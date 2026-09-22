@@ -11,18 +11,24 @@
 ;     unit is recompiled from the Flambda 2 term stored in its .cmx, and the
 ;     results are re-archived into <library>.lto.cmxa. The rebuild of a unit
 ;     needs nothing but its own .cmx and program.ltosol, so these rules are
-;     independent of one another and run in parallel;
+;     independent of one another and run in parallel. The rebuild runs the
+;     backend again, so each rule passes (after "--") the backend-relevant
+;     flags of the library's ordinary compilation in the main context: -g and
+;     -directory from (flags ...), -O3 and -fno-asan from (ocamlopt_flags ...)
+;     and, for the libraries that include ocamlopt_flags.sexp, the
+;     -function-sections it contains;
 ;   * a link of the reaped archives into ocamlopt_lto.exe.
 ;
 ; Everything below the solve rule is mechanical, one block per library. The
-; set of libraries and the order they are linked in is the only thing a rule
-; cannot work out for itself, so it is transcribed here from
+; set of libraries, the order they are linked in and the flags they were
+; compiled with are the only things a rule cannot work out for itself, so they
+; are transcribed here from
 ;
 ;   dune rules --root=. --workspace=duneconf/main.ws oxcaml_main_native.exe
 ;
-; and has to be updated when the libraries of ocamlopt change. Teaching Dune
-; itself about LTO, so that it derives all of this from (libraries ...), would
-; remove the need for this file.
+; and have to be updated when the libraries of ocamlopt or their flags change.
+; Teaching Dune itself about LTO, so that it derives all of this from
+; (libraries ...), would remove the need for this file.
 ;
 ; Build it with
 ;   rm -f duneconf/main.ws && rm -rf _build
@@ -102,7 +108,8 @@
    -ltosol program.ltosol
    -archive ../../otherlibs/unix/unix.cmxa
    -o unix.lto.cmxa
-   %{deps})))
+   %{deps}
+   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
 
 (rule
  (targets memtrace.lto.cmxa memtrace.lto.a)
@@ -117,7 +124,8 @@
    -ltosol program.ltosol
    -archive ../../external/memtrace/src/memtrace.cmxa
    -o memtrace.lto.cmxa
-   %{deps})))
+   %{deps}
+   -- -g -O3 -fno-asan -directory compiler-distro)))
 
 (rule
  (targets flambda2_floats.lto.cmxa flambda2_floats.lto.a)
@@ -132,7 +140,8 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/numbers/floats/flambda2_floats.cmxa
    -o flambda2_floats.lto.cmxa
-   %{deps})))
+   %{deps}
+   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
 
 (rule
  (targets ocamlcommon.lto.cmxa ocamlcommon.lto.a)
@@ -147,7 +156,8 @@
    -ltosol program.ltosol
    -archive ../../ocamlcommon.cmxa
    -o ocamlcommon.lto.cmxa
-   %{deps})))
+   %{deps}
+   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
 
 (rule
  (targets ocamlfrontend.lto.cmxa ocamlfrontend.lto.a)
@@ -162,7 +172,8 @@
    -ltosol program.ltosol
    -archive ../../ocamlfrontend.cmxa
    -o ocamlfrontend.lto.cmxa
-   %{deps})))
+   %{deps}
+   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
 
 (rule
  (targets ocamlbytecomp.lto.cmxa ocamlbytecomp.lto.a)
@@ -177,7 +188,8 @@
    -ltosol program.ltosol
    -archive ../../ocamlbytecomp.cmxa
    -o ocamlbytecomp.lto.cmxa
-   %{deps})))
+   %{deps}
+   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
 
 (rule
  (targets dwarf_flags.lto.cmxa dwarf_flags.lto.a)
@@ -192,7 +204,8 @@
    -ltosol program.ltosol
    -archive ../../backend/debug/dwarf/dwarf_flags/dwarf_flags.cmxa
    -o dwarf_flags.lto.cmxa
-   %{deps})))
+   %{deps}
+   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
 
 (rule
  (targets asm_targets.lto.cmxa asm_targets.lto.a)
@@ -207,7 +220,8 @@
    -ltosol program.ltosol
    -archive ../../backend/asm_targets/asm_targets.cmxa
    -o asm_targets.lto.cmxa
-   %{deps})))
+   %{deps}
+   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
 
 (rule
  (targets arm64_ast.lto.cmxa arm64_ast.lto.a)
@@ -222,7 +236,8 @@
    -ltosol program.ltosol
    -archive ../../backend/arm64/ast/arm64_ast.cmxa
    -o arm64_ast.lto.cmxa
-   %{deps})))
+   %{deps}
+   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
 
 (rule
  (targets binary_emitter_intf.lto.cmxa binary_emitter_intf.lto.a)
@@ -237,7 +252,8 @@
    -ltosol program.ltosol
    -archive ../../backend/binary_emitter_intf/binary_emitter_intf.cmxa
    -o binary_emitter_intf.lto.cmxa
-   %{deps})))
+   %{deps}
+   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
 
 (rule
  (targets arm64_binary_emitter.lto.cmxa arm64_binary_emitter.lto.a)
@@ -252,7 +268,8 @@
    -ltosol program.ltosol
    -archive ../../backend/arm64/binary_emitter/arm64_binary_emitter.cmxa
    -o arm64_binary_emitter.lto.cmxa
-   %{deps})))
+   %{deps}
+   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
 
 (rule
  (targets oxcaml_common.lto.cmxa oxcaml_common.lto.a)
@@ -267,7 +284,8 @@
    -ltosol program.ltosol
    -archive ../../oxcaml_common.cmxa
    -o oxcaml_common.lto.cmxa
-   %{deps})))
+   %{deps}
+   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
 
 (rule
  (targets flambda2_algorithms.lto.cmxa flambda2_algorithms.lto.a)
@@ -282,7 +300,8 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/algorithms/flambda2_algorithms.cmxa
    -o flambda2_algorithms.lto.cmxa
-   %{deps})))
+   %{deps}
+   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
 
 (rule
  (targets flambda2_ui.lto.cmxa flambda2_ui.lto.a)
@@ -297,7 +316,8 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/ui/flambda2_ui.cmxa
    -o flambda2_ui.lto.cmxa
-   %{deps})))
+   %{deps}
+   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
 
 (rule
  (targets flambda2_datalog.lto.cmxa flambda2_datalog.lto.a)
@@ -312,7 +332,8 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/datalog/flambda2_datalog.cmxa
    -o flambda2_datalog.lto.cmxa
-   %{deps})))
+   %{deps}
+   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
 
 (rule
  (targets flambda2_numbers.lto.cmxa flambda2_numbers.lto.a)
@@ -327,7 +348,8 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/numbers/flambda2_numbers.cmxa
    -o flambda2_numbers.lto.cmxa
-   %{deps})))
+   %{deps}
+   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
 
 (rule
  (targets flambda2_kinds.lto.cmxa flambda2_kinds.lto.a)
@@ -342,7 +364,8 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/kinds/flambda2_kinds.cmxa
    -o flambda2_kinds.lto.cmxa
-   %{deps})))
+   %{deps}
+   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
 
 (rule
  (targets flambda2_import.lto.cmxa flambda2_import.lto.a)
@@ -357,7 +380,8 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/import/flambda2_import.cmxa
    -o flambda2_import.lto.cmxa
-   %{deps})))
+   %{deps}
+   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
 
 (rule
  (targets flambda2_identifiers.lto.cmxa flambda2_identifiers.lto.a)
@@ -372,7 +396,8 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/identifiers/flambda2_identifiers.cmxa
    -o flambda2_identifiers.lto.cmxa
-   %{deps})))
+   %{deps}
+   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
 
 (rule
  (targets flambda2_nominal.lto.cmxa flambda2_nominal.lto.a)
@@ -387,7 +412,8 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/nominal/flambda2_nominal.cmxa
    -o flambda2_nominal.lto.cmxa
-   %{deps})))
+   %{deps}
+   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
 
 (rule
  (targets flambda2_bound_identifiers.lto.cmxa flambda2_bound_identifiers.lto.a)
@@ -402,7 +428,8 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/bound_identifiers/flambda2_bound_identifiers.cmxa
    -o flambda2_bound_identifiers.lto.cmxa
-   %{deps})))
+   %{deps}
+   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
 
 (rule
  (targets flambda2_lattices.lto.cmxa flambda2_lattices.lto.a)
@@ -417,7 +444,8 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/lattices/flambda2_lattices.cmxa
    -o flambda2_lattices.lto.cmxa
-   %{deps})))
+   %{deps}
+   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
 
 (rule
  (targets flambda2_term_basics.lto.cmxa flambda2_term_basics.lto.a)
@@ -432,7 +460,8 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/term_basics/flambda2_term_basics.cmxa
    -o flambda2_term_basics.lto.cmxa
-   %{deps})))
+   %{deps}
+   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
 
 (rule
  (targets flambda2_classic_mode_types.lto.cmxa flambda2_classic_mode_types.lto.a)
@@ -447,7 +476,8 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/classic_mode_types/flambda2_classic_mode_types.cmxa
    -o flambda2_classic_mode_types.lto.cmxa
-   %{deps})))
+   %{deps}
+   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
 
 (rule
  (targets flambda2_types.lto.cmxa flambda2_types.lto.a)
@@ -462,7 +492,8 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/types/flambda2_types.cmxa
    -o flambda2_types.lto.cmxa
-   %{deps})))
+   %{deps}
+   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
 
 (rule
  (targets flambda2_terms.lto.cmxa flambda2_terms.lto.a)
@@ -477,7 +508,8 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/terms/flambda2_terms.cmxa
    -o flambda2_terms.lto.cmxa
-   %{deps})))
+   %{deps}
+   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
 
 (rule
  (targets flambda2_simplify_shared.lto.cmxa flambda2_simplify_shared.lto.a)
@@ -492,7 +524,8 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/simplify_shared/flambda2_simplify_shared.cmxa
    -o flambda2_simplify_shared.lto.cmxa
-   %{deps})))
+   %{deps}
+   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
 
 (rule
  (targets flambda2_cmx.lto.cmxa flambda2_cmx.lto.a)
@@ -507,7 +540,8 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/cmx/flambda2_cmx.cmxa
    -o flambda2_cmx.lto.cmxa
-   %{deps})))
+   %{deps}
+   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
 
 (rule
  (targets compiler_owee.lto.cmxa compiler_owee.lto.a)
@@ -522,7 +556,8 @@
    -ltosol program.ltosol
    -archive ../../external/owee/compiler_owee.cmxa
    -o compiler_owee.lto.cmxa
-   %{deps})))
+   %{deps}
+   -- -g -O3 -fno-asan -directory compiler-distro)))
 
 (rule
  (targets gc_timings.lto.cmxa gc_timings.lto.a)
@@ -537,7 +572,8 @@
    -ltosol program.ltosol
    -archive ../../external/gc-timings/gc_timings.cmxa
    -o gc_timings.lto.cmxa
-   %{deps})))
+   %{deps}
+   -- -g -O3 -fno-asan -directory compiler-distro)))
 
 (rule
  (targets dwarf_low.lto.cmxa dwarf_low.lto.a)
@@ -552,7 +588,8 @@
    -ltosol program.ltosol
    -archive ../../backend/debug/dwarf/dwarf_low/dwarf_low.cmxa
    -o dwarf_low.lto.cmxa
-   %{deps})))
+   %{deps}
+   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
 
 (rule
  (targets dwarf_high.lto.cmxa dwarf_high.lto.a)
@@ -567,7 +604,8 @@
    -ltosol program.ltosol
    -archive ../../backend/debug/dwarf/dwarf_high/dwarf_high.cmxa
    -o dwarf_high.lto.cmxa
-   %{deps})))
+   %{deps}
+   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
 
 (rule
  (targets ocamloptcomp.lto.cmxa ocamloptcomp.lto.a)
@@ -582,7 +620,8 @@
    -ltosol program.ltosol
    -archive ../../ocamloptcomp.cmxa
    -o ocamloptcomp.lto.cmxa
-   %{deps})))
+   %{deps}
+   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
 
 (rule
  (targets flambda2_from_lambda.lto.cmxa flambda2_from_lambda.lto.a)
@@ -597,7 +636,8 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/from_lambda/flambda2_from_lambda.cmxa
    -o flambda2_from_lambda.lto.cmxa
-   %{deps})))
+   %{deps}
+   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
 
 (rule
  (targets flambda2_parser.lto.cmxa flambda2_parser.lto.a)
@@ -612,7 +652,8 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/parser/flambda2_parser.cmxa
    -o flambda2_parser.lto.cmxa
-   %{deps})))
+   %{deps}
+   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
 
 (rule
  (targets flambda2_simplify.lto.cmxa flambda2_simplify.lto.a)
@@ -627,7 +668,8 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/simplify/flambda2_simplify.cmxa
    -o flambda2_simplify.lto.cmxa
-   %{deps})))
+   %{deps}
+   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
 
 (rule
  (targets flambda2_to_cmm.lto.cmxa flambda2_to_cmm.lto.a)
@@ -642,7 +684,8 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/to_cmm/flambda2_to_cmm.cmxa
    -o flambda2_to_cmm.lto.cmxa
-   %{deps})))
+   %{deps}
+   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
 
 (rule
  (targets jsoo_imports.lto.cmxa jsoo_imports.lto.a)
@@ -657,7 +700,8 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/to_jsir/jsoo_imports/jsoo_imports.cmxa
    -o jsoo_imports.lto.cmxa
-   %{deps})))
+   %{deps}
+   -- -g -O3 -fno-asan -directory compiler-distro)))
 
 (rule
  (targets flambda2_to_jsir.lto.cmxa flambda2_to_jsir.lto.a)
@@ -672,7 +716,8 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/to_jsir/flambda2_to_jsir.cmxa
    -o flambda2_to_jsir.lto.cmxa
-   %{deps})))
+   %{deps}
+   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
 
 (rule
  (targets flambda2_reaper.lto.cmxa flambda2_reaper.lto.a)
@@ -687,7 +732,8 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/reaper/flambda2_reaper.cmxa
    -o flambda2_reaper.lto.cmxa
-   %{deps})))
+   %{deps}
+   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
 
 (rule
  (targets flambda2.lto.cmxa flambda2.lto.a)
@@ -702,7 +748,8 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/flambda2.cmxa
    -o flambda2.lto.cmxa
-   %{deps})))
+   %{deps}
+   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
 
 (rule
  (targets oxcaml_main_native.reaped.cmx oxcaml_main_native.reaped.o)
@@ -713,7 +760,8 @@
    -ocamlopt %{ocamlopt}
    -ltosol program.ltosol
    -o oxcaml_main_native.reaped.cmx
-   %{deps})))
+   %{deps}
+   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
 
 ; The flags are those of the ordinary link, with the -I options rebased on
 ; this directory: they are what lets the C stub archives of the libraries be

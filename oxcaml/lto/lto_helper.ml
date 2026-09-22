@@ -32,7 +32,12 @@
    copied out of the directories Dune owns. The rules know from a glob which
    .cmx files belong to a library, but not the order in which those units must
    be archived nor the C libraries the archive records; both are recovered here
-   from the library's ordinary .cmxa. *)
+   from the library's ordinary .cmxa.
+
+   The rebuild runs the unit through the backend again, so it has to be given
+   the backend-relevant flags of the unit's ordinary compilation (-g and
+   -directory in particular, without which the rebuilt code has no debug
+   information). The rules pass them after "--". *)
 
 let fatal fmt =
   Printf.ksprintf
@@ -81,7 +86,7 @@ let reaped name = Filename.remove_extension name ^ ".reaped.cmx"
 (* Rebuild [members] against [ltosol] in a scratch directory of their own, and
    return the resulting .reaped.cmx files, in the same order. One invocation
    covers the whole batch: its members then share the compiler's caches. *)
-let rebuild ~ocamlopt ~ltosol ~dir ~members ~f =
+let rebuild ~ocamlopt ~flags ~ltosol ~dir ~members ~f =
   if Sys.file_exists dir then remove_dir dir;
   Sys.mkdir dir 0o755;
   Fun.protect
@@ -95,7 +100,7 @@ let rebuild ~ocamlopt ~ltosol ~dir ~members ~f =
             dst)
           members
       in
-      run ocamlopt (("-reaper-rebuild" :: copies) @ [ltosol]);
+      run ocamlopt (flags @ ("-reaper-rebuild" :: copies) @ [ltosol]);
       f (List.map reaped copies))
 
 (* The name Dune gives the .cmx of a compilation unit: its module name with a
@@ -103,7 +108,7 @@ let rebuild ~ocamlopt ~ltosol ~dir ~members ~f =
 let cmx_basename unit =
   String.uncapitalize_ascii (Compilation_unit.full_path_as_string unit) ^ ".cmx"
 
-let rebuild_archive ~ocamlopt ~ltosol ~archive ~output ~cmxs =
+let rebuild_archive ~ocamlopt ~flags ~ltosol ~archive ~output ~cmxs =
   let infos = Compilenv.read_library_info archive in
   let by_basename =
     List.fold_left
@@ -121,7 +126,8 @@ let rebuild_archive ~ocamlopt ~ltosol ~archive ~output ~cmxs =
             (List.length cmxs) archive)
       infos.lib_units
   in
-  rebuild ~ocamlopt ~ltosol ~dir:(output ^ ".rebuild") ~members ~f:(fun reaped ->
+  rebuild ~ocamlopt ~flags ~ltosol ~dir:(output ^ ".rebuild") ~members
+    ~f:(fun reaped ->
       let opt flag opts = List.concat_map (fun o -> [flag; o]) (List.rev opts) in
       run ocamlopt
         (["-a"; "-o"; output]
@@ -129,10 +135,10 @@ let rebuild_archive ~ocamlopt ~ltosol ~archive ~output ~cmxs =
         @ opt "-cclib" infos.lib_ccobjs
         @ opt "-ccopt" infos.lib_ccopts))
 
-let rebuild_unit ~ocamlopt ~ltosol ~output ~cmxs =
+let rebuild_unit ~ocamlopt ~flags ~ltosol ~output ~cmxs =
   match cmxs with
   | [cmx] ->
-    rebuild ~ocamlopt ~ltosol ~dir:(output ^ ".rebuild") ~members:[cmx]
+    rebuild ~ocamlopt ~flags ~ltosol ~dir:(output ^ ".rebuild") ~members:[cmx]
       ~f:(fun reaped ->
         let reaped = List.hd reaped in
         let obj name = Filename.remove_extension name ^ ".o" in
@@ -144,12 +150,13 @@ let rebuild_unit ~ocamlopt ~ltosol ~output ~cmxs =
 
 let () =
   let ocamlopt = ref "" and ltosol = ref "" and archive = ref "" in
-  let output = ref "" and cmxs = ref [] in
+  let output = ref "" and cmxs = ref [] and flags = ref [] in
   let usage =
     "Usage: lto_helper -ocamlopt <exe> -ltosol <file> [-archive <lib.cmxa>] \
-     -o <output> <file>...\n\
+     -o <output> <file>... [-- <ocamlopt flag>...]\n\
      Anonymous arguments that are not .cmx files are ignored, so that the \
-     rule may simply pass %{deps}."
+     rule may simply pass %{deps}. Everything after -- is passed to the \
+     compiler when rebuilding the units."
   in
   let args =
     [ "-ocamlopt", Arg.Set_string ocamlopt, "<exe> The compiler to drive";
@@ -161,7 +168,10 @@ let () =
         "<file> The library's ordinary .cmxa, which fixes the order of its \
          members and the C libraries it records; without it a single unit is \
          rebuilt and left as a .cmx" );
-      "-o", Arg.Set_string output, "<file> The .cmxa or .cmx to produce" ]
+      "-o", Arg.Set_string output, "<file> The .cmxa or .cmx to produce";
+      ( "--",
+        Arg.Rest_all (fun rest -> flags := rest),
+        "<flag>... Compiler flags for the rebuild, e.g. -g -directory <dir>" ) ]
   in
   Arg.parse args
     (fun file ->
@@ -170,9 +180,11 @@ let () =
   List.iter
     (fun (name, value) -> if !value = "" then fatal "missing %s\n%s" name usage)
     ["-ocamlopt", ocamlopt; "-ltosol", ltosol; "-o", output];
-  let cmxs = List.rev !cmxs in
+  let cmxs = List.rev !cmxs and flags = !flags in
   if !archive = ""
-  then rebuild_unit ~ocamlopt:!ocamlopt ~ltosol:!ltosol ~output:!output ~cmxs
+  then
+    rebuild_unit ~ocamlopt:!ocamlopt ~flags ~ltosol:!ltosol ~output:!output
+      ~cmxs
   else
-    rebuild_archive ~ocamlopt:!ocamlopt ~ltosol:!ltosol ~archive:!archive
-      ~output:!output ~cmxs
+    rebuild_archive ~ocamlopt:!ocamlopt ~flags ~ltosol:!ltosol
+      ~archive:!archive ~output:!output ~cmxs
