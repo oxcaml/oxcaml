@@ -2153,9 +2153,8 @@ let rec instance_prim_locals locals mvar_l mvar_y macc (loc, yld) ty =
    AND at least one generic type variable with jkind [any] is present. The
    function returns [ty] unchanged otherwise.
 
-   When making the copy, all generic type variables with jkind [any] will be
-   modified to have a sort var jkind. The same sort var will be used for all
-   such rewrites.
+   When making the copy, generic type variables with jkind [any] whose layouts
+   are used by the primitive are modified to share a sort var jkind.
 
    The copy should also have the same level information as [ty].  This is done
    in three steps:
@@ -2223,10 +2222,33 @@ let instance_prim_layout env (desc : Primitive.description) ty =
           | None -> ())
         | _ -> ()
         end;
-        iter_type_expr (inner mark) (Fun.const ()) ty
+        match get_desc ty with
+        | Tbox _ -> ()
+        | Tconstr (path, _, _) when Path.same path Predef.path_box -> ()
+        | Tconstr (path, [_base; element], _)
+          when Path.same path Predef.path_idx_imm
+            || Path.same path Predef.path_idx_mut
+            || Path.same path Predef.path_idx_atomic ->
+          inner mark element
+        | _ -> iter_type_expr (inner mark) (Fun.const ()) ty
       end
     in
-    with_type_mark (fun mark -> inner mark ty);
+    let is_repr_poly (_, repr) = repr = Primitive.Repr_poly in
+    let rec instance_reprs mark reprs ty =
+      match reprs, get_desc ty with
+      | repr :: reprs, Tarrow (_, arg, ret, _) ->
+        if is_repr_poly repr then inner mark arg;
+        instance_reprs mark reprs ret
+      | [], _ ->
+        if is_repr_poly desc.prim_native_repr_res then inner mark ty
+      | _ :: _, _ ->
+        Misc.fatal_error "instance_prim_layout: expected arrow"
+    in
+    with_type_mark (fun mark ->
+        if is_repr_poly desc.prim_native_repr_res
+           || List.exists is_repr_poly desc.prim_native_repr_args
+        then instance_reprs mark desc.prim_native_repr_args ty
+        else inner mark ty);
     match !new_sort with
     | Some sort ->
       (* We don't want to lower the type vars from generic_level due to usages

@@ -14,56 +14,56 @@
 
 [@@@ocaml.flambda_o3]
 
-type ('a : value_or_null, 'b : any) t : bits64 mod everything = ('a, 'b) idx_mut
+type ('a : any, 'b : any) t : bits64 mod everything = ('a, 'b) idx_mut
 
 external get
-  : ('a : value_or_null) ('b : any).
-  ('a[@local_opt]) -> ('a, 'b) idx_mut -> ('b[@local_opt])
+  : ('a : any) ('b : any).
+  ('a box[@local_opt]) -> ('a, 'b) idx_mut -> ('b[@local_opt])
   = "%get_idx"
 [@@layout_poly]
 
 external set
-  : ('a : value_or_null) ('b : any).
-  ('a[@local_opt]) -> ('a, 'b) idx_mut -> 'b -> unit
+  : ('a : any) ('b : any).
+  ('a box[@local_opt]) -> ('a, 'b) idx_mut -> 'b -> unit
   = "%set_idx"
 [@@layout_poly]
 
 external compose
-  : ('a : value_or_null) ('b : any) ('c : any).
-  ('a, 'b) idx_mut -> ('b box, 'c) idx_mut -> ('a, 'c) idx_mut
+  : ('a : any) ('b : any) ('c : any).
+  ('a, 'b) idx_mut -> ('b, 'c) idx_mut -> ('a, 'c) idx_mut
   = "%idx_compose"
 
 external compose_imm
-  : ('a : value_or_null) ('b : any) ('c : any).
-  ('a, 'b) idx_mut -> ('b box, 'c) idx_imm -> ('a, 'c) idx_mut
+  : ('a : any) ('b : any) ('c : any).
+  ('a, 'b) idx_mut -> ('b, 'c) idx_imm -> ('a, 'c) idx_mut
   = "%idx_compose"
 
 external unsafe_create_into_array
-  : ('a : any mod non_float). int -> ('a array, 'a) idx_mut
+  : ('a : any mod non_float). int -> ('a array#, 'a) idx_mut
   = "%unsafe_array_idx"
 [@@layout_poly]
 
 external unsafe_create_into_array_indexed_by_int8
-  : ('a : any mod non_float). int8# -> ('a array, 'a) idx_mut
+  : ('a : any mod non_float). int8# -> ('a array#, 'a) idx_mut
   = "%unsafe_array_idx_indexed_by_int8#"
 [@@layout_poly]
 
 external unsafe_create_into_array_indexed_by_int16
-  : ('a : any mod non_float). int16# -> ('a array, 'a) idx_mut
+  : ('a : any mod non_float). int16# -> ('a array#, 'a) idx_mut
   = "%unsafe_array_idx_indexed_by_int16#"
 [@@layout_poly]
 
 external unsafe_create_into_array_indexed_by_int32
-  : ('a : any mod non_float). int32_u -> ('a array, 'a) idx_mut
+  : ('a : any mod non_float). int32_u -> ('a array#, 'a) idx_mut
   = "%unsafe_array_idx_indexed_by_int32#"
 [@@layout_poly]
 
 external unsafe_create_into_array_indexed_by_int64
-  : ('a : any mod non_float). int64_u -> ('a array, 'a) idx_mut
+  : ('a : any mod non_float). int64_u -> ('a array#, 'a) idx_mut
   = "%unsafe_array_idx_indexed_by_int64#"
 [@@layout_poly]
 
 external unsafe_create_into_array_indexed_by_nativeint
-  : ('a : any mod non_float). nativeint_u -> ('a array, 'a) idx_mut
+  : ('a : any mod non_float). nativeint_u -> ('a array#, 'a) idx_mut
   = "%unsafe_array_idx_indexed_by_nativeint#"
 [@@layout_poly]

@@ -3559,8 +3559,8 @@ module Format_history = struct
     | Layout_poly_in_external ->
       fprintf ppf
         "it's the layout polymorphic type in an external declaration@ \
-         ([@@layout_poly] forces all variables of layout 'any' to be@ \
-         representable at call sites)"
+         ([@@layout_poly] requires this type to be representable at call \
+         sites)"
     | Peek_or_poke ->
       fprintf ppf "it's the type being used for a peek or poke primitive"
     | Array_element -> fprintf ppf "it's the type of an array element"
@@ -3646,6 +3646,9 @@ module Format_history = struct
       fprintf ppf "it's the type of an expression inside of a quote"
     | Evaluated_quote -> fprintf ppf "it's the result of evaluating a quote"
     | Old_style_unboxed_type -> fprintf ppf "it's an [@@@@unboxed] type"
+    | Idx_base -> fprintf ppf "it's the base type of an index"
+    | Unboxed_atomic_record ->
+      fprintf ppf "it's the unboxed version of a record with atomic fields"
 
   let format_immediate_creation_reason ppf :
       History.immediate_creation_reason -> _ = function
@@ -3706,10 +3709,6 @@ module Format_history = struct
       fprintf ppf
         "it's the element type of an array that is iterated over in a \
          comprehension"
-    | Idx_base ->
-      fprintf ppf
-        "it's the base type (the first type parameter) for a@ block index (idx \
-         or mut_idx)"
 
   let format_value_creation_reason ppf ~layout_or_kind :
       History.value_creation_reason -> _ = function
@@ -4847,6 +4846,8 @@ module Debug_printers = struct
     | Inside_quote -> fprintf ppf "Inside_quote"
     | Evaluated_quote -> fprintf ppf "Evaluated_quote"
     | Old_style_unboxed_type -> fprintf ppf "Old_style_unboxed_type"
+    | Idx_base -> fprintf ppf "Idx_base"
+    | Unboxed_atomic_record -> fprintf ppf "Unboxed_atomic_record"
 
   let immediate_creation_reason ppf : History.immediate_creation_reason -> _ =
     function
@@ -4885,7 +4886,6 @@ module Debug_printers = struct
     | Array_comprehension_element -> fprintf ppf "Array_comprehension_element"
     | Array_comprehension_iterator_element ->
       fprintf ppf "Array_comprehension_iterator_element"
-    | Idx_base -> fprintf ppf "Idx_base"
 
   let value_creation_reason ppf : History.value_creation_reason -> _ = function
     | Class_let_binding -> fprintf ppf "Class_let_binding"

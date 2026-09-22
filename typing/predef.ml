@@ -957,7 +957,7 @@ let decl_of_type_constr type_constr =
   | `Idx_imm ->
     decl2 ~variance:(Variance.full, Variance.covariant)
        ~param_jkinds:(
-         Jkind.Builtin.value_or_null ~why:(Type_argument {
+         Jkind.Builtin.any ~why:(Type_argument {
            parent_path = Path.Pident ident_idx_imm;
            position = 1;
            arity = 2;
@@ -972,7 +972,7 @@ let decl_of_type_constr type_constr =
   | `Idx_mut ->
     decl2 ~variance:(Variance.full, Variance.full)
        ~param_jkinds:(
-         Jkind.Builtin.value_or_null ~why:(Type_argument {
+         Jkind.Builtin.any ~why:(Type_argument {
            parent_path = Path.Pident ident_idx_mut;
            position = 1;
            arity = 2;
@@ -987,7 +987,7 @@ let decl_of_type_constr type_constr =
   | `Idx_atomic ->
     decl2 ~variance:(Variance.full, Variance.full)
        ~param_jkinds:(
-         Jkind.Builtin.value_or_null ~why:(Type_argument {
+         Jkind.Builtin.any ~why:(Type_argument {
            parent_path = Path.Pident ident_idx_atomic;
            position = 1;
            arity = 2;

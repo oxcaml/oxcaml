@@ -2051,6 +2051,7 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
         array_ty, elt_ty
       | _ -> err ()
     in
+    let array_ty = Btype.new_box_ty array_ty in
     (match Types.get_desc (Ctype.expand_head env array_ty) with
      | Tconstr (p, _, _)
        when Path.same p Predef.path_array
