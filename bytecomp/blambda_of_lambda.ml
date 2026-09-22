@@ -217,20 +217,24 @@ let rec copy_mixed_block_element (elt : _ Lambda.mixed_block_element)
     (expr : Blambda.blambda) : Blambda.blambda =
   match elt with
   | Product elements ->
-    (* Bind expr to a variable so it's only evaluated once *)
-    let id = Ident.create_local "copy_src" in
-    let copied_fields =
-      Array.to_list
-        (Array.mapi
-           (fun i field_elt ->
-             copy_mixed_block_element field_elt (Prim (Getfield i, [Var id])))
-           elements)
-    in
-    Let { id; arg = expr; body = Prim (Makeblock { tag = 0 }, copied_fields) }
+    copy_product_fields elements expr ~make_block:(fun fields ->
+        Prim (Makeblock { tag = 0 }, fields))
   | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
   | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
     expr
   | Splice_variable var -> Lambda.fatal_error_unevaluated_splice_var var
+
+and copy_product_fields elements expr ~make_block =
+  (* Bind expr to a variable so it's only evaluated once *)
+  let id = Ident.create_local "copy_src" in
+  let copied_fields =
+    Array.to_list
+      (Array.mapi
+         (fun i field_elt ->
+           copy_mixed_block_element field_elt (Prim (Getfield i, [Var id])))
+         elements)
+  in
+  Let { id; arg = expr; body = make_block copied_fields }
 
 (** [copy_unboxed_product shape ~path expr] generates Blambda code that creates
     a fresh deep copy of [expr] if the field at [path] in [shape] is an unboxed
