@@ -101,6 +101,17 @@ val sub_or_error :
   ('l2 * Allowance.allowed) Types.jkind ->
   (unit, Jkind.Violation.t) result
 
+(** Requirements on the type variables of [ty], whose kind is [sub], that
+    together establish [sub <= super]. *)
+val type_var_requirements :
+  type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
+  context:Jkind.jkind_context ->
+  Env.t ->
+  Types.type_expr ->
+  (Allowance.allowed * 'r1) Types.jkind ->
+  ('l2 * Allowance.allowed) Types.jkind ->
+  ((Types.type_expr * Jkind.Mod_bounds.t) list, Jkind.Violation.t) result
+
 (** Apply path substitutions to a constructor ikind. *)
 val substitute_decl_ikind_with_lookup :
   lookup_type:(Path.t -> Subst.Ikind_substitution.type_lookup_result) ->
