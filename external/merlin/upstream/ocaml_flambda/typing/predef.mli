@@ -54,6 +54,10 @@ type abstract_non_value_type_constr = [
   | `Idx_imm
   | `Idx_mut
   | `Idx_atomic
+  | `Ptr
+  | `Ptr_imm
+  | `Addr
+  | `Addr_imm
   | `Int8x16
   | `Int16x8
   | `Int32x4

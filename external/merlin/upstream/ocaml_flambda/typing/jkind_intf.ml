@@ -454,7 +454,6 @@ module History = struct
     | Recmod_fun_arg
     | Array_comprehension_element
     | Array_comprehension_iterator_element
-    | Idx_base
 
   type value_creation_reason =
     | Class_let_binding
@@ -527,6 +526,8 @@ module History = struct
     | Inside_quote
     | Evaluated_quote
     | Old_style_unboxed_type
+    | Idx_base
+    | Unboxed_atomic_record
 
   type product_creation_reason =
     | Unboxed_tuple

@@ -1412,8 +1412,7 @@ let record_has_atomic_field lbls =
     (fun (ld : Types.label_declaration) -> Types.is_atomic ld.ld_mutable)
     lbls
 
-let record_gets_unboxed_version lbls repr =
-  not (record_has_atomic_field lbls) &&
+let record_gets_unboxed_version repr =
   match repr with
   | Record_unboxed | Record_inlined _
   | Record_float | Record_ufloat -> false
@@ -1430,15 +1429,15 @@ let gets_unboxed_version decl =
   match decl.type_kind with
   | Type_abstract _ | Type_open | Type_record_unboxed_product _
   | Type_variant _ -> false
-  | Type_record (lbls, repr, _) -> record_gets_unboxed_version lbls repr
+  | Type_record (_, repr, _) -> record_gets_unboxed_version repr
 
 let derive_unboxed_version env path_in_group_has_unboxed_version decl =
   (* This must be kept in sync with the match in [gets_unboxed_version] *)
   match decl.type_kind with
   | Type_abstract _ | Type_open | Type_record_unboxed_product _
   | Type_variant _ -> None
-  | Type_record (lbls, repr, _)
-    when not (record_gets_unboxed_version lbls repr) ->
+  | Type_record (_, repr, _)
+    when not (record_gets_unboxed_version repr) ->
     None
   | Type_record (lbls, _rep, umc) ->
     let keep_attribute a =
@@ -1469,12 +1468,13 @@ let derive_unboxed_version env path_in_group_has_unboxed_version decl =
     in
     let rep = Types.Record_unboxed_product in
     (* CR layouts v11: update type_jkind once we have [layout_of] layouts *)
-    let jkind =
-      Jkind.Builtin.product_of_any ~why:Unboxed_record
-        (List.map (fun ld -> ld.Types.ld_inheritance) lbls_unboxed)
-    in
-    let kind =
-      Type_record_unboxed_product(lbls_unboxed, rep, umc)
+    let jkind, kind =
+      if record_has_atomic_field lbls then
+        Jkind.Builtin.any ~why:Unboxed_atomic_record, Type_abstract Definition
+      else
+        Jkind.Builtin.product_of_any ~why:Unboxed_record
+          (List.map (fun ld -> ld.Types.ld_inheritance) lbls_unboxed),
+        Type_record_unboxed_product(lbls_unboxed, rep, umc)
     in
     let type_manifest =
       let has_unboxed_version path =
@@ -1540,8 +1540,8 @@ let derive_unboxed_versions decls env =
     decls
 
 (* Removes unboxed versions from type declarations not satisfying
-   [gets_unboxed_version]. In practice, this is float records and records
-   with [@atomic] fields. See Note [Typechecking unboxed versions of types].
+   [gets_unboxed_version]. In practice, this is float records.
+   See Note [Typechecking unboxed versions of types].
 
    Returns new decls and paths whose unboxed versions got removed. *)
 let remove_unboxed_versions decls =
@@ -2522,13 +2522,20 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
             List.map2 (fun (lbl, ty) sort -> (lbl, ty, sort)) lbls sorts
           in
           let jkind = Jkind.for_boxed_record_with_updates lbls_with_sorts in
-          if record_gets_unboxed_version (List.map fst lbls) rep
+          if record_gets_unboxed_version rep
           then
-            Jkind.set_layout jkind
-              (Jkind.layout_for_boxed_record
-                 (List.map2
-                    (fun (lbl, _) layout -> lbl.Types.ld_inheritance, layout)
-                    lbls (field_layouts ())))
+            let layout =
+              if record_has_atomic_field (List.map fst lbls) then
+                Jkind.Layout.Box
+                  (Jkind.Layout.Any Jkind_types.Scannable_axes.max,
+                   Jkind_types.Scannable_axes.non_float_block_axes)
+              else
+                Jkind.layout_for_boxed_record
+                  (List.map2
+                     (fun (lbl, _) layout -> lbl.Types.ld_inheritance, layout)
+                     lbls (field_layouts ()))
+            in
+            Jkind.set_layout jkind layout
           else jkind
       | Unboxed_product ->
         begin match lbls with

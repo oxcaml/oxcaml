@@ -7976,10 +7976,11 @@ and type_expect_
       match get_desc (expand_head env ty_expected) with
       | Tconstr(p, [arg1; _], _)
         when Path.same p Predef.path_idx_imm
-          || Path.same p Predef.path_idx_mut ->
-        arg1
+          || Path.same p Predef.path_idx_mut
+          || Path.same p Predef.path_idx_atomic ->
+        new_box_ty arg1
       | _ ->
-        newgenvar (Jkind.Builtin.value_or_null ~why:Idx_base)
+        new_box_ty (newgenvar (Jkind.Builtin.any ~why:Idx_base))
     in
     let expected_base_ty = expected_base_ty ty_expected in
     let principal = is_principal ty_expected in
@@ -8049,12 +8050,14 @@ and type_expect_
           Block_index_modality_mismatch { mut = is_mutable; err }
         ))
     end;
+    let contents_ty = newvar (Jkind.Builtin.any ~why:Idx_base) in
+    unify_exp_types loc env base_ty (new_box_ty contents_ty);
     let ty = match mut with
-      | Immutable -> Predef.type_idx_imm base_ty el_ty
+      | Immutable -> Predef.type_idx_imm contents_ty el_ty
       | Mutable { atomic = Nonatomic; mode = _ } ->
-        Predef.type_idx_mut base_ty el_ty
+        Predef.type_idx_mut contents_ty el_ty
       | Mutable { atomic = Atomic; mode = _ } ->
-        Predef.type_idx_atomic base_ty el_ty
+        Predef.type_idx_atomic contents_ty el_ty
     in
     with_explanation (fun () ->
       unify_exp_types loc env ty (generic_instance ty_expected));
@@ -9116,7 +9119,7 @@ and type_block_access env expected_base_ty principal
     let modality = label.lbl_modalities in
     { ba; base_ty = ty_res; el_ty = ty_arg; modality }
   | Baccess_block (mut, idx) ->
-    let base_ty = newvar (Jkind.Builtin.value_or_null ~why:Idx_base) in
+    let base_ty = newvar (Jkind.Builtin.any ~why:Idx_base) in
     let el_ty =
       newvar
         (Jkind.of_new_sort ~why:Idx_element
@@ -9137,7 +9140,7 @@ and type_block_access env expected_base_ty principal
       | Mutable_access | Atomic_access -> true
     in
     let modality = Typemode.idx_expected_modalities ~mut in
-    { ba; base_ty; el_ty; modality }
+    { ba; base_ty = new_box_ty base_ty; el_ty; modality }
 
 and type_unboxed_access env loc el_ty ua =
   match ua with
