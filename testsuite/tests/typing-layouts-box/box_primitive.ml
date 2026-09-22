@@ -18,6 +18,9 @@ external box : ('a : any). ('a [@local_opt]) -> ('a box [@local_opt])
 
 let native () = match Sys.backend_type with Native -> true | _ -> false
 
+external repr : ('a : value_or_null). 'a -> Obj.t = "%obj_magic"
+external magic : ('a : value_or_null) 'b. 'a -> 'b = "%obj_magic"
+
 let same_shape (a : Obj.t) (b : Obj.t) =
   Obj.tag a = Obj.tag b
   && Obj.size a = Obj.size b
@@ -27,7 +30,7 @@ let same_shape (a : Obj.t) (b : Obj.t) =
    be laid out like. Contents are read back by reinterpreting [boxed] as that
    record type with [Obj.magic]. *)
 let check_shape boxed record =
-  assert (same_shape (Obj.repr boxed) (Obj.repr record))
+  assert (same_shape (repr boxed) (Obj.repr record))
 [%%expect{|
 val native : unit -> bool = <fun>
 val same_shape : Obj.t -> Obj.t -> bool = <fun>
@@ -87,7 +90,7 @@ type variant = A of int64_u * string | B | C of #(float# * int)
 let check_value x =
   let boxed = box x in
   check_shape boxed { v = x };
-  assert ((Obj.magic boxed : _ vrec).v == x)
+  assert ((magic boxed : _ vrec).v == x)
 
 let () =
   check_value 42;

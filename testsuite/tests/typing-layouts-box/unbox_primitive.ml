@@ -21,10 +21,10 @@ external unbox : ('a : any). ('a box [@local_opt]) -> ('a [@local_opt])
 (* Each test runs twice: once with the box statically known, so that the
    middle end may fold the load away, and once with the box hidden behind
    [Sys.opaque_identity], so that the load really happens. *)
-type hide = { hide : 'a. 'a -> 'a }
+type hide = { hide : ('a : value_or_null). 'a -> 'a }
 
 let both_ways (test : hide -> unit) =
-  test { hide = Fun.id };
+  test { hide = (fun x -> x) };
   test { hide = Sys.opaque_identity }
 [%%expect{|
 type hide = { hide : 'a. 'a -> 'a; }
