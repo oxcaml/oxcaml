@@ -670,6 +670,11 @@ val get_nullability : Env.t -> 'd Types.jkind -> Jkind_axis.Nullability.t option
 (** Sets the layout in a jkind. *)
 val set_layout : 'd Types.jkind -> Sort.t Layout.t -> 'd Types.jkind
 
+(** Construct a kind with the given modal bounds, unrestricted layout, and no
+    with-bounds. [history] records the origin of the requirement. *)
+val of_mod_bounds :
+  history:Types.jkind_history -> Mod_bounds.t -> 'd Types.jkind
+
 (** Change a jkind to be appropriate for a type that appears under a modality.
     This means that the jkind will definitely cross the axes modified by the
     modality, by setting the mod-bounds appropriately and propagating the

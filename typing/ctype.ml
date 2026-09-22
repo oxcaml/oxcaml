@@ -3648,8 +3648,23 @@ let constrain_type_jkind ~fixed env ty jkind =
                  We could still estimate the kind on the left better. *)
               error ()
           in
-          match get_desc ty with
-          | Tconstr _ ->
+          let requirements =
+            if fixed then
+              Error (Jkind.Violation.of_ ~context env
+                (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
+            else
+              Ikind.type_var_requirements ~type_equal ~context env ty
+                ty's_jkind jkind
+          in
+          match requirements, get_desc ty with
+          | Ok requirements, _ ->
+            List.fold_left
+              (fun result (tvar, mod_bounds) ->
+                 Result.bind result (fun () ->
+                   loop ~fuel ~expanded:false env tvar ty's_jkind
+                     (Jkind.of_mod_bounds ~history:jkind.history mod_bounds)))
+              (Ok ()) requirements
+          | Error error, Tconstr _ ->
              if not expanded
              then
                let ty = expand_head_opt env ty in
@@ -3661,9 +3676,7 @@ let constrain_type_jkind ~fixed env ty jkind =
                           (Not_a_subjkind (ty's_jkind, jkind,
                                            sub_failure_reasons)))
                | Final_result ->
-                 Error
-                   (Jkind.Violation.of_ ~context env
-                      (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
+                 Error error
                | Stepped { ty; modality; or_null = None } ->
                  let jkind = Jkind.apply_modality_r modality jkind in
                  estimate_jkind_and_loop ~fuel:(fuel - 1) ~expanded:false env ty
@@ -3673,16 +3686,14 @@ let constrain_type_jkind ~fixed env ty jkind =
                | Stepped_record_unboxed_product unwrapped_tys ->
                  product ~fuel:(fuel - 1) unwrapped_tys
                end
-          | Tunboxed_tuple ltys ->
+          | Error _, Tunboxed_tuple ltys ->
             (* Note: here we "duplicate" the fuel, which may seem like cheating.
                Fuel counts expansions, and its purpose is to guard against
                infinitely expanding a recursive type. In a wide tuple, we many
                need to expand many types shallowly, and that's fine. *)
             product ~fuel (List.map (fun (_, ty) ->
               mk_unwrapped_type_expr ty) ltys)
-          | _ ->
-            Error (Jkind.Violation.of_ ~context env
-                (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
+          | Error error, _ -> Error error
   and estimate_jkind_and_loop ~fuel ~expanded env ty jkind : _ result =
     (* If [jkind]'s bound's are all max, then we immediately know that the
        mod-bounds already agree. But in such a case, we may still need to
