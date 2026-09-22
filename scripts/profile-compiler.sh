@@ -32,7 +32,8 @@ fi
 make -s install
 
 # Install all binaries we'll need, so we can surgically overwrite the compiler:
-output="$(mktemp -d)"
+mkdir -p "$root/_profile"
+output="$(mktemp -d "$root/_profile/run.XXXXXX")"
 mkdir -p "${output}/bin"
 for tool in "$root/_install/bin/"*; do
   name="$(basename -- "$tool")"
