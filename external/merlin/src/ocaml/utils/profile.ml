@@ -128,7 +128,8 @@ let record_call_internal ?(accumulate = false) ?counter_f name f =
     | Some counter_f ->
         fun () ->
           let result = f () in
-          if List.mem `Counters !Clflags.profile_columns then
+          if List.mem `Counters !Clflags.profile_columns
+             || Action_trace.enabled () then
             counters := counter_f result;
           result
     | None -> f
@@ -260,50 +261,24 @@ let profile_list_with_other ~nesting hierarchy total =
     list @ ["other", (compute_other_category hierarchy total, create ())]
   else []
 
-let rec timings_json ~nesting hierarchy total =
-  let rows = profile_list_with_other ~nesting hierarchy total in
-  `Array (List.map (fun (name, ((measure : Measure_diff.t), children)) ->
-    `Object [
-      "name", `String name;
-      "time", `Number (Printf.sprintf "%.17g" measure.duration);
-      "children", timings_json ~nesting:(nesting + 1) children measure;
-    ]) rows)
-
-let record_action ~gettimeofday ~name f =
-  if not (Action_trace.enabled ()) then f () else
-    let start = gettimeofday () in
-    Fun.protect f ~finally:(fun () ->
-      let finish = gettimeofday () in
-      let total = Measure_diff.of_diff Measure.zero (Measure.create ()) in
-      let args = ["timings", timings_json ~nesting:0 !hierarchy total] in
-      let nanoseconds seconds = int_of_float (seconds *. 1e9) in
-      Action_trace.with_fresh_context ~name ~f:(fun context ->
-        Action_trace.Context.emit context
-          (Action_trace.Event.span ~category:"compiler" ~name ~args
-             ~start_in_nanoseconds:(nanoseconds start)
-             ~finish_in_nanoseconds:(nanoseconds finish) ())))
-
 type row = R of string * (float * display) list * row list
 
-let rec rows_of_hierarchy ~nesting make_row name measure_diff hierarchy env =
-  let rows =
-    rows_of_hierarchy_list
-      ~nesting:(nesting + 1) make_row hierarchy measure_diff env in
-  let values, env =
-    make_row env measure_diff ~toplevel_other:(nesting = 0 && name = "other") in
-  R (name, values, rows), env
-
-and rows_of_hierarchy_list ~nesting make_row hierarchy total env =
+let rec map_hierarchy ~nesting make_row hierarchy total env =
   let list = profile_list_with_other ~nesting hierarchy total in
   let env = ref env in
   List.map (fun (name, (measure_diff, hierarchy)) ->
-    let a, env' =
-      rows_of_hierarchy ~nesting make_row name measure_diff hierarchy !env in
+    let children =
+      map_hierarchy ~nesting:(nesting + 1) make_row hierarchy measure_diff !env
+    in
+    let row, env' =
+      make_row !env name measure_diff children
+        ~toplevel_other:(nesting = 0 && name = "other")
+    in
     env := env';
-    a
+    row
   ) list
 
-let rows_of_hierarchy hierarchy measure_diff initial_measure columns timings_precision =
+let map_profile make_row hierarchy measure_diff initial_measure =
   (* Computing top heap size is a bit complicated: if the compiler applies a
      list of passes n times (rather than applying pass1 n times, then pass2 n
      times etc), we only show one row for that pass but what does "top heap
@@ -318,31 +293,91 @@ let rows_of_hierarchy hierarchy measure_diff initial_measure columns timings_pre
      so that any increases that happened before the start of the compilation is
      correctly reported, as a lot of code may run before the start of the
      compilation (eg functor applications). *)
-    let make_row prev_top_heap_words (p : Measure_diff.t) ~toplevel_other =
-      let top_heap_words =
-        prev_top_heap_words
-        + p.top_heap_words_increase
-        - if toplevel_other
-          then initial_measure.Measure.top_heap_words
-          else 0
-      in
-      let make value ~f = value, f value in
-      List.map (function
-        | `Time ->
-          make p.duration ~f:(time_display timings_precision)
-        | `Alloc ->
-          make p.allocated_words ~f:memory_word_display
-        | `Top_heap ->
-          make (float_of_int p.top_heap_words_increase) ~f:memory_word_display
-        | `Abs_top_heap ->
-          make (float_of_int top_heap_words)
-           ~f:(memory_word_display ~previous:(float_of_int prev_top_heap_words))
-        | `Counters -> counters_display p.counters
-      ) columns,
-      top_heap_words
+  let make_row prev_top_heap_words name (p : Measure_diff.t) children
+      ~toplevel_other =
+    let top_heap_words =
+      prev_top_heap_words
+      + p.top_heap_words_increase
+      - if toplevel_other then initial_measure.Measure.top_heap_words else 0
+    in
+    make_row name p children ~prev_top_heap_words ~top_heap_words,
+    top_heap_words
   in
-  rows_of_hierarchy_list ~nesting:0 make_row hierarchy measure_diff
+  map_hierarchy ~nesting:0 make_row hierarchy measure_diff
     initial_measure.top_heap_words
+
+let rows_of_hierarchy hierarchy measure_diff initial_measure columns
+    timings_precision =
+  let make_row name (p : Measure_diff.t) children
+      ~prev_top_heap_words ~top_heap_words =
+    let make value ~f = value, f value in
+    let values = List.map (function
+      | `Time ->
+        make p.duration ~f:(time_display timings_precision)
+      | `Alloc ->
+        make p.allocated_words ~f:memory_word_display
+      | `Top_heap ->
+        make (float_of_int p.top_heap_words_increase) ~f:memory_word_display
+      | `Abs_top_heap ->
+        make (float_of_int top_heap_words)
+          ~f:(memory_word_display ~previous:(float_of_int prev_top_heap_words))
+      | `Counters -> counters_display p.counters
+    ) columns in
+    R (name, values, children)
+  in
+  map_profile make_row hierarchy measure_diff initial_measure
+
+let column_mapping = [
+  `Time, "time";
+  `Alloc, "alloc";
+  `Top_heap, "top-heap";
+  `Abs_top_heap, "absolute-top-heap";
+  `Counters, "counters"
+]
+
+let profile_json hierarchy measure_diff initial_measure =
+  let number value = `Number (Printf.sprintf "%.17g" value) in
+  let memory words = number (words *. float_of_int (Sys.word_size / 8)) in
+  let make_row name (p : Measure_diff.t) children
+      ~prev_top_heap_words:_ ~top_heap_words =
+    let values = List.map (fun (column, name) ->
+      name, match column with
+      | `Time -> number p.duration
+      | `Alloc -> memory p.allocated_words
+      | `Top_heap -> memory (float_of_int p.top_heap_words_increase)
+      | `Abs_top_heap -> memory (float_of_int top_heap_words)
+      | `Counters ->
+        `Object (List.map (fun (name, count) ->
+          name, `Number (string_of_int count)
+        ) (String.Map.bindings p.counters))
+    ) column_mapping in
+    `Object (("name", `String name) :: values
+             @ ["children", `Array children])
+  in
+  `Array (map_profile make_row hierarchy measure_diff initial_measure)
+
+let snapshot () =
+  let initial_measure =
+    match !initial_measure with
+    | Some v -> v
+    | None -> Measure.zero
+  in
+  let total = Measure_diff.of_diff Measure.zero (Measure.create ()) in
+  !hierarchy, total, initial_measure
+
+let record_action ~gettimeofday ~name f =
+  if not (Action_trace.enabled ()) then f () else
+    let start = gettimeofday () in
+    Fun.protect f ~finally:(fun () ->
+      let finish = gettimeofday () in
+      let hierarchy, total, initial_measure = snapshot () in
+      let args = ["profile", profile_json hierarchy total initial_measure] in
+      let nanoseconds seconds = int_of_float (seconds *. 1e9) in
+      Action_trace.with_fresh_context ~name ~f:(fun context ->
+        Action_trace.Context.emit context
+          (Action_trace.Event.span ~category:"compiler" ~name ~args
+             ~start_in_nanoseconds:(nanoseconds start)
+             ~finish_in_nanoseconds:(nanoseconds finish) ())))
 
 let max_by_column ~n_columns rows =
   let a = Array.make n_columns 0. in
@@ -410,13 +445,10 @@ let output_columns output_rows_f columns ~timings_precision =
   match columns with
   | [] -> ()
   | _ :: _ ->
-     let initial_measure =
-       match !initial_measure with
-       | Some v -> v
-       | None -> Measure.zero
-     in
-     let total = Measure_diff.of_diff Measure.zero (Measure.create ()) in
-     output_rows_f (rows_of_hierarchy !hierarchy total initial_measure columns timings_precision)
+     let hierarchy, total, initial_measure = snapshot () in
+     output_rows_f
+       (rows_of_hierarchy hierarchy total initial_measure columns
+          timings_precision)
 
 let print ppf =
   output_rows
@@ -426,14 +458,6 @@ let print ppf =
     ~always_output_ancestors:true
     ~pad_empty:true
   |> output_columns
-
-let column_mapping = [
-  `Time, "time";
-  `Alloc, "alloc";
-  `Top_heap, "top-heap";
-  `Abs_top_heap, "absolute-top-heap";
-  `Counters, "counters"
-]
 
 let output_to_csv ppf columns =
   let sanitise_for_csv =
