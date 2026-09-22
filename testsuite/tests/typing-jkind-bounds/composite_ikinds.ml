@@ -591,11 +591,17 @@ type ('a : immutable_data) t = Flat | Nested of 'a t t
 Line 1, characters 0-54:
 1 | type ('a : immutable_data) t = Flat | Nested of 'a t t
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error:
-       The kind of 'a t is value non_float
-         because it's a boxed variant type.
-       But the kind of 'a t must be a subkind of immutable_data
-         because of the annotation on 'a in the declaration of the type t.
+Error: Layout mismatch in checking consistency of mutually recursive groups.
+       This is most often caused by the fact that type inference is not
+       clever enough to propagate layouts through variables in different
+       declarations. It is also not clever enough to produce a good error
+       message, so we'll say this instead:
+         The kind of 'a t is value non_float
+           because it's a boxed variant type.
+         But the kind of 'a t must be a subkind of immutable_data
+           because of the annotation on 'a in the declaration of the type t.
+       A good next step is to add a layout annotation on a parameter to
+       the declaration where this error is reported.
 |}]
 
 type ('a : immutable_data) t : immutable_data = Flat | Nested of 'a t t
@@ -859,27 +865,29 @@ val require_portability : ('a : value mod portable). 'a -> unit = <fun>
 
 let portable_pair x y = require_portability (x, y)
 [%%expect{|
-Line 1, characters 44-50:
-1 | let portable_pair x y = require_portability (x, y)
-                                                ^^^^^^
-Error: This expression has type "'a * 'b"
-       but an expression was expected of type "('c : value mod portable)"
-       The kind of 'a * 'b is immutable_data with 'a with 'b
-         because it's a tuple type.
-       But the kind of 'a * 'b must be a subkind of value mod portable
-         because of the definition of require_portability at line 1, characters 4-23.
+val portable_pair :
+  ('a : value_or_null mod portable) ('b : value_or_null mod portable).
+    'a -> 'b -> unit =
+  <fun>
 |}]
 
 let portable_nested x y = require_portability (Option.Some [x], y)
 [%%expect{|
-Line 1, characters 46-66:
+val portable_nested :
+  ('a : value_or_null mod portable) ('b : value_or_null mod portable).
+    'a -> 'b -> unit =
+  <fun>
+|}, Principal{|
+Line 1, characters 47-62:
 1 | let portable_nested x y = require_portability (Option.Some [x], y)
-                                                  ^^^^^^^^^^^^^^^^^^^^
-Error: This expression has type "'a * 'b"
-       but an expression was expected of type "('c : value mod portable)"
-       The kind of 'a * 'b is immutable_data with 'a with 'b
-         because it's a tuple type.
-       But the kind of 'a * 'b must be a subkind of value mod portable
+                                                   ^^^^^^^^^^^^^^^
+Error: This constructor has type "'a Option.t" = "'a option"
+       but an expression was expected of type
+         "('b : value_or_null mod portable)"
+       The kind of 'a Option.t is immutable_data with 'a
+         because it's a boxed variant type.
+       But the kind of 'a Option.t must be a subkind of
+           value_or_null mod portable
          because of the definition of require_portability at line 1, characters 4-23.
 |}]
 
@@ -890,6 +898,9 @@ type ('a, 'b) masked = { masked : 'a @@ portable; plain : 'b; }
 
 let portable_record (x : ('a, 'b) masked) = require_portability x
 [%%expect{|
+val portable_record : 'a ('b : value mod portable). ('a, 'b) masked -> unit =
+  <fun>
+|}, Principal{|
 Line 1, characters 64-65:
 1 | let portable_record (x : ('a, 'b) masked) = require_portability x
                                                                     ^
@@ -908,6 +919,8 @@ Error: The value "x" has type "('a, 'b) masked"
 
 let masked_function (x : (int -> int, int) masked) = portable_record x
 [%%expect{|
+val masked_function : (int -> int, int) masked -> unit = <fun>
+|}, Principal{|
 Line 1, characters 53-68:
 1 | let masked_function (x : (int -> int, int) masked) = portable_record x
                                                          ^^^^^^^^^^^^^^^
@@ -917,6 +930,9 @@ Error: Unbound value "portable_record"
 type 'a shared = { ignored : 'a @@ portable; required : 'a }
 let portable_shared (x : 'a shared) = require_portability x
 [%%expect{|
+type 'a shared = { ignored : 'a @@ portable; required : 'a; }
+val portable_shared : ('a : value mod portable). 'a shared -> unit = <fun>
+|}, Principal{|
 type 'a shared = { ignored : 'a @@ portable; required : 'a; }
 Line 2, characters 58-59:
 2 | let portable_shared (x : 'a shared) = require_portability x
@@ -944,6 +960,16 @@ Error: The value "x" has type "a option" but an expression was expected of type
 
 let universal : 'a. 'a option -> unit = fun x -> require_portability x
 [%%expect{|
+Line 1, characters 40-70:
+1 | let universal : 'a. 'a option -> unit = fun x -> require_portability x
+                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This definition has type "'b option -> unit" which is less general than
+         "'a. 'a option -> unit"
+       The kind of 'a is value
+         because it is or unifies with an unannotated universal variable.
+       But the kind of 'a must be a subkind of value mod portable
+         because of the definition of require_portability at line 1, characters 4-23.
+|}, Principal{|
 Line 1, characters 69-70:
 1 | let universal : 'a. 'a option -> unit = fun x -> require_portability x
                                                                          ^
@@ -960,6 +986,10 @@ let portable_instance x = require_portability (Option.Some (identity x))
 let function_instance = identity (fun x -> x)
 [%%expect{|
 val identity : 'a -> 'a = <fun>
+val portable_instance : ('a : value_or_null mod portable). 'a -> unit = <fun>
+val function_instance : '_weak1 -> '_weak1 = <fun>
+|}, Principal{|
+val identity : 'a -> 'a = <fun>
 Line 2, characters 46-72:
 2 | let portable_instance x = require_portability (Option.Some (identity x))
                                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -973,19 +1003,33 @@ Error: This constructor has type "'a Option.t" = "'a option"
 
 let weak = ref Option.None
 [%%expect{|
+val weak : '_weak2 Option.t ref = {contents = Option.None}
+|}, Principal{|
 val weak : '_weak1 Option.t ref = {contents = Option.None}
 |}]
 
 let rejected () = require_portability (!weak, fun x -> x)
 [%%expect{|
-Line 1, characters 38-57:
+Line 1, characters 46-56:
 1 | let rejected () = require_portability (!weak, fun x -> x)
-                                          ^^^^^^^^^^^^^^^^^^^
-Error: This expression has type "'a * 'b"
-       but an expression was expected of type "('c : value mod portable)"
-       The kind of 'a * 'b is immutable_data with 'a with 'b
-         because it's a tuple type.
-       But the kind of 'a * 'b must be a subkind of value mod portable
+                                                  ^^^^^^^^^^
+Error:
+       The kind of 'a -> 'b is value non_float mod aliased immutable
+         because it's a function type.
+       But the kind of 'a -> 'b must be a subkind of
+           value_or_null mod portable
+         because of the definition of require_portability at line 1, characters 4-23.
+|}, Principal{|
+Line 1, characters 39-44:
+1 | let rejected () = require_portability (!weak, fun x -> x)
+                                           ^^^^^
+Error: This expression has type "'weak1 Option.t" = "'weak1 option"
+       but an expression was expected of type
+         "('a : value_or_null mod portable)"
+       The kind of 'weak1 Option.t is immutable_data with 'weak1
+         because it's a boxed variant type.
+       But the kind of 'weak1 Option.t must be a subkind of
+           value_or_null mod portable
          because of the definition of require_portability at line 1, characters 4-23.
 |}]
 
@@ -995,6 +1039,8 @@ let () = weak := Option.Some (fun x -> x)
 
 let portable_tree (x : 'a rose_tree2) = require_portability x
 [%%expect{|
+val portable_tree : ('a : value mod portable). 'a rose_tree2 -> unit = <fun>
+|}, Principal{|
 Line 1, characters 60-61:
 1 | let portable_tree (x : 'a rose_tree2) = require_portability x
                                                                 ^
@@ -1008,15 +1054,24 @@ Error: The value "x" has type "'a rose_tree2"
 
 let nonportable_pair () = portable_pair (fun x -> x) 0
 [%%expect{|
-Line 1, characters 26-39:
+Line 1, characters 40-52:
 1 | let nonportable_pair () = portable_pair (fun x -> x) 0
-                              ^^^^^^^^^^^^^
-Error: Unbound value "portable_pair"
+                                            ^^^^^^^^^^^^
+Error:
+       The kind of 'a -> 'b is value non_float mod aliased immutable
+         because it's a function type.
+       But the kind of 'a -> 'b must be a subkind of
+           value_or_null mod portable
+         because of the definition of portable_pair at line 1, characters 18-50.
 |}]
 
 type 'a option_alias = 'a option
 let portable_alias (x : 'a option_alias) = require_portability x
 [%%expect{|
+type 'a option_alias = 'a option
+val portable_alias : ('a : value mod portable). 'a option_alias -> unit =
+  <fun>
+|}, Principal{|
 type 'a option_alias = 'a option
 Line 2, characters 63-64:
 2 | let portable_alias (x : 'a option_alias) = require_portability x
@@ -1032,6 +1087,11 @@ Error: The value "x" has type "'a option_alias" = "'a option"
 
 let required_list (x : 'a list require_portable) = x
 [%%expect{|
+val required_list :
+  ('a : value_or_null mod portable).
+    'a list require_portable -> 'a list require_portable =
+  <fun>
+|}, Principal{|
 Line 1, characters 23-30:
 1 | let required_list (x : 'a list require_portable) = x
                            ^^^^^^^
@@ -1049,6 +1109,10 @@ let portable_contended x =
   require_contention [x]
 [%%expect{|
 val require_contention : ('a : value mod contended). 'a -> unit = <fun>
+val portable_contended :
+  ('a : value_or_null mod portable contended). 'a -> unit = <fun>
+|}, Principal{|
+val require_contention : ('a : value mod contended). 'a -> unit = <fun>
 Line 3, characters 22-37:
 3 |   require_portability (Option.Some x);
                           ^^^^^^^^^^^^^^^
@@ -1063,6 +1127,12 @@ Error: This constructor has type "'a Option.t" = "'a option"
 type ('a : bits64, 'b) boxed_bits = { bits : 'a; other : 'b }
 let portable_bits (x : ('a, 'b) boxed_bits) = require_portability x
 [%%expect{|
+type ('a : bits64, 'b) boxed_bits = { bits : 'a; other : 'b; }
+val portable_bits :
+  ('a : bits64 mod portable) ('b : value mod portable).
+    ('a, 'b) boxed_bits -> unit =
+  <fun>
+|}, Principal{|
 type ('a : bits64, 'b) boxed_bits = { bits : 'a; other : 'b; }
 Line 2, characters 66-67:
 2 | let portable_bits (x : ('a, 'b) boxed_bits) = require_portability x
@@ -1081,14 +1151,18 @@ let portable_gadt (type a) (w : a witness) (x : a option) =
   match w with Int -> require_portability (x, Option.None)
 [%%expect{|
 type _ witness = Int : int witness
-Line 3, characters 42-58:
+val portable_gadt : 'a witness -> 'a option -> unit = <fun>
+|}, Principal{|
+type _ witness = Int : int witness
+Line 3, characters 43-44:
 3 |   match w with Int -> require_portability (x, Option.None)
-                                              ^^^^^^^^^^^^^^^^
-Error: This expression has type "'a * 'b"
-       but an expression was expected of type "('c : value mod portable)"
-       The kind of 'a * 'b is immutable_data with 'a with 'b
-         because it's a tuple type.
-       But the kind of 'a * 'b must be a subkind of value mod portable
+                                               ^
+Error: The value "x" has type "a option" but an expression was expected of type
+         "('a : value_or_null mod portable)"
+       The kind of a option is immutable_data with a
+         because it's a boxed variant type.
+       But the kind of a option must be a subkind of
+           value_or_null mod portable
          because of the definition of require_portability at line 1, characters 4-23.
 |}]
 
@@ -1096,14 +1170,25 @@ let outside_gadt (type a) (w : a witness) (x : a option) =
   (match w with Int -> require_portability (x, Option.None));
   require_portability x
 [%%expect{|
-Line 2, characters 43-59:
+Line 3, characters 22-23:
+3 |   require_portability x
+                          ^
+Error: The value "x" has type "a option" but an expression was expected of type
+         "('a : value mod portable)"
+       The kind of a option is immutable_data with a
+         because it's a boxed variant type.
+       But the kind of a option must be a subkind of value mod portable
+         because of the definition of require_portability at line 1, characters 4-23.
+|}, Principal{|
+Line 2, characters 44-45:
 2 |   (match w with Int -> require_portability (x, Option.None));
-                                               ^^^^^^^^^^^^^^^^
-Error: This expression has type "'a * 'b"
-       but an expression was expected of type "('c : value mod portable)"
-       The kind of 'a * 'b is immutable_data with 'a with 'b
-         because it's a tuple type.
-       But the kind of 'a * 'b must be a subkind of value mod portable
+                                                ^
+Error: The value "x" has type "a option" but an expression was expected of type
+         "('a : value_or_null mod portable)"
+       The kind of a option is immutable_data with a
+         because it's a boxed variant type.
+       But the kind of a option must be a subkind of
+           value_or_null mod portable
          because of the definition of require_portability at line 1, characters 4-23.
 |}]
 
@@ -1114,6 +1199,10 @@ end = struct
 end
 let portable_abstract (x : 'a Abstract.t) = require_portability x
 [%%expect{|
+module Abstract : sig type 'a t : immutable_data with 'a end
+val portable_abstract : ('a : value mod portable). 'a Abstract.t -> unit =
+  <fun>
+|}, Principal{|
 module Abstract : sig type 'a t : immutable_data with 'a end
 Line 6, characters 64-65:
 6 | let portable_abstract (x : 'a Abstract.t) = require_portability x
@@ -1130,6 +1219,9 @@ let contended_portable x =
   require_contention [x];
   require_portability (Option.Some x)
 [%%expect{|
+val contended_portable :
+  ('a : value_or_null mod portable contended). 'a -> unit = <fun>
+|}, Principal{|
 Line 2, characters 21-24:
 2 |   require_contention [x];
                          ^^^
@@ -1201,16 +1293,17 @@ let escaped_unboxed = escape_unboxed (fun x -> x)
 type 'a poly_unboxed = {
   poly_unboxed : ('b : value mod portable). 'a * 'b option;
 } [@@unboxed]
-Line 4, characters 62-63:
-4 | let portable_poly_unboxed (x : 'a poly_unboxed) = id_portable x
-                                                                  ^
-Error: The value "x" has type "'a poly_unboxed"
-       but an expression was expected of type "('b : value mod portable)"
-       The kind of 'a poly_unboxed is value non_float mod portable with 'a
-         because it's a tuple type.
-       But the kind of 'a poly_unboxed must be a subkind of
-           value mod portable
-         because of the definition of id_portable at line 1, characters 4-15.
+val portable_poly_unboxed :
+  ('a : value mod portable). 'a poly_unboxed -> 'a poly_unboxed = <fun>
+val escape_unboxed : ('a : value mod portable). 'a -> 'a poly_unboxed = <fun>
+Line 6, characters 37-49:
+6 | let escaped_unboxed = escape_unboxed (fun x -> x)
+                                         ^^^^^^^^^^^^
+Error:
+       The kind of 'a -> 'b is value non_float mod aliased immutable
+         because it's a function type.
+       But the kind of 'a -> 'b must be a subkind of value mod portable
+         because of the definition of escape_unboxed at line 5, characters 19-73.
 |}, Principal{|
 type 'a poly_unboxed = {
   poly_unboxed : ('b : value mod portable). 'a * 'b option;
@@ -1232,11 +1325,19 @@ Error: The value "x" has type "'a poly_unboxed"
 type 'a late : immutable_data = 'a list
 and late_use = (int -> int) late
 [%%expect{|
-Line 1, characters 0-39:
-1 | type 'a late : immutable_data = 'a list
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "'a list" is immutable_data with 'a
-         because it's a boxed variant type.
-       But the kind of type "'a list" must be a subkind of immutable_data
-         because of the definition of late at line 1, characters 0-39.
+Line 2, characters 15-32:
+2 | and late_use = (int -> int) late
+                   ^^^^^^^^^^^^^^^^^
+Error: Layout mismatch in final type declaration consistency check.
+       This is most often caused by the fact that type inference is not
+       clever enough to propagate layouts through variables in different
+       declarations. It is also not clever enough to produce a good error
+       message, so we'll say this instead:
+         The kind of int -> int is value non_float mod aliased immutable
+           because it's a function type.
+         But the kind of int -> int must be a subkind of
+             value mod forkable unyielding many stateless immutable
+           because of the definition of late at line 1, characters 0-39.
+       A good next step is to add a layout annotation on a parameter to
+       the declaration where this error is reported.
 |}]

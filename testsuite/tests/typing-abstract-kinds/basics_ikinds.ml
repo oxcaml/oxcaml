@@ -1437,6 +1437,8 @@ type ('a : any) with_k1 : k1 with 'a
 
 type 'a inferred = 'a with_k1 require_k1
 [%%expect{|
+type ('a : value mod everything mod dynamic) inferred = 'a with_k1 require_k1
+|}, Principal{|
 Line 1, characters 19-29:
 1 | type 'a inferred = 'a with_k1 require_k1
                        ^^^^^^^^^^
@@ -1449,6 +1451,8 @@ Error: This type "'a with_k1" should be an instance of type "('b : k1)"
 
 type ('a : k1) preserved = 'a with_k1 require_k1
 [%%expect{|
+type ('a : k1) preserved = 'a with_k1 require_k1
+|}, Principal{|
 Line 1, characters 27-37:
 1 | type ('a : k1) preserved = 'a with_k1 require_k1
                                ^^^^^^^^^^
