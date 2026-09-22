@@ -1477,7 +1477,7 @@ end = struct
         unsigned_exists p t0 || unsigned_exists p t1)
 
   let filter p t =
-    let rec loop tree =
+    let rec loop @ local = fun tree ->
       let iv = is_value_of_tree tree in
       match tree_descr tree with
       | Leaf leaf ->
@@ -1488,7 +1488,7 @@ end = struct
         let prefix_and_bit, t0, t1 = branch_descr b in
         branch prefix_and_bit (loop t0) (loop t1)
     in
-    match descr t with Empty -> t | Non_empty tree -> loop tree
+    match descr t with Empty -> t | Non_empty tree -> loop tree [@nontail]
 
   let rec partition_tree p tree =
     let iv = is_value_of_tree tree in
