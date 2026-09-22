@@ -307,3 +307,9 @@ let inherited_addressable_bad = { addressed = #{ af = #5.25 } }
 type inherited_last = { before : string; inherit last : float# }
 let inherited_last_bad = { before = "before"; last = -#6.5 }
 [%%expect {||}];;
+
+type addressable_unit = #{ au : unit# }
+type addressable_unit_arg =
+  | Addressable_unit of addressable_unit [@immediate_all_void_constructor]
+let addressable_unit_arg_bad = Addressable_unit #{ au = #() }
+[%%expect {||}];;
