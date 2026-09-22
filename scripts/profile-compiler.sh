@@ -127,7 +127,7 @@ echo "Top ${top_n} source compilations by allocation:"
   cd "$output"
   awk '
     $2 == "alloc" {bytes[FILENAME] = $1 + 0}
-    $2 ~ /^file=/ {source[FILENAME] = substr($2, 6)}
+    $NF ~ /^file=/ {source[FILENAME] = substr($NF, 6)}
     END {
       for (file in bytes)
         printf "%.0f  %-40s  %s\n",
@@ -143,9 +143,9 @@ echo
 echo "Top ${top_n} source compilations by CPU time:"
 (
   cd "$output"
-  awk '$2 ~ /^file=/ {
+  awk '$NF ~ /^file=/ {
     printf "%8.3fs  %-40s  %s\n",
-      $1 + 0, substr($2, 6), FILENAME
+      $1 + 0, substr($NF, 6), FILENAME
   }' gc.*.dump |
     sort -nr |
     sed -n "1,${top_n}p"
