@@ -717,3 +717,15 @@ Error: This type "abstract_record" should be an instance of type
            record_kind addressable
          because of the definition of addressable_abstract at line 4, characters 0-56.
 |}]
+
+(* Addressing an already-addressable field preserves its mode bounds. *)
+type ('a : any) idempotent_record = #{ x : 'a }
+type ('a : bits8 addressable mod portable) portable_addressable8
+type ('a : bits8 addressable mod portable) idempotent_record_ok =
+  'a idempotent_record portable_addressable8
+[%%expect{|
+type ('a : any) idempotent_record = #{ x : 'a; }
+type ('a : bits8 addressable mod portable) portable_addressable8
+type ('a : bits8 addressable mod portable) idempotent_record_ok =
+    'a idempotent_record portable_addressable8
+|}]
