@@ -180,3 +180,48 @@ let () =
   assert (r.head = 44 && Float_u.to_float r.tail = 8.75);
   let u : inherited_boxed_last# = unbox r in
   assert (u.#head = 44 && Float_u.to_float u.#tail = 8.75)
+
+external get_imm_idx :
+  ('a : value_or_null) ('b : any). 'a -> ('a, 'b) idx_imm -> 'b
+  = "%get_idx_imm" [@@layout_poly]
+external get_mut_idx :
+  ('a : value_or_null) ('b : any). 'a -> ('a, 'b) idx_mut -> 'b
+  = "%get_idx" [@@layout_poly]
+external compose_imm_idx :
+  ('a : value_or_null) ('b : any) ('c : any).
+  ('a, 'b) idx_imm -> ('b box, 'c) idx_imm -> ('a, 'c) idx_imm
+  = "%idx_compose"
+external compose_mut_imm_idx :
+  ('a : value_or_null) ('b : any) ('c : any).
+  ('a, 'b) idx_mut -> ('b box, 'c) idx_imm -> ('a, 'c) idx_mut
+  = "%idx_compose"
+
+type inherited_payload = { pf : float#; ps : string }
+type inherited_product = { inherit payload : inherited_payload# }
+type inherited_product_holder = {
+  mutable product : inherited_product#;
+  after : string;
+}
+
+let[@inline never] make_inherited_product payload = { payload }
+
+let check_inherited_payload p =
+  assert (Float_u.to_float p.#pf = 12.5);
+  assert (p.#ps = "payload")
+
+let () =
+  let p = #{ pf = #12.5; ps = "payload" } in
+  let r = make_inherited_product p in
+  check_inherited_payload r.payload;
+  let { payload } = r in
+  check_inherited_payload payload;
+  check_inherited_payload (get_imm_idx r (.payload));
+  assert (get_imm_idx r (.payload.#ps) = "payload");
+  let ps = compose_imm_idx (.payload) (.ps) in
+  assert (get_imm_idx r ps = "payload");
+  let h = { product = #{ payload = p }; after = "after" } in
+  let payload = compose_mut_imm_idx (.product) (.payload) in
+  check_inherited_payload (get_mut_idx h payload);
+  let ps = compose_mut_imm_idx (.product) ps in
+  assert (get_mut_idx h ps = "payload");
+  assert (h.after = "after")
