@@ -8,6 +8,5 @@
     store-to-load forwarding has satisfied have by then been rewritten into
     register moves, over which this pass can step, whereas an actual load acts
     as a barrier. The pass only runs when [-cfg-dse] is enabled (which
-    [-experimental-optimizations] also does) and, like [Cfg_cse], it leaves
-    functions carrying the [Cfg.No_CSE] codegen option untouched. *)
+    [-experimental-optimizations] also does). *)
 val run : Cfg_with_layout.t -> Cfg_with_layout.t

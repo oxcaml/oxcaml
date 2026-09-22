@@ -393,14 +393,15 @@ let operation_is_pure : specific_operation -> bool = function
                                                   not using LLVM backend"
       intr
 
-(* Specific operations that are pure except possibly for writing to memory:
+(* Specific operations that are pure except possibly for storing to memory:
    guaranteed not to read from memory, not to raise, and not to trigger the
    execution of arbitrary code. Used by dead store elimination ([Cfg_dse]);
    [false] is always a safe answer. *)
-let operation_is_pure_except_memory_writes : specific_operation -> bool =
+let operation_is_pure_except_stores : specific_operation -> bool =
   function
   | Ishiftarith _ | Imuladd | Imulsub | Inegmulf | Imuladdf | Inegmuladdf
-  | Imulsubf | Inegmulsubf | Isqrtf | Ibswap _ | Imove32 | Isignext _ -> true
+  | Imulsubf | Inegmulsubf | Isqrtf | Ibswap _ | Imove8 | Imove16 | Imove32
+  | Isignext _ -> true
   | Isimd _ | Illvm_intrinsic _ | Ifar_poll | Ifar_alloc _
   | Ifar_stackcheck _ -> false
 
