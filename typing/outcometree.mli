@@ -162,6 +162,7 @@ and out_type =
 and out_label = {
   olab_name: string;
   olab_mut: out_mutability;
+  olab_inheritance: Asttypes.field_inheritance;
   olab_type: out_type;
   olab_modalities: out_modality list;
 }

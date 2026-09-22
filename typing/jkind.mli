@@ -127,6 +127,8 @@ module Layout : sig
 
   val is_surely_addressable_flat : Sort.Flat.t t -> bool
 
+  val strip_head_addressable_flat : Sort.Flat.t t -> Sort.Flat.t t
+
   (** See [Jkind_types.Layout.Const.non_redundant_axes_of_box] *)
   val non_redundant_axes_of_box_flat :
     Sort.Flat.t t -> Scannable_axes.t -> string list
@@ -697,6 +699,17 @@ val get_nullability : Env.t -> 'd Types.jkind -> Jkind_axis.Nullability.t option
 
 (** Sets the layout in a jkind. *)
 val set_layout : 'd Types.jkind -> Sort.t Layout.t -> 'd Types.jkind
+
+val apply_operator :
+  Env.t -> Jkind_types.Kind_operator.t -> 'd Types.jkind -> 'd Types.jkind
+
+(** Pulls a bound on [contents addressable] back to [contents], using its known
+    addressability to choose a preimage. *)
+val apply_addressable_r :
+  Env.t ->
+  contents:Types.jkind_l ->
+  Types.jkind_r ->
+  (Types.jkind_r, unit) result
 
 (** Change a jkind to be appropriate for a type that appears under a modality.
     This means that the jkind will definitely cross the axes modified by the

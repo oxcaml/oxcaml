@@ -2526,6 +2526,7 @@ let rec out_jkind_of_desc env (desc : 'd Jkind.Desc.t) =
     Ojkind_product
       (List.map
          (fun layout ->
+            let layout = Jkind.Layout.strip_head_addressable_flat layout in
             out_jkind_of_desc env { desc with base = Layout layout })
          lays)
   | Layout (Addressable lay) when Option.is_none (Jkind.Desc.get_const desc) ->
@@ -3129,6 +3130,7 @@ let tree_of_label l =
   {
     olab_name = Ident.name l.ld_id;
     olab_mut = mut;
+    olab_inheritance = l.ld_inheritance;
     olab_type = tree_of_typexp Type l.ld_type;
     olab_modalities = ld_modalities;
   }

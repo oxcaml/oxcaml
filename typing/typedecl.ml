@@ -85,6 +85,7 @@ type error =
   | Too_many_constructors
   | Duplicate_label of string
   | Unboxed_mutable_label
+  | Inherited_label_not_singleton_unboxed_record
   | Recursive_abbrev of string * Env.t * reaching_type_path
   | Cycle_in_def of string * Env.t * reaching_type_path
   | Unboxed_recursion of string * Env.t * reaching_type_path
@@ -492,7 +493,7 @@ let update_type temp_env env id loc =
 *)
 let is_float env ty =
   match Ctype.get_unboxed_type_approximation env ty with
-  | { ty; or_null = None; modality = _ } -> begin
+  | { ty; or_null = None; _ } -> begin
     match get_desc ty with
     | Tconstr(p, _, _) -> Path.same p Predef.path_float
     | _ -> false end
@@ -570,6 +571,17 @@ let check_no_repr cty =
 let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
       env univars closed lbls kloc ~extension =
   assert (lbls <> []);
+  List.iter
+    (fun { pld_inheritance; pld_loc; _ } ->
+       match pld_inheritance with
+       | Noninherited -> ()
+       | Inherited ->
+         match record_form, lbls with
+         | Unboxed_product, [_] -> ()
+         | Legacy, _ | Unboxed_product, _ ->
+           raise (Error (pld_loc,
+                         Inherited_label_not_singleton_unboxed_record)))
+    lbls;
   let all_labels = ref String.Set.empty in
   List.iter
     (fun {pld_name = {txt=name; loc}} ->
@@ -577,7 +589,8 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
          raise(Error(loc, Duplicate_label name));
        all_labels := String.Set.add name !all_labels)
     lbls;
-  let mk {pld_name=name;pld_mutable=mut;pld_modalities=modalities;
+  let mk {pld_name=name;pld_mutable=mut;pld_inheritance=inheritance;
+          pld_modalities=modalities;
           pld_type=arg;pld_loc=loc;pld_attributes=attrs} =
     Builtin_attributes.warning_scope attrs
       (fun () ->
@@ -605,6 +618,7 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
           ld_name = name;
           ld_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
           ld_mutable = mut;
+          ld_inheritance = inheritance;
           ld_modalities = modalities;
           ld_type = cty; ld_loc = loc; ld_attributes = attrs}
       )
@@ -622,6 +636,7 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
          end;
          {Types.ld_id = ld.ld_id;
           ld_mutable = ld.ld_mutable;
+          ld_inheritance = ld.ld_inheritance;
           ld_modalities = ld.ld_modalities.moda_modalities;
           ld_sort = None;
             (* Updated by [update_label_sorts] *)
@@ -1415,6 +1430,7 @@ let derive_unboxed_version env path_in_group_has_unboxed_version decl =
         (fun (ld : Types.label_declaration) ->
             { Types.ld_id = Ident.create_local (Ident.name ld.ld_id);
             ld_mutable = Immutable;
+            ld_inheritance = ld.ld_inheritance;
             ld_modalities = ld.ld_modalities;
               (* Inherit modalities from the boxed version. Note that these
                   are affected by the mutability of the boxed label, even
@@ -2460,12 +2476,20 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
               (Jkind.layout_for_boxed_block (field_layouts ()))
           else jkind
       | Unboxed_product ->
-        let lbls_with_layouts =
-          List.map2
-            (fun (lbl, ty) layout -> lbl, ty, layout)
-            lbls (field_layouts ())
-        in
-        Jkind.for_unboxed_record_with_updates lbls_with_layouts
+        begin match lbls with
+        | [(lbl : Types.label_declaration), ty] ->
+          Jkind.for_abbreviation
+            ~type_jkind_purely:(Ctype.type_jkind env)
+            ~modality:lbl.ld_modalities ty
+          |> Jkind.apply_operator env (field_kind_operator lbl.ld_inheritance)
+        | [] | _ :: _ :: _ ->
+          let lbls_with_layouts =
+            List.map2
+              (fun (lbl, ty) layout -> lbl, ty, layout)
+              lbls (field_layouts ())
+          in
+          Jkind.for_unboxed_record_with_updates lbls_with_layouts
+        end
     in
     sorts, rep, jkind
   | Legacy, _,
@@ -5698,6 +5722,9 @@ let report_error ~loc = function
       Location.errorf "Two labels are named %a" Style.inline_code s
   | Unboxed_mutable_label ->
       Location.errorf ~loc "Unboxed record labels cannot be mutable"
+  | Inherited_label_not_singleton_unboxed_record ->
+      Location.errorf ~loc
+        "Inherited labels are only supported in singleton unboxed records"
   | Recursive_abbrev (s, env, reaching_path) ->
       let reaching_path = Reaching_path.simplify reaching_path in
       Printtyp.wrap_printing_env ~error:true env @@ fun () ->

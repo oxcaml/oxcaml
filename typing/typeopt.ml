@@ -66,7 +66,7 @@ let scrape_ty env ty =
           begin match find_unboxed_type (Env.find_type p env) with
           | Some _ -> begin
             match (Ctype.get_unboxed_type_approximation env ty) with
-            | { ty; or_null = None; modality = _ } ->
+            | { ty; or_null = None; _ } ->
               Some ty
             | _ -> Some ty end
           | None -> Some ty

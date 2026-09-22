@@ -791,6 +791,7 @@ and label_declaration =
     {
      pld_name: string loc;
      pld_mutable: mutable_flag;
+     pld_inheritance: field_inheritance;
      pld_modalities: modalities;
      pld_type: core_type;
      pld_loc: Location.t;

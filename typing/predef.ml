@@ -995,6 +995,7 @@ let decl_of_type_constr type_constr =
              {
                ld_id=id;
                ld_mutable=Immutable;
+               ld_inheritance=Noninherited;
                ld_modalities=Mode.Modality.Const.id;
                ld_type=field_type;
                ld_sort=Jkind_types.Sort.Const.(some scannable);

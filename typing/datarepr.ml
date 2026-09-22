@@ -328,6 +328,7 @@ let dummy_label (type rep) (record_form : rep record_form)
   in
   { lbl_name = ""; lbl_res = none; lbl_arg = none;
     lbl_mut = Immutable; lbl_modalities = Mode.Modality.Const.id;
+    lbl_inheritance = Noninherited;
     lbl_sort = None;
     lbl_pos = (-1); lbl_all = [||];
     lbl_repres = repres;
@@ -347,6 +348,7 @@ let label_descrs record_form ty_res lbls repres priv =
             lbl_res = ty_res;
             lbl_arg = l.ld_type;
             lbl_mut = l.ld_mutable;
+            lbl_inheritance = l.ld_inheritance;
             lbl_modalities = l.ld_modalities;
             lbl_sort = l.ld_sort;
             lbl_pos = num;

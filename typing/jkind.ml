@@ -225,7 +225,11 @@ module Layout = struct
         | Product ts ->
           String.concat ""
             [ (if nested then "(" else "");
-              String.concat " & " (List.map (to_string true) ts);
+              String.concat " & "
+                (List.map
+                   (function
+                     | Addressable t -> to_string true t | t -> to_string true t)
+                   ts);
               (if nested then ")" else "") ]
         | Univar { name = Some n } -> n
         | Univar { name = None } -> "_"
@@ -338,6 +342,11 @@ module Layout = struct
       let s' = Sort.strip_head_addressable s in
       if s' == s then t else Sort (s', sa)
     | (Any _ | Product _ | Box _) as t -> t
+
+  let rec strip_head_addressable_flat : Sort.Flat.t t -> Sort.Flat.t t =
+    function
+    | Addressable t -> strip_head_addressable_flat t
+    | (Any _ | Sort _ | Product _ | Box _) as t -> t
 
   (* [constrain_below_addressable t] constrains [t < t addressable] *)
   let rec constrain_below_addressable ~allow_mutation : Sort.t t -> bool =
@@ -637,7 +646,8 @@ module Layout = struct
           Fmt.fprintf ppf "%a" Sort.format s)
       | Product ts ->
         let pp_sep ppf () = Fmt.fprintf ppf "@ & " in
-        Fmt.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
+        Fmt.pp_nested_list ~nested ~pp_element ~pp_sep ppf
+          (List.map strip_head_addressable ts)
       | Addressable t ->
         if constrain_below_addressable ~allow_mutation:false t
         then pp_element ~nested ppf t
@@ -2440,7 +2450,7 @@ module Const = struct
            ticket 5769 *)
         match base with
         | Kconstr _ -> raise ~loc Abstract_kind_in_product
-        | Layout l -> l
+        | Layout l -> Layout.Const.addressable l
       in
       ( layout :: layouts_acc,
         Mod_bounds.join mod_bounds mod_bounds_acc,
@@ -2682,7 +2692,11 @@ module Desc = struct
       | Layout (Product lays) ->
         let pp_sep ppf () = Fmt.fprintf ppf "@ & " in
         Fmt.pp_nested_list ~nested ~pp_element:format_desc ~pp_sep ppf
-          (List.map (fun layout -> { desc with base = Layout layout }) lays)
+          (List.map
+             (fun layout ->
+               let layout = Layout.strip_head_addressable_flat layout in
+               { desc with base = Layout layout })
+             lays)
       | Layout (Addressable lay) when Option.is_none (get_const desc) ->
         if Layout.is_surely_addressable_flat lay
         then format_desc ~nested ppf { desc with base = Layout lay }
@@ -2828,7 +2842,13 @@ let for_unboxed_record_with_updates lbls =
   let tys_modalities =
     List.map (fun (lbl, ld_type, _) -> ld_type, lbl.ld_modalities) lbls
   in
-  let layouts = List.map (fun (_, _, layout) -> layout) lbls in
+  let layouts =
+    List.map
+      (fun (lbl, _, layout) ->
+        Layout.apply_operator layout
+          (Types.field_kind_operator lbl.ld_inheritance))
+      lbls
+  in
   Builtin.product ~why:Unboxed_record tys_modalities layouts
 
 let for_abbreviation ~type_jkind_purely ~modality ty =
@@ -2854,7 +2874,8 @@ let for_abbreviation ~type_jkind_purely ~modality ty =
 *)
 let layout_for_boxed_block component_layouts : Sort.t Layout.t =
   Box
-    ( Layout.product component_layouts,
+    ( Layout.product
+        (List.map (fun layout -> Layout.Addressable layout) component_layouts),
       Jkind_types.Scannable_axes.non_float_block_axes )
 
 (* CR rtjoa: revisit *)
@@ -3144,6 +3165,44 @@ let get_nullability env jk =
 
 let set_layout jk layout =
   { jk with jkind = { jk.jkind with base = Layout layout } }
+
+let apply_operator env op jk =
+  match (op : Kind_operator.t) with
+  | Id -> jk
+  | Addressable ->
+    let jkind = Base_and_axes.fully_expand_aliases env jk.jkind in
+    let base =
+      match jkind.base with
+      | Layout layout -> Layout (Layout.Addressable layout)
+      | Kconstr (p, sa, _) -> Kconstr (p, sa, Addressable)
+    in
+    { jk with jkind = { jkind with base } }
+
+let apply_addressable_r env ~contents jk =
+  let contents = Base_and_axes.fully_expand_aliases env contents.jkind in
+  let contents_are_addressable =
+    match contents.base with
+    | Layout layout ->
+      Layout.constrain_below_addressable ~allow_mutation:false layout
+    | Kconstr (_, _, Addressable) -> true
+    | Kconstr (_, _, Id) -> false
+  in
+  if contents_are_addressable
+  then Ok jk
+  else
+    let jkind = Base_and_axes.fully_expand_aliases env jk.jkind in
+    let base =
+      match jkind.base with
+      | Layout layout ->
+        if Layout.constrain_above_addressable ~allow_mutation:true layout
+        then Some (Layout (Layout.strip_head_addressable layout))
+        else None
+      | Kconstr (p, sa, Addressable) -> Some (Kconstr (p, sa, Id))
+      | Kconstr (_, _, Id) -> None
+    in
+    match base with
+    | Some base -> Ok { jk with jkind = { jkind with base } }
+    | None -> Error ()
 
 let apply_modality_l modality jk =
   let bounds_mask = Mod_bounds.mask_of_modality ~modality in

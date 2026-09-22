@@ -570,6 +570,7 @@ and label_declaration =
   {
     ld_id: Ident.t;
     ld_mutable: mutability;
+    ld_inheritance: Asttypes.field_inheritance;
     ld_modalities: Mode.Modality.Const.t;
     ld_type: type_expr;
     ld_sort: Jkind_types.Sort.Const.t option;
@@ -1067,6 +1068,10 @@ let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
   | Addressable sort -> Addressable (mixed_block_element_of_const_sort sort)
   | Univar _ -> Misc.fatal_error "mixed_block_element_of_const_sort: Univar"
   | Genvar _ -> Misc.fatal_error "mixed_block_element_of_const_sort: Genvar"
+
+let field_kind_operator = function
+  | Asttypes.Noninherited -> Jkind_types.Kind_operator.Addressable
+  | Asttypes.Inherited -> Jkind_types.Kind_operator.Id
 
 let find_unboxed_type decl =
   match decl.type_kind with

@@ -502,9 +502,11 @@ module Analyser =
     let get_cstr_args env pos_end =
       let tuple ct = Odoc_env.subst_type env ct.Typedtree.ctyp_type in
       let record comments
-          { Typedtree.ld_id; ld_mutable; ld_type; ld_loc; ld_attributes; _ } =
+          { Typedtree.ld_id; ld_mutable; ld_inheritance;
+            ld_type; ld_loc; ld_attributes; _ } =
         get_field env comments @@
-        {Types.ld_id; ld_mutable; ld_modalities = Mode.Modality.Const.id;
+        {Types.ld_id; ld_mutable; ld_inheritance;
+         ld_modalities = Mode.Modality.Const.id;
          ld_sort=Some Jkind.Sort.Const.void (* ignored *);
          ld_type=ld_type.Typedtree.ctyp_type;
          ld_loc; ld_attributes; ld_uid=Types.Uid.internal_not_actually_unique} in

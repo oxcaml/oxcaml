@@ -561,7 +561,7 @@ and print_typargs ppf =
       pp_close_box ppf ();
       pp_print_space ppf ()
 and print_out_label ppf
-    { olab_name; olab_mut; olab_type; olab_modalities } =
+    { olab_name; olab_mut; olab_inheritance; olab_type; olab_modalities } =
   (* See the notes [NON-LEGACY MODES] *)
   let mut, atomic =
     match olab_mut with
@@ -573,7 +573,13 @@ and print_out_label ppf
     | Nonatomic -> ()
     | Atomic -> fprintf ppf " [@@atomic]"
   in
-  fprintf ppf "@[<2>%s%a :@ %a%a%a@];"
+  let inheritance =
+    match olab_inheritance with
+    | Asttypes.Noninherited -> ""
+    | Asttypes.Inherited -> "inherit "
+  in
+  fprintf ppf "@[<2>%s%s%a :@ %a%a%a@];"
+    inheritance
     mut
     print_lident olab_name
     print_out_type olab_type
