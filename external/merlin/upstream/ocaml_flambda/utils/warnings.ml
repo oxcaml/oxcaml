@@ -170,8 +170,11 @@ type t =
   | Useless_valpoly                         (* 219 *)
   | Redundant_modality                      (* 220 *)
   | Unused_alert_disable of string          (* 221 *)
-  | Inlining_deviates_from_ideal of { current : string; ideal : string }
-                                            (* 222 *)
+  | Inlining_deviates_from_ideal of
+      { is_a_functor : bool;
+        code_size : int;
+        current : string;
+        ideal : string }                    (* 222 *)
 
 (* If you remove a warning, leave a hole in the numbering.  NEVER change
    the numbers of existing warnings.
@@ -1629,16 +1632,19 @@ let message = function
       msg "This attribute disables alert %a,@ \
            but it did not suppress any occurrence of the alert."
         Style.inline_code name
-  | Inlining_deviates_from_ideal { current; ideal } ->
+  | Inlining_deviates_from_ideal { is_a_functor; code_size; current; ideal } ->
+      let what = if is_a_functor then "functor" else "function" in
       msg "The inlining decision at this application differs from the one@ \
            that@ would@ be@ taken@ in@ the@ ideal@ configuration@ (in@ which@ \
            %a@ is@ enabled@ and@ %a@ is@ set@ to@ its@ ideal@ value).@ \
+           The@ code@ size@ of@ the@ %s@ being@ applied,@ prior@ to@ \
+           inlining,@ is@ %d.@ \
            Currently,@ %s.@ In@ the@ ideal@ configuration,@ %s."
         Style.inline_code
         "-flambda2-speculative-inlining-track-lifted-constants"
         Style.inline_code
         "-flambda2-inline-large-functor-size"
-        current ideal
+        what code_size current ideal
 ;;
 
 let nerrors = ref 0
