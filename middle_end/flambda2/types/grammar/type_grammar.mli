@@ -703,37 +703,54 @@ end
 
 module Descr : sig
   type t = private
-    | Value of head_of_kind_value Type_descr.Descr.t Or_unknown_or_bottom.t
+    | Value of
+        head_of_kind_value Type_descr.Descr.t Or_unknown_or_bottom.t
+        @@ global
     | Naked_immediate of
         head_of_kind_naked_immediate Type_descr.Descr.t Or_unknown_or_bottom.t
+        @@ global
     | Naked_float32 of
         head_of_kind_naked_float32 Type_descr.Descr.t Or_unknown_or_bottom.t
+        @@ global
     | Naked_float of
         head_of_kind_naked_float Type_descr.Descr.t Or_unknown_or_bottom.t
+        @@ global
     | Naked_int8 of
         head_of_kind_naked_int8 Type_descr.Descr.t Or_unknown_or_bottom.t
+        @@ global
     | Naked_int16 of
         head_of_kind_naked_int16 Type_descr.Descr.t Or_unknown_or_bottom.t
+        @@ global
     | Naked_int32 of
         head_of_kind_naked_int32 Type_descr.Descr.t Or_unknown_or_bottom.t
+        @@ global
     | Naked_int64 of
         head_of_kind_naked_int64 Type_descr.Descr.t Or_unknown_or_bottom.t
+        @@ global
     | Naked_nativeint of
         head_of_kind_naked_nativeint Type_descr.Descr.t Or_unknown_or_bottom.t
+        @@ global
     | Naked_vec128 of
         head_of_kind_naked_vec128 Type_descr.Descr.t Or_unknown_or_bottom.t
+        @@ global
     | Naked_vec256 of
         head_of_kind_naked_vec256 Type_descr.Descr.t Or_unknown_or_bottom.t
+        @@ global
     | Naked_vec512 of
         head_of_kind_naked_vec512 Type_descr.Descr.t Or_unknown_or_bottom.t
+        @@ global
     | Naked_mask of
         head_of_kind_naked_mask Type_descr.Descr.t Or_unknown_or_bottom.t
+        @@ global
     | Rec_info of
         head_of_kind_rec_info Type_descr.Descr.t Or_unknown_or_bottom.t
-    | Region of head_of_kind_region Type_descr.Descr.t Or_unknown_or_bottom.t
+        @@ global
+    | Region of
+        head_of_kind_region Type_descr.Descr.t Or_unknown_or_bottom.t
+        @@ global
 end
 
-val descr : t -> Descr.t
+val descr : t -> Descr.t @ local
 
 val create_from_head_value : head_of_kind_value -> t
 

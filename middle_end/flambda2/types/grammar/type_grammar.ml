@@ -4575,30 +4575,38 @@ let this_rec_info (rec_info_expr : Rec_info_expr.t) =
 
 module Descr = struct
   type t =
-    | Value of head_of_kind_value TD.Descr.t Or_unknown_or_bottom.t
+    | Value of head_of_kind_value TD.Descr.t Or_unknown_or_bottom.t @@ global
     | Naked_immediate of
-        head_of_kind_naked_immediate TD.Descr.t Or_unknown_or_bottom.t
+        head_of_kind_naked_immediate TD.Descr.t Or_unknown_or_bottom.t @@ global
     | Naked_float32 of
-        head_of_kind_naked_float32 TD.Descr.t Or_unknown_or_bottom.t
-    | Naked_float of head_of_kind_naked_float TD.Descr.t Or_unknown_or_bottom.t
-    | Naked_int8 of head_of_kind_naked_int8 TD.Descr.t Or_unknown_or_bottom.t
-    | Naked_int16 of head_of_kind_naked_int16 TD.Descr.t Or_unknown_or_bottom.t
-    | Naked_int32 of head_of_kind_naked_int32 TD.Descr.t Or_unknown_or_bottom.t
-    | Naked_int64 of head_of_kind_naked_int64 TD.Descr.t Or_unknown_or_bottom.t
+        head_of_kind_naked_float32 TD.Descr.t Or_unknown_or_bottom.t @@ global
+    | Naked_float of
+        head_of_kind_naked_float TD.Descr.t Or_unknown_or_bottom.t @@ global
+    | Naked_int8 of
+        head_of_kind_naked_int8 TD.Descr.t Or_unknown_or_bottom.t @@ global
+    | Naked_int16 of
+        head_of_kind_naked_int16 TD.Descr.t Or_unknown_or_bottom.t @@ global
+    | Naked_int32 of
+        head_of_kind_naked_int32 TD.Descr.t Or_unknown_or_bottom.t @@ global
+    | Naked_int64 of
+        head_of_kind_naked_int64 TD.Descr.t Or_unknown_or_bottom.t @@ global
     | Naked_nativeint of
-        head_of_kind_naked_nativeint TD.Descr.t Or_unknown_or_bottom.t
+        head_of_kind_naked_nativeint TD.Descr.t Or_unknown_or_bottom.t @@ global
     | Naked_vec128 of
-        head_of_kind_naked_vec128 TD.Descr.t Or_unknown_or_bottom.t
+        head_of_kind_naked_vec128 TD.Descr.t Or_unknown_or_bottom.t @@ global
     | Naked_vec256 of
-        head_of_kind_naked_vec256 TD.Descr.t Or_unknown_or_bottom.t
+        head_of_kind_naked_vec256 TD.Descr.t Or_unknown_or_bottom.t @@ global
     | Naked_vec512 of
-        head_of_kind_naked_vec512 TD.Descr.t Or_unknown_or_bottom.t
-    | Naked_mask of head_of_kind_naked_mask TD.Descr.t Or_unknown_or_bottom.t
-    | Rec_info of head_of_kind_rec_info TD.Descr.t Or_unknown_or_bottom.t
-    | Region of head_of_kind_region TD.Descr.t Or_unknown_or_bottom.t
+        head_of_kind_naked_vec512 TD.Descr.t Or_unknown_or_bottom.t @@ global
+    | Naked_mask of
+        head_of_kind_naked_mask TD.Descr.t Or_unknown_or_bottom.t @@ global
+    | Rec_info of
+        head_of_kind_rec_info TD.Descr.t Or_unknown_or_bottom.t @@ global
+    | Region of head_of_kind_region TD.Descr.t Or_unknown_or_bottom.t @@ global
 end
 
 let descr t : Descr.t =
+  exclave_
   match t with
   | Value ty -> Value (TD.descr ty)
   | Naked_immediate ty -> Naked_immediate (TD.descr ty)

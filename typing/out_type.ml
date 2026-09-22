@@ -678,7 +678,7 @@ let rec uniq = function
 
 let rec normalize_type_path ?(cache=false) env p =
   try
-    let (params, ty, _) = Env.find_type_expansion p env in
+    let #(params, ty, _) = Env.find_type_expansion p env in
     match get_desc ty with
       Tconstr (p1, tyl, _) ->
         if List.length params = List.length tyl

@@ -3449,7 +3449,7 @@ let check_regularity ~abs_env env loc path decl to_check =
           else if to_check path' && not (List.mem path' prev_exp) then begin
             try
               (* Attempt expansion *)
-              let (params0, body0, _) = Env.find_type_expansion path' env in
+              let #(params0, body0, _) = Env.find_type_expansion path' env in
               let (params, body) =
                 Ctype.instance_parameterized_type params0 body0 in
               begin
