@@ -28,7 +28,8 @@ val out_jkind : out_jkind printer
 val out_type : out_type printer
 val out_type_args : out_type list printer
 val out_constr : out_constructor printer
-val out_constr_args : (out_type * out_modality list) list printer
+val out_constr_args :
+  (out_type * out_modality list * Asttypes.inherit_flag) list printer
 val out_class_type : out_class_type printer
 val out_module_type : out_module_type printer
 val out_sig_item : out_sig_item printer

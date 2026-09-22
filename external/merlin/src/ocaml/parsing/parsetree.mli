@@ -790,6 +790,7 @@ and type_kind =
 and label_declaration =
     {
      pld_name: string loc;
+     pld_inherit: inherit_flag;
      pld_mutable: mutable_flag;
      pld_modalities: modalities;
      pld_type: core_type;
@@ -802,7 +803,10 @@ and label_declaration =
                              is {{!Asttypes.mutable_flag.Immutable}[Immutable]},
    - [{ ...; mutable l: T; ... }]
                            when {{!label_declaration.pld_mutable}[pld_mutable]}
-                             is {{!Asttypes.mutable_flag.Mutable}[Mutable]}.
+                             is {{!Asttypes.mutable_flag.Mutable}[Mutable]},
+   - [{ ...; inherit l: T; ... }]
+                           when {{!label_declaration.pld_inherit}[pld_inherit]}
+                             is {{!Asttypes.inherit_flag.Inherited}[Inherited]}.
 
    Note: [T] can be a {{!core_type_desc.Ptyp_poly}[Ptyp_poly]}.
 *)
@@ -820,6 +824,7 @@ and constructor_declaration =
 
 and constructor_argument =
   {
+    pca_inherit: inherit_flag;  (** [C of inherit T] *)
     pca_modalities: modalities;
     pca_type: core_type;
     pca_loc: Location.t;

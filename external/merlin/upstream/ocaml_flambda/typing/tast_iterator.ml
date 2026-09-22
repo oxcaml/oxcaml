@@ -199,7 +199,7 @@ let label_decl sub
   sub.typ sub ld_type;
   sub.modalities sub ld_modalities
 
-let field_decl sub {ca_loc; ca_type; ca_modalities} =
+let field_decl sub {ca_loc; ca_type; ca_modalities; ca_inherit = _} =
   sub.location sub ca_loc;
   sub.typ sub ca_type;
   sub.modalities sub ca_modalities

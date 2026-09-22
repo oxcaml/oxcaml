@@ -2519,20 +2519,27 @@ let rec out_jkind_of_desc env (desc : 'd Jkind.Desc.t) =
     Ojkind_var ("'_representable_layout_" ^
                 Int.to_string (Jkind.Sort.Var.get_print_number n),
                 Jkind.Scannable_axes.to_string_list sa)
-  (* Analyze structure (products and addressability) before calling
+  (* Analyze structure (products, addressability, and boxes) before calling
      [get_const]: the machinery in [Jkind.Const.to_out_jkind_const] works
      better for atomic layouts. *)
   | Layout (Product lays) ->
     Ojkind_product
       (List.map
          (fun layout ->
+            let layout = Jkind.Layout.strip_head_addressable_flat layout in
             out_jkind_of_desc env { desc with base = Layout layout })
          lays)
-  | Layout (Addressable lay) ->
+  | Layout (Addressable lay) when Option.is_none (Jkind.Desc.get_const desc) ->
     if Jkind.Layout.is_surely_addressable_flat lay then
       out_jkind_of_desc env { desc with base = Layout lay }
     else
       Ojkind_addressable (out_jkind_of_desc env { desc with base = Layout lay })
+  (* While we need to handle the non-constant case here, we prefer the
+     fallthrough to [Jkind.Const.to_out_jkind_const] otherwise, which puts the
+     mod- and with-bounds outside the layout *)
+  | Layout (Box (lay, sa)) when Option.is_none (Jkind.Desc.get_const desc) ->
+    let axes = Jkind.Layout.non_redundant_axes_of_box_flat lay sa in
+    Ojkind_box (out_jkind_of_desc env { desc with base = Layout lay }, axes)
   | _ -> match Jkind.Desc.get_const desc with
     | Some c -> out_jkind_of_const_jkind env c
     | None -> assert false (* handled above *)
@@ -2934,9 +2941,10 @@ and tree_of_labeled_typlist mode tyl =
     (fun (label, ty) -> label, tree_of_typexp mode Alloc.Const.legacy ty)
     tyl
 
-and tree_of_typ_gf {ca_type=ty; ca_modalities=gf; _} =
+and tree_of_typ_gf {ca_type=ty; ca_modalities=gf; ca_inherit; _} =
   (tree_of_typexp Type Alloc.Const.legacy ty,
-   tree_of_modalities Immutable gf)
+   tree_of_modalities Immutable gf,
+   ca_inherit)
 
 (** NB: This function might mutate states; the caller is responsible for
     reverting them. *)
@@ -3122,6 +3130,7 @@ let tree_of_label l =
   let ld_modalities = tree_of_modalities l.ld_mutable l.ld_modalities in
   {
     olab_name = Ident.name l.ld_id;
+    olab_inherit = l.ld_inherit;
     olab_mut = mut;
     olab_type = tree_of_typexp Type l.ld_type;
     olab_modalities = ld_modalities;
@@ -3129,7 +3138,8 @@ let tree_of_label l =
 
 let tree_of_constructor_arguments = function
   | Cstr_tuple l -> List.map tree_of_typ_gf l
-  | Cstr_record l -> [ Otyp_record (List.map tree_of_label l), [] ]
+  | Cstr_record l ->
+    [ Otyp_record (List.map tree_of_label l), [], Not_inherited ]
 
 let extension_constructor_args_and_ret_type_subtree args ret_type =
   match ret_type with

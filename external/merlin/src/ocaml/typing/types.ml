@@ -568,6 +568,7 @@ and constructor_representation =
 and label_declaration =
   {
     ld_id: Ident.t;
+    ld_inherit: inherit_flag;
     ld_mutable: mutability;
     ld_modalities: Mode.Modality.Const.t;
     ld_type: type_expr;
@@ -589,6 +590,7 @@ and constructor_declaration =
 
 and constructor_argument =
   {
+    ca_inherit: inherit_flag;
     ca_modalities: Mode.Modality.Const.t;
     ca_type: type_expr;
     ca_sort: Jkind_types.Sort.Const.t option;
@@ -1072,17 +1074,21 @@ let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
 let find_unboxed_type decl =
   match decl.type_kind with
     Type_record
-      ([{ld_type = arg; ld_modalities = ms; _}],
+      ([{ld_type = arg; ld_modalities = ms; ld_inherit = inh; _}],
        Record_unboxed, _)
   | Type_record
-      ([{ld_type = arg; ld_modalities = ms; _ }],
+      ([{ld_type = arg; ld_modalities = ms; ld_inherit = inh; _ }],
        Record_inlined (_, _, Variant_unboxed), _)
   | Type_record_unboxed_product
-      ([{ld_type = arg; ld_modalities = ms; _ }],
+      ([{ld_type = arg; ld_modalities = ms; ld_inherit = inh; _ }],
        (Record_unboxed_product | Record_unboxed_product_undetermined), _)
-  | Type_variant ([{cd_args = Cstr_tuple [{ca_type = arg; ca_modalities = ms; _}]; _}], Variant_unboxed, _)
-  | Type_variant ([{cd_args = Cstr_record [{ld_type = arg; ld_modalities = ms; _}]; _}], Variant_unboxed, _) ->
-    Some (arg, ms)
+  | Type_variant ([{cd_args = Cstr_tuple [{ca_type = arg; ca_modalities = ms;
+                                           ca_inherit = inh; _}]; _}],
+                  Variant_unboxed, _)
+  | Type_variant ([{cd_args = Cstr_record [{ld_type = arg; ld_modalities = ms;
+                                            ld_inherit = inh; _}]; _}],
+                  Variant_unboxed, _) ->
+    Some (arg, ms, inh)
   | Type_record (_, ( Record_inlined _ | Record_unboxed
                     | Record_boxed | Record_float | Record_ufloat
                     | Record_mixed _ | Record_dummy _ | Record_undetermined

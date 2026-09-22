@@ -1228,7 +1228,8 @@ module Merge = struct
           ignore
             (* CR layouts v2.8: Does this type_jkind need to be instantiated?
                Internal ticket 5095. *)
-            (Ctype.constrain_decl_jkind env tdecl sig_decl.type_jkind);
+            (Ctype.constrain_decl_jkind env ~path:(Pident id) tdecl
+               sig_decl.type_jkind);
           check_type_decl sig_env sg_for_env loc id None tdecl sig_decl;
           let reason = "package constraint removal" in
           let tdecl =

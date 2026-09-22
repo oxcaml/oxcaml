@@ -590,6 +590,10 @@ let rec layout s l =
     let l'' = layout s l' in
     if l' == l'' then l
     else Addressable l''
+  | Box (l', ax) ->
+    let l'' = layout s l' in
+    if l' == l'' then l
+    else Box (l'', ax)
 
 let jkind_desc s jkind =
   match jkind.base with
@@ -845,6 +849,7 @@ let rename_decl_ident s id =
 let label_declaration copy_scope s l =
   {
     ld_id = rename_decl_ident s l.ld_id;
+    ld_inherit = l.ld_inherit;
     ld_mutable = l.ld_mutable;
     ld_modalities = l.ld_modalities;
     ld_sort = l.ld_sort;
@@ -857,6 +862,7 @@ let label_declaration copy_scope s l =
 let constructor_argument copy_scope s ca =
   {
     ca_type = typexp copy_scope s ca.ca_loc ca.ca_type;
+    ca_inherit = ca.ca_inherit;
     ca_sort = ca.ca_sort;
     ca_loc = loc s ca.ca_loc;
     ca_modalities = ca.ca_modalities;

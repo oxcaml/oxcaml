@@ -114,6 +114,8 @@ module Sort : sig
       possibly under [Addressable] wrappers *)
   val is_scannable_or_var : t -> bool
 
+  val crosses_externality : t -> bool
+
   (** Decompose a sort into a list (of the given length) of fresh sort
       variables, equating the input sort with the product of the output sorts.
   *)
@@ -148,6 +150,8 @@ module Scannable_axes : sig
 
   val value_axes : t
 
+  val non_float_block_axes : t
+
   val equal : t -> t -> bool
 
   val less_or_equal : t -> t -> Misc.Le_result.t
@@ -175,6 +179,11 @@ module Layout : sig
     | Product of 'sort t list
     | Any of Scannable_axes.t
     | Addressable of 'sort t
+    | Box of 'sort t * Scannable_axes.t
+        (** The contents of a box imply some scannable axes, so the scannable
+            axes of a box are the meet of those implied axes and the axes
+            applied outside of the box constructor. See
+            [Const.box_scannable_axes]. *)
 
   module Const : sig
     type t = private
@@ -193,9 +202,14 @@ module Layout : sig
 
               Invariant: this constructor is never redundantly applied. I.e.,
               given [Addressable t], [not (is_surely_addressable t)]. *)
+      | Box of t * Scannable_axes.t
+          (** Invariant: axes on const boxes incorporate the axes implied by the
+              contents. I.e., given [Box (t, sa)],
+              [box_scannable_axes t sa = sa]. *)
 
     val any : Scannable_axes.t -> t
 
+    (** See [Sort.Const.product] *)
     val product : t list -> t
 
     val univar : Sort.univar -> t
@@ -212,13 +226,24 @@ module Layout : sig
 
     val get_sort : t -> Sort.Const.t option
 
-    val is_scannable_or_any : t -> bool
+    val crosses_externality : t -> bool
 
     val is_surely_addressable : t -> bool
 
     val addressable : t -> t
 
     val apply_operator : t -> Kind_operator.t -> t
+
+    (** [box_scannable_axes t sa] is the scannable axes of [t box sa]. *)
+    val box_scannable_axes : t -> Scannable_axes.t -> Scannable_axes.t
+
+    (** [non_redundant_axes_of_box t sa] is the minimal list of axis names that
+        must be applied to [t box] for it to have scannable axes [sa]. *)
+    val non_redundant_axes_of_box : t -> Scannable_axes.t -> string list
+
+    (** [box t sa] is the layout of boxed data whose unboxed form has layout
+        [t], met with [any sa]. *)
+    val box : t -> Scannable_axes.t -> t
 
     (** Returns [None] if the root of [t] has no meaningful scannable axes (e.g.
         [Base Float64], [Product], [Univar], [Genvar]). *)
@@ -241,6 +266,9 @@ module Layout : sig
 
   val get_flat_const : Sort.Flat.t t -> Const.t option
 
+  (** The layout of an unboxed product: it makes its components addressable (see
+      Note [Addressable kinds]), so a lone component is made addressable rather
+      than being the product's layout itself. *)
   val product : 'a t list -> 'a t
 
   val apply_operator : 'a t -> Kind_operator.t -> 'a t

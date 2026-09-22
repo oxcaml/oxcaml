@@ -676,6 +676,9 @@ val mcomp : Env.t -> type_expr -> type_expr -> unit
 type unwrapped_type_expr =
   { ty : type_expr
   ; modality : Mode.Modality.Const.t
+  ; addressable : bool
+    (* Whether a wrapper made [ty] addressable: a lone record field or
+       [@@unboxed] argument that is not [inherit] *)
   ; or_null : unwrapped_or_null option;
     (* We store the declaration and arguments rather than a bool to avoid
        re-writing the with-bounds of [or_null], and to be more robust for the
@@ -729,17 +732,19 @@ val contained_without_boxing : Env.t -> type_expr -> type_expr list
 val estimate_type_jkind : Env.t ->  type_expr -> jkind_l
 
 (* Get the jkind of a type, expanding it and looking through [[@@unboxed]]
-   types. *)
-val type_jkind : Env.t -> type_expr -> jkind_l
+   types. [mod_bounds_only] promises that only the result's mod- and
+   with-bounds are consumed, so its layout may be estimated cheaply. *)
+val type_jkind : ?mod_bounds_only:bool -> Env.t -> type_expr -> jkind_l
 
 (* Get the jkind of a type, dropping any changes to types caused by
    expansion. *)
-val type_jkind_purely : Env.t -> type_expr -> jkind_l
+val type_jkind_purely : ?mod_bounds_only:bool -> Env.t -> type_expr -> jkind_l
 
 (* Like [type_jkind_purely], but returns [None] if the type is not
    principally known. Useful to instantiate [jkind_of_type] in various
    functions exported by [Jkind]. *)
-val type_jkind_purely_if_principal : Env.t -> type_expr -> jkind_l option
+val type_jkind_purely_if_principal :
+  ?mod_bounds_only:bool -> Env.t -> type_expr -> jkind_l option
 
 (* Helper functions for creating jkind contexts *)
 val mk_jkind_context :
@@ -770,9 +775,11 @@ val type_jkind_and_sort :
    but correct: they are used to implement the module inclusion check, where
    we can be sure that the l-jkind has no undetermined variables. *)
 val check_decl_jkind :
-  Env.t -> type_declaration -> jkind_l -> (unit, Ikind.subjkind_error) result
+  Env.t -> path:Path.t -> type_declaration -> jkind_l ->
+  (unit, Ikind.subjkind_error) result
 val constrain_decl_jkind :
-  Env.t -> type_declaration -> jkind_l -> (unit, Ikind.subjkind_error) result
+  Env.t -> path:Path.t -> type_declaration -> jkind_l ->
+  (unit, Ikind.subjkind_error) result
 
 (* Compare two types for equality, with no renaming. This is useful for
    the [type_equal] function that must be passed to certain jkind functions. *)
@@ -780,6 +787,15 @@ val type_equal: Env.t -> type_expr -> type_expr -> bool
 
 val check_type_jkind :
   Env.t -> type_expr -> ('l * allowed) jkind -> (unit, Jkind.Violation.t) result
+
+(** [check_decl_jkind_l env ~path decl ~bound ~sub estimate] is [sub estimate],
+    except that when it fails and [estimate]'s layout is not below [bound]'s,
+    the layout is checked through the declaration's type ([constrain_type_jkind]
+    looks into boxes, tuples and records as far as [bound] asks) and [sub]
+    decides the rest on [estimate] with [bound]'s layout. *)
+val check_decl_jkind_l :
+  Env.t -> path:Path.t -> type_declaration -> bound:jkind_l ->
+  sub:(jkind_l -> (unit, 'e) result) -> jkind_l -> (unit, 'e) result
 val constrain_type_jkind :
   Env.t -> type_expr -> ('l * allowed) jkind -> (unit, Jkind.Violation.t) result
 

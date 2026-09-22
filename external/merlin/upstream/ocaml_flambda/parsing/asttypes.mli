@@ -40,6 +40,8 @@ type private_flag = Private | Public
 
 type mutable_flag = Immutable | Mutable
 
+type inherit_flag = Not_inherited | Inherited
+
 type atomic_flag = Nonatomic | Atomic
 
 type access_flag = Immutable_access | Mutable_access | Atomic_access

@@ -241,7 +241,7 @@ let field_decl sub x =
   let ca_type = sub.typ sub x.ca_type in
   let ca_loc = sub.location sub x.ca_loc in
   let ca_modalities = sub.modalities sub x.ca_modalities in
-  { ca_type; ca_loc; ca_modalities }
+  { ca_type; ca_loc; ca_modalities; ca_inherit = x.ca_inherit }
 
 let constructor_args sub = function
   | Cstr_tuple l -> Cstr_tuple (List.map (field_decl sub) l)

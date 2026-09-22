@@ -110,6 +110,9 @@ and out_jkind =
   (** The [string list] represents the scannable axes on the variable *)
   | Ojkind_product of out_jkind list
   | Ojkind_addressable of out_jkind
+  | Ojkind_box of out_jkind * string list
+  (** The [string list] represents the non-redundant scannable axes applied
+      atop the box *)
 
 (* should be empty if all the jkind annotations are missing *)
 and out_vars_jkinds = (string * out_jkind option) list
@@ -158,6 +161,7 @@ and out_type =
 
 and out_label = {
   olab_name: string;
+  olab_inherit: Asttypes.inherit_flag;
   olab_mut: out_mutability;
   olab_type: out_type;
   olab_modalities: out_modality list;
@@ -165,7 +169,7 @@ and out_label = {
 
 and out_constructor = {
   ocstr_name: string;
-  ocstr_args: (out_type * out_modality list) list;
+  ocstr_args: (out_type * out_modality list * Asttypes.inherit_flag) list;
   ocstr_return_type: (out_vars_jkinds * out_type) option;
   ocstr_all_void: bool;
 }
@@ -232,7 +236,7 @@ and out_extension_constructor =
   { oext_name: string;
     oext_type_name: string;
     oext_type_params: string list;
-    oext_args: (out_type * out_modality list) list;
+    oext_args: (out_type * out_modality list * Asttypes.inherit_flag) list;
     oext_ret_type: (out_vars_jkinds * out_type) option;
     oext_private: Asttypes.private_flag }
 and out_type_extension =

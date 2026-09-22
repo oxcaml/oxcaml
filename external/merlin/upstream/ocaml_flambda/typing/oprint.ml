@@ -27,6 +27,11 @@ let print_lident ppf = function
   | s when Lexer.is_keyword s -> fprintf ppf "\\#%s" s
   | s -> pp_print_string ppf s
 
+let print_inherit_flag ppf (inh : Asttypes.inherit_flag) =
+  match inh with
+  | Not_inherited -> ()
+  | Inherited -> pp_print_string ppf "inherit "
+
 let rec print_ident ppf =
   function
     Oide_ident s -> print_lident ppf s.printed_name
@@ -561,7 +566,7 @@ and print_typargs ppf =
       pp_close_box ppf ();
       pp_print_space ppf ()
 and print_out_label ppf
-    { olab_name; olab_mut; olab_type; olab_modalities } =
+    { olab_name; olab_inherit; olab_mut; olab_type; olab_modalities } =
   (* See the notes [NON-LEGACY MODES] *)
   let mut, atomic =
     match olab_mut with
@@ -573,7 +578,8 @@ and print_out_label ppf
     | Nonatomic -> ()
     | Atomic -> fprintf ppf " [@@atomic]"
   in
-  fprintf ppf "@[<2>%s%a :@ %a%a%a@];"
+  fprintf ppf "@[<2>%a%s%a :@ %a%a%a@];"
+    print_inherit_flag olab_inherit
     mut
     print_lident olab_name
     print_out_type olab_type
@@ -618,8 +624,15 @@ and print_out_jkind_const ppf ojkind =
     let base, withs = strip_withs ojkind in
     (match base with
     | Ojkind_const_default -> fprintf ppf "_"
-    | Ojkind_const_abbreviation (abbrev, sa) ->
-      (pp_print_list ~pp_sep:pp_print_space pp_print_string) ppf (abbrev :: sa)
+    | Ojkind_const_abbreviation (abbrev, operators) ->
+      (* A multi-word abbreviation (e.g. "bits64 mod everything") must be
+         parenthesized before postfix operators *)
+      let abbrev =
+        if operators <> [] && String.contains abbrev ' '
+        then "(" ^ abbrev ^ ")"
+        else abbrev
+      in
+      pp_print_string ppf (String.concat " " (abbrev :: operators))
     | Ojkind_const_mod (base, modes) ->
       let pp_base ppf base =
         match base with
@@ -655,13 +668,16 @@ and print_out_jkind ppf ojkind =
   let rec pp_element ~nested ppf ojkind =
     match ojkind with
     | Ojkind_var (v, nts) ->
-      (pp_print_list ~pp_sep:pp_print_space pp_print_string) ppf (v :: nts)
+      pp_print_string ppf (String.concat " " (v :: nts))
     | Ojkind_const jkind -> print_out_jkind_const ppf jkind
     | Ojkind_product ts ->
       let pp_sep ppf () = fprintf ppf "@ & " in
       pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
     | Ojkind_addressable t ->
       fprintf ppf "%a addressable" (pp_element ~nested:true) t
+    | Ojkind_box (t, axes) ->
+      fprintf ppf "%a box" (pp_element ~nested:true) t;
+      List.iter (fun axis -> fprintf ppf " %s" axis) axes
   in
   pp_element ~nested:false ppf ojkind
 
@@ -1052,7 +1068,8 @@ and print_out_type_decl kwd ppf td =
     print_or_null_attr
     print_out_attrs td.otype_attributes
 
-and print_simple_out_gf_type ppf (ty, gf) =
+and print_simple_out_gf_type ppf (ty, gf, inh) =
+  print_inherit_flag ppf inh;
   print_simple_out_type ppf ty;
   print_out_modalities ppf gf
 

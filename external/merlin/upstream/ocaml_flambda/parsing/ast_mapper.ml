@@ -263,7 +263,7 @@ module T = struct
     let pca_type = sub.typ sub x.pca_type in
     let pca_loc = sub.location sub x.pca_loc in
     let pca_modalities = sub.modalities sub x.pca_modalities in
-    { pca_type; pca_loc; pca_modalities }
+    { pca_type; pca_loc; pca_modalities; pca_inherit = x.pca_inherit }
 
   let map_constructor_arguments sub = function
     | Pcstr_tuple l -> Pcstr_tuple (List.map (map_constructor_argument sub) l)
@@ -962,10 +962,12 @@ let default_mapper =
       );
 
     label_declaration =
-      (fun this {pld_name; pld_type; pld_loc; pld_mutable; pld_modalities; pld_attributes} ->
+      (fun this {pld_name; pld_type; pld_loc; pld_inherit; pld_mutable;
+                 pld_modalities; pld_attributes} ->
          Type.field
            (map_loc this pld_name)
            (this.typ this pld_type)
+           ~inherit_:pld_inherit
            ~mut:pld_mutable
            ~modalities:(this.modalities this pld_modalities)
            ~loc:(this.location this pld_loc)

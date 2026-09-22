@@ -163,6 +163,10 @@ let line i f s (*...*) =
   fprintf f "%s" (String.make (2*i) ' ');
   fprintf f s (*...*)
 
+let inherit_flag i ppf = function
+  | Not_inherited -> ()
+  | Inherited -> line i ppf "Inherited\n"
+
 let list i f ppf l =
   match l with
   | [] -> line i ppf "[]\n"
@@ -1415,16 +1419,18 @@ and constructor_arguments i ppf = function
   | Cstr_tuple l -> list i field_decl ppf l
   | Cstr_record l -> list i label_decl ppf l
 
-and label_decl i ppf {ld_id; ld_name = _; ld_mutable; ld_type; ld_loc;
-                      ld_attributes; ld_modalities} =
+and label_decl i ppf {ld_id; ld_name = _; ld_inherit; ld_mutable; ld_type;
+                      ld_loc; ld_attributes; ld_modalities} =
   line i ppf "%a\n" fmt_location ld_loc;
   attributes i ppf ld_attributes;
+  inherit_flag (i+1) ppf ld_inherit;
   line (i+1) ppf "%a\n" fmt_mutable_mode_flag ld_mutable;
   line (i+1) ppf "%a" fmt_ident ld_id;
   core_type (i+1) ppf ld_type;
   modalities (i+1) ppf ld_modalities
 
-and field_decl i ppf {ca_type=ty; ca_loc=_; ca_modalities} =
+and field_decl i ppf {ca_type=ty; ca_loc=_; ca_modalities; ca_inherit} =
+  inherit_flag (i+1) ppf ca_inherit;
   core_type (i+1) ppf ty;
   modalities (i+1) ppf ca_modalities
 

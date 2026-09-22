@@ -398,6 +398,9 @@ let constant f const = constant_desc f const.pconst_desc
 let mutable_flag f = function
   | Immutable -> ()
   | Mutable -> pp f "mutable@;"
+let inherit_flag f = function
+  | Not_inherited -> ()
+  | Inherited -> pp f "inherit@;"
 let virtual_flag f  = function
   | Concrete -> ()
   | Virtual -> pp f "virtual@;"
@@ -466,7 +469,8 @@ let optional_atat_modalities_newline f m =
 
 let modalities_type pty ctxt f pca =
   let m = pca.pca_modalities in
-  pp f "%a%a"
+  pp f "%a%a%a"
+    inherit_flag pca.pca_inherit
     (pty ctxt) pca.pca_type
     optional_space_atat_modalities m
 
@@ -2163,7 +2167,8 @@ and type_def_list ctxt f (rf, exported, l) =
 
 and record_declaration ctxt f ~unboxed lbls =
   let type_record_field f pld =
-    pp f "@[<2>%a%a:@;%a%a@;%a@]"
+    pp f "@[<2>%a%a%a:@;%a%a@;%a@]"
+      inherit_flag pld.pld_inherit
       mutable_flag pld.pld_mutable
       ident_of_name pld.pld_name.txt
       (core_type ctxt) pld.pld_type

@@ -128,6 +128,12 @@ module Sort = struct
     | Void | Untagged_immediate | Float64 | Float32 | Bits8 | Bits16 | Bits32 ->
       false
 
+  let base_crosses_externality = function
+    | Scannable -> false
+    | Void | Untagged_immediate | Float64 | Float32 | Word | Bits8 | Bits16
+    | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask ->
+      true
+
   (* Global association list mapping poly vars to names for printing *)
   let sort_poly_var_names : (var * string) list ref = ref []
 
@@ -174,7 +180,11 @@ module Sort = struct
 
     let base b = Base b
 
-    let product cs = Product cs
+    let strip_root_addressable = function Addressable c -> c | c -> c
+
+    (* A product makes its components addressable, so [Addressable] on a
+       component would be redundant. *)
+    let product cs = Product (List.map strip_root_addressable cs)
 
     let univar uv = Univar uv
 
@@ -220,9 +230,9 @@ module Sort = struct
            representations *)
         all_void t
 
-    let rec is_surely_addressable = function
+    let is_surely_addressable = function
       | Base b -> base_is_addressable b
-      | Product cs -> List.for_all is_surely_addressable cs
+      | Product _ -> true
       | Univar _ | Genvar _ -> false
       | Addressable _ -> true
 
@@ -873,7 +883,7 @@ module Sort = struct
 
   let rec default_to_scannable_and_get : t -> Const.t = function
     | Base b -> Static.Const.of_base b
-    | Product ts -> Product (List.map default_to_scannable_and_get ts)
+    | Product ts -> Const.product (List.map default_to_scannable_and_get ts)
     | Univar uv -> Univar uv
     | Var r -> var_default_to_scannable_and_get r
     | Addressable s -> Const.addressable (default_to_scannable_and_get s)
@@ -904,8 +914,7 @@ module Sort = struct
   let rec to_const_opt : t -> Const.t option = function
     | Base b -> Some (Static.Const.of_base b)
     | Product ts ->
-      Misc.Stdlib.List.map_option to_const_opt ts
-      |> Option.map (fun cs : Const.t -> Const.Product cs)
+      Misc.Stdlib.List.map_option to_const_opt ts |> Option.map Const.product
     | Univar uv -> Some (Univar uv)
     | Var r -> (
       match r.contents with None -> None | Some s -> to_const_opt s)
@@ -916,6 +925,15 @@ module Sort = struct
       | Base Scannable | Var _ -> true
       | Addressable s -> go s
       | Base _ | Product _ | Univar _ -> false
+    in
+    go (get s)
+
+  let crosses_externality s =
+    let rec go = function
+      | Base b -> base_crosses_externality b
+      | Var _ | Univar _ -> false
+      | Product ts -> List.for_all go ts
+      | Addressable s -> go s
     in
     go (get s)
 
@@ -950,14 +968,6 @@ module Sort = struct
     | Addressable_no_mutation
     | Not_known_addressable
 
-  let combine_constrain_addressable_results r1 r2 =
-    match r1, r2 with
-    | Not_known_addressable, _ | _, Not_known_addressable ->
-      Not_known_addressable
-    | Addressable_mutated, _ | _, Addressable_mutated -> Addressable_mutated
-    | Addressable_no_mutation, Addressable_no_mutation ->
-      Addressable_no_mutation
-
   let rec constrain_addressable ~allow_mutation :
       t -> constrain_addressable_result = function
     | Addressable _ -> Addressable_no_mutation
@@ -965,15 +975,7 @@ module Sort = struct
       if base_is_addressable b
       then Addressable_no_mutation
       else Not_known_addressable
-    | Product ts ->
-      List.fold_left
-        (fun acc t ->
-          match acc with
-          | Not_known_addressable -> Not_known_addressable
-          | (Addressable_mutated | Addressable_no_mutation) as acc ->
-            combine_constrain_addressable_results acc
-              (constrain_addressable ~allow_mutation t))
-        Addressable_no_mutation ts
+    | Product _ -> Addressable_no_mutation
     | Univar _ -> Not_known_addressable
     | Var v -> (
       match v.contents with
@@ -1096,12 +1098,18 @@ module Sort = struct
            (strip_head_addressable s1)
            (strip_head_addressable arg2))
 
+  (* A product makes its components addressable, so components are equated
+     made addressable: incompletely, as in [equate_sort_addressable]. *)
   and equate_sorts sorts1 sorts2 =
     let rec go sorts1 sorts2 acc =
       match sorts1, sorts2 with
       | [], [] -> acc
       | sort1 :: sorts1, sort2 :: sorts2 -> (
-        match equate_sort_sort sort1 sort2 with
+        match
+          equate_sort_sort
+            (strip_head_addressable sort1)
+            (strip_head_addressable sort2)
+        with
         | Unequal -> Unequal
         | r -> go sorts1 sorts2 (combine_equate_results acc r))
       | _, _ -> assert false
@@ -1135,7 +1143,8 @@ module Sort = struct
       | Var v -> Fmt.fprintf ppf "%s" (Var.name v)
       | Product ts ->
         let pp_sep ppf () = Fmt.fprintf ppf " & " in
-        Fmt.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
+        Fmt.pp_nested_list ~nested ~pp_element ~pp_sep ppf
+          (List.map strip_head_addressable ts)
       | Univar { name = Some n } -> Fmt.fprintf ppf "%s" n
       | Univar { name = None } -> Fmt.fprintf ppf "_"
       | Addressable s when is_surely_addressable s -> pp_element ~nested ppf s
@@ -1183,6 +1192,9 @@ module Scannable_axes = struct
 
   let value_axes = { nullability = Non_null; separability = Separable }
 
+  let non_float_block_axes =
+    { nullability = Non_null; separability = Non_float }
+
   let equal { nullability = n1; separability = s1 }
       { nullability = n2; separability = s2 } =
     Nullability.equal n1 n2 && Separability.equal s1 s2
@@ -1208,6 +1220,7 @@ module Layout = struct
     | Product of 'sort t list
     | Any of Scannable_axes.t
     | Addressable of 'sort t
+    | Box of 'sort t * Scannable_axes.t
 
   module Const = struct
     type t =
@@ -1217,10 +1230,14 @@ module Layout = struct
       | Univar of Sort.univar
       | Genvar of Sort.var
       | Addressable of t
+      | Box of t * Scannable_axes.t
 
     let any sa = Any sa
 
-    let product cs = Product cs
+    let strip_root_addressable = function Addressable c -> c | c -> c
+
+    (* See [Sort.Const.product] *)
+    let product cs = Product (List.map strip_root_addressable cs)
 
     let univar uv = Univar uv
 
@@ -1238,39 +1255,40 @@ module Layout = struct
       | Univar uv1, Univar uv2 -> Sort.equal_univar_univar uv1 uv2
       | Genvar v1, Genvar v2 -> v1.id = v2.id
       | Addressable c1, Addressable c2 ->
-        (* Relies on invariant that constants don't have redundant [Addressable] *)
+        (* Relies on the invariant that consts have no redundant
+           [Addressable] *)
         equal c1 c2
-      | (Base _ | Any _ | Product _ | Univar _ | Genvar _ | Addressable _), _ ->
+      | Box (c1, sa1), Box (c2, sa2) ->
+        (* Relies on the invariant that axes on const boxes incorporate the
+           axes implied by the contents *)
+        equal c1 c2 && Scannable_axes.equal sa1 sa2
+      | ( ( Base _ | Any _ | Product _ | Univar _ | Genvar _ | Addressable _
+          | Box _ ),
+          _ ) ->
         false
 
     let rec get_sort : t -> Sort.Const.t option = function
       | Any _ -> None
       | Base (b, _) -> Sort.Const.some (Base b)
       | Product ts ->
-        Option.map
-          (fun x -> Sort.Const.Product x)
-          (Misc.Stdlib.List.map_option get_sort ts)
+        Option.map Sort.Const.product (Misc.Stdlib.List.map_option get_sort ts)
       | Univar uv -> Some (Sort.Const.Univar uv)
       | Genvar v -> Some (Sort.Const.Genvar v)
       | Addressable t -> Option.map Sort.Const.addressable (get_sort t)
+      | Box _ -> Sort.Const.some (Base Scannable)
 
-    let rec is_scannable_or_any = function
-      | Any _ | Base (Scannable, _) -> true
-      | Base
-          ( ( Void | Untagged_immediate | Float64 | Float32 | Word | Bits8
-            | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask ),
-            _ ) ->
-        false
-      | Product _ -> false
-      | Univar _ -> false
-      | Genvar _ -> false
-      | Addressable t -> is_scannable_or_any t
+    let rec crosses_externality = function
+      | Any _ | Univar _ | Genvar _ | Box _ -> false
+      | Base (b, _) -> Sort.base_crosses_externality b
+      | Product ts -> List.for_all crosses_externality ts
+      | Addressable t -> crosses_externality t
 
-    let rec is_surely_addressable = function
+    let is_surely_addressable = function
       | Base (b, _) -> Sort.base_is_addressable b
-      | Product cs -> List.for_all is_surely_addressable cs
+      | Product _ -> true
       | Any _ | Univar _ | Genvar _ -> false
       | Addressable _ -> true
+      | Box _ -> true
 
     let addressable c = if is_surely_addressable c then c else Addressable c
 
@@ -1278,23 +1296,82 @@ module Layout = struct
       | Id -> c
       | Addressable -> addressable c
 
+    let rec has_unknown_sort = function
+      | Any _ | Univar _ | Genvar _ -> true
+      | Base _ | Box _ -> false
+      | Product cs -> List.exists has_unknown_sort cs
+      | Addressable c -> has_unknown_sort c
+
+    let scannable_axes_of_boxed : t -> Scannable_axes.t = function
+      (* Non-addressable bases *)
+      | Base ((Void | Bits8 | Bits16 | Untagged_immediate), _) ->
+        { nullability = Non_null; separability = Non_pointer }
+      | Base ((Bits32 | Float32), _) ->
+        { nullability = Non_null; separability = Non_pointer64 }
+      | Base (Float64, _) -> Scannable_axes.value_axes
+      (* Addressable bases *)
+      | Base ((Scannable | Word | Bits64 | Vec128 | Vec256 | Vec512 | Mask), _)
+      | Box _
+      | Addressable (Base (_, _)) ->
+        Scannable_axes.non_float_block_axes
+      (* Products *)
+      | Product _ as c ->
+        if has_unknown_sort c
+        then Scannable_axes.max
+        else Scannable_axes.non_float_block_axes
+      (* Unknown *)
+      | Univar _ | Genvar _ | Any _ | Addressable (Univar _ | Genvar _ | Any _)
+        ->
+        Scannable_axes.max
+      (* Impossible: consts have no redundant [Addressable] *)
+      | Addressable (Addressable _ | Box _ | Product _) ->
+        Misc.fatal_error "scannable_axes_of_boxed"
+
+    let box_scannable_axes contents applied_axes =
+      Scannable_axes.meet (scannable_axes_of_boxed contents) applied_axes
+
+    let non_redundant_axes_of_box contents
+        ({ nullability; separability } : Scannable_axes.t) =
+      let implied = scannable_axes_of_boxed contents in
+      let separability =
+        if
+          Misc.Le_result.is_le
+            (Separability.less_or_equal implied.separability separability)
+        then []
+        else [Separability.to_string separability]
+      in
+      let nullability =
+        if
+          Misc.Le_result.is_le
+            (Nullability.less_or_equal implied.nullability nullability)
+        then []
+        else [Nullability.to_string nullability]
+      in
+      separability @ nullability
+
+    let box c sa = Box (c, box_scannable_axes c sa)
+
     let rec get_root_scannable_axes t =
       match t with
       | Any sa -> Some sa
-      | Base (_, sa) -> if is_scannable_or_any t then Some sa else None
+      | Base (Scannable, sa) -> Some sa
+      | Base (_, _) -> None
       | Product _ -> None
       | Univar _ -> None
       | Genvar _ -> None
       | Addressable t -> get_root_scannable_axes t
+      | Box (_, sa) -> Some sa
 
     let rec set_root_scannable_axes t sa =
       match t with
       | Any _ -> Any sa
-      | Base (b, _) -> if is_scannable_or_any t then Base (b, sa) else t
+      | Base (Scannable, _) -> Base (Scannable, sa)
+      | Base (_, _) -> t
       | Product _ -> t
       | Univar _ -> t
       | Genvar _ -> t
       | Addressable t' -> Addressable (set_root_scannable_axes t' sa)
+      | Box (t', _) -> box t' sa
 
     let meet_root_scannable_axes t sa =
       match get_root_scannable_axes t with
@@ -1477,10 +1554,11 @@ module Layout = struct
     | Univar uv -> Sort (Sort.Univar uv, Scannable_axes.max)
     | Genvar v -> Sort (Sort.Var v, Scannable_axes.max)
     | Addressable c -> Addressable (of_const c)
+    | Box (c, sa) -> Box (of_const c, sa)
 
   let product = function
     | [] -> Misc.fatal_error "Layout.product: empty product"
-    | [lay] -> lay
+    | [lay] -> Addressable lay
     | lays -> Product lays
 
   let apply_operator t : Kind_operator.t -> _ t = function
@@ -1491,10 +1569,10 @@ module Layout = struct
     | Any sa -> Some (Any sa)
     | Sort (s, sa) -> of_sort s sa
     | Product layouts ->
-      Option.map
-        (fun x -> Const.Product x)
+      Option.map Const.product
         (Misc.Stdlib.List.map_option (get_const of_sort) layouts)
     | Addressable t -> Option.map Const.addressable (get_const of_sort t)
+    | Box (t, sa) -> Option.map (fun c -> Const.box c sa) (get_const of_sort t)
 
   let get_flat_const t = get_const Const.of_flat_sort t
 
