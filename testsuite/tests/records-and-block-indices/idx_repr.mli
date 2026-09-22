@@ -2,9 +2,9 @@
 
 type t
 
-val of_idx_imm : 'a ('b : any). ('a, 'b) idx_imm -> t
+val of_idx_imm : ('a : any) ('b : any). ('a, 'b) idx_imm -> t
 
-val of_idx_mut : 'a ('b : any). ('a, 'b) idx_mut -> t
+val of_idx_mut : ('a : any) ('b : any). ('a, 'b) idx_mut -> t
 
 val equal : t -> t -> bool
 

@@ -50,7 +50,7 @@ let test_makearray () =
   let a = [| u |] in
   Idx_mut.set a
     ((.idx_mut(Idx_mut.unsafe_create_into_array 0).#y)
-      : (u array, _) idx_mut)
+      : (u array#, _) idx_mut)
     10;
   assert (u.#y = 1);
   assert ((array_get a 0).#y = 10)
@@ -60,7 +60,7 @@ let test_makearray_multi () =
   let a = [| u; u |] in
   Idx_mut.set a
     ((.idx_mut(Idx_mut.unsafe_create_into_array 0).#y)
-      : (u array, _) idx_mut)
+      : (u array#, _) idx_mut)
     10;
   assert (u.#y = 1);
   assert ((array_get a 0).#y = 10);
@@ -72,7 +72,7 @@ let test_arrayset () =
   array_set a 0 u;
   Idx_mut.set a
     ((.idx_mut(Idx_mut.unsafe_create_into_array 0).#y)
-      : (u array, _) idx_mut)
+      : (u array#, _) idx_mut)
     10;
   assert (u.#y = 1);
   assert ((array_get a 0).#y = 10)
@@ -82,7 +82,7 @@ let test_arrayget () =
   let u = array_get a 0 in
   Idx_mut.set a
     ((.idx_mut(Idx_mut.unsafe_create_into_array 0).#y)
-      : (u array, _) idx_mut)
+      : (u array#, _) idx_mut)
     10;
   assert (u.#y = 1);
   assert ((array_get a 0).#y = 10)
@@ -93,11 +93,11 @@ let test_arrayget () =
 
 let test_idx_get_whole_element () =
   let a = [| #{ x = 1; y = 1 } |] in
-  let whole : (u array, u) idx_mut = Idx_mut.unsafe_create_into_array 0 in
+  let whole : (u array#, u) idx_mut = Idx_mut.unsafe_create_into_array 0 in
   let u = Idx_mut.get a whole in
   Idx_mut.set a
     ((.idx_mut(Idx_mut.unsafe_create_into_array 0).#y)
-      : (u array, _) idx_mut)
+      : (u array#, _) idx_mut)
     10;
   assert (u.#y = 1);
   assert ((array_get a 0).#y = 10)
@@ -105,11 +105,11 @@ let test_idx_get_whole_element () =
 let test_idx_set_whole_element () =
   let u = #{ x = 1; y = 1 } in
   let a = [| #{ x = 0; y = 0 } |] in
-  let whole : (u array, u) idx_mut = Idx_mut.unsafe_create_into_array 0 in
+  let whole : (u array#, u) idx_mut = Idx_mut.unsafe_create_into_array 0 in
   Idx_mut.set a whole u;
   Idx_mut.set a
     ((.idx_mut(Idx_mut.unsafe_create_into_array 0).#y)
-      : (u array, _) idx_mut)
+      : (u array#, _) idx_mut)
     10;
   assert (u.#y = 1);
   assert ((array_get a 0).#y = 10)
@@ -120,7 +120,7 @@ let test_unsafe_arrayset () =
   array_unsafe_set a 0 u;
   Idx_mut.set a
     ((.idx_mut(Idx_mut.unsafe_create_into_array 0).#y)
-      : (u array, _) idx_mut)
+      : (u array#, _) idx_mut)
     10;
   assert (u.#y = 1);
   assert ((array_get a 0).#y = 10)
@@ -130,7 +130,7 @@ let test_unsafe_arrayget () =
   let u = array_unsafe_get a 0 in
   Idx_mut.set a
     ((.idx_mut(Idx_mut.unsafe_create_into_array 0).#y)
-      : (u array, _) idx_mut)
+      : (u array#, _) idx_mut)
     10;
   assert (u.#y = 1);
   assert ((array_get a 0).#y = 10)
@@ -140,11 +140,11 @@ let test_makearray_dynamic () =
   let a = makearray_dynamic 3 u in
   Idx_mut.set a
     ((.idx_mut(Idx_mut.unsafe_create_into_array 0).#y)
-      : (u array, _) idx_mut)
+      : (u array#, _) idx_mut)
     10;
   Idx_mut.set a
     ((.idx_mut(Idx_mut.unsafe_create_into_array 1).#y)
-      : (u array, _) idx_mut)
+      : (u array#, _) idx_mut)
     20;
   assert (u.#y = 1);
   assert ((array_get a 0).#y = 10);
@@ -157,11 +157,11 @@ let test_arrayblit () =
   array_blit src 0 dst 0 2;
   Idx_mut.set dst
     ((.idx_mut(Idx_mut.unsafe_create_into_array 0).#y)
-      : (u array, _) idx_mut)
+      : (u array#, _) idx_mut)
     10;
   Idx_mut.set dst
     ((.idx_mut(Idx_mut.unsafe_create_into_array 1).#y)
-      : (u array, _) idx_mut)
+      : (u array#, _) idx_mut)
     20;
   assert ((array_get src 0).#y = 1);
   assert ((array_get src 1).#y = 2);
@@ -178,7 +178,7 @@ let test_nested_makearray () =
   let a = [| o |] in
   Idx_mut.set a
     ((.idx_mut(Idx_mut.unsafe_create_into_array 0).#inner.#a)
-      : (outer array, _) idx_mut)
+      : (outer array#, _) idx_mut)
     99;
   assert (o.#inner.#a = 1);
   assert ((array_get a 0).#inner.#a = 99)
@@ -188,7 +188,7 @@ let test_nested_arrayget () =
   let o = array_get a 0 in
   Idx_mut.set a
     ((.idx_mut(Idx_mut.unsafe_create_into_array 0).#inner.#a)
-      : (outer array, _) idx_mut)
+      : (outer array#, _) idx_mut)
     99;
   assert (o.#inner.#a = 1);
   assert ((array_get a 0).#inner.#a = 99)
@@ -202,7 +202,7 @@ let test_ignorable_makearray () =
   let a = [| v |] in
   Idx_mut.set a
     ((.idx_mut(Idx_mut.unsafe_create_into_array 0).#i)
-      : (ig array, _) idx_mut)
+      : (ig array#, _) idx_mut)
     10;
   assert (v.#i = 1);
   assert ((array_get a 0).#i = 10)
@@ -213,7 +213,7 @@ let test_ignorable_arrayset () =
   array_set a 0 v;
   Idx_mut.set a
     ((.idx_mut(Idx_mut.unsafe_create_into_array 0).#i)
-      : (ig array, _) idx_mut)
+      : (ig array#, _) idx_mut)
     10;
   assert (v.#i = 1);
   assert ((array_get a 0).#i = 10)
@@ -223,18 +223,18 @@ let test_ignorable_arrayget () =
   let v = array_get a 0 in
   Idx_mut.set a
     ((.idx_mut(Idx_mut.unsafe_create_into_array 0).#i)
-      : (ig array, _) idx_mut)
+      : (ig array#, _) idx_mut)
     10;
   assert (v.#i = 1);
   assert ((array_get a 0).#i = 10)
 
 let test_ignorable_idx_get_whole_element () =
   let a = [| #{ i = 1; f = #1.0 } |] in
-  let whole : (ig array, ig) idx_mut = Idx_mut.unsafe_create_into_array 0 in
+  let whole : (ig array#, ig) idx_mut = Idx_mut.unsafe_create_into_array 0 in
   let v = Idx_mut.get a whole in
   Idx_mut.set a
     ((.idx_mut(Idx_mut.unsafe_create_into_array 0).#i)
-      : (ig array, _) idx_mut)
+      : (ig array#, _) idx_mut)
     10;
   assert (v.#i = 1);
   assert ((array_get a 0).#i = 10)
@@ -242,11 +242,11 @@ let test_ignorable_idx_get_whole_element () =
 let test_ignorable_idx_set_whole_element () =
   let v = #{ i = 1; f = #1.0 } in
   let a = [| #{ i = 0; f = #0.0 } |] in
-  let whole : (ig array, ig) idx_mut = Idx_mut.unsafe_create_into_array 0 in
+  let whole : (ig array#, ig) idx_mut = Idx_mut.unsafe_create_into_array 0 in
   Idx_mut.set a whole v;
   Idx_mut.set a
     ((.idx_mut(Idx_mut.unsafe_create_into_array 0).#i)
-      : (ig array, _) idx_mut)
+      : (ig array#, _) idx_mut)
     10;
   assert (v.#i = 1);
   assert ((array_get a 0).#i = 10)
@@ -256,11 +256,11 @@ let test_ignorable_makearray_dynamic () =
   let a = makearray_dynamic 3 v in
   Idx_mut.set a
     ((.idx_mut(Idx_mut.unsafe_create_into_array 0).#i)
-      : (ig array, _) idx_mut)
+      : (ig array#, _) idx_mut)
     10;
   Idx_mut.set a
     ((.idx_mut(Idx_mut.unsafe_create_into_array 1).#i)
-      : (ig array, _) idx_mut)
+      : (ig array#, _) idx_mut)
     20;
   assert (v.#i = 1);
   assert ((array_get a 0).#i = 10);
@@ -273,11 +273,11 @@ let test_ignorable_arrayblit () =
   array_blit src 0 dst 0 2;
   Idx_mut.set dst
     ((.idx_mut(Idx_mut.unsafe_create_into_array 0).#i)
-      : (ig array, _) idx_mut)
+      : (ig array#, _) idx_mut)
     10;
   Idx_mut.set dst
     ((.idx_mut(Idx_mut.unsafe_create_into_array 1).#i)
-      : (ig array, _) idx_mut)
+      : (ig array#, _) idx_mut)
     20;
   assert ((array_get src 0).#i = 1);
   assert ((array_get src 1).#i = 2);

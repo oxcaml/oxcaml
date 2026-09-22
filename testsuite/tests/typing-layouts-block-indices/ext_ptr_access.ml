@@ -268,7 +268,7 @@ let () =
 type vf = #{ v : string; f : int64_u }
 type pt_vf_pair = { mutable a : vf; mutable b : vf }
 
-external idx_to_int64 : (pt_vf_pair, vf) idx_mut -> int64_u = "%obj_magic"
+external idx_to_int64 : (pt_vf_pair#, vf) idx_mut -> int64_u = "%obj_magic"
 
 (* Global (non-local) variants: the read value is a real heap object, so we can
    return it globally and print the string field. *)

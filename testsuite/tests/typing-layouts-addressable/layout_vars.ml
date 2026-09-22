@@ -483,7 +483,7 @@ module Inherited_boxed_kinds :
 
 module type Inherited_boxed_index = module type of struct
   type t = { inherit i : int }
-  let index : (t, int) idx_imm = (.i)
+  let index : (t#, int) idx_imm = (.i)
 end
 [%%expect{|
 module type Inherited_boxed_index =

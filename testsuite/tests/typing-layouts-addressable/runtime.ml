@@ -182,18 +182,18 @@ let () =
   assert (u.#head = 44 && Float_u.to_float u.#tail = 8.75)
 
 external get_imm_idx :
-  ('a : value_or_null) ('b : any). 'a -> ('a, 'b) idx_imm -> 'b
+  ('a : any) ('b : any). 'a box -> ('a, 'b) idx_imm -> 'b
   = "%get_idx_imm" [@@layout_poly]
 external get_mut_idx :
-  ('a : value_or_null) ('b : any). 'a -> ('a, 'b) idx_mut -> 'b
+  ('a : any) ('b : any). 'a box -> ('a, 'b) idx_mut -> 'b
   = "%get_idx" [@@layout_poly]
 external compose_imm_idx :
-  ('a : value_or_null) ('b : any) ('c : any).
-  ('a, 'b) idx_imm -> ('b box, 'c) idx_imm -> ('a, 'c) idx_imm
+  ('a : any) ('b : any) ('c : any).
+  ('a, 'b) idx_imm -> ('b, 'c) idx_imm -> ('a, 'c) idx_imm
   = "%idx_compose"
 external compose_mut_imm_idx :
-  ('a : value_or_null) ('b : any) ('c : any).
-  ('a, 'b) idx_mut -> ('b box, 'c) idx_imm -> ('a, 'c) idx_mut
+  ('a : any) ('b : any) ('c : any).
+  ('a, 'b) idx_mut -> ('b, 'c) idx_imm -> ('a, 'c) idx_mut
   = "%idx_compose"
 
 type inherited_payload = { pf : float#; ps : string }

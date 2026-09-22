@@ -4,7 +4,7 @@
  flags = "-extension layouts_beta";
  { bytecode; }
  { native; }
- { flags += "-Oclassic"; native; }
+ { flags += " -Oclassic"; native; }
 *)
 
 open Stdlib_stable

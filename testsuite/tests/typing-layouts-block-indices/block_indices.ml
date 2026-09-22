@@ -428,7 +428,7 @@ module Composition = struct
         suffix = #3L;
         tail = "tail" }
     in
-    let middle : (outer, middle#) idx_mut = (.middle) in
+    let middle : (outer#, middle#) idx_mut = (.middle) in
     let leaf = Idx_mut.compose_imm middle (.leaf) in
     let flat = Idx_mut.compose leaf (.flat) in
     let left = Idx_mut.compose_imm leaf (.left) in
@@ -467,7 +467,7 @@ module Composition = struct
   let () =
     let a : ints# array = [| #{ first = 1; second = 2 };
                             #{ first = 3; second = 4 } |] in
-    let field : (ints, int) idx_mut = (.second) in
+    let field : (ints#, int) idx_mut = (.second) in
     let second = Idx_mut.compose (Idx_mut.unsafe_create_into_array 1) field in
     Idx_mut.set a second 5;
     assert (Idx_mut.get a second = 5);

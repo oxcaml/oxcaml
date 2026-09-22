@@ -324,7 +324,7 @@ let test_array_idx_access ~local ty =
                 line "let el = %s in" reference_update;
                 line
                   "Idx_mut.set a ((.idx_mut(Idx_mut.unsafe_create_into_array \
-                   i)%s) : (%s array, _) idx_mut) next_el%s;"
+                   i)%s) : (%s array#, _) idx_mut) next_el%s;"
                   (Path.to_string unboxed_path)
                   (Type.code ty)
                   (Path.to_string unboxed_path);
@@ -346,7 +346,7 @@ let take_n l n =
 let test_array_idx_deepening ty =
   let unboxed_paths_by_depth = Type.unboxed_paths_by_depth ty in
   let debug_exprs = [] in
-  let ty_array_s = Type.code ty ^ " array" in
+  let ty_array_s = Type.code ty ^ " array#" in
   type_section ty;
   List.iter unboxed_paths_by_depth ~f:(fun (depth, unboxed_paths) ->
       List.iter unboxed_paths ~f:(fun unboxed_path ->
@@ -428,7 +428,7 @@ let test_record_idx_access ty ~local =
                 in
                 line "let expected = %s in" reference_update;
                 let idx =
-                  sprintf "((.%s%s) : (%s, _) idx_mut)" lbl
+                  sprintf "((.%s%s) : (%s#, _) idx_mut)" lbl
                     (Path.to_string unboxed_path)
                     (Type.code ty)
                 in
@@ -470,7 +470,7 @@ let test_record_idx_deepening ty =
               let full_path = Path.Field lbl :: unboxed_path in
               line "(* Deepening to (%s) *)" (Path.to_string full_path);
               let test_deepening () =
-                line "let idx : (%s, _) idx_mut = (%s) in" (Type.code ty)
+                line "let idx : (%s#, _) idx_mut = (%s) in" (Type.code ty)
                   (Path.to_string full_path);
                 line "iter indices_in_deepening_tests ~f:(fun i ->";
                 with_indent (fun () ->
@@ -484,7 +484,7 @@ let test_record_idx_deepening ty =
                         = Void
                       in
                       line "(* from (%s) *)" (Path.to_string prefix);
-                      line "let shallow : (%s, _) idx_mut = (%s) in"
+                      line "let shallow : (%s#, _) idx_mut = (%s) in"
                         (Type.code ty) (Path.to_string prefix);
                       line "let deepened = (.idx_mut(shallow)%s) in"
                         (Path.to_string suffix);

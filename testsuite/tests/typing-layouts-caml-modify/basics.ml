@@ -413,8 +413,8 @@ let () =
    number of caml_modifies *)
 
 (* First layout poly versions *)
-external unsafe_set : ('a : value) ('b : any).
-  'a -> ('a, 'b) idx_mut -> 'b -> unit = "%set_idx"
+external unsafe_set : ('a : any) ('b : any).
+  'a box -> ('a, 'b) idx_mut -> 'b -> unit = "%set_idx"
 [@@layout_poly]
 
 let () =
@@ -446,8 +446,8 @@ let () =
                ignore (Sys.opaque_identity t))
 
 (* Second, specialized versions *)
-external unsafe_set_imm : ('a : value) ('b : immediate).
-  'a -> ('a, 'b) idx_mut -> 'b -> unit = "%set_idx"
+external unsafe_set_imm : ('a : any) ('b : immediate).
+  'a box -> ('a, 'b) idx_mut -> 'b -> unit = "%set_idx"
 
 let () =
   let open struct
@@ -458,8 +458,8 @@ let () =
   test ~expect_caml_modifies:0
     (fun () -> unsafe_set_imm t idx 1; ignore (Sys.opaque_identity t))
 
-external unsafe_set_i64 : ('a : value) ('b : bits64).
-  'a -> ('a, 'b) idx_mut -> 'b -> unit = "%set_idx"
+external unsafe_set_i64 : ('a : any) ('b : bits64).
+  'a box -> ('a, 'b) idx_mut -> 'b -> unit = "%set_idx"
 
 let () =
   let open struct
@@ -470,8 +470,8 @@ let () =
   test ~expect_caml_modifies:0
     (fun () -> unsafe_set_i64 t idx #1L; ignore (Sys.opaque_identity t))
 
-external unsafe_set_prod : ('a : value) ('b : bits64 & value & immediate).
-  'a -> ('a, 'b) idx_mut -> 'b -> unit = "%set_idx"
+external unsafe_set_prod : ('a : any) ('b : bits64 & value & immediate).
+  'a box -> ('a, 'b) idx_mut -> 'b -> unit = "%set_idx"
 
 let () =
   let open struct
@@ -484,20 +484,20 @@ let () =
                ignore (Sys.opaque_identity t))
 
 external unsafe_set_or_null
-  : ('a : value) ('b : any).
-  'a or_null @ local -> ('a, 'b) idx_mut @ local -> 'b -> unit
+  : ('a : any) ('b : any).
+  'a box or_null @ local -> ('a, 'b) idx_mut @ local -> 'b -> unit
   @@ portable
   = "%set_idx"
 [@@layout_poly]
 
 let () =
   let open struct
-    type ('base : value, 'data : any) impl =
-      #{ x : 'base or_null
+    type ('base : any, 'data : any) impl =
+      #{ x : 'base box or_null
       ; global_ idx : ('base, 'data) idx_mut
       }
 
-    type ('data : any) t = T : ('base : value) ('data : any). ('base, 'data) impl -> 'data t
+    type ('data : any) t = T : ('base : any) ('data : any). ('base, 'data) impl -> 'data t
     [@@unboxed]
 
     type 'a s = { mutable y : int or_null }
@@ -569,8 +569,8 @@ let () =
 
 (* First layout poly versions *)
 external[@layout_poly] unsafe_set_ptr :
-  'a ('b : any).
-  (#('a * ('a, 'b) idx_mut)[@local_opt]) -> ('b[@local_opt]) -> unit
+  ('a : any) ('b : any).
+  (#('a box * ('a, 'b) idx_mut)[@local_opt]) -> ('b[@local_opt]) -> unit
   = "%unsafe_set_ptr"
 
 let () =
@@ -603,8 +603,8 @@ let () =
 
 (* Second, specialized versions *)
 external unsafe_set_ptr_imm :
-  'a ('b : immediate).
-  (#('a * ('a, 'b) idx_mut)[@local_opt]) -> ('b[@local_opt]) -> unit
+  ('a : any) ('b : immediate).
+  (#('a box * ('a, 'b) idx_mut)[@local_opt]) -> ('b[@local_opt]) -> unit
   = "%unsafe_set_ptr"
 
 let () =
@@ -617,8 +617,8 @@ let () =
     (fun () -> unsafe_set_ptr_imm #(t, idx) 1; ignore (Sys.opaque_identity t))
 
 external unsafe_set_ptr_i64 :
-  'a ('b : bits64).
-  (#('a * ('a, 'b) idx_mut)[@local_opt]) -> ('b[@local_opt]) -> unit
+  ('a : any) ('b : bits64).
+  (#('a box * ('a, 'b) idx_mut)[@local_opt]) -> ('b[@local_opt]) -> unit
   = "%unsafe_set_ptr"
 
 
@@ -632,8 +632,8 @@ let () =
     (fun () -> unsafe_set_ptr_i64 #(t, idx) #1L; ignore (Sys.opaque_identity t))
 
 external unsafe_set_ptr_prod :
-  'a ('b : bits64 & value & immediate).
-  (#('a * ('a, 'b) idx_mut)[@local_opt]) -> ('b[@local_opt]) -> unit
+  ('a : any) ('b : bits64 & value & immediate).
+  (#('a box * ('a, 'b) idx_mut)[@local_opt]) -> ('b[@local_opt]) -> unit
   = "%unsafe_set_ptr"
 
 let () =

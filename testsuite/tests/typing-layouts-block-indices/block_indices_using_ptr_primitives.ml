@@ -43,11 +43,11 @@ external[@layout_poly] set :
   "%array_safe_set"
 
 external[@layout_poly] unsafe_get_ptr :
-  'a ('b : any). (#('a * ('a, 'b) idx_mut)[@local_opt]) -> ('b[@local_opt])
+  ('a : any) ('b : any). (#('a box * ('a, 'b) idx_mut)[@local_opt]) -> ('b[@local_opt])
   = "%unsafe_get_ptr"
 
 external[@layout_poly] unsafe_set_ptr :
-  'a ('b : any). (#('a * ('a, 'b) idx_mut)[@local_opt]) -> ('b[@local_opt]) -> unit
+  ('a : any) ('b : any). (#('a box * ('a, 'b) idx_mut)[@local_opt]) -> ('b[@local_opt]) -> unit
   = "%unsafe_set_ptr"
 
 type void : void

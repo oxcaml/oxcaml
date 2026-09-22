@@ -64,7 +64,7 @@ Error: This type "int array#" should be an instance of type
 (* Basic typechecking of indices *)
 
 type r = { i : int; j : int }
-type t = (r# array, r#) idx_imm
+type t = (r# array#, r#) idx_imm
 [%%expect{|
 type r = { i : int; j : int; }
 type t = (r# array, r#) idx_imm
@@ -109,8 +109,8 @@ type t2 = { mutable a : string; b : int; c : string }
 
 let a2 () = (.a)
 let b2 () = (.b)
-let a1 () : (t1, _) idx_mut = (.a)
-let b1 () : (t1, _) idx_imm = (.b)
+let a1 () : (t1#, _) idx_mut = (.a)
+let b1 () : (t1#, _) idx_imm = (.b)
 [%%expect{|
 type t1 = { mutable a : string; b : int; }
 type t2 = { mutable a : string; b : int; c : string; }
@@ -122,17 +122,17 @@ val b1 : unit -> (t1, int) idx_imm = <fun>
 
 (* Still disambiguates through a Tpoly *)
 let a1 =
-  let a1 : 'a. (t1, _) idx_mut = (.a) in
+  let a1 : 'a. (t1#, _) idx_mut = (.a) in
   fun () -> a1
 [%%expect{|
 val a1 : unit -> (t1, string) idx_mut = <fun>
 |}]
 
 (* Disambiguate by alias to idx_imm types *)
-type ('c, 'b, 'a) mi = ('a, 'b) idx_mut
-type ('c, 'b, 'a) i = ('a, 'b) idx_imm
-let a () : (_, _, t1) mi = (.a)
-let b () : (float, int, t1) i = (.b)
+type ('c, 'b : any, 'a : any) mi = ('a, 'b) idx_mut
+type ('c, 'b : any, 'a : any) i = ('a, 'b) idx_imm
+let a () : (_, _, t1#) mi = (.a)
+let b () : (float, int, t1#) i = (.b)
 [%%expect{|
 type ('c, 'b, 'a) mi = ('a, 'b) idx_mut
 type ('c, 'b, 'a) i = ('a, 'b) idx_imm
@@ -145,7 +145,7 @@ type u = #{ x : int }
 type u2 = #{ x : string }
 type 'a r = { u : u }
 type 'a r2 = { u : u2 }
-let f () : (_ r, _) idx_imm = (.u.#x)
+let f () : (_ r#, _) idx_imm = (.u.#x)
 [%%expect{|
 type u = #{ x : int; }
 type u2 = #{ x : string; }
@@ -155,7 +155,7 @@ val f : unit -> ('a r, int) idx_imm = <fun>
 |}]
 
 (* Array type disambiguates the unboxed access *)
-let f () : (u array, _) idx_mut =
+let f () : (u array#, _) idx_mut =
   (.idx_mut(Idx_mut.unsafe_create_into_array 0).#x)
 [%%expect{|
 val f : unit -> (u array, int) idx_mut = <fun>
@@ -173,7 +173,7 @@ val f : unit -> (wrap_r, int) idx_imm = <fun>
 type y = { y : int }
 type 'a t = { a : 'a }
 let bad c = if c then
-    ((.a) : (y# t, _) idx_imm)
+    ((.a) : (y# t#, _) idx_imm)
   else
     (.a.#a)
 [%%expect{|
@@ -331,7 +331,7 @@ type 'a t = { t : 'a; }
 val f : unit -> ('a t# t, 'a) idx_imm = <fun>
 |}]
 
-let f () : (int t, _) idx_imm = (.t.#t)
+let f () : (int t#, _) idx_imm = (.t.#t)
 [%%expect{|
 Line 1, characters 37-38:
 1 | let f () : (int t, _) idx_imm = (.t.#t)
@@ -678,7 +678,7 @@ val g : atomic -> unit = <fun>
 |}]
 
 (* Cannot access an element whose layout is not value *)
-let f (t : 'a) (idx : ('a, float#) idx_atomic) = Idx_atomic.get t idx
+let f (t : 'a box) (idx : ('a, float#) idx_atomic) = Idx_atomic.get t idx
 [%%expect{|
 Line 1, characters 27-33:
 1 | let f (t : 'a) (idx : ('a, float#) idx_atomic) = Idx_atomic.get t idx
@@ -971,7 +971,7 @@ val ok : unit -> ('a box# mut_not_global# box_mut, 'a) idx_mut = <fun>
 
 (* CR layouts v8: could this error message more clearly point out the problem,
    that the element type is not [mod non_float]? *)
-let bad () : (float array, _) idx_mut =
+let bad () : (float array#, _) idx_mut =
   Idx_mut.unsafe_create_into_array 0
 [%%expect{|
 Line 2, characters 2-36:
@@ -988,7 +988,7 @@ Error: This expression has type "('a array, 'a) idx_mut"
 |}]
 
 type non_sep = float or_null
-let bad () : (_ array, non_sep) idx_mut =
+let bad () : (_ array#, non_sep) idx_mut =
   Idx_mut.unsafe_create_into_array 0
 [%%expect{|
 type non_sep = float or_null
@@ -1008,7 +1008,7 @@ Error: This expression has type "('a array, 'a) idx_mut"
 |}]
 
 type abstract
-let bad () : (abstract array, _) idx_mut =
+let bad () : (abstract array#, _) idx_mut =
   Idx_mut.unsafe_create_into_array 0
 [%%expect{|
 type abstract
@@ -1026,7 +1026,7 @@ Error: This expression has type "('a array, 'a) idx_mut"
          representable at call sites).
 |}]
 
-let bad () : (float iarray, _) idx_imm = Idx_imm.unsafe_create_into_iarray 0
+let bad () : (float iarray#, _) idx_imm = Idx_imm.unsafe_create_into_iarray 0
 [%%expect{|
 Line 1, characters 41-76:
 1 | let bad () : (float iarray, _) idx_imm = Idx_imm.unsafe_create_into_iarray 0
@@ -1060,7 +1060,7 @@ Error: The value "y" has type "('a array, 'a) idx_mut"
 |}]
 
 type non_sep = float or_null
-let bad () : (_ iarray, non_sep) idx_imm =
+let bad () : (_ iarray#, non_sep) idx_imm =
   Idx_imm.unsafe_create_into_iarray 0
 [%%expect{|
 type non_sep = float or_null
@@ -1080,7 +1080,7 @@ Error: This expression has type "('a iarray, 'a) idx_imm"
 |}]
 
 type abstract
-let bad () : (abstract iarray, _) idx_imm =
+let bad () : (abstract iarray#, _) idx_imm =
   Idx_imm.unsafe_create_into_iarray 0
 [%%expect{|
 type abstract
@@ -1131,7 +1131,7 @@ type 'a t = { a : 'a; }
    non-principally. *)
 let f c =
   if c then
-    ((.u.#x) : (_ r, _) idx_imm)
+    ((.u.#x) : (_ r#, _) idx_imm)
   else
     (.u.#x)
 [%%expect{|
@@ -1149,7 +1149,7 @@ val f : bool -> ('a r, int) idx_imm = <fun>
 (* First unboxed index disambiguated non-principally *)
 let f c =
   if c then
-    ((.a.#x) : (u t, _) idx_imm)
+    ((.a.#x) : (u t#, _) idx_imm)
   else
     (.a.#x)
 [%%expect{|
@@ -1167,7 +1167,7 @@ val f : bool -> (u t, int) idx_imm = <fun>
 (* Second unboxed index disambiguated non-principally *)
 let f c =
   if c then
-    ((.a.#a.#x) : (u t# t, _) idx_imm)
+    ((.a.#a.#x) : (u t# t#, _) idx_imm)
   else
     (.a.#a.#x)
 [%%expect{|
@@ -1187,7 +1187,7 @@ val f : bool -> (u t# t, int) idx_imm = <fun>
 let f c =
   if c then
     ((.idx_mut(Idx_mut.unsafe_create_into_array 0).#x)
-      : (u array, _) idx_mut)
+      : (u array#, _) idx_mut)
   else
     (.idx_mut(Idx_mut.unsafe_create_into_array 1).#x)
 [%%expect{|
@@ -1207,7 +1207,7 @@ val f : bool -> (u array, int) idx_mut = <fun>
 let f c =
   if c then
     ((.idx_mut(Idx_mut.unsafe_create_into_array 0).#a.#x)
-      : (u t# array, _) idx_mut)
+      : (u t# array#, _) idx_mut)
   else
     (.idx_mut(Idx_mut.unsafe_create_into_array 1).#a.#x)
 [%%expect{|
@@ -1279,11 +1279,11 @@ Error: Unable to determine the array kind for array index primitive: the
 (*************************)
 (* Specialize to aliases *)
 
-type ('a, 'b : any) an_idx : bits64 = ('a, 'b) idx_imm
+type ('a : any, 'b : any) an_idx : bits64 = ('a, 'b) idx_imm
 type ('a : any mod separable) an_array = 'a iarray
 
 external ok
-  : ('a : any mod separable). int -> ('a an_array, 'a) an_idx
+  : ('a : any mod separable). int -> ('a an_array#, 'a) an_idx
   = "%unsafe_array_idx"
 [@@layout_poly]
 let use_ok () = ok 0
@@ -1302,11 +1302,11 @@ val use_ok : ('a : value_maybe_null). unit -> ('a an_array, 'a) an_idx =
 type r = #{ x : int }
 
 module M : sig
-  type t : value_or_null
+  type t : any box
   val t : t
-  val i : (t, int) idx_mut
-  val j : (t, int) idx_imm
-  val k : (t, r) idx_imm
+  val i : (t#, int) idx_mut
+  val j : (t#, int) idx_imm
+  val k : (t#, r) idx_imm
 end = struct
   type t = { mutable i : int; j : int; k : r }
   let t = { i = 1; j = 2; k = #{ x = 3 } }
@@ -1340,9 +1340,9 @@ val k : int = 3
 
 type ('a : bits64) a = { a : 'a }
 module M : sig
-  val idx_imm : ('a : value_or_null) ('b : bits64).
+  val idx_imm : ('a : any) ('b : bits64).
     ('a, 'b a#) idx_imm -> ('a, 'b) idx_imm
-  val idx_mut : ('a : value_or_null) ('b : bits64).
+  val idx_mut : ('a : any) ('b : bits64).
     ('a, 'b a#) idx_mut -> ('a, 'b) idx_mut
 end = struct
   let idx_imm i = (.idx_imm(i).#a)
@@ -1424,3 +1424,46 @@ Error: This expression has type "Composition_types.inner box/2"
        File "_none_", line 1:
          Definition of type "box/2"
 |}]
+
+module Pointer_types = struct
+  type mutable_pointer = float# ptr
+  type immutable_pointer = float# ptr_imm
+  type mutable_address = float# addr
+  type immutable_address = float# addr_imm
+  type unrepresentable_contents = int array# addr_imm
+end
+[%%expect{||}]
+
+let immutable_pointer_set (p : int ptr_imm) = Ptr.unsafe_set p 1
+[%%expect{||}]
+
+let immutable_address_set (a : int addr_imm) = Addr.set a 1
+[%%expect{||}]
+
+let local_address_escape () =
+  let r = stack_ { contents = "local" } in
+  Addr.of_idx r (.contents)
+[%%expect{||}]
+
+let local_pointer_escape () =
+  let r = stack_ { contents = "local" } in
+  Ptr.of_idx r (.contents)
+[%%expect{||}]
+
+let local_address_store (a : (string * string) addr) =
+  let value = stack_ ("a", "b") in
+  Addr.set a value
+[%%expect{||}]
+
+let local_pointer_store (p : (string * string) ptr @ local) =
+  let value = stack_ ("a", "b") in
+  Ptr.unsafe_set p value
+[%%expect{||}]
+
+module Atomic_unboxing = struct
+  type t = { mutable value : int [@atomic] }
+  type alias = t
+  type unboxed_alias = alias#
+  let unbox (x : t) = unbox x
+end
+[%%expect{||}]
