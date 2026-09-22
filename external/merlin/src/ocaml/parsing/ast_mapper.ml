@@ -1024,8 +1024,8 @@ let default_mapper =
             this.modalities this modalities
           )
         | Pjk_kind_of ty -> Pjk_kind_of (this.typ this ty)
-        | Pjk_product ts ->
-          Pjk_product (List.map (this.jkind_annotation this) ts)
+        | Pjk_product (ts, inheritance) ->
+          Pjk_product (List.map (this.jkind_annotation this) ts, inheritance)
       in
       { pjka_loc; pjka_desc });
 

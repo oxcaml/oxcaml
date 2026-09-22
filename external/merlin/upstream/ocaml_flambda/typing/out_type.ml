@@ -2523,12 +2523,13 @@ let rec out_jkind_of_desc env (desc : 'd Jkind.Desc.t) =
      [get_const]: the machinery in [Jkind.Const.to_out_jkind_const] works
      better for atomic layouts. *)
   | Layout (Product lays) ->
+    let lays, inheritance = Jkind.Layout.product_for_printing_flat lays in
     Ojkind_product
       (List.map
          (fun layout ->
-            let layout = Jkind.Layout.strip_head_addressable_flat layout in
             out_jkind_of_desc env { desc with base = Layout layout })
-         lays)
+         lays,
+       inheritance)
   | Layout (Addressable lay) when Option.is_none (Jkind.Desc.get_const desc) ->
     if Jkind.Layout.is_surely_addressable_flat lay then
       out_jkind_of_desc env { desc with base = Layout lay }

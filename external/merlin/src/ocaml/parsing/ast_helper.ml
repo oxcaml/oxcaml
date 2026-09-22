@@ -176,7 +176,8 @@ module Typ = struct
         | Pjk_with (jkind, typ, modalities) ->
           Pjk_with (loop_jkind jkind, loop typ, modalities)
         | Pjk_kind_of typ -> Pjk_kind_of (loop typ)
-        | Pjk_product jkinds -> Pjk_product (List.map loop_jkind jkinds)
+        | Pjk_product (jkinds, inheritance) ->
+            Pjk_product (List.map loop_jkind jkinds, inheritance)
       in
       { jkind with pjka_desc }
     and loop_row_field field =

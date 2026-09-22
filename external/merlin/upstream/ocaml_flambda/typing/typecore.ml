@@ -299,6 +299,7 @@ type error =
   | Invalid_unboxed_access of
       { prev_el_type : type_expr; ua : Parsetree.unboxed_access }
   | Block_access_bad_record of string
+  | Inherited_field_not_addressable of type_expr
   | Block_index_modality_mismatch of
       { mut : bool; err : Modality.equate_error }
   | Mutable_block_index_polymorphic_field of Longident.t
@@ -1428,6 +1429,7 @@ let check_atomic_loc_of_finalized_repr ~loc ~env label record_repres lid =
   | Record_mixed _ | Record_inlined (_, Constructor_mixed _, _) ->
       raise (Error (loc, env, Mixed_record_atomic_loc lid))
   | Record_undetermined | Record_variable _
+  | Record_boxed_inherited | Record_boxed_inherited_variable _
   | Record_inlined
       (_, (Constructor_undetermined | Constructor_variable _), _)
   (* [@@unboxed] prohibits mutable (and therefore atomic) fields. *)
@@ -2061,7 +2063,8 @@ let determined_lbl_repres (type rep) (form : rep record_form)
       (rep : rep) : rep option =
   match form, rep with
   | Legacy,
-    (Record_undetermined | Record_inlined (_, Constructor_undetermined, _))
+    (Record_boxed_inherited | Record_undetermined
+    | Record_inlined (_, Constructor_undetermined, _))
     ->
     None
   | Unboxed_product, Record_unboxed_product_undetermined -> None
@@ -2941,6 +2944,7 @@ module Label = NameChoice (struct
     | Record_boxed | Record_float | Record_ufloat | Record_unboxed
     | Record_mixed _ | Record_dummy _ | Record_undetermined
     | Record_variable _ -> true
+    | Record_boxed_inherited | Record_boxed_inherited_variable _ -> true
     | Record_inlined _ -> false
 end)
 
@@ -6885,6 +6889,7 @@ and type_expect_
           | Record_boxed | Record_float | Record_ufloat | Record_mixed _
           | Record_inlined (_, _, (Variant_boxed _ | Variant_extensible))
           | Record_undetermined | Record_variable _
+          | Record_boxed_inherited | Record_boxed_inherited_variable _
             -> true
           | Record_dummy _ ->
             Misc.fatal_error "type_expect: dummy record representation"
@@ -9079,7 +9084,8 @@ and type_block_access env expected_base_ty principal
       raise (Error (lid.loc, env, Block_access_bad_record reason))
     in
     (match label.lbl_repres with
-     | Record_boxed | Record_undetermined | Record_variable _ -> ()
+     | Record_boxed | Record_undetermined | Record_variable _
+     | Record_boxed_inherited | Record_boxed_inherited_variable _ -> ()
      | Record_mixed shape ->
        if Array.exists (function Float_boxed -> true | _ -> false) shape then
          bad_record_error "[@@flatten_floats]"
@@ -9095,6 +9101,18 @@ and type_block_access env expected_base_ty principal
     (match label.lbl_private with
      | Public -> ()
      | Private -> bad_record_error "private");
+    (match label.lbl_inheritance with
+     | Noninherited -> ()
+     | Inherited ->
+       let addressable =
+         Jkind.Builtin.any ~why:Dummy_jkind
+         |> Jkind.apply_operator env Jkind_types.Kind_operator.Addressable
+       in
+       (match constrain_type_jkind env ty_arg addressable with
+        | Ok () -> ()
+        | Error _ ->
+          raise (Error (lid.loc, env,
+                        Inherited_field_not_addressable ty_arg))));
     let modality = label.lbl_modalities in
     { ba; base_ty = ty_res; el_ty = ty_arg; modality }
   | Baccess_block (mut, idx) ->
@@ -13721,6 +13739,11 @@ let report_error ~loc env =
   | Block_access_bad_record kind ->
     Location.errorf ~loc
       "Block indices do not support %s records." kind
+  | Inherited_field_not_addressable ty ->
+    Location.errorf ~loc
+      "An index into an inherited field requires addressable contents,@ \
+       but this field has type %a."
+      (Style.as_inline_code Printtyp.type_expr) ty
   | Block_index_modality_mismatch { mut; err } ->
     let step, Modality.Error(ax, { left; right }) = err in
     let print_modality_doc id =

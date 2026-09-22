@@ -3233,7 +3233,7 @@ and estimate_type_jkind ~expand_components ~ignore_mod_bounds ~mod_bounds_only
     in
     Jkind.for_boxed_tuple ~component_layouts elts
   | Tunboxed_tuple ltys ->
-      let tys = List.map snd ltys in
+      let tys = List.map (fun (_, ty) -> ty, Asttypes.Noninherited) ltys in
       estimate_unboxed_product_jkind ~expand_components ~ignore_mod_bounds env
         tys ~why:Jkind_intf.History.Unboxed_tuple
   | Tconstr (p, args, _) -> begin try
@@ -3273,7 +3273,11 @@ and estimate_type_jkind ~expand_components ~ignore_mod_bounds ~mod_bounds_only
             in
             Jkind.History.update_reason jkind (Product_creation Unboxed_record)
           | _ ->
-            let tys = Array.map snd label_params_and_tys |> Array.to_list in
+            let tys =
+              List.map2
+                (fun lbl (_, ty) -> ty, lbl.ld_inheritance)
+                lbls (Array.to_list label_params_and_tys)
+            in
             estimate_unboxed_product_jkind ~expand_components ~ignore_mod_bounds
               env tys ~why:Jkind_intf.History.Unboxed_record
           end
@@ -3364,14 +3368,18 @@ and estimate_unboxed_product_jkind
       ~expand_components ~ignore_mod_bounds ~why env tys =
   let tys_modalities, layouts =
     List.map
-      (fun ty ->
-         compute_ty_modality_layout ~expand_components ~ignore_mod_bounds env
-           (maybe_expand_component env ty ~expand_components))
+      (fun (ty, inheritance) ->
+         let ty_modality, layout =
+           compute_ty_modality_layout ~expand_components ~ignore_mod_bounds env
+             (maybe_expand_component env ty ~expand_components)
+         in
+         ty_modality,
+         Jkind_types.Layout.apply_operator layout
+           (field_kind_operator inheritance))
       tys
     |> List.split
   in
-  Jkind.Builtin.product ~why tys_modalities
-    (List.map (fun layout -> Jkind.Layout.Addressable layout) layouts)
+  Jkind.Builtin.product ~why tys_modalities layouts
 (* The layout of a block component. A component that is itself a box is a
    pointer: a scannable sort with the axes its contents imply, no deeper
    ([constrain_type_jkind] looks below a block on demand). [visited] guards

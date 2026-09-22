@@ -278,6 +278,10 @@ let record_representation i ppf = let open Types in function
       (if flatten_floats then " [@@flatten_floats]" else "")
   | Record_undetermined ->
     line i ppf "Record_undetermined\n"
+  | Record_boxed_inherited ->
+    line i ppf "Record_boxed_inherited\n"
+  | Record_boxed_inherited_variable _ ->
+    line i ppf "Record_boxed_inherited_variable\n"
   | Record_variable _ ->
     line i ppf "Record_variable\n"
 

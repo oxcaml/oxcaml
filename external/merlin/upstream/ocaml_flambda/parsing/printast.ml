@@ -602,8 +602,12 @@ and jkind_annotation i ppf (jkind : jkind_annotation) =
   | Pjk_kind_of type_ ->
       line i ppf "Pjk_kind_of\n";
       core_type (i+1) ppf type_
-  | Pjk_product jkinds ->
+  | Pjk_product (jkinds, inheritance) ->
       line i ppf "Pjk_product\n";
+      begin match inheritance with
+      | Noninherited -> ()
+      | Inherited -> line (i+1) ppf "Inherited\n"
+      end;
       list i jkind_annotation ppf jkinds
 
 and function_param i ppf { pparam_desc = desc; pparam_loc = loc } =

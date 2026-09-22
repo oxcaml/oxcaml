@@ -1167,9 +1167,15 @@ module Record_diffing = struct
 
         | Record_boxed, Record_boxed -> None
 
+        | Record_boxed_inherited, Record_boxed_inherited -> None
+        | Record_boxed_inherited, _ | _, Record_boxed_inherited ->
+          Some (Record_mismatch Representation_shape_mismatch)
+
         | Record_dummy _, _ | _, Record_dummy _ ->
           Misc.fatal_error
             "compare_with_representation: dummy record representation"
+        | Record_boxed_inherited_variable _, _
+        | _, Record_boxed_inherited_variable _
         | Record_variable _, _
         | _, Record_variable _ ->
           Misc.fatal_error

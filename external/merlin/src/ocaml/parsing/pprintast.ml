@@ -528,9 +528,12 @@ and jkind_annotation ?(nested = false) ctxt f k = match k.pjka_desc with
         optional_space_atat_modalities modalities;
     ) f (t, ty, modalities)
   | Pjk_kind_of ty -> pp f "(kind_of_ %a)" (core_type ctxt) ty
-  | Pjk_product ts ->
+  | Pjk_product (ts, inheritance) ->
     Misc.pp_parens_if nested (fun f ts ->
-      pp f "@[%a@]" (list (jkind_annotation ~nested:true ctxt) ~sep:"@ & ") ts
+      pp f "@[%a@]" (list (jkind_annotation ~nested:true ctxt) ~sep:"@ & ") ts;
+      match inheritance with
+      | Noninherited -> ()
+      | Inherited -> pp f " inherit"
     ) f ts
 
 and tyvar_jkind tyvar f (str, jkind) =

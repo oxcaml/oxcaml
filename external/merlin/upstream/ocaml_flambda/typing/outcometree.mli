@@ -52,6 +52,7 @@ type out_value =
   | Oval_int32 of int32
   | Oval_int64 of int64
   | Oval_nativeint of nativeint
+  | Oval_unboxed of out_value
   | Oval_list of out_value list
   | Oval_printer of (Format_doc.formatter -> unit)
   | Oval_record of (out_ident * out_value) list
@@ -108,7 +109,7 @@ and out_jkind =
   | Ojkind_const of out_jkind_const
   | Ojkind_var of string * string list
   (** The [string list] represents the scannable axes on the variable *)
-  | Ojkind_product of out_jkind list
+  | Ojkind_product of out_jkind list * Asttypes.field_inheritance
   | Ojkind_addressable of out_jkind
   | Ojkind_box of out_jkind * string list
   (** The [string list] represents the non-redundant scannable axes applied

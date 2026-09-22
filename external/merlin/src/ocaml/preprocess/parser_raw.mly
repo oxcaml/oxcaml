@@ -1300,6 +1300,7 @@ The precedences must be listed from low to high.
 %right    MINUSGREATER                  /* function_type (t -> t -> t) */
 %right    OR BARBAR                     /* expr (e || e || e) */
 %nonassoc below_AMPERSAND
+%nonassoc INHERIT
 %right    AMPERSAND AMPERAMPER          /* expr (e && e && e) */
 %nonassoc below_EQUAL
 %left     INFIXOP0 EQUAL LESS GREATER   /* expr (e OP e OP e) */
@@ -4317,8 +4318,8 @@ jkind_desc_gen(self):
   | UNDERSCORE {
       Pjk_default
     }
-  | reverse_product_jkind_gen(self) %prec below_AMPERSAND {
-      Pjk_product (List.rev $1)
+  | reverse_product_jkind_gen(self) field_inheritance %prec below_AMPERSAND {
+      Pjk_product (List.rev $1, $2)
     }
   | LPAREN inner = self RPAREN axes = mkrhs(LIDENT)* {
       match axes with

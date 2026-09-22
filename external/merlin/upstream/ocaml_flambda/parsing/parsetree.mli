@@ -1389,7 +1389,8 @@ and jkind_annotation_desc =
   | Pjk_mod of jkind_annotation * modes
   | Pjk_with of jkind_annotation * core_type * modalities
   | Pjk_kind_of of core_type
-  | Pjk_product of jkind_annotation list
+  | Pjk_product of jkind_annotation list * field_inheritance
+  (** The inheritance flag applies to the final component. *)
 
 and jkind_annotation =
   { pjka_loc : Location.t

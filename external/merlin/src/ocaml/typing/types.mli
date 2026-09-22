@@ -998,6 +998,11 @@ and record_representation =
   (* What [Record_undetermined] becomes after typechecking a use of the record.
      In translation, this refines to [Record_{boxed,mixed}]. *)
 
+  | Record_boxed_inherited
+  (* A singleton inherited record; instantiated at each use. *)
+  | Record_boxed_inherited_variable of Jkind_types.Sort.t
+  (* Its instantiated contents sort determines boxing and unboxing. *)
+
 and record_unboxed_product_representation =
   | Record_unboxed_product
   | Record_unboxed_product_undetermined

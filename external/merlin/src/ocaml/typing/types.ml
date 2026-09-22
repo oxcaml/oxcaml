@@ -540,6 +540,8 @@ and record_representation =
   | Record_dummy of { represent_as_float_array : bool; flatten_floats : bool }
   | Record_undetermined
   | Record_variable of (Jkind_types.Sort.t * type_expr) array
+  | Record_boxed_inherited
+  | Record_boxed_inherited_variable of Jkind_types.Sort.t
 
 and record_unboxed_product_representation =
   | Record_unboxed_product
@@ -1009,6 +1011,7 @@ let equal_record_representation_up_to_scannable_axes r1 r2 = match r1, r2 with
         equal_variant_representation_up_to_scannable_axes vr1 vr2
   | Record_boxed, Record_boxed ->
       true
+  | Record_boxed_inherited, Record_boxed_inherited -> true
   | Record_float, Record_float ->
       true
   | Record_ufloat, Record_ufloat ->
@@ -1020,12 +1023,15 @@ let equal_record_representation_up_to_scannable_axes r1 r2 = match r1, r2 with
       Bool.equal a1 a2 && Bool.equal b1 b2
   | Record_undetermined, Record_undetermined -> true
   (* [Record_variable] only appears in the typedtree, never in a decl. *)
-  | Record_variable _, _ | _, Record_variable _ ->
+  | Record_variable _, _ | _, Record_variable _
+  | Record_boxed_inherited_variable _, _
+  | _, Record_boxed_inherited_variable _ ->
       Misc.fatal_error
         "equal_record_representation_up_to_scannable_axes: variable \
          representation"
   | (Record_unboxed | Record_inlined _ | Record_boxed | Record_float
-    | Record_ufloat | Record_mixed _ | Record_dummy _ | Record_undetermined),
+    | Record_ufloat | Record_mixed _ | Record_dummy _ | Record_undetermined
+    | Record_boxed_inherited),
     _ ->
       false
 
@@ -1099,6 +1105,7 @@ let find_unboxed_type decl =
   | Type_record (_, ( Record_inlined _ | Record_unboxed
                     | Record_boxed | Record_float | Record_ufloat
                     | Record_mixed _ | Record_dummy _ | Record_undetermined
+                    | Record_boxed_inherited | Record_boxed_inherited_variable _
                     | Record_variable _), _)
   | Type_record_unboxed_product
       (_, (Record_unboxed_product | Record_unboxed_product_undetermined

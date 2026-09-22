@@ -375,6 +375,7 @@ type error =
   | Invalid_unboxed_access of
       { prev_el_type : type_expr; ua : Parsetree.unboxed_access }
   | Block_access_bad_record of string
+  | Inherited_field_not_addressable of type_expr
   | Block_index_modality_mismatch of
       { mut : bool; err : Mode.Modality.equate_error }
   | Mutable_block_index_polymorphic_field of Longident.t
