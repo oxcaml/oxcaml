@@ -209,6 +209,7 @@ module Layout : sig
 
     val any : Scannable_axes.t -> t
 
+    (** See [Sort.Const.product] *)
     val product : t list -> t
 
     val univar : Sort.univar -> t

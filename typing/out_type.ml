@@ -2526,6 +2526,7 @@ let rec out_jkind_of_desc env (desc : 'd Jkind.Desc.t) =
     Ojkind_product
       (List.map
          (fun layout ->
+            let layout = Jkind.Layout.strip_head_addressable_flat layout in
             out_jkind_of_desc env { desc with base = Layout layout })
          lays)
   | Layout (Addressable lay) when Option.is_none (Jkind.Desc.get_const desc) ->

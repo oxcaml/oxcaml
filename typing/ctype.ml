@@ -3639,19 +3639,13 @@ let constrain_type_jkind ~fixed env ty jkind =
                       (Not_a_subjkind (ty's_best_jkind, jkind,
                                        sub_failure_reasons)))
              in
-             begin match Jkind.decompose_product env ty's_jkind,
-                         Jkind.decompose_product env jkind with
+             let arity = num_components in
+             begin match Jkind.decompose_product env ty's_jkind ~arity,
+                         Jkind.decompose_product env jkind ~arity with
              | Some ty's_jkinds, Some jkinds
                   when List.length ty's_jkinds = num_components
                        && List.length jkinds = num_components ->
                recur ty's_jkinds jkinds
-             | Some ty's_jkinds, None
-                  when Jkind.has_layout_any env jkind
-                    && List.length ty's_jkinds = num_components ->
-               (* Even though [jkind] has layout any, it still might have
-                  mode-crossing restrictions, so we recur, just duplicating
-                  the jkind. *)
-               recur ty's_jkinds (List.init num_components (fun _ -> jkind))
              | _ ->
                (* Products don't line up. This is only possible if [ty] was
                   given a jkind annotation of the wrong product arity.

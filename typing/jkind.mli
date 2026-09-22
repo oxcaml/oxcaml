@@ -127,6 +127,8 @@ module Layout : sig
 
   val is_surely_addressable_flat : Sort.Flat.t t -> bool
 
+  val strip_head_addressable_flat : Sort.Flat.t t -> Sort.Flat.t t
+
   (** See [Jkind_types.Layout.Const.non_redundant_axes_of_box] *)
   val non_redundant_axes_of_box_flat :
     Sort.Flat.t t -> Scannable_axes.t -> string list
@@ -730,8 +732,11 @@ val apply_or_null_r : Env.t -> Types.jkind_r -> (Types.jkind_r, unit) result
     jkind lattice than they might need to be. (This decomposes the layout but
     just reuses the non-layout parts of the original jkind.)
 
+    A kind of layout [any] decomposes into [arity] copies of itself.
+
     Never does any mutation. *)
-val decompose_product : Env.t -> 'd Types.jkind -> 'd Types.jkind list option
+val decompose_product :
+  Env.t -> 'd Types.jkind -> arity:int -> 'd Types.jkind list option
 
 (** Get an annotation (that a user might write) for this [t]. *)
 val get_annotation : 'd Types.jkind -> Parsetree.jkind_annotation option
