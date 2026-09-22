@@ -1467,3 +1467,16 @@ module Atomic_unboxing = struct
   let unbox (x : t) = unbox x
 end
 [%%expect{||}]
+
+module Float_record_indices_bad = struct
+  type t = { mutable x : float; y : float }
+  let index : (t#, float) idx_mut = (.x)
+  let get (t : t) = Idx_mut.get t index
+end
+[%%expect{|
+Line 3, characters 15-17:
+3 |   let index : (t#, float) idx_mut = (.x)
+                   ^^
+Error: The type "t" has no unboxed version.
+Hint: Float records don't get unboxed versions.
+|}]
