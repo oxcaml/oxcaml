@@ -17,6 +17,11 @@ let _ = (id A : t), (id A : s)
 type t = A | B
 type s = A | C
 val id : 'a -> 'a = <fun>
+- : t * s = (A, A)
+|}, Principal{|
+type t = A | B
+type s = A | C
+val id : 'a -> 'a = <fun>
 Line 6, characters 9-13:
 6 | let _ = (id A : t), (id A : s)
              ^^^^
@@ -33,6 +38,10 @@ let bars (xs : int list) : bar list = List.map (fun x -> Bar x) xs
 [%%expect{|
 type bar = Bar of int
 type baz = Bar of string
+val bars : int list -> bar list = <fun>
+|}, Principal{|
+type bar = Bar of int
+type baz = Bar of string
 Line 4, characters 64-66:
 4 | let bars (xs : int list) : bar list = List.map (fun x -> Bar x) xs
                                                                     ^^
@@ -46,6 +55,8 @@ Error: The value "xs" has type "int list" but an expression was expected of type
 let bars_rev_app (xs : int list) : bar list =
   xs |> List.map (fun x -> Bar x)
 [%%expect{|
+val bars_rev_app : int list -> bar list = <fun>
+|}, Principal{|
 Line 2, characters 2-4:
 2 |   xs |> List.map (fun x -> Bar x)
       ^^
@@ -57,6 +68,8 @@ Error: The value "xs" has type "int list" but an expression was expected of type
 let bars_app (xs : int list) : bar list =
   List.map (fun x -> Bar x) @@ xs
 [%%expect{|
+val bars_app : int list -> bar list = <fun>
+|}, Principal{|
 Line 2, characters 31-33:
 2 |   List.map (fun x -> Bar x) @@ xs
                                    ^^
@@ -76,6 +89,14 @@ let f (l : t1 list) : int list = List.map (fun r -> r.x) l
 [%%expect{|
 type t1 = { x : int; }
 type t2 = { x : bool; }
+Line 4, characters 52-55:
+4 | let f (l : t1 list) : int list = List.map (fun r -> r.x) l
+                                                        ^^^
+Error: The field access "r.x" has type "bool"
+       but an expression was expected of type "int"
+|}, Principal{|
+type t1 = { x : int; }
+type t2 = { x : bool; }
 Line 4, characters 57-58:
 4 | let f (l : t1 list) : int list = List.map (fun r -> r.x) l
                                                              ^
@@ -88,6 +109,8 @@ Error: The value "l" has type "t1 list" but an expression was expected of type
 
 let recs (xs : int list) : t1 list = List.map (fun x -> {x}) xs
 [%%expect{|
+val recs : int list -> t1 list = <fun>
+|}, Principal{|
 Line 1, characters 61-63:
 1 | let recs (xs : int list) : t1 list = List.map (fun x -> {x}) xs
                                                                  ^^
@@ -104,6 +127,9 @@ let const x ~y:_ = x
 let g : y:unit -> t = const A
 [%%expect{|
 val const : 'a -> y:'b -> 'a = <fun>
+val g : y:unit -> t = <fun>
+|}, Principal{|
+val const : 'a -> y:'b -> 'a = <fun>
 Line 3, characters 22-29:
 3 | let g : y:unit -> t = const A
                           ^^^^^^^
@@ -117,6 +143,9 @@ Error: This expression has type "y:unit -> s"
 let const_omitted ~y:_ x = x
 let g : y:unit -> t = const_omitted A
 [%%expect{|
+val const_omitted : y:'a -> 'b -> 'b = <fun>
+val g : y:unit -> t = <fun>
+|}, Principal{|
 val const_omitted : y:'a -> 'b -> 'b = <fun>
 Line 2, characters 22-37:
 2 | let g : y:unit -> t = const_omitted A
@@ -155,6 +184,9 @@ let const_optional ?x ~y () = y
 let h : ?x:int -> unit -> t = const_optional ~y:A
 [%%expect{|
 val const_optional : ?x:'a -> y:'b -> unit -> 'b = <fun>
+val h : ?x:int -> unit -> t = <fun>
+|}, Principal{|
+val const_optional : ?x:'a -> y:'b -> unit -> 'b = <fun>
 Line 2, characters 30-49:
 2 | let h : ?x:int -> unit -> t = const_optional ~y:A
                                   ^^^^^^^^^^^^^^^^^^^
@@ -174,6 +206,8 @@ val with_default : ?opt:int -> int -> int = <fun>
 let h : (int -> int) * int = (fun x -> x, 0) with_default
 let () = assert (fst h 2 = 2)
 [%%expect{|
+val h : (int -> int) * int = (<fun>, 0)
+|}, Principal{|
 Line 1, characters 29-57:
 1 | let h : (int -> int) * int = (fun x -> x, 0) with_default
                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -192,6 +226,8 @@ let f =
   let k x _ = x in
   fun a b -> (k {x=a} {x=b} : t1)
 [%%expect{|
+val f : int -> bool -> t1 = <fun>
+|}, Principal{|
 Line 3, characters 14-27:
 3 |   fun a b -> (k {x=a} {x=b} : t1)
                   ^^^^^^^^^^^^^
@@ -227,6 +263,12 @@ val f : container -> unit = <fun>
 let f (c : container) =
   c#on_update (signal (fun x -> print_endline x#to_string))
 [%%expect{|
+Line 2, characters 46-47:
+2 |   c#on_update (signal (fun x -> print_endline x#to_string))
+                                                  ^
+Error: This expression has type "showable"
+       It has no method "to_string"
+|}, Principal{|
 Line 2, characters 14-59:
 2 |   c#on_update (signal (fun x -> print_endline x#to_string))
                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -344,6 +386,16 @@ let test : type a. a g -> _ = function Int -> ky (1 : a) 1
 [%%expect{|
 type _ g = Int : int g
 val ky : 'a -> 'a -> 'a = <fun>
+Line 4, characters 57-58:
+4 | let test : type a. a g -> _ = function Int -> ky (1 : a) 1
+                                                             ^
+Error: The constant "1" has type "int" but an expression was expected of type
+         "a" = "int"
+       This instance of "int" is ambiguous:
+       it would escape the scope of its equation
+|}, Principal{|
+type _ g = Int : int g
+val ky : 'a -> 'a -> 'a = <fun>
 Line 4, characters 46-58:
 4 | let test : type a. a g -> _ = function Int -> ky (1 : a) 1
                                                   ^^^^^^^^^^^^
@@ -428,6 +480,14 @@ module Escape (M : Map) = struct
     List.map (fun (Field.T col) -> premium col) packed
 end
 [%%expect{|
+Line 9, characters 43-46:
+9 |     List.map (fun (Field.T col) -> premium col) packed
+                                               ^^^
+Error: The value "col" has type "$a Field.t"
+       but an expression was expected of type "'a Field.t"
+       The type constructor "$a" would escape its scope
+       Hint: "$a" is an existential type bound by the constructor "T".
+|}, Principal{|
 Line 9, characters 35-46:
 9 |     List.map (fun (Field.T col) -> premium col) packed
                                        ^^^^^^^^^^^
@@ -468,16 +528,15 @@ let fold_nonportable (f : int -> int) =
   portable (fun () ->
     fold ~init:(Ok []) ~f:(fun _ -> if true then Ok [f] else Error 0))
 [%%expect{|
-Line 3, characters 4-69:
+Line 3, characters 53-54:
 3 |     fold ~init:(Ok []) ~f:(fun _ -> if true then Ok [f] else Error 0))
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This expression has type "((int -> int) list, int) result"
-       but an expression was expected of type
-         "('a : value mod portable contended)"
-       The kind of ((int -> int) list, int) result is
-           value non_float mod immutable.
-       But the kind of ((int -> int) list, int) result must be a subkind of
-           value mod portable contended
+                                                         ^
+Error: The value "f" has type "int -> int" but an expression was expected of type
+         "('a : value_or_null mod portable contended)"
+       The kind of int -> int is value non_float mod aliased immutable
+         because it's a function type.
+       But the kind of int -> int must be a subkind of
+           value_or_null mod portable contended
          because of the definition of portable at line 2, characters 4-12.
 |}, Principal{|
 Line 3, characters 4-69:

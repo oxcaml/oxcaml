@@ -24,6 +24,8 @@ val pair : ('a : float64) 'b. 'a -> 'b -> 'a box * 'b = <fun>
 
 let p () : float * t = pair #1.0 A
 [%%expect {|
+val p : unit -> float * t = <fun>
+|}, Principal{|
 Line 1, characters 23-34:
 1 | let p () : float * t = pair #1.0 A
                            ^^^^^^^^^^^
