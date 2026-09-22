@@ -57,6 +57,7 @@ export MEMTRACE_RATE='1e-4'
 printf '%q ' "\$@" > "$output/command.\$\$.txt" # Record the compiler's arguments
 exec \
   perf stat \
+  --no-big-num \
   -e instructions:u,cycles:u,task-clock \
   -o "$output/perf.\$\$.txt" \
   -- \
@@ -111,20 +112,35 @@ if [[ ${#reports[@]} -eq 0 ]]; then
   exit 1
 fi
 
+perf_reports=("$output"/perf.*.txt)
+
 echo
-awk '
+awk \
+  -v expected_instruction_counts="${#perf_reports[@]}" \
+  -v integer_format="%'.0f" '
   $2 == "alloc" {allocated_bytes += $1}
   /^[0-9]/ && $1 ~ /s$/ && $2 != "gc" {cpu_seconds += $1}
+  $2 == "instructions:u" && $1 ~ /^[0-9]+$/ {
+    instructions += $1
+    instruction_counts++
+  }
   $1 ~ /^[0-9]+$/ && $2 == "minor" {minor += $1}
   $1 ~ /^[0-9]+$/ && $2 == "major" {major += $1}
   END {
+    if (instruction_counts == 0 || instruction_counts != expected_instruction_counts) {
+      print "Missing instruction counts in perf reports" > "/dev/stderr"
+      exit 1
+    }
     printf "Allocated %.2f GiB total.\n",
       allocated_bytes / (1024 * 1024 * 1024)
-    printf "The compiler spent %.3f seconds of CPU time.\n", cpu_seconds
-    printf "There were %d heap collections (%d minor & %d major).\n",
-      minor + major, minor, major
+    printf "The compiler executed %s user-space instructions in %.3f seconds.\n",
+      sprintf(integer_format, instructions), cpu_seconds
+    printf "There were %s heap collections (%s minor & %s major).\n",
+      sprintf(integer_format, minor + major),
+      sprintf(integer_format, minor),
+      sprintf(integer_format, major)
   }
-' "${reports[@]}"
+' "${reports[@]}" "${perf_reports[@]}"
 
 echo
 top_n='10'
