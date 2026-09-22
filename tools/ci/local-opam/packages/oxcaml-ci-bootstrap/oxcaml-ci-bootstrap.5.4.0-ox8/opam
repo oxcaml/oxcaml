@@ -1,0 +1,16 @@
+opam-version: "2.0"
+synopsis: "Pinned OxCaml bootstrap and build tools for CI"
+maintainer: "oxcaml-team"
+license: "MIT"
+authors: "oxcaml-team"
+homepage: "https://github.com/oxcaml/oxcaml"
+bug-reports: "https://github.com/oxcaml/oxcaml/issues"
+dev-repo: "git+https://github.com/oxcaml/oxcaml"
+depends: [
+  "oxcaml-compiler" {= "5.4.0-ox8"}
+  # Dune 3.24.2 can be built with OxCaml without an opam overlay patch.
+  "dune" {= "3.24.2"}
+  "menhir" {= "20231231"}
+]
+build: []
+install: []

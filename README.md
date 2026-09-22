@@ -17,7 +17,7 @@ The supported platforms are x86-64 and arm64 Linux; and arm64 macOS.  x86 macOS 
 
 One-time setup:
 ```
-$ opam switch create oxcaml-dev --empty
+$ opam switch create oxcaml-dev --empty --repos ox=git+https://github.com/oxcaml/opam-repository.git,default
 $ opam pin add -ny git+https://github.com/oxcaml/oxcaml
 $ opam switch set-invariant -y --packages oxcaml-dev
 $ eval $(opam env)

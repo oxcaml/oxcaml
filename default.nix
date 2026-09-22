@@ -14,12 +14,21 @@
   oxcamlLldb ? false,
   syntaxQuotations ? false,
   withMerlin ? true,
+  # Overrides the stdenv selected below. Not named `stdenv`, since
+  # `callPackage` would then always fill it in with `pkgs.stdenv`.
+  stdenvOverride ? null,
 }:
 let
   inherit (pkgs) lib fetchpatch;
 
   # Select stdenv based on whether asan is enabled
-  stdenv = if addressSanitizer then pkgs.clangStdenv else pkgs.stdenv;
+  stdenv =
+    if stdenvOverride != null then
+      stdenvOverride
+    else if addressSanitizer then
+      pkgs.clangStdenv
+    else
+      pkgs.stdenv;
 
   # Build configure flags based on features
   configureFlags =
@@ -81,12 +90,24 @@ let
       doCheck = false;
     };
 
-  bootstrapCompiler = import (pkgs.fetchFromGitHub {
+  bootstrapOxcaml = import (pkgs.fetchFromGitHub {
     owner = "oxcaml";
     repo = "oxcaml";
-    rev = "1c543884d56ec67ff52092942c66bf08610254c6";
-    hash = "sha256-hcj3uf5m8Dflmj7sPaB6z1jaq3BW1Y+iqX+HmGYR8HE=";
-  }) { inherit pkgs; };
+    rev = "a6d1e44c50ae2dad16ffa38a3b680668ee3e49c8";
+    hash = "sha256-P3ANPk4C1SeX+wzj5HdmRqHnf9RccDYWbh44+k98EtA=";
+  });
+
+  # The bootstrap compiler records its C compiler by name (`gcc` or `clang`)
+  # and invokes it when linking the boot workspace's executables, so it must
+  # be built with the same stdenv as this derivation: under clangStdenv (asan)
+  # there is no `gcc` on PATH. Only pass the override once the pinned revision
+  # accepts it.
+  bootstrapCompiler = bootstrapOxcaml (
+    { inherit pkgs; }
+    // lib.optionalAttrs (builtins.functionArgs bootstrapOxcaml ? stdenvOverride) {
+      stdenvOverride = stdenv;
+    }
+  );
 
   # CR sspies: For the time being, we use dune built with the vanilla 4.14.2 compiler.
   # Over time, we should probably define something like a "boot environment" and build
@@ -148,8 +169,8 @@ let
     testOcaml:
     let
       # nixpkgs does not yet provide an OCaml 5.4 package set at the pinned
-      # revision, so construct one around the compiler used to bootstrap
-      # OxCaml. Pin the plain pkgs.stdenv for this compiler rather than the
+      # revision, so construct one around upstream OCaml 5.4 for the dev tools.
+      # Pin the plain pkgs.stdenv for this compiler rather than the
       # variant stdenv: a clangStdenv-built compiler records `clang` as its C
       # compiler, which isn't on PATH when the scope's packages build under
       # the default gcc stdenv (e.g. findlib's `ocamlc -custom` link of
