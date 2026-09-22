@@ -261,9 +261,11 @@ type ebox = E : ('a : any). { v : 'a; k : int } -> ebox
 type ebox = E : ('a : any). { v : 'a; k : int; } -> ebox
 |}]
 
+(* The existential's sort, and so the block's layout, can't be told, so the
+   value prints as <abstr>. *)
 let b = E { v = 5; k = 1 }
 [%%expect{|
-val b : ebox = E {v = <poly>; k = 1}
+val b : ebox = <abstr>
 |}]
 
 let k = match b with E { k; _ } -> k
