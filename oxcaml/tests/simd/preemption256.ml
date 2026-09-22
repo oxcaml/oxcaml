@@ -38,9 +38,9 @@ let[@inline never] check_ymm_upper_3 name v b c d =
   end
 
 let run_with_tick_handler ?(interval = 0.1) ?(repeating = false)
-    ?(on_tick = fun () -> ()) computation =
+    ?(on_tick = fun () -> ()) (computation : unit -> unit) =
   let interval_usec = Int.of_float (interval *. 1_000_000.) in
-  Domain.Tick.with_ ~interval_usec (fun _ ->
+  Domain.Tick.with_ ~interval_usec (fun () ->
     let preempted_once = ref false in
     Preemptible.try_with
       ~on_tick:(fun () ->
@@ -58,7 +58,7 @@ let run_with_tick_handler ?(interval = 0.1) ?(repeating = false)
                   on_tick ();
                   continue k ())
             | _ -> None)
-      })
+      }) [@nontail]
 
 (* Spins 16 unboxed int64x4 accumulators in a tail-recursive loop, then checks
    their upper lanes. The whole thing is one function because int64x4# can't
