@@ -15,12 +15,13 @@
 
 open! Int_replace_polymorphic_compare
 module DLL = Doubly_linked_list
+module Or_null = Flambda2_algorithms.Or_null
 include Cfg_intf.S
 
 module Location : sig
   type t
 
-  val of_reg : Reg.t -> t or_null
+  val of_reg : Reg.t -> t Or_null.t
 
   val of_reg_exn : Reg.t -> t
 
@@ -134,7 +135,7 @@ end = struct
     | Reg of Regs.Phys_reg.t
     | Stack of Stack.t
 
-  let of_reg reg : t or_null =
+  let of_reg reg : t Or_null.t =
     match reg.Reg.loc with
     | Reg.Unknown -> Null
     | Reg.Reg idx -> This (Reg idx)
