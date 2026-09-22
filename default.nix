@@ -93,8 +93,8 @@ let
   bootstrapOxcaml = import (pkgs.fetchFromGitHub {
     owner = "oxcaml";
     repo = "oxcaml";
-    rev = "a6d1e44c50ae2dad16ffa38a3b680668ee3e49c8";
-    hash = "sha256-P3ANPk4C1SeX+wzj5HdmRqHnf9RccDYWbh44+k98EtA=";
+    rev = "11ae376f3e829ca475839554eb44a13313045f23";
+    hash = "sha256-1Av5KD9gRf7NOPUgXc2EgHB34YuWm7xR1eVqHAjhaVU=";
   });
 
   # The bootstrap compiler records its C compiler by name (`gcc` or `clang`)
