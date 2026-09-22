@@ -1249,7 +1249,8 @@ let transl_declaration env sdecl (id, uid) =
             Record_unboxed_product
           in
           let jkind =
-            Jkind.Builtin.product_of_any ~why:Unboxed_record (List.length lbls)
+            Jkind.Builtin.product_of_any ~why:Unboxed_record
+              (List.map (fun ld -> ld.Types.ld_inheritance) lbls')
           in
           Ttype_record_unboxed_product lbls,
           Type_record_unboxed_product(lbls', rep, None), jkind
@@ -1469,7 +1470,8 @@ let derive_unboxed_version env path_in_group_has_unboxed_version decl =
     let rep = Types.Record_unboxed_product in
     (* CR layouts v11: update type_jkind once we have [layout_of] layouts *)
     let jkind =
-      Jkind.Builtin.product_of_any ~why:Unboxed_record (List.length lbls)
+      Jkind.Builtin.product_of_any ~why:Unboxed_record
+        (List.map (fun ld -> ld.Types.ld_inheritance) lbls_unboxed)
     in
     let kind =
       Type_record_unboxed_product(lbls_unboxed, rep, umc)

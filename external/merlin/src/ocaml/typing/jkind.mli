@@ -397,12 +397,14 @@ module Builtin : sig
     Sort.t Layout.t list ->
     Types.jkind_l
 
-  (** Build a jkind of unboxed products, given only an arity. This jkind will
-      not mode-cross (and has kind [Not_best] accordingly), even though unboxed
-      products generally should. This is useful when creating an initial jkind
-      in Typedecl. *)
+  (** Build a jkind of an unboxed record, given its fields' inheritance flags.
+      This jkind will not mode-cross (and has kind [Not_best] accordingly), even
+      though unboxed products generally should. This is useful when creating an
+      initial jkind in Typedecl. *)
   val product_of_any :
-    why:History.product_creation_reason -> int -> Types.jkind_l
+    why:History.product_creation_reason ->
+    Asttypes.field_inheritance list ->
+    Types.jkind_l
 end
 
 (** Forcibly change the mod- and with-bounds of a [t] based on the mod- and

@@ -2232,11 +2232,15 @@ module Jkind0 = struct
            through the product, by one step, never loses any information. *)
         |> mark_best
 
-      let product_of_any ~why arity =
+      let product_of_any ~why inheritances =
         let layout =
           Jkind_types.Layout.product
-            (List.init arity (fun _ ->
-               Jkind_types.Layout.Any Jkind_types.Scannable_axes.max))
+            (List.map
+               (fun inheritance ->
+                 Jkind_types.Layout.apply_operator
+                   (Jkind_types.Layout.Any Jkind_types.Scannable_axes.max)
+                   (Types.field_kind_operator inheritance))
+               inheritances)
         in
         let desc : _ jkind_desc =
           { base = Layout layout;
