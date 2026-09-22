@@ -1033,26 +1033,12 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       in
       loop mode args
   | Ptyp_tuple stl ->
-    let desc, typ =
-      transl_type_aux_tuple env ~loc ~policy ~row_context stl
-    in
-    ctyp desc typ
+    let ctys, tys = transl_type_aux_tuple env ~loc ~policy ~row_context stl in
+    ctyp (Ttyp_tuple ctys) (newty (Ttuple tys))
   | Ptyp_unboxed_tuple stl ->
     Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
-    assert (List.length stl >= 2);
-    Option.iter (fun l -> raise (Error (loc, env, Repeated_tuple_label l)))
-      (Misc.repeated_label stl);
-    let tl =
-      List.map
-        (fun (label, t) ->
-           label, transl_type env ~policy ~row_context Alloc.Const.legacy t)
-        stl
-    in
-    let ctyp_type =
-      newty (Tunboxed_tuple
-               (List.map (fun (label, ctyp) -> label, ctyp.ctyp_type) tl))
-    in
-    ctyp (Ttyp_unboxed_tuple tl) ctyp_type
+    let ctys, tys = transl_type_aux_tuple env ~loc ~policy ~row_context stl in
+    ctyp (Ttyp_unboxed_tuple ctys) (newty (Tunboxed_tuple tys))
   | Ptyp_constr(lid, stl) ->
       let (path, decl) = Env.lookup_type ~loc:lid.loc lid.txt env in
       let stl =
@@ -1541,20 +1527,7 @@ and transl_type_aux_tuple env ~loc ~policy ~row_context stl =
          l, transl_type env ~policy ~row_context Alloc.Const.legacy t)
       stl
   in
-  List.iter (fun (_, {ctyp_type; ctyp_loc}) ->
-    (* CR layouts v5: remove value requirement *)
-    match
-      constrain_type_jkind env ctyp_type (Jkind.Builtin.value_or_null ~why:Tuple_element)
-    with
-    | Ok _ -> ()
-    | Error e ->
-      raise (Error(ctyp_loc, env,
-                   Non_value {vloc = Tuple; err = e; typ = ctyp_type})))
-    ctys;
-  let ctyp_type =
-    newty (Ttuple (List.map (fun (label, ctyp) -> label, ctyp.ctyp_type) ctys))
-  in
-  Ttyp_tuple ctys, ctyp_type
+  ctys, List.map (fun (label, ctyp) -> label, ctyp.ctyp_type) ctys
 
 and transl_fields env ~policy ~row_context o fields =
   let hfields = Hashtbl.create 17 in

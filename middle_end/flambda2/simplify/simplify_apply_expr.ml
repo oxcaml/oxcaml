@@ -107,8 +107,8 @@ let simplify_direct_tuple_application ~simplify_expr dacc apply
   let tuple_size =
     (* The code for the function being applied has exactly as many parameters as
        there are components of the tuple (which is the first element of
-       [Apply.args apply]). The components must be of kind [Value] (in Lambda,
-       [layout_tuple_element]) and therefore cannot be unboxed products
+       [Apply.args apply]). The components must be of kind [Value] due to the
+       check in [trans_tupled_function] and therefore cannot be unboxed products
        themselves. *)
     Flambda_arity.cardinal_unarized
       (Code_metadata.params_arity callee's_code_metadata)
