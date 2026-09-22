@@ -342,3 +342,17 @@ type addressable_unit_arg =
 val addressable_unit_arg : addressable_unit_arg =
   Addressable_unit #{au = #()}
 |}];;
+
+type wrapped_float = Wrapped_float of float# [@@unboxed]
+let wrapped_float_bad = Wrapped_float (-#2.5)
+[%%expect {|
+type wrapped_float = Wrapped_float of float# [@@unboxed]
+val wrapped_float_bad : wrapped_float = <unknown constructor>
+|}];;
+
+type wrapped_unit = Wrapped_unit of unit# [@@unboxed]
+let wrapped_unit_bad = Wrapped_unit #()
+[%%expect {|
+type wrapped_unit = Wrapped_unit of unit# [@@unboxed]
+val wrapped_unit_bad : wrapped_unit = <unknown constructor>
+|}];;
