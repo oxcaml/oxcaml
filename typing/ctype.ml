@@ -6590,8 +6590,28 @@ let path_same_normalized env p1 p2 =
 
 exception Complicated_moregen
 
+(* The fast-path counterpart of [moregen_alloc_mode]. It performs the
+   same variance-directed submode checks but without mode crossing, so it
+   never needs to consult a type (the subject's types are unsubstituted here,
+   and looking their paths up in [env] would fail or do wasted work). Crossing
+   can only widen the subject's mode, so anything accepted here is accepted
+   by the slow path. On failure we neither tighten the modes nor build an
+   error: the slow path will do both. [submode] does not mutate on failure,
+   and its successful constraints are logged, so [backtrack] undoes them. *)
+let moregen_mode_fast v a1 a2 =
+  let ok =
+    match v with
+    | Invariant ->
+      Result.is_ok (Alloc.submode a1 a2)
+      && Result.is_ok (Alloc.submode a2 a1)
+    | Covariant -> Result.is_ok (Alloc.submode a1 a2)
+    | Contravariant -> Result.is_ok (Alloc.submode a2 a1)
+    | Bivariant -> true
+  in
+  if not ok then raise_notrace Complicated_moregen
+
 let moregeneral_fast env patt subst subj =
-  For_copy.with_scope (fun _scope ->
+  For_copy.with_scope (fun scope ->
     let snap = snapshot () in
     (* Fixed upper limit of the number of nodes,
        so that we don't diverge on equirecursive types *)
@@ -6602,8 +6622,7 @@ let moregeneral_fast env patt subst subj =
       if eq_type t1 t2 then () else
       match get_desc t1, get_desc t2 with
       | Tsubst (ty, _), _ when eq_type ty t2 -> ()
-      (* CR zeisbach: obviously fix this... *)
-      (*= | Tvar { jkind }, _ when get_level t1 = generic_level ->
+      | Tvar { jkind }, _ when get_level t1 = generic_level ->
          (* As in [moregen], the subject must fit the variable's jkind. We
             avoid [check_type_jkind] here: it may normalise with-bounds, which
             looks up paths that are unsubstituted in [t2], and it may set sort
@@ -6635,10 +6654,10 @@ let moregeneral_fast env patt subst subj =
            | _ -> None
          in
          begin match layout1, layout2 with
-         | Some l1, Some l2 when Jkind.Layout.Const.equal l1 l2 -> ()
+         | Some l1, Some l2 when Jkind_types.Layout.Const.equal l1 l2 -> ()
          | _ -> raise_notrace Complicated_moregen
          end;
-         For_copy.redirect_desc scope t1 (Tsubst (t2, None)) *)
+         For_copy.redirect_desc scope t1 (Tsubst (t2, None))
       | Tarrow ((l1,a1,r1), t1, u1, _), Tarrow ((l2,a2,r2), t2, u2, _)
            when l1 = l2 ->
          begin match variance with
@@ -6650,9 +6669,8 @@ let moregeneral_fast env patt subst subj =
               || Alloc.check_generic a2
               || Alloc.check_generic r2
            then raise_notrace Complicated_moregen;
-           moregen_alloc_mode env t2 ~is_ret:false
-             (neg_variance variance) a1 a2;
-           moregen_alloc_mode env u2 ~is_ret:true variance r1 r2;
+           moregen_mode_fast (neg_variance variance) a1 a2;
+           moregen_mode_fast variance r1 r2;
            mgen (Some (neg_variance variance)) t1 t2;
            mgen (Some variance) u1 u2
          end
@@ -6696,8 +6714,7 @@ let moregeneral_fast env patt subst subj =
     in
     match mgen (Some Covariant) patt subj with
     | () -> true
-    | exception (Complicated_moregen | Moregen_trace _) ->
-      backtrack snap; false)
+    | exception Complicated_moregen -> backtrack snap; false)
 
 let may_instantiate inst_nongen t1 =
   let level = get_level t1 in
