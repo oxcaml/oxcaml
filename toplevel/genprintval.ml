@@ -345,6 +345,72 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
       | None -> Print_as "<unknown>"
       | Some sort -> print_sort sort
 
+    let sorts_of_types env tys =
+      Misc.Stdlib.Array.all_somes
+        (Array.map
+           (fun ty ->
+              Option.map (fun s -> s, ty)
+                (Jkind.sort_option_of_jkind env (Ctype.type_jkind env ty)))
+           tys)
+
+    (* Translate the representation just to be able to print it. [None] if
+       the fields' sorts and thus the block's layout are unknown. *)
+    let outval_record_rep env ~sorts_and_types
+          (rep : Types.record_representation) =
+      let transl rep =
+        Typeopt.transl_record_representation env Location.none rep
+      in
+      let rep =
+        match rep with
+        | Record_undetermined ->
+          Option.map
+            (fun l -> transl (Record_variable l))
+            (sorts_and_types ())
+        | Record_inlined (tag, Constructor_undetermined, vrep) ->
+          Option.map
+            (fun l ->
+               transl
+                 (Record_inlined (tag, Constructor_variable l, vrep)))
+            (sorts_and_types ())
+        | Record_variable _
+        | Record_inlined (_, Constructor_variable _, _) ->
+            Misc.fatal_error "variable record representation"
+        | _ -> Some (transl rep)
+      in
+      Option.map
+        (fun (rep : Lambda.record_representation) ->
+           let pos =
+             match rep with
+             | Record_inlined (_, _, Variant_extensible) -> 1
+             | _ -> 0
+           in
+           let rep =
+             match rep with
+             | Record_inlined (_, Constructor_mixed _,
+                               Variant_unboxed) ->
+                 Misc.fatal_error
+                   "a 'mixed' unboxed record is impossible"
+             | Record_inlined (_, Constructor_uniform_value,
+                               Variant_unboxed)
+             | Record_unboxed
+                 -> Outval_record_unboxed
+             | Record_boxed | Record_float | Record_ufloat
+             | Record_inlined (_, Constructor_uniform_value, _)
+                 -> Outval_record_boxed
+             | Record_inlined (_, Constructor_mixed mixed, _)
+             | Record_mixed mixed
+                 ->
+                   (* Mixed records are only represented as
+                      mixed blocks in native code. *)
+                   if !Clflags.native_code
+                   then Outval_record_mixed_block mixed
+                   else Outval_record_boxed
+             | Record_inlined (_, Constructor_immediate_all_void, _) ->
+                 Misc.fatal_error "immediate record representation"
+           in
+           rep, pos)
+        rep
+
     let outval_of_value max_steps max_depth check_depth env obj lpoly ty =
       if not @@ Types.Lpoly.is_empty_exn lpoly then Oval_stuff "<lpoly>"
       else
@@ -727,68 +793,11 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
               in
               List.iter2 (Ctype.unify env) record_params
                 (Ctype.instance_list ty_list);
-              let try_map_all a f =
-                Misc.Stdlib.Array.all_somes (Array.map f a)
-              in
-              let with_sort ty =
-                Option.map (fun s -> s, ty)
-                  (Jkind.sort_option_of_jkind env (Ctype.type_jkind env ty))
-              in
-              try_map_all label_params_and_types (fun (_, ty) -> with_sort ty)
+              sorts_of_types env (Array.map snd label_params_and_types)
             in
-            (* Translate the representation just to be able to print it *)
-            let transl rep =
-              Typeopt.transl_record_representation env Location.none rep
-            in
-            let rep =
-              match rep with
-              | Record_undetermined ->
-                Option.map
-                  (fun l -> transl (Record_variable l))
-                  (sorts_and_types ())
-              | Record_inlined (tag, Constructor_undetermined, vrep) ->
-                Option.map
-                  (fun l ->
-                     transl
-                       (Record_inlined (tag, Constructor_variable l, vrep)))
-                  (sorts_and_types ())
-              | Record_variable _
-              | Record_inlined (_, Constructor_variable _, _) ->
-                  Misc.fatal_error "variable record representation"
-              | _ -> Some (transl rep)
-            in
-            match rep with
+            match outval_record_rep env ~sorts_and_types rep with
             | None -> Oval_stuff "<abstr>"
-            | Some rep ->
-            let pos =
-              match rep with
-              | Record_inlined (_, _, Variant_extensible) -> 1
-              | _ -> 0
-            in
-            let rep =
-              match rep with
-              | Record_inlined (_, Constructor_mixed _,
-                                Variant_unboxed) ->
-                  Misc.fatal_error
-                    "a 'mixed' unboxed record is impossible"
-              | Record_inlined (_, Constructor_uniform_value,
-                                Variant_unboxed)
-              | Record_unboxed
-                  -> Outval_record_unboxed
-              | Record_boxed | Record_float | Record_ufloat
-              | Record_inlined (_, Constructor_uniform_value, _)
-                  -> Outval_record_boxed
-              | Record_inlined (_, Constructor_mixed mixed, _)
-              | Record_mixed mixed
-                  ->
-                    (* Mixed records are only represented as
-                       mixed blocks in native code. *)
-                    if !Clflags.native_code
-                    then Outval_record_mixed_block mixed
-                    else Outval_record_boxed
-              | Record_inlined (_, Constructor_immediate_all_void, _) ->
-                  Misc.fatal_error "immediate record representation"
-            in
+            | Some (rep, pos) ->
             tree_of_record_fields depth
               env path type_params ty_list
               lbl_list pos obj rep
@@ -812,40 +821,43 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                 else tree_of_name name
               and v =
                 if is_void then Oval_stuff "<void>"
-                else match rep with
-                  | Outval_record_unboxed -> tree_of_val (depth - 1) obj ty_arg
-                  | Outval_record_boxed ->
-                      let fld =
-                        if O.tag obj = O.double_array_tag then
-                          O.repr (O.double_field obj pos)
-                        else
-                          O.field obj pos
-                      in
-                      nest tree_of_val (depth - 1) fld ty_arg
-                  | Outval_record_mixed_block shape ->
-                      let fld =
-                        let of_element
-                            : unit Lambda.mixed_block_element -> _ = function
-                        | Value _ -> `Continue (O.field obj pos)
-                        | Float_boxed () | Float64 ->
-                            `Continue (O.repr (O.double_field obj pos))
-                        | Product [||] ->
-                            `Stop (Oval_stuff "<void>")
-                        | Float32 | Bits8 | Bits16 | Untagged_immediate
-                        | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask
-                        | Word | Product _ | Splice_variable _ ->
-                            `Stop (Oval_stuff "<abstr>")
-                        in
-                        of_element shape.(pos)
-                      in
-                      match fld with
-                      | `Continue fld ->
-                          nest tree_of_val (depth - 1) fld ty_arg
-                      | `Stop result -> result
+                else tree_of_field rep obj pos depth ty_arg
               in
               (lid, v) :: tree_of_fields false (pos + 1) remainder
         in
         Oval_record (tree_of_fields (pos = 0) pos lbl_list)
+
+      and tree_of_field rep obj pos depth ty_arg =
+        match rep with
+        | Outval_record_unboxed -> tree_of_val (depth - 1) obj ty_arg
+        | Outval_record_boxed ->
+            let fld =
+              if O.tag obj = O.double_array_tag then
+                O.repr (O.double_field obj pos)
+              else
+                O.field obj pos
+            in
+            nest tree_of_val (depth - 1) fld ty_arg
+        | Outval_record_mixed_block shape ->
+            let fld =
+              let of_element
+                  : unit Lambda.mixed_block_element -> _ = function
+              | Value _ -> `Continue (O.field obj pos)
+              | Float_boxed () | Float64 ->
+                  `Continue (O.repr (O.double_field obj pos))
+              | Product [||] ->
+                  `Stop (Oval_stuff "<void>")
+              | Float32 | Bits8 | Bits16 | Untagged_immediate
+              | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask
+              | Word | Product _ | Splice_variable _ ->
+                  `Stop (Oval_stuff "<abstr>")
+              in
+              of_element shape.(pos)
+            in
+            match fld with
+            | `Continue fld ->
+                nest tree_of_val (depth - 1) fld ty_arg
+            | `Stop result -> result
 
       (* CR lmaurer: *Pretty please* let's cut down on the duplication here. *)
       and tree_of_record_unboxed_product_fields depth env path type_params
