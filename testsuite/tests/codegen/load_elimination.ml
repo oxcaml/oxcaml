@@ -194,19 +194,20 @@ let store_load_across_gc p raw =
 [%%expect_asm X86_64{|
 store_load_across_gc:
   subq  $8, %rsp
-  movq  %rbx, %rdi
-  movq  %rdi, (%rax)
-  movq  %rdi, %rbx
+  movq  %rbx, (%rax)
+  movq  %rbx, %rsi
   subq  $24, %r15
   cmpq  (%r14), %r15
   jb    <hidden GC jump pad>
 .L0:
   leaq  8(%r15), %rax
-  movabsq $144115188075857920, %rsi
-  movq  %rsi, -8(%rax)
-  movq  %rbx, (%rax)
+  movabsq $144115188075857920, %rdi
+  movq  %rdi, -8(%rax)
+  movq  %rsi, (%rax)
   movq  $0, 8(%rax)
-  movq  %rdi, 8(%rax)
+  movq  %rbx, 8(%rax)
+  movq  %rbx, %rdi
+  movq  %rsi, %rbx
   addq  $8, %rsp
   ret
 |}]
@@ -223,9 +224,9 @@ let store_int_load_bits p (c : cursor) =
   #(c, bits)
 [%%expect_asm X86_64{|
 store_int_load_bits:
-  movq  %rax, %rdi
+  movq  (%rbx), %rdi
+  movq  %rdi, (%rax)
   movq  %rbx, %rax
-  movq  (%rax), %rbx
-  movq  %rbx, (%rdi)
+  movq  %rdi, %rbx
   ret
 |}]
