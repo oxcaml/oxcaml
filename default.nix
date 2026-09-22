@@ -81,27 +81,37 @@ let
       doCheck = false;
     };
 
-  # Always built with the plain pkgs.stdenv, whatever stdenv this derivation
-  # uses, so that every oxcaml variant shares one bootstrap closure. The
-  # pinned revision bootstraps itself the same way, recursively, down to a
-  # revision that bootstraps from upstream OCaml.
-  bootstrapCompiler = import (pkgs.fetchFromGitHub {
+  # The OxCaml release used to bootstrap this tree. Keep this the same as the
+  # oxcaml-compiler version in tools/ci/local-opam/packages/oxcaml-ci-bootstrap,
+  # and pin a release whose own default.nix bootstraps from upstream OCaml, so
+  # that the bootstrap chain stays two levels deep (rather than a chain of
+  # OxCaml builds, one per pin bump).
+  #
+  # It is always built with the plain pkgs.stdenv, whatever stdenv this
+  # derivation uses, so all oxcaml variants share one bootstrap closure.
+  #
+  # To update the hash without network access:
+  #   git archive <tag> | tar -x -C <dir> && nix hash path --sri <dir>
+  bootstrapSrc = pkgs.fetchFromGitHub {
     owner = "oxcaml";
     repo = "oxcaml";
-    rev = "11ae376f3e829ca475839554eb44a13313045f23";
-    hash = "sha256-1Av5KD9gRf7NOPUgXc2EgHB34YuWm7xR1eVqHAjhaVU=";
-  }) { inherit pkgs; };
+    tag = "5.4.0-ox8";
+    hash = "sha256-G/bhlNUKXpzTWpgtZHc9TmhLzzRse+6X7YQFS5CGSwA=";
+  };
 
-  # The bootstrap compiler records its C compiler by name (`gcc` with
-  # pkgs.stdenv on Linux) and both it and dune invoke that name to compile C
-  # stubs and link executables in the boot workspace. When this derivation
-  # uses clang (asan), no `gcc` is on PATH, so provide one that runs our cc.
-  # The flags the bootstrap compiler passes are accepted by clang.
-  bootstrapCcShim = lib.optional (stdenv.cc.isClang && !pkgs.stdenv.cc.isClang) (
-    pkgs.writeShellScriptBin "gcc" ''
-      exec ${stdenv.cc}/bin/cc "$@"
-    ''
-  );
+  bootstrapCompiler =
+    (import bootstrapSrc {
+      inherit pkgs;
+      withMerlin = false;
+    }).overrideAttrs
+      (old: {
+        # The bootstrap compiler records its C compiler by name and both it
+        # and dune invoke that name to compile C stubs and link executables
+        # in the boot workspace. Record `cc`, which every stdenv provides,
+        # rather than pkgs.stdenv's `gcc`, which is absent when this
+        # derivation uses clangStdenv (asan).
+        configureFlags = old.configureFlags ++ [ "CC=cc" ];
+      });
 
   # CR sspies: For the time being, we use dune built with the vanilla 4.14.2 compiler.
   # Over time, we should probably define something like a "boot environment" and build
@@ -392,9 +402,6 @@ stdenv.mkDerivation {
     pkgs.autoconf
     menhir
     bootstrapCompiler
-  ]
-  ++ bootstrapCcShim
-  ++ [
     pkgs.ocaml-ng.ocamlPackages_5_4.ocaml-lsp
     dune
     pkgs.pkg-config
