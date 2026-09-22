@@ -1052,6 +1052,12 @@ let prim_has_valid_reprs ~loc prim =
         is (Same_as_ocaml_repr C.scannable);
         is (Same_as_ocaml_repr C.scannable);
       ]
+    | "%ptr_of_idx" ->
+      check [
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.bits64);
+        is (Same_as_ocaml_repr (C.product [C.scannable; C.bits64]));
+      ]
     | "%unsafe_get_ptr" ->
       check [
         is (Same_as_ocaml_repr (C.product [C.scannable; C.bits64]));

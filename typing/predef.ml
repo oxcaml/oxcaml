@@ -70,6 +70,10 @@ type abstract_non_value_type_constr = [
   | `Idx_imm
   | `Idx_mut
   | `Idx_atomic
+  | `Ptr
+  | `Ptr_imm
+  | `Addr
+  | `Addr_imm
   | `Int8x16
   | `Int16x8
   | `Int32x4
@@ -138,6 +142,10 @@ let base_type_constrs : type_constr list = [
   `Idx_imm;
   `Idx_mut;
   `Idx_atomic;
+  `Ptr;
+  `Ptr_imm;
+  `Addr;
+  `Addr_imm;
 ]
 
 let or_null_extension_type_constrs : type_constr list = [
@@ -240,6 +248,10 @@ and ident_or_null = ident_create "or_null"
 and ident_idx_imm = ident_create "idx_imm"
 and ident_idx_mut = ident_create "idx_mut"
 and ident_idx_atomic = ident_create "idx_atomic"
+and ident_ptr = ident_create "ptr"
+and ident_ptr_imm = ident_create "ptr_imm"
+and ident_addr = ident_create "addr"
+and ident_addr_imm = ident_create "addr_imm"
 
 and ident_int8x16 = ident_create "int8x16"
 and ident_int16x8 = ident_create "int16x8"
@@ -305,6 +317,10 @@ let ident_of_type_constr : type_constr -> Ident.t = function
   | `Idx_imm -> ident_idx_imm
   | `Idx_mut -> ident_idx_mut
   | `Idx_atomic -> ident_idx_atomic
+  | `Ptr -> ident_ptr
+  | `Ptr_imm -> ident_ptr_imm
+  | `Addr -> ident_addr
+  | `Addr_imm -> ident_addr_imm
   | `Int8x16 -> ident_int8x16
   | `Int16x8 -> ident_int16x8
   | `Int32x4 -> ident_int32x4
@@ -999,6 +1015,30 @@ let decl_of_type_constr type_constr =
          }))
        ~jkind:(builtin2 Jkind.Const.Builtin.kind_of_idx)
        ()
+  | (`Ptr | `Ptr_imm | `Addr | `Addr_imm) as pointer ->
+    let variance =
+      match pointer with
+      | `Ptr | `Addr -> Variance.full
+      | `Ptr_imm | `Addr_imm -> Variance.covariant
+    in
+    decl1 ~variance
+      ~param_jkind:(Jkind.Builtin.any ~why:(Type_argument {
+        parent_path = Path.Pident type_ident;
+        position = 1;
+        arity = 1;
+      }))
+      ~jkind:(fun _ ->
+        let jkind = Jkind.Builtin.value_or_null ~why:(Primitive type_ident) in
+        let jkind_layout =
+          Jkind.Base_and_axes.map_layout
+            (fun layout ->
+              Jkind_types.(
+                Layout.product
+                  [layout; Layout.Sort (Sort.bits64, Scannable_axes.max)]))
+            jkind.jkind
+        in
+        { jkind with jkind = jkind_layout })
+      ()
   | `Lexing_position ->
     decl0
        ~kind:(

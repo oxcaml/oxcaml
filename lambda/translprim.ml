@@ -1292,6 +1292,8 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
         (Punspecializedarray,
          Punboxed_or_untagged_integer_index Unboxed_nativeint,
          Value generic_value, []), 1)
+    | "%ptr_of_idx" ->
+      Primitive(Pmake_unboxed_product (get_arg_layouts ()), 2)
     | "%unsafe_get_ptr_imm" ->
       (* This primitive requires the pointed-to data to be truly immutable,
          which the compiler will rely upon when performing optimizations *)
@@ -2886,7 +2888,7 @@ let report_error_doc ppf = function
          the@ result type should be equal to a %a or %a@ \
          whose first parameter is equal to %a or %a.@]"
         Style.inline_code "(_, _) idx_mut" Style.inline_code "(_, _) idx_imm"
-        Style.inline_code "_ array" Style.inline_code "_ iarray"
+        Style.inline_code "_ array#" Style.inline_code "_ iarray#"
   | Unable_to_specialize_idx_compose_primitive ty ->
       fprintf ppf
         "@[Cannot compose the index of type %a:@ \
