@@ -829,6 +829,7 @@
 (executable
  (name oxcaml_main_native)
  (modes native)
+ (link_deps %{ocaml_where}/stdlib.cmxa %{ocaml_where}/stdlib.a)
  (instrumentation
   (backend bisect_ppx))
  (ocamlopt_flags
