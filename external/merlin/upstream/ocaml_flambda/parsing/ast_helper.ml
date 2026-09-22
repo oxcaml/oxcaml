@@ -648,10 +648,12 @@ module Type = struct
     }
 
   let field ?(loc = !default_loc) ?(attrs = []) ?(info = empty_info)
-        ?(mut = Immutable) ?(modalities = []) name typ =
+        ?(mut = Immutable) ?(inheritance = Noninherited)
+        ?(modalities = []) name typ =
     {
      pld_name = name;
      pld_mutable = mut;
+     pld_inheritance = inheritance;
      pld_modalities = modalities;
      pld_type = typ;
      pld_loc = loc;

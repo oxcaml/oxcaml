@@ -599,6 +599,7 @@ let instance_jkind (t : jkind_lr) : jkind_lr =
     | Sort (s, sa) -> Sort (Jkind_types.Sort.instance s, sa)
     | Product ts -> Product (List.map instance_layout ts)
     | Addressable l -> Addressable (instance_layout l)
+    | Box (l, sa) -> Box (instance_layout l, sa)
   in
   match t.jkind.base with
   | Kconstr _ -> t
@@ -954,6 +955,20 @@ let simple_unbox_ty ty =
   | Ttuple tys -> Some (newty2 ~level:(get_level ty) (Tunboxed_tuple tys))
   | Tbox ty -> Some ty
   | _ -> None
+
+type reduces_box_result =
+  | Reduces_to_constr of Path.t * type_expr list
+  | Reduces_to_tuple of (string option * type_expr) list
+  | Doesn't_reduce_box
+
+let reduces_box contents =
+  match get_desc contents with
+  | Tconstr (p, args, _) -> (
+    match Path.boxed_version p with
+    | Some boxed_p -> Reduces_to_constr (boxed_p, args)
+    | None -> Doesn't_reduce_box)
+  | Tunboxed_tuple tys -> Reduces_to_tuple tys
+  | _ -> Doesn't_reduce_box
 
                   (************)
                   (*  Jkinds  *)
@@ -2132,6 +2147,18 @@ module Jkind0 = struct
           }
           ~annotation:None ~why:(Any_creation why)
 
+      let any_box ~(why : Jkind_intf.History.value_creation_reason) =
+        fresh_jkind
+          { Jkind_desc.Builtin.any with
+            base =
+              Layout
+                (Jkind_types.Layout.Box
+                   ( Jkind_types.Layout.Any Jkind_types.Scannable_axes.max,
+                     Jkind_types.Scannable_axes.max ));
+            mod_bounds = Const.Builtin.mutable_data.jkind.mod_bounds
+          }
+          ~annotation:None ~why:(Value_creation why)
+
       let value_v1_safety_check =
         { jkind = Jkind_desc.Builtin.value_or_null;
           annotation = mk_annot "value";
@@ -2149,6 +2176,18 @@ module Jkind0 = struct
       let scannable ~why =
         fresh_jkind Jkind_desc.Builtin.scannable
           ~annotation:(mk_annot "scannable") ~why:(Scannable_creation why)
+
+      let scannable_with_separability separability
+          ~(why : Jkind_intf.History.scannable_creation_reason) =
+        fresh_jkind
+          { Jkind_desc.Builtin.scannable with
+            base =
+              Layout
+                (Jkind_types.Layout.Sort
+                   ( Jkind_types.Sort.Base Jkind_types.Sort.Scannable,
+                     { Jkind_types.Scannable_axes.max with separability } ))
+          }
+          ~annotation:None ~why:(Scannable_creation why)
 
       let value_or_null ~why =
         match (why : Jkind_intf.History.value_or_null_creation_reason) with

@@ -195,6 +195,7 @@ type error =
   | Too_many_constructors
   | Duplicate_label of string
   | Unboxed_mutable_label
+  | Inherited_label_not_singleton_unboxed_record
   | Recursive_abbrev of string * Env.t * reaching_type_path
   | Cycle_in_def of string * Env.t * reaching_type_path
   | Unboxed_recursion of string * Env.t * reaching_type_path

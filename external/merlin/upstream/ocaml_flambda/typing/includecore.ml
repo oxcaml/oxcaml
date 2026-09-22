@@ -393,6 +393,7 @@ type kind_mismatch = type_kind * type_kind
 type label_mismatch =
   | Type of Errortrace.equality_error
   | Mutability of position
+  | Inheritance of position
   | Atomicity of position
   | Modality of Modality.equate_error
 
@@ -606,6 +607,10 @@ let report_label_mismatch first second env ppf err =
       report_type_inequality env ppf err
   | Mutability ord ->
       Format_doc.fprintf ppf "%s is mutable and %s is not."
+        (String.capitalize_ascii (choose ord first second))
+        (choose_other ord first second)
+  | Inheritance ord ->
+      Format_doc.fprintf ppf "%s is inherited and %s is not."
         (String.capitalize_ascii (choose ord first second))
         (choose_other ord first second)
   | Atomicity ord ->
@@ -938,6 +943,10 @@ module Record_diffing = struct
         (ld1 : Types.label_declaration)
         (ld2 : Types.label_declaration) =
         let err =
+          match ld1.ld_inheritance, ld2.ld_inheritance with
+          | Inherited, Noninherited -> Some (Inheritance First)
+          | Noninherited, Inherited -> Some (Inheritance Second)
+          | Inherited, Inherited | Noninherited, Noninherited ->
           match ld1.ld_mutable, ld2.ld_mutable with
           | Immutable, Immutable -> None
           | Mutable _, Immutable -> Some (Mutability First)
@@ -1752,7 +1761,7 @@ let type_declarations ?(equality = false) ~loc env ~mark name
            manifest fixes the problem. *)
         if Option.is_none decl2.type_manifest then
           (* Note that [decl2.type_jkind] is an upper bound *)
-          match Ctype.check_decl_jkind env decl1 decl2.type_jkind with
+          match Ctype.check_decl_jkind env ~path decl1 decl2.type_jkind with
            | Ok _ -> None
            | Error v -> Some (Jkind v)
         else None

@@ -58,6 +58,7 @@ type 'a gen_label_description =
     lbl_res: type_expr;                 (* Type of the result *)
     lbl_arg: type_expr;                 (* Type of the argument *)
     lbl_mut: mutability;                (* Is this a mutable field? *)
+    lbl_inheritance: Asttypes.field_inheritance;
     lbl_modalities: Mode.Modality.Const.t;
                                         (* Modalities on the field *)
     lbl_sort: Jkind_types.Sort.Const.t option; (* Sort of the argument *)

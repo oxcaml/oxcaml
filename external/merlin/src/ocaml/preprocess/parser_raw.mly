@@ -4554,23 +4554,33 @@ label_declarations:
   | label_declaration_semi label_declarations   { $1 :: $2 }
 ;
 label_declaration:
-    mutable_or_global_flag mkrhs(label) COLON poly_type_no_attr m1=optional_atat_modalities_expr attrs=attributes
+    inheritance=field_inheritance mut=mutable_or_global_flag
+    name=mkrhs(label) COLON typ=poly_type_no_attr
+    m1=optional_atat_modalities_expr attrs=attributes
       { let info = symbol_info $endpos in
-        let mut, m0 = $1 in
+        let mut, m0 = mut in
         let modalities = m0 @ m1 in
-        Type.field $2 $4 ~mut ~modalities ~attrs ~loc:(make_loc $sloc) ~info}
+        Type.field name typ ~mut ~inheritance ~modalities ~attrs
+          ~loc:(make_loc $sloc) ~info}
 ;
 label_declaration_semi:
-    mutable_or_global_flag mkrhs(label) COLON poly_type_no_attr m1=optional_atat_modalities_expr attrs0=attributes
+    inheritance=field_inheritance mut=mutable_or_global_flag
+    name=mkrhs(label) COLON typ=poly_type_no_attr
+    m1=optional_atat_modalities_expr attrs0=attributes
       SEMI attrs1=attributes
       { let info =
           match rhs_info $endpos(attrs0) with
           | Some _ as info_before_semi -> info_before_semi
           | None -> symbol_info $endpos
        in
-       let mut, m0 = $1 in
+       let mut, m0 = mut in
        let modalities = m0 @ m1 in
-       Type.field $2 $4 ~mut ~modalities ~attrs:(attrs0 @ attrs1) ~loc:(make_loc $sloc) ~info}
+       Type.field name typ ~mut ~inheritance ~modalities
+         ~attrs:(attrs0 @ attrs1) ~loc:(make_loc $sloc) ~info}
+;
+%inline field_inheritance:
+    /* empty */ { Noninherited }
+  | INHERIT { Inherited }
 ;
 
 /* Type Extensions */

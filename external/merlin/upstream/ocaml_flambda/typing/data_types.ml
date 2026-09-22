@@ -65,6 +65,7 @@ type 'a gen_label_description =
     lbl_res: type_expr;                 (* Type of the result *)
     lbl_arg: type_expr;                 (* Type of the argument *)
     lbl_mut: mutability;                (* Is this a mutable field? *)
+    lbl_inheritance: Asttypes.field_inheritance;
     lbl_modalities: Mode.Modality.Const.t;(* Modalities on the field *)
     lbl_sort: Jkind_types.Sort.Const.t option; (* Sort of the argument *)
     lbl_pos: int;                       (* Position in type *)
@@ -90,6 +91,7 @@ let label_declaration_of_label_description lbl =
   {
     ld_id;
     ld_mutable = lbl.lbl_mut;
+    ld_inheritance = lbl.lbl_inheritance;
     ld_modalities = lbl.lbl_modalities;
     ld_type = lbl.lbl_arg;
     ld_sort = lbl.lbl_sort;

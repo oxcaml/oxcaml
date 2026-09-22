@@ -307,7 +307,7 @@ let label_declaration sub ld =
   let attrs = sub.attributes sub ld.ld_attributes in
   let mut = mutable_ ld.ld_mutable in
   let modalities = Typemode.untransl_modalities ld.ld_modalities in
-  Type.field ~loc ~attrs ~mut ~modalities
+  Type.field ~loc ~attrs ~mut ~inheritance:ld.ld_inheritance ~modalities
     (map_loc sub ld.ld_name)
     (sub.typ sub ld.ld_type)
 

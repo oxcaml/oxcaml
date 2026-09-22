@@ -995,6 +995,7 @@ let decl_of_type_constr type_constr =
              {
                ld_id=id;
                ld_mutable=Immutable;
+               ld_inheritance=Noninherited;
                ld_modalities=Mode.Modality.Const.id;
                ld_type=field_type;
                ld_sort=Jkind_types.Sort.Const.(some scannable);
@@ -1057,7 +1058,11 @@ let decl_of_type_constr type_constr =
        ~variance:Variance.covariant
        ~separability:Separability.Ind
        ~manifest:(fun param -> newgenty (Tbox param))
-       ~jkind:(fun _ -> Jkind.Builtin.value ~why:Boxed)
+       ~jkind:(fun param ->
+         Jkind.Builtin.any_box ~why:Boxed |>
+           Jkind.add_with_bounds
+             ~modality:Mode.Modality.Const.id
+             ~type_expr:param)
        ~param_jkind:(
          Jkind.Builtin.any ~why:(Type_argument {
            parent_path = Path.Pident ident_box;

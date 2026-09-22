@@ -85,6 +85,7 @@ type error =
   | Too_many_constructors
   | Duplicate_label of string
   | Unboxed_mutable_label
+  | Inherited_label_not_singleton_unboxed_record
   | Recursive_abbrev of string * Env.t * reaching_type_path
   | Cycle_in_def of string * Env.t * reaching_type_path
   | Unboxed_recursion of string * Env.t * reaching_type_path
@@ -495,7 +496,7 @@ let update_type temp_env env id loc =
 *)
 let is_float env ty =
   match Ctype.get_unboxed_type_approximation env ty with
-  | { ty; or_null = None; modality = _ } -> begin
+  | { ty; or_null = None; _ } -> begin
     match get_desc ty with
     | Tconstr(p, _, _) -> Path.same p Predef.path_float
     | _ -> false end
@@ -573,6 +574,17 @@ let check_no_repr cty =
 let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
       env univars closed lbls kloc ~extension =
   assert (lbls <> []);
+  List.iter
+    (fun { pld_inheritance; pld_loc; _ } ->
+       match pld_inheritance with
+       | Noninherited -> ()
+       | Inherited ->
+         match record_form, lbls with
+         | Unboxed_product, [_] -> ()
+         | Legacy, _ | Unboxed_product, _ ->
+           raise (Error (pld_loc,
+                         Inherited_label_not_singleton_unboxed_record)))
+    lbls;
   let all_labels = ref String.Set.empty in
   List.iter
     (fun {pld_name = {txt=name; loc}} ->
@@ -580,7 +592,8 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
          raise(Error(loc, Duplicate_label name));
        all_labels := String.Set.add name !all_labels)
     lbls;
-  let mk {pld_name=name;pld_mutable=mut;pld_modalities=modalities;
+  let mk {pld_name=name;pld_mutable=mut;pld_inheritance=inheritance;
+          pld_modalities=modalities;
           pld_type=arg;pld_loc=loc;pld_attributes=attrs} =
     Builtin_attributes.warning_scope attrs
       (fun () ->
@@ -608,6 +621,7 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
           ld_name = name;
           ld_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
           ld_mutable = mut;
+          ld_inheritance = inheritance;
           ld_modalities = modalities;
           ld_type = cty; ld_loc = loc; ld_attributes = attrs}
       )
@@ -625,6 +639,7 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
          end;
          {Types.ld_id = ld.ld_id;
           ld_mutable = ld.ld_mutable;
+          ld_inheritance = ld.ld_inheritance;
           ld_modalities = ld.ld_modalities.moda_modalities;
           ld_sort = None;
             (* Updated by [update_label_sorts] *)
@@ -1418,6 +1433,7 @@ let derive_unboxed_version env path_in_group_has_unboxed_version decl =
         (fun (ld : Types.label_declaration) ->
             { Types.ld_id = Ident.create_local (Ident.name ld.ld_id);
             ld_mutable = Immutable;
+            ld_inheritance = ld.ld_inheritance;
             ld_modalities = ld.ld_modalities;
               (* Inherit modalities from the boxed version. Note that these
                   are affected by the mutability of the boxed label, even
@@ -1739,16 +1755,19 @@ let narrow_to_manifest_jkind env loc path decl =
         let type_equal = Ctype.type_equal env in
         let context = Ctype.mk_jkind_context_always_principal env in
         (match
-           Ikind.check_type_expr_bound
-             ~origin:(Format.asprintf
-                        "typedecl:manifest_vs_decl %a"
-                        Location.print_loc decl.type_loc)
-             ~type_equal
-             ~context
-             env
-             ~ty
-             ~actual:manifest_jkind
-             ~bound:decl.type_jkind
+           Ctype.check_decl_jkind_l env ~path decl ~bound:decl.type_jkind
+             manifest_jkind
+             ~sub:(fun actual ->
+               Ikind.check_type_expr_bound
+                 ~origin:(Format.asprintf
+                            "typedecl:manifest_vs_decl %a"
+                            Location.print_loc decl.type_loc)
+                 ~type_equal
+                 ~context
+                 env
+                 ~ty
+                 ~actual
+                 ~bound:decl.type_jkind)
          with
          | Ok () -> ()
          | Error v ->
@@ -2052,7 +2071,7 @@ module Element_repr = struct
       in
       let rec layout_to_t : Jkind_types.Layout.Const.t -> t option = function
       | Any _ -> None
-      | Base (Scannable, sa) -> Some (Value_element sa)
+      | Base (Scannable, sa) | Box (_, sa) -> Some (Value_element sa)
       | Base (Float64, _) -> Some (Unboxed_element Float64)
       | Base (Float32, _) -> Some (Unboxed_element Float32)
       | Base (Word, _) -> Some (Unboxed_element Word)
@@ -2397,28 +2416,6 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
     let types = List.map snd lbls in
     let sorts, jkinds = update_label_sorts env loc types ~form in
     let reprs, repr_summary = compute_repr_summary env lbls jkinds in
-    let jkind =
-      match form with
-      | Legacy ->
-          let lbls_with_sorts =
-            List.map2 (fun (lbl, ty) sort -> (lbl, ty, sort)) lbls sorts
-          in
-          Jkind.for_boxed_record_with_updates lbls_with_sorts
-      | Unboxed_product ->
-        let lbls_with_layouts =
-          List.map2
-            (fun (lbl, ty) jkind ->
-                let layout =
-                  match Jkind.extract_layout env jkind with
-                  | Ok layout -> layout
-                  | Error _ ->
-                      Jkind.Layout.Any Jkind_types.Scannable_axes.max
-                in
-                lbl, ty, layout)
-            lbls jkinds
-        in
-        Jkind.for_unboxed_record_with_updates lbls_with_layouts
-    in
     let rep : (rep, _) Result.t =
       (* CR layouts: improve the readability of this match *)
       let { values; floats; atomic_floats; float64s;
@@ -2460,6 +2457,45 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
         (match form with
          | Legacy -> Record_undetermined
          | Unboxed_product -> Record_unboxed_product_undetermined)
+    in
+    let field_layouts () =
+      List.map
+        (fun jkind ->
+            match Jkind.extract_layout env jkind with
+            | Ok layout -> Jkind.Layout.scannable_bound layout
+            | Error _ -> Jkind.Layout.Any Jkind_types.Scannable_axes.max)
+        jkinds
+    in
+    let jkind =
+      match form with
+      | Legacy ->
+          let lbls_with_sorts =
+            List.map2 (fun (lbl, ty) sort -> (lbl, ty, sort)) lbls sorts
+          in
+          let jkind = Jkind.for_boxed_record_with_updates lbls_with_sorts in
+          if record_gets_unboxed_version (List.map fst lbls) rep
+          then
+            Jkind.set_layout jkind
+              (Jkind.layout_for_boxed_block (field_layouts ()))
+          else jkind
+      | Unboxed_product ->
+        begin match lbls with
+        | [(lbl : Types.label_declaration), ty] ->
+          let jkind =
+            Jkind.for_abbreviation
+              ~type_jkind_purely:(Ctype.type_jkind env)
+              ~modality:lbl.ld_modalities ty
+            |> Jkind.apply_operator env (field_kind_operator lbl.ld_inheritance)
+          in
+          Jkind.History.update_reason jkind (Product_creation Unboxed_record)
+        | [] | _ :: _ :: _ ->
+          let lbls_with_layouts =
+            List.map2
+              (fun (lbl, ty) layout -> lbl, ty, layout)
+              lbls (field_layouts ())
+          in
+          Jkind.for_unboxed_record_with_updates lbls_with_layouts
+        end
     in
     sorts, rep, jkind
   | Legacy, _,
@@ -2899,8 +2935,10 @@ let rec update_decl_jkind env dpath decl =
      jkinds in transl_declaration]) *)
   let context = Ctype.mk_jkind_context_always_principal env in
   match
-    Jkind.sub_layout_or_error ~context
-      env new_decl.type_jkind decl.type_jkind
+    Ctype.check_decl_jkind_l env ~path:dpath decl ~bound:decl.type_jkind
+      new_decl.type_jkind
+      ~sub:(fun estimate ->
+        Jkind.sub_layout_or_error ~context env estimate decl.type_jkind)
   with
   | Ok () -> new_decl
   | Error err ->
@@ -3381,6 +3419,7 @@ let check_unboxed_recursion ~abs_env env loc path0 ty0 to_check =
       | Base _ -> true
       | Product l -> List.for_all is_representable l
       | Addressable layout -> is_representable layout
+      | Box _ -> true
       | Univar _ -> Misc.fatal_error "Unboxed_recursion: univar"
       | Genvar _ -> Misc.fatal_error "Unboxed_recursion: genvar"
     in
@@ -3686,7 +3725,8 @@ let normalize_decl_jkinds env decls =
       decl.type_unboxed_version
     in
     let normalization_context =
-      Ctype.mk_jkind_context env (fun ty -> Some (Ctype.type_jkind env ty))
+      Ctype.mk_jkind_context env (fun ty ->
+        Some (Ctype.type_jkind ~mod_bounds_only:true env ty))
     in
     let normalized_jkind =
       Jkind.normalize
@@ -3715,6 +3755,8 @@ let normalize_decl_jkinds env decls =
       let context = Ctype.mk_jkind_context_always_principal env in
       let type_equal = Ctype.type_equal env in
       match
+        Ctype.check_decl_jkind_l env ~path decl ~bound:original_decl.type_jkind
+          decl.type_jkind ~sub:(fun actual ->
         (* CR layouts v2.8: Consider making a function that doesn't compute
            histories for this use-case, which doesn't need it. *)
         Ikind.check_type_decl_bound
@@ -3727,8 +3769,8 @@ let normalize_decl_jkinds env decls =
           ~allow_any_crossing
           env
           ~decl
-          ~actual:decl.type_jkind
-          ~bound:original_decl.type_jkind
+          ~actual
+          ~bound:original_decl.type_jkind)
       with
       | Ok _ ->
         if allow_any_crossing then
@@ -5691,6 +5733,9 @@ let report_error ~loc = function
       Location.errorf "Two labels are named %a" Style.inline_code s
   | Unboxed_mutable_label ->
       Location.errorf ~loc "Unboxed record labels cannot be mutable"
+  | Inherited_label_not_singleton_unboxed_record ->
+      Location.errorf ~loc
+        "Inherited labels are only supported in singleton unboxed records"
   | Recursive_abbrev (s, env, reaching_path) ->
       let reaching_path = Reaching_path.simplify reaching_path in
       Printtyp.wrap_printing_env ~error:true env @@ fun () ->

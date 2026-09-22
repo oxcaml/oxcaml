@@ -1207,10 +1207,15 @@ and constructor_arguments i ppf = function
   | Pcstr_tuple l -> list i constructor_argument ppf l
   | Pcstr_record l -> list i label_decl ppf l
 
-and label_decl i ppf {pld_name; pld_mutable; pld_modalities; pld_type; pld_loc; pld_attributes}=
+and label_decl i ppf {pld_name; pld_mutable; pld_inheritance; pld_modalities;
+                     pld_type; pld_loc; pld_attributes}=
   line i ppf "%a\n" fmt_location pld_loc;
   attributes i ppf pld_attributes;
   line (i+1) ppf "%a\n" fmt_mutable_flag pld_mutable;
+  begin match pld_inheritance with
+  | Noninherited -> ()
+  | Inherited -> line (i+1) ppf "Inherited\n"
+  end;
   modalities (i+1) ppf pld_modalities;
   line (i+1) ppf "%a" fmt_string_loc pld_name;
   core_type (i+1) ppf pld_type

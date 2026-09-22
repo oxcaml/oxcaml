@@ -146,6 +146,14 @@ val tpoly_get_poly : type_expr -> type_expr * type_expr list
    if one exists in an empty environment *)
 val simple_unbox_ty : type_expr -> type_expr option
 
+(** Whether [contents box] reduces, and to what: [t# box] to [t] and
+    [#(t1 * t2) box] to [t1 * t2]. *)
+type reduces_box_result =
+  | Reduces_to_constr of Path.t * type_expr list
+  | Reduces_to_tuple of (string option * type_expr) list
+  | Doesn't_reduce_box
+val reduces_box : type_expr -> reduces_box_result
+
 (**** Utilities for private abbreviations with fixed rows ****)
 val row_of_type: type_expr -> type_expr
 val has_constr_row: type_expr -> bool
@@ -721,10 +729,17 @@ module Jkind0 : sig
         Jkind_axis.Separability.t ->
         why:Jkind_intf.History.any_creation_reason ->
         'd jkind
+
+      val any_box :
+        why:Jkind_intf.History.value_creation_reason -> 'd jkind
       val void :
         why:Jkind_intf.History.void_creation_reason -> ('l * disallowed) jkind
       val scannable :
         why:Jkind_intf.History.scannable_creation_reason -> 'd Types.jkind
+      val scannable_with_separability :
+        Jkind_axis.Separability.t ->
+        why:Jkind_intf.History.scannable_creation_reason ->
+        'd Types.jkind
       val value_or_null :
         why:Jkind_intf.History.value_or_null_creation_reason -> 'd jkind
       val value : why:Jkind_intf.History.value_creation_reason -> 'd jkind

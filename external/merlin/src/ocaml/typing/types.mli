@@ -1057,6 +1057,7 @@ and label_declaration =
   {
     ld_id: Ident.t;
     ld_mutable: mutability;
+    ld_inheritance: Asttypes.field_inheritance;
     ld_modalities: Mode.Modality.Const.t;
     ld_type: type_expr;
     ld_sort: Jkind_types.Sort.Const.t option;
@@ -1088,6 +1089,9 @@ and constructor_arguments =
   | Cstr_record of label_declaration list
 
 val tys_of_constr_args : constructor_arguments -> type_expr list
+
+val field_kind_operator :
+  Asttypes.field_inheritance -> Jkind_types.Kind_operator.t
 
 (* Returns the inner type and its modalities, if unboxed. *)
 val find_unboxed_type : type_declaration ->
