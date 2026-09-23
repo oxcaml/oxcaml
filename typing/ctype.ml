@@ -6650,33 +6650,13 @@ let rec mgen_fast env subst scope maxnodes variance t1 t2 =
   match get_desc t1, get_desc t2 with
   | Tsubst (ty, _), _ when eq_type ty t2 -> ()
   | Tvar { jkind }, _ when get_level t1 = generic_level ->
-     (* As in [moregen], the subject must fit the variable's jkind. The
-        general check ([check_type_jkind]) is expensive and looks up
-        paths, which are unsubstituted in [t2]. So we accept only two
-        cheap, pure sufficient conditions, which need neither the
-        environment nor the substitution: the jkind is the maximum one
-        (the first thing the general check tests too); or its mod-bounds
-        are maximal, so only the layout matters, and the subject is a
-        variable with the same constant layout. *)
-     let fits =
-       Jkind.is_obviously_max jkind
-       || (Jkind.mod_bounds_are_obviously_max jkind
-           && match get_desc t2 with
-              | Tvar { jkind = jkind2 } -> begin
-                  (* [get_layout] only consults [env] for an abstract
-                     kind. The path in [jkind2] is unsubstituted, but
-                     looking it up either fails (and we bail out) or finds
-                     the same declaration, as identifiers are unique. *)
-                  match
-                    Jkind.get_layout env jkind, Jkind.get_layout env jkind2
-                  with
-                  | Some l1, Some l2 ->
-                    Jkind_types.Layout.Const.equal l1 l2
-                  | _ -> false
-                end
-              | _ -> false)
-     in
-     if not fits then raise_notrace Complicated_moregen;
+    (* CR zeisbach: we want to avoid looking at the mod bounds (since properly
+       computing them is expensive). BUT, we can do better if the mod bounds are
+       max. If so, consider checking if [t2] is of the shape where calling
+       [estimate_type_jkind] is fast, and if so, call it and compare them.
+       We also would need a conservative jkind (or layout) [sub] check that does
+       not mutate / expand. This case seems rare enough to bail for now *)
+     if not (Jkind.is_obviously_max jkind) then raise_notrace Complicated_moregen;
      For_copy.redirect_desc scope t1 (Tsubst (t2, None))
   | Tarrow ((l1,a1,r1), t1, u1, _), Tarrow ((l2,a2,r2), t2, u2, _)
        when l1 = l2 ->
