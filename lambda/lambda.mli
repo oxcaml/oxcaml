@@ -970,6 +970,11 @@ type function_attribute = {
      on *both* functions involved is [true]. *)
   may_fuse_arity: bool;
   unbox_return: unbox_return_attribute;
+  cohort_id: Cohort_id.t option;
+  (* Set on instantiations of layout-polymorphic templates. Every compilation
+     unit that instantiates the same template at the same arguments produces
+     an equivalent function with the same cohort id; the backend gives such
+     functions a canonical weak symbol so the linker keeps only one copy. *)
 }
 
 type parameter_attribute = {
@@ -1427,6 +1432,8 @@ val lfunction' :
 (* Set the yielding mode of a closure (defaults to [May_yield] from the
    smart constructors). [Translcore] uses this to record the precise mode. *)
 val lfunction_with_yielding : yielding_kind -> lfunction -> lfunction
+
+val lfunction_with_attr : function_attribute -> lfunction -> lfunction
 
 
 val iter_head_constructor: (lambda -> unit) -> lambda -> unit

@@ -690,6 +690,7 @@ let rec compile_functor ~scopes mexp coercion root_path loc =
         tmc_candidate = false;
         may_fuse_arity = true;
         unbox_return = None;
+        cohort_id = None;
       }
       ~loc
       ~mode:alloc_heap

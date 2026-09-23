@@ -803,7 +803,7 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
         let code =
           (* CR mshinwell: [inlining_decision] should maybe be set properly *)
           Code.create code_id ~params_and_body ~free_names_of_params_and_body
-            ~newer_version_of ~params_arity ~param_modes
+            ~newer_version_of ~cohort:None ~params_arity ~param_modes
             ~first_complex_local_param:
               (First_complex_local_param.Index
                  (Flambda_arity.num_params params_arity))

@@ -437,6 +437,8 @@ module Function_decls : sig
 
     val stub : t -> bool
 
+    val cohort : t -> Cohort_id.t option
+
     val loc : t -> Lambda.scoped_location
 
     val recursive : t -> Recursive.t

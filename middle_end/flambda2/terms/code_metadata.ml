@@ -17,6 +17,7 @@
 type t =
   { code_id : Code_id.t;
     newer_version_of : Code_id.t option;
+    cohort : Cohort_id.t option;
     params_arity : [`Complex] Flambda_arity.t;
     param_modes : Alloc_mode.For_types.t list;
     first_complex_local_param : First_complex_local_param.t;
@@ -61,6 +62,8 @@ module Code_metadata_accessors (X : Metadata_view_type) = struct
   let code_id t = (metadata t).code_id
 
   let newer_version_of t = (metadata t).newer_version_of
+
+  let cohort t = (metadata t).cohort
 
   let params_arity t = (metadata t).params_arity
 
@@ -140,6 +143,7 @@ include Code_metadata_accessors [@inlined hint] (Metadata_view)
 type 'a create_type =
   Code_id.t ->
   newer_version_of:Code_id.t option ->
+  cohort:Cohort_id.t option ->
   params_arity:[`Complex] Flambda_arity.t ->
   param_modes:Alloc_mode.For_types.t list ->
   first_complex_local_param:First_complex_local_param.t ->
@@ -167,7 +171,7 @@ type 'a create_type =
   loopify:Loopify_attribute.t ->
   'a
 
-let createk k code_id ~newer_version_of ~params_arity ~param_modes
+let createk k code_id ~newer_version_of ~cohort ~params_arity ~param_modes
     ~first_complex_local_param ~result_arity ~result_types ~result_mode ~stub
     ~(inline : Inline_attribute.t) ~zero_alloc_attribute ~poll_attribute
     ~regalloc_attribute ~regalloc_param_attribute ~cold ~is_a_functor ~is_opaque
@@ -203,6 +207,7 @@ let createk k code_id ~newer_version_of ~params_arity ~param_modes
   k
     { code_id;
       newer_version_of;
+      cohort;
       params_arity;
       param_modes;
       first_complex_local_param;
@@ -274,7 +279,7 @@ let [@ocamlformat "disable"] print_inlining_paths ppf
       Inlining_history.Absolute.print absolute_history
 
 let [@ocamlformat "disable"] print ppf
-       { code_id = _; newer_version_of; stub; inline; zero_alloc_attribute; poll_attribute;
+       { code_id = _; newer_version_of; cohort; stub; inline; zero_alloc_attribute; poll_attribute;
          regalloc_attribute; regalloc_param_attribute; cold; is_a_functor; is_opaque; params_arity; param_modes;
          first_complex_local_param; result_arity;
          result_types; result_mode;
@@ -284,6 +289,7 @@ let [@ocamlformat "disable"] print ppf
   let module C = Flambda_colours in
   Format.fprintf ppf "@[<hov 1>(\
       @[<hov 1>%t(newer_version_of@ %a)%t@]@ \
+      @[<hov 1>%t(cohort@ %a)%t@]@ \
       @[<hov 1>%t(stub@ %b)%t@]@ \
       @[<hov 1>%t(inline@ %a)%t@]@ \
       @[<hov 1>%t(%a)%t@]@ \
@@ -312,6 +318,10 @@ let [@ocamlformat "disable"] print ppf
     (if Option.is_none newer_version_of then Flambda_colours.elide
     else Flambda_colours.none)
     (Option.print_compact Code_id.print) newer_version_of
+    Flambda_colours.pop
+    (if Option.is_none cohort then Flambda_colours.elide
+    else Flambda_colours.none)
+    (Option.print_compact Cohort_id.print) cohort
     Flambda_colours.pop
     (if not stub then Flambda_colours.elide else C.none)
     stub
@@ -408,6 +418,7 @@ let free_names
     { code_id = _;
       cold = _;
       newer_version_of;
+      cohort = _;
       params_arity = _;
       param_modes = _;
       first_complex_local_param = _;
@@ -453,6 +464,7 @@ let apply_renaming
     ({ code_id;
        cold = _;
        newer_version_of;
+       cohort = _;
        params_arity = _;
        param_modes = _;
        first_complex_local_param = _;
@@ -510,6 +522,7 @@ let ids_for_export
     { code_id;
       cold = _;
       newer_version_of;
+      cohort = _;
       params_arity = _;
       param_modes = _;
       first_complex_local_param = _;
@@ -552,6 +565,7 @@ let approx_equal
     { code_id = code_id1;
       cold = cold1;
       newer_version_of = newer_version_of1;
+      cohort = cohort1;
       params_arity = params_arity1;
       param_modes = param_modes1;
       first_complex_local_param = first_complex_local_param1;
@@ -579,6 +593,7 @@ let approx_equal
     }
     { code_id = code_id2;
       newer_version_of = newer_version_of2;
+      cohort = cohort2;
       cold = cold2;
       params_arity = params_arity2;
       param_modes = param_modes2;
@@ -607,6 +622,7 @@ let approx_equal
     } =
   Code_id.equal code_id1 code_id2
   && (Option.equal Code_id.equal) newer_version_of1 newer_version_of2
+  && (Option.equal Cohort_id.equal) cohort1 cohort2
   && Flambda_arity.equal_ignoring_subkinds params_arity1 params_arity2
   && List.equal Alloc_mode.For_types.equal param_modes1 param_modes2
   && First_complex_local_param.equal first_complex_local_param1

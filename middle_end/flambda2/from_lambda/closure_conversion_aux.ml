@@ -907,6 +907,8 @@ module Function_decls = struct
 
     let stub t = t.attr.stub
 
+    let cohort t = t.attr.cohort_id
+
     let loc t = t.loc
 
     let recursive t = t.recursive

@@ -60,10 +60,15 @@ let manufacture_symbol_of_variable v =
   let name = Variable.canonical_name v in
   manufacture_symbol name
 
-let declare_symbol_for_function_slot env ident function_slot : Env.t * Symbol.t
-    =
+let declare_symbol_for_function_slot env ident function_slot ~cohort :
+    Env.t * Symbol.t =
   let symbol =
-    manufacture_symbol (Function_slot.canonical_name function_slot)
+    match cohort with
+    | None -> manufacture_symbol (Function_slot.canonical_name function_slot)
+    | Some cohort ->
+      Symbol.unsafe_create
+        (Current_unit.get_cu_exn ())
+        (Cohort_id.closure_linkage_name cohort)
   in
   let env =
     Env.add_simple_to_substitute env ident (Simple.symbol symbol)
@@ -2656,7 +2661,7 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
            (Function_decl.zero_alloc_attribute decl))
       ~is_a_functor:(Function_decl.is_a_functor decl)
       ~cold:false ~is_opaque:false ~recursive ~newer_version_of:None
-      ~cost_metrics
+      ~cohort:None ~cost_metrics
       ~inlining_arguments:(Inlining_arguments.create ~round:0)
       ~dbg ~is_tupled ~is_my_closure_used:true ~inlining_decision
       ~absolute_history ~relative_history ~loopify:Never_loopify
@@ -3046,10 +3051,13 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
       then Default_loopify_and_tailrec
       else Default_loopify_and_not_tailrec
   in
-  let main_code_id =
+  let main_code_id, cohort =
     match calling_convention with
-    | Normal_calling_convention -> code_id
-    | Unboxed_calling_convention _ -> Code_id.rename code_id
+    | Normal_calling_convention -> code_id, Function_decl.cohort decl
+    | Unboxed_calling_convention _ ->
+      (* The wrapper and the main code would otherwise be two unrelated members
+         of the same cohort in this unit. *)
+      Code_id.rename code_id, None
   in
   let contains_no_escaping_local_allocs =
     match Function_decl.result_mode decl with
@@ -3077,7 +3085,7 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
       ~is_a_functor:(Function_decl.is_a_functor decl)
       ~cold:(Function_decl.cold decl)
       ~is_opaque:(Function_decl.is_opaque decl)
-      ~recursive ~newer_version_of:None ~cost_metrics
+      ~recursive ~newer_version_of:None ~cohort ~cost_metrics
       ~inlining_arguments:(Inlining_arguments.create ~round:0)
       ~dbg ~is_tupled:main_code_is_tupled
       ~is_my_closure_used:
@@ -3194,6 +3202,15 @@ let close_functions acc external_env ~current_alloc_region ~current_region
         Function_slot.Map.add function_slot code_id map)
       Function_slot.Map.empty func_decl_list
   in
+  let function_cohorts =
+    List.fold_left
+      (fun map decl ->
+        Function_slot.Map.add
+          (Function_decl.function_slot decl)
+          (Function_decl.cohort decl)
+          map)
+      Function_slot.Map.empty func_decl_list
+  in
   let approx_map =
     List.fold_left
       (fun approx_map decl ->
@@ -3247,7 +3264,9 @@ let close_functions acc external_env ~current_alloc_region ~current_region
             ~is_a_functor:(Function_decl.is_a_functor decl)
             ~is_opaque:(Function_decl.is_opaque decl)
             ~recursive:(Function_decl.recursive decl)
-            ~newer_version_of:None ~cost_metrics
+            ~newer_version_of:None
+            ~cohort:(Function_decl.cohort decl)
+            ~cost_metrics
             ~inlining_arguments:(Inlining_arguments.create ~round:0)
             ~dbg ~is_tupled ~is_my_closure_used:true
             ~inlining_decision:Recursive
@@ -3270,6 +3289,7 @@ let close_functions acc external_env ~current_alloc_region ~current_region
         (fun ident function_slot (acc, env, symbol_map) ->
           let env, symbol =
             declare_symbol_for_function_slot env ident function_slot
+              ~cohort:(Function_slot.Map.find function_slot function_cohorts)
           in
           let approx =
             match Function_slot.Map.find function_slot approx_map with
@@ -3601,7 +3621,8 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
         poll = Default_poll;
         tmc_candidate = false;
         may_fuse_arity = true;
-        unbox_return = None
+        unbox_return = None;
+        cohort_id = None
       }
   in
   let free_idents_of_body =

@@ -383,13 +383,21 @@ end = struct
     let arg_names =
       Array.map Mangling.symbol_arg_of_value args |> Array.to_list
     in
-    let name =
+    let name_string =
       Fmt.asprintf "%a_%a" Template_id.print id
         (Fmt.pp_print_list
            ~pp_sep:(fun ppf () -> Fmt.pp_print_string ppf "_")
            Fmt.pp_print_string)
         arg_names
-      |> Ident.create_persistent
+    in
+    let name = Ident.create_persistent name_string in
+    let cohort_id =
+      if not !Cohort_id.enabled
+      then None
+      else
+        match id.owner, Current_unit.get_cu () with
+        | Some cu, _ | None, Some cu -> Some (Cohort_id.create cu name_string)
+        | None, None -> None
     in
     let slv_comptime =
       match Ident.Tbl.find_opt t.instantiated_templates name with
@@ -402,6 +410,12 @@ end = struct
            visited before calling it. *)
         Ident.Tbl.replace t.instantiated_templates name None;
         let { Types.slv_comptime; slv_runtime } = eval_apply closure args in
+        let slv_runtime =
+          match slv_runtime, cohort_id with
+          | Lfunction lf, Some _ ->
+            Lfunction (lfunction_with_attr { lf.attr with cohort_id } lf)
+          | _, _ -> slv_runtime
+        in
         Ident.Tbl.replace t.instantiated_templates name (Some slv_comptime);
         let instantiation =
           Lambda.subst

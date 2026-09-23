@@ -1306,7 +1306,11 @@ let function_attribute ppf t =
   | Regalloc_params params ->
       List.iter (fun param -> fprintf ppf "regalloc_param(%S)@ " param) params
   end;
-  if t.cold then fprintf ppf "cold@ "
+  if t.cold then fprintf ppf "cold@ ";
+  begin match t.cohort_id with
+  | None -> ()
+  | Some cohort_id -> fprintf ppf "cohort(%a)@ " Cohort_id.print cohort_id
+  end
 
 let apply_tailcall_attribute ppf = function
   | Default_tailcall -> ()

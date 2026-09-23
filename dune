@@ -316,6 +316,7 @@
   outcometree
   allowance
   ;; lambda/
+  cohort_id
   debuginfo
   lambda
   static_label

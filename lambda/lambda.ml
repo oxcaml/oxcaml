@@ -1218,6 +1218,7 @@ type function_attribute = {
   tmc_candidate: bool;
   may_fuse_arity: bool;
   unbox_return: unbox_return_attribute;
+  cohort_id: Cohort_id.t option;
 }
 
 type scoped_location = Debuginfo.Scoped_location.t
@@ -1645,6 +1646,8 @@ let lfunction ~kind ~params ~return ~body ~attr ~loc ~mode ~ret_mode =
 
 let lfunction_with_yielding yielding (lf : lfunction) = { lf with yielding }
 
+let lfunction_with_attr attr (lf : lfunction) = { lf with attr }
+
 let lambda_unit = Lconst const_unit
 
 let of_bool = function
@@ -1800,6 +1803,7 @@ let default_function_attribute = {
   *)
   may_fuse_arity = true;
   unbox_return = None;
+  cohort_id = None;
 }
 
 let default_stub_attribute =

@@ -1505,6 +1505,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
           tmc_candidate = false;
           unbox_return = None;
           may_fuse_arity = false;
+          cohort_id = None;
         } in
       let funcid = Ident.create_local ("probe_handler_" ^ name) in
       let funcid_duid = Lambda.debug_uid_none in

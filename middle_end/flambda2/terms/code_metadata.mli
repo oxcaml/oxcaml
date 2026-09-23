@@ -31,6 +31,10 @@ module type Code_metadata_accessors_result_type = sig
 
   val newer_version_of : 'a t -> Code_id.t option
 
+  (** Set when this code is a member of a cohort (see [Cohort_id]); the newest
+      member in a compilation unit is emitted under the cohort's weak symbol. *)
+  val cohort : 'a t -> Cohort_id.t option
+
   val params_arity : 'a t -> [`Complex] Flambda_arity.t
 
   val param_modes : 'a t -> Alloc_mode.For_types.t list
@@ -95,6 +99,7 @@ include Code_metadata_accessors_result_type with type 'a t := t
 type 'a create_type =
   Code_id.t ->
   newer_version_of:Code_id.t option ->
+  cohort:Cohort_id.t option ->
   params_arity:[`Complex] Flambda_arity.t ->
   param_modes:Alloc_mode.For_types.t list ->
   first_complex_local_param:First_complex_local_param.t ->

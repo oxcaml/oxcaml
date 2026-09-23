@@ -130,6 +130,12 @@ let iter_code t ~f =
       Code_or_metadata.iter_code code_or_metadata ~f)
     t
 
+let fold_code_metadata t ~init ~f =
+  Code_id.Map.fold
+    (fun code_id code_or_metadata acc ->
+      f code_id (Code_or_metadata.code_metadata code_or_metadata) acc)
+    t init
+
 let from_raw ~sections t =
   Code_id.Map.map (Code_or_metadata.from_raw ~sections) t
 

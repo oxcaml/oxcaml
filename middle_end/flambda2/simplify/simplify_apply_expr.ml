@@ -728,7 +728,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
           let code =
             Code.create code_id ~params_and_body
               ~free_names_of_params_and_body:free_names ~newer_version_of:None
-              ~params_arity:remaining_param_arity
+              ~cohort:None ~params_arity:remaining_param_arity
               ~param_modes:remaining_params_alloc_modes
               ~first_complex_local_param ~result_arity ~result_types:Unknown
               ~result_mode ~stub:true ~inline:Default_inline
