@@ -401,7 +401,8 @@ let () =
 external get_int_idx : ('a : any).
   'a box -> ('a, int) idx_imm -> int = "%get_idx_imm"
 [%%expect{|
-external get_int_idx : 'a -> ('a, int) idx_imm -> int = "%get_idx_imm"
+external get_int_idx : ('a : any). 'a box -> ('a, int) idx_imm -> int
+  = "%get_idx_imm"
 |}]
 
 let () =
@@ -524,7 +525,7 @@ let void_index () : (unit# gap_record#, #(string * float#)) idx_imm =
   let poly_ target_index () = (.target) in
   target_index ()
 [%%expect{|
-val void_index : unit -> (unit# gap_record, #(string * float#)) idx_imm =
+val void_index : unit -> (unit# gap_record#, #(string * float#)) idx_imm =
   <fun>
 |}]
 
@@ -541,7 +542,7 @@ let print_record =
 [%%expect{|
 type ('a : any) record_for_printing = { x : int; y : 'a; }
 val print_record : int record_for_printing * float# record_for_printing =
-  ({x = 67; y = 42}, {x = 67; y = <abstr>})
+  ({x = 67; y = 42}, {x = 67; y = #42.5})
 |}]
 
 type ('a : any) inline_record_for_printing = I of { x : int ; y : 'a }
@@ -552,12 +553,12 @@ let print_inline_record =
 type ('a : any) inline_record_for_printing = I of { x : int; y : 'a; }
 val print_inline_record :
   int inline_record_for_printing * float# inline_record_for_printing =
-  (I {x = 67; y = 42}, I {x = 67; y = <abstr>})
+  (I {x = 67; y = 42}, I {x = 67; y = #42.5})
 |}]
 
 let print_variant =
   let poly_ mk x = Some x in
   mk 42, mk #42.5
 [%%expect{|
-val print_variant : int t * float# t = (Some 42, Some <abstr>)
+val print_variant : int t * float# t = (Some 42, Some #42.5)
 |}]
