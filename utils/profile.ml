@@ -63,11 +63,18 @@ module Measure = struct
     {
       time = cheap ();
       calls = !calls;
-      allocated_words = stat.minor_words +. stat.major_words; (* XXX -. stat.promoted_words and elsewhere *)
+      (* XXX -. stat.promoted_words and elsewhere *)
+      allocated_words = stat.minor_words +. stat.major_words;
       top_heap_words = stat.top_heap_words;
       counters = counters;
     }
-  let zero = { time = 0.; calls = 0; allocated_words = 0.; top_heap_words = 0; counters = Counters.create () }
+  let zero = {
+    time = 0.;
+    calls = 0;
+    allocated_words = 0.;
+    top_heap_words = 0;
+    counters = Counters.create ();
+  }
 end
 
 module Measure_diff = struct
@@ -159,7 +166,8 @@ let record_call = record_call_internal ?counter_f:None
 let record_call_with_counters ?accumulate ~counter_f =
   record_call_internal ?accumulate ~counter_f
 
-let record ?accumulate ?cheap pass f x = record_call ?accumulate ?cheap pass (fun () -> f x)
+let record ?accumulate ?cheap pass f x =
+  record_call ?accumulate ?cheap pass (fun () -> f x)
 
 let record_with_counters ?accumulate ~counter_f pass f x =
   record_call_internal ?accumulate ~counter_f pass (fun () -> f x)
@@ -180,7 +188,8 @@ let time_display precision c v : display =
      the first element of each row, we can't pad them with spaces. *)
   let to_string_without_unit v ~width = Printf.sprintf "%0*.*f" width precision v in
   let to_string ~max:_ ~width =
-    to_string_without_unit v ~width:(width - 1) ^ "s" ^ " (" ^ string_of_int c ^ ")" in
+    to_string_without_unit v ~width:(width - 1)
+    ^ "s (" ^ string_of_int c ^ ")" in
   let worth_displaying ~max:_ =
     float_of_string (to_string_without_unit v ~width:0) <> 0. || c > 1 in
   { to_string; worth_displaying }
@@ -362,8 +371,9 @@ let profile_json hierarchy measure_diff initial_measure =
           name, `Number (string_of_int count)
         ) (String.Map.bindings p.counters))
     ) column_mapping in
-    `Object (("name", `String name) :: values
-             @ ["children", `Array children])
+    `Object (("name", `String name)
+             :: ("calls", `Number (string_of_int p.calls))
+             :: values @ ["children", `Array children])
   in
   `Array (map_profile make_row hierarchy measure_diff initial_measure)
 

@@ -127,5 +127,22 @@ let () =
   let gettimeofday, calls = clock () in
   Profile.record_action ~gettimeofday ~name:"empty-profile" (fun () -> ());
   assert (!calls = 2);
+  print_trace ()
+
+let () =
+  Profile.reset ();
+  let gettimeofday, calls = clock () in
+  let cheap_calls = ref 0 in
+  let cheap () =
+    let time = float_of_int !cheap_calls in
+    incr cheap_calls;
+    time
+  in
+  let result =
+    Profile.record_action ~gettimeofday ~name:"cheap-clock" (fun () ->
+      Profile.record ~cheap "cheap" (fun () ->
+        Profile.record_call "child" (fun () -> 42)) ())
+  in
+  assert (result = 42 && !calls = 2 && !cheap_calls = 4);
   print_trace ();
   Sys.rmdir trace_dir
