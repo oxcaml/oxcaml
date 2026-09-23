@@ -3170,10 +3170,6 @@ let type_expr_with_reserved_names ppf ty =
 
 let prepared_type_scheme ppf ty = typexp Type_scheme ppf ty
 
-let tree_of_type_scheme ty =
-  prepare_for_printing [ty];
-  tree_of_typexp Type_scheme ty
-
 (* Print one type declaration *)
 
 let tree_of_constraints params =
@@ -3223,6 +3219,13 @@ let extract_qtvs tyl =
        | Tvar { jkind } when v.level = generic_level -> Some (v, jkind)
        | _ -> None)
     tfvs
+
+let tree_of_type_scheme ty =
+  prepare_for_printing [ty];
+  let tree = tree_of_typexp Type_scheme ty in
+  wrap_mutation (fun () ->
+    let qtvs = extract_qtvs [ty] |> tree_of_qtvs |> zap_qtvs_if_boring in
+    Otyp_poly (qtvs, tree))
 
 let param_jkind ty =
   match get_desc ty with
