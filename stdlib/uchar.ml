@@ -18,7 +18,7 @@ open! Stdlib
 
 [@@@ocaml.flambda_o3]
 
-external format_int : string -> int -> string @@ portable = "caml_format_int"
+external format_int : string -> int -> string @@ stateless = "caml_format_int"
 
 let err_no_pred = "U+0000 has no predecessor"
 let err_no_succ = "U+10FFFF has no successor"
@@ -47,8 +47,8 @@ let pred u =
 
 let is_valid i = (min <= i && i <= lo_bound) || (hi_bound <= i && i <= max)
 let of_int i = if is_valid i then i else invalid_arg (err_not_sv i)
-external unsafe_of_int : int -> t @@ portable = "%identity"
-external to_int : t -> int @@ portable = "%identity"
+external unsafe_of_int : int -> t @@ stateless = "%identity"
+external to_int : t -> int @@ stateless = "%identity"
 
 let is_char u = u < 256
 let of_char c = Char.code c
@@ -65,7 +65,7 @@ let compare : int -> int -> int = Stdlib.compare
    it to be marked as [@@noalloc].
  *)
 external seeded_hash_param :
-  int -> int -> int -> 'a -> int @@ portable = "caml_hash_exn" [@@noalloc]
+  int -> int -> int -> 'a -> int @@ stateless = "caml_hash_exn" [@@noalloc]
 let seeded_hash seed x = seeded_hash_param 10 100 seed x
 let hash x = seeded_hash_param 10 100 0 x
 
