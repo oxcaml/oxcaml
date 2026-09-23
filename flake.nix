@@ -33,6 +33,7 @@
           oxcaml-asan = oxcaml.override { addressSanitizer = true; };
           ppxlib = oxcaml.mkPpxlibLibs oxcaml;
           jsoo = oxcaml.mkJsooLibs oxcaml;
+          jsoo-test = oxcaml.mkJsooTest oxcaml;
           default = oxcaml;
         };
 
@@ -43,6 +44,7 @@
             oxcaml-asan
             ppxlib
             jsoo
+            jsoo-test
             merlin
             ;
         };
