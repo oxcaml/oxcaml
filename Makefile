@@ -204,14 +204,13 @@ _compare/config.status: ocaml/config.status
 	  $$(pwd)/ocaml/ $$(pwd)/_compare
 	(cd _compare && ./configure $(CONFIGURE_ARGS) --prefix=$$(pwd)/_install)
 
-
 .PHONY: promote
 promote:
 	$(dune) promotion apply $(ws_main)
 
 .PHONY: merlin-build
-merlin-build: _build/_bootinstall
-	$(dune) build $(ws_boot) @external/merlin
+merlin-build:
+	$(MAKE) -C external/merlin build
 
 .PHONY: merlin-test
 merlin-test:
