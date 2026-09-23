@@ -7,8 +7,7 @@ type 'a preemption_action =
 
 let run_with_tick_handler ?(interval_usec = 100_000) ?(repeating = false)
     ~on_preemption computation =
-  (* The handler returns an aliased value; [with_] requires a unique result. *)
-  let get_result = Domain.Tick.with_ ~interval_usec (fun () ->
+  let result = Domain.Tick.with_ ~interval_usec (fun () ->
       let preempted_once = ref false in
       let result = Preemptible.try_with
         ~on_tick:(fun () ->
@@ -26,6 +25,7 @@ let run_with_tick_handler ?(interval_usec = 100_000) ?(repeating = false)
               | Handled result -> result)
             | _ -> None) }
       in
-      fun () -> result)
+      { Modes.Global.global =
+          { Modes.Aliased.aliased = { Modes.Many.many = result } } })
   in
-  get_result () [@nontail]
+  result.global.aliased.many
