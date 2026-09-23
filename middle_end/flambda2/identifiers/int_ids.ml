@@ -263,20 +263,16 @@ module Variable_data = struct
 
   let flags = var_flags
 
-  let [@ocamlformat "disable"] print ppf { compilation_unit; name; name_stamp;
-                                           kind; user_visible; } =
-    Format.fprintf ppf "@[<hov 1>(\
-        @[<hov 1>(compilation_unit@ %a)@]@ \
-        @[<hov 1>(name@ %s)@]@ \
-        @[<hov 1>(name_stamp@ %d)@]@ \
-        @[<hov 1>(kind@ %a)@]@ \
-        @[<hov 1>(user_visible@ %b)@]\
-        )@]"
-      (Format_doc.compat Compilation_unit.print_debug) compilation_unit
-      name
-      name_stamp
-      Flambda_kind.print kind
-      user_visible
+  let print ppf { compilation_unit; name; name_stamp; kind; user_visible } =
+    let open! Misc.Sexp in
+    print ppf
+      [ p "compilation_unit"
+          (Format_doc.compat Compilation_unit.print_debug)
+          compilation_unit;
+        s "name" name;
+        i "name_stamp" name_stamp;
+        p "kind" Flambda_kind.print kind;
+        b "user_visible" user_visible ]
 
   let hash
       { compilation_unit; name = _; name_stamp; kind = _; user_visible = _ } =
@@ -319,12 +315,11 @@ module Symbol_data = struct
   let [@ocamlformat "disable"] print ppf symbol =
     let compilation_unit = Symbol0.compilation_unit symbol in
     let linkage_name = Symbol0.linkage_name symbol in
-    Format.fprintf ppf "@[<hov 1>(\
-        @[<hov 1>(compilation_unit@ %a)@]@ \
-        @[<hov 1>(linkage_name@ %a)@]\
-        )@]"
-      (Format_doc.compat Compilation_unit.print_debug) compilation_unit
-      Linkage_name.print linkage_name
+    let open! Misc.Sexp in
+    print ppf [
+      p "compilation_unit" (Format_doc.compat Compilation_unit.print_debug) compilation_unit;
+      p "linkage_name" Linkage_name.print linkage_name;
+    ]
 end
 
 module Code_id_data = struct
@@ -337,15 +332,14 @@ module Code_id_data = struct
 
   let flags = code_id_flags
 
-  let [@ocamlformat "disable"] print ppf { compilation_unit; name; debug_info = _; linkage_name; } =
-    Format.fprintf ppf "@[<hov 1>(\
-        @[<hov 1>(compilation_unit@ %a)@]@ \
-        @[<hov 1>(name@ %s)@]@ \
-        @[<hov 1>(linkage_name@ %a)@]@ \
-        )@]"
-      (Format_doc.compat Compilation_unit.print_debug) compilation_unit
-      name
-      Linkage_name.print linkage_name
+  let print ppf { compilation_unit; name; debug_info = _; linkage_name } =
+    let open! Misc.Sexp in
+    print ppf
+      [ p "compilation_unit"
+          (Format_doc.compat Compilation_unit.print_debug)
+          compilation_unit;
+        s "name" name;
+        p "linkage_name" Linkage_name.print linkage_name ]
 
   let hash { compilation_unit = _; name = _; debug_info = _; linkage_name } =
     (* Linkage names are unique across a whole project, so there's no need to
@@ -447,7 +441,7 @@ module Const = struct
 
     let hash = Id.hash
 
-    let [@ocamlformat "disable"] print ppf t = Const_data.print ppf (descr t)
+    let print ppf t = Const_data.print ppf (descr t)
   end
 
   include T0
@@ -700,10 +694,10 @@ module Simple_data = struct
   let flags = simple_flags
 
   let [@ocamlformat "disable"] print ppf { simple = _; coercion; } =
-    Format.fprintf ppf "@[<hov 1>\
-        @[<hov 1>(coercion@ %a)@]\
-        @]"
-      Coercion.print coercion
+    let open! Misc.Sexp in
+    print ppf [
+      p "coercion" Coercion.print coercion
+    ]
 
   let hash { simple; coercion } =
     Hashtbl.hash (Id.hash simple, Coercion.hash coercion)

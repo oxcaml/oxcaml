@@ -900,11 +900,10 @@ and print_named ppf (t : named) =
     fprintf ppf "@[<hov 1>(%a%t%a%t)@]" Flambda_primitive.print prim
       Flambda_colours.debuginfo print_or_elide_debuginfo dbg Flambda_colours.pop
   | Set_of_closures (set_of_closures, alloc_mode) ->
-    Set_of_closures.print_with_extra_fields
-      (fun ppf ->
-        Format.fprintf ppf "@[<hov 1>(alloc_mode@ %a)@]@ "
-          Alloc_mode.For_allocations.print alloc_mode)
-      ppf set_of_closures
+    let open! Misc.Sexp in
+    print ppf
+      (Set_of_closures.sexp_fields set_of_closures
+      @ [p "alloc_mode" Alloc_mode.For_allocations.print alloc_mode])
   | Static_consts consts -> print_static_const_group ppf consts
   | Rec_info rec_info_expr -> Rec_info_expr.print ppf rec_info_expr
 

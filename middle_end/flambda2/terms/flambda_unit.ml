@@ -43,19 +43,17 @@ let module_symbol t = t.module_symbol
 
 let with_body t body = { t with body }
 
-let [@ocamlformat "disable"] print ppf
-      { return_continuation; exn_continuation; toplevel_my_alloc_region; body;
-        module_symbol;
-      } =
-  Format.fprintf ppf "@[<hov 1>(\
-        @[<hov 1>(module_symbol@ %a)@]@ \
-        @[<hov 1>(return_continuation@ %a)@]@ \
-        @[<hov 1>(exn_continuation@ %a)@]@ \
-        @[<hov 1>(toplevel_my_alloc_region@ %a)@]@ \
-        @[<hov 1>%a@]\
-      )@]"
-    Symbol.print module_symbol
-    Continuation.print return_continuation
-    Continuation.print exn_continuation
-    Variable.print toplevel_my_alloc_region
-    Flambda.Expr.print body
+let print ppf
+    { return_continuation;
+      exn_continuation;
+      toplevel_my_alloc_region;
+      body;
+      module_symbol
+    } =
+  let open! Misc.Sexp in
+  print ppf
+    [ p "module_symbol" Symbol.print module_symbol;
+      p "return_continuation" Continuation.print return_continuation;
+      p "exn_continuation" Continuation.print exn_continuation;
+      p "toplevel_my_alloc_region" Variable.print toplevel_my_alloc_region;
+      fmt "%a" Flambda.Expr.print body ]

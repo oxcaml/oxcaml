@@ -26,10 +26,8 @@ let [@ocamlformat "disable"] print ppf t =
         Bound_var.print)
       bound_vars
   | Static bound_static ->
-    Format.fprintf ppf "@[<hov 1>\
-        @[(bound_static@ %a)@]\
-        )@]"
-      Bound_static.print bound_static
+    let open! Misc.Sexp in
+    print ppf [p "bound_static" Bound_static.print bound_static ]
 
 let free_names t =
   match t with

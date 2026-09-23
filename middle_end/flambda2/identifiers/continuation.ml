@@ -62,18 +62,15 @@ module Data = struct
 
   let flags = continuation_flags
 
-  let [@ocamlformat "disable"] print ppf
-      { compilation_unit; name; name_stamp; sort; } =
-    Format.fprintf ppf "@[<hov 1>(\
-        @[<hov 1>(compilation_unit@ %a)@]@ \
-        @[<hov 1>(name@ %s)@]@ \
-        @[<hov 1>(name_stamp@ %d)@]@ \
-        @[<hov 1>(sort@ %a)@]\
-        )@]"
-      (Format_doc.compat Compilation_unit.print_debug) compilation_unit
-      name
-      name_stamp
-      Sort.print sort
+  let print ppf { compilation_unit; name; name_stamp; sort } =
+    let open! Misc.Sexp in
+    print ppf
+      [ p "compilation_unit"
+          (Format_doc.compat Compilation_unit.print_debug)
+          compilation_unit;
+        s "name" name;
+        i "name_stamp" name_stamp;
+        p "sort" Sort.print sort ]
 
   let hash { compilation_unit; name = _; name_stamp; sort = _ } =
     Hashtbl.hash (Compilation_unit.hash compilation_unit, name_stamp)

@@ -208,7 +208,7 @@ let print_param_type print_typ ppf = function
 let print_extra_info ppf = function
   | Untag e -> Format.fprintf ppf "Untag(%a)" Printcmm.expression e
 
-let [@ocamlformat "disable"] print_inline (type a) ppf (inline : a inline) =
+let print_inline (type a) ppf (inline : a inline) =
   match inline with
   | Do_not_inline -> Format.fprintf ppf "do_not_inline"
   | May_inline_once -> Format.fprintf ppf "may_inline_once"
@@ -216,39 +216,34 @@ let [@ocamlformat "disable"] print_inline (type a) ppf (inline : a inline) =
   | Must_inline_and_duplicate -> Format.fprintf ppf "must_inline_and_duplicate"
 
 let print_cmm_expr_with_free_vars ppf (cmm_expr, free_vars) =
-  Format.fprintf ppf
-    "@[<hov 1>(@[<hov 1>(expr@ %a)@]@ @[<hov 1>(free_vars@ %a)@]@ )@]"
-    Printcmm.expression cmm_expr Backend_var.Set.print free_vars
+  let open! Misc.Sexp in
+  print ppf
+    [ p "expr" Printcmm.expression cmm_expr;
+      p "free_vars" Backend_var.Set.print free_vars ]
 
-let [@ocamlformat "disable"] print_bound_expr (type a) ppf (b : a bound_expr) =
+let print_bound_expr (type a) ppf (b : a bound_expr) =
   match b with
-  | Simple { cmm_expr; free_vars; } | Split { cmm_expr; free_vars; } ->
+  | Simple { cmm_expr; free_vars } | Split { cmm_expr; free_vars } ->
     print_cmm_expr_with_free_vars ppf (cmm_expr, free_vars)
-  | Splittable_prim { prim; args; dbg; } ->
-    Format.fprintf ppf "@[<hov 1>(\
-      @[<hov 1>(dbg@ %a)@]@ \
-      @[<hov 1>(prim@ %a)@]@ \
-      @[<hov 1>(args@ @[<hov 1>(%a)@])@]\
-      )@]"
-      Debuginfo.print_compact dbg
-      Flambda_primitive.Without_args.print prim
-      (Format.pp_print_list (fun ppf { cmm; effs = _; free_vars; } ->
-           print_cmm_expr_with_free_vars ppf (cmm, free_vars))) args
+  | Splittable_prim { prim; args; dbg } ->
+    let open! Misc.Sexp in
+    print ppf
+      [ p "dbg" Debuginfo.print_compact dbg;
+        p "prim" Flambda_primitive.Without_args.print prim;
+        p "args"
+          (Format.pp_print_list (fun ppf { cmm; effs = _; free_vars } ->
+               print_cmm_expr_with_free_vars ppf (cmm, free_vars)))
+          args ]
 
-let [@ocamlformat "disable"] print_binding (type a) ppf
-    ({ order; inline; effs; cmm_var; bound_expr; } : a binding) =
-  Format.fprintf ppf "@[<hov 1>(\
-      @[<hov 1>(order@ %d)@]@ \
-      @[<hov 1>(inline@ %a)@]@ \
-      @[<hov 1>(effs@ %a)@]@ \
-      @[<hov 1>(var@ %a)@]@ \
-      @[<hov 1>(expr@ %a)@]\
-      )@]"
-    order
-    print_inline inline
-    Ece.print effs
-    Backend_var.With_provenance.print cmm_var
-    print_bound_expr bound_expr
+let print_binding (type a) ppf
+    ({ order; inline; effs; cmm_var; bound_expr } : a binding) =
+  let open! Misc.Sexp in
+  print ppf
+    [ i "order" order;
+      p "inline" print_inline inline;
+      p "effs" Ece.print effs;
+      p "var" Backend_var.With_provenance.print cmm_var;
+      p "expr" print_bound_expr bound_expr ]
 
 let print_any_binding ppf (Binding binding) = print_binding ppf binding
 

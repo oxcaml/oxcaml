@@ -42,66 +42,47 @@ type t =
   | Recursive
   | Jsir_inlining_disabled
 
-let [@ocamlformat "disable"] print ppf t =
+let print ppf t =
+  let open! Misc.Sexp in
   match t with
   | Not_yet_decided -> Format.fprintf ppf "Not_yet_decided"
-  | Never_inline_attribute ->
-    Format.fprintf ppf "Never_inline_attribute"
+  | Never_inline_attribute -> Format.fprintf ppf "Never_inline_attribute"
   | Function_body_too_large large_function_size ->
-    Format.fprintf ppf
-      "@[<hov 1>(Function_body_too_large@ %a)@]"
-      Code_size.print large_function_size
+    print ppf
+      [ fmt "Function_body_too_large";
+        p "large_function_size" Code_size.print large_function_size ]
   | Functor_body_too_large large_functor_size ->
-    Format.fprintf ppf
-      "@[<hov 1>(Functor_body_too_large@ %a)@]"
-      Code_size.print large_functor_size
-  | Stub ->
-    Format.fprintf ppf "Stub"
-  | Attribute_inline ->
-    Format.fprintf ppf "Attribute_inline"
-  | Small_function {size; small_function_size} ->
-    Format.fprintf ppf
-      "@[<hov 1>(Small_function@ \
-        @[<hov 1>(size@ %a)@]@ \
-        @[<hov 1>(small_function_size@ %a)@]\
-        )@]"
-      Code_size.print size
-      Code_size.print small_function_size
-  | Small_functor {size; small_functor_size} ->
-    Format.fprintf ppf
-      "@[<hov 1>(Small_functor@ \
-        @[<hov 1>(size@ %a)@]@ \
-        @[<hov 1>(small_functor_size@ %a)@]\
-        )@]"
-      Code_size.print size
-      Code_size.print small_functor_size
-  | Speculatively_inlinable {size;
-                              small_function_size;
-                              large_function_size} ->
-    Format.fprintf ppf
-      "@[<hov 1>(Speculatively_inlinable@ \
-        @[<hov 1>(size@ %a)@]@ \
-        @[<hov 1>(small_function_size@ %a)@]@ \
-        @[<hov 1>(large_function_size@ %a)@]\
-        )@]"
-      Code_size.print size
-      Code_size.print small_function_size
-      Code_size.print large_function_size
+    print ppf
+      [ fmt "Functor_body_too_large";
+        p "large_function_size" Code_size.print large_functor_size ]
+  | Stub -> Format.fprintf ppf "Stub"
+  | Attribute_inline -> Format.fprintf ppf "Attribute_inline"
+  | Small_function { size; small_function_size } ->
+    print ppf
+      [ fmt "Small_function";
+        p "size" Code_size.print size;
+        p "small_function_size" Code_size.print small_function_size ]
+  | Small_functor { size; small_functor_size } ->
+    print ppf
+      [ fmt "Small_function";
+        p "size" Code_size.print size;
+        p "small_function_size" Code_size.print small_functor_size ]
+  | Speculatively_inlinable { size; small_function_size; large_function_size }
+    ->
+    print ppf
+      [ fmt "Speculatively_inlinable";
+        p "size" Code_size.print size;
+        p "small_function_size" Code_size.print small_function_size;
+        p "large_function_size" Code_size.print large_function_size ]
   | Speculatively_inlinable_functor
       { size; small_functor_size; large_functor_size } ->
-    Format.fprintf ppf
-      "@[<hov 1>(Speculatively_inlinable_functor@ \
-        @[<hov 1>(size@ %a)@]@ \
-        @[<hov 1>(small_functor_size@ %a)@]@ \
-        @[<hov 1>(large_functor_size@ %a)@]\
-        )@]"
-      Code_size.print size
-      Code_size.print small_functor_size
-      Code_size.print large_functor_size
-  | Recursive ->
-    Format.fprintf ppf "Recursive"
-  | Jsir_inlining_disabled ->
-    Format.fprintf ppf "Jsir_inlining_disabled"
+    print ppf
+      [ fmt "Speculatively_inlinable_functor";
+        p "size" Code_size.print size;
+        p "small_function_size" Code_size.print small_functor_size;
+        p "large_function_size" Code_size.print large_functor_size ]
+  | Recursive -> Format.fprintf ppf "Recursive"
+  | Jsir_inlining_disabled -> Format.fprintf ppf "Jsir_inlining_disabled"
 
 let report_decision ppf t =
   match t with

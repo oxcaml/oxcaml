@@ -35,11 +35,12 @@ let create ~arguments ~depth ~stub_depth =
   then Misc.fatal_errorf "stub_depth must be >= 0: %d" stub_depth;
   { arguments; depth; stub_depth }
 
-let [@ocamlformat "disable"] print ppf t =
-  Format.fprintf ppf "@[<hov 1>(depth@ %d, stub_depth@ %d, arguments@ %a)@]"
-    t.depth
-    t.stub_depth
-    Inlining_arguments.print t.arguments
+let print ppf t =
+  let open! Misc.Sexp in
+  print ppf
+    [ i "depth" t.depth;
+      i "stub_depth" t.stub_depth;
+      p "arguments" Inlining_arguments.print t.arguments ]
 
 let depth t = t.depth
 
