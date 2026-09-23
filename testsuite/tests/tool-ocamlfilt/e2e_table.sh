@@ -63,8 +63,15 @@ SYMS="${test_build_directory}/e2e_table.syms"
 # Strip the extra underscore the macOS assembler prepends, so one
 # committed reference works on both Linux and macOS. ocamlfilt accepts
 # either form, so demangling is unaffected.
+#
+# The frametable symbols depend on the configured frametable layout
+# ([__frametable], or [__frametable_begin] and [__frametable_end] with
+# link-order frametables), so drop them to keep the reference
+# configuration-independent.
 nm "$OBJ" | grep -Ev "$EXCLUDE" | awk '
-  $NF ~ /^_?(caml|_Caml)[A-Z]/ { print $NF }
+  $NF ~ /^_?(caml|_Caml)[A-Z]/ && $NF !~ /__frametable(_begin|_end)?$/ {
+    print $NF
+  }
 ' | sed -E 's/^_(caml|_Caml)/\1/' | sort -u > "$SYMS"
 
 if [ ! -s "$SYMS" ]; then

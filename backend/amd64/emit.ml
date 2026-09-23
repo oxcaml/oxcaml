@@ -3311,9 +3311,10 @@ let end_assembly () =
   emit_imp_table ~section:Text ();
   if Config.link_order_frametables
   then
-    (* [caml<U>__frametable_end], in an empty piece linked to the unit's last
-       text section, which the linker lays out last among its pieces. *)
-    Emitaux.emit_frametable_marker emit_data_item_actions
+    (* [caml<U>__frametable_end] and the descriptor count, in a piece linked to
+       the unit's last text section, which the linker lays out last among its
+       pieces. *)
+    Emitaux.emit_frametable_end_marker emit_data_item_actions
       ~link_symbol:(Emitaux.current_link_symbol ())
       (Cmm_helpers.make_symbol "frametable_end");
   D.data ();

@@ -143,9 +143,16 @@ let mk_no_gc_sections f =
   " Do not link executables with --gc-sections"
 
 let mk_no_export_dynamic f =
-  "-no-export-dynamic", Arg.Unit f,
-  " Link executables with --no-export-dynamic, letting --gc-sections drop \
-   unreferenced global symbols too (incompatible with Dynlink)"
+  if Config.gc_sections then
+    "-no-export-dynamic", Arg.Unit f,
+    " Link executables with --no-export-dynamic, letting --gc-sections drop \
+     unreferenced global symbols too (incompatible with Dynlink)"
+  else
+    let err () =
+      raise (Arg.Bad "OCaml has been configured without support for \
+                      -no-export-dynamic")
+    in
+    "-no-export-dynamic", Arg.Unit err, " (option not available)"
 
 let mk_stop_after ~native f =
   let pass_names = Clflags.Compiler_pass.available_pass_names
@@ -2814,7 +2821,9 @@ module Default = struct
       assert Config.gc_sections;
       gc_sections := true
     let _no_gc_sections = clear gc_sections
-    let _no_export_dynamic = set no_export_dynamic
+    let _no_export_dynamic () =
+      assert Config.gc_sections;
+      no_export_dynamic := true
     let _nodynlink = clear dlcode
     let _output_complete_obj () =
       set output_c_object (); set output_complete_object ()

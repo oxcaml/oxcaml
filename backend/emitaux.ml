@@ -57,6 +57,11 @@ type frame_descr =
 
 let frame_descriptors = ref ([] : frame_descr list)
 
+(* Descriptors emitted so far in this unit; [emit_frametable_end_marker] records
+   the total after the end marker so the runtime can size its table without
+   decoding the unit's range. *)
+let frame_descr_count = ref 0
+
 (* The epoch bumps at each text-section change. In the compact frame-descriptor
    format a return address is a delta from the previous descriptor's -- an
    assembly-time constant only when both lie in the same section -- so
@@ -432,6 +437,7 @@ let emit_descr a prev fd =
 let emit_frames_for_function a =
   let descrs = List.rev !frame_descriptors in
   ignore (List.fold_left (emit_descr a) None descrs);
+  frame_descr_count := !frame_descr_count + List.length descrs;
   frame_descriptors := []
 
 (* No alignment here: a link-order piece is a byte-granular descriptor stream
@@ -701,6 +707,7 @@ let with_snapshot ~f =
   let saved_file_pos_nums = !file_pos_nums in
   let saved_file_pos_num_cnt = !file_pos_num_cnt in
   let saved_frame_descriptors = !frame_descriptors in
+  let saved_frame_descr_count = !frame_descr_count in
   let saved_frame_section_epoch = !frame_section_epoch in
   let saved_current_code_section = !current_code_section in
   let saved_current_link_symbol = !current_link_symbol_ref in
@@ -708,6 +715,7 @@ let with_snapshot ~f =
   file_pos_nums := saved_file_pos_nums;
   file_pos_num_cnt := saved_file_pos_num_cnt;
   frame_descriptors := saved_frame_descriptors;
+  frame_descr_count := saved_frame_descr_count;
   frame_section_epoch := saved_frame_section_epoch;
   current_code_section := saved_current_code_section;
   current_link_symbol_ref := saved_current_link_symbol;
@@ -1036,6 +1044,11 @@ let emit_frametable_marker actions ~link_symbol sym_name =
   actions.symbol_defined sym_name;
   D.define_symbol_label ~section:piece sym
 
+let emit_frametable_end_marker actions ~link_symbol sym_name =
+  emit_frametable_marker actions ~link_symbol sym_name;
+  (* The unit's descriptor count, just past the end of its range. *)
+  Asm_targets.Asm_directives.targetint (Targetint.of_int_exn !frame_descr_count)
+
 let emit_data_item actions (d : Cmm.data_item) =
   let module D = Asm_targets.Asm_directives in
   let module L = Asm_targets.Asm_label in
@@ -1098,5 +1111,6 @@ let emit_data_item actions (d : Cmm.data_item) =
 let reset () =
   reset_debug_info ();
   frame_descriptors := [];
+  frame_descr_count := 0;
   reset_frame_tables ();
   stapsdt_base_emitted := false

@@ -4922,8 +4922,9 @@ let unit_deps_table units =
           | None -> cint_zero
           | Some arr_sym -> Csymbol_address arr_sym
         in
-        [Csymbol_address name_sym; Csymbol_address entry_sym;
-         Csymbol_address gc_roots_sym]
+        [ Csymbol_address name_sym;
+          Csymbol_address entry_sym;
+          Csymbol_address gc_roots_sym ]
         @ frametable_items
         @ [ Cint (Nativeint.of_int num_deps);
             deps_sym_item;
@@ -4956,6 +4957,9 @@ let segment_table namelist symbol begname endname =
     (Cdefine_symbol (global_symbol symbol)
     :: List.fold_right addsyms namelist [cint_zero])
 
+(* With per-symbol data sections (see [Emitaux.enter_data_section]) the
+   data_begin/data_end markers no longer bracket the unit's data; the runtime
+   has no consumer of caml_data_segments. *)
 let data_segment_table namelist =
   segment_table namelist "caml_data_segments" "data_begin" "data_end"
 

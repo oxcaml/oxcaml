@@ -1834,7 +1834,8 @@ G(caml_system__code_end):
         /* Link-order layout (ELF only): one piece of the caml_frametable
            section, linked to a text section of this file so that it is kept
            whenever caml_start_program is, holding the unit's begin and end
-           markers. No count word and no alignment (see frame_descriptors.h). */
+           markers. No alignment; the descriptor count follows the end marker
+           (see frame_descriptors.h). */
         .section caml_frametable,"ao",@progbits,G(caml_start_program)
         .globl  G(caml_system__frametable_begin)
 G(caml_system__frametable_begin):
@@ -1860,6 +1861,7 @@ G(caml_system__frametable):
 #if defined(LINK_ORDER_FRAMETABLES)
         .globl  G(caml_system__frametable_end)
 G(caml_system__frametable_end):
+        .quad   2            /* two descriptors */
 #endif
 
 #if defined(SYS_macosx)

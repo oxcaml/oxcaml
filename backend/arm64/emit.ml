@@ -2295,6 +2295,9 @@ let begin_assembly _unix =
   then (
     A.ins0 NOP;
     D.align ~fill:Nop ~bytes:8);
+  (* Before any descriptor is emitted (per function with link-order
+     frametables). *)
+  Emitaux.disable_short_descriptors := false;
   if Config.link_order_frametables
   then (
     (* caml<U>__frametable_begin: offset 0 of the piece linked to code_begin,
@@ -2319,9 +2322,10 @@ let end_assembly () =
   D.define_symbol_label ~section:Text code_end_sym;
   if Config.link_order_frametables
   then
-    (* caml<U>__frametable_end: an otherwise empty piece linked to the last of
-       the unit's text sections, so that it sorts after every descriptor. *)
-    Emitaux.emit_frametable_marker emit_data_item_actions
+    (* caml<U>__frametable_end and the descriptor count: a piece linked to the
+       last of the unit's text sections, so that it sorts after every
+       descriptor. *)
+    Emitaux.emit_frametable_end_marker emit_data_item_actions
       ~link_symbol:(Emitaux.current_link_symbol ())
       (Cmm_helpers.make_symbol "frametable_end");
   let data_end = Cmm_helpers.make_symbol "data_end" in
@@ -2335,7 +2339,6 @@ let end_assembly () =
   D.switch_to_section Read_only_data;
   D.align ~fill:Zero ~bytes:8;
   (* #7887 *)
-  Emitaux.disable_short_descriptors := false;
   (* The binary emitter keeps the strings inline in the frametable section:
      same-section label differences need no relocations. *)
   let debug_strings_section : Asm_targets.Asm_section.t =

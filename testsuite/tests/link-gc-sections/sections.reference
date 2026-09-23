@@ -4,6 +4,7 @@ frametable pieces: some
 plain frametable pieces: 0
 frametable_begin definitions: 1
 frametable_end definitions: 1
+count words after frametable_end: 1
 old frametable symbols: 0
 empty frametable pieces: 0
 trap note pieces: some

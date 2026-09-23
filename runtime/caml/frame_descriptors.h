@@ -41,22 +41,26 @@
  *
  * Link-order layout (LINK_ORDER_FRAMETABLES defined): a unit's
  * frametable is the byte range [caml<U>__frametable_begin,
- * caml<U>__frametable_end) of the ELF section caml_frametable, with
- * no count word. The compiler emits the descriptors of each text
- * section as a separate "piece" of that section, linked (SHF_LINK_ORDER)
- * to the text section they describe, so that the linker drops the
- * descriptors of code it discards and lays the surviving pieces out in
- * the address order of their text sections; the begin and end markers
- * are pieces linked to the unit's code_begin and code_end sections.
- * The first descriptor of every piece is escaped (see below), so a
- * piece boundary is decoded exactly like the start of a table, and
- * pieces carry no alignment padding whatsoever (a pad byte cannot be
- * told apart from a descriptor), so the section's alignment is 1 and
- * pieces concatenate byte-contiguously. The startup code lists the
- * ranges of all statically linked units in caml_frametable_ranges[],
- * a flat array begin0, end0, begin1, end1, ... terminated by a NULL
- * begin. The runtime's own descriptors (runtime/<arch>.S) form the
- * unit "system" in either layout.
+ * caml<U>__frametable_end) of the ELF section caml_frametable. The
+ * compiler emits the descriptors of each text section as a separate
+ * "piece" of that section, linked (SHF_LINK_ORDER) to the text section
+ * they describe, so that the linker drops the descriptors of code it
+ * discards and lays the surviving pieces out in the address order of
+ * their text sections; the begin and end markers are pieces linked to
+ * the unit's code_begin and code_end sections. The first descriptor of
+ * every piece is escaped (see below), so a piece boundary is decoded
+ * exactly like the start of a table, and pieces carry no alignment
+ * padding whatsoever (a pad byte cannot be told apart from a
+ * descriptor), so the section's alignment is 1 and pieces concatenate
+ * byte-contiguously. The range has no count word in front of it, but
+ * the end marker's piece holds one: the (unaligned) native word at
+ * caml<U>__frametable_end is the number of descriptors the unit was
+ * compiled with, an upper bound on the range's contents that the
+ * runtime uses to size its hash table without decoding the range. The
+ * startup code lists the ranges of all statically linked units in
+ * caml_frametable_ranges[], a flat array begin0, end0, begin1, end1,
+ * ... terminated by a NULL begin. The runtime's own descriptors
+ * (runtime/<arch>.S) form the unit "system" in either layout.
  *
  * Each frame descriptor includes:
  *
@@ -314,8 +318,8 @@ void caml_register_frametables(void **tables, int ntables);
 void caml_register_frametable(void *table);
 
 /* Register link-order frametables, each the descriptor byte range
-   [begins[i], ends[i]) with no count word. A range is unregistered
-   with caml_unregister_frametable(begin). */
+   [begins[i], ends[i]) followed at ends[i] by its count word. A range
+   is unregistered with caml_unregister_frametable(begin). */
 void caml_register_frametable_ranges(void **begins, void **ends,
                                      int ntables);
 void caml_register_frametable_range(void *begin, void *end);

@@ -268,6 +268,8 @@ dnl (SHF_LINK_ORDER) flag whose linked-to section is given by a symbol, as
 dnl used for link-order frametables.  GNU as accepts the symbol form from
 dnl binutils 2.35; older versions and some other assemblers either reject it
 dnl or accept it with a warning, so any diagnostic counts as failure.
+dnl Uses $arch: on arm64, "@" starts a comment, so the section type is spelled
+dnl "%progbits" (as Asm_section does).
 AC_DEFUN([OCAML_AS_HAS_LINK_ORDER_SECTIONS], [
   AC_MSG_CHECKING([whether the assembler supports link-order sections])
   OCAML_CC_SAVE_VARIABLES
@@ -282,12 +284,16 @@ AC_DEFUN([OCAML_AS_HAS_LINK_ORDER_SECTIONS], [
   # Treat any output on stderr as failure
   ac_c_werror_flag=yes
 
+  AS_CASE([$arch],
+    [arm64], [link_order_section_type='%progbits'],
+    [link_order_section_type='@progbits'])
+
   AC_COMPILE_IFELSE(
     [AC_LANG_SOURCE([
         .text
 foo:
         .long   0
-        .section caml_frametable,"ao",@progbits,foo
+        .section caml_frametable,"ao",$link_order_section_type,foo
         .long   0
     ])],
     [asm_link_order_supported=true

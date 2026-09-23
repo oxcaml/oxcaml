@@ -169,6 +169,13 @@ type section_details =
     is_delayed : bool
   }
 
+(* The ELF section type argument, e.g. "@progbits". On ARM targets "@" starts a
+   comment, so the type (and any argument after it) must be spelled with "%". *)
+let elf_section_type (arch : Target_system.architecture) ty =
+  match arch with
+  | ARM | AArch64 -> "%" ^ ty
+  | IA32 | X86_64 | POWER | Z | Riscv -> "@" ^ ty
+
 let details t first_occurrence =
   let first_occurrence =
     match first_occurrence with
@@ -279,12 +286,7 @@ let details t first_occurrence =
       ["__TEXT"; "__cstring"], None, ["cstring_literals"]
     | Debuginfo_strings, arch, _ ->
       (* "aMS" = SHF_ALLOC | SHF_MERGE | SHF_STRINGS; de-duped by linker *)
-      let progbits =
-        match arch with
-        | ARM | AArch64 -> "%progbits"
-        | IA32 | X86_64 | POWER | Z | Riscv -> "@progbits"
-      in
-      [".rodata.str1.1"], Some "aMS", [progbits; "1"]
+      [".rodata.str1.1"], Some "aMS", [elf_section_type arch "progbits"; "1"]
     (* 1 = characters *)
     (* Per-symbol data sections and link-order pieces are ELF-only. *)
     | ( (Data_symbol _ | Frametable_piece _ | Eh_notes_piece _),
@@ -293,15 +295,20 @@ let details t first_occurrence =
       Misc.fatal_error
         "Per-symbol data sections and link-order sections are only supported \
          on ELF targets."
-    | Data_symbol sym, _, _ -> [".data.caml." ^ sym], Some "aw", ["@progbits"]
+    | Data_symbol sym, arch, _ ->
+      [".data.caml." ^ sym], Some "aw", [elf_section_type arch "progbits"]
     (* "ao" = SHF_ALLOC | SHF_LINK_ORDER: the linker keeps and orders a piece
        with the section containing [link_symbol]. *)
-    | Frametable_piece { link_symbol }, _, _ ->
-      ["caml_frametable"], Some "ao", ["@progbits"; link_symbol]
+    | Frametable_piece { link_symbol }, arch, _ ->
+      ( ["caml_frametable"],
+        Some "ao",
+        [elf_section_type arch "progbits"; link_symbol] )
     (* Writable ("w") too: the note records hold absolute addresses, so in a
        shared object a read-only piece would need text relocations. *)
-    | Eh_notes_piece { link_symbol }, _, _ ->
-      [".ocaml_eh_notes"], Some "awo", ["@note"; link_symbol]
+    | Eh_notes_piece { link_symbol }, arch, _ ->
+      ( [".ocaml_eh_notes"],
+        Some "awo",
+        [elf_section_type arch "note"; link_symbol] )
     | Custom { names; flags; args; _ }, _, _ -> names, flags, args
   in
   let is_delayed = is_delayed t in

@@ -215,22 +215,14 @@ static frame_descr *frametable_iter_next(frametable_iter *it,
   return d;
 }
 
-/* A range has no count word, so counting its descriptors is a full
-   decoding pass (the hashtable fill is a second one). */
+/* A count-prefixed table's count word precedes its descriptors; a range's
+   count word immediately follows its end (see frame_descriptors.h). */
 static intnat count_descriptors(caml_frametable_list *list) {
   intnat num_descr = 0;
   iter_list(list,cur) {
-    if (cur->end == NULL) {
-      num_descr += (intnat)caml_read_unaligned_uintnat(cur->frametable);
-    } else {
-      frametable_iter it;
-      frametable_iter_start(&it, cur);
-      while (frametable_iter_more(&it)) {
-        uintnat retaddr;
-        (void)frametable_iter_next(&it, &retaddr);
-        num_descr++;
-      }
-    }
+    const void *count =
+      cur->end == NULL ? (const void *)cur->frametable : cur->end;
+    num_descr += (intnat)caml_read_unaligned_uintnat(count);
   }
   return num_descr;
 }

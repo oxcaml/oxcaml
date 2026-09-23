@@ -770,10 +770,16 @@ val globals_map :
     address ranges, terminated by a null begin *)
 val frame_table : Compilation_unit.t list -> phrase
 
-(** Generate the tables for data and code positions respectively of the given
-    compilation units *)
+(** Generate the caml_data_segments table of the (data_begin, data_end) address
+    pairs of the given compilation units, terminated by a null. With per-symbol
+    data sections ([Config.link_order_frametables] and function sections) the
+    pair does not bracket a unit's data: its module block, closures and
+    constants live in their own .data.caml.<symbol> sections and only the two
+    markers stay in .data. The runtime has no consumer of caml_data_segments. *)
 val data_segment_table : Compilation_unit.t list -> phrase
 
+(** Generate the caml_code_segments table of the (code_begin, code_end) address
+    pairs of the given compilation units, terminated by a null *)
 val code_segment_table : Compilation_unit.t list -> phrase
 
 (** Generate data for a predefined exception *)

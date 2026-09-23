@@ -90,8 +90,6 @@ camlE2e_ocaml__fn_N_M_code                                       E2e_ocaml.fn_N_
 camlE2e_ocaml__fn_N_M_code                                       E2e_ocaml.fn_N_M_code                           (error)     E2e_ocaml.fn_N_M_code
 camlE2e_ocaml__fn_N_M_code                                       E2e_ocaml.fn_N_M_code                           (error)     E2e_ocaml.fn_N_M_code
 camlE2e_ocaml__fn_N_M_code                                       E2e_ocaml.fn_N_M_code                           (error)     E2e_ocaml.fn_N_M_code
-camlE2e_ocaml__frametable_begin                                  E2e_ocaml.frametable_begin                      (error)     E2e_ocaml.frametable_begin
-camlE2e_ocaml__frametable_end                                    E2e_ocaml.frametable_end                        (error)     E2e_ocaml.frametable_end
 camlE2e_ocaml__gc_roots                                          E2e_ocaml.gc_roots                              (error)     E2e_ocaml.gc_roots
 camlE2e_ocaml__greet_N_M_code                                    E2e_ocaml.greet_N_M_code                        (error)     E2e_ocaml.greet_N_M_code
 camlE2e_ocaml__greet_N                                           E2e_ocaml.greet_N                               (error)     E2e_ocaml.greet_N

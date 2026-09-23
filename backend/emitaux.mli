@@ -225,8 +225,16 @@ val enter_data_section : Cmm.data_item list -> unit
 
 (** Defines the global symbol [sym_name] at offset 0 of the
     [Asm_section.Frametable_piece] linked to [link_symbol], switching to that
-    section. Used for the [caml<U>__frametable_begin] and [_end] markers. *)
+    section. Used for the [caml<U>__frametable_begin] marker. *)
 val emit_frametable_marker :
+  emit_data_item_actions -> link_symbol:string -> string -> unit
+
+(** As [emit_frametable_marker], followed by a native word holding the number of
+    descriptors emitted by [emit_frametable_piece] in this unit, which the
+    runtime reads at the end of the unit's range. Used for the
+    [caml<U>__frametable_end] marker, so must be called after the unit's last
+    [emit_frametable_piece]. *)
+val emit_frametable_end_marker :
   emit_data_item_actions -> link_symbol:string -> string -> unit
 
 val emit_data_item : emit_data_item_actions -> Cmm.data_item -> unit

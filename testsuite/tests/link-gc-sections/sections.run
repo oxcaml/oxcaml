@@ -17,13 +17,23 @@ n=$(count 'caml_frametable,"ao",@progbits,')
 if [ "$n" -ge 1 ]; then echo "frametable pieces: some"; \
   else echo "frametable pieces: NONE"; fi
 
-# No plain (non link-order) frametable piece: such a piece would be silently
-# laid out outside every unit's range.
-echo "plain frametable pieces: $(count 'caml_frametable,"a",')"
+# No plain (non link-order) frametable piece, whatever its flags: such a piece
+# would be silently laid out outside every unit's range.
+plain=$(grep -E '^[[:space:]]*\.section[[:space:]]+caml_frametable' "$asm" \
+  | grep -vc '"ao"')
+echo "plain frametable pieces: $plain"
 
 # Exactly one definition of each marker.
 echo "frametable_begin definitions: $(count '__frametable_begin:')"
 echo "frametable_end definitions: $(count '__frametable_end:')"
+
+# The descriptor count word (a native word: .8byte, or .quad in the internal
+# assembler's syntax) immediately follows the end marker.
+n=$(awk '
+  prev && ($1 == ".8byte" || $1 == ".quad") { n++ }
+  { prev = /__frametable_end:/ }
+  END { print n + 0 }' "$asm")
+echo "count words after frametable_end: $n"
 
 # The old per-unit frametable symbol is gone.
 echo "old frametable symbols: $(count '__frametable:')"
