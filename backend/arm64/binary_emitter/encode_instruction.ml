@@ -335,6 +335,9 @@ let encode_instruction : type num operands.
     in
     Logical_helpers.encode_logical_shifted_reg ~opc:0b10 ~shift ~imm6 ~rd ~rn
       ~rm
+  | EXTR, Quad (Reg rd, Reg rn, Reg rm, Imm (Six imms)) ->
+    let sf = Reg.gp_sf rd in
+    Bitfield_helpers.encode_extract ~sf ~rm ~imms ~rn ~rd
   | ( EOR_vector,
       Triple
         ( Reg { reg_name = Neon (Vector vec); index = rd },
@@ -1015,6 +1018,10 @@ let encode_instruction : type num operands.
     let sf = Reg.gp_sf rd in
     Data_proc_helpers.encode_data_proc_1_source ~sf ~s:0 ~opcode2:0b00000
       ~opcode:0b000001 ~rn ~rd
+  | RORV, Triple (Reg rd, Reg rn, Reg rm) ->
+    let sf = Reg.gp_sf rd in
+    Data_proc_helpers.encode_data_proc_2_source ~sf ~s:0 ~opcode:0b001011 ~rm
+      ~rn ~rd
   | SBFM, Quad (Reg rd, Reg rn, Imm (Six immr), Imm (Six imms)) ->
     let sf = Reg.gp_sf rd in
     let n = sf in

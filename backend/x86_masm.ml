@@ -248,6 +248,8 @@ let print_instr b = function
   | SFENCE -> i0 b "sfence"
   | MFENCE -> i0 b "mfence"
   | RET -> i0 b "ret"
+  | ROL (arg1, arg2) -> i2 b "rol" arg1 arg2
+  | ROR (arg1, arg2) -> i2 b "ror" arg1 arg2
   | SAL (arg1, arg2) -> i2 b "sal" arg1 arg2
   | SAR (arg1, arg2) -> i2 b "sar" arg1 arg2
   | SET (c, arg) -> i1 b ("set" ^ string_of_condition c) arg

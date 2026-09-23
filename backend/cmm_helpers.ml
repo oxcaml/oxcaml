@@ -4426,6 +4426,31 @@ let bbswap (bitwidth : Cmm.bswap_bitwidth) arg dbg =
         [arg],
         dbg )
 
+let rotate (direction : Cmm.rotate_direction) ~bits x count dbg =
+  let bitwidth : Cmm.rotate_bitwidth option =
+    match bits with 32 -> Some Rotate32 | 64 -> Some Rotate64 | _ -> None
+  in
+  match bitwidth with
+  | Some bitwidth
+    when Proc.operation_supported (Crotate { direction; bitwidth }) ->
+    Cop (Crotate { direction; bitwidth }, [x; count], dbg)
+  | Some _ | None ->
+    (* Expansion for widths with no rotate instruction: since [x] is
+       zero-extended from [bits] bits, the complementary shift supplies the
+       rotated-in bits, and the final [zero_extend] discards the rotated-out
+       ones. The result is unspecified unless [0 <= count < bits]; a rotation by
+       zero also works, though for [bits] = [arch_bits] it relies on the
+       target's wrapping shift semantics. *)
+    bind "rotate_count" count (fun count ->
+        bind "rotate_arg" x (fun x ->
+            let complement = sub_int (Cconst_int (bits, dbg)) count dbg in
+            let hi, lo =
+              match direction with
+              | Rotate_left -> lsl_int x count dbg, lsr_int x complement dbg
+              | Rotate_right -> lsl_int x complement dbg, lsr_int x count dbg
+            in
+            zero_extend ~bits ~dbg (or_int hi lo dbg)))
+
 type binary_primitive = expression -> expression -> Debuginfo.t -> expression
 
 (* Helper for compilation of initialization and assignment operations *)

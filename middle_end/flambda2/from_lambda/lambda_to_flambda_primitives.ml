@@ -2427,6 +2427,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         | Lsl -> Binary (Int_shift (width, Lsl), arg1, arg2)
         | Lsr -> Binary (Int_shift (width, Lsr), arg1, arg2)
         | Asr -> Binary (Int_shift (width, Asr), arg1, arg2)
+        | Rol -> Binary (Int_shift (width, Rol), arg1, arg2)
+        | Ror -> Binary (Int_shift (width, Ror), arg1, arg2)
       in
       [to_expr (maybe_wrap (Prim result))]
     | Floating (outer, op) ->

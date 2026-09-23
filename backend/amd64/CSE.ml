@@ -36,7 +36,7 @@ let class_of_operation (op : Operation.t)
     | Istore_int(_, _, is_asg) -> Class (Op_store is_asg)
     | Ioffset_loc(_, _) -> Class (Op_store true)
     | Ifloatarithmem _ -> Class (Op_load Mutable)
-    | Ibswap _ -> Use_default
+    | Ibswap _ | Irotate _ -> Use_default
     | Irdtsc | Irdpmc -> Class Op_other
     | Ilfence | Imfence ->
       (* A load that follows a load fence must not be satisfied by an equation

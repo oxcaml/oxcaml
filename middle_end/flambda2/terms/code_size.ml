@@ -328,6 +328,14 @@ let binary_int_shift_primitive ~machine_width kind op =
   | Tagged_immediate, Lsl -> 3
   | Tagged_immediate, Lsr -> 2
   | Tagged_immediate, Asr -> 2
+  (* Rotations: a single instruction for register-sized integers, a
+     sign-extended rotate instruction for int32, and a short shift/or sequence
+     (plus untagging/retagging for tagged immediates) for widths with no rotate
+     instruction *)
+  | (Naked_int64 | Naked_nativeint), (Rol | Ror) -> 1
+  | Naked_int32, (Rol | Ror) -> 2
+  | (Naked_int8 | Naked_int16 | Naked_immediate), (Rol | Ror) -> 5
+  | Tagged_immediate, (Rol | Ror) -> 7
   (* Naked ints *)
   | ( ( Naked_int8 | Naked_int16 | Naked_int32 | Naked_int64 | Naked_nativeint
       | Naked_immediate ),

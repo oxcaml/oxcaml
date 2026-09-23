@@ -112,6 +112,16 @@ let select_bitwidth : Cmm.bswap_bitwidth -> Arch.bswap_bitwidth = function
   | Thirtytwo -> Thirtytwo
   | Sixtyfour -> Sixtyfour
 
+let select_rotate_direction : Cmm.rotate_direction -> Arch.rotate_direction =
+  function
+  | Rotate_left -> Rotate_left
+  | Rotate_right -> Rotate_right
+
+let select_rotate_bitwidth : Cmm.rotate_bitwidth -> Arch.rotate_bitwidth =
+  function
+  | Rotate32 -> Rotate32
+  | Rotate64 -> Rotate64
+
 let one_arg name args =
   match args with
   | [arg] -> arg
@@ -131,6 +141,18 @@ let is_immediate_natint n =
   && Nativeint.compare n (-0x8000_0000n) >= 0
 
 let specific x : Cfg.basic_or_terminator = Basic (Op (Specific x))
+
+let select_rotate direction bitwidth (args : Cmm.expression list) :
+    Cfg_selectgen_target_intf.select_operation_result =
+  let direction = select_rotate_direction direction in
+  let bitwidth = select_rotate_bitwidth bitwidth in
+  match[@ocaml.warning "-fragile-match"] args with
+  | [arg; Cconst_int (n, _)] ->
+    let mask = (match bitwidth with Rotate32 -> 32 | Rotate64 -> 64) - 1 in
+    Rewritten
+      ( specific (Irotate { direction; bitwidth; imm = Some (n land mask) }),
+        [arg] )
+  | _ -> Rewritten (specific (Irotate { direction; bitwidth; imm = None }), args)
 
 let pseudoregs_for_operation op arg res =
   match (op : Operation.t) with
@@ -161,6 +183,7 @@ let pseudoregs_for_operation op arg res =
   | Intop_imm ((Imul | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr), _)
   | Floatop ((Float64 | Float32), (Iabsf | Inegf))
   | Specific (Ibswap { bitwidth = Thirtytwo | Sixtyfour })
+  | Specific (Irotate { imm = Some _; _ })
   | Specific Ineg
   | Opaque ->
     res, res
@@ -170,8 +193,9 @@ let pseudoregs_for_operation op arg res =
   (* For imulh, first arg must be in rax, rax is clobbered, and result is in
      rdx. *)
   | Intop (Imulh _) -> [| rax; arg.(1) |], [| rdx |]
-  (* For shifts with variable shift count, second arg must be in rcx *)
+  (* For shifts and rotations with variable count, second arg must be in rcx *)
   | Intop (Ilsl | Ilsr | Iasr) -> [| res.(0); rcx |], res
+  | Specific (Irotate { imm = None; _ }) -> [| res.(0); rcx |], res
   (* For div and mod, first arg must be in rax, rdx is clobbered, and result is
      in rax or rdx respectively. Keep it simple, just force second argument in
      rcx. *)
@@ -435,6 +459,7 @@ let select_operation'
   | Cbswap { bitwidth } ->
     let bitwidth = select_bitwidth bitwidth in
     Rewritten (specific (Ibswap { bitwidth }), args)
+  | Crotate { direction; bitwidth } -> select_rotate direction bitwidth args
   | Casr -> (
     (* Recognize sign extension *)
     match args with
@@ -497,6 +522,7 @@ let select_operation
     | Cbswap { bitwidth } ->
       let bitwidth = select_bitwidth bitwidth in
       Rewritten (specific (Ibswap { bitwidth }), args)
+    | Crotate { direction; bitwidth } -> select_rotate direction bitwidth args
     | Cextcall { func; builtin = true; _ } ->
       (* Illvm_intrinsic must not allocate on the OCaml heap. See
          [Arch.operation_allocates]. *)

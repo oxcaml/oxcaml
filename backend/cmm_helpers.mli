@@ -677,6 +677,19 @@ val addr_array_length : unary_primitive
 (** Byte swap primitive Operates on Cmm integers (unboxed values) *)
 val bbswap : bswap_bitwidth -> unary_primitive
 
+(** [rotate direction ~bits x count dbg] rotates the low [bits] bits of [x] by
+    [count]. [x] must be zero-extended from [bits] bits, and the result is
+    likewise zero-extended. For [bits] of 32 or 64 this produces a rotate
+    instruction and [count] is interpreted modulo [bits]; for other widths the
+    result is unspecified unless [0 <= count < bits]. *)
+val rotate :
+  rotate_direction ->
+  bits:int ->
+  expression ->
+  expression ->
+  Debuginfo.t ->
+  expression
+
 type binary_primitive = expression -> expression -> Debuginfo.t -> expression
 
 (** [setfield offset value_is_ptr init ptr value dbg] *)

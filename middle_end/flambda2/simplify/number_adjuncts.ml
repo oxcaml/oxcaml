@@ -137,6 +137,12 @@ module type Int_number_kind = sig
 
     val shift_right_logical : t -> Target_ocaml_int.t -> t
 
+    (* Rotation within the value's bit width. Rotation counts outside [0, bit
+       width) (whose semantics are undefined) leave the value unchanged. *)
+    val rotate_left : t -> Target_ocaml_int.t -> t
+
+    val rotate_right : t -> Target_ocaml_int.t -> t
+
     val swap_byte_endianness : t -> t
 
     val neg : t -> t
@@ -181,6 +187,15 @@ let with_shift shift if_undefined f ~integer_bit_width =
     if_undefined
   | Some shift ->
     if shift < 0 || shift >= integer_bit_width then if_undefined else f shift
+
+(* As for [with_shift], this assigns a semantics to rotations whose semantics
+   are undefined: out-of-range rotation counts leave the value unchanged. [f] is
+   only applied to counts in [1, bits - 1], so implementations of [f] need not
+   worry about shifts by 0 or by the full bit width. *)
+let with_rotation rot t f ~bits =
+  match Target_ocaml_int.to_int_option rot with
+  | None -> t
+  | Some rot -> if rot <= 0 || rot >= bits then t else f rot
 
 let compare_unsigned_generic n1 n2 ~compare ~strictly_negative =
   (* CR-someday mshinwell: Use faster implementation and/or implementation in
@@ -245,6 +260,20 @@ module For_tagged_immediates : Int_number_kind = struct
         (Target_ocaml_int.zero (machine_width t))
         (fun shift_int -> Target_ocaml_int.shift_right_logical t shift_int)
         ~integer_bit_width
+
+    let rotation_bit_width = if Target_system.is_32_bit () then 31 else 63
+
+    let rotate_left t rot =
+      with_rotation rot t ~bits:rotation_bit_width (fun rot ->
+          Target_ocaml_int.or_
+            (Target_ocaml_int.shift_left t rot)
+            (Target_ocaml_int.shift_right_logical t (rotation_bit_width - rot)))
+
+    let rotate_right t rot =
+      with_rotation rot t ~bits:rotation_bit_width (fun rot ->
+          Target_ocaml_int.or_
+            (Target_ocaml_int.shift_left t (rotation_bit_width - rot))
+            (Target_ocaml_int.shift_right_logical t rot))
 
     let swap_byte_endianness =
       Target_ocaml_int.get_least_significant_16_bits_then_byte_swap
@@ -337,6 +366,18 @@ module For_naked_immediates : Int_number_kind = struct
         (Target_ocaml_int.zero machine_width)
         (fun shift -> shift_right_logical t shift)
         ~integer_bit_width
+
+    let rotate_left t rot =
+      with_rotation rot t ~bits:integer_bit_width (fun rot ->
+          Target_ocaml_int.or_
+            (Target_ocaml_int.shift_left t rot)
+            (Target_ocaml_int.shift_right_logical t (integer_bit_width - rot)))
+
+    let rotate_right t rot =
+      with_rotation rot t ~bits:integer_bit_width (fun rot ->
+          Target_ocaml_int.or_
+            (Target_ocaml_int.shift_left t (integer_bit_width - rot))
+            (Target_ocaml_int.shift_right_logical t rot))
 
     let swap_byte_endianness =
       Target_ocaml_int.get_least_significant_16_bits_then_byte_swap
@@ -545,6 +586,14 @@ module For_int8s : Int_number_kind = struct
     let shift_right_logical x y =
       of_int (Int.shift_right_logical (to_int x land 0xff) y)
 
+    let rotate_left t rot =
+      with_rotation rot t ~bits:8 (fun rot ->
+          logor (shift_left t rot) (shift_right_logical t (8 - rot)))
+
+    let rotate_right t rot =
+      with_rotation rot t ~bits:8 (fun rot ->
+          logor (shift_left t (8 - rot)) (shift_right_logical t rot))
+
     let xor = logxor
 
     let or_ = logor
@@ -668,6 +717,14 @@ module For_int16s : Int_number_kind = struct
 
     let shift_right_logical x y =
       of_int (Int.shift_right_logical (to_int x land 0xffff) y)
+
+    let rotate_left t rot =
+      with_rotation rot t ~bits:16 (fun rot ->
+          logor (shift_left t rot) (shift_right_logical t (16 - rot)))
+
+    let rotate_right t rot =
+      with_rotation rot t ~bits:16 (fun rot ->
+          logor (shift_left t (16 - rot)) (shift_right_logical t rot))
 
     let xor = logxor
 
@@ -798,6 +855,17 @@ module For_int32s : Boxable_int_number_kind = struct
         (fun shift -> shift_right_logical t shift)
         ~integer_bit_width:32
 
+    let rotate_left t rot =
+      with_rotation rot t ~bits:32 (fun rot ->
+          Int32.logor (Int32.shift_left t rot)
+            (Int32.shift_right_logical t (32 - rot)))
+
+    let rotate_right t rot =
+      with_rotation rot t ~bits:32 (fun rot ->
+          Int32.logor
+            (Int32.shift_left t (32 - rot))
+            (Int32.shift_right_logical t rot))
+
     let to_const t = Reg_width_const.naked_int32 t
 
     let to_immediate t machine_width = Target_ocaml_int.of_int32 machine_width t
@@ -887,6 +955,17 @@ module For_int64s : Boxable_int_number_kind = struct
         (fun shift -> shift_right_logical t shift)
         ~integer_bit_width:64
 
+    let rotate_left t rot =
+      with_rotation rot t ~bits:64 (fun rot ->
+          Int64.logor (Int64.shift_left t rot)
+            (Int64.shift_right_logical t (64 - rot)))
+
+    let rotate_right t rot =
+      with_rotation rot t ~bits:64 (fun rot ->
+          Int64.logor
+            (Int64.shift_left t (64 - rot))
+            (Int64.shift_right_logical t rot))
+
     let to_const t = Reg_width_const.naked_int64 t
 
     let to_immediate t machine_width = Target_ocaml_int.of_int64 machine_width t
@@ -973,6 +1052,18 @@ module For_nativeints : Boxable_int_number_kind = struct
       with_shift shift (zero_like t)
         (fun shift -> shift_right_logical t shift)
         ~integer_bit_width
+
+    let rotate_left t rot =
+      with_rotation rot t ~bits:integer_bit_width (fun rot ->
+          Targetint_32_64.logor
+            (Targetint_32_64.shift_left t rot)
+            (Targetint_32_64.shift_right_logical t (integer_bit_width - rot)))
+
+    let rotate_right t rot =
+      with_rotation rot t ~bits:integer_bit_width (fun rot ->
+          Targetint_32_64.logor
+            (Targetint_32_64.shift_left t (integer_bit_width - rot))
+            (Targetint_32_64.shift_right_logical t rot))
 
     let to_const t = Reg_width_const.naked_nativeint t
 

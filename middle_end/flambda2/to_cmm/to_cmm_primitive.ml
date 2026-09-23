@@ -1031,42 +1031,57 @@ let relevant_bits_for_shift_amount =
   then Misc.log2 (Arch.size_int * 8)
   else Arch.size_int * 8
 
+let binary_int_rotate_primitive dbg kind (direction : Cmm.rotate_direction) x y
+    =
+  (* Rotation acts on the underlying untagged integer, viewed as an unsigned
+     value of its bit width: [C.rotate] both consumes and produces zero-extended
+     values, and [conjugate] converts to and from the outer kind. *)
+  let outer = integral_of_standard_int kind in
+  let inner =
+    C.Scalar_type.Integer.unsigned
+      (C.Scalar_type.Integral.untagged_or_identity outer)
+  in
+  let bits = C.Scalar_type.Integer.bit_width inner in
+  let y = C.low_bits ~bits:relevant_bits_for_shift_amount y ~dbg in
+  C.Scalar_type.Integral.conjugate ~outer ~inner:(Untagged inner) ~dbg
+    ~f:(fun x -> C.rotate direction ~bits x y dbg)
+    x
+
 let binary_int_shift_primitive _env dbg kind (op : P.int_shift_op) x y =
   (* See comments on [binary_int_arith_primitive], above, about sign extension
      and use of [C.low_bits]. *)
-  match[@warning "-fragile-match"] (kind : K.Standard_int.t) with
-  | Tagged_immediate -> (
-    match op with
-    | Lsl -> C.lsl_int_caml_raw x y ~dbg
-    | Lsr -> C.lsr_int_caml_raw x y ~dbg
-    | Asr -> C.asr_int_caml_raw x y ~dbg)
-  | kind ->
-    let kind = integral_of_standard_int kind in
-    let right_shift_kind signedness =
-      (* right shifts can operate directly on any untagged integers of the
-         correct signedness, as they do not require sign- or zero-extension
-         after the shift, since the cmm scalar types are already stored sign- or
-         zero-extended *)
-      C.Scalar_type.Integer.with_signedness
-        (C.Scalar_type.Integral.untagged_or_identity kind)
-        ~signedness
-    in
-    let f, (op_kind : C.Scalar_type.Integer.t) =
-      match op with
-      | Asr -> C.asr_int, right_shift_kind Signed
-      | Lsr -> C.lsr_int, right_shift_kind Unsigned
-      | Lsl ->
-        (* Left shifts operate on nativeints since they might shift arbitrary
-           bits into the high bits of the register. *)
-        C.lsl_int, C.Scalar_type.Integer.nativeint
-    in
+  let integral = integral_of_standard_int kind in
+  let right_shift_kind signedness =
+    (* right shifts can operate directly on any untagged integers of the correct
+       signedness, as they do not require sign- or zero-extension after the
+       shift, since the cmm scalar types are already stored sign- or
+       zero-extended *)
+    C.Scalar_type.Integer.with_signedness
+      (C.Scalar_type.Integral.untagged_or_identity integral)
+      ~signedness
+  in
+  let shift f (op_kind : C.Scalar_type.Integer.t) =
     let y = C.low_bits ~bits:relevant_bits_for_shift_amount y ~dbg in
-    C.Scalar_type.Integral.conjugate ~outer:kind ~inner:(Untagged op_kind) ~dbg
+    C.Scalar_type.Integral.conjugate ~outer:integral ~inner:(Untagged op_kind)
+      ~dbg
       ~f:(fun x ->
-        (* [kind] only applies to [x], the [y] argument is always a bare
+        (* the shift kind only applies to [x], the [y] argument is always a bare
            register-sized integer *)
         f x y dbg)
       x
+  in
+  match[@warning "-fragile-match"] (kind : K.Standard_int.t), op with
+  | kind, Rol -> binary_int_rotate_primitive dbg kind Rotate_left x y
+  | kind, Ror -> binary_int_rotate_primitive dbg kind Rotate_right x y
+  | Tagged_immediate, Lsl -> C.lsl_int_caml_raw x y ~dbg
+  | Tagged_immediate, Lsr -> C.lsr_int_caml_raw x y ~dbg
+  | Tagged_immediate, Asr -> C.asr_int_caml_raw x y ~dbg
+  | _, Asr -> shift C.asr_int (right_shift_kind Signed)
+  | _, Lsr -> shift C.lsr_int (right_shift_kind Unsigned)
+  | _, Lsl ->
+    (* Left shifts operate on nativeints since they might shift arbitrary bits
+       into the high bits of the register. *)
+    shift C.lsl_int C.Scalar_type.Integer.nativeint
 
 let binary_int_comp_primitive _env dbg kind cmp x y =
   match
