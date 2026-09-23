@@ -45,10 +45,20 @@ let unit_info_from_cu_or_output_prefix ~source_file kind ~output_prefix
       Unit_info.make ~source_file ~for_pack_prefix kind output_prefix
 
 let find_impl_on_load_path cu ~ext =
-  let basename = Compilation_unit.base_filename cu ^ ext in
-  match Load_path.find_normalized basename with
-  | filename -> Some filename
-  | exception Not_found -> None
+  let find cu =
+    let basename = Compilation_unit.base_filename cu ^ ext in
+    match Load_path.find_normalized basename with
+    | filename -> Some filename
+    | exception Not_found -> None
+  in
+  match find cu with
+  | Some _ as found -> found
+  | None ->
+    (* An instance's format is also recorded in its base unit's compiled
+       form; build layouts differ in which of the two is on the load path. *)
+    if Compilation_unit.is_instance cu
+    then find (fst (Compilation_unit.split_instance_exn cu))
+    else None
 
 let with_info ~backend ~tool_name ~dump_ext unit_info k =
   Compmisc.init_path ();

@@ -82,7 +82,9 @@ let run ~cmx_loader ~machine_width ~round ~code_slot_offsets unit =
   in
   let unit =
     FU.create ~return_continuation ~exn_continuation ~toplevel_my_alloc_region
-      ~module_symbol ~module_block_cells ~root_symbols ~body
+      ~module_symbol ~module_block_cells
+      ~root_symbols:(FU.root_symbols_with_sizes unit)
+      ~body
   in
   { unit;
     free_names = name_occurrences;

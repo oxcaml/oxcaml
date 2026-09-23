@@ -157,7 +157,8 @@ let close_phrase lam =
 
 (* Return the value referred to by a path *)
 
-(* Like [Obj.field] on a module block. *)
+(* Like [Obj.field] on a module block. Copied from [Topcommon], which the
+   native toplevel does not link. *)
 let mod_field obj module_repr pos =
   Option.map (Obj.field obj)
     (Mixed_block_shape.module_value_field_index module_repr pos)

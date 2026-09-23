@@ -1279,9 +1279,9 @@ val returned_module_representation :
    instantiating functor. *)
 val instantiating_functor_module_representation : module_representation
 
-(* Placeholder for [Pgetglobal] sites that only ever reach bytecode, which
-   ignores the representation (the toplevel unit in [Translmod] and
-   [Bytepackager]). *)
+(* Placeholder for [Pgetglobal] sites whose representation is never used: those
+   that only reach bytecode (the toplevel unit in [Translmod], [Bytepackager],
+   [Compile.instance]) or the JavaScript backend ([Jscompile.instance]). *)
 val bytecode_only_module_representation : module_representation
 
 type program =

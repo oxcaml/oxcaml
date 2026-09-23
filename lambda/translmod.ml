@@ -1652,7 +1652,7 @@ let rec transl_maybe_local_instance ~(gm : Global_module.t) ~chain
   then
     let cu = Compilation_unit.of_complete_global_exn gm in
     let ui_format, _arg_descr = find_impl_by_name ~chain cu in
-    let repr = main_module_representation ui_format in
+    let repr = returned_module_representation ui_format in
     let lam = Lprim (Pgetglobal (cu, repr, Dynamic), [], Loc_unknown) in
     (lam, module_map, rev_bindings)
   else transl_local_instance ~gm ~chain ~find_impl_by_name ~param_map

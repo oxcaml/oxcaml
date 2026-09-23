@@ -429,27 +429,33 @@ let check_not_current_unit env cu ~prim =
 
 (* A cell is a one-field module block holding logical field [cell_index] of the
    main module block. [physical_fields] are the indexes of the corresponding
-   physical fields of the module block, in the cell's own field order. *)
+   physical fields of the module block, in the cell's own field order;
+   [cell_elements], for a mixed module block, are those fields' elements in that
+   order. *)
 type module_block_cell =
   { cell_index : int;
     cell_symbol : Symbol.t;
     cell_shape : K.Scannable_block_shape.t;
+    cell_elements :
+      unit K.Mixed_block_lambda_shape.Singleton_mixed_block_element.t array
+      option;
     physical_fields : int list
   }
 
 let module_block_cells ~compilation_unit
     ~(module_repr : Lambda.module_representation) =
-  let cell cell_index ~cell_shape ~physical_fields =
+  let cell cell_index ~cell_shape ~cell_elements ~physical_fields =
     { cell_index;
       cell_symbol = module_block_cell_symbol compilation_unit cell_index;
       cell_shape;
+      cell_elements;
       physical_fields
     }
   in
   match module_repr with
   | Module_value_only { field_count } ->
     List.init field_count (fun i ->
-        cell i ~cell_shape:Value_only ~physical_fields:[i])
+        cell i ~cell_shape:Value_only ~cell_elements:None ~physical_fields:[i])
   | Module_mixed (shape, _) ->
     let physical_fields_by_element =
       K.Mixed_block_lambda_shape.new_indexes_by_element
@@ -460,11 +466,16 @@ let module_block_cells ~compilation_unit
         match physical_fields_by_element.(i) with
         | [] -> None (* void field *)
         | _ :: _ as physical_fields ->
+          let cell_lambda_shape = module_lambda_shape [| shape.(i) |] in
           let cell_shape =
-            K.Scannable_block_shape.from_mixed_block_shape
-              (module_lambda_shape [| shape.(i) |])
+            K.Scannable_block_shape.from_mixed_block_shape cell_lambda_shape
           in
-          Some (cell i ~cell_shape ~physical_fields))
+          let cell_elements =
+            Some
+              (K.Mixed_block_lambda_shape.flattened_reordered_shape
+                 cell_lambda_shape)
+          in
+          Some (cell i ~cell_shape ~cell_elements ~physical_fields))
       (List.init (Array.length shape) Fun.id)
 
 module Inlining = struct
@@ -1363,16 +1374,11 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       let cell_size : _ Or_unknown.t =
         Known (Target_ocaml_int.of_int machine_width 1)
       in
-      let cell_access { cell_index; cell_shape; _ } cell_pos :
+      let cell_access { cell_shape; cell_elements; _ } cell_pos :
           P.Block_access_kind.t =
-        match module_repr with
-        | Module_value_only _ ->
-          Values { tag; size = cell_size; field_kind = Any_value }
-        | Module_mixed (shape, _) ->
-          let cell_elements =
-            K.Mixed_block_lambda_shape.flattened_reordered_shape
-              (module_lambda_shape [| shape.(cell_index) |])
-          in
+        match cell_elements with
+        | None -> Values { tag; size = cell_size; field_kind = Any_value }
+        | Some cell_elements ->
           H.block_access_kind_of_mixed_field_element ~tag ~size:Unknown
             ~kind_shape:cell_shape cell_elements.(cell_pos)
       in
@@ -4319,8 +4325,7 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
       then acc
       else
         List.fold_left
-          (fun acc { cell_symbol; cell_shape; physical_fields; cell_index = _ }
-             ->
+          (fun acc { cell_symbol; cell_shape; physical_fields; _ } ->
             let fields =
               List.mapi
                 (fun cell_pos pos ->
@@ -4362,8 +4367,7 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
               Static_const.block module_block_tag Immutable block_shape
                 field_vars ) ]
       in
-      let cell_static_const
-          { cell_symbol; cell_shape; physical_fields; cell_index = _ } =
+      let cell_static_const { cell_symbol; cell_shape; physical_fields; _ } =
         let fields =
           List.map
             (fun pos ->
@@ -4470,9 +4474,19 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
     List.map (fun { cell_symbol; _ } -> cell_symbol) cells
   in
   let root_symbols =
+    let cells =
+      List.map
+        (fun { cell_symbol; physical_fields; _ } ->
+          cell_symbol, List.length physical_fields)
+        cells
+    in
     if Flambda_features.emit_module_block ()
-    then module_symbol :: module_block_cells
-    else module_block_cells
+    then
+      let module_block_size =
+        List.fold_left (fun size (_, cell_size) -> size + cell_size) 0 cells
+      in
+      (module_symbol, module_block_size) :: cells
+    else cells
   in
   let acc, body =
     wrap_final_module_block acc env ~program ~prog_return_cont ~module_repr
@@ -4481,8 +4495,23 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
   (* The module symbol is only defined when the module block is emitted; the
      cells carry the field approximations otherwise. *)
   let symbols_approximations =
+    (* The cells' approximations are recorded with their definitions, in the
+       initialiser's return continuation, which is dropped when the initialiser
+       cannot return (see [Let_cont_with_acc.build_non_recursive]); the cells
+       are exported regardless. *)
+    let approxs =
+      List.fold_left
+        (fun approxs cell_symbol ->
+          if Symbol.Map.mem cell_symbol approxs
+          then approxs
+          else
+            Symbol.Map.add cell_symbol (Value_approximation.Unknown K.value)
+              approxs)
+        (Acc.symbol_approximations acc)
+        module_block_cells
+    in
     if not (Flambda_features.emit_module_block ())
-    then Acc.symbol_approximations acc
+    then approxs
     else
       let module_block_approximation =
         match Acc.continuation_known_arguments ~cont:prog_return_cont acc with
@@ -4491,8 +4520,7 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
         | Some [approx] -> approx
         | _ -> Value_approximation.Unknown Flambda_kind.value
       in
-      Symbol.Map.add module_symbol module_block_approximation
-        (Acc.symbol_approximations acc)
+      Symbol.Map.add module_symbol module_block_approximation approxs
   in
   (* We must make sure there is always an outer [Let_symbol] binding so that
      lifted constants not in the scope of any other [Let_symbol] binding get put

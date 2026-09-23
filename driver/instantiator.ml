@@ -198,23 +198,15 @@ let instantiate
              Unit)
   in
   let find_format instance =
-    (* An instance's format is recorded both in its own compiled form and in
-       its base's; build layouts differ in which of the two is on the load
-       path. *)
-    let base_unit, _ = CU.split_instance_exn instance in
-    let format_of unit =
-      Compile_common.find_impl_on_load_path unit ~ext:expected_extension
-      |> Option.map (fun filename -> (read_unit_info filename).ui_format)
-    in
-    match format_of instance with
-    | Some format -> format
+    match
+      Compile_common.find_impl_on_load_path instance ~ext:expected_extension
+    with
+    | Some filename -> (read_unit_info filename).ui_format
     | None ->
-      match format_of base_unit with
-      | Some format -> format
-      | None ->
-        error (Missing_instance_impl
-                 { instance; base_unit; expected_extension;
-                   required_by = compilation_unit })
+      let base_unit, _ = CU.split_instance_exn instance in
+      error (Missing_instance_impl
+               { instance; base_unit; expected_extension;
+                 required_by = compilation_unit })
   in
   let output_prefix = output_filename_without_extension in
   let arg_descr = base_unit_info.ui_arg_descr in

@@ -44,7 +44,9 @@ val unit_info_from_cu_or_output_prefix :
 val find_impl_on_load_path :
   Compilation_unit.t -> ext:string -> Misc.filepath option
 (** The compiled implementation of a unit on the load path, if any; [ext] is
-    the compiled object's extension (".cmo" or ".cmx"). *)
+    the compiled object's extension (".cmo" or ".cmx"). For an instance unit
+    that is not on the load path, its base unit's, whose format also describes
+    the instance (see [Lambda.returned_module_representation]). *)
 
 val with_info :
   backend:backend ->

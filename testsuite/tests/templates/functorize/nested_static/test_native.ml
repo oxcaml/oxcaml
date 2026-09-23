@@ -66,7 +66,8 @@
 
  set OCAMLPARAM = "";
 
- script = "mkdir p p_int q q_int stateful bar wrap instances bundle_wrap";
+ script = "mkdir p p_int q q_int stateful bar wrap instances bundle_wrap \
+                 bundle_wrap_base";
  script;
 
  src = "${test_source_directory}/../p.mli \
@@ -158,46 +159,88 @@
  module = "wrap/wrap.mli wrap/wrap.ml";
  ocamlopt.byte;
 
- (* Step 6: functorize [Wrap].  Bar's [Rp_main_module_block Stateful[P:P]]
-    is substituted to [Stateful[P:P_int]] (complete) and resolved to a
-    [Pgetglobal] of the pre-instantiated CU. *)
+ {
+   (* Step 6: functorize [Wrap].  Bar's [Rp_main_module_block Stateful[P:P]]
+      is substituted to [Stateful[P:P_int]] (complete) and resolved to a
+      [Pgetglobal] of the pre-instantiated CU. *)
 
- flags = "$flg -functorize -I p -I p_int -I q -I stateful -I instances \
-   -I bar -I wrap Wrap";
- module = "";
- program = "bundle_wrap/bundle.cmx";
- all_modules = "";
- ocamlopt.byte;
+   flags = "$flg -functorize -I p -I p_int -I q -I stateful -I instances \
+     -I bar -I wrap Wrap";
+   module = "";
+   program = "bundle_wrap/bundle.cmx";
+   all_modules = "";
+   ocamlopt.byte;
 
- (* Step 7: main verifies that [Stateful[P:P_int]]'s counter is shared
-    between direct access via [Static] and access via the bundle. *)
+   (* Step 7: main verifies that [Stateful[P:P_int]]'s counter is shared
+      between direct access via [Static] and access via the bundle. *)
 
- flags = "$flg -I bundle_wrap -I p -I p_int -I q -I q_int -I stateful \
-   -I instances -I bar -I wrap";
- module = "main_nested.ml";
- ocamlopt.byte;
+   flags = "$flg -I bundle_wrap -I p -I p_int -I q -I q_int -I stateful \
+     -I instances -I bar -I wrap";
+   module = "main_nested.ml";
+   ocamlopt.byte;
 
- flags = "$flg_link";
- module = "";
- program = "$test_build_directory/test_nested.exe";
- all_modules = "\
-   p_int/p_int__.cmx \
-   p_int/p_int.cmx \
-   stateful/stateful.cmx \
-   instances/stateful-P_int.cmx \
-   q_int/q_int.cmx \
-   bar/bar.cmx \
-   wrap/wrap.cmx \
-   bundle_wrap/bundle.cmx \
-   main_nested.cmx \
- ";
- ocamlopt.byte;
+   flags = "$flg_link";
+   module = "";
+   program = "$test_build_directory/test_nested.exe";
+   all_modules = "\
+     p_int/p_int__.cmx \
+     p_int/p_int.cmx \
+     stateful/stateful.cmx \
+     instances/stateful-P_int.cmx \
+     q_int/q_int.cmx \
+     bar/bar.cmx \
+     wrap/wrap.cmx \
+     bundle_wrap/bundle.cmx \
+     main_nested.cmx \
+   ";
+   ocamlopt.byte;
 
- stdout = "test_nested.output";
- stderr = "test_nested.output";
- output = "test_nested.output";
- run;
+   stdout = "test_nested.output";
+   stderr = "test_nested.output";
+   output = "test_nested.output";
+   run;
 
- reference = "test_nested.reference";
- check-program-output;
+   reference = "test_nested.reference";
+   check-program-output;
+ }{
+   (* Steps 6 and 7 again, functorizing without [instances/] on the load
+      path: [Stateful[P:P_int]]'s block format, which the [Pgetglobal]
+      carries, is then read from [stateful.cmx]. *)
+
+   flags = "$flg -functorize -I p -I p_int -I q -I stateful -I bar -I wrap \
+     Wrap";
+   module = "";
+   program = "bundle_wrap_base/bundle.cmx";
+   all_modules = "";
+   ocamlopt.byte;
+
+   flags = "$flg -I bundle_wrap_base -I p -I p_int -I q -I q_int -I stateful \
+     -I instances -I bar -I wrap";
+   module = "main_nested.ml";
+   ocamlopt.byte;
+
+   flags = "$flg_link";
+   module = "";
+   program = "$test_build_directory/test_nested_base.exe";
+   all_modules = "\
+     p_int/p_int__.cmx \
+     p_int/p_int.cmx \
+     stateful/stateful.cmx \
+     instances/stateful-P_int.cmx \
+     q_int/q_int.cmx \
+     bar/bar.cmx \
+     wrap/wrap.cmx \
+     bundle_wrap_base/bundle.cmx \
+     main_nested.cmx \
+   ";
+   ocamlopt.byte;
+
+   stdout = "test_nested_base.output";
+   stderr = "test_nested_base.output";
+   output = "test_nested_base.output";
+   run;
+
+   reference = "test_nested.reference";
+   check-program-output;
+ }
 *)

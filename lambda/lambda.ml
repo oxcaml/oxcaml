@@ -2267,29 +2267,20 @@ let transl_module_representation repr =
 
 (* Translate an access path *)
 
-let transl_unit_address loc cu module_repr mode =
-  let staticity = Mode.With_regionality.proj_monadic Staticity mode in
-  let staticity =
-    match Mode.Staticity.zap_to_floor_exn staticity with
-    | Static -> Static
-    | Dynamic -> Dynamic
-  in
-  Lprim(Pgetglobal (cu, module_repr, staticity), [], loc)
-
 let rec transl_address loc = function
   | Env.Aunit (cu, module_repr, mode) ->
+    let staticity = Mode.With_regionality.proj_monadic Staticity mode in
+    let staticity =
+      match Mode.Staticity.zap_to_floor_exn staticity with
+      | Static -> Static
+      | Dynamic -> Dynamic
+    in
     let module_repr = transl_module_representation module_repr in
-    transl_unit_address loc cu module_repr mode
+    Lprim(Pgetglobal (cu, module_repr, staticity), [], loc)
   | Env.Alocal id ->
       if Ident.is_predef id
       then Lprim (Pgetpredef id, [], loc)
       else Lvar id
-  | Env.Adot(Env.Aunit (cu, _, mode), module_repr, pos) ->
-      (* [Foo.x]: the field's [module_repr] is also the unit's, so translate
-         it once. *)
-      let module_repr = transl_module_representation module_repr in
-      Lprim(mod_field pos module_repr,
-            [transl_unit_address loc cu module_repr mode], loc)
   | Env.Adot(addr, module_repr, pos) ->
       let module_repr = transl_module_representation module_repr in
       Lprim(mod_field pos module_repr, [transl_address loc addr], loc)
@@ -2997,7 +2988,11 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pbytes_to_string | Pbytes_of_string
   | Parray_to_iarray | Parray_of_iarray
   | Pignore -> None
-  | Pgetglobal _ | Pgetpredef _ -> None
+  | Pgetpredef _ -> None
+  | Pgetglobal _ ->
+    (* Native code rebuilds the module block from the unit's cells (see
+       [Closure_conversion]). *)
+    Some alloc_heap
   | Pmakeblock (_, _, _, m) -> Some m
   | Pmakefloatblock (_, m) -> Some m
   | Pmakeufloatblock (_, m) -> Some m

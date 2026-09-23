@@ -108,7 +108,6 @@ type starting_point =
       runtime_args : Translmod.runtime_arg list;
       main_module_block_repr : Lambda.module_representation;
       arg_descr : Lambda.arg_descr option;
-      find_format : Compilation_unit.t -> Lambda.main_module_block_format;
     }
 
 let starting_point_of_compiler_pass start_from =
@@ -139,8 +138,7 @@ let implementation_aux ~start_from ~source_file ~output_prefix
       ~hook_parse_tree:Fun.id
       ~hook_typed_tree:ignore
       info ~backend
-  | Instantiation
-      { runtime_args; main_module_block_repr; arg_descr; find_format } ->
+  | Instantiation { runtime_args; main_module_block_repr; arg_descr } ->
     begin
       match !Clflags.as_argument_for with
       | Some _ ->
@@ -155,6 +153,11 @@ let implementation_aux ~start_from ~source_file ~output_prefix
       | None -> None, None
     in
     let impl =
+      (* Bytecode ignores the representation, so the argument units' .cmo
+         files need not be looked up. *)
+      let find_format _ : Lambda.main_module_block_format =
+        Mb_struct { mb_repr = Lambda.bytecode_only_module_representation }
+      in
       Translmod.transl_instance info.module_name ~runtime_args
         ~main_module_block_repr ~arg_block_idx ~find_format
     in
@@ -167,10 +170,9 @@ let implementation ~start_from ~source_file ~output_prefix ~keep_symbol_tables =
     ~compilation_unit:Inferred_from_output_prefix
 
 let instance ~source_file ~output_prefix ~compilation_unit ~runtime_args
-    ~main_module_block_repr ~arg_descr ~find_format ~keep_symbol_tables =
+    ~main_module_block_repr ~arg_descr ~find_format:_ ~keep_symbol_tables =
   let start_from =
-    Instantiation
-      { runtime_args; main_module_block_repr; arg_descr; find_format }
+    Instantiation { runtime_args; main_module_block_repr; arg_descr }
   in
   implementation_aux ~start_from ~source_file ~output_prefix ~keep_symbol_tables
     ~compilation_unit:(Exactly compilation_unit)

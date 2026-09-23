@@ -21,7 +21,7 @@ type t =
     body : Flambda.Expr.t;
     module_symbol : Symbol.t;
     module_block_cells : Symbol.t list;
-    root_symbols : Symbol.t list
+    root_symbols : (Symbol.t * int) list
   }
 
 let create ~return_continuation ~exn_continuation ~toplevel_my_alloc_region
@@ -47,7 +47,9 @@ let module_symbol t = t.module_symbol
 
 let module_block_cells t = t.module_block_cells
 
-let root_symbols t = t.root_symbols
+let root_symbols t = List.map fst t.root_symbols
+
+let root_symbols_with_sizes t = t.root_symbols
 
 let with_body t body = { t with body }
 

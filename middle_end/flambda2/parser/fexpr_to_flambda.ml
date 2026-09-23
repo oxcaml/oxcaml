@@ -1023,9 +1023,13 @@ let conv comp_unit (fexpr : Fexpr.flambda_unit) : conv_result =
     List.map (declare_symbol env) fexpr.module_block_cells
   in
   let root_symbols =
+    (* Fexpr does not record the cells' sizes, which only size the placeholders
+       [To_cmm] defines for dropped roots; fexpr units are not translated to
+       Cmm. *)
+    let cells = List.map (fun cell -> cell, 1) module_block_cells in
     if Flambda_features.emit_module_block ()
-    then module_symbol :: module_block_cells
-    else module_block_cells
+    then (module_symbol, List.length cells) :: cells
+    else cells
   in
   let code_slot_offsets = acc.Acc.code_slot_offsets in
   let unit =

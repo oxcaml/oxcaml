@@ -59,6 +59,11 @@ val add_gc_roots : t -> Symbol.t list -> t
 (** Register a function that has been translated to Cmm. *)
 val add_function : t -> Cmm.fundecl -> t
 
+(** Define any of the given symbols that the translation has not defined, as a
+    placeholder block of the given size in words (see
+    [Flambda_unit.root_symbols_with_sizes]). *)
+val define_missing_symbols : t -> (Symbol.t * int) list -> t
+
 (** Caching of symbols associated with [Invalid] messages. *)
 val add_invalid_message_symbol : t -> Symbol.t -> message:string -> t
 
