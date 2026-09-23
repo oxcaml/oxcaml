@@ -730,10 +730,18 @@ let decl_of_type_constr type_constr =
       match type_unboxed_version with
       | None -> jkind
       | Some unboxed ->
+        let scannable_axes =
+          match jkind.jkind.base with
+          | Kconstr (_, axes, _) -> axes
+          | Layout layout ->
+            Option.bind (Jkind_types.Layout.get_const layout)
+              Jkind_types.Layout.Const.get_root_scannable_axes
+            |> Option.value ~default:Jkind_types.Scannable_axes.max
+        in
         let boxed =
           Jkind.Base_and_axes.map_layout
             (fun layout ->
-               Jkind_types.Layout.Box (layout, Jkind_types.Scannable_axes.max))
+               Jkind_types.Layout.Box (layout, scannable_axes))
             unboxed.type_jkind.jkind
         in
         { jkind with jkind = { jkind.jkind with base = boxed.base } }
@@ -769,7 +777,9 @@ let decl_of_type_constr type_constr =
       ()
     =
     let param = newgenvar param_jkind in
-    let base = decl0 ~jkind:(jkind param) ~kind:(kind param) () in
+    let base =
+      decl0 ~jkind:(jkind param) ~kind:(kind param) ?unboxed_jkind ()
+    in
     let manifest = Option.map (fun f -> f param) manifest in
     let type_unboxed_version =
       Option.map
