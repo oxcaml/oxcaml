@@ -6656,52 +6656,53 @@ let rec mgen_fast env subst scope maxnodes variance t1 t2 =
        [estimate_type_jkind] is fast, and if so, call it and compare them.
        We also would need a conservative jkind (or layout) [sub] check that does
        not mutate / expand. This case seems rare enough to bail for now *)
-     if not (Jkind.is_obviously_max jkind) then raise_notrace Complicated_moregen;
-     For_copy.redirect_desc scope t1 (Tsubst (t2, None))
+    if not (Jkind.is_obviously_max jkind) then
+      raise_notrace Complicated_moregen;
+    For_copy.redirect_desc scope t1 (Tsubst (t2, None))
   | Tarrow ((l1,a1,r1), t1, u1, _), Tarrow ((l2,a2,r2), t2, u2, _)
        when l1 = l2 ->
-     begin match variance with
-     | None -> raise_notrace Complicated_moregen
-     | Some v ->
-       moregen_mode_fast (neg_variance v) a1 a2;
-       moregen_mode_fast v r1 r2;
-       mgen_fast env subst scope maxnodes (some_neg_variance v) t1 t2;
-       mgen_fast env subst scope maxnodes variance u1 u2
-     end
+    begin match variance with
+    | None -> raise_notrace Complicated_moregen
+    | Some v ->
+      moregen_mode_fast (neg_variance v) a1 a2;
+      moregen_mode_fast v r1 r2;
+      mgen_fast env subst scope maxnodes (some_neg_variance v) t1 t2;
+      mgen_fast env subst scope maxnodes variance u1 u2
+    end
   | Ttuple tl1, Ttuple tl2 ->
-     mgen_fast_labeled env subst scope maxnodes variance tl1 tl2
+    mgen_fast_labeled env subst scope maxnodes variance tl1 tl2
   | Tconstr (p1, tl1, _), Tconstr (p2, tl2, _) ->
-     (* FIXME: easy cases of alias expansion? *)
-     let p2 =
-       try Subst.type_path subst p2
-       with Subst.Not_path -> raise_notrace Complicated_moregen
-     in
-     if not (path_same_normalized env p1 p2) then
-       raise_notrace Complicated_moregen;
-     mgen_fast_list env subst scope maxnodes tl1 tl2
+    (* FIXME: easy cases of alias expansion? *)
+    let p2 =
+      try Subst.type_path subst p2
+      with Subst.Not_path -> raise_notrace Complicated_moregen
+    in
+    if not (path_same_normalized env p1 p2) then
+      raise_notrace Complicated_moregen;
+    mgen_fast_list env subst scope maxnodes tl1 tl2
   | Tpoly (t1, []), Tpoly(t2, []) ->
-     mgen_fast env subst scope maxnodes variance t1 t2
+    mgen_fast env subst scope maxnodes variance t1 t2
   | _, _ ->
-     raise_notrace Complicated_moregen
+    raise_notrace Complicated_moregen
 
 and mgen_fast_list env subst scope maxnodes tl1 tl2 =
   match tl1, tl2 with
   | [], [] -> ()
   | t1 :: tl1, t2 :: tl2 ->
-     mgen_fast env subst scope maxnodes None t1 t2;
-     mgen_fast_list env subst scope maxnodes tl1 tl2
+    mgen_fast env subst scope maxnodes None t1 t2;
+    mgen_fast_list env subst scope maxnodes tl1 tl2
   | _, _ -> raise_notrace Complicated_moregen
 
 and mgen_fast_labeled env subst scope maxnodes variance tl1 tl2 =
   match tl1, tl2 with
   | [], [] -> ()
   | (l1, t1) :: tl1, (l2, t2) :: tl2 ->
-     (* This is an actual failure, but we raise [Complicated_moregen] so that
-        the slow path can give a nicer error. *)
-     if not (Option.equal String.equal l1 l2) then
-       raise_notrace Complicated_moregen;
-     mgen_fast env subst scope maxnodes variance t1 t2;
-     mgen_fast_labeled env subst scope maxnodes variance tl1 tl2
+    (* This is an actual failure, but we raise [Complicated_moregen] so that
+       the slow path can give a nicer error. *)
+    if not (Option.equal String.equal l1 l2) then
+      raise_notrace Complicated_moregen;
+    mgen_fast env subst scope maxnodes variance t1 t2;
+    mgen_fast_labeled env subst scope maxnodes variance tl1 tl2
   | _, _ -> raise_notrace Complicated_moregen
 
 let moregeneral_fast env patt subst subj =
