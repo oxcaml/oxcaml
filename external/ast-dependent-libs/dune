@@ -36,7 +36,7 @@
   js_of_ocaml/js_of_ocaml-ppx.install
   js_of_ocaml/js_of_ocaml.install))
 
-; For duneconf/jsoo-test.ws, which defines runtest-js and runtest-wasm.
+; For js_of_ocaml's dune-workspace, which defines runtest-js and runtest-wasm.
 (alias
  (name jsoo-test)
  (deps
