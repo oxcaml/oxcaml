@@ -1,4 +1,5 @@
 (* TEST
+ flags = "-extension layouts_alpha";
  expect;
 *)
 
@@ -20,7 +21,8 @@ type unit_u : void mod everything
 type unit_u : void mod everything
 |}]
 
-(* Variants whose constructor arguments are all void are immediates *)
+(* Variants whose all-void constructors carry
+   [@immediate_all_void_constructor] are immediates *)
 
 type v : immediate = A of unit_u [@immediate_all_void_constructor]
 [%%expect{|
@@ -127,118 +129,112 @@ type vme : void
 type t = A of vme [@immediate_all_void_constructor]
 |}]
 
-(* All-void records are not allowed *)
-type u1 = #{ a: unit_u }
-type u2 = #{ a: unit_u; b: unit_u }
+(* All-`void` boxed and inline records *)
+
+type u1 = #{ a : unit_u }
+type u2 = #{ a : unit_u; b : unit_u }
 type u3 = { a : unit_u } [@@unboxed]
-type u4 = #{ a: u2 }
-type u5 = #{ a: u3 }
+type nested = #{ a : unit_u; b : #(unit_u * unit_u) }
+type b1 = { a : unit_u }
+type b1_unboxed : void = b1#
+type inline = A of { a : nested }
 [%%expect{|
 type u1 = #{ a : unit_u; }
 type u2 = #{ a : unit_u; b : unit_u; }
 type u3 = { a : unit_u; } [@@unboxed]
-type u4 = #{ a : u2; }
-type u5 = #{ a : u3; }
+type nested = #{ a : unit_u; b : #(unit_u * unit_u); }
+type b1 = { a : unit_u; }
+type b1_unboxed = b1#
+type inline = A of { a : nested; }
 |}]
 
-type bad = { a : unit_u }
+(* Mutability of `void` fields in all-`void` records. *)
+
+type t = A of { x : unit# }
+let set (A r) = r.x <- #()
 [%%expect{|
-Line 1, characters 0-25:
-1 | type bad = { a : unit_u }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Records must contain at least one runtime value.
-|}]
-type bad = { a : #(unit_u * unit_u) }
-[%%expect{|
-Line 1, characters 0-37:
-1 | type bad = { a : #(unit_u * unit_u) }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Records must contain at least one runtime value.
-|}]
-type bad = { a : u1 }
-[%%expect{|
-Line 1, characters 0-21:
-1 | type bad = { a : u1 }
-    ^^^^^^^^^^^^^^^^^^^^^
-Error: Records must contain at least one runtime value.
-|}]
-type bad = { a : u2 }
-[%%expect{|
-Line 1, characters 0-21:
-1 | type bad = { a : u2 }
-    ^^^^^^^^^^^^^^^^^^^^^
-Error: Records must contain at least one runtime value.
-|}]
-type bad = { a : u3 }
-[%%expect{|
-Line 1, characters 0-21:
-1 | type bad = { a : u3 }
-    ^^^^^^^^^^^^^^^^^^^^^
-Error: Records must contain at least one runtime value.
-|}]
-type bad = { a : u4 }
-[%%expect{|
-Line 1, characters 0-21:
-1 | type bad = { a : u4 }
-    ^^^^^^^^^^^^^^^^^^^^^
-Error: Records must contain at least one runtime value.
-|}]
-type bad = { a : u5 }
-[%%expect{|
-Line 1, characters 0-21:
-1 | type bad = { a : u5 }
-    ^^^^^^^^^^^^^^^^^^^^^
-Error: Records must contain at least one runtime value.
+type t = A of { x : unit#; }
+Line 2, characters 16-26:
+2 | let set (A r) = r.x <- #()
+                    ^^^^^^^^^^
+Error: The record field "x" is not mutable
 |}]
 
-type bad = A of { a : unit_u }
+type t : immutable_data = { mutable x : unit# }
 [%%expect{|
-Line 1, characters 11-30:
-1 | type bad = A of { a : unit_u }
-               ^^^^^^^^^^^^^^^^^^^
-Error: Records must contain at least one runtime value.
+Line 1, characters 0-47:
+1 | type t : immutable_data = { mutable x : unit# }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         immutable_data,
+       because mutable fields are not mod immutable.
 |}]
-type bad = A of { a : #(unit_u * unit_u) }
+
+module Bad : sig type t : immutable_data end = struct
+  type t = A of { mutable x : unit# }
+end
 [%%expect{|
-Line 1, characters 11-42:
-1 | type bad = A of { a : #(unit_u * unit_u) }
-               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Records must contain at least one runtime value.
+Lines 1-3, characters 47-3:
+1 | ...............................................struct
+2 |   type t = A of { mutable x : unit# }
+3 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = A of { mutable x : unit#; } end
+       is not included in
+         sig type t : immutable_data end
+       Type declarations do not match:
+         type t = A of { mutable x : unit#; }
+       is not included in
+         type t : immutable_data
+       The kind of the first is mutable_data
+         because of the definition of t at line 2, characters 2-37.
+       But the kind of the first must be a subkind of immutable_data
+         because of the definition of t at line 1, characters 17-40.
 |}]
-type bad = A of { a : u1 }
+
+(* An abstract void field contributes with-bounds despite occupying no space. *)
+
+type record : immutable_data with key = { x : key }
+type inline_record : immutable_data with key = A of { x : key }
 [%%expect{|
-Line 1, characters 11-26:
-1 | type bad = A of { a : u1 }
-               ^^^^^^^^^^^^^^^
-Error: Records must contain at least one runtime value.
+type record = { x : key; }
+type inline_record = A of { x : key; }
 |}]
-type bad = A of { a : u2 }
+
+type bad : immutable_data = { x : key }
 [%%expect{|
-Line 1, characters 11-26:
-1 | type bad = A of { a : u2 }
-               ^^^^^^^^^^^^^^^
-Error: Records must contain at least one runtime value.
+Line 1, characters 0-39:
+1 | type bad : immutable_data = { x : key }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         immutable_data,
+       because key is not mod forkable unyielding many stateless immutable.
 |}]
-type bad = A of { a : u3 }
+
+type bad : immutable_data = A of { x : key }
 [%%expect{|
-Line 1, characters 11-26:
-1 | type bad = A of { a : u3 }
-               ^^^^^^^^^^^^^^^
-Error: Records must contain at least one runtime value.
+Line 1, characters 0-44:
+1 | type bad : immutable_data = A of { x : key }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         immutable_data,
+       because key is not mod forkable unyielding many stateless immutable.
 |}]
-type bad = A of { a : u4 }
+
+(* Refining a generic field to void preserves mutability. *)
+
+type ('a : any) generic = A of { mutable x : 'a }
+type bad : immutable_data = unit# generic
 [%%expect{|
-Line 1, characters 11-26:
-1 | type bad = A of { a : u4 }
-               ^^^^^^^^^^^^^^^
-Error: Records must contain at least one runtime value.
-|}]
-type bad = A of { a : u5 }
-[%%expect{|
-Line 1, characters 11-26:
-1 | type bad = A of { a : u5 }
-               ^^^^^^^^^^^^^^^
-Error: Records must contain at least one runtime value.
+type ('a : any) generic = A of { mutable x : 'a; }
+Line 2, characters 0-41:
+2 | type bad : immutable_data = unit# generic
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "unit# generic" is mutable_data
+         because of the definition of generic at line 1, characters 0-49.
+       But the kind of type "unit# generic" must be a subkind of immutable_data
+         because of the definition of bad at line 2, characters 0-41.
 |}]
 
 (* [void] in arrays is not yet allowed *)
@@ -310,8 +306,8 @@ Line 1, characters 29-30:
 Error: Types whose layout contains [void] are not yet supported in arrays.
 |}]
 
-(* [@immediate_all_void_constructor] is required on constructors whose arguments
-   are all void, and optional elsewhere. *)
+(* [@immediate_all_void_constructor] makes a constructor whose arguments are
+   all void an immediate; without it, such a constructor is a block. *)
 
 type t = A of unit_u [@immediate_all_void_constructor]
 [%%expect{|
@@ -341,35 +337,23 @@ module type S =
   sig type t = A of unit_u [@immediate_all_void_constructor] end
 |}]
 
-(* Missing attribute *)
+(* Without the attribute *)
 
 type t = A of unit_u
 [%%expect{|
-Line 1, characters 9-20:
-1 | type t = A of unit_u
-             ^^^^^^^^^^^
-Error: All arguments of the constructor "A" are void, so it must be
-       annotated with "[@immediate_all_void_constructor]".
+type t = A of unit_u
 |}]
 
 type t = A of #(unit_u * unit_u) | B of int
 [%%expect{|
-Line 1, characters 9-32:
-1 | type t = A of #(unit_u * unit_u) | B of int
-             ^^^^^^^^^^^^^^^^^^^^^^^
-Error: All arguments of the constructor "A" are void, so it must be
-       annotated with "[@immediate_all_void_constructor]".
+type t = A of #(unit_u * unit_u) | B of int
 |}]
 
 module type S = sig
   type t = A of unit_u
 end
 [%%expect{|
-Line 2, characters 11-22:
-2 |   type t = A of unit_u
-               ^^^^^^^^^^^
-Error: All arguments of the constructor "A" are void, so it must be
-       annotated with "[@immediate_all_void_constructor]".
+module type S = sig type t = A of unit_u end
 |}]
 
 (* A misplaced attribute is a warning, not an error, so the type is still
