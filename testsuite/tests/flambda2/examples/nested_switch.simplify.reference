@@ -36,7 +36,5 @@ let $camlNested_switch__cell1 =
   Block 0 ($camlNested_switch__f_2)
 and $camlNested_switch__cell0 =
   Block 0 ($camlNested_switch__test_1)
-and $camlNested_switch =
-  Block 0 ($camlNested_switch__test_1, $camlNested_switch__f_2)
 in
-cont done ($camlNested_switch)
+cont done (0)

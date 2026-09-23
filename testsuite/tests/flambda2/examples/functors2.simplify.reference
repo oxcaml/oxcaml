@@ -43,7 +43,5 @@ and $camlFunctors2__cell1 =
   Block 0 ($camlFunctors2__F2_2)
 and $camlFunctors2__cell0 =
   Block 0 ($camlFunctors2__F1_1)
-and $camlFunctors2 =
-  Block 0 ($camlFunctors2__F1_1, $camlFunctors2__F2_2, $camlFunctors2__F3_3)
 in
-cont done ($camlFunctors2)
+cont done (0)

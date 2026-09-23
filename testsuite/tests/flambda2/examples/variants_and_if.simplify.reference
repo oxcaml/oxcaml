@@ -33,7 +33,5 @@ apply ccall noalloc
       Block 0 ($camlVariants_and_if__f_2)
     and $camlVariants_and_if__cell0 =
       Block 0 ($camlVariants_and_if__Foo_1)
-    and $camlVariants_and_if =
-      Block 0 ($camlVariants_and_if__Foo_1, $camlVariants_and_if__f_2)
     in
-    cont done ($camlVariants_and_if)
+    cont done (0)

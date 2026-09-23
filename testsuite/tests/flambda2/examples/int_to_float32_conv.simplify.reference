@@ -24,7 +24,5 @@ let $camlInt_to_float32_conv__cell1 =
   Block 0 ($camlInt_to_float32_conv__b_3)
 and $camlInt_to_float32_conv__cell0 =
   Block 0 ($camlInt_to_float32_conv__a_1)
-and $camlInt_to_float32_conv =
-  Block 0 ($camlInt_to_float32_conv__a_1, $camlInt_to_float32_conv__b_3)
 in
-cont done ($camlInt_to_float32_conv)
+cont done (0)

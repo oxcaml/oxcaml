@@ -31,8 +31,5 @@ let $camlInlining_cost_of_primitive_on_parameters__cell1 =
   Block 0 ($camlInlining_cost_of_primitive_on_parameters__g_2)
 and $camlInlining_cost_of_primitive_on_parameters__cell0 =
   Block 0 ($camlInlining_cost_of_primitive_on_parameters__f_1)
-and $camlInlining_cost_of_primitive_on_parameters =
-  Block 0 ($camlInlining_cost_of_primitive_on_parameters__f_1,
-           $camlInlining_cost_of_primitive_on_parameters__g_2)
 in
-cont done ($camlInlining_cost_of_primitive_on_parameters)
+cont done (0)

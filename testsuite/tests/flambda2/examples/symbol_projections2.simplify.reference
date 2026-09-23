@@ -53,9 +53,5 @@ and $camlSymbol_projections2__cell1 =
   Block 0 (v)
 and $camlSymbol_projections2__cell0 =
   Block 0 ($camlSymbol_projections2__ignore_1)
-and $camlSymbol_projections2 =
-  Block 0 ($camlSymbol_projections2__ignore_1,
-           v,
-           $camlSymbol_projections2__g_2)
 in
-cont done ($camlSymbol_projections2)
+cont done (0)

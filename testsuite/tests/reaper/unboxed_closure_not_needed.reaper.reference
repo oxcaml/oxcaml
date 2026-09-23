@@ -42,5 +42,4 @@
         where k1 =
           cont k))
   where k define_root_symbol =
-    let $camlUnboxed_closure_not_needed = Block 0 () in
-    cont done ($camlUnboxed_closure_not_needed)
+    cont done (0)

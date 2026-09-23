@@ -54,7 +54,7 @@ let[@tail_mod_cons] rec map f = function
             (seq (setfield_ptr(heap-init)_computed dst offset block)
               (apply map_dps block 1 f (field_imm 1 param) tailcall)))
           (setfield_ptr(heap-init)_computed dst offset 0))))
-  (apply (field_imm 1 (global Toploop!)) "map" map))
+  (apply (field_imm 1 (global Toploop!/0)) "map" map))
 val map : ('a -> 'b) -> 'a list -> 'b list = <fun>
 |}]
 
@@ -113,7 +113,7 @@ let[@tail_mod_cons] rec rec_map f = function
                   block))
               (apply rec_map_dps block 1 f (field_imm 1 *match*) tailcall)))
           (setfield_ptr(heap-init)_computed dst offset 0))))
-  (apply (field_imm 1 (global Toploop!)) "rec_map" rec_map))
+  (apply (field_imm 1 (global Toploop!/0)) "rec_map" rec_map))
 val rec_map : ('a -> 'b) -> 'a rec_list -> 'b rec_list = <fun>
 |}]
 
@@ -207,7 +207,7 @@ let[@tail_mod_cons] rec trip = function
                     block1_arg0 block)))
               (apply trip_dps block 1 (field_imm 1 param) tailcall)))
           (setfield_ptr(heap-init)_computed dst offset 0))))
-  (apply (field_imm 1 (global Toploop!)) "trip" trip))
+  (apply (field_imm 1 (global Toploop!/0)) "trip" trip))
 val trip : 'a list -> ('a * int) list = <fun>
 |}]
 
@@ -282,7 +282,7 @@ let[@tail_mod_cons] rec effects f = function
                   block0_arg0 block))
               (apply effects_dps block 1 f (field_imm 1 param) tailcall)))
           (setfield_ptr(heap-init)_computed dst offset 0))))
-  (apply (field_imm 1 (global Toploop!)) "effects" effects))
+  (apply (field_imm 1 (global Toploop!/0)) "effects" effects))
 val effects : ('a -> 'b) -> ('a * 'a) list -> 'b list = <fun>
 |}]
 
@@ -358,7 +358,7 @@ let[@tail_mod_cons] rec map_stutter f xs =
                 (seq (setfield_ptr(heap-init)_computed block 1 block)
                   (apply map_stutter_dps block 1 f (field_imm 1 xs) tailcall)))
               (setfield_ptr(heap-init)_computed block 1 0))))))
-  (apply (field_imm 1 (global Toploop!)) "map_stutter" map_stutter))
+  (apply (field_imm 1 (global Toploop!/0)) "map_stutter" map_stutter))
 val map_stutter : ('a option -> 'b) -> 'a list -> 'b list = <fun>
 |}]
 
@@ -435,6 +435,6 @@ type 'a stream = { hd : 'a; tl : unit -> 'a stream; }
                   block0_arg0 block))
               (apply smap_stutter_dps block 1 f (apply (field_imm 1 xs) 0)
                 (%int_sub n 1) tailcall))))))
-  (apply (field_imm 1 (global Toploop!)) "smap_stutter" smap_stutter))
+  (apply (field_imm 1 (global Toploop!/0)) "smap_stutter" smap_stutter))
 val smap_stutter : ('a option -> 'b) -> 'a stream -> int -> 'b list = <fun>
 |}]

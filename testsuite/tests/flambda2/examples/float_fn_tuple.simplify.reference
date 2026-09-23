@@ -38,7 +38,5 @@ let $camlFloat_fn_tuple__cell1 =
   Block 0 ($camlFloat_fn_tuple__f_3)
 and $camlFloat_fn_tuple__cell0 =
   Block 0 ($camlFloat_fn_tuple__g_2)
-and $camlFloat_fn_tuple =
-  Block 0 ($camlFloat_fn_tuple__g_2, $camlFloat_fn_tuple__f_3)
 in
-cont done ($camlFloat_fn_tuple)
+cont done (0)

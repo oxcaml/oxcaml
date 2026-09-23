@@ -116,8 +116,5 @@ let $camlArrays_compatibility__cell1 =
   Block 0 ($camlArrays_compatibility__f_6)
 and $camlArrays_compatibility__cell0 =
   Block 0 ($camlArrays_compatibility__Pmakeblock_5)
-and $camlArrays_compatibility =
-  Block 0 ($camlArrays_compatibility__Pmakeblock_5,
-           $camlArrays_compatibility__f_6)
 in
-cont done ($camlArrays_compatibility)
+cont done (0)

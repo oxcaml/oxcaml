@@ -1,0 +1,19 @@
+external box_float : float# -> float = "%box_float"
+- : int = 11
+- : int = 3
+- : float = 4.
+- : int = five
+- : int = 5
+module type S =
+  sig
+    val f : int -> int
+    val n : int
+    val u : float#
+    val print_int : Format.formatter -> int -> unit
+  end
+module W : S
+- : int = 13
+- : float = 4.
+- : int = 3
+- : int = 6
+

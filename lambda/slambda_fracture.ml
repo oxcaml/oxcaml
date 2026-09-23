@@ -676,7 +676,7 @@ and fracture_prim lambda prim args loc =
     | _ -> wrong_arity ~expected:arity
   in
   match prim with
-  | Pgetglobal (cu, Static) ->
+  | Pgetglobal (cu, _, Static) ->
     check_arity ~arity:0;
     SLhalves { sval_comptime = SLglobal cu; sval_runtime = lambda }
   | Pmakeblock (_, (Immutable | Immutable_unique), _, _) ->
@@ -718,7 +718,7 @@ and fracture_prim lambda prim args loc =
           })
   (* Dynamic output *)
   | Pbytes_to_string | Pbytes_of_string | Pignore
-  | Pgetglobal (_, Dynamic)
+  | Pgetglobal (_, _, Dynamic)
   | Pgetpredef _
   | Pmakeblock (_, Mutable, _, _)
   | Pmakefloatblock _ | Pmakeufloatblock _ | Pmakelazyblock _

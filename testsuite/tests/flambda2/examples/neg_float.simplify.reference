@@ -31,9 +31,5 @@ and $camlNeg_float__cell1 =
   Block 0 ($camlNeg_float__make_pos_float_4)
 and $camlNeg_float__cell0 =
   Block 0 ($camlNeg_float__float_0)
-and $camlNeg_float =
-  Block 0 ($camlNeg_float__float_0,
-           $camlNeg_float__make_pos_float_4,
-           $camlNeg_float__make_neg_float_6)
 in
-cont done ($camlNeg_float)
+cont done (0)

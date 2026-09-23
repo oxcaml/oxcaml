@@ -24,7 +24,5 @@ in
 let $camlN_way_join_preserves_null__f_1 = closure f_0_1 @f &toplevel in
 let $camlN_way_join_preserves_null__cell0 =
   Block 0 ($camlN_way_join_preserves_null__f_1)
-and $camlN_way_join_preserves_null =
-  Block 0 ($camlN_way_join_preserves_null__f_1)
 in
-cont done ($camlN_way_join_preserves_null)
+cont done (0)

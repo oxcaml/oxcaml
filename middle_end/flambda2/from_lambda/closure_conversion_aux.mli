@@ -50,6 +50,11 @@ module IR : sig
         }
         (** [Begin_region] and [End_region] are needed because these primitives
             don't exist in Lambda *)
+    | Module_block_cell of Compilation_unit.t * int
+        (** The block holding field [i] of the given unit's module block (see
+            [Symbol.for_module_block_cell]); there is no Lambda term for it.
+            Emitted by [Lambda_to_flambda] for [Foo.x] so that a field read does
+            not rebuild [Foo]'s whole block. *)
     | Prim of
         { prim : Lambda.primitive;
           args : simple list list;

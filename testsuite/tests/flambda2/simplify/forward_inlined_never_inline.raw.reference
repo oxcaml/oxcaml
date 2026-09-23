@@ -73,9 +73,7 @@ let $camlForward_inlined_never_inline__first_const_0 = Block 0 () in
     let field_2 = %block_load.tag[`0`].`size`[`5`].[`2`] (module_block) in
     let field_3 = %block_load.tag[`0`].`size`[`5`].[`3`] (module_block) in
     let field_4 = %block_load.tag[`0`].`size`[`5`].[`4`] (module_block) in
-    let $camlForward_inlined_never_inline =
-      Block 0 (field_0, field_1, field_2, field_3, field_4)
-    and $camlForward_inlined_never_inline__cell0 =
+    let $camlForward_inlined_never_inline__cell0 =
       Block 0 (field_0)
     and $camlForward_inlined_never_inline__cell1 =
       Block 0 (field_1)
@@ -86,4 +84,4 @@ let $camlForward_inlined_never_inline__first_const_0 = Block 0 () in
     and $camlForward_inlined_never_inline__cell4 =
       Block 0 (field_4)
     in
-    cont done ($camlForward_inlined_never_inline)
+    cont done (0)

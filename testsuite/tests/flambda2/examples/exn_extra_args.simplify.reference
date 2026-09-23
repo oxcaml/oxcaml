@@ -69,8 +69,5 @@ let $camlExn_extra_args__cell1 =
   Block 0 ($camlExn_extra_args__ld_conf_contents_2)
 and $camlExn_extra_args__cell0 =
   Block 0 ($camlExn_extra_args__input_line_1)
-and $camlExn_extra_args =
-  Block 0 ($camlExn_extra_args__input_line_1,
-           $camlExn_extra_args__ld_conf_contents_2)
 in
-cont done ($camlExn_extra_args)
+cont done (0)

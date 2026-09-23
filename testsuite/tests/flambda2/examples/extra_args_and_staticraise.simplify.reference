@@ -29,7 +29,5 @@ in
 let $camlExtra_args_and_staticraise__f_1 = closure f_0_1 @f &toplevel in
 let $camlExtra_args_and_staticraise__cell0 =
   Block 0 ($camlExtra_args_and_staticraise__f_1)
-and $camlExtra_args_and_staticraise =
-  Block 0 ($camlExtra_args_and_staticraise__f_1)
 in
-cont done ($camlExtra_args_and_staticraise)
+cont done (0)

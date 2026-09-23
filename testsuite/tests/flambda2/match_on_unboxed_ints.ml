@@ -50,12 +50,8 @@ let $camlTOP1__map_ints_to_float_constants_1 =
   closure map_ints_to_float_constants_0_1 @map_ints_to_float_constants
     &toplevel
 in
-let $camlTOP1__cell0 =
-  Block 0 ($camlTOP1__map_ints_to_float_constants_1)
-and $camlTOP1 =
-  Block 0 ($camlTOP1__map_ints_to_float_constants_1)
-in
-cont done ($camlTOP1)
+let $camlTOP1__cell0 = Block 0 ($camlTOP1__map_ints_to_float_constants_1) in
+cont done (0)
 |}]
 
 let map_tagged_ints_to_float_constants = function
@@ -93,10 +89,8 @@ let $camlTOP2__map_tagged_ints_to_float_constants_4 =
 in
 let $camlTOP2__cell0 =
   Block 0 ($camlTOP2__map_tagged_ints_to_float_constants_4)
-and $camlTOP2 =
-  Block 0 ($camlTOP2__map_tagged_ints_to_float_constants_4)
 in
-cont done ($camlTOP2)
+cont done (0)
 |}]
 
 
@@ -115,10 +109,10 @@ let match_on_ints = function
 [%%expect_fexpr Simplify{|
 module_block_cells ($camlTOP7__cell0)
 let code match_on_ints_6 deleted in
-let opaque_fun4 = %block_load.[`0`] ($TOP6.camlTOP6) in
-let opaque_fun3 = %block_load.[`0`] ($TOP5.camlTOP5) in
-let opaque_fun2 = %block_load.[`0`] ($TOP4.camlTOP4) in
-let opaque_fun1 = %block_load.[`0`] ($TOP3.camlTOP3) in
+let opaque_fun4 = %block_load.[`0`] ($TOP6.camlTOP6__cell0) in
+let opaque_fun3 = %block_load.[`0`] ($TOP5.camlTOP5__cell0) in
+let opaque_fun2 = %block_load.[`0`] ($TOP4.camlTOP4__cell0) in
+let opaque_fun1 = %block_load.[`0`] ($TOP3.camlTOP3__cell0) in
 let $camlTOP7__match_on_ints_20 =
   closure match_on_ints_6_1 @match_on_ints &toplevel
 and code loopify(never) size(88) newer_version_of(match_on_ints_6)
@@ -181,12 +175,8 @@ and code loopify(never) size(88) newer_version_of(match_on_ints_6)
     opaque_fun4 = opaque_fun4
   }
 in
-let $camlTOP7__cell0 =
-  Block 0 ($camlTOP7__match_on_ints_20)
-and $camlTOP7 =
-  Block 0 ($camlTOP7__match_on_ints_20)
-in
-cont done ($camlTOP7)
+let $camlTOP7__cell0 = Block 0 ($camlTOP7__match_on_ints_20) in
+cont done (0)
 |}]
 
 
@@ -200,10 +190,10 @@ let match_on_tagged_ints = function
 [%%expect_fexpr Simplify{|
 module_block_cells ($camlTOP8__cell0)
 let code match_on_tagged_ints_7 deleted in
-let opaque_fun4 = %block_load.[`0`] ($TOP6.camlTOP6) in
-let opaque_fun3 = %block_load.[`0`] ($TOP5.camlTOP5) in
-let opaque_fun2 = %block_load.[`0`] ($TOP4.camlTOP4) in
-let opaque_fun1 = %block_load.[`0`] ($TOP3.camlTOP3) in
+let opaque_fun4 = %block_load.[`0`] ($TOP6.camlTOP6__cell0) in
+let opaque_fun3 = %block_load.[`0`] ($TOP5.camlTOP5__cell0) in
+let opaque_fun2 = %block_load.[`0`] ($TOP4.camlTOP4__cell0) in
+let opaque_fun1 = %block_load.[`0`] ($TOP3.camlTOP3__cell0) in
 let $camlTOP8__match_on_tagged_ints_23 =
   closure match_on_tagged_ints_7_1 @match_on_tagged_ints &toplevel
 and code loopify(never) size(61) newer_version_of(match_on_tagged_ints_7)
@@ -253,10 +243,6 @@ and code loopify(never) size(61) newer_version_of(match_on_tagged_ints_7)
     opaque_fun4 = opaque_fun4
   }
 in
-let $camlTOP8__cell0 =
-  Block 0 ($camlTOP8__match_on_tagged_ints_23)
-and $camlTOP8 =
-  Block 0 ($camlTOP8__match_on_tagged_ints_23)
-in
-cont done ($camlTOP8)
+let $camlTOP8__cell0 = Block 0 ($camlTOP8__match_on_tagged_ints_23) in
+cont done (0)
 |}]

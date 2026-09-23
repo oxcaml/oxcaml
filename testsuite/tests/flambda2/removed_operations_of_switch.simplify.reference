@@ -34,8 +34,5 @@ let $camlRemoved_operations_of_switch__cell1 =
   Block 0 ($camlRemoved_operations_of_switch__g_2)
 and $camlRemoved_operations_of_switch__cell0 =
   Block 0 ($camlRemoved_operations_of_switch__f_1)
-and $camlRemoved_operations_of_switch =
-  Block 0 ($camlRemoved_operations_of_switch__f_1,
-           $camlRemoved_operations_of_switch__g_2)
 in
-cont done ($camlRemoved_operations_of_switch)
+cont done (0)

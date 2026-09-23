@@ -27,7 +27,7 @@ type t
 
     [reachable_names] specifies which names are reachable from outside the
     compilation unit (same terminology as used in [Flambda_cmx]). *)
-val create : module_symbol:Symbol.t -> reachable_names:Name_occurrences.t -> t
+val create : reachable_names:Name_occurrences.t -> t
 
 (** Translate an existing [Symbol.t] to a Cmm symbol. *)
 val symbol : t -> Symbol.t -> Cmm.symbol
@@ -58,10 +58,6 @@ val add_gc_roots : t -> Symbol.t list -> t
 
 (** Register a function that has been translated to Cmm. *)
 val add_function : t -> Cmm.fundecl -> t
-
-(** Record the given symbol as having been defined. This is used to keep track
-    of whether the module block symbol for the current unit has been defined. *)
-val check_for_module_symbol : t -> Symbol.t -> t
 
 (** Caching of symbols associated with [Invalid] messages. *)
 val add_invalid_message_symbol : t -> Symbol.t -> message:string -> t

@@ -70,21 +70,24 @@ external ndl_run_toplevel: string -> string -> res
 let default_lookup sym =
   Dynlink.unsafe_get_global_value ~bytecode_or_asm_symbol:sym
 
-let global_symbol comp_unit =
+(* The cell holding logical field [i] of [comp_unit]'s module block (native
+   code emits one cell per field and no module block). *)
+let global_cell comp_unit i =
   let lookup =
     match !jit with
       | None -> default_lookup
       | Some {Jit.lookup_symbol; _} -> lookup_symbol
   in
   let linkage_name =
-    Symbol.for_compilation_unit comp_unit
+    Symbol.for_module_block_cell comp_unit i
     |> Symbol.linkage_name
     |> Linkage_name.to_string
   in
   match lookup linkage_name with
   | None ->
-    fatal_error ("Opttoploop.global_symbol " ^
-      (Compilation_unit.full_path_as_string comp_unit))
+    fatal_error ("Opttoploop.global_cell " ^
+      (Compilation_unit.full_path_as_string comp_unit) ^
+      " " ^ Int.to_string i)
   | Some obj -> obj
 
 let need_symbol sym =
@@ -146,7 +149,7 @@ let close_phrase lam =
     let layout = Lambda.layout_of_module_field repr pos in
     let glob =
       Lprim (mod_field pos repr,
-             [Lprim (Pgetglobal (glb, Static), [], Loc_unknown)],
+             [Lprim (Pgetglobal (glb, repr, Static), [], Loc_unknown)],
              Loc_unknown)
     in
     Llet(Strict, layout, id, Lambda.debug_uid_none, glob, l)
@@ -154,15 +157,15 @@ let close_phrase lam =
 
 (* Return the value referred to by a path *)
 
-(* Like [Obj.field], but handles field reordering in mixed modules.
-   Returns [None] if the selected field is not a value, [Some field] otherwise.
-   Copied from [Topcommon] *)
-let mod_field obj (module_repr : Lambda.module_representation) pos =
+(* The physical index of logical field [pos] in a block with representation
+   [module_repr], handling field reordering in mixed modules. Returns [None] if
+   the selected field is not a value. Adapted from [Topcommon.mod_field]. *)
+let value_field_index (module_repr : Lambda.module_representation) pos =
   if not !Clflags.native_code then
-    Some (Obj.field obj pos)
+    Some pos
   else
   match module_repr with
-  | Module_value_only _ -> Some (Obj.field obj pos)
+  | Module_value_only _ -> Some pos
   | Module_mixed (shape, _) ->
     let shape =
       Mixed_block_shape.of_mixed_block_elements shape
@@ -176,29 +179,58 @@ let mod_field obj (module_repr : Lambda.module_representation) pos =
     Option.bind new_pos
       (fun new_pos ->
         if new_pos < Mixed_block_shape.value_prefix_len shape
-        then Some (Obj.field obj new_pos)
+        then Some new_pos
         else None (* [pos] points to an unboxed singleton *))
 
+(* Like [Obj.field] on a module block. *)
+let mod_field obj module_repr pos =
+  Option.map (Obj.field obj) (value_field_index module_repr pos)
+
+(* Logical field [pos] of [cu]'s module block, read from its cell. A cell
+   holding a value is a one-field block. *)
+let cell_field cu module_repr pos =
+  Option.map
+    (fun _ -> Obj.field (global_cell cu pos) 0)
+    (value_field_index module_repr pos)
+
+let non_value_error () =
+  Location.raise_errorf
+    ~loc:Location.none
+    "Opttoploop.eval_address: Can't return a non-value"
+
 let rec eval_address = function
-  | Env.Aunit (cu, _) ->
-      global_symbol cu
-  | Env.Alocal id ->
-      let glob, pos, repr = toplevel_value id in
-      begin match mod_field (global_symbol glob) repr pos with
-      | Some field -> field
-      | None ->
+  | Env.Aunit (cu, repr, _) ->
+      (* No module block is emitted; rebuild one from the cells. *)
+      begin match Lambda.transl_module_representation repr with
+      | Module_value_only { field_count } ->
+        let block = Obj.new_block 0 field_count in
+        for i = 0 to field_count - 1 do
+          Obj.set_field block i (Obj.field (global_cell cu i) 0)
+        done;
+        block
+      | Module_mixed _ ->
         Location.raise_errorf
           ~loc:Location.none
-          "Opttoploop.eval_address: Can't return a non-value"
+          "Opttoploop.eval_address: cannot evaluate a module with unboxed \
+           fields as a value in the toplevel"
+      end
+  | Env.Alocal id ->
+      let glob, pos, repr = toplevel_value id in
+      begin match cell_field glob repr pos with
+      | Some field -> field
+      | None -> non_value_error ()
+      end
+  | Env.Adot(Env.Aunit (cu, _, _), module_repr, pos) ->
+      let module_repr = Lambda.transl_module_representation module_repr in
+      begin match cell_field cu module_repr pos with
+      | Some field -> field
+      | None -> non_value_error ()
       end
   | Env.Adot(a, module_repr, pos) ->
       let module_repr = Lambda.transl_module_representation module_repr in
       begin match mod_field (eval_address a) module_repr pos with
       | Some field -> field
-      | None ->
-        Location.raise_errorf
-          ~loc:Location.none
-          "Opttoploop.eval_address: Can't return a non-value"
+      | None -> non_value_error ()
       end
 
 let eval_path find env path =
@@ -388,7 +420,7 @@ let load_tlambda ppf ~compilation_unit ~required_globals tlam repr =
 
 let outval_of_id env id val_lpoly val_type =
   let glob, pos, (repr : Lambda.module_representation) = toplevel_value id in
-  match mod_field (global_symbol glob) repr pos with
+  match cell_field glob repr pos with
   | Some obj_to_print -> outval_of_value env obj_to_print val_lpoly val_type
   | None -> Oval_stuff "<abstr>"
 

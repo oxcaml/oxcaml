@@ -98,7 +98,5 @@ apply ccall noalloc
                 Block 0 ($camlLazy_invalid__foo_1)
               and $camlLazy_invalid__cell0 =
                 Block 0 (region_return)
-              and $camlLazy_invalid =
-                Block 0 (region_return, $camlLazy_invalid__foo_1, t)
               in
-              cont done ($camlLazy_invalid)))
+              cont done (0)))

@@ -108,14 +108,5 @@ and $camlTests15__cell1 =
   Block 0 ($camlTests15__is_c_6)
 and $camlTests15__cell0 =
   Block 0 ($camlTests15__list_to_array_5)
-and $camlTests15 =
-  Block 0 ($camlTests15__list_to_array_5,
-           $camlTests15__is_c_6,
-           $camlTests15__set_to_x_7,
-           $camlTests15__classical_id_8,
-           $camlTests15__swapped_9,
-           $camlTests15__negate_10,
-           $camlTests15__immstring_4,
-           $camlTests15__foo_11)
 in
-cont done ($camlTests15)
+cont done (0)

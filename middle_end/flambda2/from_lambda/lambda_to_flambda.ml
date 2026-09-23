@@ -468,6 +468,22 @@ let name_if_not_var acc ccenv name simple kind body =
       [id, id_duid, kind]
       Not_user_visible (IR.Simple simple) ~body:(body id)
 
+(* [Foo.x] reads field [pos] of [Foo]'s module block. Native code keeps each
+   field in its own cell instead of a block (see [Pgetglobal] in
+   [Closure_conversion]), so read the cell directly rather than rebuilding the
+   whole block only to project one field from it. *)
+let module_block_cell_projection (prim : L.primitive) (args : L.lambda list) =
+  if !Clflags.jsir
+  then None
+  else
+    match[@ocaml.warning "-fragile-match"] prim, args with
+    | Pfield (pos, ptr, sem), [Lprim (Pgetglobal (cu, _, _), [], _)] ->
+      Some (cu, pos, L.Pfield (0, ptr, sem))
+    | ( Pmixedfield (pos :: path, shape, sem),
+        [Lprim (Pgetglobal (cu, _, _), [], _)] ) ->
+      Some (cu, pos, L.Pmixedfield (0 :: path, [| shape.(pos) |], sem))
+    | _, _ -> None
+
 let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
     (k_exn : Continuation.t) : Expr_with_acc.t =
   match lam with
@@ -596,6 +612,27 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
     CC.close_let acc ccenv
       [id, Flambda_debug_uid.of_lambda_debug_uid duid, kind]
       (is_user_visible env id) (Simple (Const const)) ~body
+  | Llet
+      ( ((Strict | Alias | StrictOpt) as let_kind),
+        layout,
+        id,
+        duid,
+        Lprim (prim, args, loc),
+        body )
+    when Option.is_some (module_block_cell_projection prim args) ->
+    let cu, pos, prim = Option.get (module_block_cell_projection prim args) in
+    let cell_id = Ident.create_local "module_block_cell" in
+    let body acc ccenv =
+      cps acc env ccenv
+        (L.Llet
+           (let_kind, layout, id, duid, Lprim (prim, [Lvar cell_id], loc), body))
+        k k_exn
+    in
+    CC.close_let acc ccenv
+      [cell_id, Flambda_debug_uid.none, Flambda_kind.With_subkind.any_value]
+      Not_user_visible
+      (Module_block_cell (cu, pos))
+      ~body
   | Llet
       ( ((Strict | Alias | StrictOpt) as let_kind),
         layout,

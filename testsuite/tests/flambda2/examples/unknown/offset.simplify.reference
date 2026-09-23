@@ -193,9 +193,5 @@ apply direct(partial_apply1_44 &toplevel) inlined(never)
                      Block 0 ($camlOffset__h_5)
                    and $camlOffset__cell0 =
                      Block 0 ($camlOffset__inline_1)
-                   and $camlOffset =
-                     Block 0 ($camlOffset__inline_1,
-                              $camlOffset__h_5,
-                              $camlOffset__h_8)
                    in
-                   cont done ($camlOffset))))
+                   cont done (0))))

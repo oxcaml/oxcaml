@@ -2,18 +2,7 @@
  global "camlCells_cmm__gc_roots":
  addr G:"camlCells_cmm__cell4"
  addr G:"camlCells_cmm__cell1"
- addr G:"camlCells_cmm"
  int 0)
-(data
- int 360287970189647616
- global "camlCells_cmm":
- addr G:"camlCells_cmm__f_1"
- int 1
- int 13
- int 1
- double 4.
- double 5.
- double 7.)
 (data int 1792 global "camlCells_cmm__cell0": addr G:"camlCells_cmm__f_1")
 (data int 1792 global "camlCells_cmm__cell1": int 1)
 (data int 72057594037929728 global "camlCells_cmm__cell2": double 4.)
@@ -24,19 +13,16 @@
  global "camlCells_cmm__f_1":
  addr G:"camlCells_cmm__f_0_1_code"
  int 108086391056891909)
-(function{cells_cmm.ml:38,6-15} camlCells_cmm__f_0_1_code (x/0: int) : int
+(function{cells_cmm.ml:40,6-15} camlCells_cmm__f_0_1_code (x/0: int) : int
  (+ x/0 2) )
 
 (function no_cse reduce_code_size linscan camlCells_cmm__entry () : val
  (catch
    (let n/0 (opaque 7)
      (extcall "caml_initialize" G:"camlCells_cmm__cell1" n/0 ->unit) 1
-     (extcall "caml_initialize" (+a G:"camlCells_cmm" 8) n/0 ->unit) 1
      (let Popaque/0 (opaque 17)
        (extcall "caml_initialize" G:"camlCells_cmm__cell4" Popaque/0 ->unit)
-       1
-       (extcall "caml_initialize" (+a G:"camlCells_cmm" 24) Popaque/0 ->unit)
-       1 (exit 2 G:"camlCells_cmm")))
+       1 (exit 2 1)))
  with(2 *ret*/0: val) 1) )
 
 (data)

@@ -75,11 +75,9 @@ module_block_cells ($camlUnboxable_local_param__cell0
   where k define_root_symbol (module_block) =
     let field_0 = %block_load.tag[`0`].`size`[`2`].[`0`] (module_block) in
     let field_1 = %block_load.tag[`0`].`size`[`2`].[`1`] (module_block) in
-    let $camlUnboxable_local_param =
-      Block 0 (field_0, field_1)
-    and $camlUnboxable_local_param__cell0 =
+    let $camlUnboxable_local_param__cell0 =
       Block 0 (field_0)
     and $camlUnboxable_local_param__cell1 =
       Block 0 (field_1)
     in
-    cont done ($camlUnboxable_local_param)
+    cont done (0)

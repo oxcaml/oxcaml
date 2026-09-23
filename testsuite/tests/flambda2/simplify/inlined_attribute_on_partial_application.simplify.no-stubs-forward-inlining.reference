@@ -37,9 +37,5 @@ apply direct(f_0_1 &toplevel)
       Block 0 ($camlInlined_attribute_on_partial_application__partial_f_2)
     and $camlInlined_attribute_on_partial_application__cell0 =
       Block 0 ($camlInlined_attribute_on_partial_application__f_1)
-    and $camlInlined_attribute_on_partial_application =
-      Block 0 ($camlInlined_attribute_on_partial_application__f_1,
-               $camlInlined_attribute_on_partial_application__partial_f_2,
-               h)
     in
-    cont done ($camlInlined_attribute_on_partial_application)
+    cont done (0)

@@ -37,8 +37,11 @@ val transl_implementation:
 (* Can only be used when targeting bytecode *)
 val transl_toplevel_definition: structure -> lambda
 
+(* Each component is an implementation member's unit and the representation
+   of its main module block ([None] for an interface-only member). *)
 val transl_package:
-      Compilation_unit.t option list -> module_coercion -> int * lambda
+      (Compilation_unit.t * module_representation) option list
+        -> module_coercion -> int * lambda
 
 type runtime_arg =
   | (* A module from which we need to project out the argument block *)
@@ -52,7 +55,11 @@ type runtime_arg =
       ra_main_repr : module_representation;
     }
   | (* A module to pass in its entirety *)
-    Main_module_block of Compilation_unit.t
+    Main_module_block of {
+      mb_unit : Compilation_unit.t;
+      (* The representation of its main block *)
+      mb_repr : module_representation;
+    }
   | Unit
 
 val transl_instance:

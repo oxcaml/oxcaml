@@ -204,7 +204,8 @@ let build_global_target ~ppf_dump oc ~packed_compilation_unit state members
       (fun m ->
         match m.pm_kind with
         | PM_intf -> None
-        | PM_impl _ -> Some m.pm_packed_name)
+        | PM_impl _ ->
+          Some (m.pm_packed_name, Lambda.bytecode_only_module_representation))
       members
   in
   let main_module_block_size, lam =

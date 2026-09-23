@@ -59,11 +59,5 @@ and $camlForward_inlined_always_inline__cell1 =
   Block 0 ($camlForward_inlined_always_inline__g_2)
 and $camlForward_inlined_always_inline__cell0 =
   Block 0 ($camlForward_inlined_always_inline__f_1)
-and $camlForward_inlined_always_inline =
-  Block 0 ($camlForward_inlined_always_inline__f_1,
-           $camlForward_inlined_always_inline__g_2,
-           $camlForward_inlined_always_inline__call_g_with_default_inlined_3,
-           $camlForward_inlined_always_inline__call_g_with_always_inlined_4,
-           $camlForward_inlined_always_inline__call_g_with_never_inlined_5)
 in
-cont done ($camlForward_inlined_always_inline)
+cont done (0)

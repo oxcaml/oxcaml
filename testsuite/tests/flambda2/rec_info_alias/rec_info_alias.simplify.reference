@@ -31,9 +31,5 @@ let code loopify(never) size(34) newer_version_of(h_0)
   cont k (g)
 in
 let $camlRec_info_alias__h_1 = closure h_0_1 @h &toplevel in
-let $camlRec_info_alias__cell0 =
-  Block 0 ($camlRec_info_alias__h_1)
-and $camlRec_info_alias =
-  Block 0 ($camlRec_info_alias__h_1)
-in
-cont done ($camlRec_info_alias)
+let $camlRec_info_alias__cell0 = Block 0 ($camlRec_info_alias__h_1) in
+cont done (0)

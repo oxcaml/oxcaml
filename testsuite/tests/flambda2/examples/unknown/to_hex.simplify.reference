@@ -264,9 +264,5 @@ apply ccall
            Block 0 ($camlTo_hex__char_hex_14)
          and $camlTo_hex__cell0 =
            Block 0 ($camlTo_hex__Pmakeblock_13)
-         and $camlTo_hex =
-           Block 0 ($camlTo_hex__Pmakeblock_13,
-                    $camlTo_hex__char_hex_14,
-                    $camlTo_hex__to_hex_15)
          in
-         cont done ($camlTo_hex))
+         cont done (0))

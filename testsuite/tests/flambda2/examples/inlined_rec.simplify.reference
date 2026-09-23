@@ -47,7 +47,5 @@ apply direct(fact_1_1 &toplevel)
       Block 0 ($camlInlined_rec__fact_2)
     and $camlInlined_rec__cell0 =
       Block 0 ($camlInlined_rec__apply_1)
-    and $camlInlined_rec =
-      Block 0 ($camlInlined_rec__apply_1, $camlInlined_rec__fact_2, i)
     in
-    cont done ($camlInlined_rec)
+    cont done (0)

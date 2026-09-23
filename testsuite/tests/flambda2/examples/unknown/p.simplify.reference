@@ -45,7 +45,5 @@ and $camlP__cell1 =
   Block 0 ($camlP__bar_2)
 and $camlP__cell0 =
   Block 0 ($camlP__foo_1)
-and $camlP =
-  Block 0 ($camlP__foo_1, $camlP__bar_2, $camlP__f_4)
 in
-cont done ($camlP)
+cont done (0)

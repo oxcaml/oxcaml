@@ -12,7 +12,5 @@ let $camlOver_app_kind_check_simplify__test_1 =
 in
 let $camlOver_app_kind_check_simplify__cell0 =
   Block 0 ($camlOver_app_kind_check_simplify__test_1)
-and $camlOver_app_kind_check_simplify =
-  Block 0 ($camlOver_app_kind_check_simplify__test_1)
 in
-cont done ($camlOver_app_kind_check_simplify)
+cont done (0)

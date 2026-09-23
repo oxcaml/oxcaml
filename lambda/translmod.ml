@@ -1097,7 +1097,7 @@ let scan_used_globals lam =
   let rec scan lam =
     Lambda.iter_head_constructor scan lam;
     match lam with
-      Lprim ((Pgetglobal (cu, _)), _, _) ->
+      Lprim ((Pgetglobal (cu, _, _)), _, _) ->
         globals := Compilation_unit.Set.add cu !globals
     | _ -> ()
   in
@@ -1295,7 +1295,9 @@ let toploop_getvalue id =
   Lapply{
     ap_loc=Loc_unknown;
     ap_func=Lprim(Pfield (toploop_getvalue_pos, Pointer, Reads_agree),
-                  [Lprim(Pgetglobal (toploop_unit, Dynamic), [], Loc_unknown)],
+                  [Lprim(Pgetglobal (toploop_unit,
+                                     bytecode_only_module_representation,
+                                     Dynamic), [], Loc_unknown)],
                   Loc_unknown);
     ap_args=[Lconst(Const_base(
       Const_string (toplevel_name id, Location.none, None)))];
@@ -1318,7 +1320,9 @@ let toploop_setvalue id lam =
   Lapply{
     ap_loc=Loc_unknown;
     ap_func=Lprim(Pfield (toploop_setvalue_pos, Pointer, Reads_agree),
-                  [Lprim(Pgetglobal (toploop_unit, Dynamic), [], Loc_unknown)],
+                  [Lprim(Pgetglobal (toploop_unit,
+                                     bytecode_only_module_representation,
+                                     Dynamic), [], Loc_unknown)],
                   Loc_unknown);
     ap_args=
       [Lconst(Const_base(
@@ -1491,7 +1495,7 @@ let transl_toplevel_definition str =
 
 let get_component = function
     None -> Lconst const_unit
-  | Some id -> Lprim(Pgetglobal (id, Dynamic), [], Loc_unknown)
+  | Some (id, repr) -> Lprim(Pgetglobal (id, repr, Dynamic), [], Loc_unknown)
 
 let () =
   match Jkind.Sort.Const.for_module with
@@ -1516,22 +1520,27 @@ type runtime_arg =
       ra_field_idx : int;
       ra_main_repr : module_representation;
     }
-  | Main_module_block of Compilation_unit.t
+  | Main_module_block of {
+      mb_unit : Compilation_unit.t;
+      mb_repr : module_representation;
+    }
   | Unit
 
 let unit_of_runtime_arg arg =
   match arg with
-  | Argument_block { ra_unit = cu; _ } | Main_module_block cu -> Some cu
+  | Argument_block { ra_unit = cu; _ } | Main_module_block { mb_unit = cu; _ }
+    -> Some cu
   | Unit -> None
 
 let transl_runtime_arg arg =
   match arg with
   | Argument_block { ra_unit; ra_field_idx; ra_main_repr } ->
       Lprim (mod_field ra_field_idx ra_main_repr,
-             [Lprim (Pgetglobal (ra_unit, Dynamic), [], Loc_unknown)],
+             [Lprim (Pgetglobal (ra_unit, ra_main_repr, Dynamic), [],
+                     Loc_unknown)],
              Loc_unknown)
-  | Main_module_block cu ->
-      Lprim (Pgetglobal (cu, Dynamic), [], Loc_unknown)
+  | Main_module_block { mb_unit; mb_repr } ->
+      Lprim (Pgetglobal (mb_unit, mb_repr, Dynamic), [], Loc_unknown)
   | Unit ->
       lambda_unit
 
@@ -1545,8 +1554,10 @@ let transl_instance_impl
   let instantiating_functor_lam =
     (* Any parameterised module has a block with exactly one field, namely the
        instantiating functor (see [Lambda.main_module_block_format]) *)
-    Lprim (mod_field 0 (Module_value_only { field_count = 1 }),
-      [Lprim (Pgetglobal (base_compilation_unit, Dynamic), [], Loc_unknown)],
+    let repr = Module_value_only { field_count = 1 } in
+    Lprim (mod_field 0 repr,
+      [Lprim (Pgetglobal (base_compilation_unit, repr, Dynamic), [],
+              Loc_unknown)],
       Loc_unknown)
   in
   let runtime_args_lam = List.map transl_runtime_arg runtime_args in
@@ -1645,7 +1656,9 @@ let rec transl_maybe_local_instance ~(gm : Global_module.t) ~chain
   if Global_module.is_complete gm
   then
     let cu = Compilation_unit.of_complete_global_exn gm in
-    let lam = Lprim (Pgetglobal (cu, Dynamic), [], Loc_unknown) in
+    let ui_format, _arg_descr = find_impl_by_name ~chain cu in
+    let repr = main_module_representation ui_format in
+    let lam = Lprim (Pgetglobal (cu, repr, Dynamic), [], Loc_unknown) in
     (lam, module_map, rev_bindings)
   else transl_local_instance ~gm ~chain ~find_impl_by_name ~param_map
          ~module_map ~rev_bindings
@@ -1753,9 +1766,10 @@ and bind_local_instance ~(gm : Global_module.t) ~chain
       runtime_params
   in
   let func =
+    let repr = Module_value_only { field_count = 1 } in
     Lprim
-      ( mod_field 0 (Module_value_only { field_count = 1 }),
-        [Lprim (Pgetglobal (cu, Dynamic), [], Loc_unknown)],
+      ( mod_field 0 repr,
+        [Lprim (Pgetglobal (cu, repr, Dynamic), [], Loc_unknown)],
         Loc_unknown )
   in
   let rhs =

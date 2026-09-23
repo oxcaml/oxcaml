@@ -35,9 +35,5 @@ and $camlFunction_never_returns__cell1 =
   Block 0 ($camlFunction_never_returns__foo_2)
 and $camlFunction_never_returns__cell0 =
   Block 0 ($camlFunction_never_returns__f_1)
-and $camlFunction_never_returns =
-  Block 0 ($camlFunction_never_returns__f_1,
-           $camlFunction_never_returns__foo_2,
-           $camlFunction_never_returns__bar_3)
 in
-cont done ($camlFunction_never_returns)
+cont done (0)

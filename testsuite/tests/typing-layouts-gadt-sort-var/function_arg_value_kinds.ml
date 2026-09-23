@@ -22,7 +22,7 @@ let f : type a. a rep -> a -> int = fun Block (a, _b) -> a
        (if param
          (raise (makeblock 0 (getpredef Match_failure!!) [0: "" 1 40]))
          (field_imm 0 param))))
-  (apply (field_imm 1 (global Toploop!)) "f" f))
+  (apply (field_imm 1 (global Toploop!/0)) "f" f))
 val f : 'a rep -> 'a -> int = <fun>
 |}]
 
@@ -33,7 +33,7 @@ let g : type a. a rep -> a -> int = fun r x ->
 [%%expect{|
 (let
   (g = (function {nlocal = 0} r[value<int>] x : int (if r x (field_imm 0 x))))
-  (apply (field_imm 1 (global Toploop!)) "g" g))
+  (apply (field_imm 1 (global Toploop!/0)) "g" g))
 val g : 'a rep -> 'a -> int = <fun>
 |}]
 
@@ -50,7 +50,7 @@ let h b =
          (if param
            (raise (makeblock 0 (getpredef Match_failure!!) [0: "" 2 50]))
            (field_imm 0 param)))))
-  (apply (field_imm 1 (global Toploop!)) "h" h))
+  (apply (field_imm 1 (global Toploop!/0)) "h" h))
 val h : bool -> int = <fun>
 |}]
 
@@ -63,7 +63,7 @@ let fst2 (p : int * int) = match p with a, _b -> a
      (function {nlocal = 0}
        p[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>] : int
        (field_imm 0 p)))
-  (apply (field_imm 1 (global Toploop!)) "fst2" fst2))
+  (apply (field_imm 1 (global Toploop!/0)) "fst2" fst2))
 val fst2 : int * int -> int = <fun>
 |}]
 
@@ -75,7 +75,7 @@ let get (o : int option) = match o with Some x -> x | None -> 0
   (get =
      (function {nlocal = 0} o[value<(consts (0)) (non_consts ([0: ?]))>]
        : int (if o (field_imm 0 o) 0)))
-  (apply (field_imm 1 (global Toploop!)) "get" get))
+  (apply (field_imm 1 (global Toploop!/0)) "get" get))
 val get : int option -> int = <fun>
 |}]
 
@@ -91,7 +91,7 @@ let i : (int * int) rep -> int * int -> int = fun Block (a, _b) -> a
      (function {nlocal = 0} param[value<int>]
        param[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>]
        : int (field_imm 0 param)))
-  (apply (field_imm 1 (global Toploop!)) "i" i))
+  (apply (field_imm 1 (global Toploop!/0)) "i" i))
 val i : (int * int) rep -> int * int -> int = <fun>
 |}]
 
@@ -108,7 +108,7 @@ let j (type a) (r : a rep) : a -> int =
            param[value<
                   (consts ()) (non_consts ([0: value<int>, value<int>]))>]
            : int (field_imm 0 param)))))
-  (apply (field_imm 1 (global Toploop!)) "j" j))
+  (apply (field_imm 1 (global Toploop!/0)) "j" j))
 val j : 'a rep -> 'a -> int = <fun>
 |}]
 
@@ -125,7 +125,7 @@ type _ only = Only : (int * int) only
      (function {nlocal = 0} param[value<int>]
        param[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>]
        : int (field_imm 0 param)))
-  (apply (field_imm 1 (global Toploop!)) "k" k))
+  (apply (field_imm 1 (global Toploop!/0)) "k" k))
 val k : 'a only -> 'a -> int = <fun>
 |}]
 
@@ -146,7 +146,7 @@ type _ ab = A : int ab | B : bool ab
        : int
        (if (field_imm 0 param) (if (field_imm 1 param) 1 0)
          (field_imm 1 param))))
-  (apply (field_imm 1 (global Toploop!)) "m" m))
+  (apply (field_imm 1 (global Toploop!/0)) "m" m))
 val m : 'a ab * 'a -> int = <fun>
 |}]
 
@@ -162,7 +162,7 @@ let n : type a. a rep * a -> int = function
        param[value<(consts ()) (non_consts ([0: value<int>, *]))>] : int
        (if (field_imm 0 param) (field_imm 1 param)
          (field_imm 0 (field_imm 1 param)))))
-  (apply (field_imm 1 (global Toploop!)) "n" n))
+  (apply (field_imm 1 (global Toploop!/0)) "n" n))
 val n : 'a rep * 'a -> int = <fun>
 |}]
 
@@ -196,7 +196,7 @@ type _ rep2 = RI : im rep2 | RS : sm rep2
        (if (field_imm 0 param)
          (string.length (mixedfield 0  (*,float64) (field_imm 1 param)))
          (mixedfield 0  (value<int>,float64) (field_imm 1 param)))))
-  (apply (field_imm 1 (global Toploop!)) "mixed" mixed))
+  (apply (field_imm 1 (global Toploop!/0)) "mixed" mixed))
 val mixed : 'a rep2 * 'a -> int = <fun>
 |}]
 
@@ -225,7 +225,7 @@ type _ rep3 = RF : fa rep3 | RG : fb rep3
        (if (field_imm 0 param)
          (mixedfield 0  (value<int>,float32) (field_imm 1 param))
          (mixedfield 0  (value<int>,float64) (field_imm 1 param)))))
-  (apply (field_imm 1 (global Toploop!)) "mixed_flat" mixed_flat))
+  (apply (field_imm 1 (global Toploop!/0)) "mixed_flat" mixed_flat))
 val mixed_flat : 'a rep3 * 'a -> int = <fun>
 |}]
 
@@ -242,6 +242,6 @@ let p : type a. a rep -> int * int -> int = fun Block (x, _y) -> x
        (if param
          (raise (makeblock 0 (getpredef Match_failure!!) [0: "" 1 48]))
          (field_imm 0 param))))
-  (apply (field_imm 1 (global Toploop!)) "p" p))
+  (apply (field_imm 1 (global Toploop!/0)) "p" p))
 val p : 'a rep -> int * int -> int = <fun>
 |}]

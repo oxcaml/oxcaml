@@ -48,5 +48,4 @@
         where k1 (apply_result_1 : imm tagged) =
           cont k ($camlUnboxed_closure_not_needed__s1)))
   where k define_root_symbol (module_block) =
-    let $camlUnboxed_closure_not_needed = Block 0 () in
-    cont done ($camlUnboxed_closure_not_needed)
+    cont done (0)

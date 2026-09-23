@@ -46,10 +46,5 @@ let $camlFrom_odoc_texi__foo_3 = closure foo_1_1 @foo &toplevel in
       Block 0 (esc_8bits)
     and $camlFrom_odoc_texi__cell0 =
       Block 0 ($`camlFrom_odoc_texi__!_2`)
-    and $camlFrom_odoc_texi =
-      Block 0 ($`camlFrom_odoc_texi__!_2`,
-               esc_8bits,
-               $camlFrom_odoc_texi__foo_3,
-               y)
     in
-    cont done ($camlFrom_odoc_texi)
+    cont done (0)

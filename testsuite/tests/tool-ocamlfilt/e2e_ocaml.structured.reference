@@ -71,7 +71,6 @@ _CamlU9E2e_ocamlM9Make_pairF7make_N_M_code                                      
 _CamlU9E2e_ocamlM9Make_pairF7swap_N_M_code                                          (error)                           E2e_ocaml.Make_pair.swap_N                                     E2e_ocaml.Make_pair.swap_N
 _CamlU9E2e_ocamlO6circleF5fn_N_M_code                                               (error)                           E2e_ocaml.circle.fn_N                                          E2e_ocaml.circle.fn_N
 _CamlU9E2e_ocamlO7point2dF5fn_N_M_code                                              (error)                           E2e_ocaml.point2d.fn_N                                         E2e_ocaml.point2d.fn_N
-camlE2e_ocaml                                                                       E2e_ocaml                         (error)                                                        E2e_ocaml
 camlE2e_ocaml__$3e$3e$3d_N                                                          E2e_ocaml.>>=_N                   (error)                                                        E2e_ocaml.>>=_N
 camlE2e_ocaml__$3e$3e$7c_N                                                          E2e_ocaml.>>|_N                   (error)                                                        E2e_ocaml.>>|_N
 camlE2e_ocaml__.$25$28$29$3c$2d_N                                                   E2e_ocaml..%()<-_N                (error)                                                        E2e_ocaml..%()<-_N

@@ -32,7 +32,5 @@ let $camlResult_types_of_identity__always_0_3 =
 in
 let $camlResult_types_of_identity__cell0 =
   Block 0 ($camlResult_types_of_identity__always_0_3)
-and $camlResult_types_of_identity =
-  Block 0 ($camlResult_types_of_identity__always_0_3)
 in
-cont done ($camlResult_types_of_identity)
+cont done (0)

@@ -45,7 +45,10 @@ let module_symbol t = t.module_symbol
 
 let module_block_cells t = t.module_block_cells
 
-let root_symbols t = t.module_symbol :: t.module_block_cells
+let root_symbols t =
+  if !Clflags.jsir
+  then t.module_symbol :: t.module_block_cells
+  else t.module_block_cells
 
 let with_body t body = { t with body }
 

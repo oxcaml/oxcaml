@@ -30,9 +30,5 @@ let code loopify(never) size(35) newer_version_of(f_0)
              | 1 -> k1 pop(regular k1) ($camlWeird__Pmakeblock_3))
 in
 let $camlWeird__f_4 = closure f_0_1 @f &toplevel in
-let $camlWeird__cell0 =
-  Block 0 ($camlWeird__f_4)
-and $camlWeird =
-  Block 0 ($camlWeird__f_4)
-in
-cont done ($camlWeird)
+let $camlWeird__cell0 = Block 0 ($camlWeird__f_4) in
+cont done (0)

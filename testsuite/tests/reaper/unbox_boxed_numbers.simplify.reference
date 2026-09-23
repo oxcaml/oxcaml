@@ -340,14 +340,5 @@ and $camlUnbox_boxed_numbers__cell1 =
   Block 0 ($camlUnbox_boxed_numbers__test_int32_5)
 and $camlUnbox_boxed_numbers__cell0 =
   Block 0 ($camlUnbox_boxed_numbers__test_int64_4)
-and $camlUnbox_boxed_numbers =
-  Block 0 ($camlUnbox_boxed_numbers__test_int64_4,
-           $camlUnbox_boxed_numbers__test_int32_5,
-           $camlUnbox_boxed_numbers__test_nativeint_6,
-           $camlUnbox_boxed_numbers__test_float_9,
-           $camlUnbox_boxed_numbers__test_float32_10,
-           $camlUnbox_boxed_numbers__test_value_slot_11,
-           $camlUnbox_boxed_numbers__test_value_slot_not_unboxed_12,
-           $camlUnbox_boxed_numbers__test_pair_15)
 in
-cont done ($camlUnbox_boxed_numbers)
+cont done (0)

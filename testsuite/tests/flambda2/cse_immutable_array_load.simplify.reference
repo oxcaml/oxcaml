@@ -10,7 +10,5 @@ in
 let $camlCse_immutable_array_load__f_1 = closure f_0_1 @f &toplevel in
 let $camlCse_immutable_array_load__cell0 =
   Block 0 ($camlCse_immutable_array_load__f_1)
-and $camlCse_immutable_array_load =
-  Block 0 ($camlCse_immutable_array_load__f_1)
 in
-cont done ($camlCse_immutable_array_load)
+cont done (0)

@@ -74,7 +74,5 @@ in
 let $camlArguments_for_unboxed_closure__f_1 = closure f_0_1 @f &toplevel in
 let $camlArguments_for_unboxed_closure__cell0 =
   Block 0 ($camlArguments_for_unboxed_closure__f_1)
-and $camlArguments_for_unboxed_closure =
-  Block 0 ($camlArguments_for_unboxed_closure__f_1)
 in
-cont done ($camlArguments_for_unboxed_closure)
+cont done (0)

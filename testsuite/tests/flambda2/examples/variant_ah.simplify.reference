@@ -39,7 +39,5 @@ let $camlVariant_ah__cell1 =
   Block 0 ($camlVariant_ah__shouldn't_alloc_2)
 and $camlVariant_ah__cell0 =
   Block 0 ($camlVariant_ah__maybe_1)
-and $camlVariant_ah =
-  Block 0 ($camlVariant_ah__maybe_1, $camlVariant_ah__shouldn't_alloc_2)
 in
-cont done ($camlVariant_ah)
+cont done (0)

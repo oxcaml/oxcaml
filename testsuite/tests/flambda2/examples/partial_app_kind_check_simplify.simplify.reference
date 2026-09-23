@@ -12,7 +12,5 @@ let $camlPartial_app_kind_check_simplify__test_1 =
 in
 let $camlPartial_app_kind_check_simplify__cell0 =
   Block 0 ($camlPartial_app_kind_check_simplify__test_1)
-and $camlPartial_app_kind_check_simplify =
-  Block 0 ($camlPartial_app_kind_check_simplify__test_1)
 in
-cont done ($camlPartial_app_kind_check_simplify)
+cont done (0)

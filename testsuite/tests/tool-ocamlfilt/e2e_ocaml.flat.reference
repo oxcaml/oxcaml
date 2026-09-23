@@ -1,5 +1,4 @@
 SYMBOL                                                           FLAT1                                           STRUCTURED  AUTO
-camlE2e_ocaml                                                    E2e_ocaml                                       (error)     E2e_ocaml
 camlE2e_ocaml__$3e$3e$3d_N_M_code                                E2e_ocaml.>>=_N_M_code                          (error)     E2e_ocaml.>>=_N_M_code
 camlE2e_ocaml__$3e$3e$3d_N                                       E2e_ocaml.>>=_N                                 (error)     E2e_ocaml.>>=_N
 camlE2e_ocaml__$3e$3e$7c_N_M_code                                E2e_ocaml.>>|_N_M_code                          (error)     E2e_ocaml.>>|_N_M_code

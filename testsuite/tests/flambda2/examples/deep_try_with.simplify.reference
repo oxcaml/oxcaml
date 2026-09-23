@@ -59,7 +59,5 @@ apply ccall noalloc
                 Block 0 ($camlDeep_try_with__E2_3)
               and $camlDeep_try_with__cell0 =
                 Block 0 ($camlDeep_try_with__E1_2)
-              and $camlDeep_try_with =
-                Block 0 ($camlDeep_try_with__E1_2, $camlDeep_try_with__E2_3)
               in
-              cont done ($camlDeep_try_with)))
+              cont done (0)))

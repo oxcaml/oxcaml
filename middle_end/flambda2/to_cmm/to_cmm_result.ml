@@ -24,20 +24,16 @@ type t =
     symbols : Cmm.symbol String.Map.t;
     (* This map is only used for symbols not directly translated from
        [Symbol.t], e.g. module entry point names. *)
-    module_symbol : Symbol.t;
-    module_symbol_defined : bool;
     invalid_message_symbols : Symbol.t String.Map.t
   }
 
-let create ~module_symbol ~reachable_names =
+let create ~reachable_names =
   { gc_roots = [];
     data_list = [];
     functions = [];
     current_data = [];
     reachable_names;
     symbols = String.Map.empty;
-    module_symbol;
-    module_symbol_defined = false;
     invalid_message_symbols = String.Map.empty
   }
 
@@ -93,17 +89,6 @@ let symbol_of_code_id res code_id ~currently_in_inlined_body : Cmm.symbol =
 
 (* *)
 
-let check_for_module_symbol t symbol =
-  if Symbol.equal symbol t.module_symbol
-  then (
-    if t.module_symbol_defined
-    then
-      Misc.fatal_errorf
-        "check_for_module_symbol %a: Module block symbol (%a) already defined"
-        Symbol.print symbol Symbol.print t.module_symbol;
-    { t with module_symbol_defined = true })
-  else t
-
 let defines_a_symbol data =
   match (data : Cmm.data_item) with
   | Cdefine_symbol _ -> true
@@ -152,17 +137,6 @@ type result =
     functions : Cmm.phrase list
   }
 
-let define_module_symbol_if_missing r =
-  if r.module_symbol_defined
-  then r
-  else
-    let linkage_name =
-      Linkage_name.to_string (Symbol.linkage_name r.module_symbol)
-    in
-    let sym : Cmm.symbol = { sym_name = linkage_name; sym_global = Global } in
-    let l = C.emit_block sym (C.black_block_header 0 0) [] in
-    set_data r l
-
 let add_invalid_message_symbol t symbol ~message =
   { t with
     invalid_message_symbols =
@@ -173,8 +147,6 @@ let invalid_message_symbol t ~message =
   String.Map.find_opt message t.invalid_message_symbols
 
 let to_cmm r =
-  (* Make sure the module symbol is defined *)
-  let r = define_module_symbol_if_missing r in
   (* Make sure we do not forget any current data *)
   let r = archive_data r in
   let sorted_functions =

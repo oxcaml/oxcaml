@@ -119,7 +119,5 @@ let $camlSymbol_projections6__immstring_0 = "FOO" in
       Block 0 ($camlSymbol_projections6__f_1)
     and $camlSymbol_projections6__cell0 =
       Block 0 (foo)
-    and $camlSymbol_projections6 =
-      Block 0 (foo, $camlSymbol_projections6__f_1)
     in
-    cont done ($camlSymbol_projections6)
+    cont done (0)

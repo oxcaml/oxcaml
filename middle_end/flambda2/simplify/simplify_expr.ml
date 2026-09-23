@@ -159,11 +159,21 @@ and[@inline always] simplify_let dacc let_expr ~down_to_up =
   Simplify_let_expr.simplify_let ~simplify_expr ~simplify_function_body dacc
     let_expr ~down_to_up
 
-let simplify_toplevel dacc expr ~return_continuation ~return_arity
+let simplify_toplevel dacc expr ~root_symbols ~return_continuation ~return_arity
     ~exn_continuation =
   let params = Bound_parameters.empty in
   let implicit_params = Bound_parameters.empty in
+  let root_names =
+    List.fold_left
+      (fun names sym -> NO.add_symbol names sym Name_mode.normal)
+      NO.empty root_symbols
+  in
   simplify_toplevel_common dacc
-    (fun dacc -> simplify_expr dacc expr)
+    (fun dacc ->
+      let dacc =
+        DA.map_flow_acc dacc
+          ~f:(Flow.Acc.add_used_in_current_handler root_names)
+      in
+      simplify_expr dacc expr)
     ~params ~implicit_params ~return_continuation ~return_arity
     ~exn_continuation

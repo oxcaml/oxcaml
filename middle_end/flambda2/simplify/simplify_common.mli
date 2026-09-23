@@ -73,9 +73,12 @@ type 'a expr_simplifier =
     (Rebuilt_expr.t * Upwards_acc.t, Rebuilt_expr.t * Upwards_acc.t) down_to_up ->
   Rebuilt_expr.t * Upwards_acc.t
 
+(** [root_symbols] are kept alive whether or not the body references them (the
+    module block cells, which the unit's initialiser no longer returns). *)
 type simplify_toplevel =
   Downwards_acc.t ->
   Expr.t ->
+  root_symbols:Symbol.t list ->
   return_continuation:Continuation.t ->
   return_arity:[`Unarized] Flambda_arity.t ->
   exn_continuation:Continuation.t ->

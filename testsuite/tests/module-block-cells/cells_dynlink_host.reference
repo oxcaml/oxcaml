@@ -1,0 +1,6 @@
+host after plugin: !r = 42
+host after nocmx: !r = 43
+plugin fields: f 1 = 101, n = 5, !r = 1
+plugin whole: f 1 = 101, n = 5, !r = 1
+nocmx fields: f 1 = 101, n = 5, !r = 42
+nocmx whole: f 1 = 101, n = 5, !r = 42

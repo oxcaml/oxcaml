@@ -187,7 +187,37 @@ let instantiate
                Global_module.subst_inside global arg_subst
                |> Compilation_unit.of_complete_global_exn
              in
-             Main_module_block instance
+             (* The instance's block representation is recorded both in its
+                own compiled form and in its base's (as the representation
+                the instantiating functor returns); build layouts differ in
+                which of the two is on the load path. *)
+             let base_unit, _ = CU.split_instance_exn instance in
+             let cm_of unit = CU.base_filename unit ^ expected_extension in
+             let find_format unit =
+               match Load_path.find_normalized (cm_of unit) with
+               | filename -> Some (read_unit_info filename).ui_format
+               | exception Not_found -> None
+             in
+             let format =
+               match find_format instance with
+               | Some format -> format
+               | None ->
+                 match find_format base_unit with
+                 | Some format -> format
+                 | None ->
+                   Location.raise_errorf
+                     "@[<hov>Cannot find %s or %s on the load path,@ \
+                      required by %a.@]"
+                     (cm_of instance) (cm_of base_unit)
+                     CU.print compilation_unit
+             in
+             let mb_repr =
+               match format with
+               | Mb_struct { mb_repr } -> mb_repr
+               | Mb_instantiating_functor { mb_returned_repr; _ } ->
+                 mb_returned_repr
+             in
+             Main_module_block { mb_unit = instance; mb_repr }
            | Rp_unit ->
              Unit)
   in

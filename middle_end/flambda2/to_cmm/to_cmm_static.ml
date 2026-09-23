@@ -364,7 +364,6 @@ let static_const0 env res ~updates (bound_static : Bound_static.Pattern.t)
          statically-allocated values"
         Symbol.print s);
     let sym = R.symbol res s in
-    let res = R.check_for_module_symbol res s in
     let field_kinds, header =
       let tag = Tag.Scannable.to_int tag in
       let num_fields = List.length fields in

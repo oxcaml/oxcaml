@@ -32,6 +32,7 @@ type 'a expr_simplifier =
 type simplify_toplevel =
   Downwards_acc.t ->
   Expr.t ->
+  root_symbols:Symbol.t list ->
   return_continuation:Continuation.t ->
   return_arity:[`Unarized] Flambda_arity.t ->
   exn_continuation:Continuation.t ->

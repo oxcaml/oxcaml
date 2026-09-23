@@ -12,7 +12,5 @@ in
 let $camlCse_needing_canonicalisation__f_1 = closure f_0_1 @f &toplevel in
 let $camlCse_needing_canonicalisation__cell0 =
   Block 0 ($camlCse_needing_canonicalisation__f_1)
-and $camlCse_needing_canonicalisation =
-  Block 0 ($camlCse_needing_canonicalisation__f_1)
 in
-cont done ($camlCse_needing_canonicalisation)
+cont done (0)

@@ -66,6 +66,6 @@ in
                 | 0 -> k
                 | 1 -> error pop(regular error) ($camlTOP3__Pmakeblock_4)))
   where k =
-    let $camlTOP3__cell0 = Block 0 (0) and $camlTOP3 = Block 0 (0) in
-    cont done ($camlTOP3)
+    let $camlTOP3__cell0 = Block 0 (0) in
+    cont done (0)
 |}]

@@ -1,0 +1,4 @@
+Pack_a.x = 11, !Pack_a.r = 12
+Pack_b.f 1 = 12, Pack_b.s = b
+whole: Pack_a.x = 11, Pack_b.f 1 = 12, Pack_b.s = b
+after WA.r := 7: !Pack_a.r = 7, !W.Pack_a.r = 7

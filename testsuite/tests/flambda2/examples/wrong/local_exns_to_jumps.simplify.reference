@@ -227,12 +227,5 @@ apply ccall noalloc
            Block 0 ($camlLocal_exns_to_jumps__f1_3)
          and $camlLocal_exns_to_jumps__cell0 =
            Block 0 ($camlLocal_exns_to_jumps__Exit_2)
-         and $camlLocal_exns_to_jumps =
-           Block 0 ($camlLocal_exns_to_jumps__Exit_2,
-                    $camlLocal_exns_to_jumps__f1_3,
-                    $camlLocal_exns_to_jumps__f2_4,
-                    $camlLocal_exns_to_jumps__f3_5,
-                    $camlLocal_exns_to_jumps__Exit2_6,
-                    $camlLocal_exns_to_jumps__f4_7)
          in
-         cont done ($camlLocal_exns_to_jumps))
+         cont done (0))

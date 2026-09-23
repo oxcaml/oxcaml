@@ -90,10 +90,7 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
       (Flambda_unit.return_continuation flambda_unit)
       ~param_types:(List.map snd return_cont_params)
   in
-  let r =
-    R.create ~reachable_names
-      ~module_symbol:(Flambda_unit.module_symbol flambda_unit)
-  in
+  let r = R.create ~reachable_names in
   let body, body_free_vars, body_symbol_inits, res =
     To_cmm_expr.expr env r (Flambda_unit.body flambda_unit)
   in

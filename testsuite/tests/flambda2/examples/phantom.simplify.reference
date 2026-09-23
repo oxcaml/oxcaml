@@ -268,7 +268,5 @@ let $camlPhantom__cell1 =
   Block 0 ($camlPhantom__Make2_8)
 and $camlPhantom__cell0 =
   Block 0 ($camlPhantom__Make_5)
-and $camlPhantom =
-  Block 0 ($camlPhantom__Make_5, $camlPhantom__Make2_8)
 in
-cont done ($camlPhantom)
+cont done (0)

@@ -223,19 +223,21 @@ let eval (expr : 'a expr) =
   (match Jit.jit_load_program ~phrase_name:input_name ppf program with
   | Result _ -> ()
   | Exception exn -> raise exn);
+  (* Native code emits no module block, only per-field cells; cell 0 is a
+     one-field block holding module field 0. *)
   let linkage_name =
-    Symbol.for_compilation_unit compilation_unit
+    Symbol.for_module_block_cell compilation_unit 0
     |> Symbol.linkage_name |> Linkage_name.to_string
   in
-  let struct_obj =
+  let cell_obj =
     match Jit.jit_lookup_symbol linkage_name with
-    | Some struct_obj -> struct_obj
+    | Some cell_obj -> cell_obj
     | None ->
       failwith
-        ("Cannot find module block symbol '" ^ linkage_name
+        ("Cannot find module block cell symbol '" ^ linkage_name
        ^ "' which should have been output by the JIT")
   in
-  let obj = Obj.field struct_obj 0 in
+  let obj = Obj.field cell_obj 0 in
   (Obj.obj obj : 'a eval)
 
 let compile_mutex = Mutex.create ()

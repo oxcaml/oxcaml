@@ -65,7 +65,8 @@ type summary =
   (* CR zqian: track [add_lock] as well *)
 
 type address = Persistent_env.address =
-  | Aunit of Compilation_unit.t * Mode.With_regionality.l
+  | Aunit of
+      Compilation_unit.t * Jkind_types.Sort.t array * Mode.With_regionality.l
   | Alocal of Ident.t
   | Adot of address * Jkind_types.Sort.t array * int
 

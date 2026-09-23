@@ -74,7 +74,5 @@ let $camlUnroll2__cell1 =
   Block 0 ($camlUnroll2__bar_2)
 and $camlUnroll2__cell0 =
   Block 0 ($camlUnroll2__foo_1)
-and $camlUnroll2 =
-  Block 0 ($camlUnroll2__foo_1, $camlUnroll2__bar_2)
 in
-cont done ($camlUnroll2)
+cont done (0)

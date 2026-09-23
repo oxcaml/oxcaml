@@ -45,7 +45,5 @@ let $camlUnboxing_gadt__cell1 =
   Block 0 ($camlUnboxing_gadt__baz_2)
 and $camlUnboxing_gadt__cell0 =
   Block 0 ($camlUnboxing_gadt__f_1)
-and $camlUnboxing_gadt =
-  Block 0 ($camlUnboxing_gadt__f_1, $camlUnboxing_gadt__baz_2)
 in
-cont done ($camlUnboxing_gadt)
+cont done (0)

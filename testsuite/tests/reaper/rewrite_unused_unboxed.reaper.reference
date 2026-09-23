@@ -53,7 +53,5 @@ apply direct(Make_2_1 &toplevel)
   where k =
     let $camlRewrite_unused_unboxed__cell0 =
       Block 0 ($camlRewrite_unused_unboxed__print_int_1)
-    and $camlRewrite_unused_unboxed =
-      Block 0 ($camlRewrite_unused_unboxed__print_int_1)
     in
-    cont done ($camlRewrite_unused_unboxed)
+    cont done (0)

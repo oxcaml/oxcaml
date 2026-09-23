@@ -37,7 +37,5 @@ apply direct(fact_0_1 &toplevel) inlining_state(depth(40))
       Block 0 (int_mul_3)
     and $camlUnroll__cell0 =
       Block 0 ($camlUnroll__fact_1)
-    and $camlUnroll =
-      Block 0 ($camlUnroll__fact_1, int_mul_3, 720)
     in
-    cont done ($camlUnroll)
+    cont done (0)

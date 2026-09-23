@@ -44,7 +44,5 @@ and $camlToplevel_rec__cell1 =
   Block 0 ($camlToplevel_rec__f_1)
 and $camlToplevel_rec__cell0 =
   Block 0 (z)
-and $camlToplevel_rec =
-  Block 0 (z, $camlToplevel_rec__f_1, $camlToplevel_rec__g_2)
 in
-cont done ($camlToplevel_rec)
+cont done (0)

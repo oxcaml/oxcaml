@@ -41,7 +41,5 @@ let $camlTests5__cell1 =
   Block 0 ($camlTests5__g_2)
 and $camlTests5__cell0 =
   Block 0 ($camlTests5__f_1)
-and $camlTests5 =
-  Block 0 ($camlTests5__f_1, $camlTests5__g_2)
 in
-cont done ($camlTests5)
+cont done (0)

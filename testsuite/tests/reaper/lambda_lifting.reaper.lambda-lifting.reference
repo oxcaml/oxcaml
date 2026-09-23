@@ -48,7 +48,5 @@ let $camlLambda_lifting__cell1 =
   Block 0 ($camlLambda_lifting__f2_2)
 and $camlLambda_lifting__cell0 =
   Block 0 ($camlLambda_lifting__f1_1)
-and $camlLambda_lifting =
-  Block 0 ($camlLambda_lifting__f1_1, $camlLambda_lifting__f2_2)
 in
-cont done ($camlLambda_lifting)
+cont done (0)
