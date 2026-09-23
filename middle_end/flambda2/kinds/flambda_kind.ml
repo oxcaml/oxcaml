@@ -1053,17 +1053,16 @@ module With_subkind = struct
       | Pvariant { consts; non_consts } -> (
         match consts, non_consts with
         | [], [] -> Misc.fatal_error "[Pvariant] with no constructors at all"
-        | [], [(tag, shape)] when tag = Obj.double_array_tag ->
+        | [], [(tag, shape)] when tag = Obj.double_array_tag -> (
           (* If we have [Obj.double_array_tag] here, this is always an all-float
              block, not an array. *)
           (* CR vlaviron: change the Lambda type *)
-          let num_fields =
-            match shape with
-            | Constructor_shape_uniform fields -> List.length fields
-            | Constructor_shape_mixed _ | Constructor_shape_undetermined ->
-              Misc.fatal_error "Invalid constructor shape for a float record"
-          in
-          Float_block { num_fields }
+          match shape with
+          | Constructor_shape_uniform fields ->
+            Float_block { num_fields = List.length fields }
+          | Constructor_shape_undetermined -> Anything
+          | Constructor_shape_mixed _ ->
+            Misc.fatal_error "Invalid constructor shape for a float record")
         | [], _ :: _ | _ :: _, [] | _ :: _, _ :: _ ->
           let consts =
             Target_ocaml_int.Set.of_list
