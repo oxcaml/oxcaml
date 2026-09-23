@@ -30,6 +30,7 @@ let run ~cmx_loader ~machine_width ~round ~code_slot_offsets unit =
   let toplevel_my_alloc_region = FU.toplevel_my_alloc_region unit in
   let module_symbol = FU.module_symbol unit in
   let module_block_cells = FU.module_block_cells unit in
+  let root_symbols = FU.root_symbols unit in
   let resolver = Flambda_cmx.load_cmx_file_contents cmx_loader in
   let get_imported_code = Flambda_cmx.get_imported_code cmx_loader in
   let denv =
@@ -42,8 +43,8 @@ let run ~cmx_loader ~machine_width ~round ~code_slot_offsets unit =
      remark for the cmx contents) *)
   let dacc = DA.create denv code_slot_offsets Continuation_uses_env.empty in
   let body, uacc =
-    Simplify_expr.simplify_toplevel dacc (FU.body unit)
-      ~root_symbols:(FU.root_symbols unit) ~return_continuation
+    Simplify_expr.simplify_toplevel dacc (FU.body unit) ~root_symbols
+      ~return_continuation
       ~return_arity:(Flambda_arity.create_singletons [K.With_subkind.any_value])
       ~exn_continuation
   in
@@ -81,7 +82,7 @@ let run ~cmx_loader ~machine_width ~round ~code_slot_offsets unit =
   in
   let unit =
     FU.create ~return_continuation ~exn_continuation ~toplevel_my_alloc_region
-      ~module_symbol ~module_block_cells ~body
+      ~module_symbol ~module_block_cells ~root_symbols ~body
   in
   { unit;
     free_names = name_occurrences;

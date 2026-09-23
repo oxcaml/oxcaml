@@ -131,6 +131,8 @@ let function_result_types ~is_a_functor =
 
 let debug () = !Clflags.debug
 
+let emit_module_block () = !Clflags.jsir
+
 let opaque () = !Clflags.opaque
 
 let float_const_prop () = !Clflags.float_const_prop

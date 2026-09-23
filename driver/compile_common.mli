@@ -41,6 +41,11 @@ val unit_info_from_cu_or_output_prefix :
   compilation_unit:compilation_unit_or_inferred ->
   Unit_info.t
 
+val find_impl_on_load_path :
+  Compilation_unit.t -> ext:string -> Misc.filepath option
+(** The compiled implementation of a unit on the load path, if any; [ext] is
+    the compiled object's extension (".cmo" or ".cmx"). *)
+
 val with_info :
   backend:backend ->
   tool_name:string ->

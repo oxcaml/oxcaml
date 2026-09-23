@@ -121,6 +121,7 @@ type starting_point =
       runtime_args : Translmod.runtime_arg list;
       main_module_block_repr : Lambda.module_representation;
       arg_descr : Lambda.arg_descr option;
+      find_format : Compilation_unit.t -> Lambda.main_module_block_format;
     }
 
 let starting_point_of_compiler_pass start_from =
@@ -151,7 +152,8 @@ let implementation_aux ~start_from ~source_file ~output_prefix
       in
       Compile_common.implementation ~hook_parse_tree:Fun.id
         ~hook_typed_tree:ignore info ~backend
-  | Instantiation { runtime_args; main_module_block_repr; arg_descr } ->
+  | Instantiation
+      { runtime_args; main_module_block_repr; arg_descr; find_format } ->
       (match !Clflags.as_argument_for with
       | Some _ ->
           (* CR lmaurer: Needs nicer error message (this is a user error) *)
@@ -167,7 +169,7 @@ let implementation_aux ~start_from ~source_file ~output_prefix
       Compilenv.reset info.target;
       let impl =
         Translmod.transl_instance info.module_name ~runtime_args
-          ~main_module_block_repr ~arg_block_idx
+          ~main_module_block_repr ~arg_block_idx ~find_format
       in
       let jsir, main_module_block_format, arg_descr_computed, static_data =
         tlambda_to_jsir info impl ~as_arg_for
@@ -188,9 +190,10 @@ let implementation ~start_from ~source_file ~output_prefix ~keep_symbol_tables =
     ~compilation_unit:Inferred_from_output_prefix
 
 let instance ~source_file ~output_prefix ~compilation_unit ~runtime_args
-    ~main_module_block_repr ~arg_descr ~keep_symbol_tables =
+    ~main_module_block_repr ~arg_descr ~find_format ~keep_symbol_tables =
   let start_from =
-    Instantiation { runtime_args; main_module_block_repr; arg_descr }
+    Instantiation
+      { runtime_args; main_module_block_repr; arg_descr; find_format }
   in
   implementation_aux ~start_from ~source_file ~output_prefix ~keep_symbol_tables
     ~compilation_unit:(Exactly compilation_unit)

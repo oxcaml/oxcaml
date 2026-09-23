@@ -868,8 +868,7 @@ let acknowledge_new_pers_struct penv modname pers_name val_of_pers_sig =
               [| Jkind_types.Sort.scannable |]
           | _ ->
               Subst.Lazy.force_signature_once lazy_sign
-              |> List.filter_map Subst.Lazy.sort_of_signature_item
-              |> Array.of_list
+              |> Subst.Lazy.module_representation_of_signature
         in
         Aunit (unit, repr, mode)
   in

@@ -44,7 +44,8 @@ val instantiate
       compilation_unit:CU.t ->
       runtime_args:Translmod.runtime_arg list ->
       main_module_block_repr:Lambda.module_representation ->
-      arg_descr:Lambda.arg_descr option -> unit)
+      arg_descr:Lambda.arg_descr option ->
+      find_format:(CU.t -> Lambda.main_module_block_format) -> unit)
   -> unit
 
 type error =
@@ -78,6 +79,12 @@ type error =
   | Argument_not_fully_instantiated of {
       compilation_unit : CU.t;
       filename : Misc.filepath;
+    }
+  | Missing_instance_impl of {
+      instance : CU.t;
+      base_unit : CU.t;
+      expected_extension : string;
+      required_by : CU.t;
     }
 
 

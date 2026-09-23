@@ -58,6 +58,12 @@ type error =
       compilation_unit : CU.t;
       filename : Misc.filepath;
     }
+  | Missing_instance_impl of {
+      instance : CU.t;
+      base_unit : CU.t;
+      expected_extension : string;
+      required_by : CU.t;
+    }
 
 
 exception Error of error
@@ -187,45 +193,34 @@ let instantiate
                Global_module.subst_inside global arg_subst
                |> Compilation_unit.of_complete_global_exn
              in
-             (* The instance's block representation is recorded both in its
-                own compiled form and in its base's (as the representation
-                the instantiating functor returns); build layouts differ in
-                which of the two is on the load path. *)
-             let base_unit, _ = CU.split_instance_exn instance in
-             let cm_of unit = CU.base_filename unit ^ expected_extension in
-             let find_format unit =
-               match Load_path.find_normalized (cm_of unit) with
-               | filename -> Some (read_unit_info filename).ui_format
-               | exception Not_found -> None
-             in
-             let format =
-               match find_format instance with
-               | Some format -> format
-               | None ->
-                 match find_format base_unit with
-                 | Some format -> format
-                 | None ->
-                   Location.raise_errorf
-                     "@[<hov>Cannot find %s or %s on the load path,@ \
-                      required by %a.@]"
-                     (cm_of instance) (cm_of base_unit)
-                     CU.print compilation_unit
-             in
-             let mb_repr =
-               match format with
-               | Mb_struct { mb_repr } -> mb_repr
-               | Mb_instantiating_functor { mb_returned_repr; _ } ->
-                 mb_returned_repr
-             in
-             Main_module_block { mb_unit = instance; mb_repr }
+             Main_module_block instance
            | Rp_unit ->
              Unit)
+  in
+  let find_format instance =
+    (* An instance's format is recorded both in its own compiled form and in
+       its base's; build layouts differ in which of the two is on the load
+       path. *)
+    let base_unit, _ = CU.split_instance_exn instance in
+    let format_of unit =
+      Compile_common.find_impl_on_load_path unit ~ext:expected_extension
+      |> Option.map (fun filename -> (read_unit_info filename).ui_format)
+    in
+    match format_of instance with
+    | Some format -> format
+    | None ->
+      match format_of base_unit with
+      | Some format -> format
+      | None ->
+        error (Missing_instance_impl
+                 { instance; base_unit; expected_extension;
+                   required_by = compilation_unit })
   in
   let output_prefix = output_filename_without_extension in
   let arg_descr = base_unit_info.ui_arg_descr in
   compile
     ~source_file:src ~output_prefix ~compilation_unit ~runtime_args
-    ~main_module_block_repr ~arg_descr;
+    ~main_module_block_repr ~arg_descr ~find_format;
   ()
 
 (* Error report *)
@@ -312,6 +307,15 @@ let report_error ppf = function
          @[<hov>Instantiate %a@ with @{<inline_code>-instantiate@}.@]@]"
       CU.print_as_inline_code compilation_unit
       (Style.as_inline_code Location.Doc.filename) filename
+  | Missing_instance_impl
+      { instance; base_unit; expected_extension; required_by } ->
+    fprintf ppf
+      "@[<hov>Cannot find %a@ or %a@ on the load path,@ required by %a.@]"
+      (Style.as_inline_code Location.Doc.filename)
+      (CU.base_filename instance ^ expected_extension)
+      (Style.as_inline_code Location.Doc.filename)
+      (CU.base_filename base_unit ^ expected_extension)
+      CU.print_as_inline_code required_by
 let () =
   Location.register_error_of_exn
     (function

@@ -2365,10 +2365,8 @@ let rec components_of_module_maker
       let inner_full_env = ref cm_env in
       let pos = ref 0 in
       let module_repr =
-        List.filter_map
-          (fun (item, _) -> Subst.Lazy.sort_of_signature_item item)
-          items_and_paths
-        |> Array.of_list
+        Subst.Lazy.module_representation_of_signature
+          (List.map fst items_and_paths)
       in
       let next_address () =
         let addr : address_unforced =

@@ -283,10 +283,9 @@ let implementation (input_module_names : CU.Name.Set.t) ~ext
   let modulename = info.module_name in
   if not Clflags.(should_stop_after Compiler_pass.Typing) then begin
     let find_impl_by_name ~chain cu =
-      let base = Compilation_unit.base_filename cu ^ ext in
-      match Load_path.find_normalized base with
-      | filename -> read_format filename
-      | exception Not_found ->
+      match Compile_common.find_impl_on_load_path cu ~ext with
+      | Some filename -> read_format filename
+      | None ->
           let required_by =
             List.map
               (fun gm ->
@@ -295,7 +294,8 @@ let implementation (input_module_names : CU.Name.Set.t) ~ext
             |> String.concat ""
           in
           Location.raise_errorf "@[<hov>Cannot find %s on the load path%s.@]"
-            base required_by
+            (Compilation_unit.base_filename cu ^ ext)
+            required_by
     in
     let program =
       Translmod.transl_functorization modulename params modules

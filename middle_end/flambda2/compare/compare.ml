@@ -1392,6 +1392,7 @@ let flambda_units u1 u2 =
   |> Comparison.map ~f:(fun body ->
       let module_symbol = Flambda_unit.module_symbol u1 in
       let module_block_cells = Flambda_unit.module_block_cells u1 in
+      let root_symbols = Flambda_unit.root_symbols u1 in
       Flambda_unit.create ~return_continuation:ret_cont
         ~exn_continuation:exn_cont ~body ~module_symbol ~module_block_cells
-        ~toplevel_my_alloc_region)
+        ~root_symbols ~toplevel_my_alloc_region)

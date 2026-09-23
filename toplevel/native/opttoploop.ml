@@ -157,46 +157,24 @@ let close_phrase lam =
 
 (* Return the value referred to by a path *)
 
-(* The physical index of logical field [pos] in a block with representation
-   [module_repr], handling field reordering in mixed modules. Returns [None] if
-   the selected field is not a value. Adapted from [Topcommon.mod_field]. *)
-let value_field_index (module_repr : Lambda.module_representation) pos =
-  if not !Clflags.native_code then
-    Some pos
-  else
-  match module_repr with
-  | Module_value_only _ -> Some pos
-  | Module_mixed (shape, _) ->
-    let shape =
-      Mixed_block_shape.of_mixed_block_elements shape
-        ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
-    in
-    let new_pos =
-      match Mixed_block_shape.lookup_path_producing_new_indexes shape [pos] with
-      | [new_pos] -> Some new_pos
-      | _ -> None (* [pos] points to an unboxed product or void *)
-    in
-    Option.bind new_pos
-      (fun new_pos ->
-        if new_pos < Mixed_block_shape.value_prefix_len shape
-        then Some new_pos
-        else None (* [pos] points to an unboxed singleton *))
-
 (* Like [Obj.field] on a module block. *)
 let mod_field obj module_repr pos =
-  Option.map (Obj.field obj) (value_field_index module_repr pos)
+  Option.map (Obj.field obj)
+    (Mixed_block_shape.module_value_field_index module_repr pos)
 
 (* Logical field [pos] of [cu]'s module block, read from its cell. A cell
    holding a value is a one-field block. *)
 let cell_field cu module_repr pos =
-  Option.map
-    (fun _ -> Obj.field (global_cell cu pos) 0)
-    (value_field_index module_repr pos)
+  match Mixed_block_shape.module_value_field_index module_repr pos with
+  | Some _ -> Some (Obj.field (global_cell cu pos) 0)
+  | None -> None
 
-let non_value_error () =
-  Location.raise_errorf
-    ~loc:Location.none
-    "Opttoploop.eval_address: Can't return a non-value"
+let value_or_error = function
+  | Some field -> field
+  | None ->
+    Location.raise_errorf
+      ~loc:Location.none
+      "Opttoploop.eval_address: Can't return a non-value"
 
 let rec eval_address = function
   | Env.Aunit (cu, repr, _) ->
@@ -216,22 +194,13 @@ let rec eval_address = function
       end
   | Env.Alocal id ->
       let glob, pos, repr = toplevel_value id in
-      begin match cell_field glob repr pos with
-      | Some field -> field
-      | None -> non_value_error ()
-      end
+      value_or_error (cell_field glob repr pos)
   | Env.Adot(Env.Aunit (cu, _, _), module_repr, pos) ->
       let module_repr = Lambda.transl_module_representation module_repr in
-      begin match cell_field cu module_repr pos with
-      | Some field -> field
-      | None -> non_value_error ()
-      end
+      value_or_error (cell_field cu module_repr pos)
   | Env.Adot(a, module_repr, pos) ->
       let module_repr = Lambda.transl_module_representation module_repr in
-      begin match mod_field (eval_address a) module_repr pos with
-      | Some field -> field
-      | None -> non_value_error ()
-      end
+      value_or_error (mod_field (eval_address a) module_repr pos)
 
 let eval_path find env path =
   match find path env with

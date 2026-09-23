@@ -27,6 +27,7 @@ val create :
   body:Flambda.Expr.t ->
   module_symbol:Symbol.t ->
   module_block_cells:Symbol.t list ->
+  root_symbols:Symbol.t list ->
   t
 
 val return_continuation : t -> Continuation.t
@@ -42,7 +43,8 @@ val module_symbol : t -> Symbol.t
 val module_block_cells : t -> Symbol.t list
 
 (** The symbols that must stay reachable from outside the unit: the cells, plus
-    the module symbol when the module block is emitted (JavaScript backend). *)
+    the module symbol when the module block is emitted (see
+    [Flambda_features.emit_module_block]). *)
 val root_symbols : t -> Symbol.t list
 
 val body : t -> Flambda.Expr.t

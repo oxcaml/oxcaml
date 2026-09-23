@@ -1500,9 +1500,16 @@ type main_module_block_format =
         mb_returned_repr : module_representation;
       }
 
+let instantiating_functor_module_representation =
+  Module_value_only { field_count = 1 }
+
 let main_module_representation = function
   | Mb_struct { mb_repr } -> mb_repr
-  | Mb_instantiating_functor _ -> Module_value_only { field_count = 1 }
+  | Mb_instantiating_functor _ -> instantiating_functor_module_representation
+
+let returned_module_representation = function
+  | Mb_struct { mb_repr } -> mb_repr
+  | Mb_instantiating_functor { mb_returned_repr; _ } -> mb_returned_repr
 
 let bytecode_only_module_representation = Module_value_only { field_count = 0 }
 
@@ -2260,20 +2267,29 @@ let transl_module_representation repr =
 
 (* Translate an access path *)
 
+let transl_unit_address loc cu module_repr mode =
+  let staticity = Mode.With_regionality.proj_monadic Staticity mode in
+  let staticity =
+    match Mode.Staticity.zap_to_floor_exn staticity with
+    | Static -> Static
+    | Dynamic -> Dynamic
+  in
+  Lprim(Pgetglobal (cu, module_repr, staticity), [], loc)
+
 let rec transl_address loc = function
   | Env.Aunit (cu, module_repr, mode) ->
-    let staticity = Mode.With_regionality.proj_monadic Staticity mode in
-    let staticity =
-      match Mode.Staticity.zap_to_floor_exn staticity with
-      | Static -> Static
-      | Dynamic -> Dynamic
-    in
     let module_repr = transl_module_representation module_repr in
-    Lprim(Pgetglobal (cu, module_repr, staticity), [], loc)
+    transl_unit_address loc cu module_repr mode
   | Env.Alocal id ->
       if Ident.is_predef id
       then Lprim (Pgetpredef id, [], loc)
       else Lvar id
+  | Env.Adot(Env.Aunit (cu, _, mode), module_repr, pos) ->
+      (* [Foo.x]: the field's [module_repr] is also the unit's, so translate
+         it once. *)
+      let module_repr = transl_module_representation module_repr in
+      Lprim(mod_field pos module_repr,
+            [transl_unit_address loc cu module_repr mode], loc)
   | Env.Adot(addr, module_repr, pos) ->
       let module_repr = transl_module_representation module_repr in
       Lprim(mod_field pos module_repr, [transl_address loc addr], loc)

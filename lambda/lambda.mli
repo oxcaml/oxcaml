@@ -1245,8 +1245,6 @@ type runtime_param =
   | Rp_unit                               (* The unit value (only used when
                                              there are no other parameters) *)
 
-(* [module_representation] is defined above, alongside [primitive]. *)
-
 (* Logical field count: Each unboxed product counts as 1 field *)
 val module_representation_field_count : module_representation -> int
 
@@ -1270,6 +1268,16 @@ type main_module_block_format =
 
 val main_module_representation :
   main_module_block_format -> module_representation
+
+(* The representation of the block holding the unit's fields: the main module
+   block itself for [Mb_struct], the block returned by the instantiating
+   functor for [Mb_instantiating_functor]. *)
+val returned_module_representation :
+  main_module_block_format -> module_representation
+
+(* The one-field main module block of a parameterised module, holding its
+   instantiating functor. *)
+val instantiating_functor_module_representation : module_representation
 
 (* Placeholder for [Pgetglobal] sites that only ever reach bytecode, which
    ignores the representation (the toplevel unit in [Translmod] and

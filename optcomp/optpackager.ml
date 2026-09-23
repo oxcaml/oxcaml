@@ -115,8 +115,9 @@ end) : S = struct
               match m.pm_kind with
               | PM_intf -> None
               | PM_impl infos ->
-                Some (CU.create_child (Current_unit.get_cu_exn ()) m.pm_name,
-                      Lambda.main_module_representation infos.ui_format))
+                Some
+                  ( CU.create_child (Current_unit.get_cu_exn ()) m.pm_name,
+                    Lambda.main_module_representation infos.ui_format ))
             members
         in
         let compilation_unit = Unit_info.Artifact.modname target in

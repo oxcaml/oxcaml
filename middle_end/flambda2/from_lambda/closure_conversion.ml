@@ -415,42 +415,41 @@ let final_module_block_representation acc
   in
   block_shape, field_count, block_access, kind_of_field
 
-(* The one-field representation of a cell holding logical field [i] of a module
-   block with representation [module_repr]. *)
-let module_block_cell_representation
-    (module_repr : Lambda.module_representation) i :
-    Lambda.module_representation =
-  match module_repr with
-  | Module_value_only _ -> Module_value_only { field_count = 1 }
-  | Module_mixed (shape, shape_for_read) ->
-    Module_mixed ([| shape.(i) |], [| shape_for_read.(i) |])
+let module_block_cell_symbol compilation_unit i =
+  Flambda2_import.Symbol.for_module_block_cell compilation_unit i
+  |> Symbol.create_wrapped
 
-(* A cell is a one-field module block holding a single logical field of the main
-   module block. [physical_fields] are the indexes of the corresponding physical
-   fields of the module block, in the cell's own field order. *)
+(* The module block and cells of the current unit are being defined, so they
+   cannot be referred to. *)
+let check_not_current_unit env cu ~prim =
+  if Compilation_unit.equal cu (Env.current_unit env)
+  then
+    Misc.fatal_errorf_doc "%s %a in the same unit" prim Compilation_unit.print
+      cu
+
+(* A cell is a one-field module block holding logical field [cell_index] of the
+   main module block. [physical_fields] are the indexes of the corresponding
+   physical fields of the module block, in the cell's own field order. *)
 type module_block_cell =
-  { cell_symbol : Symbol.t;
+  { cell_index : int;
+    cell_symbol : Symbol.t;
     cell_shape : K.Scannable_block_shape.t;
-    cell_access : int -> P.Block_access_kind.t;
     physical_fields : int list
   }
 
-let module_block_cells acc ~compilation_unit
+let module_block_cells ~compilation_unit
     ~(module_repr : Lambda.module_representation) =
-  let cell i ~physical_fields =
-    let cell_symbol =
-      Symbol.create_wrapped
-        (Flambda2_import.Symbol.for_module_block_cell compilation_unit i)
-    in
-    let cell_shape, _, cell_access, _ =
-      final_module_block_representation acc
-        ~module_repr:(module_block_cell_representation module_repr i)
-    in
-    { cell_symbol; cell_shape; cell_access; physical_fields }
+  let cell cell_index ~cell_shape ~physical_fields =
+    { cell_index;
+      cell_symbol = module_block_cell_symbol compilation_unit cell_index;
+      cell_shape;
+      physical_fields
+    }
   in
   match module_repr with
   | Module_value_only { field_count } ->
-    List.init field_count (fun i -> cell i ~physical_fields:[i])
+    List.init field_count (fun i ->
+        cell i ~cell_shape:Value_only ~physical_fields:[i])
   | Module_mixed (shape, _) ->
     let physical_fields_by_element =
       K.Mixed_block_lambda_shape.new_indexes_by_element
@@ -460,7 +459,12 @@ let module_block_cells acc ~compilation_unit
       (fun i ->
         match physical_fields_by_element.(i) with
         | [] -> None (* void field *)
-        | _ :: _ as physical_fields -> Some (cell i ~physical_fields))
+        | _ :: _ as physical_fields ->
+          let cell_shape =
+            K.Scannable_block_shape.from_mixed_block_shape
+              (module_lambda_shape [| shape.(i) |])
+          in
+          Some (cell i ~cell_shape ~physical_fields))
       (List.init (Array.length shape) Fun.id)
 
 module Inlining = struct
@@ -1338,11 +1342,8 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       exn_continuation dbg ~current_region ~current_ghost_region
       ~current_alloc_region k
   | Pgetglobal (cu, module_repr, _), [] ->
-    if Compilation_unit.equal cu (Env.current_unit env)
-    then
-      Misc.fatal_errorf_doc "Pgetglobal %a in the same unit"
-        Compilation_unit.print cu;
-    if !Clflags.jsir
+    check_not_current_unit env cu ~prim:"Pgetglobal";
+    if Flambda_features.emit_module_block ()
     then
       let symbol =
         Flambda2_import.Symbol.for_compilation_unit cu |> Symbol.create_wrapped
@@ -1357,31 +1358,47 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       let block_shape, field_count, _, _ =
         final_module_block_representation acc ~module_repr
       in
+      let machine_width = Acc.machine_width acc in
+      let tag : _ Or_unknown.t = Known Tag.Scannable.zero in
+      let cell_size : _ Or_unknown.t =
+        Known (Target_ocaml_int.of_int machine_width 1)
+      in
+      let cell_access { cell_index; cell_shape; _ } cell_pos :
+          P.Block_access_kind.t =
+        match module_repr with
+        | Module_value_only _ ->
+          Values { tag; size = cell_size; field_kind = Any_value }
+        | Module_mixed (shape, _) ->
+          let cell_elements =
+            K.Mixed_block_lambda_shape.flattened_reordered_shape
+              (module_lambda_shape [| shape.(cell_index) |])
+          in
+          H.block_access_kind_of_mixed_field_element ~tag ~size:Unknown
+            ~kind_shape:cell_shape cell_elements.(cell_pos)
+      in
       let fields = Array.make field_count None in
       List.iter
-        (fun { cell_symbol; cell_access; physical_fields; _ } ->
-          let cell = Simple.symbol cell_symbol in
+        (fun ({ cell_symbol; physical_fields; _ } as cell) ->
+          let block = Simple.symbol cell_symbol in
           List.iteri
             (fun cell_pos pos ->
-              let field =
-                Target_ocaml_int.of_int (Acc.machine_width acc) cell_pos
-              in
+              let field = Target_ocaml_int.of_int machine_width cell_pos in
               let contents : H.simple_or_prim =
-                match simplify_block_load acc env ~block:cell ~field with
+                match simplify_block_load acc env ~block ~field with
                 | Field_contents simple -> H.Simple simple
                 | Unknown | Not_a_block | Block_but_cannot_simplify _ ->
                   H.Prim
                     (H.Unary
                        ( Block_load
-                           { kind = cell_access cell_pos;
+                           { kind = cell_access cell cell_pos;
                              mut = Immutable;
                              field
                            },
-                         H.Simple cell ))
+                         H.Simple block ))
               in
               fields.(pos) <- Some contents)
             physical_fields)
-        (module_block_cells acc ~compilation_unit:cu ~module_repr);
+        (module_block_cells ~compilation_unit:cu ~module_repr);
       let fields =
         Array.to_list fields
         |> List.map (function
@@ -1579,14 +1596,8 @@ let close_named acc env ~let_bound_ids_with_kinds (named : IR.named)
     Lambda_to_flambda_primitives_helpers.bind_recs acc None ~register_const0
       prim Debuginfo.none k
   | Module_block_cell (cu, pos) ->
-    if Compilation_unit.equal cu (Env.current_unit env)
-    then
-      Misc.fatal_errorf_doc "Module_block_cell %a in the same unit"
-        Compilation_unit.print cu;
-    let symbol =
-      Flambda2_import.Symbol.for_module_block_cell cu pos
-      |> Symbol.create_wrapped
-    in
+    check_not_current_unit env cu ~prim:"Module_block_cell";
+    let symbol = module_block_cell_symbol cu pos in
     k acc [Named.create_simple (Simple.symbol symbol)]
   | Prim
       { prim; args; loc; exn_continuation; region; ghost_region; alloc_region }
@@ -4308,7 +4319,8 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
       then acc
       else
         List.fold_left
-          (fun acc { cell_symbol; cell_shape; physical_fields; _ } ->
+          (fun acc { cell_symbol; cell_shape; physical_fields; cell_index = _ }
+             ->
             let fields =
               List.mapi
                 (fun cell_pos pos ->
@@ -4335,7 +4347,7 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
          from them (see [Pgetglobal] in [close_primitive]). The JavaScript
          backend still reads the module block itself. *)
       let module_block =
-        if not !Clflags.jsir
+        if not (Flambda_features.emit_module_block ())
         then []
         else
           let field_vars =
@@ -4350,7 +4362,8 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
               Static_const.block module_block_tag Immutable block_shape
                 field_vars ) ]
       in
-      let cell_static_const { cell_symbol; cell_shape; physical_fields; _ } =
+      let cell_static_const
+          { cell_symbol; cell_shape; physical_fields; cell_index = _ } =
         let fields =
           List.map
             (fun pos ->
@@ -4370,10 +4383,7 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
         let arg =
           match module_block with
           | (module_symbol, _) :: _ -> Simple.symbol module_symbol
-          | [] ->
-            Simple.const
-              (Reg_width_const.tagged_immediate
-                 (Target_ocaml_int.zero (Acc.machine_width acc)))
+          | [] -> Simple.const_unit (Acc.machine_width acc)
         in
         Apply_cont_with_acc.create acc return_cont ~args:[arg]
           ~dbg:Debuginfo.none
@@ -4455,21 +4465,34 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
       Flambda_kind.With_subkind.region
   in
   let acc = Acc.create ~cmx_loader ~machine_width in
-  let cells = module_block_cells acc ~compilation_unit ~module_repr in
+  let cells = module_block_cells ~compilation_unit ~module_repr in
   let module_block_cells =
     List.map (fun { cell_symbol; _ } -> cell_symbol) cells
+  in
+  let root_symbols =
+    if Flambda_features.emit_module_block ()
+    then module_symbol :: module_block_cells
+    else module_block_cells
   in
   let acc, body =
     wrap_final_module_block acc env ~program ~prog_return_cont ~module_repr
       ~return_cont ~module_symbol ~cells
   in
-  let module_block_approximation =
-    match Acc.continuation_known_arguments ~cont:prog_return_cont acc with
-    (* Module symbol may be rebuilt from a lifted block *)
-    | Some [Value_approximation.Value_symbol s] ->
-      Acc.find_symbol_approximation acc s
-    | Some [approx] -> approx
-    | _ -> Value_approximation.Unknown Flambda_kind.value
+  (* The module symbol is only defined when the module block is emitted; the
+     cells carry the field approximations otherwise. *)
+  let symbols_approximations =
+    if not (Flambda_features.emit_module_block ())
+    then Acc.symbol_approximations acc
+    else
+      let module_block_approximation =
+        match Acc.continuation_known_arguments ~cont:prog_return_cont acc with
+        | Some [Value_approximation.Value_symbol s] ->
+          Acc.find_symbol_approximation acc s
+        | Some [approx] -> approx
+        | _ -> Value_approximation.Unknown Flambda_kind.value
+      in
+      Symbol.Map.add module_symbol module_block_approximation
+        (Acc.symbol_approximations acc)
   in
   (* We must make sure there is always an outer [Let_symbol] binding so that
      lifted constants not in the scope of any other [Let_symbol] binding get put
@@ -4502,10 +4525,6 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
         (Bound_pattern.static bound_static)
         defining_expr ~body
   in
-  let symbols_approximations =
-    Symbol.Map.add module_symbol module_block_approximation
-      (Acc.symbol_approximations acc)
-  in
   if Option.is_some (Acc.top_closure_info acc)
   then
     Misc.fatal_error "Information on nested closures should be empty at the end";
@@ -4518,6 +4537,7 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
     let unit =
       Flambda_unit.create ~return_continuation:return_cont ~exn_continuation
         ~toplevel_my_alloc_region ~body ~module_symbol ~module_block_cells
+        ~root_symbols
     in
     { unit; code_slot_offsets; metadata = Normal }
   | Classic ->
@@ -4530,6 +4550,7 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
     let unit =
       Flambda_unit.create ~return_continuation:return_cont ~exn_continuation
         ~toplevel_my_alloc_region ~body ~module_symbol ~module_block_cells
+        ~root_symbols
     in
     { unit;
       code_slot_offsets;

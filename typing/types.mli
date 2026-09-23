@@ -1296,6 +1296,10 @@ module type Wrapped = sig
   (* Returns [None] for items that have no runtime representation (see
      [Includemod.is_runtime_component]). *)
   val sort_of_signature_item : signature_item -> Jkind_types.Sort.t option
+
+  (* The sorts of the items with a runtime representation, in order. *)
+  val module_representation_of_signature :
+    signature_item list -> module_representation
 end
 
 module Make_wrapped(Wrap : Wrap) : Wrapped with type 'a wrapped = 'a Wrap.t

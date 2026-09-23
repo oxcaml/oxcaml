@@ -55,17 +55,16 @@ type runtime_arg =
       ra_main_repr : module_representation;
     }
   | (* A module to pass in its entirety *)
-    Main_module_block of {
-      mb_unit : Compilation_unit.t;
-      (* The representation of its main block *)
-      mb_repr : module_representation;
-    }
+    Main_module_block of Compilation_unit.t
   | Unit
 
+(** [find_format] looks up the format of a [Main_module_block] argument's unit
+    (from its .cmo/.cmx), which gives the representation of its block. *)
 val transl_instance:
       Compilation_unit.t -> runtime_args:runtime_arg list
         -> main_module_block_repr:module_representation
         -> arg_block_idx:int option
+        -> find_format:(Compilation_unit.t -> main_module_block_format)
         -> program
 
 (** Translate a bundle as a generative functor over [params] whose body

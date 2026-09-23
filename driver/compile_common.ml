@@ -44,6 +44,12 @@ let unit_info_from_cu_or_output_prefix ~source_file kind ~output_prefix
       let for_pack_prefix = Compilation_unit.Prefix.from_clflags () in
       Unit_info.make ~source_file ~for_pack_prefix kind output_prefix
 
+let find_impl_on_load_path cu ~ext =
+  let basename = Compilation_unit.base_filename cu ^ ext in
+  match Load_path.find_normalized basename with
+  | filename -> Some filename
+  | exception Not_found -> None
+
 let with_info ~backend ~tool_name ~dump_ext unit_info k =
   Compmisc.init_path ();
   Compmisc.init_parameters ();
