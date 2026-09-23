@@ -13240,7 +13240,12 @@ let type_expression env jkind sexp =
         let (_path, desc, _) =
           Env.lookup_value ~use:false ~loc lid.txt env
         in
-        {exp with exp_type = desc.val_type}
+        begin match desc.val_kind with
+        | Val_prim { prim_is_layout_poly = true; _ } ->
+            (* Eta-expansion uses the instantiated calling layout. *)
+            exp
+        | _ -> {exp with exp_type = desc.val_type}
+        end
     | _ -> exp
   in
   maybe_check_uniqueness_exp exp; exp
