@@ -3652,8 +3652,6 @@ module Format_history = struct
 
   let format_immediate_creation_reason ppf :
       History.immediate_creation_reason -> _ = function
-    | Empty_record ->
-      fprintf ppf "it's a record type containing all void elements"
     | Enumeration ->
       fprintf ppf
         "it's an enumeration variant type (all constructors are constant)"
@@ -3709,6 +3707,7 @@ module Format_history = struct
       fprintf ppf
         "it's the element type of an array that is iterated over in a \
          comprehension"
+    | Optional_argument -> fprintf ppf "it's the type of an optional argument"
 
   let format_value_creation_reason ppf ~layout_or_kind :
       History.value_creation_reason -> _ = function
@@ -4851,7 +4850,6 @@ module Debug_printers = struct
 
   let immediate_creation_reason ppf : History.immediate_creation_reason -> _ =
     function
-    | Empty_record -> fprintf ppf "Empty_record"
     | Enumeration -> fprintf ppf "Enumeration"
     | Primitive id -> fprintf ppf "Primitive %s" (Ident.unique_name id)
     | Immediate_polymorphic_variant ->
@@ -4886,6 +4884,7 @@ module Debug_printers = struct
     | Array_comprehension_element -> fprintf ppf "Array_comprehension_element"
     | Array_comprehension_iterator_element ->
       fprintf ppf "Array_comprehension_iterator_element"
+    | Optional_argument -> fprintf ppf "Optional_argument"
 
   let value_creation_reason ppf : History.value_creation_reason -> _ = function
     | Class_let_binding -> fprintf ppf "Class_let_binding"

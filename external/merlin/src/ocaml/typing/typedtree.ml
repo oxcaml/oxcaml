@@ -349,7 +349,9 @@ and expression_desc =
         ( Data_types.label_description * Jkind.sort * record_label_definition )
           array;
       representation : Types.record_representation;
-      extended_expression : (expression * Jkind.sort * Unique_barrier.t) option;
+      extended_expression :
+        (expression * Jkind.sort * Types.record_representation
+         * Unique_barrier.t) option;
       alloc_mode : alloc_mode_r option
     }
   | Texp_record_unboxed_product of {
@@ -1602,36 +1604,11 @@ let label_sort (type rep)
     | Record_boxed_inherited | Record_undetermined
     | Record_inlined (_, Constructor_undetermined, _) ->
       Misc.fatal_error "label_sort: unexpected undetermined representation"
+    | Record_inlined (_, Constructor_immediate_all_void, _) ->
+      Misc.fatal_error "label_sort: unexpected immediate representation"
     | Record_dummy _ ->
       Misc.fatal_error "label_sort: unexpected dummy representation"
     end
-
-let finalized_label_sort (label : Data_types.label_description)
-      (repres : Types.record_representation) ~record_sort ~variable_sorts =
-  match repres with
-  | Record_boxed_inherited_variable sort ->
-    Jkind.Sort.default_for_transl_and_get sort
-  | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> record_sort
-  | Record_boxed | Record_float | Record_ufloat | Record_mixed _
-  | Record_inlined
-      (_, (Constructor_uniform_value | Constructor_mixed _), _) ->
-    begin match variable_sorts with
-    | Some sorts -> sorts.(label.lbl_pos)
-    | None ->
-      begin match label.lbl_sort with
-      | Some sort -> sort
-      | None ->
-        Misc.fatal_errorf
-          "no sort for label %s despite finalized representation"
-          label.lbl_name
-      end
-    end
-  | Record_boxed_inherited | Record_undetermined | Record_variable _
-  | Record_inlined
-      (_, (Constructor_undetermined | Constructor_variable _), _) ->
-    Misc.fatal_error "finalized_label_sort: representation was not finalized"
-  | Record_dummy _ ->
-    Misc.fatal_error "finalized_label_sort: unexpected dummy representation"
 
 let unboxed_label_all_sorts label repres =
   Array.map (fun lbl -> unboxed_label_sort lbl repres) label.lbl_all

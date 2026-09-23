@@ -2302,20 +2302,6 @@ module Jkind0 = struct
       | Mutable { atomic = Nonatomic; _ } -> Builtin.mutable_data)
         ~why
 
-    let all_void_sort_option sort =
-      match sort with
-      | Some sort -> Jkind_types.Sort.Const.all_void sort
-      | None -> false
-
-    let all_void_labels_with_updates lbls_updated =
-      List.for_all (fun (_, _, sort) -> all_void_sort_option sort) lbls_updated
-
-    let all_void_labels lbls =
-      List.for_all
-        (fun (lbl : label_declaration) ->
-           all_void_sort_option lbl.ld_sort)
-        lbls
-
     let add_labels_as_with_bounds lbls jkind =
       List.fold_right
         (fun ((lbl : label_declaration), ld_type, _sort) ->
@@ -2323,9 +2309,6 @@ module Jkind0 = struct
         lbls jkind
 
     let for_boxed_record_with_updates lbls =
-      if all_void_labels_with_updates lbls
-      then Builtin.immediate ~why:Empty_record
-      else
         let base =
           lbls
           |> List.map (fun ((ld : label_declaration), _, _) -> ld.ld_mutable)
@@ -2521,19 +2504,13 @@ module Jkind0 = struct
       (orphaned_type_var_list @ domain)
       (type_of_kind_list @ range)
 
-  let for_boxed_variant ~loc ~decl_params ~type_apply ~get_free_vars cstrs =
+  let for_boxed_variant ~loc ~decl_params ~type_apply ~get_free_vars
+      ~cstr_layouts cstrs =
     let base =
-      let all_args_void =
-        List.for_all
-          (fun cstr ->
-            match cstr.cd_args with
-            | Cstr_tuple args ->
-              List.for_all
-                (fun arg -> all_void_sort_option arg.ca_sort) args
-            | Cstr_record lbls -> all_void_labels lbls)
-          cstrs
+      let all_immediate =
+        Array.for_all cstr_layout_is_constant cstr_layouts
       in
-      if all_args_void
+      if all_immediate
       then (
         let has_args =
           List.exists

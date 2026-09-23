@@ -261,7 +261,6 @@ type error =
   | Label_not_atomic of Longident.t
   | Atomic_in_pattern of Longident.t
   | Atomic_in_functional_update of label
-  | Mixed_record_atomic_loc of Longident.t
   | Polymorphic_atomic_loc of Longident.t
   | Probe_format
   | Probe_name_format of string
@@ -1529,10 +1528,11 @@ let check_project_mutability ~loc ~env mut_name mutability mode =
   if Types.is_mutable mutability then
     submode ~loc ~env mode (mode_project_mutable mut_name)
 
-let check_atomic_loc_of_finalized_repr ~loc ~env label record_repres lid =
+let check_atomic_loc ~loc ~env label lid =
   if not (Types.is_atomic label.lbl_mut) then
     raise (error (loc, env, Label_not_atomic lid));
   if is_poly_Tpoly label.lbl_arg then
+<<<<<<< Merlin:rtjoa.box-demo
     raise (error (loc, env, Polymorphic_atomic_loc lid));
   (match
      Mode.Modality.Const.equate label.lbl_modalities
@@ -1556,6 +1556,39 @@ let check_atomic_loc_of_finalized_repr ~loc ~env label record_repres lid =
   | Record_dummy _ ->
       Misc.fatal_error
         "check_atomic_loc_of_finalized_repr: unexpected record representation"
+||||||| Compiler:last-imported
+    raise (Error (loc, env, Polymorphic_atomic_loc lid));
+  (match
+     Mode.Modality.Const.equate label.lbl_modalities
+       (Typemode.atomic_mutable_modalities)
+   with
+   | Ok () -> ()
+   | Error _ -> raise (Error (loc, env, Modalities_on_atomic_field lid)));
+  match record_repres with
+  | Record_boxed | Record_inlined (_, Constructor_uniform_value, _) -> ()
+  | Record_mixed _ | Record_inlined (_, Constructor_mixed _, _) ->
+      raise (Error (loc, env, Mixed_record_atomic_loc lid))
+  | Record_undetermined | Record_variable _
+  | Record_boxed_inherited | Record_boxed_inherited_variable _
+  | Record_inlined
+      (_, (Constructor_undetermined | Constructor_variable _), _)
+  (* [@@unboxed] prohibits mutable (and therefore atomic) fields. *)
+  | Record_unboxed
+  (* [@atomic] fields disable float record optimization. *)
+  | Record_float | Record_ufloat
+  (* Only exists as an intermediate step of typechecking the decl itself *)
+  | Record_dummy _ ->
+      Misc.fatal_error
+        "check_atomic_loc_of_finalized_repr: unexpected record representation"
+=======
+    raise (Error (loc, env, Polymorphic_atomic_loc lid));
+  match
+    Mode.Modality.Const.equate label.lbl_modalities
+      (Typemode.atomic_mutable_modalities)
+  with
+  | Ok () -> ()
+  | Error _ -> raise (Error (loc, env, Modalities_on_atomic_field lid))
+>>>>>>> Compiler:HEAD
 
 (* Mutable indices to polymorphic fields cannot be taken, as they would allow
    writing non-polymorphic values. *)
@@ -3319,7 +3352,9 @@ type unrepresentable_arg =
 let instance_constructor_representation env constr ~types ~why
     : _ Result.t =
   match constr.cstr_shape with
-  | (Constructor_uniform_value | Constructor_mixed _) as shape ->
+  | (Constructor_uniform_value | Constructor_mixed _
+    | Constructor_immediate_all_void)
+    as shape ->
       begin match
         Misc.Stdlib.List.map_option
           (fun arg -> arg.ca_sort |> Option.map Jkind.Sort.of_const)
@@ -4297,7 +4332,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
       (* CR layouts v5: value restriction here to be relaxed *)
       if is_optional l then
         unify_pat val_env pat
-          (type_option (newvar Predef.option_argument_jkind));
+          (type_option (newvar Predef.optional_argument_jkind));
       tps.tps_pattern_variables, pat
     end
   in
@@ -5449,7 +5484,7 @@ let rec is_nonexpansive exp =
                lbl.lbl_mut = Immutable && is_nonexpansive exp
            | Kept _ -> true)
         fields
-      && is_nonexpansive_opt (Option.map Misc.fst3 extended_expression)
+      && is_nonexpansive_opt (Option.map Misc.fst4 extended_expression)
   | Texp_record_unboxed_product { fields; extended_expression } ->
       Array.for_all
         (fun (lbl, _sort, definition) ->
@@ -5777,7 +5812,7 @@ let rec approx_type env sty =
   | Ptyp_arrow (p, ({ ptyp_desc = Ptyp_poly _ } as arg_sty), sty, arg_mode, _) ->
       let p = Typetexp.transl_label p (Some arg_sty) in
       (* CR layouts v5: value requirement here to be relaxed *)
-      if is_optional p then newvar Predef.option_argument_jkind
+      if is_optional p then newvar Predef.optional_argument_jkind
       else begin
         let arg_mode = Typemode.transl_alloc_mode arg_mode in
         let arg_ty =
@@ -5797,7 +5832,7 @@ let rec approx_type env sty =
       let p = Typetexp.transl_label p (Some arg_sty) in
       let arg =
         if is_optional p
-        then type_option (newvar Predef.option_argument_jkind)
+        then type_option (newvar Predef.optional_argument_jkind)
         else newvar (Jkind.Builtin.any ~why:Inside_of_Tarrow)
       in
       let ret = approx_type env sty in
@@ -7295,18 +7330,19 @@ and type_expect_
             in
             Some ({exp with exp_type = ty_exp}, sort, ubr), label_definitions
       in
-      let num_fields =
+      let representative_label =
         match lbl_exp_list with [] -> assert false
-        | (_, lbl,_)::_ -> Array.length lbl.lbl_all in
+        | (_, lbl, _) :: _ -> lbl
+      in
+      let label_descriptions = representative_label.lbl_all in
+      let num_fields = Array.length label_descriptions in
       (if opt_sexp <> None && List.length lid_sexp_list = num_fields then
          Location.prerr_warning loc
            (Warnings.Useless_record_with (record_form_to_string record_form)));
-      let label_descriptions, representation =
-        let (_, { lbl_all; lbl_repres; _ }, _) = List.hd lbl_exp_list in
-        lbl_all, lbl_repres
-      in
       let representation =
-        match determined_lbl_repres record_form representation with
+        match
+          determined_lbl_repres record_form representative_label.lbl_repres
+        with
         | Some rep -> rep
         | None ->
             let labels_with_updated_types =
@@ -7325,7 +7361,8 @@ and type_expect_
                each label all over again. Possibly we're doing things in the
                wrong order. *)
             Typedecl.instance_record_representation ~why env
-              sexp.pexp_loc record_form ~old_repres:representation
+              sexp.pexp_loc record_form
+              ~old_repres:representative_label.lbl_repres
               labels_with_updated_types
       in
       let fields =
@@ -7335,9 +7372,20 @@ and type_expect_
       let exp_desc =
         match record_form with
         | Legacy ->
+          let extended_expression =
+            match opt_exp with
+            | None -> None
+            | Some (exp, sort, ubr) ->
+              let source_representation =
+                update_labels env Legacy ~representative_label
+                  ~why:Field_functional_update ~loc:exp.exp_loc
+                  ~containing_type:exp.exp_type
+              in
+              Some (exp, sort, source_representation, ubr)
+          in
           Texp_record {
             fields; representation;
-            extended_expression = opt_exp;
+            extended_expression;
             alloc_mode
           }
         | Unboxed_product ->
@@ -9090,14 +9138,7 @@ and type_expect_
               Legacy lid
           in
           Env.mark_label_used Env.Projection label.lbl_uid;
-          (* A variable representation is not determined until the end of
-             typechecking. *)
-          add_delayed_check (fun () ->
-            let record_repres =
-              Typedecl.finalize_record_representation env loc record_repres
-            in
-            check_atomic_loc_of_finalized_repr ~loc ~env label record_repres
-              lid.txt);
+          check_atomic_loc ~loc ~env label lid.txt;
           let alloc_mode, argument_mode =
             register_allocation ~loc expected_mode
           in
@@ -10502,11 +10543,6 @@ and solve_Pexp_field
     type_label_access record_form env srecord label_usage lid
   in
   let ty_arg, record_repres =
-    (* XXX Not clear to me why this can't be done in [type_label_access] so that
-       the [Texp_setfield] case wouldn't have to have its own call to
-       [update_label], but doing it that way causes principality issues.
-       Notably, this call to [update_label] happens inside a local level and the
-       [Texp_setfield] call does not. *)
     with_local_level_generalize_structure_if_principal
       ~before_generalize:(fun (ty_arg, _) -> generalize_structure ty_arg)
       begin fun () ->
@@ -10519,10 +10555,6 @@ and solve_Pexp_field
         (* This redundantly calculates the sort again. But calling
            [type_sort] above let us infer that the type is representable,
            and it also gives a nicer error message *)
-        (* XXX Not entirely sure why it's necessary to do this in the inner
-           level, but weird errors happen if we don't, and it's also
-           necessary to do it in _this_ inner level so that the correct type
-           hits a [generalize_structure] *)
         update_labels env record_form ~representative_label:label ~loc
           ~why:Field_projection ~containing_type:record.exp_type
       in
@@ -11143,7 +11175,7 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app
        | Optional _ ->
            (* CR layouts v5: relax value requirement *)
            unify_exp ~sexp:sarg env arg
-             (type_option(newvar Predef.option_argument_jkind))
+             (type_option(newvar Predef.optional_argument_jkind))
        | Position _ ->
            unify_exp ~sexp:sarg env arg (instance Predef.type_lexing_position));
       (lbl, Arg (arg, mode_arg, sort_arg), None,
@@ -14051,11 +14083,6 @@ let report_error ~loc env =
          of an atomic field, do so explicitly:@ %a"
         Style.inline_code l
         Style.inline_code ("{ t with " ^ l ^ " = t." ^ l ^ " }")
-  | Mixed_record_atomic_loc lid ->
-      Location.errorf ~loc
-        "Use of %a with mixed record fields (here %a) is forbidden."
-        Style.inline_code "[%atomic.loc]"
-        quoted_longident lid
   | Polymorphic_atomic_loc lid ->
       Location.errorf ~loc
         "Use of %a with polymorphic record fields@ (here %a) is forbidden."

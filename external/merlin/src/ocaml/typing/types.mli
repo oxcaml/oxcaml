@@ -1045,11 +1045,16 @@ and cstr_layout =
 and constructor_representation =
   | Constructor_uniform_value
   (* A constant constructor or a constructor all of whose fields are values.
-     This is named 'uniform_value' to distinguish from the 'Constructor_uniform'
-     of [lambda.mli], which can also represent all-flat-float records.
+     This is named 'uniform_value' to distinguish from the
+     'Constructor_shape_uniform' of [lambda.mli], which can also represent
+     all-flat-float records.
   *)
   | Constructor_mixed of mixed_product_shape
   (* A constructor that has some non-value fields. *)
+  | Constructor_immediate_all_void
+  (* A constructor with all-void args, represented as a constant rather than a
+     block: one annotated with [@immediate_all_void_constructor], or the null
+     constructor of a [Variant_with_null]. *)
   | Constructor_undetermined
   (* The constructor has an inlined record argument with a field of layout
      [any], so its shape cannot be determined at typedecl time. *)
@@ -1360,6 +1365,13 @@ val equal_variant_representation_up_to_scannable_axes :
   variant_representation -> variant_representation -> bool
 
 val mixed_block_element_is_scannable : mixed_block_element -> bool
+
+val equal_constructor_representation_up_to_scannable_axes :
+  constructor_representation -> constructor_representation -> bool
+
+(** Whether the constructor is represented as a constant rather than a block:
+    it is nullary, or its shape is [Constructor_immediate_all_void]. *)
+val cstr_layout_is_constant : cstr_layout -> bool
 
 val mixed_block_element_of_const_sort :
   Jkind_types.Sort.Const.t -> mixed_block_element
