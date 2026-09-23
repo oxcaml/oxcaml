@@ -1,6 +1,6 @@
-; Upstream computes this in an OCaml-syntax dune file, which needs an ocaml
-; toplevel the OxCaml workspaces do not all provide. Record the OxCaml commit
-; instead (empty outside a git checkout, e.g. in nix builds).
+; Upstream runs git describe from an OCaml-syntax dune file, which here would
+; report OxCaml's release tags as the js_of_ocaml version. Record the OxCaml
+; commit instead (empty outside a git checkout, e.g. in nix builds).
 
 (rule
  (target GIT-VERSION)

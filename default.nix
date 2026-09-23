@@ -287,25 +287,10 @@ let
     hash = "sha512-rTh+QHif5woRRz236F/gF7gBWSYkQU6QMHMLLpLqCPmAlftukjZDDzPIAWBevuCipihOD2GKJqfaRZnU/Z05XQ==";
   });
 
-  stdlibShimsSrc = pkgs.runCommand "stdlib-shims-0.3.0-source" {
-    src = pkgs.fetchurl {
-      url = "https://github.com/ocaml/stdlib-shims/releases/download/0.3.0/stdlib-shims-0.3.0.tbz";
-      hash = "sha256-ur9y05F7hvcHiF8MVSjjbGP8y2mPS0bPK6tcfM3W2Eo=";
-    };
-  } ''
-    mkdir "$out"
-    tar --extract --file="$src" --directory="$out" --strip-components=1
-    # The upstream dune file is in OCaml syntax, which dune cannot evaluate
-    # through a symlinked source directory. For OCaml >= 4.11 it amounts to
-    # this empty library.
-    cat > "$out/src/dune" << 'EOF'
-    (library
-     (wrapped false)
-     (name stdlib_shims)
-     (modules)
-     (public_name stdlib-shims))
-    EOF
-  '';
+  stdlibShimsSrc = unpackSourceArchive "stdlib-shims-0.3.0-source" (pkgs.fetchurl {
+    url = "https://github.com/ocaml/stdlib-shims/releases/download/0.3.0/stdlib-shims-0.3.0.tbz";
+    hash = "sha256-ur9y05F7hvcHiF8MVSjjbGP8y2mPS0bPK6tcfM3W2Eo=";
+  });
 
   # "seq" is an empty compatibility package with no dune equivalent.
   dropSeqDependency =
