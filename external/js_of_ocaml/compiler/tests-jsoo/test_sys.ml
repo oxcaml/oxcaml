@@ -272,7 +272,9 @@ let%expect_test "double close" =
   | Sys_error _ -> print_endline "Sys_error");
   [%expect {| EBADF |}]
 
-let%expect_test "register bytes content" =
+(* Passes OCaml values to [jsoo_create_file], which expects JavaScript strings:
+   this only works with use-js-string, which is disabled by default here. *)
+let%expect_test ("register bytes content" [@when false]) =
   jsoo_create_file "/static/bin.dat" (Bytes.of_string "\xff\x00\x80a");
   let c = open_in_bin "/static/bin.dat" in
   let s = In_channel.input_all c in
