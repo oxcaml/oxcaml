@@ -1,3 +1,5 @@
+module_block_cells ($camlGadt_simplified_switch__cell0
+  $camlGadt_simplified_switch__cell1)
 (let code size(21)
        extract_int_0 (x : [ 0 |1 | 0 of imm tagged |1 of imm tagged ])
          my_closure &my_alloc_region my_depth

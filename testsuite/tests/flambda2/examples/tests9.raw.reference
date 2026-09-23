@@ -1,3 +1,5 @@
+module_block_cells ($camlTests9__cell0 $camlTests9__cell1 $camlTests9__cell2
+  $camlTests9__cell3 $camlTests9__cell4 $camlTests9__cell5)
 (let code rec loopify(default tailrec) size(22)
        length_aux_0
          (len : imm tagged, param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])

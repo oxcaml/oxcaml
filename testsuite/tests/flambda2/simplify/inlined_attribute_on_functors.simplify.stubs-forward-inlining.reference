@@ -1,3 +1,5 @@
+module_block_cells ($camlInlined_attribute_on_functors__cell0
+  $camlInlined_attribute_on_functors__cell1)
 let code Make_0 deleted in
 let code loopify(never) size(15) stub
       `fn[inlined_attribute_on_functors.ml:19,6--272]_1` (funarg : val)

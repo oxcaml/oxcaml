@@ -1,3 +1,4 @@
+module_block_cells ($camlFloat_fn__cell0 $camlFloat_fn__cell1)
 let code g_0 deleted in
 let code f_1 deleted in
 let code inline(never) loopify(never) size(9) newer_version_of(g_0)

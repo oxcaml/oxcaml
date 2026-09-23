@@ -1,3 +1,4 @@
+module_block_cells ($camlWeird__cell0)
 let $camlWeird__immstring_1 = "weird.ml" in
 let $camlWeird__const_block_2 = Block 0 ($camlWeird__immstring_1, 16, 38) in
 let $camlWeird__Pmakeblock_3 =

@@ -1,3 +1,4 @@
+module_block_cells ($camlOver_app_kind_check_simplify__cell0)
 let $camlOver_app_kind_check_simplify__first_const_0 = Block 0 () in
 (let code inline(always) size(1)
        cast_1 (param : imm tagged, x : val)

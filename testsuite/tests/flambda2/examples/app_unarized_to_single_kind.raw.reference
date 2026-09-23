@@ -1,3 +1,6 @@
+module_block_cells ($camlApp_unarized_to_single_kind__cell0
+  $camlApp_unarized_to_single_kind__cell1
+  $camlApp_unarized_to_single_kind__cell2)
 let $camlApp_unarized_to_single_kind__first_const_0 = Block 0 () in
 (let code size(1)
        f_0 (x) my_closure &my_alloc_region my_depth -> k1 * k2 : imm tagged =

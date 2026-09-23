@@ -12,6 +12,7 @@ let all_boolean_simplifications x = function
   | true -> #(true, false, x)
   | false -> #(false, true, x)
 [%%expect_fexpr Simplify{|
+module_block_cells ($camlTOP3__cell0)
 let code all_boolean_simplifications_0 deleted in
 let code loopify(never) size(2) newer_version_of(all_boolean_simplifications_0)
       all_boolean_simplifications_0_1 (x, param : imm tagged)
@@ -40,6 +41,7 @@ let all_large_simplifications x = function
   | C -> #(2, x, 3, Some 0)
   | D -> #(3, x, 4, Some 0)
 [%%expect_fexpr Simplify{|
+module_block_cells ($camlTOP4__cell0)
 let $camlTOP4__const_block_5 = Block 0 (0) in
 let code all_large_simplifications_1 deleted in
 let $camlTOP4__switch_block_7 =
@@ -75,6 +77,7 @@ let shared_affine_functions = function
   | C -> #(4, 5)
   | D -> #(6, 7)
 [%%expect_fexpr Simplify{|
+module_block_cells ($camlTOP5__cell0)
 let code shared_affine_functions_2 deleted in
 let code loopify(never) size(7) newer_version_of(shared_affine_functions_2)
       shared_affine_functions_2_1 (param : imm tagged)
@@ -103,6 +106,7 @@ let shared_lookup_table = function
   | C -> #(2, Some 0, Some 0)
   | D -> #(3, Some 0, Some 0)
 [%%expect_fexpr Simplify{|
+module_block_cells ($camlTOP6__cell0)
 let $camlTOP6__const_block_12 = Block 0 (0) in
 let code shared_lookup_table_3 deleted in
 let $camlTOP6__switch_block_14 =
@@ -137,6 +141,7 @@ let multiple_lookup_tables = function
   | C -> #(0, 0)
   | D -> #(1, 0)
 [%%expect_fexpr Simplify{|
+module_block_cells ($camlTOP7__cell0)
 let code multiple_lookup_tables_4 deleted in
 let $camlTOP7__switch_block_19 = Value_array [|1; 1; 0; 0|] in
 let $camlTOP7__switch_block_18 = Value_array [|0; 1; 0; 1|] in
@@ -174,6 +179,7 @@ let offset_lookup_table i =
   | C -> 2
   | D -> 1
 [%%expect_fexpr Simplify{|
+module_block_cells ($camlTOP8__cell0)
 let code offset_lookup_table_5 deleted in
 let $camlTOP8__switch_block_25 = Value_array [|0; 2; 1|] in
 let code loopify(never) size(30) newer_version_of(offset_lookup_table_5)
@@ -244,6 +250,7 @@ let poison_prevents_boolean_not b =
   | Absent -> A
   | Box_A t -> t
 [%%expect_fexpr Simplify{|
+module_block_cells ($camlTOP11__cell0)
 let code poison_prevents_boolean_not_6 deleted in
 let $camlTOP11__switch_block_32 = Int_array [|0; 0; 1|] in
 let code loopify(never) size(14) newer_version_of(poison_prevents_boolean_not_6)

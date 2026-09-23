@@ -1,3 +1,4 @@
+module_block_cells ($camlVariants_and_if__cell0 $camlVariants_and_if__cell1)
 let code f_0 deleted in
 let $camlVariants_and_if__immstring_0 = "Variants_and_if.Foo" in
 apply ccall noalloc

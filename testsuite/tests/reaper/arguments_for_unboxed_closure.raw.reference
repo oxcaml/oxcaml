@@ -1,3 +1,4 @@
+module_block_cells ($camlArguments_for_unboxed_closure__cell0)
 let $camlArguments_for_unboxed_closure__first_const_0 = Block 0 () in
 (let code size(11)
        g_1 (h : val)

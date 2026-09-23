@@ -1,3 +1,4 @@
+module_block_cells ($camlValue_slot_c__cell0)
 let $camlValue_slot_c__immstring_5 = "value_slot_c.ml" in
 let $camlValue_slot_c__const_block_6 =
   Block 0 ($camlValue_slot_c__immstring_5, 24, 2)

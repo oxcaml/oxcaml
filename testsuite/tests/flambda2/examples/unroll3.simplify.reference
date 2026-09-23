@@ -1,3 +1,5 @@
+module_block_cells ($camlUnroll3__cell0 $camlUnroll3__cell1
+  $camlUnroll3__cell2 $camlUnroll3__cell3)
 let code odd_1 deleted and code even_0 deleted in
 let $camlUnroll3__even_1 =
   closure even_0_1 @even &toplevel

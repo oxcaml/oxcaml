@@ -1,3 +1,5 @@
+module_block_cells ($camlProtect_refs__cell0 $camlProtect_refs__cell1
+  $camlProtect_refs__cell2 $camlProtect_refs__cell3)
 let code iter_0 deleted in
 let code `fn[protect_refs.ml:28,24--50]_2` deleted in
 let code `fn[protect_refs.ml:29,2--43]_3` deleted in

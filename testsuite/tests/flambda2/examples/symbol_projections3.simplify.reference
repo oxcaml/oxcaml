@@ -1,3 +1,5 @@
+module_block_cells ($camlSymbol_projections3__cell0
+  $camlSymbol_projections3__cell1)
 let code g_1 deleted in
 let code f_0 deleted in
 let $camlSymbol_projections3__immstring_0 = "FOO" in

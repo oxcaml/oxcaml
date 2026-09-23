@@ -1,3 +1,4 @@
+module_block_cells ($camlTests__cell0 $camlTests__cell1)
 let code to_inline_0 deleted in
 let code f_1 deleted in
 let code inline(always) loopify(never) size(1) newer_version_of(to_inline_0)

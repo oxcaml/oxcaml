@@ -4147,6 +4147,15 @@ type module_block_cell =
     physical_fields : int list
   }
 
+(* A physical field of the module block: the variable bound to it, how its load
+   simplified, and the simple naming its contents (the statically known contents
+   if [load] is [Field_contents], else [field_var]). *)
+type module_block_field =
+  { field_var : Variable.t;
+    load : simplified_block_load;
+    field_simple : Simple.t
+  }
+
 let module_block_cells ~compilation_unit
     ~(module_repr : Lambda.module_representation) =
   let cell i ~cell_shape ~physical_fields =
@@ -4161,12 +4170,13 @@ let module_block_cells ~compilation_unit
     List.init field_count (fun i ->
         cell i ~cell_shape:Value_only ~physical_fields:[i])
   | Module_mixed (shape, _) ->
-    let module_shape = module_lambda_shape shape in
+    let physical_fields_by_element =
+      K.Mixed_block_lambda_shape.new_indexes_by_element
+        (module_lambda_shape shape)
+    in
     List.filter_map
       (fun i ->
-        match
-          K.Mixed_block_lambda_shape.new_indexes_of_element module_shape i
-        with
+        match physical_fields_by_element.(i) with
         | [] -> None (* void field *)
         | _ :: _ as physical_fields ->
           let cell_shape =
@@ -4197,57 +4207,62 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
       | Value_approximation.Value_symbol s -> Simple.symbol s
       | _ -> simple_var
     in
-    let field_vars =
-      List.init field_count (fun pos ->
+    let fields =
+      Array.init field_count (fun pos ->
           let pos_str = string_of_int pos in
           let field = Target_ocaml_int.of_int (Acc.machine_width acc) pos in
-          let var = Variable.create ("field_" ^ pos_str) (kind_of_field pos) in
+          let field_var =
+            Variable.create ("field_" ^ pos_str) (kind_of_field pos)
+          in
           let load =
             simplify_block_load acc env ~block:module_block_simple ~field
           in
-          let simple =
+          let field_simple =
             match load with
             | Field_contents simple -> simple
             | Unknown | Not_a_block | Block_but_cannot_simplify _ ->
-              Simple.var var
+              Simple.var field_var
           in
-          pos, var, Flambda_debug_uid.none, load, simple)
+          { field_var; load; field_simple })
     in
-    let fields = Array.of_list field_vars in
-    (* Each cell field has the approximation of the module block field it
-       holds. *)
+    (* Each cell field has the approximation of the module block field it holds.
+       Approximations are only consumed in classic mode. *)
     let acc =
-      List.fold_left
-        (fun acc { cell_symbol; cell_shape; physical_fields } ->
-          let fields =
-            List.mapi
-              (fun cell_pos pos ->
-                let _, _, _, (load : simplified_block_load), simple =
-                  fields.(pos)
-                in
-                match load with
-                | Field_contents _ -> find_value_approximation env simple
-                | Block_but_cannot_simplify approx -> approx
-                | Unknown | Not_a_block ->
-                  Value_approximation.Unknown
-                    (K.Scannable_block_shape.element_kind cell_shape cell_pos))
-              physical_fields
-          in
-          Acc.add_symbol_approximation acc cell_symbol
-            (Value_approximation.Block_approximation
-               ( Tag.Scannable.zero,
-                 cell_shape,
-                 Array.of_list fields,
-                 Alloc_mode.For_types.heap )))
-        acc cells
+      if not (Flambda_features.classic_mode ())
+      then acc
+      else
+        List.fold_left
+          (fun acc { cell_symbol; cell_shape; physical_fields } ->
+            let fields =
+              List.mapi
+                (fun cell_pos pos ->
+                  let { load; field_simple; _ } = fields.(pos) in
+                  match load with
+                  | Field_contents _ ->
+                    find_value_approximation env field_simple
+                  | Block_but_cannot_simplify approx -> approx
+                  | Unknown | Not_a_block ->
+                    Value_approximation.Unknown
+                      (K.Scannable_block_shape.element_kind cell_shape cell_pos))
+                physical_fields
+            in
+            Acc.add_symbol_approximation acc cell_symbol
+              (Value_approximation.Block_approximation
+                 ( Tag.Scannable.zero,
+                   cell_shape,
+                   Array.of_list fields,
+                   Alloc_mode.For_types.heap )))
+          acc cells
     in
     let acc, body =
       let static_const : Static_const.t =
         let field_vars =
-          List.map
-            (fun (_, var, _, _, _) ->
-              Simple.With_debuginfo.create (Simple.var var) Debuginfo.none)
-            field_vars
+          Array.to_list
+            (Array.map
+               (fun { field_var; _ } ->
+                 Simple.With_debuginfo.create (Simple.var field_var)
+                   Debuginfo.none)
+               fields)
         in
         Static_const.block module_block_tag Immutable block_shape field_vars
       in
@@ -4256,8 +4271,8 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
         let fields =
           List.map
             (fun pos ->
-              let _, _, _, _, simple = fields.(pos) in
-              Simple.With_debuginfo.create simple Debuginfo.none)
+              Simple.With_debuginfo.create fields.(pos).field_simple
+                Debuginfo.none)
             physical_fields
         in
         Static_const.block module_block_tag Immutable cell_shape fields
@@ -4290,9 +4305,9 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
         named ~body:return
     in
     List.fold_left
-      (fun (acc, body)
-           (pos, var, var_duid, (load : simplified_block_load), simple) ->
-        let var = VB.create var var_duid Name_mode.normal in
+      (fun (acc, body) pos ->
+        let { field_var; load; field_simple } = fields.(pos) in
+        let var = VB.create field_var Flambda_debug_uid.none Name_mode.normal in
         let pat = Bound_pattern.singleton var in
         let field = Target_ocaml_int.of_int (Acc.machine_width acc) pos in
         let block = module_block_simple in
@@ -4307,9 +4322,10 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
           in
           Let_with_acc.create acc pat named ~body
         | Field_contents _ ->
-          let named = Named.create_simple simple in
+          let named = Named.create_simple field_simple in
           Let_with_acc.create acc pat named ~body)
-      (acc, body) (List.rev field_vars)
+      (acc, body)
+      (List.rev (List.init field_count Fun.id))
   in
   let load_fields_handler_param =
     [BP.create module_block_var K.With_subkind.any_value module_block_var_duid]

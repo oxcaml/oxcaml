@@ -1,3 +1,5 @@
+module_block_cells ($camlFrom_odoc_texi__cell0 $camlFrom_odoc_texi__cell1
+  $camlFrom_odoc_texi__cell2 $camlFrom_odoc_texi__cell3)
 let code `!_0` deleted in
 let code foo_1 deleted in
 let $camlFrom_odoc_texi__immstring_1 = "b" in

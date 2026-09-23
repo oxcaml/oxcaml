@@ -1,3 +1,4 @@
+module_block_cells ($camlData_flow_opam_bug__cell0)
 let $camlData_flow_opam_bug__immstring_0 = "plop" in
 let $camlData_flow_opam_bug__immstring_1 = "plip" in
 let code to_string_0 deleted in

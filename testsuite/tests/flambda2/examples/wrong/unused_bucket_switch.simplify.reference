@@ -1,3 +1,5 @@
+module_block_cells ($camlUnused_bucket_switch__cell0
+  $camlUnused_bucket_switch__cell1)
 let code opaque_0 deleted in
 let $camlUnused_bucket_switch__immstring_0 = "urk" in
 let code f_1 deleted in

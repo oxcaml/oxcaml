@@ -1,3 +1,5 @@
+module_block_cells ($camlInlined_rec__cell0 $camlInlined_rec__cell1
+  $camlInlined_rec__cell2)
 let $camlInlined_rec__first_const_0 = Block 0 () in
 (let code inline(always) size(6)
        apply_0 (f : val, i) my_closure &my_alloc_region my_depth -> k1 * k2 =

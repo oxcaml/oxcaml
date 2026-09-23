@@ -1,3 +1,4 @@
+module_block_cells ($camlP__cell0 $camlP__cell1 $camlP__cell2)
 let code foo_0 deleted in
 let code `fn[p.ml:11,19--31]_2` deleted in
 let code bar_1 deleted in

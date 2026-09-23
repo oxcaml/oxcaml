@@ -1,3 +1,5 @@
+module_block_cells ($camlTests4__cell0 $camlTests4__cell1 $camlTests4__cell2
+  $camlTests4__cell3)
 (let $camlTests4__float_0 = 0x0p+0 in
  let $camlTests4__float_1 = 0x1.8p+1 in
  let code size(54)

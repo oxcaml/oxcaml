@@ -1,3 +1,4 @@
+module_block_cells ($camlUnroll2__cell0 $camlUnroll2__cell1)
 let code foo_0 deleted in
 let code bar_1 deleted in
 let $camlUnroll2__foo_1 =

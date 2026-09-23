@@ -1,3 +1,4 @@
+module_block_cells ($camlLifting__cell0 $camlLifting__cell1)
 let code f_0 deleted in
 apply ccall ($`*extern*`.rand : val -> val) (0) -> k * error
   where k (r0) =

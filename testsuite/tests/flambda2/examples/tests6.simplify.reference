@@ -1,2 +1,3 @@
+module_block_cells ($camlTests6__cell0)
 let $camlTests6__cell0 = Block 0 (45) and $camlTests6 = Block 0 (45) in
 cont done ($camlTests6)

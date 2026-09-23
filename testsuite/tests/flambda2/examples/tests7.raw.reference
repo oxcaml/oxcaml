@@ -1,3 +1,5 @@
+module_block_cells ($camlTests7__cell0 $camlTests7__cell1 $camlTests7__cell2
+  $camlTests7__cell3 $camlTests7__cell4)
 (let $camlTests7__immstring_1 = "Cow" in
  let $camlTests7__immstring_2 = "Sheep" in
  let code size(37)

@@ -1,3 +1,7 @@
+module_block_cells ($camlInlined_attribute_on_erased_optional_application__cell0
+  $camlInlined_attribute_on_erased_optional_application__cell1
+  $camlInlined_attribute_on_erased_optional_application__cell2
+  $camlInlined_attribute_on_erased_optional_application__cell3)
 let code default_0 deleted in
 let code f_inner_2 deleted in
 let code loopify(never) size(27) stub

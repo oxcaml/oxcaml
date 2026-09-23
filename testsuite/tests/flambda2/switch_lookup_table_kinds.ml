@@ -34,6 +34,7 @@ match_tagged_immediate:
   ret
 |}]
 [%%expect_fexpr Simplify{|
+module_block_cells ($camlTOP2__cell0)
 let code match_tagged_immediate_0 deleted in
 let $camlTOP2__switch_block_3 = Value_array [|5; 10; 2; 7|] in
 let code loopify(never) size(2) newer_version_of(match_tagged_immediate_0)
@@ -70,6 +71,7 @@ match_naked_immediate:
   ret
 |}]
 [%%expect_fexpr Simplify{|
+module_block_cells ($camlTOP4__cell0)
 let code match_naked_immediate_1 deleted in
 let $camlTOP4__switch_block_8 = Int_array [|5; 10; 2; 7|] in
 let code loopify(never) size(2) newer_version_of(match_naked_immediate_1)
@@ -104,6 +106,7 @@ match_naked_float:
   ret
 |}]
 [%%expect_fexpr Simplify{|
+module_block_cells ($camlTOP5__cell0)
 let code match_naked_float_2 deleted in
 let $camlTOP5__switch_block_12 =
   Float_array [|0x1.4p+2;
@@ -143,6 +146,7 @@ match_naked_float32:
   ret
 |}]
 [%%expect_fexpr Simplify{|
+module_block_cells ($camlTOP6__cell0)
 let code match_naked_float32_3 deleted in
 let $camlTOP6__switch_block_16 =
   Float32_array [|0x1.4p+2s;
@@ -182,6 +186,7 @@ match_naked_int32:
   ret
 |}]
 [%%expect_fexpr Simplify{|
+module_block_cells ($camlTOP7__cell0)
 let code match_naked_int32_4 deleted in
 let $camlTOP7__switch_block_20 = Int32_array [|5l; 10l; 2l; 7l|] in
 let code loopify(never) size(3) newer_version_of(match_naked_int32_4)
@@ -216,6 +221,7 @@ match_naked_int64:
   ret
 |}]
 [%%expect_fexpr Simplify{|
+module_block_cells ($camlTOP8__cell0)
 let code match_naked_int64_5 deleted in
 let $camlTOP8__switch_block_24 = Int64_array [|5L; 10L; 2L; 7L|] in
 let code loopify(never) size(2) newer_version_of(match_naked_int64_5)
@@ -250,6 +256,7 @@ match_naked_nativeint:
   ret
 |}]
 [%%expect_fexpr Simplify{|
+module_block_cells ($camlTOP9__cell0)
 let code match_naked_nativeint_6 deleted in
 let $camlTOP9__switch_block_28 = Nativeint_array [|5n; 10n; 2n; 7n|] in
 let code loopify(never) size(2) newer_version_of(match_naked_nativeint_6)
@@ -285,6 +292,7 @@ match_naked_int8:
   ret
 |}]
 [%%expect_fexpr Simplify{|
+module_block_cells ($camlTOP10__cell0)
 let code match_naked_int8_7 deleted in
 let $camlTOP10__switch_block_32 = Int8_array [|5s; 10s; 2s; 7s|] in
 let code loopify(never) size(3) newer_version_of(match_naked_int8_7)
@@ -319,6 +327,7 @@ match_naked_int16:
   ret
 |}]
 [%%expect_fexpr Simplify{|
+module_block_cells ($camlTOP11__cell0)
 let code match_naked_int16_8 deleted in
 let $camlTOP11__switch_block_36 = Int16_array [|5S; 10S; 2S; 7S|] in
 let code loopify(never) size(3) newer_version_of(match_naked_int16_8)
@@ -353,6 +362,7 @@ match_symbol:
   ret
 |}]
 [%%expect_fexpr Simplify{|
+module_block_cells ($camlTOP12__cell0)
 let $camlTOP12__immstring_38 = "alpha" in
 let $camlTOP12__immstring_39 = "beta" in
 let $camlTOP12__immstring_40 = "gamma" in
@@ -402,6 +412,7 @@ match_symbol_or_tagged_immediate:
   ret
 |}]
 [%%expect_fexpr Simplify{|
+module_block_cells ($camlTOP14__cell0)
 let $camlTOP14__immstring_46 = "foo" in
 let $camlTOP14__const_block_47 = Block 1 ($camlTOP14__immstring_46) in
 let $camlTOP14__const_block_48 = Block 0 (42) in
@@ -449,6 +460,7 @@ match_symbol_tagged_or_null:
   ret
 |}]
 [%%expect_fexpr Simplify{|
+module_block_cells ($camlTOP15__cell0)
 let $camlTOP15__immstring_52 = "foo" in
 let $camlTOP15__const_block_53 = Block 1 ($camlTOP15__immstring_52) in
 let $camlTOP15__const_block_54 = Block 0 (42) in

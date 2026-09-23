@@ -1,3 +1,6 @@
+module_block_cells ($camlCross_function_cse_b__cell0
+  $camlCross_function_cse_b__cell1 $camlCross_function_cse_b__cell2
+  $camlCross_function_cse_b__cell3 $camlCross_function_cse_b__cell4)
 let code some_0 deleted in
 let code f_1 deleted in
 let code g_2 deleted in

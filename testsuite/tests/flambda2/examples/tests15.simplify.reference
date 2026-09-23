@@ -1,3 +1,6 @@
+module_block_cells ($camlTests15__cell0 $camlTests15__cell1
+  $camlTests15__cell2 $camlTests15__cell3 $camlTests15__cell4
+  $camlTests15__cell5 $camlTests15__cell6 $camlTests15__cell7)
 let $camlTests15__immstring_0 = "tests15.ml" in
 let $camlTests15__const_block_1 = Block 0 ($camlTests15__immstring_0, 18, 52)
 in

@@ -1,3 +1,5 @@
+module_block_cells ($camlCross_function_cse_a__cell0
+  $camlCross_function_cse_a__cell1 $camlCross_function_cse_a__cell2)
 (let code inline(always) size(7)
        some_0 (x)
          my_closure &my_alloc_region my_depth

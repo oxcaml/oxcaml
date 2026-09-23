@@ -1,3 +1,5 @@
+module_block_cells ($camlUnroll4__cell0 $camlUnroll4__cell1
+  $camlUnroll4__cell2 $camlUnroll4__cell3)
 let code odd_2 deleted and code even_1 deleted in
 let code parity_is_0 deleted in
 let code k_3 deleted in

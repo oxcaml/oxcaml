@@ -1,3 +1,5 @@
+module_block_cells ($camlRemoved_operations_of_switch__cell0
+  $camlRemoved_operations_of_switch__cell1)
 let code f_0 deleted in
 let code g_1 deleted in
 let code loopify(never) size(27) newer_version_of(f_0)

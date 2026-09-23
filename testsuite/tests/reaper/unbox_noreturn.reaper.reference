@@ -1,3 +1,4 @@
+module_block_cells ($camlUnbox_noreturn__cell0)
 let code body_1 deleted in
 let code `fn[unbox_noreturn.ml:15,7--28]_2` deleted in
 let code run_0 deleted in

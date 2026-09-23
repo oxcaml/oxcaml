@@ -1,3 +1,6 @@
+module_block_cells ($camlDirect_app_parameter_kind_check_classic__cell0
+  $camlDirect_app_parameter_kind_check_classic__cell1
+  $camlDirect_app_parameter_kind_check_classic__cell2)
 (let code size(25)
        send_0 (t : val, c : val)
          my_closure &my_alloc_region my_depth

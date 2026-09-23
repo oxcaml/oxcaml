@@ -1,3 +1,4 @@
+module_block_cells ($camlJoin_match__cell0 $camlJoin_match__cell1)
 let code g_0 deleted in
 let code bar_1 deleted in
 let code inline(always) loopify(never) size(33) newer_version_of(g_0)

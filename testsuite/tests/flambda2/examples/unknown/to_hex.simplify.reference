@@ -1,3 +1,4 @@
+module_block_cells ($camlTo_hex__cell0 $camlTo_hex__cell1 $camlTo_hex__cell2)
 let code failwith_0 deleted in
 let code invalid_arg_1 deleted in
 let code min_2 deleted in

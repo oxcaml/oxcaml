@@ -1,3 +1,5 @@
+module_block_cells ($camlData_flow_exception_bug__cell0
+  $camlData_flow_exception_bug__cell1)
 let $camlData_flow_exception_bug__immstring_0 = "data_flow_exception_bug.ml"
 in
 let $camlData_flow_exception_bug__const_block_1 =

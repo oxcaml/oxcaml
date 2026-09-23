@@ -1,3 +1,4 @@
+module_block_cells ($camlRay__cell0 $camlRay__cell1 $camlRay__cell2)
 let code min_0 deleted in
 let code max_1 deleted in
 let code aabb_hit_2 deleted in

@@ -1,3 +1,4 @@
+module_block_cells ($camlF__cell0)
 let $camlF__string_0 = "index out of bounds" in
 let $camlF__block_1 =
   Block 0 ($`*predef*`.caml_exn_Invalid_argument, $camlF__string_0)

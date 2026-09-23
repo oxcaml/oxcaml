@@ -1,3 +1,6 @@
+module_block_cells ($camlLet_symbol_var_inlining__cell0
+  $camlLet_symbol_var_inlining__cell1 $camlLet_symbol_var_inlining__cell2
+  $camlLet_symbol_var_inlining__cell3 $camlLet_symbol_var_inlining__cell4)
 let code f_0 deleted in
 let code g_1 deleted in
 let b = %block_load.[`4`] ($Stdlib__Sys.camlStdlib__Sys) in

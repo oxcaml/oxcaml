@@ -1,3 +1,5 @@
+module_block_cells ($camlInvalid__cell0 $camlInvalid__cell1
+  $camlInvalid__cell2)
 let $camlInvalid__immstring_0 = "lengths" in
 let code check_0 deleted in
 let code bar_1 deleted in

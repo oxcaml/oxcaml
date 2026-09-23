@@ -1,3 +1,4 @@
+module_block_cells ($camlTests8__cell0)
 let code `fn[tests8.ml:20,62--77]_2` deleted in
 let code `fn[tests8.ml:20,49--61]_3` deleted in
 let code map_foo_0 deleted and code `fn[tests8.ml:20,12--80]_1` deleted in

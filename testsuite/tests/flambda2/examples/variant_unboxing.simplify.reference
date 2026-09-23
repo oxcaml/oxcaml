@@ -1,3 +1,5 @@
+module_block_cells ($camlVariant_unboxing__cell0 $camlVariant_unboxing__cell1
+  $camlVariant_unboxing__cell2)
 let code f1_0 deleted in
 let code f2_1 deleted in
 let code f3_returning_a_2 deleted in

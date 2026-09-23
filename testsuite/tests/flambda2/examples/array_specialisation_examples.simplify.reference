@@ -1,3 +1,7 @@
+module_block_cells ($camlArray_specialisation_examples__cell0
+  $camlArray_specialisation_examples__cell1
+  $camlArray_specialisation_examples__cell2
+  $camlArray_specialisation_examples__cell3)
 let $camlArray_specialisation_examples__string_0 = "index out of bounds" in
 let $camlArray_specialisation_examples__block_1 =
   Block 0 ($`*predef*`.caml_exn_Invalid_argument,

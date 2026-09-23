@@ -1,3 +1,4 @@
+module_block_cells ($camlPhantom__cell0 $camlPhantom__cell1)
 let code is_true_1 deleted in
 let code is_false_2 deleted in
 let $camlPhantom__immstring_1 = "phantom.ml" in

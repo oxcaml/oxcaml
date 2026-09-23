@@ -1,3 +1,4 @@
+module_block_cells ($camlTest_cmx_offsets2__cell0)
 let x =
   %project_value_slot.[f].[x] ($Test_cmx_offsets1.camlTest_cmx_offsets1__f_1)
 in

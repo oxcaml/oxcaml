@@ -1,3 +1,5 @@
+module_block_cells ($camlDeleted_code_printing__cell0
+  $camlDeleted_code_printing__cell1)
 let code aux_1 deleted in
 let code foobar_0 deleted in
 let env = %block.mut.[`0`].`toplevel` (42) in

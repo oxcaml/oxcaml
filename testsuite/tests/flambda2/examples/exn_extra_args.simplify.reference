@@ -1,3 +1,4 @@
+module_block_cells ($camlExn_extra_args__cell0 $camlExn_extra_args__cell1)
 let $camlExn_extra_args__immstring_0 = "bar" in
 let code input_line_0 deleted in
 let code ld_conf_contents_1 deleted in

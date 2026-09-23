@@ -1,3 +1,4 @@
+module_block_cells ($camlIncludecore_repro__cell0)
 let $camlIncludecore_repro__const_block_0 = Block 0 (0, 0) in
 let code f_0 deleted in
 let $camlIncludecore_repro__const_block_1 =

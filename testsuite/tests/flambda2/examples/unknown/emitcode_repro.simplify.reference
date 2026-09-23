@@ -1,3 +1,4 @@
+module_block_cells ($camlEmitcode_repro__cell0)
 let code out_0 deleted in
 let $camlEmitcode_repro__const_block_0 = Block 0 (1, 1) in
 let $camlEmitcode_repro__const_block_1 = Block 0 (1, 0) in

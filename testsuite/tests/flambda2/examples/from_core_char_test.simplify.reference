@@ -1,3 +1,6 @@
+module_block_cells ($camlFrom_core_char_test__cell0
+  $camlFrom_core_char_test__cell1 $camlFrom_core_char_test__cell2
+  $camlFrom_core_char_test__cell3 $camlFrom_core_char_test__cell4)
 let $camlFrom_core_char_test__string_0 = "index out of bounds" in
 let $camlFrom_core_char_test__block_1 =
   Block 0 ($`*predef*`.caml_exn_Invalid_argument,

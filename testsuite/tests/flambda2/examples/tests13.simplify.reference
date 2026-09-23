@@ -1,3 +1,4 @@
+module_block_cells ($camlTests13__cell0)
 let code `fn[tests13.ml:30,44--59]_2` deleted in
 let code `fn[tests13.ml:30,31--43]_3` deleted in
 let code `fn[tests13.ml:27,2--118]_1` deleted in

@@ -1,3 +1,5 @@
+module_block_cells ($camlInlining_arguments_meet__cell0
+  $camlInlining_arguments_meet__cell1 $camlInlining_arguments_meet__cell2)
 let code h_0 deleted in
 let code q_1 deleted in
 let code loopify(never) size(4) newer_version_of(h_0)

@@ -1,3 +1,6 @@
+module_block_cells ($camlCross_function_cse_b__cell0
+  $camlCross_function_cse_b__cell1 $camlCross_function_cse_b__cell2
+  $camlCross_function_cse_b__cell3 $camlCross_function_cse_b__cell4)
 let $camlCross_function_cse_b__first_const_0 = Block 0 () in
 (let code inline(always) size(7)
        some_0 (x)

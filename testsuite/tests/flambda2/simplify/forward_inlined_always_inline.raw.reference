@@ -1,3 +1,8 @@
+module_block_cells ($camlForward_inlined_always_inline__cell0
+  $camlForward_inlined_always_inline__cell1
+  $camlForward_inlined_always_inline__cell2
+  $camlForward_inlined_always_inline__cell3
+  $camlForward_inlined_always_inline__cell4)
 let $camlForward_inlined_always_inline__first_const_0 = Block 0 () in
 (let code inline(always) size(1)
        f_0 (x) my_closure &my_alloc_region my_depth -> k1 * k2 =

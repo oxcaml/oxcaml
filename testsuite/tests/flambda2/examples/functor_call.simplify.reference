@@ -1,3 +1,4 @@
+module_block_cells ($camlFunctor_call__cell0 $camlFunctor_call__cell1)
 let code test_2 deleted in
 let code inline(always) loopify(never) size(5) newer_version_of(test_2)
       test_2_1 (x : imm tagged)

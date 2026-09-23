@@ -1,3 +1,8 @@
+module_block_cells ($camlSpeculative_inlining_lifted_constants__cell0
+  $camlSpeculative_inlining_lifted_constants__cell1
+  $camlSpeculative_inlining_lifted_constants__cell2
+  $camlSpeculative_inlining_lifted_constants__cell3
+  $camlSpeculative_inlining_lifted_constants__cell4)
 let $camlSpeculative_inlining_lifted_constants__first_const_0 = Block 0 () in
 (let code size(8)
        f_0 (x)

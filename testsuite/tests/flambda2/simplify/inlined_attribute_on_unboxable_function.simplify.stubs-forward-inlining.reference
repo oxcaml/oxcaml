@@ -1,3 +1,6 @@
+module_block_cells ($camlInlined_attribute_on_unboxable_function__cell0
+  $camlInlined_attribute_on_unboxable_function__cell1
+  $camlInlined_attribute_on_unboxable_function__cell2)
 let code helper_0 deleted in
 let code f_2 deleted in
 let code loopify(never) size(15) stub

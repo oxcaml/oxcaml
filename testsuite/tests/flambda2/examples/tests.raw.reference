@@ -1,3 +1,4 @@
+module_block_cells ($camlTests__cell0 $camlTests__cell1)
 let $camlTests__first_const_0 = Block 0 () in
 (let code inline(always) size(1)
        to_inline_0 (_x, _y)

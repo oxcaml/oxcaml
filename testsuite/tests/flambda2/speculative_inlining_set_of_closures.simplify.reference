@@ -1,3 +1,7 @@
+module_block_cells ($camlSpeculative_inlining_set_of_closures__cell0
+  $camlSpeculative_inlining_set_of_closures__cell1
+  $camlSpeculative_inlining_set_of_closures__cell2
+  $camlSpeculative_inlining_set_of_closures__cell3)
 let code use_0 deleted in
 let code f_2 deleted in
 let code g_1 deleted in

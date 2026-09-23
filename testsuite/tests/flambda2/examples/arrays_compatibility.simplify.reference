@@ -1,3 +1,5 @@
+module_block_cells ($camlArrays_compatibility__cell0
+  $camlArrays_compatibility__cell1)
 let code index_0 deleted in
 let $camlArrays_compatibility__string_1 = "index out of bounds" in
 let $camlArrays_compatibility__block_2 =

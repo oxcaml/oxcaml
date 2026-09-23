@@ -1,3 +1,5 @@
+module_block_cells ($camlUnroll3__cell0 $camlUnroll3__cell1
+  $camlUnroll3__cell2 $camlUnroll3__cell3)
 let $camlUnroll3__first_const_0 = Block 0 () in
 (let code rec size(23)
        even_0 (n : imm tagged)

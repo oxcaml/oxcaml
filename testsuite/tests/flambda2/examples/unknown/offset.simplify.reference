@@ -1,3 +1,4 @@
+module_block_cells ($camlOffset__cell0 $camlOffset__cell1 $camlOffset__cell2)
 let code f_2 deleted in
 let code g_3 deleted in
 let code h_4 deleted in

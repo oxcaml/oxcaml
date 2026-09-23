@@ -1,3 +1,4 @@
+module_block_cells ($camlBoxed_number_subkind_erasure__cell0)
 let code merge_usages_1 deleted in
 let code f_0 deleted in
 let code inline(never) loopify(never) size(1) newer_version_of(merge_usages_1)

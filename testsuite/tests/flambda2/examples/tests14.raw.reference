@@ -1,3 +1,5 @@
+module_block_cells ($camlTests14__cell0 $camlTests14__cell1
+  $camlTests14__cell2 $camlTests14__cell3)
 let $camlTests14__first_const_0 = Block 0 () in
 (let code size(5)
        set_0 (t : val)

@@ -1,3 +1,6 @@
+module_block_cells ($camlTest_exn_handler_inlining__cell0
+  $camlTest_exn_handler_inlining__cell1
+  $camlTest_exn_handler_inlining__cell2)
 let code id_0 deleted in
 let code p_2 deleted in
 let code g_1 deleted in

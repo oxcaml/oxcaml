@@ -1,3 +1,4 @@
+module_block_cells ($camlLifting2__cell0 $camlLifting2__cell1)
 apply ccall ($`*extern*`.rand : val -> val) (0) -> k * error
   where k (r0) =
     (apply ccall ($`*extern*`.rand : val -> val) (0) -> k * error

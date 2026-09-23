@@ -1,3 +1,4 @@
+module_block_cells ($camlUnroll__cell0 $camlUnroll__cell1 $camlUnroll__cell2)
 let code fact_0 deleted in
 let $camlUnroll__fact_1 =
   closure fact_0_1 @fact &toplevel

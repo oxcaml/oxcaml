@@ -1,3 +1,4 @@
+module_block_cells ($camlNested_switch__cell0 $camlNested_switch__cell1)
 let code test_0 deleted in
 let code f_1 deleted in
 let code inline(always) loopify(never) size(31) newer_version_of(test_0)

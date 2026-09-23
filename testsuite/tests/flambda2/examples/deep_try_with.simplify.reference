@@ -1,3 +1,4 @@
+module_block_cells ($camlDeep_try_with__cell0 $camlDeep_try_with__cell1)
 let $camlDeep_try_with__immstring_1 = "Deep_try_with.E2" in
 let $camlDeep_try_with__immstring_0 = "Deep_try_with.E1" in
 apply ccall noalloc

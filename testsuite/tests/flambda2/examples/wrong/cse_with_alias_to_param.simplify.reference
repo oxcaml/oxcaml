@@ -1,3 +1,5 @@
+module_block_cells ($camlCse_with_alias_to_param__cell0
+  $camlCse_with_alias_to_param__cell1)
 let code id_0 deleted in
 let code foo_1 deleted in
 let code inline(never) loopify(never) size(1) newer_version_of(id_0)

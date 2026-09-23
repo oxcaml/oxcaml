@@ -1,3 +1,5 @@
+module_block_cells ($camlLocal__cell0 $camlLocal__cell1 $camlLocal__cell2
+  $camlLocal__cell3 $camlLocal__cell4 $camlLocal__cell5 $camlLocal__cell6)
 let $camlLocal__const_block_0 = Block 0 (3, 0) in
 let $camlLocal__const_block_1 = Block 0 (2, $camlLocal__const_block_0) in
 let $camlLocal__const_block_2 = Block 0 (1, $camlLocal__const_block_1) in

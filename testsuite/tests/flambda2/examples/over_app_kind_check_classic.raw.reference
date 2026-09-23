@@ -1,3 +1,4 @@
+module_block_cells ($camlOver_app_kind_check_classic__cell0)
 (let code inline(never) size(1)
        f_1 (param) my_closure &my_alloc_region my_depth -> k1 * k2 : int64 =
    cont k1 (0L)

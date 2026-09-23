@@ -1,3 +1,7 @@
+module_block_cells ($camlLocal_exns_to_jumps__cell0
+  $camlLocal_exns_to_jumps__cell1 $camlLocal_exns_to_jumps__cell2
+  $camlLocal_exns_to_jumps__cell3 $camlLocal_exns_to_jumps__cell4
+  $camlLocal_exns_to_jumps__cell5)
 let code f1_0 deleted in
 let code f2_1 deleted in
 let code f3_2 deleted in

@@ -1,3 +1,4 @@
+module_block_cells ($camlTests0__cell0)
 let $camlTests0__first_const_0 = Block 0 () in
 (let code size(31)
        f_0 (param : imm tagged)

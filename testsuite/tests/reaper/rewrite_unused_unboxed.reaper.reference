@@ -1,3 +1,4 @@
+module_block_cells ($camlRewrite_unused_unboxed__cell0)
 let code print_int_0 deleted in
 let code consume_1 deleted in
 let code Make_2 deleted in

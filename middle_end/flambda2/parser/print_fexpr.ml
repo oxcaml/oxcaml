@@ -884,5 +884,13 @@ and code_binding ppf
     | Maybe_alloc_stack -> " stack")
     (expr Outer) body
 
-let flambda_unit ppf ({ body } : flambda_unit) =
-  Format.fprintf ppf "@[<v>@[%a@]@ @]" (expr Outer) body
+let module_block_cells ppf = function
+  | [] -> ()
+  | cells ->
+    Format.fprintf ppf "@[<hov 2>%tmodule_block_cells%t (%a)@]@ "
+      Flambda_colours.static_keyword Flambda_colours.pop
+      (pp_list ~sep:"@ " symbol) cells
+
+let flambda_unit ppf ({ module_block_cells = cells; body } : flambda_unit) =
+  Format.fprintf ppf "@[<v>%a@[%a@]@ @]" module_block_cells cells (expr Outer)
+    body

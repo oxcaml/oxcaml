@@ -1,3 +1,4 @@
+module_block_cells ($camlPartial_app_kind_check_classic__cell0)
 (let code inline(never) size(1)
        f_1 (param, param_1)
          my_closure &my_alloc_region my_depth

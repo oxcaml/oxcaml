@@ -1,3 +1,4 @@
+module_block_cells ($camlUnroll__cell0 $camlUnroll__cell1 $camlUnroll__cell2)
 let $camlUnroll__first_const_0 = Block 0 () in
 (let code rec size(27)
        fact_0 (n : imm tagged)

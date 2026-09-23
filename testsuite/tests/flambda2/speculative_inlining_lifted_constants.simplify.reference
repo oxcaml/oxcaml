@@ -1,3 +1,8 @@
+module_block_cells ($camlSpeculative_inlining_lifted_constants__cell0
+  $camlSpeculative_inlining_lifted_constants__cell1
+  $camlSpeculative_inlining_lifted_constants__cell2
+  $camlSpeculative_inlining_lifted_constants__cell3
+  $camlSpeculative_inlining_lifted_constants__cell4)
 let code f_0 deleted in
 let code v1_1 deleted in
 let code loopify(never) size(8) newer_version_of(f_0)

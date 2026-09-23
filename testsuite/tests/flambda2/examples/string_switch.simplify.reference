@@ -1,3 +1,4 @@
+module_block_cells ($camlString_switch__cell0)
 let $camlString_switch__immstring_0 = "Cow" in
 let $camlString_switch__immstring_1 = "Goat" in
 let $camlString_switch__immstring_2 = "Horse" in

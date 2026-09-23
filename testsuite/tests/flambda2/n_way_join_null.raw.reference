@@ -1,3 +1,4 @@
+module_block_cells ($camlN_way_join_null__cell0)
 let $camlN_way_join_null__first_const_0 = Block 0 () in
 (let code size(17)
        main_0 (x)

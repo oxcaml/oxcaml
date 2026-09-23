@@ -1,3 +1,4 @@
+module_block_cells ($camlIssue5721__cell0)
 let code main_0 deleted in
 let code loopify(never) size(33) newer_version_of(main_0)
       main_0_1 (f : val, x : [ 0 |1 | 0 of val ])

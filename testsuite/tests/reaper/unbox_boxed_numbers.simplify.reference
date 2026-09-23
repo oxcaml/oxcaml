@@ -1,3 +1,8 @@
+module_block_cells ($camlUnbox_boxed_numbers__cell0
+  $camlUnbox_boxed_numbers__cell1 $camlUnbox_boxed_numbers__cell2
+  $camlUnbox_boxed_numbers__cell3 $camlUnbox_boxed_numbers__cell4
+  $camlUnbox_boxed_numbers__cell5 $camlUnbox_boxed_numbers__cell6
+  $camlUnbox_boxed_numbers__cell7)
 let code add_int64_0 deleted in
 let code add_int32_1 deleted in
 let code add_nativeint_2 deleted in

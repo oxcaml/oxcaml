@@ -872,4 +872,8 @@ let conv flambda_unit =
      necessarily occur in dependency order *)
   let env = bind_all_code_ids env flambda_unit in
   let body = expr env (Flambda_unit.body flambda_unit) in
-  { Fexpr.body }
+  let module_block_cells =
+    List.map (Env.find_symbol_exn env)
+      (Flambda_unit.module_block_cells flambda_unit)
+  in
+  { Fexpr.module_block_cells; body }

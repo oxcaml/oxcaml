@@ -1,3 +1,4 @@
+module_block_cells ($camlVariant_ah__cell0 $camlVariant_ah__cell1)
 let code maybe_0 deleted in
 let code shouldn't_alloc_1 deleted in
 let code inline(always) loopify(never) size(18) newer_version_of(maybe_0)

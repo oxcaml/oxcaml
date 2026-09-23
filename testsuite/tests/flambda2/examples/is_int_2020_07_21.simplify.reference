@@ -1,3 +1,5 @@
+module_block_cells ($camlIs_int_2020_07_21__cell0
+  $camlIs_int_2020_07_21__cell1)
 let code of_src_0 deleted in
 let code test_1 deleted in
 let code inline(always) loopify(never) size(4) newer_version_of(of_src_0)

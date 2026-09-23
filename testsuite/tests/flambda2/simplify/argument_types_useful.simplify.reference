@@ -1,3 +1,5 @@
+module_block_cells ($camlArgument_types_useful__cell0
+  $camlArgument_types_useful__cell1 $camlArgument_types_useful__cell2)
 let code unbox_int_and_add_one_0 deleted in
 let code unbox_int_and_add_one_wrapper_1 deleted in
 let code box_int_then_call_unbox_int_and_add_one_wrapper_2 deleted in

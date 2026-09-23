@@ -14,6 +14,7 @@ let map_ints_to_float_constants = function
   | _ -> #4.
 ;;
 [%%expect_fexpr Simplify{|
+module_block_cells ($camlTOP1__cell0)
 let code map_ints_to_float_constants_0 deleted in
 let code loopify(never) size(60) newer_version_of(map_ints_to_float_constants_0)
       map_ints_to_float_constants_0_1 (param : nativeint)
@@ -65,6 +66,7 @@ let map_tagged_ints_to_float_constants = function
   | _ -> #4.
 ;;
 [%%expect_fexpr Simplify{|
+module_block_cells ($camlTOP2__cell0)
 let code map_tagged_ints_to_float_constants_1 deleted in
 let $camlTOP2__switch_block_5 =
   Float_array [|0x0p+0;
@@ -111,6 +113,7 @@ let match_on_ints = function
   | _ -> ()
 ;;
 [%%expect_fexpr Simplify{|
+module_block_cells ($camlTOP7__cell0)
 let code match_on_ints_6 deleted in
 let opaque_fun4 = %block_load.[`0`] ($TOP6.camlTOP6) in
 let opaque_fun3 = %block_load.[`0`] ($TOP5.camlTOP5) in
@@ -195,6 +198,7 @@ let match_on_tagged_ints = function
   | _ -> ()
 ;;
 [%%expect_fexpr Simplify{|
+module_block_cells ($camlTOP8__cell0)
 let code match_on_tagged_ints_7 deleted in
 let opaque_fun4 = %block_load.[`0`] ($TOP6.camlTOP6) in
 let opaque_fun3 = %block_load.[`0`] ($TOP5.camlTOP5) in

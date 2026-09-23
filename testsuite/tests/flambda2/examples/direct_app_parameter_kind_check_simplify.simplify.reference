@@ -1,3 +1,6 @@
+module_block_cells ($camlDirect_app_parameter_kind_check_simplify__cell0
+  $camlDirect_app_parameter_kind_check_simplify__cell1
+  $camlDirect_app_parameter_kind_check_simplify__cell2)
 let code send_0 deleted in
 let code create_1 deleted in
 let code loopify(never) size(21) newer_version_of(send_0)

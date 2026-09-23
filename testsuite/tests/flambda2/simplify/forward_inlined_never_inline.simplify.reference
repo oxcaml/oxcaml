@@ -1,3 +1,8 @@
+module_block_cells ($camlForward_inlined_never_inline__cell0
+  $camlForward_inlined_never_inline__cell1
+  $camlForward_inlined_never_inline__cell2
+  $camlForward_inlined_never_inline__cell3
+  $camlForward_inlined_never_inline__cell4)
 let code f_0 deleted in
 let code g_1 deleted in
 let code call_g_with_default_inlined_2 deleted in

@@ -1,3 +1,5 @@
+module_block_cells ($camlLazy_invalid__cell0 $camlLazy_invalid__cell1
+  $camlLazy_invalid__cell2)
 let code foo_0 deleted in
 let code `fn[lazy_invalid.ml:13,13--29]_1` deleted in
 let $camlLazy_invalid__immstring_0 = "" in

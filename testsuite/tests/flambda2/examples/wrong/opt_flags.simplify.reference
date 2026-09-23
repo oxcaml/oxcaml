@@ -1,3 +1,4 @@
+module_block_cells ($camlOpt_flags__cell0)
 let $camlOpt_flags__immstring_0 = "foo" in
 (let try_region = %begin_try_region () in
  let try_ghost_region = %begin_try_ghost_region () in

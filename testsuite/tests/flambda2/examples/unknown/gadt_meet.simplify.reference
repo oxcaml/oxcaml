@@ -1,3 +1,5 @@
+module_block_cells ($camlGadt_meet__cell0 $camlGadt_meet__cell1
+  $camlGadt_meet__cell2 $camlGadt_meet__cell3 $camlGadt_meet__cell4)
 let code with_y_0 deleted in
 let $camlGadt_meet__const_block_0 = Block 0 (0) in
 let $camlGadt_meet__const_block_1 = Block 0 ($camlGadt_meet__const_block_0)

@@ -1,3 +1,5 @@
+module_block_cells ($camlArgument_types_useful__cell0
+  $camlArgument_types_useful__cell1 $camlArgument_types_useful__cell2)
 let $camlArgument_types_useful__first_const_0 = Block 0 () in
 (let code size(4)
        unbox_int_and_add_one_0 (param : [ 0 of imm tagged ])

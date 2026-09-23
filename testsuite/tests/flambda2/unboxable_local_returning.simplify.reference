@@ -1,3 +1,5 @@
+module_block_cells ($camlUnboxable_local_returning__cell0
+  $camlUnboxable_local_returning__cell1)
 let code ret_local_1 deleted in
 let code loopify(never) size(13) stub
       ret_local_1_1 (param : imm tagged)

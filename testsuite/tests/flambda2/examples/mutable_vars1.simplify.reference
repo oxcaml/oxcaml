@@ -1,3 +1,4 @@
+module_block_cells ($camlMutable_vars1__cell0)
 let code escape_string_0 deleted in
 let code loopify(never) size(64) newer_version_of(escape_string_0)
       escape_string_0_1 (s : val, s' : val)

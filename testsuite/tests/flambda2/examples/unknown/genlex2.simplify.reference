@@ -1,3 +1,4 @@
+module_block_cells ($camlGenlex2__cell0 $camlGenlex2__cell1)
 let $camlGenlex2__immstring_1 = "" in
 let code foo_0 deleted in
 let $camlGenlex2__immstring_0 = "Genlex2.Error" in

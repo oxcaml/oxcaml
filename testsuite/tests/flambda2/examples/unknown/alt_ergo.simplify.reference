@@ -1,3 +1,4 @@
+module_block_cells ($camlAlt_ergo__cell0)
 let $camlAlt_ergo__immstring_0 = "alt_ergo.ml" in
 let $camlAlt_ergo__const_block_1 =
   Block 0 ($camlAlt_ergo__immstring_0, 23, 4)

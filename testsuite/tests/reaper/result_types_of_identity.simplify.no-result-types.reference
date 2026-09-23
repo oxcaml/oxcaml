@@ -1,3 +1,4 @@
+module_block_cells ($camlResult_types_of_identity__cell0)
 let $camlResult_types_of_identity__immstring_0 =
   "result_types_of_identity.ml"
 in

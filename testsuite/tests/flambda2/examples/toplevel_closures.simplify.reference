@@ -1,3 +1,5 @@
+module_block_cells ($camlToplevel_closures__cell0
+  $camlToplevel_closures__cell1 $camlToplevel_closures__cell2)
 let code f_0 deleted in
 let code g_1 deleted in
 let r = %block.mut.[`0`].`toplevel` (42) in

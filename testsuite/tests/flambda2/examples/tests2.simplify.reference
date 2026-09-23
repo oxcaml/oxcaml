@@ -1,3 +1,4 @@
+module_block_cells ($camlTests2__cell0 $camlTests2__cell1)
 let code f_0 deleted in
 let $camlTests2__f_1 =
   closure f_0_1 @f &toplevel

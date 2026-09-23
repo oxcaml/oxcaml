@@ -1,3 +1,5 @@
+module_block_cells ($camlMap_remove__cell0 $camlMap_remove__cell1
+  $camlMap_remove__cell2 $camlMap_remove__cell3 $camlMap_remove__cell4)
 let code bal_0 deleted in
 let code min_binding_1 deleted in
 let $camlMap_remove__immstring_0 = "Map.remove_min_elt" in

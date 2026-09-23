@@ -1,3 +1,5 @@
+module_block_cells ($camlMeet_with_incompatible_kinds__cell0
+  $camlMeet_with_incompatible_kinds__cell1)
 let $camlMeet_with_incompatible_kinds__float_0 = 0x1.8p+1 in
 let code aux_0 deleted in
 let code f_1 deleted in

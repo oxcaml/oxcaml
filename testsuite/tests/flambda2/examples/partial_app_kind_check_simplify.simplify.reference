@@ -1,3 +1,4 @@
+module_block_cells ($camlPartial_app_kind_check_simplify__cell0)
 let code test_0 deleted in
 let code loopify(never) size(0) newer_version_of(test_0)
       test_0_1 (u : imm tagged, a, b)

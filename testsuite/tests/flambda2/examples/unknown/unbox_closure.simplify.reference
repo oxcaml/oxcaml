@@ -1,3 +1,4 @@
+module_block_cells ($camlUnbox_closure__cell0)
 let code `fn[unbox_closure.ml:12,12--25]_2` deleted in
 let code bar_1 deleted in
 let code foobar_0 deleted in

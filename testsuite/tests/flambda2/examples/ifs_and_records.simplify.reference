@@ -1,3 +1,13 @@
+module_block_cells ($camlIfs_and_records__cell0 $camlIfs_and_records__cell1
+  $camlIfs_and_records__cell2 $camlIfs_and_records__cell3
+  $camlIfs_and_records__cell4 $camlIfs_and_records__cell5
+  $camlIfs_and_records__cell6 $camlIfs_and_records__cell7
+  $camlIfs_and_records__cell8 $camlIfs_and_records__cell9
+  $camlIfs_and_records__cell10 $camlIfs_and_records__cell11
+  $camlIfs_and_records__cell12 $camlIfs_and_records__cell13
+  $camlIfs_and_records__cell14 $camlIfs_and_records__cell15
+  $camlIfs_and_records__cell16 $camlIfs_and_records__cell17
+  $camlIfs_and_records__cell18 $camlIfs_and_records__cell19)
 let code help_desired_0 deleted in
 let code help_wrap_1 deleted in
 let code help_variant_2 deleted in

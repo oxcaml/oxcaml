@@ -1,3 +1,4 @@
+module_block_cells ($camlJoin_and_aliases__cell0)
 let $camlJoin_and_aliases__immstring_1 = "join_and_aliases.ml" in
 let $camlJoin_and_aliases__const_block_2 =
   Block 0 ($camlJoin_and_aliases__immstring_1, 35, 38)
