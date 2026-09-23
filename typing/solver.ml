@@ -2324,7 +2324,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     | Amode (a, _a_hint_lower, _a_hint_upper) -> a
     | Amodevar mv -> mlower obj mv
     | Amodejoin (a, _a_hint, mvs) ->
-      VarMap.fold (fun _ mv acc -> C.join obj acc (mupper obj mv)) mvs a
+      VarMap.fold (fun _ mv acc -> C.join obj acc (mlower obj mv)) mvs a
     | Amodemeet (a, _a_hint, mvs) ->
       VarMap.fold (fun _ mv acc -> C.meet obj acc (mlower obj mv)) mvs a
 

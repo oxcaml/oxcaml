@@ -6637,12 +6637,17 @@ let path_same_normalized env p1 p2 =
 
 exception Complicated_moregen
 
-let moregen_mode_fast v (c1 : With_locality.Const.t) c2 =
+let moregen_mode_fast v m1 m2 =
+  let le m1 m2 =
+    With_locality.Const.le
+      (With_locality.Guts.get_loose_ceil m1)
+      (With_locality.Guts.get_loose_floor m2)
+  in
   let ok =
     match v with
-    | Invariant -> With_locality.Const.equal c1 c2
-    | Covariant -> With_locality.Const.le c1 c2
-    | Contravariant -> With_locality.Const.le c2 c1
+    | Invariant -> le m1 m2 && le m2 m1
+    | Covariant -> le m1 m2
+    | Contravariant -> le m2 m1
     | Bivariant -> true
   in
   if not ok then raise_notrace Complicated_moregen
@@ -6693,13 +6698,8 @@ let moregeneral_fast env patt subst subj =
          begin match variance with
          | None -> raise_notrace Complicated_moregen
          | Some variance ->
-           let mode_check v m1 m2 =
-             match With_locality.Guts.(check_const m1, check_const m2) with
-             | Some c1, Some c2 -> moregen_mode_fast v c1 c2
-             | _, _ -> raise_notrace Complicated_moregen
-           in
-           mode_check (neg_variance variance) a1 a2;
-           mode_check variance r1 r2;
+           moregen_mode_fast (neg_variance variance) a1 a2;
+           moregen_mode_fast variance r1 r2;
            mgen (Some (neg_variance variance)) t1 t2;
            mgen (Some variance) u1 u2
          end
