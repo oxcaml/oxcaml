@@ -261,9 +261,11 @@ type ebox = E : ('a : any). { v : 'a; k : int } -> ebox
 type ebox = E : ('a : any). { v : 'a; k : int; } -> ebox
 |}]
 
+(* The layout of [v] is grounded at each construction site, so the printer
+   cannot know the representation of the record and does not read it. *)
 let b = E { v = 5; k = 1 }
 [%%expect{|
-val b : ebox = E {v = <poly>; k = 1}
+val b : ebox = E <abstr>
 |}]
 
 let k = match b with E { k; _ } -> k
