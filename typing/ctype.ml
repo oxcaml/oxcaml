@@ -6591,10 +6591,7 @@ let try_expand_path env p =
         Some p'
     | _ -> None
     end
-  | exception Not_found ->
-    None
-
-let debug_moregen = Sys.getenv_opt "MOREGEN_DEBUG" <> None
+  | exception Not_found -> None
 
 let rec path_same_expanded env p1 p2 =
   if Path.same p1 p2 then true
@@ -6604,25 +6601,12 @@ let rec path_same_expanded env p1 p2 =
       then p1, p2
       else p2, p1
     in
-    if debug_moregen then
-      Format.printf "MGEXP %a %a@."
-        (Format_doc.compat Path.print) p1
-        (Format_doc.compat Path.print) p2;
     match try_expand_path env p2 with
-    | Some p2 ->
-      path_same_expanded env p1 p2
+    | Some p2 -> path_same_expanded env p1 p2
     | None ->
       match try_expand_path env p1 with
-      | Some p1 ->
-        path_same_expanded env p1 p2
-      | None ->
-        if debug_moregen then begin
-          match Env.find_type_expansion p2 env with
-          | exception Not_found -> Format.printf "MGEXP nf@."
-          | (_, body, lv) ->
-            Format.printf "MGEXP %a %d@." !Btype.print_raw body lv
-        end;
-        false
+      | Some p1 -> path_same_expanded env p1 p2
+      | None -> false
   end
 
 let path_same_normalized env p1 p2 =
@@ -6712,19 +6696,8 @@ let rec mgen_fast env subst scope maxnodes variance t1 t2 =
        try Subst.type_path subst p2
        with Subst.Not_path -> raise_notrace Complicated_moregen
      in
-     if not (path_same_normalized env p1 p2) then begin
-       if debug_moregen then
-         Format.printf "MOREGEN: %a (%a) %d != %a (%a) %d@."
-           (Format_doc.compat Path.print) p1
-           (Format_doc.compat Path.print)
-           (Env.normalize_type_path None env p1)
-           (path_scope p1)
-           (Format_doc.compat Path.print) p2
-           (Format_doc.compat Path.print)
-           (Env.normalize_type_path None env p2)
-           (path_scope p2);
-       raise_notrace Complicated_moregen
-     end;
+     if not (path_same_normalized env p1 p2) then
+       raise_notrace Complicated_moregen;
      mgen_fast_list env subst scope maxnodes tl1 tl2
   | Tpoly (t1, []), Tpoly(t2, []) ->
      mgen_fast env subst scope maxnodes variance t1 t2
@@ -7154,17 +7127,10 @@ let moregeneral ~self_check env inst_nongen
     | _, _ -> false
   in
   if fast then []
-  else begin
-    if debug_moregen then begin
-      Format.printf "moregen:@.  %a@. ~@.   %a@.  [%a]@."
-        !Btype.print_raw pat_sch
-        !Btype.print_raw subj_sch
-        !Btype.print_raw (Subst.type_expr subst subj_sch)
-    end;
+  else
     let subj_sch = Subst.type_expr subst subj_sch in
     moregeneral_slow ~self_check env inst_nongen
       pat_sch_sorts subj_sch_sorts pat_sch subj_sch
-  end
 
 let is_moregeneral env inst_nongen pat_sch subj_sch =
   match
