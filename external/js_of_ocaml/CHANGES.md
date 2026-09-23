@@ -1,6 +1,8 @@
 # dev
 
 ## Features/Changes
+* Compiler/Wasm: split the huge toplevel function of large programs into
+  smaller functions, which are faster to optimize (#2423)
 * Lib: add `WebGL2` — bindings to the WebGL2 rendering context. The context
   inherits every method and constant of `WebGL`, and adds the WebGL2 objects
   (vertex array objects, queries, samplers, syncs, transform feedback), 3D and

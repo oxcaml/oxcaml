@@ -89,6 +89,8 @@ module Flag : sig
 
   val wasi : unit -> bool
 
+  val split_toplevel : unit -> bool
+
   val enable : string -> unit
 
   val disable : string -> unit
@@ -111,6 +113,8 @@ module Param : sig
   val constant_max_depth : unit -> int
 
   val merge_node_max : unit -> int
+
+  val toplevel_split_size : unit -> int
 
   type tc =
     | TcNone
