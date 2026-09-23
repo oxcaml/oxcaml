@@ -1070,6 +1070,12 @@ module type S = sig
           [solver_intf.mli] for cautions. *)
       val get_ceil : ('l * allowed) t -> Const.t
 
+      (** Returns a conservative, fast lower bound of a mode without zapping *)
+      val get_loose_floor : ('l * 'r) t -> Const.t
+
+      (** Returns a conservative, fast upper bound of a mode without zapping *)
+      val get_loose_ceil : ('l * 'r) t -> Const.t
+
       (** Checks that a constant is within the precise bounds of a mode. see
           notes on [get_floor] in [solver_intf.mli] for cautions. *)
       val in_bounds : Const.t -> (allowed * allowed) t -> bool
