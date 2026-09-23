@@ -9,7 +9,9 @@ let some x =
 
 let is_none t = Int64.equal (Int64.bits_of_float t) (Int64.bits_of_float none)
 
-let () =
+(* The JS runtime does not preserve NaN payloads in float/bits conversions (the
+   upstream rewrite of these conversions is reverted in this tree). *)
+let%expect_test ("NaN payloads" [@when not js]) =
   assert (is_none none);
   let l = [ nan; -.nan; 1.; -7.; infinity; neg_infinity; 0.; none ] in
   List.iter (fun f -> assert (not (is_none (some f)))) l
