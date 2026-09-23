@@ -545,10 +545,17 @@ module Operation = struct
         | Lsl
         | Asr
         | Lsr
+        | Rol
+        | Ror
 
-      let all = [Lsl; Asr; Lsr]
+      let all = [Lsl; Asr; Lsr; Rol; Ror]
 
-      let to_string = function Lsl -> "lsl" | Asr -> "asr" | Lsr -> "lsr"
+      let to_string = function
+        | Lsl -> "lsl"
+        | Asr -> "asr"
+        | Lsr -> "lsr"
+        | Rol -> "rotl"
+        | Ror -> "rotr"
     end
 
     module Float_op = struct
@@ -609,7 +616,7 @@ module Operation = struct
             | And | Or | Xor ) ) ->
         let sort = Integral.sort width in
         sort, sort, sort
-      | Shift (width, (Lsl | Lsr | Asr), Int) ->
+      | Shift (width, (Lsl | Lsr | Asr | Rol | Ror), Int) ->
         let sort = Integral.sort width in
         sort, Jkind_types.Sort.Const.scannable, sort
       | Floating (width, (Add | Sub | Mul | Div)) ->
@@ -661,7 +668,7 @@ module Operation = struct
             | Div (Unsafe, (Signed | Unsigned))
             | Mod (Unsafe, (Signed | Unsigned))
             | And | Or | Xor ) )
-      | Shift (size, (Lsl | Lsr | Asr), Int) ->
+      | Shift (size, (Lsl | Lsr | Asr | Rol | Ror), Int) ->
         { result = integral size; can_raise = false }
       | Integral
           ( size,
