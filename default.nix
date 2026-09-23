@@ -498,8 +498,8 @@ let
       // sources
     );
 
+  # The development shell already provides menhir.
   jsooTools = [
-    menhir
     pkgs.nodejs
     pkgs.binaryen
   ];
@@ -516,14 +516,14 @@ let
     buildTarget = "jsoo-build";
     installTarget = "jsoo-install";
     sources = ppxlibSources // jsooSources;
-    extraNativeBuildInputs = jsooTools;
+    extraNativeBuildInputs = [ menhir ] ++ jsooTools;
   };
 
   mkJsooTest = mkAstDependentLibsBuild {
     pname = "oxcaml-jsoo-test";
     buildTarget = "jsoo-test";
     sources = ppxlibSources // jsooSources // jsooTestSources;
-    extraNativeBuildInputs = jsooTools;
+    extraNativeBuildInputs = [ menhir ] ++ jsooTools;
   };
 
   gfortran =
