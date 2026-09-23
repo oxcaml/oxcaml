@@ -8,12 +8,11 @@
  }
 *)
 
-(* Tests functional updates of records big enough (>= Config.max_young_wosize
-   fields) to be compiled via Pduprecord *)
+(* The inline-record counterpart of functional_update_any_record_big.ml *)
 
 module Float_u = Stdlib_upstream_compatible.Float_u
 
-type ('a : any) big = {
+type ('a : any) big = Big of {
   x : 'a; f0 : float#; f1 : float#; f2 : float#; f3 : float#; f4 : float#;
   f5 : float#; f6 : float#; f7 : float#; f8 : float#; f9 : float#; f10 : float#;
   f11 : float#; f12 : float#; f13 : float#; f14 : float#; f15 : float#;
@@ -68,7 +67,7 @@ type ('a : any) big = {
 }
 
 let mk () : int big =
-  {
+  Big {
     x = 5; f0 = #0.5; f1 = #1.5; f2 = #2.5; f3 = #3.5; f4 = #4.5; f5 = #5.5;
     f6 = #6.5; f7 = #7.5; f8 = #8.5; f9 = #9.5; f10 = #10.5; f11 = #11.5;
     f12 = #12.5; f13 = #13.5; f14 = #14.5; f15 = #15.5; f16 = #16.5;
@@ -128,21 +127,28 @@ let check name (f0 : float#) (f100 : float#) (f253 : float#) (y : int) =
 
 (* Changes the representation, so shouldn't be compiled via Pduprecord *)
 let () =
-  let update_x (r : int big) (x : float#) : float# big = { r with x } in
-  let r = update_x (mk ()) #2.5 in
-  Printf.printf "cross x=%.1f " (Float_u.to_float r.x);
-  check "cross" r.f0 r.f100 r.f253 r.y
+  let update_x (r : int big) (x : float#) : float# big =
+    match r with Big r -> Big { r with x }
+  in
+  match update_x (mk ()) #2.5 with
+  | Big r ->
+    Printf.printf "cross x=%.1f " (Float_u.to_float r.x);
+    check "cross" r.f0 r.f100 r.f253 r.y
 
 (* Same representation *)
 let () =
-  let r = { (mk ()) with y = 1000 } in
-  Printf.printf "same x=%d " r.x;
-  check "same" r.f0 r.f100 r.f253 r.y
+  match (match mk () with Big r -> Big { r with y = 1000 }) with
+  | Big r ->
+    Printf.printf "same x=%d " r.x;
+    check "same" r.f0 r.f100 r.f253 r.y
 
 (* Same layout, different scannable axes. *)
 let () =
-  let update_x (r : int big) (x : string) : string big = { r with x } in
+  let update_x (r : int big) (x : string) : string big =
+    match r with Big r -> Big { r with x }
+  in
   (* use Sys.opaque_identity to work around internal ticket 7878 *)
-  let r = update_x (Sys.opaque_identity (mk ())) (String.make 3 'a') in
-  Printf.printf "scannable axes x=%s " r.x;
-  check "scannable axes" r.f0 r.f100 r.f253 r.y
+  match update_x (Sys.opaque_identity (mk ())) (String.make 3 'a') with
+  | Big r ->
+    Printf.printf "scannable axes x=%s " r.x;
+    check "scannable axes" r.f0 r.f100 r.f253 r.y
