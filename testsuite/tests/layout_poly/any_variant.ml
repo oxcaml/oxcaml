@@ -398,7 +398,8 @@ let () =
 
 (* Reading through a block index. *)
 
-external get_int_idx : 'a -> ('a, int) idx_imm -> int = "%get_idx_imm"
+external get_int_idx : ('a : any).
+  'a box -> ('a, int) idx_imm -> int = "%get_idx_imm"
 [%%expect{|
 external get_int_idx : 'a -> ('a, int) idx_imm -> int = "%get_idx_imm"
 |}]
@@ -506,7 +507,7 @@ type ('a : any) gap_record = {
 |}]
 
 (* [float#] padding creates a gap that is too large to store in a block index. *)
-let float_index () : (float# gap_record, #(string * float#)) idx_imm =
+let float_index () : (float# gap_record#, #(string * float#)) idx_imm =
   let poly_ target_index () = (.target) in
   target_index ()
 [%%expect{|
@@ -519,7 +520,7 @@ Error: This block index cannot be created because it refers to values
 |}]
 
 (* [void] padding creates no such gap. *)
-let void_index () : (unit# gap_record, #(string * float#)) idx_imm =
+let void_index () : (unit# gap_record#, #(string * float#)) idx_imm =
   let poly_ target_index () = (.target) in
   target_index ()
 [%%expect{|
