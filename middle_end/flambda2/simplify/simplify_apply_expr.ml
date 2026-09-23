@@ -1475,8 +1475,12 @@ let simplify_apply ~simplify_expr dacc apply ~down_to_up =
       in
       simplify_method_call dacc apply ~callee_ty ~kind ~obj ~down_to_up
     | C_call
-        { needs_caml_c_call = _; is_c_builtin = _; effects = _; coeffects = _ }
-      ->
+        { needs_caml_c_call = _;
+          is_c_builtin = _;
+          effects = _;
+          coeffects = _;
+          raw_ptr_arg_starts = _
+        } ->
       let callee_ty =
         match callee_ty with
         | Some callee_ty -> callee_ty

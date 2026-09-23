@@ -509,6 +509,7 @@ and extern_repr =
   | Unboxed_vector of boxed_vector
   | Unboxed_mask
   | Unboxed_or_untagged_integer of unboxed_or_untagged_integer
+  | Raw_pointer
 
 and external_call_description = extern_repr Primitive.description_gen
 
@@ -3244,6 +3245,8 @@ let layout_of_extern_repr : extern_repr -> _ = function
   | Unboxed_or_untagged_integer Unboxed_nativeint ->
     layout_boxed_int Boxed_nativeint
   | Same_as_ocaml_repr s -> layout_of_const_sort s
+  | Raw_pointer ->
+    layout_of_const_sort Jkind.Sort.Const.(product [scannable; bits64])
 
 let extern_repr_involves_unboxed_products extern_repr =
   match extern_repr with
@@ -3251,7 +3254,7 @@ let extern_repr_involves_unboxed_products extern_repr =
   | Same_as_ocaml_repr (Base _)
   | Same_as_ocaml_repr (Addressable _)
   | Unboxed_vector _ | Unboxed_mask | Unboxed_float _
-  | Unboxed_or_untagged_integer _ ->
+  | Unboxed_or_untagged_integer _ | Raw_pointer ->
     false
   | Same_as_ocaml_repr (Univar _) ->
     Misc.fatal_error "extern_repr_involves_unboxed_products: unexpected univar"

@@ -995,19 +995,22 @@ let call_kinds env (call_kind1 : Call_kind.t) (call_kind2 : Call_kind.t) :
         { needs_caml_c_call = needs_caml_c_call1;
           is_c_builtin = is_c_builtin1;
           effects = effects1;
-          coeffects = coeffects1
+          coeffects = coeffects1;
+          raw_ptr_arg_starts = raw_ptr_arg_starts1
         },
       C_call
         { needs_caml_c_call = needs_caml_c_call2;
           is_c_builtin = is_c_builtin2;
           effects = effects2;
-          coeffects = coeffects2
+          coeffects = coeffects2;
+          raw_ptr_arg_starts = raw_ptr_arg_starts2
         } ) ->
     if
       Bool.equal needs_caml_c_call1 needs_caml_c_call2
       && Bool.equal is_c_builtin1 is_c_builtin2
       && Effects.compare effects1 effects2 = 0
       && Coeffects.compare coeffects1 coeffects2 = 0
+      && List.equal Int.equal raw_ptr_arg_starts1 raw_ptr_arg_starts2
     then Equivalent
     else Different { approximant = call_kind1 }
   | _, _ -> Different { approximant = call_kind1 }

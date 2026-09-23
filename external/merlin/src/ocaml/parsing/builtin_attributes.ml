@@ -134,6 +134,7 @@ let builtin_attrs =
   ; "zero_alloc"
   ; "untagged"
   ; "unpacked"
+  ; "raw_ptr"
   ; "poll"
   ; "loop"
   ; "tail_mod_cons"

@@ -222,6 +222,7 @@ let extern_repr_of_native_repr:
   | Unboxed_or_untagged_integer i, _ -> Unboxed_or_untagged_integer i
   | Unboxed_vector i, _ -> Unboxed_vector i
   | Unboxed_mask, _ -> Unboxed_mask
+  | Raw_pointer, _ -> Raw_pointer
   | Unpacked_product sort, _ ->
     (* The product sort is unarized into separate C arguments by
        [unarize_extern_repr] in [closure_conversion.ml]. *)
@@ -233,6 +234,7 @@ let sort_of_native_repr ~poly_sort repr =
   | (Unboxed_float _ | Unboxed_or_untagged_integer _ |
      Unboxed_vector _ | Unboxed_mask) ->
     Jkind.Sort.Const.scannable
+  | Raw_pointer -> Jkind.Sort.Const.(product [scannable; bits64])
 
 let to_lambda_prim prim ~poly_sort =
   let native_repr_args =
