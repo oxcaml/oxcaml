@@ -70,7 +70,10 @@ val voids : unit# t -> unit# t = <fun>
 
 let opaque (type a : any) (r : a t) = r
 [%%expect{|
-(let (opaque = (function {nlocal = 0} r r))
+(let
+  (opaque =
+     (function {nlocal = 0} r[value<(consts ()) (non_consts ([0: ?]))>]
+       : (consts ()) (non_consts ([0: ?])) r))
   (apply (field_imm 1 (global Toploop!)) "opaque" opaque))
 val opaque : ('a : any). 'a t -> 'a t = <fun>
 |}]

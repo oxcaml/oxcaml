@@ -53,7 +53,10 @@ val g : bool -> float# -> float = <fun>
 (* The field's sort is undetermined, so the value_kind stays conservative *)
 let opaque (type a : any) (r : a t) = r
 [%%expect{|
-(let (opaque = (function {nlocal = 0} r r))
+(let
+  (opaque =
+     (function {nlocal = 0} r[value<(consts (0)) (non_consts ([0: ?]))>]
+       : (consts (0)) (non_consts ([0: ?])) r))
   (apply (field_imm 1 (global Toploop!)) "opaque" opaque))
 val opaque : ('a : any). 'a t -> 'a t = <fun>
 |}]

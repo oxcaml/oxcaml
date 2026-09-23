@@ -8,11 +8,11 @@ let code inline(never) loopify(never) size(6) newer_version_of(passthrough_any_0
       passthrough_any_0_1 (h : val)
         my_closure &my_alloc_region my_depth
         -> k * k1
-        : val =
+        : [ 0 | 0 of any ] =
   apply &my_alloc_region h (0) -> k * k1
 in
 let $camlOption_untouched_payload__passthrough_any_1 =
-  closure passthrough_any_0_1 @passthrough_any &toplevel
+  closure passthrough_any_0_1 @passthrough_any &toplevel.alloc_region
 in
 let code inline(never) loopify(never) size(6) newer_version_of(passthrough_value_1)
       passthrough_value_1_1 (h : val)
@@ -22,7 +22,7 @@ let code inline(never) loopify(never) size(6) newer_version_of(passthrough_value
   apply &my_alloc_region h (0) -> k * k1
 in
 let $camlOption_untouched_payload__passthrough_value_2 =
-  closure passthrough_value_1_1 @passthrough_value &toplevel
+  closure passthrough_value_1_1 @passthrough_value &toplevel.alloc_region
 in
 let code inline(never) loopify(never) size(19) newer_version_of(caller_any_2)
       caller_any_2_1 (h : val)
@@ -45,7 +45,7 @@ let code inline(never) loopify(never) size(19) newer_version_of(caller_any_2)
            cont k (int_add))
 in
 let $camlOption_untouched_payload__caller_any_3 =
-  closure caller_any_2_1 @caller_any &toplevel
+  closure caller_any_2_1 @caller_any &toplevel.alloc_region
 in
 let code inline(never) loopify(never) size(19) newer_version_of(caller_value_3)
       caller_value_3_1 (h : val)
@@ -68,7 +68,7 @@ let code inline(never) loopify(never) size(19) newer_version_of(caller_value_3)
            cont k (int_add))
 in
 let $camlOption_untouched_payload__caller_value_4 =
-  closure caller_value_3_1 @caller_value &toplevel
+  closure caller_value_3_1 @caller_value &toplevel.alloc_region
 in
 let code inline(never) loopify(never) size(21) newer_version_of(is_none_any_4)
       is_none_any_4_1 (p : imm tagged, h : val)
@@ -81,13 +81,13 @@ let code inline(never) loopify(never) size(21) newer_version_of(is_none_any_4)
      | 1 -> k2 (0))
     where k3 =
       apply &my_alloc_region h (0) -> k2 * k1
-    where k2 (o : val) =
+    where k2 (o : [ 0 | 0 of any ]) =
       let prim = %is_int (o) in
       let Pisint = %tag_imm (prim) in
       cont k (Pisint)
 in
 let $camlOption_untouched_payload__is_none_any_5 =
-  closure is_none_any_4_1 @is_none_any &toplevel
+  closure is_none_any_4_1 @is_none_any &toplevel.alloc_region
 in
 let code inline(never) loopify(never) size(21) newer_version_of(is_none_value_5)
       is_none_value_5_1 (p : imm tagged, h : val)
@@ -106,7 +106,7 @@ let code inline(never) loopify(never) size(21) newer_version_of(is_none_value_5)
       cont k (Pisint)
 in
 let $camlOption_untouched_payload__is_none_value_6 =
-  closure is_none_value_5_1 @is_none_value &toplevel
+  closure is_none_value_5_1 @is_none_value &toplevel.alloc_region
 in
 let $camlOption_untouched_payload =
   Block 0 ($camlOption_untouched_payload__passthrough_any_1,

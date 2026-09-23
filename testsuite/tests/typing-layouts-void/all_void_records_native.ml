@@ -21,7 +21,7 @@ type t = { x : unit#; kept : unit#; }
 type p = { y : #(unit# * unit#); }
 type m = { mutable z : unit#; }
 val describe : 'a -> string = <fun>
-val r : t = {x = <void>; kept = <void>}
+val r : t = {x = #(); kept = #()}
 |}]
 
 let description = describe r

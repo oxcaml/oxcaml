@@ -188,14 +188,14 @@ type imm = A of unit# [@immediate_all_void_constructor]
 let rec x = A (let _ = ref x in #())
 [%%expect{|
 type imm = A of unit# [@immediate_all_void_constructor]
-val x : imm = A <void>
+val x : imm = A #()
 |}]
 
 type blk = A of unit#
 let rec x = A (let _ = ref x in #())
 [%%expect{|
 type blk = A of unit#
-val x : blk = A <void>
+val x : blk = A #()
 |}]
 
 (* Mode-crossing *)
