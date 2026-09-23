@@ -1,0 +1,24 @@
+- : 'a -> 'a box = <fun>
+- : 'a box -> 'a = <fun>
+- : 'a -> 'a box = <fun>
+- : 'a box -> 'a = <fun>
+- : 'a -> 'a box = <fun>
+- : 'a box -> 'a = <fun>
+val b : 'a -> 'a box = <fun>
+- : 'a -> 'a box = <fun>
+- : float# -> float = <fun>
+- : float -> float# = <fun>
+val boxed : float = 3.5
+- : float# = #3.5
+- : #(string * float#) = #("product", #4.5)
+external opaque : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
+- : 'a -> 'a = <fun>
+- : #(string * int64_u) = #("opaque", #5L)
+- : ('a : float64). 'a -> 'a box = <fun>
+val f : ('a : float64). 'a -> 'a = <fun>
+- : ('a : float64). 'a -> 'a box = <fun>
+- : ('a : float64). 'a box -> 'a = <fun>
+- : ('a : value & float64). 'a -> 'a box = <fun>
+- : ('a : float64) 'b. 'a -> 'b -> 'b = <fun>
+- : 'a -> 'a = <fun>
+
