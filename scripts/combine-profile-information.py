@@ -84,11 +84,7 @@ for csv_path in get_input_csv_paths():
     summary_non_counter_fields.update(fields)
 
 # CR mitom: Not supporting memory for now
-summary_non_counter_fields -= {
-    "alloc",
-    "top-heap",
-    "absolute-top-heap",
-}
+summary_non_counter_fields -= {"alloc"}
 
 # Ensure consistent ordering of summary fields
 field_collections = {FILE_KEY, PRIMARY_KEY}, summary_non_counter_fields, summary_counter_fields
