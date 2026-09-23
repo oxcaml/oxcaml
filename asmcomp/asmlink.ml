@@ -150,7 +150,8 @@ let make_startup_file linkenv unix ~ppf_dump ~sourcefile_for_dwarf genfns units
   if !Clflags.output_complete_object then force_linking_of_startup ~ppf_dump;
   if !Clflags.llvm_backend
   then Llvmize.end_assembly ()
-  else Emit.end_assembly ()
+  else Emit.end_assembly ();
+  Obj.reachable_words (Obj.repr globals_map)
 
 let make_shared_startup_file unix ~ppf_dump ~sourcefile_for_dwarf genfns units =
   let compile_phrase p = Asmgen.compile_phrase ~ppf_dump p in
@@ -434,13 +435,17 @@ let link_actual unix linkenv ml_objfiles output_name ~cached_genfns_imports
     | Some bundled_cm_obj ->
       { Linkenv.path = bundled_cm_obj; units = [] } :: ml_objfiles
   in
+  let counter_f size =
+    Profile.Counters.create ()
+    |> Profile.Counters.set "caml_globals_map" size
+  in
   Asmgen.compile_unit unix ~output_prefix:output_name ~asm_filename:startup
     ~keep_asm:!Clflags.keep_startup_file ~obj_filename:startup_obj
-    ~may_reduce_heap:true ~ppf_dump (fun () ->
-      Profile.record_call "make_startup_file" (fun () ->
+    ~may_reduce_heap:true ~ppf_dump (fun () -> ignore(
+      Profile.record_with_counters ~counter_f "make_startup_file" (fun () ->
           make_startup_file linkenv unix ~ppf_dump
             ~sourcefile_for_dwarf:(Some sourcefile_for_dwarf) genfns
-            units_tolink cached_genfns_imports));
+            units_tolink cached_genfns_imports) ()));
   Emitaux.reduce_heap_size ~reset:(fun () -> ());
   (* Dissector pass: partitions all object files and rewrites them *)
   let dissector_args, dissector_temp_dir =
