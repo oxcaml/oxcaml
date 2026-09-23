@@ -5850,6 +5850,10 @@ module Monadic_gen (Obj : Obj) = struct
 
     let get_ceil m = S.get_floor obj m
 
+    let get_loose_floor m = S.get_loose_ceil obj m
+
+    let get_loose_ceil m = S.get_loose_floor obj m
+
     let check_const m =
       let floor = get_floor m in
       let ceil = get_ceil m in
@@ -7552,6 +7556,16 @@ module Value_with (Areality : Areality) = struct
     let get_ceil { monadic; comonadic } =
       let monadic = Monadic.Guts.get_ceil monadic in
       let comonadic = Comonadic.Guts.get_ceil comonadic in
+      merge { monadic; comonadic }
+
+    let get_loose_floor { monadic; comonadic } =
+      let monadic = Monadic.Guts.get_loose_floor monadic in
+      let comonadic = Comonadic.Guts.get_loose_floor comonadic in
+      merge { monadic; comonadic }
+
+    let get_loose_ceil { monadic; comonadic } =
+      let monadic = Monadic.Guts.get_loose_ceil monadic in
+      let comonadic = Comonadic.Guts.get_loose_ceil comonadic in
       merge { monadic; comonadic }
 
     let in_bounds c { monadic; comonadic } =
