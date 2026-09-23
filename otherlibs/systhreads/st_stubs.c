@@ -159,6 +159,7 @@ struct caml_thread_struct {
   void * signal_stack;       /* this thread's signal stack */
   size_t signal_stack_size;  /* size of this thread's signal stack in bytes */
   int is_main;               /* whether this is the main thread of its domain */
+  bool preemption_scheduled; /* Is a preemption scheduled? */
   dynamic_cache_t dynamic;   /* cached dynamic value bindings */
 
 #ifndef NATIVE_CODE
@@ -315,6 +316,12 @@ static void save_runtime_state(void)
   th->backtrace_pos = Caml_state->backtrace_pos;
   th->backtrace_buffer = Caml_state->backtrace_buffer;
   th->backtrace_last_exn = Caml_state->backtrace_last_exn;
+  /* We should never be able to get here if the preemption is a block; that
+     means it has been allocated but not yet initialized (and performed). We
+     must have done a GC (or run pending actions) before returning back to OCaml
+  */
+  CAMLassert(!Is_block(Caml_state->preemption));
+  th->preemption_scheduled = Caml_state->preemption == Val_long(1);
 #ifndef NATIVE_CODE
   th->trap_sp_off = Caml_state->trap_sp_off;
   th->trap_barrier_off = Caml_state->trap_barrier_off;
@@ -348,6 +355,7 @@ static void restore_runtime_state(caml_thread_t th)
     (&Caml_state->tls_state, th->tls_state);
   caml_modify_generational_global_root
     (&Caml_state->backtrace_last_exn, th->backtrace_last_exn);
+  Caml_state->preemption = Val_long(th->preemption_scheduled);
 #ifndef NATIVE_CODE
   Caml_state->trap_sp_off = th->trap_sp_off;
   Caml_state->trap_barrier_off = th->trap_barrier_off;
@@ -438,6 +446,7 @@ static caml_thread_t caml_thread_new_info(caml_thread_t parent)
   th->dynamic = caml_dynamic_cache_new();
   if (th->dynamic == NULL) goto fail_dynamic;
 
+  th->preemption_scheduled = false;
   th->c_stack = NULL;
   th->local_roots = NULL;
   th->backtrace_pos = 0;
@@ -661,6 +670,7 @@ static void caml_thread_domain_initialize_hook(void)
   new_thread->dynamic = Caml_state->dynamic_bindings;
   CAMLassert(new_thread->dynamic);
   new_thread->is_main = 1;
+  new_thread->preemption_scheduled = true;
   new_thread->signal_stack = NULL;
 
   This_thread = new_thread;
