@@ -69,7 +69,7 @@ type subkind =
   | Tagged_immediate
   | Variant of
       { consts : targetint list;
-        non_consts : (tag_scannable * kind_with_subkind list) list
+        non_consts : (tag_scannable * kind_with_subkind list option) list
       }
   | Float_block of { num_fields : int }
   | Float_array

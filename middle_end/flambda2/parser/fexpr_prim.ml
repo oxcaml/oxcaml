@@ -620,7 +620,7 @@ let kind_with_subkind =
             fun _ num_fields -> Float_block { num_fields } )
         in
         let| variant =
-          let item = param2 block_shape (list full_kind) in
+          let item = option (param2 block_shape (list full_kind)) in
           let map_bind = positional (param2 scannable_tag item) in
           let tag_map =
             maps (list map_bind)

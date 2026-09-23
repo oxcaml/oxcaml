@@ -603,6 +603,7 @@ and variant_representation =
 and constructor_shape =
   | Constructor_shape_uniform of value_kind list
   | Constructor_shape_mixed of mixed_block_shape
+  | Constructor_shape_undetermined
 
 and array_kind =
     Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
@@ -820,7 +821,9 @@ and equal_constructor_shape x y =
       && List.for_all2 equal_value_kind fields1 fields2
   | Constructor_shape_mixed shape1, Constructor_shape_mixed shape2 ->
       equal_mixed_block_shape shape1 shape2
-  | (Constructor_shape_uniform _ | Constructor_shape_mixed _), _ -> false
+  | Constructor_shape_undetermined, Constructor_shape_undetermined -> true
+  | (Constructor_shape_uniform _ | Constructor_shape_mixed _
+    | Constructor_shape_undetermined), _ -> false
 
 let equal_mixed_block_shape_up_to_value_kinds shape1 shape2 =
   Misc.Stdlib.Array.equal
@@ -883,6 +886,8 @@ let rec join_value_kind_non_null x y =
 
 and join_constructor_shape shape1 shape2 =
   match shape1, shape2 with
+  | Constructor_shape_undetermined, _ | _, Constructor_shape_undetermined ->
+      Some Constructor_shape_undetermined
   | Constructor_shape_uniform fields1, Constructor_shape_uniform fields2
     when List.length fields1 = List.length fields2 ->
       Some
