@@ -43,7 +43,9 @@ type 'a close_program_metadata =
 type 'a close_program_result =
   { unit : Flambda_unit.t;
     metadata : 'a close_program_metadata;
-    code_slot_offsets : Slot_offsets.t Code_id.Map.t
+    code_slot_offsets : Slot_offsets.t Code_id.Map.t;
+    needs_standard_library_default : bool
+        (* Whether some unit references [%standard_library_default]. *)
   }
 
 type close_functions_result =
@@ -1204,6 +1206,21 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
     List.fold_left_map (fun acc arg -> find_simples acc env arg) acc args
   in
   let dbg = Debuginfo.from_location loc in
+  (* [%standard_library_default] is converted to a reference to the
+     [caml_standard_library_nat] symbol, which the native linker only emits when
+     a linked unit needs it. Record the dependency here, where the primitive is
+     seen, so it can later be reported to [Compilenv] (see {!Flambda2}). *)
+  let acc =
+    match prim with
+    (* XXX Can we just always use native_prim_name, or is it when only one primitive is given? *)
+    | Pccall { Primitive.prim_name ; prim_native_name; _ } when String.starts_with ~prefix:"caml_natdynlink_" prim_name || String.starts_with ~prefix:"caml_natdynlink_" prim_native_name ->
+(*
+Printf.printf "prim_name: %s\n%!" prim_name;
+acc
+*)
+      Acc.mark_needs_standard_library_default acc
+    | _ -> acc
+  in
   match prim, args with
   | Pccall prim, args ->
     let exn_continuation =
@@ -4224,7 +4241,11 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
         ~toplevel_my_region ~toplevel_my_ghost_region ~toplevel_my_alloc_region
         ~body ~module_symbol
     in
-    { unit; code_slot_offsets; metadata = Normal }
+    { unit;
+      code_slot_offsets;
+      metadata = Normal;
+      needs_standard_library_default = Acc.needs_standard_library_default acc
+    }
   | Classic ->
     let all_code =
       Exported_code.add_code (Acc.code_map acc)
@@ -4261,5 +4282,6 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
     in
     { unit;
       code_slot_offsets;
-      metadata = Classic (all_code, reachable_names, cmx, exported_offsets)
+      metadata = Classic (all_code, reachable_names, cmx, exported_offsets);
+      needs_standard_library_default = Acc.needs_standard_library_default acc
     }

@@ -207,6 +207,9 @@ end) : S = struct
         Zero_alloc_info.merge info.ui_zero_alloc_info ~into:ui_zero_alloc_info)
       units;
     let modname = Compilation_unit.name ui.ui_unit in
+    let ui_need_stdlib =
+      List.exists (function { ui_need_stdlib; _ } -> ui_need_stdlib) units
+    in
     let pkg_infos =
       { ui_unit = ui.ui_unit;
         ui_defines =
@@ -237,7 +240,8 @@ end) : S = struct
         ui_external_symbols =
           union (List.map (fun info -> info.ui_external_symbols) units);
         ui_static_data = ui.ui_static_data;
-        ui_file_sections = File_sections.Builder.build file_sections
+        ui_file_sections = File_sections.Builder.build file_sections;
+        ui_need_stdlib
       }
     in
     Compilenv.write_unit_info pkg_infos cmxfile

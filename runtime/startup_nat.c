@@ -44,6 +44,8 @@
 #include "caml/frame_descriptors.h"
 #include "caml/cpu.h"
 
+intnat caml_globals_inited = 0;
+
 extern char caml_system__code_begin, caml_system__code_end;
 /* The two symbols above are defined in runtime/$ARCH.S. */
 

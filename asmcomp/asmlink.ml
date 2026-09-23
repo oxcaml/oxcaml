@@ -36,6 +36,7 @@ type unit_link_info = Linkenv.unit_link_info =
     file_name : string;
     crc : Digest.t;
     imports_cmx : Import_info.t list;
+    need_stdlib : bool;
     (* for shared libs *)
     dynunit : Cmxs_format.dynunit option
   }
@@ -74,6 +75,10 @@ let emit_ocamlrunparam ~ppf_dump =
 
 let make_startup_file linkenv unix ~ppf_dump ~sourcefile_for_dwarf genfns units
     cached_gen =
+  let need_stdlib =
+    let needs_stdlib { need_stdlib; _ } = need_stdlib in
+    List.exists needs_stdlib units
+  in
   Location.input_name := "caml_startup";
   (* set name of "current" input *)
   let startup_comp_unit =
@@ -99,14 +104,21 @@ let make_startup_file linkenv unix ~ppf_dump ~sourcefile_for_dwarf genfns units
   List.iter compile_phrase (Cmm_helpers.entry_point init_name_list);
   List.iter compile_phrase
     (* Emit the GC roots table, for dynlink. *)
+    (* CR dallsopp: What's the history behind symbols - this is only ever called with []?? *)
     (Cmm_helpers.emit_gc_roots_table ~symbols:[]
        (Generic_fns.compile ~cache:false ~shared:false genfns));
   Array.iteri
     (fun i name -> compile_phrase (Cmm_helpers.predef_exception i name))
     Runtimedef.builtin_exceptions;
   compile_phrase (Cmm_helpers.global_table init_name_list);
+  (* XXX Omittable if natdynlink not in use? *)
   let globals_map = Linkenv.make_globals_map linkenv units in
-  compile_phrase (Cmm_helpers.globals_map globals_map);
+  let size =
+    if need_stdlib then begin
+      compile_phrase (Cmm_helpers.globals_map globals_map);
+      Obj.reachable_words (Obj.repr globals_map)
+    end else 0
+  in
   compile_phrase
     (Cmm_helpers.data_segment_table (startup_comp_unit :: name_list));
   (* CR mshinwell: We should have a separate notion of "backend compilation
@@ -146,12 +158,13 @@ let make_startup_file linkenv unix ~ppf_dump ~sourcefile_for_dwarf genfns units
     then List.map (fun u -> u.name, u.imports_cmx) units
     else []
   in
+
   compile_phrase (Cmm_helpers.unit_deps_table unit_deps);
   if !Clflags.output_complete_object then force_linking_of_startup ~ppf_dump;
   if !Clflags.llvm_backend
   then Llvmize.end_assembly ()
   else Emit.end_assembly ();
-  Obj.reachable_words (Obj.repr globals_map)
+  size
 
 let make_shared_startup_file unix ~ppf_dump ~sourcefile_for_dwarf genfns units =
   let compile_phrase p = Asmgen.compile_phrase ~ppf_dump p in

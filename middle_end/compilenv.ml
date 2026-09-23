@@ -44,6 +44,7 @@ type unit_infos_builder =
     mutable uib_requires_metaprogramming : bool;
     mutable uib_external_symbols : string list;
     uib_file_sections : File_sections.Builder.t;
+    mutable uib_need_stdlib : bool;
   }
 
 module Infos_table = Global_module.Name.Tbl
@@ -71,6 +72,7 @@ let current_unit =
     uib_requires_metaprogramming = false;
     uib_external_symbols = [];
     uib_file_sections = File_sections.Builder.create 0;
+    uib_need_stdlib = false;
   }
 
 let current_zero_alloc_info () = current_unit.uib_zero_alloc_info
@@ -95,7 +97,8 @@ let reset unit_info =
   current_unit.uib_requires_metaprogramming <-
     !Clflags.requires_metaprogramming;
   current_unit.uib_external_symbols <- [];
-  File_sections.Builder.clear current_unit.uib_file_sections
+  File_sections.Builder.clear current_unit.uib_file_sections;
+  current_unit.uib_need_stdlib <- false
 
 let record_external_symbols () =
   current_unit.uib_external_symbols <- (List.filter_map (fun prim ->
@@ -134,6 +137,7 @@ let read_unit_info filename =
       ui_external_symbols = uir.uir_external_symbols |> Array.to_list;
       ui_static_data = uir.uir_static_data;
       ui_file_sections = sections;
+      ui_need_stdlib = uir.uir_need_stdlib;
     }
     in
     (ui, crc)
@@ -268,6 +272,11 @@ let need_send_fun arity result mode =
     current_unit.uib_generic_fns <-
       { fns with send_fun = (arity, result, mode) :: fns.send_fun }
 
+(* Record that caml_standard_library_nat is needed *)
+
+let need_stdlib_location () =
+  current_unit.uib_need_stdlib <- true
+
 (* Write the description of the current unit *)
 
 (* CR mshinwell: let's think about this later, quadratic algorithm
@@ -314,6 +323,7 @@ let write_unit_info info filename =
     uir_external_symbols = Array.of_list info.ui_external_symbols;
     uir_static_data = info.ui_static_data;
     uir_sections_length = total_length;
+    uir_need_stdlib = info.ui_need_stdlib;
   } in
   Misc.protect_output_to_file filename (fun oc ->
   output_string oc cmx_magic_number;
@@ -353,6 +363,7 @@ let build_unit_info ~main_module_block_format ~arg_descr ~static_data =
     ui_external_symbols = current_unit.uib_external_symbols;
     ui_file_sections =
       File_sections.Builder.build current_unit.uib_file_sections;
+    ui_need_stdlib = current_unit.uib_need_stdlib;
   }
 
 let save_unit_info filename ~main_module_block_format ~arg_descr ~static_data =

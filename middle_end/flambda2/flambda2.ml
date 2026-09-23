@@ -306,13 +306,15 @@ let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
   let sections = Compilenv.current_sections () in
   let { Closure_conversion.unit = raw_flambda;
         code_slot_offsets;
-        metadata = close_prog_metadata
+        metadata = close_prog_metadata;
+        needs_standard_library_default
       } =
     Profile.record_call "lambda_to_flambda" (fun () ->
         Lambda_to_flambda.lambda_to_flambda ~mode ~machine_width
           ~big_endian:Arch.big_endian ~cmx_loader ~compilation_unit ~module_repr
           ~sections module_initializer)
   in
+  if needs_standard_library_default then Compilenv.need_stdlib_location ();
   invoke_compilation_unit_callbacks compilation_unit;
   flambda_to_flambda0 ~ppf_dump:ppf ~prefixname ~cmx_loader ~machine_width ~mode
     ~close_prog_metadata ~code_slot_offsets ~sections raw_flambda
