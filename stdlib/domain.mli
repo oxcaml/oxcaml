@@ -82,7 +82,7 @@ let temp_file_key = Domain.DLS.new_key (fun _ ->
     to close it, thus guaranteeing the descriptor is not leaked in
     case the current domain exits. *)
 
-external cpu_relax : unit -> unit @@ portable = "%cpu_relax"
+external cpu_relax : unit -> unit @@ stateless = "%cpu_relax"
 (** If busy-waiting, calling cpu_relax () between iterations
     will improve performance on some CPU architectures *)
 
