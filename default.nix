@@ -468,6 +468,8 @@ let
         ++ extraNativeBuildInputs;
 
         dontConfigure = true;
+        # Darwin's strip aborts on the installed .wasm runtimes.
+        dontStrip = true;
 
         makeFlags = [
           "SHELL=${stdenv.shell}"
