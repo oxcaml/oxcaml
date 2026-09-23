@@ -583,7 +583,7 @@ module Row_like_for_blocks : sig
     Alloc_mode.For_types.t ->
     t
 
-  val create_multiple :
+  val create_exactly_multiple :
     machine_width:Target_system.Machine_width.t ->
     shape_and_field_tys_by_tag:
       (Flambda_kind.Block_shape.t * flambda_type list) Or_unknown.t Tag.Map.t ->
@@ -604,7 +604,7 @@ module Row_like_for_blocks : sig
     (Target_ocaml_int.t * Flambda_kind.Block_shape.t) Tag.Map.t Or_unknown.t
 
   (** If the type corresponds to a single block of known size (as created by
-      [create_multiple]) then return it. *)
+      [create_exactly_multiple]) then return it. *)
   val get_singleton :
     t ->
     (Tag.t

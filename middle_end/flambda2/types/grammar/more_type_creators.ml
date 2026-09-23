@@ -286,7 +286,7 @@ let variant ~machine_width ~const_ctors ~non_const_ctors alloc_mode =
             non_const_ctors)
         non_const_ctors Tag.Map.empty
     in
-    TG.Row_like_for_blocks.create_multiple ~machine_width
+    TG.Row_like_for_blocks.create_exactly_multiple ~machine_width
       ~shape_and_field_tys_by_tag alloc_mode
   in
   TG.create_variant ~is_unique:false ~immediates:(Known const_ctors)
@@ -300,7 +300,7 @@ let variant_non_null ~machine_width ~const_ctors ~non_const_ctors alloc_mode =
           Tag.Map.add (Tag.Scannable.to_tag tag) ty non_const_ctors)
         non_const_ctors Tag.Map.empty
     in
-    TG.Row_like_for_blocks.create_multiple ~machine_width
+    TG.Row_like_for_blocks.create_exactly_multiple ~machine_width
       ~shape_and_field_tys_by_tag alloc_mode
   in
   TG.Head_of_kind_value_non_null.create_variant ~is_unique:false
