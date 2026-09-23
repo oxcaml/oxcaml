@@ -155,7 +155,7 @@ module type Min =
   end
 (** Output signature of the functor {!MakeMin}. *)
 
-module (MakeMin @@ stateful)(E: OrderedType) : Min with type elt := E.t
+module MakeMin(E: OrderedType) : Min with type elt := E.t
 (** Functor building an implementation of the min-priority queue
     structure given a totally ordered type for elements. *)
 
@@ -182,7 +182,7 @@ module type Max =
 end
 (** Output signature of the functor {!MakeMax}. *)
 
-module (MakeMax @@ stateful)(E: OrderedType) : Max with type elt := E.t
+module MakeMax(E: OrderedType) : Max with type elt := E.t
 (** Functor building an implementation of the max-priority queue
     structure given a totally ordered type for elements. *)
 
@@ -243,7 +243,7 @@ module type MinPoly =
   end
 (** Output signature of the functor {!MakeMinPoly}. *)
 
-module (MakeMinPoly @@ stateful) (E : OrderedPolyType) :
+module MakeMinPoly (E : OrderedPolyType) :
   MinPoly with type 'a elt := 'a E.t
 (** Functor building an implementation of min-priority queues
     given a totally ordered type for the elements. *)
@@ -271,7 +271,7 @@ module type MaxPoly =
 end
 (** Output signature of the functor {!MakeMaxPoly}. *)
 
-module (MakeMaxPoly @@ stateful) (E : OrderedPolyType) :
+module MakeMaxPoly (E : OrderedPolyType) :
   MaxPoly with type 'a elt := 'a E.t
 (** Functor building an implementation of max-priority queues
     given a totally ordered type for the elements. *)
