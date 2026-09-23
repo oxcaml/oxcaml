@@ -160,7 +160,7 @@ type formatter
 
 *)
 
-val pp_open_box : formatter -> int -> unit @@ stateful portable
+val pp_open_box : formatter -> int -> unit
 val open_box : int -> unit @@ stateful portable
 (** [pp_open_box ppf d] opens a new compacting pretty-printing box with
     offset [d] in the formatter [ppf].
@@ -184,11 +184,11 @@ val open_box : int -> unit @@ stateful portable
 *)
 
 
-val pp_close_box : formatter -> unit -> unit @@ stateful portable
+val pp_close_box : formatter -> unit -> unit
 val close_box : unit -> unit @@ stateful portable
 (** Closes the most recently open pretty-printing box. *)
 
-val pp_open_hbox : formatter -> unit -> unit @@ stateful portable
+val pp_open_hbox : formatter -> unit -> unit
 val open_hbox : unit -> unit @@ stateful portable
 (** [pp_open_hbox ppf ()] opens a new 'horizontal' pretty-printing box.
 
@@ -198,7 +198,7 @@ val open_hbox : unit -> unit @@ stateful portable
   (Line splitting may still occur inside boxes nested deeper).
 *)
 
-val pp_open_vbox : formatter -> int -> unit @@ stateful portable
+val pp_open_vbox : formatter -> int -> unit
 val open_vbox : int -> unit @@ stateful portable
 (** [pp_open_vbox ppf d] opens a new 'vertical' pretty-printing box
   with offset [d].
@@ -211,7 +211,7 @@ val open_vbox : int -> unit @@ stateful portable
   current indentation.
 *)
 
-val pp_open_hvbox : formatter -> int -> unit @@ stateful portable
+val pp_open_hvbox : formatter -> int -> unit
 val open_hvbox : int -> unit @@ stateful portable
 (** [pp_open_hvbox ppf d] opens a new 'horizontal/vertical' pretty-printing box
   with offset [d].
@@ -223,7 +223,7 @@ val open_hvbox : int -> unit @@ stateful portable
   current indentation.
 *)
 
-val pp_open_hovbox : formatter -> int -> unit @@ stateful portable
+val pp_open_hovbox : formatter -> int -> unit
 val open_hovbox : int -> unit @@ stateful portable
 (** [pp_open_hovbox ppf d] opens a new 'horizontal-or-vertical'
   pretty-printing box with offset [d].
@@ -315,7 +315,7 @@ val pp_print_nothing : formatter -> unit -> unit
   means printing a newline character (ASCII code 10).
 *)
 
-val pp_print_space : formatter -> unit -> unit @@ stateful portable
+val pp_print_space : formatter -> unit -> unit
 val print_space : unit -> unit @@ stateful portable
 (** [pp_print_space ppf ()] emits a 'space' break hint:
   the pretty-printer may split the line at this point,
@@ -324,7 +324,7 @@ val print_space : unit -> unit @@ stateful portable
   [pp_print_space ppf ()] is equivalent to [pp_print_break ppf 1 0].
 *)
 
-val pp_print_cut : formatter -> unit -> unit @@ stateful portable
+val pp_print_cut : formatter -> unit -> unit
 val print_cut : unit -> unit @@ stateful portable
 (** [pp_print_cut ppf ()] emits a 'cut' break hint:
   the pretty-printer may split the line at this point,
@@ -333,7 +333,7 @@ val print_cut : unit -> unit @@ stateful portable
   [pp_print_cut ppf ()] is equivalent to [pp_print_break ppf 0 0].
 *)
 
-val pp_print_break : formatter -> int -> int -> unit @@ stateful portable
+val pp_print_break : formatter -> int -> int -> unit
 val print_break : int -> int -> unit @@ stateful portable
 (** [pp_print_break ppf nspaces offset] emits a 'full' break hint:
   the pretty-printer may split the line at this point,
@@ -347,7 +347,7 @@ val pp_print_custom_break :
   formatter ->
   fits:(string * int * string) ->
   breaks:(string * int * string) ->
-  unit @@ stateful portable
+  unit
 (** [pp_print_custom_break ppf ~fits:(s1, n, s2) ~breaks:(s3, m, s4)] emits a
    custom break hint: the pretty-printer may split the line at this point.
 
@@ -385,7 +385,7 @@ printf "@[<v 0>[@;<0 2>@[<v 0>a;@,b;@,c@]%t]@]@\n"
   @since 4.08
 *)
 
-val pp_force_newline : formatter -> unit -> unit @@ stateful portable
+val pp_force_newline : formatter -> unit -> unit
 val force_newline : unit -> unit @@ stateful portable
 (** Force a new line in the current pretty-printing box.
 
@@ -397,7 +397,7 @@ val force_newline : unit -> unit @@ stateful portable
   alternative.
 *)
 
-val pp_print_if_newline : formatter -> unit -> unit @@ stateful portable
+val pp_print_if_newline : formatter -> unit -> unit
 val print_if_newline : unit -> unit @@ stateful portable
 (** Execute the next formatting command if the preceding line
   has just been split. Otherwise, ignore the next formatting
@@ -406,7 +406,7 @@ val print_if_newline : unit -> unit @@ stateful portable
 
 (** {1 Pretty-printing termination} *)
 
-val pp_print_flush : formatter -> unit -> unit @@ stateful portable
+val pp_print_flush : formatter -> unit -> unit
 val print_flush : unit -> unit @@ stateful portable
 (** End of pretty-printing: resets the pretty-printer to initial state.
 
@@ -432,7 +432,7 @@ val print_flush : unit -> unit @@ stateful portable
   efficiency.
 *)
 
-val pp_print_newline : formatter -> unit -> unit @@ stateful portable
+val pp_print_newline : formatter -> unit -> unit
 val print_newline : unit -> unit @@ stateful portable
 (** End of pretty-printing: resets the pretty-printer to initial state.
 
@@ -456,7 +456,7 @@ val pp_infinity : int
 
   @since 5.2*)
 
-val pp_set_margin : formatter -> int -> unit @@ stateful portable
+val pp_set_margin : formatter -> int -> unit
 val set_margin : int -> unit @@ stateful portable
 (** [pp_set_margin ppf d] sets the right margin to [d] (in characters):
   the pretty-printer splits lines that overflow the right margin according to
@@ -479,7 +479,7 @@ val get_margin : unit -> int @@ stateful portable
 
 (** {1:maxindent Maximum indentation limit} *)
 
-val pp_set_max_indent : formatter -> int -> unit @@ stateful portable
+val pp_set_max_indent : formatter -> int -> unit
 val set_max_indent : int -> unit @@ stateful portable
 (** [pp_set_max_indent ppf d] sets the maximum indentation limit of lines
   to [d] (in characters):
@@ -537,10 +537,8 @@ val check_geometry: geometry -> bool
   @since 4.08 *)
 
 val pp_set_geometry : formatter -> max_indent:int -> margin:int -> unit
-  @@ stateful portable
 val set_geometry : max_indent:int -> margin:int -> unit @@ stateful portable
 val pp_safe_set_geometry : formatter -> max_indent:int -> margin:int -> unit
-  @@ stateful portable
 val safe_set_geometry : max_indent:int -> margin:int -> unit
   @@ stateful portable
 (**
@@ -571,7 +569,6 @@ val safe_set_geometry : max_indent:int -> margin:int -> unit
    @since 4.11
 *)
 val pp_update_geometry : formatter -> (geometry -> geometry) -> unit
-  @@ stateful portable
 val update_geometry : (geometry -> geometry) -> unit @@ stateful portable
 
 val pp_get_geometry: formatter -> unit -> geometry
@@ -633,7 +630,7 @@ val over_max_boxes : unit -> bool @@ stateful portable
   module {!Format}.
 *)
 
-val pp_open_tbox : formatter -> unit -> unit @@ stateful portable
+val pp_open_tbox : formatter -> unit -> unit
 val open_tbox : unit -> unit @@ stateful portable
 (** [open_tbox ()] opens a new tabulation box.
 
@@ -648,15 +645,15 @@ val open_tbox : unit -> unit @@ stateful portable
   a tabulation break.
 *)
 
-val pp_close_tbox : formatter -> unit -> unit @@ stateful portable
+val pp_close_tbox : formatter -> unit -> unit
 val close_tbox : unit -> unit @@ stateful portable
 (** Closes the most recently opened tabulation box. *)
 
-val pp_set_tab : formatter -> unit -> unit @@ stateful portable
+val pp_set_tab : formatter -> unit -> unit
 val set_tab : unit -> unit @@ stateful portable
 (** Sets a tabulation marker at current insertion point. *)
 
-val pp_print_tab : formatter -> unit -> unit @@ stateful portable
+val pp_print_tab : formatter -> unit -> unit
 val print_tab : unit -> unit @@ stateful portable
 (** [print_tab ()] emits a 'next' tabulation break hint: if not already set on
   a tabulation marker, the insertion point moves to the first tabulation
@@ -665,7 +662,7 @@ val print_tab : unit -> unit @@ stateful portable
 
   It is equivalent to [print_tbreak 0 0]. *)
 
-val pp_print_tbreak : formatter -> int -> int -> unit @@ stateful portable
+val pp_print_tbreak : formatter -> int -> int -> unit
 val print_tbreak : int -> int -> unit @@ stateful portable
 (** [print_tbreak nspaces offset] emits a 'full' tabulation break hint.
 
@@ -782,7 +779,7 @@ type stag += String_tag of tag
     @since 4.08
 *)
 
-val pp_open_stag : formatter -> stag -> unit @@ stateful portable
+val pp_open_stag : formatter -> stag -> unit
 val open_stag : stag -> unit @@ stateful
 (** [pp_open_stag ppf t] opens the semantic tag named [t].
 
@@ -793,7 +790,7 @@ val open_stag : stag -> unit @@ stateful
   @since 4.08
 *)
 
-val pp_close_stag : formatter -> unit -> unit @@ stateful portable
+val pp_close_stag : formatter -> unit -> unit
 val close_stag : unit -> unit @@ stateful portable
 (** [pp_close_stag ppf ()] closes the most recently opened semantic tag [t].
 
@@ -1021,7 +1018,7 @@ val get_formatter_stag_functions : unit -> formatter_stag_functions @@ stateful
   formatter using those functions for output.
 *)
 
-val formatter_of_out_channel : out_channel -> formatter @@ stateful portable
+val formatter_of_out_channel : out_channel -> formatter
 (** [formatter_of_out_channel oc] returns a new formatter writing
     to the corresponding output channel [oc].
 *)
@@ -1062,7 +1059,7 @@ val get_err_formatter : unit -> formatter @@ stateful
    @since 5.0
 *)
 
-val formatter_of_buffer : Buffer.t -> formatter @@ stateful portable
+val formatter_of_buffer : Buffer.t -> formatter
 (** [formatter_of_buffer b] returns a new formatter writing to
   buffer [b]. At the end of pretty-printing, the formatter must be flushed
   using {!pp_print_flush} or {!pp_print_newline}, to print all the
@@ -1096,7 +1093,6 @@ val flush_str_formatter : unit -> string @@ stateful portable
 
 val make_formatter :
   (string -> int -> int -> unit) -> (unit -> unit) -> formatter
-  @@ stateful portable
 (** [make_formatter out flush] returns a new formatter that outputs with
   function [out], and flushes with function [flush].
 
@@ -1126,7 +1122,7 @@ val make_synchronized_formatter :
 *)
 
 val formatter_of_out_functions :
-  formatter_out_functions -> formatter @@ stateful portable
+  formatter_out_functions -> formatter
 (** [formatter_of_out_functions out_funs] returns a new formatter that writes
   with the set of output functions [out_funs].
 
@@ -1219,7 +1215,6 @@ val add_symbolic_output_item :
 *)
 
 val formatter_of_symbolic_output_buffer : symbolic_output_buffer -> formatter
-  @@ stateful portable
 (** [formatter_of_symbolic_output_buffer sob] returns a symbolic formatter
   that outputs to [symbolic_output_buffer] [sob].
 
@@ -1231,7 +1226,7 @@ val formatter_of_symbolic_output_buffer : symbolic_output_buffer -> formatter
 val pp_print_iter :
   ?pp_sep:(formatter -> unit -> unit) ->
   (('a -> unit) -> 'b -> unit) ->
-  (formatter -> 'a -> unit) -> formatter -> 'b -> unit @@ stateful portable
+  (formatter -> 'a -> unit) -> formatter -> 'b -> unit
 (** [pp_print_iter ~pp_sep iter pp_v ppf v] formats on [ppf] the iterations of
   [iter] over a collection [v] of values using [pp_v]. Iterations are
   separated by [pp_sep] (defaults to {!pp_print_cut}).
@@ -1242,7 +1237,6 @@ val pp_print_iter :
 val pp_print_list:
   ?pp_sep:(formatter -> unit -> unit) ->
   (formatter -> 'a -> unit) -> (formatter -> 'a list -> unit)
-  @@ stateful portable
 (** [pp_print_list ?pp_sep pp_v ppf l] prints items of list [l],
   using [pp_v] to print each item, and calling [pp_sep]
   between items ([pp_sep] defaults to {!pp_print_cut}).
@@ -1254,7 +1248,6 @@ val pp_print_list:
 val pp_print_array:
   ?pp_sep:(formatter -> unit -> unit) ->
   (formatter -> 'a -> unit) -> (formatter -> 'a array -> unit)
-  @@ stateful portable
 (** [pp_print_array ?pp_sep pp_v ppf a] prints items of array [a],
   using [pp_v] to print each item, and calling [pp_sep]
   between items ([pp_sep] defaults to {!pp_print_cut}).
@@ -1270,7 +1263,6 @@ val pp_print_array:
 val pp_print_seq:
   ?pp_sep:(formatter -> unit -> unit) ->
   (formatter -> 'a -> unit) -> (formatter -> 'a Seq.t -> unit)
-  @@ stateful portable
 (** [pp_print_seq ?pp_sep pp_v ppf s] prints items of sequence [s],
   using [pp_v] to print each item, and calling [pp_sep]
   between items ([pp_sep] defaults to {!pp_print_cut}.
@@ -1281,7 +1273,7 @@ val pp_print_seq:
   @since 4.12
 *)
 
-val pp_print_text : formatter -> string -> unit @@ stateful portable
+val pp_print_text : formatter -> string -> unit
 (** [pp_print_text ppf s] prints [s] with spaces and newlines respectively
   printed using {!pp_print_space} and {!pp_force_newline}.
 
@@ -1343,7 +1335,6 @@ val pp_print_either :
 *)
 
 val fprintf : formatter -> ('a, formatter, unit) format -> 'a
-  @@ stateful portable
 
 (** [fprintf ff fmt arg1 ... argN] formats the arguments [arg1] to [argN]
   according to the format string [fmt], and outputs the resulting string on
@@ -1436,7 +1427,7 @@ val eprintf : ('a, formatter, unit) format -> 'a @@ stateful
     the formatter is flushed, such as with {!print_flush}.
 *)
 
-val sprintf : ('a, unit, string) format -> 'a @@ stateful portable
+val sprintf : ('a, unit, string) format -> 'a
 (** Same as [printf] above, but instead of printing on a formatter,
   returns a string containing the result of formatting the arguments.
   Note that the pretty-printer queue is flushed at the end of {e each
@@ -1453,7 +1444,7 @@ val sprintf : ('a, unit, string) format -> 'a @@ stateful portable
   pretty-printing returns the desired string.
 *)
 
-val asprintf : ('a, formatter, unit, string) format4 -> 'a @@ stateful portable
+val asprintf : ('a, formatter, unit, string) format4 -> 'a
 (** Same as [printf] above, but instead of printing on a formatter,
   returns a string containing the result of formatting the arguments.
   The type of [asprintf] is general enough to interact nicely with [%a]
@@ -1463,7 +1454,7 @@ val asprintf : ('a, formatter, unit, string) format4 -> 'a @@ stateful portable
 *)
 
 val dprintf :
-  ('a, formatter, unit, formatter -> unit) format4 -> 'a @@ stateful portable
+  ('a, formatter, unit, formatter -> unit) format4 -> 'a
 (** Same as {!fprintf}, except the formatter is the last argument.
   [dprintf "..." a b c] is a function of type
   [formatter -> unit] which can be given to a format specifier [%t].
@@ -1496,13 +1487,13 @@ val ifprintf : formatter -> ('a, formatter, unit) format -> 'a
 
 val kfprintf :
   (formatter -> 'a) -> formatter ->
-  ('b, formatter, unit, 'a) format4 -> 'b @@ stateful portable
+  ('b, formatter, unit, 'a) format4 -> 'b
 (** Same as [fprintf] above, but instead of returning immediately,
   passes the formatter to its first argument at the end of printing. *)
 
 val kdprintf :
   ((formatter -> unit) -> 'a) ->
-  ('b, formatter, unit, 'a) format4 -> 'b @@ stateful portable
+  ('b, formatter, unit, 'a) format4 -> 'b
 (** Same as {!dprintf} above, but instead of returning immediately,
   passes the suspended printer to its first argument at the end of printing.
 
@@ -1519,12 +1510,10 @@ val ikfprintf :
 *)
 
 val ksprintf : (string -> 'a) -> ('b, unit, string, 'a) format4 -> 'b
-  @@ stateful portable
 (** Same as [sprintf] above, but instead of returning the string,
   passes it to the first argument. *)
 
 val kasprintf : (string -> 'a) -> ('b, formatter, unit, 'a) format4 -> 'b
-  @@ stateful portable
 (** Same as [asprintf] above, but instead of returning the string,
   passes it to the first argument.
 
