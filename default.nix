@@ -14,9 +14,14 @@
   oxcamlLldb ? false,
   syntaxQuotations ? false,
   withMerlin ? true,
+  withAstDependentLibs ? true,
+  withJsoo ? true,
 }:
 let
   inherit (pkgs) lib fetchpatch;
+
+  # js_of_ocaml is built on top of ppxlib.
+  withAstDependentLibs' = withAstDependentLibs || withJsoo;
 
   # Select stdenv based on whether asan is enabled
   stdenv = if addressSanitizer then pkgs.clangStdenv else pkgs.stdenv;
@@ -282,15 +287,29 @@ let
     hash = "sha512-rTh+QHif5woRRz236F/gF7gBWSYkQU6QMHMLLpLqCPmAlftukjZDDzPIAWBevuCipihOD2GKJqfaRZnU/Z05XQ==";
   });
 
-  stdlibShimsSrc = unpackSourceArchive "stdlib-shims-0.3.0-source" (pkgs.fetchurl {
-    url = "https://github.com/ocaml/stdlib-shims/releases/download/0.3.0/stdlib-shims-0.3.0.tbz";
-    hash = "sha256-ur9y05F7hvcHiF8MVSjjbGP8y2mPS0bPK6tcfM3W2Eo=";
-  });
+  stdlibShimsSrc = pkgs.runCommand "stdlib-shims-0.3.0-source" {
+    src = pkgs.fetchurl {
+      url = "https://github.com/ocaml/stdlib-shims/releases/download/0.3.0/stdlib-shims-0.3.0.tbz";
+      hash = "sha256-ur9y05F7hvcHiF8MVSjjbGP8y2mPS0bPK6tcfM3W2Eo=";
+    };
+  } ''
+    mkdir "$out"
+    tar --extract --file="$src" --directory="$out" --strip-components=1
+    # The upstream dune file is in OCaml syntax, which dune cannot evaluate
+    # through a symlinked source directory. For OCaml >= 4.11 it amounts to
+    # this empty library.
+    cat > "$out/src/dune" << 'EOF'
+    (library
+     (wrapped false)
+     (name stdlib_shims)
+     (modules)
+     (public_name stdlib-shims))
+    EOF
+  '';
 
-  genSrc = unpackSourceArchive "gen-1.1-source" (pkgs.fetchurl {
-    url = "https://github.com/c-cube/gen/archive/refs/tags/v1.1.tar.gz";
-    hash = "sha256-aJO/FWu6pCVOxewupf5TkDDyOVvFzYPMuP45MM/4nLA=";
-  });
+  # "seq" is an empty compatibility package with no dune equivalent.
+  dropSeqDependency =
+    file: "substituteInPlace \"${file}\" --replace-fail '(libraries seq)' ' '";
 
   sedlexSrc = pkgs.applyPatches {
     name = "sedlex-3.7-source";
@@ -310,13 +329,45 @@ let
     '';
   };
 
-  cmdlinerSrc = unpackSourceArchive "cmdliner-2.1.1-source" (pkgs.fetchurl {
-    url = "https://erratique.ch/software/cmdliner/releases/cmdliner-2.1.1.tbz";
-    hash = "sha256-Bbk40d709UxHgXjxmCgig0UQQx7ZjyrGfLTZCqEg1rY=";
-  });
+  genSrc = pkgs.runCommand "gen-1.1-source" {
+    src = pkgs.fetchurl {
+      url = "https://github.com/c-cube/gen/archive/refs/tags/v1.1.tar.gz";
+      hash = "sha256-aJO/FWu6pCVOxewupf5TkDDyOVvFzYPMuP45MM/4nLA=";
+    };
+  } ''
+    mkdir "$out"
+    tar --extract --file="$src" --directory="$out" --strip-components=1
+    ${dropSeqDependency "$out/src/dune"}
+  '';
 
+  # Cmdliner has no dune build; add one for the library.
+  cmdlinerSrc = pkgs.runCommand "cmdliner-2.1.1-source" {
+    src = pkgs.fetchurl {
+      url = "https://erratique.ch/software/cmdliner/releases/cmdliner-2.1.1.tbz";
+      hash = "sha256-Bbk40d709UxHgXjxmCgig0UQQx7ZjyrGfLTZCqEg1rY=";
+    };
+  } ''
+    mkdir "$out"
+    tar --extract --file="$src" --directory="$out" --strip-components=1
+    cat > "$out/dune-project" << 'EOF'
+    (lang dune 3.0)
+    (name cmdliner)
+    (package (name cmdliner))
+    EOF
+    cat > "$out/src/dune" << 'EOF'
+    (library
+     (name cmdliner)
+     (public_name cmdliner)
+     (wrapped false))
+    EOF
+  '';
+
+  # Only menhirLib and menhirSdk are built from this tree; keeping the menhir
+  # executable's sources out stops dune from preferring it over the one from
+  # nixpkgs.
   menhirLibrariesSrc = pkgs.runCommand "menhir-${menhirVersion}-libraries-source" { } ''
-    cp -R ${menhirSrc} "$out"
+    mkdir "$out"
+    cp -R ${menhirSrc}/{dune,dune-project,LICENSE,lib,sdk} "$out"
     chmod -R u+w "$out"
     # Attach the deprecation to [reductions], not the surrounding signature.
     substituteInPlace "$out/sdk/cmly_api.ml" \
@@ -335,6 +386,7 @@ let
     # Keep the release's opam metadata; the prepared source is read-only.
     substituteInPlace "$out/dune-project" \
       --replace-fail '(generate_opam_files true)' '(generate_opam_files false)'
+    ${dropSeqDependency "$out/lib/dune"}
     # Eta-expand to avoid exposing Buffer.add_string's OxCaml modes.
     substituteInPlace "$out/lib/write.ml" \
       --replace-fail 'let write_intlit = Buffer.add_string' \
@@ -371,49 +423,87 @@ let
         '_opt_map_or ~d:(fun a -> Array.length a) ~f:array_sum_'
   '';
 
-  mkJsoo =
+  # Read by the external/ast-dependent-libs/deps/* rules of the Makefile.
+  ppxlibSources = {
+    PPXLIB_PPX_DERIVERS_SRC = ppxDeriversSrc;
+    PPXLIB_SEXPLIB0_SRC = sexplib0Src;
+    PPXLIB_STDLIB_SHIMS_SRC = stdlibShimsSrc;
+  };
+
+  jsooSources = {
+    SEDLEX_GEN_SRC = genSrc;
+    JSOO_SEDLEX_SRC = sedlexSrc;
+    JSOO_CMDLINER_SRC = cmdlinerSrc;
+    JSOO_MENHIR_SRC = menhirLibrariesSrc;
+    JSOO_YOJSON_SRC = yojsonSrc;
+  };
+
+  jsooTestSources = {
+    JSOO_OUT_CHANNEL_REDIRECT_SRC = outChannelRedirectSrc;
+    JSOO_QCHECK_SRC = qcheckSrc;
+  };
+
+  # Build checks against an installed OxCaml; they install nothing.
+  mkAstDependentLibsBuild =
+    {
+      pname,
+      target,
+      sources,
+      extraNativeBuildInputs ? [ ],
+    }:
     oxcaml:
-    stdenv.mkDerivation {
-      pname = "oxcaml-jsoo";
-      inherit (oxcaml) version meta;
-      inherit src;
+    stdenv.mkDerivation (
+      {
+        inherit pname;
+        inherit (oxcaml) version meta;
+        inherit src;
 
-      PPXLIB_PPX_DERIVERS_SRC = ppxDeriversSrc;
-      PPXLIB_SEXPLIB0_SRC = sexplib0Src;
-      PPXLIB_STDLIB_SHIMS_SRC = stdlibShimsSrc;
-      SEDLEX_GEN_SRC = genSrc;
-      JSOO_SEDLEX_SRC = sedlexSrc;
-      JSOO_CMDLINER_SRC = cmdlinerSrc;
-      JSOO_MENHIR_SRC = menhirLibrariesSrc;
-      JSOO_YOJSON_SRC = yojsonSrc;
+        nativeBuildInputs = [
+          dune
+          oxcaml
+        ]
+        ++ extraNativeBuildInputs;
 
-      nativeBuildInputs = [
-        dune
-        oxcaml
-        menhir
-        pkgs.nodejs
-        pkgs.binaryen
-      ];
+        dontConfigure = true;
 
-      dontConfigure = true;
+        buildPhase = ''
+          runHook preBuild
+          make \
+            SHELL="$SHELL" \
+            REQUIRES_CONFIGURATION= \
+            DUNE=${dune}/bin/dune \
+            OXCAML_INSTALL=${oxcaml} \
+            ${target}
+          runHook postBuild
+        '';
 
-      buildPhase = ''
-        runHook preBuild
-        make \
-          SHELL="$SHELL" \
-          REQUIRES_CONFIGURATION= \
-          DUNE=${dune}/bin/dune \
-          OXCAML_INSTALL=${oxcaml} \
-          jsoo-build
-        runHook postBuild
-      '';
+        installPhase = ''
+          runHook preInstall
+          mkdir "$out"
+          runHook postInstall
+        '';
+      }
+      // sources
+    );
 
-      installPhase = ''
-        runHook preInstall
-        mkdir "$out"
-        runHook postInstall
-      '';
-    };
+  jsooTools = [
+    menhir
+    pkgs.nodejs
+    pkgs.binaryen
+  ];
+
+  mkPpxlibLibs = mkAstDependentLibsBuild {
+    pname = "oxcaml-ppxlib";
+    target = "ppxlib-build";
+    sources = ppxlibSources;
+  };
+
+  mkJsooLibs = mkAstDependentLibsBuild {
+    pname = "oxcaml-jsoo";
+    target = "jsoo-build";
+    sources = ppxlibSources // jsooSources;
+    extraNativeBuildInputs = jsooTools;
+  };
 
   gfortran =
     # we require fortran for some bigarray tests, but adding `pkgs.gfortran`
@@ -501,145 +591,147 @@ let
     };
   };
 in
-stdenv.mkDerivation {
-  pname = "oxcaml";
-  version = "5.4.0+ox";
-  inherit src configureFlags;
+stdenv.mkDerivation (
+  {
+    pname = "oxcaml";
+    version = "5.4.0+ox";
+    inherit src configureFlags;
 
-  OXCAML_LLDB = if oxcamlLldb then "${lldb}/bin/lldb" else null;
-  OXCAML_CLANG = if oxcamlClang then "${clang}/bin/clang" else null;
-  PPXLIB_PPX_DERIVERS_SRC = ppxDeriversSrc;
-  PPXLIB_SEXPLIB0_SRC = sexplib0Src;
-  PPXLIB_STDLIB_SHIMS_SRC = stdlibShimsSrc;
-  SEDLEX_GEN_SRC = genSrc;
-  JSOO_SEDLEX_SRC = sedlexSrc;
-  JSOO_CMDLINER_SRC = cmdlinerSrc;
-  JSOO_MENHIR_SRC = menhirLibrariesSrc;
-  JSOO_YOJSON_SRC = yojsonSrc;
-  JSOO_OUT_CHANNEL_REDIRECT_SRC = outChannelRedirectSrc;
-  JSOO_QCHECK_SRC = qcheckSrc;
+    OXCAML_LLDB = if oxcamlLldb then "${lldb}/bin/lldb" else null;
+    OXCAML_CLANG = if oxcamlClang then "${clang}/bin/clang" else null;
 
-  enableParallelBuilding = true;
-  separateDebugInfo = false;
-  dontStrip = true;
+    enableParallelBuilding = true;
+    separateDebugInfo = false;
+    dontStrip = true;
 
-  # Disable _multioutConfig hook which adds --libdir=$out/lib into
-  # configureFlags when separateDebugInfo is enabled, breaking OCaml's configure
-  # step, which expects --libdir to be $out/lib/ocaml
-  setOutputFlags = false;
+    # Disable _multioutConfig hook which adds --libdir=$out/lib into
+    # configureFlags when separateDebugInfo is enabled, breaking OCaml's configure
+    # step, which expects --libdir to be $out/lib/ocaml
+    setOutputFlags = false;
 
-  nativeBuildInputs = [
-    pkgs.autoconf
-    menhir
-    ocaml_5_4_0
-    pkgs.ocaml-ng.ocamlPackages_5_4.ocaml-lsp
-    dune
-    pkgs.pkg-config
-    pkgs.nodejs
-    pkgs.binaryen
-    pkgs.rsync
-    pkgs.which
-    pkgs.parallel
-    gfortran # Required for Bigarray Fortran tests
-    ocamlformat # required for make fmt
-    pkgs.removeReferencesTo
-  ]
-  ++ (if pkgs.stdenv.isDarwin then [ pkgs.cctools ] else [ pkgs.libtool ]) # cctools provides Apple libtool on macOS
-  ++ lib.optional oxcamlLldb pkgs.python312
-  ++ lib.optionals withMerlin merlinDev.devNativeBuildInputs;
-
-  buildInputs = [
-    pkgs.llvm # llvm-objcopy is used for debuginfo
-  ]
-  ++ lib.optionals withMerlin merlinDev.devBuildInputs;
-
-  # Nothing here runs libtool, so stop stdenv's configurePhase from rewriting
-  # sys_lib_search_path in the checked-in build-aux/ltmain.sh.
-  dontFixLibtool = true;
-
-  preConfigure = ''
-    rm -rf _build _install _runtest
-
-    # We don't use autoreconfHook because libtoolize and autoheader are
-    # incompatible with ocaml-flambda
-    autoconf --force
-  '';
-
-  checkPhase = lib.optionalString ocamltest ''
-    # The testsuite/tests/unicode test compiles modules with non-ASCII source
-    # filenames (néant.ml, 見.ml) and links them via clang. Under the 26.05
-    # toolchain the UTF-8 bytes of the object filenames reach clang octal-escaped
-    # (e.g. '$350246213.o'), so linking fails with "no such file or directory".
-    # This exercises unicode source filenames, which we don't use; drop the test
-    # so the rest of `make ci` runs.
-    rm -rf testsuite/tests/unicode
-    make ci
-  '';
-
-  postInstall =
-    # Get rid of unused artifacts
-    ''
-      $out/bin/generate_cached_generic_functions.exe $out/lib/ocaml/cached-generic-functions
-      rm -f $out/bin/dumpobj.byte
-      rm -f $out/bin/extract_externals.byte
-      rm -f $out/bin/generate_cached_generic_functions.exe
-      rm -f $out/bin/ocamlcp
-      rm -f $out/bin/ocamlmklib.byte
-      rm -f $out/bin/ocamlmktop.byte
-      rm -f $out/bin/ocamlobjinfo.byte
-      rm -f $out/bin/ocamlopt.byte
-      rm -f $out/bin/ocamlprof
-      rm -f $out/lib/ocaml/expunge
-    '';
-
-  postFixup = ''
-    remove-references-to -t ${dune} $out/lib/ocaml/Makefile.config
-  '';
-
-  shellHook =
-    let
-      merlinCommands =
-        if withMerlin then
-          "  make merlin-build        - Build Merlin\n"
-          + "  make merlin-test         - Run the Merlin tests\n"
-          + "  make merlin-promote      - Promote Merlin test output\n"
-        else
-          "  (make merlin-* targets need this shell built with withMerlin=true,\n"
-          + "   as the flake's devShell does)\n";
-    in
-    ''
-      prefix="$(pwd)/_install"
-
-      cat >&2 << EOF
-      OxCaml $version Development Environment
-      ===============================''${version//?/=}
-
-      Available commands:
-        configurePhase           - Pre-build setup
-        make boot-compiler       - Quick build (recommended for development)
-        make boot-_install       - Quick install (recommended for development)
-        make fmt                 - Auto-format code
-        make                     - Full build
-        make install             - Install
-        make test                - Run all tests
-        make test-one TEST=...   - Run a single test
-        make jsoo-build          - Build js_of_ocaml and wasm_of_ocaml
-        make jsoo-test           - Run core JSOO compiler and JS/Wasm regressions
-      ${merlinCommands}EOF
-    '';
-
-  meta =
-    { } // (if framePointers && !pkgs.stdenv.hostPlatform.isx86_64 then { broken = true; } else { });
-
-  passthru = {
-    inherit
-      ocaml_4_14_2
+    nativeBuildInputs = [
+      pkgs.autoconf
+      menhir
       ocaml_5_4_0
-      ocamlformat
-      lldb
-      mkJsoo
-      mkMerlinPackages
-      ;
-  };
+      pkgs.ocaml-ng.ocamlPackages_5_4.ocaml-lsp
+      dune
+      pkgs.pkg-config
+      pkgs.rsync
+      pkgs.which
+      pkgs.parallel
+      gfortran # Required for Bigarray Fortran tests
+      ocamlformat # required for make fmt
+      pkgs.removeReferencesTo
+    ]
+    ++ (if pkgs.stdenv.isDarwin then [ pkgs.cctools ] else [ pkgs.libtool ]) # cctools provides Apple libtool on macOS
+    ++ lib.optional oxcamlLldb pkgs.python312
+    ++ lib.optionals withMerlin merlinDev.devNativeBuildInputs
+    ++ lib.optionals withJsoo jsooTools;
 
-}
+    buildInputs = [
+      pkgs.llvm # llvm-objcopy is used for debuginfo
+    ]
+    ++ lib.optionals withMerlin merlinDev.devBuildInputs;
+
+    # Nothing here runs libtool, so stop stdenv's configurePhase from rewriting
+    # sys_lib_search_path in the checked-in build-aux/ltmain.sh.
+    dontFixLibtool = true;
+
+    preConfigure = ''
+      rm -rf _build _install _runtest
+
+      # We don't use autoreconfHook because libtoolize and autoheader are
+      # incompatible with ocaml-flambda
+      autoconf --force
+    '';
+
+    checkPhase = lib.optionalString ocamltest ''
+      # The testsuite/tests/unicode test compiles modules with non-ASCII source
+      # filenames (néant.ml, 見.ml) and links them via clang. Under the 26.05
+      # toolchain the UTF-8 bytes of the object filenames reach clang octal-escaped
+      # (e.g. '$350246213.o'), so linking fails with "no such file or directory".
+      # This exercises unicode source filenames, which we don't use; drop the test
+      # so the rest of `make ci` runs.
+      rm -rf testsuite/tests/unicode
+      make ci
+    '';
+
+    postInstall =
+      # Get rid of unused artifacts
+      ''
+        $out/bin/generate_cached_generic_functions.exe $out/lib/ocaml/cached-generic-functions
+        rm -f $out/bin/dumpobj.byte
+        rm -f $out/bin/extract_externals.byte
+        rm -f $out/bin/generate_cached_generic_functions.exe
+        rm -f $out/bin/ocamlcp
+        rm -f $out/bin/ocamlmklib.byte
+        rm -f $out/bin/ocamlmktop.byte
+        rm -f $out/bin/ocamlobjinfo.byte
+        rm -f $out/bin/ocamlopt.byte
+        rm -f $out/bin/ocamlprof
+        rm -f $out/lib/ocaml/expunge
+      '';
+
+    postFixup = ''
+      remove-references-to -t ${dune} $out/lib/ocaml/Makefile.config
+    '';
+
+    shellHook =
+      let
+        astDependentLibsCommands =
+          if withAstDependentLibs' then
+            "  make ppxlib-build        - Build ppxlib and its dependencies\n"
+          else
+            "  (make ppxlib-build needs this shell built with withAstDependentLibs=true)\n";
+        jsooCommands =
+          if withJsoo then
+            "  make jsoo-build          - Build js_of_ocaml and wasm_of_ocaml\n"
+            + "  make jsoo-test           - Run core JSOO compiler and JS/Wasm regressions\n"
+          else
+            "  (make jsoo-* targets need this shell built with withJsoo=true)\n";
+        merlinCommands =
+          if withMerlin then
+            "  make merlin-build        - Build Merlin\n"
+            + "  make merlin-test         - Run the Merlin tests\n"
+            + "  make merlin-promote      - Promote Merlin test output\n"
+          else
+            "  (make merlin-* targets need this shell built with withMerlin=true,\n"
+            + "   as the flake's devShell does)\n";
+      in
+      ''
+        prefix="$(pwd)/_install"
+
+        cat >&2 << EOF
+        OxCaml $version Development Environment
+        ===============================''${version//?/=}
+
+        Available commands:
+          configurePhase           - Pre-build setup
+          make boot-compiler       - Quick build (recommended for development)
+          make boot-_install       - Quick install (recommended for development)
+          make fmt                 - Auto-format code
+          make                     - Full build
+          make install             - Install
+          make test                - Run all tests
+          make test-one TEST=...   - Run a single test
+        ${astDependentLibsCommands}${jsooCommands}${merlinCommands}EOF
+      '';
+
+    meta =
+      { } // (if framePointers && !pkgs.stdenv.hostPlatform.isx86_64 then { broken = true; } else { });
+
+    passthru = {
+      inherit
+        ocaml_4_14_2
+        ocaml_5_4_0
+        ocamlformat
+        lldb
+        mkPpxlibLibs
+        mkJsooLibs
+        mkMerlinPackages
+        ;
+    };
+  }
+  // lib.optionalAttrs withAstDependentLibs' ppxlibSources
+  // lib.optionalAttrs withJsoo (jsooSources // jsooTestSources)
+)

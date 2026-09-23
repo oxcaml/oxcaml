@@ -11,17 +11,21 @@ From a configured OxCaml checkout:
 nix develop --command make jsoo-build
 ```
 
-Find `js_of_ocaml.exe`, `jsoo_minify.exe`, `wasm_of_ocaml.exe` and
-`wasmoo_link_wasm.exe` under `_build/jsoo/default/compiler/bin-*/`.
-Dependencies live in `_build/<name>/install/default/lib`. Nix supplies their
-sources and the Menhir, Node.js and Binaryen tools; Make builds the libraries
-and PPX drivers with OxCaml, retaining normal `(pps ...)` preprocessing.
+This builds the `@jsoo-libs` alias of `external/ast-dependent-libs/dune`,
+with that directory as the dune root: the js_of_ocaml and wasm_of_ocaml
+compilers, PPX and libraries, together with ppxlib and every other
+dependency, all compiled with OxCaml. Find the executables under
+`_build/ast-dependent-libs/default/js_of_ocaml/` and the installed layout
+under `_build/ast-dependent-libs/install/default/`. Dependencies that are not
+part of this repository (sedlex, cmdliner, menhirLib, yojson, ...) are
+provided by Nix and symlinked into `external/ast-dependent-libs/deps/`; Nix
+also supplies the Menhir, Node.js and Binaryen tools. `make ppxlib-build`
+builds only the ppxlib stack.
 
 Make refreshes the local `_install`. Set `OXCAML_INSTALL` to use an existing
 installation without modifying it. Its `bin` and `lib/ocaml` select the
-compiler; explicit `OCAMLPATH` and an empty findlib configuration isolate
-its dependencies. The Nix `jsoo` check builds the same targets but
-intentionally installs nothing.
+compiler, and an empty findlib configuration keeps host packages out. The Nix
+`jsoo` check builds the same targets but intentionally installs nothing.
 
 ## Test
 
@@ -30,9 +34,10 @@ nix develop --command make jsoo-test
 ```
 
 This runs the core compiler/property tests, PPX harness tests, and library
-and runtime regressions for JS and Wasm, using the upstream CPS profile.
-Test builds live in `_build/jsoo-test`; test dependencies are also built
-from source with OxCaml. Failures are not automatically promoted.
+and runtime regressions for JS and Wasm, using the upstream CPS profile
+(the `@jsoo-test` alias in `external/ast-dependent-libs/dune`). Test builds live in
+`_build/jsoo-test`; test dependencies are also built from source with
+OxCaml. Failures are not automatically promoted.
 
 Optional-package integrations, browsers, native Wasm effects and C/Wasm
 runtime regeneration are outside this target. Run compiler regressions

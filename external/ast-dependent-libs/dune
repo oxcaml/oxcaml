@@ -1,0 +1,50 @@
+; Dune root for the libraries that depend on the compiler's AST, built against
+; the installed compiler (see the top-level Makefile). The symlinks next to
+; this file point at sources vendored in external/; those under deps/ are
+; created by make from nix-provided sources.
+
+; js_of_ocaml stays unvendored: recursive aliases skip vendored directories.
+(vendored_dirs deps ocaml-compiler-libs ppxlib ppxlib_jane)
+
+(alias
+ (name ppxlib-libs)
+ (deps
+  (package ocaml-compiler-libs)
+  (package ppx_derivers)
+  (package sexplib0)
+  (package stdlib-shims)
+  (package ppxlib_ast)
+  (package ppxlib)
+  (package ppxlib_jane)))
+
+(alias
+ (name jsoo-libs)
+ (deps
+  (package gen)
+  (package sedlex)
+  (package cmdliner)
+  (package menhirLib)
+  (package menhirSdk)
+  (package yojson)
+  (package js_of_ocaml-compiler)
+  (package wasm_of_ocaml-compiler)
+  (package js_of_ocaml-ppx)
+  (package js_of_ocaml)))
+
+; For duneconf/jsoo-test.ws, which defines runtest-js and runtest-wasm.
+(alias
+ (name jsoo-test)
+ (deps
+  (alias_rec js_of_ocaml/compiler/tests-compiler/runtest)
+  (alias_rec js_of_ocaml/compiler/lib-runtime-files/tests/runtest)
+  (alias_rec js_of_ocaml/compiler/tests-ppx-expect-light/runtest)
+  (alias_rec js_of_ocaml/compiler/tests-ppx-expect-light/runtest-js)
+  (alias_rec js_of_ocaml/compiler/tests-ppx-expect-light/runtest-wasm)
+  (alias_rec js_of_ocaml/compiler/tests-jsoo/runtest)
+  (alias_rec js_of_ocaml/compiler/tests-jsoo/runtest-js)
+  (alias_rec js_of_ocaml/compiler/tests-jsoo/runtest-wasm)
+  (alias_rec js_of_ocaml/compiler/tests-wasm_of_ocaml/runtest)
+  (alias_rec js_of_ocaml/compiler/tests-wasm_of_ocaml/runtest-js)
+  (alias_rec js_of_ocaml/compiler/tests-wasm_of_ocaml/runtest-wasm)
+  (alias_rec js_of_ocaml/lib/tests/runtest-js)
+  (alias_rec js_of_ocaml/lib/tests/runtest-wasm)))
