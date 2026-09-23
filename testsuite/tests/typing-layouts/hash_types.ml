@@ -239,7 +239,7 @@ Hint: [@@unboxed] records don't get unboxed versions.
 |}]
 type ('a : float64) t = { i : 'a ; j : 'a }
 [@@represent_as_float_array]
-type floatu_t : float64 & float64 = float t#
+type floatu_t : float64 & float64 = float# t#
 [%%expect{|
 type ('a : float64) t = { i : 'a; j : 'a; }
 Line 3, characters 42-44:
@@ -792,8 +792,7 @@ Line 3, characters 19-26:
 Error: The type "string" has no unboxed version.
 |}]
 
-(* Test subst when a decl's type_unboxed_version over-approximately [None]
-   (regression test for the initial implementation of [Subst] *)
+(* Unboxing follows the substituted manifest through its type parameter. *)
 module type S = sig
   type t = float
   type s = t#
@@ -1042,13 +1041,7 @@ Error: The type "M.t" has no unboxed version.
 (******************************)
 (* Signature avoidance checks *)
 
-(* Functor application and destructive substitution allows unboxed versions of
-   types to go out of scope, because [float] = [float id] for the purposes of
-   substitutions, but only [float] has an unboxed version.
-
-   To prevent this, when we do such a substitution, we make sure that there are
-   no uses of [id#].
-*)
+(* Unboxed versions survive substitution of [float id] for [float]. *)
 type 'a id = 'a
 module FloatId = struct type t = float id end
 module type FloatId_S = sig type t = float id end
@@ -1073,7 +1066,7 @@ Lines 1-4, characters 18-27:
 Error: In this instantiated signature: The type "id" has no unboxed version.
 |}]
 
-(* We can also remove an unboxed version through functor application *)
+(* Functor application also preserves the unboxed version. *)
 module F(M : sig type t = float end) = struct
   type u = M.t#
 end
@@ -1215,7 +1208,7 @@ Error: In the signature of this functor application: The type "N.t"
        has no unboxed version.
 |}]
 
-(* Chain of two aliases that lose unboxed versions *)
+(* A chain of two aliases preserves unboxed versions. *)
 module F(M : sig type t = float end) = struct
   type s = M.t
   type u = #(s# * s#)
@@ -1232,7 +1225,7 @@ Error: In the signature of this functor application: The type "s"
        has no unboxed version.
 |}]
 
-(* Mutually recursive aliases that lose unboxed versions *)
+(* Mutually recursive aliases preserve unboxed versions. *)
 module F(M : sig type t = float end) = struct
   type u = #(s# * s#)
   and s = M.t
@@ -1329,6 +1322,10 @@ type ('a : any) iarr_u : any = 'a iarray#
 [%%expect{|
 type ('a : any separable) iarr_u = 'a iarray#
 |}]
+
+type ('a : any) iarr = 'a iarray
+type ('a : any) iarr_u_2 = 'a iarr#
+[%%expect{||}]
 
 let bad (_ : 'a array#) = ()
 [%%expect{|

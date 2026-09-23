@@ -917,7 +917,6 @@ type int_b = int box
 type int_b_b = int_b box
 type int_b_b_u = int_b_b#
 let check : int_b_b_u -> int_b = fun x -> x
-(* CR box rtjoa: Unboxing is approximate. This should typecheck *)
 type int_b_b_u_u = int_b_b_u#
 let check : int_b_b_u_u -> int = fun x -> x
 type int_b_b_u_u_u = int_b_b_u_u#
@@ -1231,7 +1230,6 @@ val id : t# -> int = <fun>
 
 (* Test 38: Unboxing through abbreviations *)
 
-(* CR box rtjoa: Unboxing is approximate. This should typecheck *)
 type dummy
 type ('a, 'b) box' = 'b box
 type a = (dummy, (dummy, int) box') box'
@@ -1282,7 +1280,6 @@ type ('a, 'b) t = ('a * 'b) s2
 type ('a, 'b) t' = ('a, 'b) t#
 type ('a, 'b) t'' = ('a, 'b) t'#
 
-(* CR box rtjoa: this should typecheck, but unboxing is approximate *)
 let id (x : (int, string) t'') : int * string = x
 [%%expect{|
 type ('a, 'b) t = ('a * 'b) s2
@@ -1293,7 +1290,6 @@ Line 3, characters 29-32:
 Error: The type "t'" has no unboxed version.
 |}]
 
-(* CR box rtjoa: this should typecheck, but unboxing is approximate *)
 type ('a, 'b) t'' = ('a, 'b) t'#
 [%%expect{|
 Line 1, characters 29-32:
@@ -1340,8 +1336,7 @@ Error: The definition of "s" contains a cycle:
          "t" = "s#"
 |}]
 
-(* CR box jbachurski: This should probably complain about the cycle instead
-   once we expand abbreviations when determining unboxed versions. *)
+(* Unboxing does not break recursive alias cycles. *)
 type s1 = t2 box
 and s2 = s1 box
 and t1 = s2#
@@ -1436,22 +1431,26 @@ end = struct
   type r_box = r box
 end
 
-(* The lookup for [M.t#] cannot succeed until we match on [Equal] *)
-let f (Equal : (M.t, float) Type.eq) (x : float#) = (x : M.t#)
+(* [M.t#] is well-formed only under the equation from [Equal]. *)
+let f (Equal : (M.t, float) Type.eq) (x : float#) : float# = (x : M.t#)
 [%%expect{|
 module M : sig type t type r type r_box end
 val f : (M.t, float) Type.eq -> float# -> M.t# = <fun>
 |}]
 
-let f (Equal : (M.r, r) Type.eq) (x : r#) = (x : M.r#)
+let f (Equal : (M.r, r) Type.eq) (x : r#) : r# = (x : M.r#)
 [%%expect{|
 val f : (M.r, r) Type.eq -> r# -> M.r# = <fun>
 |}]
 
-let f (Equal : (M.r_box, r box) Type.eq) (x : r) = (x : M.r_box#)
+let f (Equal : (M.r_box, r box) Type.eq) (x : r) : r = (x : M.r_box#)
 [%%expect{|
 val f : (M.r_box, r box) Type.eq -> r -> M.r_box# = <fun>
 |}]
+
+(* [M.t#] cannot escape the equation's scope. *)
+let f (Equal : (M.t, float) Type.eq) (x : float#) = (x : M.t#)
+[%%expect{||}]
 
 (* Introducing unboxed versions with a GADT equation *)
 
