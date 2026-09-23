@@ -7,4 +7,8 @@ L.(::) ([1; 2],
 module L : sig type ('a : any) t = 'a list = [] | (::) of 'a * 'a t end
 - : int L.t L.t = [[1]; [2]; [3]; [4]; [5]]
 - : int L.t = [1; 2; 3; 4; 5]
+val floats : float# L.t = [#1.5; #2.5]
+val mixed : #(string * float#) L.t = [#("first", #1.5); #("second", #2.5)]
+val voids : unit# L.t = [#(); #()]
+val mixed_cycle : #(int * float#) L.t = [#(42, #1.5); <cycle>]
 

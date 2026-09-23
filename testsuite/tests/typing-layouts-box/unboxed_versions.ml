@@ -205,7 +205,7 @@ val f : ('a : value_or_null box). 'a id# -> 'a id# = <fun>
 
 type 'a t = 'a id# list
 [%%expect{|
-type ('a : value_or_null box) t = 'a id# list
+type ('a : any box separable non_null) t = 'a id# list
 |}]
 
 (* A stuck unboxed version of a non-constructor prints as [ty#] *)
@@ -257,14 +257,8 @@ and u = { x : t#; }
 type t : float64 box
 and u = t# list
 [%%expect{|
-Line 1, characters 0-20:
-1 | type t : float64 box
-    ^^^^^^^^^^^^^^^^^^^^
-Error:
-       The layout of t is float64 box
-         because of the annotation on the declaration of the type t.
-       But the layout of t must be a sublayout of value_or_null box
-         because the type argument of list has layout value_or_null.
+type t : float64 box
+and u = t# list
 |}]
 
 type t = string
