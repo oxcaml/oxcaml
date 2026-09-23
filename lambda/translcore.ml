@@ -1940,8 +1940,9 @@ and transl_tupled_function
           match arg_layout with
           | Pvalue {
               nullable = Non_nullable;
-              raw_kind = Pvariant { consts = [];
-                               non_consts = [0, Constructor_shape_uniform kinds] }} ->
+              raw_kind = Pvariant {
+                consts = [];
+                non_consts = [0, Constructor_shape_uniform kinds] }} ->
               (* CR layouts: we should support the [Constructor_mixed] case,
                  once the backend supports this optimization for non-values. *)
               Some kinds

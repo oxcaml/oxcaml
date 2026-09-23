@@ -447,6 +447,7 @@ module History = struct
     | Recmod_fun_arg
     | Array_comprehension_element
     | Array_comprehension_iterator_element
+    | Optional_argument
 
   type value_creation_reason =
     | Class_let_binding
