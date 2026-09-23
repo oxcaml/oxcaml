@@ -4,8 +4,9 @@ File "inline_ideal_large_functor_size_warning1.ml", lines 36-38, characters 11-4
 38 | end)
 Warning 222 [inlining-deviates-from-ideal]: The inlining decision at this application differs from the one
   that would be taken in the ideal configuration (in which
-  -flambda2-speculative-inlining-track-lifted-constants is enabled and
-  -flambda2-inline-large-functor-size is set to its ideal value). Currently,
+  -flambda2-speculative-inlining-track-lifted-constants-for-functors is
+  enabled and -flambda2-inline-large-functor-size is set to its ideal value).
+  Currently,
   the function is inlined because its speculative cost 5.5 is at or below the inlining threshold 100.
   In the ideal configuration,
   the function would not be inlined because its body would be too large for a functor (size 23 >= ideal large functor size 1).

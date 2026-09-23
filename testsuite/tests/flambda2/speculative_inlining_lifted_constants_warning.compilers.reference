@@ -1,21 +1,23 @@
-File "speculative_inlining_lifted_constants_warning.ml", line 28, characters 9-15:
-28 | let v0 = f zero
-              ^^^^^^
+File "speculative_inlining_lifted_constants_warning.ml", line 47, characters 12-20:
+47 | module V0 = F (Zero)
+                 ^^^^^^^^
 Warning 222 [inlining-deviates-from-ideal]: The inlining decision at this application differs from the one
   that would be taken in the ideal configuration (in which
-  -flambda2-speculative-inlining-track-lifted-constants is enabled and
-  -flambda2-inline-large-functor-size is set to its ideal value). Currently,
-  the function is inlined because its speculative cost -4.25 is at or below the inlining threshold 0.
+  -flambda2-speculative-inlining-track-lifted-constants-for-functors is
+  enabled and -flambda2-inline-large-functor-size is set to its ideal value).
+  Currently,
+  the function is inlined because its speculative cost -11.75 is at or below the inlining threshold 0.
   In the ideal configuration,
-  the function would not be inlined because its speculative cost 2.75 would be above the inlining threshold 0.
+  the function would not be inlined because its speculative cost 1.25 would be above the inlining threshold 0.
 
-File "speculative_inlining_lifted_constants_warning.ml", line 32, characters 12-17:
-32 | let v1 () = f one
-                 ^^^^^
+File "speculative_inlining_lifted_constants_warning.ml", line 52, characters 18-25:
+52 |   let module V1 = F (One) in
+                       ^^^^^^^
 Warning 222 [inlining-deviates-from-ideal]: The inlining decision at this application differs from the one
   that would be taken in the ideal configuration (in which
-  -flambda2-speculative-inlining-track-lifted-constants is enabled and
-  -flambda2-inline-large-functor-size is set to its ideal value). Currently,
-  the function is inlined because its speculative cost -4.25 is at or below the inlining threshold 0.
+  -flambda2-speculative-inlining-track-lifted-constants-for-functors is
+  enabled and -flambda2-inline-large-functor-size is set to its ideal value).
+  Currently,
+  the function is inlined because its speculative cost -10.625 is at or below the inlining threshold 0.
   In the ideal configuration,
-  the function would not be inlined because its speculative cost 2.75 would be above the inlining threshold 0.
+  the function would not be inlined because its speculative cost 2.375 would be above the inlining threshold 0.

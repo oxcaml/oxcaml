@@ -164,12 +164,12 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
   then
     Cost_metrics.( + ) cost_metrics (cost_metrics_of_lifted_constants ()), None
   else if
-    Warnings.is_active
-      (Warnings.Inlining_deviates_from_ideal { current = ""; ideal = "" })
+    is_a_functor
+    && Warnings.is_active
+         (Warnings.Inlining_deviates_from_ideal { current = ""; ideal = "" })
   then
-    (* Also compute the cost metrics as they would be if
-       [speculative_inlining_track_lifted_constants] were enabled, so that we
-       can warn if that flag would change the inlining decision. *)
+    (* Also compute the cost metrics with lifted-constant tracking enabled for
+       functors, so that we can warn if that changes the inlining decision. *)
     ( cost_metrics,
       Some
         (Cost_metrics.( + )
@@ -238,8 +238,8 @@ let inlining_does_decrease_code_size ~code_metadata cost_metrics =
 
 (* Result of attempting speculative inlining. [ideal_cost_metrics] gives the
    cost metrics as they would be in the ideal configuration (see below); they
-   are equal to [cost_metrics] except when
-   [speculative_inlining_track_lifted_constants] is disabled. *)
+   are equal to [cost_metrics] except when lifted-constant tracking is disabled
+   for a functor application. *)
 type speculation =
   | No_useful_argument_types
   | Code_not_present
@@ -250,15 +250,9 @@ type speculation =
 
 (* The "ideal configuration", against which warning 222
    [Inlining_deviates_from_ideal] compares inlining decisions, is the current
-   configuration with [speculative_inlining_track_lifted_constants] enabled and,
-   if [ideal_large_functor_size] is set, with [large_functor_size] set to that
-   value. *)
-let ideal_configuration_may_differ ~is_a_functor =
-  (not
-     (Flambda_features.Inlining.speculative_inlining_track_lifted_constants
-        ~is_a_functor))
-  || Option.is_some (Flambda_features.Inlining.ideal_large_functor_size ())
-
+   configuration with lifted-constant tracking enabled for functors and, if
+   [ideal_large_functor_size] is set, with [large_functor_size] set to that
+   value. Lifted-constant tracking for ordinary functions is unchanged. *)
 let ideal_function_decl_decision ~code_metadata =
   let decision = Code_metadata.inlining_decision code_metadata in
   match Flambda_features.Inlining.ideal_large_functor_size () with
@@ -347,9 +341,9 @@ let describe_current_behaviour ~code_metadata
       "the function is never inlined (as decided at its definition)")
   | In_a_stub | Doing_speculative_inlining | Unrolling_depth_exceeded
   | Max_inlining_depth_exceeded | Recursion_depth_exceeded
-  | Never_inlined_attribute
-  | Attribute_always | Replay_history_says_must_inline _ | Begin_unrolling _
-  | Continue_unrolling | Jsir_inlining_disabled ->
+  | Never_inlined_attribute | Attribute_always
+  | Replay_history_says_must_inline _ | Begin_unrolling _ | Continue_unrolling
+  | Jsir_inlining_disabled ->
     (* The warning is never emitted for these decisions. *)
     Format.asprintf "%a" Call_site_inlining_decision_type.print actual_decision
 
@@ -550,8 +544,7 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
           | Missing_code | Definition_says_not_to_inline | In_a_stub
           | Doing_speculative_inlining | Unrolling_depth_exceeded
           | Max_inlining_depth_exceeded | Recursion_depth_exceeded
-          | Never_inlined_attribute
-          | Attribute_always
+          | Never_inlined_attribute | Attribute_always
           | Replay_history_says_must_inline _ | Begin_unrolling _
           | Continue_unrolling | Definition_says_inline _
           | Jsir_inlining_disabled ->
@@ -570,7 +563,7 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
   if
     (not in_a_stub)
     && (not doing_speculative_inlining)
-    && ideal_configuration_may_differ ~is_a_functor
+    && is_a_functor
     && Warnings.is_active
          (Warnings.Inlining_deviates_from_ideal { current = ""; ideal = "" })
   then

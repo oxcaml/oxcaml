@@ -244,10 +244,10 @@ let create_raw_let_symbol uacc bound_static static_consts ~body =
     else
       (* Static consts used to always have zero cost metrics. That is now
          considered to be a bug, but it can have unexpected consequences on
-         speculative inlining -- the flag above is used to control a progressive
-         rollout of the fix and will be removed in due time. The metrics are
-         recorded separately so that we can warn when enabling the flag would
-         change a speculative inlining decision. *)
+         speculative inlining -- the flags controlling this are used for a
+         progressive rollout of the fix and will be removed in due time. The
+         metrics are recorded separately so that we can warn when enabling
+         tracking for functors would change a speculative inlining decision. *)
       UA.add_cost_metrics_of_untracked_static_consts
         cost_metrics_of_static_consts uacc
   in
