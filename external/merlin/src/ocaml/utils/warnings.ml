@@ -722,7 +722,8 @@ let descriptions = [
     names = ["inlining-deviates-from-ideal"];
     description = "An inlining decision differs from the one that would be\n\
     \    taken in the ideal configuration (in which\n\
-    \    -flambda2-speculative-inlining-track-lifted-constants is enabled and\n\
+    \    -flambda2-speculative-inlining-track-lifted-constants-for-functors\n\
+    \    is enabled and\n\
     \    -flambda2-inline-large-functor-size is set to its ideal value, as\n\
     \    given by -flambda2-inline-ideal-large-functor-size).";
     since = since 5 4 };
@@ -1643,7 +1644,7 @@ let message = function
            %a@ is@ enabled@ and@ %a@ is@ set@ to@ its@ ideal@ value).@ \
            Currently,@ %s.@ In@ the@ ideal@ configuration,@ %s."
         Style.inline_code
-        "-flambda2-speculative-inlining-track-lifted-constants"
+        "-flambda2-speculative-inlining-track-lifted-constants-for-functors"
         Style.inline_code
         "-flambda2-inline-large-functor-size"
         current ideal
