@@ -22,7 +22,7 @@ open Modes.Portable
 
 [@@@ocaml.flambda_o3]
 
-external cpu_relax : unit -> unit @@ portable = "%cpu_relax"
+external cpu_relax : unit -> unit @@ stateless = "%cpu_relax"
 
 module Obj_slot : sig @@ portable
   type t : value non_float
@@ -71,7 +71,7 @@ end = struct
     Array.blit st 0 new_st 0 size;
     new_st
 
-  external compare_exchange_field : t array -> int -> t -> t -> t @@ portable
+  external compare_exchange_field : t array -> int -> t -> t -> t @@ stateless
     = "%atomic_compare_exchange_field"
 
   let[@inline] compare_exchange st idx old new_ =
@@ -99,11 +99,11 @@ module Raw = struct
 
   external spawn : (unit -> 'a) @ portable once -> 'a term_sync -> t @@ portable
     = "caml_domain_spawn"
-  external self : unit -> t @@ portable
+  external self : unit -> t @@ reading portable
     = "caml_ml_domain_id" [@@noalloc]
-  external get_recommended_domain_count: unit -> int @@ portable
+  external get_recommended_domain_count: unit -> int @@ reading portable
     = "caml_recommended_domain_count" [@@noalloc]
-  external get_max_domain_count : unit -> int @@ portable
+  external get_max_domain_count : unit -> int @@ stateless
     = "caml_max_domain_count" [@@noalloc]
 end
 
@@ -238,10 +238,10 @@ let self () = Raw.self ()
 
 let is_main_domain () = (self () :> int) = 0
 
-external self_index : unit -> int# @@ portable
+external self_index : unit -> int# @@ reading portable
   = "%domain_index" [@@noalloc]
 
-external tag_int : int# -> int @@ portable = "%tag_int"
+external tag_int : int# -> int @@ stateless = "%tag_int"
 
 let[@inline] self_index () = tag_int (self_index ())
 
@@ -596,7 +596,7 @@ module Tick = struct
   let () = Callback.Safe.register "Domain.Tick.release" release
 
   external effective_interval_usec_prim
-    : (unit[@untagged]) -> (int[@untagged]) @@ portable
+    : (unit[@untagged]) -> (int[@untagged]) @@ reading portable
     = "caml_effective_tick_interval_usec_bytecode"
         "caml_effective_tick_interval_usec"
   [@@noalloc]
