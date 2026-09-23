@@ -3333,6 +3333,18 @@ int main(void) {
 }
 ]])], AC_DEFINE([HAS_PCLMUL]) has_pclmul=yes, [])
 
+AC_SUBST([has_aes])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("aes")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_AES]) has_aes=yes, [])
+
 AC_SUBST([has_sse3])
 AC_RUN_IFELSE([AC_LANG_SOURCE([[
 int main(void) {
