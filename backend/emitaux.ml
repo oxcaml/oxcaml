@@ -65,11 +65,19 @@ let frame_section_epoch = ref 0
 
 let current_code_section = ref ""
 
-let enter_code_section name =
+(* Encoded name of the first symbol of the current text section, to which the
+   link-order frametable and trap-note pieces of that section are linked (see
+   [Asm_section.Frametable_piece]). *)
+let current_link_symbol_ref = ref ""
+
+let enter_code_section name ~link_symbol =
+  current_link_symbol_ref := link_symbol;
   if not (String.equal name !current_code_section)
   then (
     current_code_section := name;
     incr frame_section_epoch)
+
+let current_link_symbol () = !current_link_symbol_ref
 
 (* Set by a backend before [emit_frames] when the short descriptor format cannot
    be emitted in the current context (currently only MASM, which has no .uleb128
@@ -421,7 +429,7 @@ let emit_descr a prev fd =
    out-of-line GC stub is emitted), so the prepended list is in decreasing
    order. Reverse it to emit the frame table in increasing return-address
    order. *)
-let emit_pending_descriptors a =
+let emit_frames_for_function a =
   let descrs = List.rev !frame_descriptors in
   ignore (List.fold_left (emit_descr a) None descrs);
   frame_descriptors := []
@@ -429,10 +437,12 @@ let emit_pending_descriptors a =
 (* No alignment here: a link-order piece is a byte-granular descriptor stream
    that is delimited only by decoding it, so zero fill would read as an
    escape. *)
-let emit_frames_for_function a = emit_pending_descriptors a
-
-let has_pending_frame_descriptors () =
-  not (Misc.Stdlib.List.is_empty !frame_descriptors)
+let emit_frametable_piece ~link_symbol a =
+  if not (Misc.Stdlib.List.is_empty !frame_descriptors)
+  then (
+    Asm_targets.Asm_directives.switch_to_section
+      (Frametable_piece { link_symbol });
+    emit_frames_for_function a)
 
 let fully_pack_info fd_raise d has_next =
   (* See format in caml_debuginfo_location in runtime/backtrace-nat.c *)
@@ -611,8 +621,52 @@ let emit_frames_tail ~debug_strings_section a =
 
 let emit_frames ~debug_strings_section a =
   a.efa_word (List.length !frame_descriptors);
-  emit_pending_descriptors a;
+  emit_frames_for_function a;
   emit_frames_tail ~debug_strings_section a
+
+let make_frame_actions ~type_labels : emit_frame_actions =
+  let module D = Asm_targets.Asm_directives in
+  let module L = Asm_targets.Asm_label in
+  let asm_label ~section lbl = L.create_int section (Label.to_int lbl) in
+  let type_label lbl ~(ty : D.symbol_type) =
+    if type_labels then D.type_label lbl ~ty
+  in
+  { efa_code_label =
+      (fun lbl ->
+        let lbl = asm_label ~section:Text lbl in
+        type_label lbl ~ty:Function;
+        D.label lbl);
+    efa_data_label =
+      (fun lbl ->
+        let lbl = asm_label ~section:Data lbl in
+        type_label lbl ~ty:Object;
+        D.label lbl);
+    efa_i8 = (fun n -> D.int8 n);
+    efa_i16 = (fun n -> D.int16 n);
+    efa_i32 = (fun n -> D.int32 n);
+    efa_u8 = (fun n -> D.uint8 n);
+    efa_u16 = (fun n -> D.uint16 n);
+    efa_u32 = (fun n -> D.uint32 n);
+    efa_word = (fun n -> D.targetint (Targetint.of_int_exn n));
+    efa_align = (fun n -> D.align ~fill:Zero ~bytes:n);
+    efa_label_rel =
+      (fun lbl ofs ->
+        (* Descriptors may be emitted into a frametable piece rather than
+           [Read_only_data], so the label takes the current section. *)
+        let lbl = asm_label ~section:(D.current_section ()) lbl in
+        D.between_this_and_label_offset_32bit_expr ~upper:lbl
+          ~offset_upper:(Targetint.of_int32 ofs));
+    efa_label_delta =
+      (fun upper lower ->
+        (* The return-address labels live in the text section. *)
+        let upper = asm_label ~section:Text upper in
+        let lower = asm_label ~section:Text lower in
+        D.delta_uleb128 ~upper ~lower);
+    efa_def_label =
+      (fun lbl ->
+        let lbl = asm_label ~section:(D.current_section ()) lbl in
+        D.define_label lbl)
+  }
 
 (* Detection of functions that can be duplicated between a DLL and the main
    program (PR#4690) *)
@@ -649,12 +703,14 @@ let with_snapshot ~f =
   let saved_frame_descriptors = !frame_descriptors in
   let saved_frame_section_epoch = !frame_section_epoch in
   let saved_current_code_section = !current_code_section in
+  let saved_current_link_symbol = !current_link_symbol_ref in
   let result = f () in
   file_pos_nums := saved_file_pos_nums;
   file_pos_num_cnt := saved_file_pos_num_cnt;
   frame_descriptors := saved_frame_descriptors;
   frame_section_epoch := saved_frame_section_epoch;
   current_code_section := saved_current_code_section;
+  current_link_symbol_ref := saved_current_link_symbol;
   result
 
 let get_file_num ~file_emitter file_name =
@@ -949,18 +1005,52 @@ let symbol_of_cmm_symbol (s : Cmm.symbol) : Asm_targets.Asm_symbol.t =
   in
   Asm_targets.Asm_symbol.create ~visibility s.sym_name
 
+(* Switches to the section for a data phrase: with link-order frametables and
+   function sections, a phrase defining a symbol gets its own section, named
+   after the first symbol it defines, so that the linker can discard the data
+   when it is unreferenced. *)
+let enter_data_section (l : Cmm.data_item list) =
+  let module D = Asm_targets.Asm_directives in
+  let own_section_symbol =
+    if Config.link_order_frametables && !Clflags.function_sections
+    then
+      List.find_map
+        (fun[@ocaml.warning "-4"] (item : Cmm.data_item) ->
+          match item with
+          | Cdefine_symbol s ->
+            Some (Asm_targets.Asm_symbol.encode (symbol_of_cmm_symbol s))
+          | _ -> None)
+        l
+    else None
+  in
+  match own_section_symbol with
+  | Some sym -> D.switch_to_section (Data_symbol sym)
+  | None -> D.data ()
+
+let emit_frametable_marker actions ~link_symbol sym_name =
+  let module D = Asm_targets.Asm_directives in
+  let piece : Asm_targets.Asm_section.t = Frametable_piece { link_symbol } in
+  let sym = Asm_targets.Asm_symbol.create_global sym_name in
+  D.switch_to_section piece;
+  actions.global_maybe_protected sym;
+  actions.symbol_defined sym_name;
+  D.define_symbol_label ~section:piece sym
+
 let emit_data_item actions (d : Cmm.data_item) =
   let module D = Asm_targets.Asm_directives in
   let module L = Asm_targets.Asm_label in
   match d with
   | Cdefine_symbol s -> (
+    (* Labels are named independently of their section; only definitions are
+       checked against the current section (possibly a [Data_symbol]). *)
     let sym = symbol_of_cmm_symbol s in
+    let section = D.current_section () in
     match s.sym_global with
-    | Local -> D.define_label (L.create_label_for_local_symbol Data sym)
+    | Local -> D.define_label (L.create_label_for_local_symbol section sym)
     | Global ->
       actions.global_maybe_protected sym;
       actions.symbol_defined s.sym_name;
-      D.define_joint_label_and_symbol ~section:Data sym)
+      D.define_joint_label_and_symbol ~section sym)
   | Cint8 n -> D.int8 (Numbers.Int8.of_int_exn n)
   | Cint16 n -> D.int16 (Numbers.Int16.of_int_exn n)
   | Cint32 n -> D.int32 (Numbers.Int64.to_int32_exn (Int64.of_nativeint n))

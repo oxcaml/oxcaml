@@ -314,12 +314,11 @@ void caml_register_frametables(void **tables, int ntables);
 void caml_register_frametable(void *table);
 
 /* Register link-order frametables, each the descriptor byte range
-   [begins[i], ends[i]) with no count word. A range is identified by
-   its begin pointer when unregistering. */
+   [begins[i], ends[i]) with no count word. A range is unregistered
+   with caml_unregister_frametable(begin). */
 void caml_register_frametable_ranges(void **begins, void **ends,
                                      int ntables);
 void caml_register_frametable_range(void *begin, void *end);
-void caml_unregister_frametable_range(void *begin);
 
 /* Create copies of the frametables and register them in the runtime.
    It writes back the pointers of the new copies of the frametables.

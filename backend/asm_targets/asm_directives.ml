@@ -931,7 +931,7 @@ let define_label label =
 
 let new_line () = if !Clflags.keep_asm_file then emit New_line
 
-let sections_seen = ref []
+let sections_seen : (Asm_section.t, unit) Hashtbl.t = Hashtbl.create 16
 
 let switch_to_section ?(emit_label_on_first_occurrence = false) section =
   (* CR sspies: This code could be made more sensitive to the tracking of the
@@ -941,10 +941,10 @@ let switch_to_section ?(emit_label_on_first_occurrence = false) section =
      currently emit code. So for now we always emit the section, even if we are
      not switching. *)
   let first_occurrence =
-    if List.mem section !sections_seen
+    if Hashtbl.mem sections_seen section
     then `Not_first_occurrence
     else (
-      sections_seen := section :: !sections_seen;
+      Hashtbl.replace sections_seen section ();
       `First_occurrence)
   in
   current_section_ref := Some section;
@@ -1005,7 +1005,7 @@ let temp_var_counter = ref 0
 
 let reset () =
   cached_strings := Cached_string.Map.empty;
-  sections_seen := [];
+  Hashtbl.reset sections_seen;
   current_section_ref := None;
   temp_var_counter := 0
 

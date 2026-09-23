@@ -1182,32 +1182,33 @@ static void stw_register_frametables(
   }
 }
 
-void caml_register_frametables(void **table, int ntables) {
-  caml_frametable_list *new_frametables = NULL;
-  for (int i = 0; i < ntables; i++)
-    new_frametables = cons(table[i], NULL, new_frametables);
-
+static void register_frametable_list(caml_frametable_list *new_frametables)
+{
   do {} while (!caml_try_run_on_all_domains(
                  &stw_register_frametables, new_frametables, 0));
+}
+
+/* [ends] is NULL for count-prefixed tables. */
+static void register_frametables(void **tables, void **ends, int ntables)
+{
+  caml_frametable_list *new_frametables = NULL;
+  for (int i = 0; i < ntables; i++)
+    new_frametables = cons(tables[i], ends == NULL ? NULL : ends[i],
+                           new_frametables);
+  register_frametable_list(new_frametables);
+}
+
+void caml_register_frametables(void **table, int ntables) {
+  register_frametables(table, NULL, ntables);
 }
 
 void caml_register_frametable_ranges(void **begins, void **ends,
                                      int ntables) {
-  caml_frametable_list *new_frametables = NULL;
-  for (int i = 0; i < ntables; i++)
-    new_frametables = cons(begins[i], ends[i], new_frametables);
-
-  do {} while (!caml_try_run_on_all_domains(
-                 &stw_register_frametables, new_frametables, 0));
+  register_frametables(begins, ends, ntables);
 }
 
 void caml_register_frametable_range(void *begin, void *end) {
   caml_register_frametable_ranges(&begin, &end, 1);
-}
-
-void caml_unregister_frametable_range(void *begin)
-{
-  caml_unregister_frametables(&begin, 1);
 }
 
 void caml_copy_and_register_frametables(
@@ -1217,9 +1218,7 @@ void caml_copy_and_register_frametables(
   for (int i = 0; i < ntables; i++)
     new_frametables = copy_cons((intnat **)(table + i),
                                 sizes[i], new_frametables);
-
-  do {} while (!caml_try_run_on_all_domains(
-                 &stw_register_frametables, new_frametables, 0));
+  register_frametable_list(new_frametables);
 }
 
 static void remove_frame_descriptors(

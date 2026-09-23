@@ -59,8 +59,8 @@ type t =
   | Note_gnu_stack
   | Debuginfo_strings  (** Mergeable string section for debuginfo strings *)
   | Data_symbol of string
-      (** Per-symbol data section ".data.caml.<sym>" (ELF only; [Data]
-          elsewhere), so that the linker can discard unreferenced data. *)
+      (** Per-symbol data section ".data.caml.<sym>" (ELF only), so that the
+          linker can discard unreferenced data. *)
   | Frametable_piece of { link_symbol : string }
       (** A piece of the "caml_frametable" section holding the frame descriptors
           of the text section that starts at [link_symbol] (the encoded

@@ -57,8 +57,13 @@ val record_frame_descr :
     whose return addresses are deltas from the previous descriptor -- an
     assembly-time constant only when both lie in the same section, so
     descriptors at a section boundary escape to the full format. Re-entering the
-    current section does not bump the epoch. *)
-val enter_code_section : string -> unit
+    current section does not bump the epoch. [link_symbol] is the encoded name
+    of the section's first symbol, to which the section's link-order pieces (see
+    [Asm_section.Frametable_piece]) are linked. *)
+val enter_code_section : string -> link_symbol:string -> unit
+
+(** The [link_symbol] of the most recent [enter_code_section]. *)
+val current_link_symbol : unit -> string
 
 (* When set before [emit_frames], every frame descriptor escapes to the normal
    format instead of the short encoding. Backends set this when the short format
@@ -91,24 +96,21 @@ type emit_frame_actions =
    [Read_only_data] to keep them inline in the frametable (the binary emitter
    needs this, having no relocations that can target the mergeable section).
 
-   Equivalent to a count word, [emit_frames_for_function] and
-   [emit_frames_tail]. *)
+   Equivalent to a count word, the descriptors as [emit_frametable_piece] emits
+   them, and [emit_frames_tail]. *)
 val emit_frames :
   debug_strings_section:Asm_targets.Asm_section.t -> emit_frame_actions -> unit
 
-(** Emits the frame descriptors recorded since the last call (in return-address
-    order, the first one escaping to the full format) into the current section,
-    then forgets them. No count word and no alignment directive are emitted, so
-    the caller can direct each function's descriptors into a link-order
-    [Asm_section.Frametable_piece]. The descriptors' debuginfo words are 32-bit
+(** If any frame descriptors have been recorded since the last call (those of
+    the function just emitted), switches to the link-order
+    [Asm_section.Frametable_piece] linked to [link_symbol] and emits them there
+    (in return-address order, the first one escaping to the full format), then
+    forgets them; otherwise does nothing. No count word and no alignment
+    directive are emitted. The descriptors' debuginfo words are 32-bit
     self-relative references to records that [emit_frames_tail] emits, so
     [efa_label_rel] must create its labels in the current section
     ([Asm_directives.current_section ()]). *)
-val emit_frames_for_function : emit_frame_actions -> unit
-
-(** Whether [emit_frames_for_function] would emit anything, so that callers can
-    avoid emitting empty pieces. *)
-val has_pending_frame_descriptors : unit -> bool
+val emit_frametable_piece : link_symbol:string -> emit_frame_actions -> unit
 
 (** Emits the per-unit debuginfo, name and string records referenced by the
     descriptors emitted so far, into the current section, which must be
@@ -116,6 +118,12 @@ val has_pending_frame_descriptors : unit -> bool
     [emit_frames]). Fails if descriptors are pending. *)
 val emit_frames_tail :
   debug_strings_section:Asm_targets.Asm_section.t -> emit_frame_actions -> unit
+
+(** The actions for [emit_frames], [emit_frametable_piece] and
+    [emit_frames_tail] shared by the backends. [efa_label_rel] and
+    [efa_def_label] use the current section. With [type_labels], the return
+    address and data labels get [.type] directives (arm64). *)
+val make_frame_actions : type_labels:bool -> emit_frame_actions
 
 val is_generic_function : string -> bool
 
@@ -208,5 +216,17 @@ type emit_data_item_actions =
     symbol_defined : string -> unit;
     symbol_used : string -> unit
   }
+
+(** Switches to the section for a data phrase: with
+    [Config.link_order_frametables] and function sections, a phrase defining a
+    symbol goes in its own [Asm_section.Data_symbol] (named after the first
+    symbol it defines) so that the linker can discard it; otherwise [Data]. *)
+val enter_data_section : Cmm.data_item list -> unit
+
+(** Defines the global symbol [sym_name] at offset 0 of the
+    [Asm_section.Frametable_piece] linked to [link_symbol], switching to that
+    section. Used for the [caml<U>__frametable_begin] and [_end] markers. *)
+val emit_frametable_marker :
+  emit_data_item_actions -> link_symbol:string -> string -> unit
 
 val emit_data_item : emit_data_item_actions -> Cmm.data_item -> unit

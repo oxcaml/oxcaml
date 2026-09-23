@@ -427,9 +427,8 @@ let link_actual unix linkenv ml_objfiles output_name ~cached_genfns_imports
   then Emitaux.binary_backend_available := true;
   (* Natdynlink resolves the executable's symbols from its dynamic symbol
      table, which --no-export-dynamic leaves empty. *)
-  let is_dynlink cu =
-    String.equal (CU.Name.to_string (CU.name cu)) "Dynlink"
-  in
+  let dynlink = CU.Name.of_string "Dynlink" in
+  let is_dynlink cu = CU.Name.equal (CU.name cu) dynlink in
   if !Clflags.no_export_dynamic
      && List.exists
           (fun u -> List.exists is_dynlink (u.name :: u.defines))

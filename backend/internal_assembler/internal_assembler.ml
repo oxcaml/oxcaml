@@ -220,16 +220,6 @@ let get_sections ~delayed sections =
   Emitaux.Dwarf_helpers.emit_delayed_dwarf ();
   sections @ get (delayed ())
 
-let section_type name =
-  match Section_name.section_type name with
-  | Some "progbits" -> 1 (* SHT_PROGBITS *)
-  | Some "note" -> 7 (* SHT_NOTE *)
-  | Some "nobits" -> 8 (* SHT_NOBITS *)
-  | None -> if Section_name.is_note_like name then 7 else 1
-  | Some ty ->
-    Misc.fatal_errorf "internal_assembler: unsupported type %s of section %s"
-      ty (Section_name.to_string name)
-
 (* The section defining each symbol, for resolving the linked-to symbols of
    SHF_LINK_ORDER sections to section indices. *)
 let defining_sections compiler_sections =
@@ -274,7 +264,11 @@ let make_compiler_sections section_table compiler_sections symbol_table
     else if Section_name.is_data_like name
     then make_data section_table name raw_section ~align sh_string_table
     else
-      let sh_type = section_type name in
+      let sh_type =
+        if Section_name.is_note_like name
+        then 7 (* SHT_NOTE *)
+        else 1 (* SHT_PROGBITS *)
+      in
       let sh_link = link_section_idx section_table defining name in
       make_custom_section section_table name raw_section ~align ~sh_type
         ?sh_link sh_string_table);

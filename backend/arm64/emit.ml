@@ -1251,15 +1251,21 @@ let assembly_code_for_stack_check env ~far ~max_frame_size_bytes =
 
 (* Output .text section directive, or named .text.caml.<name> if enabled. *)
 
+(* Encoded caml<U>__code_begin, the link symbol (see
+   [Emitaux.enter_code_section]) of the plain text section. Set by
+   [begin_assembly]. *)
+let code_begin_link_symbol = ref ""
+
 let emit_named_text_section func_name =
   if !Clflags.function_sections
   then (
     (* CR sspies: Clean this up and add proper support for function sections in
        the new asm directives. *)
-    let name = ".text.caml." ^ S.encode (S.create_global func_name) in
+    let func_symbol = S.encode (S.create_global func_name) in
+    let name = ".text.caml." ^ func_symbol in
     D.switch_to_section_raw ~names:[name] ~flags:(Some "ax") ~args:["%progbits"]
       ~is_delayed:false;
-    Emitaux.enter_code_section name;
+    Emitaux.enter_code_section name ~link_symbol:func_symbol;
     (* Warning: We set the internal section ref to Text here, because it
        currently does not supported named text sections. In the rest of this
        file, we pretend the section is called Text rather than the function
@@ -1269,65 +1275,9 @@ let emit_named_text_section func_name =
     D.text ();
     (* On Mach-O, [Delta_uleb128] evaluates cross-atom deltas via .set, so
        function boundaries need not break delta chains. *)
-    Emitaux.enter_code_section ".text")
+    Emitaux.enter_code_section ".text" ~link_symbol:!code_begin_link_symbol)
 
-(* The symbol that the link-order frametable piece for [sym]'s code is linked
-   to: the first symbol of the text section [sym] is emitted in, which is [sym]
-   itself with function sections and caml<U>__code_begin otherwise. *)
-let frametable_link_symbol sym =
-  if !Clflags.function_sections
-  then S.encode sym
-  else S.encode (S.create_global (Cmm_helpers.make_symbol "code_begin"))
-
-let frame_actions : Emitaux.emit_frame_actions =
-  { efa_code_label =
-      (fun lbl ->
-        let lbl = label_to_asm_label ~section:Text lbl in
-        D.type_label ~ty:Function lbl;
-        D.label lbl);
-    efa_data_label =
-      (fun lbl ->
-        let lbl = label_to_asm_label ~section:Data lbl in
-        D.type_label ~ty:Object lbl;
-        D.label lbl);
-    efa_i8 = (fun n -> D.int8 n);
-    efa_i16 = (fun n -> D.int16 n);
-    efa_i32 = (fun n -> D.int32 n);
-    efa_u8 = (fun n -> D.uint8 n);
-    efa_u16 = (fun n -> D.uint16 n);
-    efa_u32 = (fun n -> D.uint32 n);
-    efa_word = (fun n -> D.targetint (Targetint.of_int_exn n));
-    efa_align = (fun n -> D.align ~fill:Zero ~bytes:n);
-    efa_label_rel =
-      (fun lbl ofs ->
-        (* Descriptors may be emitted into a [Frametable_piece] rather than
-           [Read_only_data]; the directive layer checks the section. *)
-        let lbl = label_to_asm_label ~section:(D.current_section ()) lbl in
-        D.between_this_and_label_offset_32bit_expr ~upper:lbl
-          ~offset_upper:(Targetint.of_int32 ofs));
-    efa_label_delta =
-      (fun upper lower ->
-        (* The return-address labels live in the text section. *)
-        let upper = label_to_asm_label ~section:Text upper in
-        let lower = label_to_asm_label ~section:Text lower in
-        D.delta_uleb128 ~upper ~lower);
-    efa_def_label =
-      (fun lbl ->
-        let lbl = label_to_asm_label ~section:(D.current_section ()) lbl in
-        D.define_label lbl)
-  }
-
-(* Emit the frame descriptors recorded so far (those of the function being
-   emitted), if any, into a "caml_frametable" piece linked to [link_symbol]'s
-   section. No alignment: the descriptor stream is byte-granular and pieces are
-   concatenated by the linker. Returns whether the section was switched. *)
-let emit_frametable_piece ~link_symbol =
-  if Emitaux.has_pending_frame_descriptors ()
-  then (
-    D.switch_to_section (Frametable_piece { link_symbol });
-    Emitaux.emit_frames_for_function frame_actions;
-    true)
-  else false
+let frame_actions = Emitaux.make_frame_actions ~type_labels:true
 
 (* Emit code to load an emitted literal *)
 
@@ -2263,11 +2213,6 @@ let fundecl fundecl =
        there were %d before relaxation but %d afterwards"
       (Env.function_name env) num_call_gc_sites
       num_call_gc_sites_after_relaxation;
-  (* All of this function's frame descriptors have been recorded by now. *)
-  if
-    Config.link_order_frametables
-    && emit_frametable_piece ~link_symbol:(frametable_link_symbol fun_sym)
-  then emit_named_text_section (Env.function_name env);
   (match fun_end_label with
   | None -> ()
   | Some fun_end_label ->
@@ -2283,7 +2228,14 @@ let fundecl fundecl =
      minus symbol definition". *)
   D.type_symbol ~ty:Function fun_sym;
   D.size fun_sym;
-  emit_literals env
+  emit_literals env;
+  (* The function's frame descriptors go into a piece linked to its text
+     section; nothing more is emitted into that section afterwards. *)
+  if Config.link_order_frametables
+  then
+    Emitaux.emit_frametable_piece
+      ~link_symbol:(Emitaux.current_link_symbol ())
+      frame_actions
 
 (* Emission of data *)
 
@@ -2294,27 +2246,7 @@ let emit_data_item_actions : Emitaux.emit_data_item_actions =
   }
 
 let data l =
-  (* With link-order frametables and function sections on ELF, a phrase defining
-     a symbol gets its own section, named after the first symbol it defines, so
-     that the linker can discard it when unreferenced. *)
-  let own_section =
-    if Config.link_order_frametables && !Clflags.function_sections && not macosx
-    then
-      List.find_map
-        (fun[@ocaml.warning "-4"] (d : Cmm.data_item) ->
-          match d with
-          | Cdefine_symbol s -> Some (S.encode (symbol_of_cmm_symbol s))
-          | _ -> None)
-        l
-    else None
-  in
-  (match own_section with
-  | None -> D.data ()
-  | Some sym ->
-    D.switch_to_section (Data_symbol sym);
-    (* [Emitaux.emit_data_item] defines its labels in [Data]; pretend the
-       section is [Data], as [emit_named_text_section] does for [Text]. *)
-    D.unsafe_set_internal_section_ref Data);
+  Emitaux.enter_data_section l;
   D.align ~fill:Zero ~bytes:8;
   List.iter (Emitaux.emit_data_item emit_data_item_actions) l
 
@@ -2351,6 +2283,7 @@ let begin_assembly _unix =
   D.define_symbol_label ~section:Data data_begin_sym;
   let code_begin = Cmm_helpers.make_symbol "code_begin" in
   let code_begin_sym = S.create_global code_begin in
+  code_begin_link_symbol := S.encode code_begin_sym;
   emit_named_text_section code_begin;
   global_maybe_protected code_begin_sym;
   D.define_symbol_label ~section:Text code_begin_sym;
@@ -2366,15 +2299,9 @@ let begin_assembly _unix =
   then (
     (* caml<U>__frametable_begin: offset 0 of the piece linked to code_begin,
        which the linker places first among the unit's pieces. *)
-    let piece : Asm_targets.Asm_section.t =
-      Frametable_piece { link_symbol = S.encode code_begin_sym }
-    in
-    let frametable_begin_sym =
-      S.create_global (Cmm_helpers.make_symbol "frametable_begin")
-    in
-    D.switch_to_section piece;
-    global_maybe_protected frametable_begin_sym;
-    D.define_symbol_label ~section:piece frametable_begin_sym;
+    Emitaux.emit_frametable_marker emit_data_item_actions
+      ~link_symbol:!code_begin_link_symbol
+      (Cmm_helpers.make_symbol "frametable_begin");
     emit_named_text_section code_begin);
   let code_end = Cmm_helpers.make_symbol "code_end" in
   Emitaux.Dwarf_helpers.begin_dwarf ~code_begin ~code_end ~file_emitter
@@ -2391,18 +2318,12 @@ let end_assembly () =
   global_maybe_protected code_end_sym;
   D.define_symbol_label ~section:Text code_end_sym;
   if Config.link_order_frametables
-  then (
+  then
     (* caml<U>__frametable_end: an otherwise empty piece linked to the last of
        the unit's text sections, so that it sorts after every descriptor. *)
-    let piece : Asm_targets.Asm_section.t =
-      Frametable_piece { link_symbol = frametable_link_symbol code_end_sym }
-    in
-    let frametable_end_sym =
-      S.create_global (Cmm_helpers.make_symbol "frametable_end")
-    in
-    D.switch_to_section piece;
-    global_maybe_protected frametable_end_sym;
-    D.define_symbol_label ~section:piece frametable_end_sym);
+    Emitaux.emit_frametable_marker emit_data_item_actions
+      ~link_symbol:(Emitaux.current_link_symbol ())
+      (Cmm_helpers.make_symbol "frametable_end");
   let data_end = Cmm_helpers.make_symbol "data_end" in
   let data_end_sym = S.create_global data_end in
   D.data ();
@@ -2432,7 +2353,6 @@ let end_assembly () =
      let frametable_sym = S.create_global frametable in
      global_maybe_protected frametable_sym;
      D.define_symbol_label ~section:Read_only_data frametable_sym;
-     (* CR sspies: Share the [emit_frames] code with the x86 backend. *)
      emit_frames ~debug_strings_section frame_actions;
      D.type_symbol ~ty:Object frametable_sym;
      D.size frametable_sym);

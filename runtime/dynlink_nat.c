@@ -126,33 +126,29 @@ CAMLprim value caml_natdynlink_register(value handle_v, value symbols) {
   /* [caml_register_dyn_global] can raise, so do it prior to registering
      frametables etc. */
 
+  /* Link-order layout: a unit's frametable is the range
+     [frametable_begin, frametable_end) (see frame_descriptors.h). */
 #ifdef LINK_ORDER_FRAMETABLES
   void** ends = caml_stat_alloc(sizeof(void*) * nsymbols);
+#else
+  void** ends = NULL;
+#endif
   for (int i = 0; i < nsymbols; i++) {
     const char* unit = String_val(Field(symbols, i));
-    table[i] = getsym(handle, unit, "frametable_begin");
-    ends[i] = getsym(handle, unit, "frametable_end");
-    if (table[i] == NULL || ends[i] == NULL) {
+    table[i] = getsym(handle, unit, ends ? "frametable_begin" : "frametable");
+    if (ends) ends[i] = getsym(handle, unit, "frametable_end");
+    if (table[i] == NULL || (ends && ends[i] == NULL)) {
       caml_stat_free(table);
       caml_stat_free(ends);
       caml_invalid_argument_value(
         caml_alloc_sprintf("Dynlink: Missing frametable for %s", unit));
     }
   }
-  caml_register_frametable_ranges(table, ends, nsymbols);
+  if (ends)
+    caml_register_frametable_ranges(table, ends, nsymbols);
+  else
+    caml_register_frametables(table, nsymbols);
   caml_stat_free(ends);
-#else
-  for (int i = 0; i < nsymbols; i++) {
-    const char* unit = String_val(Field(symbols, i));
-    table[i] = getsym(handle, unit, "frametable");
-    if (table[i] == NULL) {
-      caml_stat_free(table);
-      caml_invalid_argument_value(
-        caml_alloc_sprintf("Dynlink: Missing frametable for %s", unit));
-    }
-  }
-  caml_register_frametables(table, nsymbols);
-#endif
 
   for (int i = 0; i < nsymbols; i++) {
     const char* unit = String_val(Field(symbols, i));

@@ -67,26 +67,6 @@ module Section_name = struct
 
     let link_symbol t = t.link_symbol
 
-    (* The type operand, without its "@" or "%" prefix or quotes, and without
-       any entsize following a comma: "@progbits,1" -> "progbits". *)
-    let section_type t =
-      match t.args with
-      | [] -> None
-      | arg :: _ ->
-        let arg =
-          match String.index_opt arg ',' with
-          | Some i -> String.sub arg 0 i
-          | None -> arg
-        in
-        let arg = String.concat "" (String.split_on_char '"' arg) in
-        let arg =
-          if String.length arg > 0
-             && (Char.equal arg.[0] '@' || Char.equal arg.[0] '%')
-          then String.sub arg 1 (String.length arg - 1)
-          else arg
-        in
-        if String.length arg = 0 then None else Some arg
-
     let alignment t =
       let rec align = function
         | [] -> 0L
@@ -99,7 +79,11 @@ module Section_name = struct
 
     let is_data_like t = String.starts_with ~prefix:".data" t.name_str
 
-    let is_note_like t = String.starts_with ~prefix:".note" t.name_str
+    (* Named like a note, or declared as one with a type operand
+       ("@note", as in [Asm_section.Eh_notes_piece]). *)
+    let is_note_like t =
+      String.starts_with ~prefix:".note" t.name_str
+      || List.exists (String.equal "@note") t.args
   end
 
   include S

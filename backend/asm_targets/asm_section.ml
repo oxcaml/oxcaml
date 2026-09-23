@@ -287,15 +287,13 @@ let details t first_occurrence =
       [".rodata.str1.1"], Some "aMS", [progbits; "1"]
     (* 1 = characters *)
     (* Per-symbol data sections and link-order pieces are ELF-only. *)
-    | ( Data_symbol _,
+    | ( (Data_symbol _ | Frametable_piece _ | Eh_notes_piece _),
         _,
         (MacOS_like | MinGW_32 | MinGW_64 | Win32 | Win64 | Cygwin) ) ->
-      data ()
+      Misc.fatal_error
+        "Per-symbol data sections and link-order sections are only supported \
+         on ELF targets."
     | Data_symbol sym, _, _ -> [".data.caml." ^ sym], Some "aw", ["@progbits"]
-    | ( (Frametable_piece _ | Eh_notes_piece _),
-        _,
-        (MacOS_like | MinGW_32 | MinGW_64 | Win32 | Win64 | Cygwin) ) ->
-      Misc.fatal_error "Link-order sections are only supported on ELF targets."
     (* "ao" = SHF_ALLOC | SHF_LINK_ORDER: the linker keeps and orders a piece
        with the section containing [link_symbol]. *)
     | Frametable_piece { link_symbol }, _, _ ->
@@ -359,10 +357,6 @@ let of_names names =
          && String.equal (String.sub name 0 5) ".text"
          && Char.equal name.[5] '.' ->
     Some (Function_text name)
-  | [name]
-    when String.length name > 11
-         && String.equal (String.sub name 0 11) ".data.caml." ->
-    Some (Data_symbol (String.sub name 11 (String.length name - 11)))
   | _ -> None
 
 let to_string t =
