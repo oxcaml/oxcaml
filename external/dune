@@ -9,9 +9,3 @@
 
 ; ast-dependent-libs/ is a dune root of its own (see ast-dependent-libs/dune).
 (dirs :standard \ ast-dependent-libs)
-
-; Merlin is built with the boot workspace, i.e. with the system compiler.
-(alias
- (name merlin)
- (deps
-  (alias_rec merlin/default)))
