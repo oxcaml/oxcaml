@@ -177,6 +177,20 @@ let () =
   Printf.printf "{ %s %f %s }\n" s (Float_u.to_float f) (use_void v);
   print_newline ()
 
+type empty_record = { mutable v : void }
+
+let () =
+  print_endline "Empty record";
+  let r = { v = void () } in
+  let v = unsafe_get_ptr #(r, (.v)) in
+  Printf.printf "{ %s }\n" (use_void v);
+  let rhs_calls = ref 0 in
+  unsafe_set_ptr #(r, (.v)) (incr rhs_calls; void ());
+  Printf.printf "void RHS evaluated %d time(s)\n" !rhs_calls;
+  let v = unsafe_get_ptr #(r, (.v)) in
+  Printf.printf "{ %s }\n" (use_void v);
+  print_newline ()
+
 (***************************************)
 (* Nested product update and deepening *)
 

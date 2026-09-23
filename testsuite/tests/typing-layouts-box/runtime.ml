@@ -1,5 +1,6 @@
 (* TEST
  include stdlib_upstream_compatible;
+ flags = "-extension layout_poly_alpha";
  flambda2;
  {
    native;
@@ -98,3 +99,23 @@ let () =
   let #(a, b) = #(Boxed.of_int 11, 12) in
   checki a 11;
   assert (Int.equal b 12)
+
+type ('a : any) inherited = { inherit payload : 'a }
+
+let poly_ wrap payload = { payload }
+let poly_ unwrap { payload } = payload
+let poly_ read r = r.payload
+
+let () =
+  assert (unwrap (wrap 42) = 42);
+  assert (Float.equal (Float_u.to_float (read (wrap #3.5))) 3.5);
+  let #(i, f) = unwrap (wrap #(17, #4.25)) in
+  assert (i = 17 && Float.equal (Float_u.to_float f) 4.25);
+  let #() = unwrap (wrap #()) in
+  let some_unit = Some #() in
+  assert (Option.is_some some_unit);
+  assert (not (Option.is_none some_unit));
+  match Option.join (Some (Some #(i, f))) with
+  | Some #(i, f) ->
+    assert (i = 17 && Float.equal (Float_u.to_float f) 4.25)
+  | None -> assert false
