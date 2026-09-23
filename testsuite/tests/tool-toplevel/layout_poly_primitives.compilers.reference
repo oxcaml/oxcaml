@@ -1,0 +1,53 @@
+Line 9, characters 0-3:
+9 | box;;
+    ^^^
+Error: Non-value detected in [value_kind].
+       Please report this error to the Jane Street compilers team.
+       The layout of 'a is any.
+       But the layout of 'a must be a value layout
+         because it has to be value for the V1 safety check.
+Line 1, characters 0-5:
+1 | unbox;;
+    ^^^^^
+Error: Non-value detected in [value_kind].
+       Please report this error to the Jane Street compilers team.
+       The layout of 'a is any.
+       But the layout of 'a must be a value layout
+         because it has to be value for the V1 safety check.
+Line 1, characters 0-10:
+1 | Stdlib.box;;
+    ^^^^^^^^^^
+Error: Non-value detected in [value_kind].
+       Please report this error to the Jane Street compilers team.
+       The layout of 'a is any.
+       But the layout of 'a must be a value layout
+         because it has to be value for the V1 safety check.
+Line 1, characters 0-12:
+1 | Stdlib.unbox;;
+    ^^^^^^^^^^^^
+Error: Non-value detected in [value_kind].
+       Please report this error to the Jane Street compilers team.
+       The layout of 'a is any.
+       But the layout of 'a must be a value layout
+         because it has to be value for the V1 safety check.
+- : 'a -> 'a box = <fun>
+- : 'a box -> 'a = <fun>
+val b : 'a -> 'a box = <fun>
+- : 'a -> 'a box = <fun>
+- : float# -> float = <fun>
+- : float -> float# = <fun>
+val boxed : float = 3.5
+- : float# = #3.5
+- : #(string * float#) = #("product", #4.5)
+external opaque : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
+Line 1, characters 0-6:
+1 | opaque;;
+    ^^^^^^
+Error: Non-value detected in [value_kind].
+       Please report this error to the Jane Street compilers team.
+       The layout of 'a is any
+         because of the definition of opaque at line 2, characters 0-66.
+       But the layout of 'a must be a value layout
+         because it has to be value for the V1 safety check.
+- : #(string * int64_u) = #("opaque", #5L)
+
