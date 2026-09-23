@@ -6593,7 +6593,7 @@ module Value_with (Areality : Areality) = struct
     }
 
   let print ?verbose () ppf { monadic; comonadic } =
-    Fmt.fprintf ppf "%a;%a"
+    Fmt.fprintf ppf "<%a;%a>"
       (Comonadic.print ?verbose ())
       comonadic
       (Monadic.print ?verbose ())

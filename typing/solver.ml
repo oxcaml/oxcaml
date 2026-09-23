@@ -468,7 +468,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   let rec print_var : type a. ?traversed:VarSet.t -> a C.obj -> _ -> a var -> _
       =
    fun ?traversed obj ppf v ->
-    Fmt.fprintf ppf "modevar#%x<%x>[%a .. %a]" v.id v.level (C.print obj)
+    Fmt.fprintf ppf "modevar#%x<%d>[%a .. %a]" v.id v.level (C.print obj)
       v.lower (C.print obj) v.upper;
     match traversed with
     | None -> ()
