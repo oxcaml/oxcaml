@@ -126,6 +126,9 @@ val transl_constructor_representation:
     Env.t -> Location.t -> Types.constructor_representation ->
     Lambda.constructor_representation
 
+val transl_variant_representation:
+  Types.variant_representation -> Lambda.variant_representation
+
 (* Compute a label's sort given the representation of its record *)
 val label_sort_for_representation:
   Data_types.label_description -> Lambda.record_representation
