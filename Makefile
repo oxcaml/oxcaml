@@ -271,7 +271,9 @@ ifeq ($(abspath $(OXCAML_INSTALL)),$(CURDIR)/_install)
 ast-dependent-libs-compiler: _install
 endif
 ast-dependent-libs-compiler:
-	@test -x "$(OXCAML_INSTALL)/bin/ocamlc.opt"
+	@test -x "$(OXCAML_INSTALL)/bin/ocamlc.opt" || { \
+	  echo "error: no compiler in OXCAML_INSTALL=$(OXCAML_INSTALL)" >&2; \
+	  exit 1; }
 	@mkdir -p _build
 
 # Against the system compiler, in isolated dune roots so that ppxlib_jane's
