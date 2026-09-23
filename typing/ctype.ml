@@ -5177,9 +5177,13 @@ let rec unify uenv t1 t2 =
         unify2 uenv t1 t2
     end;
     reset_trace_gadt_instances reset_tracing;
-  with Unify_trace trace ->
+  with
+  | Unify_trace trace ->
     reset_trace_gadt_instances reset_tracing;
     raise_trace_for Unify (Diff {got = t1; expected = t2} :: trace)
+  | exn ->
+    reset_trace_gadt_instances reset_tracing;
+    raise exn
 
 and unify2 uenv t1 t2 = unify2_expand uenv t1 t1 t2 t2
 
@@ -5819,11 +5823,15 @@ let unify_var uenv t1 t2 =
         unification_jkind_check uenv t2 (Jkind.disallow_left jkind);
         link_type t1 t2;
         reset_trace_gadt_instances reset_tracing;
-      with Unify_trace trace ->
+      with
+      | Unify_trace trace ->
         reset_trace_gadt_instances reset_tracing;
         raise (Unify (expand_to_unification_error
                         env
                         (Diff { got = t1; expected = t2 } :: trace)))
+      | exn ->
+        reset_trace_gadt_instances reset_tracing;
+        raise exn
       end
   | _ ->
       unify uenv t1 t2
@@ -5853,10 +5861,7 @@ let enforce_current_level env ty =
 (**** Special cases of unification ****)
 
 let expand_head_trace env t =
-  let reset_tracing = check_trace_gadt_instances env in
-  let t = expand_head_unif env t in
-  reset_trace_gadt_instances reset_tracing;
-  t
+  wrap_trace_gadt_instances env (expand_head_unif env) t
 
 (*
    Unify [t] and [l:'a -> 'b]. Return ['a] and ['b].
