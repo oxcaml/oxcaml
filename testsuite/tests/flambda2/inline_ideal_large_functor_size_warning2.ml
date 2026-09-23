@@ -14,6 +14,8 @@
    check-ocamlopt.byte-output;
  *)
 
+[@@@ocaml.flambda_o3]
+
 (* With the large functor size forced to 1, the body of [F] is deemed too
    large for it to be eligible for inlining.  With the ideal large functor
    size of 2000000, the application of [F] would instead be subject to

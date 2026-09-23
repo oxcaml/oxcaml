@@ -1,7 +1,7 @@
-File "inline_ideal_large_functor_size_warning1.ml", lines 36-38, characters 11-4:
-36 | ...........F (struct
-37 |   let x = Sys.opaque_identity 1
-38 | end)
+File "inline_ideal_large_functor_size_warning1.ml", lines 38-40, characters 11-4:
+38 | ...........F (struct
+39 |   let x = Sys.opaque_identity 1
+40 | end)
 Warning 222 [inlining-deviates-from-ideal]: The inlining decision at this application differs from the one
   that would be taken in the ideal configuration (in which
   -flambda2-speculative-inlining-track-lifted-constants-for-functors is

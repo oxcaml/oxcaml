@@ -13,6 +13,8 @@
    check-ocamlopt.byte-output;
  *)
 
+[@@@ocaml.flambda_o3]
+
 (* With the large functor size at its (huge) default, the application of [F]
    is subject to speculative inlining, and is in fact inlined.  With the ideal
    large functor size of 1, the body of [F] would be deemed too large for it
