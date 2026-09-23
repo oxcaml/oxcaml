@@ -443,7 +443,8 @@ let
     JSOO_QCHECK_SRC = qcheckSrc;
   };
 
-  # Build checks against an installed OxCaml; they install nothing.
+  # Build and install with an installed OxCaml, as findlib packages under
+  # $out/lib and executables under $out/bin.
   mkAstDependentLibsBuild =
     {
       pname,
@@ -466,22 +467,17 @@ let
 
         dontConfigure = true;
 
-        buildPhase = ''
-          runHook preBuild
-          make \
-            SHELL="$SHELL" \
-            REQUIRES_CONFIGURATION= \
-            DUNE=${dune}/bin/dune \
-            OXCAML_INSTALL=${oxcaml} \
-            ${target}
-          runHook postBuild
-        '';
+        makeFlags = [
+          "SHELL=${stdenv.shell}"
+          "REQUIRES_CONFIGURATION="
+          "DUNE=${dune}/bin/dune"
+          "OXCAML_INSTALL=${oxcaml}"
+        ];
 
-        installPhase = ''
-          runHook preInstall
-          mkdir "$out"
-          runHook postInstall
-        '';
+        buildFlags = [ "${target}-build" ];
+
+        installTargets = [ "${target}-install" ];
+        installFlags = [ "AST_DEPENDENT_LIBS_PREFIX=${placeholder "out"}" ];
       }
       // sources
     );
@@ -494,13 +490,13 @@ let
 
   mkPpxlibLibs = mkAstDependentLibsBuild {
     pname = "oxcaml-ppxlib";
-    target = "ppxlib-build";
+    target = "ppxlib";
     sources = ppxlibSources;
   };
 
   mkJsooLibs = mkAstDependentLibsBuild {
     pname = "oxcaml-jsoo";
-    target = "jsoo-build";
+    target = "jsoo";
     sources = ppxlibSources // jsooSources;
     extraNativeBuildInputs = jsooTools;
   };
@@ -681,11 +677,13 @@ stdenv.mkDerivation (
         astDependentLibsCommands =
           if withAstDependentLibs' then
             "  make ppxlib-build        - Build ppxlib and its dependencies\n"
+            + "  make ppxlib-install      - Install them (AST_DEPENDENT_LIBS_PREFIX=...)\n"
           else
             "  (make ppxlib-build needs this shell built with withAstDependentLibs=true)\n";
         jsooCommands =
           if withJsoo then
             "  make jsoo-build          - Build js_of_ocaml and wasm_of_ocaml\n"
+            + "  make jsoo-install        - Install them (AST_DEPENDENT_LIBS_PREFIX=...)\n"
             + "  make jsoo-test           - Run core JSOO compiler and JS/Wasm regressions\n"
           else
             "  (make jsoo-* targets need this shell built with withJsoo=true)\n";

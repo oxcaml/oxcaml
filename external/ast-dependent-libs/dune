@@ -6,30 +6,35 @@
 ; js_of_ocaml stays unvendored: recursive aliases skip vendored directories.
 (vendored_dirs deps ocaml-compiler-libs ppxlib ppxlib_jane)
 
+; Each alias depends on the .install files of its packages, which builds
+; everything they install. Keep in sync with PPXLIB_PACKAGES and
+; JSOO_PACKAGES in the top-level Makefile.
+
 (alias
  (name ppxlib-libs)
  (deps
-  (package ocaml-compiler-libs)
-  (package ppx_derivers)
-  (package sexplib0)
-  (package stdlib-shims)
-  (package ppxlib_ast)
-  (package ppxlib)
-  (package ppxlib_jane)))
+  ocaml-compiler-libs/ocaml-compiler-libs.install
+  deps/ppx_derivers/ppx_derivers.install
+  deps/sexplib0/sexplib0.install
+  deps/stdlib-shims/stdlib-shims.install
+  ppxlib/ppxlib_ast.install
+  ppxlib/ppxlib.install
+  ppxlib_jane/ppxlib_jane.install))
 
 (alias
  (name jsoo-libs)
  (deps
-  (package gen)
-  (package sedlex)
-  (package cmdliner)
-  (package menhirLib)
-  (package menhirSdk)
-  (package yojson)
-  (package js_of_ocaml-compiler)
-  (package wasm_of_ocaml-compiler)
-  (package js_of_ocaml-ppx)
-  (package js_of_ocaml)))
+  (alias ppxlib-libs)
+  deps/gen/gen.install
+  deps/sedlex/sedlex.install
+  deps/cmdliner/cmdliner.install
+  deps/menhir/menhirLib.install
+  deps/menhir/menhirSdk.install
+  deps/yojson/yojson.install
+  js_of_ocaml/js_of_ocaml-compiler.install
+  js_of_ocaml/wasm_of_ocaml-compiler.install
+  js_of_ocaml/js_of_ocaml-ppx.install
+  js_of_ocaml/js_of_ocaml.install))
 
 ; For duneconf/jsoo-test.ws, which defines runtest-js and runtest-wasm.
 (alias
