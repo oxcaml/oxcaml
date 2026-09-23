@@ -3932,8 +3932,8 @@ let rec occur_fast visited allow_recursive ty0 ty =
   if try_mark_node visited ty then begin
     if eq_type ty ty0 then raise Occur;
     begin match get_desc ty with
-     | Tconstr(_, _ :: _, _abbrev) ->
-         iter_type_expr (occur_fast visited allow_recursive ty0) (Fun.const ()) ty
+    | Tconstr(_, _ :: _, _abbrev) ->
+        iter_type_expr (occur_fast visited allow_recursive ty0) (Fun.const ()) ty
     | Tobject _ | Tvariant _ ->
         ()
     | _ ->
