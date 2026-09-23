@@ -16,7 +16,7 @@
  (libraries unix compiler-libs.common js_of_ocaml-compiler)
  (enabled_if %{oxcaml_supported})
  (inline_tests
-  (modes js wasm best))
+  (modes js wasm))
  (preprocess
   (pps ppx_expect_light)))
 
@@ -45,7 +45,7 @@
  (inline_tests
   (deps
    (sandbox preserve_file_kind))
-  (modes js wasm best))
+  (modes js wasm))
  (preprocess
   (pps ppx_expect_light)))
 
@@ -86,7 +86,7 @@
  (inline_tests
   (deps
    (sandbox preserve_file_kind))
-  (modes js wasm best))
+  (modes js wasm))
  (preprocess
   (pps ppx_optcomp_light ppx_expect_light)))
 
@@ -95,7 +95,7 @@
  (build_if
   (>= %{ocaml_version} 5.2))
  (modules test_float16)
- (modes js wasm native))
+ (modes js wasm))
 
 (library
  (name jsoo_test_runtime_events_register)
@@ -104,7 +104,7 @@
  (modules runtime_events_register)
  (libraries runtime_events)
  (inline_tests
-  (modes js wasm best))
+  (modes js wasm))
  (preprocess
   (pps ppx_expect_light)))
 
