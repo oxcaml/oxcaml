@@ -143,6 +143,9 @@ and out_type =
   | Otyp_sum of out_constructor list
   | Otyp_tuple of (string option * out_type) list
   | Otyp_unboxed_tuple of (string option * out_type) list
+  | Otyp_unboxed of out_type
+      (* [ty#] for a [ty] that is not a type constructor application; those
+         print through [Oide_hash] *)
   | Otyp_var of bool * string
   | Otyp_variant of out_variant * bool * (string list) option
   | Otyp_quote of out_type

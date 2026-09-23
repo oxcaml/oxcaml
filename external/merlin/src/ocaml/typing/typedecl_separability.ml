@@ -149,7 +149,7 @@ let rec immediate_subtypes : type_expr -> type_expr list = fun ty ->
       (* these should only occur under Tobject and not at the toplevel,
          but "better safe than sorry" *)
       immediate_subtypes_object_row [] ty
-  | Tquote ty | Tsplice ty | Tquote_eval ty | Tbox ty -> [ty]
+  | Tquote ty | Tsplice ty | Tquote_eval ty | Tbox ty | Tunbox ty -> [ty]
   | Tmod _ -> Misc.fatal_error "immediate_subtypes: Tmod"
   | Tlink _ | Tsubst _ -> assert false (* impossible due to Ctype.repr *)
   | Tvar _ | Tunivar _ -> []
@@ -471,6 +471,15 @@ let check_type
        under a separating type constructor. *)
     | (Tpoly(pty,_)       , m      ) ->
         check_type hyps pty m
+    (* A reducible [t#] is checked as its reduct. A stuck one is the unboxed
+       version of some box, which is separable whenever the box's components
+       all are. *)
+    | (Tunbox inner       , m      ) ->
+        let ty' = Ctype.expand_head env ty in
+        begin match get_desc ty' with
+        | Tunbox _ -> check_type hyps inner Deepsep
+        | _ -> check_type hyps ty' m
+        end
     | (Trepr(_pty,_)       , _m    ) ->
         assert false
     | (Tunivar(_)         , _      ) -> empty

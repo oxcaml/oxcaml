@@ -1064,7 +1064,13 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
     let ctys, tys = transl_type_aux_tuple env ~loc ~policy ~row_context stl in
     ctyp (Ttyp_unboxed_tuple ctys) (newty (Tunboxed_tuple tys))
   | Ptyp_constr(lid, stl) ->
-      let (path, decl) = Env.lookup_type ~loc:lid.loc lid.txt env in
+      (* [t#] is the unboxed version of [t]: look up [t], and unbox the
+         constructed type. *)
+      let boxed_lid = Env.lid_without_hash lid.txt in
+      let (path, decl) =
+        Env.lookup_type ~loc:lid.loc
+          (Option.value boxed_lid ~default:lid.txt) env
+      in
       let stl =
         match stl with
         | [ {ptyp_desc=Ptyp_any None} as t ] when decl.type_arity > 1 ->
@@ -1109,7 +1115,23 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
         (List.combine (List.combine stl args) params);
       let constr =
         newconstr path (List.map (fun ctyp -> ctyp.ctyp_type) args) in
-      ctyp (Ttyp_constr (path, lid, args)) constr
+      begin match boxed_lid with
+      | None -> ctyp (Ttyp_constr (path, lid, args)) constr
+      | Some boxed_lid ->
+        if not (constrain_unboxable_ty env constr) then begin
+          let renamed_to =
+            if Path.same path Predef.path_int32 then Some "int32_u"
+            else if Path.same path Predef.path_int64 then Some "int64_u"
+            else if Path.same path Predef.path_nativeint then Some "nativeint_u"
+            else if Path.same path Predef.path_float32 then Some "float32_u"
+            else None
+          in
+          Env.lookup_error lid.loc env
+            (No_unboxed_version (boxed_lid, decl, renamed_to))
+        end;
+        ctyp (Ttyp_constr (Path.unboxed_version path, lid, args))
+          (Btype.new_unbox_ty constr)
+      end
   | Ptyp_object (fields, o) ->
       let ty, fields = transl_fields env ~policy ~row_context o fields in
       ctyp (Ttyp_object (fields, o)) (newobj ty)
@@ -1118,20 +1140,18 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       let (path, decl) =
         match Env.lookup_cltype ~loc:lid.loc lid.txt env with
         | (path, decl) -> (path, decl.clty_hash_type)
-        (* Raise a different error if it matches the name of an unboxed type *)
+        (* Raise a different error if it names a type with an unboxed version *)
         | exception
             (Env.Error (Lookup_error (_, _, Unbound_cltype _)) as exn)
           ->
-            let unboxed_lid : Longident.t =
-              match lid.txt with
-              | Lident s -> Lident (s ^ "#")
-              | Ldot (l, s) -> Ldot (l, { s with txt = s.txt ^ "#" })
-              | Lapply _ -> fatal_error "Typetexp.transl_type"
-            in
-            match Env.find_type_by_name unboxed_lid env with
+            match Env.find_type_by_name lid.txt env with
             | exception Not_found -> raise exn
-            | (_ : _ * _) ->
-                raise (Error (styp.ptyp_loc, env, Did_you_mean_unboxed lid.txt))
+            | (path, decl) ->
+                let ty = newconstr path (instance_list decl.type_params) in
+                if is_unboxable_ty env ty then
+                  raise
+                    (Error (styp.ptyp_loc, env, Did_you_mean_unboxed lid.txt))
+                else raise exn
       in
       if List.length stl <> decl.type_arity then
         raise(Error(styp.ptyp_loc, env,

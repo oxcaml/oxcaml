@@ -672,11 +672,22 @@ let rec uniq = function
     [] -> true
   | a :: l -> not (List.memq (a : int) l) && uniq l
 
+(* A type constructor application, seeing [t#] as the path [t#]. *)
+let constr_of_type ty =
+  match get_desc ty with
+  | Tconstr (p, tyl, _) -> Some (p, tyl)
+  | Tunbox ty -> begin
+      match get_desc ty with
+      | Tconstr (p, tyl, _) -> Some (Path.unboxed_version p, tyl)
+      | _ -> None
+    end
+  | _ -> None
+
 let rec normalize_type_path ?(cache=false) env p =
   try
     let (params, ty, _) = Env.find_type_expansion p env in
-    match get_desc ty with
-      Tconstr (p1, tyl, _) ->
+    match constr_of_type ty with
+      Some (p1, tyl) ->
         if List.length params = List.length tyl
         && List.for_all2 eq_type params tyl
         then normalize_type_path ~cache env p1
@@ -686,7 +697,7 @@ let rec normalize_type_path ?(cache=false) env p =
           let l1 = List.map (index params) tyl in
           let (p2, s2) = normalize_type_path ~cache env p1 in
           (p2, compose l1 s2)
-    | _ ->
+    | None ->
         (p, Nth (index params ty))
   with
     Not_found ->
@@ -2781,7 +2792,7 @@ let rec tree_of_modal_typexp mode modal ty =
    let name = Variable_names.(name_of_type (new_var_name ~non_gen ty)) px in
    not_arrow (Otyp_var (non_gen, name)) else
 
-  let pr_typ acc_mode =
+  let rec pr_typ acc_mode =
     let tty = Transient_expr.repr ty in
     match tty.desc with
     | Tvar _ ->
@@ -2818,6 +2829,7 @@ let rec tree_of_modal_typexp mode modal ty =
         Otyp_tuple (tree_of_labeled_typlist mode labeled_tyl)
     | Tunboxed_tuple labeled_tyl ->
         Otyp_unboxed_tuple (tree_of_labeled_typlist mode labeled_tyl)
+<<<<<<< Merlin:rtjoa.box-demo
     | Tconstr(p, tyl, _abbrev) -> begin
         match best_type_path p with
         | Nth n ->
@@ -2827,6 +2839,23 @@ let rec tree_of_modal_typexp mode modal ty =
             let tyl' = apply_subst_opt nso tyl in
             Otyp_constr (tree_of_path (Some Type) p', tree_of_typlist mode tyl')
       end
+||||||| Compiler:last-imported
+    | Tconstr(p, tyl, _abbrev) ->
+        let p', s = best_type_path p in
+        let tyl' = apply_subst s tyl in
+        if is_nth s && not (tyl'=[])
+        then tree_of_typexp mode Alloc.Const.legacy (List.hd tyl')
+        else begin
+          Internal_names.add p';
+          Otyp_constr (tree_of_path (Some Type) p', tree_of_typlist mode tyl')
+        end
+=======
+    | Tconstr(p, tyl, _abbrev) -> tree_of_constr p tyl
+    | Tunbox ty when Option.is_some (constr_of_type ty) ->
+        (* [t#] prints as the path [t#] would, so aliases of it are found *)
+        let p, tyl = Option.get (constr_of_type ty) in
+        tree_of_constr (Path.unboxed_version p) tyl
+>>>>>>> Compiler:HEAD
     | Tvariant row ->
         let { fields; name; closed; present; all_present; tags } =
           tree_of_typvariant_repr row
@@ -2960,6 +2989,7 @@ let rec tree_of_modal_typexp mode modal ty =
     | Tbox ty -> begin
       (* Render as if a regular Tconstr application of Predef.path_box,
          so path shortening and shadowing (e.g. [box/2]) work uniformly. *)
+<<<<<<< Merlin:rtjoa.box-demo
         match best_type_path Predef.path_box with
         | Nth n ->
             tree_of_typexp mode Alloc.Const.legacy (apply_nth n [ty])
@@ -2968,6 +2998,27 @@ let rec tree_of_modal_typexp mode modal ty =
             let tyl' = apply_subst_opt nso [ty] in
             Otyp_constr (tree_of_path (Some Type) p', tree_of_typlist mode tyl')
       end
+||||||| Compiler:last-imported
+      let p', s = best_type_path Predef.path_box in
+      let tyl' = apply_subst s [ty] in
+      Internal_names.add p';
+      Otyp_constr (tree_of_path (Some Type) p', tree_of_typlist mode tyl')
+=======
+      let p', s = best_type_path Predef.path_box in
+      let tyl' = apply_subst s [ty] in
+      Internal_names.add p';
+      Otyp_constr (tree_of_path (Some Type) p', tree_of_typlist mode tyl')
+    | Tunbox ty -> Otyp_unboxed (tree_of_typexp mode Alloc.Const.legacy ty)
+  and tree_of_constr p tyl =
+    let p', s = best_type_path p in
+    let tyl' = apply_subst s tyl in
+    if is_nth s && not (tyl'=[])
+    then tree_of_typexp mode Alloc.Const.legacy (List.hd tyl')
+    else begin
+      Internal_names.add p';
+      Otyp_constr (tree_of_path (Some Type) p', tree_of_typlist mode tyl')
+    end
+>>>>>>> Compiler:HEAD
   in
   Aliases.remove_delay px;
   alias_nongen_row mode px ty;
@@ -4261,6 +4312,7 @@ let print_items showval env x =
 let same_path t t' =
   let open Types in
   eq_type t t' ||
+<<<<<<< Merlin:rtjoa.box-demo
   match get_desc t, get_desc t' with
   | Tconstr(p,tl,_), Tconstr(p',tl',_) -> begin
       match best_type_path p, best_type_path p' with
@@ -4268,6 +4320,23 @@ let same_path t t' =
       | Path(nso, p), Path(nso', p') when Path.same p p' ->
           let tl = apply_subst_opt nso tl in
           let tl' = apply_subst_opt nso' tl' in
+||||||| Compiler:last-imported
+  match get_desc t, get_desc t' with
+    Tconstr(p,tl,_), Tconstr(p',tl',_) ->
+      let (p1, s1) = best_type_path p and (p2, s2)  = best_type_path p' in
+      begin match s1, s2 with
+        Nth n1, Nth n2 when n1 = n2 -> true
+      | (Id | Map _), (Id | Map _) when Path.same p1 p2 ->
+          let tl = apply_subst s1 tl and tl' = apply_subst s2 tl' in
+=======
+  match constr_of_type t, constr_of_type t' with
+    Some (p, tl), Some (p', tl') ->
+      let (p1, s1) = best_type_path p and (p2, s2)  = best_type_path p' in
+      begin match s1, s2 with
+        Nth n1, Nth n2 when n1 = n2 -> true
+      | (Id | Map _), (Id | Map _) when Path.same p1 p2 ->
+          let tl = apply_subst s1 tl and tl' = apply_subst s2 tl' in
+>>>>>>> Compiler:HEAD
           List.length tl = List.length tl' &&
           List.for_all2 eq_type tl tl'
       | _ -> false

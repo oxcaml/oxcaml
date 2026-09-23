@@ -304,6 +304,11 @@ and type_desc =
   | Tbox of type_expr
   (** [Tbox ty] ==> [ty box] *)
 
+  | Tunbox of type_expr
+  (** [Tunbox ty] ==> [ty#], the unboxed version of [ty]. Well-formed only
+      when [ty] has a box kind; reduces when [ty] is known to be a box
+      (see [Ctype.unbox_ty]). *)
+
 (** This is used in the Typedtree. It is distinct from
     {{!Asttypes.arg_label}[arg_label]} because Position argument labels are
     discovered through typechecking. *)

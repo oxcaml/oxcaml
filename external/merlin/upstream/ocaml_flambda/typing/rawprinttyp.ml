@@ -172,6 +172,8 @@ and raw_type_desc ppf ty =
     fprintf ppf "Tof_kind@ %a" (Format_doc.compat (Jkind.format env)) jkind
   | Tbox t ->
     fprintf ppf "@[Tbox@ %a@]" raw_type t
+  | Tunbox t ->
+    fprintf ppf "@[Tunbox@ %a@]" raw_type t
 
 and raw_row_fixed ppf = function
 | None -> fprintf ppf "None"

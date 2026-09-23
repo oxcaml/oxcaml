@@ -178,6 +178,7 @@ and type_desc =
   | Tpackage of package
   | Tof_kind of jkind_lr
   | Tbox of type_expr
+  | Tunbox of type_expr
 
 and arg_label =
   | Nolabel
@@ -1454,6 +1455,7 @@ let best_effort_compare_type_expr te1 te2 =
         (* Types which we know how to compare structurally*)
         | Ttuple _ -> 2
         | Tunboxed_tuple _ -> 3
+        | Tunbox _ -> 4
         | Tconstr (_, _, _) -> 5
         | Tmod (_, _) -> 6
         | Tpoly (_, _) -> 7
@@ -1472,6 +1474,7 @@ let best_effort_compare_type_expr te1 te2 =
           )
           elts1
           elts2
+      | Tunbox t1, Tunbox t2 -> aux (depth + 1) t1 t2
       | Tconstr (p1, args1, _), Tconstr (p2, args2, _) ->
         let p = Path.compare p1 p2 in
         if p = 0

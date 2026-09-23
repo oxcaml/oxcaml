@@ -666,15 +666,25 @@ let check_well_formed_module env loc context mty =
         (* Check that an unboxed path is valid because substitutions can
            remove an unboxed version of a type.
            See [tests/typing-layouts/hash_types.ml]. *)
+        let no_unboxed_version env path =
+          let err =
+            Badly_formed_signature(context, Typedecl.No_unboxed_version path)
+          in
+          raise (Error (loc, env, err))
+        in
         begin match get_desc ty with
         | Tconstr (Pextra_ty(path, Punboxed_ty) as path_unboxed, _, _) ->
           let env = Lazy.force !env in
           begin try ignore (Env.find_type path_unboxed env) with
-          | Not_found ->
-            let err =
-              Badly_formed_signature(context, Typedecl.No_unboxed_version path)
-            in
-            raise (Error (loc, env, err))
+          | Not_found -> no_unboxed_version env path
+          end
+        | Tunbox inner ->
+          begin match get_desc inner with
+          | Tconstr (path, _, _) ->
+            let env = Lazy.force !env in
+            if not (Ctype.is_unboxable_ty env inner) then
+              no_unboxed_version env path
+          | _ -> ()
           end
         | _ -> ()
         end;
@@ -1061,13 +1071,32 @@ module Merge = struct
     (* Post processing *)
     let replace =
       if destructive then
-        match type_decl_is_alias sdecl with
-        | Some lid ->
+        let alias_path =
+          match type_decl_is_alias sdecl with
+          | None -> None
+          | Some lid ->
+            match Env.lid_without_hash lid.txt with
+            | None ->
+              let path, _ =
+                try Env.find_type_by_name lid.txt env
+                with Not_found -> assert false
+              in
+              Some path
+            | Some boxed_lid ->
+              (* [t#] is a declared type only for records and predefined
+                 types; otherwise it is inlined like a non-alias below. *)
+              let path, _ =
+                try Env.find_type_by_name boxed_lid env
+                with Not_found -> assert false
+              in
+              let path = Path.unboxed_version path in
+              match Env.find_type path env with
+              | _ -> Some path
+              | exception Not_found -> None
+        in
+        match alias_path with
+        | Some replacement ->
             (* if the type is an alias of [lid], replace by the definition *)
-            let replacement, _ =
-              try Env.find_type_by_name lid.txt env
-              with Not_found -> assert false
-            in
             fun s path -> Subst.Unsafe.add_type_path path replacement s
         | None ->
             (* if the type is not an alias, try to inline it *)

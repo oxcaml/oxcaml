@@ -30,6 +30,8 @@ module Ldd = Types.Ldd
 let instance_poly_for_jkind' =
   ref (fun _univars _ty -> Misc.fatal_error "instance_poly_for_jkind")
 
+let expand_head' = ref (fun _env _ty -> Misc.fatal_error "expand_head")
+
 let fresh_unknown_uid () : Types.Uid.t =
   let current_unit =
     Some
@@ -614,7 +616,7 @@ module Solver = struct
     let self_provenance, child_ctx =
       match desc with
       | Types.Tlink _ | Types.Tsubst _ | Types.Trepr _ | Types.Tpoly _
-      | Types.Tmod _ | Types.Tfield _ | Types.Tnil ->
+      | Types.Tmod _ | Types.Tfield _ | Types.Tnil | Types.Tunbox _ ->
         Fun.id, ctx
       | _ -> provenance_and_child_ctx ctx ty
     in
@@ -660,6 +662,14 @@ module Solver = struct
     | Types.Tobject _ -> self_provenance (Ldd.const Axis_lattice.object_legacy)
     | Types.Tbox contents ->
       box_kind ~self_provenance ~arg_ctx:child_ctx ctx contents
+    | Types.Tunbox _ -> (
+      (* A stuck [t#] crosses at least as much as its box [t]. *)
+      let ty' =
+        match ctx.env with Some env -> !expand_head' env ty | None -> ty
+      in
+      match Types.get_desc ty' with
+      | Types.Tunbox t -> kind ~use_tables:true ctx t
+      | _ -> kind ~use_tables:true ctx ty')
     | Types.Tfield _ -> failwith "Tfield shouldn't appear in kind"
     | Types.Tnil -> failwith "Tnil shouldn't appear in kind"
     | Types.Tquote _ | Types.Tsplice _ | Types.Tquote_eval _ ->
@@ -707,6 +717,7 @@ module Solver = struct
     | Reduces_to_tuple elts ->
       let base = self_provenance (Ldd.const Axis_lattice.immutable_data) in
       Ldd.sum elts ~base ~f:(fun (_lbl, t) -> kind ~use_tables:true arg_ctx t)
+    | Reduces_to_type ty -> kind ~use_tables:true ctx ty
     | Doesn't_reduce_box ->
       let base = self_provenance (Ldd.const Axis_lattice.mutable_data) in
       Ldd.join base (kind ~use_tables:true arg_ctx contents)

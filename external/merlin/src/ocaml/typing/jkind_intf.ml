@@ -522,6 +522,7 @@ module History = struct
     | Old_style_unboxed_type
     | Idx_base
     | Unboxed_atomic_record
+    | Unboxed_version_of_boxed_kind
 
   type product_creation_reason =
     | Unboxed_tuple

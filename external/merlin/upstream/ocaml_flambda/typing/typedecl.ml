@@ -384,26 +384,29 @@ in
     Ikind.type_declaration_ikind_of_jkind ~env:(Some env) ~params:type_params
       type_jkind
   in
-  (* In the temporary environment, all types get an unboxed version.
-     See Note [Typechecking unboxed versions of types]. *)
+  (* See Note [Typechecking unboxed versions of types]. *)
   let type_unboxed_version =
-    Some { type_params;
-      type_arity = arity;
-      type_kind = Type_abstract abstract_source;
-      type_jkind;
-      type_ikind;
-      type_private = sdecl.ptype_private;
-      type_manifest = unboxed_type_manifest;
-      type_variance = Variance.unknown_signature ~injective:false ~arity;
-      type_separability = Types.Separability.default_signature ~arity;
-      type_is_newtype = false;
-      type_expansion_scope = Btype.lowest_level;
-      type_loc = sdecl.ptype_loc;
-      type_attributes = sdecl.ptype_attributes;
-      type_unboxed_default = false;
-      type_uid = Uid.unboxed_version uid;
-      type_unboxed_version = None;
-    }
+    match sdecl.ptype_kind with
+    | Ptype_abstract | Ptype_variant _ | Ptype_record_unboxed_product _
+    | Ptype_open -> None
+    | Ptype_record _ ->
+      Some { type_params;
+        type_arity = arity;
+        type_kind = Type_abstract abstract_source;
+        type_jkind;
+        type_ikind;
+        type_private = sdecl.ptype_private;
+        type_manifest = unboxed_type_manifest;
+        type_variance = Variance.unknown_signature ~injective:false ~arity;
+        type_separability = Types.Separability.default_signature ~arity;
+        type_is_newtype = false;
+        type_expansion_scope = Btype.lowest_level;
+        type_loc = sdecl.ptype_loc;
+        type_attributes = sdecl.ptype_attributes;
+        type_unboxed_default = false;
+        type_uid = Uid.unboxed_version uid;
+        type_unboxed_version = None;
+      }
   in
   let decl =
     { type_params;
@@ -1358,10 +1361,17 @@ let transl_declaration env sdecl (id, uid) =
 
 (* Note [Typechecking unboxed versions of types]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   Unboxed versions are computed in three steps:
+   Only records and predefined types declare unboxed versions (stored in
+   [type_unboxed_version]). Every other [t#] is [Tunbox t], which requires
+   [t] to have a box kind and reduces by expanding [t] (see [Ctype.unbox_ty]).
+   In a recursive group, [t]'s temporary manifest is a type variable, so
+   [Tunbox t] refines that variable to a box kind and [update_type] checks the
+   real manifest against it.
 
-   1. In the temporary environment computed by [enter_type], all types get an
-      unboxed version.
+   Records' unboxed versions are computed in three steps:
+
+   1. In the temporary environment computed by [enter_type], all records get
+      an unboxed version.
 
    2. After translating declarations, [derive_unboxed_versions] gives unboxed
       versions to all [Record_dummy]s whose [represent_as_float_array] and
@@ -1373,17 +1383,13 @@ let transl_declaration env sdecl (id, uid) =
       These unboxed versions are removed in [remove_unboxed_versions].
 
    After steps 2 and 3, the set of unboxed versions decreases, so we check for
-   newly-unbound unboxed paths with [check_unboxed_paths].
+   newly-unbound unboxed paths and ill-formed [Tunbox]es with
+   [check_unboxed_paths].
 *)
 
 (* If a record with an unboxed version is also an alias, so is its unboxed
    version stored in [type_unboxed_version]. E.g. [type t = r = { i : int }]'s
-   unboxed version gets kind [#{ i : int}] and manifest [r#].
-
-   Note that all aliases of types with unboxed versions, with an abstract kind,
-   also have unboxed versions, but these aren't stored in
-   [type_unboxed_version].
-*)
+   unboxed version gets kind [#{ i : int}] and manifest [r#]. *)
 let shape_has_float_boxed shape =
   Array.exists
     (fun (kind : mixed_block_element) ->
@@ -1826,6 +1832,12 @@ let check_kind_coherence env loc dpath decl =
   | (Type_variant _ | Type_record _ | Type_record_unboxed_product _
     | Type_open),
     Some ty ->
+    (* [type u = t# = #{ ... }] re-exports the declaration [t#] reduces to *)
+    let ty =
+      match get_desc ty with
+      | Tunbox _ -> Ctype.reduce_head ~expand_reducible_abbrevs:false env ty
+      | _ -> ty
+    in
     begin match get_desc ty with
     | Tconstr(path, args, _) ->
       begin
@@ -2980,17 +2992,29 @@ let update_decls_jkind env order decls =
     decls
 
 (* See Note [Typechecking unboxed versions of types]. *)
-let check_unboxed_paths decls ~unboxed_version_banned =
+let check_unboxed_paths env decls ~removed =
   (* We iterate on all subexpressions of the declaration to check "in depth"
-     that no non-existent unboxed version is used. *)
+     that no non-existent unboxed version is used. [removed] lists the paths
+     whose unboxed versions were removed after [env] was built. *)
   let open Btype in
   with_type_mark (fun mark ->
     let super = type_iterators mark in
     let check_ty loc ty =
       match get_desc ty with
       | Tconstr(Pextra_ty (path, Punboxed_ty), _, _)
-        when unboxed_version_banned path ->
+        when Path.Set.mem path removed
+          || (match Env.find_type (Path.unboxed_version path) env with
+              | _ -> false
+              | exception Not_found -> true) ->
           raise (Error (loc, No_unboxed_version path))
+      | Tunbox inner -> begin
+          match get_desc inner with
+          | Tconstr (path, _, _)
+            when Path.Set.mem path removed
+              || not (Ctype.is_unboxable_ty env inner) ->
+            raise (Error (loc, No_unboxed_version path))
+          | _ -> ()
+        end
       | _ -> ()
     in
     let check_decl d =
@@ -3367,7 +3391,7 @@ let check_unboxed_recursion ~abs_env env loc path0 ty0 to_check =
     in
     if is_representable layout then [] else tyl
   in
-  let step_once parents ty =
+  let rec step_once parents ty =
     match get_desc ty with
     | Tconstr (path, tyl, _) ->
       if to_check path then
@@ -3396,6 +3420,17 @@ let check_unboxed_recursion ~abs_env env loc path0 ty0 to_check =
             typechecked, so it's already in [env]. *)
           Misc.fatal_error "Typedecl.check_unboxed_recursion"
         end
+    | Tunbox _ ->
+      (* A declared unboxed version prints as [t#] does, so step to it
+         silently; expansions through abbreviations are recorded. *)
+      begin match Ctype.reduce_head ~expand_reducible_abbrevs:false env ty with
+      | ty' when ty' != ty -> step_once parents ty'
+      | _ ->
+        match Ctype.try_expand_safe_opt env ty with
+        | ty' -> Expanded_to ty', parents
+        | exception Ctype.Cannot_expand ->
+          Contained (Ctype.contained_without_boxing env ty), parents
+      end
     | _ -> Contained (Ctype.contained_without_boxing env ty), parents
   in
   let rec visit parents trace ty =
@@ -3888,10 +3923,6 @@ let transl_type_decl env rec_flag sdecl_list =
     List.fold_left2
       (enter_type ~abstract_abbrevs:Rec_check_regularity rec_flag)
       env sdecl_list ids_list in
-  check_unboxed_paths decls
-    ~unboxed_version_banned:(fun path ->
-       match Env.find_type (Path.unboxed_version path) new_env with
-        | _ -> false | exception Not_found -> true);
   List.iter (fun (id, decl) ->
     check_well_founded_manifest ~abs_env new_env (List.assoc id id_loc_list)
       (Path.Pident id) decl)
@@ -3914,6 +3945,8 @@ let transl_type_decl env rec_flag sdecl_list =
       (Path.Pident id)
       decl to_check)
     decls;
+  (* Cycles are ruled out, so the kind checks below terminate. *)
+  check_unboxed_paths new_env decls ~removed:Path.Set.empty;
   (* Update temporary definitions (for well-founded recursive types) *)
   let delayed_jkind_checks =
     match rec_flag with
@@ -3991,8 +4024,7 @@ let transl_type_decl env rec_flag sdecl_list =
       in
       let removed, decls = remove_unboxed_versions decls in
       if not (Path.Set.is_empty removed) then
-        check_unboxed_paths decls
-          ~unboxed_version_banned:(fun p -> Path.Set.mem p removed);
+        check_unboxed_paths new_env decls ~removed;
       new_env, update_decls_jkind_reason decls
     with
     | Typedecl_variance.Error (loc, err) ->
@@ -5044,50 +5076,6 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
   if arity_ok && not sig_decl_abstract
   && sdecl.ptype_private = Private then
     Location.deprecated loc "spurious use of private";
-  let type_uid = Uid.mk ~current_unit:(Env.get_current_unit ()) in
-  let type_unboxed_version =
-    match get_desc man with
-    | Tconstr (path, args, _) ->
-      begin match Env.find_type path sig_env with
-      | { type_unboxed_version = Some decl ; _ } ->
-        let man = Ctype.newconstr (Path.unboxed_version path) args in
-        let type_kind =
-          match sig_decl.type_unboxed_version, arity_ok with
-          | Some { type_kind ; _ }, true -> type_kind
-          | None, _ | _, false -> Type_abstract Definition
-        in
-        let type_jkind = decl.type_jkind in
-        Some {
-          type_params = params;
-          type_arity = arity;
-          type_kind;
-          type_jkind;
-          type_ikind =
-            (let reason =
-               Format.asprintf "transl_with_constraint unboxed path=%a"
-                 (Format_doc.compat Path.print) (Path.unboxed_version path)
-             in
-             Types.ikinds_todo reason);
-          type_private = priv;
-          type_manifest = Some man;
-          type_variance = [];
-          type_separability = Types.Separability.default_signature ~arity;
-          type_is_newtype = false;
-          type_expansion_scope = Btype.lowest_level;
-          type_loc = loc;
-          type_attributes = decl.type_attributes;
-          type_unboxed_default = false;
-          type_uid = Uid.unboxed_version type_uid;
-          type_unboxed_version = None;
-        }
-      | { type_unboxed_version = None ; _ } ->
-        None
-      | exception Not_found ->
-        (* If [man] was translated already, this should be unreachable *)
-        Misc.fatal_error "Typedecl.transl_with_constraint"
-      end
-    | _ -> None
-  in
   let type_kind, type_unboxed_default, type_jkind =
     if arity_ok then
       sig_decl.type_kind,
@@ -5117,8 +5105,20 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
       type_attributes = sdecl.ptype_attributes;
       type_unboxed_default;
       type_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
-      type_unboxed_version;
+      type_unboxed_version = None;
     }
+  in
+  let new_sig_decl =
+    let type_unboxed_version =
+      derive_unboxed_version env Path.Map.empty new_sig_decl
+      |> Option.map (fun ud ->
+        (* The unboxed version's jkind is not recomputed here (see
+           [update_decls_jkind]); take the signature's. *)
+        match sig_decl.type_unboxed_version with
+        | Some { type_jkind; _ } -> { ud with type_jkind }
+        | None -> ud)
+    in
+    { new_sig_decl with type_unboxed_version }
   in
   Option.iter (fun p -> set_private_row env sdecl.ptype_loc p new_sig_decl)
     fixed_row_path;
@@ -5457,7 +5457,12 @@ module Reaching_path = struct
 
   (* Simplify a reaching type path before showing it in error messages. *)
   let simplify path =
-    let is_tconstr ty = match get_desc ty with Tconstr _ -> true | _ -> false in
+    let rec is_tconstr ty =
+      match get_desc ty with
+      | Tconstr _ -> true
+      | Tunbox ty -> is_tconstr ty
+      | _ -> false
+    in
     let rec simplify : reaching_type_path -> reaching_type_path = function
       | Contains (ty1, _ty2) :: Contains (ty2', ty3) :: rest
         when not (is_tconstr ty2') ->
