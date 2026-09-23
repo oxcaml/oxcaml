@@ -905,7 +905,7 @@ module M :
   sig
     type ('a : any) b = 'a box
     type ('a : any) t = 'a b#
-    type ('a : any) t2 = 'a box#
+    type ('a : any) t2 = 'a
     type s = string b#
     type tup = #(int * int) b
   end
@@ -926,10 +926,10 @@ type int_b = int box
 type int_b_b = int_b box
 type int_b_b_u = int_b_b#
 val check : int_b_b_u -> int_b = <fun>
-Line 6, characters 19-29:
-6 | type int_b_b_u_u = int_b_b_u#
-                       ^^^^^^^^^^
-Error: The type "int_b_b_u" has no unboxed version.
+type int_b_b_u_u = int_b_b_u#
+val check : int_b_b_u_u -> int = <fun>
+type int_b_b_u_u_u = int_b_b_u_u#
+val check : int_b_b_u_u_u -> int# = <fun>
 |}]
 
 module M : sig
@@ -1240,10 +1240,7 @@ type dummy
 type ('a, 'b) box' = 'b box
 type a = (dummy, (dummy, int) box') box'
 type b = a#
-Line 5, characters 9-11:
-5 | type c = b#
-             ^^
-Error: The type "b" has no unboxed version.
+type c = b#
 |}]
 
 (* ... *)
@@ -1270,10 +1267,7 @@ val id : (int, string) t' -> int * string = <fun>
 
 type ('a, 'b) t'' = ('a, 'b) t'#
 [%%expect{|
-Line 1, characters 29-32:
-1 | type ('a, 'b) t'' = ('a, 'b) t'#
-                                 ^^^
-Error: The type "t'" has no unboxed version.
+type ('a, 'b) t'' = ('a, 'b) t'#
 |}]
 
 type ('a, 'b) t = ('a * 'b) s2
@@ -1284,18 +1278,13 @@ let id (x : (int, string) t'') : int * string = x
 [%%expect{|
 type ('a, 'b) t = ('a * 'b) s2
 type ('a, 'b) t' = ('a, 'b) t#
-Line 3, characters 29-32:
-3 | type ('a, 'b) t'' = ('a, 'b) t'#
-                                 ^^^
-Error: The type "t'" has no unboxed version.
+type ('a, 'b) t'' = ('a, 'b) t'#
+val id : (int, string) t'' -> int * string = <fun>
 |}]
 
 type ('a, 'b) t'' = ('a, 'b) t'#
 [%%expect{|
-Line 1, characters 29-32:
-1 | type ('a, 'b) t'' = ('a, 'b) t'#
-                                 ^^^
-Error: The type "t'" has no unboxed version.
+type ('a, 'b) t'' = ('a, 'b) t'#
 |}]
 
 type ('a, 'b) t'' = ('a, 'b) t''#
@@ -1303,7 +1292,9 @@ type ('a, 'b) t'' = ('a, 'b) t''#
 Line 1, characters 0-33:
 1 | type ('a, 'b) t'' = ('a, 'b) t''#
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The type "t''" has no unboxed version.
+Error: The type abbreviation "t''" is cyclic:
+         "('a, 'b) t''" = "('a, 'b) t''#",
+         "('a, 'b) t''#" contains "('a, 'b) t''"
 |}]
 
 (* Test 38: Unboxing through tuple type abbreviation *)
@@ -1326,14 +1317,12 @@ and t = s#
 Line 1, characters 0-14:
 1 | type s = t box
     ^^^^^^^^^^^^^^
-Error: The definition of "s" contains a cycle:
+Error: The type abbreviation "s" is cyclic:
          "s" = "t box",
          "t box" = "t box",
          "t box" contains "t",
          "t" = "s#",
-         "s#" = "t box#",
-         "t box#" = "t",
-         "t" = "s#"
+         "s#" contains "s"
 |}]
 
 (* Unboxing does not break recursive alias cycles. *)
@@ -1342,10 +1331,20 @@ and s2 = s1 box
 and t1 = s2#
 and t2 = t1#
 [%%expect{|
-Line 4, characters 0-12:
-4 | and t2 = t1#
-    ^^^^^^^^^^^^
-Error: The type "t1" has no unboxed version.
+Line 1, characters 0-16:
+1 | type s1 = t2 box
+    ^^^^^^^^^^^^^^^^
+Error: The type abbreviation "s1" is cyclic:
+         "s1" = "t2 box",
+         "t2 box" = "t2 box",
+         "t2 box" contains "t2",
+         "t2" = "t1#",
+         "t1#" contains "t1",
+         "t1" = "s2#",
+         "s2#" contains "s2",
+         "s2" = "s1 box",
+         "s1 box" = "s1 box",
+         "s1 box" contains "s1"
 |}]
 
 (* Test 40: GADT equations commute *)
@@ -1435,22 +1434,30 @@ end
 let f (Equal : (M.t, float) Type.eq) (x : float#) : float# = (x : M.t#)
 [%%expect{|
 module M : sig type t type r type r_box end
-val f : (M.t, float) Type.eq -> float# -> M.t# = <fun>
+val f : (M.t, float) Type.eq -> float# -> float# = <fun>
 |}]
 
 let f (Equal : (M.r, r) Type.eq) (x : r#) : r# = (x : M.r#)
 [%%expect{|
-val f : (M.r, r) Type.eq -> r# -> M.r# = <fun>
+val f : (M.r, r) Type.eq -> r# -> r# = <fun>
 |}]
 
 let f (Equal : (M.r_box, r box) Type.eq) (x : r) : r = (x : M.r_box#)
 [%%expect{|
-val f : (M.r_box, r box) Type.eq -> r -> M.r_box# = <fun>
+val f : (M.r_box, r box) Type.eq -> r -> r = <fun>
 |}]
 
 (* [M.t#] cannot escape the equation's scope. *)
 let f (Equal : (M.t, float) Type.eq) (x : float#) = (x : M.t#)
-[%%expect{||}]
+[%%expect{|
+Line 1, characters 52-62:
+1 | let f (Equal : (M.t, float) Type.eq) (x : float#) = (x : M.t#)
+                                                        ^^^^^^^^^^
+Error: This expression has type "M.t#" = "float#"
+       but an expression was expected of type "'a"
+       This instance of "float" is ambiguous:
+       it would escape the scope of its equation
+|}]
 
 (* Introducing unboxed versions with a GADT equation *)
 
@@ -1618,6 +1625,7 @@ Line 1, characters 66-67:
                                                                       ^
 Error: The value "x" has type "Abstract_box.t#"
        but an expression was expected of type "Concrete_box.t#"
+       Type "Abstract_box.t" is not compatible with type "Concrete_box.t"
 |}]
 
 type public_box_alias = Abstract_box.t
@@ -1645,6 +1653,7 @@ Line 1, characters 71-72:
                                                                            ^
 Error: The value "x" has type "Abstract_box.t#"
        but an expression was expected of type "private_box_alias#"
+       Type "Abstract_box.t" is not compatible with type "private_box_alias"
 |}]
 
 module Parameterized_box : sig
@@ -1731,12 +1740,12 @@ let portable_locally_abstract
     (type a : (value & float64) box mod portable) (x : a) : a# =
   Stdlib.unbox x
 [%%expect{|
-val unbox_locally_abstract : ('a : value & float64). 'a box -> 'a = <fun>
-val box_locally_abstract : ('a : value & float64). 'a -> 'a box = <fun>
+val unbox_locally_abstract : ('a : (value & float64) box). 'a -> 'a# = <fun>
+val box_locally_abstract : ('a : (value & float64) box). 'a# -> 'a = <fun>
 val both_locally_abstract :
-  ('a : value & float64). 'a box -> #('a box * 'a * 'a) = <fun>
+  ('a : (value & float64) box). 'a -> #('a * 'a# * 'a#) = <fun>
 val portable_locally_abstract :
-  ('a : value mod portable & float64 mod portable). 'a box -> 'a = <fun>
+  ('a : (value & float64) box mod portable). 'a -> 'a# = <fun>
 |}]
 
 kind_ abstract_box_kind = (value & float64) box
@@ -1782,7 +1791,7 @@ Line 1, characters 0-54:
 1 | type bad_addressed_contents : float64 = addressed_box#
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The layout of type "addressed_box#" is float64 addressable
-         because of the definition of addressed_box at line 1, characters 0-44.
+         because it's the unboxed version of a type with a box kind.
        But the layout of type "addressed_box#" must be a sublayout of float64
          because of the definition of bad_addressed_contents at line 1, characters 0-54.
 |}]
@@ -1813,8 +1822,7 @@ Error: The type "ordinary_value" has no unboxed version.
 let abstract_unbox_slot =
   fun (type a : value box) -> ref (None : (a -> a#) option)
 [%%expect{|
-val abstract_unbox_slot : ('_weak1 box -> '_weak1) option ref =
-  {contents = None}
+val abstract_unbox_slot : ('_a -> '_a#) option ref = {contents = None}
 |}]
 
 let () =

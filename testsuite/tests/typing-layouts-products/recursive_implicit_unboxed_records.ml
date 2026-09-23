@@ -169,7 +169,8 @@ Line 1, characters 0-25:
     ^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The type abbreviation "bad" is cyclic:
          "bad" = "bad record_id#",
-         "bad record_id#" contains "bad"
+         "bad record_id#" contains "bad record_id",
+         "bad record_id" contains "bad"
 |}]
 
 type bad = bad alias_id

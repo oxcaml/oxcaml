@@ -216,7 +216,7 @@ module type Big = sig type t type u end
 module type B2S = functor (X : Big) -> Small with type t = X.t
 [%%expect{|
 {
- "B2S"[module type] -> <.39>;
+ "B2S"[module type] -> <.38>;
  }
 module type B2S = functor (X : Big) -> sig type t = X.t end
 |}]
@@ -225,8 +225,8 @@ module Big_to_small1 : B2S = functor (X : Big) -> X
 [%%expect{|
 {
  "Big_to_small1"[module] ->
-   Abs<.41>(X, {<.40>
-                "t"[type] -> X<.40> . "t"[type];
+   Abs<.40>(X, {<.39>
+                "t"[type] -> X<.39> . "t"[type];
                 });
  }
 module Big_to_small1 : B2S
@@ -235,8 +235,8 @@ module Big_to_small1 : B2S
 module Big_to_small2 : B2S = functor (X : Big) -> struct include X end
 [%%expect{|
 {
- "Big_to_small2"[module] -> Abs<.43>(X, {
-                                         "t"[type] -> X<.42> . "t"[type];
+ "Big_to_small2"[module] -> Abs<.42>(X, {
+                                         "t"[type] -> X<.41> . "t"[type];
                                          });
  }
 module Big_to_small2 : B2S

@@ -231,20 +231,16 @@ type r = { i : int } [@@unboxed]
 type bad = r#
 [%%expect{|
 type r = { i : int; } [@@unboxed]
-Line 2, characters 11-13:
-2 | type bad = r#
-               ^^
-Error: The type "r" has no unboxed version.
-Hint: [@@unboxed] records don't get unboxed versions.
+type bad = r#
 |}]
 type ('a : float64) t = { i : 'a ; j : 'a }
 [@@represent_as_float_array]
 type floatu_t : float64 & float64 = float# t#
 [%%expect{|
 type ('a : float64) t = { i : 'a; j : 'a; }
-Line 3, characters 42-44:
-3 | type floatu_t : float64 & float64 = float t#
-                                              ^^
+Line 3, characters 43-45:
+3 | type floatu_t : float64 & float64 = float# t#
+                                               ^^
 Error: The type "t" has no unboxed version.
 Hint: Float records don't get unboxed versions.
 |}]
@@ -441,10 +437,19 @@ end = struct
   type t = Bad1.t#
 end
 [%%expect{|
-Line 2, characters 11-18:
+Lines 1-5, characters 0-3:
+1 | module rec Bad1 : sig
 2 |   type t = Bad2.t#
-               ^^^^^^^
-Error: The type "Bad2.t" has no unboxed version.
+3 | end = struct
+4 |   type t = Bad2.t#
+5 | end
+Error: The definition of "Bad1.t" contains a cycle:
+         "Bad2.t#" contains "Bad2.t",
+         "Bad2.t" = "Bad1.t#",
+         "Bad1.t#" contains "Bad1.t",
+         "Bad1.t" = "Bad2.t#",
+         "Bad2.t#" contains "Bad2.t",
+         "Bad2.t" = "Bad1.t#"
 |}]
 
 (* Implicit unboxed records *)
@@ -802,10 +807,7 @@ module type T = S with type t := < m : float > t
 [%%expect{|
 module type S = sig type t = float type s = t# end
 type 'a t = 'b constraint 'a = < m : 'b >
-Line 6, characters 16-48:
-6 | module type T = S with type t := < m : float > t
-                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: In this instantiated signature: The type "t" has no unboxed version.
+module type T = sig type s = < m : float > t# end
 |}]
 
 (* Standalone destructive substitution *)
@@ -1058,12 +1060,7 @@ module type Bad = sig
   type u = t#
 end with type t := float id
 [%%expect{|
-Lines 1-4, characters 18-27:
-1 | ..................sig
-2 |   type t = float
-3 |   type u = t#
-4 | end with type t := float id
-Error: In this instantiated signature: The type "id" has no unboxed version.
+module type Bad = sig type u = float id# end
 |}]
 
 (* Functor application also preserves the unboxed version. *)
@@ -1073,11 +1070,7 @@ end
 module Bad = F(FloatId)
 [%%expect{|
 module F : functor (M : sig type t = float end) -> sig type u = M.t# end
-Line 4, characters 13-23:
-4 | module Bad = F(FloatId)
-                 ^^^^^^^^^^
-Error: In the signature of this functor application: The type "FloatId.t"
-       has no unboxed version.
+module Bad : sig type u = FloatId.t# end
 |}]
 
 (* ..and module substitution... *)
@@ -1088,15 +1081,7 @@ module type Bad = sig
   type u = Float.t#
 end with module Float := FloatId
 [%%expect{|
-Lines 1-6, characters 18-32:
-1 | ..................sig
-2 |   module Float : sig
-3 |     type t = float
-4 |   end
-5 |   type u = Float.t#
-6 | end with module Float := FloatId
-Error: In this instantiated signature: The type "FloatId.t"
-       has no unboxed version.
+module type Bad = sig type u = FloatId.t# end
 |}]
 
 (* ..and module type substitution. *)
@@ -1109,16 +1094,8 @@ module type Bad = sig
   end
 end with module type Float_S := FloatId_S
 [%%expect{|
-Lines 1-8, characters 18-41:
-1 | ..................sig
-2 |   module type Float_S = sig
-3 |     type t = float
-4 |   end
-5 |   module F(M : Float_S) : sig
-6 |     type u = M.t#
-7 |   end
-8 | end with module type Float_S := FloatId_S
-Error: In this instantiated signature: The type "M.t" has no unboxed version.
+module type Bad =
+  sig module F : functor (M : FloatId_S) -> sig type u = M.t# end end
 |}]
 
 (* The check for bad unboxed paths looks deeply through manifests *)
@@ -1127,12 +1104,7 @@ module type Bad = sig
   type uu = #(t# * t#)
 end with type t := float id
 [%%expect{|
-Lines 1-4, characters 18-27:
-1 | ..................sig
-2 |   type t = float
-3 |   type uu = #(t# * t#)
-4 | end with type t := float id
-Error: In this instantiated signature: The type "id" has no unboxed version.
+module type Bad = sig type uu = #(float id# * float id#) end
 |}]
 
 (* The check for bad unboxed paths looks deeply through kinds *)
@@ -1141,12 +1113,7 @@ module type Bad = sig
   type uu = #{ uu : #(t# * t#) }
 end with type t := float id
 [%%expect{|
-Lines 1-4, characters 18-27:
-1 | ..................sig
-2 |   type t = float
-3 |   type uu = #{ uu : #(t# * t#) }
-4 | end with type t := float id
-Error: In this instantiated signature: The type "id" has no unboxed version.
+module type Bad = sig type uu = #{ uu : #(float id# * float id#); } end
 |}]
 
 (* The check for bad unboxed paths looks through nested modules *)
@@ -1157,14 +1124,7 @@ module type Bad = sig
   type u = M.t#
 end with type M.t := float id
 [%%expect{|
-Lines 1-6, characters 18-29:
-1 | ..................sig
-2 |   module M : sig
-3 |     type t = float
-4 |   end
-5 |   type u = M.t#
-6 | end with type M.t := float id
-Error: In this instantiated signature: The type "id" has no unboxed version.
+module type Bad = sig module M : sig end type u = float id# end
 |}]
 
 (* Still check when the original unboxed version comes from a constraint *)
@@ -1173,12 +1133,7 @@ module type Bad = sig
   type u = float t#
 end with type 'a t := 'a id
 [%%expect{|
-Lines 1-4, characters 18-27:
-1 | ..................sig
-2 |   type 'a t = 'a constraint float = 'a
-3 |   type u = float t#
-4 | end with type 'a t := 'a id
-Error: In this instantiated signature: The type "id" has no unboxed version.
+module type Bad = sig type u = float id# end
 |}]
 
 (* Nested functor application *)
@@ -1201,11 +1156,11 @@ module G :
       module N : sig type t = M.t end
       module O : sig type u = #(N.t# * N.t#) end
     end
-Line 10, characters 13-44:
-10 | module Bad = G(struct type t = float id end)
-                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: In the signature of this functor application: The type "N.t"
-       has no unboxed version.
+module Bad :
+  sig
+    module N : sig type t = float id end
+    module O : sig type u = #(N.t# * N.t#) end
+  end
 |}]
 
 (* A chain of two aliases preserves unboxed versions. *)
@@ -1218,11 +1173,7 @@ module Bad = F(FloatId)
 module F :
   functor (M : sig type t = float end) ->
     sig type s = M.t type u = #(s# * s#) end
-Line 5, characters 13-23:
-5 | module Bad = F(FloatId)
-                 ^^^^^^^^^^
-Error: In the signature of this functor application: The type "s"
-       has no unboxed version.
+module Bad : sig type s = FloatId.t type u = #(s# * s#) end
 |}]
 
 (* Mutually recursive aliases preserve unboxed versions. *)
@@ -1235,11 +1186,7 @@ module Bad = F(FloatId)
 module F :
   functor (M : sig type t = float end) ->
     sig type u = #(s# * s#) and s = M.t end
-Line 5, characters 13-23:
-5 | module Bad = F(FloatId)
-                 ^^^^^^^^^^
-Error: In the signature of this functor application: The type "s"
-       has no unboxed version.
+module Bad : sig type u = #(s# * s#) and s = FloatId.t end
 |}]
 
 (* Make sure our check isn't too restrictive. We allow a module with a
@@ -1325,7 +1272,10 @@ type ('a : any separable) iarr_u = 'a iarray#
 
 type ('a : any) iarr = 'a iarray
 type ('a : any) iarr_u_2 = 'a iarr#
-[%%expect{||}]
+[%%expect{|
+type ('a : any separable) iarr = 'a iarray
+type ('a : any separable) iarr_u_2 = 'a iarr#
+|}]
 
 let bad (_ : 'a array#) = ()
 [%%expect{|

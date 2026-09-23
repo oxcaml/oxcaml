@@ -337,4 +337,8 @@ end
 
 let box_m (x : M.t#) = box x
 let unbox_m (x : M.t) : M.t# = unbox x
-[%%expect{||}]
+[%%expect{|
+module M : sig type t : (value & float64) box end
+val box_m : M.t# -> M.t = <fun>
+val unbox_m : M.t -> M.t# = <fun>
+|}]
