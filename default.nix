@@ -443,12 +443,14 @@ let
     JSOO_QCHECK_SRC = qcheckSrc;
   };
 
-  # Build and install with an installed OxCaml, as findlib packages under
-  # $out/lib and executables under $out/bin.
+  # Run make buildTarget with an installed OxCaml, then installTarget, which
+  # installs findlib packages under $out/lib and executables under $out/bin.
+  # Without an installTarget, $out is empty (for checks).
   mkAstDependentLibsBuild =
     {
       pname,
-      target,
+      buildTarget,
+      installTarget ? null,
       sources,
       extraNativeBuildInputs ? [ ],
     }:
@@ -474,11 +476,23 @@ let
           "OXCAML_INSTALL=${oxcaml}"
         ];
 
-        buildFlags = [ "${target}-build" ];
-
-        installTargets = [ "${target}-install" ];
-        installFlags = [ "AST_DEPENDENT_LIBS_PREFIX=${placeholder "out"}" ];
+        buildFlags = [ buildTarget ];
       }
+      // (
+        if installTarget == null then
+          {
+            installPhase = ''
+              runHook preInstall
+              mkdir "$out"
+              runHook postInstall
+            '';
+          }
+        else
+          {
+            installTargets = [ installTarget ];
+            installFlags = [ "AST_DEPENDENT_LIBS_PREFIX=${placeholder "out"}" ];
+          }
+      )
       // sources
     );
 
@@ -490,14 +504,23 @@ let
 
   mkPpxlibLibs = mkAstDependentLibsBuild {
     pname = "oxcaml-ppxlib";
-    target = "ppxlib";
+    buildTarget = "ppxlib-build";
+    installTarget = "ppxlib-install";
     sources = ppxlibSources;
   };
 
   mkJsooLibs = mkAstDependentLibsBuild {
     pname = "oxcaml-jsoo";
-    target = "jsoo";
+    buildTarget = "jsoo-build";
+    installTarget = "jsoo-install";
     sources = ppxlibSources // jsooSources;
+    extraNativeBuildInputs = jsooTools;
+  };
+
+  mkJsooTest = mkAstDependentLibsBuild {
+    pname = "oxcaml-jsoo-test";
+    buildTarget = "jsoo-test";
+    sources = ppxlibSources // jsooSources // jsooTestSources;
     extraNativeBuildInputs = jsooTools;
   };
 
@@ -726,6 +749,7 @@ stdenv.mkDerivation (
         lldb
         mkPpxlibLibs
         mkJsooLibs
+        mkJsooTest
         mkMerlinPackages
         ;
     };
