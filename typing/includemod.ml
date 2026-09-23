@@ -691,17 +691,14 @@ and try_modtypes ~core ~direction ~loc env subst ~modes
     begin match Includecore.check_modes env ~item:Module
       ~crossing:Ctype.mode_crossing_module modes with
     | Error e ->
-        let mty1 = Mtype.reduce_alias_lazy env mty1 in
-        let mty2 =
-          Subst.Lazy.modtype Keep subst mty2 |> Mtype.reduce_alias_lazy env
-        in
-        begin match mty1, mty2 with
-        | Some mty1, Some mty2 ->
-            try_modtypes ~core ~direction ~loc env subst ~modes mty1 mty2
-              orig_shape
-        | _, _ ->
-            Error (Error.Mode e)
-        end
+        let mty2 = Subst.Lazy.modtype Keep subst mty2 in
+        let mty1' = Mtype.scrape_alias_lazy env mty1 in
+        let mty2' = Mtype.scrape_alias_lazy env mty2 in
+        if mty1' == mty1 || mty2' == mty2 then
+          Error (Error.Mode e)
+        else
+          try_modtypes ~core ~direction ~loc env subst ~modes mty1' mty2'
+            orig_shape
     | Ok () ->
     Ok (Tcoerce_none, orig_shape)
     end
