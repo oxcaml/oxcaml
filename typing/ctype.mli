@@ -315,9 +315,10 @@ val apply:
 
 val reduce_head:
   expand_reducible_abbrevs:bool -> Env.t -> type_expr -> type_expr
-(** Exhaustively beta-reduce head-position quotes, splices, quote-evals, and
-    boxes. If [expand_reducible_abbrevs] is true, expands [Predef]'s [eval]s and
-    [box]es into [Tquote_eval] and [Tbox], enabling further reductions. *)
+(** Exhaustively beta-reduce head-position quotes, splices, quote-evals, boxes
+    and unboxes. If [expand_reducible_abbrevs] is true, expands [Predef]'s
+    [eval]s and [box]es into [Tquote_eval] and [Tbox], enabling further
+    reductions. *)
 
 val try_expand_once_opt: Env.t -> type_expr -> type_expr
 val try_expand_safe_opt: Env.t -> type_expr -> type_expr
@@ -796,6 +797,12 @@ val check_decl_jkind_l :
   sub:(jkind_l -> (unit, 'e) result) -> jkind_l -> (unit, 'e) result
 val constrain_type_jkind :
   Env.t -> type_expr -> ('l * allowed) jkind -> (unit, Jkind.Violation.t) result
+
+(* Whether [ty#] is well-formed: [ty] is a known box (a type with a declared
+   unboxed version, a box type, a tuple) or has a box kind. [constrain_...] may
+   refine the kind of a type variable to [any box]. *)
+val is_unboxable_ty : Env.t -> type_expr -> bool
+val constrain_unboxable_ty : Env.t -> type_expr -> bool
 
 (* Check whether a type's externality's upper bound is less than some target.
    Potentially cheaper than just calling [type_jkind], because this can stop

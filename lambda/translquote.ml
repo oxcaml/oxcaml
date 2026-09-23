@@ -2681,6 +2681,18 @@ let type_for_annotation ~env ~loc typ =
         | Tbox ty ->
           let lident = Untypeast.lident_of_path Predef.path_box in
           Ttyp_constr (Predef.path_box, mkloc lident loc, [go ty])
+        | Tunbox ty -> (
+          match (go ty).ctyp_desc with
+          | Ttyp_constr (path, _, args) ->
+            let path = Path.unboxed_version path in
+            let lident = Untypeast.lident_of_path path in
+            Ttyp_constr (path, mkloc lident loc, args)
+          | _ ->
+            fatal_errorf
+              "Translquote [at %a]:@ Unboxed versions of types that are not \
+               type constructor applications cannot appear in type annotations \
+               inserted in quotations"
+              Location.print_loc_in_lowercase loc)
         | Tsplice _ ->
           fatal_errorf
             "Translquote [at %a]:@ Splices cannot appear in type annotations \

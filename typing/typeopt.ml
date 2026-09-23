@@ -58,7 +58,7 @@ let scrape_ty env ty =
     | _ -> ty
   in
   match get_desc ty with
-  | Tconstr _
+  | Tconstr _ | Tunbox _
   | Tquote _ | Tsplice _ | Tquote_eval _ ->
       let ty = Ctype.expand_head_opt env ty in
       begin match get_desc ty with
@@ -276,8 +276,8 @@ let rec classify ~classify_product env ty layout : _ classification =
   | Tarrow _ | Ttuple _ | Tpackage _ | Tobject _  | Tnil | Tvariant _ ->
       Addr
   (* Quotes are not representable, but it's safe to say they are [Any].
-     Unreduced splices and evals might stand for anything. *)
-  | Tquote _ | Tsplice _ | Tquote_eval _ | Tbox _ ->
+     Unreduced splices, evals, boxes and unboxes might stand for anything. *)
+  | Tquote _ | Tsplice _ | Tquote_eval _ | Tbox _ | Tunbox _ ->
       Any
   | Tlink _ | Tsubst _ | Tpoly _ | Tfield _ | Tunboxed_tuple _
   | Trepr _ ->
@@ -877,7 +877,8 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
           end
         | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil
         | Tlink _ | Tsubst _ | Tvariant _ | Tunivar _ | Tpoly _ | Tpackage _
-        | Tquote _ | Tsplice _ | Tquote_eval _ | Tof_kind _ | Tbox _ ->
+        | Tquote _ | Tsplice _ | Tquote_eval _ | Tof_kind _ | Tbox _
+        | Tunbox _ ->
           unknown ()
         | Trepr _ -> Misc.fatal_error "value_kind_mixed_block_field: Trepr"
         end

@@ -176,6 +176,7 @@ let new_splice_ty t = newty2 ~level:(get_level t) (Tsplice t)
 let new_quote_ty t = newty2 ~level:(get_level t) (Tquote t)
 let new_quote_eval_ty t = newty2 ~level:(get_level t) (Tquote_eval t)
 let new_box_ty t = newty2 ~level:(get_level t) (Tbox t)
+let new_unbox_ty t = newty2 ~level:(get_level t) (Tunbox t)
 
 (**** Check some types ****)
 
@@ -382,7 +383,7 @@ let fold_type_expr f fm init ty =
   | Tpackage pack ->
     List.fold_left (fun result (_n, ty) -> f result ty) init pack.pack_cstrs
   | Tof_kind _ -> init
-  | Tbox ty -> f init ty
+  | Tbox ty | Tunbox ty -> f init ty
 
 let iter_type_expr f fm ty =
   fold_type_expr (fun () v -> f v) (fun () v -> fm v) () ty
@@ -641,6 +642,7 @@ let rec copy_type_desc ?(keep_names=false) f fm = function
         pack_cstrs = List.map (fun (n, ty) -> (n, f ty)) pack.pack_cstrs}
   | Tof_kind jk -> Tof_kind jk
   | Tbox ty -> Tbox (f ty)
+  | Tunbox ty -> Tunbox (f ty)
 
 (* TODO: rename to [module Copy_scope] *)
 module For_copy : sig
@@ -950,15 +952,10 @@ let tpoly_get_mono ty =
                   (*  Utilities for box types    *)
                   (*******************************)
 
-let simple_unbox_ty ty =
-  match get_desc ty with
-  | Ttuple tys -> Some (newty2 ~level:(get_level ty) (Tunboxed_tuple tys))
-  | Tbox ty -> Some ty
-  | _ -> None
-
 type reduces_box_result =
   | Reduces_to_constr of Path.t * type_expr list
   | Reduces_to_tuple of (string option * type_expr) list
+  | Reduces_to_type of type_expr
   | Doesn't_reduce_box
 
 let reduces_box contents =
@@ -968,6 +965,7 @@ let reduces_box contents =
     | Some boxed_p -> Reduces_to_constr (boxed_p, args)
     | None -> Doesn't_reduce_box)
   | Tunboxed_tuple tys -> Reduces_to_tuple tys
+  | Tunbox ty -> Reduces_to_type ty
   | _ -> Doesn't_reduce_box
 
                   (************)

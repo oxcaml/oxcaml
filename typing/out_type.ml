@@ -676,11 +676,22 @@ let rec uniq = function
     [] -> true
   | a :: l -> not (List.memq (a : int) l) && uniq l
 
+(* A type constructor application, seeing [t#] as the path [t#]. *)
+let constr_of_type ty =
+  match get_desc ty with
+  | Tconstr (p, tyl, _) -> Some (p, tyl)
+  | Tunbox ty -> begin
+      match get_desc ty with
+      | Tconstr (p, tyl, _) -> Some (Path.unboxed_version p, tyl)
+      | _ -> None
+    end
+  | _ -> None
+
 let rec normalize_type_path ?(cache=false) env p =
   try
     let (params, ty, _) = Env.find_type_expansion p env in
-    match get_desc ty with
-      Tconstr (p1, tyl, _) ->
+    match constr_of_type ty with
+      Some (p1, tyl) ->
         if List.length params = List.length tyl
         && List.for_all2 eq_type params tyl
         then normalize_type_path ~cache env p1
@@ -690,7 +701,7 @@ let rec normalize_type_path ?(cache=false) env p =
           let l1 = List.map (index params) tyl in
           let (p2, s2) = normalize_type_path ~cache env p1 in
           (p2, compose l1 s2)
-    | _ ->
+    | None ->
         (p, Nth (index params ty))
   with
     Not_found ->
@@ -2671,7 +2682,7 @@ let rec tree_of_modal_typexp mode modal ty =
    let name = Variable_names.(name_of_type (new_var_name ~non_gen ty)) px in
    not_arrow (Otyp_var (non_gen, name)) else
 
-  let pr_typ acc_mode =
+  let rec pr_typ acc_mode =
     let tty = Transient_expr.repr ty in
     match tty.desc with
     | Tvar _ ->
@@ -2708,15 +2719,11 @@ let rec tree_of_modal_typexp mode modal ty =
         Otyp_tuple (tree_of_labeled_typlist mode labeled_tyl)
     | Tunboxed_tuple labeled_tyl ->
         Otyp_unboxed_tuple (tree_of_labeled_typlist mode labeled_tyl)
-    | Tconstr(p, tyl, _abbrev) ->
-        let p', s = best_type_path p in
-        let tyl' = apply_subst s tyl in
-        if is_nth s && not (tyl'=[])
-        then tree_of_typexp mode Alloc.Const.legacy (List.hd tyl')
-        else begin
-          Internal_names.add p';
-          Otyp_constr (tree_of_path (Some Type) p', tree_of_typlist mode tyl')
-        end
+    | Tconstr(p, tyl, _abbrev) -> tree_of_constr p tyl
+    | Tunbox ty when Option.is_some (constr_of_type ty) ->
+        (* [t#] prints as the path [t#] would, so aliases of it are found *)
+        let p, tyl = Option.get (constr_of_type ty) in
+        tree_of_constr (Path.unboxed_version p) tyl
     | Tvariant row ->
         let { fields; name; closed; present; all_present; tags } =
           tree_of_typvariant_repr row
@@ -2847,6 +2854,16 @@ let rec tree_of_modal_typexp mode modal ty =
       let tyl' = apply_subst s [ty] in
       Internal_names.add p';
       Otyp_constr (tree_of_path (Some Type) p', tree_of_typlist mode tyl')
+    | Tunbox ty -> Otyp_unboxed (tree_of_typexp mode Alloc.Const.legacy ty)
+  and tree_of_constr p tyl =
+    let p', s = best_type_path p in
+    let tyl' = apply_subst s tyl in
+    if is_nth s && not (tyl'=[])
+    then tree_of_typexp mode Alloc.Const.legacy (List.hd tyl')
+    else begin
+      Internal_names.add p';
+      Otyp_constr (tree_of_path (Some Type) p', tree_of_typlist mode tyl')
+    end
   in
   Aliases.remove_delay px;
   alias_nongen_row mode px ty;
@@ -4119,8 +4136,8 @@ let print_items showval env x =
 let same_path t t' =
   let open Types in
   eq_type t t' ||
-  match get_desc t, get_desc t' with
-    Tconstr(p,tl,_), Tconstr(p',tl',_) ->
+  match constr_of_type t, constr_of_type t' with
+    Some (p, tl), Some (p', tl') ->
       let (p1, s1) = best_type_path p and (p2, s2)  = best_type_path p' in
       begin match s1, s2 with
         Nth n1, Nth n2 when n1 = n2 -> true

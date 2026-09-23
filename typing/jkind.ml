@@ -1414,7 +1414,7 @@ module Base_and_axes = struct
           match Types.get_desc ty with
           | Tmod (ty, _) -> check ~bounds_mask t ty
           | Tpoly (ty, _) | Trepr (ty, _) -> check ~bounds_mask t ty
-          | Ttuple _ | Tbox _ ->
+          | Ttuple _ | Tbox _ | Tunbox _ ->
             if tuple_fuel > 0
             then
               Continue
@@ -3121,6 +3121,21 @@ let extract_layout : 'l 'r. _ -> ('l * 'r) jkind -> _ =
 
 let extract_layout_opt env t = extract_layout env t |> Result.to_option
 
+(* A box crosses like [mutable_data] with its payload, so the payload crosses
+   at least as much as the box: the bounds carry over. *)
+let for_unbox env (jkind : jkind_l) : jkind_l =
+  let why = History.Unboxed_version_of_boxed_kind in
+  match extract_layout env jkind with
+  | Ok (Box (payload, _)) ->
+    fresh_jkind_poly
+      { base = Layout payload;
+        mod_bounds = jkind.jkind.mod_bounds;
+        with_bounds = jkind.jkind.with_bounds
+      }
+      ~annotation:None ~why:(Any_creation why)
+  | Ok (Any _ | Sort _ | Product _ | Addressable _) | Error _ ->
+    Builtin.any ~why
+
 let get_layout_defaulting_to_scannable env jkind =
   extract_layout_opt env jkind |> Option.map Layout.default_to_scannable_and_get
 
@@ -3649,6 +3664,8 @@ module Format_history = struct
     | Idx_base -> fprintf ppf "it's the base type of an index"
     | Unboxed_atomic_record ->
       fprintf ppf "it's the unboxed version of a record with atomic fields"
+    | Unboxed_version_of_boxed_kind ->
+      fprintf ppf "it's the unboxed version of a type with a box kind"
 
   let format_immediate_creation_reason ppf :
       History.immediate_creation_reason -> _ = function
@@ -4847,6 +4864,8 @@ module Debug_printers = struct
     | Old_style_unboxed_type -> fprintf ppf "Old_style_unboxed_type"
     | Idx_base -> fprintf ppf "Idx_base"
     | Unboxed_atomic_record -> fprintf ppf "Unboxed_atomic_record"
+    | Unboxed_version_of_boxed_kind ->
+      fprintf ppf "Unboxed_version_of_boxed_kind"
 
   let immediate_creation_reason ppf : History.immediate_creation_reason -> _ =
     function

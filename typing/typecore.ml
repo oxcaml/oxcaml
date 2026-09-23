@@ -2654,6 +2654,13 @@ let rec expand_path env p =
   in
   match decl with
     Some {type_manifest = Some ty} ->
+      (* The manifest of a re-exported record or variant is a type constructor,
+         or the [t#] of one (see [Typedecl.check_kind_coherence]) *)
+      let ty =
+        match get_desc ty with
+        | Tunbox _ -> Ctype.reduce_head ~expand_reducible_abbrevs:false env ty
+        | _ -> ty
+      in
       begin match get_desc ty with
         Tconstr(p,_,_) -> expand_path env p
       | _ -> assert false
@@ -5633,12 +5640,19 @@ let rec approx_type env sty =
   | Ptyp_tuple args ->
       newty (Ttuple (List.map (fun (l, t) -> l, approx_type env t) args))
   | Ptyp_constr (lid, ctl) ->
-      let path, decl = Env.lookup_type ~use:false ~loc:lid.loc lid.txt env in
+      let boxed_lid = Env.lid_without_hash lid.txt in
+      let path, decl =
+        Env.lookup_type ~use:false ~loc:lid.loc
+          (Option.value boxed_lid ~default:lid.txt) env
+      in
       if List.length ctl <> decl.type_arity
       then newvar (Jkind.Builtin.any ~why:Dummy_jkind)
       else begin
         let tyl = List.map (approx_type env) ctl in
-        newconstr path tyl
+        let ty = newconstr path tyl in
+        match boxed_lid with
+        | None -> ty
+        | Some _ -> Btype.new_unbox_ty ty
       end
   | _ -> approx_type_default ()
 

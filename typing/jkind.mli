@@ -340,6 +340,9 @@ module Builtin : sig
     why:History.any_creation_reason ->
     'd Types.jkind
 
+  (** [any box]: the kind of every type with an unboxed version. *)
+  val any_box : why:History.value_creation_reason -> 'd Types.jkind
+
   (** Like [any], but with the given separability on the scannable axis. *)
   val any_with_separability :
     Jkind_axis.Separability.t ->
@@ -591,6 +594,10 @@ val for_arrow : Types.jkind_l
 (** The jkind of [contents box]. *)
 val for_box :
   contents:Types.type_expr -> contents_layout:Sort.t Layout.t -> Types.jkind_l
+
+(** The jkind of a stuck [t#] ([Tunbox]) given the jkind of [t]: the payload of
+    its box layout, keeping its bounds. [any] if the layout is not a box. *)
+val for_unbox : Env.t -> Types.jkind_l -> Types.jkind_l
 
 (** The jkind of an object type. *)
 val for_object : Types.jkind_l

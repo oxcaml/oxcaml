@@ -328,6 +328,9 @@ val lookup_value:
 val lookup_type:
   ?use:bool -> loc:Location.t -> Longident.t -> t ->
   Path.t * type_declaration
+
+(* [Some lid] for a longident [lid#] (the syntax of an unboxed version) *)
+val lid_without_hash : Longident.t -> Longident.t option
 val lookup_module:
   ?use:bool -> loc:Location.t -> Longident.t -> t ->
   Path.t * module_declaration * mode_with_locks

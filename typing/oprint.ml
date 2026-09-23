@@ -493,6 +493,8 @@ and print_simple_out_type ppf =
         tyl;
       pp_print_char ppf ')';
       pp_close_box ppf ()
+  | Otyp_unboxed ty ->
+      fprintf ppf "@[%a#@]" print_simple_out_type ty
   | Otyp_abstract | Otyp_open
   | Otyp_sum _ | Otyp_manifest (_, _) -> ()
   | Otyp_record lbls -> print_record_decl ~unboxed:false ppf lbls

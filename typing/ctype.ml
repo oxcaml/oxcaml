@@ -1091,7 +1091,7 @@ let rec copy_spine copy_scope ty =
   | Tof_kind _
   | Tbox _ -> ty
   | ( Tarrow _ | Tpoly _ | Trepr _ | Ttuple _ | Tunboxed_tuple _ | Tpackage _
-    | Tconstr _ | Tmod _ ) as desc ->
+    | Tconstr _ | Tmod _ | Tunbox _ ) as desc ->
       let level = get_level ty in
       let current_level = !current_level in
       if level < current_level || level = generic_level then ty else
@@ -1122,6 +1122,7 @@ let rec copy_spine copy_scope ty =
           Tconstr (path, List.map copy_rec tyl, ref Mnil)
       | Tmod (ty, mod_bounds) ->
           Tmod (copy_rec ty, mod_bounds)
+      | Tunbox ty -> Tunbox (copy_rec ty)
       | _ -> assert false
       in
       Transient_expr.set_stub_desc t desc';
@@ -1569,7 +1570,7 @@ let rec copy ?partial ?keep_names ?(instantiate_modes = true) copy_scope ty =
                   (* TODO: is this case possible?
                      possibly an interaction with (copy more) below? *)
                 | Tconstr _ | Tquote _ | Tsplice _ | Tnil | Tof_kind _
-                | Tbox _ ->
+                | Tbox _ | Tunbox _ ->
                     copy more
                 | Tvar _ | Tunivar _ ->
                     if keep then more else newty mored
@@ -2484,6 +2485,38 @@ let safe_abbrev env ty =
       cleanup_abbrev ();
       false
 
+(* [ty#] when [ty] is known to be a box: a type with a declared unboxed
+   version, a box type, or a tuple. *)
+let reduce_unbox env ty =
+  match get_desc ty with
+  | Tconstr (p, args, _) ->
+    let pu = Path.unboxed_version p in
+    begin match Env.find_type pu env with
+    | _ -> Some (newty2 ~level:(get_level ty) (Tconstr (pu, args, ref Mnil)))
+    | exception Not_found -> None
+    end
+  | Ttuple tys -> Some (newty2 ~level:(get_level ty) (Tunboxed_tuple tys))
+  | Tbox ty -> Some ty
+  | _ -> None
+
+(* [ty box] when [ty] is known to be an unboxed version. *)
+let reduce_box ty =
+  let level = get_level ty in
+  match Btype.reduces_box ty with
+  | Reduces_to_constr (p, args) ->
+    Some (newty2 ~level (Tconstr (p, args, ref Mnil)))
+  | Reduces_to_tuple tys -> Some (newty2 ~level (Ttuple tys))
+  | Reduces_to_type ty -> Some ty
+  | Doesn't_reduce_box -> None
+
+let is_boxable_ty ty = Option.is_some (reduce_box ty)
+
+(* Only valid on types that pass [is_boxable_ty] *)
+let box_ty_exn ty =
+  match reduce_box ty with
+  | Some ty -> ty
+  | None -> invalid_arg "not boxable"
+
 let rec try_expand_once_gen expand_abbrev env ty =
   match get_desc ty with
     Tconstr _ -> expand_abbrev env ty
@@ -2495,26 +2528,14 @@ let rec try_expand_once_gen expand_abbrev env ty =
       try_expand_once_gen expand_abbrev (incr_stage env) t |> new_quote_eval_ty
   | Tbox t ->
       try_expand_once_gen expand_abbrev env t |> new_box_ty
+  | Tunbox t ->
+      (* A declared unboxed version of the head takes precedence over
+         expanding it. *)
+      begin match reduce_unbox env t with
+      | Some ty -> ty
+      | None -> try_expand_once_gen expand_abbrev env t |> new_unbox_ty
+      end
   | _ -> raise Cannot_expand
-
-let unbox_ty env ty =
-  match get_desc ty with
-  | Tconstr (p, args, _) ->
-    let pu = Path.unboxed_version p in
-    begin match Env.find_type pu env with
-    | _ -> Some (newty2 ~level:(get_level ty) (Tconstr (pu, args, ref Mnil)))
-    | exception Not_found -> None
-    end
-  | _ ->
-    simple_unbox_ty ty
-
-let is_unboxable_ty env ty = unbox_ty env ty |> Option.is_some
-
-(* Only valid on types that pass [is_unboxable_ty] *)
-let unbox_ty_exn env ty =
-  match unbox_ty env ty with
-  | Some ty -> ty
-  | None -> invalid_arg "not unboxable"
 
 (* Expand the head of a type once.
    Raise Cannot_expand if the type cannot be expanded.
@@ -2560,13 +2581,17 @@ let try_expand_safe env ty =
 (* Perform one of the following head-position beta reductions via rewrites:
    * Reduce a quoted-eval through a concrete (persistent) type constructor.
    * Cancel a quote-splice pair.
-   * Simplify a [Tbox] over a type with a unboxed version. *)
+   * Simplify a [Tbox] over an unboxed version, or a [Tunbox] over a box. *)
 let rec try_reduce_once env t =
+  let or_cannot_expand = function
+    | Some t -> t
+    | None -> raise Cannot_expand
+  in
   match get_desc t with
   | Tquote_eval t ->
     try_reduce_quote_eval env t |> newty2 ~level:(get_level t)
-  | Tbox t ->
-    try_reduce_box t |> newty2 ~level:(get_level t)
+  | Tbox t -> reduce_box t |> or_cannot_expand
+  | Tunbox t -> reduce_unbox env t |> or_cannot_expand
   | Tsplice t -> begin
     match get_desc t with
     (* [$<[ t ]>] ==> [t] ]>] *)
@@ -2609,6 +2634,9 @@ and try_reduce_quote_eval env t =
   (* [<[t box]> eval]  ==>  [<[t]> eval box] *)
   | Tbox t ->
     Tbox (new_quote_eval_ty t)
+  (* [<[t#]> eval]  ==>  [(<[t]> eval)#] *)
+  | Tunbox t ->
+    Tunbox (new_quote_eval_ty t)
   (* [<[#(t1 * t2)]> eval]  ==>  [#(<[t1]> eval * <[t2]> eval)] *)
   | Tunboxed_tuple tl ->
     Tunboxed_tuple (List.map (fun (l, t) -> (l, new_quote_eval_ty t)) tl)
@@ -2694,12 +2722,6 @@ and try_reduce_quote_eval env t =
   | Tof_kind _ -> raise Cannot_expand
   | Tlink _ | Tsubst _ -> assert false
 
-and try_reduce_box contents =
-  match Btype.reduces_box contents with
-  | Reduces_to_constr (p, args) -> Tconstr (p, args, ref Mnil)
-  | Reduces_to_tuple tys -> Ttuple tys
-  | Doesn't_reduce_box -> raise Cannot_expand
-
 (* Perform head-position reductions exhaustively til the normal form. *)
 let rec try_reduce env ty =
   let ty' = try_reduce_once env ty in
@@ -2755,6 +2777,7 @@ let expand_head env ty =
   with Cannot_expand -> ty
 
 let _ = forward_try_expand_safe := try_expand_safe
+let () = Ikind.expand_head' := expand_head
 
 
 (* Expand until we find a non-abstract type declaration,
@@ -2792,6 +2815,13 @@ let rec extract_concrete_typedecl env ty =
   | Tsplice ty -> extract_concrete_typedecl (decr_stage env) ty
   | Tquote_eval ty -> extract_concrete_typedecl (incr_stage env) ty
   | Tbox ty -> extract_concrete_typedecl env ty
+  | Tunbox _ ->
+      (* Reduce rather than look through: [r#] resolves to the unboxed
+         record's declaration, not the boxed record's. *)
+      begin match try_expand_safe env ty with
+      | exception Cannot_expand -> May_have_typedecl
+      | ty -> extract_concrete_typedecl env ty
+      end
   | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tobject _ | Tfield _ | Tnil
   | Tvariant _ | Tpackage _ | Tof_kind _ -> Has_no_typedecl
   | Tvar _ | Tunivar _ -> May_have_typedecl
@@ -3018,7 +3048,7 @@ let contained_without_boxing env ty =
   | Trepr (_, _) ->  Misc.fatal_error "Ctype.contained_without_boxing: repr"
   | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil | Tlink _
   | Tsubst _ | Tvariant _ | Tunivar _ | Tpackage _ | Tof_kind _ | Tbox _
-  | Tquote _ | Tsplice _ | Tquote_eval _ -> []
+  | Tunbox _ | Tquote _ | Tsplice _ | Tquote_eval _ -> []
 
 (* We use ty_prev to track the last type for which we found a definition,
    allowing us to return a type for which a definition was found even if
@@ -3331,6 +3361,17 @@ and estimate_type_jkind ~expand_components ~ignore_mod_bounds ~mod_bounds_only
       ~contents_layout:
         (estimate_type_layout ~expand_components env ~visited:[get_id ty]
            contents)
+  | Tunbox _ ->
+    let ty' = expand_head_opt env ty in
+    begin match get_desc ty' with
+    | Tunbox payload ->
+      estimate_type_jkind ~expand_components ~ignore_mod_bounds ~mod_bounds_only
+        env payload
+      |> Jkind.for_unbox env
+    | _ ->
+      estimate_type_jkind ~expand_components ~ignore_mod_bounds ~mod_bounds_only
+        env ty'
+    end
   | Tnil -> Jkind.Builtin.value ~why:Tnil
   | Tlink _ | Tsubst _ -> assert false
   | Tvariant row ->
@@ -3807,7 +3848,7 @@ let constrain_type_jkind ~fixed env ty jkind =
             | _ -> error ()
           in
           let unboxed ~fuel =
-            match unbox_ty env ty with
+            match reduce_unbox env ty with
             | Some contents -> box ~fuel contents
             | None -> error ()
           in
@@ -3848,6 +3889,20 @@ let constrain_type_jkind ~fixed env ty jkind =
               mk_unwrapped_type_expr
                 ~kind_operator:Jkind_types.Kind_operator.Addressable ty) ltys)
           | Ttuple (_ :: _) | Tbox _ -> unboxed ~fuel
+          | Tunbox _ when not expanded ->
+            let ty = expand_head_opt env ty in
+            estimate_jkind_and_loop ~fuel ~expanded:true env ty jkind
+          | Tunbox payload when not fixed && is_Tvar payload ->
+            (* A bound on a variable's unboxed version bounds its box. *)
+            begin match Jkind.extract_layout env jkind with
+            | Ok layout ->
+              let box =
+                Jkind.Layout.Box (layout, Jkind_types.Scannable_axes.max)
+              in
+              loop ~fuel ~expanded:false env payload ty's_jkind
+                (Jkind.set_layout jkind box)
+            | Error _ -> error ()
+            end
           | _ -> error ()
   and estimate_jkind_and_loop ~fuel ~expanded env ty jkind : _ result =
     (* If [jkind]'s bound's are all max, then we immediately know that the
@@ -3908,6 +3963,33 @@ let type_sort ~why ~fixed env ty =
 
 let check_type_jkind env ty jkind =
   constrain_type_jkind ~fixed:true env ty jkind
+
+(* [Some ty#] when [ty] has an unboxed version: the reduct when [ty] is a
+   known box (see [reduce_unbox]), else a stuck [Tunbox ty] when [ty] has a
+   box kind. *)
+let unbox_ty_gen ~fixed env ty =
+  match reduce_unbox env ty with
+  | Some _ as reduct -> reduct
+  | None ->
+    match
+      constrain_type_jkind ~fixed env ty
+        (Jkind.Builtin.any_box ~why:Boxed)
+    with
+    | Ok () -> Some (new_unbox_ty ty)
+    | Error _ -> None
+
+let unbox_ty = unbox_ty_gen ~fixed:true
+
+let is_unboxable_ty env ty = Option.is_some (unbox_ty env ty)
+
+let constrain_unboxable_ty env ty =
+  Option.is_some (unbox_ty_gen ~fixed:false env ty)
+
+(* Only valid on types that pass [is_unboxable_ty] *)
+let unbox_ty_exn env ty =
+  match unbox_ty env ty with
+  | Some ty -> ty
+  | None -> invalid_arg "not unboxable"
 
 let constrain_type_jkind env ty jkind =
   constrain_type_jkind ~fixed:false env ty jkind
@@ -4807,6 +4889,16 @@ let rec mcomp type_pairs env t1 t2 =
             mcomp type_pairs (decr_stage env) t1 t2
         | (Tquote_eval t1, Tquote_eval t2, _, _) ->
             mcomp type_pairs (incr_stage env) t1 t2
+        | (Tunbox t1, Tunbox t2, _, _) ->
+            mcomp type_pairs env t1 t2
+        | (Tunbox t, _, _, _) when is_boxable_ty t2' ->
+            mcomp type_pairs env t (box_ty_exn t2')
+        | (_, Tunbox t, _, _) when is_boxable_ty t1' ->
+            mcomp type_pairs env (box_ty_exn t1') t
+        | (Tunbox _, _, _, _) | (_, Tunbox _, _, _) ->
+            (* A stuck [t#] may be the unboxed version of anything with a box
+               kind. *)
+            ()
         | (Tbox t1, Tbox t2, _, _) ->
             mcomp type_pairs env t1 t2
         | (Tbox t, _, _, _) when is_unboxable_ty env t2' ->
@@ -5469,12 +5561,25 @@ and unify3 uenv t1 t1' t2 t2' =
       unify_with_decr_stage uenv (fun uenv -> unify uenv (new_quote_ty t1') s2)
   | (_, Tquote s2) when is_flexible_ty s2 ->
       unify_with_incr_stage uenv (fun uenv -> unify uenv (new_splice_ty t1') s2)
+  (* Both sides are expanded, so a [Tunbox] here is stuck (its payload is a
+     variable or an abstract type of box kind), and a [Tbox]'s payload is
+     never an unboxed version. A well-formed [t#] has [t = t# box]. *)
+  | (Tunbox t1, Tunbox t2) ->
+      unify uenv t1 t2
+  | (Tunbox t1, _) when is_Tvar t1 ->
+      unify uenv t1 (new_box_ty t2')
+  | (_, Tunbox t2) when is_Tvar t2 ->
+      unify uenv (new_box_ty t1') t2
+  | (Tunbox t1, _) when is_boxable_ty t2' ->
+      unify uenv t1 (box_ty_exn t2')
+  | (_, Tunbox t2) when is_boxable_ty t1' ->
+      unify uenv (box_ty_exn t1') t2
   | (Tbox t1, Tbox t2) ->
       unify uenv t1 t2
   | (_, Tbox t2) when is_unboxable_ty (get_env uenv) t1' ->
       unify uenv (unbox_ty_exn (get_env uenv) t1') t2
   | (Tbox t1, _) when is_unboxable_ty (get_env uenv) t2' ->
-      unify uenv t1 (unbox_ty_exn (get_env uenv) t2)
+      unify uenv t1 (unbox_ty_exn (get_env uenv) t2')
   | (Tfield _, Tfield _) -> (* special case for GADTs *)
       unify_fields uenv t1' t2'
   | _ ->
@@ -6850,6 +6955,14 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
           | (Tquote_eval t1, Tquote_eval t2) ->
               moregen inst_nongen variance type_pairs
                 (incr_stage env) t1 t2
+          | (Tunbox t1, Tunbox t2) ->
+              moregen inst_nongen variance type_pairs env t1 t2
+          | (Tunbox t1, _) when is_Tvar t1 ->
+              moregen inst_nongen variance type_pairs env t1 (new_box_ty t2')
+          | (Tunbox t1, _) when is_boxable_ty t2' ->
+              moregen inst_nongen variance type_pairs env t1 (box_ty_exn t2')
+          | (_, Tunbox t2) when is_boxable_ty t1' ->
+              moregen inst_nongen variance type_pairs env (box_ty_exn t1') t2
           | (Tbox t1, Tbox t2) ->
               moregen inst_nongen variance type_pairs env t1 t2
           | (Tbox t, _) when is_unboxable_ty env t2' ->
@@ -7367,7 +7480,7 @@ let rec eqtype rename type_pairs subst env ~do_jkind_check t1 t2 =
           | (Tquote_eval t1, Tquote_eval t2) ->
               eqtype rename type_pairs subst
                 (incr_stage env) ~do_jkind_check t1 t2
-          | (Tbox t1, Tbox t2) ->
+          | (Tbox t1, Tbox t2) | (Tunbox t1, Tunbox t2) ->
               eqtype rename type_pairs subst env ~do_jkind_check t1 t2
           | (_, _) ->
               raise_unexplained_for Equality
@@ -8113,6 +8226,10 @@ let rec build_subtype env (visited : transient_expr list)
       let (t1', c) = build_subtype env visited loops posi level t1 in
       if c > Unchanged then (newty (Tbox t1'), c)
       else (t, Unchanged)
+  | Tunbox t1 ->
+      let (t1', c) = build_subtype env visited loops posi level t1 in
+      if c > Unchanged then (newty (Tunbox t1'), c)
+      else (t, Unchanged)
   | Tnil ->
       if posi then
         let v = newvar (Jkind.Builtin.value ~why:Tnil) in
@@ -8215,6 +8332,16 @@ let rec subtype_rec env trace t1 t2 cstrs =
         subtype_labeled_list env trace tl1 tl2 cstrs
     | (Tunboxed_tuple tl1, Tunboxed_tuple tl2) ->
         subtype_labeled_list env trace tl1 tl2 cstrs
+    | (Tunbox _, _) | (_, Tunbox _) ->
+        let t1' = expand_head_opt env t1 and t2' = expand_head_opt env t2 in
+        if eq_type t1 t1' && eq_type t2 t2' then
+          begin match get_desc t1, get_desc t2 with
+          | Tunbox u1, Tunbox u2 ->
+            subtype_rec env (Subtype.Diff {got = u1; expected = u2} :: trace)
+              u1 u2 cstrs
+          | _ -> (trace, t1, t2, !univar_pairs)::cstrs
+          end
+        else subtype_rec env trace t1' t2' cstrs
     | (Tconstr(p1, [], _), Tconstr(p2, [], _)) when Path.same p1 p2 ->
         cstrs
     | (Tconstr(p1, _tl1, _abbrev1), _)
