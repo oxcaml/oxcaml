@@ -6,9 +6,13 @@
 
 let () =
   assert (not (Action_trace.enabled ()));
-  let gettimeofday () = failwith "Clock called with tracing disabled" in
+  (* The clock is still installed for timing passes, but no span is recorded
+     and the profile is never serialised. *)
+  let clock_calls = ref 0 in
+  let gettimeofday () = incr clock_calls; 0. in
   assert (Profile.record_action ~gettimeofday ~name:"disabled"
     (fun () -> 42) = 42);
+  assert (!clock_calls = 1);
   Action_trace.with_fresh_context ~name:"disabled" ~f:(fun context ->
     Action_trace.Context.emit context
       (Action_trace.Event.span ~category:"test" ~name:"disabled"

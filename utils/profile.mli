@@ -37,16 +37,16 @@ end
 val reset : unit -> unit
 (** erase all recorded profile information *)
 
-val record_call : ?accumulate:bool -> ?cheap:(unit -> float) -> string -> (unit -> 'a) -> 'a
+val record_call : ?accumulate:bool -> string -> (unit -> 'a) -> 'a
 (** [record_call pass f] calls [f] and records its profile information. *)
 
 val record_call_with_counters :
-  ?accumulate:bool -> counter_f:('a -> Counters.t) -> ?cheap:(unit -> float) -> string -> (unit -> 'a) -> 'a
+  ?accumulate:bool -> counter_f:('a -> Counters.t) -> string -> (unit -> 'a) -> 'a
 (** [record_call_with_counters counter_f pass f] calls [f] and records its profile
     information (including counter information given by calling [counter_f] on the
     result of calling [f]) *)
 
-val record : ?accumulate:bool -> ?cheap:(unit -> float) -> string -> ('a -> 'b) -> 'a -> 'b
+val record : ?accumulate:bool -> string -> ('a -> 'b) -> 'a -> 'b
 (** [record pass f arg] records the profile information of [f arg] *)
 
 val record_with_counters :
@@ -66,13 +66,14 @@ Format.formatter -> Clflags.profile_column list -> timings_precision:int -> unit
 
 val record_action :
   gettimeofday:(unit -> float) -> name:string -> (unit -> 'a) -> 'a
-(** When Dune action tracing is enabled, record a span covering the call,
-    with the complete [-dprofile] hierarchy in its [profile] argument,
+(** Install [gettimeofday] as the clock used to time passes (the default is
+    the CPU clock, which is much slower to read), then call the function.
+    When Dune action tracing is enabled, also record a span covering the
+    call, with the complete [-dprofile] hierarchy in its [profile] argument,
     regardless of the selected profile columns. The columns are [time]
-    (seconds on the pass's selected clock), [alloc], [top-heap],
-    [absolute-top-heap] (all in bytes), and [counters] (an object of integer
-    counts). Each row also includes [calls], the number of CPU-clock reads
-    attributed to it. The span uses wall-clock time.
+    (seconds), [alloc] (bytes), and [counters] (an object of integer
+    counts). Each row also includes [calls], the number of clock reads
+    attributed to it.
     Pass [Unix.gettimeofday] as the clock; compiler-libs itself does not
     depend on [Unix]. *)
 
