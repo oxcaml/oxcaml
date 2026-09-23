@@ -28,6 +28,10 @@
 open Lambda
 module Fmt = Format_doc
 
+type error = Block_index_gap_overflow_possible
+
+exception Error of Location.t * error
+
 module Or_missing = struct
   type 'a t =
     | Present of 'a
@@ -477,7 +481,7 @@ and eval_lam_shallow ctx env lam =
     let new_bindings = Misc.Stdlib.List.map_sharing eval_binding old_bindings in
     if new_bindings == old_bindings then lam else Lletrec (new_bindings, body)
   | Lprim (old_prim, args, loc) ->
-    let new_prim = eval_prim env old_prim in
+    let new_prim = eval_prim env loc old_prim in
     if new_prim == old_prim then lam else Lprim (new_prim, args, loc)
   | Lswitch (scrutinee, switch, loc, old_layout) ->
     let new_layout = eval_layout env old_layout in
@@ -555,7 +559,13 @@ and eval_lam_shallow ctx env lam =
 and eval_structured_const env const =
   match const with
   | Const_mixed_block (n, old_shape, old_consts) ->
-    let new_shape = eval_mixed_block_shape env old_shape in
+    let new_shape =
+      (* [Lconst] doesn't carry a source location, so we use [Loc_unknown].
+         Plus the check here is only defensive: we don't currently support lpoly
+         structured constants, and non-lpoly blocks that fail the block shape
+         check are rejected earlier during typechecking. *)
+      eval_mixed_block_shape env old_shape ~check_at:(Some Loc_unknown)
+    in
     let new_consts =
       Misc.Stdlib.List.map_sharing (eval_structured_const env) old_consts
     in
@@ -571,17 +581,50 @@ and eval_structured_const env const =
   | Const_null ->
     const
 
-and eval_block_shape env block_shape =
+and eval_block_shape env loc block_shape =
   match block_shape with
   | All_value -> block_shape
   | Shape old_shape ->
-    let new_shape = eval_mixed_block_shape env old_shape in
+    let new_shape = eval_mixed_block_shape env old_shape ~check_at:(Some loc) in
     if new_shape == old_shape then block_shape else Shape new_shape
 
+and eval_record_representation env loc (repr : record_representation) =
+  match repr with
+  | Record_boxed_inherited sort -> Record_boxed_inherited (eval_sort env sort)
+  | Record_mixed old_shape ->
+    let new_shape = eval_mixed_block_shape env old_shape ~check_at:(Some loc) in
+    if new_shape == old_shape then repr else Record_mixed new_shape
+  | Record_inlined (tag, Constructor_mixed old_shape, variant_repr) ->
+    let new_shape = eval_mixed_block_shape env old_shape ~check_at:(Some loc) in
+    if new_shape == old_shape
+    then repr
+    else Record_inlined (tag, Constructor_mixed new_shape, variant_repr)
+  | Record_unboxed | Record_boxed | Record_float | Record_ufloat
+  | Record_inlined
+      (_, (Constructor_uniform_value | Constructor_immediate_all_void), _) ->
+    repr
+
 and eval_mixed_block_shape :
-    'a. Env.t -> 'a mixed_block_element array -> 'a mixed_block_element array =
- fun env shape ->
-  Misc.Stdlib.Array.map_sharing (eval_mixed_block_element env) shape
+    'a.
+    Env.t ->
+    'a mixed_block_element array ->
+    check_at:scoped_location option
+      (* If [Some loc], perform block shape check, reporting errors at [loc].
+      *) ->
+    'a mixed_block_element array =
+ fun env shape ~check_at ->
+  let shape' =
+    Misc.Stdlib.Array.map_sharing (eval_mixed_block_element env) shape
+  in
+  (match check_at with
+  (* Only check shapes if they changed during evaluation. Shapes that were
+      already concrete were validated during typechecking. *)
+  | Some loc when shape' != shape ->
+    Typeopt.assert_mixed_product_support_for_lambda_shape
+      (Debuginfo.Scoped_location.to_location loc)
+      Block shape'
+  | Some _ | None -> ());
+  shape'
 
 and eval_mixed_block_element :
     'a. Env.t -> 'a mixed_block_element -> 'a mixed_block_element =
@@ -595,8 +638,11 @@ and eval_mixed_block_element :
       Misc.Stdlib.Array.map_sharing (eval_mixed_block_element env) old_elements
     in
     if new_elements == old_elements then element else Product new_elements
-  | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
-  | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
+  | Value old_kind ->
+    let new_kind = eval_value_kind env old_kind in
+    if new_kind == old_kind then element else Value new_kind
+  | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
+  | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
     element
 
 and eval_sort env (sort : Jkind.Sort.Const.t) =
@@ -623,9 +669,56 @@ and eval_layout env layout =
       Misc.Stdlib.List.map_sharing (eval_layout env) old_layouts
     in
     if new_layouts == old_layouts then layout else Punboxed_product new_layouts
-  | Ptop | Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _
-  | Punboxed_vector _ | Punboxed_mask | Pbottom ->
+  | Pvalue old_kind ->
+    let new_kind = eval_value_kind env old_kind in
+    if new_kind == old_kind then layout else Pvalue new_kind
+  | Ptop | Punboxed_float _ | Punboxed_or_untagged_integer _ | Punboxed_vector _
+  | Punboxed_mask | Pbottom ->
     layout
+
+and eval_value_kind env ({ raw_kind = old_raw_kind; nullable } as value_kind) =
+  let new_raw_kind = eval_raw_value_kind env old_raw_kind in
+  if new_raw_kind == old_raw_kind
+  then value_kind
+  else { raw_kind = new_raw_kind; nullable }
+
+and eval_raw_value_kind env value_kind =
+  match value_kind with
+  | Pvariant { consts; non_consts = old_non_consts } ->
+    let new_non_consts =
+      Misc.Stdlib.List.map_sharing
+        (fun ((i, old_constructor_shape) as non_const) ->
+          let new_constructor_shape =
+            eval_constructor_shape env old_constructor_shape
+          in
+          if new_constructor_shape == old_constructor_shape
+          then non_const
+          else i, new_constructor_shape)
+        old_non_consts
+    in
+    if new_non_consts == old_non_consts
+    then value_kind
+    else Pvariant { consts; non_consts = new_non_consts }
+  | Pgenval | Pintval | Pboxedfloatval _ | Pboxedintval _ | Parrayval _
+  | Pboxedvectorval _ | Pboxedmaskval ->
+    value_kind
+
+and eval_constructor_shape env constructor_shape =
+  match constructor_shape with
+  | Constructor_shape_uniform old_value_kinds ->
+    let new_value_kinds =
+      Misc.Stdlib.List.map_sharing (eval_value_kind env) old_value_kinds
+    in
+    if new_value_kinds == old_value_kinds
+    then constructor_shape
+    else Constructor_shape_uniform new_value_kinds
+  | Constructor_shape_mixed old_mixed_block_shape ->
+    let new_mixed_block_shape =
+      eval_mixed_block_shape env old_mixed_block_shape ~check_at:None
+    in
+    if new_mixed_block_shape == old_mixed_block_shape
+    then constructor_shape
+    else Constructor_shape_mixed new_mixed_block_shape
 
 and eval_lfunction_shallow env
     ({ kind;
@@ -652,19 +745,32 @@ and eval_lfunction_shallow env
     lfunction' ~kind ~params:new_params ~return:new_return ~body ~attr ~loc
       ~mode ~ret_mode
 
-and eval_prim env prim =
+and eval_prim env loc prim =
   match prim with
   | Pmakeblock (n, mut, old_shape, mode) ->
-    let new_shape = eval_block_shape env old_shape in
+    let new_shape = eval_block_shape env loc old_shape in
     if new_shape == old_shape then prim else Pmakeblock (n, mut, new_shape, mode)
+  | Pduprecord (old_repr, size) ->
+    let new_repr = eval_record_representation env loc old_repr in
+    if new_repr == old_repr then prim else Pduprecord (new_repr, size)
   | Pmixedfield (is, old_shape, sem) ->
-    let new_shape = eval_mixed_block_shape env old_shape in
+    let new_shape = eval_mixed_block_shape env old_shape ~check_at:(Some loc) in
     if new_shape == old_shape then prim else Pmixedfield (is, new_shape, sem)
   | Psetmixedfield (is, old_shape, init_or_assign) ->
-    let new_shape = eval_mixed_block_shape env old_shape in
+    let new_shape = eval_mixed_block_shape env old_shape ~check_at:(Some loc) in
     if new_shape == old_shape
     then prim
     else Psetmixedfield (is, new_shape, init_or_assign)
+  | Patomic_load_mixed_field { index; shape = old_shape } ->
+    let new_shape = eval_mixed_block_shape env old_shape ~check_at:(Some loc) in
+    if new_shape == old_shape
+    then prim
+    else Patomic_load_mixed_field { index; shape = new_shape }
+  | Patomic_set_mixed_field { index; shape = old_shape; mode } ->
+    let new_shape = eval_mixed_block_shape env old_shape ~check_at:(Some loc) in
+    if new_shape == old_shape
+    then prim
+    else Patomic_set_mixed_field { index; shape = new_shape; mode }
   | Pmake_unboxed_product old_layouts ->
     let new_layouts =
       Misc.Stdlib.List.map_sharing (eval_layout env) old_layouts
@@ -680,7 +786,16 @@ and eval_prim env prim =
     then prim
     else Punboxed_product_field (i, new_layouts)
   | Pmake_idx_mixed_field (old_shape, i, path, root) ->
-    let new_shape = eval_mixed_block_shape env old_shape in
+    let new_shape = eval_mixed_block_shape env old_shape ~check_at:(Some loc) in
+    (* We check for gap overflow after static evaluation to account for layout-
+       polymorphic blocks, but this check covers non-lpoly blocks, too. *)
+    let counts = Mixed_product_bytes.Wrt_path.count_shape new_shape i path in
+    if Option.is_none (Mixed_product_bytes.Wrt_path.offset_and_gap counts)
+    then
+      raise
+        (Error
+           ( Debuginfo.Scoped_location.to_location loc,
+             Block_index_gap_overflow_possible ));
     if new_shape == old_shape
     then prim
     else Pmake_idx_mixed_field (new_shape, i, path, root)
@@ -756,7 +871,7 @@ and eval_prim env prim =
   | Pbytes_to_string | Pbytes_of_string | Pignore | Pgetglobal _ | Pgetpredef _
   | Pmakefloatblock _ | Pmakeufloatblock _ | Pmakelazyblock _ | Pfield _
   | Pfield_computed _ | Psetfield _ | Psetfield_computed _ | Pfloatfield _
-  | Psetfloatfield _ | Psetufloatfield _ | Pufloatfield _ | Pduprecord _
+  | Psetfloatfield _ | Psetufloatfield _ | Pufloatfield _
   | Parray_element_size_in_bytes _ | Pmake_idx_field _ | Pwith_stack
   | Pwith_stack_preemptible | Pperform | Pcontinue | Pdiscontinue
   | Pdiscontinue_with_backtrace | Preperform | Pccall _ | Praise _ | Psequand
@@ -786,8 +901,7 @@ and eval_prim env prim =
   | Puntagged_int8_array_set_vec _ | Puntagged_int16_array_set_vec _
   | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
   | Punboxed_nativeint_array_set_vec _ | Pctconst _ | Pint_as_pointer _
-  | Patomic_load_field _ | Patomic_load_mixed_field _ | Patomic_set_field _
-  | Patomic_set_mixed_field _ | Patomic_exchange_field _
+  | Patomic_load_field _ | Patomic_set_field _ | Patomic_exchange_field _
   | Patomic_compare_exchange_field _ | Patomic_compare_set_field _
   | Patomic_fetch_add_field | Patomic_add_field | Patomic_sub_field
   | Patomic_land_field | Patomic_lor_field | Patomic_lxor_field
@@ -813,14 +927,6 @@ let rec assert_sort_contains_no_splices (sort : Jkind.Sort.Const.t) =
   | Product sorts -> List.iter assert_sort_contains_no_splices sorts
   | Addressable sort -> assert_sort_contains_no_splices sort
 
-let rec assert_layout_contains_no_splices : Lambda.layout -> unit = function
-  | Psplicevar _ -> raise Found_a_splice
-  | Ptop | Pbottom | Pvalue _ | Punboxed_float _
-  | Punboxed_or_untagged_integer _ | Punboxed_vector _ | Punboxed_mask ->
-    ()
-  | Punboxed_product layouts ->
-    List.iter assert_layout_contains_no_splices layouts
-
 let rec assert_mixed_block_element_contains_no_splices : type a.
     a Lambda.mixed_block_element -> unit = function
   | Splice_variable _ -> raise Found_a_splice
@@ -832,6 +938,34 @@ let rec assert_mixed_block_element_contains_no_splices : type a.
 
 let assert_mixed_block_shape_contains_no_splices shape =
   Array.iter assert_mixed_block_element_contains_no_splices shape
+
+let rec assert_layout_contains_no_splices : Lambda.layout -> unit = function
+  | Psplicevar _ -> raise Found_a_splice
+  | Ptop | Pbottom | Punboxed_float _ | Punboxed_or_untagged_integer _
+  | Punboxed_vector _ | Punboxed_mask ->
+    ()
+  | Pvalue value_kind -> assert_value_kind_contains_no_splices value_kind
+  | Punboxed_product layouts ->
+    List.iter assert_layout_contains_no_splices layouts
+
+and assert_value_kind_contains_no_splices { raw_kind; nullable = _ } =
+  assert_raw_value_kind_contains_no_splices raw_kind
+
+and assert_raw_value_kind_contains_no_splices = function
+  | Pvariant { consts = _; non_consts } ->
+    List.iter
+      (fun (_, constructor_shape) ->
+        assert_constructor_shape_contains_no_splices constructor_shape)
+      non_consts
+  | Pgenval | Pintval | Pboxedfloatval _ | Pboxedintval _ | Parrayval _
+  | Pboxedvectorval _ | Pboxedmaskval ->
+    ()
+
+and assert_constructor_shape_contains_no_splices = function
+  | Constructor_shape_uniform value_kinds ->
+    List.iter assert_value_kind_contains_no_splices value_kinds
+  | Constructor_shape_mixed mixed_block_shape ->
+    assert_mixed_block_shape_contains_no_splices mixed_block_shape
 
 let assert_primitive_contains_no_splices (prim : Lambda.primitive) =
   match prim with
@@ -849,7 +983,12 @@ let assert_primitive_contains_no_splices (prim : Lambda.primitive) =
     assert_layout_contains_no_splices layout
   | Pmake_unboxed_product layouts | Punboxed_product_field (_, layouts) ->
     List.iter assert_layout_contains_no_splices layouts
-  | Pmakeblock (_, _, Shape shape, _) ->
+  | Pmakeblock (_, _, Shape shape, _)
+  | Patomic_load_mixed_field { shape; _ }
+  | Patomic_set_mixed_field { shape; _ }
+  | Pduprecord
+      ((Record_mixed shape | Record_inlined (_, Constructor_mixed shape, _)), _)
+    ->
     assert_mixed_block_shape_contains_no_splices shape
   | Pmixedfield (_, shape, _) ->
     Array.iter assert_mixed_block_element_contains_no_splices shape
@@ -925,3 +1064,21 @@ let eval ~cu_static_data slam =
          Misc.fatal_error
            "Encountered a splice in the program after slambda eval");
       { CU_data.templates = ctx.store; cu = slv_comptime }, slv_runtime)
+
+let report_error_doc ppf = function
+  | Block_index_gap_overflow_possible ->
+    (* This message describes a more conservative rule than we enforce; see
+       [Mixed_product_bytes.Wrt_path.offset_and_gap]. *)
+    Fmt.fprintf ppf
+      "This block index cannot be created because it refers to values@ and \
+       non-values that are separated by 2^%d or more bytes in their@ block, or \
+       could be deepened to such an index."
+      (64 - Mixed_product_bytes.block_index_offset_bits)
+
+let () =
+  Location.register_error_of_exn (function
+    | Error (loc, err) ->
+      Some (Location.error_of_printer ~loc report_error_doc err)
+    | _ -> None)
+
+let report_error = Fmt.compat report_error_doc

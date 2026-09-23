@@ -476,7 +476,6 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
       else
         (* CR box: Update this read once addressability
            affects how elements are stored in blocks *)
-        let shape = Lambda.transl_mixed_product_shape shape in
         Some (Outval_record_mixed_block shape)
 
     let outval_rep_of_tuple env labeled_tys =
@@ -500,20 +499,18 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
       | Variant_boxed _ | Variant_unboxed | Variant_with_null -> 0
 
     let outval_rep_of_constructor_shape
-          (shape : Types.constructor_representation)
-          (vrep : Types.variant_representation) =
+          (shape : Lambda.constructor_representation)
+          (vrep : Lambda.variant_representation) =
       match shape, vrep with
       | Constructor_mixed _, (Variant_unboxed | Variant_with_null) ->
           Misc.fatal_error "a 'mixed' unboxed constructor is impossible"
       | Constructor_uniform_value, (Variant_unboxed | Variant_with_null) ->
           Some Outval_record_unboxed
-      | Constructor_uniform_value, (Variant_boxed _ | Variant_extensible) ->
+      | Constructor_uniform_value, (Variant_boxed | Variant_extensible) ->
           Some Outval_record_boxed
-      | Constructor_mixed shape, (Variant_boxed _ | Variant_extensible) ->
+      | Constructor_mixed shape, (Variant_boxed | Variant_extensible) ->
           outval_mixed_block_rep shape
       | Constructor_immediate_all_void, _ -> Some Outval_record_boxed
-      | (Constructor_undetermined | Constructor_variable _), _ ->
-          Misc.fatal_error "variable constructor representation"
 
     (* Finalize the representation just to be able to print it *)
     let outval_rep_of_constructor env ~sorts_and_types
@@ -536,30 +533,26 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
       in
       Option.bind shape (fun shape ->
         let shape =
-          Typedecl.finalize_constructor_representation env Location.none shape
+          Typeopt.transl_constructor_representation env Location.none shape
         in
         Option.map
           (fun rep -> rep, first_field_pos vrep)
-          (outval_rep_of_constructor_shape shape vrep))
+          (outval_rep_of_constructor_shape shape
+             (Typeopt.transl_variant_representation vrep)))
 
     let outval_rep_of_record env ~sorts_and_types
           (rep : Types.record_representation) =
       let finalize rep =
-        match Typedecl.finalize_record_representation env Location.none rep with
+        match Typeopt.transl_record_representation env Location.none rep with
         | Record_unboxed -> Some (Outval_record_unboxed, 0)
         | Record_boxed | Record_float | Record_ufloat ->
             Some (Outval_record_boxed, 0)
         | Record_mixed shape ->
             Option.map (fun rep -> rep, 0) (outval_mixed_block_rep shape)
-        | Record_boxed_inherited_variable sort ->
-            Some (Outval_record_inherited
-                    (Jkind.Sort.default_for_transl_and_get sort), 0)
+        | Record_boxed_inherited sort ->
+            Some (Outval_record_inherited sort, 0)
         | Record_inlined _ ->
             Misc.fatal_error "inlined record representation"
-        | Record_dummy _ ->
-            Misc.fatal_error "dummy record representation"
-        | Record_undetermined | Record_variable _ | Record_boxed_inherited ->
-            Misc.fatal_error "variable record representation"
       in
       match rep with
       | Record_inlined (_, shape, vrep) ->
