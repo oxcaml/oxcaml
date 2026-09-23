@@ -110,6 +110,12 @@ module type Int_number_kind = sig
 
     val shift_right_logical : t -> Target_ocaml_int.t -> t
 
+    (* Rotation within the value's bit width. Rotation counts outside [0, bit
+       width) (whose semantics are undefined) leave the value unchanged. *)
+    val rotate_left : t -> Target_ocaml_int.t -> t
+
+    val rotate_right : t -> Target_ocaml_int.t -> t
+
     val swap_byte_endianness : t -> t
 
     val neg : t -> t

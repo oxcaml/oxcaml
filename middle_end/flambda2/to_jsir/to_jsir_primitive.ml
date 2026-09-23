@@ -415,6 +415,11 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
       | (Naked_int8 | Naked_int16), _ ->
         (* CR selee: smallints *)
         raise Primitive_not_supported
+      | ( ( Tagged_immediate | Naked_immediate | Naked_int32 | Naked_int64
+          | Naked_nativeint ),
+          (Rol | Ror) ) ->
+        (* No rotation primitives exist in the JSIR runtime. *)
+        raise Primitive_not_supported
     in
     let extern_name =
       with_int_prefix_exn ~kind op_name ~percent_for_imms:true

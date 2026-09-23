@@ -204,6 +204,10 @@ module I = struct
 
   let ret () = emit RET
 
+  let rol x y = emit (ROL (x, y))
+
+  let ror x y = emit (ROR (x, y))
+
   let sal x y = emit (SAL (x, y))
 
   let sar x y = emit (SAR (x, y))

@@ -42,3 +42,16 @@ let encode_bitfield ~sf ~opc ~n ~immr ~imms ~rn ~rd =
   let result = logor result (shift_left (of_int (Reg.gp_encoding rn)) 5) in
   let result = logor result (of_int (Reg.gp_encoding rd)) in
   result
+
+(* Extract encoding - C4.1.92.9 Used for EXTR (N = sf, op21 = 00, o0 = 0) *)
+let encode_extract ~sf ~rm ~imms ~rn ~rd =
+  let open Int32 in
+  let result = zero in
+  let result = logor result (shift_left (of_int sf) 31) in
+  let result = logor result (shift_left (of_int 0b100111) 23) in
+  let result = logor result (shift_left (of_int sf) 22) in
+  let result = logor result (shift_left (of_int (Reg.gp_encoding rm)) 16) in
+  let result = logor result (shift_left (of_int imms) 10) in
+  let result = logor result (shift_left (of_int (Reg.gp_encoding rn)) 5) in
+  let result = logor result (of_int (Reg.gp_encoding rd)) in
+  result

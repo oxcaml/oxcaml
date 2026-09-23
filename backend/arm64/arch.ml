@@ -63,6 +63,10 @@ type cmm_label = Label.t
 
 type bswap_bitwidth = Sixteen | Thirtytwo | Sixtyfour
 
+type rotate_direction = Rotate_left | Rotate_right
+
+type rotate_bitwidth = Rotate32 | Rotate64
+
 (* Specific operations, including [Simd], must not raise. *)
 type specific_operation =
   | Ifar_poll
@@ -84,6 +88,12 @@ type specific_operation =
   | Inegmulsubf   (* floating-point negate, multiply and subtract *)
   | Isqrtf        (* floating-point square root *)
   | Ibswap of { bitwidth: bswap_bitwidth; } (* endianness conversion *)
+  | Irotate of { direction: rotate_direction;
+                 bitwidth: rotate_bitwidth;
+                 imm: int option }
+                  (* rotation of the low [bitwidth] bits; the count is [imm]
+                     (already reduced modulo the bit width) if present,
+                     otherwise the second argument *)
   | Imove32       (* 32-bit integer move *)
   | Isignext of int (* sign extension *)
   | Isimd of Simd.operation
@@ -183,6 +193,10 @@ let print_addressing printreg addr ppf arg =
   | Ibased(s, n) ->
       fprintf ppf "\"%s\" + %i" (Asm_targets.Asm_symbol.encode s) n
 
+let int_of_rotate_bitwidth = function
+  | Rotate32 -> 32
+  | Rotate64 -> 64
+
 let int_of_bswap_bitwidth = function
   | Sixteen -> 16
   | Thirtytwo -> 32
@@ -249,6 +263,14 @@ let print_specific_operation printreg op ppf arg =
       let n = int_of_bswap_bitwidth bitwidth in
       fprintf ppf "bswap%i %a" n
         printreg arg.(0)
+  | Irotate { direction; bitwidth; imm } ->
+      let n = int_of_rotate_bitwidth bitwidth in
+      let name =
+        match direction with Rotate_left -> "rotl" | Rotate_right -> "rotr"
+      in
+      fprintf ppf "%s%i %a%s" name n
+        printreg arg.(0)
+        (match imm with None -> "" | Some count -> sprintf " %i" count)
   | Imove32 ->
       fprintf ppf "move32 %a"
         printreg arg.(0)
@@ -288,6 +310,8 @@ let specific_operation_name : specific_operation -> string = fun op ->
   | Inegmulsubf -> "negmulsubf"
   | Isqrtf -> "sqrtf"
   | Ibswap _ -> "bswap"
+  | Irotate { direction = Rotate_left; _ } -> "rotl"
+  | Irotate { direction = Rotate_right; _ } -> "rotr"
   | Imove32 -> "move32"
   | Isignext _ -> "signext"
   | Isimd _ -> "simd"
@@ -332,13 +356,23 @@ let equal_specific_operation left right =
   | Isqrtf, Isqrtf -> true
   | Ibswap { bitwidth = left }, Ibswap { bitwidth = right } ->
     Int.equal (int_of_bswap_bitwidth left) (int_of_bswap_bitwidth right)
+  | Irotate { direction = left_dir; bitwidth = left_bitwidth; imm = left_imm },
+    Irotate { direction = right_dir; bitwidth = right_bitwidth;
+              imm = right_imm } ->
+    (match left_dir, right_dir with
+     | Rotate_left, Rotate_left | Rotate_right, Rotate_right -> true
+     | (Rotate_left | Rotate_right), _ -> false)
+    && Int.equal (int_of_rotate_bitwidth left_bitwidth)
+         (int_of_rotate_bitwidth right_bitwidth)
+    && Option.equal Int.equal left_imm right_imm
   | Imove32, Imove32 -> true
   | Isignext left, Isignext right -> Int.equal left right
   | Isimd left, Isimd right -> Simd.equal_operation left right
   | Illvm_intrinsic left, Illvm_intrinsic right -> String.equal left right
   | (Ifar_alloc _  | Ifar_poll | Ifar_stackcheck _ | Ishiftarith _
     | Imuladd | Imulsub | Inegmulf | Imuladdf | Inegmuladdf | Imulsubf
-    | Inegmulsubf | Isqrtf | Ibswap _ | Imove32 | Isignext _ | Isimd _
+    | Inegmulsubf | Isqrtf | Ibswap _ | Irotate _ | Imove32 | Isignext _
+    | Isimd _
     | Illvm_intrinsic _), _ -> false
 
 let isomorphic_specific_operation op1 op2 =
@@ -358,6 +392,7 @@ let operation_is_pure : specific_operation -> bool = function
   | Inegmulsubf -> true
   | Isqrtf -> true
   | Ibswap _ -> true
+  | Irotate _ -> true
   | Imove32 -> true
   | Isignext _ -> true
   | Isimd op -> Simd.operation_is_pure op
@@ -384,6 +419,7 @@ let operation_allocates = function
   | Ishiftarith (_, _)
   | Isignext _
   | Ibswap _
+  | Irotate _
   | Isimd _ -> false
   | Illvm_intrinsic _intr ->
       (* Used by the zero_alloc checker that runs before the Llvmize. *)

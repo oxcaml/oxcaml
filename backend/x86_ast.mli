@@ -168,6 +168,8 @@ type instruction =
   | SFENCE
   | MFENCE
   | RET
+  | ROL of arg * arg
+  | ROR of arg * arg
   | SAL of arg * arg
   | SAR of arg * arg
   | SET of condition * arg

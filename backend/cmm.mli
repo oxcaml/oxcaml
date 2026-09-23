@@ -271,6 +271,17 @@ type bswap_bitwidth =
   | Thirtytwo
   | Sixtyfour
 
+type rotate_direction =
+  | Rotate_left
+  | Rotate_right
+
+(** Rotations exist only at the widths for which the targets have rotate
+    instructions; rotations of narrower integers are expanded into shift/or
+    sequences by [Cmm_helpers.rotate]. *)
+type rotate_bitwidth =
+  | Rotate32
+  | Rotate64
+
 type initialization_or_assignment =
   | Initialization
   | Assignment
@@ -469,6 +480,14 @@ type operation =
   | Clsr
   | Casr
   | Cbswap of { bitwidth : bswap_bitwidth }
+  | Crotate of
+      { direction : rotate_direction;
+        bitwidth : rotate_bitwidth
+      }
+      (** Rotates the low [bitwidth] bits of the first argument by the second
+          argument (interpreted modulo [bitwidth]), in the given direction. Bits
+          of the first argument above [bitwidth] are ignored, and the result is
+          zero-extended from [bitwidth] bits. *)
   | Ccsel of machtype
   | Cclz
   | Cctz

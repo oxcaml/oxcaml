@@ -589,7 +589,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
        | Opaque
        | Begin_region
        | End_region
-       | Specific (Ilea _ | Ioffset_loc _ | Ibswap _
+       | Specific (Ilea _ | Ioffset_loc _ | Ibswap _ | Irotate _
                   | Isextend32 | Izextend32 | Ineg
                   | Ilfence | Isfence | Imfence)
        | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Pause)
@@ -750,6 +750,7 @@ let operation_supported = function
   | Cand | Cor | Cxor | Clsl | Clsr | Casr
   | Ccsel _
   | Cbswap _
+  | Crotate _
   | Cclz | Cctz
   | Ccmpi _ | Caddv | Cadda
   | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32

@@ -974,6 +974,34 @@ let bswap t (i : Cfg.basic Cfg.instruction) (bitwidth : Arch.bswap_bitwidth) =
   let zexted = do_zext bswapped in
   store_into_reg t i.res.(0) zexted
 
+(* Rotations become LLVM funnel shifts with both value inputs equal. *)
+let rotate t (i : Cfg.basic Cfg.instruction) (direction : Arch.rotate_direction)
+    (bitwidth : Arch.rotate_bitwidth) imm =
+  let typ = match bitwidth with Rotate32 -> T.i32 | Rotate64 -> T.i64 in
+  let do_trunc arg =
+    if T.equal typ (V.get_type arg)
+    then arg
+    else emit_ins t (I.convert Trunc ~arg ~to_:typ)
+  in
+  let do_zext arg =
+    if T.equal typ T.i64
+    then arg
+    else emit_ins t (I.convert Zext ~arg ~to_:T.i64)
+  in
+  let arg = do_trunc (load_reg_to_temp t i.arg.(0)) in
+  let count =
+    match imm with
+    | Some n -> V.of_int ~typ n
+    | None -> do_trunc (load_reg_to_temp t i.arg.(1))
+  in
+  let name =
+    match direction with Rotate_left -> "fshl." | Rotate_right -> "fshr."
+  in
+  let rotated =
+    call_llvm_intrinsic t (name ^ T.to_string typ) [arg; arg; count] typ
+  in
+  store_into_reg t i.res.(0) (do_zext rotated)
+
 (* CR yusumez: Make [Illvm_intrinsic] contain the LLVM intrinsic name and
    necessary types (as passed to [do_intrinsic_call]). This means
    [Cfg_selection] will be responsible for all the arch-specific handling, while
@@ -1024,6 +1052,7 @@ let intrinsic t (i : Cfg.basic Cfg.instruction) intrinsic_name =
 let specific t (i : Cfg.basic Cfg.instruction) (op : Arch.specific_operation) =
   match[@warning "-fragile-match"] op with
   | Ibswap { bitwidth } -> bswap t i bitwidth
+  | Irotate { direction; bitwidth; imm } -> rotate t i direction bitwidth imm
   | Illvm_intrinsic intrinsic_name -> intrinsic t i intrinsic_name
   | _ -> not_implemented_basic ~msg:"specific" i
 

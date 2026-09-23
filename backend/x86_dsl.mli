@@ -204,6 +204,10 @@ module I : sig
 
   val ret : unit -> unit
 
+  val rol : arg -> arg -> unit
+
+  val ror : arg -> arg -> unit
+
   val sal : arg -> arg -> unit
 
   val sar : arg -> arg -> unit

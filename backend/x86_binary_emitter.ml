@@ -1174,19 +1174,25 @@ let emit_div b dst =
   | _ -> assert false
 
 let emit_shift reg b dst src =
+  (* r/m64 forms unless the destination is a 32-bit register *)
+  let rex_always = match dst with Reg32 _ -> 0 | _ -> rexw in
   match (dst, src) with
   | ((Reg64 _ | Reg32 _ | Mem _) as rm), Imm 1L ->
-      emit_mod_rm_reg b rexw [ 0xD1 ] rm reg
+      emit_mod_rm_reg b rex_always [ 0xD1 ] rm reg
   | ((Reg64 _ | Reg32 _ | Mem _) as rm), Imm n ->
       assert (is_imm8L n);
-      emit_mod_rm_reg b rexw [ 0xC1 ] rm reg;
+      emit_mod_rm_reg b rex_always [ 0xC1 ] rm reg;
       buf_int8L b n
   | ((Reg64 _ | Reg32 _ | Mem _) as rm), Reg8L RCX ->
-      emit_mod_rm_reg b rexw [ 0xD3 ] rm reg
+      emit_mod_rm_reg b rex_always [ 0xD3 ] rm reg
   | _ ->
       Format.eprintf "emit_shift: src=%a dst=%a@." print_old_arg src
         print_old_arg dst;
       assert false
+
+let emit_ROL b dst src = emit_shift 0 b dst src
+
+let emit_ROR b dst src = emit_shift 1 b dst src
 
 let emit_SAL b dst src = emit_shift 4 b dst src
 
@@ -1564,6 +1570,8 @@ let assemble_instr b loc = function
   | SFENCE -> emit_sfence b
   | MFENCE -> emit_mfence b
   | RET -> emit_ret b
+  | ROL (src, dst) -> emit_ROL b dst src
+  | ROR (src, dst) -> emit_ROR b dst src
   | SAL (src, dst) -> emit_SAL b dst src
   | SAR (src, dst) -> emit_SAR b dst src
   | SHR (src, dst) -> emit_SHR b dst src
