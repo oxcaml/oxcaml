@@ -117,7 +117,8 @@ let make_startup_file linkenv unix ~ppf_dump ~sourcefile_for_dwarf genfns units
     if need_stdlib then begin
       compile_phrase (Cmm_helpers.globals_map globals_map);
       Obj.reachable_words (Obj.repr globals_map)
-    end else 0
+    end else 
+      -(Obj.reachable_words (Obj.repr globals_map))
   in
   compile_phrase
     (Cmm_helpers.data_segment_table (startup_comp_unit :: name_list));
