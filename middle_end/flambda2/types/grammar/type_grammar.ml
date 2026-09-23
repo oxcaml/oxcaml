@@ -3883,7 +3883,8 @@ module Row_like_for_blocks = struct
     in
     { known_tags = Tag.Map.map case tags; other_tags = Bottom; alloc_mode }
 
-  let create_multiple ~machine_width ~shape_and_field_tys_by_tag alloc_mode =
+  let create_exactly_multiple ~machine_width ~shape_and_field_tys_by_tag
+      alloc_mode =
     let known_tags =
       Tag.Map.map
         (Or_unknown.map ~f:(fun (shape, field_tys) ->
