@@ -511,6 +511,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
           Some Outval_record_boxed
       | Constructor_mixed shape, (Variant_boxed _ | Variant_extensible) ->
           outval_mixed_block_rep shape
+      | Constructor_immediate_all_void, _ -> Some Outval_record_boxed
       | (Constructor_undetermined | Constructor_variable _), _ ->
           Misc.fatal_error "variable constructor representation"
 
@@ -529,7 +530,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
             Option.map (fun l -> Constructor_variable l) (sorts_and_types ())
         | Constructor_variable _, _ ->
             Misc.fatal_error "variable constructor representation"
-        | (Constructor_uniform_value | Constructor_mixed _), _ ->
+        | (Constructor_uniform_value | Constructor_mixed _
+          | Constructor_immediate_all_void), _ ->
             Some shape
       in
       Option.bind shape (fun shape ->

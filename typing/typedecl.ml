@@ -131,7 +131,6 @@ type error =
       ; typ : type_expr
       ; err : Jkind.Violation.t
       }
-  | Jkind_empty_record
   | Non_representable_in_module of Env.t * Jkind.Violation.t * type_expr
   | Invalid_jkind_in_block of type_expr * Jkind.Sort.Const.t * jkind_sort_loc
   | Illegal_mixed_product of mixed_product_violation
@@ -164,7 +163,6 @@ type error =
   | Misplaced_flatten_floats
   | Recursive_jkind_definition of Path.t * Env.t * reaching_kind_path
   | Bad_represent_as_float_array_attribute
-  | Missing_immediate_all_void_constructor_attribute of string
 
 open Typedtree
 
@@ -1883,41 +1881,12 @@ let all_void_sort_option sort =
   | Some sort -> Jkind.Sort.Const.all_void sort
   | None -> false
 
-(* CR layouts v5: it wouldn't be too hard to support records that are all
-   void.  just needs a bit of refactoring in translcore *)
-let check_record_not_all_void_defaulting loc sorts =
-  if
-    List.for_all
-      (fun sort ->
-         Jkind.Sort.Const.maybe_all_void
-           (Jkind.Sort.default_for_transl_and_get sort))
-      sorts
-  then raise (Error (loc, Jkind_empty_record))
-
-(* Check a record's sorts to see if it is surely all-void, i.e. if all uses
-   of the record would cause [check_record_not_all_void_defaulting] to fire.
-   We still need that check, as this treats missing/variable sorts
-   conservatively, but this allows for errors on e.g. declarations. *)
-let eagerly_check_record_not_all_void loc sorts =
-  let field_is_void (sort : Jkind.Sort.t option) =
-    match sort with
-    | None -> false
-    | Some sort ->
-      (match Jkind.Sort.to_const_opt sort with
-       | Some const when Jkind.Sort.Const.is_concrete const ->
-         Jkind.Sort.Const.all_void const
-       | Some _ | None -> false)
-  in
-  if List.for_all field_is_void sorts then
-    raise (Error (loc, Jkind_empty_record))
-
 (* The [update_x_sorts] functions infer more precise jkinds in the type kind,
    including which fields of a record are void.  This would be hard to do during
    [transl_declaration] due to mutually recursive types.
 *)
 (* [update_label_sorts] additionally returns the jkinds of the labels *)
-let update_label_sorts (type rep) ?(allow_all_void = false) env loc types
-    ~(form : rep record_form) =
+let update_label_sorts env types =
   let sorts_and_jkinds =
     List.map (fun ld_type ->
       let jkind = Ctype.type_jkind env ld_type in
@@ -1940,18 +1909,13 @@ let update_label_sorts (type rep) ?(allow_all_void = false) env loc types
       sort, (ld_sort, jkind)
     ) types
   in
-  let live_sorts, sorts_and_jkinds = List.split sorts_and_jkinds in
+  let _, sorts_and_jkinds = List.split sorts_and_jkinds in
   let sorts, jkinds = List.split sorts_and_jkinds in
-  (match form with
-   | Legacy ->
-     if not allow_all_void then
-       eagerly_check_record_not_all_void loc live_sorts
-   | Unboxed_product -> ());
   sorts, jkinds
 
-let update_label_sorts_in_place env loc lbls ~form =
+let update_label_sorts_in_place env lbls =
   let types = List.map (fun lbl -> lbl.Types.ld_type) lbls in
-  let sorts, jkinds = update_label_sorts env loc types ~form in
+  let sorts, jkinds = update_label_sorts env types in
   let lbls =
     List.map2 (fun lbl sort -> { lbl with ld_sort = sort }) lbls sorts
   in
@@ -1962,7 +1926,7 @@ let update_label_sorts_in_place env loc lbls ~form =
    can be [immediate]. Also returns the jkinds and
    [match cd_args with | Cstr_tuple _ -> the sort of each argument
                        | Cstr_record -> the single sort value] *)
-let update_constructor_arguments_sorts env loc cd_args =
+let update_constructor_arguments_sorts env cd_args =
   match cd_args with
   | Types.Cstr_tuple args ->
     let args_and_jkinds =
@@ -1984,7 +1948,7 @@ let update_constructor_arguments_sorts env loc cd_args =
       |> Option.map Array.of_list
   | Types.Cstr_record lbls ->
     let lbls, jkinds =
-      update_label_sorts_in_place env loc lbls ~form:Legacy
+      update_label_sorts_in_place env lbls
     in
     Types.Cstr_record lbls, false, jkinds, Some [| Jkind.Sort.Const.scannable |]
 
@@ -2263,7 +2227,7 @@ let update_constructor_representation
 let update_constructor_representation env loc args
       ~is_extension_constructor =
   let args, constant, jkinds, arg_sorts =
-    update_constructor_arguments_sorts env loc args
+    update_constructor_arguments_sorts env args
   in
   let constructor_shape =
     update_constructor_representation env args jkinds ~loc
@@ -2344,10 +2308,8 @@ let compute_record_repr
   (* For other mixed blocks, float fields are stored as flat
       only when they're unboxed.
   *)
-  | ~values:true, ~voids:true, ..
-  | ~floats:true, ~voids:true, ..
+  | ~voids:true, ..
   | ~floats:true, ~float64s:true, ..
-  | ~float64s:true, ~voids:true, ..
   | ~values:true, ~float64s:true, ..
   | ~non_float64_unboxed_fields:true, .. ->
     mixed_record ()
@@ -2369,7 +2331,7 @@ let compute_record_repr
     Ok Record_boxed
   | ~values:false, ~floats:false, ~atomic_floats:false,
       ~float64s:false, ~non_float64_unboxed_fields:false,
-      ~voids:_, ~atomic_fields:_, ~first_any:None ->
+      ~voids:false, ~atomic_fields:_, ~first_any:None ->
     Misc.fatal_error "Typedecl.compute_record_repr: empty record"
 
 (* For tracking what types appear in record blocks. All product layouts
@@ -2474,7 +2436,7 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
       | _ -> false
     in
     let sorts, jkinds =
-      update_label_sorts ~allow_all_void:inherited_singleton env loc types ~form
+      update_label_sorts env types
     in
     let reprs, repr_summary = compute_repr_summary env lbls jkinds in
     let rep : (rep, _) Result.t =
@@ -2606,10 +2568,6 @@ let instance_record_representation
     List.map2 (fun sort (_lbl, ty) -> sort, ty) sorts lbls_and_types
     |> Array.of_list
   in
-  let add_delayed_all_void_check () =
-    !Env.add_delayed_check_forward (fun () ->
-      check_record_not_all_void_defaulting loc sorts)
-  in
   let rep : rep =
     match form, old_repres with
     | Legacy, Record_boxed_inherited ->
@@ -2618,7 +2576,6 @@ let instance_record_representation
        | _ ->
          Misc.fatal_error "inherited boxed record has multiple fields")
     | Legacy, Record_undetermined ->
-      add_delayed_all_void_check ();
       Record_variable (sorts_and_types ())
     | Legacy, Record_inlined (tag, Constructor_undetermined, vrep) ->
       (match vrep with
@@ -2627,7 +2584,6 @@ let instance_record_representation
             [Constructor_uniform_value], as at declaration time. *)
          Record_inlined (tag, Constructor_uniform_value, Variant_unboxed)
        | Variant_boxed _ ->
-         add_delayed_all_void_check ();
          Record_inlined
            (tag, Constructor_variable (sorts_and_types ()), vrep)
        | Variant_extensible | Variant_with_null ->
@@ -2696,7 +2652,8 @@ let finalize_instantiated_constructor env loc sorts_and_types kind
 let finalize_constructor_representation env loc
     (shape : Types.constructor_representation) =
   match shape with
-  | Constructor_uniform_value | Constructor_mixed _ -> shape
+  | Constructor_uniform_value | Constructor_mixed _
+  | Constructor_immediate_all_void -> shape
   | Constructor_variable sorts_and_types ->
       finalize_instantiated_constructor env loc sorts_and_types Cstr_tuple
   | Constructor_undetermined ->
@@ -2882,17 +2839,18 @@ let rec update_decl_jkind env dpath decl =
                 | Cstr_tuple (_ :: _) -> true
                 | Cstr_tuple [] | Cstr_record _ -> false)
           in
-          if is_nonempty_all_void
-          && not (Builtin_attributes.has_immediate_all_void_constructor
-                    cstr.Types.cd_attributes)
-          then
-            raise
-              (Error (cstr.Types.cd_loc,
-                      Missing_immediate_all_void_constructor_attribute
-                        (Ident.name cstr.Types.cd_id)));
+          let immediate_all_void =
+            is_nonempty_all_void
+            && Builtin_attributes.has_immediate_all_void_constructor
+                 cstr.Types.cd_attributes
+          in
           let () =
             match cstr_repr, arg_sorts with
             | Ok shape, Some sorts ->
+                let shape =
+                  if immediate_all_void then Constructor_immediate_all_void
+                  else shape
+                in
                 cstr_layouts.(idx) <- Cstr_layout_known { shape; sorts }
             | Ok _, None ->
                 Misc.fatal_error "Representation but no arg sorts?"
@@ -2910,6 +2868,7 @@ let rec update_decl_jkind env dpath decl =
           ~decl_params:decl.type_params
           ~type_apply:(Ctype.apply env)
           ~get_free_vars:(Ctype.free_variable_set_of_list env)
+          ~cstr_layouts
           (List.rev cstrs)
       in
       cstrs, Variant_boxed cstr_layouts, jkind
@@ -6076,8 +6035,6 @@ let report_error ~loc = function
       (Jkind.Violation.report_with_offender
          ~offender:(fun ppf -> Printtyp.type_expr ppf typ)
          env) err
-  | Jkind_empty_record ->
-    Location.errorf ~loc "Records must contain at least one runtime value."
   | Non_representable_in_module (env, err, ty) ->
     let offender ppf = fprintf ppf "type %a" Printtyp.type_expr ty in
     Location.errorf ~loc "The type of a module-level value must have a@ \
@@ -6278,12 +6235,6 @@ let report_error ~loc = function
       "%a can only be used on records whose fields \
        are all float64."
       Style.inline_code "[@@represent_as_float_array]"
-  | Missing_immediate_all_void_constructor_attribute name ->
-    Location.errorf ~loc
-      "All arguments of the constructor %a are void, so it must be@ \
-       annotated with %a."
-      Style.inline_code name
-      Style.inline_code "[@immediate_all_void_constructor]"
 
 let () =
   Location.register_error_of_exn

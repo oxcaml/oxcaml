@@ -131,6 +131,8 @@ let field_offset_for_label lbl repres =
       lbl.lbl_pos
   | Record_dummy _ ->
       fatal_error "field_offset_for_label: dummy record representation"
+  | Record_inlined (_, Constructor_immediate_all_void, _) ->
+      fatal_error "field_offset_for_label: immediate record representation"
   | Record_inlined
       (_, (Constructor_undetermined | Constructor_variable _), _)
   | (Record_undetermined | Record_variable _) ->
@@ -729,6 +731,9 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                     None
               | Constructor_uniform_value ->
                   Some (Const_block(runtime_tag, constants))
+              | Constructor_immediate_all_void ->
+                  fatal_error
+                    "transl_exp: non-constant immediate constructor"
               | (Constructor_undetermined | Constructor_variable _) ->
                   fatal_error
                     "transl_exp: variable constructor representation")
@@ -754,6 +759,9 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                        stored as immediates *)
                     let shape = Lambda.transl_mixed_product_shape shape in
                     Pmakeblock(runtime_tag, Immutable, Shape shape, alloc_mode)
+                | Constructor_immediate_all_void ->
+                    fatal_error
+                      "transl_exp: non-constant immediate constructor"
                 | (Constructor_undetermined | Constructor_variable _) ->
                     fatal_error
                       "transl_exp: variable constructor representation"
@@ -800,6 +808,9 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                     Array.append [| Lambda.Value Lambda.generic_value |] shape
                   in
                   Pmakeblock(0, Immutable, Shape shape, alloc_mode)
+              | Constructor_immediate_all_void ->
+                  fatal_error "Unexpected immediate representation in \
+                               extensible variant"
               | (Constructor_undetermined | Constructor_variable _) ->
                   fatal_error "Unexpected indeterminate representation in \
                                extensible variant"
@@ -868,6 +879,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
            rejected during typechecking. *)
         | Record_unboxed | Record_inlined
             (_, (Constructor_undetermined | Constructor_variable _), _)
+        | Record_inlined (_, Constructor_immediate_all_void, _)
         | Record_inlined (_, Constructor_mixed _, _) | Record_float
         | Record_ufloat | Record_mixed _ | Record_dummy _
         | Record_boxed_inherited | Record_boxed_inherited_variable _
@@ -972,6 +984,8 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         | Record_inlined (_, _, Variant_with_null) -> assert false
         | Record_boxed_inherited | Record_dummy _ ->
           fatal_error "transl_exp0: dummy record representation"
+        | Record_inlined (_, Constructor_immediate_all_void, _) ->
+          fatal_error "transl_exp0: immediate record representation"
         | Record_inlined
             (_, (Constructor_undetermined | Constructor_variable _), _)
         | (Record_undetermined | Record_variable _) ->
@@ -1059,6 +1073,8 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
           fatal_error "transl_exp0: unexpected unknown representation"
         | Record_boxed_inherited | Record_boxed_inherited_variable _ ->
           fatal_error "transl_exp0: mutable inherited record"
+        | Record_inlined (_, Constructor_immediate_all_void, _) ->
+          fatal_error "transl_exp0: unexpected immediate representation"
         | Record_unboxed | Record_inlined (_, _, Variant_unboxed) ->
           assert false
         | Record_float ->
@@ -2545,6 +2561,8 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             | Record_inlined (_, _, Variant_with_null) -> assert false
             | Record_dummy _ ->
               fatal_error "transl_record: unexpected dummy representation"
+            | Record_inlined (_, Constructor_immediate_all_void, _) ->
+              fatal_error "transl_record: unexpected immediate representation"
             | Record_inlined
                 (_, (Constructor_undetermined
                     | Constructor_variable _), _)
@@ -2642,6 +2660,9 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                  | Record_boxed_inherited | Record_dummy _ ->
                    fatal_error
                      "transl_record: unexpected dummy representation"
+                 | Record_inlined (_, Constructor_immediate_all_void, _) ->
+                   fatal_error
+                     "transl_record: unexpected immediate representation"
                  | Record_inlined
                      (_, (Constructor_undetermined
                          | Constructor_variable _), _)
@@ -2710,6 +2731,8 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             raise Not_constant
         | Record_boxed_inherited | Record_dummy _ ->
           fatal_error "transl_record: unexpected dummy representation"
+        | Record_inlined (_, Constructor_immediate_all_void, _) ->
+          fatal_error "transl_record: unexpected immediate representation"
         | Record_inlined
             (_, (Constructor_undetermined | Constructor_variable _), _)
         | (Record_undetermined | Record_variable _) ->
@@ -2770,6 +2793,8 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
         | Record_inlined (Null, _, _) -> assert false
         | Record_boxed_inherited | Record_dummy _ ->
           fatal_error "transl_record: unexpected dummy representation"
+        | Record_inlined (_, Constructor_immediate_all_void, _) ->
+          fatal_error "transl_record: unexpected immediate representation"
         | Record_inlined
             (_, (Constructor_undetermined | Constructor_variable _), _)
         | (Record_undetermined | Record_variable _) ->
