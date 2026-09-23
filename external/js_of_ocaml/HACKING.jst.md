@@ -24,8 +24,12 @@ builds only the ppxlib stack.
 
 Make refreshes the local `_install`. Set `OXCAML_INSTALL` to use an existing
 installation without modifying it. Its `bin` and `lib/ocaml` select the
-compiler, and an empty findlib configuration keeps host packages out. The Nix
-`jsoo` check builds the same targets but intentionally installs nothing.
+compiler, and an empty findlib configuration keeps host packages out.
+
+`make jsoo-install` (or `ppxlib-install`) installs the packages into
+`AST_DEPENDENT_LIBS_PREFIX` (default: `OXCAML_INSTALL`), as findlib packages
+under `lib/` and executables under `bin/`. The Nix `jsoo` and `ppxlib`
+packages are built this way.
 
 ## Test
 

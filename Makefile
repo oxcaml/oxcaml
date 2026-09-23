@@ -269,15 +269,19 @@ duneconf/ast-dependent-libs.ws duneconf/jsoo-test.ws: Makefile
 
 OXCAML_INSTALL ?= $(CURDIR)/_install
 
-# --ignore-promoted-rules: sedlex's unicode.ml generator downloads the Unicode
-# data; use the shipped file instead.
-ast_dependent_libs_dune = \
+ast_dependent_libs_env = \
   env -u OCAMLPATH \
     PATH="$(OXCAML_INSTALL)/bin:$(PATH)" \
     OCAMLLIB="$(OXCAML_INSTALL)/lib/ocaml" \
     OCAMLFIND_CONF=/dev/null \
-    DUNE_CACHE=disabled \
-  $(dune) build --ignore-promoted-rules
+    DUNE_CACHE=disabled
+
+# --ignore-promoted-rules: sedlex's unicode.ml generator downloads the Unicode
+# data; use the shipped file instead. The .install files are not promoted, as
+# some of the sources are read-only.
+ast_dependent_libs_dune = \
+  $(ast_dependent_libs_env) $(dune) build --ignore-promoted-rules \
+    --promote-install-files=false
 
 .PHONY: ast-dependent-libs-compiler
 # Refresh the local compiler, but never rebuild an externally supplied install.
@@ -355,6 +359,27 @@ ppxlib-build: ast-dependent-libs-compiler duneconf/ast-dependent-libs.ws $(PPXLI
 jsoo-build: ast-dependent-libs-compiler duneconf/ast-dependent-libs.ws \
   $(PPXLIB_DEPS) $(JSOO_DEPS)
 	$(ast_dependent_libs_dune) $(ws_ast_dependent_libs) @jsoo-libs
+
+# The packages built by the ppxlib-libs and jsoo-libs aliases.
+PPXLIB_PACKAGES = ocaml-compiler-libs ppx_derivers sexplib0 stdlib-shims \
+  ppxlib_ast ppxlib ppxlib_jane
+JSOO_PACKAGES = $(PPXLIB_PACKAGES) gen sedlex cmdliner menhirLib menhirSdk \
+  yojson js_of_ocaml-compiler wasm_of_ocaml-compiler js_of_ocaml-ppx \
+  js_of_ocaml
+
+AST_DEPENDENT_LIBS_PREFIX ?= $(OXCAML_INSTALL)
+
+ast_dependent_libs_install = \
+  $(ast_dependent_libs_env) $(dune) install $(ws_ast_dependent_libs) \
+    --prefix="$(AST_DEPENDENT_LIBS_PREFIX)" $(1)
+
+.PHONY: ppxlib-install
+ppxlib-install: ppxlib-build
+	$(call ast_dependent_libs_install,$(PPXLIB_PACKAGES))
+
+.PHONY: jsoo-install
+jsoo-install: jsoo-build
+	$(call ast_dependent_libs_install,$(JSOO_PACKAGES))
 
 .PHONY: jsoo-test
 jsoo-test: ast-dependent-libs-compiler duneconf/jsoo-test.ws \
