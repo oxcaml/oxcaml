@@ -376,19 +376,25 @@ let rec rewrite_kind_with_subkind context metadata kind =
     | Variant { consts; non_consts } ->
       let non_consts =
         Tag.Scannable.Map.map
-          (Option.map (fun (shape, kinds) ->
-               let kinds =
-                 List.mapi
-                   (fun i kind ->
-                     let field =
-                       Field.block i (Flambda_kind.With_subkind.kind kind)
-                     in
-                     rewrite_kind_with_subkind context
-                       (follow_field context metadata field)
-                       kind)
-                   kinds
-               in
-               shape, kinds))
+          (fun (shape :
+                 Flambda_kind.With_subkind.Non_null_value_subkind
+                 .constructor_shape) ->
+            match shape with
+            | Undetermined -> shape
+            | Determined (shape, kinds) ->
+              let kinds =
+                List.mapi
+                  (fun i kind ->
+                    let field =
+                      Field.block i (Flambda_kind.With_subkind.kind kind)
+                    in
+                    rewrite_kind_with_subkind context
+                      (follow_field context metadata field)
+                      kind)
+                  kinds
+              in
+              Flambda_kind.With_subkind.Non_null_value_subkind.Determined
+                (shape, kinds))
           non_consts
       in
       Flambda_kind.With_subkind.create Flambda_kind.value

@@ -617,7 +617,16 @@ let kind_with_subkind =
             fun _ num_fields -> Float_block { num_fields } )
         in
         let| variant =
-          let item = option (param2 block_shape (list full_kind)) in
+          let item =
+            maps
+              (option (param2 block_shape (list full_kind)))
+              ~from:(fun _ -> function
+                | None -> Undetermined
+                | Some (shape, fields) -> Determined (shape, fields))
+              ~to_:(fun _ -> function
+                | Undetermined -> None
+                | Determined (shape, fields) -> Some (shape, fields))
+          in
           let map_bind = positional (param2 scannable_tag item) in
           let tag_map =
             maps (list map_bind)

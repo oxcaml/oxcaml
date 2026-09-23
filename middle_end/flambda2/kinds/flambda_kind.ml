@@ -604,8 +604,7 @@ module With_subkind = struct
       | Tagged_immediate
       | Variant of
           { consts : Target_ocaml_int.Set.t;
-            non_consts :
-              (Block_shape.t * full_kind list) option Tag.Scannable.Map.t
+            non_consts : constructor_shape Tag.Scannable.Map.t
           }
       | Float_block of { num_fields : int }
       | Float_array
@@ -626,6 +625,10 @@ module With_subkind = struct
       | Unboxed_product_array
     (* CR mshinwell: more information could be added to
        [Unboxed_product_array] *)
+
+    and constructor_shape =
+      | Undetermined
+      | Determined of Block_shape.t * full_kind list
 
     (* CR vlaviron: only [Value] kinds need [value_subkind] and [nullable]
        fields. We should switch this to a variant in the future to avoid
@@ -682,9 +685,13 @@ module With_subkind = struct
             List.for_all2
               (fun fields1 fields2 ->
                 match fields1, fields2 with
-                | _, None -> true
-                | None, Some _ -> false
-                | Some (shape1, fields1), Some (shape2, fields2) ->
+                | Undetermined, Undetermined -> true
+                | Determined _, Undetermined ->
+                  (* A determined shape can be used where no shape is
+                     required. *)
+                  true
+                | Undetermined, Determined _ -> false
+                | Determined (shape1, fields1), Determined (shape2, fields2) ->
                   if not (Block_shape.equal shape1 shape2)
                   then false
                   else if List.compare_lengths fields1 fields2 <> 0
@@ -794,8 +801,8 @@ module With_subkind = struct
             colour Target_ocaml_int.Set.print consts
             (Tag.Scannable.Map.print (fun ppf fields ->
                  match fields with
-                 | None -> Format.pp_print_string ppf "?"
-                 | Some (_shape, fields) ->
+                 | Undetermined -> Format.pp_print_string ppf "?"
+                 | Determined (_shape, fields) ->
                    Format.fprintf ppf "[%a]"
                      (Format.pp_print_list ~pp_sep:Format.pp_print_space
                         print_field)
@@ -981,7 +988,8 @@ module With_subkind = struct
            { consts = Target_ocaml_int.Set.empty;
              non_consts =
                Tag.Scannable.Map.singleton tag
-                 (Some (Block_shape.Scannable Value_only, fields))
+                 (Non_null_value_subkind.Determined
+                    (Block_shape.Scannable Value_only, fields))
            })
         Non_nullable
     | None -> Misc.fatal_errorf "Tag %a is not scannable" Tag.print tag
@@ -1068,13 +1076,14 @@ module With_subkind = struct
               (fun non_consts (tag, shape) ->
                 match Tag.Scannable.create tag with
                 | Some tag ->
-                  let shape_and_fields : (Block_shape.t * t list) option =
+                  let shape_and_fields :
+                      Non_null_value_subkind.constructor_shape =
                     (* CR mshinwell/vlaviron: In both of these cases it would be
                        nice to propagate immediacy information. *)
                     match (shape : Lambda.constructor_shape) with
-                    | Constructor_shape_undetermined -> None
+                    | Constructor_shape_undetermined -> Undetermined
                     | Constructor_shape_uniform fields ->
-                      Some
+                      Determined
                         ( Scannable Value_only,
                           List.map
                             (from_lambda_value_kind ~machine_width)
@@ -1120,7 +1129,7 @@ module With_subkind = struct
                           (Scannable_block_shape.from_mixed_block_shape
                              mixed_block_shape)
                       in
-                      Some (block_shape, fields)
+                      Determined (block_shape, fields)
                   in
                   Tag.Scannable.Map.add tag shape_and_fields non_consts
                 | None ->
