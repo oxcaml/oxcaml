@@ -257,7 +257,7 @@ type ('a [@rec]) contravariant_rec = { foo : 'a -> unit; }
 type recursive_contravariant = recursive_contravariant contravariant_rec
 |}]
 
-(* Custom list type that is contractive *)
+(* List type with contractive parameter *)
 type ('a [@rec]) my_list =
   | MyNil
   | MyCons of 'a * 'a my_list;;
