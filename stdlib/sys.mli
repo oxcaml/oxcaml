@@ -37,17 +37,20 @@ val executable_name : string
     on the platform and whether the program was compiled to bytecode or a native
     executable. *)
 
-external file_exists : string -> bool = "caml_sys_file_exists"
+external file_exists : string -> bool @@ reading portable
+  = "caml_sys_file_exists"
 (** Test if a file with the given name exists. *)
 
-external is_directory : string -> bool = "caml_sys_is_directory"
+external is_directory : string -> bool @@ reading portable
+  = "caml_sys_is_directory"
 (** Returns [true] if the given name refers to a directory,
     [false] if it refers to another kind of file.
     @raise Sys_error if no file exists with the given name.
     @since 3.10
 *)
 
-external is_regular_file : string -> bool = "caml_sys_is_regular_file"
+external is_regular_file : string -> bool @@ reading portable
+  = "caml_sys_is_regular_file"
 (** Returns [true] if the given name refers to a regular file,
     [false] if it refers to another kind of file.
     @raise Sys_error if no file exists with the given name.
@@ -68,7 +71,7 @@ external rename : string -> string -> unit = "caml_sys_rename"
     those of [oldpath].
    @since 4.06 concerning the "replace existing file" behavior *)
 
-external getenv : string -> string = "caml_sys_getenv"
+external getenv : string -> string @@ reading portable = "caml_sys_getenv"
 (** Return the value associated to a variable in the process
    environment.
    @raise Not_found if the variable is unbound. *)
@@ -99,7 +102,7 @@ external command : string -> int = "caml_sys_system_command"
   given a command name, a list of arguments, and optional file redirections.
 *)
 
-external time : unit -> (float [@unboxed]) =
+external time : unit -> (float [@unboxed]) @@ reading portable =
   "caml_sys_time" "caml_sys_time_unboxed" [@@noalloc]
 (** Return the processor time, in seconds, used by the program
    since the beginning of execution. *)
@@ -119,10 +122,11 @@ external rmdir : string -> unit = "caml_sys_rmdir"
     @since 4.12
 *)
 
-external getcwd : unit -> string = "caml_sys_getcwd"
+external getcwd : unit -> string @@ reading portable = "caml_sys_getcwd"
 (** Return the current working directory of the process. *)
 
-external readdir : string -> string array = "caml_sys_read_directory"
+external readdir : string -> string array @@ reading portable
+  = "caml_sys_read_directory"
 (** Return the names of all files present in the given directory.
    Names denoting the current directory and the parent directory
    (["."] and [".."] in Unix) are not returned.  Each string in the
@@ -253,13 +257,14 @@ val max_unboxed_vec256_array_length : int
 (** Maximum length of an unboxed 256-bit simd vector array.
     Only supported in 64-bit native code. *)
 
-external runtime_variant : unit -> string = "caml_runtime_variant"
+external runtime_variant : unit -> string @@ stateless = "caml_runtime_variant"
 (** Return the name of the runtime variant the program is running on.
     This is normally the argument given to [-runtime-variant] at compile
     time, but for byte-code it can be changed after compilation.
     @since 4.03 *)
 
-external runtime_parameters : unit -> string = "caml_runtime_parameters"
+external runtime_parameters : unit -> string @@ reading portable
+  = "caml_runtime_parameters"
 (** Return the value of the runtime parameters, in the same format
     as the contents of the [OCAMLRUNPARAM] environment variable.
     @since 4.03 *)
@@ -528,7 +533,8 @@ val runtime_warnings_enabled: unit -> bool
 (** {1 Optimization} *)
 
 external[@layout_poly] opaque_identity :
-  ('a : any). ('a[@local_opt]) -> ('a[@local_opt]) = "%opaque"
+  ('a : any). ('a[@local_opt]) -> ('a[@local_opt]) @@ stateless
+  = "%opaque"
 (** For the purposes of optimization, [opaque_identity] behaves like an
     unknown (and thus possibly side-effecting) function.
 

@@ -552,13 +552,13 @@ let token_float ib = float_of_string (Scanning.token ib)
    since those modules are not available to [Scanf].
    However, we can bind and use the corresponding primitives that are
    available in the runtime. *)
-external nativeint_of_string : string -> nativeint @@ portable
+external nativeint_of_string : string -> nativeint @@ stateless
   = "caml_nativeint_of_string"
 
-external int32_of_string : string -> int32 @@ portable
+external int32_of_string : string -> int32 @@ stateless
   = "caml_int32_of_string"
 
-external int64_of_string : string -> int64 @@ portable
+external int64_of_string : string -> int64 @@ stateless
   = "caml_int64_of_string"
 
 
