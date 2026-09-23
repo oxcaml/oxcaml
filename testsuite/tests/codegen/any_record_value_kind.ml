@@ -68,8 +68,7 @@ let tuple_join_is_int : type a. a tuple_repr * a -> bool = function
   | Three, x -> is_int x
 [%%expect_asm X86_64{|
 tuple_join_is_int:
-  andl  $1, %ebx
-  leaq  1(%rbx,%rbx), %rax
+  movl  $1, %eax
   ret
 |}]
 
@@ -80,8 +79,7 @@ let record_join_is_int : type (a : any). a repr * a t -> bool = function
   | Float, x -> is_int x
 [%%expect_asm X86_64{|
 record_join_is_int:
-  andl  $1, %ebx
-  leaq  1(%rbx,%rbx), %rax
+  movl  $1, %eax
   ret
 |}]
 
@@ -96,8 +94,7 @@ let mixed_join_is_int : type a. a mixed_repr * a -> bool = function
   | Int64, x -> is_int x
 [%%expect_asm X86_64{|
 mixed_join_is_int:
-  andl  $1, %ebx
-  leaq  1(%rbx,%rbx), %rax
+  movl  $1, %eax
   ret
 |}]
 
