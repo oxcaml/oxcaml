@@ -13,6 +13,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
+
 type 'a with_name =
   { value : 'a;
     name : string

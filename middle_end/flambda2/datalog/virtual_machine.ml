@@ -13,6 +13,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
 open Datalog_imports
 
 type outcome =
@@ -64,6 +65,40 @@ struct
         * string
         * string list
         -> ('a, 's) instruction
+
+  (* Prepared instructions have the same shape, except that [Open] carries a
+     reusable loop-body continuation. Stack frames are still allocated at run
+     time, and the continuation receives the current stack on each call. *)
+  module Prepared_instruction = struct
+    type ('a, 's) t =
+      | Advance : ('a, 's) t
+      | Up : ('x, 's) t -> ('x, 'a -> 's) t
+      | Dispatch : ('a, 'b -> 's) t
+      | Seek :
+          'b Channel.or_null_receiver
+          * 'b Iterator.t
+          * ('a, 's) t
+          * string
+          * string
+          -> ('a, 's) t
+      | Open :
+          'b Iterator.t
+          * 'b Channel.or_null_sender
+          * ('b -> 's) continuation
+          * ('a, 'b -> 's) t
+          * string
+          * string
+          -> ('a, 's) t
+      | Action : 'a * ('a, 's) t -> ('a, 's) t
+      | Call :
+          ('c -> 'b Constant.hlist -> unit)
+          * 'c
+          * 'b Or_null_receiver.hlist
+          * ('a, 's) t
+          * string
+          * string list
+          -> ('a, 's) t
+  end
 
   let pp_instruction pp_act ff instr =
     let pp_initiator ppf depth =
@@ -146,8 +181,9 @@ struct
   type t = nil continuation
 
   let[@inline] execute (type a) ~(evaluate : a -> outcome) instruction =
-    let rec execute : type s. (a, s) instruction -> s continuation =
+    let rec execute : type s. (a, s) Prepared_instruction.t -> s continuation =
      fun instruction stack ->
+      let open! Prepared_instruction in
       match instruction with
       | Advance -> advance stack
       | Up k ->
@@ -155,7 +191,7 @@ struct
         execute k stack
       | Open (iterator, cell, for_each, k, _iterator_name, _cell_name) ->
         Iterator.init iterator;
-        execute k (Stack_cons (iterator, cell, execute for_each, stack))
+        execute k (Stack_cons (iterator, cell, for_each, stack))
       | Seek (key_ref, iterator, k, _key_ref_name, _iterator_name) -> (
         match Channel.recv_or_null key_ref with
         | Null -> Misc.fatal_error "datalog: seek key must be bound"
@@ -176,9 +212,25 @@ struct
         f ctx (Or_null_receiver.recv_hlist rs);
         execute k stack
     in
-    execute instruction
+    let rec prepare : type s.
+        (a, s) instruction -> (a, s) Prepared_instruction.t = function
+      | Advance -> Prepared_instruction.Advance
+      | Up k -> Prepared_instruction.Up (prepare k)
+      | Dispatch -> Prepared_instruction.Dispatch
+      | Seek (key_ref, iterator, k, key_ref_name, iterator_name) ->
+        Prepared_instruction.Seek
+          (key_ref, iterator, prepare k, key_ref_name, iterator_name)
+      | Open (iterator, cell, for_each, k, iterator_name, cell_name) ->
+        let for_each = execute (prepare for_each) in
+        Prepared_instruction.Open
+          (iterator, cell, for_each, prepare k, iterator_name, cell_name)
+      | Action (op, k) -> Prepared_instruction.Action (op, prepare k)
+      | Call (f, ctx, rs, k, name, names) ->
+        Prepared_instruction.Call (f, ctx, rs, prepare k, name, names)
+    in
+    execute (prepare instruction)
 
-  let create ~evaluate (instruction : (_, _) instruction) =
+  let[@inline always] create ~evaluate (instruction : (_, _) instruction) =
     execute ~evaluate instruction
 
   let run continuation = continuation Stack_nil
@@ -198,3 +250,4 @@ struct
 
   let call f ~name ~context y k = Call (f, context, y.values, k, name, y.names)
 end
+[@@inline always]

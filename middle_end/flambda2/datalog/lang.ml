@@ -26,6 +26,7 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
+open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
 open Datalog_imports
 
 type 'a variable =
@@ -41,7 +42,7 @@ module Variable = struct
 
     let equal = Int.equal
 
-    let hash : int -> int = Hashtbl.hash
+    let hash = Numbers.Int.hash
 
     module Tree = Patricia_tree.Make (Numbers.Int)
     module Set = Tree.Set

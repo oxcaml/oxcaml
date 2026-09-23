@@ -13,6 +13,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
 open Datalog_imports
 
 (* Note: we don't use [with_name] here to avoid the extra indirection during

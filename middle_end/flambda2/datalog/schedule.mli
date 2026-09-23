@@ -13,6 +13,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
+
 type stats
 
 val create_stats : ?with_provenance:bool -> Table.Map.t -> stats

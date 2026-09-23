@@ -166,8 +166,8 @@ val cannot_change_calling_convention :
   analysis_scope:Analysis_scope.t -> result -> Code_id.t -> bool
 
 val perform_analysis :
+  ?stats:Datalog.Schedule.stats ->
   Datalog.database ->
-  stats:Datalog.Schedule.stats ->
   analysis_scope:Analysis_scope.t ->
   result
 

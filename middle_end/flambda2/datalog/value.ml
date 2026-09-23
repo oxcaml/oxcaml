@@ -27,8 +27,11 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
+open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
+
 type _ repr =
   | Int_repr : { print : Format.formatter -> int -> unit } -> int repr
+[@@unboxed]
 
 include Heterogenous_list.Make (struct
   type 'a t = 'a repr

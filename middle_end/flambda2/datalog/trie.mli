@@ -13,6 +13,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
 open Heterogenous_list
 
 (** [('t, 'k, 'v) is_trie] is a witness that the type ['t] is a trie from keys

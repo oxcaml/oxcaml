@@ -1019,15 +1019,15 @@ let post_processing_rules ~analysis_scope =
 
 let has_source_query db x = has_source_query [x] db
 
-let perform_analysis db ~stats ~analysis_scope =
+let perform_analysis ?stats db ~analysis_scope =
   let db =
     Profile.record_call ~accumulate:true "analysis" (fun () ->
-        Datalog.Schedule.run ~stats (datalog_schedule ~analysis_scope) db)
+        Datalog.Schedule.run ?stats (datalog_schedule ~analysis_scope) db)
   in
   let db =
     Profile.record_call ~accumulate:true "compute_field_usages" (fun () ->
         List.fold_left
-          (fun db rule -> Datalog.Schedule.run ~stats rule db)
+          (fun db rule -> Datalog.Schedule.run ?stats rule db)
           db
           (post_processing_rules ~analysis_scope))
   in

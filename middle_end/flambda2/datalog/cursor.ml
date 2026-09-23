@@ -13,6 +13,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
 open Datalog_imports
 
 type binder =
@@ -201,6 +202,7 @@ module From_plan = struct
   let rec build_stages : type s.
       Env.t -> (_, _) Planner.plan -> int -> s Executor.builder =
    fun env plan index ->
+    (* [index] starts at zero and only increases by one. *)
     if index >= Iarray.length plan.input_stages
     then
       Iarray.fold_right
@@ -214,7 +216,7 @@ module From_plan = struct
         plan.output_atoms
         (Executor.break plan.num_existentials)
     else
-      match Iarray.get plan.input_stages index with
+      match Iarray.unsafe_get plan.input_stages index with
       | Join_stage (var, columns) ->
         let env, iterators = join_iterators env columns in
         let repr = value_repr_for_join columns in

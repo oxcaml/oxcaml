@@ -13,6 +13,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
+
 module String = struct
   include String
 
@@ -59,7 +61,7 @@ type (_, _) terminator =
       -> ('p, ('p, 'v) Cursor.With_parameters.t) terminator
   | Map : ('p, 'a) terminator * ('a -> 'b) -> ('p, 'b) terminator
 
-type levels = Levels : 'a Variable.hlist -> levels
+type levels = Levels : 'a Variable.hlist -> levels [@@unboxed]
 
 let rec prepend_vars : type a. a Variable.hlist -> levels -> levels =
  fun vars levels ->
