@@ -32,6 +32,10 @@ external logxor : (int32[@local_opt]) -> (int32[@local_opt]) -> (int32[@local_op
 external shift_left : (int32[@local_opt]) -> int -> (int32[@local_opt]) @@ portable = "%int32_lsl"
 external shift_right : (int32[@local_opt]) -> int -> (int32[@local_opt]) @@ portable = "%int32_asr"
 external shift_right_logical : (int32[@local_opt]) -> int -> (int32[@local_opt]) @@ portable = "%int32_lsr"
+external rotate_left : (int32[@local_opt]) -> int -> (int32[@local_opt])
+  @@ portable = "%int32_rotl"
+external rotate_right : (int32[@local_opt]) -> int -> (int32[@local_opt])
+  @@ portable = "%int32_rotr"
 external of_int : int -> (int32[@local_opt]) @@ portable = "%int32_of_int"
 external to_int : (int32[@local_opt]) -> int @@ portable = "%int32_to_int"
 external of_float : float -> int32 @@ portable

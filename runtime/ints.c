@@ -382,6 +382,22 @@ CAMLprim value caml_int32_shift_right(value v1, value v2)
 CAMLprim value caml_int32_shift_right_unsigned(value v1, value v2)
 { return caml_copy_int32((uint32_t)Int32_val(v1) >> Int_val(v2)); }
 
+/* The rotation count is reduced mod 32; "(32 - rot) & 31" avoids an
+   undefined shift by 32 when rot is 0. */
+CAMLprim value caml_int32_rotate_left(value v1, value v2)
+{
+  uint32_t x = (uint32_t) Int32_val(v1);
+  uintnat rot = (uintnat) Int_val(v2) & 31;
+  return caml_copy_int32((int32_t) ((x << rot) | (x >> ((32 - rot) & 31))));
+}
+
+CAMLprim value caml_int32_rotate_right(value v1, value v2)
+{
+  uint32_t x = (uint32_t) Int32_val(v1);
+  uintnat rot = (uintnat) Int_val(v2) & 31;
+  return caml_copy_int32((int32_t) ((x >> rot) | (x << ((32 - rot) & 31))));
+}
+
 static int32_t caml_swap32(int32_t x)
 {
   return (((x & 0x000000FF) << 24) |
@@ -610,6 +626,20 @@ CAMLprim value caml_int64_shift_right(value v1, value v2)
 
 CAMLprim value caml_int64_shift_right_unsigned(value v1, value v2)
 { return caml_copy_int64((uint64_t) (Int64_val(v1)) >>  Int_val(v2)); }
+
+CAMLprim value caml_int64_rotate_left(value v1, value v2)
+{
+  uint64_t x = (uint64_t) Int64_val(v1);
+  uintnat rot = (uintnat) Int_val(v2) & 63;
+  return caml_copy_int64((int64_t) ((x << rot) | (x >> ((64 - rot) & 63))));
+}
+
+CAMLprim value caml_int64_rotate_right(value v1, value v2)
+{
+  uint64_t x = (uint64_t) Int64_val(v1);
+  uintnat rot = (uintnat) Int_val(v2) & 63;
+  return caml_copy_int64((int64_t) ((x >> rot) | (x << ((64 - rot) & 63))));
+}
 
 #ifdef ARCH_SIXTYFOUR
 static value caml_swap64(value x)
@@ -910,6 +940,26 @@ CAMLprim value caml_nativeint_shift_right(value v1, value v2)
 
 CAMLprim value caml_nativeint_shift_right_unsigned(value v1, value v2)
 { return caml_copy_nativeint((uintnat)Nativeint_val(v1) >> Int_val(v2)); }
+
+#define Nativeint_bits (8 * sizeof(value))
+
+CAMLprim value caml_nativeint_rotate_left(value v1, value v2)
+{
+  uintnat x = (uintnat) Nativeint_val(v1);
+  uintnat rot = (uintnat) Int_val(v2) & (Nativeint_bits - 1);
+  return caml_copy_nativeint
+    ((intnat) ((x << rot) | (x >> ((Nativeint_bits - rot)
+                                   & (Nativeint_bits - 1)))));
+}
+
+CAMLprim value caml_nativeint_rotate_right(value v1, value v2)
+{
+  uintnat x = (uintnat) Nativeint_val(v1);
+  uintnat rot = (uintnat) Int_val(v2) & (Nativeint_bits - 1);
+  return caml_copy_nativeint
+    ((intnat) ((x >> rot) | (x << ((Nativeint_bits - rot)
+                                   & (Nativeint_bits - 1)))));
+}
 
 value caml_nativeint_direct_bswap(value v)
 {

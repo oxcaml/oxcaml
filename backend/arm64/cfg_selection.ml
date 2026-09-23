@@ -230,6 +230,32 @@ let select_operation' ~generic_select_condition:_ (op : Cmm.operation)
   | Cbswap { bitwidth } ->
     let bitwidth = select_bitwidth bitwidth in
     Rewritten (specific (Ibswap { bitwidth }), args)
+  (* Rotations *)
+  | Crotate { direction; bitwidth } -> (
+    let direction : Arch.rotate_direction =
+      match direction with
+      | Rotate_left -> Rotate_left
+      | Rotate_right -> Rotate_right
+    in
+    let bitwidth : Arch.rotate_bitwidth =
+      match bitwidth with Rotate32 -> Rotate32 | Rotate64 -> Rotate64
+    in
+    match[@ocaml.warning "-fragile-match"] args with
+    | [arg; Cconst_int (count, _)] ->
+      let count = count land (Arch.int_of_rotate_bitwidth bitwidth - 1) in
+      Rewritten
+        (specific (Irotate { direction; bitwidth; imm = Some count }), [arg])
+    | [arg; count] -> (
+      match direction with
+      | Rotate_right ->
+        Rewritten (specific (Irotate { direction; bitwidth; imm = None }), args)
+      | Rotate_left ->
+        (* There is no rotate-left instruction: rotate right by the negated
+           count, which the instruction takes modulo the bit width. *)
+        Rewritten
+          ( specific (Irotate { direction = Rotate_right; bitwidth; imm = None }),
+            [arg; Cop (Csubi, [Cconst_int (0, dbg); count], dbg)] ))
+    | _ -> Use_default)
   (* Other operations are regular *)
   | Cload { memory_chunk = _; mutability = _; is_atomic = false }
   | Cnegf Float32
@@ -301,7 +327,7 @@ let pseudoregs_for_operation op arg res =
       | Imulsubf | Inegmulsubf | Isqrtf | Imove32 | Ifar_alloc _
       | Ifar_stackcheck _
       | Ishiftarith (_, _)
-      | Ibswap _ | Isignext _ )
+      | Ibswap _ | Irotate _ | Isignext _ )
   | Move | Spill | Reload | Pause | Begin_region | End_region | Dls_get
   | Tls_get | Domain_index | Poll | Const_int _ | Const_float32 _
   | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _

@@ -1264,11 +1264,35 @@ and comp_binary_scalar_intrinsic : type a.
   | Shift (size, op, Int) -> (
     match Scalar.Integral.width size with
     | Taggable taggable -> (
+      let rotate ~left =
+        (* Rotation of the low [bits] bits of [x] by [y]; as with shifts, the
+           result is unspecified unless [0 <= y < bits]. *)
+        let x_id = Ident.create_local "rotate_x" in
+        let y_id = Ident.create_local "rotate_count" in
+        let xv = Blambda.Var x_id in
+        let yv = Blambda.Var y_id in
+        let bits =
+          match taggable with
+          | Int8 -> tagged_immediate 8
+          | Int16 -> tagged_immediate 16
+          | Int -> Prim (caml_sys_const Int_size, [unit])
+        in
+        let complement = Prim (Subint, [bits; yv]) in
+        let lsl_by count = Prim (Lslint, [xv; count]) in
+        let lsr_by count = Prim (Lsrint, [zero_extend taggable xv; count]) in
+        let hi, lo =
+          if left
+          then lsl_by yv, lsr_by complement
+          else lsl_by complement, lsr_by yv
+        in
+        lets [x_id, x; y_id, y] (sign_extend taggable (Prim (Orint, [hi; lo])))
+      in
       match op with
       | Asr -> prim Asrint
       | Lsl -> sign_extend taggable (prim Lslint)
       | Lsr -> sign_extend taggable (Prim (Lsrint, [zero_extend taggable x; y]))
-      )
+      | Rol -> rotate ~left:true
+      | Ror -> rotate ~left:false)
     | Boxable
         (( Int32 Any_locality_mode
          | Nativeint Any_locality_mode
@@ -1277,7 +1301,9 @@ and comp_binary_scalar_intrinsic : type a.
       match op with
       | Lsl -> ccall "caml_%s_shift_left" size
       | Lsr -> ccall "caml_%s_shift_right_unsigned" size
-      | Asr -> ccall "caml_%s_shift_right" size))
+      | Asr -> ccall "caml_%s_shift_right" size
+      | Rol -> ccall "caml_%s_rotate_left" size
+      | Ror -> ccall "caml_%s_rotate_right" size))
   | Icmp (size, cmp) -> (
     match Scalar.Integral.width size with
     | Taggable (Int | Int8 | Int16) ->
