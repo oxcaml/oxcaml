@@ -4,7 +4,7 @@ behind a CLI wrapper) rather than run directly.
 
   $ echo 'let () = print_string "ok\n"' > prog.ml
   $ ocamlc prog.ml -o prog.bc
-  $ wasm_of_ocaml prog.bc -o prog.js
+  $ dune exec -- wasm_of_ocaml prog.bc -o prog.js
 
 Run directly:
 

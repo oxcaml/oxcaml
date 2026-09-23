@@ -3,7 +3,7 @@
 
   $ ocamlc test.ml -o test.bc
 
-  $ js_of_ocaml test.bc -o test.js
+  $ dune exec -- js_of_ocaml test.bc -o test.js
 
   $ node test.js
   test
