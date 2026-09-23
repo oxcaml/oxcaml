@@ -355,7 +355,7 @@ static void restore_runtime_state(caml_thread_t th)
     (&Caml_state->tls_state, th->tls_state);
   caml_modify_generational_global_root
     (&Caml_state->backtrace_last_exn, th->backtrace_last_exn);
-  Caml_state->preemption = Val_long(th->preemption_scheduled);
+  Caml_state->preemption = th->preemption_scheduled ? Val_long(1) : Val_long(0);
 #ifndef NATIVE_CODE
   Caml_state->trap_sp_off = th->trap_sp_off;
   Caml_state->trap_barrier_off = th->trap_barrier_off;
@@ -670,7 +670,7 @@ static void caml_thread_domain_initialize_hook(void)
   new_thread->dynamic = Caml_state->dynamic_bindings;
   CAMLassert(new_thread->dynamic);
   new_thread->is_main = 1;
-  new_thread->preemption_scheduled = true;
+  new_thread->preemption_scheduled = false;
   new_thread->signal_stack = NULL;
 
   This_thread = new_thread;
