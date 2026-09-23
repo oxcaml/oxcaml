@@ -109,6 +109,7 @@ end
 (**** Type level management ****)
 
 let generic_level = Mode.With_locality.generic_level
+let subject_level = generic_level - 1
 let lowest_level = Ident.lowest_scope
 
 (**** leveled type pool ****)

@@ -51,7 +51,7 @@ module Sort = struct
      treated as flexible, but have special treatment in e.g. [instance]. *)
   let generic_level = Ident.highest_scope
 
-  (* Same as [Ctype.subject_level]. Rigid, so if [v.level = subject_level],
+  (* Same as [Btype.subject_level]. Rigid, so if [v.level = subject_level],
      then [v.contents] is always [None]. *)
   let subject_level = generic_level - 1
 
