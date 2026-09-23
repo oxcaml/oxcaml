@@ -20,8 +20,36 @@ let usage = "Usage: ocamlopt <options> <files>\nOptions are:"
 module Options = Oxcaml_args.Make_optcomp_options
         (Oxcaml_args.Default.Optmain)
 
+(* The compiler is a short-lived program with a high allocation rate, for
+   which the runtime's default major GC pacing (a space overhead of 80) spends
+   more time collecting than the memory it saves is worth. Measured on the
+   compilation of the larger stdlib modules, 140 takes 5-7% off the compiler's
+   CPU time for a peak heap some 5-20 MB larger. An explicit setting in
+   OCAMLRUNPARAM (or in CAMLRUNPARAM, which the runtime only reads when
+   OCAMLRUNPARAM is unset) takes precedence, as it does for any program. *)
+let default_space_overhead = 140
+
+let set_default_space_overhead () =
+  let runparam =
+    match Sys.getenv_opt "OCAMLRUNPARAM" with
+    | Some _ as params -> params
+    | None -> Sys.getenv_opt "CAMLRUNPARAM"
+  in
+  let sets_space_overhead params =
+    (* The runtime identifies each setting by its first character; see
+       [parse_ocamlrunparam] in runtime/startup_aux.c. *)
+    List.exists
+      (fun setting -> String.length setting > 0 && setting.[0] = 'o')
+      (String.split_on_char ',' params)
+  in
+  match runparam with
+  | Some params when sets_space_overhead params -> ()
+  | Some _ | None ->
+    Gc.set { (Gc.get ()) with space_overhead = default_space_overhead }
+
 let main unix argv ppf ~flambda2 ~reaped_flambda2_to_cmm ~reaper_lto_solve =
   native_code := true;
+  set_default_space_overhead ();
   let columns =
     match Sys.getenv "COLUMNS" with
     | exception Not_found -> None
