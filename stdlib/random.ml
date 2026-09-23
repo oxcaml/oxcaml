@@ -29,7 +29,7 @@ module State = struct
 
   type t = (int64, int64_elt, c_layout) Array1.t
 
-  external next: t @ local -> (int64[@unboxed]) @@ portable
+  external next: t @ local -> (int64[@unboxed]) @@ stateless
       = "caml_lxm_next" "caml_lxm_next_unboxed" [@@noalloc]
 
   let create () : t =
