@@ -1,7 +1,17 @@
 (env
  (_ (flags (:standard -no-principal -w -69-70))))
 
-(vendored_dirs gc-timings memtrace ocaml-jit owee ppxlib ppxlib_jane)
+(vendored_dirs gc-timings memtrace ocaml-compiler-libs ocaml-jit owee ppxlib
+  ppxlib_jane)
 
-; js_of_ocaml is built with its own Dune root via make jsoo-build.
+; js_of_ocaml is only built from ast-dependent-libs/.
 (data_only_dirs js_of_ocaml)
+
+; ast-dependent-libs/ is a dune root of its own (see ast-dependent-libs/dune).
+(dirs :standard \ ast-dependent-libs)
+
+; Merlin is built with the boot workspace, i.e. with the system compiler.
+(alias
+ (name merlin)
+ (deps
+  (alias_rec merlin/default)))
