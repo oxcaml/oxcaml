@@ -375,20 +375,36 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
       | Vec128 | Vec256 | Vec512 | Mask -> None
 
     let native_mixed_field obj shape pos =
-      match shape.(pos) with
-      | Lambda.Product elts when Array.length elts <> 0 -> None
-      | _ ->
-          let reordered =
-            Mixed_block_shape.of_mixed_block_elements shape
-              ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
-          in
+      let reordered =
+        Mixed_block_shape.of_mixed_block_elements shape
+          ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
+      in
+      let flattened = Mixed_block_shape.flattened_reordered_shape reordered in
+      let rec read path (element : unit Lambda.mixed_block_element) =
+        match element with
+        | Product elements ->
+            (* A uniform block avoids float-array specialization. *)
+            let product = Obj.new_block 0 (Array.length elements) in
+            let rec fill i =
+              if i = Array.length elements then Some (O.repr product)
+              else
+                match read (path @ [i]) elements.(i) with
+                | None -> None
+                | Some field ->
+                    Obj.set_field product i (O.obj field);
+                    fill (i + 1)
+            in
+            fill 0
+        | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16
+        | Bits32 | Bits64 | Word | Untagged_immediate
+        | Vec128 | Vec256 | Vec512 | Mask | Splice_variable _ ->
           match
-            Mixed_block_shape.lookup_path_producing_new_indexes reordered [pos]
+            Mixed_block_shape.lookup_path_producing_new_indexes reordered
+              (pos :: path)
           with
-          | [] -> Some (O.repr ())
           | [i] ->
               let counts =
-                Mixed_product_bytes.Wrt_path.count_shape shape pos []
+                Mixed_product_bytes.Wrt_path.count_shape shape pos path
               in
               let { Mixed_product_bytes.Wrt_path.offset_bytes; _ } =
                 Mixed_product_bytes.Wrt_path.offset_and_gap_unchecked counts
@@ -396,9 +412,10 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
               let word =
                 Mixed_product_bytes.Byte_count.on_64_bit_arch offset_bytes / 8
               in
-              native_scalar_field obj word
-                (Mixed_block_shape.flattened_reordered_shape reordered).(i)
-          | _ :: _ :: _ -> None
+              native_scalar_field obj word flattened.(i)
+          | [] | _ :: _ :: _ -> None
+      in
+      read [] shape.(pos)
 
     let module_field_for_printing obj
           (rep : Lambda.module_representation) pos =
@@ -444,7 +461,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
           ( Scannable | Void | Float64 | Float32 | Bits8 | Bits16 | Bits32
           | Bits64 | Word | Untagged_immediate ) -> Print_as_value
       | Base (Vec128 | Vec256 | Vec512 | Mask) -> Print_as "<abstr>"
-      | Product _ -> Print_as "<unboxed product>"
+      | Product _ -> Print_as_value
       | Addressable sort -> print_sort sort
       | Univar _ -> Print_as "<univar>"
       | Genvar _ -> Print_as "<genvar>"
@@ -1034,6 +1051,14 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
           | [] -> []
           | {ld_id; ld_type; ld_sort} :: remainder ->
               let ty_arg = instantiate_type env type_params ty_list ld_type in
+              let sort =
+                match ld_sort with
+                | Some _ -> ld_sort
+                | None ->
+                    Option.map Jkind.Sort.default_for_transl_and_get
+                      (Jkind.sort_option_of_jkind env
+                         (Ctype.type_jkind env ty_arg))
+              in
               let name = Ident.name ld_id in
               (* PR#5722: print full module path only
                  for first record field *)
@@ -1041,7 +1066,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                 if first then tree_of_unboxed_product_label env path name
                 else tree_of_name name
               and v =
-                match print_sort_option ld_sort with
+                match print_sort_option sort with
                 | Print_as msg -> Oval_stuff msg
                 | Print_as_value ->
                   match lbl_list with
