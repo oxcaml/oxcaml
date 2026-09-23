@@ -1,6 +1,8 @@
 {
   pkgs ? import <nixpkgs> { },
   src ? ./.,
+  # Short commit hash of src, recorded in the js_of_ocaml version.
+  gitRev ? null,
   addressSanitizer ? false,
   dev ? false,
   flambdaInvariants ? false,
@@ -468,6 +470,7 @@ let
 
         buildFlags = [ buildTarget ];
       }
+      // lib.optionalAttrs (gitRev != null) { JSOO_GIT_VERSION = "ox-${gitRev}"; }
       // (
         if installTarget == null then
           {

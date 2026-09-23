@@ -22,7 +22,10 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
         lib = pkgs.lib;
-        oxcaml = pkgs.callPackage ./default.nix { src = self; };
+        oxcaml = pkgs.callPackage ./default.nix {
+          src = self;
+          gitRev = self.shortRev or self.dirtyShortRev or null;
+        };
         merlinPackages = oxcaml.mkMerlinPackages oxcaml;
       in
       {
