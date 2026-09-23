@@ -51,5 +51,8 @@
   (alias_rec js_of_ocaml/compiler/tests-wasm_of_ocaml/runtest)
   (alias_rec js_of_ocaml/compiler/tests-wasm_of_ocaml/runtest-js)
   (alias_rec js_of_ocaml/compiler/tests-wasm_of_ocaml/runtest-wasm)
+  (alias_rec js_of_ocaml/compiler/tests-oxcaml/runtest)
+  (alias_rec js_of_ocaml/compiler/tests-oxcaml/runtest-js)
+  (alias_rec js_of_ocaml/compiler/tests-oxcaml/runtest-wasm)
   (alias_rec js_of_ocaml/lib/tests/runtest-js)
   (alias_rec js_of_ocaml/lib/tests/runtest-wasm)))
