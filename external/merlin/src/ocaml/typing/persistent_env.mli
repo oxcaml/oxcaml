@@ -92,7 +92,8 @@ val clear_missing : 'a t -> unit
 val fold : 'a t -> (Global_module.Name.t -> 'a -> 'b -> 'b) -> 'b -> 'b
 
 type address =
-  | Aunit of Compilation_unit.t * Mode.With_regionality.l
+  | Aunit of
+      Compilation_unit.t * Types.module_representation * Mode.With_regionality.l
   | Alocal of Ident.t
   | Adot of address * Types.module_representation * int
 

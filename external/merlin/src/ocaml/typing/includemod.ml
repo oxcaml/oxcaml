@@ -964,14 +964,8 @@ and signatures ~core ~direction ~loc env subst ~modes sig1 sig2 mod_shape =
           then mod_shape
           else Shape.str ?uid:mod_shape.Shape.uid d.shape_map
         in
-        let input_repr =
-          List.filter_map Subst.Lazy.sort_of_signature_item sig1
-          |> Array.of_list
-        in
-        let output_repr =
-          List.filter_map Subst.Lazy.sort_of_signature_item sig2
-          |> Array.of_list
-        in
+        let input_repr = Subst.Lazy.module_representation_of_signature sig1 in
+        let output_repr = Subst.Lazy.module_representation_of_signature sig2 in
         let coercion =
           if runtime_len1 = runtime_len2 then (* see PR#5098 *)
             simplify_structure_coercion input_repr output_repr cc id_pos_list

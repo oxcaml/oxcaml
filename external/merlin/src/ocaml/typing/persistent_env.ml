@@ -871,7 +871,8 @@ let make_binding penv (global : Global_module.t) (impl : CU.t option) : binding 
     Constant unit
 
 type address =
-  | Aunit of Compilation_unit.t * Mode.With_regionality.l
+  | Aunit of
+      Compilation_unit.t * Types.module_representation * Mode.With_regionality.l
   | Alocal of Ident.t
   | Adot of address * Types.module_representation * int
 
@@ -891,7 +892,7 @@ let acknowledge_new_pers_struct penv modname pers_name val_of_pers_sig short_pat
   let {persistent_structures; locals_bound_to_runtime_parameters; _} = penv in
   let import = pers_name.pn_import in
   let global = pers_name.pn_global in
-  let (_, mode) as sign = pers_name.pn_sign in
+  let (lazy_sign, mode) as sign = pers_name.pn_sign in
   let is_param = import.imp_is_param in
   let impl = import.imp_impl in
   let filename = import.imp_filename in
@@ -909,7 +910,18 @@ let acknowledge_new_pers_struct penv modname pers_name val_of_pers_sig short_pat
   let address : address =
     match binding with
     | Runtime_parameter id -> Alocal id
-    | Constant unit -> Aunit (unit, mode)
+    | Constant unit ->
+        let repr : Types.module_representation =
+          match import.imp_params with
+          | _ :: _ when not (CU.is_instance unit) ->
+              (* The base unit of a parameterised module: its block holds
+                 only the instantiating functor *)
+              [| Jkind_types.Sort.scannable |]
+          | _ ->
+              Subst.Lazy.force_signature_once lazy_sign
+              |> Subst.Lazy.module_representation_of_signature
+        in
+        Aunit (unit, repr, mode)
   in
   let shape =
     match import.imp_impl, import.imp_params with
