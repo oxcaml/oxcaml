@@ -730,6 +730,17 @@ module type Wrapped = sig
   | Mty_strengthen of module_type * Path.t * Aliasability.t
       (* See comments about the aliasability of strengthening in mtype.ml *)
 
+  | Mty_with of module_type * Ident.t * string list * with_constraint
+      (* The identifier binds the unconstrained module type in the constraint.
+         Components are projected from it instead of copying the signature.
+         Its scope is used to freshen the signature when the wrapper expands. *)
+
+  and with_constraint =
+  | With_type of type_declaration
+  | With_module of module_declaration
+  | With_modtype of modtype_declaration
+  | With_jkind of jkind_declaration
+
   and functor_parameter =
   | Unit
   | Named of Ident.t option * module_type * Mode.With_locality.lr
@@ -820,6 +831,26 @@ module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
     | Mty_signature sg -> To.Mty_signature (signature m sg)
     | Mty_strengthen (mty,p,aliasable) ->
         To.Mty_strengthen (module_type m mty, p, aliasable)
+
+    | Mty_with (mty, id, names, cstr) ->
+        To.Mty_with (module_type m mty, id, names, with_constraint m cstr)
+
+  and with_constraint m = function
+    | With_type td -> To.With_type td
+    | With_module md ->
+        To.With_module
+          { md_type = module_type m md.md_type;
+            md_modalities = md.md_modalities;
+            md_attributes = md.md_attributes;
+            md_loc = md.md_loc;
+            md_uid = md.md_uid }
+    | With_modtype mtd ->
+        To.With_modtype
+          { mtd_type = Option.map (module_type m) mtd.mtd_type;
+            mtd_attributes = mtd.mtd_attributes;
+            mtd_loc = mtd.mtd_loc;
+            mtd_uid = mtd.mtd_uid }
+    | With_jkind jd -> To.With_jkind jd
 
   and functor_parameter m = function
       | Unit -> To.Unit

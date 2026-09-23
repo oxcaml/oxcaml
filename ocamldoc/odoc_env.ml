@@ -212,6 +212,7 @@ let subst_module_type env t =
           Odoc_name.to_path (full_module_type_name env (Odoc_name.from_path p))
         in
         Mty_ident new_p
+    | Mty_with _ as mt -> mt
     | Mty_strengthen (mt,p,a) ->
         Mty_strengthen (iter mt,p,a)
     | Mty_alias _
