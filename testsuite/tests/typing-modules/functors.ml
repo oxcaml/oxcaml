@@ -2116,8 +2116,8 @@ Error: The functor application "Set.Make(Set)(A)" is ill-typed.
             sig
               module type OrderedType = Set.OrderedType
               module type S = Set.S
-              module Make = Set.Make @@ portable
-              module MakePortable = Set.MakePortable @@ portable
+              module Make = Set.Make @@ stateless
+              module MakePortable = Set.MakePortable @@ stateless
             end
           is not included in
             Set.OrderedType
