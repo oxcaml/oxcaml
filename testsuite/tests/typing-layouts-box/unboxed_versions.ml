@@ -328,3 +328,13 @@ module type S = sig type t : float64 val f : t -> unit end
 [%%expect{|
 module type S = sig val f : float# -> unit end
 |}]
+
+module M : sig
+  type t : (value & float64) box
+end = struct
+  type t = { i : int; f : float# }
+end
+
+let box_m (x : M.t#) = box x
+let unbox_m (x : M.t) : M.t# = unbox x
+[%%expect{||}]
