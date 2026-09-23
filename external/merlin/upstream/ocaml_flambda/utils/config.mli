@@ -316,6 +316,16 @@ val function_sections : bool
 (** Whether the compiler was configured to generate
     each function in a separate section *)
 
+val link_order_frametables : bool
+(** Whether frame descriptors are emitted per function in sections linked
+    (SHF_LINK_ORDER) to the code they describe, and gathered by the runtime
+    from [caml_frametable_ranges], rather than as one count-prefixed table
+    per unit.  Must agree with the runtime's [LINK_ORDER_FRAMETABLES]. *)
+
+val gc_sections : bool
+(** Whether executables are linked with [--gc-sections] by default
+    (requires [link_order_frametables]) *)
+
 val probes : bool
 (** Whether the target supports tracing probes *)
 
