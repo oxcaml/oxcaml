@@ -70,27 +70,27 @@ let%expect_test "functions never below an effect handler are not double-translat
   print_double_fun_decl program "in_fiber";
   [%expect
     {|
-           function call_unknown(_c_){
-            l[1] = [0, function(param){return 0;}, l[1]];
-            _c_ = fns[1];
-            if(! _c_) return;
-            var g = _c_[1];
-            return caml_call1(g, 0);
-           }
-           //end
-           not found
-           function in_fiber$0(_c_){
-            _c_ = l[1];
-            l[1] = [0, _b_(), _c_];
-            return runtime.caml_raise_unhandled(E);
-           }
-           //end
-           function in_fiber$1(_c_, cont){
-            _c_ = l[1];
-            l[1] = [0, _b_(), _c_];
-            return runtime.caml_perform_effect(E, cont);
-           }
-           //end
-           var in_fiber = caml_cps_closure(in_fiber$0, in_fiber$1);
-           //end
-           |}]
+    function call_unknown(_a_){
+     l[1] = [0, function(param){return 0;}, l[1]];
+     _a_ = fns[1];
+     if(! _a_) return;
+     var g = _a_[1];
+     return caml_call1(g, 0);
+    }
+    //end
+    not found
+    function in_fiber$0(_b_){
+     _b_ = l[1];
+     l[1] = [0, _a_(), _b_];
+     return runtime.caml_raise_unhandled(E);
+    }
+    //end
+    function in_fiber$1(_b_, cont){
+     _b_ = l[1];
+     l[1] = [0, _a_(), _b_];
+     return runtime.caml_perform_effect(E, cont);
+    }
+    //end
+    var in_fiber = runtime.caml_cps_closure(in_fiber$0, in_fiber$1);
+    //end
+    |}]
