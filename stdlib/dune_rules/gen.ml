@@ -105,7 +105,7 @@ let gen_rule ~ppf ~tgt_file ~base ~deps =
   match ext with
   | `Cmi ->
      let action =
-       sprintf "(run %%{exe:../../main_native.exe} %s -o %s.cmi -c %%{src})"
+       sprintf "(run %%{exe:../../boot_ocamlc.exe} %s -o %s.cmi -c %%{src})"
          flags target
      in
      rule ~ppf ~target ~exts:["cmi";"cmsi";"cmti"] ~src ~deps ~action
@@ -119,7 +119,7 @@ let gen_rule ~ppf ~tgt_file ~base ~deps =
      rule ~ppf ~target ~exts:["o";"cmx"] ~src ~deps ~action
   | `Cmo ->
      let action =
-       sprintf "(run %%{exe:../../main_native.exe} %s -cmi-file %s.cmi \
+       sprintf "(run %%{exe:../../boot_ocamlc.exe} %s -cmi-file %s.cmi \
                                                    -o %s.cmo -c %%{src})"
          flags target target
      in
@@ -170,7 +170,7 @@ let write_stdlib_dune ppf =
     modnames
     |> List.map (fun m -> sprintf "%%{dep:%s.cmo}" (get_target m))
     |> String.concat " "
-    |> sprintf "(run %%{exe:../../main_native.exe} -g -nostdlib -a \
+    |> sprintf "(run %%{exe:../../boot_ocamlc.exe} -g -nostdlib -a \
                                                    -o stdlib.cma %s)"
   in
   rule ~ppf ~target:"stdlib" ~exts:["cma"] ~src:"stdlib.ml"

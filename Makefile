@@ -5,7 +5,7 @@ export ARCH
 
 dune = $(opam_exec) $(DUNE)
 
-boot_ocamlc = main_native.exe
+boot_ocamlc = boot_ocamlc.exe
 boot_ocamlopt = boot_ocamlopt.exe
 boot_ocamlj = boot_ocamlj.exe
 boot_ocamlmklib = tools/ocamlmklib.exe
