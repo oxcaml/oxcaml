@@ -3971,9 +3971,14 @@ let unbox_ty_gen ~fixed env ty =
   match reduce_unbox env ty with
   | Some _ as reduct -> reduct
   | None ->
+    let box_kind =
+      Jkind.set_layout
+        (Jkind.Builtin.any ~why:Unboxed_version_of_boxed_kind)
+        (Box (Any Jkind_types.Scannable_axes.max,
+              Jkind_types.Scannable_axes.max))
+    in
     match
-      constrain_type_jkind ~fixed env ty
-        (Jkind.Builtin.any_box ~why:Boxed)
+      constrain_type_jkind ~fixed env ty box_kind
     with
     | Ok () -> Some (new_unbox_ty ty)
     | Error _ -> None

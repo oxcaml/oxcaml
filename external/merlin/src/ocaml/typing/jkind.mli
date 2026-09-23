@@ -340,9 +340,6 @@ module Builtin : sig
     why:History.any_creation_reason ->
     'd Types.jkind
 
-  (** [any box]: the kind of every type with an unboxed version. *)
-  val any_box : why:History.value_creation_reason -> 'd Types.jkind
-
   (** Like [any], but with the given separability on the scannable axis. *)
   val any_with_separability :
     Jkind_axis.Separability.t ->
