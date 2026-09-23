@@ -1,5 +1,7 @@
 (* TEST
- toplevel;
+ flags = "-extension layouts_alpha";
+ { toplevel; }
+ { toplevel.opt; }
 *)
 
 module L = struct
@@ -15,3 +17,8 @@ end;;
 L.[[1];[2];[3];[4];[5]];;
 open L;;
 [1;2;3;4;5];;
+
+let floats = [#1.5; #2.5];;
+let mixed = [#("first", #1.5); #("second", #2.5)];;
+let voids = [#(); #()];;
+let rec mixed_cycle = #(42, #1.5) :: mixed_cycle;;
