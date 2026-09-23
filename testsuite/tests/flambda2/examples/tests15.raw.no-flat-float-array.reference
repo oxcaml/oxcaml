@@ -122,7 +122,6 @@
     let field_3 = %block_load.tag[`0`].`size`[`8`].[`3`] (module_block) in
     let field_4 = %block_load.tag[`0`].`size`[`8`].[`4`] (module_block) in
     let field_5 = %block_load.tag[`0`].`size`[`8`].[`5`] (module_block) in
-    let field_6 = $camlTests15__immstring_4 in
     let field_7 = %block_load.tag[`0`].`size`[`8`].[`7`] (module_block) in
     let $camlTests15 =
       Block 0 (field_0,
@@ -131,7 +130,7 @@
                field_3,
                field_4,
                field_5,
-               field_6,
+               $camlTests15__immstring_4,
                field_7)
     in
     cont done ($camlTests15)
