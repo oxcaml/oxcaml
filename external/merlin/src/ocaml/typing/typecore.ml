@@ -1532,63 +1532,13 @@ let check_atomic_loc ~loc ~env label lid =
   if not (Types.is_atomic label.lbl_mut) then
     raise (error (loc, env, Label_not_atomic lid));
   if is_poly_Tpoly label.lbl_arg then
-<<<<<<< Merlin:rtjoa.box-demo
     raise (error (loc, env, Polymorphic_atomic_loc lid));
-  (match
-     Mode.Modality.Const.equate label.lbl_modalities
-       (Typemode.atomic_mutable_modalities)
-   with
-   | Ok () -> ()
-   | Error _ -> raise (error (loc, env, Modalities_on_atomic_field lid)));
-  match record_repres with
-  | Record_boxed | Record_inlined (_, Constructor_uniform_value, _) -> ()
-  | Record_mixed _ | Record_inlined (_, Constructor_mixed _, _) ->
-      raise (Error (loc, env, Mixed_record_atomic_loc lid))
-  | Record_undetermined | Record_variable _
-  | Record_boxed_inherited | Record_boxed_inherited_variable _
-  | Record_inlined
-      (_, (Constructor_undetermined | Constructor_variable _), _)
-  (* [@@unboxed] prohibits mutable (and therefore atomic) fields. *)
-  | Record_unboxed
-  (* [@atomic] fields disable float record optimization. *)
-  | Record_float | Record_ufloat
-  (* Only exists as an intermediate step of typechecking the decl itself *)
-  | Record_dummy _ ->
-      Misc.fatal_error
-        "check_atomic_loc_of_finalized_repr: unexpected record representation"
-||||||| Compiler:last-imported
-    raise (Error (loc, env, Polymorphic_atomic_loc lid));
-  (match
-     Mode.Modality.Const.equate label.lbl_modalities
-       (Typemode.atomic_mutable_modalities)
-   with
-   | Ok () -> ()
-   | Error _ -> raise (Error (loc, env, Modalities_on_atomic_field lid)));
-  match record_repres with
-  | Record_boxed | Record_inlined (_, Constructor_uniform_value, _) -> ()
-  | Record_mixed _ | Record_inlined (_, Constructor_mixed _, _) ->
-      raise (Error (loc, env, Mixed_record_atomic_loc lid))
-  | Record_undetermined | Record_variable _
-  | Record_boxed_inherited | Record_boxed_inherited_variable _
-  | Record_inlined
-      (_, (Constructor_undetermined | Constructor_variable _), _)
-  (* [@@unboxed] prohibits mutable (and therefore atomic) fields. *)
-  | Record_unboxed
-  (* [@atomic] fields disable float record optimization. *)
-  | Record_float | Record_ufloat
-  (* Only exists as an intermediate step of typechecking the decl itself *)
-  | Record_dummy _ ->
-      Misc.fatal_error
-        "check_atomic_loc_of_finalized_repr: unexpected record representation"
-=======
-    raise (Error (loc, env, Polymorphic_atomic_loc lid));
   match
     Mode.Modality.Const.equate label.lbl_modalities
       (Typemode.atomic_mutable_modalities)
   with
   | Ok () -> ()
-  | Error _ -> raise (Error (loc, env, Modalities_on_atomic_field lid))
->>>>>>> Compiler:HEAD
+  | Error _ -> raise (error (loc, env, Modalities_on_atomic_field lid))
 
 (* Mutable indices to polymorphic fields cannot be taken, as they would allow
    writing non-polymorphic values. *)
