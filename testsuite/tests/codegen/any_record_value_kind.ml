@@ -59,6 +59,62 @@ first:
   ret
 |}]
 
+type _ tuple_repr =
+  | Two : (int * int) tuple_repr
+  | Three : (int * int * int) tuple_repr
+
+let tuple_join_is_int : type a. a tuple_repr * a -> bool = function
+  | Two, x -> is_int x
+  | Three, x -> is_int x
+[%%expect_asm X86_64{|
+tuple_join_is_int:
+  andl  $1, %ebx
+  leaq  1(%rbx,%rbx), %rax
+  ret
+|}]
+
+type ('a : any) repr = Int : int repr | Float : float# repr
+
+let record_join_is_int : type (a : any). a repr * a t -> bool = function
+  | Int, x -> is_int x
+  | Float, x -> is_int x
+[%%expect_asm X86_64{|
+record_join_is_int:
+  andl  $1, %ebx
+  leaq  1(%rbx,%rbx), %rax
+  ret
+|}]
+
+type float_record = { f : float# }
+type int64_record = { i : int64_u }
+type _ mixed_repr =
+  | Float : float_record mixed_repr
+  | Int64 : int64_record mixed_repr
+
+let mixed_join_is_int : type a. a mixed_repr * a -> bool = function
+  | Float, x -> is_int x
+  | Int64, x -> is_int x
+[%%expect_asm X86_64{|
+mixed_join_is_int:
+  andl  $1, %ebx
+  leaq  1(%rbx,%rbx), %rax
+  ret
+|}]
+
+type float_one = { x : float }
+type float_two = { y : float; z : float }
+type _ float_repr = One : float_one float_repr | Two : float_two float_repr
+
+let float_join_is_int : type a. a float_repr * a -> bool = function
+  | One, x -> is_int x
+  | Two, x -> is_int x
+[%%expect_asm X86_64{|
+float_join_is_int:
+  andl  $1, %ebx
+  leaq  1(%rbx,%rbx), %rax
+  ret
+|}]
+
 let () =
   assert (not (record_is_int { field = #42.0 }));
   assert (not (variant_is_int (A #42.0)));
@@ -67,6 +123,14 @@ let () =
   assert (not (option_is_int (Some #42.0)));
   assert ((rebuild_int { field = 42 }).field = 42);
   assert (box_float (rebuild_float { field = #42.0 }).field = 42.0);
-  assert (first { field = [| 42 |] } = 42)
+  assert (first { field = [| 42 |] } = 42);
+  assert (not (tuple_join_is_int (Two, (1, 2))));
+  assert (not (tuple_join_is_int (Three, (1, 2, 3))));
+  assert (not (record_join_is_int (Int, { field = 42 })));
+  assert (not (record_join_is_int (Float, { field = #42.0 })));
+  assert (not (mixed_join_is_int (Float, { f = #42.0 })));
+  assert (not (mixed_join_is_int (Int64, { i = #42L })));
+  assert (not (float_join_is_int (One, { x = 1.0 })));
+  assert (not (float_join_is_int (Two, { y = 1.0; z = 2.0 })))
 [%%expect{|
 |}]
