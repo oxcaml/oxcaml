@@ -68,7 +68,7 @@ let rec reduce_strengthen_lazy ~aliasable mty p =
       (* Strengthening aliases, generative functors and already strengthened
         types is a no-op. *)
       Some mty
-  | Mty_ident _ -> None
+  | Mty_ident _ | Mty_with _ -> None
 
 (* Strengthen a type by pushing strengthening inward and/or constructing
     appropriate Mty_strengthen nodes. *)
@@ -218,6 +218,48 @@ let rec reduce_lazy ~aliases env mty =
         | None -> None
         end
       end
+  | Mty_with (body, id, names, cstr) ->
+      !Subst.check_with id;
+      let scope = Ident.scope id in
+      begin match body with
+      | Mty_signature sg ->
+          let items = force_signature_once sg in
+          let subst = unprefix_signature (Pident id) items in
+          let cstr = with_constraint subst cstr in
+          let replace = function
+            | Sig_type (id, _, rs, vis), [name], With_type td
+              when Ident.name id = name -> Sig_type (id, td, rs, vis)
+            | Sig_module (id, pres, _, rs, vis), [name], With_module md
+              when Ident.name id = name ->
+                Sig_module (id, pres, md, rs, vis)
+            | Sig_modtype (id, _, vis), [name], With_modtype mtd
+              when Ident.name id = name -> Sig_modtype (id, mtd, vis)
+            | Sig_jkind (id, _, vis), [name], With_jkind jd
+              when Ident.name id = name -> Sig_jkind (id, jd, vis)
+            | (Sig_module (id, _, md, rs, vis) as item),
+              name :: (_ :: _ as names), cstr when Ident.name id = name ->
+                begin match md.md_type with
+                | Mty_alias _ -> item
+                | body ->
+                    let binder = Ident.create_scoped ~scope "$with" in
+                    let subst = Subst.add_module id (Pident binder)
+                        Subst.identity in
+                    let cstr = with_constraint subst cstr in
+                    let md_type = Mty_with (body, binder, names, cstr) in
+                    Sig_module (id, Mp_present, { md with md_type }, rs, vis)
+                end
+            | item, _, _ -> item
+          in
+          let sg = of_value
+              (List.map (fun item -> replace (item, names, cstr)) items) in
+          Some (Mty_signature
+            (signature (Rescope scope) Subst.identity sg))
+      | _ ->
+          begin match reduce_lazy ~aliases:true env body with
+          | Some body -> Some (Mty_with (body, id, names, cstr))
+          | None -> None
+          end
+      end
   | Mty_signature _ | Mty_functor _ | Mty_alias _ -> None
 
 let rec scrape_lazy ~aliases env mty =
@@ -239,7 +281,7 @@ let reduce env mty =
 let rec expand_lazy env mty =
   let open Subst.Lazy in
   match mty with
-  | Mty_strengthen _ ->
+  | Mty_strengthen _ | Mty_with _ ->
     begin match reduce_lazy env mty with
     | Some mty -> expand_lazy env mty
     | None -> mty
@@ -279,6 +321,23 @@ let rec expand_paths_lazy paths env =
       in
       let res = expand_paths_lazy paths env res in
       Mty_functor (param,res,mres)
+  | Mty_with (body, id, names, cstr) ->
+      (* Preserve the wrapper: its body may refer to a removed module whose
+         replacement will only become available after substitution. *)
+      let body = expand_paths_lazy paths env body in
+      let env =
+        Env.add_module_lazy ~update_summary:false id Mp_present body env in
+      let cstr = match cstr with
+        | With_module md ->
+            let md_type = expand_paths_lazy paths env md.md_type in
+            With_module { md with md_type }
+        | With_modtype mtd ->
+            let mtd_type =
+              Option.map (expand_paths_lazy paths env) mtd.mtd_type in
+            With_modtype { mtd with mtd_type }
+        | With_type _ | With_jkind _ -> cstr
+      in
+      Mty_with (body, id, names, cstr)
   | Mty_strengthen (_,p,_) as mty when Path.Set.mem p paths ->
       (* If the path we're strengthening with is in paths then we need to
           unfold the node. *)
@@ -424,6 +483,9 @@ let rec make_aliases_absent ~aliased pres mty =
       pres, Mty_functor(arg, res, mres)
   | Mty_ident _ ->
       pres, mty
+  | Mty_with (mty, id, names, cstr) ->
+      let pres, mty = make_aliases_absent ~aliased pres mty in
+      pres, Mty_with (mty, id, names, cstr)
   | Mty_strengthen (mty,p,a) ->
       let aliased = aliased || Aliasability.is_aliasable a in
       let pres, res = make_aliases_absent ~aliased pres mty in
@@ -439,7 +501,7 @@ let scrape_for_type_of env pres mty =
         with Not_found -> outer
       end
     | Mty_strengthen (inner,_,_) -> loop env outer inner
-    | Mty_ident _ | Mty_signature _ | Mty_functor _ -> outer
+    | Mty_ident _ | Mty_signature _ | Mty_functor _ | Mty_with _ -> outer
   in
   make_aliases_absent ~aliased:false pres (loop env mty mty)
 
@@ -457,7 +519,7 @@ let scrape_lazy env mty = scrape_lazy ~aliases:false env mty
 
 let scrape env mty =
   match mty with
-    Mty_ident _ | Mty_strengthen _ ->
+    Mty_ident _ | Mty_strengthen _ | Mty_with _ ->
       Subst.Lazy.force_modtype (scrape_lazy env (Subst.Lazy.of_modtype mty))
   | _ -> mty
 
@@ -526,6 +588,7 @@ let rec nondep_mty_with_presence env va ids pres mty =
                     nondep_mty res_env va ids res, mres)
       in
       pres, mty
+  | Mty_with _ -> Misc.fatal_error "Mtype.nondep: unexpanded with"
   | Mty_strengthen (mty,p,a) ->
       (* If we end up strengthening an abstract type with a dependent module,
         just drop the strengthening. *)
@@ -653,7 +716,8 @@ and enrich_item env p = function
 
 let rec type_and_jkind_paths env p mty =
   match scrape env mty with
-  | Mty_ident _ | Mty_alias _ | Mty_functor _ | Mty_strengthen _ ->
+  | Mty_ident _ | Mty_alias _ | Mty_functor _ | Mty_strengthen _
+  | Mty_with _ ->
     ~types:[], ~jkinds:[]
   | Mty_signature sg -> type_and_jkind_paths_sig env p sg
 
@@ -691,7 +755,7 @@ let rec no_code_needed_mod env pres mty =
       | Mty_signature sg -> no_code_needed_sig env sg
       | Mty_functor _ -> false
       | Mty_alias _ -> false
-      | Mty_strengthen _ -> false
+      | Mty_strengthen _ | Mty_with _ -> false
     end
 
 and no_code_needed_sig env sg =
@@ -733,7 +797,7 @@ module Contains_type_or_jkind = struct
         contains_type_or_jkind env body
     | Mty_alias _ ->
         ()
-    | Mty_strengthen _ -> raise (Contains Type)
+    | Mty_strengthen _ | Mty_with _ -> raise (Contains Type)
 
   and contains_type_or_jkind_sig env =
     List.iter (contains_type_or_jkind_item env)

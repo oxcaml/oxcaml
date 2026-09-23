@@ -2571,6 +2571,17 @@ let rec components_of_module_maker
           fcomp_cache = Hashtbl.create 17;
           fcomp_subst_cache = Hashtbl.create 17 })
   | Mty_ident p | Mty_strengthen (_, p, _) -> Error (No_components_abstract p)
+  | Mty_with (body, _, _, _) ->
+      let open Subst.Lazy in
+      let rec unavailable = function
+        | Mty_ident p | Mty_strengthen (_, p, _) ->
+            Result.Error (No_components_abstract p)
+        | Mty_alias p -> Result.Error (No_components_alias p)
+        | Mty_with (body, _, _, _) -> unavailable body
+        | Mty_signature _ | Mty_functor _ ->
+            Misc.fatal_error "Env.components: invalid with body"
+      in
+      unavailable body
   | Mty_alias p -> Error (No_components_alias p)
 
 (* Insertion of bindings by identifier + path *)

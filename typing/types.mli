@@ -1254,6 +1254,17 @@ module type Wrapped = sig
   | Mty_strengthen of module_type * Path.t * Aliasability.t
       (* See comments about the aliasability of strengthening in mtype.ml *)
 
+  | Mty_with of module_type * Ident.t * string list * with_constraint
+      (* The identifier binds the unconstrained module type in the constraint.
+         Components are projected from it instead of copying the signature.
+         Its scope is used to freshen the signature when the wrapper expands. *)
+
+  and with_constraint =
+  | With_type of type_declaration
+  | With_module of module_declaration
+  | With_modtype of modtype_declaration
+  | With_jkind of jkind_declaration
+
   and functor_parameter =
   | Unit
   | Named of Ident.t option * module_type * Mode.With_locality.lr

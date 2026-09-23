@@ -518,6 +518,14 @@ let type_iterators_without_type_expr =
         it.it_functor_param it p;
         it.it_module_type it mt;
         it.it_mode_expr mm
+    | Mty_with (mty, _, _, cstr) ->
+        it.it_module_type it mty;
+        begin match cstr with
+        | With_type td -> it.it_type_declaration it td
+        | With_module md -> it.it_module_declaration it md
+        | With_modtype mtd -> it.it_modtype_declaration it mtd
+        | With_jkind jd -> it.it_jkind_declaration it jd
+        end
     | Mty_strengthen (mty, p, _) ->
         it.it_module_type it mty;
         it.it_path p

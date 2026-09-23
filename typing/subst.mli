@@ -44,6 +44,9 @@ type unsafe = [`Unsafe]
 type t = safe subst
 (** Standard substitution*)
 
+(* Filled by Typemod: validate a delayed constraint before copying it. *)
+val check_with : (Ident.t -> unit) ref
+
 val identity: 'a subst
 val for_loading_cmi : unit -> t
 val unsafe: t -> unsafe subst
@@ -191,6 +194,8 @@ module Lazy : sig
   val module_decl : scoping -> t -> module_declaration -> module_declaration
   val modtype : scoping -> t -> module_type -> module_type
   val modtype_decl : scoping -> t -> modtype_declaration -> modtype_declaration
+  val with_constraint : t -> with_constraint -> with_constraint
+  val unprefix_signature : Path.t -> signature_item list -> t
   val signature : scoping -> t -> signature -> signature
   val signature_item : scoping -> t -> signature_item -> signature_item
   val value_description : t -> value_description -> value_description
