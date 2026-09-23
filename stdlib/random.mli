@@ -14,7 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 open! Stdlib
 
@@ -35,25 +35,25 @@ open! Stdlib
 
 (** {1 Basic functions} *)
 
-val init : int -> unit
+val init : int -> unit @@ stateful portable
 (** Initialize the domain-local generator, using the argument as a seed.
     The same seed will always yield the same sequence of numbers. *)
 
-val full_init : int array -> unit
+val full_init : int array -> unit @@ stateful portable
 (** Same as {!Random.init} but takes more data as seed. *)
 
-val self_init : unit -> unit
+val self_init : unit -> unit @@ stateful portable
 (** Initialize the domain-local generator with a random seed chosen in a
     system-dependent way.  If a cryptographically secure pseudorandom number
     generator is available on the host machine, it is used to provide a highly
     random initial seed.  Otherwise, a less random seed is computed from system
     parameters (current time, process IDs, domain-local state). *)
 
-val bits : unit -> int
+val bits : unit -> int @@ stateful portable
 (** Return 30 random bits in a nonnegative integer.
 *)
 
-val int : int -> int
+val int : int -> int @@ stateful portable
 (** [Random.int bound] returns a random integer between 0 (inclusive)
      and [bound] (exclusive).  [bound] must be greater than 0 and less
      than 2{^30}.
@@ -61,7 +61,7 @@ val int : int -> int
     @raise Invalid_argument if [bound] <= 0 or [bound] >= 2{^30}.
 *)
 
-val full_int : int -> int
+val full_int : int -> int @@ stateful portable
 (** [Random.full_int bound] returns a random integer between 0 (inclusive)
      and [bound] (exclusive). [bound] may be any positive integer.
 
@@ -81,7 +81,7 @@ val full_int : int -> int
 
     @since 4.13 *)
 
-val int_in_range : min:int -> max:int -> int
+val int_in_range : min:int -> max:int -> int @@ stateful portable
 (** [Random.int_in_range ~min ~max] returns a random integer
     between [min] (inclusive) and [max] (inclusive).
     Both [min] and [max] are allowed to be negative;
@@ -96,14 +96,14 @@ val int_in_range : min:int -> max:int -> int
 
     @since 5.2 *)
 
-val int32 : Int32.t -> Int32.t
+val int32 : Int32.t -> Int32.t @@ stateful portable
 (** [Random.int32 bound] returns a random integer between 0 (inclusive)
      and [bound] (exclusive).  [bound] must be greater than 0.
 
     @raise Invalid_argument if [bound] <= 0.
 *)
 
-val int32_in_range : min:int32 -> max:int32 -> int32
+val int32_in_range : min:int32 -> max:int32 -> int32 @@ stateful portable
 (** [Random.int32_in_range ~min ~max] returns a random integer
     between [min] (inclusive) and [max] (inclusive).
     Both [min] and [max] are allowed to be negative;
@@ -113,7 +113,7 @@ val int32_in_range : min:int32 -> max:int32 -> int32
 
     @since 5.2 *)
 
-val nativeint : Nativeint.t -> Nativeint.t
+val nativeint : Nativeint.t -> Nativeint.t @@ stateful portable
 (** [Random.nativeint bound] returns a random integer between 0 (inclusive)
      and [bound] (exclusive).  [bound] must be greater than 0.
 
@@ -121,6 +121,7 @@ val nativeint : Nativeint.t -> Nativeint.t
 *)
 
 val nativeint_in_range : min:nativeint -> max:nativeint -> nativeint
+  @@ stateful portable
 (** [Random.nativeint_in_range ~min ~max] returns a random integer
     between [min] (inclusive) and [max] (inclusive).
     Both [min] and [max] are allowed to be negative;
@@ -130,14 +131,14 @@ val nativeint_in_range : min:nativeint -> max:nativeint -> nativeint
 
     @since 5.2 *)
 
-val int64 : Int64.t -> Int64.t
+val int64 : Int64.t -> Int64.t @@ stateful portable
 (** [Random.int64 bound] returns a random integer between 0 (inclusive)
      and [bound] (exclusive).  [bound] must be greater than 0.
 
     @raise Invalid_argument if [bound] <= 0.
 *)
 
-val int64_in_range : min:int64 -> max:int64 -> int64
+val int64_in_range : min:int64 -> max:int64 -> int64 @@ stateful portable
 (** [Random.int64_in_range ~min ~max] returns a random integer
     between [min] (inclusive) and [max] (inclusive).
     Both [min] and [max] are allowed to be negative;
@@ -147,26 +148,26 @@ val int64_in_range : min:int64 -> max:int64 -> int64
 
     @since 5.2 *)
 
-val float : float -> float
+val float : float -> float @@ stateful portable
 (** [Random.float bound] returns a random floating-point number
    between 0 and [bound] (inclusive).  If [bound] is
    negative, the result is negative or zero.  If [bound] is 0,
    the result is 0. *)
 
-val bool : unit -> bool
+val bool : unit -> bool @@ stateful portable
 (** [Random.bool ()] returns [true] or [false] with probability 0.5 each. *)
 
-val bits32 : unit -> Int32.t
+val bits32 : unit -> Int32.t @@ stateful portable
 (** [Random.bits32 ()] returns 32 random bits as an integer between
     {!Int32.min_int} and {!Int32.max_int}.
     @since 4.14 *)
 
-val bits64 : unit -> Int64.t
+val bits64 : unit -> Int64.t @@ stateful portable
 (** [Random.bits64 ()] returns 64 random bits as an integer between
     {!Int64.min_int} and {!Int64.max_int}.
     @since 4.14 *)
 
-val nativebits : unit -> Nativeint.t
+val nativebits : unit -> Nativeint.t @@ stateful portable
 (** [Random.nativebits ()] returns 32 or 64 random bits (depending on
     the bit width of the platform) as an integer between
     {!Nativeint.min_int} and {!Nativeint.max_int}.
@@ -181,14 +182,14 @@ val nativebits : unit -> Nativeint.t
     other parts of the program.
 *)
 
-module State : sig
+module State : sig @@ stateless
   type t : mutable_data
   (** The type of PRNG states. *)
 
   val make : int array -> t
   (** Create a new state and initialize it with the given seed. *)
 
-  val make_self_init : unit -> t
+  val make_self_init : unit -> t @@ stateful portable
   (** Create a new state and initialize it with a random seed chosen
       in a system-dependent way.
       The seed is obtained as described in {!Random.self_init}. *)
@@ -255,18 +256,18 @@ module State : sig
 
       @since 5.1
   *)
-end
+end @@ stateful portable
 
-val get_state : unit -> State.t
+val get_state : unit -> State.t @@ stateful portable
 (** [get_state()] returns a fresh copy of the current state of the
     domain-local generator (which is used by the basic functions). *)
 
-val set_state : State.t -> unit
+val set_state : State.t -> unit @@ stateful portable
 (** [set_state s] updates the current state of the domain-local
     generator (which is used by the basic functions) by copying
     the state [s] into it. *)
 
-val split : unit -> State.t
+val split : unit -> State.t @@ stateful portable
 (** Draw a fresh PRNG state from the current state of the domain-local
     generator used by the default functions.
     (The state of the domain-local generator is modified.)

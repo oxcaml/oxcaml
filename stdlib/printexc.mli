@@ -14,7 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 open! Stdlib
 
@@ -23,7 +23,7 @@ open! Stdlib
 type t = exn = ..
 (** The type of exception values. *)
 
-val to_string: exn -> string
+val to_string: exn -> string @@ stateful portable
 (** [Printexc.to_string e] returns a string representation of
    the exception [e]. *)
 
@@ -33,7 +33,7 @@ val to_string_default: exn -> string
     @since 4.09
 *)
 
-val print: ('a -> 'b) -> 'a -> 'b
+val print: ('a -> 'b) -> 'a -> 'b @@ stateful portable
 (** [Printexc.print fn x] applies [fn] to [x] and returns the result.
    If the evaluation of [fn x] raises any exception, the
    name of the exception is printed on standard error output,
@@ -41,7 +41,7 @@ val print: ('a -> 'b) -> 'a -> 'b
    The typical use is to catch and report exceptions that
    escape a function application. *)
 
-val catch: ('a -> 'b) -> 'a -> 'b @@ nonportable
+val catch: ('a -> 'b) -> 'a -> 'b @@ stateful
 [@@ocaml.deprecated "This function is no longer needed."]
 (** [Printexc.catch fn x] is similar to {!Printexc.print}, but
    aborts the program with exit code 2 after printing the
@@ -52,7 +52,7 @@ val catch: ('a -> 'b) -> 'a -> 'b @@ nonportable
    using the debugger or the stack backtrace facility.
    So, do not use [Printexc.catch] in new code.  *)
 
-val print_backtrace: out_channel -> unit
+val print_backtrace: out_channel -> unit @@ reading portable
 (** [Printexc.print_backtrace oc] prints an exception backtrace
     on the output channel [oc].  The backtrace lists the program
     locations where the most-recently raised exception was raised
@@ -67,14 +67,14 @@ val print_backtrace: out_channel -> unit
     @since 3.11
 *)
 
-val get_backtrace: unit -> string
+val get_backtrace: unit -> string @@ reading portable
 (** [Printexc.get_backtrace ()] returns a string containing the
     same exception backtrace that [Printexc.print_backtrace] would
     print. Same restriction usage than {!print_backtrace}.
     @since 3.11
 *)
 
-val record_backtrace: bool -> unit
+val record_backtrace: bool -> unit @@ stateful portable
 (** [Printexc.record_backtrace b] turns recording of exception backtraces
     on (if [b = true]) or off (if [b = false]).  Initially, backtraces
     are not recorded, unless the [b] flag is given to the program
@@ -82,13 +82,13 @@ val record_backtrace: bool -> unit
     @since 3.11
 *)
 
-val backtrace_status: unit -> bool
+val backtrace_status: unit -> bool @@ reading portable
 (** [Printexc.backtrace_status()] returns [true] if exception
     backtraces are currently recorded, [false] if not.
     @since 3.11
 *)
 
-val register_printer: (exn -> string option) -> unit @@ nonportable
+val register_printer: (exn -> string option) -> unit @@ stateful
 [@@alert unsafe_multidomain "Use [Printexc.Safe.register_printer]."]
 (** [Printexc.register_printer fn] registers [fn] as an exception
     printer.  The printer should return [None] or raise an exception
@@ -108,7 +108,7 @@ val register_printer: (exn -> string option) -> unit @@ nonportable
     @since 3.11.2
 *)
 
-val use_printers: exn -> string option
+val use_printers: exn -> string option @@ stateful portable
 (** [Printexc.use_printers e] returns [None] if there are no registered
     printers and [Some s] with [s] the resulting string otherwise.
     @since 4.09
@@ -156,7 +156,7 @@ type raw_backtrace_entry = private int
 val raw_backtrace_entries : raw_backtrace -> raw_backtrace_entry array
 (** @since 4.12 *)
 
-val get_raw_backtrace: unit -> raw_backtrace
+val get_raw_backtrace: unit -> raw_backtrace @@ reading portable
 (** [Printexc.get_raw_backtrace ()] returns the same exception
     backtrace that [Printexc.print_backtrace] would print, but in
     a raw format. Same restriction usage than {!print_backtrace}.
@@ -179,7 +179,7 @@ val raw_backtrace_to_string: raw_backtrace -> string
 *)
 
 external raise_with_backtrace: ('a : value_or_null)
-  . exn -> raw_backtrace -> 'a @ portable unique @@ stateless
+  . exn -> raw_backtrace -> 'a @ portable unique
   = "%raise_with_backtrace"
 (** Reraise the exception using the given raw_backtrace for the
     origin of the exception
@@ -202,13 +202,15 @@ external get_callstack: int -> raw_backtrace @@ reading portable
 (** {1 Uncaught exceptions} *)
 
 val default_uncaught_exception_handler: exn -> raw_backtrace -> unit
+  @@ stateful portable
 (** [Printexc.default_uncaught_exception_handler] prints the exception and
     backtrace on standard error output.
 
     @since 4.11
 *)
 
-val set_uncaught_exception_handler: (exn -> raw_backtrace -> unit) -> unit @@ nonportable
+val set_uncaught_exception_handler: (exn -> raw_backtrace -> unit) -> unit
+  @@ stateful
 [@@alert unsafe_multidomain "Use [Printexc.Safe.set_uncaught_exception_handler]."]
 (** [Printexc.set_uncaught_exception_handler fn] registers [fn] as the handler
     for uncaught exceptions. The default handler is
@@ -436,7 +438,7 @@ module Safe : sig
 
       The provided closure must be [portable] as exception handlers may be called from
       any domain, not just the one that it's registered on. *)
-end
+end @@ stateful portable
 
 (**/**)
 

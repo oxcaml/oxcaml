@@ -21,7 +21,7 @@
 (*                                                                          *)
 (****************************************************************************)
 
-@@ portable
+@@ stateless
 
 (** Randomized exponential backoff mechanism. *)
 
@@ -39,7 +39,7 @@ val create : ?lower_wait_log:int -> ?upper_wait_log:int -> unit -> t
 val default : t
 (** [default] is equivalent to [create ()]. *)
 
-val once : t -> t
+val once : t -> t @@ stateful portable
 (** [once b] executes one random wait and returns a new backoff with logarithm
     of the current maximum value incremented unless it is already at
     [upper_wait_log] of [b].
