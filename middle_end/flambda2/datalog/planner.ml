@@ -26,6 +26,7 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
+open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
 open Datalog_imports
 open Lang
 
@@ -78,7 +79,7 @@ let print_stage ppf stage =
 let print_stages print ppf stages =
   let depth = ref 0 in
   for i = 0 to Iarray.length stages - 1 do
-    let stage = Iarray.get stages i in
+    let stage = Iarray.unsafe_get stages i in
     let extra_indent =
       match stage with Join_stage _ -> 2 | Seek_stage _ | Check_stage _ -> 0
     in
@@ -117,7 +118,7 @@ type table_layers =
       { table : 't variable;
         columns : index_layer iarray;
         result : 'v variable;
-        (* Updated during planning. *)
+        (* Updated during planning, from zero up to [Iarray.length columns]. *)
         mutable bound_prefix : int
       }
       -> table_layers
@@ -197,7 +198,7 @@ let add_stages_involving_no_free_vars stages atom_decomposition =
       if bound_prefix = Iarray.length columns
       then stop_iteration ()
       else
-        let index_layer = Iarray.get columns bound_prefix in
+        let index_layer = Iarray.unsafe_get columns bound_prefix in
         let (Index_layer (col, outer, arg, inner)) = index_layer in
         match arg with
         | Variable var when Variable.Id.Set.mem (Variable.uid var) free_vars ->
@@ -232,6 +233,7 @@ let plan_rule ?(callback = ref ignore) parameters vars { head; body } =
   let tables, body_layout = Iarray.fold_left_map layout_atom [] body in
   let tables = Iarray.of_list (List.rev tables) in
   let var_to_atoms = Variable.Id.Tbl.create 0 in
+  (* All stored atom indices come from this traversal of [body_layout]. *)
   Iarray.iteri
     (fun aid atom_layout ->
       let free_vars = atom_layout.free_vars in
@@ -250,7 +252,7 @@ let plan_rule ?(callback = ref ignore) parameters vars { head; body } =
   let place_stages_involving_var var atom_ids =
     List.iter
       (fun aid ->
-        let atom_layout = Iarray.get body_layout aid in
+        let atom_layout = Iarray.unsafe_get body_layout aid in
         atom_layout.free_vars
           <- Variable.Id.Set.remove (Variable.uid var) atom_layout.free_vars;
         add_stages_involving_no_free_vars stages atom_layout)
@@ -280,7 +282,7 @@ let plan_rule ?(callback = ref ignore) parameters vars { head; body } =
         let column_iterators =
           List.fold_left
             (fun column_iterators aid ->
-              match Iarray.get body_layout aid with
+              match Iarray.unsafe_get body_layout aid with
               | { table_layers = None; _ } -> column_iterators
               | { table_layers = Some table_layers; _ } ->
                 advance_prefix_and_extract_iterator_on_variable table_layers var
@@ -323,7 +325,7 @@ let plan_rule ?(callback = ref ignore) parameters vars { head; body } =
       if n >= Iarray.length vars
       then n
       else
-        let var = Iarray.get vars (Iarray.length vars - n - 1) in
+        let var = Iarray.unsafe_get vars (Iarray.length vars - n - 1) in
         let (Variable.Any var) = var in
         if Variable.Id.Set.mem (Variable.uid var) free_vars_head
         then n

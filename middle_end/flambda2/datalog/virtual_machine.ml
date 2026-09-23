@@ -13,6 +13,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
 open Datalog_imports
 
 type outcome =
@@ -178,7 +179,7 @@ struct
     in
     execute instruction
 
-  let create ~evaluate (instruction : (_, _) instruction) =
+  let[@inline always] create ~evaluate (instruction : (_, _) instruction) =
     execute ~evaluate instruction
 
   let run continuation = continuation Stack_nil
@@ -198,3 +199,4 @@ struct
 
   let call f ~name ~context y k = Call (f, context, y.values, k, name, y.names)
 end
+[@@inline always]

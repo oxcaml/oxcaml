@@ -12,6 +12,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
+
 (* The following is a "big endian" implementation. *)
 
 type key = int
@@ -1884,11 +1886,16 @@ end = struct
 
                {b Warning}: The value of [current_key] is arbitrary and must not
                be read if [current] is [Null]. *)
-            stack : ('a, non_empty) tree Dynarray.t
-                (* Stack of later subtrees to iterate on. The stack is
-                   represented as a dynamic array, with capacity [Sys.int_size].
+            mutable stack : 'a t array;
+            mutable stack_size : int
+                (* Stack of later subtrees to iterate on. Storage is allocated
+                   on first initialization, with capacity [Sys.int_size], enough
+                   for one pending subtree per branching bit. Slots below
+                   [stack_size] contain nonempty trees; the rest are empty.
 
                    It is guaranteed that:
+
+                   - [0 <= stack_size <= Array.length stack].
 
                    - If [current] is [Null], the stack is empty.
 
@@ -1902,7 +1909,8 @@ end = struct
         let create () =
           { current = Or_null.null;
             current_key = 0 (* any value works *);
-            stack = Dynarray.create ()
+            stack = [||];
+            stack_size = 0
           }
 
         let current t =
@@ -1921,17 +1929,30 @@ end = struct
           t.current <- Or_null.this (leaf_datum l)
         [@@inline]
 
-        let push t tree = Dynarray.add_last t.stack tree [@@inline]
-
-        let pop_or_exhaust t ~then_ =
-          match Dynarray.pop_last t.stack with
-          | exception Not_found -> t.current <- Or_null.null
-          | tree -> (then_ [@inlined hint]) tree
+        let push t tree =
+          Array.unsafe_set t.stack t.stack_size (of_tree tree);
+          t.stack_size <- t.stack_size + 1
         [@@inline]
 
-        let reset t =
-          Dynarray.clear t.stack;
-          Dynarray.ensure_capacity t.stack Sys.int_size;
+        let pop_or_exhaust t ~then_ =
+          if t.stack_size = 0
+          then t.current <- Or_null.null
+          else
+            let index = t.stack_size - 1 in
+            match descr (Array.unsafe_get t.stack index) with
+            | Empty -> Misc.fatal_error "Patricia iterator: empty stack slot"
+            | Non_empty tree ->
+              Array.unsafe_set t.stack index (empty (is_value_of_tree tree));
+              t.stack_size <- index;
+              (then_ [@inlined hint]) tree
+        [@@inline]
+
+        let reset t iv =
+          let empty = empty iv in
+          if Array.length t.stack = 0
+          then t.stack <- Array.make Sys.int_size empty;
+          Array.fill t.stack 0 t.stack_size empty;
+          t.stack_size <- 0;
           t.current <- Or_null.null
       end :
         sig
@@ -1942,11 +1963,8 @@ end = struct
               - A stack of sub-trees to iterate on in the future. *)
           type 'a iterator
 
-          (** Create an empty iterator with no stack and no current key.
-
-              {b Warning}: this iterator has {b no} associated stack, and
-              calling [push] on an iterator created with [create_empty] will
-              raise [Misc.Fatal_error]. *)
+          (** Create an empty iterator with no stack storage and no current key.
+              Call [reset] before [push] to allocate the bounded stack. *)
           val create : unit -> 'a iterator
 
           val current : 'a iterator -> 'a Binding.t option
@@ -1955,10 +1973,8 @@ end = struct
 
           val set_current : 'a iterator -> ('a, leaf) tree -> unit
 
-          (** Push a new tree onto the stack.
-
-              This raises [Misc.Fatal_error] if the iterator was created with
-              [create_empty]. *)
+          (** Push a new tree onto the initialized stack. Its depth is bounded
+              by the number of branching bits, at most [Sys.int_size]. *)
           val push : 'a iterator -> ('a, non_empty) tree -> unit
 
           (** If the stack is not empty, pop the next tree from the top of the
@@ -1966,12 +1982,12 @@ end = struct
 
               Otherwise, exhaust the iterator (clear the current key).
 
-              {b Note}: This can safely be called on iterators that were created
-              with [create_empty] and will always exhaust these iterators. *)
+              {b Note}: This can safely be called before initialization and will
+              exhaust these iterators. *)
           val pop_or_exhaust :
             'a iterator -> then_:(('a, non_empty) tree -> unit) -> unit
 
-          val reset : 'a iterator -> unit
+          val reset : 'a iterator -> 'a is_value -> unit
         end)
 
     let rec unsigned_init t tree =
@@ -1982,7 +1998,7 @@ end = struct
         unsigned_init t (branch0 b)
 
     let init it t =
-      reset it;
+      reset it (is_value_of t);
       match descr t with
       | Empty -> ()
       | Non_empty tree -> (

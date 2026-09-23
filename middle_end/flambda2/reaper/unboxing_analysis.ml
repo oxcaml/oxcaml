@@ -784,7 +784,7 @@ let query_dominated_by =
     (let^$ [x], [y] = ["x"], ["y"] in
      [dominated_by_allocation_point x y] =>? [y])
 
-let perform_analysis0 db ~stats ~analysis_scope =
+let perform_analysis0 ?stats db ~analysis_scope =
   let db =
     Profile.record_call ~accumulate:true "compute_unboxing_decisions" (fun () ->
         (* We need to do this after [field_of_constructor_is_used] is computed,
@@ -812,7 +812,7 @@ let perform_analysis0 db ~stats ~analysis_scope =
             db
         in
         List.fold_left
-          (fun db rule -> Datalog.Schedule.run ~stats rule db)
+          (fun db rule -> Datalog.Schedule.run ?stats rule db)
           db
           (datalog_rules ~analysis_scope))
   in
@@ -980,12 +980,12 @@ let perform_analysis0 db ~stats ~analysis_scope =
   in
   db, unboxed, changed_representation
 
-let perform_analysis db ~stats ~analysis_scope =
+let perform_analysis ?stats db ~analysis_scope =
   let db, unboxed_fields, changed_representation =
     if
       Flambda_features.reaper_unbox ()
       && Flambda_features.reaper_change_calling_conventions ()
-    then perform_analysis0 db ~stats ~analysis_scope
+    then perform_analysis0 ?stats db ~analysis_scope
     else db, Code_id_or_name.Map.empty, Code_id_or_name.Map.empty
   in
   if Flambda_features.debug_reaper "db"

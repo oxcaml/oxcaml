@@ -27,6 +27,8 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
+open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
+
 type _ repr
 
 include Heterogenous_list.S with type 'a t := 'a repr

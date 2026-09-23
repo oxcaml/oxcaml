@@ -13,6 +13,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
+
 module Type : sig
   type (_, _) eq = Equal : ('a, 'a) eq
 end

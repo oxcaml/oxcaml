@@ -13,6 +13,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
+
 module Int = struct
   include Numbers.Int
   module Tree = Patricia_tree.Make (Numbers.Int)
@@ -71,7 +73,7 @@ module Id = struct
 
   let print ppf t = Format.fprintf ppf "%s" t.name
 
-  let hash { id; _ } = Hashtbl.hash (Type.Id.uid id)
+  let hash { id; _ } = Int.hash (Type.Id.uid id)
 
   let equal { id = id1; _ } { id = id2; _ } = Type.Id.uid id1 = Type.Id.uid id2
 
