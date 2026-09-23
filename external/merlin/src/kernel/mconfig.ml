@@ -776,6 +776,7 @@ let ocaml_ignored_flags =
     "-ftrap-notes";
     "-function-sections";
     "-functorize";
+    "-gc-sections";
     "-gdwarf-may-alter-codegen-experimental";
     "-gno-dwarf-may-alter-codegen-experimental";
     "-gno-startup";
@@ -784,6 +785,8 @@ let ocaml_ignored_flags =
     "-insn-sched";
     "-internal-assembler";
     "-long-frames";
+    "-no-export-dynamic";
+    "-no-gc-sections";
     "-no-insn-sched";
     "-no-long-frames";
     "-no-unbox-free-vars-of-closures";
