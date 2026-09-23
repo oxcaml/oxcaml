@@ -23,4 +23,28 @@ type one_slot_record = { payload : #(unit# * int); }
 val one_slot_record : one_slot_record = {payload = <abstr>}
 type inherited_one_slot = { inherit payload : #(unit# * int); }
 val inherited_one_slot : inherited_one_slot = {payload = <abstr>}
+type scalar_record = #{ scalar : float#; }
+val scalar_record : scalar_record = #{scalar = #3.5}
+val labeled : #(left:float# * name:string * empty:unit# * right:int64_u) =
+  <abstr>
+val numbers :
+  #(int8# * int16# * int32_u * nativeint_u * float32_u * float# * int64_u) =
+  <abstr>
+type nested = #{ a : t; b : #(unit# * string * float#); c : unit#; }
+val nested : nested = <abstr>
+type ('a : any) poly = #{ data : 'a; empty : unit#; }
+val poly : #(string * float#) poly = <abstr>
+val boxed_tuple : #(float# * string) * int64_u * nested =
+  (<abstr>, #2L, <abstr>)
+type variant = Product of #(float# * string) | Record of { data : nested; }
+val variant : variant = Product <unboxed product>
+val inline : variant = Record {data = <abstr>}
+module M : sig val product : #(float# * string * int64_u) end
+- : #(float# * string * int64_u) = <abstr>
+type cycle = { mutable next : #(int * cycle) option; }
+val cycle : cycle = {next = None}
+- : unit = ()
+- : cycle = {next = Some <unboxed product>}
+- : nested = <abstr>
+- : #(string * float#) poly = <abstr>
 
