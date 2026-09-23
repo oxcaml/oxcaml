@@ -132,6 +132,7 @@ let parse_flags flags =
         | 'x' -> 0x4L
         | 'M' -> 0x10L
         | 'S' -> 0x20L
+        | 'o' -> 0x80L (* SHF_LINK_ORDER *)
         (* CR mcollins - do we need to worry about group flags? *)
         | '?' -> 0x0L
         | 'G' -> 0x0L
@@ -141,16 +142,20 @@ let parse_flags flags =
   in
   inner 0L (String.to_seq flags ())
 
-let make_custom_section sections name raw_section ~align sh_string_table =
+let make_custom_section sections name raw_section ~align ~sh_type ?sh_link
+    sh_string_table =
   let flags = parse_flags (X86_proc.Section_name.flags name) in
   let args_align = X86_proc.Section_name.alignment name in
   let align = Int64.max args_align align in
-  make_section sections name
+  make_section sections name ~sh_type
     ~size:(Int64.of_int (X86_binary_emitter.size raw_section))
-    ~align ~flags
+    ~align ~flags ?sh_link
     ~body:(X86_binary_emitter.contents_mut raw_section)
     sh_string_table
 
+(* Returns the file offset of the new section: several sections may share a
+   name (link-order pieces), so their ".rela" sections cannot be found by
+   name when writing them out. *)
 let make_relocation_section sections ~sym_tbl_idx relocation_table
     sh_string_table =
   let name = Relocation_table.section_name relocation_table in
@@ -159,11 +164,13 @@ let make_relocation_section sections ~sym_tbl_idx relocation_table
       (Int64.of_int (Relocation_table.num_relocations relocation_table))
   in
   let idx = Section_table.get_sec_idx sections name in
+  let offset = Section_table.current_offset sections in
   make_section sections
     (Section_name.of_string (".rela" ^ Section_name.to_string name))
     ~sh_type:4 (* SHT_RELA *) ~size ~entsize:24L
     ~flags:0x40L (* SHF_INFO_LINK *) ~sh_link:sym_tbl_idx sh_string_table
-    ~align:8L ~sh_info:idx
+    ~align:8L ~sh_info:idx;
+  offset
 
 let assemble_one_section ~name instructions =
   let align =
@@ -180,9 +187,13 @@ let assemble_one_section ~name instructions =
       sec_instrs = DLL.to_array instructions
     }
 
+(* The result keeps the order of [sections]: it becomes the order of the
+   sections in the object file, which the linker preserves within an output
+   section. The layout of link-order sections (frametable pieces) depends on
+   it: a unit's text sections must lie between its code_begin and code_end. *)
 let get_sections ~delayed sections =
   X86_binary_emitter.clear_cross_section_labels ();
-  let get acc sections =
+  let get sections =
     (* Assemble text-like sections first: data sections may contain
        [Delta_uleb128] label differences that resolve only once the text
        sections holding those labels have been assembled. *)
@@ -191,9 +202,13 @@ let get_sections ~delayed sections =
         (fun (name, _) -> Section_name.is_text_like name)
         sections
     in
-    List.fold_left (fun acc (name, instructions) ->
-      Section_name.Map.add name (assemble_one_section ~name instructions) acc)
-      acc (text @ others)
+    let assembled = Section_name.Tbl.create 16 in
+    List.iter (fun (name, instructions) ->
+      Section_name.Tbl.replace assembled name
+        (assemble_one_section ~name instructions))
+      (text @ others);
+    List.map (fun (name, _) -> name, Section_name.Tbl.find assembled name)
+      sections
   in
   (* DWARF sections must be emitted after .text and .data because they
      contain information that is produced when .text and .data are emitted.
@@ -201,43 +216,88 @@ let get_sections ~delayed sections =
      from the start of the .text section.
      Additionally, DWARF sections may add relocations to the object file's
      relocation table. *)
-  let acc = Section_name.Map.empty in
-  let acc = get acc sections in
+  let sections = get sections in
   Emitaux.Dwarf_helpers.emit_delayed_dwarf ();
-  get acc (delayed ())
+  sections @ get (delayed ())
+
+let section_type name =
+  match Section_name.section_type name with
+  | Some "progbits" -> 1 (* SHT_PROGBITS *)
+  | Some "note" -> 7 (* SHT_NOTE *)
+  | Some "nobits" -> 8 (* SHT_NOBITS *)
+  | None -> if Section_name.is_note_like name then 7 else 1
+  | Some ty ->
+    Misc.fatal_errorf "internal_assembler: unsupported type %s of section %s"
+      ty (Section_name.to_string name)
+
+(* The section defining each symbol, for resolving the linked-to symbols of
+   SHF_LINK_ORDER sections to section indices. *)
+let defining_sections compiler_sections =
+  let tbl = String.Tbl.create 100 in
+  List.iter
+    (fun (name, (_align, raw_section)) ->
+      String.Tbl.iter
+        (fun sym_name (symbol : X86_binary_emitter.symbol) ->
+          if Option.is_some symbol.sy_pos
+          then String.Tbl.replace tbl sym_name name)
+        (X86_binary_emitter.labels raw_section))
+    compiler_sections;
+  tbl
+
+let link_section_idx section_table defining name =
+  match Section_name.link_symbol name with
+  | None -> None
+  | Some sym -> (
+    match String.Tbl.find_opt defining sym with
+    | None ->
+      Misc.fatal_errorf
+        "internal_assembler: linked-to symbol %s of section %s is not \
+         defined in this unit"
+        sym (Section_name.to_string name)
+    | Some defining_name -> (
+      match Section_table.get_sec_idx section_table defining_name with
+      | idx -> Some idx
+      | exception Not_found ->
+        Misc.fatal_errorf
+          "internal_assembler: linked-to symbol %s of section %s is defined \
+           in a section that itself has a linked-to symbol"
+          sym (Section_name.to_string name)))
 
 let make_compiler_sections section_table compiler_sections symbol_table
     sh_string_table =
   let section_symbols = Section_name.Tbl.create 100 in
-  Section_name.Map.iter
-    (fun name (align, raw_section) ->
-      if Section_name.is_text_like name
-      then
-        make_text section_table name raw_section ~align:(Int64.of_int align)
-          sh_string_table
-      else if Section_name.is_data_like name
-      then
-        make_data section_table name raw_section ~align:(Int64.of_int align)
-          sh_string_table
-      else if Section_name.is_note_like name
-      then
-        make_custom_section section_table name raw_section
-          ~align:(Int64.of_int align) ~sh_type:7 (* SHT_NOTE *) sh_string_table
-      else
-        make_custom_section section_table name raw_section
-          ~align:(Int64.of_int align) ~sh_type:1 (* SHT_PROGBITS *)
-          sh_string_table;
-      Section_name.Tbl.add section_symbols name
-        (Symbol_table.make_section_symbol symbol_table
-           (Section_table.num_sections section_table - 1)
-           section_table))
-    compiler_sections;
+  let defining = defining_sections compiler_sections in
+  let make (name, (align, raw_section)) =
+    let align = Int64.of_int align in
+    (if Section_name.is_text_like name
+    then make_text section_table name raw_section ~align sh_string_table
+    else if Section_name.is_data_like name
+    then make_data section_table name raw_section ~align sh_string_table
+    else
+      let sh_type = section_type name in
+      let sh_link = link_section_idx section_table defining name in
+      make_custom_section section_table name raw_section ~align ~sh_type
+        ?sh_link sh_string_table);
+    Section_name.Tbl.add section_symbols name
+      (Symbol_table.make_section_symbol symbol_table
+         (Section_table.num_sections section_table - 1)
+         section_table)
+  in
+  (* Link-order sections come after all others, so that the sections they
+     link to already have indices. *)
+  let linked, others =
+    List.partition
+      (fun (name, _) -> Option.is_some (Section_name.link_symbol name))
+      compiler_sections
+  in
+  List.iter make others;
+  List.iter make linked;
   section_symbols
 
 let make_symbols section_tables compiler_sections symbol_table section_symbols
     string_table =
-  Section_name.Map.iter
-    (fun section (align, raw_section) ->
+  List.iter
+    (fun (section, (align, raw_section)) ->
       let symbols = X86_binary_emitter.labels raw_section in
       String.Tbl.iter
         (fun name symbol ->
@@ -263,7 +323,7 @@ let create_relocation_tables compiler_sections symbol_table string_table =
                symbol_table string_table)
            l;
          Some relocation_table))
-    (Section_name.Map.bindings compiler_sections)
+    compiler_sections
 
 let write buf header section_table symbol_table relocation_tables string_table =
   Compiler_owee.Owee_elf.write_elf buf header (Section_table.get_sections section_table);
@@ -278,7 +338,7 @@ let write buf header section_table symbol_table relocation_tables string_table =
   in
   Symbol_table.write symbol_table symtab.sh_offset buf;
   List.iter
-    (fun t -> Relocation_table.write t section_table buf)
+    (fun (t, sh_offset) -> Relocation_table.write t ~sh_offset buf)
     relocation_tables;
   String_table.write string_table strtab.sh_offset buf
 
@@ -302,11 +362,14 @@ let assemble unix ~delayed asm output_file =
   let sym_tbl_idx =
     Section_table.num_sections sections + List.length relocation_tables
   in
-  List.iter
-    (fun relocation_table ->
-      make_relocation_section sections ~sym_tbl_idx relocation_table
-        sh_string_table)
-    relocation_tables;
+  let relocation_tables =
+    List.map
+      (fun relocation_table ->
+        ( relocation_table,
+          make_relocation_section sections ~sym_tbl_idx relocation_table
+            sh_string_table ))
+      relocation_tables
+  in
   let num_locals = Symbol_table.num_locals symbol_table in
   let strtabidx = 1 + Section_table.num_sections sections in
   make_section sections

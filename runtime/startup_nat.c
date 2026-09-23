@@ -201,7 +201,12 @@ struct caml_unit_deps_entry {
   const char *unit_name;       /* compilation unit name */
   void *entry_fn;              /* entry function (raw code pointer) */
   value *gc_roots;             /* pointer to gc_roots (module block) */
+#ifdef LINK_ORDER_FRAMETABLES
+  void *frametable_begin;      /* frametable descriptor range */
+  void *frametable_end;
+#else
   intnat *frametable;          /* pointer to frametable */
+#endif
   intnat num_deps;             /* number of dependencies */
   const intnat *dep_indices;   /* array of indices into caml_unit_deps_table */
   enum init_state init_state;  /* one of INIT_STATE_* */
@@ -297,9 +302,9 @@ static value caml_init_module_rec_exn(struct caml_unit_deps_entry *entry)
 
   /* Register gc_roots and frametable before calling the entry function,
      matching the ordering used by both the normal startup path (where
-     caml_globals[] and caml_frametable[] are statically available before
-     caml_program runs) and natdynlink (which registers both before calling
-     the entry point).
+     caml_globals[] and caml_frametable[] / caml_frametable_ranges[] are
+     statically available before caml_program runs) and natdynlink (which
+     registers both before calling the entry point).
 
      gc_roots must be registered before the frametables because
      caml_register_dyn_globals can raise (upon duplicate registration). */
@@ -308,10 +313,17 @@ static value caml_init_module_rec_exn(struct caml_unit_deps_entry *entry)
     caml_register_dyn_globals(globals, 1);
   }
 
+#ifdef LINK_ORDER_FRAMETABLES
+  if (entry->frametable_begin != NULL) {
+    caml_register_frametable_range(entry->frametable_begin,
+                                   entry->frametable_end);
+  }
+#else
   if (entry->frametable != NULL) {
     void *tables[1] = { (void *)entry->frametable };
     caml_register_frametables(tables, 1);
   }
+#endif
 
   /* Create a closure wrapper for the entry function.
      The closure has: code pointer at field 0, closinfo at field 1.

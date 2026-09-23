@@ -264,6 +264,8 @@ val classic_inlining : bool ref
 val afl_instrument : bool ref
 val afl_inst_ratio : int ref
 val function_sections : bool ref
+val gc_sections : bool ref
+val no_export_dynamic : bool ref
 val probes : bool ref
 val kind_verbosity : int ref
 val emit_optimized_probes : bool ref

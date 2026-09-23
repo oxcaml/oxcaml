@@ -27,6 +27,7 @@ type error =
   | Dsymutil_error of int
   | Objcopy_error of int
   | Cm_bundle_error of Cm_bundle.error
+  | No_export_dynamic_with_dynlink
 
 exception Error of error
 
@@ -309,6 +310,21 @@ let call_linker ?dissector_args file_list_rev startup_file output_name =
     then Ccomp.Partial
     else Ccomp.Exe
   in
+  (* Section GC only applies to executables linked the normal way (the
+     dissector links with its own linker script). [Ccomp.call_linker] puts
+     [all_ccopts] on the command line in reverse, so appending here places these
+     after [Config.mkexe]'s own options (such as -Wl,-E) and before the user's
+     -ccopt options, which therefore still take precedence. *)
+  (match dissector_args, mode with
+  | None, Ccomp.Exe ->
+    let gc_sections =
+      if !Clflags.gc_sections then ["-Wl,--gc-sections"] else []
+    in
+    let no_export_dynamic =
+      if !Clflags.no_export_dynamic then ["-Wl,--no-export-dynamic"] else []
+    in
+    Clflags.all_ccopts := !Clflags.all_ccopts @ gc_sections @ no_export_dynamic
+  | Some _, _ | None, (Ccomp.MainDll | Ccomp.Dll | Ccomp.Partial) -> ());
   (* Determine if we need to use a temporary file for objcopy workflow *)
   (* We disable the objcopy workflow if the output is piped to /dev/null. *)
   let needs_objcopy_workflow =
@@ -409,6 +425,16 @@ let link_actual unix linkenv ml_objfiles output_name ~cached_genfns_imports
     ~genfns ~units_tolink ~uses_eval ~quoted_cmi ~quoted_cmx ~ppf_dump : unit =
   if !Oxcaml_flags.internal_assembler
   then Emitaux.binary_backend_available := true;
+  (* Natdynlink resolves the executable's symbols from its dynamic symbol
+     table, which --no-export-dynamic leaves empty. *)
+  let is_dynlink cu =
+    String.equal (CU.Name.to_string (CU.name cu)) "Dynlink"
+  in
+  if !Clflags.no_export_dynamic
+     && List.exists
+          (fun u -> List.exists is_dynlink (u.name :: u.defines))
+          units_tolink
+  then raise (Error No_export_dynamic_with_dynlink);
   let named_startup_file = named_startup_file () in
   let startup =
     if named_startup_file
@@ -525,6 +551,10 @@ let report_error_doc ppf = function
     fprintf ppf
       "Missing implementation for module %a which is required by quote"
       CU.print_as_inline_code impl
+  | No_export_dynamic_with_dynlink ->
+    fprintf ppf
+      "-no-export-dynamic cannot be used when linking Dynlink:@ \
+       dynamically loaded code needs the executable's dynamic symbol table."
 
 let report_error = Format_doc.compat report_error_doc
 

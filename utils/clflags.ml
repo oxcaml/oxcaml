@@ -291,6 +291,8 @@ let afl_instrument = ref Config.afl_instrument (* -afl-instrument *)
 let afl_inst_ratio = ref 100           (* -afl-inst-ratio *)
 
 let function_sections = ref false      (* -function-sections *)
+let gc_sections = ref Config.gc_sections (* -gc-sections *)
+let no_export_dynamic = ref false      (* -no-export-dynamic *)
 let probes = ref Config.probes         (* -probes *)
 
 let kind_verbosity = ref 0             (* -kind-verbosity *)

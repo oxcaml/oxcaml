@@ -245,9 +245,9 @@ let command_line_options =
     "-fno-PIC", Arg.Clear Clflags.pic_code,
       " Generate position-dependent machine code";
     "-ftrap-notes", Arg.Set trap_notes,
-      " Emit .note.ocaml_eh section with trap handling information (default)";
+      " Emit ELF note section with trap handling information (default)";
     "-fno-trap-notes", Arg.Clear trap_notes,
-      " Do not emit .note.ocaml_eh section with trap handling information";
+      " Do not emit ELF note section with trap handling information";
     "-fno-asan",
       Arg.Clear is_asan_enabled,
       " Disable AddressSanitizer. This is only meaningful if the compiler was \

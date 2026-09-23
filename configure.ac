@@ -442,6 +442,8 @@ AC_SUBST([align_double])
 AC_SUBST([align_int64])
 AC_SUBST([flat_float_array])
 AC_SUBST([function_sections])
+AC_SUBST([link_order_frametables])
+AC_SUBST([gc_sections])
 AC_SUBST([oxcaml_dwarf_flags_for_compiler])
 AC_SUBST([assembly_flag_for_compiler])
 AC_SUBST([probes])
@@ -3234,7 +3236,8 @@ AS_IF([test x"$enable_function_sections" = "xno"],
           [gcc-*|clang-*],
             [function_sections=true;
             oc_native_compflags='-function-sections'
-            internal_cflags="$internal_cflags -ffunction-sections";
+            internal_cflags="$internal_cflags -ffunction-sections \
+-fdata-sections";
             AC_DEFINE([FUNCTION_SECTIONS], [1])],
           [function_sections=false;
           AC_MSG_NOTICE([Function sections are not supported by
@@ -3245,6 +3248,35 @@ AS_IF([test x"$enable_function_sections" = "xno"],
       [AC_MSG_ERROR([Function sections are not supported.])],
       [AC_MSG_NOTICE([Disabling function sections.])])],
     [])])
+
+# Link-order frametables: each function's frame descriptors live in a
+# caml_frametable piece linked (SHF_LINK_ORDER) to the function's text
+# section, so that the linker's --gc-sections drops them together.  Requires
+# function sections, an ELF target on amd64 or arm64 (the runtime's own
+# pieces live in runtime/amd64.S and runtime/arm64.S and use ELF section
+# syntax) and assembler support.  When they are available and the linker
+# accepts --gc-sections, executables are linked with --gc-sections by default
+# (ocamlopt -no-gc-sections opts out).
+link_order_frametables=false
+gc_sections=false
+AS_IF([test x"$function_sections" = "xtrue"],
+  [AS_CASE([$arch,$system],
+    [amd64,linux|amd64,freebsd|amd64,netbsd|amd64,openbsd|amd64,gnu \
+      |arm64,linux|arm64,freebsd|arm64,netbsd|arm64,openbsd],
+    [OCAML_AS_HAS_LINK_ORDER_SECTIONS
+     AS_IF([$asm_link_order_supported],
+       [link_order_frametables=true
+        AC_DEFINE([LINK_ORDER_FRAMETABLES], [1])
+        AC_MSG_CHECKING([whether the linker supports --gc-sections])
+        SAVED_LDFLAGS="$LDFLAGS"
+        LDFLAGS="$LDFLAGS -Wl,--gc-sections -Wl,--no-export-dynamic"
+        AC_LINK_IFELSE([AC_LANG_PROGRAM([], [])],
+          [gc_sections=true
+           AC_MSG_RESULT([yes])],
+          [AC_MSG_RESULT([no])])
+        LDFLAGS="$SAVED_LDFLAGS"],
+       [AC_MSG_NOTICE([Disabling link-order frametables.])])],
+    [AC_MSG_NOTICE([No support for link-order frametables on $target.])])])
 
 AS_CASE([$arch],
   [amd64|arm64],

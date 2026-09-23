@@ -369,9 +369,14 @@ let reset_asm_code () = DLL.clear asm_code
 (* The instructions are emitted as a single flat stream, [asm_code]; the
    internal assembler consumes them grouped by section. [collect_sections] walks
    the stream and groups the lines according to the [Section] directives, which
-   act as separators and do not appear in the result. *)
+   act as separators and do not appear in the result. The sections are returned
+   in order of first occurrence, which is the order they would have in a text
+   assembly file; the internal assembler relies on it for the layout of
+   link-order sections (e.g. a unit's code_begin section must precede its
+   function sections, which must precede its code_end section). *)
 let collect_sections ~is_delayed =
   let sections = Section_name.Tbl.create 16 in
+  let order = ref [] in
   let current = ref None in
   DLL.iter asm_code ~f:(fun line ->
       match[@warning "-4"] line with
@@ -392,11 +397,10 @@ let collect_sections ~is_delayed =
           | None ->
             let instrs = DLL.make_empty () in
             Section_name.Tbl.add sections name instrs;
+            order := (name, instrs) :: !order;
             current := Some instrs)
       | dir -> !current |> Option.iter (fun instrs -> DLL.add_end instrs dir));
-  Section_name.Tbl.fold
-    (fun name instrs acc -> (name, instrs) :: acc)
-    sections []
+  List.rev !order
 
 type output_pos = asm_line DLL.cell option (* None means the beginning *)
 

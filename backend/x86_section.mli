@@ -32,6 +32,12 @@ module Section_name : sig
 
   val flags : t -> string option
 
+  (** The linked-to symbol of a section with the "o" (SHF_LINK_ORDER) flag. *)
+  val link_symbol : t -> string option
+
+  (** The section type operand, e.g. "progbits" or "note", if any. *)
+  val section_type : t -> string option
+
   val alignment : t -> int64
 
   val is_text_like : t -> bool

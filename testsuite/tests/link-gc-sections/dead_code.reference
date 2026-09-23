@@ -1,0 +1,7 @@
+caught Deep 5
+Raised at Dead_code_lib.frame3 in file "dead_code_lib.ml", line 8, characters 17-31
+Called from Dead_code_lib.frame2 in file "dead_code_lib.ml", line 10, characters 30-44
+Called from Dead_code_lib.frame1 in file "dead_code_lib.ml", line 12, characters 30-44
+Called from Dead_code_lib.live in file "dead_code_lib.ml", line 14, characters 35-45
+Called from Dead_code in file "dead_code.ml", line 51, characters 7-27
+churn 20

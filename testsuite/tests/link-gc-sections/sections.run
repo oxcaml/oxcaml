@@ -1,0 +1,51 @@
+#!/bin/sh
+
+exec > "${output}" 2>&1
+
+# First, run the program to make sure it works.
+${program}
+
+# Now check the assembly file produced during compilation.
+asm=${test_build_directory}/sections.s
+
+count () {
+  grep -c -E "$1" "$asm"
+}
+
+# At least one link-order frametable piece.
+n=$(count 'caml_frametable,"ao",@progbits,')
+if [ "$n" -ge 1 ]; then echo "frametable pieces: some"; \
+  else echo "frametable pieces: NONE"; fi
+
+# No plain (non link-order) frametable piece: such a piece would be silently
+# laid out outside every unit's range.
+echo "plain frametable pieces: $(count 'caml_frametable,"a",')"
+
+# Exactly one definition of each marker.
+echo "frametable_begin definitions: $(count '__frametable_begin:')"
+echo "frametable_end definitions: $(count '__frametable_end:')"
+
+# The old per-unit frametable symbol is gone.
+echo "old frametable symbols: $(count '__frametable:')"
+
+# No empty frametable piece: a function without frame descriptors gets no
+# piece at all, so no frametable section directive is immediately followed by
+# another section directive.
+empty=$(awk '
+  prev && /^[[:space:]]*\.section/ { n++ }
+  { prev = /caml_frametable,"ao",/ }
+  END { print n + 0 }' "$asm")
+echo "empty frametable pieces: $empty"
+
+# Trap notes are writable link-order pieces (the runtime patches them).
+n=$(count '\.ocaml_eh_notes,"awo",@note,')
+if [ "$n" -ge 1 ]; then echo "trap note pieces: some"; \
+  else echo "trap note pieces: NONE"; fi
+
+# Per-symbol data sections.
+n=$(count '\.data\.caml\.')
+if [ "$n" -ge 1 ]; then echo "data sections: some"; \
+  else echo "data sections: NONE"; fi
+
+# No per-unit jump table section.
+echo "jump table sections: $(count '__jump_tables')"

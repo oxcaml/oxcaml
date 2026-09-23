@@ -35,4 +35,5 @@ val num_relocations : t -> int
 
 val section_name : t -> X86_proc.Section_name.t
 
-val write : t -> Section_table.t -> Compiler_owee.Owee_buf.t -> unit
+(** [sh_offset] is the file offset of the table's ".rela" section. *)
+val write : t -> sh_offset:int64 -> Compiler_owee.Owee_buf.t -> unit

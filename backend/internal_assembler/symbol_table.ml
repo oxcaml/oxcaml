@@ -101,12 +101,15 @@ let get_label_idx t name =
   let idx = (IntTbl.find t.section_symbol_tbl (Symbol_entry.get_shndx symbol)) + 1 in
   label, idx
 
+(* Symbol order: locals, weak, globals. Undefined globals are added while
+   relocations are being created, so the indices of weak symbols must not
+   depend on the number of globals. *)
 let get_symbol_idx_opt t name =
   match String.Tbl.find_opt t.global_symbols_tbl name with
-  | Some idx -> Some (t.local_num_symbols + idx + 1)
+  | Some idx -> Some (t.local_num_symbols + t.weak_num_symbols + idx + 1)
   | None ->
     begin match String.Tbl.find_opt t.weak_symbols_tbl name with
-    | Some idx -> Some (t.local_num_symbols + t.global_num_symbols + idx + 1)
+    | Some idx -> Some (t.local_num_symbols + idx + 1)
     | None ->
       String.Tbl.find_opt t.local_symbols_tbl name |> Option.map succ
     end
@@ -143,4 +146,5 @@ let write t sh_offset buf =
     (fun i symbol ->
       let idx = ((i + 1) * 24) + Int64.to_int sh_offset in
       Symbol_entry.write symbol (Compiler_owee.Owee_buf.cursor buf ~at:idx))
-    (List.rev t.local_symbols @ List.rev t.global_symbols @ List.rev t.weak_symbols)
+    (List.rev t.local_symbols @ List.rev t.weak_symbols
+    @ List.rev t.global_symbols)

@@ -1,0 +1,7 @@
+plugin loaded
+caught Boom 42
+Raised at Host_api.boom in file "host_api.ml", line 8, characters 42-62
+Called from Plugin.call_host in file "plugin.ml", line 5, characters 10-31
+Called from Plugin.(fun) in file "plugin.ml", line 11, characters 4-16
+Called from Dynlink_host.run_callback in file "dynlink_host.ml", line 48, characters 2-23
+Called from Dynlink_host in file "dynlink_host.ml", line 55, characters 6-21

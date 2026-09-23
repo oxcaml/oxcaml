@@ -28,7 +28,37 @@
 /* The compiler generates a "frame descriptor" for every potential
  * return address. Each loaded module has a block of memory, the
  * "frame table", consisting of these frame descriptors
- * concatenated. Each frame descriptor includes:
+ * concatenated. The runtime supports two frametable layouts, selected
+ * at configure time (LINK_ORDER_FRAMETABLES); the compiler and the
+ * runtime must agree on the layout.
+ *
+ * Count-prefixed layout (LINK_ORDER_FRAMETABLES undefined): a
+ * frametable is a word-aligned block whose first word is the number
+ * of descriptors, followed by the descriptors. The startup code lists
+ * the tables of all statically linked units in caml_frametable[], a
+ * NULL-terminated array of table pointers; natdynlink finds a unit's
+ * table through the symbol caml<U>__frametable.
+ *
+ * Link-order layout (LINK_ORDER_FRAMETABLES defined): a unit's
+ * frametable is the byte range [caml<U>__frametable_begin,
+ * caml<U>__frametable_end) of the ELF section caml_frametable, with
+ * no count word. The compiler emits the descriptors of each text
+ * section as a separate "piece" of that section, linked (SHF_LINK_ORDER)
+ * to the text section they describe, so that the linker drops the
+ * descriptors of code it discards and lays the surviving pieces out in
+ * the address order of their text sections; the begin and end markers
+ * are pieces linked to the unit's code_begin and code_end sections.
+ * The first descriptor of every piece is escaped (see below), so a
+ * piece boundary is decoded exactly like the start of a table, and
+ * pieces carry no alignment padding whatsoever (a pad byte cannot be
+ * told apart from a descriptor), so the section's alignment is 1 and
+ * pieces concatenate byte-contiguously. The startup code lists the
+ * ranges of all statically linked units in caml_frametable_ranges[],
+ * a flat array begin0, end0, begin1, end1, ... terminated by a NULL
+ * begin. The runtime's own descriptors (runtime/<arch>.S) form the
+ * unit "system" in either layout.
+ *
+ * Each frame descriptor includes:
  *
  * - frame_return_to_C(): Whether the return is to C from OCaml, in
  *   which case there is no actual stack frame, GC roots, allocation
@@ -72,8 +102,9 @@
  * Any descriptor not fitting the constraints of the "short" layout
  * begins with a zero byte (FRAME_DELTA_ESCAPE). Since a zero "delta"
  * is impossible, this marks it as non-short ("medium" or "long", see
- * below). This includes the first descriptor of any frametable (no
- * previous return address), and the first descriptor in any section.
+ * below). This includes the first descriptor of any frametable or
+ * piece (no previous return address), and the first descriptor in any
+ * section.
  *
  * "Short" layout:
  *
@@ -134,9 +165,10 @@
  *
  * Each debug word is the byte offset, from its own address, of a
  * debuginfo record chain or suffix-sharing jump word (see
- * runtime/backtrace_nat.c); these are emitted after the descriptors,
- * so the offset is positive. In an allocating frame a zero word means
- * that allocation has no debuginfo. */
+ * runtime/backtrace_nat.c); these are emitted after the descriptors
+ * (in the unit's read-only data, in the link-order layout). In an
+ * allocating frame a zero word means that allocation has no
+ * debuginfo. */
 
 typedef unsigned char frame_descr;
 
@@ -277,8 +309,17 @@ Caml_inline bool frame_has_debug(frame_descr *d) {
 
 void caml_init_frame_descriptors(void);
 
+/* Register count-prefixed frametables. */
 void caml_register_frametables(void **tables, int ntables);
 void caml_register_frametable(void *table);
+
+/* Register link-order frametables, each the descriptor byte range
+   [begins[i], ends[i]) with no count word. A range is identified by
+   its begin pointer when unregistering. */
+void caml_register_frametable_ranges(void **begins, void **ends,
+                                     int ntables);
+void caml_register_frametable_range(void *begin, void *end);
+void caml_unregister_frametable_range(void *begin);
 
 /* Create copies of the frametables and register them in the runtime.
    It writes back the pointers of the new copies of the frametables.
@@ -294,9 +335,12 @@ void* caml_copy_and_register_frametable(void *table, int size);
 void caml_unregister_frametables(void **tables, int ntables);
 void caml_unregister_frametable(void *table);
 
-/* a linked list of frametables */
+/* a linked list of frametables, in either layout */
 typedef struct caml_frametable_list {
+  /* Count-prefixed table, or first descriptor of a range */
   intnat* frametable;
+  /* One past the last descriptor of a range; NULL if count-prefixed */
+  const unsigned char *end;
   struct caml_frametable_list *next;
 } caml_frametable_list;
 

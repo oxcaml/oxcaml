@@ -4653,7 +4653,8 @@ let make_symbol ?compilation_unit name =
      compiler currently hardcode the symbol names and some symbols should use C
      linkage names to be referenced from the runtime (e.g., frame tables and GC
      roots). [make_symbol] is called, for example, for [code_begin], [code_end],
-     [data_begin], [data_end], [entry], [frametable], [gc_roots], and
+     [data_begin], [data_end], [entry], [frametable] (or [frametable_begin] and
+     [frametable_end] with link-order frametables), [gc_roots], and
      [jump_tables]. *)
   Symbol.for_name compilation_unit name
   |> Symbol.linkage_name |> Linkage_name.to_string
@@ -4900,8 +4901,14 @@ let unit_deps_table units =
         let gc_roots_sym =
           global_symbol (make_symbol ~compilation_unit:cu "gc_roots")
         in
-        let frametable_sym =
-          global_symbol (make_symbol ~compilation_unit:cu "frametable")
+        let frametable_items =
+          let sym name =
+            Csymbol_address
+              (global_symbol (make_symbol ~compilation_unit:cu name))
+          in
+          if Config.link_order_frametables
+          then [sym "frametable_begin"; sym "frametable_end"]
+          else [sym "frametable"]
         in
         let num_deps =
           List.length
@@ -4915,14 +4922,13 @@ let unit_deps_table units =
           | None -> cint_zero
           | Some arr_sym -> Csymbol_address arr_sym
         in
-        [ Csymbol_address name_sym;
-          Csymbol_address entry_sym;
-          Csymbol_address gc_roots_sym;
-          Csymbol_address frametable_sym;
-          Cint (Nativeint.of_int num_deps);
-          deps_sym_item;
-          Cint 1n (* init_state: INIT_STATE_NOT_INITIALIZED = Val_int(0) *);
-          Cint 1n (* raised_exn: Val_unit (no exception yet) *) ])
+        [Csymbol_address name_sym; Csymbol_address entry_sym;
+         Csymbol_address gc_roots_sym]
+        @ frametable_items
+        @ [ Cint (Nativeint.of_int num_deps);
+            deps_sym_item;
+            Cint 1n (* init_state: INIT_STATE_NOT_INITIALIZED = Val_int(0) *);
+            Cint 1n (* raised_exn: Val_unit (no exception yet) *) ])
       sorted_units
   in
   Cdata (string_data @ dep_arrays @ table_header @ table_entries)
@@ -4936,18 +4942,6 @@ let global_data sym_name v =
   Cdata (emit_string_constant symbol (Marshal.to_string v []) [])
 
 let globals_map v = global_data "caml_globals_map" v
-
-(* Generate the master table of frame descriptors *)
-
-let frame_table namelist =
-  let mksym name =
-    Csymbol_address
-      (global_symbol (make_symbol ~compilation_unit:name "frametable"))
-  in
-  Cdata
-    (Cdefine_symbol (global_symbol "caml_frametable")
-     :: List.map mksym namelist
-    @ [cint_zero])
 
 (* Generate the table of module data and code segments *)
 
@@ -4967,6 +4961,25 @@ let data_segment_table namelist =
 
 let code_segment_table namelist =
   segment_table namelist "caml_code_segments" "code_begin" "code_end"
+
+(* Generate the master table of frame descriptors *)
+
+let frame_table namelist =
+  if Config.link_order_frametables
+  then
+    (* Each unit's descriptors form a byte range delimited by its
+       [frametable_begin] and [frametable_end] markers. *)
+    segment_table namelist "caml_frametable_ranges" "frametable_begin"
+      "frametable_end"
+  else
+    let mksym name =
+      Csymbol_address
+        (global_symbol (make_symbol ~compilation_unit:name "frametable"))
+    in
+    Cdata
+      (Cdefine_symbol (global_symbol "caml_frametable")
+       :: List.map mksym namelist
+      @ [cint_zero])
 
 (* Initialize a predefined exception *)
 

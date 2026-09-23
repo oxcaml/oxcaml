@@ -39,18 +39,11 @@ let num_relocations t = List.length t.relocations
 
 let section_name t = t.section
 
-let write t section_table buf =
-  match
-    Section_table.get_section_opt section_table
-      (X86_proc.Section_name.of_string
-         (".rela" ^ X86_proc.Section_name.to_string t.section))
-  with
-  | Some table ->
-    List.iteri
-      (fun i relocation ->
-        let open Compiler_owee.Owee_buf in
-        (* 24 is the size of each relocation entry *)
-        let idx = (i * 24) + Int64.to_int table.sh_offset in
-        Relocation_entry.write relocation (cursor buf ~at:idx))
-      t.relocations
-  | None -> ()
+let write t ~sh_offset buf =
+  List.iteri
+    (fun i relocation ->
+      let open Compiler_owee.Owee_buf in
+      (* 24 is the size of each relocation entry *)
+      let idx = (i * 24) + Int64.to_int sh_offset in
+      Relocation_entry.write relocation (cursor buf ~at:idx))
+    t.relocations

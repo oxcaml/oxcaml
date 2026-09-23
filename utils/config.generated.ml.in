@@ -69,6 +69,8 @@ let align_double = @align_double@
 let align_int64 = @align_int64@
 
 let function_sections = @function_sections@
+let link_order_frametables = @link_order_frametables@
+let gc_sections = @gc_sections@
 let probes = @probes@
 let afl_instrument = @afl@
 let stack_allocation = @stack_allocation@

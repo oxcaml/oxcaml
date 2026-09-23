@@ -1619,8 +1619,18 @@ G(caml_system__code_end):
 
 /* Frametable - GC roots for callback */
 /* Uses the same naming convention as ocamlopt generated modules. */
+#if defined(LINK_ORDER_FRAMETABLES)
+        /* Link-order layout (ELF only): one piece of the caml_frametable
+           section, linked to a text section of this file so that it is kept
+           whenever caml_start_program is, holding the unit's begin and end
+           markers. No count word and no alignment (see frame_descriptors.h). */
+        .section caml_frametable,"ao",%progbits,G(caml_start_program)
+        .globl  G(CAMLSEP(system,frametable_begin))
+G(CAMLSEP(system,frametable_begin)):
+#else
 OBJECT(CAMLSEP(system,frametable))
         .quad   2                   /* two descriptors */
+#endif
         /* Each descriptor is preceded by a "delta" byte. These return-to-C
            descriptors do not fit the "short" format, so each escapes: a 0
            delta byte followed by a descriptor in the medium format (which
@@ -1633,6 +1643,11 @@ OBJECT(CAMLSEP(system,frametable))
         .4byte  L(frame_runstack) - . /* return address into fiber handler */
         .short  -1                    /* negative frame size => use callback link */
         .short  0                     /* no roots here */
+#if defined(LINK_ORDER_FRAMETABLES)
+        .globl  G(CAMLSEP(system,frametable_end))
+G(CAMLSEP(system,frametable_end)):
+#else
         END_OBJECT(CAMLSEP(system,frametable))
+#endif
 
         NONEXECSTACK_NOTE

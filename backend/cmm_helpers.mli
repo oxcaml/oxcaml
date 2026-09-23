@@ -749,7 +749,8 @@ val entry_point : Compilation_unit.t list -> phrase list
 val global_table : Compilation_unit.t list -> phrase
 
 (** Generate the caml_unit_deps_table for shared objects / complete objects.
-    Maps compilation unit names to their entry functions, gc_roots, and
+    Maps compilation unit names to their entry functions, gc_roots, frametable
+    (a (begin, end) range with [Config.link_order_frametables]), and
     dependencies. *)
 val unit_deps_table : (Compilation_unit.t * Import_info.t list) list -> phrase
 
@@ -764,7 +765,9 @@ val globals_map :
   phrase
 
 (** Generate the caml_frametable table, referencing the frametables from the
-    given compilation units *)
+    given compilation units; or, with [Config.link_order_frametables], the
+    caml_frametable_ranges table of their (frametable_begin, frametable_end)
+    address ranges, terminated by a null begin *)
 val frame_table : Compilation_unit.t list -> phrase
 
 (** Generate the tables for data and code positions respectively of the given

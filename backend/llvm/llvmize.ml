@@ -1980,6 +1980,11 @@ let assemble_file ~asm_filename ~obj_filename =
    passed, which it shouldn't do. *)
 
 let begin_assembly ~is_startup ~sourcefile =
+  if Config.link_order_frametables
+  then
+    Misc.fatal_error
+      "The LLVM backend does not support link-order frametables yet; this \
+       compiler was configured with them (see [Config.link_order_frametables])";
   let t = get_current_compilation_unit "begin_asm" in
   t.sourcefile <- sourcefile;
   t.is_startup <- is_startup

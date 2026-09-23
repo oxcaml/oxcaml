@@ -57,6 +57,9 @@ type t =
   | Note_ocaml_eh
   | Note_gnu_stack
   | Debuginfo_strings
+  | Data_symbol of string
+  | Frametable_piece of { link_symbol : string }
+  | Eh_notes_piece of { link_symbol : string }
   | Custom of
       { names : string list;
         flags : string option;
@@ -89,7 +92,8 @@ let is_delayed = function
   | Data | Read_only_data | Eight_byte_literals | Sixteen_byte_literals
   | Thirtytwo_byte_literals | Sixtyfour_byte_literals | Jump_tables | Text
   | Function_text _ | Stapsdt_base | Stapsdt_note | Probes | Note_ocaml_eh
-  | Note_gnu_stack | Debuginfo_strings ->
+  | Note_gnu_stack | Debuginfo_strings | Data_symbol _ | Frametable_piece _
+  | Eh_notes_piece _ ->
     false
   | Custom { is_delayed; _ } -> is_delayed
 
@@ -121,6 +125,11 @@ let print ppf t =
     | Note_ocaml_eh -> "Note_ocaml_eh"
     | Note_gnu_stack -> "Note_gnu_stack"
     | Debuginfo_strings -> "Debuginfo_strings"
+    | Data_symbol sym -> Printf.sprintf "(Data_symbol %s)" sym
+    | Frametable_piece { link_symbol } ->
+      Printf.sprintf "(Frametable_piece %s)" link_symbol
+    | Eh_notes_piece { link_symbol } ->
+      Printf.sprintf "(Eh_notes_piece %s)" link_symbol
     | Custom { names; _ } ->
       Printf.sprintf "(Custom %s)" (String.concat " " names)
   in
@@ -145,7 +154,7 @@ let section_is_text = function
   | Data | Read_only_data | Eight_byte_literals | Sixteen_byte_literals
   | Thirtytwo_byte_literals | Sixtyfour_byte_literals | Jump_tables | DWARF _
   | Stapsdt_base | Stapsdt_note | Probes | Note_ocaml_eh | Note_gnu_stack
-  | Debuginfo_strings ->
+  | Debuginfo_strings | Data_symbol _ | Frametable_piece _ | Eh_notes_piece _ ->
     false
   | Custom { flags; _ } -> (
     (* Check if the section is executable based on flags *)
@@ -277,6 +286,24 @@ let details t first_occurrence =
       in
       [".rodata.str1.1"], Some "aMS", [progbits; "1"]
     (* 1 = characters *)
+    (* Per-symbol data sections and link-order pieces are ELF-only. *)
+    | ( Data_symbol _,
+        _,
+        (MacOS_like | MinGW_32 | MinGW_64 | Win32 | Win64 | Cygwin) ) ->
+      data ()
+    | Data_symbol sym, _, _ -> [".data.caml." ^ sym], Some "aw", ["@progbits"]
+    | ( (Frametable_piece _ | Eh_notes_piece _),
+        _,
+        (MacOS_like | MinGW_32 | MinGW_64 | Win32 | Win64 | Cygwin) ) ->
+      Misc.fatal_error "Link-order sections are only supported on ELF targets."
+    (* "ao" = SHF_ALLOC | SHF_LINK_ORDER: the linker keeps and orders a piece
+       with the section containing [link_symbol]. *)
+    | Frametable_piece { link_symbol }, _, _ ->
+      ["caml_frametable"], Some "ao", ["@progbits"; link_symbol]
+    (* Writable ("w") too: the note records hold absolute addresses, so in a
+       shared object a read-only piece would need text relocations. *)
+    | Eh_notes_piece { link_symbol }, _, _ ->
+      [".ocaml_eh_notes"], Some "awo", ["@note"; link_symbol]
     | Custom { names; flags; args; _ }, _, _ -> names, flags, args
   in
   let is_delayed = is_delayed t in
@@ -332,6 +359,10 @@ let of_names names =
          && String.equal (String.sub name 0 5) ".text"
          && Char.equal name.[5] '.' ->
     Some (Function_text name)
+  | [name]
+    when String.length name > 11
+         && String.equal (String.sub name 0 11) ".data.caml." ->
+    Some (Data_symbol (String.sub name 11 (String.length name - 11)))
   | _ -> None
 
 let to_string t =

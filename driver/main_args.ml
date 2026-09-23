@@ -126,6 +126,27 @@ let mk_function_sections f =
     in
     "-function-sections", Arg.Unit err, " (option not available)"
 
+let mk_gc_sections f =
+  if Config.gc_sections then
+    "-gc-sections", Arg.Unit f,
+    " Link executables with --gc-sections to drop unreferenced functions \
+     and data (default)"
+  else
+    let err () =
+      raise (Arg.Bad "OCaml has been configured without support for \
+                      -gc-sections")
+    in
+    "-gc-sections", Arg.Unit err, " (option not available)"
+
+let mk_no_gc_sections f =
+  "-no-gc-sections", Arg.Unit f,
+  " Do not link executables with --gc-sections"
+
+let mk_no_export_dynamic f =
+  "-no-export-dynamic", Arg.Unit f,
+  " Link executables with --no-export-dynamic, letting --gc-sections drop \
+   unreferenced global symbols too (incompatible with Dynlink)"
+
 let mk_stop_after ~native f =
   let pass_names = Clflags.Compiler_pass.available_pass_names
                      ~filter:(fun _ -> true)
@@ -1440,6 +1461,9 @@ module type Optcomp_options = sig
   val _afl_instrument : unit -> unit
   val _afl_inst_ratio : int -> unit
   val _function_sections : unit -> unit
+  val _gc_sections : unit -> unit
+  val _no_gc_sections : unit -> unit
+  val _no_export_dynamic : unit -> unit
   val _save_ir_after : string -> unit
   val _save_ir_before : string -> unit
   val _probes : unit -> unit
@@ -1829,6 +1853,9 @@ struct
     mk_g_opt F._g;
     mk_no_g F._no_g;
     mk_function_sections F._function_sections;
+    mk_gc_sections F._gc_sections;
+    mk_no_gc_sections F._no_gc_sections;
+    mk_no_export_dynamic F._no_export_dynamic;
     mk_stop_after ~native:true F._stop_after;
     mk_save_ir_after ~native:true F._save_ir_after;
     mk_save_ir_before ~native:true F._save_ir_before;
@@ -2780,8 +2807,14 @@ module Default = struct
     let _afl_instrument = set afl_instrument
     let _function_sections () =
       assert Config.function_sections;
-      Compenv.first_ccopts := ("-ffunction-sections" ::(!Compenv.first_ccopts));
+      Compenv.first_ccopts :=
+        "-ffunction-sections" :: "-fdata-sections" :: !Compenv.first_ccopts;
       function_sections := true
+    let _gc_sections () =
+      assert Config.gc_sections;
+      gc_sections := true
+    let _no_gc_sections = clear gc_sections
+    let _no_export_dynamic = set no_export_dynamic
     let _nodynlink = clear dlcode
     let _output_complete_obj () =
       set output_c_object (); set output_complete_object ()

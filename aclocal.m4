@@ -263,6 +263,42 @@ camlConftest__entry:
   OCAML_CC_RESTORE_VARIABLES
 ])
 
+dnl Probe whether the assembler accepts an ELF section with the "o"
+dnl (SHF_LINK_ORDER) flag whose linked-to section is given by a symbol, as
+dnl used for link-order frametables.  GNU as accepts the symbol form from
+dnl binutils 2.35; older versions and some other assemblers either reject it
+dnl or accept it with a warning, so any diagnostic counts as failure.
+AC_DEFUN([OCAML_AS_HAS_LINK_ORDER_SECTIONS], [
+  AC_MSG_CHECKING([whether the assembler supports link-order sections])
+  OCAML_CC_SAVE_VARIABLES
+  saved_ac_c_werror_flag="$ac_c_werror_flag"
+
+  # Modify C-compiler variables to use the assembler
+  CC="$AS"
+  CFLAGS="-o conftest.$ac_objext"
+  CPPFLAGS=""
+  ac_ext="S"
+  ac_compile='$CC $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
+  # Treat any output on stderr as failure
+  ac_c_werror_flag=yes
+
+  AC_COMPILE_IFELSE(
+    [AC_LANG_SOURCE([
+        .text
+foo:
+        .long   0
+        .section caml_frametable,"ao",@progbits,foo
+        .long   0
+    ])],
+    [asm_link_order_supported=true
+    AC_MSG_RESULT([yes])],
+    [asm_link_order_supported=false
+    AC_MSG_RESULT([no])])
+
+  ac_c_werror_flag="$saved_ac_c_werror_flag"
+  OCAML_CC_RESTORE_VARIABLES
+])
+
 AC_DEFUN([OCAML_MMAP_SUPPORTS_MAP_STACK], [
   AC_MSG_CHECKING([whether mmap supports MAP_STACK])
   AC_RUN_IFELSE(

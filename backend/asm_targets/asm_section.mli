@@ -58,6 +58,17 @@ type t =
   | Note_ocaml_eh
   | Note_gnu_stack
   | Debuginfo_strings  (** Mergeable string section for debuginfo strings *)
+  | Data_symbol of string
+      (** Per-symbol data section ".data.caml.<sym>" (ELF only; [Data]
+          elsewhere), so that the linker can discard unreferenced data. *)
+  | Frametable_piece of { link_symbol : string }
+      (** A piece of the "caml_frametable" section holding the frame descriptors
+          of the text section that starts at [link_symbol] (the encoded
+          assembler name). Emitted with SHF_LINK_ORDER, so the linker keeps the
+          piece iff it keeps that text section and lays the pieces out in text
+          order. ELF only. *)
+  | Eh_notes_piece of { link_symbol : string }
+      (** Likewise for the ".ocaml_eh_notes" trap notes. *)
   | Custom of
       { names : string list;
         flags : string option;

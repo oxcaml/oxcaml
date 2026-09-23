@@ -961,6 +961,11 @@ let switch_to_section_raw ~names ~flags ~args ~is_delayed =
 let unsafe_set_internal_section_ref section =
   current_section_ref := Some section
 
+let current_section () =
+  match !current_section_ref with
+  | None -> not_initialized ()
+  | Some section -> section
+
 let text () = switch_to_section Asm_section.Text
 
 let data () = switch_to_section Asm_section.Data

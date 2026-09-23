@@ -574,3 +574,7 @@ val with_measuring : f:(unit -> 'a) -> 'a
 (** Directly set the internal section ref. Use this function with caution. It
     only makes sense when you manually switch directly to a section. *)
 val unsafe_set_internal_section_ref : Asm_section.t -> unit
+
+(** The section most recently switched to (via [switch_to_section] or
+    [unsafe_set_internal_section_ref]). *)
+val current_section : unit -> Asm_section.t

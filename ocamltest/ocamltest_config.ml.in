@@ -100,6 +100,8 @@ let windows_unicode = @windows_unicode@ != 0
 
 let function_sections = @function_sections@
 
+let link_order_frametables = @link_order_frametables@
+
 let instrumented_runtime = @instrumented_runtime@
 
 let frame_pointers = @frame_pointers@

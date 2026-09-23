@@ -89,8 +89,32 @@ type emit_frame_actions =
    [Read_only_data]. Debuginfo strings go in [debug_strings_section]: pass
    [Asm_section.Debuginfo_strings] so that the linker de-duplicates them, or
    [Read_only_data] to keep them inline in the frametable (the binary emitter
-   needs this, having no relocations that can target the mergeable section). *)
+   needs this, having no relocations that can target the mergeable section).
+
+   Equivalent to a count word, [emit_frames_for_function] and
+   [emit_frames_tail]. *)
 val emit_frames :
+  debug_strings_section:Asm_targets.Asm_section.t -> emit_frame_actions -> unit
+
+(** Emits the frame descriptors recorded since the last call (in return-address
+    order, the first one escaping to the full format) into the current section,
+    then forgets them. No count word and no alignment directive are emitted, so
+    the caller can direct each function's descriptors into a link-order
+    [Asm_section.Frametable_piece]. The descriptors' debuginfo words are 32-bit
+    self-relative references to records that [emit_frames_tail] emits, so
+    [efa_label_rel] must create its labels in the current section
+    ([Asm_directives.current_section ()]). *)
+val emit_frames_for_function : emit_frame_actions -> unit
+
+(** Whether [emit_frames_for_function] would emit anything, so that callers can
+    avoid emitting empty pieces. *)
+val has_pending_frame_descriptors : unit -> bool
+
+(** Emits the per-unit debuginfo, name and string records referenced by the
+    descriptors emitted so far, into the current section, which must be
+    [Read_only_data] (strings go in [debug_strings_section], as for
+    [emit_frames]). Fails if descriptors are pending. *)
+val emit_frames_tail :
   debug_strings_section:Asm_targets.Asm_section.t -> emit_frame_actions -> unit
 
 val is_generic_function : string -> bool

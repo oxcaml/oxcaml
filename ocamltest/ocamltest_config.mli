@@ -140,6 +140,10 @@ val function_sections : bool
 (** Whether the compiler was configured to generate
     each function in a separate section *)
 
+val link_order_frametables : bool
+(** Whether the compiler was configured to emit per-function frametables
+    in link-order sections *)
+
 val instrumented_runtime : bool
 (** Whether the instrumented runtime is available *)
 

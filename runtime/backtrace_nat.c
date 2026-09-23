@@ -362,9 +362,11 @@ static debuginfo debuginfo_extract(frame_descr *d, ptrdiff_t alloc_idx)
   } else {
     CAMLassert(alloc_idx == -1);
   }
-  /* read offset to debuginfo */
+  /* read offset to debuginfo; it is self-relative and may be negative
+     (link-order frametables sit after .rodata) */
   debuginfo_offset = caml_read_unaligned_uint32(infoptr);
-  return debuginfo_resolve_jumps((debuginfo)(infoptr + debuginfo_offset));
+  return debuginfo_resolve_jumps
+    ((debuginfo)(infoptr + (int32_t)debuginfo_offset));
 }
 
 debuginfo caml_debuginfo_extract(backtrace_slot slot)

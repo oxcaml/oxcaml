@@ -139,6 +139,8 @@ let configuration_variables () =
   p_bool "align_double" align_double;
   p_bool "align_int64" align_int64;
   p_bool "function_sections" function_sections;
+  p_bool "link_order_frametables" link_order_frametables;
+  p_bool "gc_sections" gc_sections;
   p_bool "afl_instrument" afl_instrument;
   p_bool "tsan" tsan;
   p_bool "windows_unicode" windows_unicode;
