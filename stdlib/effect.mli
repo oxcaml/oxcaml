@@ -12,6 +12,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+@@ stateless
+
 (** Effects.
 
     See 'Language extensions/Effect handlers' section in the manual.
@@ -44,7 +46,7 @@ type _ t +=
   (* CR aspsmith: Add more documentation here once preemption is closer to being
      finished *)
 
-external perform : 'a t -> 'a = "%perform"
+external perform : 'a t -> 'a @@ stateful = "%perform"
 [@@alert unsafe_effects "Use [Effect.Safe.perform]. [Effect.perform] may not \
                          function correctly on Js_of_ocaml"]
 (** [perform e] performs an effect [e].
@@ -65,7 +67,7 @@ module Safe : sig
   (** OxCaml-compatible version of [perform]. Takes a [Handler.t @ local] to
       prove that the current function is running in an effect handler. *)
   val perform : Handler.t @ local -> 'a t -> 'a
-end
+end @@ stateful
 
 type tick_outcome =
   | Preempt
@@ -268,7 +270,7 @@ module Deep : sig
     "caml_get_continuation_callstack"
   (** [get_callstack c n] returns a description of the top of the call stack on
       the continuation [c], with at most [n] entries. *)
-end
+end @@ stateful
 
 module Shallow : sig
   (* Shallow handlers *)
@@ -478,4 +480,4 @@ module Shallow : sig
     "caml_get_continuation_callstack"
   (** [get_callstack c n] returns a description of the top of the call stack on
       the continuation [c], with at most [n] entries. *)
-end
+end @@ stateful

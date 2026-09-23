@@ -14,7 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 open! Stdlib
 
@@ -67,7 +67,7 @@ exception Undefined
     recursively.
 *)
 
-external force : 'a t -> 'a @@ stateless = "%lazy_force"
+external force : 'a t -> 'a = "%lazy_force"
 (** [force x] forces the suspension [x] and returns its result. If [x] has
     already been forced, [Lazy.force x] returns the same value again without
     recomputing it.  If it raised an exception, the same exception is raised

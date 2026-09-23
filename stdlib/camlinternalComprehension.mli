@@ -1,4 +1,4 @@
-@@ portable
+@@ stateless
 
 (** Supporting functions for list comprehensions *)
 

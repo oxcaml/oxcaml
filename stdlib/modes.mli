@@ -12,6 +12,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+@@ stateless
+
 (** This module provides types that wrap a value in a different mode from its
     context. In the standard OCaml compiler, these types are all no-op
     wrappers. *)

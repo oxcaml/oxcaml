@@ -14,7 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 open! Stdlib
 
@@ -51,28 +51,28 @@ val one : nativeint
 val minus_one : nativeint
 (** The native integer -1.*)
 
-external neg : (nativeint[@local_opt]) -> (nativeint[@local_opt]) @@ stateless
+external neg : (nativeint[@local_opt]) -> (nativeint[@local_opt])
   = "%nativeint_neg"
 (** Unary negation. *)
 
 external add :
   (nativeint[@local_opt]) -> (nativeint[@local_opt]) -> (nativeint[@local_opt])
-  @@ stateless = "%nativeint_add"
+  = "%nativeint_add"
 (** Addition. *)
 
 external sub :
   (nativeint[@local_opt]) -> (nativeint[@local_opt]) -> (nativeint[@local_opt])
-  @@ stateless = "%nativeint_sub"
+  = "%nativeint_sub"
 (** Subtraction. *)
 
 external mul :
   (nativeint[@local_opt]) -> (nativeint[@local_opt]) -> (nativeint[@local_opt])
-  @@ stateless = "%nativeint_mul"
+  = "%nativeint_mul"
 (** Multiplication. *)
 
 external div :
   (nativeint[@local_opt]) -> (nativeint[@local_opt]) -> (nativeint[@local_opt])
-  @@ stateless = "%nativeint_div"
+  = "%nativeint_div"
 (** Integer division. This division rounds the real quotient of
    its arguments towards zero, as specified for {!Stdlib.(/)}.
 
@@ -87,7 +87,7 @@ val unsigned_div : nativeint -> nativeint -> nativeint
 
 external rem :
   (nativeint[@local_opt]) -> (nativeint[@local_opt]) -> (nativeint[@local_opt])
-  @@ stateless = "%nativeint_mod"
+  = "%nativeint_mod"
 (** Integer remainder.  If [y] is not zero, the result
    of [Nativeint.rem x y] satisfies the following properties:
    [Nativeint.zero <= Nativeint.rem x y < Nativeint.abs y] and
@@ -129,38 +129,38 @@ val min_int : nativeint
 
 external logand :
   (nativeint[@local_opt]) -> (nativeint[@local_opt]) -> (nativeint[@local_opt])
-  @@ stateless = "%nativeint_and"
+  = "%nativeint_and"
 (** Bitwise logical and. *)
 
 external logor :
   (nativeint[@local_opt]) -> (nativeint[@local_opt]) -> (nativeint[@local_opt])
-  @@ stateless = "%nativeint_or"
+  = "%nativeint_or"
 (** Bitwise logical or. *)
 
 external logxor :
   (nativeint[@local_opt]) -> (nativeint[@local_opt]) -> (nativeint[@local_opt])
-  @@ stateless = "%nativeint_xor"
+  = "%nativeint_xor"
 (** Bitwise logical exclusive or. *)
 
 val lognot : nativeint -> nativeint
 (** Bitwise logical negation. *)
 
 external shift_left : (nativeint[@local_opt]) -> int -> (nativeint[@local_opt])
-  @@ stateless = "%nativeint_lsl"
+  = "%nativeint_lsl"
 (** [Nativeint.shift_left x y] shifts [x] to the left by [y] bits.
    The result is unspecified if [y < 0] or [y >= bitsize],
    where [bitsize] is [32] on a 32-bit platform and
    [64] on a 64-bit platform. *)
 
 external shift_right : (nativeint[@local_opt]) -> int -> (nativeint[@local_opt])
-  @@ stateless = "%nativeint_asr"
+  = "%nativeint_asr"
 (** [Nativeint.shift_right x y] shifts [x] to the right by [y] bits.
    This is an arithmetic shift: the sign bit of [x] is replicated
    and inserted in the vacated bits.
    The result is unspecified if [y < 0] or [y >= bitsize]. *)
 
 external shift_right_logical :
-  (nativeint[@local_opt]) -> int -> (nativeint[@local_opt]) @@ stateless
+  (nativeint[@local_opt]) -> int -> (nativeint[@local_opt])
   = "%nativeint_lsr"
 (** [Nativeint.shift_right_logical x y] shifts [x] to the right
    by [y] bits.
@@ -169,12 +169,12 @@ external shift_right_logical :
    The result is unspecified if [y < 0] or [y >= bitsize]. *)
 
 
-external of_int : int -> (nativeint[@local_opt]) @@ stateless
+external of_int : int -> (nativeint[@local_opt])
   = "%nativeint_of_int"
 (** Convert the given integer (type [int]) to a native integer
    (type [nativeint]). *)
 
-external to_int : (nativeint[@local_opt]) -> int @@ stateless
+external to_int : (nativeint[@local_opt]) -> int
   = "%nativeint_to_int"
 (** Convert the given native integer (type [nativeint]) to an
    integer (type [int]).  The high-order bit is lost during
@@ -187,7 +187,7 @@ val unsigned_to_int : nativeint -> int option
 
     @since 4.08 *)
 
-external of_float : float -> nativeint @@ stateless
+external of_float : float -> nativeint
   = "caml_nativeint_of_float" "caml_nativeint_of_float_unboxed"
   [@@unboxed] [@@noalloc]
 (** Convert the given floating-point number to a native integer,
@@ -196,23 +196,23 @@ external of_float : float -> nativeint @@ stateless
    \[{!Nativeint.min_int}, {!Nativeint.max_int}\], no exception is raised,
    and an unspecified, platform-dependent integer is returned. *)
 
-external to_float : nativeint -> float @@ stateless
+external to_float : nativeint -> float
   = "caml_nativeint_to_float" "caml_nativeint_to_float_unboxed"
   [@@unboxed] [@@noalloc]
 (** Convert the given native integer to a floating-point number. *)
 
-external of_int32 : int32 -> nativeint @@ stateless = "%nativeint_of_int32"
+external of_int32 : int32 -> nativeint = "%nativeint_of_int32"
 (** Convert the given 32-bit integer (type [int32])
    to a native integer. *)
 
-external to_int32 : nativeint -> int32 @@ stateless = "%nativeint_to_int32"
+external to_int32 : nativeint -> int32 = "%nativeint_to_int32"
 (** Convert the given native integer to a
    32-bit integer (type [int32]).  On 64-bit platforms,
    the 64-bit native integer is taken modulo 2{^32},
    i.e. the top 32 bits are lost.  On 32-bit platforms,
    the conversion is exact. *)
 
-external of_string : string -> (nativeint[@unboxed]) @@ stateless
+external of_string : string -> (nativeint[@unboxed])
   = "caml_nativeint_of_string" "caml_nativeint_of_string_unboxed"
 (** Convert the given string to a native integer.
    The string is read in decimal (by default, or if the string

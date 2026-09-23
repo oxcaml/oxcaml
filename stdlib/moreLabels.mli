@@ -14,7 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 open! Stdlib
 
@@ -39,7 +39,7 @@ open! Stdlib
 
 [@@@ocaml.nolabels]
 
-module Hashtbl : sig
+module Hashtbl : sig @@ stateless
   (** Hash tables and hash functions.
 
      Hash tables are hashed association tables, with in-place modification.
@@ -87,7 +87,7 @@ module Hashtbl : sig
   (** The type of hash tables from type ['a] to type ['b]. *)
 
   val create : ?random: (* thwart tools/sync_stdlib_docs *) bool ->
-               int -> ('a, 'b) t
+               int -> ('a, 'b) t @@ stateful portable
   (** [Hashtbl.create n] creates a new, empty hash table, with initial
      size greater or equal to the suggested size [n].  For best results,
      [n] should be on the order of the expected number of elements that
@@ -240,7 +240,7 @@ module Hashtbl : sig
      [Hashtbl.length] gives the number of times [Hashtbl.iter] calls its
      first argument. *)
 
-  val randomize : unit -> unit
+  val randomize : unit -> unit @@ stateful portable
   (** After a call to [Hashtbl.randomize()], hash tables are created in
       randomized mode by default: {!create} returns randomized
       hash tables, unless the [~random:false] optional parameter is given.
@@ -259,13 +259,13 @@ module Hashtbl : sig
 
       @since 4.00 *)
 
-  val is_randomized : unit -> bool
+  val is_randomized : unit -> bool @@ stateful portable
   (** Return [true] if the tables are currently created in randomized mode
       by default, [false] otherwise.
       @since 4.03 *)
 
   val rebuild : ?random (* thwart tools/sync_stdlib_docs *) :bool ->
-      ('a, 'b) t -> ('a, 'b) t
+      ('a, 'b) t -> ('a, 'b) t @@ stateful portable
   (** Return a copy of the given hashtable.  Unlike {!copy},
       {!rebuild}[ h] re-hashes all the (key, value) entries of
       the original table [h].  The returned hash table is randomized if
@@ -331,7 +331,7 @@ module Hashtbl : sig
   (** Add the given bindings to the table, using {!replace}
       @since 4.07 *)
 
-  val of_seq : ('a * 'b) Seq.t -> ('a, 'b) t
+  val of_seq : ('a * 'b) Seq.t -> ('a, 'b) t @@ stateful portable
   (** Build a table from the given bindings. The bindings are added
       in the same order they appear in the sequence, using {!replace_seq},
       which means that if two pairs have the same key, only the latest one
@@ -443,7 +443,7 @@ module Hashtbl : sig
 
     module Make : functor (H : HashedType) -> S
     with type key = H.t
-     and type 'a t = 'a Hashtbl.Make(H).t
+     and type 'a t = 'a Hashtbl.Make(H).t @@ stateful portable
   (** Functor building an implementation of the hashtable structure.
       The functor [Hashtbl.Make] returns a structure containing
       a type [key] of keys and a type ['a t] of hash tables
@@ -455,7 +455,8 @@ module Hashtbl : sig
       the [create] operation of the result structure always returns
       non-randomized hash tables. *)
 
-    module MakePortable (H : sig @@ portable include HashedType end) :
+    module (MakePortable @@ stateful portable)
+      (H : sig @@ portable include HashedType end) :
       sig @@ portable
         include S with type key = H.t
                    and type 'a t = 'a Hashtbl.MakePortable(H).t
@@ -529,7 +530,7 @@ module Hashtbl : sig
   (** The output signature of the functor {!MakeSeeded}.
       @since 4.00 *)
 
-    module MakeSeeded (H : SeededHashedType) : SeededS
+    module (MakeSeeded @@ stateful portable) (H : SeededHashedType) : SeededS
     with type key = H.t
      and type 'a t = 'a Hashtbl.MakeSeeded(H).t
   (** Functor building an implementation of the hashtable structure.
@@ -545,7 +546,8 @@ module Hashtbl : sig
       or if randomization is globally on (see {!Hashtbl.randomize}).
       @since 4.00 *)
 
-    module MakeSeededPortable (H : sig @@ portable include SeededHashedType end) :
+    module (MakeSeededPortable @@ stateful portable)
+      (H : sig @@ portable include SeededHashedType end) :
     sig @@ portable
       include SeededS with type key = H.t
                        and type 'a t = 'a Hashtbl.MakeSeededPortable(H).t
@@ -686,7 +688,7 @@ module Hashtbl : sig
 
   *)
 
-end
+end @@ stateful portable
 
 module Map : sig
   (** Association tables over ordered types.

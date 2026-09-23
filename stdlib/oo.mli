@@ -14,7 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 open! Stdlib
 
@@ -24,12 +24,12 @@ open! Stdlib
 
 (** [Oo.copy o] returns a copy of object [o], that is a fresh
    object with the same methods and instance variables as [o]. *)
-val copy : (< .. > as 'a) -> 'a
+val copy : (< .. > as 'a) -> 'a @@ stateful portable
 [@@alert unsynchronized_access
     "Unsynchronized accesses to mutable objects are a programming error."
 ]
 
-external id : < .. > -> int @@ stateless = "%field1"
+external id : < .. > -> int = "%field1"
 (** Return an integer identifying this object, unique for
     the current execution of the program. The generic comparison
     and hashing functions are based on this integer. When an object
