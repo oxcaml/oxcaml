@@ -33,7 +33,6 @@ CLEAN_DIRS = \
 CLEAN_FILES = \
   $(CLEAN_DUNE_WORKSPACES) \
   duneconf/ast-dependent-libs.ws \
-  duneconf/jsoo-test.ws \
   duneconf/dirs-to-ignore.inc \
   duneconf/ox-extra.inc \
   natdynlinkops \
@@ -237,8 +236,11 @@ ast_dependent_libs_deps = $(ast_dependent_libs_root)/deps
 ws_ast_dependent_libs = --root=$(ast_dependent_libs_root) \
   --workspace=$(CURDIR)/duneconf/ast-dependent-libs.ws \
   --build-dir=$(CURDIR)/_build/ast-dependent-libs
+# js_of_ocaml's dune-workspace sets up its test aliases, but is only read by
+# default when js_of_ocaml is the dune root.
 ws_jsoo_test = --root=$(ast_dependent_libs_root) \
-  --workspace=$(CURDIR)/duneconf/jsoo-test.ws \
+  --workspace=$(CURDIR)/external/js_of_ocaml/dune-workspace \
+  --profile=with-effects \
   --build-dir=$(CURDIR)/_build/jsoo-test
 
 define dune_ast_dependent_libs_context
@@ -247,25 +249,8 @@ define dune_ast_dependent_libs_context
   (profile release)))
 endef
 
-# Mirrors the dune-workspace file of js_of_ocaml, which is only read when
-# js_of_ocaml is the dune root.
-define dune_jsoo_test_context
-(lang dune 3.23)
-(context (default
-  (profile with-effects)
-  (env (_
-    (js_of_ocaml
-      (flags (:standard -w "no-missing-effects-backend"))
-      (link_flags (:standard -w "no-missing-effects-backend"))
-      (runtest_alias runtest-js))
-    (wasm_of_ocaml
-      (enabled_if %{env:WASM_OF_OCAML=false})
-      (runtest_alias runtest-wasm))))))
-endef
-
 duneconf/ast-dependent-libs.ws: export contents = $(dune_ast_dependent_libs_context)
-duneconf/jsoo-test.ws: export contents = $(dune_jsoo_test_context)
-duneconf/ast-dependent-libs.ws duneconf/jsoo-test.ws: Makefile
+duneconf/ast-dependent-libs.ws: Makefile
 
 OXCAML_INSTALL ?= $(CURDIR)/_install
 
@@ -379,7 +364,7 @@ jsoo-install: jsoo-build
 	$(call ast_dependent_libs_install,$(JSOO_PACKAGES))
 
 .PHONY: jsoo-test
-jsoo-test: ast-dependent-libs-compiler duneconf/jsoo-test.ws \
+jsoo-test: ast-dependent-libs-compiler \
   $(PPXLIB_DEPS) $(JSOO_DEPS) $(JSOO_TEST_DEPS)
 	PROJECT_ROOT="$(CURDIR)/_build/jsoo-test/default/js_of_ocaml" \
 	WASM_OF_OCAML=true \
