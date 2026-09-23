@@ -127,7 +127,7 @@ type c2 = B of #(c2 option * float#)
 let rec c2 = B #(Some c2, #4.0);;
 [%%expect {|
 type c2 = B of #(c2 option * float#)
-val c2 : c2 = B <unboxed product>
+val c2 : c2 = B #(Some <cycle>, #4.)
 |}];;
 
 type c3 = C of { c3 : #(c3 option * float#); i : int }

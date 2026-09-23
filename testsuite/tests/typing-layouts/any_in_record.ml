@@ -193,8 +193,7 @@ let test_nested_block : int64_u t# t =
 |> Sys.opaque_identity
 [%%expect {|
 val test_nested_block : int64_u t# t =
-  {fst = #{fst = <unknown>; snd = <unknown>};
-   snd = #{fst = <unknown>; snd = <unknown>}}
+  {fst = #{fst = #1L; snd = #2L}; snd = #{fst = #3L; snd = #4L}}
 |}]
 
 let test_nested_direct =
