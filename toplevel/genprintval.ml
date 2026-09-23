@@ -769,21 +769,38 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         else match check_depth depth obj ty with
           | Some x -> x
           | None ->
-              let rec tree_of_conses tree_list depth obj ty_arg =
+              let ty_list = Predef.type_list ty_arg in
+              let field =
+                if !Clflags.native_code then
+                  Option.map
+                    (fun shape obj pos -> native_mixed_field obj shape pos)
+                    (mixed_block_shape_of_types env [|ty_arg; ty_list|])
+                else Some (fun obj pos -> Some (O.field obj pos))
+              in
+              match field with
+              | None -> Oval_stuff "<abstr list>"
+              | Some field ->
+              let rec tree_of_conses tree_list depth obj ty_list =
                 if !printer_steps < 0 || depth < 0 then
                   Oval_ellipsis :: tree_list
-                else if is_real_block obj then
-                  let tree = nest tree_of_val (depth - 1)
-                                (O.field obj 0) ty_arg
-                  in
-                  let next_obj = O.field obj 1 in
-                  nest_gen (Oval_stuff "<cycle>" :: tree :: tree_list)
-                    (tree_of_conses (tree :: tree_list))
-                    depth next_obj ty_arg
+                else if is_real_block obj then begin
+                  match field obj 1 with
+                  | None -> Oval_stuff "<abstr>" :: tree_list
+                  | Some next_obj ->
+                      let tree =
+                        match field obj 0 with
+                        | None -> Oval_stuff "<abstr>"
+                        | Some head ->
+                            nest tree_of_val (depth - 1) head ty_arg
+                      in
+                      nest_gen (Oval_stuff "<cycle>" :: tree :: tree_list)
+                        (tree_of_conses (tree :: tree_list))
+                        depth next_obj ty_list
+                end
                 else tree_list
               in
               Oval_list
-                  (List.rev (tree_of_conses [] depth obj ty_arg))
+                  (List.rev (tree_of_conses [] depth obj ty_list))
 
       and tree_of_generic_array am depth obj ty_arg =
         let obj_block = Obj.Uniform_or_mixed.of_block (O.obj obj) in
