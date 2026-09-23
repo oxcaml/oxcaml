@@ -27,6 +27,7 @@ jobs:
           - name: default (x86_64-linux)
             os: warp-ubuntu-latest-x64-8x
             build_debug: true
+            build_ast_dependent_libs: true
             sysdeps: gdb
 
           - name: dissector-assembler (x86_64-linux)
