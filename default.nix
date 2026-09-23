@@ -326,6 +326,9 @@ let
     postPatch = ''
       substituteInPlace dune-project \
         --replace-fail '(generate_opam_files true)' '(generate_opam_files false)'
+      # Use the shipped unicode.ml: its promote rule downloads the Unicode data.
+      sed -i '/^(rule$/,$d' src/syntax/dune
+      if grep -q unicode.ml src/syntax/dune; then exit 1; fi
     '';
   };
 

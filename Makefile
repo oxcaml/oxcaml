@@ -276,12 +276,9 @@ ast_dependent_libs_env = \
     OCAMLFIND_CONF=/dev/null \
     DUNE_CACHE=disabled
 
-# --ignore-promoted-rules: sedlex's unicode.ml generator downloads the Unicode
-# data; use the shipped file instead. The .install files are not promoted, as
-# some of the sources are read-only.
+# The .install files are not promoted, as some of the sources are read-only.
 ast_dependent_libs_dune = \
-  $(ast_dependent_libs_env) $(dune) build --ignore-promoted-rules \
-    --promote-install-files=false
+  $(ast_dependent_libs_env) $(dune) build --promote-install-files=false
 
 .PHONY: ast-dependent-libs-compiler
 # Refresh the local compiler, but never rebuild an externally supplied install.
