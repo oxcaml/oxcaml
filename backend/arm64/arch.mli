@@ -43,6 +43,10 @@ type cmm_label = Label.t
 
 type bswap_bitwidth = Sixteen | Thirtytwo | Sixtyfour
 
+type rotate_direction = Rotate_left | Rotate_right
+
+type rotate_bitwidth = Rotate32 | Rotate64
+
 type specific_operation =
   | Ifar_poll
   | Ifar_alloc of
@@ -61,6 +65,12 @@ type specific_operation =
   | Inegmulsubf   (* floating-point negate, multiply and subtract *)
   | Isqrtf        (* floating-point square root *)
   | Ibswap of { bitwidth: bswap_bitwidth; } (* endianness conversion *)
+  | Irotate of { direction: rotate_direction;
+                 bitwidth: rotate_bitwidth;
+                 imm: int option }
+                  (* rotation of the low [bitwidth] bits; the count is [imm]
+                     (already reduced modulo the bit width) if present,
+                     otherwise the second argument *)
   | Imove32       (* 32-bit integer move *)
   | Isignext of int (* sign extension *)
   | Isimd of Simd.operation
@@ -69,6 +79,8 @@ type specific_operation =
 and arith_operation =
     Ishiftadd
   | Ishiftsub
+
+val int_of_rotate_bitwidth : rotate_bitwidth -> int
 
 val equal_specific_operation : specific_operation -> specific_operation -> bool
 

@@ -510,7 +510,7 @@ let operation_supported : Cmm.operation -> bool = function
   | Cnegf Float32 | Cabsf Float32 | Caddf Float32
   | Csubf Float32 | Cmulf Float32 | Cdivf Float32
   | Cpackf32
-  | Cclz | Cctz | Cbswap _
+  | Cclz | Cctz | Cbswap _ | Crotate _
   | Capply _ | Cextcall _ | Cload _ | Calloc _ | Cstore _
   | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _
   | Cand | Cor | Cxor | Clsl | Clsr | Casr
