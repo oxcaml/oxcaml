@@ -7,22 +7,22 @@
 (data
  int 360287970189647616
  global "camlCells_cmm":
- addr G:"camlCells_cmm__f_1"
+ addr L:"camlCells_cmm__f_1"
  int 1
  int 13
  int 1
  double 4.
  double 5.
  double 7.)
-(data int 1792 global "camlCells_cmm__cell0": addr G:"camlCells_cmm__f_1")
+(data int 1792 global "camlCells_cmm__cell0": addr L:"camlCells_cmm__f_1")
 (data int 1792 global "camlCells_cmm__cell1": int 1)
 (data int 72057594037929728 global "camlCells_cmm__cell2": double 4.)
 (data int 144115188075858688 global "camlCells_cmm__cell3": int 13 double 5.)
 (data int 144115188075858688 global "camlCells_cmm__cell4": int 1 double 7.)
 (data
  int 3063
- global "camlCells_cmm__f_1":
- addr G:"camlCells_cmm__f_0_1_code"
+ "camlCells_cmm__f_1":
+ addr L:"camlCells_cmm__f_0_1_code"
  int 108086391056891909)
 (function{cells_cmm.ml:38,6-15} camlCells_cmm__f_0_1_code (x/0: int) : int
  (+ x/0 2) )

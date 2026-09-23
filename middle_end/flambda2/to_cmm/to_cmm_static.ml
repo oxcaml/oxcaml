@@ -725,11 +725,6 @@ let static_consts0 env r ~params_and_body bound_static static_consts =
      defined. *)
   let static_consts' = Static_const_group.to_list static_consts in
   let bound_static' = Bound_static.to_list bound_static in
-  if not (List.compare_lengths bound_static' static_consts' = 0)
-  then
-    Misc.fatal_errorf
-      "Mismatch between [Bound_static] and [Static_const]s:@ %a@ =@ %a"
-      Bound_static.print bound_static Static_const_group.print static_consts;
   let r =
     ListLabels.fold_left static_consts' ~init:r ~f:(fun r static_const ->
         match Static_const_or_code.to_code static_const with
@@ -742,6 +737,13 @@ let static_consts0 env r ~params_and_body bound_static static_consts =
 
 let static_consts env r ~params_and_body bound_static static_consts =
   try
+    let bound_static' = Bound_static.to_list bound_static in
+    let static_consts' = Static_const_group.to_list static_consts in
+    if List.compare_lengths bound_static' static_consts' <> 0
+    then
+      Misc.fatal_errorf
+        "Mismatch between [Bound_static] and [Static_const]s:@ %a@ =@ %a"
+        Bound_static.print bound_static Static_const_group.print static_consts;
     (* Gc roots: statically allocated blocks themselves do not need to be
        scanned, however if statically allocated blocks contain dynamically
        allocated contents, then that block has to be registered as Gc roots for
@@ -751,17 +753,13 @@ let static_consts env r ~params_and_body bound_static static_consts =
        fully_static). This is decided per pattern, so that a fully static
        constant in a group with a non-static one is not rooted. *)
     let roots =
-      let bound_static' = Bound_static.to_list bound_static in
-      let static_consts' = Static_const_group.to_list static_consts in
-      if List.compare_lengths bound_static' static_consts' <> 0
-      then [] (* [static_consts0] reports the mismatch *)
-      else
-        List.combine bound_static' static_consts'
-        |> List.filter_map (fun (pat, const) ->
-            if Static_const_or_code.is_fully_static const
-            then None
-            else Some pat)
-        |> Bound_static.create |> Bound_static.gc_roots
+      List.concat
+        (List.map2
+           (fun pat const ->
+             if Static_const_or_code.is_fully_static const
+             then []
+             else Bound_static.Pattern.gc_roots pat)
+           bound_static' static_consts')
     in
     let r = R.add_gc_roots r roots in
     static_consts0 env r ~params_and_body bound_static static_consts

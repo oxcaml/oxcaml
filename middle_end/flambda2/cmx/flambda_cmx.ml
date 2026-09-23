@@ -107,14 +107,12 @@ let create_loader ~get_module_info =
 
 let get_imported_code loader () = loader.imported_code
 
-let root_names ~module_symbol ~module_block_cells =
+let root_names ~root_symbols =
   List.fold_left
-    (fun names cell -> Name_occurrences.add_symbol names cell Name_mode.normal)
-    (Name_occurrences.singleton_symbol module_symbol Name_mode.normal)
-    module_block_cells
+    (fun names sym -> Name_occurrences.add_symbol names sym Name_mode.normal)
+    Name_occurrences.empty root_symbols
 
-let compute_reachable_names_and_code ~module_symbol ~module_block_cells
-    ~free_names_of_name code =
+let compute_reachable_names_and_code ~root_symbols ~free_names_of_name code =
   let rec fixpoint names_to_add names_already_added =
     if Name_occurrences.is_empty names_to_add
     then names_already_added
@@ -182,15 +180,12 @@ let compute_reachable_names_and_code ~module_symbol ~module_block_cells
       in
       fixpoint from_names_and_code_ids names_already_added
   in
-  let init_names = root_names ~module_symbol ~module_block_cells in
-  fixpoint init_names Name_occurrences.empty
+  fixpoint (root_names ~root_symbols) Name_occurrences.empty
 
-let prepare_cmx ~module_symbol ~module_block_cells create_typing_env
-    ~free_names_of_name ~used_value_slots ~canonicalise ~exported_offsets
-    ~sections all_code =
+let prepare_cmx ~root_symbols create_typing_env ~free_names_of_name
+    ~used_value_slots ~canonicalise ~exported_offsets ~sections all_code =
   let reachable_names =
-    compute_reachable_names_and_code ~module_symbol ~module_block_cells
-      ~free_names_of_name all_code
+    compute_reachable_names_and_code ~root_symbols ~free_names_of_name all_code
   in
   let all_code =
     (* CR mshinwell: do we need to remove unused function slot bindings from the
@@ -233,12 +228,11 @@ let prepare_cmx ~module_symbol ~module_block_cells create_typing_env
   in
   reachable_names, Some cmx
 
-let prepare_cmx_file_contents ~final_typing_env ~module_symbol
-    ~module_block_cells ~used_value_slots ~exported_offsets ~sections all_code =
+let prepare_cmx_file_contents ~final_typing_env ~root_symbols ~used_value_slots
+    ~exported_offsets ~sections all_code =
   match final_typing_env with
-  | None -> root_names ~module_symbol ~module_block_cells, None
-  | Some _ when Flambda_features.opaque () ->
-    root_names ~module_symbol ~module_block_cells, None
+  | None -> root_names ~root_symbols, None
+  | Some _ when Flambda_features.opaque () -> root_names ~root_symbols, None
   | Some final_typing_env ->
     let typing_env, canonicalise =
       TE.Pre_serializable.create final_typing_env ~used_value_slots
@@ -249,14 +243,13 @@ let prepare_cmx_file_contents ~final_typing_env ~module_symbol
     let free_names_of_name name =
       Some (T.free_names (TE.Pre_serializable.find typing_env name))
     in
-    prepare_cmx ~module_symbol ~module_block_cells create_typing_env
-      ~free_names_of_name ~used_value_slots ~canonicalise ~exported_offsets
-      ~sections all_code
+    prepare_cmx ~root_symbols create_typing_env ~free_names_of_name
+      ~used_value_slots ~canonicalise ~exported_offsets ~sections all_code
 
-let prepare_cmx_from_approx ~machine_width ~approxs ~module_symbol
-    ~module_block_cells ~exported_offsets ~used_value_slots ~sections all_code =
+let prepare_cmx_from_approx ~machine_width ~approxs ~root_symbols
+    ~exported_offsets ~used_value_slots ~sections all_code =
   if Flambda_features.opaque ()
-  then root_names ~module_symbol ~module_block_cells, None
+  then root_names ~root_symbols, None
   else
     let create_typing_env reachable_names =
       let approxs =
@@ -276,7 +269,7 @@ let prepare_cmx_from_approx ~machine_width ~approxs ~module_symbol
           (Value_approximation.free_names
              ~code_free_names:Code_or_metadata.free_names approx)
     in
-    prepare_cmx ~module_symbol ~module_block_cells create_typing_env
-      ~free_names_of_name ~used_value_slots
+    prepare_cmx ~root_symbols create_typing_env ~free_names_of_name
+      ~used_value_slots
       ~canonicalise:(fun id -> id)
       ~exported_offsets ~sections all_code

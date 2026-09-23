@@ -849,11 +849,9 @@ let run0 unit acc ~all_constants () =
   let dummy_toplevel_exn = Variable.create "dummy_toplevel_exn" K.value in
   Acc.add_any_usage acc (Code_id_or_name.var dummy_toplevel_return);
   Acc.add_any_usage acc (Code_id_or_name.var dummy_toplevel_exn);
-  (* The module block is kept alive via the return continuation's argument; the
-     cells are only reachable from the cmx, so root them here. *)
   List.iter
-    (fun cell -> Acc.add_any_usage acc (Code_id_or_name.symbol cell))
-    (Flambda_unit.module_block_cells unit);
+    (fun sym -> Acc.add_any_usage acc (Code_id_or_name.symbol sym))
+    (Flambda_unit.root_symbols unit);
   let return_continuation = Flambda_unit.return_continuation unit in
   let exn_continuation = Flambda_unit.exn_continuation unit in
   let conts =

@@ -31,6 +31,8 @@ module Pattern : sig
   val block_like : Symbol.t -> t
 
   val print : Format.formatter -> t -> unit
+
+  val gc_roots : t -> Symbol.t list
 end
 
 type t
@@ -66,8 +68,6 @@ val everything_being_defined : t -> Code_id_or_symbol.Set.t
 val everything_being_defined_as_list : t -> Code_id_or_symbol.t list
 
 val concat : t -> t -> t
-
-val gc_roots : t -> Symbol.t list
 
 val print : Format.formatter -> t -> unit
 

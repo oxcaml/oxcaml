@@ -41,6 +41,10 @@ val module_symbol : t -> Symbol.t
     cell). *)
 val module_block_cells : t -> Symbol.t list
 
+(** The symbols that must stay reachable from outside the unit: the module
+    symbol and the cells. *)
+val root_symbols : t -> Symbol.t list
+
 val body : t -> Flambda.Expr.t
 
 val with_body : t -> Flambda.Expr.t -> t

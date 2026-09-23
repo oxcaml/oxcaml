@@ -77,3 +77,9 @@ val new_indexes_to_old_indexes : 'a t -> int array
 val new_block_length : 'a t -> int
 
 val new_index_to_old_path : 'a t -> int -> int list
+
+(** The indexes into the flattened, reordered shape of the fields making up
+    element [i] of the original shape, in the order in which the singleton
+    shape [[| shape.(i) |]] flattens them (values first, then flats, each in
+    tree order). Empty for a void element. *)
+val new_indexes_of_element : 'a t -> int -> int list
