@@ -6652,96 +6652,112 @@ let moregen_mode_fast v m1 m2 =
   in
   if not ok then raise_notrace Complicated_moregen
 
+let some_neg_variance = function
+  (* pre-allocated for hot path *)
+  | Invariant -> Some Invariant
+  | Covariant -> Some Contravariant
+  | Contravariant -> Some Covariant
+  | Bivariant -> Some Bivariant
+
+let rec mgen_fast env subst scope maxnodes variance t1 t2 =
+  decr maxnodes;
+  if !maxnodes = 0 then raise_notrace Complicated_moregen;
+  if eq_type t1 t2 then () else
+  match get_desc t1, get_desc t2 with
+  | Tsubst (ty, _), _ when eq_type ty t2 -> ()
+  | Tvar { jkind }, _ when get_level t1 = generic_level ->
+     (* As in [moregen], the subject must fit the variable's jkind. The
+        general check ([check_type_jkind]) is expensive and looks up
+        paths, which are unsubstituted in [t2]. So we accept only two
+        cheap, pure sufficient conditions, which need neither the
+        environment nor the substitution: the jkind is the maximum one
+        (the first thing the general check tests too); or its mod-bounds
+        are maximal, so only the layout matters, and the subject is a
+        variable with the same constant layout. *)
+     let fits =
+       Jkind.is_obviously_max jkind
+       || (Jkind.mod_bounds_are_obviously_max jkind
+           && match get_desc t2 with
+              | Tvar { jkind = jkind2 } -> begin
+                  (* [get_layout] only consults [env] for an abstract
+                     kind. The path in [jkind2] is unsubstituted, but
+                     looking it up either fails (and we bail out) or finds
+                     the same declaration, as identifiers are unique. *)
+                  match
+                    Jkind.get_layout env jkind, Jkind.get_layout env jkind2
+                  with
+                  | Some l1, Some l2 ->
+                    Jkind_types.Layout.Const.equal l1 l2
+                  | _ -> false
+                end
+              | _ -> false)
+     in
+     if not fits then raise_notrace Complicated_moregen;
+     For_copy.redirect_desc scope t1 (Tsubst (t2, None))
+  | Tarrow ((l1,a1,r1), t1, u1, _), Tarrow ((l2,a2,r2), t2, u2, _)
+       when l1 = l2 ->
+     begin match variance with
+     | None -> raise_notrace Complicated_moregen
+     | Some v ->
+       moregen_mode_fast (neg_variance v) a1 a2;
+       moregen_mode_fast v r1 r2;
+       mgen_fast env subst scope maxnodes (some_neg_variance v) t1 t2;
+       mgen_fast env subst scope maxnodes variance u1 u2
+     end
+  | Ttuple tl1, Ttuple tl2 ->
+     mgen_fast_labeled env subst scope maxnodes variance tl1 tl2
+  | Tconstr (p1, tl1, _), Tconstr (p2, tl2, _) ->
+     (* FIXME: easy cases of alias expansion? *)
+     let p2 =
+       try Subst.type_path subst p2
+       with Subst.Not_path -> raise_notrace Complicated_moregen
+     in
+     if not (path_same_normalized env p1 p2) then begin
+       if debug_moregen then
+         Format.printf "MOREGEN: %a (%a) %d != %a (%a) %d@."
+           (Format_doc.compat Path.print) p1
+           (Format_doc.compat Path.print)
+           (Env.normalize_type_path None env p1)
+           (path_scope p1)
+           (Format_doc.compat Path.print) p2
+           (Format_doc.compat Path.print)
+           (Env.normalize_type_path None env p2)
+           (path_scope p2);
+       raise_notrace Complicated_moregen
+     end;
+     mgen_fast_list env subst scope maxnodes tl1 tl2
+  | Tpoly (t1, []), Tpoly(t2, []) ->
+     mgen_fast env subst scope maxnodes variance t1 t2
+  | _, _ ->
+     raise_notrace Complicated_moregen
+
+and mgen_fast_list env subst scope maxnodes tl1 tl2 =
+  match tl1, tl2 with
+  | [], [] -> ()
+  | t1 :: tl1, t2 :: tl2 ->
+     mgen_fast env subst scope maxnodes None t1 t2;
+     mgen_fast_list env subst scope maxnodes tl1 tl2
+  | _, _ -> raise_notrace Complicated_moregen
+
+and mgen_fast_labeled env subst scope maxnodes variance tl1 tl2 =
+  match tl1, tl2 with
+  | [], [] -> ()
+  | (l1, t1) :: tl1, (l2, t2) :: tl2 ->
+     (* This is an actual failure, but we raise [Complicated_moregen] so that
+        the slow path can give a nicer error. *)
+     if not (Option.equal String.equal l1 l2) then
+       raise_notrace Complicated_moregen;
+     mgen_fast env subst scope maxnodes variance t1 t2;
+     mgen_fast_labeled env subst scope maxnodes variance tl1 tl2
+  | _, _ -> raise_notrace Complicated_moregen
+
 let moregeneral_fast env patt subst subj =
   For_copy.with_scope (fun scope ->
     let snap = snapshot () in
     (* Fixed upper limit of the number of nodes,
        so that we don't diverge on equirecursive types *)
     let maxnodes = ref 200 in
-    let rec mgen variance t1 t2 =
-      decr maxnodes;
-      if !maxnodes = 0 then raise_notrace Complicated_moregen;
-      if eq_type t1 t2 then () else
-      match get_desc t1, get_desc t2 with
-      | Tsubst (ty, _), _ when eq_type ty t2 -> ()
-      | Tvar { jkind }, _ when get_level t1 = generic_level ->
-         (* As in [moregen], the subject must fit the variable's jkind. The
-            general check ([check_type_jkind]) is expensive and looks up
-            paths, which are unsubstituted in [t2]. So we accept only two
-            cheap, pure sufficient conditions, which need neither the
-            environment nor the substitution: the jkind is the maximum one
-            (the first thing the general check tests too); or its mod-bounds
-            are maximal, so only the layout matters, and the subject is a
-            variable with the same constant layout. *)
-         let fits =
-           Jkind.is_obviously_max jkind
-           || (Jkind.mod_bounds_are_obviously_max jkind
-               && match get_desc t2 with
-                  | Tvar { jkind = jkind2 } -> begin
-                      (* [get_layout] only consults [env] for an abstract
-                         kind. The path in [jkind2] is unsubstituted, but
-                         looking it up either fails (and we bail out) or finds
-                         the same declaration, as identifiers are unique. *)
-                      match
-                        Jkind.get_layout env jkind, Jkind.get_layout env jkind2
-                      with
-                      | Some l1, Some l2 ->
-                        Jkind_types.Layout.Const.equal l1 l2
-                      | _ -> false
-                    end
-                  | _ -> false)
-         in
-         if not fits then raise_notrace Complicated_moregen;
-         For_copy.redirect_desc scope t1 (Tsubst (t2, None))
-      | Tarrow ((l1,a1,r1), t1, u1, _), Tarrow ((l2,a2,r2), t2, u2, _)
-           when l1 = l2 ->
-         begin match variance with
-         | None -> raise_notrace Complicated_moregen
-         | Some variance ->
-           moregen_mode_fast (neg_variance variance) a1 a2;
-           moregen_mode_fast variance r1 r2;
-           mgen (Some (neg_variance variance)) t1 t2;
-           mgen (Some variance) u1 u2
-         end
-      | Ttuple tl1, Ttuple tl2 ->
-         mgen_labeled variance tl1 tl2
-      | Tconstr (p1, tl1, _), Tconstr (p2, tl2, _) ->
-         (* FIXME: easy cases of alias expansion? *)
-         let p2 =
-           try Subst.type_path subst p2
-           with Subst.Not_path -> raise_notrace Complicated_moregen
-         in
-         if not (path_same_normalized env p1 p2) then begin
-           if debug_moregen then
-             Format.printf "MOREGEN: %a (%a) %d != %a (%a) %d@."
-               (Format_doc.compat Path.print) p1
-               (Format_doc.compat Path.print)
-               (Env.normalize_type_path None env p1)
-               (path_scope p1)
-               (Format_doc.compat Path.print) p2
-               (Format_doc.compat Path.print)
-               (Env.normalize_type_path None env p2)
-               (path_scope p2);
-           raise_notrace Complicated_moregen
-         end;
-         List.iter2 (mgen None) tl1 tl2
-      | Tpoly (t1, []), Tpoly(t2, []) ->
-         mgen variance t1 t2
-      | _, _ ->
-         raise_notrace Complicated_moregen
-    and mgen_labeled variance tl1 tl2 =
-      (* This is an actual failure, but we raise [Complicated_moregen] so that
-         the slow path can give a nicer error. *)
-      if List.compare_lengths tl1 tl2 <> 0 then
-        raise_notrace Complicated_moregen;
-      List.iter2
-        (fun (l1, t1) (l2, t2) ->
-          if not (Option.equal String.equal l1 l2) then
-            raise_notrace Complicated_moregen;
-          mgen variance t1 t2)
-        tl1 tl2
-    in
-    match mgen (Some Covariant) patt subj with
+    match mgen_fast env subst scope maxnodes (Some Covariant) patt subj with
     | () -> true
     | exception (Complicated_moregen | Moregen_trace _) ->
       backtrack snap; false)
