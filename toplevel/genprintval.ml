@@ -495,19 +495,21 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
            affects how elements are stored in blocks *)
         Some (Outval_record_mixed_block shape)
 
-    let outval_rep_of_tuple env labeled_tys =
-      if not !Clflags.native_code then Some Outval_record_boxed
-      else
-        let tys = Array.of_list (List.map snd labeled_tys) in
-        Option.map (fun sorts_and_types ->
-          let shape = Array.map (fun (sort, _) ->
+    let mixed_block_shape_of_types env tys =
+      Option.map (fun sorts_and_types ->
+          Array.map (fun (sort, _) ->
             sort
             |> Jkind.Sort.default_for_transl_and_get
             |> Lambda.layout_of_const_sort
             |> Lambda.mixed_block_element_of_layout) sorts_and_types
-          in
-          Outval_record_mixed_block shape)
-          (sorts_of_types env tys)
+        ) (sorts_of_types env tys)
+
+    let outval_rep_of_tuple env labeled_tys =
+      if not !Clflags.native_code then Some Outval_record_boxed
+      else
+        let tys = Array.of_list (List.map snd labeled_tys) in
+        Option.map (fun shape -> Outval_record_mixed_block shape)
+          (mixed_block_shape_of_types env tys)
 
     (* The position of the first field: an extension constructor's block
        starts with its extension slot. *)
