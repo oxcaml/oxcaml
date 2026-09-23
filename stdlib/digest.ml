@@ -78,13 +78,15 @@ module BLAKE2 (X: sig val hash_length : int end) : sig @@ portable include S end
 
   type state
 
-  external create_gen: int -> string -> state @@ portable = "caml_blake2_create"
-  external update: state -> bytes -> int -> int -> unit @@ portable
+  external create_gen: int -> string -> state @@ stateless
+    = "caml_blake2_create"
+  external update: state -> bytes -> int -> int -> unit @@ stateless
                         = "caml_blake2_update"
-  external final: state -> int -> t @@ portable = "caml_blake2_final"
-  external unsafe_string: int -> string -> string -> int -> int -> t @@ portable
+  external final: state -> int -> t @@ stateless = "caml_blake2_final"
+  external unsafe_string:
+    int -> string -> string -> int -> int -> t @@ stateless
                         = "caml_blake2_string"
-  external unsafe_bytes: int -> string -> bytes -> int -> int -> t @@ portable
+  external unsafe_bytes: int -> string -> bytes -> int -> int -> t @@ stateless
                         = "caml_blake2_bytes"
 
   let create () = create_gen hash_length ""
@@ -162,9 +164,11 @@ module MD5 = struct
   let compare = String.compare
   let equal = String.equal
 
-  external unsafe_string: string -> int -> int -> t @@ portable = "caml_md5_string"
-  external unsafe_bytes: bytes -> int -> int -> t @@ portable = "caml_md5_bytes"
-  external channel: in_channel -> int -> t @@ portable = "caml_md5_chan"
+  external unsafe_string: string -> int -> int -> t @@ stateless
+    = "caml_md5_string"
+  external unsafe_bytes: bytes -> int -> int -> t @@ stateless
+    = "caml_md5_bytes"
+  external channel: in_channel -> int -> t @@ stateless = "caml_md5_chan"
 
   let string str =
     unsafe_string str 0 (String.length str)
