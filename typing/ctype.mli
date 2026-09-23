@@ -420,6 +420,9 @@ val deep_occur_list: type_expr -> type_expr list -> bool
         (* Check whether a type occurs structurally within any type from
            a list of types. *)
 val is_moregeneral: Env.t -> bool -> type_expr -> type_expr -> bool
+val take_moregen_counters: unit -> Profile.Counters.t
+        (* Profiling counters for the [moregeneral] fast path accumulated
+           since the last call (only maintained under [-dcounters]). *)
 val all_distinct_vars: Env.t -> type_expr list -> bool
         (* Check those types are all distinct type variables *)
 

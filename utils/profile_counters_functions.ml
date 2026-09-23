@@ -104,4 +104,4 @@ let count_language_extensions typing_input =
     iterator.structure iterator tree.structure
   | Typedtree_signature_output signature ->
     iterator.signature iterator signature);
-  !counters
+  Profile.Counters.union !counters (Ctype.take_moregen_counters ())

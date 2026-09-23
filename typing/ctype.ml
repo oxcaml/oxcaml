@@ -6590,7 +6590,127 @@ let path_same_normalized env p1 p2 =
 
 exception Complicated_moregen
 
-let moregen_mode_fast v m1 m2 =
+(* Profiling counters for the fast path, reported by [-dcounters]. Every
+   counter is registered at zero so that the output always lists them all. *)
+type moregen_bail_reason =
+  | Maxnodes
+  | Tvar_jkind_bounds
+  | Tvar_jkind_layout_differ
+  | Tvar_jkind_layout_unknown_pat
+  | Tvar_jkind_layout_unknown_subj
+  | Tvar_jkind_vs_constr
+  | Tvar_jkind_vs_other
+  | Arrow_novariance
+  | Arrow_mode_arg_const
+  | Arrow_mode_arg_var
+  | Arrow_mode_ret_const
+  | Arrow_mode_ret_var
+  | Arrow_label
+  | Constr_not_path
+  | Constr_path
+  | Tuple_length
+  | Tuple_label
+  | Other_tsubst
+  | Other_tvar_nongen
+  | Other_subject_tvar
+  | Other_constr_mismatch
+  | Other_variant
+  | Other_object
+  | Other_poly
+  | Other_package
+  | Other_unboxed_tuple
+  | Other
+
+let all_moregen_bail_reasons =
+  [ Maxnodes; Tvar_jkind_bounds; Tvar_jkind_layout_differ;
+    Tvar_jkind_layout_unknown_pat; Tvar_jkind_layout_unknown_subj;
+    Tvar_jkind_vs_constr; Tvar_jkind_vs_other; Arrow_novariance;
+    Arrow_mode_arg_const; Arrow_mode_arg_var; Arrow_mode_ret_const;
+    Arrow_mode_ret_var; Arrow_label; Constr_not_path; Constr_path;
+    Tuple_length; Tuple_label; Other_tsubst; Other_tvar_nongen;
+    Other_subject_tvar; Other_constr_mismatch; Other_variant; Other_object;
+    Other_poly; Other_package; Other_unboxed_tuple; Other ]
+
+let moregen_bail_reason_name = function
+  | Maxnodes -> "maxnodes"
+  | Tvar_jkind_bounds -> "tvar_jkind_bounds"
+  | Tvar_jkind_layout_differ -> "tvar_jkind_layout_differ"
+  | Tvar_jkind_layout_unknown_pat -> "tvar_jkind_layout_unknown_pat"
+  | Tvar_jkind_layout_unknown_subj -> "tvar_jkind_layout_unknown_subj"
+  | Tvar_jkind_vs_constr -> "tvar_jkind_vs_constr"
+  | Tvar_jkind_vs_other -> "tvar_jkind_vs_other"
+  | Arrow_novariance -> "arrow_novariance"
+  | Arrow_mode_arg_const -> "arrow_mode_arg_const"
+  | Arrow_mode_arg_var -> "arrow_mode_arg_var"
+  | Arrow_mode_ret_const -> "arrow_mode_ret_const"
+  | Arrow_mode_ret_var -> "arrow_mode_ret_var"
+  | Arrow_label -> "arrow_label"
+  | Constr_not_path -> "constr_not_path"
+  | Constr_path -> "constr_path"
+  | Tuple_length -> "tuple_length"
+  | Tuple_label -> "tuple_label"
+  | Other_tsubst -> "other_tsubst"
+  | Other_tvar_nongen -> "other_tvar_nongen"
+  | Other_subject_tvar -> "other_subject_tvar"
+  | Other_constr_mismatch -> "other_constr_mismatch"
+  | Other_variant -> "other_variant"
+  | Other_object -> "other_object"
+  | Other_poly -> "other_poly"
+  | Other_package -> "other_package"
+  | Other_unboxed_tuple -> "other_unboxed_tuple"
+  | Other -> "other"
+
+let moregen_bail_counter reason =
+  "moregen_bail:" ^ moregen_bail_reason_name reason
+
+let moregen_outcome_counters =
+  [ "moregen_calls"; "moregen_fast_ok"; "moregen_fast_bail";
+    "moregen_fast_trace"; "moregen_skip_sorts"; "moregen_slow_ok";
+    "moregen_slow_fail" ]
+
+let initial_moregen_counters =
+  List.fold_left
+    (fun counters name -> Profile.Counters.set name 0 counters)
+    (Profile.Counters.create ())
+    (moregen_outcome_counters
+     @ List.map moregen_bail_counter all_moregen_bail_reasons)
+
+let moregen_counters = ref initial_moregen_counters
+
+let counting_moregen () = List.mem `Counters !Clflags.profile_columns
+
+let incr_moregen_counter name =
+  if counting_moregen () then
+    moregen_counters := Profile.Counters.incr name !moregen_counters
+
+let take_moregen_counters () =
+  let counters = !moregen_counters in
+  moregen_counters := initial_moregen_counters;
+  counters
+
+let moregen_bail reason =
+  if counting_moregen () then
+    incr_moregen_counter (moregen_bail_counter reason);
+  raise_notrace Complicated_moregen
+
+(* Classify the pattern/subject pair of the fast path's catch-all case. A
+   generic pattern variable is handled before reaching it, so a [Tvar]
+   pattern here is non-generic. *)
+let moregen_other_bail_reason t1 t2 =
+  match get_desc t1, get_desc t2 with
+  | Tsubst _, _ -> Other_tsubst
+  | Tvar _, _ -> Other_tvar_nongen
+  | _, Tvar _ -> Other_subject_tvar
+  | Tconstr _, _ | _, Tconstr _ -> Other_constr_mismatch
+  | Tvariant _, _ | _, Tvariant _ -> Other_variant
+  | (Tobject _ | Tfield _ | Tnil), _ | _, (Tobject _ | Tfield _ | Tnil) ->
+    Other_object
+  | (Tpoly _ | Tunivar _), _ | _, (Tpoly _ | Tunivar _) -> Other_poly
+  | Tpackage _, _ | _, Tpackage _ -> Other_package
+  | Tunboxed_tuple _, _ | _, Tunboxed_tuple _ -> Other_unboxed_tuple
+  | _, _ -> Other
+
+let moregen_mode_fast ~is_ret v m1 m2 =
   let le m1 m2 =
     Alloc.Const.le
       (Alloc.Guts.get_loose_ceil m1)
@@ -6603,7 +6723,20 @@ let moregen_mode_fast v m1 m2 =
     | Contravariant -> le m2 m1
     | Bivariant -> true
   in
-  if not ok then raise_notrace Complicated_moregen
+  if not ok then begin
+    let is_const m =
+      Alloc.Const.equal
+        (Alloc.Guts.get_loose_ceil m)
+        (Alloc.Guts.get_loose_floor m)
+    in
+    let const = is_const m1 && is_const m2 in
+    moregen_bail
+      (match is_ret, const with
+       | false, true -> Arrow_mode_arg_const
+       | false, false -> Arrow_mode_arg_var
+       | true, true -> Arrow_mode_ret_const
+       | true, false -> Arrow_mode_ret_var)
+  end
 
 let moregeneral_fast env patt subst subj =
   For_copy.with_scope (fun scope ->
@@ -6613,7 +6746,7 @@ let moregeneral_fast env patt subst subj =
     let maxnodes = ref 200 in
     let rec mgen variance t1 t2 =
       decr maxnodes;
-      if !maxnodes = 0 then raise_notrace Complicated_moregen;
+      if !maxnodes = 0 then moregen_bail Maxnodes;
       if eq_type t1 t2 then () else
       match get_desc t1, get_desc t2 with
       | Tsubst (ty, _), _ when eq_type ty t2 -> ()
@@ -6626,33 +6759,35 @@ let moregeneral_fast env patt subst subj =
             (the first thing the general check tests too); or its mod-bounds
             are maximal, so only the layout matters, and the subject is a
             variable with the same constant layout. *)
-         let fits =
-           Jkind.is_obviously_max jkind
-           || (Jkind.mod_bounds_are_obviously_max jkind
-               && match get_desc t2 with
-                  | Tvar { jkind = jkind2 } -> begin
-                      (* [get_layout] only consults [env] for an abstract
-                         kind. The path in [jkind2] is unsubstituted, but
-                         looking it up either fails (and we bail out) or finds
-                         the same declaration, as identifiers are unique. *)
-                      match
-                        Jkind.get_layout env jkind, Jkind.get_layout env jkind2
-                      with
-                      | Some l1, Some l2 ->
-                        Jkind_types.Layout.Const.equal l1 l2
-                      | _ -> false
-                    end
-                  | _ -> false)
-         in
-         if not fits then raise_notrace Complicated_moregen;
+         if not (Jkind.is_obviously_max jkind) then begin
+           if not (Jkind.mod_bounds_are_obviously_max jkind) then
+             moregen_bail Tvar_jkind_bounds;
+           match get_desc t2 with
+           | Tvar { jkind = jkind2 } -> begin
+               (* [get_layout] only consults [env] for an abstract
+                  kind. The path in [jkind2] is unsubstituted, but
+                  looking it up either fails (and we bail out) or finds
+                  the same declaration, as identifiers are unique. *)
+               match
+                 Jkind.get_layout env jkind, Jkind.get_layout env jkind2
+               with
+               | Some l1, Some l2 ->
+                 if not (Jkind_types.Layout.Const.equal l1 l2) then
+                   moregen_bail Tvar_jkind_layout_differ
+               | None, _ -> moregen_bail Tvar_jkind_layout_unknown_pat
+               | Some _, None -> moregen_bail Tvar_jkind_layout_unknown_subj
+             end
+           | Tconstr _ -> moregen_bail Tvar_jkind_vs_constr
+           | _ -> moregen_bail Tvar_jkind_vs_other
+         end;
          For_copy.redirect_desc scope t1 (Tsubst (t2, None))
       | Tarrow ((l1,a1,r1), t1, u1, _), Tarrow ((l2,a2,r2), t2, u2, _)
            when l1 = l2 ->
          begin match variance with
-         | None -> raise_notrace Complicated_moregen
+         | None -> moregen_bail Arrow_novariance
          | Some variance ->
-           moregen_mode_fast (neg_variance variance) a1 a2;
-           moregen_mode_fast variance r1 r2;
+           moregen_mode_fast ~is_ret:false (neg_variance variance) a1 a2;
+           moregen_mode_fast ~is_ret:true variance r1 r2;
            mgen (Some (neg_variance variance)) t1 t2;
            mgen (Some variance) u1 u2
          end
@@ -6662,7 +6797,7 @@ let moregeneral_fast env patt subst subj =
          (* FIXME: easy cases of alias expansion? *)
          let p2 =
            try Subst.type_path subst p2
-           with Subst.Not_path -> raise_notrace Complicated_moregen
+           with Subst.Not_path -> moregen_bail Constr_not_path
          in
          if not (path_same_normalized env p1 p2) then begin
            if debug_moregen then
@@ -6675,28 +6810,34 @@ let moregeneral_fast env patt subst subj =
                (Format_doc.compat Path.print)
                (Env.normalize_type_path None env p2)
                (path_scope p2);
-           raise_notrace Complicated_moregen
+           moregen_bail Constr_path
          end;
          List.iter2 (mgen None) tl1 tl2
       | Tpoly (t1, []), Tpoly(t2, []) ->
          mgen variance t1 t2
+      | Tarrow _, Tarrow _ ->
+         moregen_bail Arrow_label
       | _, _ ->
-         raise_notrace Complicated_moregen
+         moregen_bail (moregen_other_bail_reason t1 t2)
     and mgen_labeled variance tl1 tl2 =
       (* This is an actual failure, but we raise [Complicated_moregen] so that
          the slow path can give a nicer error. *)
       if List.compare_lengths tl1 tl2 <> 0 then
-        raise_notrace Complicated_moregen;
+        moregen_bail Tuple_length;
       List.iter2
         (fun (l1, t1) (l2, t2) ->
           if not (Option.equal String.equal l1 l2) then
-            raise_notrace Complicated_moregen;
+            moregen_bail Tuple_label;
           mgen variance t1 t2)
         tl1 tl2
     in
     match mgen (Some Covariant) patt subj with
-    | () -> true
-    | exception (Complicated_moregen | Moregen_trace _) ->
+    | () -> incr_moregen_counter "moregen_fast_ok"; true
+    | exception Complicated_moregen ->
+      incr_moregen_counter "moregen_fast_bail";
+      backtrack snap; false
+    | exception Moregen_trace _ ->
+      incr_moregen_counter "moregen_fast_trace";
       backtrack snap; false)
 
 let may_instantiate inst_nongen t1 =
@@ -7081,10 +7222,11 @@ let moregeneral ~self_check env inst_nongen
     pat_sch_sorts subj_sch_sorts pat_sch subst subj_sch =
   (* The fast path does not handle layout-polymorphic schemes, so only try it
      when there are no sort variables on either side. *)
+  incr_moregen_counter "moregen_calls";
   let fast =
     match pat_sch_sorts, subj_sch_sorts with
     | [], [] -> moregeneral_fast env pat_sch subst subj_sch
-    | _, _ -> false
+    | _, _ -> incr_moregen_counter "moregen_skip_sorts"; false
   in
   if fast then []
   else begin
@@ -7095,8 +7237,13 @@ let moregeneral ~self_check env inst_nongen
         !Btype.print_raw (Subst.type_expr subst subj_sch)
     end;
     let subj_sch = Subst.type_expr subst subj_sch in
-    moregeneral_slow ~self_check env inst_nongen
-      pat_sch_sorts subj_sch_sorts pat_sch subj_sch
+    match
+      moregeneral_slow ~self_check env inst_nongen
+        pat_sch_sorts subj_sch_sorts pat_sch subj_sch
+    with
+    | result -> incr_moregen_counter "moregen_slow_ok"; result
+    | exception (Moregen _ as exn) ->
+      incr_moregen_counter "moregen_slow_fail"; raise exn
   end
 
 let is_moregeneral env inst_nongen pat_sch subj_sch =
