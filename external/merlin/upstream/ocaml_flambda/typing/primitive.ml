@@ -52,6 +52,10 @@ type mode =
   | Prim_global
   | Prim_poly
 
+(* CR-someday lmaurer: We should consider moving [prim_alloc], [prim_effects],
+   and [prim_coeffects] into a variant to replace the [bool] in
+   [prim_c_builtin]. They're ignored for compiler primitives (for which we
+   already know the correct values - see [Lambda.primitive_may_allocate]). *)
 type 'repr description_gen =
   { prim_name: string;         (* Name of primitive  or C function *)
     prim_arity: int;           (* Number of arguments *)
@@ -1170,6 +1174,19 @@ let prim_has_valid_reprs ~loc prim =
       check [
         is (Same_as_ocaml_repr C.scannable);
         any;
+      ]
+    | "%makeblock" ->
+      check [any; (is (Same_as_ocaml_repr C.scannable))]
+    | "%makemutable" ->
+      check [any; (is (Same_as_ocaml_repr C.scannable))]
+    | "%field0_of_1"
+    | "%field0_of_1_immut" ->
+      check [is (Same_as_ocaml_repr C.scannable); any]
+    | "%setfield0_of_1" ->
+      check [
+        is (Same_as_ocaml_repr C.scannable);
+        any;
+        is (Same_as_ocaml_repr C.scannable)
       ]
 
     | name -> (

@@ -3724,6 +3724,8 @@ module Format_history = struct
       fprintf ppf
         "it's the element type of an array that is iterated over in a \
          comprehension"
+    | List_comprehension_element ->
+      fprintf ppf "it's the element type of list comprehension"
     | Optional_argument -> fprintf ppf "it's the type of an optional argument"
 
   let format_value_creation_reason ppf ~layout_or_kind :
@@ -4903,6 +4905,7 @@ module Debug_printers = struct
     | Array_comprehension_element -> fprintf ppf "Array_comprehension_element"
     | Array_comprehension_iterator_element ->
       fprintf ppf "Array_comprehension_iterator_element"
+    | List_comprehension_element -> fprintf ppf "List_comprehension_element"
     | Optional_argument -> fprintf ppf "Optional_argument"
 
   let value_creation_reason ppf : History.value_creation_reason -> _ = function
