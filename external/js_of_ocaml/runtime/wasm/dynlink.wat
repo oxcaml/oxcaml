@@ -65,7 +65,7 @@
 
    ;; Standard OCaml dynlink primitives
 
-(@if (and (>= $ocaml_version (5 1 0)) (not $oxcaml))
+(@if (>= $ocaml_version (5 1 0))
 (@then
    (func (export "caml_dynlink_open_lib")
       (param (ref eq)) (result (ref eq))
