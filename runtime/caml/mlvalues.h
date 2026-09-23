@@ -555,6 +555,7 @@ CAMLextern value caml_hash_variant(char const * tag);
 #define String_tag 252
 #define String_val(x) ((const char *) Bp_val(x))
 #define Bytes_val(x) ((unsigned char *) Bp_val(x))
+/* Reserved bits are always zero in string headers. */
 CAMLextern mlsize_t caml_string_length (value);   /* size in bytes */
 CAMLextern int caml_string_is_c_safe (value);
   /* true if string contains no '\0' null characters */
