@@ -44,6 +44,44 @@
   (progn
    (diff empty.expected atomics.out))))
 
+; Test rotations with binary emitter - not supported on macOS
+
+(executables
+ (names rotations)
+ (modules rotations)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -internal-assembler)))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{system} macosx)))
+ (targets rotations.out)
+ (deps rotations.exe)
+ (action
+  (progn
+   (with-outputs-to
+    rotations.out
+    (run ./rotations.exe)))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{system} macosx)))
+ (action
+  (progn
+   (diff empty.expected rotations.out))))
+
 
 ; Test arch_* intrinsics
 

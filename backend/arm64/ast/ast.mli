@@ -766,6 +766,13 @@ module Instruction_name : sig
           * [`Reg of [`Neon of [`Vector of [`V16B] * [`B]]]]
           * [`Imm of [`Six]] )
         t
+    | EXTR :
+        ( quad,
+          [`Reg of [`GP of ([< `X | `W] as 'w)]]
+          * [`Reg of [`GP of 'w]]
+          * [`Reg of [`GP of 'w]]
+          * [`Imm of [`Six]] )
+        t
     | FABS :
         ( pair,
           [`Reg of [`Neon of [`Scalar of ([< `S | `D] as 'p)]]]
@@ -1220,6 +1227,12 @@ module Instruction_name : sig
         (pair, [`Reg of [`GP of ([< `X | `W] as 'w)]] * [`Reg of [`GP of 'w]]) t
     | REV16 :
         (pair, [`Reg of [`GP of ([< `X | `W] as 'w)]] * [`Reg of [`GP of 'w]]) t
+    | RORV :
+        ( triple,
+          [`Reg of [`GP of ([< `X | `W] as 'w)]]
+          * [`Reg of [`GP of 'w]]
+          * [`Reg of [`GP of 'w]] )
+        t
     | SBFM :
         ( quad,
           [`Reg of [`GP of ([< `X | `W] as 'w)]]
