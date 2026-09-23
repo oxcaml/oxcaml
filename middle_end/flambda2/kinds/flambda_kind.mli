@@ -235,8 +235,7 @@ module With_subkind : sig
       | Tagged_immediate
       | Variant of
           { consts : Target_ocaml_int.Set.t;
-            non_consts :
-              (Block_shape.t * full_kind list) option Tag.Scannable.Map.t
+            non_consts : constructor_shape Tag.Scannable.Map.t
           }
       | Float_block of { num_fields : int }
       | Float_array
@@ -255,6 +254,10 @@ module With_subkind : sig
       | Unboxed_vec512_array
       | Unboxed_mask_array
       | Unboxed_product_array
+
+    and constructor_shape =
+      | Undetermined
+      | Determined of Block_shape.t * full_kind list
 
     include Container_types.S with type t := t
   end

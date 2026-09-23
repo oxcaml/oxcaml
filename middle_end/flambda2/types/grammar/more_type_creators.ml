@@ -523,9 +523,11 @@ let rec unknown_with_subkind ?(alloc_mode = Alloc_mode.For_types.unknown ())
         let const_ctors = these_naked_immediates consts in
         let non_const_ctors =
           Tag.Scannable.Map.map
-            (function
-              | None -> Or_unknown.Unknown
-              | Some (shape, fields) ->
+            (fun (shape :
+                   K.With_subkind.Non_null_value_subkind.constructor_shape) ->
+              match shape with
+              | Undetermined -> Or_unknown.Unknown
+              | Determined (shape, fields) ->
                 Or_unknown.Known
                   ( shape,
                     List.map

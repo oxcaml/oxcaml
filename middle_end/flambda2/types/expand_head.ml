@@ -1010,7 +1010,9 @@ and is_useful_block ~non_consts env ~blocks =
     | Known row_like_for_blocks ->
       TG.Row_like_for_blocks.is_bottom row_like_for_blocks
       || Tag.Scannable.Map.exists
-           (fun tag shape_and_fields ->
+           (fun tag
+                (shape_and_fields :
+                  K.With_subkind.Non_null_value_subkind.constructor_shape) ->
              let tag = Tag.Scannable.to_tag tag in
              let[@local] process_case
                  (row_like_block_case : TG.row_like_block_case) =
@@ -1019,8 +1021,8 @@ and is_useful_block ~non_consts env ~blocks =
                   inlining. *)
                let types = row_like_block_case.maps_to in
                match shape_and_fields with
-               | None -> true
-               | Some (_block_shape, field_kinds) -> (
+               | Undetermined -> true
+               | Determined (_block_shape, field_kinds) -> (
                  try
                    List.iteri
                      (fun ix field_kind ->

@@ -213,23 +213,29 @@ let rec rewrite_kind_with_subkind_not_top_not_bottom context usages kind =
     let fields = PTA.get_fields context.db usages in
     let non_consts =
       Tag.Scannable.Map.map
-        (Option.map (fun (shape, kinds) ->
-             let kinds =
-               List.mapi
-                 (fun i kind ->
-                   let field =
-                     Field.block i (Flambda_kind.With_subkind.kind kind)
-                   in
-                   match Field.Map.find_opt field fields with
-                   | None -> (* maybe poison *) erase_subkind kind
-                   | Some Unknown -> (* top *) kind
-                   | Some (Known flow_to) ->
-                     let usages = PTA.get_direct_usages context.db flow_to in
-                     rewrite_kind_with_subkind_not_top_not_bottom context usages
-                       kind)
-                 kinds
-             in
-             shape, kinds))
+        (fun (shape :
+               Flambda_kind.With_subkind.Non_null_value_subkind
+               .constructor_shape) ->
+          match shape with
+          | Undetermined -> shape
+          | Determined (shape, kinds) ->
+            let kinds =
+              List.mapi
+                (fun i kind ->
+                  let field =
+                    Field.block i (Flambda_kind.With_subkind.kind kind)
+                  in
+                  match Field.Map.find_opt field fields with
+                  | None -> (* maybe poison *) erase_subkind kind
+                  | Some Unknown -> (* top *) kind
+                  | Some (Known flow_to) ->
+                    let usages = PTA.get_direct_usages context.db flow_to in
+                    rewrite_kind_with_subkind_not_top_not_bottom context usages
+                      kind)
+                kinds
+            in
+            Flambda_kind.With_subkind.Non_null_value_subkind.Determined
+              (shape, kinds))
         non_consts
     in
     Flambda_kind.With_subkind.create Flambda_kind.value
