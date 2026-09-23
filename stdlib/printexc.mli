@@ -179,7 +179,7 @@ val raw_backtrace_to_string: raw_backtrace -> string
 *)
 
 external raise_with_backtrace: ('a : value_or_null)
-  . exn -> raw_backtrace -> 'a @ portable unique
+  . exn -> raw_backtrace -> 'a @ portable unique @@ stateless
   = "%raise_with_backtrace"
 (** Reraise the exception using the given raw_backtrace for the
     origin of the exception
@@ -189,7 +189,8 @@ external raise_with_backtrace: ('a : value_or_null)
 
 (** {1 Current call stack} *)
 
-external get_callstack: int -> raw_backtrace = "caml_get_current_callstack"
+external get_callstack: int -> raw_backtrace @@ reading portable
+  = "caml_get_current_callstack"
 (** [Printexc.get_callstack n] returns a description of the top of the
     call stack on the current program point (for the current thread),
     with at most [n] entries.  (Note: this function is not related to
