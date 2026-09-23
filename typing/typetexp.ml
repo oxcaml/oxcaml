@@ -27,6 +27,8 @@ open Ctype
 
 exception Already_bound
 
+type var_universe = UType | UMode
+
 type unbound_variable_policy =
   | Open (* common case *)
   | Closed (* no wildcards or unqunatified variables allowed *)
@@ -71,8 +73,8 @@ type jkind_info =
   }
 
 type error =
-  | Unbound_type_variable of
-    string * string list * unbound_variable_reason option
+  | Unbound_variable of
+    var_universe * string * string list * unbound_variable_reason option
   | No_type_wildcards of unbound_variable_reason option
   | Undefined_type_constructor of Path.t
   | Type_arity_mismatch of Longident.t * int * int
@@ -237,6 +239,9 @@ module TyVarEnv : sig
     row_context:type_expr option ref list -> string -> type_expr * Env.stage
     (* look up a local type variable; throws Not_found if it isn't in scope *)
 
+  val lookup_local_mode : string -> Alloc.lr
+    (* look up a local mode variable; throws Not_found if it isn't in scope *)
+
   val lookup_global_jkind : string -> jkind_lr
     (* look up a global type variable, returning the jkind it was originally
        assigned. Throws [Not_found] if the variable isn't in scope. See
@@ -263,6 +268,8 @@ module TyVarEnv : sig
        imprecise annotations on it can be detected in [check_poly_univars].
        Does nothing if the name does not refer to an in-scope univar. *)
 
+  val remember_used_mode : string -> Alloc.lr -> Location.t -> unit
+
   val globalize_used_variables : policy -> Env.t -> unit -> unit
   (* after finishing with a type signature, used variables are unified to the
      corresponding global type variables if they exist. Otherwise, in function
@@ -276,20 +283,76 @@ module TyVarEnv : sig
       function performs both the deferred unifications and the rigid-variable
       jkind checks. *)
 end = struct
-  (** Map indexed by type variable names. *)
-  module TyVarMap = Misc.Stdlib.String.Map
+  (** Map indexed by type or mode variable names. *)
+  module VarMap (M : sig
+    type ty
+    type mo
+  end) : sig
+    type 'a universe =
+      | Type : M.ty universe
+      | Mode : M.mo universe
+
+    type t
+
+    val empty : t
+    val mem : 'a universe -> string -> t -> bool
+    val find : 'a universe -> string -> t -> 'a
+    val add : 'a universe -> string -> 'a -> t -> t
+    val iter : 'a universe -> (string -> 'a -> unit) -> t -> unit
+    val fold :
+      'a universe -> (string -> 'a -> 'acc -> 'acc) -> t -> 'acc -> 'acc
+  end = struct
+    type 'a universe =
+      | Type : M.ty universe
+      | Mode : M.mo universe
+
+    module Map = Misc.Stdlib.String.Map
+
+    type t = { ty: M.ty Map.t; mo: M.mo Map.t }
+
+    let empty = { ty = Map.empty; mo = Map.empty }
+
+    let mem (type u) (u : u universe) key t =
+      match u with
+      | Type -> Map.mem key t.ty
+      | Mode -> Map.mem key t.mo
+
+    let find (type u) (u : u universe) key t : u =
+      match u with
+      | Type -> Map.find key t.ty
+      | Mode -> Map.find key t.mo
+
+    let add (type u) (u : u universe) key (value : u) t =
+      match u with
+      | Type -> { t with ty = Map.add key value t.ty }
+      | Mode -> { t with mo = Map.add key value t.mo }
+
+    let iter (type u) (u : u universe) (f : string -> u -> unit) t =
+      match u with
+      | Type -> Map.iter f t.ty
+      | Mode -> Map.iter f t.mo
+
+    let fold (type u) (u : u universe) (f : string -> u -> _ -> _) t acc =
+      match u with
+      | Type -> Map.fold f t.ty acc
+      | Mode -> Map.fold f t.mo acc
+  end
 
   let not_generic v = get_level v <> Btype.generic_level
+
+  module GlobalVarMap = VarMap (struct
+    type ty = type_expr * bool ref * jkind_lr * Env.stage
+    type mo = Alloc.lr
+  end )
+
 
   (* These are the "global" type variables: they were in scope before
      we started processing the current type. See Note [Global type variables].
   *)
-  let type_variables =
-    ref (TyVarMap.empty :
-           (type_expr * bool ref * jkind_lr * Env.stage) TyVarMap.t)
+  let variables = ref GlobalVarMap.empty
 
   (* These are variables that have been used in the currently-being-checked
-     type, possibly including the variables in [type_variables].
+     type, possibly including the variables in [variables].
   *)
   type used_info = {
     ty : type_expr;
@@ -306,8 +369,12 @@ end = struct
     annotated_jkind : jkind_lr option;
   }
 
-  let used_variables =
-    ref (TyVarMap.empty : used_info TyVarMap.t)
+  module LocalVarMap = VarMap (struct
+    type ty = used_info
+    type mo = Alloc.lr * Location.t
+  end)
+
+  let used_variables = ref LocalVarMap.empty
 
   (* Anonymous type variables with a jkind annotation ([(_ : kind)]) that
      have been used in the currently-being-checked type. Tracked separately
@@ -327,23 +394,28 @@ end = struct
 
   let reset () =
     reset_global_level ();
-    type_variables := TyVarMap.empty;
+    variables := GlobalVarMap.empty;
     warned_imprecise_locs := LocSet.empty
 
   let is_in_scope name =
-    TyVarMap.mem name !type_variables
+    GlobalVarMap.mem Type name !variables
 
   let add ?(unused = ref false) name v jkind stage =
     assert (not_generic v);
-    type_variables :=
-      TyVarMap.add name (v, unused, jkind, stage) !type_variables
+    variables :=
+      GlobalVarMap.add Type name (v, unused, jkind, stage) !variables
+
+  let add_mode name mode =
+    assert (not (Alloc.check_generic mode));
+    variables :=
+      GlobalVarMap.add Mode name mode !variables
 
   let narrow () =
-    (increase_global_level (), !type_variables)
+    (increase_global_level (), !variables)
 
   let widen (gl, tv) =
     restore_global_level gl;
-    type_variables := tv
+    variables := tv
 
   let with_local_scope f =
    let context = narrow () in
@@ -353,18 +425,23 @@ end = struct
 
   (* throws Not_found if the variable is not in scope *)
   let lookup_global name =
-    let (type_expr, unused, _, stage) = TyVarMap.find name !type_variables in
+    let (type_expr, unused, _, stage) =
+      GlobalVarMap.find Type name !variables
+    in
     unused := false;
     (type_expr, stage)
 
   let lookup_global_jkind name =
-    thd4 (TyVarMap.find name !type_variables)
+    thd4 (GlobalVarMap.find Type name !variables)
 
-  let get_in_scope_names () =
+  let lookup_global_mode name =
+    GlobalVarMap.find Mode name !variables
+
+  let get_in_scope_names u =
     let add_name name _ l =
       if name = "_" then l else Pprintast.tyvar_of_name name :: l
     in
-    TyVarMap.fold add_name !type_variables []
+    GlobalVarMap.fold u add_name !variables []
 
   (*****)
   (* These are variables we expect to become univars (they were introduced with
@@ -565,7 +642,7 @@ end = struct
   let reset_locals ?univars:(uvs=[]) () =
     assert_univars uvs;
     univars := uvs;
-    used_variables := TyVarMap.empty;
+    used_variables := LocalVarMap.empty;
     used_anonymous_variables := []
 
   let associate row_context p =
@@ -579,12 +656,15 @@ end = struct
       associate row_context p;
       p.univar, s
     with Not_found ->
-      let info = TyVarMap.find name !used_variables in
+      let info = LocalVarMap.find Type name !used_variables in
       info.unused := false;
       instance info.ty, info.stage
       (* This call to instance might be redundant; all variables
          inserted into [used_variables] are non-generic, but some
          might get generalized. *)
+
+  let lookup_local_mode name =
+    LocalVarMap.find Mode name !used_variables |> fst
 
   let remember_univar_use name annotated_jkind loc =
     match find_poly_univars name !univars with
@@ -595,7 +675,7 @@ end = struct
   let remember_used ?check ~rigid ~annotated_jkind name v loc stage =
     assert (not_generic v);
     let rigid, annotated_jkind =
-      match TyVarMap.find name !used_variables with
+      match LocalVarMap.find Type name !used_variables with
       | info -> info.rigid, info.annotated_jkind
       | exception Not_found -> rigid, annotated_jkind
     in
@@ -613,13 +693,15 @@ end = struct
       | _ -> ref false
     in
     let info = { ty = v; unused; loc; rigid; stage; annotated_jkind } in
-    used_variables := TyVarMap.add name info !used_variables
+    used_variables := LocalVarMap.add Type name info !used_variables
 
   let remember_used_anonymous v annotated_jkind loc =
     assert (not_generic v);
     used_anonymous_variables :=
       (v, annotated_jkind, loc) :: !used_anonymous_variables
 
+  let remember_used_mode name mode loc =
+    used_variables := LocalVarMap.add Mode name (mode, loc) !used_variables
 
   type flavor = Unification | Universal
   type policy = {
@@ -684,7 +766,7 @@ end = struct
         check_imprecise_annotation env loc "_" ty annotated_jkind)
       !used_anonymous_variables;
     used_anonymous_variables := [];
-    TyVarMap.iter
+    LocalVarMap.iter Type
       (fun name { ty; unused; rigid; loc; stage = s; annotated_jkind } ->
         Option.iter
           (check_imprecise_annotation env loc
@@ -721,16 +803,32 @@ end = struct
               add ~unused name v2 jkind s;
             | Closed, true ->
               raise(Error(loc, env,
-                          Unbound_type_variable (Pprintast.tyvar_of_name name,
-                                                 get_in_scope_names (),
-                                                 None)))
+                          Unbound_variable (UType,
+                                            Pprintast.tyvar_of_name name,
+                                            get_in_scope_names Type,
+                                            None)))
             | Closed_for_upstream_compatibility, true ->
               raise(Error(loc, env,
-                          Unbound_type_variable (Pprintast.tyvar_of_name name,
-                                                 get_in_scope_names (),
-                                                 Some Upstream_compatibility))))
+                          Unbound_variable (UType,
+                                            Pprintast.tyvar_of_name name,
+                                            get_in_scope_names Type,
+                                            Some Upstream_compatibility))))
       !used_variables;
-    used_variables := TyVarMap.empty;
+    LocalVarMap.iter Mode
+      (fun name (mode, loc) ->
+        match lookup_global_mode name with
+        | mode' -> Alloc.equate_exn mode mode'
+        | exception Not_found ->
+          match unbound_variable_policy with
+          | Open -> add_mode name mode
+          | Closed | Closed_for_upstream_compatibility ->
+            raise(Error(loc, env,
+                        Unbound_variable (UMode,
+                                          Pprintast.tyvar_of_name name,
+                                          get_in_scope_names Mode,
+                                          None))))
+      !used_variables;
+    used_variables := LocalVarMap.empty;
     fun () ->
       List.iter
         (function (loc, t1, t2) ->
@@ -877,32 +975,6 @@ let get_type_param_name styp =
   | Ptyp_var (name, _) -> Some name
   | _ -> Misc.fatal_error "non-type-variable in get_type_param_name"
 
-module Mode_var_env : sig
-  val lookup : string -> Alloc.lr
-
-  val with_mode_var_scope : (unit -> 'a) -> 'a
-end = struct
-  module StringMap = Map.Make(String)
-
-  type env = Alloc.lr StringMap.t ref
-
-  let table : env = ref StringMap.empty
-
-  let reset () = table := StringMap.empty
-
-  let lookup name =
-    match StringMap.find_opt name !table with
-    | Some v -> v
-    | None ->
-        let v = Alloc.newvar (get_current_level ()) in
-        table := StringMap.add name v !table;
-        v
-
-  let with_mode_var_scope f =
-    reset ();
-    Misc.try_finally f ~always:(fun () -> reset ())
-end
-
 type sig_var =
   { mode : Alloc.lr;
     upper_const : Alloc.Const.t
@@ -912,10 +984,17 @@ type sig_mode =
   | Sig_const of Alloc.Const.t
   | Sig_var of sig_var
 
+let transl_mode_var { txt; loc } =
+  try TyVarEnv.lookup_local_mode txt
+  with Not_found ->
+    let v = Alloc.newvar (Ctype.get_current_level ()) in
+    TyVarEnv.remember_used_mode txt v loc;
+    v
+
 let transl_modepoly_morph_r
     (elem : (Allowance.disallowed * Allowance.allowed) Typemode.modepoly_elem)
     : Alloc.r =
-  let v = Mode_var_env.lookup elem.elem_var.txt in
+  let v = transl_mode_var elem.elem_var in
   let base =
     match elem.elem_morph with
     | None -> Alloc.disallow_left v
@@ -937,7 +1016,7 @@ let transl_modepoly_morph_r
 let transl_modepoly_morph_l
     (elem : (Allowance.allowed * Allowance.disallowed) Typemode.modepoly_elem)
     : Alloc.l =
-  let v = Mode_var_env.lookup elem.elem_var.txt in
+  let v = transl_mode_var elem.elem_var in
   let base : Alloc.l =
     match elem.elem_morph with
     | None -> Alloc.disallow_right v
@@ -960,11 +1039,11 @@ let transl_modepoly_morph_l
 let transl_modepoly_annot env (annot : Typemode.modepoly_annot) : sig_var =
   let m = Alloc.newvar (get_current_level ()) in
   match annot with
-  | Typemode.Pmode_var { txt = name; loc } ->
-      let v = Mode_var_env.lookup name in
+  | Typemode.Pmode_var {txt; loc} ->
+      let v = transl_mode_var {txt; loc} in
       (match Alloc.equate m v with
       | Ok () -> ()
-      | Error _ -> raise (Error (loc, env, Unsatisfiable_mode_variable name)));
+      | Error _ -> raise (Error (loc, env, Unsatisfiable_mode_variable txt)));
       { mode = m; upper_const = Alloc.Const.max }
   | Typemode.Pmode_bounds { txt = { upper; lower }; loc } ->
       let upper_const =
@@ -1867,9 +1946,7 @@ let transl_type env policy mode styp =
 let transl_simple_type_impl env ~new_var_jkind ?univars ~policy mode styp =
   TyVarEnv.reset_locals ?univars ();
   let policy = TyVarEnv.make_policy policy new_var_jkind in
-  let typ =
-    Mode_var_env.with_mode_var_scope (fun () ->
-        transl_type env policy mode styp)
+  let typ = transl_type env policy mode styp
   in
   TyVarEnv.globalize_used_variables policy env ();
   make_fixed_univars typ.ctyp_type;
@@ -1886,9 +1963,7 @@ let transl_simple_type_univars env styp =
     TyVarEnv.collect_univars begin fun () ->
       with_local_level_generalize begin fun () ->
         let policy = TyVarEnv.univars_policy in
-        let typ =
-          Mode_var_env.with_mode_var_scope (fun () ->
-              transl_type env policy sig_mode_legacy styp)
+        let typ = transl_type env policy sig_mode_legacy styp
         in
         TyVarEnv.globalize_used_variables policy env ();
         typ
@@ -1904,9 +1979,7 @@ let transl_simple_type_delayed env mode styp =
   let typ, force =
     with_local_level_generalize begin fun () ->
       let policy = TyVarEnv.make_policy Open Any in
-      let typ =
-        Mode_var_env.with_mode_var_scope (fun () ->
-            transl_type env policy (Sig_const mode) styp)
+      let typ = transl_type env policy (Sig_const mode) styp
       in
       make_fixed_univars typ.ctyp_type;
       (* This brings the used variables to the global level, but doesn't link
@@ -2078,9 +2151,10 @@ let report_unbound_variable_reason = function
   | None -> []
 
 let report_error_doc loc env = function
-  | Unbound_type_variable (name, in_scope_names, reason) ->
+  | Unbound_variable (universe, name, in_scope_names, reason) ->
     Location.aligned_error_hint ~loc
-      "@{<ralign>The type variable @}%a is unbound in this type declaration."
+      "@{<ralign>The %s variable @}%a is unbound in this type declaration."
+        (match universe with UType -> "type" | UMode -> "mode")
         Style.inline_code name
         (Misc.did_you_mean (Misc.spellcheck in_scope_names name))
         ~sub:(report_unbound_variable_reason reason)

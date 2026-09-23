@@ -12,21 +12,30 @@
 
 type ('a, 'b) fn = { f : 'a @ [< 'm] -> 'b @ [> 'm] }
 [%%expect{|
-type ('a, 'b) fn = { f : 'a @ [< 'm] -> 'b @ [> 'm]; }
+Line 1, characters 33-35:
+1 | type ('a, 'b) fn = { f : 'a @ [< 'm] -> 'b @ [> 'm] }
+                                     ^^
+Error: The mode variable "'m" is unbound in this type declaration.
 |}]
 
 (* Mode variables are allowed on function types in constructor arguments *)
 
 type ('a, 'b) v = Fn of ('a @ [< 'm] -> 'b @ [> 'm])
 [%%expect{|
-type ('a, 'b) v = Fn of ('a @ [< 'm] -> 'b @ [> 'm])
+Line 1, characters 33-35:
+1 | type ('a, 'b) v = Fn of ('a @ [< 'm] -> 'b @ [> 'm])
+                                     ^^
+Error: The mode variable "'m" is unbound in this type declaration.
 |}]
 
 (* Mode variables are allowed on function types in type abbreviations *)
 
 type ('a, 'b) arrow = 'a @ [< 'm] -> 'b @ [> 'm]
 [%%expect{|
-type ('a, 'b) arrow = 'a @ [< 'm] -> 'b @ [> 'm]
+Line 1, characters 30-32:
+1 | type ('a, 'b) arrow = 'a @ [< 'm] -> 'b @ [> 'm]
+                                  ^^
+Error: The mode variable "'m" is unbound in this type declaration.
 |}]
 
 (* Mode variables are allowed on function types in GADT constructors *)
