@@ -1,13 +1,10 @@
 ; Upstream runs git describe from an OCaml-syntax dune file, which here would
-; report OxCaml's release tags as the js_of_ocaml version. Record the OxCaml
-; commit instead (empty outside a git checkout, e.g. in nix builds).
+; report OxCaml's release tags as the js_of_ocaml version. Nix builds provide
+; the OxCaml commit instead; it is empty in development shells.
 
 (rule
  (target GIT-VERSION)
- (deps
-  (universe))
  (action
   (with-stdout-to
    %{target}
-   (bash
-    "v=$(git describe --always --dirty --exclude='*' 2>/dev/null) && echo ox-$v || true"))))
+   (echo "%{env:JSOO_GIT_VERSION=}"))))
