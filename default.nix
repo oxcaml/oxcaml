@@ -320,7 +320,7 @@ let
       hash = "sha256-ucqrJkzS6cVogGUf1vU8oBpSryneMBqTjzxwsOi6Egs=";
     };
     # Adapt the ppx to the OxCaml parsetree (labeled tuples, function
-    # parameters) and mark generated code as ghost locations.
+    # parameters).
     patches = [ ./external/patches/sedlex-oxcaml-syntax.patch ];
     # Keep the release's opam metadata; the prepared source is read-only.
     postPatch = ''
