@@ -2881,7 +2881,7 @@ let prim_params_yielding env ty ~arity =
     create_yielding_mode_l (Yielding.join yieldings)
 
 let is_principal ty =
-  not !Clflags.principal || get_level ty = generic_level
+  not !Clflags.principal || get_level ty >= subject_level
 
 type unwrapped_type_expr =
   { ty : type_expr
@@ -3882,9 +3882,6 @@ let check_and_update_generalized_ty_jkind ?name ~loc ty =
     end
   in
   with_type_mark (fun mark -> inner mark ty)
-
-let is_principal ty =
-  not !Clflags.principal || get_level ty = generic_level
 
 (* Recursively expand the head of a type.
    Also expand #-types.
@@ -6384,9 +6381,6 @@ let generalize_class_signature_spine sign =
                         (***********************************)
                         (*  Matching between type schemes  *)
                         (***********************************)
-
-(* Level of the subject, should be just below generic_level *)
-let subject_level = generic_level - 1
 
 (*
    Update the level of [ty]. First check that the levels of generic
