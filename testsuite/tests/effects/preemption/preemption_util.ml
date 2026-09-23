@@ -7,9 +7,10 @@ type 'a preemption_action =
 
 let run_with_tick_handler ?(interval_usec = 100_000) ?(repeating = false)
     ~on_preemption computation =
-  Domain.Tick.with_ ~interval_usec (fun _ ->
+  (* The handler returns an aliased value; [with_] requires a unique result. *)
+  let get_result = Domain.Tick.with_ ~interval_usec (fun () ->
       let preempted_once = ref false in
-      Preemptible.try_with
+      let result = Preemptible.try_with
         ~on_tick:(fun () ->
           if !preempted_once && not repeating
           then Continue
@@ -23,4 +24,8 @@ let run_with_tick_handler ?(interval_usec = 100_000) ?(repeating = false)
               match on_preemption resume with
               | Resume -> resume ()
               | Handled result -> result)
-            | _ -> None) })
+            | _ -> None) }
+      in
+      fun () -> result)
+  in
+  get_result () [@nontail]

@@ -58,7 +58,9 @@ let run_with_tick_handler ?(interval = 0.1) ?(repeating = false)
                   on_tick ();
                   continue k ())
             | _ -> None)
-      }) [@nontail]
+      };
+    ());
+  ()
 
 (* Spins 16 unboxed int64x4 accumulators in a tail-recursive loop, then checks
    their upper lanes. The whole thing is one function because int64x4# can't
