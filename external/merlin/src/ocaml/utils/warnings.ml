@@ -170,6 +170,8 @@ type t =
   | Useless_valpoly                         (* 219 *)
   | Redundant_modality                      (* 220 *)
   | Unused_alert_disable of string          (* 221 *)
+  | Inlining_deviates_from_ideal of { current : string; ideal : string }
+                                            (* 222 *)
 
 (* If you remove a warning, leave a hole in the numbering.  NEVER change
    the numbers of existing warnings.
@@ -273,6 +275,7 @@ let number = function
   | Useless_valpoly -> 219
   | Redundant_modality -> 220
   | Unused_alert_disable _ -> 221
+  | Inlining_deviates_from_ideal _ -> 222
 ;;
 (* DO NOT REMOVE the ;; above: it is used by
    the testsuite/ests/warnings/mnemonics.mll test to determine where
@@ -715,6 +718,15 @@ let descriptions = [
     description = "An attribute disabling an alert did not suppress any\n\
     \    occurrence of that alert.";
     since = since 5 4 };
+  { number = 222;
+    names = ["inlining-deviates-from-ideal"];
+    description = "An inlining decision differs from the one that would be\n\
+    \    taken in the ideal configuration (in which\n\
+    \    -flambda2-speculative-inlining-track-lifted-constants-for-functors\n\
+    \    is enabled and\n\
+    \    -flambda2-inline-large-functor-size is set to its ideal value, as\n\
+    \    given by -flambda2-inline-ideal-large-functor-size).";
+    since = since 5 4 };
 ]
 
 let name_to_number =
@@ -1134,7 +1146,7 @@ let parse_options errflag s =
   alerts
 
 (* If you change these, don't forget to change them in man/ocamlc.m *)
-let defaults_w = "+a-4-7-9-27-29-30-32..42-44-45-48-50-60-66..70-74-221"
+let defaults_w = "+a-4-7-9-27-29-30-32..42-44-45-48-50-60-66..70-74-221-222"
 let defaults_warn_error = "-a"
 let default_disabled_alerts = [ "unstable"; "unsynchronized_access" ]
 
@@ -1626,6 +1638,16 @@ let message = function
       msg "This attribute disables alert %a,@ \
            but it did not suppress any occurrence of the alert."
         Style.inline_code name
+  | Inlining_deviates_from_ideal { current; ideal } ->
+      msg "The inlining decision at this application differs from the one@ \
+           that@ would@ be@ taken@ in@ the@ ideal@ configuration@ (in@ which@ \
+           %a@ is@ enabled@ and@ %a@ is@ set@ to@ its@ ideal@ value).@ \
+           Currently,@ %s.@ In@ the@ ideal@ configuration,@ %s."
+        Style.inline_code
+        "-flambda2-speculative-inlining-track-lifted-constants-for-functors"
+        Style.inline_code
+        "-flambda2-inline-large-functor-size"
+        current ideal
 ;;
 
 let nerrors = ref 0

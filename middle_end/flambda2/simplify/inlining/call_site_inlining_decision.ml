@@ -128,41 +128,55 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
         in
         rebuild uacc ~after_rebuild:(fun expr uacc -> expr, uacc))
   in
-  let cost_metrics_of_lifted_constants =
-    if track_lifted_constants
-    then
-      (* If we are not at toplevel, there might still be lifted constants to be
-         placed in the accumulator whose size must be taken into account for
-         speculative inlining. *)
-      let lifted_constants = UA.lifted_constants uacc in
-      (* CR-someday bclement: Ideally we would simply call
-         [place_lifted_constants] in [after_rebuild] above so that we can share
-         the code with the non-speculative inlining code path; however, that
-         function expects to be called at toplevel and there could be unintended
-         consequences -- notably regarding the validity of the used value slots.
+  let cost_metrics_of_lifted_constants () =
+    (* If we are not at toplevel, there might still be lifted constants to be
+       placed in the accumulator whose size must be taken into account for
+       speculative inlining. *)
+    let lifted_constants = UA.lifted_constants uacc in
+    (* CR-someday bclement: Ideally we would simply call
+       [place_lifted_constants] in [after_rebuild] above so that we can share
+       the code with the non-speculative inlining code path; however, that
+       function expects to be called at toplevel and there could be unintended
+       consequences -- notably regarding the validity of the used value slots.
 
-         At the time of writing, this means that we incorrectly:
+       At the time of writing, this means that we incorrectly:
 
-         - Ignore the size of the symbol projections created during speculative
-         inlining;
+       - Ignore the size of the symbol projections created during speculative
+       inlining;
 
-         - Count the size of unused value slots of lifted sets of closures
-         created during speculative inlining (but again, it is not clear that it
-         is always possible to compute a correct set of "used value slots" at
-         the time we are doing speculative inlining, because some value slots
-         could be used later in the compilation unit). *)
-      Lifted_constant_state.fold lifted_constants ~init:Cost_metrics.zero
-        ~f:(fun cost_metrics lifted_constant ->
-          List.fold_left
-            (fun cost_metrics definition ->
-              Cost_metrics.( + ) cost_metrics
-                (Rebuilt_static_const.cost_metrics
-                   (Lifted_constant.Definition.defining_expr definition)))
-            cost_metrics
-            (Lifted_constant.definitions lifted_constant))
-    else Cost_metrics.zero
+       - Count the size of unused value slots of lifted sets of closures created
+       during speculative inlining (but again, it is not clear that it is always
+       possible to compute a correct set of "used value slots" at the time we
+       are doing speculative inlining, because some value slots could be used
+       later in the compilation unit). *)
+    Lifted_constant_state.fold lifted_constants ~init:Cost_metrics.zero
+      ~f:(fun cost_metrics lifted_constant ->
+        List.fold_left
+          (fun cost_metrics definition ->
+            Cost_metrics.( + ) cost_metrics
+              (Rebuilt_static_const.cost_metrics
+                 (Lifted_constant.Definition.defining_expr definition)))
+          cost_metrics
+          (Lifted_constant.definitions lifted_constant))
   in
-  Cost_metrics.( + ) (UA.cost_metrics uacc) cost_metrics_of_lifted_constants
+  let cost_metrics = UA.cost_metrics uacc in
+  if track_lifted_constants
+  then
+    Cost_metrics.( + ) cost_metrics (cost_metrics_of_lifted_constants ()), None
+  else if
+    is_a_functor
+    && Warnings.is_active
+         (Warnings.Inlining_deviates_from_ideal { current = ""; ideal = "" })
+  then
+    (* Also compute the cost metrics with lifted-constant tracking enabled for
+       functors, so that we can warn if that changes the inlining decision. *)
+    ( cost_metrics,
+      Some
+        (Cost_metrics.( + )
+           (Cost_metrics.( + ) cost_metrics
+              (cost_metrics_of_lifted_constants ()))
+           (UA.cost_metrics_of_untracked_static_consts uacc)) )
+  else cost_metrics, None
 
 type argument_types_useful =
   | Coarse
@@ -222,6 +236,220 @@ let inlining_does_decrease_code_size ~code_metadata cost_metrics =
   let inlined_code_size = Cost_metrics.size cost_metrics in
   not (Code_size.( <= ) original_code_size inlined_code_size)
 
+(* Result of attempting speculative inlining. [ideal_cost_metrics] gives the
+   cost metrics as they would be in the ideal configuration (see below); they
+   are equal to [cost_metrics] except when lifted-constant tracking is disabled
+   for a functor application. *)
+type speculation =
+  | No_useful_argument_types
+  | Code_not_present
+  | Speculated of
+      { cost_metrics : Cost_metrics.t;
+        ideal_cost_metrics : Cost_metrics.t
+      }
+
+(* The "ideal configuration", against which warning 222
+   [Inlining_deviates_from_ideal] compares inlining decisions, is the current
+   configuration with lifted-constant tracking enabled for functors and, if
+   [ideal_large_functor_size] is set, with [large_functor_size] set to that
+   value. Lifted-constant tracking for ordinary functions is unchanged. *)
+let ideal_function_decl_decision ~code_metadata =
+  let decision = Code_metadata.inlining_decision code_metadata in
+  match Flambda_features.Inlining.ideal_large_functor_size () with
+  | None -> decision
+  | Some ideal_large_functor_size ->
+    if not (Code_metadata.is_a_functor code_metadata)
+    then decision
+    else
+      (* Declaration decisions use the definition's arguments, which may differ
+         from the caller's when the functor comes from another compilation
+         unit. *)
+      let inlining_args = Code_metadata.inlining_arguments code_metadata in
+      let make_decision ~inlining_arguments =
+        Function_decl_inlining_decision.make_decision ~inlining_arguments
+          ~inline:(Code_metadata.inline code_metadata)
+          ~stub:(Code_metadata.stub code_metadata)
+          ~cost_metrics:(Code_metadata.cost_metrics code_metadata)
+          ~is_a_functor:true
+          ~recursive:(Code_metadata.recursive code_metadata)
+      in
+      let current = make_decision ~inlining_arguments:inlining_args in
+      let ideal =
+        make_decision
+          ~inlining_arguments:
+            (Inlining_arguments.with_large_functor_size inlining_args
+               ~large_functor_size:ideal_large_functor_size)
+      in
+      if Function_decl_inlining_decision_type.equal current ideal
+      then decision
+      else ideal
+
+let code_size t = Cost_metrics.size (Code_metadata.cost_metrics t)
+
+let describe_current_behaviour ~code_metadata
+    (actual_decision : Call_site_inlining_decision_type.t) =
+  match actual_decision with
+  | Speculatively_inline { evaluated_to; threshold; _ } ->
+    Format.asprintf
+      "the function is inlined because its speculative cost %g is at or below \
+       the inlining threshold %g"
+      evaluated_to threshold
+  | Speculatively_not_inline { evaluated_to; threshold; _ } ->
+    Format.asprintf
+      "the function is not inlined because its speculative cost %g is above \
+       the inlining threshold %g"
+      evaluated_to threshold
+  | Argument_types_not_useful ->
+    "the function is not inlined because there is no useful information about \
+     its arguments"
+  | Missing_code ->
+    "the function is not inlined because its code is not available"
+  | Definition_says_inline _ -> (
+    match Code_metadata.inlining_decision code_metadata with
+    | Small_functor { size; small_functor_size } ->
+      Format.asprintf
+        "the function is always inlined because it is a small functor (size %a \
+         <= small functor size %a)"
+        Code_size.print size Code_size.print small_functor_size
+    | Small_function { size; small_function_size } ->
+      Format.asprintf
+        "the function is always inlined because it is a small function (size \
+         %a <= small function size %a)"
+        Code_size.print size Code_size.print small_function_size
+    | Not_yet_decided | Never_inline_attribute | Function_body_too_large _
+    | Functor_body_too_large _ | Stub | Attribute_inline
+    | Speculatively_inlinable _ | Speculatively_inlinable_functor _ | Recursive
+    | Jsir_inlining_disabled ->
+      "the function is always inlined")
+  | Definition_says_not_to_inline -> (
+    match Code_metadata.inlining_decision code_metadata with
+    | Functor_body_too_large large_functor_size ->
+      Format.asprintf
+        "the function is not inlined because its body is too large for a \
+         functor (size %a >= large functor size %a)"
+        Code_size.print (code_size code_metadata) Code_size.print
+        large_functor_size
+    | Function_body_too_large large_function_size ->
+      Format.asprintf
+        "the function is not inlined because its body is too large (size %a >= \
+         large function size %a)"
+        Code_size.print (code_size code_metadata) Code_size.print
+        large_function_size
+    | Not_yet_decided | Never_inline_attribute | Stub | Attribute_inline
+    | Small_function _ | Small_functor _ | Speculatively_inlinable _
+    | Speculatively_inlinable_functor _ | Recursive | Jsir_inlining_disabled ->
+      "the function is never inlined (as decided at its definition)")
+  | In_a_stub | Doing_speculative_inlining | Unrolling_depth_exceeded
+  | Max_inlining_depth_exceeded | Recursion_depth_exceeded
+  | Never_inlined_attribute | Attribute_always
+  | Replay_history_says_must_inline _ | Begin_unrolling _ | Continue_unrolling
+  | Jsir_inlining_disabled ->
+    (* The warning is never emitted for these decisions. *)
+    Format.asprintf "%a" Call_site_inlining_decision_type.print actual_decision
+
+let describe_ideal_must_inline
+    (ideal_decl : Function_decl_inlining_decision_type.t) =
+  match ideal_decl with
+  | Small_functor { size; small_functor_size } ->
+    Format.asprintf
+      "the function would always be inlined because it would be a small \
+       functor (size %a <= small functor size %a)"
+      Code_size.print size Code_size.print small_functor_size
+  | Small_function { size; small_function_size } ->
+    Format.asprintf
+      "the function would always be inlined because it is a small function \
+       (size %a <= small function size %a)"
+      Code_size.print size Code_size.print small_function_size
+  | Not_yet_decided | Never_inline_attribute | Function_body_too_large _
+  | Functor_body_too_large _ | Stub | Attribute_inline
+  | Speculatively_inlinable _ | Speculatively_inlinable_functor _ | Recursive
+  | Jsir_inlining_disabled ->
+    "the function would always be inlined"
+
+let describe_ideal_cannot_inline ~code_metadata
+    (ideal_decl : Function_decl_inlining_decision_type.t) =
+  match ideal_decl with
+  | Functor_body_too_large large_functor_size ->
+    Format.asprintf
+      "the function would not be inlined because its body would be too large \
+       for a functor (size %a >= ideal large functor size %a)"
+      Code_size.print (code_size code_metadata) Code_size.print
+      large_functor_size
+  | Function_body_too_large large_function_size ->
+    Format.asprintf
+      "the function would not be inlined because its body is too large (size \
+       %a >= large function size %a)"
+      Code_size.print (code_size code_metadata) Code_size.print
+      large_function_size
+  | Not_yet_decided | Never_inline_attribute | Stub | Attribute_inline
+  | Small_function _ | Small_functor _ | Speculatively_inlinable _
+  | Speculatively_inlinable_functor _ | Recursive | Jsir_inlining_disabled ->
+    "the function would never be inlined"
+
+let warn_if_ideal_configuration_differs ~apply ~code_metadata ~inlining_args
+    ~threshold ~code_present ~actual_decision ~speculation ~speculate =
+  let ideal_decl = ideal_function_decl_decision ~code_metadata in
+  let ideal_would_inline, ideal =
+    if Function_decl_inlining_decision_type.must_be_inlined ideal_decl
+    then
+      if code_present ()
+      then true, describe_ideal_must_inline ideal_decl
+      else
+        ( false,
+          "the function would not be inlined because its code is not available"
+        )
+    else if Function_decl_inlining_decision_type.cannot_be_inlined ideal_decl
+    then false, describe_ideal_cannot_inline ~code_metadata ideal_decl
+    else
+      (* In the ideal configuration, the decision would be taken by speculative
+         inlining. If the actual decision was also taken by speculative inlining
+         then reuse its results, otherwise speculate now. *)
+      let speculation =
+        match speculation with
+        | Some speculation -> speculation
+        | None -> speculate ()
+      in
+      match (speculation : speculation) with
+      | No_useful_argument_types ->
+        ( false,
+          "the function would not be inlined because there is no useful \
+           information about its arguments" )
+      | Code_not_present ->
+        ( false,
+          "the function would not be inlined because its code is not available"
+        )
+      | Speculated { ideal_cost_metrics; cost_metrics = _ } ->
+        let evaluated_to =
+          Cost_metrics.evaluate ~args:inlining_args ideal_cost_metrics
+        in
+        if Float.compare evaluated_to threshold <= 0
+        then
+          ( true,
+            Format.asprintf
+              "the function would be inlined because its speculative cost %g \
+               would be at or below the inlining threshold %g"
+              evaluated_to threshold )
+        else
+          ( false,
+            Format.asprintf
+              "the function would not be inlined because its speculative cost \
+               %g would be above the inlining threshold %g"
+              evaluated_to threshold )
+  in
+  let actually_inlines =
+    match Call_site_inlining_decision_type.can_inline actual_decision with
+    | Inline _ -> true
+    | Do_not_inline _ -> false
+  in
+  if not (Bool.equal ideal_would_inline actually_inlines)
+  then
+    Location.prerr_warning
+      (Debuginfo.to_location (Apply.dbg apply))
+      (Warnings.Inlining_deviates_from_ideal
+         { current = describe_current_behaviour ~code_metadata actual_decision;
+           ideal
+         })
+
 let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
     ~return_arity : Call_site_inlining_decision_type.t =
   let code_present () =
@@ -240,79 +468,108 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
     | Disable_inlining Speculative_inlining -> false, true
     | Do_not_disable_inlining -> false, false
   in
-  if in_a_stub
-  then In_a_stub
-  else if Function_decl_inlining_decision_type.must_be_inlined decision
-  then
-    if code_present ()
-    then
-      Definition_says_inline
-        { was_inline_always =
-            Function_decl_inlining_decision_type.has_attribute_inline decision
+  let inlining_args =
+    Inlining_arguments.combine
+      ~from_env:(DE.inlining_arguments denv)
+      ~from_metadata:(Apply.inlining_arguments apply)
+  in
+  let threshold = Inlining_arguments.threshold inlining_args in
+  let speculate () : speculation =
+    if not (argument_types_useful dacc ~apply ~code_metadata)
+    then No_useful_argument_types
+    else if not (code_present ())
+    then Code_not_present
+    else
+      let cost_metrics, ideal_cost_metrics =
+        speculative_inlining ~apply dacc ~simplify_expr ~return_arity
+          ~function_type ~is_a_functor
+      in
+      Speculated
+        { cost_metrics;
+          ideal_cost_metrics =
+            Option.value ideal_cost_metrics ~default:cost_metrics
         }
-    else Missing_code
-  else if Function_decl_inlining_decision_type.cannot_be_inlined decision
-  then Definition_says_not_to_inline
-  else if doing_speculative_inlining
-  then Doing_speculative_inlining
-  else
-    Profile.record_call_with_counters ~accumulate:true "speculative_inlining"
-      ~counter_f:(fun (decision : Call_site_inlining_decision_type.t) ->
-        let counters = Profile.Counters.create () in
-        match decision with
-        | Argument_types_not_useful ->
-          Profile.Counters.incr "argument_types_not_useful" counters
-        | Speculatively_inline { cost_metrics; _ } ->
-          let counters =
-            Profile.Counters.incr "speculatively_inline" counters
-          in
-          if inlining_does_decrease_code_size ~code_metadata cost_metrics
-          then counters
-          else Profile.Counters.incr "same_code_size" counters
-        | Speculatively_not_inline _ ->
-          Profile.Counters.incr "speculatively_not_inline" counters
-        | Missing_code | Definition_says_not_to_inline | In_a_stub
-        | Doing_speculative_inlining | Unrolling_depth_exceeded
-        | Max_inlining_depth_exceeded | Recursion_depth_exceeded
-        | Never_inlined_attribute | Attribute_always
-        | Replay_history_says_must_inline _ | Begin_unrolling _
-        | Continue_unrolling | Definition_says_inline _ | Jsir_inlining_disabled
-          ->
-          (* These can't be returned by the speculative inlining cases below. *)
-          if Flambda_features.check_light_invariants ()
-          then
-            Misc.fatal_error
-              "Unexpected call site inlinine decision for speculative inlining";
-          counters)
-      (fun () : Call_site_inlining_decision_type.t ->
-        if not (argument_types_useful dacc ~apply ~code_metadata)
-        then Argument_types_not_useful
-        else if not (code_present ())
-        then Missing_code
-        else
-          let cost_metrics =
-            speculative_inlining ~apply dacc ~simplify_expr ~return_arity
-              ~function_type ~is_a_functor
-          in
-          let inlining_args =
-            Inlining_arguments.combine
-              ~from_env:(DE.inlining_arguments denv)
-              ~from_metadata:(Apply.inlining_arguments apply)
-          in
-          let evaluated_to =
-            Cost_metrics.evaluate ~args:inlining_args cost_metrics
-          in
-          let threshold = Inlining_arguments.threshold inlining_args in
-          let is_under_inline_threshold =
-            Float.compare evaluated_to threshold <= 0
-          in
-          if is_under_inline_threshold
-          then
-            Speculatively_inline
-              { cost_metrics; evaluated_to; threshold; is_a_functor }
-          else
-            Speculatively_not_inline
-              { cost_metrics; evaluated_to; threshold; is_a_functor })
+  in
+  let decision_of_speculation (speculation : speculation) :
+      Call_site_inlining_decision_type.t =
+    match speculation with
+    | No_useful_argument_types -> Argument_types_not_useful
+    | Code_not_present -> Missing_code
+    | Speculated { cost_metrics; ideal_cost_metrics = _ } ->
+      let evaluated_to =
+        Cost_metrics.evaluate ~args:inlining_args cost_metrics
+      in
+      if Float.compare evaluated_to threshold <= 0
+      then
+        Speculatively_inline
+          { cost_metrics; evaluated_to; threshold; is_a_functor }
+      else
+        Speculatively_not_inline
+          { cost_metrics; evaluated_to; threshold; is_a_functor }
+  in
+  let (actual_decision : Call_site_inlining_decision_type.t), speculation =
+    if in_a_stub
+    then In_a_stub, None
+    else if Function_decl_inlining_decision_type.must_be_inlined decision
+    then
+      ( (if code_present ()
+         then
+           Definition_says_inline
+             { was_inline_always =
+                 Function_decl_inlining_decision_type.has_attribute_inline
+                   decision
+             }
+         else Missing_code),
+        None )
+    else if Function_decl_inlining_decision_type.cannot_be_inlined decision
+    then Definition_says_not_to_inline, None
+    else if doing_speculative_inlining
+    then Doing_speculative_inlining, None
+    else
+      Profile.record_call_with_counters ~accumulate:true "speculative_inlining"
+        ~counter_f:(fun ((decision : Call_site_inlining_decision_type.t), _) ->
+          let counters = Profile.Counters.create () in
+          match decision with
+          | Argument_types_not_useful ->
+            Profile.Counters.incr "argument_types_not_useful" counters
+          | Speculatively_inline { cost_metrics; _ } ->
+            let counters =
+              Profile.Counters.incr "speculatively_inline" counters
+            in
+            if inlining_does_decrease_code_size ~code_metadata cost_metrics
+            then counters
+            else Profile.Counters.incr "same_code_size" counters
+          | Speculatively_not_inline _ ->
+            Profile.Counters.incr "speculatively_not_inline" counters
+          | Missing_code | Definition_says_not_to_inline | In_a_stub
+          | Doing_speculative_inlining | Unrolling_depth_exceeded
+          | Max_inlining_depth_exceeded | Recursion_depth_exceeded
+          | Never_inlined_attribute | Attribute_always
+          | Replay_history_says_must_inline _ | Begin_unrolling _
+          | Continue_unrolling | Definition_says_inline _
+          | Jsir_inlining_disabled ->
+            (* These can't be returned by the speculative inlining cases
+               below. *)
+            if Flambda_features.check_light_invariants ()
+            then
+              Misc.fatal_error
+                "Unexpected call site inlinine decision for speculative \
+                 inlining";
+            counters)
+        (fun () ->
+          let speculation = speculate () in
+          decision_of_speculation speculation, Some speculation)
+  in
+  if
+    (not in_a_stub)
+    && (not doing_speculative_inlining)
+    && is_a_functor
+    && Warnings.is_active
+         (Warnings.Inlining_deviates_from_ideal { current = ""; ideal = "" })
+  then
+    warn_if_ideal_configuration_differs ~apply ~code_metadata ~inlining_args
+      ~threshold ~code_present ~actual_decision ~speculation ~speculate;
+  actual_decision
 
 let get_rec_info dacc ~function_type =
   let rec_info = FT.rec_info function_type in

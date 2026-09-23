@@ -302,6 +302,9 @@ let small_functor_size t = t.Args.small_functor_size
 
 let large_functor_size t = t.Args.large_functor_size
 
+let with_large_functor_size t ~large_functor_size =
+  { t with Args.large_functor_size }
+
 let threshold t = t.Args.threshold
 
 let meet t1 t2 =
