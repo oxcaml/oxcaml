@@ -403,6 +403,7 @@ let deep_copy () =
         | Tquote_eval t -> Tquote_eval (copy t)
         | Tsplice t -> Tsplice (copy t)
         | Tbox t -> Tbox (copy t)
+        | Tunbox t -> Tunbox (copy t)
         | Tmod (t, mod_bounds) -> Tmod (copy t, mod_bounds)
         | Tlink _ | Tsubst _ -> assert false
       in

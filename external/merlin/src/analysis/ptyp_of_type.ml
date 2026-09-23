@@ -77,6 +77,15 @@ and core_type type_expr =
   | Tbox ty ->
     let loc = Untypeast.lident_of_path Predef.path_box |> Location.mknoloc in
     Typ.constr loc [ core_type ty ]
+  | Tunbox ty -> (
+    match Types.get_desc ty with
+    | Tconstr (path, args, _) ->
+      let loc =
+        Path.unboxed_version path |> Untypeast.lident_of_path
+        |> Location.mknoloc
+      in
+      Typ.constr loc (List.map ~f:core_type args)
+    | _ -> Typ.any None)
   | Tobject (type_expr, _class_) ->
     let rec aux acc type_expr =
       match get_desc type_expr with

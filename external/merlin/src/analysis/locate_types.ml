@@ -100,6 +100,7 @@ let rec create_type_tree ty : Type_tree.t =
       children
     }
   | Tmod (ty, _) -> create_type_tree ty
+  | Tunbox inner -> { data = Other ty; children = [ create_type_tree inner ] }
   | Tnil
   | Tvar _
   | Tsubst _
