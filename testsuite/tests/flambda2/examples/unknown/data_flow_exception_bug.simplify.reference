@@ -46,7 +46,11 @@ in
 let $camlData_flow_exception_bug__stuff_4 =
   closure stuff_1_1 @stuff &toplevel
 in
-let $camlData_flow_exception_bug =
+let $camlData_flow_exception_bug__cell1 =
+  Block 0 ($camlData_flow_exception_bug__stuff_4)
+and $camlData_flow_exception_bug__cell0 =
+  Block 0 ($camlData_flow_exception_bug__do_stuff_3)
+and $camlData_flow_exception_bug =
   Block 0 ($camlData_flow_exception_bug__do_stuff_3,
            $camlData_flow_exception_bug__stuff_4)
 in

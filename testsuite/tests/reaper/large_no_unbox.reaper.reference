@@ -68,5 +68,9 @@ let code loopify(never) size(36) newer_version_of(f_0)
            cont k (int_add))
 in
 let $camlLarge_no_unbox__f_1 = closure f_0_1 @f &toplevel in
-let $camlLarge_no_unbox = Block 0 ($camlLarge_no_unbox__f_1) in
+let $camlLarge_no_unbox__cell0 =
+  Block 0 ($camlLarge_no_unbox__f_1)
+and $camlLarge_no_unbox =
+  Block 0 ($camlLarge_no_unbox__f_1)
+in
 cont done ($camlLarge_no_unbox)

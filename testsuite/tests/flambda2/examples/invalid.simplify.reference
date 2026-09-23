@@ -51,7 +51,13 @@ let code loopify(never) size(11) newer_version_of(foo_2)
       invalid "(Defining_expr_of_let (bound_pattern prim/109N)\n (defining_expr\n  (((Array_load Naked_floats Naked_floats Mutable) t2/105UV 0)\n   invalid.ml:29,2--23)))"
 in
 let $camlInvalid__foo_7 = closure foo_2_1 @foo &toplevel in
-let $camlInvalid =
+let $camlInvalid__cell2 =
+  Block 0 ($camlInvalid__foo_7)
+and $camlInvalid__cell1 =
+  Block 0 ($camlInvalid__bar_6)
+and $camlInvalid__cell0 =
+  Block 0 ($camlInvalid__check_4)
+and $camlInvalid =
   Block 0 ($camlInvalid__check_4, $camlInvalid__bar_6, $camlInvalid__foo_7)
 in
 cont done ($camlInvalid)

@@ -44,7 +44,17 @@ in
 let $camlForward_inlined_always_inline__call_g_with_never_inlined_5 =
   closure call_g_with_never_inlined_4_1 @call_g_with_never_inlined &toplevel
 in
-let $camlForward_inlined_always_inline =
+let $camlForward_inlined_always_inline__cell4 =
+  Block 0 ($camlForward_inlined_always_inline__call_g_with_never_inlined_5)
+and $camlForward_inlined_always_inline__cell3 =
+  Block 0 ($camlForward_inlined_always_inline__call_g_with_always_inlined_4)
+and $camlForward_inlined_always_inline__cell2 =
+  Block 0 ($camlForward_inlined_always_inline__call_g_with_default_inlined_3)
+and $camlForward_inlined_always_inline__cell1 =
+  Block 0 ($camlForward_inlined_always_inline__g_2)
+and $camlForward_inlined_always_inline__cell0 =
+  Block 0 ($camlForward_inlined_always_inline__f_1)
+and $camlForward_inlined_always_inline =
   Block 0 ($camlForward_inlined_always_inline__f_1,
            $camlForward_inlined_always_inline__g_2,
            $camlForward_inlined_always_inline__call_g_with_default_inlined_3,

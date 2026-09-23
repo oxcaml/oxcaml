@@ -11,5 +11,9 @@ let code loopify(never) size(12) newer_version_of(f_0)
       cont k (a)
 in
 let $camlInt_array_modify__f_1 = closure f_0_1 @f &toplevel in
-let $camlInt_array_modify = Block 0 ($camlInt_array_modify__f_1) in
+let $camlInt_array_modify__cell0 =
+  Block 0 ($camlInt_array_modify__f_1)
+and $camlInt_array_modify =
+  Block 0 ($camlInt_array_modify__f_1)
+in
 cont done ($camlInt_array_modify)

@@ -101,7 +101,13 @@ apply direct(init_mod_4 &toplevel)
                       where k1 (param : imm tagged) =
                         cont k)
                  where k =
-                   let $camlFunctors =
+                   let $camlFunctors__cell2 =
+                     Block 0 ($camlFunctors__Pmakeblock_7)
+                   and $camlFunctors__cell1 =
+                     Block 0 (M)
+                   and $camlFunctors__cell0 =
+                     Block 0 (M0)
+                   and $camlFunctors =
                      Block 0 (M0, M, $camlFunctors__Pmakeblock_7)
                    in
                    cont done ($camlFunctors))))

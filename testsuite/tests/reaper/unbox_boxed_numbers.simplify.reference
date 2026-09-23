@@ -319,7 +319,23 @@ in
 let $camlUnbox_boxed_numbers__test_pair_15 =
   closure test_pair_16_1 @test_pair &toplevel
 in
-let $camlUnbox_boxed_numbers =
+let $camlUnbox_boxed_numbers__cell7 =
+  Block 0 ($camlUnbox_boxed_numbers__test_pair_15)
+and $camlUnbox_boxed_numbers__cell6 =
+  Block 0 ($camlUnbox_boxed_numbers__test_value_slot_not_unboxed_12)
+and $camlUnbox_boxed_numbers__cell5 =
+  Block 0 ($camlUnbox_boxed_numbers__test_value_slot_11)
+and $camlUnbox_boxed_numbers__cell4 =
+  Block 0 ($camlUnbox_boxed_numbers__test_float32_10)
+and $camlUnbox_boxed_numbers__cell3 =
+  Block 0 ($camlUnbox_boxed_numbers__test_float_9)
+and $camlUnbox_boxed_numbers__cell2 =
+  Block 0 ($camlUnbox_boxed_numbers__test_nativeint_6)
+and $camlUnbox_boxed_numbers__cell1 =
+  Block 0 ($camlUnbox_boxed_numbers__test_int32_5)
+and $camlUnbox_boxed_numbers__cell0 =
+  Block 0 ($camlUnbox_boxed_numbers__test_int64_4)
+and $camlUnbox_boxed_numbers =
   Block 0 ($camlUnbox_boxed_numbers__test_int64_4,
            $camlUnbox_boxed_numbers__test_int32_5,
            $camlUnbox_boxed_numbers__test_nativeint_6,

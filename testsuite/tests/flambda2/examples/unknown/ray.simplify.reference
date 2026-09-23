@@ -196,7 +196,13 @@ let code loopify(never) size(222) newer_version_of(aabb_hit_2)
                                          cont k (Pnot))))))))
 in
 let $camlRay__aabb_hit_4 = closure aabb_hit_2_1 @aabb_hit &toplevel in
-let $camlRay =
+let $camlRay__cell2 =
+  Block 0 ($camlRay__aabb_hit_4)
+and $camlRay__cell1 =
+  Block 0 ($camlRay__max_3)
+and $camlRay__cell0 =
+  Block 0 ($camlRay__min_2)
+and $camlRay =
   Block 0 ($camlRay__min_2, $camlRay__max_3, $camlRay__aabb_hit_4)
 in
 cont done ($camlRay)

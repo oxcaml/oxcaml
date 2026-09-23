@@ -38,7 +38,11 @@ and code loopify(done) size(15) newer_version_of(aux_1)
            let Pfield = %block_load.mut.[`0`] (env_2) in
            cont k (Pfield))
 in
-let $camlDeleted_code_printing =
+let $camlDeleted_code_printing__cell1 =
+  Block 0 ($camlDeleted_code_printing__foobar_1)
+and $camlDeleted_code_printing__cell0 =
+  Block 0 (env)
+and $camlDeleted_code_printing =
   Block 0 (env, $camlDeleted_code_printing__foobar_1)
 in
 cont done ($camlDeleted_code_printing)

@@ -186,7 +186,13 @@ apply direct(partial_apply1_44 &toplevel) inlined(never)
                      closure h_4_3 @h &toplevel
                      with { a = 0; b = 0; r = r_1; s = s_1 }
                    in
-                   let $camlOffset =
+                   let $camlOffset__cell2 =
+                     Block 0 ($camlOffset__h_8)
+                   and $camlOffset__cell1 =
+                     Block 0 ($camlOffset__h_5)
+                   and $camlOffset__cell0 =
+                     Block 0 ($camlOffset__inline_1)
+                   and $camlOffset =
                      Block 0 ($camlOffset__inline_1,
                               $camlOffset__h_5,
                               $camlOffset__h_8)

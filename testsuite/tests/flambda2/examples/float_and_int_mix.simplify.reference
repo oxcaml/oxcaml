@@ -21,7 +21,11 @@ in
 let $camlFloat_and_int_mix__gasp_in_horror_2 =
   closure gasp_in_horror_1_1 @gasp_in_horror &toplevel
 in
-let $camlFloat_and_int_mix =
+let $camlFloat_and_int_mix__cell1 =
+  Block 0 ($camlFloat_and_int_mix__gasp_in_horror_2)
+and $camlFloat_and_int_mix__cell0 =
+  Block 0 ($camlFloat_and_int_mix__read_int_1)
+and $camlFloat_and_int_mix =
   Block 0 ($camlFloat_and_int_mix__read_int_1,
            $camlFloat_and_int_mix__gasp_in_horror_2)
 in

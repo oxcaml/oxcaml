@@ -19,5 +19,9 @@ in
 let $camlTests4a__pr2162_3_as_int64_1 =
   closure pr2162_3_as_int64_0_1 @pr2162_3_as_int64 &toplevel
 in
-let $camlTests4a = Block 0 ($camlTests4a__pr2162_3_as_int64_1) in
+let $camlTests4a__cell0 =
+  Block 0 ($camlTests4a__pr2162_3_as_int64_1)
+and $camlTests4a =
+  Block 0 ($camlTests4a__pr2162_3_as_int64_1)
+in
 cont done ($camlTests4a)

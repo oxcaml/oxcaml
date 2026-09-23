@@ -133,5 +133,21 @@
                field_5,
                field_6,
                field_7)
+    and $camlTests15__cell0 =
+      Block 0 (field_0)
+    and $camlTests15__cell1 =
+      Block 0 (field_1)
+    and $camlTests15__cell2 =
+      Block 0 (field_2)
+    and $camlTests15__cell3 =
+      Block 0 (field_3)
+    and $camlTests15__cell4 =
+      Block 0 (field_4)
+    and $camlTests15__cell5 =
+      Block 0 (field_5)
+    and $camlTests15__cell6 =
+      Block 0 ($camlTests15__immstring_4)
+    and $camlTests15__cell7 =
+      Block 0 (field_7)
     in
     cont done ($camlTests15)

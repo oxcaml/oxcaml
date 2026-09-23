@@ -47,7 +47,11 @@ let ghost_region = %begin_ghost_region () in
   where k (region_return : imm tagged) =
     let `unit` = %end_region (`region`) in
     let unit_1 = %end_ghost_region (ghost_region) in
-    let $camlUnused_bucket_switch =
+    let $camlUnused_bucket_switch__cell1 =
+      Block 0 (region_return)
+    and $camlUnused_bucket_switch__cell0 =
+      Block 0 ($camlUnused_bucket_switch__opaque_1)
+    and $camlUnused_bucket_switch =
       Block 0 ($camlUnused_bucket_switch__opaque_1, region_return)
     in
     cont done ($camlUnused_bucket_switch)

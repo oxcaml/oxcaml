@@ -1246,6 +1246,10 @@ type module_representation =
 (* Logical field count: Each unboxed product counts as 1 field *)
 val module_representation_field_count : module_representation -> int
 
+(* The representation of a one-field module holding just logical field [pos] *)
+val module_representation_of_field :
+  module_representation -> int -> module_representation
+
 val layout_of_module_field : module_representation -> int -> layout
 
 (* The structure of the main module block. A module with no parameters will be

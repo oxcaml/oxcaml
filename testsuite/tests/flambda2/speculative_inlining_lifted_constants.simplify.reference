@@ -37,7 +37,17 @@ apply direct(f_0_1 &toplevel)
           -> k * k1
       with { one = one }
     in
-    let $camlSpeculative_inlining_lifted_constants =
+    let $camlSpeculative_inlining_lifted_constants__cell4 =
+      Block 0 ($camlSpeculative_inlining_lifted_constants__v1_3)
+    and $camlSpeculative_inlining_lifted_constants__cell3 =
+      Block 0 (one)
+    and $camlSpeculative_inlining_lifted_constants__cell2 =
+      Block 0 (v0)
+    and $camlSpeculative_inlining_lifted_constants__cell1 =
+      Block 0 (zero)
+    and $camlSpeculative_inlining_lifted_constants__cell0 =
+      Block 0 ($camlSpeculative_inlining_lifted_constants__f_1)
+    and $camlSpeculative_inlining_lifted_constants =
       Block 0 ($camlSpeculative_inlining_lifted_constants__f_1,
                zero,
                v0,

@@ -17,5 +17,9 @@ let code loopify(never) size(17) newer_version_of(foo_1)
            cont `self` (int_add, Pfield))
 in
 let $camlPartial_closure__foo_3 = closure foo_1_1 @foo &toplevel in
-let $camlPartial_closure = Block 0 ($camlPartial_closure__foo_3) in
+let $camlPartial_closure__cell0 =
+  Block 0 ($camlPartial_closure__foo_3)
+and $camlPartial_closure =
+  Block 0 ($camlPartial_closure__foo_3)
+in
 cont done ($camlPartial_closure)

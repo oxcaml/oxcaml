@@ -31,6 +31,16 @@ camlE2e_suboptimal__Pmakeblock_N                                  E2e_suboptimal
 camlE2e_suboptimal__Pmakeblock_N                                  E2e_suboptimal.Pmakeblock_N      (error)                                          E2e_suboptimal.Pmakeblock_N
 camlE2e_suboptimal__Pmakeblock_N                                  E2e_suboptimal.Pmakeblock_N      (error)                                          E2e_suboptimal.Pmakeblock_N
 camlE2e_suboptimal__Pmakeblock_N                                  E2e_suboptimal.Pmakeblock_N      (error)                                          E2e_suboptimal.Pmakeblock_N
+camlE2e_suboptimal__cell0                                         E2e_suboptimal.cell0             (error)                                          E2e_suboptimal.cell0
+camlE2e_suboptimal__cell1                                         E2e_suboptimal.cell1             (error)                                          E2e_suboptimal.cell1
+camlE2e_suboptimal__cell2                                         E2e_suboptimal.cell2             (error)                                          E2e_suboptimal.cell2
+camlE2e_suboptimal__cell3                                         E2e_suboptimal.cell3             (error)                                          E2e_suboptimal.cell3
+camlE2e_suboptimal__cell4                                         E2e_suboptimal.cell4             (error)                                          E2e_suboptimal.cell4
+camlE2e_suboptimal__cell5                                         E2e_suboptimal.cell5             (error)                                          E2e_suboptimal.cell5
+camlE2e_suboptimal__cell6                                         E2e_suboptimal.cell6             (error)                                          E2e_suboptimal.cell6
+camlE2e_suboptimal__cell7                                         E2e_suboptimal.cell7             (error)                                          E2e_suboptimal.cell7
+camlE2e_suboptimal__cell8                                         E2e_suboptimal.cell8             (error)                                          E2e_suboptimal.cell8
+camlE2e_suboptimal__cell9                                         E2e_suboptimal.cell9             (error)                                          E2e_suboptimal.cell9
 camlE2e_suboptimal__cmp_N                                         E2e_suboptimal.cmp_N             (error)                                          E2e_suboptimal.cmp_N
 camlE2e_suboptimal__cmp_N                                         E2e_suboptimal.cmp_N             (error)                                          E2e_suboptimal.cmp_N
 camlE2e_suboptimal__code_begin                                    E2e_suboptimal.code_begin        (error)                                          E2e_suboptimal.code_begin

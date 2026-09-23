@@ -99,8 +99,10 @@ let build_run_result unit ~prepare_cmx ~all_code
     ({ used_value_slots; exported_offsets } : Slot_offsets.result) : run_result
     =
   let module_symbol = Flambda_unit.module_symbol unit in
+  let module_block_cells = Flambda_unit.module_block_cells unit in
   let reachable_names, cmx =
-    prepare_cmx ~module_symbol ~used_value_slots ~exported_offsets all_code
+    prepare_cmx ~module_symbol ~module_block_cells ~used_value_slots
+      ~exported_offsets all_code
   in
   { cmx; unit; all_code; exported_offsets; reachable_names }
 
@@ -182,21 +184,22 @@ let flambda_to_flambda0 : type m.
           run_reaper ~ppf ~prefixname ~machine_width ~cmx_loader ~all_code
             ~final_typing_env:(Some final_typing_env) ~free_names raw_flambda
         in
-        let prepare_cmx ~module_symbol ~used_value_slots ~exported_offsets
-            all_code =
+        let prepare_cmx ~module_symbol ~module_block_cells ~used_value_slots
+            ~exported_offsets all_code =
           Flambda_cmx.prepare_cmx_file_contents ~final_typing_env ~module_symbol
-            ~used_value_slots ~exported_offsets ~sections all_code
+            ~module_block_cells ~used_value_slots ~exported_offsets ~sections
+            all_code
         in
         flambda, all_code, slot_offsets, prepare_cmx, "reaper"
       else
         let slot_offsets =
           finalize_offsets ~free_names ~all_code slot_offsets
         in
-        let prepare_cmx ~module_symbol ~used_value_slots ~exported_offsets
-            all_code =
+        let prepare_cmx ~module_symbol ~module_block_cells ~used_value_slots
+            ~exported_offsets all_code =
           Flambda_cmx.prepare_cmx_from_approx ~machine_width ~approxs
-            ~module_symbol ~exported_offsets ~used_value_slots ~sections
-            all_code
+            ~module_symbol ~module_block_cells ~exported_offsets
+            ~used_value_slots ~sections all_code
         in
         raw_flambda, all_code, slot_offsets, prepare_cmx, "raw"
     | Normal, Normal ->
@@ -241,10 +244,11 @@ let flambda_to_flambda0 : type m.
           in
           flambda, all_code, slot_offsets, final_typing_env, last_pass_name
       in
-      let prepare_cmx ~module_symbol ~used_value_slots ~exported_offsets
-          all_code =
+      let prepare_cmx ~module_symbol ~module_block_cells ~used_value_slots
+          ~exported_offsets all_code =
         Flambda_cmx.prepare_cmx_file_contents ~final_typing_env ~module_symbol
-          ~used_value_slots ~exported_offsets ~sections all_code
+          ~module_block_cells ~used_value_slots ~exported_offsets ~sections
+          all_code
       in
       flambda, all_code, slot_offsets, prepare_cmx, last_pass_name
   in

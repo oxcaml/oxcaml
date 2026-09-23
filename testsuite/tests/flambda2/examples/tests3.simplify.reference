@@ -72,5 +72,11 @@ let code loopify(never) size(33) newer_version_of(f_1)
            cont k (int_add))
 in
 let $camlTests3__f_3 = closure f_1_1 @f &toplevel in
-let $camlTests3 = Block 0 ($camlTests3__foo_2, $camlTests3__f_3) in
+let $camlTests3__cell1 =
+  Block 0 ($camlTests3__f_3)
+and $camlTests3__cell0 =
+  Block 0 ($camlTests3__foo_2)
+and $camlTests3 =
+  Block 0 ($camlTests3__foo_2, $camlTests3__f_3)
+in
 cont done ($camlTests3)

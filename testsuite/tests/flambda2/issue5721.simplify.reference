@@ -23,5 +23,9 @@ let code loopify(never) size(33) newer_version_of(main_0)
       cont k (Pnot)
 in
 let $camlIssue5721__main_1 = closure main_0_1 @main &toplevel in
-let $camlIssue5721 = Block 0 ($camlIssue5721__main_1) in
+let $camlIssue5721__cell0 =
+  Block 0 ($camlIssue5721__main_1)
+and $camlIssue5721 =
+  Block 0 ($camlIssue5721__main_1)
+in
 cont done ($camlIssue5721)

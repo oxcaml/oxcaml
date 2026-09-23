@@ -1493,6 +1493,17 @@ let module_representation_field_count = function
   | Module_value_only { field_count } -> field_count
   | Module_mixed (shape, _) -> Array.length shape
 
+let module_representation_of_field repr pos =
+  match repr with
+  | Module_value_only _ -> Module_value_only { field_count = 1 }
+  | Module_mixed (shape, shape_for_read) ->
+    (match shape.(pos) with
+     | Value _ -> Module_value_only { field_count = 1 }
+     | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
+     | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate
+     | Product _ | Splice_variable _ ->
+       Module_mixed ([| shape.(pos) |], [| shape_for_read.(pos) |]))
+
 type main_module_block_format =
   | Mb_struct of { mb_repr : module_representation }
   | Mb_instantiating_functor of

@@ -34,5 +34,9 @@ let code loopify(never) size(41) newer_version_of(f_0)
       cont k (float_add)
 in
 let $camlFloat_unboxing_rec__f_1 = closure f_0_1 @f &toplevel in
-let $camlFloat_unboxing_rec = Block 0 ($camlFloat_unboxing_rec__f_1) in
+let $camlFloat_unboxing_rec__cell0 =
+  Block 0 ($camlFloat_unboxing_rec__f_1)
+and $camlFloat_unboxing_rec =
+  Block 0 ($camlFloat_unboxing_rec__f_1)
+in
 cont done ($camlFloat_unboxing_rec)

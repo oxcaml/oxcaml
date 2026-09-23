@@ -20,7 +20,11 @@ let code loopify(never) size(4) newer_version_of(g_1)
       -> k * k1
 in
 let $camlCode_size_of_boolean_not_switch__g_2 = closure g_1_1 @g &toplevel in
-let $camlCode_size_of_boolean_not_switch =
+let $camlCode_size_of_boolean_not_switch__cell1 =
+  Block 0 ($camlCode_size_of_boolean_not_switch__g_2)
+and $camlCode_size_of_boolean_not_switch__cell0 =
+  Block 0 ($camlCode_size_of_boolean_not_switch__f_1)
+and $camlCode_size_of_boolean_not_switch =
   Block 0 ($camlCode_size_of_boolean_not_switch__f_1,
            $camlCode_size_of_boolean_not_switch__g_2)
 in

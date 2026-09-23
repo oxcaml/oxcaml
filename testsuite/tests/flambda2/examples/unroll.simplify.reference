@@ -30,5 +30,13 @@ apply direct(fact_0_1 &toplevel) inlining_state(depth(40))
     let int_mul_1 = %int_barith.mul (4, int_mul) in
     let int_mul_2 = %int_barith.mul (5, int_mul_1) in
     let int_mul_3 = %int_barith.mul (6, int_mul_2) in
-    let $camlUnroll = Block 0 ($camlUnroll__fact_1, int_mul_3, 720) in
+    let $camlUnroll__cell2 =
+      Block 0 (720)
+    and $camlUnroll__cell1 =
+      Block 0 (int_mul_3)
+    and $camlUnroll__cell0 =
+      Block 0 ($camlUnroll__fact_1)
+    and $camlUnroll =
+      Block 0 ($camlUnroll__fact_1, int_mul_3, 720)
+    in
     cont done ($camlUnroll)

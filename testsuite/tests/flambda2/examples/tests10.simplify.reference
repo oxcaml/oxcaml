@@ -13,5 +13,9 @@ and code rec loopify(never) size(8) newer_version_of(f_0)
   in
   cont k (Pmakeblock)
 in
-let $camlTests10 = Block 0 ($camlTests10__f_1) in
+let $camlTests10__cell0 =
+  Block 0 ($camlTests10__f_1)
+and $camlTests10 =
+  Block 0 ($camlTests10__f_1)
+in
 cont done ($camlTests10)

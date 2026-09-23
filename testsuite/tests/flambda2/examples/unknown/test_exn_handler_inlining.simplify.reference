@@ -69,7 +69,13 @@ let code loopify(never) size(18) newer_version_of(f_3)
       cont k (c_unboxed0_1)
 in
 let $camlTest_exn_handler_inlining__f_4 = closure f_3_1 @f &toplevel in
-let $camlTest_exn_handler_inlining =
+let $camlTest_exn_handler_inlining__cell2 =
+  Block 0 ($camlTest_exn_handler_inlining__f_4)
+and $camlTest_exn_handler_inlining__cell1 =
+  Block 0 ($camlTest_exn_handler_inlining__g_2)
+and $camlTest_exn_handler_inlining__cell0 =
+  Block 0 ($camlTest_exn_handler_inlining__id_1)
+and $camlTest_exn_handler_inlining =
   Block 0 ($camlTest_exn_handler_inlining__id_1,
            $camlTest_exn_handler_inlining__g_2,
            $camlTest_exn_handler_inlining__f_4)

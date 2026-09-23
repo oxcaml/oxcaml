@@ -93,7 +93,15 @@ in
    where k1 (param) =
      cont k)
   where k =
-    let $camlProtect_refs =
+    let $camlProtect_refs__cell3 =
+      Block 0 ($camlProtect_refs__set_mode_pattern_5)
+    and $camlProtect_refs__cell2 =
+      Block 0 (umode)
+    and $camlProtect_refs__cell1 =
+      Block 0 ($`camlProtect_refs__fn[protect_refs.ml:29,2--43]_4`)
+    and $camlProtect_refs__cell0 =
+      Block 0 ($camlProtect_refs__iter_1)
+    and $camlProtect_refs =
       Block 0 ($camlProtect_refs__iter_1,
                $`camlProtect_refs__fn[protect_refs.ml:29,2--43]_4`,
                umode,

@@ -19,7 +19,13 @@ let code loopify(never) size(1) newer_version_of(h_2)
   cont k (x)
 in
 let $camlApp_unarized_to_single_kind__h_3 = closure h_2_1 @h &toplevel in
-let $camlApp_unarized_to_single_kind =
+let $camlApp_unarized_to_single_kind__cell2 =
+  Block 0 ($camlApp_unarized_to_single_kind__h_3)
+and $camlApp_unarized_to_single_kind__cell1 =
+  Block 0 ($camlApp_unarized_to_single_kind__g_2)
+and $camlApp_unarized_to_single_kind__cell0 =
+  Block 0 ($camlApp_unarized_to_single_kind__f_1)
+and $camlApp_unarized_to_single_kind =
   Block 0 ($camlApp_unarized_to_single_kind__f_1,
            $camlApp_unarized_to_single_kind__g_2,
            $camlApp_unarized_to_single_kind__h_3)

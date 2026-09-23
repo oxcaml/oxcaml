@@ -123,7 +123,15 @@ in
 let $camlTests4__pr2162_3_as_int64_9 =
   closure pr2162_3_as_int64_3_1 @pr2162_3_as_int64 &toplevel
 in
-let $camlTests4 =
+let $camlTests4__cell3 =
+  Block 0 ($camlTests4__pr2162_3_as_int64_9)
+and $camlTests4__cell2 =
+  Block 0 ($camlTests4__pr2162_3_8)
+and $camlTests4__cell1 =
+  Block 0 ($camlTests4__pr2162_2_7)
+and $camlTests4__cell0 =
+  Block 0 ($camlTests4__pr2162_2_first_6)
+and $camlTests4 =
   Block 0 ($camlTests4__pr2162_2_first_6,
            $camlTests4__pr2162_2_7,
            $camlTests4__pr2162_3_8,

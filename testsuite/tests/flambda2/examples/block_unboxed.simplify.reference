@@ -24,5 +24,9 @@ let code loopify(never) size(25) newer_version_of(foo_0)
       cont k (int_add)
 in
 let $camlBlock_unboxed__foo_1 = closure foo_0_1 @foo &toplevel in
-let $camlBlock_unboxed = Block 0 ($camlBlock_unboxed__foo_1) in
+let $camlBlock_unboxed__cell0 =
+  Block 0 ($camlBlock_unboxed__foo_1)
+and $camlBlock_unboxed =
+  Block 0 ($camlBlock_unboxed__foo_1)
+in
 cont done ($camlBlock_unboxed)

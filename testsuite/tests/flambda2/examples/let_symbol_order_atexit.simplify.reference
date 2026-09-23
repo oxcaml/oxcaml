@@ -46,7 +46,11 @@ let code loopify(never) size(19) newer_version_of(exit_3)
 in
 let $camlLet_symbol_order_atexit__exit_4 = closure exit_3_1 @exit &toplevel
 in
-let $camlLet_symbol_order_atexit =
+let $camlLet_symbol_order_atexit__cell1 =
+  Block 0 ($camlLet_symbol_order_atexit__do_at_exit_2)
+and $camlLet_symbol_order_atexit__cell0 =
+  Block 0 ($camlLet_symbol_order_atexit__exit_4)
+and $camlLet_symbol_order_atexit =
   Block 0 ($camlLet_symbol_order_atexit__exit_4,
            $camlLet_symbol_order_atexit__do_at_exit_2)
 in

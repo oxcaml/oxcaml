@@ -1391,6 +1391,7 @@ let flambda_units u1 u2 =
   exprs env body1 body2
   |> Comparison.map ~f:(fun body ->
       let module_symbol = Flambda_unit.module_symbol u1 in
+      let module_block_cells = Flambda_unit.module_block_cells u1 in
       Flambda_unit.create ~return_continuation:ret_cont
-        ~exn_continuation:exn_cont ~body ~module_symbol
+        ~exn_continuation:exn_cont ~body ~module_symbol ~module_block_cells
         ~toplevel_my_alloc_region)

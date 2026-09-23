@@ -1,3 +1,7 @@
 let $camlNan__nan_1 = nan in
-let $camlNan = Block 0 ($camlNan__nan_1) in
+let $camlNan__cell0 =
+  Block 0 ($camlNan__nan_1)
+and $camlNan =
+  Block 0 ($camlNan__nan_1)
+in
 cont done ($camlNan)

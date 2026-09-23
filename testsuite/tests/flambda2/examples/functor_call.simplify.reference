@@ -29,7 +29,11 @@ let $camlFunctor_call__foo_6 =
   closure foo_1 @foo &toplevel
   with { X = $camlFunctor_call__Pmakeblock_5 }
 in
-let $camlFunctor_call =
+let $camlFunctor_call__cell1 =
+  Block 0 ($camlFunctor_call__foo_6)
+and $camlFunctor_call__cell0 =
+  Block 0 ($camlFunctor_call__Pmakeblock_5)
+and $camlFunctor_call =
   Block 0 ($camlFunctor_call__Pmakeblock_5, $camlFunctor_call__foo_6)
 in
 cont done ($camlFunctor_call)

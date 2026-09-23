@@ -167,7 +167,15 @@ apply direct(k_3_1 &toplevel) inlined(hint) inlining_state(depth(21))
       apply direct(odd_2_2 &toplevel) inlining_state(depth(41))
         $camlUnroll4__odd_6 ~ depth 0 -> unroll 0 4 (0) -> k * error)
        where k (four_is_odd : imm tagged) =
-         let $camlUnroll4 =
+         let $camlUnroll4__cell3 =
+           Block 0 (four_is_odd)
+         and $camlUnroll4__cell2 =
+           Block 0 (one_is_even)
+         and $camlUnroll4__cell1 =
+           Block 0 ($camlUnroll4__k_2)
+         and $camlUnroll4__cell0 =
+           Block 0 ($camlUnroll4__parity_is_1)
+         and $camlUnroll4 =
            Block 0 ($camlUnroll4__parity_is_1,
                     $camlUnroll4__k_2,
                     one_is_even,

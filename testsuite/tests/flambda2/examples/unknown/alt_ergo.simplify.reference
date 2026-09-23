@@ -178,5 +178,9 @@ let code loopify(never) size(11) newer_version_of(div_4)
       cont k1 pop(regular k1) ($camlAlt_ergo__Pmakeblock_8)
 in
 let $camlAlt_ergo__div_13 = closure div_4_1 @div &toplevel in
-let $camlAlt_ergo = Block 0 ($camlAlt_ergo__div_13) in
+let $camlAlt_ergo__cell0 =
+  Block 0 ($camlAlt_ergo__div_13)
+and $camlAlt_ergo =
+  Block 0 ($camlAlt_ergo__div_13)
+in
 cont done ($camlAlt_ergo)

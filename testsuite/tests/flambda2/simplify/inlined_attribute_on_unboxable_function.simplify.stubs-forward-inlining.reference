@@ -50,7 +50,13 @@ apply direct(helper_0_1 &toplevel) inlining_state(depth(1))
     (0, 0)
     -> k * error
   where k (apply_result : imm tagged) =
-    let $camlInlined_attribute_on_unboxable_function =
+    let $camlInlined_attribute_on_unboxable_function__cell2 =
+      Block 0 (apply_result)
+    and $camlInlined_attribute_on_unboxable_function__cell1 =
+      Block 0 ($camlInlined_attribute_on_unboxable_function__f_2)
+    and $camlInlined_attribute_on_unboxable_function__cell0 =
+      Block 0 ($camlInlined_attribute_on_unboxable_function__helper_1)
+    and $camlInlined_attribute_on_unboxable_function =
       Block 0 ($camlInlined_attribute_on_unboxable_function__helper_1,
                $camlInlined_attribute_on_unboxable_function__f_2,
                apply_result)

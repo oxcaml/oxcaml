@@ -16,7 +16,9 @@ and code loopify(never) size(4) newer_version_of(`fn[symbol_projections7.ml:20,4
   cont k (int_add)
   with { y = y }
 in
-let $camlSymbol_projections7 =
+let $camlSymbol_projections7__cell0 =
+  Block 0 ($`camlSymbol_projections7__fn[symbol_projections7.ml:20,4--18]_3`)
+and $camlSymbol_projections7 =
   Block 0 ($`camlSymbol_projections7__fn[symbol_projections7.ml:20,4--18]_3`)
 in
 cont done ($camlSymbol_projections7)

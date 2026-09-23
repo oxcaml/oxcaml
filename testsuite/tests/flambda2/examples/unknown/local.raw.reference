@@ -393,5 +393,19 @@
     let field_6 = %block_load.tag[`0`].`size`[`7`].[`6`] (module_block) in
     let $camlLocal =
       Block 0 (field_0, field_1, field_2, field_3, field_4, field_5, field_6)
+    and $camlLocal__cell0 =
+      Block 0 (field_0)
+    and $camlLocal__cell1 =
+      Block 0 (field_1)
+    and $camlLocal__cell2 =
+      Block 0 (field_2)
+    and $camlLocal__cell3 =
+      Block 0 (field_3)
+    and $camlLocal__cell4 =
+      Block 0 (field_4)
+    and $camlLocal__cell5 =
+      Block 0 (field_5)
+    and $camlLocal__cell6 =
+      Block 0 (field_6)
     in
     cont done ($camlLocal)

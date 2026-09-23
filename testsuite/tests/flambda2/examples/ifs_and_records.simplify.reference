@@ -319,7 +319,47 @@ in
 let $camlIfs_and_records__main_hand_inline_tuple_18 =
   closure main_hand_inline_tuple_17_1 @main_hand_inline_tuple &toplevel
 in
-let $camlIfs_and_records =
+let $camlIfs_and_records__cell19 =
+  Block 0 ($camlIfs_and_records__main_hand_inline_tuple_18)
+and $camlIfs_and_records__cell18 =
+  Block 0 ($camlIfs_and_records__main_hand_inline_17)
+and $camlIfs_and_records__cell17 =
+  Block 0 ($camlIfs_and_records__main_no_if_tuple_16)
+and $camlIfs_and_records__cell16 =
+  Block 0 ($camlIfs_and_records__main_no_if_15)
+and $camlIfs_and_records__cell15 =
+  Block 0 ($camlIfs_and_records__main_interior_if_14)
+and $camlIfs_and_records__cell14 =
+  Block 0 ($camlIfs_and_records__main_tuple_13)
+and $camlIfs_and_records__cell13 =
+  Block 0 ($camlIfs_and_records__main_wrap_variant_12)
+and $camlIfs_and_records__cell12 =
+  Block 0 ($camlIfs_and_records__main_variant_11)
+and $camlIfs_and_records__cell11 =
+  Block 0 ($camlIfs_and_records__main_wrap_10)
+and $camlIfs_and_records__cell10 =
+  Block 0 ($camlIfs_and_records__main_desired_9)
+and $camlIfs_and_records__cell9 =
+  Block 0 ($camlIfs_and_records__help_no_if_tuple_8)
+and $camlIfs_and_records__cell8 =
+  Block 0 ($camlIfs_and_records__help_no_if_7)
+and $camlIfs_and_records__cell7 =
+  Block 0 ($camlIfs_and_records__help_interior_if_6)
+and $camlIfs_and_records__cell6 =
+  Block 0 ($camlIfs_and_records__help_tuple_5)
+and $camlIfs_and_records__cell5 =
+  Block 0 ($camlIfs_and_records__help_wrap_variant_4)
+and $camlIfs_and_records__cell4 =
+  Block 0 ($camlIfs_and_records__help_variant_3)
+and $camlIfs_and_records__cell3 =
+  Block 0 ($camlIfs_and_records__help_wrap_2)
+and $camlIfs_and_records__cell2 =
+  Block 0 ($camlIfs_and_records__help_desired_1)
+and $camlIfs_and_records__cell1 =
+  Block 0 ($camlIfs_and_records__empty_block_0)
+and $camlIfs_and_records__cell0 =
+  Block 0 ($camlIfs_and_records__empty_block_0)
+and $camlIfs_and_records =
   Block 0 ($camlIfs_and_records__empty_block_0,
            $camlIfs_and_records__empty_block_0,
            $camlIfs_and_records__help_desired_1,

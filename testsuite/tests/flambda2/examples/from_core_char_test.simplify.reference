@@ -129,7 +129,17 @@ let code loopify(never) size(30) newer_version_of(top_5)
         | 1 -> k (0)
 in
 let $camlFrom_core_char_test__top_15 = closure top_5_1 @top &toplevel in
-let $camlFrom_core_char_test =
+let $camlFrom_core_char_test__cell4 =
+  Block 0 ($camlFrom_core_char_test__top_15)
+and $camlFrom_core_char_test__cell3 =
+  Block 0 ($camlFrom_core_char_test__test_12)
+and $camlFrom_core_char_test__cell2 =
+  Block 0 ($camlFrom_core_char_test__result_try_with_11)
+and $camlFrom_core_char_test__cell1 =
+  Block 0 ($camlFrom_core_char_test__result_is_error_10)
+and $camlFrom_core_char_test__cell0 =
+  Block 0 ($camlFrom_core_char_test__char_of_string_9)
+and $camlFrom_core_char_test =
   Block 0 ($camlFrom_core_char_test__char_of_string_9,
            $camlFrom_core_char_test__result_is_error_10,
            $camlFrom_core_char_test__result_try_with_11,

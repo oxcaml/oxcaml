@@ -50,6 +50,11 @@ let code loopify(never) size(40) newer_version_of(bar_1)
            cont k (int_add))
 in
 let $camlJoin_match__bar_2 = closure bar_1_1 @bar &toplevel in
-let $camlJoin_match = Block 0 ($camlJoin_match__g_1, $camlJoin_match__bar_2)
+let $camlJoin_match__cell1 =
+  Block 0 ($camlJoin_match__bar_2)
+and $camlJoin_match__cell0 =
+  Block 0 ($camlJoin_match__g_1)
+and $camlJoin_match =
+  Block 0 ($camlJoin_match__g_1, $camlJoin_match__bar_2)
 in
 cont done ($camlJoin_match)

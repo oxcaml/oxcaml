@@ -55,5 +55,15 @@ let $camlUnroll5__first_const_0 = Block 0 () in
     let field_1 = %block_load.tag[`0`].`size`[`4`].[`1`] (module_block) in
     let field_2 = %block_load.tag[`0`].`size`[`4`].[`2`] (module_block) in
     let field_3 = %block_load.tag[`0`].`size`[`4`].[`3`] (module_block) in
-    let $camlUnroll5 = Block 0 (field_0, field_1, field_2, field_3) in
+    let $camlUnroll5 =
+      Block 0 (field_0, field_1, field_2, field_3)
+    and $camlUnroll5__cell0 =
+      Block 0 (field_0)
+    and $camlUnroll5__cell1 =
+      Block 0 (field_1)
+    and $camlUnroll5__cell2 =
+      Block 0 (field_2)
+    and $camlUnroll5__cell3 =
+      Block 0 (field_3)
+    in
     cont done ($camlUnroll5)

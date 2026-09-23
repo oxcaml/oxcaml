@@ -40,7 +40,11 @@ apply direct(Make_0_1 &toplevel)
     let Pfield = %block_load.[`1`] (`let`) in
     let $camlInlined_attribute_on_functors__Pmakeblock_5 = Block 0 (Pfield)
     in
-    let $camlInlined_attribute_on_functors =
+    let $camlInlined_attribute_on_functors__cell1 =
+      Block 0 ($camlInlined_attribute_on_functors__Pmakeblock_5)
+    and $camlInlined_attribute_on_functors__cell0 =
+      Block 0 ($camlInlined_attribute_on_functors__Pmakeblock_3)
+    and $camlInlined_attribute_on_functors =
       Block 0 ($camlInlined_attribute_on_functors__Pmakeblock_3,
                $camlInlined_attribute_on_functors__Pmakeblock_5)
     in

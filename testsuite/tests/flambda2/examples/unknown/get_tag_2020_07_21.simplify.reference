@@ -32,7 +32,11 @@ let code loopify(never) size(29) newer_version_of(test_1)
       apply &my_alloc_region g (dst) -> k * k1
 in
 let $camlGet_tag_2020_07_21__test_2 = closure test_1_1 @test &toplevel in
-let $camlGet_tag_2020_07_21 =
+let $camlGet_tag_2020_07_21__cell1 =
+  Block 0 ($camlGet_tag_2020_07_21__test_2)
+and $camlGet_tag_2020_07_21__cell0 =
+  Block 0 ($camlGet_tag_2020_07_21__of_src_1)
+and $camlGet_tag_2020_07_21 =
   Block 0 ($camlGet_tag_2020_07_21__of_src_1, $camlGet_tag_2020_07_21__test_2)
 in
 cont done ($camlGet_tag_2020_07_21)

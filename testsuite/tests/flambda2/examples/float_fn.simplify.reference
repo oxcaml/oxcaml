@@ -25,5 +25,11 @@ let code loopify(never) size(13) newer_version_of(f_1)
       cont k (float_add)
 in
 let $camlFloat_fn__f_3 = closure f_1_1 @f &toplevel in
-let $camlFloat_fn = Block 0 ($camlFloat_fn__g_2, $camlFloat_fn__f_3) in
+let $camlFloat_fn__cell1 =
+  Block 0 ($camlFloat_fn__f_3)
+and $camlFloat_fn__cell0 =
+  Block 0 ($camlFloat_fn__g_2)
+and $camlFloat_fn =
+  Block 0 ($camlFloat_fn__g_2, $camlFloat_fn__f_3)
+in
 cont done ($camlFloat_fn)

@@ -144,5 +144,9 @@ let code loopify(done) size(115) newer_version_of(emit_2)
                      cont `self` (Pfield))))
 in
 let $camlEmitcode_repro__emit_8 = closure emit_2_1 @emit &toplevel in
-let $camlEmitcode_repro = Block 0 ($camlEmitcode_repro__emit_8) in
+let $camlEmitcode_repro__cell0 =
+  Block 0 ($camlEmitcode_repro__emit_8)
+and $camlEmitcode_repro =
+  Block 0 ($camlEmitcode_repro__emit_8)
+in
 cont done ($camlEmitcode_repro)

@@ -122,5 +122,8 @@ let for_compilation_unit compilation_unit =
     hash = Hashtbl.hash linkage_name;
   }
 
+let for_module_block_cell compilation_unit i =
+  for_name compilation_unit ("cell" ^ Int.to_string i)
+
 let is_predef_exn t =
   CU.equal t.compilation_unit CU.predef_exn

@@ -10,5 +10,9 @@ let code loopify(never) size(9) newer_version_of(neg_0)
   cont k (float_neg)
 in
 let $camlC__neg_1 = closure neg_0_1 @neg &toplevel in
-let $camlC = Block 0 ($camlC__neg_1) in
+let $camlC__cell0 =
+  Block 0 ($camlC__neg_1)
+and $camlC =
+  Block 0 ($camlC__neg_1)
+in
 cont done ($camlC)

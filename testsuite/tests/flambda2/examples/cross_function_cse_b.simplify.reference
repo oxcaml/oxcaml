@@ -56,7 +56,17 @@ in
 let $camlCross_function_cse_b__g_classic_5 =
   closure g_classic_4_1 @g_classic &toplevel
 in
-let $camlCross_function_cse_b =
+let $camlCross_function_cse_b__cell4 =
+  Block 0 ($camlCross_function_cse_b__g_classic_5)
+and $camlCross_function_cse_b__cell3 =
+  Block 0 ($camlCross_function_cse_b__f_classic_4)
+and $camlCross_function_cse_b__cell2 =
+  Block 0 ($camlCross_function_cse_b__g_3)
+and $camlCross_function_cse_b__cell1 =
+  Block 0 ($camlCross_function_cse_b__f_2)
+and $camlCross_function_cse_b__cell0 =
+  Block 0 ($camlCross_function_cse_b__some_1)
+and $camlCross_function_cse_b =
   Block 0 ($camlCross_function_cse_b__some_1,
            $camlCross_function_cse_b__f_2,
            $camlCross_function_cse_b__g_3,

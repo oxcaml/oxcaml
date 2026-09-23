@@ -49,7 +49,11 @@ let $camlTOP1__map_ints_to_float_constants_1 =
   closure map_ints_to_float_constants_0_1 @map_ints_to_float_constants
     &toplevel
 in
-let $camlTOP1 = Block 0 ($camlTOP1__map_ints_to_float_constants_1) in
+let $camlTOP1__cell0 =
+  Block 0 ($camlTOP1__map_ints_to_float_constants_1)
+and $camlTOP1 =
+  Block 0 ($camlTOP1__map_ints_to_float_constants_1)
+in
 cont done ($camlTOP1)
 |}]
 
@@ -85,7 +89,11 @@ let $camlTOP2__map_tagged_ints_to_float_constants_4 =
   closure map_tagged_ints_to_float_constants_1_1
     @map_tagged_ints_to_float_constants &toplevel
 in
-let $camlTOP2 = Block 0 ($camlTOP2__map_tagged_ints_to_float_constants_4) in
+let $camlTOP2__cell0 =
+  Block 0 ($camlTOP2__map_tagged_ints_to_float_constants_4)
+and $camlTOP2 =
+  Block 0 ($camlTOP2__map_tagged_ints_to_float_constants_4)
+in
 cont done ($camlTOP2)
 |}]
 
@@ -170,7 +178,11 @@ and code loopify(never) size(88) newer_version_of(match_on_ints_6)
     opaque_fun4 = opaque_fun4
   }
 in
-let $camlTOP7 = Block 0 ($camlTOP7__match_on_ints_20) in
+let $camlTOP7__cell0 =
+  Block 0 ($camlTOP7__match_on_ints_20)
+and $camlTOP7 =
+  Block 0 ($camlTOP7__match_on_ints_20)
+in
 cont done ($camlTOP7)
 |}]
 
@@ -237,6 +249,10 @@ and code loopify(never) size(61) newer_version_of(match_on_tagged_ints_7)
     opaque_fun4 = opaque_fun4
   }
 in
-let $camlTOP8 = Block 0 ($camlTOP8__match_on_tagged_ints_23) in
+let $camlTOP8__cell0 =
+  Block 0 ($camlTOP8__match_on_tagged_ints_23)
+and $camlTOP8 =
+  Block 0 ($camlTOP8__match_on_tagged_ints_23)
+in
 cont done ($camlTOP8)
 |}]

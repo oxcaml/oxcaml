@@ -39,7 +39,13 @@ in
 apply direct(fact_1_1 &toplevel)
   ($camlInlined_rec__fact_2 : _ -> imm tagged) (1000000) -> k * error
   where k (i : imm tagged) =
-    let $camlInlined_rec =
+    let $camlInlined_rec__cell2 =
+      Block 0 (i)
+    and $camlInlined_rec__cell1 =
+      Block 0 ($camlInlined_rec__fact_2)
+    and $camlInlined_rec__cell0 =
+      Block 0 ($camlInlined_rec__apply_1)
+    and $camlInlined_rec =
       Block 0 ($camlInlined_rec__apply_1, $camlInlined_rec__fact_2, i)
     in
     cont done ($camlInlined_rec)

@@ -86,7 +86,11 @@ let $camlSymbol_projections4__immstring_0 = "FOO" in
           let int_add = %int_barith.add (y, y) in
           cont k (int_add)
     in
-    let $camlSymbol_projections4 =
+    let $camlSymbol_projections4__cell1 =
+      Block 0 ($camlSymbol_projections4__f_1)
+    and $camlSymbol_projections4__cell0 =
+      Block 0 (foo)
+    and $camlSymbol_projections4 =
       Block 0 (foo, $camlSymbol_projections4__f_1)
     in
     cont done ($camlSymbol_projections4)

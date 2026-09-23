@@ -748,11 +748,20 @@ let static_consts env r ~params_and_body bound_static static_consts =
        the Gc to correctly patch it if/when it moves some of the dynamically
        allocated blocks. As a safe over-approximation, we thus register as
        gc_roots all symbols who have an associated computation (and thus are not
-       fully_static). *)
+       fully_static). This is decided per pattern, so that a fully static
+       constant in a group with a non-static one is not rooted. *)
     let roots =
-      if Static_const_group.is_fully_static static_consts
-      then []
-      else Bound_static.gc_roots bound_static
+      let bound_static' = Bound_static.to_list bound_static in
+      let static_consts' = Static_const_group.to_list static_consts in
+      if List.compare_lengths bound_static' static_consts' <> 0
+      then [] (* [static_consts0] reports the mismatch *)
+      else
+        List.combine bound_static' static_consts'
+        |> List.filter_map (fun (pat, const) ->
+            if Static_const_or_code.is_fully_static const
+            then None
+            else Some pat)
+        |> Bound_static.create |> Bound_static.gc_roots
     in
     let r = R.add_gc_roots r roots in
     static_consts0 env r ~params_and_body bound_static static_consts

@@ -24,5 +24,11 @@ apply ccall ($`*extern*`.rand : val -> val) (0) -> k * error
                 cont k (int_add_2)
                 with { r0 = r0; r1 = r1; r2 = r2 }
               in
-              let $camlLifting = Block 0 (r2, $camlLifting__f_1) in
+              let $camlLifting__cell1 =
+                Block 0 ($camlLifting__f_1)
+              and $camlLifting__cell0 =
+                Block 0 (r2)
+              and $camlLifting =
+                Block 0 (r2, $camlLifting__f_1)
+              in
               cont done ($camlLifting)))

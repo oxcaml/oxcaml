@@ -19,7 +19,17 @@ let code loopify(never) size(5) newer_version_of(g_1)
   cont k (int_mul)
 in
 let $camlLet_symbol_var_inlining__g_3 = closure g_1_1 @g &toplevel in
-let $camlLet_symbol_var_inlining =
+let $camlLet_symbol_var_inlining__cell4 =
+  Block 0 ($camlLet_symbol_var_inlining__g_3)
+and $camlLet_symbol_var_inlining__cell3 =
+  Block 0 ($camlLet_symbol_var_inlining__f_2)
+and $camlLet_symbol_var_inlining__cell2 =
+  Block 0 ($Stdlib__List.camlStdlib__List__map_16_36)
+and $camlLet_symbol_var_inlining__cell1 =
+  Block 0 (b)
+and $camlLet_symbol_var_inlining__cell0 =
+  Block 0 ($Stdlib__List.camlStdlib__List__length_1_15)
+and $camlLet_symbol_var_inlining =
   Block 0 ($Stdlib__List.camlStdlib__List__length_1_15,
            b,
            $Stdlib__List.camlStdlib__List__map_16_36,

@@ -9,7 +9,9 @@ in
 let $camlOver_app_kind_check_simplify__test_1 =
   closure test_0_1 @test &toplevel
 in
-let $camlOver_app_kind_check_simplify =
+let $camlOver_app_kind_check_simplify__cell0 =
+  Block 0 ($camlOver_app_kind_check_simplify__test_1)
+and $camlOver_app_kind_check_simplify =
   Block 0 ($camlOver_app_kind_check_simplify__test_1)
 in
 cont done ($camlOver_app_kind_check_simplify)

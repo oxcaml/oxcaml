@@ -141,7 +141,13 @@ in
 let $camlVariant_unboxing__f3_returning_a_3 =
   closure f3_returning_a_2_1 @f3_returning_a &toplevel
 in
-let $camlVariant_unboxing =
+let $camlVariant_unboxing__cell2 =
+  Block 0 ($camlVariant_unboxing__f3_returning_a_3)
+and $camlVariant_unboxing__cell1 =
+  Block 0 ($camlVariant_unboxing__f2_2)
+and $camlVariant_unboxing__cell0 =
+  Block 0 ($camlVariant_unboxing__f1_1)
+and $camlVariant_unboxing =
   Block 0 ($camlVariant_unboxing__f1_1,
            $camlVariant_unboxing__f2_2,
            $camlVariant_unboxing__f3_returning_a_3)

@@ -1023,5 +1023,6 @@ let conv comp_unit (fexpr : Fexpr.flambda_unit) : conv_result =
   let unit =
     Flambda_unit.create ~return_continuation ~exn_continuation
       ~toplevel_my_alloc_region:toplevel_alloc_region ~body ~module_symbol
+      ~module_block_cells:[]
   in
   { unit; code_slot_offsets }

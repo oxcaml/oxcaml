@@ -39,7 +39,13 @@ let $camlArgument_types_useful__box_int_then_call_unbox_int_and_add_one_wrapper_
   closure box_int_then_call_unbox_int_and_add_one_wrapper_2_1
     @box_int_then_call_unbox_int_and_add_one_wrapper &toplevel
 in
-let $camlArgument_types_useful =
+let $camlArgument_types_useful__cell2 =
+  Block 0 ($camlArgument_types_useful__box_int_then_call_unbox_int_and_add_one_wrapper_3)
+and $camlArgument_types_useful__cell1 =
+  Block 0 ($camlArgument_types_useful__unbox_int_and_add_one_wrapper_2)
+and $camlArgument_types_useful__cell0 =
+  Block 0 ($camlArgument_types_useful__unbox_int_and_add_one_1)
+and $camlArgument_types_useful =
   Block 0 ($camlArgument_types_useful__unbox_int_and_add_one_1,
            $camlArgument_types_useful__unbox_int_and_add_one_wrapper_2,
            $camlArgument_types_useful__box_int_then_call_unbox_int_and_add_one_wrapper_3)

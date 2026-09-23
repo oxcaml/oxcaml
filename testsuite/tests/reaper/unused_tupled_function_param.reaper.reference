@@ -55,7 +55,9 @@ in
                 ($camlUnused_tupled_function_param__Pmakeblock_3)
             | 1 -> k))
   where k =
-    let $camlUnused_tupled_function_param =
+    let $camlUnused_tupled_function_param__cell0 =
+      Block 0 ($camlUnused_tupled_function_param__tupled_4)
+    and $camlUnused_tupled_function_param =
       Block 0 ($camlUnused_tupled_function_param__tupled_4)
     in
     cont done ($camlUnused_tupled_function_param)

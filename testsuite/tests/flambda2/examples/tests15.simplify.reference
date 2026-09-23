@@ -89,7 +89,23 @@ let code loopify(never) size(2) newer_version_of(foo_6)
   cont k (int_or)
 in
 let $camlTests15__foo_11 = closure foo_6_1 @foo &toplevel in
-let $camlTests15 =
+let $camlTests15__cell7 =
+  Block 0 ($camlTests15__foo_11)
+and $camlTests15__cell6 =
+  Block 0 ($camlTests15__immstring_4)
+and $camlTests15__cell5 =
+  Block 0 ($camlTests15__negate_10)
+and $camlTests15__cell4 =
+  Block 0 ($camlTests15__swapped_9)
+and $camlTests15__cell3 =
+  Block 0 ($camlTests15__classical_id_8)
+and $camlTests15__cell2 =
+  Block 0 ($camlTests15__set_to_x_7)
+and $camlTests15__cell1 =
+  Block 0 ($camlTests15__is_c_6)
+and $camlTests15__cell0 =
+  Block 0 ($camlTests15__list_to_array_5)
+and $camlTests15 =
   Block 0 ($camlTests15__list_to_array_5,
            $camlTests15__is_c_6,
            $camlTests15__set_to_x_7,

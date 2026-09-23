@@ -257,7 +257,13 @@ apply ccall
                               cont k1 pop(regular k1) ($camlTo_hex__block_4))))
          in
          let $camlTo_hex__to_hex_15 = closure to_hex_7_1 @to_hex &toplevel in
-         let $camlTo_hex =
+         let $camlTo_hex__cell2 =
+           Block 0 ($camlTo_hex__to_hex_15)
+         and $camlTo_hex__cell1 =
+           Block 0 ($camlTo_hex__char_hex_14)
+         and $camlTo_hex__cell0 =
+           Block 0 ($camlTo_hex__Pmakeblock_13)
+         and $camlTo_hex =
            Block 0 ($camlTo_hex__Pmakeblock_13,
                     $camlTo_hex__char_hex_14,
                     $camlTo_hex__to_hex_15)

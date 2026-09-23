@@ -50,7 +50,9 @@ apply direct(Make_2_1 &toplevel)
   where k1 =
     cont k
   where k =
-    let $camlRewrite_unused_unboxed =
+    let $camlRewrite_unused_unboxed__cell0 =
+      Block 0 ($camlRewrite_unused_unboxed__print_int_1)
+    and $camlRewrite_unused_unboxed =
       Block 0 ($camlRewrite_unused_unboxed__print_int_1)
     in
     cont done ($camlRewrite_unused_unboxed)

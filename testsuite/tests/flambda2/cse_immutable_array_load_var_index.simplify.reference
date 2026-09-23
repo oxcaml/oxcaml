@@ -8,7 +8,9 @@ let code loopify(never) size(1) newer_version_of(f_0)
 in
 let $camlCse_immutable_array_load_var_index__f_1 = closure f_0_1 @f &toplevel
 in
-let $camlCse_immutable_array_load_var_index =
+let $camlCse_immutable_array_load_var_index__cell0 =
+  Block 0 ($camlCse_immutable_array_load_var_index__f_1)
+and $camlCse_immutable_array_load_var_index =
   Block 0 ($camlCse_immutable_array_load_var_index__f_1)
 in
 cont done ($camlCse_immutable_array_load_var_index)

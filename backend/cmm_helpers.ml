@@ -4654,8 +4654,8 @@ let make_symbol ?compilation_unit name =
      linkage names to be referenced from the runtime (e.g., frame tables and GC
      roots). [make_symbol] is called, for example, for [code_begin], [code_end],
      [data_begin], [data_end], [entry], [frametable] (or [frametable_begin] and
-     [frametable_end] with link-order frametables), [gc_roots], and
-     [jump_tables]. *)
+     [frametable_end] with link-order frametables), [gc_roots], [jump_tables],
+     and [cell<i>] (module block cells). *)
   Symbol.for_name compilation_unit name
   |> Symbol.linkage_name |> Linkage_name.to_string
 

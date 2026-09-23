@@ -64,5 +64,9 @@ and code loopify(never) size(4) newer_version_of(`fn[tests8.ml:20,12--80]_1`)
        0)
       -> k * k1
 in
-let $camlTests8 = Block 0 ($camlTests8__map_foo_1) in
+let $camlTests8__cell0 =
+  Block 0 ($camlTests8__map_foo_1)
+and $camlTests8 =
+  Block 0 ($camlTests8__map_foo_1)
+in
 cont done ($camlTests8)

@@ -21,7 +21,11 @@ and code loopify(never) size(14) newer_version_of(escape_0)
   cont k (int_of_int64)
   with { unboxed_field_r = r }
 in
-let $camlBoxed_number_escape =
+let $camlBoxed_number_escape__cell1 =
+  Block 0 ($camlBoxed_number_escape__escape_1)
+and $camlBoxed_number_escape__cell0 =
+  Block 0 (r)
+and $camlBoxed_number_escape =
   Block 0 (r, $camlBoxed_number_escape__escape_1)
 in
 cont done ($camlBoxed_number_escape)

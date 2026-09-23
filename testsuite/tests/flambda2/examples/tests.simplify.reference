@@ -29,5 +29,11 @@ let code loopify(never) size(22) newer_version_of(f_1)
         | 1 -> k (1)
 in
 let $camlTests__f_2 = closure f_1_1 @f &toplevel in
-let $camlTests = Block 0 ($camlTests__to_inline_1, $camlTests__f_2) in
+let $camlTests__cell1 =
+  Block 0 ($camlTests__f_2)
+and $camlTests__cell0 =
+  Block 0 ($camlTests__to_inline_1)
+and $camlTests =
+  Block 0 ($camlTests__to_inline_1, $camlTests__f_2)
+in
 cont done ($camlTests)

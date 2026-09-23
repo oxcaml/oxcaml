@@ -35,5 +35,11 @@ let $camlJs__Pmakeblock_10 =
            $camlJs__of__debug_9,
            $camlJs__of__unsafe_8)
 in
-let $camlJs = Block 0 (0, $camlJs__Pmakeblock_10) in
+let $camlJs__cell1 =
+  Block 0 ($camlJs__Pmakeblock_10)
+and $camlJs__cell0 =
+  Block 0 (0)
+and $camlJs =
+  Block 0 (0, $camlJs__Pmakeblock_10)
+in
 cont done ($camlJs)
