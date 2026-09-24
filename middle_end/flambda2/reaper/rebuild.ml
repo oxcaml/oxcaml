@@ -1465,7 +1465,7 @@ let rebuild_singleton_binding_which_is_being_unboxed env bv
   in
   match[@ocaml.warning "-fragile-match"] defining_expr with
   | Prim (Variadic (Make_block (kind, _, _), args), _dbg) ->
-    Field.Map.fold
+    Field.Map.ordered_fold
       (fun field (var : _ Unboxed_fields.u) hole ->
         let arg : _ Either.t =
           match Field.view field with
@@ -1499,7 +1499,7 @@ let rebuild_singleton_binding_which_is_being_unboxed env bv
         | Right arg_fields -> bind_fields var (Unboxed arg_fields) hole)
       to_bind hole
   | Prim (Unary (Box_number (prim_bn, _), contents), _dbg) ->
-    Field.Map.fold
+    Field.Map.ordered_fold
       (fun field (var : _ Unboxed_fields.u) hole ->
         let arg =
           match Field.view field with
@@ -1564,7 +1564,7 @@ let rebuild_set_of_closures_binding_which_is_being_unboxed env bvs
                (Code_id_or_name.var (Bound_var.var bv)))
         in
         let value_slots = set_of_closures.value_slots in
-        Field.Map.fold
+        Field.Map.ordered_fold
           (fun field (var : _ Unboxed_fields.u) hole ->
             match Field.view field with
             | Value_slot value_slot ->
