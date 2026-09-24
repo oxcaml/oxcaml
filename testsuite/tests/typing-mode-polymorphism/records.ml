@@ -121,7 +121,10 @@ let foo (x @ local) = alloc x
 Line 1, characters 28-29:
 1 | let foo (x @ local) = alloc x
                                 ^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region
+         because it is the parameter at line 1, characters 8-19
+         which is "local".
+       However, the highlighted expression is expected to be "global".
 |}]
 
 let foo (x @ once) = alloc x

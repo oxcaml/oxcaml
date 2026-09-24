@@ -284,6 +284,9 @@ Error: Signature mismatch:
        is not compatible with the type
          "'a @ [< 'p & past('o)] -> ('b @ [< past('n)] -> 'a @ [> 'p]) @ local"
        The return mode was expected to be "many" but is "once"
+       because it contains a usage (of the pattern at line 2, characters 10-11)
+       which is expected to be "unique"
+       because it has to hold for every instance of a mode variable
 |}]
 
 (* an [aliased] argument is not sufficient; the argument can be [once] *)
@@ -329,6 +332,7 @@ Error: Signature mismatch:
          "'a @ [< 'p & past('o) > aliased] ->
          ('b @ [< past('n)] -> 'a @ [> 'p | aliased]) @ local"
        The return mode was expected to be "many" but is "once"
+       because it has to hold for every instance of a mode variable
 |}]
 
 (* a [once] argument is not sufficient; the argument can be [unique] which gets
@@ -370,6 +374,9 @@ Error: Signature mismatch:
          "'a @ [< 'p & past('o) & many] ->
          ('b @ [< past('n)] -> 'a @ [> 'p]) @ local"
        The return mode was expected to be "many" but is "once"
+       because it contains a usage (of the pattern at line 2, characters 10-11)
+       which is expected to be "unique"
+       because it has to hold for every instance of a mode variable
 |}]
 
 (* if the argument is both [many] and [aliased], then the curry mode is
@@ -433,6 +440,7 @@ Error: Signature mismatch:
          "'a @ [< 'p & past('o)] -> ('b @ [< past('n)] -> 'a @ [> 'p]) @ once"
        The return mode was expected to be "global"
        because it crosses with something but is "local"
+       because it crosses with something
 |}]
 
 (* but if the argument is bound by [< global], we can write the following *)
@@ -489,7 +497,9 @@ Error: Signature mismatch:
          ('b @ [> past('n)] -> 'a @ [> 'm]) @ [> close('m) | local]"
        is not compatible with the type
          "'a @ [< 'q & past('o)] -> ('b @ [< past('n)] -> 'a @ [> 'q]) @ 'p"
-       The return mode was expected to be "global" but is "local"
+       The return mode was expected to be "global"
+       because it has to hold for every instance of a mode variable but is "local"
+       because it crosses with something
 |}]
 
 (* [> close('m)] is not more general than [> 'm] *)
@@ -532,7 +542,9 @@ Error: Signature mismatch:
        is not compatible with the type
          "'a @ [< 'q & 'p & past('o)] ->
          ('b @ [< past('n)] -> 'a @ [> 'q]) @ [> 'p | local]"
-       The return mode was expected to be "many" but is "once"
+       The return mode was expected to be "many"
+       because it has to hold for every instance of a mode variable but is "once"
+       because it has to hold for every instance of a mode variable
 |}]
 
 (* a written curry mode is the base of the deeper implicit curries: the

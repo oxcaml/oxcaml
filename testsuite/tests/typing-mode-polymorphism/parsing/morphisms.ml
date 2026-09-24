@@ -73,7 +73,9 @@ Error: Signature mismatch:
        The type "'a @ [< 'm > past('n)] -> 'a @ [> 'm]"
        is not compatible with the type
          "'a @ [< past('o) & past('n)] -> 'a @ [> past('o)]"
-       The return mode was expected to be "unique" but is "aliased"
+       The return mode was expected to be "unique"
+       because it has to hold for every instance of a mode variable but is "aliased"
+       because it has to hold for every instance of a mode variable
 |}]
 
 (* [mod c] drops the axes [c] mentions from the inequality *)
@@ -106,7 +108,9 @@ Error: Signature mismatch:
        The type "'a @ [< 'm > past('n)] -> 'a @ [> 'm]"
        is not compatible with the type
          "'a @ [< 'o & past('n)] -> 'a @ [> 'o mod portable]"
-       The return mode was expected to be "portable" but is "nonportable"
+       The return mode was expected to be "portable"
+       because it has to hold for every instance of a mode variable but is "nonportable"
+       because it has to hold for every instance of a mode variable
 |}]
 
 module type Mod_lower_monadic = sig
@@ -166,7 +170,9 @@ Error: Signature mismatch:
        is not compatible with the type
          "'a @ [< 'o mod aliased contended & past('n)] ->
          'a @ [> 'o mod many portable]"
-       The return mode was expected to be "many" but is "once"
+       The return mode was expected to be "many"
+       because it has to hold for every instance of a mode variable but is "once"
+       because it has to hold for every instance of a mode variable
 |}]
 
 (* [mod] on an upper bound strengthens the signature: the function must
@@ -194,7 +200,9 @@ Error: Signature mismatch:
        The type "'a @ [< 'm > past('n)] -> 'a @ [> 'm]"
        is not compatible with the type
          "'a @ [< 'o mod contended & past('n)] -> 'a @ [> 'o]"
-       The return mode was expected to be "uncontended" but is "contended"
+       The return mode was expected to be "uncontended"
+       because it has to hold for every instance of a mode variable but is "contended"
+       because it has to hold for every instance of a mode variable
 |}]
 
 module type Plain = sig
@@ -226,7 +234,9 @@ Error: Signature mismatch:
        The type "'a @ [< 'm > past('n)] -> 'a @ [> 'm]"
        is not compatible with the type
          "'a @ [< 'o mod contended & past('n)] -> 'a @ [> 'o]"
-       The return mode was expected to be "uncontended" but is "contended"
+       The return mode was expected to be "uncontended"
+       because it has to hold for every instance of a mode variable but is "contended"
+       because it has to hold for every instance of a mode variable
 |}]
 
 (* [mod c] applied to [close('m)] *)
@@ -273,7 +283,9 @@ Error: Signature mismatch:
        is not compatible with the type
          "'a @ [< 'p & past('o)] ->
          ('b @ [< past('n)] -> 'a @ [> 'p]) @ [> close('p) mod portable | local once]"
-       The return mode was expected to be "portable" but is "nonportable"
+       The return mode was expected to be "portable"
+       because it has to hold for every instance of a mode variable but is "nonportable"
+       because it has to hold for every instance of a mode variable
 |}]
 
 (* [mod many] on [close('m)] weakens the curry's floor below what a
@@ -321,7 +333,9 @@ Error: Signature mismatch:
        is not compatible with the type
          "'a @ [< 'p & past('o)] ->
          ('b @ [< past('n)] -> 'a @ [> 'p]) @ [> close('p) mod many | local]"
-       The return mode was expected to be "many" but is "once"
+       The return mode was expected to be "many"
+       because it has to hold for every instance of a mode variable but is "once"
+       because it has to hold for every instance of a mode variable
 |}]
 
 (* [mod] required by implementations *)

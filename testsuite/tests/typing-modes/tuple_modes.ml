@@ -76,7 +76,10 @@ let f e0 (e1 @ local) =
 Line 3, characters 42-44:
 3 |     | x0, x1 -> use_global x0; use_global x1; ()
                                               ^^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region
+         because it is the parameter at line 1, characters 9-21
+         which is "local".
+       However, the highlighted expression is expected to be "global".
 |}]
 
 let f e0 (e1 @ local) =
@@ -86,7 +89,10 @@ let f e0 (e1 @ local) =
 Line 3, characters 45-47:
 3 |     | #(x0, x1) -> use_global x0; use_global x1; ()
                                                  ^^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region
+         because it is the parameter at line 1, characters 9-21
+         which is "local".
+       However, the highlighted expression is expected to be "global".
 |}]
 
 let f e0 (e1 @ local) =
@@ -101,7 +107,9 @@ Error: This value is "local"
          because it is allocated at line 2, characters 10-16 containing data
          which is "local" to the parent region
          because it is a tuple that contains the expression at line 2, characters 14-16
-         which is "local" to the parent region.
+         which is "local" to the parent region
+         because it is the parameter at line 1, characters 9-21
+         which is "local".
        However, the highlighted expression is expected to be "global".
 |}]
 
@@ -115,7 +123,9 @@ Line 4, characters 30-31:
                                   ^
 Error: This value is "local" to the parent region
          because it is a tuple that contains the expression at line 2, characters 16-18
-         which is "local" to the parent region.
+         which is "local" to the parent region
+         because it is the parameter at line 1, characters 9-21
+         which is "local".
        However, the highlighted expression is expected to be "global".
 |}]
 
@@ -153,7 +163,9 @@ Error: This value is "local"
          because it is allocated at line 2, characters 10-16 containing data
          which is "local" to the parent region
          because it is a tuple that contains the expression at line 2, characters 14-16
-         which is "local" to the parent region.
+         which is "local" to the parent region
+         because it is the parameter at line 1, characters 9-21
+         which is "local".
        However, the highlighted expression is expected to be "local" to the parent region or "global"
          because it is a function return value.
          Hint: Use exclave_ to return a local value.
@@ -178,7 +190,9 @@ Line 3, characters 27-29:
                                ^^
 Error: This value is "local" to the parent region
          because it is an element of the tuple at line 2, characters 32-33
-         which is "local" to the parent region.
+         which is "local" to the parent region
+         because it is the parameter at line 1, characters 24-35
+         which is "local".
        However, the highlighted expression is expected to be "global".
 |}]
 
@@ -191,7 +205,9 @@ Line 3, characters 30-32:
                                   ^^
 Error: This value is "local" to the parent region
          because it is an element of the tuple at line 2, characters 35-36
-         which is "local" to the parent region.
+         which is "local" to the parent region
+         because it is the parameter at line 1, characters 24-35
+         which is "local".
        However, the highlighted expression is expected to be "global".
 |}]
 
@@ -216,7 +232,10 @@ let f b e0 (e1 @ local) e2 e3 =
 Line 3, characters 42-44:
 3 |     | x0, x1 -> use_global x0; use_global x1; ()
                                               ^^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region
+         because it is the parameter at line 1, characters 11-23
+         which is "local".
+       However, the highlighted expression is expected to be "global".
 |}]
 
 let f b e0 (e1 @ local) e2 e3 =
@@ -226,7 +245,10 @@ let f b e0 (e1 @ local) e2 e3 =
 Line 3, characters 45-47:
 3 |     | #(x0, x1) -> use_global x0; use_global x1; ()
                                                  ^^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region
+         because it is the parameter at line 1, characters 11-23
+         which is "local".
+       However, the highlighted expression is expected to be "global".
 |}]
 
 (* An unboxed tuple is not an allocation, but a regular tuple is *)
@@ -252,7 +274,9 @@ Error: This value is "local"
          because it is allocated at line 2, characters 10-16 containing data
          which is "local" to the parent region
          because it is a tuple that contains the expression at line 2, characters 11-12
-         which is "local" to the parent region.
+         which is "local" to the parent region
+         because it is the parameter at line 1, characters 18-28
+         which is "local".
        However, the highlighted expression is expected to be "local" to the parent region or "global"
          because it is a function return value.
          Hint: Use exclave_ to return a local value.

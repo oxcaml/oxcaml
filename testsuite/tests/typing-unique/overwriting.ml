@@ -96,7 +96,9 @@ Line 2, characters 22-23:
 2 |   overwrite_ r with { x }
                           ^
 Error: This value is "local" to the parent region
-       but is expected to be "global"
+         because it is the parameter at line 1, characters 46-56
+         which is "local".
+       However, the highlighted expression is expected to be "global"
          because it is the field "x" of the record at line 2, characters 20-25
          which is expected to be "global".
 |}]
@@ -120,7 +122,9 @@ Line 2, characters 22-23:
 2 |   overwrite_ r with { x }
                           ^
 Error: This value is "local" to the parent region
-       but is expected to be "global"
+         because it is the parameter at line 1, characters 40-50
+         which is "local".
+       However, the highlighted expression is expected to be "global"
          because it is the field "x" of the record at line 2, characters 20-25
          which is expected to be "global".
 |}]
@@ -197,7 +201,10 @@ let disallowed_by_regionality (r @ local unique) x =
 Line 3, characters 16-17:
 3 |   let ref = ref r in
                     ^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region
+         because it is the parameter at line 1, characters 30-48
+         which is "local".
+       However, the highlighted expression is expected to be "global".
 |}]
 
 let gc_soundness_no_bug (r @ unique) x =

@@ -94,7 +94,9 @@ Line 1, characters 25-28:
                              ^^^
 Error: This value is "local" to the parent region
          because it is the field "s" of the record at line 1, characters 25-26
-         which is "local" to the parent region.
+         which is "local" to the parent region
+         because it is the parameter at line 1, characters 8-18
+         which is "local".
        However, the highlighted expression is expected to be "global".
 |}]
 

@@ -440,7 +440,10 @@ let curry =
 Line 3, characters 2-15:
 3 |   foo ~a:3 ~c:4
       ^^^^^^^^^^^^^
-Error: This value is "once" but is expected to be "many".
+Error: This value is "once"
+         because it contains a usage (of the pattern at line 2, characters 10-12)
+         which is expected to be "unique".
+       However, the highlighted expression is expected to be "many".
 |}]
 
 let curry =

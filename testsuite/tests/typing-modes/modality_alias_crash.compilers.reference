@@ -17,7 +17,10 @@ Error: The implementation modality_alias_reject.ml
        is not included in
          val f : unit -> unit (* in a structure at portable *)
        The first is nonportable
-       but the second is portable.
+         because it contains the module Inner defined as the module at file "modality_alias_reject.ml", line 6, characters 17-38
+         which is nonportable
+         because it is a compilation unit and thus always at the legacy modes.
+       However, the second is portable.
        File "modality_alias_np_lib.mli", line 1, characters 0-20:
          Expected declaration
        File "modality_alias_np_lib.mli", line 1, characters 0-20:

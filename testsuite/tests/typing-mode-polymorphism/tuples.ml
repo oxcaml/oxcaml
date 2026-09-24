@@ -54,6 +54,8 @@ Line 3, characters 15-16:
                    ^
 Error: This value is "nonportable"
          because it is an element of the tuple at line 2, characters 15-23
+         which is "nonportable"
+         because it is a tuple that contains the expression at line 1, characters 19-20
          which is "nonportable".
        However, the highlighted expression is expected to be "portable".
 |}]
@@ -70,7 +72,10 @@ let foo (x @ local) (y @ global) =
 Line 2, characters 17-18:
 2 |     let _ = prod x y in ()
                      ^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region
+         because it is the parameter at line 1, characters 8-19
+         which is "local".
+       However, the highlighted expression is expected to be "global".
 |}]
 
 let foo (y @ local) (x @ global) =
@@ -79,7 +84,10 @@ let foo (y @ local) (x @ global) =
 Line 2, characters 17-18:
 2 |     let _ = prod y x in ()
                      ^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region
+         because it is the parameter at line 1, characters 8-19
+         which is "local".
+       However, the highlighted expression is expected to be "global".
 |}]
 
 (* They can be local using exclave_ *)
@@ -141,7 +149,9 @@ Line 2, characters 16-17:
 2 |   let _ = swap (x, y) in ()
                     ^
 Error: This value is "local" to the parent region
-       but is expected to be "global"
+         because it is the parameter at line 1, characters 8-19
+         which is "local".
+       However, the highlighted expression is expected to be "global"
          because it is an element of the tuple at line 2, characters 15-21
          which is expected to be "global".
 |}]

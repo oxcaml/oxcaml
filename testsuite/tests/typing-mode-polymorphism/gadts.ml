@@ -81,7 +81,10 @@ let local_arg_bad (type a) (w : a dom) (g : a) (s : string @ local) =
 Line 4, characters 11-12:
 4 |   | G -> g s
                ^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region
+         because it is the parameter at line 1, characters 47-67
+         which is "local".
+       However, the highlighted expression is expected to be "global".
 |}]
 
 type _ cross = Int : int cross | Str : string cross
@@ -109,7 +112,10 @@ let escapes (type a) (w : a cross) (x : a @ local) : a @ global =
 Line 4, characters 11-12:
 4 |   | Str -> x
                ^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region
+         because it is the parameter at line 1, characters 35-50
+         which is "local".
+       However, the highlighted expression is expected to be "global".
 |}]
 
 type packed = P : (int -> int) -> packed

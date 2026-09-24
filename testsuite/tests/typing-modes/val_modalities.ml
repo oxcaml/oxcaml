@@ -1205,7 +1205,9 @@ Line 2, characters 18-19:
 2 |   let k = (module M : Func_nonportable) in
                       ^
 Error: The value "M.baz" is "nonportable"
-       but is expected to be "portable"
+         because it contains the class "cla" defined as the class at line 38, characters 2-24
+         which is "nonportable" because classes are always at the legacy modes.
+       However, the value "M.baz" highlighted is expected to be "portable"
          because it is used inside the function at lines 1-3, characters 21-3
          which is expected to be "portable".
 |}]

@@ -1775,7 +1775,8 @@ Error: Signature mismatch:
        The type "'a @ stateless -> 'b @ writing -> 'a * 'b @ writing"
        is not compatible with the type
          "'a @ reading -> 'b @ writing -> 'a * 'b @ writing"
-       The argument mode was expected to be "writing" but is "reading"
+       The argument mode was expected to be "writing"
+       because it is an element of the tuple at file "_none_", line 1 but is "reading"
 |}]
 
 module _ : sig
@@ -1803,6 +1804,8 @@ Error: Signature mismatch:
        Type "'b -> 'a * 'b" is not compatible with type
          "'b @ writing -> 'a * 'b @ reading"
        The return mode was expected to be "reading" but is "writing"
+       because it is a tuple that contains the expression at line 4, characters 18-19
+       which is "writing"
 |}]
 
 module _ : sig
@@ -1831,6 +1834,8 @@ Error: Signature mismatch:
        Type "'b @ writing -> 'a * 'b @ writing" is not compatible with type
          "'b @ writing -> 'a * 'b @ stateless"
        The return mode was expected to be "stateless" but is "writing"
+       because it is a tuple that contains the expression at line 4, characters 18-19
+       which is "writing"
 |}]
 
 module _ : sig
@@ -1858,6 +1863,8 @@ Error: Signature mismatch:
        Type "'b -> 'a * 'b" is not compatible with type
          "'b @ reading -> 'a * 'b @ writing"
        The return mode was expected to be "writing" but is "reading"
+       because it is a tuple that contains the expression at line 4, characters 18-19
+       which is "reading"
 |}]
 
 module _ : sig
@@ -1883,7 +1890,8 @@ Error: Signature mismatch:
        The type "'a @ stateless -> 'b @ reading -> 'a * 'b @ reading"
        is not compatible with the type
          "'a @ writing -> 'b @ reading -> 'a * 'b @ reading"
-       The argument mode was expected to be "reading" but is "writing"
+       The argument mode was expected to be "reading"
+       because it is an element of the tuple at file "_none_", line 1 but is "writing"
 |}]
 
 module _ : sig
@@ -1912,6 +1920,8 @@ Error: Signature mismatch:
        Type "'b @ reading -> 'a * 'b @ reading" is not compatible with type
          "'b @ reading -> 'a * 'b @ stateless"
        The return mode was expected to be "stateless" but is "reading"
+       because it is a tuple that contains the expression at line 4, characters 18-19
+       which is "reading"
 |}]
 
 (* Lattice structure: [read] and [write] meet to become [read_write].
@@ -2072,7 +2082,10 @@ Error: Signature mismatch:
        The type "'a * 'b @ stateless -> 'a reading * 'b writing"
        is not compatible with the type
          "'a * 'b @ reading -> 'a reading * 'b writing"
-       The argument mode was expected to be stronger than "writing" but is "reading"
+       The argument mode was expected to be stronger than "writing"
+       because it is a tuple that contains the expression at line 4, characters 46-47
+       which is expected to be "writing"
+       because it is the field "writing" (with some modality) of the record at line 4, characters 34-49 but is "reading"
 |}]
 
 module _ : sig
@@ -2098,7 +2111,10 @@ Error: Signature mismatch:
        The type "'a * 'b @ stateless -> 'a reading * 'b writing"
        is not compatible with the type
          "'a * 'b @ writing -> 'a reading * 'b writing"
-       The argument mode was expected to be stronger than "reading" but is "writing"
+       The argument mode was expected to be stronger than "reading"
+       because it is a tuple that contains the expression at line 4, characters 29-30
+       which is expected to be "reading"
+       because it is the field "reading" (with some modality) of the record at line 4, characters 17-32 but is "writing"
 |}]
 
 module _ : sig
@@ -2123,7 +2139,10 @@ Error: Signature mismatch:
          val f : 'a * 'b -> 'a reading * 'b writing
        The type "'a * 'b @ stateless -> 'a reading * 'b writing"
        is not compatible with the type "'a * 'b -> 'a reading * 'b writing"
-       The argument mode was expected to be stronger than "reading" but is "stateful"
+       The argument mode was expected to be stronger than "reading"
+       because it is a tuple that contains the expression at line 4, characters 29-30
+       which is expected to be "reading"
+       because it is the field "reading" (with some modality) of the record at line 4, characters 17-32 but is "stateful"
 |}]
 
 (* Modality composition: visibility. *)

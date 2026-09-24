@@ -2061,31 +2061,43 @@ let prim_mode mvar prim ~level =
   in
   fst (prim_mode' mvar prim)
 
-(** Returns a new mode variable whose locality is the given locality and
-    whose yieldingness is the given yieldingness, while all other axes are
-    from the given [m]. This function is too specific to be put in [mode.ml] *)
+(** Returns a mode whose locality is the given locality and whose forkability
+    and yieldingness are the given ones, while all other axes are from the given
+    [m]. This function is too specific to be put in [mode.ml] *)
 let with_locality_and_forkable_yielding (locality, fy) m =
-  let forkable = Option.map fst fy in
-  let yielding = Option.map snd fy in
-  let m' = Alloc.newvar 0 in
-  Locality.equate_exn (Alloc.proj_comonadic Areality m') locality;
-  let forkable =
-    Option.value ~default:(Alloc.proj_comonadic Forkable m) forkable
-  in
-  let yielding =
-    Option.value ~default:(Alloc.proj_comonadic Yielding m) yielding
-  in
-  Forkable.equate_exn (Alloc.proj_comonadic Forkable m') forkable;
-  Yielding.equate_exn (Alloc.proj_comonadic Yielding m') yielding;
-  let c =
-    { Alloc.Comonadic.Const.max with
-      areality = Locality.Const.min;
-      forkable = Forkable.Const.min;
-      yielding = Yielding.Const.min}
-  in
-  Alloc.submode_exn (Alloc.meet_const c m') m;
-  Alloc.submode_exn (Alloc.meet_const c m) m';
-  m'
+  match Alloc.Guts.check_const m with
+  | None ->
+    (* [m] is this use's own instance of a mode-polymorphic declared mode, so
+       we constrain it directly. Its mode variables already determine
+       forkability and yieldingness; only the locality is shared, since
+       translation uses a single locality for the whole primitive. *)
+    Locality.equate_exn (Alloc.proj_comonadic Areality m) locality;
+    m
+  | Some _ ->
+    let forkable = Option.map fst fy in
+    let yielding = Option.map snd fy in
+    let m' = Alloc.newvar (get_current_level ()) in
+    Locality.equate_exn (Alloc.proj_comonadic Areality m') locality;
+    let forkable =
+      Option.value ~default:(Alloc.proj_comonadic Forkable m) forkable
+    in
+    let yielding =
+      Option.value ~default:(Alloc.proj_comonadic Yielding m) yielding
+    in
+    Forkable.equate_exn (Alloc.proj_comonadic Forkable m') forkable;
+    Yielding.equate_exn (Alloc.proj_comonadic Yielding m') yielding;
+    let c =
+      { Alloc.Comonadic.Const.max with
+        areality = Locality.Const.min;
+        forkable = Forkable.Const.min;
+        yielding = Yielding.Const.min}
+    in
+    (* [m] and [m'] agree on every axis that [c] doesn't pin to its minimum, and
+       those minima never cause an error, so the meets are skipped in error
+       reporting. *)
+    Alloc.submode_exn (Alloc.meet_const ~hint:Skip c m') m;
+    Alloc.submode_exn (Alloc.meet_const ~hint:Skip c m) m';
+    m'
 
 (* When user writes an (uncurried) arrow type [A -> B -> C], the corresponding
 implementation is typically [fun a b -> ...], in which case [fun b -> ...] will
@@ -2139,9 +2151,12 @@ module Curry_mode = struct
       add_arg t (Alloc.of_const arg) ~upper_areality:arg.areality
 end
 
-let rec instance_prim_locals locals mvar_l mvar_y macc (loc, yld) ty =
+let rec instance_prim_locals ~instantiate locals mvar_l mvar_y macc (loc, yld)
+    ty =
   match locals, get_desc ty with
   | l :: locals, Tarrow ((lbl,marg,mret),arg,ret,commu) ->
+     let marg = instantiate marg in
+     let mret = instantiate mret in
      let marg = with_locality_and_forkable_yielding
       (prim_mode' (Some (mvar_l, mvar_y)) l) marg
      in
@@ -2164,7 +2179,9 @@ let rec instance_prim_locals locals mvar_l mvar_y macc (loc, yld) ty =
           in
           mret'
      in
-     let ret = instance_prim_locals locals mvar_l mvar_y macc (loc, yld) ret in
+     let ret =
+       instance_prim_locals ~instantiate locals mvar_l mvar_y macc (loc, yld) ret
+     in
      newty2 ~level:(get_level ty) (Tarrow ((lbl,marg,mret),arg,ret, commu))
   | _ :: _, _ -> assert false
   | [], _ ->
@@ -2260,13 +2277,19 @@ let instance_prim_mode (desc : Primitive.description) ty =
   in
   if is_poly desc.prim_native_repr_res ||
        List.exists is_poly desc.prim_native_repr_args then
-    let mode_l = Locality.newvar 0 in
-    let mode_fy = Forkable.newvar 0, Yielding.newvar 0 in
+    let current_level = get_current_level () in
+    let mode_l = Locality.newvar current_level in
+    let mode_fy = Forkable.newvar current_level, Yielding.newvar current_level in
     let finalret =
       prim_mode' (Some (mode_l, mode_fy)) desc.prim_native_repr_res
     in
-    instance_prim_locals desc.prim_native_repr_args
-      mode_l mode_fy (Alloc.disallow_right Alloc.legacy) finalret ty,
+    (* The declared modes may contain generic mode variables, which we
+       instantiate here so that each use gets fresh ones. *)
+    Mode.with_copy_scope (fun copy_scope ->
+      instance_prim_locals
+        ~instantiate:(Alloc.instantiate ~copy_scope ~current_level)
+        desc.prim_native_repr_args
+        mode_l mode_fy (Alloc.disallow_right Alloc.legacy) finalret ty),
     Some mode_l, Some mode_fy
   else
     ty, None, None

@@ -313,7 +313,9 @@ Line 3, characters 63-64:
 3 |     fun ~a -> fun[@curry] ~b -> fun[@curry] ~c -> print_string a
                                                                    ^
 Error: The value "a" is "local" to the parent region
-       but is expected to be "global"
+         because it is the parameter at line 3, characters 8-10
+         which is "local".
+       However, the value "a" highlighted is expected to be "global"
          because it is used inside the function at line 3, characters 14-64
          which is expected to be "global".
 |}]

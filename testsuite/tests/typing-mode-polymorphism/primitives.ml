@@ -95,7 +95,7 @@ external int32_neg : int32 @ [< 'm] -> int32 @ [> 'm] = "%int32_neg"
 (fun x -> int32_neg x)
 [%%expect{|
 (function {nlocal = 0} x/6[value<int32>] : int32 (%int32_neg x/6))
-- : int32 @ [< global] -> int32 @ [> aliased dynamic] = <fun>
+- : int32 @ [< global] -> int32 @ [> dynamic] = <fun>
 |}];;
 
 (fun (x @ local) -> int32_neg x)
@@ -112,5 +112,32 @@ Error: This value is "local"
 (fun x -> exclave_ int32_neg x)
 [%%expect{|
 (function {nlocal = 1} x/7[L][value<int32>] : stackint32 (%int32_neg[L] x/7))
-- : int32 @ 'm -> int32 @ [> local aliased dynamic] = <fun>
+- : int32 @ 'm -> int32 @ [> local dynamic] = <fun>
+|}];;
+
+(* Each use of a mode-polymorphic external gets its own instance of the mode
+   variables, and applying one gives a mode-polymorphic function. *)
+external id : 'a @ [< 'm] -> 'a @ [> 'm] = "%identity"
+let id_unique () = (id : 'a @ unique -> 'a @ unique)
+let id_local () = (id : 'a @ local -> 'a @ local)
+let apply_id x = id x
+[%%expect{|
+0
+external id : 'a @ [< 'm] -> 'a @ [> 'm] = "%identity"
+(let
+  (id_unique/0 =
+     (function {nlocal = 1} param/0[L][value<int>]
+       (function {nlocal = 0} prim/7 stub prim/7)))
+  (apply (field_imm 1 (global Toploop!)) "id_unique" id_unique/0))
+val id_unique : unit @ 'm -> ('a @ unique -> 'a @ unique) @ [> stateful] =
+  <fun>
+(let
+  (id_local/0 =
+     (function {nlocal = 1} param/1[L][value<int>]
+       (function {nlocal = 1} prim/8[L] stub : stack prim/8)))
+  (apply (field_imm 1 (global Toploop!)) "id_local" id_local/0))
+val id_local : unit @ 'm -> ('a @ local -> 'a @ local) @ [> stateful] = <fun>
+(let (apply_id/0 = (function {nlocal = 0} x/8 x/8))
+  (apply (field_imm 1 (global Toploop!)) "apply_id" apply_id/0))
+val apply_id : 'a @ [< 'm & global] -> 'a @ [> 'm | dynamic] = <fun>
 |}];;

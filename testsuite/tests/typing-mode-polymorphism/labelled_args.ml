@@ -154,7 +154,12 @@ let () =
 Line 4, characters 13-14:
 4 |   use_global y
                  ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local"
+         because it is the result of the expression at line 1, characters 20-21
+         which is "local" to the parent region
+         because it is the parameter at line 1, characters 16-17
+         which is "local".
+       However, the highlighted expression is expected to be "global".
 |}]
 
 let foo x ?label1 = x

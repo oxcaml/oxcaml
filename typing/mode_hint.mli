@@ -144,6 +144,9 @@ type 'd const =
   | Contained_by : is_contained_by -> ('l * 'r) const
   | Annotation : annotation -> ('l * 'r) const
   | Mod_unpack : ('l * disallowed) neg const
+  | Rigid_mode_variable : ('l * 'r) const
+      (** The bound must hold for every instance of a rigid mode variable, such
+          as a mode variable of a signature during inclusion checking. *)
   constraint 'd = _ * _
 [@@ocaml.warning "-62"]
 
@@ -161,6 +164,14 @@ type allocation_desc =
   | Captured_by_partial_application
 
 type allocation = allocation_desc Location.loc
+
+(** What an areality conversion relates. Around a function, the conversion
+    relates a mode seen from outside the function (an allocation mode, in the
+    function's type) to the same mode seen from inside it (a value mode). *)
+type areality_conversion =
+  | Unexplained
+  | Function_parameter of Location.t  (** Carries the parameter's location *)
+  | Function_body of Location.t  (** Carries the body's location *)
 
 (** Hint for morphisms. When acompanied by a destination [pinpoint], [morph]
     gives a source [pinpoint] and explains the relation between them. See
@@ -194,6 +205,11 @@ type 'd morph =
   | Application_to_functor : Location.t -> (disallowed * 'r) neg morph
       (** The dual of [Functor_to_application]: from the result's staticity back
           to the functor's. Carries the application's location. *)
+  | Areality_conversion : areality_conversion -> ('l * 'r) morph
+      (** Converts between locality (of allocations) and regionality (of
+          values), behaving as identity on other axes. Skipped in printing when
+          the conversion doesn't change the mode, and otherwise explained by the
+          [areality_conversion]. *)
   | Allocation_r : allocation -> (disallowed * 'r) morph
   | Allocation_l : allocation -> ('l * disallowed) morph
   | Allocation : allocation -> ('l * 'r) morph

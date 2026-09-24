@@ -119,7 +119,9 @@ Error: Signature mismatch:
          val f : 'a @ [> 'm] -> 'a @ [< 'm]
        The type "'a @ [< 'm > past('n)] -> 'a @ [> 'm]"
        is not compatible with the type "'a @ [< past('n) > 'o] -> 'a @ [< 'o]"
-       The return mode was expected to be "global" but is "local"
+       The return mode was expected to be "global"
+       because it has to hold for every instance of a mode variable but is "local"
+       because it has to hold for every instance of a mode variable
 |}]
 
 module No_variance_inhabited : sig

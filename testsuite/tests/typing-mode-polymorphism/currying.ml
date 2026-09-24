@@ -117,7 +117,9 @@ Line 5, characters 56-60:
 5 |   let _ : (unit -> unit) @ portable = fun () -> let _ = bar1 () in () in
                                                             ^^^^
 Error: The value "bar1" is "nonportable"
-       but is expected to be "portable"
+         because it contains a usage (of the value "c" at line 3, characters 21-22)
+         which is expected to be "uncontended".
+       However, the value "bar1" highlighted is expected to be "portable"
          because it is used inside the function at line 5, characters 38-69
          which is expected to be "portable".
 |}]
@@ -288,7 +290,11 @@ Line 5, characters 56-60:
 5 |   let _ : (unit -> unit) @ portable = fun () -> let _ = bar1 () in () in
                                                             ^^^^
 Error: The value "bar1" is "nonportable"
-       but is expected to be "portable"
+         because it closes over the value "x" at line 1, characters 21-22
+         which is "nonportable"
+         because it contains a usage (of the value "c" at line 3, characters 21-22)
+         which is expected to be "uncontended".
+       However, the value "bar1" highlighted is expected to be "portable"
          because it is used inside the function at line 5, characters 38-69
          which is expected to be "portable".
 |}]

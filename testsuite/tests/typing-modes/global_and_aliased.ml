@@ -53,7 +53,9 @@ Line 1, characters 40-42:
 1 | let fail1 (x1 : 'a @ local) : 'a t1 = { x1 }
                                             ^^
 Error: This value is "local" to the parent region
-       but is expected to be "global"
+         because it is the parameter at line 1, characters 10-27
+         which is "local".
+       However, the highlighted expression is expected to be "global"
          because it is the field "x1" (with some modality) of the record at line 1, characters 38-44.
 |}]
 
@@ -64,7 +66,9 @@ Line 1, characters 40-42:
 1 | let fail3 (x3 : 'a @ local) : 'a t3 = { x3 }
                                             ^^
 Error: This value is "local" to the parent region
-       but is expected to be "global"
+         because it is the parameter at line 1, characters 10-27
+         which is "local".
+       However, the highlighted expression is expected to be "global"
          because it is the field "x3" (with some modality) of the record at line 1, characters 38-44.
 |}]
 

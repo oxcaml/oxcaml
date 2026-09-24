@@ -18,7 +18,9 @@ Line 1, characters 33-34:
 1 | let f (local_ s : string) = This s
                                      ^
 Error: This value is "local" to the parent region
-       but is expected to be "global"
+         because it is the parameter at line 1, characters 6-25
+         which is "local".
+       However, the highlighted expression is expected to be "global"
          because it is contained (via constructor "This") (with some modality) in the value at line 1, characters 28-34.
 |}]
 

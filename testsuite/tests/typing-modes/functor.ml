@@ -647,7 +647,10 @@ end
 Line 3, characters 38-53:
 3 |   module (F1_applied_2 @ stateless) = F1_applied (M2)
                                           ^^^^^^^^^^^^^^^
-Error: The module is "stateful" but is expected to be "stateless".
+Error: The module is "stateful"
+         because it closes over the value "M1.f" at line 2, characters 11-15
+         which is "stateful".
+       However, the module highlighted is expected to be "stateless".
 |}]
 
 let f2 (x1 @ stateless) (x2 @ stateful) (x3 @ stateless) =

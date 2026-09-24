@@ -279,7 +279,9 @@ Error: Signature mismatch:
        is not compatible with the type
          "'a @ [< 'p & past('o) & global unique] ->
          ('b @ [< past('n)] -> 'a @ [> 'p]) @ [> close('p) mod many]"
-       The return mode was expected to be "many" but is "once"
+       The return mode was expected to be "many"
+       because it has to hold for every instance of a mode variable but is "once"
+       because it has to hold for every instance of a mode variable
 |}]
 
 let k x y = x

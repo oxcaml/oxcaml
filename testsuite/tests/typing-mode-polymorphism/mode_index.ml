@@ -105,6 +105,7 @@ Error: Signature mismatch:
            'a @ [> local aliased stateful dynamic]"
        is not compatible with the type "'a @ [< 'm] -> 'a @ [> 'm | local]"
        The argument mode was expected to be "many" but is "once"
+       because it has to hold for every instance of a mode variable
 |}]
 
 module M : sig
@@ -132,6 +133,7 @@ Error: Signature mismatch:
            'a @ [> local aliased stateful dynamic]"
        is not compatible with the type "'a @ 'm -> 'a @ [> local]"
        The argument mode was expected to be "many" but is "once"
+       because it has to hold for every instance of a mode variable
 |}]
 
 module M : sig

@@ -957,7 +957,11 @@ module type S = sig
 
     val proj_monadic : 'a Monadic.Axis.t -> ('l * 'r) t -> ('a, 'r * 'l) mode
 
-    val meet_const : Comonadic.Const.t -> ('l * 'r) t -> ('l * disallowed) t
+    val meet_const :
+      ?hint:('l * disallowed) pos_hint_morph ->
+      Comonadic.Const.t ->
+      ('l * 'r) t ->
+      ('l * disallowed) t
 
     val join_const : Monadic.Const.t -> ('l * 'r) t -> (disallowed * 'r) t
 
@@ -1121,8 +1125,18 @@ module type S = sig
   val alloc_as_value :
     ?allocation:Hint.allocation -> ('l * 'r) Alloc.t -> ('l * 'r) Value.t
 
+  (** [alloc_as_value] for the return mode of a function, whose body is at
+      [body]. *)
+  val function_return_as_value :
+    body:Location.t -> ('l * 'r) Alloc.t -> ('l * 'r) Value.t
+
   (** Similar to [local_to_regional], behaves as identity in other axes *)
   val alloc_to_value_l2r : ('l * 'r) Alloc.t -> ('l * disallowed) Value.t
+
+  (** [alloc_to_value_l2r] for the mode of the function parameter at
+      [parameter], giving the mode of the parameter inside the function. *)
+  val function_parameter_to_value :
+    parameter:Location.t -> ('l * 'r) Alloc.t -> ('l * disallowed) Value.t
 
   (** Similar to [regional_to_local], behaves as identity on other axes *)
   val value_to_alloc_r2l : ('l * 'r) Value.t -> ('l * 'r) Alloc.t

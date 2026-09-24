@@ -265,7 +265,12 @@ val id : 'a @ [< 'm] -> 'a @ [> 'm] = <fun>
 Line 5, characters 13-14:
 5 |   use_global x
                  ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local"
+         because it is the result of the expression at line 1, characters 11-12
+         which is "local" to the parent region
+         because it is the parameter at line 1, characters 7-8
+         which is "local".
+       However, the highlighted expression is expected to be "global".
 |}]
 
 (* if the return value is allocated, its locality is restricted to global *)
@@ -279,7 +284,10 @@ val some : 'a @ [< 'm & global] -> 'a option @ [> 'm] = <fun>
 Line 4, characters 15-16:
 4 |   let x = some x in
                    ^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region
+         because it is the parameter at line 3, characters 8-19
+         which is "local".
+       However, the highlighted expression is expected to be "global".
 |}]
 
 (* unless there is an exclave_ *)

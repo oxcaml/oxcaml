@@ -46,6 +46,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
       | Is_closed_by (Monadic, co) -> co.closure, Close_over (Monadic, co)
       | Is_closed_by (Comonadic, co) -> co.closure, Close_over (Comonadic, co)
       | Crossing -> pp, Crossing
+      | Areality_conversion c -> pp, Areality_conversion c
       | Functor_to_parameter loc ->
         (loc, Functor), Parameter_to_functor (fst pp)
       | Parameter_to_functor loc ->
@@ -74,6 +75,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
       | Close_over (Monadic, co) -> co.closed, Is_closed_by (Monadic, co)
       | Close_over (Comonadic, co) -> co.closed, Is_closed_by (Comonadic, co)
       | Crossing -> pp, Crossing
+      | Areality_conversion c -> pp, Areality_conversion c
       | Functor_to_parameter loc ->
         (loc, Functor), Parameter_to_functor (fst pp)
       | Parameter_to_functor loc ->
@@ -103,6 +105,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Close_over (Monadic, x) -> Close_over (Monadic, x)
         | Close_over (Comonadic, x) -> Close_over (Comonadic, x)
         | Crossing -> Crossing
+        | Areality_conversion c -> Areality_conversion c
         | Functor_to_parameter p -> Functor_to_parameter p
         | Parameter_to_functor p -> Parameter_to_functor p
         | Application_to_functor loc -> Application_to_functor loc
@@ -121,6 +124,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Is_closed_by (Monadic, x) -> Is_closed_by (Monadic, x)
         | Is_closed_by (Comonadic, x) -> Is_closed_by (Comonadic, x)
         | Crossing -> Crossing
+        | Areality_conversion c -> Areality_conversion c
         | Functor_to_parameter p -> Functor_to_parameter p
         | Parameter_to_functor p -> Parameter_to_functor p
         | Functor_to_application loc -> Functor_to_application loc
@@ -141,6 +145,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Is_closed_by (Monadic, x) -> Is_closed_by (Monadic, x)
         | Is_closed_by (Comonadic, x) -> Is_closed_by (Comonadic, x)
         | Crossing -> Crossing
+        | Areality_conversion c -> Areality_conversion c
         | Functor_to_parameter p -> Functor_to_parameter p
         | Parameter_to_functor p -> Parameter_to_functor p
         | Functor_to_application loc -> Functor_to_application loc
@@ -165,6 +170,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Is_closed_by (Monadic, x) -> Is_closed_by (Monadic, x)
         | Is_closed_by (Comonadic, x) -> Is_closed_by (Comonadic, x)
         | Crossing -> Crossing
+        | Areality_conversion c -> Areality_conversion c
         | Functor_to_parameter p -> Functor_to_parameter p
         | Parameter_to_functor p -> Parameter_to_functor p
         | Functor_to_application loc -> Functor_to_application loc
@@ -190,6 +196,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
 
     let min : _ t = Unknown
 
+    let rigid : _ t = Rigid_mode_variable
+
     include Magic_allow_disallow (struct
       type (_, _, 'd) sided = 'd t constraint 'd = 'l * 'r
 
@@ -210,6 +218,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Lpoly_inst -> Lpoly_inst
         | Contained_by c -> Contained_by c
         | Annotation annotation -> Annotation annotation
+        | Rigid_mode_variable -> Rigid_mode_variable
 
       let allow_right : type l r. (l * allowed) t -> (l * r) t =
        fun (type l r) (h : (l * allowed) t) : (l * r) t ->
@@ -233,6 +242,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Spliced Comonadic -> Spliced Comonadic
         | Contained_by c -> Contained_by c
         | Annotation annotation -> Annotation annotation
+        | Rigid_mode_variable -> Rigid_mode_variable
         | Mod_unpack -> Mod_unpack
 
       let disallow_left : type l r. (l * r) t -> (disallowed * r) t =
@@ -263,6 +273,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Spliced Comonadic -> Spliced Comonadic
         | Contained_by c -> Contained_by c
         | Annotation annotation -> Annotation annotation
+        | Rigid_mode_variable -> Rigid_mode_variable
         | Mod_unpack -> Mod_unpack
 
       let disallow_right : type l r. (l * r) t -> (l * disallowed) t =
@@ -293,6 +304,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Spliced Comonadic -> Spliced Comonadic
         | Contained_by c -> Contained_by c
         | Annotation annotation -> Annotation annotation
+        | Rigid_mode_variable -> Rigid_mode_variable
         | Mod_unpack -> Mod_unpack
     end)
   end
@@ -4996,17 +5008,46 @@ module Report = struct
         ppf
     | Mod_unpack ->
       Fmt.fprintf ppf "unpacked first-class modules are always dynamic"
+    | Rigid_mode_variable ->
+      Fmt.fprintf ppf "it has to hold for every instance of a mode variable"
+
+  (** [dst_inside] says whether the destination of the conversion is the mode
+      seen from inside the function, as opposed to from outside it. *)
+  let print_areality_conversion ~dst_inside conversion =
+    let src_and_description : (pinpoint * _) option =
+      match conversion, dst_inside with
+      | Unexplained, _ -> None
+      | Function_parameter loc, true ->
+        Some ((loc, Parameter), Fmt.dprintf "is %t")
+      | Function_parameter loc, false ->
+        Some ((loc, Pattern), Fmt.dprintf "is bound by %t")
+      | Function_body loc, true -> Some ((loc, Return), Fmt.dprintf "is %t")
+      | Function_body loc, false ->
+        Some ((loc, Expression), Fmt.dprintf "is the result of %t")
+    in
+    Option.bind src_and_description (fun (src, description) ->
+        print_pinpoint src
+        |> Option.map (fun print_src ->
+            description (print_src ~definite:true ~capitalize:false), src))
+
+  (* Value modes, which use regionality, are the modes seen from inside a
+     function. *)
+  let is_value_obj : type a. a C.obj -> bool = function
+    | Regionality | Comonadic_with_regionality -> true
+    | _ -> false
+  [@@ocaml.warning "-4"]
 
   (** Given a pinpoint and a morph, where the pinpoint is the destination of the
       morph and have been expressed already, print the morph and return the
       source pinpoint. The source pinpoint could be [Unknown], in which case the
       rest of the chain will not be printed. *)
-  let print_morph : type l r.
+  let print_morph : type a l r.
       fixpoint:bool ->
+      a C.obj ->
       pinpoint ->
       (l * r) morph ->
       ((Fmt.formatter -> unit) * pinpoint) option =
-   fun ~fixpoint pp -> function
+   fun ~fixpoint obj pp -> function
     | Skip ->
       Some (print_bug ~explanation:"Skip hint should not be printed" (), pp)
     | Allocation _ ->
@@ -5018,6 +5059,8 @@ module Report = struct
             (),
           pp )
     | Unknown -> None
+    | Areality_conversion conversion ->
+      print_areality_conversion ~dst_inside:(is_value_obj obj) conversion
     | Close_over (Comonadic, { closed = pp; _ }) ->
       print_pinpoint pp
       |> Option.map (fun print_pp ->
@@ -5190,7 +5233,15 @@ module Report = struct
       (* These morphisms should never be skipped *)
       ~is_skip:false, ~fixpoint
     | Skip | Crossing ->
-      (* We only skip when the morphism changes the mode *)
+      (* We only skip when the morphism doesn't change the mode *)
+      ~is_skip:fixpoint, ~fixpoint
+    | Areality_conversion _ ->
+      (* The mode doesn't change if the locality mode maps to its corresponding
+         regionality mode. *)
+      let fixpoint =
+        implements_alloc_to_value Locality_as_regionality src obj a b
+        || implements_alloc_to_value Locality_as_regionality obj src b a
+      in
       ~is_skip:fixpoint, ~fixpoint
     | Allocation_r _ ->
       (* We check that the morphism is value_to_alloc_r2g *)
@@ -5231,7 +5282,7 @@ module Report = struct
       then print_ahint ~sub side pp src ppf ahint
       else (
         print_mode_with_side ~sub side obj ppf a;
-        match print_morph ~fixpoint pp morph_hint with
+        match print_morph ~fixpoint obj pp morph_hint with
         | None -> Some Mode
         | Some (t, pp) ->
           Fmt.fprintf ppf "@ because it %t" t;
@@ -5643,21 +5694,31 @@ module Comonadic_gen (Obj : Obj) = struct
 
   let apply_hint hint m = wrap ~hint Fun.id m
 
+  (* [meet_const max] and [imply_const max] are the identity *)
+  let is_identity_const c = C.le obj (C.max obj) c
+
   let meet_const_unhint c m =
-    (* [meet_const max] is the identity *)
-    if C.le obj (C.max obj) c
+    if is_identity_const c
     then m
     else S.Unhint.apply obj (Simple (Meet_const c)) m
 
-  let meet_const ?hint c m = wrap ?hint (meet_const_unhint c) (disallow_right m)
+  (* When the operation is the identity and there is no hint to explain it, we
+     return the mode untouched rather than adding an unexplained morphism that
+     would cut its hint chain. *)
+  let meet_const ?hint c m =
+    let m = disallow_right m in
+    match hint with
+    | None when is_identity_const c -> m
+    | _ -> wrap ?hint (meet_const_unhint c) m
 
   let imply_const_unhint c m =
-    (* [imply_const max] is the identity *)
-    if C.le obj (C.max obj) c
+    if is_identity_const c
     then m
     else S.Unhint.apply obj (Simple (Imply_const c)) m
 
-  let imply_const c m = m |> disallow_left |> wrap (imply_const_unhint c)
+  let imply_const c m =
+    let m = disallow_left m in
+    if is_identity_const c then m else wrap (imply_const_unhint c) m
 
   let desc a = S.desc obj a
 
@@ -5852,23 +5913,31 @@ module Monadic_gen (Obj : Obj) = struct
 
   let apply_hint hint m = wrap ~hint Fun.id m
 
+  (* The underlying object is the opposite lattice, so [join_const] is a meet
+     and [subtract_const] is an imply, both of which are the identity on
+     [max]. *)
+  let is_identity_const c = C.le obj (C.max obj) c
+
   let join_const_unhint c m =
-    (* The underlying object is the opposite lattice, so this is a meet, and
-       [meet_const max] is the identity *)
-    if C.le obj (C.max obj) c
+    if is_identity_const c
     then m
     else S.Unhint.apply Obj.obj (Simple (Meet_const c)) m
 
-  let join_const ?hint c m = wrap ?hint (join_const_unhint c) (disallow_left m)
+  (* See [Comonadic_gen.meet_const] for why we don't wrap the identity. *)
+  let join_const ?hint c m =
+    let m = disallow_left m in
+    match hint with
+    | None when is_identity_const c -> m
+    | _ -> wrap ?hint (join_const_unhint c) m
 
   let subtract_const_unhint c m =
-    (* The underlying object is the opposite lattice, so this is an imply, and
-       [imply_const max] is the identity *)
-    if C.le obj (C.max obj) c
+    if is_identity_const c
     then m
     else S.Unhint.apply obj (Simple (Imply_const c)) m
 
-  let subtract_const c m = m |> disallow_right |> wrap (subtract_const_unhint c)
+  let subtract_const c m =
+    let m = disallow_right m in
+    if is_identity_const c then m else wrap (subtract_const_unhint c) m
 
   let desc a = S.desc obj a
 
@@ -7269,9 +7338,9 @@ module Value_with (Areality : Areality) = struct
     S.apply Comonadic.Obj.obj (Simple (Core Monadic_op_to_comonadic_max))
       (Monadic.disallow_right m)
 
-  let meet_const c { comonadic; monadic } =
+  let meet_const ?hint c { comonadic; monadic } =
     let monadic = Monadic.disallow_right monadic in
-    let comonadic = Comonadic.meet_const c comonadic in
+    let comonadic = Comonadic.meet_const ?hint c comonadic in
     { monadic; comonadic }
 
   let join_const c { comonadic; monadic } =
@@ -7712,34 +7781,53 @@ let locality_as_regionality m =
   S.apply C.Regionality
     (Simple (Core (Locality_restricted Locality_as_regionality))) m
 
-let alloc_as_value ?allocation { comonadic; monadic } =
-  let hint = Option.map (fun a -> Hint.Allocation a) allocation in
+let alloc_as_value_with_hint ~hint { comonadic; monadic } =
   { comonadic =
-      S.apply Value.Comonadic.Obj.obj ?hint
+      S.apply Value.Comonadic.Obj.obj ~hint
         (Simple (Core (Locality_full Locality_as_regionality))) comonadic;
     monadic = Value.Monadic.apply_hint Skip monadic
   }
 
-let alloc_to_value_l2r m =
+let alloc_as_value ?allocation m =
+  let hint : _ Hint.morph =
+    match allocation with
+    | Some a -> Allocation a
+    | None -> Areality_conversion Unexplained
+  in
+  alloc_as_value_with_hint ~hint m
+
+let function_return_as_value ~body m =
+  alloc_as_value_with_hint ~hint:(Areality_conversion (Function_body body)) m
+
+let alloc_to_value_l2r_with_conversion conversion m =
   let { comonadic; monadic } = Alloc.disallow_right m in
   { comonadic =
-      S.apply Value.Comonadic.Obj.obj
+      S.apply Value.Comonadic.Obj.obj ~hint:(Areality_conversion conversion)
         (Simple (Core (Locality_full Local_to_regional))) comonadic;
     monadic = Value.Monadic.apply_hint Skip monadic
   }
 
+let alloc_to_value_l2r m = alloc_to_value_l2r_with_conversion Unexplained m
+
+let function_parameter_to_value ~parameter m =
+  alloc_to_value_l2r_with_conversion (Function_parameter parameter) m
+
 let value_to_alloc_r2g ?allocation m =
-  let hint = Option.map (fun a -> Hint.Allocation_r a) allocation in
+  let hint : _ Hint.morph =
+    match allocation with
+    | Some a -> Allocation_r a
+    | None -> Areality_conversion Unexplained
+  in
   let { comonadic; monadic } = Value.disallow_left m in
   { comonadic =
-      S.apply Alloc.Comonadic.Obj.obj ?hint
+      S.apply Alloc.Comonadic.Obj.obj ~hint
         (Simple (Core (Locality_full Regional_to_global))) comonadic;
     monadic = Alloc.Monadic.apply_hint Skip monadic
   }
 
 let value_to_alloc_r2l { comonadic; monadic } =
   { comonadic =
-      S.apply Alloc.Comonadic.Obj.obj
+      S.apply Alloc.Comonadic.Obj.obj ~hint:(Areality_conversion Unexplained)
         (Simple (Core (Locality_full Regional_to_local))) comonadic;
     monadic = Alloc.Monadic.apply_hint Skip monadic
   }

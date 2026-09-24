@@ -45,7 +45,10 @@ let foo (x @ local) =
 Line 2, characters 14-15:
 2 |   let y = id' x in ()
                   ^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region
+         because it is the parameter at line 1, characters 8-19
+         which is "local".
+       However, the highlighted expression is expected to be "global".
 |}]
 
 (* HIGHER-ORDER FUNCTIONS *)
@@ -148,8 +151,8 @@ let rec recursive x n =
 [%%expect{|
 val recursive :
   'a @ [< 'm & global] ->
-  int @ [< many read_write > dynamic] -> 'a @ [< global > 'm | dynamic] =
-  <fun>
+  int @ [< global many read_write > dynamic] ->
+  'a @ [< global > 'm | dynamic] = <fun>
 |}]
 
 let foo (x @ portable) =
@@ -163,8 +166,8 @@ let recursive' = recursive
 [%%expect{|
 val recursive' :
   'a @ [< 'm & global] ->
-  int @ [< many read_write > dynamic] -> 'a @ [< global > 'm | dynamic] =
-  <fun>
+  int @ [< global many read_write > dynamic] ->
+  'a @ [< global > 'm | dynamic] = <fun>
 |}]
 
 let foo (x @ nonportable) =
@@ -208,7 +211,10 @@ let foo (y @ nonportable) =
 Line 5, characters 15-17:
 5 |   use_portable lg
                    ^^
-Error: This value is "nonportable" but is expected to be "portable".
+Error: This value is "nonportable"
+         because it contains (via constructor "::") the expression at line 3, characters 15-18
+         which is "nonportable".
+       However, the highlighted expression is expected to be "portable".
 |}]
 
 let foo (y @ portable) =
@@ -229,7 +235,10 @@ let foo (y @ nonportable) =
 Line 5, characters 15-17:
 5 |   use_portable lg
                    ^^
-Error: This value is "nonportable" but is expected to be "portable".
+Error: This value is "nonportable"
+         because it contains (via constructor "::") the expression at line 3, characters 15-18
+         which is "nonportable".
+       However, the highlighted expression is expected to be "portable".
 |}]
 
 (* SEQUENCING *)

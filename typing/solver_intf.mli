@@ -619,6 +619,10 @@ module type Hint = sig
     (** The hint to explain using [min] on the LHS of [submode]. *)
     val min : ('l * disallowed) t
 
+    (** The hint for a bound that must hold for every instance of a rigid
+        variable. *)
+    val rigid : ('l * 'r) t
+
     include Allow_disallow with type (_, _, 'd) sided = 'd t
   end
 end

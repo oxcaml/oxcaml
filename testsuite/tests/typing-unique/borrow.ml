@@ -605,7 +605,9 @@ Line 3, characters 2-29:
 3 |   local_returning (borrow_ x);
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This value is "local"
-       but is expected to be "local" to the parent region or "global"
+         because it is the result of the expression at line 1, characters 33-45
+         which is "local" to the parent region.
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
          because it escapes the borrow region at line 3, characters 2-29.
 |}]
 
@@ -752,7 +754,11 @@ Line 3, characters 10-24:
 3 |   let _ = id (borrow_ x) in
               ^^^^^^^^^^^^^^
 Error: This value is "local"
-       but is expected to be "local" to the parent region or "global"
+         because it is the result of the expression at line 1, characters 21-22
+         which is "local" to the parent region
+         because it is the parameter at line 1, characters 7-18
+         which is "local".
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
          because it escapes the borrow region at line 3, characters 10-24.
 |}]
 

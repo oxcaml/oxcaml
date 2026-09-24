@@ -292,7 +292,8 @@ Error: Signature mismatch:
          val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless
        The type "'a @ [< 'm > past('n) | local] -> 'a @ [> 'm | local]"
        is not compatible with the type "'a @ [< 'o & past('n)] -> 'a @ [> 'o]"
-       The return mode was expected to be "global" but is "local"
+       The return mode was expected to be "global"
+       because it has to hold for every instance of a mode variable but is "local"
 |}]
 
 module Fail_less_polymorphic_unique : module type of Base = struct
@@ -315,6 +316,7 @@ Error: Signature mismatch:
        The type "'a @ [< 'm & unique] -> 'a @ [> 'm]"
        is not compatible with the type "'a @ [< 'n] -> 'a @ [> 'n]"
        The argument mode was expected to be "unique" but is "aliased"
+       because it has to hold for every instance of a mode variable
 |}]
 
 module Fail_less_polymorphic_global : module type of Base = struct
@@ -338,6 +340,7 @@ Error: Signature mismatch:
        is not compatible with the type "'a @ [< 'n] -> 'a @ [> 'n]"
        The argument mode was expected to be "global"
        because it crosses with something but is "local"
+       because it has to hold for every instance of a mode variable
 |}]
 
 module Fail_less_polymorphic_portable : module type of Base = struct
@@ -360,6 +363,7 @@ Error: Signature mismatch:
        The type "'a @ [< 'm & portable] -> 'a @ [> 'm]"
        is not compatible with the type "'a @ [< 'n] -> 'a @ [> 'n]"
        The argument mode was expected to be "portable" but is "nonportable"
+       because it has to hold for every instance of a mode variable
 |}]
 
 module Producer = struct
@@ -419,7 +423,8 @@ Error: Signature mismatch:
        is not compatible with the type
          "'a @ [< past('q) & past('p) & global] ->
          ('b @ [< 'mm0 & past('o)] -> 'b @ [> 'mm0]) @ [> past('q)]"
-       The return mode was expected to be "global" but is "local"
+       The return mode was expected to be "global"
+       because it has to hold for every instance of a mode variable but is "local"
 |}]
 
 module Fail_local_escapes : sig
@@ -447,6 +452,10 @@ Error: Signature mismatch:
        is not compatible with the type "'a @ local -> 'a"
        The return mode was expected to be "global"
        because it crosses with something but is "local"
+       because it is the result of the expression at line 4, characters 12-13
+       which is "local" to the parent region
+       because it is the parameter at line 4, characters 8-9 which is "local"
+       because it crosses with something which is "local"
 |}]
 
 module Fail_arg_needs_portable : sig
