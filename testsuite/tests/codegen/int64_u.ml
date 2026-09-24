@@ -355,8 +355,8 @@ to_int:
 let int_roundtrip x = Int64_u.of_int x |> Int64_u.to_int
 [%%expect_asm X86_64{|
 int_roundtrip:
-  sarq  $1, %rax
-  leaq  1(%rax,%rax), %rax
+  andq  $-2, %rax
+  incq  %rax
   ret
 |}]
 
@@ -641,8 +641,7 @@ untag_masked_u16:
 let lsl_lsr x = Int64_u.shift_left (Int64_u.shift_right_logical x 3) 3
 [%%expect_asm X86_64{|
 lsl_lsr:
-  shrq  $3, %rax
-  salq  $3, %rax
+  andq  $-8, %rax
   ret
 |}]
 
@@ -651,24 +650,21 @@ let lsl_lsr_add x =
 [%%expect_asm X86_64{|
 lsl_lsr_add:
   addq  $7, %rax
-  shrq  $3, %rax
-  salq  $3, %rax
+  andq  $-8, %rax
   ret
 |}]
 
 let lsl_asr x = Int64_u.shift_left (Int64_u.shift_right x 3) 3
 [%%expect_asm X86_64{|
 lsl_asr:
-  sarq  $3, %rax
-  salq  $3, %rax
+  andq  $-8, %rax
   ret
 |}]
 
 let lsl_asr_one x = Int64_u.shift_left (Int64_u.shift_right x 1) 1
 [%%expect_asm X86_64{|
 lsl_asr_one:
-  sarq  $1, %rax
-  salq  $1, %rax
+  andq  $-2, %rax
   ret
 |}]
 
@@ -693,8 +689,7 @@ lsl_lsr_large:
 let and_asr_mask x = Int64_u.logand (Int64_u.shift_right x 48) #0xFFFFL
 [%%expect_asm X86_64{|
 and_asr_mask:
-  sarq  $48, %rax
-  andl  $65535, %eax
+  shrq  $48, %rax
   ret
 |}]
 
