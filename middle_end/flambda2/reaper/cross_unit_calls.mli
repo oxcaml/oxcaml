@@ -31,6 +31,7 @@
     reference escapes to [le_monde_exterieur]. *)
 val link :
   Global_flow_graph.graph ->
+  analysis_scope:Analysis_scope.t ->
   code_deps:Traverse_acc.code_dep Code_id.Map.t ->
   le_monde_exterieur:Symbol.t ->
   Traverse_acc.code_reference list ->

@@ -72,12 +72,12 @@ let answer_call_queries db (applications : Traverse_acc.Applications.t) result =
         })
     applications result
 
-let fixpoint (graph : Global_flow_graph.graph) ~applications =
+let fixpoint (graph : Global_flow_graph.graph) ~applications ~analysis_scope =
   let datalog = Global_flow_graph.to_datalog graph in
   let with_provenance = Flambda_features.debug_reaper "prov" in
   let stats = Datalog.Schedule.create_stats ~with_provenance datalog in
-  let db = PTA.perform_analysis datalog ~stats in
-  let (unboxing : UA.result) = UA.perform_analysis db ~stats in
+  let db = PTA.perform_analysis datalog ~stats ~analysis_scope in
+  let (unboxing : UA.result) = UA.perform_analysis db ~stats ~analysis_scope in
   if with_provenance || Flambda_features.debug_reaper "stats"
   then Format.eprintf "%a@." Datalog.Schedule.print_stats stats;
   if Flambda_features.debug_reaper "db"

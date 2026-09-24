@@ -271,7 +271,7 @@ let to_change_representation x = to_change_representation_tbl % [x]
 let lambda_lifting =
   Oxcaml_args.Extra_options.bool __LOC__ "reaper-lambda-lifting"
 
-let datalog_rules =
+let datalog_rules ~analysis_scope =
   saturate_in_order
     [ (* If any usage is possible, do not change the representation. Note that
          this rule will change in the future, when local value slots are
@@ -281,7 +281,7 @@ let datalog_rules =
          x); *)
       (let$ [x; field; y] = ["x"; "field"; "y"] in
        [ any_usage x;
-         unless1 Field.is_local field;
+         unless1 (Field.is_local ~analysis_scope) field;
          when1 Field.is_real_field field;
          constructor ~base:x field ~from:y ]
        ==> cannot_change_representation0 x);
@@ -291,7 +291,7 @@ let datalog_rules =
          the source at each point. *)
       (let$ [x; field; y; z] = ["x"; "field"; "y"; "z"] in
        [ any_usage x;
-         when1 Field.is_local field;
+         when1 (Field.is_local ~analysis_scope) field;
          reading_field field z;
          constructor ~base:x field ~from:y ]
        ==> cannot_change_representation0 x);
@@ -303,7 +303,7 @@ let datalog_rules =
        in
        [ rev_accessor ~base:usage field ~to_:v;
          has_usage v;
-         when1 Field.is_local field;
+         when1 (Field.is_local ~analysis_scope) field;
          sources usage source1;
          has_source source1;
          sources usage source2;
@@ -677,12 +677,14 @@ let cannot_change_calling_convention_query =
   let^? [x], [] = ["x"], [] in
   [cannot_change_calling_convention x]
 
-let cannot_change_calling_convention uses v =
+let cannot_change_calling_convention ~analysis_scope uses v =
   (not (Flambda_features.reaper_change_calling_conventions ()))
-  || (not (Current_unit.is_current (Code_id.get_compilation_unit v)))
+  || (not
+        (Analysis_scope.contains_unit analysis_scope
+           (Code_id.get_compilation_unit v)))
   || cannot_change_calling_convention_query [Code_id_or_name.code_id v] uses.db
 
-let perform_analysis0 db ~stats =
+let perform_analysis0 db ~stats ~analysis_scope =
   let db =
     Profile.record_call ~accumulate:true "compute_unboxing_decisions" (fun () ->
         (* We need to do this after [field_of_constructor_is_used] is computed,
@@ -711,7 +713,8 @@ let perform_analysis0 db ~stats =
         in
         List.fold_left
           (fun db rule -> Datalog.Schedule.run ~stats rule db)
-          db datalog_rules)
+          db
+          (datalog_rules ~analysis_scope))
   in
   let name_of_node =
     if Flambda_features.debug_reaper "nostamps"
@@ -764,9 +767,14 @@ let perform_analysis0 db ~stats =
                 PTA.get_direct_usages db
                   (Code_id_or_name.Map.singleton to_patch ())
               in
+              let compilation_unit =
+                Code_id_or_name.compilation_unit to_patch
+              in
               let fields =
                 mk_unboxed_fields ~has_to_be_unboxed
-                  ~mk:(fun kind name -> Variable.create name kind)
+                  ~mk:(fun kind name ->
+                    Variable.create_in_compilation_unit ~compilation_unit name
+                      kind)
                   db code_or_name
                   (PTA.get_fields db
                      (PTA.add_usages_through_function_slots
@@ -825,10 +833,12 @@ let perform_analysis0 db ~stats =
                 in
                 add_to_s (Block_representation (repr, !r + 1)) code_id_or_name
               | Set_of_closures l ->
+                let compilation_unit =
+                  Code_id_or_name.compilation_unit code_id_or_name
+                in
                 let mk kind name =
-                  Value_slot.create
-                    (Current_unit.get_cu_exn ())
-                    ~name ~is_always_immediate:false kind
+                  Value_slot.create compilation_unit ~name
+                    ~is_always_immediate:false kind
                 in
                 let fields =
                   PTA.get_fields_usage_of_constructors db
@@ -844,8 +854,7 @@ let perform_analysis0 db ~stats =
                   List.fold_left
                     (fun acc (fs, _) ->
                       Function_slot.Map.add fs
-                        (Function_slot.create
-                           (Current_unit.get_cu_exn ())
+                        (Function_slot.create compilation_unit
                            ~name:(Function_slot.name fs)
                            ~is_always_immediate:false Flambda_kind.value)
                         acc)
@@ -866,11 +875,11 @@ let perform_analysis0 db ~stats =
   in
   { db; unboxed_fields = unboxed; changed_representation }
 
-let perform_analysis db ~stats =
+let perform_analysis db ~stats ~analysis_scope =
   if
     Flambda_features.reaper_unbox ()
     && Flambda_features.reaper_change_calling_conventions ()
-  then perform_analysis0 db ~stats
+  then perform_analysis0 db ~stats ~analysis_scope
   else
     { db;
       unboxed_fields = Code_id_or_name.Map.empty;
@@ -882,7 +891,10 @@ type code_change =
     code_metadata : Code_metadata.t
   }
 
-type code_changes = code_change Code_id.Map.t
+type code_changes =
+  { analysis_scope : Analysis_scope.t;
+    changes : code_change Code_id.Map.t
+  }
 
 let arity_of_decisions params_decisions =
   let arity =
@@ -939,8 +951,8 @@ let get_arity_and_modes params_decisions =
            arity)),
     modes )
 
-let compute_code_changes uses ~rewrite_kind_with_subkind ~rewrite_result_types
-    ~code_deps =
+let compute_code_changes0 uses ~analysis_scope ~rewrite_kind_with_subkind
+    ~rewrite_result_types ~code_deps =
   let get_unboxed_fields cn =
     Code_id_or_name.Map.find_opt cn uses.unboxed_fields
   in
@@ -978,7 +990,7 @@ let compute_code_changes uses ~rewrite_kind_with_subkind ~rewrite_result_types
         else Code_metadata.with_is_my_closure_used false code_metadata
       in
       let calling_convention_change, code_metadata =
-        if cannot_change_calling_convention uses code_id
+        if cannot_change_calling_convention ~analysis_scope uses code_id
         then
           (* We still need to rewrite the kinds and subkinds of parameters and
              returns, as they could be poisoned. *)
@@ -1132,14 +1144,24 @@ let compute_code_changes uses ~rewrite_kind_with_subkind ~rewrite_result_types
       { calling_convention_change; code_metadata })
     code_deps
 
+let compute_code_changes uses ~analysis_scope ~rewrite_kind_with_subkind
+    ~rewrite_result_types ~code_deps =
+  { analysis_scope;
+    changes =
+      compute_code_changes0 uses ~analysis_scope ~rewrite_kind_with_subkind
+        ~rewrite_result_types ~code_deps
+  }
+
 let get_calling_convention_change t code_id =
-  match Code_id.Map.find_opt code_id t with
+  match Code_id.Map.find_opt code_id t.changes with
   | None ->
-    if Current_unit.is_current (Code_id.get_compilation_unit code_id)
+    if
+      Analysis_scope.contains_unit t.analysis_scope
+        (Code_id.get_compilation_unit code_id)
     then
       Misc.fatal_errorf
-        "[get_calling_convention_change]: code_id %a is in current unit but \
-         missing in code changes"
+        "[get_calling_convention_change]: code_id %a is in the analysis scope \
+         but missing in code changes"
         Code_id.print code_id
     else Not_changing_calling_convention
   | Some code_change -> code_change.calling_convention_change
@@ -1150,27 +1172,32 @@ let is_changing_calling_convention t code_id =
   | Changing_calling_convention _ -> true
 
 let get_code_metadata t code_id =
-  if not (Current_unit.is_current (Code_id.get_compilation_unit code_id))
+  if
+    not
+      (Analysis_scope.contains_unit t.analysis_scope
+         (Code_id.get_compilation_unit code_id))
   then
     Misc.fatal_errorf
-      "[get_code_metadata]: code_id %a is not from the current unit"
+      "[get_code_metadata]: code_id %a is not in the analysis scope"
       Code_id.print code_id;
-  match Code_id.Map.find_opt code_id t with
+  match Code_id.Map.find_opt code_id t.changes with
   | None ->
     Misc.fatal_errorf
-      "[get_code_metadata]: code_id %a is in current unit but missing in code \
-       changes"
+      "[get_code_metadata]: code_id %a is in the analysis scope but missing in \
+       code changes"
       Code_id.print code_id
   | Some code_change -> code_change.code_metadata
 
 let find_code_metadata t code_id =
-  match Code_id.Map.find_opt code_id t with
+  match Code_id.Map.find_opt code_id t.changes with
   | None ->
-    if Current_unit.is_current (Code_id.get_compilation_unit code_id)
+    if
+      Analysis_scope.contains_unit t.analysis_scope
+        (Code_id.get_compilation_unit code_id)
     then
       Misc.fatal_errorf
-        "[find_code_metadata]: code_id %a is in current unit but missing in \
-         code changes"
+        "[find_code_metadata]: code_id %a is in the analysis scope but missing \
+         in code changes"
         Code_id.print code_id
     else None
   | Some code_change -> Some code_change.code_metadata
