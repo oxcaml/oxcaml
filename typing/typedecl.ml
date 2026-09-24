@@ -3925,8 +3925,11 @@ let transl_type_decl env rec_flag sdecl_list =
     | Typedecl_separability.Error (loc, err) ->
         raise (Error (loc, Separability err))
   in
-  (* Check re-exportation, updating [type_jkind] from the manifest *)
+  (* Check re-exportation, updating [type_jkind] from the manifest. This can
+     refine parameters whose uses [check_constraints] has already checked, so
+     check them again. *)
   let decls = List.map2 (check_abbrev new_env) sdecl_list decls in
+  List.iter2 (check_constraints new_env) sdecl_list decls;
   let shapes = shape_declarations env decls in
   (* Compute the final environment with variance and immediacy *)
   let final_env = add_types_to_env ~shapes:(Some shapes) decls env in
