@@ -322,9 +322,15 @@ let cfg_profile to_cfg =
         := Profile.Counters.union !total_counters (cfg_block_counters block)
   in
   let counter_f x =
-    let cfg = to_cfg x in
-    Cfg.iter_blocks cfg ~f:block_f;
-    Profile.Counters.union !total_counters (whole_cfg_counters cfg)
+    (* Walking every block after every pass is expensive, so only do it when
+       counters were asked for, not merely because action tracing is on. *)
+    if not (List.mem `Counters !Clflags.profile_columns)
+    then Profile.Counters.create ()
+    else begin
+      let cfg = to_cfg x in
+      Cfg.iter_blocks cfg ~f:block_f;
+      Profile.Counters.union !total_counters (whole_cfg_counters cfg)
+    end
   in
   Profile.record_with_counters ~counter_f
 
