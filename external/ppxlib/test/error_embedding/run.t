@@ -24,6 +24,8 @@ Anything else will embed an error extension node
   $ ./extender.exe parsing_payload_extension.ml
   [%%ocaml.error "constant expected"]
   [%%ocaml.error "constant expected"]
+  [%%ocaml.error "Extension `export_string' was not translated"]
+  [%%ocaml.error "Extension `export_string' was not translated"]
   let _ = "string"
   let _ = [%export_string "string" "other"]
   let _ = [%export_string identifier]

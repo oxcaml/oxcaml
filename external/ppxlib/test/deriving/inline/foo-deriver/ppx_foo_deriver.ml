@@ -48,6 +48,7 @@ let add_deriver () =
                 ( Nonrecursive,
                   [
                     {
+                      pvb_is_poly = false;
                       pvb_pat =
                         {
                           ppat_desc = Ppat_any;
@@ -63,6 +64,8 @@ let add_deriver () =
                             expr
                               (Pexp_extension ({ loc; txt = "foo" }, PStr []));
                           ];
+                      pvb_constraint = None;
+                      pvb_modes = [];
                       pvb_attributes = [];
                       pvb_loc = loc;
                     };

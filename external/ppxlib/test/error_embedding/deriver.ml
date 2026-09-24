@@ -7,8 +7,11 @@ let derive_a_string ~ctxt (_rec_flag, _type_declarations) =
     pstr_value ~loc Nonrecursive
       [
         {
+          pvb_is_poly = false;
           pvb_pat = ppat_any ~loc;
           pvb_expr = estring ~loc "derived_string";
+          pvb_constraint = None;
+          pvb_modes = [];
           pvb_attributes = [];
           pvb_loc = loc;
         };

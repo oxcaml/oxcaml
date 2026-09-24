@@ -7,6 +7,7 @@ let accessor_impl (ld : label_declaration) =
   pstr_value ~loc Nonrecursive
     [
       {
+        pvb_is_poly = false;
         pvb_pat = ppat_var ~loc ld.pld_name;
         pvb_expr =
           pexp_fun ~loc Nolabel None
@@ -14,6 +15,8 @@ let accessor_impl (ld : label_declaration) =
             (pexp_field ~loc
                (pexp_ident ~loc { loc; txt = lident "x" })
                { loc; txt = lident ld.pld_name.txt });
+        pvb_constraint = None;
+        pvb_modes = [];
         pvb_attributes = [];
         pvb_loc = loc;
       };
@@ -23,11 +26,13 @@ let accessor_intf ~ptype_name (ld : label_declaration) =
   let loc = ld.pld_loc in
   psig_value ~loc
     {
+      pval_poly = false;
       pval_name = ld.pld_name;
       pval_type =
         ptyp_arrow ~loc Nolabel
           (ptyp_constr ~loc { loc; txt = lident ptype_name.txt } [])
           ld.pld_type;
+      pval_modalities = [];
       pval_attributes = [];
       pval_loc = loc;
       pval_prim = [];
