@@ -424,7 +424,9 @@ and copy_value_binding :
        Ast_500.Parsetree.pvb_attributes;
        Ast_500.Parsetree.pvb_loc;
      } ->
-
+  (* Ppxes may still produce the pre-[pvb_constraint] encoding (the constraint
+     spelled out on the pattern and expression); such bindings are resugared
+     below. *)
   let pvb_pat = copy_pattern pvb_pat in
   let pvb_expr = copy_expression pvb_expr in
   let pvb_constraint = Option.map copy_value_constraint pvb_constraint in
@@ -533,7 +535,17 @@ and copy_value_binding :
     | `Desugared_locally_abstract (p, ty_vars, typ, e) ->
         (p, e, with_constraint ty_vars typ)
     | `Desugared_locally_abstract_jkinded (inner_pat, canonical_poly) ->
-
+        (* [Pvc_constraint.locally_abstract_univars] can't carry jkind
+           annotations, so this binding has to keep its desugared encoding.
+           We canonicalise the pattern's annotation to be exactly the tree
+           that the compiler's [Pprintast.is_desugared_gadt] computes from
+           the expression (it compares the two copies with [=], locations
+           included), so that it recognises the binding and prints it as
+           [let f : type (a : k). ... = ...], which reparses to this same
+           encoding. Once [is_desugared_gadt] compares the two copies of the
+           annotation modulo locations, this canonicalisation can go: keep the
+           (location-insensitive) detection above, but pass the binding through
+           unchanged here, i.e. [(pvb_pat, pvb_expr, None)]. *)
         let pat =
           { pvb_pat with
             Ast_999.Parsetree.ppat_desc =
@@ -1058,7 +1070,8 @@ and copy_module_expr_desc :
       Ast_999.Parsetree.Pmod_unpack (copy_expression x0)
   | Ast_500.Parsetree.Pmod_extension x0 ->
       Ast_999.Parsetree.Pmod_extension (copy_extension x0)
-  | Ast_500.Parsetree.Pmod_hole -> Ast_999.Parsetree.Pmod_hole
+  | Ast_500.Parsetree.Pmod_hole ->
+      Ast_999.Parsetree.Pmod_hole
   | Ast_500.Parsetree.Pmod_instance x0 ->
       Ast_999.Parsetree.Pmod_instance (copy_module_instance x0)
 

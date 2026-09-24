@@ -132,6 +132,7 @@ module Value_binding : sig
     :  loc:Location.t
     -> pat:pattern
     -> expr:expression
+    -> constraint_:value_constraint option
     -> modes:Modes.t
     -> value_binding
 end
@@ -504,6 +505,7 @@ module Module_expr_desc : sig
     | Pmod_structure of structure
     | Pmod_functor of functor_parameter * module_expr
     | Pmod_apply of module_expr * module_expr
+    | Pmod_apply_unit of module_expr
     | Pmod_constraint of module_expr * module_type option * Modes.t
     | Pmod_unpack of expression
     | Pmod_extension of extension
