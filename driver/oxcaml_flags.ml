@@ -191,7 +191,6 @@ module Flambda2 = struct
   module Default = struct
     let classic_mode = false
     let join_points = false
-    let unbox_along_intra_function_control_flow = true
     let backend_cse_at_toplevel = false
     let cse_depth = 2
     let join_depth = 5
@@ -214,7 +213,6 @@ module Flambda2 = struct
   type flags = {
     classic_mode : bool;
     join_points : bool;
-    unbox_along_intra_function_control_flow : bool;
     backend_cse_at_toplevel : bool;
     cse_depth : int;
     join_depth : int;
@@ -235,7 +233,6 @@ module Flambda2 = struct
   let default = {
     classic_mode = Default.classic_mode;
     join_points = Default.join_points;
-    unbox_along_intra_function_control_flow = Default.unbox_along_intra_function_control_flow;
     backend_cse_at_toplevel = Default.backend_cse_at_toplevel;
     cse_depth = Default.cse_depth;
     join_depth = Default.join_depth;
@@ -264,7 +261,6 @@ module Flambda2 = struct
     default with
     cse_depth = 2;
     join_points = true;
-    unbox_along_intra_function_control_flow = true;
     backend_cse_at_toplevel = false;
   }
 
@@ -284,7 +280,6 @@ module Flambda2 = struct
 
   let classic_mode = ref Default
   let join_points = ref Default
-  let unbox_along_intra_function_control_flow = ref Default
   let backend_cse_at_toplevel = ref Default
   let cse_depth = ref Default
   let join_depth = ref Default

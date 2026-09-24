@@ -67,13 +67,6 @@ val add_function_slot_offset : t -> Function_slot.t -> function_slot_info -> t
 (** Record the assignment of the given offset to the given value slot *)
 val add_value_slot_offset : t -> Value_slot.t -> value_slot_info -> t
 
-val map_function_slot_offsets :
-  t -> (Function_slot.t -> function_slot_info -> 'a) -> 'a Function_slot.Map.t
-
-(** Build maps from the underlying data *)
-val map_value_slot_offsets :
-  t -> (Value_slot.t -> value_slot_info -> 'a) -> 'a Value_slot.Map.t
-
 (** Take the offsets read from a cmx file and add them to the current state *)
 val import_offsets : t -> unit
 
