@@ -408,6 +408,12 @@ let available_regs ~stack_slots ~f x =
   then x
   else f x
 
+external gettimeofday : unit -> (float[@unboxed])
+  = "caml_hack_gettimeofday" "caml_hack_gettimeofday_unboxed"
+[@@noalloc]
+
+let _gettimeofday = gettimeofday
+
 let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
   let module CSE = Cfg_cse.Cse_generic (CSE) in
   cfg_with_layout
@@ -586,10 +592,11 @@ let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
   ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg
        (if !Oxcaml_flags.use_ssa then "After SSA" else "After selection")
   ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)
-  ++ Profile.record ~accumulate:true "cfg" (fun cfg_with_layout ->
-      if !Clflags.llvm_backend
-      then compile_via_llvm ~ppf_dump ~funcnames cfg_with_layout
-      else compile_via_linear ~ppf_dump ~funcnames fd_cmm cfg_with_layout)
+  ++ Profile.record ~accumulate:true ~cheap:gettimeofday "cfg"
+       (fun cfg_with_layout ->
+         if !Clflags.llvm_backend
+         then compile_via_llvm ~ppf_dump ~funcnames cfg_with_layout
+         else compile_via_linear ~ppf_dump ~funcnames fd_cmm cfg_with_layout)
 
 let compile_data dl = dl ++ save_data ++ emit_data
 

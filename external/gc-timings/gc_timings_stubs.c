@@ -1,6 +1,10 @@
+#define CAML_INTERNALS
 #include <caml/memory.h>
 #include <caml/alloc.h>
 #include <caml/gc.h>
+
+#include <caml/misc.h>
+#include <sys/time.h>
 
 #ifdef _WIN32
 #include <wtypes.h>
@@ -97,4 +101,16 @@ CAMLprim value caml_timing_gc_time_spent_minor(value unit) {
 CAMLprim value caml_timing_gc_time_spent_major(value unit) {
   CAMLparam1 (unit);
   CAMLreturn (caml_copy_double (caml_timing_major_gc));
+}
+
+double caml_hack_gettimeofday_unboxed(value unit)
+{
+  struct timeval tp;
+  gettimeofday(&tp, NULL);
+  return ((double) tp.tv_sec + (double) tp.tv_usec / USEC_PER_SEC);
+}
+
+CAMLprim value caml_hack_gettimeofday(value unit)
+{
+  return caml_copy_double(caml_hack_gettimeofday_unboxed(unit));
 }
