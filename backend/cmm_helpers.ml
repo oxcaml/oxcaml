@@ -523,6 +523,16 @@ let[@inline] is_constant = function
   | Cconst_int _ | Cconst_natint _ -> true
   | _ -> false
 
+let[@inline] get_const = function
+  | Cconst_int (i, _) -> Some (Nativeint.of_int i)
+  | Cconst_natint (i, _) -> Some i
+  | _ -> None
+
+let[@inline] const_exn = function
+  | Cconst_int (i, _) -> Nativeint.of_int i
+  | Cconst_natint (i, _) -> i
+  | _ -> Misc.fatal_error "const_exn: not a constant"
+
 let rec add_const c n dbg =
   if n = 0
   then c
@@ -747,16 +757,6 @@ let rec ignore_low_bit_int' arg =
 let ignore_low_bit_int =
   check_equal_1 "ignore_low_bit_int" ignore_low_bit_int
     ~engine:ignore_low_bit_int'
-
-let[@inline] get_const = function
-  | Cconst_int (i, _) -> Some (Nativeint.of_int i)
-  | Cconst_natint (i, _) -> Some i
-  | _ -> None
-
-let[@inline] const_exn = function
-  | Cconst_int (i, _) -> Nativeint.of_int i
-  | Cconst_natint (i, _) -> i
-  | _ -> Misc.fatal_error "const_exn: not a constant"
 
 let replace x ~with_ =
   match x with
