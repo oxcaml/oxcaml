@@ -1426,6 +1426,12 @@ val allocate_uninitialized_array :
   Debuginfo.t ->
   expression option
 
+(** Allocate a string of the given length, leaving its contents uninitialized,
+    or return [None] if the string is too long to be allocated inline or the
+    length is negative. *)
+val allocate_uninitialized_string :
+  Cmm.Alloc_mode.t -> length:int -> Debuginfo.t -> expression option
+
 (** Compute the length of an unboxed float32 array. *)
 val unboxed_float32_array_length : expression -> Debuginfo.t -> expression
 

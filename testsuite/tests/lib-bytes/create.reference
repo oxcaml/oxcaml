@@ -1,0 +1,24 @@
+Bytes.create__stack, length 0: Bytes.length 0, tag 252, size 1, padding "\000\000\000\000\000\000\000\007", words 2, stack true
+Bytes.create__stack, length 1: Bytes.length 1, tag 252, size 1, padding "\000\000\000\000\000\000\006", words 2, stack true
+Bytes.create__stack, length 5: Bytes.length 5, tag 252, size 1, padding "\000\000\002", words 2, stack true
+Bytes.create__stack, length 7: Bytes.length 7, tag 252, size 1, padding "\000", words 2, stack true
+Bytes.create__stack, length 8: Bytes.length 8, tag 252, size 2, padding "\000\000\000\000\000\000\000\007", words 3, stack true
+Bytes.create__stack, length 9: Bytes.length 9, tag 252, size 2, padding "\000\000\000\000\000\000\006", words 3, stack true
+Bytes.create__stack, length 2047: Bytes.length 2047, tag 252, size 256, padding "\000", words 257, stack true
+Bytes.create__stack, length 2048: Bytes.length 2048, tag 252, size 257, padding "\000\000\000\000\000\000\000\007", words 258, stack true
+Bytes.create, length 0: Bytes.length 0, tag 252, size 1, padding "\000\000\000\000\000\000\000\007", words 0, stack false
+Bytes.create, length 1: Bytes.length 1, tag 252, size 1, padding "\000\000\000\000\000\000\006", words 0, stack false
+Bytes.create, length 5: Bytes.length 5, tag 252, size 1, padding "\000\000\002", words 0, stack false
+Bytes.create, length 7: Bytes.length 7, tag 252, size 1, padding "\000", words 0, stack false
+Bytes.create, length 8: Bytes.length 8, tag 252, size 2, padding "\000\000\000\000\000\000\000\007", words 0, stack false
+Bytes.create, length 9: Bytes.length 9, tag 252, size 2, padding "\000\000\000\000\000\000\006", words 0, stack false
+Bytes.create, length 2047: Bytes.length 2047, tag 252, size 256, padding "\000", words 0, stack false
+Bytes.create, length 2048: Bytes.length 2048, tag 252, size 257, padding "\000\000\000\000\000\000\000\007", words 0, stack false
+Bytes.create__stack: checked known lengths 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 2047
+Bytes.create: checked known lengths 0, 5, 8, 2047
+caml_alloc_local_string: checked known lengths 0, 5, 2047
+caml_alloc_string: checked known lengths 0, 5, 2047
+Bytes.create, known length -1: Invalid_argument "Bytes.create"
+Bytes.create, known length max_int: Invalid_argument "Bytes.create"
+Bytes.create__stack, known length -1: Invalid_argument "Bytes.create"
+Bytes.create__stack, known length min_int: Invalid_argument "Bytes.create"

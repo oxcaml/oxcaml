@@ -5767,6 +5767,18 @@ let allocate_unboxed_vec512_array ~elements mode dbg =
     ~tag:Unboxed_or_untagged_array_tags.unboxed_vec512_array_tag ~elements mode
     dbg
 
+let make_uninitialized_alloc ~(mode : Cmm.Alloc_mode.t) ~block_kind
+    ~alloc_block_kind dbg ~tag ~wosize =
+  let header =
+    match mode with
+    | Heap -> block_header ~block_kind tag wosize
+    | Local -> local_block_header ~block_kind tag wosize
+  in
+  Cop
+    ( Calloc_uninitialized { mode; wosize; alloc_block_kind },
+      [Cconst_natint (header, dbg)],
+      dbg )
+
 type unscanned_array_layout =
   | Float_array
   | Words_per_element of
@@ -5820,16 +5832,38 @@ let allocate_uninitialized_array (mode : Cmm.Alloc_mode.t) layout
     else if wosize > Config.max_young_wosize
     then None
     else
-      let header =
-        match mode with
-        | Heap -> block_header ~block_kind tag wosize
-        | Local -> local_block_header ~block_kind tag wosize
-      in
       Some
-        (Cop
-           ( Calloc_uninitialized { mode; wosize; alloc_block_kind },
-             [Cconst_natint (header, dbg)],
-             dbg ))
+        (make_uninitialized_alloc ~mode ~block_kind ~alloc_block_kind dbg ~tag
+           ~wosize)
+
+let allocate_uninitialized_string (mode : Cmm.Alloc_mode.t) ~length dbg =
+  if length < 0 || length >= Config.max_young_wosize * size_addr
+  then
+    (* As for arrays, strings of more than [Config.max_young_wosize] words are
+       left to the runtime, and so are negative lengths, for which
+       [caml_create_bytes] raises an exception. *)
+    None
+  else
+    let wosize = (length + size_addr) / size_addr in
+    (* As in [caml_alloc_string], the last word is zero apart from its final
+       byte, which counts the bytes between it and the end of the string. *)
+    let last_word =
+      let padding = Nativeint.of_int ((wosize * size_addr) - 1 - length) in
+      if big_endian
+      then padding
+      else Nativeint.shift_left padding ((size_addr - 1) * 8)
+    in
+    let allocation =
+      make_uninitialized_alloc ~mode ~block_kind:Regular_block
+        ~alloc_block_kind:Alloc_block_kind_other dbg ~tag:Obj.string_tag ~wosize
+    in
+    Some
+      (bind "str" allocation (fun str ->
+           Csequence
+             ( store ~dbg Word_int Initialization
+                 ~addr:(field_address str (wosize - 1) dbg)
+                 ~new_value:(natint_const_untagged dbg last_word),
+               str )))
 
 (* Drop internal optional arguments from exported interface *)
 let block_header x y = block_header x y
