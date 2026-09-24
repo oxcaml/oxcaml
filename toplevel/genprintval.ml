@@ -323,7 +323,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
     type outval_record_rep =
       | Outval_record_boxed
       | Outval_record_unboxed
-      | Outval_record_mixed_block of Lambda.mixed_block_shape
+      | Outval_record_mixed_block of unit Mixed_block_shape.t
+      | Outval_record_immediate (* all fields are void *)
 
     type printing_jkind =
       | Print_as_value (* can interpret as a value and print *)
@@ -344,6 +345,105 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
     let print_sort_option : Jkind.Sort.Const.t option -> _ = function
       | None -> Print_as "<unknown>"
       | Some sort -> print_sort sort
+
+    let sorts_of_types env tys =
+      Misc.Stdlib.Array.all_somes
+        (Array.map
+           (fun ty ->
+              Option.map (fun s -> s, ty)
+                (Jkind.sort_option_of_jkind env (Ctype.type_jkind env ty)))
+           tys)
+
+    let sorts_of_labels env lbl_list type_params ty_list () =
+      let label_params_and_types, record_params =
+        Ctype.instance_label_declarations ~fixed:false
+          (lbl_list |> Array.of_list) ~params:type_params
+      in
+      List.iter2 (Ctype.unify env) record_params
+        (Ctype.instance_list ty_list);
+      sorts_of_types env (Array.map snd label_params_and_types)
+
+    let outval_mixed_block_rep shape =
+      (* Mixed records are only represented as mixed blocks in native code. *)
+      if not !Clflags.native_code then Some Outval_record_boxed
+      else if Lambda.mixed_block_shape_has_splices shape then None
+      else
+        Some
+          (Outval_record_mixed_block
+             (Mixed_block_shape.of_mixed_block_elements shape
+                ~print_locality:(fun ppf () -> Format.fprintf ppf "()")))
+
+    (* The position of the first field: an extension constructor's block
+       starts with its extension slot. *)
+    let first_field_pos : Types.variant_representation -> int = function
+      | Variant_extensible -> 1
+      | Variant_boxed _ | Variant_unboxed | Variant_with_null -> 0
+
+    let outval_rep_of_constructor_shape
+          (shape : Lambda.constructor_representation)
+          (vrep : Types.variant_representation) =
+      match shape, vrep with
+      | Constructor_mixed _, (Variant_unboxed | Variant_with_null) ->
+          Misc.fatal_error "a 'mixed' unboxed constructor is impossible"
+      | Constructor_uniform_value, (Variant_unboxed | Variant_with_null) ->
+          Some Outval_record_unboxed
+      | Constructor_uniform_value, (Variant_boxed _ | Variant_extensible) ->
+          Some Outval_record_boxed
+      | Constructor_mixed shape, (Variant_boxed _ | Variant_extensible) ->
+          outval_mixed_block_rep shape
+      | Constructor_immediate_all_void, _ -> Some Outval_record_immediate
+
+    (* Translate the representation just to be able to print it. [None] if
+       the fields' sorts and thus the block's layout are unknown. *)
+    let outval_rep_of_constructor env ~sorts_and_types
+          (shape : Types.constructor_representation)
+          (vrep : Types.variant_representation) =
+      let shape : Types.constructor_representation option =
+        match shape, vrep with
+        | Constructor_undetermined, Variant_unboxed ->
+            (* As in [Typedecl.instance_record_representation]: the shape of
+               an unboxed constructor is always [Constructor_uniform_value]. *)
+            Some Constructor_uniform_value
+        | Constructor_undetermined,
+          (Variant_boxed _ | Variant_extensible | Variant_with_null) ->
+            Option.map (fun l -> Constructor_variable l) (sorts_and_types ())
+        | Constructor_variable _, _ ->
+            Misc.fatal_error "variable constructor representation"
+        | (Constructor_uniform_value | Constructor_mixed _
+          | Constructor_immediate_all_void), _ ->
+            Some shape
+      in
+      Option.bind shape (fun shape ->
+        let shape =
+          Typeopt.transl_constructor_representation env Location.none shape
+        in
+        Option.map
+          (fun rep -> rep, first_field_pos vrep)
+          (outval_rep_of_constructor_shape shape vrep))
+
+    let outval_rep_of_record env ~sorts_and_types
+          (rep : Types.record_representation) =
+      let transl rep =
+        match Typeopt.transl_record_representation env Location.none rep with
+        | Record_unboxed -> Some (Outval_record_unboxed, 0)
+        | Record_boxed | Record_float | Record_ufloat ->
+            Some (Outval_record_boxed, 0)
+        | Record_mixed shape ->
+            Option.map (fun rep -> rep, 0) (outval_mixed_block_rep shape)
+        | Record_inlined _ ->
+            Misc.fatal_error "inlined record representation"
+      in
+      match rep with
+      | Record_inlined (_, shape, vrep) ->
+          outval_rep_of_constructor env ~sorts_and_types shape vrep
+      | Record_undetermined ->
+          Option.bind (sorts_and_types ())
+            (fun l -> transl (Record_variable l))
+      | Record_variable _ ->
+          Misc.fatal_error "variable record representation"
+      | (Record_unboxed | Record_boxed | Record_float | Record_ufloat
+        | Record_mixed _ | Record_dummy _) as rep ->
+          transl rep
 
     let outval_of_value max_steps max_depth check_depth env obj lpoly ty =
       if not @@ Types.Lpoly.is_empty_exn lpoly then Oval_stuff "<lpoly>"
@@ -637,7 +737,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
           else
             true, O.obj obj
         in
-        let analyse {cd_id;cd_args;cd_res} =
+        let analyse cstr {cd_id;cd_args;cd_res} =
           let type_params =
             match cd_res with
               Some t ->
@@ -647,12 +747,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                 | _ -> assert false end
             | None -> type_params
           in
-          let unbx =
-            match rep with
-            | Variant_unboxed -> true
-            | Variant_with_null when tag = -1 -> false
-            | Variant_with_null -> true
-            | Variant_boxed _ | Variant_extensible -> false
+          let outval_rep ~sorts_and_types =
+            outval_rep_of_constructor env ~sorts_and_types cstr.cstr_shape rep
           in
           match cd_args with
           | Cstr_tuple l ->
@@ -677,118 +773,73 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                      (ty_arg, print_sort_option sort)
                   ) l ty_args
               in
-              tree_of_constr_with_args (tree_of_constr env path)
-                (Ident.name cd_id) false 0 depth obj
-                ty_args unbx
+              let sorts_and_types () =
+                sorts_of_types env (Array.of_list (List.map fst ty_args))
+              in
+              begin match outval_rep ~sorts_and_types with
+              | None -> Oval_stuff "<abstr>"
+              | Some (rep, pos) ->
+                  tree_of_constr_with_args (tree_of_constr env path)
+                    (Ident.name cd_id) pos depth obj ty_args rep
+              end
           | Cstr_record lbls ->
-              let rep =
-                if unbx then
-                  Outval_record_unboxed
-                else
-                  Outval_record_boxed
+              let sorts_and_types =
+                sorts_of_labels env lbls type_params ty_list
               in
-              let r =
-                tree_of_record_fields depth
-                  env path type_params ty_list
-                  lbls 0 obj rep
-              in
-              Oval_constr(tree_of_constr env path (Ident.name cd_id),
-                          [ r ])
-      in
-      try
-        (* CR dkalinichenko: this is broken for unboxed variants:
-            unless the tag of the inner value just happens to be 0,
-            [Datarepr.find_constr_by_tag] will fail. *)
-        let {cstr_uid} =
-          Datarepr.find_constr_by_tag ~constant tag cstrs
+              begin match outval_rep ~sorts_and_types with
+              | None -> Oval_stuff "<abstr>"
+              | Some (rep, pos) ->
+                  let r =
+                    tree_of_record_fields depth
+                      env path type_params ty_list
+                      lbls pos obj rep
+                  in
+                  Oval_constr(tree_of_constr env path (Ident.name cd_id),
+                              [ r ])
+              end
         in
-        List.find (fun {cd_uid} -> Uid.equal cd_uid cstr_uid)
-          constr_list
-        |> analyse
-      with
-      | Datarepr.Constr_not_found | Not_found ->
-        match rep with
-        | Variant_with_null ->
-          (match
-             Datarepr.find_variant_with_null_payload constr_list
-           with
-           | Some { payload_cstr; _ } -> analyse payload_cstr
-           | None -> Oval_stuff "<unknown constructor>")
-        | _ -> Oval_stuff "<unknown constructor>"
+        let cstr =
+          (* CR dkalinichenko: this is broken for unboxed variants:
+              unless the tag of the inner value just happens to be 0,
+              [Datarepr.find_constr_by_tag] will fail. *)
+          match Datarepr.find_constr_by_tag ~constant tag cstrs with
+          | cstr -> Some cstr
+          | exception Datarepr.Constr_not_found ->
+            match rep with
+            | Variant_with_null ->
+              begin match
+                Datarepr.find_variant_with_null_payload constr_list
+              with
+              | Some { payload_cstr; _ } ->
+                  List.find_map
+                    (fun ((cstr, _locks), _use) ->
+                       if Uid.equal cstr.cstr_uid payload_cstr.cd_uid
+                       then Some cstr else None)
+                    cstrs
+              | None -> None
+              end
+            | _ -> None
+        in
+        let decl_of {cstr_uid; _} =
+          List.find_opt (fun {cd_uid; _} -> Uid.equal cd_uid cstr_uid)
+            constr_list
+        in
+        match Option.bind cstr (fun cstr ->
+          Option.map (fun cd -> cstr, cd) (decl_of cstr))
+        with
+        | None -> Oval_stuff "<unknown constructor>"
+        | Some (cstr, cd) -> analyse cstr cd
 
       and tree_of_record depth path type_params ty_list obj lbl_list rep =
         match check_depth depth obj ty with
         | Some x -> x
         | None ->
-            let sorts_and_types () =
-              let label_params_and_types, record_params =
-                Ctype.instance_label_declarations ~fixed:false
-                  (lbl_list |> Array.of_list) ~params:type_params
-              in
-              List.iter2 (Ctype.unify env) record_params
-                (Ctype.instance_list ty_list);
-              let try_map_all a f =
-                Misc.Stdlib.Array.all_somes (Array.map f a)
-              in
-              let with_sort ty =
-                Option.map (fun s -> s, ty)
-                  (Jkind.sort_option_of_jkind env (Ctype.type_jkind env ty))
-              in
-              try_map_all label_params_and_types (fun (_, ty) -> with_sort ty)
+            let sorts_and_types =
+              sorts_of_labels env lbl_list type_params ty_list
             in
-            (* Translate the representation just to be able to print it *)
-            let transl rep =
-              Typeopt.transl_record_representation env Location.none rep
-            in
-            let rep =
-              match rep with
-              | Record_undetermined ->
-                Option.map
-                  (fun l -> transl (Record_variable l))
-                  (sorts_and_types ())
-              | Record_inlined (tag, Constructor_undetermined, vrep) ->
-                Option.map
-                  (fun l ->
-                     transl
-                       (Record_inlined (tag, Constructor_variable l, vrep)))
-                  (sorts_and_types ())
-              | Record_variable _
-              | Record_inlined (_, Constructor_variable _, _) ->
-                  Misc.fatal_error "variable record representation"
-              | _ -> Some (transl rep)
-            in
-            match rep with
+            match outval_rep_of_record env ~sorts_and_types rep with
             | None -> Oval_stuff "<abstr>"
-            | Some rep ->
-            let pos =
-              match rep with
-              | Record_inlined (_, _, Variant_extensible) -> 1
-              | _ -> 0
-            in
-            let rep =
-              match rep with
-              | Record_inlined (_, Constructor_mixed _,
-                                Variant_unboxed) ->
-                  Misc.fatal_error
-                    "a 'mixed' unboxed record is impossible"
-              | Record_inlined (_, Constructor_uniform_value,
-                                Variant_unboxed)
-              | Record_unboxed
-                  -> Outval_record_unboxed
-              | Record_boxed | Record_float | Record_ufloat
-              | Record_inlined (_, Constructor_uniform_value, _)
-                  -> Outval_record_boxed
-              | Record_inlined (_, Constructor_mixed mixed, _)
-              | Record_mixed mixed
-                  ->
-                    (* Mixed records are only represented as
-                       mixed blocks in native code. *)
-                    if !Clflags.native_code
-                    then Outval_record_mixed_block mixed
-                    else Outval_record_boxed
-              | Record_inlined (_, Constructor_immediate_all_void, _) ->
-                  Misc.fatal_error "immediate record representation"
-            in
+            | Some (rep, pos) ->
             tree_of_record_fields depth
               env path type_params ty_list
               lbl_list pos obj rep
@@ -812,40 +863,42 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                 else tree_of_name name
               and v =
                 if is_void then Oval_stuff "<void>"
-                else match rep with
-                  | Outval_record_unboxed -> tree_of_val (depth - 1) obj ty_arg
-                  | Outval_record_boxed ->
-                      let fld =
-                        if O.tag obj = O.double_array_tag then
-                          O.repr (O.double_field obj pos)
-                        else
-                          O.field obj pos
-                      in
-                      nest tree_of_val (depth - 1) fld ty_arg
-                  | Outval_record_mixed_block shape ->
-                      let fld =
-                        let of_element
-                            : unit Lambda.mixed_block_element -> _ = function
-                        | Value _ -> `Continue (O.field obj pos)
-                        | Float_boxed () | Float64 ->
-                            `Continue (O.repr (O.double_field obj pos))
-                        | Product [||] ->
-                            `Stop (Oval_stuff "<void>")
-                        | Float32 | Bits8 | Bits16 | Untagged_immediate
-                        | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask
-                        | Word | Product _ | Splice_variable _ ->
-                            `Stop (Oval_stuff "<abstr>")
-                        in
-                        of_element shape.(pos)
-                      in
-                      match fld with
-                      | `Continue fld ->
-                          nest tree_of_val (depth - 1) fld ty_arg
-                      | `Stop result -> result
+                else tree_of_field rep obj pos depth ty_arg
               in
               (lid, v) :: tree_of_fields false (pos + 1) remainder
         in
         Oval_record (tree_of_fields (pos = 0) pos lbl_list)
+
+      and tree_of_field rep obj pos depth ty_arg =
+        let nested fld = nest tree_of_val (depth - 1) fld ty_arg in
+        match rep with
+        | Outval_record_unboxed -> tree_of_val (depth - 1) obj ty_arg
+        | Outval_record_immediate -> Oval_stuff "<void>"
+        | Outval_record_boxed ->
+            nested
+              (if O.tag obj = O.double_array_tag then
+                 O.repr (O.double_field obj pos)
+               else
+                 O.field obj pos)
+        | Outval_record_mixed_block shape ->
+            (* Native code stores a mixed block's value fields before its
+               flat ones, so [pos] is not necessarily the runtime index. *)
+            match
+              Mixed_block_shape.lookup_path_producing_new_indexes shape [pos]
+            with
+            | [] -> Oval_stuff "<void>"
+            | [i] ->
+                begin match
+                  (Mixed_block_shape.flattened_reordered_shape shape).(i)
+                with
+                | Value _ -> nested (O.field obj i)
+                | Float_boxed () | Float64 ->
+                    nested (O.repr (O.double_field obj i))
+                | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256
+                | Vec512 | Mask | Word | Untagged_immediate ->
+                    Oval_stuff "<abstr>"
+                end
+            | _ :: _ :: _ -> Oval_stuff "<abstr>"
 
       (* CR lmaurer: *Pretty please* let's cut down on the duplication here. *)
       and tree_of_record_unboxed_product_fields depth env path type_params
@@ -911,30 +964,20 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
       (* CR layouts v4: When we allow other jkinds in tuples, this should be
          generalized to take a list or array of jkinds, rather than just
          pairing each type with a bool indicating whether it is void *)
-      and tree_of_val_list start depth obj ty_list =
+      and tree_of_val_list start depth obj ty_list rep =
         let rec tree_list i = function
           | [] -> []
           | (_, Print_as msg) :: ty_list ->
               Oval_stuff msg :: tree_list (i + 1) ty_list
           | (ty, Print_as_value) :: ty_list ->
-              let tree = nest tree_of_val (depth - 1) (O.field obj i) ty in
-              tree :: tree_list (i + 1) ty_list
+              tree_of_field rep obj i depth ty :: tree_list (i + 1) ty_list
         in
       tree_list start ty_list
 
       and tree_of_constr_with_args
-             tree_of_cstr cstr_name inlined start depth obj ty_args unboxed =
-        let lid = tree_of_cstr cstr_name in
-        let args =
-          if inlined || unboxed then
-            match ty_args with
-            | [_,Print_as msg] -> [ Oval_stuff msg ]
-            | [ty,Print_as_value] -> [ tree_of_val (depth - 1) obj ty ]
-            | _ -> assert false
-          else
-            tree_of_val_list start depth obj ty_args
-        in
-        Oval_constr (lid, args)
+             tree_of_cstr cstr_name start depth obj ty_args rep =
+        Oval_constr
+          (tree_of_cstr cstr_name, tree_of_val_list start depth obj ty_args rep)
 
     and tree_of_extension type_path ty_list depth bucket =
       let slot =
@@ -974,10 +1017,12 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
             (arg, print_sort_option ca_sort))
             cstr.cstr_args args
         in
-        tree_of_constr_with_args
-           tree_of_name name (cstr.cstr_inlined <> None)
-           1 depth bucket
-           args false
+        let rep =
+          match cstr.cstr_inlined with
+          | Some _ -> Outval_record_unboxed (* the argument is the block *)
+          | None -> Outval_record_boxed
+        in
+        tree_of_constr_with_args tree_of_name name 1 depth bucket args rep
       with Not_found | EVP.Error ->
         match check_depth depth bucket ty with
           Some x -> x
