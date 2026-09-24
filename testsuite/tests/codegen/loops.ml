@@ -15,9 +15,8 @@
 open Intrinsics
 
 
-(* CR ttebbi: What could have been a nice dense loop got
-   interrupted by the loop exit path. In addition, we should do
-   loop rotation to remove the unconditional jump. *)
+(* CR ttebbi: We should do loop rotation to remove the unconditional
+   jump. *)
 let loop_code_layout n =
   let[@cold] cold () = () in
   let sum = ref 0 in
@@ -33,17 +32,17 @@ loop_code_layout:
 .L0:
   leaq  -1(%rbx,%rax), %rbx
   cmpq  $1, %rax
-  jne   .L2
+  je    .L1
+  addq  $-2, %rax
+  jmp   .L0
+.L1:
   movq  %rbx, (%rsp)
   movl  $1, %eax
   call  camlTOP2__cold_1_4_code@PLT
-.L1:
+.L2:
   movq  (%rsp), %rax
   addq  $8, %rsp
   ret
-.L2:
-  addq  $-2, %rax
-  jmp   .L0
 
 loop_code_layout.cold:
   movl  $1, %eax

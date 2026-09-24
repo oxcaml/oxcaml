@@ -56,6 +56,14 @@ val demote_exn_handler : t -> Continuation.t -> t
 
 val demoted_exn_handlers : t -> Continuation.Set.t
 
+(** Mark the continuation whose handler is currently being simplified as cold,
+    because that handler (unconditionally) calls a cold function. Has no effect
+    at the toplevel of a function body: there is no code to lay out differently
+    there. *)
+val mark_current_continuation_as_cold : t -> t
+
+val continuation_is_cold : t -> Continuation.t -> bool
+
 val code_age_relation : t -> Code_age_relation.t
 
 val with_code_age_relation : t -> code_age_relation:Code_age_relation.t -> t

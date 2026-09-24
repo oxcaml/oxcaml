@@ -71,3 +71,86 @@ get_mid:
   popq  %r11
   jmp   *%r11
 |}]
+
+(* A call to a [@cold] function marks the call site as cold, even when the
+   function is inlined (here, to nothing): the [then] branch, which is laid out
+   first in [without_cold_call], is sunk to the end of the function in
+   [with_cold_call]. *)
+
+let without_cold_call (r : int ref) x y =
+  if x > y then begin
+    r := x;
+    x + y
+  end
+  else x - y
+[%%expect_asm X86_64{|
+without_cold_call:
+  cmpq  %rdi, %rbx
+  jle   .L0
+  movq  %rbx, (%rax)
+  leaq  -1(%rbx,%rdi), %rax
+  ret
+.L0:
+  subq  %rdi, %rbx
+  leaq  1(%rbx), %rax
+  ret
+|}]
+
+let with_cold_call (r : int ref) x y =
+  let[@inline] [@cold] mark_cold () = () in
+  if x > y then begin
+    mark_cold ();
+    r := x;
+    x + y
+  end
+  else x - y
+[%%expect_asm X86_64{|
+with_cold_call:
+  cmpq  %rdi, %rbx
+  jg    .L0
+  subq  %rdi, %rbx
+  leaq  1(%rbx), %rax
+  ret
+.L0:
+  movq  %rbx, (%rax)
+  leaq  -1(%rbx,%rdi), %rax
+  ret
+|}]
+
+(* Same when the cold function is not inlined. *)
+
+let with_cold_call_not_inlined (r : int ref) x y =
+  let[@cold] cold_not_inlined () = () in
+  if x > y then begin
+    cold_not_inlined ();
+    r := x;
+    x + y
+  end
+  else x - y
+[%%expect_asm X86_64{|
+with_cold_call_not_inlined:
+  cmpq  %rdi, %rbx
+  jg    .L0
+  subq  %rdi, %rbx
+  leaq  1(%rbx), %rax
+  ret
+.L0:
+  subq  $24, %rsp
+  movq  %rdi, 16(%rsp)
+  movq  %rbx, 8(%rsp)
+  movq  %rax, (%rsp)
+  movl  $1, %eax
+  call  .LcamlTOP5__cold_not_inlined_6_13_code
+.L1:
+  movq  (%rsp), %rax
+  movq  8(%rsp), %rbx
+  movq  %rbx, (%rax)
+  movq  16(%rsp), %rax
+  leaq  -1(%rbx,%rax), %rax
+  addq  $24, %rsp
+  ret
+
+with_cold_call_not_inlined.cold_not_inlined:
+  movl  $1, %eax
+  ret
+|}]

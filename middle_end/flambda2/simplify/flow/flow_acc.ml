@@ -98,6 +98,11 @@ let exit_continuation cont (t : t) =
     let map = Continuation.Map.add cont elt t.map in
     { t with stack; map }
 
+let current_continuation (t : t) =
+  match t.stack with
+  | [] -> None
+  | { continuation; _ } :: _ -> Some continuation
+
 let update_top_of_stack ~(t : t) ~f =
   match t.stack with
   | [] -> Misc.fatal_errorf "Empty stack of variable uses"

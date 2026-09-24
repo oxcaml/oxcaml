@@ -1139,7 +1139,7 @@ let rec compute_specialized_continuation ~replay ~simplify_expr ~original_cont
             params;
             rebuild_handler;
             is_exn_handler;
-            is_cold = handler.is_cold;
+            is_cold = handler.is_cold || DA.continuation_is_cold dacc cont;
             continuations_used = Continuation.Set.empty;
             (* this is only used for sorting mutually recursive continuation, so
                this does not matter for non-recursive continuations *)
@@ -1477,7 +1477,7 @@ and simplify_single_recursive_handler ~simplify_expr cont_uses_env_so_far
           params;
           rebuild_handler;
           is_exn_handler = false;
-          is_cold;
+          is_cold = is_cold || DA.continuation_is_cold dacc cont;
           continuations_used;
           unbox_decisions;
           extra_params_and_args = EPA.empty
@@ -1644,7 +1644,7 @@ and simplify_handlers ~simplify_expr ~down_to_up ~denv_for_join ~rebuild_body
               params;
               rebuild_handler;
               is_exn_handler;
-              is_cold;
+              is_cold = is_cold || DA.continuation_is_cold dacc cont;
               continuations_used;
               unbox_decisions;
               extra_params_and_args
