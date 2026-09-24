@@ -1250,6 +1250,105 @@ let builtin_sign_extends = function
     true
   | _ -> false
 
+(* [Lambda_to_lambda_transforms] creates uninitialized arrays, whose elements
+   are not scanned by the GC, by calling these runtime functions. Arrays of
+   known length are allocated inline instead, if they are small enough. *)
+let transl_uninitialized_array_creation name args dbg =
+  let module Tags = Unboxed_or_untagged_array_tags in
+  let allocate ~is_local layout alloc_block_kind ~length =
+    (* Without stack allocation, the runtime allocates "local" arrays on the
+       heap. *)
+    let mode : Cmm.Alloc_mode.t =
+      if is_local && Config.stack_allocation then Local else Heap
+    in
+    match[@warning "-4"] length with
+    | Cconst_int (tagged_length, _) ->
+      allocate_uninitialized_array mode layout alloc_block_kind
+        ~length:(tagged_length asr 1) dbg
+    | _ -> None
+  in
+  let single_component_elements layout alloc_block_kind ~length =
+    let is_local = String.starts_with ~prefix:"caml_make_local_" name in
+    allocate ~is_local layout alloc_block_kind ~length
+  in
+  let vectors ~size_in_bytes ~tag =
+    Words_per_element { words = size_in_bytes / size_addr; tag }
+  in
+  match[@warning "-4"] name, args with
+  | ( ("caml_make_unboxed_float64_vect" | "caml_make_local_unboxed_float64_vect"),
+      [length] ) ->
+    single_component_elements Float_array Alloc_block_kind_float_array ~length
+  | ( ("caml_make_unboxed_float32_vect" | "caml_make_local_unboxed_float32_vect"),
+      [length] ) ->
+    single_component_elements
+      (Elements_per_word
+         { elements = 2; zero_tag = Tags.unboxed_float32_array_zero_tag })
+      Alloc_block_kind_float32_u_array ~length
+  | ( ("caml_make_untagged_int_vect" | "caml_make_local_untagged_int_vect"),
+      [length] ) ->
+    single_component_elements
+      (Words_per_element { words = 1; tag = Tags.untagged_int_array_tag })
+      Alloc_block_kind_int_u_array ~length
+  | ( ("caml_make_untagged_int8_vect" | "caml_make_local_untagged_int8_vect"),
+      [length] ) ->
+    single_component_elements
+      (Elements_per_word
+         { elements = 8; zero_tag = Tags.untagged_int8_array_zero_tag })
+      Alloc_block_kind_int8_u_array ~length
+  | ( ("caml_make_untagged_int16_vect" | "caml_make_local_untagged_int16_vect"),
+      [length] ) ->
+    single_component_elements
+      (Elements_per_word
+         { elements = 4; zero_tag = Tags.untagged_int16_array_zero_tag })
+      Alloc_block_kind_int16_u_array ~length
+  | ( ("caml_make_unboxed_int32_vect" | "caml_make_local_unboxed_int32_vect"),
+      [length] ) ->
+    single_component_elements
+      (Elements_per_word
+         { elements = 2; zero_tag = Tags.unboxed_int32_array_zero_tag })
+      Alloc_block_kind_int32_u_array ~length
+  | ( ("caml_make_unboxed_int64_vect" | "caml_make_local_unboxed_int64_vect"),
+      [length] ) ->
+    single_component_elements
+      (Words_per_element { words = 1; tag = Tags.unboxed_int64_array_tag })
+      Alloc_block_kind_int64_u_array ~length
+  | ( ( "caml_make_unboxed_nativeint_vect"
+      | "caml_make_local_unboxed_nativeint_vect" ),
+      [length] ) ->
+    single_component_elements
+      (Words_per_element { words = 1; tag = Tags.unboxed_nativeint_array_tag })
+      Alloc_block_kind_int64_u_array ~length
+  | ( ("caml_make_unboxed_vec128_vect" | "caml_make_local_unboxed_vec128_vect"),
+      [length] ) ->
+    single_component_elements
+      (vectors ~size_in_bytes:size_vec128 ~tag:Tags.unboxed_vec128_array_tag)
+      Alloc_block_kind_vec128_u_array ~length
+  | ( ("caml_make_unboxed_vec256_vect" | "caml_make_local_unboxed_vec256_vect"),
+      [length] ) ->
+    single_component_elements
+      (vectors ~size_in_bytes:size_vec256 ~tag:Tags.unboxed_vec256_array_tag)
+      Alloc_block_kind_vec256_u_array ~length
+  | ( ("caml_make_unboxed_vec512_vect" | "caml_make_local_unboxed_vec512_vect"),
+      [length] ) ->
+    single_component_elements
+      (vectors ~size_in_bytes:size_vec512 ~tag:Tags.unboxed_vec512_array_tag)
+      Alloc_block_kind_vec512_u_array ~length
+  | ( ("caml_make_unboxed_mask_vect" | "caml_make_local_unboxed_mask_vect"),
+      [length] ) ->
+    single_component_elements
+      (Words_per_element { words = 1; tag = Tags.unboxed_mask_array_tag })
+      Alloc_block_kind_mask_u_array ~length
+  | ( "caml_makearray_dynamic_non_scannable_unboxed_product",
+      [ Cconst_int (tagged_num_components, _);
+        Cconst_int (tagged_is_local, _);
+        length ] ) ->
+    (* [num_components] is the number of words in each element. *)
+    allocate
+      ~is_local:(tagged_is_local asr 1 <> 0)
+      (Words_per_element { words = tagged_num_components asr 1; tag = 0 })
+      Alloc_block_kind_other ~length
+  | _ -> None
+
 type t =
   { extcall : expression;
     builtin_sign_extends : bool
@@ -1276,13 +1375,16 @@ let extcall ~dbg ~returns ~alloc ~is_c_builtin ~effects ~coeffects ~ty_args name
         args,
         dbg )
   in
-  if is_c_builtin || builtin_even_if_not_annotated name
-  then
-    match transl_builtin name args dbg typ_res with
-    | Some op ->
-      { extcall = op; builtin_sign_extends = builtin_sign_extends name }
-    | None -> { extcall = default; builtin_sign_extends = false }
-  else { extcall = default; builtin_sign_extends = false }
+  match transl_uninitialized_array_creation name args dbg with
+  | Some allocation -> { extcall = allocation; builtin_sign_extends = false }
+  | None ->
+    if is_c_builtin || builtin_even_if_not_annotated name
+    then
+      match transl_builtin name args dbg typ_res with
+      | Some op ->
+        { extcall = op; builtin_sign_extends = builtin_sign_extends name }
+      | None -> { extcall = default; builtin_sign_extends = false }
+    else { extcall = default; builtin_sign_extends = false }
 
 let report_error ppf = function
   | Bad_immediate msg -> Format_doc.pp_print_string ppf msg

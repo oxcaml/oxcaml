@@ -81,8 +81,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | Cextcall { effects = No_effects; coeffects = No_coeffects } ->
         List.for_all is_simple_expr args
         (* The following may have side effects *)
-      | Capply _ | Cextcall _ | Calloc _ | Cstore _ | Craise _ | Catomic _
-      | Cprobe _ | Cprobe_is_enabled _ | Copaque | Cpoll | Cpause ->
+      | Capply _ | Cextcall _ | Calloc _ | Calloc_uninitialized _ | Cstore _
+      | Craise _ | Catomic _ | Cprobe _ | Cprobe_is_enabled _ | Copaque | Cpoll
+      | Cpause ->
         false
       | Cprefetch _ | Cbeginregion | Cendregion ->
         false
@@ -134,8 +135,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         | Cextcall { effects = e; coeffects = ce } ->
           EC.create (SU.select_effects e) (SU.select_coeffects ce)
         | Capply _ | Cprobe _ | Copaque | Cpoll | Cpause -> EC.arbitrary
-        | Calloc (Heap, _) -> EC.none
-        | Calloc (Local, _) -> EC.coeffect_only Arbitrary
+        | Calloc (Heap, _) | Calloc_uninitialized { mode = Heap; _ } -> EC.none
+        | Calloc (Local, _) | Calloc_uninitialized { mode = Local; _ } ->
+          EC.coeffect_only Arbitrary
         | Cstore _ -> EC.effect_only Arbitrary
         | Cbeginregion | Cendregion -> EC.arbitrary
         | Cprefetch _ -> EC.arbitrary
@@ -371,6 +373,19 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       ( SU.basic_op
           (Alloc
              { bytes = 0; dbginfo = [placeholder_for_alloc_block_kind]; mode }),
+        args )
+    | Calloc_uninitialized { mode; wosize; alloc_block_kind } ->
+      (* Only the header is initialized, so the size of the block cannot be
+         computed from the arguments, as it is for [Calloc]. *)
+      let placeholder_for_alloc_block_kind : Cmm.alloc_dbginfo_item =
+        { alloc_words = 0; alloc_block_kind; alloc_dbg = Debuginfo.none }
+      in
+      ( SU.basic_op
+          (Alloc
+             { bytes = (wosize + 1) * Arch.size_addr;
+               dbginfo = [placeholder_for_alloc_block_kind];
+               mode
+             }),
         args )
     | Cpoll -> SU.basic_op Poll, args
     | Cpause -> SU.basic_op Pause, args
@@ -1053,9 +1068,12 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         in
         SU.set_traps_for_raise env;
         Never_returns
-      | Basic (Op (Alloc { bytes = _; mode; dbginfo = [placeholder] })) ->
+      | Basic (Op (Alloc { bytes; mode; dbginfo = [placeholder] })) ->
         let rd = Reg.createv Cmm.typ_val in
-        let bytes = SU.size_expr env (Ctuple new_args) in
+        (* The arguments initialize the block from its header onwards. Any
+           remaining bytes (see [Calloc_uninitialized]) are left
+           uninitialized. *)
+        let bytes = Int.max bytes (SU.size_expr env (Ctuple new_args)) in
         let alloc_words = (bytes + Arch.size_addr - 1) / Arch.size_addr in
         let op =
           Operation.Alloc

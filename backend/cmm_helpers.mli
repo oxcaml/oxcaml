@@ -1398,6 +1398,34 @@ val allocate_unboxed_vec256_array :
 val allocate_unboxed_vec512_array :
   elements:Cmm.expression list -> Cmm.Alloc_mode.t -> Debuginfo.t -> expression
 
+(** How the length of an array whose elements the GC does not scan determines
+    the size and tag of the block holding it. *)
+type unscanned_array_layout =
+  | Float_array  (** One word per element, with [Double_array_tag]. *)
+  | Words_per_element of
+      { words : int;
+        tag : int
+      }  (** A mixed block without scannable fields. *)
+  | Elements_per_word of
+      { elements : int;
+        zero_tag : int
+      }
+      (** A mixed block without scannable fields, whose tag is [zero_tag] plus
+          the number of unused elements in its last word (see
+          [Unboxed_or_untagged_array_tags]). *)
+
+(** Allocate an array of the given length, leaving its elements uninitialized,
+    or return [None] if the array is too big to be allocated inline or the
+    length is invalid. Empty arrays are not allocated: the empty array shared by
+    the runtime is returned instead. *)
+val allocate_uninitialized_array :
+  Cmm.Alloc_mode.t ->
+  unscanned_array_layout ->
+  Cmm.alloc_block_kind ->
+  length:int ->
+  Debuginfo.t ->
+  expression option
+
 (** Compute the length of an unboxed float32 array. *)
 val unboxed_float32_array_length : expression -> Debuginfo.t -> expression
 

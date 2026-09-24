@@ -221,7 +221,7 @@ let oper_result_type = function
     | Twofiftysix_aligned | Twofiftysix_unaligned -> typ_vec256
     | Fivetwelve_aligned | Fivetwelve_unaligned -> typ_vec512
     | _ -> typ_int)
-  | Calloc _ -> typ_val
+  | Calloc _ | Calloc_uninitialized _ -> typ_val
   | Cstore (_c, _) -> typ_void
   | Cdls_get -> typ_val
   | Ctls_get -> typ_val

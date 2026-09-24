@@ -582,6 +582,11 @@ type operation =
         is_atomic : bool
       }
   | Calloc of Alloc_mode.t * alloc_block_kind
+  | Calloc_uninitialized of
+      { mode : Alloc_mode.t;
+        wosize : int;
+        alloc_block_kind : alloc_block_kind
+      }
   | Cstore of memory_chunk * initialization_or_assignment
   | Caddi
   | Csubi
@@ -810,11 +815,11 @@ let iter_shallow_tail f = function
   | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_mask _
   | Cconst_symbol _ | Cvar _ | Ctuple _
   | Cop
-      ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi _ | Cmodi _ | Caddi128
-        | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr
-        | Cpopcnt | Caddv | Cadda | Cpackf32 | Copaque | Cbeginregion
-        | Cendregion | Cdls_get | Ctls_get | Cdomain_index | Cpoll | Cpause
-        | Capply _ | Cextcall _ | Cload _
+      ( ( Calloc _ | Calloc_uninitialized _ | Caddi | Csubi | Cmuli | Cdivi _
+        | Cmodi _ | Caddi128 | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Clsl
+        | Clsr | Casr | Cpopcnt | Caddv | Cadda | Cpackf32 | Copaque
+        | Cbeginregion | Cendregion | Cdls_get | Ctls_get | Cdomain_index
+        | Cpoll | Cpause | Capply _ | Cextcall _ | Cload _
         | Cstore (_, _)
         | Cmulhi _ | Cbswap _ | Crotate _ | Ccsel _ | Cclz | Cctz | Cprefetch _
         | Catomic _ | Ccmpi _ | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _
@@ -845,11 +850,11 @@ let map_shallow_tail f = function
     | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_mask _
     | Cconst_symbol _ | Cvar _ | Ctuple _
     | Cop
-        ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi _ | Cmodi _ | Caddi128
-          | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr
-          | Cpopcnt | Caddv | Cadda | Cpackf32 | Copaque | Cbeginregion
-          | Cendregion | Cdls_get | Ctls_get | Cdomain_index | Cpoll | Cpause
-          | Capply _ | Cextcall _ | Cload _
+        ( ( Calloc _ | Calloc_uninitialized _ | Caddi | Csubi | Cmuli | Cdivi _
+          | Cmodi _ | Caddi128 | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Clsl
+          | Clsr | Casr | Cpopcnt | Caddv | Cadda | Cpackf32 | Copaque
+          | Cbeginregion | Cendregion | Cdls_get | Ctls_get | Cdomain_index
+          | Cpoll | Cpause | Capply _ | Cextcall _ | Cload _
           | Cstore (_, _)
           | Cmulhi _ | Cbswap _ | Crotate _ | Ccsel _ | Cclz | Cctz
           | Cprefetch _ | Catomic _ | Ccmpi _ | Cnegf _ | Cabsf _ | Caddf _
