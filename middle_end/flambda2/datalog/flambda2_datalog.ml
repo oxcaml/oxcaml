@@ -106,6 +106,8 @@ module Datalog = struct
 
       val add_or_replace : keys Constant.hlist -> value -> t -> t
 
+      val union : t -> t -> t
+
       val remove : keys Constant.hlist -> t -> t
 
       val find_opt : keys Constant.hlist -> t -> value option
@@ -145,6 +147,9 @@ module Datalog = struct
         let is_trie = Column.is_trie columns
 
         let empty = C.Map.empty
+
+        let union =
+          Column.union_total_hlist columns (Table.result_repr_union result_repr)
       end
 
       include T

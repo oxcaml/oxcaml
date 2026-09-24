@@ -57,6 +57,7 @@ let union_total : type t k v. (t, k, v) id -> (v -> v -> v) -> t -> t -> t =
  fun { repr; _ } f t1 t2 ->
   let Patricia_tree_repr = repr in
   Int.Map.union_total (fun _ v1 v2 -> f v1 v2) t1 t2
+[@@inline]
 
 let diff_or_null : type t k v.
     (t, k, v) id -> (v -> v -> v Or_null.t) -> t -> t -> t Or_null.t =
@@ -82,6 +83,16 @@ let print_key : type t k v. (t, k, v) id -> Format.formatter -> k -> unit =
 type (_, _, _) hlist =
   | [] : ('v, nil, 'v) hlist
   | ( :: ) : ('t, 'k, 's) id * ('s, 'ks, 'v) hlist -> ('t, 'k -> 'ks, 'v) hlist
+
+let union_total_hlist (type v) columns (f : v -> v -> v) t1 t2 =
+  let rec union_total_hlist : type t k. (t, k, v) hlist -> t -> t -> t =
+   fun columns t1 t2 ->
+    match columns with
+    | [] -> (f [@inlined hint]) t1 t2
+    | column :: columns -> union_total column (union_total_hlist columns) t1 t2
+  in
+  union_total_hlist columns t1 t2
+[@@inline]
 
 let rec print_keys : type t k v.
     (t, k, v) hlist -> Format.formatter -> k Constant.hlist -> unit =

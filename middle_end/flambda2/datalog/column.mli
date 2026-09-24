@@ -58,6 +58,8 @@ val compare_keys :
 
 val is_trie : ('t, 'k, 'v) hlist -> ('t, 'k, 'v) Trie.is_trie
 
+val union_total_hlist : ('t, 'k, 'v) hlist -> ('v -> 'v -> 'v) -> 't -> 't -> 't
+
 module Make (_ : sig
   val name : string
 

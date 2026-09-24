@@ -531,6 +531,8 @@ module Datalog : sig
 
       val add_or_replace : keys Constant.hlist -> value -> t -> t
 
+      val union : t -> t -> t
+
       val remove : keys Constant.hlist -> t -> t
 
       val find_opt : keys Constant.hlist -> t -> value option
