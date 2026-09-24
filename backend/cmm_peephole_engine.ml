@@ -139,6 +139,7 @@ type cmm_pattern =
   | Const_int of int pattern_var
   | Const_natint_fixed of Nativeint.t
   | Const_natint of Nativeint.t pattern_var
+  | Const_any of Nativeint.t pattern_var
   | Binop of binop * cmm_pattern * cmm_pattern
   | Guarded of
       { pat : cmm_pattern;
@@ -180,6 +181,9 @@ let match_clauses_in_order ~default ~matches clauses expr =
       | Const_natint_fixed n1, Cconst_natint (n2, _) ->
         if Nativeint.equal n1 n2 then Some env else None
       | Const_natint v, Cconst_natint (n, _) -> Some (Env.add env v n)
+      | Const_any v, Cconst_int (n, _) ->
+        Some (Env.add env v (Nativeint.of_int n))
+      | Const_any v, Cconst_natint (n, _) -> Some (Env.add env v n)
       | Binop (binop, pat1, pat2), Cop (cop, [expr1; expr2], _) ->
         if matches_binop binop cop
         then
@@ -225,6 +229,12 @@ module Default_variables = struct
   let n1 = create_var Int "n1"
 
   let n2 = create_var Int "n2"
+
+  let k = create_var Natint "k"
+
+  let k1 = create_var Natint "k1"
+
+  let k2 = create_var Natint "k2"
 end
 
 module Cmm_comparator = struct
