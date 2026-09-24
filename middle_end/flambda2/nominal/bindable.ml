@@ -44,4 +44,6 @@ module type S = sig
       turns all occurrences of the name [stale] into [fresh] (in a
       capture-avoiding manner, but that is inherent in [Renaming]). *)
   val renaming : t -> guaranteed_fresh:t -> Renaming.t
+
+  val import_and_rename : t -> Renaming.t -> Renaming.t * t
 end

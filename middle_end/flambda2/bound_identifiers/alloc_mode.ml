@@ -200,6 +200,23 @@ module For_applications = struct
     | Maybe_alloc_stack _, Not_alloc_stack _ ->
       Misc.fatal_error "Mismatched alloc_mode in renaming"
 
+  let import_and_rename t renaming =
+    match t with
+    | Not_alloc_stack { alloc_region } ->
+      let renaming, alloc_region =
+        Renaming.bind_variable renaming alloc_region
+      in
+      renaming, Not_alloc_stack { alloc_region }
+    | Maybe_alloc_stack { alloc_region; region; ghost_region } ->
+      let renaming, alloc_region =
+        Renaming.bind_variable renaming alloc_region
+      in
+      let renaming, region = Renaming.bind_variable renaming region in
+      let renaming, ghost_region =
+        Renaming.bind_variable renaming ghost_region
+      in
+      renaming, Maybe_alloc_stack { alloc_region; region; ghost_region }
+
   let apply_renaming t renaming =
     match t with
     | Not_alloc_stack { alloc_region } ->
