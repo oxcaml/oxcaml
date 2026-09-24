@@ -844,6 +844,10 @@ val prove_single_closures_entry :
   * Function_type.t)
   proof_of_property
 
+val meet_code_ids : Typing_env.t -> t -> Code_id.Set.t meet_shortcut
+
+val prove_code_ids : Typing_env.t -> t -> Code_id.Set.t proof_of_property
+
 val meet_strings : Typing_env.t -> t -> String_info.Set.t meet_shortcut
 
 val prove_strings : Typing_env.t -> t -> String_info.Set.t proof_of_property
