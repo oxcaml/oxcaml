@@ -29,7 +29,7 @@ val copy : (< .. > as 'a) -> 'a
     "Unsynchronized accesses to mutable objects are a programming error."
 ]
 
-external id : < .. > -> int = "%field1"
+external id : < .. > -> int @@ stateless = "%field1"
 (** Return an integer identifying this object, unique for
     the current execution of the program. The generic comparison
     and hashing functions are based on this integer. When an object
