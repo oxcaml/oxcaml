@@ -439,7 +439,7 @@ module Variance = struct
       [mp, May_pos; mn, May_neg; mw, May_weak; mnc, May_noncontractive;
        inj, Inj; pos, Pos; neg, Neg]
   let strengthen v =
-    if mem May_neg v then v else v land (full - single May_weak)
+    if mem May_neg v then v else v land (unset May_weak full)
   let get_upper v = (mem May_pos v, mem May_neg v)
   let get_lower v = (mem Pos v, mem Neg v, mem Inj v)
   let is_null v = (v = null)
