@@ -10,8 +10,7 @@
 let add_const_eq x = x + 3 = 10
 [%%expect_asm X86_64{|
 add_const_eq:
-  addq  $6, %rax
-  cmpq  $21, %rax
+  cmpq  $15, %rax
   sete  %al
   movzbq %al, %rax
   leaq  1(%rax,%rax), %rax
@@ -21,8 +20,7 @@ add_const_eq:
 let sub_const_ne x = x - 3 <> 10
 [%%expect_asm X86_64{|
 sub_const_ne:
-  addq  $-6, %rax
-  cmpq  $21, %rax
+  cmpq  $27, %rax
   setne %al
   movzbq %al, %rax
   leaq  1(%rax,%rax), %rax
@@ -33,8 +31,8 @@ let xor_const_eq x = x lxor 5 = 9
 [%%expect_asm X86_64{|
 xor_const_eq:
   xorq  $11, %rax
-  orq   $1, %rax
-  cmpq  $19, %rax
+  shrq  $1, %rax
+  cmpq  $9, %rax
   sete  %al
   movzbq %al, %rax
   leaq  1(%rax,%rax), %rax
@@ -46,8 +44,7 @@ let char_eq (s : string) i = String.unsafe_get s i = ']'
 char_eq:
   sarq  $1, %rbx
   movzbq (%rax,%rbx), %rax
-  leaq  1(%rax,%rax), %rax
-  cmpq  $187, %rax
+  cmpq  $93, %rax
   sete  %al
   movzbq %al, %rax
   leaq  1(%rax,%rax), %rax
@@ -59,8 +56,7 @@ let if_char_ne (s : string) i = if String.unsafe_get s i <> ']' then 1 else 2
 if_char_ne:
   sarq  $1, %rbx
   movzbq (%rax,%rbx), %rax
-  leaq  1(%rax,%rax), %rax
-  cmpq  $187, %rax
+  cmpq  $93, %rax
   je    .L0
   movl  $3, %eax
   ret
@@ -75,10 +71,8 @@ let chars_eq (s : string) i (t : string) j =
 chars_eq:
   sarq  $1, %rsi
   movzbq (%rdi,%rsi), %rdi
-  leaq  1(%rdi,%rdi), %rdi
   sarq  $1, %rbx
   movzbq (%rax,%rbx), %rax
-  leaq  1(%rax,%rax), %rax
   cmpq  %rdi, %rax
   sete  %al
   movzbq %al, %rax
@@ -89,9 +83,8 @@ chars_eq:
 let lor_const_eq x = (x lsr 60) lor 1 = 5
 [%%expect_asm X86_64{|
 lor_const_eq:
-  shrq  $60, %rax
-  orq   $3, %rax
-  cmpq  $11, %rax
+  shrq  $62, %rax
+  cmpq  $2, %rax
   sete  %al
   movzbq %al, %rax
   leaq  1(%rax,%rax), %rax
@@ -102,10 +95,6 @@ lor_const_eq:
 let lor_const_impossible x = x lor 1 = 4
 [%%expect_asm X86_64{|
 lor_const_impossible:
-  orq   $3, %rax
-  cmpq  $9, %rax
-  sete  %al
-  movzbq %al, %rax
-  leaq  1(%rax,%rax), %rax
+  movl  $1, %eax
   ret
 |}]
