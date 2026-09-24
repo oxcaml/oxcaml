@@ -84,8 +84,8 @@ div_by_constant:
 
 (* CR ttebbi:
     The last two instructions:
-      sarq  $1, %rax
-      leaq  1(%rax,%rax), %rax
+      andq  $-2, %rax
+      incq  %rax
     are the same as
       orq $1, %rax
 *)
