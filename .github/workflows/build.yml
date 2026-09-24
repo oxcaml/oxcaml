@@ -27,6 +27,9 @@ jobs:
           - name: default (x86_64-linux)
             os: warp-ubuntu-latest-x64-8x
             build_debug: true
+            oxcaml_llvm_tag: oxcaml-lldb-21.1.0+oxcaml1
+            oxcaml_llvm_source_branch: oxcaml-llvm-plugin
+            native_debugger_lldb: true
             sysdeps: gdb
 
           - name: dissector-assembler (x86_64-linux)
@@ -125,6 +128,9 @@ jobs:
             build_ocamlparam: '_,w=-46,save-ir-before=register_allocation,verify-binary-emitter=1'
             ocamlparam: '_,w=-46,save-ir-before=register_allocation,verify-binary-emitter=1'
             run_regalloc_tool: true
+            oxcaml_llvm_tag: oxcaml-lldb-21.1.0+oxcaml1
+            oxcaml_llvm_source_branch: oxcaml-llvm-plugin
+            native_debugger_lldb: true
             sysdeps: gdb
 
           - name: regalloc multidomain (aarch64-linux)
@@ -338,6 +344,22 @@ jobs:
           wget -O oxcaml-llvm.tar.gz "$OXCAML_LLVM_URL"
           mkdir -p oxcaml-llvm
           tar -xzf oxcaml-llvm.tar.gz -C oxcaml-llvm --strip-components=1
+
+      - name: Add OxCaml LLDB to PATH
+        if: matrix.native_debugger_lldb == true
+        run: |
+          # Symlink lldb alone rather than prepending oxcaml-llvm/bin, which
+          # would shadow the system clang and other LLVM tools. The symlink
+          # lives outside the repo because Makefile.common-ox turns every
+          # top-level directory into a @dir/runtest target.
+          if [ ! -x "$GITHUB_WORKSPACE/oxcaml-llvm/bin/lldb" ]; then
+            echo "OxCaml LLDB missing: native_debugger_lldb requires oxcaml_llvm_tag"
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/lldb-path"
+          ln -sf "$GITHUB_WORKSPACE/oxcaml-llvm/bin/lldb" "$RUNNER_TEMP/lldb-path/lldb"
+          echo "$RUNNER_TEMP/lldb-path" >> "$GITHUB_PATH"
+          echo "OXCAML_LLDB=$GITHUB_WORKSPACE/oxcaml-llvm/bin/lldb" >> "$GITHUB_ENV"
 
       - name: Configure OxCaml
         env:
