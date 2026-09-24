@@ -1254,21 +1254,22 @@ let builtin_sign_extends = function
     true
   | _ -> false
 
+(* Without stack allocation, the runtime allocates "local" blocks on the
+   heap. *)
+let runtime_alloc_mode ~is_local : Cmm.Alloc_mode.t =
+  if is_local && Config.stack_allocation then Local else Heap
+
 (* [Lambda_to_lambda_transforms] creates uninitialized arrays, whose elements
    are not scanned by the GC, by calling these runtime functions. Arrays of
    known length are allocated inline instead, if they are small enough. *)
 let transl_uninitialized_array_creation name args dbg =
   let module Tags = Unboxed_or_untagged_array_tags in
   let allocate ~is_local layout alloc_block_kind ~length =
-    (* Without stack allocation, the runtime allocates "local" arrays on the
-       heap. *)
-    let mode : Cmm.Alloc_mode.t =
-      if is_local && Config.stack_allocation then Local else Heap
-    in
     match[@warning "-4"] length with
     | Cconst_int (tagged_length, _) ->
-      allocate_uninitialized_array mode layout alloc_block_kind
-        ~length:(tagged_length asr 1) dbg
+      allocate_uninitialized_array
+        (runtime_alloc_mode ~is_local)
+        layout alloc_block_kind ~length:(tagged_length asr 1) dbg
     | _ -> None
   in
   let single_component_elements layout alloc_block_kind ~length =
@@ -1353,6 +1354,26 @@ let transl_uninitialized_array_creation name args dbg =
       Alloc_block_kind_other ~length
   | _ -> None
 
+(* [Bytes.create] and [Bytes.create__stack] create strings with uninitialized
+   contents by calling [caml_create_bytes] and [caml_create_local_bytes].
+   [caml_alloc_string] and [caml_alloc_local_string] are their counterparts in
+   the C API, which take untagged lengths. Strings of known length are allocated
+   inline instead, if they are small enough. *)
+let transl_uninitialized_string_creation name args dbg =
+  let allocate ~is_local ~length =
+    allocate_uninitialized_string (runtime_alloc_mode ~is_local) ~length dbg
+  in
+  match[@warning "-4"] name, args with
+  | "caml_create_bytes", [Cconst_int (tagged_length, _)] ->
+    allocate ~is_local:false ~length:(tagged_length asr 1)
+  | "caml_create_local_bytes", [Cconst_int (tagged_length, _)] ->
+    allocate ~is_local:true ~length:(tagged_length asr 1)
+  | "caml_alloc_string", [Cconst_int (length, _)] ->
+    allocate ~is_local:false ~length
+  | "caml_alloc_local_string", [Cconst_int (length, _)] ->
+    allocate ~is_local:true ~length
+  | _ -> None
+
 type t =
   { extcall : expression;
     builtin_sign_extends : bool
@@ -1379,7 +1400,12 @@ let extcall ~dbg ~returns ~alloc ~is_c_builtin ~effects ~coeffects ~ty_args name
         args,
         dbg )
   in
-  match transl_uninitialized_array_creation name args dbg with
+  let uninitialized_allocation =
+    match transl_uninitialized_array_creation name args dbg with
+    | Some _ as allocation -> allocation
+    | None -> transl_uninitialized_string_creation name args dbg
+  in
+  match uninitialized_allocation with
   | Some allocation -> { extcall = allocation; builtin_sign_extends = false }
   | None ->
     if is_c_builtin || builtin_even_if_not_annotated name
