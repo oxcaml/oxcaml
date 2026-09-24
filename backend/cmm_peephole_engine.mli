@@ -72,6 +72,12 @@ module Default_variables : sig
   val n1 : int pattern_var
 
   val n2 : int pattern_var
+
+  val k : Nativeint.t pattern_var
+
+  val k1 : Nativeint.t pattern_var
+
+  val k2 : Nativeint.t pattern_var
 end
 
 (* The type for right-hand side environments. They are created by the engine,
@@ -106,6 +112,9 @@ type cmm_pattern =
       (** Matches [Cconst_natint] with a given integer *)
   | Const_natint of Nativeint.t pattern_var
       (** Matches any [Cconst_natint] and binds the underlying integer *)
+  | Const_any of Nativeint.t pattern_var
+      (** Matches any [Cconst_int] or [Cconst_natint] and binds the underlying
+          integer as a nativeint *)
   | Binop of binop * cmm_pattern * cmm_pattern
       (** Matches the corresponding [Cop] terms *)
   | Guarded of
