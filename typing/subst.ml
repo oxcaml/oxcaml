@@ -1281,10 +1281,13 @@ let rec subst_lazy_value_description s descr =
 and subst_lazy_module_decl copy_scope scoping s md =
   let md_type = subst_lazy_modtype copy_scope scoping s md.md_type in
   let md_modalities =
-    match s.additional_action with
-    | Prepare_for_saving { prepare_modality; _ } ->
+    match s.additional_action, md_type with
+    | _, Mty_alias _ ->
+        (* A module alias carries no modality. *)
+        md.md_modalities
+    | Prepare_for_saving { prepare_modality; _ }, _ ->
         prepare_modality md.md_modalities
-    | _ -> md.md_modalities
+    | _, _ -> md.md_modalities
   in
   { md_type;
     md_modalities;

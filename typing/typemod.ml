@@ -202,13 +202,17 @@ let infer_modalities pp ~loc_md item ~md_mode ~mode =
 [M] with [modalities] on it, calculate the modalities on the [item] to be used
 in the enclosing structure which is at [md_mode] and [loc_md]. *)
 let rebase_modalities ~loc ~loc_md item ~md_mode ~mode modalities =
-  let pp : Hint.pinpoint = (loc, Structure_item item) in
-  let is_contained_by : Hint.is_contained_by =
-    { containing = Structure (item, Modality);
-      container = (loc, Structure)}
-  in
-  let mode = Modality.apply_left ~is_contained_by modalities mode in
-  infer_modalities pp ~loc_md item ~md_mode ~mode
+  (* The undefined modality (a module alias carries no modality) is accepted
+     and returned unchanged. *)
+  if Modality.is_undefined modalities then modalities
+  else
+    let pp : Hint.pinpoint = (loc, Structure_item item) in
+    let is_contained_by : Hint.is_contained_by =
+      { containing = Structure (item, Modality);
+        container = (loc, Structure)}
+    in
+    let mode = Modality.apply_left ~is_contained_by modalities mode in
+    infer_modalities pp ~loc_md item ~md_mode ~mode
 
 (** Similiar to [rebase_modalities] but lifted to signatures. *)
 let rebase_modalities_sg ~loc ~loc_md ~md_mode ~mode sg =
@@ -763,11 +767,15 @@ let params_are_constrained =
   loop
 
 let rec remove_modality_and_zero_alloc_variables_sg env ~zap_modality sg =
+  let zap m =
+    (* The undefined modality (a module alias carries no modality) is accepted
+       and returned unchanged. *)
+    if Mode.Modality.is_undefined m then m
+    else m |> zap_modality |> Mode.Modality.of_const
+  in
   let sg_item = function
     | Sig_value (id, desc, vis) ->
-        let val_modalities =
-          desc.val_modalities |> zap_modality |> Mode.Modality.of_const
-        in
+        let val_modalities = zap desc.val_modalities in
         let val_zero_alloc =
           Zero_alloc.create_const (Zero_alloc.get desc.val_zero_alloc)
         in
@@ -778,9 +786,7 @@ let rec remove_modality_and_zero_alloc_variables_sg env ~zap_modality sg =
           remove_modality_and_zero_alloc_variables_mty env ~zap_modality
             md.md_type
         in
-        let md_modalities =
-          md.md_modalities |> zap_modality |> Mode.Modality.of_const
-        in
+        let md_modalities = zap md.md_modalities in
         let md = {md with md_type; md_modalities} in
         Sig_module (id, pres, md, re, vis)
     | item -> item
@@ -964,7 +970,14 @@ module Merge = struct
               return_payload ~ghosts
                 ~replace_by:(Some current_item) path ~late_typedtree
           | _, _ ->
-              let new_md = {md with md_type = Mty_signature newsg} in
+              let md_modalities =
+                match md.md_type with
+                | Mty_alias p -> Mtype.modality_of_alias_target sig_env p
+                | _ -> md.md_modalities
+              in
+              let new_md =
+                {md with md_type = Mty_signature newsg; md_modalities}
+              in
               let new_item = Sig_module(id, Mp_present, new_md, rs, priv) in
               return_payload ~ghosts ~replace_by:(Some new_item)
                 path ~paths ~late_typedtree
@@ -1163,7 +1176,12 @@ module Merge = struct
                 ~zap_modality:Mode.Modality.zap_to_id mty
             in
             assert (Modality.is_undefined md'.md_modalities);
-            let modalities = Modality.(Const.id |> of_const) in
+            let modalities =
+              match mty with
+              (* A module alias carries no modality; see [Pstr_module]. *)
+              | Mty_alias _ -> Modality.undefined
+              | _ -> Modality.(Const.id |> of_const)
+            in
             let md'' = { md' with md_type = mty; md_modalities = modalities} in
             let newmd =
               Mtype.strengthen_decl ~aliasable:false md'' path in
@@ -1409,6 +1427,9 @@ let rec apply_modalities_signature ~recursive env modalities sg =
       let val_modalities = concat_modalities vd.val_modalities in
       let vd = {vd with val_modalities = of_const val_modalities} in
       Sig_value (id, vd, vis)
+  | Sig_module (_, _, {md_type = Mty_alias _; _}, _, _) as item ->
+      (* A module alias carries no modality; see [module_decl_modalities]. *)
+      item
   | Sig_module (id, pres, md, rec_, vis) when recursive ->
       let md_modalities = concat_modalities md.md_modalities in
       let md_type, md_modalities =
@@ -1558,9 +1579,14 @@ let rec approx_modtype env smty =
       Mty_strengthen (mty, path, Aliasability.aliasable aliasable)
 
 and approx_module_declaration env pmd =
+  let md_type = approx_modtype env pmd.pmd_type in
   {
-    Types.md_type = approx_modtype env pmd.pmd_type;
-    md_modalities = Mode.Modality.(Const.id |> of_const);
+    Types.md_type;
+    md_modalities =
+      (match md_type with
+       (* A module alias carries no modality; see [Pstr_module]. *)
+       | Mty_alias _ -> Mode.Modality.undefined
+       | _ -> Mode.Modality.(Const.id |> of_const));
     md_attributes = pmd.pmd_attributes;
     md_loc = pmd.pmd_loc;
     md_uid = Uid.internal_not_actually_unique;
@@ -2405,7 +2431,11 @@ and transl_signature ?(interface_toplevel = false) env
         in
         let md = {
           md_type=tmty.mty_type;
-          md_modalities = Modality.of_const md_modalities.moda_modalities;
+          md_modalities =
+            (match tmty.mty_type with
+             (* A module alias carries no modality; see [Pstr_module]. *)
+             | Mty_alias _ -> Modality.undefined
+             | _ -> Modality.of_const md_modalities.moda_modalities);
           md_attributes=pmd.pmd_attributes;
           md_loc=pmd.pmd_loc;
           md_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
@@ -2448,7 +2478,8 @@ and transl_signature ?(interface_toplevel = false) env
             md
           else
             { md_type = Mty_alias path;
-              md_modalities = Mode.Modality.(Const.id |> of_const);
+              (* A module alias carries no modality; see [Pstr_module]. *)
+              md_modalities = Mode.Modality.undefined;
               md_attributes = pms.pms_attributes;
               md_loc = pms.pms_loc;
               md_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
@@ -3456,8 +3487,24 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
 
 and type_module_path_aux ~alias ~hold_locks ~strengthen env path
   (mode, locks) (lid : _ loc) smod =
+  let aliasable = not (Env.is_functor_arg path env) in
+  let opaque = alias && aliasable in
+  let mode =
+    (* The mode recorded for a module alias is just the max mode; its real
+       mode is its target's. When the module is used opaquely (an alias
+       binding, without holding locks), the mode is unused and the target is
+       not loaded; any other use inspects the target anyway, so resolve its
+       mode (possibly reading its cmi). For a path that is not an alias,
+       [find_module_mode] returns the recorded mode. *)
+    if opaque && not hold_locks then mode
+    else Env.find_module_mode path env
+  in
   let mod_mode =
     if hold_locks then mode, Some (locks, lid.txt, lid.loc)
+    else if opaque then
+      (* A module alias is opaque: it doesn't close over its target, so
+         there are no locks to walk. *)
+      mode, None
     else
       let vmode =
         Env.walk_locks ~env ~loc:lid.loc lid.txt ~item:Module None (mode, locks)
@@ -3470,7 +3517,6 @@ and type_module_path_aux ~alias ~hold_locks ~strengthen env path
              mod_env = env;
              mod_attributes = smod.pmod_attributes;
              mod_loc = smod.pmod_loc } in
-  let aliasable = not (Env.is_functor_arg path env) in
   let shape =
     Env.shape_of_path ~namespace:Shape.Sig_component_kind.Module env path
   in
@@ -4037,9 +4083,18 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
               ~scope ~shape:md_shape name pres md ~mode env
             in
             Signature_names.check_module names pmb_loc id;
-            let pp : Mode.Hint.pinpoint = (modl.mod_loc, Module) in
             let md_modalities =
-              infer_modalities pp ~loc_md (Module, id) ~md_mode ~mode
+              match modl.mod_type with
+              | Mty_alias _ ->
+                  (* A module alias is not a real member of the enclosing
+                     structure (it is more like a type declaration): it
+                     carries no modality and doesn't constrain the enclosing
+                     structure's mode; its mode is that of its target,
+                     resolved when the alias is consumed. *)
+                  Modality.undefined
+              | _ ->
+                  let pp : Mode.Hint.pinpoint = (modl.mod_loc, Module) in
+                  infer_modalities pp ~loc_md (Module, id) ~md_mode ~mode
             in
             Some id, e,
             [Sig_module(id, pres,

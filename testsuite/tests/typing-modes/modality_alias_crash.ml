@@ -20,9 +20,7 @@
  module = "modality_alias_reject.mli";
  ocamlc.byte;
  module = "modality_alias_reject.ml";
- ocamlc_byte_exit_status = "2";
  ocamlc.byte;
- check-ocamlc.byte-output;
 *)
 
 (* Regression test: checking this unit against its interface used to crash
@@ -33,13 +31,12 @@
      from another (nonportable) compilation unit ([Inner =
      Modality_alias_lib]);
    - a module alias to [Outer] ([Outer_alias]) declared in both the
-     implementation and the interface, so the interface keeps the portable
-     modality on the alias declaration.
+     implementation and the interface.
 
-   The portability claim is now checked structurally: this unit is accepted
-   because [Modality_alias_lib] only contains an [int], which crosses
-   portability, while [modality_alias_reject.ml] (whose library contains a
-   function) is rejected with a proper error. *)
+   A module alias is not a real member of the enclosing structure and carries
+   no modality: the default [@@ portable] doesn't apply to [Outer_alias], so
+   both this unit and [modality_alias_reject.ml] (whose library contains a
+   function) are accepted. *)
 
 module Outer = struct
   module Inner = Modality_alias_lib

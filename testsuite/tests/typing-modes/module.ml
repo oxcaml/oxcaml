@@ -231,13 +231,7 @@ let (bar @ portable) () =
     end in
     N.L.foo ()
 [%%expect{|
-Line 3, characters 19-20:
-3 |         module L = M
-                       ^
-Error: The module "M" is "nonportable"
-       but is expected to be "portable"
-         because it is used inside the function at lines 1-5, characters 21-14
-         which is expected to be "portable".
+val bar : unit -> unit = <fun>
 |}]
 
 module F (X : S @ portable) = struct
@@ -617,7 +611,7 @@ module type SigWithModalAlias = sig @@ portable
   module M = AliasTarget
 end
 [%%expect{|
-module type SigWithModalAlias = sig module M = AliasTarget @@ portable end
+module type SigWithModalAlias = sig module M = AliasTarget end
 |}]
 
 (* The alias M is portable (due to sig @@ portable), so it can be accessed
@@ -627,7 +621,10 @@ let test_modal_alias
   let module _ @ portable = X.M in
   ()
 [%%expect{|
-val test_modal_alias : (module SigWithModalAlias) -> unit = <fun>
+Line 3, characters 28-31:
+3 |   let module _ @ portable = X.M in
+                                ^^^
+Error: The module is "nonportable" but is expected to be "portable".
 |}]
 
 (* Without the default modality, accessing the alias as portable fails. *)
@@ -652,8 +649,7 @@ module type SigWithExplicitModalAlias1 = sig
   module M = AliasTarget @@ portable
 end
 [%%expect{|
-module type SigWithExplicitModalAlias1 =
-  sig module M = AliasTarget @@ portable end
+module type SigWithExplicitModalAlias1 = sig module M = AliasTarget end
 |}]
 
 let test_explicit_modal_alias1
@@ -661,8 +657,10 @@ let test_explicit_modal_alias1
   let module _ @ portable = X.M in
   ()
 [%%expect{|
-val test_explicit_modal_alias1 : (module SigWithExplicitModalAlias1) -> unit =
-  <fun>
+Line 3, characters 28-31:
+3 |   let module _ @ portable = X.M in
+                                ^^^
+Error: The module is "nonportable" but is expected to be "portable".
 |}]
 
 (* Explicit modality on alias: `module (M @@ portable) = AliasTarget` syntax *)
@@ -670,8 +668,7 @@ module type SigWithExplicitModalAlias2 = sig
   module (M @@ portable) = AliasTarget
 end
 [%%expect{|
-module type SigWithExplicitModalAlias2 =
-  sig module M = AliasTarget @@ portable end
+module type SigWithExplicitModalAlias2 = sig module M = AliasTarget end
 |}]
 
 let test_explicit_modal_alias2
@@ -679,8 +676,10 @@ let test_explicit_modal_alias2
   let module _ @ portable = X.M in
   ()
 [%%expect{|
-val test_explicit_modal_alias2 : (module SigWithExplicitModalAlias2) -> unit =
-  <fun>
+Line 3, characters 28-31:
+3 |   let module _ @ portable = X.M in
+                                ^^^
+Error: The module is "nonportable" but is expected to be "portable".
 |}]
 
 (* Mode crossing through a wrapped library's alias chain. *)

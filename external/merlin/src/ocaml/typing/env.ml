@@ -2457,10 +2457,42 @@ let module_declaration_address env id presence md =
   | Mp_present ->
       Lazy_backtrack.create_forced (Alocal id)
 
+(* The mode of the module at the given path, resolving through module
+   aliases. A module alias is not a real member of the enclosing structure
+   (it is more like a type declaration): its mode is not derived from the
+   enclosing module's mode, but is the mode of its target. If resolution
+   fails, return the max mode, which is always sound. *)
+let find_module_mode path env =
+  let rec chase path =
+    let mda =
+      match path with
+      | Pident id -> find_ident_module id env
+      | Pdot (p, s) ->
+          NameMap.find s (find_structure_components p env).comp_modules
+      | Papply _ | Pextra_ty _ -> raise Not_found
+    in
+    match mda.mda_declaration.md_type with
+    | Mty_alias path -> chase path
+    | Mty_ident _ | Mty_signature _ | Mty_functor _ | Mty_strengthen _
+    | Mty_for_hole ->
+        snd (Normalize_mode.mda Assert_normalized mda)
+  in
+  try chase path with Not_found -> Mode.Value.(max |> disallow_right)
+
 let rec components_of_module_maker
           {cm_env; cm_prefixing_subst;
            cm_path; cm_addr; cm_mty; cm_mode; cm_shape} : _ result =
   let cm_env = !cm_env in
+  let cm_mode =
+    (* The components of a module alias are built at the target's mode; see
+       [find_module_mode]. Note that building the components resolves the
+       target anyway (see [scrape_alias] below), possibly reading a cmi. *)
+    match cm_mty with
+    | Mty_alias path -> find_module_mode path cm_env
+    | Mty_ident _ | Mty_signature _ | Mty_functor _ | Mty_strengthen _
+    | Mty_for_hole ->
+        cm_mode
+  in
   match !scrape_alias cm_env cm_mty with
     Mty_signature sg ->
       let c =
@@ -2590,7 +2622,22 @@ let rec components_of_module_maker
             in
             c.comp_constrs <- add_to_tbl (Ident.name id) cda c.comp_constrs
         | Sig_module(id, pres, md, _, _) ->
-            let md, mode = Normalize_mode.md Normalize_exn md cm_mode in
+            (* A module alias carries no modality ([undefined]); its real mode
+               is its target's, resolved when the alias is consumed: its
+               components are built at the target's mode (see
+               [find_module_mode]), and module-level lookups that may load the
+               target chase it (see [lookup_module_path]). The mode recorded
+               here is the max mode, which is always sound. Any other module
+               declaration carries a modality. *)
+            let md, mode =
+              match md.md_type with
+              | Mty_alias _ ->
+                  Normalize_mode.md Assert_normalized md
+                    Mode.Value.(max |> disallow_right)
+              | Mty_ident _ | Mty_signature _ | Mty_functor _
+              | Mty_strengthen _ | Mty_for_hole ->
+                  Normalize_mode.md Normalize_exn md cm_mode
+            in
             let md' =
               (* The prefixed items get the same scope as [cm_path], which is
                  the prefix. *)
@@ -3403,7 +3450,7 @@ let add_signature map mod_shape sg ?mode env =
   in
   M.add_signature map mod_shape sg ?mode env
 
-let add_signature_lazy =
+let add_signature_lazy map mod_shape sg ?mode env =
   let module M = Add_signature(Subst.Lazy)(struct
     let add_value ?shape ~mode = add_value_lazy ?check:None ?shape ~mode
     let add_module_declaration ?arg ?shape ~full_env ~check id pres md
@@ -3413,7 +3460,7 @@ let add_signature_lazy =
     let add_modtype = add_modtype_lazy ~update_summary:true
   end)
   in
-  M.add_signature
+  M.add_signature map mod_shape sg ?mode env
 
 let enter_signature_and_shape ~scope ~parent_shape mod_shape sg ?mode env =
   let sg = Subst.signature (Rescope scope) Subst.identity sg in
@@ -3442,8 +3489,8 @@ let add_module_declaration_lazy ?(arg=false) =
 let add_signature sg env =
   let _, env = add_signature Shape.Map.empty None sg env in
   env
-let add_signature_lazy sg env =
-  let _, env = add_signature_lazy Shape.Map.empty None sg env in
+let add_signature_lazy ?mode sg env =
+  let _, env = add_signature_lazy Shape.Map.empty None sg ?mode env in
   env
 
 (* Add "unbound" bindings *)

@@ -955,7 +955,7 @@ let (foo @ portable) () =
   let _ : F(M).t = 42 in
   ()
 [%%expect{|
-module F = F @@ stateless nonportable
+module F = F
 module M = M
 val foo : unit -> unit = <fun>
 |}]
