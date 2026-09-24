@@ -1,11 +1,9 @@
-let default_allow_unused_code_warnings = false
-let perform_checks = false
+let default_allow_unused_code_warnings = true
+let perform_checks = true
 
 (* The checks on extensions are only to get better error messages
-   since the compiler will choke on unknown extensions. We disable
-   them externally to make it easier to use non ppxlib based
-   rewriters with ppxlib *)
-let perform_checks_on_extensions = false
-let perform_locations_check = false
+   since the compiler will choke on unknown extensions. *)
+let perform_checks_on_extensions = true
+let perform_locations_check = true
 let fail_on_duplicate_derivers = false
 let diff_command = None

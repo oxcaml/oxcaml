@@ -19,7 +19,8 @@ let print_cookie_x =
           (fun acc str_item ->
             match str_item with
             | [%stri [@@@print_cookie_x]] ->
-                let _ = print_endline !value_x in
+                Attribute.explicitly_drop#structure_item str_item;
+                print_endline !value_x;
                 acc
             | _ -> str_item :: acc)
           [] str

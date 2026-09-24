@@ -33,5 +33,5 @@ or `dont-apply`
   $ echo "let _ = [%print_hi]" > impl.ml
   $ ocaml -ppx './print_stuff.exe --as-ppx -dont-apply test' impl.ml
   File "./impl.ml", line 1, characters 10-18:
-  Error: Uninterpreted extension 'print_hi'.
+  Error: Extension `print_hi' was not translated
   [2]

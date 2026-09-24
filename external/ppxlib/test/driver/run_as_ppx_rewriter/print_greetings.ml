@@ -1,14 +1,20 @@
 open Ppxlib
 
 let hi_rule =
-  let expand ~loc ~path:_ = [%expr print_endline "hi"] in
+  let expand ~loc ~path:_ =
+    let loc = { loc with loc_ghost = true } in
+    [%expr print_endline "hi"]
+  in
   Extension.declare "print_hi" Extension.Context.expression
     Ast_pattern.(pstr nil)
     expand
   |> Context_free.Rule.extension
 
 let bye_rule =
-  let expand ~loc ~path:_ = [%expr print_endline "bye"] in
+  let expand ~loc ~path:_ =
+    let loc = { loc with loc_ghost = true } in
+    [%expr print_endline "bye"]
+  in
   Extension.declare "print_bye" Extension.Context.expression
     Ast_pattern.(pstr nil)
     expand

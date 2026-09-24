@@ -4,6 +4,7 @@ let mk_expression ~loc pexp_desc =
   { pexp_desc; pexp_loc_stack = []; pexp_loc = loc; pexp_attributes = [] }
 
 let print_string s ~loc =
+  let loc = { loc with loc_ghost = true } in
   let print_exp =
     mk_expression ~loc (Pexp_ident { txt = Lident "print_endline"; loc })
   in

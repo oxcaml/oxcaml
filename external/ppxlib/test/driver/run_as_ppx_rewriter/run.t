@@ -18,7 +18,7 @@ The driver's `shared_args` are taken into account, such as `-apply`...
   $ ocaml -ppx './print_greetings.exe -apply print_hi' file.ml
   hi
   File "./file.ml", line 2, characters 11-20:
-  Error: Uninterpreted extension 'print_bye'.
+  Error: Extension `print_bye' was not translated
   [2]
 
 ... and `-check`
