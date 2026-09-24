@@ -13,7 +13,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 open! Stdlib
 
@@ -42,35 +42,36 @@ type open_flag = Stdlib.open_flag =
   | Open_nonblock    (** open in non-blocking mode. *)
 (** Opening modes for {!open_gen}. *)
 
-val stdin : t
+val stdin : t @@ stateful portable
 (** The standard input for the process. *)
 
-val open_bin : string -> t
+val open_bin : string -> t @@ stateful portable
 (** Open the named file for reading, and return a new input channel on that
     file, positioned at the beginning of the file. *)
 
-val open_text : string -> t
+val open_text : string -> t @@ stateful portable
 (** Same as {!open_bin}, but the file is opened in text mode, so that newline
     translation takes place during reads. On operating systems that do not
     distinguish between text mode and binary mode, this function behaves like
     {!open_bin}. *)
 
-val open_gen : open_flag list -> int -> string -> t
+val open_gen : open_flag list -> int -> string -> t @@ stateful portable
 (** [open_gen mode perm filename] opens the named file for reading, as described
     above. The extra arguments [mode] and [perm] specify the opening mode and
     file permissions.  {!open_text} and {!open_bin} are special cases of this
     function. *)
 
-val with_open_bin : string -> (t -> 'a) -> 'a
+val with_open_bin : string -> (t -> 'a) -> 'a @@ stateful portable
 (** [with_open_bin fn f] opens a channel [ic] on file [fn] and returns [f
     ic]. After [f] returns, either with a value or by raising an exception, [ic]
     is guaranteed to be closed. *)
 
-val with_open_text : string -> (t -> 'a) -> 'a
+val with_open_text : string -> (t -> 'a) -> 'a @@ stateful portable
 (** Like {!with_open_bin}, but the channel is opened in text mode (see
     {!open_text}). *)
 
 val with_open_gen : open_flag list -> int -> string -> (t -> 'a) -> 'a
+  @@ stateful portable
 (** Like {!with_open_bin}, but can specify the opening mode and file permission,
     in case the file must be created (see {!open_gen}). *)
 

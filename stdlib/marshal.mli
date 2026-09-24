@@ -14,7 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 open! Stdlib
 
@@ -130,7 +130,8 @@ external to_bytes :
 
 external to_string :
   ('a : value_or_null)
-  . 'a -> extern_flags list -> string = "caml_output_value_to_string"
+  . 'a -> extern_flags list -> string
+  = "caml_output_value_to_string"
 (** Same as [to_bytes] but return the result as a string instead of
     a byte sequence. *)
 

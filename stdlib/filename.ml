@@ -167,7 +167,8 @@ module Win32 : SYSDEPS = struct
     else
       None
 
-  external temp_dir_name: unit -> string = "caml_sys_temp_dir_name"
+  external temp_dir_name: unit -> string @@ reading portable
+    = "caml_sys_temp_dir_name"
   let temp_dir_name = temp_dir_name ()
 
   let quote s =

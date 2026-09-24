@@ -14,7 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 open! Stdlib
 
@@ -157,12 +157,14 @@ val cat : string -> string -> string
 (** {1:predicates Predicates and comparisons} *)
 
 external equal :
-  (t[@local_opt]) -> (t[@local_opt]) -> bool = "caml_string_equal" [@@noalloc]
+  (t[@local_opt]) -> (t[@local_opt]) -> bool
+  = "caml_string_equal" [@@noalloc]
 (** [equal s0 s1] is [true] if and only if [s0] and [s1] are character-wise
     equal.
     @since 4.03 (4.05 in StringLabels) *)
 
-external compare : (t[@local_opt]) -> (t[@local_opt]) -> int = "%compare"
+external compare : (t[@local_opt]) -> (t[@local_opt]) -> int
+  = "%compare"
 (** [compare s0 s1] sorts [s0] and [s1] in lexicographical order. [compare]
     behaves like {!Stdlib.compare} on strings but may be more efficient. *)
 
@@ -255,7 +257,7 @@ val exists : f:(char -> bool) -> string -> bool
     [p].
     @since 4.13 *)
 
-val trim : string -> string
+val trim : string -> string @@ stateful portable
 (** [trim s] is [s] without leading and trailing whitespace. Whitespace
     characters are: [' '], ['\x0C'] (form feed), ['\n'], ['\r'], and ['\t'].
 
@@ -596,7 +598,8 @@ val get_int64_le : string -> int -> int64
 
 (* The following is for system use only. Do not call directly. *)
 
-external unsafe_get : (t[@local_opt]) -> int -> char = "%string_unsafe_get"
+external unsafe_get : (t[@local_opt]) -> int -> char
+  = "%string_unsafe_get"
 external unsafe_blit :
   src:string -> src_pos:int -> dst:bytes -> dst_pos:int -> len:int ->
     unit = "caml_blit_string" [@@noalloc]

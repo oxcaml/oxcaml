@@ -12,6 +12,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+@@ stateless
+
 (** Priority queues.
 
     The {!Pqueue} module implements a data structure of priority queues,

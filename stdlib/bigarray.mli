@@ -14,7 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 open! Stdlib
 
@@ -300,7 +300,7 @@ module Genarray :
     : ('a : any) ('b : any) ('c : any).
       ('a, 'b) kind -> 'c layout -> (int array[@local_opt])
       -> ('a, 'b, 'c) t @ unique
-    @@ portable
+    @@ stateless
     = "caml_ba_create"
   (** [Genarray.create kind layout dimensions] returns a new Bigarray
      whose element kind is determined by the parameter [kind] (one of
@@ -390,7 +390,7 @@ module Genarray :
 
   external change_layout
     : ('a : any) ('b : any) ('c : any).
-      ('a, 'b, 'c) t -> 'd layout -> ('a, 'b, 'd) t
+      ('a, 'b, 'c) t -> 'd layout -> ('a, 'b, 'd) t @@ stateless
       = "caml_ba_change_layout"
   (** [Genarray.change_layout a layout] returns a Bigarray with the
       specified [layout], sharing the data with [a] (and hence having
@@ -414,7 +414,7 @@ module Genarray :
     : ('a : value_or_null) ('b : any) ('c : any).
       (('a, 'b, 'c) t[@local_opt]) @ read
       -> (int array[@local_opt])
-      -> 'a
+      -> 'a @@ stateless
     = "caml_ba_get_generic"
   (** Read an element of a generic Bigarray.
      [Genarray.get a [|i1; ...; iN|]] returns the element of [a]
@@ -439,7 +439,7 @@ module Genarray :
   external set
     : ('a : value_or_null) ('b : any) ('c : any).
       (('a, 'b, 'c) t[@local_opt]) -> (int array[@local_opt])
-      -> ('a[@local_opt]) -> unit
+      -> ('a[@local_opt]) -> unit @@ stateless
     = "caml_ba_set_generic"
   (** Assign an element of a generic Bigarray.
      [Genarray.set a [|i1; ...; iN|] v] stores the value [v] in the
@@ -459,7 +459,7 @@ module Genarray :
 
   external sub_left
     : ('a : any) ('b : any) ('c : any).
-      ('a, 'b, c_layout) t -> int -> int -> ('a, 'b, c_layout) t
+      ('a, 'b, c_layout) t -> int -> int -> ('a, 'b, c_layout) t @@ stateless
     = "caml_ba_sub"
   (** Extract a sub-array of the given Bigarray by restricting the
      first (left-most) dimension.  [Genarray.sub_left a ofs len]
@@ -481,6 +481,7 @@ module Genarray :
   external sub_right
     : ('a : any) ('b : any) ('c : any).
       ('a, 'b, fortran_layout) t -> int -> int -> ('a, 'b, fortran_layout) t
+    @@ stateless
     = "caml_ba_sub"
   (** Extract a sub-array of the given Bigarray by restricting the
      last (right-most) dimension.  [Genarray.sub_right a ofs len]
@@ -502,6 +503,7 @@ module Genarray :
   external slice_left
     : ('a : any) ('b : any) ('c : any).
       ('a, 'b, c_layout) t -> (int array[@local_opt]) -> ('a, 'b, c_layout) t
+    @@ stateless
     = "caml_ba_slice"
   (** Extract a sub-array of lower dimension from the given Bigarray
      by fixing one or several of the first (left-most) coordinates.
@@ -521,7 +523,7 @@ module Genarray :
   external slice_right
     : ('a : any) ('b : any) ('c : any).
       ('a, 'b, fortran_layout) t -> (int array[@local_opt])
-      -> ('a, 'b, fortran_layout) t
+      -> ('a, 'b, fortran_layout) t @@ stateless
     = "caml_ba_slice"
   (** Extract a sub-array of lower dimension from the given Bigarray
      by fixing one or several of the last (right-most) coordinates.
@@ -541,7 +543,7 @@ module Genarray :
   external blit
     : ('a : any) ('b : any) ('c : any).
       (('a, 'b, 'c) t[@local_opt]) @ read -> (('a, 'b, 'c) t[@local_opt])
-      -> unit
+      -> unit @@ stateless
     = "caml_ba_blit"
   (** Copy all elements of a Bigarray in another Bigarray.
      [Genarray.blit src dst] copies all elements of [src] into
@@ -552,7 +554,7 @@ module Genarray :
 
   external fill
     : ('a : value_or_null) ('b : any) ('c : any).
-      (('a, 'b, 'c) t[@local_opt]) -> ('a[@local_opt]) -> unit
+      (('a, 'b, 'c) t[@local_opt]) -> ('a[@local_opt]) -> unit @@ stateless
     = "caml_ba_fill"
   (** Set all elements of a Bigarray to a given value.
      [Genarray.fill a v] stores the value [v] in all elements of
@@ -630,14 +632,14 @@ module Array0 : sig
   external blit
     : ('a : any) ('b : any) ('c : any).
       (('a, 'b, 'c) t[@local_opt]) @ read -> (('a, 'b, 'c) t[@local_opt])
-      -> unit
+      -> unit @@ stateless
     = "caml_ba_blit"
   (** Copy the first Bigarray to the second Bigarray.
      See {!Genarray.blit} for more details. *)
 
   external fill
     : ('a : value_or_null) ('b : any) ('c : any).
-      (('a, 'b, 'c) t[@local_opt]) -> ('a[@local_opt]) -> unit
+      (('a, 'b, 'c) t[@local_opt]) -> ('a[@local_opt]) -> unit @@ stateless
     = "caml_ba_fill"
   (** Fill the given Bigarray with the given value.
      See {!Genarray.fill} for more details. *)
@@ -711,6 +713,7 @@ module Array1 : sig
   external change_layout
     : ('a : any) ('b : any) ('c : any).
       (('a, 'b, 'c) t[@local_opt]) -> 'd layout -> (('a, 'b, 'd) t[@local_opt])
+    @@ stateless
     = "caml_ba_change_layout"
   (** [Array1.change_layout a layout] returns a Bigarray with the
       specified [layout], sharing the data with [a] (and hence having
@@ -731,6 +734,7 @@ module Array1 : sig
   external get
     : ('a : value_or_null) ('b : any) ('c : any).
       (('a, 'b, 'c) t[@local_opt]) @ read -> int -> ('a[@local_opt])
+    @@ stateless
     = "%caml_ba_ref_1"
   (** [Array1.get a x], or alternatively [a.{x}],
      returns the element of [a] at index [x].
@@ -742,6 +746,7 @@ module Array1 : sig
   external set
     : ('a : value_or_null) ('b : any) ('c : any).
       (('a, 'b, 'c) t[@local_opt]) -> int -> ('a[@local_opt]) -> unit
+    @@ stateless
     = "%caml_ba_set_1"
   (** [Array1.set a x v], also written [a.{x} <- v],
      stores the value [v] at index [x] in [a].
@@ -752,6 +757,7 @@ module Array1 : sig
   external sub
     : ('a : any) ('b : any) ('c : any).
       (('a, 'b, 'c) t[@local_opt]) -> int -> int -> (('a, 'b, 'c) t[@local_opt])
+    @@ stateless
       = "caml_ba_sub"
   (** Extract a sub-array of the given one-dimensional Bigarray.
      See {!Genarray.sub_left} for more details. *)
@@ -768,14 +774,14 @@ module Array1 : sig
   external blit
     : ('a : any) ('b : any) ('c : any).
       (('a, 'b, 'c) t[@local_opt]) @ read -> (('a, 'b, 'c) t[@local_opt])
-      -> unit
+      -> unit @@ stateless
     = "caml_ba_blit"
   (** Copy the first Bigarray to the second Bigarray.
      See {!Genarray.blit} for more details. *)
 
   external fill
     : ('a : value_or_null) ('b : any) ('c : any).
-      (('a, 'b, 'c) t[@local_opt]) -> ('a[@local_opt]) -> unit
+      (('a, 'b, 'c) t[@local_opt]) -> ('a[@local_opt]) -> unit @@ stateless
     = "caml_ba_fill"
   (** Fill the given Bigarray with the given value.
      See {!Genarray.fill} for more details. *)
@@ -789,6 +795,7 @@ module Array1 : sig
   external unsafe_get
     : ('a : value_or_null) ('b : any) ('c : any).
       (('a, 'b, 'c) t[@local_opt]) @ read -> int -> ('a[@local_opt])
+    @@ stateless
     = "%caml_ba_unsafe_ref_1"
   (** Like {!Bigarray.Array1.get}, but bounds checking is not always performed.
       Use with caution and only when the program logic guarantees that
@@ -797,6 +804,7 @@ module Array1 : sig
   external unsafe_set
     : ('a : value_or_null) ('b : any) ('c : any).
       (('a, 'b, 'c) t[@local_opt]) -> int -> ('a[@local_opt]) -> unit
+    @@ stateless
     = "%caml_ba_unsafe_set_1"
   (** Like {!Bigarray.Array1.set}, but bounds checking is not always performed.
       Use with caution and only when the program logic guarantees that
@@ -892,7 +900,7 @@ module Array2 :
       (('a, 'b, 'c) t[@local_opt]) @ read
       -> int
       -> int
-      -> ('a[@local_opt])
+      -> ('a[@local_opt]) @@ stateless
     = "%caml_ba_ref_2"
   (** [Array2.get a x y], also written [a.{x,y}],
      returns the element of [a] at coordinates ([x], [y]).
@@ -903,6 +911,7 @@ module Array2 :
   external set
     : ('a : value_or_null) ('b : any) ('c : any).
       (('a, 'b, 'c) t[@local_opt]) -> int -> int -> ('a[@local_opt]) -> unit
+    @@ stateless
     = "%caml_ba_set_2"
   (** [Array2.set a x y v], or alternatively [a.{x,y} <- v],
      stores the value [v] at coordinates ([x], [y]) in [a].
@@ -912,7 +921,7 @@ module Array2 :
 
   external sub_left
     : ('a : any) ('b : any) ('c : any).
-      ('a, 'b, c_layout) t -> int -> int -> ('a, 'b, c_layout) t
+      ('a, 'b, c_layout) t -> int -> int -> ('a, 'b, c_layout) t @@ stateless
     = "caml_ba_sub"
   (** Extract a two-dimensional sub-array of the given two-dimensional
      Bigarray by restricting the first dimension.
@@ -922,6 +931,7 @@ module Array2 :
   external sub_right
     : ('a : any) ('b : any) ('c : any).
       ('a, 'b, fortran_layout) t -> int -> int -> ('a, 'b, fortran_layout) t
+    @@ stateless
     = "caml_ba_sub"
   (** Extract a two-dimensional sub-array of the given two-dimensional
      Bigarray by restricting the second dimension.
@@ -948,14 +958,14 @@ module Array2 :
   external blit
     : ('a : any) ('b : any) ('c : any).
       (('a, 'b, 'c) t[@local_opt]) @ read -> (('a, 'b, 'c) t[@local_opt])
-      -> unit
+      -> unit @@ stateless
     = "caml_ba_blit"
   (** Copy the first Bigarray to the second Bigarray.
      See {!Bigarray.Genarray.blit} for more details. *)
 
   external fill
     : ('a : value_or_null) ('b : any) ('c : any).
-      (('a, 'b, 'c) t[@local_opt]) -> ('a[@local_opt]) -> unit
+      (('a, 'b, 'c) t[@local_opt]) -> ('a[@local_opt]) -> unit @@ stateless
     = "caml_ba_fill"
   (** Fill the given Bigarray with the given value.
      See {!Bigarray.Genarray.fill} for more details. *)
@@ -972,7 +982,7 @@ module Array2 :
       (('a, 'b, 'c) t[@local_opt]) @ read
       -> int
       -> int
-      -> ('a[@local_opt])
+      -> ('a[@local_opt]) @@ stateless
     = "%caml_ba_unsafe_ref_2"
   (** Like {!Bigarray.Array2.get}, but bounds checking is not always
       performed. *)
@@ -980,6 +990,7 @@ module Array2 :
   external unsafe_set
     : ('a : value_or_null) ('b : any) ('c : any).
       (('a, 'b, 'c) t[@local_opt]) -> int -> int -> ('a[@local_opt]) -> unit
+    @@ stateless
     = "%caml_ba_unsafe_set_2"
   (** Like {!Bigarray.Array2.set}, but bounds checking is not always
       performed. *)
@@ -1079,7 +1090,7 @@ module Array3 :
   external get
     : ('a : value_or_null) ('b : any) ('c : any).
       (('a, 'b, 'c) t[@local_opt]) @ read -> int -> int -> int
-      -> ('a[@local_opt])
+      -> ('a[@local_opt]) @@ stateless
     = "%caml_ba_ref_3"
   (** [Array3.get a x y z], also written [a.{x,y,z}],
      returns the element of [a] at coordinates ([x], [y], [z]).
@@ -1090,7 +1101,7 @@ module Array3 :
   external set
     : ('a : value_or_null) ('b : any) ('c : any).
       (('a, 'b, 'c) t[@local_opt]) -> int -> int -> int -> ('a[@local_opt])
-      -> unit
+      -> unit @@ stateless
     = "%caml_ba_set_3"
   (** [Array3.set a x y v], or alternatively [a.{x,y,z} <- v],
      stores the value [v] at coordinates ([x], [y], [z]) in [a].
@@ -1100,7 +1111,7 @@ module Array3 :
 
   external sub_left
     : ('a : any) ('b : any) ('c : any).
-      ('a, 'b, c_layout) t -> int -> int -> ('a, 'b, c_layout) t
+      ('a, 'b, c_layout) t -> int -> int -> ('a, 'b, c_layout) t @@ stateless
     = "caml_ba_sub"
   (** Extract a three-dimensional sub-array of the given
      three-dimensional Bigarray by restricting the first dimension.
@@ -1110,6 +1121,7 @@ module Array3 :
   external sub_right
     : ('a : any) ('b : any) ('c : any).
       ('a, 'b, fortran_layout) t -> int -> int -> ('a, 'b, fortran_layout) t
+    @@ stateless
     = "caml_ba_sub"
   (** Extract a three-dimensional sub-array of the given
      three-dimensional Bigarray by restricting the second dimension.
@@ -1158,14 +1170,14 @@ module Array3 :
   external blit
     : ('a : any) ('b : any) ('c : any).
       (('a, 'b, 'c) t[@local_opt]) @ read -> (('a, 'b, 'c) t[@local_opt])
-      -> unit
+      -> unit @@ stateless
     = "caml_ba_blit"
   (** Copy the first Bigarray to the second Bigarray.
      See {!Bigarray.Genarray.blit} for more details. *)
 
   external fill
     : ('a : value_or_null) ('b : any) ('c : any).
-      (('a, 'b, 'c) t[@local_opt]) -> ('a[@local_opt]) -> unit
+      (('a, 'b, 'c) t[@local_opt]) -> ('a[@local_opt]) -> unit @@ stateless
     = "caml_ba_fill"
   (** Fill the given Bigarray with the given value.
      See {!Bigarray.Genarray.fill} for more details. *)
@@ -1180,7 +1192,7 @@ module Array3 :
   external unsafe_get
     : ('a : value_or_null) ('b : any) ('c : any).
       (('a, 'b, 'c) t[@local_opt]) @ read -> int -> int -> int
-      -> ('a[@local_opt])
+      -> ('a[@local_opt]) @@ stateless
     = "%caml_ba_unsafe_ref_3"
   (** Like {!Bigarray.Array3.get}, but bounds checking is not always
       performed. *)
@@ -1188,7 +1200,7 @@ module Array3 :
   external unsafe_set
     : ('a : value_or_null) ('b : any) ('c : any).
       (('a, 'b, 'c) t[@local_opt]) -> int -> int -> int -> ('a[@local_opt])
-      -> unit
+      -> unit @@ stateless
     = "%caml_ba_unsafe_set_3"
   (** Like {!Bigarray.Array3.set}, but bounds checking is not always
       performed. *)

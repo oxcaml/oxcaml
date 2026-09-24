@@ -12,6 +12,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+@@ stateless
+
 (** Effects.
 
     See 'Language extensions/Effect handlers' section in the manual.
@@ -42,7 +44,7 @@ type _ t +=
   (* CR aspsmith: Add more documentation here once preemption is closer to being
      finished *)
 
-external perform : 'a t -> 'a = "%perform"
+external perform : 'a t -> 'a @@ stateful = "%perform"
 [@@alert unsafe_effects "Use [Effect.Safe.perform]. [Effect.perform] may not \
                          function correctly on Js_of_ocaml"]
 (** [perform e] performs an effect [e].
@@ -63,13 +65,13 @@ module Safe : sig
   (** OxCaml-compatible version of [perform]. Takes a [Handler.t @ local] to
       prove that the current function is running in an effect handler. *)
   val perform : Handler.t @ local -> 'a t -> 'a
-end
+end @@ stateful
 
 type tick_outcome =
   | Preempt
   | Continue
 
-module Deep : sig
+module Deep : sig @@ stateless
   (** Deep handlers *)
 
   type nonrec ('a,'b) continuation = ('a,'b) continuation
@@ -106,7 +108,7 @@ module Deep : sig
       is the value handler, [exnc] handles exceptions, and [effc] handles the
       effects performed by the computation enclosed by the handler. *)
 
-  val match_with: ('c -> 'a) -> 'c -> ('a,'b) handler -> 'b
+  val match_with: ('c -> 'a) -> 'c -> ('a,'b) handler -> 'b @@ stateful
   (** [match_with f x h] runs the computation [f x] in the handler [h].
 
       @raise Out_of_fibers if unable to allocate a fiber. *)
@@ -117,7 +119,7 @@ module Deep : sig
       [fun x -> x] and an exception handler that raises any exception
       [fun e -> raise e]. *)
 
-  val try_with: ('b -> 'a) -> 'b -> 'a effect_handler -> 'a
+  val try_with: ('b -> 'a) -> 'b -> 'a effect_handler -> 'a @@ stateful
   (** [try_with f x h] runs the computation [f x] under the handler [h].
 
       @raise Out_of_fibers if unable to allocate a fiber. *)
@@ -169,7 +171,7 @@ module Deep : sig
         -> 'a effect_handler
         -> 'a
     end
-  end
+  end @@ stateful
 
 
   module Preemptible : sig
@@ -253,14 +255,14 @@ module Deep : sig
           -> 'a
       end
     end
-  end
+  end @@ stateful
 
   external get_callstack :
     ('a,'b) continuation -> int -> Printexc.raw_backtrace =
     "caml_get_continuation_callstack"
   (** [get_callstack c n] returns a description of the top of the call stack on
       the continuation [c], with at most [n] entries. *)
-end
+end @@ stateful
 
 module Shallow : sig
   (* Shallow handlers *)
@@ -441,8 +443,8 @@ module Shallow : sig
   end
 
   external get_callstack :
-    ('a,'b) continuation -> int -> Printexc.raw_backtrace =
+    ('a,'b) continuation -> int -> Printexc.raw_backtrace @@ stateless =
     "caml_get_continuation_callstack"
   (** [get_callstack c n] returns a description of the top of the call stack on
       the continuation [c], with at most [n] entries. *)
-end
+end @@ stateful

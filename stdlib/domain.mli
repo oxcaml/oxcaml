@@ -17,6 +17,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+@@ stateless
+
 (** Domains.
 
     See 'Parallel programming' chapter in the manual.
@@ -27,7 +29,7 @@ type !'a t : value mod portable contended with 'a
 (** A domain of type ['a t] runs independently, eventually producing a
     result of type 'a, or an exception *)
 
-val spawn : (unit -> 'a) -> 'a t
+val spawn : (unit -> 'a) -> 'a t @@ stateful
 [@@alert do_not_spawn_domains
    "User programs should never spawn domains. To execute a function on a \
     domain, use [Multicore] from the threading library. This is because \
@@ -41,7 +43,7 @@ val spawn : (unit -> 'a) -> 'a t
     @raise Failure if the program has insufficient resources to create another
     domain. *)
 
-val join : 'a t -> 'a @@ portable
+val join : 'a t -> 'a
 (** [join d] blocks until domain [d] runs to completion. If [d] results in a
     value, then that is returned by [join d]. If [d] raises an uncaught
     exception, then that is re-raised by [join d]. *)
@@ -49,13 +51,13 @@ val join : 'a t -> 'a @@ portable
 type id = private int
 (** Domains have unique integer identifiers *)
 
-val get_id : 'a t -> id @@ portable
+val get_id : 'a t -> id
 (** [get_id d] returns the identifier of the domain [d] *)
 
-val self : unit -> id @@ portable
+val self : unit -> id @@ reading portable
 (** [self ()] is the identifier of the currently running domain *)
 
-val before_first_spawn : (unit -> unit) -> unit
+val before_first_spawn : (unit -> unit) -> unit @@ stateful
 (** [before_first_spawn f] registers [f] to be called before the first domain
     is spawned by the program. The functions registered with
     [before_first_spawn] are called on the main (initial) domain. The functions
@@ -64,7 +66,7 @@ val before_first_spawn : (unit -> unit) -> unit
 
     @raise Invalid_argument if the program has already spawned a domain. *)
 
-val at_exit : (unit -> unit) -> unit
+val at_exit : (unit -> unit) -> unit @@ stateful
 (** [at_exit f] registers [f] to be called when the current domain exits. Note
     that [at_exit] callbacks are domain-local and only apply to the calling
     domain. The registered functions are called in 'last in, first out' order:
@@ -82,14 +84,14 @@ let temp_file_key = Domain.DLS.new_key (fun _ ->
     to close it, thus guaranteeing the descriptor is not leaked in
     case the current domain exits. *)
 
-external cpu_relax : unit -> unit @@ portable = "%cpu_relax"
+external cpu_relax : unit -> unit = "%cpu_relax"
 (** If busy-waiting, calling cpu_relax () between iterations
     will improve performance on some CPU architectures *)
 
-val is_main_domain : unit -> bool @@ portable
+val is_main_domain : unit -> bool @@ reading portable
 (** [is_main_domain ()] returns true if called from the initial domain. *)
 
-val recommended_domain_count : unit -> int @@ portable
+val recommended_domain_count : unit -> int @@ reading portable
 (** The recommended maximum number of domains which should be running
     simultaneously (including domains already running).
 
@@ -98,7 +100,7 @@ val recommended_domain_count : unit -> int @@ portable
 val max_domain_count : int
 (** The maximum number of simultaneously running domains. *)
 
-val self_index : unit -> int @@ portable
+val self_index : unit -> int @@ reading portable
 (** The index of the current domain. It is an integer unique among
     currently-running domains, in the interval [0; N-1] where N is the
     peak number of domains running simultaneously so far.
@@ -172,7 +174,7 @@ module DLS : sig
     (** [set k v] updates the calling domain's domain-local state to associate
         the key [k] with value [v]. It overwrites any previous values associated
         to [k], which cannot be restored later. *)
-end
+end @@ stateful
 
 (** Thread-local storage. Like {!DLS}, but stores a distinct value for each
     thread. Domains can contain multiple threads, so [TLS] should be preferred
@@ -201,7 +203,7 @@ module TLS : sig
         val get_initial_keys : unit -> keys
         val set_initial_keys : keys -> unit
     end
-end
+end @@ stateful
 
 module Tick : sig @@ portable
   (** A handle to a request that the tick thread tick at a given interval
@@ -233,8 +235,8 @@ module Tick : sig @@ portable
   (** Returns the interval at which the tick thread will tick, or [Null]
       if no domain has any active tick requests. This is the global minimum
       across all domains of live tick requests. *)
-  val effective_interval_usec : unit -> int or_null
-end
+  val effective_interval_usec : unit -> int or_null @@ reading portable
+end @@ stateful
 
 (** Submodule containing non-backwards-compatible functions which enforce thread
     safety via modes. *)
@@ -299,4 +301,4 @@ module Safe : sig @@ portable
       The provided closure must be [portable] to enforce that it does not unsafely close
       over any data in the current capsule, which the current domain may not have
       uncontended access to at exit. *)
-end
+end @@ stateful

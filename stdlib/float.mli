@@ -15,7 +15,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 open! Stdlib
 
@@ -55,19 +55,24 @@ val minus_one : float
 (** The floating-point -1.
    @since 4.08 *)
 
-external neg : (float[@local_opt]) -> (float[@local_opt]) = "%negfloat"
+external neg : (float[@local_opt]) -> (float[@local_opt])
+  = "%negfloat"
 (** Unary negation. *)
 
-external add : (float[@local_opt]) -> (float[@local_opt]) -> (float[@local_opt]) = "%addfloat"
+external add : (float[@local_opt]) -> (float[@local_opt]) -> (float[@local_opt])
+  = "%addfloat"
 (** Floating-point addition. *)
 
-external sub : (float[@local_opt]) -> (float[@local_opt]) -> (float[@local_opt]) = "%subfloat"
+external sub : (float[@local_opt]) -> (float[@local_opt]) -> (float[@local_opt])
+  = "%subfloat"
 (** Floating-point subtraction. *)
 
-external mul : (float[@local_opt]) -> (float[@local_opt]) -> (float[@local_opt]) = "%mulfloat"
+external mul : (float[@local_opt]) -> (float[@local_opt]) -> (float[@local_opt])
+  = "%mulfloat"
 (** Floating-point multiplication. *)
 
-external div : (float[@local_opt]) -> (float[@local_opt]) -> (float[@local_opt]) = "%divfloat"
+external div : (float[@local_opt]) -> (float[@local_opt]) -> (float[@local_opt])
+  = "%divfloat"
 (** Floating-point division. *)
 
 external fma : float -> float -> float -> float =
@@ -102,7 +107,8 @@ val pred : float -> float
    {!next_after}.
    @since 4.08 *)
 
-external abs : (float[@local_opt]) -> (float[@local_opt]) = "%absfloat"
+external abs : (float[@local_opt]) -> (float[@local_opt])
+  = "%absfloat"
 (** [abs f] returns the absolute value of [f]. *)
 
 val infinity : float
@@ -233,7 +239,8 @@ external cbrt : float -> float = "caml_cbrt_float" "caml_cbrt"
     @since 4.13
 *)
 
-external exp : float -> float = "caml_exp_float" "exp" [@@unboxed] [@@noalloc]
+external exp : float -> float
+  = "caml_exp_float" "exp" [@@unboxed] [@@noalloc]
 (** Exponential. *)
 
 external exp2 : float -> float = "caml_exp2_float" "caml_exp2"
@@ -243,7 +250,8 @@ external exp2 : float -> float = "caml_exp2_float" "caml_exp2"
     @since 4.13
 *)
 
-external log : float -> float = "caml_log_float" "log" [@@unboxed] [@@noalloc]
+external log : float -> float
+  = "caml_log_float" "log" [@@unboxed] [@@noalloc]
 (** Natural logarithm. *)
 
 external log10 : float -> float = "caml_log10_float" "log10"
@@ -267,13 +275,16 @@ external log1p : float -> float = "caml_log1p_float" "caml_log1p"
 (** [log1p x] computes [log(1.0 +. x)] (natural logarithm),
     giving numerically-accurate results even if [x] is close to [0.0]. *)
 
-external cos : float -> float = "caml_cos_float" "cos" [@@unboxed] [@@noalloc]
+external cos : float -> float
+  = "caml_cos_float" "cos" [@@unboxed] [@@noalloc]
 (** Cosine.  Argument is in radians. *)
 
-external sin : float -> float = "caml_sin_float" "sin" [@@unboxed] [@@noalloc]
+external sin : float -> float
+  = "caml_sin_float" "sin" [@@unboxed] [@@noalloc]
 (** Sine.  Argument is in radians. *)
 
-external tan : float -> float = "caml_tan_float" "tan" [@@unboxed] [@@noalloc]
+external tan : float -> float
+  = "caml_tan_float" "tan" [@@unboxed] [@@noalloc]
 (** Tangent.  Argument is in radians. *)
 
 external acos : float -> float = "caml_acos_float" "acos"
@@ -291,13 +302,15 @@ external atan : float -> float = "caml_atan_float" "atan"
 (** Arc tangent.
     Result is in radians and is between [-pi/2] and [pi/2]. *)
 
-external atan2 : float -> float -> float = "caml_atan2_float" "atan2"
+external atan2 : float -> float -> float
+  = "caml_atan2_float" "atan2"
 [@@unboxed] [@@noalloc]
 (** [atan2 y x] returns the arc tangent of [y /. x].  The signs of [x]
     and [y] are used to determine the quadrant of the result.
     Result is in radians and is between [-pi] and [pi]. *)
 
-external hypot : float -> float -> float = "caml_hypot_float" "caml_hypot"
+external hypot : float -> float -> float
+  = "caml_hypot_float" "caml_hypot"
 [@@unboxed] [@@noalloc]
 (** [hypot x y] returns [sqrt(x *. x +. y *. y)], that is, the length
     of the hypotenuse of a right-angled triangle with sides of length
@@ -431,7 +444,8 @@ external frexp : float -> float * int = "caml_frexp_float"
     zero.  When [f] is non-zero, they are defined by
     [f = x *. 2 ** n] and [0.5 <= x < 1.0]. *)
 
-external ldexp : (float [@unboxed]) -> (int [@untagged]) -> (float [@unboxed]) =
+external ldexp : (float [@unboxed]) -> (int [@untagged]) -> (float [@unboxed])
+  =
   "caml_ldexp_float" "caml_ldexp_float_unboxed" [@@noalloc]
 (** [ldexp x n] returns [x *. 2 ** n]. *)
 
@@ -502,7 +516,7 @@ val hash : t -> int
     {!Hashtbl.hash}. This function allows this module to be passed as argument
     to the functor {!Hashtbl.Make}. *)
 
-module Array : sig
+module Array : sig @@ stateless
   type t = floatarray
   (** The type of float arrays with packed representation.
       @since 4.08
@@ -559,7 +573,7 @@ module Array : sig
 
       @since 5.2 *)
 
-  val append : t -> t -> t
+  val append : t -> t -> t @@ stateful portable
   (** [append v1 v2] returns a fresh floatarray containing the
       concatenation of the floatarrays [v1] and [v2].
       @raise Invalid_argument if
@@ -576,7 +590,7 @@ module Array : sig
       designate a valid subarray of [a]; that is, if
       [pos < 0], or [len < 0], or [pos + len > length a]. *)
 
-  val copy : t -> t
+  val copy : t -> t @@ stateful portable
   (** [copy a] returns a copy of [a], that is, a fresh floatarray
       containing the same elements as [a]. *)
 
@@ -879,13 +893,15 @@ module Array : sig
   (** {1 Undocumented functions} *)
 
   (* These functions are for system use only. Do not call directly. *)
-  external unsafe_get : t -> int -> float = "%floatarray_unsafe_get"
-  external unsafe_set : t -> int -> float -> unit = "%floatarray_unsafe_set"
+  external unsafe_get : t -> int -> float
+    = "%floatarray_unsafe_get"
+  external unsafe_set : t -> int -> float -> unit
+    = "%floatarray_unsafe_set"
 
-end
+end @@ stateful portable
 (** Float arrays with packed representation. *)
 
-module ArrayLabels : sig
+module ArrayLabels : sig @@ stateless
   type t = floatarray
   (** The type of float arrays with packed representation.
       @since 4.08
@@ -942,7 +958,7 @@ module ArrayLabels : sig
 
       @since 5.2 *)
 
-  val append : t -> t -> t
+  val append : t -> t -> t @@ stateful portable
   (** [append v1 v2] returns a fresh floatarray containing the
       concatenation of the floatarrays [v1] and [v2].
       @raise Invalid_argument if
@@ -959,7 +975,7 @@ module ArrayLabels : sig
       designate a valid subarray of [a]; that is, if
       [pos < 0], or [len < 0], or [pos + len > length a]. *)
 
-  val copy : t -> t
+  val copy : t -> t @@ stateful portable
   (** [copy a] returns a copy of [a], that is, a fresh floatarray
       containing the same elements as [a]. *)
 
@@ -1262,8 +1278,10 @@ module ArrayLabels : sig
   (** {1 Undocumented functions} *)
 
   (* These functions are for system use only. Do not call directly. *)
-  external unsafe_get : t -> int -> float = "%floatarray_unsafe_get"
-  external unsafe_set : t -> int -> float -> unit = "%floatarray_unsafe_set"
+  external unsafe_get : t -> int -> float
+    = "%floatarray_unsafe_get"
+  external unsafe_set : t -> int -> float -> unit
+    = "%floatarray_unsafe_set"
 
-end
+end @@ stateful portable
 (** Float arrays with packed representation (labeled functions). *)

@@ -22,7 +22,7 @@ open Modes.Portable
 
 [@@@ocaml.flambda_o3]
 
-external cpu_relax : unit -> unit @@ portable = "%cpu_relax"
+external cpu_relax : unit -> unit @@ stateless = "%cpu_relax"
 
 module Obj_opt : sig @@ portable
   type t
@@ -62,7 +62,7 @@ end = struct
     new_st
 
   external compare_and_set_field
-    : t array -> int -> t -> t -> bool @@ portable = "%atomic_cas_field"
+    : t array -> int -> t -> t -> bool @@ stateless = "%atomic_cas_field"
 
   let[@inline] compare_and_set st idx old new_ =
     (* In Flambda 2 there is a strict distinction between arrays and blocks. *)
@@ -89,11 +89,11 @@ module Raw = struct
 
   external spawn : (unit -> 'a) @ portable once -> 'a term_sync -> t @@ portable
     = "caml_domain_spawn"
-  external self : unit -> t @@ portable
+  external self : unit -> t @@ reading portable
     = "caml_ml_domain_id" [@@noalloc]
-  external get_recommended_domain_count: unit -> int @@ portable
+  external get_recommended_domain_count: unit -> int @@ reading portable
     = "caml_recommended_domain_count" [@@noalloc]
-  external get_max_domain_count : unit -> int @@ portable
+  external get_max_domain_count : unit -> int @@ stateless
     = "caml_max_domain_count" [@@noalloc]
 end
 
@@ -108,7 +108,7 @@ module DLS0 = struct
 
   type dls_state = Obj_opt.t array
 
-  external get_dls_state : unit -> dls_state @@ portable = "%dls_get"
+  external get_dls_state : unit -> dls_state @@ reading portable = "%dls_get"
 
   external set_dls_state : dls_state -> unit @@ portable =
     "caml_domain_dls_set" [@@noalloc]
@@ -231,10 +231,10 @@ let self () = Raw.self ()
 
 let is_main_domain () = (self () :> int) = 0
 
-external self_index : unit -> int# @@ portable
+external self_index : unit -> int# @@ reading portable
   = "%domain_index" [@@noalloc]
 
-external tag_int : int# -> int @@ portable = "%tag_int"
+external tag_int : int# -> int @@ stateless = "%tag_int"
 
 let[@inline] self_index () = tag_int (self_index ())
 
@@ -336,7 +336,7 @@ module TLS0 = struct
   type tls_state = Obj_opt.t array
 
   external get_tls_state
-    : unit -> tls_state @@ portable = "%tls_get"
+    : unit -> tls_state @@ reading portable = "%tls_get"
   [@@noalloc]
   external set_tls_state
     : tls_state -> unit @@ portable = "caml_domain_tls_set"
@@ -573,7 +573,7 @@ module Tick = struct
   let () = Callback.Safe.register "Domain.Tick.release" release
 
   external effective_interval_usec_prim
-    : (unit[@untagged]) -> (int[@untagged]) @@ portable
+    : (unit[@untagged]) -> (int[@untagged]) @@ reading portable
     = "caml_effective_tick_interval_usec_bytecode"
         "caml_effective_tick_interval_usec"
   [@@noalloc]

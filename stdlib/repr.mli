@@ -12,6 +12,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+@@ stateless
+
 (** Functions defined on the low-level representations of values.
 
     @since 5.4 *)
@@ -19,7 +21,8 @@
 (** {1 Physical comparison} *)
 
 external phys_equal :
-  ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> bool = "%eq"
+  ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> bool
+  = "%eq"
 (** [phys_equal e1 e2] tests for physical equality of [e1] and [e2].
     On mutable types such as references, arrays, byte sequences, records with
     mutable fields and objects with mutable instance variables,
@@ -32,7 +35,8 @@ external phys_equal :
 (** {1 Polymorphic comparison} *)
 
 external equal :
-  ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> bool = "%equal"
+  ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> bool
+  = "%equal"
 (** [equal e1 e2] tests for structural equality of [e1] and [e2].
     Mutable structures (e.g. references and arrays) are equal
     if and only if their current contents are structurally equal,

@@ -14,7 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 open! Stdlib
 
@@ -37,27 +37,31 @@ val executable_name : string
     on the platform and whether the program was compiled to bytecode or a native
     executable. *)
 
-external file_exists : string -> bool = "caml_sys_file_exists"
+external file_exists : string -> bool @@ reading portable
+  = "caml_sys_file_exists"
 (** Test if a file with the given name exists. *)
 
-external is_directory : string -> bool = "caml_sys_is_directory"
+external is_directory : string -> bool @@ reading portable
+  = "caml_sys_is_directory"
 (** Returns [true] if the given name refers to a directory,
     [false] if it refers to another kind of file.
     @raise Sys_error if no file exists with the given name.
     @since 3.10
 *)
 
-external is_regular_file : string -> bool = "caml_sys_is_regular_file"
+external is_regular_file : string -> bool @@ reading portable
+  = "caml_sys_is_regular_file"
 (** Returns [true] if the given name refers to a regular file,
     [false] if it refers to another kind of file.
     @raise Sys_error if no file exists with the given name.
     @since 5.1
 *)
 
-external remove : string -> unit = "caml_sys_remove"
+external remove : string -> unit @@ stateful portable = "caml_sys_remove"
 (** Remove the given file name from the file system. *)
 
-external rename : string -> string -> unit = "caml_sys_rename"
+external rename : string -> string -> unit @@ stateful portable
+  = "caml_sys_rename"
 (** Rename a file or directory.  [rename oldpath newpath] renames the
     file or directory called [oldpath], giving it [newpath] as its new name,
     moving it between (parent) directories if needed.  If a file named
@@ -68,18 +72,19 @@ external rename : string -> string -> unit = "caml_sys_rename"
     those of [oldpath].
    @since 4.06 concerning the "replace existing file" behavior *)
 
-external getenv : string -> string = "caml_sys_getenv"
+external getenv : string -> string @@ reading portable = "caml_sys_getenv"
 (** Return the value associated to a variable in the process
    environment.
    @raise Not_found if the variable is unbound. *)
 
-val getenv_opt: string -> string option
+val getenv_opt: string -> string option @@ reading portable
 (** Return the value associated to a variable in the process
     environment or [None] if the variable is unbound.
     @since 4.05
 *)
 
-external command : string -> int = "caml_sys_system_command"
+external command : string -> int @@ stateful portable
+  = "caml_sys_system_command"
 (** Execute the given shell command and return its exit code.
 
   The argument of {!Sys.command} is generally the name of a
@@ -99,30 +104,31 @@ external command : string -> int = "caml_sys_system_command"
   given a command name, a list of arguments, and optional file redirections.
 *)
 
-external time : unit -> (float [@unboxed]) =
+external time : unit -> (float [@unboxed]) @@ reading portable =
   "caml_sys_time" "caml_sys_time_unboxed" [@@noalloc]
 (** Return the processor time, in seconds, used by the program
    since the beginning of execution. *)
 
-external chdir : string -> unit = "caml_sys_chdir"
+external chdir : string -> unit @@ stateful portable = "caml_sys_chdir"
 (** Change the current working directory of the process. *)
 
-external mkdir : string -> int -> unit = "caml_sys_mkdir"
+external mkdir : string -> int -> unit @@ stateful portable = "caml_sys_mkdir"
 (** Create a directory with the given permissions.
 
     @since 4.12
 *)
 
-external rmdir : string -> unit = "caml_sys_rmdir"
+external rmdir : string -> unit @@ stateful portable = "caml_sys_rmdir"
 (** Remove an empty directory.
 
     @since 4.12
 *)
 
-external getcwd : unit -> string = "caml_sys_getcwd"
+external getcwd : unit -> string @@ reading portable = "caml_sys_getcwd"
 (** Return the current working directory of the process. *)
 
-external readdir : string -> string array = "caml_sys_read_directory"
+external readdir : string -> string array @@ reading portable
+  = "caml_sys_read_directory"
 (** Return the names of all files present in the given directory.
    Names denoting the current directory and the parent directory
    (["."] and [".."] in Unix) are not returned.  Each string in the
@@ -142,7 +148,7 @@ val io_buffer_size: int
     @since 5.4
 *)
 
-val interactive : bool ref @@ nonportable
+val interactive : bool ref
 [@@alert unsynchronized_access
     "The interactive status is a mutable global state."
 ]
@@ -259,12 +265,13 @@ external runtime_variant : unit -> string = "caml_runtime_variant"
     time, but for byte-code it can be changed after compilation.
     @since 4.03 *)
 
-external runtime_parameters : unit -> string = "caml_runtime_parameters"
+external runtime_parameters : unit -> string @@ reading portable
+  = "caml_runtime_parameters"
 (** Return the value of the runtime parameters, in the same format
     as the contents of the [OCAMLRUNPARAM] environment variable.
     @since 4.03 *)
 
-external poll_actions : unit -> unit = "%poll"
+external poll_actions : unit -> unit @@ stateful portable = "%poll"
 (** Run any pending runtime actions, such as minor collections, major
     GC slices, signal handlers, finalizers, or memprof callbacks.
     @since 5.3 *)
@@ -294,7 +301,7 @@ type signal_behavior =
    number as an argument. *)
 
 external signal :
-  signal -> signal_behavior -> signal_behavior @@ nonportable
+  signal -> signal_behavior -> signal_behavior @@ stateful
   = "caml_install_signal_handler"
 [@@alert unsafe_multidomain "Use [Sys.Safe.signal]."]
 (** Set the behavior of the system on receipt of a given signal.  The
@@ -308,7 +315,7 @@ external signal :
    calling the handler.
 *)
 
-val set_signal : signal -> signal_behavior -> unit @@ nonportable
+val set_signal : signal -> signal_behavior -> unit @@ stateful
 [@@alert unsafe_multidomain "Use [Sys.Safe.set_signal]."]
 (** Same as {!Sys.signal} but the return value is ignored. *)
 
@@ -444,7 +451,7 @@ exception Break
 (** Exception raised on interactive interrupt if {!Sys.catch_break}
    is enabled. *)
 
-val catch_break : bool -> unit
+val catch_break : bool -> unit @@ stateful portable
 (** [catch_break] governs whether interactive interrupt (ctrl-C)
     terminates the program or raises the [Break] exception.
     Call [catch_break true] to enable raising [Break],
@@ -461,7 +468,7 @@ val catch_break : bool -> unit
     signal masks from [Thread.sigmask] to direct the interrupt towards a
     specific thread. *)
 
-val with_async_exns : (unit -> 'a) -> 'a
+val with_async_exns : (unit -> 'a) -> 'a @@ stateful portable
 (** [with_async_exns f] runs [f] and returns its result, in addition to
     causing any asynchronous [Break] or [Stack_overflow] exceptions
     (e.g. from finalisers, signal handlers or the GC) to be raised from the
@@ -506,7 +513,7 @@ val ocaml_release : ocaml_release_info
     @since 4.14
 *)
 
-val enable_runtime_warnings: bool -> unit
+val enable_runtime_warnings: bool -> unit @@ stateful portable
 [@@alert unsynchronized_access
     "The status of runtime warnings is a mutable global state."
 ]
@@ -517,7 +524,7 @@ val enable_runtime_warnings: bool -> unit
 
     @since 4.03 *)
 
-val runtime_warnings_enabled: unit -> bool
+val runtime_warnings_enabled: unit -> bool @@ reading portable
 [@@alert unsynchronized_access
     "The status of runtime warnings is a mutable global state."
 ]
@@ -588,7 +595,7 @@ module Safe : sig
 
       The provided [signal_behavior] must be [portable] as it is shared between all
       domains. *)
-end
+end @@ stateful portable
 
 type arch =
   | Amd64
