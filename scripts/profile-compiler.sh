@@ -43,8 +43,14 @@ for tool in "$root/_install/bin/"*; do
 done
 
 # Make a fake `ocamlopt` that collects profiling data:
-rm -- "$output/bin/ocamlopt" "$output/bin/ocamlopt.opt"
-cat > "${output}/bin/ocamlopt" <<EOF
+for bin in ocamlopt ocamlopt.opt ocamlc ocamlc.opt
+do
+rm -fr "$output/bin/$bin"
+native_only_flags=''
+if [[ $bin == ocamlopt* ]]; then
+  native_only_flags='-dgc-timings -inlining-report'
+fi
+cat > "$output/bin/$bin" <<EOF
 #!/usr/bin/env bash
 
 # Boilerplate:
@@ -61,19 +67,18 @@ exec \
   -e instructions:u,cycles:u,task-clock \
   -o "$output/perf.\$\$.txt" \
   -- \
-    "$root/_install/bin/ocamlopt.opt" \
+    "$root/_install/bin/$bin" \
     -dprofile \
     -dgranularity func \
     -dtimings-precision 6 \
-    -dgc-timings \
-    -inlining-report \
+    $native_only_flags \
     -dump-into-file \
     -dump-dir "${output}" \
     -dprofile-output "gc.\$\$.dump" \
     "\$@" # Invoke the compiler
 EOF
-chmod +x "$output/bin/ocamlopt"
-cp "$output/bin/ocamlopt" "$output/bin/ocamlopt.opt"
+chmod +x "$output/bin/$bin"
+done
 
 # Ask the build to use our compiler instead of the default:
 sed \
@@ -95,6 +100,7 @@ dune build \
   stdlib/.stdlib.objs/native/std_exit.cmx
 
 # Make memtrace data (machine-)readable:
+echo 'Analyzing the results...'
 dune build --workspace duneconf/boot.ws external/memtrace/bin/dump_trace.exe
 for trace in "${output}"/alloc.*.ctf
 do
