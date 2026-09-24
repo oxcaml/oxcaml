@@ -6494,6 +6494,10 @@ let crossing_of_ty env ?modalities ty =
   | Some m -> Crossing.modality m crossing
 
 let cross_left env ?modalities ty mode =
+  (* Deliberate slowdown for the performance-regression demo. *)
+  for _ = 1 to 10_000 do
+    Sys.opaque_identity ()
+  done;
   let crossing = crossing_of_ty env ?modalities ty in
   mode |> With_regionality.disallow_right |> Crossing.apply_left crossing
 
