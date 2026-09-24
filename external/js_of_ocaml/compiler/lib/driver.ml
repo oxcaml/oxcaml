@@ -235,7 +235,8 @@ let rec loop max name round i (p : 'a) : 'a =
 let round profile : 'a -> 'a =
   print
   +> tailcall
-  +> Ref_unboxing.f
+  (* CR-someday jvanburen: Re-enable reference unboxing once we've confirmed
+     ocsigen/js_of_ocaml#2426 fixes the assertion failures it hit on OxCaml bytecode. *)
   +> (flow +> specialize +> eval +> fst)
   +> inline profile
   +> phi
