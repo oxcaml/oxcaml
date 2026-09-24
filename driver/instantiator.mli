@@ -28,7 +28,6 @@ module CU := Compilation_unit
 
 type unit_info = {
   ui_unit : CU.t;
-  ui_arg_descr : Lambda.arg_descr option;
   ui_format : Lambda.main_module_block_format;
 }
 
@@ -43,8 +42,7 @@ val instantiate
       output_prefix:string ->
       compilation_unit:CU.t ->
       runtime_args:Translmod.runtime_arg list ->
-      main_module_block_repr:Lambda.module_representation ->
-      arg_descr:Lambda.arg_descr option -> unit)
+      main_module_block_repr:Lambda.module_representation -> unit)
   -> unit
 
 type error =

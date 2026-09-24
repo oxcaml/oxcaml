@@ -37,7 +37,6 @@ module type S = sig
     compilation_unit:Compilation_unit.t ->
     runtime_args:Translmod.runtime_arg list ->
     main_module_block_repr:Lambda.module_representation ->
-    arg_descr:Lambda.arg_descr option ->
     keep_symbol_tables:bool ->
     unit
 
@@ -83,14 +82,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
 
   (** Native compilation backend for .ml files. *)
 
-  let make_arg_descr ~param ~arg_block_idx : Lambda.arg_descr option =
-    match param, arg_block_idx with
-    | Some arg_param, Some arg_block_idx -> Some { arg_param; arg_block_idx }
-    | None, None -> None
-    | Some _, None -> Misc.fatal_error "No argument field"
-    | None, Some _ -> Misc.fatal_error "Unexpected argument field"
-
-  let compile_from_tlambda i tlambda ~keep_symbol_tables ~as_arg_for =
+  let compile_from_tlambda i tlambda ~keep_symbol_tables =
     tlambda
     |> Profile.(record generate) (fun (program : Lambda.program) ->
         Builtin_attributes.warn_unused ();
@@ -121,30 +113,25 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
             ~sourcefile:(Some (Unit_info.original_source_file i.target))
             ~prefixname:(Unit_info.prefix i.target)
             ~ppf_dump:i.ppf_dump program;
-          let arg_descr =
-            make_arg_descr ~param:as_arg_for
-              ~arg_block_idx:program.arg_block_idx
-          in
           Compilenv.save_unit_info
             (Unit_info.Artifact.filename
                (Unit_info.artifact i.target ~extension:Backend.ext_flambda_obj))
             ~main_module_block_format:program.main_module_block_format
-            ~arg_descr ~static_data))
+            ~static_data))
 
-  let compile_from_typed i typed ~keep_symbol_tables ~as_arg_for =
+  let compile_from_typed i typed ~keep_symbol_tables =
     let loc = Location.in_file (Unit_info.original_source_file i.target) in
     typed
     |> Profile.(record transl)
          (Translmod.transl_implementation ~loc i.module_name)
-    |> compile_from_tlambda i ~keep_symbol_tables ~as_arg_for
+    |> compile_from_tlambda i ~keep_symbol_tables
 
   type starting_point =
     | Parsing
     | Emit of Optcomp_intf.emit
     | Instantiation of
         { runtime_args : Translmod.runtime_arg list;
-          main_module_block_repr : Lambda.module_representation;
-          arg_descr : Lambda.arg_descr option
+          main_module_block_repr : Lambda.module_representation
         }
 
   let starting_point_of_compiler_pass start_from =
@@ -178,12 +165,8 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
           | None -> None
         in
         let typed = structure, coercion, argument_coercion in
-        let as_arg_for =
-          !Clflags.as_argument_for
-          |> Option.map Global_module.Parameter_name.of_string
-        in
         if not (Config.flambda || Config.flambda2) then Clflags.set_oclassic ();
-        compile_from_typed info typed ~as_arg_for ~keep_symbol_tables
+        compile_from_typed info typed ~keep_symbol_tables
       in
       Compile_common.implementation
         ~hook_parse_tree:(Compiler_hooks.execute Compiler_hooks.Parse_tree_impl)
@@ -191,25 +174,19 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
           Compiler_hooks.execute Compiler_hooks.Typed_tree_impl impl)
         info ~backend
     | Emit emit -> emit info (* Emit assembly directly from Linear IR *)
-    | Instantiation { runtime_args; main_module_block_repr; arg_descr } ->
+    | Instantiation { runtime_args; main_module_block_repr } ->
       (match !Clflags.as_argument_for with
       | Some _ ->
         (* CR lmaurer: Needs nicer error message (this is a user error) *)
         Misc.fatal_error
           "-as-argument-for is not allowed (and not needed) with -instantiate"
       | None -> ());
-      let as_arg_for, arg_block_idx =
-        match (arg_descr : Lambda.arg_descr option) with
-        | Some { arg_param; arg_block_idx } ->
-          Some arg_param, Some arg_block_idx
-        | None -> None, None
-      in
       let impl =
         Translmod.transl_instance info.module_name ~runtime_args
-          ~main_module_block_repr ~arg_block_idx
+          ~main_module_block_repr
       in
       if not (Config.flambda || Config.flambda2) then Clflags.set_oclassic ();
-      compile_from_tlambda info impl ~as_arg_for ~keep_symbol_tables
+      compile_from_tlambda info impl ~keep_symbol_tables
 
   let implementation ~start_from ~source_file ~output_prefix ~keep_symbol_tables
       =
@@ -218,10 +195,8 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
       ~keep_symbol_tables ~compilation_unit:Inferred_from_output_prefix
 
   let instance ~source_file ~output_prefix ~compilation_unit ~runtime_args
-      ~main_module_block_repr ~arg_descr ~keep_symbol_tables =
-    let start_from =
-      Instantiation { runtime_args; main_module_block_repr; arg_descr }
-    in
+      ~main_module_block_repr ~keep_symbol_tables =
+    let start_from = Instantiation { runtime_args; main_module_block_repr } in
     implementation_aux ~start_from ~source_file ~output_prefix
       ~keep_symbol_tables ~compilation_unit:(Exactly compilation_unit)
 
@@ -238,8 +213,8 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
 
   let read_unit_info file : Instantiator.unit_info =
     let unit_info, _crc = Compilenv.read_unit_info file in
-    let { Cmx_format.ui_unit; ui_arg_descr; ui_format; _ } = unit_info in
-    { Instantiator.ui_unit; ui_arg_descr; ui_format }
+    let { Cmx_format.ui_unit; ui_format; _ } = unit_info in
+    { Instantiator.ui_unit; ui_format }
 
   let instantiate ~src ~args targetcmx =
     Instantiator.instantiate ~src ~args targetcmx
@@ -251,13 +226,13 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     then Emitaux.binary_backend_available := true;
     Compilenv.reset info.Compile_common.target;
     if not (Config.flambda || Config.flambda2) then Clflags.set_oclassic ();
-    compile_from_tlambda info program ~as_arg_for:None ~keep_symbol_tables:false
+    compile_from_tlambda info program ~keep_symbol_tables:false
 
   let functorize input_module_names target =
     Functorizer.functorize input_module_names target ~with_info ~impl_ext:"cmx"
       ~read_format:(fun filename ->
         let unit_info, _crc = Compilenv.read_unit_info filename in
-        unit_info.ui_format, unit_info.ui_arg_descr)
+        unit_info.ui_format)
       ~compile_program
 end
 

@@ -121,7 +121,6 @@ let read_unit_info filename =
       ui_unit = uir.uir_unit;
       ui_defines = uir.uir_defines;
       ui_format = uir.uir_format;
-      ui_arg_descr = uir.uir_arg_descr;
       ui_imports_cmi = uir.uir_imports_cmi |> Array.to_list;
       ui_imports_cmx = uir.uir_imports_cmx |> Array.to_list;
       ui_quoted_cmi = uir.uir_quoted_cmi |> Array.to_list;
@@ -299,7 +298,6 @@ let write_unit_info info filename =
   let raw_info = {
     uir_unit = info.ui_unit;
     uir_defines = info.ui_defines;
-    uir_arg_descr = info.ui_arg_descr;
     uir_imports_cmi = Array.of_list info.ui_imports_cmi;
     uir_imports_cmx = Array.of_list info.ui_imports_cmx;
     uir_quoted_cmi = Array.of_list info.ui_quoted_cmi;
@@ -323,7 +321,7 @@ let write_unit_info info filename =
   let crc = Digest.file filename in
   Digest.output oc crc)
 
-let build_unit_info ~main_module_block_format ~arg_descr ~static_data =
+let build_unit_info ~main_module_block_format ~static_data =
   let quoted_intfs = Env.quoted_intfs () in
   let quoted_intfs_and_deps = Env.loaded_transitive_dependencies quoted_intfs in
   let static_data =
@@ -331,14 +329,13 @@ let build_unit_info ~main_module_block_format ~arg_descr ~static_data =
       ~sections:current_unit.uib_file_sections
       static_data
   in
-  (* We could have [set_main_module_block_format] and [set_arg_descr] instead
-     of passing these in as arguments but, unlike most of the state that this
-     module keeps track of, they're not values that get accumulated over time,
-     they just get computed once. (Arguably we should remove [set_export_info]
-     by the same reasoning.) *)
+  (* We could have [set_main_module_block_format] instead of passing it in as
+     an argument but, unlike most of the state that this module keeps track
+     of, it's not a value that gets accumulated over time, it just gets
+     computed once. (Arguably we should remove [set_export_info] by the same
+     reasoning.) *)
   { ui_unit = current_unit.uib_unit;
     ui_defines = current_unit.uib_defines;
-    ui_arg_descr = arg_descr;
     ui_imports_cmi = Env.imports();
     ui_imports_cmx = current_unit.uib_imports_cmx;
     ui_quoted_cmi = CU.Name.Set.to_list quoted_intfs_and_deps;
@@ -355,9 +352,9 @@ let build_unit_info ~main_module_block_format ~arg_descr ~static_data =
       File_sections.Builder.build current_unit.uib_file_sections;
   }
 
-let save_unit_info filename ~main_module_block_format ~arg_descr ~static_data =
+let save_unit_info filename ~main_module_block_format ~static_data =
   let current_unit =
-    build_unit_info ~main_module_block_format ~arg_descr ~static_data
+    build_unit_info ~main_module_block_format ~static_data
   in
   write_unit_info current_unit filename
 

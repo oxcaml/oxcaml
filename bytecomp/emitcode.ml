@@ -424,7 +424,7 @@ let rec emit = function
 (* Emission to a file *)
 
 let to_file outchan cu artifact_info ~required_globals ~main_module_block_format
-          ~arg_descr code =
+          code =
   init();
   Fun.protect ~finally:clear (fun () ->
   output_string outchan cmo_magic_number;
@@ -458,7 +458,6 @@ let to_file outchan cu artifact_info ~required_globals ~main_module_block_format
       cu_pos = pos_code;
       cu_codesize = !out_position;
       cu_reloc = List.rev !reloc_info;
-      cu_arg_descr = arg_descr;
       cu_imports = Env.imports() |> Array.of_list;
       cu_format = main_module_block_format;
       cu_primitives = List.map Primitive.byte_name
