@@ -130,6 +130,8 @@ module Variable : sig
   val export : Set.t -> importer
 
   val import : importer -> t -> t
+
+  val import_and_rename : importer -> t -> t
 end
 
 module Symbol : sig
