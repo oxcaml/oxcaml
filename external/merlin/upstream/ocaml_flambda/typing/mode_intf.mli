@@ -1231,11 +1231,21 @@ module type S = sig
         ('l * allowed) With_regionality.t ->
         With_regionality.r
 
-      (** [concat ~then t] returns the modality that is [then_] after [t]. *)
+      (** [concat ~then_ t] returns the modality that is [then_] after [t]. It
+          retains annotations that individually establish a resulting bound,
+          preferring [then_] when both do. Bounds established only by combining
+          two annotations have no single annotation. *)
       val concat : then_:t -> t -> t
 
-      (** [set a t] overwrites an axis of [t] to be [a]. *)
-      val set : 'a Axis.t -> 'a -> t -> t
+      (** [set ax a t] overwrites an axis of [t] to be [a]. [annotation] records
+          the source that imposed this bound; omitting it clears any previous
+          annotation on this axis. Identity modalities introduce no bound and do
+          not retain an annotation. *)
+      val set : ?annotation:Hint.annotation_source -> 'a Axis.t -> 'a -> t -> t
+
+      (** The source responsible for this axis, including when the bound was
+          implied by an annotation on another axis. *)
+      val annotation : 'a Axis.t -> t -> Hint.annotation_source option
 
       (** [proj ax t] projects out the axis [ax] of [t]. *)
       val proj : 'a Axis.t -> t -> 'a
@@ -1244,8 +1254,8 @@ module type S = sig
           [t0]. *)
       val diff : t -> t -> atom list
 
-      (** [equate t0 t1] checks that [t0 = t1]. Definition: [t0 = t1] iff
-          [t0 <= t1] and [t1 <= t0]. *)
+      (** [equate t0 t1] checks that [t0 = t1], ignoring annotations.
+          Definition: [t0 = t1] iff [t0 <= t1] and [t1 <= t0]. *)
       val equate : t -> t -> (unit, equate_error) Result.t
 
       (** Printing for debugging. *)

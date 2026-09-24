@@ -33,6 +33,7 @@ val transl_mode_with_locality :
     attributes on the field and insert mutable-implied modalities accordingly.
 *)
 val transl_modalities :
+  ?mutable_field:string Location.loc ->
   maturity:Language_extension.maturity ->
   Types.mutability ->
   Parsetree.modalities ->
@@ -50,7 +51,8 @@ val least_modalities :
 val sort_dedup_modalities : Mode.Modality.atom list -> Mode.Modality.atom list
 
 (** Get the default modalities implied by the mutability of a field. *)
-val mutable_modalities : Types.mutability -> Mode.Modality.Const.t
+val mutable_modalities :
+  ?field:string Location.loc -> Types.mutability -> Mode.Modality.Const.t
 
 (** Similar to [transl_modalities] but takes an explicit [default] modality
     instead of computing it from mutability. Used when merging explicit
