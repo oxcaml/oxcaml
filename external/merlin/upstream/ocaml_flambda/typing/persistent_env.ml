@@ -109,6 +109,7 @@ type import = {
   imp_visibility: Load_path.visibility;
   imp_crcs : Import_info.Intf.t array;
   imp_flags : Cmi_format.pers_flags list;
+  mutable imp_crcs_checked : bool;
 }
 
 (* If a .cmi file is missing (or invalid), we
@@ -288,6 +289,16 @@ let check_consistency penv imp =
     | (Normal _ | Parameter), _ ->
       error (Inconsistent_import(name, auth, source))
 
+(* CRC vectors have one entry per transitive interface, so scan each import at
+   most once. A [~check:false] lookup caches the import unchecked; the first
+   checking lookup then scans it. The flag is set only after success, so a
+   failed check is retried. *)
+let check_consistency_once penv imp =
+  if not imp.imp_crcs_checked then begin
+    check_consistency penv imp;
+    imp.imp_crcs_checked <- true
+  end
+
 let is_registered_parameter_import {param_imports; _} name =
   Global_module.Name.mem_parameter_set name !param_imports
 
@@ -394,9 +405,10 @@ let acknowledge_import penv ~check modname pers_sig =
       imp_visibility = visibility;
       imp_crcs = crcs;
       imp_flags = flags;
+      imp_crcs_checked = false;
     }
   in
-  if check then check_consistency penv import;
+  if check then check_consistency_once penv import;
   Hashtbl.add imports modname (Found import);
   import
 
@@ -726,7 +738,7 @@ and acknowledge_new_pers_name penv check global_name global import =
              pn_global = global;
              pn_sign;
            } in
-  if check then check_consistency penv import;
+  if check then check_consistency_once penv import;
   Hashtbl.add persistent_names global_name pn;
   remember_global penv global ~precision:Exact ~mentioned_by:Current;
   pn
