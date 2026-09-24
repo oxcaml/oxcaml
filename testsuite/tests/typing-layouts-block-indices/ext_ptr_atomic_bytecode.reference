@@ -1,0 +1,11 @@
+load: Failure: External ptr primitives are unimplemented on bytecode
+set: Failure: External ptr primitives are unimplemented on bytecode
+exchange: Failure: External ptr primitives are unimplemented on bytecode
+cas: Failure: External ptr primitives are unimplemented on bytecode
+compare_exchange: Failure: External ptr primitives are unimplemented on bytecode
+fetch_add: Failure: External ptr primitives are unimplemented on bytecode
+add: Failure: External ptr primitives are unimplemented on bytecode
+sub: Failure: External ptr primitives are unimplemented on bytecode
+land: Failure: External ptr primitives are unimplemented on bytecode
+lor: Failure: External ptr primitives are unimplemented on bytecode
+lxor: Failure: External ptr primitives are unimplemented on bytecode
