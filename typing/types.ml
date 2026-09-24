@@ -308,7 +308,7 @@ and jkind_declaration =
 module TransientTypeOps = struct
   type t = type_expr
   let compare t1 t2 = t1.id - t2.id
-  let hash t = t.id
+  let hash _ = 0
   let equal t1 t2 = t1 == t2
 end
 
