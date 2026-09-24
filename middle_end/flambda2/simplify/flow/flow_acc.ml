@@ -352,7 +352,7 @@ let record_let_binding ~rewrite_id ~generate_phantom_lets ~let_bound
       let bound_var = Bound_pattern.must_be_singleton let_bound in
       let var = Bound_var.var bound_var in
       record_var_alias var simple t
-    | Set_of_closures _ | Rec_info _ -> record_var_bindings t free_names
+    | Set_of_closures _ | Unboxed_closure _ | Rec_info _ -> record_var_bindings t free_names
     | Prim (original_prim, _) -> (
       let bound_var = Bound_pattern.must_be_singleton let_bound in
       let var = Bound_var.var bound_var in

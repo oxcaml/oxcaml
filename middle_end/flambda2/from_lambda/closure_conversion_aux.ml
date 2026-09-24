@@ -1088,7 +1088,7 @@ module Let_with_acc = struct
     let has_no_effects =
       match (named : Named.t) with
       | Prim (prim, _) -> Flambda_primitive.at_most_generative_effects prim
-      | Simple _ | Static_consts _ | Set_of_closures _ | Rec_info _ -> true
+      | Simple _ | Static_consts _ | Set_of_closures _ | Unboxed_closure _ | Rec_info _ -> true
     in
     let keep_bindings_for_simplify =
       (* When using Simplify, we don't delete unused bindings here, to increase
@@ -1114,6 +1114,8 @@ module Let_with_acc = struct
                 function_slot_size = Code.function_slot_size code
               })
             set_of_closures
+        | Unboxed_closure { closure; first_unarized_parameters = _ } ->
+          Code_size.simple closure |> Cost_metrics.from_size
         | Rec_info _ -> Cost_metrics.zero
       in
       let acc =

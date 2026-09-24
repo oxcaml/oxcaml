@@ -321,6 +321,9 @@ and subst_named env (n : Named.t) =
   | Prim (p, dbg) -> Named.create_prim (subst_primitive env p) dbg
   | Set_of_closures (set, alloc_mode) ->
     Named.create_set_of_closures ~alloc_mode (subst_set_of_closures env set)
+  | Unboxed_closure { closure; first_unarized_parameters } ->
+    Named.create_unboxed_closure ~closure:(subst_simple env closure)
+      ~first_unarized_parameters:(List.map (subst_simple env) first_unarized_parameters)
   | Static_consts sc -> Named.create_static_consts (subst_static_consts env sc)
   | Rec_info ri -> Named.create_rec_info (subst_rec_info_expr env ri)
 
@@ -893,6 +896,11 @@ let named_exprs env named1 named2 : Named.t Comparison.t =
       |> Comparison.map
            ~f:(Named.create_set_of_closures ~alloc_mode:alloc_mode1)
     else Different { approximant = named1 }
+  | Unboxed_closure { closure = closure1; first_unarized_parameters = params1 },
+    Unboxed_closure { closure = closure2; first_unarized_parameters = params2 } ->
+    pairs ~f1:simple_exprs ~f2:simple_lists env (closure1, params1) (closure2, params2)
+    |> Comparison.map ~f:(fun (closure, first_unarized_parameters) ->
+        Named.create_unboxed_closure ~closure ~first_unarized_parameters)
   | Rec_info rec_info_expr1, Rec_info rec_info_expr2 ->
     rec_info_exprs env rec_info_expr1 rec_info_expr2
     |> Comparison.map ~f:Named.create_rec_info
@@ -901,7 +909,7 @@ let named_exprs env named1 named2 : Named.t Comparison.t =
        back when [Static_consts] was added. Remember, kids, don't use catch-all
        cases. *)
     assert false
-  | (Simple _ | Prim _ | Set_of_closures _ | Static_consts _ | Rec_info _), _ ->
+  | (Simple _ | Prim _ | Set_of_closures _ | Unboxed_closure _ | Static_consts _ | Rec_info _), _ ->
     Different { approximant = subst_named env named1 }
 
 (* Compares the two patterns for compatibility *and* adds the

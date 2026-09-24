@@ -360,6 +360,7 @@ and dynamic_let_expr env vars (defining_expr : Flambda.Named.t) body :
         List.map (fun decl : Fexpr.named -> Fexpr.Closure decl) fun_decls
       in
       defining_exprs, value_slots
+    | Unboxed_closure _ -> Misc.fatal_error "TODO: fexpr unboxed closure"
     | Rec_info ri -> ([Rec_info (rec_info env ri)] : Fexpr.named list), None
     | Static_consts _ -> assert false
   in
@@ -770,6 +771,7 @@ module Iter = struct
         Name_mode.is_phantom (Bound_pattern.name_mode bound_pattern)
       in
       f_s ~closure_symbols:None ~is_phantom s
+    | Unboxed_closure _ -> Misc.fatal_error "TODO: fexpr unboxed closure"
     | Static_consts consts -> (
       match bound_pattern with
       | Static bound_static -> static_consts f_c f_s bound_static consts
