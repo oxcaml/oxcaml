@@ -123,13 +123,10 @@ module Layout : sig
 
   val is_surely_addressable_flat : Sort.Flat.t t -> bool
 
-  val crosses_externality : Sort.t t -> bool
+  val implied_externality : Sort.t t -> Jkind_axis.Externality.t
 
   (** Updates the nullability on the layout's scannable axis. *)
   val set_root_nullability : Sort.t t -> Jkind_axis.Nullability.t -> Sort.t t
-
-  (** Updates the separability on the layout's scannable axis. *)
-  val set_root_separability : Sort.t t -> Jkind_axis.Separability.t -> Sort.t t
 
   module Debug_printers : sig
     val t :
@@ -337,8 +334,6 @@ module Builtin : sig
 
   (** Value of types of this jkind are not retained at all at runtime *)
   val void : why:History.void_creation_reason -> ('l * disallowed) Types.jkind
-
-  val scannable : why:History.scannable_creation_reason -> 'd Types.jkind
 
   val value_or_null :
     why:History.value_or_null_creation_reason -> 'd Types.jkind

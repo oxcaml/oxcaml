@@ -45,6 +45,8 @@ module Bounds_mask = struct
 
   let residual = Axis_lattice.co_sub
 
+  let meet_externality = Axis_lattice.meet_externality
+
   let le = Axis_lattice.leq
 
   let of_axis_set = Axis_lattice.of_axis_set
@@ -332,11 +334,14 @@ module Layout = struct
       false
     | Product ts -> List.for_all is_surely_addressable_flat ts
 
-  let rec crosses_externality : Sort.t t -> bool = function
-    | Any _ -> false
-    | Sort (s, _) -> Sort.crosses_externality s
-    | Product ts -> List.for_all crosses_externality ts
-    | Addressable t -> crosses_externality t
+  let rec implied_externality : Sort.t t -> Externality.t = function
+    | Any _ -> Internal
+    | Sort (s, sa) -> Sort.implied_externality ~separability:sa.separability s
+    | Product ts ->
+      List.fold_left
+        (fun acc t -> Externality.join acc (implied_externality t))
+        Externality.min ts
+    | Addressable t -> implied_externality t
 
   let rec equate_or_equal ~allow_mutation t1 t2 =
     match t1, t2 with
@@ -677,8 +682,11 @@ module Mod_bounds = struct
     then Bounds_mask.bot
     else Bounds_mask.meet (to_axis_lattice t) mask
 
-  let mask_of_externality externality =
-    to_axis_lattice (create Crossing.max ~externality)
+  let meet_externality e t =
+    let capped = Externality.meet (externality t) e in
+    if Externality.equal capped (externality t)
+    then t
+    else set_externality capped t
 
   let join_axis_lattice t bounds =
     Bounds_mask.join (to_axis_lattice t) bounds |> of_axis_lattice
@@ -710,16 +718,25 @@ module With_bounds = struct
       let open Format in
       fprintf ppf "@[{ bounds_mask = %a }@]" Bounds_mask.print bounds_mask
 
-    let printable_bounds_mask ~mod_bounds ~bounds_crossed_by_layout
+    let printable_bounds_mask ~mod_bounds ~implied_externality
         ~type_info:{ bounds_mask = explicit_bounds_mask } =
       (* Contributions covered by direct bounds can be restored for printing. *)
-      Mod_bounds.to_axis_lattice mod_bounds
-      |> Bounds_mask.join explicit_bounds_mask
-      |> Bounds_mask.join bounds_crossed_by_layout
+      let mask =
+        Mod_bounds.to_axis_lattice mod_bounds
+        |> Bounds_mask.join explicit_bounds_mask
+      in
+      (* An externality contribution at or above the bound implied by the
+         type's layout (or the enclosing kind's layout) is redundant and not
+         printed. *)
+      if Externality.le implied_externality (Axis_lattice.externality mask)
+      then
+        Bounds_mask.join mask
+          (Bounds_mask.of_axis_set (Axis_set.singleton (Nonmodal Externality)))
+      else mask
 
-    let has_non_id_modalities ~mod_bounds ~bounds_crossed_by_layout ~type_info =
+    let has_non_id_modalities ~mod_bounds ~implied_externality ~type_info =
       let bounds_mask =
-        printable_bounds_mask ~mod_bounds ~bounds_crossed_by_layout ~type_info
+        printable_bounds_mask ~mod_bounds ~implied_externality ~type_info
       in
       not (Bounds_mask.equal bounds_mask Axis_lattice.top)
   end
@@ -1021,23 +1038,13 @@ module Base_and_axes = struct
               with_bounds = t.with_bounds
             })
 
-  let refresh_layout_implied_crossing_mod_bounds ~crosses_externality l
-      mod_bounds =
-    match Mod_bounds.externality mod_bounds with
-    | Externality.External -> mod_bounds
-    | Externality.External64 | Externality.Internal ->
-      if crosses_externality l
-      then Mod_bounds.set_externality Externality.External mod_bounds
-      else mod_bounds
-
-  let refresh_layout_implied_crossing ~crosses_externality
+  let refresh_layout_implied_crossing ~implied_externality
       ({ base; mod_bounds; _ } as t) =
     match base with
     | Kconstr _ -> t
     | Layout l ->
       let mod_bounds' =
-        refresh_layout_implied_crossing_mod_bounds ~crosses_externality l
-          mod_bounds
+        Mod_bounds.meet_externality (implied_externality l) mod_bounds
       in
       if mod_bounds' == mod_bounds
       then t
@@ -1045,11 +1052,11 @@ module Base_and_axes = struct
 
   let refresh_layout_implied_crossing_const t =
     refresh_layout_implied_crossing
-      ~crosses_externality:Layout.Const.crosses_externality t
+      ~implied_externality:Layout.Const.implied_externality t
 
   let refresh_layout_implied_crossing_desc t =
     refresh_layout_implied_crossing
-      ~crosses_externality:Layout.crosses_externality t
+      ~implied_externality:Layout.implied_externality t
 
   let rec fully_expand_aliases_const env t : _ jkind_const_desc =
     match expand_base_once_const env t with
@@ -1080,6 +1087,13 @@ module Base_and_axes = struct
         fully_expand_aliases_const_report_missing_cmi env t
       in
       jkind_desc_of_const const, missing_cmi
+
+  (* Precondition: [jk] is fully expanded; an unexpanded [Kconstr] may have a
+     manifest whose layout implies a lower bound. *)
+  let implied_externality_of_fully_expanded jk =
+    match jk.base with
+    | Layout l -> Layout.implied_externality l
+    | Kconstr _ -> Externality.Internal
 
   type normalize_mode =
     | Require_best
@@ -1450,10 +1464,11 @@ module Base_and_axes = struct
                 loop ctl bounds_so_far bounds_mask ((ty, ti) :: bs)
             | _ -> (
               let found_jkind_for_ty ctl b_upper_bounds b_with_bounds quality
-                  skippable_bounds :
+                  skippable_bounds ~externality_cap :
                   Mod_bounds.t * (l * disallowed) with_bounds * Loop_control.t =
                 let bounds_mask_for_ty =
-                  Bounds_mask.residual bounds_mask_for_ty skippable_bounds
+                  Bounds_mask.meet_externality externality_cap
+                    (Bounds_mask.residual bounds_mask_for_ty skippable_bounds)
                 in
                 match quality, mode, t_has_abstract_base with
                 | Best, _, _ | Not_best, Ignore_best, false -> (
@@ -1504,7 +1519,8 @@ module Base_and_axes = struct
                 | Ignore_best ->
                   (* out of fuel, so assume [ty] has the worst possible bounds. *)
                   found_jkind_for_ty ctl Mod_bounds.max No_with_bounds Not_best
-                    Bounds_mask.bot [@nontail]
+                    Bounds_mask.bot ~externality_cap:Externality.Internal
+                  [@nontail]
                 | Require_best ->
                   (* See Note [Ran out of fuel when requiring best]. *)
                   Mod_bounds.max, No_with_bounds, ctl)
@@ -1516,25 +1532,21 @@ module Base_and_axes = struct
                     (* must expand aliases before trusting b_jkind's mod_bounds *)
                     fully_expand_aliases env b_jkind.jkind
                   in
-                  let skippable_bounds =
+                  let externality_cap =
                     (* Prevent [b]'s with-bounds from raising its layout-implied
                        externality. *)
-                    match b_jkind_jkind.base with
-                    | Layout l when Layout.crosses_externality l ->
-                      Bounds_mask.join skippable_bounds
-                        (Bounds_mask.of_axis_set
-                           (Axis_set.singleton (Nonmodal Externality)))
-                    | Layout _ | Kconstr _ -> skippable_bounds
+                    implied_externality_of_fully_expanded b_jkind_jkind
                   in
                   (found_jkind_for_ty ctl b_jkind_jkind.mod_bounds
                      b_jkind_jkind.with_bounds b_jkind.quality skippable_bounds
-                   [@nontail])
+                     ~externality_cap [@nontail])
                 | None ->
                   (* kind of b is not principally known, so we treat it as having
                    the max bound (only along the axes we care about for this
                    type!) *)
                   found_jkind_for_ty ctl Mod_bounds.max No_with_bounds Not_best
-                    skippable_bounds [@nontail]))))
+                    skippable_bounds ~externality_cap:Externality.Internal
+                  [@nontail]))))
       in
       let mod_bounds, with_bounds, ctl =
         match t.with_bounds with
@@ -1645,8 +1657,7 @@ module Jkind_desc = struct
     match base1, base2 with
     | Layout l1, Layout l2 ->
       let refresh l mod_bounds =
-        Base_and_axes.refresh_layout_implied_crossing_mod_bounds
-          ~crosses_externality:Layout.crosses_externality l mod_bounds
+        Mod_bounds.meet_externality (Layout.implied_externality l) mod_bounds
       in
       Layout.equate_or_equal ~allow_mutation l1 l2
       && Mod_bounds.equal (refresh l1 mod_bounds1) (refresh l2 mod_bounds2)
@@ -1678,8 +1689,7 @@ module Jkind_desc = struct
            revealing a layout with a lower implied externality bound. *)
         match base1 with
         | Layout l ->
-          Base_and_axes.refresh_layout_implied_crossing_mod_bounds
-            ~crosses_externality:Layout.crosses_externality l bounds1
+          Mod_bounds.meet_externality (Layout.implied_externality l) bounds1
         | Kconstr _ -> bounds1
       in
       let bounds = Mod_bounds.less_or_equal bounds1 bounds2 in
@@ -1857,12 +1867,10 @@ let estimate_type_jkind : (Env.t -> type_expr -> jkind_l) ref =
 
 let set_estimate_type_jkind f = estimate_type_jkind := f
 
-let bounds_crossed_by_layout env ty =
+let layout_implied_externality env ty =
   let jkind = !estimate_type_jkind env ty in
-  match (Base_and_axes.fully_expand_aliases env jkind.jkind).base with
-  | Layout l when Layout.crosses_externality l ->
-    Bounds_mask.of_axis_set (Axis_set.singleton (Nonmodal Externality))
-  | Layout _ | Kconstr _ -> Bounds_mask.bot
+  Base_and_axes.implied_externality_of_fully_expanded
+    (Base_and_axes.fully_expand_aliases env jkind.jkind)
 
 (* CR layouts v2.8: This should sometimes be for type schemes, not types
    (which print weak variables like ['_a] correctly), but this works better
@@ -1901,6 +1909,11 @@ module Const = struct
     match jk.base with
     | Layout l -> Layout.Const.get_root_scannable_axes l
     | Kconstr (_, sa, _) -> Some sa
+
+  let implied_externality_of_fully_expanded jk =
+    match jk.base with
+    | Layout l -> Layout.Const.implied_externality l
+    | Kconstr _ -> Externality.Internal
 
   let expand_once env t =
     match Base_and_axes.expand_base_once_const env t with
@@ -2025,6 +2038,23 @@ module Const = struct
         Base_and_axes.fully_expand_aliases_const env base.jkind
       in
       let actual = Base_and_axes.fully_expand_aliases_const env actual in
+      let actual_implied_externality =
+        implied_externality_of_fully_expanded actual
+      in
+      let denoted_mod_bounds =
+        (* Mod-bounds are printed relative to the kind the printed base and
+           operators denote: [base] under [actual]'s scannable axes, whose
+           layout may imply lower bounds than [base]'s alone. *)
+        let denoted =
+          match get_scannable_axes_of_fully_expanded actual with
+          | Some sa ->
+            { base_jkind with
+              base = Base_and_axes.meet_scannable_axes base_jkind.base sa
+            }
+          | None -> base_jkind
+        in
+        (Base_and_axes.refresh_layout_implied_crossing_const denoted).mod_bounds
+      in
       let matching_layouts, addressable =
         match base_jkind.base, actual.base with
         | Kconstr (p1, _, op1), Kconstr (p2, _, op2) ->
@@ -2045,8 +2075,7 @@ module Const = struct
           (get_scannable_axes_of_fully_expanded actual)
       in
       let modal_bounds =
-        get_modal_bounds ~verbosity ~base:base_jkind.mod_bounds
-          actual.mod_bounds
+        get_modal_bounds ~verbosity ~base:denoted_mod_bounds actual.mod_bounds
       in
       let printable_with_bounds =
         (* This match statement is a bit of a hack. One usage of this function
@@ -2068,7 +2097,9 @@ module Const = struct
               let bounds_mask =
                 With_bounds.Type_info.printable_bounds_mask
                   ~mod_bounds:actual.mod_bounds
-                  ~bounds_crossed_by_layout:(bounds_crossed_by_layout env ty)
+                  ~implied_externality:
+                    (Externality.meet actual_implied_externality
+                       (layout_implied_externality env ty))
                   ~type_info
               in
               let modal_modality, nonmodal_axes =
@@ -2434,13 +2465,7 @@ module Const = struct
             let bounds = Mod_bounds.mask_of_modality ~modality in
             match externality with
             | None -> bounds
-            | Some ext ->
-              let is_top =
-                Per_axis.le (Nonmodal Externality) Externality.max ext
-              in
-              if is_top
-              then bounds
-              else Bounds_mask.meet bounds (Mod_bounds.mask_of_externality ext)
+            | Some ext -> Bounds_mask.meet_externality ext bounds
           in
           { base = base.base;
             mod_bounds = base.mod_bounds;
@@ -3336,12 +3361,6 @@ module Format_history = struct
       fprintf ppf "it is the primitive immediate_or_null type %s"
         (Ident.name id)
 
-  let format_scannable_creation_reason ppf :
-      History.scannable_creation_reason -> _ = function
-    | Dummy_jkind ->
-      format_with_notify_js ppf
-        "it's assigned a dummy kind that should have been overwritten"
-
   let format_value_or_null_creation_reason ppf ~layout_or_kind :
       History.value_or_null_creation_reason -> _ = function
     | Primitive id ->
@@ -3464,8 +3483,6 @@ module Format_history = struct
       format_immediate_creation_reason ppf immediate
     | Immediate_or_null_creation immediate ->
       format_immediate_or_null_creation_reason ppf immediate
-    | Scannable_creation scannable ->
-      format_scannable_creation_reason ppf scannable
     | Void_creation _ -> .
     | Value_or_null_creation value ->
       format_value_or_null_creation_reason ppf value ~layout_or_kind
@@ -3612,11 +3629,17 @@ module Violation = struct
       in
       let has_modalities =
         let jkind_has_modalities jkind =
+          let jkind_implied_externality =
+            Base_and_axes.implied_externality_of_fully_expanded
+              (Base_and_axes.fully_expand_aliases env jkind.jkind)
+          in
           List.exists
             (fun (ty, type_info) ->
               With_bounds.Type_info.has_non_id_modalities
                 ~mod_bounds:jkind.jkind.mod_bounds
-                ~bounds_crossed_by_layout:(bounds_crossed_by_layout env ty)
+                ~implied_externality:
+                  (Externality.meet jkind_implied_externality
+                     (layout_implied_externality env ty))
                 ~type_info)
             (With_bounds.to_list jkind.jkind.with_bounds)
         in
@@ -4455,10 +4478,6 @@ module Debug_printers = struct
       History.immediate_or_null_creation_reason -> _ = function
     | Primitive id -> fprintf ppf "Primitive %s" (Ident.unique_name id)
 
-  let scannable_creation_reason ppf : History.scannable_creation_reason -> _ =
-    function
-    | Dummy_jkind -> fprintf ppf "Dummy_jkind"
-
   let value_or_null_creation_reason ppf :
       History.value_or_null_creation_reason -> _ = function
     | Primitive id -> fprintf ppf "Primitive %s" (Ident.unique_name id)
@@ -4540,8 +4559,6 @@ module Debug_printers = struct
     | Immediate_or_null_creation immediate ->
       fprintf ppf "Immediate_or_null_creation %a"
         immediate_or_null_creation_reason immediate
-    | Scannable_creation scannable ->
-      fprintf ppf "Scannable_creation %a" scannable_creation_reason scannable
     | Value_or_null_creation value ->
       fprintf ppf "Value_or_null_creation %a" value_or_null_creation_reason
         value

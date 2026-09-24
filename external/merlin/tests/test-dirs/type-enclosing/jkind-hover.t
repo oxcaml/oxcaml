@@ -61,7 +61,7 @@ Test that hovering over jkind annotations shows their full expansion.
   $ hover 3 16 1
   type ('a : immediate) t3 : value
                   ^
-  "immediate)" : "value non_pointer mod global many stateless immutable external_"
+  "immediate)" : "value non_pointer mod global many stateless immutable"
 
   $ hover 3 28 2
   type ('a : immediate) t3 : value
@@ -102,7 +102,7 @@ Test that hovering over jkind annotations shows their full expansion.
   $ hover 10 18 1
     val f : ('a : immediate). 'a -> 'a
                     ^
-  "immediate)" : "value non_pointer mod global many stateless immutable external_"
+  "immediate)" : "value non_pointer mod global many stateless immutable"
 
   $ hover 11 18 1
     val g : ('b : bits32) -> ('b : value mod portable)
