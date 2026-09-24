@@ -3698,8 +3698,9 @@ let constrain_type_jkind ~fixed env ty jkind =
   estimate_jkind_and_loop ~fuel:100 ~expanded:false env ty
     (Jkind.disallow_left jkind)
 
-let () =
-  Jkind.set_estimate_type_jkind (estimate_type_jkind ~ignore_mod_bounds:false)
+let estimate_type_jkind = estimate_type_jkind ~ignore_mod_bounds:false
+
+let () = Jkind.set_estimate_type_jkind estimate_type_jkind
 
 let type_jkind_and_sort ~why ~fixed env ty =
   let jkind, sort = Jkind.of_new_sort_var ~level:!current_level ~why in
@@ -6642,8 +6643,16 @@ let some_neg_variance = function
   | Contravariant -> Some Covariant
   | Bivariant -> Some Bivariant
 
-let mgen_fast_estimate_jkind env _subst ty =
+(* The layout of [ty], for the shapes of [ty] where computing it is cheap and
+   needs no mutation; raises [Complicated_moregen] otherwise. *)
+let mgen_fast_estimate_layout env _subst ty =
   match get_desc ty with
+  (* CR zeisbach: maybe we could improve the cases we cover here... *)
+  | Tvar { jkind } ->
+    begin match Jkind.get_layout env jkind with
+    | Some layout -> layout
+    | None -> raise_notrace Complicated_moregen
+    end
   (* CR zeisbach: benchmark to determine if we want to do this! *)
   (*= | Tconstr (p, _, _) ->
     let p =
@@ -6651,16 +6660,16 @@ let mgen_fast_estimate_jkind env _subst ty =
       with Subst.Not_path -> raise_notrace Complicated_moregen
     in
     begin match Env.find_type p env with
-    | decl -> decl.type_jkind
+    | decl ->
+      begin match Jkind.get_layout env decl.type_jkind with
+      | Some layout -> layout
+      | None -> raise_notrace Complicated_moregen
+      end
     | exception Not_found -> raise_notrace Complicated_moregen
     end *)
-  | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil | Tpackage _ ->
-    (* Only the layout is compared, so no substitution into with-bounds. *)
-    estimate_type_jkind ~ignore_mod_bounds:true env ty
+  | Tarrow _ | Ttuple _ | Tobject _ | Tpackage _ ->
+    Jkind_types.Layout.Const.Static.scannable_non_null_non_float
   | _ -> raise_notrace Complicated_moregen
-
-(* shadow for exporting *)
-let estimate_type_jkind = estimate_type_jkind ~ignore_mod_bounds:false
 
 let rec mgen_fast env subst scope maxnodes variance t1 t2 =
   decr maxnodes;
@@ -6676,10 +6685,10 @@ let rec mgen_fast env subst scope maxnodes variance t1 t2 =
     if not (Jkind.is_obviously_max jkind) then begin
       if not (Jkind.mod_bounds_are_obviously_max jkind) then
         raise_notrace Complicated_moregen;
-      let jkind2 = mgen_fast_estimate_jkind env subst t2 in
-      match Jkind.get_layout env jkind, Jkind.get_layout env jkind2 with
-      | Some l1, Some l2 when Jkind_types.Layout.Const.equal l1 l2 -> ()
-      | _, _ -> raise_notrace Complicated_moregen
+      let layout2 = mgen_fast_estimate_layout env subst t2 in
+      match Jkind.get_layout env jkind with
+      | Some layout1 when Jkind_types.Layout.Const.equal layout1 layout2 -> ()
+      | _ -> raise_notrace Complicated_moregen
     end;
     For_copy.redirect_desc scope t1 (Tsubst (t2, None))
   | Tarrow ((l1,a1,r1), t1, u1, _), Tarrow ((l2,a2,r2), t2, u2, _)
