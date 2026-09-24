@@ -74,8 +74,12 @@ module Mode_axis_pair = struct
     | "global" -> comonadic Areality Global
     | "unique" -> monadic Uniqueness Unique
     | "aliased" -> monadic Uniqueness Aliased
+    | "owned" -> monadic Borrowedness Owned
+    | "borrowed" -> monadic Borrowedness Borrowed
     | "once" -> comonadic Linearity Once
     | "many" -> comonadic Linearity Many
+    | "borrowable" -> comonadic Borrowability Borrowable
+    | "unborrowable" -> comonadic Borrowability Unborrowable
     | "nonportable" -> comonadic Portability Nonportable
     | "corruptible" -> comonadic Portability Corruptible
     | "shareable" -> comonadic Portability Shareable
@@ -160,7 +164,15 @@ end
 
    Similarly [visibility]/[contention] and [statefulness]/[portability].
 
-   [global] must imply [aliased] for soundness of borrowing. *)
+   [many] implies [borrowable] and [once] implies [unborrowable]; likewise
+   [unique] implies [owned] and [aliased] implies [borrowed]. These
+   implications are only applied to modalities and kind bounds, not to mode
+   annotations (see [apply_mode_implications]): until closing over a [unique]
+   value makes the closure [unborrowable], the implication would make an
+   arrow annotated [@ once] differ from the implicit mode of a curried arrow.
+
+   [global] must imply [aliased] (and hence [borrowed]) for soundness of
+   borrowing. *)
 let implied_modalities (Atom (ax, a) : Modality.atom) : Modality.atom list =
   match[@warning "-18"] ax, a with
   | Comonadic Areality, Meet_const a -> (
@@ -168,7 +180,8 @@ let implied_modalities (Atom (ax, a) : Modality.atom) : Modality.atom list =
     | Global ->
       [ Modality.Atom (Comonadic Forkable, Meet_const Forkable.Const.Forkable);
         Atom (Comonadic Yielding, Meet_const Yielding.Const.Unyielding);
-        Atom (Monadic Uniqueness, Join_const Uniqueness.Const.Aliased) ]
+        Atom (Monadic Uniqueness, Join_const Uniqueness.Const.Aliased);
+        Atom (Monadic Borrowedness, Join_const Borrowedness.Const.Borrowed) ]
     | Local ->
       [ Modality.Atom (Comonadic Forkable, Meet_const Forkable.Const.Unforkable);
         Atom (Comonadic Yielding, Meet_const Yielding.Const.Yielding) ]
@@ -193,6 +206,16 @@ let implied_modalities (Atom (ax, a) : Modality.atom) : Modality.atom list =
       | Stateful -> Nonportable
     in
     [Atom (Comonadic Portability, Meet_const b)]
+  | Comonadic Linearity, Meet_const a ->
+    let b : Borrowability.Const.t =
+      match a with Many -> Borrowable | Once -> Unborrowable
+    in
+    [Atom (Comonadic Borrowability, Meet_const b)]
+  | Monadic Uniqueness, Join_const a ->
+    let b : Borrowedness.Const.t =
+      match a with Unique -> Owned | Aliased -> Borrowed
+    in
+    [Atom (Monadic Borrowedness, Join_const b)]
   | _ -> []
 
 let enforce_forbidden_modalities ~loc annot_type m =
@@ -299,8 +322,8 @@ let untransl_modality =
 (* For now, mutable implies:
    1. [global forkable unyielding]. This is for compatibility with existing code
       and will be removed in the future.
-   2. [many]. This is to remedy the coarse treatment of modalities in the
-      uniqueness analysis.
+   2. [many borrowable]. This is to remedy the coarse treatment of modalities
+      in the uniqueness analysis.
       See [https://github.com/oxcaml/oxcaml/pull/4415#discussion_r2250801078].
    3. legacy modalities for all monadic axes. This will stay in the future.
 
@@ -310,6 +333,7 @@ let[@warning "-18"] mutable_implied_modalities ~for_mutable_variable mut =
   let comonadic : Modality.atom list =
     [ Atom (Comonadic Areality, Meet_const Regionality.Const.legacy);
       Atom (Comonadic Linearity, Meet_const Linearity.Const.legacy);
+      Atom (Comonadic Borrowability, Meet_const Borrowability.Const.legacy);
       Atom (Comonadic Forkable, Meet_const Forkable.Const.legacy);
       Atom (Comonadic Yielding, Meet_const Yielding.Const.legacy) ]
   in
@@ -317,7 +341,8 @@ let[@warning "-18"] mutable_implied_modalities ~for_mutable_variable mut =
     [ Atom (Monadic Uniqueness, Join_const Uniqueness.Const.legacy);
       Atom (Monadic Contention, Join_const Contention.Const.legacy);
       Atom (Monadic Visibility, Join_const Visibility.Const.legacy);
-      Atom (Monadic Staticity, Join_const Staticity.Const.legacy) ]
+      Atom (Monadic Staticity, Join_const Staticity.Const.legacy);
+      Atom (Monadic Borrowedness, Join_const Borrowedness.Const.legacy) ]
   in
   if mut
   then if for_mutable_variable then monadic else monadic @ comonadic
@@ -351,10 +376,12 @@ let idx_expected_modalities ~(mut : bool) =
       modality_of_list
         [ Atom (Comonadic Areality, Meet_const Regionality.Const.legacy);
           Atom (Comonadic Linearity, Meet_const Linearity.Const.legacy);
+          Atom (Comonadic Borrowability, Meet_const Borrowability.Const.legacy);
           Atom (Comonadic Forkable, Meet_const Forkable.Const.legacy);
           Atom (Comonadic Yielding, Meet_const Yielding.Const.legacy);
           Atom (Monadic Uniqueness, Join_const Uniqueness.Const.legacy);
-          Atom (Monadic Staticity, Join_const Staticity.Const.legacy) ]
+          Atom (Monadic Staticity, Join_const Staticity.Const.legacy);
+          Atom (Monadic Borrowedness, Join_const Borrowedness.Const.legacy) ]
       [@warning "-18"]
     else Mode.Modality.Const.id
   in

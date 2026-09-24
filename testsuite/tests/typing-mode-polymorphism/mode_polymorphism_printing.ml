@@ -74,7 +74,7 @@ let x =
   let _ @ uncontended = foo  (ref 41 : _ @ uncontended) in
   foo
 [%%expect{|
-val x : '_weak1 -> '_weak1 @ [> aliased stateful dynamic] = <fun>
+val x : '_weak1 -> '_weak1 @ [> aliased stateful dynamic borrowed] = <fun>
 |}]
 
 type ('a,'b) mytype = { x : 'a; y : 'b }
@@ -115,7 +115,7 @@ type 'a myref = { mutable x : 'a; }
 let create a = { x = a }
 [%%expect{|
 val create :
-  'a @ [< 'm mod aliased dynamic & global many] ->
+  'a @ [< 'm mod aliased dynamic borrowed & global many borrowable] ->
   'a myref @ [> 'm | stateful] = <fun>
 |}]
 
@@ -123,14 +123,15 @@ let read r = r.x
 [%%expect{|
 val read :
   'a myref @ [< 'm & read] ->
-  'a @ [> 'm mod global many forkable unyielding | aliased dynamic] = <fun>
+  'a @ [> 'm mod global many forkable unyielding borrowable | aliased dynamic borrowed] =
+  <fun>
 |}]
 
 let store r = fun a -> r.x <- a
 [%%expect{|
 val store :
-  'a myref @ [< global write] -> 'a @ [< global many read_write] -> unit @ 'm =
-  <fun>
+  'a myref @ [< global write] ->
+  'a @ [< global many read_write borrowable] -> unit @ 'm = <fun>
 |}]
 
 (* products *)
@@ -210,15 +211,15 @@ val snd : 'a @ 'n -> 'b @ [< 'm] -> 'b @ [> 'm] = <fun>
 let foo x y = ref x
 [%%expect{|
 val foo :
-  'a @ [< global many read_write] ->
-  'b @ 'm -> 'a ref @ [> aliased stateful dynamic] = <fun>
+  'a @ [< global many read_write borrowable] ->
+  'b @ 'm -> 'a ref @ [> aliased stateful dynamic borrowed] = <fun>
 |}]
 
 let foo (x @ aliased) y = ref x
 [%%expect{|
 val foo :
-  'a @ [< global many read_write > aliased] ->
-  'b @ 'm -> 'a ref @ [> aliased stateful dynamic] = <fun>
+  'a @ [< global many read_write borrowable > aliased] ->
+  'b @ 'm -> 'a ref @ [> aliased stateful dynamic borrowed] = <fun>
 |}]
 
 let foo (x @ contended) y = x
@@ -305,7 +306,7 @@ val foo :
 let foo (f : int -> int) x y = f
 [%%expect{|
 val foo :
-  (int -> int) @ [< 'm mod aliased contended immutable & global] ->
+  (int -> int) @ [< 'm mod aliased contended immutable borrowed & global] ->
   'a @ [< global] -> 'b @ 'n -> (int -> int) @ [> 'm] = <fun>
 |}]
 
@@ -326,19 +327,19 @@ val map : ('a -> 'b) -> 'a list -> 'b list = <fun>
 let map f l = List.map f l
 [%%expect{|
 val map :
-  ('a @ [> past('m) | aliased stateful dynamic] ->
-   'b @ [< global many read_write]) @ [< past('n) & past('m) & global many] ->
-  'a list @ [< global many read_write] ->
-  'b list @ [> past('n) | aliased stateful dynamic] = <fun>
+  ('a @ [> past('m) | aliased stateful dynamic borrowed] ->
+   'b @ [< global many read_write borrowable]) @ [< past('n) & past('m) & global many borrowable] ->
+  'a list @ [< global many read_write borrowable] ->
+  'b list @ [> past('n) | aliased stateful dynamic borrowed] = <fun>
 |}]
 
 let map_eta f = fun l -> List.map f l
 [%%expect{|
 val map_eta :
-  ('a @ [> past('m) | aliased stateful dynamic] ->
-   'b @ [< global many read_write]) @ [< past('n) & past('m) & global many] ->
-  'a list @ [< global many read_write] ->
-  'b list @ [> past('n) | aliased stateful dynamic] = <fun>
+  ('a @ [> past('m) | aliased stateful dynamic borrowed] ->
+   'b @ [< global many read_write borrowable]) @ [< past('n) & past('m) & global many borrowable] ->
+  'a list @ [< global many read_write borrowable] ->
+  'b list @ [> past('n) | aliased stateful dynamic borrowed] = <fun>
 |}]
 
 (* modules *)
@@ -363,8 +364,8 @@ module Counter : sig type t val incr : t -> t val to_int : t -> int end
 let incr n = Counter.incr n
 [%%expect{|
 val incr :
-  Counter.t @ [< global many read_write] ->
-  Counter.t @ [> aliased stateful dynamic] = <fun>
+  Counter.t @ [< global many read_write borrowable] ->
+  Counter.t @ [> aliased stateful dynamic borrowed] = <fun>
 |}]
 
 let incr = Counter.incr
@@ -524,7 +525,8 @@ val nest :
 let use_and_return x = ignore x; x
 [%%expect{|
 val use_and_return :
-  'a @ [< 'm & global many read_write] -> 'a @ [> 'm | aliased] = <fun>
+  'a @ [< 'm & global many read_write borrowable] -> 'a @ [> 'm | aliased] =
+  <fun>
 |}]
 
 (* multiple distinct mode variables *)

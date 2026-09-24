@@ -254,6 +254,7 @@ Error: This type "(int -> int) u" should be an instance of type
          yielding: mod unyielding with int -> int ≰ mod unyielding
          statefulness: mod stateless with int -> int ≰ mod stateless
          visibility: mod immutable with int -> int ≰ mod immutable
+         borrowability: mod borrowable with int -> int ≰ mod borrowable
 |}]
 
 module M : sig
@@ -387,6 +388,7 @@ Error: Signature mismatch:
          linearity: mod many with 'a ≰ mod many
          forkable: mod forkable with 'a ≰ mod forkable
          yielding: mod unyielding with 'a ≰ mod unyielding
+         borrowability: mod borrowable with 'a ≰ mod borrowable
 |}]
 
 module M : sig
