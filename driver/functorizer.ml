@@ -35,7 +35,7 @@ module GM = Global_module
    importing parameterised units, and it already distinguishes parameters of
    the current unit from parameters it is merely aware of. *)
 
-type chain = CU.Name.t list
+type chain = GM.t list
 (** The modules through which a module is reached, innermost first. Command-line
     inputs have the empty chain. *)
 
@@ -78,7 +78,7 @@ let assert_subset ~gm ~chain sub sup =
       |> String.concat ", "
     in
     let chain_to_string chain =
-      List.map CU.Name.to_string chain |> String.concat ", required by "
+      List.map GM.to_string chain |> String.concat ", required by "
     in
     Misc.fatal_errorf
       "{%s} is not a subset of {%s} (while loading %s, required by %s)"
@@ -87,7 +87,7 @@ let assert_subset ~gm ~chain sub sup =
 
 let load_exact ~chain (gm : GM.t) : Signature_with_global_bindings.t =
   let cu, cmi_params, swg =
-    Env.find_import ~chain (CU.Name.of_head_of_global_name (GM.to_name gm))
+    Env.find_import ~chain (CU.Name.of_head_of_global gm)
   in
   assert (Option.is_some cu);
   let tracked_set =
@@ -103,7 +103,7 @@ let load_exact ~chain (gm : GM.t) : Signature_with_global_bindings.t =
 let rec load_approx ~chain (gm : GM.t) : GM.t * Signature_with_global_bindings.t
     =
   let cu, cmi_params, swg =
-    Env.find_import ~chain (CU.Name.of_head_of_global_name (GM.to_name gm))
+    Env.find_import ~chain (CU.Name.of_head_of_global gm)
   in
   assert (Option.is_some cu);
   let param_set args =
@@ -134,7 +134,7 @@ let rec load_approx ~chain (gm : GM.t) : GM.t * Signature_with_global_bindings.t
 let rec insert_module_exact ~chain (gm : GM.t)
     (swg : Signature_with_global_bindings.t) state =
   state.module_map <- GM.Name.Map.add (GM.to_name gm) chain state.module_map;
-  let chain = CU.Name.of_head_of_global_name (GM.to_name gm) :: chain in
+  let chain = gm :: chain in
 
   let swg =
     let args =
@@ -268,9 +268,7 @@ let interface input_module_names (info : Compile_common.info) =
       Misc.remove_file (Unit_info.Artifact.filename (Unit_info.cmi unit_info)))
 
 let implementation (input_module_names : CU.Name.Set.t) ~ext
-    ~(read_format :
-       Misc.filepath ->
-       Lambda.main_module_block_format * Lambda.arg_descr option)
+    ~(read_format : Misc.filepath -> Lambda.main_module_block_format)
     ~(compile_program : Compile_common.info -> Lambda.program -> unit)
     (info : Compile_common.info) : unit =
   let unit_info = info.target in

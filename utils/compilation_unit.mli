@@ -47,6 +47,8 @@ module Name : sig
 
   val of_head_of_global_name : Global_module.Name.t -> t
 
+  val of_head_of_global : Global_module.t -> t
+
   val of_parameter_name : Global_module.Parameter_name.t -> t
 
   val to_global_name : t -> Global_module.Name.t

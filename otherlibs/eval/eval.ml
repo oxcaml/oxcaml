@@ -78,7 +78,6 @@ let read_bundles ~marshalled_cmi_bundle ~marshalled_cmx_bundle =
           { ui_unit = uir.uir_unit;
             ui_defines = uir.uir_defines;
             ui_format = uir.uir_format;
-            ui_arg_descr = uir.uir_arg_descr;
             ui_imports_cmi = uir.uir_imports_cmi |> Array.to_list;
             ui_imports_cmx = uir.uir_imports_cmx |> Array.to_list;
             ui_quoted_cmi = uir.uir_quoted_cmi |> Array.to_list;
@@ -197,16 +196,11 @@ let eval (expr : 'a expr) =
           typed_impl.argument_interface )
   in
   Warnings.check_fatal () (* TODO: more error handling? *);
-  (* TODO: assert program.arg_block_idx is none? *)
   (* We ignore the comptime bit here because eval'd stuff is dynamic, we could
      consider packaging the comptime component up in the result if the quoted
-     mode is static, which would let us do something like:
-     [{
-      val eval : <[ 'a @ static ]> expr -> <[ 'a ]> eval with_static_data
-      val inject
-        :  (('a. 'a with_static_data -> <[ 'a @ static ]> expr) -> 'b expr)
-        -> 'b eval
-     }] *)
+     mode is static, which would let us do something like: [{ val eval : <[ 'a @
+     static ]> expr -> <[ 'a ]> eval with_static_data val inject : (('a. 'a
+     with_static_data -> <[ 'a @ static ]> expr) -> 'b expr) -> 'b eval }] *)
   let lambda =
     let _static_data, raw_lambda =
       Slambda.eval ~cu_static_data:Compilenv.get_static_data Fun.id
