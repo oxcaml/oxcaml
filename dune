@@ -17,12 +17,12 @@
 (env
  (release
   (flags
-   (:standard -g -principal -w +a-4-9-40-41-42-44-45-48-66-67-70)))
+   (:standard -g -no-principal -w +a-4-9-40-41-42-44-45-48-66-67-70)))
  (main
   (flags
    (:standard
     -g
-    -principal
+    -no-principal
     -warn-error
     +A
     -w
@@ -31,7 +31,7 @@
   (flags
    (:standard
     -g
-    -principal
+    -no-principal
     -w
     +a-4-9-40-41-42-44-45-48-66-67-70
     -warn-error
@@ -123,7 +123,8 @@
    ; -47 needed because [@inline available] is not recognized by the system compiler
    ))
  (ocamlopt_flags
-  (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
+  (:standard
+   (:include %{project_root}/ocamlopt_flags.sexp)))
  (preprocess
   (per_module
    ((action
@@ -199,7 +200,7 @@
   language_extension
   asttypes
   parsetree ; mli only file
-  ;; DRIVER
+            ;; DRIVER
   pparse
   ;; TYPING (these depend only on utils/, so live here to let
   ;; compilation_unit and symbol reference them)
@@ -220,7 +221,8 @@
    ; -47 needed because [@inline available] is not recognized by the system compiler
    ))
  (ocamlopt_flags
-  (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
+  (:standard
+   (:include %{project_root}/ocamlopt_flags.sexp)))
  (library_flags -linkall)
  (libraries flambda2_floats ocamlcommon)
  (modules_without_implementation
@@ -372,7 +374,8 @@
  (flags
   (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
  (ocamlopt_flags
-  (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
+  (:standard
+   (:include %{project_root}/ocamlopt_flags.sexp)))
  (libraries ocamlfrontend)
  (modules
   ;; bytecomp/
@@ -416,7 +419,8 @@
  (flags
   (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
  (ocamlopt_flags
-  (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
+  (:standard
+   (:include %{project_root}/ocamlopt_flags.sexp)))
  (libraries ocamlfrontend flambda2)
  (modules jsmaindriver jscompile jslibrarian))
 
@@ -521,10 +525,7 @@
  (package ocaml))
 
 (install
- (files
-  Makefile.build_config
-  Makefile.config_if_required
-  Makefile.config)
+ (files Makefile.build_config Makefile.config_if_required Makefile.config)
  (section lib)
  (package ocaml))
 
@@ -540,9 +541,11 @@
    -bin-annot
    -safe-string
    -strict-formats
-   -w -27-32-33-34-37-39-60-69-70))
+   -w
+   -27-32-33-34-37-39-60-69-70))
  (ocamlopt_flags
-  (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
+  (:standard
+   (:include %{project_root}/ocamlopt_flags.sexp)))
  (instrumentation
   (backend bisect_ppx))
  (modules_without_implementation
@@ -782,7 +785,8 @@
    ; remove -w -67 by adding the camlinternalMenhirLib hack like the Makefile
    ))
  (ocamlopt_flags
-  (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
+  (:standard
+   (:include %{project_root}/ocamlopt_flags.sexp)))
  (instrumentation
   (backend bisect_ppx))
  (libraries
@@ -841,14 +845,11 @@
   (backend bisect_ppx))
  ; We don't use [unix] in [libraries] as that causes ocaml/otherlibs/unix/
  ; to be built against the system compiler, which won't work.
- (ocamlc_flags (:standard -I +unix unix.cma))
- (ocamlopt_flags (:standard -I +unix unix.cmxa))
- (libraries
-  flambda2
-  flambda2_ui
-  flambda2_to_cmm
-  ocamloptcomp
-  ocamlfrontend)
+ (ocamlc_flags
+  (:standard -I +unix unix.cma))
+ (ocamlopt_flags
+  (:standard -I +unix unix.cmxa))
+ (libraries flambda2 flambda2_ui flambda2_to_cmm ocamloptcomp ocamlfrontend)
  (modules boot_ocamlopt))
 
 ; The input archives (.a, .cma and .cmxa) to the following three rules
@@ -1022,6 +1023,7 @@
 ; for the entire repo will build too much, as we don't want to build directories
 ; like stdlib/ or the tests. Also, aliases like `@typing/check` are empty in our
 ; build rules, which is why we glob on cmi, cmt, and cmti files.
+
 (alias
  (name merlin-support)
  (deps
@@ -1063,8 +1065,7 @@
    backend/binary_emitter_intf/.binary_emitter_intf.objs/byte/*.{cmi,cmo,cmt,cmti})
   (glob_files
    backend/binary_emitter_intf/.binary_emitter_intf.objs/native/*.cmx)
-  (glob_files
-   backend/arm64/ast/.arm64_ast.objs/byte/*.{cmi,cmo,cmt,cmti})
+  (glob_files backend/arm64/ast/.arm64_ast.objs/byte/*.{cmi,cmo,cmt,cmti})
   (glob_files backend/arm64/ast/.arm64_ast.objs/native/*.cmx)
   (glob_files
    backend/arm64/binary_emitter/.arm64_binary_emitter.objs/byte/*.{cmi,cmo,cmt,cmti})

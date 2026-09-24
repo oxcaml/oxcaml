@@ -81,8 +81,6 @@ type error =
 exception Error of Location.t * error
 
 let mode_variable_error ~loc =
-  Language_extension.assert_enabled ~loc Mode_polymorphism
-    Language_extension.Alpha;
   raise (Error (loc, Mode_variable_not_allowed))
 
 module Mode_axis_pair = struct
@@ -644,8 +642,6 @@ let has_mode_variables annots =
 
 let transl_modepoly_annot annots : modepoly_annot =
   let transl_annot { Location.txt; loc } =
-    Language_extension.assert_enabled ~loc Mode_polymorphism
-      Language_extension.Alpha;
     match (txt : Parsetree.mode) with
     | Mode _ -> raise (Error (loc, Mixed_mode_annotation))
     | Mode_var name -> Pmode_var name
