@@ -32,7 +32,7 @@ let id x = x
 (* A devoted type for sizes to avoid confusion
    between sizes and mere integers. *)
 module Size : sig @@ portable
-  type t : value mod portable contended
+  type t : immediate
 
   val to_int : t -> int
   val of_int : int -> t
