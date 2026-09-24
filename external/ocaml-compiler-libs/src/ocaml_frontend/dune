@@ -1,0 +1,24 @@
+; OxCaml splits the type checker out of ocamlcommon into ocamlfrontend.
+; Ocaml_frontend aliases the modules of both, like upstream's Ocaml_common.
+
+(library
+ (name ocaml_frontend)
+ (public_name ocaml-compiler-libs.frontend)
+ (flags :standard -safe-string)
+ (optional)
+ (libraries compiler-libs.common compiler-libs.frontend)
+ (preprocess no_preprocessing))
+
+(rule
+ (targets ocaml_frontend.ml)
+ (deps
+  (:first_dep ../gen/gen.exe))
+ (action
+  (run
+   %{first_dep}
+   -archive
+   %{ocaml_where}/compiler-libs/ocamlcommon.cma
+   -archive
+   %{ocaml_where}/compiler-libs/ocamlfrontend.cma
+   -o
+   %{targets})))
