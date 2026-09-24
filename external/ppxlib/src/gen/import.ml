@@ -39,6 +39,7 @@ let common_prefix l =
 let map_keyword = function
   | ( "open" | "private" | "downto" | "to" | "mutable" | "rec" | "nonrec"
     | "virtual" | "type" | "mod" | "begin" | "end" | "with" | "functor"
+    | "constraint"
     (* "default" isn't a keyword, but the [Default] constructor used
        for the jkind annotation conflicts with a very common variable
        name.

@@ -223,8 +223,8 @@ let ptyp_var l = ptyp_var l drop
 
 let type_declaration = type_declaration ~jkind_annotation:drop
 
-let value_binding ~pat ~expr =
-  value_binding ~pat ~expr ~modes:drop ~is_poly:drop
+let value_binding ~pat ~expr ~constraint_ =
+  value_binding ~pat ~expr ~constraint_ ~modes:drop ~is_poly:drop
 
 let value_description ~name ~type_ ~prim =
   value_description ~name ~type_ ~modalities:drop ~prim ~poly:drop
@@ -277,15 +277,11 @@ let no_label t = cst Asttypes.Nolabel ~to_string:(fun _ -> "Nolabel") ** t
 let ebool t = pexp_construct (lident (bool' t)) none
 let pbool t = ppat_construct (lident (bool' t)) none
 
-let pexp_function cases =
-  pexp_function nil
+let pexp_function params constraint_ body =
+  pexp_function params
     (function_constraint ~mode_annotations:nil ~ret_mode_annotations:nil
-      ~ret_type_constraint:none)
-    (pfunction_cases cases
-       drop
-       (T (fun _ _ attrs k ->
-            Common.assert_no_attributes attrs;
-            k)))
+      ~ret_type_constraint:constraint_)
+    body
 
 let extension (T f1) (T f2) =
   T

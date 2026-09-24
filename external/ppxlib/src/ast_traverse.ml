@@ -241,7 +241,15 @@ class map_with_expansion_context_and_errors =
       with_value_description >>= fun ctxt -> super#value_description ctxt vd
 
     method! value_binding ctxt
-        ({ pvb_is_poly; pvb_pat; pvb_expr; pvb_attributes; pvb_loc; pvb_modes } as vb) =
+        ({
+           pvb_is_poly;
+           pvb_pat;
+           pvb_expr;
+           pvb_constraint;
+           pvb_attributes;
+           pvb_loc;
+           pvb_modes;
+         } as vb) =
       Attribute.get_res do_not_enter_value_binding vb |> of_result ~default:None
       >>= function
       | Some () -> super#value_binding ctxt vb
@@ -256,6 +264,9 @@ class map_with_expansion_context_and_errors =
           let pvb_expr, expr_errors =
             self#expression in_binding_ctxt pvb_expr
           in
+          let pvb_constraint, constraint_errors =
+            self#option self#value_constraint ctxt pvb_constraint
+          in
           let pvb_attributes, attributes_errors =
             self#attributes in_binding_ctxt pvb_attributes
           in
@@ -266,12 +277,22 @@ class map_with_expansion_context_and_errors =
               [
                 ("pvb_pat", pat_errors);
                 ("pvb_expr", expr_errors);
+                ("pvb_constraint", constraint_errors);
                 ("pvb_attributes", attributes_errors);
                 ("pvb_loc", loc_errors);
                 ("pvb_modes", modes_errors);
               ]
           in
-          ({ pvb_is_poly; pvb_pat; pvb_expr; pvb_attributes; pvb_loc; pvb_modes }, errors)
+          ( {
+              pvb_is_poly;
+              pvb_pat;
+              pvb_expr;
+              pvb_constraint;
+              pvb_attributes;
+              pvb_loc;
+              pvb_modes;
+            },
+            errors )
   end
 
 class sexp_of =

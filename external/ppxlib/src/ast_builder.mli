@@ -61,6 +61,13 @@ module Default : sig
   val ppat_construct :
     loc:location -> longident loc -> pattern option -> pattern
 
+  val coalesce_arity : expression -> expression
+  (** If an expression [e] is a function of arity [n] with a body that is
+      another function with arity [m], then [coalesce_arity e] will produce a
+      function of arity [n + m]. This will not run recursively, so an expression
+      [fun x -> fun y -> fun z -> x + y + z] will become
+      [fun x y -> fun z -> x + y + z]. *)
+
   val constructor_declaration :
     loc:location ->
     name:label loc ->

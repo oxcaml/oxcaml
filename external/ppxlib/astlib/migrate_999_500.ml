@@ -419,173 +419,12 @@ and copy_value_binding :
        Ast_999.Parsetree.pvb_attributes;
        Ast_999.Parsetree.pvb_loc;
      } ->
-  let merge_loc left right =
-    Location.
-      { loc_start = left.loc_start; loc_end = right.loc_end; loc_ghost = false }
-  in
-  let ghost_loc loc = { loc with Location.loc_ghost = true } in
-  let ghost_constraint pat typ =
-    let ppat_loc =
-      ghost_loc
-        (merge_loc pat.Ast_500.Parsetree.ppat_loc typ.Ast_500.Parsetree.ptyp_loc)
-    in
-    {
-      Ast_500.Parsetree.ppat_attributes = [];
-      ppat_loc;
-      ppat_desc = Ast_500.Parsetree.Ppat_constraint (pat, Some typ, []);
-      ppat_loc_stack = [];
-    }
-  in
-  let pvb_pat = copy_pattern pvb_pat and pvb_expr = copy_expression pvb_expr in
-  let constrain_pat pat typ expr =
-    let typ = copy_core_type typ in
-    let pvb_pat = ghost_constraint pat typ in
-    (pvb_pat, pvb_expr)
-  in
-  let pvb_pat, pvb_expr =
-    match (pvb_constraint, pvb_pat) with
-    | ( Some
-          (Pvc_constraint
-            {
-              locally_abstract_univars = [];
-              typ = { ptyp_desc = Ptyp_poly _; _ } as typ;
-            }),
-        { Ast_500.Parsetree.ppat_desc = Ppat_var _; ppat_attributes = [] } ) ->
-        (* the sugaring of [let x: univars . typ = exp ] was desugared to
-           [let (x:univars . typ) = exp] in 5.0 which doesn't fit the case below *)
-        constrain_pat pvb_pat typ pvb_expr
-    | ( Some (Pvc_constraint { locally_abstract_univars; typ }),
-        { Ast_500.Parsetree.ppat_desc = Ppat_var _; ppat_attributes = [] } ) ->
-        (* Copied and adapted from OCaml 5.0 Ast_helper *)
-        let varify_constructors var_names t =
-          let var_names = List.map (fun v -> v.Location.txt) var_names in
-          let rec loop t =
-            let desc =
-              match t.Ast_500.Parsetree.ptyp_desc with
-              | Ast_500.Parsetree.Ptyp_any x -> Ast_500.Parsetree.Ptyp_any x
-              | Ptyp_var (x1, x2) -> Ptyp_var (x1, x2)
-              | Ptyp_arrow (label, core_type, core_type', m1, m2) ->
-                  Ptyp_arrow (label, loop core_type, loop core_type', m1, m2)
-              | Ptyp_tuple lst -> Ptyp_tuple (List.map (fun (l, t) -> l, loop t) lst)
-              | Ptyp_unboxed_tuple lst ->
-                Ptyp_unboxed_tuple (List.map (fun (l, t) -> l, loop t) lst)
-              | Ptyp_constr ({ txt = Longident.Lident s }, [])
-                when List.mem s var_names ->
-                  Ptyp_var (s, None)
-              | Ptyp_constr (longident, lst) ->
-                  Ptyp_constr (longident, List.map loop lst)
-              | Ptyp_object (lst, o) ->
-                  Ptyp_object (List.map loop_object_field lst, o)
-              | Ptyp_class (longident, lst) ->
-                  Ptyp_class (longident, List.map loop lst)
-              | Ptyp_alias (core_type, string, jkind) ->
-                  Ptyp_alias (loop core_type, string, jkind)
-              | Ptyp_variant (row_field_list, flag, lbl_lst_option) ->
-                  Ptyp_variant
-                    ( List.map loop_row_field row_field_list,
-                      flag,
-                      lbl_lst_option )
-              | Ptyp_poly (string_lst, core_type) ->
-                  Ptyp_poly (string_lst, loop core_type)
-              | Ptyp_package (longident, lst) ->
-                  Ptyp_package
-                    (longident, List.map (fun (n, typ) -> (n, loop typ)) lst)
-              | Ptyp_quote core_type -> Ptyp_quote (loop core_type)
-              | Ptyp_splice core_type -> Ptyp_splice (loop core_type)
-              | Ptyp_of_kind x1 -> Ptyp_of_kind x1
-              | Ptyp_repr (vars, core_type) -> Ptyp_repr (vars, loop core_type)
-              | Ptyp_newlayout (vars, core_type) -> Ptyp_newlayout (vars, loop core_type)
-              | Ptyp_extension (s, arg) -> Ptyp_extension (s, arg)
-            in
-            { t with ptyp_desc = desc }
-          and loop_row_field field =
-            let prf_desc =
-              match field.prf_desc with
-              | Ast_500.Parsetree.Rtag (label, flag, lst) ->
-                  Ast_500.Parsetree.Rtag (label, flag, List.map loop lst)
-              | Rinherit t -> Rinherit (loop t)
-            in
-            { field with prf_desc }
-          and loop_object_field field =
-            let pof_desc =
-              match field.pof_desc with
-              | Ast_500.Parsetree.Otag (label, t) ->
-                  Ast_500.Parsetree.Otag (label, loop t)
-              | Oinherit t -> Oinherit (loop t)
-            in
-            { field with pof_desc }
-          in
-          loop t
-        in
-        let typ = copy_core_type typ in
-        let pexp_loc = ghost_loc (merge_loc typ.ptyp_loc pvb_expr.pexp_loc) in
-        let typ_maybe_poly =
-          match locally_abstract_univars with
-          | [] -> typ
-          | _ :: _ ->
-            {
-              typ with
-              ptyp_loc = ghost_loc typ.ptyp_loc;
-              ptyp_attributes = [];
-              ptyp_desc =
-                Ast_500.Parsetree.Ptyp_poly
-                  ( List.map (fun x -> x, None) locally_abstract_univars,
-                    varify_constructors locally_abstract_univars typ );
-            }
-        in
-
-        let pvb_pat = ghost_constraint pvb_pat typ_maybe_poly
-        and pvb_expr =
-          List.fold_left
-            (fun expr var ->
-              {
-                expr with
-                pexp_attributes = [];
-                pexp_loc;
-                Ast_500.Parsetree.pexp_desc =
-                  Ast_500.Parsetree.Pexp_newtype (var, None, expr);
-              })
-            {
-              pvb_expr with
-              pexp_attributes = [];
-              pexp_loc;
-              pexp_desc = Pexp_constraint (pvb_expr, Some typ, []);
-            }
-            (List.rev locally_abstract_univars)
-        in
-        (pvb_pat, pvb_expr)
-    | Some (Pvc_constraint { locally_abstract_univars = []; typ }), _ ->
-        constrain_pat pvb_pat typ pvb_expr
-    | Some (Pvc_coercion { ground; coercion }), _ ->
-        let coercion = copy_core_type coercion in
-        let ptyp_loc = ghost_loc coercion.ptyp_loc in
-        let typ =
-          {
-            coercion with
-            ptyp_attributes = [];
-            ptyp_loc;
-            ptyp_desc = Ast_500.Parsetree.Ptyp_poly ([], coercion);
-          }
-        in
-        let pvb_pat = ghost_constraint pvb_pat typ in
-        let ground = Option.map copy_core_type ground in
-        let pexp_loc = merge_loc pvb_pat.ppat_loc pvb_expr.pexp_loc in
-        let pvb_expr =
-          {
-            pvb_expr with
-            pexp_attributes = [];
-            pexp_loc;
-            pexp_desc =
-              Ast_500.Parsetree.Pexp_coerce (pvb_expr, ground, coercion);
-          }
-        in
-        (pvb_pat, pvb_expr)
-    | _ -> (pvb_pat, pvb_expr)
-  in
   {
     Ast_500.Parsetree.pvb_is_poly;
-    Ast_500.Parsetree.pvb_pat;
-    Ast_500.Parsetree.pvb_expr;
+    Ast_500.Parsetree.pvb_pat = copy_pattern pvb_pat;
+    Ast_500.Parsetree.pvb_expr = copy_expression pvb_expr;
+    Ast_500.Parsetree.pvb_constraint =
+      Option.map copy_value_constraint pvb_constraint;
     Ast_500.Parsetree.pvb_modes = copy_modes pvb_modes;
     Ast_500.Parsetree.pvb_attributes = copy_attributes pvb_attributes;
     Ast_500.Parsetree.pvb_loc = copy_location pvb_loc;
@@ -676,6 +515,23 @@ and copy_pattern_desc :
       Ast_500.Parsetree.Ppat_extension (copy_extension x0)
   | Ast_999.Parsetree.Ppat_open (x0, x1) ->
       Ast_500.Parsetree.Ppat_open (copy_loc copy_Longident_t x0, copy_pattern x1)
+
+and copy_value_constraint :
+    Ast_999.Parsetree.value_constraint -> Ast_500.Parsetree.value_constraint =
+  function
+  | Ast_999.Parsetree.Pvc_constraint { locally_abstract_univars; typ } ->
+      Ast_500.Parsetree.Pvc_constraint
+        {
+          locally_abstract_univars =
+            List.map (copy_loc (fun x -> x)) locally_abstract_univars;
+          typ = copy_core_type typ;
+        }
+  | Ast_999.Parsetree.Pvc_coercion { ground; coercion } ->
+      Ast_500.Parsetree.Pvc_coercion
+        {
+          ground = Option.map copy_core_type ground;
+          coercion = copy_core_type coercion;
+        }
 
 and copy_core_type : Ast_999.Parsetree.core_type -> Ast_500.Parsetree.core_type =
   fun t ->
@@ -1022,14 +878,13 @@ and copy_module_expr :
        Ast_999.Parsetree.pmod_loc;
        Ast_999.Parsetree.pmod_attributes;
      } ->
-  let loc = copy_location pmod_loc in
   {
-    Ast_500.Parsetree.pmod_desc = copy_module_expr_desc loc pmod_desc;
-    Ast_500.Parsetree.pmod_loc = loc;
+    Ast_500.Parsetree.pmod_desc = copy_module_expr_desc pmod_desc;
+    Ast_500.Parsetree.pmod_loc = copy_location pmod_loc;
     Ast_500.Parsetree.pmod_attributes = copy_attributes pmod_attributes;
   }
 
-and copy_module_expr_desc loc :
+and copy_module_expr_desc :
     Ast_999.Parsetree.module_expr_desc -> Ast_500.Parsetree.module_expr_desc =
   function
   | Ast_999.Parsetree.Pmod_ident x0 ->
@@ -1040,34 +895,9 @@ and copy_module_expr_desc loc :
       Ast_500.Parsetree.Pmod_functor
         (copy_functor_parameter x0, copy_module_expr x1)
   | Ast_999.Parsetree.Pmod_apply (x0, x1) ->
-      let x1 = copy_module_expr x1 in
-      let x1 =
-        match x1.pmod_desc with
-        | Pmod_structure [] ->
-            let loc = { x1.pmod_loc with loc_ghost = true } in
-            let pmod_attributes =
-              {
-                Ast_500.Parsetree.attr_name =
-                  { txt = "ppxlib.migration.keep_structure"; loc };
-                attr_payload = Ast_500.Parsetree.PStr [];
-                attr_loc = loc;
-              }
-              :: x1.pmod_attributes
-            in
-            { x1 with pmod_attributes }
-        | _ -> x1
-      in
-      Ast_500.Parsetree.Pmod_apply (copy_module_expr x0, x1)
+      Ast_500.Parsetree.Pmod_apply (copy_module_expr x0, copy_module_expr x1)
   | Ast_999.Parsetree.Pmod_apply_unit x0 ->
-      let empty_struct =
-        Ast_500.Parsetree.
-          {
-            pmod_desc = Pmod_structure [];
-            pmod_loc = loc;
-            pmod_attributes = [];
-          }
-      in
-      Ast_500.Parsetree.Pmod_apply (copy_module_expr x0, empty_struct)
+      Ast_500.Parsetree.Pmod_apply_unit (copy_module_expr x0)
   | Ast_999.Parsetree.Pmod_constraint (x0, x1, x2) ->
       Ast_500.Parsetree.Pmod_constraint
         (copy_module_expr x0, Option.map copy_module_type x1, copy_modes x2)

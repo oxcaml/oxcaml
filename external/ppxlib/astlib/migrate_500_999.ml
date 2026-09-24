@@ -419,66 +419,25 @@ and copy_value_binding :
        Ast_500.Parsetree.pvb_is_poly;
        Ast_500.Parsetree.pvb_pat;
        Ast_500.Parsetree.pvb_expr;
+       Ast_500.Parsetree.pvb_constraint;
        Ast_500.Parsetree.pvb_modes;
        Ast_500.Parsetree.pvb_attributes;
        Ast_500.Parsetree.pvb_loc;
      } ->
-  (* Copied and adapted from OCaml 5.0 Ast_helper *)
-  let varify_constructors vars t =
-    let var_names = List.map (fun (v, _) -> v.Location.txt) vars in
-    let rec loop t =
-      let desc =
-        match t.Ast_500.Parsetree.ptyp_desc with
-        | Ast_500.Parsetree.Ptyp_any x -> Ast_500.Parsetree.Ptyp_any x
-        | Ptyp_var (x1, x2) -> Ptyp_var (x1,x2)
-        | Ptyp_arrow (label, core_type, core_type', m1, m2) ->
-            Ptyp_arrow (label, loop core_type, loop core_type', m1, m2)
-        | Ptyp_tuple lst -> Ptyp_tuple (List.map (fun (l, p) -> l, loop p) lst)
-        | Ptyp_unboxed_tuple lst ->
-            Ptyp_unboxed_tuple (List.map (fun (l, t) -> l, loop t) lst)
-        | Ptyp_constr ({ txt = Longident.Lident s }, [])
-          when List.mem s var_names ->
-            Ptyp_var (s, None)
-        | Ptyp_constr (longident, lst) ->
-            Ptyp_constr (longident, List.map loop lst)
-        | Ptyp_object (lst, o) -> Ptyp_object (List.map loop_object_field lst, o)
-        | Ptyp_class (longident, lst) ->
-            Ptyp_class (longident, List.map loop lst)
-        | Ptyp_alias (core_type, string, j) -> Ptyp_alias (loop core_type, string, j)
-        | Ptyp_variant (row_field_list, flag, lbl_lst_option) ->
-            Ptyp_variant
-              (List.map loop_row_field row_field_list, flag, lbl_lst_option)
-        | Ptyp_poly (string_lst, core_type) ->
-            Ptyp_poly (string_lst, loop core_type)
-        | Ptyp_package (longident, lst) ->
-            Ptyp_package
-              (longident, List.map (fun (n, typ) -> (n, loop typ)) lst)
-        | Ptyp_quote core_type -> Ptyp_quote (loop core_type)
-        | Ptyp_splice core_type -> Ptyp_splice (loop core_type)
-        | Ptyp_of_kind x1 -> Ptyp_of_kind x1
-        | Ptyp_repr (vars, core_type) -> Ptyp_repr (vars, loop core_type)
-        | Ptyp_newlayout (vars, core_type) -> Ptyp_newlayout (vars, loop core_type)
-        | Ptyp_extension (s, arg) -> Ptyp_extension (s, arg)
-      in
-      { t with ptyp_desc = desc }
-    and loop_row_field field =
-      let prf_desc =
-        match field.prf_desc with
-        | Ast_500.Parsetree.Rtag (label, flag, lst) ->
-            Ast_500.Parsetree.Rtag (label, flag, List.map loop lst)
-        | Rinherit t -> Rinherit (loop t)
-      in
-      { field with prf_desc }
-    and loop_object_field field =
-      let pof_desc =
-        match field.pof_desc with
-        | Ast_500.Parsetree.Otag (label, t) ->
-            Ast_500.Parsetree.Otag (label, loop t)
-        | Oinherit t -> Oinherit (loop t)
-      in
-      { field with pof_desc }
+  (* Ppxes may still produce the pre-[pvb_constraint] encoding (the constraint
+     spelled out on the pattern and expression); such bindings are resugared
+     below. *)
+  let pvb_pat = copy_pattern pvb_pat in
+  let pvb_expr = copy_expression pvb_expr in
+  let pvb_constraint = Option.map copy_value_constraint pvb_constraint in
+  let equal_core_types_ignoring_locations =
+    let module Ast_mapper = Ocaml_common.Ast_mapper in
+    let mapper =
+      { Ast_mapper.default_mapper with
+        Ast_mapper.location = (fun _this _loc -> Ocaml_common.Location.none) }
     in
-    loop t
+    let strip cty = mapper.Ast_mapper.typ mapper cty in
+    fun t1 t2 -> strip t1 = strip t2
   in
   (* Match the form of the expr and pattern to decide the value of
      [pvb_constraint]. Adapted from OCaml 5.0 PPrinter. *)
@@ -486,7 +445,7 @@ and copy_value_binding :
     let value_pattern =
       match p with
       | {
-       Ast_500.Parsetree.ppat_desc =
+       Ast_999.Parsetree.ppat_desc =
          Ppat_constraint
            ( ({ ppat_desc = Ppat_var _ } as pat),
              Some ({ ptyp_desc = Ptyp_poly (args_tyvars, rt) } as ty_ext), modes );
@@ -498,9 +457,9 @@ and copy_value_binding :
           assert (List.is_empty modes);
           assert (match rt.ptyp_desc with Ptyp_poly _ -> false | _ -> true);
           let ty = match args_tyvars with [] -> rt | _ -> ty_ext in
-          `Var (pat, args_tyvars, rt, ty)
+          `Var (pat, args_tyvars, ty_ext, ty)
       | {
-       Ast_500.Parsetree.ppat_desc = Ppat_constraint (pat, Some rt, modes);
+       Ast_999.Parsetree.ppat_desc = Ppat_constraint (pat, Some rt, modes);
        ppat_attributes = [];
       } ->
           assert (List.is_empty modes);
@@ -510,7 +469,7 @@ and copy_value_binding :
     let rec value_exp tyvars e =
       match e with
       | {
-       Ast_500.Parsetree.pexp_desc = Pexp_newtype (tyvar, jkind, e);
+       Ast_999.Parsetree.pexp_desc = Pexp_newtype (tyvar, jkind, e);
        pexp_attributes = [];
       } ->
           value_exp ((tyvar, jkind) :: tyvars) e
@@ -526,53 +485,94 @@ and copy_value_binding :
     in
     let value_exp = value_exp [] e in
     match (value_pattern, value_exp) with
-    | `Var (p, pt_tyvars, pt_ct, extern_ct), Some (e_tyvars, inner_e, e_ct)
-      when pt_tyvars = e_tyvars ->
-        let no_jkinds = List.for_all (Fun.compose Option.is_none snd) pt_tyvars in
-        let ety = varify_constructors e_tyvars e_ct in
-        if no_jkinds && ety = pt_ct then
-          `Desugared_locally_abstract (p, List.map fst pt_tyvars, e_ct, inner_e)
-        else
-          (* the expression constraint and the pattern constraint either have jkinds or
-             don't match, but we still have a Ptyp_poly pattern constraint that
-             should be resugared to a value binding *)
-          `Univars (p, pt_tyvars, extern_ct, e)
-    | `Var (p, pt_tyvars, pt_ct, extern_ct), _ ->
+    | `Var (p, pt_tyvars, ty_ext, extern_ct), Some (e_tyvars, inner_e, e_ct) -> (
+        match
+          Ocaml_common.Ast_helper.Typ.varify_constructors
+            (List.map fst e_tyvars) e_ct
+        with
+        | exception Ocaml_common.Syntaxerr.Error _ ->
+            `Univars (p, pt_tyvars, extern_ct, e)
+        | ety ->
+            (* Pprintast is slightly deficient here, see the handling for
+               `Desugared_locally_abstract_jkinded case when constructing
+                pvb_{pat,expr,constraint} below. *)
+            let canonical_poly =
+              { ty_ext with
+                Ast_999.Parsetree.ptyp_desc = Ptyp_poly (e_tyvars, ety) }
+            in
+            if equal_core_types_ignoring_locations ty_ext canonical_poly then
+              if List.for_all (fun (_, jkind) -> Option.is_none jkind) e_tyvars
+              then
+                `Desugared_locally_abstract
+                  (p, List.map fst e_tyvars, e_ct, inner_e)
+              else `Desugared_locally_abstract_jkinded (p, canonical_poly)
+            else
+              (* the expression constraint and the pattern constraint don't
+                 match, but we still have a Ptyp_poly pattern constraint that
+                 should be resugared to a value binding *)
+              `Univars (p, pt_tyvars, extern_ct, e))
+    | `Var (p, pt_tyvars, _ty_ext, extern_ct), None ->
         `Univars (p, pt_tyvars, extern_ct, e)
     | `NonVar (p, pt_ct), Some ([], e, e_ct) when pt_ct = e_ct -> `NonVar (p, pt_ct, e)
     | `NonVar (p, pt_ct), _ -> `NonVar (p, pt_ct, e)
-    | _ -> `None
+    | `None, _ -> `None
   in
   let with_constraint ty_vars typ =
-    let typ = copy_core_type typ in
     Some
       (Ast_999.Parsetree.Pvc_constraint
          { locally_abstract_univars = ty_vars; typ })
   in
   let pvb_pat, pvb_expr, pvb_constraint =
+    match pvb_constraint with
+    | Some _ ->
+        (* Unlike OCaml 5.0's parsetree, our [Ast_500] already carries
+           [pvb_constraint]; copy it as is. Only bindings whose constraint is
+           encoded in the pattern and expression (typically built by ppxes)
+           take the resugaring path below. *)
+        (pvb_pat, pvb_expr, pvb_constraint)
+    | None -> (
     match resugarable_value_binding pvb_pat pvb_expr with
     | `Desugared_locally_abstract (p, ty_vars, typ, e) ->
         (p, e, with_constraint ty_vars typ)
+    | `Desugared_locally_abstract_jkinded (inner_pat, canonical_poly) ->
+        (* [Pvc_constraint.locally_abstract_univars] can't carry jkind
+           annotations, so this binding has to keep its desugared encoding.
+           We canonicalise the pattern's annotation to be exactly the tree
+           that the compiler's [Pprintast.is_desugared_gadt] computes from
+           the expression (it compares the two copies with [=], locations
+           included), so that it recognises the binding and prints it as
+           [let f : type (a : k). ... = ...], which reparses to this same
+           encoding. Once [is_desugared_gadt] compares the two copies of the
+           annotation modulo locations, this canonicalisation can go: keep the
+           (location-insensitive) detection above, but pass the binding through
+           unchanged here, i.e. [(pvb_pat, pvb_expr, None)]. *)
+        let pat =
+          { pvb_pat with
+            Ast_999.Parsetree.ppat_desc =
+              Ppat_constraint (inner_pat, Some canonical_poly, [])
+          }
+        in
+        (pat, pvb_expr, None)
     | `Univars (pat, [], ct, expr) -> (
         (* check if we are in the [let x : ty? :> coer = expr ] case *)
         match expr with
         | { pexp_desc = Pexp_coerce (expr, gr, coerce); pexp_attributes = [] }
           ->
-            let ground = Option.map copy_core_type gr in
-            let coercion = copy_core_type coerce in
             let pvb_constraint =
-              Some (Ast_999.Parsetree.Pvc_coercion { ground; coercion })
+              Some
+                (Ast_999.Parsetree.Pvc_coercion
+                   { ground = gr; coercion = coerce })
             in
             (pat, expr, pvb_constraint)
         | _ -> (pat, expr, with_constraint [] ct))
     | `Univars (pat, _, ct, expr) -> (pat, expr, with_constraint [] ct)
     | `NonVar (p, typ, e) -> (p, e, with_constraint [] typ)
-    | `None -> (pvb_pat, pvb_expr, None)
+    | `None -> (pvb_pat, pvb_expr, None))
   in
   {
     Ast_999.Parsetree.pvb_is_poly;
-    Ast_999.Parsetree.pvb_pat = copy_pattern pvb_pat;
-    Ast_999.Parsetree.pvb_expr = copy_expression pvb_expr;
+    Ast_999.Parsetree.pvb_pat;
+    Ast_999.Parsetree.pvb_expr;
     Ast_999.Parsetree.pvb_constraint;
     Ast_999.Parsetree.pvb_modes = copy_modes pvb_modes;
     Ast_999.Parsetree.pvb_attributes = copy_attributes pvb_attributes;
@@ -679,6 +679,23 @@ and copy_pattern_desc_with_loc :
       Ast_999.Parsetree.Ppat_extension (copy_extension x0)
   | Ast_500.Parsetree.Ppat_open (x0, x1) ->
       Ast_999.Parsetree.Ppat_open (copy_loc (copy_Longident_t ~loc:x0.loc) x0, copy_pattern x1)
+
+and copy_value_constraint :
+    Ast_500.Parsetree.value_constraint -> Ast_999.Parsetree.value_constraint =
+  function
+  | Ast_500.Parsetree.Pvc_constraint { locally_abstract_univars; typ } ->
+      Ast_999.Parsetree.Pvc_constraint
+        {
+          locally_abstract_univars =
+            List.map (copy_loc (fun x -> x)) locally_abstract_univars;
+          typ = copy_core_type typ;
+        }
+  | Ast_500.Parsetree.Pvc_coercion { ground; coercion } ->
+      Ast_999.Parsetree.Pvc_coercion
+        {
+          ground = Option.map copy_core_type ground;
+          coercion = copy_core_type coercion;
+        }
 
 and copy_core_type : Ast_500.Parsetree.core_type -> Ast_999.Parsetree.core_type
     =
@@ -1043,27 +1060,9 @@ and copy_module_expr_desc :
       Ast_999.Parsetree.Pmod_functor
         (copy_functor_parameter x0, copy_module_expr x1)
   | Ast_500.Parsetree.Pmod_apply (x0, x1) ->
-      let x1, is_unit =
-        match x1.pmod_desc with
-        | Pmod_structure [] ->
-            let rec extract_attr acc : Ast_500.Parsetree.attributes -> _ =
-              function
-              | [] -> (List.rev acc, true)
-              | {
-                  attr_name = { txt = "ppxlib.migration.keep_structure"; _ };
-                  _;
-                }
-                :: q ->
-                  (List.rev_append acc q, false)
-              | hd :: tl -> extract_attr (hd :: acc) tl
-            in
-            let pmod_attributes, b = extract_attr [] x1.pmod_attributes in
-            ({ x1 with pmod_attributes }, b)
-        | _ -> (x1, false)
-      in
-      if is_unit then Ast_999.Parsetree.Pmod_apply_unit (copy_module_expr x0)
-      else
-        Ast_999.Parsetree.Pmod_apply (copy_module_expr x0, copy_module_expr x1)
+      Ast_999.Parsetree.Pmod_apply (copy_module_expr x0, copy_module_expr x1)
+  | Ast_500.Parsetree.Pmod_apply_unit x0 ->
+      Ast_999.Parsetree.Pmod_apply_unit (copy_module_expr x0)
   | Ast_500.Parsetree.Pmod_constraint (x0, x1, x2) ->
       Ast_999.Parsetree.Pmod_constraint
         (copy_module_expr x0, Option.map copy_module_type x1, copy_modes x2)
@@ -1071,7 +1070,8 @@ and copy_module_expr_desc :
       Ast_999.Parsetree.Pmod_unpack (copy_expression x0)
   | Ast_500.Parsetree.Pmod_extension x0 ->
       Ast_999.Parsetree.Pmod_extension (copy_extension x0)
-  | Ast_500.Parsetree.Pmod_hole -> Ast_999.Parsetree.Pmod_hole
+  | Ast_500.Parsetree.Pmod_hole ->
+      Ast_999.Parsetree.Pmod_hole
   | Ast_500.Parsetree.Pmod_instance x0 ->
       Ast_999.Parsetree.Pmod_instance (copy_module_instance x0)
 

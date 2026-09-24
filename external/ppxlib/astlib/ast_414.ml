@@ -688,9 +688,9 @@ module Parsetree = struct
     | Baccess_field of Longident.t loc
         (** [.foo] *)
     | Baccess_block of access_flag * expression
-        (** Access using another block index: [.idx_imm(E)], [.idx_mut(E)]
-            (usually followed by unboxed accesses, to deepen the index).
-        *)
+        (** Access using another block index: [.idx_imm(E)], [.idx_mut(E)],
+            [.idx_atomic(E)] (usually followed by unboxed accesses,
+            to deepen the index). *)
 
   and unboxed_access (*IF_CURRENT = Parsetree.unboxed_access *) =
     | Uaccess_unboxed_field of Longident.t loc
@@ -1290,6 +1290,7 @@ module Parsetree = struct
     | Pmod_functor of functor_parameter * module_expr
         (** [functor(X : MT1) -> ME] *)
     | Pmod_apply of module_expr * module_expr  (** [ME1(ME2)] *)
+    | Pmod_apply_unit of module_expr (** [ME1()] *)
     | Pmod_constraint of module_expr * module_type option * modes  (** [(ME : MT)] *)
     | Pmod_unpack of expression  (** [(val E)] *)
     | Pmod_extension of extension  (** [[%id]] *)
@@ -1344,11 +1345,19 @@ module Parsetree = struct
     | Pstr_jkind of jkind_declaration
         (** [kind_abbrev_ name = k] *)
 
+  and value_constraint (*IF_CURRENT = Parsetree.value_constraint *) =
+    | Pvc_constraint of {
+      locally_abstract_univars:string loc list;
+      typ:core_type;
+      }
+    | Pvc_coercion of {ground:core_type option; coercion:core_type }
+
   and value_binding (*IF_CURRENT = Parsetree.value_binding *) =
     {
       pvb_is_poly: bool; (** [let poly_ ] *)
       pvb_pat: pattern;
       pvb_expr: expression;
+      pvb_constraint: value_constraint option;
       pvb_modes: modes;
       pvb_attributes: attributes;
       pvb_loc: Location.t;

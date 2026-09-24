@@ -45,7 +45,17 @@ module type Additional_helpers = sig
   val elist : (expression list -> expression) with_loc
   val plist : (pattern list -> pattern) with_loc
 
-  val pexp_function : (case list -> expression) with_loc
+  val pexp_function :
+    (function_param list ->
+    type_constraint option ->
+    function_body ->
+    expression)
+    with_loc
+
+  val pexp_function_cases : (case list -> expression) with_loc
+  (** [pexp_function_cases] builds an expression in the shape
+      [function C1 -> E1 | ...]. *)
+
   val pexp_fun :
     (arg_label -> expression option -> pattern -> expression -> expression) with_loc
 

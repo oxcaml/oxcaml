@@ -471,8 +471,10 @@ module Incl = struct
 end
 
 module Vb = struct
-  let mk ?(loc = !default_loc) ?(attrs = []) pat expr =
-    { pvb_is_poly = false; pvb_pat = pat; pvb_expr = expr; pvb_modes = []; pvb_attributes = attrs; pvb_loc = loc }
+  let mk ?(loc = !default_loc) ?(attrs = []) ?value_constraint pat expr =
+    { pvb_is_poly = false; pvb_pat = pat; pvb_expr = expr;
+      pvb_constraint = value_constraint; pvb_modes = [];
+      pvb_attributes = attrs; pvb_loc = loc }
 end
 
 module Ci = struct

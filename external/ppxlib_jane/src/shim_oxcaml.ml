@@ -132,10 +132,11 @@ end
 module Value_binding = struct
   let extract_modes vb = vb.pvb_modes, { vb with pvb_modes = [] }
 
-  let create ~loc ~pat ~expr ~modes =
+  let create ~loc ~pat ~expr ~constraint_ ~modes =
     { pvb_is_poly = false
     ; pvb_pat = pat
     ; pvb_expr = expr
+    ; pvb_constraint = constraint_
     ; pvb_modes = modes
     ; pvb_attributes = []
     ; pvb_loc = loc
@@ -517,6 +518,7 @@ module Module_expr_desc = struct
     | Pmod_structure of structure
     | Pmod_functor of functor_parameter * module_expr
     | Pmod_apply of module_expr * module_expr
+    | Pmod_apply_unit of module_expr
     | Pmod_constraint of module_expr * module_type option * Modes.t
     | Pmod_unpack of expression
     | Pmod_extension of extension
