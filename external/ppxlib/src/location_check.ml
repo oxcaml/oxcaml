@@ -222,11 +222,6 @@ let enforce_invariants fname =
         do_check ~node_name:"object field" x.pof_loc childrens_locs
           siblings_locs
 
-    method! binding_op x siblings_locs =
-      let childrens_locs = super#binding_op x Non_intersecting_ranges.empty in
-      do_check ~node_name:"binding operator" x.pbop_loc childrens_locs
-        siblings_locs
-
     method! value_description x siblings_locs =
       if should_ignore x.pval_loc x.pval_attributes then siblings_locs
       else
@@ -496,6 +491,10 @@ let enforce_invariants fname =
         in
         do_check ~node_name:"core type" x.ptyp_loc childrens_locs siblings_locs
 
+    method! jkind_annotation x siblings_locs =
+      let childrens_locs = super#jkind_annotation x Non_intersecting_ranges.empty in
+      do_check ~node_name:"jkind annotation" x.pjka_loc childrens_locs siblings_locs
+
     (*****************)
     (* And again ... *)
     (*****************)
@@ -735,4 +734,17 @@ let enforce_invariants fname =
       match x.attr_name.txt with
       | "ocaml.doc" | "ocaml.text" -> acc
       | _ -> super#attribute x acc
+
+    (************************************************************)
+    (* The following is overridden because the locations of a   *)
+    (* binding_op often overlap with adjacent parts of a letop. *)
+    (************************************************************)
+
+    method! binding_op x siblings_locs =
+      let childrens_locs = super#binding_op x Non_intersecting_ranges.empty in
+      do_check ~node_name:"binding operator"
+        (* set [loc_ghost = true] on current node's location *)
+        { x.pbop_loc with loc_ghost = true }
+        childrens_locs
+        siblings_locs
   end
