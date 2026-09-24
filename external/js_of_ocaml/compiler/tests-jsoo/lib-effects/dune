@@ -19,7 +19,7 @@
  (inline_tests
   (deps
    (sandbox preserve_file_kind))
-  (modes js wasm))
+  (modes js wasm best))
  (modules
   (:standard
    \
