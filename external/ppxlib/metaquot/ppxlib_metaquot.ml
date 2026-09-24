@@ -36,7 +36,7 @@ module Make (M : sig
 
   (* This is called on the result of evaluating the lifter on an expression.
      We special case some expressions in OxCaml to support syntactic
-     function arity. See the comment on the generated call to [coalesce_fun_arity]. *)
+     function arity. See the comment on the generated call to [coalesce_arity]. *)
   val on_expression : expression -> result -> result
 
   class std_lifters : location -> [result] Ppxlib_traverse_builtins.std_lifters
@@ -233,7 +233,7 @@ module Expr = Make (struct
      to:
 
      {[
-       Ppxlib_jane.Ast_builder.Default.coalesce_fun_arity [%expr fun P -> [%e y]]
+       Ppxlib.Ast_builder.Default.coalesce_arity [%expr fun P -> [%e y]]
      ]}
 
      and similarly with newtypes:
@@ -246,7 +246,7 @@ module Expr = Make (struct
      [1 + arity(y)] instead of [1].
 
      This notion of "arity" is introduced in an OxCaml compiler change
-     and upstream in (most likely) OCaml 5.2.
+     and upstream in OCaml 5.2.
   *)
   let on_expression (input_expression : expression) (lifted : result) =
     match input_expression.pexp_desc with
@@ -254,8 +254,8 @@ module Expr = Make (struct
       let loc = input_expression.pexp_loc in
       let fun_binding =
         Ldot
-          ( Ldot (Ldot (Lident "Ppxlib_jane", "Ast_builder") ,"Default")
-          , "coalesce_fun_arity" )
+          ( Ldot (Ldot (Lident "Ppxlib", "Ast_builder") ,"Default")
+          , "coalesce_arity" )
       in
       pexp_apply
         ~loc

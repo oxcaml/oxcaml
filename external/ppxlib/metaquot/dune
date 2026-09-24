@@ -6,4 +6,4 @@
   (:standard -safe-string))
  (libraries ppxlib_ast.astlib ppxlib ppxlib_ast.traverse_builtins
   ppxlib_metaquot_lifters)
- (ppx_runtime_libraries ppxlib_ast.ast))
+ (ppx_runtime_libraries ppxlib))
