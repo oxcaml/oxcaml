@@ -286,8 +286,8 @@ let[@inline always] apply_coercion ~apply_coercion_head coercion t :
   | Unknown | Bottom -> Ok t
   | Ok (Equals simple) -> (
     match Simple.apply_coercion simple coercion with
-    | None -> Bottom
-    | Some simple -> Ok (create_equals simple))
+    | Misc.Or_null.Null -> Bottom
+    | Misc.Or_null.This simple -> Ok (create_equals simple))
   | Ok (No_alias head) ->
     let<+ head = apply_coercion_head head coercion in
     create head

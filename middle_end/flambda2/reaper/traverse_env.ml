@@ -52,9 +52,9 @@ let all_constants t = t.all_constants
 let with_parent t parent = { t with parent }
 
 let find_cont t cont =
-  match Continuation.Map.find_opt cont t.conts with
-  | Some cont_kind -> cont_kind
-  | None ->
+  match Continuation.Map.find_or_null cont t.conts with
+  | This cont_kind -> cont_kind
+  | Null ->
     Misc.fatal_errorf "[Env.find_cont]: continuation %a not found in env"
       Continuation.print cont
 

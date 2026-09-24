@@ -70,21 +70,21 @@ let coalesce_temp_spills_and_reloads (block : Cfg.basic_block)
     | Op Reload -> (
       let var = inst.arg.(0) in
       let temp = inst.res.(0) in
-      match Reg.Tbl.find_opt var_to_block_temp var with
-      | None -> Reg.Tbl.add var_to_block_temp var temp
-      | Some block_temp ->
+      match Reg.Tbl.find var_to_block_temp var with
+      | exception Not_found -> Reg.Tbl.add var_to_block_temp var temp
+      | block_temp ->
         DLL.delete_curr inst_cell;
         replace temp block_temp)
     | Op Spill -> (
       let var = inst.res.(0) in
       let temp = inst.arg.(0) in
-      (match Reg.Tbl.find_opt last_spill var with
-      | None -> ()
-      | Some prev_inst_cell -> DLL.delete_curr prev_inst_cell);
+      (match Reg.Tbl.find last_spill var with
+      | exception Not_found -> ()
+      | prev_inst_cell -> DLL.delete_curr prev_inst_cell);
       Reg.Tbl.replace last_spill var inst_cell;
-      match Reg.Tbl.find_opt var_to_block_temp var with
-      | None -> Reg.Tbl.add var_to_block_temp var temp
-      | Some block_temp -> replace temp block_temp)
+      match Reg.Tbl.find var_to_block_temp var with
+      | exception Not_found -> Reg.Tbl.add var_to_block_temp var temp
+      | block_temp -> replace temp block_temp)
     | Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _
     | Stack_check _
     | Op
@@ -188,9 +188,9 @@ let rewrite_gen : type s.
       if is_spilled reg
       then (
         let spilled =
-          match Reg.Tbl.find_opt spilled_map reg with
-          | None -> assert false
-          | Some r -> r
+          match Reg.Tbl.find spilled_map reg with
+          | exception Not_found -> assert false
+          | r -> r
         in
         let move, move_dir =
           match direction with
@@ -198,12 +198,12 @@ let rewrite_gen : type s.
           | Store_after_cell _ | Store_before_list _ -> Move.Store, Store
         in
         let add_instr, temp =
-          match Reg.Tbl.find_opt sharing reg with
-          | None ->
+          match Reg.Tbl.find sharing reg with
+          | exception Not_found ->
             let new_temp = make_new_temporary ~move reg in
             Reg.Tbl.add sharing reg (new_temp, move_dir);
             true, new_temp
-          | Some (r, dir) -> not (equal_move_kind dir move_dir), r
+          | r, dir -> not (equal_move_kind dir move_dir), r
         in
         (if add_instr
          then

@@ -57,8 +57,8 @@ let set_layout t layout =
      let new_layout = label_set_of_layout layout in
      let hd_is_entry =
        match DLL.hd layout with
-       | None -> false
-       | Some label -> Label.equal label t.cfg.entry_label
+       | Misc.Or_null.Null -> false
+       | Misc.Or_null.This label -> Label.equal label t.cfg.entry_label
      in
      if not (hd_is_entry && Label.Set.equal cur_layout new_layout)
      then
@@ -114,8 +114,9 @@ let add_block t (block : Cfg.basic_block) ~after =
   match
     DLL.find_cell_opt t.layout ~f:(fun label -> Label.equal label after)
   with
-  | None -> Misc.fatal_error "Cfg set_layout: 'after' block is not present"
-  | Some cell -> (
+  | Misc.Or_null.Null ->
+    Misc.fatal_error "Cfg set_layout: 'after' block is not present"
+  | Misc.Or_null.This cell -> (
     DLL.insert_after cell block.start;
     Cfg.add_block_exn t.cfg block;
     (* The new block inherits the section of the [after] block, so that the
@@ -299,8 +300,8 @@ let print_dot ?(show_instr = true) ?(show_exn = true) ?(annotate_instr = [])
     Label.Tbl.iter
       (fun label block ->
         match DLL.find_opt ~f:(fun lbl -> Label.equal label lbl) t.layout with
-        | None -> print_block_dot label block None
-        | _ -> ())
+        | Misc.Or_null.Null -> print_block_dot label block None
+        | Misc.Or_null.This _ -> ())
       t.cfg.blocks;
   Format.fprintf ppf "}\n%!";
   ()
@@ -446,14 +447,14 @@ let insert_block :
         available_across,
         phantom_available_before ) =
     match DLL.last body with
-    | None ->
+    | Misc.Or_null.Null ->
       ( Debuginfo.none,
         Fdo_info.none,
         Reg.Set.empty,
         Reg_availability_set.Unreachable,
         Reg_availability_set.Unreachable,
         None )
-    | Some
+    | Misc.Or_null.This
         { dbg;
           fdo;
           live;

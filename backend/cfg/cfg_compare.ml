@@ -286,16 +286,18 @@ let compare_instruction_fields ~ppf_m ~kind ~old_label ~new_label
 let compare_body ~ppf_m ~map_label ~old_label ~new_label old_body new_body =
   let rec skip_moves cell =
     match cell with
-    | Some c -> if is_move (DLL.value c) then skip_moves (DLL.next c) else cell
-    | None -> cell
+    | Misc.Or_null.This c ->
+      if is_move (DLL.value c) then skip_moves (DLL.next c) else cell
+    | Misc.Or_null.Null -> cell
   in
   let rec loop old_cell new_cell =
     match skip_moves old_cell, skip_moves new_cell with
-    | None, None -> ()
-    | Some _, None | None, Some _ ->
+    | Misc.Or_null.Null, Misc.Or_null.Null -> ()
+    | Misc.Or_null.This _, Misc.Or_null.Null
+    | Misc.Or_null.Null, Misc.Or_null.This _ ->
       Format.fprintf ppf_m "Body length mismatch at old=%a new=%a@."
         Label.format old_label Label.format new_label
-    | Some old_cell, Some new_cell ->
+    | Misc.Or_null.This old_cell, Misc.Or_null.This new_cell ->
       let (old_instr : Cfg.basic Cfg.instruction) = DLL.value old_cell in
       let (new_instr : Cfg.basic Cfg.instruction) = DLL.value new_cell in
       if not (basic_desc_match ~map_label old_instr.desc new_instr.desc)
@@ -711,20 +713,20 @@ let process_block_backward ~ppf_m eqs ~(old_block : Cfg.basic_block)
      moves *)
   let rec loop eqs old_cell new_cell =
     match old_cell, new_cell with
-    | None, None -> eqs
-    | Some cell, _ when is_move (DLL.value cell) ->
+    | Misc.Or_null.Null, Misc.Or_null.Null -> eqs
+    | Misc.Or_null.This cell, _ when is_move (DLL.value cell) ->
       let (old_instr : Cfg.basic Cfg.instruction) = DLL.value cell in
       loop
         (Equations.subst_old_move eqs ~src:old_instr.arg.(0)
            ~dst:old_instr.res.(0))
         (DLL.prev cell) new_cell
-    | _, Some cell when is_move (DLL.value cell) ->
+    | _, Misc.Or_null.This cell when is_move (DLL.value cell) ->
       let (new_instr : Cfg.basic Cfg.instruction) = DLL.value cell in
       loop
         (Equations.subst_new_move eqs ~src:new_instr.arg.(0)
            ~dst:new_instr.res.(0))
         old_cell (DLL.prev cell)
-    | Some old_cell, Some new_cell ->
+    | Misc.Or_null.This old_cell, Misc.Or_null.This new_cell ->
       let old_instr = DLL.value old_cell in
       let new_instr = DLL.value new_cell in
       let eqs =
@@ -733,7 +735,8 @@ let process_block_backward ~ppf_m eqs ~(old_block : Cfg.basic_block)
           ~is_gc_point:(Cfg.is_alloc old_instr || Cfg.is_poll old_instr)
       in
       loop eqs (DLL.prev old_cell) (DLL.prev new_cell)
-    | Some _, None | None, Some _ ->
+    | Misc.Or_null.This _, Misc.Or_null.Null
+    | Misc.Or_null.Null, Misc.Or_null.This _ ->
       Format.fprintf ppf_m "Body length mismatch at old=%a new=%a@."
         Label.format old_label Label.format new_label;
       eqs

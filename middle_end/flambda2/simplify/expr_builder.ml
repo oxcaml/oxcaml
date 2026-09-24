@@ -560,8 +560,8 @@ let apply_continuation_aliases uenv cont =
   | None -> cont
   | Some shortcut -> (
     match Continuation_shortcut.to_alias shortcut with
-    | None -> cont
-    | Some cont -> cont)
+    | Misc.Or_null.Null -> cont
+    | Misc.Or_null.This cont -> cont)
 
 let apply_exn_continuation_aliases uenv exn_cont =
   let cont = Exn_continuation.exn_handler exn_cont in
@@ -569,8 +569,8 @@ let apply_exn_continuation_aliases uenv exn_cont =
   | None -> exn_cont
   | Some shortcut -> (
     match Continuation_shortcut.to_alias shortcut with
-    | None -> exn_cont
-    | Some cont -> Exn_continuation.with_exn_handler exn_cont cont)
+    | Misc.Or_null.Null -> exn_cont
+    | Misc.Or_null.This cont -> Exn_continuation.with_exn_handler exn_cont cont)
 
 let no_rewrite_apply_cont uenv apply_cont =
   let apply_cont = apply_continuation_shortcuts uenv apply_cont in

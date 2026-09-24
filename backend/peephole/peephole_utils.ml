@@ -14,17 +14,18 @@ let rec prev_at_most steps cell =
   (* Convention: must try to go back at least one element *)
   assert (steps > 0);
   match DLL.prev cell with
-  | Some prev_cell ->
+  | Misc.Or_null.This prev_cell ->
     if steps = 1 then prev_cell else prev_at_most (steps - 1) prev_cell
-  | None -> cell
+  | Misc.Or_null.Null -> cell
 
-let rec get_cells' (cell : Cfg.basic Cfg.instruction DLL.cell option) size lst =
+let rec get_cells' (cell : Cfg.basic Cfg.instruction DLL.cell Misc.Or_null.t)
+    size lst =
   match cell with
-  | Some cell -> (
+  | Misc.Or_null.This cell -> (
     match size with
     | 0 -> List.rev lst
     | size -> get_cells' (DLL.next cell) (size - 1) (cell :: lst))
-  | None -> List.rev lst
+  | Misc.Or_null.Null -> List.rev lst
 
 let get_cells cell size =
   assert (size > 0);

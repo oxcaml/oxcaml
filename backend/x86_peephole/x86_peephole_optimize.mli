@@ -4,4 +4,4 @@ open X86_ast
 module DLL = Doubly_linked_list
 
 (** Optimize starting from a given cell, walking forward through the DLL. *)
-val optimize_from_cell : asm_line DLL.cell option -> unit
+val optimize_from_cell : asm_line DLL.cell Misc.Or_null.t -> unit

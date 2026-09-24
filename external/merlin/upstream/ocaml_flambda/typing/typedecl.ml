@@ -2242,7 +2242,7 @@ let compute_record_repr
   | ~values:false, ~floats:true,
       ~atomic_floats:false, ~float64s:true,
       ~non_float64_unboxed_fields:false, ~atomic_fields:false,
-      ~first_any:None, ~voids:_ ->
+      ~first_any:Misc.Or_null.Null, ~voids:_ ->
     if flatten_floats then
       let rec of_repr (repr : Element_repr.t) : Types.mixed_block_element =
         match repr with
@@ -2270,11 +2270,11 @@ let compute_record_repr
       Ok (Record_mixed shape)
     else
       mixed_record ()
-  | ~first_any:(Some id), .. ->
+  | ~first_any:(Misc.Or_null.This id), .. ->
     Result.Error (Unrepresentable_field (Ident.name id))
   | ~values:false, ~floats:false, ~atomic_floats:false,
     ~float64s:true, ~non_float64_unboxed_fields:false,
-    ~voids:false, ~first_any:None, ~atomic_fields:_ ->
+    ~voids:false, ~first_any:Misc.Or_null.Null, ~atomic_fields:_ ->
     if represent_as_float_array then
       Ok Record_ufloat
     else
@@ -2296,16 +2296,16 @@ let compute_record_repr
   *)
   | ~values:false, ~floats:true, ~atomic_floats:false,
       ~float64s:false, ~non_float64_unboxed_fields:false,
-      ~voids:false, ~first_any:None, ~atomic_fields:_ ->
+      ~voids:false, ~first_any:Misc.Or_null.Null, ~atomic_fields:_ ->
     Ok Record_float
   (* Records with atomic float fields cannot use flat representation *)
-  | ~atomic_floats:true, ~first_any:None, .. ->
+  | ~atomic_floats:true, ~first_any:Misc.Or_null.Null, .. ->
     if warn && floats && not values
     then Location.prerr_warning loc Warnings.Atomic_float_record_boxed;
     Ok Record_boxed
   | ~values:false, ~floats:false, ~atomic_floats:false,
       ~float64s:false, ~non_float64_unboxed_fields:false,
-      ~voids:false, ~atomic_fields:_, ~first_any:None ->
+      ~voids:false, ~atomic_fields:_, ~first_any:Misc.Or_null.Null ->
     Misc.fatal_error "Typedecl.compute_record_repr: empty record"
 
 (* For tracking what types appear in record blocks. All product layouts
@@ -2324,7 +2324,7 @@ type element_repr_summary =
      mutable non_float64_unboxed_fields : bool;
      (* Includes product containing void *)
      mutable voids : bool;
-     mutable first_any : Ident.t option;
+     mutable first_any : Ident.t Misc.Or_null.t;
   }
 
 let compute_repr_summary env lbls =
@@ -2340,13 +2340,14 @@ let compute_repr_summary env lbls =
   let repr_summary =
     { values = false; floats = false; atomic_floats = false;
       atomic_fields = false; float64s = false;
-      non_float64_unboxed_fields = false; voids = false; first_any = None;
+      non_float64_unboxed_fields = false; voids = false;
+      first_any = Misc.Or_null.Null;
     }
   in
   let add_any name =
     match repr_summary.first_any with
-    | Some _ -> ()
-    | None -> repr_summary.first_any <- Some name
+    | Misc.Or_null.This _ -> ()
+    | Misc.Or_null.Null -> repr_summary.first_any <- Misc.Or_null.This name
   in
   List.iter
     (fun { lbl; repr } ->
@@ -2455,8 +2456,9 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
         rep
       | Unboxed_product ->
         (match first_any with
-        | Some id -> Result.Error (Unrepresentable_field (Ident.name id))
-        | None -> Ok Record_unboxed_product)
+        | Misc.Or_null.This id ->
+            Result.Error (Unrepresentable_field (Ident.name id))
+        | Misc.Or_null.Null -> Ok Record_unboxed_product)
     in
     let rep : rep =
       match rep with
@@ -3751,7 +3753,7 @@ let transl_type_decl env rec_flag sdecl_list =
       let temp_env =
         List.fold_left2 (enter_type rec_flag) env sdecl_list ids_list in
       (* Translate each declaration. *)
-      let current_slot = ref None in
+      let current_slot = ref Misc.Or_null.Null in
       let warn_unused =
         Warnings.(is_active (Unused_type_declaration ("", Declaration))) in
       let ids_slots (id, _uid as ids) =
@@ -3765,14 +3767,14 @@ let transl_type_decl env rec_flag sdecl_list =
               td
               (fun old_callback ->
                 match !current_slot with
-                | Some slot -> slot := td.type_uid :: !slot
-                | None ->
+                | Misc.Or_null.This slot -> slot := td.type_uid :: !slot
+                | Misc.Or_null.Null ->
                     List.iter Env.mark_type_used (get_ref slot);
                     old_callback ()
               );
-            ids, Some slot
+            ids, Misc.Or_null.This slot
         | Asttypes.Recursive | Asttypes.Nonrecursive ->
-            ids, None
+            ids, Misc.Or_null.Null
       in
       let transl_declaration name_sdecl (id, slot) =
         current_slot := slot;
@@ -3792,7 +3794,7 @@ let transl_type_decl env rec_flag sdecl_list =
         List.map2
           (fun tdecl (_, decl) -> { tdecl with typ_type = decl }) tdecls decls
       in
-      current_slot := None;
+      current_slot := Misc.Or_null.Null;
       (* Check for duplicates *)
       check_duplicates sdecl_list;
       (* Build the final env. *)

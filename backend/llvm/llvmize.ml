@@ -1605,9 +1605,10 @@ let alloca_regs t (cfg : Cfg.t) arg_values arg_regs =
 
 let trap_handler_entry t (block : Cfg.basic_block) label =
   match[@ocaml.warning "-fragile-match"]
-    DLL.hd block.body |> Option.map (fun (i : _ Cfg.instruction) -> i, i.desc)
+    DLL.hd block.body
+    |> Misc.Or_null.map (fun (i : _ Cfg.instruction) -> i, i.desc)
   with
-  | Some (i, Op Move) -> (
+  | Misc.Or_null.This (i, Op Move) -> (
     match Label.Tbl.find_opt (get_fun_info t).trap_blocks label with
     | Some { exn_bucket; _ } ->
       (* Restore RBP (+ remove padding) *)

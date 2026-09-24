@@ -474,7 +474,7 @@ let rebuild_let_cont (data : rebuild_let_cont_data) ~after_rebuild body uacc =
         else
           let remove_let_cont_leaving_handler =
             match RE.to_apply_cont body with
-            | Some apply_cont -> (
+            | Misc.Or_null.This apply_cont -> (
               if
                 not
                   (Continuation.equal cont (Apply_cont.continuation apply_cont))
@@ -483,7 +483,7 @@ let rebuild_let_cont (data : rebuild_let_cont_data) ~after_rebuild body uacc =
                 match Apply_cont.args apply_cont with
                 | [] -> Option.is_none (Apply_cont.trap_action apply_cont)
                 | _ :: _ -> false)
-            | None -> false
+            | Misc.Or_null.Null -> false
           in
           if remove_let_cont_leaving_handler
           then
@@ -758,13 +758,13 @@ let rebuild_single_non_recursive_handler ~at_unit_toplevel
             then Unknown
             else
               match RE.to_apply_cont handler with
-              | Some apply_cont -> (
+              | Misc.Or_null.This apply_cont -> (
                 match Apply_cont.trap_action apply_cont with
                 | Some _ -> Unknown
                 | None ->
                   let args = Apply_cont.args apply_cont in
                   Shortcut_to (Apply_cont.continuation apply_cont, args))
-              | None ->
+              | Misc.Or_null.Null ->
                 if
                   RE.can_be_removed_as_invalid handler
                     (UA.are_rebuilding_terms uacc)

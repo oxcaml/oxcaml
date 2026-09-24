@@ -505,9 +505,9 @@ let deps t ~all_constants =
            apply_call_witness
          } ->
       let code_dep =
-        match Code_id.Map.find_opt apply_code_id t.code_deps with
-        | Some code_dep -> code_dep
-        | None ->
+        match Code_id.Map.find_or_null apply_code_id t.code_deps with
+        | This code_dep -> code_dep
+        | Null ->
           Misc.fatal_errorf
             "No code found for %a in apply dep (from %a); external code ids \
              should not appear here"

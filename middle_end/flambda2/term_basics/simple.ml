@@ -81,15 +81,16 @@ let without_coercion t =
 
 let apply_coercion t applied_coercion =
   if Coercion.is_id applied_coercion || is_const t
-  then Some t
+  then Misc.Or_null.This t
   else
     Coercion.compose (coercion t) ~then_:applied_coercion
-    |> Option.map (fun coercion -> with_coercion (without_coercion t) coercion)
+    |> Misc.Or_null.map (fun coercion ->
+        with_coercion (without_coercion t) coercion)
 
 let apply_coercion_exn t applied_coercion =
   match apply_coercion t applied_coercion with
-  | Some t -> t
-  | None ->
+  | Misc.Or_null.This t -> t
+  | Misc.Or_null.Null ->
     Misc.fatal_errorf "Cannot@ apply@ coercion@ %a@ to@ %a" Coercion.print
       applied_coercion print t
 

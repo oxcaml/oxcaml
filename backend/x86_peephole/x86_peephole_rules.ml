@@ -90,7 +90,7 @@ let combine_add_rsp stats cell =
         DLL.delete_curr cell3;
         DLL.delete_curr cell4;
         (* Return cell1 to allow iterative combination of multiple ADDs *)
-        U.Matched (Some cell1)
+        U.Matched (Misc.Or_null.This cell1)
       end
     | _, _, _, _ -> U.No_match)
   | _ -> U.No_match
@@ -125,7 +125,7 @@ let remove_mov_to_dead_register stats cell =
         stats.remove_mov_to_dead_register
           <- stats.remove_mov_to_dead_register + 1;
         (* Return cell1 to allow iterative combination *)
-        U.Matched (Some cell1)
+        U.Matched (Misc.Or_null.This cell1)
       end
       else U.No_match
     | _, _ -> U.No_match)
@@ -134,23 +134,25 @@ let remove_mov_to_dead_register stats cell =
 let find_redundant_cmp src dst start_cell =
   let rec loop cell_opt =
     match cell_opt with
-    | None -> None
-    | Some cell -> (
+    | Misc.Or_null.Null -> Misc.Or_null.Null
+    | Misc.Or_null.This cell -> (
       let value = DLL.value cell in
       if U.is_hard_barrier value
-      then None
+      then Misc.Or_null.Null
       else
         match value with
         | Ins instr -> (
           if not (U.arg_unchanged_by src instr && U.arg_unchanged_by dst instr)
-          then None
+          then Misc.Or_null.Null
           else
             match instr with
             | CMP (src2, dst2) when equal_args src src2 && equal_args dst dst2
               ->
-              Some cell
+              Misc.Or_null.This cell
             | _ ->
-              if U.maybe_writes_flags instr then None else loop (DLL.next cell))
+              if U.maybe_writes_flags instr
+              then Misc.Or_null.Null
+              else loop (DLL.next cell))
         | Directive _ -> loop (DLL.next cell))
   in
   loop (DLL.next start_cell)
@@ -169,13 +171,13 @@ let remove_redundant_cmp stats cell =
   | Ins (CMP (src, dst)) -> (
     (* Search for a redundant CMP *)
     match find_redundant_cmp src dst cell with
-    | Some redundant_cell ->
+    | Misc.Or_null.This redundant_cell ->
       (* Delete the redundant CMP *)
       DLL.delete_curr redundant_cell;
       stats.remove_redundant_cmp <- stats.remove_redundant_cmp + 1;
       (* Return the first CMP cell to allow iterative removal *)
-      U.Matched (Some cell)
-    | None -> U.No_match)
+      U.Matched (Misc.Or_null.This cell)
+    | Misc.Or_null.Null -> U.No_match)
   | _ -> U.No_match
 
 (* Rewrite rule: remove a sign/zero-extension instruction that immediately
@@ -203,7 +205,7 @@ let remove_redundant_extension stats cell =
       DLL.delete_curr cell2;
       stats.remove_redundant_extension <- stats.remove_redundant_extension + 1;
       (* Return cell1 so that a third identical extension is also removed *)
-      U.Matched (Some cell1)
+      U.Matched (Misc.Or_null.This cell1)
     | _, _ -> U.No_match)
   | _ -> U.No_match
 
@@ -229,7 +231,7 @@ let remove_redundant_test stats cell =
       when equal_reg64 dst src1 && equal_reg64 dst src2 ->
       DLL.delete_curr cell2;
       stats.remove_redundant_test <- stats.remove_redundant_test + 1;
-      U.Matched (Some cell1)
+      U.Matched (Misc.Or_null.This cell1)
     | _, _ -> U.No_match)
   | _ -> U.No_match
 

@@ -26,4 +26,4 @@ val apply : t -> Simple.t list -> Continuation.t * Simple.t list
 
 val continuation : t -> Continuation.t
 
-val to_alias : t -> Continuation.t option
+val to_alias : t -> Continuation.t Misc.Or_null.t

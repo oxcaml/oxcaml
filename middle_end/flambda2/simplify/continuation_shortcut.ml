@@ -59,5 +59,5 @@ let apply { params; continuation; args } shortcut_args =
 let to_alias t =
   let params = Bound_parameters.simples t.params in
   if Misc.Stdlib.List.equal Simple.equal t.args params
-  then Some t.continuation
-  else None
+  then Misc.Or_null.This t.continuation
+  else Misc.Or_null.Null

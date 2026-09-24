@@ -106,8 +106,8 @@ let rebuild_arm uacc arm (action, use_id, arity, env_at_use)
         else
           let check_handler ~handler ~action =
             match RE.to_apply_cont handler with
-            | Some action -> Some action
-            | None -> Some action
+            | Misc.Or_null.This action -> Some action
+            | Misc.Or_null.Null -> Some action
           in
           match cont_info_from_uenv with
           | Linearly_used_and_inlinable

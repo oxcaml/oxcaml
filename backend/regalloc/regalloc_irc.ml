@@ -342,8 +342,8 @@ let assign_colors : State.t -> Cfg_with_layout.t -> unit =
          passed affinities *)
       let rec get_available aff =
         match Regalloc_affinity.next aff with
-        | None -> get_first_available ()
-        | Some { Regalloc_affinity.priority = _; phys_reg } ->
+        | Misc.Or_null.Null -> get_first_available ()
+        | Misc.Or_null.This { Regalloc_affinity.priority = _; phys_reg } ->
           let idx = Regs.index_in_class phys_reg in
           if idx >= 0 && idx < reg_num_avail && Array.unsafe_get ok_colors idx
           then idx
@@ -522,7 +522,7 @@ let rec main : round:int -> State.t -> Cfg_with_infos.t -> unit =
       State.invariant state;
       main ~round:(succ round) state cfg_with_infos)
 
-let run : Cfg_with_infos.t -> Cfg_with_infos.t option =
+let run : Cfg_with_infos.t -> Cfg_with_infos.t Misc.Or_null.t =
  fun cfg_with_infos ->
   if debug then reset_indentation ();
   let cfg_with_layout = Cfg_with_infos.cfg_with_layout cfg_with_infos in
@@ -542,7 +542,7 @@ let run : Cfg_with_infos.t -> Cfg_with_infos.t option =
       ~stack_slots ~affinity ()
   in
   match main ~round:1 state cfg_with_infos with
-  | exception Function_is_too_complex -> None
+  | exception Function_is_too_complex -> Misc.Or_null.Null
   | () ->
     if debug then log_cfg_with_infos cfg_with_infos;
     Regalloc_rewrite.postlude
@@ -555,4 +555,4 @@ let run : Cfg_with_infos.t -> Cfg_with_infos.t option =
           (fun reg -> State.set_degree state reg 0)
           (all_precolored_regs ()))
       cfg_with_infos;
-    Some cfg_with_infos
+    Misc.Or_null.This cfg_with_infos

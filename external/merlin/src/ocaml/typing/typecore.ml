@@ -12754,7 +12754,7 @@ and type_let_def_wrap_warnings
        to the current definition (!current_slot).
        In effect, this creates a dependency graph between definitions.
 
-     - After type checking the definition (!current_slot = None),
+     - After type checking the definition (!current_slot = Null),
        when one of the bound identifier is effectively used, we trigger
        again all the events recorded in the corresponding slot.
        The effect is to traverse the transitive closure of the graph created
@@ -12764,13 +12764,14 @@ and type_let_def_wrap_warnings
      are unused. If this is the case, for local declarations, the issued
      warning is 26, not 27.
    *)
-  let current_slot = ref None in
+  let current_slot = ref Misc.Or_null.Null in
   let rec_needed = ref false in
   let mode_typ_slot_list =
     List.map2
       (fun attrs (mode, pat, expected_ty) ->
         Builtin_attributes.warning_scope ~ppwarning:false attrs (fun () ->
-          if not warn_about_unused_bindings then mode, expected_ty, None
+          if not warn_about_unused_bindings then
+            mode, expected_ty, Misc.Or_null.Null
           else
             let some_used = ref false in
             (* has one of the identifier of this pattern been used? *)
@@ -12808,9 +12809,9 @@ and type_let_def_wrap_warnings
                   vd
                   (fun () ->
                     match !current_slot with
-                    | Some slot ->
+                    | Misc.Or_null.This slot ->
                         slot := vd.val_uid :: !slot; rec_needed := true
-                    | None ->
+                    | Misc.Or_null.Null ->
                         List.iter Env.mark_value_used (get_ref slot);
                         used := true;
                         some_used := true
@@ -12823,7 +12824,7 @@ and type_let_def_wrap_warnings
                 | Val_self _ | Val_anc _ -> ()
               )
               (Typedtree.pat_bound_idents pat);
-            mode, expected_ty, Some slot
+            mode, expected_ty, Misc.Or_null.This slot
            ))
       attrs_list
       mode_pat_typ_list
@@ -12835,7 +12836,7 @@ and type_let_def_wrap_warnings
         type_def exp_env case mode expected_ty)
       spat_sexp_list mode_typ_slot_list
   in
-  current_slot := None;
+  current_slot := Misc.Or_null.Null;
   if is_recursive && not !rec_needed then begin
     let {pvb_pat; pvb_attributes} = List.hd spat_sexp_list in
     (* See PR#6677 *)

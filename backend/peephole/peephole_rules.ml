@@ -12,8 +12,8 @@ let delete_fst_if_redundant ~fst ~snd ~(fst_val : Cfg.basic Cfg.instruction)
   if U.are_equal_regs fst_dst snd_dst
   then (
     DLL.delete_curr fst;
-    Some (U.prev_at_most U.go_back_const snd))
-  else None
+    Misc.Or_null.This (U.prev_at_most U.go_back_const snd))
+  else Misc.Or_null.Null
 
 (** Logical condition for simplifying the following case:
     {v
@@ -47,10 +47,10 @@ let remove_overwritten_mov (cell : Cfg.basic Cfg.instruction DLL.cell) =
          currently removed by [Regalloc_utils.simplify_cfg] before this pass
          runs, but do not rely on that here. *)
       if U.are_equal_regs snd_val.arg.(0) snd_val.res.(0)
-      then None
+      then Misc.Or_null.Null
       else delete_fst_if_redundant ~fst ~snd ~fst_val ~snd_val
-    | _, _ -> None)
-  | _ -> None
+    | _, _ -> Misc.Or_null.Null)
+  | _ -> Misc.Or_null.Null
 
 (** Logical condition for simplifying the following case:
     {v
@@ -74,11 +74,11 @@ let remove_useless_mov (cell : Cfg.basic Cfg.instruction DLL.cell) =
         if U.are_equal_regs fst_src snd_dst && U.are_equal_regs fst_dst snd_src
         then (
           DLL.delete_curr snd;
-          Some (U.prev_at_most U.go_back_const fst))
-        else None
-      | _ -> None)
-    | _ -> None)
-  | _ -> None
+          Misc.Or_null.This (U.prev_at_most U.go_back_const fst))
+        else Misc.Or_null.Null
+      | _ -> Misc.Or_null.Null)
+    | _ -> Misc.Or_null.Null)
+  | _ -> Misc.Or_null.Null
 
 (** Logical condition for simplifying the following case:
     {v
@@ -184,11 +184,11 @@ let fold_intop_imm (cell : Cfg.basic Cfg.instruction DLL.cell) =
           in
           DLL.delete_curr fst;
           DLL.delete_curr snd;
-          Some ((U.prev_at_most U.go_back_const) new_cell)
-        | _ -> None)
-      | _ -> None
-    else None
-  | _ -> None
+          Misc.Or_null.This ((U.prev_at_most U.go_back_const) new_cell)
+        | _ -> Misc.Or_null.Null)
+      | _ -> Misc.Or_null.Null
+    else Misc.Or_null.Null
+  | _ -> Misc.Or_null.Null
 
 (** Logical condition for simplifying the following case:
     {v
@@ -214,12 +214,13 @@ let fold_intop_imm_into_specific (cell : Cfg.basic Cfg.instruction DLL.cell) =
     let snd_val = DLL.value snd in
     let delta =
       match fst_val.desc with
-      | Op (Intop_imm (Iadd, imm)) -> Some imm
-      | Op (Intop_imm (Isub, imm)) when imm <> min_int -> Some (-imm)
-      | _ -> None
+      | Op (Intop_imm (Iadd, imm)) -> Misc.Or_null.This imm
+      | Op (Intop_imm (Isub, imm)) when imm <> min_int ->
+        Misc.Or_null.This (-imm)
+      | _ -> Misc.Or_null.Null
     in
     match delta, snd_val.desc with
-    | Some delta, Op (Specific specific)
+    | Misc.Or_null.This delta, Op (Specific specific)
       when Array.length fst_val.arg = 1
            && Array.length fst_val.res = 1
            && Array.length snd_val.res = 1
@@ -237,7 +238,7 @@ let fold_intop_imm_into_specific (cell : Cfg.basic Cfg.instruction DLL.cell) =
         Arch.fold_delta_into_specific_operation specific ~arg_is_folded_reg
           ~delta
       with
-      | None -> None
+      | None -> Misc.Or_null.Null
       | Some specific ->
         let new_cell =
           DLL.insert_and_return_before snd
@@ -245,9 +246,9 @@ let fold_intop_imm_into_specific (cell : Cfg.basic Cfg.instruction DLL.cell) =
         in
         DLL.delete_curr fst;
         DLL.delete_curr snd;
-        Some (U.prev_at_most U.go_back_const new_cell))
-    | _, _ -> None)
-  | _ -> None
+        Misc.Or_null.This (U.prev_at_most U.go_back_const new_cell))
+    | _, _ -> Misc.Or_null.Null)
+  | _ -> Misc.Or_null.Null
 
 let remove_intop_neutral_element (cell : Cfg.basic Cfg.instruction DLL.cell) =
   (* CR-someday xclerc for xclerc: it is not clear we want these rewrites to
@@ -283,20 +284,20 @@ let remove_intop_neutral_element (cell : Cfg.basic Cfg.instruction DLL.cell) =
            deleted cell. *)
         let continue =
           match DLL.prev cell with
-          | Some _ as prev -> prev
-          | None -> DLL.next cell
+          | Misc.Or_null.This _ as prev -> prev
+          | Misc.Or_null.Null -> DLL.next cell
         in
         DLL.delete_curr cell;
         continue)
-      else None
-    | _ -> None)
-  | _ -> None
+      else Misc.Or_null.Null
+    | _ -> Misc.Or_null.Null)
+  | _ -> Misc.Or_null.Null
 
 let apply cell =
   let[@inline always] if_none_do f o =
-    match o with Some _ -> o | None -> f cell
+    match o with Misc.Or_null.This _ -> o | Misc.Or_null.Null -> f cell
   in
-  None
+  Misc.Or_null.Null
   |> if_none_do remove_overwritten_mov
   |> if_none_do remove_useless_mov
   |> if_none_do fold_intop_imm

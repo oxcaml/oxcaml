@@ -15,7 +15,9 @@
 type t
 
 val create :
-  prim:Flambda_primitive.t -> comparison_results:t Variable.Map.t -> t option
+  prim:Flambda_primitive.t ->
+  comparison_results:t Variable.Map.t ->
+  t Misc.Or_null.t
 
 val print : Format.formatter -> t -> unit
 

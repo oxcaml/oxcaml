@@ -400,7 +400,10 @@ let collect_sections ~is_delayed =
 
 type output_pos = asm_line DLL.cell option (* None means the beginning *)
 
-let current_output_pos () = DLL.last_cell asm_code
+let current_output_pos () =
+  match DLL.last_cell asm_code with
+  | Misc.Or_null.Null -> None
+  | Misc.Or_null.This cell -> Some cell
 
 let next_pos pos =
   match pos with None -> DLL.hd_cell asm_code | Some cell -> DLL.next cell

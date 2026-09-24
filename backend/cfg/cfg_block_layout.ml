@@ -127,8 +127,8 @@ let run (cfg_with_layout : Cfg_with_layout.t) =
   then (
     let new_layout = compute_new_layout cfg layout in
     (match DLL.hd new_layout with
-    | Some first when Label.equal first (Cfg.entry_label cfg) -> ()
-    | Some _ | None ->
+    | Misc.Or_null.This first when Label.equal first (Cfg.entry_label cfg) -> ()
+    | Misc.Or_null.This _ | Misc.Or_null.Null ->
       Misc.fatal_errorf "Cfg_block_layout: entry block is not first (%s)"
         (Cfg.fun_name cfg));
     if DLL.compare_lengths new_layout layout <> 0

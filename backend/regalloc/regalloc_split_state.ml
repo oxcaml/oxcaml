@@ -524,9 +524,10 @@ end = struct
                 (fun (reg : Reg.t) ->
                   if debug then log "register %a" Printreg.reg reg;
                   let keep =
-                    match Reg.Tbl.find_opt num_sets reg with
-                    | None | Some Maybe_more_than_once -> true
-                    | Some At_most_once -> (
+                    match Reg.Tbl.find num_sets reg with
+                    | exception Not_found -> true
+                    | Maybe_more_than_once -> true
+                    | At_most_once -> (
                       match Reg.Map.find_opt reg !already_spilled with
                       | None ->
                         if debug
@@ -607,12 +608,12 @@ end = struct
     let incr_set (tbl : set Reg.Tbl.t) (arr : Reg.t array) ~(in_loop : bool) :
         unit =
       Array.iter arr ~f:(fun (reg : Reg.t) ->
-          match Reg.Tbl.find_opt tbl reg with
-          | None ->
+          match Reg.Tbl.find tbl reg with
+          | exception Not_found ->
             Reg.Tbl.replace tbl reg
               (if in_loop then Maybe_more_than_once else At_most_once)
-          | Some At_most_once -> Reg.Tbl.replace tbl reg Maybe_more_than_once
-          | Some Maybe_more_than_once -> ())
+          | At_most_once -> Reg.Tbl.replace tbl reg Maybe_more_than_once
+          | Maybe_more_than_once -> ())
     in
     let num_sets =
       Cfg_with_infos.fold_blocks cfg_with_infos ~init:(Reg.Tbl.create 123)

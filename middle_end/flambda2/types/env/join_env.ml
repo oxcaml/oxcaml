@@ -1236,11 +1236,11 @@ let rec add_inverse_relation_to_env_extension ?(seen = Name.Set.empty)
       (TG.Head_of_kind_naked_immediate.from_descr_non_empty
          { descr with inverse_relations })
   in
-  match Name.Map.find_opt name (TEE.to_map env_extension) with
-  | None ->
+  match Name.Map.find_or_null name (TEE.to_map env_extension) with
+  | Null ->
     TEE.add_or_replace_equation env_extension name
       (updated_type_from_descr empty_descr)
-  | Some existing_ty -> (
+  | This existing_ty -> (
     match TG.descr existing_ty with
     | Naked_immediate Bottom ->
       (* If we already know that we are bottom, we don't need to store anything

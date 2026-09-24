@@ -115,7 +115,7 @@ let add_continuation_shortcut t cont ~params ~shortcut_to ~args =
        seems like we should have a more general mechanism for checking arities
        when applying continuations that's independent of shortcuts. *)
     (match Continuation_shortcut.to_alias shortcut with
-    | Some alias_for ->
+    | Misc.Or_null.This alias_for ->
       let arity = Bound_parameters.arity params in
       let alias_for_arity = continuation_arity t alias_for in
       if not (Flambda_arity.equal_ignoring_subkinds arity alias_for_arity)
@@ -125,7 +125,7 @@ let add_continuation_shortcut t cont ~params ~shortcut_to ~args =
            continuations differ in arity"
           Continuation.print cont Flambda_arity.print arity Continuation.print
           alias_for Flambda_arity.print alias_for_arity
-    | None -> ());
+    | Misc.Or_null.Null -> ());
     let continuation_shortcuts =
       Continuation.Map.add cont shortcut t.continuation_shortcuts
     in

@@ -104,8 +104,8 @@ end = struct
     (* [layout] is not empty and entry of cfg is the first node in the
        layout. *)
     (match DLL.hd layout with
-    | None -> report t "Empty layout"
-    | Some hd ->
+    | Misc.Or_null.Null -> report t "Empty layout"
+    | Misc.Or_null.This hd ->
       if not (Label.equal hd t.cfg.entry_label)
       then
         report t "Cfg entry node %a is not the first node in the layout @.%a@."

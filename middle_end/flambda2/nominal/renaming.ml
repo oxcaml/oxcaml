@@ -116,6 +116,8 @@ end
 type t =
   { continuations : Continuations.t;
     variables : Variables.t;
+    (* Renamings are marshalled in .cmx files. Keep this field's representation
+       identical across bootstrap stages. *)
     import_map : Import_map.t option
   }
 

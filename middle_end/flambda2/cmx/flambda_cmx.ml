@@ -262,9 +262,9 @@ let prepare_cmx_from_approx ~machine_width ~approxs ~module_symbol
     in
     let free_names_of_name name =
       let symbol = Name.must_be_symbol name in
-      match Symbol.Map.find_opt symbol approxs with
-      | None -> None
-      | Some approx ->
+      match Symbol.Map.find_or_null symbol approxs with
+      | Null -> None
+      | This approx ->
         Some
           (Value_approximation.free_names
              ~code_free_names:Code_or_metadata.free_names approx)

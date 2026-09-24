@@ -29,8 +29,8 @@ let to_expr t are_rebuilding =
 
 let to_apply_cont t =
   match Expr.descr t with
-  | Apply_cont apply_cont -> Some apply_cont
-  | Let _ | Let_cont _ | Apply _ | Switch _ | Invalid _ -> None
+  | Apply_cont apply_cont -> Misc.Or_null.This apply_cont
+  | Let _ | Let_cont _ | Apply _ | Switch _ | Invalid _ -> Misc.Or_null.Null
 
 let can_be_removed_as_invalid t are_rebuilding =
   if ART.do_not_rebuild_terms are_rebuilding

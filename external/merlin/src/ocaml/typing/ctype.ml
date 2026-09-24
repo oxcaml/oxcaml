@@ -2204,13 +2204,13 @@ let instance_prim_layout env (desc : Primitive.description) ty =
   if not desc.prim_is_layout_poly
   then ty, None
   else
-  let new_sort = ref None in
+  let new_sort = ref Misc.Or_null.Null in
   let get_sort () =
     match !new_sort with
-    | Some sort -> sort
-    | None ->
+    | Misc.Or_null.This sort -> sort
+    | Misc.Or_null.Null ->
       let sort = Jkind.Sort.(of_var (new_var ~level:!current_level)) in
-      new_sort := Some sort;
+      new_sort := Misc.Or_null.This sort;
       sort
   in
   (* Instantiate a jkind with layout
@@ -2260,12 +2260,12 @@ let instance_prim_layout env (desc : Primitive.description) ty =
     in
     with_type_mark (fun mark -> inner mark ty);
     match !new_sort with
-    | Some sort ->
+    | Misc.Or_null.This sort ->
       (* We don't want to lower the type vars from generic_level due to usages
          in [includecore.ml]. This means an extra [instance] call is needed in
          [type_ident], but we only hit it if it's layout polymorphic. *)
       generic_instance ty, Some sort
-    | None -> ty, None)
+    | Misc.Or_null.Null -> ty, None)
 
 
 let instance_prim_mode (desc : Primitive.description) ty =

@@ -726,8 +726,8 @@ struct
 
   let get_canonical_with ({ aliases_of_names; names_to_process } as u) canonical
       kind metadata =
-    match Name.Map.find_opt canonical aliases_of_names with
-    | None ->
+    match Name.Map.find_or_null canonical aliases_of_names with
+    | Null ->
       let aliases_of_names =
         Name.Map.add canonical
           (X.Map.singleton metadata (canonical, kind))
@@ -737,7 +737,7 @@ struct
         (canonical, metadata, kind, canonical) :: names_to_process
       in
       canonical, { aliases_of_names; names_to_process }
-    | Some aliases_of_name -> (
+    | This aliases_of_name -> (
       match X.Map.find_opt metadata aliases_of_name with
       | Some (name_with_metadata, _kind) -> name_with_metadata, u
       | None ->

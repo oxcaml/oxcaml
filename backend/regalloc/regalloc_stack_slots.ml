@@ -30,9 +30,9 @@ let[@inline] get_and_incr t ~stack_class =
   res
 
 let[@inline] get_or_create t reg =
-  match Reg.Tbl.find_opt t.stack_slots reg with
-  | Some slot -> slot
-  | None ->
+  match Reg.Tbl.find t.stack_slots reg with
+  | slot -> slot
+  | exception Not_found ->
     let res =
       get_and_incr t ~stack_class:(Stack_class.of_machtype reg.Reg.typ)
     in
@@ -40,14 +40,16 @@ let[@inline] get_or_create t reg =
     res
 
 let[@inline] get_or_fatal t reg =
-  match Reg.Tbl.find_opt t.stack_slots reg with
-  | None -> fatal "register %a has no associated slot" Printreg.reg reg
-  | Some slot -> slot
+  match Reg.Tbl.find t.stack_slots reg with
+  | exception Not_found ->
+    fatal "register %a has no associated slot" Printreg.reg reg
+  | slot -> slot
 
 let[@inline] use_same_slot_or_fatal t reg ~existing =
-  match Reg.Tbl.find_opt t.stack_slots existing with
-  | None -> fatal "register %a has no associated slot" Printreg.reg existing
-  | Some slot -> Reg.Tbl.replace t.stack_slots reg slot
+  match Reg.Tbl.find t.stack_slots existing with
+  | exception Not_found ->
+    fatal "register %a has no associated slot" Printreg.reg existing
+  | slot -> Reg.Tbl.replace t.stack_slots reg slot
 
 let[@inline] update_cfg_with_layout t cfg_with_layout =
   let fun_num_stack_slots =

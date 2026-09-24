@@ -3050,8 +3050,8 @@ let vectorize (block : Block.t) tree =
   (* Add vector instructions. *)
   let rec add_vector_instructions cell_option =
     match cell_option with
-    | None -> ()
-    | Some cell ->
+    | Misc.Or_null.Null -> ()
+    | Misc.Or_null.This cell ->
       (let old_instruction = DLL.value cell in
        let instruction = Instruction.basic old_instruction in
        match Computation.find_group tree ~key:instruction with
@@ -3090,18 +3090,23 @@ let can_reorder tree body deps =
       if same_position instruction
       then
         (* the [instruction] is already at [position], no need to reorder. *)
-        DLL.prev position
+        match DLL.prev position with
+        | Misc.Or_null.Null -> None
+        | Misc.Or_null.This cell -> Some cell
       else
         let cell =
-          DLL.find_cell_opt body ~f:(Instruction.equal_id instruction)
-          |> Option.get
+          match
+            DLL.find_cell_opt body ~f:(Instruction.equal_id instruction)
+          with
+          | Misc.Or_null.This cell -> cell
+          | Misc.Or_null.Null -> invalid_arg "option is None"
         in
         (* Traverse from [cell] to [position], making sure the [instruction] can
            be moved across every [other_instruction] along the way. *)
         let rec can_cross cur =
           match DLL.next cur with
-          | None -> assert false
-          | Some next_cell ->
+          | Misc.Or_null.Null -> assert false
+          | Misc.Or_null.This next_cell ->
             let other_instruction = DLL.value next_cell in
             if not (Dependencies.independent deps instruction other_instruction)
             then raise (Cannot_reorder (instruction, other_instruction))
@@ -3123,7 +3128,10 @@ let can_reorder tree body deps =
     let key = DLL.value position in
     let group = Computation.find_group tree ~key in
     match group with
-    | None -> DLL.prev position
+    | None -> (
+      match DLL.prev position with
+      | Misc.Or_null.Null -> None
+      | Misc.Or_null.This cell -> Some cell)
     | Some (group : Computation.Group.t) ->
       let instructions = Computation.Group.scalar_instructions group in
       (* traverse [instructions] backwards, moving each to [position], and
@@ -3132,8 +3140,11 @@ let can_reorder tree body deps =
   in
   let rec reorder cell_option =
     match cell_option with
-    | None -> ()
-    | Some cell -> reorder_group cell |> reorder
+    | Misc.Or_null.Null -> ()
+    | Misc.Or_null.This cell -> (
+      match reorder_group cell with
+      | None -> ()
+      | Some cell -> reorder (Misc.Or_null.This cell))
   in
   (* traverse the block backwards *)
   DLL.last_cell body |> reorder

@@ -16,11 +16,12 @@ let rec optimize_body steps_until_termination cell =
   if steps_until_termination > 0
   then
     match R.apply cell with
-    | None -> (
+    | Misc.Or_null.Null -> (
       match DLL.next cell with
-      | None -> ()
-      | Some next_cell -> optimize_body (steps_until_termination - 1) next_cell)
-    | Some continuation_cell ->
+      | Misc.Or_null.Null -> ()
+      | Misc.Or_null.This next_cell ->
+        optimize_body (steps_until_termination - 1) next_cell)
+    | Misc.Or_null.This continuation_cell ->
       optimize_body (steps_until_termination - 1) continuation_cell
 
 (* Apply peephole optimization for the body of each block of the CFG*)
@@ -29,7 +30,8 @@ let peephole_optimize_cfg cfg_with_layout =
   then
     Cfg.iter_blocks (Cfg_with_layout.cfg cfg_with_layout)
       ~f:(fun (_ : Label.t) block ->
-        Option.iter
-          (optimize_body (termination_cond_const * DLL.length block.body))
-          (DLL.hd_cell block.body));
+        match DLL.hd_cell block.body with
+        | Misc.Or_null.Null -> ()
+        | Misc.Or_null.This cell ->
+          optimize_body (termination_cond_const * DLL.length block.body) cell);
   cfg_with_layout
