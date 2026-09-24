@@ -44,7 +44,17 @@ type unsafe = [`Unsafe]
 type t = safe subst
 (** Standard substitution*)
 
-(* Filled by Typemod: validate a delayed constraint before copying it. *)
+(** Installed by Typemod to force pending well-formedness checks for
+    [Mty_with] binders. This may run type checking and raise an error.
+    Call before renaming a binder or expanding its wrapper, while the original
+    obligation can still be found. Reentrant calls during that check do nothing;
+    temporary results of validation must not escape if the check fails.
+
+    Success removes the obligation; failures are memoized and raised again.
+    No entry means there is no pending check: copies have checked their original
+    binder, and CMI saving checks wrappers before serializing them. Imported
+    binders therefore need no registry entry. Typing also queues checks for
+    unused wrappers at the compilation-unit or toplevel-phrase boundary. *)
 val check_with : (Ident.t -> unit) ref
 
 val identity: 'a subst
@@ -195,7 +205,13 @@ module Lazy : sig
   val modtype : scoping -> t -> module_type -> module_type
   val modtype_decl : scoping -> t -> modtype_declaration -> modtype_declaration
   val with_constraint : t -> with_constraint -> with_constraint
+
+  (** Close signature-component references over [root]. *)
+  val prefix_signature : Path.t -> signature_item list -> t -> t
+
+  (** Reopen projections from [root] using the signature's current binders. *)
   val unprefix_signature : Path.t -> signature_item list -> t
+
   val signature : scoping -> t -> signature -> signature
   val signature_item : scoping -> t -> signature_item -> signature_item
   val value_description : t -> value_description -> value_description

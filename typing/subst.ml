@@ -1505,6 +1505,22 @@ module Lazy = struct
     For_copy.with_scope (fun copy_scope ->
       subst_lazy_with_constraint copy_scope Keep s cstr)
 
+  (* The two directions of the Mty_with binder convention: close references
+     over a projected signature, then reopen them using the current identifiers.
+     Class identifiers stand for their associated types, as in renaming. *)
+  let prefix_signature root items subst =
+    List.fold_left (fun subst item ->
+      let path id = Pdot (root, Ident.name id) in
+      match item with
+      | Sig_type (id, _, _, _) | Sig_typext (id, _, _, _)
+      | Sig_class (id, _, _, _) | Sig_class_type (id, _, _, _) ->
+          add_type id (path id) subst
+      | Sig_module (id, _, _, _, _) ->
+          add_module id (path id) subst
+      | Sig_modtype (id, _, _) -> add_modtype id (path id) subst
+      | Sig_jkind (id, _, _) -> add_jkind id (path id) subst
+      | Sig_value _ -> subst) subst items
+
   let unprefix_signature root sg =
     List.fold_left (fun s item ->
       let type_id id =

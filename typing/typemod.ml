@@ -726,33 +726,49 @@ let check_well_formed_module env loc context mty =
 
 let () = Env.check_well_formed_module := check_well_formed_module
 
-module With_checks = Ephemeron.K1.Make(struct
-  type t = Ident.t
-  let equal = Ident.same
-  let hash id = Hashtbl.hash (Ident.unique_name id)
-end)
+module With_checks : sig
+  val register : Ident.t -> (unit -> unit) -> unit
+  val force : Ident.t -> unit
+end = struct
+  module Table = Ephemeron.K1.Make(struct
+    type t = Ident.t
+    let equal = Ident.same
+    let hash id = Hashtbl.hash (Ident.unique_name id)
+  end)
 
-let with_checks = With_checks.create 17
+  type check = {
+    validation : unit Lazy.t;
+    mutable checking : bool;
+  }
 
-let check_with id =
-  match With_checks.find_opt with_checks id with
-  | None -> ()
-  | Some (check, checking) ->
-      if not !checking then begin
-        checking := true;
-        Fun.protect ~finally:(fun () -> checking := false) (fun () ->
-          Lazy.force check;
-          With_checks.remove with_checks id)
-      end
+  let pending = Table.create 17
 
-let () = Subst.check_with := check_with
+  let force id =
+    match Table.find_opt pending id with
+    | None -> ()
+    | Some check ->
+        if not check.checking then begin
+          (* Validation traverses the wrapper itself. Reentrant forcing is
+             part of this check, not a second validation. Any temporary copies
+             made by that traversal must not escape a failed check. *)
+          check.checking <- true;
+          Fun.protect ~finally:(fun () -> check.checking <- false) (fun () ->
+            Lazy.force check.validation;
+            Table.remove pending id)
+          (* Lazy.force caches failures; a failed check stays pending and
+             subsequent attempts raise again instead of treating it as valid. *)
+        end
 
-let register_with_check id check =
-  (* Checks cannot wait past the first use of a wrapper: an ill-founded
-     recursive signature can otherwise loop during inclusion or lookup.
-     The ephemeron also releases environments abandoned after a typing error. *)
-  With_checks.add with_checks id (lazy (check ()), ref false);
-  !Env.add_delayed_check_forward (fun () -> check_with id)
+  let register id validate =
+    (* Check before first use: recursive signatures can otherwise loop while
+       being copied or expanded. The delayed-check queue also rejects invalid
+       wrappers that are never used. Ephemerons release abandoned environments
+       after errors; they do not represent validation success. *)
+    Table.add pending id { validation = lazy (validate ()); checking = false };
+    !Env.add_delayed_check_forward (fun () -> force id)
+end
+
+let () = Subst.check_with := With_checks.force
 
 let type_decl_is_alias sdecl = (* assuming no explicit constraint *)
   let eq_vars x y =
@@ -2095,6 +2111,73 @@ let has_remove_aliases_attribute attr =
   | None -> false
   | Some _ -> true
 
+type with_component = {
+  path : Path.t;
+  declaration : Types.signature_item;
+  signature_env : Env.t;
+  signature_items : Subst.Lazy.signature_item list;
+  prefix_subst : Subst.t;
+}
+
+let rec with_signature ~loc env mty =
+  match mty with
+  | Subst.Lazy.Mty_signature _ -> mty
+  | _ ->
+      match Mtype.reduce_alias_lazy env mty with
+      | Some mty -> with_signature ~loc env mty
+      | None -> raise (Error (loc, env, Signature_expected))
+
+let lookup_with_component ~loc env binder lid ~names constr lookup_type =
+  let missing () =
+    raise (Error (loc, env, With_no_component lid.txt)) in
+  let rec find sig_env root subst names mty =
+    let items = match with_signature ~loc sig_env mty with
+      | Subst.Lazy.Mty_signature sg ->
+          Subst.Lazy.force_signature_once sg
+      | _ -> Misc.fatal_error "Typemod.lookup_with_component: signature"
+    in
+    let sig_env = Env.add_signature_lazy items sig_env in
+    let subst = Subst.Lazy.prefix_signature root items subst in
+    let item = List.find_opt (fun item ->
+      let open Subst.Lazy in
+      match names, item, constr with
+      (* Signature_group treats the type following a class declaration as
+         a ghost component. It must not be selected as an ordinary type. *)
+      | [name], Sig_type (id, _, _, _), Pwith_type _ ->
+          Ident.name id = name &&
+          not (List.exists (function
+            | Sig_class (id, _, _, _) | Sig_class_type (id, _, _, _) ->
+                Ident.name id = name
+            | _ -> false) items)
+      | [name], Sig_module (id, _, _, _, _), Pwith_module _
+      | [name], Sig_modtype (id, _, _), Pwith_modtype _
+      | [name], Sig_jkind (id, _, _), Pwith_jkind _
+      | name :: _ :: _, Sig_module (id, _, _, _, _), _ ->
+          Ident.name id = name
+      | _ -> false) items
+    in
+    match names, item with
+    | name :: (_ :: _ as rest),
+      Some (Subst.Lazy.Sig_module (id, _, md, _, _)) ->
+        let component =
+          find sig_env (Pdot (root, name)) subst rest md.md_type in
+        { component with path = path_concat id component.path }
+    | [_], Some item ->
+        let id = match item with
+          | Subst.Lazy.Sig_type (id, _, _, _)
+          | Sig_module (id, _, _, _, _)
+          | Sig_modtype (id, _, _) | Sig_jkind (id, _, _) -> id
+          | _ -> Misc.fatal_error "Typemod.lookup_with_component: item"
+        in
+        { path = Pident id;
+          declaration = Subst.Lazy.force_signature_item item;
+          signature_env = sig_env;
+          signature_items = items;
+          prefix_subst = subst }
+    | _ -> missing ()
+  in
+  find env (Pident binder) Subst.identity names lookup_type
+
 (* Check and translate a module type expression *)
 
 let transl_modtype_longident loc env lid =
@@ -2235,112 +2318,25 @@ and transl_with_delayed ~loc env remove_aliases
   | Pwith_type (_, decl) when Typedecl.is_fixed_type decl -> eager ()
   | Pwith_type (lid, _) | Pwith_module (lid, _)
   | Pwith_modtype (lid, _) | Pwith_jkind (lid, _) ->
-      let rec signature env mty =
-        match mty with
-        | Subst.Lazy.Mty_signature _ -> mty
-        | _ ->
-            match Mtype.reduce_alias_lazy env mty with
-            | Some mty -> signature env mty
-            | None -> raise (Error (loc, env, Signature_expected))
-      in
-      let lookup_type = signature env (match lookup_type with
+      let lookup_type = with_signature ~loc env (match lookup_type with
         | Some mty -> mty
         | None -> Subst.Lazy.of_modtype body) in
       let scope = Ctype.create_scope () in
       let binder = Ident.create_scoped ~scope "$with" in
       let names = Longident.flatten lid.txt in
-      let prefix_items root items subst =
-        List.fold_left (fun subst item ->
-          let open Subst.Lazy in
-          let path id = Pdot (root, Ident.name id) in
-          match item with
-          | Sig_type (id, _, _, _) | Sig_typext (id, _, _, _)
-          | Sig_class (id, _, _, _) | Sig_class_type (id, _, _, _) ->
-              Subst.add_type id (path id) subst
-          | Sig_module (id, _, _, _, _) ->
-              Subst.add_module id (path id) subst
-          | Sig_modtype (id, _, _) -> Subst.add_modtype id (path id) subst
-          | Sig_jkind (id, _, _) -> Subst.add_jkind id (path id) subst
-          | Sig_value _ -> subst) subst items
-      in
-      let missing () =
-        raise (Error (loc, env, With_no_component lid.txt)) in
-      let rec find sig_env root subst names mty =
-        let items = match signature sig_env mty with
-          | Subst.Lazy.Mty_signature sg ->
-              Subst.Lazy.force_signature_once sg
-          | _ -> Misc.fatal_error "Typemod.transl_with_delayed: signature"
-        in
-        let sig_env = Env.add_signature_lazy items sig_env in
-        let subst = prefix_items root items subst in
-        let item = List.find_opt (fun item ->
-          let open Subst.Lazy in
-          match names, item, constr with
-          | [name], Sig_type (id, _, _, _), Pwith_type _ ->
-              Ident.name id = name &&
-              not (List.exists (function
-                | Sig_class (id, _, _, _) | Sig_class_type (id, _, _, _) ->
-                    Ident.name id = name
-                | _ -> false) items)
-          | [name], Sig_module (id, _, _, _, _), Pwith_module _
-          | [name], Sig_modtype (id, _, _), Pwith_modtype _
-          | [name], Sig_jkind (id, _, _), Pwith_jkind _
-          | name :: _ :: _, Sig_module (id, _, _, _, _), _ ->
-              Ident.name id = name
-          | _ -> false) items
-        in
-        match names, item with
-        | name :: (_ :: _ as rest),
-          Some (Subst.Lazy.Sig_module (id, _, md, _, _)) ->
-            let path, item, sig_env, items, subst =
-              find sig_env (Pdot (root, name)) subst rest md.md_type in
-            path_concat id path, item, sig_env, items, subst
-        | [_], Some item ->
-            let id = match item with
-              | Subst.Lazy.Sig_type (id, _, _, _)
-              | Sig_module (id, _, _, _, _)
-              | Sig_modtype (id, _, _) | Sig_jkind (id, _, _) -> id
-              | _ -> Misc.fatal_error "Typemod.transl_with_delayed: item"
-            in
-            Pident id, Subst.Lazy.force_signature_item item,
-            sig_env, items, subst
-        | _ -> missing ()
-      in
-      let path, item, sig_env, items, subst =
-        find env (Pident binder) Subst.identity names lookup_type in
+      let component =
+        lookup_with_component ~loc env binder lid ~names constr lookup_type in
       let name = Longident.last lid.txt in
       let has_row = List.exists (function
         | Subst.Lazy.Sig_type (id, _, _, _) ->
             Ident.name id = name ^ "#row"
-        | _ -> false) items in
+        | _ -> false) component.signature_items in
+      (* Private rows are Signature_group.pre_ghosts. The singleton checker
+         below cannot update that group, so retain the eager path. *)
       if has_row then eager () else
-      let leaf = { lid with txt = Lident name } in
-      let leaf_constr = match constr with
-        | Pwith_type (_, decl) -> Pwith_type (leaf, decl)
-        | Pwith_module (_, rhs) -> Pwith_module (leaf, rhs)
-        | Pwith_modtype (_, rhs) -> Pwith_modtype (leaf, rhs)
-        | Pwith_jkind (_, rhs) -> Pwith_jkind (leaf, rhs)
-        | _ -> Misc.fatal_error "Typemod.transl_with_delayed"
-      in
-      let tcstrs, patch =
-        try transl_with ~outer_env:env ~sg_for_env:items
-              ~loc sig_env remove_aliases
-              ([], [item]) leaf_constr
-        with Error (loc, error_env, With_mismatch (_, explanation)) ->
-          raise (Error (loc, error_env, With_mismatch (lid.txt, explanation)))
-      in
-      let cstr = match patch with
-        | [Sig_type (_, td, _, _)] ->
-            With_type (Subst.type_declaration subst td)
-        | [Sig_module (_, _, md, _, _)] ->
-            With_module (Subst.module_declaration Keep subst md)
-        | [Sig_modtype (_, mtd, _)] ->
-            With_modtype (Subst.modtype_declaration Keep subst mtd)
-        | [Sig_jkind (_, jd, _)] ->
-            With_jkind (Subst.jkind_declaration subst jd)
-        | _ -> Misc.fatal_error "Typemod.transl_with_delayed: patch"
-      in
-      let tcstrs = List.map (fun (_, _, tcstr) -> path, lid, tcstr) tcstrs in
+      let tcstrs, cstr =
+        transl_with_replacement ~loc ~outer_env:env ~name remove_aliases
+          component lid constr in
       let lazy_cstr = match cstr with
         | With_type td -> Subst.Lazy.With_type td
         | With_module md ->
@@ -2351,11 +2347,43 @@ and transl_with_delayed ~loc env remove_aliases
       in
       let lookup_type =
         Subst.Lazy.Mty_with (lookup_type, binder, names, lazy_cstr) in
-      register_with_check binder (fun () ->
+      With_checks.register binder (fun () ->
         check_well_formed_module env loc "this instantiated signature"
           (Subst.Lazy.force_modtype lookup_type));
       tcstrs @ rev_tcstrs, Mty_with (body, binder, names, cstr),
       Some lookup_type
+
+and transl_with_replacement ~loc ~outer_env ~name remove_aliases
+    component lid constr =
+  let leaf = { lid with txt = Lident name } in
+  let leaf_constr = match constr with
+    | Pwith_type (_, decl) -> Pwith_type (leaf, decl)
+    | Pwith_module (_, rhs) -> Pwith_module (leaf, rhs)
+    | Pwith_modtype (_, rhs) -> Pwith_modtype (leaf, rhs)
+    | Pwith_jkind (_, rhs) -> Pwith_jkind (leaf, rhs)
+    | _ -> Misc.fatal_error "Typemod.transl_with_delayed"
+  in
+  let tcstrs, patch =
+    try transl_with ~outer_env ~sg_for_env:component.signature_items
+          ~loc component.signature_env remove_aliases
+          ([], [component.declaration]) leaf_constr
+    with Error (loc, error_env, With_mismatch (_, explanation)) ->
+      raise (Error (loc, error_env, With_mismatch (lid.txt, explanation)))
+  in
+  let cstr = match patch with
+    | [Sig_type (_, td, _, _)] ->
+        With_type (Subst.type_declaration component.prefix_subst td)
+    | [Sig_module (_, _, md, _, _)] ->
+        With_module (Subst.module_declaration Keep component.prefix_subst md)
+    | [Sig_modtype (_, mtd, _)] ->
+        With_modtype (Subst.modtype_declaration Keep component.prefix_subst mtd)
+    | [Sig_jkind (_, jd, _)] ->
+        With_jkind (Subst.jkind_declaration component.prefix_subst jd)
+    | _ -> Misc.fatal_error "Typemod.transl_with_delayed: patch"
+  in
+  let tcstrs =
+    List.map (fun (_, _, tcstr) -> component.path, lid, tcstr) tcstrs in
+  tcstrs, cstr
 
 and transl_with ?sg_for_env ?outer_env
     ~loc env remove_aliases (rev_tcstrs, sg) constr =
