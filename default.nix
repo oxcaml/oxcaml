@@ -272,27 +272,27 @@ let
   # testOcaml argument (it only feeds the merlin package's check phase).
   merlinDev = (mkMerlinPackages ocaml_5_4_0).merlin;
 
-  unpackSourceArchive =
-    name: archive:
-    pkgs.runCommand name { } ''
-      mkdir "$out"
-      tar --extract --file=${archive} --directory="$out" --strip-components=1
-    '';
+  ppxDeriversSrc = pkgs.fetchFromGitHub {
+    name = "ppx-derivers-1.2.1-source";
+    owner = "ocaml-ppx";
+    repo = "ppx_derivers";
+    rev = "1.2.1";
+    hash = "sha256-9k4rbB1G4894F95XPMQsiVgwZKJ2XcaDUaEviArHG3s=";
+  };
 
-  ppxDeriversSrc = unpackSourceArchive "ppx-derivers-1.2.1-source" (pkgs.fetchurl {
-    url = "https://github.com/ocaml-ppx/ppx_derivers/archive/1.2.1.tar.gz";
-    hash = "sha256-tlle4Yfep5KzH8VKDhUkqx5IvGBo0wZsRSFaE4zHO5U=";
-  });
+  sexplib0Src = pkgs.fetchFromGitHub {
+    name = "sexplib0-v0.17.0-source";
+    owner = "janestreet";
+    repo = "sexplib0";
+    rev = "v0.17.0";
+    hash = "sha256-Q53wEhRet/Ou9Kr0TZNTyXT5ASQpsVLPz5n/I+Fhy+g=";
+  };
 
-  sexplib0Src = unpackSourceArchive "sexplib0-v0.17.0-source" (pkgs.fetchurl {
-    url = "https://github.com/janestreet/sexplib0/archive/refs/tags/v0.17.0.tar.gz";
-    hash = "sha512-rTh+QHif5woRRz236F/gF7gBWSYkQU6QMHMLLpLqCPmAlftukjZDDzPIAWBevuCipihOD2GKJqfaRZnU/Z05XQ==";
-  });
-
-  stdlibShimsSrc = unpackSourceArchive "stdlib-shims-0.3.0-source" (pkgs.fetchurl {
+  stdlibShimsSrc = pkgs.fetchzip {
+    name = "stdlib-shims-0.3.0-source";
     url = "https://github.com/ocaml/stdlib-shims/releases/download/0.3.0/stdlib-shims-0.3.0.tbz";
-    hash = "sha256-ur9y05F7hvcHiF8MVSjjbGP8y2mPS0bPK6tcfM3W2Eo=";
-  });
+    hash = "sha256-uvnR7o0wicL7VfWpGefIgaAydnJ6/pLqaXmH9rgg8Xk=";
+  };
 
   # "seq" is an empty compatibility package with no dune equivalent.
   dropSeqDependency =
@@ -319,38 +319,38 @@ let
     '';
   };
 
-  genSrc = pkgs.runCommand "gen-1.1-source" {
-    src = pkgs.fetchurl {
-      url = "https://github.com/c-cube/gen/archive/refs/tags/v1.1.tar.gz";
-      hash = "sha256-aJO/FWu6pCVOxewupf5TkDDyOVvFzYPMuP45MM/4nLA=";
+  genSrc = pkgs.applyPatches {
+    name = "gen-1.1-source";
+    src = pkgs.fetchFromGitHub {
+      owner = "c-cube";
+      repo = "gen";
+      rev = "v1.1";
+      hash = "sha256-ZytPPGhmt/uANaSgkgsUBOwyQ9ka5H4J+5CnJpEdrNk=";
     };
-  } ''
-    mkdir "$out"
-    tar --extract --file="$src" --directory="$out" --strip-components=1
-    ${dropSeqDependency "$out/src/dune"}
-  '';
+    postPatch = dropSeqDependency "src/dune";
+  };
 
   # Cmdliner has no dune build; add one for the library.
-  cmdlinerSrc = pkgs.runCommand "cmdliner-2.1.1-source" {
-    src = pkgs.fetchurl {
+  cmdlinerSrc = pkgs.applyPatches {
+    name = "cmdliner-2.1.1-source";
+    src = pkgs.fetchzip {
       url = "https://erratique.ch/software/cmdliner/releases/cmdliner-2.1.1.tbz";
-      hash = "sha256-Bbk40d709UxHgXjxmCgig0UQQx7ZjyrGfLTZCqEg1rY=";
+      hash = "sha256-WJEtB7PI8wB+nbVavPso4m1poy1JJnhtGQ4JRXJT2F4=";
     };
-  } ''
-    mkdir "$out"
-    tar --extract --file="$src" --directory="$out" --strip-components=1
-    cat > "$out/dune-project" << 'EOF'
-    (lang dune 3.0)
-    (name cmdliner)
-    (package (name cmdliner))
-    EOF
-    cat > "$out/src/dune" << 'EOF'
-    (library
-     (name cmdliner)
-     (public_name cmdliner)
-     (wrapped false))
-    EOF
-  '';
+    postPatch = ''
+      cat > dune-project << 'EOF'
+      (lang dune 3.0)
+      (name cmdliner)
+      (package (name cmdliner))
+      EOF
+      cat > src/dune << 'EOF'
+      (library
+       (name cmdliner)
+       (public_name cmdliner)
+       (wrapped false))
+      EOF
+    '';
+  };
 
   # Only menhirLib and menhirSdk are built from this tree; keeping the menhir
   # executable's sources out stops dune from preferring it over the one from
@@ -365,53 +365,55 @@ let
         '[@@ocaml.deprecated "Please use [get_reductions]"]'
   '';
 
-  yojsonSrc = pkgs.runCommand "yojson-2.2.2-source" {
-    src = pkgs.fetchurl {
+  yojsonSrc = pkgs.applyPatches {
+    name = "yojson-2.2.2-source";
+    src = pkgs.fetchzip {
       url = "https://github.com/ocaml-community/yojson/releases/download/2.2.2/yojson-2.2.2.tbz";
-      hash = "sha256-mr+tjJp51HI60vZEjmacHmjb/IfMVKG3wGSwyQkSxZU=";
+      hash = "sha256-V3USV8xhN1pQq5m0KmvUwgw7MujuCdWsv3lD+8PkECA=";
     };
-  } ''
-    mkdir "$out"
-    tar --extract --file="$src" --directory="$out" --strip-components=1
-    # Keep the release's opam metadata; the prepared source is read-only.
-    substituteInPlace "$out/dune-project" \
-      --replace-fail '(generate_opam_files true)' '(generate_opam_files false)'
-    ${dropSeqDependency "$out/lib/dune"}
-    # Eta-expand to avoid exposing Buffer.add_string's OxCaml modes.
-    substituteInPlace "$out/lib/write.ml" \
-      --replace-fail 'let write_intlit = Buffer.add_string' \
-        'let write_intlit ob s = Buffer.add_string ob s' \
-      --replace-fail 'let write_floatlit = Buffer.add_string' \
-        'let write_floatlit ob s = Buffer.add_string ob s' \
-      --replace-fail 'let write_stringlit = Buffer.add_string' \
-        'let write_stringlit ob s = Buffer.add_string ob s'
-  '';
+    postPatch = ''
+      # Keep the release's opam metadata; the prepared source is read-only.
+      substituteInPlace dune-project \
+        --replace-fail '(generate_opam_files true)' '(generate_opam_files false)'
+      ${dropSeqDependency "lib/dune"}
+      # Eta-expand to avoid exposing Buffer.add_string's OxCaml modes.
+      substituteInPlace lib/write.ml \
+        --replace-fail 'let write_intlit = Buffer.add_string' \
+          'let write_intlit ob s = Buffer.add_string ob s' \
+        --replace-fail 'let write_floatlit = Buffer.add_string' \
+          'let write_floatlit ob s = Buffer.add_string ob s' \
+        --replace-fail 'let write_stringlit = Buffer.add_string' \
+          'let write_stringlit ob s = Buffer.add_string ob s'
+    '';
+  };
 
-  outChannelRedirectSrc = pkgs.runCommand "out-channel-redirect-0.2-source" {
-    src = pkgs.fetchurl {
+  outChannelRedirectSrc = pkgs.applyPatches {
+    name = "out-channel-redirect-0.2-source";
+    src = pkgs.fetchzip {
       url = "https://github.com/hhugo/out-channel-redirect/releases/download/0.2/out-channel-redirect-0.2.tbz";
-      hash = "sha256-rUJ+jdNv4YNHzEpXSvF3d+BlD1WFNF+rWCzu+xbuIZ4=";
+      hash = "sha256-ThMQaTtmT6ltL0As7K9761qEz/jPKfv3vsxnVNHeKl4=";
     };
-  } ''
-    mkdir "$out"
-    tar --extract --file="$src" --directory="$out" --strip-components=1
-    substituteInPlace "$out/dune-project" \
-      --replace-fail '(generate_opam_files true)' '(generate_opam_files false)'
-  '';
+    postPatch = ''
+      substituteInPlace dune-project \
+        --replace-fail '(generate_opam_files true)' '(generate_opam_files false)'
+    '';
+  };
 
-  qcheckSrc = pkgs.runCommand "qcheck-0.25-source" {
-    src = pkgs.fetchurl {
-      url = "https://github.com/c-cube/qcheck/archive/v0.25.tar.gz";
-      hash = "sha512-oLV5HOoJ+Y8fFyIeYom4enocFq4cmvDC5b1qFw8s+HJ9ugdZp/2TLV1hfowkJWLWkYfH507v1SYrxf11oyJpng==";
+  qcheckSrc = pkgs.applyPatches {
+    name = "qcheck-0.25-source";
+    src = pkgs.fetchFromGitHub {
+      owner = "c-cube";
+      repo = "qcheck";
+      rev = "v0.25";
+      hash = "sha256-Z89jJ21zm89wb9m5HthnbHdnE9iXLyaH9k8S+FAWkKQ=";
     };
-  } ''
-    mkdir "$out"
-    tar --extract --file="$src" --directory="$out" --strip-components=1
     # Do not constrain the callback to Array.length's polymodal signature.
-    substituteInPlace "$out/src/core/QCheck.ml" \
-      --replace-fail '_opt_map_or ~d:Array.length ~f:array_sum_' \
-        '_opt_map_or ~d:(fun a -> Array.length a) ~f:array_sum_'
-  '';
+    postPatch = ''
+      substituteInPlace src/core/QCheck.ml \
+        --replace-fail '_opt_map_or ~d:Array.length ~f:array_sum_' \
+          '_opt_map_or ~d:(fun a -> Array.length a) ~f:array_sum_'
+    '';
+  };
 
   # Read by the external/ast-dependent-libs/deps/* rules of the Makefile.
   ppxlibSources = {
