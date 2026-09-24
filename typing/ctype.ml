@@ -3698,9 +3698,8 @@ let constrain_type_jkind ~fixed env ty jkind =
   estimate_jkind_and_loop ~fuel:100 ~expanded:false env ty
     (Jkind.disallow_left jkind)
 
-let estimate_type_jkind = estimate_type_jkind ~ignore_mod_bounds:false
-
-let () = Jkind.set_estimate_type_jkind estimate_type_jkind
+let () =
+  Jkind.set_estimate_type_jkind (estimate_type_jkind ~ignore_mod_bounds:false)
 
 let type_jkind_and_sort ~why ~fixed env ty =
   let jkind, sort = Jkind.of_new_sort_var ~level:!current_level ~why in
@@ -6643,6 +6642,26 @@ let some_neg_variance = function
   | Contravariant -> Some Covariant
   | Bivariant -> Some Bivariant
 
+let mgen_fast_estimate_jkind env _subst ty =
+  match get_desc ty with
+  (* CR zeisbach: benchmark to determine if we want to do this! *)
+  (*= | Tconstr (p, _, _) ->
+    let p =
+      try Subst.type_path subst p
+      with Subst.Not_path -> raise_notrace Complicated_moregen
+    in
+    begin match Env.find_type p env with
+    | decl -> decl.type_jkind
+    | exception Not_found -> raise_notrace Complicated_moregen
+    end *)
+  | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil | Tpackage _ ->
+    (* Only the layout is compared, so no substitution into with-bounds. *)
+    estimate_type_jkind ~ignore_mod_bounds:true env ty
+  | _ -> raise_notrace Complicated_moregen
+
+(* shadow for exporting *)
+let estimate_type_jkind = estimate_type_jkind ~ignore_mod_bounds:false
+
 let rec mgen_fast env subst scope maxnodes variance t1 t2 =
   decr maxnodes;
   if !maxnodes = 0 then raise_notrace Complicated_moregen;
@@ -6650,14 +6669,18 @@ let rec mgen_fast env subst scope maxnodes variance t1 t2 =
   match get_desc t1, get_desc t2 with
   | Tsubst (ty, _), _ when eq_type ty t2 -> ()
   | Tvar { jkind }, _ when get_level t1 = generic_level ->
-    (* CR zeisbach: we want to avoid looking at the mod bounds (since properly
-       computing them is expensive). BUT, we can do better if the mod bounds are
-       max. If so, consider checking if [t2] is of the shape where calling
-       [estimate_type_jkind] is fast, and if so, call it and compare them.
-       We also would need a conservative jkind (or layout) [sub] check that does
-       not mutate / expand. This case seems rare enough to bail for now *)
-    if not (Jkind.is_obviously_max jkind) then
-      raise_notrace Complicated_moregen;
+    (* Properly computing the mod bounds of [t2] is expensive, so we avoid it.
+       But if the mod bounds of [jkind] are max, only the layouts matter, and
+       we can compare those when [t2] has a shape for which estimating its
+       jkind is cheap. Otherwise, bail. *)
+    if not (Jkind.is_obviously_max jkind) then begin
+      if not (Jkind.mod_bounds_are_obviously_max jkind) then
+        raise_notrace Complicated_moregen;
+      let jkind2 = mgen_fast_estimate_jkind env subst t2 in
+      match Jkind.get_layout env jkind, Jkind.get_layout env jkind2 with
+      | Some l1, Some l2 when Jkind_types.Layout.Const.equal l1 l2 -> ()
+      | _, _ -> raise_notrace Complicated_moregen
+    end;
     For_copy.redirect_desc scope t1 (Tsubst (t2, None))
   | Tarrow ((l1,a1,r1), t1, u1, _), Tarrow ((l2,a2,r2), t2, u2, _)
        when l1 = l2 ->
@@ -6670,6 +6693,8 @@ let rec mgen_fast env subst scope maxnodes variance t1 t2 =
       mgen_fast env subst scope maxnodes variance u1 u2
     end
   | Ttuple tl1, Ttuple tl2 ->
+    mgen_fast_labeled env subst scope maxnodes variance tl1 tl2
+  | Tunboxed_tuple tl1, Tunboxed_tuple tl2 ->
     mgen_fast_labeled env subst scope maxnodes variance tl1 tl2
   | Tconstr (p1, tl1, _), Tconstr (p2, tl2, _) ->
     (* FIXME: easy cases of alias expansion? *)
