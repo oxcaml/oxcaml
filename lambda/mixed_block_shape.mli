@@ -77,3 +77,17 @@ val new_indexes_to_old_indexes : 'a t -> int array
 val new_block_length : 'a t -> int
 
 val new_index_to_old_path : 'a t -> int -> int list
+
+module Field_for_printing : sig
+  type 'a shape := 'a t
+
+  type 'a t =
+    | Void
+    | Unboxed_product
+    | Singleton of
+        { element : 'a Singleton_mixed_block_element.t;
+          offset_in_words : int
+        }
+
+  val of_shape : 'a shape -> index:int -> 'a t
+end

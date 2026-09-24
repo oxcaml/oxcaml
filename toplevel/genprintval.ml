@@ -323,7 +323,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
     type outval_record_rep =
       | Outval_record_boxed
       | Outval_record_unboxed
-      | Outval_record_mixed_block of Lambda.mixed_block_shape
+      | Outval_record_mixed of unit Mixed_block_shape.t
+      | Outval_record_immediate
 
     type printing_jkind =
       | Print_as_value (* can interpret as a value and print *)
@@ -363,10 +364,12 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
       sorts_of_types env (Array.map snd label_params_and_types)
 
     let outval_mixed_rep shape =
-      (* Mixed records are only represented as mixed blocks in native code. *)
-      Some
-        (if !Clflags.native_code then Outval_record_mixed_block shape
-         else Outval_record_boxed)
+      if Lambda.mixed_block_shape_has_splices shape then None
+      else
+        Some
+          (Outval_record_mixed
+             (Mixed_block_shape.of_mixed_block_elements shape
+                ~print_locality:(fun ppf () -> Format.fprintf ppf "()")))
 
     (* The position of the first field: an extension constructor's block
        starts with its extension slot. *)
@@ -388,8 +391,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
           Misc.fatal_error "a 'mixed' extensible constructor is impossible"
       | Constructor_mixed shape, Variant_boxed _ ->
           outval_mixed_rep shape
-      | Constructor_immediate_all_void, _ ->
-          Misc.fatal_error "immediate record representation"
+      | Constructor_immediate_all_void, _ -> Some Outval_record_immediate
 
     (* Translate the representation just to be able to print it. [None] if
        the fields' sorts and thus the block's layout are unknown. *)
@@ -873,23 +875,34 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         let nested fld = nest tree_of_val (depth - 1) fld ty_arg in
         match rep with
         | Outval_record_unboxed -> tree_of_val (depth - 1) obj ty_arg
+        | Outval_record_immediate ->
+            (* an immediate constructor's fields are all void *)
+            Oval_stuff "<void>"
         | Outval_record_boxed ->
             nested
               (if O.tag obj = O.double_array_tag then
                  O.repr (O.double_field obj pos)
                else
                  O.field obj pos)
-        | Outval_record_mixed_block shape ->
-            let of_element : unit Lambda.mixed_block_element -> _ = function
-              | Value _ -> nested (O.field obj pos)
-              | Float_boxed () | Float64 ->
-                  nested (O.repr (O.double_field obj pos))
-              | Product [||] -> Oval_stuff "<void>"
-              | Float32 | Bits8 | Bits16 | Untagged_immediate
-              | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask
-              | Word | Product _ | Splice_variable _ -> Oval_stuff "<abstr>"
-            in
-            of_element shape.(pos)
+        | Outval_record_mixed shape ->
+            (* Only native code reorders a mixed block's fields; bytecode lays
+               them out uniformly. *)
+            if not !Clflags.native_code then nested (O.field obj pos)
+            else begin
+              match
+                Mixed_block_shape.Field_for_printing.of_shape shape ~index:pos
+              with
+              | Void -> Oval_stuff "<void>"
+              | Unboxed_product -> Oval_stuff "<abstr>"
+              | Singleton { element; offset_in_words } ->
+                  match element with
+                  | Value _ -> nested (O.field obj offset_in_words)
+                  | Float_boxed () | Float64 ->
+                      nested (O.repr (O.double_field obj offset_in_words))
+                  | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
+                  | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
+                      Oval_stuff "<abstr>"
+            end
 
       (* CR lmaurer: *Pretty please* let's cut down on the duplication here. *)
       and tree_of_record_unboxed_product_fields depth env path type_params
