@@ -377,7 +377,6 @@ let load_tlambda ppf ~compilation_unit ~required_globals tlam repr =
     { Lambda.
       code = lam;
       main_module_block_format = Mb_struct { mb_repr = repr };
-      arg_block_idx = None;
       compilation_unit;
       required_globals;
     }
