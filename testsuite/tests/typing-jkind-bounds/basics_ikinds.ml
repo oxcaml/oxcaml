@@ -1511,6 +1511,21 @@ type 'a t : value mod global = private 'a
 type ('a : value mod global) t = private 'a
 |}]
 
+(* Refining a parameter from the manifest must not skip checking its uses. *)
+type 'a t : value mod global = 'a
+and u = (int -> int) t
+[%%expect {|
+type ('a : value mod global) t = 'a
+and u = (int -> int) t
+|}]
+
+type 'a t : value mod global = 'a u
+and 'a u = 'a
+[%%expect {|
+type ('a : value mod global) t = 'a u
+and 'a u = 'a
+|}]
+
 type 'a t : word = private 'a
 [%%expect {|
 Line 1, characters 0-29:
