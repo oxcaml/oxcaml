@@ -35,3 +35,27 @@ val append_arbitrary_suffix_to_include_signature
   :  Ast.include_description
   -> suffix:string
   -> Ast.include_description
+
+(** Suppress warning 181 (imprecise-kind-annotation) in a structure for ppx derivers.
+    Takes a list of original type declarations to check whether they contain kind
+    annotations. If any are present, disable warning 181 in passed structure items.
+
+    Used when ppx derivers only support a subset of the kinds the original type does.
+    Should be removed after fixing the ppx deriver to support all possible kinds. *)
+val suppress_imprecise_kind_annotation_warning_in_structure
+  :  loc:Astlib.Location.t
+  -> Parsetree.type_declaration list
+  -> Parsetree.structure_item list
+  -> Parsetree.structure_item list
+
+(** Suppress warning 181 (imprecise-kind-annotation) in a signature for ppx derivers.
+    Takes a list of original type declarations to check whether they contain kind
+    annotations. If any are present, disable warning 181 in passed structure items.
+
+    Used when ppx derivers only support a subset of the kinds the original type does.
+    Should be removed after fixing the ppx deriver to support all possible kinds. *)
+val suppress_imprecise_kind_annotation_warning_in_signature
+  :  loc:Astlib.Location.t
+  -> Parsetree.type_declaration list
+  -> Parsetree.signature_item list
+  -> Parsetree.signature_item list
