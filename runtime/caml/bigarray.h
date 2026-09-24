@@ -107,6 +107,10 @@ enum caml_ba_subarray {
   CAML_BA_SUBARRAY = 0x800     /* Data is shared with another bigarray */
 };
 
+enum caml_ba_allocation {
+  CAML_BA_STACK = 0x1000      /* Descriptor is allocated on the local stack */
+};
+
 struct caml_ba_proxy {
   atomic_uintnat refcount;      /* Reference count */
   void * data;                  /* Pointer to base of actual data */
@@ -138,6 +142,7 @@ CAMLextern value
     caml_ba_alloc(int flags, int num_dims, void * data, intnat * dim);
 CAMLextern value caml_ba_alloc_dims(int flags, int num_dims, void * data,
                                  ... /*dimensions, with type intnat */);
+CAMLextern value caml_bigstring_alloc_local(void * data, intnat len);
 CAMLextern uintnat caml_ba_byte_size(struct caml_ba_array * b);
 CAMLextern uintnat caml_ba_num_elts(struct caml_ba_array * b);
 
