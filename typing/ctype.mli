@@ -409,10 +409,11 @@ val filter_method: Env.t -> string -> type_expr -> type_expr
 val occur_in: Env.t -> type_expr -> type_expr -> bool
 val moregeneral: self_check:bool -> Env.t -> bool ->
   Jkind_types.Sort.var list -> Jkind_types.Sort.var list ->
-  type_expr -> type_expr -> Jkind_types.Sort.Const.t option list
-        (* Check if the first type scheme is more general than the second.
+  type_expr -> Subst.t -> type_expr -> Jkind_types.Sort.Const.t option list
+        (* [moregeneral ~self_check _ _ sv1 sv2 t1 s t2] checks
+           whether the type scheme [t1] is more general than [s(t2)].
            The two [Sort.var list] arguments are the layout-polymorphic sort
-           variables of the pattern and subject respectively.
+           variables of the pattern [sv1] and subject [sv2] respectively.
            Returns, for each pattern sort variable (in order), the sort it was
            constrained to during the check, or [None] if unconstrained. Sorts
            in the result may contain subject sort variables. *)

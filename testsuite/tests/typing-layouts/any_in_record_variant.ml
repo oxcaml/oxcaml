@@ -261,6 +261,8 @@ type ebox = E : ('a : any). { v : 'a; k : int } -> ebox
 type ebox = E : ('a : any). { v : 'a; k : int; } -> ebox
 |}]
 
+(* The existential's sort, and so the block's layout, can't be told, so the
+   value prints as <abstr>. *)
 let b = E { v = 5; k = 1 }
 [%%expect{|
 val b : ebox = <abstr>
