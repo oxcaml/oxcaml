@@ -24,7 +24,7 @@ depends: [
   "ocaml"
   "ocaml-compiler-libs" {>= "v0.11.0"}
   "ppx_derivers" {>= "1.0"}
-  "sexplib0" {>= "v0.12"}
+  "sexp_type"
   "stdlib-shims"
   "odoc" {with-doc}
 ]

@@ -15,7 +15,7 @@
  (deps
   ocaml-compiler-libs/ocaml-compiler-libs.install
   deps/ppx_derivers/ppx_derivers.install
-  deps/sexplib0/sexplib0.install
+  deps/sexp_type/sexp_type.install
   deps/stdlib-shims/stdlib-shims.install
   ppxlib/ppxlib_ast.install
   ppxlib/ppxlib.install
