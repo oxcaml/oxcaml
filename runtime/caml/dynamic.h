@@ -51,8 +51,9 @@ CAMLprim value caml_dynamic_pop(value dyn);
    to other worker threads. */
 CAMLprim value caml_dynamic_freeze_scope(value unit);
 
-/* Install [scope] as the current fiber's dynamic binding state and mark it as
-   a concurrent task. See [caml_dynamic_freeze_scope] for usage. */
+/* Install [scope] at the bottom of the current fiber's dynamic binding
+   stack and mark the current fiber as a concurrent task.
+   See [caml_dynamic_freeze_scope] for usage. */
 CAMLprim value caml_dynamic_use_scope(value scope);
 
 typedef struct dynamic_binding_s {
