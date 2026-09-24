@@ -53,19 +53,21 @@ type control = {
   custom_minor_max_size : int;
 }
 
-external stat : unit -> stat @@ portable = "caml_gc_stat"
-external quick_stat : unit -> stat @@ portable = "caml_gc_quick_stat"
-external counters : unit -> (float * float * float) @@ portable = "caml_gc_counters"
-external minor_words : unit -> (float [@unboxed]) @@ portable
+external stat : unit -> stat @@ reading portable = "caml_gc_stat"
+external quick_stat : unit -> stat @@ reading portable = "caml_gc_quick_stat"
+external counters : unit -> (float * float * float) @@ reading portable
+  = "caml_gc_counters"
+external minor_words : unit -> (float [@unboxed]) @@ reading portable
   = "caml_gc_minor_words" "caml_gc_minor_words_unboxed"
-external get : unit -> control @@ portable = "caml_gc_get"
+external get : unit -> control @@ reading portable = "caml_gc_get"
 external set : control -> unit @@ portable = "caml_gc_set"
 external minor : unit -> unit @@ portable = "caml_gc_minor"
 external major_slice : int -> int @@ portable = "caml_gc_major_slice"
 external major : unit -> unit @@ portable = "caml_gc_major"
 external full_major : unit -> unit @@ portable = "caml_gc_full_major"
 external compact : unit -> unit @@ portable = "caml_gc_compaction"
-external get_minor_free : unit -> int @@ portable = "caml_get_minor_free"
+external get_minor_free : unit -> int @@ reading portable
+  = "caml_get_minor_free"
 
 open Printf
 
@@ -217,8 +219,9 @@ module Memprof =
 
 module Tweak = struct
   external set : string -> int -> unit = "caml_gc_tweak_set"
-  external get : string -> int = "caml_gc_tweak_get"
-  external list_active : unit -> (string * int) list = "caml_gc_tweak_list_active"
+  external get : string -> int @@ reading portable = "caml_gc_tweak_get"
+  external list_active : unit -> (string * int) list @@ reading portable
+    = "caml_gc_tweak_list_active"
 end
 
 type suspended_collection_work = int
