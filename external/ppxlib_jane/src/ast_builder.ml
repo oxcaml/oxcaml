@@ -495,8 +495,8 @@ struct
       ()
   ;;
 
-  let value_binding ~pat ~expr ~modes : value_binding =
-    value_binding ~loc ~pat ~expr ~modes
+  let value_binding ~pat ~expr ~constraint_ ~modes : value_binding =
+    value_binding ~loc ~pat ~expr ~constraint_ ~modes
   ;;
 
   let pcstr_tuple fields : constructor_arguments = pcstr_tuple ~loc fields
