@@ -2,9 +2,10 @@ open StdLabels
 
 let compunit_name Cmo_format.{ cu_name; _ } = Compunit_name.of_cu_name cu_name
 
+(* Like the compiler's load path, accept both [foo.cmi] and [Foo.cmi]. *)
 let has_cmi ~dir unit_name =
-  let filename = String.uncapitalize_ascii unit_name ^ ".cmi" in
-  Sys.file_exists (Filename.concat dir filename)
+  List.exists [ String.uncapitalize_ascii unit_name; unit_name ] ~f:(fun basename ->
+    Sys.file_exists (Filename.concat dir (basename ^ ".cmi")))
 
 let units fn =
   (* The cma format is documented in typing/cmo_format.mli in the compiler sources *)
