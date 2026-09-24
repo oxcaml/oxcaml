@@ -745,12 +745,21 @@ let literal_object self_id (fields : field_desc list) =
                 body
           | _ -> body
         in
+        let ghost_self_id =
+          (object
+             inherit Ast_traverse.map
+
+             method! location loc = { loc with loc_ghost = true }
+          end)
+            #pattern
+            self_id
+        in
         lift_function_body_constraint
           (Ast_builder.Default.pexp_fun
              ~loc:{ body.pexp_loc with loc_ghost = true }
              Nolabel
              None
-             self_id
+             ghost_self_id
              body)
   in
   let extra_types =

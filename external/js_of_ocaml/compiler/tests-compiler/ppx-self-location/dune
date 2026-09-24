@@ -1,0 +1,9 @@
+(library
+ (name jsoo_ppx_self_location)
+ (libraries js_of_ocaml)
+ (preprocess
+  (pps js_of_ocaml-ppx -- -check -locations-check)))
+
+(alias
+ (name runtest)
+ (deps jsoo_ppx_self_location.cma))
