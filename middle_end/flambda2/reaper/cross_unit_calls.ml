@@ -29,7 +29,7 @@ module Graph = Global_flow_graph
 
 (* Look up the referenced code among the code of the current unit. Since we use
    this module for cross unit calls, it currently always returns [None]. This
-   will change once we add support for link-time optimization.  *)
+   will change once we add support for link-time optimization. *)
 let find_code_dep ~code_deps code_id =
   if not (Current_unit.is_current (Code_id.get_compilation_unit code_id))
   then None
