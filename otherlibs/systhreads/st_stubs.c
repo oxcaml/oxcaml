@@ -318,7 +318,8 @@ static void save_runtime_state(void)
   th->backtrace_last_exn = Caml_state->backtrace_last_exn;
   /* We should never be able to get here if the preemption is a block; that
      means it has been allocated but not yet initialized (and performed). We
-     must have done a GC (or run pending actions) before returning back to OCaml
+     must have done a GC (or run pending actions) before returning back to
+     OCaml.
   */
   CAMLassert(!Is_block(Caml_state->preemption));
   th->preemption_scheduled = Caml_state->preemption == Val_long(1);
