@@ -677,12 +677,27 @@ let rec max_signed_bit_length e =
     if n = 0 then max_signed_bit_length c else arch_bits - n
   | Cop ((Cand | Cor | Cxor), [x; y], _) ->
     Int.max (max_signed_bit_length x) (max_signed_bit_length y)
+  | Cop (Cload { memory_chunk; _ }, _, _) -> loaded_bit_length memory_chunk
   | _ -> arch_bits
+
+(* The number of significant bits of a value loaded from memory, per
+   [max_signed_bit_length]. *)
+and loaded_bit_length (memory_chunk : Cmm.memory_chunk) =
+  match memory_chunk with
+  | Byte_unsigned | Byte_signed -> 8
+  | Sixteen_unsigned | Sixteen_signed -> 16
+  | Thirtytwo_unsigned | Thirtytwo_signed -> 32
+  | Word_int | Word_mask | Word_val | Single _ | Double
+  | Onetwentyeight_unaligned | Onetwentyeight_aligned | Twofiftysix_unaligned
+  | Twofiftysix_aligned | Fivetwelve_unaligned | Fivetwelve_aligned ->
+    arch_bits
 
 let rec max_signed_bit_length' e =
   let open P.Default_variables in
   P.run_default
-    ~default:(fun _ -> arch_bits)
+    ~default:(function
+      | Cop (Cload { memory_chunk; _ }, _, _) -> loaded_bit_length memory_chunk
+      | _ -> arch_bits)
     (prefer_or e)
     [ (Binop (Comparison, Any c1, Any c2) => fun _env -> 1);
       ( Guarded

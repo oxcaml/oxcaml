@@ -635,7 +635,5 @@ let untag_masked_u16 (s : string) = Int64_u.of_int (get16 s 0 land 0xffff)
 [%%expect_asm X86_64{|
 untag_masked_u16:
   movzwq (%rax), %rax
-  salq  $1, %rax
-  sarq  $1, %rax
   ret
 |}]
