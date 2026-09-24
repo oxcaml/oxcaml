@@ -6594,7 +6594,7 @@ let rec path_scope : Path.t -> int =
 
 let try_expand_path env p =
   match Env.find_type_expansion p env with
-  | (params, body, _lv) ->
+  | #(params, body, _lv) ->
     begin match get_desc body with
     | Tconstr (p', args, _)
         when args == params ||
