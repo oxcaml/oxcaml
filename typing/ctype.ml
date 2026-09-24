@@ -6748,12 +6748,11 @@ let path_same_normalized env p1 p2 =
 exception Complicated_moregen
 
 let moregen_mode_fast v m1 m2 =
-  let le = With_locality.Guts.le_loose in
   let ok =
     match v with
-    | Invariant -> le m1 m2 && le m2 m1
-    | Covariant -> le m1 m2
-    | Contravariant -> le m2 m1
+    | Invariant -> With_locality.Guts.(le_loose m1 m2 && le_loose m2 m1)
+    | Covariant -> With_locality.Guts.le_loose m1 m2
+    | Contravariant -> With_locality.Guts.le_loose m2 m1
     | Bivariant -> true
   in
   if not ok then raise_notrace Complicated_moregen
