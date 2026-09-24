@@ -154,3 +154,73 @@ with_cold_call_not_inlined.cold_not_inlined:
   movl  $1, %eax
   ret
 |}]
+
+(* Coldness propagates forwards: all control flow following the cold call (the
+   nested conditional and its join point) is only reachable through the cold
+   block, so it is laid out after the hot [else] branch too. *)
+
+let cold_call_followed_by_branch (r : int ref) x y =
+  let[@inline] [@cold] mark_cold () = () in
+  if x > y then begin
+    mark_cold ();
+    if x > 100 then r := x else r := y;
+    x + y
+  end
+  else x - y
+[%%expect_asm X86_64{|
+cold_call_followed_by_branch:
+  cmpq  %rdi, %rbx
+  jg    .L0
+  subq  %rdi, %rbx
+  leaq  1(%rbx), %rax
+  ret
+.L0:
+  cmpq  $201, %rbx
+  jle   .L1
+  movq  %rbx, (%rax)
+  jmp   .L2
+.L1:
+  movq  %rdi, (%rax)
+.L2:
+  leaq  -1(%rbx,%rdi), %rax
+  ret
+|}]
+
+(* Coldness does not propagate through a join point that also has a hot
+   predecessor: only the cold [then] branch is sunk, while the code after the
+   conditional, which is reached from the hot [else] branch too, stays in place
+   (and the cold block jumps back into it). *)
+
+let cold_branch_rejoins_hot_path (r : int ref) x y =
+  let[@inline] [@cold] mark_cold () = () in
+  if x > y then begin
+    mark_cold ();
+    r := x
+  end
+  else r := y;
+  let v = !r * x in
+  if v > 100 then v + x else v - y
+[%%expect_asm X86_64{|
+cold_branch_rejoins_hot_path:
+  cmpq  %rdi, %rbx
+  jg    .L2
+  movq  %rdi, (%rax)
+.L0:
+  movq  %rbx, %rsi
+  sarq  $1, %rsi
+  movq  (%rax), %rax
+  decq  %rax
+  imulq %rsi, %rax
+  incq  %rax
+  cmpq  $201, %rax
+  jle   .L1
+  leaq  -1(%rax,%rbx), %rax
+  ret
+.L1:
+  subq  %rdi, %rax
+  incq  %rax
+  ret
+.L2:
+  movq  %rbx, (%rax)
+  jmp   .L0
+|}]
