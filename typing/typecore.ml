@@ -917,12 +917,12 @@ let register_allocation_mode locality_mode =
   allocations := locality_mode :: !allocations
 
 let newvar_below_if_modepoly level m =
-  if Language_extension.(is_at_least Mode_polymorphism Alpha)
+  if true
   then fst (Locality.newvar_below level m)
   else m
 
 let newvar_above_if_modepoly level m =
-  if Language_extension.(is_at_least Mode_polymorphism Alpha)
+  if true
   then fst (Locality.newvar_above level m)
   else m
 
@@ -934,7 +934,7 @@ let create_allocation_mode_l mode =
 let create_function_return_mode
     ~return_from_exclave ret_mode : return_mode =
   let ret_mode =
-    if Language_extension.(is_at_least Mode_polymorphism Alpha) then
+    if true then
       if return_from_exclave
       then Locality.disallow_right Locality.local
       else Locality.disallow_right Locality.global
@@ -5323,7 +5323,7 @@ let type_omitted_parameters_and_build_result_type expected_mode env loc ty_ret
                 the return value):
                 [mode_ret] < [mode_ret_alloc] < [mode_ret_eta] *)
              let mode_ret_eta =
-               if Language_extension.(is_at_least Mode_polymorphism Alpha)
+               if true
                then
                 fst
                   (With_locality.newvar_above
@@ -5373,7 +5373,7 @@ let type_omitted_parameters_and_build_result_type expected_mode env loc ty_ret
              in
              (* [mode_ret] < [mode_ret_alloc] < [mode_ret_eta]*)
              let mode_ret_alloc =
-              if Language_extension.(is_at_least Mode_polymorphism Alpha)
+              if true
               then begin
                 let m = Locality.newvar 0 in
                 Locality.submode_exn

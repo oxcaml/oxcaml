@@ -753,7 +753,7 @@ let remove_mode_and_jkind_variables ~zap_scope ty =
       | Tvar { jkind } -> Jkind.default_to_scannable jkind
       | Tunivar { jkind } -> Jkind.default_to_scannable jkind
       | Tarrow ((_,marg,mret),targ,tret,_) ->
-         if Language_extension.(is_at_least Mode_polymorphism Alpha) then begin
+         if true then begin
           With_locality.add_mode_to_zap_scope ~arg:true marg zap_scope;
           With_locality.add_mode_to_zap_scope ~arg:false mret zap_scope
          end else begin
@@ -2825,7 +2825,7 @@ let expand_head_opt env ty =
 
 let create_yielding_mode_l yielding =
   let yielding =
-    if Language_extension.(is_at_least Mode_polymorphism Alpha)
+    if true
     then fst (Yielding.newvar_above 0 yielding)
     else yielding
   in

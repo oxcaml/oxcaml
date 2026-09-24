@@ -2842,7 +2842,7 @@ and nongen_signature_item env f g = function
 let remove_functor_mode_variables ~zap_scope = function
   | Mty_functor (arg_opt, _, mres) ->
       let zap_mode ~arg mode =
-        if Language_extension.(is_at_least Mode_polymorphism Alpha) then begin
+        if true then begin
           With_locality.add_mode_to_zap_scope ~arg mode zap_scope
          end else begin
           With_locality.zap_to_legacy_force ~arg mode |> ignore
