@@ -120,66 +120,75 @@ module Mappings = struct
         let ori_line_r = ref 1 in
         let ori_col_r = ref 0 in
         let ori_name_r = ref 0 in
-        let rec loop prev i =
+        let rec loop ~emitted i =
           if i < len
-          then
-            let c = a.(i) in
-            if
-              i + 1 < len
-              && gen_line c = gen_line a.(i + 1)
-              && gen_col c = gen_col a.(i + 1)
+          then (
+            (* Keep the last mapping at each position, preferring named mappings. *)
+            let rec choose_mapping c j =
+              if j < len && gen_line c = gen_line a.(j) && gen_col c = gen_col a.(j)
+              then
+                let c =
+                  match c, a.(j) with
+                  | Gen_Ori_Name _, (Gen _ | Gen_Ori _) -> c
+                  | _ -> a.(j)
+                in
+                choose_mapping c (j + 1)
+              else c, j
+            in
+            let c, next = choose_mapping a.(i) (i + 1) in
+            if !gen_line_r <> gen_line c
+            then (
+              assert (!gen_line_r < gen_line c);
+              for _i = !gen_line_r to gen_line c - 1 do
+                Buffer.add_char buf ';'
+              done;
+              gen_col_r := 0;
+              gen_line_r := gen_line c)
+            else if emitted
             then
-              (* Only keep one source location per generated location *)
-              loop prev (i + 1)
-            else (
-              if !gen_line_r <> gen_line c
-              then (
-                assert (!gen_line_r < gen_line c);
-                for _i = !gen_line_r to gen_line c - 1 do
-                  Buffer.add_char buf ';'
-                done;
-                gen_col_r := 0;
-                gen_line_r := gen_line c)
-              else if i > 0
-              then Buffer.add_char buf ',';
-              let l =
-                match c with
-                | Gen { gen_line = _; gen_col } ->
-                    let res = [ gen_col - !gen_col_r ] in
-                    gen_col_r := gen_col;
-                    res
-                | Gen_Ori { gen_line = _; gen_col; ori_source; ori_line; ori_col } ->
-                    let res =
-                      [ gen_col - !gen_col_r
-                      ; ori_source - !ori_source_r
-                      ; ori_line - !ori_line_r
-                      ; ori_col - !ori_col_r
-                      ]
-                    in
-                    gen_col_r := gen_col;
-                    ori_col_r := ori_col;
-                    ori_line_r := ori_line;
-                    ori_source_r := ori_source;
-                    res
-                | Gen_Ori_Name
-                    { gen_line = _; gen_col; ori_source; ori_line; ori_col; ori_name } ->
-                    let res =
-                      [ gen_col - !gen_col_r
-                      ; ori_source - !ori_source_r
-                      ; ori_line - !ori_line_r
-                      ; ori_col - !ori_col_r
-                      ; ori_name - !ori_name_r
-                      ]
-                    in
-                    gen_col_r := gen_col;
-                    ori_col_r := ori_col;
-                    ori_line_r := ori_line;
-                    ori_source_r := ori_source;
-                    ori_name_r := ori_name;
-                    res
-              in
-              Vlq64.encode_l buf l;
-              loop i (i + 1))
+              (* Only emit a separator if a segment was already emitted on
+                  this line. Deduplication may skip the first mappings, and a
+                  leading separator (empty segment) is rejected by some
+                  consumers, e.g. Binaryen. *)
+              Buffer.add_char buf ',';
+            let l =
+              match c with
+              | Gen { gen_line = _; gen_col } ->
+                  let res = [ gen_col - !gen_col_r ] in
+                  gen_col_r := gen_col;
+                  res
+              | Gen_Ori { gen_line = _; gen_col; ori_source; ori_line; ori_col } ->
+                  let res =
+                    [ gen_col - !gen_col_r
+                    ; ori_source - !ori_source_r
+                    ; ori_line - !ori_line_r
+                    ; ori_col - !ori_col_r
+                    ]
+                  in
+                  gen_col_r := gen_col;
+                  ori_col_r := ori_col;
+                  ori_line_r := ori_line;
+                  ori_source_r := ori_source;
+                  res
+              | Gen_Ori_Name
+                  { gen_line = _; gen_col; ori_source; ori_line; ori_col; ori_name } ->
+                  let res =
+                    [ gen_col - !gen_col_r
+                    ; ori_source - !ori_source_r
+                    ; ori_line - !ori_line_r
+                    ; ori_col - !ori_col_r
+                    ; ori_name - !ori_name_r
+                    ]
+                  in
+                  gen_col_r := gen_col;
+                  ori_col_r := ori_col;
+                  ori_line_r := ori_line;
+                  ori_source_r := ori_source;
+                  ori_name_r := ori_name;
+                  res
+            in
+            Vlq64.encode_l buf l;
+            loop ~emitted:true next)
         in
 
         let offset =
@@ -191,7 +200,7 @@ module Mappings = struct
             first_line - 1)
           else 0
         in
-        loop (-1) 0;
+        loop ~emitted:false 0;
         offset, Uninterpreted (Buffer.contents buf)
 
   let encode mapping =
