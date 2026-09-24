@@ -33,7 +33,7 @@ open! Stdlib
 type t = char
 (** An alias for the type of characters. *)
 
-external code : char -> int = "%identity"
+external code : char -> int @@ stateless = "%identity"
 (** Return the integer code of the argument. *)
 
 val chr : int -> char
@@ -208,4 +208,4 @@ val hash : t -> int
 
 (* The following is for system use only. Do not call directly. *)
 
-external unsafe_chr : int -> char = "%identity"
+external unsafe_chr : int -> char @@ stateless = "%identity"

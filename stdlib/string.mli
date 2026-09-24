@@ -99,10 +99,10 @@ val empty : string
     @since 4.13
 *)
 
-external length : (t[@local_opt]) -> int = "%string_length"
+external length : (t[@local_opt]) -> int @@ stateless = "%string_length"
 (** [length s] is the length (number of bytes/characters) of [s]. *)
 
-external get : (t[@local_opt]) -> int -> char = "%string_safe_get"
+external get : (t[@local_opt]) -> int -> char @@ stateless = "%string_safe_get"
 (** [get s i] is the character at index [i] in [s]. This is the same
     as writing [s.[i]].
 
@@ -150,12 +150,14 @@ val cat : string -> string -> string
 (** {1:predicates Predicates and comparisons} *)
 
 external equal :
-  (t[@local_opt]) -> (t[@local_opt]) -> bool = "caml_string_equal" [@@noalloc]
+  (t[@local_opt]) -> (t[@local_opt]) -> bool @@ stateless
+  = "caml_string_equal" [@@noalloc]
 (** [equal s0 s1] is [true] if and only if [s0] and [s1] are character-wise
     equal.
     @since 4.03 (4.05 in StringLabels) *)
 
-external compare : (t[@local_opt]) -> (t[@local_opt]) -> int = "%compare"
+external compare : (t[@local_opt]) -> (t[@local_opt]) -> int @@ stateless
+  = "%compare"
 (** [compare s0 s1] sorts [s0] and [s1] in lexicographical order. [compare]
     behaves like {!Stdlib.compare} on strings but may be more efficient. *)
 
@@ -543,7 +545,7 @@ val hash : t @ local -> int
     @since 5.0 *)
 
 external seeded_hash :
-  int -> (t[@local_opt]) -> int = "caml_string_hash" [@@noalloc]
+  int -> (t[@local_opt]) -> int @@ stateless = "caml_string_hash" [@@noalloc]
 (** A seeded hash function for strings, with the same output value as
     {!Hashtbl.seeded_hash}. This function allows this module to be passed as
     argument to the functor {!Hashtbl.MakeSeeded}.
@@ -589,7 +591,8 @@ val get_int64_le : string -> int -> int64
 
 (* The following is for system use only. Do not call directly. *)
 
-external unsafe_get : (t[@local_opt]) -> int -> char = "%string_unsafe_get"
+external unsafe_get : (t[@local_opt]) -> int -> char @@ stateless
+  = "%string_unsafe_get"
 external unsafe_blit :
   string -> int -> bytes -> int -> int ->
-    unit = "caml_blit_string" [@@noalloc]
+    unit @@ stateless = "caml_blit_string" [@@noalloc]
