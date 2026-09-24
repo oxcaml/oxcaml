@@ -13,7 +13,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 (** Output channels.
 
@@ -41,40 +41,41 @@ type open_flag = Stdlib.open_flag =
   | Open_nonblock    (** open in non-blocking mode. *)
 (** Opening modes for {!open_gen}. *)
 
-val stdout : t
+val stdout : t @@ stateful portable
 (** The standard output for the process. *)
 
-val stderr : t
+val stderr : t @@ stateful portable
 (** The standard error output for the process. *)
 
-val open_bin : string -> t
+val open_bin : string -> t @@ stateful portable
 (** Open the named file for writing, and return a new output channel on that
     file, positioned at the beginning of the file. The file is truncated to zero
     length if it already exists. It is created if it does not already exists. *)
 
-val open_text : string -> t
+val open_text : string -> t @@ stateful portable
 (** Same as {!open_bin}, but the file is opened in text mode, so that newline
     translation takes place during writes. On operating systems that do not
     distinguish between text mode and binary mode, this function behaves like
     {!open_bin}. *)
 
-val open_gen : open_flag list -> int -> string -> t
+val open_gen : open_flag list -> int -> string -> t @@ stateful portable
 (** [open_gen mode perm filename] opens the named file for writing, as described
     above. The extra argument [mode] specifies the opening mode. The extra
     argument [perm] specifies the file permissions, in case the file must be
     created.  {!open_text} and {!open_bin} are special cases of this
     function. *)
 
-val with_open_bin : string -> (t -> 'a) -> 'a
+val with_open_bin : string -> (t -> 'a) -> 'a @@ stateful portable
 (** [with_open_bin fn f] opens a channel [oc] on file [fn] and returns [f
     oc]. After [f] returns, either with a value or by raising an exception, [oc]
     is guaranteed to be closed. *)
 
-val with_open_text : string -> (t -> 'a) -> 'a
+val with_open_text : string -> (t -> 'a) -> 'a @@ stateful portable
 (** Like {!with_open_bin}, but the channel is opened in text mode (see
     {!open_text}). *)
 
 val with_open_gen : open_flag list -> int -> string -> (t -> 'a) -> 'a
+  @@ stateful portable
 (** Like {!with_open_bin}, but can specify the opening mode and file permission,
     in case the file must be created (see {!open_gen}). *)
 
@@ -129,7 +130,7 @@ val flush : t -> unit
     pending writes on that channel.  Interactive programs must be careful about
     flushing standard output and standard error at the right time. *)
 
-val flush_all : unit -> unit
+val flush_all : unit -> unit @@ stateful portable
 (** Flush all open output channels; ignore errors. *)
 
 (** {1:seeking Seeking} *)

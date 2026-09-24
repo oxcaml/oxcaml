@@ -1,3 +1,5 @@
+@@ stateless
+
 (******************************************************************************
  *                                  OxCaml                                    *
  *                      Andrej Ivaskovic, Jane Street                         *
@@ -39,8 +41,8 @@ module Expr : sig
   val float : float -> <[float]> expr
   val char : char -> <[char]> expr
   val string : string -> <[string]> expr
-end
+end @@ stateful
 
 val duplicate : 'a expr @ once -> 'a expr * 'a expr @ once
-val print : Format.formatter -> 'a expr -> unit
-val string_of_expr : 'a expr @ once -> string
+val print : Format.formatter -> 'a expr -> unit @@ stateful
+val string_of_expr : 'a expr @ once -> string @@ stateful

@@ -14,6 +14,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+@@ stateless
+
 open! Stdlib
 
 (** Registering OCaml values with the C runtime.
@@ -23,13 +25,13 @@ open! Stdlib
    OCaml functions, or raise registered OCaml exceptions.
 *)
 
-val register : string -> 'a -> unit
+val register : string -> 'a -> unit @@ stateful
 [@@alert unsafe_multidomain "Use [Callback.Safe.register]."]
 (** [Callback.register n v] registers the value [v] under
    the name [n]. C code can later retrieve a handle to [v]
    by calling [caml_named_value(n)]. *)
 
-val register_exception : string -> exn -> unit
+val register_exception : string -> exn -> unit @@ stateful
 [@@alert unsafe_multidomain "Use [Callback.Safe.register_exception]."]
 (** [Callback.register_exception n exn] registers the
    exception contained in the exception value [exn]
@@ -52,4 +54,4 @@ module Safe : sig
 
       The provided exception must be [portable] as registered exceptions may be looked up
       from any domain. *)
-end
+end @@ stateful
