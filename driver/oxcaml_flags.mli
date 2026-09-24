@@ -58,7 +58,6 @@ val cfg_value_propagation_float : bool ref
 val cfg_value_propagation_flow : bool ref
 
 val reorder_blocks_random : int option ref
-val basic_block_sections : bool ref
 val module_entry_functions_section : bool ref
 
 val dasm_comments : bool ref

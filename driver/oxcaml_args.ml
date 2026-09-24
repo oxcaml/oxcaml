@@ -269,21 +269,6 @@ let mk_reorder_blocks_random f =
       "<seed> Randomly reorder basic blocks in every function, using the \
        provided seed (intended for testing, off by default)." )
 
-let mk_basic_block_sections f =
-  if Config.function_sections then
-    ( "-basic-block-sections",
-      Arg.Unit f,
-      " Emit each basic block in a separate section if target supports it. \
-       Requires -ocamlcfg." )
-  else
-    let err () =
-      raise
-        (Arg.Bad
-           "OCaml has been configured without support for -function-sections \
-            which is required for -basic-block-sections")
-    in
-    ("-basic-block-sections", Arg.Unit err, " (option not available)")
-
 let mk_module_entry_functions_section f =
   if Config.function_sections then
     ( "-module-entry-functions-section",
@@ -1395,7 +1380,6 @@ module type Oxcaml_options = sig
   val no_cfg_value_propagation_flow : unit -> unit
   val experimental_optimizations : unit -> unit
   val reorder_blocks_random : int -> unit
-  val basic_block_sections : unit -> unit
   val module_entry_functions_section : unit -> unit
   val dasm_comments : unit -> unit
   val dno_asm_comments : unit -> unit
@@ -1601,7 +1585,6 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_no_cfg_value_propagation_flow F.no_cfg_value_propagation_flow;
       mk_experimental_optimizations F.experimental_optimizations;
       mk_reorder_blocks_random F.reorder_blocks_random;
-      mk_basic_block_sections F.basic_block_sections;
       mk_module_entry_functions_section F.module_entry_functions_section;
       mk_dasm_comments F.dasm_comments;
       mk_dno_asm_comments F.dno_asm_comments;
@@ -1977,8 +1960,6 @@ module Oxcaml_options_impl = struct
 
   let reorder_blocks_random seed =
     Oxcaml_flags.reorder_blocks_random := Some seed
-
-  let basic_block_sections () = set' Oxcaml_flags.basic_block_sections ()
 
   let module_entry_functions_section () =
     set' Oxcaml_flags.module_entry_functions_section ()
@@ -2578,7 +2559,6 @@ module Extra_params = struct
         true
     | "reorder-blocks-random" ->
         set_int_option' Oxcaml_flags.reorder_blocks_random
-    | "basic-block-sections" -> set' Oxcaml_flags.basic_block_sections
     | "module-entry-functions-section" ->
         set' Oxcaml_flags.module_entry_functions_section
     | "heap-reduction-threshold" ->

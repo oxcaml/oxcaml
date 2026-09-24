@@ -532,7 +532,6 @@ let ocaml_ignored_flags =
     "-safe-matching";
     "-bin-annot-occurrences";
     (* flambda-backend specific *)
-    "-basic-block-sections";
     "-caml-apply-inline-fast-path";
     "-debug-ocaml";
     "-dgc-timings";
