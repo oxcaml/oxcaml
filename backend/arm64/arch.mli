@@ -114,6 +114,10 @@ val offset_addressing : addressing_mode -> int -> addressing_mode
 
 val num_args_addressing : addressing_mode -> int
 
+(** [strength_reduce_mul_into_lea mult] is [None] on arm64 (no [lea]). It exists
+    so the cross-architecture peephole optimizer can call it uniformly. *)
+val strength_reduce_mul_into_lea : int -> specific_operation option
+
 (** [fold_delta_into_specific_operation op ~arg_is_folded_reg ~delta] is used
     by the peephole optimizer to delete an instruction [r := r + delta] that
     immediately precedes the instruction carrying [op].
