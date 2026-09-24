@@ -101,7 +101,7 @@ type global_name_info = {
 type import = {
   imp_is_param : bool;
   imp_params : Global_module.Parameter_name.t list;
-  imp_arg_for : Global_module.Parameter_name.t option;
+  imp_arg_for : Types.arg_for option;
   imp_impl : CU.t option; (* None iff import is a parameter *)
   imp_raw_sign : Signature_with_global_bindings.t;
   imp_filename : string;
@@ -232,11 +232,6 @@ let find_import_info_in_cache {imports; _} import =
   | exception Not_found -> None
   | Missing -> None
   | Found imp -> Some imp
-
-let find_name_info_in_cache {persistent_names; _} name =
-  match Hashtbl.find persistent_names name with
-  | exception Not_found -> None
-  | pn -> Some pn
 
 let find_info_in_cache {persistent_structures; _} name =
   match Hashtbl.find persistent_structures name with
@@ -625,7 +620,7 @@ and compute_global penv modname ~params ~check ~allow_excess_args =
                   error (Not_compiled_as_argument
                            { param = expected_type; value = arg_value;
                              filename = pn.pn_import.imp_filename })
-              | Some ty -> ty
+              | Some { Types.arg_param; _ } -> arg_param
             in
             if not (Global_module.Parameter_name.equal expected_type actual_type)
             then begin
@@ -1088,7 +1083,7 @@ let loaded_transitive_dependencies penv intfs =
 
 let find_import penv modname =
   let import = find_import ~allow_hidden:true penv ~check:true modname in
-  import.imp_impl, import.imp_params, import.imp_raw_sign
+  import.imp_impl, import.imp_params, import.imp_arg_for, import.imp_raw_sign
 
 let require_impl_for_quote {quoted_impls; _} name =
   quoted_impls := CU.Set.add name !quoted_impls
@@ -1139,11 +1134,6 @@ let looked_up {persistent_structures; _} modname =
 
 let is_imported_opaque {imported_opaque_units; _} s =
   CU.Name.Set.mem s !imported_opaque_units
-
-let implemented_parameter penv modname =
-  match find_name_info_in_cache penv modname with
-  | Some { pn_import = { imp_arg_for; _ }; _ } -> imp_arg_for
-  | None -> None
 
 let make_cmi penv modname kind sign alerts =
   let flags =

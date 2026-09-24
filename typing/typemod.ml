@@ -4606,6 +4606,21 @@ let check_argument_type_if_given env sourcefile ~actual_staticity actual_sig
              ai_coercion_from_primary = coercion;
            }
 
+let cmi_arg_for sg arg_param =
+  Option.map
+    (fun arg_param : Types.arg_for ->
+      (* The argument block is appended after the signature's runtime fields;
+         must agree with [Translmod.add_arg_block_to_module_block]. *)
+      let sig_repr =
+        List.map snd (Types.bound_value_identifiers_and_sorts sg)
+      in
+      { arg_param;
+        arg_block_idx = List.length sig_repr;
+        arg_main_repr =
+          Array.of_list
+            (sig_repr @ [Jkind_types.Sort.(of_const Const.for_module)]) })
+    arg_param
+
 let type_implementation target modulename initial_env ast =
   let sourcefile = Unit_info.original_source_file target in
   let error e =
@@ -4707,7 +4722,10 @@ let type_implementation target modulename initial_env ast =
           in
           if Env.is_parameter_unit global_name then
             error (Cannot_implement_parameter (cu_name, source_intf));
-          let arg_type_from_cmi = Env.implemented_parameter global_name in
+          let arg_type_from_cmi =
+            Env.implemented_parameter ~chain:[] cu_name
+            |> Option.map (fun ({ arg_param; _ } : Types.arg_for) -> arg_param)
+          in
           if not (Option.equal Global_module.Parameter_name.equal
                     arg_type arg_type_from_cmi) then
             error (Inconsistent_argument_types
@@ -4796,7 +4814,9 @@ let type_implementation target modulename initial_env ast =
           if not !Clflags.dont_write_files then begin
             let name = Compilation_unit.name modulename in
             let kind =
-              Cmi_format.Normal { cmi_impl = modulename; cmi_arg_for = arg_type }
+              Cmi_format.Normal
+                { cmi_impl = modulename;
+                  cmi_arg_for = cmi_arg_for simple_sg arg_type }
             in
             let cmi =
               Profile.record_call "save_cmi" (fun () ->
