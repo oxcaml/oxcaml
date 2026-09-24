@@ -6677,7 +6677,8 @@ let initial_moregen_counters =
 
 let moregen_counters = ref initial_moregen_counters
 
-let counting_moregen () = List.mem `Counters !Clflags.profile_columns
+let counting_moregen () =
+  List.mem `Counters !Clflags.profile_columns || Action_trace.enabled ()
 
 let incr_moregen_counter name =
   if counting_moregen () then
