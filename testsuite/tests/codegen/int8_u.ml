@@ -613,8 +613,6 @@ let popcount x = Int8_u.popcount x
 popcount:
   andl  $255, %eax
   popcnt %rax, %rax
-  salq  $56, %rax
-  sarq  $56, %rax
   ret
 |}]
 
@@ -623,8 +621,6 @@ let ctz x = Int8_u.ctz x
 ctz:
   orq   $256, %rax
   tzcnt %rax, %rax
-  salq  $56, %rax
-  sarq  $56, %rax
   ret
 |}]
 
@@ -634,8 +630,6 @@ clz:
   andl  $255, %eax
   lzcnt %rax, %rax
   addq  $-56, %rax
-  salq  $56, %rax
-  sarq  $56, %rax
   ret
 |}]
 
