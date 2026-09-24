@@ -73,6 +73,7 @@ Error: Signature mismatch:
        The type "'a @ [< 'm > past('n)] -> 'a @ [> 'm]"
        is not compatible with the type
          "'a @ [< past('o) & past('n)] -> 'a @ [> past('o)]"
+       The return mode was expected to be "unique" but is "aliased"
 |}]
 
 (* [mod c] drops the axes [c] mentions from the inequality *)
@@ -105,6 +106,7 @@ Error: Signature mismatch:
        The type "'a @ [< 'm > past('n)] -> 'a @ [> 'm]"
        is not compatible with the type
          "'a @ [< 'o & past('n)] -> 'a @ [> 'o mod portable]"
+       The return mode was expected to be "portable" but is "nonportable"
 |}]
 
 module type Mod_lower_monadic = sig
@@ -164,6 +166,7 @@ Error: Signature mismatch:
        is not compatible with the type
          "'a @ [< 'o mod aliased contended & past('n)] ->
          'a @ [> 'o mod many portable]"
+       The return mode was expected to be "many" but is "once"
 |}]
 
 (* [mod] on an upper bound strengthens the signature: the function must
@@ -191,6 +194,7 @@ Error: Signature mismatch:
        The type "'a @ [< 'm > past('n)] -> 'a @ [> 'm]"
        is not compatible with the type
          "'a @ [< 'o mod contended & past('n)] -> 'a @ [> 'o]"
+       The return mode was expected to be "uncontended" but is "contended"
 |}]
 
 module type Plain = sig
@@ -222,6 +226,7 @@ Error: Signature mismatch:
        The type "'a @ [< 'm > past('n)] -> 'a @ [> 'm]"
        is not compatible with the type
          "'a @ [< 'o mod contended & past('n)] -> 'a @ [> 'o]"
+       The return mode was expected to be "uncontended" but is "contended"
 |}]
 
 (* [mod c] applied to [close('m)] *)
@@ -268,6 +273,7 @@ Error: Signature mismatch:
        is not compatible with the type
          "'a @ [< 'p & past('o)] ->
          ('b @ [< past('n)] -> 'a @ [> 'p]) @ [> close('p) mod portable | local once]"
+       The return mode was expected to be "portable" but is "nonportable"
 |}]
 
 (* [mod many] on [close('m)] weakens the curry's floor below what a
@@ -315,6 +321,7 @@ Error: Signature mismatch:
        is not compatible with the type
          "'a @ [< 'p & past('o)] ->
          ('b @ [< past('n)] -> 'a @ [> 'p]) @ [> close('p) mod many | local]"
+       The return mode was expected to be "many" but is "once"
 |}]
 
 (* [mod] required by implementations *)

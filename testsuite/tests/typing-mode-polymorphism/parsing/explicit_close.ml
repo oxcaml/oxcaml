@@ -279,6 +279,7 @@ Error: Signature mismatch:
        is not compatible with the type
          "'a @ [< 'p & past('o) & global unique] ->
          ('b @ [< past('n)] -> 'a @ [> 'p]) @ [> close('p) mod many]"
+       The return mode was expected to be "many" but is "once"
 |}]
 
 let k x y = x

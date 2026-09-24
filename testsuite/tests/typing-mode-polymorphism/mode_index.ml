@@ -104,6 +104,7 @@ Error: Signature mismatch:
            "'a @ [< many read_write] ->
            'a @ [> local aliased stateful dynamic]"
        is not compatible with the type "'a @ [< 'm] -> 'a @ [> 'm | local]"
+       The argument mode was expected to be "many" but is "once"
 |}]
 
 module M : sig
@@ -130,6 +131,7 @@ Error: Signature mismatch:
            "'a @ [< many read_write] ->
            'a @ [> local aliased stateful dynamic]"
        is not compatible with the type "'a @ 'm -> 'a @ [> local]"
+       The argument mode was expected to be "many" but is "once"
 |}]
 
 module M : sig
@@ -165,4 +167,6 @@ Error: Signature mismatch:
            "'a @ [< many read_write > aliased stateful dynamic] ->
            'a @ [> local aliased stateful dynamic]"
        is not compatible with the type "'a -> 'a"
+       The return mode was expected to be "global"
+       because it crosses with something but is "local"
 |}]
