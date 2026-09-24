@@ -698,5 +698,79 @@ let and_asr_mask_partial x = Int64_u.logand (Int64_u.shift_right x 48) #0xFFL
 and_asr_mask_partial:
   sarq  $48, %rax
   andl  $255, %eax
+(* Nested additions of constants that do not fit a host [int] *)
+
+let add_add_2_62_bad x =
+  Int64_u.add (Int64_u.add x #0x4000000000000000L) #0x4000000000000000L
+[%%expect_asm X86_64{|
+add_add_2_62_bad:
+  movabsq $4611686018427387904, %rbx
+  movabsq $4611686018427387904, %rdi
+  addq  %rdi, %rax
+  addq  %rbx, %rax
+  ret
+|}]
+
+let add_add_2_62_minus_1_bad x =
+  Int64_u.add (Int64_u.add x #0x3fffffffffffffffL) #0x3fffffffffffffffL
+[%%expect_asm X86_64{|
+add_add_2_62_minus_1_bad:
+  movabsq $4611686018427387903, %rbx
+  movabsq $4611686018427387903, %rdi
+  addq  %rdi, %rax
+  addq  %rbx, %rax
+  ret
+|}]
+
+let add_add_max_int_bad x =
+  Int64_u.add (Int64_u.add x #0x7fffffffffffffffL) #0x7fffffffffffffffL
+[%%expect_asm X86_64{|
+add_add_max_int_bad:
+  movabsq $9223372036854775807, %rbx
+  movabsq $9223372036854775807, %rdi
+  addq  %rdi, %rax
+  addq  %rbx, %rax
+  ret
+|}]
+
+let add_sub_max_int_bad x =
+  Int64_u.add (Int64_u.sub x #0x7fffffffffffffffL) #0x7fffffffffffffffL
+[%%expect_asm X86_64{|
+add_sub_max_int_bad:
+  movabsq $9223372036854775807, %rbx
+  movabsq $9223372036854775807, %rdi
+  subq  %rdi, %rax
+  addq  %rbx, %rax
+  ret
+|}]
+
+let add_rsub_max_int_bad x =
+  Int64_u.add (Int64_u.sub #0x7fffffffffffffffL x) #0x7fffffffffffffffL
+[%%expect_asm X86_64{|
+add_rsub_max_int_bad:
+  movabsq $9223372036854775807, %rdi
+  movabsq $9223372036854775807, %rbx
+  subq  %rax, %rbx
+  leaq  (%rbx,%rdi), %rax
+  ret
+|}]
+
+let sub_add_max_int_bad x =
+  Int64_u.sub (Int64_u.add x #0x7fffffffffffffffL) (-#0x7fffffffffffffffL)
+[%%expect_asm X86_64{|
+sub_add_max_int_bad:
+  movabsq $-9223372036854775807, %rbx
+  movabsq $9223372036854775807, %rdi
+  addq  %rdi, %rax
+  subq  %rbx, %rax
+  ret
+|}]
+
+let sub_min_int_bad x =
+  Int64_u.sub x #0x8000000000000000L
+[%%expect_asm X86_64{|
+sub_min_int_bad:
+  movabsq $-9223372036854775808, %rbx
+  subq  %rbx, %rax
   ret
 |}]
