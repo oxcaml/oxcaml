@@ -195,9 +195,10 @@ module type S = sig
         with_loc
 
   (** [pexp_function_cases] builds a unary function expression in the shape
-      [function C1 -> E1 | ...]. To create a function with multiple argument that
-      pattern-matches on the last one, use [add_param] or [add_params] to add more
-      parameters. Alternatively, use [pexp_function] to provide all parameters at once. *)
+      [function C1 -> E1 | ...]. To create a function with multiple arguments that
+      pattern-matches on the last one, use [add_fun_param] or [add_fun_params] to add more
+      parameters. Alternatively, use [Latest.pexp_function] to provide all parameters at
+      once. *)
   val pexp_function_cases : (case list -> expression) with_loc
 
   (** [unary_function cases] is [function <cases>]. When used with the Jane Street
