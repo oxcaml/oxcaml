@@ -65,10 +65,6 @@ val enter_continuation :
     handler. *)
 val exit_continuation : Continuation.t -> t -> t
 
-(** The continuation whose handler is currently being traversed (the top of the
-    stack), if any. *)
-val current_continuation : t -> Continuation.t option
-
 (** Record that the current expression defines some lifted constants; this is
     not liked to the current continuation. Note: this should only be called at
     top-level, where the constants will be placed, and not from the fonction

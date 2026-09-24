@@ -263,7 +263,7 @@ let demote_exn_handler t cont =
 let demoted_exn_handlers t = t.demoted_exn_handlers
 
 let mark_current_continuation_as_cold t =
-  match Flow.Acc.current_continuation t.flow_acc with
+  match DE.current_continuation t.denv with
   | None -> t
   | Some cont ->
     { t with
