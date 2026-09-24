@@ -196,3 +196,75 @@ c_api_local_known_length:
   addq  $8, %rsp
   ret
 |}]
+
+(* Flambda knows the length of the strings that the runtime functions create for
+   known lengths, so it can remove bounds checks. *)
+
+let known_length_no_bounds_check () =
+  let b = Bytes.create 5 in
+  Bytes.set b 4 'a';
+  b
+[%%expect_asm X86_64{|
+known_length_no_bounds_check:
+  subq  $8, %rsp
+  subq  $16, %r15
+  cmpq  (%r14), %r15
+  jb    <hidden GC jump pad>
+.L0:
+  leaq  8(%r15), %rax
+  movq  $1276, -8(%rax)
+  movabsq $144115188075855872, %rbx
+  movq  %rbx, (%rax)
+  movl  $97, %ebx
+  movb  %bl, 4(%rax)
+  addq  $8, %rsp
+  ret
+|}]
+
+external set_local : bytes @ local -> int -> char -> unit = "%bytes_safe_set"
+
+let local_known_length_no_bounds_check () =
+  exclave_
+  let b = Bytes.create__stack 5 in
+  set_local b 4 'a';
+  b
+[%%expect_asm X86_64{|
+local_known_length_no_bounds_check:
+  subq  $8, %rsp
+  movq  64(%r14), %rax
+  subq  $16, %rax
+  movq  %rax, 64(%r14)
+  cmpq  80(%r14), %rax
+  jl    <hidden GC jump pad>
+.L0:
+  addq  72(%r14), %rax
+  addq  $8, %rax
+  movq  $2044, -8(%rax)
+  movabsq $144115188075855872, %rbx
+  movq  %rbx, (%rax)
+  movl  $97, %ebx
+  movb  %bl, 4(%rax)
+  addq  $8, %rsp
+  ret
+|}]
+
+let c_api_known_length_no_bounds_check () =
+  let b = alloc_string 5 in
+  Bytes.set b 4 'a';
+  b
+[%%expect_asm X86_64{|
+c_api_known_length_no_bounds_check:
+  subq  $8, %rsp
+  subq  $16, %r15
+  cmpq  (%r14), %r15
+  jb    <hidden GC jump pad>
+.L0:
+  leaq  8(%r15), %rax
+  movq  $1276, -8(%rax)
+  movabsq $144115188075855872, %rbx
+  movq  %rbx, (%rax)
+  movl  $97, %ebx
+  movb  %bl, 4(%rax)
+  addq  $8, %rsp
+  ret
+|}]

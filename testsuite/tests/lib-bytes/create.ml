@@ -129,3 +129,25 @@ let () =
       exclave_ Bytes.create__stack (-1));
   check "Bytes.create__stack, known length min_int" (fun () ->
       exclave_ Bytes.create__stack min_int)
+
+(* Bounds checks against known lengths that must fail still raise. *)
+let () =
+  let b = Bytes.create 5 in
+  Bytes.set b 4 'a';
+  match Bytes.set b 5 'a' with
+  | () -> print_endline "Bytes.set, index 5 of known length 5: no exception"
+  | exception Invalid_argument msg ->
+    Printf.printf "Bytes.set, index 5 of known length 5: Invalid_argument %S\n"
+      msg
+
+(* The contents of strings created by the runtime may change, so [%obj_dup]
+   must copy them. *)
+external dup : bytes -> bytes = "%obj_dup"
+
+let () =
+  let b = Bytes.create 5 in
+  Bytes.fill b 0 5 'a';
+  let copy = dup b in
+  Bytes.set copy 0 'b';
+  Printf.printf "%%obj_dup: original %S, copy %S\n" (Bytes.to_string b)
+    (Bytes.to_string copy)

@@ -4546,7 +4546,11 @@ let boxed_mask_alias_to ~naked_mask =
   box_mask (Naked_mask (TD.create_equals (Simple.var naked_mask)))
 
 let this_immutable_string str =
-  let string_info = String_info.Set.singleton str in
+  let string_info = String_info.Set.singleton (Immutable str) in
+  non_null_value (String string_info)
+
+let mutable_string ~length =
+  let string_info = String_info.Set.singleton (Mutable { length }) in
   non_null_value (String string_info)
 
 let array_of_length ~element_kind ~length alloc_mode =
