@@ -507,6 +507,7 @@ let
         dontStrip = true;
 
         makeFlags = [
+          # The Makefile's /usr/bin/env bash does not exist in the build sandbox.
           "SHELL=${stdenv.shell}"
           "REQUIRES_CONFIGURATION="
           "DUNE=${dune}/bin/dune"
@@ -727,7 +728,7 @@ stdenv.mkDerivation {
       $out/bin/generate_cached_generic_functions.exe $out/lib/ocaml/cached-generic-functions
     ''
     + lib.optionalString withJsoo ''
-      make jsoo-install-bin OXCAML_INSTALL="$out" AST_DEPENDENT_LIBS_PREFIX="$out"
+      make SHELL="$SHELL" jsoo-install-bin OXCAML_INSTALL="$out" AST_DEPENDENT_LIBS_PREFIX="$out"
       ${wrapWasmOfOcaml}
     ''
     # Get rid of unused artifacts
