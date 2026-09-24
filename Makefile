@@ -298,7 +298,7 @@ ast-dependent-libs-build-boot: ocaml-compiler-libs-build-boot ppxlib-jane-build-
 
 # Each deps/<name> names the variable holding its nix-provided source.
 $(ast_dependent_libs_deps)/ppx_derivers: src_var = PPXLIB_PPX_DERIVERS_SRC
-$(ast_dependent_libs_deps)/sexplib0: src_var = PPXLIB_SEXPLIB0_SRC
+$(ast_dependent_libs_deps)/sexp_type: src_var = PPXLIB_SEXP_TYPE_SRC
 $(ast_dependent_libs_deps)/stdlib-shims: src_var = PPXLIB_STDLIB_SHIMS_SRC
 $(ast_dependent_libs_deps)/gen: src_var = SEDLEX_GEN_SRC
 $(ast_dependent_libs_deps)/sedlex: src_var = JSOO_SEDLEX_SRC
@@ -310,7 +310,7 @@ $(ast_dependent_libs_deps)/qcheck: src_var = JSOO_QCHECK_SRC
 
 PPXLIB_DEPS = \
   $(ast_dependent_libs_deps)/ppx_derivers \
-  $(ast_dependent_libs_deps)/sexplib0 \
+  $(ast_dependent_libs_deps)/sexp_type \
   $(ast_dependent_libs_deps)/stdlib-shims
 
 JSOO_DEPS = \
@@ -344,7 +344,7 @@ jsoo-build: ast-dependent-libs-compiler duneconf/ast-dependent-libs.ws \
 	$(ast_dependent_libs_dune) $(ws_ast_dependent_libs) @jsoo-libs
 
 # The packages built by the ppxlib-libs and jsoo-libs aliases.
-PPXLIB_PACKAGES = ocaml-compiler-libs ppx_derivers sexplib0 stdlib-shims \
+PPXLIB_PACKAGES = ocaml-compiler-libs ppx_derivers sexp_type stdlib-shims \
   ppxlib_ast ppxlib ppxlib_jane
 JSOO_PACKAGES = $(PPXLIB_PACKAGES) gen sedlex cmdliner menhirLib menhirSdk \
   yojson js_of_ocaml-compiler wasm_of_ocaml-compiler js_of_ocaml-ppx \
@@ -363,6 +363,14 @@ ppxlib-install: ppxlib-build
 .PHONY: jsoo-install
 jsoo-install: jsoo-build
 	$(call ast_dependent_libs_install,$(JSOO_PACKAGES))
+
+# Only the executables, so that installing alongside the compiler adds no
+# findlib packages to it.
+JSOO_BIN_PACKAGES = js_of_ocaml-compiler wasm_of_ocaml-compiler
+
+.PHONY: jsoo-install-bin
+jsoo-install-bin: jsoo-build
+	$(call ast_dependent_libs_install,--sections=bin $(JSOO_BIN_PACKAGES))
 
 .PHONY: jsoo-test
 jsoo-test: ast-dependent-libs-compiler \

@@ -60,7 +60,10 @@
         # the shellHook behaves exactly like the nix build. withMerlin only
         # extends its inputs with what `make merlin-build` / `make merlin-test`
         # need.
-        devShells.default = oxcaml.override { withMerlin = true; };
+        devShells.default = oxcaml.override {
+          withMerlin = true;
+          withJsooTestSources = true;
+        };
       }
     )
     // {

@@ -13,7 +13,7 @@
   ppxlib_ast.traverse_builtins
   ppxlib_ast.stdppx
   stdlib-shims
-  sexplib0)
+  sexp_type)
  (flags
   (:standard -safe-string -open Ocaml_shadow))
  (ppx.driver

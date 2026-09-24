@@ -18,6 +18,8 @@
   withMerlin ? true,
   withAstDependentLibs ? true,
   withJsoo ? true,
+  # Test-only sources for make jsoo-test; not needed to build the compiler.
+  withJsooTestSources ? pkgs.lib.inNixShell,
 }:
 let
   inherit (pkgs) lib fetchpatch;
@@ -280,12 +282,20 @@ let
     hash = "sha256-9k4rbB1G4894F95XPMQsiVgwZKJ2XcaDUaEviArHG3s=";
   };
 
-  sexplib0Src = pkgs.fetchFromGitHub {
-    name = "sexplib0-v0.17.0-source";
-    owner = "janestreet";
-    repo = "sexplib0";
-    rev = "v0.17.0";
-    hash = "sha256-Q53wEhRet/Ou9Kr0TZNTyXT5ASQpsVLPz5n/I+Fhy+g=";
+  # sexp_type has no releases; pin a commit.
+  sexpTypeSrc = pkgs.applyPatches {
+    name = "sexp_type-6d16004-source";
+    src = pkgs.fetchFromGitHub {
+      owner = "janestreet";
+      repo = "sexp_type";
+      rev = "6d16004ed65cbed153c130d4beba1c5655146152";
+      hash = "sha256-Iq8AosBQGfl78pBr4IVRpDBMH6XDHuNvUUjeN/WgImE=";
+    };
+    # Only the sexp_type library is needed; sexp_type.grammar depends on
+    # basement, which is not available here.
+    postPatch = ''
+      rm -r grammar_type
+    '';
   };
 
   stdlibShimsSrc = pkgs.fetchzip {
@@ -418,7 +428,7 @@ let
   # Read by the external/ast-dependent-libs/deps/* rules of the Makefile.
   ppxlibSources = {
     PPXLIB_PPX_DERIVERS_SRC = ppxDeriversSrc;
-    PPXLIB_SEXPLIB0_SRC = sexplib0Src;
+    PPXLIB_SEXP_TYPE_SRC = sexpTypeSrc;
     PPXLIB_STDLIB_SHIMS_SRC = stdlibShimsSrc;
   };
 
@@ -445,6 +455,7 @@ let
       installTarget ? null,
       sources,
       extraNativeBuildInputs ? [ ],
+      postInstall ? "",
     }:
     oxcaml:
     stdenv.mkDerivation (
@@ -471,6 +482,8 @@ let
         ];
 
         buildFlags = [ buildTarget ];
+
+        inherit postInstall;
       }
       // lib.optionalAttrs (gitRev != null) { JSOO_GIT_VERSION = "ox-${gitRev}"; }
       // (
@@ -495,7 +508,14 @@ let
   jsooTools = [
     pkgs.nodejs
     pkgs.binaryen
+    pkgs.makeWrapper
   ];
+
+  # wasm_of_ocaml runs the Binaryen tools from PATH.
+  wrapWasmOfOcaml = ''
+    wrapProgram "$out/bin/wasm_of_ocaml" \
+      --prefix PATH : ${lib.makeBinPath [ pkgs.binaryen ]}
+  '';
 
   mkPpxlibLibs = mkAstDependentLibsBuild {
     pname = "oxcaml-ppxlib";
@@ -510,6 +530,7 @@ let
     installTarget = "jsoo-install";
     sources = ppxlibSources // jsooSources;
     extraNativeBuildInputs = [ menhir ] ++ jsooTools;
+    postInstall = wrapWasmOfOcaml;
   };
 
   mkJsooTest = mkAstDependentLibsBuild {
@@ -671,9 +692,15 @@ stdenv.mkDerivation (
     '';
 
     postInstall =
-      # Get rid of unused artifacts
       ''
         $out/bin/generate_cached_generic_functions.exe $out/lib/ocaml/cached-generic-functions
+      ''
+      + lib.optionalString withJsoo ''
+        make jsoo-install-bin OXCAML_INSTALL="$out" AST_DEPENDENT_LIBS_PREFIX="$out"
+        ${wrapWasmOfOcaml}
+      ''
+      # Get rid of unused artifacts
+      + ''
         rm -f $out/bin/dumpobj.byte
         rm -f $out/bin/extract_externals.byte
         rm -f $out/bin/generate_cached_generic_functions.exe
@@ -749,6 +776,8 @@ stdenv.mkDerivation (
         ;
     };
   }
+  // lib.optionalAttrs (withJsoo && gitRev != null) { JSOO_GIT_VERSION = "ox-${gitRev}"; }
   // lib.optionalAttrs withAstDependentLibs' ppxlibSources
-  // lib.optionalAttrs withJsoo (jsooSources // jsooTestSources)
+  // lib.optionalAttrs withJsoo jsooSources
+  // lib.optionalAttrs (withJsoo && withJsooTestSources) jsooTestSources
 )
