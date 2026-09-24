@@ -382,8 +382,8 @@ compare_equal:
   neg   %rbx
   subq  %rdi, %rbx
   addq  %rbx, %rax
-  leaq  1(%rax,%rax), %rax
-  cmpq  $1, %rax
+  salq  $1, %rax
+  testq %rax, %rax
   sete  %al
   movzbq %al, %rax
   leaq  1(%rax,%rax), %rax

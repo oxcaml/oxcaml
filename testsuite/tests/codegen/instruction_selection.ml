@@ -190,8 +190,7 @@ branch_and_return:
   xorl  %eax, %eax
   cmpq  $1, %rbx
   setne %al
-  leaq  1(%rax,%rax), %rax
-  cmpq  $3, %rax
+  cmpq  $1, %rax
   jne   .L0
   movq  %rbx, %rax
   ret
@@ -236,8 +235,7 @@ constant_folding:
   cmpq  %rax, %rax
   jl    .L0
   subq  %rax, %rax
-  incq  %rax
-  cmpq  $1, %rax
+  testq %rax, %rax
   jne   .L1
 .L0:
   movl  $7, %eax
