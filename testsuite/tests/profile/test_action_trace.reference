@@ -1,0 +1,15 @@
+[{"tid":0,"pid":0,"name":"instant","cat":"test","ts":1746546737170594}
+,{"args":{"nested":{"values":[null,true,false,1.25],"\"key\"":"\b\t\n\f\r\\\"\u0000\u001f","utf8":"é��"}},"tid":0,"pid":0,"name":"span","cat":"test","ts":1746546737170595,"dur":1}
+]
+[
+]
+[{"tid":0,"pid":0,"name":"exception","cat":"test","ts":0}
+]
+[{"args":{"profile":[{"name":"file=example.ml","calls":9,"time":<time>,"alloc":<alloc>,"top-heap":<top-heap>,"absolute-top-heap":<absolute-top-heap>,"counters":{},"children":[{"name":"repeated","calls":1,"time":<time>,"alloc":<alloc>,"top-heap":<top-heap>,"absolute-top-heap":<absolute-top-heap>,"counters":{"nodes":2},"children":[]},{"name":"repeated","calls":1,"time":<time>,"alloc":<alloc>,"top-heap":<top-heap>,"absolute-top-heap":<absolute-top-heap>,"counters":{"nodes":3},"children":[]},{"name":"accumulated","calls":2,"time":<time>,"alloc":<alloc>,"top-heap":<top-heap>,"absolute-top-heap":<absolute-top-heap>,"counters":{"nodes":12},"children":[]},{"name":"other","calls":5,"time":<time>,"alloc":<alloc>,"top-heap":<top-heap>,"absolute-top-heap":<absolute-top-heap>,"counters":{},"children":[]}]},{"name":"other","calls":1,"time":<time>,"alloc":<alloc>,"top-heap":<top-heap>,"absolute-top-heap":<absolute-top-heap>,"counters":{},"children":[]}]},"tid":0,"pid":0,"name":"compiler","cat":"compiler","ts":1700000000000000,"dur":2000000}
+]
+[{"args":{"profile":[{"name":"pass","calls":1,"time":<time>,"alloc":<alloc>,"top-heap":<top-heap>,"absolute-top-heap":<absolute-top-heap>,"counters":{},"children":[]},{"name":"other","calls":12,"time":<time>,"alloc":<alloc>,"top-heap":<top-heap>,"absolute-top-heap":<absolute-top-heap>,"counters":{},"children":[]}]},"tid":0,"pid":0,"name":"failed","cat":"compiler","ts":1700000000000000,"dur":2000000}
+]
+[{"args":{"profile":[{"name":"other","calls":14,"time":<time>,"alloc":<alloc>,"top-heap":<top-heap>,"absolute-top-heap":<absolute-top-heap>,"counters":{},"children":[]}]},"tid":0,"pid":0,"name":"empty-profile","cat":"compiler","ts":1700000000000000,"dur":2000000}
+]
+[{"args":{"profile":[{"name":"cheap","calls":0,"time":<time>,"alloc":<alloc>,"top-heap":<top-heap>,"absolute-top-heap":<absolute-top-heap>,"counters":{},"children":[{"name":"child","calls":0,"time":<time>,"alloc":<alloc>,"top-heap":<top-heap>,"absolute-top-heap":<absolute-top-heap>,"counters":{},"children":[]},{"name":"other","calls":0,"time":<time>,"alloc":<alloc>,"top-heap":<top-heap>,"absolute-top-heap":<absolute-top-heap>,"counters":{},"children":[]}]},{"name":"other","calls":15,"time":<time>,"alloc":<alloc>,"top-heap":<top-heap>,"absolute-top-heap":<absolute-top-heap>,"counters":{},"children":[]}]},"tid":0,"pid":0,"name":"cheap-clock","cat":"compiler","ts":1700000000000000,"dur":2000000}
+]
