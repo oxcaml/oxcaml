@@ -1,6 +1,6 @@
 open! Import
 
-(* Internally to Jane Street, shadow the auto-generated [pexp_function] binding. The
+(* In OxCaml, shadow the auto-generated [pexp_function] binding. The
    auto-generated version exposes our compiler's [function_constraint] record, which
    includes mode annotations; we only want to export a version with upstream ppxlib's
    signature. Ppxes that need modes should use [Ppxlib_jane]'s builders. *)
