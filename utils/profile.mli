@@ -37,20 +37,27 @@ end
 val reset : unit -> unit
 (** erase all recorded profile information *)
 
-val record_call : ?accumulate:bool -> string -> (unit -> 'a) -> 'a
-(** [record_call pass f] calls [f] and records its profile information. *)
+val record_call :
+  ?accumulate:bool -> ?debug_only:bool -> string -> (unit -> 'a) -> 'a
+(** [record_call pass f] calls [f] and records its profile information.
+
+    If [debug_only] is [true], no profile information is recorded for [pass]
+    or for any pass recorded while [f] is running. *)
 
 val record_call_with_counters :
-  ?accumulate:bool -> counter_f:('a -> Counters.t) -> string -> (unit -> 'a) -> 'a
+  ?accumulate:bool -> ?debug_only:bool -> counter_f:('a -> Counters.t) ->
+  string -> (unit -> 'a) -> 'a
 (** [record_call_with_counters counter_f pass f] calls [f] and records its profile
     information (including counter information given by calling [counter_f] on the
     result of calling [f]) *)
 
-val record : ?accumulate:bool -> string -> ('a -> 'b) -> 'a -> 'b
+val record :
+  ?accumulate:bool -> ?debug_only:bool -> string -> ('a -> 'b) -> 'a -> 'b
 (** [record pass f arg] records the profile information of [f arg] *)
 
 val record_with_counters :
-  ?accumulate:bool -> counter_f:('b -> Counters.t) -> string -> ('a -> 'b) -> 'a -> 'b
+  ?accumulate:bool -> ?debug_only:bool -> counter_f:('b -> Counters.t) ->
+  string -> ('a -> 'b) -> 'a -> 'b
 (** [record_with_counters counter_f pass f arg] records the profile information of [f arg]
   and records counter information given by calling [counter_f] on the result of [f arg] *)
 

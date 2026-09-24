@@ -524,12 +524,15 @@ let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
   let module Cfg_selection = Cfg_selectgen.Make (Cfg_selection) in
   Reg.clear_relocatable_regs ();
   fd_cmm
-  ++ Profile.record ~accumulate:true "cmm_invariants" (cmm_invariants ppf_dump)
+  ++ Profile.record ~accumulate:true ~debug_only:true "cmm_invariants"
+       (cmm_invariants ppf_dump)
   ++ (fun (fd_cmm : Cmm.fundecl) ->
   Cfg_selection.emit_fundecl ~future_funcnames:funcnames fd_cmm
   ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After selection")
-  ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)
-  ++ Profile.record ~accumulate:true "cfg" (fun cfg_with_layout ->
+  ++ Profile.record ~accumulate:true ~debug_only:true "cfg_invariants"
+       (cfg_invariants ppf_dump)
+  ++ Profile.record ~accumulate:true ~debug_only:true "cfg"
+       (fun cfg_with_layout ->
       if !Clflags.llvm_backend
       then compile_via_llvm ~ppf_dump ~funcnames cfg_with_layout
       else compile_via_linear ~ppf_dump ~funcnames fd_cmm cfg_with_layout)

@@ -113,16 +113,24 @@ type hierarchy =
   | E of (string, Measure_diff.t * hierarchy) Hashtbl.t
 [@@unboxed]
 
+(* Set while inside a pass recorded with [~debug_only:true]; while set, no
+   profile information is recorded for that pass or anything beneath it. *)
+let suppressed = ref false
+
 let create () = E (Hashtbl.create 2)
 let hierarchy = ref (create ())
-let reset () = hierarchy := create ()
+let reset () = hierarchy := create (); suppressed := false
 
 (* Baseline for the total, and so for the toplevel "other" row. *)
 let startup_measure = ref Measure.zero
 
-let record_call_internal ?(accumulate = false) ?counter_f name f =
-  if !Clflags.profile_columns = [] && not (Action_trace.enabled ())
-  then f () else
+let record_call_internal ?(accumulate = false) ?(debug_only = false) ?counter_f name f =
+  if !Clflags.profile_columns = [] && not (Action_trace.enabled ()) || !suppressed
+  then f ()
+  else if debug_only then begin
+    suppressed := true;
+    Misc.try_finally f ~always:(fun () -> suppressed := false)
+  end else
   let E prev_hierarchy = !hierarchy in
   let start_measure = Measure.create () in
   let this_measure_diff, this_table =
@@ -160,13 +168,14 @@ let record_call_internal ?(accumulate = false) ?counter_f name f =
 
 let record_call = record_call_internal ?counter_f:None
 
-let record_call_with_counters ?accumulate ~counter_f =
-  record_call_internal ?accumulate ~counter_f
+let record_call_with_counters ?accumulate ?debug_only ~counter_f =
+  record_call_internal ?accumulate ?debug_only ~counter_f
 
-let record ?accumulate pass f x = record_call ?accumulate pass (fun () -> f x)
+let record ?accumulate ?debug_only pass f x =
+  record_call ?accumulate ?debug_only pass (fun () -> f x)
 
-let record_with_counters ?accumulate ~counter_f pass f x =
-  record_call_internal ?accumulate ~counter_f pass (fun () -> f x)
+let record_with_counters ?accumulate ?debug_only ~counter_f pass f x =
+  record_call_internal ?accumulate ?debug_only ~counter_f pass (fun () -> f x)
 
 let file_prefix = "file="
 
