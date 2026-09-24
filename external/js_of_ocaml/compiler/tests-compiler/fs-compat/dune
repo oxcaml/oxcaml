@@ -1,0 +1,15 @@
+(rule
+ (targets runtime.js)
+ (action
+  (run %{bin:js_of_ocaml} build-runtime -o %{targets})))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (<> %{profile} quickjs))
+ (action
+  (run
+   %{bin:node}
+   %{dep:fs_compat.js}
+   %{dep:../../tests-full/fs.output.js}
+   %{dep:runtime.js})))

@@ -360,6 +360,7 @@ function caml_ba_map_file_bytecode(argv, _argn) {
 //Provides: jsoo_create_file_extern
 function jsoo_create_file_extern(name, content) {
   if (globalThis.jsoo_create_file) globalThis.jsoo_create_file(name, content);
+  else if (globalThis.caml_create_file) globalThis.caml_create_file(name, content);
   else {
     if (!globalThis.jsoo_fs_tmp) globalThis.jsoo_fs_tmp = [];
     globalThis.jsoo_fs_tmp.push({ name: name, content: content });
@@ -370,14 +371,16 @@ function jsoo_create_file_extern(name, content) {
 //Provides: caml_fs_init
 //Requires: jsoo_create_file
 function caml_fs_init() {
-  var tmp = globalThis.jsoo_fs_tmp;
+  var tmp = [].concat(globalThis.jsoo_fs_tmp || [], globalThis.caml_fs_tmp || []);
   if (tmp) {
     for (var i = 0; i < tmp.length; i++) {
       jsoo_create_file(tmp[i].name, tmp[i].content);
     }
   }
   globalThis.jsoo_create_file = jsoo_create_file;
+  globalThis.caml_create_file = jsoo_create_file;
   globalThis.jsoo_fs_tmp = [];
+  globalThis.caml_fs_tmp = [];
   return 0;
 }
 
