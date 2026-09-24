@@ -126,11 +126,19 @@ jobs:
         sed -i -e '/ocamlformat\|merlin\|ocaml-lsp-server/d' oxcaml-dev.opam
         opam pin add --yes oxcaml-dev .
 
+    - name: Set up the OxCaml bootstrap compiler
+      id: bootstrap
+      if: env.MERLIN_EMERGENCY_SKIP != 'y' && steps.cache.outputs.cache-hit != 'true'
+      uses: ./oxcaml/.github/actions/setup-bootstrap
+
     - name: Configure, build, and install OxCaml
       if: env.MERLIN_EMERGENCY_SKIP != 'y' && steps.cache.outputs.cache-hit != 'true'
       working-directory: flambda-backend
+      env:
+        BOOTSTRAP_BIN: ${{ steps.bootstrap.outputs.bin }}
       run: |
         eval $(opam env)
+        export PATH="$BOOTSTRAP_BIN:$PATH"
         autoconf
         ./configure \
           --prefix=$GITHUB_WORKSPACE/flambda-backend/_install \

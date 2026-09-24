@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Keep upstream formatting for upstream syntax. The OxCaml fork understands
+# modes and layouts, but is based on an older upstream formatting style.
+diagnostics=$(mktemp)
+trap 'rm -f "$diagnostics"' EXIT
+if "$UPSTREAM_OCAMLFORMAT" "$@" 2> "$diagnostics"; then
+  cat "$diagnostics" >&2
+else
+  status=$?
+  if grep -qi 'syntax error' "$diagnostics"; then
+    "$OXCAML_OCAMLFORMAT" --no-version-check "$@"
+  else
+    cat "$diagnostics" >&2
+    exit "$status"
+  fi
+fi

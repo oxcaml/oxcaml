@@ -276,6 +276,10 @@ let
     # `myStdenv` that we want to keep, such as `as` and `objcopy`
     pkgs.linkFarm "gfortran-only" { "bin/gfortran" = lib.getExe pkgs.gfortran; };
 
+  # The pinned bootstrap compiler invokes gcc even in the clang ASan build.
+  # Expose only that executable, without replacing the stdenv's C toolchain.
+  bootstrapGcc = pkgs.linkFarm "bootstrap-gcc" { "bin/gcc" = lib.getExe pkgs.gcc; };
+
   makeLlvm =
     {
       pname,
@@ -390,6 +394,7 @@ stdenv.mkDerivation {
     pkgs.removeReferencesTo
   ]
   ++ (if pkgs.stdenv.isDarwin then [ pkgs.cctools ] else [ pkgs.libtool ]) # cctools provides Apple libtool on macOS
+  ++ lib.optional addressSanitizer bootstrapGcc
   ++ lib.optional oxcamlLldb pkgs.python312
   ++ lib.optionals withMerlin merlinDev.devNativeBuildInputs;
 

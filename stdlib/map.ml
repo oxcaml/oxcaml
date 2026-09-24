@@ -389,25 +389,31 @@ module Make(Ord: OrderedType) = struct
       | Some d -> join t1 v d t2
       | None -> concat t1 t2
 
-    let rec split x = function
+    let rec split_unboxed x = function
         Empty ->
-          (Empty, None, Empty)
+          #(Empty, None, Empty)
       | Node {l; v; d; r} ->
           let c = Ord.compare x v in
-          if c = 0 then (l, Some d, r)
+          if c = 0 then #(l, Some d, r)
           else if c < 0 then
-            let (ll, pres, rl) = split x l in (ll, pres, join rl v d r)
+            let #(ll, pres, rl) = split_unboxed x l in
+            #(ll, pres, join rl v d r)
           else
-            let (lr, pres, rr) = split x r in (join l v d lr, pres, rr)
+            let #(lr, pres, rr) = split_unboxed x r in
+            #(join l v d lr, pres, rr)
+
+    let split x m =
+      let #(l, pres, r) = split_unboxed x m in
+      (l, pres, r)
 
     let rec merge f s1 s2 =
       match (s1, s2) with
         (Empty, Empty) -> Empty
       | (Node {l=l1; v=v1; d=d1; r=r1; h=h1}, _) when h1 >= height s2 ->
-          let (l2, d2, r2) = split v1 s2 in
+          let #(l2, d2, r2) = split_unboxed v1 s2 in
           concat_or_join (merge f l1 l2) v1 (f v1 (Some d1) d2) (merge f r1 r2)
       | (_, Node {l=l2; v=v2; d=d2; r=r2}) ->
-          let (l1, d1, r1) = split v2 s1 in
+          let #(l1, d1, r1) = split_unboxed v2 s1 in
           concat_or_join (merge f l1 l2) v2 (f v2 d1 (Some d2)) (merge f r1 r2)
       | _ ->
           assert false
@@ -418,13 +424,13 @@ module Make(Ord: OrderedType) = struct
       | (Node {l=l1; v=v1; d=d1; r=r1; h=h1},
          Node {l=l2; v=v2; d=d2; r=r2; h=h2}) ->
           if h1 >= h2 then
-            let (l2, d2, r2) = split v1 s2 in
+            let #(l2, d2, r2) = split_unboxed v1 s2 in
             let l = union f l1 l2 and r = union f r1 r2 in
             match d2 with
             | None -> join l v1 d1 r
             | Some d2 -> concat_or_join l v1 (f v1 d1 d2) r
           else
-            let (l1, d1, r1) = split v2 s1 in
+            let #(l1, d1, r1) = split_unboxed v2 s1 in
             let l = union f l1 l2 and r = union f r1 r2 in
             match d1 with
             | None -> join l v2 d2 r
@@ -865,25 +871,31 @@ module MakePortable(Ord: sig @@ portable include OrderedType end) = struct
       | Some d -> join t1 v d t2
       | None -> concat t1 t2
 
-    let rec split x = function
+    let rec split_unboxed x = function
         Empty ->
-          (Empty, None, Empty)
+          #(Empty, None, Empty)
       | Node {l; v; d; r} ->
           let c = Ord.compare x v in
-          if c = 0 then (l, Some d, r)
+          if c = 0 then #(l, Some d, r)
           else if c < 0 then
-            let (ll, pres, rl) = split x l in (ll, pres, join rl v d r)
+            let #(ll, pres, rl) = split_unboxed x l in
+            #(ll, pres, join rl v d r)
           else
-            let (lr, pres, rr) = split x r in (join l v d lr, pres, rr)
+            let #(lr, pres, rr) = split_unboxed x r in
+            #(join l v d lr, pres, rr)
+
+    let split x m =
+      let #(l, pres, r) = split_unboxed x m in
+      (l, pres, r)
 
     let rec merge f s1 s2 =
       match (s1, s2) with
         (Empty, Empty) -> Empty
       | (Node {l=l1; v=v1; d=d1; r=r1; h=h1}, _) when h1 >= height s2 ->
-          let (l2, d2, r2) = split v1 s2 in
+          let #(l2, d2, r2) = split_unboxed v1 s2 in
           concat_or_join (merge f l1 l2) v1 (f v1 (Some d1) d2) (merge f r1 r2)
       | (_, Node {l=l2; v=v2; d=d2; r=r2}) ->
-          let (l1, d1, r1) = split v2 s1 in
+          let #(l1, d1, r1) = split_unboxed v2 s1 in
           concat_or_join (merge f l1 l2) v2 (f v2 d1 (Some d2)) (merge f r1 r2)
       | _ ->
           assert false
@@ -894,13 +906,13 @@ module MakePortable(Ord: sig @@ portable include OrderedType end) = struct
       | (Node {l=l1; v=v1; d=d1; r=r1; h=h1},
          Node {l=l2; v=v2; d=d2; r=r2; h=h2}) ->
           if h1 >= h2 then
-            let (l2, d2, r2) = split v1 s2 in
+            let #(l2, d2, r2) = split_unboxed v1 s2 in
             let l = union f l1 l2 and r = union f r1 r2 in
             match d2 with
             | None -> join l v1 d1 r
             | Some d2 -> concat_or_join l v1 (f v1 d1 d2) r
           else
-            let (l1, d1, r1) = split v2 s1 in
+            let #(l1, d1, r1) = split_unboxed v2 s1 in
             let l = union f l1 l2 and r = union f r1 r2 in
             match d1 with
             | None -> join l v2 d2 r
