@@ -25,34 +25,53 @@ module UK = C.Update_kind
 module MBS = Flambda_kind.Mixed_block_shape
 module Tags = C.Unboxed_or_untagged_array_tags
 
-let static_field res field field_kind =
+(* A [Var] field of a static block whose delayed Cmm binding is a constant
+   symbol or immediate can be emitted directly in the data section, saving the
+   [caml_initialize] that would otherwise be needed at runtime. This matters in
+   Classic mode, where the fields of the module block are the parameters of the
+   (inlined) return continuation and so are always variables, even when bound to
+   constants. *)
+let constant_static_field env var (field_kind : Flambda_kind.t) =
+  match field_kind with
+  | Value -> (
+    match[@ocaml.warning "-4"] To_cmm_env.find_pure_bound_cmm_expr env var with
+    | Some (Cconst_symbol (sym, _dbg)) -> Some (C.symbol_address sym)
+    | Some (Cconst_int (i, _dbg)) -> Some (C.cint (Nativeint.of_int i))
+    | Some (Cconst_natint (i, _dbg)) -> Some (C.cint i)
+    | Some _ | None -> None)
+  | Naked_number _ | Region | Rec_info -> None
+
+let static_field env res field field_kind =
   Simple.pattern_match'
     (Simple.With_debuginfo.simple field)
-    ~var:(fun _var ~coercion:_ ->
-      match (field_kind : Flambda_kind.t) with
-      | Naked_number Naked_vec128 -> [C.cvec128 { word0 = 1L; word1 = 1L }]
-      | Naked_number Naked_vec256 ->
-        [C.cvec256 { word0 = 1L; word1 = 1L; word2 = 1L; word3 = 1L }]
-      | Naked_number Naked_vec512 ->
-        [ C.cvec512
-            { word0 = 1L;
-              word1 = 1L;
-              word2 = 1L;
-              word3 = 1L;
-              word4 = 1L;
-              word5 = 1L;
-              word6 = 1L;
-              word7 = 1L
-            } ]
-      | Naked_number
-          ( Naked_immediate | Naked_float32 | Naked_float | Naked_int8
-          | Naked_int16 | Naked_int32 | Naked_int64 | Naked_nativeint
-          | Naked_mask )
-      | Value ->
-        [C.cint 1n]
-      | Region | Rec_info ->
-        Misc.fatal_errorf "Unexpected static field kind %a" Flambda_kind.print
-          field_kind)
+    ~var:(fun var ~coercion:_ ->
+      match constant_static_field env var field_kind with
+      | Some data_item -> [data_item]
+      | None -> (
+        match (field_kind : Flambda_kind.t) with
+        | Naked_number Naked_vec128 -> [C.cvec128 { word0 = 1L; word1 = 1L }]
+        | Naked_number Naked_vec256 ->
+          [C.cvec256 { word0 = 1L; word1 = 1L; word2 = 1L; word3 = 1L }]
+        | Naked_number Naked_vec512 ->
+          [ C.cvec512
+              { word0 = 1L;
+                word1 = 1L;
+                word2 = 1L;
+                word3 = 1L;
+                word4 = 1L;
+                word5 = 1L;
+                word6 = 1L;
+                word7 = 1L
+              } ]
+        | Naked_number
+            ( Naked_immediate | Naked_float32 | Naked_float | Naked_int8
+            | Naked_int16 | Naked_int32 | Naked_int64 | Naked_nativeint
+            | Naked_mask )
+        | Value ->
+          [C.cint 1n]
+        | Region | Rec_info ->
+          Misc.fatal_errorf "Unexpected static field kind %a" Flambda_kind.print
+            field_kind))
     ~symbol:(fun sym ~coercion:_ -> [C.symbol_address (R.symbol res sym)])
     ~const:C.const_static
 
@@ -61,22 +80,29 @@ let or_variable f default v cont =
   | Const c -> f c cont
   | Var _ -> f default cont
 
-let update_field symb env res acc i update_kind field =
+let update_field symb env res acc i update_kind field_kind field =
   Simple.pattern_match'
     (Simple.With_debuginfo.simple field)
     ~var:(fun var ~coercion:_ ->
-      (* CR mshinwell/mslater: It would be nice to know if [var] is an
-         immediate. *)
-      let dbg = Simple.With_debuginfo.dbg field in
-      C.make_update env res dbg update_kind ~symbol:(C.symbol ~dbg symb) var
-        ~index:i ~prev_updates:acc)
+      match constant_static_field env var field_kind with
+      | Some _ ->
+        (* Already emitted statically by [static_field]. *)
+        env, res, acc
+      | None ->
+        (* CR mshinwell/mslater: It would be nice to know if [var] is an
+           immediate. *)
+        let dbg = Simple.With_debuginfo.dbg field in
+        C.make_update env res dbg update_kind ~symbol:(C.symbol ~dbg symb) var
+          ~index:i ~prev_updates:acc)
     ~symbol:(fun _sym ~coercion:_ -> env, res, acc)
     ~const:(fun _cst -> env, res, acc)
 
 let rec static_block_updates symb env res acc i = function
   | [] -> env, res, acc
-  | (simple, update_kind) :: r ->
-    let env, res, acc = update_field symb env res acc i update_kind simple in
+  | (simple, update_kind, field_kind) :: r ->
+    let env, res, acc =
+      update_field symb env res acc i update_kind field_kind simple
+    in
     static_block_updates symb env res acc
       (i + UK.field_size_in_words update_kind)
       r
@@ -378,7 +404,7 @@ let static_const0 env res ~updates (bound_static : Bound_static.Pattern.t)
             ~scannable_prefix_len:(MBS.value_prefix_size shape) )
     in
     let static_fields =
-      Misc.Stdlib.List.concat_map2 (static_field res) fields field_kinds
+      Misc.Stdlib.List.concat_map2 (static_field env res) fields field_kinds
     in
     let block = C.emit_block sym header static_fields in
     let update_kinds =
@@ -409,7 +435,9 @@ let static_const0 env res ~updates (bound_static : Bound_static.Pattern.t)
     in
     let env, res, updates =
       static_block_updates sym env res updates 0
-        (List.combine fields update_kinds)
+        (Misc.Stdlib.List.map3
+           (fun field update_kind field_kind -> field, update_kind, field_kind)
+           fields update_kinds field_kinds)
     in
     env, R.set_data res block, updates
   | Set_of_closures closure_symbols, Set_of_closures set_of_closures ->
@@ -590,13 +618,15 @@ let static_const0 env res ~updates (bound_static : Bound_static.Pattern.t)
       List.init (List.length fields) (fun _ -> Flambda_kind.value)
     in
     let static_fields =
-      Misc.Stdlib.List.concat_map2 (static_field res) fields field_kinds
+      Misc.Stdlib.List.concat_map2 (static_field env res) fields field_kinds
     in
     let block = C.emit_block sym header static_fields in
     let update_kinds = List.map (fun _ -> UK.pointers) fields in
     let env, res, updates =
       static_block_updates sym env res updates 0
-        (List.combine fields update_kinds)
+        (Misc.Stdlib.List.map3
+           (fun field update_kind field_kind -> field, update_kind, field_kind)
+           fields update_kinds field_kinds)
     in
     env, R.set_data res block, updates
   | ( Block_like s,
