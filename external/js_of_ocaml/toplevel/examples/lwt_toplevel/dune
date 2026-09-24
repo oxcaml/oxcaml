@@ -154,7 +154,7 @@
    graphics
    str
    dynlink
-   js_of_ocaml-compiler.runtime
+   js_of_ocaml-runtime
    js_of_ocaml-lwt.graphics
    js_of_ocaml-ppx.as-lib
    js_of_ocaml.deriving

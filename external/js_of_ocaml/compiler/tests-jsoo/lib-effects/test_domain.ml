@@ -1,6 +1,9 @@
 [@@@ocaml.alert "-unsafe_parallelism-unsafe_multidomain-do_not_spawn_domains"]
 
-let%expect_test _ =
+(* The domain tests are not run natively: OxCaml is usually built without
+   multidomain support, and Domain.spawn then fails. *)
+
+let%expect_test ("Domain.spawn" [@when not native]) =
   let d = Domain.spawn (fun () -> 1 + 2) in
   print_int (Domain.join d);
   [%expect {| 3 |}];
@@ -43,7 +46,7 @@ let%expect_test _ =
       if Random.int 2 < 1 then print_int (1 + f ()) else print_int (f () + 1));
   [%expect {| 43 |}]
 
-let%expect_test "domain body raising" =
+let%expect_test ("domain body raising" [@when not native]) =
   (match
      let d = Domain.spawn (fun () -> raise Not_found) in
      Domain.join d

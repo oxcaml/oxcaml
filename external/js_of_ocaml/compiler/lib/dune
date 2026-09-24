@@ -11,7 +11,7 @@
  (flags
   (:standard -w -7-37 -safe-string))
  (preprocess
-  (pps ppx_optcomp_light sedlex.ppx)))
+  (pps ppx_optcomp_light -no-check sedlex.ppx)))
 
 (ocamllex annot_lexer)
 

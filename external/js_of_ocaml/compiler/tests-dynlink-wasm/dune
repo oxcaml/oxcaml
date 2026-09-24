@@ -187,7 +187,7 @@
   dynlink
   plugin_dep
   wasm_of_ocaml-compiler.dynlink
-  js_of_ocaml-compiler.runtime)
+  js_of_ocaml-runtime)
  (link_flags
   (:standard -linkall))
  (modes byte))

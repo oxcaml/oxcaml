@@ -3,7 +3,7 @@ open Stdlib
 open StdLabels
 
 module Sexp = struct
-  include Sexplib0.Sexp
+  include Sexp_type.Sexp
 
   let must_escape_char = function
     | 'A' .. 'Z' | 'a' .. 'z' | '0' .. '9' | '+' | '-' | '.' | '_' -> false
