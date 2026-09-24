@@ -415,6 +415,8 @@ let check_variance_extension env decl ext rloc =
 let compute_decl env ~check decl req =
   compute_variance_decl env ~check decl (req, decl.type_loc)
 
+let () = Ctype.compute_decl_variance := compute_decl
+
 let check_decl env check decl req =
   ignore (compute_variance_decl env ~check decl (req, decl.type_loc))
 
