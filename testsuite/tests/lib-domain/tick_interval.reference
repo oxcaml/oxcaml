@@ -6,9 +6,9 @@ acquiring tick at 50μs
 Global (effective) interval: 50 μs(expected 50 μs)
 acquiring second tick at 100μs
 Global (effective) interval: 50 μs(expected 50 μs)
+releasing second 100μs tick
+Global (effective) interval: 50 μs(expected 50 μs)
 Releasing 50μs tick
-Global (effective) interval: 100 μs(expected 100 μs)
-releasing 100μs tick
 Global (effective) interval: 100 μs(expected 100 μs)
 releasing 100μs tick
 Global (effective) interval: none(expected none)

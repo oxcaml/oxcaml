@@ -513,10 +513,6 @@ module Tick = struct
       else This (Inner.min_binding inner' |> fst)
   end
 
-  (* NOTE: st_stubs.c relies on this being an int (and in particular not
-     scanned) *)
-  type t = int
-
   (* One registry per recommended_domain_count.
 
      If more than recommended_domain_count domains are spawned (which in
@@ -558,9 +554,10 @@ module Tick = struct
       | Null -> set_tick_interval_usec 0
       | This interval -> set_tick_interval_usec interval)
 
-  let with_ ~interval_usec f =
+  (* [f] being [unyielding] implies it cannot switch domains. *)
+  let with_ ~interval_usec (f @ unyielding) = exclave_
     let t = acquire ~interval_usec in
-    match f (borrow_ t) with
+    match f () with
     | res ->
       release t;
       res

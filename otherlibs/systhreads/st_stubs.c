@@ -800,6 +800,26 @@ static void thread_init_current(caml_thread_t th)
   th->signal_stack = caml_init_signal_stack(&th->signal_stack_size);
 }
 
+CAMLprim value caml_thread_acquire_tick(value interval_usec)
+{
+  CAMLparam1(interval_usec);
+  const value* acquire_tick = caml_named_value("Domain.Tick.acquire");
+  if (!acquire_tick) {
+    caml_fatal_error("named value Domain.Tick.acquire not found");
+  }
+  CAMLreturn(caml_callback(*acquire_tick, interval_usec));
+}
+
+CAMLprim value caml_thread_release_tick(value tick)
+{
+  CAMLparam1(tick);
+  const value* release_tick = caml_named_value("Domain.Tick.release");
+  if (!release_tick) {
+    caml_fatal_error("named value Domain.Tick.release not found");
+  }
+  CAMLreturn(caml_callback(*release_tick, tick));
+}
+
 /* Create a thread */
 
 /* the thread lock is not held when entering */
