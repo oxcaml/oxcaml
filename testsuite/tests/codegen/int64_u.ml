@@ -529,16 +529,15 @@ let unsigned_compare x y = Int64_u.unsigned_compare x y
 [%%expect_asm X86_64{|
 unsigned_compare:
   movabsq $-9223372036854775808, %rdi
-  subq  %rdi, %rbx
-  movabsq $-9223372036854775808, %rsi
-  movq  %rax, %rdi
-  subq  %rsi, %rdi
-  movq  $-1, %rsi
+  addq  %rbx, %rdi
+  movabsq $-9223372036854775808, %rbx
+  leaq  (%rax,%rbx), %rsi
+  movq  $-1, %rbx
   xorl  %eax, %eax
-  cmpq  %rbx, %rdi
+  cmpq  %rdi, %rsi
   setg  %al
-  cmovge %rax, %rsi
-  leaq  1(%rsi,%rsi), %rax
+  cmovge %rax, %rbx
+  leaq  1(%rbx,%rbx), %rax
   ret
 |}]
 
@@ -630,77 +629,62 @@ bytes_get_int64_bswap:
 
 (* Nested additions of constants that do not fit a host [int] *)
 
-let add_add_2_62_bad x =
+let add_add_2_62 x =
   Int64_u.add (Int64_u.add x #0x4000000000000000L) #0x4000000000000000L
 [%%expect_asm X86_64{|
-add_add_2_62_bad:
-  movabsq $4611686018427387904, %rbx
-  movabsq $4611686018427387904, %rdi
-  addq  %rdi, %rax
+add_add_2_62:
+  movabsq $-9223372036854775808, %rbx
   addq  %rbx, %rax
   ret
 |}]
 
-let add_add_2_62_minus_1_bad x =
+let add_add_2_62_minus_1 x =
   Int64_u.add (Int64_u.add x #0x3fffffffffffffffL) #0x3fffffffffffffffL
 [%%expect_asm X86_64{|
-add_add_2_62_minus_1_bad:
-  movabsq $4611686018427387903, %rbx
-  movabsq $4611686018427387903, %rdi
-  addq  %rdi, %rax
+add_add_2_62_minus_1:
+  movabsq $9223372036854775806, %rbx
   addq  %rbx, %rax
   ret
 |}]
 
-let add_add_max_int_bad x =
+let add_add_max_int x =
   Int64_u.add (Int64_u.add x #0x7fffffffffffffffL) #0x7fffffffffffffffL
 [%%expect_asm X86_64{|
-add_add_max_int_bad:
-  movabsq $9223372036854775807, %rbx
-  movabsq $9223372036854775807, %rdi
-  addq  %rdi, %rax
-  addq  %rbx, %rax
+add_add_max_int:
+  addq  $-2, %rax
   ret
 |}]
 
-let add_sub_max_int_bad x =
+let add_sub_max_int x =
   Int64_u.add (Int64_u.sub x #0x7fffffffffffffffL) #0x7fffffffffffffffL
 [%%expect_asm X86_64{|
-add_sub_max_int_bad:
-  movabsq $9223372036854775807, %rbx
-  movabsq $9223372036854775807, %rdi
-  subq  %rdi, %rax
-  addq  %rbx, %rax
+add_sub_max_int:
   ret
 |}]
 
-let add_rsub_max_int_bad x =
+let add_rsub_max_int x =
   Int64_u.add (Int64_u.sub #0x7fffffffffffffffL x) #0x7fffffffffffffffL
 [%%expect_asm X86_64{|
-add_rsub_max_int_bad:
-  movabsq $9223372036854775807, %rdi
-  movabsq $9223372036854775807, %rbx
+add_rsub_max_int:
+  movq  $-2, %rbx
   subq  %rax, %rbx
-  leaq  (%rbx,%rdi), %rax
+  movq  %rbx, %rax
   ret
 |}]
 
-let sub_add_max_int_bad x =
+let sub_add_max_int x =
   Int64_u.sub (Int64_u.add x #0x7fffffffffffffffL) (-#0x7fffffffffffffffL)
 [%%expect_asm X86_64{|
-sub_add_max_int_bad:
-  movabsq $-9223372036854775807, %rbx
-  movabsq $9223372036854775807, %rdi
-  addq  %rdi, %rax
-  subq  %rbx, %rax
+sub_add_max_int:
+  addq  $-2, %rax
   ret
 |}]
 
-let sub_min_int_bad x =
+let sub_min_int x =
   Int64_u.sub x #0x8000000000000000L
 [%%expect_asm X86_64{|
-sub_min_int_bad:
+sub_min_int:
   movabsq $-9223372036854775808, %rbx
-  subq  %rbx, %rax
+  addq  %rbx, %rax
   ret
 |}]
