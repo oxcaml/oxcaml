@@ -1,3 +1,4 @@
+module_block_cells ($camlEmitcode_repro__cell0)
 let code out_0 deleted in
 let $camlEmitcode_repro__const_block_0 = Block 0 (1, 1) in
 let $camlEmitcode_repro__const_block_1 = Block 0 (1, 0) in
@@ -144,5 +145,9 @@ let code loopify(done) size(115) newer_version_of(emit_2)
                      cont `self` (Pfield))))
 in
 let $camlEmitcode_repro__emit_8 = closure emit_2_1 @emit &toplevel in
-let $camlEmitcode_repro = Block 0 ($camlEmitcode_repro__emit_8) in
+let $camlEmitcode_repro__cell0 =
+  Block 0 ($camlEmitcode_repro__emit_8)
+and $camlEmitcode_repro =
+  Block 0 ($camlEmitcode_repro__emit_8)
+in
 cont done ($camlEmitcode_repro)

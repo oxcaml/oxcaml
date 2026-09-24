@@ -47,7 +47,13 @@ Typing env:
  (code_age_relation
   {([0m[38;5;169;1mcamlQuestion__answer_0_1_code[0m [0m[38;5;169;1mcamlQuestion__answer_0_0_code[0m)})
  (type_equations
-  {([0m[38;5;111;1m[0m[38;5;98;1mQuestion.camlQuestion[0m[38;5;111;1m[0m
+  {([0m[38;5;111;1m[0m[38;5;98;1mQuestion.camlQuestion__cell0[0m[38;5;111;1m[0m
+    (Val!
+     (Variant
+      (blocks (alloc_mode Heap)
+       (known
+        {(tag_0 => (Known 1), ((Val ([0m[38;5;160;1m=[0m [0m[38;5;111;1m[0m[38;5;98;1mQuestion.camlQuestion__answer_1[0m[38;5;111;1m[0m))))})))))
+   ([0m[38;5;111;1m[0m[38;5;98;1mQuestion.camlQuestion[0m[38;5;111;1m[0m
     (Val!
      (Variant
       (blocks (alloc_mode Heap)

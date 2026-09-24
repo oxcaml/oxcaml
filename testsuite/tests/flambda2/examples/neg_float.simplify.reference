@@ -1,3 +1,5 @@
+module_block_cells ($camlNeg_float__cell0 $camlNeg_float__cell1
+  $camlNeg_float__cell2)
 let code make_pos_float_0 deleted in
 let code make_neg_float_1 deleted in
 let $camlNeg_float__float_0 = -0x1.5p+5 in
@@ -23,7 +25,13 @@ in
 let $camlNeg_float__make_neg_float_6 =
   closure make_neg_float_1_1 @make_neg_float &toplevel
 in
-let $camlNeg_float =
+let $camlNeg_float__cell2 =
+  Block 0 ($camlNeg_float__make_neg_float_6)
+and $camlNeg_float__cell1 =
+  Block 0 ($camlNeg_float__make_pos_float_4)
+and $camlNeg_float__cell0 =
+  Block 0 ($camlNeg_float__float_0)
+and $camlNeg_float =
   Block 0 ($camlNeg_float__float_0,
            $camlNeg_float__make_pos_float_4,
            $camlNeg_float__make_neg_float_6)

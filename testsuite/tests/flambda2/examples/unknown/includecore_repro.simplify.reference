@@ -1,3 +1,4 @@
+module_block_cells ($camlIncludecore_repro__cell0)
 let $camlIncludecore_repro__const_block_0 = Block 0 (0, 0) in
 let code f_0 deleted in
 let $camlIncludecore_repro__const_block_1 =
@@ -103,5 +104,9 @@ apply direct(f_0_1 &toplevel)
   where k1 (param : [ 0 | 0 of val ]) =
     cont k
   where k =
-    let $camlIncludecore_repro = Block 0 ($camlIncludecore_repro__f_2) in
+    let $camlIncludecore_repro__cell0 =
+      Block 0 ($camlIncludecore_repro__f_2)
+    and $camlIncludecore_repro =
+      Block 0 ($camlIncludecore_repro__f_2)
+    in
     cont done ($camlIncludecore_repro)

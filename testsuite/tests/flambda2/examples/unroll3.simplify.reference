@@ -1,3 +1,5 @@
+module_block_cells ($camlUnroll3__cell0 $camlUnroll3__cell1
+  $camlUnroll3__cell2 $camlUnroll3__cell3)
 let code odd_1 deleted and code even_0 deleted in
 let $camlUnroll3__even_1 =
   closure even_0_1 @even &toplevel
@@ -41,7 +43,15 @@ apply direct(odd_1_1 &toplevel) inlining_state(depth(20))
     (2)
     -> k * error
   where k (four_is_odd : imm tagged) =
-    let $camlUnroll3 =
+    let $camlUnroll3__cell3 =
+      Block 0 (four_is_odd)
+    and $camlUnroll3__cell2 =
+      Block 0 (0)
+    and $camlUnroll3__cell1 =
+      Block 0 ($camlUnroll3__odd_2)
+    and $camlUnroll3__cell0 =
+      Block 0 ($camlUnroll3__even_1)
+    and $camlUnroll3 =
       Block 0 ($camlUnroll3__even_1, $camlUnroll3__odd_2, 0, four_is_odd)
     in
     cont done ($camlUnroll3)

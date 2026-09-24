@@ -1,3 +1,4 @@
+module_block_cells ($camlJs__cell0 $camlJs__cell1)
 let $camlJs__immstring_0 = "js.ml" in
 let $camlJs__const_block_1 = Block 0 ($camlJs__immstring_0, 14, 17) in
 let $camlJs__Pmakeblock_2 =
@@ -35,5 +36,11 @@ let $camlJs__Pmakeblock_10 =
            $camlJs__of__debug_9,
            $camlJs__of__unsafe_8)
 in
-let $camlJs = Block 0 (0, $camlJs__Pmakeblock_10) in
+let $camlJs__cell1 =
+  Block 0 ($camlJs__Pmakeblock_10)
+and $camlJs__cell0 =
+  Block 0 (0)
+and $camlJs =
+  Block 0 (0, $camlJs__Pmakeblock_10)
+in
 cont done ($camlJs)

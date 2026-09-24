@@ -1,3 +1,5 @@
+module_block_cells ($camlArgument_types_useful__cell0
+  $camlArgument_types_useful__cell1 $camlArgument_types_useful__cell2)
 let $camlArgument_types_useful__first_const_0 = Block 0 () in
 (let code size(4)
        unbox_int_and_add_one_0 (param : [ 0 of imm tagged ])
@@ -62,5 +64,13 @@ let $camlArgument_types_useful__first_const_0 = Block 0 () in
     let field_0 = %block_load.tag[`0`].`size`[`3`].[`0`] (module_block) in
     let field_1 = %block_load.tag[`0`].`size`[`3`].[`1`] (module_block) in
     let field_2 = %block_load.tag[`0`].`size`[`3`].[`2`] (module_block) in
-    let $camlArgument_types_useful = Block 0 (field_0, field_1, field_2) in
+    let $camlArgument_types_useful =
+      Block 0 (field_0, field_1, field_2)
+    and $camlArgument_types_useful__cell0 =
+      Block 0 (field_0)
+    and $camlArgument_types_useful__cell1 =
+      Block 0 (field_1)
+    and $camlArgument_types_useful__cell2 =
+      Block 0 (field_2)
+    in
     cont done ($camlArgument_types_useful)

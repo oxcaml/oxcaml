@@ -1,3 +1,5 @@
+module_block_cells ($camlUnroll5__cell0 $camlUnroll5__cell1
+  $camlUnroll5__cell2 $camlUnroll5__cell3)
 let code foo_0 deleted in
 let code test1_1 deleted in
 let code test2_2 deleted in
@@ -319,7 +321,15 @@ let code loopify(never) size(232) newer_version_of(test3_3)
                     -> k * k1))
 in
 let $camlUnroll5__test3_4 = closure test3_3_1 @test3 &toplevel in
-let $camlUnroll5 =
+let $camlUnroll5__cell3 =
+  Block 0 ($camlUnroll5__test3_4)
+and $camlUnroll5__cell2 =
+  Block 0 ($camlUnroll5__test2_3)
+and $camlUnroll5__cell1 =
+  Block 0 ($camlUnroll5__test1_2)
+and $camlUnroll5__cell0 =
+  Block 0 ($camlUnroll5__foo_1)
+and $camlUnroll5 =
   Block 0 ($camlUnroll5__foo_1,
            $camlUnroll5__test1_2,
            $camlUnroll5__test2_3,

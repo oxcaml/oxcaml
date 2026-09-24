@@ -37,6 +37,10 @@ val for_structured_mangling_path :
 
 val for_compilation_unit : Compilation_unit.t -> t
 
+(** The cell holding logical field [i] of a unit's module block
+    ([caml<Unit>__cell<i>]). *)
+val for_module_block_cell : Compilation_unit.t -> int -> t
+
 val compilation_unit : t -> Compilation_unit.t
 
 val linkage_name : t -> Linkage_name.t

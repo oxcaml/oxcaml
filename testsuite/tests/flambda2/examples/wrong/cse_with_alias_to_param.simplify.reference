@@ -1,3 +1,5 @@
+module_block_cells ($camlCse_with_alias_to_param__cell0
+  $camlCse_with_alias_to_param__cell1)
 let code id_0 deleted in
 let code foo_1 deleted in
 let code inline(never) loopify(never) size(1) newer_version_of(id_0)
@@ -29,7 +31,11 @@ let code loopify(never) size(42) newer_version_of(foo_1)
       cont k (Pmakeblock_1)
 in
 let $camlCse_with_alias_to_param__foo_2 = closure foo_1_1 @foo &toplevel in
-let $camlCse_with_alias_to_param =
+let $camlCse_with_alias_to_param__cell1 =
+  Block 0 ($camlCse_with_alias_to_param__foo_2)
+and $camlCse_with_alias_to_param__cell0 =
+  Block 0 ($camlCse_with_alias_to_param__id_1)
+and $camlCse_with_alias_to_param =
   Block 0 ($camlCse_with_alias_to_param__id_1,
            $camlCse_with_alias_to_param__foo_2)
 in

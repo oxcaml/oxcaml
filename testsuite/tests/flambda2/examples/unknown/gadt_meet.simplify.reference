@@ -1,3 +1,5 @@
+module_block_cells ($camlGadt_meet__cell0 $camlGadt_meet__cell1
+  $camlGadt_meet__cell2 $camlGadt_meet__cell3 $camlGadt_meet__cell4)
 let code with_y_0 deleted in
 let $camlGadt_meet__const_block_0 = Block 0 (0) in
 let $camlGadt_meet__const_block_1 = Block 0 ($camlGadt_meet__const_block_0)
@@ -90,7 +92,17 @@ let code loopify(never) size(17) newer_version_of(foo_4)
            cont k (Pfield))
 in
 let $camlGadt_meet__foo_8 = closure foo_4_1 @foo &toplevel in
-let $camlGadt_meet =
+let $camlGadt_meet__cell4 =
+  Block 0 ($camlGadt_meet__foo_8)
+and $camlGadt_meet__cell3 =
+  Block 0 ($camlGadt_meet__test_7)
+and $camlGadt_meet__cell2 =
+  Block 0 ($camlGadt_meet__get_6)
+and $camlGadt_meet__cell1 =
+  Block 0 ($camlGadt_meet__f_5)
+and $camlGadt_meet__cell0 =
+  Block 0 ($camlGadt_meet__with_y_4)
+and $camlGadt_meet =
   Block 0 ($camlGadt_meet__with_y_4,
            $camlGadt_meet__f_5,
            $camlGadt_meet__get_6,

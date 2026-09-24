@@ -1,3 +1,5 @@
+module_block_cells ($camlFloat_and_int_mix__cell0
+  $camlFloat_and_int_mix__cell1)
 let code read_int_0 deleted in
 let code gasp_in_horror_1 deleted in
 let code inline(never) loopify(never) size(1) newer_version_of(read_int_0)
@@ -21,7 +23,11 @@ in
 let $camlFloat_and_int_mix__gasp_in_horror_2 =
   closure gasp_in_horror_1_1 @gasp_in_horror &toplevel
 in
-let $camlFloat_and_int_mix =
+let $camlFloat_and_int_mix__cell1 =
+  Block 0 ($camlFloat_and_int_mix__gasp_in_horror_2)
+and $camlFloat_and_int_mix__cell0 =
+  Block 0 ($camlFloat_and_int_mix__read_int_1)
+and $camlFloat_and_int_mix =
   Block 0 ($camlFloat_and_int_mix__read_int_1,
            $camlFloat_and_int_mix__gasp_in_horror_2)
 in

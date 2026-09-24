@@ -1,3 +1,4 @@
+module_block_cells ($camlMatch_in_match_seq__cell0)
 let $camlMatch_in_match_seq__first_const_0 = Block 0 () in
 (let code rec inline(always) loopify(always) size(35)
        aux_1 (acc, s : val) my_closure &my_alloc_region my_depth -> k1 * k2 =
@@ -298,5 +299,9 @@ let $camlMatch_in_match_seq__first_const_0 = Block 0 () in
      cont k (Pmakeblock))
   where k define_root_symbol (module_block) =
     let field_0 = %block_load.tag[`0`].`size`[`1`].[`0`] (module_block) in
-    let $camlMatch_in_match_seq = Block 0 (field_0) in
+    let $camlMatch_in_match_seq =
+      Block 0 (field_0)
+    and $camlMatch_in_match_seq__cell0 =
+      Block 0 (field_0)
+    in
     cont done ($camlMatch_in_match_seq)

@@ -1019,9 +1019,13 @@ let conv comp_unit (fexpr : Fexpr.flambda_unit) : conv_result =
   let exn_continuation = Exn_continuation.exn_handler error_continuation in
   let env = bind_all_code_ids env fexpr in
   let acc, body = expr env Acc.empty fexpr.body in
+  let module_block_cells =
+    List.map (declare_symbol env) fexpr.module_block_cells
+  in
   let code_slot_offsets = acc.Acc.code_slot_offsets in
   let unit =
     Flambda_unit.create ~return_continuation ~exn_continuation
       ~toplevel_my_alloc_region:toplevel_alloc_region ~body ~module_symbol
+      ~module_block_cells
   in
   { unit; code_slot_offsets }

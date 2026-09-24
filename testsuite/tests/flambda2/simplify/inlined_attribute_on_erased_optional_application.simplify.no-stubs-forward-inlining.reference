@@ -1,3 +1,7 @@
+module_block_cells ($camlInlined_attribute_on_erased_optional_application__cell0
+  $camlInlined_attribute_on_erased_optional_application__cell1
+  $camlInlined_attribute_on_erased_optional_application__cell2
+  $camlInlined_attribute_on_erased_optional_application__cell3)
 let code default_0 deleted in
 let code f_inner_2 deleted in
 let code loopify(never) size(27) stub
@@ -76,7 +80,15 @@ apply direct(default_0_1 &toplevel)
         (x, 0, 0)
         -> k * error
   where k (h : imm tagged) =
-    let $camlInlined_attribute_on_erased_optional_application =
+    let $camlInlined_attribute_on_erased_optional_application__cell3 =
+      Block 0 (h)
+    and $camlInlined_attribute_on_erased_optional_application__cell2 =
+      Block 0 ($camlInlined_attribute_on_erased_optional_application__partial_f_4)
+    and $camlInlined_attribute_on_erased_optional_application__cell1 =
+      Block 0 ($camlInlined_attribute_on_erased_optional_application__f_3)
+    and $camlInlined_attribute_on_erased_optional_application__cell0 =
+      Block 0 ($camlInlined_attribute_on_erased_optional_application__default_1)
+    and $camlInlined_attribute_on_erased_optional_application =
       Block 0 ($camlInlined_attribute_on_erased_optional_application__default_1,
                $camlInlined_attribute_on_erased_optional_application__f_3,
                $camlInlined_attribute_on_erased_optional_application__partial_f_4,

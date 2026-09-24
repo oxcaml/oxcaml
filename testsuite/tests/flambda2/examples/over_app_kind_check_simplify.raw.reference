@@ -1,3 +1,4 @@
+module_block_cells ($camlOver_app_kind_check_simplify__cell0)
 let $camlOver_app_kind_check_simplify__first_const_0 = Block 0 () in
 (let code inline(always) size(1)
        cast_1 (param : imm tagged, x : val)
@@ -29,5 +30,9 @@ let $camlOver_app_kind_check_simplify__first_const_0 = Block 0 () in
  cont k (Pmakeblock))
   where k define_root_symbol (module_block) =
     let field_0 = %block_load.tag[`0`].`size`[`1`].[`0`] (module_block) in
-    let $camlOver_app_kind_check_simplify = Block 0 (field_0) in
+    let $camlOver_app_kind_check_simplify =
+      Block 0 (field_0)
+    and $camlOver_app_kind_check_simplify__cell0 =
+      Block 0 (field_0)
+    in
     cont done ($camlOver_app_kind_check_simplify)

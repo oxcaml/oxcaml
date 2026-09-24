@@ -1,3 +1,5 @@
+module_block_cells ($camlUnroll3__cell0 $camlUnroll3__cell1
+  $camlUnroll3__cell2 $camlUnroll3__cell3)
 let $camlUnroll3__first_const_0 = Block 0 () in
 (let code rec size(23)
        even_0 (n : imm tagged)
@@ -60,5 +62,15 @@ let $camlUnroll3__first_const_0 = Block 0 () in
     let field_1 = %block_load.tag[`0`].`size`[`4`].[`1`] (module_block) in
     let field_2 = %block_load.tag[`0`].`size`[`4`].[`2`] (module_block) in
     let field_3 = %block_load.tag[`0`].`size`[`4`].[`3`] (module_block) in
-    let $camlUnroll3 = Block 0 (field_0, field_1, field_2, field_3) in
+    let $camlUnroll3 =
+      Block 0 (field_0, field_1, field_2, field_3)
+    and $camlUnroll3__cell0 =
+      Block 0 (field_0)
+    and $camlUnroll3__cell1 =
+      Block 0 (field_1)
+    and $camlUnroll3__cell2 =
+      Block 0 (field_2)
+    and $camlUnroll3__cell3 =
+      Block 0 (field_3)
+    in
     cont done ($camlUnroll3)

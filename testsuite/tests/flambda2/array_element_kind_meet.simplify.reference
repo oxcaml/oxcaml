@@ -1,3 +1,4 @@
+module_block_cells ($camlArray_element_kind_meet__cell0)
 let code sum_0 deleted in
 let code loopify(never) size(52) newer_version_of(sum_0)
       sum_0_1 (t : [ 0 of imm tagged * imm tagged * val array ])
@@ -38,7 +39,9 @@ let code loopify(never) size(52) newer_version_of(sum_0)
                   | 1 -> k2 (for_next_naked, return_val0)))
 in
 let $camlArray_element_kind_meet__sum_1 = closure sum_0_1 @sum &toplevel in
-let $camlArray_element_kind_meet =
+let $camlArray_element_kind_meet__cell0 =
+  Block 0 ($camlArray_element_kind_meet__sum_1)
+and $camlArray_element_kind_meet =
   Block 0 ($camlArray_element_kind_meet__sum_1)
 in
 cont done ($camlArray_element_kind_meet)

@@ -1,3 +1,4 @@
+module_block_cells ($camlLifting2__cell0 $camlLifting2__cell1)
 apply ccall ($`*extern*`.rand : val -> val) (0) -> k * error
   where k (r0) =
     (apply ccall ($`*extern*`.rand : val -> val) (0) -> k * error
@@ -5,5 +6,11 @@ apply ccall ($`*extern*`.rand : val -> val) (0) -> k * error
          (apply ccall ($`*extern*`.rand : val -> val) (0) -> k * error
             where k (r2) =
               let $camlLifting2__t_1 = Block 0 (r0, r1, r2) in
-              let $camlLifting2 = Block 0 (r2, $camlLifting2__t_1) in
+              let $camlLifting2__cell1 =
+                Block 0 ($camlLifting2__t_1)
+              and $camlLifting2__cell0 =
+                Block 0 (r2)
+              and $camlLifting2 =
+                Block 0 (r2, $camlLifting2__t_1)
+              in
               cont done ($camlLifting2)))

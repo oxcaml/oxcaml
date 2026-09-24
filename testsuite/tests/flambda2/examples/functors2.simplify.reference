@@ -1,3 +1,5 @@
+module_block_cells ($camlFunctors2__cell0 $camlFunctors2__cell1
+  $camlFunctors2__cell2)
 let code F1_0 deleted in
 let code F2_1 deleted in
 let code F3_2 deleted in
@@ -35,7 +37,13 @@ let code loopify(never) size(13) newer_version_of(F3_2)
       cont k (Pmakeblock)
 in
 let $camlFunctors2__F3_3 = closure F3_2_1 @F3 &toplevel in
-let $camlFunctors2 =
+let $camlFunctors2__cell2 =
+  Block 0 ($camlFunctors2__F3_3)
+and $camlFunctors2__cell1 =
+  Block 0 ($camlFunctors2__F2_2)
+and $camlFunctors2__cell0 =
+  Block 0 ($camlFunctors2__F1_1)
+and $camlFunctors2 =
   Block 0 ($camlFunctors2__F1_1, $camlFunctors2__F2_2, $camlFunctors2__F3_3)
 in
 cont done ($camlFunctors2)

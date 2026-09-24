@@ -1,3 +1,4 @@
+module_block_cells ($camlNested_switch__cell0 $camlNested_switch__cell1)
 let code test_0 deleted in
 let code f_1 deleted in
 let code inline(always) loopify(never) size(31) newer_version_of(test_0)
@@ -31,7 +32,11 @@ let code loopify(never) size(21) newer_version_of(f_1)
         ($`*extern*`.caml_greaterthan : val * val -> val) (x, y) -> k * k1
 in
 let $camlNested_switch__f_2 = closure f_1_1 @f &toplevel in
-let $camlNested_switch =
+let $camlNested_switch__cell1 =
+  Block 0 ($camlNested_switch__f_2)
+and $camlNested_switch__cell0 =
+  Block 0 ($camlNested_switch__test_1)
+and $camlNested_switch =
   Block 0 ($camlNested_switch__test_1, $camlNested_switch__f_2)
 in
 cont done ($camlNested_switch)

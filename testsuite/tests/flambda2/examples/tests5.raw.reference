@@ -1,3 +1,4 @@
+module_block_cells ($camlTests5__cell0 $camlTests5__cell1)
 let $camlTests5__first_const_0 = Block 0 () in
 (let code rec size(23)
        f_0 (x : imm tagged)
@@ -48,5 +49,11 @@ let $camlTests5__first_const_0 = Block 0 () in
   where k define_root_symbol (module_block) =
     let field_0 = %block_load.tag[`0`].`size`[`2`].[`0`] (module_block) in
     let field_1 = %block_load.tag[`0`].`size`[`2`].[`1`] (module_block) in
-    let $camlTests5 = Block 0 (field_0, field_1) in
+    let $camlTests5 =
+      Block 0 (field_0, field_1)
+    and $camlTests5__cell0 =
+      Block 0 (field_0)
+    and $camlTests5__cell1 =
+      Block 0 (field_1)
+    in
     cont done ($camlTests5)

@@ -1,3 +1,5 @@
+module_block_cells ($camlMap_remove__cell0 $camlMap_remove__cell1
+  $camlMap_remove__cell2 $camlMap_remove__cell3 $camlMap_remove__cell4)
 let code bal_0 deleted in
 let code min_binding_1 deleted in
 let $camlMap_remove__immstring_0 = "Map.remove_min_elt" in
@@ -207,7 +209,17 @@ let code loopify(never) size(30) newer_version_of(remove_4)
                -> k * k1)
 in
 let $camlMap_remove__remove_6 = closure remove_4_1 @remove &toplevel in
-let $camlMap_remove =
+let $camlMap_remove__cell4 =
+  Block 0 ($camlMap_remove__remove_6)
+and $camlMap_remove__cell3 =
+  Block 0 ($camlMap_remove__merge_5)
+and $camlMap_remove__cell2 =
+  Block 0 ($camlMap_remove__remove_min_binding_3)
+and $camlMap_remove__cell1 =
+  Block 0 ($camlMap_remove__min_binding_2)
+and $camlMap_remove__cell0 =
+  Block 0 ($camlMap_remove__bal_1)
+and $camlMap_remove =
   Block 0 ($camlMap_remove__bal_1,
            $camlMap_remove__min_binding_2,
            $camlMap_remove__remove_min_binding_3,

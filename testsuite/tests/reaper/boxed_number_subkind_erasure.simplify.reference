@@ -1,3 +1,4 @@
+module_block_cells ($camlBoxed_number_subkind_erasure__cell0)
 let code merge_usages_1 deleted in
 let code f_0 deleted in
 let code inline(never) loopify(never) size(1) newer_version_of(merge_usages_1)
@@ -53,7 +54,9 @@ let code loopify(never) size(65) newer_version_of(f_0)
                 cont k (int64_add)))
 in
 let $camlBoxed_number_subkind_erasure__f_1 = closure f_0_1 @f &toplevel in
-let $camlBoxed_number_subkind_erasure =
+let $camlBoxed_number_subkind_erasure__cell0 =
+  Block 0 ($camlBoxed_number_subkind_erasure__f_1)
+and $camlBoxed_number_subkind_erasure =
   Block 0 ($camlBoxed_number_subkind_erasure__f_1)
 in
 cont done ($camlBoxed_number_subkind_erasure)

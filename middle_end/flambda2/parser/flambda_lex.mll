@@ -38,6 +38,7 @@ let keyword_table =
     "boxed", KWD_BOXED;
     "ccall", KWD_CCALL;
     "mcall", KWD_MCALL;
+    "module_block_cells", KWD_MODULE_BLOCK_CELLS;
     "self", KWD_SELF;
     "public", KWD_PUBLIC;
     "cached", KWD_CACHED;

@@ -15,6 +15,30 @@
  addr G:"camlCmm__idx_compare_exchange_12"
  addr G:"camlCmm__idx_fetch_and_add_13")
 (data
+ int 1792
+ global "camlCmm__cell0":
+ addr G:"camlCmm__standard_atomic_get_2")
+(data int 1792 global "camlCmm__cell1": addr G:"camlCmm__get_3")
+(data int 1792 global "camlCmm__cell2": addr G:"camlCmm__set_4")
+(data int 1792 global "camlCmm__cell3": addr G:"camlCmm__get_imm_5")
+(data int 1792 global "camlCmm__cell4": addr G:"camlCmm__set_imm_6")
+(data int 1792 global "camlCmm__cell5": addr G:"camlCmm__cas_7")
+(data int 1792 global "camlCmm__cell6": addr G:"camlCmm__idx_get_8")
+(data int 1792 global "camlCmm__cell7": addr G:"camlCmm__idx_set_9")
+(data int 1792 global "camlCmm__cell8": addr G:"camlCmm__idx_exchange_10")
+(data
+ int 1792
+ global "camlCmm__cell9":
+ addr G:"camlCmm__idx_compare_and_set_11")
+(data
+ int 1792
+ global "camlCmm__cell10":
+ addr G:"camlCmm__idx_compare_exchange_12")
+(data
+ int 1792
+ global "camlCmm__cell11":
+ addr G:"camlCmm__idx_fetch_and_add_13")
+(data
  int 4087
  global "camlCmm__idx_fetch_and_add_13":
  addr G:"caml_curryV_I_V"

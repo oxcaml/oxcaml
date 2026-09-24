@@ -12,6 +12,7 @@ let all_boolean_simplifications x = function
   | true -> #(true, false, x)
   | false -> #(false, true, x)
 [%%expect_fexpr Simplify{|
+module_block_cells ($camlTOP3__cell0)
 let code all_boolean_simplifications_0 deleted in
 let code loopify(never) size(2) newer_version_of(all_boolean_simplifications_0)
       all_boolean_simplifications_0_1 (x, param : imm tagged)
@@ -25,7 +26,11 @@ let $camlTOP3__all_boolean_simplifications_3 =
   closure all_boolean_simplifications_0_1 @all_boolean_simplifications
     &toplevel
 in
-let $camlTOP3 = Block 0 ($camlTOP3__all_boolean_simplifications_3) in
+let $camlTOP3__cell0 =
+  Block 0 ($camlTOP3__all_boolean_simplifications_3)
+and $camlTOP3 =
+  Block 0 ($camlTOP3__all_boolean_simplifications_3)
+in
 cont done ($camlTOP3)
 |}]
 
@@ -36,6 +41,7 @@ let all_large_simplifications x = function
   | C -> #(2, x, 3, Some 0)
   | D -> #(3, x, 4, Some 0)
 [%%expect_fexpr Simplify{|
+module_block_cells ($camlTOP4__cell0)
 let $camlTOP4__const_block_5 = Block 0 (0) in
 let code all_large_simplifications_1 deleted in
 let $camlTOP4__switch_block_7 =
@@ -56,7 +62,11 @@ in
 let $camlTOP4__all_large_simplifications_6 =
   closure all_large_simplifications_1_1 @all_large_simplifications &toplevel
 in
-let $camlTOP4 = Block 0 ($camlTOP4__all_large_simplifications_6) in
+let $camlTOP4__cell0 =
+  Block 0 ($camlTOP4__all_large_simplifications_6)
+and $camlTOP4 =
+  Block 0 ($camlTOP4__all_large_simplifications_6)
+in
 cont done ($camlTOP4)
 |}]
 
@@ -67,6 +77,7 @@ let shared_affine_functions = function
   | C -> #(4, 5)
   | D -> #(6, 7)
 [%%expect_fexpr Simplify{|
+module_block_cells ($camlTOP5__cell0)
 let code shared_affine_functions_2 deleted in
 let code loopify(never) size(7) newer_version_of(shared_affine_functions_2)
       shared_affine_functions_2_1 (param : imm tagged)
@@ -80,7 +91,11 @@ in
 let $camlTOP5__shared_affine_functions_10 =
   closure shared_affine_functions_2_1 @shared_affine_functions &toplevel
 in
-let $camlTOP5 = Block 0 ($camlTOP5__shared_affine_functions_10) in
+let $camlTOP5__cell0 =
+  Block 0 ($camlTOP5__shared_affine_functions_10)
+and $camlTOP5 =
+  Block 0 ($camlTOP5__shared_affine_functions_10)
+in
 cont done ($camlTOP5)
 |}]
 
@@ -91,6 +106,7 @@ let shared_lookup_table = function
   | C -> #(2, Some 0, Some 0)
   | D -> #(3, Some 0, Some 0)
 [%%expect_fexpr Simplify{|
+module_block_cells ($camlTOP6__cell0)
 let $camlTOP6__const_block_12 = Block 0 (0) in
 let code shared_lookup_table_3 deleted in
 let $camlTOP6__switch_block_14 =
@@ -110,7 +126,11 @@ in
 let $camlTOP6__shared_lookup_table_13 =
   closure shared_lookup_table_3_1 @shared_lookup_table &toplevel
 in
-let $camlTOP6 = Block 0 ($camlTOP6__shared_lookup_table_13) in
+let $camlTOP6__cell0 =
+  Block 0 ($camlTOP6__shared_lookup_table_13)
+and $camlTOP6 =
+  Block 0 ($camlTOP6__shared_lookup_table_13)
+in
 cont done ($camlTOP6)
 |}]
 
@@ -121,6 +141,7 @@ let multiple_lookup_tables = function
   | C -> #(0, 0)
   | D -> #(1, 0)
 [%%expect_fexpr Simplify{|
+module_block_cells ($camlTOP7__cell0)
 let code multiple_lookup_tables_4 deleted in
 let $camlTOP7__switch_block_19 = Value_array [|1; 1; 0; 0|] in
 let $camlTOP7__switch_block_18 = Value_array [|0; 1; 0; 1|] in
@@ -136,7 +157,11 @@ in
 let $camlTOP7__multiple_lookup_tables_17 =
   closure multiple_lookup_tables_4_1 @multiple_lookup_tables &toplevel
 in
-let $camlTOP7 = Block 0 ($camlTOP7__multiple_lookup_tables_17) in
+let $camlTOP7__cell0 =
+  Block 0 ($camlTOP7__multiple_lookup_tables_17)
+and $camlTOP7 =
+  Block 0 ($camlTOP7__multiple_lookup_tables_17)
+in
 cont done ($camlTOP7)
 |}]
 
@@ -154,6 +179,7 @@ let offset_lookup_table i =
   | C -> 2
   | D -> 1
 [%%expect_fexpr Simplify{|
+module_block_cells ($camlTOP8__cell0)
 let code offset_lookup_table_5 deleted in
 let $camlTOP8__switch_block_25 = Value_array [|0; 2; 1|] in
 let code loopify(never) size(30) newer_version_of(offset_lookup_table_5)
@@ -181,7 +207,11 @@ in
 let $camlTOP8__offset_lookup_table_24 =
   closure offset_lookup_table_5_1 @offset_lookup_table &toplevel
 in
-let $camlTOP8 = Block 0 ($camlTOP8__offset_lookup_table_24) in
+let $camlTOP8__cell0 =
+  Block 0 ($camlTOP8__offset_lookup_table_24)
+and $camlTOP8 =
+  Block 0 ($camlTOP8__offset_lookup_table_24)
+in
 cont done ($camlTOP8)
 |}]
 
@@ -220,6 +250,7 @@ let poison_prevents_boolean_not b =
   | Absent -> A
   | Box_A t -> t
 [%%expect_fexpr Simplify{|
+module_block_cells ($camlTOP11__cell0)
 let code poison_prevents_boolean_not_6 deleted in
 let $camlTOP11__switch_block_32 = Int_array [|0; 0; 1|] in
 let code loopify(never) size(14) newer_version_of(poison_prevents_boolean_not_6)
@@ -239,6 +270,10 @@ let $camlTOP11__poison_prevents_boolean_not_31 =
   closure poison_prevents_boolean_not_6_1 @poison_prevents_boolean_not
     &toplevel
 in
-let $camlTOP11 = Block 0 ($camlTOP11__poison_prevents_boolean_not_31) in
+let $camlTOP11__cell0 =
+  Block 0 ($camlTOP11__poison_prevents_boolean_not_31)
+and $camlTOP11 =
+  Block 0 ($camlTOP11__poison_prevents_boolean_not_31)
+in
 cont done ($camlTOP11)
 |}]

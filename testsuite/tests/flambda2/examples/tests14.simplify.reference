@@ -1,3 +1,5 @@
+module_block_cells ($camlTests14__cell0 $camlTests14__cell1
+  $camlTests14__cell2 $camlTests14__cell3)
 let code set_0 deleted in
 let code nth_char_1 deleted in
 let code needs_try_region_2 deleted in
@@ -48,7 +50,15 @@ let code loopify(never) size(12) newer_version_of(gadt_match_3)
 in
 let $camlTests14__gadt_match_4 = closure gadt_match_3_1 @gadt_match &toplevel
 in
-let $camlTests14 =
+let $camlTests14__cell3 =
+  Block 0 ($camlTests14__gadt_match_4)
+and $camlTests14__cell2 =
+  Block 0 ($camlTests14__needs_try_region_3)
+and $camlTests14__cell1 =
+  Block 0 ($camlTests14__nth_char_2)
+and $camlTests14__cell0 =
+  Block 0 ($camlTests14__set_1)
+and $camlTests14 =
   Block 0 ($camlTests14__set_1,
            $camlTests14__nth_char_2,
            $camlTests14__needs_try_region_3,

@@ -121,6 +121,7 @@ let make_boxed_const_int (i, m) : static_data =
 %token KWD_BOXED [@symbol "boxed"]
 %token KWD_CCALL  [@symbol "ccall"]
 %token KWD_MCALL  [@symbol "mcall"]
+%token KWD_MODULE_BLOCK_CELLS [@symbol "module_block_cells"]
 %token KWD_SELF  [@symbol "self"]
 %token KWD_PUBLIC  [@symbol "public"]
 %token KWD_CACHED  [@symbol "cached"]
@@ -247,19 +248,20 @@ let make_boxed_const_int (i, m) : static_data =
 
 (* CR-someday lmaurer: Modularize and generally clean up *)
 
-flambda_unit:
-  | body = module_
-    EOF
-    { body }
-;
-
 (* XCR lwhite: Probably easier to just use some default names for these
    continuations
 
    lmaurer: Makes sense. I went with "done" and "error" for the names. *)
-module_:
-  | body = expr
-    { { body } }
+flambda_unit:
+  | module_block_cells = loption(module_block_cells);
+    body = expr;
+    EOF
+    { { module_block_cells; body } }
+;
+
+module_block_cells:
+  | KWD_MODULE_BLOCK_CELLS; LPAREN; cells = list(symbol); RPAREN
+    { cells }
 ;
 
 exn_extra_arg:

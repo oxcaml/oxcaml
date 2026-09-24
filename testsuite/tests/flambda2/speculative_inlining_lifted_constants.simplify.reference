@@ -1,3 +1,8 @@
+module_block_cells ($camlSpeculative_inlining_lifted_constants__cell0
+  $camlSpeculative_inlining_lifted_constants__cell1
+  $camlSpeculative_inlining_lifted_constants__cell2
+  $camlSpeculative_inlining_lifted_constants__cell3
+  $camlSpeculative_inlining_lifted_constants__cell4)
 let code f_0 deleted in
 let code v1_1 deleted in
 let code loopify(never) size(8) newer_version_of(f_0)
@@ -37,7 +42,17 @@ apply direct(f_0_1 &toplevel)
           -> k * k1
       with { one = one }
     in
-    let $camlSpeculative_inlining_lifted_constants =
+    let $camlSpeculative_inlining_lifted_constants__cell4 =
+      Block 0 ($camlSpeculative_inlining_lifted_constants__v1_3)
+    and $camlSpeculative_inlining_lifted_constants__cell3 =
+      Block 0 (one)
+    and $camlSpeculative_inlining_lifted_constants__cell2 =
+      Block 0 (v0)
+    and $camlSpeculative_inlining_lifted_constants__cell1 =
+      Block 0 (zero)
+    and $camlSpeculative_inlining_lifted_constants__cell0 =
+      Block 0 ($camlSpeculative_inlining_lifted_constants__f_1)
+    and $camlSpeculative_inlining_lifted_constants =
       Block 0 ($camlSpeculative_inlining_lifted_constants__f_1,
                zero,
                v0,

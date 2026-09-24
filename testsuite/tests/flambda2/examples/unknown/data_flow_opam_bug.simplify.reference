@@ -1,3 +1,4 @@
+module_block_cells ($camlData_flow_opam_bug__cell0)
 let $camlData_flow_opam_bug__immstring_0 = "plop" in
 let $camlData_flow_opam_bug__immstring_1 = "plip" in
 let code to_string_0 deleted in
@@ -17,6 +18,9 @@ in
 let $camlData_flow_opam_bug__to_string_2 =
   closure to_string_0_1 @to_string &toplevel
 in
-let $camlData_flow_opam_bug = Block 0 ($camlData_flow_opam_bug__to_string_2)
+let $camlData_flow_opam_bug__cell0 =
+  Block 0 ($camlData_flow_opam_bug__to_string_2)
+and $camlData_flow_opam_bug =
+  Block 0 ($camlData_flow_opam_bug__to_string_2)
 in
 cont done ($camlData_flow_opam_bug)

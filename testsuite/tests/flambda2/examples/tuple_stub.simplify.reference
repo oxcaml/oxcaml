@@ -1,3 +1,4 @@
+module_block_cells ($camlTuple_stub__cell0)
 let code thd3_0 deleted in
 let code loopify(never) size(1) newer_version_of(thd3_0) tupled 
       thd3_0_1 (param, param_1, param_2)
@@ -6,5 +7,9 @@ let code loopify(never) size(1) newer_version_of(thd3_0) tupled
   cont k (param_2)
 in
 let $camlTuple_stub__thd3_1 = closure thd3_0_1 @thd3 &toplevel in
-let $camlTuple_stub = Block 0 ($camlTuple_stub__thd3_1) in
+let $camlTuple_stub__cell0 =
+  Block 0 ($camlTuple_stub__thd3_1)
+and $camlTuple_stub =
+  Block 0 ($camlTuple_stub__thd3_1)
+in
 cont done ($camlTuple_stub)

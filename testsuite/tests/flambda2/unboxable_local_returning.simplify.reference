@@ -1,3 +1,5 @@
+module_block_cells ($camlUnboxable_local_returning__cell0
+  $camlUnboxable_local_returning__cell1)
 let code ret_local_1 deleted in
 let code loopify(never) size(13) stub
       ret_local_1_1 (param : imm tagged)
@@ -63,7 +65,11 @@ apply direct(print_endline_47 &toplevel) inlined(never)
   where k1 (param : imm tagged) =
     cont k
   where k =
-    let $camlUnboxable_local_returning =
+    let $camlUnboxable_local_returning__cell1 =
+      Block 0 ($camlUnboxable_local_returning__ret_heap_10)
+    and $camlUnboxable_local_returning__cell0 =
+      Block 0 ($camlUnboxable_local_returning__ret_local_8)
+    and $camlUnboxable_local_returning =
       Block 0 ($camlUnboxable_local_returning__ret_local_8,
                $camlUnboxable_local_returning__ret_heap_10)
     in

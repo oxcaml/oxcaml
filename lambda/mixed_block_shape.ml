@@ -144,6 +144,20 @@ let new_index_to_old_path t new_index =
 
 let new_block_length t = Array.length t.flattened_reordered_shape
 
+let new_indexes_by_element t =
+  (* The reordering is a stable partition of the flattened elements into values
+     then flats, so bucketing the new indexes in ascending order by the head of
+     their old path gives each element its values first, then its flats, each
+     in tree order: the order in which the singleton shape [[| shape.(i) |]]
+     flattens. *)
+  let result = Array.make (Array.length t.forest) [] in
+  for new_index = new_block_length t - 1 downto 0 do
+    match new_index_to_old_path t new_index with
+    | first :: _ -> result.(first) <- new_index :: result.(first)
+    | [] -> Misc.fatal_errorf "Empty path in shape:@ %a" print t
+  done;
+  result
+
 let lookup_path_producing_new_indexes ({ forest; _ } as t) path =
   let original_path = path in
   match path with

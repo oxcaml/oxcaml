@@ -1,3 +1,6 @@
+module_block_cells ($camlApp_unarized_to_single_kind__cell0
+  $camlApp_unarized_to_single_kind__cell1
+  $camlApp_unarized_to_single_kind__cell2)
 let $camlApp_unarized_to_single_kind__first_const_0 = Block 0 () in
 (let code size(1)
        f_0 (x) my_closure &my_alloc_region my_depth -> k1 * k2 : imm tagged =
@@ -30,5 +33,11 @@ let $camlApp_unarized_to_single_kind__first_const_0 = Block 0 () in
     let field_2 = %block_load.tag[`0`].`size`[`3`].[`2`] (module_block) in
     let $camlApp_unarized_to_single_kind =
       Block 0 (field_0, field_1, field_2)
+    and $camlApp_unarized_to_single_kind__cell0 =
+      Block 0 (field_0)
+    and $camlApp_unarized_to_single_kind__cell1 =
+      Block 0 (field_1)
+    and $camlApp_unarized_to_single_kind__cell2 =
+      Block 0 (field_2)
     in
     cont done ($camlApp_unarized_to_single_kind)

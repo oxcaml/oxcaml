@@ -1,3 +1,8 @@
+module_block_cells ($camlForward_inlined_always_inline__cell0
+  $camlForward_inlined_always_inline__cell1
+  $camlForward_inlined_always_inline__cell2
+  $camlForward_inlined_always_inline__cell3
+  $camlForward_inlined_always_inline__cell4)
 let $camlForward_inlined_always_inline__first_const_0 = Block 0 () in
 (let code inline(always) size(1)
        f_0 (x) my_closure &my_alloc_region my_depth -> k1 * k2 =
@@ -70,5 +75,15 @@ let $camlForward_inlined_always_inline__first_const_0 = Block 0 () in
     let field_4 = %block_load.tag[`0`].`size`[`5`].[`4`] (module_block) in
     let $camlForward_inlined_always_inline =
       Block 0 (field_0, field_1, field_2, field_3, field_4)
+    and $camlForward_inlined_always_inline__cell0 =
+      Block 0 (field_0)
+    and $camlForward_inlined_always_inline__cell1 =
+      Block 0 (field_1)
+    and $camlForward_inlined_always_inline__cell2 =
+      Block 0 (field_2)
+    and $camlForward_inlined_always_inline__cell3 =
+      Block 0 (field_3)
+    and $camlForward_inlined_always_inline__cell4 =
+      Block 0 (field_4)
     in
     cont done ($camlForward_inlined_always_inline)

@@ -1,3 +1,4 @@
+module_block_cells ($camlArguments_for_unboxed_closure__cell0)
 let code g_1 deleted in
 let code id_2 deleted in
 let code unused_3 deleted in
@@ -69,7 +70,9 @@ let code loopify(never) size(13) newer_version_of(f_0)
            cont k (int_add))
 in
 let $camlArguments_for_unboxed_closure__f_1 = closure f_0_1 @f &toplevel in
-let $camlArguments_for_unboxed_closure =
+let $camlArguments_for_unboxed_closure__cell0 =
+  Block 0 ($camlArguments_for_unboxed_closure__f_1)
+and $camlArguments_for_unboxed_closure =
   Block 0 ($camlArguments_for_unboxed_closure__f_1)
 in
 cont done ($camlArguments_for_unboxed_closure)

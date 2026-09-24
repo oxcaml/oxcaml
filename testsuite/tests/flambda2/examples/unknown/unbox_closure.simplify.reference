@@ -1,3 +1,4 @@
+module_block_cells ($camlUnbox_closure__cell0)
 let code `fn[unbox_closure.ml:12,12--25]_2` deleted in
 let code bar_1 deleted in
 let code foobar_0 deleted in
@@ -52,5 +53,9 @@ let code loopify(never) size(53) newer_version_of(foobar_0)
       apply &my_alloc_region f (x) -> k * k1
 in
 let $camlUnbox_closure__foobar_1 = closure foobar_0_1 @foobar &toplevel in
-let $camlUnbox_closure = Block 0 ($camlUnbox_closure__foobar_1) in
+let $camlUnbox_closure__cell0 =
+  Block 0 ($camlUnbox_closure__foobar_1)
+and $camlUnbox_closure =
+  Block 0 ($camlUnbox_closure__foobar_1)
+in
 cont done ($camlUnbox_closure)

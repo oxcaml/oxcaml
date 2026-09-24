@@ -1,3 +1,4 @@
+module_block_cells ($camlN_way_join_preserves_null__cell0)
 let $camlN_way_join_preserves_null__first_const_0 = Block 0 () in
 (let code size(38)
        f_0 (bit : imm tagged, bit' : imm tagged)
@@ -34,5 +35,9 @@ let $camlN_way_join_preserves_null__first_const_0 = Block 0 () in
  cont k (Pmakeblock))
   where k define_root_symbol (module_block) =
     let field_0 = %block_load.tag[`0`].`size`[`1`].[`0`] (module_block) in
-    let $camlN_way_join_preserves_null = Block 0 (field_0) in
+    let $camlN_way_join_preserves_null =
+      Block 0 (field_0)
+    and $camlN_way_join_preserves_null__cell0 =
+      Block 0 (field_0)
+    in
     cont done ($camlN_way_join_preserves_null)

@@ -1,3 +1,4 @@
+module_block_cells ($camlDeep_try_with__cell0 $camlDeep_try_with__cell1)
 let $camlDeep_try_with__immstring_1 = "Deep_try_with.E2" in
 let $camlDeep_try_with__immstring_0 = "Deep_try_with.E1" in
 apply ccall noalloc
@@ -54,7 +55,11 @@ apply ccall noalloc
             where k (x : imm tagged, y : imm tagged) =
               let int_add = %int_barith.add (x, y) in
               let Popaque = %opaque (int_add) in
-              let $camlDeep_try_with =
+              let $camlDeep_try_with__cell1 =
+                Block 0 ($camlDeep_try_with__E2_3)
+              and $camlDeep_try_with__cell0 =
+                Block 0 ($camlDeep_try_with__E1_2)
+              and $camlDeep_try_with =
                 Block 0 ($camlDeep_try_with__E1_2, $camlDeep_try_with__E2_3)
               in
               cont done ($camlDeep_try_with)))

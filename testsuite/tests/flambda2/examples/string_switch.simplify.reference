@@ -1,3 +1,4 @@
+module_block_cells ($camlString_switch__cell0)
 let $camlString_switch__immstring_0 = "Cow" in
 let $camlString_switch__immstring_1 = "Goat" in
 let $camlString_switch__immstring_2 = "Horse" in
@@ -63,5 +64,9 @@ in
 let $camlString_switch__of_string_7 =
   closure of_string_0_1 @of_string &toplevel
 in
-let $camlString_switch = Block 0 ($camlString_switch__of_string_7) in
+let $camlString_switch__cell0 =
+  Block 0 ($camlString_switch__of_string_7)
+and $camlString_switch =
+  Block 0 ($camlString_switch__of_string_7)
+in
 cont done ($camlString_switch)

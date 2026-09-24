@@ -1,3 +1,4 @@
+module_block_cells ($camlBlock_closure_rec__cell0)
 let code foo_0 deleted in
 let $camlBlock_closure_rec__foo_1 =
   closure foo_0_1 @foo &toplevel
@@ -10,5 +11,9 @@ and code rec loopify(never) size(8) newer_version_of(foo_0)
   in
   cont k (Pmakeblock)
 in
-let $camlBlock_closure_rec = Block 0 ($camlBlock_closure_rec__foo_1) in
+let $camlBlock_closure_rec__cell0 =
+  Block 0 ($camlBlock_closure_rec__foo_1)
+and $camlBlock_closure_rec =
+  Block 0 ($camlBlock_closure_rec__foo_1)
+in
 cont done ($camlBlock_closure_rec)

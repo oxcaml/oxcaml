@@ -1,3 +1,7 @@
+module_block_cells ($camlCode_size_of_single_arg_switch__cell0
+  $camlCode_size_of_single_arg_switch__cell1
+  $camlCode_size_of_single_arg_switch__cell2
+  $camlCode_size_of_single_arg_switch__cell3)
 let code switch_converted_to_lookup_table_0 deleted in
 let code switch_converted_to_lookup_table'_1 deleted in
 let code switch_converted_to_affine_2 deleted in
@@ -64,7 +68,15 @@ let $camlCode_size_of_single_arg_switch__switch_converted_to_affine'_5 =
   closure switch_converted_to_affine'_3_1 @switch_converted_to_affine'
     &toplevel
 in
-let $camlCode_size_of_single_arg_switch =
+let $camlCode_size_of_single_arg_switch__cell3 =
+  Block 0 ($camlCode_size_of_single_arg_switch__switch_converted_to_affine'_5)
+and $camlCode_size_of_single_arg_switch__cell2 =
+  Block 0 ($camlCode_size_of_single_arg_switch__switch_converted_to_affine_4)
+and $camlCode_size_of_single_arg_switch__cell1 =
+  Block 0 ($camlCode_size_of_single_arg_switch__switch_converted_to_lookup_table'_3)
+and $camlCode_size_of_single_arg_switch__cell0 =
+  Block 0 ($camlCode_size_of_single_arg_switch__switch_converted_to_lookup_table_1)
+and $camlCode_size_of_single_arg_switch =
   Block 0 ($camlCode_size_of_single_arg_switch__switch_converted_to_lookup_table_1,
            $camlCode_size_of_single_arg_switch__switch_converted_to_lookup_table'_3,
            $camlCode_size_of_single_arg_switch__switch_converted_to_affine_4,

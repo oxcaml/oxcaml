@@ -1,3 +1,5 @@
+module_block_cells ($camlBoxed_number_escape__cell0
+  $camlBoxed_number_escape__cell1)
 let code escape_0 deleted in
 let $camlBoxed_number_escape__int64_0 = 0L in
 let r = %block.mut.[`0`].`toplevel` ($camlBoxed_number_escape__int64_0) in
@@ -20,7 +22,11 @@ and code loopify(never) size(14) newer_version_of(escape_0)
   cont k (int_of_int64)
   with { r = r }
 in
-let $camlBoxed_number_escape =
+let $camlBoxed_number_escape__cell1 =
+  Block 0 ($camlBoxed_number_escape__escape_1)
+and $camlBoxed_number_escape__cell0 =
+  Block 0 (r)
+and $camlBoxed_number_escape =
   Block 0 (r, $camlBoxed_number_escape__escape_1)
 in
 cont done ($camlBoxed_number_escape)

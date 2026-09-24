@@ -1,3 +1,5 @@
+module_block_cells ($camlTests9__cell0 $camlTests9__cell1 $camlTests9__cell2
+  $camlTests9__cell3 $camlTests9__cell4 $camlTests9__cell5)
 let code length_aux_0 deleted in
 let code length_1 deleted in
 let code rev_append_2 deleted in
@@ -1148,7 +1150,19 @@ let code loopify(never) size(99) newer_version_of(foo_9)
     (sort : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) (42, l) -> k * k1
 in
 let $camlTests9__foo_8 = closure foo_9_1 @foo &toplevel in
-let $camlTests9 =
+let $camlTests9__cell5 =
+  Block 0 ($camlTests9__foo_8)
+and $camlTests9__cell4 =
+  Block 0 ($camlTests9__sort_uniq_7)
+and $camlTests9__cell3 =
+  Block 0 ($camlTests9__chop_6)
+and $camlTests9__cell2 =
+  Block 0 ($camlTests9__rev_append_5)
+and $camlTests9__cell1 =
+  Block 0 ($camlTests9__length_4)
+and $camlTests9__cell0 =
+  Block 0 ($camlTests9__length_aux_3)
+and $camlTests9 =
   Block 0 ($camlTests9__length_aux_3,
            $camlTests9__length_4,
            $camlTests9__rev_append_5,

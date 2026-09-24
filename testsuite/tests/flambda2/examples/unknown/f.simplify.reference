@@ -1,3 +1,4 @@
+module_block_cells ($camlF__cell0)
 let $camlF__string_0 = "index out of bounds" in
 let $camlF__block_1 =
   Block 0 ($`*predef*`.caml_exn_Invalid_argument, $camlF__string_0)
@@ -47,5 +48,9 @@ let code loopify(never) size(82) newer_version_of(maxson_0)
            cont k1 pop(regular k1) ($camlF__block_1))
 in
 let $camlF__maxson_2 = closure maxson_0_1 @maxson &toplevel in
-let $camlF = Block 0 ($camlF__maxson_2) in
+let $camlF__cell0 =
+  Block 0 ($camlF__maxson_2)
+and $camlF =
+  Block 0 ($camlF__maxson_2)
+in
 cont done ($camlF)

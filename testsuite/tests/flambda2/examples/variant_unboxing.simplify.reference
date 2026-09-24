@@ -1,3 +1,5 @@
+module_block_cells ($camlVariant_unboxing__cell0 $camlVariant_unboxing__cell1
+  $camlVariant_unboxing__cell2)
 let code f1_0 deleted in
 let code f2_1 deleted in
 let code f3_returning_a_2 deleted in
@@ -141,7 +143,13 @@ in
 let $camlVariant_unboxing__f3_returning_a_3 =
   closure f3_returning_a_2_1 @f3_returning_a &toplevel
 in
-let $camlVariant_unboxing =
+let $camlVariant_unboxing__cell2 =
+  Block 0 ($camlVariant_unboxing__f3_returning_a_3)
+and $camlVariant_unboxing__cell1 =
+  Block 0 ($camlVariant_unboxing__f2_2)
+and $camlVariant_unboxing__cell0 =
+  Block 0 ($camlVariant_unboxing__f1_1)
+and $camlVariant_unboxing =
   Block 0 ($camlVariant_unboxing__f1_1,
            $camlVariant_unboxing__f2_2,
            $camlVariant_unboxing__f3_returning_a_3)

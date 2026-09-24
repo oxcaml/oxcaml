@@ -1,3 +1,5 @@
+module_block_cells ($camlFunction_never_returns__cell0
+  $camlFunction_never_returns__cell1 $camlFunction_never_returns__cell2)
 let code f_0 deleted in
 let code foo_1 deleted in
 let code bar_2 deleted in
@@ -27,7 +29,13 @@ let code loopify(never) size(4) newer_version_of(bar_2)
     ($camlFunction_never_returns__f_1 : _ -> imm tagged) (0) -> never * k1
 in
 let $camlFunction_never_returns__bar_3 = closure bar_2_1 @bar &toplevel in
-let $camlFunction_never_returns =
+let $camlFunction_never_returns__cell2 =
+  Block 0 ($camlFunction_never_returns__bar_3)
+and $camlFunction_never_returns__cell1 =
+  Block 0 ($camlFunction_never_returns__foo_2)
+and $camlFunction_never_returns__cell0 =
+  Block 0 ($camlFunction_never_returns__f_1)
+and $camlFunction_never_returns =
   Block 0 ($camlFunction_never_returns__f_1,
            $camlFunction_never_returns__foo_2,
            $camlFunction_never_returns__bar_3)

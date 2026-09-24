@@ -26,6 +26,7 @@ val create :
   toplevel_my_alloc_region:Variable.t ->
   body:Flambda.Expr.t ->
   module_symbol:Symbol.t ->
+  module_block_cells:Symbol.t list ->
   t
 
 val return_continuation : t -> Continuation.t
@@ -35,6 +36,14 @@ val exn_continuation : t -> Continuation.t
 val toplevel_my_alloc_region : t -> Variable.t
 
 val module_symbol : t -> Symbol.t
+
+(** The per-field cells of the module block, in field order (void fields have no
+    cell). *)
+val module_block_cells : t -> Symbol.t list
+
+(** The symbols that must stay reachable from outside the unit: the module
+    symbol and the cells. *)
+val root_symbols : t -> Symbol.t list
 
 val body : t -> Flambda.Expr.t
 

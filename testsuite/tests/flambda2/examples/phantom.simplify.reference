@@ -1,3 +1,4 @@
+module_block_cells ($camlPhantom__cell0 $camlPhantom__cell1)
 let code is_true_1 deleted in
 let code is_false_2 deleted in
 let $camlPhantom__immstring_1 = "phantom.ml" in
@@ -263,5 +264,11 @@ let code inline(always) loopify(never) size(176) newer_version_of(Make2_5)
       cont k (Pmakeblock)
 in
 let $camlPhantom__Make2_8 = closure Make2_5_1 @Make2 &toplevel in
-let $camlPhantom = Block 0 ($camlPhantom__Make_5, $camlPhantom__Make2_8) in
+let $camlPhantom__cell1 =
+  Block 0 ($camlPhantom__Make2_8)
+and $camlPhantom__cell0 =
+  Block 0 ($camlPhantom__Make_5)
+and $camlPhantom =
+  Block 0 ($camlPhantom__Make_5, $camlPhantom__Make2_8)
+in
 cont done ($camlPhantom)

@@ -1,3 +1,5 @@
+module_block_cells ($camlId_switch__cell0 $camlId_switch__cell1
+  $camlId_switch__cell2)
 let code x_0 deleted in
 let code id_switch_1 deleted in
 let code not_switch_2 deleted in
@@ -31,7 +33,13 @@ in
 let $camlId_switch__not_switch_3 =
   closure not_switch_2_1 @not_switch &toplevel
 in
-let $camlId_switch =
+let $camlId_switch__cell2 =
+  Block 0 ($camlId_switch__not_switch_3)
+and $camlId_switch__cell1 =
+  Block 0 ($camlId_switch__id_switch_2)
+and $camlId_switch__cell0 =
+  Block 0 ($camlId_switch__x_1)
+and $camlId_switch =
   Block 0 ($camlId_switch__x_1,
            $camlId_switch__id_switch_2,
            $camlId_switch__not_switch_3)

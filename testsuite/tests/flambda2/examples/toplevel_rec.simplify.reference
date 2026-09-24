@@ -1,3 +1,5 @@
+module_block_cells ($camlToplevel_rec__cell0 $camlToplevel_rec__cell1
+  $camlToplevel_rec__cell2)
 let code g_1 deleted and code f_0 deleted in
 let z = %opaque (42) in
 let $camlToplevel_rec__f_1 =
@@ -36,7 +38,13 @@ and code rec loopify(never) size(10) newer_version_of(f_0)
       cont k (int_add)
   with { z = z }
 in
-let $camlToplevel_rec =
+let $camlToplevel_rec__cell2 =
+  Block 0 ($camlToplevel_rec__g_2)
+and $camlToplevel_rec__cell1 =
+  Block 0 ($camlToplevel_rec__f_1)
+and $camlToplevel_rec__cell0 =
+  Block 0 (z)
+and $camlToplevel_rec =
   Block 0 (z, $camlToplevel_rec__f_1, $camlToplevel_rec__g_2)
 in
 cont done ($camlToplevel_rec)

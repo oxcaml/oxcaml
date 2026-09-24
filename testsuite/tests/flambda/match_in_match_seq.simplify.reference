@@ -1,3 +1,4 @@
+module_block_cells ($camlMatch_in_match_seq__cell0)
 let code foo_12 deleted in
 let code loopify(never) size(35) newer_version_of(foo_12)
       foo_12_1 (param : imm tagged)
@@ -29,7 +30,9 @@ let $camlMatch_in_match_seq__foo_9 = closure foo_12_1 @foo &toplevel in
 let $camlMatch_in_match_seq__Pmakeblock_20 =
   Block 0 ($camlMatch_in_match_seq__foo_9)
 in
-let $camlMatch_in_match_seq =
+let $camlMatch_in_match_seq__cell0 =
+  Block 0 ($camlMatch_in_match_seq__Pmakeblock_20)
+and $camlMatch_in_match_seq =
   Block 0 ($camlMatch_in_match_seq__Pmakeblock_20)
 in
 cont done ($camlMatch_in_match_seq)

@@ -1,3 +1,4 @@
+module_block_cells ($camlCse_immutable_array_load__cell0)
 let code f_0 deleted in
 let code loopify(never) size(1) newer_version_of(f_0)
       f_0_1 (arr : imm array)
@@ -7,7 +8,9 @@ let code loopify(never) size(1) newer_version_of(f_0)
   cont k (1)
 in
 let $camlCse_immutable_array_load__f_1 = closure f_0_1 @f &toplevel in
-let $camlCse_immutable_array_load =
+let $camlCse_immutable_array_load__cell0 =
+  Block 0 ($camlCse_immutable_array_load__f_1)
+and $camlCse_immutable_array_load =
   Block 0 ($camlCse_immutable_array_load__f_1)
 in
 cont done ($camlCse_immutable_array_load)

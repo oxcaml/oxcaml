@@ -1,3 +1,4 @@
+module_block_cells ($camlAndor__cell0)
 let code is_valid_0 deleted in
 let code loopify(never) size(41) newer_version_of(is_valid_0)
       is_valid_0_1 (i : imm tagged)
@@ -24,5 +25,9 @@ let code loopify(never) size(41) newer_version_of(is_valid_0)
            cont k (int_lessequal))
 in
 let $camlAndor__is_valid_1 = closure is_valid_0_1 @is_valid &toplevel in
-let $camlAndor = Block 0 ($camlAndor__is_valid_1) in
+let $camlAndor__cell0 =
+  Block 0 ($camlAndor__is_valid_1)
+and $camlAndor =
+  Block 0 ($camlAndor__is_valid_1)
+in
 cont done ($camlAndor)

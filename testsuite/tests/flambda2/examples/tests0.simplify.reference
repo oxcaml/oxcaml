@@ -1,3 +1,4 @@
+module_block_cells ($camlTests0__cell0)
 let code f_0 deleted in
 let code loopify(never) size(1) newer_version_of(f_0)
       f_0_1 (param : imm tagged)
@@ -7,5 +8,9 @@ let code loopify(never) size(1) newer_version_of(f_0)
   cont k (0)
 in
 let $camlTests0__f_1 = closure f_0_1 @f &toplevel in
-let $camlTests0 = Block 0 ($camlTests0__f_1) in
+let $camlTests0__cell0 =
+  Block 0 ($camlTests0__f_1)
+and $camlTests0 =
+  Block 0 ($camlTests0__f_1)
+in
 cont done ($camlTests0)

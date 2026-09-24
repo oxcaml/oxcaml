@@ -1,3 +1,5 @@
+module_block_cells ($camlTests7__cell0 $camlTests7__cell1 $camlTests7__cell2
+  $camlTests7__cell3 $camlTests7__cell4)
 let $camlTests7__immstring_1 = "Cow" in
 let $camlTests7__immstring_2 = "Sheep" in
 let code f_0 deleted in
@@ -31,7 +33,17 @@ let code loopify(never) size(13) newer_version_of(foo_1)
   cont k (float_add)
 in
 let $camlTests7__foo_4 = closure foo_1_1 @foo &toplevel in
-let $camlTests7 =
+let $camlTests7__cell4 =
+  Block 0 ($camlTests7__foo_4)
+and $camlTests7__cell3 =
+  Block 0 ($camlTests7__f_3)
+and $camlTests7__cell2 =
+  Block 0 ($camlTests7__immstring_2)
+and $camlTests7__cell1 =
+  Block 0 ($camlTests7__immstring_1)
+and $camlTests7__cell0 =
+  Block 0 ($camlTests7__empty_block_0)
+and $camlTests7 =
   Block 0 ($camlTests7__empty_block_0,
            $camlTests7__immstring_1,
            $camlTests7__immstring_2,

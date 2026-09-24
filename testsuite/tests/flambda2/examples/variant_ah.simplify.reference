@@ -1,3 +1,4 @@
+module_block_cells ($camlVariant_ah__cell0 $camlVariant_ah__cell1)
 let code maybe_0 deleted in
 let code shouldn't_alloc_1 deleted in
 let code inline(always) loopify(never) size(18) newer_version_of(maybe_0)
@@ -34,7 +35,11 @@ in
 let $camlVariant_ah__shouldn't_alloc_2 =
   closure shouldn't_alloc_1_1 @shouldn't_alloc &toplevel
 in
-let $camlVariant_ah =
+let $camlVariant_ah__cell1 =
+  Block 0 ($camlVariant_ah__shouldn't_alloc_2)
+and $camlVariant_ah__cell0 =
+  Block 0 ($camlVariant_ah__maybe_1)
+and $camlVariant_ah =
   Block 0 ($camlVariant_ah__maybe_1, $camlVariant_ah__shouldn't_alloc_2)
 in
 cont done ($camlVariant_ah)

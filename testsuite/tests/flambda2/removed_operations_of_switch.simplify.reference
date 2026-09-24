@@ -1,3 +1,5 @@
+module_block_cells ($camlRemoved_operations_of_switch__cell0
+  $camlRemoved_operations_of_switch__cell1)
 let code f_0 deleted in
 let code g_1 deleted in
 let code loopify(never) size(27) newer_version_of(f_0)
@@ -28,7 +30,11 @@ let code loopify(never) size(4) newer_version_of(g_1)
       -> k * k1
 in
 let $camlRemoved_operations_of_switch__g_2 = closure g_1_1 @g &toplevel in
-let $camlRemoved_operations_of_switch =
+let $camlRemoved_operations_of_switch__cell1 =
+  Block 0 ($camlRemoved_operations_of_switch__g_2)
+and $camlRemoved_operations_of_switch__cell0 =
+  Block 0 ($camlRemoved_operations_of_switch__f_1)
+and $camlRemoved_operations_of_switch =
   Block 0 ($camlRemoved_operations_of_switch__f_1,
            $camlRemoved_operations_of_switch__g_2)
 in

@@ -1,3 +1,4 @@
+module_block_cells ($camlVariants__cell0)
 let code f_0 deleted in
 let code loopify(never) size(41) newer_version_of(f_0)
       f_0_1 (t : [ 0 |1 | 0 of imm tagged |1 of imm tagged * imm tagged ])
@@ -28,5 +29,9 @@ let code loopify(never) size(41) newer_version_of(f_0)
       cont k (Pfield)
 in
 let $camlVariants__f_1 = closure f_0_1 @f &toplevel in
-let $camlVariants = Block 0 ($camlVariants__f_1) in
+let $camlVariants__cell0 =
+  Block 0 ($camlVariants__f_1)
+and $camlVariants =
+  Block 0 ($camlVariants__f_1)
+in
 cont done ($camlVariants)

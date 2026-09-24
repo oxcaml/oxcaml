@@ -1,3 +1,4 @@
+module_block_cells ($camlVariant_unboxed__cell0)
 let $camlVariant_unboxed__immstring_0 = "variant_unboxed.ml" in
 let $camlVariant_unboxed__const_block_1 =
   Block 0 ($camlVariant_unboxed__immstring_0, 32, 14)
@@ -67,5 +68,9 @@ let code loopify(never) size(47) newer_version_of(foo_0)
            cont k (int_add))
 in
 let $camlVariant_unboxed__foo_3 = closure foo_0_1 @foo &toplevel in
-let $camlVariant_unboxed = Block 0 ($camlVariant_unboxed__foo_3) in
+let $camlVariant_unboxed__cell0 =
+  Block 0 ($camlVariant_unboxed__foo_3)
+and $camlVariant_unboxed =
+  Block 0 ($camlVariant_unboxed__foo_3)
+in
 cont done ($camlVariant_unboxed)

@@ -1,3 +1,4 @@
+module_block_cells ($camlVariants_and_if__cell0 $camlVariants_and_if__cell1)
 let code f_0 deleted in
 let $camlVariants_and_if__immstring_0 = "Variants_and_if.Foo" in
 apply ccall noalloc
@@ -28,7 +29,11 @@ apply ccall noalloc
             | 1 -> k (1)
     in
     let $camlVariants_and_if__f_2 = closure f_0_1 @f &toplevel in
-    let $camlVariants_and_if =
+    let $camlVariants_and_if__cell1 =
+      Block 0 ($camlVariants_and_if__f_2)
+    and $camlVariants_and_if__cell0 =
+      Block 0 ($camlVariants_and_if__Foo_1)
+    and $camlVariants_and_if =
       Block 0 ($camlVariants_and_if__Foo_1, $camlVariants_and_if__f_2)
     in
     cont done ($camlVariants_and_if)

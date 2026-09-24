@@ -1,3 +1,6 @@
+module_block_cells ($camlInlined_attribute_on_partial_application__cell0
+  $camlInlined_attribute_on_partial_application__cell1
+  $camlInlined_attribute_on_partial_application__cell2)
 let code f_0 deleted in
 let code loopify(never) size(7) stub
       partial_f_1 (param1 : imm tagged)
@@ -23,7 +26,13 @@ let $camlInlined_attribute_on_partial_application__partial_f_2 =
   closure partial_f_1 @partial_f &toplevel
   with { f = $camlInlined_attribute_on_partial_application__f_1 }
 in
-let $camlInlined_attribute_on_partial_application =
+let $camlInlined_attribute_on_partial_application__cell2 =
+  Block 0 (0)
+and $camlInlined_attribute_on_partial_application__cell1 =
+  Block 0 ($camlInlined_attribute_on_partial_application__partial_f_2)
+and $camlInlined_attribute_on_partial_application__cell0 =
+  Block 0 ($camlInlined_attribute_on_partial_application__f_1)
+and $camlInlined_attribute_on_partial_application =
   Block 0 ($camlInlined_attribute_on_partial_application__f_1,
            $camlInlined_attribute_on_partial_application__partial_f_2,
            0)

@@ -1,3 +1,4 @@
+module_block_cells ($camlJoin_and_aliases__cell0)
 let $camlJoin_and_aliases__immstring_1 = "join_and_aliases.ml" in
 let $camlJoin_and_aliases__const_block_2 =
   Block 0 ($camlJoin_and_aliases__immstring_1, 35, 38)
@@ -32,5 +33,9 @@ let code loopify(never) size(35) newer_version_of(f_0)
              | 1 -> k1 pop(regular k1) ($camlJoin_and_aliases__Pmakeblock_3))
 in
 let $camlJoin_and_aliases__f_4 = closure f_0_1 @f &toplevel in
-let $camlJoin_and_aliases = Block 0 ($camlJoin_and_aliases__f_4) in
+let $camlJoin_and_aliases__cell0 =
+  Block 0 ($camlJoin_and_aliases__f_4)
+and $camlJoin_and_aliases =
+  Block 0 ($camlJoin_and_aliases__f_4)
+in
 cont done ($camlJoin_and_aliases)

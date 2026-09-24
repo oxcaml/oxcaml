@@ -1,3 +1,8 @@
+module_block_cells ($camlFob__cell0)
 let $camlFob__infinity_1 = infinity in
-let $camlFob = Block 0 ($camlFob__infinity_1) in
+let $camlFob__cell0 =
+  Block 0 ($camlFob__infinity_1)
+and $camlFob =
+  Block 0 ($camlFob__infinity_1)
+in
 cont done ($camlFob)

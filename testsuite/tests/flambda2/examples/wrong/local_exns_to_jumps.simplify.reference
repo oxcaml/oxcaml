@@ -1,3 +1,7 @@
+module_block_cells ($camlLocal_exns_to_jumps__cell0
+  $camlLocal_exns_to_jumps__cell1 $camlLocal_exns_to_jumps__cell2
+  $camlLocal_exns_to_jumps__cell3 $camlLocal_exns_to_jumps__cell4
+  $camlLocal_exns_to_jumps__cell5)
 let code f1_0 deleted in
 let code f2_1 deleted in
 let code f3_2 deleted in
@@ -211,7 +215,19 @@ apply ccall noalloc
                cont k (int_add_2)
          in
          let $camlLocal_exns_to_jumps__f4_7 = closure f4_3_1 @f4 &toplevel in
-         let $camlLocal_exns_to_jumps =
+         let $camlLocal_exns_to_jumps__cell5 =
+           Block 0 ($camlLocal_exns_to_jumps__f4_7)
+         and $camlLocal_exns_to_jumps__cell4 =
+           Block 0 ($camlLocal_exns_to_jumps__Exit2_6)
+         and $camlLocal_exns_to_jumps__cell3 =
+           Block 0 ($camlLocal_exns_to_jumps__f3_5)
+         and $camlLocal_exns_to_jumps__cell2 =
+           Block 0 ($camlLocal_exns_to_jumps__f2_4)
+         and $camlLocal_exns_to_jumps__cell1 =
+           Block 0 ($camlLocal_exns_to_jumps__f1_3)
+         and $camlLocal_exns_to_jumps__cell0 =
+           Block 0 ($camlLocal_exns_to_jumps__Exit_2)
+         and $camlLocal_exns_to_jumps =
            Block 0 ($camlLocal_exns_to_jumps__Exit_2,
                     $camlLocal_exns_to_jumps__f1_3,
                     $camlLocal_exns_to_jumps__f2_4,

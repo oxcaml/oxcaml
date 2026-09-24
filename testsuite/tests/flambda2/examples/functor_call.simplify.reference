@@ -1,3 +1,4 @@
+module_block_cells ($camlFunctor_call__cell0 $camlFunctor_call__cell1)
 let code test_2 deleted in
 let code inline(always) loopify(never) size(5) newer_version_of(test_2)
       test_2_1 (x : imm tagged)
@@ -29,7 +30,11 @@ let $camlFunctor_call__foo_6 =
   closure foo_1 @foo &toplevel
   with { X = $camlFunctor_call__Pmakeblock_5 }
 in
-let $camlFunctor_call =
+let $camlFunctor_call__cell1 =
+  Block 0 ($camlFunctor_call__foo_6)
+and $camlFunctor_call__cell0 =
+  Block 0 ($camlFunctor_call__Pmakeblock_5)
+and $camlFunctor_call =
   Block 0 ($camlFunctor_call__Pmakeblock_5, $camlFunctor_call__foo_6)
 in
 cont done ($camlFunctor_call)

@@ -1,3 +1,6 @@
+module_block_cells ($camlInlined_attribute_on_out_of_order_partial_application__cell0
+  $camlInlined_attribute_on_out_of_order_partial_application__cell1
+  $camlInlined_attribute_on_out_of_order_partial_application__cell2)
 let code f_0 deleted in
 let code loopify(never) size(7) stub
       g_1 (param) my_closure &my_alloc_region my_depth -> k * k1 =
@@ -26,7 +29,13 @@ apply direct(f_0_1 &toplevel)
     (0, 0)
     -> k * error
   where k (h : imm tagged) =
-    let $camlInlined_attribute_on_out_of_order_partial_application =
+    let $camlInlined_attribute_on_out_of_order_partial_application__cell2 =
+      Block 0 (h)
+    and $camlInlined_attribute_on_out_of_order_partial_application__cell1 =
+      Block 0 ($camlInlined_attribute_on_out_of_order_partial_application__g_2)
+    and $camlInlined_attribute_on_out_of_order_partial_application__cell0 =
+      Block 0 ($camlInlined_attribute_on_out_of_order_partial_application__f_1)
+    and $camlInlined_attribute_on_out_of_order_partial_application =
       Block 0 ($camlInlined_attribute_on_out_of_order_partial_application__f_1,
                $camlInlined_attribute_on_out_of_order_partial_application__g_2,
                h)

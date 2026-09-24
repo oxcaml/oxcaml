@@ -1,0 +1,20 @@
+block size = 7
+cell0 size = 1
+cell1 size = 1
+cell2 size = 1
+cell3 size = 2
+cell4 size = 2
+cell0[0] = block[0] (f): OK
+cell1[0] = block[1] (n): OK
+cell2[0] = block[4] (u): OK
+cell3[0] = block[2] (snd p): OK
+cell3[1] = block[5] (fst p): OK
+cell4[0] = block[3] (snd q): OK
+cell4[1] = block[6] (fst q): OK
+f 3 via cell0: OK
+n via cell1: OK
+u via cell2: OK
+snd p via cell3: OK
+fst p via cell3: OK
+snd q via cell4: OK
+fst q via cell4: OK

@@ -1,3 +1,5 @@
+module_block_cells ($camlUnused_bucket_switch__cell0
+  $camlUnused_bucket_switch__cell1)
 let code opaque_0 deleted in
 let $camlUnused_bucket_switch__immstring_0 = "urk" in
 let code f_1 deleted in
@@ -47,7 +49,11 @@ let ghost_region = %begin_ghost_region () in
   where k (region_return : imm tagged) =
     let `unit` = %end_region (`region`) in
     let unit_1 = %end_ghost_region (ghost_region) in
-    let $camlUnused_bucket_switch =
+    let $camlUnused_bucket_switch__cell1 =
+      Block 0 (region_return)
+    and $camlUnused_bucket_switch__cell0 =
+      Block 0 ($camlUnused_bucket_switch__opaque_1)
+    and $camlUnused_bucket_switch =
       Block 0 ($camlUnused_bucket_switch__opaque_1, region_return)
     in
     cont done ($camlUnused_bucket_switch)

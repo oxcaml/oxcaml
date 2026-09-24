@@ -1,3 +1,5 @@
+module_block_cells ($camlMeet_with_incompatible_kinds__cell0
+  $camlMeet_with_incompatible_kinds__cell1)
 let $camlMeet_with_incompatible_kinds__float_0 = 0x1.8p+1 in
 let code aux_0 deleted in
 let code f_1 deleted in
@@ -32,7 +34,11 @@ let code loopify(never) size(10) newer_version_of(f_1)
   cont k (Pmakeblock)
 in
 let $camlMeet_with_incompatible_kinds__f_2 = closure f_1_1 @f &toplevel in
-let $camlMeet_with_incompatible_kinds =
+let $camlMeet_with_incompatible_kinds__cell1 =
+  Block 0 ($camlMeet_with_incompatible_kinds__f_2)
+and $camlMeet_with_incompatible_kinds__cell0 =
+  Block 0 ($camlMeet_with_incompatible_kinds__aux_1)
+and $camlMeet_with_incompatible_kinds =
   Block 0 ($camlMeet_with_incompatible_kinds__aux_1,
            $camlMeet_with_incompatible_kinds__f_2)
 in

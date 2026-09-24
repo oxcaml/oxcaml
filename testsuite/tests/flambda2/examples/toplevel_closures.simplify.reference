@@ -1,3 +1,5 @@
+module_block_cells ($camlToplevel_closures__cell0
+  $camlToplevel_closures__cell1 $camlToplevel_closures__cell2)
 let code f_0 deleted in
 let code g_1 deleted in
 let r = %block.mut.[`0`].`toplevel` (42) in
@@ -29,7 +31,13 @@ and code loopify(never) size(8) newer_version_of(g_1)
   cont k (int_add_1)
   with { r_1 = r }
 in
-let $camlToplevel_closures =
+let $camlToplevel_closures__cell2 =
+  Block 0 ($camlToplevel_closures__g_2)
+and $camlToplevel_closures__cell1 =
+  Block 0 ($camlToplevel_closures__f_1)
+and $camlToplevel_closures__cell0 =
+  Block 0 (r)
+and $camlToplevel_closures =
   Block 0 (r, $camlToplevel_closures__f_1, $camlToplevel_closures__g_2)
 in
 cont done ($camlToplevel_closures)

@@ -172,5 +172,3 @@ let ids_for_export t =
   List.map Pattern.ids_for_export t |> Ids_for_export.union_list
 
 let concat t1 t2 = t1 @ t2
-
-let gc_roots t = List.concat_map Pattern.gc_roots t

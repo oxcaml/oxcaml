@@ -36,6 +36,7 @@ let r =
   let y = if Sys.opaque_identity true then A g else B f in
   (k[@inlined]) x y
 [%%expect_fexpr Simplify{|
+module_block_cells ($camlTOP3__cell0)
 let $camlTOP3__immstring_2 = "" in
 let $camlTOP3__const_block_3 = Block 0 ($camlTOP3__immstring_2, 27, 11) in
 let $camlTOP3__Pmakeblock_4 =
@@ -65,6 +66,6 @@ in
                 | 0 -> k
                 | 1 -> error pop(regular error) ($camlTOP3__Pmakeblock_4)))
   where k =
-    let $camlTOP3 = Block 0 (0) in
+    let $camlTOP3__cell0 = Block 0 (0) and $camlTOP3 = Block 0 (0) in
     cont done ($camlTOP3)
 |}]

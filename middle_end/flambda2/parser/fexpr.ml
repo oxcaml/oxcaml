@@ -434,4 +434,7 @@ and static_closure_binding =
     fun_decl : fun_decl
   }
 
-type flambda_unit = { body : expr }
+type flambda_unit =
+  { module_block_cells : symbol list;
+    body : expr
+  }
