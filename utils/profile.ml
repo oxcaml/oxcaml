@@ -86,6 +86,7 @@ module Measure_diff = struct
     duration : float;
     allocated_words : float;
     counters : Counters.t;
+    invocations : int;
   }
   let zero () = {
     timestamp = timestamp ();
@@ -93,6 +94,7 @@ module Measure_diff = struct
     duration = 0.;
     allocated_words = 0.;
     counters = Counters.create ();
+    invocations = 0;
   }
   let accumulate t (m1 : Measure.t) (m2 : Measure.t) = {
     timestamp = t.timestamp;
@@ -100,7 +102,8 @@ module Measure_diff = struct
     duration = t.duration +. (m2.time -. m1.time);
     allocated_words =
       t.allocated_words +. (m2.allocated_words -. m1.allocated_words);
-    counters = Counters.union t.counters m2.counters
+    counters = Counters.union t.counters m2.counters;
+    invocations = t.invocations + 1;
   }
   let of_diff m1 m2 =
     accumulate (zero ()) m1 m2
@@ -252,6 +255,7 @@ let compute_other_category (E table : hierarchy) (total : Measure_diff.t) =
       duration = p1.duration -. p2.duration;
       allocated_words = p1.allocated_words -. p2.allocated_words;
       counters = Counters.create ();
+      invocations = 0;
     }
   ) table;
   !r
@@ -262,7 +266,7 @@ let profile_list_with_other ~nesting hierarchy total =
     list @ ["other", (compute_other_category hierarchy total, create ())]
   else []
 
-type row = R of string * (float * display) list * row list
+type row = R of string * int * (float * display) list * row list
 
 let rec map_hierarchy ~nesting make_row hierarchy total =
   let list = profile_list_with_other ~nesting hierarchy total in
@@ -286,7 +290,7 @@ let rows_of_hierarchy hierarchy measure_diff columns timings_precision =
         make p.allocated_words ~f:memory_word_display
       | `Counters -> counters_display p.counters
     ) columns in
-    R (name, values, children)
+    R (name, p.invocations, values, children)
   in
   map_profile make_row hierarchy measure_diff
 
@@ -339,7 +343,7 @@ let record_action ~gettimeofday ~name f =
 
 let max_by_column ~n_columns rows =
   let a = Array.make n_columns 0. in
-  let rec loop (R (_, values, rows)) =
+  let rec loop (R (_, _, values, rows)) =
     List.iteri (fun i (v, _) -> a.(i) <- Float.max a.(i) v) values;
     List.iter loop rows
   in
@@ -348,7 +352,7 @@ let max_by_column ~n_columns rows =
 
 let width_by_column ~n_columns ~display_cell rows =
   let a = Array.make n_columns 1 in
-  let rec loop (R (_, values, rows)) =
+  let rec loop (R (_, _, values, rows)) =
     List.iteri (fun i cell ->
       let _, str = display_cell i cell ~width:0 in
       a.(i) <- Int.max a.(i) (String.length str)
@@ -359,7 +363,9 @@ let width_by_column ~n_columns ~display_cell rows =
   a
 
 let output_rows
-    ~(output_row : prefix:string -> cell_strings:string list -> name:string -> unit)
+    ~(output_row :
+        prefix:string -> cell_strings:string list -> name:string
+        -> invocations:int -> unit)
     ~(new_prefix : prev:string -> curr_name:string -> string)
     ~(always_output_ancestors : bool)
     ~(pad_empty : bool)
@@ -368,7 +374,7 @@ let output_rows
   let n_columns =
     match rows with
     | [] -> 0
-    | R (_, values, _) :: _ -> List.length values
+    | R (_, _, values, _) :: _ -> List.length values
   in
   let maxs = max_by_column ~n_columns rows in
   let display_cell i (_, c) ~width =
@@ -380,16 +386,18 @@ let output_rows
   let widths = width_by_column ~n_columns ~display_cell rows in
   (* We track print row functions in a queue to ensure ancestors not worth displaying have
   print functions executed if a descendant is worth displaying (possible with counters) *)
-  let rec loop (R (name, values, rows)) ~prefix ~output_stack =
+  let rec loop (R (name, invocations, values, rows)) ~prefix ~output_stack =
     let worth_displaying, cell_strings =
       values
       |> List.mapi (fun i cell -> display_cell i cell ~width:widths.(i))
       |> List.split
     in
-    let should_output_row = List.exists (fun b -> b) worth_displaying in
+    let should_output_row =
+      List.exists (fun b -> b) worth_displaying || invocations > 10
+    in
     let output_current () =
       let cell_strings = if should_output_row then cell_strings else [] in
-      output_row ~prefix ~cell_strings ~name
+      output_row ~prefix ~cell_strings ~name ~invocations
     in
     output_stack := output_current :: (if always_output_ancestors then !output_stack else []);
     if should_output_row then
@@ -408,8 +416,12 @@ let output_columns output_rows_f columns ~timings_precision =
 
 let print ppf =
   output_rows
-    ~output_row:(fun ~prefix ~cell_strings ~name ->
-      Format.fprintf ppf "%s%s %s@\n" prefix (String.concat " " cell_strings) name)
+    ~output_row:(fun ~prefix ~cell_strings ~name ~invocations ->
+      let invocations =
+        if invocations > 1 then Printf.sprintf " (%d calls)" invocations else ""
+      in
+      Format.fprintf ppf "%s%s %s%s@\n" prefix (String.concat " " cell_strings)
+        name invocations)
     ~new_prefix:(fun ~prev ~curr_name:_ -> "  " ^ prev)
     ~always_output_ancestors:true
     ~pad_empty:true
@@ -429,7 +441,7 @@ let output_to_csv ppf columns =
   in
   let output_row_f =
     output_rows
-      ~output_row:(fun ~prefix ~cell_strings ~name ->
+      ~output_row:(fun ~prefix ~cell_strings ~name ~invocations:_ ->
         Format.fprintf ppf "%s@\n" (to_csv ((prefix ^ add_suffix name) :: cell_strings)))
       ~new_prefix:(fun ~prev ~curr_name ->
         Format.sprintf "%s%s/" prev (add_suffix curr_name))
