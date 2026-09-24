@@ -1135,3 +1135,15 @@ let get_code_metadata t code_id =
        changes"
       Code_id.print code_id
   | Some code_change -> code_change.code_metadata
+
+let find_code_metadata t code_id =
+  match Code_id.Map.find_opt code_id t with
+  | None ->
+    if Current_unit.is_current (Code_id.get_compilation_unit code_id)
+    then
+      Misc.fatal_errorf
+        "[find_code_metadata]: code_id %a is in current unit but missing in \
+         code changes"
+        Code_id.print code_id
+    else None
+  | Some code_change -> Some code_change.code_metadata

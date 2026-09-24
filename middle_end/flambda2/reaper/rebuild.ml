@@ -51,9 +51,8 @@ type should_preserve_direct_calls =
 
 type env =
   { machine_width : Target_system.Machine_width.t;
-    uses : Unboxing_analysis.result;
+    uses : Analysis.result;
     code_changes : Unboxing_analysis.code_changes;
-    code_deps : Traverse_acc.code_dep Code_id.Map.t;
     get_code_metadata : Code_id.t -> Code_metadata.t;
     (* TODO change names *)
     cont_params_to_keep :
@@ -468,13 +467,7 @@ let rewrite_set_of_closures env res ~(bound : Name.t list)
                     only_full_applications || changed_calling_convention
                 }
             else
-              let code_metadata =
-                if
-                  Current_unit.is_current (Code_id.get_compilation_unit code_id)
-                then
-                  Unboxing_analysis.get_code_metadata env.code_changes code_id
-                else env.get_code_metadata code_id
-              in
+              let code_metadata = env.get_code_metadata code_id in
               Deleted
                 { function_slot_size =
                     Code_metadata.function_slot_size code_metadata;
@@ -1050,12 +1043,9 @@ let decide_whether_apply_needs_calling_convention_change env apply =
   in
   match code_id_actually_called with
   | None -> Unboxing_analysis.Not_changing_calling_convention, call_kind
-  | Some code_id -> (
-    match Code_id.Map.find_opt code_id env.code_deps with
-    | None -> Unboxing_analysis.Not_changing_calling_convention, call_kind
-    | Some _ ->
-      ( Unboxing_analysis.get_calling_convention_change env.code_changes code_id,
-        call_kind ))
+  | Some code_id ->
+    ( Unboxing_analysis.get_calling_convention_change env.code_changes code_id,
+      call_kind )
 
 let rebuild_apply env apply =
   let callee_is_dead =
@@ -2358,8 +2348,7 @@ type result =
     code_ids_to_remember : Code_id.Set.t
   }
 
-let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
-    ~ordered_code_ids
+let rebuild ~machine_width ~ordered_code_ids
     ~(continuation_info : Traverse_acc.continuation_info Continuation.Map.t)
     ~fixed_arity_continuations ~final_typing_env ~types_rewrite_context
     ~code_changes (solved_dep : Analysis.result) get_code_metadata toplevel_expr
@@ -2402,11 +2391,17 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
     | Always -> Yes
     | Auto -> Auto
   in
+  (* Make sure [get_code_metadata] returns the updated code metadata in case it
+     exists *)
+  let get_code_metadata code_id =
+    match Unboxing_analysis.find_code_metadata code_changes code_id with
+    | Some code_metadata -> code_metadata
+    | None -> get_code_metadata code_id
+  in
   let env =
     { machine_width;
       uses = solved_dep;
       code_changes;
-      code_deps;
       get_code_metadata;
       cont_params_to_keep;
       should_keep_param;
