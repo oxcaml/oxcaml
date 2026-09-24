@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Namespaces</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <script type="text/javascript" src="a.js"></script>
+    <script type="text/javascript" src="b.js"></script>
+    <script type="text/javascript">
+      function shouldRaise(f) {
+	try {
+	  f();
+	  throw new Error ("should have raised");
+	} catch (e) { console.log("OK"); return }
+      }
+      function shouldNotRaise(f) {
+	try {
+	  f();
+	  console.log("OK");
+	  return
+	} catch (e) { throw new Error ("should have raised"); }
+      }
+      var a = implemA(globalThis);
+      var b = implemB(globalThis);
+      shouldNotRaise (() => a.tryWith(a.raise));
+      shouldNotRaise (() => b.tryWith(b.raise));
+      shouldRaise(() => a.tryWith(b.raise));
+      shouldRaise(() => b.tryWith(a.raise));
+    </script>
+  </head>
+</html>
