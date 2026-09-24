@@ -56,6 +56,13 @@
   (compilation_mode whole_program)
   (flags :standard)))
 
+(test
+ (name bigarray_set_view)
+ (modes wasm)
+ (wasm_of_ocaml
+  (compilation_mode whole_program)
+  (flags :standard %{dep:bigarray_set_view.wat})))
+
 (tests
  (names string_interning)
  (modes wasm))
