@@ -93,5 +93,9 @@ let apply_renaming { param; kind; uid } renaming =
   let param = Renaming.apply_variable renaming param in
   create param kind uid
 
+let import_and_rename { param; kind; uid } renaming =
+  let renaming, param = Renaming.bind_variable renaming param in
+  renaming, create param kind uid
+
 let ids_for_export { param; kind = _; uid = _ } =
   Ids_for_export.add_variable Ids_for_export.empty param

@@ -126,6 +126,23 @@ let renaming t1 ~guaranteed_fresh:t2 =
   | (Singleton _ | Set_of_closures _ | Static _), _ ->
     Misc.fatal_errorf "Pattern mismatch:@ %a@ and@ %a" print t1 print t2
 
+let import_and_rename t renaming =
+  match t with
+  | Singleton bound_var ->
+    let renaming, bound_var = Bound_var.import_and_rename bound_var renaming in
+    renaming, Singleton bound_var
+  | Set_of_closures bound_vars ->
+    let renaming, bound_vars =
+      List.fold_left_map
+        (fun renaming bound_var ->
+          Bound_var.import_and_rename bound_var renaming)
+        renaming bound_vars
+    in
+    renaming, Set_of_closures bound_vars
+  | Static _ ->
+    (* We never permute symbols or code IDs. *)
+    renaming, t
+
 let singleton var = Singleton var
 
 let set_of_closures bound_vars =

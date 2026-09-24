@@ -78,10 +78,12 @@ val free_names :
   (module Bindable.S with type t = 'bindable) ->
   ('bindable, 'term) t ->
   free_names_of_term:('term -> Name_occurrences.t) ->
+  apply_renaming_to_term:('term -> Renaming.t -> 'term) ->
   Name_occurrences.t
 
 val ids_for_export :
   (module Bindable.S with type t = 'bindable) ->
   ('bindable, 'term) t ->
   ids_for_export_of_term:('term -> Ids_for_export.t) ->
+  apply_renaming_to_term:('term -> Renaming.t -> 'term) ->
   Ids_for_export.t
