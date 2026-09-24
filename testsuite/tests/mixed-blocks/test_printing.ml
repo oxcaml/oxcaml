@@ -1,6 +1,5 @@
 (* TEST
- { expect; }
- { expect.opt; }
+ { expect; expect.opt; }
 *)
 
 (* Test printing of values in the bytecode and native toplevels *)
