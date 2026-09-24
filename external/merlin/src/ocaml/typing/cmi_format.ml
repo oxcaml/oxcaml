@@ -23,7 +23,7 @@ type pers_flags =
 type kind =
   | Normal of {
       cmi_impl : Compilation_unit.t;
-      cmi_arg_for : Global_module.Parameter_name.t option;
+      cmi_arg_for : Types.arg_for option;
     }
   | Parameter
 

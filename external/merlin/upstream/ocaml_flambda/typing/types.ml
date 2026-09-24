@@ -1142,6 +1142,12 @@ let signature_item_representation sg =
 let bound_value_identifiers_and_sorts sigs =
   List.filter_map signature_item_representation sigs
 
+type arg_for = {
+  arg_param : Global_module.Parameter_name.t;
+  arg_block_idx : int;
+  arg_main_repr : module_representation;
+}
+
 let rec mixed_block_element_to_string = function
   | Scannable _ -> "Scannable"
   | Float_boxed -> "Float_boxed"

@@ -1378,6 +1378,22 @@ val bound_value_identifiers_and_sorts :
 
 val signature_item_id : signature_item -> Ident.t
 
+(* Info for a compilation unit that implements a parameter (that is, was
+   compiled with [-as-argument-for]); stored in the unit's [.cmi]. Note that
+   if the CU is itself parameterised, this information describes instances
+   rather than the base CU. *)
+type arg_for = {
+  arg_param : Global_module.Parameter_name.t;
+    (* The parameter implemented (the [P] in [-as-argument-for P]) *)
+  arg_block_idx : int;
+    (* The index of the _argument block_ within the main module block (for a
+       parameterised unit, within the block returned by its instantiating
+       functor). [-instantiate] passes the argument block to instantiating
+       functors; its signature is exactly that of the parameter. *)
+  arg_main_repr : module_representation;
+    (* The representation of the block that [arg_block_idx] indexes into *)
+}
+
 val equal_mixed_block_element_up_to_scannable_axes :
   mixed_block_element -> mixed_block_element -> bool
 (* CR layouts: this appears to be dead code *)

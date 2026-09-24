@@ -131,6 +131,7 @@ val find_import :
   'a t -> Compilation_unit.Name.t ->
   Compilation_unit.t option
   * Global_module.Parameter_name.t list
+  * Types.arg_for option
   * Signature_with_global_bindings.t
 val find : allow_hidden:bool -> 'a t -> 'a sig_reader
   -> Global_module.Name.t -> allow_excess_args:bool -> 'a
@@ -161,11 +162,6 @@ val is_imported_opaque : 'a t -> Compilation_unit.Name.t -> bool
 (* [register_import_as_opaque penv md] registers [md] in [penv] as an
    opaque module *)
 val register_import_as_opaque : 'a t -> Compilation_unit.Name.t -> unit
-
-(* [implemented_parameter penv md] returns the argument to [-as-argument-for]
-   that [md] was compiled with. *)
-val implemented_parameter : 'a t
-  -> Global_module.Name.t -> Global_module.Parameter_name.t option
 
 val global_of_global_name : 'a t
   -> check:bool
