@@ -194,3 +194,74 @@ heap_known_length_too_big:
   addq  $8, %rsp
   ret
 |}]
+
+(* Flambda knows the length of the array created by the runtime, so it can
+   remove bounds checks and fold [Array.length]. *)
+
+external[@layout_poly] length :
+  ('a : any mod separable). 'a array @ local -> int = "%array_length"
+
+external[@layout_poly] set :
+  ('a : any mod separable). 'a array @ local -> int -> 'a -> unit
+  = "%array_safe_set"
+
+let known_length_no_bounds_check () : int32_u array =
+  let t = make_heap 1 in
+  set t 0 #1l;
+  t
+[%%expect_asm X86_64{|
+known_length_no_bounds_check:
+  subq  $8, %rsp
+  subq  $16, %r15
+  cmpq  (%r14), %r15
+  jb    <hidden GC jump pad>
+.L0:
+  leaq  8(%r15), %rax
+  movabsq $72057594037928963, %rbx
+  movq  %rbx, -8(%rax)
+  movl  $1, %ebx
+  movl  %ebx, (%rax)
+  addq  $8, %rsp
+  ret
+|}]
+
+let unknown_length_array_length n =
+  let t : int32_u array = make_heap n in
+  length t
+[%%expect_asm X86_64{|
+unknown_length_array_length:
+  subq  $8, %rsp
+  movq  %rax, %rdi
+  movq  %rax, (%rsp)
+  movq  caml_make_unboxed_int32_vect@GOTPCREL(%rip), %rax
+  call  caml_c_call@PLT
+.L0:
+  movq  (%rsp), %rax
+  addq  $8, %rsp
+  ret
+|}]
+
+(* [%makearray_dynamic] creates local arrays of values by calling
+   [caml_array_make_local]. *)
+
+external[@layout_poly] make_local_with_init :
+  ('a : any mod separable). int -> 'a -> 'a array @ local
+  = "%makearray_dynamic"
+
+let local_values_known_length_no_bounds_check () : int array =
+  exclave_
+  let t = make_local_with_init 1 0 in
+  set t 0 1;
+  t
+[%%expect_asm X86_64{|
+local_values_known_length_no_bounds_check:
+  subq  $8, %rsp
+  movl  $1, %esi
+  movl  $3, %edi
+  movq  caml_array_make_local@GOTPCREL(%rip), %rax
+  call  caml_c_call@PLT
+.L0:
+  movq  $3, (%rax)
+  addq  $8, %rsp
+  ret
+|}]
