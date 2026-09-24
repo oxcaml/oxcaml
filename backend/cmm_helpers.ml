@@ -712,12 +712,20 @@ let max_signed_bit_length =
   check_equal_int_1 "max_signed_bit_length" max_signed_bit_length
     ~engine:max_signed_bit_length'
 
+let low_bit_is_clear = function
+  | Cconst_int (n, _) -> n land 1 = 0
+  | Cconst_natint (n, _) -> Nativeint.equal (Nativeint.logand n 1n) 0n
+  | _ -> false
+
 let rec ignore_low_bit_int = function
   | Cop
       ( Caddi,
         [(Cop (Clsl, [_; Cconst_int (n, _)], _) as c); Cconst_int (1, _)],
         _ )
     when n > 0 && is_defined_shift n ->
+    ignore_low_bit_int c
+  | Cop (Caddi, [(Cop (Cand, [_; mask], _) as c); Cconst_int (1, _)], _)
+    when low_bit_is_clear mask ->
     ignore_low_bit_int c
   | Cop (Cor, [c; Cconst_int (1, _)], _) -> ignore_low_bit_int c
   | Cop (Clsl, [Cop (Clsr, [c; Cconst_int (1, _)], _); Cconst_int (1, _)], _) ->
@@ -736,6 +744,12 @@ let rec ignore_low_bit_int' arg =
                   As (c, Binop (Lsl, Any c1, Const_int n)),
                   Const_int_fixed 1 );
             guard = (fun env -> env#.n > 0 && is_defined_shift env#.n)
+          }
+      => fun env -> ignore_low_bit_int' env#.c );
+      ( Guarded
+          { pat =
+              Binop (Add, As (c, Binop (And, Any c1, Any c2)), Const_int_fixed 1);
+            guard = (fun env -> low_bit_is_clear env#.c2)
           }
       => fun env -> ignore_low_bit_int' env#.c );
       ( Binop (Or, Any c, Const_int_fixed 1) => fun env ->
@@ -925,6 +939,11 @@ and lsl_int c1 c2 dbg =
           | Cop (Cand, [x; ((Cconst_int _ | Cconst_natint _) as y)], _)
             when Nativeint.shift_left (const_exn y) n = 0n ->
             replace x ~with_:(Cconst_int (0, dbg))
+          | Cop ((Clsr | Casr), [x; Cconst_int (n', _)], _)
+            when n' = n && n < 32 ->
+            (* For [n >= 32] the mask isn't a 32-bit immediate, so the shifts
+               are shorter. *)
+            Cop (Cand, [x; Cconst_int (-1 lsl n, dbg)], dbg)
           | c1 -> Cop (Clsl, [c1; c2], dbg)))
       | Cop (Clsl, [x; (Cconst_int (n', _) as y)], dbg'), c2
         when is_defined_shift n' ->
@@ -1008,6 +1027,11 @@ let rec and_const e n dbg =
                      Cconst_int (1, dbg) ],
                    dbg ))
               dbg
+          | Cop (Casr, [x; Cconst_int (c, _)], _)
+            when c > 0 && is_defined_shift c
+                 && Nativeint.equal n (Nativeint.shift_right_logical (-1n) c) ->
+            (* the mask drops exactly the bits copied from the sign bit *)
+            lsr_const x c dbg
           | Cop (Cload { memory_chunk; mutability; is_atomic }, args, dbg) -> (
             let[@local] load memory_chunk =
               Cop (Cload { memory_chunk; mutability; is_atomic }, args, dbg)
