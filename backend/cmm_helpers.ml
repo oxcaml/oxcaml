@@ -1658,6 +1658,110 @@ let unsigned_mod_int c1 c2 dbg =
           sub_int c1 (mul_int (unsigned_div_int c1 c2 dbg) c2 dbg) dbg)
   | _, _ -> Cop (Cmodi { signed = false }, [c1; c2], dbg)
 
+(* Equality tests *)
+
+(* [x = n] and [x <> n] can be pushed through an operation on [x] whose effect
+   on the constant is invertible: [(x + k) = n <=> x = n - k], [(x xor k) = n
+   <=> x = n xor k], and so on. The constants are combined as native integers,
+   so the equivalences hold exactly, wraparound included. *)
+
+let equality_holds (cmp : integer_comparison) equal =
+  match cmp with
+  | Ceq -> equal
+  | Cne -> not equal
+  | Clt | Cgt | Cle | Cge | Cult | Cugt | Cule | Cuge ->
+    Misc.fatal_error "equality_holds: not an equality"
+
+(* The operands of a binary operation, one of which is a constant *)
+let operand_and_const = function
+  | [x; k] when is_constant k -> Some (x, const_exn k)
+  | [k; x] when is_constant k -> Some (x, const_exn k)
+  | _ -> None
+
+let rec int_equality_const (cmp : integer_comparison) x n dbg =
+  let[@local] result b = replace x ~with_:(Cconst_int (Bool.to_int b, dbg)) in
+  let[@local] impossible () = result (equality_holds cmp false) in
+  let[@local] default () =
+    Cop (Ccmpi cmp, [x; natint_const_untagged dbg n], dbg)
+  in
+  let low_bits_mask s = Nativeint.pred (Nativeint.shift_left 1n s) in
+  match get_const x with
+  | Some m -> result (equality_holds cmp (Nativeint.equal m n))
+  | None -> (
+    match x with
+    | Cop (Caddi, args, _) -> (
+      match operand_and_const args with
+      | Some (x, k) -> int_equality_const cmp x (Nativeint.sub n k) dbg
+      | None -> default ())
+    | Cop (Csubi, [x; k], _) when is_constant k ->
+      int_equality_const cmp x (Nativeint.add n (const_exn k)) dbg
+    | Cop (Csubi, [k; x], _) when is_constant k ->
+      int_equality_const cmp x (Nativeint.sub (const_exn k) n) dbg
+    | Cop (Cxor, args, _) -> (
+      match operand_and_const args with
+      | Some (x, k) -> int_equality_const cmp x (Nativeint.logxor n k) dbg
+      | None -> default ())
+    | Cop (Cor, args, _) -> (
+      match operand_and_const args with
+      | Some (x, k) ->
+        if not (Nativeint.equal (Nativeint.logand n k) k)
+        then impossible ()
+        else
+          (* the bits of [k] are set on both sides; compare the others *)
+          int_equality_const cmp
+            (and_const x (Nativeint.lognot k) dbg)
+            (Nativeint.logxor n k) dbg
+      | None -> default ())
+    | Cop (Cand, args, _) -> (
+      match operand_and_const args with
+      | Some (x, k) ->
+        if not (Nativeint.equal (Nativeint.logand n (Nativeint.lognot k)) 0n)
+        then impossible ()
+        else
+          let cleared = Nativeint.lognot k in
+          let s = arch_bits - Misc.count_leading_zeroes_nativeint cleared in
+          if
+            s > 0 && is_defined_shift s
+            && Nativeint.equal cleared (low_bits_mask s)
+          then
+            (* [k] clears the low [s] bits, which are zero in [n] too: compare
+               the remaining bits *)
+            int_equality_const cmp (lsr_const x s dbg)
+              (Nativeint.shift_right_logical n s)
+              dbg
+          else default ()
+      | None -> default ())
+    | Cop (Clsl, [x; Cconst_int (s, _)], _) when s > 0 && is_defined_shift s ->
+      if not (Nativeint.equal (Nativeint.logand n (low_bits_mask s)) 0n)
+      then impossible ()
+      else if max_signed_bit_length x + s < arch_bits
+      then
+        (* no bit of [x] is shifted out, so [x << s] is injective on the values
+           [x] can take *)
+        int_equality_const cmp x (Nativeint.shift_right n s) dbg
+      else default ()
+    | _ -> default ())
+
+let rec int_equality (cmp : integer_comparison) x y dbg =
+  match get_const x, get_const y with
+  | Some n, _ -> int_equality_const cmp y n dbg
+  | _, Some n -> int_equality_const cmp x n dbg
+  | None, None -> (
+    match x, y with
+    | Cop (Caddi, [x; k1], _), Cop (Caddi, [y; k2], _)
+    | Cop (Cxor, [x; k1], _), Cop (Cxor, [y; k2], _)
+      when is_constant k1 && is_constant k2
+           && Nativeint.equal (const_exn k1) (const_exn k2) ->
+      (* the same invertible operation on both sides *)
+      int_equality cmp x y dbg
+    | ( Cop (Clsl, [x; Cconst_int (s, _)], _),
+        Cop (Clsl, [y; Cconst_int (s', _)], _) )
+      when s = s' && s > 0 && is_defined_shift s
+           && max_signed_bit_length x + s < arch_bits
+           && max_signed_bit_length y + s < arch_bits ->
+      int_equality cmp x y dbg
+    | _ -> Cop (Ccmpi cmp, [x; y], dbg))
+
 (* Bool *)
 
 let test_bool dbg cmm =
@@ -1669,7 +1773,7 @@ let test_bool dbg cmm =
     c
   | Cconst_int (n, dbg) ->
     if n = 1 then Cconst_int (0, dbg) else Cconst_int (1, dbg)
-  | c -> Cop (Ccmpi Cne, [c; Cconst_int (1, dbg)], dbg)
+  | c -> int_equality_const Cne c 1n dbg
 
 (* Float *)
 
@@ -5129,64 +5233,9 @@ let lsr_int_caml_raw ~dbg arg1 arg2 = or_const (lsr_int arg1 arg2 dbg) 1n dbg
 
 let asr_int_caml_raw ~dbg arg1 arg2 = or_const (asr_int arg1 arg2 dbg) 1n dbg
 
-let eq ~dbg x y =
-  match x, y with
-  | Cconst_int (n, _), Cop (Csubi, [Cconst_int (m, _); c], _)
-  | Cop (Csubi, [Cconst_int (m, _); c], _), Cconst_int (n, _)
-    when Misc.no_overflow_sub m n ->
-    (* [n = m - c] <=> [c = m - n]
+let eq ~dbg x y = int_equality Ceq x y dbg
 
-       This is typically generated by expressions of the form [if not expr then
-       ...], with [not expr] being compiled to [4 - c] and the condition for the
-       test becomes [1 = 4 - c].
-
-       We need to impose the side condition because the above equivalence hides
-       a subtlety: While [c] is a full-blooded native integer, [m] and [n] are
-       OCaml ints that will be sign-extended between now and run time. That in
-       itself doesn't break the equivalence. The problem is that we intend to
-       compute [m - n] right now, while [m] and [n] are one bit shorter. Thus
-       there's a bit of sleight of hand going on: the [m - n] we compute now may
-       not be the [m - n] that appears in the equivalence. [m - c], however,
-       _is_ subtraction of full native ints (it must be, since [c] can be any
-       native int). So [m - c] and [m - n] refer to two different operations and
-       we're cheekily swapping one for the other. We'll get away with it,
-       however, _so long as [m - n] doesn't overflow_.
-
-       Formally, writing [se] for sign extension, we can write a version of our
-       equivalence that's unconditionally true: [se(n) = se(m) - c] <=> [c =
-       se(m) - se(n)], where now [-] consistently means subtraction of native
-       ints. Effectively, we intend to write [c = se(m - n)] in the compiled
-       code (here [-] is instead subtraction of OCaml ints). This is the same as
-       [c = se(m) - se(n)] exactly when [se(m - n) = se(m) - se(n)], which is
-       another way of saying that [m - n] doesn't overflow.
-
-       The following z3 script confirms that this check is sufficient: *)
-    (*
-     *   (define-sort int63 () (_ BitVec 63))
-     *   (define-sort int64 () (_ BitVec 64))
-     *   (define-const z63 int63 ((_ int2bv 63) 0))
-     *
-     *   (declare-const m int63)
-     *   (declare-const n int63)
-     *   (declare-const c int64)
-     *
-     *   ; let no_overflow_sub a b = (a lxor (lnot b)) lor (b lxor (a-b)) < 0
-     *   (define-fun no_overflow_sub ((a int63) (b int63)) Bool
-     *     (bvslt (bvor (bvxor a (bvnot b)) (bvxor b (bvsub a b))) z63))
-     *
-     *   (assert (no_overflow_sub m n))
-     *
-     *   (assert (not (=
-     *     (= ((_ sign_extend 1) n) (bvsub ((_ sign_extend 1) m) c))
-     *     (= c ((_ sign_extend 1) (bvsub m n)))
-     *   )))
-     *
-     *   (check-sat)
-     *)
-    binary (Ccmpi Ceq) ~dbg c (Cconst_int (m - n, dbg))
-  | _, _ -> binary (Ccmpi Ceq) ~dbg x y
-
-let neq = binary (Ccmpi Cne)
+let neq ~dbg x y = int_equality Cne x y dbg
 
 let lt = binary (Ccmpi Clt)
 

@@ -386,8 +386,7 @@ let string_unsafe_get_and_use (t : string) : bool =
 [%%expect_asm X86_64{|
 string_unsafe_get_and_use:
   movzbq (%rax), %rax
-  leaq  1(%rax,%rax), %rax
-  cmpq  $131, %rax
+  cmpq  $65, %rax
   sete  %al
   movzbq %al, %rax
   leaq  1(%rax,%rax), %rax
