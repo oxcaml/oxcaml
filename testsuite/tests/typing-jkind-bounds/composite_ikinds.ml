@@ -601,6 +601,21 @@ Error:
 type ('a : immutable_data) t : immutable_data = Flat | Nested of 'a t t
 [%%expect {|
 type ('a : immutable_data) t = Flat | Nested of 'a t t
+|}, Principal{|
+Line 1, characters 65-71:
+1 | type ('a : immutable_data) t : immutable_data = Flat | Nested of 'a t t
+                                                                     ^^^^^^
+Error: Layout mismatch in final type declaration consistency check.
+       This is most often caused by the fact that type inference is not
+       clever enough to propagate layouts through variables in different
+       declarations. It is also not clever enough to produce a good error
+       message, so we'll say this instead:
+         The kind of 'a t/2 is immutable_data with 'a t/2 t/2
+           because it's a boxed variant type.
+         But the kind of 'a t/2 must be a subkind of immutable_data
+           because of the definition of t at line 1, characters 0-71.
+       A good next step is to add a layout annotation on a parameter to
+       the declaration where this error is reported.
 |}]
 
 let foo (t : int t @ contended) = use_uncontended t
@@ -611,6 +626,8 @@ val foo : int t @ contended -> unit = <fun>
 let foo (t : _ t @ contended) = use_uncontended t
 [%%expect {|
 val foo : ('a : immutable_data). 'a t @ contended -> unit = <fun>
+|}, Principal{|
+val foo : 'a t @ contended -> unit = <fun>
 |}]
 
 let foo (t : _ t @ aliased) = use_unique t
