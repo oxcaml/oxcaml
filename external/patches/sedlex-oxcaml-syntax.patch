@@ -65,3 +65,18 @@ diff --git a/src/syntax/ppx_sedlex.ml b/src/syntax/ppx_sedlex.ml
                  } ) ) -> begin
            match (i1, i2) with
              | Pconst_integer (i1, _), Pconst_integer (i2, _) ->
+diff --git a/src/syntax/dune b/src/syntax/dune
+--- a/src/syntax/dune
++++ b/src/syntax/dune
+@@ -9,11 +9,2 @@
+  (flags
+   (:standard -w -9)))
+-
+-(rule
+- (targets unicode.ml)
+- (mode promote)
+- (deps
+-  (:gen ../generator/gen_unicode.exe)
+-  (glob_files ../generator/data/*.txt))
+- (action
+-  (run %{gen} %{targets})))

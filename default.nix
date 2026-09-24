@@ -22,10 +22,10 @@
   withJsooTestSources ? pkgs.lib.inNixShell,
 }:
 let
-  inherit (pkgs) lib fetchpatch;
+  inherit (pkgs) lib;
 
   # js_of_ocaml is built on top of ppxlib.
-  withAstDependentLibs' = withAstDependentLibs || withJsoo;
+  needsPpxlibSources = withAstDependentLibs || withJsoo;
 
   # Select stdenv based on whether asan is enabled
   stdenv = if addressSanitizer then pkgs.clangStdenv else pkgs.stdenv;
@@ -274,13 +274,17 @@ let
   # testOcaml argument (it only feeds the merlin package's check phase).
   merlinDev = (mkMerlinPackages ocaml_5_4_0).merlin;
 
-  ppxDeriversSrc = pkgs.fetchFromGitHub {
-    name = "ppx-derivers-1.2.1-source";
-    owner = "ocaml-ppx";
-    repo = "ppx_derivers";
-    rev = "1.2.1";
-    hash = "sha256-9k4rbB1G4894F95XPMQsiVgwZKJ2XcaDUaEviArHG3s=";
-  };
+  ppxDeriversSrc =
+    let
+      version = "1.2.1";
+    in
+    pkgs.fetchFromGitHub {
+      name = "ppx_derivers-${version}-source";
+      owner = "ocaml-ppx";
+      repo = "ppx_derivers";
+      tag = version;
+      hash = "sha256-9k4rbB1G4894F95XPMQsiVgwZKJ2XcaDUaEviArHG3s=";
+    };
 
   # sexp_type has no releases; pin a commit.
   sexpTypeSrc = pkgs.applyPatches {
@@ -298,132 +302,160 @@ let
     '';
   };
 
-  stdlibShimsSrc = pkgs.fetchzip {
-    name = "stdlib-shims-0.3.0-source";
-    url = "https://github.com/ocaml/stdlib-shims/releases/download/0.3.0/stdlib-shims-0.3.0.tbz";
-    hash = "sha256-uvnR7o0wicL7VfWpGefIgaAydnJ6/pLqaXmH9rgg8Xk=";
-  };
+  stdlibShimsSrc =
+    let
+      version = "0.3.0";
+    in
+    pkgs.fetchzip {
+      name = "stdlib-shims-${version}-source";
+      url = "https://github.com/ocaml/stdlib-shims/releases/download/${version}/stdlib-shims-${version}.tbz";
+      hash = "sha256-uvnR7o0wicL7VfWpGefIgaAydnJ6/pLqaXmH9rgg8Xk=";
+    };
 
   # "seq" is an empty compatibility package with no dune equivalent.
-  dropSeqDependency =
-    file: "substituteInPlace \"${file}\" --replace-fail '(libraries seq)' ' '";
+  dropSeqDependency = file: "substituteInPlace ${file} --replace-fail '(libraries seq)' ''";
 
-  sedlexSrc = pkgs.applyPatches {
-    name = "sedlex-3.7-source";
-    src = pkgs.fetchFromGitHub {
-      owner = "ocaml-community";
-      repo = "sedlex";
-      rev = "v3.7";
-      hash = "sha256-ucqrJkzS6cVogGUf1vU8oBpSryneMBqTjzxwsOi6Egs=";
-    };
-    # Adapt the ppx to the OxCaml parsetree (labeled tuples, function
-    # parameters).
-    patches = [ ./external/patches/sedlex-oxcaml-syntax.patch ];
-    # Keep the release's opam metadata; the prepared source is read-only.
-    postPatch = ''
-      substituteInPlace dune-project \
-        --replace-fail '(generate_opam_files true)' '(generate_opam_files false)'
-      # Use the shipped unicode.ml: its promote rule downloads the Unicode data.
-      sed -i '/^(rule$/,$d' src/syntax/dune
-      if grep -q unicode.ml src/syntax/dune; then exit 1; fi
-    '';
-  };
+  # Keep the release's opam metadata; the prepared source is read-only.
+  keepReleaseOpamFiles = ''
+    substituteInPlace dune-project \
+      --replace-fail '(generate_opam_files true)' '(generate_opam_files false)'
+  '';
 
-  genSrc = pkgs.applyPatches {
-    name = "gen-1.1-source";
-    src = pkgs.fetchFromGitHub {
-      owner = "c-cube";
-      repo = "gen";
-      rev = "v1.1";
-      hash = "sha256-ZytPPGhmt/uANaSgkgsUBOwyQ9ka5H4J+5CnJpEdrNk=";
+  sedlexSrc =
+    let
+      version = "3.7";
+    in
+    pkgs.applyPatches {
+      name = "sedlex-${version}-source";
+      src = pkgs.fetchFromGitHub {
+        owner = "ocaml-community";
+        repo = "sedlex";
+        tag = "v${version}";
+        hash = "sha256-ucqrJkzS6cVogGUf1vU8oBpSryneMBqTjzxwsOi6Egs=";
+      };
+      # Adapt the ppx to the OxCaml parsetree (labeled tuples, function
+      # parameters), and use the shipped unicode.ml: its promote rule
+      # downloads the Unicode data.
+      patches = [ ./external/patches/sedlex-oxcaml-syntax.patch ];
+      postPatch = keepReleaseOpamFiles;
     };
-    postPatch = dropSeqDependency "src/dune";
-  };
+
+  genSrc =
+    let
+      version = "1.1";
+    in
+    pkgs.applyPatches {
+      name = "gen-${version}-source";
+      src = pkgs.fetchFromGitHub {
+        owner = "c-cube";
+        repo = "gen";
+        tag = "v${version}";
+        hash = "sha256-ZytPPGhmt/uANaSgkgsUBOwyQ9ka5H4J+5CnJpEdrNk=";
+      };
+      postPatch = dropSeqDependency "src/dune";
+    };
 
   # Cmdliner has no dune build; add one for the library.
-  cmdlinerSrc = pkgs.applyPatches {
-    name = "cmdliner-2.1.1-source";
-    src = pkgs.fetchzip {
-      url = "https://erratique.ch/software/cmdliner/releases/cmdliner-2.1.1.tbz";
-      hash = "sha256-WJEtB7PI8wB+nbVavPso4m1poy1JJnhtGQ4JRXJT2F4=";
+  cmdlinerSrc =
+    let
+      version = "2.1.1";
+      duneProject = pkgs.writeText "cmdliner-dune-project" ''
+        (lang dune 3.0)
+        (name cmdliner)
+        (package (name cmdliner))
+      '';
+      srcDune = pkgs.writeText "cmdliner-src-dune" ''
+        (library
+         (name cmdliner)
+         (public_name cmdliner)
+         (wrapped false))
+      '';
+    in
+    pkgs.applyPatches {
+      name = "cmdliner-${version}-source";
+      src = pkgs.fetchzip {
+        url = "https://erratique.ch/software/cmdliner/releases/cmdliner-${version}.tbz";
+        hash = "sha256-WJEtB7PI8wB+nbVavPso4m1poy1JJnhtGQ4JRXJT2F4=";
+      };
+      postPatch = ''
+        cp ${duneProject} dune-project
+        cp ${srcDune} src/dune
+      '';
     };
-    postPatch = ''
-      cat > dune-project << 'EOF'
-      (lang dune 3.0)
-      (name cmdliner)
-      (package (name cmdliner))
-      EOF
-      cat > src/dune << 'EOF'
-      (library
-       (name cmdliner)
-       (public_name cmdliner)
-       (wrapped false))
-      EOF
-    '';
-  };
 
   # Only menhirLib and menhirSdk are built from this tree; keeping the menhir
   # executable's sources out stops dune from preferring it over the one from
   # nixpkgs.
-  menhirLibrariesSrc = pkgs.runCommand "menhir-${menhirVersion}-libraries-source" { } ''
-    mkdir "$out"
-    cp -R ${menhirSrc}/{dune,dune-project,LICENSE,lib,sdk} "$out"
-    chmod -R u+w "$out"
-    # Attach the deprecation to [reductions], not the surrounding signature.
-    substituteInPlace "$out/sdk/cmly_api.ml" \
-      --replace-fail '[@@@ocaml.deprecated "Please use [get_reductions]"]' \
-        '[@@ocaml.deprecated "Please use [get_reductions]"]'
-  '';
-
-  yojsonSrc = pkgs.applyPatches {
-    name = "yojson-2.2.2-source";
-    src = pkgs.fetchzip {
-      url = "https://github.com/ocaml-community/yojson/releases/download/2.2.2/yojson-2.2.2.tbz";
-      hash = "sha256-V3USV8xhN1pQq5m0KmvUwgw7MujuCdWsv3lD+8PkECA=";
-    };
+  menhirLibrariesSrc = pkgs.applyPatches {
+    name = "menhir-${menhirVersion}-libraries-source";
+    src = menhirSrc;
     postPatch = ''
-      # Keep the release's opam metadata; the prepared source is read-only.
-      substituteInPlace dune-project \
-        --replace-fail '(generate_opam_files true)' '(generate_opam_files false)'
-      ${dropSeqDependency "lib/dune"}
-      # Eta-expand to avoid exposing Buffer.add_string's OxCaml modes.
-      substituteInPlace lib/write.ml \
-        --replace-fail 'let write_intlit = Buffer.add_string' \
-          'let write_intlit ob s = Buffer.add_string ob s' \
-        --replace-fail 'let write_floatlit = Buffer.add_string' \
-          'let write_floatlit ob s = Buffer.add_string ob s' \
-        --replace-fail 'let write_stringlit = Buffer.add_string' \
-          'let write_stringlit ob s = Buffer.add_string ob s'
+      find . -mindepth 1 -maxdepth 1 \
+        ! -name dune ! -name dune-project ! -name LICENSE ! -name lib ! -name sdk \
+        -exec rm -r {} +
+      # Attach the deprecation to [reductions], not the surrounding signature.
+      substituteInPlace sdk/cmly_api.ml \
+        --replace-fail '[@@@ocaml.deprecated "Please use [get_reductions]"]' \
+          '[@@ocaml.deprecated "Please use [get_reductions]"]'
     '';
   };
 
-  outChannelRedirectSrc = pkgs.applyPatches {
-    name = "out-channel-redirect-0.2-source";
-    src = pkgs.fetchzip {
-      url = "https://github.com/hhugo/out-channel-redirect/releases/download/0.2/out-channel-redirect-0.2.tbz";
-      hash = "sha256-ThMQaTtmT6ltL0As7K9761qEz/jPKfv3vsxnVNHeKl4=";
+  yojsonSrc =
+    let
+      version = "2.2.2";
+    in
+    pkgs.applyPatches {
+      name = "yojson-${version}-source";
+      src = pkgs.fetchzip {
+        url = "https://github.com/ocaml-community/yojson/releases/download/${version}/yojson-${version}.tbz";
+        hash = "sha256-V3USV8xhN1pQq5m0KmvUwgw7MujuCdWsv3lD+8PkECA=";
+      };
+      postPatch = ''
+        ${keepReleaseOpamFiles}
+        ${dropSeqDependency "lib/dune"}
+        # Eta-expand to avoid exposing Buffer.add_string's OxCaml modes.
+        substituteInPlace lib/write.ml \
+          --replace-fail 'let write_intlit = Buffer.add_string' \
+            'let write_intlit ob s = Buffer.add_string ob s' \
+          --replace-fail 'let write_floatlit = Buffer.add_string' \
+            'let write_floatlit ob s = Buffer.add_string ob s' \
+          --replace-fail 'let write_stringlit = Buffer.add_string' \
+            'let write_stringlit ob s = Buffer.add_string ob s'
+      '';
     };
-    postPatch = ''
-      substituteInPlace dune-project \
-        --replace-fail '(generate_opam_files true)' '(generate_opam_files false)'
-    '';
-  };
 
-  qcheckSrc = pkgs.applyPatches {
-    name = "qcheck-0.25-source";
-    src = pkgs.fetchFromGitHub {
-      owner = "c-cube";
-      repo = "qcheck";
-      rev = "v0.25";
-      hash = "sha256-Z89jJ21zm89wb9m5HthnbHdnE9iXLyaH9k8S+FAWkKQ=";
+  outChannelRedirectSrc =
+    let
+      version = "0.2";
+    in
+    pkgs.applyPatches {
+      name = "out-channel-redirect-${version}-source";
+      src = pkgs.fetchzip {
+        url = "https://github.com/hhugo/out-channel-redirect/releases/download/${version}/out-channel-redirect-${version}.tbz";
+        hash = "sha256-ThMQaTtmT6ltL0As7K9761qEz/jPKfv3vsxnVNHeKl4=";
+      };
+      postPatch = keepReleaseOpamFiles;
     };
-    # Do not constrain the callback to Array.length's polymodal signature.
-    postPatch = ''
-      substituteInPlace src/core/QCheck.ml \
-        --replace-fail '_opt_map_or ~d:Array.length ~f:array_sum_' \
-          '_opt_map_or ~d:(fun a -> Array.length a) ~f:array_sum_'
-    '';
-  };
+
+  qcheckSrc =
+    let
+      version = "0.25";
+    in
+    pkgs.applyPatches {
+      name = "qcheck-${version}-source";
+      src = pkgs.fetchFromGitHub {
+        owner = "c-cube";
+        repo = "qcheck";
+        tag = "v${version}";
+        hash = "sha256-Z89jJ21zm89wb9m5HthnbHdnE9iXLyaH9k8S+FAWkKQ=";
+      };
+      # Do not constrain the callback to Array.length's polymodal signature.
+      postPatch = ''
+        substituteInPlace src/core/QCheck.ml \
+          --replace-fail '_opt_map_or ~d:Array.length ~f:array_sum_' \
+            '_opt_map_or ~d:(fun a -> Array.length a) ~f:array_sum_'
+      '';
+    };
 
   # Read by the external/ast-dependent-libs/deps/* rules of the Makefile.
   ppxlibSources = {
@@ -484,8 +516,9 @@ let
         buildFlags = [ buildTarget ];
 
         inherit postInstall;
+
+        env = sources // lib.optionalAttrs (gitRev != null) { JSOO_GIT_VERSION = "ox-${gitRev}"; };
       }
-      // lib.optionalAttrs (gitRev != null) { JSOO_GIT_VERSION = "ox-${gitRev}"; }
       // (
         if installTarget == null then
           {
@@ -501,11 +534,10 @@ let
             installFlags = [ "AST_DEPENDENT_LIBS_PREFIX=${placeholder "out"}" ];
           }
       )
-      // sources
     );
 
-  # The development shell already provides menhir.
   jsooTools = [
+    menhir
     pkgs.nodejs
     pkgs.binaryen
     pkgs.makeWrapper
@@ -529,7 +561,7 @@ let
     buildTarget = "jsoo-build";
     installTarget = "jsoo-install";
     sources = ppxlibSources // jsooSources;
-    extraNativeBuildInputs = [ menhir ] ++ jsooTools;
+    extraNativeBuildInputs = jsooTools;
     postInstall = wrapWasmOfOcaml;
   };
 
@@ -537,7 +569,7 @@ let
     pname = "oxcaml-jsoo-test";
     buildTarget = "jsoo-test";
     sources = ppxlibSources // jsooSources // jsooTestSources;
-    extraNativeBuildInputs = [ menhir ] ++ jsooTools;
+    extraNativeBuildInputs = jsooTools;
   };
 
   gfortran =
@@ -626,158 +658,158 @@ let
     };
   };
 in
-stdenv.mkDerivation (
-  {
-    pname = "oxcaml";
-    version = "5.4.0+ox";
-    inherit src configureFlags;
+stdenv.mkDerivation {
+  pname = "oxcaml";
+  version = "5.4.0+ox";
+  inherit src configureFlags;
 
-    OXCAML_LLDB = if oxcamlLldb then "${lldb}/bin/lldb" else null;
-    OXCAML_CLANG = if oxcamlClang then "${clang}/bin/clang" else null;
+  OXCAML_LLDB = if oxcamlLldb then "${lldb}/bin/lldb" else null;
+  OXCAML_CLANG = if oxcamlClang then "${clang}/bin/clang" else null;
 
-    enableParallelBuilding = true;
-    separateDebugInfo = false;
-    dontStrip = true;
+  enableParallelBuilding = true;
+  separateDebugInfo = false;
+  dontStrip = true;
 
-    # Disable _multioutConfig hook which adds --libdir=$out/lib into
-    # configureFlags when separateDebugInfo is enabled, breaking OCaml's configure
-    # step, which expects --libdir to be $out/lib/ocaml
-    setOutputFlags = false;
+  # Disable _multioutConfig hook which adds --libdir=$out/lib into
+  # configureFlags when separateDebugInfo is enabled, breaking OCaml's configure
+  # step, which expects --libdir to be $out/lib/ocaml
+  setOutputFlags = false;
 
-    nativeBuildInputs = [
-      pkgs.autoconf
-      menhir
+  nativeBuildInputs = [
+    pkgs.autoconf
+    menhir
+    ocaml_5_4_0
+    pkgs.ocaml-ng.ocamlPackages_5_4.ocaml-lsp
+    dune
+    pkgs.pkg-config
+    pkgs.rsync
+    pkgs.which
+    pkgs.parallel
+    gfortran # Required for Bigarray Fortran tests
+    ocamlformat # required for make fmt
+    pkgs.removeReferencesTo
+  ]
+  ++ (if pkgs.stdenv.isDarwin then [ pkgs.cctools ] else [ pkgs.libtool ]) # cctools provides Apple libtool on macOS
+  ++ lib.optional oxcamlLldb pkgs.python312
+  ++ lib.optionals withMerlin merlinDev.devNativeBuildInputs
+  ++ lib.optionals withJsoo jsooTools;
+
+  buildInputs = [
+    pkgs.llvm # llvm-objcopy is used for debuginfo
+  ]
+  ++ lib.optionals withMerlin merlinDev.devBuildInputs;
+
+  # Nothing here runs libtool, so stop stdenv's configurePhase from rewriting
+  # sys_lib_search_path in the checked-in build-aux/ltmain.sh.
+  dontFixLibtool = true;
+
+  preConfigure = ''
+    rm -rf _build _install _runtest
+
+    # We don't use autoreconfHook because libtoolize and autoheader are
+    # incompatible with ocaml-flambda
+    autoconf --force
+  '';
+
+  checkPhase = lib.optionalString ocamltest ''
+    # The testsuite/tests/unicode test compiles modules with non-ASCII source
+    # filenames (néant.ml, 見.ml) and links them via clang. Under the 26.05
+    # toolchain the UTF-8 bytes of the object filenames reach clang octal-escaped
+    # (e.g. '$350246213.o'), so linking fails with "no such file or directory".
+    # This exercises unicode source filenames, which we don't use; drop the test
+    # so the rest of `make ci` runs.
+    rm -rf testsuite/tests/unicode
+    make ci
+  '';
+
+  postInstall =
+    ''
+      $out/bin/generate_cached_generic_functions.exe $out/lib/ocaml/cached-generic-functions
+    ''
+    + lib.optionalString withJsoo ''
+      make jsoo-install-bin OXCAML_INSTALL="$out" AST_DEPENDENT_LIBS_PREFIX="$out"
+      ${wrapWasmOfOcaml}
+    ''
+    # Get rid of unused artifacts
+    + ''
+      rm -f $out/bin/dumpobj.byte
+      rm -f $out/bin/extract_externals.byte
+      rm -f $out/bin/generate_cached_generic_functions.exe
+      rm -f $out/bin/ocamlcp
+      rm -f $out/bin/ocamlmklib.byte
+      rm -f $out/bin/ocamlmktop.byte
+      rm -f $out/bin/ocamlobjinfo.byte
+      rm -f $out/bin/ocamlopt.byte
+      rm -f $out/bin/ocamlprof
+      rm -f $out/lib/ocaml/expunge
+    '';
+
+  postFixup = ''
+    remove-references-to -t ${dune} $out/lib/ocaml/Makefile.config
+  '';
+
+  shellHook =
+    let
+      astDependentLibsCommands =
+        if needsPpxlibSources then
+          "  make ppxlib-build        - Build ppxlib and its dependencies\n"
+          + "  make ppxlib-install      - Install them (AST_DEPENDENT_LIBS_PREFIX=...)\n"
+        else
+          "  (make ppxlib-build needs this shell built with withAstDependentLibs=true)\n";
+      jsooCommands =
+        if withJsoo then
+          "  make jsoo-build          - Build js_of_ocaml and wasm_of_ocaml\n"
+          + "  make jsoo-install        - Install them (AST_DEPENDENT_LIBS_PREFIX=...)\n"
+          + "  make jsoo-test           - Run core JSOO compiler and JS/Wasm regressions\n"
+        else
+          "  (make jsoo-* targets need this shell built with withJsoo=true)\n";
+      merlinCommands =
+        if withMerlin then
+          "  make merlin-build        - Build Merlin\n"
+          + "  make merlin-test         - Run the Merlin tests\n"
+          + "  make merlin-promote      - Promote Merlin test output\n"
+        else
+          "  (make merlin-* targets need this shell built with withMerlin=true,\n"
+          + "   as the flake's devShell does)\n";
+    in
+    ''
+      prefix="$(pwd)/_install"
+
+      cat >&2 << EOF
+      OxCaml $version Development Environment
+      ===============================''${version//?/=}
+
+      Available commands:
+        configurePhase           - Pre-build setup
+        make boot-compiler       - Quick build (recommended for development)
+        make boot-_install       - Quick install (recommended for development)
+        make fmt                 - Auto-format code
+        make                     - Full build
+        make install             - Install
+        make test                - Run all tests
+        make test-one TEST=...   - Run a single test
+      ${astDependentLibsCommands}${jsooCommands}${merlinCommands}EOF
+    '';
+
+  meta =
+    { } // (if framePointers && !pkgs.stdenv.hostPlatform.isx86_64 then { broken = true; } else { });
+
+  passthru = {
+    inherit
+      ocaml_4_14_2
       ocaml_5_4_0
-      pkgs.ocaml-ng.ocamlPackages_5_4.ocaml-lsp
-      dune
-      pkgs.pkg-config
-      pkgs.rsync
-      pkgs.which
-      pkgs.parallel
-      gfortran # Required for Bigarray Fortran tests
-      ocamlformat # required for make fmt
-      pkgs.removeReferencesTo
-    ]
-    ++ (if pkgs.stdenv.isDarwin then [ pkgs.cctools ] else [ pkgs.libtool ]) # cctools provides Apple libtool on macOS
-    ++ lib.optional oxcamlLldb pkgs.python312
-    ++ lib.optionals withMerlin merlinDev.devNativeBuildInputs
-    ++ lib.optionals withJsoo jsooTools;
+      ocamlformat
+      lldb
+      mkPpxlibLibs
+      mkJsooLibs
+      mkJsooTest
+      mkMerlinPackages
+      ;
+  };
 
-    buildInputs = [
-      pkgs.llvm # llvm-objcopy is used for debuginfo
-    ]
-    ++ lib.optionals withMerlin merlinDev.devBuildInputs;
-
-    # Nothing here runs libtool, so stop stdenv's configurePhase from rewriting
-    # sys_lib_search_path in the checked-in build-aux/ltmain.sh.
-    dontFixLibtool = true;
-
-    preConfigure = ''
-      rm -rf _build _install _runtest
-
-      # We don't use autoreconfHook because libtoolize and autoheader are
-      # incompatible with ocaml-flambda
-      autoconf --force
-    '';
-
-    checkPhase = lib.optionalString ocamltest ''
-      # The testsuite/tests/unicode test compiles modules with non-ASCII source
-      # filenames (néant.ml, 見.ml) and links them via clang. Under the 26.05
-      # toolchain the UTF-8 bytes of the object filenames reach clang octal-escaped
-      # (e.g. '$350246213.o'), so linking fails with "no such file or directory".
-      # This exercises unicode source filenames, which we don't use; drop the test
-      # so the rest of `make ci` runs.
-      rm -rf testsuite/tests/unicode
-      make ci
-    '';
-
-    postInstall =
-      ''
-        $out/bin/generate_cached_generic_functions.exe $out/lib/ocaml/cached-generic-functions
-      ''
-      + lib.optionalString withJsoo ''
-        make jsoo-install-bin OXCAML_INSTALL="$out" AST_DEPENDENT_LIBS_PREFIX="$out"
-        ${wrapWasmOfOcaml}
-      ''
-      # Get rid of unused artifacts
-      + ''
-        rm -f $out/bin/dumpobj.byte
-        rm -f $out/bin/extract_externals.byte
-        rm -f $out/bin/generate_cached_generic_functions.exe
-        rm -f $out/bin/ocamlcp
-        rm -f $out/bin/ocamlmklib.byte
-        rm -f $out/bin/ocamlmktop.byte
-        rm -f $out/bin/ocamlobjinfo.byte
-        rm -f $out/bin/ocamlopt.byte
-        rm -f $out/bin/ocamlprof
-        rm -f $out/lib/ocaml/expunge
-      '';
-
-    postFixup = ''
-      remove-references-to -t ${dune} $out/lib/ocaml/Makefile.config
-    '';
-
-    shellHook =
-      let
-        astDependentLibsCommands =
-          if withAstDependentLibs' then
-            "  make ppxlib-build        - Build ppxlib and its dependencies\n"
-            + "  make ppxlib-install      - Install them (AST_DEPENDENT_LIBS_PREFIX=...)\n"
-          else
-            "  (make ppxlib-build needs this shell built with withAstDependentLibs=true)\n";
-        jsooCommands =
-          if withJsoo then
-            "  make jsoo-build          - Build js_of_ocaml and wasm_of_ocaml\n"
-            + "  make jsoo-install        - Install them (AST_DEPENDENT_LIBS_PREFIX=...)\n"
-            + "  make jsoo-test           - Run core JSOO compiler and JS/Wasm regressions\n"
-          else
-            "  (make jsoo-* targets need this shell built with withJsoo=true)\n";
-        merlinCommands =
-          if withMerlin then
-            "  make merlin-build        - Build Merlin\n"
-            + "  make merlin-test         - Run the Merlin tests\n"
-            + "  make merlin-promote      - Promote Merlin test output\n"
-          else
-            "  (make merlin-* targets need this shell built with withMerlin=true,\n"
-            + "   as the flake's devShell does)\n";
-      in
-      ''
-        prefix="$(pwd)/_install"
-
-        cat >&2 << EOF
-        OxCaml $version Development Environment
-        ===============================''${version//?/=}
-
-        Available commands:
-          configurePhase           - Pre-build setup
-          make boot-compiler       - Quick build (recommended for development)
-          make boot-_install       - Quick install (recommended for development)
-          make fmt                 - Auto-format code
-          make                     - Full build
-          make install             - Install
-          make test                - Run all tests
-          make test-one TEST=...   - Run a single test
-        ${astDependentLibsCommands}${jsooCommands}${merlinCommands}EOF
-      '';
-
-    meta =
-      { } // (if framePointers && !pkgs.stdenv.hostPlatform.isx86_64 then { broken = true; } else { });
-
-    passthru = {
-      inherit
-        ocaml_4_14_2
-        ocaml_5_4_0
-        ocamlformat
-        lldb
-        mkPpxlibLibs
-        mkJsooLibs
-        mkJsooTest
-        mkMerlinPackages
-        ;
-    };
-  }
-  // lib.optionalAttrs (withJsoo && gitRev != null) { JSOO_GIT_VERSION = "ox-${gitRev}"; }
-  // lib.optionalAttrs withAstDependentLibs' ppxlibSources
-  // lib.optionalAttrs withJsoo jsooSources
-  // lib.optionalAttrs (withJsoo && withJsooTestSources) jsooTestSources
-)
+  env =
+    lib.optionalAttrs (withJsoo && gitRev != null) { JSOO_GIT_VERSION = "ox-${gitRev}"; }
+    // lib.optionalAttrs needsPpxlibSources ppxlibSources
+    // lib.optionalAttrs withJsoo jsooSources
+    // lib.optionalAttrs (withJsoo && withJsooTestSources) jsooTestSources;
+}
