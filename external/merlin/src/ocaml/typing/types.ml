@@ -768,6 +768,9 @@ module type Wrapped = sig
 
   val sort_of_signature_item :
     signature_item -> Jkind_types.Sort.t option
+
+  val module_representation_of_signature :
+    signature_item list -> module_representation
 end
 
 module Make_wrapped(Wrap : Wrap) = struct
@@ -798,6 +801,9 @@ module Make_wrapped(Wrap : Wrap) = struct
     | Sig_class _ ->
         Some Jkind_types.Sort.(of_const Const.for_class)
     | Sig_type _ | Sig_modtype _ | Sig_class_type _ | Sig_jkind _ -> None
+
+  let module_representation_of_signature items =
+    List.filter_map sort_of_signature_item items |> Array.of_list
 end
 
 module Map_wrapped(From : Wrapped)(To : Wrapped) = struct

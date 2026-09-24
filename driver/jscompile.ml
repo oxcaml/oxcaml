@@ -166,8 +166,14 @@ let implementation_aux ~start_from ~source_file ~output_prefix
       in
       Compilenv.reset info.target;
       let impl =
+        (* The JavaScript backend keeps the module block itself (see
+           [Flambda_features.emit_module_block]), so the representation is
+           unused and the argument units' .cmx files need not be looked up. *)
+        let find_format _ : Lambda.main_module_block_format =
+          Mb_struct { mb_repr = Lambda.bytecode_only_module_representation }
+        in
         Translmod.transl_instance info.module_name ~runtime_args
-          ~main_module_block_repr ~arg_block_idx
+          ~main_module_block_repr ~arg_block_idx ~find_format
       in
       let jsir, main_module_block_format, arg_descr_computed, static_data =
         tlambda_to_jsir info impl ~as_arg_for
@@ -188,7 +194,7 @@ let implementation ~start_from ~source_file ~output_prefix ~keep_symbol_tables =
     ~compilation_unit:Inferred_from_output_prefix
 
 let instance ~source_file ~output_prefix ~compilation_unit ~runtime_args
-    ~main_module_block_repr ~arg_descr ~keep_symbol_tables =
+    ~main_module_block_repr ~arg_descr ~find_format:_ ~keep_symbol_tables =
   let start_from =
     Instantiation { runtime_args; main_module_block_repr; arg_descr }
   in

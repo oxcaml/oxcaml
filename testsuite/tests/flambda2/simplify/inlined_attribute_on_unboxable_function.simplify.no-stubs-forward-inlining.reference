@@ -61,9 +61,5 @@ apply direct(f_2_2 &toplevel)
       Block 0 ($camlInlined_attribute_on_unboxable_function__f_2)
     and $camlInlined_attribute_on_unboxable_function__cell0 =
       Block 0 ($camlInlined_attribute_on_unboxable_function__helper_1)
-    and $camlInlined_attribute_on_unboxable_function =
-      Block 0 ($camlInlined_attribute_on_unboxable_function__helper_1,
-               $camlInlined_attribute_on_unboxable_function__f_2,
-               int_add)
     in
-    cont done ($camlInlined_attribute_on_unboxable_function)
+    cont done (0)

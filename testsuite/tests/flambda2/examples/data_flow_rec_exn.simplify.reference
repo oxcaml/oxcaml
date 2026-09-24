@@ -63,8 +63,5 @@ let $camlData_flow_rec_exn__cell1 =
   Block 0 ($camlData_flow_rec_exn__stuff_5)
 and $camlData_flow_rec_exn__cell0 =
   Block 0 ($camlData_flow_rec_exn__do_stuff_4)
-and $camlData_flow_rec_exn =
-  Block 0 ($camlData_flow_rec_exn__do_stuff_4,
-           $camlData_flow_rec_exn__stuff_5)
 in
-cont done ($camlData_flow_rec_exn)
+cont done (0)

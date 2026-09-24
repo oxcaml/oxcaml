@@ -35,6 +35,6 @@ Static data:
                        ; r =
                          ⟪(apply[L] $#app/1
                             (field_imm 0
-                              (global static Cross_module_static_lib!)))⟫ })
+                              (global static Cross_module_static_lib!/4)))⟫ })
                     x/318)⟫ })
               { c = #body/2.c; r = ⟪(region $#body/2)⟫ }))⟫ }))

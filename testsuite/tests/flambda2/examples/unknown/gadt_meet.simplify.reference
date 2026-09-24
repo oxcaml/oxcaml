@@ -102,11 +102,5 @@ and $camlGadt_meet__cell1 =
   Block 0 ($camlGadt_meet__f_5)
 and $camlGadt_meet__cell0 =
   Block 0 ($camlGadt_meet__with_y_4)
-and $camlGadt_meet =
-  Block 0 ($camlGadt_meet__with_y_4,
-           $camlGadt_meet__f_5,
-           $camlGadt_meet__get_6,
-           $camlGadt_meet__test_7,
-           $camlGadt_meet__foo_8)
 in
-cont done ($camlGadt_meet)
+cont done (0)

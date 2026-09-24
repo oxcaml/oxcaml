@@ -29,7 +29,5 @@ apply ccall ($`*extern*`.rand : val -> val) (0) -> k * error
                 Block 0 ($camlLifting__f_1)
               and $camlLifting__cell0 =
                 Block 0 (r2)
-              and $camlLifting =
-                Block 0 (r2, $camlLifting__f_1)
               in
-              cont done ($camlLifting)))
+              cont done (0)))

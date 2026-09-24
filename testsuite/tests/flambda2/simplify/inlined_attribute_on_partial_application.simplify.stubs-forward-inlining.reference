@@ -32,9 +32,5 @@ and $camlInlined_attribute_on_partial_application__cell1 =
   Block 0 ($camlInlined_attribute_on_partial_application__partial_f_2)
 and $camlInlined_attribute_on_partial_application__cell0 =
   Block 0 ($camlInlined_attribute_on_partial_application__f_1)
-and $camlInlined_attribute_on_partial_application =
-  Block 0 ($camlInlined_attribute_on_partial_application__f_1,
-           $camlInlined_attribute_on_partial_application__partial_f_2,
-           0)
 in
-cont done ($camlInlined_attribute_on_partial_application)
+cont done (0)

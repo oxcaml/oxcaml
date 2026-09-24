@@ -23,9 +23,5 @@ let code loopify(never) size(23) newer_version_of(f_0)
   cont k (g)
 in
 let $camlCode_size__f_1 = closure f_0_1 @f &toplevel in
-let $camlCode_size__cell0 =
-  Block 0 ($camlCode_size__f_1)
-and $camlCode_size =
-  Block 0 ($camlCode_size__f_1)
-in
-cont done ($camlCode_size)
+let $camlCode_size__cell0 = Block 0 ($camlCode_size__f_1) in
+cont done (0)

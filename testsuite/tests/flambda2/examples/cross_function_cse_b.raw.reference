@@ -46,7 +46,8 @@ let $camlCross_function_cse_b__first_const_0 = Block 0 () in
          : [ 0 of [ 0 | 0 of val ] * [ 0 | 0 of val ] ] =
    let next_depth = rec_info (succ my_depth) in
    let Pfield =
-     %block_load.[`1`] ($Cross_function_cse_a.camlCross_function_cse_a)
+     %block_load.[`0`]
+       ($Cross_function_cse_a.camlCross_function_cse_a__cell1)
    in
    apply &my_alloc_region inlined(always) Pfield (x) -> k1 * k2
  in
@@ -57,7 +58,8 @@ let $camlCross_function_cse_b__first_const_0 = Block 0 () in
          : [ 0 of [ 0 | 0 of val ] * [ 0 | 0 of val ] ] =
    let next_depth = rec_info (succ my_depth) in
    let Pfield =
-     %block_load.[`2`] ($Cross_function_cse_a.camlCross_function_cse_a)
+     %block_load.[`0`]
+       ($Cross_function_cse_a.camlCross_function_cse_a__cell2)
    in
    apply &my_alloc_region inlined(always) Pfield (x) -> k1 * k2
  in
@@ -75,9 +77,7 @@ let $camlCross_function_cse_b__first_const_0 = Block 0 () in
     let field_2 = %block_load.tag[`0`].`size`[`5`].[`2`] (module_block) in
     let field_3 = %block_load.tag[`0`].`size`[`5`].[`3`] (module_block) in
     let field_4 = %block_load.tag[`0`].`size`[`5`].[`4`] (module_block) in
-    let $camlCross_function_cse_b =
-      Block 0 (field_0, field_1, field_2, field_3, field_4)
-    and $camlCross_function_cse_b__cell0 =
+    let $camlCross_function_cse_b__cell0 =
       Block 0 (field_0)
     and $camlCross_function_cse_b__cell1 =
       Block 0 (field_1)
@@ -88,4 +88,4 @@ let $camlCross_function_cse_b__first_const_0 = Block 0 () in
     and $camlCross_function_cse_b__cell4 =
       Block 0 (field_4)
     in
-    cont done ($camlCross_function_cse_b)
+    cont done (0)

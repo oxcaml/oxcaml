@@ -1,0 +1,55 @@
+(data
+ global "camlCells_use_cmm__gc_roots":
+ addr G:"camlCells_use_cmm__cell1"
+ addr G:"camlCells_use_cmm__Pmakeblock_4"
+ int 0)
+(data
+ int 1792
+ global "camlCells_use_cmm__cell0":
+ addr G:"camlCells_lib__f_1")
+(data int 1792 global "camlCells_use_cmm__cell1": int 1)
+(data
+ int 1792
+ global "camlCells_use_cmm__cell2":
+ addr G:"camlCells_use_cmm__get_r_1")
+(data
+ int 1792
+ global "camlCells_use_cmm__cell3":
+ addr G:"camlCells_use_cmm__u_2")
+(data
+ int 1792
+ global "camlCells_use_cmm__cell4":
+ addr G:"camlCells_use_cmm__Pmakeblock_4")
+(data int 2816 global "camlCells_use_cmm__Pmakeblock_4": int 1 int 1)
+(data
+ int 3063
+ global "camlCells_use_cmm__u_2":
+ addr G:"camlCells_use_cmm__u_1_3_code"
+ int 108086391056891909)
+(data
+ int 3063
+ global "camlCells_use_cmm__get_r_1":
+ addr G:"camlCells_use_cmm__get_r_0_2_code"
+ int 108086391056891909)
+(function{cells_use_cmm.ml:39,10-27} camlCells_use_cmm__get_r_0_2_code
+     (param/0: int) : int
+ (load_mut val (load val G:"camlCells_lib__cell2")) )
+
+(function{cells_use_cmm.ml:40,6-22} camlCells_use_cmm__u_1_3_code
+     (param/1: int) : float
+ 1.5 )
+
+(function no_cse reduce_code_size linscan camlCells_use_cmm__entry () : val
+ (catch
+   (let n/0 (load val G:"camlCells_lib__cell1")
+     (extcall "caml_initialize" G:"camlCells_use_cmm__cell1" n/0 ->unit) 1
+     (extcall "caml_initialize"{cells_use_cmm.ml:41,20-29}
+       G:"camlCells_use_cmm__Pmakeblock_4" n/0 ->unit)
+     1
+     (extcall "caml_initialize"{cells_use_cmm.ml:41,20-29}
+       (+a G:"camlCells_use_cmm__Pmakeblock_4" 8)
+       (load val G:"camlCells_lib__cell2") ->unit)
+     1 (exit 3 1))
+ with(3 *ret*/0: val) 1) )
+
+(data)

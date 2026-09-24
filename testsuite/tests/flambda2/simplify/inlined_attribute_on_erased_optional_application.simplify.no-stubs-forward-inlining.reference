@@ -88,10 +88,5 @@ apply direct(default_0_1 &toplevel)
       Block 0 ($camlInlined_attribute_on_erased_optional_application__f_3)
     and $camlInlined_attribute_on_erased_optional_application__cell0 =
       Block 0 ($camlInlined_attribute_on_erased_optional_application__default_1)
-    and $camlInlined_attribute_on_erased_optional_application =
-      Block 0 ($camlInlined_attribute_on_erased_optional_application__default_1,
-               $camlInlined_attribute_on_erased_optional_application__f_3,
-               $camlInlined_attribute_on_erased_optional_application__partial_f_4,
-               h)
     in
-    cont done ($camlInlined_attribute_on_erased_optional_application)
+    cont done (0)

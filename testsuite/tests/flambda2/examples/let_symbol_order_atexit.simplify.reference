@@ -52,8 +52,5 @@ let $camlLet_symbol_order_atexit__cell1 =
   Block 0 ($camlLet_symbol_order_atexit__do_at_exit_2)
 and $camlLet_symbol_order_atexit__cell0 =
   Block 0 ($camlLet_symbol_order_atexit__exit_4)
-and $camlLet_symbol_order_atexit =
-  Block 0 ($camlLet_symbol_order_atexit__exit_4,
-           $camlLet_symbol_order_atexit__do_at_exit_2)
 in
-cont done ($camlLet_symbol_order_atexit)
+cont done (0)

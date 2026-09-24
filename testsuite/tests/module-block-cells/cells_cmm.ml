@@ -26,7 +26,9 @@
 *)
 
 (* Each module field gets its own statically allocated cell,
-   [camlCells_cmm__cell<i>], next to the module block.  In the Cmm dump:
+   [camlCells_cmm__cell<i>]; native code emits no module block
+   ([camlCells_cmm]), and the entry function returns a dummy.  In the Cmm
+   dump:
    - cell0 (the closure of [f]) is prefilled with the closure symbol;
    - cell1 ([n], computed at initialisation) holds a placeholder that the
      entry function stores into, and is therefore listed in gc_roots;

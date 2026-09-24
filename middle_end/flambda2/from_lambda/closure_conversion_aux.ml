@@ -46,6 +46,7 @@ module IR = struct
           region : Ident.t;
           ghost : bool
         }
+    | Module_block_cell of Compilation_unit.t * int
     | Prim of
         { prim : Lambda.primitive;
           args : simple list list;
@@ -112,6 +113,10 @@ module IR = struct
       then fprintf ppf "@[<2>(End_try_region@ %a)@]" Ident.print region
       else fprintf ppf "@[<2>(End_region@ %a)@]" Ident.print region;
       if ghost then fprintf ppf "_ghost"
+    | Module_block_cell (cu, pos) ->
+      fprintf ppf "@[<2>(Module_block_cell@ %s@ %d)@]"
+        (Compilation_unit.full_path_as_string cu)
+        pos
     | Prim { prim; args; _ } ->
       fprintf ppf "@[<2>(%a %a)@]" Printlambda.primitive prim
         (Format.pp_print_list ~pp_sep:Format.pp_print_space (fun ppf arg ->

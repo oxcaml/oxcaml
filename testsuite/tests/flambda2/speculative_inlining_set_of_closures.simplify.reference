@@ -135,10 +135,5 @@ and $camlSpeculative_inlining_set_of_closures__cell1 =
   Block 0 ($camlSpeculative_inlining_set_of_closures__g_2)
 and $camlSpeculative_inlining_set_of_closures__cell0 =
   Block 0 ($camlSpeculative_inlining_set_of_closures__use_1)
-and $camlSpeculative_inlining_set_of_closures =
-  Block 0 ($camlSpeculative_inlining_set_of_closures__use_1,
-           $camlSpeculative_inlining_set_of_closures__g_2,
-           $camlSpeculative_inlining_set_of_closures__r1_3,
-           $camlSpeculative_inlining_set_of_closures__r2_6)
 in
-cont done ($camlSpeculative_inlining_set_of_closures)
+cont done (0)

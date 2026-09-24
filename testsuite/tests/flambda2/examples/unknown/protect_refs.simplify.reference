@@ -103,10 +103,5 @@ in
       Block 0 ($`camlProtect_refs__fn[protect_refs.ml:29,2--43]_4`)
     and $camlProtect_refs__cell0 =
       Block 0 ($camlProtect_refs__iter_1)
-    and $camlProtect_refs =
-      Block 0 ($camlProtect_refs__iter_1,
-               $`camlProtect_refs__fn[protect_refs.ml:29,2--43]_4`,
-               umode,
-               $camlProtect_refs__set_mode_pattern_5)
     in
-    cont done ($camlProtect_refs)
+    cont done (0)

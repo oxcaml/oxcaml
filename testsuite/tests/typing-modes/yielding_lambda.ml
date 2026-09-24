@@ -13,18 +13,18 @@ end
 let[@inline never] yield (_ : Yielding.t @ yielding) = ()
 let[@inline never] add x y = x + y
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Yielding/332"
+(apply (field_imm 1 (global Toploop!/0)) "Yielding/332"
   (let (with_ = (function {nlocal = 0} f never_inline (apply[yielding] f 0)))
     (makeblock 0 with_)))
 module Yielding : sig type t val with_ : (t @ yielding -> 'r) -> 'r end
 (let (yield = (function {nlocal = 0} param never_inline : int 0))
-  (apply (field_imm 1 (global Toploop!)) "yield" yield))
+  (apply (field_imm 1 (global Toploop!/0)) "yield" yield))
 val yield : Yielding.t @ yielding -> unit = <fun>
 (let
   (add =
      (function {nlocal = 0} x[value<int>] y[value<int>] never_inline : int
        (%int_add x y)))
-  (apply (field_imm 1 (global Toploop!)) "add" add))
+  (apply (field_imm 1 (global Toploop!/0)) "add" add))
 val add : int -> int -> int = <fun>
 |}]
 
@@ -39,9 +39,9 @@ let () = Yielding.with_ (fun y ->
 (* Note the [yielding] marker only on the call to [yield] *)
 [%%expect{|
 (let
-  (add =? (apply (field_imm 0 (global Toploop!)) "add")
-   yield =? (apply (field_imm 0 (global Toploop!)) "yield")
-   Yielding =? (apply (field_imm 0 (global Toploop!)) "Yielding/332")
+  (add =? (apply (field_imm 0 (global Toploop!/0)) "add")
+   yield =? (apply (field_imm 0 (global Toploop!/0)) "yield")
+   Yielding =? (apply (field_imm 0 (global Toploop!/0)) "Yielding/332")
    *match* =[value<int>]
      (apply (field_imm 0 Yielding)
        (function {nlocal = 0} y : int
@@ -57,9 +57,9 @@ let () = Yielding.with_ (fun y ->
 (* Note the [yielding] marker only on the call to [yield] *)
 [%%expect{|
 (let
-  (add =? (apply (field_imm 0 (global Toploop!)) "add")
-   yield =? (apply (field_imm 0 (global Toploop!)) "yield")
-   Yielding =? (apply (field_imm 0 (global Toploop!)) "Yielding/332")
+  (add =? (apply (field_imm 0 (global Toploop!/0)) "add")
+   yield =? (apply (field_imm 0 (global Toploop!/0)) "yield")
+   Yielding =? (apply (field_imm 0 (global Toploop!/0)) "Yielding/332")
    *match* =[value<int>]
      (apply (field_imm 0 Yielding)
        (function {nlocal = 0} y : int
@@ -74,9 +74,9 @@ let () = Yielding.with_ (fun y ->
 (* Note the [yielding] marker only on the call to [yield] *)
 [%%expect{|
 (let
-  (add =? (apply (field_imm 0 (global Toploop!)) "add")
-   yield =? (apply (field_imm 0 (global Toploop!)) "yield")
-   Yielding =? (apply (field_imm 0 (global Toploop!)) "Yielding/332")
+  (add =? (apply (field_imm 0 (global Toploop!/0)) "add")
+   yield =? (apply (field_imm 0 (global Toploop!/0)) "yield")
+   Yielding =? (apply (field_imm 0 (global Toploop!/0)) "Yielding/332")
    *match* =[value<int>]
      (apply (field_imm 0 Yielding)
        (function {nlocal = 0} y : int
@@ -91,9 +91,9 @@ let (_ : int) = Yielding.with_ (fun y ->
 (* Note the [yielding] marker only on the call to [yield] *)
 [%%expect{|
 (let
-  (add =? (apply (field_imm 0 (global Toploop!)) "add")
-   yield =? (apply (field_imm 0 (global Toploop!)) "yield")
-   Yielding =? (apply (field_imm 0 (global Toploop!)) "Yielding/332"))
+  (add =? (apply (field_imm 0 (global Toploop!/0)) "add")
+   yield =? (apply (field_imm 0 (global Toploop!/0)) "yield")
+   Yielding =? (apply (field_imm 0 (global Toploop!/0)) "Yielding/332"))
   (apply (field_imm 0 Yielding)
     (function {nlocal = 0} y : int
       (seq (apply add 2 2) (apply[yielding] yield y) (applynontail add 4 4)))))
@@ -119,7 +119,7 @@ end = struct
   ;;
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "List/438"
+(apply (field_imm 1 (global Toploop!/0)) "List/438"
   (letrec
     (map
        (function {nlocal = 2} f[L]
@@ -164,7 +164,7 @@ end
                         (apply[yielding] f i)
                         (apply[yielding] loop (%int_sub i 1)))
                       0)))
-               (applytail (field_imm 10 (global Stdlib__List!))
+               (applytail (field_imm 10 (global Stdlib__List!/70))
                  (apply[yielding] loop i))))))
       (makeblock 0 map init))))
 module List :
@@ -182,9 +182,9 @@ let f (l : int list) =
     List.map (fun x -> yield y; x + 4) l) [@nontail]
 [%%expect{|
 (let
-  (yield =? (apply (field_imm 0 (global Toploop!)) "yield")
-   List =? (apply (field_imm 0 (global Toploop!)) "List/438")
-   Yielding =? (apply (field_imm 0 (global Toploop!)) "Yielding/332")
+  (yield =? (apply (field_imm 0 (global Toploop!/0)) "yield")
+   List =? (apply (field_imm 0 (global Toploop!/0)) "List/438")
+   Yielding =? (apply (field_imm 0 (global Toploop!/0)) "Yielding/332")
    f =
      (function {nlocal = 0}
        l[value<
@@ -207,7 +207,7 @@ let f (l : int list) =
                  (function {nlocal = 0} x[value<int>] : int
                    (seq (apply[yielding] yield y) (%int_add x 4)))
                  l)))))))
-  (apply (field_imm 1 (global Toploop!)) "f" f))
+  (apply (field_imm 1 (global Toploop!/0)) "f" f))
 val f : int list -> int list = <fun>
 |}]
 
@@ -226,9 +226,9 @@ let () =
     ignore (List.init (fun _ -> don't_yield ()) 10))
 [%%expect{|
 (let
-  (yield =? (apply (field_imm 0 (global Toploop!)) "yield")
-   List =? (apply (field_imm 0 (global Toploop!)) "List/438")
-   Yielding =? (apply (field_imm 0 (global Toploop!)) "Yielding/332")
+  (yield =? (apply (field_imm 0 (global Toploop!/0)) "yield")
+   List =? (apply (field_imm 0 (global Toploop!/0)) "List/438")
+   Yielding =? (apply (field_imm 0 (global Toploop!/0)) "Yielding/332")
    *match* =[value<int>]
      (apply (field_imm 0 Yielding)
        (function {nlocal = 0} y : int
@@ -292,7 +292,7 @@ let () =
           (let (tag =a[value<int>] (caml_obj_tag lazy_val))
             (if (%int_equal tag 250) (field_mut 0 lazy_val)
               (if (|| (%int_equal tag 246) (%int_equal tag 244))
-                (apply (field_imm 1 (global CamlinternalLazy!))
+                (apply (field_imm 1 (global CamlinternalLazy!/4))
                   (opaque lazy_val) never_inline)
                 lazy_val))))
        (if (%eq n 4) 0
@@ -313,25 +313,27 @@ end
 [%%expect{|
 (let
   (A =
-     (apply (field_imm 0 (global CamlinternalMod!)) [0: "" 1 44] [0: [0: 0]])
+     (apply (field_imm 0 (global CamlinternalMod!/2)) [0: "" 1 44]
+       [0: [0: 0]])
    B =
-     (apply (field_imm 0 (global CamlinternalMod!)) [0: "" 4 37] [0: [0: 0]]))
+     (apply (field_imm 0 (global CamlinternalMod!/2)) [0: "" 4 37]
+       [0: [0: 0]]))
   (seq
-    (apply (field_imm 1 (global CamlinternalMod!)) [0: [0: 0]] A
+    (apply (field_imm 1 (global CamlinternalMod!/2)) [0: [0: 0]] A
       (let
         (f =
            (function {nlocal = 0} n[value<int>] : int
              (if (%int_lessequal n 0) 0
                (apply (field_imm 0 B) (%int_sub n 1)))))
         (makeblock 0 f)))
-    (apply (field_imm 1 (global CamlinternalMod!)) [0: [0: 0]] B
+    (apply (field_imm 1 (global CamlinternalMod!/2)) [0: [0: 0]] B
       (let
         (g =
            (function {nlocal = 0} n[value<int>] : int
              (apply (field_imm 0 A) n)))
         (makeblock 0 g)))
-    (apply (field_imm 1 (global Toploop!)) "A" A)
-    (apply (field_imm 1 (global Toploop!)) "B" B)))
+    (apply (field_imm 1 (global Toploop!/0)) "A" A)
+    (apply (field_imm 1 (global Toploop!/0)) "B" B)))
 module rec A : sig val f : int -> int end
 and B : sig val g : int -> int end
 |}]
@@ -350,10 +352,10 @@ let f x =
        (let (l =? (caml_alloc_dummy_lazy 0))
          (seq
            (caml_update_dummy_lazy l
-             (apply (field_imm 3 (global CamlinternalLazy!))
+             (apply (field_imm 3 (global CamlinternalLazy!/4))
                (makeforwardblock x)))
            l))))
-  (apply (field_imm 1 (global Toploop!)) "f" f))
+  (apply (field_imm 1 (global Toploop!/0)) "f" f))
 val f : 'a -> 'a lazy_t = <fun>
 |}]
 
@@ -370,34 +372,34 @@ end
    o =
      (let
        (class =?
-          (opaque (apply (field_imm 15 (global CamlinternalOO!)) shared))
+          (opaque (apply (field_imm 15 (global CamlinternalOO!/30)) shared))
         obj_init =
           (let
             (ids =?
                (opaque
-                 (apply (field_imm 3 (global CamlinternalOO!)) class shared
-                   (opaque [0: #"x"])))
+                 (apply (field_imm 3 (global CamlinternalOO!/30)) class
+                   shared (opaque [0: #"x"])))
              with_x =o? (field_mut 0 ids)
              x =o? (field_mut 1 ids))
             (seq
               (opaque
-                (apply (field_imm 9 (global CamlinternalOO!)) class with_x
+                (apply (field_imm 9 (global CamlinternalOO!/30)) class with_x
                   (function {nlocal = 0} self-1 n[value<int>]
                     (let
                       (copy =
-                         (apply (field_imm 21 (global CamlinternalOO!))
+                         (apply (field_imm 21 (global CamlinternalOO!/30))
                            self-1))
                       (seq (setfield_imm_computed copy x n) copy)))))
               (function {nlocal = 0} env
                 (let
                   (self =?
                      (opaque
-                       (apply (field_imm 23 (global CamlinternalOO!)) 0
+                       (apply (field_imm 23 (global CamlinternalOO!/30)) 0
                          class)))
                   (seq (setfield_imm_computed self x 1) self))))))
-       (seq (opaque (apply (field_imm 16 (global CamlinternalOO!)) class))
+       (seq (opaque (apply (field_imm 16 (global CamlinternalOO!/30)) class))
          (opaque (apply obj_init 0)))))
-  (apply (field_imm 1 (global Toploop!)) "o" o))
+  (apply (field_imm 1 (global Toploop!/0)) "o" o))
 val o : < with_x : int -> 'a > as 'a = <obj>
 |}]
 
@@ -424,7 +426,7 @@ let rec f =
              (function {nlocal = 0} x[value<int>] : int
                (if (%int_lessequal x 0) 0 (apply f (%int_sub x 1)))))
           (makeblock 0 g)))
-      (apply (field_imm 1 (global Toploop!)) "f" f))))
+      (apply (field_imm 1 (global Toploop!/0)) "f" f))))
 val f : int -> int = <fun>
 |}]
 
@@ -483,7 +485,7 @@ let (_ : int) =
   end
 ;;
 [%%expect{|
-(let (Yielding =? (apply (field_imm 0 (global Toploop!)) "Yielding/332"))
+(let (Yielding =? (apply (field_imm 0 (global Toploop!/0)) "Yielding/332"))
   (apply (field_imm 0 Yielding)
     (function {nlocal = 0} y : int
       (let
@@ -529,8 +531,8 @@ let (_ : int) =
     f 5)
 [%%expect{|
 (let
-  (yield =? (apply (field_imm 0 (global Toploop!)) "yield")
-   Yielding =? (apply (field_imm 0 (global Toploop!)) "Yielding/332"))
+  (yield =? (apply (field_imm 0 (global Toploop!/0)) "yield")
+   Yielding =? (apply (field_imm 0 (global Toploop!/0)) "Yielding/332"))
   (apply (field_imm 0 Yielding)
     (function {nlocal = 0} y : int
       (let
@@ -572,8 +574,8 @@ let () =
     f y)
 [%%expect{|
 (let
-  (yield =? (apply (field_imm 0 (global Toploop!)) "yield")
-   Yielding =? (apply (field_imm 0 (global Toploop!)) "Yielding/332")
+  (yield =? (apply (field_imm 0 (global Toploop!/0)) "yield")
+   Yielding =? (apply (field_imm 0 (global Toploop!/0)) "Yielding/332")
    *match* =[value<int>]
      (apply (field_imm 0 Yielding)
        (function {nlocal = 0} y : int
@@ -608,17 +610,17 @@ module F (X : sig val n : int end) = struct let m = X.n + 1 end
 module N = struct let n = 41 end
 module R = F(N)
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "F/857"
+(apply (field_imm 1 (global Toploop!/0)) "F/857"
   (function {nlocal = 0} X is_a_functor never_loop
     (let (m =[value<int>] (%int_add (field_imm 0 X) 1)) (makeblock 0 m))))
 module F : functor (X : sig val n : int end) -> sig val m : int end
-(apply (field_imm 1 (global Toploop!)) "N/862"
+(apply (field_imm 1 (global Toploop!/0)) "N/862"
   (let (n =[value<int>] 41) (makeblock 0 n)))
 module N : sig val n : int end
 (let
-  (N =? (apply (field_imm 0 (global Toploop!)) "N/862")
-   F =? (apply (field_imm 0 (global Toploop!)) "F/857"))
-  (apply (field_imm 1 (global Toploop!)) "R/864" (apply F N)))
+  (N =? (apply (field_imm 0 (global Toploop!/0)) "N/862")
+   F =? (apply (field_imm 0 (global Toploop!/0)) "F/857"))
+  (apply (field_imm 1 (global Toploop!/0)) "R/864" (apply F N)))
 module R : sig val m : int end
 |}]
 
@@ -629,7 +631,7 @@ module Yf (X : sig val f : unit -> unit end @ yielding) = struct
   let g () = X.f ()
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Yf/870"
+(apply (field_imm 1 (global Toploop!/0)) "Yf/870"
   (function {nlocal = 0} X is_a_functor never_loop
     (let
       (g =
@@ -646,9 +648,9 @@ let () =
     R.g ())
 [%%expect{|
 (let
-  (yield =? (apply (field_imm 0 (global Toploop!)) "yield")
-   Yf =? (apply (field_imm 0 (global Toploop!)) "Yf/870")
-   Yielding =? (apply (field_imm 0 (global Toploop!)) "Yielding/332")
+  (yield =? (apply (field_imm 0 (global Toploop!/0)) "yield")
+   Yf =? (apply (field_imm 0 (global Toploop!/0)) "Yf/870")
+   Yielding =? (apply (field_imm 0 (global Toploop!/0)) "Yielding/332")
    *match* =[value<int>]
      (apply (field_imm 0 Yielding)
        (function {nlocal = 0} y : int
@@ -674,17 +676,17 @@ let h () =
   let module R = Yf (M) in
   R.g ()
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "M/883"
+(apply (field_imm 1 (global Toploop!/0)) "M/883"
   (let (f = (function {nlocal = 0} param[value<int>] : int 0))
     (makeblock 0 f)))
 module M : sig val f : unit -> unit end
 (let
-  (M =? (apply (field_imm 0 (global Toploop!)) "M/883")
-   Yf =? (apply (field_imm 0 (global Toploop!)) "Yf/870")
+  (M =? (apply (field_imm 0 (global Toploop!/0)) "M/883")
+   Yf =? (apply (field_imm 0 (global Toploop!/0)) "Yf/870")
    h =
      (function {nlocal = 0} param[value<int>] : int
        (let (R = (apply Yf M)) (apply[yielding] (field_imm 0 R) 0))))
-  (apply (field_imm 1 (global Toploop!)) "h" h))
+  (apply (field_imm 1 (global Toploop!/0)) "h" h))
 val h : unit -> unit = <fun>
 |}]
 
@@ -697,7 +699,7 @@ let () =
     let module R = Uf (struct let f () = yield y end) in
     R.g ())
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Uf/894"
+(apply (field_imm 1 (global Toploop!/0)) "Uf/894"
   (function {nlocal = 0} X is_a_functor never_loop
     (let
       (g =
@@ -735,9 +737,9 @@ let () =
     R2.g ())
 [%%expect{|
 (let
-  (yield =? (apply (field_imm 0 (global Toploop!)) "yield")
-   M =? (apply (field_imm 0 (global Toploop!)) "M/883")
-   Yielding =? (apply (field_imm 0 (global Toploop!)) "Yielding/332")
+  (yield =? (apply (field_imm 0 (global Toploop!/0)) "yield")
+   M =? (apply (field_imm 0 (global Toploop!/0)) "M/883")
+   Yielding =? (apply (field_imm 0 (global Toploop!/0)) "Yielding/332")
    *match* =[value<int>]
      (apply (field_imm 0 Yielding)
        (function {nlocal = 0} y : int
@@ -766,8 +768,8 @@ let () =
     ())
 [%%expect{|
 (let
-  (yield =? (apply (field_imm 0 (global Toploop!)) "yield")
-   Yielding =? (apply (field_imm 0 (global Toploop!)) "Yielding/332")
+  (yield =? (apply (field_imm 0 (global Toploop!/0)) "yield")
+   Yielding =? (apply (field_imm 0 (global Toploop!/0)) "Yielding/332")
    *match* =[value<int>]
      (apply (field_imm 0 Yielding)
        (function {nlocal = 0} y : int
@@ -865,27 +867,28 @@ class d = object inherit c as super method n = super#m end
             (let
               (m =?
                  (opaque
-                   (apply (field_imm 6 (global CamlinternalOO!)) class #"m")))
+                   (apply (field_imm 6 (global CamlinternalOO!/30)) class
+                     #"m")))
               (seq
                 (opaque
-                  (apply (field_imm 10 (global CamlinternalOO!)) class
+                  (apply (field_imm 10 (global CamlinternalOO!/30)) class
                     (opaque (makeblock 0 m 0 0))))
                 (function {nlocal = 0} env self?
                   (opaque
-                    (apply (field_imm 23 (global CamlinternalOO!)) self
+                    (apply (field_imm 23 (global CamlinternalOO!/30)) self
                       class)))))))
        (opaque
-         (apply (field_imm 18 (global CamlinternalOO!)) (opaque [0: #"m"])
+         (apply (field_imm 18 (global CamlinternalOO!/30)) (opaque [0: #"m"])
            c_init))))
-  (apply (field_imm 1 (global Toploop!)) "c/956" c))
+  (apply (field_imm 1 (global Toploop!/0)) "c/956" c))
 class c : object method m : int end
 (let
-  (c =? (apply (field_imm 0 (global Toploop!)) "c/956")
+  (c =? (apply (field_imm 0 (global Toploop!/0)) "c/956")
    mk = (function {nlocal = 0} param[value<int>] (apply (field_mut 0 c) 0)))
-  (apply (field_imm 1 (global Toploop!)) "mk" mk))
+  (apply (field_imm 1 (global Toploop!/0)) "mk" mk))
 val mk : unit -> c = <fun>
 (let
-  (c =? (apply (field_imm 0 (global Toploop!)) "c/956")
+  (c =? (apply (field_imm 0 (global Toploop!/0)) "c/956")
    shared =a (opaque [0: #"m"])
    shared =a (opaque [0: #"n" #"m"])
    d =?
@@ -895,33 +898,33 @@ val mk : unit -> c = <fun>
             (let
               (ids =?
                  (opaque
-                   (apply (field_imm 7 (global CamlinternalOO!)) class
+                   (apply (field_imm 7 (global CamlinternalOO!/30)) class
                      shared))
                n =o? (field_mut 0 ids)
                inh =[value<genarray>]
                  (opaque
-                   (apply (field_imm 17 (global CamlinternalOO!)) class 0 0
-                     shared c 1))
+                   (apply (field_imm 17 (global CamlinternalOO!/30)) class 0
+                     0 shared c 1))
                obj_init =o? (field_mut 0 inh)
                m =o? (field_mut 1 inh))
               (seq
                 (opaque
-                  (apply (field_imm 9 (global CamlinternalOO!)) class n
+                  (apply (field_imm 9 (global CamlinternalOO!/30)) class n
                     (function {nlocal = 0} self-7 : int (apply m self-7))))
                 (function {nlocal = 0} env self?
                   (let
                     (self =?
                        (opaque
-                         (apply (field_imm 23 (global CamlinternalOO!)) self
-                           class)))
+                         (apply (field_imm 23 (global CamlinternalOO!/30))
+                           self class)))
                     (seq (opaque (apply obj_init self))
                       (opaque
-                        (apply (field_imm 25 (global CamlinternalOO!)) self
-                          self class)))))))))
+                        (apply (field_imm 25 (global CamlinternalOO!/30))
+                          self self class)))))))))
        (opaque
-         (apply (field_imm 18 (global CamlinternalOO!))
+         (apply (field_imm 18 (global CamlinternalOO!/30))
            (opaque [0: #"m" #"n"]) d_init))))
-  (apply (field_imm 1 (global Toploop!)) "d/984" d))
+  (apply (field_imm 1 (global Toploop!/0)) "d/984" d))
 class d : object method m : int method n : int end
 |}]
 
@@ -935,7 +938,7 @@ let std_pipe = ( |> )
 0
 external ( |> ) : 'a -> ('a -> 'b) -> 'b = "%revapply"
 (let (std_pipe = (function {nlocal = 0} prim prim stub (apply prim prim)))
-  (apply (field_imm 1 (global Toploop!)) "std_pipe" std_pipe))
+  (apply (field_imm 1 (global Toploop!/0)) "std_pipe" std_pipe))
 val std_pipe : 'a -> ('a -> 'b) -> 'b = <fun>
 |}]
 
@@ -952,7 +955,7 @@ external pipe_y : 'a @ yielding -> ('a @ yielding -> 'b) @ yielding -> 'b
 (let
   (yielding_pipe =
      (function {nlocal = 0} prim prim stub (apply[yielding] prim prim)))
-  (apply (field_imm 1 (global Toploop!)) "yielding_pipe" yielding_pipe))
+  (apply (field_imm 1 (global Toploop!/0)) "yielding_pipe" yielding_pipe))
 val yielding_pipe : 'a @ yielding -> ('a @ yielding -> 'b) @ yielding -> 'b =
   <fun>
 |}]
@@ -975,12 +978,12 @@ end
 [%%expect{|
 0
 module type S = sig type t val x : t end
-(apply (field_imm 1 (global Toploop!)) "F/1032"
+(apply (field_imm 1 (global Toploop!/0)) "F/1032"
   (function {nlocal = 0} M is_a_functor never_loop
     (let (y = (field_imm 0 M)) (makeblock 0 y))))
 module F : functor (M : S) -> sig val y : M.t end
-(let (F =? (apply (field_imm 0 (global Toploop!)) "F/1032"))
-  (apply (field_imm 1 (global Toploop!)) "M/1040"
+(let (F =? (apply (field_imm 0 (global Toploop!/0)) "F/1032"))
+  (apply (field_imm 1 (global Toploop!/0)) "M/1040"
     (let (x =[value<int>] 42 include = (apply F (makeblock 0 x)))
       (makeblock 0 x (field_imm 0 include)))))
 module M : sig type t = int val x : int val y : int end
@@ -1000,7 +1003,7 @@ let () =
     end in
     M.g ())
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Gf/1047"
+(apply (field_imm 1 (global Toploop!/0)) "Gf/1047"
   (function {nlocal = 0} X is_a_functor never_loop
     (let
       (g =
@@ -1011,9 +1014,9 @@ module Gf :
   functor (X : sig val f : unit -> unit end @ yielding) ->
     sig val g : unit -> unit end @ yielding
 (let
-  (yield =? (apply (field_imm 0 (global Toploop!)) "yield")
-   Gf =? (apply (field_imm 0 (global Toploop!)) "Gf/1047")
-   Yielding =? (apply (field_imm 0 (global Toploop!)) "Yielding/332")
+  (yield =? (apply (field_imm 0 (global Toploop!/0)) "yield")
+   Gf =? (apply (field_imm 0 (global Toploop!/0)) "Gf/1047")
+   Yielding =? (apply (field_imm 0 (global Toploop!/0)) "Yielding/332")
    *match* =[value<int>]
      (apply (field_imm 0 Yielding)
        (function {nlocal = 0} y : int
@@ -1041,17 +1044,18 @@ end
    o =
      (let
        (class =?
-          (opaque (apply (field_imm 15 (global CamlinternalOO!)) shared))
+          (opaque (apply (field_imm 15 (global CamlinternalOO!/30)) shared))
         obj_init =
           (let
             (ids =?
                (opaque
-                 (apply (field_imm 7 (global CamlinternalOO!)) class shared))
+                 (apply (field_imm 7 (global CamlinternalOO!/30)) class
+                   shared))
              uses =o? (field_mut 0 ids)
              m =o? (field_mut 1 ids))
             (seq
               (opaque
-                (apply (field_imm 10 (global CamlinternalOO!)) class
+                (apply (field_imm 10 (global CamlinternalOO!/30)) class
                   (opaque
                     (makeblock 0 m
                       (function {nlocal = 0} self-8 x[value<int>] : int
@@ -1059,23 +1063,23 @@ end
                       uses (function {nlocal = 0} self-8 param : int 0)))))
               (function {nlocal = 0} env
                 (opaque
-                  (apply (field_imm 23 (global CamlinternalOO!)) 0 class))))))
-       (seq (opaque (apply (field_imm 16 (global CamlinternalOO!)) class))
+                  (apply (field_imm 23 (global CamlinternalOO!/30)) 0 class))))))
+       (seq (opaque (apply (field_imm 16 (global CamlinternalOO!/30)) class))
          (opaque (apply obj_init 0)))))
-  (apply (field_imm 1 (global Toploop!)) "o" o))
+  (apply (field_imm 1 (global Toploop!/0)) "o" o))
 val o : < m : int -> int; uses : Yielding.t @ yielding -> int > = <obj>
 |}]
 
 let bare = o#m
 let applied = o#m 3
 [%%expect{|
-(let (o =? (apply (field_imm 0 (global Toploop!)) "o") bare = (send o 109))
-  (apply (field_imm 1 (global Toploop!)) "bare" bare))
+(let (o =? (apply (field_imm 0 (global Toploop!/0)) "o") bare = (send o 109))
+  (apply (field_imm 1 (global Toploop!/0)) "bare" bare))
 val bare : int -> int = <fun>
 (let
-  (o =? (apply (field_imm 0 (global Toploop!)) "o")
+  (o =? (apply (field_imm 0 (global Toploop!/0)) "o")
    applied =[value<int>] (send o 109 3))
-  (apply (field_imm 1 (global Toploop!)) "applied" applied))
+  (apply (field_imm 1 (global Toploop!/0)) "applied" applied))
 val applied : int = 4
 |}]
 
@@ -1083,8 +1087,8 @@ val applied : int = 4
 let (_ : int) = Yielding.with_ (fun y -> o#uses y)
 [%%expect{|
 (let
-  (o =? (apply (field_imm 0 (global Toploop!)) "o")
-   Yielding =? (apply (field_imm 0 (global Toploop!)) "Yielding/332"))
+  (o =? (apply (field_imm 0 (global Toploop!/0)) "o")
+   Yielding =? (apply (field_imm 0 (global Toploop!/0)) "Yielding/332"))
   (apply (field_imm 0 Yielding)
     (function {nlocal = 0} y : int (send[yielding] o -844262836 y))))
 - : int = 0
@@ -1106,13 +1110,13 @@ end
             (let
               (ids =?
                  (opaque
-                   (apply (field_imm 7 (global CamlinternalOO!)) class
+                   (apply (field_imm 7 (global CamlinternalOO!/30)) class
                      shared))
                m =o? (field_mut 0 ids)
                call_m =o? (field_mut 1 ids))
               (seq
                 (opaque
-                  (apply (field_imm 10 (global CamlinternalOO!)) class
+                  (apply (field_imm 10 (global CamlinternalOO!/30)) class
                     (opaque
                       (makeblock 0 m
                         (function {nlocal = 0} self-9 x[value<int>] : int
@@ -1120,10 +1124,10 @@ end
                         call_m 16 m 4))))
                 (function {nlocal = 0} env self?
                   (opaque
-                    (apply (field_imm 23 (global CamlinternalOO!)) self
+                    (apply (field_imm 23 (global CamlinternalOO!/30)) self
                       class)))))))
        (opaque
-         (apply (field_imm 18 (global CamlinternalOO!)) shared c2_init))))
-  (apply (field_imm 1 (global Toploop!)) "c2/1096" c2))
+         (apply (field_imm 18 (global CamlinternalOO!/30)) shared c2_init))))
+  (apply (field_imm 1 (global Toploop!/0)) "c2/1096" c2))
 class c2 : object method call_m : int method m : int -> int end
 |}]

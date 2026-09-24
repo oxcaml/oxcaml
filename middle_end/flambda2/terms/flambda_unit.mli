@@ -27,6 +27,7 @@ val create :
   body:Flambda.Expr.t ->
   module_symbol:Symbol.t ->
   module_block_cells:Symbol.t list ->
+  root_symbols:(Symbol.t * int) list ->
   t
 
 val return_continuation : t -> Continuation.t
@@ -41,9 +42,16 @@ val module_symbol : t -> Symbol.t
     cell). *)
 val module_block_cells : t -> Symbol.t list
 
-(** The symbols that must stay reachable from outside the unit: the module
-    symbol and the cells. *)
+(** The symbols that must stay reachable from outside the unit: the cells, plus
+    the module symbol when the module block is emitted (see
+    [Flambda_features.emit_module_block]). *)
 val root_symbols : t -> Symbol.t list
+
+(** [root_symbols], each with the size in words of the block it names. The roots
+    are defined in the initialiser's return continuation, which is dropped when
+    the initialiser cannot return; [To_cmm] then defines placeholders of these
+    sizes. *)
+val root_symbols_with_sizes : t -> (Symbol.t * int) list
 
 val body : t -> Flambda.Expr.t
 

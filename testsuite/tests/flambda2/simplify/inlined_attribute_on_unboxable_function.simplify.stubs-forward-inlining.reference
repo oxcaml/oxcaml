@@ -59,9 +59,5 @@ apply direct(helper_0_1 &toplevel) inlining_state(depth(1))
       Block 0 ($camlInlined_attribute_on_unboxable_function__f_2)
     and $camlInlined_attribute_on_unboxable_function__cell0 =
       Block 0 ($camlInlined_attribute_on_unboxable_function__helper_1)
-    and $camlInlined_attribute_on_unboxable_function =
-      Block 0 ($camlInlined_attribute_on_unboxable_function__helper_1,
-               $camlInlined_attribute_on_unboxable_function__f_2,
-               apply_result)
     in
-    cont done ($camlInlined_attribute_on_unboxable_function)
+    cont done (0)

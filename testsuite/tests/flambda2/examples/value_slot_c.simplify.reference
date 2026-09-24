@@ -25,10 +25,12 @@ let code loopify(never) size(59) newer_version_of(f_2)
      | 0 -> k3
      | 1 -> k4)
     where k4 =
-      let Pfield = %block_load.[`0`] ($Value_slot_b.camlValue_slot_b) in
+      let Pfield = %block_load.[`0`] ($Value_slot_b.camlValue_slot_b__cell0)
+      in
       cont k2 (Pfield)
     where k3 =
-      let Pfield = %block_load.[`1`] ($Value_slot_b.camlValue_slot_b) in
+      let Pfield = %block_load.[`0`] ($Value_slot_b.camlValue_slot_b__cell1)
+      in
       cont k2 (Pfield)
     where k2 (g : val) =
       (apply &my_alloc_region inlined(always) g (3) -> k2 * k1
@@ -52,9 +54,5 @@ let code loopify(never) size(59) newer_version_of(f_2)
                   | 1 -> k (0)))
 in
 let $camlValue_slot_c__f_10 = closure f_2_1 @f &toplevel in
-let $camlValue_slot_c__cell0 =
-  Block 0 ($camlValue_slot_c__f_10)
-and $camlValue_slot_c =
-  Block 0 ($camlValue_slot_c__f_10)
-in
-cont done ($camlValue_slot_c)
+let $camlValue_slot_c__cell0 = Block 0 ($camlValue_slot_c__f_10) in
+cont done (0)

@@ -1,0 +1,6 @@
+packed: f 2 = 6, c = constant, n = 14, !r = 2
+M: f 2 = 6, c = constant, n = 14, !r = 2
+I: f 2 = 6, c = constant, n = 14, !r = 2
+FM.g () = 42
+coerced: f 2 = 6, n = 14
+after r := 100: !P.r = 100, !M.r = 100, !I.r = 100

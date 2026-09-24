@@ -24,20 +24,16 @@ type t =
     symbols : Cmm.symbol String.Map.t;
     (* This map is only used for symbols not directly translated from
        [Symbol.t], e.g. module entry point names. *)
-    module_symbol : Symbol.t;
-    module_symbol_defined : bool;
     invalid_message_symbols : Symbol.t String.Map.t
   }
 
-let create ~module_symbol ~reachable_names =
+let create ~reachable_names =
   { gc_roots = [];
     data_list = [];
     functions = [];
     current_data = [];
     reachable_names;
     symbols = String.Map.empty;
-    module_symbol;
-    module_symbol_defined = false;
     invalid_message_symbols = String.Map.empty
   }
 
@@ -93,24 +89,15 @@ let symbol_of_code_id res code_id ~currently_in_inlined_body : Cmm.symbol =
 
 (* *)
 
-let check_for_module_symbol t symbol =
-  if Symbol.equal symbol t.module_symbol
-  then (
-    if t.module_symbol_defined
-    then
-      Misc.fatal_errorf
-        "check_for_module_symbol %a: Module block symbol (%a) already defined"
-        Symbol.print symbol Symbol.print t.module_symbol;
-    { t with module_symbol_defined = true })
-  else t
-
-let defines_a_symbol data =
+let defined_symbol_name data =
   match (data : Cmm.data_item) with
-  | Cdefine_symbol _ -> true
+  | Cdefine_symbol sym -> Some sym.sym_name
   | Cint8 _ | Cint16 _ | Cint32 _ | Cint _ | Csingle _ | Cdouble _ | Cvec128 _
   | Cvec256 _ | Cvec512 _ | Csymbol_address _ | Csymbol_offset _ | Cstring _
   | Cskip _ | Calign _ ->
-    false
+    None
+
+let defines_a_symbol data = Option.is_some (defined_symbol_name data)
 
 let add_to_data_list x l =
   match x with
@@ -146,22 +133,42 @@ let add_gc_roots r l = { r with gc_roots = l @ r.gc_roots }
 
 let add_function r f = { r with functions = f :: r.functions }
 
+(* The roots are defined in the initialiser's return continuation, which is
+   dropped when the initialiser cannot return, while other units still refer to
+   them. The placeholders are never read; their Abstract tag keeps the GC from
+   scanning them. *)
+let define_missing_symbols r symbols_with_sizes =
+  let r = archive_data r in
+  let defined =
+    List.fold_left
+      (fun defined (phrase : Cmm.phrase) ->
+        match phrase with
+        | Cfunction _ -> defined
+        | Cdata items ->
+          List.fold_left
+            (fun defined item ->
+              match defined_symbol_name item with
+              | Some name -> String.Set.add name defined
+              | None -> defined)
+            defined items)
+      String.Set.empty r.data_list
+  in
+  List.fold_left
+    (fun r (sym, size) ->
+      let sym = symbol r sym in
+      if String.Set.mem sym.sym_name defined
+      then r
+      else
+        let header = C.block_header Obj.abstract_tag size in
+        let fields = List.init size (fun _ -> Cmm.Cint 0n) in
+        add_archive_data_items r (C.emit_block sym header fields))
+    r symbols_with_sizes
+
 type result =
   { data_items : Cmm.phrase list;
     gc_roots : Cmm.symbol list;
     functions : Cmm.phrase list
   }
-
-let define_module_symbol_if_missing r =
-  if r.module_symbol_defined
-  then r
-  else
-    let linkage_name =
-      Linkage_name.to_string (Symbol.linkage_name r.module_symbol)
-    in
-    let sym : Cmm.symbol = { sym_name = linkage_name; sym_global = Global } in
-    let l = C.emit_block sym (C.black_block_header 0 0) [] in
-    set_data r l
 
 let add_invalid_message_symbol t symbol ~message =
   { t with
@@ -173,8 +180,6 @@ let invalid_message_symbol t ~message =
   String.Map.find_opt message t.invalid_message_symbols
 
 let to_cmm r =
-  (* Make sure the module symbol is defined *)
-  let r = define_module_symbol_if_missing r in
   (* Make sure we do not forget any current data *)
   let r = archive_data r in
   let sorted_functions =

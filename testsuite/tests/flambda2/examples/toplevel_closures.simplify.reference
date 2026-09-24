@@ -37,7 +37,5 @@ and $camlToplevel_closures__cell1 =
   Block 0 ($camlToplevel_closures__f_1)
 and $camlToplevel_closures__cell0 =
   Block 0 (r)
-and $camlToplevel_closures =
-  Block 0 (r, $camlToplevel_closures__f_1, $camlToplevel_closures__g_2)
 in
-cont done ($camlToplevel_closures)
+cont done (0)

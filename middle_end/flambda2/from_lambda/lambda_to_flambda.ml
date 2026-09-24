@@ -468,6 +468,22 @@ let name_if_not_var acc ccenv name simple kind body =
       [id, id_duid, kind]
       Not_user_visible (IR.Simple simple) ~body:(body id)
 
+(* [Foo.x] reads field [pos] of [Foo]'s module block. Native code keeps each
+   field in its own cell instead of a block (see [Pgetglobal] in
+   [Closure_conversion]), so read the cell directly rather than rebuilding the
+   whole block only to project one field from it. *)
+let module_block_cell_projection (prim : L.primitive) (args : L.lambda list) =
+  if Flambda_features.emit_module_block ()
+  then None
+  else
+    match[@ocaml.warning "-fragile-match"] prim, args with
+    | Pfield (pos, ptr, sem), [Lprim (Pgetglobal (cu, _, _), [], _)] ->
+      Some (cu, pos, L.Pfield (0, ptr, sem))
+    | ( Pmixedfield (pos :: path, shape, sem),
+        [Lprim (Pgetglobal (cu, _, _), [], _)] ) ->
+      Some (cu, pos, L.Pmixedfield (0 :: path, [| shape.(pos) |], sem))
+    | _, _ -> None
+
 let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
     (k_exn : Continuation.t) : Expr_with_acc.t =
   match lam with
@@ -603,80 +619,102 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
         duid,
         Lprim (prim, args, loc),
         body ) -> (
-    let env, result =
-      Lambda_to_lambda_transforms.transform_primitive env prim args loc
-    in
-    match result with
-    | Primitive (prim, args, loc) ->
-      (* This case avoids extraneous continuations. *)
-      let exn_continuation : IR.exn_continuation option =
-        if L.primitive_can_raise prim
-        then
-          Some
-            { exn_handler = k_exn;
-              extra_args = extra_args_for_exn_continuation env k_exn
-            }
-        else None
+    match module_block_cell_projection prim args with
+    | Some (cu, pos, prim) ->
+      let cell_id = Ident.create_local "module_block_cell" in
+      let body acc ccenv =
+        cps acc env ccenv
+          (L.Llet
+             ( let_kind,
+               layout,
+               id,
+               duid,
+               Lprim (prim, [Lvar cell_id], loc),
+               body ))
+          k k_exn
       in
-      cps_non_tail_list acc env ccenv args
-        (fun acc env ccenv args _arity ->
-          let env, ids_with_kinds =
-            match layout with
-            | Ptop | Pbottom ->
-              Misc.fatal_error "Cannot bind layout [Ptop] or [Pbottom]"
-            | Psplicevar ident ->
-              Lambda.fatal_error_unevaluated_splice_var ident
-            | Pvalue _ | Punboxed_or_untagged_integer _ | Punboxed_float _
-            | Punboxed_vector _ | Punboxed_mask ->
-              ( env,
-                [ ( id,
-                    Flambda_debug_uid.of_lambda_debug_uid duid,
-                    Flambda_kind.With_subkind
-                    .from_lambda_values_and_unboxed_numbers_only layout
-                      ~machine_width:(Acc.machine_width acc) ) ] )
-            | Punboxed_product layouts ->
-              let arity_component =
-                Flambda_arity.Component_for_creation.Unboxed_product
-                  (List.map
-                     (Flambda_arity.Component_for_creation.from_lambda
-                        ~machine_width:(Acc.machine_width acc))
-                     layouts)
-              in
-              let arity = Flambda_arity.create [arity_component] in
-              let fields =
-                Flambda_arity.fresh_idents_unarized ~id arity
-                |> Flambda_debug_uid.add_proj_debugging_uids_to_fields ~duid
-              in
-              let env =
-                Env.register_unboxed_product_with_kinds env ~unboxed_product:id
-                  ~before_unarization:arity_component ~fields
-              in
-              env, fields
-          in
-          let body acc ccenv = cps acc env ccenv body k k_exn in
-          let current_region = Env.current_region env in
-          let region =
-            Option.map Env.Region_stack_element.region current_region
-          in
-          let ghost_region =
-            Option.map Env.Region_stack_element.ghost_region current_region
-          in
-          let alloc_region = Env.current_alloc_region env in
-          CC.close_let acc ccenv ids_with_kinds (is_user_visible env id)
-            (Prim
-               { prim;
-                 args;
-                 loc;
-                 exn_continuation;
-                 region;
-                 ghost_region;
-                 alloc_region
-               })
-            ~body)
-        k_exn
-    | Transformed lam ->
-      cps acc env ccenv (L.Llet (let_kind, layout, id, duid, lam, body)) k k_exn
-    )
+      CC.close_let acc ccenv
+        [cell_id, Flambda_debug_uid.none, Flambda_kind.With_subkind.any_value]
+        Not_user_visible
+        (Module_block_cell (cu, pos))
+        ~body
+    | None -> (
+      let env, result =
+        Lambda_to_lambda_transforms.transform_primitive env prim args loc
+      in
+      match result with
+      | Primitive (prim, args, loc) ->
+        (* This case avoids extraneous continuations. *)
+        let exn_continuation : IR.exn_continuation option =
+          if L.primitive_can_raise prim
+          then
+            Some
+              { exn_handler = k_exn;
+                extra_args = extra_args_for_exn_continuation env k_exn
+              }
+          else None
+        in
+        cps_non_tail_list acc env ccenv args
+          (fun acc env ccenv args _arity ->
+            let env, ids_with_kinds =
+              match layout with
+              | Ptop | Pbottom ->
+                Misc.fatal_error "Cannot bind layout [Ptop] or [Pbottom]"
+              | Psplicevar ident ->
+                Lambda.fatal_error_unevaluated_splice_var ident
+              | Pvalue _ | Punboxed_or_untagged_integer _ | Punboxed_float _
+              | Punboxed_vector _ | Punboxed_mask ->
+                ( env,
+                  [ ( id,
+                      Flambda_debug_uid.of_lambda_debug_uid duid,
+                      Flambda_kind.With_subkind
+                      .from_lambda_values_and_unboxed_numbers_only layout
+                        ~machine_width:(Acc.machine_width acc) ) ] )
+              | Punboxed_product layouts ->
+                let arity_component =
+                  Flambda_arity.Component_for_creation.Unboxed_product
+                    (List.map
+                       (Flambda_arity.Component_for_creation.from_lambda
+                          ~machine_width:(Acc.machine_width acc))
+                       layouts)
+                in
+                let arity = Flambda_arity.create [arity_component] in
+                let fields =
+                  Flambda_arity.fresh_idents_unarized ~id arity
+                  |> Flambda_debug_uid.add_proj_debugging_uids_to_fields ~duid
+                in
+                let env =
+                  Env.register_unboxed_product_with_kinds env
+                    ~unboxed_product:id ~before_unarization:arity_component
+                    ~fields
+                in
+                env, fields
+            in
+            let body acc ccenv = cps acc env ccenv body k k_exn in
+            let current_region = Env.current_region env in
+            let region =
+              Option.map Env.Region_stack_element.region current_region
+            in
+            let ghost_region =
+              Option.map Env.Region_stack_element.ghost_region current_region
+            in
+            let alloc_region = Env.current_alloc_region env in
+            CC.close_let acc ccenv ids_with_kinds (is_user_visible env id)
+              (Prim
+                 { prim;
+                   args;
+                   loc;
+                   exn_continuation;
+                   region;
+                   ghost_region;
+                   alloc_region
+                 })
+              ~body)
+          k_exn
+      | Transformed lam ->
+        cps acc env ccenv
+          (L.Llet (let_kind, layout, id, duid, lam, body))
+          k k_exn))
   | Llet
       ( (Strict | Alias | StrictOpt),
         _,

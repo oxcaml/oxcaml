@@ -369,26 +369,5 @@ and $camlIfs_and_records__cell1 =
   Block 0 ($camlIfs_and_records__empty_block_0)
 and $camlIfs_and_records__cell0 =
   Block 0 ($camlIfs_and_records__empty_block_0)
-and $camlIfs_and_records =
-  Block 0 ($camlIfs_and_records__empty_block_0,
-           $camlIfs_and_records__empty_block_0,
-           $camlIfs_and_records__help_desired_1,
-           $camlIfs_and_records__help_wrap_2,
-           $camlIfs_and_records__help_variant_3,
-           $camlIfs_and_records__help_wrap_variant_4,
-           $camlIfs_and_records__help_tuple_5,
-           $camlIfs_and_records__help_interior_if_6,
-           $camlIfs_and_records__help_no_if_7,
-           $camlIfs_and_records__help_no_if_tuple_8,
-           $camlIfs_and_records__main_desired_9,
-           $camlIfs_and_records__main_wrap_10,
-           $camlIfs_and_records__main_variant_11,
-           $camlIfs_and_records__main_wrap_variant_12,
-           $camlIfs_and_records__main_tuple_13,
-           $camlIfs_and_records__main_interior_if_14,
-           $camlIfs_and_records__main_no_if_15,
-           $camlIfs_and_records__main_no_if_tuple_16,
-           $camlIfs_and_records__main_hand_inline_17,
-           $camlIfs_and_records__main_hand_inline_tuple_18)
 in
-cont done ($camlIfs_and_records)
+cont done (0)

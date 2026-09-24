@@ -4,36 +4,36 @@
       (makeblock 0 x)))
   (let
     (A =
-       (apply (field_imm 0 (global CamlinternalMod!))
+       (apply (field_imm 0 (global CamlinternalMod!/2))
          [0: "anonymous.ml" 25 6] [0: [0]])
      B =
-       (apply (field_imm 0 (global CamlinternalMod!))
+       (apply (field_imm 0 (global CamlinternalMod!/2))
          [0: "anonymous.ml" 35 6] [0: [0]]))
     (seq
       (ignore
         (let (x =[(consts ()) (non_consts ([0: [int], [int]]))] [0: 4 2])
           (makeblock 0 x)))
-      (apply (field_imm 1 (global CamlinternalMod!)) [0: [0]] A A)
-      (apply (field_imm 1 (global CamlinternalMod!)) [0: [0]] B
+      (apply (field_imm 1 (global CamlinternalMod!/2)) [0: [0]] A A)
+      (apply (field_imm 1 (global CamlinternalMod!/2)) [0: [0]] B
         (let (x =[(consts ()) (non_consts ([0: *, *]))] [0: "foo" "bar"])
           (makeblock 0)))
-      (setfield_ptr(root-init) 0 (global Anonymous!) A)
-      (setfield_ptr(root-init) 1 (global Anonymous!) B)
+      (setfield_ptr(root-init) 0 (global Anonymous!/5) A)
+      (setfield_ptr(root-init) 1 (global Anonymous!/5) B)
       (let (f = (function {nlocal = 0} param : int 0))
-        (setfield_ptr(root-init) 2 (global Anonymous!) f))
+        (setfield_ptr(root-init) 2 (global Anonymous!/5) f))
       (let (s = (makemutable 0 ""))
-        (setfield_ptr(root-init) 3 (global Anonymous!) s))
+        (setfield_ptr(root-init) 3 (global Anonymous!/5) s))
       (ignore
         (let
           (*match* =[int]
-             (setfield_ptr 0 (field_imm 3 (global Anonymous!))
+             (setfield_ptr 0 (field_imm 3 (global Anonymous!/5))
                "Hello World!"))
           (makeblock 0)))
       (let (drop = (function {nlocal = 0} param : int 0))
-        (setfield_ptr(root-init) 4 (global Anonymous!) drop))
+        (setfield_ptr(root-init) 4 (global Anonymous!/5) drop))
       (let
         (*match* =[int]
-           (apply (field_imm 4 (global Anonymous!))
-             (field_mut 0 (field_imm 3 (global Anonymous!)))))
+           (apply (field_imm 4 (global Anonymous!/5))
+             (field_mut 0 (field_imm 3 (global Anonymous!/5)))))
         0)
       0)))

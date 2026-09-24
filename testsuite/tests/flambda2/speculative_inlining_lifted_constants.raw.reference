@@ -39,9 +39,7 @@ let $camlSpeculative_inlining_lifted_constants__first_const_0 = Block 0 () in
     let field_2 = %block_load.tag[`0`].`size`[`5`].[`2`] (module_block) in
     let field_3 = %block_load.tag[`0`].`size`[`5`].[`3`] (module_block) in
     let field_4 = %block_load.tag[`0`].`size`[`5`].[`4`] (module_block) in
-    let $camlSpeculative_inlining_lifted_constants =
-      Block 0 (field_0, field_1, field_2, field_3, field_4)
-    and $camlSpeculative_inlining_lifted_constants__cell0 =
+    let $camlSpeculative_inlining_lifted_constants__cell0 =
       Block 0 (field_0)
     and $camlSpeculative_inlining_lifted_constants__cell1 =
       Block 0 (field_1)
@@ -52,4 +50,4 @@ let $camlSpeculative_inlining_lifted_constants__first_const_0 = Block 0 () in
     and $camlSpeculative_inlining_lifted_constants__cell4 =
       Block 0 (field_4)
     in
-    cont done ($camlSpeculative_inlining_lifted_constants)
+    cont done (0)

@@ -57,9 +57,5 @@ let code loopify(never) size(45) newer_version_of(run_0)
       -> k * k1
 in
 let $camlUnbox_noreturn__run_1 = closure run_0_1 @run &toplevel in
-let $camlUnbox_noreturn__cell0 =
-  Block 0 ($camlUnbox_noreturn__run_1)
-and $camlUnbox_noreturn =
-  Block 0 ($camlUnbox_noreturn__run_1)
-in
-cont done ($camlUnbox_noreturn)
+let $camlUnbox_noreturn__cell0 = Block 0 ($camlUnbox_noreturn__run_1) in
+cont done (0)

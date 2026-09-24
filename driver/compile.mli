@@ -26,6 +26,7 @@ val instance:
   runtime_args:Translmod.runtime_arg list ->
   main_module_block_repr:Lambda.module_representation ->
   arg_descr:Lambda.arg_descr option ->
+  find_format:(Compilation_unit.t -> Lambda.main_module_block_format) ->
   keep_symbol_tables:bool -> unit
 
 (** {2 Internal functions} **)

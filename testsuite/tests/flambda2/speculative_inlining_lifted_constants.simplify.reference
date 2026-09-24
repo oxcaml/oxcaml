@@ -52,11 +52,5 @@ apply direct(f_0_1 &toplevel)
       Block 0 (zero)
     and $camlSpeculative_inlining_lifted_constants__cell0 =
       Block 0 ($camlSpeculative_inlining_lifted_constants__f_1)
-    and $camlSpeculative_inlining_lifted_constants =
-      Block 0 ($camlSpeculative_inlining_lifted_constants__f_1,
-               zero,
-               v0,
-               one,
-               $camlSpeculative_inlining_lifted_constants__v1_3)
     in
-    cont done ($camlSpeculative_inlining_lifted_constants)
+    cont done (0)

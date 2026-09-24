@@ -154,7 +154,9 @@ type primitive =
   | Pbytes_of_string
   | Pignore
   (* Globals *)
-  | Pgetglobal of Compilation_unit.t * staticity
+  | Pgetglobal of Compilation_unit.t * module_representation * staticity
+  (* The representation of the unit's main module block; native code uses it
+     to rebuild the block from the unit's per-field cells. *)
   | Pgetpredef of Ident.t
   (* Operations on heap blocks *)
   | Pmakeblock of int * mutable_flag * block_shape * locality_mode
@@ -670,6 +672,15 @@ and mixed_block_shape = unit mixed_block_element array
 
 and mixed_block_shape_with_locality_mode
   = locality_mode mixed_block_element array
+
+and module_representation =
+  | Module_value_only of { field_count : int }
+  (* All module fields are boxed. *)
+  | Module_mixed of mixed_block_shape * mixed_block_shape_with_locality_mode
+  (* The module contains both values and unboxed elements. We have two shapes:
+     one for allocating (used by [block_of_module_representation]) and one for
+     reading (used by [mod_field]). This will be cleaned up after we add
+     [Pmixedfieldzeroalloc] (name subject to change) *)
 
 (** Compare to [Types.record_representation]. *)
 and record_representation =
@@ -1234,15 +1245,6 @@ type runtime_param =
   | Rp_unit                               (* The unit value (only used when
                                              there are no other parameters) *)
 
-type module_representation =
-  | Module_value_only of { field_count : int }
-  (* All module fields are boxed. *)
-  | Module_mixed of mixed_block_shape * mixed_block_shape_with_locality_mode
-  (* The module contains both values and unboxed elements. We have two shapes:
-     one for allocating (used by [block_of_module_representation]) and one for
-     reading (used by [mod_field]). This will be cleaned up after we add
-     [Pmixedfieldzeroalloc] (name subject to change) *)
-
 (* Logical field count: Each unboxed product counts as 1 field *)
 val module_representation_field_count : module_representation -> int
 
@@ -1266,6 +1268,21 @@ type main_module_block_format =
 
 val main_module_representation :
   main_module_block_format -> module_representation
+
+(* The representation of the block holding the unit's fields: the main module
+   block itself for [Mb_struct], the block returned by the instantiating
+   functor for [Mb_instantiating_functor]. *)
+val returned_module_representation :
+  main_module_block_format -> module_representation
+
+(* The one-field main module block of a parameterised module, holding its
+   instantiating functor. *)
+val instantiating_functor_module_representation : module_representation
+
+(* Placeholder for [Pgetglobal] sites whose representation is never used: those
+   that only reach bytecode (the toplevel unit in [Translmod], [Bytepackager],
+   [Compile.instance]) or the JavaScript backend ([Jscompile.instance]). *)
+val bytecode_only_module_representation : module_representation
 
 type program =
   { compilation_unit : Compilation_unit.t;

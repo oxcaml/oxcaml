@@ -198,7 +198,7 @@ type primitive =
   | Pbytes_of_string
   | Pignore
     (* Globals *)
-  | Pgetglobal of Compilation_unit.t * staticity
+  | Pgetglobal of Compilation_unit.t * module_representation * staticity
   | Pgetpredef of Ident.t
   (* Operations on heap blocks *)
   | Pmakeblock of int * mutable_flag * block_shape * locality_mode
@@ -587,6 +587,10 @@ and mixed_block_shape = unit mixed_block_element array
 
 and mixed_block_shape_with_locality_mode
   = locality_mode mixed_block_element array
+
+and module_representation =
+  | Module_value_only of { field_count : int }
+  | Module_mixed of mixed_block_shape * mixed_block_shape_with_locality_mode
 
 and record_representation =
   | Record_unboxed
@@ -1485,10 +1489,6 @@ type runtime_param =
   | Rp_main_module_block of Global_module.t
   | Rp_unit
 
-type module_representation =
-  | Module_value_only of { field_count : int }
-  | Module_mixed of mixed_block_shape * mixed_block_shape_with_locality_mode
-
 let module_representation_field_count = function
   | Module_value_only { field_count } -> field_count
   | Module_mixed (shape, _) -> Array.length shape
@@ -1500,9 +1500,18 @@ type main_module_block_format =
         mb_returned_repr : module_representation;
       }
 
+let instantiating_functor_module_representation =
+  Module_value_only { field_count = 1 }
+
 let main_module_representation = function
   | Mb_struct { mb_repr } -> mb_repr
-  | Mb_instantiating_functor _ -> Module_value_only { field_count = 1 }
+  | Mb_instantiating_functor _ -> instantiating_functor_module_representation
+
+let returned_module_representation = function
+  | Mb_struct { mb_repr } -> mb_repr
+  | Mb_instantiating_functor { mb_returned_repr; _ } -> mb_returned_repr
+
+let bytecode_only_module_representation = Module_value_only { field_count = 0 }
 
 type program =
   { compilation_unit : Compilation_unit.t;
@@ -2259,14 +2268,15 @@ let transl_module_representation repr =
 (* Translate an access path *)
 
 let rec transl_address loc = function
-  | Env.Aunit (cu, mode) ->
+  | Env.Aunit (cu, module_repr, mode) ->
     let staticity = Mode.With_regionality.proj_monadic Staticity mode in
     let staticity =
       match Mode.Staticity.zap_to_floor_exn staticity with
       | Static -> Static
       | Dynamic -> Dynamic
     in
-    Lprim(Pgetglobal (cu, staticity), [], loc)
+    let module_repr = transl_module_representation module_repr in
+    Lprim(Pgetglobal (cu, module_repr, staticity), [], loc)
   | Env.Alocal id ->
       if Ident.is_predef id
       then Lprim (Pgetpredef id, [], loc)
@@ -2978,7 +2988,11 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pbytes_to_string | Pbytes_of_string
   | Parray_to_iarray | Parray_of_iarray
   | Pignore -> None
-  | Pgetglobal _ | Pgetpredef _ -> None
+  | Pgetpredef _ -> None
+  | Pgetglobal _ ->
+    (* Native code rebuilds the module block from the unit's cells (see
+       [Closure_conversion]). *)
+    Some alloc_heap
   | Pmakeblock (_, _, _, m) -> Some m
   | Pmakefloatblock (_, m) -> Some m
   | Pmakeufloatblock (_, m) -> Some m

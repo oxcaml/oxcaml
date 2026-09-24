@@ -20,17 +20,19 @@ type t =
     toplevel_my_alloc_region : Variable.t;
     body : Flambda.Expr.t;
     module_symbol : Symbol.t;
-    module_block_cells : Symbol.t list
+    module_block_cells : Symbol.t list;
+    root_symbols : (Symbol.t * int) list
   }
 
 let create ~return_continuation ~exn_continuation ~toplevel_my_alloc_region
-    ~body ~module_symbol ~module_block_cells =
+    ~body ~module_symbol ~module_block_cells ~root_symbols =
   { return_continuation;
     exn_continuation;
     toplevel_my_alloc_region;
     body;
     module_symbol;
-    module_block_cells
+    module_block_cells;
+    root_symbols
   }
 
 let return_continuation t = t.return_continuation
@@ -45,13 +47,15 @@ let module_symbol t = t.module_symbol
 
 let module_block_cells t = t.module_block_cells
 
-let root_symbols t = t.module_symbol :: t.module_block_cells
+let root_symbols t = List.map fst t.root_symbols
+
+let root_symbols_with_sizes t = t.root_symbols
 
 let with_body t body = { t with body }
 
 let [@ocamlformat "disable"] print ppf
       { return_continuation; exn_continuation; toplevel_my_alloc_region; body;
-        module_symbol; module_block_cells;
+        module_symbol; module_block_cells; root_symbols = _;
       } =
   Format.fprintf ppf "@[<hov 1>(\
         @[<hov 1>(module_symbol@ %a)@]@ \

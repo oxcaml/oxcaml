@@ -20,7 +20,5 @@ let $camlData_flow_opam_bug__to_string_2 =
 in
 let $camlData_flow_opam_bug__cell0 =
   Block 0 ($camlData_flow_opam_bug__to_string_2)
-and $camlData_flow_opam_bug =
-  Block 0 ($camlData_flow_opam_bug__to_string_2)
 in
-cont done ($camlData_flow_opam_bug)
+cont done (0)

@@ -29,9 +29,5 @@ let code loopify(never) size(41) newer_version_of(f_0)
       cont k (Pfield)
 in
 let $camlVariants__f_1 = closure f_0_1 @f &toplevel in
-let $camlVariants__cell0 =
-  Block 0 ($camlVariants__f_1)
-and $camlVariants =
-  Block 0 ($camlVariants__f_1)
-in
-cont done ($camlVariants)
+let $camlVariants__cell0 = Block 0 ($camlVariants__f_1) in
+cont done (0)

@@ -30,7 +30,5 @@ let $camlFloat_fn__cell1 =
   Block 0 ($camlFloat_fn__f_3)
 and $camlFloat_fn__cell0 =
   Block 0 ($camlFloat_fn__g_2)
-and $camlFloat_fn =
-  Block 0 ($camlFloat_fn__g_2, $camlFloat_fn__f_3)
 in
-cont done ($camlFloat_fn)
+cont done (0)

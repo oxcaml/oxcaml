@@ -43,11 +43,5 @@ and $camlTests7__cell1 =
   Block 0 ($camlTests7__immstring_1)
 and $camlTests7__cell0 =
   Block 0 ($camlTests7__empty_block_0)
-and $camlTests7 =
-  Block 0 ($camlTests7__empty_block_0,
-           $camlTests7__immstring_1,
-           $camlTests7__immstring_2,
-           $camlTests7__f_3,
-           $camlTests7__foo_4)
 in
-cont done ($camlTests7)
+cont done (0)

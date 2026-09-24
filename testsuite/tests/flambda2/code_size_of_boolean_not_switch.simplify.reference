@@ -26,8 +26,5 @@ let $camlCode_size_of_boolean_not_switch__cell1 =
   Block 0 ($camlCode_size_of_boolean_not_switch__g_2)
 and $camlCode_size_of_boolean_not_switch__cell0 =
   Block 0 ($camlCode_size_of_boolean_not_switch__f_1)
-and $camlCode_size_of_boolean_not_switch =
-  Block 0 ($camlCode_size_of_boolean_not_switch__f_1,
-           $camlCode_size_of_boolean_not_switch__g_2)
 in
-cont done ($camlCode_size_of_boolean_not_switch)
+cont done (0)

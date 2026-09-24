@@ -129,7 +129,5 @@ let $camlTests12__cell1 =
   Block 0 ($camlTests12__map_foo_4)
 and $camlTests12__cell0 =
   Block 0 ($camlTests12__bar_1)
-and $camlTests12 =
-  Block 0 ($camlTests12__bar_1, $camlTests12__map_foo_4)
 in
-cont done ($camlTests12)
+cont done (0)

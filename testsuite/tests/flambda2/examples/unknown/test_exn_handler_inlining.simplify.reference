@@ -78,9 +78,5 @@ and $camlTest_exn_handler_inlining__cell1 =
   Block 0 ($camlTest_exn_handler_inlining__g_2)
 and $camlTest_exn_handler_inlining__cell0 =
   Block 0 ($camlTest_exn_handler_inlining__id_1)
-and $camlTest_exn_handler_inlining =
-  Block 0 ($camlTest_exn_handler_inlining__id_1,
-           $camlTest_exn_handler_inlining__g_2,
-           $camlTest_exn_handler_inlining__f_4)
 in
-cont done ($camlTest_exn_handler_inlining)
+cont done (0)

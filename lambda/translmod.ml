@@ -1097,7 +1097,7 @@ let scan_used_globals lam =
   let rec scan lam =
     Lambda.iter_head_constructor scan lam;
     match lam with
-      Lprim ((Pgetglobal (cu, _)), _, _) ->
+      Lprim ((Pgetglobal (cu, _, _)), _, _) ->
         globals := Compilation_unit.Set.add cu !globals
     | _ -> ()
   in
@@ -1295,7 +1295,9 @@ let toploop_getvalue id =
   Lapply{
     ap_loc=Loc_unknown;
     ap_func=Lprim(Pfield (toploop_getvalue_pos, Pointer, Reads_agree),
-                  [Lprim(Pgetglobal (toploop_unit, Dynamic), [], Loc_unknown)],
+                  [Lprim(Pgetglobal (toploop_unit,
+                                     bytecode_only_module_representation,
+                                     Dynamic), [], Loc_unknown)],
                   Loc_unknown);
     ap_args=[Lconst(Const_base(
       Const_string (toplevel_name id, Location.none, None)))];
@@ -1318,7 +1320,9 @@ let toploop_setvalue id lam =
   Lapply{
     ap_loc=Loc_unknown;
     ap_func=Lprim(Pfield (toploop_setvalue_pos, Pointer, Reads_agree),
-                  [Lprim(Pgetglobal (toploop_unit, Dynamic), [], Loc_unknown)],
+                  [Lprim(Pgetglobal (toploop_unit,
+                                     bytecode_only_module_representation,
+                                     Dynamic), [], Loc_unknown)],
                   Loc_unknown);
     ap_args=
       [Lconst(Const_base(
@@ -1491,7 +1495,7 @@ let transl_toplevel_definition str =
 
 let get_component = function
     None -> Lconst const_unit
-  | Some id -> Lprim(Pgetglobal (id, Dynamic), [], Loc_unknown)
+  | Some (id, repr) -> Lprim(Pgetglobal (id, repr, Dynamic), [], Loc_unknown)
 
 let () =
   match Jkind.Sort.Const.for_module with
@@ -1524,20 +1528,22 @@ let unit_of_runtime_arg arg =
   | Argument_block { ra_unit = cu; _ } | Main_module_block cu -> Some cu
   | Unit -> None
 
-let transl_runtime_arg arg =
+let transl_runtime_arg ~find_format arg =
   match arg with
   | Argument_block { ra_unit; ra_field_idx; ra_main_repr } ->
       Lprim (mod_field ra_field_idx ra_main_repr,
-             [Lprim (Pgetglobal (ra_unit, Dynamic), [], Loc_unknown)],
+             [Lprim (Pgetglobal (ra_unit, ra_main_repr, Dynamic), [],
+                     Loc_unknown)],
              Loc_unknown)
   | Main_module_block cu ->
-      Lprim (Pgetglobal (cu, Dynamic), [], Loc_unknown)
+      let repr = returned_module_representation (find_format cu) in
+      Lprim (Pgetglobal (cu, repr, Dynamic), [], Loc_unknown)
   | Unit ->
       lambda_unit
 
 let transl_instance_impl
       compilation_unit ~runtime_args ~main_module_block_repr
-      ~arg_block_idx
+      ~arg_block_idx ~find_format
     : Lambda.program =
   let base_compilation_unit, _args =
     Compilation_unit.split_instance_exn compilation_unit
@@ -1545,11 +1551,15 @@ let transl_instance_impl
   let instantiating_functor_lam =
     (* Any parameterised module has a block with exactly one field, namely the
        instantiating functor (see [Lambda.main_module_block_format]) *)
-    Lprim (mod_field 0 (Module_value_only { field_count = 1 }),
-      [Lprim (Pgetglobal (base_compilation_unit, Dynamic), [], Loc_unknown)],
+    let repr = instantiating_functor_module_representation in
+    Lprim (mod_field 0 repr,
+      [Lprim (Pgetglobal (base_compilation_unit, repr, Dynamic), [],
+              Loc_unknown)],
       Loc_unknown)
   in
-  let runtime_args_lam = List.map transl_runtime_arg runtime_args in
+  let runtime_args_lam =
+    List.map (transl_runtime_arg ~find_format) runtime_args
+  in
   let code =
     Lapply {
       ap_func = instantiating_functor_lam;
@@ -1582,12 +1592,12 @@ let transl_instance_impl
   }
 
 let transl_instance instance_unit ~runtime_args ~main_module_block_repr
-      ~arg_block_idx =
+      ~arg_block_idx ~find_format =
   assert (Compilation_unit.is_instance instance_unit);
   if (runtime_args = []) then
     Misc.fatal_error "Trying to instantiate but passing no arguments";
   transl_instance_impl instance_unit ~runtime_args
-    ~main_module_block_repr ~arg_block_idx
+    ~main_module_block_repr ~arg_block_idx ~find_format
 
 let cu_of_impl (gm : Global_module.t) : Compilation_unit.t =
   let impl, _params, _sig =
@@ -1617,11 +1627,7 @@ let project_arg_block ~find_impl_by_name ~chain ~(gm : Global_module.t)
           "project_arg_block: %a was not compiled with -as-argument-for"
           Global_module.print gm
   in
-  let main_repr =
-    match (fmt : main_module_block_format) with
-    | Mb_struct { mb_repr } -> mb_repr
-    | Mb_instantiating_functor { mb_returned_repr; _ } -> mb_returned_repr
-  in
+  let main_repr = returned_module_representation fmt in
   Lprim (mod_field arg_block_idx main_repr, [main_block], Loc_unknown)
 
 (** All three of [transl_maybe_local_instance], [transl_local_instance],
@@ -1645,7 +1651,9 @@ let rec transl_maybe_local_instance ~(gm : Global_module.t) ~chain
   if Global_module.is_complete gm
   then
     let cu = Compilation_unit.of_complete_global_exn gm in
-    let lam = Lprim (Pgetglobal (cu, Dynamic), [], Loc_unknown) in
+    let ui_format, _arg_descr = find_impl_by_name ~chain cu in
+    let repr = returned_module_representation ui_format in
+    let lam = Lprim (Pgetglobal (cu, repr, Dynamic), [], Loc_unknown) in
     (lam, module_map, rev_bindings)
   else transl_local_instance ~gm ~chain ~find_impl_by_name ~param_map
          ~module_map ~rev_bindings
@@ -1753,9 +1761,10 @@ and bind_local_instance ~(gm : Global_module.t) ~chain
       runtime_params
   in
   let func =
+    let repr = instantiating_functor_module_representation in
     Lprim
-      ( mod_field 0 (Module_value_only { field_count = 1 }),
-        [Lprim (Pgetglobal (cu, Dynamic), [], Loc_unknown)],
+      ( mod_field 0 repr,
+        [Lprim (Pgetglobal (cu, repr, Dynamic), [], Loc_unknown)],
         Loc_unknown )
   in
   let rhs =

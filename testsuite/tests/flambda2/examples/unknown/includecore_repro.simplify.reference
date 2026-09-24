@@ -104,9 +104,6 @@ apply direct(f_0_1 &toplevel)
   where k1 (param : [ 0 | 0 of val ]) =
     cont k
   where k =
-    let $camlIncludecore_repro__cell0 =
-      Block 0 ($camlIncludecore_repro__f_2)
-    and $camlIncludecore_repro =
-      Block 0 ($camlIncludecore_repro__f_2)
+    let $camlIncludecore_repro__cell0 = Block 0 ($camlIncludecore_repro__f_2)
     in
-    cont done ($camlIncludecore_repro)
+    cont done (0)

@@ -109,7 +109,5 @@ apply direct(init_mod_4 &toplevel)
                      Block 0 (M)
                    and $camlFunctors__cell0 =
                      Block 0 (M0)
-                   and $camlFunctors =
-                     Block 0 (M0, M, $camlFunctors__Pmakeblock_7)
                    in
-                   cont done ($camlFunctors))))
+                   cont done (0))))

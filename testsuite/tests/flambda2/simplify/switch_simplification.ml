@@ -26,12 +26,8 @@ let $camlTOP3__all_boolean_simplifications_3 =
   closure all_boolean_simplifications_0_1 @all_boolean_simplifications
     &toplevel
 in
-let $camlTOP3__cell0 =
-  Block 0 ($camlTOP3__all_boolean_simplifications_3)
-and $camlTOP3 =
-  Block 0 ($camlTOP3__all_boolean_simplifications_3)
-in
-cont done ($camlTOP3)
+let $camlTOP3__cell0 = Block 0 ($camlTOP3__all_boolean_simplifications_3) in
+cont done (0)
 |}]
 
 let all_large_simplifications x = function
@@ -62,12 +58,8 @@ in
 let $camlTOP4__all_large_simplifications_6 =
   closure all_large_simplifications_1_1 @all_large_simplifications &toplevel
 in
-let $camlTOP4__cell0 =
-  Block 0 ($camlTOP4__all_large_simplifications_6)
-and $camlTOP4 =
-  Block 0 ($camlTOP4__all_large_simplifications_6)
-in
-cont done ($camlTOP4)
+let $camlTOP4__cell0 = Block 0 ($camlTOP4__all_large_simplifications_6) in
+cont done (0)
 |}]
 
 let shared_affine_functions = function
@@ -91,12 +83,8 @@ in
 let $camlTOP5__shared_affine_functions_10 =
   closure shared_affine_functions_2_1 @shared_affine_functions &toplevel
 in
-let $camlTOP5__cell0 =
-  Block 0 ($camlTOP5__shared_affine_functions_10)
-and $camlTOP5 =
-  Block 0 ($camlTOP5__shared_affine_functions_10)
-in
-cont done ($camlTOP5)
+let $camlTOP5__cell0 = Block 0 ($camlTOP5__shared_affine_functions_10) in
+cont done (0)
 |}]
 
 let shared_lookup_table = function
@@ -126,12 +114,8 @@ in
 let $camlTOP6__shared_lookup_table_13 =
   closure shared_lookup_table_3_1 @shared_lookup_table &toplevel
 in
-let $camlTOP6__cell0 =
-  Block 0 ($camlTOP6__shared_lookup_table_13)
-and $camlTOP6 =
-  Block 0 ($camlTOP6__shared_lookup_table_13)
-in
-cont done ($camlTOP6)
+let $camlTOP6__cell0 = Block 0 ($camlTOP6__shared_lookup_table_13) in
+cont done (0)
 |}]
 
 (* CR-someday bclement: this should be a single unboxed product array *)
@@ -157,12 +141,8 @@ in
 let $camlTOP7__multiple_lookup_tables_17 =
   closure multiple_lookup_tables_4_1 @multiple_lookup_tables &toplevel
 in
-let $camlTOP7__cell0 =
-  Block 0 ($camlTOP7__multiple_lookup_tables_17)
-and $camlTOP7 =
-  Block 0 ($camlTOP7__multiple_lookup_tables_17)
-in
-cont done ($camlTOP7)
+let $camlTOP7__cell0 = Block 0 ($camlTOP7__multiple_lookup_tables_17) in
+cont done (0)
 |}]
 
 let offset_lookup_table i =
@@ -207,12 +187,8 @@ in
 let $camlTOP8__offset_lookup_table_24 =
   closure offset_lookup_table_5_1 @offset_lookup_table &toplevel
 in
-let $camlTOP8__cell0 =
-  Block 0 ($camlTOP8__offset_lookup_table_24)
-and $camlTOP8 =
-  Block 0 ($camlTOP8__offset_lookup_table_24)
-in
-cont done ($camlTOP8)
+let $camlTOP8__cell0 = Block 0 ($camlTOP8__offset_lookup_table_24) in
+cont done (0)
 |}]
 
 (* The test below ensures that we don't introduce a %boolean_not primitive that
@@ -270,10 +246,7 @@ let $camlTOP11__poison_prevents_boolean_not_31 =
   closure poison_prevents_boolean_not_6_1 @poison_prevents_boolean_not
     &toplevel
 in
-let $camlTOP11__cell0 =
-  Block 0 ($camlTOP11__poison_prevents_boolean_not_31)
-and $camlTOP11 =
-  Block 0 ($camlTOP11__poison_prevents_boolean_not_31)
+let $camlTOP11__cell0 = Block 0 ($camlTOP11__poison_prevents_boolean_not_31)
 in
-cont done ($camlTOP11)
+cont done (0)
 |}]

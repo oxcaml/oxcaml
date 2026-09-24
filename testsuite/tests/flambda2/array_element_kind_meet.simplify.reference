@@ -41,7 +41,5 @@ in
 let $camlArray_element_kind_meet__sum_1 = closure sum_0_1 @sum &toplevel in
 let $camlArray_element_kind_meet__cell0 =
   Block 0 ($camlArray_element_kind_meet__sum_1)
-and $camlArray_element_kind_meet =
-  Block 0 ($camlArray_element_kind_meet__sum_1)
 in
-cont done ($camlArray_element_kind_meet)
+cont done (0)

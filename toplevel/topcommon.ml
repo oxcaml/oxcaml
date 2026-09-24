@@ -101,32 +101,14 @@ end
 (* Like [Obj.field], but handles field reordering in mixed modules.
    Returns [None] if the selected field is not a value, [Some field]
    otherwise. *)
-let mod_field obj (module_repr : Lambda.module_representation) pos =
-  if not !Clflags.native_code then
-    Some (Obj.field obj pos)
-  else
-  match module_repr with
-  | Module_value_only _ -> Some (Obj.field obj pos)
-  | Module_mixed (shape, _) ->
-    let shape =
-      Mixed_block_shape.of_mixed_block_elements shape
-        ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
-    in
-    let new_pos =
-      match Mixed_block_shape.lookup_path_producing_new_indexes shape [pos] with
-      | [new_pos] -> Some new_pos
-      | _ -> None (* [pos] points to an unboxed product or void *)
-    in
-    Option.bind new_pos
-      (fun new_pos ->
-        if new_pos < Mixed_block_shape.value_prefix_len shape
-        then Some (Obj.field obj new_pos)
-        else None (* [pos] points to an unboxed singleton *))
+let mod_field obj module_repr pos =
+  Option.map (Obj.field obj)
+    (Mixed_block_shape.module_value_field_index module_repr pos)
 
 module MakeEvalPrinter (E: EVAL_BASE) = struct
 
   let rec eval_address = function
-    | Env.Aunit (cu, _) -> E.eval_compilation_unit cu
+    | Env.Aunit (cu, _, _) -> E.eval_compilation_unit cu
     | Env.Alocal id -> E.eval_ident id
     | Env.Adot(p, module_repr, pos) ->
       let module_repr = Lambda.transl_module_representation module_repr in

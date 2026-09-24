@@ -1,20 +1,5 @@
 (data global "camlCmm__gc_roots": int 0)
 (data
- int 13056
- global "camlCmm":
- addr G:"camlCmm__standard_atomic_get_2"
- addr G:"camlCmm__get_3"
- addr G:"camlCmm__set_4"
- addr G:"camlCmm__get_imm_5"
- addr G:"camlCmm__set_imm_6"
- addr G:"camlCmm__cas_7"
- addr G:"camlCmm__idx_get_8"
- addr G:"camlCmm__idx_set_9"
- addr G:"camlCmm__idx_exchange_10"
- addr G:"camlCmm__idx_compare_and_set_11"
- addr G:"camlCmm__idx_compare_exchange_12"
- addr G:"camlCmm__idx_fetch_and_add_13")
-(data
  int 1792
  global "camlCmm__cell0":
  addr G:"camlCmm__standard_atomic_get_2")
@@ -149,6 +134,6 @@
  (atomic xadd (+ value -1) (+a r idx)) )
 
 (function no_cse reduce_code_size linscan camlCmm__entry () : val
- (catch (exit 32 G:"camlCmm") with(32 *ret*: val) 1) )
+ (catch (exit 32 1) with(32 *ret*: val) 1) )
 
 (data)

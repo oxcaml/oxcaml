@@ -1,10 +1,4 @@
 (data global "camlInvalid__gc_roots": int 0)
-(data
- int 3840
- global "camlInvalid":
- addr G:"camlInvalid__check_4"
- addr G:"camlInvalid__bar_6"
- addr G:"camlInvalid__foo_7")
 (data int 1792 global "camlInvalid__cell0": addr G:"camlInvalid__check_4")
 (data int 1792 global "camlInvalid__cell1": addr G:"camlInvalid__bar_6")
 (data int 1792 global "camlInvalid__cell2": addr G:"camlInvalid__foo_7")
@@ -69,6 +63,6 @@
      L:"camlInvalid__invalid_9")) )
 
 (function no_cse reduce_code_size linscan camlInvalid__entry () : val
- (catch (exit 7 G:"camlInvalid") with(7 *ret*/0: val) 1) )
+ (catch (exit 7 1) with(7 *ret*/0: val) 1) )
 
 (data)

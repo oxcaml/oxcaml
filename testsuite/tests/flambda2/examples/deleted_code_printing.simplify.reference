@@ -44,7 +44,5 @@ let $camlDeleted_code_printing__cell1 =
   Block 0 ($camlDeleted_code_printing__foobar_1)
 and $camlDeleted_code_printing__cell0 =
   Block 0 (env)
-and $camlDeleted_code_printing =
-  Block 0 (env, $camlDeleted_code_printing__foobar_1)
 in
-cont done ($camlDeleted_code_printing)
+cont done (0)

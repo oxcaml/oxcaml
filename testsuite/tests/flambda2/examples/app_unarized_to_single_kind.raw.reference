@@ -31,13 +31,11 @@ let $camlApp_unarized_to_single_kind__first_const_0 = Block 0 () in
     let field_0 = %block_load.tag[`0`].`size`[`3`].[`0`] (module_block) in
     let field_1 = %block_load.tag[`0`].`size`[`3`].[`1`] (module_block) in
     let field_2 = %block_load.tag[`0`].`size`[`3`].[`2`] (module_block) in
-    let $camlApp_unarized_to_single_kind =
-      Block 0 (field_0, field_1, field_2)
-    and $camlApp_unarized_to_single_kind__cell0 =
+    let $camlApp_unarized_to_single_kind__cell0 =
       Block 0 (field_0)
     and $camlApp_unarized_to_single_kind__cell1 =
       Block 0 (field_1)
     and $camlApp_unarized_to_single_kind__cell2 =
       Block 0 (field_2)
     in
-    cont done ($camlApp_unarized_to_single_kind)
+    cont done (0)

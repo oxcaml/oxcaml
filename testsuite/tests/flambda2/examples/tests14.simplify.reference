@@ -58,10 +58,5 @@ and $camlTests14__cell1 =
   Block 0 ($camlTests14__nth_char_2)
 and $camlTests14__cell0 =
   Block 0 ($camlTests14__set_1)
-and $camlTests14 =
-  Block 0 ($camlTests14__set_1,
-           $camlTests14__nth_char_2,
-           $camlTests14__needs_try_region_3,
-           $camlTests14__gadt_match_4)
 in
-cont done ($camlTests14)
+cont done (0)

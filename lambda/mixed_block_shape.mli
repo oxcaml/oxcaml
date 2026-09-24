@@ -83,3 +83,8 @@ val new_index_to_old_path : 'a t -> int -> int list
     singleton shape [[| shape.(i) |]] flattens them (values first, then flats,
     each in tree order). Empty for a void element. *)
 val new_indexes_by_element : 'a t -> int list array
+
+(** The physical index of logical field [pos] of a module block with the given
+    representation, or [None] if that field is not a value (an unboxed field,
+    product or void). Bytecode module blocks are not reordered. *)
+val module_value_field_index : Lambda.module_representation -> int -> int option

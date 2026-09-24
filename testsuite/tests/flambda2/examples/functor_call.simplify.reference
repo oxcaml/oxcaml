@@ -34,7 +34,5 @@ let $camlFunctor_call__cell1 =
   Block 0 ($camlFunctor_call__foo_6)
 and $camlFunctor_call__cell0 =
   Block 0 ($camlFunctor_call__Pmakeblock_5)
-and $camlFunctor_call =
-  Block 0 ($camlFunctor_call__Pmakeblock_5, $camlFunctor_call__foo_6)
 in
-cont done ($camlFunctor_call)
+cont done (0)

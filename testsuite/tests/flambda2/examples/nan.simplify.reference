@@ -1,8 +1,4 @@
 module_block_cells ($camlNan__cell0)
 let $camlNan__nan_1 = nan in
-let $camlNan__cell0 =
-  Block 0 ($camlNan__nan_1)
-and $camlNan =
-  Block 0 ($camlNan__nan_1)
-in
-cont done ($camlNan)
+let $camlNan__cell0 = Block 0 ($camlNan__nan_1) in
+cont done (0)

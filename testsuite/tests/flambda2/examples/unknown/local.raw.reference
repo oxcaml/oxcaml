@@ -393,9 +393,7 @@ module_block_cells ($camlLocal__cell0 $camlLocal__cell1 $camlLocal__cell2
     let field_4 = %block_load.tag[`0`].`size`[`7`].[`4`] (module_block) in
     let field_5 = %block_load.tag[`0`].`size`[`7`].[`5`] (module_block) in
     let field_6 = %block_load.tag[`0`].`size`[`7`].[`6`] (module_block) in
-    let $camlLocal =
-      Block 0 (field_0, field_1, field_2, field_3, field_4, field_5, field_6)
-    and $camlLocal__cell0 =
+    let $camlLocal__cell0 =
       Block 0 (field_0)
     and $camlLocal__cell1 =
       Block 0 (field_1)
@@ -410,4 +408,4 @@ module_block_cells ($camlLocal__cell0 $camlLocal__cell1 $camlLocal__cell2
     and $camlLocal__cell6 =
       Block 0 (field_6)
     in
-    cont done ($camlLocal)
+    cont done (0)

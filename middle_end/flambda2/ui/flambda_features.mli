@@ -77,6 +77,11 @@ val function_result_types : is_a_functor:bool -> bool
 
 val debug : unit -> bool
 
+(** Whether the compilation unit's module block is emitted as a whole (the
+    JavaScript backend). Otherwise only its per-field cells are emitted, and
+    consumers read fields from the cells. *)
+val emit_module_block : unit -> bool
+
 val opaque : unit -> bool
 
 val float_const_prop : unit -> bool

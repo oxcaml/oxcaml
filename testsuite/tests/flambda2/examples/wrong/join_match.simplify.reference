@@ -55,7 +55,5 @@ let $camlJoin_match__cell1 =
   Block 0 ($camlJoin_match__bar_2)
 and $camlJoin_match__cell0 =
   Block 0 ($camlJoin_match__g_1)
-and $camlJoin_match =
-  Block 0 ($camlJoin_match__g_1, $camlJoin_match__bar_2)
 in
-cont done ($camlJoin_match)
+cont done (0)

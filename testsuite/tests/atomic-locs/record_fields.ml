@@ -17,7 +17,7 @@ module Atomic = struct
   end
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Atomic/329"
+(apply (field_imm 1 (global Toploop!/0)) "Atomic/329"
   (let (Loc = (makeblock 0)) (makeblock 0 Loc)))
 module Atomic :
   sig
@@ -55,7 +55,7 @@ module Basic = struct
     Atomic.Loc.compare_and_set (get_loc r) oldv newv
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Basic/367"
+(apply (field_imm 1 (global Toploop!/0)) "Basic/367"
   (let
     (get = (function {nlocal = 0} r (atomic_load_field_ptr r 1))
      get_imm = (function {nlocal = 0} r : int (atomic_load_field_imm r 1))
@@ -189,7 +189,7 @@ end : sig
   type t = { mutable x : int [@atomic] }
 end)
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Ok/408" (makeblock 0))
+(apply (field_imm 1 (global Toploop!/0)) "Ok/408" (makeblock 0))
 module Ok : sig type t = { mutable x : int [@atomic]; } end
 |}];;
 
@@ -204,7 +204,7 @@ type ('a : any) t = { a : 'a; mutable f : int [@atomic]; }
 let project (t: int t) = t.f
 [%%expect{|
 (let (project = (function {nlocal = 0} t : int (atomic_load_field_imm t 1)))
-  (apply (field_imm 1 (global Toploop!)) "project" project))
+  (apply (field_imm 1 (global Toploop!/0)) "project" project))
 val project : int t -> int = <fun>
 |}];;
 
@@ -214,14 +214,14 @@ let mixed_project (t: int64_u t) = t.f
   (mixed_project =
      (function {nlocal = 0} t : int
        (atomic_load_mixed_field 1  (bits64,value<int>) t)))
-  (apply (field_imm 1 (global Toploop!)) "mixed_project" mixed_project))
+  (apply (field_imm 1 (global Toploop!/0)) "mixed_project" mixed_project))
 val mixed_project : int64_u t -> int = <fun>
 |}];;
 
 let set (t: int t) = t.f <- 42
 [%%expect{|
 (let (set = (function {nlocal = 0} t : int (atomic_set_field_imm t 1 42)))
-  (apply (field_imm 1 (global Toploop!)) "set" set))
+  (apply (field_imm 1 (global Toploop!/0)) "set" set))
 val set : int t -> unit = <fun>
 |}];;
 
@@ -231,14 +231,14 @@ let mixed_set (t: int64_u t) = t.f <- 42
   (mixed_set =
      (function {nlocal = 0} t : int
        (atomic_set_mixed_field 1  (bits64,value<int>) t 42)))
-  (apply (field_imm 1 (global Toploop!)) "mixed_set" mixed_set))
+  (apply (field_imm 1 (global Toploop!/0)) "mixed_set" mixed_set))
 val mixed_set : int64_u t -> unit = <fun>
 |}];;
 
 let loc (t: int t) = [%atomic.loc t.f]
 [%%expect{|
 (let (loc = (function {nlocal = 0} t (makeblock 0 (*,value<int>) t 1)))
-  (apply (field_imm 1 (global Toploop!)) "loc" loc))
+  (apply (field_imm 1 (global Toploop!/0)) "loc" loc))
 val loc : int t -> int atomic_loc = <fun>
 |}];;
 
@@ -258,7 +258,7 @@ module Inline_record = struct
   let test : t -> int = fun (A r) -> r.x
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Inline_record/452"
+(apply (field_imm 1 (global Toploop!/0)) "Inline_record/452"
   (let
     (test =
        (function {nlocal = 0} param : int (atomic_load_field_imm param 0)))
@@ -280,7 +280,7 @@ module Extension_with_inline_record = struct
   let () = assert (test (A { x = 42 }) = 42)
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Extension_with_inline_record/464"
+(apply (field_imm 1 (global Toploop!/0)) "Extension_with_inline_record/464"
   (let
     (A =
        (makeblock_unique 248 "Extension_with_inline_record.A"
@@ -311,7 +311,7 @@ type ('a : any) t = A of { a : 'a; mutable f : int [@atomic]; }
 let project (t: int t) = match t with A r -> r.f
 [%%expect{|
 (let (project = (function {nlocal = 0} t : int (atomic_load_field_imm t 1)))
-  (apply (field_imm 1 (global Toploop!)) "project" project))
+  (apply (field_imm 1 (global Toploop!/0)) "project" project))
 val project : int t -> int = <fun>
 |}];;
 
@@ -321,14 +321,14 @@ let mixed_project (t: int64_u t) = match t with A r -> r.f
   (mixed_project =
      (function {nlocal = 0} t : int
        (atomic_load_mixed_field 1  (bits64,value<int>) t)))
-  (apply (field_imm 1 (global Toploop!)) "mixed_project" mixed_project))
+  (apply (field_imm 1 (global Toploop!/0)) "mixed_project" mixed_project))
 val mixed_project : int64_u t -> int = <fun>
 |}];;
 
 let set (t: int t) = match t with A r -> r.f <- 42
 [%%expect{|
 (let (set = (function {nlocal = 0} t : int (atomic_set_field_imm t 1 42)))
-  (apply (field_imm 1 (global Toploop!)) "set" set))
+  (apply (field_imm 1 (global Toploop!/0)) "set" set))
 val set : int t -> unit = <fun>
 |}];;
 
@@ -338,14 +338,14 @@ let mixed_set (t: int64_u t) = match t with A r -> r.f <- 42
   (mixed_set =
      (function {nlocal = 0} t : int
        (atomic_set_mixed_field 1  (bits64,value<int>) t 42)))
-  (apply (field_imm 1 (global Toploop!)) "mixed_set" mixed_set))
+  (apply (field_imm 1 (global Toploop!/0)) "mixed_set" mixed_set))
 val mixed_set : int64_u t -> unit = <fun>
 |}];;
 
 let ok_loc (t: int t) = match t with A r -> [%atomic.loc r.f]
 [%%expect{|
 (let (ok_loc = (function {nlocal = 0} t (makeblock 0 (*,value<int>) t 1)))
-  (apply (field_imm 1 (global Toploop!)) "ok_loc" ok_loc))
+  (apply (field_imm 1 (global Toploop!/0)) "ok_loc" ok_loc))
 val ok_loc : int t -> int atomic_loc = <fun>
 |}];;
 
@@ -372,7 +372,7 @@ let undetermined_project t = t.f
 (let
   (undetermined_project =
      (function {nlocal = 0} t : int (atomic_load_field_imm t 1)))
-  (apply (field_imm 1 (global Toploop!)) "undetermined_project"
+  (apply (field_imm 1 (global Toploop!/0)) "undetermined_project"
     undetermined_project))
 val undetermined_project : 'a t -> int = <fun>
 |}];;
@@ -382,7 +382,8 @@ let undetermined_set t = t.f <- 42
 (let
   (undetermined_set =
      (function {nlocal = 0} t : int (atomic_set_field_imm t 1 42)))
-  (apply (field_imm 1 (global Toploop!)) "undetermined_set" undetermined_set))
+  (apply (field_imm 1 (global Toploop!/0)) "undetermined_set"
+    undetermined_set))
 val undetermined_set : 'a t -> unit = <fun>
 |}];;
 
@@ -391,7 +392,8 @@ let undetermined_loc t = [%atomic.loc t.f]
 (let
   (undetermined_loc =
      (function {nlocal = 0} t (makeblock 0 (*,value<int>) t 1)))
-  (apply (field_imm 1 (global Toploop!)) "undetermined_loc" undetermined_loc))
+  (apply (field_imm 1 (global Toploop!/0)) "undetermined_loc"
+    undetermined_loc))
 val undetermined_loc : 'a t -> int atomic_loc = <fun>
 |}];;
 
@@ -406,7 +408,7 @@ let later_boxed_loc t =
   (later_boxed_loc =
      (function {nlocal = 0} t
        (let (l = (makeblock 0 (*,value<int>) t 1)) (seq t l))))
-  (apply (field_imm 1 (global Toploop!)) "later_boxed_loc" later_boxed_loc))
+  (apply (field_imm 1 (global Toploop!/0)) "later_boxed_loc" later_boxed_loc))
 val later_boxed_loc : int t -> int atomic_loc = <fun>
 |}];;
 
@@ -435,7 +437,7 @@ let undetermined_project_inline t = match t with A r -> r.f
 (let
   (undetermined_project_inline =
      (function {nlocal = 0} t : int (atomic_load_field_imm t 1)))
-  (apply (field_imm 1 (global Toploop!)) "undetermined_project_inline"
+  (apply (field_imm 1 (global Toploop!/0)) "undetermined_project_inline"
     undetermined_project_inline))
 val undetermined_project_inline : 'a w -> int = <fun>
 |}];;
@@ -457,7 +459,7 @@ Warning 214 [atomic-float-record-boxed]: This record contains atomic float field
   which prevents the float record optimization.
   The fields of this record will be boxed instead of being
   represented as a flat float array.
-(apply (field_imm 1 (global Toploop!)) "Float_records/574"
+(apply (field_imm 1 (global Toploop!/0)) "Float_records/574"
   (let
     (mk_flat =
        (function {nlocal = 0} x[value<float>] y[value<float>]
@@ -677,7 +679,7 @@ Line 5, characters 14-19:
 Warning 9 [missing-record-field-pattern]: the following labels are not bound
   in this record pattern: "y".
   Either bind these labels explicitly or add "; _" to the pattern.
-(apply (field_imm 1 (global Toploop!)) "Pattern_matching_wildcard/667"
+(apply (field_imm 1 (global Toploop!/0)) "Pattern_matching_wildcard/667"
   (let
     (warning = (function {nlocal = 0} param : int (field_int 0 param))
      allowed = (function {nlocal = 0} param : int (field_int 0 param))
@@ -718,7 +720,7 @@ module Functional_update_ok = struct
   let allowed t = { t with y = 42 }
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Functional_update_ok/687"
+(apply (field_imm 1 (global Toploop!/0)) "Functional_update_ok/687"
   (let
     (allowed =
        (function {nlocal = 0} t
@@ -738,7 +740,7 @@ module Functional_update_copy_ok = struct
   let allowed t = { t with y = t.y }
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Functional_update_copy_ok/699"
+(apply (field_imm 1 (global Toploop!/0)) "Functional_update_copy_ok/699"
   (let
     (allowed =
        (function {nlocal = 0} t
@@ -772,7 +774,7 @@ module Functional_update_multi_ok = struct
   let allowed t = { t with y = 42; z = 67 } (* no implicit atomic loads *)
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Functional_update_multi_ok/719"
+(apply (field_imm 1 (global Toploop!/0)) "Functional_update_multi_ok/719"
   (let
     (allowed =
        (function {nlocal = 0} t
@@ -796,7 +798,8 @@ module Functional_update_multi_copy_ok = struct
   let allowed t = { t with y = t.y; z = t.z } (* no implicit atomic loads *)
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Functional_update_multi_copy_ok/734"
+(apply (field_imm 1 (global Toploop!/0))
+  "Functional_update_multi_copy_ok/734"
   (let
     (allowed =
        (function {nlocal = 0} t
@@ -825,7 +828,7 @@ end
 
 let project (t : Mixed_blocks.t) = t.field
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Mixed_blocks/745" (makeblock 0))
+(apply (field_imm 1 (global Toploop!/0)) "Mixed_blocks/745" (makeblock 0))
 module Mixed_blocks :
   sig
     type t = { padding : #(int * int * int); mutable field : int [@atomic]; }
@@ -836,7 +839,7 @@ module Mixed_blocks :
        (atomic_load_mixed_field 1  (product  (value_or_null<int>,value_or_null<
                                                                   int>,
          value_or_null<int>),value<int>) t)))
-  (apply (field_imm 1 (global Toploop!)) "project" project))
+  (apply (field_imm 1 (global Toploop!/0)) "project" project))
 val project : Mixed_blocks.t -> int = <fun>
 |}]
 
@@ -848,7 +851,7 @@ let set (t: Mixed_blocks.t) = t.field <- 42
        (atomic_set_mixed_field 1  (product  (value_or_null<int>,value_or_null<
                                                                  int>,
          value_or_null<int>),value<int>) t 42)))
-  (apply (field_imm 1 (global Toploop!)) "set" set))
+  (apply (field_imm 1 (global Toploop!/0)) "set" set))
 val set : Mixed_blocks.t -> unit = <fun>
 |}]
 
@@ -869,7 +872,7 @@ end
 
 let project (t : Mixed_blocks_2.t) = t.field
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Mixed_blocks_2/759" (makeblock 0))
+(apply (field_imm 1 (global Toploop!/0)) "Mixed_blocks_2/759" (makeblock 0))
 module Mixed_blocks_2 :
   sig
     type t = { mutable field : int [@atomic]; padding : #(int * int * int); }
@@ -879,7 +882,7 @@ module Mixed_blocks_2 :
      (function {nlocal = 0} t : int
        (atomic_load_mixed_field 0  (value<int>,product  (value_or_null<int>,
          value_or_null<int>,value_or_null<int>)) t)))
-  (apply (field_imm 1 (global Toploop!)) "project" project))
+  (apply (field_imm 1 (global Toploop!/0)) "project" project))
 val project : Mixed_blocks_2.t -> int = <fun>
 |}]
 
@@ -890,7 +893,7 @@ let set (t: Mixed_blocks_2.t) = t.field <- 42
      (function {nlocal = 0} t : int
        (atomic_set_mixed_field 0  (value<int>,product  (value_or_null<int>,
          value_or_null<int>,value_or_null<int>)) t 42)))
-  (apply (field_imm 1 (global Toploop!)) "set" set))
+  (apply (field_imm 1 (global Toploop!/0)) "set" set))
 val set : Mixed_blocks_2.t -> unit = <fun>
 |}]
 
@@ -915,7 +918,8 @@ module Mixed_blocks_rec = struct
 end
 
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Mixed_blocks_rec/776" (makeblock 0))
+(apply (field_imm 1 (global Toploop!/0)) "Mixed_blocks_rec/776"
+  (makeblock 0))
 module Mixed_blocks_rec :
   sig
     type t = { padding : u; mutable field : int [@atomic]; }
@@ -930,7 +934,7 @@ let project (t : Mixed_blocks_rec.t) = t.field
      (function {nlocal = 0} t : int
        (atomic_load_mixed_field 1  (product  (untagged_immediate,float64),
          value<int>) t)))
-  (apply (field_imm 1 (global Toploop!)) "project" project))
+  (apply (field_imm 1 (global Toploop!/0)) "project" project))
 val project : Mixed_blocks_rec.t -> int = <fun>
 |}]
 let set (t: Mixed_blocks_rec.t) = t.field <- 42
@@ -940,7 +944,7 @@ let set (t: Mixed_blocks_rec.t) = t.field <- 42
      (function {nlocal = 0} t : int
        (atomic_set_mixed_field 1  (product  (untagged_immediate,float64),
          value<int>) t 42)))
-  (apply (field_imm 1 (global Toploop!)) "set" set))
+  (apply (field_imm 1 (global Toploop!/0)) "set" set))
 val set : Mixed_blocks_rec.t -> unit = <fun>
 |}]
 let loc (t: Mixed_blocks_rec.t) = [%atomic.loc t.field]
@@ -1023,7 +1027,7 @@ module Atomic_float_with_float_hash = struct
 end
 
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Atomic_float_with_float_hash/810"
+(apply (field_imm 1 (global Toploop!/0)) "Atomic_float_with_float_hash/810"
   (let
     (disallowed =
        (function {nlocal = 0} t : float
@@ -1044,7 +1048,7 @@ module Inline_record_atomic_in_mixed = struct
 end
 
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Inline_record_atomic_in_mixed/823"
+(apply (field_imm 1 (global Toploop!/0)) "Inline_record_atomic_in_mixed/823"
   (let
     (disallowed =
        (function {nlocal = 0} t : int

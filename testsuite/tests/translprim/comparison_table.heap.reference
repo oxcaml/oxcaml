@@ -371,7 +371,7 @@
                                                                     [0: *, *]))]]))]
                                                                     (apply
                                                                     (field_imm 19
-                                                                    (global Stdlib__List!))
+                                                                    (global Stdlib__List!/70))
                                                                     (apply
                                                                     uncurry
                                                                     f) l)))
@@ -560,7 +560,7 @@
                     [(consts (0))
                      (non_consts ([0: *,
                                    [(consts (0)) (non_consts ([0: *, *]))]]))]
-                    (apply (field_imm 19 (global Stdlib__List!))
+                    (apply (field_imm 19 (global Stdlib__List!/70))
                       (apply uncurry f) l)))
                (makeblock 0 ([(consts ())
                               (non_consts ([0:

@@ -37,8 +37,11 @@ val transl_implementation:
 (* Can only be used when targeting bytecode *)
 val transl_toplevel_definition: structure -> lambda
 
+(* Each component is an implementation member's unit and the representation
+   of its main module block ([None] for an interface-only member). *)
 val transl_package:
-      Compilation_unit.t option list -> module_coercion -> int * lambda
+      (Compilation_unit.t * module_representation) option list
+        -> module_coercion -> int * lambda
 
 type runtime_arg =
   | (* A module from which we need to project out the argument block *)
@@ -55,10 +58,13 @@ type runtime_arg =
     Main_module_block of Compilation_unit.t
   | Unit
 
+(** [find_format] looks up the format of a [Main_module_block] argument's unit
+    (from its .cmo/.cmx), which gives the representation of its block. *)
 val transl_instance:
       Compilation_unit.t -> runtime_args:runtime_arg list
         -> main_module_block_repr:module_representation
         -> arg_block_idx:int option
+        -> find_format:(Compilation_unit.t -> main_module_block_format)
         -> program
 
 (** Translate a bundle as a generative functor over [params] whose body

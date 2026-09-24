@@ -1674,9 +1674,7 @@ module_block_cells ($camlTests9__cell0 $camlTests9__cell1 $camlTests9__cell2
     let field_3 = %block_load.tag[`0`].`size`[`6`].[`3`] (module_block) in
     let field_4 = %block_load.tag[`0`].`size`[`6`].[`4`] (module_block) in
     let field_5 = %block_load.tag[`0`].`size`[`6`].[`5`] (module_block) in
-    let $camlTests9 =
-      Block 0 (field_0, field_1, field_2, field_3, field_4, field_5)
-    and $camlTests9__cell0 =
+    let $camlTests9__cell0 =
       Block 0 (field_0)
     and $camlTests9__cell1 =
       Block 0 (field_1)
@@ -1689,4 +1687,4 @@ module_block_cells ($camlTests9__cell0 $camlTests9__cell1 $camlTests9__cell2
     and $camlTests9__cell5 =
       Block 0 (field_5)
     in
-    cont done ($camlTests9)
+    cont done (0)

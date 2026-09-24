@@ -329,10 +329,5 @@ and $camlUnroll5__cell1 =
   Block 0 ($camlUnroll5__test1_2)
 and $camlUnroll5__cell0 =
   Block 0 ($camlUnroll5__foo_1)
-and $camlUnroll5 =
-  Block 0 ($camlUnroll5__foo_1,
-           $camlUnroll5__test1_2,
-           $camlUnroll5__test2_3,
-           $camlUnroll5__test3_4)
 in
-cont done ($camlUnroll5)
+cont done (0)

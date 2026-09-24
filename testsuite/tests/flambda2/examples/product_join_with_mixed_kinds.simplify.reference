@@ -27,7 +27,5 @@ in
 let $camlProduct_join_with_mixed_kinds__f_1 = closure f_0_1 @f &toplevel in
 let $camlProduct_join_with_mixed_kinds__cell0 =
   Block 0 ($camlProduct_join_with_mixed_kinds__f_1)
-and $camlProduct_join_with_mixed_kinds =
-  Block 0 ($camlProduct_join_with_mixed_kinds__f_1)
 in
-cont done ($camlProduct_join_with_mixed_kinds)
+cont done (0)

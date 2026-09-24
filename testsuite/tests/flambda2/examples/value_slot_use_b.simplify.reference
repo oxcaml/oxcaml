@@ -14,9 +14,6 @@
          (1)
          -> k * error)
   where k (g : val) =
-    (apply &toplevel inlined(never) g (2) -> k1 * error
-       where k1 (param : [ 0 of imm tagged * imm tagged ]) =
-         cont k
-       where k =
-         let $camlValue_slot_use_b = Block 0 () in
-         cont done ($camlValue_slot_use_b))
+    (apply &toplevel inlined(never) g (2) -> k * error
+       where k (param : [ 0 of imm tagged * imm tagged ]) =
+         cont done (0))

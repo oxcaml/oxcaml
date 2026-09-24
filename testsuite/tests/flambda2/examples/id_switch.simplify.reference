@@ -39,9 +39,5 @@ and $camlId_switch__cell1 =
   Block 0 ($camlId_switch__id_switch_2)
 and $camlId_switch__cell0 =
   Block 0 ($camlId_switch__x_1)
-and $camlId_switch =
-  Block 0 ($camlId_switch__x_1,
-           $camlId_switch__id_switch_2,
-           $camlId_switch__not_switch_3)
 in
-cont done ($camlId_switch)
+cont done (0)

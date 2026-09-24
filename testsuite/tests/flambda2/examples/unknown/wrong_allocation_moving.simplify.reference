@@ -43,7 +43,5 @@ in
 let $camlWrong_allocation_moving__f_1 = closure f_0_1 @f &toplevel in
 let $camlWrong_allocation_moving__cell0 =
   Block 0 ($camlWrong_allocation_moving__f_1)
-and $camlWrong_allocation_moving =
-  Block 0 ($camlWrong_allocation_moving__f_1)
 in
-cont done ($camlWrong_allocation_moving)
+cont done (0)

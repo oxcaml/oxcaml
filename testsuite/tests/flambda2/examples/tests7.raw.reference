@@ -60,9 +60,7 @@ module_block_cells ($camlTests7__cell0 $camlTests7__cell1 $camlTests7__cell2
     let field_2 = $camlTests7__immstring_2 in
     let field_3 = %block_load.tag[`0`].`size`[`5`].[`3`] (module_block) in
     let field_4 = %block_load.tag[`0`].`size`[`5`].[`4`] (module_block) in
-    let $camlTests7 =
-      Block 0 (field_0, field_1, field_2, field_3, field_4)
-    and $camlTests7__cell0 =
+    let $camlTests7__cell0 =
       Block 0 ($camlTests7__empty_block_0)
     and $camlTests7__cell1 =
       Block 0 ($camlTests7__immstring_1)
@@ -73,4 +71,4 @@ module_block_cells ($camlTests7__cell0 $camlTests7__cell1 $camlTests7__cell2
     and $camlTests7__cell4 =
       Block 0 (field_4)
     in
-    cont done ($camlTests7)
+    cont done (0)

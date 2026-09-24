@@ -3,7 +3,7 @@ module_block_cells ($camlLet_symbol_var_inlining__cell0
   $camlLet_symbol_var_inlining__cell3 $camlLet_symbol_var_inlining__cell4)
 let code f_0 deleted in
 let code g_1 deleted in
-let b = %block_load.[`4`] ($Stdlib__Sys.camlStdlib__Sys) in
+let b = %block_load.[`0`] ($Stdlib__Sys.camlStdlib__Sys__cell4) in
 let code loopify(never) size(3) newer_version_of(f_0)
       f_0_1 (n : imm tagged)
         my_closure &my_alloc_region my_depth
@@ -32,11 +32,5 @@ and $camlLet_symbol_var_inlining__cell1 =
   Block 0 (b)
 and $camlLet_symbol_var_inlining__cell0 =
   Block 0 ($Stdlib__List.camlStdlib__List__length_1_15)
-and $camlLet_symbol_var_inlining =
-  Block 0 ($Stdlib__List.camlStdlib__List__length_1_15,
-           b,
-           $Stdlib__List.camlStdlib__List__map_16_36,
-           $camlLet_symbol_var_inlining__f_2,
-           $camlLet_symbol_var_inlining__g_3)
 in
-cont done ($camlLet_symbol_var_inlining)
+cont done (0)

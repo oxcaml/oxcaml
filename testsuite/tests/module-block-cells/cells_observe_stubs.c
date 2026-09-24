@@ -1,19 +1,14 @@
 #include <caml/mlvalues.h>
 #include <caml/alloc.h>
 
-/* The module block of Cells_observe_lib and its cells.  A data symbol labels
-   the first field of its block, so the symbol's address is the block. */
-extern value camlCells_observe_lib;
+/* The cells of Cells_observe_lib (native code emits no module block).  A data
+   symbol labels the first field of its block, so the symbol's address is the
+   block. */
 extern value camlCells_observe_lib__cell0;
 extern value camlCells_observe_lib__cell1;
 extern value camlCells_observe_lib__cell2;
 extern value camlCells_observe_lib__cell3;
 extern value camlCells_observe_lib__cell4;
-
-static value block(void)
-{
-  return (value)&camlCells_observe_lib;
-}
 
 static value cell(value i)
 {
@@ -26,22 +21,12 @@ static value cell(value i)
   }
 }
 
-value cells_observe_block_size(value unit)
-{
-  return Val_long(Wosize_val(block()));
-}
-
 value cells_observe_cell_size(value i)
 {
   return Val_long(Wosize_val(cell(i)));
 }
 
 /* Raw words, so that flat (unboxed) fields can be compared too. */
-value cells_observe_block_word(value i)
-{
-  return caml_copy_int64((int64_t)Field(block(), Long_val(i)));
-}
-
 value cells_observe_cell_word(value i, value j)
 {
   return caml_copy_int64((int64_t)Field(cell(i), Long_val(j)));

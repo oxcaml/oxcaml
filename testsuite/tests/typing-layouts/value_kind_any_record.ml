@@ -16,7 +16,7 @@ let ints (r : int t) = r
      (function {nlocal = 0}
        r[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>]
        : (consts ()) (non_consts ([0: value<int>, value<int>])) r))
-  (apply (field_imm 1 (global Toploop!)) "ints" ints))
+  (apply (field_imm 1 (global Toploop!/0)) "ints" ints))
 val ints : int t -> int t = <fun>
 |}]
 
@@ -27,7 +27,7 @@ let floats (r : float t) = r
      (function {nlocal = 0}
        r[value<(consts ()) (non_consts ([0: value<float>, value<int>]))>]
        : (consts ()) (non_consts ([0: value<float>, value<int>])) r))
-  (apply (field_imm 1 (global Toploop!)) "floats" floats))
+  (apply (field_imm 1 (global Toploop!/0)) "floats" floats))
 val floats : float t -> float t = <fun>
 |}]
 
@@ -38,7 +38,7 @@ let unboxed_floats (r : float# t) = r
      (function {nlocal = 0}
        r[value<(consts ()) (non_consts ([0: float64, value<int>]))>]
        : (consts ()) (non_consts ([0: float64, value<int>])) r))
-  (apply (field_imm 1 (global Toploop!)) "unboxed_floats" unboxed_floats))
+  (apply (field_imm 1 (global Toploop!/0)) "unboxed_floats" unboxed_floats))
 val unboxed_floats : float# t -> float# t = <fun>
 |}]
 
@@ -53,7 +53,7 @@ let products (r : #(int * float#) t) = r
        : (consts ())
           (non_consts ([0: product value<int>, float64, value<int>]))
        r))
-  (apply (field_imm 1 (global Toploop!)) "products" products))
+  (apply (field_imm 1 (global Toploop!/0)) "products" products))
 val products : #(int * float#) t -> #(int * float#) t = <fun>
 |}]
 
@@ -64,14 +64,14 @@ let voids (r : unit# t) = r
      (function {nlocal = 0}
        r[value<(consts ()) (non_consts ([0: product , value<int>]))>]
        : (consts ()) (non_consts ([0: product , value<int>])) r))
-  (apply (field_imm 1 (global Toploop!)) "voids" voids))
+  (apply (field_imm 1 (global Toploop!/0)) "voids" voids))
 val voids : unit# t -> unit# t = <fun>
 |}]
 
 let opaque (type a : any) (r : a t) = r
 [%%expect{|
 (let (opaque = (function {nlocal = 0} r r))
-  (apply (field_imm 1 (global Toploop!)) "opaque" opaque))
+  (apply (field_imm 1 (global Toploop!/0)) "opaque" opaque))
 val opaque : ('a : any). 'a t -> 'a t = <fun>
 |}]
 
@@ -89,7 +89,7 @@ let boxed_floats (r : float single) = r
      (function {nlocal = 0}
        r[value<(consts ()) (non_consts ([0: value<float>]))>]
        : (consts ()) (non_consts ([0: value<float>])) r))
-  (apply (field_imm 1 (global Toploop!)) "boxed_floats" boxed_floats))
+  (apply (field_imm 1 (global Toploop!/0)) "boxed_floats" boxed_floats))
 val boxed_floats : float single -> float single = <fun>
 |}]
 
@@ -100,7 +100,7 @@ let all_void (r : unit# single) = r
      (function {nlocal = 0}
        r[value<(consts ()) (non_consts ([0: product ]))>]
        : (consts ()) (non_consts ([0: product ])) r))
-  (apply (field_imm 1 (global Toploop!)) "all_void" all_void))
+  (apply (field_imm 1 (global Toploop!/0)) "all_void" all_void))
 val all_void : unit# single -> unit# single = <fun>
 |}]
 
@@ -113,7 +113,7 @@ type ('a : any) mutable_record = { mutable field : 'a; }
 let mutable_record (r : float# mutable_record) = r
 [%%expect{|
 (let (mutable_record = (function {nlocal = 0} r r))
-  (apply (field_imm 1 (global Toploop!)) "mutable_record" mutable_record))
+  (apply (field_imm 1 (global Toploop!/0)) "mutable_record" mutable_record))
 val mutable_record : float# mutable_record -> float# mutable_record = <fun>
 |}]
 
@@ -138,6 +138,6 @@ let either (v : float# inline) (w : float# inline) =
        (catch (if v (exit 11 v) (if w (exit 11 w) 0))
         with (11 r[value<(consts ()) (non_consts ([0: float64, value<int>]))>])
          (mixedfield 1  (float64,value<int>) r))))
-  (apply (field_imm 1 (global Toploop!)) "either" either))
+  (apply (field_imm 1 (global Toploop!/0)) "either" either))
 val either : float# inline -> float# inline -> int = <fun>
 |}]

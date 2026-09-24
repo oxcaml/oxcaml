@@ -153,8 +153,13 @@ let implementation_aux ~start_from ~source_file ~output_prefix
       | None -> None, None
     in
     let impl =
+      (* Bytecode ignores the representation, so the argument units' .cmo
+         files need not be looked up. *)
+      let find_format _ : Lambda.main_module_block_format =
+        Mb_struct { mb_repr = Lambda.bytecode_only_module_representation }
+      in
       Translmod.transl_instance info.module_name ~runtime_args
-        ~main_module_block_repr ~arg_block_idx
+        ~main_module_block_repr ~arg_block_idx ~find_format
     in
     let bytecode = tlambda_to_bytecode info impl ~as_arg_for in
     emit_bytecode info bytecode
@@ -165,7 +170,7 @@ let implementation ~start_from ~source_file ~output_prefix ~keep_symbol_tables =
     ~compilation_unit:Inferred_from_output_prefix
 
 let instance ~source_file ~output_prefix ~compilation_unit ~runtime_args
-    ~main_module_block_repr ~arg_descr ~keep_symbol_tables =
+    ~main_module_block_repr ~arg_descr ~find_format:_ ~keep_symbol_tables =
   let start_from =
     Instantiation { runtime_args; main_module_block_repr; arg_descr }
   in

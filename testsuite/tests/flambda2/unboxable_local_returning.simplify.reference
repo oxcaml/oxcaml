@@ -69,8 +69,5 @@ apply direct(print_endline_47 &toplevel) inlined(never)
       Block 0 ($camlUnboxable_local_returning__ret_heap_10)
     and $camlUnboxable_local_returning__cell0 =
       Block 0 ($camlUnboxable_local_returning__ret_local_8)
-    and $camlUnboxable_local_returning =
-      Block 0 ($camlUnboxable_local_returning__ret_local_8,
-               $camlUnboxable_local_returning__ret_heap_10)
     in
-    cont done ($camlUnboxable_local_returning)
+    cont done (0)

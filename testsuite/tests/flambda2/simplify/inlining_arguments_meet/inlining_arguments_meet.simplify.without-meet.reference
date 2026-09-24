@@ -46,9 +46,5 @@ and $camlInlining_arguments_meet__cell1 =
   Block 0 ($camlInlining_arguments_meet__g_with_code_size_between_11_and_20_2)
 and $camlInlining_arguments_meet__cell0 =
   Block 0 ($camlInlining_arguments_meet__h_1)
-and $camlInlining_arguments_meet =
-  Block 0 ($camlInlining_arguments_meet__h_1,
-           $camlInlining_arguments_meet__g_with_code_size_between_11_and_20_2,
-           $camlInlining_arguments_meet__q_3)
 in
-cont done ($camlInlining_arguments_meet)
+cont done (0)

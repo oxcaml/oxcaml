@@ -64,9 +64,5 @@ in
 let $camlString_switch__of_string_7 =
   closure of_string_0_1 @of_string &toplevel
 in
-let $camlString_switch__cell0 =
-  Block 0 ($camlString_switch__of_string_7)
-and $camlString_switch =
-  Block 0 ($camlString_switch__of_string_7)
-in
-cont done ($camlString_switch)
+let $camlString_switch__cell0 = Block 0 ($camlString_switch__of_string_7) in
+cont done (0)

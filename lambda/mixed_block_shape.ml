@@ -291,3 +291,24 @@ let of_mixed_block_elements ~print_locality
     forest;
     print_locality
   }
+
+let module_value_field_index (module_repr : Lambda.module_representation) pos =
+  if not !Clflags.native_code
+  then Some pos
+  else
+    match module_repr with
+    | Module_value_only _ -> Some pos
+    | Module_mixed (shape, _) ->
+      let shape =
+        of_mixed_block_elements shape ~print_locality:(fun ppf () ->
+            Format.fprintf ppf "()")
+      in
+      let new_pos =
+        match lookup_path_producing_new_indexes shape [pos] with
+        | [new_pos] -> Some new_pos
+        | _ -> None (* [pos] points to an unboxed product or void *)
+      in
+      Option.bind new_pos (fun new_pos ->
+          if new_pos < value_prefix_len shape
+          then Some new_pos
+          else None (* [pos] points to an unboxed singleton *))

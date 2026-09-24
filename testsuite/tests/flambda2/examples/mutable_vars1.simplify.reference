@@ -51,9 +51,6 @@ in
 let $camlMutable_vars1__escape_string_1 =
   closure escape_string_0_1 @escape_string &toplevel
 in
-let $camlMutable_vars1__cell0 =
-  Block 0 ($camlMutable_vars1__escape_string_1)
-and $camlMutable_vars1 =
-  Block 0 ($camlMutable_vars1__escape_string_1)
+let $camlMutable_vars1__cell0 = Block 0 ($camlMutable_vars1__escape_string_1)
 in
-cont done ($camlMutable_vars1)
+cont done (0)

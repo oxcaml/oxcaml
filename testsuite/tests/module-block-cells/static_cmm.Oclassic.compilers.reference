@@ -1,0 +1,50 @@
+(data global "camlStatic_cmm__gc_roots": int 0)
+(data int 1792 global "camlStatic_cmm__cell4": addr G:"camlStatic_cmm__s2")
+(data int 1792 global "camlStatic_cmm__cell3": addr G:"camlStatic_cmm__s1")
+(data int 1792 global "camlStatic_cmm__cell2": int 85)
+(data int 1792 global "camlStatic_cmm__cell1": addr G:"camlStatic_lib__s0")
+(data int 1792 global "camlStatic_cmm__cell0": addr G:"camlStatic_cmm__s0")
+(data
+ int 5888
+ "camlStatic_cmm__s4":
+ addr G:"camlStatic_cmm__s0"
+ addr G:"camlStatic_lib__s0"
+ int 85
+ addr G:"camlStatic_cmm__s1"
+ addr G:"camlStatic_cmm__s2")
+(data
+ int 4864
+ global "camlStatic_cmm__s1":
+ addr G:"camlStatic_lib__s0"
+ addr G:"camlStatic_lib__s1"
+ int 85
+ addr G:"camlStatic_lib__s2")
+(data
+ int 3063
+ global "camlStatic_cmm__s2":
+ addr G:"camlStatic_cmm__make_whole_1_1"
+ int 108086391056891909)
+(data
+ int 3063
+ global "camlStatic_cmm__s0":
+ addr G:"camlStatic_cmm__apply_f_0_0"
+ int 108086391056891909)
+(data
+ int 4864
+ global "camlStatic_cmm__s3":
+ addr G:"camlStatic_lib__s0"
+ addr G:"camlStatic_lib__s1"
+ int 85
+ addr G:"camlStatic_lib__s2")
+(function{static_cmm.ml:42,12-30} camlStatic_cmm__apply_f_0_0
+     (x/0: int) : int
+ (+ x/0 2) )
+
+(function{static_cmm.ml:46,15-43} camlStatic_cmm__make_whole_1_1
+     (param/0: int) : val
+ G:"camlStatic_cmm__s3" )
+
+(function no_cse reduce_code_size linscan camlStatic_cmm__entry () : val
+ (catch (exit 3 1) with(3 *ret*/0: val) 1) )
+
+(data)
