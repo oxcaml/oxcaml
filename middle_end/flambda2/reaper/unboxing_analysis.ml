@@ -70,21 +70,44 @@ open! Datalog_helpers.Syntax
 open Datalog_helpers
 
 module Unboxed_fields = struct
-  type 'a t = 'a u Field.Map.t
+  type 'a t =
+    { fields : 'a u Field.Map.t;
+      in_order : Field.t list (* the keys of [fields], in a fixed order *)
+    }
 
   and 'a u =
     | Not_unboxed of 'a
     | Unboxed of 'a t
 
+  (* Field IDs can change order on import. Keep the solve-time traversal order
+     so that rebuilt parameters and arguments agree with the code metadata. *)
+  let of_map fields =
+    { fields; in_order = List.map fst (Field.Map.bindings fields) }
+
+  let to_map t = t.fields
+
+  let find field t = Field.Map.find field t.fields
+
+  let is_empty t = Field.Map.is_empty t.fields
+
+  let keys t = Field.Map.keys t.fields
+
+  let fold f t acc =
+    List.fold_left
+      (fun acc field -> f field (Field.Map.find field t.fields) acc)
+      acc t.in_order
+
+  let mapi_fields f t = { t with fields = Field.Map.mapi f t.fields }
+
   let rec print_u pp_elem ppf = function
     | Not_unboxed x -> pp_elem ppf x
     | Unboxed fields -> print pp_elem ppf fields
 
-  and print pp_elem ppf fields = Field.Map.print (print_u pp_elem) ppf fields
+  and print pp_elem ppf t = Field.Map.print (print_u pp_elem) ppf t.fields
 
   let rec fold_with_kind (f : Flambda_kind.t -> 'a -> 'b -> 'b) (fields : 'a t)
       acc =
-    Field.Map.fold
+    fold
       (fun field elt acc ->
         match elt with
         | Not_unboxed elt -> f (Field.kind field) elt acc
@@ -98,7 +121,7 @@ module Unboxed_fields = struct
     | Unboxed f -> Unboxed (mapi not_unboxed unboxed acc f)
 
   and mapi not_unboxed unboxed acc f =
-    Field.Map.mapi
+    mapi_fields
       (fun field uf -> mapi_u not_unboxed unboxed (unboxed field acc) uf)
       f
 
@@ -119,9 +142,9 @@ module Unboxed_fields = struct
     | Unboxed fields1, Unboxed fields2 -> fold2_subset f fields1 fields2 acc
 
   and fold2_subset f fields1 fields2 acc =
-    Field.Map.fold
+    fold
       (fun field f1 acc ->
-        match Field.Map.find field fields2 with
+        match find field fields2 with
         | exception Not_found ->
           Misc.fatal_errorf "@[<v 2>@[%a@]:@ @[%a@]@]@." Format.pp_print_text
             "Expected a subset of unboxed fields, but the following field is \
@@ -131,9 +154,9 @@ module Unboxed_fields = struct
       fields1 acc
 
   let rec fold2_subset_with_kind f fields1 fields2 acc =
-    Field.Map.fold
+    fold
       (fun field f1 acc ->
-        match Field.Map.find field fields2 with
+        match find field fields2 with
         | exception Not_found ->
           Misc.fatal_errorf "@[<v 2>@[%a@]:@ @[%a@]@]@." Format.pp_print_text
             "Expected a subset of unboxed fields, but the following field is \
@@ -157,13 +180,14 @@ module Unboxed_fields = struct
   and equal_shape fields1 fields2 =
     (* CR ncourant: we can't use [Field.Map.equal] here because it doesn't have
        a type that is general enough :( *)
-    let bindings1 = Field.Map.bindings fields1 in
-    let bindings2 = Field.Map.bindings fields2 in
-    List.compare_lengths bindings1 bindings2 = 0
+    List.compare_lengths fields1.in_order fields2.in_order = 0
     && List.for_all2
-         (fun (f1, fields1) (f2, fields2) ->
-           Field.equal f1 f2 && equal_shape_u fields1 fields2)
-         bindings1 bindings2
+         (fun f1 f2 ->
+           Field.equal f1 f2
+           && equal_shape_u
+                (Field.Map.find f1 fields1.fields)
+                (Field.Map.find f2 fields2.fields))
+         fields1.in_order fields2.in_order
 end
 
 (* CR-someday ncourant: track fields that are known to be constant, here and in
@@ -628,6 +652,7 @@ let rec mk_unboxed_fields ~has_to_be_unboxed ~mk db unboxed_block fields
                 Field.print field name_prefix
             else default ())))
     fields
+  |> Unboxed_fields.of_map
 
 let has_to_be_unboxed =
   let^? [x], [alloc_point] = ["x"], ["alloc_point"] in
