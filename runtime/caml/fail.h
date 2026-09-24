@@ -58,6 +58,9 @@ struct longjmp_buffer {
 struct longjmp_buffer {
   jmp_buf buf;
 };
+/* The libc may already define sigsetjmp and siglongjmp as macros. */
+#undef sigsetjmp
+#undef siglongjmp
 #define sigsetjmp(buf,save) setjmp(buf)
 #define siglongjmp(buf,val) longjmp(buf,val)
 #endif

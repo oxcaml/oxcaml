@@ -56,6 +56,29 @@
 #define lseek _lseeki64
 #endif
 
+#ifdef CAML_BARE_METAL
+/* Unlike the other stubbed-out syscalls, [close] reports success: there
+   is nothing to release on bare metal, and failing (e.g. with ENOSYS)
+   would make closing a channel raise a spurious [Sys_error]. */
+static int caml_bare_close(int fd)
+{
+  (void)fd;
+  return 0;
+}
+
+static off_t caml_bare_lseek(int fd, off_t offset, int whence)
+{
+  (void)fd;
+  (void)offset;
+  (void)whence;
+  errno = ESPIPE;
+  return (off_t)-1;
+}
+
+#define close caml_bare_close
+#define lseek caml_bare_lseek
+#endif
+
 /* Representation of channel status and direction:
 
    Open channels have fd >= 0 && buff != dummy_buff
@@ -1117,7 +1140,9 @@ CAMLprim value caml_ml_input_scan_line(value vchannel)
   CAMLreturn (Val_long(res));
 }
 
+#ifndef CAML_BARE_METAL
 CAMLprim value caml_terminfo_rows(value vchannel)
 {
   return Val_int(caml_num_rows_fd(Channel(vchannel)->fd));
 }
+#endif
