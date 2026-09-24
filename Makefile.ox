@@ -13,7 +13,7 @@ ifeq ($(shell which ocamlopt >& /dev/null || echo fail), fail)
   $(error ocamlopt not found. See HACKING.ox)
 endif
 
-boot_ocamlc = main_native.exe
+boot_ocamlc = boot_ocamlc.exe
 boot_ocamlopt = optmain_native.exe
 boot_ocamlj = boot_ocamlj.exe
 boot_ocamlmklib = tools/ocamlmklib.exe
