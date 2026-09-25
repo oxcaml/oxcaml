@@ -3887,17 +3887,16 @@ module Row_like_for_blocks = struct
       alloc_mode =
     let known_tags =
       Tag.Map.map
-        (fun (shape, field_tys) ->
-          check_field_tys ~shape ~field_tys;
-          let maps_to = Array.of_list field_tys in
-          let size =
-            Target_ocaml_int.of_int machine_width (List.length field_tys)
-          in
-          Or_unknown.Known
-            { maps_to;
-              index = { domain = Known size; shape };
-              env_extension = { equations = Name.Map.empty }
-            })
+        (Or_unknown.map ~f:(fun (shape, field_tys) ->
+             check_field_tys ~shape ~field_tys;
+             let maps_to = Array.of_list field_tys in
+             let size =
+               Target_ocaml_int.of_int machine_width (List.length field_tys)
+             in
+             { maps_to;
+               index = { domain = Known size; shape };
+               env_extension = { equations = Name.Map.empty }
+             }))
         shape_and_field_tys_by_tag
     in
     { known_tags; other_tags = Bottom; alloc_mode }
