@@ -393,18 +393,17 @@ module SpillCosts = struct
     in
     Reg.Tbl.replace costs reg (curr + delta)
 
-  let normal_cost = lazy (find_param_value "SPILL_NORMAL_COST")
+  let normal_cost = int_of_param ~default:1 "SPILL_NORMAL_COST"
 
-  let cold_cost = lazy (find_param_value "SPILL_COLD_COST")
+  let cold_cost = int_of_param ~default:0 "SPILL_COLD_COST"
 
-  let loop_cost = lazy (find_param_value "SPILL_LOOP_COST")
+  let loop_cost = int_of_param ~default:10 "SPILL_LOOP_COST"
 
   let cost_for_block : Cfg.basic_block -> int =
    fun block ->
-    let param =
-      match block.cold with false -> normal_cost | true -> cold_cost
-    in
-    match Lazy.force param with None -> 1 | Some cost -> int_of_string cost
+    match block.cold with
+    | false -> Lazy.force normal_cost
+    | true -> Lazy.force cold_cost
 
   let compute : Cfg_with_infos.t -> flat:bool -> unit -> t =
    fun cfg_with_infos ~flat () ->
@@ -436,15 +435,10 @@ module SpillCosts = struct
             assert flat;
             1
           | Some depth ->
-            let base =
-              match Lazy.force loop_cost with
-              | None -> 10
-              | Some cost -> int_of_string cost
-            in
             (* CR-soon xclerc for xclerc: consider adding an overflow check (See
                tools/regalloc/regalloc.ml). Or better, share the code between
                the tool and the allocators. *)
-            Misc.power ~base depth
+            Misc.power ~base:(Lazy.force loop_cost) depth
         in
         let cost = base_cost * cost_multiplier in
         DLL.iter ~f:(fun instr -> update_instr cost instr) block.body;
