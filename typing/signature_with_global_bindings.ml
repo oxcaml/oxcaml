@@ -24,12 +24,12 @@ let array_fold_left_filter_map f init array =
 
 let name_in_subst (name : Global_module.Name.t) subst =
   match name with
-  | { head; args = [] } ->
+  | Without_prefix { head; args = [] } ->
     (* Not generally okay to just convert to a parameter name, but we're only doing this
        to check whether there happens to be a parameter with this name in the subst *)
     let head_as_param_name = head |> Global_module.Parameter_name.of_string in
     Global_module.Parameter_name.Map.mem head_as_param_name subst
-  | _ -> false
+  | Without_prefix _ | With_prefix _ -> false
 
 let subst t (args : (Global_module.Parameter_name.t * Global_module.t) list) =
   let { sign = sign, staticity; bound_globals } = t in

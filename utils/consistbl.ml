@@ -86,6 +86,11 @@ end) = struct
       mod_names
       init
 
+  let fold f tbl init =
+    Module_name.Tbl.fold
+      (fun name (data, crc, _source) acc -> f name data crc acc)
+      tbl init
+
   let filter p tbl =
     let to_remove = ref [] in
     Module_name.Tbl.iter

@@ -29,8 +29,10 @@ type t =
          predefined identifiers is always unique. *)
   | Global_with_args of global
       (* must have non-empty [args] *)
-and global = Global_module.Name.t = private
-  { head: string; args: Global_module.Name.argument list }
+  | Global_with_prefix of string list * string
+      (* must have non-empty prefix *)
+and global = Global_module.Name_unprefixed.t = private
+  { head: string; args: Global_module.Name_unprefixed.argument list }
 
 (* A stamp of 0 denotes a persistent identifier *)
 
@@ -52,18 +54,20 @@ let create_predef s =
 let create_persistent s =
   Global s
 
-let create_global glob =
-  match glob with
-  | { head; args = [] } -> Global head
-  | _ -> Global_with_args glob
+let create_global (name : Global_module.Name.t) =
+  match name with
+  | Without_prefix { head; args = [] } -> Global head
+  | Without_prefix glob -> Global_with_args glob
+  | With_prefix (prefix, name) -> Global_with_prefix (prefix, name)
 
 let create_local_binding_for_global glob =
-  create_local (Global_module.Name.to_string glob)
+  create_local
+    (Global_module.Name_unprefixed.to_string
+       (Global_module.Name.to_name_exn glob))
 
-let create_instance head args =
-  create_global (Global_module.Name.create_exn head args)
+let global_name g = Global_module.Name_unprefixed.to_string g
 
-let global_name g = Global_module.Name.to_string g
+let prefixed_name prefix name = String.concat "." (prefix @ [name])
 
 let name = function
   | Local { name; _ }
@@ -71,6 +75,7 @@ let name = function
   | Global name
   | Predef { name; _ } -> name
   | Global_with_args g -> global_name g
+  | Global_with_prefix (prefix, name) -> prefixed_name prefix name
 
 let rename_with_stamp stamp = function
   | Local { name; stamp = _ }
@@ -96,6 +101,9 @@ let unique_name = function
          "_<some number>", and that their name is unique. *)
       name
   | Global_with_args g -> global_name g
+  | Global_with_prefix (prefix, name) ->
+      (* a prefixed name contains dots, so cannot clash with local idents *)
+      prefixed_name prefix name
 
 let canonical_name i = if !Clflags.canonical_ids then name i else unique_name i
 
@@ -105,6 +113,10 @@ let unique_toplevel_name = function
   | Global name
   | Predef { name; _ } -> name
   | Global_with_args g -> global_name g
+  | Global_with_prefix (prefix, name) -> prefixed_name prefix name
+
+let equal_prefixed prefix1 name1 prefix2 name2 =
+  List.equal String.equal prefix1 prefix2 && String.equal name1 name2
 
 let equal i1 i2 =
   match i1, i2 with
@@ -115,7 +127,10 @@ let equal i1 i2 =
   | Predef { stamp = s1; _ }, Predef { stamp = s2 } ->
       (* if they don't have the same stamp, they don't have the same name *)
       s1 = s2
-  | Global_with_args g1, Global_with_args g2 -> Global_module.Name.equal g1 g2
+  | Global_with_args g1, Global_with_args g2 ->
+      Global_module.Name_unprefixed.equal g1 g2
+  | Global_with_prefix (prefix1, name1), Global_with_prefix (prefix2, name2) ->
+      equal_prefixed prefix1 name1 prefix2 name2
   | _ ->
       false
 
@@ -127,7 +142,10 @@ let same i1 i2 =
       s1 = s2
   | Global name1, Global name2 ->
       name1 = name2
-  | Global_with_args g1, Global_with_args g2 -> Global_module.Name.equal g1 g2
+  | Global_with_args g1, Global_with_args g2 ->
+      Global_module.Name_unprefixed.equal g1 g2
+  | Global_with_prefix (prefix1, name1), Global_with_prefix (prefix2, name2) ->
+      equal_prefixed prefix1 name1 prefix2 name2
   | _ ->
       false
 
@@ -142,7 +160,8 @@ let compare_stamp id1 id2 =
 let scope = function
   | Scoped { scope; _ } -> scope
   | Local _ -> highest_scope
-  | Global _ | Predef _ | Global_with_args _ -> lowest_scope
+  | Global _ | Predef _ | Global_with_args _ | Global_with_prefix _ ->
+      lowest_scope
 
 let reinit_level = ref (-1)
 
@@ -154,6 +173,7 @@ let reinit () =
 let is_global = function
   | Global _ -> true
   | Global_with_args _ -> true
+  | Global_with_prefix _ -> true
   | _ -> false
 
 let is_global_or_predef = function
@@ -161,7 +181,8 @@ let is_global_or_predef = function
   | Scoped _ -> false
   | Global _
   | Predef _
-  | Global_with_args _ -> true
+  | Global_with_args _
+  | Global_with_prefix _ -> true
 
 let is_predef = function
   | Predef _ -> true
@@ -171,9 +192,11 @@ let is_instance = function
   | Global_with_args _ -> true
   | _ -> false
 
-let to_global = function
-  | Global head -> Some (Global_module.Name.create_no_args head)
-  | Global_with_args g -> Some g
+let to_global : t -> Global_module.Name.t option = function
+  | Global head ->
+      Some (Without_prefix (Global_module.Name_unprefixed.create_no_args head))
+  | Global_with_args g -> Some (Without_prefix g)
+  | Global_with_prefix (prefix, name) -> Some (With_prefix (prefix, name))
   | _ -> None
 
 let canonical_stamps = s_table Hashtbl.create 0
@@ -220,7 +243,9 @@ let print ~with_scope ppf =
         pp_stamped (name, stamp)
         (if with_scope then asprintf "[%i]" scope else "")
   | Global_with_args g ->
-      fprintf ppf "%a!" Global_module.Name.print g
+      fprintf ppf "%a!" Global_module.Name_unprefixed.print g
+  | Global_with_prefix (prefix, name) ->
+      fprintf ppf "%s!" (prefixed_name prefix name)
 
 let print_with_scope ppf id = print ~with_scope:true ppf id
 
@@ -457,9 +482,16 @@ let compare x y =
   | Global x, Global y -> compare x y
   | Global _, _ -> 1
   | _, Global _ -> (-1)
-  | Global_with_args g1, Global_with_args g2 -> Global_module.Name.compare g1 g2
+  | Global_with_args g1, Global_with_args g2 ->
+      Global_module.Name_unprefixed.compare g1 g2
   | Global_with_args _, _ -> 1
   | _, Global_with_args _ -> (-1)
+  | Global_with_prefix (prefix1, name1), Global_with_prefix (prefix2, name2) ->
+      let c = List.compare String.compare prefix1 prefix2 in
+      if c <> 0 then c
+      else String.compare name1 name2
+  | Global_with_prefix _, _ -> 1
+  | _, Global_with_prefix _ -> (-1)
   | Predef { stamp = s1; _ }, Predef { stamp = s2; _ } -> compare s1 s2
 
 let output oc id = output_string oc (unique_name id)

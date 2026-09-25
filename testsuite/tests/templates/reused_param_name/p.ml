@@ -1,0 +1,1 @@
+let regular () = "regular P"

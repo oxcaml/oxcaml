@@ -31,7 +31,7 @@ let load_cmx_file_contents loader comp_unit =
       ~accessed_by:(Current_unit.get_cu_exn ())
   in
   let cmx_file =
-    Compilation_unit.to_global_name_without_prefix accessible_comp_unit
+    Compilation_unit.to_global_name accessible_comp_unit
   in
   match Imported_unit_map.find cmx_file loader.imported_units with
   | typing_env_or_none -> typing_env_or_none
@@ -101,7 +101,7 @@ let create_loader ~get_module_info =
   let predefined_exception_typing_env = predefined_exception_typing_env () in
   loader.imported_units
     <- Imported_unit_map.singleton
-         (Compilation_unit.Name.to_global_name Compilation_unit.Name.predef_exn)
+         (Compilation_unit.to_global_name Compilation_unit.predef_exn)
          (Some predefined_exception_typing_env);
   loader
 

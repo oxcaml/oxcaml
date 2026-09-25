@@ -74,11 +74,11 @@ val add_required : t -> filepath * CU.Name.t option -> Import_info.t -> unit
 
 val remove_required : t -> CU.t -> unit
 
-val add_quoted_cmi : t -> CU.Name.t list -> unit
+val add_quoted_cmi : t -> CU.t list -> unit
 
 val add_quoted_cmx : t -> CU.t list -> unit
 
-val get_quoted_cmi : t -> CU.Name.Set.t
+val get_quoted_cmi : t -> CU.Set.t
 
 val get_quoted_cmx : t -> CU.Set.t
 
@@ -103,7 +103,9 @@ type error =
       }
   | Not_an_object_file of filepath
   | Missing_implementations of (Compilation_unit.t * string list) list
-  | Inconsistent_interface of Compilation_unit.Name.t * filepath * filepath
+  | Inconsistent_interface of Compilation_unit.t * filepath * filepath
+  | Inconsistent_interface_intf of
+      Compilation_unit.Intf.t * filepath * filepath
   | Inconsistent_implementation of Compilation_unit.t * filepath * filepath
   | Multiple_definition of Compilation_unit.Name.t * filepath * filepath
   | Missing_cmx of filepath * Compilation_unit.t

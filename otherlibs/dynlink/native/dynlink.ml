@@ -24,7 +24,12 @@ module DC = Dynlink_common
 module DT = Dynlink_types
 
 let convert_cmi_import import =
-  let name = Import_info.name import |> Compilation_unit.Name.to_string in
+  let name =
+    match Import_info.Intf.view import with
+    | Normal (cu, _) | Alias cu -> Compilation_unit.full_path_as_string cu
+    | Parameter (intf, _) ->
+      Compilation_unit.Intf.to_name intf |> Compilation_unit.Name.to_string
+  in
   let crc = Import_info.crc import in
   name, crc
 
