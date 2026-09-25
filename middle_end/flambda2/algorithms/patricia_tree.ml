@@ -22,6 +22,11 @@ external int_clz : int -> (int[@untagged])
   = "caml_int_clz_tagged_to_tagged" "caml_int_clz_tagged_to_untagged"
 [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
+external prefetch_read_high_offset : 'a -> (int[@untagged]) -> unit
+  = "caml_flambda2_prefetch_read_high_offset"
+    "caml_prefetch_read_high_val_offset_untagged"
+[@@noalloc] [@@builtin]
+
 (* A bit-packed pair of a bit [b] and prefix [p] matching the beginning
    (big-endian) of every key in a subtree, up to bit [b].
 
@@ -1867,6 +1872,10 @@ end = struct
     | Non_empty t -> filter_map_sharing_tree f t
 
   module Mutable_iterator = struct
+    let[@inline always] prefetch_tree (tree : (_, non_empty) tree) =
+      (* Non-empty trees are blocks. *)
+      prefetch_read_high_offset tree (-(Sys.word_size / 8))
+
     (* Use [include] to avoid exposing the internals of the [iterator] type
        beyond what's strictly necessary to ensure internal invariants. *)
     include (
@@ -1925,6 +1934,12 @@ end = struct
           else Or_null.null
 
         let set_current t l =
+          let stack_size = t.stack_size in
+          (if stack_size > 0
+           then
+             match descr t.stack.(stack_size - 1) with
+             | Empty -> ()
+             | Non_empty tree -> prefetch_tree tree);
           t.current_key <- leaf_key l;
           t.current <- Or_null.this (leaf_datum l)
         [@@inline]
