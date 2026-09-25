@@ -530,28 +530,28 @@ val void_index : unit -> (unit# gap_record, #(string * float#)) idx_imm =
 
 (* test printing of polymorphic record/variant types *)
 
-(* We put the definitely-scannable parts first to work around a mixed block field
-   reordering bug in the native toplevel printer (see internal ticket 4431). *)
-type ('a : any) record_for_printing = { x : int ; y : 'a }
+(* [y] precedes the scannable [x], so the native block reorders its fields and
+   this exercises the mixed-block printer's remapping. *)
+type ('a : any) record_for_printing = { y : 'a ; x : int }
 
 let print_record =
-  let poly_ mk y = { x = 67 ; y } in
+  let poly_ mk y = { y ; x = 67 } in
   mk 42, mk #42.5
 [%%expect{|
-type ('a : any) record_for_printing = { x : int; y : 'a; }
+type ('a : any) record_for_printing = { y : 'a; x : int; }
 val print_record : int record_for_printing * float# record_for_printing =
-  ({x = 67; y = 42}, {x = 67; y = <abstr>})
+  ({y = 42; x = 67}, {y = <abstr>; x = 67})
 |}]
 
-type ('a : any) inline_record_for_printing = I of { x : int ; y : 'a }
+type ('a : any) inline_record_for_printing = I of { y : 'a ; x : int }
 let print_inline_record =
-  let poly_ mk y = I { x = 67 ; y } in
+  let poly_ mk y = I { y ; x = 67 } in
   mk 42, mk #42.5
 [%%expect{|
-type ('a : any) inline_record_for_printing = I of { x : int; y : 'a; }
+type ('a : any) inline_record_for_printing = I of { y : 'a; x : int; }
 val print_inline_record :
   int inline_record_for_printing * float# inline_record_for_printing =
-  (I {x = 67; y = 42}, I {x = 67; y = <abstr>})
+  (I {y = 42; x = 67}, I {y = <abstr>; x = 67})
 |}]
 
 let print_variant =
