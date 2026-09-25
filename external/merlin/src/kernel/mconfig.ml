@@ -629,6 +629,7 @@ let ocaml_ignored_flags =
     "-disable-zero-alloc-checker";
     "-disable-precise-zero-alloc-checker";
     "-no-x86-peephole-remove-redundant-test";
+    "-no-x86-peephole-fuse-and-test";
     "-cfg-stack-checks";
     "-no-cfg-stack-checks";
     "-gdwarf-inlined-frames";

@@ -48,7 +48,7 @@ let code loopify(never) size(77) newer_version_of(true_at_level0_4)
               | 0 -> k3 (0)
               | 1 -> k4
               where k4 =
-                let prim = %phys_eq (unboxed_field_1, 0) in
+                let prim = %int_comp.eq (unboxed_field_1, 0) in
                 let eq = %tag_imm (prim) in
                 cont k3 (eq)))
     where k3 (body_result : imm tagged) =
@@ -182,7 +182,7 @@ let code loopify(never) size(77) newer_version_of(true_at_level0_4_1)
               | 0 -> k3 (0)
               | 1 -> k4
               where k4 =
-                let prim = %phys_eq (lvl_1, 0) in
+                let prim = %int_comp.eq (lvl_1, 0) in
                 let eq = %tag_imm (prim) in
                 cont k3 (eq)))
     where k3 (body_result : imm tagged) =

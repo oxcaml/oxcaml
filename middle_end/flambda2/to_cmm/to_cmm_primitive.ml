@@ -1097,8 +1097,10 @@ let binary_int_comp_primitive _env dbg kind cmp x y =
   | Untagged _, Le Unsigned -> C.ule ~dbg x y
   | Untagged _, Gt Unsigned -> C.ugt ~dbg x y
   | Untagged _, Ge Unsigned -> C.uge ~dbg x y
-  | (Tagged _ | Untagged _), Eq -> C.eq ~dbg x y
-  | (Tagged _ | Untagged _), Neq -> C.neq ~dbg x y
+  | Tagged _, Eq -> C.eq_tagged ~dbg x y
+  | Tagged _, Neq -> C.neq_tagged ~dbg x y
+  | Untagged _, Eq -> C.eq ~dbg x y
+  | Untagged _, Neq -> C.neq ~dbg x y
 
 let binary_int_comp_primitive_yielding_int _env dbg _kind
     (signed : P.signed_or_unsigned) x y =

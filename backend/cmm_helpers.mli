@@ -964,6 +964,13 @@ val eq : dbg:Debuginfo.t -> expression -> expression -> expression
     integer (either 0 or 1) to represent the result of the comparison. *)
 val neq : dbg:Debuginfo.t -> expression -> expression -> expression
 
+(** Same as [eq] and [neq], for arguments that are both well-formed tagged
+    immediates (i.e. whose least significant bit is 1). This knowledge is used
+    to simplify comparisons of the form [(x land m) = c]. *)
+val eq_tagged : dbg:Debuginfo.t -> expression -> expression -> expression
+
+val neq_tagged : dbg:Debuginfo.t -> expression -> expression -> expression
+
 val lt : dbg:Debuginfo.t -> expression -> expression -> expression
 
 val le : dbg:Debuginfo.t -> expression -> expression -> expression

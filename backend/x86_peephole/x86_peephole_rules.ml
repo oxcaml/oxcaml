@@ -11,7 +11,8 @@ type peephole_stats =
     mutable remove_redundant_cmp : int;
     mutable remove_redundant_extension : int;
     mutable combine_add_rsp : int;
-    mutable remove_redundant_test : int
+    mutable remove_redundant_test : int;
+    mutable fuse_and_test : int
   }
 
 let create_peephole_stats () =
@@ -19,7 +20,8 @@ let create_peephole_stats () =
     remove_redundant_cmp = 0;
     remove_redundant_extension = 0;
     combine_add_rsp = 0;
-    remove_redundant_test = 0
+    remove_redundant_test = 0;
+    fuse_and_test = 0
   }
 
 let peephole_stats_to_counters stats =
@@ -33,6 +35,7 @@ let peephole_stats_to_counters stats =
   |> Profile.Counters.set "x86_peephole.combine_add_rsp" stats.combine_add_rsp
   |> Profile.Counters.set "x86_peephole.remove_redundant_test"
        stats.remove_redundant_test
+  |> Profile.Counters.set "x86_peephole.fuse_and_test" stats.fuse_and_test
 
 (* Rewrite rule: combine adjacent ADD to RSP with CFI directives. Pattern: addq
    $n1, %rsp; .cfi_adjust_cfa_offset d1; addq $n2, %rsp; .cfi_adjust_cfa_offset
@@ -207,9 +210,54 @@ let remove_redundant_extension stats cell =
     | _, _ -> U.No_match)
   | _ -> U.No_match
 
+(* [and_imm32_clears_sign_bit n] holds when [and $n, %r32] is guaranteed to
+   leave bit 31 of its result clear, i.e. when [0 <= n < 2^31]. The emitter uses
+   the 32-bit form of AND for non-negative immediates because it zero-extends
+   into the full 64-bit register. *)
+let and_imm32_clears_sign_bit n =
+  Int64.compare n 0L >= 0 && Int64.compare n 0x7FFF_FFFFL <= 0
+
+(* Rewrite rule: fuse an AND with an immediate into the TEST that follows it.
+   Pattern: and $n, r; test r, r (where r is a 64-bit register, or a 32-bit
+   register with 0 <= n < 2^31, and r is not read afterwards). Rewrite: test $n,
+   r
+
+   [test $n, r] computes [r & n] and sets ZF, SF and PF from it while clearing
+   CF and OF, exactly as [and $n, r] did (AF is undefined after both); the
+   original [test r, r] then recomputed those same flags from that same value.
+   With a 32-bit destination, the original sequence observed the zero-extended
+   result, whose bit 63 (hence SF) is 0: requiring bit 31 of [n] to be clear
+   guarantees that the 32-bit test also yields SF = 0, while ZF and PF do not
+   depend on the width. The fused instruction no longer writes [r], so the
+   rewrite additionally requires that [r] is never read afterwards. *)
+let fuse_and_test stats cell =
+  match U.get_cells cell 2 with
+  | [cell1; cell2] -> (
+    let[@local] rewrite n dst_arg =
+      DLL.set_value cell2 (Ins (TEST (Imm n, dst_arg)));
+      DLL.delete_curr cell1;
+      stats.fuse_and_test <- stats.fuse_and_test + 1;
+      U.Matched (Some cell2)
+    in
+    match DLL.value cell1, DLL.value cell2 with
+    | ( Ins (AND (Imm n, (Reg64 dst as dst_arg))),
+        Ins (TEST (Reg64 src1, Reg64 src2)) )
+      when equal_reg64 dst src1 && equal_reg64 dst src2
+           && U.reg64_is_never_read dst cell2 ->
+      rewrite n dst_arg
+    | ( Ins (AND (Imm n, (Reg32 dst as dst_arg))),
+        Ins (TEST (Reg64 src1, Reg64 src2)) )
+      when equal_reg64 dst src1 && equal_reg64 dst src2
+           && and_imm32_clears_sign_bit n
+           && U.reg64_is_never_read dst cell2 ->
+      rewrite n dst_arg
+    | _, _ -> U.No_match)
+  | _ -> U.No_match
+
 (* Rewrite rule: remove a TEST made redundant by the preceding instruction.
    Pattern: op src, r; test r, r (where op is one of and/or/xor and r is a
-   64-bit register). Rewrite: op src, r
+   64-bit register, or op is an and with an immediate 0 <= n < 2^31 and r is a
+   32-bit register). Rewrite: op src, r
 
    AND, OR and XOR set ZF, SF and PF according to their result and clear CF and
    OF - exactly the flag state [test r, r] computes from that same value (AF is
@@ -219,17 +267,27 @@ let remove_redundant_extension stats cell =
    rather than clearing them, so extending the rule to them would require
    checking which flags the following instructions read. Both operands are
    restricted to 64-bit registers so that the flag-setting operation and the
-   test have the same width. *)
+   test have the same width; the only exception is [and $n, %r32] with bit 31 of
+   [n] clear, whose zero-extended result has the same ZF, SF (= 0) and PF as its
+   32-bit result. This rule acts as the fallback of [fuse_and_test] for the case
+   where [r] is still read afterwards. *)
 let remove_redundant_test stats cell =
   match U.get_cells cell 2 with
   | [cell1; cell2] -> (
+    let[@local] remove_test () =
+      DLL.delete_curr cell2;
+      stats.remove_redundant_test <- stats.remove_redundant_test + 1;
+      U.Matched (Some cell1)
+    in
     match DLL.value cell1, DLL.value cell2 with
     | ( Ins (AND (_, Reg64 dst) | OR (_, Reg64 dst) | XOR (_, Reg64 dst)),
         Ins (TEST (Reg64 src1, Reg64 src2)) )
       when equal_reg64 dst src1 && equal_reg64 dst src2 ->
-      DLL.delete_curr cell2;
-      stats.remove_redundant_test <- stats.remove_redundant_test + 1;
-      U.Matched (Some cell1)
+      remove_test ()
+    | Ins (AND (Imm n, Reg32 dst)), Ins (TEST (Reg64 src1, Reg64 src2))
+      when equal_reg64 dst src1 && equal_reg64 dst src2
+           && and_imm32_clears_sign_bit n ->
+      remove_test ()
     | _, _ -> U.No_match)
   | _ -> U.No_match
 
@@ -253,6 +311,7 @@ let apply stats cell =
   |> if_no_match
        ~enabled:!Oxcaml_flags.x86_peephole_combine_add_rsp
        combine_add_rsp
+  |> if_no_match ~enabled:!Oxcaml_flags.x86_peephole_fuse_and_test fuse_and_test
   |> if_no_match
        ~enabled:!Oxcaml_flags.x86_peephole_remove_redundant_test
        remove_redundant_test
