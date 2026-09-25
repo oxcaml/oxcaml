@@ -29,23 +29,6 @@
 open Merlin_utils
 open Ocaml_utils.Misc
 open Std
-open Std.Result
-
-let findlib_ok =
-  try Ok (Findlib.init ())
-  with exn ->
-    let message =
-      match exn with
-      | Failure message -> message
-      | exn -> Printexc.to_string exn
-    in
-    (* This is a quick and dirty workaround to get Merlin to work even when
-       findlib directory has been removed. *)
-    begin match Sys.getenv "OCAMLFIND_CONF" with
-    | exception Not_found -> Unix.putenv "OCAMLFIND_CONF" "/dev/null"
-    | _ -> ()
-    end;
-    Error ("Error during findlib initialization: " ^ message)
 
 let { Logger.log } = Logger.for_section "Mconfig_dot"
 
@@ -84,8 +67,6 @@ module Cache = File_cache.Make (struct
           tell (`CMT (String.drop 4 line))
         else if String.is_prefixed ~by:"INDEX " line then
           tell (`INDEX (String.drop 6 line))
-        else if String.is_prefixed ~by:"PKG " line then
-          tell (`PKG (rev_split_words (String.drop 4 line)))
         else if String.is_prefixed ~by:"EXT " line then
           tell (`EXT (rev_split_words (String.drop 4 line)))
         else if String.is_prefixed ~by:"FLG " line then
@@ -112,16 +93,10 @@ module Cache = File_cache.Make (struct
                  "Expected two arguments to UNIT_NAME_FOR directive")
         else if String.is_prefixed ~by:"WRAPPING_PREFIX " line then
           tell (`WRAPPING_PREFIX (String.drop 16 line))
-        else if String.is_prefixed ~by:"FINDLIB " line then
-          tell (`FINDLIB (String.drop 8 line))
         else if String.is_prefixed ~by:"SUFFIX " line then
           tell (`SUFFIX (String.drop 7 line))
         else if String.is_prefixed ~by:"READER " line then
           tell (`READER (List.rev (rev_split_words (String.drop 7 line))))
-        else if String.is_prefixed ~by:"FINDLIB_PATH " line then
-          tell (`FINDLIB_PATH (String.drop 13 line))
-        else if String.is_prefixed ~by:"FINDLIB_TOOLCHAIN " line then
-          tell (`FINDLIB_TOOLCHAIN (String.drop 18 line))
         else if String.is_prefixed ~by:"EXCLUDE_QUERY_DIR" line then
           tell `EXCLUDE_QUERY_DIR
         else if String.is_prefixed ~by:"USE_PPX_CACHE" line then
@@ -183,156 +158,18 @@ let directives_of_files filenames =
   in
   process [] filenames
 
-let ppx_of_package ?(predicates = []) setup pkg =
-  let d = Findlib.package_directory pkg in
-  (* Determine the 'ppx' property: *)
-  let in_words ~comma s =
-    (* splits s in words separated by commas and/or whitespace *)
-    let l = String.length s in
-    let rec split i j =
-      if j < l then
-        match s.[j] with
-        | (' ' | '\t' | '\n' | '\r' | ',') as c when c <> ',' || comma ->
-          if i < j then String.sub s ~pos:i ~len:(j - i) :: split (j + 1) (j + 1)
-          else split (j + 1) (j + 1)
-        | _ -> split i (j + 1)
-      else if i < j then [ String.sub s ~pos:i ~len:(j - i) ]
-      else []
-    in
-    split 0 0
-  in
-  let resolve_path = Findlib.resolve_path ~base:d ~explicit:true in
-  let ppx =
-    try Some (resolve_path (Findlib.package_property predicates pkg "ppx"))
-    with Not_found -> None
-  and ppxopts =
-    try
-      List.map
-        ~f:(fun opt ->
-          match in_words ~comma:true opt with
-          | pkg :: opts -> (pkg, List.map ~f:resolve_path opts)
-          | _ -> assert false)
-        (in_words ~comma:false
-           (Findlib.package_property predicates pkg "ppxopt"))
-    with Not_found -> []
-  in
-  begin match ppx with
-  | None -> ()
-  | Some ppx -> log ~title:"ppx" "%s" ppx
-  end;
-  begin match ppxopts with
-  | [] -> ()
-  | lst ->
-    log ~title:"ppx options" "%a" Logger.json @@ fun () ->
-    let f (ppx, opts) =
-      `List [ `String ppx; `List (List.map ~f:(fun s -> `String s) opts) ]
-    in
-    `List (List.map ~f lst)
-  end;
-  let setup =
-    match ppx with
-    | None -> setup
-    | Some ppx -> Ppxsetup.add_ppx ppx setup
-  in
-  List.fold_left ppxopts ~init:setup ~f:(fun setup (ppx, opts) ->
-      Ppxsetup.add_ppxopts ppx opts setup)
-
-let path_separator =
-  match Sys.os_type with
-  | "Cygwin" | "Win32" -> ";"
-  | _ -> ":"
-
-let set_findlib_path =
-  let findlib_cache = ref ("", [], "") in
-  fun ?(conf = "") ?(path = []) ?(toolchain = "") () ->
-    let key = (conf, path, toolchain) in
-    if key <> !findlib_cache then begin
-      let env_ocamlpath =
-        match path with
-        | [] -> None
-        | path -> Some (String.concat ~sep:path_separator path)
-      and config =
-        match conf with
-        | "" -> None
-        | s -> Some s
-      and toolchain =
-        match toolchain with
-        | "" -> None
-        | s -> Some s
-      in
-      log ~title:"set_findlib_path" "findlib_conf = %s; findlib_path = %s\n"
-        conf
-        (String.concat ~sep:path_separator path);
-      Findlib.init ?env_ocamlpath ?config ?toolchain ();
-      findlib_cache := key
-    end
-
-let standard_library =
-  set_findlib_path ();
-  Findlib.ocaml_stdlib ()
-
-let is_package_optional name =
-  let last = String.length name - 1 in
-  last >= 0 && name.[last] = '?'
-
-let remove_option name =
-  let last = String.length name - 1 in
-  if last >= 0 && name.[last] = '?' then String.sub name ~pos:0 ~len:last
-  else name
-
-let path_of_packages ?conf ?path ?toolchain packages =
-  set_findlib_path ?conf ?path ?toolchain ();
-  let recorded_packages, invalid_packages =
-    List.partition packages ~f:(fun name ->
-        match Findlib.package_directory (remove_option name) with
-        | _ -> true
-        | exception _ -> false)
-  in
-  let failures =
-    match
-      List.filter_map invalid_packages ~f:(fun pkg ->
-          if is_package_optional pkg then (
-            log ~title:"path_of_packages" "Uninstalled package %S" pkg;
-            None)
-          else Some pkg)
-    with
-    | [] -> []
-    | xs -> [ "Failed to load packages: " ^ String.concat ~sep:"," xs ]
-  in
-  let recorded_packages = List.map ~f:remove_option recorded_packages in
-  let packages, failures =
-    match Findlib.package_deep_ancestors [] recorded_packages with
-    | packages -> (packages, failures)
-    | exception exn ->
-      ([], sprintf "Findlib failure: %S" (Printexc.to_string exn) :: failures)
-  in
-  let packages = List.filter_dup packages in
-  let path = List.map ~f:Findlib.package_directory packages in
-  let ppxs = List.fold_left ~f:ppx_of_package packages ~init:Ppxsetup.empty in
-  (path, ppxs, failures)
+let standard_library = "%%STDLIB%%"
 
 type config =
   { pass_forward : Merlin_dot_protocol.Directive.no_processing_required list;
     to_canonicalize :
       (string * Merlin_dot_protocol.Directive.include_path) list;
     stdlib : string option;
-    source_root : string option;
-    packages_to_load : string list;
-    findlib : string option;
-    findlib_path : string list;
-    findlib_toolchain : string option
+    source_root : string option
   }
 
 let empty_config =
-  { pass_forward = [];
-    to_canonicalize = [];
-    stdlib = None;
-    source_root = None;
-    packages_to_load = [];
-    findlib = None;
-    findlib_path = [];
-    findlib_toolchain = None
-  }
+  { pass_forward = []; to_canonicalize = []; stdlib = None; source_root = None }
 
 let prepend_config ~cwd ~cfg =
   List.fold_left ~init:cfg
@@ -353,7 +190,6 @@ let prepend_config ~cwd ~cfg =
         | `UNKNOWN_TAG _
         | `UNIT_NAME_FOR_ERROR _ ) as directive ->
         { cfg with pass_forward = directive :: cfg.pass_forward }
-      | `PKG ps -> { cfg with packages_to_load = ps @ cfg.packages_to_load }
       | `STDLIB path ->
         let canon_path = canonicalize_filename ~cwd path in
         begin match cfg.stdlib with
@@ -364,25 +200,7 @@ let prepend_config ~cwd ~cfg =
         { cfg with stdlib = Some canon_path }
       | `SOURCE_ROOT path ->
         let canon_path = canonicalize_filename ~cwd path in
-        { cfg with source_root = Some canon_path }
-      | `FINDLIB path ->
-        let canon_path = canonicalize_filename ~cwd path in
-        begin match cfg.stdlib with
-        | None -> ()
-        | Some p ->
-          log ~title:"conflicting paths for findlib" "%s\n%s" p canon_path
-        end;
-        { cfg with findlib = Some canon_path }
-      | `FINDLIB_PATH path ->
-        let canon_path = canonicalize_filename ~cwd path in
-        { cfg with findlib_path = canon_path :: cfg.findlib_path }
-      | `FINDLIB_TOOLCHAIN path ->
-        begin match cfg.stdlib with
-        | None -> ()
-        | Some p ->
-          log ~title:"conflicting paths for findlib toolchain" "%s\n%s" p path
-        end;
-        { cfg with findlib_toolchain = Some path })
+        { cfg with source_root = Some canon_path })
 
 let process_one ~cfg { path; directives; _ } =
   let cwd = Filename.dirname path in
@@ -404,14 +222,8 @@ let expand =
 
 let postprocess cfg =
   let stdlib = Option.value ~default:standard_library cfg.stdlib in
-  let pkg_paths, ppxsetup, failures = path_of_packages cfg.packages_to_load in
-  let ppx =
-    match Ppxsetup.command_line ppxsetup with
-    | [] -> []
-    | lst ->
-      let cmd = List.concat_map lst ~f:(fun pp -> [ "-ppx"; pp ]) in
-      [ `FLG cmd ]
-  in
+  let pkg_paths, failures = ([], []) in
+  let ppx = [] in
   List.concat
     [ List.concat_map cfg.to_canonicalize ~f:(fun (dir, directive) ->
           let dirs =
@@ -446,10 +258,7 @@ let load dot_merlin_file =
     List.fold_left directives ~init:empty_config ~f:(fun cfg file ->
         process_one ~cfg file)
   in
-  let directives = postprocess cfg in
-  match (cfg.packages_to_load, findlib_ok) with
-  | [], _ | _, Ok _ -> directives
-  | _, Error msg -> `ERROR_MSG msg :: directives
+  postprocess cfg
 
 let dot_merlin_file = Filename.concat (Sys.getcwd ()) ".merlin"
 
