@@ -132,8 +132,7 @@ two_known_lengths:
   jl    <hidden GC jump pad>
 .L0:
   addq  72(%r14), %rbx
-  addq  $8, %rbx
-  addq  $24, %rbx
+  addq  $32, %rbx
   movabsq $72057594037929747, %rax
   movq  %rax, -8(%rbx)
   leaq  -24(%rbx), %rax

@@ -529,15 +529,15 @@ let unsigned_compare x y = Int64_u.unsigned_compare x y
 [%%expect_asm X86_64{|
 unsigned_compare:
   movabsq $-9223372036854775808, %rdi
-  addq  %rbx, %rdi
-  movabsq $-9223372036854775808, %rbx
-  leaq  (%rax,%rbx), %rsi
-  movq  $-1, %rbx
+  addq  %rdi, %rbx
+  movabsq $-9223372036854775808, %rdi
+  addq  %rax, %rdi
+  movq  $-1, %rsi
   xorl  %eax, %eax
-  cmpq  %rdi, %rsi
+  cmpq  %rbx, %rdi
   setg  %al
-  cmovge %rax, %rbx
-  leaq  1(%rbx,%rbx), %rax
+  cmovge %rax, %rsi
+  leaq  1(%rsi,%rsi), %rax
   ret
 |}]
 
@@ -697,6 +697,9 @@ let and_asr_mask_partial x = Int64_u.logand (Int64_u.shift_right x 48) #0xFFL
 and_asr_mask_partial:
   sarq  $48, %rax
   andl  $255, %eax
+  ret
+|}]
+
 (* Nested additions of constants that do not fit a host [int] *)
 
 let add_add_2_62 x =
@@ -736,9 +739,9 @@ let add_rsub_max_int x =
   Int64_u.add (Int64_u.sub #0x7fffffffffffffffL x) #0x7fffffffffffffffL
 [%%expect_asm X86_64{|
 add_rsub_max_int:
-  movq  $-2, %rbx
-  subq  %rax, %rbx
-  movq  %rbx, %rax
+  movq  %rax, %rbx
+  movq  $-2, %rax
+  subq  %rbx, %rax
   ret
 |}]
 
