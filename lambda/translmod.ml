@@ -297,9 +297,12 @@ let apply_coercion a b c d =
 (* Record the primitive declarations occurring in the module compiled *)
 
 let primitive_declarations = ref ([] : Primitive.description list)
-let record_primitive = function
-  | {val_kind=Val_prim p;val_loc} ->
+let record_primitive (descr : Typedtree.value_description) =
+  match descr.val_val with
+  | {val_kind=Val_prim p; val_loc; val_type; _} ->
       Translprim.check_primitive_arity val_loc p;
+      Typeopt.warn_flat_float_array_in_external
+        descr.val_desc.ctyp_env val_loc p val_type;
       primitive_declarations := p :: !primitive_declarations
   | _ -> ()
 
@@ -795,7 +798,7 @@ and transl_structure ~scopes loc
           in
           mk_lam_let body, repr
       | Tstr_primitive descr ->
-          record_primitive descr.val_val;
+          record_primitive descr;
           transl_structure ~scopes loc fields cc rootpath final_env rem
       | Tstr_type _ ->
           transl_structure ~scopes loc fields cc rootpath final_env rem
@@ -1366,7 +1369,7 @@ let transl_toplevel_item ~scopes item =
                     set_idents (pos + 1) ids) in
       Llet(Strict, Lambda.layout_module, mid, mid_duid, modl, set_idents 0 ids)
   | Tstr_primitive descr ->
-      record_primitive descr.val_val;
+      record_primitive descr;
       lambda_unit
   | Tstr_open od ->
       let pure = pure_module od.open_expr in

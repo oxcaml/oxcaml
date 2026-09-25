@@ -4980,7 +4980,17 @@ let transl_value_decl env loc ~modal ~why valdecl =
 
 let transl_value_decl env ~modal ~why loc valdecl =
   Builtin_attributes.warning_scope valdecl.pval_attributes
-    (fun () -> transl_value_decl env ~modal ~why loc valdecl)
+    (fun () ->
+       let desc, mode, newenv = transl_value_decl env ~modal ~why loc valdecl in
+       (* Record the warning settings in force at this declaration, for
+          diagnostics emitted after typing (see
+          [Typeopt.warn_flat_float_array_in_external]). *)
+       let val_desc =
+         { desc.val_desc with
+           ctyp_env =
+             Env.set_warning_state (Warnings.backup ()) desc.val_desc.ctyp_env }
+       in
+       { desc with val_desc }, mode, newenv)
 
 (* Translate a "with" constraint -- much simplified version of
    transl_type_decl. For a constraint [Sig with t = sdecl],

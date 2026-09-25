@@ -173,6 +173,12 @@ type t =
   | Useless_valpoly                         (* 219 *)
   | Redundant_modality                      (* 220 *)
   | Unused_alert_disable of string          (* 221 *)
+  | Flat_float_array_in_external of string  (* 224 *)
+      (** The type of a C external mentions the given array type, whose element
+          type is [float]: the C code may rely on the flat representation. *)
+  | Maybe_flat_float_array_in_external of string (* 225 *)
+      (** The type of a C external mentions the given array type, whose element
+          type is not known to be [non_float]. *)
 
 type alert = {kind:string; message:string; def:loc; use:loc}
 

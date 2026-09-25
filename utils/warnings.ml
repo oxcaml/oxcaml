@@ -170,6 +170,8 @@ type t =
   | Useless_valpoly                         (* 219 *)
   | Redundant_modality                      (* 220 *)
   | Unused_alert_disable of string          (* 221 *)
+  | Flat_float_array_in_external of string  (* 224 *)
+  | Maybe_flat_float_array_in_external of string (* 225 *)
 
 (* If you remove a warning, leave a hole in the numbering.  NEVER change
    the numbers of existing warnings.
@@ -273,6 +275,8 @@ let number = function
   | Useless_valpoly -> 219
   | Redundant_modality -> 220
   | Unused_alert_disable _ -> 221
+  | Flat_float_array_in_external _ -> 224
+  | Maybe_flat_float_array_in_external _ -> 225
 ;;
 (* DO NOT REMOVE the ;; above: it is used by
    the testsuite/ests/warnings/mnemonics.mll test to determine where
@@ -715,6 +719,18 @@ let descriptions = [
     description = "An attribute disabling an alert did not suppress any\n\
     \    occurrence of that alert.";
     since = since 5 4 };
+  { number = 224;
+    names = ["flat-float-array-in-external"];
+    description = "The type of an external (C stub) mentions an array whose\n\
+    \    element type is [float]: the C code may rely on the flat float\n\
+    \    array representation.";
+    since = since 5 4 };
+  { number = 225;
+    names = ["maybe-flat-float-array-in-external"];
+    description = "The type of an external (C stub) mentions an array whose\n\
+    \    element type is not known to be [non_float]: the C code may\n\
+    \    receive a flat float array.";
+    since = since 5 4 };
 ]
 
 let name_to_number =
@@ -727,6 +743,13 @@ let name_to_number =
 (* Must be the max number returned by the [number] function. *)
 
 let parsed_ocamlparam = ref "<not-set>"
+
+(* Audit warnings that are opt-in only: [+a] (and [+A]) do not enable them,
+   so a file-level [@@@warning "+a..."] does not turn them on. Enable them
+   explicitly, e.g. [-w +224+225] or [-w +flat-float-array-in-external]. *)
+let opt_in_only =
+  [ number (Flat_float_array_in_external "");
+    number (Maybe_flat_float_array_in_external "") ]
 
 (* CR-soon xclerc for xclerc: remove the `for_debug` parameter... *)
 let letter for_debug = function
@@ -1097,7 +1120,16 @@ let parse_opt error active errflag s =
           | None -> if c = lc then Clear else Set
           | Some m -> m
         in
-        List.iter (action modifier) (letter s lc)
+        let numbers = letter s lc in
+        let numbers =
+          (* [+a] / [+A] do not enable opt-in warnings; they must be named
+             explicitly. [-a] still disables them. *)
+          match modifier with
+          | Set | Set_all when lc = 'a' ->
+              List.filter (fun n -> not (List.mem n opt_in_only)) numbers
+          | Set | Set_all | Clear -> numbers
+        in
+        List.iter (action modifier) numbers
     | Num(n1,n2,modifier) ->
         for n = n1 to Misc.Stdlib.Int.min n2 last_warning_number do action modifier n done
   in
@@ -1127,7 +1159,7 @@ let parse_options errflag s =
   alerts
 
 (* If you change these, don't forget to change them in man/ocamlc.m *)
-let defaults_w = "+a-4-7-9-27-29-30-32..42-44-45-48-50-60-66..70-74-221"
+let defaults_w = "+a-4-7-9-27-29-30-32..42-44-45-48-50-60-66..70-74-221-224-225"
 let defaults_warn_error = "-a"
 let default_disabled_alerts = [ "unstable"; "unsynchronized_access" ]
 
@@ -1618,6 +1650,26 @@ let message = function
       msg "This attribute disables alert %a,@ \
            but it did not suppress any occurrence of the alert."
         Style.inline_code name
+  | Flat_float_array_in_external ty ->
+      msg "The type of this external mentions %a, a flat float array.@ \
+           If the C code reads or writes the array, it relies on the flat@ \
+           float array representation.@ \
+           Hint: use %a with the %a macros to keep a flat@ \
+           representation, or make the stub representation-agnostic@ \
+           (%a with %a)."
+        Style.inline_code ty
+        Style.inline_code "floatarray"
+        Style.inline_code "Double_flat_field"
+        Style.inline_code "Double_array_field"
+        Style.inline_code "CAMLparam/CAMLlocal"
+  | Maybe_flat_float_array_in_external ty ->
+      msg "The type of this external mentions %a, whose element type is not@ \
+           known to be non-float: the C code may receive a flat float array.@ \
+           Hint: annotate the element type with %a if it cannot be a float,@ \
+           or check %a in the stub."
+        Style.inline_code ty
+        Style.inline_code "value mod non_float"
+        Style.inline_code "Tag_val(v) == Double_array_tag"
 ;;
 
 let nerrors = ref 0

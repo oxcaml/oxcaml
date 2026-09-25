@@ -400,6 +400,78 @@ let array_kind_of_elt env loc ty =
   | Void ->
     raise (Error (loc, Unsupported_void_in_array))
 
+(* Translation runs after typing has restored the surrounding warning scope.
+   Report [mk ty] under the warning settings that were in force at the
+   declaration [env] was recorded from (see [Typedecl.transl_value_decl]). *)
+let warn_with_env_state env loc mk ty =
+  let report () =
+    if Warnings.is_active (mk "") then
+      Location.prerr_warning loc
+        (mk (Format.asprintf "%a" Printtyp.type_expr ty))
+  in
+  match Env.warning_state env with
+  | None -> report ()
+  | Some state -> Warnings.with_state state report
+
+(* Warnings 224 and 225: the type of a C external mentions an [array] or
+   [iarray] whose elements are [float] (224) or not known to be [non_float]
+   (225). The compiler makes no representation decision here; this is a hint
+   that the C code may read or write a flat float array (or, after the
+   optimization is removed, wrongly assume one).
+
+   The type is searched structurally after expanding abbreviations, so
+   [float array option] and [type fa = float array] are found, but arrays
+   hidden behind abstract types or record fields are not. [%]-primitives are
+   skipped: they are implemented by the compiler, not by C code.
+
+   Unlike [array_kind_of_elt], the classification does not depend on
+   [Config.flat_float_array]: the question is what the C code may assume,
+   not what this compiler does. *)
+type flat_float_array_status = Always_float | Maybe_float | Never_float
+
+let flat_float_array_status env ty =
+  let ty = match scrape_ty env ty with Some ty -> ty | None -> ty in
+  match get_desc ty with
+  | Tconstr (p, _, _) when Path.same p Predef.path_float -> Always_float
+  | _ ->
+    if Ctype.check_type_separability env ty Non_float then Never_float
+    else Maybe_float
+
+let warn_flat_float_array_in_external env loc (prim : Primitive.description)
+      ty =
+  let is_c_stub =
+    String.length prim.prim_name > 0 && prim.prim_name.[0] <> '%'
+  in
+  (* No early [Warnings.is_active] check here: whether the warnings are on is
+     decided under the declaration's own warning state, in
+     [warn_with_env_state]. *)
+  if is_c_stub then begin
+    let visited = ref Btype.TypeSet.empty in
+    let rec go ty =
+      let ty = Ctype.expand_head_opt env ty in
+      if not (Btype.TypeSet.mem ty !visited) then begin
+        visited := Btype.TypeSet.add ty !visited;
+        begin match get_desc ty with
+        | Tconstr (p, [elt], _)
+          when Path.same p Predef.path_array
+            || Path.same p Predef.path_iarray ->
+          begin match flat_float_array_status env elt with
+          | Always_float ->
+            warn_with_env_state env loc
+              (fun s -> Warnings.Flat_float_array_in_external s) ty
+          | Maybe_float ->
+            warn_with_env_state env loc
+              (fun s -> Warnings.Maybe_flat_float_array_in_external s) ty
+          | Never_float -> ()
+          end
+        | _ -> ()
+        end;
+        Btype.iter_type_expr go (fun _mode -> ()) ty
+      end
+    in
+    go ty
+  end
+
 let array_type_kind ~elt_ty env loc ty =
   match scrape_poly env ty with
   | Some (Tconstr(p, [elt_ty], _))

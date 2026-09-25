@@ -34,6 +34,11 @@ val array_type_kind :
 val array_type_mut : Env.t -> Types.type_expr -> Lambda.mutable_flag
 val array_kind_of_elt :
   Env.t -> Location.t -> Types.type_expr -> Lambda.array_kind
+
+(* Emit warnings 224/225 if the type of a C external mentions an array whose
+   element type is [float] or not known to be [non_float]. *)
+val warn_flat_float_array_in_external :
+  Env.t -> Location.t -> Primitive.description -> Types.type_expr -> unit
 val array_kind : Typedtree.expression -> Lambda.array_kind
 val array_pattern_kind : Typedtree.pattern -> Lambda.array_kind
 

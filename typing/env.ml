@@ -682,7 +682,8 @@ type t = {
   implicit_jkinds: jkind_lr loc String.Map.t;
   flags: int;
   stage: stage;
-  persistent_scope: int
+  persistent_scope: int;
+  warning_state: Warnings.state option
 }
 
 and module_components =
@@ -996,8 +997,16 @@ let empty = {
   functor_args = Ident.empty;
   jkinds = IdTbl.empty;
   stage = 0;
-  persistent_scope = Ident.lowest_scope
+  persistent_scope = Ident.lowest_scope;
+  warning_state = None
  }
+
+let set_warning_state state env =
+  match env.warning_state with
+  | Some previous when previous == state -> env
+  | None | Some _ -> { env with warning_state = Some state }
+
+let warning_state env = env.warning_state
 
 let path_at_current_stage env path = { StagedPath.stage = env.stage; path }
 
@@ -4314,6 +4323,7 @@ let add_components slot root env0 comps (locks : locks) =
     flags = env0.flags;
     stage = env0.stage;
     persistent_scope = env0.persistent_scope;
+    warning_state = env0.warning_state;
   }
 
 let open_signature_by_path path env0 =
@@ -5061,6 +5071,7 @@ let keep_only_summary env =
        local_constraints = env.local_constraints;
        local_constraints_update_count = env.local_constraints_update_count;
        flags = env.flags;
+       warning_state = env.warning_state;
       }
     in
     last_env := env;
@@ -5075,6 +5086,7 @@ let env_of_only_summary env_from_summary env =
     local_constraints = env.local_constraints;
     local_constraints_update_count = env.local_constraints_update_count;
     flags = env.flags;
+    warning_state = env.warning_state;
   }
 
 (* Forward declartions that must refer to type t *)

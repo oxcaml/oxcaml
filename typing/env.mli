@@ -73,6 +73,10 @@ type t
 
 val empty: t
 
+(** Warning settings saved during typing for diagnostics emitted later. *)
+val set_warning_state : Warnings.state -> t -> t
+val warning_state : t -> Warnings.state option
+
 (* This environment is lazy so that it may depend on the enabled extensions,
    typically adjusted via command line flags.  If extensions are changed after
    theis environment is forced, they may be inaccurate.  This could happen, for
