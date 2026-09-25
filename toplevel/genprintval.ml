@@ -842,7 +842,9 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         match rep with
         | Outval_record_unboxed -> tree_of_val (depth - 1) obj ty_arg
         | Outval_record_immediate ->
-            (* an immediate constructor's fields are all void *)
+            (* an immediate constructor's fields are all void. (This is
+               unreachable due to eager sort checks elsewhere in the file, and
+               should be fixed once we print concrete unboxed values) *)
             Oval_stuff "<void>"
         | Outval_record_boxed ->
             nested
