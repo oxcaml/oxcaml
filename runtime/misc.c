@@ -24,9 +24,6 @@
 #include "caml/misc.h"
 #include "caml/memory.h"
 #include "caml/osdeps.h"
-#include "caml/domain.h"
-#include "caml/startup.h"
-#include "caml/startup_aux.h"
 
 _Atomic caml_timing_hook caml_major_slice_begin_hook = (caml_timing_hook)NULL;
 _Atomic caml_timing_hook caml_major_slice_end_hook = (caml_timing_hook)NULL;

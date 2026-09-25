@@ -22,15 +22,10 @@
 #include "caml/camlatomic.h"
 #include "caml/alloc.h"
 #include "caml/fail.h"
-#include "caml/gc.h"
-#include "caml/interp.h"
-#include "caml/major_gc.h"
 #include "caml/memory.h"
-#include "caml/minor_gc.h"
 #include "caml/misc.h"
 #include "caml/mlvalues.h"
 #include "caml/platform.h"
-#include "caml/prims.h"
 #include "caml/signals.h"
 
 static int obj_tag (value arg)

@@ -32,12 +32,10 @@
 #include "caml/misc.h"
 #include "caml/mlvalues.h"
 #include "caml/platform.h"
-#include "caml/roots.h"
 #include "caml/signals.h"
 #include "caml/sys.h"
 #include "caml/memprof.h"
 #include "caml/finalise.h"
-#include "caml/printexc.h"
 #ifdef __linux__
 #include <sys/auxv.h>
 #include <linux/auxvec.h>
