@@ -104,8 +104,8 @@ Line 2, characters 0-16:
 2 | type !'a u = int
     ^^^^^^^^^^^^^^^^
 Error: In this definition, expected parameter variances are not satisfied.
-       The 1st type parameter was expected to be injective invariant,
-       but it is unrestricted.
+       The 1st type parameter was expected to be injective,
+       but it is noninjective.
 |}]
 type !'a t = private 'a list
 type !'a t = private int
@@ -115,8 +115,8 @@ Line 2, characters 0-24:
 2 | type !'a t = private int
     ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In this definition, expected parameter variances are not satisfied.
-       The 1st type parameter was expected to be injective invariant,
-       but it is unrestricted.
+       The 1st type parameter was expected to be injective,
+       but it is noninjective.
 |}]
 
 (* Can also use to add injectivity in private row types *)
@@ -189,8 +189,8 @@ Line 1, characters 0-58:
 1 | type !'a t = private 'b constraint 'a = < b : 'b; c : 'c > (* KO *)
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In this definition, expected parameter variances are not satisfied.
-       The 1st type parameter was expected to be injective invariant,
-       but it is unrestricted.
+       The 1st type parameter was expected to be injective,
+       but it is noninjective.
 |}]
 
 (* Injective bivariance in a signature is respected in its structures *)
@@ -257,8 +257,8 @@ Line 2, characters 2-50:
 2 |   type !'a u = 'b X.t constraint 'a = <b : 'b X.t>
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In this definition, expected parameter variances are not satisfied.
-       The 1st type parameter was expected to be injective invariant,
-       but it is unrestricted.
+       The 1st type parameter was expected to be injective,
+       but it is noninjective.
 |}]
 module F(X : sig type 'a t end) = struct
   type !'a u = 'b constraint 'a = <b : _ X.t as 'b>
@@ -272,8 +272,8 @@ Line 2, characters 2-51:
 2 |   type !'a u = 'b constraint 'a = <b : _ X.t as 'b>
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In this definition, expected parameter variances are not satisfied.
-       The 1st type parameter was expected to be injective invariant,
-       but it is unrestricted.
+       The 1st type parameter was expected to be injective,
+       but it is noninjective.
 |}]
 
 (* Motivating examples with GADTs *)
@@ -445,8 +445,8 @@ Line 1, characters 19-47:
 1 | module rec R : sig type !'a t = [ `A of 'a S.t] end = R
                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In this definition, expected parameter variances are not satisfied.
-       The 1st type parameter was expected to be injective invariant,
-       but it is invariant.
+       The 1st type parameter was expected to be injective,
+       but it is noninjective.
 |}]
 
 (* The parameter of R.t is never used, so we can build an equality witness
@@ -492,8 +492,8 @@ Line 3, characters 2-35:
 3 |   type !'a t = private [`T of 'a t]
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In this definition, expected parameter variances are not satisfied.
-       The 1st type parameter was expected to be injective invariant,
-       but it is invariant.
+       The 1st type parameter was expected to be injective,
+       but it is noninjective.
 |}]
 
 module Priv2 :
@@ -513,6 +513,6 @@ Line 3, characters 2-31:
 3 |   type !'a t = private <m:'a t>
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In this definition, expected parameter variances are not satisfied.
-       The 1st type parameter was expected to be injective invariant,
-       but it is invariant.
+       The 1st type parameter was expected to be injective,
+       but it is noninjective.
 |}]
