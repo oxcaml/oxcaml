@@ -627,3 +627,13 @@ bytes_get_int64_bswap:
   bswap %rax
   ret
 |}]
+
+external get16 : string -> int -> int = "%caml_string_get16u"
+
+(* Untagging a 16-bit load masked to 16 bits. *)
+let untag_masked_u16 (s : string) = Int64_u.of_int (get16 s 0 land 0xffff)
+[%%expect_asm X86_64{|
+untag_masked_u16:
+  movzwq (%rax), %rax
+  ret
+|}]
