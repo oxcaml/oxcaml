@@ -143,6 +143,17 @@ let bad (x : b8) : b8 = magic_to_addressable x
 Line 1, characters 24-46:
 1 | let bad (x : b8) : b8 = magic_to_addressable x
                             ^^^^^^^^^^^^^^^^^^^^^^
+Error:
+       The layout of b8 is bits8
+         because of the definition of b8 at line 3, characters 0-15.
+       But the layout of b8 must be a sublayout of bits8 addressable
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
+|}, Principal{|
+Line 1, characters 24-46:
+1 | let bad (x : b8) : b8 = magic_to_addressable x
+                            ^^^^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "('a : bits8 addressable)"
        but an expression was expected of type "b8"
        The layout of b8 is bits8
@@ -157,6 +168,17 @@ Error: This expression has type "('a : bits8 addressable)"
    [bits64], which does not unify with [b8a]'s [bits8 addressable] *)
 let bad (x : int64_u) : b8a = magic_to_addressable x
 [%%expect{|
+Line 1, characters 30-52:
+1 | let bad (x : int64_u) : b8a = magic_to_addressable x
+                                  ^^^^^^^^^^^^^^^^^^^^^^
+Error:
+       The layout of b8a is bits8 addressable
+         because of the definition of b8a at line 1, characters 0-28.
+       But the layout of b8a must be a sublayout of bits64
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
+|}, Principal{|
 Line 1, characters 30-52:
 1 | let bad (x : int64_u) : b8a = magic_to_addressable x
                                   ^^^^^^^^^^^^^^^^^^^^^^

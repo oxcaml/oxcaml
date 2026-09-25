@@ -539,6 +539,15 @@ let test2 : type a. a t -> a option = fun x ->
   !u
 ;; (* fails because u : (int | a) option ref *)
 [%%expect{|
+Line 4, characters 47-48:
+4 |   begin match x with Int -> u := Some 1; r := !u end;
+                                                   ^
+Error: The value "u" has type "int option ref"
+       but an expression was expected of type "a option ref"
+       Type "int" is not compatible with type "a" = "int"
+       This instance of "int" is ambiguous:
+       it would escape the scope of its equation
+|}, Principal{|
 Line 4, characters 46-48:
 4 |   begin match x with Int -> u := Some 1; r := !u end;
                                                   ^^

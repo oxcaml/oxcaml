@@ -85,11 +85,10 @@ let fail = Or_null.This (Or_null.This 5)
 Line 1, characters 24-40:
 1 | let fail = Or_null.This (Or_null.This 5)
                             ^^^^^^^^^^^^^^^^
-Error: This constructor has type "'a Or_null.t" = "'a or_null"
-       but an expression was expected of type "('b : value)"
-       The layout of 'a Or_null.t is value_or_null
+Error:
+       The layout of int Or_null.t is value_or_null
          because it is the primitive type or_null.
-       But the layout of 'a Or_null.t must be a sublayout of value
+       But the layout of int Or_null.t must be a sublayout of value
          because of the definition of t at line 2, characters 2-79.
 |}]
 
@@ -106,11 +105,10 @@ module Or_null :
 Line 4, characters 24-40:
 4 | let fail = Or_null.This (Or_null.This 5)
                             ^^^^^^^^^^^^^^^^
-Error: This constructor has type "'a Or_null.t" = "'a or_null"
-       but an expression was expected of type "('b : value)"
-       The layout of 'a Or_null.t is value_or_null
+Error:
+       The layout of int Or_null.t is value_or_null
          because it is the primitive type or_null.
-       But the layout of 'a Or_null.t must be a sublayout of value
+       But the layout of int Or_null.t must be a sublayout of value
          because of the definition of t at line 2, characters 2-45.
 |}]
 
@@ -170,11 +168,10 @@ module Or_null :
 Line 4, characters 24-40:
 4 | let fail = Or_null.This (Or_null.This 5)
                             ^^^^^^^^^^^^^^^^
-Error: This constructor has type "'a Or_null.t" = "'a or_null"
-       but an expression was expected of type "('b : value_maybe_separable)"
-       The layout of 'a Or_null.t is value_or_null
+Error:
+       The layout of int Or_null.t is value_or_null
          because it is the primitive type or_null.
-       But the layout of 'a Or_null.t must be a sublayout of
+       But the layout of int Or_null.t must be a sublayout of
            value_maybe_separable
          because of the definition of t at line 2, characters 2-63.
 |}]
