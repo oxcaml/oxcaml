@@ -802,6 +802,7 @@
    (func $bigarray_hash (param $vba (ref eq)) (result i32)
       (local $b (ref $bigarray))
       (local $h i32) (local $len i32) (local $i i32) (local $w i32)
+      (local $l i64)
       (local $view (ref extern))
       (local.set $b (ref.cast (ref $bigarray) (local.get $vba)))
       (local.set $view (struct.get $bigarray $ba_view (local.get $b)))
@@ -817,10 +818,38 @@
               (block $float16
                (@if $portable-int
                (@then
-                  (br_table $float32 $float64 $int8 $int8 $int16 $int16
-                            $int32 $int64 $int64 $int64
-                            $complex32 $complex64 $int8 $float16
-                     (struct.get_u $bigarray $ba_kind (local.get $b))))
+                  (block $intnat
+                     (br_table $float32 $float64 $int8 $int8 $int16 $int16
+                               $int32 $int64 $intnat $intnat
+                               $complex32 $complex64 $int8 $float16
+                        (struct.get_u $bigarray $ba_kind (local.get $b))))
+                  ;; int and nativeint: 64-bit elements, hashed like
+                  ;; caml_hash_mix_intnat so that small values hash as on
+                  ;; 32-bit targets
+                  (local.set $len (i32.shl (local.get $len) (i32.const 3)))
+                  (if (i32.gt_u (local.get $len) (i32.const 512))
+                     (then (local.set $len (i32.const 512))))
+                  (loop $loop
+                     (if (i32.lt_u (local.get $i) (local.get $len))
+                        (then
+                           (local.set $l
+                              (call $dv_get_i64
+                                 (local.get $view)
+                                 (local.get $i)
+                                 (global.get $littleEndian)))
+                           (local.set $h
+                              (call $caml_hash_mix_int (local.get $h)
+                                 (i32.wrap_i64
+                                    (i64.xor
+                                       (i64.xor
+                                          (i64.shr_s (local.get $l)
+                                             (i64.const 32))
+                                          (i64.shr_s (local.get $l)
+                                             (i64.const 63)))
+                                       (local.get $l)))))
+                           (local.set $i (i32.add (local.get $i) (i32.const 8)))
+                           (br $loop))))
+                  (return (local.get $h)))
                (@else
                (br_table $float32 $float64 $int8 $int8 $int16 $int16
                          $int32 $int64 $int32 $int32
