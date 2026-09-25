@@ -30,5 +30,5 @@ let functorize input_module_names target =
     ~impl_ext:"cmo"
     ~read_format:(fun f ->
       let cmo = Cmo_io.read_cmo f in
-      cmo.cu_format, cmo.cu_arg_descr)
+      cmo.cu_format)
     ~compile_program:Compile.emit_lambda_program

@@ -688,7 +688,7 @@ val save_signature_with_imports:
 
 (** See [Persistent_env.find_import]. *)
 val find_import:
-  chain:Compilation_unit.Name.t list ->
+  chain:Global_module.t list ->
   Compilation_unit.Name.t ->
   Compilation_unit.t option
   * Global_module.Parameter_name.t list
@@ -727,10 +727,11 @@ val register_import_as_opaque: Compilation_unit.Name.t -> unit
    -as-parameter *)
 val is_parameter_unit: Global_module.Name.t -> bool
 
-(* [implemented_parameter md] is the argument given to -as-argument-for when
-   [md] was compiled *)
+(* [implemented_parameter md] is the [Types.arg_for] recorded when [md] was
+   compiled with -as-argument-for *)
 val implemented_parameter:
-  Global_module.Name.t -> Global_module.Parameter_name.t option
+  chain:Global_module.t list ->
+  Compilation_unit.Name.t -> Types.arg_for option
 
 (* [is_imported_parameter md] is true if [md] has been imported and is a
    parameter to this module *)
@@ -765,7 +766,7 @@ type error =
   | Unsupported_inside_quotation of Location.t * no_open_quotations_context
   | Cmi_not_found of
       { modname : Compilation_unit.Name.t;
-        chain : Compilation_unit.Name.t list;
+        chain : Global_module.t list;
             (** Dependency chain leading to [modname], in reversed order
                 (most-recent loader first). *)
       }

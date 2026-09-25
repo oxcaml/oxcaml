@@ -78,7 +78,6 @@ let cmx_bundle ~quoted_cmx =
       let raw_info : Cmx_format.unit_infos_raw =
         { uir_unit = info.ui_unit;
           uir_defines = info.ui_defines;
-          uir_arg_descr = info.ui_arg_descr;
           uir_imports_cmi = Array.of_list info.ui_imports_cmi;
           uir_imports_cmx = Array.of_list info.ui_imports_cmx;
           uir_quoted_cmi = Array.of_list info.ui_quoted_cmi;

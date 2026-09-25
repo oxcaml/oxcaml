@@ -25,7 +25,6 @@ val instance:
   compilation_unit:Compilation_unit.t ->
   runtime_args:Translmod.runtime_arg list ->
   main_module_block_repr:Lambda.module_representation ->
-  arg_descr:Lambda.arg_descr option ->
   keep_symbol_tables:bool -> unit
 
 (** {2 Internal functions} **)
@@ -33,10 +32,8 @@ val instance:
 val to_bytecode :
   Compile_common.info ->
   Typedtree.implementation ->
-  as_arg_for:Global_module.Parameter_name.t option ->
   Instruct.instruction list * Compilation_unit.Set.t *
-    Lambda.main_module_block_format *
-    Lambda.arg_descr option
+    Lambda.main_module_block_format
 (** [to_bytecode info typed] takes a typechecked implementation
     and returns its bytecode.
 *)
@@ -44,8 +41,7 @@ val to_bytecode :
 val emit_bytecode :
   Compile_common.info ->
   Instruct.instruction list * Compilation_unit.Set.t *
-    Lambda.main_module_block_format *
-    Lambda.arg_descr option ->
+    Lambda.main_module_block_format ->
     unit
 (** [emit_bytecode bytecode] output the bytecode executable. *)
 

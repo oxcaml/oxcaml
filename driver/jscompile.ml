@@ -29,14 +29,7 @@ let interface ~source_file ~output_prefix =
 
 (** Js_of_ocaml IR compilation backend for .ml files. *)
 
-let make_arg_descr ~param ~arg_block_idx : Lambda.arg_descr option =
-  match (param, arg_block_idx) with
-  | Some arg_param, Some arg_block_idx -> Some { arg_param; arg_block_idx }
-  | None, None -> None
-  | Some _, None -> Misc.fatal_error "No argument field"
-  | None, Some _ -> Misc.fatal_error "Unexpected argument field"
-
-let tlambda_to_jsir i tlambda ~as_arg_for =
+let tlambda_to_jsir i tlambda =
   tlambda
   |> Profile.(record ~accumulate:true generate)
        (fun (program : Lambda.program) ->
@@ -51,11 +44,7 @@ let tlambda_to_jsir i tlambda ~as_arg_for =
          |> Simplif.simplify_lambda ~restrict_to_upstream_dwarf:true
               ~gdwarf_may_alter_codegen:false
          |> print_if i.ppf_dump Clflags.dump_lambda Printlambda.lambda
-         |> fun lambda ->
-         let arg_descr =
-           make_arg_descr ~param:as_arg_for ~arg_block_idx:program.arg_block_idx
-         in
-         lambda |> fun code ->
+         |> fun code ->
          Flambda2.lambda_to_flambda ~machine_width:Thirty_two_no_gc_tag_bit
            ~ppf_dump:i.ppf_dump
            ~prefixname:(Unit_info.prefix i.target)
@@ -72,7 +61,7 @@ let tlambda_to_jsir i tlambda ~as_arg_for =
                     (fun _ _ -> "")
                     jsir.program)
          in
-         (jsir, program.main_module_block_format, arg_descr, static_data))
+         (jsir, program.main_module_block_format, static_data))
 
 let emit_jsir i
     ({ program; imported_compilation_units } :
@@ -93,8 +82,7 @@ let emit_jsir i
       in
       output_value oc cmj_body)
 
-let to_jsir i Typedtree.{ structure; coercion; argument_interface; _ }
-    ~as_arg_for =
+let to_jsir i Typedtree.{ structure; coercion; argument_interface; _ } =
   let argument_coercion =
     match argument_interface with
     | Some { ai_coercion_from_primary; ai_signature = _ } ->
@@ -107,12 +95,10 @@ let to_jsir i Typedtree.{ structure; coercion; argument_interface; _ }
     |> Profile.(record transl)
          (Translmod.transl_implementation ~loc i.module_name)
   in
-  let jsir, main_module_block_format, arg_descr, static_data =
-    tlambda_to_jsir i tlambda ~as_arg_for
-  in
+  let jsir, main_module_block_format, static_data = tlambda_to_jsir i tlambda in
   Compilenv.save_unit_info
     (Unit_info.Artifact.filename (Unit_info.cmjx i.target))
-    ~main_module_block_format ~arg_descr ~static_data;
+    ~main_module_block_format ~static_data;
   jsir
 
 type starting_point =
@@ -120,7 +106,6 @@ type starting_point =
   | Instantiation of {
       runtime_args : Translmod.runtime_arg list;
       main_module_block_repr : Lambda.module_representation;
-      arg_descr : Lambda.arg_descr option;
     }
 
 let starting_point_of_compiler_pass start_from =
@@ -142,45 +127,30 @@ let implementation_aux ~start_from ~source_file ~output_prefix
   | Parsing ->
       let backend info typed =
         Compilenv.reset info.target;
-        let as_arg_for =
-          !Clflags.as_argument_for
-          |> Option.map Global_module.Parameter_name.of_string
-        in
-        let jsir = to_jsir info typed ~as_arg_for in
+        let jsir = to_jsir info typed in
         emit_jsir info jsir
       in
       Compile_common.implementation ~hook_parse_tree:Fun.id
         ~hook_typed_tree:ignore info ~backend
-  | Instantiation { runtime_args; main_module_block_repr; arg_descr } ->
+  | Instantiation { runtime_args; main_module_block_repr } ->
       (match !Clflags.as_argument_for with
       | Some _ ->
           (* CR lmaurer: Needs nicer error message (this is a user error) *)
           Misc.fatal_error
             "-as-argument-for is not allowed (and not needed) with -instantiate"
       | None -> ());
-      let as_arg_for, arg_block_idx =
-        match (arg_descr : Lambda.arg_descr option) with
-        | Some { arg_param; arg_block_idx } ->
-            (Some arg_param, Some arg_block_idx)
-        | None -> (None, None)
-      in
       Compilenv.reset info.target;
       let impl =
         Translmod.transl_instance info.module_name ~runtime_args
-          ~main_module_block_repr ~arg_block_idx
+          ~main_module_block_repr
       in
-      let jsir, main_module_block_format, arg_descr_computed, static_data =
-        tlambda_to_jsir info impl ~as_arg_for
+      let jsir, main_module_block_format, static_data =
+        tlambda_to_jsir info impl
       in
       emit_jsir info jsir;
       Compilenv.save_unit_info
         (Unit_info.Artifact.filename (Unit_info.cmx info.target))
-        ~main_module_block_format
-        ~arg_descr:
-          (match arg_descr with
-          | None -> arg_descr_computed
-          | Some _ -> arg_descr)
-        ~static_data
+        ~main_module_block_format ~static_data
 
 let implementation ~start_from ~source_file ~output_prefix ~keep_symbol_tables =
   let start_from = start_from |> starting_point_of_compiler_pass in
@@ -188,9 +158,7 @@ let implementation ~start_from ~source_file ~output_prefix ~keep_symbol_tables =
     ~compilation_unit:Inferred_from_output_prefix
 
 let instance ~source_file ~output_prefix ~compilation_unit ~runtime_args
-    ~main_module_block_repr ~arg_descr ~keep_symbol_tables =
-  let start_from =
-    Instantiation { runtime_args; main_module_block_repr; arg_descr }
-  in
+    ~main_module_block_repr ~keep_symbol_tables =
+  let start_from = Instantiation { runtime_args; main_module_block_repr } in
   implementation_aux ~start_from ~source_file ~output_prefix ~keep_symbol_tables
     ~compilation_unit:(Exactly compilation_unit)
