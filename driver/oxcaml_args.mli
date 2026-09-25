@@ -76,6 +76,7 @@ module type Oxcaml_options = sig
   val experimental_optimizations : unit -> unit
   val reorder_blocks_random : int -> unit
   val module_entry_functions_section : unit -> unit
+  val jump_table_sections : unit -> unit
   val dasm_comments : unit -> unit
   val dno_asm_comments : unit -> unit
   val heap_reduction_threshold : int -> unit

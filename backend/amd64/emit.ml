@@ -800,6 +800,23 @@ type jump_table =
 
 let jump_tables = ref ([] : jump_table list)
 
+(* With [-jump-table-sections], the jump tables of each function emitted so far,
+   latest function first. Each function's tables get their own section, so that
+   the linker can discard them along with the function. *)
+let function_jump_tables = ref ([] : (string * jump_table list) list)
+
+let jump_table_sections () =
+  !Oxcaml_flags.jump_table_sections && !Clflags.function_sections
+
+let emit_jump_table_section func_name =
+  let name =
+    Printf.sprintf ".text.caml.%s.jump_tables" (emit_symbol func_name)
+  in
+  D.switch_to_section_raw ~names:[name] ~flags:(Some "ax") ~args:["@progbits"]
+    ~is_delayed:false;
+  Emitaux.enter_code_section name;
+  D.unsafe_set_internal_section_ref Text
+
 let emit_jump_table t =
   D.define_label t.table_lbl;
   for i = 0 to Array.length t.elems - 1 do
@@ -807,12 +824,11 @@ let emit_jump_table t =
     D.between_labels_32_bit ~upper ~lower:t.table_lbl ()
   done
 
-let emit_jump_tables () =
+let emit_jump_tables tables =
   I.ud2 ();
   (* data in text below *)
   D.align ~fill:Nop ~bytes:4;
-  List.iter emit_jump_table !jump_tables;
-  jump_tables := []
+  List.iter emit_jump_table tables
 
 (* Names for instructions *)
 
@@ -2872,7 +2888,12 @@ let fundecl fundecl =
   | None -> ());
   D.comment ("LLVM-MCA-END " ^ !function_name);
   D.cfi_endproc ();
-  emit_function_type_and_size fundecl_sym
+  emit_function_type_and_size fundecl_sym;
+  if jump_table_sections () && not (Misc.Stdlib.List.is_empty !jump_tables)
+  then (
+    function_jump_tables
+      := (fundecl.fun_name, !jump_tables) :: !function_jump_tables;
+    jump_tables := [])
 
 (* Emission of data *)
 
@@ -3232,8 +3253,18 @@ let end_assembly () =
     List.iter (fun (cst, lbl) -> emit_vec512_constant cst lbl) !vec512_constants);
   (* Emit probe handler wrappers *)
   List.iter emit_probe_handler_wrapper (Probe_emission.get_probes ());
-  emit_named_text_section (Cmm_helpers.make_symbol "jump_tables");
-  emit_jump_tables ();
+  if jump_table_sections ()
+  then
+    List.iter
+      (fun (fun_name, tables) ->
+        emit_jump_table_section fun_name;
+        emit_jump_tables tables)
+      (List.rev !function_jump_tables)
+  else (
+    emit_named_text_section (Cmm_helpers.make_symbol "jump_tables");
+    emit_jump_tables !jump_tables);
+  jump_tables := [];
+  function_jump_tables := [];
   let code_end = Cmm_helpers.make_symbol "code_end" in
   emit_named_text_section code_end;
   if is_macosx system then I.nop ();
