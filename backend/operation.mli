@@ -181,7 +181,12 @@ type t =
   | Alloc of
       { bytes : int;
         dbginfo : Cmm.alloc_dbginfo;
-        mode : Cmm.Alloc_mode.t
+        mode : Cmm.Alloc_mode.t;
+        offset : int
+            (** The result points [offset] bytes past the first field of the
+                allocated region. It is zero except for allocations combined
+                by [Cfg_comballoc], whose first block is at the top of the
+                region. *)
       }
 
 val is_pure : t -> bool

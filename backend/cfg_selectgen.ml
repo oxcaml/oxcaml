@@ -372,7 +372,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       in
       ( SU.basic_op
           (Alloc
-             { bytes = 0; dbginfo = [placeholder_for_alloc_block_kind]; mode }),
+             { bytes = 0;
+               dbginfo = [placeholder_for_alloc_block_kind];
+               mode;
+               offset = 0
+             }),
         args )
     | Calloc_uninitialized { mode; wosize; alloc_block_kind } ->
       (* Only the header is initialized, so the size of the block cannot be
@@ -384,7 +388,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           (Alloc
              { bytes = (wosize + 1) * Arch.size_addr;
                dbginfo = [placeholder_for_alloc_block_kind];
-               mode
+               mode;
+               offset = 0
              }),
         args )
     | Cpoll -> SU.basic_op Poll, args
@@ -1068,7 +1073,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         in
         SU.set_traps_for_raise env;
         Never_returns
-      | Basic (Op (Alloc { bytes; mode; dbginfo = [placeholder] })) ->
+      | Basic (Op (Alloc { bytes; mode; dbginfo = [placeholder]; offset = _ })) ->
         let rd = Reg.createv Cmm.typ_val in
         (* The arguments initialize the block from its header onwards. Any
            remaining bytes (see [Calloc_uninitialized]) are left
@@ -1079,7 +1084,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           Operation.Alloc
             { bytes = alloc_words * Arch.size_addr;
               dbginfo = [{ placeholder with alloc_words; alloc_dbg = dbg }];
-              mode
+              mode;
+              offset = 0
             }
         in
         insert_debug env sub_cfg (Op op) dbg [||] rd;
@@ -1087,7 +1093,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         emit_stores env sub_cfg dbg new_args rd;
         SU.set_traps_for_raise env;
         Ok rd
-      | Basic (Op (Alloc { bytes = _; mode = _; dbginfo })) ->
+      | Basic (Op (Alloc { bytes = _; mode = _; dbginfo; offset = _ })) ->
         Misc.fatal_errorf
           "Selection Alloc: expected a single placehold in dbginfo, found %d"
           (List.length dbginfo)

@@ -583,8 +583,7 @@ register_pressure:
   cmpq  (%r14), %r15
   jb    <hidden GC jump pad>
 .L0:
-  leaq  8(%r15), %rbx
-  addq  $456, %rbx
+  leaq  464(%r15), %rbx
   movq  $3072, -8(%rbx)
   movq  %rax, (%rbx)
   leaq  2(%rax), %rdi

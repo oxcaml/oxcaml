@@ -328,7 +328,8 @@ type t =
   | Alloc of
       { bytes : int;
         dbginfo : Cmm.alloc_dbginfo;
-        mode : Cmm.Alloc_mode.t
+        mode : Cmm.Alloc_mode.t;
+        offset : int
       }
 
 let is_pure = function
@@ -468,10 +469,11 @@ let dump ppf op =
   | Domain_index -> Format.fprintf ppf "domain_index"
   | Poll -> Format.fprintf ppf "poll"
   | Pause -> Format.fprintf ppf "pause"
-  | Alloc { bytes; dbginfo = _; mode = Heap } ->
-    Format.fprintf ppf "alloc %i" bytes
-  | Alloc { bytes; dbginfo = _; mode = Local } ->
-    Format.fprintf ppf "alloc_local %i" bytes
+  | Alloc { bytes; dbginfo = _; mode; offset } ->
+    (match mode with
+    | Heap -> Format.fprintf ppf "alloc %i" bytes
+    | Local -> Format.fprintf ppf "alloc_local %i" bytes);
+    if offset <> 0 then Format.fprintf ppf " (+%i)" offset
 
 let equal_test left right =
   match left, right with
@@ -610,11 +612,22 @@ let equal left right =
   | Domain_index, Domain_index -> true
   | Int128op left_op, Int128op right_op ->
     equal_int128_operation left_op right_op
-  | ( Alloc { bytes = left_bytes; dbginfo = left_dbg; mode = left_mode },
-      Alloc { bytes = right_bytes; dbginfo = right_dbg; mode = right_mode } ) ->
+  | ( Alloc
+        { bytes = left_bytes;
+          dbginfo = left_dbg;
+          mode = left_mode;
+          offset = left_offset
+        },
+      Alloc
+        { bytes = right_bytes;
+          dbginfo = right_dbg;
+          mode = right_mode;
+          offset = right_offset
+        } ) ->
     Int.equal left_bytes right_bytes
     && Cmm.equal_alloc_dbginfo left_dbg right_dbg
     && Cmm.Alloc_mode.equal left_mode right_mode
+    && Int.equal left_offset right_offset
   | ( ( Move | Spill | Reload | Const_int _ | Const_float32 _ | Const_float _
       | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
       | Const_mask _ | Stackoffset _ | Load _ | Store _ | Intop _ | Int128op _

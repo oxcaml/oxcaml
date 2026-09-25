@@ -537,10 +537,10 @@ let is_alloc (instr : basic instruction) =
 
 let is_heap_alloc (instr : basic instruction) =
   match instr.desc with
-  | Op (Alloc { mode = Heap; bytes = _; dbginfo = _ }) -> true
+  | Op (Alloc { mode = Heap; bytes = _; dbginfo = _; offset = _ }) -> true
   | Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _ | Stack_check _
   | Op
-      ( Alloc { mode = Local; bytes = _; dbginfo = _ }
+      ( Alloc { mode = Local; bytes = _; dbginfo = _; offset = _ }
       | Poll | Move | Spill | Reload | Opaque | Begin_region | End_region
       | Dls_get | Tls_get | Domain_index | Pause | Const_int _ | Const_float32 _
       | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _

@@ -162,8 +162,7 @@ unboxing_through_select:
   jl    <hidden GC jump pad>
 .L0:
   addq  72(%r14), %rdx
-  addq  $8, %rdx
-  addq  $24, %rdx
+  addq  $32, %rdx
   movq  $3071, -8(%rdx)
   movq  caml_int64_ops@GOTPCREL(%rip), %rcx
   movq  %rcx, (%rdx)

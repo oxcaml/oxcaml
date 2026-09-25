@@ -2654,7 +2654,7 @@ end = struct
              poll insertion is enabled. [@poll error] should be used instead. *)
           next
         | Alloc { mode = Local; _ } -> next
-        | Alloc { mode = Heap; bytes; dbginfo } ->
+        | Alloc { mode = Heap; bytes; dbginfo; offset = _ } ->
           let w = create_witnesses t (Alloc { bytes; dbginfo }) dbg in
           let effect_ =
             match Metadata.assume_value dbg ~can_raise:false w with

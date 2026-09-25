@@ -1163,7 +1163,7 @@ let store t (i : Cfg.basic Cfg.instruction) (memory_chunk : Cmm.memory_chunk)
   | Twofiftysix_aligned | Fivetwelve_unaligned | Fivetwelve_aligned ->
     not_implemented_basic ~msg:"store vector" i
 
-let local_alloc t (i : Cfg.basic Cfg.instruction) num_bytes =
+let local_alloc t (i : Cfg.basic Cfg.instruction) num_bytes ~offset =
   (* Make space on the local stack *)
   let local_sp_ptr = load_domainstate_addr t Domain_local_sp in
   let local_sp = emit_ins t (I.load ~ptr:local_sp_ptr ~typ:T.i64) in
@@ -1204,10 +1204,11 @@ let local_alloc t (i : Cfg.basic Cfg.instruction) num_bytes =
     emit_ins t (I.binary Add ~arg1:new_local_sp ~arg2:local_top)
   in
   (* Skip the header word *)
-  let res = do_offset t new_local_sp_addr T.val_ptr 8 in
+  let res = do_offset t new_local_sp_addr T.val_ptr (8 + offset) in
   store_into_reg t i.res.(0) res
 
-let heap_alloc t (i : Cfg.basic Cfg.instruction) num_bytes alloc_info =
+let heap_alloc t (i : Cfg.basic Cfg.instruction) num_bytes alloc_info ~offset
+    =
   (* Make space on the minor heap *)
   let alloc_ptr = emit_ins t (I.load ~ptr:allocation_ptr ~typ:T.i64) in
   let new_alloc_ptr =
@@ -1244,7 +1245,7 @@ let heap_alloc t (i : Cfg.basic Cfg.instruction) num_bytes alloc_info =
   (* Load alloc ptr again since GC call might have changed it *)
   let alloc_ptr = emit_ins t (I.load ~ptr:allocation_ptr ~typ:T.i64) in
   (* Skip the header word *)
-  let res = do_offset t alloc_ptr T.val_ptr 8 in
+  let res = do_offset t alloc_ptr T.val_ptr (8 + offset) in
   store_into_reg t i.res.(0) res
 
 let basic_op t (i : Cfg.basic Cfg.instruction) (op : Operation.t) =
@@ -1284,8 +1285,10 @@ let basic_op t (i : Cfg.basic Cfg.instruction) (op : Operation.t) =
     let local_sp_ptr = load_domainstate_addr t Domain_local_sp in
     let saved_local_sp = load_reg_to_temp t i.arg.(0) in
     emit_ins_no_res t (I.store ~ptr:local_sp_ptr ~to_store:saved_local_sp)
-  | Alloc { bytes; dbginfo = _; mode = Local } -> local_alloc t i bytes
-  | Alloc { bytes; dbginfo; mode = Heap } -> heap_alloc t i bytes dbginfo
+  | Alloc { bytes; dbginfo = _; mode = Local; offset } ->
+    local_alloc t i bytes ~offset
+  | Alloc { bytes; dbginfo; mode = Heap; offset } ->
+    heap_alloc t i bytes dbginfo ~offset
   | Csel test_op ->
     let typ = T.of_reg i.res.(0) in
     let len = Array.length i.arg in
