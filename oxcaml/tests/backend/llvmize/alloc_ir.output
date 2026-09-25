@@ -184,13 +184,13 @@ L120:
   %45 = load ptr addrspace(1), ptr %13
   store ptr addrspace(1) %45, ptr %14
   %46 = load i64, ptr %ds
-  %47 = add i64 %46, 64
+  %47 = add i64 %46, 72
   %48 = inttoptr i64 %47 to ptr
   %49 = load i64, ptr %48
   %50 = sub i64 %49, 24
   store i64 %50, ptr %48
   %51 = load i64, ptr %ds
-  %52 = add i64 %51, 80
+  %52 = add i64 %51, 88
   %53 = inttoptr i64 %52 to ptr
   %54 = load i64, ptr %53
   %55 = icmp sle i64 %54, %50
@@ -207,7 +207,7 @@ L126:
   br label %L127
 L127:
   %62 = load i64, ptr %ds
-  %63 = add i64 %62, 72
+  %63 = add i64 %62, 80
   %64 = inttoptr i64 %63 to ptr
   %65 = load i64, ptr %64
   %66 = add i64 %50, %65
@@ -271,7 +271,7 @@ L129:
   %21 = load i64, ptr %4
   store i64 %21, ptr %8
   %22 = load i64, ptr %ds
-  %23 = add i64 %22, 64
+  %23 = add i64 %22, 72
   %24 = inttoptr i64 %23 to ptr
   %25 = load i64, ptr %24
   store i64 %25, ptr %9
@@ -328,7 +328,7 @@ L133:
   %53 = load i64, ptr %17
   store i64 %53, ptr %18
   %54 = load i64, ptr %ds
-  %55 = add i64 %54, 64
+  %55 = add i64 %54, 72
   %56 = inttoptr i64 %55 to ptr
   %57 = load i64, ptr %10
   store i64 %57, ptr %56
