@@ -40,6 +40,53 @@ let empty = {
   env_extensions = [] ;
   }
 
+(* Ocamldoc's syntax/type traversal and printers consume expanded constraints.
+   Expand while compiler identifiers can still be resolved, before converting
+   paths into documentation names. Keep ordinary module-type aliases intact. *)
+let rec expand_module_type typing_env = function
+  | Types.Mty_with _ as mty ->
+      begin match Mtype.scrape_alias typing_env mty with
+      | Types.Mty_with _ ->
+          Misc.fatal_error "Odoc_env.expand_module_type: unavailable signature"
+      | mty -> expand_module_type typing_env mty
+      end
+  | Types.Mty_signature sg ->
+      Types.Mty_signature (expand_signature typing_env sg)
+  | Types.Mty_functor (param, body, mode) ->
+      let param, body_env = match param with
+        | Types.Unit -> Types.Unit, typing_env
+        | Types.Named (id, arg, arg_mode) ->
+            let arg = expand_module_type typing_env arg in
+            let body_env = match id with
+              | None -> typing_env
+              | Some id ->
+                  let mode = Mode.(with_locality_as_regionality arg_mode
+                    |> With_regionality.disallow_right) in
+                  Env.add_module ~arg:true id Types.Mp_present arg
+                    ~mode typing_env
+            in
+            Types.Named (id, arg, arg_mode), body_env
+      in
+      Types.Mty_functor (param, expand_module_type body_env body, mode)
+  | Types.Mty_strengthen (body, path, aliasable) ->
+      Types.Mty_strengthen
+        (expand_module_type typing_env body, path, aliasable)
+  | Types.Mty_ident _ | Types.Mty_alias _ as mty -> mty
+
+and expand_signature typing_env sg =
+  (* Include the entire group before visiting recursive module declarations. *)
+  let typing_env = Env.add_signature sg typing_env in
+  List.map (function
+    | Types.Sig_module (id, presence, md, rec_status, visibility) ->
+        let md_type = expand_module_type typing_env md.Types.md_type in
+        Types.Sig_module
+          (id, presence, { md with md_type }, rec_status, visibility)
+    | Types.Sig_modtype (id, mtd, visibility) ->
+        let mtd_type =
+          Option.map (expand_module_type typing_env) mtd.Types.mtd_type in
+        Types.Sig_modtype (id, { mtd with mtd_type }, visibility)
+    | item -> item) sg
+
 (** Add a signature to an environment.  *)
 let rec add_signature env root ?rel signat =
   let qualify id = Name.concat root (Name.from_ident id) in
@@ -212,6 +259,9 @@ let subst_module_type env t =
           Odoc_name.to_path (full_module_type_name env (Odoc_name.from_path p))
         in
         Mty_ident new_p
+    | Mty_with _ ->
+        Misc.fatal_error
+          "Odoc_env.subst_module_type: expand constraints before qualification"
     | Mty_strengthen (mt,p,a) ->
         Mty_strengthen (iter mt,p,a)
     | Mty_alias _

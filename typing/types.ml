@@ -730,6 +730,25 @@ module type Wrapped = sig
   | Mty_strengthen of module_type * Path.t * Aliasability.t
       (* See comments about the aliasability of strengthening in mtype.ml *)
 
+  | Mty_with of module_type * Ident.t * string list * with_constraint
+      (* The component-name list is nonempty. The identifier denotes the
+         unconstrained body and binds only in the constraint, not in the body.
+         References to signature components are projected from it instead of
+         copying the signature. Its scope
+         is used to freshen the signature when the wrapper expands.
+
+         Typemod registers a pending well-formedness check for a new binder.
+         Subst.check_with forces it before copying or expanding the wrapper;
+         unused checks also run at the end of typing. Checks are not part of
+         the serialized representation: saving discharges them, and fresh
+         copies and imported binders have no pending check. *)
+
+  and with_constraint =
+  | With_type of type_declaration
+  | With_module of module_declaration
+  | With_modtype of modtype_declaration
+  | With_jkind of jkind_declaration
+
   and functor_parameter =
   | Unit
   | Named of Ident.t option * module_type * Mode.With_locality.lr
@@ -821,13 +840,20 @@ module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
     | Mty_strengthen (mty,p,aliasable) ->
         To.Mty_strengthen (module_type m mty, p, aliasable)
 
+    | Mty_with (mty, id, names, cstr) ->
+        To.Mty_with (module_type m mty, id, names, with_constraint m cstr)
+
+  and with_constraint m = function
+    | With_type td -> To.With_type td
+    | With_module md -> To.With_module (module_declaration m md)
+    | With_modtype mtd -> To.With_modtype (modtype_declaration m mtd)
+    | With_jkind jd -> To.With_jkind jd
+
   and functor_parameter m = function
       | Unit -> To.Unit
       | Named (id,mty,mm) -> To.Named (id, module_type m mty,mm)
 
-  let value_description m vd = m.map_value_description m vd
-
-  let module_declaration m {md_type; md_modalities; md_attributes;
+  and module_declaration m {md_type; md_modalities; md_attributes;
     md_loc; md_uid} =
     To.{
       md_type = module_type m md_type;
@@ -837,13 +863,15 @@ module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
       md_uid;
     }
 
-  let modtype_declaration m {mtd_type; mtd_attributes; mtd_loc; mtd_uid} =
+  and modtype_declaration m {mtd_type; mtd_attributes; mtd_loc; mtd_uid} =
     To.{
       mtd_type = Option.map (module_type m) mtd_type;
       mtd_attributes;
       mtd_loc;
       mtd_uid;
     }
+
+  let value_description m vd = m.map_value_description m vd
 
   let signature_item m = function
     | Sig_value (id,vd,vis) ->

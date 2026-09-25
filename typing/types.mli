@@ -1254,6 +1254,25 @@ module type Wrapped = sig
   | Mty_strengthen of module_type * Path.t * Aliasability.t
       (* See comments about the aliasability of strengthening in mtype.ml *)
 
+  | Mty_with of module_type * Ident.t * string list * with_constraint
+      (* The component-name list is nonempty. The identifier denotes the
+         unconstrained body and binds only in the constraint, not in the body.
+         References to signature components are projected from it instead of
+         copying the signature. Its scope
+         is used to freshen the signature when the wrapper expands.
+
+         Typemod registers a pending well-formedness check for a new binder.
+         Subst.check_with forces it before copying or expanding the wrapper;
+         unused checks also run at the end of typing. Checks are not part of
+         the serialized representation: saving discharges them, and fresh
+         copies and imported binders have no pending check. *)
+
+  and with_constraint =
+  | With_type of type_declaration
+  | With_module of module_declaration
+  | With_modtype of modtype_declaration
+  | With_jkind of jkind_declaration
+
   and functor_parameter =
   | Unit
   | Named of Ident.t option * module_type * Mode.With_locality.lr
