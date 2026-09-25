@@ -334,9 +334,9 @@ and emit env c (exp : Cmm.expression) ~tail : result =
            | Capply _ | Cextcall _ | Cload _
            | Calloc (_, _)
            | Cstore (_, _)
-           | Cmulhi _ | Cmuli64 _ | Cbswap _ | Ccsel _ | Cprefetch _ | Catomic _
-           | Ccmpi _ | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _
-           | Creinterpret_cast _ | Cstatic_cast _
+           | Cmulhi _ | Cmuli64 _ | Cbswap _ | Crotate _ | Ccsel _ | Cprefetch _
+           | Catomic _ | Ccmpi _ | Cnegf _ | Cabsf _ | Caddf _ | Csubf _
+           | Cmulf _ | Cdivf _ | Creinterpret_cast _ | Cstatic_cast _
            | Ccmpf (_, _)
            | Cprobe _ | Cprobe_is_enabled _ ) as op),
           args,

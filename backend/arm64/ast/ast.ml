@@ -1156,6 +1156,13 @@ module Instruction_name = struct
           * [`Reg of [`Neon of [`Vector of [`V16B] * [`B]]]]
           * [`Imm of [`Six]] )
         t
+    | EXTR :
+        ( quad,
+          [`Reg of [`GP of ([< `X | `W] as 'w)]]
+          * [`Reg of [`GP of 'w]]
+          * [`Reg of [`GP of 'w]]
+          * [`Imm of [`Six]] )
+        t
     | FABS :
         ( pair,
           [`Reg of [`Neon of [`Scalar of ([< `S | `D] as 'p)]]]
@@ -1597,6 +1604,12 @@ module Instruction_name = struct
         (pair, [`Reg of [`GP of ([< `X | `W] as 'w)]] * [`Reg of [`GP of 'w]]) t
     | REV16 :
         (pair, [`Reg of [`GP of ([< `X | `W] as 'w)]] * [`Reg of [`GP of 'w]]) t
+    | RORV :
+        ( triple,
+          [`Reg of [`GP of ([< `X | `W] as 'w)]]
+          * [`Reg of [`GP of 'w]]
+          * [`Reg of [`GP of 'w]] )
+        t
     | SBFM :
         ( quad,
           [`Reg of [`GP of ([< `X | `W] as 'w)]]
@@ -1983,6 +1996,7 @@ module Instruction_name = struct
         | DSB b -> "dsb\t" ^ Memory_barrier.to_string b
         | DUP _ -> "dup"
         | EOR_immediate | EOR_shifted_register | EOR_vector -> "eor"
+        | EXTR -> "extr"
         | EXT -> "ext"
         | FABS -> "fabs"
         | FADD -> "fadd"
@@ -2053,6 +2067,7 @@ module Instruction_name = struct
         | RET -> "ret"
         | REV -> "rev"
         | REV16 -> "rev16"
+        | RORV -> "rorv"
         | SBFM -> "sbfm"
         | SCVTF -> "scvtf"
         | SCVTF_vector -> "scvtf"
@@ -2243,6 +2258,9 @@ module Instruction_name = struct
       | EXT ->
         let (Quad (rd, rs1, rs2, idx)) = ops in
         [| o rd; o rs1; o rs2; o idx |]
+      | EXTR ->
+        let (Quad (rd, rn, rm, imms)) = ops in
+        [| o rd; o rn; o rm; o imms |]
       | FABS ->
         let (Pair (rd, rn)) = ops in
         [| o rd; o rn |]
@@ -2471,6 +2489,9 @@ module Instruction_name = struct
       | REV16 ->
         let (Pair (rd, rn)) = ops in
         [| o rd; o rn |]
+      | RORV ->
+        let (Triple (rd, rn, rm)) = ops in
+        [| o rd; o rn; o rm |]
       | SBFM ->
         let (Quad (rd, rn, immr, imms)) = ops in
         [| o rd; o rn; o immr; o imms |]
@@ -2677,7 +2698,7 @@ module Instruction = struct
     | AND_shifted_register | AND_vector | ASRV | B | BL | BLR | BR | CLZ
     | CM_register _ | CM_zero _ | CNT | CNT_vector | CSEL | CSINC | CTZ | DMB _
     | DSB _ | DUP _ | EOR_immediate | EOR_shifted_register | EOR_vector | EXT
-    | FABS | FADD | FADDP_vector | FADD_vector | FCMP | FCM_register _
+    | EXTR | FABS | FADD | FADDP_vector | FADD_vector | FCMP | FCM_register _
     | FCM_zero _ | FCSEL | FCVT | FCVTL_vector | FCVTNS | FCVTNS_vector
     | FCVTN_vector | FCVTZS | FCVTZS_vector | FDIV | FDIV_vector | FMADD | FMAX
     | FMAX_vector | FMIN | FMIN_vector | FMOV_fp | FMOV_gp_to_fp_32
@@ -2688,7 +2709,7 @@ module Instruction = struct
     | INS_V _ | LDAR | LDP _ | LDR | LDRB | LDRH | LDRSB | LDRSH | LDRSW
     | LDR_simd_and_fp | LSLV | LSRV | MADD | MOVI | MOVK | MOVN | MOVZ | MSUB
     | MUL_vector | MVN_vector | NEG_vector | NOP | ORR_immediate
-    | ORR_shifted_register | ORR_vector | RBIT | RET | REV | REV16 | SBFM
+    | ORR_shifted_register | ORR_vector | RBIT | RET | REV | REV16 | RORV | SBFM
     | SCVTF | SCVTF_vector | SDIV | UDIV | SHL | SMAX_vector | SMIN_vector
     | SMOV _ | SMULH | SMULL2_vector _ | SMULL_vector _ | SQADD_vector
     | SQSUB_vector | SQXTN _ | SQXTN2 _ | SSHL_vector | SSHR | STP _ | STR

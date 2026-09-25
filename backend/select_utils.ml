@@ -232,7 +232,8 @@ let oper_result_type = function
     typ_int
   | Catomic { op = Add | Sub | Land | Lor | Lxor; _ } -> typ_void
   | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _ | Cand | Cor | Cxor
-  | Clsl | Clsr | Casr | Cclz | Cctz | Cpopcnt | Cbswap _ | Ccmpi _ | Ccmpf _ ->
+  | Clsl | Clsr | Casr | Cclz | Cctz | Cpopcnt | Cbswap _ | Crotate _ | Ccmpi _
+  | Ccmpf _ ->
     typ_int
   | Caddi128 | Csubi128 | Cmuli64 _ -> typ_int128
   | Caddv -> typ_val

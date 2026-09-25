@@ -128,6 +128,18 @@ external shift_right_logical : (int64[@local_opt]) -> int -> (int64[@local_opt])
    regardless of the sign of [x].
    The result is unspecified if [y < 0] or [y >= 64]. *)
 
+external rotate_left :
+  (int64[@local_opt]) -> int -> (int64[@local_opt]) = "%int64_rotl"
+(** [Int64.rotate_left x y] rotates [x] to the left by [y] bits: the bits
+   shifted out at the high end re-enter at the low end.
+   The result is unspecified if [y < 0] or [y >= 64]. *)
+
+external rotate_right :
+  (int64[@local_opt]) -> int -> (int64[@local_opt]) = "%int64_rotr"
+(** [Int64.rotate_right x y] rotates [x] to the right by [y] bits: the bits
+   shifted out at the low end re-enter at the high end.
+   The result is unspecified if [y < 0] or [y >= 64]. *)
+
 external of_int : int -> (int64[@local_opt]) = "%int64_of_int"
 (** Convert the given integer (type [int]) to a 64-bit integer
     (type [int64]). *)

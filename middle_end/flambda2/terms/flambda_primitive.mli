@@ -535,11 +535,13 @@ type binary_int_arith_op =
   | Or
   | Xor
 
-(** Shift operations on integers. *)
+(** Shift and rotate operations on integers. *)
 type int_shift_op =
   | Lsl
   | Lsr
   | Asr
+  | Rol
+  | Ror
 
 (** Naked float binary arithmetic operations. *)
 type binary_float_arith_op =
