@@ -450,6 +450,9 @@ val create_closures : Alloc_mode.For_types.t -> row_like_for_closures -> t
 (** Note this assumes the allocation mode is [Heap] *)
 val this_immutable_string : string -> t
 
+(** See [String_info.Mutable]. *)
+val mutable_string : length:Target_ocaml_int.t -> t
+
 val array_of_length :
   element_kind:Flambda_kind.With_subkind.t Or_unknown_or_bottom.t ->
   length:t ->
