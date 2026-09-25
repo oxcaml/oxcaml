@@ -528,9 +528,8 @@ compare:
 let unsigned_compare x y = Int64_u.unsigned_compare x y
 [%%expect_asm X86_64{|
 unsigned_compare:
-  movabsq $-9223372036854775808, %rdi
-  subq  %rdi, %rbx
   movabsq $-9223372036854775808, %rsi
+  subq  %rsi, %rbx
   movq  %rax, %rdi
   subq  %rsi, %rdi
   movq  $-1, %rsi
