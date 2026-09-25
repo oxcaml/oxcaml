@@ -1,0 +1,520 @@
+{%html: <div style="display: flex; justify-content:space-between"><div>%}{{!"driver"}< The Driver}{%html: </div><div>%}{{!"generating-code"}Generating AST nodes >}{%html: </div></div>%}
+
+{0 Writing a Transformation}
+
+This chapter covers the [ppxlib] procedure basics to define and register a
+transformation, be it a global or a context-free transformation.
+
+For the actual manipulation and generation of code, [ppxlib] provides many helpers
+that are listed in {!generatingcode}.
+
+{1 Defining a Transformation}
+
+For [ppxlib], a transformation is a description of a way to modify a given AST
+into another one. A transformation can be:
+
+- A context-free transformation, which only acts on a portion of the AST. In the [ppxlib] framework, those transformations
+  are represented by values of type {{!Ppxlib.Context_free.Rule.t}[Context_free.Rule.t]} and are executed in the {{!driver."context-free-phase"}context-free phase}. This is the strongly recommended kind of transformation due to its  {{!driver.advantages}important advantages}, such as good performance, well-defined composition semantics, and the safety and trustability that comes with well-isolated and strictly local modifications.
+- A global transformation, which takes the simple form of a function of type
+  [structure -> structure] or [signature -> signature], that can sometimes take
+  extra information as additional arguments. Such a transformation is applied in
+  the {{!driver."global-transfo-phase"}global transformation phase}, unless it
+  has a good reason to have been registered in another phase. While global transformations are a flexible and powerful tool in the OCaml ecosystem, they come with many {{!global_transformation}drawbacks} and should only be used when really necessary.  
+
+In order to register a transformation to the [ppxlib] driver, one should use the
+{{!Ppxlib.Driver.V2.register_transformation}[Driver.V2.register_transformation]}. This function is used to register all
+rewriter types in every different phase, except derivers, which are abstracted
+away in {{!Ppxlib.Deriving}[Deriving]}.
+
+{1 Context-Free Transformation}
+
+In [ppxlib], the type for context-free transformation is
+{{!Ppxlib.Context_free.Rule.t}[Context_free.Rule.t]}. Rules will be applied during the AST's top-down traverse
+of the context-free pass. A rule contains the information about
+when it should be applied in the traversal, as well as the transformation to
+apply.
+
+Currently, rules can only be defined to apply in four different contexts:
+
+- on extensions points, such as [\[%ext_point payload\]]
+- on some structure or signature items with an attribute, such as
+  [type t = Nil \[@@deriving show\]],
+- on
+  {{:https://v2.ocaml.org/manual/extensionsyntax.html#ss:extension-literals}
+  litterals with modifiers}, such as [41g] or [43.2x],
+- on function application or identifiers, such as [meta_function "99"] and [meta_constant].
+
+In order to define rules on extensions points, we will use the {{!Ppxlib.Extension}[Extension]}
+module. In order to define rules on attributed items, we will use the
+{{!Ppxlib.Deriving}[Deriving]} module. For the two other rules, we will directly use the
+{{!Ppxlib.Context_free.Rule}[Context_free.Rule]} module.
+
+{2 Extenders}
+
+An {{!driver.def_extenders}extender} is characterised by several things:
+
+{ul
+{li The situation that triggers the rewriting, which consists of two things:
+  {ul
+    {li The extension points' name on which it is triggered. For instance,
+       an extender triggered on [[%name]] would not be triggered on [[%other_name]]}
+    {li The AST context on which it applies. Indeed, extension points can be used in
+       many different places: expression, pattern, core type, etc., and the extender
+       should be restricted to one context, as it produces code of a single type. So,
+       an extender triggered on expressions could be triggered on [let x = [%name]]
+       but not on [let [%name] = expr].}}}
+{li The actual rewriting of the extension node:
+  {ul
+    {li A function, called "expander", taking arguments and outputting the generated AST}
+    {li How to extract from the payload the arguments to pass to the expander}}
+}}
+
+{3:ext_context The Extender Context}
+
+The context is a value of type {{!Ppxlib.Extension.Context.t}[Extension.Context.t]}. For instance, to
+define an extender for expression-extension points, the correct context is
+{{!Ppxlib.Extension.Context.expression}[Extension.Context.expression]}. Consult the
+{{!Ppxlib.Extension.Context}[Extension.Context]} module's API for the list of all contexts!
+
+{@ocaml[
+  # let context = Extension.Context.expression;;
+  val context : expression Extension.Context.t =
+    Ppxlib.Extension.Context.Expression
+]}
+
+{3 The Extender Name}
+
+The extension point name on which it applies is simply a string.
+
+{@ocaml[
+  # let extender_name = "add_suffix" ;;
+  val extender_name : string = "add_suffix"
+]}
+
+See below for examples on when the above name and context will trigger rewriting:
+{@ocaml[
+  (* will trigger rewriting: *)
+  let _ = [%add_suffix "payload"]
+
+  (* won't trigger rewriting: *)
+  let _ = [%other_name "payload"] (* wrong name *)
+  let _ = match () with [%add_suffix "payload"] -> () (* wrong context *)
+]}
+
+{3 The Payload Extraction}
+
+An extension node contains a {{!Ppxlib.Parsetree.payload}[payload]}, which will be passed to the transformation function. However, while this payload contains all information, it is not always structured the best way for the transformation function. For instance, in [[%add_suffix "payload"]], the string ["payload"] is encoded as a structure item consisting of an expression’s evaluation, a constant that is a string.
+
+[ppxlib] allows separating the transformation function from the extraction of the payload’s relevant information. As explained in depth in the {{!"matching-code"}Destructing AST nodes} chapter, this extraction is done by destructing the payload’s structure (which is therefore restricted: [[%add_suffix 12]] would be refused by the rewriter of the example below). The extraction is defined by a value of type
+{{!Ppxlib.Ast_pattern.t}[Ast_pattern.t]}. The {{!Ppxlib.Ast_pattern}[Ast_pattern]} module provides some kind of pattern-matching on AST nodes: a way to structurally extract values from an AST
+node in order to generate a value of another kind.
+
+For instance, a value of type
+[(payload, int -> float -> expression, expression) Ast_pattern.t] means that it
+defines a way to extract an [int] and a [float] from a {{!Ppxlib.Parsetree.payload}[payload]},
+which should be then combined to define a value of type {{!Ppxlib.Parsetree.expression}[expression]}.
+
+In our case, the matched value will always be a {{!Ppxlib.Parsetree.payload}[payload]}, as that's the type for extension points' payloads. The type of the
+produced node will have to match the {{!ext_context}type of extension node we rewrite}, {{!Ppxlib.Parsetree.expression}[expression]} in our example.
+
+{@ocaml[
+  # let extracter () = Ast_pattern.(single_expr_payload (estring __)) ;;
+  val extracter : unit -> (payload, string -> 'a, 'a) Ast_pattern.t = <fun>
+]}
+
+The above pattern extracts a string inside an extension node pattern. It will extract ["string"] in the the extension node [[%ext_name "string"]] and will refuse [[%ext_name 1+1]]. For other ready-to-use examples of patterns, refer to the {{!"matching-code".pattern_examples}example} section. For more in-depth explanation on the types and functions used above, see the {{!"matching-code"}Destructing AST nodes} chapter and the {{!Ppxlib.Ast_pattern}[Ast_pattern] API} .
+
+The unit argument in [extractor] is not important. It is added so that {{:https://v2.ocaml.org/manual/polymorphism.html#ss:valuerestriction}value restriction} does not add noise to the type variables. 
+
+{3 The Expand Function}
+
+The expander is the function that takes the values extracted from the
+payload and produces the value that replaces the extension node.
+
+Building and inspecting AST nodes can be painful due to how
+{{!Ppxlib.Parsetree}large} the AST type is. [ppxlib] provides several helper
+modules to ease this generation, such as {{!Ppxlib.Ast_builder}[Ast_builder]},
+{!Ppxlib_metaquot}, {{!Ppxlib.Ast_pattern}[Ast_pattern]}, and {{!Ppxlib.Ast_traverse}[Ast_traverse]}, which are
+explained in their own chapters: {{!"generating-code"}Generating AST nodes},
+{{!"matching-code"}Destructing AST nodes} and {{!"ast-traversal"}Traversing AST
+nodes}.
+
+In the example below, you can ignore the body of the function until reading
+those chapters.
+
+{@ocaml[
+  # let expander ~ctxt s =
+      let loc = Expansion_context.Extension.extension_point_loc ctxt in
+      Ast_builder.Default.(estring ~loc (s ^ "_suffixed")) ;;
+  val expander : ctxt:Expansion_context.Extension.t -> string -> expression =
+  <fun>
+]}
+
+The expander takes [ctxt] as a named argument that is ignored here. This
+argument corresponds to additional information, such as the location of the
+extension node. More precisely, it is of type
+{{!Ppxlib.Expansion_context.Extension.t}[Expansion_context.Extension.t]} and
+includes:
+
+- The location of the extension node
+- The tool that called the rewriting ([merlin], [ocamlc], [ocaml],
+  [ocamlopt], etc.)
+- The name of the input file given to the driver (see
+  {{!Ppxlib.Expansion_context.Base.input_name}[Expansion_context.Base.input_name]})
+- The [code_path] (see {{!Ppxlib.Expansion_context.Base.input_name}[Expansion_context.Base.input_name]} and
+  {{!Ppxlib.Code_path}[Code_path]})
+
+{3 Declaring an Extender}
+
+When we have defined the four prerequisites, we are able to combine all of them to define an
+extender using the {{!Ppxlib.Extension.V3.declare}[Extension.V3.declare]} function.
+
+{[
+  # V3.declare ;;
+    string ->
+    'context Context.t ->
+    (payload, 'a, 'context) Ast_pattern.t ->
+    (ctxt:Expansion_context.Extension.t -> 'a) ->
+    t
+]}
+
+Note that the type is consistent: the context on which the expander is
+applied and the value produced by the expander need to be equal (indeed,
+['a] must be of the form ['extacted_1 -> 'extracted_2 -> ... -> 'context]
+with the constraints given by {{!Ppxlib.Ast_pattern}[Ast_pattern]}).
+
+We are thus able to create the extender given by the previous examples:
+
+{[
+  # let my_extender = Extension.V3.declare extender_name context (extracter()) expander ;;
+  val my_extender : Extension.t = <abstr>
+]}
+
+Note that we use the [V3] version of the [declare] function, which passes the
+expansion context to the expander. Previous versions were kept for
+retro-compatibility.
+
+We can finally turn the extender into a rule (using
+{{!Ppxlib.Context_free.Rule.extension}[Context_free.Rule.extension]}) and register it to the driver:
+
+{[
+  # let extender_rule = Context_free.Rule.extension my_extender ;;
+  val extender_rule : Context_free.Rule.t = <abstr>
+  # Driver.register_transformation ~rules:[extender_rule] "name_only_for_debug_purpose" ;;
+  - : unit = ()
+]}
+
+Now, the following:
+
+{@ocaml[
+  let () = print_endline [%add_suffix "helloworld"]
+]}
+
+would be rewritten by the PPX in:
+
+{@ocaml[
+  let () = print_endline "helloworld_suffixed"
+]}
+
+{2 Derivers}
+
+A {{!driver.def_derivers}deriver} is characterised by several things:
+
+- The way to parse arguments passed through the attribute payload
+- The set of other derivers that need to run before it is applied
+- The actual generator function
+
+Contrary to extenders, the registration of the deriver as a
+{{!Ppxlib.Context_free.Rule.t}[Context_free.Rule.t]} is not made by the user via
+{{!Ppxlib.Driver.register_transformation}[Driver.register_transformation]}, but
+rather by {{!Ppxlib.Deriving.add}[Deriving.add]}.
+
+{4 Derivers Arguments}
+
+In [ppxlib], a deriver is applied by adding an attribute containing the derivers' names
+to apply:
+
+{[
+  type tree = Leaf | Node of tree * tree  [@@deriving show, yojson]
+]}
+
+However, it is also possible to pass arguments to the derivers, either through a
+record or through labelled arguments:
+
+{[
+  type tree = Leaf | Node of tree * tree  [@@deriving my_deriver ~flag ~option1:52]
+]}
+
+or
+
+{[
+  type tree = Leaf | Node of tree * tree  [@@deriving my_deriver { flag; option1=52 }]
+]}
+
+The [flag] argument is a flag, and it can only be present or absent but not take a
+value. The [option1] argument is a regular argument, so it is also optional but can
+take a value.
+
+In [ppxlib], arguments have the type {{!Ppxlib.Deriving.Args.t}[Deriving.Args.t]}. Similarly to the
+{{!Ppxlib.Ast_pattern.t}[Ast_pattern.t]} type, a value of type [(int -> string -> structure, structure) Args.t]
+means that it provides a way to extract an integer from the argument and
+a string from the options, later combined to create a structure.
+
+The way to define a {{!Ppxlib.Deriving.Args.t}[Deriving.Args.t]} value is to start with the value describing an
+empty set of arguments, {{!Ppxlib.Deriving.Args.empty}[Deriving.Args.empty]}. Then add the arguments one by one, using
+the combinator {{!Ppxlib.Deriving.Args.(+>)}[Deriving.Args.(+>)]}. Each argument is created using either {{!Ppxlib.Deriving.Args.arg}[Deriving.Args.arg]}
+for optional arguments (with value extracted using {{!Ppxlib.Ast_pattern}[Ast_pattern]}) or
+{{!Ppxlib.Deriving.Args.flag}[Deriving.Args.flag]} for optional arguments without values.
+
+{@ocaml[
+  # let args () = Deriving.Args.(empty +> arg "option1" (eint __) +> flag "flag") ;;
+  val args : (int option -> bool -> 'a, 'a) Deriving.Args.t = <abstr>
+]}
+
+{4 Derivers Dependency}
+
+[ppxlib] allows declaring that a deriver depends on the previous application of
+another deriver. This is expressed simply as a list of derivers. For instance,
+the {{:https://github.com/janestreet/ppx_csv_conv}csv} deriver depends on the
+{{:https://github.com/janestreet/ppx_fields_conv}fields} deriver to run
+first.
+
+{@ocaml[
+  # let deps = [] ;;
+  val deps : 'a list = []
+]}
+
+In this example, we do not include any dependency.
+
+{3 Generator Function}
+
+Similarly to an extender's [expand] function, the function generating new
+code in derivers also takes a context and the arguments extracted from the
+attribute payload. Here again, the body of the example function can be
+safely ignored ,as it relies on {{!"generating-code"}later chapters}.
+
+{@ocaml[
+  # let generate_impl ~ctxt _ast option1 flag =
+      let return s =  (* See "Generating code" chapter *)
+        let loc = Expansion_context.Deriver.derived_item_loc ctxt in
+        [ Ast_builder.Default.(pstr_eval ~loc (estring ~loc s) []) ]
+      in
+      if flag then return "flag is on"
+      else
+        match option1 with
+        | Some i -> return (Printf.sprintf "option is %d" i)
+        | None -> return "flag and option are not set" ;;
+  val generate_impl :
+  ctxt:Expansion_context.Deriver.t ->
+  'a -> int option -> bool -> structure_item list = <fun>
+]}
+
+Similarly to extenders, there is an additional (ignored
+in the example) argument to the function: the context. This time, the context
+is of type {{!Ppxlib.Expansion_context.Deriver.t}[Expansion_context.Deriver.t]} and includes:
+
+- The location of the derived item
+- Whether the code generation will be inlined (see {!"inlining-transformations"})
+- The tool that called the rewriting ([merlin], [ocamlc], [ocaml],
+  [ocamlopt], etc.),
+- The name of the input file given to the driver (see
+  {{!Ppxlib.Expansion_context.Base.input_name}[Expansion_context.Base.input_name]})
+- The [code_path] (see {{!Ppxlib.Expansion_context.Base.input_name}[Expansion_context.Base.input_name]} and
+  {{!Ppxlib.Code_path}[Code_path]}).
+
+{3 Registering a Deriver}
+
+
+Once the generator function is defined, we can combine the argument extraction
+and the generator function to create a
+{{!Ppxlib.Deriving.Generator.t}[Deriving.Generator.t]}:
+
+{@ocaml[
+  # let generator () = Deriving.Generator.V2.make (args()) generate_impl ;;
+  val generator : unit -> (structure_item list, 'a) Deriving.Generator.t = <abstr>
+]}
+
+This generator can then be registered as a deriver through the {{!Ppxlib.Deriving.add}[Deriving.add]}
+function. Note that, {{!Ppxlib.Deriving.add}[Deriving.add]} will call {{!Ppxlib.Driver.register_transformation}[Driver.register_transformation]}
+itself, so you won't need to do it manually. Adding a deriver is done in a way
+that no two derivers with the same name can be registered. This includes derivers
+registered through the {{:https://github.com/ocaml-ppx/ppx_deriving}ppx_deriving} library.
+
+{@ocaml[
+  # let my_deriver = Deriving.add "my_deriver" ~str_type_decl:(generator()) ;;
+  val my_deriver : Deriving.t = <abstr>
+]}
+
+The different, optional named argument allows registering generators to be
+applied in different contexts and in one function call. Remember that you
+can only add one deriver with a given name, even if applied on different
+contexts. As the API shows, derivers are restricted to being applied in the following contexts:
+
+- Type declarations ([type t = Foo of int])
+- Type extensions ([type t += Foo of int])
+- Exceptions ([exception E of int])
+- Module type declarations ([module type T = sig end])
+
+in both structures and signatures.
+
+{2 Constant Rewriting}
+
+OCaml integrates a
+{{:https://v2.ocaml.org/manual/extensionsyntax.html#ss:extension-literals}syntax}
+to define special constants. Any [g..z] or [G..Z] suffix appended after a float
+or int is accepted by the parser (but refused later by the compiler). This means
+a PPX must rewrite them.
+
+[ppxlib] provides the {{!Ppxlib.Context_free.Rule.constant}[Context_free.Rule.constant]} function to rewrite those litteral
+constants. The character (between [g] and [z] or [G] and [Z]) has to be
+provided, as well as the constant kind (float or int), and both the location and
+the litteral as a string will be passed to a rewriting function:
+
+{@ocaml[
+  # let kind = Context_free.Rule.Constant_kind.Integer ;;
+  val kind : Context_free.Rule.Constant_kind.t =
+    Ppxlib.Context_free.Rule.Constant_kind.Integer
+  # let rewriter loc s = Ast_builder.Default.eint ~loc (int_of_string s * 100) ;;
+  val rewriter : location -> string -> expression = <fun>
+  # let rule = Context_free.Rule.constant kind 'g' rewriter ;;
+  val rule : Context_free.Rule.t = <abstr>
+  # Driver.register_transformation ~rules:[ rule ] "constant" ;;
+  - : unit = ()
+]}
+
+As an example with the above transformation, [let x = 2g + 3g] will be
+rewritten to [let x = 200 + 300].
+
+{2 Special Functions}
+
+[ppxlib] supports registering functions to be applied at compile time. A registered identifier [f_macro] will trigger rewriting in two situations:
+{ol
+{li When it plays the role of the function in a function application}
+{li Anywhere it appears in an expression}
+}
+For instance, in
+{@ocaml[
+  let _ = (f_macro arg1 arg2, f_macro)
+]}
+
+the rewriting will be triggered once for the left-hand side [f_macro arg1 arg2]
+and once for the right hand side [f_macro]. It is the expansion function that
+is responsible for distinguishing between the two cases: using pattern-matching to
+distinguish between a function application in one case and a single identifier in
+the other.
+
+In order to register a special function, one needs to use {{!Ppxlib.Context_free.Rule.special_function}[Context_free.Rule.special_function]}, indicating the name of the special function and the rewriter. The rewriter will take the expression (without expansion context) and should output an [expression option], where:
+
+- [None] signifies that no rewriting should be done: the top-down pass can
+  continue (potentially inside the expression).
+- [Some exp] signifies the original expression should be replaced by [expr]. The
+  top-down pass continues with [expr].
+
+The difference between [fun expr -> None] and [fun expr -> Some expr] is that
+the former will continue the top-down pass {e inside} [expr], while the latter
+will continue the top-down pass from [expr] (included), therefore starting an
+infinite loop.
+
+{@ocaml[
+  # let expand e =
+      let return n = Some (Ast_builder.Default.eint ~loc:e.pexp_loc n) in
+      match e.pexp_desc with
+      | Pexp_apply (_, arg_list) -> return (List.length arg_list)
+      | _ -> return 0
+    ;;
+  val expand : expression -> expression option = <fun>
+  # let rule = Context_free.Rule.special_function "n_args" expand ;;
+  val rule : Context_free.Rule.t = <abstr>
+  # Driver.register_transformation ~rules:[ rule ] "special_function_demo" ;;
+   - : unit = ()
+]}
+
+With such a rewriter registered:
+{[
+  # Printf.printf "n_args is applied with %d arguments\n" (n_args ignored "arguments");;
+  n_args is applied with 2 arguments
+  - : unit = ()
+]}
+
+{1:global_transformation Global transformation}
+
+Global transformations are the most general kind of transformation. As such, they allow doing virtually any modifications, but this comes with several drawbacks. There are very few PPXs that really need this powerful but dangerous feature. In fact, even if, at first sight, it seems like your transformation isn't context-free, it's likely that you can find a more suitable abstraction with which it becomes context-free. Whenever that's the case, go for context-free! The mentioned drawbacks are:
+
+- It is harder for the user to know exactly what parts of the AST will be
+  changed. Your transformation becomes a scary black box. 
+- It is harder for [ppxlib] to combine several global transformations, as there is no
+  guarantee that the effect of one will work well with the effect of another.
+- The job done by two global transformations (e.g., an AST traverse) cannot be
+  factorised, resulting in slower compilation time.
+- If you don't make sure that you really follow all {{!"good-practices"}good practices}, you might end up messing up the global developer experience.
+
+- If you don't make sure that you really follow all {{!"good-practices"}good practices}, you might end up messing up the global developer experience.
+
+For all these reasons, a global transformation should be avoided whenever a
+context-free transformation could do the job, which by experience seems to be most of the time.
+The API for defining a global transformation is easy. A global transformation consists simply of the function and can be directly be registered with {{!Ppxlib.Driver.register_transformation}[Driver.register_transformation]}.
+
+{@ocaml[
+  # let f str = List.filter (fun _ -> Random.bool ()) str;; (* Randomly omit structure items *)
+  val f : 'a list -> 'a list = <fun>
+  # Driver.register_transformation ~impl:f "absent_minded_transformation"
+  - : unit = ()
+]}
+
+{1 Inlining Transformations}
+
+When using a PPX, the transformation happens at compile time, and the produced code could be directly inlined into the original code. This allows dropping the dependency on [ppxlib] and the PPX used to generate the code.
+
+This mechanism is implemented for derivers implemented in [ppxlib] and is convenient to use, especially in conjunction with Dune. When applying a deriver, using [[@@deriving_inline deriver_name]] will apply the inline mode of [deriver_name] instead of the normal mode.
+
+Inline derivers will generate a [.corrected] version of the file that Dune can use to promote your file. For more information on how to use this feature to remove a dependency on [ppxlib] and a specific PPX from your project, refer to {{:https://ocaml.org/docs/metaprogramming#dropping-ppxs-dependency-with-derivinginline}this guide}.
+
+{1 Integration with Dune}
+
+If your PPX is written as a Dune project, you'll need to specify the [kind]
+field in your [dune] file with one of the following two values:
+
+- [ppx_rewriter], or
+- [ppx_deriver].
+
+If your transformation is anything but a deriver (e.g. an extension node rewriter), use [ppx_rewriter]. If your transformation is a deriver, then the TLDR workflow is: use [ppx_deriver] and furthermore add [ppx_deriving] to your dependencies, i.e. to the [libraries] field of your dune file. In fact, the situation is quite a bit more complex, though: apart from applying the registered transformations, the Ppxlib driver also does several checks. One of those consists in checking the following: whenever the source code contains [\[@@deriving foo (...)\]], then the Ppxlib driver expects a driver named [foo] to be registered. That's helpful to catch typos and missing dependencies on derivers and is certainly more hygienic than silently ignoring the annotation. However, for that check to work, the registered derivers must be grouped together into one process, i.e. a driver. UTop cannot use a static driver such as the Ppxlib one because dependencies are added dynamically to a UTop session. So the solution is the following: if you use [ppx_deriver] in your [kind] field, dune will add the right data to your PPXs META file to ensure that UTop will use the [ppx_deriving] driver, which links the derivers dynamically. As a result, [ppx_derivng] appears as a dependency in the META file. Therefore, whenever a user uses [ocamlfind] (e.g. by using UTop), they will hit an "[ppx_derivng] not found" error, unless you define [ppx_deriving] in your dependencies. So, long story short: if you strongly care about avoiding [ppx_deriving] as a dependency, use [ppx_rewriter] in your [kind] field and be aware of the fact that users won't be able to try your deriver in UTop; otherwise do the TLDR workflow.
+
+Here is a minimal Dune stanza for a rewriter:
+
+{@dune[
+  (library
+    (public_name my_ppx_rewriter)
+    (kind ppx_rewriter)
+    (libraries ppxlib))
+]}
+
+The public name you chose is the name your users will refer to your PPX in
+the [preprocess] field. For example, to use this PPX rewriter, one would add the
+[(preprocess (pps my_ppx_rewriter))] to their [library] or [executable] stanza.
+
+{1:generatingcode Defining AST Transformations}
+
+In this chapter, we only focused on the [ppxlib] ceremony to declare all kinds
+of transformations. However, we did not cover how to write the actual
+generative function, the backbone of the transformation. [ppxlib] provides several
+modules to help with code generation and matching, which are covered in more
+depth in the next chapters of this documentation:
+
+- {{!Ppxlib.Ast_traverse}[Ast_traverse]}, which helps in defining AST traversals, such as maps, folds,
+  iter, etc.
+- {{!Ppxlib.Ast_helper}[Ast_helper]} and {{!Ppxlib.Ast_builder}[Ast_builder]}, for generating AST nodes in a simpler way than
+  directly dealing with the {{!Ppxlib.Parsetree}[Parsetree]} types, providing a more stable API.
+- {{!Ppxlib.Ast_pattern}[Ast_pattern]}, the sibling of {{!Ppxlib.Ast_builder}[Ast_builder]} for matching on AST nodes,
+  extracting values for them.
+- {!Ppxlib_metaquot}, a PPX to manipulate code more simply by quoting and unquoting
+  code.
+
+This documentation also includes some {{!"good-practices"}guidelines} on how to generate nice code.
+We encourage you to read and follow it to produce high quality PPXs:
+
+- A section on good {{!page-"good-practices"."handling_errors"}error reporting}
+- A section on the {{!page-"good-practices"."quoting"}mechanism}
+- A section on how to {{!page-"good-practices"."testing-your-ppx"}test} your PPX
+- A section on how to collaborate with Merlin effectively by being careful with {{!page-"good-practices"."testing-your-ppx"}locations}
+
+{%html: <div style="display: flex; justify-content:space-between"><div>%}{{!"driver"}< The Driver}{%html: </div><div>%}{{!"generating-code"}Generating AST nodes >}{%html: </div></div>%}
