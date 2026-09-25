@@ -1781,7 +1781,7 @@ and meet_row_like_for_closures env
       (match other_closures with
       | Or_bottom.Bottom -> ()
       | Or_bottom.Ok _ ->
-        Misc.fatal_error "Unexpected bottom other case in meet of row-like");
+        Misc.fatal_error "Unexpected non-bottom other case in meet of row-like");
       TG.Row_like_for_closures.create_raw ~known_closures)
     (meet_row_like ~meet_expanded_head ~n_way_join_type:n_way_join
        ~meet_maps_to:meet_closures_entry
@@ -2890,7 +2890,7 @@ and n_way_join_row_like_for_closures env
     (match other_closures with
     | Or_bottom.Bottom -> ()
     | Or_bottom.Ok _ ->
-      Misc.fatal_error "Unexpected bottom other case in n-way join of row-like");
+      Misc.fatal_error "Unexpected non-bottom other case in n-way join of row-like");
     TG.Row_like_for_closures.create_raw ~known_closures, env
   | Unknown, _ ->
     Misc.fatal_error "Join row_like case for closures returned Unknown"
