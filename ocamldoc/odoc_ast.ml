@@ -1496,9 +1496,11 @@ module Analyser =
           let kind, sig_mtype =
             match modtype, tt_module_type.mtd_type with
             | Some modtype, Some mty_type ->
+                let expanded = Odoc_env.expand_module_type
+                    mty_type.mty_env mty_type.mty_type in
                 Some (Sig.analyse_module_type_kind env complete_name
-                        modtype mty_type.mty_type),
-                Some mty_type.mty_type
+                        modtype expanded),
+                Some expanded
             | _ -> None, None
           in
           let comment_opt =
@@ -1658,7 +1660,8 @@ module Analyser =
       let pos_end = loc.Location.loc_end.Lexing.pos_cnum in
       let modtype =
         (* FIXME : Odoc_env.subst_module_type env  ? *)
-        tt_module_expr.Typedtree.mod_type
+        Odoc_env.expand_module_type tt_module_expr.Typedtree.mod_env
+          tt_module_expr.Typedtree.mod_type
       in
       let m_code_intf =
         match p_module_expr.Parsetree.pmod_desc with
@@ -1714,11 +1717,13 @@ module Analyser =
                Typedtree.Named (ident, _, mty, _) ->
                let loc =  pmty.Parsetree.pmty_loc in
                let mp_name = Option.fold ~none:"*" ~some:Name.from_ident ident in
+               let expanded =
+                 Odoc_env.expand_module_type mty.mty_env mty.mty_type in
                let mp_kind =
                  Sig.analyse_module_type_kind env current_module_name pmty
-                   mty.mty_type
+                   expanded
                in
-               let mp_type = Odoc_env.subst_module_type env mty.mty_type in
+               let mp_type = Odoc_env.subst_module_type env expanded in
                loc, mp_name, mp_kind, Some mp_type
              | _, _ -> assert false
            in
@@ -1802,6 +1807,8 @@ module Analyser =
               p_module_expr2
               tt_module_expr2
           in
+          let tt_modtype = Odoc_env.expand_module_type
+              tt_module_expr.Typedtree.mod_env tt_modtype in
           let mtkind = Sig.analyse_module_type_kind env
               (Name.concat current_module_name "??")
               p_modtype tt_modtype
@@ -1826,7 +1833,9 @@ module Analyser =
           let included_modules_from_tt = tt_get_included_module_list tt_structure in
           let elements2 = replace_dummy_included_modules elements included_modules_from_tt in
           { m_base with
-            m_type = Odoc_env.subst_module_type env tt_modtype ;
+            m_type = Odoc_env.subst_module_type env
+              (Odoc_env.expand_module_type
+                 tt_module_expr.Typedtree.mod_env tt_modtype) ;
             m_kind = Module_struct elements2 ;
           }
 
@@ -1849,7 +1858,9 @@ module Analyser =
           in
           let alias = { mta_name = name ; mta_module = None } in
           { m_base with
-            m_type = Odoc_env.subst_module_type env tt_modtype ;
+            m_type = Odoc_env.subst_module_type env
+              (Odoc_env.expand_module_type
+                 tt_module_expr.Typedtree.mod_env tt_modtype) ;
             m_kind = Module_unpack (code, alias) ;
           }
 
