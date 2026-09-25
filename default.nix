@@ -45,6 +45,7 @@ let
       (mkFlag warnError "warn-error")
       (mkFlag ocamltest "ocamltest")
       (mkFlag syntaxQuotations "syntax-quotations")
+      (mkFlag false "flat-float-array")
     ];
 
   # Boot compilers
