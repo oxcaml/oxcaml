@@ -84,10 +84,8 @@ let%expect_test "direct calls with --effects=double-translation" =
        "use strict";
        var
         runtime = globalThis.jsoo_runtime,
-        caml_cps_closure = runtime.caml_cps_closure,
         caml_get_global = runtime.caml_get_global,
         caml_maybe_attach_backtrace = runtime.caml_maybe_attach_backtrace,
-        caml_pop_trap = runtime.caml_pop_trap,
         caml_string_of_jsbytes = runtime.caml_string_of_jsbytes,
         caml_wrap_exception = runtime.caml_wrap_exception;
        function caml_call1(f, a0){
@@ -100,59 +98,18 @@ let%expect_test "direct calls with --effects=double-translation" =
                 ? f(a0, a1)
                 : runtime.caml_call_gen(f, [a0, a1]);
        }
-       function caml_trampoline_cps_call2(f, a0, a1){
-        return runtime.caml_stack_check_depth()
-                ? f.cps
-                  ? (f.cps.l
-                      >= 0
-                      ? f.cps.l
-                      : f.cps.l = f.cps.length)
-                    === 2
-                    ? f.cps.call(null, a0, a1)
-                    : runtime.caml_call_gen_cps(f, [a0, a1])
-                  : a1
-                    ((f.l >= 0 ? f.l : f.l = f.length) === 1
-                      ? f(a0)
-                      : runtime.caml_call_gen(f, [a0]))
-                : runtime.caml_trampoline_return(f, [a0, a1], 0);
-       }
-       function caml_exact_trampoline_cps_call(f, a0, a1){
-        return runtime.caml_stack_check_depth()
-                ? f.cps ? f.cps.call(null, a0, a1) : a1(f(a0))
-                : runtime.caml_trampoline_return(f, [a0, a1], 0);
-       }
-       function caml_trampoline_cps_call3(f, a0, a1, a2){
-        return runtime.caml_stack_check_depth()
-                ? f.cps
-                  ? (f.cps.l
-                      >= 0
-                      ? f.cps.l
-                      : f.cps.l = f.cps.length)
-                    === 3
-                    ? f.cps.call(null, a0, a1, a2)
-                    : runtime.caml_call_gen_cps(f, [a0, a1, a2])
-                  : a2
-                    ((f.l >= 0 ? f.l : f.l = f.length) === 2
-                      ? f(a0, a1)
-                      : runtime.caml_call_gen(f, [a0, a1]))
-                : runtime.caml_trampoline_return(f, [a0, a1, a2], 0);
-       }
-       function caml_exact_trampoline_cps_call$0(f, a0, a1, a2){
-        return runtime.caml_stack_check_depth()
-                ? f.cps ? f.cps.call(null, a0, a1, a2) : a2(f(a0, a1))
-                : runtime.caml_trampoline_return(f, [a0, a1, a2], 0);
-       }
        var
-        _a_ = [0, [4, 0, 0, 0, 0], caml_string_of_jsbytes("%d")],
-        cst_a$0 = caml_string_of_jsbytes("a"),
-        cst_a = caml_string_of_jsbytes("a"),
+        dummy = 0,
         Stdlib = caml_get_global("Stdlib"),
         Stdlib_Printf = caml_get_global("Stdlib__Printf"),
+        cst_a = caml_string_of_jsbytes("a"),
+        cst_a$0 = caml_string_of_jsbytes("a"),
+        _a_ = [0, [4, 0, 0, 0, 0], caml_string_of_jsbytes("%d")],
         l = [0, 0];
        function test1(param){
         function f(g, x){
          l[1] = [0, function(param){return 0;}, l[1]];
-         try{caml_call1(g, 0); return;}
+         try{g(); return;}
          catch(e$0){
           var e = caml_wrap_exception(e$0);
           throw caml_maybe_attach_backtrace(e, 0);
@@ -162,143 +119,62 @@ let%expect_test "direct calls with --effects=double-translation" =
         f(function(x){});
         return 0;
        }
-       function _c_(){return function(param){return 0;};}
-       function f$0(){
-        function f$0(g, x){
-         var _f_ = l[1];
-         l[1] = [0, _c_(), _f_];
-         try{caml_call1(g, x); return;}
+       function test2(param){
+        function f(g, x){
+         l[1] = [0, function(param){return 0;}, l[1]];
+         try{g(x); return;}
          catch(e$0){
           var e = caml_wrap_exception(e$0);
           throw caml_maybe_attach_backtrace(e, 0);
          }
         }
-        function f$1(g, x, cont){
-         var _f_ = l[1];
-         l[1] = [0, _c_(), _f_];
-         runtime.caml_push_trap
-          (function(e$0){
-            var raise = caml_pop_trap(), e = caml_maybe_attach_backtrace(e$0, 0);
-            return raise(e);
-           });
-         return caml_exact_trampoline_cps_call
-                 (g, x, function(_f_){caml_pop_trap(); return cont();});
-        }
-        var f = caml_cps_closure(f$0, f$1);
-        return f;
-       }
-       function _d_(){return function(x){};}
-       function _e_(){
-        return caml_cps_closure
-                (function(x){return caml_call2(Stdlib[28], x, cst_a$0);},
-                 function(x, cont){
-                  return caml_trampoline_cps_call3(Stdlib[28], x, cst_a$0, cont);
-                 });
-       }
-       function test2$0(param){
-        var f = f$0();
-        f(_d_(), 7);
-        f(_e_(), cst_a);
+        f(function(x){}, 7);
+        f(function(x){return caml_call2(Stdlib[28], x, cst_a$0);}, cst_a);
         return 0;
        }
-       function test2$1(param, cont){
-        var f = f$0();
-        return caml_exact_trampoline_cps_call$0
-                (f,
-                 _d_(),
-                 7,
-                 function(_f_){
-                  return caml_exact_trampoline_cps_call$0
-                          (f, _e_(), cst_a, function(_f_){return cont(0);});
-                 });
-       }
-       var test2 = caml_cps_closure(test2$0, test2$1);
        function test3(x){
         function F(symbol){
          var for$ = 0, r = [0, 0];
          for(;;){
           r[1]++;
-          var _e_ = for$ + 1 | 0;
+          var _b_ = for$ + 1 | 0;
           if(2 === for$) break;
-          for$ = _e_;
+          for$ = _b_;
          }
          function f(x){return x + 1 | 0;}
          return [0, , f];
         }
-        var M1 = F(), M2 = F(), _e_ = caml_call1(M2[2], 2);
-        return [0, caml_call1(M1[2], 1), _e_];
+        var M1 = F(), M2 = F(), _b_ = M2[2].call(null, 2);
+        return [0, M1[2].call(null, 1), _b_];
        }
-       function f(){
-        function f$0(x){return caml_call2(Stdlib_Printf[2], _a_, x);}
-        function f$1(x, cont){
-         return caml_trampoline_cps_call3(Stdlib_Printf[2], _a_, x, cont);
-        }
-        var f = caml_cps_closure(f$0, f$1);
-        return f;
-       }
-       function F(){
+       function test4(x){
         function F(symbol){
          var for$ = 0, r = [0, 0];
          for(;;){
           r[1]++;
-          var _e_ = for$ + 1 | 0;
-          if(2 === for$){var f$0 = f(); return [0, , f$0];}
-          for$ = _e_;
+          var _b_ = for$ + 1 | 0;
+          if(2 === for$) break;
+          for$ = _b_;
          }
+         function f(x){return caml_call2(Stdlib_Printf[2], _a_, x);}
+         return [0, , f];
         }
-        return F;
+        var M1 = F(), M2 = F();
+        M1[2].call(null, 1);
+        return M2[2].call(null, 2);
        }
-       function test4$0(x){
-        var F$0 = F(), M1 = F$0(), M2 = F$0();
-        caml_call1(M1[2], 1);
-        return caml_call1(M2[2], 2);
-       }
-       function test4$1(x, cont){
-        var F$0 = F(), M1 = F$0(), M2 = F$0();
-        return caml_exact_trampoline_cps_call
-                (M1[2],
-                 1,
-                 function(_e_){
-                  return caml_exact_trampoline_cps_call(M2[2], 2, cont);
-                 });
-       }
-       var test4 = caml_cps_closure(test4$0, test4$1);
-       function _b_(){return function(param){return 0;};}
-       function recfuncs(x){
-        function f(y){return 0 === y ? 1 : x + h(y - 1 | 0) | 0;}
-        function h(z){return 0 === z ? 1 : x + f(z - 1 | 0) | 0;}
-        return [0, h, f];
-       }
-       function g(){
-        function g$0(x){
-         var _e_ = l[1];
-         l[1] = [0, _b_(), _e_];
-         _e_ = recfuncs(x);
-         var f = _e_[2], h = _e_[1], _e_ = h(100), _e_ = f(12) + _e_ | 0;
-         return caml_call1(Stdlib[44], _e_);
+       function test5(param){
+        function g(x){
+         l[1] = [0, function(param){return 0;}, l[1]];
+         function f(y){return 0 === y ? 1 : x + h(y - 1 | 0) | 0;}
+         function h(z){return 0 === z ? 1 : x + f(z - 1 | 0) | 0;}
+         var _a_ = h(100), _a_ = f(12) + _a_ | 0;
+         return caml_call1(Stdlib[44], _a_);
         }
-        function g$1(x, cont){
-         var _e_ = l[1];
-         l[1] = [0, _b_(), _e_];
-         _e_ = recfuncs(x);
-         var f = _e_[2], h = _e_[1], _e_ = h(100), _e_ = f(12) + _e_ | 0;
-         return caml_trampoline_cps_call2(Stdlib[44], _e_, cont);
-        }
-        var g = caml_cps_closure(g$0, g$1);
-        return g;
+        g(42);
+        g(- 5);
+        return 0;
        }
-       function test5$0(param){var g$0 = g(); g$0(42); g$0(- 5); return 0;}
-       function test5$1(param, cont){
-        var g$0 = g();
-        return caml_exact_trampoline_cps_call
-                (g$0,
-                 42,
-                 function(_e_){
-                  return caml_exact_trampoline_cps_call
-                          (g$0, - 5, function(_e_){return cont(0);});
-                 });
-       }
-       var test5 = caml_cps_closure(test5$0, test5$1);
        runtime.caml_register_global
         ([0, l, test1, test2, test3, test4, test5], "Test");
        return;
