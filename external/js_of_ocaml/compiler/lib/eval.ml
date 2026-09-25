@@ -310,15 +310,7 @@ let eval_prim ~target x =
           Some (Int (Targetint.of_int64_truncate i))
       | "caml_nativeint_of_int", [ Int i ] -> nativeint (Targetnativeint.of_int64_truncate (Targetint.to_int64 i))
       (* int64 *)
-      (* TODO: unboxed float option encodings represent [none] as a very
-         specific, sentinel NaN. This [js_of_ocaml] compile time eval would turn
-         that sentinel NaN into a canonical [NaN], making [is_none (none ())]
-         return false.
-
-         [none ()] calls [caml_int64_bits_of_float], so making this function
-         no longer available at comp-time eval stops the over-optimization that breaks [is_none].
-      *)
-      (* | "caml_int64_bits_of_float", [ Float f ] -> int64 f *)
+      | "caml_int64_bits_of_float", [ Float f ] -> int64 f
       | "caml_int64_float_of_bits", [ Int64 i ]
         when match target with
              | `JavaScript ->
