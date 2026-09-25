@@ -1,0 +1,39 @@
+(data global "camlTagging_blocks__gc_roots": int 0)
+(data
+ int 3840
+ global "camlTagging_blocks":
+ addr G:"camlTagging_blocks__pair_3"
+ addr G:"camlTagging_blocks__f_4"
+ addr G:"camlTagging_blocks__g_5")
+(data
+ int 3063
+ global "camlTagging_blocks__g_5":
+ addr G:"camlTagging_blocks__g_2_5_code"
+ int 108086391056891909)
+(data
+ int 3063
+ global "camlTagging_blocks__f_4":
+ addr G:"camlTagging_blocks__f_1_4_code"
+ int 108086391056891909)
+(data
+ int 4087
+ global "camlTagging_blocks__pair_3":
+ addr G:"caml_curry2"
+ int 180143985094819847
+ addr G:"camlTagging_blocks__pair_0_3_code")
+(function{tagging_blocks.ml:12,24-34} camlTagging_blocks__pair_0_3_code
+     (a/0: val b/0: val) : val
+ (alloc{tagging_blocks.ml:12,30-34} 2048 a/0 b/0) )
+
+(function{tagging_blocks.ml:13,6-15} camlTagging_blocks__f_1_4_code
+     (x/0: int) : int
+ (+ x/0 2) )
+
+(function{tagging_blocks.ml:14,6-23} camlTagging_blocks__g_2_5_code
+     (p/0: val) : int
+ (+ (+ (load val p/0) (load val (+a p/0 8))) -1) )
+
+(function no_cse reduce_code_size linscan camlTagging_blocks__entry () : val
+ (catch (exit 5 G:"camlTagging_blocks") with(5 *ret*/0: val) 1) )
+
+(data)

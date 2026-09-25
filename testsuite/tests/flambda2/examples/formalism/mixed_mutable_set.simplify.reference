@@ -1,0 +1,21 @@
+let code write_then_read_0 deleted in
+let code loopify(never) size(3) newer_version_of(write_then_read_0)
+      write_then_read_0_1 (t : val, v : float)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : float =
+  let Psetmixedfield =
+    %block_set.mixed.`float`.`1`.[`float`, `int32`].[`1`] (t, v)
+  in
+  let Pmixedfield =
+    %block_load.mixed.`float`.`1`.[`float`, `int32`].mut.[`1`] (t)
+  in
+  cont k (Pmixedfield)
+in
+let $camlMixed_mutable_set__write_then_read_1 =
+  closure write_then_read_0_1 @write_then_read
+in
+let $camlMixed_mutable_set =
+  Block 0 ($camlMixed_mutable_set__write_then_read_1)
+in
+cont done ($camlMixed_mutable_set)

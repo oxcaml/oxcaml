@@ -1,0 +1,28 @@
+(data global "camlTrywith_region__gc_roots": int 0)
+(data
+ int 1792
+ global "camlTrywith_region":
+ addr G:"camlTrywith_region__tw_1")
+(data
+ int 4087
+ global "camlTrywith_region__tw_1":
+ addr G:"caml_curry2"
+ int 180143985094819847
+ addr G:"camlTrywith_region__tw_0_1_code")
+(function{trywith_region.ml:11,22-62} camlTrywith_region__tw_0_1_code
+     (g/0: val x/0: val) : int
+ (let try_region/0 (beginregion)
+   (catch exn
+     (catch (exit<push(6)> 7) with(7)
+       (let
+         body_result/0
+           (app{trywith_region.ml:12,6-9} (load_mut int g/0) x/0 g/0 int)
+         (exit<pop(6)> *return* body_result/0)))
+   with(6 exn/0: val)
+     (let unit/0 (seq (endregion try_region/0) 1)
+       (if (== exn/0 G:"caml_exn_Not_found") -1 (raise_notrace exn/0))))) )
+
+(function no_cse reduce_code_size linscan camlTrywith_region__entry () : val
+ (catch (exit 5 G:"camlTrywith_region") with(5 *ret*/0: val) 1) )
+
+(data)

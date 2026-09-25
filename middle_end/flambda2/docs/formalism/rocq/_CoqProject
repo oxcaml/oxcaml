@@ -1,0 +1,30 @@
+-Q theories Flambda2
+-arg -w -arg +default
+
+theories/Base.v
+theories/Syntax.v
+theories/Cmm.v
+theories/Values.v
+theories/WellFormed.v
+theories/TypeGrammar.v
+theories/CmmMemory.v
+theories/Opsem.v
+theories/PrimMemoryA.v
+theories/PrimScalar.v
+theories/PrimMemoryB.v
+theories/Concretization.v
+theories/ToCmmControl.v
+theories/Machine.v
+theories/Representation.v
+theories/MeetJoin.v
+theories/SimplifyStructure.v
+theories/Inlining.v
+theories/RewritesControl.v
+theories/Unboxing.v
+theories/RewritesPrim.v
+theories/ToCmmData.v
+theories/ToCmmSoundness.v
+theories/Simplify.v
+theories/Soundness.v
+theories/Pilot.v
+theories/All.v
