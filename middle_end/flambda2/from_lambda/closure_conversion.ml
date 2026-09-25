@@ -1434,6 +1434,29 @@ let simplify_block_load acc body_env ~block ~field : simplified_block_load =
     | Some approx -> Block_but_cannot_simplify approx
     | None -> Not_a_block)
 
+let try_fold_primitive acc env (prim : P.t) : Simple.t option =
+  let const_of_simple simple =
+    match find_value_approximation_through_symbol acc env simple with
+    | Value_const const -> Some const
+    | Value_symbol _ | Closure_approximation _ | Block_approximation _
+    | Unknown _ ->
+      None
+  in
+  let machine_width = Acc.machine_width acc in
+  match prim with
+  | Unary (unary_prim, arg) ->
+    Option.bind (const_of_simple arg) (fun arg ->
+        Lambda_to_flambda_primitives_helpers.fold_unary_int_primitive unary_prim
+          arg)
+    |> Option.map Simple.const
+  | Binary (binary_prim, arg1, arg2) ->
+    Option.bind (const_of_simple arg1) (fun arg1 ->
+        Option.bind (const_of_simple arg2) (fun arg2 ->
+            Lambda_to_flambda_primitives_helpers.fold_binary_primitive
+              machine_width binary_prim arg1 arg2))
+    |> Option.map Simple.const
+  | Nullary _ | Ternary _ | Quaternary _ | Variadic _ -> None
+
 type block_static_kind =
   | Dynamic_block
   | Computed_static of Simple.With_debuginfo.t list
@@ -1731,6 +1754,13 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
           | Block_but_cannot_simplify approx ->
             let body_env = Env.add_var_approximation body_env var approx in
             bind acc body_env)
+        | Prim (((Unary _ | Binary _) as prim), _)
+          when Flambda_features.classic_mode () -> (
+          match try_fold_primitive acc body_env prim with
+          | Some simple ->
+            let body_env = Env.add_simple_to_substitute env id simple kind in
+            body acc body_env
+          | None -> bind acc body_env)
         | _ -> bind acc body_env))
     | _, _ ->
       Misc.fatal_errorf
