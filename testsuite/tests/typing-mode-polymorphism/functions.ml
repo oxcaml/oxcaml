@@ -151,8 +151,8 @@ let rec recursive x n =
 [%%expect{|
 val recursive :
   'a @ [< 'm & global] ->
-  int @ [< global many read_write > dynamic] ->
-  'a @ [< global > 'm | dynamic] = <fun>
+  int @ [< many read_write > dynamic] -> 'a @ [< global > 'm | dynamic] =
+  <fun>
 |}]
 
 let foo (x @ portable) =
@@ -166,8 +166,8 @@ let recursive' = recursive
 [%%expect{|
 val recursive' :
   'a @ [< 'm & global] ->
-  int @ [< global many read_write > dynamic] ->
-  'a @ [< global > 'm | dynamic] = <fun>
+  int @ [< many read_write > dynamic] -> 'a @ [< global > 'm | dynamic] =
+  <fun>
 |}]
 
 let foo (x @ nonportable) =

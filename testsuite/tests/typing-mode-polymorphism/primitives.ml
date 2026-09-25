@@ -141,3 +141,35 @@ val id_local : unit @ 'm -> ('a @ local -> 'a @ local) @ [> stateful] = <fun>
   (apply (field_imm 1 (global Toploop!)) "apply_id" apply_id/0))
 val apply_id : 'a @ [< 'm & global] -> 'a @ [> 'm | dynamic] = <fun>
 |}];;
+
+(* A primitive bound as a value is eta-expanded into a single function, so its
+   return locality must stay a non-generalizable variable that every use (in
+   particular, a signature) can constrain. Otherwise nothing prevents the
+   allocation optimisation from making the eta-expansion local-returning while
+   the exported type says global. *)
+module Bound_id : sig
+  val bound_id : string -> string
+end = struct
+  external id : 'a @ [< 'm] -> 'a @ [> 'm] = "%identity"
+  let bound_id = id
+end
+[%%expect{|
+(apply (field_imm 1 (global Toploop!)) "Bound_id/362"
+  (let (bound_id/0 = (function {nlocal = 0} prim/9 stub prim/9))
+    (makeblock 0 bound_id/0)))
+module Bound_id : sig val bound_id : string -> string end
+|}];;
+
+module Bound_ref : sig
+  val mk : string -> string ref
+end = struct
+  external mkref : 'a -> ('a ref[@local_opt]) = "%makemutable"
+  let mk = mkref
+end
+[%%expect{|
+(apply (field_imm 1 (global Toploop!)) "Bound_ref/367"
+  (let
+    (mk/0 = (function {nlocal = 0} prim/10 stub (makemutable 0 (*) prim/10)))
+    (makeblock 0 mk/0)))
+module Bound_ref : sig val mk : string -> string ref end
+|}];;

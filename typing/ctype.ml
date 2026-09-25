@@ -2278,8 +2278,8 @@ let instance_prim_mode (desc : Primitive.description) ty =
   if is_poly desc.prim_native_repr_res ||
        List.exists is_poly desc.prim_native_repr_args then
     let current_level = get_current_level () in
-    let mode_l = Locality.newvar current_level in
-    let mode_fy = Forkable.newvar current_level, Yielding.newvar current_level in
+    let mode_l = Locality.newvar 0 in
+    let mode_fy = Forkable.newvar 0, Yielding.newvar 0 in
     let finalret =
       prim_mode' (Some (mode_l, mode_fy)) desc.prim_native_repr_res
     in
