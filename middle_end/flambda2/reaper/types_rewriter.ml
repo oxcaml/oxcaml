@@ -267,6 +267,61 @@ let join_metadata context x y =
       Many_sources_usages
         (PTA.Usages (Code_id_or_name.Map.inter (fun _ () () -> ()) u1 u2)))
 
+let get_block_changed_representation context metadata =
+  let get_one x =
+    match
+      Code_id_or_name.Map.find_opt x context.unboxing.changed_representation
+    with
+    | None -> None
+    | Some (Closure_representation _, _) -> None
+    | Some (Block_representation { fields; shape; size }, source) ->
+      Some (~fields, ~shape, ~size, ~source)
+  in
+  match metadata with
+  | No_source | At_least_one_source_no_usages ->
+    Misc.fatal_errorf
+      "[get_block_changed_representation] should not be called on %a"
+      print_metadata metadata
+  | Many_sources_any_usage ->
+    (* If we are [any_usage], there is no way our representation (for a block)
+       could have been changed. *)
+    None
+  | Single_source source -> get_one source
+  | Many_sources_usages (Usages usages) -> (
+    (* A block that has changed representation must be a source of all its
+       usages. As such, if at least one usage has a block changed
+       representation, they all must have, with the same source. *)
+    assert (not (Code_id_or_name.Map.is_empty usages));
+    let[@local] inconsistent () =
+      Misc.fatal_errorf
+        "For usages %a, some usages change a block representation and some \
+         don't or change with a different representation"
+        (Code_id_or_name.Map.print Unit.print)
+        usages
+    in
+    let usage, () = Code_id_or_name.Map.choose usages in
+    match get_one usage with
+    | None ->
+      if
+        not
+          (Code_id_or_name.Map.for_all
+             (fun x () -> Option.is_none (get_one x))
+             usages)
+      then inconsistent ()
+      else None
+    | Some (~source, ..) as r ->
+      if
+        not
+          (Code_id_or_name.Map.for_all
+             (fun x () ->
+               match get_one x with
+               | None -> false
+               | Some (~source:source2, ..) ->
+                 Code_id_or_name.equal source source2)
+             usages)
+      then inconsistent ()
+      else r)
+
 let metadata_for_name context name =
   match PTA.get_single_source context.db name with
   | Bottom -> No_source
@@ -281,6 +336,152 @@ let metadata_for_name context name =
     | Ok usages -> Many_sources_usages usages)
 
 (** Subkind rewriting *)
+
+let combine_for_unboxed_fields db fields unboxed_fields source =
+  Field.Map.merge
+    (fun field field_use unboxed_field ->
+      match field_use, unboxed_field with
+      | None, None ->
+        Misc.fatal_errorf
+          "Field %a appeared in neither [fields] nor [unboxed_fields] in \
+           [combine_for_unboxed_fields]"
+          Field.print field
+      | Some _, None ->
+        (match Field.view field with
+        | Call_witness _ | Code_id_of_call_witness | Return_of_call _ ->
+          (* Virtual fields *) ()
+        | Function_slot _ -> (* Shortcut *) ()
+        | Is_int | Get_tag ->
+          (* is_int/get_tag of the original block are preserved when changing
+             representation *)
+          ()
+        | Block _ | Value_slot _ | Boxed_number _ -> (
+          let field_source = PTA.get_single_field_source db source field in
+          match field_source with
+          | No_source -> ()
+          | One _ | Many ->
+            Misc.fatal_errorf
+              "Field %a appeared in [fields] but not [unboxed_fields] in \
+               [combine_for_unboxed_fields]"
+              Field.print field));
+        None
+      | None, Some _ ->
+        (* This should not happen if we only start [patterns_for_unboxed_fields]
+           on the same name we started [mk_unboxed_fields]. *)
+        Misc.fatal_errorf
+          "In [combine_for_unboxed_fields], field %a existed in \
+           [unboxed_fields] but not in [fields]"
+          Field.print field
+      | Some field_use, Some unboxed_fields -> Some (field_use, unboxed_fields))
+    fields unboxed_fields
+
+let rec subkinds_for_unboxed_fields db fields unboxed_fields unboxed_block kind
+    =
+  let combined =
+    combine_for_unboxed_fields db fields unboxed_fields unboxed_block
+  in
+  let for_one_use field (field_use, unboxed_fields) field_kind =
+    let field_source = PTA.get_single_field_source db unboxed_block field in
+    match (unboxed_fields : _ Unboxed_fields.u) with
+    | Not_unboxed pos -> [field_kind, pos, Some (field_source, field_use)]
+    | Unboxed unboxed_fields -> (
+      match (field_use : _ Or_unknown.t) with
+      | Unknown ->
+        Misc.fatal_errorf
+          "In [subkinds_for_unboxed_fields], field was unboxed but has \
+           [Used_as_top] usage"
+      | Known flow_to -> (
+        match field_source with
+        | No_source ->
+          Misc.fatal_errorf
+            "In [subkinds_for_unboxed_fields], field was unboxed but has no \
+             source"
+        | Many ->
+          Misc.fatal_errorf
+            "In [subkinds_for_unboxed_fields], field was unboxed but has many \
+             sources"
+        | One field_source ->
+          let usages = PTA.get_direct_usages db flow_to in
+          let fields =
+            PTA.get_fields db
+              (PTA.add_usages_through_function_slots
+                 ~follow_known_arity_calls:true db usages)
+          in
+          subkinds_for_unboxed_fields db fields unboxed_fields field_source
+            field_kind))
+  in
+  match classify_field_map combined with
+  | Empty | Fields_from_distinct_subkinds | Closure_fields _ ->
+    Unboxed_fields.fold_with_kind
+      (fun kind pos acc ->
+        (Flambda_kind.With_subkind.anything kind, pos, None) :: acc)
+      unboxed_fields []
+  | Boxed_number_field (bn, use) ->
+    let field = Field.boxed_number bn in
+    for_one_use field use (Flambda_kind.With_subkind.naked_of_boxable_number bn)
+  | Block_fields { is_int; get_tag; fields } ->
+    let acc = [] in
+    let acc =
+      match is_int with
+      | None -> acc
+      | Some use ->
+        for_one_use Field.is_int use Flambda_kind.With_subkind.naked_immediate
+        @ acc
+    in
+    let acc =
+      match get_tag with
+      | None -> acc
+      | Some use ->
+        for_one_use Field.get_tag use Flambda_kind.With_subkind.naked_immediate
+        @ acc
+    in
+    let acc = ref acc in
+    List.iteri
+      (fun i use ->
+        match use with
+        | None -> ()
+        | Some (field_kind, use) ->
+          let field = Field.block i field_kind in
+          let field_kind =
+            match Flambda_kind.With_subkind.non_null_value_subkind kind with
+            | Anything | Tagged_immediate | Boxed_float32 | Boxed_float
+            | Boxed_int32 | Boxed_int64 | Boxed_nativeint | Boxed_vec128
+            | Boxed_vec256 | Boxed_vec512 | Boxed_mask | Float_block _
+            | Float_array | Immediate_array | Value_array | Generic_array
+            | Unboxed_float32_array | Untagged_int_array | Untagged_int8_array
+            | Untagged_int16_array | Unboxed_int32_array | Unboxed_int64_array
+            | Unboxed_nativeint_array | Unboxed_vec128_array
+            | Unboxed_vec256_array | Unboxed_vec512_array | Unboxed_mask_array
+            | Unboxed_product_array ->
+              Flambda_kind.With_subkind.anything field_kind
+            | Variant { consts = _; non_consts } -> (
+              let possible_field_subkinds =
+                Tag.Scannable.Map.fold
+                  (fun _tag (_shape, kinds) acc ->
+                    let field_subkind = List.nth kinds i in
+                    if
+                      Flambda_kind.equal field_kind
+                        (Flambda_kind.With_subkind.kind field_subkind)
+                    then field_subkind :: acc
+                    else acc)
+                  non_consts []
+              in
+              match possible_field_subkinds with
+              | [] ->
+                (* We should produce [Bottom] but this seems dangerous and is
+                   difficult to do, for little benefit. Produce an unknown
+                   instead. *)
+                Flambda_kind.With_subkind.anything field_kind
+              | [field_subkind] -> field_subkind
+              | _ :: _ :: _ ->
+                (* [Flambda_kind.With_subkind.join] does not exist! CR ncourant:
+                   it is again very unfortunate that this is needed: the reaper
+                   should be able to know the tag of the block here... *)
+                Flambda_kind.With_subkind.anything field_kind)
+          in
+          acc := for_one_use field use field_kind @ !acc)
+      fields;
+    !acc
 
 (* Note that this depends crucially on the fact that the poison value is not
    nullable. If it was, we could instead keep the subkind but erase the
@@ -373,28 +574,75 @@ let rec rewrite_kind_with_subkind context metadata kind =
     | Unboxed_vec512_array | Unboxed_mask_array | Unboxed_product_array ->
       (* For all these subkinds, we don't track fields (for now). *)
       kind
-    | Variant { consts; non_consts } ->
-      let non_consts =
-        Tag.Scannable.Map.map
-          (fun (shape, kinds) ->
-            let kinds =
-              List.mapi
-                (fun i kind ->
-                  let field =
-                    Field.block i (Flambda_kind.With_subkind.kind kind)
+    | Variant { consts; non_consts } -> (
+      match get_block_changed_representation context metadata with
+      | None ->
+        let non_consts =
+          Tag.Scannable.Map.map
+            (fun (shape, kinds) ->
+              let kinds =
+                List.mapi
+                  (fun i kind ->
+                    let field =
+                      Field.block i (Flambda_kind.With_subkind.kind kind)
+                    in
+                    rewrite_kind_with_subkind context
+                      (follow_field context metadata field)
+                      kind)
+                  kinds
+              in
+              shape, kinds)
+            non_consts
+        in
+        Flambda_kind.With_subkind.create Flambda_kind.value
+          (Flambda_kind.With_subkind.Non_null_value_subkind.Variant
+             { consts; non_consts })
+          (Flambda_kind.With_subkind.nullable kind)
+      | Some (~fields, ~shape, ~size, ~source) ->
+        let fields_usages =
+          PTA.get_fields_usage_of_constructors context.db
+            (Code_id_or_name.Map.singleton source ())
+        in
+        let new_subkinds =
+          subkinds_for_unboxed_fields context.db fields_usages fields source
+            kind
+        in
+        let new_subkinds =
+          List.fold_left
+            (fun acc (kind, pos, metadata_to_rewrite) ->
+              let kind =
+                match metadata_to_rewrite with
+                | None -> kind
+                | Some (field_source, field_use) ->
+                  let metadata =
+                    match
+                      ( (field_source : PTA.single_field_source),
+                        (field_use : _ Or_unknown.t) )
+                    with
+                    | No_source, _ -> No_source
+                    | One source, _ -> Single_source source
+                    | Many, Unknown -> Many_sources_any_usage
+                    | Many, Known flow_to ->
+                      let usages = PTA.get_direct_usages context.db flow_to in
+                      Many_sources_usages usages
                   in
-                  rewrite_kind_with_subkind context
-                    (follow_field context metadata field)
-                    kind)
-                kinds
-            in
-            shape, kinds)
-          non_consts
-      in
-      Flambda_kind.With_subkind.create Flambda_kind.value
-        (Flambda_kind.With_subkind.Non_null_value_subkind.Variant
-           { consts; non_consts })
-        (Flambda_kind.With_subkind.nullable kind))
+                  rewrite_kind_with_subkind context metadata kind
+              in
+              Numeric_types.Int.Map.add pos kind acc)
+            Numeric_types.Int.Map.empty new_subkinds
+        in
+        let new_subkinds =
+          List.init size (fun i -> Numeric_types.Int.Map.find i new_subkinds)
+        in
+        let non_consts =
+          Tag.Scannable.Map.map
+            (fun _ -> Flambda_kind.Block_shape.Scannable shape, new_subkinds)
+            non_consts
+        in
+        Flambda_kind.With_subkind.create Flambda_kind.value
+          (Flambda_kind.With_subkind.Non_null_value_subkind.Variant
+             { consts = Target_ocaml_int.Set.empty; non_consts })
+          Non_nullable))
 
 let rewrite_kind_with_subkind context var kind =
   let var = Code_id_or_name.name var in
@@ -437,42 +685,7 @@ module Rewriter = struct
       ~patterns_for_function_slots db ~var fields unboxed_fields unboxed_block =
     let open Flambda2_types.Rewriter in
     let combined =
-      Field.Map.merge
-        (fun field field_use unboxed_field ->
-          match field_use, unboxed_field with
-          | None, None ->
-            Misc.fatal_errorf
-              "Field %a appeared in neither [fields] nor [unboxed_fields] in \
-               [patterns_for_unboxed_fields]"
-              Field.print field
-          | Some _, None ->
-            (match Field.view field with
-            | Call_witness _ | Code_id_of_call_witness | Return_of_call _ ->
-              (* Virtual fields *) ()
-            | Function_slot _ -> (* Shortcut *) ()
-            | Block _ | Value_slot _ | Is_int | Get_tag | Boxed_number _ -> (
-              let field_source =
-                PTA.get_single_field_source db unboxed_block field
-              in
-              match field_source with
-              | No_source -> ()
-              | One _ | Many ->
-                Misc.fatal_errorf
-                  "Field %a appeared in [fields] but not [unboxed_fields] in \
-                   [patterns_for_unboxed_fields]"
-                  Field.print field));
-            None
-          | None, Some _ ->
-            (* This should not happen if we only start
-               [patterns_for_unboxed_fields] on the same name we started
-               [mk_unboxed_fields]. *)
-            Misc.fatal_errorf
-              "In [patterns_for_unboxed_fields], field %a existed in \
-               [unboxed_fields] but not in [fields]"
-              Field.print field
-          | Some field_use, Some unboxed_fields ->
-            Some (field_use, unboxed_fields))
-        fields unboxed_fields
+      combine_for_unboxed_fields db fields unboxed_fields unboxed_block
     in
     let forget unboxed_fields =
       Unboxed_fields.map_u (fun x -> None, x) unboxed_fields
@@ -845,10 +1058,64 @@ module Rewriter = struct
       match
         Flambda2_types.meet_single_closures_entry typing_env flambda_type
       with
-      | Invalid ->
-        (* Not a closure. For now, we can never change the representation of
-           this, so no rewrite is necessary. *)
-        Rule.identity
+      | Invalid -> (
+        (* Not a closure, but possibly a block whose representation has
+           changed. *)
+        match get_block_changed_representation context usages with
+        | None -> Rule.identity
+        | Some (~fields, ~shape, ~size, ~source) -> (
+          match
+            Flambda2_types.prove_unique_tag_and_size typing_env flambda_type
+          with
+          | Unknown ->
+            (* This is unfortunate: we need this only to get the tag of the
+               rewritten block. Still, it should not happen to often in
+               practice. CR-someday ncourant: the reaper should be able to know
+               the tag of the block, without asking the typing_env, because it
+               has seen the construction of the block! *)
+            forget_type ()
+          | Proved (tag, _original_shape, _original_size) ->
+            let fields_usages =
+              PTA.get_fields_usage_of_constructors db
+                (Code_id_or_name.Map.singleton source ())
+            in
+            let bound, pat =
+              patterns_for_unboxed_fields
+                ~machine_width:(Typing_env.machine_width typing_env)
+                ~patterns_for_function_slots:None db
+                ~var:(fun
+                    _ (field_source : PTA.single_field_source) field_use ->
+                  let metadata =
+                    match field_source, field_use with
+                    | No_source, _ -> No_source
+                    | One source, _ -> Single_source source
+                    | Many, Unknown -> Many_sources_any_usage
+                    | Many, Known flow_to ->
+                      let usages = PTA.get_direct_usages context.db flow_to in
+                      Many_sources_usages usages
+                  in
+                  context, metadata)
+                fields_usages fields source
+            in
+            let new_fields =
+              Unboxed_fields.fold_with_kind
+                (fun kind (var, pos) m ->
+                  let e =
+                    match var with
+                    | None -> Expr.unknown kind
+                    | Some var -> Expr.var var
+                  in
+                  Numeric_types.Int.Map.add pos e m)
+                bound Numeric_types.Int.Map.empty
+            in
+            let new_fields =
+              List.init size (fun i -> Numeric_types.Int.Map.find i new_fields)
+            in
+            Rule.rewrite pat
+              (Expr.immutable_block ~is_unique:false tag
+                 ~shape:(Flambda_kind.Block_shape.Scannable shape)
+                 (Alloc_mode.For_types.unknown ())
+                 ~fields:new_fields)))
       | Need_meet ->
         (* Multiple closures are possible. We are never able to use this
            information currently; convert to Unknown. Note that this case

@@ -349,6 +349,98 @@ let rewrite_simple_with_debuginfo env (simple : Simple.With_debuginfo.t) =
 let rewrite_simples_with_debuginfo env simples =
   List.map (rewrite_simple_with_debuginfo env) simples
 
+let block_kind_for_changed_representation ~(shape : K.Scannable_block_shape.t)
+    ~tag ~size : P.Block_kind.t =
+  match shape with
+  | Value_only -> Values (tag, List.init size (fun _ -> KS.any_value))
+  | Mixed_record mixed_shape -> Mixed (tag, mixed_shape)
+
+let block_load_for_changed_representation env
+    ~(shape : K.Scannable_block_shape.t) ~index ~result_kind block : P.t =
+  let index = Target_ocaml_int.of_int env.machine_width index in
+  let kind =
+    P.Block_access_kind.from_block_shape (K.Block_shape.Scannable shape) ~index
+      ~result_kind:(KS.anything result_kind)
+  in
+  P.Unary (Block_load { field = index; kind; mut = Immutable }, block)
+
+(* The fields of the block that replaces the block [bound], whose original
+   fields are [original_fields] and whose representation is being changed to
+   [repr]: each field of the original block that is kept is moved to its new
+   index, and each field that is unboxed is replaced by the variables holding
+   its components. *)
+let fields_of_block_whose_representation_is_being_changed env
+    (repr : int Unboxed_fields.t) ~size original_fields =
+  (* CR-someday ncourant: It might be possible to make this code (and likewise
+     for sets of closures) cleaner by mapping the arguments to a Field.Map.t and
+     simply using [fold2_subset_u]. However, this would lose a bit of precision
+     in the error messages, and would require mapping the [Variable.t
+     Unboxed_fields.t] of [get_simple_unboxable] to [Simple.t
+     Unboxed_fields.t] *)
+  let original_fields = Iarray.of_list original_fields in
+  let fields =
+    Field.Map.fold
+      (fun f (uf : _ Unboxed_fields.u) fields ->
+        match Field.view f with
+        | Block (nth, field_kind) -> (
+          let field =
+            if
+              0 <= nth
+              && nth < Iarray.length original_fields
+              && K.equal field_kind
+                   (get_simple_kind
+                      (Simple.With_debuginfo.simple
+                         (Iarray.get original_fields nth)))
+            then Iarray.get original_fields nth
+            else
+              Misc.fatal_errorf
+                "[fields_of_block_whose_representation_is_being_changed]: the \
+                 new representation %a contains a field that did not exist in \
+                 the original block (pos = %d, kind = %a)"
+                (Unboxed_fields.print Format.pp_print_int)
+                repr nth K.print field_kind
+          in
+          let simple = Simple.With_debuginfo.simple field in
+          let dbg = Simple.With_debuginfo.dbg field in
+          if simple_is_unboxable env simple
+          then
+            Unboxed_fields.fold2_subset_u
+              (fun index var fields ->
+                Int.Map.add index
+                  (Simple.With_debuginfo.create (Simple.var var) dbg)
+                  fields)
+              uf
+              (Unboxed (get_simple_unboxable env simple))
+              fields
+          else
+            match uf with
+            | Not_unboxed index ->
+              Int.Map.add index (rewrite_simple_with_debuginfo env field) fields
+            | Unboxed _ ->
+              Misc.fatal_errorf
+                "Field %a of is unboxed in the new representation %a, but its \
+                 contents %a are not unboxed"
+                Field.print f
+                (Unboxed_fields.print Format.pp_print_int)
+                repr Simple.print simple)
+        | Is_int | Get_tag | Value_slot _ | Function_slot _ | Boxed_number _
+        | Call_witness _ | Return_of_call _ | Code_id_of_call_witness ->
+          Misc.fatal_errorf
+            "Unexpected field %a when rebuilding changed representation %a"
+            Field.print f
+            (Unboxed_fields.print Format.pp_print_int)
+            repr)
+      repr Int.Map.empty
+  in
+  List.init size (fun index ->
+      match Int.Map.find_opt index fields with
+      | Some field -> field
+      | None ->
+        Misc.fatal_errorf
+          "Missing field %d when rebuilding changed representation %a" index
+          (Unboxed_fields.print Format.pp_print_int)
+          repr)
+
 let rewrite_set_of_closures env res ~(bound : Name.t list)
     ({ Rev_expr.function_decls; value_slots } : Rev_expr.rev_set_of_closures) =
   let slot_is_used slot =
@@ -532,23 +624,36 @@ let rewrite_static_const (env : env) ~(bound_to : Symbol.t) (sc : SC.t) =
     Misc.fatal_errorf
       "Set of closures given as input to [rewrite_static_const]:@ %a@."
       Set_of_closures.print set
-  | Block (tag, mut, shape, fields) ->
+  | Block (tag, mut, shape, fields) -> (
     (* Note: shape contains only kinds, no subkinds: no need to rewrite. *)
     let bound_name = Code_id_or_name.symbol bound_to in
-    let fields =
-      List.mapi
-        (fun i field ->
-          let kind = K.Scannable_block_shape.element_kind shape i in
-          let f = Field.block i kind in
-          if Analysis.field_used env.uses bound_name f
-          then rewrite_simple_with_debuginfo env field
-          else
-            Simple.With_debuginfo.create
-              (poison "reaper_field_of_static_const" kind)
-              (Simple.With_debuginfo.dbg field))
-        fields
-    in
-    SC.block tag mut shape fields
+    match Analysis.get_changed_representation env.uses bound_name with
+    | Some (Closure_representation _) ->
+      Misc.fatal_errorf
+        "Expected block representation for static block %a, got closure \
+         representation"
+        Symbol.print bound_to
+    | Some (Block_representation { fields = repr; shape; size }) ->
+      let fields =
+        fields_of_block_whose_representation_is_being_changed env repr ~size
+          fields
+      in
+      SC.block tag mut shape fields
+    | None ->
+      let fields =
+        List.mapi
+          (fun i field ->
+            let kind = K.Scannable_block_shape.element_kind shape i in
+            let f = Field.block i kind in
+            if Analysis.field_used env.uses bound_name f
+            then rewrite_simple_with_debuginfo env field
+            else
+              Simple.With_debuginfo.create
+                (poison "reaper_field_of_static_const" kind)
+                (Simple.With_debuginfo.dbg field))
+          fields
+      in
+      SC.block tag mut shape fields)
   | Boxed_float f -> SC.boxed_float (rewrite_or_variable Float.zero env f)
   | Boxed_float32 f -> SC.boxed_float32 (rewrite_or_variable Float32.zero env f)
   | Boxed_int32 n -> SC.boxed_int32 (rewrite_or_variable Int32.zero env n)
@@ -654,16 +759,11 @@ let rebuild_named_default_case env (named : Named.t) =
     in
     let arg_repr = get_simple_changed_repr env arg in
     match arg_repr with
-    | Block_representation (arg_fields, _size) ->
-      get_field arg_fields ~f:(fun (field, kind) ->
+    | Block_representation { fields = arg_fields; shape; size = _ } ->
+      get_field arg_fields ~f:(fun index ->
           let prim =
-            P.Unary
-              ( Block_load
-                  { field = Target_ocaml_int.of_int env.machine_width field;
-                    kind;
-                    mut = Immutable
-                  },
-                arg )
+            block_load_for_changed_representation env ~shape ~index
+              ~result_kind:(Field.kind field) arg
           in
           ( Named.create_prim prim dbg,
             Code_size.prim ~machine_width:env.machine_width prim ))
@@ -711,12 +811,10 @@ let rebuild_named_default_case env (named : Named.t) =
   | Prim (Unary (Project_value_slot { value_slot; _ }, arg), dbg)
     when simple_changed_repr env arg ->
     rewrite_field_access_chg_repr arg (Field.value_slot value_slot) dbg
-  | Prim (Unary (Is_int { variant_only = true }, arg), dbg)
-    when simple_changed_repr env arg ->
-    rewrite_field_access_chg_repr arg Field.is_int dbg
-  | Prim (Unary (Get_tag, arg), dbg) when simple_changed_repr env arg ->
-    rewrite_field_access_chg_repr arg Field.get_tag dbg
   | Prim (prim, dbg) ->
+    (* This includes [Is_int] and [Get_tag] applied to a block whose
+       representation has changed, since we keep the original tag, no rewriting
+       is necessary. *)
     let prim = P.map_args (rewrite_simple env) prim in
     ( Named.create_prim prim dbg,
       Code_size.prim ~machine_width:env.machine_width prim )
@@ -1404,7 +1502,7 @@ let load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
         (Analysis.has_source env.uses arg);
     let arg = Option.get (Analysis.get_changed_representation env.uses arg) in
     match arg with
-    | Block_representation (arg_fields, _size) -> (
+    | Block_representation { fields = arg_fields; shape; size = _ } -> (
       match Field.Map.find field arg_fields with
       | exception Not_found ->
         Misc.fatal_errorf "@[<v>%a@;<1 2>%a@ %a@;<1 2>%a@ %a@]@."
@@ -1413,20 +1511,15 @@ let load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
           Simple.print oarg Format.pp_print_text "but it was not tracked."
       | arg ->
         Unboxed_fields.fold2_subset_u
-          (fun var (field, kind) hole ->
+          (fun var index hole ->
             let bp =
               Bound_pattern.singleton
                 (Bound_var.create var Flambda_debug_uid.none Name_mode.normal)
               (* CR sspies: Missing debug uid. *)
             in
             let prim =
-              P.Unary
-                ( Block_load
-                    { field = Target_ocaml_int.of_int env.machine_width field;
-                      kind;
-                      mut = Immutable
-                    },
-                  oarg )
+              block_load_for_changed_representation env ~shape ~index
+                ~result_kind:(Variable.kind var) oarg
             in
             let named = Named.create_prim prim dbg in
             let size_of_defining_expr =
@@ -1594,8 +1687,6 @@ let rebuild_set_of_closures_binding_which_is_being_unboxed env bvs
 
 let rebuild_singleton_binding_whose_representation_is_being_changed env bp bv
     ~(defining_expr : Named.t) ~hole =
-  (* TODO when this block is stored anywhere else, the subkind is no longer
-     correct... we need to fix that somehow *)
   match[@ocaml.warning "-fragile-match"] defining_expr with
   | Prim (Unary (Project_function_slot { move_from; move_to }, arg), dbg) ->
     let fields =
@@ -1625,82 +1716,38 @@ let rebuild_singleton_binding_whose_representation_is_being_changed env bp bv
       Code_size.prim ~machine_width:env.machine_width prim
     in
     RE.create_let bp named ~size_of_defining_expr ~body:hole
-  | Prim (Variadic (Make_block (kind, _mut, alloc_mode), args), dbg) ->
-    let fields =
+  | Prim (Variadic (Make_block (kind, mut, alloc_mode), args), dbg) ->
+    let repr =
       Option.get
         (Analysis.get_changed_representation env.uses
            (Code_id_or_name.var (Bound_var.var bv)))
     in
-    let fields, size =
-      match fields with
-      | Block_representation (fields, size) -> fields, size
+    let fields, shape, size =
+      match repr with
+      | Block_representation { fields; shape; size } -> fields, shape, size
       | Closure_representation _ ->
         Misc.fatal_errorf
           "Expected block representation for Make_block on %a, got closure \
            representation"
           Bound_var.print bv
     in
-    let mp =
-      Field.Map.fold
-        (fun f (uf : _ Unboxed_fields.u) mp ->
-          match Field.view f with
-          | Block (i, _kind) -> (
-            let arg = List.nth args i in
-            if simple_is_unboxable env arg
-            then
-              Unboxed_fields.fold2_subset_u
-                (fun (ff, _) var mp -> Int.Map.add ff (Simple.var var) mp)
-                uf
-                (Unboxed (get_simple_unboxable env arg))
-                mp
-            else
-              match uf with
-              | Not_unboxed (ff, _) ->
-                Int.Map.add ff (rewrite_simple env arg) mp
-              | Unboxed _ -> Misc.fatal_errorf "trying to unbox simple")
-          | Get_tag -> (
-            let tag =
-              match kind with
-              | Values (tag, _) | Mixed (tag, _) ->
-                Tag.to_targetint_31_63 env.machine_width
-                  (Tag.Scannable.to_tag tag)
-              | Naked_floats ->
-                Tag.to_targetint_31_63 env.machine_width Tag.double_array_tag
-            in
-            match uf with
-            | Not_unboxed (ff, _) ->
-              Int.Map.add ff (rewrite_simple env (Simple.const_int tag)) mp
-            | Unboxed _ -> Misc.fatal_errorf "trying to unbox simple")
-          | Is_int -> (
-            match uf with
-            | Not_unboxed (ff, _) ->
-              Int.Map.add ff
-                (rewrite_simple env (Simple.const_one env.machine_width))
-                mp
-            | Unboxed _ -> Misc.fatal_errorf "trying to unbox simple")
-          | Value_slot _ | Function_slot _ | Boxed_number _ | Return_of_call _
-          | Call_witness _ | Code_id_of_call_witness ->
-            Misc.fatal_errorf
-              "Unexpected field kind %a when rebuilding Make_block for %a \
-               whose representation is being changed"
-              Field.print f Bound_var.print bv)
-        fields Int.Map.empty
+    let tag =
+      match kind with
+      | Values (tag, _) | Mixed (tag, _) -> tag
+      | Naked_floats ->
+        (* CR-someday ncourant: we should instead try to preserve [Naked_floats]
+           records. This is currently ok because we never call [Get_tag] on a
+           float record, but this could change in the future with constructor
+           unboxing. *)
+        Tag.Scannable.zero
     in
     let args =
-      List.init size (fun i ->
-          match Int.Map.find_opt i mp with
-          | None -> Simple.const_zero env.machine_width
-          | Some x -> x)
+      fields_of_block_whose_representation_is_being_changed env ~size fields
+        (List.map (fun arg -> Simple.With_debuginfo.create arg dbg) args)
+      |> List.map Simple.With_debuginfo.simple
     in
-    let prim =
-      P.Variadic
-        ( Make_block
-            ( P.Block_kind.Values
-                (Tag.Scannable.zero, List.map (fun _ -> KS.any_value) args),
-              Immutable,
-              alloc_mode ),
-          args )
-    in
+    let block_kind = block_kind_for_changed_representation ~shape ~tag ~size in
+    let prim = P.Variadic (Make_block (block_kind, mut, alloc_mode), args) in
     let named = Named.create_prim prim dbg in
     let size_of_defining_expr =
       Code_size.prim ~machine_width:env.machine_width prim

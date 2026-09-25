@@ -109,6 +109,29 @@ module Unboxed_fields = struct
     | Not_unboxed x -> Not_unboxed (f x)
     | Unboxed fields -> Unboxed (map f fields)
 
+  let rec ordered_iter_u f kind = function
+    | Not_unboxed x -> f kind x
+    | Unboxed fields -> ordered_iter f fields
+
+  and ordered_iter f uf =
+    let uf = Field.Map.bindings uf in
+    let uf =
+      List.stable_sort
+        (fun (field1, _) (field2, _) ->
+          let field_idx field =
+            match Field.view field with
+            | Block (idx, _) -> idx
+            | Get_tag -> -1
+            | Is_int -> -2
+            | Value_slot _ | Function_slot _ | Boxed_number _
+            | Code_id_of_call_witness | Call_witness _ | Return_of_call _ ->
+              -3
+          in
+          Int.compare (field_idx field1) (field_idx field2))
+        uf
+    in
+    List.iter (fun (field, uf) -> ordered_iter_u f (Field.kind field) uf) uf
+
   (* This is not symmetrical!! [fields1] must define a subset of [fields2], but
      does not have to define all of them. *)
   let rec fold2_subset_u f fields1 fields2 acc =
@@ -177,11 +200,11 @@ end
 type unboxed = Variable.t Unboxed_fields.t
 
 type changed_representation =
-  (* CR ncourant: [Block_representation] is currently never produced, because we
-     need to rewrite the value_kinds to account for changed representations
-     before enabling it *)
   | Block_representation of
-      (int * Flambda_primitive.Block_access_kind.t) Unboxed_fields.t * int
+      { fields : int Unboxed_fields.t;
+        shape : Flambda_kind.Scannable_block_shape.t;
+        size : int
+      }
   | Closure_representation of
       Value_slot.t Unboxed_fields.t
       * Function_slot.t Function_slot.Map.t (* old -> new *)
@@ -206,10 +229,10 @@ let print_param_decision ppf param_decision =
     Format.fprintf ppf "Unbox %a" (Unboxed_fields.print Variable.print) fields
 
 let pp_changed_representation ff = function
-  | Block_representation (fields, size) ->
-    Format.fprintf ff "(fields %a) (size %d)"
-      (Unboxed_fields.print (fun ff (field, _) -> Format.pp_print_int ff field))
-      fields size
+  | Block_representation { fields; shape; size } ->
+    Format.fprintf ff "(fields %a) (shape %a) (size %d)"
+      (Unboxed_fields.print Format.pp_print_int)
+      fields Flambda_kind.Scannable_block_shape.print shape size
   | Closure_representation (fields, function_slots, fs) ->
     Format.fprintf ff "(fields %a) (function_slots %a) (current %a)"
       (Unboxed_fields.print Value_slot.print)
@@ -246,6 +269,16 @@ let to_change_representation x = to_change_representation_tbl % [x]
 
 let lambda_lifting =
   Oxcaml_args.Extra_options.bool __LOC__ "reaper-lambda-lifting"
+
+type change_block_representation =
+  | Never
+  | Always
+  | Symbols_only
+
+let change_block_representation =
+  Oxcaml_args.Extra_options.symbol __LOC__ "reaper-change-block-representation"
+    Never
+    ["never", Never; "always", Always; "symbols", Symbols_only]
 
 let datalog_rules =
   saturate_in_order
@@ -405,28 +438,36 @@ let datalog_rules =
        ==> cannot_change_representation1 y);
       (let$ [x] = ["x"] in
        [cannot_change_representation1 x] ==> cannot_change_representation x);
-      (* Due to value_kinds rewriting not taking representation changes into
-         account for now, blocks cannot have their representation changed, so we
-         prevent it here. Boxed numbers are also prevented from changing their
-         representation, but for a different reason: since they only have a
-         single field, a representation change could never be useful. Either
-         that field is used, and no representation change is necessary, or it is
-         unused, and the whole boxed number should be replaced by a poison value
-         instead. *)
+      (* Boxed numbers are prevented from changing their representation: since
+         they only have a single field, a representation change could never be
+         useful. Either that field is used, and no representation change is
+         necessary, or it is unused, and the whole boxed number should be
+         replaced by a poison value instead. As for blocks, changing their
+         representation depends on the [-X reaper-change-block-representation]
+         flag. *)
       (let$ [x; field; y] = ["x"; "field"; "y"] in
        [ constructor ~base:x field ~from:y;
-         when1
-           (fun f ->
+         filter
+           (fun [x; f] ->
              match Field.view f with
-             | Block _ | Is_int | Get_tag | Boxed_number _ -> true
+             | Boxed_number _ -> true
+             | Block _ | Is_int | Get_tag -> (
+               match change_block_representation () with
+               | Never -> true
+               | Always -> false
+               | Symbols_only ->
+                 Code_id_or_name.pattern_match x
+                   ~code_id:(fun _ -> assert false)
+                   ~var:(fun _ -> true)
+                   ~symbol:(fun _ -> false))
              | Value_slot _ | Function_slot _ | Call_witness _
              | Return_of_call _ | Code_id_of_call_witness ->
                false)
-           field ]
+           [x; field] ]
        ==> cannot_change_representation x);
       (* The use of [cannot_change_representation1] is here to still allow
-         unboxing of blocks, even if we cannot change their representation due
-         to the value_kind limitation. *)
+         unboxing of blocks and boxed numbers, even when we do not change their
+         representation. *)
       (let$ [x] = ["x"] in
        [cannot_change_representation1 x] ==> cannot_unbox0 x);
       (* This is repeated from the earlier occurrence in
@@ -772,19 +813,16 @@ let perform_analysis0 db ~stats =
               in
               match PTA.get_set_of_closures_def db code_id_or_name with
               | Not_a_set_of_closures ->
-                let r = ref ~-1 in
-                let mk _kind _name =
-                  (* XXX fixme, disabled for now *)
-                  (* TODO depending on the kind, use two counters; then produce a
-               mixed block; map_unboxed_fields should help with that *)
-                  incr r;
-                  ( !r,
-                    Flambda_primitive.(
-                      Block_access_kind.Values
-                        { tag = Unknown;
-                          size = Unknown;
-                          field_kind = Block_access_field_kind.Any_value
-                        }) )
+                let num_values = ref 0 in
+                let num_naked = ref 0 in
+                let mk (kind : Flambda_kind.t) _name =
+                  let id = !num_values + !num_naked in
+                  (match kind with
+                  | Region | Rec_info ->
+                    Misc.fatal_error "Field of impossible kind"
+                  | Value -> incr num_values
+                  | Naked_number _ -> incr num_naked);
+                  id
                 in
                 let usages =
                   PTA.get_direct_usages db
@@ -794,11 +832,67 @@ let perform_analysis0 db ~stats =
                   PTA.add_usages_through_function_slots
                     ~follow_known_arity_calls:false db usages
                 in
+                let fields = PTA.get_fields db uses in
+                (* The block will keep its original [Is_int] and [Get_tag]
+                   fields. As such, we don't need to store them in the block
+                   itself. *)
+                let fields =
+                  Field.Map.remove Field.is_int
+                    (Field.Map.remove Field.get_tag fields)
+                in
                 let repr =
                   mk_unboxed_fields ~has_to_be_unboxed ~mk db code_id_or_name
-                    (PTA.get_fields db uses) ""
+                    fields ""
                 in
-                add_to_s (Block_representation (repr, !r + 1)) code_id_or_name
+                let size = !num_values + !num_naked in
+                let cur_value = ref 0 in
+                let cur_naked = ref 0 in
+                let actual_positions = Array.make size (-1) in
+                let naked_kinds =
+                  Array.make !num_naked
+                    Flambda_kind.Flat_suffix_element.naked_float
+                in
+                (* Some blocks may have their representation changed, even if
+                   they have no unboxed field at all (for instance to delete
+                   unused fields, or just because they can!) In this case, we
+                   want to avoid reordering them completely. [ordered_iter] will
+                   ensure we iterate in order of increasing initial position of
+                   the fields, preserving the order in these cases. *)
+                Unboxed_fields.ordered_iter
+                  (fun kind id ->
+                    let pos =
+                      match kind with
+                      | Region | Rec_info ->
+                        Misc.fatal_error "Field of impossible kind"
+                      | Value ->
+                        let r = !cur_value in
+                        incr cur_value;
+                        r
+                      | Naked_number nnk ->
+                        let r = !cur_naked in
+                        incr cur_naked;
+                        naked_kinds.(r)
+                          <- Flambda_kind.Flat_suffix_element
+                             .of_naked_number_kind nnk;
+                        r + !num_values
+                    in
+                    actual_positions.(id) <- pos)
+                  repr;
+                let repr =
+                  Unboxed_fields.map (fun id -> actual_positions.(id)) repr
+                in
+                let shape : Flambda_kind.Scannable_block_shape.t =
+                  if !num_naked = 0
+                  then Value_only
+                  else
+                    Mixed_record
+                      (Flambda_kind.Mixed_block_shape
+                       .from_prefix_size_and_suffix_elements !num_values
+                         (Array.to_list naked_kinds))
+                in
+                add_to_s
+                  (Block_representation { fields = repr; shape; size })
+                  code_id_or_name
               | Set_of_closures l ->
                 let mk kind name =
                   Value_slot.create
