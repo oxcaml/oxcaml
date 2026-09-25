@@ -323,3 +323,58 @@ Line 2, characters 15-32:
                    ^^^^^^^^^^^^^^^^^
 Error: This value is "nonportable" but is expected to be "portable".
 |}]
+
+module F (M : sig
+  val flip
+    :  ('a -> 'b -> 'c) @ [< 'm & many global]
+    -> ('b -> 'a -> 'c) @ [> 'm]
+end) : sig
+  val flip : ('a -> 'a -> int) -> ('a -> 'a -> int)
+end = M
+
+[%%expect{|
+Line 7, characters 6-7:
+7 | end = M
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           val flip :
+             ('a -> 'b -> 'c) @ [< past('o) & 'n & global many] ->
+             ('b -> ('a -> 'c) @ [> past('m) | past('o) | local stateful]) @ [< past('m) > 'n]
+         end
+       is not included in
+         sig val flip : ('a -> 'a -> int) -> 'a -> 'a -> int end
+       Values do not match:
+         val flip :
+           ('a -> 'b -> 'c) @ [< past('o) & 'n & global many] ->
+           ('b -> ('a -> 'c) @ [> past('m) | past('o) | local stateful]) @ [< past('m) > 'n]
+       is not included in
+         val flip : ('a -> 'a -> int) -> 'a -> 'a -> int
+       The type
+         "('a -> ('a -> int) @ [> past('m) | stateful dynamic]) @ [< past('p) & past('m) & 'o & global many] ->
+         ('a -> ('a -> int) @ [> past('n) | past('p) | local stateful]) @ [< past('n) > 'o]"
+       is not compatible with the type "('a -> 'a -> int) -> 'a -> 'a -> int"
+       Type "'a -> ('a -> int) @ [> past('n) | past('p) | local stateful]"
+       is not compatible with type "'a -> 'a -> int"
+|}]
+
+
+module F (M : sig
+  val flip
+    :  ('a -> 'b -> 'c) @ [< 'm & many global]
+    -> ('b -> ('a -> 'c)) @ [> 'm]
+end) : sig
+  val flip : ('a -> 'a -> int) -> ('a -> 'a -> int)
+end = M
+
+[%%expect{|
+module F :
+  functor
+    (M : sig
+           val flip :
+             ('a -> 'b -> 'c) @ [< 'm & global many] ->
+             ('b -> ('a -> 'c)) @ [> 'm]
+         end)
+    -> sig val flip : ('a -> 'a -> int) -> 'a -> 'a -> int end
+|}]
