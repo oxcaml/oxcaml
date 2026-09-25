@@ -55,3 +55,6 @@
 (cram
  (applies_to split_toplevel_pieces)
  (deps split_toplevel.ml split_toplevel_switch.ml))
+
+(cram
+ (deps %{bin:wasm_of_ocaml}))

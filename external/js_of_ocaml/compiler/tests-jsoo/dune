@@ -253,7 +253,9 @@
  (package js_of_ocaml-lwt)
  (modules test_lwt_promise)
  (enabled_if
-  (<> %{env:JSOO_TEST_ENGINE=node} wasi))
+  (and
+   (<> %{env:JSOO_TEST_ENGINE=node} wasi)
+   %{lib-available:lwt}))
  (libraries js_of_ocaml js_of_ocaml-lwt lwt)
  (modes js wasm)
  (preprocess
@@ -279,3 +281,6 @@
 (ocamlyacc parser_1307)
 
 (ocamllex lexer_1307)
+
+(cram
+ (deps %{bin:js_of_ocaml}))
