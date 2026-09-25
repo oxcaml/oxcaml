@@ -6631,13 +6631,6 @@ let moregen_mode_fast v m1 m2 =
   in
   if not ok then raise_notrace Complicated_moregen
 
-let some_neg_variance = function
-  (* pre-allocated for hot path *)
-  | Invariant -> Some Invariant
-  | Covariant -> Some Contravariant
-  | Contravariant -> Some Covariant
-  | Bivariant -> Some Bivariant
-
 (* The layout of [ty], for the shapes of [ty] where computing it is cheap and
    needs no mutation; raises [Complicated_moregen] otherwise. *)
 let mgen_fast_estimate_layout _env _subst ty =
@@ -6684,14 +6677,10 @@ let rec mgen_fast env subst scope maxnodes variance t1 t2 =
     For_copy.redirect_desc scope t1 (Tsubst (t2, None))
   | Tarrow ((l1,a1,r1), t1, u1, _), Tarrow ((l2,a2,r2), t2, u2, _)
        when l1 = l2 ->
-    begin match variance with
-    | None -> raise_notrace Complicated_moregen
-    | Some v ->
-      moregen_mode_fast (neg_variance v) a1 a2;
-      moregen_mode_fast v r1 r2;
-      mgen_fast env subst scope maxnodes (some_neg_variance v) t1 t2;
-      mgen_fast env subst scope maxnodes variance u1 u2
-    end
+    moregen_mode_fast (neg_variance variance) a1 a2;
+    moregen_mode_fast variance r1 r2;
+    mgen_fast env subst scope maxnodes (neg_variance variance) t1 t2;
+    mgen_fast env subst scope maxnodes variance u1 u2
   | Ttuple tl1, Ttuple tl2 ->
     mgen_fast_labeled env subst scope maxnodes variance tl1 tl2
   | Tunboxed_tuple tl1, Tunboxed_tuple tl2 ->
@@ -6715,7 +6704,7 @@ and mgen_fast_list env subst scope maxnodes tl1 tl2 =
   match tl1, tl2 with
   | [], [] -> ()
   | t1 :: tl1, t2 :: tl2 ->
-    mgen_fast env subst scope maxnodes None t1 t2;
+    mgen_fast env subst scope maxnodes Invariant t1 t2;
     mgen_fast_list env subst scope maxnodes tl1 tl2
   | _, _ -> raise_notrace Complicated_moregen
 
@@ -6737,7 +6726,7 @@ let moregeneral_fast env patt subst subj =
     (* Fixed upper limit of the number of nodes,
        so that we don't diverge on equirecursive types *)
     let maxnodes = ref 200 in
-    match mgen_fast env subst scope maxnodes (Some Covariant) patt subj with
+    match mgen_fast env subst scope maxnodes Covariant patt subj with
     | () -> true
     | exception (Complicated_moregen | Moregen_trace _) ->
       backtrack snap; false)
