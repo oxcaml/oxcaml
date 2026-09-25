@@ -346,30 +346,26 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
       | None -> Print_as "<unknown>"
       | Some sort -> print_sort sort
 
-    let sorts_of_types env tys =
-      Misc.Stdlib.Array.all_somes
-        (Array.map
-           (fun ty ->
-              Option.map (fun s -> s, ty)
-                (Jkind.sort_option_of_jkind env (Ctype.type_jkind env ty)))
-           tys)
-
-    let sorts_of_labels env lbl_list type_params ty_list () =
+    let field_types_of_labels env lbl_list type_params ty_list () =
       let label_params_and_types, record_params =
         Ctype.instance_label_declarations ~fixed:false
           (lbl_list |> Array.of_list) ~params:type_params
       in
       List.iter2 (Ctype.unify env) record_params
         (Ctype.instance_list ty_list);
-      sorts_of_types env (Array.map snd label_params_and_types)
+      List.map snd (Array.to_list label_params_and_types)
 
     let outval_mixed_rep shape =
-      if Lambda.mixed_block_shape_has_splices shape then None
-      else
-        Some
-          (Outval_record_mixed
-             (Mixed_block_shape.of_mixed_block_elements shape
-                ~print_locality:(fun ppf () -> Format.fprintf ppf "()")))
+      Outval_record_mixed
+        (Mixed_block_shape.of_mixed_block_elements
+           (Lambda.transl_mixed_product_shape shape)
+           ~print_locality:(fun ppf () -> Format.fprintf ppf "()"))
+
+    let outval_rep_of_field_types env field_types =
+      match Typedecl.compute_block_shape env (field_types ()) with
+      | `Not_mixed -> Some Outval_record_boxed
+      | `Mixed shape -> Some (outval_mixed_rep shape)
+      | `Undetermined -> None
 
     (* The position of the first field: an extension constructor's block
        starts with its extension slot. *)
@@ -377,75 +373,38 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
       | Variant_extensible -> 1
       | Variant_boxed _ | Variant_unboxed | Variant_with_null -> 0
 
-    let outval_rep_of_constructor_shape
-          (shape : Lambda.constructor_representation)
-          (vrep : Types.variant_representation) =
-      match shape, vrep with
-      | Constructor_mixed _, (Variant_unboxed | Variant_with_null) ->
-          Misc.fatal_error "a 'mixed' unboxed constructor is impossible"
-      | Constructor_uniform_value, (Variant_unboxed | Variant_with_null) ->
-          Some Outval_record_unboxed
-      | Constructor_uniform_value, (Variant_boxed _ | Variant_extensible) ->
-          Some Outval_record_boxed
-      | Constructor_mixed _, Variant_extensible ->
-          Misc.fatal_error "a 'mixed' extensible constructor is impossible"
-      | Constructor_mixed shape, Variant_boxed _ ->
-          outval_mixed_rep shape
-      | Constructor_immediate_all_void, _ -> Some Outval_record_immediate
-
-    (* Translate the representation just to be able to print it. [None] if
-       the fields' sorts and thus the block's layout are unknown. *)
-    let outval_rep_of_constructor env ~sorts_and_types
+    let outval_rep_of_constructor env ~field_types
           (shape : Types.constructor_representation)
           (vrep : Types.variant_representation) =
-      let shape : Types.constructor_representation option =
-        match shape, vrep with
-        | Constructor_undetermined, Variant_unboxed ->
-            (* As in [Typedecl.instance_record_representation]: the shape of
-               an unboxed constructor is always [Constructor_uniform_value]. *)
-            Some Constructor_uniform_value
-        | Constructor_undetermined,
-          (Variant_boxed _ | Variant_extensible | Variant_with_null) ->
-            (* We need the fields' sorts to know the block's layout. *)
-            Option.map (fun l -> Constructor_variable l) (sorts_and_types ())
-        | Constructor_variable _, _ ->
-            Misc.fatal_error "variable constructor representation"
-        | (Constructor_uniform_value | Constructor_mixed _
-          | Constructor_immediate_all_void), _ ->
-            Some shape
+      let rep =
+        match vrep with
+        | Variant_unboxed | Variant_with_null -> Some Outval_record_unboxed
+        | Variant_boxed _ | Variant_extensible ->
+            match shape with
+            | Constructor_uniform_value -> Some Outval_record_boxed
+            | Constructor_mixed shape -> Some (outval_mixed_rep shape)
+            | Constructor_immediate_all_void -> Some Outval_record_immediate
+            | Constructor_undetermined ->
+                outval_rep_of_field_types env field_types
+            | Constructor_variable _ ->
+                Misc.fatal_error "variable constructor representation"
       in
-      Option.bind shape (fun shape ->
-        let shape =
-          Typeopt.transl_constructor_representation env Location.none shape
-        in
-        Option.map
-          (fun rep -> rep, first_field_pos vrep)
-          (outval_rep_of_constructor_shape shape vrep))
+      Option.map (fun rep -> rep, first_field_pos vrep) rep
 
-    let outval_rep_of_record env ~sorts_and_types
+    let outval_rep_of_record env ~field_types
           (rep : Types.record_representation) =
-      let transl rep =
-        match Typeopt.transl_record_representation env Location.none rep with
-        | Record_unboxed -> Some (Outval_record_unboxed, 0)
-        | Record_boxed | Record_float | Record_ufloat ->
-            Some (Outval_record_boxed, 0)
-        | Record_mixed shape ->
-            Option.map (fun rep -> rep, 0) (outval_mixed_rep shape)
-        | Record_inlined _ ->
-            Misc.fatal_error "inlined record representation"
-      in
+      let not_inlined rep = rep, 0 in
       match rep with
       | Record_inlined (_, shape, vrep) ->
-          outval_rep_of_constructor env ~sorts_and_types shape vrep
+          outval_rep_of_constructor env ~field_types shape vrep
+      | Record_unboxed -> Some (not_inlined Outval_record_unboxed)
+      | Record_boxed | Record_float | Record_ufloat ->
+          Some (not_inlined Outval_record_boxed)
+      | Record_mixed shape -> Some (not_inlined (outval_mixed_rep shape))
       | Record_undetermined ->
-          (* We need the fields' sorts to know the block's layout. *)
-          Option.bind (sorts_and_types ())
-            (fun l -> transl (Record_variable l))
-      | Record_variable _ ->
-          Misc.fatal_error "variable record representation"
-      | (Record_unboxed | Record_boxed | Record_float | Record_ufloat
-        | Record_mixed _ | Record_dummy _) as rep ->
-          transl rep
+          Option.map not_inlined (outval_rep_of_field_types env field_types)
+      | Record_variable _ | Record_dummy _ ->
+          Misc.fatal_error "variable or dummy record representation"
 
     let outval_of_value max_steps max_depth check_depth env obj lpoly ty =
       if not @@ Types.Lpoly.is_empty_exn lpoly then Oval_stuff "<lpoly>"
@@ -749,8 +708,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                 | _ -> assert false end
             | None -> type_params
           in
-          let outval_rep ~sorts_and_types =
-            outval_rep_of_constructor env ~sorts_and_types cstr.cstr_shape rep
+          let outval_rep ~field_types =
+            outval_rep_of_constructor env ~field_types cstr.cstr_shape rep
           in
           match cd_args with
           | Cstr_tuple l ->
@@ -775,20 +734,18 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                      (ty_arg, print_sort_option sort)
                   ) l ty_args
               in
-              let sorts_and_types () =
-                sorts_of_types env (Array.of_list (List.map fst ty_args))
-              in
-              begin match outval_rep ~sorts_and_types with
+              let field_types () = List.map fst ty_args in
+              begin match outval_rep ~field_types with
               | None -> Oval_stuff "<abstr>"
               | Some (rep, pos) ->
                   tree_of_constr_with_args (tree_of_constr env path)
                     (Ident.name cd_id) false pos depth obj ty_args rep
               end
           | Cstr_record lbls ->
-              let sorts_and_types =
-                sorts_of_labels env lbls type_params ty_list
+              let field_types =
+                field_types_of_labels env lbls type_params ty_list
               in
-              begin match outval_rep ~sorts_and_types with
+              begin match outval_rep ~field_types with
               | None -> Oval_stuff "<abstr>"
               | Some (rep, pos) ->
                   let r =
@@ -836,10 +793,10 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         match check_depth depth obj ty with
         | Some x -> x
         | None ->
-            let sorts_and_types =
-              sorts_of_labels env lbl_list type_params ty_list
+            let field_types =
+              field_types_of_labels env lbl_list type_params ty_list
             in
-            match outval_rep_of_record env ~sorts_and_types rep with
+            match outval_rep_of_record env ~field_types rep with
             | None -> Oval_stuff "<abstr>"
             | Some (rep, pos) ->
             tree_of_record_fields depth
