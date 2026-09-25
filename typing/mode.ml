@@ -5923,6 +5923,10 @@ module Monadic_gen (Obj : Obj) = struct
 
     let get_ceil m = S.get_floor obj m
 
+    let get_loose_floor m = S.get_loose_ceil obj m
+
+    let get_loose_ceil m = S.get_loose_floor obj m
+
     let check_const m =
       let floor = get_floor m in
       let ceil = get_ceil m in
@@ -7647,6 +7651,14 @@ module Mode_with (Areality : Areality) = struct
       let monadic = Monadic.Guts.get_ceil monadic in
       let comonadic = Comonadic.Guts.get_ceil comonadic in
       merge { monadic; comonadic }
+
+    let le_loose m1 m2 =
+      Comonadic.Const.le
+        (Comonadic.Guts.get_loose_ceil m1.comonadic)
+        (Comonadic.Guts.get_loose_floor m2.comonadic)
+      && Monadic.Const.le
+           (Monadic.Guts.get_loose_ceil m1.monadic)
+           (Monadic.Guts.get_loose_floor m2.monadic)
 
     let in_bounds c { monadic; comonadic } =
       let c = split c in
