@@ -122,19 +122,20 @@ let two_local_known_lengths () =
 [%%expect_asm X86_64{|
 two_local_known_lengths:
   subq  $8, %rsp
-  movq  64(%r14), %rbx
-  subq  $40, %rbx
-  movq  %rbx, 64(%r14)
-  cmpq  80(%r14), %rbx
+  movq  64(%r14), %rax
+  subq  $40, %rax
+  movq  %rax, 64(%r14)
+  cmpq  80(%r14), %rax
   jl    <hidden GC jump pad>
 .L0:
-  addq  72(%r14), %rbx
-  addq  $8, %rbx
-  addq  $16, %rbx
-  movq  $3068, -8(%rbx)
-  movabsq $216172782113783808, %rax
-  movq  %rax, 8(%rbx)
-  leaq  -16(%rbx), %rax
+  addq  72(%r14), %rax
+  addq  $8, %rax
+  addq  $16, %rax
+  movq  $3068, -8(%rax)
+  movq  %rax, %rbx
+  movabsq $216172782113783808, %rdi
+  movq  %rdi, 8(%rbx)
+  addq  $-16, %rax
   movq  $2044, -8(%rax)
   movabsq $288230376151711744, %rdi
   movq  %rdi, (%rax)
