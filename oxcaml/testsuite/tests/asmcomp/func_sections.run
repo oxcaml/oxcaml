@@ -1,0 +1,20 @@
+#!/bin/sh
+
+exec > "${output}" 2>&1
+
+# first, run the program to make sure it doesn't crash
+${program}
+
+# now check the assembly file produced during compilation
+asm=${test_build_directory}/func_sections.s
+grep -E "\.section \.text\.caml\.(camlFunc_sections__|_ZN13Func_sections)" "$asm" | wc -l | tr -d ' ' | sed '/^$/d'
+
+# jump tables in text must be in their function's own section, after its .size
+grep -c "__jump_tables" "$asm"
+awk '
+/^\t\.section / { sec = $2; sub(/,.*/, "", sec); sub(/_[0-9_]+_code$/, "", sec); sized = 0 }
+/^\t\.size / { sized = 1 }
+/^\t\.4byte\t\.L[0-9]+ - \.L[0-9]+$/ && sec ~ /^\.text/ {
+  print sec, (sized ? "after .size" : "before .size")
+}
+' "$asm" | uniq -c | sed 's/^ *//'

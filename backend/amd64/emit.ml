@@ -2902,7 +2902,12 @@ let fundecl fundecl =
   | None -> ());
   D.comment ("LLVM-MCA-END " ^ !function_name);
   D.cfi_endproc ();
-  emit_function_type_and_size fundecl_sym
+  emit_function_type_and_size fundecl_sym;
+  if !Clflags.function_sections && not (Misc.Stdlib.List.is_empty !jump_tables)
+  then
+    (* Jump tables stay in the function's own section so that the linker
+       discards them with it and their entries need no relocations. *)
+    emit_jump_tables ()
 
 (* Emission of data *)
 
@@ -3262,8 +3267,10 @@ let end_assembly () =
     List.iter (fun (cst, lbl) -> emit_vec512_constant cst lbl) !vec512_constants);
   (* Emit probe handler wrappers *)
   List.iter emit_probe_handler_wrapper (Probe_emission.get_probes ());
-  emit_named_text_section (Cmm_helpers.make_symbol "jump_tables");
-  emit_jump_tables ();
+  if not !Clflags.function_sections
+  then (
+    emit_named_text_section (Cmm_helpers.make_symbol "jump_tables");
+    emit_jump_tables ());
   let code_end = Cmm_helpers.make_symbol "code_end" in
   emit_named_text_section code_end;
   if is_macosx system then I.nop ();
