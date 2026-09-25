@@ -8,5 +8,5 @@
  (libraries
   wasm_of_ocaml-compiler
   js_of_ocaml-compiler
-  js_of_ocaml-compiler.runtime
+  js_of_ocaml-runtime
   compiler-libs.bytecomp))

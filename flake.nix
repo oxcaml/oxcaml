@@ -22,7 +22,10 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
         lib = pkgs.lib;
-        oxcaml = pkgs.callPackage ./default.nix { src = self; };
+        oxcaml = pkgs.callPackage ./default.nix {
+          src = self;
+          gitRev = self.shortRev or self.dirtyShortRev or null;
+        };
         merlinPackages = oxcaml.mkMerlinPackages oxcaml;
       in
       {
@@ -31,7 +34,10 @@
           inherit (merlinPackages) merlin-lib dot-merlin-reader merlin;
           oxcaml-fp = oxcaml.override { framePointers = true; };
           oxcaml-asan = oxcaml.override { addressSanitizer = true; };
-          external-libs = oxcaml.mkExternalLibraries oxcaml;
+          ppxlib = oxcaml.mkPpxlibLibs oxcaml;
+          jsoo = oxcaml.mkJsooLibs oxcaml;
+          jsoo-test = oxcaml.mkJsooTest oxcaml;
+          jsoo-smoke-test = oxcaml.mkJsooSmokeTest oxcaml;
           default = oxcaml;
         };
 
@@ -40,7 +46,10 @@
             oxcaml
             oxcaml-fp
             oxcaml-asan
-            external-libs
+            ppxlib
+            jsoo
+            jsoo-test
+            jsoo-smoke-test
             merlin
             ;
         };
@@ -53,7 +62,10 @@
         # the shellHook behaves exactly like the nix build. withMerlin only
         # extends its inputs with what `make merlin-build` / `make merlin-test`
         # need.
-        devShells.default = oxcaml.override { withMerlin = true; };
+        devShells.default = oxcaml.override {
+          withMerlin = true;
+          withJsooTestSources = true;
+        };
       }
     )
     // {

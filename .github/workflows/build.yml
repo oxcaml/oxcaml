@@ -27,6 +27,7 @@ jobs:
           - name: default (x86_64-linux)
             os: warp-ubuntu-latest-x64-8x
             build_debug: true
+            build_ast_dependent_libs: true
             sysdeps: gdb
 
           - name: dissector-assembler (x86_64-linux)
@@ -385,9 +386,9 @@ jobs:
           codesign -s - -f --entitlements /tmp/core.entitlements $OCAML_BIN/ocamlc.opt
           codesign -s - -f --entitlements /tmp/core.entitlements $OCAML_BIN/ocamlopt.opt
 
-      - name: Build external libraries against bootstrap compiler
-        if: matrix.build_external_libs == true
-        run: make external-libs-build-boot
+      - name: Build AST-dependent libraries against bootstrap compiler
+        if: matrix.build_ast_dependent_libs == true
+        run: make ast-dependent-libs-build-boot
 
       - name: Build OxCaml
         if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true

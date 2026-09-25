@@ -64,7 +64,7 @@
 (rule
  (target stdlib.cmis.js)
  (action
-  (run jsoo_mkcmis -o %{target} stdlib js_of_ocaml-compiler.runtime lwt)))
+  (run jsoo_mkcmis -o %{target} stdlib js_of_ocaml-runtime lwt)))
 
 ;; examples.ml is a data file, fetched at runtime to fill the examples sidebar.
 ;; It only holds DOM-free snippets, since a Web Worker has no DOM.
