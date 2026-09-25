@@ -58,6 +58,14 @@ compare:
   ret
 |}]
 
+(* This should fold to true using the int32 bounds. *)
+let le_max x = Int32_u.to_int32 x <= 0x7fff_ffffl
+[%%expect_asm X86_64{|
+le_max:
+  movl  $3, %eax
+  ret
+|}]
+
 (* CR ttebbi: This should be right-shift by 1 followed by sign extension. *)
 let of_int x = Int32_u.of_int x
 [%%expect_asm X86_64{|
