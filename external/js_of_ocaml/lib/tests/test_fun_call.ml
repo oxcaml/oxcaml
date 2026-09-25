@@ -431,7 +431,9 @@ let%expect_test (_ [@when effects <> "cps"] [@tags "js-only"]) =
   [%expect {|
     Result: function#2#2 |}]
 
-let%expect_test (_ [@tags "js-only"]) =
+(* Passes a JavaScript string where an OCaml string is expected: this only
+   works with use-js-string, which is disabled by default here. *)
+let%expect_test (_ [@when false] [@tags "js-only"]) =
   let open Js_of_ocaml in
   let f = Js.wrap_callback (fun s -> print_endline s) in
   Js.export "f" f;
