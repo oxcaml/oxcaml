@@ -326,6 +326,13 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
       | Outval_record_mixed of unit Mixed_block_shape.t
       | Outval_record_immediate
 
+    type outval_record =
+      { rep : outval_record_rep;
+        first_field_pos : int
+          (* Position of the first field. It's only non-zero for extensible
+             variants, which use the first word to identify the constructor *)
+      }
+
     type printing_jkind =
       | Print_as_value (* can interpret as a value and print *)
       | Print_as of string (* can't print *)
@@ -367,9 +374,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
       | `Mixed shape -> Some (outval_mixed_rep shape)
       | `Undetermined -> None
 
-    (* The position of the first field: an extension constructor's block
-       starts with its extension slot. *)
-    let first_field_pos : Types.variant_representation -> int = function
+    let first_field_pos_of_variant : Types.variant_representation -> int =
+      function
       | Variant_extensible -> 1
       | Variant_boxed _ | Variant_unboxed | Variant_with_null -> 0
 
@@ -389,11 +395,13 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
             | Constructor_variable _ ->
                 Misc.fatal_error "variable constructor representation"
       in
-      Option.map (fun rep -> rep, first_field_pos vrep) rep
+      Option.map
+        (fun rep -> { rep; first_field_pos = first_field_pos_of_variant vrep })
+        rep
 
     let outval_rep_of_record env ~field_types
           (rep : Types.record_representation) =
-      let not_inlined rep = rep, 0 in
+      let not_inlined rep = { rep; first_field_pos = 0 } in
       match rep with
       | Record_inlined (_, shape, vrep) ->
           outval_rep_of_constructor env ~field_types shape vrep
@@ -737,9 +745,10 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
               let field_types () = List.map fst ty_args in
               begin match outval_rep ~field_types with
               | None -> Oval_stuff "<abstr>"
-              | Some (rep, pos) ->
+              | Some { rep; first_field_pos } ->
                   tree_of_constr_with_args (tree_of_constr env path)
-                    (Ident.name cd_id) false pos depth obj ty_args rep
+                    (Ident.name cd_id) false first_field_pos depth obj ty_args
+                    rep
               end
           | Cstr_record lbls ->
               let field_types =
@@ -747,11 +756,11 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
               in
               begin match outval_rep ~field_types with
               | None -> Oval_stuff "<abstr>"
-              | Some (rep, pos) ->
+              | Some { rep; first_field_pos } ->
                   let r =
                     tree_of_record_fields depth
                       env path type_params ty_list
-                      lbls pos obj rep
+                      lbls first_field_pos obj rep
                   in
                   Oval_constr(tree_of_constr env path (Ident.name cd_id),
                               [ r ])
@@ -798,10 +807,10 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
             in
             match outval_rep_of_record env ~field_types rep with
             | None -> Oval_stuff "<abstr>"
-            | Some (rep, pos) ->
+            | Some { rep; first_field_pos } ->
             tree_of_record_fields depth
               env path type_params ty_list
-              lbl_list pos obj rep
+              lbl_list first_field_pos obj rep
 
       and tree_of_record_fields depth env path type_params ty_list
           lbl_list pos obj rep =
