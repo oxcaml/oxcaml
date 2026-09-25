@@ -654,6 +654,7 @@ let ocaml_ignored_flags =
     "-cfg-eliminate-dead-trap-handlers";
     "-no-cfg-eliminate-dead-trap-handlers";
     "-module-entry-functions-section";
+    "-jump-table-sections";
     "-zero-alloc-checker-details-extra";
     "-no-zero-alloc-checker-details-extra";
     "-favx512f";
