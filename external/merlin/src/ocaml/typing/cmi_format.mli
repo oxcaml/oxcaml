@@ -19,6 +19,9 @@ type pers_flags =
   | Rectypes
   | Alerts of alerts
   | Opaque
+  | Closed
+    (* No global module name reachable from this cmi lacks an attached cmi
+       path (see [Compilation_unit_intf.Found]). *)
 
 type kind =
   | Normal of {

@@ -86,9 +86,7 @@ let assert_subset ~gm ~chain sub sup =
       (chain_to_string chain)
 
 let load_exact ~chain (gm : GM.t) : Signature_with_global_bindings.t =
-  let cu, cmi_params, swg =
-    Env.find_import ~chain (GM.to_name gm).GM.Name.head
-  in
+  let cu, cmi_params, swg = Env.find_import ~chain gm.head in
   assert (Option.is_some cu);
   let tracked_set =
     gm.GM.hidden_args @ gm.GM.visible_args
@@ -102,9 +100,7 @@ let load_exact ~chain (gm : GM.t) : Signature_with_global_bindings.t =
 
 let rec load_approx ~chain (gm : GM.t) : GM.t * Signature_with_global_bindings.t
     =
-  let cu, cmi_params, swg =
-    Env.find_import ~chain (GM.to_name gm).GM.Name.head
-  in
+  let cu, cmi_params, swg = Env.find_import ~chain gm.head in
   assert (Option.is_some cu);
   let param_set args =
     List.map (fun (a : _ GM.Argument.t) -> a.param) args
@@ -134,7 +130,7 @@ let rec load_approx ~chain (gm : GM.t) : GM.t * Signature_with_global_bindings.t
 let rec insert_module_exact ~chain (gm : GM.t)
     (swg : Signature_with_global_bindings.t) state =
   state.module_map <- GM.Name.Map.add (GM.to_name gm) chain state.module_map;
-  let chain = (GM.to_name gm).GM.Name.head :: chain in
+  let chain = gm.head :: chain in
 
   let swg =
     let args =

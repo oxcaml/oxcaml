@@ -11,6 +11,10 @@
  ocamlc.byte;
  module = "c.ml";
  ocamlc.byte;
+ (* The cmis above record the path of subdir/m.cmi: remove it so that the
+    missing-cmi machinery is actually exercised. *)
+ script = "rm subdir/m.cmi";
+ script;
  flags = "-extension layouts_beta";
  module = "main_ok.ml";
  ocamlc.byte;

@@ -166,6 +166,9 @@ let add_jkind_path id p s =
            last_compose = None }
 let add_jkind id p s = add_jkind_path (Pident id) p s
 
+let add_same_module_path p p' s =
+  { s with modules = Path.Map.add p p' s.modules; last_compose = None }
+
 type additional_action_config =
   | Duplicate_variables
   | Prepare_for_saving

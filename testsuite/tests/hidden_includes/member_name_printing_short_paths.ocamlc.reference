@@ -1,0 +1,2 @@
+val f : Attr.t * Attr.lst
+val g : 'a -> Attr.Id.t Attr.expr
