@@ -152,7 +152,7 @@ module Degree = struct
   let to_float deg = if deg = max_int then Float.infinity else Float.of_int deg
 end
 
-let bit_matrix_threshold : int Lazy.t =
+let bit_matrix_threshold : int Param.t =
   Regalloc_utils.int_of_param ~default:0 "BIT_MATRIX_THRESHOLD"
 
 (** Interference graph representation.
@@ -175,7 +175,7 @@ type t =
 let[@inline] make () =
   let num_registers = Reg.For_testing.get_stamp () in
   let adj_set =
-    if num_registers < Lazy.force bit_matrix_threshold
+    if num_registers < Param.get bit_matrix_threshold
     then BitMatrix (BitMatrix.make ~num_registers)
     else EdgeSet (EdgeSet.make ~num_registers)
   in

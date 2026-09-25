@@ -16,7 +16,15 @@ let fatal fmt =
 
 let function_specific_params : string list ref = ref []
 
-let set_function_specific_params l = function_specific_params := l
+(* Incremented whenever the function-specific parameters change, so that the
+   values derived from parameters (see [Param]) can be recomputed. *)
+let params_generation : int ref = ref 0
+
+let set_function_specific_params l =
+  if not (List.equal ~eq:String.equal l !function_specific_params)
+  then (
+    function_specific_params := l;
+    incr params_generation)
 
 let find_param_value param_name =
   (* Concatenate function-specific params with global params *)
@@ -30,43 +38,62 @@ let find_param_value param_name =
         then Some (String.concat ":" rest)
         else None)
 
+module Param = struct
+  type 'a t =
+    { compute : unit -> 'a;
+      mutable value : 'a option;
+      mutable generation : int
+    }
+
+  let make compute = { compute; value = None; generation = -1 }
+
+  let get t =
+    match t.value with
+    | Some value when t.generation = !params_generation -> value
+    | Some _ | None ->
+      let value = t.compute () in
+      t.value <- Some value;
+      t.generation <- !params_generation;
+      value
+end
+
 let bool_of_param ?guard ?(default = false) param_name =
-  lazy
-    (let res =
-       match
-         find_param_value param_name |> Option.map String.lowercase_ascii
-       with
-       | None -> default
-       | Some ("1" | "true" | "on") -> true
-       | Some ("0" | "false" | "off") -> false
-       | Some value ->
-         Misc.fatal_errorf
-           "the %s variable is %S but should be one of: \"0\", \"1\", \
-            \"true\", \"false\", \"on\", \"off\""
-           param_name value
-     in
-     (if res
-      then
-        match guard with
-        | None -> ()
-        | Some (guard_value, guard_name) ->
-          if not guard_value
-          then fatal "%s is set but %s is not" param_name guard_name);
-     res)
+  Param.make (fun () ->
+      let res =
+        match
+          find_param_value param_name |> Option.map String.lowercase_ascii
+        with
+        | None -> default
+        | Some ("1" | "true" | "on") -> true
+        | Some ("0" | "false" | "off") -> false
+        | Some value ->
+          Misc.fatal_errorf
+            "the %s variable is %S but should be one of: \"0\", \"1\", \
+             \"true\", \"false\", \"on\", \"off\""
+            param_name value
+      in
+      (if res
+       then
+         match guard with
+         | None -> ()
+         | Some (guard_value, guard_name) ->
+           if not guard_value
+           then fatal "%s is set but %s is not" param_name guard_name);
+      res)
 
 let int_of_param ?(default = 0) param_name =
-  lazy
-    (match find_param_value param_name with
-    | None -> default
-    | Some value -> (
-      try int_of_string value
-      with Failure _ ->
-        Misc.fatal_errorf "the %s variable is %S but should be an integer"
-          param_name value))
+  Param.make (fun () ->
+      match find_param_value param_name with
+      | None -> default
+      | Some value -> (
+        try int_of_string value
+        with Failure _ ->
+          Misc.fatal_errorf "the %s variable is %S but should be an integer"
+            param_name value))
 
 let debug = false
 
-let invariants : bool Lazy.t =
+let invariants : bool Param.t =
   bool_of_param ~guard:(debug, "debug") "INVARIANTS"
 
 let validator_debug = bool_of_param "VALIDATOR_DEBUG"
@@ -75,7 +102,7 @@ let block_temporaries = bool_of_param "BLOCK_TEMPORARIES"
 
 let affinity = bool_of_param "AFFINITY"
 
-let verbose : bool Lazy.t = bool_of_param "VERBOSE"
+let verbose : bool Param.t = bool_of_param "VERBOSE"
 
 type liveness = Cfg_with_infos.liveness
 
@@ -97,7 +124,7 @@ type log_function =
 
 let make_log_function : label:string -> log_function =
  fun ~label ->
-  let enabled = Lazy.force verbose in
+  let enabled = Param.get verbose in
   let indent_level = ref 0 in
   let indent () = incr indent_level in
   let dedent () = decr indent_level in
@@ -402,8 +429,8 @@ module SpillCosts = struct
   let cost_for_block : Cfg.basic_block -> int =
    fun block ->
     match block.cold with
-    | false -> Lazy.force normal_cost
-    | true -> Lazy.force cold_cost
+    | false -> Param.get normal_cost
+    | true -> Param.get cold_cost
 
   let compute : Cfg_with_infos.t -> flat:bool -> unit -> t =
    fun cfg_with_infos ~flat () ->
@@ -438,7 +465,7 @@ module SpillCosts = struct
             (* CR-soon xclerc for xclerc: consider adding an overflow check (See
                tools/regalloc/regalloc.ml). Or better, share the code between
                the tool and the allocators. *)
-            Misc.power ~base:(Lazy.force loop_cost) depth
+            Misc.power ~base:(Param.get loop_cost) depth
         in
         let cost = base_cost * cost_multiplier in
         DLL.iter ~f:(fun instr -> update_instr cost instr) block.body;
