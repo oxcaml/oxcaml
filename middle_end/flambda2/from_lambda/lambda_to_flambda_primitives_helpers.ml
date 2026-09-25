@@ -221,6 +221,52 @@ let must_be_singleton_named args =
       (Format.pp_print_list ~pp_sep:Format.pp_print_space Named.print)
       args
 
+(* In classic mode the simplifier does not run, so integer primitives applied to
+   known constants are constant-folded during closure conversion instead,
+   reusing the simplifier's evaluation functions so that the semantics cannot
+   diverge. *)
+
+let fold_unary_int_primitive (prim : P.unary_primitive) arg =
+  match[@warning "-fragile-match"] prim with
+  | Tag_immediate ->
+    Option.map Reg_width_const.tagged_immediate
+      (Reg_width_const.is_naked_immediate arg)
+  | Untag_immediate ->
+    Option.map Reg_width_const.naked_immediate
+      (Reg_width_const.is_tagged_immediate arg)
+  | _ -> None
+
+let fold_binary_primitive machine_width (prim : P.binary_primitive) arg1 arg2 =
+  match[@warning "-fragile-match"] prim with
+  | Phys_equal op ->
+    Option.bind (Reg_width_const.is_tagged_immediate arg1) (fun n1 ->
+        Option.bind (Reg_width_const.is_tagged_immediate arg2) (fun n2 ->
+            let equal = Target_ocaml_int.equal n1 n2 in
+            let result =
+              match (op : P.equality_comparison) with
+              | Eq -> equal
+              | Neq -> not equal
+            in
+            Some
+              (Reg_width_const.naked_immediate
+                 (Target_ocaml_int.bool machine_width result))))
+  | _ ->
+    Flambda2_simplify.Simplify_binary_primitive.fold_binary_int_primitive
+      ~machine_width prim arg1 arg2
+
+let fold_primitive_with_const_args machine_width (prim : P.t) : Simple.t option
+    =
+  (match prim with
+    | Unary (unary_prim, arg) ->
+      Option.bind (Simple.must_be_const arg) (fun arg ->
+          fold_unary_int_primitive unary_prim arg)
+    | Binary (binary_prim, arg1, arg2) ->
+      Option.bind (Simple.must_be_const arg1) (fun arg1 ->
+          Option.bind (Simple.must_be_const arg2) (fun arg2 ->
+              fold_binary_primitive machine_width binary_prim arg1 arg2))
+    | Nullary _ | Ternary _ | Quaternary _ | Variadic _ -> None)
+  |> Option.map Simple.const
+
 let rec bind_recs acc exn_cont ~register_const0 (prim : expr_primitive)
     (dbg : Debuginfo.t) (cont : Acc.t -> Named.t list -> Expr_with_acc.t) :
     Expr_with_acc.t =
@@ -474,22 +520,43 @@ and bind_rec_primitive acc exn_cont ~register_const0 (prim : simple_or_prim)
   | Simple s -> cont acc [s]
   | Prim p ->
     let cont acc (nameds : Named.t list) =
-      let vars =
+      let bindings =
         List.map
-          (fun named ->
-            Variable.create "prim" (Named.kind named), Flambda_debug_uid.none)
+          (fun (named : Named.t) ->
+            let folded =
+              if not (Flambda_features.classic_mode ())
+              then None
+              else
+                match named with
+                | Simple simple -> Some simple
+                | Prim (prim, _dbg) ->
+                  fold_primitive_with_const_args (Acc.machine_width acc) prim
+                | Set_of_closures _ | Static_consts _ | Rec_info _ -> None
+            in
+            match folded with
+            | Some simple -> Either.Left simple
+            | None ->
+              let var = Variable.create "prim" (Named.kind named) in
+              Either.Right
+                (VB.create var Flambda_debug_uid.none Name_mode.normal, named))
           nameds
       in
-      let vars' =
+      let simples =
         List.map
-          (fun (var, var_duid) -> VB.create var var_duid Name_mode.normal)
-          vars
+          (fun (binding : (Simple.t, VB.t * Named.t) Either.t) ->
+            match binding with
+            | Left simple -> simple
+            | Right (pat, _) -> Simple.var (VB.var pat))
+          bindings
       in
-      let acc, body = cont acc (List.map (fun (v, _) -> Simple.var v) vars) in
-      List.fold_left2
-        (fun (acc, body) pat prim ->
-          Let_with_acc.create acc (Bound_pattern.singleton pat) prim ~body)
-        (acc, body) (List.rev vars') (List.rev nameds)
+      let acc, body = cont acc simples in
+      List.fold_left
+        (fun (acc, body) (binding : (Simple.t, VB.t * Named.t) Either.t) ->
+          match binding with
+          | Left _ -> acc, body
+          | Right (pat, named) ->
+            Let_with_acc.create acc (Bound_pattern.singleton pat) named ~body)
+        (acc, body) (List.rev bindings)
     in
     bind_recs acc exn_cont ~register_const0 p dbg cont
 

@@ -76,6 +76,8 @@ module type Num_common = sig
 
   val to_const : t -> Reg_width_const.t
 
+  val of_const : Reg_width_const.t -> t option
+
   val to_immediate : t -> Target_system.Machine_width.t -> Target_ocaml_int.t
 
   val to_naked_float32 : t -> Numeric_types.Float32_by_bit_pattern.t
@@ -251,6 +253,8 @@ module For_tagged_immediates : Int_number_kind = struct
 
     let to_const t = Reg_width_const.tagged_immediate t
 
+    let of_const const = Reg_width_const.is_tagged_immediate const
+
     let to_immediate t _machine_width = t
 
     let to_naked_float32 t =
@@ -343,6 +347,8 @@ module For_naked_immediates : Int_number_kind = struct
 
     let to_const t = Reg_width_const.naked_immediate t
 
+    let of_const const = Reg_width_const.is_naked_immediate const
+
     let to_immediate t _machine_width = t
 
     let to_naked_float32 t =
@@ -398,6 +404,8 @@ module For_float32s : Boxable_number_kind = struct
     let mod_ t1 t2 = Some (IEEE_semantics.mod_ t1 t2)
 
     let to_const t = Reg_width_const.naked_float32 t
+
+    let of_const const = Reg_width_const.is_naked_float32 const
 
     let to_immediate t machine_width =
       Target_ocaml_int.of_float machine_width (to_float t)
@@ -459,6 +467,8 @@ module For_floats : Boxable_number_kind = struct
     let mod_ t1 t2 = Some (IEEE_semantics.mod_ t1 t2)
 
     let to_const t = Reg_width_const.naked_float t
+
+    let of_const const = Reg_width_const.is_naked_float const
 
     let to_immediate t machine_width =
       (Target_ocaml_int.of_float machine_width) (to_float t)
@@ -578,6 +588,8 @@ module For_int8s : Int_number_kind = struct
         ~integer_bit_width:8
 
     let to_const t = Reg_width_const.naked_int8 t
+
+    let of_const const = Reg_width_const.is_naked_int8 const
 
     let to_immediate t machine_width =
       Target_ocaml_int.of_int machine_width (to_int t)
@@ -703,6 +715,8 @@ module For_int16s : Int_number_kind = struct
 
     let to_const t = Reg_width_const.naked_int16 t
 
+    let of_const const = Reg_width_const.is_naked_int16 const
+
     let to_immediate t machine_width =
       Target_ocaml_int.of_int machine_width (to_int t)
 
@@ -800,6 +814,8 @@ module For_int32s : Boxable_int_number_kind = struct
 
     let to_const t = Reg_width_const.naked_int32 t
 
+    let of_const const = Reg_width_const.is_naked_int32 const
+
     let to_immediate t machine_width = Target_ocaml_int.of_int32 machine_width t
 
     let to_naked_float32 t = Float32_by_bit_pattern.of_int64 (Int64.of_int32 t)
@@ -889,6 +905,8 @@ module For_int64s : Boxable_int_number_kind = struct
 
     let to_const t = Reg_width_const.naked_int64 t
 
+    let of_const const = Reg_width_const.is_naked_int64 const
+
     let to_immediate t machine_width = Target_ocaml_int.of_int64 machine_width t
 
     let to_naked_float32 t = Float32_by_bit_pattern.of_int64 t
@@ -975,6 +993,8 @@ module For_nativeints : Boxable_int_number_kind = struct
         ~integer_bit_width
 
     let to_const t = Reg_width_const.naked_nativeint t
+
+    let of_const const = Reg_width_const.is_naked_nativeint const
 
     let to_immediate t machine_width =
       Target_ocaml_int.of_targetint machine_width t
