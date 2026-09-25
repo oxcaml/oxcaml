@@ -157,6 +157,9 @@ let num_args_addressing = function
    of its source registers. *)
 let fold_delta_into_specific_operation _op ~arg_is_folded_reg:_ ~delta:_ = None
 
+(* No two arm64-specific operations can currently be merged into one. *)
+let merge_adjacent_specific_operations _op1 _op2 = None
+
 let addressing_displacement_for_llvmize addr =
   if not !Clflags.llvm_backend
   then
