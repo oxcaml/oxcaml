@@ -12,22 +12,34 @@ val set_function_specific_params : string list -> unit
 
 val find_param_value : string -> string option
 
+module Param : sig
+  (* A value derived from the register allocator parameters (the global
+     [-regalloc-param] flags and the [@regalloc_param] attributes of the current
+     function). It is computed on first access, and recomputed only when the
+     function-specific parameters change. *)
+  type 'a t
+
+  val make : (unit -> 'a) -> 'a t
+
+  val get : 'a t -> 'a
+end
+
 val debug : bool
 
 val bool_of_param :
-  ?guard:bool * string -> ?default:bool -> string -> bool Lazy.t
+  ?guard:bool * string -> ?default:bool -> string -> bool Param.t
 
-val int_of_param : ?default:int -> string -> int Lazy.t
+val int_of_param : ?default:int -> string -> int Param.t
 
-val invariants : bool Lazy.t
+val invariants : bool Param.t
 
-val verbose : bool Lazy.t
+val verbose : bool Param.t
 
-val validator_debug : bool Lazy.t
+val validator_debug : bool Param.t
 
-val block_temporaries : bool Lazy.t
+val block_temporaries : bool Param.t
 
-val affinity : bool Lazy.t
+val affinity : bool Param.t
 
 type liveness = Cfg_with_infos.liveness
 

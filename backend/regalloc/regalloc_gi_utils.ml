@@ -6,16 +6,16 @@ module DLL = Doubly_linked_list
 
 let gi_rng = Random.State.make [| 4; 6; 2 |]
 
-let log_function = lazy (make_log_function ~label:"gi")
+let log_function = Param.make (fun () -> make_log_function ~label:"gi")
 
-let indent () = (Lazy.force log_function).indent ()
+let indent () = (Param.get log_function).indent ()
 
-let dedent () = (Lazy.force log_function).dedent ()
+let dedent () = (Param.get log_function).dedent ()
 
-let reset_indentation () = (Lazy.force log_function).reset_indentation ()
+let reset_indentation () = (Param.get log_function).reset_indentation ()
 
 let log : type a. ?no_eol:unit -> (a, Format.formatter, unit) format -> a =
- fun ?no_eol fmt -> (Lazy.force log_function).log ?no_eol fmt
+ fun ?no_eol fmt -> (Param.get log_function).log ?no_eol fmt
 
 let instr_prefix (instr : Cfg.basic Cfg.instruction) =
   InstructionId.to_string instr.id
@@ -29,12 +29,12 @@ let log_body_and_terminator :
     liveness ->
     unit =
  fun body terminator liveness ->
-  make_log_body_and_terminator (Lazy.force log_function) ~instr_prefix
+  make_log_body_and_terminator (Param.get log_function) ~instr_prefix
     ~term_prefix body terminator liveness
 
 let log_cfg_with_infos : Cfg_with_infos.t -> unit =
  fun cfg_with_infos ->
-  make_log_cfg_with_infos (Lazy.force log_function) ~instr_prefix ~term_prefix
+  make_log_cfg_with_infos (Param.get log_function) ~instr_prefix ~term_prefix
     cfg_with_infos
 
 (* CR xclerc for xclerc: add more heuristics *)
@@ -58,16 +58,16 @@ module Priority_heuristics = struct
       String.concat ", "
         (all |> List.map ~f:to_string |> List.map ~f:(Printf.sprintf "%S"))
     in
-    lazy
-      (match find_param_value "GI_PRIORITY_HEURISTICS" with
-      | None -> default
-      | Some id -> (
-        match String.lowercase_ascii id with
-        | "interval_length" | "interval-length" -> Interval_length
-        | "random" -> Random_for_testing
-        | _ ->
-          fatal "unknown heuristics %S (possible values: %s)" id
-            (available_heuristics ())))
+    Param.make (fun () ->
+        match find_param_value "GI_PRIORITY_HEURISTICS" with
+        | None -> default
+        | Some id -> (
+          match String.lowercase_ascii id with
+          | "interval_length" | "interval-length" -> Interval_length
+          | "random" -> Random_for_testing
+          | _ ->
+            fatal "unknown heuristics %S (possible values: %s)" id
+              (available_heuristics ())))
 end
 
 (* CR xclerc for xclerc: add more heuristics *)
@@ -102,18 +102,18 @@ module Selection_heuristics = struct
       String.concat ", "
         (all |> List.map ~f:to_string |> List.map ~f:(Printf.sprintf "%S"))
     in
-    lazy
-      (match find_param_value "GI_SELECTION_HEURISTICS" with
-      | None -> default
-      | Some id -> (
-        match String.lowercase_ascii id with
-        | "first_available" | "first-available" -> First_available
-        | "best_fit" | "best-fit" -> Best_fit
-        | "worst_fit" | "worst-fit" -> Worst_fit
-        | "random" -> Random_for_testing
-        | _ ->
-          fatal "unknown heuristics %S (possible values: %s)" id
-            (available_heuristics ())))
+    Param.make (fun () ->
+        match find_param_value "GI_SELECTION_HEURISTICS" with
+        | None -> default
+        | Some id -> (
+          match String.lowercase_ascii id with
+          | "first_available" | "first-available" -> First_available
+          | "best_fit" | "best-fit" -> Best_fit
+          | "worst_fit" | "worst-fit" -> Worst_fit
+          | "random" -> Random_for_testing
+          | _ ->
+            fatal "unknown heuristics %S (possible values: %s)" id
+              (available_heuristics ())))
 end
 
 module Spilling_heuristics = struct
@@ -138,17 +138,17 @@ module Spilling_heuristics = struct
       String.concat ", "
         (all |> List.map ~f:to_string |> List.map ~f:(Printf.sprintf "%S"))
     in
-    lazy
-      (match find_param_value "GI_SPILLING_HEURISTICS" with
-      | None -> default
-      | Some id -> (
-        match String.lowercase_ascii id with
-        | "flat_uses" | "flat-uses" -> Flat_uses
-        | "hierarchical_uses" | "hierarchical-uses" -> Hierarchical_uses
-        | "random" -> Random_for_testing
-        | _ ->
-          fatal "unknown heuristics %S (possible values: %s)" id
-            (available_heuristics ())))
+    Param.make (fun () ->
+        match find_param_value "GI_SPILLING_HEURISTICS" with
+        | None -> default
+        | Some id -> (
+          match String.lowercase_ascii id with
+          | "flat_uses" | "flat-uses" -> Flat_uses
+          | "hierarchical_uses" | "hierarchical-uses" -> Hierarchical_uses
+          | "random" -> Random_for_testing
+          | _ ->
+            fatal "unknown heuristics %S (possible values: %s)" id
+              (available_heuristics ())))
 end
 
 let iter_instructions_layout :
@@ -343,7 +343,7 @@ let build_intervals : Cfg_with_infos.t -> Interval.t Reg.Tbl.t =
     (fun _reg (interval : Interval.t) ->
       interval.ranges <- List.rev interval.ranges)
     past_ranges;
-  if debug && Lazy.force verbose
+  if debug && Param.get verbose
   then
     Cfg_with_layout.iter_blocks cfg_with_layout ~f:(fun block ->
         log "(block %a)" Label.format block.start;
@@ -598,7 +598,7 @@ module Hardware_registers = struct
       | Some _ as res -> res
       | None -> (
         let heuristic =
-          match Lazy.force Selection_heuristics.value with
+          match Param.get Selection_heuristics.value with
           | Selection_heuristics.Random_for_testing ->
             Selection_heuristics.random ()
           | (First_available | Best_fit | Worst_fit) as heuristic -> heuristic

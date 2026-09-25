@@ -446,7 +446,7 @@ let insert_phi_moves :
                 instrs ~after:predecessor_block ~before:(Some block)
             in
             block_inserted := true;
-            if debug && Lazy.force invariants
+            if debug && Param.get invariants
             then (
               (match inserted_blocks with
               | [inserted_block] ->

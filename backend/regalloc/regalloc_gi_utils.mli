@@ -29,7 +29,7 @@ module Priority_heuristics : sig
 
   val random : unit -> int
 
-  val value : t Lazy.t
+  val value : t Param.t
 end
 
 module Selection_heuristics : sig
@@ -45,7 +45,7 @@ module Selection_heuristics : sig
 
   val random : unit -> t
 
-  val value : t Lazy.t
+  val value : t Param.t
 end
 
 module Spilling_heuristics : sig
@@ -60,7 +60,7 @@ module Spilling_heuristics : sig
 
   val random : unit -> bool
 
-  val value : t Lazy.t
+  val value : t Param.t
 end
 
 val iter_instructions_layout :
