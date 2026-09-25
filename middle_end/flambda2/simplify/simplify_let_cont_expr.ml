@@ -671,6 +671,13 @@ let rebuild_single_non_recursive_handler ~at_unit_toplevel
       } =
     handler_to_rebuild
   in
+  (* Coldness inferred from calls to cold functions is only known once the whole
+     downwards traversal is complete (a call inside the handler of a
+     continuation that gets inlined marks the continuation of the use site,
+     whose handler may have been traversed earlier). *)
+  let is_cold =
+    is_cold || DA.continuation_is_cold (UA.creation_dacc uacc) cont
+  in
   (* In case the continuation was previously recursive, we make sure not to
      forget the invariant original and extra params. *)
   let params = Bound_parameters.append original_invariant_params params in
@@ -823,11 +830,15 @@ let rebuild_single_recursive_handler cont
       let invariant_params, variant_params =
         Apply_cont_rewrite.get_used_params rewrite
       in
+      let is_cold =
+        handler_to_rebuild.is_cold
+        || DA.continuation_is_cold (UA.creation_dacc uacc) cont
+      in
       let cont_handler =
         RE.Continuation_handler.create
           (UA.are_rebuilding_terms uacc)
           variant_params ~handler ~free_names_of_handler:free_names
-          ~is_exn_handler:false ~is_cold:handler_to_rebuild.is_cold
+          ~is_exn_handler:false ~is_cold
       in
       let free_names =
         remove_params invariant_params (remove_params variant_params free_names)
@@ -1071,11 +1082,16 @@ let sort_handlers data handlers =
         | No_loop cont ->
           let handler = Continuation.Map.find cont handlers in
           let is_single_inlinable_use =
+            (* This must agree with [Join_points.compute_handler_env], which
+               simplifies the handler of a continuation with a single inlinable
+               use in the environment at that use. In particular cold handlers
+               are inlined too: the continuation they are inlined into is marked
+               as cold instead (see [simplify_handler]). *)
             match Continuation_uses.get_uses (get_uses data cont) with
             | [] | _ :: _ :: _ -> false
             | [use] -> (
               match One_continuation_use.use_kind use with
-              | Inlinable -> not handler.is_cold
+              | Inlinable -> true
               | Non_inlinable _ -> false)
           in
           Non_recursive { cont; handler; is_single_inlinable_use }
@@ -1107,7 +1123,11 @@ let rec compute_specialized_continuation ~replay ~simplify_expr ~original_cont
       let uses = Continuation_uses.add_use uses use in
       Continuation_uses.get_arg_types_by_use_id uses
     in
-    let dacc, unbox_decisions, is_exn_handler, extra_params_and_args =
+    let ( dacc,
+          unbox_decisions,
+          is_exn_handler,
+          extra_params_and_args,
+          is_single_inlinable_use ) =
       prepare_dacc_for_handlers dacc ~env_at_fork:denv ~params ~replay
         ~lifted_params ~consts_lifted_after_fork:data.consts_lifted_after_fork
         ~is_recursive (Continuation.sort cont)
@@ -1121,8 +1141,9 @@ let rec compute_specialized_continuation ~replay ~simplify_expr ~original_cont
       DA.with_are_lifting_conts dacc
         (Are_lifting_conts.no_lifting In_continuation_specialization)
     in
-    simplify_handler ~simplify_expr ~is_recursive ~is_exn_handler ~params cont
-      dacc original.handler ~invariant_params:Bound_parameters.empty
+    simplify_handler ~simplify_expr ~is_recursive ~is_exn_handler
+      ~is_cold:handler.is_cold ~is_single_inlinable_use ~params cont dacc
+      original.handler ~invariant_params:Bound_parameters.empty
       (fun dacc rebuild_handler cont_uses_env_in_handler ->
         let dacc, consts_lifted_in_handler =
           DA.get_and_clear_lifted_constants dacc
@@ -1409,11 +1430,21 @@ and prepare_dacc_for_handlers dacc ~replay ~env_at_fork ~params ~is_recursive
   ( DA.with_denv dacc handler_env,
     unbox_decisions,
     is_exn_handler,
-    join_result.extra_params_and_args )
+    join_result.extra_params_and_args,
+    join_result.is_single_inlinable_use )
 
-and simplify_handler ~simplify_expr ~is_recursive ~is_exn_handler
-    ~invariant_params ~params cont dacc handler k =
+and simplify_handler ~simplify_expr ~is_recursive ~is_exn_handler ~is_cold
+    ~is_single_inlinable_use ~invariant_params ~params cont dacc handler k =
   let dacc = DA.with_continuation_uses_env dacc ~cont_uses_env:CUE.empty in
+  let dacc =
+    (* The handler of a continuation with a single inlinable use has been
+       prepared to be simplified in the environment at that use, and will be
+       inlined there: the current continuation stays the one of the use, and
+       inherits the coldness of the handler being inlined. *)
+    if is_single_inlinable_use
+    then if is_cold then DA.mark_current_continuation_as_cold dacc else dacc
+    else DA.map_denv dacc ~f:(fun denv -> DE.set_current_continuation denv cont)
+  in
   let dacc =
     DA.map_flow_acc
       ~f:
@@ -1463,8 +1494,8 @@ and simplify_single_recursive_handler ~simplify_expr cont_uses_env_so_far
   in
   let dacc = DA.with_denv dacc handler_env in
   simplify_handler ~simplify_expr ~is_recursive:true ~is_exn_handler:false
-    ~params ~invariant_params cont dacc handler
-    (fun dacc rebuild_handler cont_uses_env_in_handler ->
+    ~is_cold ~is_single_inlinable_use:false ~params ~invariant_params cont dacc
+    handler (fun dacc rebuild_handler cont_uses_env_in_handler ->
       let cont_uses_env_so_far =
         CUE.union cont_uses_env_so_far cont_uses_env_in_handler
       in
@@ -1618,7 +1649,11 @@ and simplify_handlers ~simplify_expr ~down_to_up ~denv_for_join ~rebuild_body
                 [cont; DE.unit_toplevel_exn_continuation denv])
       in
       let denv = DE.set_at_unit_toplevel_state denv at_unit_toplevel in
-      let dacc, unbox_decisions, is_exn_handler, extra_params_and_args =
+      let ( dacc,
+            unbox_decisions,
+            is_exn_handler,
+            extra_params_and_args,
+            is_single_inlinable_use ) =
         prepare_dacc_for_handlers dacc ~env_at_fork:denv ~params ~lifted_params
           ~consts_lifted_after_fork:consts_lifted_during_body
           ~is_recursive:false ~replay:None (Continuation.sort cont)
@@ -1627,7 +1662,8 @@ and simplify_handlers ~simplify_expr ~down_to_up ~denv_for_join ~rebuild_body
           ~arg_types_by_use_id:(Continuation_uses.get_arg_types_by_use_id uses)
       in
       simplify_handler ~simplify_expr ~is_recursive:false ~is_exn_handler
-        ~params cont dacc handler ~invariant_params:Bound_parameters.empty
+        ~is_cold ~is_single_inlinable_use ~params cont dacc handler
+        ~invariant_params:Bound_parameters.empty
         (fun dacc rebuild_handler cont_uses_env_in_handler ->
           let dacc, consts_lifted_in_handler =
             DA.get_and_clear_lifted_constants dacc
@@ -1712,7 +1748,11 @@ and simplify_handlers ~simplify_expr ~down_to_up ~denv_for_join ~rebuild_body
         all_uses
     in
     let uses = List.concat_map Continuation_uses.get_uses all_uses in
-    let dacc, unbox_decisions, is_exn_handler, extra_params_and_args =
+    let ( dacc,
+          unbox_decisions,
+          is_exn_handler,
+          extra_params_and_args,
+          (_is_single_inlinable_use : bool) ) =
       prepare_dacc_for_handlers dacc ~env_at_fork:denv ~params:invariant_params
         ~lifted_params ~is_recursive:true ~replay:None
         ~consts_lifted_after_fork:consts_lifted_during_body

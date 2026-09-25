@@ -282,6 +282,18 @@ module Acc : sig
   val continuation_known_arguments :
     cont:Continuation.t -> t -> Env.value_approximation list option
 
+  (** The continuation whose handler is currently being closure-converted, if
+      any (there is none at the toplevel of a function body). *)
+  val current_continuation : t -> Continuation.t option
+
+  val with_current_continuation : Continuation.t option -> t -> t
+
+  (** Mark the continuation whose handler is currently being closure-converted
+      as cold, because that handler calls a cold function. *)
+  val mark_current_continuation_as_cold : t -> t
+
+  val continuation_is_cold : Continuation.t -> t -> bool
+
   val with_free_names : Name_occurrences.t -> t -> t
 
   (* This is intended to evaluate a distinct free_names from the one in acc, one
