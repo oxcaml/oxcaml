@@ -5,7 +5,6 @@ Interfaces imported:
 	00000000000000000000000000000000	Ref_indirect
 	00000000000000000000000000000000	Monoid_utils
 	00000000000000000000000000000000	Monoid
-	00000000000000000000000000000000	CamlinternalFormatBasics
 Runtime parameters:
 	Monoid
 	Monoid_utils
@@ -14,14 +13,13 @@ Uses unsafe features: no
 Force link: no
 File ref_indirect.cmi
 Unit name: Ref_indirect
+CRC of interface: 00000000000000000000000000000000
 Is parameter: no
 Parameters:
 	Monoid
 Interfaces imported:
-	00000000000000000000000000000000	Ref_indirect
 	00000000000000000000000000000000	Stdlib
 	00000000000000000000000000000000	Monoid_utils
 	00000000000000000000000000000000	Monoid
-	00000000000000000000000000000000	CamlinternalFormatBasics
 Globals in scope:
 	Monoid_utils{Monoid}
