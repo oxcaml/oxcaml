@@ -26,8 +26,8 @@ let times = Debug.find "times"
 module Addr = struct
   type t = int
 
-  module Set = Set.Make (Int)
-  module Map = Map.Make (Int)
+  module Set = Int_set
+  module Map = Int_trie
   module Hashtbl = Int.Hashtbl
 
   let to_string = string_of_int
@@ -72,7 +72,7 @@ module Var : sig
 
   val reset : unit -> unit
 
-  module Set : Set.S with type elt = t
+  module Set : Int_set.S with type elt = t
 
   module Map : Map.S with type key = t
 
@@ -259,7 +259,7 @@ end = struct
     propagate_name o n;
     n
 
-  module Set = Set.Make (T)
+  module Set = Int_set
   module Map = Map.Make (T)
 
   module Tbl = struct
@@ -1034,10 +1034,8 @@ let do_compact { blocks; start; free_pc = _ } =
     { block with body; branch }
   in
   let blocks =
-    Addr.Map.fold
-      (fun pc b blocks -> Addr.Map.add remap.(pc) (rewrite remap b) blocks)
-      blocks
-      Addr.Map.empty
+    Addr.Map.of_seq
+      (Seq.map (fun (pc, b) -> remap.(pc), rewrite remap b) (Addr.Map.to_seq blocks))
   in
   let free_pc = (Addr.Map.max_binding blocks |> fst) + 1 in
   let start = remap.(start) in

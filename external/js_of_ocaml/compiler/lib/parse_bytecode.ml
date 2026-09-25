@@ -3031,6 +3031,7 @@ and compile infos pc state (instrs : instr list) =
                  ( Extern ("%with_stack_preemptible", None)
                  , [ Pv valuec; Pv exnc; Pv effc; Pv tickc; Pv f; Pv arg ] ) )
           :: instrs)
+    | NEXT_RESERVED_BITS -> compile infos (pc + 2) state instrs
     | EVENT | BREAK | FIRST_UNIMPLEMENTED_OP -> assert false)
 
 (****)
@@ -3459,7 +3460,7 @@ module Reloc = struct
     ; primitives = String.Hashtbl.create 17
     }
 
-  let constant_of_const x = Ocaml_compiler.constant_of_const x
+  let constant_of_const x = Ocaml_compiler.Constant.of_const x
   [@@if ocaml_version < (5, 1, 0)]
 
   let constant_of_const x = Constants.parse x [@@if ocaml_version >= (5, 1, 0)]

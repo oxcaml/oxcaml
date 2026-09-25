@@ -51,6 +51,7 @@ let print ?(debuginfo = true) ?(report = false) ?(invalid = false) ~compact sour
     let parsed = Parse_js.parse `Module lexed in
     (if debuginfo then Config.Flag.enable else Config.Flag.disable) "debuginfo";
     let _ = Js_output.program pp parsed in
+    Config.Flag.disable "debuginfo";
     let s = Buffer.contents buffer in
     print_endline s;
     (let lexed = Parse_js.Lexer.of_string ~filename:"fake" s in
@@ -682,8 +683,7 @@ class x extends p {
        var s =  /*<<fake:8:12>>*/ super[d];
        var s =  /*<<fake:9:12>>*/ super.d;
        /*<<fake:6:4>>*/ }
-      static
-      bar(){
+      static bar(){
        var s =  /*<<fake:14:12>>*/ super[d];
        var s =  /*<<fake:15:12>>*/ super.d;
        /*<<fake:12:11>>*/ }

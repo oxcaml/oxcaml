@@ -145,19 +145,40 @@ var caml_call_gen_tuple = (function () {
       if (typeof g !== "function") return g;
       return caml_call_gen_direct(g, args.slice(n));
     } else {
-      // FIXME: Restore the optimization of handling specially d = 1 or 2
       var args_ = args.slice();
       args_.length = argsLen;
-      var ret = caml_cps_closure(
-        function (...extra_args) {
-          if (extra_args.length === 0) extra_args = [undefined];
-          return caml_call_gen_direct(f, args.concat(extra_args));
-        },
-        function (...extra_args) {
-          if (extra_args.length === 0) extra_args = [undefined];
-          return caml_call_gen_cps(f, args_.concat(extra_args));
-        },
-      );
+      var direct;
+      switch (d) {
+        case 1: {
+          direct = function (x) {
+            var nargs = new Array(argsLen + 1);
+            for (var i = 0; i < argsLen; i++) nargs[i] = args[i];
+            nargs[argsLen] = x;
+            return f.apply(null, nargs);
+          };
+          break;
+        }
+        case 2: {
+          direct = function (x, y) {
+            var nargs = new Array(argsLen + 2);
+            for (var i = 0; i < argsLen; i++) nargs[i] = args[i];
+            nargs[argsLen] = x;
+            nargs[argsLen + 1] = y;
+            return f.apply(null, nargs);
+          };
+          break;
+        }
+        default: {
+          direct = function (...extra_args) {
+            if (extra_args.length === 0) extra_args = [undefined];
+            return caml_call_gen_direct(f, args.concat(extra_args));
+          };
+        }
+      }
+      var ret = caml_cps_closure(direct, function (...extra_args) {
+        if (extra_args.length === 0) extra_args = [undefined];
+        return caml_call_gen_cps(f, args_.concat(extra_args));
+      });
       ret.l = d;
       ret.cps.l = d + 1;
       return ret;
@@ -165,6 +186,14 @@ var caml_call_gen_tuple = (function () {
   }
   function caml_call_gen_cps(f, args) {
     if (!f.cps) {
+      // [f] cannot perform an effect, so it is called in direct style.
+      // But if it is applied to too many arguments, the closure it
+      // returns may perform one: it is then applied in CPS.
+      var n = f.l >= 0 ? f.l : (f.l = f.length);
+      if (args.length - 1 > n) {
+        var g = f.apply(null, args.slice(0, n));
+        return caml_call_gen_cps(g, args.slice(n));
+      }
       var k = args.pop();
       return k(caml_call_gen_direct(f, args));
     }
@@ -281,11 +310,13 @@ function caml_register_global_by_index(v, idx) {
 
 //Provides: caml_register_global (shallow, const)
 //Requires: caml_global_data, caml_callback, caml_build_symbols
-//Requires: caml_link_info
+//Requires: caml_link_info, caml_string_of_jsbytes
 //Requires: jsoo_toplevel_reloc
 function caml_register_global(v, name) {
   if (jsoo_toplevel_reloc) {
-    var n = caml_callback(jsoo_toplevel_reloc, [[0, name]]);
+    var n = caml_callback(jsoo_toplevel_reloc, [
+      [0, caml_string_of_jsbytes(name)],
+    ]);
     caml_global_data[n + 1] = v;
   } else if (caml_link_info.symbols) {
     if (!caml_link_info.symidx) {
@@ -305,12 +336,14 @@ function caml_register_global(v, name) {
 
 //Provides: caml_register_global_predef (shallow, const)
 //Requires: caml_global_data, caml_callback, caml_build_symbols
-//Requires: caml_link_info
+//Requires: caml_link_info, caml_string_of_jsbytes
 //Requires: jsoo_toplevel_reloc
 function caml_register_global_predef(v, name) {
   var key = "predef:" + name;
   if (jsoo_toplevel_reloc) {
-    var n = caml_callback(jsoo_toplevel_reloc, [[1, name]]);
+    var n = caml_callback(jsoo_toplevel_reloc, [
+      [1, caml_string_of_jsbytes(name)],
+    ]);
     caml_global_data[n + 1] = v;
   } else if (caml_link_info.symbols) {
     if (!caml_link_info.symidx) {
