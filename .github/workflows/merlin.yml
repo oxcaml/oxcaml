@@ -19,9 +19,9 @@ concurrency:
 
 # Overall approach to running the tests:
 #  - Install OCaml 5.4, as this is the version of dependencies our merlin expects.
-#  - Build OxCaml (which also requires installing OCaml 5.4).
-#  - Build merlin using OCaml 5.4, and then run the tests while pointing merlin at
-#    OxCaml's stdlib and ocamlc.
+#  - Build OxCaml using a separate, pinned OxCaml bootstrap switch.
+#  - Build merlin using OCaml 5.4 in its standalone Dune project, then run the
+#    tests while pointing merlin at OxCaml's stdlib and ocamlc.
 #
 # The second step's result is cached, keyed by the hash of the commit being
 # tested, so re-runs of the same commit can skip rebuilding the compiler.
@@ -118,25 +118,26 @@ jobs:
         path: 'flambda-backend'
         persist-credentials: false
 
-    - name: Install dependencies for OxCaml
+    - name: Set up the OxCaml bootstrap switch
       if: env.MERLIN_EMERGENCY_SKIP != 'y' && steps.cache.outputs.cache-hit != 'true'
-      working-directory: flambda-backend
       run: |
-        # We don't need the dev tool parts
-        sed -i -e '/ocamlformat\|merlin\|ocaml-lsp-server/d' oxcaml-dev.opam
-        opam pin add --yes oxcaml-dev .
+        # Keep the upstream switch and its repository selection for Merlin.
+        opam repository add --dont-select ox \
+          git+https://github.com/oxcaml/opam-repository.git
+        opam switch create oxcaml-bootstrap --yes --no-switch \
+          --repositories=local,ox,default \
+          --packages=oxcaml-ci-bootstrap.5.4.0-ox8
 
     - name: Configure, build, and install OxCaml
       if: env.MERLIN_EMERGENCY_SKIP != 'y' && steps.cache.outputs.cache-hit != 'true'
       working-directory: flambda-backend
       run: |
-        eval $(opam env)
+        eval "$(opam env --switch=oxcaml-bootstrap --set-switch)"
         autoconf
         ./configure \
           --prefix=$GITHUB_WORKSPACE/flambda-backend/_install \
-          --with-dune=$(which dune)
+          --with-opam-switch=oxcaml-bootstrap
         make install
-        opam pin remove oxcaml-dev
 
     - name: Upload OxCaml cache
       if: env.MERLIN_EMERGENCY_SKIP != 'y' && steps.cache.outputs.cache-hit != 'true'
@@ -153,20 +154,14 @@ jobs:
         opam install --yes ppx_string ppx_compare ocamlformat.0.29.0
         opam install . --deps-only --with-test --yes
 
-    - name: Configure OxCaml
-      if: env.MERLIN_EMERGENCY_SKIP != 'y'
-      working-directory: oxcaml
-      run: |
-        autoconf
-        ./configure --prefix=$GITHUB_WORKSPACE/_install
-
     - name: Build and test in release mode (linux)
       if: env.MERLIN_EMERGENCY_SKIP != 'y'
       working-directory: oxcaml/external/merlin
       run: |
         export MERLIN_TEST_OCAML_PATH=$GITHUB_WORKSPACE/flambda-backend/_install
-        make build
-        make test
+        # Do not inherit the parent's OxCaml-only boot workspace flags.
+        dune build --root .
+        DUNE_CACHE=disabled dune build --root . @check @runtest
         if ! git diff --quiet ; then
           echo "The following files were modified by dune:" >&2
           git diff --name-only >&2

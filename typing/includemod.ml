@@ -261,11 +261,11 @@ module Core_inclusion = struct
       vd2 =
     if Directionality.mark_as_used direction then
       Env.mark_value_used vd1.val_uid;
-    let vd2 = Subst.value_description subst vd2 in
     try
       Ok (Includecore.value_descriptions ~loc env (Ident.name id) ~mmodes
-            ~self_check vd1 vd2)
+            ~self_check vd1 subst vd2)
     with Includecore.Dont_match err ->
+      let vd2 = Subst.value_description subst vd2 in
       Error Error.(Core (Value_descriptions (mdiff vd1 vd2 mmodes err)))
 
   (* Inclusion between type declarations *)
@@ -561,7 +561,8 @@ let retrieve_functor_params env mty =
         (* the function is only used for functor parameter diff, so the return
            mode is intentionally ignored. *)
         retrieve_functor_params (p :: before) env res
-    | Mty_ident _ | Mty_alias _ | Mty_signature _ | Mty_strengthen _ as res ->
+    | Mty_ident _ | Mty_alias _ | Mty_signature _ | Mty_strengthen _
+    | Mty_with _ as res ->
         { Error.params = List.rev before; res }
   in
   retrieve_functor_params [] env mty
@@ -630,6 +631,26 @@ type core_relation = {
   jkind_declarations: Types.jkind_declaration core_incl;
 }
 
+(* Local signatures need structural inclusion to mark their declarations as
+   used. An imported signature has no such local declarations; functor
+   applications must have imported arguments too. *)
+let rec imported_with_body mty =
+  let open Subst.Lazy in
+  match mty with
+  | Mty_ident path when List.for_all Ident.is_global (Path.heads path) ->
+      Some mty
+  | Mty_with (body, _, _, With_type _) -> imported_with_body body
+  | Mty_ident _ | Mty_signature _ | Mty_functor _ | Mty_alias _
+  | Mty_strengthen _ | Mty_with _ -> None
+
+let rec check_with_types mty =
+  let open Subst.Lazy in
+  match mty with
+  | Mty_with (body, id, _, With_type _) ->
+      !Subst.check_with id;
+      check_with_types body
+  | _ -> ()
+
 (* Quickly compare module types without expanding them, succeeding only if mty1
   is a subtype of mty2 with no coercion  *)
 let rec shallow_modtypes env subst mty1 mty2 =
@@ -654,6 +675,18 @@ let rec shallow_modtypes env subst mty1 mty2 =
   | Mty_strengthen (mty1,_,_), mty2 ->
       (* S with M <= S *)
       shallow_modtypes env subst mty1 mty2
+  | Mty_with (_, _, _, With_type _), mty2 ->
+      (* Type equalities preserve the runtime structure of the body. *)
+      begin match imported_with_body mty1 with
+      | None -> false
+      | Some body ->
+          check_with_types mty1;
+          shallow_modtypes env subst body mty2
+      end
+  | Mty_with _, _ ->
+      (* A module constraint can change the layout of a submodule, so even
+         inclusion in the unconstrained body may require a coercion. *)
+      false
   | (Mty_alias _ | Mty_ident _ | Mty_signature _ | Mty_functor _), _  -> false
 
 and shallow_module_paths env subst p1 mty2 p2 =
@@ -665,6 +698,7 @@ and shallow_module_paths env subst p1 mty2 p2 =
         shallow_modtypes env subst mty1 mty2
           && equal_module_paths env p1 subst p2
     | Mty_alias _ | Mty_ident _ | Mty_signature _ | Mty_functor _
+    | Mty_with _
     | exception Not_found -> false
 
 let rec modtypes ~core ~direction ~loc env subst ~modes mty1 mty2 shape =
@@ -841,7 +875,7 @@ and try_modtypes ~core ~direction ~loc env subst ~modes
         match mty1, mty2 with
         | _, Mty_strengthen (_,p,Aliasable) when Env.is_functor_arg p env ->
             Error (Error.Invalid_module_alias p)
-        | (Mty_ident _ | Mty_strengthen _), _ ->
+        | (Mty_ident _ | Mty_strengthen _ | Mty_with _), _ ->
             Error (Error.Mt_core Abstract_module_type)
         | (Mty_alias _, Mty_alias p2) ->
             if Env.is_functor_arg p2 env then
@@ -854,7 +888,7 @@ and try_modtypes ~core ~direction ~loc env subst ~modes
               (retrieve_functor_params env (Subst.Lazy.force_modtype mty1))
               (retrieve_functor_params env (Subst.Lazy.force_modtype mty2))
               Error.Incompatible
-        | _, (Mty_ident _ | Mty_strengthen _) ->
+        | _, (Mty_ident _ | Mty_strengthen _ | Mty_with _) ->
             Error Error.(Mt_core Not_an_identifier)
         | _, Mty_alias _ ->
             Error (Error.Mt_core Error.Not_an_alias)
@@ -1440,7 +1474,8 @@ module Functor_inclusion_diff = struct
   let rec keep_expansible_param = function
     | Mty_ident _ | Mty_alias _ as mty -> Some mty
     | Mty_signature _ | Mty_functor _ -> None
-    | Mty_strengthen (mty,_,_) -> keep_expansible_param mty
+    | Mty_strengthen (mty,_,_) | Mty_with (mty,_,_,_) ->
+        keep_expansible_param mty
 
   let lookup_expansion { env ; res ; _ } = match res with
     | None -> None

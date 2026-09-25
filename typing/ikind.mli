@@ -43,7 +43,7 @@ val sub_jkind_l :
   ?allow_any_crossing:bool ->
   ?origin:string ->
   type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
-  context:Jkind.jkind_context ->
+  context:Jkind.jkind_context @ local ->
   Env.t ->
   Types.jkind_l ->
   Types.jkind_l ->
@@ -52,7 +52,7 @@ val sub_jkind_l :
 val check_type_expr_bound :
   ?origin:string ->
   type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
-  context:Jkind.jkind_context ->
+  context:Jkind.jkind_context @ local ->
   Env.t ->
   ty:Types.type_expr ->
   actual:Types.jkind_l ->
@@ -63,7 +63,7 @@ val check_type_decl_bound :
   ?allow_any_crossing:bool ->
   ?origin:string ->
   type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
-  context:Jkind.jkind_context ->
+  context:Jkind.jkind_context @ local ->
   Env.t ->
   decl:Types.type_declaration ->
   actual:Types.jkind_l ->
@@ -71,7 +71,7 @@ val check_type_decl_bound :
   (unit, subjkind_error) result
 
 val crossing_of_jkind :
-  context:Jkind.jkind_context ->
+  context:Jkind.jkind_context @ local ->
   Env.t ->
   ('l * 'r) Types.jkind ->
   Mode.Crossing.t
@@ -85,8 +85,8 @@ type sub_or_intersect = Jkind.sub_or_intersect
 
 val sub_or_intersect :
   ?origin:string ->
-  type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
-  context:Jkind.jkind_context ->
+  type_equal:(Types.type_expr -> Types.type_expr -> bool) @ local ->
+  context:Jkind.jkind_context @ local ->
   Env.t ->
   (Allowance.allowed * 'r1) Types.jkind ->
   ('l2 * Allowance.allowed) Types.jkind ->
@@ -94,8 +94,8 @@ val sub_or_intersect :
 
 val sub_or_error :
   ?origin:string ->
-  type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
-  context:Jkind.jkind_context ->
+  type_equal:(Types.type_expr -> Types.type_expr -> bool) @ local ->
+  context:Jkind.jkind_context @ local ->
   Env.t ->
   (Allowance.allowed * 'r1) Types.jkind ->
   ('l2 * Allowance.allowed) Types.jkind ->

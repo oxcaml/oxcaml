@@ -118,6 +118,24 @@ module Stdlib = struct
 
     type 'a t = 'a list
 
+    let rec iter f = function
+      | [] -> ()
+      | x :: xs -> f x; iter f xs
+
+    let rec fold_left f acc = function
+      | [] -> acc
+      | x :: xs -> fold_left f (f acc x) xs
+
+    let[@tail_mod_cons] rec map f = function
+      | [] -> []
+      | [x] ->
+          let y = f x in
+          [y]
+      | x1 :: x2 :: xs ->
+          let y1 = f x1 in
+          let y2 = f x2 in
+          y1 :: y2 :: map f xs
+
     let is_empty = function
       | [] -> true
       | _ :: _ -> false
@@ -149,13 +167,20 @@ module Stdlib = struct
       in
       aux [] l1 l2
 
-    let map3 f =
-      let rec loop acc as_ bs cs = match as_, bs, cs with
+    let map3 f as_ bs cs =
+      let rec loop f acc as_ bs cs =
+        match as_, bs, cs with
         | [], [], [] -> List.rev acc
-        | a :: as_, b :: bs, c :: cs -> loop (f a b c :: acc) as_ bs cs
+        | a :: as_, b :: bs, c :: cs -> loop f (f a b c :: acc) as_ bs cs
         | _ -> invalid_arg "map3"
       in
-      loop []
+      loop f [] as_ bs cs
+
+    let rec iter3 f as_ bs cs =
+      match as_, bs, cs with
+      | [], [], [] -> ()
+      | a :: as_, b :: bs, c :: cs -> f a b c; iter3 f as_ bs cs
+      | _ -> invalid_arg "iter3"
 
     let concat_map2 f l1 l2 =
       let rec aux f acc = function
@@ -329,6 +354,10 @@ module Stdlib = struct
   module Option = struct
     type 'a t = 'a option
 
+    let map f = function
+      | None -> None
+      | Some x -> Some (f x)
+
     let exists p t = match t with
       | Some x -> p x
       | None -> false
@@ -352,6 +381,11 @@ module Stdlib = struct
   end
 
   module Array = struct
+    let iter f a =
+      for i = 0 to Array.length a - 1 do
+        f (Array.unsafe_get a i)
+      done
+
     let exists2 p a1 a2 =
       let n = Array.length a1 in
       if Array.length a2 <> n then invalid_arg "Misc.Stdlib.Array.exists2";

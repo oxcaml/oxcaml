@@ -81,7 +81,27 @@ let
       doCheck = false;
     };
 
-  ocaml_5_4_0 = mkBootOcaml_5_4_0 stdenv;
+  # Always built with the plain pkgs.stdenv, whatever stdenv this derivation
+  # uses, so that every oxcaml variant shares one bootstrap closure. The
+  # pinned revision bootstraps itself the same way, recursively, down to a
+  # revision that bootstraps from upstream OCaml.
+  bootstrapCompiler = import (pkgs.fetchFromGitHub {
+    owner = "oxcaml";
+    repo = "oxcaml";
+    rev = "11ae376f3e829ca475839554eb44a13313045f23";
+    hash = "sha256-1Av5KD9gRf7NOPUgXc2EgHB34YuWm7xR1eVqHAjhaVU=";
+  }) { inherit pkgs; };
+
+  # The bootstrap compiler records its C compiler by name (`gcc` with
+  # pkgs.stdenv on Linux) and both it and dune invoke that name to compile C
+  # stubs and link executables in the boot workspace. When this derivation
+  # uses clang (asan), no `gcc` is on PATH, so provide one that runs our cc.
+  # The flags the bootstrap compiler passes are accepted by clang.
+  bootstrapCcShim = lib.optional (stdenv.cc.isClang && !pkgs.stdenv.cc.isClang) (
+    pkgs.writeShellScriptBin "gcc" ''
+      exec ${stdenv.cc}/bin/cc "$@"
+    ''
+  );
 
   # CR sspies: For the time being, we use dune built with the vanilla 4.14.2 compiler.
   # Over time, we should probably define something like a "boot environment" and build
@@ -143,8 +163,8 @@ let
     testOcaml:
     let
       # nixpkgs does not yet provide an OCaml 5.4 package set at the pinned
-      # revision, so construct one around the compiler used to bootstrap
-      # OxCaml. Pin the plain pkgs.stdenv for this compiler rather than the
+      # revision, so construct one around upstream OCaml 5.4 for the dev tools.
+      # Pin the plain pkgs.stdenv for this compiler rather than the
       # variant stdenv: a clangStdenv-built compiler records `clang` as its C
       # compiler, which isn't on PATH when the scope's packages build under
       # the default gcc stdenv (e.g. findlib's `ocamlc -custom` link of
@@ -263,7 +283,7 @@ let
 
   # Only the passthru dev-input lists are used here, which don't depend on the
   # testOcaml argument (it only feeds the merlin package's check phase).
-  merlinDev = (mkMerlinPackages ocaml_5_4_0).merlin;
+  merlinDev = (mkMerlinPackages bootstrapCompiler).merlin;
 
   gfortran =
     # we require fortran for some bigarray tests, but adding `pkgs.gfortran`
@@ -371,11 +391,16 @@ stdenv.mkDerivation {
   nativeBuildInputs = [
     pkgs.autoconf
     menhir
-    ocaml_5_4_0
+    bootstrapCompiler
+  ]
+  ++ bootstrapCcShim
+  ++ [
     pkgs.ocaml-ng.ocamlPackages_5_4.ocaml-lsp
     dune
     pkgs.pkg-config
     pkgs.rsync
+    pkgs.ripgrep
+    pkgs.ocamlPackages.memtrace
     pkgs.which
     pkgs.parallel
     gfortran # Required for Bigarray Fortran tests
@@ -470,7 +495,7 @@ stdenv.mkDerivation {
   passthru = {
     inherit
       ocaml_4_14_2
-      ocaml_5_4_0
+      bootstrapCompiler
       ocamlformat
       lldb
       mkMerlinPackages

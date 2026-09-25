@@ -246,7 +246,8 @@ module Violation : sig
   (** Set [?missing_cmi] to mark [t] as having arisen from a missing cmi *)
 
   val of_ :
-    context:jkind_context -> ?missing_cmi:Path.t -> Env.t -> violation -> t
+    context:jkind_context @ local -> ?missing_cmi:Path.t ->
+    Env.t -> violation -> t
 
   (** Is this error from a missing cmi? *)
   val is_missing_cmi : t -> bool
@@ -644,20 +645,21 @@ val extract_layout : Env.t -> 'd Types.jkind -> (Sort.t Layout.t, Path.t) result
 
 (** Gets the mode crossing for types of this jkind. *)
 val get_mode_crossing :
-  context:jkind_context -> Env.t -> 'd Types.jkind -> Mode.Crossing.t
+  context:jkind_context @ local -> Env.t -> 'd Types.jkind -> Mode.Crossing.t
 
 val to_unsafe_mode_crossing : Types.jkind_l -> Types.unsafe_mode_crossing
 
 val equal_unsafe_mode_crossing :
   type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
-  context:jkind_context ->
+  context:jkind_context @ local ->
   Env.t ->
   Types.unsafe_mode_crossing ->
   Types.unsafe_mode_crossing ->
   bool
 
 val get_externality_upper_bound :
-  context:jkind_context -> Env.t -> 'd Types.jkind -> Jkind_axis.Externality.t
+  context:jkind_context @ local -> Env.t ->
+  'd Types.jkind -> Jkind_axis.Externality.t
 
 (** Computes a jkind that is the same as the input but with an updated maximum
     mode for the externality axis *)
@@ -724,7 +726,7 @@ type normalize_mode =
 
 val normalize :
   mode:normalize_mode ->
-  context:jkind_context ->
+  context:jkind_context @ local ->
   Env.t ->
   Types.jkind_l ->
   Types.jkind_l
@@ -825,8 +827,8 @@ type 'd intersection_result =
           believing match cases are unreachable. *)
 
 val intersection :
-  type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
-  context:jkind_context ->
+  type_equal:(Types.type_expr -> Types.type_expr -> bool) @ local ->
+  context:jkind_context @ local ->
   reason:History.interact_reason ->
   Env.t ->
   ('l1 * allowed) Types.jkind ->
@@ -846,8 +848,8 @@ val intersection :
     intersection exists. Use [intersection_result] if you need to distinguish
     this case from definite non-intersection. *)
 val intersection_or_error :
-  type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
-  context:jkind_context ->
+  type_equal:(Types.type_expr -> Types.type_expr -> bool) @ local ->
+  context:jkind_context @ local ->
   reason:History.interact_reason ->
   Env.t ->
   ('l1 * allowed) Types.jkind ->
@@ -857,8 +859,8 @@ val intersection_or_error :
 (** [sub t1 t2] says whether [t1] is a subjkind of [t2]. Might update either
     [t1] or [t2] to make their layouts equal.*)
 val sub :
-  type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
-  context:jkind_context ->
+  type_equal:(Types.type_expr -> Types.type_expr -> bool) @ local ->
+  context:jkind_context @ local ->
   Env.t ->
   (allowed * 'r) Types.jkind ->
   ('l * allowed) Types.jkind ->
@@ -875,8 +877,8 @@ type sub_or_intersect =
 (** [sub_or_intersect t1 t2] does a subtype check, returning a
     [sub_or_intersect]; see comments there for more info. *)
 val sub_or_intersect :
-  type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
-  context:jkind_context ->
+  type_equal:(Types.type_expr -> Types.type_expr -> bool) @ local ->
+  context:jkind_context @ local ->
   Env.t ->
   (allowed * 'r) Types.jkind ->
   ('l * allowed) Types.jkind ->
@@ -885,8 +887,8 @@ val sub_or_intersect :
 (** [sub_or_error t1 t2] does a subtype check, returning an appropriate
     [Violation.t] upon failure. *)
 val sub_or_error :
-  type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
-  context:jkind_context ->
+  type_equal:(Types.type_expr -> Types.type_expr -> bool) @ local ->
+  context:jkind_context @ local ->
   Env.t ->
   (allowed * 'r) Types.jkind ->
   ('l * allowed) Types.jkind ->
@@ -896,7 +898,7 @@ val sub_or_error :
     update either [t1] or [t2] to make their layouts equal. Does not check
     bounds at all. *)
 val sub_layout_or_error :
-  context:jkind_context ->
+  context:jkind_context @ local ->
   Env.t ->
   (allowed * 'r1) Types.jkind ->
   ('l2 * 'r2) Types.jkind ->
@@ -907,7 +909,7 @@ val sub_layout_or_error :
     might be filled in later. *)
 val sub_jkind_l :
   type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
-  context:jkind_context ->
+  context:jkind_context @ local ->
   ?allow_any_crossing:bool ->
   Env.t ->
   Types.jkind_l ->
@@ -918,7 +920,7 @@ val sub_jkind_l :
     output. If the base is abstract, it may not be possible to eliminate the
     with bounds, in which case this returns [None]. *)
 val round_up :
-  context:jkind_context ->
+  context:jkind_context @ local ->
   Env.t ->
   (allowed * 'r) Types.jkind ->
   ('l * allowed) Types.jkind option

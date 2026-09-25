@@ -678,7 +678,7 @@ let rec uniq = function
 
 let rec normalize_type_path ?(cache=false) env p =
   try
-    let (params, ty, _) = Env.find_type_expansion p env in
+    let #(params, ty, _) = Env.find_type_expansion p env in
     match get_desc ty with
       Tconstr (p1, tyl, _) ->
         if List.length params = List.length tyl
@@ -3248,11 +3248,14 @@ let prepare_decl id decl =
 
 let tree_of_type_decl id decl =
   let ty_manifest, params = prepare_decl id decl in
-  let type_param ot_variance ot_jkind =
+  let type_param ot_variance ot_injectivity ot_rec ot_jkind =
     function
     | Otyp_var (ot_non_gen, ot_name) ->
-        {ot_non_gen; ot_name; ot_variance; ot_jkind}
-    | _ -> {ot_non_gen=false; ot_name="?"; ot_variance; ot_jkind}
+        {ot_non_gen; ot_name;
+         ot_variance; ot_injectivity; ot_rec; ot_jkind}
+    | _ ->
+        {ot_non_gen=false; ot_name="?";
+         ot_variance; ot_injectivity; ot_rec; ot_jkind}
   in
   let type_defined decl =
     let abstr =
@@ -3273,28 +3276,45 @@ let tree_of_type_decl id decl =
       List.map2
         (fun ty v ->
           let is_var = is_Tvar ty in
-          if !Clflags.print_variance || abstr || not is_var then
-            let inj =
-              !Clflags.print_variance && Variance.mem Inj v ||
-              type_kind_is_abstract decl && Variance.mem Inj v &&
-              match decl.type_manifest with
-              | None -> true
-              | Some ty -> (* only abstract or private row types *)
-                  decl.type_private = Private &&
-                  Btype.is_constr_row ~allow_ident:true (Btype.row_of_type ty)
-            and (co, cn) = Variance.get_upper v in
-            (match co, cn with
-            | false, false -> Bivariant
-            | true, false -> Covariant
-            | false, true -> Contravariant
-            | true, true -> NoVariance),
-            (if inj then Injective else NoInjectivity)
-          else (NoVariance, NoInjectivity))
+          let ot_variance, ot_injectivity =
+            if !Clflags.print_variance || abstr || not is_var then
+              let inj =
+                !Clflags.print_variance && Variance.mem Inj v ||
+                type_kind_is_abstract decl && Variance.mem Inj v &&
+                match decl.type_manifest with
+                | None -> true
+                | Some ty -> (* only abstract or private row types *)
+                    decl.type_private = Private &&
+                    Btype.is_constr_row
+                      ~allow_ident:true (Btype.row_of_type ty)
+              and (co, cn) = Variance.get_upper v in
+              let ot_variance =
+                match co, cn with
+                | false, false -> Bivariant
+                | true, false -> Covariant
+                | false, true -> Contravariant
+                | true, true -> NoVariance
+              in
+              let ot_injectivity =
+                if inj then Injective else NoInjectivity
+              in
+              (ot_variance, ot_injectivity)
+            else (NoVariance, NoInjectivity)
+          in
+          let ot_rec =
+            let has_public_manifest =
+              decl.type_manifest <> None && decl.type_private = Public
+            in
+            not has_public_manifest
+            && not (Variance.mem May_noncontractive v)
+          in
+          ot_variance, ot_injectivity, ot_rec)
         decl.type_params decl.type_variance
     in
-    let mk_param ty variance =
+    let mk_param ty (ot_variance, ot_injectivity, ot_rec) =
       let jkind = param_jkind ty in
-      type_param variance jkind (tree_of_typexp Type ty)
+      type_param ot_variance ot_injectivity ot_rec
+        jkind (tree_of_typexp Type ty)
     in
     (Ident.name id,
      List.map2 mk_param params vari)
@@ -3743,9 +3763,12 @@ let tree_of_class_param param variance =
      annotations on class type parameters *)
   let ot_jkind = param_jkind param in
   match tree_of_typexp Type_scheme param with
-    Otyp_var (ot_non_gen, ot_name) ->
-      {ot_non_gen; ot_name; ot_variance; ot_jkind}
-  | _ -> {ot_non_gen=false; ot_name="?"; ot_variance; ot_jkind}
+  | Otyp_var (ot_non_gen, ot_name) ->
+      {ot_non_gen; ot_name; ot_variance = fst ot_variance;
+       ot_injectivity = snd ot_variance; ot_rec = false; ot_jkind}
+  | _ ->
+      {ot_non_gen=false; ot_name="?"; ot_variance = fst ot_variance;
+       ot_injectivity = snd ot_variance; ot_rec = false; ot_jkind}
 
 let class_variance =
   let open Variance in let open Asttypes in
@@ -3978,6 +4001,13 @@ let rec tree_of_modtype ?abbrev = function
       Omty_functor (param, res, mres))
   | Mty_alias p ->
       Omty_alias (tree_of_path (Some Module) p)
+  | Mty_with _ as mty ->
+      begin match !expand_module_type !printing_env mty with
+      | Mty_with _ ->
+          (* Its base signature may be unavailable during error reporting. *)
+          Omty_signature [Osig_ellipsis]
+      | mty -> tree_of_modtype ?abbrev mty
+      end
   | Mty_strengthen _ as mty ->
       begin match !expand_module_type !printing_env mty with
       | Mty_strengthen (mty,p,a) ->

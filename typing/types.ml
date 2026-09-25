@@ -384,32 +384,46 @@ and method_privacy =
 
 module Variance = struct
   type t = int
-  type f = May_pos | May_neg | May_weak | Inj | Pos | Neg | Inv
+  type f =
+    | May_pos | May_neg | May_weak | May_noncontractive
+    | Inj | Pos | Neg | Inv
   let single = function
     | May_pos -> 1
     | May_neg -> 2 + 4
     | May_weak -> 4
-    | Inj -> 8
-    | Pos -> 16 + 8 + 1
-    | Neg -> 32 + 8 + 4 + 2
-    | Inv -> 63
+    | May_noncontractive -> 8
+    | Inj -> 16
+    | Pos -> 32 + 16 + 1
+    | Neg -> 64 + 16 + 4 + 2
+    | Inv -> 127
   let union v1 v2 = v1 lor v2
   let inter v1 v2 = v1 land v2
+  let subtract v1 v2 = v1 land (lnot v2)
   let subset v1 v2 = (v1 land v2 = v1)
   let eq (v1 : t) v2 = (v1 = v2)
   let set x v = union v (single x)
+  let unset x v = subtract v (single x)
   let set_if b x v = if b then set x v else v
   let mem x = subset (single x)
   let null = 0
-  let unknown = 7
+  let unknown = 15
   let full = single Inv
-  let covariant = single Pos
-  let contravariant = single Neg
+  let covariant = union (single Pos) (single May_noncontractive)
+  let contravariant = union (single Neg) (single May_noncontractive)
   let swap f1 f2 v v' =
     set_if (mem f2 v) f1 (set_if (mem f1 v) f2 v')
   let conjugate v =
-    let v' = inter v (union (single Inj) (single May_weak)) in
+    let v' =
+      inter v
+        (union (single Inj)
+           (union (single May_weak) (single May_noncontractive)))
+    in
     swap Pos Neg v (swap May_pos May_neg v v')
+  let contractive v = unset May_noncontractive v
+
+  let contractive_if_rectypes_enabled vari =
+    if !Clflags.recursive_types then contractive vari else vari
+
   let compose v1 v2 =
     if mem Inv v1 && mem Inj v2 then full else
     let mp =
@@ -417,15 +431,18 @@ module Variance = struct
     and mn =
       mem May_pos v1 && mem May_neg v2 || mem May_neg v1 && mem May_pos v2
     and mw = mem May_weak v1 && v2 <> null || v1 <> null && mem May_weak v2
+    and mnc = mem May_noncontractive v1 && mem May_noncontractive v2
     and inj = mem Inj v1 && mem Inj v2
     and pos = mem Pos v1 && mem Pos v2 || mem Neg v1 && mem Neg v2
     and neg = mem Pos v1 && mem Neg v2 || mem Neg v1 && mem Pos v2 in
     List.fold_left (fun v (b,f) -> set_if b f v) null
-      [mp, May_pos; mn, May_neg; mw, May_weak; inj, Inj; pos, Pos; neg, Neg]
+      [mp, May_pos; mn, May_neg; mw, May_weak; mnc, May_noncontractive;
+       inj, Inj; pos, Pos; neg, Neg]
   let strengthen v =
-    if mem May_neg v then v else v land (full - single May_weak)
+    if mem May_neg v then v else v land (unset May_weak full)
   let get_upper v = (mem May_pos v, mem May_neg v)
   let get_lower v = (mem Pos v, mem Neg v, mem Inj v)
+  let is_null v = (v = null)
   let unknown_signature ~injective ~arity =
     let v = if injective then set Inj unknown else unknown in
     Misc.replicate_list v arity
@@ -730,6 +747,25 @@ module type Wrapped = sig
   | Mty_strengthen of module_type * Path.t * Aliasability.t
       (* See comments about the aliasability of strengthening in mtype.ml *)
 
+  | Mty_with of module_type * Ident.t * string list * with_constraint
+      (* The component-name list is nonempty. The identifier denotes the
+         unconstrained body and binds only in the constraint, not in the body.
+         References to signature components are projected from it instead of
+         copying the signature. Its scope
+         is used to freshen the signature when the wrapper expands.
+
+         Typemod registers a pending well-formedness check for a new binder.
+         Subst.check_with forces it before copying or expanding the wrapper;
+         unused checks also run at the end of typing. Checks are not part of
+         the serialized representation: saving discharges them, and fresh
+         copies and imported binders have no pending check. *)
+
+  and with_constraint =
+  | With_type of type_declaration
+  | With_module of module_declaration
+  | With_modtype of modtype_declaration
+  | With_jkind of jkind_declaration
+
   and functor_parameter =
   | Unit
   | Named of Ident.t option * module_type * Mode.With_locality.lr
@@ -821,13 +857,20 @@ module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
     | Mty_strengthen (mty,p,aliasable) ->
         To.Mty_strengthen (module_type m mty, p, aliasable)
 
+    | Mty_with (mty, id, names, cstr) ->
+        To.Mty_with (module_type m mty, id, names, with_constraint m cstr)
+
+  and with_constraint m = function
+    | With_type td -> To.With_type td
+    | With_module md -> To.With_module (module_declaration m md)
+    | With_modtype mtd -> To.With_modtype (modtype_declaration m mtd)
+    | With_jkind jd -> To.With_jkind jd
+
   and functor_parameter m = function
       | Unit -> To.Unit
       | Named (id,mty,mm) -> To.Named (id, module_type m mty,mm)
 
-  let value_description m vd = m.map_value_description m vd
-
-  let module_declaration m {md_type; md_modalities; md_attributes;
+  and module_declaration m {md_type; md_modalities; md_attributes;
     md_loc; md_uid} =
     To.{
       md_type = module_type m md_type;
@@ -837,13 +880,15 @@ module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
       md_uid;
     }
 
-  let modtype_declaration m {mtd_type; mtd_attributes; mtd_loc; mtd_uid} =
+  and modtype_declaration m {mtd_type; mtd_attributes; mtd_loc; mtd_uid} =
     To.{
       mtd_type = Option.map (module_type m) mtd_type;
       mtd_attributes;
       mtd_loc;
       mtd_uid;
     }
+
+  let value_description m vd = m.map_value_description m vd
 
   let signature_item m = function
     | Sig_value (id,vd,vis) ->
@@ -1328,6 +1373,8 @@ let not_marked_node mark t =
   | Mark {mark} -> (repr t).scope land mark = 0
   | Hash {visited} -> not (TransientTypeHash.mem visited (repr t))
 
+let marked_node mark t = not (not_marked_node mark t)
+
 (* transient type_expr *)
 
 module Transient_expr = struct
@@ -1365,6 +1412,7 @@ end
 
 (* setting marks *)
 let try_mark_node mark t = Transient_expr.try_mark_node mark (repr t)
+let mark_node mark t = ignore (try_mark_node mark t)
 
 (* Comparison for [type_expr]; cannot be used for functors *)
 

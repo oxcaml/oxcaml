@@ -1,0 +1,4 @@
+File "use.ml", line 1, characters 11-18:
+1 | let f (x : Param.P.Config.t) : int = x
+               ^^^^^^^
+Error: The module Param.P is of abstract type Base.S, it cannot have any components
