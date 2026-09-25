@@ -6772,30 +6772,6 @@ let some_neg_variance = function
 
 (* The layout of [ty], for the shapes of [ty] where computing it is cheap and
    needs no mutation; raises [Complicated_moregen] otherwise. *)
-<<<<<<< HEAD
-let mgen_fast_estimate_layout env _subst ty =
-  match get_desc ty with
-  (* CR zeisbach: maybe we could improve the cases we cover here... *)
-  | Tvar { jkind } ->
-    begin match Jkind.get_layout env jkind with
-    | Some layout -> layout
-    | None -> raise_notrace Complicated_moregen
-    end
-  (* CR zeisbach: benchmark to determine if we want to do this! *)
-  (*= | Tconstr (p, _, _) ->
-    let p =
-      try Subst.type_path subst p
-      with Subst.Not_path -> raise_notrace Complicated_moregen
-    in
-    begin match Env.find_type p env with
-    | decl ->
-      begin match Jkind.get_layout env decl.type_jkind with
-      | Some layout -> layout
-      | None -> raise_notrace Complicated_moregen
-      end
-    | exception Not_found -> raise_notrace Complicated_moregen
-    end *)
-=======
 let mgen_fast_estimate_layout _env _subst ty =
   match get_desc ty with
   (* CR zeisbach: maybe we could improve the cases we cover here... *)
@@ -6809,7 +6785,6 @@ let mgen_fast_estimate_layout _env _subst ty =
       | None -> raise_notrace Complicated_moregen
     end
   (* FIXME: maybe a better [Tconstr] check could be done? *)
->>>>>>> zeisbach.moregen-optimization
   | Tarrow _ | Ttuple _ | Tobject _ | Tpackage _ ->
     Jkind_types.Layout.Const.Static.scannable_non_null_non_float
   | _ -> raise_notrace Complicated_moregen
@@ -6822,16 +6797,6 @@ let rec mgen_fast env subst scope maxnodes variance t1 t2 =
   | Tsubst (ty, _), _ when eq_type ty t2 -> ()
   | Tvar { jkind }, _ when get_level t1 = generic_level ->
     (* Properly computing the mod bounds of [t2] is expensive, so we avoid it.
-<<<<<<< HEAD
-       But if the mod bounds of [jkind] are max, only the layouts matter, and
-       we can compare those when [t2] has a shape for which estimating its
-       jkind is cheap. Otherwise, bail. *)
-    if not (Jkind.is_obviously_max jkind) then begin
-      if not (Jkind.mod_bounds_are_obviously_max jkind) then
-        raise_notrace Complicated_moregen;
-      let layout2 = mgen_fast_estimate_layout env subst t2 in
-      match Jkind.get_layout env jkind with
-=======
        But if the mod bounds of [jkind] are max (and the kind isn't abstract),
        then only the layouts matter, and we can compare those. This is cheap
        based on [t2]'s shape; otherwise, bail. *)
@@ -6845,7 +6810,6 @@ let rec mgen_fast env subst scope maxnodes variance t1 t2 =
         raise_notrace Complicated_moregen;
       let layout2 = mgen_fast_estimate_layout env subst t2 in
       match Jkind_types.Layout.get_const layout1 with
->>>>>>> zeisbach.moregen-optimization
       | Some layout1 when Jkind_types.Layout.Const.equal layout1 layout2 -> ()
       | _ -> raise_notrace Complicated_moregen
     end;
@@ -6875,10 +6839,7 @@ let rec mgen_fast env subst scope maxnodes variance t1 t2 =
     mgen_fast_list env subst scope maxnodes tl1 tl2
   | Tpoly (t1, []), Tpoly(t2, []) ->
     mgen_fast env subst scope maxnodes variance t1 t2
-<<<<<<< HEAD
-=======
   (* FIXME: handling of [Tvariant]? Annoying but does come up... *)
->>>>>>> zeisbach.moregen-optimization
   | _, _ ->
     raise_notrace Complicated_moregen
 
