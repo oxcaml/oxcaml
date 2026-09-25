@@ -8981,6 +8981,16 @@ and type_expect_
       | _ ->
           raise (Error (loc, env, Invalid_atomic_loc_payload))
       end
+  (* GC-safe sections (step 1: transparent recognition; verification and
+     native codegen come later). [%critical e] / [%blocking e] currently type
+     [e] at the ambient type/mode and evaluate to it, matching the documented
+     non-native "plain expression" behavior. *)
+  | Pexp_extension ({ txt = ("critical" | "ocaml.critical"); _ },
+                    PStr [{ pstr_desc = Pstr_eval (e, _); _ }]) ->
+      type_expect env expected_mode e ty_expected_explained
+  | Pexp_extension ({ txt = ("blocking" | "ocaml.blocking"); _ },
+                    PStr [{ pstr_desc = Pstr_eval (e, _); _ }]) ->
+      type_expect env expected_mode e ty_expected_explained
   | Pexp_extension ext ->
     raise (Error_forward (Builtin_attributes.error_of_extension ext))
 
