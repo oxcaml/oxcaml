@@ -61,13 +61,18 @@ module Block_kind = struct
   let [@ocamlformat "disable"] print ppf t =
    match t with
    | Values (tag, shape) ->
-     Format.fprintf ppf
-       "@[<hov 1>(Values@ \
-         @[<hov 1>(tag %a)@]@ \
-         @[<hov 1>(shape@ @[<hov 1>(%a)@])@])@]"
-       Tag.Scannable.print tag
-       (Format.pp_print_list ~pp_sep:Format.pp_print_space
-      K.With_subkind.print) shape
+     if Flambda_features.dump_compact ()
+     then
+       Format.fprintf ppf "@[<hov 1>(tag %a)@]"
+         Tag.Scannable.print tag
+     else
+       Format.fprintf ppf
+         "@[<hov 1>(Values@ \
+           @[<hov 1>(tag %a)@]@ \
+           @[<hov 1>(shape@ @[<hov 1>(%a)@])@])@]"
+         Tag.Scannable.print tag
+         (Format.pp_print_list ~pp_sep:Format.pp_print_space
+        K.With_subkind.print) shape
    | Naked_floats ->
      Format.pp_print_string ppf "Naked_floats"
    | Mixed (tag, shape) ->
