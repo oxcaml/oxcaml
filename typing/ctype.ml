@@ -6573,54 +6573,41 @@ let moregen_mode_with_locality env ~is_ret ty v a1 a2 =
     in
     raise_for Moregen (Mode_mismatch (pos, e))
 
-let rec path_scope : Path.t -> int =
-  function
-  | Papply (f, _) -> path_scope f
-  | Pdot (p, _) | Pextra_ty (p, _) -> path_scope p
-  | Pident id ->
-    if Ident.is_predef id then -1
-    else Ident.scope id
-
-let try_expand_path env p =
-  match Env.find_type_expansion p env with
-  | (params, body, _lv) ->
-    begin match get_desc body with
-    | Tconstr (p', args, _)
-        when args == params ||
-             List.equal eq_type args params ->
-        Some p'
-    | _ -> None
-    end
-  | exception Not_found -> None
-
-let rec path_same_expanded env p1 p2 =
-  if Path.same p1 p2 then true
-  else begin
-    let p1, p2 =
-      if path_scope p1 < path_scope p2
-      then p1, p2
-      else p2, p1
-    in
-    match try_expand_path env p2 with
-    | Some p2 -> path_same_expanded env p1 p2
-    | None ->
-      match try_expand_path env p1 with
-      | Some p1 -> path_same_expanded env p1 p2
-      | None -> false
-  end
-
-let path_same_normalized env p1 p2 =
-  if Path.same p1 p2
-  then true
-  else begin
-    let p1 = Env.normalize_type_path None env p1 in
-    let p2 = Env.normalize_type_path None env p2 in
-    path_same_expanded env p1 p2
-  end
-
-
 exception Complicated_moregen
 
+let rec path_scope : Path.t -> int = function
+  | Papply (f, _) -> path_scope f
+  | Pdot (p, _) | Pextra_ty (p, _) -> path_scope p
+  | Pident id -> if Ident.is_predef id then -1 else Ident.scope id
+
+let rec expand_path_fast env p =
+  match Env.find_type_expansion p env with
+  | exception Not_found -> Env.normalize_type_path None env p, None
+  | (params, body, _scope) ->
+    match get_desc body with
+    | Tconstr (p', args, _)
+        when args == params || List.equal eq_type args params ->
+      expand_path_fast env p'
+    | _ -> Env.normalize_type_path None env p, Some (params, body)
+
+let expand_paths_fast env p1 p2 =
+  (* CR zeisbach: STYLE: annoying duplication but alternatives that return
+     the correctly matched [expN]s all seemed worse... *)
+  if path_scope p1 >= path_scope p2 then begin
+    let p1, exp1 = expand_path_fast env p1 in
+    if Path.same p1 p2 then p1, exp1, p2, None
+    else
+      let p2, exp2 = expand_path_fast env p2 in
+      p1, exp1, p2, exp2
+  end else begin
+    let p2, exp2 = expand_path_fast env p2 in
+    if Path.same p1 p2 then p1, None, p2, exp2
+    else
+      let p1, exp1 = expand_path_fast env p1 in
+      p1, exp1, p2, exp2
+  end
+
+(* CR zeisbach: still room for more fast mode paths... *)
 let moregen_mode_fast v m1 m2 =
   let ok =
     match v with
@@ -6686,14 +6673,24 @@ let rec mgen_fast env subst scope maxnodes variance t1 t2 =
   | Tunboxed_tuple tl1, Tunboxed_tuple tl2 ->
     mgen_fast_labeled env subst scope maxnodes variance tl1 tl2
   | Tconstr (p1, tl1, _), Tconstr (p2, tl2, _) ->
-    (* FIXME: easy cases of alias expansion? *)
     let p2 =
       try Subst.type_path subst p2
       with Subst.Not_path -> raise_notrace Complicated_moregen
     in
-    if not (path_same_normalized env p1 p2) then
-      raise_notrace Complicated_moregen;
-    mgen_fast_list env subst scope maxnodes tl1 tl2
+    if Path.same p1 p2 then mgen_fast_list env subst scope maxnodes tl1 tl2
+    else begin
+      let p1, exp1, p2, exp2 = expand_paths_fast env p1 p2 in
+      if Path.same p1 p2 then mgen_fast_list env subst scope maxnodes tl1 tl2
+      else
+        match tl1, exp1, tl2, exp2 with
+        | [], Some ([], exp1), [], Some ([], exp2) ->
+          mgen_fast env Subst.identity scope maxnodes variance exp1 exp2
+        | [], Some ([], exp1), _, _ ->
+          mgen_fast env subst scope maxnodes variance exp1 t2
+        | _, _, [], Some ([], exp2) ->
+          mgen_fast env Subst.identity scope maxnodes variance t1 exp2
+        | _, _, _, _ -> raise_notrace Complicated_moregen
+    end
   | Tpoly (t1, []), Tpoly(t2, []) ->
     mgen_fast env subst scope maxnodes variance t1 t2
   (* FIXME: handling of [Tvariant]? Annoying but does come up... *)
