@@ -1,0 +1,39 @@
+let code f_0 deleted in
+let code v1_1 deleted in
+let code loopify(never) size(8) newer_version_of(f_0)
+      f_0_1 (x)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : [ 0 of val * val ] =
+  let Pmakeblock = %block.[`0`].my_alloc_region (x, x) in
+  cont k (Pmakeblock)
+in
+let $camlSpeculative_inlining_lifted_constants__f_1 =
+  closure f_0_1 @f &toplevel
+in
+let zero = %opaque (0) in
+let $camlSpeculative_inlining_lifted_constants__Pmakeblock_3 =
+  Block 0 (zero, zero)
+in
+let one = %opaque (1) in
+let one_1 = one in
+let $camlSpeculative_inlining_lifted_constants__v1_4 =
+  closure v1_1_1 @v1 &toplevel
+and code loopify(never) size(1) newer_version_of(v1_1)
+      v1_1_1 (param : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : [ 0 of imm tagged * imm tagged ] =
+  cont k ($camlSpeculative_inlining_lifted_constants__Pmakeblock_6)
+and $camlSpeculative_inlining_lifted_constants__Pmakeblock_6 =
+  Block 0 (one_1, one_1)
+  with { one = one }
+in
+let $camlSpeculative_inlining_lifted_constants =
+  Block 0 ($camlSpeculative_inlining_lifted_constants__f_1,
+           zero,
+           $camlSpeculative_inlining_lifted_constants__Pmakeblock_3,
+           one,
+           $camlSpeculative_inlining_lifted_constants__v1_4)
+in
+cont done ($camlSpeculative_inlining_lifted_constants)

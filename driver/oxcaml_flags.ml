@@ -456,7 +456,9 @@ module Flambda2 = struct
 
       let speculative_inlining_only_if_arguments_useful = true
 
-      let speculative_inlining_track_lifted_constants = false
+      let speculative_inlining_track_lifted_constants_for_functors = false
+
+      let speculative_inlining_track_lifted_constants_for_functions = false
     end
 
     let max_depth = ref (I.default Default.default_arguments.max_depth)
@@ -486,8 +488,11 @@ module Flambda2 = struct
     let speculative_inlining_only_if_arguments_useful =
       ref Default.speculative_inlining_only_if_arguments_useful
 
-    let speculative_inlining_track_lifted_constants =
-      ref Default.speculative_inlining_track_lifted_constants
+    let speculative_inlining_track_lifted_constants_for_functors =
+      ref Default.speculative_inlining_track_lifted_constants_for_functors
+
+    let speculative_inlining_track_lifted_constants_for_functions =
+      ref Default.speculative_inlining_track_lifted_constants_for_functions
 
     let report_bin = ref false
 

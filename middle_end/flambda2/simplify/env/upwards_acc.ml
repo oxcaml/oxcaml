@@ -28,6 +28,7 @@ type t =
     all_code : Exported_code.t;
     name_occurrences : Name_occurrences.t;
     cost_metrics : Cost_metrics.t;
+    track_lifted_constants : bool;
     slot_offsets : Slot_offsets.t Or_unknown.t;
     flow_result : Flow_types.Flow_result.t;
     resimplify : bool
@@ -35,7 +36,8 @@ type t =
 
 let [@ocamlformat "disable"] print ppf
       { uenv; creation_dacc = _; lifted_constants; name_occurrences;
-        all_code = _; cost_metrics; slot_offsets; flow_result; resimplify;
+        all_code = _; cost_metrics; track_lifted_constants = _;
+        slot_offsets; flow_result; resimplify;
       } =
   Format.fprintf ppf "@[<hov 1>(\
       @[<hov 1>(uenv@ %a)@]@ \
@@ -57,7 +59,12 @@ let [@ocamlformat "disable"] print ppf
      else
        (fun _ppf () -> ())) ()
 
-let create ~flow_result ~compute_slot_offsets uenv dacc =
+let create
+    ?(track_lifted_constants =
+      Flambda_features.Inlining.speculative_inlining_track_lifted_constants
+        ~is_a_functor:true
+      || Flambda_features.Inlining.speculative_inlining_track_lifted_constants
+           ~is_a_functor:false) ~flow_result ~compute_slot_offsets uenv dacc =
   let slot_offsets : _ Or_unknown.t =
     if compute_slot_offsets then Known Slot_offsets.empty else Unknown
   in
@@ -71,6 +78,7 @@ let create ~flow_result ~compute_slot_offsets uenv dacc =
        saved and restored (like free name information is when dealing with a
        [Let_cont]). *)
     cost_metrics = Cost_metrics.zero;
+    track_lifted_constants;
     slot_offsets;
     flow_result;
     resimplify = false
@@ -91,6 +99,8 @@ let add_lifted_constant t const =
   { t with lifted_constants = LCS.add t.lifted_constants const }
 
 let cost_metrics t = t.cost_metrics
+
+let track_lifted_constants t = t.track_lifted_constants
 
 let are_rebuilding_terms t = DE.are_rebuilding_terms (DA.denv t.creation_dacc)
 
