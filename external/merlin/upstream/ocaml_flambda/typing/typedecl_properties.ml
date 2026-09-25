@@ -24,6 +24,8 @@ type ('prop, 'req) property = {
   compute : Env.t -> decl -> 'req -> 'prop;
   update_decl : decl -> 'prop -> decl;
 
+  unboxed_version_inherits_prop : bool;
+
   check : Env.t -> Ident.t -> decl -> 'req * 'req option -> unit;
 }
 
@@ -67,9 +69,11 @@ let compute_property
     let new_props =
       List.map2
         (fun (_id, (decl : decl)) ((prop, prop_u), (req, req_u)) ->
-           update_prop decl prop req,
+           let new_prop = update_prop decl prop req in
+           new_prop,
            Option.map (fun d ->
-               update_prop d (Option.get prop_u) (Option.get req_u))
+               if property.unboxed_version_inherits_prop then new_prop
+               else update_prop d (Option.get prop_u) (Option.get req_u))
              decl.type_unboxed_version)
         new_decls (List.combine props required) in
     if not (List.for_all2
