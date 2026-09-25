@@ -219,8 +219,7 @@ two_element_list:
   cmpq  (%r14), %r15
   jb    <hidden GC jump pad>
 .L0:
-  leaq  8(%r15), %rbx
-  addq  $24, %rbx
+  leaq  32(%r15), %rbx
   movq  $2048, -8(%rbx)
   movq  %rdi, (%rbx)
   movq  $1, 8(%rbx)

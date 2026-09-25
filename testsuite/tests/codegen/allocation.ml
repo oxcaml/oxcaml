@@ -87,3 +87,57 @@ spill_slot_lifetime.get_one:
   vmovsd <hidden PC-relative offset>(%rip), %xmm0
   ret
 |}]
+
+(* Combined allocations: the address of the first block (at the top of the
+   combined region) is folded into the allocation's own address computation
+   rather than added afterwards. *)
+let combined_heap x y = (x, y), [x]
+[%%expect_asm X86_64{|
+combined_heap:
+  subq  $8, %rsp
+  subq  $72, %r15
+  cmpq  (%r14), %r15
+  jb    <hidden GC jump pad>
+.L0:
+  leaq  56(%r15), %rdi
+  movq  $2048, -8(%rdi)
+  movq  %rax, (%rdi)
+  movq  $1, 8(%rdi)
+  leaq  -24(%rdi), %rsi
+  movq  $2048, -8(%rsi)
+  movq  %rax, (%rsi)
+  movq  %rbx, 8(%rsi)
+  leaq  -24(%rsi), %rax
+  movq  $2048, -8(%rax)
+  movq  %rsi, (%rax)
+  movq  %rdi, 8(%rax)
+  addq  $8, %rsp
+  ret
+|}]
+
+let combined_local x y = exclave_ ((x, y), [x])
+[%%expect_asm X86_64{|
+combined_local:
+  subq  $8, %rsp
+  movq  64(%r14), %rdi
+  subq  $72, %rdi
+  movq  %rdi, 64(%r14)
+  cmpq  80(%r14), %rdi
+  jl    <hidden GC jump pad>
+.L0:
+  addq  72(%r14), %rdi
+  addq  $56, %rdi
+  movq  $2816, -8(%rdi)
+  movq  %rax, (%rdi)
+  movq  $1, 8(%rdi)
+  leaq  -24(%rdi), %rsi
+  movq  $2816, -8(%rsi)
+  movq  %rax, (%rsi)
+  movq  %rbx, 8(%rsi)
+  leaq  -24(%rsi), %rax
+  movq  $2816, -8(%rax)
+  movq  %rsi, (%rax)
+  movq  %rdi, 8(%rax)
+  addq  $8, %rsp
+  ret
+|}]

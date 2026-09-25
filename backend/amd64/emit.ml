@@ -2318,8 +2318,9 @@ let emit_instr ~first ~last ~fallthrough i =
     Address_sanitizer.emit_sanitize ~dependencies:[| src |] ~instr:i ~address
       Word_int memory_access;
     I.mov src address
-  | Lop (Alloc { bytes = n; dbginfo; mode = Heap }) ->
+  | Lop (Alloc { bytes = n; dbginfo; mode = Heap; offset }) ->
     assert (n <= (Config.max_young_wosize + 1) * Arch.size_addr);
+    assert (0 <= offset && offset < n);
     let gc_save_simd = must_save_simd_regs i.live in
     if !fastcode_flag
     then (
@@ -2330,7 +2331,7 @@ let emit_instr ~first ~last ~fallthrough i =
       I.jb (emit_asm_label_arg lbl_call_gc);
       let lbl_after_alloc = L.create Text in
       D.define_label lbl_after_alloc;
-      I.lea (mem64 NONE 8 (Scalar R15)) (res i 0);
+      I.lea (mem64 NONE (8 + offset) (Scalar R15)) (res i 0);
       call_gc_sites
         := { gc_lbl = lbl_call_gc;
              gc_return_lbl = lbl_after_alloc;
@@ -2352,8 +2353,9 @@ let emit_instr ~first ~last ~fallthrough i =
         emit_call (global_gc_sym "caml_allocN" ~simd:gc_save_simd));
       let label = record_frame_label i.live (Dbg_alloc dbginfo) in
       D.define_label label;
-      I.lea (mem64 NONE 8 (Scalar R15)) (res i 0))
-  | Lop (Alloc { bytes = n; dbginfo = _; mode = Local }) ->
+      I.lea (mem64 NONE (8 + offset) (Scalar R15)) (res i 0))
+  | Lop (Alloc { bytes = n; dbginfo = _; mode = Local; offset }) ->
+    assert (0 <= offset && offset < n);
     let r = res i 0 in
     I.mov (domain_field Domainstate.Domain_local_sp) r;
     I.sub (int n) r;
@@ -2364,7 +2366,7 @@ let emit_instr ~first ~last ~fallthrough i =
     let lbl_after_alloc = L.create Text in
     D.define_label lbl_after_alloc;
     I.add (domain_field Domainstate.Domain_local_top) r;
-    I.add (int 8) r;
+    I.add (int (8 + offset)) r;
     local_realloc_sites
       := { lr_lbl = lbl_call;
            lr_dbg = i.dbg;

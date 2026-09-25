@@ -193,8 +193,9 @@ module Polls_before_prtc_transfer = struct
       if InstructionId.equal instr.id optimistic_prologue_poll_instr_id
       then Ok dom
       else Ok Always_polls
-    | Op (Alloc { mode = Heap; bytes = _; dbginfo = _ }) -> Ok Always_polls
-    | Op (Alloc { mode = Local; bytes = _; dbginfo = _ }) ->
+    | Op (Alloc { mode = Heap; bytes = _; dbginfo = _; offset = _ }) ->
+      Ok Always_polls
+    | Op (Alloc { mode = Local; bytes = _; dbginfo = _; offset = _ }) ->
       (* A local allocation does not call the GC, and is hence not a polling
          point. *)
       Ok dom

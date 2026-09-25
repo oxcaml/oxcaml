@@ -12,6 +12,7 @@ type allocation =
   { bytes : int;
     dbginfo : Cmm.alloc_dbginfo;
     mode : Cmm.Alloc_mode.t;
+    offset : int;
     cell : cell
   }
 
@@ -31,7 +32,8 @@ let rec find_next_allocation : cell option -> allocation option =
   | Some cell -> (
     let instr = DLL.value cell in
     match instr.desc with
-    | Op (Alloc { bytes; dbginfo; mode }) -> Some { bytes; dbginfo; mode; cell }
+    | Op (Alloc { bytes; dbginfo; mode; offset }) ->
+      Some { bytes; dbginfo; mode; offset; cell }
     | Op
         ( Move | Spill | Reload | Const_int _ | Const_float _ | Const_float32 _
         | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
@@ -74,7 +76,7 @@ let find_compatible_allocations :
         { allocations = List.rev allocations; next_cell = Some cell }
       in
       match instr.desc with
-      | Op (Alloc { bytes; dbginfo; mode }) ->
+      | Op (Alloc { bytes; dbginfo; mode; offset }) ->
         let is_compatible =
           Cmm.Alloc_mode.equal mode curr_mode
           && (curr_size + bytes
@@ -83,7 +85,7 @@ let find_compatible_allocations :
         in
         if is_compatible
         then
-          let allocation = { bytes; dbginfo; mode; cell } in
+          let allocation = { bytes; dbginfo; mode; offset; cell } in
           loop
             (allocation :: allocations)
             (DLL.next cell) ~curr_mode ~curr_size:(curr_size + bytes)
@@ -133,7 +135,9 @@ let find_compatible_allocations :
     When steps 1 and 2 are both successful, allocations are effectively
     combined. This means that:
 
-    - the "first" allocation is made bigger to account for all allocations;
+    - the "first" allocation is made bigger to account for all allocations, and
+      its result is offset so that it still points at the first block, which
+      is now at the top of the combined region;
     - the other allocations are replaced with a reference to the result of the
       previous allocation, with a different offset. *)
 let rec combine : instr_id:InstructionId.sequence -> cell option -> unit =
@@ -141,7 +145,7 @@ let rec combine : instr_id:InstructionId.sequence -> cell option -> unit =
   let first_allocation = find_next_allocation cell in
   match first_allocation with
   | None -> ()
-  | Some { bytes; dbginfo; mode; cell } ->
+  | Some { bytes; dbginfo; mode; offset; cell } ->
     if List.length dbginfo <> 1
     then
       Misc.fatal_errorf
@@ -175,7 +179,9 @@ let rec combine : instr_id:InstructionId.sequence -> cell option -> unit =
               res0 ))
       in
       (* Then, change the size of the first allocation so that it is the sum of
-         all allocations, and update the debug info. *)
+         all allocations, offset its result past the other blocks (the
+         emitters fold this into the address computation, so no separate add
+         is needed), and update the debug info. *)
       DLL.set_value cell
         { first_allocation_instr with
           desc =
@@ -183,16 +189,9 @@ let rec combine : instr_id:InstructionId.sequence -> cell option -> unit =
               (Alloc
                  { bytes = bytes + total_size_of_other_allocations;
                    dbginfo = dbginfo_of_other_allocations @ dbginfo;
-                   mode
+                   mode;
+                   offset = offset + total_size_of_other_allocations
                  })
-        };
-      DLL.insert_after cell
-        { first_allocation_instr with
-          desc =
-            Cfg.Op (Intop_imm (Operation.Iadd, total_size_of_other_allocations));
-          arg = [| first_allocation_res0 |];
-          res = [| first_allocation_res0 |];
-          id = InstructionId.get_and_incr instr_id
         });
     combine ~instr_id compatible_allocs.next_cell
 

@@ -153,9 +153,10 @@ module Make (T : Branch_relaxation_intf.S) = struct
           in
           match instr.desc with
           | Lop Poll -> relax_instr (T.relax_poll ())
-          | Lop (Alloc { bytes = num_bytes; dbginfo; mode }) ->
+          | Lop (Alloc { bytes = num_bytes; dbginfo; mode; offset }) ->
             relax_instr
-              (T.relax_allocation ~num_bytes ~dbginfo ~res:instr.res.(0) ~mode)
+              (T.relax_allocation ~num_bytes ~dbginfo ~res:instr.res.(0) ~mode
+                 ~offset)
           | Lstackcheck { max_frame_size_bytes } ->
             relax_instr (T.relax_stackcheck ~max_frame_size_bytes)
           | Lcondbranch (test, lbl) ->

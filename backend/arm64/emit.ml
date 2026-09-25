@@ -1086,7 +1086,7 @@ let cond_for_cset_for_float_comparison : Cmm.float_comparison -> Cond.t =
 
 (* Output the assembly code for an allocation. *)
 
-let assembly_code_for_local_allocation0 ~n ~far ~res_reg =
+let assembly_code_for_local_allocation0 ~n ~offset ~far ~res_reg =
   (* This must not use [env], as it is called from [emit_relaxed_instruction] *)
   let r = res_reg in
   A.ins2 LDR reg_x_tmp1 (H.domainstate_field Domain_local_limit);
@@ -1107,22 +1107,25 @@ let assembly_code_for_local_allocation0 ~n ~far ~res_reg =
   D.define_label lr_return_lbl;
   A.ins2 LDR reg_x_tmp1 (H.domainstate_field Domain_local_top);
   A.ins4 ADD_shifted_register r r reg_x_tmp1 O.optional_none;
-  A.ins4 ADD_immediate r r (O.imm 8) O.optional_none;
+  emit_addimm r r (8 + offset);
   lr_lbl, lr_return_lbl
 
-let assembly_code_for_local_allocation env i ~n ~far =
+let assembly_code_for_local_allocation env i ~n ~offset ~far =
   let lr_lbl, lr_return_lbl =
-    assembly_code_for_local_allocation0 ~n ~far ~res_reg:(H.reg_x i.res.(0))
+    assembly_code_for_local_allocation0 ~n ~offset ~far
+      ~res_reg:(H.reg_x i.res.(0))
   in
   Env.add_local_realloc_site env { lr_lbl; lr_dbg = i.dbg; lr_return_lbl }
 
-let assembly_code_for_fast_heap_allocation0 ~n ~far ~res_reg =
+let assembly_code_for_fast_heap_allocation0 ~n ~offset ~far ~res_reg =
   (* This must not use [env], as it is called from [emit_relaxed_instruction] *)
   let gc_return_lbl = L.create Text in
   let gc_lbl = L.create Text in
   (* n is at most Max_young_whsize * 8, i.e. currently 0x808, so it is
-     reasonable to assume n < 0x1_000. This makes the generated code simpler. *)
+     reasonable to assume n < 0x1_000. This makes the generated code simpler,
+     and means [8 + offset] below fits in an immediate too. *)
   assert (16 <= n && n < 0x1_000 && n land 0x7 = 0);
+  assert (0 <= offset && offset < n);
   A.ins2 LDR reg_x_tmp1 (H.domainstate_field Domain_young_limit);
   emit_subimm reg_x_alloc_ptr reg_x_alloc_ptr n;
   A.ins_cmp_reg reg_x_alloc_ptr reg_x_tmp1 O.optional_none;
@@ -1133,16 +1136,17 @@ let assembly_code_for_fast_heap_allocation0 ~n ~far ~res_reg =
      A.ins1 (B_cond (Branch_cond.Int CS)) (local_label lbl);
      A.ins1 B (local_label gc_lbl);
      D.define_label lbl);
-  labelled_ins4 gc_return_lbl ADD_immediate res_reg reg_x_alloc_ptr (O.imm 8)
-    O.optional_none;
+  labelled_ins4 gc_return_lbl ADD_immediate res_reg reg_x_alloc_ptr
+    (O.imm (8 + offset)) O.optional_none;
   gc_lbl, gc_return_lbl
 
-let assembly_code_for_fast_heap_allocation env i ~n ~far ~dbginfo =
+let assembly_code_for_fast_heap_allocation env i ~n ~offset ~far ~dbginfo =
   let gc_frame_lbl = Cmm.new_label () in
   let gc_frame_size = Env.frame_size env in
   let gc_live_offset = compute_live_offset env i.live in
   let gc_lbl, gc_return_lbl =
-    assembly_code_for_fast_heap_allocation0 ~n ~far ~res_reg:(H.reg_x i.res.(0))
+    assembly_code_for_fast_heap_allocation0 ~n ~offset ~far
+      ~res_reg:(H.reg_x i.res.(0))
   in
   Env.add_call_gc_site env
     { gc_lbl;
@@ -1153,7 +1157,8 @@ let assembly_code_for_fast_heap_allocation env i ~n ~far ~dbginfo =
       gc_frame_dbg = Dbg_alloc dbginfo
     }
 
-let assembly_code_for_slow_heap_allocation env i ~n ~dbginfo =
+let assembly_code_for_slow_heap_allocation env i ~n ~offset ~dbginfo =
+  assert (0 <= offset && offset < n);
   let lbl_frame = record_frame_label env i.live (Dbg_alloc dbginfo) in
   (match n with
   | 16 -> A.ins1 BL (runtime_function S.Predef.caml_alloc1)
@@ -1164,14 +1169,16 @@ let assembly_code_for_slow_heap_allocation env i ~n ~dbginfo =
     A.ins1 BL (runtime_function S.Predef.caml_allocN));
   labelled_ins4 lbl_frame ADD_immediate
     (H.reg_x i.res.(0))
-    reg_x_alloc_ptr (O.imm 8) O.optional_none
+    reg_x_alloc_ptr
+    (O.imm (8 + offset))
+    O.optional_none
 
-let assembly_code_for_allocation env i ~local ~n ~far ~dbginfo =
+let assembly_code_for_allocation env i ~local ~n ~offset ~far ~dbginfo =
   if local
-  then assembly_code_for_local_allocation env i ~n ~far
+  then assembly_code_for_local_allocation env i ~n ~offset ~far
   else if Env.fastcode_flag env
-  then assembly_code_for_fast_heap_allocation env i ~n ~far ~dbginfo
-  else assembly_code_for_slow_heap_allocation env i ~n ~dbginfo
+  then assembly_code_for_fast_heap_allocation env i ~n ~offset ~far ~dbginfo
+  else assembly_code_for_slow_heap_allocation env i ~n ~offset ~dbginfo
 
 (* Output the assembly code for a poll. *)
 
@@ -1670,14 +1677,16 @@ let emit_instr env i =
     | Word_mask | Twofiftysix_aligned | Twofiftysix_unaligned
     | Fivetwelve_aligned | Fivetwelve_unaligned ->
       Misc.fatal_error "arm64: got 256/512 bit vector or mask")
-  | Lop (Alloc { bytes = n; dbginfo; mode = Heap }) ->
-    assembly_code_for_allocation env i ~n ~local:false ~far:false ~dbginfo
-  | Lop (Specific (Ifar_alloc { bytes = n; dbginfo; mode })) ->
-    assembly_code_for_allocation env i ~n
+  | Lop (Alloc { bytes = n; dbginfo; mode = Heap; offset }) ->
+    assembly_code_for_allocation env i ~n ~offset ~local:false ~far:false
+      ~dbginfo
+  | Lop (Specific (Ifar_alloc { bytes = n; dbginfo; mode; offset })) ->
+    assembly_code_for_allocation env i ~n ~offset
       ~local:(Cmm.Alloc_mode.is_local mode)
       ~far:true ~dbginfo
-  | Lop (Alloc { bytes = n; dbginfo; mode = Local }) ->
-    assembly_code_for_allocation env i ~n ~local:true ~far:false ~dbginfo
+  | Lop (Alloc { bytes = n; dbginfo; mode = Local; offset }) ->
+    assembly_code_for_allocation env i ~n ~offset ~local:true ~far:false
+      ~dbginfo
   | Lop Begin_region ->
     A.ins2 LDR (H.reg_x i.res.(0)) (H.domainstate_field Domain_local_sp)
   | Lop End_region ->
@@ -2063,7 +2072,8 @@ type relaxed_instruction =
       { num_bytes : int;
         dbginfo : Cmm.alloc_dbginfo;
         res : Reg.t;
-        mode : Cmm.Alloc_mode.t
+        mode : Cmm.Alloc_mode.t;
+        offset : int
       }
   | Far_stackcheck of { max_frame_size_bytes : int }
   | Condbranch of
@@ -2080,15 +2090,15 @@ let emit_relaxed_instruction (relaxed : relaxed_instruction) =
       assembly_code_for_poll0 ~far:true ~return_label:None
     in
     ()
-  | Far_alloc { num_bytes; res; dbginfo = _; mode = Heap } ->
+  | Far_alloc { num_bytes; res; dbginfo = _; mode = Heap; offset } ->
     let _gc_lbl, _gc_return_lbl =
-      assembly_code_for_fast_heap_allocation0 ~n:num_bytes ~far:true
+      assembly_code_for_fast_heap_allocation0 ~n:num_bytes ~offset ~far:true
         ~res_reg:(H.reg_x res)
     in
     ()
-  | Far_alloc { num_bytes; res; dbginfo = _; mode = Local } ->
+  | Far_alloc { num_bytes; res; dbginfo = _; mode = Local; offset } ->
     let _lr_lbl, _lr_return_lbl =
-      assembly_code_for_local_allocation0 ~n:num_bytes ~far:true
+      assembly_code_for_local_allocation0 ~n:num_bytes ~offset ~far:true
         ~res_reg:(H.reg_x res)
     in
     ()
@@ -2129,8 +2139,8 @@ let relax_branches env body =
     let relaxed_instruction_desc ri : Linear.instruction_desc =
       match ri with
       | Far_poll -> Lop (Specific Ifar_poll)
-      | Far_alloc { num_bytes; dbginfo; res = _; mode } ->
-        Lop (Specific (Ifar_alloc { bytes = num_bytes; dbginfo; mode }))
+      | Far_alloc { num_bytes; dbginfo; res = _; mode; offset } ->
+        Lop (Specific (Ifar_alloc { bytes = num_bytes; dbginfo; mode; offset }))
       | Far_stackcheck { max_frame_size_bytes } ->
         Lop (Specific (Ifar_stackcheck { max_frame_size_bytes }))
       | Condbranch { test; lbl; arg = _ } -> Lcondbranch (test, lbl)
@@ -2138,8 +2148,8 @@ let relax_branches env body =
 
     let relax_poll () = Far_poll
 
-    let relax_allocation ~num_bytes ~dbginfo ~res ~mode =
-      Far_alloc { num_bytes; dbginfo; res; mode }
+    let relax_allocation ~num_bytes ~dbginfo ~res ~mode ~offset =
+      Far_alloc { num_bytes; dbginfo; res; mode; offset }
 
     let relax_stackcheck ~max_frame_size_bytes =
       Far_stackcheck { max_frame_size_bytes }
