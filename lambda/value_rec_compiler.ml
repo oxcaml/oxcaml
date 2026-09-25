@@ -508,6 +508,7 @@ let compute_static_size lam =
     | Patomic_compare_set_idx _
     | Patomic_fetch_add_idx
     | Popaque _
+    | Psection _
     | Pdls_get
     | Ptls_get
     | Pdomain_index

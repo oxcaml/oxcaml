@@ -2301,6 +2301,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
        [Lambda_to_lambda_transforms]"
   | Popaque layout, [arg] ->
     opaque ~machine_width layout arg ~middle_end_only:false
+  | Psection (_, layout), [arg] ->
+    opaque ~machine_width layout arg ~middle_end_only:false
   | Pobj_magic layout, [arg] ->
     opaque ~machine_width layout arg ~middle_end_only:true
   | Pduprecord (repr, num_fields), [[arg]] ->
@@ -3639,7 +3641,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
        %a (%a)"
       Printlambda.primitive prim H.print_list_of_simple_or_prim
       (List.flatten args)
-  | ( ( Pfield _ | Pnot | Pstringlength | Pbyteslength | Popaque _
+  | ( ( Pfield _ | Pnot | Pstringlength | Pbyteslength | Popaque _ | Psection _
       | Pduprecord _ | Parraylength _ | Pduparray _ | Pfloatfield _
       | Poffsetref _ | Pisint _ | Pisnull | Pint_as_pointer _ | Pbigarraydim _
       | Pobj_dup | Pobj_magic _ | Punbox_vector _ | Punbox_unit

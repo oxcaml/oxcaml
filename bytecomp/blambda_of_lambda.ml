@@ -564,7 +564,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         if is_representable_const_int y && not (is_representable_const_int x)
         then Prim (prim, [y; x])
         else Prim (prim, [x; y]))
-    | Popaque _ | Pobj_magic _ -> (
+    | Popaque _ | Pobj_magic _ | Psection _ -> (
       match args with
       | [arg] ->
         (* in bytecode we only deal with boxed+tagged floats/ints/units *)

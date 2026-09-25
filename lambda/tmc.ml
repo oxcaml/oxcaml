@@ -913,6 +913,12 @@ let rec choice ctx t =
           | _ -> invalid_arg "choice_prim" in
         let+ l1 = choice ctx ~tail l1 in
         Lprim (Popaque layout, [l1], loc)
+    | Psection (kind, layout) ->
+        let l1 = match primargs with
+          |  [l1] -> l1
+          | _ -> invalid_arg "choice_prim" in
+        let+ l1 = choice ctx ~tail l1 in
+        Lprim (Psection (kind, layout), [l1], loc)
 
     (* in common cases we just return *)
     | Pphys_equal _

@@ -149,6 +149,8 @@ type lazy_block_tag =
    whether some of the primitives specific to ufloat records
    ([Pmakeufloatblock], [Pufloatfield], and [Psetufloatfield]) can/should be
    generalized, rather than just adding new primitives. *)
+type section_kind = Critical | Blocking
+
 type primitive =
   | Pbytes_to_string
   | Pbytes_of_string
@@ -441,6 +443,8 @@ type primitive =
   | Patomic_lxor_idx
   (* Inhibition of optimisation *)
   | Popaque of layout
+  (* GC-safe section marker (identity; carries the section kind + body layout) *)
+  | Psection of section_kind * layout
   (* Statically-defined probes *)
   | Pprobe_is_enabled of { name: string; enabled_at_init: bool option }
   (* Primitives for [Obj] *)

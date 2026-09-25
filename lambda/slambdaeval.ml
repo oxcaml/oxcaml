@@ -899,6 +899,9 @@ and eval_prim env loc prim =
   | Popaque old_layout ->
     let new_layout = eval_layout env old_layout in
     if new_layout == old_layout then prim else Popaque new_layout
+  | Psection (kind, old_layout) ->
+    let new_layout = eval_layout env old_layout in
+    if new_layout == old_layout then prim else Psection (kind, new_layout)
   | Pobj_magic old_layout ->
     let new_layout = eval_layout env old_layout in
     if new_layout == old_layout then prim else Pobj_magic new_layout
@@ -1047,6 +1050,8 @@ and assert_constructor_shape_contains_no_splices = function
 let assert_primitive_contains_no_splices (prim : Lambda.primitive) =
   match prim with
   | Popaque layout | Pobj_magic layout ->
+    assert_layout_contains_no_splices layout
+  | Psection (_, layout) ->
     assert_layout_contains_no_splices layout
   | Pget_idx (layout, _)
   | Pset_idx (layout, _)

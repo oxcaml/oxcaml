@@ -193,6 +193,8 @@ let tag_of_lazy_tag = function
   | Lazy_tag -> Config.lazy_tag
   | Forward_tag -> Obj.forward_tag
 
+type section_kind = Critical | Blocking
+
 type primitive =
   | Pbytes_to_string
   | Pbytes_of_string
@@ -466,6 +468,7 @@ type primitive =
   | Patomic_lxor_idx
   (* Inhibition of optimisation *)
   | Popaque of layout
+  | Psection of section_kind * layout
   (* Statically-defined probes *)
   | Pprobe_is_enabled of { name: string; enabled_at_init: bool option }
   (* Primitives for [Obj] *)
@@ -3059,6 +3062,7 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pctconst _ -> None
   | Pint_as_pointer m -> Some m
   | Popaque _ -> None
+  | Psection _ -> None
   | Pprobe_is_enabled _ -> None
   | Pobj_dup -> Some alloc_heap
   | Pobj_magic _ -> None
@@ -3286,7 +3290,7 @@ let primitive_can_raise prim =
   | Punboxed_int32_array_set_vec { unsafe = true; _ }
   | Punboxed_int64_array_set_vec { unsafe = true; _ }
   | Punboxed_nativeint_array_set_vec { unsafe = true; _ }
-  | Pctconst _ | Pint_as_pointer _ | Popaque _
+  | Pctconst _ | Pint_as_pointer _ | Popaque _ | Psection _
   | Pprobe_is_enabled _ | Pobj_dup | Pobj_magic _
   | Pbox_vector (_, _) | Punbox_vector _
   | Pbox_mask _ | Punbox_mask
@@ -3635,6 +3639,7 @@ let primitive_result_layout (p : primitive) =
      | Naked (Floating (Float32 Any_locality_mode)) ->
        layout_unboxed_float Unboxed_float32)
   | Popaque layout | Pobj_magic layout -> layout
+  | Psection (_, layout) -> layout
   | Pbytes_to_string | Pbytes_of_string -> layout_string
   | Pignore | Psetfield _ | Psetfield_computed _ | Psetfloatfield _ | Poffsetref _
   | Psetufloatfield _ | Psetmixedfield _

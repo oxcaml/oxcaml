@@ -2848,7 +2848,7 @@ let lambda_primitive_needs_event_after = function
   | Patomic_compare_set_idx _ | Patomic_fetch_add_idx
   | Patomic_add_idx | Patomic_sub_idx
   | Patomic_land_idx | Patomic_lor_idx | Patomic_lxor_idx
-  | Pcpu_relax | Pctconst _ | Pint_as_pointer _ | Popaque _
+  | Pcpu_relax | Pctconst _ | Pint_as_pointer _ | Popaque _ | Psection _
   | Pdls_get
   | Ptls_get
   | Pdomain_index

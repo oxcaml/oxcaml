@@ -1301,7 +1301,7 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Punboxed_float32_array_set_vec _ | Puntagged_int8_array_set_vec _
       | Puntagged_int16_array_set_vec _ | Punboxed_int32_array_set_vec _
       | Punboxed_int64_array_set_vec _ | Punboxed_nativeint_array_set_vec _
-      | Pctconst _ | Pint_as_pointer _ | Popaque _ | Pprobe_is_enabled _
+      | Pctconst _ | Pint_as_pointer _ | Popaque _ | Psection _ | Pprobe_is_enabled _
       | Pobj_dup | Pobj_magic _ | Pmakelazyblock _ | Punbox_vector _
       | Punbox_unit
       | Pbox_vector (_, _)

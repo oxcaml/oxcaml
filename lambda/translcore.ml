@@ -434,6 +434,20 @@ let zero_alloc_of_application
     end
   | None, _ -> Zero_alloc_utils.Assume_info.none
 
+(* GC-safe sections: recover the section kind from the marker attribute that
+   [Typecore] attaches to a [%critical]/[%blocking] body. *)
+let section_kind_of_attributes (attrs : Parsetree.attributes) =
+  let has n =
+    List.exists
+      (fun (a : Parsetree.attribute) ->
+        let s = a.attr_name.txt in
+        String.equal s n || String.equal s ("ocaml." ^ n))
+      attrs
+  in
+  if has "critical" then Some Critical
+  else if has "blocking" then Some Blocking
+  else None
+
 let rec transl_exp ~scopes layout e =
   transl_exp1 ~scopes ~in_new_scope:false layout e
 
@@ -451,8 +465,14 @@ and transl_exp1 ~scopes ~in_new_scope layout e =
       Texp_function _ | Texp_for _ | Texp_while _ -> false
     | _ -> true
   in
-  if eval_once then transl_exp0 ~scopes ~in_new_scope layout e else
-  Translobj.oo_wrap e.exp_env true (transl_exp0 ~scopes ~in_new_scope layout) e
+  let lam =
+    if eval_once then transl_exp0 ~scopes ~in_new_scope layout e else
+    Translobj.oo_wrap e.exp_env true (transl_exp0 ~scopes ~in_new_scope layout) e
+  in
+  match section_kind_of_attributes e.exp_attributes with
+  | None -> lam
+  | Some kind ->
+    Lprim (Psection (kind, layout), [lam], of_location ~scopes e.exp_loc)
 
 and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
   match e.exp_desc with

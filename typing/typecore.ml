@@ -8987,10 +8987,22 @@ and type_expect_
      non-native "plain expression" behavior. *)
   | Pexp_extension ({ txt = ("critical" | "ocaml.critical"); _ },
                     PStr [{ pstr_desc = Pstr_eval (e, _); _ }]) ->
-      type_expect env expected_mode e ty_expected_explained
+      let exp = type_expect env expected_mode e ty_expected_explained in
+      { exp with
+        exp_attributes =
+          { Parsetree.attr_name = Location.mkloc "ocaml.critical" loc;
+            attr_payload = Parsetree.PStr [];
+            attr_loc = loc }
+          :: exp.exp_attributes }
   | Pexp_extension ({ txt = ("blocking" | "ocaml.blocking"); _ },
                     PStr [{ pstr_desc = Pstr_eval (e, _); _ }]) ->
-      type_expect env expected_mode e ty_expected_explained
+      let exp = type_expect env expected_mode e ty_expected_explained in
+      { exp with
+        exp_attributes =
+          { Parsetree.attr_name = Location.mkloc "ocaml.blocking" loc;
+            attr_payload = Parsetree.PStr [];
+            attr_loc = loc }
+          :: exp.exp_attributes }
   | Pexp_extension ext ->
     raise (Error_forward (Builtin_attributes.error_of_extension ext))
 
