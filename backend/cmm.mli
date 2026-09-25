@@ -452,6 +452,16 @@ type operation =
         is_atomic : bool
       }
   | Calloc of Alloc_mode.t * alloc_block_kind
+  | Calloc_uninitialized of
+      { mode : Alloc_mode.t;
+        wosize : int;
+        alloc_block_kind : alloc_block_kind
+      }
+      (** [Calloc_uninitialized] allocates a block of [wosize] fields, which
+          must be small enough to be allocated on the minor heap if [mode] is
+          [Heap]. Its only argument is the header of the block. The fields are
+          left uninitialized, so the header must describe a block that the GC
+          does not scan. *)
   | Cstore of memory_chunk * initialization_or_assignment
   | Caddi
   | Csubi
