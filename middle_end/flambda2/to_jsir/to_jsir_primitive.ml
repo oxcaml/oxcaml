@@ -508,14 +508,15 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
         | Float32 -> "caml_float32_compare")
     in
     use_prim' (Extern extern_name)
-  | Atomic_load (Field_index, _) -> use_prim' (Extern "caml_atomic_load_field")
+  | Atomic_load (Field_index, _, _) ->
+    use_prim' (Extern "caml_atomic_load_field")
   | Bigarray_get_alignment _ ->
     (* Only used for SIMD *)
     raise Primitive_not_supported
   | Poke _ ->
     (* Unsupported in bytecode *)
     raise Primitive_not_supported
-  | Atomic_load (Byte_offset, _) | Read_offset _ ->
+  | Atomic_load (Byte_offset, _, _) | Read_offset _ ->
     (* CR selee: This is for block indices, which likely requires changes to
        JSOO to support. We will leave this for now. *)
     raise Primitive_not_supported
@@ -580,13 +581,13 @@ let ternary_exn ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
       | Xor -> "caml_atomic_lxor_field"
     in
     use_prim' (Extern extern_name)
-  | Atomic_set (Field_index, _, _) ->
+  | Atomic_set (Field_index, _, _, _) ->
     let _var, env, res = use_prim' (Extern "caml_atomic_exchange_field") in
     unit ~env ~res
   | Atomic_exchange (Field_index, _, _) ->
     use_prim' (Extern "caml_atomic_exchange_field")
   | Atomic_int_arith (Byte_offset, _)
-  | Atomic_set (Byte_offset, _, _)
+  | Atomic_set (Byte_offset, _, _, _)
   | Atomic_exchange (Byte_offset, _, _)
   | Write_offset _ ->
     (* CR selee: This is for block indices, which likely requires changes to

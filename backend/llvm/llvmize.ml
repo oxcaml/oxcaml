@@ -1037,7 +1037,7 @@ let atomic t (i : Cfg.basic Cfg.instruction) (op : Cmm.atomic_op) ~size ~addr =
     | Compare_set -> 2
     | Fetch_and_add -> 1
     | Add | Sub | Land | Lor | Lxor -> 1
-    | Exchange -> 1
+    | Exchange | Release_store -> 1
     | Compare_exchange -> 2
   in
   let typ =
@@ -1078,6 +1078,7 @@ let atomic t (i : Cfg.basic Cfg.instruction) (op : Cmm.atomic_op) ~size ~addr =
       emit_ins t (I.select ~cond:success ~ifso:orig ~ifnot:loaded)
     in
     store_into_reg t i.res.(0) selected
+  | Release_store -> emit_ins_no_res t (I.store ~ptr ~to_store:arg)
 
 let load t (i : Cfg.basic Cfg.instruction) (memory_chunk : Cmm.memory_chunk)
     (addr_mode : Arch.addressing_mode) =
@@ -1238,8 +1239,8 @@ let basic_op t (i : Cfg.basic Cfg.instruction) (op : Operation.t) =
   | Const_float bits -> store_into_reg t i.res.(0) (V.of_float64_bits bits)
   | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Const_mask _ ->
     not_implemented_basic ~msg:"const_vec" i
-  (* CR yusumez: What do we do with mutability / is_atomic / is_modify? *)
-  | Load { memory_chunk; addressing_mode; mutability = _; is_atomic = _ } ->
+  (* CR yusumez: What do we do with mutability / atomic / is_modify? *)
+  | Load { memory_chunk; addressing_mode; mutability = _; atomic = _ } ->
     load t i memory_chunk addressing_mode
   | Store (memory_chunk, addressing_mode, _is_modify) ->
     store t i memory_chunk addressing_mode

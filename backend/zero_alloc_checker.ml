@@ -2644,8 +2644,8 @@ end = struct
             Misc.fatal_errorf "Expected pure operation, got %a\n" Operation.dump
               op;
           next
-        | Load { is_atomic; _ } ->
-          if (not is_atomic) && not (Operation.is_pure op)
+        | Load { atomic; _ } ->
+          if Option.is_none atomic && not (Operation.is_pure op)
           then
             Misc.fatal_errorf "Expected pure operation, got non-atomic load\n";
           next

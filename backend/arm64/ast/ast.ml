@@ -1720,6 +1720,7 @@ module Instruction_name = struct
           * [`Reg of [`Neon of [`Vector of 'v * 'w]]]
           * [`Shift_by_element_width of 'w] )
         t
+    | STLR : (pair, [`Reg of [`GP of [< `X | `W]]] * [`Mem of [`Base_reg]]) t
     | STP :
         ('w1, 'w2) LDP_STP_width.t
         -> ( triple,
@@ -2070,6 +2071,7 @@ module Instruction_name = struct
         | SQXTN2 _ -> "sqxtn2"
         | SSHL_vector -> "sshl"
         | SSHR -> "sshr"
+        | STLR -> "stlr"
         | STP _ -> "stp"
         | STR -> "str"
         | STR_simd_and_fp -> "str"
@@ -2522,6 +2524,9 @@ module Instruction_name = struct
       | SSHR ->
         let (Triple (rd, rs, imm)) = ops in
         [| o rd; o rs; o imm |]
+      | STLR ->
+        let (Pair (rt, addr)) = ops in
+        [| o rt; o addr |]
       | STP _ ->
         let (Triple (rt1, rt2, addr)) = ops in
         [| o rt1; o rt2; o addr |]
@@ -2691,13 +2696,13 @@ module Instruction = struct
     | ORR_shifted_register | ORR_vector | RBIT | RET | REV | REV16 | SBFM
     | SCVTF | SCVTF_vector | SDIV | UDIV | SHL | SMAX_vector | SMIN_vector
     | SMOV _ | SMULH | SMULL2_vector _ | SMULL_vector _ | SQADD_vector
-    | SQSUB_vector | SQXTN _ | SQXTN2 _ | SSHL_vector | SSHR | STP _ | STR
-    | STRB | STRH | STR_simd_and_fp | SUBS_immediate | SUBS_shifted_register
-    | SUB_immediate | SUB_shifted_register | SUB_vector | SXTL _ | TST
-    | UADDLP_vector | UBFM | UMAX_vector | UMIN_vector | UMOV _ | UMULH
-    | UMULL2_vector _ | UMULL_vector _ | UQADD_vector | UQSUB_vector | UQXTN _
-    | UQXTN2 _ | USHL_vector | USHR | UXTL _ | XTN _ | XTN2 _ | YIELD | ZIP1
-    | ZIP2 ->
+    | SQSUB_vector | SQXTN _ | SQXTN2 _ | SSHL_vector | SSHR | STLR | STP _
+    | STR | STRB | STRH | STR_simd_and_fp | SUBS_immediate
+    | SUBS_shifted_register | SUB_immediate | SUB_shifted_register | SUB_vector
+    | SXTL _ | TST | UADDLP_vector | UBFM | UMAX_vector | UMIN_vector | UMOV _
+    | UMULH | UMULL2_vector _ | UMULL_vector _ | UQADD_vector | UQSUB_vector
+    | UQXTN _ | UQXTN2 _ | USHL_vector | USHR | UXTL _ | XTN _ | XTN2 _ | YIELD
+    | ZIP1 | ZIP2 ->
       None
 end
 
