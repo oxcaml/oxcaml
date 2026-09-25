@@ -140,6 +140,148 @@ let prepare_rewrite_context result all_sets_of_closures =
   in
   { db = result.UA.db; unboxing = result; sets_of_closures_by_function_slot }
 
+(* When we rewrite a type corresponding to a given value, we will have the
+   following invariants:
+
+   - the sources corresponding to the metadata (empty for [No_source], a
+   singleton for [Single_source], everything for the other cases) form a
+   superset of the possible sources of that value (so if the value can come from
+   outside the current compilation unit, [No_source] and [Single_source] are
+   impossible).
+
+   - the usages, if provided, correspond to a **subset** of the possible usages
+   computed by the reaper of any possible source for that value. *)
+
+type rewrite_metadata =
+  | No_source
+  | Single_source of Code_id_or_name.t
+  | Many_sources_any_usage
+  | Many_sources_usages of PTA.usages
+  | At_least_one_source_no_usages
+
+let compare_metadata x y =
+  match x, y with
+  | No_source, No_source -> 0
+  | Single_source source1, Single_source source2 ->
+    Code_id_or_name.compare source1 source2
+  | Many_sources_any_usage, Many_sources_any_usage -> 0
+  | Many_sources_usages (Usages usages1), Many_sources_usages (Usages usages2)
+    ->
+    Code_id_or_name.Map.compare Unit.compare usages1 usages2
+  | At_least_one_source_no_usages, At_least_one_source_no_usages -> 0
+  | ( No_source,
+      ( Single_source _ | Many_sources_any_usage | Many_sources_usages _
+      | At_least_one_source_no_usages ) ) ->
+    -1
+  | ( ( Single_source _ | Many_sources_any_usage | Many_sources_usages _
+      | At_least_one_source_no_usages ),
+      No_source ) ->
+    1
+  | ( Single_source _,
+      ( Many_sources_any_usage | Many_sources_usages _
+      | At_least_one_source_no_usages ) ) ->
+    -1
+  | ( ( Many_sources_any_usage | Many_sources_usages _
+      | At_least_one_source_no_usages ),
+      Single_source _ ) ->
+    1
+  | ( Many_sources_any_usage,
+      (Many_sources_usages _ | At_least_one_source_no_usages) ) ->
+    -1
+  | ( (Many_sources_usages _ | At_least_one_source_no_usages),
+      Many_sources_any_usage ) ->
+    1
+  | Many_sources_usages _, At_least_one_source_no_usages -> -1
+  | At_least_one_source_no_usages, Many_sources_usages _ -> 1
+
+let print_metadata ff t =
+  match t with
+  | No_source -> Format.fprintf ff "No_source"
+  | Single_source source ->
+    Format.fprintf ff "(Single_source %a)" Code_id_or_name.print source
+  | Many_sources_any_usage -> Format.fprintf ff "Many_sources_any_usage"
+  | Many_sources_usages (Usages usages) ->
+    Format.fprintf ff "(Many_sources_usages %a)" Code_id_or_name.Set.print
+      (Code_id_or_name.Map.keys usages)
+  | At_least_one_source_no_usages ->
+    Format.fprintf ff "At_least_one_source_no_usages"
+
+let follow_field context metadata field =
+  let[@local] for_usages usages =
+    match PTA.get_one_field_usage context.db field usages with
+    | Unknown -> Many_sources_any_usage
+    | Bottom -> At_least_one_source_no_usages
+    | Ok vars -> Many_sources_usages (PTA.get_direct_usages context.db vars)
+  in
+  match metadata with
+  | No_source ->
+    Misc.fatal_errorf "Unexpected [No_source] in [follow_field] for field %a"
+      Field.print field
+  | At_least_one_source_no_usages ->
+    Misc.fatal_errorf
+      "Unexpected [At_least_one_source_no_usages] in [follow_field] for field \
+       %a"
+      Field.print field
+  | Many_sources_any_usage -> Many_sources_any_usage
+  | Many_sources_usages usages -> for_usages usages
+  | Single_source source -> (
+    if not (PTA.field_used context.db source field)
+    then
+      At_least_one_source_no_usages
+      (* The field has been deleted when building the value *)
+    else
+      match PTA.get_single_field_source context.db source field with
+      | No_source -> No_source
+      | One field_source -> Single_source field_source
+      | Many -> (
+        match PTA.get_usages context.db source with
+        | Unknown -> Many_sources_any_usage
+        | Bottom -> At_least_one_source_no_usages
+        | Ok usages -> for_usages usages))
+
+let join_metadata context x y =
+  let usages_of x =
+    match x with
+    | No_source | At_least_one_source_no_usages -> assert false
+    | Single_source source -> (
+      match PTA.get_usages context.db source with
+      | Unknown -> None
+      | Ok usages -> Some usages
+      | Bottom -> Some (PTA.Usages Code_id_or_name.Map.empty))
+    | Many_sources_any_usage -> None
+    | Many_sources_usages usages -> Some usages
+  in
+  match x, y with
+  | No_source, t0 | t0, No_source -> t0
+  | At_least_one_source_no_usages, _ | _, At_least_one_source_no_usages ->
+    At_least_one_source_no_usages
+  | Single_source source1, Single_source source2
+    when Code_id_or_name.equal source1 source2 ->
+    Single_source source1
+  | ( (Single_source _ | Many_sources_any_usage | Many_sources_usages _),
+      (Single_source _ | Many_sources_any_usage | Many_sources_usages _) ) -> (
+    match usages_of x, usages_of y with
+    | None, None -> Many_sources_any_usage
+    | Some u, None | None, Some u -> Many_sources_usages u
+    | Some (PTA.Usages u1), Some (PTA.Usages u2) ->
+      Many_sources_usages
+        (PTA.Usages (Code_id_or_name.Map.inter (fun _ () () -> ()) u1 u2)))
+
+let metadata_for_name context name =
+  match PTA.get_single_source context.db name with
+  | Bottom -> No_source
+  | Ok source ->
+    if PTA.has_use context.db name
+    then Single_source source
+    else At_least_one_source_no_usages
+  | Unknown -> (
+    match PTA.get_usages context.db name with
+    | Bottom -> At_least_one_source_no_usages
+    | Unknown -> Many_sources_any_usage
+    | Ok usages -> Many_sources_usages usages)
+
+(** Subkind rewriting *)
+
 (* Note that this depends crucially on the fact that the poison value is not
    nullable. If it was, we could instead keep the subkind but erase the
    nullability part instead. *)
@@ -163,165 +305,112 @@ let[@inline] erase_subkind kind =
       Flambda_kind.With_subkind.Non_null_value_subkind.Anything
       (Flambda_kind.With_subkind.nullable kind)
 
-let rewrite_boxed_number_kind context usages kind bn =
+let rewrite_boxed_number_kind context metadata kind bn =
   (* The contents of boxed numbers are tracked via [Boxed_number] fields. If the
      contents are read, the value must really be a boxed number (in particular,
      it cannot have been replaced by a poison value), so the subkind can be
      kept.
 
-     Note that the [Bottom] case below is reachable even though this function is
-     only called for values with usages: the value's usages may all read a
+     Note that the [No_source] case below is reachable even though this function
+     is only called for values with usages: the value's usages may all read a
      different field, for example when the value flows into a parameter that is
      also fed by values of a different shape and only the fields of those other
      values are read. Such a read is invalid when it is reached with a value of
      this kind, but not immediately invalid (it may be behind a branch), so the
      value here can still have been replaced by a poison value and the subkind
      must be erased. *)
-  match PTA.get_one_field_usage context.db (Field.boxed_number bn) usages with
-  | Bottom -> erase_subkind kind
-  | Unknown | Ok _ -> kind
+  match follow_field context metadata (Field.boxed_number bn) with
+  | No_source | At_least_one_source_no_usages -> erase_subkind kind
+  | Many_sources_any_usage | Many_sources_usages _ | Single_source _ -> kind
 
-let rec rewrite_kind_with_subkind_not_top_not_bottom context usages kind =
+let rec rewrite_kind_with_subkind context metadata kind =
   (* CR ncourant: rewrite changed representation, or at least replace with Top.
      Not needed while we don't change representation of blocks. *)
-  match Flambda_kind.With_subkind.non_null_value_subkind kind with
-  | Anything -> kind
-  | Tagged_immediate ->
-    kind (* Always correct, since poison is a tagged immediate *)
-  | Boxed_float32 -> rewrite_boxed_number_kind context usages kind Naked_float32
-  | Boxed_float -> rewrite_boxed_number_kind context usages kind Naked_float
-  | Boxed_int32 -> rewrite_boxed_number_kind context usages kind Naked_int32
-  | Boxed_int64 -> rewrite_boxed_number_kind context usages kind Naked_int64
-  | Boxed_nativeint ->
-    rewrite_boxed_number_kind context usages kind Naked_nativeint
-  | Boxed_vec128 -> rewrite_boxed_number_kind context usages kind Naked_vec128
-  | Boxed_vec256 -> rewrite_boxed_number_kind context usages kind Naked_vec256
-  | Boxed_vec512 -> rewrite_boxed_number_kind context usages kind Naked_vec512
-  | Boxed_mask -> rewrite_boxed_number_kind context usages kind Naked_mask
-  | Float_block _ | Float_array | Immediate_array | Value_array | Generic_array
-  | Unboxed_float32_array | Untagged_int_array | Untagged_int8_array
-  | Untagged_int16_array | Unboxed_int32_array | Unboxed_int64_array
-  | Unboxed_nativeint_array | Unboxed_vec128_array | Unboxed_vec256_array
-  | Unboxed_vec512_array | Unboxed_mask_array | Unboxed_product_array ->
-    (* For all these subkinds, we don't track fields (for now). Thus, being in
-       this case without being top or bottom means that we never use this
-       particular value, but that it syntactically looks like it could be used.
-       We could keep the subkind info, but as this value should not be used, it
-       is best to delete it. *)
+  match metadata with
+  | No_source ->
+    (* This means that this value could not possibly have been produced.
+       Actually propagating this information seems however difficult,
+       potentially dangerous, and not very useful in practice, so we just erase
+       the subkind. *)
     erase_subkind kind
-  | Variant { consts; non_consts } ->
-    let fields = PTA.get_fields context.db usages in
-    let non_consts =
-      Tag.Scannable.Map.map
-        (fun (shape, kinds) ->
-          let kinds =
-            List.mapi
-              (fun i kind ->
-                let field =
-                  Field.block i (Flambda_kind.With_subkind.kind kind)
-                in
-                match Field.Map.find_opt field fields with
-                | None -> (* maybe poison *) erase_subkind kind
-                | Some Unknown -> (* top *) kind
-                | Some (Known flow_to) ->
-                  let usages = PTA.get_direct_usages context.db flow_to in
-                  rewrite_kind_with_subkind_not_top_not_bottom context usages
+  | At_least_one_source_no_usages ->
+    (* This value will no longer be used at all, so it might have been replaced
+       by a poison value; erase the subkind. *)
+    erase_subkind kind
+  | Many_sources_any_usage ->
+    (* This value is used in a uncontrolled way. Since subkinds can never
+       reference local fields, no change can have happened to the value at all,
+       as all fields of the value are therefore also used in an uncontrolled
+       way. Thus, we can keep the kind. *)
+    kind
+  | Single_source _ | Many_sources_usages _ -> (
+    match Flambda_kind.With_subkind.non_null_value_subkind kind with
+    | Anything -> kind
+    | Tagged_immediate -> kind
+    | Boxed_float32 ->
+      rewrite_boxed_number_kind context metadata kind Naked_float32
+    | Boxed_float -> rewrite_boxed_number_kind context metadata kind Naked_float
+    | Boxed_int32 -> rewrite_boxed_number_kind context metadata kind Naked_int32
+    | Boxed_int64 -> rewrite_boxed_number_kind context metadata kind Naked_int64
+    | Boxed_nativeint ->
+      rewrite_boxed_number_kind context metadata kind Naked_nativeint
+    | Boxed_vec128 ->
+      rewrite_boxed_number_kind context metadata kind Naked_vec128
+    | Boxed_vec256 ->
+      rewrite_boxed_number_kind context metadata kind Naked_vec256
+    | Boxed_vec512 ->
+      rewrite_boxed_number_kind context metadata kind Naked_vec512
+    | Boxed_mask -> rewrite_boxed_number_kind context metadata kind Naked_mask
+    | Float_block _ ->
+      (* Some of the fields of the float block may be replaced by poison, but it
+         will still be a poison of kind [Naked_float]. That means we can still
+         keep the subkind without rewriting. *)
+      kind
+    | Float_array | Immediate_array | Value_array | Generic_array
+    | Unboxed_float32_array | Untagged_int_array | Untagged_int8_array
+    | Untagged_int16_array | Unboxed_int32_array | Unboxed_int64_array
+    | Unboxed_nativeint_array | Unboxed_vec128_array | Unboxed_vec256_array
+    | Unboxed_vec512_array | Unboxed_mask_array | Unboxed_product_array ->
+      (* For all these subkinds, we don't track fields (for now). *)
+      kind
+    | Variant { consts; non_consts } ->
+      let non_consts =
+        Tag.Scannable.Map.map
+          (fun (shape, kinds) ->
+            let kinds =
+              List.mapi
+                (fun i kind ->
+                  let field =
+                    Field.block i (Flambda_kind.With_subkind.kind kind)
+                  in
+                  rewrite_kind_with_subkind context
+                    (follow_field context metadata field)
                     kind)
-              kinds
-          in
-          shape, kinds)
-        non_consts
-    in
-    Flambda_kind.With_subkind.create Flambda_kind.value
-      (Flambda_kind.With_subkind.Non_null_value_subkind.Variant
-         { consts; non_consts })
-      (Flambda_kind.With_subkind.nullable kind)
+                kinds
+            in
+            shape, kinds)
+          non_consts
+      in
+      Flambda_kind.With_subkind.create Flambda_kind.value
+        (Flambda_kind.With_subkind.Non_null_value_subkind.Variant
+           { consts; non_consts })
+        (Flambda_kind.With_subkind.nullable kind))
 
 let rewrite_kind_with_subkind context var kind =
   let var = Code_id_or_name.name var in
-  match PTA.get_usages context.db var with
-  | Bottom -> erase_subkind kind
-  | Unknown -> kind
-  | Ok usages ->
-    (* We don't need to add usages through function slots, since functions never
-       appear in value_kinds. *)
-    rewrite_kind_with_subkind_not_top_not_bottom context usages kind
+  rewrite_kind_with_subkind context (metadata_for_name context var) kind
 
 let forget_all_types = lazy (Flambda_features.debug_reaper "forget-types")
 
 let debug_types = lazy (Flambda_features.debug_reaper "types")
 
 module Rewriter = struct
-  type t0 =
-    | No_source
-    | Single_source of Code_id_or_name.t
-    | Many_sources_any_usage
-    | Many_sources_usages of PTA.usages
-    | At_least_one_source_no_usages
-  (* When we rewrite a type corresponding to a given value, we will have the
-     following invariants:
+  type t = rewrite_context * rewrite_metadata
 
-     - the sources corresponding to the metadata (empty for [No_source], a
-     singleton for [Single_source], everything for the other cases) form a
-     superset of the possible sources of that value (so if the value can come
-     from outside the current compilation unit, [No_source] and [Single_source]
-     are impossible).
+  let compare (_context1, meta1) (_context2, meta2) =
+    compare_metadata meta1 meta2
 
-     - the usages, if provided, correspond to a **subset** of the possible
-     usages computed by the reaper of any possible source for that value. *)
-
-  type t = rewrite_context * t0
-
-  let compare_t0 x y =
-    match x, y with
-    | No_source, No_source -> 0
-    | Single_source source1, Single_source source2 ->
-      Code_id_or_name.compare source1 source2
-    | Many_sources_any_usage, Many_sources_any_usage -> 0
-    | Many_sources_usages (Usages usages1), Many_sources_usages (Usages usages2)
-      ->
-      Code_id_or_name.Map.compare Unit.compare usages1 usages2
-    | At_least_one_source_no_usages, At_least_one_source_no_usages -> 0
-    | ( No_source,
-        ( Single_source _ | Many_sources_any_usage | Many_sources_usages _
-        | At_least_one_source_no_usages ) ) ->
-      -1
-    | ( ( Single_source _ | Many_sources_any_usage | Many_sources_usages _
-        | At_least_one_source_no_usages ),
-        No_source ) ->
-      1
-    | ( Single_source _,
-        ( Many_sources_any_usage | Many_sources_usages _
-        | At_least_one_source_no_usages ) ) ->
-      -1
-    | ( ( Many_sources_any_usage | Many_sources_usages _
-        | At_least_one_source_no_usages ),
-        Single_source _ ) ->
-      1
-    | ( Many_sources_any_usage,
-        (Many_sources_usages _ | At_least_one_source_no_usages) ) ->
-      -1
-    | ( (Many_sources_usages _ | At_least_one_source_no_usages),
-        Many_sources_any_usage ) ->
-      1
-    | Many_sources_usages _, At_least_one_source_no_usages -> -1
-    | At_least_one_source_no_usages, Many_sources_usages _ -> 1
-
-  let compare (_context1, t1) (_context2, t2) = compare_t0 t1 t2
-
-  let print_t0 ff t =
-    match t with
-    | No_source -> Format.fprintf ff "No_source"
-    | Single_source source ->
-      Format.fprintf ff "(Single_source %a)" Code_id_or_name.print source
-    | Many_sources_any_usage -> Format.fprintf ff "Many_sources_any_usage"
-    | Many_sources_usages (Usages usages) ->
-      Format.fprintf ff "(Many_sources_usages %a)" Code_id_or_name.Set.print
-        (Code_id_or_name.Map.keys usages)
-    | At_least_one_source_no_usages ->
-      Format.fprintf ff "At_least_one_source_no_usages"
-
-  let print ppf (_, t) = print_t0 ppf t
+  let print ppf (_, meta) = print_metadata ppf meta
 
   module T = Container_types.Make (struct
     type nonrec t = t
@@ -332,7 +421,7 @@ module Rewriter = struct
 
     let hash _t = failwith "hash"
 
-    let print ff (_context, t) = print_t0 ff t
+    let print ff (_context, metadata) = print_metadata ff metadata
   end)
 
   module Map = T.Map
@@ -499,68 +588,6 @@ module Rewriter = struct
     | Closure_fields (value_slots, function_slots) ->
       assert (Function_slot.Map.is_empty function_slots);
       closure value_slots
-
-  let follow_field context t field =
-    let[@local] for_usages usages =
-      match PTA.get_one_field_usage context.db field usages with
-      | Unknown -> Many_sources_any_usage
-      | Bottom -> At_least_one_source_no_usages
-      | Ok vars -> Many_sources_usages (PTA.get_direct_usages context.db vars)
-    in
-    match t with
-    | No_source ->
-      Misc.fatal_errorf "Unexpected [No_source] in [follow_field] for field %a"
-        Field.print field
-    | At_least_one_source_no_usages ->
-      Misc.fatal_errorf
-        "Unexpected [At_least_one_source_no_usages] in [follow_field] for \
-         field %a"
-        Field.print field
-    | Many_sources_any_usage -> Many_sources_any_usage
-    | Many_sources_usages usages -> for_usages usages
-    | Single_source source -> (
-      if not (PTA.field_used context.db source field)
-      then
-        At_least_one_source_no_usages
-        (* The field has been deleted when building the value *)
-      else
-        match PTA.get_single_field_source context.db source field with
-        | No_source -> No_source
-        | One field_source -> Single_source field_source
-        | Many -> (
-          match PTA.get_usages context.db source with
-          | Unknown -> Many_sources_any_usage
-          | Bottom -> At_least_one_source_no_usages
-          | Ok usages -> for_usages usages))
-
-  let join_t0 db x y =
-    let usages_of_t0 x =
-      match x with
-      | No_source | At_least_one_source_no_usages -> assert false
-      | Single_source source -> (
-        match PTA.get_usages db source with
-        | Unknown -> None
-        | Ok usages -> Some usages
-        | Bottom -> Some (PTA.Usages Code_id_or_name.Map.empty))
-      | Many_sources_any_usage -> None
-      | Many_sources_usages usages -> Some usages
-    in
-    match x, y with
-    | No_source, t0 | t0, No_source -> t0
-    | At_least_one_source_no_usages, _ | _, At_least_one_source_no_usages ->
-      At_least_one_source_no_usages
-    | Single_source source1, Single_source source2
-      when Code_id_or_name.equal source1 source2 ->
-      Single_source source1
-    | ( (Single_source _ | Many_sources_any_usage | Many_sources_usages _),
-        (Single_source _ | Many_sources_any_usage | Many_sources_usages _) )
-      -> (
-      match usages_of_t0 x, usages_of_t0 y with
-      | None, None -> Many_sources_any_usage
-      | Some u, None | None, Some u -> Many_sources_usages u
-      | Some (PTA.Usages u1), Some (PTA.Usages u2) ->
-        Many_sources_usages
-          (PTA.Usages (Code_id_or_name.Map.inter (fun _ () () -> ()) u1 u2)))
 
   let follow_field_for_set_of_closures context set_of_closures value_slot =
     let field = Field.value_slot value_slot in
@@ -791,7 +818,7 @@ module Rewriter = struct
         && not (Flambda2_types.is_unknown_maybe_null typing_env flambda_type)
       then
         Format.eprintf "Forgetting: %a@.Usages = %a@." Flambda2_types.print
-          flambda_type print_t0 usages;
+          flambda_type print_metadata usages;
       Rule.rewrite Pattern.any (Expr.unknown (Flambda2_types.kind flambda_type))
     in
     match usages with
@@ -1035,14 +1062,14 @@ module Rewriter = struct
                      (value_slots2, function_slots2) ->
                   let value_slots =
                     Value_slot.Map.inter
-                      (fun _ t1 t2 -> join_t0 context.db t1 t2)
+                      (fun _ t1 t2 -> join_metadata context t1 t2)
                       value_slots1 value_slots2
                   in
                   let function_slots =
                     Function_slot.Map.inter
                       (fun _ (t1, code_id_must_be_erased1)
                            (t2, code_id_must_be_erased2) ->
-                        ( join_t0 context.db t1 t2,
+                        ( join_metadata context t1 t2,
                           code_id_must_be_erased1 || code_id_must_be_erased2 ))
                       function_slots1 function_slots2
                   in
@@ -1247,23 +1274,12 @@ module TypesRewrite = Flambda2_types.Rewriter.Make (Rewriter)
 let rewrite_typing_env context ~unit_symbol:_ typing_env =
   if Lazy.force debug_types
   then Format.eprintf "OLD typing env: %a@." Typing_env.print typing_env;
-  let db = context.db in
   let symbol_metadata sym =
     if not (Current_unit.is_current (Symbol.compilation_unit sym))
-    then context, Rewriter.Many_sources_any_usage
+    then context, Many_sources_any_usage
     else
       let sym = Code_id_or_name.symbol sym in
-      match PTA.get_single_source db sym with
-      | Bottom -> context, Rewriter.No_source
-      | Ok source ->
-        if PTA.has_use db sym
-        then context, Rewriter.Single_source source
-        else context, Rewriter.At_least_one_source_no_usages
-      | Unknown -> (
-        match PTA.get_usages db sym with
-        | Bottom -> context, Rewriter.At_least_one_source_no_usages
-        | Unknown -> context, Rewriter.Many_sources_any_usage
-        | Ok usages -> context, Rewriter.Many_sources_usages usages)
+      context, metadata_for_name context sym
   in
   let r =
     Profile.record_call ~accumulate:true "types" (fun () ->
@@ -1325,12 +1341,12 @@ let rewrite_result_types context ~old_typing_env ~my_closure:func_my_closure
             ~var:(fun v field_source field_use ->
               let metadata =
                 match field_source, field_use with
-                | No_source, _ -> Rewriter.No_source
-                | One source, _ -> Rewriter.Single_source source
-                | Many, Unknown -> Rewriter.Many_sources_any_usage
+                | No_source, _ -> No_source
+                | One source, _ -> Single_source source
+                | Many, Unknown -> Many_sources_any_usage
                 | Many, Known flow_to ->
                   let usages = PTA.get_direct_usages db flow_to in
-                  Rewriter.Many_sources_usages usages
+                  Many_sources_usages usages
               in
               Variable.name v, (context, metadata))
             fields unboxed_fields allocation_point
@@ -1352,19 +1368,7 @@ let rewrite_result_types context ~old_typing_env ~my_closure:func_my_closure
       match to_keep with
       | PTA.Delete -> (Flambda2_types.Rewriter.Pattern.any, kind), []
       | PTA.Keep ->
-        let metadata =
-          match PTA.get_single_source db var with
-          | Bottom -> context, Rewriter.No_source
-          | Ok source ->
-            if PTA.has_use db var
-            then context, Rewriter.Single_source source
-            else context, Rewriter.At_least_one_source_no_usages
-          | Unknown -> (
-            match PTA.get_usages db var with
-            | Bottom -> context, Rewriter.At_least_one_source_no_usages
-            | Unknown -> context, Rewriter.Many_sources_any_usage
-            | Ok usages -> context, Rewriter.Many_sources_usages usages)
-        in
+        let metadata = context, metadata_for_name context var in
         let v = Flambda2_types.Rewriter.Var.create () in
         let pat = Flambda2_types.Rewriter.Pattern.var v (name, metadata) in
         (pat, kind), [v]
