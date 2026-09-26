@@ -24,13 +24,12 @@ module DC = Dynlink_common
 module DT = Dynlink_types
 
 let convert_cmi_import import =
-  let name = Import_info.name import |> Compilation_unit.Name.to_string in
-  let crc = Import_info.crc import in
-  name, crc
+  Import_info.Intf.name import, Import_info.Intf.crc import
 
 type global_map = {
-  name : Compilation_unit.t;
+  intf : Compilation_unit_intf.t;
   crc_intf : Digest.t option;
+  impl : Compilation_unit.t option;
   crc_impl : Digest.t option;
   syms : Symbol.t list;
 }
@@ -90,8 +89,8 @@ module Native = struct
 
   let fold_initial_units ~init ~f =
     let rank = ref 0 in
-    List.fold_left (fun acc { name; crc_intf; crc_impl; syms; } ->
-        let name = Compilation_unit.full_path_as_string name in
+    List.fold_left (fun acc { intf; crc_intf; impl; crc_impl; syms; } ->
+        let impl = Option.map Compilation_unit.full_path_as_string impl in
         let syms =
           List.map
             (fun sym -> Symbol.linkage_name sym |> Linkage_name.to_string)
@@ -103,7 +102,7 @@ module Native = struct
           | None -> None
           | Some _ as crco -> Some (crco, DT.Check_inited !rank)
         in
-        f acc ~compunit:name ~interface:crc_intf
+        f acc ~intf ~impl ~interface:crc_intf
             ~implementation ~defined_symbols:syms)
       init
       (ndl_getmap ())

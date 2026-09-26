@@ -24,7 +24,7 @@
  *                                                                                *
  **********************************************************************************)
 
-module CU = Compilation_unit
+module CUI = Compilation_unit_intf
 module GM = Global_module
 
 (* CR-someday zqian: the analysis below duplicates machinery in
@@ -35,7 +35,7 @@ module GM = Global_module
    importing parameterised units, and it already distinguishes parameters of
    the current unit from parameters it is merely aware of. *)
 
-type chain = CU.Name.t list
+type chain = CUI.t list
 (** The modules through which a module is reached, innermost first. Command-line
     inputs have the empty chain. *)
 
@@ -78,7 +78,7 @@ let assert_subset ~gm ~chain sub sup =
       |> String.concat ", "
     in
     let chain_to_string chain =
-      List.map CU.Name.to_string chain |> String.concat ", required by "
+      List.map CUI.to_string chain |> String.concat ", required by "
     in
     Misc.fatal_errorf
       "{%s} is not a subset of {%s} (while loading %s, required by %s)"
@@ -87,7 +87,7 @@ let assert_subset ~gm ~chain sub sup =
 
 let load_exact ~chain (gm : GM.t) : Signature_with_global_bindings.t =
   let cu, cmi_params, swg =
-    Env.find_import ~chain (CU.Name.of_head_of_global_name (GM.to_name gm))
+    Env.find_import ~chain (GM.to_name gm).GM.Name.head
   in
   assert (Option.is_some cu);
   let tracked_set =
@@ -103,7 +103,7 @@ let load_exact ~chain (gm : GM.t) : Signature_with_global_bindings.t =
 let rec load_approx ~chain (gm : GM.t) : GM.t * Signature_with_global_bindings.t
     =
   let cu, cmi_params, swg =
-    Env.find_import ~chain (CU.Name.of_head_of_global_name (GM.to_name gm))
+    Env.find_import ~chain (GM.to_name gm).GM.Name.head
   in
   assert (Option.is_some cu);
   let param_set args =
@@ -134,7 +134,7 @@ let rec load_approx ~chain (gm : GM.t) : GM.t * Signature_with_global_bindings.t
 let rec insert_module_exact ~chain (gm : GM.t)
     (swg : Signature_with_global_bindings.t) state =
   state.module_map <- GM.Name.Map.add (GM.to_name gm) chain state.module_map;
-  let chain = CU.Name.of_head_of_global_name (GM.to_name gm) :: chain in
+  let chain = (GM.to_name gm).GM.Name.head :: chain in
 
   let swg =
     let args =
@@ -187,37 +187,35 @@ type result = {
   params : (GM.Parameter_name.t * Ident.t) list;
 }
 
-let validate_inputs (input_module_names : string list) : CU.Name.Set.t =
+let validate_inputs (input_module_names : string list) : CUI.Set.t =
   if List.is_empty input_module_names then
     Compenv.fatal "Must specify at least one module name with -functorize";
   List.fold_left
     (fun set name ->
-      let cu_name = CU.Name.of_string name in
-      if CU.Name.Set.mem cu_name set then
+      let cu_name = CUI.of_string name in
+      if CUI.Set.mem cu_name set then
         Compenv.fatal (Printf.sprintf "Duplicate -functorize input: '%s'" name);
-      CU.Name.Set.add cu_name set)
-    CU.Name.Set.empty input_module_names
+      CUI.Set.add cu_name set)
+    CUI.Set.empty input_module_names
 
-let analyze (src_names : CU.Name.Set.t) : result =
+let analyze (src_names : CUI.Set.t) : result =
   let chain = [] in
   let state = new_empty_state () in
-  CU.Name.Set.iter
+  CUI.Set.iter
     (fun cu_name ->
       match Env.find_import ~chain cu_name with
       | None, _, _ ->
           Compenv.fatal
             (Printf.sprintf
                "Invalid -functorize input: '%s' is a parameter module"
-               (CU.Name.to_string cu_name))
+               (CUI.to_string cu_name))
       | Some _, [], _ ->
           Compenv.fatal
             (Printf.sprintf
                "Invalid -functorize input: '%s' is not a parameterised module"
-               (CU.Name.to_string cu_name))
+               (CUI.to_string cu_name))
       | Some _, cmi_params, swg ->
-          let gm =
-            GM.create_exn (CU.Name.to_string cu_name) [] ~hidden_args:cmi_params
-          in
+          let gm = GM.create_exn cu_name [] ~hidden_args:cmi_params in
           maybe_insert_module_exact ~chain gm swg state)
     src_names;
   let id_map =
@@ -267,7 +265,7 @@ let interface input_module_names (info : Compile_common.info) =
     ~exceptionally:(fun () ->
       Misc.remove_file (Unit_info.Artifact.filename (Unit_info.cmi unit_info)))
 
-let implementation (input_module_names : CU.Name.Set.t) ~ext
+let implementation (input_module_names : CUI.Set.t) ~ext
     ~(read_format :
        Misc.filepath ->
        Lambda.main_module_block_format * Lambda.arg_descr option)

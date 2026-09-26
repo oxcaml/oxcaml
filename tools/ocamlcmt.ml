@@ -100,7 +100,7 @@ let print_info cmt =
       Printf.fprintf oc "interface digest: %s\n" (Digest.to_hex digest);
   end;
   let compare_imports (name1, _crco1) (name2, _crco2) =
-    Compilation_unit.Name.compare name1 name2
+    String.compare name1 name2
   in
   let imports =
     let imports =
@@ -117,7 +117,7 @@ let print_info cmt =
         None -> dummy_crc
       | Some crc -> Digest.to_hex crc
     in
-    Printf.fprintf oc "import: %a %s\n" Compilation_unit.Name.output name crc;
+    Printf.fprintf oc "import: %s %s\n" name crc;
   ) imports;
   Printf.fprintf oc "%!";
   begin match !target_filename with

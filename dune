@@ -162,6 +162,7 @@
   local_store
   target_system
   compilation_unit
+  compilation_unit_intf
   import_info
   linkage_name
   opt_fuel
