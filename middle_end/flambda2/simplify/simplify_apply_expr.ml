@@ -1229,7 +1229,10 @@ let simplify_function_call ~simplify_expr dacc apply ~callee_ty
                 | exception Not_found -> false
                 | code_metadata ->
                   let params_arity = Code_metadata.params_arity code_metadata in
-                  Flambda_arity.equal_ignoring_subkinds args_arity params_arity)
+                  let is_tupled = Code_metadata.is_tupled code_metadata in
+                  (not is_tupled)
+                  && Flambda_arity.equal_ignoring_subkinds args_arity
+                       params_arity)
               code_ids
           then
             type_unavailable
