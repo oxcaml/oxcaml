@@ -52,4 +52,5 @@
   flambda2_classic_mode_types
   flambda2_terms
   flambda2_ui
+  flambda2_simplify
   flambda2_simplify_shared))
