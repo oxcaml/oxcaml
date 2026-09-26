@@ -30,12 +30,15 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
           fixed_arity_continuations;
           continuation_info;
           code_deps;
+          code_references;
+          le_monde_exterieur;
           applications;
           all_sets_of_closures;
           closure_function_decls
         } =
     Traverse.run unit
   in
+  Cross_unit_calls.link deps ~code_deps ~le_monde_exterieur code_references;
   let solved_dep, uses =
     Profile.record_call ~accumulate:true "solver" (fun () ->
         Analysis.fixpoint deps ~applications)
