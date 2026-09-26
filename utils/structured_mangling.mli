@@ -39,24 +39,33 @@
     {2 Mangled symbol format}
 
     A mangled symbol has the form [_Caml<path>] where [<path>] is a sequence of
-    tagged items. Most items are tags followed by a length-prefixed identifier:
+    tagged items. Named scopes are tags followed by a length-prefixed
+    identifier:
     - [U] - compilation Unit
-    - [I] - Inline marker (no payload)
     - [M] - Module
-    - [S] - anonymous Struct
     - [O] - class (O for object)
     - [F] - Function
-    - [L] - anonymous function (L for lambda)
-    - [P] - Partial application
 
-    Compiler-generated stamps, which make otherwise identically-named symbols
-    unique, are tagged [D] and carry a decimal number terminated by [_] rather
-    than an identifier, e.g. [D42_]. Keeping stamps out of the identifiers lets
-    a demangler omit them.
+    Anonymous scopes are tags followed by a decimal number terminated by [_]
+    (e.g. [L0_]), which cannot be confused with a length-prefixed identifier:
+    - [L] - anonymous function (L for lambda)
+    - [S] - anonymous Struct
+    - [Z] - lazy expression (Z for the last letter of lazy)
+    - [D] - compiler-generated stamp (D for disambiguator)
+
+    The number of an anonymous function, module or lazy expression is its
+    ordinal among such items directly enclosed in the same scope, so it only
+    changes when the enclosing scope itself is edited. The stamps make otherwise
+    identically-named symbols unique; keeping them out of the identifiers lets a
+    demangler omit them.
+
+    Finally, [I] is a payload-free inline marker and [P], a partial application,
+    carries a position encoded as an identifier.
 
     For example, [Foo.Bar.baz] in compilation unit [Foo] mangles to
-    [_CamlU3FooM3BarF3baz], and the code of a function slot with stamp 0 and
-    code ID stamp 3 to [_CamlU3FooM3BarF3bazD0_D3_]. *)
+    [_CamlU3FooM3BarF3baz], and the code of the second lambda directly inside
+    it, with function slot stamp 0 and code ID stamp 3, to
+    [_CamlU3FooM3BarF3bazL1_D0_D3_]. *)
 
 (** A path item represents a single lexical scope in the mangling path. *)
 type 'cu path_item =
@@ -64,21 +73,21 @@ type 'cu path_item =
   | Inline_marker
       (** A separator (between destination and source) to track inlining *)
   | Module of string  (** A named module *)
-  | Anonymous_module of int * int * string option
-      (** [struct ... end] at (line, col, file) *)
+  | Anonymous_module of int
+      (** [struct ... end], numbered among the anonymous items of its scope *)
   | Class of string  (** A class definition *)
   | Function of string  (** A named function *)
-  | Anonymous_function of int * int * string option
-      (** [fun ... -> ...] at (line, col, file) *)
+  | Anonymous_function of int
+      (** [fun ... -> ...], numbered among the anonymous items of its scope *)
+  | Lazy of int
+      (** [lazy ...], numbered among the anonymous items of its scope *)
   | Partial_function of int * int * string option
       (** A partial application at (line, col, file) *)
   | Stamp of int
       (** A compiler-generated stamp (of a function slot or a code ID) *)
 
-(* CR sspies: Support for lazy expressions (they do not appear in the mangling
-   path at all) and object methods (they appear as regular functions) is still
-   missing; adding a construct for lazy expressions would allow us to make sure
-   there is always a mangling path item for every [Debuginfo] scope *)
+(* CR sspies: Support for object methods (they appear as regular functions) is
+   still missing. *)
 
 (** A mangling path is a list of path items representing the full lexical
     context of an identifier. *)

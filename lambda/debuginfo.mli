@@ -32,22 +32,25 @@ module Scoped_location : sig
     | Cons of {item: scope_item; str: string; str_fun: string; name : string; prev: scopes;
                assume_zero_alloc: ZA.Assume_info.t;
                mangling_item:
-                 Compilation_unit.t Structured_mangling.path_item option}
+                 Compilation_unit.t Structured_mangling.path_item option;
+               next_anonymous: int ref;
+               (* The ordinal for the next anonymous item directly under this
+                  scope. *)
+              }
 
   val string_of_scopes : include_zero_alloc:bool -> scopes -> string
 
   val compilation_unit : scopes -> Compilation_unit.t option
 
   val empty_scopes : scopes
+  (* Anonymous functions, modules and lazy expressions are numbered among such
+     items directly under the same enclosing scope, in the order in which they
+     are entered. *)
   val enter_anonymous_function :
     scopes:scopes ->
     assume_zero_alloc:ZA.Assume_info.t ->
-    loc:Location.t ->
     scopes
-  val enter_anonymous_module :
-    scopes:scopes ->
-    loc:Location.t ->
-    scopes
+  val enter_anonymous_module : scopes:scopes -> scopes
   val enter_value_definition :
     scopes:scopes -> assume_zero_alloc:ZA.Assume_info.t -> Ident.t -> scopes
   val enter_compilation_unit : scopes:scopes -> Compilation_unit.t -> scopes
@@ -141,9 +144,11 @@ val merge : into:t -> t -> t
 
 val assume_zero_alloc : t -> ZA.Assume_info.t
 
-(** [to_structured_mangling_path] converts the debug info into a mangling path.
-    In all cases, the [name] is used to populate the last element of the path.
-*)
+(** [to_structured_mangling_path ~name dbg] converts the debug info of a
+    function into a mangling path, i.e. the scopes enclosing the function
+    followed by an item identifying the function itself. [name] is the name the
+    middle end gave the function; it ends the path when the scopes do not
+    already identify the function (see the implementation for details). *)
 val to_structured_mangling_path :
   name:string -> t -> Compilation_unit.t Structured_mangling.path
 
