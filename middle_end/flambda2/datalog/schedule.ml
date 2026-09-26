@@ -94,7 +94,6 @@ type rule =
   | Rule :
       { executor : rule_executor;
         rule_id : rule_id;
-        variables : Lang.Variable.t_ list;
         rule : Lang.rule
       }
       -> rule
@@ -124,7 +123,7 @@ let extra_atoms_for_provenance ~stats ~rule_id atom =
     [Lang.callback_with_bindings ~name provenance_fn args]
   | Table _ | Unless _ | Distinct _ | Filter _ | Callback_with_bindings _ -> []
 
-let compile_rule ?with_provenance ~rule_id vars rule =
+let compile_rule ?with_provenance ~rule_id rule =
   let rule =
     match with_provenance with
     | None -> rule
@@ -141,15 +140,15 @@ let compile_rule ?with_provenance ~rule_id vars rule =
       { rule with Lang.head }
   in
   let cursor =
-    Cursor.With_parameters.create_from_rule [] vars rule
+    Cursor.With_parameters.create_from_rule [] rule
     |> Cursor.With_parameters.without_parameters
   in
   Rule_executor { cursor }
 
-let create_rule variables rule =
+let create_rule rule =
   let rule_id = fresh_rule_id () in
-  let executor = compile_rule ~rule_id variables rule in
-  Rule { rule_id; variables; rule; executor }
+  let executor = compile_rule ~rule_id rule in
+  Rule { rule_id; rule; executor }
 
 let provenance_from_db db =
   Table.Map.fold db ~init:FactMap.empty ~f:(fun (Binding (tid, _)) provenance ->
@@ -360,9 +359,9 @@ type t =
   | Fixpoint of t list
 
 let recompile_rule_with_provenance ~stats rule =
-  let (Rule { rule_id; variables; rule; _ }) = rule in
-  let executor = compile_rule ~with_provenance:stats ~rule_id variables rule in
-  Rule { rule_id; variables; rule; executor }
+  let (Rule { rule_id; rule; _ }) = rule in
+  let executor = compile_rule ~with_provenance:stats ~rule_id rule in
+  Rule { rule_id; rule; executor }
 
 let rec recompile_schedule_with_provenance ~stats schedule =
   match schedule with
@@ -382,7 +381,9 @@ let maybe_recompile_with_provenance ?stats schedule =
 
 let fixpoint schedule = Fixpoint schedule
 
-let saturate rules = Saturate rules
+let saturate rules =
+  let rules = List.map create_rule rules in
+  Saturate rules
 
 let run_rules_incremental ?stats rules ~previous ~diff ~current output =
   List.fold_left

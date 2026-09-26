@@ -367,8 +367,8 @@ module With_parameters = struct
 
   let without_parameters { parameters = []; cursor } = cursor
 
-  let create_from_rule ?callback params vars rule =
-    let plan = Planner.plan_rule ?callback params vars rule in
+  let create_from_rule ?callback params rule =
+    let plan = Planner.plan_rule ?callback params rule in
     From_plan.create_from_plan_with_parameters ~original_rule:rule plan
 
   let naive_fold { parameters; cursor } ps db f acc =

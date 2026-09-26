@@ -176,7 +176,7 @@ module Datalog = struct
 
   module Schedule = Schedule
 
-  type rule = Schedule.rule
+  type rule = Lang.rule
 
   type deduction =
     [ `Atom of atom

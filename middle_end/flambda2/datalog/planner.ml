@@ -227,7 +227,8 @@ let advance_prefix_and_extract_iterator_on_variable (type a) table_layers
         layers.bound_prefix <- bound_prefix + 1;
         Column_iterator (column, outer_var, inner_var) :: iterators))
 
-let plan_rule ?(callback = ref ignore) parameters vars { head; body } =
+let plan_rule ?(callback = ref ignore) parameters
+    { variables = vars; head; body } =
   let tables, body_layout = Iarray.fold_left_map layout_atom [] body in
   let tables = Iarray.of_list (List.rev tables) in
   let var_to_atoms = Variable.Id.Tbl.create 0 in

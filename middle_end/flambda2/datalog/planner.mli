@@ -56,6 +56,5 @@ val print_plan : Format.formatter -> ('p, 'v) plan -> unit
 val plan_rule :
   ?callback:('v Constant.hlist -> unit) ref ->
   'p Variable.hlist ->
-  Variable.t_ list ->
   rule ->
   ('p, 'v) plan

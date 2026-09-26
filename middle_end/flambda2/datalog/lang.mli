@@ -87,10 +87,12 @@ val callback_with_bindings :
   atom
 
 type rule =
-  { head : atom iarray;
+  { variables : Variable.t_ list;
+    head : atom iarray;
     body : atom iarray
   }
 
 val print_rule : Format.formatter -> rule -> unit
 
-val rule : head:atom list -> body:atom list -> rule
+val rule :
+  variables:Variable.t_ list -> head:atom list -> body:atom list -> rule
