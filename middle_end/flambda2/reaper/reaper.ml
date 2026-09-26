@@ -62,9 +62,13 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
                ~old_typing_env ~my_closure ~params ~results types))
       ~code_deps
   in
+  let slot_offsets_inputs =
+    Slot_offsets_analysis.Inputs.create ~free_names ~closure_function_decls
+      ~code_deps ~get_code_metadata
+  in
   let slot_offsets =
-    Slot_offsets_analysis.compute ~free_names ~closure_function_decls
-      ~code_changes ~get_code_metadata solved_dep
+    Slot_offsets_analysis.compute ~inputs:slot_offsets_inputs ~code_changes
+      solved_dep
   in
   let Rebuild.{ body; all_code; code_ids_to_remember } =
     Rebuild.rebuild ~machine_width ~ordered_code_ids ~fixed_arity_continuations
