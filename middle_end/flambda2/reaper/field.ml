@@ -87,6 +87,46 @@ let equal_view v1 v2 =
       _ ) ->
     false
 
+let compare_view v1 v2 =
+  let constructor_numbering = function
+    | Block _ -> 0
+    | Value_slot _ -> 1
+    | Function_slot _ -> 2
+    | Call_witness _ -> 3
+    | Is_int -> 4
+    | Get_tag -> 5
+    | Boxed_number _ -> 6
+    | Return_of_call _ -> 7
+    | Code_id_of_call_witness -> 8
+  in
+  match v1, v2 with
+  | Block (i1, kind1), Block (i2, kind2) ->
+    let c = Int.compare i1 i2 in
+    if c <> 0 then c else Flambda_kind.compare kind1 kind2
+  | Value_slot vs1, Value_slot vs2 -> Value_slot.compare vs1 vs2
+  | Function_slot fs1, Function_slot fs2 -> Function_slot.compare fs1 fs2
+  | Call_witness ep1, Call_witness ep2 ->
+    Int.compare
+      (closure_entry_point_to_int ep1)
+      (closure_entry_point_to_int ep2)
+  | Is_int, Is_int
+  | Get_tag, Get_tag
+  | Code_id_of_call_witness, Code_id_of_call_witness ->
+    0
+  | Boxed_number bn1, Boxed_number bn2 ->
+    Flambda_kind.Boxable_number.compare bn1 bn2
+  | Return_of_call Exn, Return_of_call Exn -> 0
+  | Return_of_call (Normal i1), Return_of_call (Normal i2) -> Int.compare i1 i2
+  | Return_of_call (Normal _), Return_of_call Exn -> -1
+  | Return_of_call Exn, Return_of_call (Normal _) -> 1
+  | ( ( Block _ | Value_slot _ | Function_slot _ | Call_witness _ | Is_int
+      | Get_tag | Boxed_number _
+      | Return_of_call Exn
+      | Return_of_call (Normal _)
+      | Code_id_of_call_witness ),
+      _ ) ->
+    Int.compare (constructor_numbering v1) (constructor_numbering v2)
+
 let print_view ppf = function
   | Block (i, k) -> Format.fprintf ppf "%i_%a" i Flambda_kind.print k
   | Value_slot s -> Format.fprintf ppf "%a" Value_slot.print s
@@ -121,11 +161,32 @@ let create view = Table.add grand_table_of_fields view
 
 let view t = Table.find grand_table_of_fields t
 
-include Datalog.Column.Make (struct
+module Column = Datalog.Column.Make (struct
   let name = "field"
 
   let print ppf t = print_view ppf (view t)
 end)
+
+type t = Column.t
+
+let print = Column.print
+
+module Set = Column.Set
+
+module Map = struct
+  include Column.Map
+
+  let ordered_fold f m acc =
+    List.fold_left
+      (fun acc (field, elt) -> f field elt acc)
+      acc
+      (List.sort
+         (fun (field1, _) (field2, _) ->
+           compare_view (view field1) (view field2))
+         (bindings m))
+end
+
+let datalog_column_id = Column.datalog_column_id
 
 let block i k = create (Block (i, k))
 

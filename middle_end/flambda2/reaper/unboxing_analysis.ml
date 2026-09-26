@@ -84,7 +84,7 @@ module Unboxed_fields = struct
 
   let rec fold_with_kind (f : Flambda_kind.t -> 'a -> 'b -> 'b) (fields : 'a t)
       acc =
-    Field.Map.fold
+    Field.Map.ordered_fold
       (fun field elt acc ->
         match elt with
         | Not_unboxed elt -> f (Field.kind field) elt acc
@@ -119,7 +119,7 @@ module Unboxed_fields = struct
     | Unboxed fields1, Unboxed fields2 -> fold2_subset f fields1 fields2 acc
 
   and fold2_subset f fields1 fields2 acc =
-    Field.Map.fold
+    Field.Map.ordered_fold
       (fun field f1 acc ->
         match Field.Map.find field fields2 with
         | exception Not_found ->
@@ -131,7 +131,7 @@ module Unboxed_fields = struct
       fields1 acc
 
   let rec fold2_subset_with_kind f fields1 fields2 acc =
-    Field.Map.fold
+    Field.Map.ordered_fold
       (fun field f1 acc ->
         match Field.Map.find field fields2 with
         | exception Not_found ->
