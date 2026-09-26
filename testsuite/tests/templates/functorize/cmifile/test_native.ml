@@ -202,5 +202,11 @@
 
    compiler_reference = "bad_cmi_file_struct.reference";
    check-ocamlopt.byte-output;
+
+   (* The failing inclusion must not delete the input [-cmi-file]
+      (this invocation writes no cmi at all). *)
+
+   script = "sh -c 'test -f bundle_bad/bundle_bad.cmi'";
+   script;
  }
 *)
