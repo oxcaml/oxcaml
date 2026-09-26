@@ -5,7 +5,7 @@ let code loopify(never) size(3) newer_version_of(`fn[unbox_noreturn.ml:15,7--28]
       `fn[unbox_noreturn.ml:15,7--28]_2_1` (x : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
-        : [ 0 | 0 of val ] =
+        : val =
   cont k1 pop(reraise k1) ($Stdlib.camlStdlib__Exit1460_42)
 in
 let $`camlUnbox_noreturn__fn[unbox_noreturn.ml:15,7--28]_2` =
