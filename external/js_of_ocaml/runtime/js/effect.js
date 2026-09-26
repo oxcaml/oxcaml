@@ -334,7 +334,7 @@ function caml_continuation_use_and_update_handler_noexc(
 //Provides: caml_continuation_update_handler_noexc
 //Version: >= 5.2
 //If: oxcaml
-function caml_continuation_update_handler_noexc(cont, hval, hexn, heff, _htick) {
+function caml_continuation_update_handler_noexc(cont, hval, hexn, heff) {
   var stack = cont[1];
   if (stack === 0) return cont;
   var last = cont[2];

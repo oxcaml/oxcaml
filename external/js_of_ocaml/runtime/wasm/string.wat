@@ -384,9 +384,9 @@
                         (i64.const 56))))))
 
    (func (export "caml_bytes_set8")
-      (param (ref eq)) (param $p i32) (param $v i32) (result (ref eq))
+      (param $vs (ref eq)) (param $p i32) (param $v i32) (result (ref eq))
       (local $s (ref $bytes))
-      (local.set $s (ref.cast (ref $bytes) (local.get 0)))
+      (local.set $s (ref.cast (ref $bytes) (local.get $vs)))
       (if (i32.lt_s (local.get $p) (i32.const 0))
          (then (call $caml_bound_error)))
       (if (i32.ge_u (local.get $p)
