@@ -355,8 +355,8 @@ to_int:
 let int_roundtrip x = Int64_u.of_int x |> Int64_u.to_int
 [%%expect_asm X86_64{|
 int_roundtrip:
-  sarq  $1, %rax
-  leaq  1(%rax,%rax), %rax
+  andq  $-2, %rax
+  incq  %rax
   ret
 |}]
 
@@ -625,5 +625,68 @@ bytes_get_int64_bswap:
   sarq  $1, %rbx
   movq  (%rax,%rbx), %rax
   bswap %rax
+  ret
+|}]
+
+let lsl_lsr x = Int64_u.shift_left (Int64_u.shift_right_logical x 3) 3
+[%%expect_asm X86_64{|
+lsl_lsr:
+  andq  $-8, %rax
+  ret
+|}]
+
+let lsl_lsr_add x =
+  Int64_u.shift_left (Int64_u.shift_right_logical (Int64_u.add x #7L) 3) 3
+[%%expect_asm X86_64{|
+lsl_lsr_add:
+  addq  $7, %rax
+  andq  $-8, %rax
+  ret
+|}]
+
+let lsl_asr x = Int64_u.shift_left (Int64_u.shift_right x 3) 3
+[%%expect_asm X86_64{|
+lsl_asr:
+  andq  $-8, %rax
+  ret
+|}]
+
+let lsl_asr_one x = Int64_u.shift_left (Int64_u.shift_right x 1) 1
+[%%expect_asm X86_64{|
+lsl_asr_one:
+  andq  $-2, %rax
+  ret
+|}]
+
+(* [(x asr 1) lsl 1 + 1] re-tags an integer; untagging it again must still cancel
+   down to a single shift. *)
+let untag_retag_untag (x : int) = Int64_u.of_int (Int64_u.to_int (Int64_u.of_int x))
+[%%expect_asm X86_64{|
+untag_retag_untag:
+  sarq  $1, %rax
+  ret
+|}]
+
+(* The mask does not fit an immediate. *)
+let lsl_lsr_large x = Int64_u.shift_left (Int64_u.shift_right_logical x 40) 40
+[%%expect_asm X86_64{|
+lsl_lsr_large:
+  shrq  $40, %rax
+  salq  $40, %rax
+  ret
+|}]
+
+let and_asr_mask x = Int64_u.logand (Int64_u.shift_right x 48) #0xFFFFL
+[%%expect_asm X86_64{|
+and_asr_mask:
+  shrq  $48, %rax
+  ret
+|}]
+
+let and_asr_mask_partial x = Int64_u.logand (Int64_u.shift_right x 48) #0xFFL
+[%%expect_asm X86_64{|
+and_asr_mask_partial:
+  sarq  $48, %rax
+  andl  $255, %eax
   ret
 |}]
