@@ -39,9 +39,9 @@
     {2 Mangled symbol format}
 
     A mangled symbol has the form [_Caml<path>] where [<path>] is a sequence of
-    tagged, length-prefixed identifiers:
+    tagged items. Most items are tags followed by a length-prefixed identifier:
     - [U] - compilation Unit
-    - [I] - Inline marker
+    - [I] - Inline marker (no payload)
     - [M] - Module
     - [S] - anonymous Struct
     - [O] - class (O for object)
@@ -49,8 +49,14 @@
     - [L] - anonymous function (L for lambda)
     - [P] - Partial application
 
+    Compiler-generated stamps, which make otherwise identically-named symbols
+    unique, are tagged [D] and carry a decimal number terminated by [_] rather
+    than an identifier, e.g. [D42_]. Keeping stamps out of the identifiers lets
+    a demangler omit them.
+
     For example, [Foo.Bar.baz] in compilation unit [Foo] mangles to
-    [_CamlU3FooM3BarF3baz]. *)
+    [_CamlU3FooM3BarF3baz], and the code of a function slot with stamp 0 and
+    code ID stamp 3 to [_CamlU3FooM3BarF3bazD0_D3_]. *)
 
 (** A path item represents a single lexical scope in the mangling path. *)
 type 'cu path_item =
@@ -66,6 +72,8 @@ type 'cu path_item =
       (** [fun ... -> ...] at (line, col, file) *)
   | Partial_function of int * int * string option
       (** A partial application at (line, col, file) *)
+  | Stamp of int
+      (** A compiler-generated stamp (of a function slot or a code ID) *)
 
 (* CR sspies: Support for lazy expressions (they do not appear in the mangling
    path at all) and object methods (they appear as regular functions) is still
@@ -93,11 +101,10 @@ module Parse : sig
       [__Caml] variant). *)
   val starts_with_prefix : string -> bool
 
-  (** [parse sym] returns the structured path encoded by [sym] together with any
-      trailing suffix (e.g. [_<n>] ids appended by the compiler after the
-      mangled path). Returns [None] if [sym] is not a valid structured mangled
-      symbol. *)
-  val parse : string -> (string path * string) option
+  (** [parse sym] returns the structured path encoded by [sym]. Returns [None]
+      if [sym] is not a valid structured mangled symbol, in particular if it has
+      trailing characters after the last item. *)
+  val parse : string -> string path option
 
   (** [decode str pos] reverse {!encode}: decode a single length-prefixed
       identifier at [pos] in [str], returning the decoded string and the number
