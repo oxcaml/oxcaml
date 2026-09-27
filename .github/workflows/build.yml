@@ -443,6 +443,10 @@ jobs:
           OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
           USE_RUNTIME: ${{ matrix.use_runtime }}
 
+      - name: Check installed library metadata
+        if: matrix.name == 'default (x86_64-linux)'
+        run: make test-installed-metadata
+
       - name: Run minimizer
         if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true && steps.build.conclusion == 'success' && always()
         run: |

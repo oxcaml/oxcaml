@@ -143,6 +143,10 @@ ci-no-coverage: runtest runtest-upstream minimizer
 .PHONY: ci-coverage
 ci-coverage: boot-runtest coverage
 
+.PHONY: test-installed-metadata
+test-installed-metadata:
+	bash tools/ci/actions/check-installed-metadata.sh "$(prefix)"
+
 # CR mshinwell: build is broken
 # .PHONY: minimizer-upstream
 # minimizer-upstream:
