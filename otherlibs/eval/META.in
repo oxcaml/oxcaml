@@ -2,7 +2,7 @@
 
 version = "@VERSION@"
 description = "Runtime support for quotation evaluation"
-archive(byte) = "eval.cma"
+directory = "+"
+requires = "ocaml-jit"
 archive(native) = "eval.cmxa"
-plugin(byte) = "eval.cma"
 plugin(native) = "eval.cmxs"
