@@ -250,6 +250,7 @@ let
           '';
           meta.mainProgram = "ocamlmerlin";
           passthru = {
+            inherit (ocamlPackages) findlib;
             devBuildInputs = [
               ocamlPackages.alcotest
               ocamlPackages.csexp
@@ -270,8 +271,8 @@ let
     in
     packages;
 
-  # Only the passthru dev-input lists are used here, which don't depend on the
-  # testOcaml argument (it only feeds the merlin package's check phase).
+  # Only passthru dev inputs and findlib are used here; neither depends on
+  # testOcaml (which only feeds the merlin package's check phase).
   merlinDev = (mkMerlinPackages ocaml_5_4_0).merlin;
 
   ppxDeriversSrc =
@@ -618,6 +619,36 @@ let
       '';
     };
 
+  mkInstalledLibraryConsumerCheck =
+    oxcaml:
+    stdenv.mkDerivation {
+      pname = "oxcaml-installed-library-consumers-check";
+      inherit (oxcaml) version meta;
+      inherit src;
+
+      # The compiler under test must not precede bootstrap findlib on PATH.
+      nativeBuildInputs = [
+        ocaml_5_4_0
+        merlinDev.findlib
+        dune
+      ];
+
+      dontConfigure = true;
+      makeFlags = [
+        "SHELL=${stdenv.shell}"
+        "REQUIRES_CONFIGURATION="
+        "prefix=${oxcaml}"
+      ];
+      buildFlags = [ "test-installed-library-consumers" ];
+      OXCAML_EXPECT_SHIPPED_LIBRARIES = "1";
+
+      installPhase = ''
+        runHook preInstall
+        mkdir "$out"
+        runHook postInstall
+      '';
+    };
+
   gfortran =
     # we require fortran for some bigarray tests, but adding `pkgs.gfortran`
     # directly to `nativeBuildInputs` overrides many `$PATH` entries from
@@ -851,6 +882,7 @@ stdenv.mkDerivation {
       mkJsooLibs
       mkJsooTest
       mkJsooSmokeTest
+      mkInstalledLibraryConsumerCheck
       mkMerlinPackages
       ;
   };

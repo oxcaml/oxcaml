@@ -1,0 +1,4 @@
+ocaml/eval.cma # Eval requires native metaprogramming support.
+ocaml/ocaml-jit/jit.cma # JIT requires the native-only toplevel.
+ocaml/stdlib.cma # The bytecode compiler links stdlib implicitly.
+ocaml/stdlib.cmxa # The native compiler links stdlib implicitly.

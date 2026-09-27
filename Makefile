@@ -147,6 +147,10 @@ ci-coverage: boot-runtest coverage
 test-installed-metadata:
 	bash tools/ci/actions/check-installed-metadata.sh "$(prefix)"
 
+.PHONY: test-installed-library-consumers
+test-installed-library-consumers: test-installed-metadata
+	bash tools/ci/actions/check-installed-libraries.sh "$(prefix)"
+
 # CR mshinwell: build is broken
 # .PHONY: minimizer-upstream
 # minimizer-upstream:
