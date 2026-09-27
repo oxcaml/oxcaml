@@ -71,6 +71,7 @@ DISTCLEAN_FILES = \
   utils/config.common.ml \
   utils/config.generated.ml \
   compilerlibs/META \
+  external/ocaml-jit/lib/META \
   otherlibs/dynlink/dynlink_cmo_format.mli \
   otherlibs/dynlink/dynlink_cmxs_format.mli \
   otherlibs/dynlink/dynlink_config.ml \
