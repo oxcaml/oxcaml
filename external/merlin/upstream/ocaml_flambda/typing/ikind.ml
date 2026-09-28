@@ -1639,31 +1639,32 @@ let sub_jkind_l ?(allow_any_crossing = false) ?origin
       Jkind.sub_layout_or_error ~context env sub super |> map_jkind_error
     with
     | Error _ as error -> error
-    | Ok () ->
-    if allow_any_crossing
-    then (
-      (if !Clflags.ikinds_debug
-       then
-         let origin_suffix = origin_suffix_of origin in
-         Format.eprintf "[ikind-subjkind] call%s allow_any=true@." origin_suffix);
-      Ok ())
-    else
-      let subcheck_polys = compute_subcheck_polys ~context env sub super in
-      match
-        check_mode_crossing_polys ~origin ~sub_jkind:sub ~super_jkind:super
-          ~printing_env:env subcheck_polys
-      with
-      | Ok () -> Ok ()
-      | Error ikind_error -> (
-        if !Clflags.ikinds_debug
-        then Error ikind_error
-        else
-          match
-            Jkind.sub_jkind_l ~allow_any_crossing ~type_equal ~context env sub
-              super
-          with
-          | Ok () -> Error ikind_error
-          | Error jkind_error -> Error (Jkind_error jkind_error))
+    | Ok () -> (
+      if allow_any_crossing
+      then (
+        (if !Clflags.ikinds_debug
+         then
+           let origin_suffix = origin_suffix_of origin in
+           Format.eprintf "[ikind-subjkind] call%s allow_any=true@."
+             origin_suffix);
+        Ok ())
+      else
+        let subcheck_polys = compute_subcheck_polys ~context env sub super in
+        match
+          check_mode_crossing_polys ~origin ~sub_jkind:sub ~super_jkind:super
+            ~printing_env:env subcheck_polys
+        with
+        | Ok () -> Ok ()
+        | Error ikind_error -> (
+          if !Clflags.ikinds_debug
+          then Error ikind_error
+          else
+            match
+              Jkind.sub_jkind_l ~allow_any_crossing ~type_equal ~context env sub
+                super
+            with
+            | Ok () -> Error ikind_error
+            | Error jkind_error -> Error (Jkind_error jkind_error)))
 
 let check_bound ?(allow_any_crossing = false) ?origin ~decl_uid_under_check
     ~type_equal ~context env ~actual ~bound ~provenance_lhs =
@@ -1676,40 +1677,42 @@ let check_bound ?(allow_any_crossing = false) ?origin ~decl_uid_under_check
       Jkind.sub_layout_or_error ~context env actual bound |> map_jkind_error
     with
     | Error _ as error -> error
-    | Ok () ->
-    if allow_any_crossing
-    then Ok ()
-    else
-      let actual_polys = compute_subcheck_polys ~context env actual bound in
-      match
-        check_mode_crossing_polys ~origin ~sub_jkind:actual ~super_jkind:bound
-          ~printing_env:env actual_polys
-      with
-      | Ok () -> Ok ()
-      | Error actual_error ->
-        let fallback_error () =
-          match
-            Jkind.sub_jkind_l ~allow_any_crossing ~type_equal ~context env
-              actual bound
-          with
-          | Ok () ->
-            let violating_axes =
-              match actual_error with
-              | Mode_crossing_error { violating_axes; _ } -> violating_axes
-              | Jkind_error _ -> []
-            in
-            let axis_reasons = axis_disagreement_reasons violating_axes in
-            Some
-              (Jkind_error
-                 (Jkind.Violation.of_ ~context env
-                    (Jkind.Violation.Not_a_subjkind (actual, bound, axis_reasons))))
-          | Error jkind_error -> Some (Jkind_error jkind_error)
-        in
-        best_effort_provenance_error ~fallback_error ~origin ~sub_jkind:actual
-          ~super_jkind:bound ~printing_env:env actual_error (fun () ->
-            compute_provenance_bound_polys ~decl_uid_under_check env
-              ~lhs:provenance_lhs bound)
-        [@nontail]
+    | Ok () -> (
+      if allow_any_crossing
+      then Ok ()
+      else
+        let actual_polys = compute_subcheck_polys ~context env actual bound in
+        match
+          check_mode_crossing_polys ~origin ~sub_jkind:actual ~super_jkind:bound
+            ~printing_env:env actual_polys
+        with
+        | Ok () -> Ok ()
+        | Error actual_error ->
+          let fallback_error () =
+            match
+              Jkind.sub_jkind_l ~allow_any_crossing ~type_equal ~context env
+                actual bound
+            with
+            | Ok () ->
+              let violating_axes =
+                match actual_error with
+                | Mode_crossing_error { violating_axes; _ } -> violating_axes
+                | Jkind_error _ -> []
+              in
+              let axis_reasons = axis_disagreement_reasons violating_axes in
+              Some
+                (Jkind_error
+                   (Jkind.Violation.of_ ~context env
+                      (Jkind.Violation.Not_a_subjkind
+                         (actual, bound, axis_reasons))))
+            | Error jkind_error -> Some (Jkind_error jkind_error)
+          in
+          (best_effort_provenance_error ~fallback_error ~origin
+             ~sub_jkind:actual ~super_jkind:bound ~printing_env:env actual_error
+             (fun () ->
+               compute_provenance_bound_polys ~decl_uid_under_check env
+                 ~lhs:provenance_lhs bound)
+          [@nontail]))
 
 let check_type_expr_bound ?origin ~type_equal ~context env ~ty ~actual ~bound =
   check_bound ?origin ~decl_uid_under_check:None ~type_equal ~context env
@@ -1834,8 +1837,7 @@ let fast_sub : type r1 l2.
     fast_sub_of_any_super mod_bounds sub
   | _ -> false
 
-let sub_or_intersect ?origin ~type_equal
-    ~(context : Jkind.jkind_context) env
+let sub_or_intersect ?origin ~type_equal ~(context : Jkind.jkind_context) env
     (t1 : (Allowance.allowed * 'r1) Types.jkind)
     (t2 : ('l2 * Allowance.allowed) Types.jkind) : sub_or_intersect =
   let debug_polys ?polys ~outcome () =
@@ -1908,9 +1910,8 @@ let sub_or_intersect ?origin ~type_equal
     Jkind.Sub)
   else generic_sub_or_intersect () [@nontail]
 
-let sub_or_error ?origin:_origin ~type_equal
-    ~(context : Jkind.jkind_context) env
-    (t1 : (Allowance.allowed * 'r1) Types.jkind)
+let sub_or_error ?origin:_origin ~type_equal ~(context : Jkind.jkind_context)
+    env (t1 : (Allowance.allowed * 'r1) Types.jkind)
     (t2 : ('l2 * Allowance.allowed) Types.jkind) :
     (unit, Jkind.Violation.t) result =
   if not (enable_sub_or_error && !Clflags.ikinds)
