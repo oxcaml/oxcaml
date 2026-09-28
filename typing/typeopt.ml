@@ -1393,8 +1393,12 @@ let transl_module_representation repr =
        axes in [shape] will all be [max]. This should not matter, though, since
        it is not possible to reassign / directly mutate a [val] in a module. *)
     let shape =
-      transl_mixed_product_shape
-        (Array.map Types.mixed_block_element_of_const_sort sorts)
+      Array.map
+        (fun sort ->
+           transl_layout
+             (Jkind.Layout.Const.of_sort_const sort
+                Jkind_types.Scannable_axes.max))
+        sorts
     in
     Module_mixed
       ( shape,

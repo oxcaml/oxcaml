@@ -102,7 +102,10 @@ let transl_type_extension ~scopes env rootpath tyext body =
 let block_of_module_representation ~loc = function
   | Module_value_only _ -> Pmakeblock(0, Immutable, All_value, alloc_heap)
   | Module_mixed (shape, _) ->
-    Typeopt.assert_mixed_product_support_for_lambda_shape loc Module shape;
+    (* Shapes containing splices are checked after static evaluation *)
+    if not (Lambda.mixed_block_shape_has_splices shape)
+    then
+      Typeopt.assert_mixed_product_support_for_lambda_shape loc Module shape;
     Pmakeblock(0, Immutable, Shape shape, alloc_heap)
 
 (* Compile a coercion *)
