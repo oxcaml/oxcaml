@@ -2056,20 +2056,42 @@ let instance_label' copy_scope ~fixed lbl =
 let instance_label ~fixed lbl =
   For_copy.with_scope (fun copy_scope -> instance_label' copy_scope ~fixed lbl)
 
+<<<<<<< Merlin:typing-recovery-from-ocaml-541
 let instance_labels ~fixed ~representative lbls =
   (* Merlin-only: Merlin sometimes calls this function with an empty lbls (since lbl_all
      is empty for dummy labels). In the compiler, this function assumes the array is
      non-empty to get the result type. But in Merlin, we explicitly pass representative to
      avoid an index-out-of-bounds exception. *)
+||||||| Compiler:last-imported
+let instance_labels ~fixed lbls =
+=======
+let instance_labels ~fixed ?representative lbls =
+>>>>>>> Compiler:HEAD
   For_copy.with_scope (fun copy_scope ->
     let vars_and_ty_args =
       Array.map
         (fun lbl -> instance_label_type' copy_scope ~fixed lbl.lbl_arg)
         lbls
     in
+<<<<<<< Merlin:typing-recovery-from-ocaml-541
     let ty_res = copy copy_scope representative.lbl_res in
+||||||| Compiler:last-imported
+    let ty_res = copy copy_scope lbls.(0).lbl_res in
+=======
+    let lbl =
+      (* Typing recovery calls this function with an empty lbls
+          (since lbl_all is empty for dummy labels). In the compiler,
+          this function assumes the array is non-empty to get the
+          result type. But in Typing Recovery, we explicitly pass
+          representative to avoid an index-out-of-bounds exception. *)
+      match representative with
+      | None -> lbls.(0)
+      | Some l -> l
+    in
+    let ty_res = copy copy_scope lbl.lbl_res in
+>>>>>>> Compiler:HEAD
     (vars_and_ty_args, ty_res)
-  )
+    )
 
 let instance_label_declarations ~fixed lds ~params =
   For_copy.with_scope (fun copy_scope ->

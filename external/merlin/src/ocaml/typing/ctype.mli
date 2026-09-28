@@ -267,11 +267,24 @@ val instance_label:
         _ Data_types.gen_label_description -> type_expr list * type_expr * type_expr
         (* Same, for a label *)
 val instance_labels:
+<<<<<<< Merlin:typing-recovery-from-ocaml-541
         fixed:bool ->
         representative:_ Data_types.gen_label_description ->
         _ Data_types.gen_label_description array ->
         (type_expr list * type_expr) array * type_expr
         (* Same, for a whole list of labels *)
+||||||| Compiler:last-imported
+  fixed:bool ->
+  _ Data_types.gen_label_description array ->
+  (type_expr list * type_expr) array * type_expr
+(* Same, for a whole list of labels *)
+=======
+  fixed:bool ->
+  ?representative:'a Data_types.gen_label_description ->
+  'a Data_types.gen_label_description array ->
+  (type_expr list * type_expr) array * type_expr
+(* Same, for a whole list of labels *)
+>>>>>>> Compiler:HEAD
 val instance_label_declarations:
         fixed:bool ->
         label_declaration array ->
