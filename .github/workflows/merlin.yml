@@ -160,8 +160,10 @@ jobs:
       run: |
         export MERLIN_TEST_OCAML_PATH=$GITHUB_WORKSPACE/flambda-backend/_install
         # Do not inherit the parent's OxCaml-only boot workspace flags.
-        dune build --root .
-        DUNE_CACHE=disabled dune build --root . @check @runtest
+        # Release uses the checked-in parsers; dev regenerates their paths
+        # relative to this standalone root.
+        dune build --root . --profile release
+        DUNE_CACHE=disabled dune build --root . --profile release @check @runtest
         if ! git diff --quiet ; then
           echo "The following files were modified by dune:" >&2
           git diff --name-only >&2
