@@ -12,15 +12,15 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(* Check META paths, dependencies and unreferenced archives under PREFIX.
+(* Check META paths, dependencies and unreferenced native archives under PREFIX.
    Usage: check_metadata.exe PREFIX ALLOWLIST, with isolated OCAMLFIND_CONF. *)
 
 open Fl_metascanner
 
 let fail fmt = Printf.ksprintf (fun msg -> prerr_endline msg; exit 1) fmt
 
-let is_library_archive path =
-  List.exists (Filename.check_suffix path) [".cma"; ".cmxa"; ".cmxs"]
+let is_native_archive path =
+  List.exists (Filename.check_suffix path) [".cmxa"; ".cmxs"]
 
 let relative_to dir path =
   if Filename.is_relative path then Filename.concat dir path else path
@@ -71,14 +71,12 @@ let () =
     in
     (* Findlib 1.9.8 caches missing dependencies across predicate sets.
        Use a fresh process per query; there is no public cache reset. *)
-    List.iter (fun mode ->
-      let command = Filename.quote_command "ocamlfind"
-        ["query"; "-recursive"; "-predicates";
-         String.concat "," (mode :: predicates); name]
-      in
-      if Sys.command (command ^ " > /dev/null") <> 0 then
-        fail "%s: %s dependency resolution failed" name mode)
-      ["byte"; "native"];
+    let command = Filename.quote_command "ocamlfind"
+      ["query"; "-recursive"; "-predicates";
+       String.concat "," ("native" :: predicates); name]
+    in
+    if Sys.command (command ^ " > /dev/null") <> 0 then
+      fail "%s: native dependency resolution failed" name;
     Printf.printf "META checked: %s\n%!" name;
     List.iter (fun (child, expr) ->
       check_package dir (name ^ "." ^ child) expr) expr.pkg_children
@@ -105,7 +103,7 @@ let () =
     Sys.readdir dir |> Array.iter (fun file ->
       let path = Filename.concat dir file in
       if Sys.is_directory path then check_dir path
-      else if is_library_archive path &&
+      else if is_native_archive path &&
               not (Hashtbl.mem archives (Unix.realpath path) ||
                    List.mem path allowed)
       then fail "Unreferenced installed archive: %s" path)

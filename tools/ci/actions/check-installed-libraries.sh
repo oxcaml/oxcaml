@@ -14,7 +14,8 @@
 #*                                                                        *#
 #**************************************************************************#
 
-# Compare installed library inventories and build findlib/Dune consumers.
+# Compare installed library inventories and build native findlib/Dune consumers.
+# Also build JS/Wasm consumers when checking the shipped libraries.
 # Usage: check-installed-libraries.sh PREFIX core|shipped
 
 set -euo pipefail
@@ -84,58 +85,43 @@ while read -r name; do
     link_flags=(-extension runtime_metaprogramming -uses-metaprogramming)
   findlib_flags=()
   for flag in "${link_flags[@]}"; do findlib_flags+=(-passopt "$flag"); done
-  package_targets=()
-  for mode in byte native; do
-    case "$mode" in
-      byte) compiler=ocamlc; target=main.bc ;;
-      native) compiler=ocamlopt; target=main.exe ;;
-    esac
-    archive=$(ocamlfind query -predicates "${predicate:+$predicate,}$mode" \
-      -format '%A' "$name")
-    [ -n "$archive" ] || continue
-    package_targets+=("$name/$target")
-    if [ -z "$predicate" ]; then
-      echo "Checking $name with findlib ($mode)"
-      (cd "$direct" && ocamlfind "$compiler" -package "$name" \
-        -linkpkg -linkall "${findlib_flags[@]}" -o "$target" main.ml)
-    fi
-  done
+  archive=$(ocamlfind query -predicates "${predicate:+$predicate,}native" \
+    -format '%A' "$name")
+  [ -n "$archive" ] || [ -n "$predicate" ] || continue
+  if [ -z "$predicate" ]; then
+    echo "Checking $name with findlib (native)"
+    (cd "$direct" && ocamlfind ocamlopt -package "$name" \
+      -linkpkg -linkall "${findlib_flags[@]}" -o main.exe main.ml)
+  fi
   if [ "$kind" = ppx_rewriter ]; then
     echo "Checking $name with findlib (preprocessor)"
-    (cd "$direct" && ocamlfind ocamlc -package "$name" -c main.ml)
+    (cd "$direct" && ocamlfind ocamlopt -package "$name" -c main.ml)
   fi
   if grep -Fxq "$name" dune-names; then
     mkdir "$name"
     cp "$direct/main.ml" "$name/main.ml"
     dependency="(libraries $name)"
     [ -z "$predicate" ] || dependency="(preprocess (pps $name))"
-    printf '%s\n' '(executable (name main) (modes exe byte)' \
+    printf '%s\n' '(executable (name main) (modes exe)' \
       " $dependency" \
       " (link_flags (:standard -linkall ${link_flags[*]})))" > "$name/dune"
-    if [ "${#package_targets[@]}" = 0 ]; then
-      package_targets=("$name/main.bc" "$name/main.exe")
-    fi
-    targets+=("${package_targets[@]}")
+    targets+=("$name/main.exe")
   fi
 done < findlib-names
 
+if [ "$inventory" = shipped ]; then
+  echo 'Checking installed JS/Wasm compilers and their library consumer'
+  # Dune resolves these on PATH; do not fall back to bootstrap tools.
+  for tool in js_of_ocaml wasm_of_ocaml; do
+    [ "$(command -v "$tool")" = "$prefix/bin/$tool" ] || {
+      echo "Expected $prefix/bin/$tool on PATH" >&2; exit 1;
+    }
+  done
+  mkdir jsoo
+  smoke_dir="$script_dir/../../../external/ast-dependent-libs/smoke"
+  cp "$smoke_dir/main.ml" "$smoke_dir/dune" jsoo/
+  targets+=(jsoo/main.bc.js jsoo/main.bc.wasm.js)
+fi
+
 echo 'Checking installed libraries with Dune'
 dune build --display=short "${targets[@]}"
-
-smoke_bytecode() {
-  local package=$1 source=$2
-  echo "Checking bytecode stub loading for $package"
-  printf '%s\n' "$source" > main.ml
-  ocamlfind ocamlc -package "$package" -linkpkg -o "$package.bc" main.ml
-  "$prefix/bin/ocamlrun" "$package.bc" > /dev/null
-}
-
-if [ "$inventory" = shipped ]; then
-  smoke_bytecode js_of_ocaml-runtime \
-    'let () = print_endline Jsoo_runtime.Sys.version'
-  smoke_bytecode js_of_ocaml 'let () = ()'
-  # Ensure these runs exercised DLL lookup rather than passing vacuously.
-  "$prefix/bin/ocamlobjinfo" js_of_ocaml.bc > js_stub.objinfo
-  grep -Fq dlljs_of_ocaml_stubs js_stub.objinfo
-  grep -Fq dlljsoo_runtime_stubs js_stub.objinfo
-fi

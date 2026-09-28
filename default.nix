@@ -807,7 +807,6 @@ stdenv.mkDerivation {
     ''
     + lib.optionalString withJsoo ''
       make SHELL="$SHELL" jsoo-install-shipped OXCAML_INSTALL="$out" AST_DEPENDENT_LIBS_PREFIX="$out"
-      printf '%s\n' "$out/lib/stublibs" >> "$out/lib/ocaml/ld.conf"
       ${wrapWasmOfOcaml}
     ''
     # Get rid of unused artifacts
