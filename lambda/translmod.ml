@@ -205,7 +205,7 @@ and apply_coercion_result loc strict funct params args yielding cc_res =
                       ap_tailcall=Default_tailcall;
                       ap_inlined=forward_inlined_attribute ();
                       ap_specialised=Default_specialise;
-                      ap_probe=None;
+                      ap_probe=None; ap_section = None;
                     })))
 
 and wrap_id_pos_list loc id_pos_list get_field get_layout lam =
@@ -514,7 +514,7 @@ let eval_rec_bindings bindings cont =
              ap_tailcall=Default_tailcall;
              ap_inlined=Default_inlined;
              ap_specialised=Default_specialise;
-             ap_probe=None;
+             ap_probe=None; ap_section = None;
            },
            bind_inits rem)
   and bind_strict = function
@@ -547,7 +547,7 @@ let eval_rec_bindings bindings cont =
           ap_tailcall=Default_tailcall;
           ap_inlined=Default_inlined;
           ap_specialised=Default_specialise;
-          ap_probe=None;
+          ap_probe=None; ap_section = None;
         },
         patch_forwards rem)
   in
@@ -743,7 +743,7 @@ and transl_apply ~scopes ~loc ~cc mod_env funct ~yielding ~staticity
       ap_tailcall=Default_tailcall;
       ap_inlined=inlined_attribute;
       ap_specialised=Default_specialise;
-      ap_probe=None; }
+      ap_probe=None; ap_section = None; }
   in
   let apply =
     match staticity with
@@ -1078,7 +1078,7 @@ and transl_include_functor ~generative ~input_repr ~yielding modl params scopes
     ap_tailcall = Default_tailcall;
     ap_inlined = inlined_attribute;
     ap_specialised = Default_specialise;
-    ap_probe = None;}
+    ap_probe = None; ap_section = None;}
 
 (* Update forward declaration in Translcore *)
 let _ =
@@ -1297,7 +1297,7 @@ let toploop_getvalue id =
     ap_tailcall=Default_tailcall;
     ap_inlined=Default_inlined;
     ap_specialised=Default_specialise;
-    ap_probe=None;
+    ap_probe=None; ap_section = None;
   }
 
 let toploop_setvalue id lam =
@@ -1322,7 +1322,7 @@ let toploop_setvalue id lam =
     ap_tailcall=Default_tailcall;
     ap_inlined=Default_inlined;
     ap_specialised=Default_specialise;
-    ap_probe=None;
+    ap_probe=None; ap_section = None;
   }
 
 let toploop_setvalue_id id = toploop_setvalue id (Lvar id)
@@ -1551,7 +1551,7 @@ let transl_instance_impl
       (* Instantiation of a parameterized module cannot perform effects *)
       ap_yielding = Unyielding;
       ap_region_close = Rc_normal;
-      ap_probe = None;
+      ap_probe = None; ap_section = None;
     }
   in
   let required_globals =
@@ -1772,7 +1772,7 @@ and bind_local_instance ~(gm : Global_module.t) ~chain
         ap_mode = not_alloc_stack;
         ap_region_close = Rc_normal;
         ap_yielding = Unyielding;
-        ap_probe = None
+        ap_probe = None; ap_section = None
       }
   in
   let rev_bindings = (new_id, rhs) :: rev_bindings in

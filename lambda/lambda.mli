@@ -1183,6 +1183,8 @@ and lambda_apply =
     ap_inlined : inlined_attribute; (* [@inlined] attribute in code *)
     ap_specialised : specialise_attribute;
     ap_probe : probe;
+    ap_section : section_kind option;
+    (* [Some k]: verified full direct call to a function safe in [k] sections *)
   }
 
 and lambda_switch =

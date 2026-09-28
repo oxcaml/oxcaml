@@ -8982,12 +8982,16 @@ and type_expect_
           raise (Error (loc, env, Invalid_atomic_loc_payload))
       end
   (* GC-safe sections (step 1: transparent recognition; verification and
-     native codegen come later). [%critical e] / [%blocking e] currently type
-     [e] at the ambient type/mode and evaluate to it, matching the documented
-     non-native "plain expression" behavior. *)
+     native codegen come later). [%critical e] / [%blocking e] type [e] at
+     the ambient type and evaluate to it, but in nontail position: the body
+     is wrapped in a primitive at lambda ([Psection]), where region-closing
+     tail applies would be ill-formed (as in [mode_trywith]). *)
   | Pexp_extension ({ txt = ("critical" | "ocaml.critical"); _ },
                     PStr [{ pstr_desc = Pstr_eval (e, _); _ }]) ->
-      let exp = type_expect env expected_mode e ty_expected_explained in
+      let exp =
+        type_expect env { expected_mode with position = RNontail } e
+          ty_expected_explained
+      in
       { exp with
         exp_attributes =
           { Parsetree.attr_name = Location.mkloc "ocaml.critical" loc;
@@ -8996,7 +9000,10 @@ and type_expect_
           :: exp.exp_attributes }
   | Pexp_extension ({ txt = ("blocking" | "ocaml.blocking"); _ },
                     PStr [{ pstr_desc = Pstr_eval (e, _); _ }]) ->
-      let exp = type_expect env expected_mode e ty_expected_explained in
+      let exp =
+        type_expect env { expected_mode with position = RNontail } e
+          ty_expected_explained
+      in
       { exp with
         exp_attributes =
           { Parsetree.attr_name = Location.mkloc "ocaml.blocking" loc;
@@ -12001,6 +12008,52 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
          we type-checked expressions before patterns, then we could call
          [add_module_variables] here.
       *)
+      (* GC-safe sections: copy [@@critical]/[@@blocking] attributes from a
+         binding to its variable's value description ([val_attributes]),
+         where call sites and [Includecore] look for them. *)
+      let pvs =
+        let is_section_attribute (a : Parsetree.attribute) =
+          match a.attr_name.txt with
+          | "critical" | "ocaml.critical" | "blocking" | "ocaml.blocking" ->
+            true
+          | _ -> false
+        in
+        let annotated =
+          List.filter_map
+            (fun ((_, pat), (pvb : Parsetree.value_binding)) ->
+              match
+                pat.pat_desc,
+                List.filter is_section_attribute pvb.pvb_attributes
+              with
+              | Tpat_var { id; _ }, (_ :: _ as attrs) ->
+                (* Mark used and validate payloads during typing. *)
+                ignore
+                  (Builtin_attributes.section_safety ~name:"critical"
+                     pvb.pvb_attributes
+                   : Builtin_attributes.section_safety);
+                ignore
+                  (Builtin_attributes.section_safety ~name:"blocking"
+                     pvb.pvb_attributes
+                   : Builtin_attributes.section_safety);
+                Some (id, attrs)
+              | _, _ -> None)
+            (List.combine pat_list spat_sexp_list)
+        in
+        match annotated with
+        | [] -> pvs
+        | _ :: _ ->
+          List.map
+            (fun pv ->
+              match
+                List.find_opt
+                  (fun (id, _) -> Ident.same id pv.pv_id)
+                  annotated
+              with
+              | None -> pv
+              | Some (_, attrs) ->
+                { pv with pv_attributes = pv.pv_attributes @ attrs })
+            pvs
+      in
       let new_env = add_pattern_variables new_env pvs in
       let mode_pat_typ_list =
         List.map

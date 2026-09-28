@@ -701,7 +701,7 @@ let rec split_static_function lfun block_var local_idents lam :
         ap_region_close = Rc_normal;
         ap_mode = lfun.ret_mode;
         ap_yielding = lfun.yielding;
-        ap_probe = None;
+        ap_probe = None; ap_section = None;
       }
     in
     let wrapper =
@@ -1031,7 +1031,7 @@ let compile_indirect newval =
     (* [indirect] just allocates a forwarding block; it never runs user code,
        so it can't yield *)
     ap_yielding = Unyielding;
-    ap_probe = None;
+    ap_probe = None; ap_section = None;
   }
 
 let compile_alloc size =

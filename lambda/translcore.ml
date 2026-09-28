@@ -31,6 +31,7 @@ type error =
     Free_super_var
   | Unreachable_reached
   | Unsafe_in_section of Lambda.section_kind * string
+  | Misplaced_section_attribute of string
   | Bad_probe_layout of Ident.t
   | Unknown_probe_layout of Ident.t
   | Illegal_void_record_field
@@ -435,6 +436,38 @@ let zero_alloc_of_application
     end
   | None, _ -> Zero_alloc_utils.Assume_info.none
 
+(* GC-safe sections: arrows in a function's declared type, deciding whether
+   an application of a [@@critical safe] function is full. *)
+let rec count_type_arity env ty =
+  match get_desc (Ctype.expand_head env ty) with
+  | Tarrow (_, _, ty2, _) -> 1 + count_type_arity env ty2
+  | Tpoly (ty, _) -> count_type_arity env ty
+  | _ -> 0
+
+(* GC-safe sections: a direct, fully-applied call to a function annotated
+   [@@critical safe] is allowed inside [%critical] sections. *)
+let section_of_application funct (oargs : (_ * Typedtree.apply_arg) list) =
+  match funct.exp_desc with
+  | Texp_ident { desc = { val_attributes; val_type; _ }; _ } ->
+    (match
+       Builtin_attributes.section_safety ~warn:false ~name:"critical"
+         val_attributes
+     with
+     | Section_safe ->
+       let arity = count_type_arity funct.exp_env val_type in
+       if arity > 0
+          && List.compare_length_with oargs arity = 0
+          && List.for_all
+               (fun (_, arg) ->
+                 match (arg : Typedtree.apply_arg) with
+                 | Arg _ -> true
+                 | Omitted _ -> false)
+               oargs
+       then Some Lambda.Critical
+       else None
+     | Section_unsafe | Section_only -> None)
+  | _ -> None
+
 (* GC-safe sections: statically verify a section body, already translated to
    lambda. First increment: structural checks only. The [@@critical] /
    [@@blocking] call-attribute discipline is not implemented yet, so all
@@ -453,7 +486,13 @@ let check_section_body kind section_loc body =
     | Lvar _ | Lmutvar _ | Lconst _ -> ()
     | Lfunction _ -> violation loc "function definition"
     | Lletrec _ -> violation loc "recursive definition"
-    | Lapply _ | Lsend _ | Linstantiate _ -> violation loc "function call"
+    | Lapply ap ->
+      (match ap.ap_section, (kind : Lambda.section_kind) with
+       | Some Critical, Critical | Some Blocking, Blocking ->
+         iter_head_constructor (check loc) lam
+       | (Some (Critical | Blocking) | None), _ ->
+         violation loc "function call")
+    | Lsend _ | Linstantiate _ -> violation loc "function call"
     | Ltrywith _ -> violation loc "exception handler"
     | Lstringswitch _ -> violation loc "string match"
     | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _ ->
@@ -507,6 +546,47 @@ let section_kinds_of_attributes (attrs : Parsetree.attributes) =
       | "blocking" | "ocaml.blocking" -> Some Blocking
       | _ -> None)
     attrs
+
+(* GC-safe sections: [@@critical safe] on a let binding asserts the bound
+   function is callable from [%critical] sections; verify its body. Other
+   section attributes are not supported on OCaml bindings. *)
+let check_section_binding pat expr attrs lam =
+  let get name = Builtin_attributes.section_safety ~warn:false ~name attrs in
+  let err msg = raise (Error (pat.pat_loc, Misplaced_section_attribute msg)) in
+  (match get "blocking" with
+   | Section_unsafe -> ()
+   | Section_safe | Section_only ->
+     err "[@@blocking] is only supported on external declarations");
+  match get "critical" with
+  | Section_unsafe -> ()
+  | Section_only ->
+    err "[@@critical] sections-only functions are not yet supported"
+  | Section_safe ->
+    let syntactic_arity =
+      match expr.exp_desc with
+      | Texp_function { params; body; _ } ->
+        List.length params
+        + (match body with
+           | Tfunction_cases _ -> 1
+           | Tfunction_body _ -> 0)
+      | _ -> 0
+    in
+    if syntactic_arity = 0
+    then err "[@@critical safe] must be applied to a syntactic function";
+    if count_type_arity expr.exp_env pat.pat_type <> syntactic_arity
+    then
+      err "a [@@critical safe] function must take all of its arguments \
+           syntactically";
+    let rec function_body lam =
+      match lam with
+      | Levent (lam, _) -> function_body lam
+      | Lfunction f -> Some f.body
+      | _ -> None
+    in
+    match function_body lam with
+    | Some body -> check_section_body Critical pat.pat_loc body
+    | None ->
+      err "[@@critical safe] must be applied to a syntactic function"
 
 let rec transl_exp ~scopes layout e =
   transl_exp1 ~scopes ~in_new_scope:false layout e
@@ -644,6 +724,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       event_after ~scopes e
         (transl_apply ~scopes ~tailcall ~inlined ~specialised
            ~assume_zero_alloc
+           ~section:(section_of_application funct oargs)
            ~result_layout:layout
            ~position ~mode ~yielding
            (transl_exp ~scopes Lambda.layout_function funct)
@@ -1336,7 +1417,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                        calling an ancestor method cannot yield *)
                     ap_yielding = Unyielding;
                     ap_region_close = pos;
-                    ap_probe = None;
+                    ap_probe = None; ap_section = None;
                     ap_tailcall = Default_tailcall;
                     ap_inlined = Default_inlined;
                     ap_specialised = Default_specialise}
@@ -1360,7 +1441,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         ap_tailcall=Default_tailcall;
         ap_inlined=Default_inlined;
         ap_specialised=Default_specialise;
-        ap_probe=None;
+        ap_probe=None; ap_section = None;
       }
   | Texp_instvar(path_self, path, _) ->
       let loc = of_location ~scopes e.exp_loc in
@@ -1396,7 +1477,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
              ap_tailcall=Default_tailcall;
              ap_inlined=Default_inlined;
              ap_specialised=Default_specialise;
-             ap_probe=None;
+             ap_probe=None; ap_section = None;
            },
            List.fold_right
              (fun (id, _, expr) rem ->
@@ -1652,6 +1733,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
           ap_inlined = Never_inlined;
           ap_specialised = Always_specialise;
           ap_probe;
+          ap_section = None;
         }
       in
       let lam =
@@ -1782,6 +1864,7 @@ and transl_apply ~scopes
       ?(position=Rc_normal)
       ?(mode=not_alloc_stack)
       ?(yielding=May_yield)
+      ?(section=None)
       ~result_layout
       lam sargs loc
   =
@@ -1819,6 +1902,8 @@ and transl_apply ~scopes
           {ap with ap_args = ap.ap_args @ args; ap_loc = loc;
                    ap_region_close = pos;
                    ap_mode = mode;
+                   (* Merging over-applies through a returned closure. *)
+                   ap_section = None;
                    ap_yielding = join_yielding_kind ap.ap_yielding yielding;
 
                    ap_result_layout = result_layout }
@@ -1846,6 +1931,7 @@ and transl_apply ~scopes
           ap_inlined=inlined;
           ap_specialised=specialised;
           ap_probe=None;
+          ap_section=section;
         }
   in
   (* Build a function application.
@@ -2549,6 +2635,7 @@ and transl_bound_exp ~scopes ~in_structure pat layout expr loc attrs =
       transl_scoped_exp ~scopes layout expr
     | _ -> transl_exp ~scopes layout expr
   in
+  check_section_binding pat expr attrs lam;
   Translattribute.add_function_attributes lam loc attrs
 
 (*
@@ -3331,7 +3418,7 @@ and transl_letop ~scopes loc env let_ ands param param_debug_uid param_sort case
                ap_tailcall = Default_tailcall;
                ap_inlined = Default_inlined;
                ap_specialised = Default_specialise;
-               ap_probe=None;
+               ap_probe=None; ap_section = None;
              })
         in
         bind_with_layout Strict (left_id, left_id_duid, prev_layout) prev_lam
@@ -3395,7 +3482,7 @@ and transl_letop ~scopes loc env let_ ands param param_debug_uid param_sort case
     ap_tailcall = Default_tailcall;
     ap_inlined = Default_inlined;
     ap_specialised = Default_specialise;
-    ap_probe=None;
+    ap_probe=None; ap_section = None;
   }
 
 (* Wrapper for class/module compilation,
@@ -3436,6 +3523,8 @@ let report_error_doc ppf = function
       in
       fprintf ppf
         "This %s is not allowed inside a [%%%s] section." what kind_s
+  | Misplaced_section_attribute msg ->
+      fprintf ppf "%s." msg
   | Unreachable_reached ->
       fprintf ppf "Unreachable expression was reached"
   | Bad_probe_layout id ->

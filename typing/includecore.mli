@@ -38,6 +38,7 @@ type value_mismatch =
   | Not_a_primitive
   | Type of Errortrace.moregen_error
   | Zero_alloc of Zero_alloc.error
+  | Section_attribute
   | Modality of Mode.Modality.error
   | Mode of Mode.With_regionality.error
 

@@ -2522,7 +2522,7 @@ let lambda_of_prim prim_name prim ~yielding loc args arg_exps =
         ap_tailcall = Default_tailcall;
         ap_inlined = Default_inlined;
         ap_specialised = Default_specialise;
-        ap_probe = None;
+        ap_probe = None; ap_section = None;
         ap_region_close = pos;
         ap_mode = not_alloc_stack;
         (* [yielding] is the joined yielding mode of the application of the

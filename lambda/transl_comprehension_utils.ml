@@ -81,6 +81,7 @@ module Lambda_utils = struct
         ap_inlined = inlined;
         ap_specialised = specialised;
         ap_probe = probe;
+        ap_section = None;
         ap_result_layout = result_layout
       }
 

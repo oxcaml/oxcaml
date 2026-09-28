@@ -44,6 +44,7 @@ type value_mismatch =
   | Not_a_primitive
   | Type of Errortrace.moregen_error
   | Zero_alloc of Zero_alloc.error
+  | Section_attribute
   | Modality of Mode.Modality.error
   | Mode of Mode.With_regionality.error
 
@@ -236,6 +237,22 @@ let value_descriptions_zero_alloc
   | Ok () -> prim_coercion_zero_alloc_check
   | Error e -> raise (Dont_match (Zero_alloc e))
 
+(* GC-safe sections: the interface may drop a [@@critical]/[@@blocking]
+   annotation, but may not claim one the implementation lacks. *)
+let value_descriptions_section
+    (vd1 : Types.value_description) (vd2 : Types.value_description) =
+  List.iter
+    (fun name ->
+      let safety (vd : Types.value_description) =
+        Builtin_attributes.section_safety ~warn:false ~name vd.val_attributes
+      in
+      match safety vd2 with
+      | Section_unsafe -> ()
+      | (Section_safe | Section_only) as claimed ->
+        if not (Primitive.equal_section_safety (safety vd1) claimed)
+        then raise (Dont_match Section_attribute))
+    ["critical"; "blocking"]
+
 let rec compilation_unit_of_uid = function
   | Uid.Compilation_unit comp_unit
   | Uid.Item { comp_unit; _ } ->
@@ -262,6 +279,7 @@ let value_descriptions_without_modes ~loc env name ~self_check
     vd1.val_attributes vd2.val_attributes
     name;
   let prim_coercion_zero_alloc_check = value_descriptions_zero_alloc vd1 vd2 in
+  value_descriptions_section vd1 vd2;
   let val_lpoly1 = Lpoly.get_exn vd1.val_lpoly in
   let val_lpoly2 = Lpoly.get_exn vd2.val_lpoly in
   match vd1.val_kind with
@@ -595,6 +613,10 @@ let report_value_mismatch ~pp first second env ppf err =
         (msg "The type")
         (msg "is not compatible with the type")
   | Zero_alloc e -> Zero_alloc.print_error ppf e
+  | Section_attribute ->
+      pr "The two declarations have different %a or %a annotations"
+        Style.inline_code "[@@critical]"
+        Style.inline_code "[@@blocking]"
   | Modality e -> report_modality_sub_error first second ppf e
   | Mode e ->
       let got = first ^ " is" in

@@ -549,7 +549,8 @@ and eval_lam_shallow ctx env lam =
         ap_tailcall;
         ap_inlined;
         ap_specialised;
-        ap_probe
+        ap_probe;
+        ap_section
       } ->
     let new_result_layout = eval_layout env old_result_layout in
     if new_result_layout == old_result_layout
@@ -566,7 +567,8 @@ and eval_lam_shallow ctx env lam =
           ap_tailcall;
           ap_inlined;
           ap_specialised;
-          ap_probe
+          ap_probe;
+          ap_section
         }
   | Lfunction old_lfunction ->
     let new_lfunction = eval_lfunction_shallow env old_lfunction in

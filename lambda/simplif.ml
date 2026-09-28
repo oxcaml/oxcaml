@@ -928,7 +928,7 @@ let split_default_wrapper ~id:fun_id ~debug_uid:fun_duid ~kind ~params ~return
             ap_tailcall = Default_tailcall;
             ap_inlined = forward_inlined_attribute ();
             ap_specialised = Default_specialise;
-            ap_probe=None;
+            ap_probe=None; ap_section = None;
           }
         in
         let inner_params = List.map map_param params in

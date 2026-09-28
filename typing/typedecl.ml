@@ -4838,6 +4838,16 @@ let transl_value_decl env loc ~modal ~why valdecl =
         | Assume _ ->
           raise (Error(valdecl.pval_loc, Zero_alloc_attr_unsupported zero_alloc))
       in
+      (* GC-safe sections: mark [@@critical]/[@@blocking] used; they are
+         read from [val_attributes] at call sites and in [Includecore]. *)
+      ignore
+        (Builtin_attributes.section_safety ~name:"critical"
+           valdecl.pval_attributes
+         : Builtin_attributes.section_safety);
+      ignore
+        (Builtin_attributes.section_safety ~name:"blocking"
+           valdecl.pval_attributes
+         : Builtin_attributes.section_safety);
       { val_type = ty;
         val_kind = Val_reg sort;
         val_lpoly = Lpoly.determined lpoly;

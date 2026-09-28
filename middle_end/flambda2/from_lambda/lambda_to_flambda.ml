@@ -510,7 +510,8 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
         ap_tailcall = _;
         ap_inlined;
         ap_specialised = _;
-        ap_probe
+        ap_probe;
+        ap_section = _
       } ->
     (* Note that we don't need kind information about [ap_args] since we already
        have it on the corresponding [Simple]s in the environment. *)

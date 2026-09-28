@@ -361,6 +361,7 @@ let apply modname field loc args =
        { ap_func = Lazy.force comb;
          ap_args = args;
          ap_probe = None;
+         ap_section = None;
          (* These combinators build quotation AST; they never run the quoted
             code, so they can't yield *)
          ap_yielding = Unyielding;

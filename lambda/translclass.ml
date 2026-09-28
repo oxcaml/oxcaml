@@ -257,7 +257,7 @@ let mkappl (func, args, layout) =
          ap_tailcall=Default_tailcall;
          ap_inlined=Default_inlined;
          ap_specialised=Default_specialise;
-         ap_probe=None;
+         ap_probe=None; ap_section = None;
        }],
      Loc_unknown)
 
@@ -906,7 +906,7 @@ let transl_class_rebind ~scopes cl vf =
         ap_tailcall=Default_tailcall;
         ap_inlined=Default_inlined;
         ap_specialised=Default_specialise;
-        ap_probe=None;
+        ap_probe=None; ap_section = None;
       }
     in
     let _, path_lam, obj_init' =

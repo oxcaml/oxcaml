@@ -300,7 +300,8 @@ type section_safety =
 
 (* [section_safety ~name attrs] parses the section attribute [name]
    ("critical" or "blocking") in [attrs]. *)
-val section_safety : name:string -> Parsetree.attributes -> section_safety
+val section_safety :
+  ?warn:bool -> name:string -> Parsetree.attributes -> section_safety
 
 (* Support for zero_alloc *)
 type zero_alloc_check =

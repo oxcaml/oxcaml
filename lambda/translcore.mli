@@ -49,6 +49,7 @@ type error =
     Free_super_var
   | Unreachable_reached
   | Unsafe_in_section of Lambda.section_kind * string
+  | Misplaced_section_attribute of string
   | Bad_probe_layout of Ident.t
   | Unknown_probe_layout of Ident.t
   | Illegal_void_record_field

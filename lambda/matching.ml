@@ -2363,7 +2363,7 @@ let call_force_lazy_block ?(inlined = Default_inlined) varg loc ~pos =
       ap_yielding = Unyielding;
       ap_inlined = inlined;
       ap_specialised = Default_specialise;
-      ap_probe = None;
+      ap_probe = None; ap_section = None;
     }
 
 let lazy_forward_field = Lambda.Pfield (0, Pointer, Reads_vary)
@@ -2452,7 +2452,7 @@ let inline_lazy_force arg pos loc =
         ap_yielding = Unyielding;
         ap_inlined = Never_inlined;
         ap_specialised = Default_specialise;
-        ap_probe=None;
+        ap_probe=None; ap_section = None;
       }
   else if !Clflags.native_code && not (Clflags.is_flambda2 ()) then
     (* CR vlaviron: Find a way for Flambda 2 to avoid both the call to

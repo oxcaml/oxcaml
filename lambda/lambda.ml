@@ -1372,6 +1372,7 @@ and lambda_apply =
     ap_inlined : inlined_attribute;
     ap_specialised : specialise_attribute;
     ap_probe : probe;
+    ap_section : section_kind option;
   }
 
 and lambda_switch =
@@ -2552,7 +2553,7 @@ let shallow_map ~tail ~non_tail:f lam =
   | Lsplice _ -> lam
   | Lapply { ap_func = old_func; ap_args = old_args; ap_result_layout;
              ap_region_close; ap_mode; ap_yielding; ap_loc; ap_tailcall;
-             ap_inlined; ap_specialised; ap_probe } ->
+             ap_inlined; ap_specialised; ap_probe; ap_section } ->
       let new_func = f old_func in
       let new_args = Misc.Stdlib.List.map_sharing f old_args in
       if old_func == new_func && old_args == new_args
@@ -2570,6 +2571,7 @@ let shallow_map ~tail ~non_tail:f lam =
           ap_inlined;
           ap_specialised;
           ap_probe;
+          ap_section;
         }
   | Lkindinstantiate { kinst_func = old_func; kinst_args; kinst_result_layout;
                        kinst_mode; kinst_loc } ->
@@ -2586,7 +2588,7 @@ let shallow_map ~tail ~non_tail:f lam =
         }
   | Linstantiate { ap_func = old_func; ap_args = old_args; ap_result_layout;
                    ap_region_close; ap_mode; ap_yielding; ap_loc; ap_tailcall;
-                   ap_inlined; ap_specialised; ap_probe } ->
+                   ap_inlined; ap_specialised; ap_probe; ap_section } ->
       let new_func = f old_func in
       let new_args = Misc.Stdlib.List.map_sharing f old_args in
       if old_func == new_func && old_args == new_args
@@ -2604,6 +2606,7 @@ let shallow_map ~tail ~non_tail:f lam =
           ap_inlined;
           ap_specialised;
           ap_probe;
+          ap_section;
         }
   | Lfunction old_lfun ->
       let new_lfun = map_lfunction f old_lfun in

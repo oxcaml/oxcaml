@@ -953,17 +953,28 @@ type section_safety =
   | Section_safe
   | Section_only
 
-let section_safety ~name attrs =
+let section_safety ?(warn = true) ~name attrs =
   match select_attribute [name, Return] attrs with
   | None -> Section_unsafe
   | Some attr ->
-    match
-      parse_optional_id_payload name attr.attr_loc ~empty:Section_only
-        ["safe", Section_safe; "unsafe", Section_unsafe; "only", Section_only]
-        attr.attr_payload
-    with
-    | Ok safety -> safety
-    | Error () -> Section_unsafe
+    let cases =
+      ["safe", Section_safe; "unsafe", Section_unsafe; "only", Section_only]
+    in
+    if warn then
+      match
+        parse_optional_id_payload name attr.attr_loc ~empty:Section_only cases
+          attr.attr_payload
+      with
+      | Ok safety -> safety
+      | Error () -> Section_unsafe
+    else
+      match get_optional_payload get_id_from_exp attr.attr_payload with
+      | Ok None -> Section_only
+      | Ok (Some id) ->
+        (match List.assoc_opt id cases with
+         | Some safety -> safety
+         | None -> Section_unsafe)
+      | Error () -> Section_unsafe
 
 (* Looks for `custom_error_message msg` in payload.
    If present, this returns `msg` and an updated payload

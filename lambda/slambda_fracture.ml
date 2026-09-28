@@ -501,7 +501,8 @@ let rec fracture_lam lambda : slambda =
                         ap_tailcall = Default_tailcall;
                         ap_inlined = Default_inlined;
                         ap_specialised = Default_specialise;
-                        ap_probe = None
+                        ap_probe = None;
+                        ap_section = None
                       }
                 }
           })
