@@ -40,28 +40,33 @@ val one : int
 val minus_one : int
 (** [minus_one] is the integer [-1]. *)
 
-external neg : (int[@local_opt]) -> int = "%negint"
+external neg : (int[@local_opt]) -> int @@ stateless = "%negint"
 (** [neg x] is [~-x]. *)
 
-external add : (int[@local_opt]) -> (int[@local_opt]) -> int = "%addint"
+external add : (int[@local_opt]) -> (int[@local_opt]) -> int @@ stateless
+  = "%addint"
 (** [add x y] is the addition [x + y]. *)
 
-external sub : (int[@local_opt]) -> (int[@local_opt]) -> int = "%subint"
+external sub : (int[@local_opt]) -> (int[@local_opt]) -> int @@ stateless
+  = "%subint"
 (** [sub x y] is the subtraction [x - y]. *)
 
-external mul : (int[@local_opt]) -> (int[@local_opt]) -> int = "%mulint"
+external mul : (int[@local_opt]) -> (int[@local_opt]) -> int @@ stateless
+  = "%mulint"
 (** [mul x y] is the multiplication [x * y]. *)
 
-external div : (int[@local_opt]) -> (int[@local_opt]) -> int = "%divint"
+external div : (int[@local_opt]) -> (int[@local_opt]) -> int @@ stateless
+  = "%divint"
 (** [div x y] is the division [x / y]. See {!Stdlib.( / )} for details. *)
 
-external rem : (int[@local_opt]) -> (int[@local_opt]) -> int = "%modint"
+external rem : (int[@local_opt]) -> (int[@local_opt]) -> int @@ stateless
+  = "%modint"
 (** [rem x y] is the remainder [x mod y]. See {!Stdlib.( mod )} for details. *)
 
-external succ : (int[@local_opt]) -> int = "%succint"
+external succ : (int[@local_opt]) -> int @@ stateless = "%succint"
 (** [succ x] is [add x 1]. *)
 
-external pred : (int[@local_opt]) -> int = "%predint"
+external pred : (int[@local_opt]) -> int @@ stateless = "%predint"
 (** [pred x] is [sub x 1]. *)
 
 val abs : int -> int
@@ -77,29 +82,35 @@ val min_int : int
 (** [min_int] is the smallest representable integer,
     [-2]{^[Sys.int_size - 1]}. *)
 
-external logand : (int[@local_opt]) -> (int[@local_opt]) -> int = "%andint"
+external logand : (int[@local_opt]) -> (int[@local_opt]) -> int @@ stateless
+  = "%andint"
 (** [logand x y] is the bitwise logical and of [x] and [y]. *)
 
-external logor : (int[@local_opt]) -> (int[@local_opt]) -> int = "%orint"
+external logor : (int[@local_opt]) -> (int[@local_opt]) -> int @@ stateless
+  = "%orint"
 (** [logor x y] is the bitwise logical or of [x] and [y]. *)
 
-external logxor : (int[@local_opt]) -> (int[@local_opt]) -> int = "%xorint"
+external logxor : (int[@local_opt]) -> (int[@local_opt]) -> int @@ stateless
+  = "%xorint"
 (** [logxor x y] is the bitwise logical exclusive or of [x] and [y]. *)
 
 val lognot : int -> int
 (** [lognot x] is the bitwise logical negation of [x]. *)
 
-external shift_left : (int[@local_opt]) -> (int[@local_opt]) -> int = "%lslint"
+external shift_left : (int[@local_opt]) -> (int[@local_opt]) -> int @@ stateless
+  = "%lslint"
 (** [shift_left x n] shifts [x] to the left by [n] bits. The result
     is unspecified if [n < 0] or [n > ]{!Sys.int_size}. *)
 
-external shift_right : (int[@local_opt]) -> (int[@local_opt]) -> int = "%asrint"
+external shift_right : (int[@local_opt]) -> (int[@local_opt]) -> int
+  @@ stateless = "%asrint"
 (** [shift_right x n] shifts [x] to the right by [n] bits. This is an
     arithmetic shift: the sign bit of [x] is replicated and inserted
     in the vacated bits. The result is unspecified if [n < 0] or
     [n > ]{!Sys.int_size}. *)
 
-external shift_right_logical : (int[@local_opt]) -> (int[@local_opt]) -> int = "%lsrint"
+external shift_right_logical : (int[@local_opt]) -> (int[@local_opt]) -> int
+  @@ stateless = "%lsrint"
 (** [shift_right x n] shifts [x] to the right by [n] bits. This is a
     logical shift: zeroes are inserted in the vacated bits regardless
     of the sign of [x]. The result is unspecified if [n < 0] or
@@ -125,10 +136,11 @@ val max : int -> int -> int
 
 (** {1:convert Converting} *)
 
-external to_float : (int[@local_opt]) -> (float[@local_opt]) = "%floatofint"
+external to_float : (int[@local_opt]) -> (float[@local_opt]) @@ stateless
+  = "%floatofint"
 (** [to_float x] is [x] as a floating point number. *)
 
-external of_float : (float[@local_opt]) -> int = "%intoffloat"
+external of_float : (float[@local_opt]) -> int @@ stateless = "%intoffloat"
 (** [of_float x] truncates [x] to an integer. The result is
     unspecified if the argument is [nan] or falls outside the range of
     representable integers. *)
