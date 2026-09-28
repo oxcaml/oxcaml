@@ -1,3 +1,13 @@
+# Libraries bundled by Nix, listed by both Dune and findlib.
+compiler-libs
+compiler-libs.bytecomp
+compiler-libs.common
+compiler-libs.frontend
+compiler-libs.native-toplevel
+compiler-libs.optcomp
+compiler-libs.toplevel
+dynlink
+eval
 js_of_ocaml
 js_of_ocaml-ppx
 js_of_ocaml-ppx.as-lib
@@ -8,6 +18,7 @@ ocaml-compiler-libs.common
 ocaml-compiler-libs.optcomp
 ocaml-compiler-libs.shadow
 ocaml-compiler-libs.toplevel
+ocaml-jit
 ppx_derivers
 ppxlib
 ppxlib.ast
@@ -25,5 +36,15 @@ ppxlib_ast.astlib
 ppxlib_ast.stdppx
 ppxlib_ast.traverse_builtins
 ppxlib_jane
+runtime_events
 sexp_type
+stdlib
 stdlib-shims
+stdlib_alpha
+stdlib_beta
+stdlib_stable
+stdlib_upstream_compatible
+str
+threads
+threads.posix
+unix

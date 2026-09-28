@@ -144,17 +144,15 @@ ci-no-coverage: runtest runtest-upstream minimizer
 ci-coverage: boot-runtest coverage
 
 # These targets check an existing install at $(prefix); they do not install.
-.PHONY: test-installed-metadata
-test-installed-metadata:
-	bash tools/ci/actions/check-installed.sh metadata "$(prefix)"
+# check-installed checks metadata; check-installed-bundled also checks
+# inventories and consumers, expecting the bundled libraries Nix installs.
+.PHONY: check-installed
+check-installed:
+	bash tools/ci/actions/check-installed.sh "$(prefix)"
 
-# core: only libraries the compiler installs; shipped: also bundled libraries.
-INSTALLED_LIBRARIES ?= core
-
-.PHONY: test-installed-libraries
-test-installed-libraries: test-installed-metadata
-	bash tools/ci/actions/check-installed.sh libraries \
-	  "$(prefix)" "$(INSTALLED_LIBRARIES)"
+.PHONY: check-installed-bundled
+check-installed-bundled:
+	bash tools/ci/actions/check-installed.sh "$(prefix)" --bundled
 
 # CR mshinwell: build is broken
 # .PHONY: minimizer-upstream

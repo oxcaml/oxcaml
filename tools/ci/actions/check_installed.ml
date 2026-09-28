@@ -12,66 +12,64 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(* Check META paths, dependencies and native archive ownership, or inventories
-   and findlib/Dune/JS/Wasm consumers. Built with bootstrap Findlib; the
-   installed compiler runs only in subprocesses. *)
+(* Check installed metadata. --bundled also checks the full Nix library set.
+   The wrapper supplies a disposable cwd and bootstrap Findlib; installed
+   compilers run only in subprocesses. *)
 
 open Fl_metascanner
 
 let fail fmt = Printf.ksprintf failwith fmt
+let checking fmt =
+  Printf.ksprintf (fun s -> Printf.printf "Checking %s\n%!" s) fmt
 let write path text =
   Out_channel.with_open_text path (fun channel -> output_string channel text)
 let read path = In_channel.with_open_text path In_channel.input_all
-let lines text = String.split_on_char '\n' text |> List.filter ((<>) "")
+let lines text =
+  String.split_on_char '\n' text
+  |> List.map String.trim |> List.filter ((<>) "")
 let words = Fl_split.in_words
 let sorted = List.sort String.compare
 
-let with_directory dir f =
-  let previous = Sys.getcwd () in
-  Unix.chdir dir;
-  Fun.protect ~finally:(fun () -> Unix.chdir previous) f
+let check_status command = function
+  | Unix.WEXITED 0 -> ()
+  | status ->
+      let reason = match status with
+        | Unix.WEXITED code -> Printf.sprintf "exited %d" code
+        | Unix.WSIGNALED signal -> "killed by " ^ Sys.signal_to_string signal
+        | Unix.WSTOPPED signal -> "stopped by " ^ Sys.signal_to_string signal
+      in
+      fail "Command %s\n  cwd: %s\n  %s" command (Sys.getcwd ()) reason
 
-type inventory = Core | Shipped
-type check = Metadata | Libraries of inventory
-type context = { prefix : string; source_root : string; env : string array }
+let run program args =
+  let command = Filename.quote_command program args in
+  let channel = Unix.open_process_out ("exec " ^ command) in
+  check_status command (Unix.close_process_out channel)
+
+let capture program args =
+  let command = Filename.quote_command program args in
+  let channel = Unix.open_process_in ("exec " ^ command) in
+  let text = In_channel.input_all channel in
+  check_status command (Unix.close_process_in channel);
+  String.trim text
+
+type context =
+  { prefix : string; lists_dir : string; findlib : string; dune : string }
 
 let installed t path = Filename.concat t.prefix path
-let source t path = Filename.concat t.source_root path
-let data t file = source t ("tools/ci/actions/" ^ file)
-
-let spawn ?(stdout = Unix.stdout) t program args =
-  Unix.create_process_env program (Array.of_list (program :: args)) t.env
-    Unix.stdin stdout Unix.stderr
-
-let wait program pid =
-  match snd (Unix.waitpid [] pid) with
-  | Unix.WEXITED 0 -> ()
-  | Unix.WEXITED code -> fail "%s exited %d" program code
-  | Unix.WSIGNALED signal | Unix.WSTOPPED signal ->
-      fail "%s stopped by signal %d" program signal
-
-let run t program args = wait program (spawn t program args)
-
-let capture t program args =
-  let input, output = Unix.pipe ~cloexec:true () in
-  let pid = spawn ~stdout:output t program args in
-  Unix.close output;
-  let channel = Unix.in_channel_of_descr input in
-  let text = In_channel.input_all channel in
-  close_in channel;
-  wait program pid;
-  String.trim text
+let data t file = Filename.concat t.lists_dir file
 
 (* Use ocamlfind rather than the in-process Findlib API: version 1.9.8 caches
    missing dependencies across predicate sets, with no public reset. *)
-let query t args package = capture t "ocamlfind" ("query" :: args @ [package])
+let findlib_query t args package =
+  capture t.findlib ("query" :: args @ [package])
 
 type kind = Library | Ppx_deriver | Ppx_rewriter
 
-let kind = function
+let library_kind_of_string package = function
+  | "" | "normal" -> Library
   | "ppx_deriver" -> Ppx_deriver
   | "ppx_rewriter" -> Ppx_rewriter
-  | _ -> Library
+  | value -> fail "%s: unknown library_kind %S" package value
 
 let predicates = function
   | Library -> "native"
@@ -84,8 +82,12 @@ let link_flags = function
 let findlib_flags package =
   List.concat_map (fun flag -> ["-passopt"; flag]) (link_flags package)
 
-let metadata t =
-  let lib = installed t "lib" in
+let read_meta file =
+  try In_channel.with_open_text file parse with
+  | Failure message | Fl_metascanner.Error message -> fail "%s: %s" file message
+
+let check_meta_files t =
+  checking "META files";
   let stdlib = installed t "lib/ocaml" in
   let relative_to dir path =
     if Filename.is_relative path then Filename.concat dir path else path
@@ -98,12 +100,17 @@ let metadata t =
     resolved
   in
   let archives = Hashtbl.create 128 in
-  let rec check_package parent name expr =
+  let packages = Hashtbl.create 64 in
+  let rec check_package meta parent name expr =
+    checking "META package %s" name;
+    (match Hashtbl.find_opt packages name with
+     | None -> Hashtbl.add packages name meta
+     | Some previous -> fail "Duplicate package %s in %s and %s"
+                          name previous meta);
     let property key =
       try lookup key [] expr.pkg_defs with Not_found -> ""
     in
-    let dir =
-      match property "directory" with
+    let dir = match property "directory" with
       | "" -> parent
       | directory when directory.[0] = '+' || directory.[0] = '^' ->
           Filename.concat stdlib
@@ -123,13 +130,12 @@ let metadata t =
             (words def.def_value))
           then fail "%s: exists_if %S fails in %s" name def.def_value dir
       | _ -> ()) expr.pkg_defs;
-    let (_ : string) = query t
-      ["-recursive"; "-predicates"; predicates (kind (property "library_kind"))]
-      name
+    let kind = library_kind_of_string name (property "library_kind") in
+    let (_ : string) = findlib_query t
+      ["-recursive"; "-predicates"; predicates kind] name
     in
-    Printf.printf "META checked: %s\n%!" name;
     List.iter (fun (child, expr) ->
-      check_package dir (name ^ "." ^ child) expr) expr.pkg_children
+      check_package meta dir (name ^ "." ^ child) expr) expr.pkg_children
   in
   (* Findlib's package listing hides packages with a failing exists_if. *)
   List.iter (fun root ->
@@ -137,76 +143,92 @@ let metadata t =
       let parent = Filename.concat root package in
       let meta = Filename.concat parent "META" in
       if Sys.file_exists meta then
-        In_channel.with_open_text meta (fun channel ->
-          check_package parent package (parse channel)))) [stdlib; lib];
-  let allowed = read (data t "installed-unreferenced-archives.txt") |> lines
-    |> List.filter_map (fun line ->
-      let path = String.split_on_char '#' line |> List.hd |> String.trim in
-      if path = "" then None else Some (Filename.concat lib path))
-  in
+        check_package meta parent package (read_meta meta)))
+    [stdlib; installed t "lib"];
+  archives
+
+let check_archive_ownership t archives =
+  checking "native archive ownership";
+  (* The compiler links stdlib.cmxa implicitly. *)
+  let implicit_stdlib = installed t "lib/ocaml/stdlib.cmxa" in
   let rec check_dir dir =
-    Sys.readdir dir |> Array.iter (fun file ->
+    Sys.readdir dir |> Array.to_list |> sorted |> List.iter (fun file ->
       let path = Filename.concat dir file in
       if Sys.is_directory path then check_dir path
       else if List.exists (Filename.check_suffix path) [".cmxa"; ".cmxs"] &&
-              not (Hashtbl.mem archives (Unix.realpath path) ||
-                   List.mem path allowed)
+              path <> implicit_stdlib &&
+              not (Hashtbl.mem archives (Unix.realpath path))
       then fail "Unreferenced installed archive: %s" path)
   in
-  check_dir lib;
+  check_dir (installed t "lib")
+
+let check_native_smoke_programs t =
   let smoke package text =
-    Printf.printf "Checking native consumer of %s\n%!" package;
+    checking "native consumer of %s" package;
     write "main.ml" text;
-    run t "ocamlfind" (["ocamlopt"; "-package"; package; "-linkpkg"] @
+    run t.findlib (["ocamlopt"; "-package"; package; "-linkpkg"] @
       findlib_flags package @ ["main.ml"; "-o"; "smoke.exe"]);
-    run t "./smoke.exe" []
+    run "./smoke.exe" []
   in
   smoke "compiler-libs.native-toplevel"
     "let () = Opttoploop.initialize_toplevel_env ()\n";
   smoke "ocaml-jit" "let () = Jit.init_top ()\n";
   (* -uses-metaprogramming would mask a missing eval-to-JIT dependency. *)
-  let dependencies = query t
+  checking "eval's ocaml-jit dependency";
+  let dependencies = findlib_query t
     ["-recursive"; "-predicates"; "native"; "-format"; "%p"] "eval" |> lines
   in
   if not (List.mem "ocaml-jit" dependencies) then
     fail "eval: missing ocaml-jit dependency";
   smoke "eval" "let () = ()\n"
 
-let inventory_names output =
-  lines output |> List.filter_map (fun line ->
+let read_list file =
+  read file |> lines |> List.filter_map (fun line ->
+    let name = String.split_on_char '#' line |> List.hd |> String.trim in
+    if name = "" then None else Some name)
+
+let inventory_names tool text =
+  lines text |> List.map (fun line ->
     match words line with
-    | name :: "(version:" :: _ -> Some name
-    | _ -> None) |> sorted
+    | name :: "(version:" :: (_ :: _)
+      when String.ends_with ~suffix:")" line -> name
+    | _ -> fail "%s: unrecognized library listing line %S" tool line)
 
-let check_names tool expected actual =
-  let expected = sorted expected in
-  if expected <> actual then begin
-    List.iter (fun name ->
-      if not (List.mem name actual) then Printf.eprintf "- %s\n" name) expected;
-    List.iter (fun name ->
-      if not (List.mem name expected) then Printf.eprintf "+ %s\n" name) actual;
-    fail "Installed %s library names differ from the expected inventory" tool
-  end
-
-let check_findlib_consumer t name kind =
-  let command = match kind with
-    | Ppx_deriver -> None
-    | Ppx_rewriter -> Some ("preprocessor", ["-c"; "main.ml"])
-    | Library -> Some ("native",
-        ["-linkpkg"; "-linkall"] @ findlib_flags name @
-        ["-o"; "main.exe"; "main.ml"])
+let check_names tool files actual =
+  let expected = List.concat_map read_list files |> sorted in
+  let actual = sorted actual in
+  let rec duplicates = function
+    | a :: (b :: _ as rest) when a = b -> a :: duplicates rest
+    | _ :: rest -> duplicates rest
+    | [] -> []
   in
-  match command with
-  | None -> ()
-  | Some (label, args) ->
-      let direct = Filename.concat "direct" name in
-      Unix.mkdir direct 0o700;
-      with_directory direct (fun () ->
-        write "main.ml" "let () = ()\n";
-        Printf.printf "Checking %s with findlib (%s)\n%!" name label;
-        run t "ocamlfind" (["ocamlopt"; "-package"; name] @ args))
+  let report label names = match List.sort_uniq String.compare names with
+    | [] -> []
+    | names -> [label ^ ": " ^ String.concat ", " names]
+  in
+  let problems =
+    report "listed, not installed"
+      (List.filter (fun name -> not (List.mem name actual)) expected) @
+    report "installed, not listed"
+      (List.filter (fun name -> not (List.mem name expected)) actual) @
+    report "listed twice" (duplicates expected) @
+    report "installed twice" (duplicates actual)
+  in
+  if problems <> [] then
+    fail "%s inventory (%s):\n%s" tool (String.concat ", " files)
+      (String.concat "\n" problems)
 
-let dune_target name kind =
+let check_findlib_consumer t name = function
+  | Ppx_deriver -> () (* Dune supplies the driver needed to run derivers. *)
+  | Ppx_rewriter ->
+      checking "findlib preprocessor %s" name;
+      run t.findlib ["ocamlopt"; "-package"; name; "-c"; "direct/main.ml"]
+  | Library ->
+      checking "findlib native consumer %s" name;
+      run t.findlib (["ocamlopt"; "-package"; name; "-linkpkg"; "-linkall"] @
+        findlib_flags name @ ["-o"; "direct/main.exe"; "direct/main.ml"])
+
+let create_dune_target name kind =
   Unix.mkdir name 0o700;
   write (Filename.concat name "main.ml") "let () = ()\n";
   let dependency = match kind with
@@ -220,108 +242,111 @@ let dune_target name kind =
     dependency (String.concat " " (link_flags name)));
   name ^ "/main.exe"
 
-let libraries t inventory =
-  let stdlib = capture t (installed t "bin/ocamlc") ["-where"] in
-  if stdlib <> installed t "lib/ocaml" then
-    fail "Installed ocamlc uses %s, expected %s"
-      stdlib (installed t "lib/ocaml");
-  write "dune-project" "(lang dune 3.23)\n(name installed_libraries_probe)\n";
-  print_endline "Checking installed findlib and Dune inventories";
-  let findlib_names = capture t "ocamlfind" ["list"] |> inventory_names in
-  let dune_names =
-    capture t "dune" ["installed-libraries"] |> inventory_names
+let archive_less_packages =
+  [ "compiler-libs"; "ocaml-compiler-libs"; "ppxlib_ast" (* Umbrella roots. *)
+  ; "stdlib" (* Linked implicitly. *)
+  ; "threads.posix" (* Alias for threads. *)
+  ; "compiler-libs.toplevel" (* Bytecode only. *)
+  ]
+
+let check_bundled_libraries t =
+  checking "bundled library inventories";
+  let findlib_names = capture t.findlib ["list"] |> inventory_names "findlib" in
+  let dune_names = capture t.dune ["installed-libraries"; "--root"; "."]
+    |> inventory_names "Dune"
   in
-  let names file = read (data t file) |> lines in
-  let shared = names "installed-core-libraries.txt" @
-    match inventory with
-    | Core -> []
-    | Shipped -> names "installed-shipped-libraries.txt"
-  in
-  let findlib_only = match inventory with
-    | Core -> []
-    | Shipped -> names "installed-shipped-findlib-extras.txt"
-  in
-  check_names "findlib" (shared @ findlib_only) findlib_names;
-  check_names "Dune" shared dune_names;
+  let common = data t "installed-bundled-libraries.txt" in
+  let extras = data t "installed-findlib-only-libraries.txt" in
+  check_names "findlib" [common; extras] findlib_names;
+  check_names "Dune" [common] dune_names;
   Unix.mkdir "direct" 0o700;
-  let targets = List.filter_map (fun name ->
-    let kind = kind (query t ["-format"; "%(library_kind)"] name) in
-    let archive =
-      query t ["-predicates"; predicates kind; "-format"; "%A"] name
+  write "direct/main.ml" "let () = ()\n";
+  let targets = ref [] in
+  List.iter (fun name ->
+    checking "bundled package %s" name;
+    let kind = findlib_query t ["-format"; "%(library_kind)"] name
+      |> library_kind_of_string name
     in
-    if archive = "" && kind = Library then None else begin
-      check_findlib_consumer t name kind;
-      if List.mem name dune_names then Some (dune_target name kind) else None
-    end) findlib_names
-  in
-  let targets = match inventory with
-    | Core -> targets
-    | Shipped ->
-        print_endline "Checking installed JS/Wasm compilers";
-        (* prefix/bin is first on PATH; missing tools must not fall back. *)
-        List.iter (fun tool ->
-          let file = installed t ("bin/" ^ tool) in
-          let executable =
-            try Unix.access file [Unix.X_OK]; not (Sys.is_directory file)
-            with Unix.Unix_error _ -> false
+    let consume = match kind with
+      | Ppx_deriver | Ppx_rewriter -> true
+      | Library ->
+          let archive = findlib_query t
+            ["-predicates"; "native"; "-format"; "%A"] name
           in
-          if not executable then fail "Missing installed compiler: %s" file)
-          ["js_of_ocaml"; "wasm_of_ocaml"];
-        Unix.mkdir "jsoo" 0o700;
-        List.iter (fun file -> write (Filename.concat "jsoo" file)
-          (read (source t ("external/ast-dependent-libs/smoke/" ^ file))))
-          ["main.ml"; "dune"];
-        targets @ ["jsoo/main.bc.js"; "jsoo/main.bc.wasm.js"]
-  in
-  print_endline "Checking installed libraries with Dune";
-  run t "dune" ("build" :: "--display=short" :: targets)
+          if archive <> "" then true
+          else if List.mem name archive_less_packages then false
+          else fail "%s: no native archive" name
+    in
+    if consume then begin
+      check_findlib_consumer t name kind;
+      if List.mem name dune_names then
+        targets := create_dune_target name kind :: !targets
+    end) findlib_names;
+  checking "Dune native consumers";
+  run t.dune
+    ("build" :: "--root" :: "." :: "--display=short" :: List.rev !targets)
+
+let resolve_tool name =
+  let path = String.split_on_char ':' (Sys.getenv "PATH") in
+  match List.find_map (fun dir ->
+    let file = Filename.concat dir name in
+    try Unix.access file [Unix.X_OK];
+        if Sys.is_directory file then None else Some (Unix.realpath file)
+    with Unix.Unix_error _ -> None) path
+  with
+  | Some path -> path
+  | None -> fail "Cannot find %s on PATH" name
+
+let configure_environment t =
+  let stdlib = installed t "lib/ocaml" in
+  write "findlib.conf" (Printf.sprintf
+    "path=%S\nstdlib=%S\nocamlc=%S\nocamlopt=%S\nldconf=\"ignore\"\n"
+    (installed t "lib" ^ ":" ^ stdlib) stdlib
+    (installed t "bin/ocamlc") (installed t "bin/ocamlopt"));
+  Unix.putenv "PATH" (installed t "bin" ^ ":" ^ Sys.getenv "PATH");
+  Unix.putenv "OCAMLFIND_CONF" (Filename.concat (Sys.getcwd ()) "findlib.conf");
+  Unix.putenv "TMPDIR" (Sys.getcwd ());
+  Unix.putenv "DUNE_CACHE" "disabled"
 
 let main () =
-  let source_root, check, prefix = match Array.to_list Sys.argv with
-    | [_; "--source-root"; root; "metadata"; prefix] -> root, Metadata, prefix
-    | [_; "--source-root"; root; "libraries"; prefix; "core"] ->
-        root, Libraries Core, prefix
-    | [_; "--source-root"; root; "libraries"; prefix; "shipped"] ->
-        root, Libraries Shipped, prefix
-    | _ -> fail "Usage: %s --source-root ROOT \
-                 metadata PREFIX | libraries PREFIX core|shipped" Sys.argv.(0)
+  let lists_dir, prefix, bundled = match Array.to_list Sys.argv with
+    | [_; "--lists-dir"; dir; prefix] -> dir, prefix, false
+    | [_; "--lists-dir"; dir; prefix; "--bundled"] -> dir, prefix, true
+    | _ -> fail "Usage: %s --lists-dir DIR PREFIX [--bundled]\n\
+                 --bundled checks the complete Nix install's libraries."
+             Sys.argv.(0)
   in
   let stdlib = Filename.concat prefix "lib/ocaml" in
   if not (Sys.file_exists stdlib && Sys.is_directory stdlib) then
     fail "No install at %s" prefix;
-  let prefix = Unix.realpath prefix in
-  let source_root = Unix.realpath source_root in
-  let work = Filename.temp_dir "check-installed-" "" |> Unix.realpath in
-  let removed = ["PATH"; "TMPDIR"; "OCAMLFIND_CONF"; "DUNE_CACHE"; "OCAMLLIB";
-    "CAMLLIB"; "CAML_LD_LIBRARY_PATH"; "OCAMLPATH"; "OCAMLFIND_COMMANDS";
-    "OCAMLFIND_TOOLCHAIN"; "OPAM_SWITCH_PREFIX"; "OPAMROOT"]
+  let findlib = resolve_tool "ocamlfind" in
+  let dune = resolve_tool "dune" in
+  Printf.printf "Bootstrap ocamlfind: %s (%s)\n%!" findlib
+    (capture findlib ["query"; "-format"; "%v"; "findlib"]);
+  Printf.printf "Bootstrap dune: %s (%s)\n%!" dune
+    (capture dune ["--root"; "."; "--version"]);
+  let t = { prefix = Unix.realpath prefix; lists_dir; findlib; dune } in
+  configure_environment t;
+  checking "installed compiler location";
+  let stdlib = capture (installed t "bin/ocamlc") ["-where"] in
+  if stdlib <> installed t "lib/ocaml" then
+    fail "Installed ocamlc uses %s, expected %s"
+      stdlib (installed t "lib/ocaml");
+  write "dune-project" "(lang dune 1.0)\n";
+  let archives = check_meta_files t in
+  check_archive_ownership t archives;
+  checking "Dune library availability";
+  let unavailable =
+    capture dune ["installed-libraries"; "--root"; "."; "--na"]
   in
-  let inherited = Unix.environment () |> Array.to_list
-    |> List.filter (fun entry ->
-      not (List.exists (fun key -> String.starts_with ~prefix:(key ^ "=") entry)
-        removed))
-  in
-  let env = Array.of_list
-    (["PATH=" ^ Filename.concat prefix "bin" ^ ":" ^ Sys.getenv "PATH";
-      "OCAMLFIND_CONF=" ^ Filename.concat work "findlib.conf";
-      "TMPDIR=" ^ work; "DUNE_CACHE=disabled"] @
-     (* Redirect compilers in staged trees that still embed the final prefix.
-        The libraries check instead verifies the built-in -where. *)
-     (match check with
-      | Metadata -> ["OCAMLLIB=" ^ Filename.concat prefix "lib/ocaml"]
-      | Libraries _ -> []) @ inherited)
-  in
-  let t = { prefix; source_root; env } in
-  Fun.protect ~finally:(fun () -> run t "rm" ["-rf"; work]) (fun () ->
-    with_directory work (fun () ->
-      write "findlib.conf" (Printf.sprintf
-        "path=%S\nstdlib=%S\nocamlc=%S\nocamlopt=%S\nldconf=\"ignore\"\n"
-        (installed t "lib" ^ ":" ^ installed t "lib/ocaml")
-        (installed t "lib/ocaml") (installed t "bin/ocamlc")
-        (installed t "bin/ocamlopt"));
-      match check with
-      | Metadata -> metadata t
-      | Libraries inventory -> libraries t inventory))
+  if unavailable <> "" then fail "Unavailable Dune libraries:\n%s" unavailable;
+  check_native_smoke_programs t;
+  if bundled then check_bundled_libraries t
 
 let () =
-  try main () with Failure message -> prerr_endline message; exit 1
+  try main () with
+  | Failure message | Sys_error message -> prerr_endline message; exit 1
+  | Unix.Unix_error (error, operation, argument) ->
+      Printf.eprintf "%s(%S): %s\n"
+        operation argument (Unix.error_message error);
+      exit 1

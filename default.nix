@@ -622,6 +622,7 @@ let
       '';
     };
 
+  # Check metadata and native consumers of the full bundled compiler install.
   mkInstalledLibrariesCheck =
     oxcaml:
     stdenv.mkDerivation {
@@ -640,9 +641,8 @@ let
         "SHELL=${stdenv.shell}"
         "REQUIRES_CONFIGURATION="
         "prefix=${oxcaml}"
-        "INSTALLED_LIBRARIES=shipped"
       ];
-      buildFlags = [ "test-installed-libraries" ];
+      buildFlags = [ "check-installed-bundled" ];
 
       installPhase = ''
         runHook preInstall
