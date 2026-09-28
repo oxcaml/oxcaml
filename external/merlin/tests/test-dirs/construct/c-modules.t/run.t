@@ -159,17 +159,17 @@ Delayed constraints in functor parameters, results, and nested signatures
   > EOF
 
   $ $MERLIN single construct -position 4:3 \
-  > -filename with_constraints.ml <with_constraints.ml | jq -r '.value[1][]'
+  > -filename with_constraints.ml <with_constraints.ml | revert-newlines | jq -r '.value[1][]'
   functor (X : sig type t = int end) ->
   struct  end
 
   $ $MERLIN single construct -position 8:3 \
-  > -filename with_constraints.ml <with_constraints.ml | jq -r '.value[1][]'
+  > -filename with_constraints.ml <with_constraints.ml | revert-newlines | jq -r '.value[1][]'
   functor (X : sig module type T  = sig type t end end) ->
   struct type t = int end
 
   $ $MERLIN single construct -position 14:3 \
-  > -filename with_constraints.ml <with_constraints.ml | jq -r '.value[1][]'
+  > -filename with_constraints.ml <with_constraints.ml | revert-newlines | jq -r '.value[1][]'
   functor (X :
   sig module type T  = sig type t end module Y : sig type t = int end end) ->
   struct  end
