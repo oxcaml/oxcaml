@@ -12,14 +12,14 @@ val print_lines : string list -> unit = <fun>
 Line 5, characters 2-15:
 5 |   print_endline "foo"
       ^^^^^^^^^^^^^
-Error: This extra argument "print_endline" is not expected.
+Error: This extra argument "print_endline" and the one following are not expected.
 Line 4, characters 55-57:
 4 |   print_lines (List.map string_of_int [ 1; 2; 3; 4; 5 ])
                                                            ^^
   Hint: Did you forget a ';'?
-Lines 4-5, characters 2-15:
+Lines 4-5, characters 2-21:
 4 | ..print_lines (List.map string_of_int [ 1; 2; 3; 4; 5 ])
-5 |   print_endline......
+5 |   print_endline "foo"
   The function "print_lines" has type string list -> unit
   It is applied to too many arguments
 |}]
@@ -264,5 +264,65 @@ Line 1, characters 9-25:
 1 | let () = f 1 ~foo:(2 + 3)
              ^^^^^^^^^^^^^^^^
   The function "f" has type int -> int
+  It is applied to too many arguments
+|}]
+
+(* Several extra arguments are counted. *)
+
+let () = f 1 2 3
+[%%expect{|
+Line 1, characters 13-14:
+1 | let () = f 1 2 3
+                 ^
+Error: This extra argument "2" and the one following are not expected.
+Line 1, characters 9-16:
+1 | let () = f 1 2 3
+             ^^^^^^^
+  The function "f" has type int -> int
+  It is applied to too many arguments
+|}]
+
+let () = f 1 ~foo:2 3 4 5
+[%%expect{|
+Line 1, characters 18-19:
+1 | let () = f 1 ~foo:2 3 4 5
+                      ^
+Error: This extra argument "~foo" and the 3 following are not expected.
+Line 1, characters 9-25:
+1 | let () = f 1 ~foo:2 3 4 5
+             ^^^^^^^^^^^^^^^^
+  The function "f" has type int -> int
+  It is applied to too many arguments
+|}]
+
+let () = f 1 (2 + 3) 4
+[%%expect{|
+Line 1, characters 13-20:
+1 | let () = f 1 (2 + 3) 4
+                 ^^^^^^^
+Error: This extra argument and the one following are not expected.
+Line 1, characters 9-22:
+1 | let () = f 1 (2 + 3) 4
+             ^^^^^^^^^^^^^
+  The function "f" has type int -> int
+  It is applied to too many arguments
+|}]
+
+let k () = ()
+let () = k () () ()
+[%%expect{|
+val k : unit -> unit = <fun>
+Line 2, characters 14-16:
+2 | let () = k () () ()
+                  ^^
+Error: This extra argument "()" and the one following are not expected.
+Line 2, characters 12-14:
+2 | let () = k () () ()
+                ^^
+  Hint: Did you forget a ';'?
+Line 2, characters 9-19:
+2 | let () = k () () ()
+             ^^^^^^^^^^
+  The function "k" has type unit -> unit
   It is applied to too many arguments
 |}]
