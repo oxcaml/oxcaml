@@ -255,6 +255,8 @@ let to_lambda_prim prim ~poly_sort =
     ~c_builtin:prim.prim_c_builtin
     ~effects:prim.prim_effects
     ~coeffects:prim.prim_coeffects
+    ~critical:prim.prim_critical
+    ~blocking:prim.prim_blocking
     ~native_name:prim.prim_native_name
     ~native_repr_args
     ~native_repr_res

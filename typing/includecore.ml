@@ -37,6 +37,7 @@ type primitive_mismatch =
   | Result_repr
   | Argument_repr of int
   | Layout_poly_attr
+  | Section_safety
 
 type value_mismatch =
   | Primitive_mismatch of primitive_mismatch
@@ -152,6 +153,11 @@ let primitive_descriptions pd1 pd2 =
     (Primitive.equal_coeffects
        pd1.prim_coeffects pd2.prim_coeffects) then
     Some Coeffects
+  else if not
+    (Primitive.equal_section_safety pd1.prim_critical pd2.prim_critical
+     && Primitive.equal_section_safety pd1.prim_blocking pd2.prim_blocking)
+  then
+    Some Section_safety
   else if not (String.equal pd1.prim_native_name pd2.prim_native_name) then
     Some Native_name
   else if not
@@ -570,6 +576,10 @@ let report_primitive_mismatch first second ppf err =
         n (Misc.ordinal_suffix n)
   | Layout_poly_attr ->
       pr "The two primitives have different [@@layout_poly] attributes"
+  | Section_safety ->
+      pr "The two primitives have different %a or %a annotations"
+        Style.inline_code "[@@critical]"
+        Style.inline_code "[@@blocking]"
 
 let report_value_mismatch ~pp first second env ppf err =
   let pr fmt = Fmt.fprintf ppf fmt in

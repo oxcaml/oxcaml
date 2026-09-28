@@ -443,7 +443,7 @@ type primitive =
   | Patomic_lxor_idx
   (* Inhibition of optimisation *)
   | Popaque of layout
-  (* GC-safe section marker (identity; carries the section kind + body layout) *)
+  (* GC-safe section marker (identity; carries section kind, body layout) *)
   | Psection of section_kind * layout
   (* Statically-defined probes *)
   | Pprobe_is_enabled of { name: string; enabled_at_init: bool option }

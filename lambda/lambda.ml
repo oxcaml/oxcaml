@@ -3970,6 +3970,8 @@ let simple_prim_on_values ~name ~arity ~alloc =
     ~c_builtin:false
     ~effects:Arbitrary_effects
     ~coeffects:Has_coeffects
+    ~critical:Builtin_attributes.Section_unsafe
+    ~blocking:Builtin_attributes.Section_unsafe
     ~native_name:""
     ~native_repr_args:
       (Primitive.make_prim_repr_args arity

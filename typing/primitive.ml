@@ -61,6 +61,10 @@ type 'repr description_gen =
     prim_c_builtin: bool;        (* Is the compiler allowed to replace it? *)
     prim_effects: effects;
     prim_coeffects: coeffects;
+    prim_critical: Builtin_attributes.section_safety;
+                               (* Callability from [%critical] sections *)
+    prim_blocking: Builtin_attributes.section_safety;
+                               (* Callability from [%blocking] sections *)
     prim_native_name: string;  (* Name of C function for the nat. code gen. *)
     prim_native_repr_args: (mode * 'repr) list;
     prim_native_repr_res: mode * 'repr;
@@ -92,6 +96,7 @@ type error =
   | No_native_primitive_with_non_value
   | Inconsistent_attributes_for_effects
   | Inconsistent_noalloc_attributes_for_effects
+  | Missing_noalloc_for_section_attribute
   | Invalid_representation_polymorphic_attribute
   | Invalid_native_repr_for_primitive of
       { prim_name : string; errors : wrong_repr_error list }
@@ -121,6 +126,7 @@ let rec make_prim_repr_args arity x =
     x :: make_prim_repr_args (arity - 1) x
 
 let make ~name ~alloc ~c_builtin ~effects ~coeffects
+      ~critical ~blocking
       ~native_name ~native_repr_args ~native_repr_res
       ~is_layout_poly =
   {prim_name = name;
@@ -129,6 +135,8 @@ let make ~name ~alloc ~c_builtin ~effects ~coeffects
    prim_c_builtin = c_builtin;
    prim_effects = effects;
    prim_coeffects = coeffects;
+   prim_critical = critical;
+   prim_blocking = blocking;
    prim_native_name = native_name;
    prim_native_repr_args = native_repr_args;
    prim_native_repr_res = native_repr_res;
@@ -223,6 +231,20 @@ let parse_declaration valdecl ~native_repr_args ~native_repr_res ~is_layout_poly
   if noalloc && only_generative_effects_attribute then
     raise (Error (valdecl.pval_loc,
                   Inconsistent_noalloc_attributes_for_effects));
+  let prim_critical =
+    Builtin_attributes.section_safety ~name:"critical" valdecl.pval_attributes
+  in
+  let prim_blocking =
+    Builtin_attributes.section_safety ~name:"blocking" valdecl.pval_attributes
+  in
+  let section_annotated : Builtin_attributes.section_safety -> bool = function
+    | Section_unsafe -> false
+    | Section_safe | Section_only -> true
+  in
+  if (section_annotated prim_critical || section_annotated prim_blocking)
+     && not noalloc
+  then
+    raise (Error (valdecl.pval_loc, Missing_noalloc_for_section_attribute));
   let native_repr_args, native_repr_res =
     if old_style_float then
       (make_prim_repr_args arity (Prim_global, Unboxed_float Boxed_float64),
@@ -236,6 +258,8 @@ let parse_declaration valdecl ~native_repr_args ~native_repr_res ~is_layout_poly
    prim_c_builtin = builtin_attribute;
    prim_effects = effects;
    prim_coeffects = coeffects;
+   prim_critical;
+   prim_blocking;
    prim_native_name = native_name;
    prim_native_repr_args = native_repr_args;
    prim_native_repr_res = native_repr_res;
@@ -271,6 +295,11 @@ let oattr_builtin = { oattr_name = "builtin" }
 let oattr_no_effects = { oattr_name = "no_effects" }
 let oattr_only_generative_effects = { oattr_name = "only_generative_effects" }
 let oattr_no_coeffects = { oattr_name = "no_coeffects" }
+(* Payloads are part of the name; [Oprint] prints them verbatim. *)
+let oattr_critical = { oattr_name = "critical" }
+let oattr_critical_safe = { oattr_name = "critical safe" }
+let oattr_blocking = { oattr_name = "blocking" }
+let oattr_blocking_safe = { oattr_name = "blocking safe" }
 let oattr_local_opt = { oattr_name = "local_opt" }
 let oattr_layout_poly = { oattr_name = "layout_poly" }
 
@@ -335,6 +364,16 @@ let print p osig_val_decl =
   let attrs = match p.prim_coeffects with
     | No_coeffects -> oattr_no_coeffects::attrs
     | Has_coeffects -> attrs
+  in
+  let attrs = match p.prim_critical with
+    | Builtin_attributes.Section_unsafe -> attrs
+    | Builtin_attributes.Section_safe -> oattr_critical_safe::attrs
+    | Builtin_attributes.Section_only -> oattr_critical::attrs
+  in
+  let attrs = match p.prim_blocking with
+    | Builtin_attributes.Section_unsafe -> attrs
+    | Builtin_attributes.Section_safe -> oattr_blocking_safe::attrs
+    | Builtin_attributes.Section_only -> oattr_blocking::attrs
   in
   let attrs =
     if all_unboxed then
@@ -516,6 +555,14 @@ let equal_coeffects cf1 cf2 =
   | No_coeffects, Has_coeffects -> false
   | Has_coeffects, Has_coeffects -> true
   | Has_coeffects, No_coeffects -> false
+
+let equal_section_safety s1 s2 =
+  let open Builtin_attributes in
+  match (s1 : section_safety), s2 with
+  | Section_unsafe, Section_unsafe
+  | Section_safe, Section_safe
+  | Section_only, Section_only -> true
+  | (Section_unsafe | Section_safe | Section_only), _ -> false
 
 let native_name_is_external p =
   let nat_name = native_name p in
@@ -1365,6 +1412,11 @@ let report_error ppf err =
   | Inconsistent_noalloc_attributes_for_effects ->
     Format_doc.fprintf ppf "Cannot use %a in conjunction with %a."
       Style.inline_code "[@@no_generative_effects]"
+      Style.inline_code "[@@noalloc]"
+  | Missing_noalloc_for_section_attribute ->
+    Format_doc.fprintf ppf "%a and %a require %a."
+      Style.inline_code "[@@critical]"
+      Style.inline_code "[@@blocking]"
       Style.inline_code "[@@noalloc]"
   | Invalid_representation_polymorphic_attribute ->
     Format_doc.fprintf ppf "Attribute %a can only be used \

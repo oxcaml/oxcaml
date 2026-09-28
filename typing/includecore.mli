@@ -31,6 +31,7 @@ type primitive_mismatch =
   | Result_repr
   | Argument_repr of int
   | Layout_poly_attr
+  | Section_safety
 
 type value_mismatch =
   | Primitive_mismatch of primitive_mismatch

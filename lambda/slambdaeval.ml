@@ -1051,8 +1051,7 @@ let assert_primitive_contains_no_splices (prim : Lambda.primitive) =
   match prim with
   | Popaque layout | Pobj_magic layout ->
     assert_layout_contains_no_splices layout
-  | Psection (_, layout) ->
-    assert_layout_contains_no_splices layout
+  | Psection (_, layout) -> assert_layout_contains_no_splices layout
   | Pget_idx (layout, _)
   | Pset_idx (layout, _)
   | Patomic_load_idx { layout }

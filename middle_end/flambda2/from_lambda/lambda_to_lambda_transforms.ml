@@ -341,7 +341,8 @@ let makearray_dynamic_singleton name (mode : L.locality_mode) ~length ~init loc
   let external_call_desc =
     Primitive.make ~name ~alloc:true (* the C stub may raise an exception *)
       ~c_builtin:false ~effects:Arbitrary_effects ~coeffects:Has_coeffects
-      ~native_name:name
+      ~critical:Builtin_attributes.Section_unsafe
+      ~blocking:Builtin_attributes.Section_unsafe ~native_name:name
       ~native_repr_args:
         ([Primitive.Prim_global, L.Same_as_ocaml_repr S.scannable]
         @
@@ -379,7 +380,8 @@ let makearray_dynamic_unboxed_products_only_64_bit () =
 let makearray_dynamic_unboxed_product_c_stub ~name (mode : L.locality_mode) =
   Primitive.make ~name ~alloc:true (* the C stub may raise an exception *)
     ~c_builtin:false ~effects:Arbitrary_effects ~coeffects:Has_coeffects
-    ~native_name:name
+    ~critical:Builtin_attributes.Section_unsafe
+    ~blocking:Builtin_attributes.Section_unsafe ~native_name:name
     ~native_repr_args:
       [ Prim_global, L.Same_as_ocaml_repr S.scannable;
         Prim_local, L.Same_as_ocaml_repr S.scannable;
@@ -812,7 +814,8 @@ let arrayblit_runtime env args loc =
     let name = "caml_array_blit" in
     (* Note: [caml_array_blit] can enter the GC, so [alloc] must be [true]. *)
     Primitive.make ~name ~alloc:true ~c_builtin:false ~effects:Arbitrary_effects
-      ~coeffects:Has_coeffects ~native_name:name
+      ~coeffects:Has_coeffects ~critical:Builtin_attributes.Section_unsafe
+      ~blocking:Builtin_attributes.Section_unsafe ~native_name:name
       ~native_repr_args:
         [ (* The arrays might be local *)
           Primitive.Prim_local, L.Same_as_ocaml_repr S.scannable;
@@ -843,6 +846,8 @@ let arrayblit env ~src_mutability ~(dst_array_set_kind : L.array_set_kind) args
 let cast_vec128_to_vec256 =
   Primitive.make ~name:"caml_simd_bytecode_not_supported" ~alloc:false
     ~c_builtin:true ~effects:No_effects ~coeffects:No_coeffects
+    ~critical:Builtin_attributes.Section_unsafe
+    ~blocking:Builtin_attributes.Section_unsafe
     ~native_name:"caml_vec256_low_of_vec128"
     ~native_repr_args:[Prim_global, L.Same_as_ocaml_repr S.vec128]
     ~native_repr_res:(Prim_global, L.Same_as_ocaml_repr S.vec256)
@@ -852,6 +857,8 @@ let cast_vec128_to_vec256 =
 let cast_vec256_to_vec128 =
   Primitive.make ~name:"caml_simd_bytecode_not_supported" ~alloc:false
     ~c_builtin:true ~effects:No_effects ~coeffects:No_coeffects
+    ~critical:Builtin_attributes.Section_unsafe
+    ~blocking:Builtin_attributes.Section_unsafe
     ~native_name:"caml_vec256_low_to_vec128"
     ~native_repr_args:[Prim_global, L.Same_as_ocaml_repr S.vec256]
     ~native_repr_res:(Prim_global, L.Same_as_ocaml_repr S.vec128)
@@ -861,6 +868,8 @@ let cast_vec256_to_vec128 =
 let vec256_insert_vec128 =
   Primitive.make ~name:"caml_simd_bytecode_not_supported" ~alloc:false
     ~c_builtin:true ~effects:No_effects ~coeffects:No_coeffects
+    ~critical:Builtin_attributes.Section_unsafe
+    ~blocking:Builtin_attributes.Section_unsafe
     ~native_name:"caml_avx_vec256_insert_128"
     ~native_repr_args:
       [ Prim_global, L.Same_as_ocaml_repr S.bits64;
@@ -873,6 +882,8 @@ let vec256_insert_vec128 =
 let vec256_extract_vec128 =
   Primitive.make ~name:"caml_simd_bytecode_not_supported" ~alloc:false
     ~c_builtin:true ~effects:No_effects ~coeffects:No_coeffects
+    ~critical:Builtin_attributes.Section_unsafe
+    ~blocking:Builtin_attributes.Section_unsafe
     ~native_name:"caml_avx_vec256_extract_128"
     ~native_repr_args:
       [ Prim_global, L.Same_as_ocaml_repr S.bits64;
@@ -1437,7 +1448,8 @@ let transform_primitive0 env (prim : L.primitive) args loc =
       let desc =
         Primitive.make ~name:desc.prim_name ~alloc:desc.prim_alloc
           ~c_builtin:desc.prim_c_builtin ~effects:desc.prim_effects
-          ~coeffects:desc.prim_coeffects ~native_name:desc.prim_native_name
+          ~coeffects:desc.prim_coeffects ~critical:desc.prim_critical
+          ~blocking:desc.prim_blocking ~native_name:desc.prim_native_name
           ~native_repr_args:prim_native_repr_args
           ~native_repr_res:prim_native_repr_res
           ~is_layout_poly:desc.prim_is_layout_poly

@@ -471,6 +471,15 @@ let check_section_body kind section_loc body =
        | Pwith_stack_preemptible ->
          violation loc "effect operation"
        | Ppoll -> violation loc "poll"
+       | Pccall prim ->
+         (* Trusted: asserted by [@@critical]/[@@blocking] at the external's
+            declaration (see [Primitive.parse_declaration]). *)
+         let safety : Builtin_attributes.section_safety =
+           if blocking then prim.prim_blocking else prim.prim_critical
+         in
+         (match safety with
+          | Section_safe | Section_only -> ()
+          | Section_unsafe -> violation loc "unannotated external call")
        | _ ->
          if primitive_can_raise p
          then violation loc "operation that may raise";
@@ -518,7 +527,8 @@ and transl_exp1 ~scopes ~in_new_scope layout e =
   in
   let lam =
     if eval_once then transl_exp0 ~scopes ~in_new_scope layout e else
-    Translobj.oo_wrap e.exp_env true (transl_exp0 ~scopes ~in_new_scope layout) e
+    Translobj.oo_wrap e.exp_env true
+      (transl_exp0 ~scopes ~in_new_scope layout) e
   in
   match section_kinds_of_attributes e.exp_attributes with
   | [] -> lam

@@ -78,6 +78,10 @@ type 'repr description_gen = private
        whose name [prim_name] starts with %. *)
     prim_effects: effects;
     prim_coeffects: coeffects;
+    prim_critical: Builtin_attributes.section_safety;
+                               (* Callability from [%critical] sections *)
+    prim_blocking: Builtin_attributes.section_safety;
+                               (* Callability from [%blocking] sections *)
     prim_native_name: string;  (* Name of C function for the nat. code gen. *)
     prim_native_repr_args: (mode * 'repr) list;
     prim_native_repr_res: mode * 'repr;
@@ -98,6 +102,8 @@ val make
   -> c_builtin:bool
   -> effects:effects
   -> coeffects:coeffects
+  -> critical:Builtin_attributes.section_safety
+  -> blocking:Builtin_attributes.section_safety
   -> native_name:string
   -> native_repr_args: (mode * 'repr) list
   -> native_repr_res: mode * 'repr
@@ -137,6 +143,9 @@ val compare_boxed_vector : boxed_vector -> boxed_vector -> int
 val equal_native_repr : native_repr -> native_repr -> bool
 val equal_effects : effects -> effects -> bool
 val equal_coeffects : coeffects -> coeffects -> bool
+val equal_section_safety :
+  Builtin_attributes.section_safety -> Builtin_attributes.section_safety ->
+  bool
 
 (** [native_name_is_externa] returns [true] iff the [native_name] for the
     given primitive identifies that the primitive is not implemented in the
@@ -171,6 +180,7 @@ type error =
   | No_native_primitive_with_non_value
   | Inconsistent_attributes_for_effects
   | Inconsistent_noalloc_attributes_for_effects
+  | Missing_noalloc_for_section_attribute
   | Invalid_representation_polymorphic_attribute
   | Invalid_native_repr_for_primitive of
       { prim_name : string; errors : wrong_repr_error list }

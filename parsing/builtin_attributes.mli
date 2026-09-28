@@ -289,6 +289,19 @@ val parse_optional_id_payload :
   string -> Location.t -> empty:'a -> (string * 'a) list ->
   Parsetree.payload -> ('a,unit) Result.t
 
+(* Support for GC-safe sections. Callability of an external from
+   [%critical]/[%blocking] sections, given by the payload of its
+   [@@critical]/[@@blocking] attribute: no attribute = unsafe, bare
+   attribute = only. *)
+type section_safety =
+  | Section_unsafe
+  | Section_safe
+  | Section_only
+
+(* [section_safety ~name attrs] parses the section attribute [name]
+   ("critical" or "blocking") in [attrs]. *)
+val section_safety : name:string -> Parsetree.attributes -> section_safety
+
 (* Support for zero_alloc *)
 type zero_alloc_check =
   { strict: bool;

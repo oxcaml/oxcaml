@@ -948,6 +948,23 @@ let parse_optional_id_payload txt loc ~empty cases payload =
       | Some r -> Ok r
       | None -> warn ()
 
+type section_safety =
+  | Section_unsafe
+  | Section_safe
+  | Section_only
+
+let section_safety ~name attrs =
+  match select_attribute [name, Return] attrs with
+  | None -> Section_unsafe
+  | Some attr ->
+    match
+      parse_optional_id_payload name attr.attr_loc ~empty:Section_only
+        ["safe", Section_safe; "unsafe", Section_unsafe; "only", Section_only]
+        attr.attr_payload
+    with
+    | Ok safety -> safety
+    | Error () -> Section_unsafe
+
 (* Looks for `custom_error_message msg` in payload.
    If present, this returns `msg` and an updated payload
    with `customer_error_message msg` removed.

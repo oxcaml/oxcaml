@@ -733,6 +733,8 @@ let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
         prim_c_builtin;
         prim_effects;
         prim_coeffects;
+        prim_critical = _;
+        prim_blocking = _;
         prim_native_name;
         prim_native_repr_args;
         prim_native_repr_res;
@@ -1003,6 +1005,8 @@ let close_c_call acc env ~loc ~let_bound_ids_with_kinds
         prim_c_builtin;
         prim_effects;
         prim_coeffects;
+        prim_critical;
+        prim_blocking;
         prim_native_name;
         prim_native_repr_args;
         prim_native_repr_res;
@@ -1048,8 +1052,9 @@ let close_c_call acc env ~loc ~let_bound_ids_with_kinds
         match has_unboxed_products with false -> "" | true -> prim_native_name
       in
       Primitive.make ~name:prim_name ~alloc:prim_alloc ~c_builtin:prim_c_builtin
-        ~effects:prim_effects ~coeffects:prim_coeffects
-        ~native_name:prim_native_name ~native_repr_args:prim_native_repr_args
+        ~effects:prim_effects ~coeffects:prim_coeffects ~critical:prim_critical
+        ~blocking:prim_blocking ~native_name:prim_native_name
+        ~native_repr_args:prim_native_repr_args
         ~native_repr_res:prim_native_repr_res
         ~is_layout_poly:prim_is_layout_poly
   in
@@ -1301,9 +1306,9 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Punboxed_float32_array_set_vec _ | Puntagged_int8_array_set_vec _
       | Puntagged_int16_array_set_vec _ | Punboxed_int32_array_set_vec _
       | Punboxed_int64_array_set_vec _ | Punboxed_nativeint_array_set_vec _
-      | Pctconst _ | Pint_as_pointer _ | Popaque _ | Psection _ | Pprobe_is_enabled _
-      | Pobj_dup | Pobj_magic _ | Pmakelazyblock _ | Punbox_vector _
-      | Punbox_unit
+      | Pctconst _ | Pint_as_pointer _ | Popaque _ | Psection _
+      | Pprobe_is_enabled _ | Pobj_dup | Pobj_magic _ | Pmakelazyblock _
+      | Punbox_vector _ | Punbox_unit
       | Pbox_vector (_, _)
       | Punbox_mask | Pbox_mask _ | Pjoin_vec256 | Psplit_vec256
       | Preinterpret_boxed_vector_as_tuple _
