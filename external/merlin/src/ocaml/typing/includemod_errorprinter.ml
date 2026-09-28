@@ -506,8 +506,14 @@ module With_shorthand = struct
     | Types.Mty_ident _
     | Types.Mty_alias _
     | Types.Mty_signature []
+<<<<<<< Merlin:unbox-stuff-and-moregen
     | Types.Mty_for_hole
     | Types.Mty_strengthen _
+||||||| Compiler:last-imported
+    | Types.Mty_strengthen _
+=======
+    | Types.Mty_strengthen _ | Types.Mty_with _
+>>>>>>> Compiler:HEAD
       -> Original r.item
     | Types.Mty_signature _ | Types.Mty_functor _
       -> Synthetic r

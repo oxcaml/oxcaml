@@ -160,15 +160,15 @@ val set_static_row_name: type_declaration -> Path.t -> unit
 (**** Utilities for type traversal ****)
 
 val iter_type_expr:
-  (type_expr -> unit) -> (Mode.With_locality.lr -> unit) ->
-  type_expr -> unit
+  (type_expr -> unit) @ local ->
+  (Mode.With_locality.lr -> unit) @ local -> type_expr -> unit
         (* Iteration on types *)
 val fold_type_expr:
-  ('a -> type_expr -> 'a) -> ('a -> Mode.With_locality.lr -> 'a) ->
-  'a -> type_expr -> 'a
-val iter_row: (type_expr -> unit) -> row_desc -> unit
+  ('a -> type_expr -> 'a) @ local ->
+  ('a -> Mode.With_locality.lr -> 'a) @ local -> 'a -> type_expr -> 'a
+val iter_row: (type_expr -> unit) @ local -> row_desc -> unit
         (* Iteration on types in a row *)
-val fold_row: ('a -> type_expr -> 'a) -> 'a -> row_desc -> 'a
+val fold_row: ('a -> type_expr -> 'a) @ local -> 'a -> row_desc -> 'a
 val iter_abbrev: (type_expr -> unit) -> abbrev_memo -> unit
         (* Iteration on types in an abbreviation list *)
 val iter_type_expr_kind: (type_expr -> unit) ->
@@ -225,11 +225,12 @@ val type_iterators_without_type_expr: type_iterators_without_type_expr
 (**** Utilities for copying ****)
 
 val copy_type_desc:
-    ?keep_names:bool -> (type_expr -> type_expr) ->
-    (Mode.With_locality.lr -> Mode.With_locality.lr) -> type_desc -> type_desc
+    ?keep_names:bool -> (type_expr -> type_expr) @ local ->
+    (Mode.With_locality.lr -> Mode.With_locality.lr) @ local ->
+    type_desc -> type_desc
         (* Copy on types *)
 val copy_row:
-    (type_expr -> type_expr) ->
+    (type_expr -> type_expr) @ local ->
     bool -> row_desc -> bool -> type_expr -> row_desc
 
 val copy_commu : commutable -> commutable

@@ -519,6 +519,17 @@ let iter_type_expr_with_stages f env fm ty =
   | _ ->
     iter_type_expr (f env) fm ty
 
+let fold_type_expr_with_stages f env fm init ty =
+  match get_desc ty with
+  | Tquote ty ->
+    f (incr_stage env) init ty
+  | Tsplice ty ->
+    f (decr_stage env) init ty
+  | Tquote_eval ty ->
+    f (incr_stage env) init ty
+  | _ ->
+    fold_type_expr (f env) fm init ty
+
 (* CR metaprogramming jbachurski: We use this to adjust the environment while
    printing error messages. The original type may have been well-staged,
    but since we always print (non-unification) errors at stage 0, we should
@@ -800,7 +811,7 @@ let[@inline] free_vars ~init ~add_one ?env mark tys =
           let acc =
             match Env.find_type_expansion path env with
             | exception Not_found -> acc
-            | (_, body, _) ->
+            | #(_, body, _) ->
                 if get_level body = generic_level then acc
                 else add_one ty None kind acc
           in
@@ -952,7 +963,7 @@ exception CCFailure of closed_class_failure
 let closed_class ~zap_scope params sign =
   with_type_mark begin fun mark ->
   List.iter (mark_type mark) params;
-  ignore (try_mark_node mark sign.csig_self_row);
+  mark_node mark sign.csig_self_row;
   try
     Meths.iter
       (fun lab (priv, _, ty) ->
@@ -1151,7 +1162,9 @@ let rec normalize_package_path env p =
   in
   match t with
   | Some (Mty_ident p) -> normalize_package_path env p
-  | Some (Mty_signature _ | Mty_functor _ | Mty_alias _ | Mty_strengthen _) | None ->
+  | Some (Mty_signature _ | Mty_functor _ | Mty_alias _
+         | Mty_strengthen _ | Mty_with _)
+  | None ->
       match p with
         Path.Pdot (p1, s) ->
           (* For module aliases *)
@@ -1240,7 +1253,7 @@ let rec update_level env level expand ty =
         let needs_expand =
           expand ||
           List.exists2
-            (fun var ty -> var = Variance.null && get_level ty > level)
+            (fun var ty -> Variance.is_null var && get_level ty > level)
             variance tl
         in
         begin try
@@ -1325,11 +1338,11 @@ let rec lower_contravariant env var_level visited contra ty =
             List.map (fun _ -> Variance.unknown) tyl,
             false
         in
-        if List.for_all ((=) Variance.null) variance then () else
+        if List.for_all Variance.is_null variance then () else
           let not_expanded () =
             List.iter2
               (fun v t ->
-                if v = Variance.null then () else
+                if Variance.is_null v then () else
                   if Variance.(mem May_weak v)
                   then lower_rec true t
                   else lower_rec contra t)
@@ -1507,8 +1520,7 @@ let abbreviations = ref (ref Mnil)
 
 (* partial: we may not wish to copy the non generic types
    before we call type_pat *)
-let rec copy ?partial ?keep_names ?(instantiate_modes = true) copy_scope ty =
-  let copy = copy ?partial ?keep_names ~instantiate_modes copy_scope in
+let rec copy ?partial ?keep_names ~instantiate_modes copy_scope ty =
   match get_desc ty with
     Tsubst (ty, _) -> ty
   | desc ->
@@ -1531,6 +1543,7 @@ let rec copy ?partial ?keep_names ?(instantiate_modes = true) copy_scope ty =
       newty2 ~level:forget
         (Tvar { name = None; jkind = Jkind.Builtin.any ~why:Dummy_jkind })
     else
+    let copy ty = copy ?partial ?keep_names ~instantiate_modes copy_scope ty in
     let t = newstub ~scope:(get_scope ty) (Jkind.Builtin.any ~why:Dummy_jkind) in
     For_copy.redirect_desc copy_scope ty (Tsubst (t, None));
     let desc' =
@@ -1550,7 +1563,7 @@ let rec copy ?partial ?keep_names ?(instantiate_modes = true) copy_scope ty =
              ation can be released by changing the content of just
              one reference.
           *)
-              Tconstr (p, List.map copy tl,
+              Tconstr (p, Misc.Stdlib.List.map copy tl,
                        ref (match !(!abbreviations) with
                               Mcons _ -> Mlink !abbreviations
                             | abbrev  -> abbrev))
@@ -1626,14 +1639,18 @@ let rec copy ?partial ?keep_names ?(instantiate_modes = true) copy_scope ty =
         let copy_mode =
           if instantiate_modes
           then
-            For_copy.mode_instantiate copy_scope
-              ~current_level:!current_level
+            let current_level = !current_level in
+            fun mode ->
+              For_copy.mode_instantiate copy_scope ~current_level mode
           else Fun.id
         in
         copy_type_desc ?keep_names copy copy_mode desc
     in
     Transient_expr.set_stub_desc t desc';
     t
+
+let copy ?partial ?keep_names ?(instantiate_modes = true) copy_scope ty =
+  copy ?partial ?keep_names ~instantiate_modes copy_scope ty
 
 (**** Variants of instantiations ****)
 
@@ -2437,7 +2454,7 @@ let expand_abbrev_gen kind find_type_expansion env ty =
           let path' = Env.normalize_type_path None env path in
           if Path.same path path' then raise Cannot_expand
           else newty2 ~level (Tconstr (path', args, abbrev))
-      | (params, body, lv) ->
+      | #(params, body, lv) ->
           (* prerr_endline
              ("add a "^string_of_kind kind^" expansion for "^Path.name path);*)
           let ty' =
@@ -3079,6 +3096,7 @@ let mk_is_abstract env p =
   -> false
 
 let mk_jkind_context env jkind_of_type =
+  exclave_
   let lookup_type p =
     match Env.find_type p env with
     | decl -> Some decl
@@ -3344,10 +3362,12 @@ let estimate_type_jkind =
 
 (* After type_jkind_purely_if_principal is defined, we can use it directly *)
 let mk_jkind_context_check_principal env =
-  mk_jkind_context env (type_jkind_purely_if_principal env)
+  exclave_
+  mk_jkind_context env (fun ty -> type_jkind_purely_if_principal env ty)
 
 (* For cases where we always want Some (type_jkind_purely env ty) *)
 let mk_jkind_context_always_principal env =
+  exclave_
   mk_jkind_context env (fun ty -> Some (type_jkind_purely env ty))
 
 (**** checking jkind relationships ****)
@@ -3378,8 +3398,9 @@ let constrain_type_jkind ~fixed env ty jkind =
      Trying to apply the modality to the jkind extracted from [ty] would be
      wrong, as it would incorrectly change the jkind on a [Tvar] to mode-cross
      more than necessary.  *)
-  let rec loop ~fuel ~expanded env ty ty's_jkind jkind =
-    let type_equal = !type_equal' env in
+  let rec loop ~fixed ~fuel ~expanded env ty ty's_jkind jkind =
+    let type_equal = !type_equal' in
+    let type_equal ty1 ty2 = type_equal env ty1 ty2 in
     let context = mk_jkind_context_check_principal env in
     (* Just succeed if we're comparing against [any] *)
     if Jkind.is_obviously_max jkind then Ok () else
@@ -3430,17 +3451,17 @@ let constrain_type_jkind ~fixed env ty jkind =
 
          But if we ever choose to substitute min mod-bounds for [Tunivar]s, we
          must do so here. Internal ticket 5746. *)
-      loop ~fuel ~expanded:false env t ty's_jkind jkind
+      loop ~fixed ~fuel ~expanded:false env t ty's_jkind jkind
 
     (* CR metaprogramming jbachurski: These should update the stage, which
        means this function should pass the context explicitly. *)
     (* CR quoted-kinds jbachurski: These quote/splice [ty's_jkind]. *)
     | Tquote ty ->
-      loop ~fuel ~expanded (incr_stage env) ty ty's_jkind jkind
+      loop ~fixed ~fuel ~expanded (incr_stage env) ty ty's_jkind jkind
     | Tsplice ty ->
-      loop ~fuel ~expanded (decr_stage env) ty ty's_jkind jkind
+      loop ~fixed ~fuel ~expanded (decr_stage env) ty ty's_jkind jkind
     | Tquote_eval ty ->
-      loop ~fuel ~expanded (incr_stage env) ty ty's_jkind jkind
+      loop ~fixed ~fuel ~expanded (incr_stage env) ty ty's_jkind jkind
 
     | _ ->
        if !Clflags.ikinds_debug
@@ -3543,7 +3564,7 @@ let constrain_type_jkind ~fixed env ty jkind =
                            field reveals one layer deeper of the layout tree. *)
                         (* CR-someday rtjoa: The above should be solved with
                            layout_of instead. *)
-                        estimate_jkind_and_loop ~fuel ~expanded:false env
+                        estimate_jkind_and_loop ~fixed ~fuel ~expanded:false env
                           unwrapped_ty.ty jkind
                       | _ ->
                         (* In this case, there's nothing to gain by
@@ -3551,7 +3572,7 @@ let constrain_type_jkind ~fixed env ty jkind =
                            will successfully recurse into it, or it's not a
                            product and (because it's not [any]) re-estimating
                            won't change that. *)
-                        loop ~fuel ~expanded:false env unwrapped_ty.ty
+                        loop ~fixed ~fuel ~expanded:false env unwrapped_ty.ty
                           ty's_jkind jkind)
                    unwrapped_tys ty's_jkinds jkinds
                in
@@ -3605,7 +3626,7 @@ let constrain_type_jkind ~fixed env ty jkind =
              | Some ty's_jkinds, Some jkinds
                   when List.length ty's_jkinds = num_components
                        && List.length jkinds = num_components ->
-               recur ty's_jkinds jkinds
+               recur ty's_jkinds jkinds [@nontail]
              | Some ty's_jkinds, None
                   when Jkind.has_layout_any env jkind
                     && List.length ty's_jkinds = num_components ->
@@ -3613,6 +3634,7 @@ let constrain_type_jkind ~fixed env ty jkind =
                   mode-crossing restrictions, so we recur, just duplicating
                   the jkind. *)
                recur ty's_jkinds (List.init num_components (fun _ -> jkind))
+               [@nontail]
              | _ ->
                (* Products don't line up. This is only possible if [ty] was
                   given a jkind annotation of the wrong product arity.
@@ -3632,7 +3654,8 @@ let constrain_type_jkind ~fixed env ty jkind =
             with
             | Ok jkind ->
               (match
-                estimate_jkind_and_loop ~fuel ~expanded:false env ty jkind
+                estimate_jkind_and_loop ~fixed ~fuel ~expanded:false
+                  env ty jkind
               with
               | Ok () -> Ok ()
               | Error _ ->
@@ -3641,19 +3664,19 @@ let constrain_type_jkind ~fixed env ty jkind =
                    type on the left, return the original error.
                    We could do something smarter here, updating the [loop]-ed
                    error to have correct jkinds. *)
-                error ())
+                error () [@nontail])
             | Error () ->
               (* CR or_null:
                  [_ or_null] fails against a non-null jkind.
                  We could still estimate the kind on the left better. *)
-              error ()
+              error () [@nontail]
           in
           match get_desc ty with
           | Tconstr _ ->
              if not expanded
              then
                let ty = expand_head_opt env ty in
-               estimate_jkind_and_loop ~fuel ~expanded:true env ty jkind
+               estimate_jkind_and_loop ~fixed ~fuel ~expanded:true env ty jkind
              else
                begin match unbox_once env (mk_unwrapped_type_expr ty) with
                | Missing path ->
@@ -3666,12 +3689,12 @@ let constrain_type_jkind ~fixed env ty jkind =
                       (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
                | Stepped { ty; modality; or_null = None } ->
                  let jkind = Jkind.apply_modality_r modality jkind in
-                 estimate_jkind_and_loop ~fuel:(fuel - 1) ~expanded:false env ty
-                    jkind
+                 estimate_jkind_and_loop ~fixed ~fuel:(fuel - 1)
+                   ~expanded:false env ty jkind
                | Stepped { ty; modality; or_null = Some _ } ->
-                 or_null ~fuel:(fuel - 1) ty modality
+                 or_null ~fuel:(fuel - 1) ty modality [@nontail]
                | Stepped_record_unboxed_product unwrapped_tys ->
-                 product ~fuel:(fuel - 1) unwrapped_tys
+                 product ~fuel:(fuel - 1) unwrapped_tys [@nontail]
                end
           | Tunboxed_tuple ltys ->
             (* Note: here we "duplicate" the fuel, which may seem like cheating.
@@ -3679,11 +3702,11 @@ let constrain_type_jkind ~fixed env ty jkind =
                infinitely expanding a recursive type. In a wide tuple, we many
                need to expand many types shallowly, and that's fine. *)
             product ~fuel (List.map (fun (_, ty) ->
-              mk_unwrapped_type_expr ty) ltys)
+              mk_unwrapped_type_expr ty) ltys) [@nontail]
           | _ ->
             Error (Jkind.Violation.of_ ~context env
                 (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
-  and estimate_jkind_and_loop ~fuel ~expanded env ty jkind : _ result =
+  and estimate_jkind_and_loop ~fixed ~fuel ~expanded env ty jkind : _ result =
     (* If [jkind]'s bound's are all max, then we immediately know that the
        mod-bounds already agree. But in such a case, we may still need to
        constrain layouts. So we still continue, but we avoid performing any
@@ -3693,9 +3716,9 @@ let constrain_type_jkind ~fixed env ty jkind =
     let jkind = Jkind.fully_expand_aliases env jkind in
     let ignore_mod_bounds = Jkind.mod_bounds_are_obviously_max jkind in
     let ty's_jkind = estimate_type_jkind ~ignore_mod_bounds env ty in
-    loop ~fuel ~expanded env ty ty's_jkind jkind
+    loop ~fixed ~fuel ~expanded env ty ty's_jkind jkind
   in
-  estimate_jkind_and_loop ~fuel:100 ~expanded:false env ty
+  estimate_jkind_and_loop ~fixed ~fuel:100 ~expanded:false env ty
     (Jkind.disallow_left jkind)
 
 let estimate_type_jkind = estimate_type_jkind ~ignore_mod_bounds:false
@@ -3815,6 +3838,7 @@ let rec intersect_type_jkind ~reason env ty1 jkind2 =
     match jkind1, jkind2 with
     | Some jkind1, Some jkind2 ->
       Jkind.intersection ~type_equal ~context ~reason env jkind1 jkind2
+      [@nontail]
     | _, _ -> Jkind.Unknown
 
 (* See comment on [jkind_unification_mode] *)
@@ -3882,7 +3906,7 @@ let full_expand ~may_forget_scope env ty =
 *)
 let generic_abbrev env path =
   try
-    let (_, body, _) = Env.find_type_expansion path env in
+    let #(_, body, _) = Env.find_type_expansion path env in
     get_level body = generic_level
   with
     Not_found ->
@@ -3898,11 +3922,13 @@ let generic_private_abbrev env path =
     | _ -> false
   with Not_found -> false
 
-let is_contractive env p =
-  try
-    let decl = Env.find_type p env in
-    in_pervasives p && decl.type_manifest = None || is_datatype decl
-  with Not_found -> false
+let is_contractive_with_rectypes_decl p decl =
+  in_pervasives p && decl.type_manifest = None || is_datatype decl
+
+let is_contractive_with_rectypes env p =
+  match Env.find_type p env with
+  | decl -> is_contractive_with_rectypes_decl p decl
+  | exception Not_found -> false
 
 
                               (*****************)
@@ -3912,39 +3938,139 @@ let is_contractive env p =
 
 exception Occur
 
-let rec occur_rec env visited allow_recursive parents ty0 ty =
-  if not_marked_node visited ty then begin
+let rec occur_fast visited allow_recursive ty0 ty =
+  if try_mark_node visited ty then begin
     if eq_type ty ty0 then raise Occur;
     begin match get_desc ty with
-      Tconstr(p, _tl, _abbrev) ->
-        if allow_recursive && is_contractive env p then () else
-        begin try
-          if TypeSet.mem ty parents then raise Occur;
-          let parents = TypeSet.add ty parents in
-          iter_type_expr
-            (occur_rec env visited allow_recursive parents ty0)
-            (Fun.const ()) ty
-        with Occur -> try
-          let ty' = try_expand_head try_expand_safe env ty in
-          (* This call used to be inlined, but there seems no reason for it.
-            Message was referring to change in rev. 1.58 of the CVS repo. *)
-          occur_rec env visited allow_recursive parents ty0 ty'
-        with Cannot_expand ->
-          raise Occur
-        end
+    | Tconstr(_, _ :: _, _abbrev) ->
+        iter_type_expr (occur_fast visited allow_recursive ty0) (Fun.const ()) ty
     | Tobject _ | Tvariant _ ->
         ()
     | _ ->
-        if allow_recursive ||  TypeSet.mem ty parents then () else begin
-          let parents = TypeSet.add ty parents in
-          iter_type_expr_with_stages
-            (fun env -> occur_rec env visited allow_recursive parents ty0)
-            env
-            (Fun.const ()) ty
+        if not allow_recursive then begin
+          iter_type_expr
+            (occur_fast visited allow_recursive ty0) (Fun.const ()) ty
         end
-    end;
-    ignore (try_mark_node visited ty)
+    end
   end
+
+let rec occur_precise env visited occurs allow_recursive ty0 ty =
+  if not (try_mark_node visited ty) then not_marked_node occurs ty
+  else begin
+    let safe =
+      if eq_type ty ty0 then false
+      else begin
+        match get_desc ty with
+        | Tconstr(_, [], _) -> true
+        | Tconstr(p, tl, _abbrev) ->
+            begin match Env.find_type p env with
+            | exception Not_found ->
+                fold_type_expr
+                  (fun acc ty ->
+                     occur_precise env visited occurs allow_recursive ty0 ty
+                     && acc)
+                  (fun acc _ -> acc) true ty
+            | decl ->
+                if allow_recursive && is_contractive_with_rectypes_decl p decl
+                then true
+                else
+                  List.fold_left2
+                    (fun acc v t ->
+                       if Variance.(mem May_noncontractive v) then
+                         occur_precise env visited occurs allow_recursive ty0 t
+                         && acc
+                       else
+                         acc)
+                    true decl.type_variance tl
+            end
+        | Tobject _ | Tvariant _ ->
+            true
+        | _ ->
+            if allow_recursive then true else begin
+              fold_type_expr_with_stages
+                (fun env acc ty ->
+                   occur_precise env visited occurs allow_recursive ty0 ty && acc)
+                env (fun acc _ -> acc) true ty
+            end
+      end
+    in
+    if not safe then mark_node occurs ty;
+    safe
+  end
+
+let rec occur_with_expansion
+    env visited_with_expansion visited_precise occurs allow_recursive ty0 ty =
+  if try_mark_node visited_with_expansion ty then begin
+    (* Nodes not yet seen by [occur_precise] were created by an expansion.
+       Classify them first, so that we only expand abbreviations whose
+       arguments are known to contain [ty0]. *)
+    let unsafe =
+      if not_marked_node visited_precise ty then
+        not (occur_precise env visited_precise occurs allow_recursive ty0 ty)
+      else marked_node occurs ty
+    in
+    if unsafe then begin
+      if eq_type ty ty0 then raise Occur;
+      begin match get_desc ty with
+      | Tconstr(p, ((_ :: _) as tl), _) ->
+          begin match Env.find_type p env with
+          | exception Not_found ->
+              iter_type_expr
+                (occur_with_expansion
+                   env visited_with_expansion visited_precise
+                   occurs allow_recursive ty0)
+                (Fun.const ()) ty
+          | decl ->
+              if allow_recursive && is_contractive_with_rectypes_decl p decl
+              then ()
+              else begin
+                match try_expand_head try_expand_safe env ty with
+                | ty' ->
+                    occur_with_expansion
+                      env visited_with_expansion visited_precise
+                      occurs allow_recursive ty0 ty'
+                | exception Cannot_expand ->
+                    List.iter2
+                      (fun v t ->
+                         if Variance.(mem May_noncontractive v) then
+                           occur_with_expansion
+                             env visited_with_expansion visited_precise
+                             occurs allow_recursive ty0 t)
+                      decl.type_variance tl
+              end
+          end
+      | Tobject _ | Tvariant _ ->
+          ()
+      | _ ->
+          if not allow_recursive then begin
+            iter_type_expr_with_stages
+              (fun env ->
+                 occur_with_expansion
+                   env visited_with_expansion visited_precise
+                   occurs allow_recursive ty0)
+              env (Fun.const ()) ty
+          end
+      end
+    end
+  end
+
+let occur_full env allow_recursive ty0 ty =
+  match
+    with_type_mark (fun visited ->
+      occur_fast visited allow_recursive ty0 ty)
+  with
+  | () -> ()
+  | exception Occur ->
+      with_type_mark (fun visited_precise ->
+        with_type_mark (fun occurs ->
+          let safe =
+            occur_precise env visited_precise occurs allow_recursive ty0 ty
+          in
+          if not safe then begin
+            with_type_mark (fun visited_with_expansion ->
+              occur_with_expansion env visited_with_expansion
+                visited_precise occurs allow_recursive ty0 ty)
+          end))
 
 let type_changed = ref false (* trace possible changes to the studied type *)
 
@@ -3957,9 +4083,9 @@ let occur uenv ty0 ty =
   try
     while
       type_changed := false;
-      if not (eq_type ty0 ty) then
-        with_type_mark (fun mark ->
-          occur_rec env mark allow_recursive TypeSet.empty ty0 ty);
+      if not (eq_type ty0 ty) then begin
+        occur_full env allow_recursive ty0 ty
+      end;
       !type_changed
     do () (* prerr_endline "changed" *) done;
     merge type_changed old
@@ -3986,22 +4112,28 @@ let rec local_non_recursive_abbrev ~allow_rec strict visited env p ty =
     match get_desc ty with
       Tconstr(p', args, _abbrev) ->
         if Path.same p p' then raise Occur;
-        if allow_rec && not strict && is_contractive env p' then () else
+        if allow_rec
+           && not strict && is_contractive_with_rectypes env p' then () else
         let visited = get_id ty :: visited in
         begin try
           (* try expanding, since [p] could be hidden *)
           local_non_recursive_abbrev ~allow_rec strict visited env p
             (try_expand_head try_expand_safe_opt env ty)
         with Cannot_expand ->
-          let params =
-            try (Env.find_type p' env).type_params
-            with Not_found -> args
+          let params, variance =
+            match Env.find_type p' env with
+            | decl -> decl.type_params, decl.type_variance
+            | exception Not_found ->
+                let variance = List.map (fun _ -> Variance.unknown) args in
+                args, variance
           in
-          List.iter2
-            (fun tv ty ->
-              let strict = strict || not (is_Tvar tv) in
-              local_non_recursive_abbrev ~allow_rec strict visited env p ty)
-            params args
+          Stdlib.List.iter3
+            (fun tv ty v ->
+               if strict || Variance.(mem May_noncontractive v) then begin
+                 let strict = strict || not (is_Tvar tv) in
+                 local_non_recursive_abbrev ~allow_rec strict visited env p ty
+               end)
+            params args variance
         end
     | Tobject _ | Tvariant _ when not strict ->
         ()
@@ -4096,7 +4228,7 @@ let occur_univar ?(inj_only=false) env ty =
   let rec occur_rec env bound ty =
     if not_marked_node mark ty then
       if TypeSet.is_empty bound then
-        (ignore (try_mark_node mark ty); occur_desc env bound ty)
+        (mark_node mark ty; occur_desc env bound ty)
       else try
         let bound' = TypeMap.find ty !visited in
         if not (TypeSet.subset bound' bound) then begin
@@ -4131,7 +4263,7 @@ let occur_univar ?(inj_only=false) env ty =
                    in this position. Physical expansion, as done in `occur`,
                    would be costly here, since we need to check inside
                    object and variant types too. *)
-                if Variance.(if inj_only then mem Inj v else not (eq v null))
+                if Variance.(if inj_only then mem Inj v else not (is_null v))
                 then occur_rec env bound t)
               tl td.type_variance
           with Not_found ->
@@ -4187,7 +4319,7 @@ let univars_escape env univar_pairs vl ty =
             let td = Env.find_type p env in
             List.iter2
               (* see occur_univar *)
-              (fun t v -> if not Variance.(eq v null) then occur env t)
+              (fun t v -> if not (Variance.is_null v) then occur env t)
               tl td.type_variance
           with Not_found ->
             List.iter (occur env) tl
@@ -6457,7 +6589,7 @@ let zap_modalities_to_floor_if_at_least level =
 
 let crossing_of_jkind env jkind =
   let context = mk_jkind_context_check_principal env in
-  Ikind.crossing_of_jkind ~context env jkind
+  Ikind.crossing_of_jkind ~context env jkind [@nontail]
 
 let crossing_of_ty env ?modalities ty =
   let principal = is_principal ty in
@@ -6566,6 +6698,175 @@ let moregen_mode_with_locality env ~is_ret ty v a1 a2 =
       if is_ret then Return else Argument
     in
     raise_for Moregen (Mode_mismatch (pos, e))
+
+let rec path_scope : Path.t -> int =
+  function
+  | Papply (f, _) -> path_scope f
+  | Pdot (p, _) | Pextra_ty (p, _) -> path_scope p
+  | Pident id ->
+    if Ident.is_predef id then -1
+    else Ident.scope id
+
+let try_expand_path env p =
+  match Env.find_type_expansion p env with
+  | #(params, body, _lv) ->
+    begin match get_desc body with
+    | Tconstr (p', args, _)
+        when args == params ||
+             List.equal eq_type args params ->
+        Some p'
+    | _ -> None
+    end
+  | exception Not_found -> None
+
+let rec path_same_expanded env p1 p2 =
+  if Path.same p1 p2 then true
+  else begin
+    let p1, p2 =
+      if path_scope p1 < path_scope p2
+      then p1, p2
+      else p2, p1
+    in
+    match try_expand_path env p2 with
+    | Some p2 -> path_same_expanded env p1 p2
+    | None ->
+      match try_expand_path env p1 with
+      | Some p1 -> path_same_expanded env p1 p2
+      | None -> false
+  end
+
+let path_same_normalized env p1 p2 =
+  if Path.same p1 p2
+  then true
+  else begin
+    let p1 = Env.normalize_type_path None env p1 in
+    let p2 = Env.normalize_type_path None env p2 in
+    path_same_expanded env p1 p2
+  end
+
+
+exception Complicated_moregen
+
+let moregen_mode_fast v m1 m2 =
+  let ok =
+    match v with
+    | Invariant -> With_locality.Guts.(le_loose m1 m2 && le_loose m2 m1)
+    | Covariant -> With_locality.Guts.le_loose m1 m2
+    | Contravariant -> With_locality.Guts.le_loose m2 m1
+    | Bivariant -> true
+  in
+  if not ok then raise_notrace Complicated_moregen
+
+let some_neg_variance = function
+  (* pre-allocated for hot path *)
+  | Invariant -> Some Invariant
+  | Covariant -> Some Contravariant
+  | Contravariant -> Some Covariant
+  | Bivariant -> Some Bivariant
+
+(* The layout of [ty], for the shapes of [ty] where computing it is cheap and
+   needs no mutation; raises [Complicated_moregen] otherwise. *)
+let mgen_fast_estimate_layout _env _subst ty =
+  match get_desc ty with
+  (* CR zeisbach: maybe we could improve the cases we cover here... *)
+  | Tvar { jkind } ->
+    (* Expanding a kind abbreviation needs the environment; bail instead. *)
+    begin match jkind.jkind.base with
+    | Kconstr _ -> raise_notrace Complicated_moregen
+    | Layout layout ->
+      match Jkind_types.Layout.get_const layout with
+      | Some layout -> layout
+      | None -> raise_notrace Complicated_moregen
+    end
+  (* FIXME: maybe a better [Tconstr] check could be done? *)
+  | Tarrow _ | Ttuple _ | Tobject _ | Tpackage _ ->
+    Jkind_types.Layout.Const.Static.scannable_non_null_non_float
+  | _ -> raise_notrace Complicated_moregen
+
+let rec mgen_fast env subst scope maxnodes variance t1 t2 =
+  decr maxnodes;
+  if !maxnodes = 0 then raise_notrace Complicated_moregen;
+  if eq_type t1 t2 then () else
+  match get_desc t1, get_desc t2 with
+  | Tsubst (ty, _), _ when eq_type ty t2 -> ()
+  | Tvar { jkind }, _ when get_level t1 = generic_level ->
+    (* Properly computing the mod bounds of [t2] is expensive, so we avoid it.
+       But if the mod bounds of [jkind] are max (and the kind isn't abstract),
+       then only the layouts matter, and we can compare those. This is cheap
+       based on [t2]'s shape; otherwise, bail. *)
+    if not (Jkind.is_obviously_max jkind) then begin
+      let layout1 =
+        match jkind.jkind.base with
+        | Kconstr _ -> raise_notrace Complicated_moregen
+        | Layout layout1 -> layout1
+      in
+      if not (Jkind.mod_bounds_are_obviously_max jkind) then
+        raise_notrace Complicated_moregen;
+      let layout2 = mgen_fast_estimate_layout env subst t2 in
+      match Jkind_types.Layout.get_const layout1 with
+      | Some layout1 when Jkind_types.Layout.Const.equal layout1 layout2 -> ()
+      | _ -> raise_notrace Complicated_moregen
+    end;
+    For_copy.redirect_desc scope t1 (Tsubst (t2, None))
+  | Tarrow ((l1,a1,r1), t1, u1, _), Tarrow ((l2,a2,r2), t2, u2, _)
+       when l1 = l2 ->
+    begin match variance with
+    | None -> raise_notrace Complicated_moregen
+    | Some v ->
+      moregen_mode_fast (neg_variance v) a1 a2;
+      moregen_mode_fast v r1 r2;
+      mgen_fast env subst scope maxnodes (some_neg_variance v) t1 t2;
+      mgen_fast env subst scope maxnodes variance u1 u2
+    end
+  | Ttuple tl1, Ttuple tl2 ->
+    mgen_fast_labeled env subst scope maxnodes variance tl1 tl2
+  | Tunboxed_tuple tl1, Tunboxed_tuple tl2 ->
+    mgen_fast_labeled env subst scope maxnodes variance tl1 tl2
+  | Tconstr (p1, tl1, _), Tconstr (p2, tl2, _) ->
+    (* FIXME: easy cases of alias expansion? *)
+    let p2 =
+      try Subst.type_path subst p2
+      with Subst.Not_path -> raise_notrace Complicated_moregen
+    in
+    if not (path_same_normalized env p1 p2) then
+      raise_notrace Complicated_moregen;
+    mgen_fast_list env subst scope maxnodes tl1 tl2
+  | Tpoly (t1, []), Tpoly(t2, []) ->
+    mgen_fast env subst scope maxnodes variance t1 t2
+  (* FIXME: handling of [Tvariant]? Annoying but does come up... *)
+  | _, _ ->
+    raise_notrace Complicated_moregen
+
+and mgen_fast_list env subst scope maxnodes tl1 tl2 =
+  match tl1, tl2 with
+  | [], [] -> ()
+  | t1 :: tl1, t2 :: tl2 ->
+    mgen_fast env subst scope maxnodes None t1 t2;
+    mgen_fast_list env subst scope maxnodes tl1 tl2
+  | _, _ -> raise_notrace Complicated_moregen
+
+and mgen_fast_labeled env subst scope maxnodes variance tl1 tl2 =
+  match tl1, tl2 with
+  | [], [] -> ()
+  | (l1, t1) :: tl1, (l2, t2) :: tl2 ->
+    (* This is an actual failure, but we raise [Complicated_moregen] so that
+       the slow path can give a nicer error. *)
+    if not (Option.equal String.equal l1 l2) then
+      raise_notrace Complicated_moregen;
+    mgen_fast env subst scope maxnodes variance t1 t2;
+    mgen_fast_labeled env subst scope maxnodes variance tl1 tl2
+  | _, _ -> raise_notrace Complicated_moregen
+
+let moregeneral_fast env patt subst subj =
+  For_copy.with_scope (fun scope ->
+    let snap = snapshot () in
+    (* Fixed upper limit of the number of nodes,
+       so that we don't diverge on equirecursive types *)
+    let maxnodes = ref 200 in
+    match mgen_fast env subst scope maxnodes (Some Covariant) patt subj with
+    | () -> true
+    | exception (Complicated_moregen | Moregen_trace _) ->
+      backtrack snap; false)
 
 let may_instantiate inst_nongen t1 =
   let level = get_level t1 in
@@ -6877,7 +7178,7 @@ and moregen_row inst_nongen variance type_pairs env row1 row2 =
    Usually, the subject is given by the user, and the pattern
    is unimportant.  So, no need to propagate abbreviations.
 *)
-let moregeneral ~self_check env inst_nongen
+let moregeneral_slow ~self_check env inst_nongen
     pat_sch_sorts subj_sch_sorts pat_sch subj_sch =
   let instantiate_modes = not self_check in
   (* Moregen splits the generic level into two finer levels:
@@ -6948,9 +7249,26 @@ let moregeneral ~self_check env inst_nongen
     | _, Error trace -> raise (Moregen (expand_to_moregen_error env trace))
   end
 
+
+let moregeneral ~self_check env inst_nongen
+    pat_sch_sorts subj_sch_sorts pat_sch subst subj_sch =
+  (* The fast path does not handle layout-polymorphic schemes, so only try it
+     when there are no sort variables on either side. *)
+  let fast =
+    match pat_sch_sorts, subj_sch_sorts with
+    | [], [] -> moregeneral_fast env pat_sch subst subj_sch
+    | _, _ -> false
+  in
+  if fast then []
+  else
+    let subj_sch = Subst.type_expr subst subj_sch in
+    moregeneral_slow ~self_check env inst_nongen
+      pat_sch_sorts subj_sch_sorts pat_sch subj_sch
+
 let is_moregeneral env inst_nongen pat_sch subj_sch =
   match
-    moregeneral ~self_check:false env inst_nongen [] [] pat_sch subj_sch
+    moregeneral ~self_check:false env inst_nongen [] []
+      pat_sch Subst.identity subj_sch
   with
   | _ -> true
   | exception Moregen _ -> false
