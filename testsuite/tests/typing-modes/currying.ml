@@ -66,7 +66,7 @@ let ill_typed () = g 1 2 3 4 5
 Line 1, characters 29-30:
 1 | let ill_typed () = g 1 2 3 4 5
                                  ^
-Error: This extra argument is not expected.
+Error: This extra argument "5" is not expected.
 Line 1, characters 19-30:
 1 | let ill_typed () = g 1 2 3 4 5
                        ^^^^^^^^^^^

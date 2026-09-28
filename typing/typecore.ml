@@ -205,7 +205,8 @@ type error =
       func_ty : type_expr;
       res_ty : type_expr;
       previous_arg_loc : Location.t;
-      extra_arg_loc : Location.t;
+      extra_arg_label : arg_label;
+      extra_arg : Parsetree.expression;
     }
   | Apply_wrong_label of arg_label * type_expr * bool
   | Label_multiply_defined of string
@@ -5168,7 +5169,8 @@ let collect_unknown_apply_args env funct ty_fun0 mode_fun rev_args sargs
                     func_ty = expand_head env funct.exp_type;
                     res_ty = expand_head env ty_res;
                     previous_arg_loc = previous_arg_loc rev_args ~funct;
-                    extra_arg_loc = sarg.pexp_loc; }))
+                    extra_arg_label = lbl;
+                    extra_arg = sarg; }))
         in
         let arg =
           Unknown_arg { sarg; ty_arg_mono; mode_fun; mode_arg; sort_arg }
@@ -13287,8 +13289,9 @@ let report_unification_error ~loc ?sub env err
   ) ()
 
 let report_too_many_arg_error ~funct ~func_ty ~previous_arg_loc
-    ~extra_arg_loc ~returns_unit loc =
+    ~extra_arg_label ~extra_arg ~returns_unit loc =
   let open Location in
+  let extra_arg_loc = extra_arg.pexp_loc in
   let cnum_offset off (pos : Lexing.position) =
     { pos with pos_cnum = pos.pos_cnum + off }
   in
@@ -13305,7 +13308,18 @@ let report_too_many_arg_error ~funct ~func_ty ~previous_arg_loc
       loc_end = cnum_offset ~+1 arg_end;
       loc_ghost = false }
   in
-  errorf ~loc:extra_arg_loc "This extra argument is not expected."
+  let pp_extra_arg_name ppf =
+    match extra_arg_label with
+    | Nolabel ->
+        Option.iter
+          (fprintf ppf " %a" (Style.as_inline_code pp_doc))
+          (Pprintast.Doc.nominal_exp extra_arg)
+    | Labelled _ | Optional _ | Position _ ->
+        fprintf ppf " %a" Style.inline_code
+          (prefixed_label_name extra_arg_label)
+  in
+  errorf ~loc:extra_arg_loc "This extra argument%t is not expected."
+    pp_extra_arg_name
     ~sub:(
       let semicolon =
         if returns_unit then
@@ -13431,7 +13445,7 @@ let report_error ~loc env =
            (fprintf ppf " on %a" (Style.as_inline_code Printtyp.type_expr))
            type_with_local_equation)
   | Apply_non_function {
-      funct; func_ty; res_ty; previous_arg_loc; extra_arg_loc
+      funct; func_ty; res_ty; previous_arg_loc; extra_arg_label; extra_arg
     } ->
       begin match get_desc func_ty with
         Tarrow _ ->
@@ -13440,7 +13454,7 @@ let report_error ~loc env =
             | _ -> false
           in
           report_too_many_arg_error ~funct ~func_ty ~previous_arg_loc
-            ~extra_arg_loc ~returns_unit loc
+            ~extra_arg_label ~extra_arg ~returns_unit loc
       | _ ->
           Location.errorf ~loc "@[<v>@[<2>This expression has type@ %a@]@ %s@]"
             (Style.as_inline_code Printtyp.type_expr) func_ty
