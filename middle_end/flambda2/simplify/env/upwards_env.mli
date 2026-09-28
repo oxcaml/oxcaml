@@ -32,6 +32,7 @@ val add_non_inlinable_continuation :
   Are_rebuilding_terms.t ->
   t ->
   Continuation.t ->
+  is_cold:bool ->
   params:Bound_parameters.t ->
   handler:
     (Rebuilt_expr.t
@@ -66,6 +67,8 @@ val add_function_return_or_exn_continuation :
 val find_continuation : t -> Continuation.t -> Continuation_in_env.t
 
 val mem_continuation : t -> Continuation.t -> bool
+
+val is_cold_continuation : t -> Continuation.t -> bool
 
 val find_continuation_shortcut :
   t -> Continuation.t -> Continuation_shortcut.t option

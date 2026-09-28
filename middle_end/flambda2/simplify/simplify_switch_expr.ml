@@ -806,9 +806,10 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
                of continuations in [Name_occurrences] and then try to inline out
                [dest]. This might happen anyway in the backend though so this
                probably isn't that important for now. *)
+            let is_cold = UE.is_cold_continuation (UA.uenv uacc) dest in
             let apply_cont = Apply_cont.create dest ~args ~dbg in
             return
-              (RE.create_apply_cont apply_cont)
+              (RE.create_apply_cont ~is_cold apply_cont)
               ~added_code_size:(Code_size.apply_cont apply_cont)
               ~free_names:(Apply_cont.free_names apply_cont)
           | special_arg :: special_args ->

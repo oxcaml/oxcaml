@@ -16,6 +16,7 @@
 
 type t =
   { continuations : Continuation_in_env.t Continuation.Map.t;
+    cold_continuations : Continuation.Set.t;
     continuation_shortcuts : Continuation_shortcut.t Continuation.Map.t;
     unique_handlers_map :
       Continuation.t Rebuilt_expr.Unique_continuation_handlers.t;
@@ -27,6 +28,7 @@ type t =
 
 let create are_rebuilding_terms ~machine_width =
   { continuations = Continuation.Map.empty;
+    cold_continuations = Continuation.Set.empty;
     continuation_shortcuts = Continuation.Map.empty;
     unique_handlers_map = Rebuilt_expr.Unique_continuation_handlers.empty;
     apply_cont_rewrites = Continuation.Map.empty;
@@ -37,16 +39,18 @@ let create are_rebuilding_terms ~machine_width =
 let machine_width t = t.machine_width
 
 let [@ocamlformat "disable"] print ppf
-    { continuations; unique_handlers_map = _;
+    { continuations; cold_continuations; unique_handlers_map = _;
       apply_cont_rewrites; are_rebuilding_terms ;
       continuation_shortcuts; machine_width = _ } =
   Format.fprintf ppf "@[<hov 1>(\
       @[<hov 1>(continuations@ %a)@]@ \
+      @[<hov 1>(cold_continuations@ %a)@]@ \
       @[<hov 1>(continuation_shortcuts@ %a)@]@ \
       @[<hov 1>(apply_cont_rewrites@ %a)@]\
       )@]"
     (Continuation.Map.print (Continuation_in_env.print are_rebuilding_terms))
     continuations
+    Continuation.Set.print cold_continuations
     (Continuation.Map.print Continuation_shortcut.print)
     continuation_shortcuts
     (Continuation.Map.print Apply_cont_rewrite.print)
@@ -60,6 +64,8 @@ let find_continuation t cont =
   | cont_in_env -> cont_in_env
 
 let mem_continuation t cont = Continuation.Map.mem cont t.continuations
+
+let is_cold_continuation t cont = Continuation.Set.mem cont t.cold_continuations
 
 let check_shortcut_transitivity t cont shortcut_to =
   if
@@ -101,8 +107,13 @@ let add_unique_continuation_handler are_rebuilding_terms t cont ~params ~handler
     in
     { t with unique_handlers_map }
 
-let add_non_inlinable_continuation are_rebuilding_terms t cont ~params ~handler
-    =
+let add_cold_continuation t cont =
+  let cold_continuations = Continuation.Set.add cont t.cold_continuations in
+  { t with cold_continuations }
+
+let add_non_inlinable_continuation are_rebuilding_terms t cont ~is_cold ~params
+    ~handler =
+  let t = if is_cold then add_cold_continuation t cont else t in
   let t, handler =
     match (handler : _ Or_unknown.t) with
     | Known (handler, ~is_exn_handler, ~free_names_without_params) ->
