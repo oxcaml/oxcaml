@@ -721,7 +721,11 @@ let rebuild_single_non_recursive_handler ~at_unit_toplevel
         add_phantom_params_bindings uacc handler new_phantom_params
       in
       let free_names_of_handler = remove_params new_phantom_params free_names in
-      let is_cold = is_cold || RE.is_cold handler in
+      (* Update the cold marker on the rebuilt handler according to the marker
+         on the [let cont], so that it gets properly propagated if the
+         continuation gets inlined. *)
+      let handler = if is_cold then RE.mark_as_cold handler else handler in
+      let is_cold = RE.is_cold handler in
       let cont_handler =
         RE.Continuation_handler.create
           (UA.are_rebuilding_terms uacc)
@@ -763,11 +767,21 @@ let rebuild_single_non_recursive_handler ~at_unit_toplevel
             else
               match RE.to_apply_cont handler with
               | Some apply_cont -> (
-                match Apply_cont.trap_action apply_cont with
-                | Some _ -> Unknown
-                | None ->
-                  let args = Apply_cont.args apply_cont in
-                  Shortcut_to (Apply_cont.continuation apply_cont, args))
+                let is_cold_shortcut =
+                  UE.is_cold_continuation uenv
+                    (Apply_cont.continuation apply_cont)
+                in
+                (* Do not introduce a shortcut if our [let cont] was explicitly
+                   marked as cold but is calling another continuation that is
+                   not, or we would lose the coldness information. *)
+                if is_cold && not is_cold_shortcut
+                then Unknown
+                else
+                  match Apply_cont.trap_action apply_cont with
+                  | Some _ -> Unknown
+                  | None ->
+                    let args = Apply_cont.args apply_cont in
+                    Shortcut_to (Apply_cont.continuation apply_cont, args))
               | None -> (
                 if
                   RE.can_be_removed_as_invalid handler
