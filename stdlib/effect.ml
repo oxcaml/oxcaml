@@ -18,7 +18,7 @@ external perform : 'a t -> 'a = "%perform"
 
 module Handler = struct
   type t : void mod external_ many stateless immutable
-  external unsafe_make : unit -> t @ yielding = "%unbox_unit"
+  external unsafe_make : unit -> t @ yielding @@ stateless = "%unbox_unit"
 end
 
 module Safe = struct
@@ -71,12 +71,13 @@ module Prim = struct
     = "caml_register_named_value"
 
   external cont_set_last_fiber :
-    _ cont -> last_fiber -> unit = "%setfield1"
+    _ cont -> last_fiber -> unit @@ stateless = "%setfield1"
 
-  external continue : ('a, _, 'b) cont -> 'a -> 'b = "%continue"
-  external discontinue : ('a, _, 'b) cont -> exn -> 'b = "%discontinue"
+  external continue : ('a, _, 'b) cont -> 'a -> 'b @@ stateless = "%continue"
+  external discontinue : ('a, _, 'b) cont -> exn -> 'b @@ stateless
+    = "%discontinue"
   external discontinue_with_backtrace :
-    ('a, _, 'b) cont -> exn -> Printexc.raw_backtrace -> 'b
+    ('a, _, 'b) cont -> exn -> Printexc.raw_backtrace -> 'b @@ stateless
     = "%discontinue_with_backtrace"
 
   external reperform :
@@ -88,7 +89,7 @@ module Prim = struct
     ('a . ('a,'x,'b) effc) ->
     ('d -> 'x) ->
     'd ->
-    'b = "%with_stack"
+    'b @@ stateless = "%with_stack"
 
   external with_stack_preemptible :
     ('x -> 'b) ->
@@ -97,7 +98,7 @@ module Prim = struct
     (unit -> tick_outcome) ->
     ('d -> 'x) ->
     'd ->
-    'b = "%with_stack_preemptible"
+    'b @@ stateless = "%with_stack_preemptible"
 
   external update_cont_handler_noexc :
     ('a, 'x, _) cont ->
@@ -105,7 +106,7 @@ module Prim = struct
     (exn -> 'b) ->
     ('a2 . ('a2, 'x, 'b) effc) ->
     (unit -> tick_outcome) or_null ->
-    ('a, 'x, 'b) cont = "caml_continuation_update_handler_noexc"
+    ('a, 'x, 'b) cont @@ stateless = "caml_continuation_update_handler_noexc"
 end
 
 type _ t += Preemption : unit t
@@ -334,7 +335,7 @@ module Deep = struct
   end
 
   external get_callstack :
-    ('a,'b) continuation -> int -> Printexc.raw_backtrace =
+    ('a,'b) continuation -> int -> Printexc.raw_backtrace @@ stateless =
     "caml_get_continuation_callstack"
 end
 
@@ -537,6 +538,6 @@ module Shallow = struct
   end
 
   external get_callstack :
-    ('a,'b) continuation -> int -> Printexc.raw_backtrace =
+    ('a,'b) continuation -> int -> Printexc.raw_backtrace @@ stateless =
     "caml_get_continuation_callstack"
 end

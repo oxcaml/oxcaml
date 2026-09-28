@@ -15,7 +15,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 open! Stdlib
 
@@ -249,13 +249,13 @@ type control =
     OCAMLRUNPARAM environment variable.  See the documentation of
     [ocamlrun]. *)
 
-external stat : unit -> stat = "caml_gc_stat"
+external stat : unit -> stat @@ reading portable = "caml_gc_stat"
 (** Return the current values of the memory management counters in a
     [stat] record that represent the program's total memory stats.
 
     This is expensive, as it causes a full major collection. *)
 
-external quick_stat : unit -> stat = "caml_gc_quick_stat"
+external quick_stat : unit -> stat @@ reading portable = "caml_gc_quick_stat"
 (** Same as [stat] except much cheaper.
 
     no major collection is triggered, and the values returned (except
@@ -264,12 +264,13 @@ external quick_stat : unit -> stat = "caml_gc_quick_stat"
     [largest_free], and [stack_size] are set to 0).
     *)
 
-external counters : unit -> float * float * float = "caml_gc_counters"
+external counters : unit -> float * float * float @@ reading portable
+  = "caml_gc_counters"
 (** Return [(minor_words, promoted_words, major_words)] for the current
     domain or potentially previous domains.  This function is as fast as
     [quick_stat]. *)
 
-external minor_words : unit -> (float [@unboxed])
+external minor_words : unit -> (float [@unboxed]) @@ reading portable
   = "caml_gc_minor_words" "caml_gc_minor_words_unboxed"
 (** Number of words allocated in the minor heap by this domain or potentially
     previous domains. This number is accurate in byte-code programs, but
@@ -279,7 +280,7 @@ external minor_words : unit -> (float [@unboxed])
 
     @since 4.04 *)
 
-external get : unit -> control = "caml_gc_get"
+external get : unit -> control @@ reading portable = "caml_gc_get"
 [@@alert unsynchronized_access
     "GC parameters are a mutable global state."
 ]
@@ -288,7 +289,7 @@ external get : unit -> control = "caml_gc_get"
     The [allocation_policy] and [window_size] fields are not available:
     their returned field values are therefore [0]. *)
 
-external set : control -> unit = "caml_gc_set"
+external set : control -> unit @@ stateful portable = "caml_gc_set"
 [@@alert unsynchronized_access
     "GC parameters are a mutable global state."
 ]
@@ -298,10 +299,10 @@ external set : control -> unit = "caml_gc_set"
     The [allocation_policy] and [window_size] fields are not available:
     setting them therefore has no effect. *)
 
-external minor : unit -> unit = "caml_gc_minor"
+external minor : unit -> unit @@ stateful portable = "caml_gc_minor"
 (** Trigger a minor collection. *)
 
-external major_slice : int -> int = "caml_gc_major_slice"
+external major_slice : int -> int @@ stateful portable = "caml_gc_major_slice"
 (** [major_slice n]
     Do a minor collection and a slice of major collection. [n] is the
     size of the slice: the GC will do enough work to free (on average)
@@ -309,34 +310,35 @@ external major_slice : int -> int = "caml_gc_major_slice"
     to ensure that the next automatic slice has no work to do.
     This function returns an unspecified integer (currently: 0). *)
 
-external major : unit -> unit = "caml_gc_major"
+external major : unit -> unit @@ stateful portable = "caml_gc_major"
 (** Do a minor collection and finish the current major collection cycle. *)
 
-external full_major : unit -> unit = "caml_gc_full_major"
+external full_major : unit -> unit @@ stateful portable = "caml_gc_full_major"
 (** Do a minor collection, finish the current major collection cycle,
    and perform a complete new cycle.  This will collect all currently
    unreachable blocks. *)
 
-external compact : unit -> unit = "caml_gc_compaction"
+external compact : unit -> unit @@ stateful portable = "caml_gc_compaction"
 (** Perform a full major collection and compact the heap.  Note that heap
    compaction is a lengthy operation. *)
 
-val print_stat : out_channel -> unit
+val print_stat : out_channel -> unit @@ reading portable
 (** Print the current values of the memory management counters (in
    human-readable form) of the total program into the channel argument. *)
 
-val allocated_bytes : unit -> float
+val allocated_bytes : unit -> float @@ reading portable
 (** Return the number of bytes allocated by this domain and potentially
    a previous domain. It is returned as a [float] to avoid overflow problems
    with [int] on 32-bit machines. *)
 
-external get_minor_free : unit -> int = "caml_get_minor_free"
+external get_minor_free : unit -> int @@ reading portable
+  = "caml_get_minor_free"
 (** Return the current size of the free space inside the minor heap of this
    domain.
 
     @since 4.03 *)
 
-val finalise : ('a -> unit) -> 'a -> unit @@ nonportable
+val finalise : ('a -> unit) -> 'a -> unit @@ stateful
 (** [finalise f v] registers [f] as a finalisation function for [v].
    [v] must be heap-allocated.  [f] will be called with [v] as
    argument at some point between the first time [v] becomes unreachable
@@ -408,7 +410,7 @@ val finalise : ('a -> unit) -> 'a -> unit @@ nonportable
    heap-allocated and non-constant except when the length argument is [0].
 *)
 
-val finalise_last : (unit -> unit) -> 'a -> unit @@ nonportable
+val finalise_last : (unit -> unit) -> 'a -> unit @@ stateful
 (** same as {!finalise} except the value is not given as argument. So
     you can't use the given value for the computation of the
     finalisation function. The benefit is that the function is called
@@ -427,7 +429,7 @@ val finalise_last : (unit -> unit) -> 'a -> unit @@ nonportable
     @since 4.04
 *)
 
-val finalise_release : unit -> unit
+val finalise_release : unit -> unit @@ stateful portable
 (** A finalisation function may call [finalise_release] to tell the
     GC that it can launch the next finalisation function without waiting
     for the current one to return. *)
@@ -437,7 +439,7 @@ type alarm : value mod portable contended
    major GC cycle.  The following functions are provided to create
    and delete alarms. *)
 
-val create_alarm : (unit -> unit) -> alarm @@ nonportable
+val create_alarm : (unit -> unit) -> alarm @@ stateful
 (** [create_alarm f] will arrange for [f] to be called at the end of
    major GC cycles, not caused by [f] itself, starting with the
    current cycle or the next one. [f] will run on the same domain that
@@ -502,7 +504,7 @@ module Safe : sig
       The provided closure must be [portable] as it might close over data from the current
       capsule, but will be called on the current domain, regardless of whether the current
       domain still has uncontended access to the original capsule. *)
-end
+end @@ stateful portable
 
 (** [Memprof] is a profiling engine which randomly samples allocated
    memory words. Every allocated word has a probability of being
@@ -524,7 +526,7 @@ end
    notice.
 
    *)
-module (Memprof @@ nonportable) :
+module (Memprof @@ stateful) :
   sig @@ portable
     type t
     (** the type of a profile *)
@@ -680,7 +682,7 @@ end
 
         OCAMLRUNPARAM='Xfoo=42'
     *)
-module (Tweak @@ nonportable) : sig
+module (Tweak @@ stateful) : sig
   (** Change a parameter.
       Raises Invalid_argument if no such parameter exists *)
   val set : string -> int -> unit
@@ -697,7 +699,8 @@ end
 
 type suspended_collection_work
 
-external ramp_up : (unit -> 'a) -> 'a * suspended_collection_work
+external ramp_up :
+  (unit -> 'a) -> 'a * suspended_collection_work @@ stateful portable
   = "caml_ml_gc_ramp_up"
 (** In general, the OCaml GC assumes that the program runs in
     a "steady state" where peak memory usage remains constant: for
@@ -740,7 +743,7 @@ external ramp_up : (unit -> 'a) -> 'a * suspended_collection_work
     [Effect.Unhandled] exception is thrown instead.
 *)
 
-external ramp_down : suspended_collection_work -> unit
+external ramp_down : suspended_collection_work -> unit @@ stateful portable
   = "caml_ml_gc_ramp_down"
 (** Notify the GC about some amount of collection work that was
     suspended during a ramp-up phase, to be resumed now. *)

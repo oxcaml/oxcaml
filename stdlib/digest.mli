@@ -14,7 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 open! Stdlib
 
@@ -70,7 +70,7 @@ val channel : in_channel -> int -> t
    all characters from [ic] until end-of-file is reached and return
    their digest. *)
 
-val file : string -> t
+val file : string -> t @@ stateful portable
 (** Return the digest of the file whose name is given. *)
 
 val output : out_channel -> t -> unit
@@ -155,26 +155,26 @@ end
 
 (** {1 Specific hash functions} *)
 
-module BLAKE128 : S
+module BLAKE128 : S @@ stateful portable
   (** [BLAKE128] is the BLAKE2b hash function producing
       128-bit (16-byte) digests.  It is cryptographically secure.
       However, the small size of the digests enables brute-force attacks
       in [2{^64}] attempts.
       @since 5.2 *)
 
-module BLAKE256 : S
+module BLAKE256 : S @@ stateful portable
   (** [BLAKE256] is the BLAKE2b hash function producing
       256-bit (32-byte) digests.  It is cryptographically secure,
       and the digests are large enough to thwart brute-force attacks.
       @since 5.2 *)
 
-module BLAKE512 : S
+module BLAKE512 : S @@ stateful portable
   (** [BLAKE512] is the BLAKE2b hash function producing
       512-bit (64-byte) digests.  It is cryptographically secure,
       and the digests are large enough to thwart brute-force attacks.
       @since 5.2 *)
 
-module MD5 : S
+module MD5 : S @@ stateful portable
   (** [MD5] is the MD5 hash function.  It produces 128-bit (16-byte) digests
       and is not cryptographically secure at all. It should be used only
       for compatibility with earlier designs that mandate the use of MD5.

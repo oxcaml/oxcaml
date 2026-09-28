@@ -14,7 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 open! Stdlib
 
@@ -161,7 +161,7 @@ type formatter
 *)
 
 val pp_open_box : formatter -> int -> unit
-val open_box : int -> unit
+val open_box : int -> unit @@ stateful portable
 (** [pp_open_box ppf d] opens a new compacting pretty-printing box with
     offset [d] in the formatter [ppf].
 
@@ -185,11 +185,11 @@ val open_box : int -> unit
 
 
 val pp_close_box : formatter -> unit -> unit
-val close_box : unit -> unit
+val close_box : unit -> unit @@ stateful portable
 (** Closes the most recently open pretty-printing box. *)
 
 val pp_open_hbox : formatter -> unit -> unit
-val open_hbox : unit -> unit
+val open_hbox : unit -> unit @@ stateful portable
 (** [pp_open_hbox ppf ()] opens a new 'horizontal' pretty-printing box.
 
   This box prints material on a single line.
@@ -199,7 +199,7 @@ val open_hbox : unit -> unit
 *)
 
 val pp_open_vbox : formatter -> int -> unit
-val open_vbox : int -> unit
+val open_vbox : int -> unit @@ stateful portable
 (** [pp_open_vbox ppf d] opens a new 'vertical' pretty-printing box
   with offset [d].
 
@@ -212,7 +212,7 @@ val open_vbox : int -> unit
 *)
 
 val pp_open_hvbox : formatter -> int -> unit
-val open_hvbox : int -> unit
+val open_hvbox : int -> unit @@ stateful portable
 (** [pp_open_hvbox ppf d] opens a new 'horizontal/vertical' pretty-printing box
   with offset [d].
 
@@ -224,7 +224,7 @@ val open_hvbox : int -> unit
 *)
 
 val pp_open_hovbox : formatter -> int -> unit
-val open_hovbox : int -> unit
+val open_hovbox : int -> unit @@ stateful portable
 (** [pp_open_hovbox ppf d] opens a new 'horizontal-or-vertical'
   pretty-printing box with offset [d].
 
@@ -240,11 +240,11 @@ val open_hovbox : int -> unit
 (** {1 Formatting functions} *)
 
 val pp_print_string : formatter -> string -> unit
-val print_string : string -> unit
+val print_string : string -> unit @@ stateful portable
 (** [pp_print_string ppf s] prints [s] in the current pretty-printing box. *)
 
 val pp_print_substring : pos:int -> len:int -> formatter -> string -> unit
-val print_substring : pos:int -> len:int -> string -> unit
+val print_substring : pos:int -> len:int -> string -> unit @@ stateful portable
 (** [pp_print_substring ~pos ~len ppf s] prints the substring of [s] that starts
     at position [pos] and stops at position [pos+len] in the current
     pretty-printing box.
@@ -252,13 +252,13 @@ val print_substring : pos:int -> len:int -> string -> unit
 *)
 
 val pp_print_bytes : formatter -> bytes -> unit
-val print_bytes : bytes -> unit
+val print_bytes : bytes -> unit @@ stateful portable
 (** [pp_print_bytes ppf b] prints [b] in the current pretty-printing box.
     @since 4.13
 *)
 
 val pp_print_as : formatter -> int -> string -> unit
-val print_as : int -> string -> unit
+val print_as : int -> string -> unit @@ stateful portable
 (** [pp_print_as ppf len s] prints [s] in the current pretty-printing box.
   The pretty-printer formats [s] as if it were of length [len].
 *)
@@ -266,6 +266,7 @@ val print_as : int -> string -> unit
 val pp_print_substring_as :
   pos:int -> len:int -> formatter -> int -> string -> unit
 val print_substring_as : pos:int -> len:int -> int -> string -> unit
+  @@ stateful portable
 (** [pp_print_substring_as ~first ~len ppf len_as s] prints the substring of [s]
   that starts at position [pos] and stop at position [pos+len] in the current
   pretty-printing box as if it were of length [len_as].
@@ -273,19 +274,19 @@ val print_substring_as : pos:int -> len:int -> int -> string -> unit
 *)
 
 val pp_print_int : formatter -> int -> unit
-val print_int : int -> unit
+val print_int : int -> unit @@ stateful portable
 (** Print an integer in the current pretty-printing box. *)
 
 val pp_print_float : formatter -> float -> unit
-val print_float : float -> unit
+val print_float : float -> unit @@ stateful portable
 (** Print a floating point number in the current pretty-printing box. *)
 
 val pp_print_char : formatter -> char -> unit
-val print_char : char -> unit
+val print_char : char -> unit @@ stateful portable
 (** Print a character in the current pretty-printing box. *)
 
 val pp_print_bool : formatter -> bool -> unit
-val print_bool : bool -> unit
+val print_bool : bool -> unit @@ stateful portable
 (** Print a boolean in the current pretty-printing box. *)
 
 val pp_print_nothing : formatter -> unit -> unit
@@ -315,7 +316,7 @@ val pp_print_nothing : formatter -> unit -> unit
 *)
 
 val pp_print_space : formatter -> unit -> unit
-val print_space : unit -> unit
+val print_space : unit -> unit @@ stateful portable
 (** [pp_print_space ppf ()] emits a 'space' break hint:
   the pretty-printer may split the line at this point,
   otherwise it prints one space.
@@ -324,7 +325,7 @@ val print_space : unit -> unit
 *)
 
 val pp_print_cut : formatter -> unit -> unit
-val print_cut : unit -> unit
+val print_cut : unit -> unit @@ stateful portable
 (** [pp_print_cut ppf ()] emits a 'cut' break hint:
   the pretty-printer may split the line at this point,
   otherwise it prints nothing.
@@ -333,7 +334,7 @@ val print_cut : unit -> unit
 *)
 
 val pp_print_break : formatter -> int -> int -> unit
-val print_break : int -> int -> unit
+val print_break : int -> int -> unit @@ stateful portable
 (** [pp_print_break ppf nspaces offset] emits a 'full' break hint:
   the pretty-printer may split the line at this point,
   otherwise it prints [nspaces] spaces.
@@ -385,7 +386,7 @@ printf "@[<v 0>[@;<0 2>@[<v 0>a;@,b;@,c@]%t]@]@\n"
 *)
 
 val pp_force_newline : formatter -> unit -> unit
-val force_newline : unit -> unit
+val force_newline : unit -> unit @@ stateful portable
 (** Force a new line in the current pretty-printing box.
 
   The pretty-printer must split the line at this point,
@@ -397,7 +398,7 @@ val force_newline : unit -> unit
 *)
 
 val pp_print_if_newline : formatter -> unit -> unit
-val print_if_newline : unit -> unit
+val print_if_newline : unit -> unit @@ stateful portable
 (** Execute the next formatting command if the preceding line
   has just been split. Otherwise, ignore the next formatting
   command.
@@ -406,7 +407,7 @@ val print_if_newline : unit -> unit
 (** {1 Pretty-printing termination} *)
 
 val pp_print_flush : formatter -> unit -> unit
-val print_flush : unit -> unit
+val print_flush : unit -> unit @@ stateful portable
 (** End of pretty-printing: resets the pretty-printer to initial state.
 
   All open pretty-printing boxes are closed, all pending text is printed.
@@ -432,7 +433,7 @@ val print_flush : unit -> unit
 *)
 
 val pp_print_newline : formatter -> unit -> unit
-val print_newline : unit -> unit
+val print_newline : unit -> unit @@ stateful portable
 (** End of pretty-printing: resets the pretty-printer to initial state.
 
   All open pretty-printing boxes are closed, all pending text is printed.
@@ -456,7 +457,7 @@ val pp_infinity : int
   @since 5.2*)
 
 val pp_set_margin : formatter -> int -> unit
-val set_margin : int -> unit
+val set_margin : int -> unit @@ stateful portable
 (** [pp_set_margin ppf d] sets the right margin to [d] (in characters):
   the pretty-printer splits lines that overflow the right margin according to
   the break hints given.
@@ -473,13 +474,13 @@ val set_margin : int -> unit
 *)
 
 val pp_get_margin : formatter -> unit -> int
-val get_margin : unit -> int
+val get_margin : unit -> int @@ stateful portable
 (** Returns the position of the right margin. *)
 
 (** {1:maxindent Maximum indentation limit} *)
 
 val pp_set_max_indent : formatter -> int -> unit
-val set_max_indent : int -> unit
+val set_max_indent : int -> unit @@ stateful portable
 (** [pp_set_max_indent ppf d] sets the maximum indentation limit of lines
   to [d] (in characters):
   once this limit is reached, new pretty-printing boxes are rejected to the
@@ -516,7 +517,7 @@ val set_max_indent : int -> unit
 *)
 
 val pp_get_max_indent : formatter -> unit -> int
-val get_max_indent : unit -> int
+val get_max_indent : unit -> int @@ stateful portable
 (** Return the maximum indentation limit (in characters). *)
 
 (** {1 Geometry }
@@ -536,9 +537,10 @@ val check_geometry: geometry -> bool
   @since 4.08 *)
 
 val pp_set_geometry : formatter -> max_indent:int -> margin:int -> unit
-val set_geometry : max_indent:int -> margin:int -> unit
+val set_geometry : max_indent:int -> margin:int -> unit @@ stateful portable
 val pp_safe_set_geometry : formatter -> max_indent:int -> margin:int -> unit
 val safe_set_geometry : max_indent:int -> margin:int -> unit
+  @@ stateful portable
 (**
    [pp_set_geometry ppf ~max_indent ~margin] sets both the margin
    and maximum indentation limit for [ppf].
@@ -567,10 +569,10 @@ val safe_set_geometry : max_indent:int -> margin:int -> unit
    @since 4.11
 *)
 val pp_update_geometry : formatter -> (geometry -> geometry) -> unit
-val update_geometry : (geometry -> geometry) -> unit
+val update_geometry : (geometry -> geometry) -> unit @@ stateful portable
 
 val pp_get_geometry: formatter -> unit -> geometry
-val get_geometry: unit -> geometry
+val get_geometry: unit -> geometry @@ stateful portable
 (** Return the current geometry of the formatter
 
     @since 4.08
@@ -588,7 +590,7 @@ val get_geometry: unit -> geometry
 *)
 
 val pp_set_max_boxes : formatter -> int -> unit
-val set_max_boxes : int -> unit
+val set_max_boxes : int -> unit @@ stateful portable
 (** [pp_set_max_boxes ppf max] sets the maximum number of pretty-printing
     boxes simultaneously open.
 
@@ -599,13 +601,13 @@ val set_max_boxes : int -> unit
 *)
 
 val pp_get_max_boxes : formatter -> unit -> int
-val get_max_boxes : unit -> int
+val get_max_boxes : unit -> int @@ stateful portable
 (** Returns the maximum number of pretty-printing boxes allowed before
   ellipsis.
 *)
 
 val pp_over_max_boxes : formatter -> unit -> bool
-val over_max_boxes : unit -> bool
+val over_max_boxes : unit -> bool @@ stateful portable
 (** Tests if the maximum number of pretty-printing boxes allowed have already
   been opened.
 *)
@@ -629,7 +631,7 @@ val over_max_boxes : unit -> bool
 *)
 
 val pp_open_tbox : formatter -> unit -> unit
-val open_tbox : unit -> unit
+val open_tbox : unit -> unit @@ stateful portable
 (** [open_tbox ()] opens a new tabulation box.
 
   This box prints lines separated into cells of fixed width.
@@ -644,15 +646,15 @@ val open_tbox : unit -> unit
 *)
 
 val pp_close_tbox : formatter -> unit -> unit
-val close_tbox : unit -> unit
+val close_tbox : unit -> unit @@ stateful portable
 (** Closes the most recently opened tabulation box. *)
 
 val pp_set_tab : formatter -> unit -> unit
-val set_tab : unit -> unit
+val set_tab : unit -> unit @@ stateful portable
 (** Sets a tabulation marker at current insertion point. *)
 
 val pp_print_tab : formatter -> unit -> unit
-val print_tab : unit -> unit
+val print_tab : unit -> unit @@ stateful portable
 (** [print_tab ()] emits a 'next' tabulation break hint: if not already set on
   a tabulation marker, the insertion point moves to the first tabulation
   marker on the right, or the pretty-printer splits the line and insertion
@@ -661,7 +663,7 @@ val print_tab : unit -> unit
   It is equivalent to [print_tbreak 0 0]. *)
 
 val pp_print_tbreak : formatter -> int -> int -> unit
-val print_tbreak : int -> int -> unit
+val print_tbreak : int -> int -> unit @@ stateful portable
 (** [print_tbreak nspaces offset] emits a 'full' tabulation break hint.
 
   If not already set on a tabulation marker, the insertion point moves to the
@@ -679,13 +681,13 @@ val print_tbreak : int -> int -> unit
 (** {1 Ellipsis} *)
 
 val pp_set_ellipsis_text : formatter -> string -> unit
-val set_ellipsis_text : string -> unit
+val set_ellipsis_text : string -> unit @@ stateful portable
 (** Set the text of the ellipsis printed when too many pretty-printing boxes
   are open (a single dot, [.], by default).
 *)
 
 val pp_get_ellipsis_text : formatter -> unit -> string
-val get_ellipsis_text : unit -> string
+val get_ellipsis_text : unit -> string @@ stateful portable
 (** Return the text of the ellipsis. *)
 
 (** {1:tags Semantic tags} *)
@@ -778,7 +780,7 @@ type stag += String_tag of tag
 *)
 
 val pp_open_stag : formatter -> stag -> unit
-val open_stag : stag -> unit @@ nonportable
+val open_stag : stag -> unit @@ stateful
 (** [pp_open_stag ppf t] opens the semantic tag named [t].
 
   The [print_open_stag] tag-printing function of the formatter is called with
@@ -789,7 +791,7 @@ val open_stag : stag -> unit @@ nonportable
 *)
 
 val pp_close_stag : formatter -> unit -> unit
-val close_stag : unit -> unit
+val close_stag : unit -> unit @@ stateful portable
 (** [pp_close_stag ppf ()] closes the most recently opened semantic tag [t].
 
   The closing tag marker, as given by [mark_close_stag t], is written into the
@@ -800,31 +802,31 @@ val close_stag : unit -> unit
 *)
 
 val pp_set_tags : formatter -> bool -> unit
-val set_tags : bool -> unit
+val set_tags : bool -> unit @@ stateful portable
 (** [pp_set_tags ppf b] turns on or off the treatment of semantic tags
   (default is off).
 *)
 
 val pp_set_print_tags : formatter -> bool -> unit
-val set_print_tags : bool -> unit
+val set_print_tags : bool -> unit @@ stateful portable
 (** [pp_set_print_tags ppf b] turns on or off the tag-printing operations. *)
 
 val pp_set_mark_tags : formatter -> bool -> unit
-val set_mark_tags : bool -> unit
+val set_mark_tags : bool -> unit @@ stateful portable
 (** [pp_set_mark_tags ppf b] turns on or off the tag-marking operations. *)
 
 val pp_get_print_tags : formatter -> unit -> bool
-val get_print_tags : unit -> bool
+val get_print_tags : unit -> bool @@ stateful portable
 (** Return the current status of tag-printing operations. *)
 
 val pp_get_mark_tags : formatter -> unit -> bool
-val get_mark_tags : unit -> bool
+val get_mark_tags : unit -> bool @@ stateful portable
 (** Return the current status of tag-marking operations. *)
 
 (** {1 Redirecting the standard formatter output} *)
 val pp_set_formatter_out_channel :
   formatter -> Stdlib.out_channel -> unit
-val set_formatter_out_channel : Stdlib.out_channel -> unit
+val set_formatter_out_channel : Stdlib.out_channel -> unit @@ stateful portable
 (** Redirect the standard pretty-printer output to the given channel.
   (All the output functions of the standard formatter are set to the
    default output functions printing to the given channel.)
@@ -836,7 +838,7 @@ val set_formatter_out_channel : Stdlib.out_channel -> unit
 val pp_set_formatter_output_functions :
   formatter -> (string -> int -> int -> unit) -> (unit -> unit) -> unit
 val set_formatter_output_functions :
-  (string -> int -> int -> unit) -> (unit -> unit) -> unit @@ nonportable
+  (string -> int -> int -> unit) -> (unit -> unit) -> unit @@ stateful
 (** [pp_set_formatter_output_functions ppf out flush] redirects the
   standard pretty-printer output functions to the functions [out] and
   [flush].
@@ -854,7 +856,7 @@ val set_formatter_output_functions :
 val pp_get_formatter_output_functions :
   formatter -> unit -> (string -> int -> int -> unit) * (unit -> unit)
 val get_formatter_output_functions :
-  unit -> (string -> int -> int -> unit) * (unit -> unit) @@ nonportable
+  unit -> (string -> int -> int -> unit) * (unit -> unit) @@ stateful
 (** Return the current output functions of the standard pretty-printer. *)
 
 (** {1:meaning Redefining formatter output} *)
@@ -911,7 +913,7 @@ type formatter_out_functions = {
 
 val pp_set_formatter_out_functions :
   formatter -> formatter_out_functions -> unit
-val set_formatter_out_functions : formatter_out_functions -> unit @@ nonportable
+val set_formatter_out_functions : formatter_out_functions -> unit @@ stateful
 (** [pp_set_formatter_out_functions ppf out_funs]
   Set all the pretty-printer output functions of [ppf] to those of
   argument [out_funs],
@@ -929,7 +931,7 @@ val set_formatter_out_functions : formatter_out_functions -> unit @@ nonportable
 
 val pp_get_formatter_out_functions :
   formatter -> unit -> formatter_out_functions
-val get_formatter_out_functions : unit -> formatter_out_functions @@ nonportable
+val get_formatter_out_functions : unit -> formatter_out_functions @@ stateful
 (** Return the current output functions of the pretty-printer,
   including line splitting and indentation functions. Useful to record the
   current setting and restore it afterwards.
@@ -968,7 +970,7 @@ type formatter_stag_functions = {
 
 val pp_set_formatter_stag_functions :
   formatter -> formatter_stag_functions -> unit
-val set_formatter_stag_functions : formatter_stag_functions -> unit @@ nonportable
+val set_formatter_stag_functions : formatter_stag_functions -> unit @@ stateful
 (** [pp_set_formatter_stag_functions ppf tag_funs] changes the meaning of
   opening and closing semantic tag operations to use the functions in
   [tag_funs] when printing on [ppf].
@@ -990,7 +992,7 @@ val set_formatter_stag_functions : formatter_stag_functions -> unit @@ nonportab
 
 val pp_get_formatter_stag_functions :
   formatter -> unit -> formatter_stag_functions
-val get_formatter_stag_functions : unit -> formatter_stag_functions @@ nonportable
+val get_formatter_stag_functions : unit -> formatter_stag_functions @@ stateful
 (** Return the current semantic tag operation functions of the standard
     pretty-printer.
 
@@ -1022,7 +1024,7 @@ val formatter_of_out_channel : out_channel -> formatter
 *)
 
 val synchronized_formatter_of_out_channel :
-  out_channel -> formatter Domain.Safe.DLS.key
+  out_channel -> formatter Domain.Safe.DLS.key @@ stateful portable
 [@@alert unstable][@@alert "-unstable"]
 (** [synchronized_formatter_of_out_channel oc] returns the key to the
     domain-local state that holds the domain-local formatter for writing to the
@@ -1033,25 +1035,25 @@ val synchronized_formatter_of_out_channel :
     is flushed, such as with {!print_flush}.
 *)
 
-val std_formatter : formatter @@ nonportable
+val std_formatter : formatter @@ stateful
 (** The initial domain's standard formatter to write to standard output.
 
   It is defined as {!formatter_of_out_channel} {!Stdlib.stdout}.
 *)
 
-val get_std_formatter : unit -> formatter @@ nonportable
+val get_std_formatter : unit -> formatter @@ stateful
 (** [get_std_formatter ()] returns the current domain's standard formatter used
     to write to standard output.
     @since 5.0
 *)
 
-val err_formatter : formatter @@ nonportable
+val err_formatter : formatter @@ stateful
 (** The initial domain's formatter to write to standard error.
 
   It is defined as {!formatter_of_out_channel} {!Stdlib.stderr}.
 *)
 
-val get_err_formatter : unit -> formatter @@ nonportable
+val get_err_formatter : unit -> formatter @@ stateful
 (** [get_err_formatter ()] returns the current domain's formatter used to write
    to standard error.
    @since 5.0
@@ -1064,27 +1066,27 @@ val formatter_of_buffer : Buffer.t -> formatter
   pending material into the buffer.
 *)
 
-val stdbuf : Buffer.t @@ nonportable
+val stdbuf : Buffer.t
 (** The initial domain's string buffer in which [str_formatter] writes. *)
 
-val get_stdbuf : unit -> Buffer.t @@ nonportable
+val get_stdbuf : unit -> Buffer.t @@ stateful
 (** [get_stdbuf ()] returns the current domain's string buffer in which the
     current domain's string formatter writes.
     @since 5.0 *)
 
-val str_formatter : formatter @@ nonportable
+val str_formatter : formatter @@ stateful
 (** The initial domain's formatter to output to the {!stdbuf} string buffer.
 
   [str_formatter] is defined as {!formatter_of_buffer} {!stdbuf}.
 *)
 
-val get_str_formatter : unit -> formatter @@ nonportable
+val get_str_formatter : unit -> formatter @@ stateful
 (** The current domain's formatter to output to the current domains string
     buffer.
     @since 5.0
 *)
 
-val flush_str_formatter : unit -> string
+val flush_str_formatter : unit -> string @@ stateful portable
 (** Returns the material printed with [str_formatter] of the current domain,
     flushes the formatter and resets the corresponding buffer.
 *)
@@ -1106,7 +1108,7 @@ val make_formatter :
 val make_synchronized_formatter :
   (string -> int -> int -> unit) -> (unit -> unit)
   -> formatter Domain.Safe.DLS.key
-  @@ nonportable
+  @@ stateful
 [@@alert unstable][@@alert "-unstable"]
 [@@alert unsafe_multidomain "Use [Format.Safe.make_synchronized_formatter]."]
 (** [make_synchronized_formatter out flush] returns the key to the domain-local
@@ -1405,7 +1407,7 @@ val fprintf : formatter -> ('a, formatter, unit) format -> 'a
 
 *)
 
-val printf : ('a, formatter, unit) format -> 'a @@ nonportable
+val printf : ('a, formatter, unit) format -> 'a @@ stateful
 (** Same as [fprintf] above, but output on [get_std_formatter ()].
 
     It is defined similarly to [fun fmt -> fprintf (get_std_formatter ()) fmt]
@@ -1415,7 +1417,7 @@ val printf : ('a, formatter, unit) format -> 'a @@ nonportable
     the formatter is flushed, such as with {!print_flush}.
 *)
 
-val eprintf : ('a, formatter, unit) format -> 'a @@ nonportable
+val eprintf : ('a, formatter, unit) format -> 'a @@ stateful
 (** Same as [fprintf] above, but output on [get_err_formatter ()].
 
     It is defined similarly to [fun fmt -> fprintf (get_err_formatter ()) fmt]
@@ -1528,7 +1530,7 @@ module Safe : sig
     (string -> int -> int -> unit) @ portable
     -> (unit -> unit) @ portable
     -> formatter Domain.Safe.DLS.key
-end
+end @@ stateful portable
 
 (** {1:examples Examples}
 
