@@ -332,7 +332,7 @@ let get_removed_aliased_params uacc cont =
   in
   cont_params.removed_aliased_params_and_extra_params
 
-let make_rewrite_for_recursive_continuation uacc ~cont
+let make_rewrite_for_recursive_continuation uacc ~cont ~is_cold
     ~original_invariant_params ~invariant_extra_params_and_args
     ~original_variant_params ~variant_extra_params_and_args ~rewrite_ids =
   (* Note: extra_params_and_args come from CSE & immutable unboxing *)
@@ -374,7 +374,7 @@ let make_rewrite_for_recursive_continuation uacc ~cont
   let uacc =
     UA.map_uenv uacc ~f:(fun uenv ->
         let uenv = UE.add_apply_cont_rewrite uenv cont rewrite in
-        UE.add_non_inlinable_continuation
+        UE.add_non_inlinable_continuation ~is_cold
           (UA.are_rebuilding_terms uacc)
           uenv cont ~params ~handler:Unknown)
   in
@@ -691,6 +691,7 @@ let rebuild_single_non_recursive_handler ~rebuild_expr ~at_unit_toplevel
         add_phantom_params_bindings uacc handler new_phantom_params
       in
       let free_names_of_handler = remove_params new_phantom_params free_names in
+      let is_cold = is_cold || RE.is_cold handler in
       let cont_handler =
         RE.Continuation_handler.create
           (UA.are_rebuilding_terms uacc)
@@ -759,7 +760,7 @@ let rebuild_single_non_recursive_handler ~rebuild_expr ~at_unit_toplevel
           | Shortcut_to (shortcut_to, args) ->
             UE.add_continuation_shortcut uenv cont ~params ~shortcut_to ~args
           | Unknown ->
-            UE.add_non_inlinable_continuation
+            UE.add_non_inlinable_continuation ~is_cold
               (UA.are_rebuilding_terms uacc)
               uenv cont ~params
               ~handler:
@@ -865,7 +866,8 @@ let rec rebuild_continuation_handlers_loop ~rebuild_body ~rebuild_expr
       Continuation.Map.fold
         (fun cont (handler : Simplified_expr.simplified_handler) uacc ->
           make_rewrite_for_recursive_continuation uacc ~cont
-            ~original_invariant_params ~original_variant_params:handler.params
+            ~is_cold:handler.is_cold ~original_invariant_params
+            ~original_variant_params:handler.params
             ~invariant_extra_params_and_args:
               handler.invariant_extra_params_and_args
             ~variant_extra_params_and_args:handler.extra_params_and_args

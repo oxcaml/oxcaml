@@ -22,6 +22,7 @@ type contents_hash =
 
 type t =
   { expr : Expr.t;
+    is_cold : bool;
     contents_hash : contents_hash Or_null.t
         (* If not null, this is a structural hash of the contents of this
            rebuilt expression (always null when not rebuilding terms).
@@ -31,6 +32,8 @@ type t =
            that might bind variables with different names (see
            [Unique_continuation_map]). *)
   }
+
+let is_cold { is_cold; _ } = is_cold
 
 (* Rebuilt terms with no [contents_hash] cannot be deduplicated (e.g. because
    they contain not-shareable subterms such as sets of closures). We also want
@@ -49,7 +52,7 @@ type t =
    switch branches. *)
 let max_hash_depth = 32
 
-let create ?contents_hash expr =
+let create ?contents_hash ~is_cold expr =
   (* Since we are building terms from the bottom-up, we don't know initially at
      which depth they will end up. Instead, we eagerly compute hashes as we
      rebuild expressions (so that computing the hash does not need another
@@ -59,7 +62,7 @@ let create ?contents_hash expr =
     | Some { depth; _ } when depth >= max_hash_depth -> Or_null.null
     | _ -> Or_null.of_option contents_hash
   in
-  { expr; contents_hash }
+  { expr; is_cold; contents_hash }
 
 type rebuilt_expr = t
 
@@ -93,7 +96,8 @@ let [@ocamlformat "disable"] print are_rebuilding ppf t =
   else
     Expr.print ppf t.expr
 
-let term_not_rebuilt = create (Expr.create_invalid Code_not_rebuilt)
+let term_not_rebuilt =
+  create ~is_cold:false (Expr.create_invalid Code_not_rebuilt)
 
 let contents_hash_simple simple =
   (* We want a "structural" hash that doesn't depend on names bound by
@@ -141,14 +145,15 @@ let create_let are_rebuilding bound_vars defining_expr ~body ~free_names_of_body
     in
     Let.create bound_vars defining_expr ~body:body.expr
       ~free_names_of_body:(Known free_names_of_body)
-    |> Expr.create_let |> create ?contents_hash
+    |> Expr.create_let
+    |> create ?contents_hash ~is_cold:body.is_cold
 
-let create_apply are_rebuilding apply =
+let create_apply are_rebuilding ~is_cold apply =
   if ART.do_not_rebuild_terms are_rebuilding
   then term_not_rebuilt
-  else Expr.create_apply apply |> create
+  else Expr.create_apply apply |> create ~is_cold
 
-let create_apply_cont apply_cont =
+let create_apply_cont ~is_cold apply_cont =
   let contents_hash =
     match Apply_cont.trap_action apply_cont with
     | Some _ -> None
@@ -162,7 +167,7 @@ let create_apply_cont apply_cont =
                 List.map contents_hash_simple (Apply_cont.args apply_cont) )
         }
   in
-  Expr.create_apply_cont apply_cont |> create ?contents_hash
+  Expr.create_apply_cont apply_cont |> create ?contents_hash ~is_cold
 
 module Function_params_and_body = struct
   type t = Function_params_and_body.t
@@ -211,7 +216,7 @@ let create_non_recursive_let_cont are_rebuilding cont handler ~body
   else
     Let_cont.create_non_recursive cont handler ~body:body.expr
       ~free_names_of_body:(Known free_names_of_body)
-    |> create
+    |> create ~is_cold:body.is_cold
 
 let create_non_recursive_let_cont' are_rebuilding cont handler ~body
     ~num_free_occurrences_of_cont_in_body ~is_applied_with_traps =
@@ -221,7 +226,7 @@ let create_non_recursive_let_cont' are_rebuilding cont handler ~body
     Let_cont.create_non_recursive' ~cont handler ~body:body.expr
       ~num_free_occurrences_of_cont_in_body:
         (Known num_free_occurrences_of_cont_in_body) ~is_applied_with_traps
-    |> create
+    |> create ~is_cold:body.is_cold
 
 let create_non_recursive_let_cont_without_free_names are_rebuilding cont handler
     ~body =
@@ -230,21 +235,21 @@ let create_non_recursive_let_cont_without_free_names are_rebuilding cont handler
   else
     Let_cont.create_non_recursive cont handler ~body:body.expr
       ~free_names_of_body:Unknown
-    |> create
+    |> create ~is_cold:body.is_cold
 
 let create_recursive_let_cont are_rebuilding ~invariant_params handlers ~body =
   if ART.do_not_rebuild_terms are_rebuilding
   then term_not_rebuilt
   else
     Let_cont.create_recursive ~invariant_params handlers ~body:body.expr
-    |> create
+    |> create ~is_cold:body.is_cold
 
-let create_switch are_rebuilding switch =
+let create_switch are_rebuilding ~is_cold switch =
   if ART.do_not_rebuild_terms are_rebuilding
   then term_not_rebuilt
-  else Expr.create_switch switch |> create
+  else Expr.create_switch switch |> create ~is_cold
 
-let create_invalid reason = Expr.create_invalid reason |> create
+let create_invalid reason = Expr.create_invalid reason |> create ~is_cold:false
 
 let bind_no_simplification are_rebuilding ~bindings ~body ~cost_metrics_of_body
     ~free_names_of_body =
