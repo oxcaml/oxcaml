@@ -99,7 +99,8 @@ let split_direct_over_application apply ~callee's_code_id
     ~callee's_code_metadata =
   let apply_alloc_mode = Apply.return_mode apply in
   let callee's_params_arity =
-    Code_metadata.params_arity callee's_code_metadata
+    match Code_metadata.params_arity callee's_code_metadata with
+    | Non_tupled params_arity | Tupled params_arity -> params_arity
   in
   let num_non_unarized_params =
     Flambda_arity.num_params callee's_params_arity

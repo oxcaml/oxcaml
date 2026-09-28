@@ -433,7 +433,12 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
       let newer_version_of =
         Option.map (Env.find_code_id_exn env) (Code.newer_version_of code)
       in
-      let param_arity = Some (complex_arity (Code.params_arity code)) in
+      let params_arity, is_tupled =
+        match Code.params_arity code with
+        | Non_tupled params_arity -> params_arity, false
+        | Tupled params_arity -> params_arity, true
+      in
+      let param_arity = Some (complex_arity params_arity) in
       let ret_arity = Code.result_arity code |> arity_opt in
       let recursive = recursive_flag (Code.recursive code) in
       let inline =
@@ -448,7 +453,6 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
         then None
         else Some (Code.loopify code)
       in
-      let is_tupled = Code.is_tupled code in
       let stub = Code.stub code in
       let params_and_body =
         Flambda.Function_params_and_body.pattern_match

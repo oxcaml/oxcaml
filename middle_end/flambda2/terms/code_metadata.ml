@@ -14,10 +14,28 @@
 (*                                                                        *)
 (**************************************************************************)
 
+type params_arity =
+  | Non_tupled of [`Complex] Flambda_arity.t
+  | Tupled of [`Complex] Flambda_arity.t
+
+let equal_params_arity equal_arity params_arity1 params_arity2 =
+  match params_arity1, params_arity2 with
+  | Non_tupled params_arity1, Non_tupled params_arity2
+  | Tupled params_arity1, Tupled params_arity2 ->
+    equal_arity params_arity1 params_arity2
+  | (Non_tupled _ | Tupled _), _ -> false
+
+let equal_ignoring_subkinds_params_arity params_arity1 params_arity2 =
+  equal_params_arity Flambda_arity.equal_ignoring_subkinds params_arity1
+    params_arity2
+
+let equal_exact_params_arity params_arity1 params_arity2 =
+  equal_params_arity Flambda_arity.equal_exact params_arity1 params_arity2
+
 type t =
   { code_id : Code_id.t;
     newer_version_of : Code_id.t option;
-    params_arity : [`Complex] Flambda_arity.t;
+    params_arity : params_arity;
     param_modes : Alloc_mode.For_types.t list;
     first_complex_local_param : First_complex_local_param.t;
     (* Note: first_complex_local_param cannot be computed from param_modes,
@@ -39,7 +57,6 @@ type t =
     cost_metrics : Cost_metrics.t;
     inlining_arguments : Inlining_arguments.t;
     dbg : Debuginfo.t;
-    is_tupled : bool;
     is_my_closure_used : bool;
     inlining_decision : Function_decl_inlining_decision_type.t;
     absolute_history : Inlining_history.Absolute.t;
@@ -100,8 +117,6 @@ module Code_metadata_accessors (X : Metadata_view_type) = struct
 
   let dbg t = (metadata t).dbg
 
-  let is_tupled t = (metadata t).is_tupled
-
   let is_my_closure_used t = (metadata t).is_my_closure_used
 
   let inlining_decision t = (metadata t).inlining_decision
@@ -114,9 +129,11 @@ module Code_metadata_accessors (X : Metadata_view_type) = struct
 
   let function_slot_size t =
     let metadata = metadata t in
-    let is_tupled = metadata.is_tupled in
-    let arity = Flambda_arity.num_params metadata.params_arity in
-    if (arity = 0 || arity = 1) && not is_tupled then 2 else 3
+    match metadata.params_arity with
+    | Non_tupled params_arity ->
+      let arity = Flambda_arity.num_params params_arity in
+      if arity = 0 || arity = 1 then 2 else 3
+    | Tupled _ -> 3
 end
 
 module type Code_metadata_accessors_result_type = sig
@@ -140,7 +157,7 @@ include Code_metadata_accessors [@inlined hint] (Metadata_view)
 type 'a create_type =
   Code_id.t ->
   newer_version_of:Code_id.t option ->
-  params_arity:[`Complex] Flambda_arity.t ->
+  params_arity:params_arity ->
   param_modes:Alloc_mode.For_types.t list ->
   first_complex_local_param:First_complex_local_param.t ->
   result_arity:[`Unarized] Flambda_arity.t ->
@@ -159,7 +176,6 @@ type 'a create_type =
   cost_metrics:Cost_metrics.t ->
   inlining_arguments:Inlining_arguments.t ->
   dbg:Debuginfo.t ->
-  is_tupled:bool ->
   is_my_closure_used:bool ->
   inlining_decision:Function_decl_inlining_decision_type.t ->
   absolute_history:Inlining_history.Absolute.t ->
@@ -171,9 +187,11 @@ let createk k code_id ~newer_version_of ~params_arity ~param_modes
     ~first_complex_local_param ~result_arity ~result_types ~result_mode ~stub
     ~(inline : Inline_attribute.t) ~zero_alloc_attribute ~poll_attribute
     ~regalloc_attribute ~regalloc_param_attribute ~cold ~is_a_functor ~is_opaque
-    ~recursive ~cost_metrics ~inlining_arguments ~dbg ~is_tupled
-    ~is_my_closure_used ~inlining_decision ~absolute_history ~relative_history
-    ~loopify =
+    ~recursive ~cost_metrics ~inlining_arguments ~dbg ~is_my_closure_used
+    ~inlining_decision ~absolute_history ~relative_history ~loopify =
+  let arity =
+    match params_arity with Tupled arity | Non_tupled arity -> arity
+  in
   (match stub, inline with
   | true, (Available_inline | Never_inline | Default_inline)
   | ( false,
@@ -185,18 +203,17 @@ let createk k code_id ~newer_version_of ~params_arity ~param_modes
   (match (first_complex_local_param : First_complex_local_param.t) with
   | Never_partially_applied -> ()
   | Index index ->
-    if index < 0 || index > Flambda_arity.num_params params_arity
+    if index < 0 || index > Flambda_arity.num_params arity
     then
       Misc.fatal_errorf
         "Illegal first_complex_local_param=%d for params arity: %a" index
-        Flambda_arity.print params_arity);
+        Flambda_arity.print arity);
   if
-    List.compare_length_with param_modes
-      (Flambda_arity.cardinal_unarized params_arity)
+    List.compare_length_with param_modes (Flambda_arity.cardinal_unarized arity)
     <> 0
   then
     Misc.fatal_errorf "Parameter modes do not match arity: %a and (%a)"
-      Flambda_arity.print params_arity
+      Flambda_arity.print arity
       (Format.pp_print_list ~pp_sep:Format.pp_print_space
          Alloc_mode.For_types.print)
       param_modes;
@@ -222,7 +239,6 @@ let createk k code_id ~newer_version_of ~params_arity ~param_modes
       cost_metrics;
       inlining_arguments;
       dbg;
-      is_tupled;
       is_my_closure_used;
       inlining_decision;
       absolute_history;
@@ -248,8 +264,6 @@ let with_param_modes param_modes t = { t with param_modes }
 
 let with_first_complex_local_param first_complex_local_param t =
   { t with first_complex_local_param }
-
-let with_is_tupled is_tupled t = { t with is_tupled }
 
 let with_result_types result_types t = { t with result_types }
 
@@ -279,9 +293,14 @@ let [@ocamlformat "disable"] print ppf
          first_complex_local_param; result_arity;
          result_types; result_mode;
          recursive; cost_metrics; inlining_arguments;
-         dbg; is_tupled; is_my_closure_used; inlining_decision;
+         dbg; is_my_closure_used; inlining_decision;
          absolute_history; relative_history; loopify } =
   let module C = Flambda_colours in
+  let params_arity, is_tupled =
+    match params_arity with
+    | Non_tupled params_arity -> params_arity, false
+    | Tupled params_arity -> params_arity, true
+  in
   Format.fprintf ppf "@[<hov 1>(\
       @[<hov 1>%t(newer_version_of@ %a)%t@]@ \
       @[<hov 1>%t(stub@ %b)%t@]@ \
@@ -426,7 +445,6 @@ let free_names
       cost_metrics = _;
       inlining_arguments = _;
       dbg = _;
-      is_tupled = _;
       is_my_closure_used = _;
       inlining_decision = _;
       absolute_history = _;
@@ -471,7 +489,6 @@ let apply_renaming
        cost_metrics = _;
        inlining_arguments = _;
        dbg = _;
-       is_tupled = _;
        is_my_closure_used = _;
        inlining_decision = _;
        absolute_history = _;
@@ -528,7 +545,6 @@ let ids_for_export
       cost_metrics = _;
       inlining_arguments = _;
       dbg = _;
-      is_tupled = _;
       is_my_closure_used = _;
       inlining_decision = _;
       absolute_history = _;
@@ -570,7 +586,6 @@ let approx_equal
       cost_metrics = cost_metrics1;
       inlining_arguments = inlining_arguments1;
       dbg = dbg1;
-      is_tupled = is_tupled1;
       is_my_closure_used = is_my_closure_used1;
       inlining_decision = inlining_decision1;
       absolute_history = absolute_history1;
@@ -598,7 +613,6 @@ let approx_equal
       cost_metrics = cost_metrics2;
       inlining_arguments = inlining_arguments2;
       dbg = dbg2;
-      is_tupled = is_tupled2;
       is_my_closure_used = is_my_closure_used2;
       inlining_decision = inlining_decision2;
       absolute_history = absolute_history2;
@@ -607,7 +621,7 @@ let approx_equal
     } =
   Code_id.equal code_id1 code_id2
   && (Option.equal Code_id.equal) newer_version_of1 newer_version_of2
-  && Flambda_arity.equal_ignoring_subkinds params_arity1 params_arity2
+  && equal_ignoring_subkinds_params_arity params_arity1 params_arity2
   && List.equal Alloc_mode.For_types.equal param_modes1 param_modes2
   && First_complex_local_param.equal first_complex_local_param1
        first_complex_local_param2
@@ -627,7 +641,6 @@ let approx_equal
   && Cost_metrics.equal cost_metrics1 cost_metrics2
   && Inlining_arguments.equal inlining_arguments1 inlining_arguments2
   && Int.equal (Debuginfo.compare dbg1 dbg2) 0
-  && Bool.equal is_tupled1 is_tupled2
   && Bool.equal is_my_closure_used1 is_my_closure_used2
   && Function_decl_inlining_decision_type.equal inlining_decision1
        inlining_decision2

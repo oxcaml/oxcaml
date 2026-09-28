@@ -975,16 +975,21 @@ let compute_code_changes uses ~rewrite_kind_with_subkind ~rewrite_result_types
               (fun var kind -> rewrite_kind_with_subkind (Name.var var) kind)
               vars kinds
           in
-          let params_arity =
+          let rewrite_params_arity params_arity =
             Flambda_arity.create
               (List.map
                  (fun kinds ->
                    Flambda_arity.Component_for_creation.(
                      Unboxed_product
                        (List.map (fun kind -> Singleton kind) kinds)))
-                 (Flambda_arity.group_by_parameter code_dep.arity
+                 (Flambda_arity.group_by_parameter params_arity
                     (rewrite_kinds code_dep.params
-                       (Flambda_arity.unarize code_dep.arity))))
+                       (Flambda_arity.unarize params_arity))))
+          in
+          let params_arity : Code_metadata.params_arity =
+            match code_dep.arity with
+            | Tupled arity -> Tupled (rewrite_params_arity arity)
+            | Non_tupled arity -> Non_tupled (rewrite_params_arity arity)
           in
           let result_arity =
             Flambda_arity.create_singletons
@@ -995,6 +1000,9 @@ let compute_code_changes uses ~rewrite_kind_with_subkind ~rewrite_result_types
             Code_metadata.with_params_arity params_arity
               (Code_metadata.with_result_arity result_arity code_metadata) )
         else
+          let arity =
+            match code_dep.arity with Tupled arity | Non_tupled arity -> arity
+          in
           let params_decisions =
             List.map2
               (fun param kind ->
@@ -1004,7 +1012,7 @@ let compute_code_changes uses ~rewrite_kind_with_subkind ~rewrite_result_types
                   if is_var_used param then Keep (param, kind) else Delete
                 | Some fields -> Unbox fields)
               code_dep.params
-              (Flambda_arity.unarize code_dep.arity)
+              (Flambda_arity.unarize arity)
           in
           let my_closure_decision, code_metadata =
             match
@@ -1030,12 +1038,10 @@ let compute_code_changes uses ~rewrite_kind_with_subkind ~rewrite_result_types
             Flambda_arity.unarize_t (arity_of_decisions return_decisions)
           in
           let code_metadata =
-            Code_metadata.with_is_tupled false
-              (Code_metadata.with_result_arity result_arity code_metadata)
+            Code_metadata.with_result_arity result_arity code_metadata
           in
           let params_decisions_and_modes =
-            Flambda_arity.group_by_parameter
-              (Code_metadata.params_arity code_metadata)
+            Flambda_arity.group_by_parameter arity
               (List.combine params_decisions
                  (Code_metadata.param_modes code_metadata))
           in
@@ -1061,7 +1067,7 @@ let compute_code_changes uses ~rewrite_kind_with_subkind ~rewrite_result_types
             get_arity_and_modes params_decisions_and_modes
           in
           let code_metadata =
-            Code_metadata.with_params_arity params_arity
+            Code_metadata.with_params_arity (Non_tupled params_arity)
               (Code_metadata.with_param_modes modes code_metadata)
           in
           (* We only change the calling convention if the analysis has shown

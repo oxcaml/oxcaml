@@ -287,6 +287,9 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
   | Function { function_call = Direct code_id } -> (
     let code_metadata = Env.get_code_metadata env code_id in
     let params_arity = Code_metadata.params_arity code_metadata in
+    let params_arity =
+      match params_arity with Tupled arity | Non_tupled arity -> arity
+    in
     if not (C.check_arity params_arity args)
     then Misc.fatal_errorf "Wrong arity for direct call";
     let args =

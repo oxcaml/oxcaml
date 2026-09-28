@@ -513,9 +513,8 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
       ~regalloc_attribute:(Code.regalloc_attribute code)
       ~regalloc_param_attribute:(Code.regalloc_param_attribute code)
       ~cold:(Code.cold code) ~is_a_functor ~is_opaque ~recursive ~cost_metrics
-      ~inlining_arguments ~dbg ~is_tupled:(Code.is_tupled code)
-      ~is_my_closure_used ~inlining_decision ~absolute_history ~relative_history
-      ~loopify
+      ~inlining_arguments ~dbg ~is_my_closure_used ~inlining_decision
+      ~absolute_history ~relative_history ~loopify
   in
   let code =
     let are_rebuilding = DA.are_rebuilding_terms dacc_after_body in

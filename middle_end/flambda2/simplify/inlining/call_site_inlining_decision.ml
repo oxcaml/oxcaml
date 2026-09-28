@@ -186,7 +186,10 @@ let argument_types_useful dacc ~apply ~code_metadata =
             ~const:(fun _ -> true))
         (Apply.args apply)
     | Fine ->
-      let arity = Code_metadata.params_arity code_metadata in
+      let arity =
+        match Code_metadata.params_arity code_metadata with
+        | Non_tupled arity | Tupled arity -> arity
+      in
       List.exists2
         (fun full_kind simple ->
           Simple.pattern_match simple

@@ -110,8 +110,12 @@ let simplify_direct_tuple_application ~simplify_expr dacc apply
        [Apply.args apply]). The components must be of kind [Value] (in Lambda,
        [layout_tuple_element]) and therefore cannot be unboxed products
        themselves. *)
-    Flambda_arity.cardinal_unarized
-      (Code_metadata.params_arity callee's_code_metadata)
+    match Code_metadata.params_arity callee's_code_metadata with
+    | Tupled params_arity -> Flambda_arity.cardinal_unarized params_arity
+    | Non_tupled _ ->
+      Misc.fatal_errorf
+        "Cannot simplify direct tuple application with curried callee:@ %a"
+        Apply.print apply
   in
   (* Split the tuple argument from any over application arguments *)
   let tuple_arg, over_application_args =
@@ -728,7 +732,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
           let code =
             Code.create code_id ~params_and_body
               ~free_names_of_params_and_body:free_names ~newer_version_of:None
-              ~params_arity:remaining_param_arity
+              ~params_arity:(Non_tupled remaining_param_arity)
               ~param_modes:remaining_params_alloc_modes
               ~first_complex_local_param ~result_arity ~result_types:Unknown
               ~result_mode ~stub:true ~inline:Default_inline
@@ -738,7 +742,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
               ~cold:false ~is_a_functor:false ~is_opaque:false ~recursive
               ~cost_metrics:cost_metrics_of_body
               ~inlining_arguments:(DE.inlining_arguments (DA.denv dacc))
-              ~dbg ~is_tupled:false
+              ~dbg
               ~is_my_closure_used:
                 (Function_params_and_body.is_my_closure_used params_and_body)
               ~inlining_decision:Stub ~absolute_history ~relative_history
@@ -998,6 +1002,11 @@ let simplify_direct_function_call ~simplify_expr dacc apply
     let call_kind = Call_kind.direct_function_call callee's_code_id in
     let apply = Apply.with_call_kind apply call_kind in
     let params_arity = Code_metadata.params_arity callee's_code_metadata in
+    let is_indirect_tuple_application, params_arity =
+      match params_arity with
+      | Tupled arity -> must_be_detupled, arity
+      | Non_tupled arity -> false, arity
+    in
     (* A function declaration with [is_tupled = true] must be treated specially:
 
        - Direct calls adopt the normal calling convention of the code's body,
@@ -1006,7 +1015,7 @@ let simplify_direct_function_call ~simplify_expr dacc apply
        - Indirect calls adopt the calling convention consisting of a single
        tuple argument, irrespective of what [Code.params_arity] says. *)
     let args_arity = Apply.args_arity apply in
-    if must_be_detupled
+    if is_indirect_tuple_application
     then
       simplify_direct_tuple_application ~simplify_expr dacc apply
         ~callee's_code_id ~callee's_code_metadata ~down_to_up
@@ -1132,7 +1141,7 @@ let simplify_function_call ~simplify_expr dacc apply ~callee_ty
      calling convention, but we simplify it into a direct call, which uses the
      callee's code calling convention. In this case, we need to "detuple" the
      call in order to correctly adapt to the change in calling convention. *)
-  let call_must_be_detupled is_function_decl_tupled =
+  let must_be_detupled =
     match call with
     | Direct _ | Indirect_known_arity _ ->
       (* In these cases, the calling convention already used in the application
@@ -1142,8 +1151,8 @@ let simplify_function_call ~simplify_expr dacc apply ~callee_ty
     | Indirect_unknown_arity ->
       (* In the indirect case, the calling convention used currently is the
          generic one. Thus we need to detuple the call iff the function
-         declaration is tupled. *)
-      is_function_decl_tupled
+         declaration is tupled, which will be checked later. *)
+      true
   in
   let type_unavailable call =
     simplify_function_call_where_callee's_type_unavailable dacc apply call
@@ -1165,8 +1174,14 @@ let simplify_function_call ~simplify_expr dacc apply ~callee_ty
       match DE.find_code_metadata_exn denv callee's_code_id with
       | exception Not_found -> type_unavailable call
       | callee's_code_metadata ->
+        (* Direct calls always use the normal (non-tupled) calling convention,
+           independent of whether the code is tupled or not. *)
+        let params_arity =
+          match Code_metadata.params_arity callee's_code_metadata with
+          | Tupled arity | Non_tupled arity -> arity
+        in
         simplify_direct_full_application ~simplify_expr dacc apply None
-          ~params_arity:(Code_metadata.params_arity callee's_code_metadata)
+          ~params_arity
           ~result_arity:(Code_metadata.result_arity callee's_code_metadata)
           ~result_types:(Code_metadata.result_types callee's_code_metadata)
           ~down_to_up ~coming_from_indirect:false ~callee's_code_metadata
@@ -1197,10 +1212,6 @@ let simplify_function_call ~simplify_expr dacc apply ~callee_ty
       match DE.find_code_metadata_exn denv callee's_code_id_from_type with
       | exception Not_found -> type_unavailable call
       | callee's_code_metadata_from_type ->
-        let must_be_detupled =
-          call_must_be_detupled
-            (Code_metadata.is_tupled callee's_code_metadata_from_type)
-        in
         simplify_direct_function_call ~simplify_expr dacc apply
           ~callee's_code_id_from_type ~callee's_code_metadata_from_type
           ~callee's_code_ids_from_call_kind ~callee's_function_slot
@@ -1227,12 +1238,18 @@ let simplify_function_call ~simplify_expr dacc apply ~callee_ty
               (fun code_id ->
                 match DE.find_code_metadata_exn denv code_id with
                 | exception Not_found -> false
-                | code_metadata ->
-                  let params_arity = Code_metadata.params_arity code_metadata in
-                  let is_tupled = Code_metadata.is_tupled code_metadata in
-                  (not is_tupled)
-                  && Flambda_arity.equal_ignoring_subkinds args_arity
-                       params_arity)
+                | code_metadata -> (
+                  match Code_metadata.params_arity code_metadata with
+                  | Tupled _ ->
+                    (* CR-soon ncourant and bclement: this would be fine if we
+                       were able to de-tuple calls when going from
+                       [Indirect_unknown_arity] to [Indirect_known_arity], which
+                       could be done by reusing most of the
+                       [simplify_direct_function_call] path. *)
+                    false
+                  | Non_tupled params_arity ->
+                    Flambda_arity.equal_ignoring_subkinds args_arity
+                      params_arity))
               code_ids
           then
             type_unavailable

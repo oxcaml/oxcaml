@@ -17,6 +17,12 @@
 (** Classification of application expressions. *)
 
 module Function_call : sig
+  (** [Direct] and [Indirect_known_arity] function calls use the "known arity"
+      (i.e. untupled) calling convention: tupled functions take as many arg as
+      there are components in the tuple.
+
+      [Indirect_unknown_arity] function calls use the "unknown arity" (i.e.
+      tupled) calling convention: tupled functions take exactly one argument. *)
   type t = private
     | Direct of Code_id.t
         (** The [code_id] uniquely determines the function symbol that must be

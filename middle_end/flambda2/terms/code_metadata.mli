@@ -14,6 +14,14 @@
 (*                                                                        *)
 (**************************************************************************)
 
+type params_arity =
+  | Non_tupled of [`Complex] Flambda_arity.t
+  | Tupled of [`Complex] Flambda_arity.t
+
+val equal_exact_params_arity : params_arity -> params_arity -> bool
+
+val equal_ignoring_subkinds_params_arity : params_arity -> params_arity -> bool
+
 type t
 
 type code_metadata = t
@@ -31,7 +39,7 @@ module type Code_metadata_accessors_result_type = sig
 
   val newer_version_of : 'a t -> Code_id.t option
 
-  val params_arity : 'a t -> [`Complex] Flambda_arity.t
+  val params_arity : 'a t -> params_arity
 
   val param_modes : 'a t -> Alloc_mode.For_types.t list
 
@@ -72,8 +80,6 @@ module type Code_metadata_accessors_result_type = sig
 
   val dbg : 'a t -> Debuginfo.t
 
-  val is_tupled : 'a t -> bool
-
   val is_my_closure_used : 'a t -> bool
 
   val inlining_decision : 'a t -> Function_decl_inlining_decision_type.t
@@ -95,7 +101,7 @@ include Code_metadata_accessors_result_type with type 'a t := t
 type 'a create_type =
   Code_id.t ->
   newer_version_of:Code_id.t option ->
-  params_arity:[`Complex] Flambda_arity.t ->
+  params_arity:params_arity ->
   param_modes:Alloc_mode.For_types.t list ->
   first_complex_local_param:First_complex_local_param.t ->
   result_arity:[`Unarized] Flambda_arity.t ->
@@ -114,7 +120,6 @@ type 'a create_type =
   cost_metrics:Cost_metrics.t ->
   inlining_arguments:Inlining_arguments.t ->
   dbg:Debuginfo.t ->
-  is_tupled:bool ->
   is_my_closure_used:bool ->
   inlining_decision:Function_decl_inlining_decision_type.t ->
   absolute_history:Inlining_history.Absolute.t ->
@@ -136,13 +141,11 @@ val with_is_my_closure_used : bool -> t -> t
 
 val with_result_arity : [`Unarized] Flambda_arity.t -> t -> t
 
-val with_params_arity : [`Complex] Flambda_arity.t -> t -> t
+val with_params_arity : params_arity -> t -> t
 
 val with_param_modes : Alloc_mode.For_types.t list -> t -> t
 
 val with_first_complex_local_param : First_complex_local_param.t -> t -> t
-
-val with_is_tupled : bool -> t -> t
 
 val with_result_types : Result_types.t Or_unknown_or_bottom.t -> t -> t
 
