@@ -30,6 +30,7 @@ open Debuginfo.Scoped_location
 type error =
     Free_super_var
   | Unreachable_reached
+  | Unsafe_in_section of Lambda.section_kind * string
   | Bad_probe_layout of Ident.t
   | Unknown_probe_layout of Ident.t
   | Illegal_void_record_field
@@ -434,19 +435,69 @@ let zero_alloc_of_application
     end
   | None, _ -> Zero_alloc_utils.Assume_info.none
 
-(* GC-safe sections: recover the section kind from the marker attribute that
-   [Typecore] attaches to a [%critical]/[%blocking] body. *)
-let section_kind_of_attributes (attrs : Parsetree.attributes) =
-  let has n =
-    List.exists
-      (fun (a : Parsetree.attribute) ->
-        let s = a.attr_name.txt in
-        String.equal s n || String.equal s ("ocaml." ^ n))
-      attrs
+(* GC-safe sections: statically verify a section body, already translated to
+   lambda. First increment: structural checks only. The [@@critical] /
+   [@@blocking] call-attribute discipline is not implemented yet, so all
+   function calls (including externals) are rejected. *)
+let check_section_body kind section_loc body =
+  let violation loc what =
+    raise (Error (loc, Unsafe_in_section (kind, what)))
   in
-  if has "critical" then Some Critical
-  else if has "blocking" then Some Blocking
-  else None
+  let blocking =
+    match (kind : Lambda.section_kind) with
+    | Blocking -> true
+    | Critical -> false
+  in
+  let rec check loc lam =
+    match lam with
+    | Lvar _ | Lmutvar _ | Lconst _ -> ()
+    | Lfunction _ -> violation loc "function definition"
+    | Lletrec _ -> violation loc "recursive definition"
+    | Lapply _ | Lsend _ | Linstantiate _ -> violation loc "function call"
+    | Ltrywith _ -> violation loc "exception handler"
+    | Lstringswitch _ -> violation loc "string match"
+    | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _ ->
+      violation loc "template"
+    | Lregion (body, _) | Lexclave body ->
+      if blocking then violation loc "stack allocation"
+      else check loc body
+    | Lprim (p, args, ploc) ->
+      let loc = to_location ploc in
+      (match p with
+       | Psection _ -> violation loc "nested section"
+       | Praise _ -> violation loc "raise"
+       | Pperform | Preperform | Pcontinue | Pdiscontinue
+       | Pdiscontinue_with_backtrace | Pwith_stack
+       | Pwith_stack_preemptible ->
+         violation loc "effect operation"
+       | Ppoll -> violation loc "poll"
+       | _ ->
+         if primitive_can_raise p
+         then violation loc "operation that may raise";
+         (match primitive_may_allocate p with
+          | None -> ()
+          | Some mode ->
+            if blocking || is_heap_mode mode
+            then violation loc "allocation"));
+      List.iter (check loc) args
+    | Llet _ | Lmutlet _ | Lswitch _ | Lstaticraise _ | Lstaticcatch _
+    | Lifthenelse _ | Lsequence _ | Lwhile _ | Lfor _ | Lassign _
+    | Levent _ | Lifused _ ->
+      iter_head_constructor (check loc) lam
+  in
+  check section_loc body
+
+(* GC-safe sections: recover the section kind(s) from the marker attributes
+   that [Typecore] attaches to a [%critical]/[%blocking] body. An immediately
+   nested section puts two markers on the same expression. *)
+let section_kinds_of_attributes (attrs : Parsetree.attributes) =
+  List.filter_map
+    (fun (a : Parsetree.attribute) ->
+      match a.attr_name.txt with
+      | "critical" | "ocaml.critical" -> Some Critical
+      | "blocking" | "ocaml.blocking" -> Some Blocking
+      | _ -> None)
+    attrs
 
 let rec transl_exp ~scopes layout e =
   transl_exp1 ~scopes ~in_new_scope:false layout e
@@ -469,10 +520,13 @@ and transl_exp1 ~scopes ~in_new_scope layout e =
     if eval_once then transl_exp0 ~scopes ~in_new_scope layout e else
     Translobj.oo_wrap e.exp_env true (transl_exp0 ~scopes ~in_new_scope layout) e
   in
-  match section_kind_of_attributes e.exp_attributes with
-  | None -> lam
-  | Some kind ->
+  match section_kinds_of_attributes e.exp_attributes with
+  | [] -> lam
+  | [kind] ->
+    check_section_body kind e.exp_loc lam;
     Lprim (Psection (kind, layout), [lam], of_location ~scopes e.exp_loc)
+  | kind :: _ :: _ ->
+    raise (Error (e.exp_loc, Unsafe_in_section (kind, "nested section")))
 
 and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
   match e.exp_desc with
@@ -3364,6 +3418,14 @@ let report_error_doc ppf = function
   | Free_super_var ->
       fprintf ppf
         "Ancestor names can only be used to select inherited methods"
+  | Unsafe_in_section (kind, what) ->
+      let kind_s =
+        match kind with
+        | Lambda.Critical -> "critical"
+        | Lambda.Blocking -> "blocking"
+      in
+      fprintf ppf
+        "This %s is not allowed inside a [%%%s] section." what kind_s
   | Unreachable_reached ->
       fprintf ppf "Unreachable expression was reached"
   | Bad_probe_layout id ->

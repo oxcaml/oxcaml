@@ -48,6 +48,7 @@ val transl_scoped_exp : scopes:scopes -> Lambda.layout -> expression -> lambda
 type error =
     Free_super_var
   | Unreachable_reached
+  | Unsafe_in_section of Lambda.section_kind * string
   | Bad_probe_layout of Ident.t
   | Unknown_probe_layout of Ident.t
   | Illegal_void_record_field
