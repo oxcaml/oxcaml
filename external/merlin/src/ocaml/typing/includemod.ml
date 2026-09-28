@@ -561,14 +561,8 @@ let retrieve_functor_params env mty =
         (* the function is only used for functor parameter diff, so the return
            mode is intentionally ignored. *)
         retrieve_functor_params (p :: before) env res
-<<<<<<< Merlin:unbox-stuff-and-moregen
-    | Mty_ident _ | Mty_alias _ | Mty_signature _ | Mty_strengthen _ | Mty_for_hole as res ->
-||||||| Compiler:last-imported
-    | Mty_ident _ | Mty_alias _ | Mty_signature _ | Mty_strengthen _ as res ->
-=======
     | Mty_ident _ | Mty_alias _ | Mty_signature _ | Mty_strengthen _
-    | Mty_with _ as res ->
->>>>>>> Compiler:HEAD
+    | Mty_with _ | Mty_for_hole as res ->
         { Error.params = List.rev before; res }
   in
   retrieve_functor_params [] env mty
@@ -647,7 +641,7 @@ let rec imported_with_body mty =
       Some mty
   | Mty_with (body, _, _, With_type _) -> imported_with_body body
   | Mty_ident _ | Mty_signature _ | Mty_functor _ | Mty_alias _
-  | Mty_strengthen _ | Mty_with _ -> None
+  | Mty_strengthen _ | Mty_with _ | Mty_for_hole -> None
 
 let rec check_with_types mty =
   let open Subst.Lazy in
@@ -681,11 +675,6 @@ let rec shallow_modtypes env subst mty1 mty2 =
   | Mty_strengthen (mty1,_,_), mty2 ->
       (* S with M <= S *)
       shallow_modtypes env subst mty1 mty2
-<<<<<<< Merlin:unbox-stuff-and-moregen
-  | (Mty_alias _ | Mty_ident _ | Mty_signature _ | Mty_functor _ | Mty_for_hole), _  -> false
-||||||| Compiler:last-imported
-  | (Mty_alias _ | Mty_ident _ | Mty_signature _ | Mty_functor _), _  -> false
-=======
   | Mty_with (_, _, _, With_type _), mty2 ->
       (* Type equalities preserve the runtime structure of the body. *)
       begin match imported_with_body mty1 with
@@ -698,8 +687,8 @@ let rec shallow_modtypes env subst mty1 mty2 =
       (* A module constraint can change the layout of a submodule, so even
          inclusion in the unconstrained body may require a coercion. *)
       false
-  | (Mty_alias _ | Mty_ident _ | Mty_signature _ | Mty_functor _), _  -> false
->>>>>>> Compiler:HEAD
+  | (Mty_alias _ | Mty_ident _ | Mty_signature _ | Mty_functor _
+    | Mty_for_hole), _ -> false
 
 and shallow_module_paths env subst p1 mty2 p2 =
   equal_module_paths env p1 subst p2 ||
@@ -709,14 +698,8 @@ and shallow_module_paths env subst p1 mty2 p2 =
     | Mty_strengthen (mty1,p1,_) ->
         shallow_modtypes env subst mty1 mty2
           && equal_module_paths env p1 subst p2
-<<<<<<< Merlin:unbox-stuff-and-moregen
-    | Mty_alias _ | Mty_ident _ | Mty_signature _ | Mty_functor _ | Mty_for_hole
-||||||| Compiler:last-imported
     | Mty_alias _ | Mty_ident _ | Mty_signature _ | Mty_functor _
-=======
-    | Mty_alias _ | Mty_ident _ | Mty_signature _ | Mty_functor _
-    | Mty_with _
->>>>>>> Compiler:HEAD
+    | Mty_with _ | Mty_for_hole
     | exception Not_found -> false
 
 let rec modtypes ~core ~direction ~loc env subst ~modes mty1 mty2 shape =
@@ -1493,17 +1476,9 @@ module Functor_inclusion_diff = struct
 
   let rec keep_expansible_param = function
     | Mty_ident _ | Mty_alias _ as mty -> Some mty
-<<<<<<< Merlin:unbox-stuff-and-moregen
     | Mty_signature _ | Mty_functor _ | Mty_for_hole -> None
-    | Mty_strengthen (mty,_,_) -> keep_expansible_param mty
-||||||| Compiler:last-imported
-    | Mty_signature _ | Mty_functor _ -> None
-    | Mty_strengthen (mty,_,_) -> keep_expansible_param mty
-=======
-    | Mty_signature _ | Mty_functor _ -> None
     | Mty_strengthen (mty,_,_) | Mty_with (mty,_,_,_) ->
         keep_expansible_param mty
->>>>>>> Compiler:HEAD
 
   let lookup_expansion { env ; res ; _ } = match res with
     | None -> None

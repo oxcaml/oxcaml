@@ -1181,15 +1181,9 @@ let rec normalize_package_path env p =
   in
   match t with
   | Some (Mty_ident p) -> normalize_package_path env p
-<<<<<<< Merlin:unbox-stuff-and-moregen
-  | Some (Mty_signature _ | Mty_functor _ | Mty_alias _ | Mty_strengthen _ | Mty_for_hole) | None ->
-||||||| Compiler:last-imported
-  | Some (Mty_signature _ | Mty_functor _ | Mty_alias _ | Mty_strengthen _) | None ->
-=======
   | Some (Mty_signature _ | Mty_functor _ | Mty_alias _
-         | Mty_strengthen _ | Mty_with _)
+         | Mty_strengthen _ | Mty_with _ | Mty_for_hole)
   | None ->
->>>>>>> Compiler:HEAD
       match p with
         Path.Pdot (p1, s) ->
           (* For module aliases *)

@@ -4149,10 +4149,7 @@ let rec tree_of_modtype ?abbrev = function
   | Mty_alias p ->
       let p = best_module_path p in
       Omty_alias (tree_of_path (Some Module) p)
-<<<<<<< Merlin:unbox-stuff-and-moregen
   | Mty_for_hole -> Omty_hole
-||||||| Compiler:last-imported
-=======
   | Mty_with _ as mty ->
       begin match !expand_module_type !printing_env mty with
       | Mty_with _ ->
@@ -4160,7 +4157,6 @@ let rec tree_of_modtype ?abbrev = function
           Omty_signature [Osig_ellipsis]
       | mty -> tree_of_modtype ?abbrev mty
       end
->>>>>>> Compiler:HEAD
   | Mty_strengthen _ as mty ->
       begin match !expand_module_type !printing_env mty with
       | Mty_strengthen (mty,p,a) ->

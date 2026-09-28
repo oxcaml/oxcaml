@@ -3359,16 +3359,9 @@ and package_constraints env loc mty constrs =
     | mty ->
       let rec ident = function
           Mty_ident p -> p
-<<<<<<< Merlin:unbox-stuff-and-moregen
-        | Mty_strengthen (mty,_,_) -> ident mty
-        | Mty_functor _ | Mty_alias _ | Mty_signature _ | Mty_for_hole -> assert false
-||||||| Compiler:last-imported
-        | Mty_strengthen (mty,_,_) -> ident mty
-        | Mty_functor _ | Mty_alias _ | Mty_signature _ -> assert false
-=======
         | Mty_strengthen (mty,_,_) | Mty_with (mty,_,_,_) -> ident mty
-        | Mty_functor _ | Mty_alias _ | Mty_signature _ -> assert false
->>>>>>> Compiler:HEAD
+        | Mty_functor _ | Mty_alias _ | Mty_signature _ | Mty_for_hole ->
+            assert false
       in
       raise(Error(loc, env, Cannot_scrape_package_type (ident mty)))
   end
@@ -4039,13 +4032,8 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
     end
   | Mty_alias path ->
       raise(Error(app_view.f_loc, env, Cannot_scrape_alias path))
-<<<<<<< Merlin:unbox-stuff-and-moregen
-  | Mty_ident _ | Mty_signature _ | Mty_strengthen _ | Mty_for_hole ->
-||||||| Compiler:last-imported
-  | Mty_ident _ | Mty_signature _ | Mty_strengthen _ ->
-=======
-  | Mty_ident _ | Mty_signature _ | Mty_strengthen _ | Mty_with _ ->
->>>>>>> Compiler:HEAD
+  | Mty_ident _ | Mty_signature _ | Mty_strengthen _ | Mty_with _
+  | Mty_for_hole ->
       let args = List.map simplify_app_summary args in
       let mty_f = md_f.mod_type in
       let app_name = match sfunct.pmod_desc with

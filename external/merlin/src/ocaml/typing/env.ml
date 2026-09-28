@@ -2700,6 +2700,9 @@ let rec components_of_module_maker
             Result.Error (No_components_abstract p)
         | Mty_alias p -> Result.Error (No_components_alias p)
         | Mty_with (body, _, _, _) -> unavailable body
+        | Mty_for_hole ->
+            Result.Error
+              (No_components_abstract (Pident (Ident.create_local "hole")))
         | Mty_signature _ | Mty_functor _ ->
             Misc.fatal_error "Env.components: invalid with body"
       in

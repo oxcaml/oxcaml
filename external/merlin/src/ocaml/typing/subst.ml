@@ -397,16 +397,8 @@ let rec module_path s path =
 let modtype_path s path =
       match Path.Map.find path s.modtypes with
       | Mty_ident p -> p
-<<<<<<< Merlin:unbox-stuff-and-moregen
-      | Mty_alias _ | Mty_signature _ | Mty_functor _ | Mty_for_hole
-      | Mty_strengthen _ as mty ->
-||||||| Compiler:last-imported
       | Mty_alias _ | Mty_signature _ | Mty_functor _
-      | Mty_strengthen _ as mty ->
-=======
-      | Mty_alias _ | Mty_signature _ | Mty_functor _
-      | Mty_strengthen _ | Mty_with _ as mty ->
->>>>>>> Compiler:HEAD
+      | Mty_strengthen _ | Mty_with _ | Mty_for_hole as mty ->
          raise (Module_type_path_substituted_away (path,mty))
       | exception Not_found ->
          match path with

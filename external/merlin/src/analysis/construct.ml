@@ -224,14 +224,22 @@ module Gen = struct
       let env = Env.add_signature sig_items env in
       Mod.structure @@ structure env sig_items
     | Mty_functor (param, out, _) ->
-      let param =
+      let param, env =
         match param with
-        | Unit -> Parsetree.Unit
+        | Unit -> (Parsetree.Unit, env)
         | Named (id, in_, _) ->
-          Parsetree.Named
-            ( Location.mknoloc (Option.map ~f:Ident.name id),
-              Ptyp_of_type.module_type in_,
-              [] )
+          let param =
+            Parsetree.Named
+              ( Location.mknoloc (Option.map ~f:Ident.name id),
+                Ptyp_of_type.module_type env in_,
+                [] )
+          in
+          let env =
+            match id with
+            | None -> env
+            | Some id -> Env.add_module ~arg:true id Mp_present in_ env
+          in
+          (param, env)
       in
       Mod.functor_ param @@ module_ env out
     | Mty_alias path ->
@@ -239,6 +247,7 @@ module Gen = struct
       raise (Modtype_not_found (Mod, name))
     | Mty_strengthen (mty, _, _) -> module_ env mty
     | Mty_for_hole -> Mod.hole ()
+    | Mty_with _ -> raise No_constraint
 
   and structure_item env =
     let open Ast_helper in
@@ -257,7 +266,8 @@ module Gen = struct
       Str.type_ rec_flag [ td ]
     | Sig_modtype (id, { mtd_type; _ }, _visibility) ->
       let mtd =
-        Ast_helper.Mtd.mk ?typ:(Option.map ~f:Ptyp_of_type.module_type mtd_type)
+        Ast_helper.Mtd.mk
+          ?typ:(Option.map ~f:(Ptyp_of_type.module_type env) mtd_type)
         @@ Util.var_of_id id
       in
       Ast_helper.Str.modtype mtd

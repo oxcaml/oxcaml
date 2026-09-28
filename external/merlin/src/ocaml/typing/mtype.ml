@@ -68,13 +68,7 @@ let rec reduce_strengthen_lazy ~aliasable mty p =
       (* Strengthening aliases, generative functors and already strengthened
         types is a no-op. *)
       Some mty
-<<<<<<< Merlin:unbox-stuff-and-moregen
-  | Mty_ident _ | Mty_for_hole -> None
-||||||| Compiler:last-imported
-  | Mty_ident _ -> None
-=======
-  | Mty_ident _ | Mty_with _ -> None
->>>>>>> Compiler:HEAD
+  | Mty_ident _ | Mty_with _ | Mty_for_hole -> None
 
 (* Strengthen a type by pushing strengthening inward and/or constructing
     appropriate Mty_strengthen nodes. *)
@@ -224,11 +218,6 @@ let rec reduce_lazy ~aliases env mty =
         | None -> None
         end
       end
-<<<<<<< Merlin:unbox-stuff-and-moregen
-  | Mty_signature _ | Mty_functor _ | Mty_alias _ | Mty_for_hole -> None
-||||||| Compiler:last-imported
-  | Mty_signature _ | Mty_functor _ | Mty_alias _ -> None
-=======
   | Mty_with (body, id, names, cstr) ->
       !Subst.check_with id;
       let scope = Ident.scope id in
@@ -271,8 +260,7 @@ let rec reduce_lazy ~aliases env mty =
           | None -> None
           end
       end
-  | Mty_signature _ | Mty_functor _ | Mty_alias _ -> None
->>>>>>> Compiler:HEAD
+  | Mty_signature _ | Mty_functor _ | Mty_alias _ | Mty_for_hole -> None
 
 let rec scrape_lazy ~aliases env mty =
   match reduce_lazy ~aliases env mty with
@@ -513,13 +501,8 @@ let scrape_for_type_of env pres mty =
         with Not_found -> outer
       end
     | Mty_strengthen (inner,_,_) -> loop env outer inner
-<<<<<<< Merlin:unbox-stuff-and-moregen
-    | Mty_ident _ | Mty_signature _ | Mty_functor _ | Mty_for_hole -> outer
-||||||| Compiler:last-imported
-    | Mty_ident _ | Mty_signature _ | Mty_functor _ -> outer
-=======
-    | Mty_ident _ | Mty_signature _ | Mty_functor _ | Mty_with _ -> outer
->>>>>>> Compiler:HEAD
+    | Mty_ident _ | Mty_signature _ | Mty_functor _ | Mty_with _
+    | Mty_for_hole -> outer
   in
   make_aliases_absent ~aliased:false pres (loop env mty mty)
 
@@ -607,12 +590,8 @@ let rec nondep_mty_with_presence env va ids pres mty =
                     nondep_mty res_env va ids res, mres)
       in
       pres, mty
-<<<<<<< Merlin:unbox-stuff-and-moregen
   | Mty_for_hole as mty_for_hole -> pres, mty_for_hole
-||||||| Compiler:last-imported
-=======
   | Mty_with _ -> Misc.fatal_error "Mtype.nondep: unexpanded with"
->>>>>>> Compiler:HEAD
   | Mty_strengthen (mty,p,a) ->
       (* If we end up strengthening an abstract type with a dependent module,
         just drop the strengthening. *)
@@ -748,17 +727,9 @@ type type_and_jkind_paths =
 
 let rec type_and_jkind_paths env p mty =
   match scrape env mty with
-<<<<<<< Merlin:unbox-stuff-and-moregen
-  | Mty_ident _ | Mty_alias _ | Mty_functor _ | Mty_strengthen _ | Mty_for_hole ->
-    { types = []; jkinds = [] }
-||||||| Compiler:last-imported
-  | Mty_ident _ | Mty_alias _ | Mty_functor _ | Mty_strengthen _ ->
-    ~types:[], ~jkinds:[]
-=======
   | Mty_ident _ | Mty_alias _ | Mty_functor _ | Mty_strengthen _
-  | Mty_with _ ->
-    ~types:[], ~jkinds:[]
->>>>>>> Compiler:HEAD
+  | Mty_with _ | Mty_for_hole ->
+    { types = []; jkinds = [] }
   | Mty_signature sg -> type_and_jkind_paths_sig env p sg
 
 and type_and_jkind_paths_sig env p sg =
@@ -795,14 +766,8 @@ let rec no_code_needed_mod env pres mty =
       | Mty_signature sg -> no_code_needed_sig env sg
       | Mty_functor _ -> false
       | Mty_alias _ -> false
-<<<<<<< Merlin:unbox-stuff-and-moregen
       | Mty_for_hole -> true
-      | Mty_strengthen _ -> false
-||||||| Compiler:last-imported
-      | Mty_strengthen _ -> false
-=======
       | Mty_strengthen _ | Mty_with _ -> false
->>>>>>> Compiler:HEAD
     end
 
 and no_code_needed_sig env sg =
