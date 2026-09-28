@@ -12,9 +12,10 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(* Check installed metadata. --bundled also checks the full Nix library set.
-   The wrapper supplies a disposable cwd and bootstrap Findlib; installed
-   compilers run only in subprocesses. *)
+(* Check compiler location, META paths/dependencies, native archive ownership,
+   Dune availability and native toplevel/JIT/eval consumers. --bundled adds Nix
+   library inventories/consumers. The wrapper supplies a disposable cwd,
+   bootstrap tools and an environment without inherited OCaml configuration. *)
 
 open Fl_metascanner
 
@@ -30,26 +31,29 @@ let lines text =
 let words = Fl_split.in_words
 let sorted = List.sort String.compare
 
-let check_status command = function
+let check_status program args status =
+  let error reason =
+    fail "Command %s\n  cwd: %s\n  %s"
+      (Filename.quote_command program args) (Sys.getcwd ()) reason
+  in
+  match status with
   | Unix.WEXITED 0 -> ()
-  | status ->
-      let reason = match status with
-        | Unix.WEXITED code -> Printf.sprintf "exited %d" code
-        | Unix.WSIGNALED signal -> "killed by " ^ Sys.signal_to_string signal
-        | Unix.WSTOPPED signal -> "stopped by " ^ Sys.signal_to_string signal
-      in
-      fail "Command %s\n  cwd: %s\n  %s" command (Sys.getcwd ()) reason
+  | Unix.WEXITED code -> error (Printf.sprintf "exited with code %d" code)
+  | Unix.WSIGNALED signal -> error ("killed by " ^ Sys.signal_to_string signal)
+  | Unix.WSTOPPED signal -> error ("stopped by " ^ Sys.signal_to_string signal)
 
 let run program args =
-  let command = Filename.quote_command program args in
-  let channel = Unix.open_process_out ("exec " ^ command) in
-  check_status command (Unix.close_process_out channel)
+  let pid = Unix.create_process program (Array.of_list (program :: args))
+    Unix.stdin Unix.stdout Unix.stderr
+  in
+  check_status program args (snd (Unix.waitpid [] pid))
 
 let capture program args =
-  let command = Filename.quote_command program args in
-  let channel = Unix.open_process_in ("exec " ^ command) in
+  let channel = Unix.open_process_args_in program
+    (Array.of_list (program :: args))
+  in
   let text = In_channel.input_all channel in
-  check_status command (Unix.close_process_in channel);
+  check_status program args (Unix.close_process_in channel);
   String.trim text
 
 type context =
@@ -158,7 +162,7 @@ let check_archive_ownership t archives =
       else if List.exists (Filename.check_suffix path) [".cmxa"; ".cmxs"] &&
               path <> implicit_stdlib &&
               not (Hashtbl.mem archives (Unix.realpath path))
-      then fail "Unreferenced installed archive: %s" path)
+      then fail "Unreferenced installed archive: %s; add a META reference" path)
   in
   check_dir (installed t "lib")
 
@@ -243,10 +247,10 @@ let create_dune_target name kind =
   name ^ "/main.exe"
 
 let archive_less_packages =
-  [ "compiler-libs"; "ocaml-compiler-libs"; "ppxlib_ast" (* Umbrella roots. *)
-  ; "stdlib" (* Linked implicitly. *)
-  ; "threads.posix" (* Alias for threads. *)
-  ; "compiler-libs.toplevel" (* Bytecode only. *)
+  [ "compiler-libs"; (* Umbrella root. *)
+    "stdlib"; (* Linked implicitly. *)
+    "threads.posix"; (* Alias for threads. *)
+    "compiler-libs.toplevel"; (* Bytecode only. *)
   ]
 
 let check_bundled_libraries t =
@@ -259,6 +263,7 @@ let check_bundled_libraries t =
   let extras = data t "installed-findlib-only-libraries.txt" in
   check_names "findlib" [common; extras] findlib_names;
   check_names "Dune" [common] dune_names;
+  let archive_less = archive_less_packages @ read_list extras in
   Unix.mkdir "direct" 0o700;
   write "direct/main.ml" "let () = ()\n";
   let targets = ref [] in
@@ -274,28 +279,17 @@ let check_bundled_libraries t =
             ["-predicates"; "native"; "-format"; "%A"] name
           in
           if archive <> "" then true
-          else if List.mem name archive_less_packages then false
-          else fail "%s: no native archive" name
+          else if List.mem name archive_less then false
+          else fail "%s: no native archive; fix META or document an exception \
+                       in check_installed.ml's archive_less_packages" name
     in
     if consume then begin
       check_findlib_consumer t name kind;
-      if List.mem name dune_names then
-        targets := create_dune_target name kind :: !targets
+      targets := create_dune_target name kind :: !targets
     end) findlib_names;
   checking "Dune native consumers";
   run t.dune
     ("build" :: "--root" :: "." :: "--display=short" :: List.rev !targets)
-
-let resolve_tool name =
-  let path = String.split_on_char ':' (Sys.getenv "PATH") in
-  match List.find_map (fun dir ->
-    let file = Filename.concat dir name in
-    try Unix.access file [Unix.X_OK];
-        if Sys.is_directory file then None else Some (Unix.realpath file)
-    with Unix.Unix_error _ -> None) path
-  with
-  | Some path -> path
-  | None -> fail "Cannot find %s on PATH" name
 
 let configure_environment t =
   let stdlib = installed t "lib/ocaml" in
@@ -303,36 +297,32 @@ let configure_environment t =
     "path=%S\nstdlib=%S\nocamlc=%S\nocamlopt=%S\nldconf=\"ignore\"\n"
     (installed t "lib" ^ ":" ^ stdlib) stdlib
     (installed t "bin/ocamlc") (installed t "bin/ocamlopt"));
-  Unix.putenv "PATH" (installed t "bin" ^ ":" ^ Sys.getenv "PATH");
+  let path = Option.value (Sys.getenv_opt "PATH") ~default:"" in
+  Unix.putenv "PATH" (installed t "bin" ^ ":" ^ path);
   Unix.putenv "OCAMLFIND_CONF" (Filename.concat (Sys.getcwd ()) "findlib.conf");
   Unix.putenv "TMPDIR" (Sys.getcwd ());
   Unix.putenv "DUNE_CACHE" "disabled"
 
 let main () =
-  let lists_dir, prefix, bundled = match Array.to_list Sys.argv with
-    | [_; "--lists-dir"; dir; prefix] -> dir, prefix, false
-    | [_; "--lists-dir"; dir; prefix; "--bundled"] -> dir, prefix, true
-    | _ -> fail "Usage: %s --lists-dir DIR PREFIX [--bundled]\n\
-                 --bundled checks the complete Nix install's libraries."
-             Sys.argv.(0)
+  let lists_dir, findlib, dune, prefix, bundled =
+    match Array.to_list Sys.argv with
+    | [_; "--lists-dir"; dir; "--ocamlfind"; findlib; "--dune"; dune; prefix] ->
+        dir, findlib, dune, prefix, false
+    | [_; "--lists-dir"; dir; "--ocamlfind"; findlib; "--dune"; dune; prefix;
+       "--bundled"] -> dir, findlib, dune, prefix, true
+    | _ -> fail "Invalid checker invocation; use check-installed.sh"
   in
   let stdlib = Filename.concat prefix "lib/ocaml" in
   if not (Sys.file_exists stdlib && Sys.is_directory stdlib) then
     fail "No install at %s" prefix;
-  let findlib = resolve_tool "ocamlfind" in
-  let dune = resolve_tool "dune" in
-  Printf.printf "Bootstrap ocamlfind: %s (%s)\n%!" findlib
-    (capture findlib ["query"; "-format"; "%v"; "findlib"]);
-  Printf.printf "Bootstrap dune: %s (%s)\n%!" dune
-    (capture dune ["--root"; "."; "--version"]);
   let t = { prefix = Unix.realpath prefix; lists_dir; findlib; dune } in
   configure_environment t;
   checking "installed compiler location";
-  let stdlib = capture (installed t "bin/ocamlc") ["-where"] in
-  if stdlib <> installed t "lib/ocaml" then
+  let where = capture (installed t "bin/ocamlc") ["-where"] in
+  if where <> installed t "lib/ocaml" then
     fail "Installed ocamlc uses %s, expected %s"
-      stdlib (installed t "lib/ocaml");
-  write "dune-project" "(lang dune 1.0)\n";
+      where (installed t "lib/ocaml");
+  write "dune-project" "(lang dune 3.0)\n";
   let archives = check_meta_files t in
   check_archive_ownership t archives;
   checking "Dune library availability";

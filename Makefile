@@ -143,9 +143,10 @@ ci-no-coverage: runtest runtest-upstream minimizer
 .PHONY: ci-coverage
 ci-coverage: boot-runtest coverage
 
-# These targets check an existing install at $(prefix); they do not install.
-# check-installed checks metadata; check-installed-bundled also checks
-# inventories and consumers, expecting the bundled libraries Nix installs.
+# Check an existing install at $(prefix); these targets do not install.
+# Both check compiler location, META paths/dependencies, native archive ownership,
+# Dune availability and native toplevel/JIT/eval consumers. The bundled target
+# also checks inventories and native consumers for the complete Nix library set.
 .PHONY: check-installed
 check-installed:
 	bash tools/ci/actions/check-installed.sh "$(prefix)"
