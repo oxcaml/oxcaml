@@ -1027,7 +1027,7 @@ let empty_bindings =
 (** Allocation and backpatching code *)
 
 let compile_indirect newval =
-  let indirect = Lambda.transl_prim "CamlinternalLazy" "indirect" in
+  let indirect = Typeopt.transl_prim "CamlinternalLazy" "indirect" in
   Lapply {
     ap_func = indirect;
     ap_args = [newval];
