@@ -342,6 +342,50 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
     in
     after_rebuild body uacc
 
+let charge_speculative_inlining_budget_for_let dacc simplify_named_result
+    removed_operations ~lifted_constants_from_defining_expr =
+  match DA.speculative_inlining_budget dacc with
+  | Not_in_speculative_region | Exhausted -> dacc
+  | Remaining _ ->
+    (* This mirrors the accounting done in [rebuild_let], but on the way down,
+       so that a speculative inlining can be aborted early. It is only an
+       approximation, e.g. bindings that will be deleted on the way up are still
+       charged for. *)
+    let cost_metrics =
+      List.fold_left
+        (fun cost_metrics (binding : Expr_builder.binding_to_place) ->
+          match binding with
+          | Delete_binding _ -> cost_metrics
+          | Keep_binding { let_bound; simplified_defining_expr; _ } ->
+            Cost_metrics.( + ) cost_metrics
+              (Cost_metrics.increase_due_to_let_expr
+                 ~is_phantom:
+                   (Name_mode.is_phantom (Bound_pattern.name_mode let_bound))
+                 ~cost_metrics_of_defining_expr:
+                   (Simplified_named.cost_metrics simplified_defining_expr)))
+        Cost_metrics.zero
+        (Simplify_named_result.bindings_to_place simplify_named_result)
+    in
+    let cost_metrics =
+      Cost_metrics.notify_removed ~operation:removed_operations cost_metrics
+    in
+    let cost_metrics =
+      if
+        Flambda_features.Inlining.speculative_inlining_track_lifted_constants ()
+      then
+        LCS.fold lifted_constants_from_defining_expr ~init:cost_metrics
+          ~f:(fun cost_metrics lifted_constant ->
+            List.fold_left
+              (fun cost_metrics definition ->
+                Cost_metrics.( + ) cost_metrics
+                  (Rebuilt_static_const.cost_metrics
+                     (LC.Definition.defining_expr definition)))
+              cost_metrics
+              (LC.definitions lifted_constant))
+      else cost_metrics
+    in
+    DA.charge_speculative_inlining_budget dacc cost_metrics
+
 let record_new_defining_expression_binding_for_data_flow dacc ~rewrite_id
     data_flow (binding : Expr_builder.binding_to_place) : Flow.Acc.t =
   let generate_phantom_lets = DE.generate_phantom_lets (DA.denv dacc) in
@@ -427,6 +471,10 @@ let simplify_let0 ~simplify_expr ~simplify_function_body dacc let_expr
       let lifted_constants_from_defining_expr = DA.get_lifted_constants dacc in
       let dacc =
         DA.add_to_lifted_constant_accumulator dacc prior_lifted_constants
+      in
+      let dacc =
+        charge_speculative_inlining_budget_for_let dacc simplify_named_result
+          removed_operations ~lifted_constants_from_defining_expr
       in
       let rewrite_id = Named_rewrite_id.create () in
       let dacc =

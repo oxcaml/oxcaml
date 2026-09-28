@@ -141,12 +141,27 @@ val decrease_continuation_lifting_budget : t -> int -> t
 
 val prepare_for_speculative_inlining : t -> t
 
-(** The remaining speculative inlining budget, if inside a speculatively-inlined
-    function body and [Flambda_features.Inlining.speculative_inlining_budget] is
-    enabled. *)
-val speculative_inlining_budget : t -> float option
+(** Tracking of the speculative inlining budget (see
+    [Flambda_features.Inlining.speculative_inlining_budget]). Inside a
+    speculatively-inlined function body, or during a speculation, the cost of
+    the code produced so far is charged against the budget as the downwards
+    traversal proceeds. *)
+type speculative_inlining_budget =
+  | Not_in_speculative_region
+  | Remaining of float
+  | Exhausted
 
-val with_speculative_inlining_budget : t -> float option -> t
+val speculative_inlining_budget : t -> speculative_inlining_budget
+
+val with_speculative_inlining_budget : t -> speculative_inlining_budget -> t
+
+(** [None] if not in a speculative region; [Some 0.] if exhausted. *)
+val remaining_speculative_inlining_budget : t -> float option
+
+val speculative_inlining_budget_exhausted : t -> bool
+
+(** Charge the (evaluated) cost metrics against the budget, if any. *)
+val charge_speculative_inlining_budget : t -> Cost_metrics.t -> t
 
 val continuations_to_specialize : t -> Continuation.Set.t
 

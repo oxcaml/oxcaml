@@ -19,6 +19,17 @@ module DE = Downwards_env
 module LCS = Lifted_constant_state
 module TE = Flambda2_types.Typing_env
 
+type speculative_inlining_budget =
+  | Not_in_speculative_region
+  | Remaining of float
+  | Exhausted
+
+let print_speculative_inlining_budget ppf budget =
+  match budget with
+  | Not_in_speculative_region -> Format.fprintf ppf "Not_in_speculative_region"
+  | Remaining remaining -> Format.fprintf ppf "(Remaining %f)" remaining
+  | Exhausted -> Format.fprintf ppf "Exhausted"
+
 type t =
   { denv : DE.t;
     continuation_uses_env : CUE.t;
@@ -36,9 +47,8 @@ type t =
     lifted_continuations : (DE.t * Original_handlers.t) list;
     (* head of the list is the innermost continuation being lifted *)
     continuation_lifting_budget : int;
-    speculative_inlining_budget : float option;
-    (* [Some remaining] when inside a speculatively-inlined function body (see
-       [Flambda_features.Inlining.speculative_inlining_budget]) *)
+    speculative_inlining_budget : speculative_inlining_budget;
+    (* See [Flambda_features.Inlining.speculative_inlining_budget]. *)
     continuations_to_specialize : Continuation.Set.t;
     (* CR gbury: we could try and encode the set of continuations to specialize
        into the map below as the keys of the map *)
@@ -93,7 +103,7 @@ let [@ocamlformat "disable"] print ppf
     (Format.pp_print_list ~pp_sep:Format.pp_print_space
        print_lifted_cont) lifted_continuations
     continuation_lifting_budget
-    (Format.pp_print_option Format.pp_print_float) speculative_inlining_budget
+    print_speculative_inlining_budget speculative_inlining_budget
     Continuation.Set.print continuations_to_specialize
     (Continuation.Map.print (Apply_cont_rewrite_id.Map.print Continuation.print)) specialization_map
 
@@ -113,7 +123,7 @@ let create denv slot_offsets continuation_uses_env =
     are_lifting_conts = Are_lifting_conts.no_lifting At_toplevel;
     lifted_continuations = [];
     continuation_lifting_budget = Flambda_features.Expert.cont_lifting_budget ();
-    speculative_inlining_budget = None;
+    speculative_inlining_budget = Not_in_speculative_region;
     continuations_to_specialize = Continuation.Set.empty;
     specialization_map = Continuation.Map.empty
   }
@@ -134,6 +144,28 @@ let speculative_inlining_budget t = t.speculative_inlining_budget
 
 let with_speculative_inlining_budget t speculative_inlining_budget =
   { t with speculative_inlining_budget }
+
+let remaining_speculative_inlining_budget t =
+  match t.speculative_inlining_budget with
+  | Not_in_speculative_region -> None
+  | Remaining remaining -> Some remaining
+  | Exhausted -> Some 0.
+
+let speculative_inlining_budget_exhausted t =
+  match t.speculative_inlining_budget with
+  | Exhausted -> true
+  | Not_in_speculative_region | Remaining _ -> false
+
+let charge_speculative_inlining_budget t cost_metrics =
+  match t.speculative_inlining_budget with
+  | Not_in_speculative_region | Exhausted -> t
+  | Remaining remaining ->
+    let args = DE.inlining_arguments t.denv in
+    let remaining = remaining -. Cost_metrics.evaluate ~args cost_metrics in
+    let speculative_inlining_budget =
+      if Float.compare remaining 0. < 0 then Exhausted else Remaining remaining
+    in
+    { t with speculative_inlining_budget }
 
 let with_continuation_uses_env t ~cont_uses_env =
   { t with continuation_uses_env = cont_uses_env }

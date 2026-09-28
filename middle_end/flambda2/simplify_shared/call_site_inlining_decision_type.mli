@@ -32,6 +32,10 @@ type t =
         code_size : Code_size.t;
         max_code_size : float
       }
+  | Speculative_inlining_aborted of
+      { budget : float;
+        threshold_is_remaining_budget : bool
+      }
   | Speculatively_not_inline of
       { cost_metrics : Cost_metrics.t;
         cost_metrics_of_lifted_constants : Cost_metrics.t;

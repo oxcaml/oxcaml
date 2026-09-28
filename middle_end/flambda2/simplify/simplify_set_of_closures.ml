@@ -175,8 +175,12 @@ let extract_accumulators_from_function outer_dacc ~dacc_after_body
     |> DA.with_code_age_relation ~code_age_relation
   in
   let outer_dacc =
-    DA.with_speculative_inlining_budget outer_dacc
-      (DA.speculative_inlining_budget dacc_after_body)
+    (* The cost of the function's code is charged to the enclosing budget via
+       the set of closures, so only exhaustion (which causes a speculation to be
+       aborted) is propagated outwards. *)
+    match DA.speculative_inlining_budget dacc_after_body with
+    | Exhausted -> DA.with_speculative_inlining_budget outer_dacc Exhausted
+    | Not_in_speculative_region | Remaining _ -> outer_dacc
   in
   outer_dacc, lifted_consts_this_function
 

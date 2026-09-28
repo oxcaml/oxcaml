@@ -21,11 +21,13 @@
 
    With [-flambda2-speculative-inlining-budget], the inlining threshold is
    treated as a budget shared by all speculative inlinings performed within a
-   speculatively-inlined body.  The inlining of a level of [f] at the
-   top-level call [f 1] uses up most of the budget, so the calls to the level
-   below (whose code size is large compared to the remaining budget) are not
-   even speculated upon.  The final code should contain only one copy of
-   [big]. *)
+   speculatively-inlined body, with the cost of the code produced inside that
+   body being charged against the budget as simplification proceeds.  Each of
+   the three inlinings of a level of [f] at the top-level call [f 1] can then
+   only afford to inline one call to the level below, after which the
+   remaining calls (whose code size is large compared to the remaining budget)
+   are not even speculated upon.  The final code should contain four copies of
+   [big] rather than 3^3 + 1. *)
 
 let[@inline never] call ~f = f ()
 

@@ -1,11 +1,11 @@
 let code call_0 deleted in
 let code big_2 deleted in
 let code f_1 deleted in
-let code `fn[speculative_inlining_budget.ml:56,18--45]_4` deleted in
+let code `fn[speculative_inlining_budget.ml:58,18--45]_4` deleted in
 let code f_3 deleted in
-let code `fn[speculative_inlining_budget.ml:57,18--45]_6` deleted in
+let code `fn[speculative_inlining_budget.ml:59,18--45]_6` deleted in
 let code f_5 deleted in
-let code `fn[speculative_inlining_budget.ml:58,18--45]_8` deleted in
+let code `fn[speculative_inlining_budget.ml:60,18--45]_8` deleted in
 let code f_7 deleted in
 let code g_9 deleted in
 let code inline(never) loopify(never) size(6) newer_version_of(call_0)
@@ -215,13 +215,13 @@ let code loopify(never) size(211) newer_version_of(f_1)
       -> k * k1
 in
 let $camlSpeculative_inlining_budget__f_3 = closure f_1_1 @f &toplevel in
-let code loopify(never) size(18) newer_version_of(`fn[speculative_inlining_budget.ml:56,18--45]_4`)
-      `fn[speculative_inlining_budget.ml:56,18--45]_4_1` (param : imm tagged)
+let code loopify(never) size(18) newer_version_of(`fn[speculative_inlining_budget.ml:58,18--45]_4`)
+      `fn[speculative_inlining_budget.ml:58,18--45]_4_1` (param : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   let x =
-    %project_value_slot.[`fn[speculative_inlining_budget.ml:56,18--45]`].[x_1]
+    %project_value_slot.[`fn[speculative_inlining_budget.ml:58,18--45]`].[x_1]
       (my_closure)
   in
   apply direct(f_1_1 &my_alloc_region)
@@ -248,24 +248,24 @@ let code loopify(never) size(31) newer_version_of(f_3)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
-  let `fn[speculative_inlining_budget.ml:56,18--45]` =
-    closure `fn[speculative_inlining_budget.ml:56,18--45]_4_1`
-      @`fn[speculative_inlining_budget.ml:56,18--45]` &my_alloc_region
+  let `fn[speculative_inlining_budget.ml:58,18--45]` =
+    closure `fn[speculative_inlining_budget.ml:58,18--45]_4_1`
+      @`fn[speculative_inlining_budget.ml:58,18--45]` &my_alloc_region
   with { f = $camlSpeculative_inlining_budget__f_3; x_1 = x }
   in
   apply direct(call_0_1 &my_alloc_region)
     ($camlSpeculative_inlining_budget__call_2 : _ -> imm tagged)
-      (`fn[speculative_inlining_budget.ml:56,18--45]`)
+      (`fn[speculative_inlining_budget.ml:58,18--45]`)
       -> k * k1
 in
 let $camlSpeculative_inlining_budget__f_4 = closure f_3_1 @f_1 &toplevel in
-let code loopify(never) size(18) newer_version_of(`fn[speculative_inlining_budget.ml:56,18--45]_4_1`)
-      `fn[speculative_inlining_budget.ml:56,18--45]_4_2` (param : imm tagged)
+let code loopify(never) size(18) newer_version_of(`fn[speculative_inlining_budget.ml:58,18--45]_4_1`)
+      `fn[speculative_inlining_budget.ml:58,18--45]_4_2` (param : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   let x =
-    %project_value_slot.[`fn[speculative_inlining_budget.ml:56,18--45]`].[x_1]
+    %project_value_slot.[`fn[speculative_inlining_budget.ml:58,18--45]`].[x_1]
       (my_closure)
   in
   apply direct(f_1_1 &my_alloc_region) inlining_state(depth(10))
@@ -287,13 +287,13 @@ let code loopify(never) size(18) newer_version_of(`fn[speculative_inlining_budge
                 let int_add_1 = %int_barith.add (int_add, apply_result) in
                 cont k (int_add_1)))
 in
-let code loopify(never) size(18) newer_version_of(`fn[speculative_inlining_budget.ml:56,18--45]_4_1`)
-      `fn[speculative_inlining_budget.ml:56,18--45]_4_3` (param : imm tagged)
+let code loopify(never) size(18) newer_version_of(`fn[speculative_inlining_budget.ml:58,18--45]_4_1`)
+      `fn[speculative_inlining_budget.ml:58,18--45]_4_3` (param : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   let x =
-    %project_value_slot.[`fn[speculative_inlining_budget.ml:56,18--45]`].[x_1]
+    %project_value_slot.[`fn[speculative_inlining_budget.ml:58,18--45]`].[x_1]
       (my_closure)
   in
   apply direct(f_1_1 &my_alloc_region) inlining_state(depth(10))
@@ -315,13 +315,13 @@ let code loopify(never) size(18) newer_version_of(`fn[speculative_inlining_budge
                 let int_add_1 = %int_barith.add (int_add, apply_result) in
                 cont k (int_add_1)))
 in
-let code loopify(never) size(18) newer_version_of(`fn[speculative_inlining_budget.ml:56,18--45]_4_1`)
-      `fn[speculative_inlining_budget.ml:56,18--45]_4_4` (param : imm tagged)
+let code loopify(never) size(18) newer_version_of(`fn[speculative_inlining_budget.ml:58,18--45]_4_1`)
+      `fn[speculative_inlining_budget.ml:58,18--45]_4_4` (param : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   let x =
-    %project_value_slot.[`fn[speculative_inlining_budget.ml:56,18--45]`].[x_1]
+    %project_value_slot.[`fn[speculative_inlining_budget.ml:58,18--45]`].[x_1]
       (my_closure)
   in
   apply direct(f_1_1 &my_alloc_region) inlining_state(depth(10))
@@ -343,45 +343,45 @@ let code loopify(never) size(18) newer_version_of(`fn[speculative_inlining_budge
                 let int_add_1 = %int_barith.add (int_add, apply_result) in
                 cont k (int_add_1)))
 in
-let code loopify(never) size(99) newer_version_of(`fn[speculative_inlining_budget.ml:57,18--45]_6`)
-      `fn[speculative_inlining_budget.ml:57,18--45]_6_1` (param : imm tagged)
+let code loopify(never) size(99) newer_version_of(`fn[speculative_inlining_budget.ml:59,18--45]_6`)
+      `fn[speculative_inlining_budget.ml:59,18--45]_6_1` (param : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   let x =
-    %project_value_slot.[`fn[speculative_inlining_budget.ml:57,18--45]`].[x_2]
+    %project_value_slot.[`fn[speculative_inlining_budget.ml:59,18--45]`].[x_2]
       (my_closure)
   in
-  (let `fn[speculative_inlining_budget.ml:56,18--45]` =
-     closure `fn[speculative_inlining_budget.ml:56,18--45]_4_4`
-       @`fn[speculative_inlining_budget.ml:56,18--45]` &my_alloc_region
+  (let `fn[speculative_inlining_budget.ml:58,18--45]` =
+     closure `fn[speculative_inlining_budget.ml:58,18--45]_4_4`
+       @`fn[speculative_inlining_budget.ml:58,18--45]` &my_alloc_region
    with { f = $camlSpeculative_inlining_budget__f_3; x_1 = x }
    in
    apply direct(call_0_1 &my_alloc_region) inlining_state(depth(10))
      ($camlSpeculative_inlining_budget__call_2 : _ -> imm tagged)
-       (`fn[speculative_inlining_budget.ml:56,18--45]`)
+       (`fn[speculative_inlining_budget.ml:58,18--45]`)
        -> k2 * k1)
     where k2 (apply_result : imm tagged) =
-      ((let `fn[speculative_inlining_budget.ml:56,18--45]` =
-          closure `fn[speculative_inlining_budget.ml:56,18--45]_4_3`
-            @`fn[speculative_inlining_budget.ml:56,18--45]` &my_alloc_region
+      ((let `fn[speculative_inlining_budget.ml:58,18--45]` =
+          closure `fn[speculative_inlining_budget.ml:58,18--45]_4_3`
+            @`fn[speculative_inlining_budget.ml:58,18--45]` &my_alloc_region
         with { f = $camlSpeculative_inlining_budget__f_3; x_1 = x }
         in
         apply direct(call_0_1 &my_alloc_region) inlining_state(depth(10))
           ($camlSpeculative_inlining_budget__call_2 : _ -> imm tagged)
-            (`fn[speculative_inlining_budget.ml:56,18--45]`)
+            (`fn[speculative_inlining_budget.ml:58,18--45]`)
             -> k2 * k1)
          where k2 (apply_result_1 : imm tagged) =
-           ((let `fn[speculative_inlining_budget.ml:56,18--45]` =
-               closure `fn[speculative_inlining_budget.ml:56,18--45]_4_2`
-                 @`fn[speculative_inlining_budget.ml:56,18--45]`
+           ((let `fn[speculative_inlining_budget.ml:58,18--45]` =
+               closure `fn[speculative_inlining_budget.ml:58,18--45]_4_2`
+                 @`fn[speculative_inlining_budget.ml:58,18--45]`
                  &my_alloc_region
              with { f = $camlSpeculative_inlining_budget__f_3; x_1 = x }
              in
              apply direct(call_0_1 &my_alloc_region)
                     inlining_state(depth(10))
                ($camlSpeculative_inlining_budget__call_2 : _ -> imm tagged)
-                 (`fn[speculative_inlining_budget.ml:56,18--45]`)
+                 (`fn[speculative_inlining_budget.ml:58,18--45]`)
                  -> k2 * k1)
               where k2 (apply_result_2 : imm tagged) =
                 let int_add =
@@ -395,24 +395,24 @@ let code loopify(never) size(112) newer_version_of(f_5)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
-  let `fn[speculative_inlining_budget.ml:57,18--45]` =
-    closure `fn[speculative_inlining_budget.ml:57,18--45]_6_1`
-      @`fn[speculative_inlining_budget.ml:57,18--45]` &my_alloc_region
+  let `fn[speculative_inlining_budget.ml:59,18--45]` =
+    closure `fn[speculative_inlining_budget.ml:59,18--45]_6_1`
+      @`fn[speculative_inlining_budget.ml:59,18--45]` &my_alloc_region
   with { f_1 = $camlSpeculative_inlining_budget__f_4; x_2 = x }
   in
   apply direct(call_0_1 &my_alloc_region)
     ($camlSpeculative_inlining_budget__call_2 : _ -> imm tagged)
-      (`fn[speculative_inlining_budget.ml:57,18--45]`)
+      (`fn[speculative_inlining_budget.ml:59,18--45]`)
       -> k * k1
 in
 let $camlSpeculative_inlining_budget__f_5 = closure f_5_1 @f_2 &toplevel in
-let code loopify(never) size(18) newer_version_of(`fn[speculative_inlining_budget.ml:58,18--45]_8`)
-      `fn[speculative_inlining_budget.ml:58,18--45]_8_1` (param : imm tagged)
+let code loopify(never) size(18) newer_version_of(`fn[speculative_inlining_budget.ml:60,18--45]_8`)
+      `fn[speculative_inlining_budget.ml:60,18--45]_8_1` (param : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   let x =
-    %project_value_slot.[`fn[speculative_inlining_budget.ml:58,18--45]`].[x_3]
+    %project_value_slot.[`fn[speculative_inlining_budget.ml:60,18--45]`].[x_3]
       (my_closure)
   in
   apply direct(f_5_1 &my_alloc_region)
@@ -439,19 +439,19 @@ let code loopify(never) size(31) newer_version_of(f_7)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
-  let `fn[speculative_inlining_budget.ml:58,18--45]` =
-    closure `fn[speculative_inlining_budget.ml:58,18--45]_8_1`
-      @`fn[speculative_inlining_budget.ml:58,18--45]` &my_alloc_region
+  let `fn[speculative_inlining_budget.ml:60,18--45]` =
+    closure `fn[speculative_inlining_budget.ml:60,18--45]_8_1`
+      @`fn[speculative_inlining_budget.ml:60,18--45]` &my_alloc_region
   with { f_2 = $camlSpeculative_inlining_budget__f_5; x_3 = x }
   in
   apply direct(call_0_1 &my_alloc_region)
     ($camlSpeculative_inlining_budget__call_2 : _ -> imm tagged)
-      (`fn[speculative_inlining_budget.ml:58,18--45]`)
+      (`fn[speculative_inlining_budget.ml:60,18--45]`)
       -> k * k1
 in
 let $camlSpeculative_inlining_budget__f_6 = closure f_7_1 @f_3 &toplevel in
-let code loopify(never) size(17) newer_version_of(`fn[speculative_inlining_budget.ml:56,18--45]_4_2`)
-      `fn[speculative_inlining_budget.ml:56,18--45]_4_5` (param : imm tagged)
+let code loopify(never) size(17) newer_version_of(`fn[speculative_inlining_budget.ml:58,18--45]_4_2`)
+      `fn[speculative_inlining_budget.ml:58,18--45]_4_5` (param : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
@@ -474,13 +474,13 @@ let code loopify(never) size(17) newer_version_of(`fn[speculative_inlining_budge
                 let int_add_1 = %int_barith.add (int_add, apply_result) in
                 cont k (int_add_1)))
 in
-let $`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:56,18--45]_32` =
-  closure `fn[speculative_inlining_budget.ml:56,18--45]_4_5`
-    @`fn[speculative_inlining_budget.ml:56,18--45]` &toplevel
+let $`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:58,18--45]_38` =
+  closure `fn[speculative_inlining_budget.ml:58,18--45]_4_5`
+    @`fn[speculative_inlining_budget.ml:58,18--45]` &toplevel
   with { x_1 = 1 }
 in
-let code loopify(never) size(17) newer_version_of(`fn[speculative_inlining_budget.ml:56,18--45]_4_3`)
-      `fn[speculative_inlining_budget.ml:56,18--45]_4_6` (param : imm tagged)
+let code loopify(never) size(17) newer_version_of(`fn[speculative_inlining_budget.ml:58,18--45]_4_3`)
+      `fn[speculative_inlining_budget.ml:58,18--45]_4_6` (param : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
@@ -503,79 +503,88 @@ let code loopify(never) size(17) newer_version_of(`fn[speculative_inlining_budge
                 let int_add_1 = %int_barith.add (int_add, apply_result) in
                 cont k (int_add_1)))
 in
-let $`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:56,18--45]_31` =
-  closure `fn[speculative_inlining_budget.ml:56,18--45]_4_6`
-    @`fn[speculative_inlining_budget.ml:56,18--45]` &toplevel
+let $`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:58,18--45]_37` =
+  closure `fn[speculative_inlining_budget.ml:58,18--45]_4_6`
+    @`fn[speculative_inlining_budget.ml:58,18--45]` &toplevel
   with { x_1 = 1 }
 in
-let code loopify(never) size(17) newer_version_of(`fn[speculative_inlining_budget.ml:56,18--45]_4_4`)
-      `fn[speculative_inlining_budget.ml:56,18--45]_4_7` (param : imm tagged)
+let code loopify(never) size(59) newer_version_of(big_2_1)
+      big_2_2 (param : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
-  apply direct(f_1_1 &my_alloc_region) inlining_state(depth(30))
-    ($camlSpeculative_inlining_budget__f_3 : _ -> imm tagged) (1) -> k2 * k1
-    where k2 (apply_result : imm tagged) =
-      (apply direct(f_1_1 &my_alloc_region) inlining_state(depth(30))
-         ($camlSpeculative_inlining_budget__f_3 : _ -> imm tagged)
-           (1)
-           -> k2 * k1
-         where k2 (apply_result_1 : imm tagged) =
-           (apply direct(f_1_1 &my_alloc_region) inlining_state(depth(30))
-              ($camlSpeculative_inlining_budget__f_3 : _ -> imm tagged)
-                (1)
-                -> k2 * k1
-              where k2 (apply_result_2 : imm tagged) =
-                let int_add =
-                  %int_barith.add (apply_result_2, apply_result_1)
-                in
-                let int_add_1 = %int_barith.add (int_add, apply_result) in
-                cont k (int_add_1)))
+  let `region` = %begin_region () in
+  let Pmakearray =
+    %array.`imm`.mut.my_alloc_region.local[`region`]
+      (1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1)
+  in
+  let Parrayrefs = %array_load.`imm`.mut (Pmakearray, 7) in
+  let `unit` = %end_region (`region`) in
+  cont k (Parrayrefs)
 in
-let $`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:56,18--45]_30` =
-  closure `fn[speculative_inlining_budget.ml:56,18--45]_4_7`
-    @`fn[speculative_inlining_budget.ml:56,18--45]` &toplevel
-  with { x_1 = 1 }
+let $camlSpeculative_inlining_budget__big_36 =
+  closure big_2_2 @big &toplevel
+  with { x = 1 }
 in
-let code loopify(never) size(17) newer_version_of(`fn[speculative_inlining_budget.ml:57,18--45]_6_1`)
-      `fn[speculative_inlining_budget.ml:57,18--45]_6_2` (param : imm tagged)
+let code loopify(never) size(17) newer_version_of(`fn[speculative_inlining_budget.ml:58,18--45]_4_4`)
+      `fn[speculative_inlining_budget.ml:58,18--45]_4_7` (param : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   apply direct(call_0_1 &my_alloc_region) inlining_state(depth(30))
     ($camlSpeculative_inlining_budget__call_2 : _ -> imm tagged)
-      ($`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:56,18--45]_30`)
+      ($camlSpeculative_inlining_budget__big_36)
       -> k2 * k1
     where k2 (apply_result : imm tagged) =
-      (apply direct(call_0_1 &my_alloc_region) inlining_state(depth(30))
-         ($camlSpeculative_inlining_budget__call_2 : _ -> imm tagged)
-           ($`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:56,18--45]_31`)
-           -> k2 * k1
-         where k2 (apply_result_1 : imm tagged) =
-           (apply direct(call_0_1 &my_alloc_region) inlining_state(depth(30))
-              ($camlSpeculative_inlining_budget__call_2 : _ -> imm tagged)
-                ($`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:56,18--45]_32`)
-                -> k2 * k1
-              where k2 (apply_result_2 : imm tagged) =
-                let int_add =
-                  %int_barith.add (apply_result_2, apply_result_1)
-                in
-                let int_add_1 = %int_barith.add (int_add, apply_result) in
-                cont k (int_add_1)))
-in
-let $`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:57,18--45]_29` =
-  closure `fn[speculative_inlining_budget.ml:57,18--45]_6_2`
-    @`fn[speculative_inlining_budget.ml:57,18--45]` &toplevel
-  with { x_2 = 1 }
-in
-let code loopify(never) size(17) newer_version_of(`fn[speculative_inlining_budget.ml:56,18--45]_4_2`)
-      `fn[speculative_inlining_budget.ml:56,18--45]_4_8` (param : imm tagged)
-        my_closure &my_alloc_region my_depth
-        -> k * k1
-        : imm tagged =
-  apply direct(f_1_1 &my_alloc_region) inlining_state(depth(30))
-    ($camlSpeculative_inlining_budget__f_3 : _ -> imm tagged) (1) -> k2 * k1
-    where k2 (apply_result : imm tagged) =
       (apply direct(f_1_1 &my_alloc_region) inlining_state(depth(30))
          ($camlSpeculative_inlining_budget__f_3 : _ -> imm tagged)
            (1)
@@ -592,88 +601,29 @@ let code loopify(never) size(17) newer_version_of(`fn[speculative_inlining_budge
                 let int_add_1 = %int_barith.add (int_add, apply_result) in
                 cont k (int_add_1)))
 in
-let $`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:56,18--45]_24` =
-  closure `fn[speculative_inlining_budget.ml:56,18--45]_4_8`
-    @`fn[speculative_inlining_budget.ml:56,18--45]` &toplevel
+let $`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:58,18--45]_34` =
+  closure `fn[speculative_inlining_budget.ml:58,18--45]_4_7`
+    @`fn[speculative_inlining_budget.ml:58,18--45]` &toplevel
   with { x_1 = 1 }
 in
-let code loopify(never) size(17) newer_version_of(`fn[speculative_inlining_budget.ml:56,18--45]_4_3`)
-      `fn[speculative_inlining_budget.ml:56,18--45]_4_9` (param : imm tagged)
-        my_closure &my_alloc_region my_depth
-        -> k * k1
-        : imm tagged =
-  apply direct(f_1_1 &my_alloc_region) inlining_state(depth(30))
-    ($camlSpeculative_inlining_budget__f_3 : _ -> imm tagged) (1) -> k2 * k1
-    where k2 (apply_result : imm tagged) =
-      (apply direct(f_1_1 &my_alloc_region) inlining_state(depth(30))
-         ($camlSpeculative_inlining_budget__f_3 : _ -> imm tagged)
-           (1)
-           -> k2 * k1
-         where k2 (apply_result_1 : imm tagged) =
-           (apply direct(f_1_1 &my_alloc_region) inlining_state(depth(30))
-              ($camlSpeculative_inlining_budget__f_3 : _ -> imm tagged)
-                (1)
-                -> k2 * k1
-              where k2 (apply_result_2 : imm tagged) =
-                let int_add =
-                  %int_barith.add (apply_result_2, apply_result_1)
-                in
-                let int_add_1 = %int_barith.add (int_add, apply_result) in
-                cont k (int_add_1)))
-in
-let $`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:56,18--45]_23` =
-  closure `fn[speculative_inlining_budget.ml:56,18--45]_4_9`
-    @`fn[speculative_inlining_budget.ml:56,18--45]` &toplevel
-  with { x_1 = 1 }
-in
-let code loopify(never) size(17) newer_version_of(`fn[speculative_inlining_budget.ml:56,18--45]_4_4`)
-      `fn[speculative_inlining_budget.ml:56,18--45]_4_10`
-        (param : imm tagged)
-        my_closure &my_alloc_region my_depth
-        -> k * k1
-        : imm tagged =
-  apply direct(f_1_1 &my_alloc_region) inlining_state(depth(30))
-    ($camlSpeculative_inlining_budget__f_3 : _ -> imm tagged) (1) -> k2 * k1
-    where k2 (apply_result : imm tagged) =
-      (apply direct(f_1_1 &my_alloc_region) inlining_state(depth(30))
-         ($camlSpeculative_inlining_budget__f_3 : _ -> imm tagged)
-           (1)
-           -> k2 * k1
-         where k2 (apply_result_1 : imm tagged) =
-           (apply direct(f_1_1 &my_alloc_region) inlining_state(depth(30))
-              ($camlSpeculative_inlining_budget__f_3 : _ -> imm tagged)
-                (1)
-                -> k2 * k1
-              where k2 (apply_result_2 : imm tagged) =
-                let int_add =
-                  %int_barith.add (apply_result_2, apply_result_1)
-                in
-                let int_add_1 = %int_barith.add (int_add, apply_result) in
-                cont k (int_add_1)))
-in
-let $`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:56,18--45]_22` =
-  closure `fn[speculative_inlining_budget.ml:56,18--45]_4_10`
-    @`fn[speculative_inlining_budget.ml:56,18--45]` &toplevel
-  with { x_1 = 1 }
-in
-let code loopify(never) size(17) newer_version_of(`fn[speculative_inlining_budget.ml:57,18--45]_6_1`)
-      `fn[speculative_inlining_budget.ml:57,18--45]_6_3` (param : imm tagged)
+let code loopify(never) size(17) newer_version_of(`fn[speculative_inlining_budget.ml:59,18--45]_6_1`)
+      `fn[speculative_inlining_budget.ml:59,18--45]_6_2` (param : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   apply direct(call_0_1 &my_alloc_region) inlining_state(depth(30))
     ($camlSpeculative_inlining_budget__call_2 : _ -> imm tagged)
-      ($`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:56,18--45]_22`)
+      ($`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:58,18--45]_34`)
       -> k2 * k1
     where k2 (apply_result : imm tagged) =
       (apply direct(call_0_1 &my_alloc_region) inlining_state(depth(30))
          ($camlSpeculative_inlining_budget__call_2 : _ -> imm tagged)
-           ($`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:56,18--45]_23`)
+           ($`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:58,18--45]_37`)
            -> k2 * k1
          where k2 (apply_result_1 : imm tagged) =
            (apply direct(call_0_1 &my_alloc_region) inlining_state(depth(30))
               ($camlSpeculative_inlining_budget__call_2 : _ -> imm tagged)
-                ($`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:56,18--45]_24`)
+                ($`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:58,18--45]_38`)
                 -> k2 * k1
               where k2 (apply_result_2 : imm tagged) =
                 let int_add =
@@ -682,14 +632,13 @@ let code loopify(never) size(17) newer_version_of(`fn[speculative_inlining_budge
                 let int_add_1 = %int_barith.add (int_add, apply_result) in
                 cont k (int_add_1)))
 in
-let $`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:57,18--45]_21` =
-  closure `fn[speculative_inlining_budget.ml:57,18--45]_6_3`
-    @`fn[speculative_inlining_budget.ml:57,18--45]` &toplevel
+let $`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:59,18--45]_33` =
+  closure `fn[speculative_inlining_budget.ml:59,18--45]_6_2`
+    @`fn[speculative_inlining_budget.ml:59,18--45]` &toplevel
   with { x_2 = 1 }
 in
-let code loopify(never) size(17) newer_version_of(`fn[speculative_inlining_budget.ml:56,18--45]_4_2`)
-      `fn[speculative_inlining_budget.ml:56,18--45]_4_11`
-        (param : imm tagged)
+let code loopify(never) size(17) newer_version_of(`fn[speculative_inlining_budget.ml:58,18--45]_4_2`)
+      `fn[speculative_inlining_budget.ml:58,18--45]_4_8` (param : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
@@ -712,14 +661,13 @@ let code loopify(never) size(17) newer_version_of(`fn[speculative_inlining_budge
                 let int_add_1 = %int_barith.add (int_add, apply_result) in
                 cont k (int_add_1)))
 in
-let $`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:56,18--45]_16` =
-  closure `fn[speculative_inlining_budget.ml:56,18--45]_4_11`
-    @`fn[speculative_inlining_budget.ml:56,18--45]` &toplevel
+let $`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:58,18--45]_28` =
+  closure `fn[speculative_inlining_budget.ml:58,18--45]_4_8`
+    @`fn[speculative_inlining_budget.ml:58,18--45]` &toplevel
   with { x_1 = 1 }
 in
-let code loopify(never) size(17) newer_version_of(`fn[speculative_inlining_budget.ml:56,18--45]_4_3`)
-      `fn[speculative_inlining_budget.ml:56,18--45]_4_12`
-        (param : imm tagged)
+let code loopify(never) size(17) newer_version_of(`fn[speculative_inlining_budget.ml:58,18--45]_4_3`)
+      `fn[speculative_inlining_budget.ml:58,18--45]_4_9` (param : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
@@ -742,59 +690,97 @@ let code loopify(never) size(17) newer_version_of(`fn[speculative_inlining_budge
                 let int_add_1 = %int_barith.add (int_add, apply_result) in
                 cont k (int_add_1)))
 in
-let $`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:56,18--45]_15` =
-  closure `fn[speculative_inlining_budget.ml:56,18--45]_4_12`
-    @`fn[speculative_inlining_budget.ml:56,18--45]` &toplevel
+let $`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:58,18--45]_27` =
+  closure `fn[speculative_inlining_budget.ml:58,18--45]_4_9`
+    @`fn[speculative_inlining_budget.ml:58,18--45]` &toplevel
   with { x_1 = 1 }
 in
-let code loopify(never) size(17) newer_version_of(`fn[speculative_inlining_budget.ml:56,18--45]_4_4`)
-      `fn[speculative_inlining_budget.ml:56,18--45]_4_13`
-        (param : imm tagged)
+let code loopify(never) size(59) newer_version_of(big_2_1)
+      big_2_3 (param : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
-  apply direct(f_1_1 &my_alloc_region) inlining_state(depth(30))
-    ($camlSpeculative_inlining_budget__f_3 : _ -> imm tagged) (1) -> k2 * k1
-    where k2 (apply_result : imm tagged) =
-      (apply direct(f_1_1 &my_alloc_region) inlining_state(depth(30))
-         ($camlSpeculative_inlining_budget__f_3 : _ -> imm tagged)
-           (1)
-           -> k2 * k1
-         where k2 (apply_result_1 : imm tagged) =
-           (apply direct(f_1_1 &my_alloc_region) inlining_state(depth(30))
-              ($camlSpeculative_inlining_budget__f_3 : _ -> imm tagged)
-                (1)
-                -> k2 * k1
-              where k2 (apply_result_2 : imm tagged) =
-                let int_add =
-                  %int_barith.add (apply_result_2, apply_result_1)
-                in
-                let int_add_1 = %int_barith.add (int_add, apply_result) in
-                cont k (int_add_1)))
+  let `region` = %begin_region () in
+  let Pmakearray =
+    %array.`imm`.mut.my_alloc_region.local[`region`]
+      (1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1)
+  in
+  let Parrayrefs = %array_load.`imm`.mut (Pmakearray, 7) in
+  let `unit` = %end_region (`region`) in
+  cont k (Parrayrefs)
 in
-let $`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:56,18--45]_14` =
-  closure `fn[speculative_inlining_budget.ml:56,18--45]_4_13`
-    @`fn[speculative_inlining_budget.ml:56,18--45]` &toplevel
-  with { x_1 = 1 }
+let $camlSpeculative_inlining_budget__big_26 =
+  closure big_2_3 @big &toplevel
+  with { x = 1 }
 in
-let code loopify(never) size(17) newer_version_of(`fn[speculative_inlining_budget.ml:57,18--45]_6_1`)
-      `fn[speculative_inlining_budget.ml:57,18--45]_6_4` (param : imm tagged)
+let code loopify(never) size(17) newer_version_of(`fn[speculative_inlining_budget.ml:58,18--45]_4_4`)
+      `fn[speculative_inlining_budget.ml:58,18--45]_4_10`
+        (param : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   apply direct(call_0_1 &my_alloc_region) inlining_state(depth(30))
     ($camlSpeculative_inlining_budget__call_2 : _ -> imm tagged)
-      ($`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:56,18--45]_14`)
+      ($camlSpeculative_inlining_budget__big_26)
       -> k2 * k1
     where k2 (apply_result : imm tagged) =
-      (apply direct(call_0_1 &my_alloc_region) inlining_state(depth(30))
-         ($camlSpeculative_inlining_budget__call_2 : _ -> imm tagged)
-           ($`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:56,18--45]_15`)
+      (apply direct(f_1_1 &my_alloc_region) inlining_state(depth(30))
+         ($camlSpeculative_inlining_budget__f_3 : _ -> imm tagged)
+           (1)
            -> k2 * k1
          where k2 (apply_result_1 : imm tagged) =
-           (apply direct(call_0_1 &my_alloc_region) inlining_state(depth(30))
-              ($camlSpeculative_inlining_budget__call_2 : _ -> imm tagged)
-                ($`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:56,18--45]_16`)
+           (apply direct(f_1_1 &my_alloc_region) inlining_state(depth(30))
+              ($camlSpeculative_inlining_budget__f_3 : _ -> imm tagged)
+                (1)
                 -> k2 * k1
               where k2 (apply_result_2 : imm tagged) =
                 let int_add =
@@ -803,29 +789,250 @@ let code loopify(never) size(17) newer_version_of(`fn[speculative_inlining_budge
                 let int_add_1 = %int_barith.add (int_add, apply_result) in
                 cont k (int_add_1)))
 in
-let $`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:57,18--45]_13` =
-  closure `fn[speculative_inlining_budget.ml:57,18--45]_6_4`
-    @`fn[speculative_inlining_budget.ml:57,18--45]` &toplevel
+let $`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:58,18--45]_24` =
+  closure `fn[speculative_inlining_budget.ml:58,18--45]_4_10`
+    @`fn[speculative_inlining_budget.ml:58,18--45]` &toplevel
+  with { x_1 = 1 }
+in
+let code loopify(never) size(17) newer_version_of(`fn[speculative_inlining_budget.ml:59,18--45]_6_1`)
+      `fn[speculative_inlining_budget.ml:59,18--45]_6_3` (param : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  apply direct(call_0_1 &my_alloc_region) inlining_state(depth(30))
+    ($camlSpeculative_inlining_budget__call_2 : _ -> imm tagged)
+      ($`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:58,18--45]_24`)
+      -> k2 * k1
+    where k2 (apply_result : imm tagged) =
+      (apply direct(call_0_1 &my_alloc_region) inlining_state(depth(30))
+         ($camlSpeculative_inlining_budget__call_2 : _ -> imm tagged)
+           ($`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:58,18--45]_27`)
+           -> k2 * k1
+         where k2 (apply_result_1 : imm tagged) =
+           (apply direct(call_0_1 &my_alloc_region) inlining_state(depth(30))
+              ($camlSpeculative_inlining_budget__call_2 : _ -> imm tagged)
+                ($`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:58,18--45]_28`)
+                -> k2 * k1
+              where k2 (apply_result_2 : imm tagged) =
+                let int_add =
+                  %int_barith.add (apply_result_2, apply_result_1)
+                in
+                let int_add_1 = %int_barith.add (int_add, apply_result) in
+                cont k (int_add_1)))
+in
+let $`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:59,18--45]_23` =
+  closure `fn[speculative_inlining_budget.ml:59,18--45]_6_3`
+    @`fn[speculative_inlining_budget.ml:59,18--45]` &toplevel
   with { x_2 = 1 }
 in
-let code loopify(never) size(17) newer_version_of(`fn[speculative_inlining_budget.ml:58,18--45]_8_1`)
-      `fn[speculative_inlining_budget.ml:58,18--45]_8_2` (param : imm tagged)
+let code loopify(never) size(17) newer_version_of(`fn[speculative_inlining_budget.ml:58,18--45]_4_2`)
+      `fn[speculative_inlining_budget.ml:58,18--45]_4_11`
+        (param : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  apply direct(f_1_1 &my_alloc_region) inlining_state(depth(30))
+    ($camlSpeculative_inlining_budget__f_3 : _ -> imm tagged) (1) -> k2 * k1
+    where k2 (apply_result : imm tagged) =
+      (apply direct(f_1_1 &my_alloc_region) inlining_state(depth(30))
+         ($camlSpeculative_inlining_budget__f_3 : _ -> imm tagged)
+           (1)
+           -> k2 * k1
+         where k2 (apply_result_1 : imm tagged) =
+           (apply direct(f_1_1 &my_alloc_region) inlining_state(depth(30))
+              ($camlSpeculative_inlining_budget__f_3 : _ -> imm tagged)
+                (1)
+                -> k2 * k1
+              where k2 (apply_result_2 : imm tagged) =
+                let int_add =
+                  %int_barith.add (apply_result_2, apply_result_1)
+                in
+                let int_add_1 = %int_barith.add (int_add, apply_result) in
+                cont k (int_add_1)))
+in
+let $`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:58,18--45]_18` =
+  closure `fn[speculative_inlining_budget.ml:58,18--45]_4_11`
+    @`fn[speculative_inlining_budget.ml:58,18--45]` &toplevel
+  with { x_1 = 1 }
+in
+let code loopify(never) size(17) newer_version_of(`fn[speculative_inlining_budget.ml:58,18--45]_4_3`)
+      `fn[speculative_inlining_budget.ml:58,18--45]_4_12`
+        (param : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  apply direct(f_1_1 &my_alloc_region) inlining_state(depth(30))
+    ($camlSpeculative_inlining_budget__f_3 : _ -> imm tagged) (1) -> k2 * k1
+    where k2 (apply_result : imm tagged) =
+      (apply direct(f_1_1 &my_alloc_region) inlining_state(depth(30))
+         ($camlSpeculative_inlining_budget__f_3 : _ -> imm tagged)
+           (1)
+           -> k2 * k1
+         where k2 (apply_result_1 : imm tagged) =
+           (apply direct(f_1_1 &my_alloc_region) inlining_state(depth(30))
+              ($camlSpeculative_inlining_budget__f_3 : _ -> imm tagged)
+                (1)
+                -> k2 * k1
+              where k2 (apply_result_2 : imm tagged) =
+                let int_add =
+                  %int_barith.add (apply_result_2, apply_result_1)
+                in
+                let int_add_1 = %int_barith.add (int_add, apply_result) in
+                cont k (int_add_1)))
+in
+let $`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:58,18--45]_17` =
+  closure `fn[speculative_inlining_budget.ml:58,18--45]_4_12`
+    @`fn[speculative_inlining_budget.ml:58,18--45]` &toplevel
+  with { x_1 = 1 }
+in
+let code loopify(never) size(59) newer_version_of(big_2_1)
+      big_2_4 (param : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let `region` = %begin_region () in
+  let Pmakearray =
+    %array.`imm`.mut.my_alloc_region.local[`region`]
+      (1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1,
+       1)
+  in
+  let Parrayrefs = %array_load.`imm`.mut (Pmakearray, 7) in
+  let `unit` = %end_region (`region`) in
+  cont k (Parrayrefs)
+in
+let $camlSpeculative_inlining_budget__big_16 =
+  closure big_2_4 @big &toplevel
+  with { x = 1 }
+in
+let code loopify(never) size(17) newer_version_of(`fn[speculative_inlining_budget.ml:58,18--45]_4_4`)
+      `fn[speculative_inlining_budget.ml:58,18--45]_4_13`
+        (param : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  apply direct(call_0_1 &my_alloc_region) inlining_state(depth(30))
+    ($camlSpeculative_inlining_budget__call_2 : _ -> imm tagged)
+      ($camlSpeculative_inlining_budget__big_16)
+      -> k2 * k1
+    where k2 (apply_result : imm tagged) =
+      (apply direct(f_1_1 &my_alloc_region) inlining_state(depth(30))
+         ($camlSpeculative_inlining_budget__f_3 : _ -> imm tagged)
+           (1)
+           -> k2 * k1
+         where k2 (apply_result_1 : imm tagged) =
+           (apply direct(f_1_1 &my_alloc_region) inlining_state(depth(30))
+              ($camlSpeculative_inlining_budget__f_3 : _ -> imm tagged)
+                (1)
+                -> k2 * k1
+              where k2 (apply_result_2 : imm tagged) =
+                let int_add =
+                  %int_barith.add (apply_result_2, apply_result_1)
+                in
+                let int_add_1 = %int_barith.add (int_add, apply_result) in
+                cont k (int_add_1)))
+in
+let $`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:58,18--45]_14` =
+  closure `fn[speculative_inlining_budget.ml:58,18--45]_4_13`
+    @`fn[speculative_inlining_budget.ml:58,18--45]` &toplevel
+  with { x_1 = 1 }
+in
+let code loopify(never) size(17) newer_version_of(`fn[speculative_inlining_budget.ml:59,18--45]_6_1`)
+      `fn[speculative_inlining_budget.ml:59,18--45]_6_4` (param : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  apply direct(call_0_1 &my_alloc_region) inlining_state(depth(30))
+    ($camlSpeculative_inlining_budget__call_2 : _ -> imm tagged)
+      ($`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:58,18--45]_14`)
+      -> k2 * k1
+    where k2 (apply_result : imm tagged) =
+      (apply direct(call_0_1 &my_alloc_region) inlining_state(depth(30))
+         ($camlSpeculative_inlining_budget__call_2 : _ -> imm tagged)
+           ($`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:58,18--45]_17`)
+           -> k2 * k1
+         where k2 (apply_result_1 : imm tagged) =
+           (apply direct(call_0_1 &my_alloc_region) inlining_state(depth(30))
+              ($camlSpeculative_inlining_budget__call_2 : _ -> imm tagged)
+                ($`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:58,18--45]_18`)
+                -> k2 * k1
+              where k2 (apply_result_2 : imm tagged) =
+                let int_add =
+                  %int_barith.add (apply_result_2, apply_result_1)
+                in
+                let int_add_1 = %int_barith.add (int_add, apply_result) in
+                cont k (int_add_1)))
+in
+let $`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:59,18--45]_13` =
+  closure `fn[speculative_inlining_budget.ml:59,18--45]_6_4`
+    @`fn[speculative_inlining_budget.ml:59,18--45]` &toplevel
+  with { x_2 = 1 }
+in
+let code loopify(never) size(17) newer_version_of(`fn[speculative_inlining_budget.ml:60,18--45]_8_1`)
+      `fn[speculative_inlining_budget.ml:60,18--45]_8_2` (param : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   apply direct(call_0_1 &my_alloc_region) inlining_state(depth(20))
     ($camlSpeculative_inlining_budget__call_2 : _ -> imm tagged)
-      ($`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:57,18--45]_13`)
+      ($`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:59,18--45]_13`)
       -> k2 * k1
     where k2 (apply_result : imm tagged) =
       (apply direct(call_0_1 &my_alloc_region) inlining_state(depth(20))
          ($camlSpeculative_inlining_budget__call_2 : _ -> imm tagged)
-           ($`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:57,18--45]_21`)
+           ($`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:59,18--45]_23`)
            -> k2 * k1
          where k2 (apply_result_1 : imm tagged) =
            (apply direct(call_0_1 &my_alloc_region) inlining_state(depth(20))
               ($camlSpeculative_inlining_budget__call_2 : _ -> imm tagged)
-                ($`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:57,18--45]_29`)
+                ($`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:59,18--45]_33`)
                 -> k2 * k1
               where k2 (apply_result_2 : imm tagged) =
                 let int_add =
@@ -834,9 +1041,9 @@ let code loopify(never) size(17) newer_version_of(`fn[speculative_inlining_budge
                 let int_add_1 = %int_barith.add (int_add, apply_result) in
                 cont k (int_add_1)))
 in
-let $`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:58,18--45]_8` =
-  closure `fn[speculative_inlining_budget.ml:58,18--45]_8_2`
-    @`fn[speculative_inlining_budget.ml:58,18--45]` &toplevel
+let $`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:60,18--45]_8` =
+  closure `fn[speculative_inlining_budget.ml:60,18--45]_8_2`
+    @`fn[speculative_inlining_budget.ml:60,18--45]` &toplevel
   with { x_3 = 1 }
 in
 let code loopify(never) size(4) newer_version_of(g_9)
@@ -846,7 +1053,7 @@ let code loopify(never) size(4) newer_version_of(g_9)
         : imm tagged =
   apply direct(call_0_1 &my_alloc_region) inlining_state(depth(10))
     ($camlSpeculative_inlining_budget__call_2 : _ -> imm tagged)
-      ($`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:58,18--45]_8`)
+      ($`camlSpeculative_inlining_budget__fn[speculative_inlining_budget.ml:60,18--45]_8`)
       -> k * k1
 in
 let $camlSpeculative_inlining_budget__g_7 = closure g_9_1 @g &toplevel in

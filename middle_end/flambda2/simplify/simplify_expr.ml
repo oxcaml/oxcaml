@@ -110,22 +110,46 @@ let simplify_toplevel_common dacc simplify ~params ~implicit_params
 (* CR-someday mshinwell: Consider defunctionalising to remove the [k]. *)
 
 let rec simplify_expr dacc expr ~down_to_up =
-  match Expr.descr expr with
-  | Let let_expr -> simplify_let dacc let_expr ~down_to_up
-  | Let_cont let_cont ->
-    Simplify_let_cont_expr.simplify_let_cont ~simplify_expr dacc let_cont
-      ~down_to_up
-  | Apply apply ->
-    Simplify_apply_expr.simplify_apply ~simplify_expr dacc apply ~down_to_up
-  | Apply_cont apply_cont ->
-    Simplify_apply_cont_expr.simplify_apply_cont dacc apply_cont ~down_to_up
-  | Switch switch ->
-    Simplify_switch_expr.simplify_switch dacc switch ~down_to_up
-  | Invalid { message } ->
-    (* CR mshinwell: Make sure that a program can be simplified to just
-       [Invalid]. *)
-    down_to_up dacc ~rebuild:(fun uacc ~after_rebuild ->
-        EB.rebuild_invalid uacc (Message message) ~after_rebuild)
+  if
+    DA.speculative_inlining_budget_exhausted dacc
+    && Are_rebuilding_terms.do_not_rebuild_terms (DA.are_rebuilding_terms dacc)
+  then
+    (* The budget of a speculative inlining has been exhausted: abort the
+       speculation by not simplifying the rest of the inlined body. (This never
+       happens when rebuilding terms, see [Call_site_inlining_decision].) *)
+    simplify_invalid dacc ~down_to_up
+      ~message:"speculative inlining budget exhausted"
+  else
+    match Expr.descr expr with
+    | Let let_expr -> simplify_let dacc let_expr ~down_to_up
+    | Let_cont let_cont ->
+      Simplify_let_cont_expr.simplify_let_cont ~simplify_expr dacc let_cont
+        ~down_to_up
+    | Apply apply ->
+      let dacc =
+        DA.charge_speculative_inlining_budget dacc
+          (Cost_metrics.from_size (Code_size.apply apply))
+      in
+      Simplify_apply_expr.simplify_apply ~simplify_expr dacc apply ~down_to_up
+    | Apply_cont apply_cont ->
+      let dacc =
+        DA.charge_speculative_inlining_budget dacc
+          (Cost_metrics.from_size (Code_size.apply_cont apply_cont))
+      in
+      Simplify_apply_cont_expr.simplify_apply_cont dacc apply_cont ~down_to_up
+    | Switch switch ->
+      let dacc =
+        DA.charge_speculative_inlining_budget dacc
+          (Cost_metrics.from_size (Code_size.switch switch))
+      in
+      Simplify_switch_expr.simplify_switch dacc switch ~down_to_up
+    | Invalid { message } -> simplify_invalid dacc ~down_to_up ~message
+
+and simplify_invalid dacc ~down_to_up ~message =
+  (* CR mshinwell: Make sure that a program can be simplified to just
+     [Invalid]. *)
+  down_to_up dacc ~rebuild:(fun uacc ~after_rebuild ->
+      EB.rebuild_invalid uacc (Message message) ~after_rebuild)
 
 and simplify_function_body dacc expr ~return_continuation ~return_arity
     ~exn_continuation ~(loopify_state : Loopify_state.t) ~params
