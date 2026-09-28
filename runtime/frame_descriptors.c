@@ -224,6 +224,56 @@ static int capacity(caml_frame_descrs table) {
   return capacity;
 }
 
+/* The descriptors array is mmapped rather than malloced. This allows
+ * us to use MAP_POPULATE which is a significant performance
+ * improvement (avoiding many separate page faults as we then populate
+ * the array).
+ *
+ * Under ASan, caml_mem_map is malloc-backed and does not
+ * zero its memory, so we use the C heap instead. */
+
+#ifdef WITH_ADDRESS_SANITIZER
+
+static frame_descr_entry *alloc_descriptors(intnat capacity)
+{
+  frame_descr_entry *descriptors =
+    caml_stat_calloc_noexc(capacity, sizeof(frame_descr_entry));
+  if (descriptors == NULL) caml_raise_out_of_memory();
+  return descriptors;
+}
+
+static void free_descriptors(frame_descr_entry *descriptors,
+                             intnat capacity)
+{
+  (void)capacity;
+  caml_stat_free(descriptors);
+}
+
+#else
+
+static uintnat descriptors_mapping_size(intnat capacity)
+{
+  return caml_mem_round_up_mapping_size(
+    (uintnat)capacity * sizeof(frame_descr_entry));
+}
+
+static frame_descr_entry *alloc_descriptors(intnat capacity)
+{
+  frame_descr_entry *descriptors = caml_mem_map(
+    descriptors_mapping_size(capacity), CAML_MAP_POPULATE,
+    "frame descriptors");
+  if (descriptors == NULL) caml_raise_out_of_memory();
+  return descriptors;
+}
+
+static void free_descriptors(frame_descr_entry *descriptors,
+                             intnat capacity)
+{
+  caml_mem_unmap(descriptors, descriptors_mapping_size(capacity));
+}
+
+#endif
+
 static void fill_hashtable(
   caml_frame_descrs *table, caml_frametable_list *new_frametables)
 {
@@ -1048,6 +1098,11 @@ static void add_frame_descriptors(
   /* Reallocate the caml_frame_descriptor table if it is too small */
   if(tblsize < (table->num_descr + increase) * 2) {
 
+    if (table->descriptors != NULL) {
+      free_descriptors(table->descriptors, tblsize);
+      table->descriptors = NULL;
+    }
+
     /* Merge both lists */
     tail->next = table->frametables;
     table->frametables = NULL;
@@ -1060,11 +1115,7 @@ static void add_frame_descriptors(
     table->num_descr = num_descr;
     table->mask = tblsize - 1;
 
-    if (table->descriptors != NULL) caml_stat_free(table->descriptors);
-    table->descriptors =
-      (frame_descr_entry *) caml_stat_calloc_noexc(tblsize,
-                                                   sizeof(frame_descr_entry));
-    if (table->descriptors == NULL) caml_raise_out_of_memory();
+    table->descriptors = alloc_descriptors(tblsize);
 
     fill_hashtable(table, new_frametables);
     if (caml_measure_frametables) {
