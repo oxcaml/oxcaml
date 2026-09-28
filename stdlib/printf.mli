@@ -14,7 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 open! Stdlib
 
@@ -133,10 +133,10 @@ val fprintf : out_channel -> ('a, out_channel, unit) format -> 'a
    For instance, [%.*f] prints a [float] with as many fractional
    digits as the value of the argument given before the float. *)
 
-val printf : ('a, out_channel, unit) format -> 'a
+val printf : ('a, out_channel, unit) format -> 'a @@ stateful portable
 (** Same as {!Printf.fprintf}, but output on [stdout]. *)
 
-val eprintf : ('a, out_channel, unit) format -> 'a
+val eprintf : ('a, out_channel, unit) format -> 'a @@ stateful portable
 (** Same as {!Printf.fprintf}, but output on [stderr]. *)
 
 val sprintf : ('a, unit, string) format -> 'a

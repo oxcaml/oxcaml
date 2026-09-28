@@ -14,7 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 open! Stdlib
 
@@ -48,24 +48,24 @@ val one : int32
 val minus_one : int32
 (** The 32-bit integer -1. *)
 
-external neg : (int32[@local_opt]) -> (int32[@local_opt]) @@ stateless
+external neg : (int32[@local_opt]) -> (int32[@local_opt])
   = "%int32_neg"
 (** Unary negation. *)
 
 external add : (int32[@local_opt]) -> (int32[@local_opt]) -> (int32[@local_opt])
-  @@ stateless = "%int32_add"
+  = "%int32_add"
 (** Addition. *)
 
 external sub : (int32[@local_opt]) -> (int32[@local_opt]) -> (int32[@local_opt])
-  @@ stateless = "%int32_sub"
+  = "%int32_sub"
 (** Subtraction. *)
 
 external mul : (int32[@local_opt]) -> (int32[@local_opt]) -> (int32[@local_opt])
-  @@ stateless = "%int32_mul"
+  = "%int32_mul"
 (** Multiplication. *)
 
 external div : (int32[@local_opt]) -> (int32[@local_opt]) -> (int32[@local_opt])
-  @@ stateless = "%int32_div"
+  = "%int32_div"
 (** Integer division. This division rounds the real quotient of
    its arguments towards zero, as specified for {!Stdlib.(/)}.
    @raise Division_by_zero if the second
@@ -78,7 +78,7 @@ val unsigned_div : int32 -> int32 -> int32
     @since 4.08 *)
 
 external rem : (int32[@local_opt]) -> (int32[@local_opt]) -> (int32[@local_opt])
-  @@ stateless = "%int32_mod"
+  = "%int32_mod"
 (** Integer remainder.  If [y] is not zero, the result
    of [Int32.rem x y] satisfies the following property:
    [x = Int32.add (Int32.mul (Int32.div x y) y) (Int32.rem x y)].
@@ -109,47 +109,47 @@ val min_int : int32
 
 external logand :
   (int32[@local_opt]) -> (int32[@local_opt]) -> (int32[@local_opt])
-  @@ stateless = "%int32_and"
+  = "%int32_and"
 (** Bitwise logical and. *)
 
 external logor :
   (int32[@local_opt]) -> (int32[@local_opt]) -> (int32[@local_opt])
-  @@ stateless = "%int32_or"
+  = "%int32_or"
 (** Bitwise logical or. *)
 
 external logxor :
   (int32[@local_opt]) -> (int32[@local_opt]) -> (int32[@local_opt])
-  @@ stateless = "%int32_xor"
+  = "%int32_xor"
 (** Bitwise logical exclusive or. *)
 
 val lognot : int32 -> int32
 (** Bitwise logical negation. *)
 
 external shift_left : (int32[@local_opt]) -> int -> (int32[@local_opt])
-  @@ stateless = "%int32_lsl"
+  = "%int32_lsl"
 (** [Int32.shift_left x y] shifts [x] to the left by [y] bits.
    The result is unspecified if [y < 0] or [y >= 32]. *)
 
 external shift_right : (int32[@local_opt]) -> int -> (int32[@local_opt])
-  @@ stateless = "%int32_asr"
+  = "%int32_asr"
 (** [Int32.shift_right x y] shifts [x] to the right by [y] bits.
    This is an arithmetic shift: the sign bit of [x] is replicated
    and inserted in the vacated bits.
    The result is unspecified if [y < 0] or [y >= 32]. *)
 
 external shift_right_logical : (int32[@local_opt]) -> int -> (int32[@local_opt])
-  @@ stateless = "%int32_lsr"
+  = "%int32_lsr"
 (** [Int32.shift_right_logical x y] shifts [x] to the right by [y] bits.
    This is a logical shift: zeroes are inserted in the vacated bits
    regardless of the sign of [x].
    The result is unspecified if [y < 0] or [y >= 32]. *)
 
-external of_int : int -> (int32[@local_opt]) @@ stateless = "%int32_of_int"
+external of_int : int -> (int32[@local_opt]) = "%int32_of_int"
 (** Convert the given integer (type [int]) to a 32-bit integer
     (type [int32]). On 64-bit platforms, the argument is taken
     modulo 2{^32}. *)
 
-external to_int : (int32[@local_opt]) -> int @@ stateless = "%int32_to_int"
+external to_int : (int32[@local_opt]) -> int = "%int32_to_int"
 (** Convert the given 32-bit integer (type [int32]) to an
    integer (type [int]).  On 32-bit platforms, the 32-bit integer
    is taken modulo 2{^31}, i.e. the high-order bit is lost
@@ -163,7 +163,7 @@ val unsigned_to_int : int32 -> int option
 
     @since 4.08 *)
 
-external of_float : float -> int32 @@ stateless
+external of_float : float -> int32
   = "caml_int32_of_float" "caml_int32_of_float_unboxed"
   [@@unboxed] [@@noalloc]
 (** Convert the given floating-point number to a 32-bit integer,
@@ -172,12 +172,12 @@ external of_float : float -> int32 @@ stateless
    \[{!Int32.min_int}, {!Int32.max_int}\], no exception is raised, and
    an unspecified, platform-dependent integer is returned. *)
 
-external to_float : int32 -> float @@ stateless
+external to_float : int32 -> float
   = "caml_int32_to_float" "caml_int32_to_float_unboxed"
   [@@unboxed] [@@noalloc]
 (** Convert the given 32-bit integer to a floating-point number. *)
 
-external of_string : string -> (int32[@unboxed]) @@ stateless
+external of_string : string -> (int32[@unboxed])
   = "caml_int32_of_string" "caml_int32_of_string_unboxed"
 (** Convert the given string to a 32-bit integer.
    The string is read in decimal (by default, or if the string
@@ -203,7 +203,7 @@ val of_string_opt: string -> int32 option
 val to_string : int32 -> string
 (** Return the string representation of its argument, in signed decimal. *)
 
-external bits_of_float : float -> int32 @@ stateless
+external bits_of_float : float -> int32
   = "caml_int32_bits_of_float" "caml_int32_bits_of_float_unboxed"
   [@@unboxed] [@@noalloc]
 (** Return the internal representation of the given float according
@@ -212,7 +212,7 @@ external bits_of_float : float -> int32 @@ stateless
    bits 30 to 23 represent the (biased) exponent; bits 22 to 0
    represent the mantissa. *)
 
-external float_of_bits : int32 -> float @@ stateless
+external float_of_bits : int32 -> float
   = "caml_int32_float_of_bits" "caml_int32_float_of_bits_unboxed"
   [@@unboxed] [@@noalloc]
 (** Return the floating-point number whose internal representation,

@@ -14,7 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 open! Stdlib
 
@@ -68,7 +68,7 @@ type (!'a, !'b) t : mutable_data with 'a with 'b
 (** The type of hash tables from type ['a] to type ['b]. *)
 
 val create : ?random: (* thwart tools/sync_stdlib_docs *) bool ->
-             int -> ('a, 'b) t
+             int -> ('a, 'b) t @@ stateful portable
 (** [Hashtbl.create n] creates a new, empty hash table, with initial
    size greater or equal to the suggested size [n].  For best results,
    [n] should be on the order of the expected number of elements that
@@ -221,7 +221,7 @@ val length : ('a, 'b) t -> int
    [Hashtbl.length] gives the number of times [Hashtbl.iter] calls its
    first argument. *)
 
-val randomize : unit -> unit
+val randomize : unit -> unit @@ stateful portable
 (** After a call to [Hashtbl.randomize()], hash tables are created in
     randomized mode by default: {!create} returns randomized
     hash tables, unless the [~random:false] optional parameter is given.
@@ -240,13 +240,13 @@ val randomize : unit -> unit
 
     @since 4.00 *)
 
-val is_randomized : unit -> bool
+val is_randomized : unit -> bool @@ stateful portable
 (** Return [true] if the tables are currently created in randomized mode
     by default, [false] otherwise.
     @since 4.03 *)
 
 val rebuild : ?random (* thwart tools/sync_stdlib_docs *) :bool ->
-    ('a, 'b) t -> ('a, 'b) t
+    ('a, 'b) t -> ('a, 'b) t @@ stateful portable
 (** Return a copy of the given hashtable.  Unlike {!copy},
     {!rebuild}[ h] re-hashes all the (key, value) entries of
     the original table [h].  The returned hash table is randomized if
@@ -312,7 +312,7 @@ val replace_seq : ('a,'b) t -> ('a * 'b) Seq.t -> unit
 (** Add the given bindings to the table, using {!replace}
     @since 4.07 *)
 
-val of_seq : ('a * 'b) Seq.t -> ('a, 'b) t
+val of_seq : ('a * 'b) Seq.t -> ('a, 'b) t @@ stateful portable
 (** Build a table from the given bindings. The bindings are added
     in the same order they appear in the sequence, using {!replace_seq},
     which means that if two pairs have the same key, only the latest one
@@ -422,7 +422,7 @@ module type S =
   end
 (** The output signature of the functor {!Make}. *)
 
-module Make (H : HashedType) : S with type key = H.t
+module (Make @@ stateful portable) (H : HashedType) : S with type key = H.t
 (** Functor building an implementation of the hashtable structure.
     The functor [Hashtbl.Make] returns a structure containing
     a type [key] of keys and a type ['a t] of hash tables
@@ -434,7 +434,8 @@ module Make (H : HashedType) : S with type key = H.t
     the [create] operation of the result structure always returns
     non-randomized hash tables. *)
 
-module MakePortable (H : sig @@ portable include HashedType end)
+module (MakePortable @@ stateful portable)
+  (H : sig @@ portable include HashedType end)
   : sig @@ portable include S with type key = H.t end
 (** Like [Make], but takes a portable [hash] function to
     portable [Hashtbl] operations. *)
@@ -505,7 +506,8 @@ module type SeededS =
 (** The output signature of the functor {!MakeSeeded}.
     @since 4.00 *)
 
-module MakeSeeded (H : SeededHashedType) : SeededS with type key = H.t
+module (MakeSeeded @@ stateful portable)
+  (H : SeededHashedType) : SeededS with type key = H.t
 (** Functor building an implementation of the hashtable structure.
     The functor [Hashtbl.MakeSeeded] returns a structure containing
     a type [key] of keys and a type ['a t] of hash tables
@@ -519,7 +521,8 @@ module MakeSeeded (H : SeededHashedType) : SeededS with type key = H.t
     or if randomization is globally on (see {!Hashtbl.randomize}).
     @since 4.00 *)
 
-module MakeSeededPortable (H : sig @@ portable include SeededHashedType end)
+module (MakeSeededPortable @@ stateful portable)
+  (H : sig @@ portable include SeededHashedType end)
   : sig @@ portable include SeededS with type key = H.t end
 (** Like [MakeSeeded], but takes a portable [seeded_hash] function to
     portable [Hashtbl] operations. *)

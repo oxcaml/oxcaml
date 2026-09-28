@@ -14,7 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 open! Stdlib
 
@@ -131,6 +131,7 @@ val null : string
     @since 4.10 *)
 
 val temp_file : ?temp_dir: string -> string -> string -> string
+  @@ stateful portable
 (** [temp_file prefix suffix] returns the name of a
    fresh temporary file in the temporary directory.
    The base name of the temporary file is formed by concatenating
@@ -147,7 +148,7 @@ val temp_file : ?temp_dir: string -> string -> string -> string
 
 val open_temp_file :
       ?mode: open_flag list -> ?perms: int -> ?temp_dir: string -> string ->
-      string -> string * out_channel
+      string -> string * out_channel @@ stateful portable
 (** Same as {!Filename.temp_file}, but returns both the name of a fresh
    temporary file, and an output channel opened (atomically) on
    this file.  This function is more secure than [temp_file]: there
@@ -165,6 +166,7 @@ val open_temp_file :
 *)
 
 val temp_dir : ?temp_dir: string -> ?perms:int  -> string -> string -> string
+  @@ stateful portable
 (** [temp_dir prefix suffix] creates and returns the name of a fresh
    temporary directory with permissions [perms] (defaults to 0o700)
    inside [temp_dir].  The base name of the temporary directory is
@@ -184,7 +186,7 @@ val temp_dir : ?temp_dir: string -> ?perms:int  -> string -> string -> string
    @since 5.1
 *)
 
-val get_temp_dir_name : unit -> string
+val get_temp_dir_name : unit -> string @@ stateful portable
 (** The name of the temporary directory:
     Under Unix, the value of the [TMPDIR] environment variable, or "/tmp"
     if the variable is not set.
@@ -200,7 +202,7 @@ val get_temp_dir_name : unit -> string
     @since 4.00
 *)
 
-val set_temp_dir_name : string -> unit
+val set_temp_dir_name : string -> unit @@ stateful portable
 (** Change the temporary directory returned by {!Filename.get_temp_dir_name}
     and used by {!Filename.temp_file} and {!Filename.open_temp_file}.
     The temporary directory is a domain-local value which is inherited

@@ -14,7 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 open! Stdlib
 
@@ -34,12 +34,12 @@ type t = bool = false | true (**)
 val not : bool -> bool
 (** [not b] is the boolean negation of [b]. *)
 
-external ( && ) : bool -> bool -> bool @@ stateless = "%sequand"
+external ( && ) : bool -> bool -> bool = "%sequand"
 (** [e0 && e1] is the lazy boolean conjunction of expressions [e0] and [e1].
     If [e0] evaluates to [false], [e1] is not evaluated. Right-associative
     operator at precedence level 3/11. *)
 
-external ( || ) : bool -> bool -> bool @@ stateless = "%sequor"
+external ( || ) : bool -> bool -> bool = "%sequor"
 (** [e0 || e1] is the lazy boolean disjunction of expressions [e0] and [e1].
     If [e0] evaluates to [true], [e1] is not evaluated. Right-associative
     operator at precedence level 2/11. *)

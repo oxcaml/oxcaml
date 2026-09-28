@@ -14,7 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 open! Stdlib
 
@@ -61,26 +61,26 @@ open! Stdlib
 
 [@@@ocaml.nolabels]
 
-external length : (bytes[@local_opt]) @ immutable -> int @@ stateless
+external length : (bytes[@local_opt]) @ immutable -> int
   = "%bytes_length"
 (** Return the length (number of bytes) of the argument. *)
 
-external get : bytes -> int -> char @@ stateless = "%bytes_safe_get"
+external get : bytes -> int -> char = "%bytes_safe_get"
 (** [get s n] returns the byte at index [n] in argument [s].
     @raise Invalid_argument if [n] is not a valid index in [s]. *)
 
 
-external set : bytes -> int -> char -> unit @@ stateless = "%bytes_safe_set"
+external set : bytes -> int -> char -> unit = "%bytes_safe_set"
 (** [set s n c] modifies [s] in place, replacing the byte at index [n]
     with [c].
     @raise Invalid_argument if [n] is not a valid index in [s]. *)
 
-external create : int -> bytes @@ stateless = "caml_create_bytes"
+external create : int -> bytes = "caml_create_bytes"
 (** [create n] returns a new byte sequence of length [n]. The
     sequence is uninitialized and contains arbitrary bytes.
     @raise Invalid_argument if [n < 0] or [n > ]{!Sys.max_string_length}. *)
 
-external create__stack : int -> bytes @ local @@ stateless
+external create__stack : int -> bytes @ local
   = "caml_create_local_bytes"
 (** [create__stack n] is like {!create} but returns a stack-allocated bytes. *)
 
@@ -167,7 +167,7 @@ val blit_string :
     do not designate a valid range of [dst].
     @since 4.05 in BytesLabels *)
 
-val concat : sep:bytes -> bytes list -> bytes
+val concat : sep:bytes -> bytes list -> bytes @@ stateful portable
 (** [concat ~sep sl] concatenates the list of byte sequences [sl],
     inserting the separator byte sequence [sep] between each, and
     returns the result as a new byte sequence.
@@ -225,7 +225,7 @@ val exists : f:(char -> bool) -> bytes -> bool
     [p].
     @since 4.13 *)
 
-val trim : bytes -> bytes
+val trim : bytes -> bytes @@ stateful portable
 (** Return a copy of the argument, without leading and trailing
     whitespace. The bytes regarded as whitespace are the ASCII
     characters [' '], ['\012'], ['\n'], ['\r'], and ['\t']. *)
@@ -360,7 +360,7 @@ val ends_with :
 *)
 
 external unsafe_to_string :
-  (bytes[@local_opt]) -> (string[@local_opt]) @@ stateless = "%bytes_to_string"
+  (bytes[@local_opt]) -> (string[@local_opt]) = "%bytes_to_string"
 (** Unsafely convert a byte sequence into a string.
 
     To reason about the use of [unsafe_to_string], it is convenient to
@@ -437,7 +437,7 @@ let bytes_length (s : bytes) =
 *)
 
 external unsafe_of_string :
-  (string[@local_opt]) -> (bytes[@local_opt]) @@ stateless = "%bytes_of_string"
+  (string[@local_opt]) -> (bytes[@local_opt]) = "%bytes_of_string"
 (** Unsafely convert a shared string to a byte sequence that should
     not be mutated.
 
@@ -835,19 +835,19 @@ let d1 = Domain.spawn (fun () -> Bytes.set_int32_ne b 0 100; b.[0] <- 'd' )
 (* The following is for system use only. Do not call directly. *)
 
 external unsafe_get :
-  (bytes[@local_opt]) @ read -> int -> char @@ stateless = "%bytes_unsafe_get"
+  (bytes[@local_opt]) @ read -> int -> char = "%bytes_unsafe_get"
 external unsafe_set :
-  (bytes[@local_opt]) -> int -> char -> unit @@ stateless = "%bytes_unsafe_set"
+  (bytes[@local_opt]) -> int -> char -> unit = "%bytes_unsafe_set"
 external unsafe_blit :
   src:(bytes[@local_opt]) @ read -> src_pos:int ->
-  dst:(bytes[@local_opt]) -> dst_pos:int -> len:int -> unit @@ stateless
+  dst:(bytes[@local_opt]) -> dst_pos:int -> len:int -> unit
   = "caml_blit_bytes" [@@noalloc]
 external unsafe_blit_string :
   src:(string[@local_opt]) -> src_pos:int ->
-  dst:(bytes[@local_opt]) -> dst_pos:int -> len:int -> unit @@ stateless
+  dst:(bytes[@local_opt]) -> dst_pos:int -> len:int -> unit
   = "caml_blit_string" [@@noalloc]
 external unsafe_fill :
-  (bytes[@local_opt]) -> pos:int -> len:int -> char -> unit @@ stateless
+  (bytes[@local_opt]) -> pos:int -> len:int -> char -> unit
   = "caml_fill_bytes" [@@noalloc]
 
 val unsafe_escape : bytes -> bytes

@@ -14,7 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 open! Stdlib
 
@@ -1210,7 +1210,6 @@ end
 
 external genarray_of_array0 : ('a : any) ('b : any) ('c : any).
   (('a, 'b, 'c) Array0.t[@local_opt]) -> (('a, 'b, 'c) Genarray.t[@local_opt])
-  @@ stateless
   = "%identity"
 (** Return the generic Bigarray corresponding to the given zero-dimensional
     Bigarray.
@@ -1218,21 +1217,18 @@ external genarray_of_array0 : ('a : any) ('b : any) ('c : any).
 
 external genarray_of_array1 : ('a : any) ('b : any) ('c : any).
   (('a, 'b, 'c) Array1.t[@local_opt]) -> (('a, 'b, 'c) Genarray.t[@local_opt])
-  @@ stateless
   = "%identity"
 (** Return the generic Bigarray corresponding to the given one-dimensional
    Bigarray. *)
 
 external genarray_of_array2 : ('a : any) ('b : any) ('c : any).
   (('a, 'b, 'c) Array2.t[@local_opt]) -> (('a, 'b, 'c) Genarray.t[@local_opt])
-  @@ stateless
   = "%identity"
 (** Return the generic Bigarray corresponding to the given two-dimensional
    Bigarray. *)
 
 external genarray_of_array3 : ('a : any) ('b : any) ('c : any).
   (('a, 'b, 'c) Array3.t[@local_opt]) -> (('a, 'b, 'c) Genarray.t[@local_opt])
-  @@ stateless
   = "%identity"
 (** Return the generic Bigarray corresponding to the given three-dimensional
    Bigarray. *)
