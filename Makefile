@@ -146,14 +146,14 @@ ci-coverage: boot-runtest coverage
 # These targets check an existing install at $(prefix); they do not install.
 .PHONY: test-installed-metadata
 test-installed-metadata:
-	bash tools/ci/actions/check-installed-metadata.sh "$(prefix)"
+	bash tools/ci/actions/check-installed.sh metadata "$(prefix)"
 
 # core: only libraries the compiler installs; shipped: also bundled libraries.
 INSTALLED_LIBRARIES ?= core
 
 .PHONY: test-installed-libraries
 test-installed-libraries: test-installed-metadata
-	bash tools/ci/actions/check-installed-libraries.sh \
+	bash tools/ci/actions/check-installed.sh libraries \
 	  "$(prefix)" "$(INSTALLED_LIBRARIES)"
 
 # CR mshinwell: build is broken
