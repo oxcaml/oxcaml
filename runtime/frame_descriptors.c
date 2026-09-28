@@ -83,10 +83,13 @@ extern intnat * caml_frametable[];
    flags, sizes, and the pointers needed to locate its live offsets,
    allocation sizes, and debug words. [d] points at the descriptor body:
    the byte after its LEB128 delta (short), or the escape byte itself
-   (medium/long). */
-void caml_decode_frame_descr(frame_descr *d, struct frame_descr_decoded *out)
+   (medium/long).
+
+   Inline to optimise frametable registration, which only needs out->end. */
+Caml_inline void decode_frame_descr(frame_descr *d,
+                                    struct frame_descr_decoded *out)
 {
-  memset(out, 0, sizeof(*out));
+  *out = (struct frame_descr_decoded){ 0 };
   if (frame_is_short(d)) {
     const unsigned char *p = (const unsigned char *)d;
     unsigned char sf = *p++; /* size+flags byte */
@@ -146,6 +149,11 @@ void caml_decode_frame_descr(frame_descr *d, struct frame_descr_decoded *out)
   out->end = p;
 }
 
+void caml_decode_frame_descr(frame_descr *d, struct frame_descr_decoded *out)
+{
+  decode_frame_descr(d, out);
+}
+
 /* Iterate over the descriptors of one frametable, reconstructing the
    absolute return address of each descriptor by walking the delta chain.
    An escaped descriptor carries an absolute return address (retaddr_rel);
@@ -165,8 +173,8 @@ static void frametable_iter_start(frametable_iter *it, intnat *tbl)
 
 /* Yield the next descriptor body and its absolute return address. Must
    only be called while [it->remaining > 0]. */
-static frame_descr *frametable_iter_next(frametable_iter *it,
-                                         uintnat *retaddr_out)
+Caml_inline frame_descr *frametable_iter_next(frametable_iter *it,
+                                              uintnat *retaddr_out)
 {
   const unsigned char *p = it->next;
   frame_descr *d;
@@ -187,7 +195,7 @@ static frame_descr *frametable_iter_next(frametable_iter *it,
     d = (frame_descr *)p;
   }
   struct frame_descr_decoded dec;
-  caml_decode_frame_descr(d, &dec);
+  decode_frame_descr(d, &dec);
   it->next = dec.end;
   it->remaining--;
   *retaddr_out = it->retaddr;
