@@ -256,7 +256,7 @@ module Deep : sig
   end
 
   external get_callstack :
-    ('a,'b) continuation -> int -> Printexc.raw_backtrace =
+    ('a,'b) continuation -> int -> Printexc.raw_backtrace @@ stateless =
     "caml_get_continuation_callstack"
   (** [get_callstack c n] returns a description of the top of the call stack on
       the continuation [c], with at most [n] entries. *)
@@ -441,7 +441,7 @@ module Shallow : sig
   end
 
   external get_callstack :
-    ('a,'b) continuation -> int -> Printexc.raw_backtrace =
+    ('a,'b) continuation -> int -> Printexc.raw_backtrace @@ stateless =
     "caml_get_continuation_callstack"
   (** [get_callstack c n] returns a description of the top of the call stack on
       the continuation [c], with at most [n] entries. *)

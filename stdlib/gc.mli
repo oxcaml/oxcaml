@@ -249,13 +249,13 @@ type control =
     OCAMLRUNPARAM environment variable.  See the documentation of
     [ocamlrun]. *)
 
-external stat : unit -> stat = "caml_gc_stat"
+external stat : unit -> stat @@ reading portable = "caml_gc_stat"
 (** Return the current values of the memory management counters in a
     [stat] record that represent the program's total memory stats.
 
     This is expensive, as it causes a full major collection. *)
 
-external quick_stat : unit -> stat = "caml_gc_quick_stat"
+external quick_stat : unit -> stat @@ reading portable = "caml_gc_quick_stat"
 (** Same as [stat] except much cheaper.
 
     no major collection is triggered, and the values returned (except
@@ -264,12 +264,13 @@ external quick_stat : unit -> stat = "caml_gc_quick_stat"
     [largest_free], and [stack_size] are set to 0).
     *)
 
-external counters : unit -> float * float * float = "caml_gc_counters"
+external counters : unit -> float * float * float @@ reading portable
+  = "caml_gc_counters"
 (** Return [(minor_words, promoted_words, major_words)] for the current
     domain or potentially previous domains.  This function is as fast as
     [quick_stat]. *)
 
-external minor_words : unit -> (float [@unboxed])
+external minor_words : unit -> (float [@unboxed]) @@ reading portable
   = "caml_gc_minor_words" "caml_gc_minor_words_unboxed"
 (** Number of words allocated in the minor heap by this domain or potentially
     previous domains. This number is accurate in byte-code programs, but
@@ -279,7 +280,7 @@ external minor_words : unit -> (float [@unboxed])
 
     @since 4.04 *)
 
-external get : unit -> control = "caml_gc_get"
+external get : unit -> control @@ reading portable = "caml_gc_get"
 [@@alert unsynchronized_access
     "GC parameters are a mutable global state."
 ]
@@ -330,7 +331,8 @@ val allocated_bytes : unit -> float
    a previous domain. It is returned as a [float] to avoid overflow problems
    with [int] on 32-bit machines. *)
 
-external get_minor_free : unit -> int = "caml_get_minor_free"
+external get_minor_free : unit -> int @@ reading portable
+  = "caml_get_minor_free"
 (** Return the current size of the free space inside the minor heap of this
    domain.
 
