@@ -1374,29 +1374,21 @@ let label_sort_for_representation (label : Data_types.label_description)
       "label_sort_for_representation: unexpected immediate representation"
 
 let transl_module_representation repr =
-  (* The shape here is potentially an underapproximation, since the scannable
-     axes in [shape] will all be [max]. This should not matter, though, since it
-     is not possible to reassign / directly mutate a [val] in a module. *)
-  let shape =
+  (* Potentially an underapproximation, since the scannable axes in [layouts]
+     will all be [max]. This should not matter, though, since it is not possible
+     to reassign / directly mutate a [val] in a module. *)
+  let layouts =
     Array.map
       (fun sort ->
-         sort
-         |> Jkind.Sort.default_for_transl_and_get
-         |> Types.mixed_block_element_of_const_sort)
+         let sort = Jkind.Sort.default_for_transl_and_get sort in
+         Jkind.Layout.Const.of_sort_const sort Jkind_types.Scannable_axes.max)
       repr
   in
-  let rec is_value (elt : Types.mixed_block_element) =
-    match elt with
-    | Scannable _ -> true
-    | Addressable elt -> is_value elt
-    | Float_boxed | Float64 | Float32 | Bits8 | Bits16 | Untagged_immediate
-    | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word
-    | Product _ | Void -> false
-  in
-  if Array.for_all is_value shape
-  then Module_value_only { field_count = Array.length shape }
+  (* These layouts come from sorts, so they will never be [any]. *)
+  if Array.for_all Jkind_types.Layout.Const.is_scannable_or_any layouts
+  then Module_value_only { field_count = Array.length layouts }
   else
-    let shape = transl_mixed_product_shape shape in
+    let shape = Array.map transl_layout layouts in
     Module_mixed
       ( shape,
         mixed_product_shape_for_read

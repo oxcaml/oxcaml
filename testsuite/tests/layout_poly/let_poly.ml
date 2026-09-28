@@ -663,9 +663,8 @@ let with_int, with_unboxed_float =
   in
   make_m1 42, to_float (make_m1 #42.5)
 [%%expect {|
->> Fatal error: mixed_block_element_of_const_sort: Genvar
-Uncaught exception: Misc.Fatal_error
-
+val with_int : int = 42
+val with_unboxed_float : float = 42.5
 |}]
 
 let with_int, with_unboxed_float =
@@ -679,7 +678,6 @@ let with_int, with_unboxed_float =
   in
   make_m2 42, to_float (make_m2 #42.5)
 [%%expect {|
->> Fatal error: mixed_block_element_of_const_sort: Genvar
-Uncaught exception: Misc.Fatal_error
-
+val with_int : int = 42
+val with_unboxed_float : float = 42.5
 |}]
