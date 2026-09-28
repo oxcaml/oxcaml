@@ -6,4 +6,4 @@ Warning 223 [functor-considered-for-inlining]: This functor application was cons
   Code ID: camlFunctor_considered_for_inlining_warning1__F_0_2_code. Source
   location: functor_considered_for_inlining_warning1.ml:33,11--57. Code size:
   23. Inlining decision:
-  (Speculatively_inline (cost_metrics size: 13 removed: {call: 0 alloc: 2 prim: 2 branch: 0 direct: 0 poly_cmp: 0 requested: 0}) (evaluated_to 5.500000) (threshold 100.000000) (is_a_functor true)).
+  (Speculatively_inline (cost_metrics size: 13 removed: {call: 0 alloc: 2 prim: 2 branch: 0 direct: 0 poly_cmp: 0 requested: 0}) (cost_metrics_of_lifted_constants size: 0 removed: {call: 0 alloc: 0 prim: 0 branch: 0 direct: 0 poly_cmp: 0 requested: 0}) (evaluated_to 5.500000) (threshold 100.000000) (threshold_is_remaining_budget false) (is_a_functor true)).

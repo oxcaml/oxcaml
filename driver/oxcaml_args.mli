@@ -202,6 +202,9 @@ module type Oxcaml_options = sig
   val flambda2_speculative_inlining_charge_uninlined_calls : unit -> unit
   val no_flambda2_speculative_inlining_charge_uninlined_calls : unit -> unit
   val flambda2_speculative_inlining_uninlined_call_cost_factor : float -> unit
+  val flambda2_speculative_inlining_budget : unit -> unit
+  val no_flambda2_speculative_inlining_budget : unit -> unit
+  val flambda2_speculative_inlining_budget_size_ratio : float -> unit
   val flambda2_inlining_report_bin : unit -> unit
   val flambda2_unicode : unit -> unit
   val flambda2_kind_checks : unit -> unit

@@ -141,6 +141,13 @@ val decrease_continuation_lifting_budget : t -> int -> t
 
 val prepare_for_speculative_inlining : t -> t
 
+(** The remaining speculative inlining budget, if inside a speculatively-inlined
+    function body and [Flambda_features.Inlining.speculative_inlining_budget] is
+    enabled. *)
+val speculative_inlining_budget : t -> float option
+
+val with_speculative_inlining_budget : t -> float option -> t
+
 val continuations_to_specialize : t -> Continuation.Set.t
 
 val add_continuation_to_specialize : t -> Continuation.t -> t

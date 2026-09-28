@@ -552,6 +552,7 @@ let ocaml_ignored_flags =
     "-flambda2-speculative-inlining-only-if-arguments-useful";
     "-flambda2-speculative-inlining-track-lifted-constants";
     "-flambda2-speculative-inlining-charge-uninlined-calls";
+    "-flambda2-speculative-inlining-budget";
     "-flambda2-unbox-along-intra-function-control-flow";
     "-flambda2-unicode";
     "-flambda2-kind-checks";
@@ -569,6 +570,7 @@ let ocaml_ignored_flags =
     "-no-flambda2-speculative-inlining-only-if-arguments-useful";
     "-no-flambda2-speculative-inlining-track-lifted-constants";
     "-no-flambda2-speculative-inlining-charge-uninlined-calls";
+    "-no-flambda2-speculative-inlining-budget";
     "-no-flambda2-unbox-along-intra-function-control-flow";
     "-ocamlcfg";
     "-no-ocamlcfg";
@@ -862,6 +864,7 @@ let ocaml_ignored_parametrized_flags =
     "-flambda2-inline-small-function-size";
     "-flambda2-inline-threshold";
     "-flambda2-speculative-inlining-uninlined-call-cost-factor";
+    "-flambda2-speculative-inlining-budget-size-ratio";
     "-flambda2-inline-small-functor-size";
     "-flambda2-inline-large-functor-size";
     "-flambda2-inline-ideal-large-functor-size";

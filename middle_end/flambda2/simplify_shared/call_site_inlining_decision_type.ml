@@ -35,11 +35,17 @@ type t =
   | Recursion_depth_exceeded
   | Never_inlined_attribute
   | Forward_inlined_attribute_but_nothing_to_forward
+  | Speculative_inlining_budget_exhausted of
+      { remaining_budget : float;
+        code_size : Code_size.t;
+        max_code_size : float
+      }
   | Speculatively_not_inline of
       { cost_metrics : Cost_metrics.t;
         cost_metrics_of_lifted_constants : Cost_metrics.t;
         evaluated_to : float;
         threshold : float;
+        threshold_is_remaining_budget : bool;
         is_a_functor : bool
       }
   | Attribute_always
@@ -52,6 +58,7 @@ type t =
         cost_metrics_of_lifted_constants : Cost_metrics.t;
         evaluated_to : float;
         threshold : float;
+        threshold_is_remaining_budget : bool;
         is_a_functor : bool
       }
   | Jsir_inlining_disabled
@@ -80,6 +87,17 @@ let [@ocamlformat "disable"] rec print ppf t =
     Format.fprintf ppf "Never_inlined_attribute"
   | Forward_inlined_attribute_but_nothing_to_forward ->
     Format.fprintf ppf "Forward_inlined_attribute_but_nothing_to_forward"
+  | Speculative_inlining_budget_exhausted
+      { remaining_budget; code_size; max_code_size } ->
+    Format.fprintf ppf
+      "@[<hov 1>(Speculative_inlining_budget_exhausted@ \
+        @[<hov 1>(remaining_budget@ %f)@]@ \
+        @[<hov 1>(code_size@ %a)@]@ \
+        @[<hov 1>(max_code_size@ %f)@]\
+        )@]"
+      remaining_budget
+      Code_size.print code_size
+      max_code_size
   | Attribute_always ->
     Format.fprintf ppf "Attribute_always"
   | Replay_history_says_must_inline t' ->
@@ -99,34 +117,40 @@ let [@ocamlformat "disable"] rec print ppf t =
   | Continue_unrolling ->
     Format.fprintf ppf "Continue_unrolling"
   | Speculatively_not_inline { cost_metrics; cost_metrics_of_lifted_constants;
-                                threshold; evaluated_to; is_a_functor; } ->
+                                threshold; threshold_is_remaining_budget;
+                                evaluated_to; is_a_functor; } ->
     Format.fprintf ppf
       "@[<hov 1>(Speculatively_not_inline@ \
         @[<hov 1>(cost_metrics@ %a)@]@ \
         @[<hov 1>(cost_metrics_of_lifted_constants@ %a)@]@ \
         @[<hov 1>(evaluated_to@ %f)@]@ \
         @[<hov 1>(threshold@ %f)@]@ \
+        @[<hov 1>(threshold_is_remaining_budget@ %b)@]@ \
         @[<hov 1>(is_a_functor@ %b)@]\
         )@]"
       Cost_metrics.print cost_metrics
       Cost_metrics.print cost_metrics_of_lifted_constants
       evaluated_to
       threshold
+      threshold_is_remaining_budget
       is_a_functor
   | Speculatively_inline { cost_metrics; cost_metrics_of_lifted_constants;
-                            threshold; evaluated_to; is_a_functor; } ->
+                            threshold; threshold_is_remaining_budget;
+                            evaluated_to; is_a_functor; } ->
     Format.fprintf ppf
       "@[<hov 1>(Speculatively_inline@ \
         @[<hov 1>(cost_metrics@ %a)@]@ \
         @[<hov 1>(cost_metrics_of_lifted_constants@ %a)@]@ \
         @[<hov 1>(evaluated_to@ %f)@]@ \
         @[<hov 1>(threshold@ %f)@]@ \
+        @[<hov 1>(threshold_is_remaining_budget@ %b)@]@ \
         @[<hov 1>(is_a_functor@ %b)@]\
         )@]"
       Cost_metrics.print cost_metrics
       Cost_metrics.print cost_metrics_of_lifted_constants
       evaluated_to
       threshold
+      threshold_is_remaining_budget
       is_a_functor
   | Jsir_inlining_disabled -> Format.fprintf ppf "Jsir_inlining_disabled"
 
@@ -141,8 +165,8 @@ let rec can_inline (t : t) : can_inline =
   match t with
   | Missing_code | In_a_stub | Doing_speculative_inlining _
   | Max_inlining_depth_exceeded | Recursion_depth_exceeded
-  | Speculatively_not_inline _ | Definition_says_not_to_inline
-  | Argument_types_not_useful ->
+  | Speculative_inlining_budget_exhausted _ | Speculatively_not_inline _
+  | Definition_says_not_to_inline | Argument_types_not_useful ->
     (* If there's an [@inlined] attribute on this, something's gone wrong *)
     Do_not_inline { erase_attribute_if_ignored = false }
   | Never_inlined_attribute ->
@@ -232,34 +256,47 @@ let rec report_reason fmt t =
       "this@ function@ was@ decided@ to@ be@ always@ inlined@ at@ its@ \
        definition@ site (annotated@ by@ [@inlined always]@ or@ determined@ to@ \
        be@ small@ enough)"
+  | Speculative_inlining_budget_exhausted
+      { remaining_budget; code_size; max_code_size } ->
+    Format.fprintf fmt
+      "the@ function@ was@ not@ speculated@ upon@ as@ its@ code@ size@ (%a)@ \
+       exceeds@ the@ maximum@ (%f)@ allowed@ by@ the@ remaining@ speculative@ \
+       inlining@ budget@ (%f)@ of@ the@ enclosing@ inlined@ body"
+      Code_size.print code_size max_code_size remaining_budget
   | Speculatively_not_inline
       { cost_metrics;
         cost_metrics_of_lifted_constants;
         evaluated_to;
         threshold;
+        threshold_is_remaining_budget;
         is_a_functor
       } ->
     Format.fprintf fmt
       "the@ %s@ was@ not@ inlined@ after@ speculation@ as@ its@ cost@ metrics \
        were=%a@ (of@ which@ lifted@ constants:@ %a),@ which@ was@ evaluated@ \
-       to@ %f > threshold %f"
+       to@ %f > %s %f"
       (if is_a_functor then "functor" else "function")
       Cost_metrics.print cost_metrics Cost_metrics.print
-      cost_metrics_of_lifted_constants evaluated_to threshold
+      cost_metrics_of_lifted_constants evaluated_to
+      (if threshold_is_remaining_budget then "remaining budget" else "threshold")
+      threshold
   | Speculatively_inline
       { cost_metrics;
         cost_metrics_of_lifted_constants;
         evaluated_to;
         threshold;
+        threshold_is_remaining_budget;
         is_a_functor
       } ->
     Format.fprintf fmt
       "the@ %s@ was@ inlined@ after@ speculation@ as@ its@ cost@ metrics \
        were=%a@ (of@ which@ lifted@ constants:@ %a),@ which@ was@ evaluated@ \
-       to@ %f <= threshold %f"
+       to@ %f <= %s %f"
       (if is_a_functor then "functor" else "function")
       Cost_metrics.print cost_metrics Cost_metrics.print
-      cost_metrics_of_lifted_constants evaluated_to threshold
+      cost_metrics_of_lifted_constants evaluated_to
+      (if threshold_is_remaining_budget then "remaining budget" else "threshold")
+      threshold
   | Jsir_inlining_disabled ->
     Format.fprintf fmt
       "function@ inlining@ is@ disabled@ for@ Js_of_ocaml@ translation"
@@ -271,11 +308,27 @@ let charged_code_size (t : t) =
   | Argument_types_not_useful | Unrolling_depth_exceeded
   | Max_inlining_depth_exceeded | Recursion_depth_exceeded
   | Never_inlined_attribute | Forward_inlined_attribute_but_nothing_to_forward
-  | Speculatively_not_inline _ | Attribute_always
-  | Replay_history_says_must_inline _ | Begin_unrolling _ | Continue_unrolling
-  | Definition_says_inline _ | Speculatively_inline _ | Jsir_inlining_disabled
-    ->
+  | Speculative_inlining_budget_exhausted _ | Speculatively_not_inline _
+  | Attribute_always | Replay_history_says_must_inline _ | Begin_unrolling _
+  | Continue_unrolling | Definition_says_inline _ | Speculatively_inline _
+  | Jsir_inlining_disabled ->
     Code_size.zero
+
+let rec speculative_inlining_cost_and_threshold (t : t) =
+  match t with
+  | Speculatively_inline { evaluated_to; threshold; _ } ->
+    Some (evaluated_to, threshold)
+  | Replay_history_says_must_inline t ->
+    speculative_inlining_cost_and_threshold t
+  | Missing_code | Definition_says_not_to_inline | In_a_stub
+  | Doing_speculative_inlining _ | Argument_types_not_useful
+  | Unrolling_depth_exceeded | Max_inlining_depth_exceeded
+  | Recursion_depth_exceeded | Never_inlined_attribute
+  | Forward_inlined_attribute_but_nothing_to_forward
+  | Speculative_inlining_budget_exhausted _ | Speculatively_not_inline _
+  | Attribute_always | Begin_unrolling _ | Continue_unrolling
+  | Definition_says_inline _ | Jsir_inlining_disabled ->
+    None
 
 let report fmt t =
   Format.fprintf fmt

@@ -121,17 +121,21 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
   let used_value_slots = DA.used_value_slots outer_dacc in
   let shareable_constants = DA.shareable_constants outer_dacc in
   let slot_offsets = DA.slot_offsets outer_dacc in
+  let speculative_inlining_budget = DA.speculative_inlining_budget outer_dacc in
   (* CR vlaviron: maybe DA could be restructured so that it can keep track of
      the global values going around the loop here, so we don't forget to add one
      of these lines below... *)
-  dacc
-  |> DA.with_code_ids_to_remember ~code_ids_to_remember
-  |> DA.with_code_ids_to_never_delete ~code_ids_to_never_delete
-  |> DA.with_code_ids_never_simplified ~code_ids_never_simplified
-  |> DA.with_used_value_slots ~used_value_slots
-  |> DA.with_shareable_constants ~shareable_constants
-  |> DA.with_slot_offsets ~slot_offsets
-  |> DA.reset_continuation_lifting_budget
+  let dacc =
+    dacc
+    |> DA.with_code_ids_to_remember ~code_ids_to_remember
+    |> DA.with_code_ids_to_never_delete ~code_ids_to_never_delete
+    |> DA.with_code_ids_never_simplified ~code_ids_never_simplified
+    |> DA.with_used_value_slots ~used_value_slots
+    |> DA.with_shareable_constants ~shareable_constants
+    |> DA.with_slot_offsets ~slot_offsets
+    |> DA.reset_continuation_lifting_budget
+  in
+  DA.with_speculative_inlining_budget dacc speculative_inlining_budget
 
 let extract_accumulators_from_function outer_dacc ~dacc_after_body
     ~uacc_after_upwards_traversal =
@@ -169,6 +173,10 @@ let extract_accumulators_from_function outer_dacc ~dacc_after_body
     |> DA.with_shareable_constants ~shareable_constants
     |> DA.with_slot_offsets ~slot_offsets
     |> DA.with_code_age_relation ~code_age_relation
+  in
+  let outer_dacc =
+    DA.with_speculative_inlining_budget outer_dacc
+      (DA.speculative_inlining_budget dacc_after_body)
   in
   outer_dacc, lifted_consts_this_function
 

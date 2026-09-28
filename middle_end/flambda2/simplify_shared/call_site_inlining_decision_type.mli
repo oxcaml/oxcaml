@@ -28,11 +28,17 @@ type t =
   | Recursion_depth_exceeded
   | Never_inlined_attribute
   | Forward_inlined_attribute_but_nothing_to_forward
+  | Speculative_inlining_budget_exhausted of
+      { remaining_budget : float;
+        code_size : Code_size.t;
+        max_code_size : float
+      }
   | Speculatively_not_inline of
       { cost_metrics : Cost_metrics.t;
         cost_metrics_of_lifted_constants : Cost_metrics.t;
         evaluated_to : float;
         threshold : float;
+        threshold_is_remaining_budget : bool;
         is_a_functor : bool
       }
   | Attribute_always
@@ -45,6 +51,7 @@ type t =
         cost_metrics_of_lifted_constants : Cost_metrics.t;
         evaluated_to : float;
         threshold : float;
+        threshold_is_remaining_budget : bool;
         is_a_functor : bool
       }
   | Jsir_inlining_disabled
@@ -65,3 +72,8 @@ val can_inline : t -> can_inline
 (** The code size charged to the enclosing speculative inlining for a call that
     was not inlined because speculation was in progress (zero otherwise). *)
 val charged_code_size : t -> Code_size.t
+
+(** For a decision to inline after speculation (possibly via a replay), the
+    evaluated cost of the inlined body together with the threshold it was
+    compared against. *)
+val speculative_inlining_cost_and_threshold : t -> (float * float) option

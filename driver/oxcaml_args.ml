@@ -1173,6 +1173,32 @@ let mk_flambda2_speculative_inlining_uninlined_call_cost_factor f =
       Flambda2.Inlining.Default.speculative_inlining_uninlined_call_cost_factor
   )
 
+let mk_flambda2_speculative_inlining_budget f =
+  ( "-flambda2-speculative-inlining-budget",
+    Arg.Unit f,
+    Printf.sprintf
+      " Treat the inlining threshold as a budget shared by all speculative\n\
+      \    inlinings performed within a speculatively-inlined function body%s\n\
+      \    (Flambda 2 only)"
+      (format_default Flambda2.Inlining.Default.speculative_inlining_budget) )
+
+let mk_no_flambda2_speculative_inlining_budget f =
+  ( "-no-flambda2-speculative-inlining-budget",
+    Arg.Unit f,
+    Printf.sprintf
+      " Use a fresh inlining threshold for each speculative inlining%s\n\
+      \    (Flambda 2 only)"
+      (format_not_default Flambda2.Inlining.Default.speculative_inlining_budget)
+  )
+
+let mk_flambda2_speculative_inlining_budget_size_ratio f =
+  ( "-flambda2-speculative-inlining-budget-size-ratio",
+    Arg.Float f,
+    " <float>  When using a speculative inlining budget, do not speculate on\n\
+    \    a callee whose code size exceeds this multiple of the remaining\n\
+    \    budget (a value <= 0 means: the large function size divided by\n\
+    \    the inlining threshold) (Flambda 2 only)" )
+
 let mk_flambda2_inlining_report_bin f =
   ( "-flambda2-inlining-report-bin",
     Arg.Unit f,
@@ -1564,6 +1590,9 @@ module type Oxcaml_options = sig
   val flambda2_speculative_inlining_charge_uninlined_calls : unit -> unit
   val no_flambda2_speculative_inlining_charge_uninlined_calls : unit -> unit
   val flambda2_speculative_inlining_uninlined_call_cost_factor : float -> unit
+  val flambda2_speculative_inlining_budget : unit -> unit
+  val no_flambda2_speculative_inlining_budget : unit -> unit
+  val flambda2_speculative_inlining_budget_size_ratio : float -> unit
   val flambda2_inlining_report_bin : unit -> unit
   val flambda2_unicode : unit -> unit
   val flambda2_kind_checks : unit -> unit
@@ -1810,6 +1839,12 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
         F.no_flambda2_speculative_inlining_charge_uninlined_calls;
       mk_flambda2_speculative_inlining_uninlined_call_cost_factor
         F.flambda2_speculative_inlining_uninlined_call_cost_factor;
+      mk_flambda2_speculative_inlining_budget
+        F.flambda2_speculative_inlining_budget;
+      mk_no_flambda2_speculative_inlining_budget
+        F.no_flambda2_speculative_inlining_budget;
+      mk_flambda2_speculative_inlining_budget_size_ratio
+        F.flambda2_speculative_inlining_budget_size_ratio;
       mk_flambda2_inlining_report_bin F.flambda2_inlining_report_bin;
       mk_flambda2_unicode F.flambda2_unicode;
       mk_flambda2_kind_checks F.flambda2_kind_checks;
@@ -2389,6 +2424,15 @@ module Oxcaml_options_impl = struct
   let flambda2_speculative_inlining_uninlined_call_cost_factor factor =
     Flambda2.Inlining.speculative_inlining_uninlined_call_cost_factor := factor
 
+  let flambda2_speculative_inlining_budget =
+    set' Flambda2.Inlining.speculative_inlining_budget
+
+  let no_flambda2_speculative_inlining_budget =
+    clear' Flambda2.Inlining.speculative_inlining_budget
+
+  let flambda2_speculative_inlining_budget_size_ratio ratio =
+    Flambda2.Inlining.speculative_inlining_budget_size_ratio := ratio
+
   let flambda2_inlining_report_bin = set' Flambda2.Inlining.report_bin
   let flambda2_unicode = set Flambda2.unicode
   let flambda2_kind_checks = set Flambda2.kind_checks
@@ -2884,6 +2928,17 @@ module Extra_params = struct
         set' Flambda2.Inlining.speculative_inlining_track_lifted_constants
     | "flambda2-speculative-inlining-charge-uninlined-calls" ->
         set' Flambda2.Inlining.speculative_inlining_charge_uninlined_calls
+    | "flambda2-speculative-inlining-budget" ->
+        set' Flambda2.Inlining.speculative_inlining_budget
+    | "flambda2-speculative-inlining-budget-size-ratio" ->
+        (match float_of_string_opt v with
+        | Some ratio ->
+            Flambda2.Inlining.speculative_inlining_budget_size_ratio := ratio
+        | None ->
+            Location.print_warning Location.none ppf
+              (Warnings.Bad_env_variable
+                 ("OCAMLPARAM", Printf.sprintf "bad value %s for %s" v name)));
+        true
     | "flambda2-speculative-inlining-uninlined-call-cost-factor" ->
         (match float_of_string_opt v with
         | Some factor ->

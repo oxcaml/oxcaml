@@ -254,6 +254,11 @@ let inlining_does_decrease_code_size ~code_metadata cost_metrics =
 type speculation =
   | No_useful_argument_types
   | Code_not_present
+  | Budget_exhausted of
+      { remaining_budget : float;
+        code_size : Code_size.t;
+        max_code_size : float
+      }
   | Speculated of
       { cost_metrics : Cost_metrics.t;
         ideal_cost_metrics : Cost_metrics.t;
@@ -319,6 +324,12 @@ let describe_current_behaviour ~code_metadata
   | Argument_types_not_useful ->
     "the function is not inlined because there is no useful information about \
      its arguments"
+  | Speculative_inlining_budget_exhausted
+      { remaining_budget; code_size; max_code_size } ->
+    Format.asprintf
+      "the function is not inlined because its code size %a exceeds the \
+       maximum %g allowed by the remaining speculative inlining budget %g"
+      Code_size.print code_size max_code_size remaining_budget
   | Missing_code ->
     "the function is not inlined because its code is not available"
   | Definition_says_inline _ -> (
@@ -435,6 +446,10 @@ let warn_if_ideal_configuration_differs ~apply ~code_metadata ~inlining_args
         ( false,
           "the function would not be inlined because its code is not available"
         )
+      | Budget_exhausted _ ->
+        ( false,
+          "the function would not be inlined because the speculative inlining \
+           budget of the enclosing inlined body is exhausted" )
       | Speculated
           { ideal_cost_metrics;
             cost_metrics = _;
@@ -496,29 +511,77 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
       ~from_env:(DE.inlining_arguments denv)
       ~from_metadata:(Apply.inlining_arguments apply)
   in
-  let threshold = Inlining_arguments.threshold inlining_args in
+  let threshold_from_args = Inlining_arguments.threshold inlining_args in
+  let remaining_budget =
+    if Flambda_features.Inlining.speculative_inlining_budget ()
+    then DA.speculative_inlining_budget dacc
+    else None
+  in
+  let threshold, threshold_is_remaining_budget =
+    match remaining_budget with
+    | None -> threshold_from_args, false
+    | Some remaining_budget -> remaining_budget, true
+  in
+  let budget_exhausted () =
+    (* When inside a speculatively-inlined body, do not bother speculating on
+       callees whose code size is so large compared to the remaining budget that
+       they are unlikely to fit. *)
+    match remaining_budget with
+    | None -> None
+    | Some remaining_budget ->
+      let ratio =
+        let ratio =
+          Flambda_features.Inlining.speculative_inlining_budget_size_ratio ()
+        in
+        if Float.compare ratio 0. > 0
+        then ratio
+        else
+          let large_size =
+            if is_a_functor
+            then Inlining_arguments.large_functor_size inlining_args
+            else Inlining_arguments.large_function_size inlining_args
+          in
+          Float.of_int large_size /. threshold_from_args
+      in
+      let code_size =
+        Code_metadata.cost_metrics code_metadata |> Cost_metrics.size
+      in
+      let max_code_size = remaining_budget *. ratio in
+      if
+        Float.compare (Float.of_int (Code_size.to_int code_size)) max_code_size
+        > 0
+      then
+        Some (Budget_exhausted { remaining_budget; code_size; max_code_size })
+      else None
+  in
   let speculate () : speculation =
     if not (argument_types_useful dacc ~apply ~code_metadata)
     then No_useful_argument_types
     else if not (code_present ())
     then Code_not_present
     else
-      let cost_metrics, ideal_cost_metrics, cost_metrics_of_lifted_constants =
-        speculative_inlining ~apply dacc ~simplify_expr ~return_arity
-          ~function_type
-      in
-      Speculated
-        { cost_metrics;
-          ideal_cost_metrics =
-            Option.value ideal_cost_metrics ~default:cost_metrics;
-          cost_metrics_of_lifted_constants
-        }
+      match budget_exhausted () with
+      | Some speculation -> speculation
+      | None ->
+        let cost_metrics, ideal_cost_metrics, cost_metrics_of_lifted_constants =
+          speculative_inlining ~apply dacc ~simplify_expr ~return_arity
+            ~function_type
+        in
+        Speculated
+          { cost_metrics;
+            ideal_cost_metrics =
+              Option.value ideal_cost_metrics ~default:cost_metrics;
+            cost_metrics_of_lifted_constants
+          }
   in
   let decision_of_speculation (speculation : speculation) :
       Call_site_inlining_decision_type.t =
     match speculation with
     | No_useful_argument_types -> Argument_types_not_useful
     | Code_not_present -> Missing_code
+    | Budget_exhausted { remaining_budget; code_size; max_code_size } ->
+      Speculative_inlining_budget_exhausted
+        { remaining_budget; code_size; max_code_size }
     | Speculated
         { cost_metrics;
           ideal_cost_metrics = _;
@@ -534,6 +597,7 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
             cost_metrics_of_lifted_constants;
             evaluated_to;
             threshold;
+            threshold_is_remaining_budget;
             is_a_functor
           }
       else
@@ -542,6 +606,7 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
             cost_metrics_of_lifted_constants;
             evaluated_to;
             threshold;
+            threshold_is_remaining_budget;
             is_a_functor
           }
   in
@@ -602,6 +667,9 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
             else Profile.Counters.incr "same_code_size" counters
           | Speculatively_not_inline _ ->
             Profile.Counters.incr "speculatively_not_inline" counters
+          | Speculative_inlining_budget_exhausted _ ->
+            Profile.Counters.incr "speculative_inlining_budget_exhausted"
+              counters
           | Missing_code | Definition_says_not_to_inline | In_a_stub
           | Doing_speculative_inlining _ | Unrolling_depth_exceeded
           | Max_inlining_depth_exceeded | Recursion_depth_exceeded
