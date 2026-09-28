@@ -3,7 +3,7 @@ Error: Multiple errors were encountered
 File "too_many_arguments.ml", line 11, characters 13-15:
 11 | let y = f 10 11
                   ^^
-  This extra argument is not expected.
+  This extra argument 11 is not expected.
 File "too_many_arguments.ml", line 11, characters 8-15:
 11 | let y = f 10 11
              ^^^^^^^
