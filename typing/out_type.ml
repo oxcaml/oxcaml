@@ -3978,6 +3978,13 @@ let rec tree_of_modtype ?abbrev = function
       Omty_functor (param, res, mres))
   | Mty_alias p ->
       Omty_alias (tree_of_path (Some Module) p)
+  | Mty_with _ as mty ->
+      begin match !expand_module_type !printing_env mty with
+      | Mty_with _ ->
+          (* Its base signature may be unavailable during error reporting. *)
+          Omty_signature [Osig_ellipsis]
+      | mty -> tree_of_modtype ?abbrev mty
+      end
   | Mty_strengthen _ as mty ->
       begin match !expand_module_type !printing_env mty with
       | Mty_strengthen (mty,p,a) ->

@@ -22,6 +22,12 @@ type env
 (** The empty environment. *)
 val empty : env
 
+(** Expand delayed constraints using the compiler environment, before name
+    qualification or the legacy syntax/type traversal. Ordinary aliases are
+    preserved; nested signatures and functor binders are handled recursively. *)
+val expand_module_type : Env.t -> Types.module_type -> Types.module_type
+val expand_signature : Env.t -> Types.signature -> Types.signature
+
 (** Extending an environment *)
 
 val add_signature : env -> string -> ?rel:string -> Types.signature -> env
@@ -68,7 +74,10 @@ val full_class_or_class_type_name : env -> Odoc_name.t -> Odoc_name.t
 (** Replace the [Path.t] by a complete [Path.t] in a [Types.type_expr].*)
 val subst_type : env -> Types.type_expr -> Types.type_expr
 
-(** Replace the [Path.t] by a complete [Path.t] in a [Types.module_type].*)
+(** Replace paths by their fully qualified documentation names.
+    Delayed constraints must first be expanded with [expand_module_type];
+    documentation names no longer carry the compiler bindings needed to do
+    so. *)
 val subst_module_type : env -> Types.module_type -> Types.module_type
 
 (** Replace the [Path.t] by a complete [Path.t] in a [Types.class_type].

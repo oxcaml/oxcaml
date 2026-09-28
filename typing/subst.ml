@@ -145,11 +145,15 @@ let add_type_replacement types id replacement =
         (Path.unboxed_version id) (Type_function { params; body }) types
     | _ -> types
 
+let check_with : (Ident.t -> unit) ref = ref (fun _ -> ())
+
 let unsafe x = x
 
-let add_type id p s =
-  let types = add_type_replacement s.types (Pident id) (Path p) in
+let add_type_path path p s =
+  let types = add_type_replacement s.types path (Path p) in
   { s with types; last_compose = None }
+
+let add_type id p s = add_type_path (Pident id) p s
 
 let add_module id p s =
   { s with modules = Path.Map.add (Pident id) p s.modules; last_compose = None }
@@ -388,7 +392,7 @@ let modtype_path s path =
       match Path.Map.find path s.modtypes with
       | Mty_ident p -> p
       | Mty_alias _ | Mty_signature _ | Mty_functor _
-      | Mty_strengthen _ as mty ->
+      | Mty_strengthen _ | Mty_with _ as mty ->
          raise (Module_type_path_substituted_away (path,mty))
       | exception Not_found ->
          match path with
@@ -1153,14 +1157,15 @@ end
 module Lazy_types = Types.Make_wrapped(Wrap)
 open Lazy_types
 
+let rename_bound_ident scoping s =
+  let open Ident in
+  match scoping with
+  | Keep -> (fun id -> create_scoped ~scope:(scope id) (name id))
+  | Make_local -> rename_ident s
+  | Rescope scope -> (fun id -> create_scoped ~scope (name id))
+
 let rename_bound_idents scoping s sg =
-  let rename =
-    let open Ident in
-    match scoping with
-    | Keep -> (fun id -> create_scoped ~scope:(scope id) (name id))
-    | Make_local -> rename_ident s
-    | Rescope scope -> (fun id -> create_scoped ~scope (name id))
-  in
+  let rename = rename_bound_ident scoping s in
   let rec rename_bound_idents s sg = function
     | [] -> sg, s
     | Sig_type(id, td, rs, vis) :: rest ->
@@ -1329,6 +1334,22 @@ and subst_lazy_modtype copy_scope scoping s = function
       Mty_strengthen (subst_lazy_modtype copy_scope scoping s mty,
                       module_path s p, a)
 
+  | Mty_with (mty, id, names, cstr) ->
+      !check_with id;
+      let id' = rename_bound_ident scoping s id in
+      Mty_with
+        (subst_lazy_modtype copy_scope scoping s mty, id', names,
+         subst_lazy_with_constraint copy_scope scoping
+           (add_module id (Pident id') s) cstr)
+
+and subst_lazy_with_constraint copy_scope scoping s = function
+  | With_type td -> With_type (type_declaration' copy_scope s td)
+  | With_module md ->
+      With_module (subst_lazy_module_decl copy_scope scoping s md)
+  | With_modtype mtd ->
+      With_modtype (subst_lazy_modtype_decl copy_scope scoping s mtd)
+  | With_jkind jd -> With_jkind (jkind_declaration s jd)
+
 and subst_lazy_modtype_decl copy_scope scoping s mtd =
   { mtd_type =
       Option.map (subst_lazy_modtype copy_scope scoping s) mtd.mtd_type;
@@ -1480,6 +1501,48 @@ module Lazy = struct
   let modtype_decl scoping s mtd =
     For_copy.with_scope (fun copy_scope ->
       subst_lazy_modtype_decl copy_scope scoping s mtd)
+  let with_constraint s cstr =
+    For_copy.with_scope (fun copy_scope ->
+      subst_lazy_with_constraint copy_scope Keep s cstr)
+
+  (* The two directions of the Mty_with binder convention: close references
+     over a projected signature, then reopen them using the current identifiers.
+     Class identifiers stand for their associated types, as in renaming. *)
+  let prefix_signature root items subst =
+    List.fold_left (fun subst item ->
+      let path id = Pdot (root, Ident.name id) in
+      match item with
+      | Sig_type (id, _, _, _) | Sig_typext (id, _, _, _)
+      | Sig_class (id, _, _, _) | Sig_class_type (id, _, _, _) ->
+          add_type id (path id) subst
+      | Sig_module (id, _, _, _, _) ->
+          add_module id (path id) subst
+      | Sig_modtype (id, _, _) -> add_modtype id (path id) subst
+      | Sig_jkind (id, _, _) -> add_jkind id (path id) subst
+      | Sig_value _ -> subst) subst items
+
+  let unprefix_signature root sg =
+    List.fold_left (fun s item ->
+      let type_id id =
+        let path = Pdot (root, Ident.name id) in
+        { s with types = add_type_replacement s.types path (Path (Pident id));
+                 last_compose = None }
+      in
+      match item with
+      | Sig_type (id, _, _, _) | Sig_typext (id, _, _, _)
+      | Sig_class (id, _, _, _) | Sig_class_type (id, _, _, _) -> type_id id
+      | Sig_module (id, _, _, _, _) ->
+          { s with
+            modules = Path.Map.add (Pdot (root, Ident.name id))
+                        (Pident id) s.modules;
+            last_compose = None }
+      | Sig_modtype (id, _, _) ->
+          add_modtype_path (Pdot (root, Ident.name id)) (Pident id) s
+      | Sig_jkind (id, _, _) ->
+          add_jkind_path (Pdot (root, Ident.name id)) (Pident id) s
+      | Sig_value _ -> s)
+      identity sg
+
   let signature = subst_lazy_signature
   let signature_item = subst_lazy_signature_item
   let value_description = subst_lazy_value_description
