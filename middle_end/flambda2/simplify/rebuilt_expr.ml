@@ -191,24 +191,64 @@ module Function_params_and_body = struct
 end
 
 module Continuation_handler = struct
-  type t = Continuation_handler.t
-
-  let print ~cont ~recursive ppf ch =
-    Continuation_handler.print ~cont ~recursive ppf ch
+  type t =
+    | Continuation_handler of
+        { params : Bound_parameters.t;
+          handler : Flambda.expr;
+          free_names_of_handler : Name_occurrences.t;
+          is_exn_handler : bool;
+          is_cold : bool
+        }
+    | Continuation_handler_not_rebuilt
 
   let dummy =
     Continuation_handler.create Bound_parameters.empty
       ~handler:term_not_rebuilt.expr ~free_names_of_handler:Unknown
       ~is_exn_handler:false ~is_cold:false
 
+  let to_continuation_handler ~body_is_cold t =
+    match t with
+    | Continuation_handler_not_rebuilt -> dummy
+    | Continuation_handler
+        { params; handler; free_names_of_handler; is_exn_handler; is_cold } ->
+      (* If the body of the continuation handler is cold, then it is the
+         responsibility of our context to introduce a coldness boundary (at
+         another continuation handler or function definition).
+
+         It is important that we clear the [is_cold] flag here: being cold
+         prevents *all* inlining (both in flambda and cmm), but we only actually
+         care about inlining of cold continuations into hot contexts (or across
+         different cold contexts, e.g. within a loop and outside of a loop), not
+         within a single cold context.
+
+         Note that this is a (likely) good enough approximation but does not
+         deal with all possible situations. For instance, if we have successive
+         cold handlers ([let [@cold] k1 = ... in let[@cold] k2 = ... in ...])
+         then we will still prevent inlining of [k1] into [k2]. This is likely
+         fine, and not worth doing something specific to deal with that
+         situation. Sinking the definition of [k1] to the dominator of its uses
+         would cleanly prevent this issue. *)
+      let is_cold = is_cold && not body_is_cold in
+      Continuation_handler.create params ~handler
+        ~free_names_of_handler:(Known free_names_of_handler) ~is_exn_handler
+        ~is_cold
+
+  let print ~cont ~recursive ppf ch =
+    Continuation_handler.print ~cont ~recursive ppf
+      (to_continuation_handler ~body_is_cold:false ch)
+
   let create are_rebuilding params ~handler ~free_names_of_handler
       ~is_exn_handler ~is_cold =
     if ART.do_not_rebuild_terms are_rebuilding
-    then dummy
+    then Continuation_handler_not_rebuilt
     else
-      Continuation_handler.create params ~handler:handler.expr
-        ~free_names_of_handler:(Known free_names_of_handler) ~is_exn_handler
-        ~is_cold
+      Continuation_handler
+        { params;
+          handler = handler.expr;
+          free_names_of_handler;
+          is_exn_handler;
+          is_cold
+        }
 end
 
 let create_non_recursive_let_cont are_rebuilding cont handler ~body
@@ -216,6 +256,10 @@ let create_non_recursive_let_cont are_rebuilding cont handler ~body
   if ART.do_not_rebuild_terms are_rebuilding
   then term_not_rebuilt
   else
+    let handler =
+      Continuation_handler.to_continuation_handler ~body_is_cold:body.is_cold
+        handler
+    in
     Let_cont.create_non_recursive cont handler ~body:body.expr
       ~free_names_of_body:(Known free_names_of_body)
     |> create ~is_cold:body.is_cold
@@ -225,6 +269,10 @@ let create_non_recursive_let_cont' are_rebuilding cont handler ~body
   if ART.do_not_rebuild_terms are_rebuilding
   then term_not_rebuilt
   else
+    let handler =
+      Continuation_handler.to_continuation_handler ~body_is_cold:body.is_cold
+        handler
+    in
     Let_cont.create_non_recursive' ~cont handler ~body:body.expr
       ~num_free_occurrences_of_cont_in_body:
         (Known num_free_occurrences_of_cont_in_body) ~is_applied_with_traps
@@ -235,6 +283,10 @@ let create_non_recursive_let_cont_without_free_names are_rebuilding cont handler
   if ART.do_not_rebuild_terms are_rebuilding
   then term_not_rebuilt
   else
+    let handler =
+      Continuation_handler.to_continuation_handler ~body_is_cold:body.is_cold
+        handler
+    in
     Let_cont.create_non_recursive cont handler ~body:body.expr
       ~free_names_of_body:Unknown
     |> create ~is_cold:body.is_cold
@@ -243,6 +295,11 @@ let create_recursive_let_cont are_rebuilding ~invariant_params handlers ~body =
   if ART.do_not_rebuild_terms are_rebuilding
   then term_not_rebuilt
   else
+    let handlers =
+      Continuation.Lmap.map
+        (Continuation_handler.to_continuation_handler ~body_is_cold:body.is_cold)
+        handlers
+    in
     Let_cont.create_recursive ~invariant_params handlers ~body:body.expr
     |> create ~is_cold:body.is_cold
 
