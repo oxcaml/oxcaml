@@ -19,12 +19,12 @@
         many
         stateless
         immutable
+        external_
         forkable
         unyielding
         aliased
         portable
         contended
-        external_
         static
 
   $ run 1:17 <<EOF

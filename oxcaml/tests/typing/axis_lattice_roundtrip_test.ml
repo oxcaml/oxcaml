@@ -62,7 +62,7 @@ let check_lattic_roundtrip label sample =
   if roundtripped <> sample
   then failwith (Format.asprintf "axis roundtrip failed: %s" label)
 
-let mod_bounds_of_sample sample =
+let crossing_of_sample sample =
   let monadic =
     Mode.Crossing.Monadic.create
       ~uniqueness:
@@ -89,6 +89,9 @@ let mod_bounds_of_sample sample =
       ~portability:
         (Mode.Crossing.Comonadic.Atom.Modality
            (Mode.Modality.Comonadic.Atom.Meet_const sample.portability))
+      ~externality:
+        (Mode.Crossing.Comonadic.Atom.Modality
+           (Mode.Modality.Comonadic.Atom.Meet_const sample.externality))
       ~forkable:
         (Mode.Crossing.Comonadic.Atom.Modality
            (Mode.Modality.Comonadic.Atom.Meet_const sample.forkable))
@@ -99,17 +102,13 @@ let mod_bounds_of_sample sample =
         (Mode.Crossing.Comonadic.Atom.Modality
            (Mode.Modality.Comonadic.Atom.Meet_const sample.statefulness))
   in
-  Btype.Jkind0.Mod_bounds.create { monadic; comonadic }
-    ~externality:sample.externality
+  ({ monadic; comonadic } : Mode.Crossing.t)
 
-let check_mod_bounds_roundtrip label sample =
-  let bounds = mod_bounds_of_sample sample in
-  let roundtripped =
-    bounds |> Btype.Jkind0.Mod_bounds.to_axis_lattice
-    |> Btype.Jkind0.Mod_bounds.of_axis_lattice
-  in
-  if not (Btype.Jkind0.Mod_bounds.equal bounds roundtripped)
-  then failwith (Format.asprintf "mod_bounds roundtrip failed: %s" label)
+let check_crossing_roundtrip label sample =
+  let bounds = crossing_of_sample sample in
+  let roundtripped = bounds |> of_mode_crossing |> to_mode_crossing in
+  if not (Mode.Crossing.equal bounds roundtripped)
+  then failwith (Format.asprintf "crossing roundtrip failed: %s" label)
 
 let check_roundtripping label update values =
   List.iter
@@ -118,7 +117,7 @@ let check_roundtripping label update values =
         (fun base_sample ->
           let sample = update base_sample value in
           check_lattic_roundtrip label sample;
-          check_mod_bounds_roundtrip label sample)
+          check_crossing_roundtrip label sample)
         base_samples)
     values
 
@@ -193,36 +192,35 @@ let all_axis_sets =
 
 let mask_of_axis : type a. a Jkind_axis.Axis.t -> t =
  fun axis ->
-  let open Jkind_axis.Axis in
   let open Mode.Axis in
   let open Mode.Crossing.Axis in
   let sample = sample_of_lattice bot in
   match axis with
-  | Modal (Comonadic Areality) ->
+  | Comonadic Areality ->
     lattice_of_sample { sample with areality = Mode.Regionality.Const.Local }
-  | Modal (Monadic Uniqueness) ->
+  | Monadic Uniqueness ->
     lattice_of_sample { sample with uniqueness = Mode.Uniqueness.Const.Unique }
-  | Modal (Comonadic Linearity) ->
+  | Comonadic Linearity ->
     lattice_of_sample { sample with linearity = Mode.Linearity.Const.Once }
-  | Modal (Monadic Contention) ->
+  | Monadic Contention ->
     lattice_of_sample
       { sample with contention = Mode.Contention.Const.Uncontended }
-  | Modal (Comonadic Portability) ->
+  | Comonadic Portability ->
     lattice_of_sample
       { sample with portability = Mode.Portability.Const.Nonportable }
-  | Modal (Comonadic Forkable) ->
+  | Comonadic Forkable ->
     lattice_of_sample { sample with forkable = Mode.Forkable.Const.Unforkable }
-  | Modal (Comonadic Yielding) ->
+  | Comonadic Yielding ->
     lattice_of_sample { sample with yielding = Mode.Yielding.Const.Yielding }
-  | Modal (Comonadic Statefulness) ->
+  | Comonadic Statefulness ->
     lattice_of_sample
       { sample with statefulness = Mode.Statefulness.Const.Stateful }
-  | Modal (Monadic Visibility) ->
+  | Monadic Visibility ->
     lattice_of_sample
       { sample with visibility = Mode.Visibility.Const.Read_write }
-  | Modal (Monadic Staticity) ->
+  | Monadic Staticity ->
     lattice_of_sample { sample with staticity = Mode.Staticity.Static }
-  | Nonmodal Externality ->
+  | Comonadic Externality ->
     lattice_of_sample
       { sample with externality = Jkind_axis.Externality.Internal }
 
