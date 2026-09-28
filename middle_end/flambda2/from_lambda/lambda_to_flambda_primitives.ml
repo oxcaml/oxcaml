@@ -3729,7 +3729,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     (* CR zeisbach: the current state of the world is a little sad. We either
        box small numbers as tagged immediates and break representation
        invariants for singleton unboxed records, or box them as tag-0 blocks and
-       break numeric layout invariants / optimizations. We pick the former, but
+       break numeric layout invariants / optimizations. We pick the latter, but
        we need addressability to properly handle these cases. *)
     | Punboxed_float f ->
       mixed_singleton (flat_suffix_element_of_unboxed_float f)
@@ -3793,7 +3793,6 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     let mutability = Mutability.Mutable in
     (* CR zeisbach: this will have to change with [inherit] fields *)
     let tag = Or_unknown.Known Tag.Scannable.zero in
-    (* CR zeisbach: products are actually larger... *)
     let size = Or_unknown.Known (Target_ocaml_int.of_int machine_width 1) in
     let field = Target_ocaml_int.of_int machine_width 0 in
     let load_mixed_singleton elt : H.expr_primitive list =
