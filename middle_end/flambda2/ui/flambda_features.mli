@@ -193,6 +193,10 @@ module Inlining : sig
   val speculative_inlining_only_if_arguments_useful : unit -> bool
 
   val speculative_inlining_track_lifted_constants : unit -> bool
+
+  val speculative_inlining_charge_uninlined_calls : unit -> bool
+
+  val speculative_inlining_uninlined_call_cost_factor : unit -> float
 end
 
 module Debug : sig

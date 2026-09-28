@@ -467,6 +467,10 @@ module Flambda2 = struct
       let speculative_inlining_only_if_arguments_useful = true
 
       let speculative_inlining_track_lifted_constants = false
+
+      let speculative_inlining_charge_uninlined_calls = false
+
+      let speculative_inlining_uninlined_call_cost_factor = 1.0
     end
 
     let max_depth = ref (I.default Default.default_arguments.max_depth)
@@ -498,6 +502,12 @@ module Flambda2 = struct
 
     let speculative_inlining_track_lifted_constants =
       ref Default.speculative_inlining_track_lifted_constants
+
+    let speculative_inlining_charge_uninlined_calls =
+      ref Default.speculative_inlining_charge_uninlined_calls
+
+    let speculative_inlining_uninlined_call_cost_factor =
+      ref Default.speculative_inlining_uninlined_call_cost_factor
 
     let report_bin = ref false
 

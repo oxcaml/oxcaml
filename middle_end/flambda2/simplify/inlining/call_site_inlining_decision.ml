@@ -157,7 +157,8 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
             (Lifted_constant.definitions lifted_constant))
     else Cost_metrics.zero
   in
-  Cost_metrics.( + ) (UA.cost_metrics uacc) cost_metrics_of_lifted_constants
+  ( Cost_metrics.( + ) (UA.cost_metrics uacc) cost_metrics_of_lifted_constants,
+    cost_metrics_of_lifted_constants )
 
 type argument_types_useful =
   | Coarse
@@ -249,7 +250,29 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
   else if Function_decl_inlining_decision_type.cannot_be_inlined decision
   then Definition_says_not_to_inline
   else if doing_speculative_inlining
-  then Doing_speculative_inlining
+  then
+    (* The callee is speculatively inlinable, but nested speculation is not
+       performed. If the callee would be considered for inlining later (i.e. its
+       argument types are useful), optionally charge an estimate of the code
+       size that inlining it would produce, so that the enclosing speculation
+       does not underestimate the size of the inlined body. *)
+    let charged_code_size =
+      if
+        Flambda_features.Inlining.speculative_inlining_charge_uninlined_calls ()
+        && argument_types_useful dacc ~apply ~code_metadata
+      then
+        let callee_code_size =
+          Code_metadata.cost_metrics code_metadata
+          |> Cost_metrics.size |> Code_size.to_int |> Float.of_int
+        in
+        let factor =
+          Flambda_features.Inlining
+          .speculative_inlining_uninlined_call_cost_factor ()
+        in
+        Code_size.of_int (Float.to_int (callee_code_size *. factor))
+      else Code_size.zero
+    in
+    Doing_speculative_inlining { charged_code_size }
   else
     Profile.record_call_with_counters ~accumulate:true "speculative_inlining"
       ~counter_f:(fun (decision : Call_site_inlining_decision_type.t) ->
@@ -267,7 +290,7 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
         | Speculatively_not_inline _ ->
           Profile.Counters.incr "speculatively_not_inline" counters
         | Missing_code | Definition_says_not_to_inline | In_a_stub
-        | Doing_speculative_inlining | Unrolling_depth_exceeded
+        | Doing_speculative_inlining _ | Unrolling_depth_exceeded
         | Max_inlining_depth_exceeded | Recursion_depth_exceeded
         | Never_inlined_attribute | Attribute_always
         | Replay_history_says_must_inline _ | Begin_unrolling _
@@ -285,7 +308,7 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
         else if not (code_present ())
         then Missing_code
         else
-          let cost_metrics =
+          let cost_metrics, cost_metrics_of_lifted_constants =
             speculative_inlining ~apply dacc ~simplify_expr ~return_arity
               ~function_type
           in
@@ -304,10 +327,20 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
           if is_under_inline_threshold
           then
             Speculatively_inline
-              { cost_metrics; evaluated_to; threshold; is_a_functor }
+              { cost_metrics;
+                cost_metrics_of_lifted_constants;
+                evaluated_to;
+                threshold;
+                is_a_functor
+              }
           else
             Speculatively_not_inline
-              { cost_metrics; evaluated_to; threshold; is_a_functor })
+              { cost_metrics;
+                cost_metrics_of_lifted_constants;
+                evaluated_to;
+                threshold;
+                is_a_functor
+              })
 
 let get_rec_info dacc ~function_type =
   let rec_info = FT.rec_info function_type in

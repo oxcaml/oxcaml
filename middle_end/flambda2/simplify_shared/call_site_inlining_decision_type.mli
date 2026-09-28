@@ -21,7 +21,7 @@ type t =
   | Missing_code
   | Definition_says_not_to_inline
   | In_a_stub
-  | Doing_speculative_inlining
+  | Doing_speculative_inlining of { charged_code_size : Code_size.t }
   | Argument_types_not_useful
   | Unrolling_depth_exceeded
   | Max_inlining_depth_exceeded
@@ -29,6 +29,7 @@ type t =
   | Never_inlined_attribute
   | Speculatively_not_inline of
       { cost_metrics : Cost_metrics.t;
+        cost_metrics_of_lifted_constants : Cost_metrics.t;
         evaluated_to : float;
         threshold : float;
         is_a_functor : bool
@@ -40,6 +41,7 @@ type t =
   | Definition_says_inline of { was_inline_always : bool }
   | Speculatively_inline of
       { cost_metrics : Cost_metrics.t;
+        cost_metrics_of_lifted_constants : Cost_metrics.t;
         evaluated_to : float;
         threshold : float;
         is_a_functor : bool
@@ -58,3 +60,7 @@ type can_inline = private
       }
 
 val can_inline : t -> can_inline
+
+(** The code size charged to the enclosing speculative inlining for a call that
+    was not inlined because speculation was in progress (zero otherwise). *)
+val charged_code_size : t -> Code_size.t
