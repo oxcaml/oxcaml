@@ -289,6 +289,8 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
           else Profile.Counters.incr "same_code_size" counters
         | Speculatively_not_inline _ ->
           Profile.Counters.incr "speculatively_not_inline" counters
+        | Speculative_inlining_budget_exhausted _ ->
+          Profile.Counters.incr "speculative_inlining_budget_exhausted" counters
         | Missing_code | Definition_says_not_to_inline | In_a_stub
         | Doing_speculative_inlining _ | Unrolling_depth_exceeded
         | Max_inlining_depth_exceeded | Recursion_depth_exceeded
@@ -308,39 +310,94 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
         else if not (code_present ())
         then Missing_code
         else
-          let cost_metrics, cost_metrics_of_lifted_constants =
-            speculative_inlining ~apply dacc ~simplify_expr ~return_arity
-              ~function_type
-          in
           let inlining_args =
             Inlining_arguments.combine
               ~from_env:(DE.inlining_arguments denv)
               ~from_metadata:(Apply.inlining_arguments apply)
           in
-          let evaluated_to =
-            Cost_metrics.evaluate ~args:inlining_args cost_metrics
+          let threshold_from_args =
+            Inlining_arguments.threshold inlining_args
           in
-          let threshold = Inlining_arguments.threshold inlining_args in
-          let is_under_inline_threshold =
-            Float.compare evaluated_to threshold <= 0
+          let remaining_budget =
+            if Flambda_features.Inlining.speculative_inlining_budget ()
+            then DA.speculative_inlining_budget dacc
+            else None
           in
-          if is_under_inline_threshold
-          then
-            Speculatively_inline
-              { cost_metrics;
-                cost_metrics_of_lifted_constants;
-                evaluated_to;
-                threshold;
-                is_a_functor
-              }
-          else
-            Speculatively_not_inline
-              { cost_metrics;
-                cost_metrics_of_lifted_constants;
-                evaluated_to;
-                threshold;
-                is_a_functor
-              })
+          let threshold, threshold_is_remaining_budget =
+            match remaining_budget with
+            | None -> threshold_from_args, false
+            | Some remaining_budget -> remaining_budget, true
+          in
+          let budget_exhausted =
+            (* When inside a speculatively-inlined body, do not bother
+               speculating on callees whose code size is so large compared to
+               the remaining budget that they are unlikely to fit. *)
+            match remaining_budget with
+            | None -> None
+            | Some remaining_budget ->
+              let ratio =
+                let ratio =
+                  Flambda_features.Inlining
+                  .speculative_inlining_budget_size_ratio ()
+                in
+                if Float.compare ratio 0. > 0
+                then ratio
+                else
+                  let large_size =
+                    if is_a_functor
+                    then Inlining_arguments.large_functor_size inlining_args
+                    else Inlining_arguments.large_function_size inlining_args
+                  in
+                  Float.of_int large_size /. threshold_from_args
+              in
+              let code_size =
+                Code_metadata.cost_metrics code_metadata |> Cost_metrics.size
+              in
+              let max_code_size = remaining_budget *. ratio in
+              if
+                Float.compare
+                  (Float.of_int (Code_size.to_int code_size))
+                  max_code_size
+                > 0
+              then
+                Some
+                  (Call_site_inlining_decision_type
+                   .Speculative_inlining_budget_exhausted
+                     { remaining_budget; code_size; max_code_size })
+              else None
+          in
+          match budget_exhausted with
+          | Some decision -> decision
+          | None ->
+            let cost_metrics, cost_metrics_of_lifted_constants =
+              speculative_inlining ~apply dacc ~simplify_expr ~return_arity
+                ~function_type
+            in
+            let evaluated_to =
+              Cost_metrics.evaluate ~args:inlining_args cost_metrics
+            in
+            let is_under_inline_threshold =
+              Float.compare evaluated_to threshold <= 0
+            in
+            if is_under_inline_threshold
+            then
+              Speculatively_inline
+                { cost_metrics;
+                  cost_metrics_of_lifted_constants;
+                  evaluated_to;
+                  threshold;
+                  threshold_is_remaining_budget;
+                  is_a_functor
+                }
+            else
+              Speculatively_not_inline
+                { cost_metrics;
+                  cost_metrics_of_lifted_constants;
+                  evaluated_to;
+                  threshold;
+                  threshold_is_remaining_budget;
+                  is_a_functor
+                })
 
 let get_rec_info dacc ~function_type =
   let rec_info = FT.rec_info function_type in

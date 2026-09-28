@@ -327,6 +327,12 @@ module Inlining = struct
   let speculative_inlining_uninlined_call_cost_factor () =
     !Oxcaml_flags.Flambda2.Inlining
      .speculative_inlining_uninlined_call_cost_factor
+
+  let speculative_inlining_budget () =
+    !Oxcaml_flags.Flambda2.Inlining.speculative_inlining_budget
+
+  let speculative_inlining_budget_size_ratio () =
+    !Oxcaml_flags.Flambda2.Inlining.speculative_inlining_budget_size_ratio
 end
 
 module Debug = struct

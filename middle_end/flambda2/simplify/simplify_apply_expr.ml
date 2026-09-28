@@ -216,7 +216,48 @@ type inlining_decision =
       { erase_attribute : bool;
         charged_code_size : Code_size.t
       }
-  | Inline of DA.t * Expr.t
+  | Inline of
+      { dacc : DA.t;
+        inlined : Expr.t;
+        leaving_speculative_region : bool
+      }
+
+(* When [Flambda_features.Inlining.speculative_inlining_budget] is enabled, a
+   speculative inlining whose call site is not already inside a
+   speculatively-inlined body opens a "region" whose budget is the inlining
+   threshold less the cost of the inlined body. Any inlining performed inside
+   the region consumes budget: a speculative inlining consumes the cost of its
+   body as measured by the speculation, and any other inlining consumes the code
+   size of the callee. Speculations inside the region are limited to the
+   remaining budget (see [Call_site_inlining_decision]). *)
+let enter_inlined_body_for_speculative_inlining_budget dacc decision
+    ~callee's_code_metadata =
+  if not (Flambda_features.Inlining.speculative_inlining_budget ())
+  then dacc, false
+  else
+    let cost_and_threshold =
+      Call_site_inlining_decision_type.speculative_inlining_cost_and_threshold
+        decision
+    in
+    match DA.speculative_inlining_budget dacc, cost_and_threshold with
+    | None, None -> dacc, false
+    | None, Some (evaluated_to, threshold) ->
+      ( DA.with_speculative_inlining_budget dacc
+          (Some (threshold -. evaluated_to)),
+        true )
+    | Some _, Some (evaluated_to, threshold) ->
+      (* [threshold] is the remaining budget at the call site. *)
+      ( DA.with_speculative_inlining_budget dacc
+          (Some (threshold -. evaluated_to)),
+        false )
+    | Some remaining_budget, None ->
+      let code_size =
+        Code_metadata.cost_metrics callee's_code_metadata
+        |> Cost_metrics.size |> Code_size.to_int |> Float.of_int
+      in
+      ( DA.with_speculative_inlining_budget dacc
+          (Some (remaining_budget -. code_size)),
+        false )
 
 (* CR vlaviron: fetch [params_arity], [result_arity] and [result_types] from
    [callee's_code_metadata] to prevent using the wrong one by mistake *)
@@ -263,11 +304,20 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
           Inlining_transforms.inline dacc ~apply ~unroll_to ~was_inline_always
             function_type
         in
-        Inline (dacc, inlined))
+        let dacc, leaving_speculative_region =
+          enter_inlined_body_for_speculative_inlining_budget dacc decision
+            ~callee's_code_metadata
+        in
+        Inline { dacc; inlined; leaving_speculative_region })
   in
   match inlined with
-  | Inline (dacc, inlined) ->
+  | Inline { dacc; inlined; leaving_speculative_region } ->
     let down_to_up dacc ~rebuild =
+      let dacc =
+        if leaving_speculative_region
+        then DA.with_speculative_inlining_budget dacc None
+        else dacc
+      in
       let rebuild uacc ~after_rebuild =
         let uacc =
           if coming_from_indirect
