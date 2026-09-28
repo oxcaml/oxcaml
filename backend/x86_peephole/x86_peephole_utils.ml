@@ -215,6 +215,40 @@ let reads_from_reg64 target = function
   (* Conservative: assume SIMD instructions may read from target. *)
   | SIMD _ -> true
 
+(* Whether the first instruction at or after [cell_opt] (skipping directives
+   that are not hard barriers) is [movzx %r8l, %r] with [r] being [target], i.e.
+   an instruction that reads only the low byte of [target] and overwrites the
+   whole register. *)
+let next_is_zero_extension_of_low_byte target cell_opt =
+  let rec loop cell_opt =
+    match cell_opt with
+    | None -> false
+    | Some cell -> (
+      let value = DLL.value cell in
+      if is_hard_barrier value
+      then false
+      else
+        match value with
+        | Directive _ -> loop (DLL.next cell)
+        | Ins instr -> (
+          match[@ocaml.warning "-fragile-match"] instr with
+          | MOVZX (Reg8L src, (Reg32 dst | Reg64 dst)) ->
+            equal_reg64 target src && equal_reg64 target dst
+          | _ -> false))
+  in
+  loop cell_opt
+
+(* Comparison results are materialized as [set cond, %r8l; movzx %r8l, %r]. On
+   its own, [set] keeps the old value of the upper bytes of [r] alive since it
+   only writes the low byte; but the [movzx] then reads only that freshly
+   written byte and overwrites the whole register, so taken together the two
+   instructions fully overwrite [r] without reading its old value. *)
+let is_setcc_materialization target instr next_cell =
+  match[@ocaml.warning "-fragile-match"] instr with
+  | SET (_, Reg8L r) ->
+    equal_reg64 target r && next_is_zero_extension_of_low_byte target next_cell
+  | _ -> false
+
 let reg64_is_never_read target start_cell =
   let rec loop cell_opt =
     match cell_opt with
@@ -226,8 +260,9 @@ let reg64_is_never_read target start_cell =
       else
         match value with
         | Ins instr ->
-          (not (reads_from_reg64 target instr))
-          && (writes_to_reg64 target instr || loop (DLL.next cell))
+          is_setcc_materialization target instr (DLL.next cell)
+          || (not (reads_from_reg64 target instr))
+             && (writes_to_reg64 target instr || loop (DLL.next cell))
         | Directive _ -> loop (DLL.next cell))
   in
   loop (DLL.next start_cell)

@@ -72,7 +72,6 @@ let clz32_const () = Builtins.int32_clz (Int32.of_int 6)
 [%%expect_asm X86_64{|
 clz32_const:
   movl  $6, %eax
-  movl  %eax, %eax
   lzcnt %rax, %rax
   leaq  -63(%rax,%rax), %rax
   ret
@@ -248,7 +247,6 @@ let popcnt32_const () = Builtins.int32_popcnt (Int32.of_int 6)
 [%%expect_asm X86_64{|
 popcnt32_const:
   movl  $6, %eax
-  movl  %eax, %eax
   popcnt %rax, %rax
   leaq  1(%rax,%rax), %rax
   ret
@@ -443,9 +441,7 @@ let int32_shr_const () =
   Builtins.int32_shr 6l 2l |> Int32_u.of_int32
 [%%expect_asm X86_64{|
 int32_shr_const:
-  movl  $6, %eax
-  movl  %eax, %eax
-  shrq  $2, %rax
+  movl  $1, %eax
   movslq %eax, %rax
   ret
 |}]

@@ -156,7 +156,7 @@ apply ccall
                  : val =
            (let prim = %string_length (d) in
             let Pstringlength = %tag_imm (prim) in
-            let prim_1 = %phys_ne (Pstringlength, 16) in
+            let prim_1 = %int_comp.ne (Pstringlength, 16) in
             switch prim_1
               | 0 -> k2 (prim)
               | 1 -> k3

@@ -69,13 +69,11 @@ do_intersect:
 |}]
 
 
-(* CR ttebbi: We could merge the and and cmp instructions *)
 let logand_branch x y f = if x land (1 lsl 4) <> 0 then f()
 [%%expect_asm X86_64{|
 logand_branch:
   movq  %rdi, %rbx
-  andl  $33, %eax
-  cmpq  $1, %rax
+  andl  $32, %eax
   je    .L0
   movl  $1, %eax
   movq  (%rbx), %rdi
@@ -432,9 +430,8 @@ let shift_of_logand (a : int64_u) =
 ;;
 [%%expect_asm X86_64{|
 shift_of_logand:
-  movl  $1, %ebx
   movq  %rax, %rcx
-  andq  %rbx, %rcx
+  andl  $1, %ecx
   movl  $3, %eax
   shrq  %cl, %rax
   orq   $1, %rax

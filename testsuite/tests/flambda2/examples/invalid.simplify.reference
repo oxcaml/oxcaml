@@ -13,7 +13,7 @@ let code inline(never) loopify(never) size(22) newer_version_of(check_0)
         : imm tagged =
   let Parraylength = %array_length.generic (t2) in
   let Parraylength_1 = %array_length.generic (t1) in
-  let prim = %phys_ne (Parraylength_1, Parraylength) in
+  let prim = %int_comp.ne (Parraylength_1, Parraylength) in
   switch prim
     | 0 -> k (0)
     | 1 -> k1 pop(reraise k1) ($camlInvalid__Pmakeblock_5)

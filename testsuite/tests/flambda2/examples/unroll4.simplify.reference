@@ -5,7 +5,7 @@ let code rec loopify(never) size(26) newer_version_of(odd_2)
       odd_2_1 (n : imm tagged) my_closure &my_alloc_region my_depth -> k * k1 =
   let k = %project_value_slot.[odd].[k] (my_closure) in
   let even = %project_function_slot.[odd].[even] (my_closure) in
-  let prim = %phys_eq (n, 0) in
+  let prim = %int_comp.eq (n, 0) in
   switch prim
     | 0 -> k2
     | 1 -> k3
@@ -21,7 +21,7 @@ and code rec loopify(never) size(26) newer_version_of(even_1)
         -> k * k1 =
   let k = %project_value_slot.[even].[k] (my_closure) in
   let odd = %project_function_slot.[even].[odd] (my_closure) in
-  let prim = %phys_eq (n, 0) in
+  let prim = %int_comp.eq (n, 0) in
   switch prim
     | 0 -> k2
     | 1 -> k3
@@ -45,7 +45,7 @@ let code inline(always) loopify(never) size(222) newer_version_of(parity_is_0)
      | 0 -> k2
      | 1 -> k3)
     where k3 =
-      let prim = %phys_eq (n, 0) in
+      let prim = %int_comp.eq (n, 0) in
       (switch prim
          | 0 -> k3
          | 1 -> k4
@@ -54,7 +54,7 @@ let code inline(always) loopify(never) size(222) newer_version_of(parity_is_0)
              k (0) -> k * k1
          where k3 =
            let int_sub = %int_barith.sub (n, 1) in
-           let prim_1 = %phys_eq (int_sub, 0) in
+           let prim_1 = %int_comp.eq (int_sub, 0) in
            (switch prim_1
               | 0 -> k3
               | 1 -> k4
@@ -64,7 +64,7 @@ let code inline(always) loopify(never) size(222) newer_version_of(parity_is_0)
                   k (1) -> k * k1
               where k3 =
                 let int_sub_1 = %int_barith.sub (int_sub, 1) in
-                let prim_2 = %phys_eq (int_sub_1, 0) in
+                let prim_2 = %int_comp.eq (int_sub_1, 0) in
                 (switch prim_2
                    | 0 -> k3
                    | 1 -> k4
@@ -74,7 +74,7 @@ let code inline(always) loopify(never) size(222) newer_version_of(parity_is_0)
                        k (0) -> k * k1
                    where k3 =
                      let int_sub_2 = %int_barith.sub (int_sub_1, 1) in
-                     let prim_3 = %phys_eq (int_sub_2, 0) in
+                     let prim_3 = %int_comp.eq (int_sub_2, 0) in
                      (switch prim_3
                         | 0 -> k3
                         | 1 -> k4
@@ -88,7 +88,7 @@ let code inline(always) loopify(never) size(222) newer_version_of(parity_is_0)
                                  inlining_state(depth(40))
                             odd ~ depth 0 -> unroll 0 4 (int_sub_3) -> k * k1))))
     where k2 =
-      let prim = %phys_eq (n, 0) in
+      let prim = %int_comp.eq (n, 0) in
       (switch prim
          | 0 -> k2
          | 1 -> k3
@@ -97,7 +97,7 @@ let code inline(always) loopify(never) size(222) newer_version_of(parity_is_0)
              k (1) -> k * k1
          where k2 =
            let int_sub = %int_barith.sub (n, 1) in
-           let prim_1 = %phys_eq (int_sub, 0) in
+           let prim_1 = %int_comp.eq (int_sub, 0) in
            (switch prim_1
               | 0 -> k2
               | 1 -> k3
@@ -107,7 +107,7 @@ let code inline(always) loopify(never) size(222) newer_version_of(parity_is_0)
                   k (0) -> k * k1
               where k2 =
                 let int_sub_1 = %int_barith.sub (int_sub, 1) in
-                let prim_2 = %phys_eq (int_sub_1, 0) in
+                let prim_2 = %int_comp.eq (int_sub_1, 0) in
                 (switch prim_2
                    | 0 -> k2
                    | 1 -> k3
@@ -138,7 +138,7 @@ apply direct(k_3_1 &toplevel) inlined(hint) inlining_state(depth(21))
             odd_2_2 (n : imm tagged)
               my_closure &my_alloc_region my_depth
               -> k1 * k2 =
-        let prim = %phys_eq (n, 0) in
+        let prim = %int_comp.eq (n, 0) in
         switch prim
           | 0 -> k3
           | 1 -> k1 (0)
@@ -152,7 +152,7 @@ apply direct(k_3_1 &toplevel) inlined(hint) inlining_state(depth(21))
             even_1_2 (n : imm tagged)
               my_closure &my_alloc_region my_depth
               -> k1 * k2 =
-        let prim = %phys_eq (n, 0) in
+        let prim = %int_comp.eq (n, 0) in
         switch prim
           | 0 -> k3
           | 1 -> k1 (1)

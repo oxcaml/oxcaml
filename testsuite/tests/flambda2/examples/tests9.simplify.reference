@@ -77,7 +77,7 @@ let code loopify(done) size(28) newer_version_of(chop_3)
     where rec `self`
                 (k_1 : imm tagged,
                  l_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
-      let prim = %phys_eq (k_1, 0) in
+      let prim = %int_comp.eq (k_1, 0) in
       (switch prim
          | 0 -> k2
          | 1 -> k (l_1)
@@ -134,7 +134,7 @@ let code loopify(done) size(90) newer_version_of(rev_merge_5)
                 let h1 = %block_load.[`0`] (l1_1) in
                 (apply &my_alloc_region cmp (h1, h2) -> k2 * k1
                    where k2 (c : imm tagged) =
-                     let prim_2 = %phys_eq (c, 0) in
+                     let prim_2 = %int_comp.eq (c, 0) in
                      (switch prim_2
                         | 0 -> k2
                         | 1 -> k3
@@ -201,7 +201,7 @@ let code loopify(done) size(90) newer_version_of(rev_merge_rev_6)
                 let h1 = %block_load.[`0`] (l1_1) in
                 (apply &my_alloc_region cmp (h1, h2) -> k2 * k1
                    where k2 (c : imm tagged) =
-                     let prim_2 = %phys_eq (c, 0) in
+                     let prim_2 = %int_comp.eq (c, 0) in
                      (switch prim_2
                         | 0 -> k2
                         | 1 -> k3
@@ -267,7 +267,7 @@ let code rec loopify(never) size(588) newer_version_of(rev_sort_8)
                            let x1 = %block_load.[`0`] (l) in
                            (apply &my_alloc_region cmp (x1, x2) -> k4 * k1
                               where k4 (c : imm tagged) =
-                                let prim_5 = %phys_eq (c, 0) in
+                                let prim_5 = %int_comp.eq (c, 0) in
                                 (switch prim_5
                                    | 0 -> k4
                                    | 1 -> k5
@@ -275,7 +275,8 @@ let code rec loopify(never) size(588) newer_version_of(rev_sort_8)
                                      (apply &my_alloc_region
                                         cmp (x2, x3) -> k5 * k1
                                         where k5 (c_1 : imm tagged) =
-                                          let prim_6 = %phys_eq (c_1, 0) in
+                                          let prim_6 = %int_comp.eq (c_1, 0)
+                                          in
                                           (switch prim_6
                                              | 0 -> k5
                                              | 1 -> k6
@@ -321,7 +322,8 @@ let code rec loopify(never) size(588) newer_version_of(rev_sort_8)
                                           (apply &my_alloc_region
                                              cmp (x2, x3) -> k5 * k1
                                              where k5 (c_1 : imm tagged) =
-                                               let prim_7 = %phys_eq (c_1, 0)
+                                               let prim_7 =
+                                                 %int_comp.eq (c_1, 0)
                                                in
                                                (switch prim_7
                                                   | 0 -> k5
@@ -370,7 +372,7 @@ let code rec loopify(never) size(588) newer_version_of(rev_sort_8)
                                                                     c_2 :
                                                                     imm tagged) =
                                                               let prim_9 =
-                                                                %phys_eq
+                                                                %int_comp.eq
                                                                   (c_2, 0)
                                                               in
                                                               (switch prim_9
@@ -441,7 +443,8 @@ let code rec loopify(never) size(588) newer_version_of(rev_sort_8)
                                           (apply &my_alloc_region
                                              cmp (x1, x3) -> k4 * k1
                                              where k4 (c_1 : imm tagged) =
-                                               let prim_7 = %phys_eq (c_1, 0)
+                                               let prim_7 =
+                                                 %int_comp.eq (c_1, 0)
                                                in
                                                (switch prim_7
                                                   | 0 -> k4
@@ -490,7 +493,7 @@ let code rec loopify(never) size(588) newer_version_of(rev_sort_8)
                                                                     c_2 :
                                                                     imm tagged) =
                                                               let prim_9 =
-                                                                %phys_eq
+                                                                %int_comp.eq
                                                                   (c_2, 0)
                                                               in
                                                               (switch prim_9
@@ -573,7 +576,7 @@ let code rec loopify(never) size(588) newer_version_of(rev_sort_8)
                  let x1 = %block_load.[`0`] (l) in
                  (apply &my_alloc_region cmp (x1, x2) -> k3 * k1
                     where k3 (c : imm tagged) =
-                      let prim_3 = %phys_eq (c, 0) in
+                      let prim_3 = %int_comp.eq (c, 0) in
                       (switch prim_3
                          | 0 -> k3
                          | 1 -> k4
@@ -673,7 +676,7 @@ and code rec loopify(never) size(588) newer_version_of(sort_7)
                            let x1 = %block_load.[`0`] (l) in
                            (apply &my_alloc_region cmp (x1, x2) -> k4 * k1
                               where k4 (c : imm tagged) =
-                                let prim_5 = %phys_eq (c, 0) in
+                                let prim_5 = %int_comp.eq (c, 0) in
                                 (switch prim_5
                                    | 0 -> k4
                                    | 1 -> k5
@@ -681,7 +684,8 @@ and code rec loopify(never) size(588) newer_version_of(sort_7)
                                      (apply &my_alloc_region
                                         cmp (x2, x3) -> k5 * k1
                                         where k5 (c_1 : imm tagged) =
-                                          let prim_6 = %phys_eq (c_1, 0) in
+                                          let prim_6 = %int_comp.eq (c_1, 0)
+                                          in
                                           (switch prim_6
                                              | 0 -> k5
                                              | 1 -> k6
@@ -727,7 +731,8 @@ and code rec loopify(never) size(588) newer_version_of(sort_7)
                                           (apply &my_alloc_region
                                              cmp (x2, x3) -> k5 * k1
                                              where k5 (c_1 : imm tagged) =
-                                               let prim_7 = %phys_eq (c_1, 0)
+                                               let prim_7 =
+                                                 %int_comp.eq (c_1, 0)
                                                in
                                                (switch prim_7
                                                   | 0 -> k5
@@ -776,7 +781,7 @@ and code rec loopify(never) size(588) newer_version_of(sort_7)
                                                                     c_2 :
                                                                     imm tagged) =
                                                               let prim_9 =
-                                                                %phys_eq
+                                                                %int_comp.eq
                                                                   (c_2, 0)
                                                               in
                                                               (switch prim_9
@@ -847,7 +852,8 @@ and code rec loopify(never) size(588) newer_version_of(sort_7)
                                           (apply &my_alloc_region
                                              cmp (x1, x3) -> k4 * k1
                                              where k4 (c_1 : imm tagged) =
-                                               let prim_7 = %phys_eq (c_1, 0)
+                                               let prim_7 =
+                                                 %int_comp.eq (c_1, 0)
                                                in
                                                (switch prim_7
                                                   | 0 -> k4
@@ -896,7 +902,7 @@ and code rec loopify(never) size(588) newer_version_of(sort_7)
                                                                     c_2 :
                                                                     imm tagged) =
                                                               let prim_9 =
-                                                                %phys_eq
+                                                                %int_comp.eq
                                                                   (c_2, 0)
                                                               in
                                                               (switch prim_9
@@ -979,7 +985,7 @@ and code rec loopify(never) size(588) newer_version_of(sort_7)
                  let x1 = %block_load.[`0`] (l) in
                  (apply &my_alloc_region cmp (x1, x2) -> k3 * k1
                     where k3 (c : imm tagged) =
-                      let prim_3 = %phys_eq (c, 0) in
+                      let prim_3 = %int_comp.eq (c, 0) in
                       (switch prim_3
                          | 0 -> k3
                          | 1 -> k4

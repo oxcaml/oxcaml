@@ -975,8 +975,8 @@ module Binary_float32_comp = Binary_arith_like (Float32_ops_for_binary_comp)
 (* Unlike in the language specification, the compiler defines physical equality
    as referential equality on all values, including immediates and immutable
    blocks. *)
-let simplify_phys_equal (op : P.equality_comparison) dacc ~original_term _dbg
-    ~arg1:_ ~arg1_ty ~arg2:_ ~arg2_ty ~result_var =
+let simplify_phys_equal (op : P.equality_comparison) dacc ~original_term dbg
+    ~arg1 ~arg1_ty ~arg2 ~arg2_ty ~result_var =
   (* This primitive is only used for arguments of kind [Value]. *)
   let typing_env = DA.typing_env dacc in
   (* Note: We don't compare the arguments themselves for equality. Instead, we
@@ -998,7 +998,26 @@ let simplify_phys_equal (op : P.equality_comparison) dacc ~original_term _dbg
       DA.add_variable dacc result_var
         (T.these_naked_immediates (Target_ocaml_int.all_bools machine_width))
     in
-    SPR.create original_term ~try_reify:false dacc
+    let term =
+      match
+        ( T.prove_is_a_tagged_immediate typing_env arg1_ty,
+          T.prove_is_a_tagged_immediate typing_env arg2_ty )
+      with
+      | Proved (), Proved () ->
+        (* Integer (in)equality reaches Flambda2 as [Phys_equal] (cf.
+           [Lambda_to_flambda_primitives]). When both arguments are known to be
+           tagged immediates, physical equality is integer equality: expose this
+           as [Int_comp], so that the translation to Cmm can exploit the
+           representation of tagged immediates when comparing them. *)
+        let cmp : P.signed_or_unsigned P.comparison =
+          match op with Eq -> Eq | Neq -> Neq
+        in
+        Named.create_prim
+          (P.Binary (Int_comp (Tagged_immediate, Yielding_bool cmp), arg1, arg2))
+          dbg
+      | (Proved () | Unknown), (Proved () | Unknown) -> original_term
+    in
+    SPR.create term ~try_reify:false dacc
 
 let simplify_array_load (array_kind : P.Array_kind.t)
     (array_load_kind : P.Array_load_kind.t) mutability dacc ~original_term:_ dbg

@@ -113,3 +113,32 @@
 (check-sat)
 (echo "")
 (pop)
+
+(declare-const mc ocaml_int)
+(declare-const cc ocaml_int)
+
+(define-const m tagged_int (tag mc))
+(define-const c tagged_int (tag cc))
+
+(push)
+(echo "Tagged, Eq -> C.eq_tagged: (x & m) = c  iff  (x & (m ^ 1)) = (c ^ 1)")
+(assert (not (=
+ (= (bvand x m) c)
+ (= (bvand x (bvxor m (_ bv1 64))) (bvxor c (_ bv1 64))))))
+(check-sat)
+(echo "")
+(pop)
+
+(declare-const z tagged_int)
+(declare-const p tagged_int)
+
+(push)
+(echo "(z & p) = p  iff  (z & p) != 0, for p a single bit")
+(assert (not (= p (_ bv0 64))))
+(assert (= (bvand p (bvsub p (_ bv1 64))) (_ bv0 64)))
+(assert (not (=
+ (= (bvand z p) p)
+ (not (= (bvand z p) (_ bv0 64))))))
+(check-sat)
+(echo "")
+(pop)
