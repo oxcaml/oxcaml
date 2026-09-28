@@ -115,11 +115,16 @@ module Sort = struct
     | Void | Untagged_immediate | Float64 | Float32 | Bits8 | Bits16 | Bits32 ->
       false
 
-  let base_crosses_externality = function
-    | Scannable -> false
+  let base_implied_externality ~separability : base -> Jkind_axis.Externality.t
+      = function
+    | Scannable -> (
+      match (separability : Jkind_axis.Separability.t) with
+      | Non_pointer -> External
+      | Non_pointer64 -> External64
+      | Non_float | Separable | Maybe_separable -> Internal)
     | Void | Untagged_immediate | Float64 | Float32 | Word | Bits8 | Bits16
     | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask ->
-      true
+      External
 
   (* Global association list mapping poly vars to names for printing *)
   let sort_poly_var_names : (var * string) list ref = ref []
@@ -816,14 +821,19 @@ module Sort = struct
     in
     go (get s)
 
-  let crosses_externality s =
-    let rec go = function
-      | Base b -> base_crosses_externality b
-      | Var _ | Univar _ -> false
-      | Product ts -> List.for_all go ts
-      | Addressable s -> go s
+  let implied_externality ~separability s =
+    let rec go ~separability = function
+      | Base b -> base_implied_externality ~separability b
+      | Var _ | Univar _ -> Jkind_axis.Externality.Internal
+      | Product ts ->
+        List.fold_left
+          (fun acc t ->
+            Jkind_axis.Externality.join acc
+              (go ~separability:Jkind_axis.Separability.max t))
+          Jkind_axis.Externality.min ts
+      | Addressable s -> go ~separability s
     in
-    go (get s)
+    go ~separability (get s)
 
   (***********************)
   (* equality *)
@@ -1060,11 +1070,15 @@ module Layout = struct
       | Genvar _ -> false
       | Addressable t -> is_scannable_or_any t
 
-    let rec crosses_externality = function
-      | Any _ | Univar _ | Genvar _ -> false
-      | Base (b, _) -> Sort.base_crosses_externality b
-      | Product ts -> List.for_all crosses_externality ts
-      | Addressable t -> crosses_externality t
+    let rec implied_externality : t -> Externality.t = function
+      | Any _ | Univar _ | Genvar _ -> Internal
+      | Base (b, sa) ->
+        Sort.base_implied_externality ~separability:sa.separability b
+      | Product ts ->
+        List.fold_left
+          (fun acc t -> Externality.join acc (implied_externality t))
+          Externality.min ts
+      | Addressable t -> implied_externality t
 
     let rec is_surely_addressable = function
       | Base (b, _) -> Sort.base_is_addressable b
