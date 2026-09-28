@@ -373,7 +373,7 @@ Line 1, characters 0-37:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In this definition, expected parameter variances are not satisfied.
        The 2nd type parameter was expected to be covariant,
-       but it is injective invariant.
+       but it is invariant.
 |}]
 
 (**********)

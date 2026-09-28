@@ -1368,7 +1368,7 @@ Line 1, characters 0-24:
     ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In this definition, expected parameter variances are not satisfied.
        The 1st type parameter was expected to be covariant,
-       but it is injective invariant.
+       but it is invariant.
 |}]
 
 (* [iarray#] is covariant in its parameter, like [iarray] (unlike [array#]). *)
