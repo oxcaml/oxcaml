@@ -650,3 +650,36 @@ Line 1, characters 36-45:
                                         ^^^^^^^^^
 Error: The poke primitive does not currently support layout polymorphic arguments
 |}]
+
+(* Modules containing lpoly items *)
+
+let with_int, with_unboxed_float =
+  (* this one might end up being all values *)
+  let poly_ make_m1 x =
+    let module M = struct
+      let k = x
+    end in
+    M.k
+  in
+  make_m1 42, to_float (make_m1 #42.5)
+[%%expect {|
+>> Fatal error: mixed_block_element_of_const_sort: Genvar
+Uncaught exception: Misc.Fatal_error
+
+|}]
+
+let with_int, with_unboxed_float =
+  (* this one always contains nonvalues *)
+  let poly_ make_m2 x =
+    let module M = struct
+      let j = #42.5
+      let k = x
+    end in
+    M.k
+  in
+  make_m2 42, to_float (make_m2 #42.5)
+[%%expect {|
+>> Fatal error: mixed_block_element_of_const_sort: Genvar
+Uncaught exception: Misc.Fatal_error
+
+|}]
