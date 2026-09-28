@@ -1,11 +1,30 @@
 #!/usr/bin/env bash
+
+#**************************************************************************#
+#*                                                                        *#
+#*                                 OCaml                                  *#
+#*                                                                        *#
+#*                  Jacob Van Buren, Jane Street, New York                *#
+#*                                                                        *#
+#*   Copyright 2026 Jane Street Group LLC                                 *#
+#*                                                                        *#
+#*   All rights reserved.  This file is distributed under the terms of    *#
+#*   the GNU Lesser General Public License version 2.1, with the          *#
+#*   special exception on linking described in the file LICENSE.          *#
+#*                                                                        *#
+#**************************************************************************#
+
+# Compare installed library inventories and build findlib/Dune consumers.
+# Usage: check-installed-libraries.sh PREFIX core|shipped
+
 set -euo pipefail
 
+[ -d "$1/lib/ocaml" ] || { echo "No install at $1" >&2; exit 1; }
 prefix=$(cd "$1" && pwd)
 script_dir=$(cd "$(dirname "$0")" && pwd)
-case "${OXCAML_EXPECT_SHIPPED_LIBRARIES:-}" in
-  0|1) ;;
-  *) echo 'Set OXCAML_EXPECT_SHIPPED_LIBRARIES to 0 or 1' >&2; exit 1 ;;
+case "${2:-}" in
+  core|shipped) inventory=$2 ;;
+  *) echo "Usage: $0 PREFIX core|shipped" >&2; exit 1 ;;
 esac
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
@@ -32,148 +51,91 @@ if [ "$compiler_stdlib" != "$prefix/lib/ocaml" ]; then
 fi
 printf '%s\n' '(lang dune 3.23)' '(name installed_libraries_probe)' \
   > dune-project
-printf '%s\n' 'let () = ()' > main.ml
-mkdir direct
-cp main.ml direct/main.ml
+
+echo 'Checking installed findlib and Dune inventories'
 ocamlfind list > findlib.list
 dune installed-libraries > dune.list
 awk '$2 == "(version:" { print $1 }' findlib.list \
   | LC_ALL=C sort > findlib-names
 awk '$2 == "(version:" { print $1 }' dune.list | LC_ALL=C sort > dune-names
-[ -s findlib-names ] || { echo 'No findlib packages found' >&2; exit 1; }
-[ -s dune-names ] || { echo 'No Dune libraries found' >&2; exit 1; }
-
-findlib_lists=("$script_dir/installed-core-libraries.txt")
-dune_lists=("$script_dir/installed-core-libraries.txt")
-if [ "$OXCAML_EXPECT_SHIPPED_LIBRARIES" = 1 ]; then
-  findlib_lists+=("$script_dir/installed-shipped-findlib-libraries.txt")
-  dune_lists+=("$script_dir/installed-shipped-dune-libraries.txt")
+lists=("$script_dir/installed-core-libraries.txt")
+findlib_only=()
+if [ "$inventory" = shipped ]; then
+  lists+=("$script_dir/installed-shipped-libraries.txt")
+  findlib_only=("$script_dir/installed-shipped-findlib-extras.txt")
 fi
-LC_ALL=C sort "${findlib_lists[@]}" > expected-findlib-names
-LC_ALL=C sort "${dune_lists[@]}" > expected-dune-names
-if ! diff -u expected-findlib-names findlib-names; then
-  echo 'Installed findlib library names differ from the expected inventory' >&2
-  exit 1
-fi
-if ! diff -u expected-dune-names dune-names; then
-  echo 'Installed Dune library names differ from the expected inventory' >&2
-  exit 1
-fi
+LC_ALL=C sort "${lists[@]}" > expected-dune-names
+LC_ALL=C sort "${lists[@]}" "${findlib_only[@]}" > expected-findlib-names
+diff -u expected-findlib-names findlib-names
+diff -u expected-dune-names dune-names
 
-for meta in "$prefix"/lib/*/META; do
-  [ ! -f "$meta" ] || [ -f "${meta%/META}/dune-package" ] || {
-    echo "Missing dune-package next to $meta" >&2
-    exit 1
-  }
-done
-
+targets=()
 while read -r name; do
+  direct=$(mktemp -d "$work/direct.XXXXXX")
+  printf '%s\n' 'let () = ()' > "$direct/main.ml"
   kind=$(ocamlfind query -format '%(library_kind)' "$name")
   case "$kind" in
     ppx_rewriter|ppx_deriver) predicate=ppx_driver ;;
     *) predicate= ;;
   esac
-  byte_archive=
-  native_archive=
+  link_flags=()
+  # Eval requires runtime metaprogramming support at link time.
+  [ "$name" != eval ] || \
+    link_flags=(-extension runtime_metaprogramming -uses-metaprogramming)
+  findlib_flags=()
+  for flag in "${link_flags[@]}"; do findlib_flags+=(-passopt "$flag"); done
+  package_targets=()
   for mode in byte native; do
-    predicates="$mode"
-    [ -z "$predicate" ] || predicates="$predicate,$mode"
-    dependencies=$(ocamlfind query -recursive -predicates "$predicates" \
-      -format '%p|%d' "$name")
-    while IFS='|' read -r dependency directory; do
-      case "$directory" in
-        "$prefix/lib"|"$prefix/lib/"*) ;;
-        *)
-          echo "$name ($mode): $dependency escaped prefix: $directory" >&2
-          exit 1
-          ;;
-      esac
-    done <<< "$dependencies"
-    archive=$(ocamlfind query -predicates "$predicates" -format '%A' "$name")
-    if [ -n "$archive" ]; then
-      if [ "$mode" = byte ]; then
-        byte_archive=1
-      else
-        native_archive=1
-      fi
-      if [ -z "$predicate" ]; then
-        if [ "$mode" = byte ]; then
-          compiler=ocamlc
-          target=main.bc
-        else
-          compiler=ocamlopt
-          target=main.exe
-        fi
-        link_flags=()
-        # Eval requires runtime metaprogramming support at link time.
-        if [ "$name" = eval ]; then
-          link_flags=(-passopt -extension -passopt runtime_metaprogramming
-            -passopt -uses-metaprogramming)
-        fi
-        if ! (cd direct && ocamlfind "$compiler" -package "$name" \
-          -linkpkg -linkall "${link_flags[@]}" -o "$target" main.ml) \
-          > findlib-link.log 2>&1; then
-          cat findlib-link.log >&2
-          echo "$name: findlib $mode link failed" >&2
-          exit 1
-        fi
-      fi
+    case "$mode" in
+      byte) compiler=ocamlc; target=main.bc ;;
+      native) compiler=ocamlopt; target=main.exe ;;
+    esac
+    archive=$(ocamlfind query -predicates "${predicate:+$predicate,}$mode" \
+      -format '%A' "$name")
+    [ -n "$archive" ] || continue
+    package_targets+=("$name/$target")
+    if [ -z "$predicate" ]; then
+      echo "Checking $name with findlib ($mode)"
+      (cd "$direct" && ocamlfind "$compiler" -package "$name" \
+        -linkpkg -linkall "${findlib_flags[@]}" -o "$target" main.ml)
     fi
   done
-
   if [ "$kind" = ppx_rewriter ]; then
-    if ! (cd direct && ocamlfind ocamlc -package "$name" -c main.ml) \
-      > findlib-ppx.log 2>&1; then
-      cat findlib-ppx.log >&2
-      echo "$name: findlib preprocessor failed" >&2
-      exit 1
-    fi
+    echo "Checking $name with findlib (preprocessor)"
+    (cd "$direct" && ocamlfind ocamlc -package "$name" -c main.ml)
   fi
-
   if grep -Fxq "$name" dune-names; then
-    if [ -n "$predicate" ]; then
-      printf '%s\n' '(executable' ' (name main)' ' (modes exe byte)' \
-        ' (link_flags (:standard -linkall))' \
-        " (preprocess (pps $name)))" > dune
-    elif [ "$name" = eval ]; then
-      printf '%s\n' '(executable (name main) (modes exe)' \
-        ' (libraries eval)' \
-        ' (link_flags (:standard -linkall' \
-        '              -extension runtime_metaprogramming' \
-        '              -uses-metaprogramming)))' > dune
-    else
-      printf '%s\n' '(executable' ' (name main)' ' (modes exe byte)' \
-        " (libraries $name)" ' (link_flags (:standard -linkall)))' \
-        > dune
+    mkdir "$name"
+    cp "$direct/main.ml" "$name/main.ml"
+    dependency="(libraries $name)"
+    [ -z "$predicate" ] || dependency="(preprocess (pps $name))"
+    printf '%s\n' '(executable (name main) (modes exe byte)' \
+      " $dependency" \
+      " (link_flags (:standard -linkall ${link_flags[*]})))" > "$name/dune"
+    if [ "${#package_targets[@]}" = 0 ]; then
+      package_targets=("$name/main.bc" "$name/main.exe")
     fi
-    targets=()
-    if [ -z "$byte_archive" ] && [ -z "$native_archive" ]; then
-      targets=(main.bc main.exe)
-    else
-      [ -z "$byte_archive" ] || targets+=(main.bc)
-      [ -z "$native_archive" ] || targets+=(main.exe)
-    fi
-    dune build --display=quiet "${targets[@]}"
+    targets+=("${package_targets[@]}")
   fi
-  printf 'Installed library checked: %s\n' "$name"
-  rm -f direct/main.bc direct/main.exe direct/main.cmi \
-    direct/main.cmo direct/main.cmx direct/main.o
 done < findlib-names
 
-if [ "$OXCAML_EXPECT_SHIPPED_LIBRARIES" = 1 ]; then
-  printf '%s\n' 'let () = print_endline Jsoo_runtime.Sys.version' \
-    > direct/runtime_stub.ml
-  printf '%s\n' 'let () = ()' > direct/js_stub.ml
-  for package in js_of_ocaml-runtime js_of_ocaml; do
-    case "$package" in
-      js_of_ocaml-runtime) source=runtime_stub ;;
-      js_of_ocaml) source=js_stub ;;
-    esac
-    (cd direct && ocamlfind ocamlc -package "$package" -linkpkg \
-      -o "$source.bc" "$source.ml")
-    "$prefix/bin/ocamlrun" "direct/$source.bc" > /dev/null
-  done
-  "$prefix/bin/ocamlobjinfo" direct/js_stub.bc > js_stub.objinfo
+echo 'Checking installed libraries with Dune'
+dune build --display=short "${targets[@]}"
+
+smoke_bytecode() {
+  local package=$1 source=$2
+  echo "Checking bytecode stub loading for $package"
+  printf '%s\n' "$source" > main.ml
+  ocamlfind ocamlc -package "$package" -linkpkg -o "$package.bc" main.ml
+  "$prefix/bin/ocamlrun" "$package.bc" > /dev/null
+}
+
+if [ "$inventory" = shipped ]; then
+  smoke_bytecode js_of_ocaml-runtime \
+    'let () = print_endline Jsoo_runtime.Sys.version'
+  smoke_bytecode js_of_ocaml 'let () = ()'
+  # Ensure these runs exercised DLL lookup rather than passing vacuously.
+  "$prefix/bin/ocamlobjinfo" js_of_ocaml.bc > js_stub.objinfo
   grep -Fq dlljs_of_ocaml_stubs js_stub.objinfo
   grep -Fq dlljsoo_runtime_stubs js_stub.objinfo
 fi

@@ -10,7 +10,8 @@ depends: [
   "ocaml-base-compiler" {= "5.4.0+oxcaml"}
   "menhir" {= "20231231"}
   "ocamlformat" {= "0.29.0"}
-  "ocamlfind"
+  # This version should match findlib in the nixpkgs pinned by flake.nix
+  "ocamlfind" {= "1.9.8"}
   # This version should be the same as in default.nix
   "dune" {= "3.23.1"}
   "re" {>= "1.10.0"}

@@ -52,7 +52,7 @@
             jsoo-smoke-test
             merlin
             ;
-          installed-library-consumers = oxcaml.mkInstalledLibraryConsumerCheck oxcaml;
+          installed-libraries = oxcaml.mkInstalledLibrariesCheck oxcaml;
         };
 
         formatter = pkgs.nixfmt-tree;

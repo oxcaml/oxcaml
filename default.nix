@@ -148,44 +148,48 @@ let
       }
     );
 
+  # nixpkgs does not yet provide an OCaml 5.4 package set at the pinned
+  # revision, so construct one around the compiler used to bootstrap OxCaml.
+  # Pin the plain pkgs.stdenv for this compiler rather than the variant
+  # stdenv: a clangStdenv-built compiler records `clang` as its C compiler,
+  # which isn't on PATH when the scope's packages build under the default gcc
+  # stdenv (e.g. findlib's `ocamlc -custom` link of ocamlfind). Pinning also
+  # keeps the dev-tool closure identical across oxcaml variants, so they share
+  # cached builds.
+  bootOcamlPackages =
+    let
+      ocaml = mkBootOcaml_5_4_0 pkgs.stdenv;
+    in
+    (pkgs.ocaml-ng.mkOcamlPackages ocaml).overrideScope (
+      _: osuper: {
+        dune_3 = dune;
+
+        # ounit2's own test suite has a flaky threads test that can hit its
+        # 600s timeout on loaded CI runners; skip upstream's tests.
+        ounit2 = osuper.ounit2.overrideAttrs (_: { doCheck = false; });
+
+        # Merlin relies on generated parser sources matching this version.
+        menhirLib = osuper.menhirLib.overrideAttrs (_: {
+          version = menhirVersion;
+          src = menhirSrc;
+        });
+
+        # menhirGLR inherits menhirLib's pinned src, which predates the
+        # menhirGLR package; menhir builds fine without it.
+        menhirGLR = null;
+
+        # nixpkgs' suggest-menhirLib patch doesn't apply to the pinned
+        # menhir source (same reason the 4.14 menhir above drops it).
+        menhir = osuper.menhir.overrideAttrs (_: { patches = [ ]; });
+      }
+    );
+
   mkMerlinPackages =
     testOcaml:
     let
-      # nixpkgs does not yet provide an OCaml 5.4 package set at the pinned
-      # revision, so construct one around the compiler used to bootstrap
-      # OxCaml. Pin the plain pkgs.stdenv for this compiler rather than the
-      # variant stdenv: a clangStdenv-built compiler records `clang` as its C
-      # compiler, which isn't on PATH when the scope's packages build under
-      # the default gcc stdenv (e.g. findlib's `ocamlc -custom` link of
-      # ocamlfind). Pinning also keeps the dev-tool closure identical across
-      # oxcaml variants, so they share cached builds.
-      merlinBootOcaml = mkBootOcaml_5_4_0 pkgs.stdenv;
-      ocamlPackages =
-        (pkgs.ocaml-ng.mkOcamlPackages merlinBootOcaml).overrideScope (
-          _: osuper: {
-            dune_3 = dune;
-
-            # ounit2's own test suite has a flaky threads test that can hit
-            # its 600s timeout on loaded CI runners; skip upstream's tests.
-            ounit2 = osuper.ounit2.overrideAttrs (_: { doCheck = false; });
-
-            # Merlin relies on generated parser sources matching this version.
-            menhirLib = osuper.menhirLib.overrideAttrs (_: {
-              version = menhirVersion;
-              src = menhirSrc;
-            });
-
-            # menhirGLR inherits menhirLib's pinned src, which predates the
-            # menhirGLR package; menhir builds fine without it.
-            menhirGLR = null;
-
-            # nixpkgs' suggest-menhirLib patch doesn't apply to the pinned
-            # menhir source (same reason the 4.14 menhir above drops it).
-            menhir = osuper.menhir.overrideAttrs (_: { patches = [ ]; });
-
-            inherit (packages) merlin-lib dot-merlin-reader merlin;
-          }
-        );
+      ocamlPackages = bootOcamlPackages.overrideScope (
+        _: _: { inherit (packages) merlin-lib dot-merlin-reader merlin; }
+      );
 
       inherit (ocamlPackages) buildDunePackage;
       merlinSrc = "${src}/external/merlin";
@@ -250,7 +254,6 @@ let
           '';
           meta.mainProgram = "ocamlmerlin";
           passthru = {
-            inherit (ocamlPackages) findlib;
             devBuildInputs = [
               ocamlPackages.alcotest
               ocamlPackages.csexp
@@ -271,8 +274,8 @@ let
     in
     packages;
 
-  # Only passthru dev inputs and findlib are used here; neither depends on
-  # testOcaml (which only feeds the merlin package's check phase).
+  # Only the passthru dev-input lists are used here, which don't depend on the
+  # testOcaml argument (it only feeds the merlin package's check phase).
   merlinDev = (mkMerlinPackages ocaml_5_4_0).merlin;
 
   ppxDeriversSrc =
@@ -619,17 +622,16 @@ let
       '';
     };
 
-  mkInstalledLibraryConsumerCheck =
+  mkInstalledLibrariesCheck =
     oxcaml:
     stdenv.mkDerivation {
-      pname = "oxcaml-installed-library-consumers-check";
+      pname = "oxcaml-installed-libraries-check";
       inherit (oxcaml) version meta;
       inherit src;
 
-      # The compiler under test must not precede bootstrap findlib on PATH.
       nativeBuildInputs = [
-        ocaml_5_4_0
-        merlinDev.findlib
+        bootOcamlPackages.ocaml
+        bootOcamlPackages.findlib
         dune
       ];
 
@@ -638,9 +640,9 @@ let
         "SHELL=${stdenv.shell}"
         "REQUIRES_CONFIGURATION="
         "prefix=${oxcaml}"
+        "INSTALLED_LIBRARIES=shipped"
       ];
-      buildFlags = [ "test-installed-library-consumers" ];
-      OXCAML_EXPECT_SHIPPED_LIBRARIES = "1";
+      buildFlags = [ "test-installed-libraries" ];
 
       installPhase = ''
         runHook preInstall
@@ -882,7 +884,7 @@ stdenv.mkDerivation {
       mkJsooLibs
       mkJsooTest
       mkJsooSmokeTest
-      mkInstalledLibraryConsumerCheck
+      mkInstalledLibrariesCheck
       mkMerlinPackages
       ;
   };

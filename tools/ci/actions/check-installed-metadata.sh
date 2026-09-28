@@ -1,6 +1,25 @@
 #!/usr/bin/env bash
+
+#**************************************************************************#
+#*                                                                        *#
+#*                                 OCaml                                  *#
+#*                                                                        *#
+#*                  Jacob Van Buren, Jane Street, New York                *#
+#*                                                                        *#
+#*   Copyright 2026 Jane Street Group LLC                                 *#
+#*                                                                        *#
+#*   All rights reserved.  This file is distributed under the terms of    *#
+#*   the GNU Lesser General Public License version 2.1, with the          *#
+#*   special exception on linking described in the file LICENSE.          *#
+#*                                                                        *#
+#**************************************************************************#
+
+# Check installed META files and run native toplevel, JIT and eval consumers.
+# Usage: check-installed-metadata.sh PREFIX
+
 set -euo pipefail
 
+[ -d "$1/lib/ocaml" ] || { echo "No install at $1" >&2; exit 1; }
 prefix=$(cd "$1" && pwd)
 script_dir=$(cd "$(dirname "$0")" && pwd)
 work=$(mktemp -d)
@@ -9,10 +28,9 @@ trap 'rm -rf "$work"' EXIT
 # Findlib uses the bootstrap compiler's ABI, not the installed compiler's.
 cp "$script_dir/check_installed_metadata.ml" "$work/"
 cd "$work"
+echo 'Checking installed META paths and dependencies'
 ocamlfind ocamlc -package findlib,unix -linkpkg check_installed_metadata.ml \
   -o check_metadata.exe
-./check_metadata.exe "$prefix/lib/ocaml" meta-packages.txt \
-  "$script_dir/installed-unreferenced-archives.txt"
 
 cat > findlib.conf <<EOF
 path="$prefix/lib:$prefix/lib/ocaml"
@@ -21,42 +39,29 @@ ocamlopt="$prefix/bin/ocamlopt"
 ldconf="ignore"
 EOF
 export OCAMLFIND_CONF="$work/findlib.conf"
-export OCAMLLIB="$prefix/lib/ocaml"
 unset CAMLLIB OCAMLPATH OCAMLFIND_COMMANDS OCAMLFIND_TOOLCHAIN
+# The bootstrap helper must not load stubs from the target's OCAMLLIB.
+./check_metadata.exe "$prefix" "$script_dir/installed-unreferenced-archives.txt"
+export OCAMLLIB="$prefix/lib/ocaml"
 
-while IFS=$'\t' read -r name kind; do
-  case "$kind" in
-    ppx_deriver|ppx_rewriter) predicate=ppx_driver ;;
-    *) predicate= ;;
-  esac
-  for mode in byte native; do
-    predicates="$mode"
-    [ -z "$predicate" ] || predicates="$predicate,$mode"
-    ocamlfind query -recursive -predicates "$predicates" "$name" > /dev/null
-  done
-done < meta-packages.txt
+smoke() {
+  local package=$1 source=$2
+  shift 2
+  echo "Checking native consumer of $package"
+  printf '%s\n' "$source" > main.ml
+  ocamlfind ocamlopt -package "$package" -linkpkg "$@" main.ml -o smoke.exe
+  ./smoke.exe
+}
 
-cat > native_toplevel.ml <<'EOF'
-let () =
-  Opttoploop.initialize_toplevel_env ();
-  print_endline "native-toplevel linked and ran"
-EOF
-ocamlfind ocamlopt -package compiler-libs.native-toplevel -linkpkg \
-  native_toplevel.ml -o smoke.exe
-./smoke.exe
-
-cat > jit_link.ml <<'EOF'
-let () =
-  Jit.init_top ();
-  print_endline "ocaml-jit linked and ran"
-EOF
-ocamlfind ocamlopt -package ocaml-jit -linkpkg jit_link.ml -o smoke.exe
-./smoke.exe
-
-cat > eval_link.ml <<'EOF'
-let () = print_endline "eval linked and ran"
-EOF
-ocamlfind ocamlopt -package eval -linkpkg \
+smoke compiler-libs.native-toplevel \
+  'let () = Opttoploop.initialize_toplevel_env ()'
+smoke ocaml-jit 'let () = Jit.init_top ()'
+# Check eval requires ocaml-jit: -uses-metaprogramming would mask its absence.
+ocamlfind query -recursive -predicates native -format '%p' eval \
+  | grep -Fxq ocaml-jit || {
+    echo 'eval: missing ocaml-jit dependency' >&2
+    exit 1
+  }
+smoke eval 'let () = ()' \
   -passopt -extension -passopt runtime_metaprogramming \
-  -passopt -uses-metaprogramming eval_link.ml -o smoke.exe
-./smoke.exe
+  -passopt -uses-metaprogramming
