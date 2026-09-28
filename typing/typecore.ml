@@ -13305,11 +13305,7 @@ let report_too_many_arg_error ~funct ~func_ty ~previous_arg_loc
       loc_end = cnum_offset ~+1 arg_end;
       loc_ghost = false }
   in
-  errorf ~loc:app_loc
-    "@[<v>@[<2>%a@ %a@]\
-     @ It is applied to too many arguments@]"
-    (report_this_texp_has_type (Some "function")) funct
-    Printtyp.type_expr func_ty
+  errorf ~loc:extra_arg_loc "This extra argument is not expected."
     ~sub:(
       let semicolon =
         if returns_unit then
@@ -13317,7 +13313,10 @@ let report_too_many_arg_error ~funct ~func_ty ~previous_arg_loc
         else []
       in
       semicolon @
-      [msg ~loc:extra_arg_loc "This extra argument is not expected."]
+      [msg ~loc:app_loc
+         "@[<v>@[<2>%a@ %a@]@ It is applied to too many arguments@]"
+         (report_this_texp_has_type (Some "function")) funct
+         Printtyp.type_expr func_ty]
     )
 
 let msg = Fmt.doc_printf
