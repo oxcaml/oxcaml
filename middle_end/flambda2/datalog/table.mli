@@ -13,10 +13,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module Type : sig
-  type (_, _) eq = Equal : ('a, 'a) eq
-end
-
 type _ result_repr
 
 val unit_repr : unit result_repr
