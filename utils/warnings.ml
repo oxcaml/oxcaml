@@ -171,6 +171,7 @@ type t =
   | Useless_valpoly                         (* 219 *)
   | Redundant_modality                      (* 220 *)
   | Unused_alert_disable of string          (* 221 *)
+  | Tmc_breaks_tailcall_region              (* 222 *)
 
 (* If you remove a warning, leave a hole in the numbering.  NEVER change
    the numbers of existing warnings.
@@ -274,6 +275,7 @@ let number = function
   | Useless_valpoly -> 219
   | Redundant_modality -> 220
   | Unused_alert_disable _ -> 221
+  | Tmc_breaks_tailcall_region -> 222
 ;;
 (* DO NOT REMOVE the ;; above: it is used by
    the testsuite/ests/warnings/mnemonics.mll test to determine where
@@ -715,6 +717,12 @@ let descriptions = [
     names = ["unused-alert-disable"];
     description = "An attribute disabling an alert did not suppress any\n\
     \    occurrence of that alert.";
+    since = since 5 4 };
+  { number = 222;
+    names = ["tmc-breaks-tailcall-region"];
+    description = "A tail call is turned into a non-tail call by the\n\
+    \    @tail_mod_cons transformation, because it is enclosed in a\n\
+    \    local-allocation region that cannot be closed at the call.";
     since = since 5 4 };
 ]
 
@@ -1499,6 +1507,17 @@ let message = function
            make@ its@ non-tailness@ explicit.@]"
         Style.inline_code "[@tail_mod_cons]"
         Style.inline_code "[@tailcall false]"
+  | Tmc_breaks_tailcall_region ->
+      msg "This call@ is@ in@ tail-modulo-cons@ position@ in@ a@ TMC@ \
+           function,@ but@ it@ is@ enclosed@ in@ a@ local-allocation@ \
+           region@ that@ cannot@ be@ closed@ as@ part@ of@ the@ call,@ so@ \
+           the@ call@ will@ not@ be@ transformed@ into@ a@ tail@ call@ and@ \
+           the@ function@ does@ not@ run@ in@ constant@ stack@ space.@ \
+           @[This@ happens@ when@ an@ argument@ passed@ at@ mode@ %a@ may@ \
+           point@ to@ a@ value@ allocated@ in@ the@ region.@ Parameters,@ \
+           non-allocating@ projections@ of@ parameters,@ immediates,@ and@ \
+           heap@ allocations@ are@ allowed.@]"
+        Style.inline_code "local"
   | Generative_application_expects_unit ->
       msg "A generative functor@ \
            should be applied@ to@ %a;@ using@ %a@ is deprecated."

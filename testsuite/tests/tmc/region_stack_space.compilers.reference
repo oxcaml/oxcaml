@@ -1,0 +1,35 @@
+File "region_stack_space.ml", line 68, characters 25-49:
+68 |   | hd :: tl -> f' hd :: map_using_local tl ~f:f'
+                              ^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 222 [tmc-breaks-tailcall-region]: This call is in tail-modulo-cons
+  position in a TMC function, but it is enclosed in a local-allocation region
+  that cannot be closed as part of the call, so the call will not be
+  transformed into a tail call and the function does not run in constant
+  stack space.
+  This happens when an argument passed at mode local may point to a value
+  allocated in the region. Parameters, non-allocating projections of
+  parameters, immediates, and heap allocations are allowed.
+
+File "region_stack_space.ml", line 137, characters 37-75:
+137 |   | hd :: tl -> f (hd + fst prev) :: map_pass_local (stack_ (hd, hd)) tl ~f
+                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 222 [tmc-breaks-tailcall-region]: This call is in tail-modulo-cons
+  position in a TMC function, but it is enclosed in a local-allocation region
+  that cannot be closed as part of the call, so the call will not be
+  transformed into a tail call and the function does not run in constant
+  stack space.
+  This happens when an argument passed at mode local may point to a value
+  allocated in the region. Parameters, non-allocating projections of
+  parameters, immediates, and heap allocations are allowed.
+
+File "region_stack_space.ml", line 148, characters 24-51:
+148 |   | hd :: tl -> f hd :: map_float_field r r.v tl ~f
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 222 [tmc-breaks-tailcall-region]: This call is in tail-modulo-cons
+  position in a TMC function, but it is enclosed in a local-allocation region
+  that cannot be closed as part of the call, so the call will not be
+  transformed into a tail call and the function does not run in constant
+  stack space.
+  This happens when an argument passed at mode local may point to a value
+  allocated in the region. Parameters, non-allocating projections of
+  parameters, immediates, and heap allocations are allowed.
