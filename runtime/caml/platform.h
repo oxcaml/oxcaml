@@ -445,7 +445,19 @@ uintnat caml_mem_round_up_mapping_size(uintnat size);
    caml_plat_pagesize. The size given to caml_mem_unmap and caml_mem_decommit
    must match the size given to caml_mem_map/caml_mem_commit for mem.
 */
-enum { CAML_MAP_RESERVE_ONLY = 1 << 0, CAML_MAP_NO_HUGETLB = 1 << 1 };
+/* Memory returned by caml_mem_map is zero-filled unless
+   CAML_MAP_RESERVE_ONLY is given.
+
+   CAML_MAP_NO_HUGETLB specifies not to request hugepages.
+
+   CAML_MAP_POPULATE requests immediate mapping and zeroing, where the
+   OS supports it, rather than on first touch; use it for mappings
+   that will be written all over right away. */
+enum {
+  CAML_MAP_RESERVE_ONLY = 1 << 0,
+  CAML_MAP_NO_HUGETLB = 1 << 1,
+  CAML_MAP_POPULATE = 1 << 2
+};
 void* caml_mem_map(uintnat size, uintnat flags, const char* name);
 void* caml_mem_commit(void* mem, uintnat size, const char* name);
 void caml_mem_decommit(void* mem, uintnat size, const char* name);
