@@ -1283,7 +1283,7 @@ let to_seq_rev_reentrant a =
   in
   aux (length a - 1)
 
-external unsafe_iarray_of_array : 'a array -> 'a iarray @@ portable = "%opaque"
+external unsafe_iarray_of_array : 'a array -> 'a iarray @@ stateless = "%opaque"
 
 let unsafe_to_iarray ~capacity (f : 'a t -> unit) =
   let a = create () in

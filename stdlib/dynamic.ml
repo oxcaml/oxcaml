@@ -14,8 +14,8 @@
 
 type 'a t : value mod everything with 'a @@ contended portable
 
-external make : unit -> 'a t @@ portable = "caml_dynamic_make"
-external get : 'a t -> 'a or_null @ contended portable @@ portable =
+external make : unit -> 'a t @@ stateless = "caml_dynamic_make"
+external get : 'a t -> 'a or_null @ contended portable @@ reading portable =
   "caml_dynamic_get" [@@noalloc]
 external push : 'a t -> 'a @ contended portable -> unit @@ portable =
   "caml_dynamic_push"
