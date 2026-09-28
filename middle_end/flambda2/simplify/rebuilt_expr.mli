@@ -36,6 +36,8 @@ val to_expr : t -> Are_rebuilding_terms.t -> Expr.t
 
 val to_apply_cont : t -> Apply_cont.t option
 
+val is_cold : t -> bool
+
 val can_be_removed_as_invalid : t -> Are_rebuilding_terms.t -> bool
 
 val term_not_rebuilt : t
@@ -50,11 +52,11 @@ val create_let :
   free_names_of_body:Name_occurrences.t ->
   t
 
-val create_apply : Are_rebuilding_terms.t -> Apply.t -> t
+val create_apply : Are_rebuilding_terms.t -> is_cold:bool -> Apply.t -> t
 
 (** [Apply_cont] expressions are always rebuilt to allow optimisations in
     [Simplify_switch_expr] and [Simplify_let_cont_expr]. *)
-val create_apply_cont : Apply_cont.t -> t
+val create_apply_cont : is_cold:bool -> Apply_cont.t -> t
 
 module Function_params_and_body : sig
   type t
@@ -128,7 +130,7 @@ val create_recursive_let_cont :
   body:t ->
   t
 
-val create_switch : Are_rebuilding_terms.t -> Switch_expr.t -> t
+val create_switch : Are_rebuilding_terms.t -> is_cold:bool -> Switch_expr.t -> t
 
 val create_invalid : Invalid.t -> t
 
