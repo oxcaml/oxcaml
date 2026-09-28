@@ -52,7 +52,7 @@ let use modname field =
        | Some lid -> Ldot (Location.mknoloc lid, Location.mknoloc field)
      in
      match Env.find_value_by_name_lazy lid env with
-     | p, _ -> transl_value_path Loc_unknown env p
+     | p, _ -> Typeopt.transl_value_path Loc_unknown env p
      | exception Not_found ->
        fatal_errorf "Primitive CamlinternalQuote.%s.%s not found." modname field)
 

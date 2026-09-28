@@ -102,7 +102,7 @@ let ( rev_list_to_list,
       rev_dlist_concat_iterate_up,
       rev_dlist_concat_iterate_down ) =
   let transl name =
-    lazy (Lambda.transl_prim "CamlinternalComprehension" name)
+    lazy (Typeopt.transl_prim "CamlinternalComprehension" name)
   in
   ( transl "rev_list_to_list",
     transl "rev_dlist_concat_map",

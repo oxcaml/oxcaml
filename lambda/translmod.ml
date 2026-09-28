@@ -119,8 +119,8 @@ let rec apply_coercion loc strict restr arg =
       arg
   | Tcoerce_structure { input_repr; output_repr; pos_cc_list; id_pos_list } ->
       name_lambda strict arg Lambda.layout_module (fun id ->
-        let input_repr = transl_module_representation input_repr in
-        let output_repr = transl_module_representation output_repr in
+        let input_repr = Typeopt.transl_module_representation input_repr in
+        let output_repr = Typeopt.transl_module_representation output_repr in
         let get_field pos =
           if pos < 0 then lambda_unit
           else
@@ -157,7 +157,7 @@ let rec apply_coercion loc strict restr arg =
         None
       |> apply_kindtemplate_coercion loc pc_kindtemplate
   | Tcoerce_alias (env, path, cc) ->
-      let lam = transl_module_path loc env path in
+      let lam = Typeopt.transl_module_path loc env path in
       name_lambda strict arg Lambda.layout_module
         (fun _ -> apply_coercion loc Alias cc lam)
   | Tcoerce_invalid -> Misc.fatal_error "Translmod: invalid coercion"
@@ -348,7 +348,7 @@ let record_primitive = function
 
 (* Utilities for compiling "module rec" definitions *)
 
-let mod_prim = Lambda.transl_prim "CamlinternalMod"
+let mod_prim = Typeopt.transl_prim "CamlinternalMod"
 
 let undefined_location loc =
   let (fname, line, char) = Location.get_pos_info loc.Location.loc_start in
@@ -712,7 +712,7 @@ and transl_module ~scopes cc rootpath mexp =
   match mexp.mod_desc with
   | Tmod_ident (path,_) ->
       apply_coercion loc Strict cc
-        (transl_module_path loc mexp.mod_env path)
+        (Typeopt.transl_module_path loc mexp.mod_env path)
   | Tmod_structure str ->
       let lam, _repr = transl_struct ~scopes loc [] cc rootpath str in
       lam
@@ -773,7 +773,9 @@ and transl_structure ~scopes loc
         match cc with
           Tcoerce_none ->
             let ids, sorts = List.split (List.rev fields) in
-            let repr = transl_module_representation (Array.of_list sorts) in
+            let repr =
+              Typeopt.transl_module_representation (Array.of_list sorts)
+            in
             Lprim(block_of_module_representation ~loc:(to_location loc) repr,
                   List.map (fun id -> Lvar id) ids, loc),
               repr
@@ -800,7 +802,9 @@ and transl_structure ~scopes loc
                 (fun (id, _) s -> Ident.Set.add id s)
                 fields Ident.Set.empty
             in
-            let output_repr = transl_module_representation output_repr in
+            let output_repr =
+              Typeopt.transl_module_representation output_repr
+            in
             let lam =
               Lprim(block_of_module_representation
                       ~loc:(to_location loc) output_repr,
@@ -967,7 +971,7 @@ and transl_structure ~scopes loc
           let modl = incl.incl_mod in
           let mid = Ident.create_local "include" in
           let mid_duid = Lambda.debug_uid_none in
-          let incl_repr = transl_module_representation incl.incl_repr in
+          let incl_repr = Typeopt.transl_module_representation incl.incl_repr in
           let rec rebind_idents pos newfields = function
               [] ->
                 transl_structure ~scopes loc newfields cc rootpath final_env rem
@@ -1022,7 +1026,9 @@ and transl_structure ~scopes loc
               in
               let mid = Ident.create_local "open" in
               let mid_duid = Lambda.debug_uid_none in
-              let open_repr = transl_module_representation od.open_items_repr in
+              let open_repr =
+                Typeopt.transl_module_representation od.open_items_repr
+              in
               let rec rebind_idents pos newfields = function
                   [] -> transl_structure
                           ~scopes loc newfields cc rootpath final_env rem
@@ -1059,7 +1065,7 @@ and transl_structure ~scopes loc
 (* construct functor application in "include functor" case *)
 and transl_include_functor ~generative ~input_repr ~yielding modl params scopes
       loc =
-  let input_repr = transl_module_representation input_repr in
+  let input_repr = Typeopt.transl_module_representation input_repr in
   let inlined_attribute =
     Translattribute.get_inlined_attribute_on_module modl
   in
@@ -1425,7 +1431,7 @@ let transl_toplevel_item ~scopes item =
       in
       let mid = Ident.create_local "include" in
       let mid_duid = Lambda.debug_uid_none in
-      let incl_repr = transl_module_representation incl.incl_repr in
+      let incl_repr = Typeopt.transl_module_representation incl.incl_repr in
       let rec set_idents pos = function
         [] ->
           lambda_unit
@@ -1450,7 +1456,9 @@ let transl_toplevel_item ~scopes item =
           let ids = bound_value_identifiers od.open_bound_items in
           let mid = Ident.create_local "open" in
           let mid_duid = Lambda.debug_uid_none in
-          let open_repr = transl_module_representation od.open_items_repr in
+          let open_repr =
+            Typeopt.transl_module_representation od.open_items_repr
+          in
           let rec set_idents pos = function
               [] ->
                 lambda_unit
@@ -1906,7 +1914,7 @@ let transl_functorization compilation_unit
     match (coercion : Typedtree.module_coercion) with
     | Tcoerce_none -> Module_value_only { field_count = List.length fields }
     | Tcoerce_structure { output_repr; _ } ->
-        transl_module_representation output_repr
+        Typeopt.transl_module_representation output_repr
     | Tcoerce_functor _ | Tcoerce_primitive _ | Tcoerce_alias _
     | Tcoerce_kindtemplate _ | Tcoerce_invalid ->
         Misc.fatal_error
