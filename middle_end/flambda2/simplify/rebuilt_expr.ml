@@ -35,6 +35,8 @@ type t =
 
 let is_cold { is_cold; _ } = is_cold
 
+let mark_as_cold t = { t with is_cold = true }
+
 (* Rebuilt terms with no [contents_hash] cannot be deduplicated (e.g. because
    they contain not-shareable subterms such as sets of closures). We also want
    to clear it for terms that are "too big": sharing those is unlikely to

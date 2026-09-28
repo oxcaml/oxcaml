@@ -38,6 +38,8 @@ val to_apply_cont : t -> Apply_cont.t option
 
 val is_cold : t -> bool
 
+val mark_as_cold : t -> t
+
 val can_be_removed_as_invalid : t -> Are_rebuilding_terms.t -> bool
 
 val term_not_rebuilt : t
