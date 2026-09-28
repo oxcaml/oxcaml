@@ -82,6 +82,7 @@ and named =
   | Simple of Simple.t
   | Prim of Flambda_primitive.t * Debuginfo.t
   | Set_of_closures of Set_of_closures.t * Alloc_mode.For_allocations.t
+  | Unboxed_closure of { closure : Simple.t; first_unarized_parameters : Simple.t list }
   | Static_consts of static_const_group
   | Rec_info of Rec_info_expr.t
 
@@ -183,6 +184,12 @@ and apply_renaming_named (named : named) renaming : named =
     if set == set' && alloc_mode == alloc_mode'
     then named
     else Set_of_closures (set', alloc_mode')
+  | Unboxed_closure { closure; first_unarized_parameters } ->
+    let closure' = Simple.apply_renaming closure renaming in
+    let first_unarized_parameters' = Simple.List.apply_renaming first_unarized_parameters renaming in
+    if closure == closure' && first_unarized_parameters == first_unarized_parameters'
+    then named
+    else Unboxed_closure { closure = closure'; first_unarized_parameters = first_unarized_parameters' }
   | Static_consts consts ->
     let consts' = apply_renaming_static_const_group consts renaming in
     if consts == consts' then named else Static_consts consts'
@@ -400,6 +407,10 @@ and ids_for_export_named t =
     Ids_for_export.union
       (Set_of_closures.ids_for_export set)
       (Alloc_mode.For_allocations.ids_for_export alloc_mode)
+  | Unboxed_closure { closure; first_unarized_parameters } ->
+    List.fold_left Ids_for_export.add_simple
+      (Ids_for_export.from_simple closure)
+      first_unarized_parameters
   | Static_consts consts -> ids_for_export_static_const_group consts
   | Rec_info rec_info_expr -> Rec_info_expr.ids_for_export rec_info_expr
 
@@ -472,7 +483,7 @@ let _shape_colour descr =
 let rec named_must_be_static_consts (named : named) =
   match named with
   | Static_consts consts -> consts
-  | Simple _ | Prim _ | Set_of_closures _ | Rec_info _ ->
+  | Simple _ | Prim _ | Set_of_closures _ | Unboxed_closure _ | Rec_info _ ->
     Misc.fatal_errorf "Must be [Static_consts], but is not: %a" print_named
       named
 
@@ -850,7 +861,7 @@ and print_let_expr ppf ({ let_abst = _; defining_expr } as t) : unit =
     else
       match (defining_expr : named) with
       | Rec_info _ -> Flambda_colours.depth_variable
-      | Simple _ | Prim _ | Set_of_closures _ | Static_consts _ ->
+      | Simple _ | Prim _ | Set_of_closures _ | Unboxed_closure _ | Static_consts _ ->
         Flambda_colours.variable
   in
   let rec let_body (expr : expr) =
@@ -905,6 +916,9 @@ and print_named ppf (t : named) =
         Format.fprintf ppf "@[<hov 1>(alloc_mode@ %a)@]@ "
           Alloc_mode.For_allocations.print alloc_mode)
       ppf set_of_closures
+  | Unboxed_closure { closure; first_unarized_parameters } ->
+    fprintf ppf "@[<hov 1>(%a specialised to %a)@]"
+      Simple.print closure Simple.List.print first_unarized_parameters
   | Static_consts consts -> print_static_const_group ppf consts
   | Rec_info rec_info_expr -> Rec_info_expr.print ppf rec_info_expr
 
@@ -1156,6 +1170,7 @@ module Let_expr = struct
     | Prim _, Singleton _
     | Simple _, Singleton _
     | Rec_info _, Singleton _
+    | Unboxed_closure _, Singleton _
     | Set_of_closures _, Set_of_closures _ ->
       ()
     | Set_of_closures _, Singleton _ ->
@@ -1171,7 +1186,7 @@ module Let_expr = struct
       Misc.fatal_errorf
         "Cannot bind a [Static_const] to a [Singleton]:@ %a =@ %a"
         Bound_pattern.print bound_pattern print_named defining_expr
-    | (Simple _ | Prim _ | Set_of_closures _ | Rec_info _), Static _ ->
+    | (Simple _ | Prim _ | Set_of_closures _ | Unboxed_closure _ | Rec_info _), Static _ ->
       Misc.fatal_errorf
         "Cannot bind a non-[Static_const] to [Symbols]:@ %a =@ %a"
         Bound_pattern.print bound_pattern print_named defining_expr);
@@ -1398,6 +1413,9 @@ module Named = struct
   let create_set_of_closures ~alloc_mode set_of_closures =
     Set_of_closures (set_of_closures, alloc_mode)
 
+  let create_unboxed_closure ~closure ~first_unarized_parameters =
+    Unboxed_closure { closure; first_unarized_parameters }
+
   let create_static_consts consts = Static_consts consts
 
   let create_rec_info rec_info_expr = Rec_info rec_info_expr
@@ -1410,6 +1428,9 @@ module Named = struct
       Name_occurrences.union
         (Set_of_closures.free_names set)
         (Alloc_mode.For_allocations.free_names alloc_mode)
+    | Unboxed_closure { closure; first_unarized_parameters } ->
+      Name_occurrences.union (Simple.free_names closure)
+        (Simple.List.free_names first_unarized_parameters)
     | Static_consts consts -> Static_const_group.free_names consts
     | Rec_info rec_info_expr -> Rec_info_expr.free_names rec_info_expr
 
@@ -1422,6 +1443,7 @@ module Named = struct
     | Simple _ -> true
     | Prim (prim, _) -> Flambda_primitive.at_most_generative_effects prim
     | Set_of_closures _ -> true
+    | Unboxed_closure _ -> true
     | Static_consts _ -> true
     | Rec_info _ -> true
 
@@ -1473,25 +1495,26 @@ module Named = struct
     | Simple s -> Simple.kind s
     | Prim (p, _dbg) -> Flambda_primitive.result_kind' p
     | Rec_info _ -> K.rec_info
+    | Unboxed_closure _ -> K.value
     | Set_of_closures _ | Static_consts _ ->
       Misc.fatal_errorf "No valid kind for non-singleton named %a" print t
 
   let is_dynamically_allocated_set_of_closures t =
     match t with
     | Set_of_closures _ -> true
-    | Simple _ | Prim _ | Static_consts _ | Rec_info _ -> false
+    | Simple _ | Prim _ | Static_consts _ | Unboxed_closure _ | Rec_info _ -> false
 
   let is_static_consts t =
     match t with
     | Static_consts _ -> true
-    | Simple _ | Prim _ | Set_of_closures _ | Rec_info _ -> false
+    | Simple _ | Prim _ | Set_of_closures _ | Unboxed_closure _ | Rec_info _ -> false
 
   let must_be_static_consts = named_must_be_static_consts
 
   let fold_code_and_sets_of_closures t ~init ~f_code ~f_set =
     match t with
     | Set_of_closures (s, _alloc_mode) -> f_set init s
-    | Rec_info _ | Simple _ | Prim _ -> init
+    | Rec_info _ | Simple _ | Prim _ | Unboxed_closure _ -> init
     | Static_consts group ->
       Static_const_group.to_list group
       |> List.fold_left

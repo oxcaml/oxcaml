@@ -187,6 +187,9 @@ let simplify_named0 dacc (bound_pattern : Bound_pattern.t) (named : Named.t)
     ok
       (Simplify_set_of_closures.simplify_non_lifted_set_of_closures dacc
          bound_pattern set_of_closures alloc_mode ~simplify_function_body)
+  | Unboxed_closure { closure; first_unarized_parameters } ->
+      ok (Simplify_set_of_closures.specialise_closure dacc bound_pattern closure
+            first_unarized_parameters ~simplify_function_body)
   | Static_consts static_consts ->
     let bound_static = Bound_pattern.must_be_static bound_pattern in
     let binds_symbols = Bound_static.binds_symbols bound_static in
@@ -265,6 +268,9 @@ let removed_operations ~min_name_mode ~(original : Named.t) dacc
         || Simplify_named_result.no_bindings result
       then Removed_operations.alloc
       else zero
+    | Unboxed_closure _ ->
+      (* No runtime instructions *)
+      zero
     | Static_consts _ ->
       (* There are no operations to remove in a [Static_consts] binding. *)
       zero
@@ -304,7 +310,7 @@ let removed_operations ~min_name_mode ~(original : Named.t) dacc
               c = 0
             | Keep_binding
                 { simplified_defining_expr =
-                    { named = Simple _ | Set_of_closures _ | Rec_info _; _ };
+                    { named = Simple _ | Set_of_closures _ | Unboxed_closure _ | Rec_info _; _ };
                   _
                 }
             | Delete_binding _ ->

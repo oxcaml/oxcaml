@@ -51,3 +51,12 @@ val simplify_static_stub_function :
   all_code:Code.t Code_id.Map.t ->
   simplify_function_body:Simplify_common.simplify_function_body ->
   Rebuilt_static_const.t * Downwards_acc.t
+
+(** Specialise a function (given by its closure) to the given parameters *)
+val specialise_closure :
+  Downwards_acc.t ->
+  Bound_pattern.t ->
+  Simple.t ->
+  Simple.t list ->
+  simplify_function_body:Simplify_common.simplify_function_body ->
+  Simplify_named_result.t
