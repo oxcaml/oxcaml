@@ -28,7 +28,7 @@ type t =
   | Missing_code
   | Definition_says_not_to_inline
   | In_a_stub
-  | Doing_speculative_inlining
+  | Doing_speculative_inlining of { charged_code_size : Code_size.t }
   | Argument_types_not_useful
   | Unrolling_depth_exceeded
   | Max_inlining_depth_exceeded
@@ -37,6 +37,7 @@ type t =
   | Forward_inlined_attribute_but_nothing_to_forward
   | Speculatively_not_inline of
       { cost_metrics : Cost_metrics.t;
+        cost_metrics_of_lifted_constants : Cost_metrics.t;
         evaluated_to : float;
         threshold : float;
         is_a_functor : bool
@@ -48,6 +49,7 @@ type t =
   | Definition_says_inline of { was_inline_always : bool }
   | Speculatively_inline of
       { cost_metrics : Cost_metrics.t;
+        cost_metrics_of_lifted_constants : Cost_metrics.t;
         evaluated_to : float;
         threshold : float;
         is_a_functor : bool
@@ -60,8 +62,12 @@ let [@ocamlformat "disable"] rec print ppf t =
   | Definition_says_not_to_inline ->
     Format.fprintf ppf "Definition_says_not_to_inline"
   | In_a_stub -> Format.fprintf ppf "In_a_stub"
-  | Doing_speculative_inlining ->
-    Format.fprintf ppf "Doing_speculative_inlining"
+  | Doing_speculative_inlining { charged_code_size } ->
+    Format.fprintf ppf
+      "@[<hov 1>(Doing_speculative_inlining@ \
+        @[<hov 1>(charged_code_size@ %a)@])\
+        @]"
+      Code_size.print charged_code_size
   | Argument_types_not_useful ->
     Format.fprintf ppf "Argument_types_not_useful"
   | Unrolling_depth_exceeded ->
@@ -92,29 +98,33 @@ let [@ocamlformat "disable"] rec print ppf t =
       unroll_to
   | Continue_unrolling ->
     Format.fprintf ppf "Continue_unrolling"
-  | Speculatively_not_inline { cost_metrics; threshold; evaluated_to;
-                                is_a_functor; } ->
+  | Speculatively_not_inline { cost_metrics; cost_metrics_of_lifted_constants;
+                                threshold; evaluated_to; is_a_functor; } ->
     Format.fprintf ppf
       "@[<hov 1>(Speculatively_not_inline@ \
         @[<hov 1>(cost_metrics@ %a)@]@ \
+        @[<hov 1>(cost_metrics_of_lifted_constants@ %a)@]@ \
         @[<hov 1>(evaluated_to@ %f)@]@ \
         @[<hov 1>(threshold@ %f)@]@ \
         @[<hov 1>(is_a_functor@ %b)@]\
         )@]"
       Cost_metrics.print cost_metrics
+      Cost_metrics.print cost_metrics_of_lifted_constants
       evaluated_to
       threshold
       is_a_functor
-  | Speculatively_inline { cost_metrics; threshold; evaluated_to;
-                            is_a_functor; } ->
+  | Speculatively_inline { cost_metrics; cost_metrics_of_lifted_constants;
+                            threshold; evaluated_to; is_a_functor; } ->
     Format.fprintf ppf
       "@[<hov 1>(Speculatively_inline@ \
         @[<hov 1>(cost_metrics@ %a)@]@ \
+        @[<hov 1>(cost_metrics_of_lifted_constants@ %a)@]@ \
         @[<hov 1>(evaluated_to@ %f)@]@ \
         @[<hov 1>(threshold@ %f)@]@ \
         @[<hov 1>(is_a_functor@ %b)@]\
         )@]"
       Cost_metrics.print cost_metrics
+      Cost_metrics.print cost_metrics_of_lifted_constants
       evaluated_to
       threshold
       is_a_functor
@@ -129,7 +139,7 @@ type can_inline =
 
 let rec can_inline (t : t) : can_inline =
   match t with
-  | Missing_code | In_a_stub | Doing_speculative_inlining
+  | Missing_code | In_a_stub | Doing_speculative_inlining _
   | Max_inlining_depth_exceeded | Recursion_depth_exceeded
   | Speculatively_not_inline _ | Definition_says_not_to_inline
   | Argument_types_not_useful ->
@@ -178,8 +188,15 @@ let rec report_reason fmt t =
     Format.fprintf fmt
       "this@ function@ is@ being@ called@ inside@ of@ a@ stub;@ inlining@ is@ \
        not@ performed@ inside@ stubs@ (until@ they@ are@ inlined)"
-  | Doing_speculative_inlining ->
-    Format.fprintf fmt "because@ speculative@ inlining@ is@ in@ progress"
+  | Doing_speculative_inlining { charged_code_size } ->
+    if Code_size.equal charged_code_size Code_size.zero
+    then Format.fprintf fmt "speculative@ inlining@ is@ in@ progress"
+    else
+      Format.fprintf fmt
+        "speculative@ inlining@ is@ in@ progress;@ an@ estimate@ of@ the@ \
+         callee's@ code@ size@ (%a)@ was@ charged@ to@ the@ enclosing@ \
+         speculation"
+        Code_size.print charged_code_size
   | Argument_types_not_useful ->
     Format.fprintf fmt
       "there@ was@ no@ useful@ information@ about@ the@ arguments"
@@ -216,22 +233,49 @@ let rec report_reason fmt t =
        definition@ site (annotated@ by@ [@inlined always]@ or@ determined@ to@ \
        be@ small@ enough)"
   | Speculatively_not_inline
-      { cost_metrics; evaluated_to; threshold; is_a_functor } ->
+      { cost_metrics;
+        cost_metrics_of_lifted_constants;
+        evaluated_to;
+        threshold;
+        is_a_functor
+      } ->
     Format.fprintf fmt
       "the@ %s@ was@ not@ inlined@ after@ speculation@ as@ its@ cost@ metrics \
-       were=%a,@ which@ was@ evaluated@ to@ %f > threshold %f"
+       were=%a@ (of@ which@ lifted@ constants:@ %a),@ which@ was@ evaluated@ \
+       to@ %f > threshold %f"
       (if is_a_functor then "functor" else "function")
-      Cost_metrics.print cost_metrics evaluated_to threshold
-  | Speculatively_inline { cost_metrics; evaluated_to; threshold; is_a_functor }
-    ->
+      Cost_metrics.print cost_metrics Cost_metrics.print
+      cost_metrics_of_lifted_constants evaluated_to threshold
+  | Speculatively_inline
+      { cost_metrics;
+        cost_metrics_of_lifted_constants;
+        evaluated_to;
+        threshold;
+        is_a_functor
+      } ->
     Format.fprintf fmt
       "the@ %s@ was@ inlined@ after@ speculation@ as@ its@ cost@ metrics \
-       were=%a,@ which@ was@ evaluated@ to@ %f <= threshold %f"
+       were=%a@ (of@ which@ lifted@ constants:@ %a),@ which@ was@ evaluated@ \
+       to@ %f <= threshold %f"
       (if is_a_functor then "functor" else "function")
-      Cost_metrics.print cost_metrics evaluated_to threshold
+      Cost_metrics.print cost_metrics Cost_metrics.print
+      cost_metrics_of_lifted_constants evaluated_to threshold
   | Jsir_inlining_disabled ->
     Format.fprintf fmt
       "function@ inlining@ is@ disabled@ for@ Js_of_ocaml@ translation"
+
+let charged_code_size (t : t) =
+  match t with
+  | Doing_speculative_inlining { charged_code_size } -> charged_code_size
+  | Missing_code | Definition_says_not_to_inline | In_a_stub
+  | Argument_types_not_useful | Unrolling_depth_exceeded
+  | Max_inlining_depth_exceeded | Recursion_depth_exceeded
+  | Never_inlined_attribute | Forward_inlined_attribute_but_nothing_to_forward
+  | Speculatively_not_inline _ | Attribute_always
+  | Replay_history_says_must_inline _ | Begin_unrolling _ | Continue_unrolling
+  | Definition_says_inline _ | Speculatively_inline _ | Jsir_inlining_disabled
+    ->
+    Code_size.zero
 
 let report fmt t =
   Format.fprintf fmt

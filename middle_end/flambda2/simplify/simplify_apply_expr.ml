@@ -212,7 +212,10 @@ let rebuild_non_inlined_direct_full_application apply ~use_id ~exn_cont_use_id
   after_rebuild expr uacc
 
 type inlining_decision =
-  | Do_not_inline of { erase_attribute : bool }
+  | Do_not_inline of
+      { erase_attribute : bool;
+        charged_code_size : Code_size.t
+      }
   | Inline of DA.t * Expr.t
 
 (* CR vlaviron: fetch [params_arity], [result_arity] and [result_types] from
@@ -225,7 +228,8 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
     match function_type with
     | None ->
       (* No rec info available, prevent inlining to avoid problems *)
-      Do_not_inline { erase_attribute = false }
+      Do_not_inline
+        { erase_attribute = false; charged_code_size = Code_size.zero }
     | Some function_type -> (
       let decision =
         Call_site_inlining_decision.make_decision dacc ~simplify_expr ~apply
@@ -247,7 +251,11 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
           ~apply ~inlined_forwarded_from decision;
       match Call_site_inlining_decision_type.can_inline decision with
       | Do_not_inline { erase_attribute_if_ignored } ->
-        Do_not_inline { erase_attribute = erase_attribute_if_ignored }
+        Do_not_inline
+          { erase_attribute = erase_attribute_if_ignored;
+            charged_code_size =
+              Call_site_inlining_decision_type.charged_code_size decision
+          }
       | Inline { unroll_to; was_inline_always } ->
         let dacc =
           DA.map_denv dacc ~f:(DE.record_inlining_decision ~apply decision)
@@ -275,7 +283,18 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
       down_to_up dacc ~rebuild
     in
     simplify_expr dacc inlined ~down_to_up
-  | Do_not_inline { erase_attribute } -> (
+  | Do_not_inline { erase_attribute; charged_code_size } -> (
+    let down_to_up =
+      if Code_size.equal charged_code_size Code_size.zero
+      then down_to_up
+      else
+        fun dacc ~rebuild ->
+          let rebuild uacc ~after_rebuild =
+            let uacc = UA.notify_added ~code_size:charged_code_size uacc in
+            rebuild uacc ~after_rebuild
+          in
+          down_to_up dacc ~rebuild
+    in
     let apply =
       let inlined : Inlined_attribute.t =
         if erase_attribute

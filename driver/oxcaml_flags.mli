@@ -311,6 +311,8 @@ module Flambda2 : sig
       val default_arguments : inlining_arguments
       val speculative_inlining_only_if_arguments_useful : bool
       val speculative_inlining_track_lifted_constants : bool
+      val speculative_inlining_charge_uninlined_calls : bool
+      val speculative_inlining_uninlined_call_cost_factor : float
     end
 
     val oclassic_arguments : inlining_arguments
@@ -344,6 +346,10 @@ module Flambda2 : sig
     val speculative_inlining_only_if_arguments_useful : bool ref
 
     val speculative_inlining_track_lifted_constants : bool ref
+
+    val speculative_inlining_charge_uninlined_calls : bool ref
+
+    val speculative_inlining_uninlined_call_cost_factor : float ref
 
     val report_bin : bool ref
   end

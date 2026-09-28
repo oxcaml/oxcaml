@@ -1141,6 +1141,38 @@ let mk_no_flambda2_speculative_inlining_track_lifted_constants f =
          Flambda2.Inlining.Default.speculative_inlining_track_lifted_constants)
   )
 
+let mk_flambda2_speculative_inlining_charge_uninlined_calls f =
+  ( "-flambda2-speculative-inlining-charge-uninlined-calls",
+    Arg.Unit f,
+    Printf.sprintf
+      " When doing speculative inlining, charge an estimate of the code size\n\
+      \    of calls to speculatively-inlinable functions that are not inlined\n\
+      \    during the speculation (since they may be inlined later)%s\n\
+      \    (Flambda 2 only)"
+      (format_default
+         Flambda2.Inlining.Default.speculative_inlining_charge_uninlined_calls)
+  )
+
+let mk_no_flambda2_speculative_inlining_charge_uninlined_calls f =
+  ( "-no-flambda2-speculative-inlining-charge-uninlined-calls",
+    Arg.Unit f,
+    Printf.sprintf
+      " Do not charge the code size of calls not inlined during speculative\n\
+      \    inlining%s (Flambda 2 only)"
+      (format_not_default
+         Flambda2.Inlining.Default.speculative_inlining_charge_uninlined_calls)
+  )
+
+let mk_flambda2_speculative_inlining_uninlined_call_cost_factor f =
+  ( "-flambda2-speculative-inlining-uninlined-call-cost-factor",
+    Arg.Float f,
+    Printf.sprintf
+      "<float>  Scaling factor applied to the callee's code size when\n\
+      \    charging calls not inlined during speculative inlining\n\
+      \    (default %g) (Flambda 2 only)"
+      Flambda2.Inlining.Default.speculative_inlining_uninlined_call_cost_factor
+  )
+
 let mk_flambda2_inlining_report_bin f =
   ( "-flambda2-inlining-report-bin",
     Arg.Unit f,
@@ -1529,6 +1561,9 @@ module type Oxcaml_options = sig
   val no_flambda2_speculative_inlining_only_if_arguments_useful : unit -> unit
   val flambda2_speculative_inlining_track_lifted_constants : unit -> unit
   val no_flambda2_speculative_inlining_track_lifted_constants : unit -> unit
+  val flambda2_speculative_inlining_charge_uninlined_calls : unit -> unit
+  val no_flambda2_speculative_inlining_charge_uninlined_calls : unit -> unit
+  val flambda2_speculative_inlining_uninlined_call_cost_factor : float -> unit
   val flambda2_inlining_report_bin : unit -> unit
   val flambda2_unicode : unit -> unit
   val flambda2_kind_checks : unit -> unit
@@ -1769,6 +1804,12 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
         F.flambda2_speculative_inlining_track_lifted_constants;
       mk_no_flambda2_speculative_inlining_track_lifted_constants
         F.no_flambda2_speculative_inlining_track_lifted_constants;
+      mk_flambda2_speculative_inlining_charge_uninlined_calls
+        F.flambda2_speculative_inlining_charge_uninlined_calls;
+      mk_no_flambda2_speculative_inlining_charge_uninlined_calls
+        F.no_flambda2_speculative_inlining_charge_uninlined_calls;
+      mk_flambda2_speculative_inlining_uninlined_call_cost_factor
+        F.flambda2_speculative_inlining_uninlined_call_cost_factor;
       mk_flambda2_inlining_report_bin F.flambda2_inlining_report_bin;
       mk_flambda2_unicode F.flambda2_unicode;
       mk_flambda2_kind_checks F.flambda2_kind_checks;
@@ -2339,6 +2380,15 @@ module Oxcaml_options_impl = struct
   let no_flambda2_speculative_inlining_track_lifted_constants =
     clear' Flambda2.Inlining.speculative_inlining_track_lifted_constants
 
+  let flambda2_speculative_inlining_charge_uninlined_calls =
+    set' Flambda2.Inlining.speculative_inlining_charge_uninlined_calls
+
+  let no_flambda2_speculative_inlining_charge_uninlined_calls =
+    clear' Flambda2.Inlining.speculative_inlining_charge_uninlined_calls
+
+  let flambda2_speculative_inlining_uninlined_call_cost_factor factor =
+    Flambda2.Inlining.speculative_inlining_uninlined_call_cost_factor := factor
+
   let flambda2_inlining_report_bin = set' Flambda2.Inlining.report_bin
   let flambda2_unicode = set Flambda2.unicode
   let flambda2_kind_checks = set Flambda2.kind_checks
@@ -2832,6 +2882,18 @@ module Extra_params = struct
         set' Flambda2.Inlining.speculative_inlining_only_if_arguments_useful
     | "flambda2-speculative-inlining-track-lifted-constants" ->
         set' Flambda2.Inlining.speculative_inlining_track_lifted_constants
+    | "flambda2-speculative-inlining-charge-uninlined-calls" ->
+        set' Flambda2.Inlining.speculative_inlining_charge_uninlined_calls
+    | "flambda2-speculative-inlining-uninlined-call-cost-factor" ->
+        (match float_of_string_opt v with
+        | Some factor ->
+            Flambda2.Inlining.speculative_inlining_uninlined_call_cost_factor :=
+              factor
+        | None ->
+            Location.print_warning Location.none ppf
+              (Warnings.Bad_env_variable
+                 ("OCAMLPARAM", Printf.sprintf "bad value %s for %s" v name)));
+        true
     | "flambda2-inlining-report-bin" -> set' Flambda2.Inlining.report_bin
     | "flambda2-expert-fallback-inlining-heuristic" ->
         set Flambda2.Expert.fallback_inlining_heuristic
