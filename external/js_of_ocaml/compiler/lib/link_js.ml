@@ -57,7 +57,7 @@ end = struct
     t.lnum <- 0
 
   let open_ fname =
-    let lines = file_lines_bin fname in
+    let lines = file_lines_bin (Dune_manifests_reader.resolve fname) in
     { lines; lnum = 0; fname; current = lines }
 
   let next t =
