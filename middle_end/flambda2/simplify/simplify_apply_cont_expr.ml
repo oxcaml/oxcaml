@@ -148,7 +148,10 @@ let rebuild_apply_cont apply_cont ~args ~rewrite_id uacc ~after_rebuild =
         Name_occurrences.empty )
     | Non_inlinable_zero_arity _ | Non_inlinable_non_zero_arity _
     | Toplevel_or_function_return_or_exn_continuation _ ->
-      ( RE.create_apply_cont apply_cont,
+      let is_cold =
+        UE.is_cold_continuation uenv (Apply_cont.continuation apply_cont)
+      in
+      ( RE.create_apply_cont ~is_cold apply_cont,
         Cost_metrics.from_size (Code_size.apply_cont apply_cont),
         Apply_cont.free_names apply_cont )
   in

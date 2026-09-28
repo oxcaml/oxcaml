@@ -144,6 +144,7 @@ val rewrite_switch_arm :
 val rewrite_fixed_arity_apply :
   Upwards_acc.t ->
   use_id:Apply_cont_rewrite_id.t option ->
+  is_cold:bool ->
   [`Unarized] Flambda_arity.t ->
   Apply.t ->
   Upwards_acc.t * Rebuilt_expr.t
