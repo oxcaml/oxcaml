@@ -26,7 +26,6 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-open Datalog_imports
 open Lang
 
 type 'k column_iterator =
@@ -47,14 +46,9 @@ type ('p, 'v) plan =
     parameters : 'p Variable.hlist;
     input_stages : stage iarray;
     num_existentials : int;
-    output_atoms : atom iarray;
-    callback : ('v Constant.hlist -> unit) ref
+    output_atoms : atom iarray
   }
 
 val print_plan : Format.formatter -> ('p, 'v) plan -> unit
 
-val plan_rule :
-  ?callback:('v Constant.hlist -> unit) ref ->
-  'p Variable.hlist ->
-  rule ->
-  ('p, 'v) plan
+val plan_rule : 'p Variable.hlist -> rule -> ('p, 'v) plan

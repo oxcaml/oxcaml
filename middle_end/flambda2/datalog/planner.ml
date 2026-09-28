@@ -26,7 +26,6 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-open Datalog_imports
 open Lang
 
 type 'k column_iterator =
@@ -47,8 +46,7 @@ type ('p, 'v) plan =
     parameters : 'p Variable.hlist;
     input_stages : stage iarray;
     num_existentials : int;
-    output_atoms : atom iarray;
-    callback : ('v Constant.hlist -> unit) ref
+    output_atoms : atom iarray
   }
 
 let print_stage ppf stage =
@@ -227,8 +225,7 @@ let advance_prefix_and_extract_iterator_on_variable (type a) table_layers
         layers.bound_prefix <- bound_prefix + 1;
         Column_iterator (column, outer_var, inner_var) :: iterators))
 
-let plan_rule ?(callback = ref ignore) parameters
-    { variables = vars; head; body } =
+let plan_rule parameters { variables = vars; head; body } =
   let tables, body_layout = Iarray.fold_left_map layout_atom [] body in
   let tables = Iarray.of_list (List.rev tables) in
   let var_to_atoms = Variable.Id.Tbl.create 0 in
@@ -331,10 +328,4 @@ let plan_rule ?(callback = ref ignore) parameters
     in
     loop 0
   in
-  { tables;
-    parameters;
-    input_stages;
-    output_atoms = head;
-    num_existentials;
-    callback
-  }
+  { tables; parameters; input_stages; output_atoms = head; num_existentials }

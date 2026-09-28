@@ -315,13 +315,12 @@ module From_plan = struct
             Misc.fatal_error "Callback with bindings cannot be used in the body")
         @@ build_stages env plan (index + 1)
 
-  let create_from_plan_with_parameters ~original_rule
+  let create_from_plan_with_parameters ?(callback = ref ignore) ~original_rule
       ({ tables;
          parameters;
          input_stages = _;
          output_atoms = _;
-         num_existentials = _;
-         callback
+         num_existentials = _
        } as plan) : (_, _) with_parameters =
     let env = Env.create () in
     let env, parameters =
@@ -368,8 +367,9 @@ module With_parameters = struct
   let without_parameters { parameters = []; cursor } = cursor
 
   let create_from_rule ?callback params rule =
-    let plan = Planner.plan_rule ?callback params rule in
-    From_plan.create_from_plan_with_parameters ~original_rule:rule plan
+    let plan = Planner.plan_rule params rule in
+    From_plan.create_from_plan_with_parameters ?callback ~original_rule:rule
+      plan
 
   let naive_fold { parameters; cursor } ps db f acc =
     Or_null_sender.send_hlist parameters ps;
