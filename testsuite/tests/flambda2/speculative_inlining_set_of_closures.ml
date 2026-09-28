@@ -4,7 +4,7 @@
 
    ocamlopt_flags += " -flambda2-inline-small-function-size 0";
    ocamlopt_flags += " -flambda2-inline-threshold 60";
-   ocamlopt_flags += " -flambda2-speculative-inlining-track-lifted-constants";
+   ocamlopt_flags += " -flambda2-speculative-inlining-track-lifted-constants-for-functions";
    ocamlopt_flags += " -no-flambda2-speculative-inlining-only-if-arguments-useful";
 
    setup-ocamlopt.byte-build-env;

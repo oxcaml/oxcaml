@@ -309,7 +309,8 @@ module Flambda2 : sig
     module Default : sig
       val default_arguments : inlining_arguments
       val speculative_inlining_only_if_arguments_useful : bool
-      val speculative_inlining_track_lifted_constants : bool
+      val speculative_inlining_track_lifted_constants_for_functors : bool
+      val speculative_inlining_track_lifted_constants_for_functions : bool
     end
 
     val oclassic_arguments : inlining_arguments
@@ -336,7 +337,8 @@ module Flambda2 : sig
 
     val speculative_inlining_only_if_arguments_useful : bool ref
 
-    val speculative_inlining_track_lifted_constants : bool ref
+    val speculative_inlining_track_lifted_constants_for_functors : bool ref
+    val speculative_inlining_track_lifted_constants_for_functions : bool ref
 
     val report_bin : bool ref
   end

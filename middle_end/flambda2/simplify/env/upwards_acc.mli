@@ -19,7 +19,10 @@ type t
 (** Print a upwards accumulator to a formatter. *)
 val print : Format.formatter -> t -> unit
 
+(** Speculative inlining must supply [track_lifted_constants] using the callee's
+    flag. Otherwise, static constants are counted if either flag is on. *)
 val create :
+  ?track_lifted_constants:bool ->
   flow_result:Flow_types.Flow_result.t ->
   compute_slot_offsets:bool ->
   Upwards_env.t ->
@@ -32,6 +35,8 @@ val creation_dacc : t -> Downwards_acc.t
 val uenv : t -> Upwards_env.t
 
 val cost_metrics : t -> Cost_metrics.t
+
+val track_lifted_constants : t -> bool
 
 val code_age_relation : t -> Code_age_relation.t
 
