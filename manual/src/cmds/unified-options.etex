@@ -761,6 +761,11 @@ ordinary infix operator. This overrides the default chosen when the
 compiler was configured.
 
 \notop{%
+\item["-typing-recovery"]
+Try to collect all typing errors.
+}
+
+\notop{%
 \item["-unboxed-types"]
 When a type is unboxable (i.e. a record with a single argument or a
 concrete datatype with a single constructor of one argument) it will

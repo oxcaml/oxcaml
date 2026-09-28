@@ -58,7 +58,7 @@ type error =
 
 
 
-exception Error of error
+type exn += private Error of error
 
 val report_error: error Format_doc.format_printer
 val report_error_doc: error Format_doc.printer
