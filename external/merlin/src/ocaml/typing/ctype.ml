@@ -830,7 +830,7 @@ let[@inline] free_vars ~init ~add_one ?env mark tys =
           let acc =
             match Env.find_type_expansion path env with
             | exception Not_found -> acc
-            | #(_, body, _) ->
+            | (_, body, _) ->
                 if get_level body = generic_level then acc
                 else add_one ty None kind acc
           in
@@ -2477,7 +2477,7 @@ let expand_abbrev_gen kind find_type_expansion env ty =
           let path' = Env.normalize_type_path None env path in
           if Path.same path path' then raise Cannot_expand
           else newty2 ~level (Tconstr (path', args, abbrev))
-      | #(params, body, lv) ->
+      | (params, body, lv) ->
           (* prerr_endline
              ("add a "^string_of_kind kind^" expansion for "^Path.name path);*)
           let ty' =
@@ -3128,7 +3128,6 @@ let mk_is_abstract env p =
   -> false
 
 let mk_jkind_context env jkind_of_type =
-  exclave_
   let lookup_type p =
     match Env.find_type p env with
     | decl -> Some decl
@@ -3394,12 +3393,10 @@ let estimate_type_jkind =
 
 (* After type_jkind_purely_if_principal is defined, we can use it directly *)
 let mk_jkind_context_check_principal env =
-  exclave_
   mk_jkind_context env (fun ty -> type_jkind_purely_if_principal env ty)
 
 (* For cases where we always want Some (type_jkind_purely env ty) *)
 let mk_jkind_context_always_principal env =
-  exclave_
   mk_jkind_context env (fun ty -> Some (type_jkind_purely env ty))
 
 (**** checking jkind relationships ****)
@@ -3938,7 +3935,7 @@ let full_expand ~may_forget_scope env ty =
 *)
 let generic_abbrev env path =
   try
-    let #(_, body, _) = Env.find_type_expansion path env in
+    let (_, body, _) = Env.find_type_expansion path env in
     get_level body = generic_level
   with
     Not_found ->
@@ -6741,7 +6738,7 @@ let rec path_scope : Path.t -> int =
 
 let try_expand_path env p =
   match Env.find_type_expansion p env with
-  | #(params, body, _lv) ->
+  | (params, body, _lv) ->
     begin match get_desc body with
     | Tconstr (p', args, _)
         when args == params ||

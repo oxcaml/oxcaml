@@ -25,8 +25,8 @@ module type Dataflow_direction_S = sig
 
   type instr_domain
 
-  (* For a given block, iterates the sequence of all successor labels (taking the
-     dataflow direction into account). *)
+  (* For a given block, iterates the sequence of all successor labels (taking
+     the dataflow direction into account). *)
   val iter_edges_out : Cfg.basic_block -> f:(Label.t -> unit) -> unit
 
   type context

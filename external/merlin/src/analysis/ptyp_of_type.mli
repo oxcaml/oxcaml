@@ -7,7 +7,10 @@ val module_type : Env.t -> Types.module_type -> Parsetree.module_type
 val core_type : Types.type_expr -> Parsetree.core_type
 
 val modtype_declaration :
-  Env.t -> Ident.t -> Types.modtype_declaration -> Parsetree.module_type_declaration
+  Env.t ->
+  Ident.t ->
+  Types.modtype_declaration ->
+  Parsetree.module_type_declaration
 
 val module_declaration :
   Env.t -> Ident.t -> Types.module_declaration -> Parsetree.module_declaration

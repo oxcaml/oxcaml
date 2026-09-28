@@ -2106,7 +2106,7 @@ let find_type_expansion path env =
        purely abstract data types without manifest type definition. *)
     | _ -> raise Not_found
   in
-  #(decl.type_params, body, decl.type_expansion_scope)
+  (decl.type_params, body, decl.type_expansion_scope)
 
 (* Find the manifest type information associated to a type, i.e.
    the necessary information for the compiler's type-based optimisations.
@@ -2121,7 +2121,7 @@ let find_type_expansion_opt path env =
     | Some body -> body
     | _ -> raise Not_found
   in
-  #(decl.type_params, body, decl.type_expansion_scope)
+  (decl.type_params, body, decl.type_expansion_scope)
 
 let find_jkind_expansion path env =
   let decl = find_jkind path env in
@@ -5902,7 +5902,7 @@ let short_paths_module_type_desc (mty : Subst.Lazy.module_type option) =
   | None | Some Mty_for_hole -> Fresh
   | Some (Mty_ident path) -> Alias path
   | Some (Mty_signature _ | Mty_functor _) -> Fresh
-  | Some (Mty_strengthen _) -> Fresh
+  | Some (Mty_strengthen _ | Mty_with _) -> Fresh
   | Some (Mty_alias _) -> assert false
 
 let deprecated_of_alerts alerts =
@@ -5940,7 +5940,7 @@ let rec short_paths_module_desc env mpath mty comp =
         short_paths_functor_components_desc env mpath comp path
       in
       Fresh (Functor apply)
-  | Mty_strengthen _ -> Fresh (Signature (lazy []))
+  | Mty_strengthen _ | Mty_with _ -> Fresh (Signature (lazy []))
   | Mty_for_hole -> Fresh (Signature (lazy []))
 
 and short_paths_module_components_desc env mpath comp =

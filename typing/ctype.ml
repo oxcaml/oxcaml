@@ -3943,7 +3943,8 @@ let rec occur_fast visited allow_recursive ty0 ty =
     if eq_type ty ty0 then raise Occur;
     begin match get_desc ty with
     | Tconstr(_, _ :: _, _abbrev) ->
-        iter_type_expr (occur_fast visited allow_recursive ty0) (Fun.const ()) ty
+        iter_type_expr
+          (occur_fast visited allow_recursive ty0) (Fun.const ()) ty
     | Tobject _ | Tvariant _ ->
         ()
     | _ ->
@@ -3989,7 +3990,8 @@ let rec occur_precise env visited occurs allow_recursive ty0 ty =
             if allow_recursive then true else begin
               fold_type_expr_with_stages
                 (fun env acc ty ->
-                   occur_precise env visited occurs allow_recursive ty0 ty && acc)
+                   occur_precise env visited occurs allow_recursive ty0 ty
+                   && acc)
                 env (fun acc _ -> acc) true ty
             end
       end

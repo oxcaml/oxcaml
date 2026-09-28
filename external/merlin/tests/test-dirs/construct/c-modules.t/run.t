@@ -139,3 +139,37 @@ Construction in functor application
       "struct let x = _ end"
     ]
   ]
+
+Delayed constraints in functor parameters, results, and nested signatures
+  $ cat > with_constraints.ml <<'EOF'
+  > module type S = sig type t end
+  > module F :
+  >   functor (X : S with type t = int) -> sig end =
+  >   _
+  > module G :
+  >   functor (X : sig module type T = sig type t end end) ->
+  >     X.T with type t = int =
+  >   _
+  > module H :
+  >   functor (X : sig
+  >     module type T = sig type t end
+  >     module Y : T with type t = int
+  >   end) -> sig end =
+  >   _
+  > EOF
+
+  $ $MERLIN single construct -position 4:3 \
+  > -filename with_constraints.ml <with_constraints.ml | jq -r '.value[1][]'
+  functor (X : sig type t = int end) ->
+  struct  end
+
+  $ $MERLIN single construct -position 8:3 \
+  > -filename with_constraints.ml <with_constraints.ml | jq -r '.value[1][]'
+  functor (X : sig module type T  = sig type t end end) ->
+  struct type t = int end
+
+  $ $MERLIN single construct -position 14:3 \
+  > -filename with_constraints.ml <with_constraints.ml | jq -r '.value[1][]'
+  functor (X :
+  sig module type T  = sig type t end module Y : sig type t = int end end) ->
+  struct  end

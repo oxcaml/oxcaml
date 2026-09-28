@@ -76,7 +76,7 @@ let rec union : type t k v.
   | [] -> result_repr_union repr t1 t2
   | column :: columns ->
     let merge t1 t2 = union columns repr t1 t2 in
-    Column.union_total column merge t1 t2 [@nontail]
+    (Column.union_total column merge t1 t2 [@nontail])
 
 let rec diff_or_null : type t k v.
     (t, k, v) Column.hlist -> v result_repr -> t -> t -> t Or_null.t =
