@@ -726,6 +726,8 @@ stdenv.mkDerivation {
     menhir
     ocaml_5_4_0
     pkgs.ocaml-ng.ocamlPackages_5_4.ocaml-lsp
+    pkgs.ocaml-ng.ocamlPackages_5_4.merlin
+    pkgs.ocaml-ng.ocamlPackages_5_4.dot-merlin-reader
     dune
     pkgs.pkg-config
     pkgs.rsync
