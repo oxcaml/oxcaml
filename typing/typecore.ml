@@ -3503,7 +3503,6 @@ and type_pat_aux
   and rvp x = crp (pure category x)
   and rcp x = crp (only_impure category x) in
   let type_tuple_pat ~is_unboxed spl closed =
-    (* CR zeisbach: we might want to gate mixed tuples behind a flag *)
     if is_unboxed then
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
     assert (closed = Open || List.length spl >= 2);
@@ -8778,7 +8777,8 @@ and type_expect_
               | _ :: _ ->
                 (Jkind.of_new_sort ~why:Tuple_element
                    ~level:(Ctype.get_current_level ()),
-                 (* non-empty => desugaring into tuple, which is scannable *)
+                 (* With custom [and] operators, the [let]'s continuation takes
+                    in a (nested) tuple, which is scannable. *)
                  Jkind.Sort.scannable)
             in
             let spat_params, ty_params =
@@ -10993,7 +10993,8 @@ and type_tuple ~is_unboxed ~overwrite ~loc ~env ~(expected_mode : expected_mode)
   Option.iter
     (fun l -> raise (Error (loc, env, Repeated_tuple_exp_label l)))
     (Misc.repeated_label sexpl);
-  (* wrap [register_allocation_value_mode] as unboxed tuples aren't allocated *)
+  (* wrap [register_allocation_value_mode] call with an [option], as unboxed
+     tuples aren't allocated and thus have no [alloc_mode]. *)
   let register_allocation mode =
     if is_unboxed then None, mode
     else
@@ -11075,9 +11076,11 @@ and type_tuple ~is_unboxed ~overwrite ~loc ~env ~(expected_mode : expected_mode)
   in
   let exp_desc =
     match alloc_mode with
-    (* [alloc_mode] is [None] iff [is_unboxed] *)
-    | None -> Texp_unboxed_tuple expl
+    | None ->
+        assert is_unboxed;
+        Texp_unboxed_tuple expl
     | Some alloc_mode ->
+        assert (not is_unboxed);
         Texp_tuple (expl, Typedtree.create_locality_mode_r alloc_mode)
   in
   re {

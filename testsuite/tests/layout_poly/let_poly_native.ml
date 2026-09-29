@@ -10,7 +10,10 @@ external to_float : float# -> float = "%box_float"
 
 (* Tupled functions. Native-only because the restriction on poly tupled
    functions is specific to the native backend. *)
-(* arguments here are [value], so the function still gets tupled *)
+(* CR layouts-mixed-tuplify: support layout poly tupled functions + interaction
+   with mixed tuples *)
+(* Arguments here are [value], so the function still gets tupled, exposing the
+   lack of support for lpoly tupled functions. *)
 let poly_ f = fun (g, ()) -> g ()
 [%%expect{|
 >> Fatal error: Slambda does not currently support poly tupled functions

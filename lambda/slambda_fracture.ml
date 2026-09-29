@@ -408,8 +408,11 @@ let rec fracture_lam lambda : slambda =
       let kind =
         match kind with
         | Tupled ->
-          (* CR layouts: this branch is currently not reachable due to the
-             [all_components_are_values] check in [transl_tupled_function]. *)
+          (* We check for [all_components_are_values] in
+             [transl_tupled_function], but can still hit this case with other
+             polymorphism (e.g. in the return only). *)
+          (* CR layouts-mixed-tuplify: once we have mixed tupled functions, we
+             will hit this more. Regardless, it should be supported! *)
           Misc.fatal_errorf
             "Slambda does not currently support poly tupled functions"
         | Curried { nlocal } ->

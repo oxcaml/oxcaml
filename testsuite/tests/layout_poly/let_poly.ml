@@ -543,9 +543,10 @@ val x : int8 = 1s
 
 (* Tupled functions *)
 let x =
-  (* CR layouts: we eagerly bail out of the tupled function optimization when
-     encountering non-[scannable] sorts, so we don't hit a fatal error here.
-     Eventually, we should properly support layout poly tupled functions. *)
+  (* We eagerly bail out of the tupled function optimization when
+     encountering non-[scannable] sorts, so we don't hit the fatal error seen
+     in let_poly_native.ml. However, we still don't get the tupled function
+     optimization. *)
   let poly_ f = fun (g, x) -> g x in
   f ((fun y -> y + 1), 41)
 

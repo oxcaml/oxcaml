@@ -1207,7 +1207,6 @@ and value_kind_tuple env ~loc ~visited ~depth ~num_nodes_visited elements =
     num_nodes_visited, non_nullable Pgenval
   | Some mixed_block_elements ->
     let num_nodes_visited, constructor_shape =
-      (* if we are not in a mixed tuple, match existing value kind exactly *)
       if List.for_all Types.mixed_block_element_is_scannable
            mixed_block_elements
       then

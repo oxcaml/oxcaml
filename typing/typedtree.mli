@@ -586,7 +586,7 @@ and expression_desc =
             - [(E1, ..., En)]
                 when [el] is [(None, E1, s1);...;(None, En, sn)],
             - [(L1:E1, ..., Ln:En)]
-                when [el] is [(Some L1, E1, sn);...;(Some Ln, En, sn)],
+                when [el] is [(Some L1, E1, s1);...;(Some Ln, En, sn)],
             - Any mix, e.g. [(L1: E1, E2)]
                 when [el] is [(Some L1, E1, s1); (None, E2, s2)]
           *)
