@@ -27,6 +27,7 @@ type t =
     lifted_constants : LCS.t;
     flow_acc : Flow.Acc.t;
     demoted_exn_handlers : Continuation.Set.t;
+    cold_continuations : Continuation.Set.t;
     code_ids_to_remember : Code_id.Set.t;
     code_ids_to_never_delete : Code_id.Set.t;
     code_ids_never_simplified : Code_id.Set.t;
@@ -49,7 +50,8 @@ let print_lifted_cont ppf (denv, original_handlers) =
 
 let [@ocamlformat "disable"] print ppf
       { denv; continuation_uses_env; shareable_constants; used_value_slots;
-        lifted_constants; flow_acc; demoted_exn_handlers; code_ids_to_remember;
+        lifted_constants; flow_acc; demoted_exn_handlers; cold_continuations;
+        code_ids_to_remember;
         code_ids_to_never_delete; code_ids_never_simplified; slot_offsets; debuginfo_rewrites;
         are_lifting_conts; lifted_continuations; continuation_lifting_budget;
         continuations_to_specialize; specialization_map; } =
@@ -61,6 +63,7 @@ let [@ocamlformat "disable"] print ppf
       @[<hov 1>(lifted_constant_state@ %a)@]@ \
       @[<hov 1>(flow_acc@ %a)@]@ \
       @[<hov 1>(demoted_exn_handlers@ %a)@]@ \
+      @[<hov 1>(cold_continuations@ %a)@]@ \
       @[<hov 1>(code_ids_to_remember@ %a)@]@ \
       @[<hov 1>(code_ids_to_never_delete@ %a)@]@ \
       @[<hov 1>(code_ids_never_simplified@ %a)@]@ \
@@ -79,6 +82,7 @@ let [@ocamlformat "disable"] print ppf
     LCS.print lifted_constants
     Flow.Acc.print flow_acc
     Continuation.Set.print demoted_exn_handlers
+    Continuation.Set.print cold_continuations
     Code_id.Set.print code_ids_to_remember
     Code_id.Set.print code_ids_to_never_delete
     Code_id.Set.print code_ids_never_simplified
@@ -100,6 +104,7 @@ let create denv slot_offsets continuation_uses_env =
     lifted_constants = LCS.empty;
     flow_acc = Flow.Acc.empty ();
     demoted_exn_handlers = Continuation.Set.empty;
+    cold_continuations = Continuation.Set.empty;
     code_ids_to_remember = Code_id.Set.empty;
     code_ids_to_never_delete = Code_id.Set.empty;
     code_ids_never_simplified = Code_id.Set.empty;
@@ -256,6 +261,16 @@ let demote_exn_handler t cont =
   }
 
 let demoted_exn_handlers t = t.demoted_exn_handlers
+
+let mark_current_continuation_as_cold t =
+  match DE.current_continuation t.denv with
+  | None -> t
+  | Some cont ->
+    { t with
+      cold_continuations = Continuation.Set.add cont t.cold_continuations
+    }
+
+let continuation_is_cold t cont = Continuation.Set.mem cont t.cold_continuations
 
 let slot_offsets t = t.slot_offsets
 

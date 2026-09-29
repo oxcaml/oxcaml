@@ -1916,6 +1916,19 @@ let close_exact_or_unknown_apply acc env
     in
     if Flambda_features.classic_mode ()
     then
+      let acc =
+        (* Simplify does not run in classic mode, so mark the call site as cold
+           here (see [Simplify_apply_expr.simplify_direct_full_application]). *)
+        match (callee_approx : Env.value_approximation option) with
+        | Some (Closure_approximation { code; _ })
+          when Code_metadata.cold (Code_or_metadata.code_metadata code) ->
+          Acc.mark_current_continuation_as_cold acc
+        | None
+        | Some
+            ( Closure_approximation _ | Unknown _ | Value_symbol _
+            | Value_const _ | Block_approximation _ ) ->
+          acc
+      in
       if !Clflags.jsir
       then
         let apply =
@@ -2883,6 +2896,8 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
   in
   let acc = Acc.with_seen_a_function acc false in
   let compute_body acc =
+    let outer_continuation = Acc.current_continuation acc in
+    let acc = Acc.with_current_continuation None acc in
     let acc, body =
       (* XXX seems like this needs to know what [my_region] is *)
       try body acc closure_env
@@ -2899,6 +2914,7 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
         (* print body *)
         Printexc.raise_with_backtrace Misc.Fatal_error bt
     in
+    let acc = Acc.with_current_continuation outer_continuation acc in
     let my_closure' = Simple.var my_closure in
     let acc, body =
       (* CR mshinwell: These Project_function_slot operations should maybe be

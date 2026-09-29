@@ -373,6 +373,8 @@ module Acc = struct
       code_map : Code.t Code_id.Map.t;
       free_names : Name_occurrences.t;
       continuation_applications : continuation_application Continuation.Map.t;
+      current_continuation : Continuation.t option;
+      cold_continuations : Continuation.Set.t;
       cost_metrics : Cost_metrics.t;
       seen_a_function : bool;
       slot_offsets : Slot_offsets.t;
@@ -464,6 +466,8 @@ module Acc = struct
       code_map = Code_id.Map.empty;
       free_names = Name_occurrences.empty;
       continuation_applications = Continuation.Map.empty;
+      current_continuation = None;
+      cold_continuations = Continuation.Set.empty;
       cost_metrics = Cost_metrics.zero;
       seen_a_function = false;
       slot_offsets = Slot_offsets.empty;
@@ -677,6 +681,22 @@ module Acc = struct
     match Continuation.Map.find cont t.continuation_applications with
     | (exception Not_found) | Untrackable -> None
     | Trackable_arguments args -> Some args
+
+  let current_continuation t = t.current_continuation
+
+  let with_current_continuation current_continuation t =
+    { t with current_continuation }
+
+  let mark_current_continuation_as_cold t =
+    match t.current_continuation with
+    | None -> t
+    | Some cont ->
+      { t with
+        cold_continuations = Continuation.Set.add cont t.cold_continuations
+      }
+
+  let continuation_is_cold cont t =
+    Continuation.Set.mem cont t.cold_continuations
 
   let with_free_names free_names t = { t with free_names }
 
@@ -1162,6 +1182,17 @@ module Continuation_handler_with_acc = struct
 end
 
 module Let_cont_with_acc = struct
+  let build_handler acc cont ~handler ~params ~is_exn_handler ~is_cold =
+    Acc.measure_cost_metrics acc ~f:(fun acc ->
+        let outer_continuation = Acc.current_continuation acc in
+        let acc, handler =
+          handler (Acc.with_current_continuation (Some cont) acc)
+        in
+        let is_cold = is_cold || Acc.continuation_is_cold cont acc in
+        let acc = Acc.with_current_continuation outer_continuation acc in
+        Continuation_handler_with_acc.create acc params ~handler ~is_exn_handler
+          ~is_cold)
+
   let create_non_recursive acc cont handler ~body ~free_names_of_body
       ~cost_metrics_of_handler =
     let acc =
@@ -1200,10 +1231,7 @@ module Let_cont_with_acc = struct
         (fun cont (handler, params, is_exn_handler, is_cold)
              (free_names, costs, acc, handlers) ->
           let cost_metrics_of_handler, handler_free_names, acc, handler =
-            Acc.measure_cost_metrics acc ~f:(fun acc ->
-                let acc, handler = handler acc in
-                Continuation_handler_with_acc.create acc params ~handler
-                  ~is_exn_handler ~is_cold)
+            build_handler acc cont ~handler ~params ~is_exn_handler ~is_cold
           in
           ( Name_occurrences.union free_names handler_free_names,
             Cost_metrics.( + ) costs cost_metrics_of_handler,
@@ -1231,10 +1259,8 @@ module Let_cont_with_acc = struct
     in
     let body_acc = acc in
     let cost_metrics_of_handler, handler_free_names, acc, handler =
-      Acc.measure_cost_metrics acc ~f:(fun acc ->
-          let acc, handler = handler acc in
-          Continuation_handler_with_acc.create acc handler_params ~handler
-            ~is_exn_handler ~is_cold)
+      build_handler acc cont ~handler ~params:handler_params ~is_exn_handler
+        ~is_cold
     in
     match Name_occurrences.count_continuation free_names_of_body cont with
     | Zero when not (Continuation_handler.is_exn_handler handler) ->

@@ -278,3 +278,10 @@ val denv_for_lifted_continuation : denv_for_join:t -> denv:t -> t
 val has_seen_a_non_liftable_continuation : t -> bool
 
 val set_has_seen_a_non_liftable_continuation : t -> t
+
+(** The continuation in whose handler the code being simplified will end up,
+    taking into account the inlining of continuations with a single inlinable
+    use. [None] at the toplevel of a function body. *)
+val current_continuation : t -> Continuation.t option
+
+val set_current_continuation : t -> Continuation.t -> t

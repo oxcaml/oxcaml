@@ -221,6 +221,15 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
     ~params_arity ~result_arity ~(result_types : _ Or_unknown_or_bottom.t)
     ~down_to_up ~coming_from_indirect ~callee's_code_metadata
     ~inlined_forwarded_from =
+  (* A call to a cold function marks the current control flow position as cold,
+     whether or not the call ends up being inlined. Since the handler of a
+     continuation is straight-line code up to its terminal expression, this
+     amounts to marking the enclosing continuation handler as cold. *)
+  let dacc =
+    if Code_metadata.cold callee's_code_metadata
+    then DA.mark_current_continuation_as_cold dacc
+    else dacc
+  in
   let inlined =
     match function_type with
     | None ->
