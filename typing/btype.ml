@@ -1741,6 +1741,19 @@ module Jkind0 = struct
           name = "bits64 mod everything"
         }
 
+      (* CR address-patterns: figure out the right mode crossing behavior for
+         addrs *)
+      let kind_of_addr =
+        { jkind =
+            mk_jkind
+              (Layout.Const.product
+                 [ base Scannable Scannable_axes.value_axes;
+                   base Bits64 Scannable_axes.max ])
+              ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max;
+          name = "value & bits64"
+        }
+
       let vec128 =
         { jkind =
             mk_jkind (base Vec128 Scannable_axes.max)
