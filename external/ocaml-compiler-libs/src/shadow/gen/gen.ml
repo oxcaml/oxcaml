@@ -32,10 +32,7 @@ let () =
         with _ ->
           String.capitalize_ascii (Filename.chop_extension fn)
       in
-      let units =
-        Read_cma.units (Filename.concat dir fn)
-        |> List.sort ~cmp:String.compare
-      in
+      let units = Read_cma.units (Filename.concat dir fn) in
       List.fold_left units ~init:acc ~f:(fun acc unit ->
         Smap.add acc ~key:unit ~data:lib_mod))
   in
