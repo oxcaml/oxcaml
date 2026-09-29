@@ -5905,7 +5905,6 @@ let filter_arrow env t l ~force_tpoly =
     let k_res = Jkind.Builtin.any ~why:Inside_of_Tarrow in
     let ty_arg =
       if not force_tpoly then begin
-        assert (not (is_optional l));
         newvar2 level k_arg
       end else begin
         let t1 =

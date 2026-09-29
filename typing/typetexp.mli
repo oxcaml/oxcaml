@@ -187,7 +187,6 @@ type error =
   | Not_an_object of type_expr
   | Repeated_tuple_label of string
   | Unsupported_extension : _ Language_extension.t -> error
-  | Polymorphic_optional_param
   | Non_value of
       {vloc : value_loc; typ : type_expr; err : Jkind.Violation.t}
   | Non_sort of

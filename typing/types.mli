@@ -184,8 +184,11 @@ and type_desc =
       [Tarrow (Labelled "l", e1, e2, c)] ==> [l:e1  -> e2]
       [Tarrow (Optional "l", e1, e2, c)] ==> [?l:e1 -> e2]
 
-      See [commutable] for the last argument. The argument
-      type must be a [Tpoly] node *)
+      See [commutable] for the last argument.
+      The argument type must be a [Tpoly] node. For an optional argument,
+      the body of the [Tpoly] node is an [option] type; in particular, a
+      polymorphic optional argument is represented as
+      [Tpoly (option body, variables)]. *)
 
   | Ttuple of (string option * type_expr) list
   (** [Ttuple [None, t1; ...; None, tn]] ==> [t1 * ... * tn]

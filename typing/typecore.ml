@@ -315,7 +315,6 @@ type error =
   | Function_returns_local
   | Tail_call_local_returning
   | Bad_tail_annotation of [`Conflict|`Not_a_tailcall]
-  | Optional_poly_param
   | Exclave_in_nontail_position
   | Exclave_returns_not_local
   | Unboxed_int_literals_not_supported
@@ -1225,6 +1224,13 @@ let constant_or_raise env loc cst =
 let type_option ty =
   newty (Tconstr(Predef.path_option,[ty], ref Mnil))
 
+(** Add [option] underneath the quantifiers of a [Tpoly] type.
+
+    Safety: [ty] must be a [Tpoly] type. *)
+let type_option_poly ty =
+  let ty, vars = Btype.tpoly_get_poly ty in
+  newty (Tpoly (type_option ty, vars))
+
 let mkexp exp_desc exp_type exp_loc exp_env =
   { exp_desc; exp_type;
     exp_loc; exp_env; exp_extra = []; exp_attributes = [] }
@@ -1235,10 +1241,14 @@ let type_option_none env ty loc =
   let repres = Types.Constructor_uniform_value in
   mkexp (Texp_construct (mknoloc lid, cnone, repres, [], None)) ty loc env
 
-let extract_option_type env ty =
+let is_option_type env ty =
   match get_desc (expand_head env ty) with
-    Tconstr(path, [ty], _) when Path.same path Predef.path_option -> ty
-  | _ -> assert false
+  | Tconstr (path, [ _ ], _) -> Path.same path Predef.path_option
+  | _ -> false
+
+let is_option_type_poly env ty =
+  let body, _ = Btype.tpoly_get_poly ty in
+  is_option_type env body
 
 let is_floatarray_type env ty =
   match get_desc (expand_head env ty) with
@@ -1309,6 +1319,69 @@ let extract_label_names record_form env ty =
   | Record_type (_, _,fields, _) -> List.map (fun l -> l.Types.ld_id) fields
   | Record_type_of_other_form | Not_a_record_type | Maybe_a_record_type ->
     assert false
+
+let extract_option_type env ty =
+  match get_desc (expand_head env ty) with
+  | Tconstr (path, [ ty ], _) when Path.same path Predef.path_option -> ty
+  | _ -> assert false
+
+let extract_option_type_poly env ty =
+  let ty, vars = Btype.tpoly_get_poly ty in
+  newty (Tpoly (extract_option_type env ty, vars))
+
+(** Translate the polymorphic annotation of an optional parameter.
+
+    The external type, stored under [Tarrow], must always have the form
+    [Tpoly (option body, vars)] (see types.mli). The internal type
+    depends on whether the parameter has a default:
+
+    (1) [?(x : 'as. ty = default)], the annotation matches the type of [x],
+        so the internal type is [Tpoly (ty, 'as)] and [option] is added
+        only to the external type to be [Tpoly (ty option, 'as)].
+    (2) [?(x : 'as. ty)], pattern binds the optional type, so the
+        annotation [ty] must be an [option]-type. The internal and
+        external types are the same.
+
+    In (2), if the annotation is not an [option]-type, we still need
+    it to be an [option]-type externally. This failure is caught
+    later during [solve_Ppat_constraint].
+
+    See [type_approx_fun_one_param] and [type_function] for the two consumers
+    of these types, and [Typetexp.transl_type_aux] for polymorphic optional
+    annotations in function types. *)
+let transl_poly_optional_param env ~has_default pat
+  : ty_internal:type_expr * ty_external:type_expr
+  =
+  let annotated_ty =
+    match pat.ppat_desc with
+    | Ppat_constraint
+        ( _
+        , Some ({ ptyp_desc = Ptyp_poly _ } as sty)
+        , poly_mode ) ->
+      let poly_mode =
+        Typemode.transl_mode_with_locality poly_mode
+      in
+      (Typetexp.transl_simple_type
+         ~new_var_jkind:Any
+         env
+         ~closed:false
+         poly_mode.mode_modes
+         sty)
+        .ctyp_type
+    | _ -> assert false
+  in
+  if has_default
+  then
+    ( ~ty_internal:annotated_ty
+    , ~ty_external:(type_option_poly annotated_ty) )
+  else (
+    let contents =
+      if is_option_type_poly env annotated_ty
+      then extract_option_type_poly env annotated_ty
+      else annotated_ty
+    in
+    let ty = type_option_poly contents in
+    ~ty_internal:ty, ~ty_external:ty)
 
 let has_poly_constraint spat =
   match spat.ppat_desc with
@@ -5751,21 +5824,23 @@ let rec approx_type env sty =
   | Ptyp_arrow (p, ({ ptyp_desc = Ptyp_poly _ } as arg_sty), sty, arg_mode, _) ->
       let p = Typetexp.transl_label p (Some arg_sty) in
       (* CR layouts v5: value requirement here to be relaxed *)
-      if is_optional p then newvar Predef.option_argument_jkind
-      else begin
-        let arg_mode = Typemode.transl_mode_with_locality arg_mode in
-        let arg_ty =
-          (* Polymorphic types will only unify with types that match all of their
+      let arg_mode = Typemode.transl_mode_with_locality arg_mode in
+      let arg_ty =
+        (* Polymorphic types will only unify with types that match all of their
            polymorphic parts, so we need to fully translate the type here
            unlike in the monomorphic case *)
-          Typetexp.transl_simple_type ~new_var_jkind:Any env ~closed:false
-            arg_mode.mode_modes arg_sty
-        in
-        let ret = approx_type env sty in
-        let marg = With_locality.of_const arg_mode.mode_modes in
-        let mret = With_locality.newvar (get_current_level ()) in
-        newty (Tarrow ((p,marg,mret), arg_ty.ctyp_type, ret, commu_ok))
-      end
+        (Typetexp.transl_simple_type ~new_var_jkind:Any env ~closed:false
+          arg_mode.mode_modes arg_sty).ctyp_type
+      in
+      let arg_ty =
+        (* Keep the quantifiers outside [option] *)
+        if is_optional p then type_option_poly arg_ty
+        else arg_ty
+      in
+      let ret = approx_type env sty in
+      let marg = With_locality.of_const arg_mode.mode_modes in
+      let mret = With_locality.newvar (get_current_level ()) in
+      newty (Tarrow ((p,marg,mret), arg_ty, ret, commu_ok))
   | Ptyp_arrow (p, arg_sty, sty, arg_mode, _) ->
       let arg_mode = Typemode.transl_mode_with_locality arg_mode in
       let p = Typetexp.transl_label p (Some arg_sty) in
@@ -5841,8 +5916,6 @@ let type_approx_fun_one_param
     | Some spat ->
         let mode_annots = mode_annots_from_pat spat in
         let has_poly = has_poly_constraint spat in
-        if has_poly && is_optional label then
-          raise(Error(spat.ppat_loc, env, Optional_poly_param));
         Some mode_annots, has_poly
   in
   let loc_fun, ty_fun = in_function in
@@ -6902,6 +6975,16 @@ let add_zero_alloc_attribute expr attributes =
       { expr with exp_desc }
     end
   | _ -> expr
+
+
+type argument_elaboration =
+  | Wrap_in_some of
+      { some_arg : Typedtree.expression
+      ; some_locality : (disallowed * allowed) Locality.t
+      }
+    (** [~l:e] applied to [?l:ty], elaborated to [?l:(Some e)] *)
+  | Direct of Typedtree.expression
+    (** [e] or [~l:e] applied to [ty] or [l:ty], passed unchanged. *)
 
 let rec type_exp ?recarg ?(overwrite=No_overwrite) env expected_mode sexp =
   (* We now delegate everything to type_expect *)
@@ -9730,8 +9813,6 @@ and type_function
       in
       let mode_annots = mode_annots_from_pat pat in
       let has_poly = has_poly_constraint pat in
-      if has_poly && is_optional_parsetree arg_label then
-        raise(Error(pat.ppat_loc, env, Optional_poly_param));
       if has_poly
       && not (Language_extension.is_enabled Polymorphic_parameters) then
         raise (Typetexp.Error (loc, env,
@@ -9784,9 +9865,21 @@ and type_function
          to the function. This is different than [ty_arg_mono] exactly for
          optional arguments with defaults, where the external [ty_arg_mono]
          is optional and the internal view is not optional.
+
+         See [transl_poly_optional_param] for the handling of internal/external
+         types for optional polymorphic parameters.
       *)
       let ty_arg_internal, default_arg, sort_arg_internal =
         match default_arg with
+        | None when has_poly && Btype.is_optional typed_arg_label ->
+            let ( ~ty_internal, ~ty_external ) =
+              transl_poly_optional_param env ~has_default:false pat
+            in
+            unify_pat_types pat.ppat_loc env ty_external ty_arg;
+            (* [ty_internal] and [ty_external] are the same optional
+               type here. So the sort internal sort is the same as the
+               external sort. *)
+            ty_internal, None, arg_sort
         | None -> ty_arg_mono, None, arg_sort
         | Some default ->
             let arg_label =
@@ -9795,21 +9888,54 @@ and type_function
               | Nolabel | Labelled _ ->
                 Misc.fatal_error "[default] allowed only with optional argument"
             in
-            let default_arg_jkind, default_arg_sort =
-              Jkind.of_new_sort_var ~why:Optional_arg_default
-                ~level:(Ctype.get_current_level ())
+            let ty_default_arg, default_arg_sort =
+              if has_poly then begin
+                let ( ~ty_internal, ~ty_external) =
+                  transl_poly_optional_param
+                    env
+                    ~has_default:true
+                    pat
+                in
+                unify_pat_types pat.ppat_loc env ty_external ty_arg;
+                (* [ty_external] must be representable after unification with
+                   [ty_arg]. Since [ty_external] is nothing but
+                   [type_option_poly ty_internal], thus [ty_internal] must
+                   be representable. *)
+                let internal_sort =
+                  match
+                    type_sort
+                      ~why:Function_argument
+                      ~fixed:false
+                      env
+                      ty_internal
+                  with
+                  | Ok internal_sort -> internal_sort
+                  | Error _ ->
+                    Misc.fatal_error "Expected ty_internal to be representable"
+                in
+                ty_internal, internal_sort
+              end else begin
+                let default_arg_jkind, default_arg_sort =
+                  Jkind.of_new_sort_var ~why:Optional_arg_default
+                    ~level:(Ctype.get_current_level ())
+                in
+                let ty_default_arg = newvar default_arg_jkind in
+                begin
+                  try unify env (type_option ty_default_arg) ty_arg_mono
+                  with Unify _ -> assert false
+                end;
+                ty_default_arg, default_arg_sort
+              end
             in
-            let ty_default_arg = newvar default_arg_jkind in
-            begin
-              try unify env (type_option ty_default_arg) ty_arg_mono
-              with Unify _ -> assert false;
-            end;
             (* Issue#12668: Retain type-directed disambiguation of
                ?x:(y : Variant.t = Constr)
             *)
             let default =
               match pat.ppat_desc with
-              | Ppat_constraint (_, Some sty, _) ->
+              | Ppat_constraint (_, Some sty, _modes) when not has_poly ->
+                  (* Propagating the constraint to [default] is disabled for
+                     polymorphic defaults since we do not permit [Ptyp_poly]
+                     in [Pexp_constraint]s. This could be relaxed in future. *)
                   let gloc = { default.pexp_loc with loc_ghost = true } in
                   Ast_helper.Exp.constraint_ default (Some sty) ~loc:gloc []
               | _ -> default
@@ -9817,7 +9943,37 @@ and type_function
             (* Defaults are always global. They can be moved out of the
                function's region by Simplf.split_default_wrapper. *)
             let default_arg =
-              type_expect env mode_legacy default (mk_expected ty_default_arg)
+              if has_poly
+              then (
+                let ty, vars = tpoly_get_poly ty_default_arg in
+                let default, vars =
+                  with_local_level_generalize
+                    ~before_generalize:(fun (default, univars) ->
+                      may_lower_contravariant env default;
+                      default.exp_type :: univars
+                      |> List.iter generalize)
+                    (fun () ->
+                    let vars, ty =
+                      with_local_level_generalize_structure_if_principal
+                        ~before_generalize:(fun (_, ty) ->
+                          generalize_structure ty)
+                        (fun () ->
+                          instance_poly_fixed ~keep_names:true vars ty)
+                    in
+                    let default =
+                      type_expect env mode_legacy default (mk_expected ty)
+                    in
+                    default, vars)
+                in
+                check_univars
+                  env
+                  "default argument"
+                  default
+                  ty_default_arg
+                  vars;
+                { default with exp_type = instance default.exp_type })
+              else
+                type_expect env mode_legacy default (mk_expected ty_default_arg)
             in
             ty_default_arg, Some (default_arg, arg_label, default_arg_sort),
               default_arg_sort
@@ -10501,21 +10657,6 @@ and type_format loc str env =
   with Failure msg ->
     raise (Error (loc, env, Invalid_format msg))
 
-and type_option_some env expected_mode sarg ty ty0 =
-  let ty' = extract_option_type env ty in
-  let ty0' = extract_option_type env ty0 in
-  let locality_mode, argument_mode =
-    register_allocation ~loc:sarg.pexp_loc ~desc:Optional_argument expected_mode
-  in
-  let arg = type_argument ~overwrite:No_overwrite env argument_mode sarg ty' ty0' in
-  let lid = Longident.Lident "Some" in
-  let csome = Env.find_ident_constructor Predef.ident_some env in
-  let sort = Jkind.Sort.scannable in
-  let repres = Types.Constructor_uniform_value in
-  mkexp (Texp_construct(mknoloc lid , csome, repres, [sort, arg],
-                        Some (Typedtree.create_locality_mode_r locality_mode)))
-    (type_option arg.exp_type) arg.exp_loc arg.exp_env
-
 (* [expected_mode] is the expected mode of the field. It's already adjusted for
    allocation, mutation and modalities. *)
 and type_label_exp
@@ -10663,13 +10804,18 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
       let rec make_args args ty_fun =
         match get_desc (expand_head env ty_fun) with
         | Tarrow ((l,_marg,_mret),ty_arg,ty_fun,_) when is_optional l ->
-            let ty =
-              type_option_none env (instance (tpoly_get_mono ty_arg))
-                sarg.pexp_loc
+            let none_arg =
+              let ty_arg =
+                match get_desc ty_arg with
+                | Tpoly (ty_arg_body, ty_arg_vars) ->
+                  instance_poly ~keep_names:true ty_arg_vars ty_arg_body
+                | _ -> instance ty_arg
+              in
+              type_option_none env ty_arg sarg.pexp_loc
             in
             (* CR layouts v5: change value assumption below when we allow
                non-values in structures. *)
-            make_args ((l, Arg (ty, Jkind.Sort.scannable)) :: args) ty_fun
+            make_args ((l, Arg (none_arg, Jkind.Sort.scannable)) :: args) ty_fun
         | Tarrow ((l,_marg,_mret),_,ty_fun,_) when is_position l ->
             let arg = src_pos (Location.ghostify sarg.pexp_loc) [] env in
             make_args ((l, Arg (arg, Jkind.Sort.scannable)) :: args) ty_fun
@@ -10834,6 +10980,34 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
       unify_exp ~sexp:sarg env texp ty_expected;
       texp
 
+and type_option_some_arg env expected_mode sarg ty ty0 =
+  let ty' = extract_option_type env ty in
+  let ty0' = extract_option_type env ty0 in
+  let locality_mode, argument_mode =
+    register_allocation ~loc:sarg.pexp_loc ~desc:Optional_argument expected_mode
+  in
+  ( type_argument
+      ~overwrite:No_overwrite
+      env
+      argument_mode
+      sarg
+      ty'
+      ty0'
+  , locality_mode )
+
+and option_some env ~locality_mode arg =
+  let lid = Longident.Lident "Some" in
+  let csome = Env.find_ident_constructor Predef.ident_some env in
+  let sort = Jkind.Sort.scannable in
+  let repres = Types.Constructor_uniform_value in
+  mkexp (Texp_construct(mknoloc lid , csome, repres, [sort, arg],
+                        Some (Typedtree.create_locality_mode_r locality_mode)))
+    (type_option arg.exp_type) arg.exp_loc arg.exp_env
+
+and type_option_some env expected_mode sarg ty ty0 =
+  let arg, locality_mode = type_option_some_arg env expected_mode sarg ty ty0 in
+  option_some env ~locality_mode arg
+
 (* See Note [Type-checking applications] for an overview *)
 and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app
       (lbl, arg) =
@@ -10859,15 +11033,30 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app
         mode_argument ~funct ~index ~lbl ~position_and_mode ~partial_app
           mode_arg in
       let ty_arg', vars = tpoly_get_poly ty_arg in
-      let arg, sch =
+      let arg_elab, sch =
         if vars = [] then begin
           let ty_arg0' = tpoly_get_mono ty_arg0 in
           if wrapped_in_some then begin
-            type_option_some
-              env expected_mode sarg ty_arg' ty_arg0', None
+            let some_arg, some_locality =
+              type_option_some_arg
+                env
+                expected_mode
+                sarg
+                ty_arg'
+                ty_arg0'
+            in
+            Wrap_in_some { some_arg; some_locality }, None
           end else begin
-            type_argument ~overwrite:No_overwrite
-              env expected_mode sarg ty_arg' ty_arg0', None
+            let arg =
+              type_argument
+                ~overwrite:No_overwrite
+                env
+                expected_mode
+                sarg
+                ty_arg'
+                ty_arg0'
+            in
+            Direct arg, None
           end
         end else begin
           let sch =
@@ -10884,7 +11073,28 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app
           let separate =
             !Clflags.principal || Env.has_local_constraints env
           in
-          let arg, ty_arg, vars =
+          let ty_arg_for_check =
+            (* [check_univars] unifies an instance of [ty_arg_for_check]
+               with [arg.exp_type]. For a [~l] application of a optional
+               [?l] parameter, [arg] is checked before it is wrapped in
+               [Some], so use the corresponding type without [option]. *)
+            if wrapped_in_some
+            then extract_option_type_poly env ty_arg
+            else ty_arg
+          in
+          (* For polymorphic optional arguments, we may allocate a [Some].
+             We need to register this allocation and check [arg] against
+             the expected [argument_mode]. *)
+          let some_locality, argument_mode =
+            if wrapped_in_some then
+              let locality_mode, argument_mode =
+                register_allocation ~loc:sarg.pexp_loc
+                  ~desc:Optional_argument expected_mode
+              in
+              Some locality_mode, argument_mode
+            else None, expected_mode
+          in
+          let arg, vars =
             with_local_level_generalize begin fun () ->
               let vars, ty_arg' =
                 with_local_level_generalize_structure_if separate
@@ -10896,21 +11106,43 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app
               in
               let (ty_arg0', vars0) = tpoly_get_poly ty_arg0 in
               let vars0, ty_arg0' = instance_poly_fixed vars0 ty_arg0' in
+              let ty_arg', ty_arg0' =
+                (* A [~l] argument to an optional parameter is checked
+                    against the type inside [option], then wrapped in [Some] *)
+                if wrapped_in_some then
+                  extract_option_type env ty_arg',
+                  extract_option_type env ty_arg0'
+                else
+                  ty_arg', ty_arg0'
+              in
               List.iter2 (fun ty ty' -> unify_var env ty ty') vars vars0;
               let arg =
                 type_argument ~overwrite:No_overwrite
-                  env expected_mode sarg ty_arg' ty_arg0'
+                  env argument_mode sarg ty_arg' ty_arg0'
               in
-              arg, ty_arg, vars
+              arg, vars
             end
-            ~before_generalize:(fun (arg, ty_arg, vars) ->
+            ~before_generalize:(fun (arg, vars) ->
               if maybe_expansive arg then
                 lower_contravariant env arg.exp_type;
-              List.iter generalize (arg.exp_type :: ty_arg :: vars))
+              List.iter generalize (arg.exp_type :: vars))
           in
-          check_univars env "argument" arg ty_arg vars;
-          {arg with exp_type = instance arg.exp_type}, sch
+          check_univars env "argument" arg ty_arg_for_check vars;
+          let arg = {arg with exp_type = instance arg.exp_type} in
+          match some_locality with
+          | Some some_locality ->
+              Wrap_in_some { some_arg = arg; some_locality }, sch
+          | None -> Direct arg, sch
         end
+      in
+      let arg =
+        match arg_elab with
+        | Wrap_in_some { some_arg; some_locality } ->
+          assert wrapped_in_some;
+          option_some env ~locality_mode:some_locality some_arg
+        | Direct arg ->
+          assert (not wrapped_in_some);
+          arg
       in
       ( lbl, Arg (arg, mode_arg, sort_arg), sch,
         ~mode_fun:(Mode.with_locality_as_regionality mode_fun))
@@ -14134,9 +14366,6 @@ let report_error ~loc env =
       Location.errorf ~loc
         "@[This expression is local because it is an exclave,@ \
           but was expected otherwise.@]"
-  | Optional_poly_param ->
-      Location.errorf ~loc
-        "Optional parameters cannot be polymorphic"
   | Function_returns_local ->
       Location.errorf ~loc
         "This function is local-returning, but was expected otherwise."
