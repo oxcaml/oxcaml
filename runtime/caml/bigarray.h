@@ -142,7 +142,6 @@ CAMLextern value
     caml_ba_alloc(int flags, int num_dims, void * data, intnat * dim);
 CAMLextern value caml_ba_alloc_dims(int flags, int num_dims, void * data,
                                  ... /*dimensions, with type intnat */);
-CAMLextern value caml_bigstring_alloc_local(void * data, intnat len);
 CAMLextern uintnat caml_ba_byte_size(struct caml_ba_array * b);
 CAMLextern uintnat caml_ba_num_elts(struct caml_ba_array * b);
 

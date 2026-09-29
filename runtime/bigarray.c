@@ -213,21 +213,6 @@ CAMLexport const struct custom_operations caml_ba_ops = {
   custom_fixed_length_default
 };
 
-static const struct custom_operations caml_bigstring_local_ops = {
-  /* Same identifier as [caml_ba_ops] --- stack-allocated bigstrings demarshal
-   * into heap-allocated bigstrings that own and free their backing memory */
-  "_bigarr02",
-  /* [caml_alloc_custom_local] does not support finalizers */
-  custom_finalize_default,
-  /* Remaining fields are the same as [caml_ba_ops] */
-  caml_ba_compare,
-  caml_ba_hash,
-  caml_ba_serialize,
-  caml_ba_deserialize,
-  custom_compare_ext_default,
-  custom_fixed_length_default
-};
-
 /* Allocation of a big array */
 
 /* [caml_ba_alloc] will allocate a new bigarray object in the heap.
@@ -292,34 +277,6 @@ CAMLexport value caml_ba_alloc_dims(int flags, int num_dims, void * data, ...)
   for (int i = 0; i < num_dims; i++) dim[i] = va_arg(ap, intnat);
   va_end(ap);
   res = caml_ba_alloc(flags, num_dims, data, dim);
-  return res;
-}
-
-/* Like [caml_ba_alloc]. The allocated block always has the flags corresponding
- * to a plain bigstring. When stack allocation is enabled, the block is
- * allocated on the stack, and the [CAML_BA_STACK] flag is set.
- *
- * When [data = NULL], [caml_bigstring_alloc_local] does _not_ malloc new
- * backing memory owned by the allocated block. Instead, the block's data
- * pointer simply remains [NULL]. */
-
-CAMLexport value caml_bigstring_alloc_local(void * data, intnat len)
-{
-  struct caml_ba_array * b;
-  value res;
-
-  CAMLassert(len >= 0);
-  res = caml_alloc_custom_local(&caml_bigstring_local_ops,
-                               SIZEOF_BA_ARRAY + sizeof(intnat), 0, 1);
-  b = Caml_ba_array_val(res);
-  b->data = data;
-  b->num_dims = 1;
-  b->flags = CAML_BA_CHAR | CAML_BA_C_LAYOUT | CAML_BA_EXTERNAL;
-#if defined(NATIVE_CODE) && defined(STACK_ALLOCATION)
-  b->flags |= CAML_BA_STACK;
-#endif
-  b->proxy = NULL;
-  b->dim[0] = len;
   return res;
 }
 
