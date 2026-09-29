@@ -299,6 +299,18 @@ type vv : value & value
 type ok_vv_any_np = vv require_any_non_pointer
 |}]
 
+type bad_vv = vv require_external
+[%%expect{|
+Line 1, characters 14-16:
+1 | type bad_vv = vv require_external
+                  ^^
+Error: This type "vv" should be an instance of type "('a : any mod external_)"
+       The kind of vv is value & value
+         because of the definition of vv at line 2, characters 0-23.
+       But the kind of vv must be a subkind of any mod external_
+         because of the definition of require_external at line 1, characters 0-46.
+|}]
+
 type anp : any non_pointer
 type bad_any_np = anp require_external
 [%%expect{|
