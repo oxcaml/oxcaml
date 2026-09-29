@@ -45,7 +45,7 @@ type unbound_variable_reason = | Upstream_compatibility
 type jkind_initialization_choice = Sort | Any
 
 type value_loc =
-    Tuple | Poly_variant | Object_field | Optional_arg
+    Poly_variant | Object_field | Optional_arg
 
 type sort_loc =
     Fun_arg | Fun_ret
@@ -2069,7 +2069,6 @@ let report_error_doc loc env = function
   | Non_value {vloc; typ; err} ->
     let s =
       match vloc with
-      | Tuple -> "Tuple element"
       | Poly_variant -> "Polymorphic variant constructor argument"
       | Object_field -> "Object field"
       | Optional_arg -> "Optional argument"
