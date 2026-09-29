@@ -102,7 +102,7 @@ val check_value : hide -> 'a -> unit = <fun>
 
 (* Unboxed numbers, both whole-word and narrower than a word *)
 
-(* CR zeisbach: these tests all (knowingly) fail because [box num# = num] yet
+(* CR layouts-box: these tests all (knowingly) fail because [box num# = num] yet
    they are not laid out like [num], and instead are laid out like [{i : num}].
    Once we have addressasbility properly, we can box these numbers by tagging,
    which should allow these tests to pass.
@@ -153,7 +153,7 @@ let () = both_ways (fun { hide } ->
 [%%expect{|
 |}]
 
-(* CR zeisbach: add tests for mixed tuples after rebasing onto them *)
+(* CR layouts-box: add tests for mixed tuples after rebasing onto them *)
 (*
 (* Unboxed tuples mixing values and flat data, in various orders *)
 
@@ -255,7 +255,7 @@ let () = both_ways (fun { hide } ->
     unbox (hide (box #{ w1 = 1; w2 = #(#{ ix = #2L; iy = s }, #3l); w3 = s }))
   in
   assert (w1 = 1 && eq_i64 ix #2L && iy == s && eq_i32 w2b #3l && w3 == s)
-  (* CR zeisbach: mixed tuple, enable after rebasing onto mixed tuples
+  (* CR layouts-box: mixed tuple, enable after rebasing onto mixed tuples
   ;
   let #(#{ ix; iy }, b) = unbox (hide (box #(#{ ix = #4L; iy = s }, #5.5))) in
   assert (eq_i64 ix #4L && iy == s && eq_f64 b #5.5)
@@ -322,7 +322,7 @@ let () = both_ways (fun { hide } ->
   let #{ x = _; kept = _ } = unbox (hide (box #{ x = #(); kept = #() })) in
   let #{ x = _; kept = _ } = unbox (hide { x = #(); kept = #() }) in
   ()
-  (* CR zeisbach: mixed tuple, enable after rebasing onto mixed tuples
+  (* CR layouts-box: mixed tuple, enable after rebasing onto mixed tuples
   ;
   let #(#(_, a), b, _) = unbox (hide (box #(#(#(), #1L), s, #()))) in
   assert (eq_i64 a #1L && b == s)
@@ -341,7 +341,7 @@ let () =
   let local_ r = box #{ g = #1L; h = #2.5; k = s; l = 3; m = #4L } in
   let #{ g; h; k; l; m } = unbox r in
   assert (eq_i64 g #1L && eq_f64 h #2.5 && k == s && l = 3 && eq_i64 m #4L)
-  (* CR zeisbach: mixed tuples, enable after rebasing onto mixed tuples
+  (* CR layouts-box: mixed tuples, enable after rebasing onto mixed tuples
   ;
   let local_ b = box #(#1L, s) in
   let #(a, c) = unbox b in
@@ -407,7 +407,6 @@ module M :
    deeply: *)
 
 type inner = #{ ix : int; iy : int }
-(* CR zeisbach: avoiding singleton unboxed record because it can be weird. *)
 type outer = { mutable u : inner; tag : int }
 
 let () =
