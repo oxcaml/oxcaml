@@ -1083,8 +1083,9 @@ module Base_and_axes = struct
       in
       jkind_desc_of_const const, missing_cmi
 
-  (* Precondition: [jk] is fully expanded; an unexpanded [Kconstr] may have a
-     manifest whose layout implies a lower bound. *)
+  (* Precondition: [jk] is fully expanded (e.g. via [fully_expand_aliases]);
+     an unexpanded [Kconstr] may have a manifest whose layout implies a lower
+     bound. *)
   let implied_externality_of_fully_expanded jk =
     match jk.base with
     | Layout l -> Layout.implied_externality l
@@ -1905,6 +1906,9 @@ module Const = struct
     | Layout l -> Layout.Const.get_root_scannable_axes l
     | Kconstr (_, sa, _) -> Some sa
 
+  (* Precondition: [jk] is fully expanded (e.g. via
+     [Base_and_axes.fully_expand_aliases_const]); an unexpanded [Kconstr] may
+     have a manifest whose layout implies a lower bound. *)
   let implied_externality_of_fully_expanded jk =
     match jk.base with
     | Layout l -> Layout.Const.implied_externality l
