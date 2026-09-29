@@ -1774,7 +1774,7 @@ let layout_of_ty_for_idx_set env loc ty =
     | None -> Misc.fatal_error "layout_of_ty_for_idx_set: expected layout"
   in
   let mbe =
-    transl_const_layout layout
+    transl_layout layout
     |> refine_mixed_block_element env (to_location loc) ty
   in
   let context = Ctype.mk_jkind_context_check_principal env in

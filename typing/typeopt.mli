@@ -108,7 +108,7 @@ val assert_mixed_product_support_for_lambda_shape :
 
 (* Translate a representable layout, turning generalized sorts into splices.
    Rejects [Any] and [Univar]. *)
-val transl_const_layout :
+val transl_layout :
   Jkind_types.Layout.Const.t -> unit Lambda.mixed_block_element
 
 (* Translate record representations to Lambda, defaulting unfilled
