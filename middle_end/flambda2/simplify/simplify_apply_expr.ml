@@ -261,6 +261,7 @@ let simplify_direct_full_application ~simplify_expr ~rebuild_expr dacc apply
   in
   match inlined with
   | Inline (dacc, inlined) ->
+    let is_cold = Code_metadata.cold callee's_code_metadata in
     let down_to_up dacc simplified_body =
       let simplified_body =
         if coming_from_indirect
@@ -272,6 +273,9 @@ let simplify_direct_full_application ~simplify_expr ~rebuild_expr dacc apply
       in
       let simplified_body =
         SE.notify_removed ~operation:Removed_operations.call simplified_body
+      in
+      let simplified_body =
+        if is_cold then SE.mark_as_cold simplified_body else simplified_body
       in
       down_to_up dacc simplified_body
     in

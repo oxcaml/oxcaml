@@ -31,7 +31,8 @@ open! Flambda.Import
 type t = private
   { simplified_lets_and_let_conts : simplified_lets_and_let_conts;
     simplified_terminator : simplified_terminator;
-    removed_operations : Removed_operations.t
+    removed_operations : Removed_operations.t;
+    is_cold : bool
   }
 
 and simplified_lets_and_let_conts = private
@@ -132,6 +133,8 @@ and simplified_switch = private
   }
 
 val notify_removed : operation:Removed_operations.t -> t -> t
+
+val mark_as_cold : t -> t
 
 val simplified_let :
   bindings_to_place:Simplified_named.binding_to_place list ->

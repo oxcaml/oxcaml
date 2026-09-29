@@ -36,7 +36,8 @@ module LCS = Lifted_constant_state
 type t =
   { simplified_lets_and_let_conts : simplified_lets_and_let_conts;
     simplified_terminator : simplified_terminator;
-    removed_operations : Removed_operations.t
+    removed_operations : Removed_operations.t;
+    is_cold : bool
   }
 
 and simplified_lets_and_let_conts =
@@ -135,6 +136,8 @@ let notify_removed ~operation t =
     removed_operations = Removed_operations.( + ) operation t.removed_operations
   }
 
+let mark_as_cold t = if t.is_cold then t else { t with is_cold = true }
+
 let simplified_let ~bindings_to_place ~removed_operations
     ~lifted_constants_from_defining_expr ~at_unit_toplevel ~closure_info
     ~rewrite_id t =
@@ -160,7 +163,8 @@ let simplified_let_cont simplified_handlers t =
 let simplified_terminator simplified_terminator =
   { simplified_lets_and_let_conts = Simplified_terminator;
     simplified_terminator;
-    removed_operations = Removed_operations.zero
+    removed_operations = Removed_operations.zero;
+    is_cold = false
   }
 
 let simplified_apply simplified_apply =

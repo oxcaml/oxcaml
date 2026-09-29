@@ -31,7 +31,8 @@ let rebuild_terminator (terminator : Simplified_expr.simplified_terminator) uacc
 let rec rebuild_expr (expr : Simplified_expr.t) uacc ~after_rebuild =
   let { Simplified_expr.simplified_lets_and_let_conts;
         simplified_terminator;
-        removed_operations
+        removed_operations;
+        is_cold
       } =
     expr
   in
@@ -44,6 +45,7 @@ let rec rebuild_expr (expr : Simplified_expr.t) uacc ~after_rebuild =
       rebuild_terminator simplified_terminator uacc
         ~after_rebuild:(fun expr uacc ->
           let uacc = UA.notify_removed ~operation:removed_operations uacc in
+          let expr = if is_cold then RE.mark_as_cold expr else expr in
           after_rebuild expr uacc)
     | Simplified_let (simplified_let, simplified_lets_and_let_conts) ->
       rebuild_lets_and_let_conts simplified_lets_and_let_conts uacc
