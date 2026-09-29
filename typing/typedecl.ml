@@ -1958,20 +1958,6 @@ let assert_mixed_product_support =
                      { value_prefix_len; max_value_prefix_len;
                        mixed_product_kind })))
 
-let assert_mixed_block_shape_support loc mixed_product_kind shape =
-  (* CR zeisbach: we should do a check for splice variables after slambda.
-     This isn't currently present, but Joe has a PR that will do this. *)
-  if not (Lambda.mixed_block_shape_has_splices shape) then begin
-    let mpb = Mixed_product_bytes.count (Product shape) in
-    (* All-value/void shapes compile to uniform blocks (products of values are
-       flattened), so the scannable prefix length limit doesn't apply.
-       We only want to do the check if we are in a mixed block. *)
-    if not (Mixed_product_bytes.all_value mpb)
-    then
-      assert_mixed_product_support loc mixed_product_kind
-        ~value_prefix_len:(Mixed_product_bytes.value_prefix_len mpb)
-  end
-
 (* Records and variants with a field or constructor argument of kind [any] get a
    variable representation, as oxcaml/oxcaml#5461. We gate this by extension. *)
 let assert_any_args_support loc =
@@ -4336,8 +4322,6 @@ let native_repr_of_type ~loc env kind ty sort_or_poly ~is_return =
     let is_scannable =
       match sort_or_poly with
       | Poly -> false
-      (* CR zeisbach: technically this differs in fatal_error behavior from
-         previous helper. Not sure what is the trade-off to make... *)
       | Sort s -> Jkind.Sort.Const.is_scannable s
     in
     if is_immediate && is_non_nullable && is_scannable

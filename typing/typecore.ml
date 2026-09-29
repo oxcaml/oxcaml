@@ -10994,14 +10994,14 @@ and type_tuple ~is_unboxed ~overwrite ~loc ~env ~(expected_mode : expected_mode)
     (fun l -> raise (Error (loc, env, Repeated_tuple_exp_label l)))
     (Misc.repeated_label sexpl);
   (* wrap [register_allocation_value_mode] call with an [option], as unboxed
-     tuples aren't allocated and thus have no [alloc_mode]. *)
+     tuples aren't allocated and thus have no [locality_mode]. *)
   let register_allocation mode =
     if is_unboxed then None, mode
     else
-      let alloc_mode, mode = register_allocation_value_mode ~loc mode in
-      Some alloc_mode, mode
+      let locality_mode, mode = register_allocation_value_mode ~loc mode in
+      Some locality_mode, mode
   in
-  let alloc_mode, value_mode = register_allocation expected_mode.mode in
+  let locality_mode, value_mode = register_allocation expected_mode.mode in
   let argument_mode =
     value_mode
     |> apply_right_is_contained_by
@@ -11075,13 +11075,13 @@ and type_tuple ~is_unboxed ~overwrite ~loc ~env ~(expected_mode : expected_mode)
       sexpl types_sorts_and_modes overwrites
   in
   let exp_desc =
-    match alloc_mode with
+    match locality_mode with
     | None ->
         assert is_unboxed;
         Texp_unboxed_tuple expl
-    | Some alloc_mode ->
+    | Some locality_mode ->
         assert (not is_unboxed);
-        Texp_tuple (expl, Typedtree.create_locality_mode_r alloc_mode)
+        Texp_tuple (expl, Typedtree.create_locality_mode_r locality_mode)
   in
   re {
     exp_desc;

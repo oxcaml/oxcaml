@@ -1197,33 +1197,29 @@ and value_kind_immutable_record env ~loc ~visited ~depth ~num_nodes_visited
     end
 
 and value_kind_tuple env ~loc ~visited ~depth ~num_nodes_visited elements =
-  let compute_mbe_if_repr (_, ty) =
-    Typedecl.mixed_block_element env ty (Ctype.type_jkind env ty)
+  let types = List.map snd elements in
+  let tuple_kind constructor_shape =
+    non_nullable (Pvariant { consts = []; non_consts = [0, constructor_shape] })
   in
-  match Misc.Stdlib.List.map_option compute_mbe_if_repr elements with
-  | None ->
+  match Typedecl.compute_block_shape env types with
+  | `Undetermined ->
     (* Some element's layout is unknown or not representable, so computing
        a more precise value kind is useless. This arises from [any] in tuples *)
     num_nodes_visited, non_nullable Pgenval
-  | Some mixed_block_elements ->
-    let num_nodes_visited, constructor_shape =
-      if List.for_all Types.mixed_block_element_is_scannable
-           mixed_block_elements
-      then
-        let num_nodes_visited, fields =
-          List.fold_left_map (fun num_nodes_visited (_, field) ->
-            let num_nodes_visited = num_nodes_visited + 1 in
-            value_kind env ~loc ~visited ~depth ~num_nodes_visited field)
-            num_nodes_visited elements
-        in
-        num_nodes_visited, Constructor_shape_uniform fields
-      else
-        value_kind_mixed_block env ~loc ~visited ~depth ~num_nodes_visited
-          ~shape:(Array.of_list mixed_block_elements)
-          (List.map (fun (_, field) -> Some field) elements)
+  | `Not_mixed ->
+    let num_nodes_visited, fields =
+      List.fold_left_map (fun num_nodes_visited field ->
+        let num_nodes_visited = num_nodes_visited + 1 in
+        value_kind env ~loc ~visited ~depth ~num_nodes_visited field)
+        num_nodes_visited types
     in
-    num_nodes_visited,
-    non_nullable (Pvariant { consts = []; non_consts = [0, constructor_shape] })
+    num_nodes_visited, tuple_kind (Constructor_shape_uniform fields)
+  | `Mixed shape ->
+    let num_nodes_visited, constructor_shape =
+      value_kind_mixed_block env ~loc ~visited ~depth ~num_nodes_visited
+        ~shape (List.map Option.some types)
+    in
+    num_nodes_visited, tuple_kind constructor_shape
 
 let value_kind env loc ty =
   try

@@ -621,7 +621,10 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       let shape =
         Array.of_list (List.map Lambda.mixed_block_element_of_layout layouts)
       in
-      Typedecl.assert_mixed_block_shape_support e.exp_loc Tuple shape;
+      (* Shapes containing splices are checked after static evaluation *)
+      if not (Lambda.mixed_block_shape_has_splices shape) then
+        Typeopt.assert_mixed_product_support_for_lambda_shape e.exp_loc Tuple
+          shape;
       let constant =
         match List.map extract_constant ll with
         | exception Not_constant -> None
