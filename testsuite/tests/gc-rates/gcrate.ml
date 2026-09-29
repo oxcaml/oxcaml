@@ -150,7 +150,7 @@ let interned =
 type node =
   | Leaf
   | Str of string
-  | Floats of float array
+  | Floats of floatarray
   | Ints of int array
   | Cons of node * node
   | Pair of node * node
@@ -160,7 +160,7 @@ and record =
   { id : int;
     name : string;
     mutable hits : int;
-    mutable score : float; (* boxed: mixed record *)
+    mutable score : float; (* boxed *)
     kids : node array
   }
 
@@ -187,7 +187,7 @@ let fresh_string b =
 let fresh_floats b =
   let len = rand_len b 24 in
   charge b (1 + len);
-  Floats (Array.init len (fun i -> float_of_int i *. 1.5))
+  Floats (Float.Array.init len (fun i -> float_of_int i *. 1.5))
 
 let fresh_ints b =
   let len = rand_len b 16 in
@@ -265,7 +265,7 @@ let rec checksum node depth acc =
     match node with
     | Leaf -> acc + 1
     | Str s -> acc + String.length s
-    | Floats f -> acc + Array.length f
+    | Floats f -> acc + Float.Array.length f
     | Ints a -> acc + Array.length a
     | Cons (a, b) | Pair (a, b) ->
       checksum b (depth + 1) (checksum a (depth + 1) acc)
