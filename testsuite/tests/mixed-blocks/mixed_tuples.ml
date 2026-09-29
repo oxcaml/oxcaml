@@ -246,6 +246,28 @@ Lines 2-20, characters 2-3:
 Error: Mixed tuples may contain at most 254 value fields prior to the flat suffix, but this one contains 255.
 |}]
 
+(* regression test: boxed vs unboxed labeled tuples report the right errors *)
+
+let f (x : #(a:int * b:string)) = match x with (p, q) -> p
+[%%expect{|
+Line 1, characters 47-53:
+1 | let f (x : #(a:int * b:string)) = match x with (p, q) -> p
+                                                   ^^^^^^
+Error: This pattern matches values of type "'a * 'b"
+       but a pattern was expected which matches values of type
+         "#(a:int * b:string)"
+|}]
+
+let f (x : (a:int * b:string)) = match x with #(p, q) -> p
+[%%expect{|
+Line 1, characters 46-53:
+1 | let f (x : (a:int * b:string)) = match x with #(p, q) -> p
+                                                  ^^^^^^^
+Error: This pattern matches values of type "#('a * 'b)"
+       but a pattern was expected which matches values of type
+         "a:int * b:string"
+|}]
+
 (* regression test: partial pattern matching counterexample generation *)
 
 type t = int * float# * #((unit * string) * unit#)
