@@ -3669,12 +3669,7 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
         ~mty_res
         ~mode_res:(with_locality_as_regionality mm_res)
         ~mode_arg:None;
-      { mod_desc =
-          Tmod_apply_unit
-            (funct,
-             functor_application_yielding ~funct
-               ~arg_mode:
-                 (With_regionality.disallow_right With_regionality.legacy));
+      { mod_desc = Tmod_apply_unit(funct, Mode.Yielding.newvar 0);
         mod_type = mty_res;
         mod_mode =
           with_locality_as_regionality
