@@ -1747,7 +1747,7 @@ let with_bounds_is_empty : type l r. (l * r) Types.with_bounds -> bool =
   | Types.No_with_bounds -> true
   | Types.With_bounds _ -> false
 
-let fast_sub_of_sort_sub : type r.
+let fast_sub_of_layout_sub : type r.
     sub:(Allowance.allowed * r) Types.jkind ->
     sub_layout:Jkind_types.Sort.t Jkind_types.Layout.t ->
     super_lat:Axis_lattice.t ->
@@ -1771,7 +1771,7 @@ let fast_sub_of_any_super : type r.
  fun mod_bounds sub ->
   match sub.jkind.base with
   | Types.Layout (Jkind_types.Layout.Sort _ as sub_layout) ->
-    fast_sub_of_sort_sub ~sub ~sub_layout
+    fast_sub_of_layout_sub ~sub ~sub_layout
       ~super_lat:(Jkind.Mod_bounds.to_axis_lattice mod_bounds)
   | Types.Layout _ | Types.Kconstr _ -> false
 
@@ -1786,7 +1786,7 @@ let fast_sub_of_sort_super : type r.
     if not (Jkind_types.Sort.equate ~allow_mutation:true sub_sort super_sort)
     then false
     else
-      fast_sub_of_sort_sub ~sub ~sub_layout
+      fast_sub_of_layout_sub ~sub ~sub_layout
         ~super_lat:(Jkind.Mod_bounds.to_axis_lattice mod_bounds)
   | Types.Layout _ | Types.Kconstr _ -> false
 
