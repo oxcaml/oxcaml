@@ -5046,8 +5046,46 @@ let sequence x y =
   | _, Ctuple [] -> x
   | _, _ -> Csequence (x, y)
 
+let match_equality_with_constant cond ~then_ ~else_ =
+  let match_args args equal unequal =
+    match args with
+    | [arg; ((Cconst_int _ | Cconst_natint _) as constant)]
+    | [((Cconst_int _ | Cconst_natint _) as constant); arg] ->
+      Some (arg, constant, equal, unequal)
+    | _ -> None
+  in
+  match cond with
+  | Cop (Ccmpi Ceq, args, _) -> match_args args then_ else_
+  | Cop (Ccmpi Cne, args, _) -> match_args args else_ then_
+  | _ -> None
+
+let is_tagged_equality expr arg1 arg2 =
+  match expr with
+  | Cop
+      ( (Caddi | Cor),
+        [ Cop (Clsl, [Cop (Ccmpi Ceq, [a; b], _); Cconst_int (1, _)], _);
+          Cconst_int (1, _) ],
+        _ ) ->
+    (same_simple_value a arg1 && same_simple_value b arg2)
+    || (same_simple_value a arg2 && same_simple_value b arg1)
+  | _ -> false
+
 let ite ~dbg ~then_dbg ~then_ ~else_dbg ~else_ cond =
-  Cifthenelse (cond, then_dbg, then_, else_dbg, else_, dbg)
+  let default () = Cifthenelse (cond, then_dbg, then_, else_dbg, else_, dbg) in
+  (* Collapse a sentinel-based equality test to the final tagged comparison. If
+     [a = c], [a = b] is equivalent to [b = c]; if [a <> c] and [b = c], it is
+     false. [same_simple_value] restricts the operands to variables and
+     constants, so no effects are discarded or speculated. *)
+  match match_equality_with_constant cond ~then_ ~else_ with
+  | Some (a, constant, equal, Cifthenelse (cond, _, then_, _, else_, _)) -> (
+    match match_equality_with_constant cond ~then_ ~else_ with
+    | Some (b, constant', Cconst_int (1, _), unequal)
+      when same_simple_value constant constant'
+           && is_tagged_equality equal b constant
+           && is_tagged_equality unequal a b ->
+      unequal
+    | _ -> default ())
+  | _ -> default ()
 
 let trywith ~dbg ~body ~exn_var ~extra_args ~handler_cont ~handler () =
   Ccatch
