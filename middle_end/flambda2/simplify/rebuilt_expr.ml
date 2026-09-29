@@ -308,7 +308,7 @@ let create_switch are_rebuilding ~is_cold switch =
   then term_not_rebuilt
   else Expr.create_switch switch |> create ~is_cold
 
-let create_invalid reason = Expr.create_invalid reason |> create ~is_cold:false
+let create_invalid reason = Expr.create_invalid reason |> create ~is_cold:true
 
 let bind_no_simplification are_rebuilding ~bindings ~body ~cost_metrics_of_body
     ~free_names_of_body =
