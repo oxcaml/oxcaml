@@ -3249,7 +3249,7 @@ module Format_history = struct
     | Signature_item -> fprintf ppf "it's the type of something in a signature"
     | Layout_poly -> fprintf ppf "it's the layout polymorphic type"
     | Typing_recovery ->
-      fprintf ppf "typing recovery needed to create a fake AST node"
+      fprintf ppf "it's a fake kind created during error recovery"
 
   let format_concrete_legacy_creation_reason ppf :
       History.concrete_legacy_creation_reason -> unit = function
