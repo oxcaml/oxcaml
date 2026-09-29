@@ -1,4 +1,5 @@
 (* TEST
+ flags = "-extension layouts_beta";
  { expect; expect.opt; }
 *)
 
@@ -100,4 +101,37 @@ let t = A (#5.0, #(), "str")
 [%%expect {|
 type t = A of float# * unit# * string | B
 val t : t = A (<abstr>, <void>, "str")
+|}];;
+
+(* Mixed tuple *)
+let t = (#5.0, "str", #5L, "str2")
+
+[%%expect {|
+val t : float# * string * int64_u * string =
+  (<abstr>, "str", <abstr>, "str2")
+|}];;
+
+(* Void tuple element *)
+let t = (#5.0, #(), "str")
+
+[%%expect {|
+val t : float# * unit# * string = (<abstr>, <void>, "str")
+|}];;
+
+(* Labeled mixed tuple *)
+let t = (~uflt:#5.0, ~str:"str", "str2")
+
+[%%expect {|
+val t : uflt:float# * str:string * string =
+  (~uflt:<abstr>, ~str:"str", "str2")
+|}];;
+
+(* Regression test: void field of a record with an [any] parameter *)
+type ('a : any) t = { x : int; y : 'a }
+
+let t = { x = 42; y = #() }
+
+[%%expect {|
+type ('a : any) t = { x : int; y : 'a; }
+val t : unit# t = {x = 42; y = <void>}
 |}];;
