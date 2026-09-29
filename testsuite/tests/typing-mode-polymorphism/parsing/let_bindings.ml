@@ -49,3 +49,10 @@ Line 1, characters 14-20:
                   ^^^^^^
 Error: Mode variables and mode bounds are only allowed on function types.
 |}]
+
+(* Mode variables are scoped like type variables *)
+
+let f (_ : unit -> 'a @ 'm) : unit -> 'a @ 'm = fun () -> ""
+[%%expect{|
+val f : (unit -> string @ 'm) @ 'p -> (unit -> string @ 'o) @ 'n = <fun>
+|}]
