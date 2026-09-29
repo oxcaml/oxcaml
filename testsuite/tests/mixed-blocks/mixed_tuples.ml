@@ -1,4 +1,5 @@
 (* TEST
+ flags = "-extension layout_poly_alpha";
  flambda2;
  { expect; expect.opt; }
 *)
@@ -244,6 +245,75 @@ Lines 2-20, characters 2-3:
 19 |     #1.0
 20 |   )
 Error: Mixed tuples may contain at most 254 value fields prior to the flat suffix, but this one contains 255.
+|}]
+
+(* Shapes of layout-polymorphic tuples contain splices, so they are checked
+   after static evaluation instead. *)
+let poly_capped_ok =
+  let poly_ mk x =
+    (
+      p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
+      p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
+      p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
+      p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
+      p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
+      p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
+      p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
+      p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
+      p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
+      p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
+      p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
+      p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
+      p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
+      p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
+      p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
+      p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
+      x
+    )
+  in
+  let _ = mk 42 in
+  ()
+[%%expect{|
+val poly_capped_ok : unit = ()
+|}]
+
+let poly_capped_err =
+  let poly_ mk x =
+    (
+      p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
+      p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
+      p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
+      p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
+      p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
+      p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
+      p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
+      p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
+      p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
+      p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
+      p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
+      p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
+      p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
+      p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
+      p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
+      p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
+      x
+    )
+  in
+  let _ = mk #1.0 in
+  ()
+[%%expect{|
+Lines 3-21, characters 4-5:
+ 3 | ....(
+ 4 |       p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
+ 5 |       p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
+ 6 |       p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
+ 7 |       p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
+...
+18 |       p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
+19 |       p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
+20 |       x
+21 |     )
+Error: Mixed blocks may contain at most 254 value fields prior to the flat suffix, but this one contains 255.
 |}]
 
 (* regression test: boxed vs unboxed labeled tuples report the right errors *)

@@ -4980,7 +4980,9 @@ let do_for_multiple_match ~scopes ~return_layout loc idl mode
            (fun (_, _, layout) -> Lambda.mixed_block_element_of_layout layout)
            idl)
     in
-    Typedecl.assert_mixed_block_shape_support loc Tuple shape;
+    (* Shapes containing splices are checked after static evaluation *)
+    if not (Lambda.mixed_block_shape_has_splices shape) then
+      Typeopt.assert_mixed_product_support_for_lambda_shape loc Tuple shape;
     Lprim (Pmakeblock (0, Immutable, Shape shape, mode), param_lambda, sloc)
   in
   let input_args =
