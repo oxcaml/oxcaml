@@ -331,6 +331,7 @@ type error =
   | Field_value_not_rep of type_expr * Jkind.Violation.t
   | Constructor_arg_projection_not_rep of type_expr * Jkind.Violation.t
   | Constructor_arg_value_not_rep of type_expr * Jkind.Violation.t
+  | Optional_param_not_rep of type_expr * Jkind.Violation.t
   | Invalid_label_for_src_pos of arg_label
   | Nonoptional_call_pos_label of string
   | Always_heap_allocation of always_heap_allocation
@@ -1371,9 +1372,24 @@ let transl_poly_optional_param env ~has_default pat
     | _ -> assert false
   in
   if has_default
-  then
+  then (
+    (* [annotated_ty] must be representable to be an argument of a
+       [type_option_poly]. *)
+    (match
+       constrain_type_jkind
+         env
+         annotated_ty
+         Predef.option_argument_jkind
+     with
+     | Ok () -> ()
+     | Error e ->
+       raise
+         (Error
+            ( pat.ppat_loc
+            , env
+            , (Optional_param_not_rep (annotated_ty, e)))));
     ( ~ty_internal:annotated_ty
-    , ~ty_external:(type_option_poly annotated_ty) )
+    , ~ty_external:(type_option_poly annotated_ty) ))
   else (
     let contents =
       if is_option_type_poly env annotated_ty
@@ -14438,6 +14454,12 @@ let report_error ~loc env =
   | Constructor_arg_value_not_rep (ty,violation) ->
       Location.errorf ~loc
         "@[Constructor arguments must be representable.@]@ %a"
+        (Jkind.Violation.report_with_offender
+           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
+           env) violation
+  | Optional_param_not_rep (ty, violation) ->
+      Location.errorf ~loc
+        "@[Optional parameter types must be representable.@]@ %a"
         (Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
            env) violation

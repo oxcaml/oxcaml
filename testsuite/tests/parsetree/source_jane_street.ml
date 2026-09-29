@@ -395,7 +395,11 @@ let f ?(local_ x = 42)
 Line 5, characters 8-53:
 5 |       ?(local_ x : ('a : any) 'b . 'a @ once portable = assert false)
             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Optional parameters cannot be polymorphic
+Error: Optional parameter types must be representable.
+       The layout of ('a : any). 'a is any
+         because of the annotation on the universal variable 'a.
+       But the layout of ('a : any). 'a must be a value layout
+         because the type argument of option has layout value_or_null.
 |}]
 
 (* bindings, in the order specified by [let_binding_body_no_punning] in [parser.mly] *)
