@@ -632,7 +632,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
             if
               List.for_all (fun (_, _, s) -> Jkind.Sort.Const.is_scannable s) el
             then
-              (* Ensure that existing uniform tuple constants are optimized *)
+              (* Ensure that uniform tuple constants are optimized *)
               Some (Const_block(0, constants))
             else if !Clflags.native_code then
               Some (Const_mixed_block(0, shape, constants))
@@ -1931,7 +1931,7 @@ and transl_apply ~scopes
     - [Curried]. It takes each argument individually.
 
    We first try treating the function as taking a flattened tupled argument (in
-   [trans_tupled_function]) and, if that doesn't work, we fall back to treating
+   [transl_tupled_function]) and, if that doesn't work, we fall back to treating
    the function as taking each argument individually (in
    [trans_curried_function]).
 *)
@@ -1980,10 +1980,10 @@ and transl_tupled_function
      (whose alloc mode must be global) and the function itself is global. It may
      actually be sound to tuplify locally-allocated functions, but we haven't
      thought it through. *)
-  (* CR layouts: We also currently require every component of the tuple pattern
-     to have the value sort, since the backend does not currently support
-     optimizing mixed tupled functions. This should change, especially to
-     properly support layout poly tupled functions. *)
+  (* CR layouts-mixed-tuplify: We also currently require every component of the
+     tuple pattern to have the value sort, since the backend does not currently
+     support optimizing mixed tupled functions. This should change, especially
+     to properly support layout poly tupled functions. *)
   let all_components_are_values pl =
     List.for_all
       (fun (_, _, sort) ->
@@ -2016,8 +2016,9 @@ and transl_tupled_function
                 Pvariant { consts = [];
                            non_consts = [0, Constructor_shape_uniform kinds] }
             } ->
-              (* CR layouts: we should support the [Constructor_mixed] case,
-                 once the backend supports this optimization for non-values. *)
+              (* CR layouts-mixed-tuplify: we should support the
+                 [Constructor_mixed] case, once the backend supports this
+                 optimization for non-values. *)
               Some kinds
           | _ -> None
         in
@@ -2032,8 +2033,9 @@ and transl_tupled_function
                tuple_value_kinds (layout_of_fun_arg_ty fun_arg_ty loc arg_sort)
              with
              | Some kinds -> kinds
-             (* CR layouts: this should compute a layout (not necessarily a
-                value_kind) from the stored sorts, following backend support. *)
+             (* CR layouts-mixed-tuplify: this should compute a layout (not
+                necessarily a value_kind) from the stored sorts, following
+                backend support. *)
              | None -> List.init size (fun _ -> Lambda.generic_value))
           else
             match

@@ -491,9 +491,6 @@ let matcher discr (p : Simple.pattern) rem =
       (* List lengths can differ with GADT refinements.
          see [basic-more/robustmatch.ml] module [M7] for an example *)
       yesif (List.length l1 = List.length l2 &&
-              (* CR zeisbach: ignoring the sort variables here is a little
-                 suspicious, but I couldn't manage to break it. It's probably
-                 OK (see unboxed version below), but worth thinking about. *)
              List.for_all2 (fun (lbl1, _) (lbl2, _) -> lbl1 = lbl2) l1 l2)
   | Unboxed_tuple l1, Unboxed_tuple l2 ->
       yesif (List.for_all2 (fun (lbl1, _) (lbl2, _) -> lbl1 = lbl2) l1 l2)
