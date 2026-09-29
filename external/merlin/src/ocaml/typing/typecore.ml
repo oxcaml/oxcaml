@@ -11295,39 +11295,10 @@ and type_argument ?explanation ?recarg ~overwrite env mode sarg
         with exn when Typing_recovery.is_recoverable exn ->
           Typing_recovery.erroneous_type_register ty_expected;
           let loc = sarg.pexp_loc in
-          let exp =
-            Texp_ident
-              { path = Path.Pident (Ident.create_local "*type-error*");
-                lid = Location.mkloc (Longident.Lident "*type-error*") loc;
-                desc = {
-                  val_type = ty_expected;
-                  val_kind =
-                    Val_reg (Var (Jkind.Sort.new_var
-                                    ~level:(Ctype.get_current_level ())));
-                  val_lpoly = Lpoly.determined [];
-                  val_loc = loc;
-                  val_attributes = [];
-                  val_uid = Uid.internal_not_actually_unique;
-                  val_zero_alloc = Zero_alloc.default;
-                  val_modalities = Modality.of_const Modality.Const.id
-                };
-                kind = Id_value;
-                unique_use = (Uniqueness.disallow_left Uniqueness.legacy,
-                              Linearity.disallow_right Linearity.legacy);
-                staticity = proj_staticity Mode.With_regionality.legacy;
-                mode =
-                  Mode.With_regionality.disallow_right
-                    Mode.With_regionality.legacy
-              }
-          in
-          { exp_desc = exp;
-            exp_loc = loc;
-            exp_extra = [];
-            exp_type = ty_expected;
-            exp_env = env;
-            exp_attributes =
-              Typing_recovery_state.recovery_attributes sarg.pexp_attributes
-          })
+          create_typing_recovery_error_node loc env ty_expected
+            ~attributes:(Typing_recovery_state.recovery_attributes
+                           sarg.pexp_attributes)
+      )
   else delayed ()
 
 (* See Note [Type-checking applications] for an overview *)
