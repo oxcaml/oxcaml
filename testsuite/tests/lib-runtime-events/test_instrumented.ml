@@ -2,6 +2,8 @@
  {
    include runtime_events;
    flags = "-runtime-variant=i";
+   reason = "instrumented runtime not supported by oxcaml";
+   skip;
    instrumented-runtime;
    native;
  }
