@@ -757,18 +757,8 @@ let make_constructor
                    ~got:ret_type
                    ~expected:(Ctype.newconstr type_path type_params)]
               in
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-              raise (Error(sret_type.ptyp_loc,
-                          Constraint_failed(env,
-                                         Errortrace.unification_error ~trace)))
-||||||| Compiler:last-imported
-              raise (Error(sret_type.ptyp_loc,
-                           Constraint_failed(
-                           env, Errortrace.unification_error ~trace)))
-=======
               Error.log_and_raise sret_type.ptyp_loc
                 (Constraint_failed (env, Errortrace.unification_error ~trace))
->>>>>>> Compiler:HEAD
           end;
           (targs, tret_type, args, ret_type, univar_list)
         end
@@ -3936,18 +3926,10 @@ let transl_type_decl env rec_flag sdecl_list =
       let decl = tdecl.typ_type in
        match Mode.With_locality.with_zap_scope (fun ~zap_scope ->
           Ctype.closed_type_decl ~zap_scope decl) with
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-         Some ty ->
-          if not (Msupport.erroneous_type_check ty) then
-            raise(Error(sdecl.ptype_loc, Unbound_type_var(ty,decl)))
-||||||| Compiler:last-imported
-         Some ty -> raise(Error(sdecl.ptype_loc, Unbound_type_var(ty,decl)))
-=======
          Some ty ->
            (* do not report spurious error in a recovered contexts *)
            if not (Typing_recovery.erroneous_type_check ty) then
              Error.log_and_raise sdecl.ptype_loc (Unbound_type_var(ty,decl))
->>>>>>> Compiler:HEAD
        | None   -> ())
     sdecl_list tdecls;
   (* Check that constraints are enforced *)
@@ -4919,14 +4901,9 @@ let transl_value_decl env loc ~modal ~why valdecl =
       (*
       if prim.prim_arity = 0 &&
          (prim.prim_name = "" || prim.prim_name.[0] <> '%') then
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-        raise(Error(valdecl.pval_type.ptyp_loc, Null_arity_external));
+         Error.log_and_raise valdecl.pval_type.ptyp_loc  Null_arity_external;
       *)
-||||||| Compiler:last-imported
-        raise(Error(valdecl.pval_type.ptyp_loc, Null_arity_external));
-=======
-        Error.log_and_raise valdecl.pval_type.ptyp_loc  Null_arity_external;
->>>>>>> Compiler:HEAD
+
       if !Clflags.native_code
       && prim.prim_arity > 5
       && prim.prim_native_name = ""

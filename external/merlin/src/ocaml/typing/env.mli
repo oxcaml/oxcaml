@@ -891,9 +891,9 @@ val cleanup_functor_caches : stamp:int -> unit
 val scrape_lazy: (t -> Subst.Lazy.module_type -> Subst.Lazy.module_type) ref
 val cleanup_usage_tables : stamp:int -> unit
 
-(** This value should be filled in with [Msupport.raise_error]. [Env] cannot use this
-    function directly because [Msupport] depends on [Env] *)
-val msupport_raise_error : (?ignore_unify:bool -> exn -> unit) ref
+(** This value should be filled in with [Typing_recovery.log_or_raise]. [Env] cannot use this
+    function directly because [Typing_recovery] depends on [Env] *)
+val msupport_raise_error : (exn -> unit) ref
 
 type 'acc fold_all_labels_f = {
   fold_all_labels_f : 'rcd. 'rcd record_form -> 'rcd gen_label_description -> 'acc -> 'acc

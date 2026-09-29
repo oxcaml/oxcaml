@@ -14,8 +14,8 @@
 (**************************************************************************)
 
 let msupport_raise_error =
-  ref (fun ?ignore_unify:_ _ ->
-        failwith "Env.raise_error should be filled in with Msupport.raise_error")
+  ref (fun _ ->
+        failwith "Env.raise_error should be filled in with Typing_recovery.log_or_raise")
 
 (* Environment handling *)
 

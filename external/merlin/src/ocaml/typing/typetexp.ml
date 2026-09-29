@@ -981,27 +981,6 @@ let type_open :
   ref (fun ?used_slot:_ _ -> assert false)
 
 let rec transl_type env ~policy ?(aliased=false) ~row_context mode styp =
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-  Msupport.with_saved_types
-    ~warning_attribute:styp.ptyp_attributes ?save_part:None
-    (fun () ->
-       try
-         transl_type_aux env ~policy ~aliased ~row_context mode styp
-       with exn ->
-         let ty = new_global_var (Jkind.Builtin.value ~why:(Unknown "merlin")) in
-         Msupport.erroneous_type_register ty;
-         Msupport.raise_error exn;
-           { ctyp_desc = Ttyp_var (None, None);
-             ctyp_type = ty;
-             ctyp_env = env;
-             ctyp_loc = styp.ptyp_loc;
-             ctyp_attributes = [];
-           }
-    )
-||||||| Compiler:last-imported
-  Builtin_attributes.warning_scope styp.ptyp_attributes
-    (fun () -> transl_type_aux env ~policy ~aliased ~row_context mode styp)
-=======
   let delayed () =
     Builtin_attributes.warning_scope styp.ptyp_attributes
       (fun () -> transl_type_aux env ~policy ~aliased ~row_context mode styp)
@@ -1026,7 +1005,6 @@ let rec transl_type env ~policy ?(aliased=false) ~row_context mode styp =
               ctyp_attributes = [];
             })
   else delayed ()
->>>>>>> Compiler:HEAD
 
 and transl_type_aux env ~row_context ~aliased ~policy mode styp =
   let loc = styp.ptyp_loc in

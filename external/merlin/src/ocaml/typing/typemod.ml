@@ -275,13 +275,7 @@ let check_for_generated_type_or_jkind ~funct_body env loc mty exn =
     match Mtype.Contains_type_or_jkind.check env mty with
     | None -> ()
     | Some tj ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-      Msupport.raise_error (Error (loc, env, exn tj))
-||||||| Compiler:last-imported
-      raise (Error (loc, env, exn tj))
-=======
         Error.log_and_raise loc env (exn tj)
->>>>>>> Compiler:HEAD
 
 (* Extract the signature and the mode of a functor's return, given the signature
    [sig_acc] and mode [md_mode] of the functor argument. [funct_mode] is the
@@ -386,29 +380,6 @@ let initial_env ~loc ~initially_opened_module ~open_implicit_args =
   let env = Lazy.force Env.initial in
   let open_module env m =
     let open Asttypes in
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-    let lid = {loc; txt = Longident.parse m } in
-    try
-      let _ , _, env = type_open_ Override env lid.loc lid in
-      env
-    with
-    | (Typetexp.Error _ | Env.Error _ | Magic_numbers.Cmi.Error _ | Persistent_env.Error _) as exn ->
-      Msupport.raise_error exn;
-      env
-    | exn ->
-      Printf.ksprintf failwith
-        "Uncaught exception %s in initial_env.open_module: %s"
-        Obj.Extension_constructor.(name (of_val exn))
-        (Printexc.to_string exn)
-||||||| Compiler:last-imported
-    let lexbuf = Lexing.from_string m in
-    let txt =
-      Location.init lexbuf (Printf.sprintf "command line argument: -open %S" m);
-      Parse.simple_module_path lexbuf
-    in
-    let _, _, env = type_open_ Override env loc {txt;loc} in
-    env
-=======
     let lexbuf = Lexing.from_string m in
     let txt =
       Location.init lexbuf (Printf.sprintf "command line argument: -open %S" m);
@@ -427,7 +398,6 @@ let initial_env ~loc ~initially_opened_module ~open_implicit_args =
            be overwritten by the final set. *)
         Typing_recovery.log_or_raise exn;
         env
->>>>>>> Compiler:HEAD
   in
   let process_open_arg env (arg : Clflags.open_arg) =
     match arg with
@@ -2422,24 +2392,16 @@ and transl_signature ?(keep_warnings = false) ?(interface_toplevel = false) env 
           then
             (* This error should be a parsing error,
                once we have nice error messages there. *)
-            raise (Error (td.ptype_loc, env, Invalid_type_subst_rhs))
+            Error.log_and_raise td.ptype_loc env Invalid_type_subst_rhs
         ) sdecls;
         let (decls, newenv, _shapes) =
           Typedecl.transl_type_decl env Nonrecursive sdecls
         in
         List.iter (fun td ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-||||||| Compiler:last-imported
-          if td.typ_kind <> Ttype_abstract || td.typ_manifest = None ||
-             td.typ_private = Private
-          then
-            raise (Error (td.typ_loc, env, Invalid_type_subst_rhs));
-=======
           if td.typ_kind <> Ttype_abstract || td.typ_manifest = None ||
              td.typ_private = Private
           then
             Error.log_and_raise td.typ_loc env Invalid_type_subst_rhs;
->>>>>>> Compiler:HEAD
           let params = td.typ_type.type_params in
           if params_are_constrained params
           then
@@ -2702,27 +2664,6 @@ and transl_signature ?(keep_warnings = false) ?(interface_toplevel = false) env 
   in
   let rec transl_sig env sig_items sig_type sig_type_include_functor = function
     | [] -> List.rev sig_items, List.rev sig_type, env
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-    | item :: srem -> begin
-        match transl_sig_item env sig_type_include_functor item with
-        | new_item , new_types , env ->
-            transl_sig env
-              (new_item :: sig_items)
-              (List.rev_append new_types sig_type)
-              (List.rev_append new_types sig_type_include_functor)
-              srem
-        | exception exn ->
-            Msupport.raise_error exn;
-            transl_sig env sig_items sig_type sig_type_include_functor srem
-      end
-||||||| Compiler:last-imported
-    | item :: srem ->
-      let new_item , new_types , env = transl_sig_item env sig_type item in
-      transl_sig env
-        (new_item :: sig_items)
-        (List.rev_append new_types sig_type)
-        srem
-=======
     | item :: srem -> begin
         match transl_sig_item env sig_type item with
         | exception exn when
@@ -2734,41 +2675,10 @@ and transl_signature ?(keep_warnings = false) ?(interface_toplevel = false) env 
               (List.rev_append new_types sig_type)
               srem
       end
->>>>>>> Compiler:HEAD
   in
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-  Msupport.with_saved_types
-    ?warning_attribute:(if keep_warnings then None else Some [])
-    ~save_part:(fun sg -> Cmt_format.Partial_signature sg)
-||||||| Compiler:last-imported
-  let previous_saved_types = Cmt_format.get_saved_types () in
-  Builtin_attributes.warning_scope []
-=======
   Typing_recovery_state.with_saved_types
     ~save_part:(fun sg -> Cmt_format.Partial_signature sg)
->>>>>>> Compiler:HEAD
     (fun () ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-       let (trem, rem, final_env) =
-         transl_sig (Env.in_signature true env) [] [] sig_acc psg_items
-       in
-       let rem = Signature_names.simplify final_env names rem in
-       { sig_items = trem; sig_type = rem; sig_final_env = final_env;
-         sig_modalities; sig_sloc = psg_loc })
-||||||| Compiler:last-imported
-       let (trem, rem, final_env) =
-         transl_sig (Env.in_signature true env) [] [] psg_items
-       in
-       let rem = Signature_names.simplify final_env names rem in
-       let sg =
-         { sig_items = trem; sig_type = rem; sig_final_env = final_env;
-           sig_modalities; sig_sloc = psg_loc }
-       in
-       Cmt_format.set_saved_types
-         ((Cmt_format.Partial_signature sg) :: previous_saved_types);
-       sg
-    )
-=======
        Builtin_attributes.warning_scope []
          (fun () ->
             let (trem, rem, final_env) =
@@ -2777,7 +2687,6 @@ and transl_signature ?(keep_warnings = false) ?(interface_toplevel = false) env 
             let rem = Signature_names.simplify final_env names rem in
             { sig_items = trem; sig_type = rem; sig_final_env = final_env;
               sig_modalities; sig_sloc = psg_loc }))
->>>>>>> Compiler:HEAD
 
 and transl_modtype_decl env pmtd =
   Builtin_attributes.warning_scope pmtd.pmtd_attributes
@@ -3170,17 +3079,9 @@ let check_recmodule_inclusion env bindings =
               ~loc:modl.mod_loc ~mark:true
               env ~modes mty_actual' mty_decl'
           with Includemod.Error msg ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-            Msupport.raise_error(Error(modl.mod_loc, env, Not_included msg));
-            Tcoerce_none, shape
-        in
-||||||| Compiler:last-imported
-            raise(Error(modl.mod_loc, env, Not_included msg)) in
-=======
             Error.log_or_raise modl.mod_loc env (Not_included msg);
             (Tcoerce_none, shape)
         in
->>>>>>> Compiler:HEAD
         let modl' =
             { mod_desc = Tmod_constraint(modl, mty_decl.mty_type,
                 Tmodtype_explicit (mty_decl, mode_decl), coercion);
@@ -3330,17 +3231,9 @@ let wrap_constraint_package env mark arg mty mode explicit =
     try
       Includemod.modtypes ~loc:arg.mod_loc env ~mark ~modes mty1 mty2
     with Includemod.Error msg ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-      Msupport.raise_error(Error(arg.mod_loc, env, Not_included msg));
-      Tcoerce_none
-  in
-||||||| Compiler:last-imported
-      raise(Error(arg.mod_loc, env, Not_included msg)) in
-=======
       Error.log_or_raise arg.mod_loc env (Not_included msg);
       Tcoerce_none
   in
->>>>>>> Compiler:HEAD
   { mod_desc = Tmod_constraint(arg, mty, explicit, coercion);
     mod_type = mty;
     mod_mode = With_regionality.disallow_right mode, None;
@@ -3356,17 +3249,9 @@ let wrap_constraint_with_shape ~self_check env mark arg mty mode
       Includemod.modtypes_constraint ~self_check ~shape ~loc:arg.mod_loc env
         ~mark ~modes arg.mod_type mty
     with Includemod.Error msg ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-      Msupport.raise_error(Error(arg.mod_loc, env, Not_included msg));
-      Tcoerce_none, Shape.dummy_mod
-  in
-||||||| Compiler:last-imported
-      raise(Error(arg.mod_loc, env, Not_included msg)) in
-=======
       Error.log_or_raise arg.mod_loc env (Not_included msg);
       Tcoerce_none, Shape.dummy_mod
   in
->>>>>>> Compiler:HEAD
   { mod_desc = Tmod_constraint(arg, mty, explicit, coercion);
     mod_type = mty;
     mod_mode = With_regionality.disallow_right mode, None;
@@ -3419,30 +3304,6 @@ let rec type_module ?alias ~strengthen ~funct_body anchor env smod =
 
 and type_module_maybe_hold_locks ?(alias=false) ~hold_locks ~strengthen
     ~funct_body anchor env smod =
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-  (* Merlin: when we start typing a module we don't want to include potential
-    saved_items from its parent. We backup them before starting and restore them
-    when finished. *)
-  Msupport.with_saved_types @@ fun () ->
-  try
-    Builtin_attributes.warning_scope smod.pmod_attributes
-      (fun () ->
-         type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
-           smod)
-  with exn ->
-    Msupport.raise_error exn;
-    { mod_desc = Tmod_typed_hole;
-      mod_type = Mty_for_hole;
-      mod_mode = With_regionality.(disallow_right min), None;
-      mod_env = env;
-      mod_attributes = Msupport.flush_saved_types () @ smod.pmod_attributes;
-      mod_loc = smod.pmod_loc },
-      Shape.dummy_mod
-||||||| Compiler:last-imported
-  Builtin_attributes.warning_scope smod.pmod_attributes
-    (fun () -> type_module_aux ~alias ~hold_locks ~strengthen ~funct_body
-        anchor env smod)
-=======
   let delayed () =
     Builtin_attributes.warning_scope smod.pmod_attributes
       (fun () -> type_module_aux ~alias ~hold_locks ~strengthen ~funct_body
@@ -3465,7 +3326,6 @@ and type_module_maybe_hold_locks ?(alias=false) ~hold_locks ~strengthen
             mod_loc = smod.pmod_loc },
           Shape.dummy_mod)
   else delayed ()
->>>>>>> Compiler:HEAD
 
 and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
     smod =
@@ -3630,7 +3490,7 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
           in the recovered typedtree *)
         match sarg.pmod_desc with
         | Pmod_hole ->
-            Msupport.raise_error exn;
+            Typing_recovery.log_or_raise exn;
             {
               mod_desc = Tmod_typed_hole;
               mod_type = Mty_for_hole;
@@ -3686,7 +3546,6 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
   | Pmod_extension ext ->
       raise (Error_forward (Builtin_attributes.error_of_extension ext))
   | Pmod_hole ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
       { mod_desc = Tmod_typed_hole;
         mod_type = Mty_for_hole;
         mod_mode = With_regionality.(disallow_right min), None;
@@ -3694,11 +3553,6 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
         mod_attributes = smod.pmod_attributes;
         mod_loc = smod.pmod_loc },
       Shape.dummy_mod
-||||||| Compiler:last-imported
-      raise (Typecore.Error(smod.pmod_loc, env, Typecore.Unexpected_hole))
-=======
-      Typecore.Error.log_and_raise smod.pmod_loc env Typecore.Unexpected_hole
->>>>>>> Compiler:HEAD
   | Pmod_instance glob ->
       Language_extension.assert_enabled ~loc:smod.pmod_loc Instances ();
       let glob = instance_name ~loc:smod.pmod_loc env glob in
@@ -3889,19 +3743,6 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
         Includemod.Apply_error {loc=apply_loc;env;app_name;mty_f;args}
       in
       begin match app_view with
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-      | { arg = None; loc = app_loc; attributes = app_attributes; _ } ->
-          Msupport.raise_error (apply_error ());
-          { mod_desc = Tmod_apply_unit(funct, Mode.Yielding.newvar 0);
-            mod_type = mty_res;
-            mod_mode = With_regionality.(disallow_right min), None;
-            mod_env = env;
-            mod_attributes = app_attributes;
-            mod_loc = app_loc },
-          funct_shape
-||||||| Compiler:last-imported
-      | { arg = None; _ } -> apply_error ()
-=======
       | { arg = None; loc = app_loc; attributes = app_attributes; _ } ->
           Typing_recovery.log_or_raise (apply_error ());
           { mod_desc =
@@ -3916,24 +3757,15 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
             mod_loc = app_loc;
             mod_mode = With_regionality.(disallow_right min), None },
           funct_shape
->>>>>>> Compiler:HEAD
       | { loc = app_loc; attributes = app_attributes;
           arg = Some { shape = arg_shape; path = arg_path; arg } } ->
       let coercion =
         try Includemod.modtypes ~loc:arg.mod_loc ~mark:true env
               arg.mod_type mty_param
               ~modes:(Specific (arg.mod_mode, mm_param))
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-        with Includemod.Error _ ->
-          Msupport.raise_error (apply_error ());
-          Tcoerce_none
-||||||| Compiler:last-imported
-        with Includemod.Error _ -> apply_error ()
-=======
         with Includemod.Error _ ->
           Typing_recovery.log_or_raise (apply_error ());
           Tcoerce_none
->>>>>>> Compiler:HEAD
       in
       let mty_appl =
         match arg_path with
@@ -3960,13 +3792,7 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
                   with Ctype.Nondep_cannot_erase _ ->
                     let error = Cannot_eliminate_dependency
                                   (Functor_applied, mty_functor) in
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-                    raise (Error(app_loc, parent_env, error))
-||||||| Compiler:last-imported
-                    raise (Error(app_loc, env, error))
-=======
                     Error.log_and_raise app_loc env error
->>>>>>> Compiler:HEAD
             in
             (* TODO(merlin): we could perhaps log the "fatal error" cases...
                not sure it's worth the effort. *)
@@ -4037,16 +3863,8 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
       Shape.app ~arg:arg_shape funct_shape
     end
   | Mty_alias path ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-      raise(Error(app_view.f_loc, env, Cannot_scrape_alias path))
-  | Mty_ident _ | Mty_signature _ | Mty_strengthen _ | Mty_for_hole ->
-||||||| Compiler:last-imported
-      raise(Error(app_view.f_loc, env, Cannot_scrape_alias path))
-  | Mty_ident _ | Mty_signature _ | Mty_strengthen _ ->
-=======
       Error.log_and_raise app_view.f_loc env (Cannot_scrape_alias path)
-  | Mty_ident _ | Mty_signature _ | Mty_strengthen _ ->
->>>>>>> Compiler:HEAD
+  | Mty_ident _ | Mty_signature _ | Mty_strengthen _ | Mty_for_hole ->
       let args = List.map simplify_app_summary args in
       let mty_f = md_f.mod_type in
       let app_name = match sfunct.pmod_desc with
@@ -4596,58 +4414,16 @@ and type_structure ?(toplevel = None) ?(keep_warnings = false) ~funct_body
         let item = Sig_jkind(id, decl.jkind_jkind, Exported) in
         Tstr_jkind decl, [item], shape_map, env
   in
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
   let toplevel_sig =
     (* See comment on [type_structure] above *)
     sig_acc
   in
   let rec type_struct env shape_map sstr str_acc sig_acc sig_acc_include_functor =
-||||||| Compiler:last-imported
-  let toplevel_sig = Option.value toplevel ~default:[] in
-  let rec type_struct env shape_map sstr str_acc sig_acc
-            sig_acc_include_functor =
-=======
-  let toplevel_sig = Option.value toplevel ~default:[] in
-  let rec type_struct env shape_map sstr str_acc sig_acc
-      sig_acc_include_functor =
->>>>>>> Compiler:HEAD
     match sstr with
     | [] ->
         (List.rev str_acc, List.rev sig_acc, shape_map, env)
     | item :: srem -> begin
         let previous_saved_types = Cmt_format.get_saved_types () in
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-        match type_str_item env shape_map pstr sig_acc_include_functor with
-        | desc, sg, shape_map, new_env ->
-            let str = { str_desc = desc; str_loc = pstr.pstr_loc; str_env = env } in
-            Cmt_format.set_saved_types (Cmt_format.Partial_structure_item str
-                                        :: previous_saved_types);
-            type_struct new_env shape_map srem (str :: str_acc) (List.rev_append sg sig_acc)
-              (List.rev_append sg sig_acc_include_functor)
-        | exception exn ->
-            Msupport.raise_error exn;
-            type_struct env shape_map srem str_acc sig_acc sig_acc_include_functor;
-||||||| Compiler:last-imported
-        let desc, sg, shape_map, new_env =
-          type_str_item env shape_map pstr sig_acc_include_functor
-        in
-        let str = { str_desc = desc; str_loc = pstr.pstr_loc; str_env = env } in
-        Cmt_format.set_saved_types (Cmt_format.Partial_structure_item str
-                                    :: previous_saved_types);
-        type_struct new_env shape_map srem (str :: str_acc)
-          (List.rev_append sg sig_acc)
-          (List.rev_append sg sig_acc_include_functor)
-  in
-  let previous_saved_types = Cmt_format.get_saved_types () in
-  let run () =
-    let (items, sg, shape_map, final_env) =
-      type_struct env Shape.Map.empty sstr [] [] toplevel_sig
-    in
-    let str = { str_items = items; str_type = sg; str_final_env = final_env } in
-    Cmt_format.set_saved_types
-      (Cmt_format.Partial_structure str :: previous_saved_types);
-    str, sg, md_mode, names, Shape.str shape_map, final_env
-=======
         match type_str_item env shape_map item sig_acc_include_functor with
         | desc, sg, shape_map, new_env ->
             let str =
@@ -4670,30 +4446,12 @@ and type_structure ?(toplevel = None) ?(keep_warnings = false) ~funct_body
     in
     let str = { str_items = items; str_type = sg; str_final_env = final_env } in
     str, sg, md_mode, names, Shape.str shape_map, final_env
->>>>>>> Compiler:HEAD
   in
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-  Msupport.with_saved_types
-    ?warning_attribute:(if Option.is_some toplevel || keep_warnings then None else Some [])
-    ~save_part:(fun (str,_,_,_,_,_) -> Cmt_format.Partial_structure str)
-    (fun () ->
-       let (items, sg, shape_map, final_env) = type_struct env Shape.Map.empty sstr [] [] toplevel_sig in
-       let str = { str_items = items; str_type = sg; str_final_env = final_env } in
-       (*=
-       Cmt_format.set_saved_types
-         (Cmt_format.Partial_structure str :: previous_saved_types);
-       *)
-       str, sg, md_mode, names, Shape.str shape_map, final_env)
-||||||| Compiler:last-imported
-  if Option.is_some toplevel then run ()
-  else Builtin_attributes.warning_scope [] run
-=======
   Typing_recovery_state.with_saved_types
     ~save_part:(fun (str,_,_,_,_, _) -> Cmt_format.Partial_structure str)
     (fun () ->
        if Option.is_some toplevel then delayed ()
        else Builtin_attributes.warning_scope [] delayed)
->>>>>>> Compiler:HEAD
 
 (* The toplevel will print some types not present in the signature *)
 let remove_mode_and_jkind_variables_for_toplevel str =
@@ -5072,16 +4830,7 @@ let type_implementation target modulename initial_env ast =
         ignore @@ Warnings.parse_options false "-32-34-37-38-60-191";
       if !Clflags.as_parameter then
         error Cannot_compile_implementation_as_parameter;
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-      let (str, sg, mode, names, shape, finalenv) =
-        type_structure initial_env ast
-||||||| Compiler:last-imported
-      let (str, sg, mode, names, shape, finalenv) =
-        Profile.record_call "infer" (fun () -> type_structure initial_env ast)
-=======
-      let delayed () =
-        Profile.record_call "infer" (fun () -> type_structure initial_env ast)
->>>>>>> Compiler:HEAD
+      let delayed () = type_structure initial_env ast
       in
       let (str, sg, mode, names, shape, finalenv) =
         if !Clflags.typing_recovery then

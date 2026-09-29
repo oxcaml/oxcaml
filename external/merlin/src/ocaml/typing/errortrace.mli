@@ -116,11 +116,6 @@ type ('a, 'variety) t = ('a, 'variety) elt list
 type 'variety trace = (type_expr,     'variety) t
 type 'variety error = (expanded_type, 'variety) t
 
-(** merlin specific *)
-val map_types :
-  (type_expr -> type_expr) ->
-  (expanded_type, 'variety) t -> (expanded_type, 'variety) t
-
 val map_elt : ('a -> 'b) -> ('a, 'variety) elt -> ('b, 'variety) elt
 
 val map : ('a -> 'b) -> ('a, 'variety) t -> ('b, 'variety) t
@@ -193,13 +188,6 @@ module Subtype : sig
     trace:error_trace -> unification_trace:unification_error_trace -> error
 
   val map : ('a -> 'b) -> 'a t -> 'b t
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-
-  (** merlin specific *)
-  val map_types : (type_expr -> type_expr) -> expanded_type t -> expanded_type t
-||||||| Compiler:last-imported
-=======
 
   val map_types : (type_expr -> type_expr) -> expanded_type t -> expanded_type t
->>>>>>> Compiler:HEAD
 end

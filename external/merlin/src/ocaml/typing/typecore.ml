@@ -28,8 +28,6 @@ open Btype
 open Ctype
 open Mode
 
-let raise_error = Msupport.raise_error
-
 type comprehension_type =
   | List_comprehension
   | Array_comprehension of mutability
@@ -537,112 +535,6 @@ let error_of_filter_arrow_failure ~explanation ~first ty_fun
     end
   | Jkind_error (ty, err) -> Function_type_not_rep (ty, err)
 
-(* merlin: deep copy types in errors, to keep them meaningful after
-   backtracking *)
-let deep_copy () =
-  let table = TypeHash.create 7 in
-  let rec copy ty : type_expr =
-    try TypeHash.find table ty
-    with Not_found ->
-      let ty' =
-        let {Types. level; id; desc; scope = _ } as ty = Transient_expr.repr ty in
-        create_expr ~level ~id ~scope:(Transient_expr.get_scope ty) desc
-      in
-      TypeHash.add table ty ty';
-      let desc =
-        match get_desc ty with
-        | Tvar _ | Tnil | Tunivar _ | Tof_kind _ as desc -> desc
-        | Tvariant _ as desc -> (* fixme *) desc
-        | Tarrow (l,t1,t2,c) -> Tarrow (l, copy t1, copy t2, c)
-        | Ttuple tl -> Ttuple (List.map (fun (l, t) -> l, copy t) tl)
-        | Tunboxed_tuple tl -> Tunboxed_tuple (List.map (fun (l, t) -> l, copy t) tl)
-        | Tconstr (p, tl, _) -> Tconstr (p, List.map copy tl, ref Mnil)
-        | Tobject (t1, r) ->
-          let r = match !r with
-            | None -> None
-            | Some (p,tl) -> Some (p, List.map copy tl)
-          in
-          Tobject (copy t1, ref r)
-        | Tfield (s,fk,t1,t2) -> Tfield (s, fk, copy t1, copy t2)
-        | Tpoly (t,tl) -> Tpoly (copy t, List.map copy tl)
-        | Trepr (t,tl) -> Trepr (copy t, tl)
-        | Tpackage { pack_path; pack_cstrs } ->
-          Tpackage
-            { pack_path; pack_cstrs = List.map (fun (l, tl) -> l, copy tl) pack_cstrs }
-        | Tquote t -> Tquote (copy t)
-        | Tquote_eval t -> Tquote_eval (copy t)
-        | Tsplice t -> Tsplice (copy t)
-        | Tbox t -> Tbox (copy t)
-        | Tmod (t, mod_bounds) -> Tmod (copy t, mod_bounds)
-        | Tlink _ | Tsubst _ -> assert false
-      in
-      Transient_expr.(set_desc (repr ty') desc);
-      ty'
-  in
-  copy
-
-let trace_copy_raw ?(copy=deep_copy ())
-  (trace : Errortrace.unification Errortrace.error) =
-  Errortrace.map_types copy trace
-
-let trace_copy ?copy
-  ({ trace } : Errortrace.unification_error) =
-  Errortrace.unification_error ~trace:(trace_copy_raw ?copy trace)
-
-let trace_subtype_copy ?(copy=deep_copy ())
-  (error_trace : Errortrace.Subtype.error_trace) =
-  Errortrace.Subtype.map_types copy error_trace
-
-let copy_expanded_type copy ({ ty; expanded } : Errortrace.expanded_type) =
-  Errortrace.{ ty = copy ty; expanded = copy expanded }
-
-let error (loc, env, err) =
-  let err = match err with
-    | Label_mismatch (record_form, li, unification_error) ->
-      Label_mismatch (record_form, li, trace_copy unification_error)
-    | Pattern_type_clash (trace, popt) ->
-      Pattern_type_clash (trace_copy trace, popt)
-    | Or_pattern_type_clash (i, trace) ->
-      Or_pattern_type_clash (i, trace_copy trace)
-    | Expr_type_clash (trace, ctx_opt, eopt) ->
-      Expr_type_clash (trace_copy trace, ctx_opt, eopt)
-    | Apply_non_function t ->
-      Apply_non_function { t with
-        func_ty = deep_copy () t.func_ty;
-        res_ty = deep_copy () t.res_ty }
-    | Apply_wrong_label (l, t, b) ->
-      Apply_wrong_label (l, deep_copy () t, b)
-    | Wrong_name (s1, t, wn) ->
-      Wrong_name (s1, { t with ty = deep_copy () t.ty }, wn)
-    | Undefined_method (t, s, l) ->
-      Undefined_method (deep_copy () t, s, l)
-    | Private_type t ->
-      Private_type (deep_copy () t)
-    | Private_label (li, t) ->
-      Private_label (li, deep_copy () t)
-    | Not_subtype { trace; unification_trace} ->
-      let copy = deep_copy () in
-      let trace = trace_subtype_copy ~copy trace in
-      let unification_trace = trace_copy_raw ~copy unification_trace in
-      Not_subtype (Errortrace.Subtype.error ~trace ~unification_trace)
-    | Coercion_failure (exptype, ts, b) ->
-      let copy = deep_copy () in
-      Coercion_failure (copy_expanded_type copy exptype, trace_copy ~copy ts, b)
-    | Too_many_arguments (t, ctx_opt) ->
-      Too_many_arguments (deep_copy () t, ctx_opt)
-    | Abstract_wrong_label ({ expected_type; _} as awl) ->
-      Abstract_wrong_label
-        { awl with expected_type = deep_copy () expected_type }
-    | Scoping_let_module (s, t) ->
-      Scoping_let_module (s, deep_copy () t)
-    | Less_general (s, tr) ->
-      Less_general (s, trace_copy tr)
-    | Not_a_packed_module t ->
-      Not_a_packed_module (deep_copy () t)
-    | err -> err
-  in
-  Error (loc, env, err)
-
 (* Forward declaration, to be filled in by Typemod.type_module *)
 
 let type_module =
@@ -713,21 +605,9 @@ let check_probe_name name loc env =
   if String.length name > probe_name_max_length then
     Location.prerr_warning loc (Warnings.Probe_name_too_long name);
   String.iter (fun c ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-    match c with
-    | 'a'..'z' | 'A'..'Z' | '0'..'9' | '_' -> ()
-    | _ -> raise (error (loc, env, (Probe_name_format name)))
-  ) name
-||||||| Compiler:last-imported
-    match c with
-    | 'a'..'z' | 'A'..'Z' | '0'..'9' | '_' -> ()
-    | _ -> raise (Error (loc, env, (Probe_name_format name)))
-  ) name
-=======
       match c with
       | 'a'..'z' | 'A'..'Z' | '0'..'9' | '_' -> ()
       | _ -> Error.log_and_raise loc env (Probe_name_format name)) name
->>>>>>> Compiler:HEAD
 
 let mk_expected ?explanation ty = { ty; explanation; }
 
@@ -805,13 +685,7 @@ let position_and_mode_default = {
 let position_and_mode env (expected_mode : expected_mode) sexp
   : position_and_mode =
   let fail err =
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-    raise (error (sexp.pexp_loc, env, Bad_tail_annotation err))
-||||||| Compiler:last-imported
-    raise (Error (sexp.pexp_loc, env, Bad_tail_annotation err))
-=======
     Error.log_and_raise sexp.pexp_loc env (Bad_tail_annotation err)
->>>>>>> Compiler:HEAD
   in
   let requested =
     match Builtin_attributes.tailcall sexp.pexp_attributes with
@@ -859,13 +733,7 @@ let check_tail_call_local_returning loc env ap_mode {apply_position; _} =
           (locality_as_regionality ap_mode) Regionality.global
       with
       | Ok () -> ()
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-      | Error _ -> raise (error (loc, env, Tail_call_local_returning))
-||||||| Compiler:last-imported
-      | Error _ -> raise (Error (loc, env, Tail_call_local_returning))
-=======
       | Error _ -> Error.log_and_raise loc env (Tail_call_local_returning)
->>>>>>> Compiler:HEAD
     end
   | Nontail | Default -> ()
 
@@ -1162,16 +1030,8 @@ let submode ~loc ~env ?(reason = Other) mode expected_mode =
   match res with
   | Ok () -> ()
   | Error failure_reason ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-      let err = Submode_failed(failure_reason, reason) in
-      raise (error(loc, env, err))
-||||||| Compiler:last-imported
-      let error = Submode_failed(failure_reason, reason) in
-      raise (Error(loc, env, error))
-=======
       let error = Submode_failed(failure_reason, reason) in
       Error.log_and_raise loc env error
->>>>>>> Compiler:HEAD
 
 let escape ~loc ~env ~reason m =
   submode ~loc ~env ~reason m mode_legacy
@@ -1535,13 +1395,7 @@ let constant_or_raise env loc cst =
        | Const_int64 _ | Const_nativeint _ ->
            ());
       c
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-  | Error err -> raise (error (loc, env, err))
-||||||| Compiler:last-imported
-  | Error err -> raise (Error (loc, env, err))
-=======
   | Error err -> Error.log_and_raise loc env err
->>>>>>> Compiler:HEAD
 
 (* Specific version of type_option, using newty rather than newgenty *)
 
@@ -1831,33 +1685,15 @@ let check_project_mutability ~loc ~env mut_name mutability mode =
 
 let check_atomic_loc ~loc ~env label lid =
   if not (Types.is_atomic label.lbl_mut) then
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-    raise (error (loc, env, Label_not_atomic lid));
-||||||| Compiler:last-imported
-    raise (Error (loc, env, Label_not_atomic lid));
-=======
     Error.log_and_raise loc env (Label_not_atomic lid);
->>>>>>> Compiler:HEAD
   if is_poly_Tpoly label.lbl_arg then
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-    raise (error (loc, env, Polymorphic_atomic_loc lid));
-||||||| Compiler:last-imported
-    raise (Error (loc, env, Polymorphic_atomic_loc lid));
-=======
     Error.log_and_raise loc env (Polymorphic_atomic_loc lid);
->>>>>>> Compiler:HEAD
   match
     Mode.Modality.Const.equate label.lbl_modalities
       (Typemode.atomic_mutable_modalities)
   with
   | Ok () -> ()
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-  | Error _ -> raise (error (loc, env, Modalities_on_atomic_field lid))
-||||||| Compiler:last-imported
-  | Error _ -> raise (Error (loc, env, Modalities_on_atomic_field lid))
-=======
   | Error _ -> Error.log_and_raise loc env (Modalities_on_atomic_field lid)
->>>>>>> Compiler:HEAD
 
 (* Mutable indices to polymorphic fields cannot be taken, as they would allow
    writing non-polymorphic values. *)
@@ -1919,13 +1755,7 @@ let type_continuation_pat env expected_ty sp =
         Some (id, desc)
   | Ppat_extension ext ->
       raise (Error_forward (Builtin_attributes.error_of_extension ext))
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-  | _ -> raise (error (loc, env, Invalid_continuation_pattern))
-||||||| Compiler:last-imported
-  | _ -> raise (Error (loc, env, Invalid_continuation_pattern))
-=======
   | _ -> Error.log_and_raise loc env Invalid_continuation_pattern
->>>>>>> Compiler:HEAD
 
 (* unification inside type_exp and type_expect
 
@@ -1938,13 +1768,7 @@ let unify_exp_types ?sexp loc env ty expected_ty =
     unify env ty expected_ty
   with
     Unify err ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-      raise(error(loc, env, Expr_type_clash(err, None, None)))
-||||||| Compiler:last-imported
-      raise(Error(loc, env, Expr_type_clash(err, None, None)))
-=======
       Error.log_and_raise loc env (Expr_type_clash(err, None, sexp))
->>>>>>> Compiler:HEAD
   | Tags(l1,l2) ->
       Typetexp.Error.log_and_raise loc env (Typetexp.Variant_tags (l1, l2))
 
@@ -1973,19 +1797,7 @@ let proper_exp_loc exp =
     original formatting *)
 let unify_exp ~sexp env exp expected_ty =
   let loc = proper_exp_loc exp in
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-  try
-    unify_exp_types loc env exp.exp_type expected_ty
-  with Error(loc, env, Expr_type_clash(err, tfc, None)) ->
-    raise (error (loc, env, Expr_type_clash(err, tfc, Some sexp)))
-||||||| Compiler:last-imported
-  try
-    unify_exp_types loc env exp.exp_type expected_ty
-  with Error(loc, env, Expr_type_clash(err, tfc, None)) ->
-    raise (Error(loc, env, Expr_type_clash(err, tfc, Some sexp)))
-=======
   unify_exp_types ~sexp loc env exp.exp_type expected_ty
->>>>>>> Compiler:HEAD
 
 (* helper notation for Pattern_env.t *)
 let (!!) (penv : Pattern_env.t) = penv.env
@@ -1996,13 +1808,7 @@ let (!!) (penv : Pattern_env.t) = penv.env
 let unify_pat_types ?sdesc_for_hint loc env ty ty' =
   try unify env ty ty' with
   | Unify err ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-      raise(error(loc, env, Pattern_type_clash(err, None)))
-||||||| Compiler:last-imported
-      raise(Error(loc, env, Pattern_type_clash(err, None)))
-=======
       Error.log_and_raise loc env (Pattern_type_clash(err, sdesc_for_hint))
->>>>>>> Compiler:HEAD
   | Tags(l1,l2) ->
       Typetexp.Error.log_and_raise loc env (Typetexp.Variant_tags (l1, l2))
 
@@ -2017,13 +1823,7 @@ let unify_pat_types_return_equated_pairs ~refine loc penv ~pat ~expected =
     else (unify !!penv pat expected; nothing_equated)
   with
   | Unify err ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-      raise(error(loc, !!penv, Pattern_type_clash(err, None)))
-||||||| Compiler:last-imported
-      raise(Error(loc, !!penv, Pattern_type_clash(err, None)))
-=======
       Error.log_and_raise loc !!penv (Pattern_type_clash(err, None))
->>>>>>> Compiler:HEAD
   | Tags(l1,l2) ->
       Typetexp.Error.log_and_raise loc !!penv (Typetexp.Variant_tags (l1, l2))
 
@@ -2044,17 +1844,7 @@ let unify_pat_types_penv loc penv ty ty' =
 (* If [penv] is available, calling this function requires
    [penv.in_counterexample = false] *)
 let unify_pat ?sdesc_for_hint env pat expected_ty =
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-  try unify_pat_types pat.pat_loc env pat.pat_type expected_ty
-  with Error (loc, env, Pattern_type_clash(err, None)) ->
-    raise(error(loc, env, Pattern_type_clash(err, sdesc_for_hint)))
-||||||| Compiler:last-imported
-  try unify_pat_types pat.pat_loc env pat.pat_type expected_ty
-  with Error (loc, env, Pattern_type_clash(err, None)) ->
-    raise(Error(loc, env, Pattern_type_clash(err, sdesc_for_hint)))
-=======
   unify_pat_types ?sdesc_for_hint pat.pat_loc env pat.pat_type expected_ty
->>>>>>> Compiler:HEAD
 
 (* unification of a type with a Tconstr with freshly created arguments *)
 let unify_head_only loc penv constr ~expected:ty =
@@ -2296,13 +2086,7 @@ let enter_variable ?(is_module=false) ?(is_as_variable=false) tps loc name mode
     ~kind ty attrs sort =
   if List.exists (fun {pv_id; _} -> Ident.name pv_id = name.txt)
       tps.tps_pattern_variables
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-  then raise(error(loc, Env.empty, Multiply_bound_variable name.txt));
-||||||| Compiler:last-imported
-  then raise(Error(loc, Env.empty, Multiply_bound_variable name.txt));
-=======
   then Error.log_or_raise loc Env.empty (Multiply_bound_variable name.txt);
->>>>>>> Compiler:HEAD
   let id =
     if is_module then begin
       (* Unpack patterns result in both a module declaration and a value
@@ -2312,14 +2096,8 @@ let enter_variable ?(is_module=false) ?(is_as_variable=false) tps loc name mode
       match tps.tps_module_variables with
       | Modvars_ignored -> Ident.create_local name.txt
       | Modvars_rejected ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-          raise (error (loc, Env.empty, Modules_not_allowed));
-||||||| Compiler:last-imported
-          raise (Error (loc, Env.empty, Modules_not_allowed));
-=======
           Error.log_or_raise loc Env.empty Modules_not_allowed;
           Ident.create_local name.txt
->>>>>>> Compiler:HEAD
       | Modvars_allowed { scope; module_variables } ->
         let id = Ident.create_scoped name.txt ~scope in
         let module_variables =
@@ -2376,13 +2154,7 @@ let enter_orpat_variables loc env  p1_vs p2_vs =
               unify env t1 t2
             with
             | Unify err ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-                raise(error(loc, env, Or_pattern_type_clash(x1, err)))
-||||||| Compiler:last-imported
-                raise(Error(loc, env, Or_pattern_type_clash(x1, err)))
-=======
                 Error.log_and_raise loc env (Or_pattern_type_clash(x1, err))
->>>>>>> Compiler:HEAD
             end;
             let m = With_regionality.join [m1; m2] in
             let var = { pv1 with pv_mode = m } in
@@ -2391,25 +2163,13 @@ let enter_orpat_variables loc env  p1_vs p2_vs =
           end
       | [],[] -> [], []
       | {pv_id; _}::_, [] | [],{pv_id; _}::_ ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-          raise (error (loc, env, Orpat_vars (pv_id, [])))
-||||||| Compiler:last-imported
-          raise (Error (loc, env, Orpat_vars (pv_id, [])))
-=======
           Error.log_and_raise loc env (Orpat_vars (pv_id, []))
->>>>>>> Compiler:HEAD
       | {pv_id = x; _}::_, {pv_id = y; _}::_ ->
           let err =
             if Ident.name x < Ident.name y
             then Orpat_vars (x, vars p2_vs)
             else Orpat_vars (y, vars p1_vs) in
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-          raise (error (loc, env, err)) in
-||||||| Compiler:last-imported
-          raise (Error (loc, env, err)) in
-=======
           Error.log_and_raise loc env err in
->>>>>>> Compiler:HEAD
   unify_vars p1_vs p2_vs
 
 let rec build_as_type_and_mode (env : Env.t) p ~mode =
@@ -2573,12 +2333,6 @@ let update_labels (type rep) env (form : rep record_form) ~representative_label
      that [containing_type] has no arguments (or only variables as
      arguments). *)
   let vars_and_ty_args, ty_res =
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-    Ctype.instance_labels ~fixed:false ~representative:representative_label
-      representative_label.lbl_all
-||||||| Compiler:last-imported
-    Ctype.instance_labels ~fixed:false representative_label.lbl_all
-=======
     let representative =
       if !Clflags.typing_recovery then
         Some representative_label
@@ -2586,7 +2340,6 @@ let update_labels (type rep) env (form : rep record_form) ~representative_label
     in
     Ctype.instance_labels ~fixed:false ?representative
       representative_label.lbl_all
->>>>>>> Compiler:HEAD
   in
   unify_exp_types loc env containing_type ty_res;
   match determined_lbl_repres form representative_label.lbl_repres with
@@ -2647,14 +2400,8 @@ let reorder_pat loc penv patl closed labeled_tl expected_ty =
     match extract_or_mk_pat label rem closed with
     | Some (pat, rem) -> (label, pat) :: taken, rem
     | None ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-      raise (error (loc, !!penv, Missing_tuple_label(label, expected_ty)))
-||||||| Compiler:last-imported
-      raise (Error (loc, !!penv, Missing_tuple_label(label, expected_ty)))
-=======
         Typing_recovery.erroneous_type_register expected_ty;
         Error.log_and_raise loc !!penv (Missing_tuple_label(label, expected_ty))
->>>>>>> Compiler:HEAD
   in
   match List.fold_left take_next ([], patl) labeled_tl with
   | taken, [] ->
@@ -2838,16 +2585,8 @@ let solve_constructor_annotation
               unify_pat_types cty.ctyp_loc env tv tv';
               List.remove_assoc id rem
           | _ ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-              raise (error (cty.ctyp_loc, !!penv,
-                            Unbound_existential (ids, ty))))
-||||||| Compiler:last-imported
-              raise (Error (cty.ctyp_loc, !!penv,
-                            Unbound_existential (ids, ty))))
-=======
               Error.log_and_raise cty.ctyp_loc !!penv
                 (Unbound_existential (ids, ty)))
->>>>>>> Compiler:HEAD
         ids_decls ty_ex
     in
     (* The other type names should be bound to newly introduced existentials. *)
@@ -2858,43 +2597,17 @@ let solve_constructor_annotation
         begin match get_desc tv' with
         | Tconstr (Path.Pident id', [], _) ->
               if List.exists (Ident.same id') !bound_ids then
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-                raise (error (cty.ctyp_loc, !!penv,
-                              Bind_existential (Bind_already_bound, id, tv')));
-||||||| Compiler:last-imported
-                raise (Error (cty.ctyp_loc, !!penv,
-                              Bind_existential (Bind_already_bound, id, tv')));
-=======
                 Error.log_and_raise cty.ctyp_loc !!penv
                   (Bind_existential (Bind_already_bound, id, tv'));
->>>>>>> Compiler:HEAD
               (* Both id and id' are Scoped identifiers, so their stamps grow *)
               if Ident.scope id' <> penv.equations_scope
               || Ident.compare_stamp id id' > 0 then
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-                raise (error (cty.ctyp_loc, !!penv,
-                              Bind_existential (Bind_not_in_scope, id, tv')));
-||||||| Compiler:last-imported
-                raise (Error (cty.ctyp_loc, !!penv,
-                              Bind_existential (Bind_not_in_scope, id, tv')));
-=======
                 Error.log_and_raise cty.ctyp_loc !!penv
                   (Bind_existential (Bind_not_in_scope, id, tv'));
->>>>>>> Compiler:HEAD
               bound_ids := id' :: !bound_ids
         | _ ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-            raise (error (cty.ctyp_loc, !!penv,
-                          Bind_existential
-                            (Bind_non_locally_abstract, id, tv')));
-||||||| Compiler:last-imported
-            raise (Error (cty.ctyp_loc, !!penv,
-                          Bind_existential
-                            (Bind_non_locally_abstract, id, tv')));
-=======
             Error.log_and_raise cty.ctyp_loc !!penv
               (Bind_existential (Bind_non_locally_abstract, id, tv'));
->>>>>>> Compiler:HEAD
         end;
         let env =
           Env.add_type ~check:false id
@@ -3003,19 +2716,9 @@ let solve_Ppat_record_field loc penv label label_lid record_ty
     let (_, ty_arg, ty_res) = instance_label ~fixed:false label in
     begin try
       unify_pat_types_penv loc penv ty_res (instance record_ty)
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-    with Error(_loc, _env, Pattern_type_clash(err, _)) ->
-      raise(error(label_lid.loc, !!penv,
-                  Label_mismatch(P record_form, label_lid.txt, err)))
-||||||| Compiler:last-imported
-    with Error(_loc, _env, Pattern_type_clash(err, _)) ->
-      raise(Error(label_lid.loc, !!penv,
-                  Label_mismatch(P record_form, label_lid.txt, err)))
-=======
     with Error.In_context(_loc, _env, Pattern_type_clash(err, _)) ->
       Error.log_and_raise label_lid.loc !!penv
         (Label_mismatch(P record_form, label_lid.txt, err))
->>>>>>> Compiler:HEAD
     end;
     ty_arg, [ty_res; ty_arg]
   end
@@ -3105,14 +2808,8 @@ let build_or_pat env loc lid =
     let ty = expand_head env (newty(Tconstr(path, tyl, ref Mnil))) in
     match get_desc ty with
       Tvariant row when static_row row -> row
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-      | _ -> raise(error(lid.loc, env, Not_a_polymorphic_variant_type lid.txt))
-||||||| Compiler:last-imported
-    | _ -> raise(Error(lid.loc, env, Not_a_polymorphic_variant_type lid.txt))
-=======
     | _ ->
         Error.log_and_raise lid.loc env (Not_a_polymorphic_variant_type lid.txt)
->>>>>>> Compiler:HEAD
   in
   let pats, fields =
     List.fold_left
@@ -3154,13 +2851,7 @@ let build_or_pat env loc lid =
     [] ->
       (* empty polymorphic variants: not possible with the concrete language
          but valid at the ast level *)
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-      raise(error(lid.loc, env, Not_a_polymorphic_variant_type lid.txt))
-||||||| Compiler:last-imported
-      raise(Error(lid.loc, env, Not_a_polymorphic_variant_type lid.txt))
-=======
       Error.log_and_raise lid.loc env (Not_a_polymorphic_variant_type lid.txt)
->>>>>>> Compiler:HEAD
   | pat :: pats ->
       let r =
         List.fold_left
@@ -3192,13 +2883,7 @@ let type_for_loop_like_index ~error:err ~loc ~env ~param ~any ~var =
           ~pv_as_var:false
           ~pv_attributes:[]
   | _ ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-      raise (error (param.ppat_loc, env, err))
-||||||| Compiler:last-imported
-      raise (Error (param.ppat_loc, env, error))
-=======
-      Error.log_and_raise param.ppat_loc env error
->>>>>>> Compiler:HEAD
+      Error.log_and_raise param.ppat_loc env err
 
 let type_for_loop_index ~loc ~env ~param =
   type_for_loop_like_index
@@ -3266,28 +2951,14 @@ let check_let_mutable (mf : mutable_flag) env ?restriction vbs =
          - Mutables are not restricted here according to [restriction] *)
       Language_extension.assert_enabled ~loc Let_mutable ();
       match restriction, vb.pvb_pat.ppat_desc, vbs with
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-      | _, _, _ :: _ -> raise_error (error (loc, env, Unexpected_mutable In_group))
-      | Some r, _, _ -> raise_error (error (loc, env, Unexpected_mutable r))
-||||||| Compiler:last-imported
-      | _, _, _ :: _ -> raise (Error (loc, env, Unexpected_mutable In_group))
-      | Some r, _, _ -> raise (Error (loc, env, Unexpected_mutable r))
-=======
       | _, _, _ :: _ ->
           Error.log_or_raise loc env (Unexpected_mutable In_group)
       | Some r, _, _ ->
           Error.log_or_raise loc env (Unexpected_mutable r)
->>>>>>> Compiler:HEAD
       | None, Ppat_var _, [] -> ()
       | None, (Ppat_constraint ({ppat_desc=Ppat_var _}, _, _)), [] -> ()
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-      | None, _, [] -> raise_error (error (loc, env, Illegal_mutable_pat))
-||||||| Compiler:last-imported
-      | None, _, [] -> raise (Error (loc, env, Illegal_mutable_pat))
-=======
       | None, _, [] ->
           Error.log_or_raise loc env Illegal_mutable_pat
->>>>>>> Compiler:HEAD
     end
   | _ -> ()
 ;;
@@ -3539,16 +3210,8 @@ end) = struct
                (tp0, tp))
             lbls
         in
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-        raise (error (lid.loc, env,
-                      Name_type_mismatch (kind, lid.txt, tp, tpl)));
-||||||| Compiler:last-imported
-        raise (Error (lid.loc, env,
-                      Name_type_mismatch (kind, lid.txt, tp, tpl)));
-=======
         Error.log_and_raise lid.loc env
           (Name_type_mismatch (kind, lid.txt, tp, tpl));
->>>>>>> Compiler:HEAD
         end
     in
     (* warn only on nominal labels *)
@@ -3566,14 +3229,8 @@ end
 let wrap_disambiguate msg ty f x =
   try f x with
   | Wrong_name_disambiguation (env, wrong_name) ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-    raise (error (wrong_name.name.loc, env, Wrong_name (msg, ty, wrong_name)))
-||||||| Compiler:last-imported
-    raise (Error (wrong_name.name.loc, env, Wrong_name (msg, ty, wrong_name)))
-=======
       Error.log_and_raise wrong_name.name.loc env
         (Wrong_name (msg, ty, wrong_name))
->>>>>>> Compiler:HEAD
 
 module Label = NameChoice (struct
   type t = label_description
@@ -3789,14 +3446,8 @@ let check_recordpat_labels loc lbl_pat_list closed record_form =
       let defined = Array.make (Array.length all) false in
       let check_defined (_, label, _) =
         if defined.(label.lbl_pos)
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-        then raise(error(loc, Env.empty, Label_multiply_defined label.lbl_name))
-||||||| Compiler:last-imported
-        then raise(Error(loc, Env.empty, Label_multiply_defined label.lbl_name))
-=======
         then Error.log_or_raise loc Env.empty
                (Label_multiply_defined label.lbl_name)
->>>>>>> Compiler:HEAD
         else defined.(label.lbl_pos) <- true in
       List.iter check_defined lbl_pat_list;
       if closed = Closed
@@ -3917,16 +3568,8 @@ let split_half_typed_cases env zipped_cases =
       let pat = htc.typed_pat in
       match split_pattern pat with
       | Some _, Some _ when htc.untyped_case.has_guard ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-          raise (error (pat.pat_loc, env,
-                        Mixed_value_and_exception_patterns_under_guard))
-||||||| Compiler:last-imported
-          raise (Error (pat.pat_loc, env,
-                        Mixed_value_and_exception_patterns_under_guard))
-=======
           Error.log_and_raise pat.pat_loc env
             Mixed_value_and_exception_patterns_under_guard
->>>>>>> Compiler:HEAD
       | vp, ep -> add_case vals htc data vp, add_case exns htc data ep
     ) zipped_cases ([], [])
 
@@ -3971,20 +3614,8 @@ let check_scope_escape loc env level ty =
     (* We don't expand the type here because if we do, we might expand to the
        type that escaped, leading to confusing error messages. *)
     let trace = Errortrace.[Escape (map_escape trivial_expansion esc)] in
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-    raise (error(loc,
-                 env,
-                 Pattern_type_clash(Errortrace.unification_error ~trace, None)))
-
-||||||| Compiler:last-imported
-    raise (Error(loc,
-                 env,
-                 Pattern_type_clash(Errortrace.unification_error ~trace, None)))
-
-=======
     Error.log_and_raise loc env
       (Pattern_type_clash(Errortrace.unification_error ~trace, None))
->>>>>>> Compiler:HEAD
 
 (** The typedtree has two distinct syntactic categories for patterns,
    "value" patterns, matching on values, and "computation" patterns
@@ -4022,15 +3653,7 @@ let only_impure
   match category with
   | Value ->
      (* LATER: this exception could be renamed/generalized *)
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-     raise (error (pat.pat_loc, pat.pat_env,
-                   Exception_pattern_disallowed))
-||||||| Compiler:last-imported
-     raise (Error (pat.pat_loc, pat.pat_env,
-                   Exception_pattern_disallowed))
-=======
      Error.log_and_raise pat.pat_loc pat.pat_env Exception_pattern_disallowed
->>>>>>> Compiler:HEAD
   | Computation -> pat
 
 let as_comp_pattern
@@ -4050,13 +3673,7 @@ let forbid_atomic_field_patterns loc penv (label_lid, label, pat) =
     | _ -> false
   in
   if Types.is_atomic label.lbl_mut && not (wildcard pat) then
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-    raise (error (loc, !!penv, Atomic_in_pattern label_lid.txt))
-||||||| Compiler:last-imported
-    raise (Error (loc, !!penv, Atomic_in_pattern label_lid.txt))
-=======
     Error.log_or_raise loc !!penv (Atomic_in_pattern label_lid.txt)
->>>>>>> Compiler:HEAD
 
 let forbid_atomic_in_record_update loc env lbl =
   if Types.is_atomic lbl.lbl_mut then
@@ -4071,45 +3688,6 @@ let rec type_pat
       penv: Pattern_env.t -> Parsetree.pattern -> type_expr ->
       Jkind.Sort.t -> k general_pattern
   = fun tps category ~no_existentials ~pat_mode ~mutable_flag ~penv sp
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-      expected_ty sort ->
-  Msupport.with_saved_types
-    ~warning_attribute:sp.ppat_attributes ?save_part:None
-    (fun () ->
-       let saved = save_levels () in
-       try
-         type_pat_aux tps category ~no_existentials
-           ~pat_mode ~mutable_flag ~penv sp expected_ty sort
-       with Error _ as exn ->
-         (* We only want to catch error, not internal exceptions such as
-            [Need_backtrack], etc. *)
-         Msupport.erroneous_type_register expected_ty;
-         raise_error exn;
-         set_levels saved;
-         let loc = sp.ppat_loc in
-         let pat =
-           {
-             pat_desc = Tpat_any;
-             pat_loc = loc;
-             pat_extra = [];
-             pat_type = expected_ty;
-             pat_env = !!penv;
-             pat_attributes = Msupport.recovery_attributes sp.ppat_attributes;
-             pat_unique_barrier = Unique_barrier.not_computed ();
-           }
-         in
-         (match category with
-             | Value -> pat
-             | Computation -> as_computation_pattern pat)
-    )
-||||||| Compiler:last-imported
-      expected_ty sort ->
-  Builtin_attributes.warning_scope sp.ppat_attributes
-    (fun () ->
-       type_pat_aux tps category ~no_existentials
-         ~pat_mode ~mutable_flag ~penv sp expected_ty sort
-    )
-=======
     expected_ty sort ->
     let delayed () =
       Builtin_attributes.warning_scope sp.ppat_attributes
@@ -4143,7 +3721,6 @@ let rec type_pat
             in
             pure category pat)
     else delayed ()
->>>>>>> Compiler:HEAD
 
 and type_pat_aux
   : type k . type_pat_state -> k pattern_category -> no_existentials:_ ->
@@ -4174,13 +3751,7 @@ and type_pat_aux
        when we allow non-values in boxed tuples. *)
     assert (closed = Open || List.length spl >= 2);
     Option.iter
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-      (fun l -> raise (error (loc, !!penv, Repeated_tuple_pat_label l)))
-||||||| Compiler:last-imported
-      (fun l -> raise (Error (loc, !!penv, Repeated_tuple_pat_label l)))
-=======
       (fun l -> Error.log_or_raise loc !!penv (Repeated_tuple_pat_label l))
->>>>>>> Compiler:HEAD
       (Misc.repeated_label spl);
     let args =
       match get_desc (expand_head !!penv expected_ty) with
@@ -4189,21 +3760,11 @@ and type_pat_aux
         reorder_pat loc penv spl closed labeled_tl expected_ty
       (* If not, it's not allowed to be open (partial) *)
       | _ ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-        match closed with
-        | Open -> raise (error (loc, !!penv, Partial_tuple_pattern_bad_type))
-        | Closed -> spl
-||||||| Compiler:last-imported
-        match closed with
-        | Open -> raise (Error (loc, !!penv, Partial_tuple_pattern_bad_type))
-        | Closed -> spl
-=======
           (match closed with
            | Open ->
                Error.log_or_raise loc !!penv Partial_tuple_pattern_bad_type
            | Closed -> ());
           spl
->>>>>>> Compiler:HEAD
     in
     let expected_tys =
       solve_Ppat_tuple ~pat_mode loc penv args expected_ty
@@ -4228,13 +3789,7 @@ and type_pat_aux
       Language_extension.Stable;
     assert (closed = Open || List.length spl >= 2);
     Option.iter
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-      (fun l -> raise (error (loc, !!penv, Repeated_tuple_pat_label l)))
-||||||| Compiler:last-imported
-      (fun l -> raise (Error (loc, !!penv, Repeated_tuple_pat_label l)))
-=======
       (fun l -> Error.log_or_raise loc !!penv (Repeated_tuple_pat_label l))
->>>>>>> Compiler:HEAD
       (Misc.repeated_label spl);
     let args =
       match get_desc (expand_head !!penv expected_ty) with
@@ -4243,21 +3798,11 @@ and type_pat_aux
         reorder_pat loc penv spl closed labeled_tl expected_ty
       (* If not, it's not allowed to be open (partial) *)
       | _ ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-        match closed with
-        | Open -> raise (error (loc, !!penv, Partial_tuple_pattern_bad_type))
-        | Closed -> spl
-||||||| Compiler:last-imported
-        match closed with
-        | Open -> raise (Error (loc, !!penv, Partial_tuple_pattern_bad_type))
-        | Closed -> spl
-=======
           (match closed with
            | Open ->
                Error.log_or_raise loc !!penv Partial_tuple_pattern_bad_type
            | Closed -> ());
           spl
->>>>>>> Compiler:HEAD
     in
     let expected_tys =
       solve_Ppat_unboxed_tuple ~pat_mode loc penv args expected_ty
@@ -4289,29 +3834,15 @@ and type_pat_aux
         | Record_type_of_other_form ->
           let err =
             Wrong_expected_record_boxing(Pattern, P record_form, expected_ty) in
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-          raise (error (loc, !!penv, err))
-||||||| Compiler:last-imported
-          raise (Error (loc, !!penv, error))
-=======
-          Error.log_and_raise loc !!penv error
->>>>>>> Compiler:HEAD
+          Error.log_and_raise loc !!penv err
         | Maybe_a_record_type ->
           None,
           newvar (Jkind.of_new_sort ~level:(Ctype.get_current_level ())
                     ~why:Record_projection)
         | Not_a_record_type ->
           let wks = record_form_to_wrong_kind_sort record_form in
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-          let err = Wrong_expected_kind(wks, Pattern, expected_ty) in
-          raise (error (loc, !!penv, err))
-||||||| Compiler:last-imported
-          let error = Wrong_expected_kind(wks, Pattern, expected_ty) in
-          raise (Error (loc, !!penv, error))
-=======
           let error = Wrong_expected_kind(wks, Pattern, expected_ty) in
           Error.log_and_raise loc !!penv error
->>>>>>> Compiler:HEAD
       in
       let type_label_pat rep (label_lid, (label : rep gen_label_description),
                               sarg) =
@@ -4544,13 +4075,7 @@ and type_pat_aux
         expand_interval (c1 land 0xff) (c2 land 0xff)
           ~make:(fun loc i -> Const.untagged_char ~loc (Char.chr i))
       | _ ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-        raise (error (loc, !!penv, Invalid_interval))
-||||||| Compiler:last-imported
-        raise (Error (loc, !!penv, Invalid_interval))
-=======
         Error.log_and_raise loc !!penv Invalid_interval
->>>>>>> Compiler:HEAD
       end
   | Ppat_tuple (spl, closed) ->
       type_tuple_pat spl closed
@@ -4564,16 +4089,8 @@ and type_pat_aux
         | Maybe_a_variant_type -> None
         | Not_a_variant_type ->
             let srt = wrong_kind_sort_of_constructor lid.txt in
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-            let err = Wrong_expected_kind(srt, Pattern, expected_ty) in
-            raise (error (loc, !!penv, err))
-||||||| Compiler:last-imported
-            let error = Wrong_expected_kind(srt, Pattern, expected_ty) in
-            raise (Error (loc, !!penv, error))
-=======
             let err = Wrong_expected_kind(srt, Pattern, expected_ty) in
             Error.log_and_raise loc !!penv err
->>>>>>> Compiler:HEAD
       in
       let (constr, locks), ambiguity =
         let candidates =
@@ -4587,13 +4104,7 @@ and type_pat_aux
       | None, _ | _, [] -> ()
       | Some r, (_ :: _) ->
           let name = constr.cstr_name in
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-          raise (error (loc, !!penv, Unexpected_existential (r, name)))
-||||||| Compiler:last-imported
-          raise (Error (loc, !!penv, Unexpected_existential (r, name)))
-=======
           Error.log_and_raise loc !!penv (Unexpected_existential (r, name))
->>>>>>> Compiler:HEAD
       end;
       let sarg', existential_styp =
         match sarg with
@@ -4604,13 +4115,7 @@ and type_pat_aux
         | Some ([], sp) ->
             Some sp, None
         | Some (_, sp) ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-            raise (error (sp.ppat_loc, !!penv, Missing_type_constraint))
-||||||| Compiler:last-imported
-            raise (Error (sp.ppat_loc, !!penv, Missing_type_constraint))
-=======
             Error.log_and_raise sp.ppat_loc !!penv Missing_type_constraint
->>>>>>> Compiler:HEAD
       in
       let sargs =
         match sarg' with
@@ -4621,13 +4126,7 @@ and type_pat_aux
           ->
             List.map (fun (l, sp) ->
               match l with
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-              | Some _ -> raise (error (loc, !!penv, Constructor_labeled_arg))
-||||||| Compiler:last-imported
-              | Some _ -> raise (Error(loc, !!penv, Constructor_labeled_arg))
-=======
               | Some _ -> Error.log_and_raise loc !!penv Constructor_labeled_arg
->>>>>>> Compiler:HEAD
               | None -> sp
             ) spl
         | Some({ppat_desc = Ppat_any} as sp) when
@@ -4646,17 +4145,9 @@ and type_pat_aux
         | _ -> ()
         end;
       if List.length sargs <> constr.cstr_arity then
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-        raise(error(loc, !!penv, Constructor_arity_mismatch(lid.txt,
-                                     constr.cstr_arity, List.length sargs)));
-||||||| Compiler:last-imported
-        raise(Error(loc, !!penv, Constructor_arity_mismatch(lid.txt,
-                                     constr.cstr_arity, List.length sargs)));
-=======
         Error.log_and_raise loc !!penv
           (Constructor_arity_mismatch
              (lid.txt, constr.cstr_arity, List.length sargs));
->>>>>>> Compiler:HEAD
 
       let (args, existential_ctyp) =
         solve_Ppat_construct tps penv loc constr no_existentials
@@ -4671,13 +4162,7 @@ and type_pat_aux
         | Ppat_alias (p, _) ->
             check_non_escaping p
         | Ppat_constraint _ ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-            raise (error (p.ppat_loc, !!penv, Inlined_record_escape))
-||||||| Compiler:last-imported
-            raise (Error (p.ppat_loc, !!penv, Inlined_record_escape))
-=======
             Error.log_or_raise p.ppat_loc !!penv Inlined_record_escape
->>>>>>> Compiler:HEAD
         | _ ->
             ()
       in
@@ -4690,17 +4175,9 @@ and type_pat_aux
         match Ctype.check_constructor_crossing_destruction !!penv
           lid constr.cstr_tag ~res:expected_ty ~args locks with
         | Ok mode -> mode
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-        | Error e -> raise (error (lid.loc, !!penv,
-          Submode_failed (e, Constructor lid.txt)))
-||||||| Compiler:last-imported
-        | Error e -> raise (Error (lid.loc, !!penv,
-          Submode_failed (e, Constructor lid.txt)))
-=======
         | Error e ->
             Error.log_and_raise lid.loc !!penv
               (Submode_failed (e, Constructor lid.txt))
->>>>>>> Compiler:HEAD
       in
       let is_contained_by : Mode.Hint.is_contained_by =
         { containing = Constructor (constr.cstr_name, Modality);
@@ -4970,13 +4447,7 @@ and type_pat_aux
         pat_unique_barrier = Unique_barrier.not_computed ();
       }
   | Ppat_effect _ ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-      raise (error (loc, !!penv, Effect_pattern_below_toplevel))
-||||||| Compiler:last-imported
-      raise (Error (loc, !!penv, Effect_pattern_below_toplevel))
-=======
       Error.log_and_raise loc !!penv Effect_pattern_below_toplevel
->>>>>>> Compiler:HEAD
   | Ppat_extension ext ->
       raise (Error_forward (Builtin_attributes.error_of_extension ext))
 
@@ -5562,15 +5033,8 @@ let check_unused
           env expected_ty pat
       with
         Some pat' when refute ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-          raise_error (error (pat.pat_loc, env, Unrefuted_pattern pat'));
-          Some pat
-||||||| Compiler:last-imported
-          raise (Error (pat.pat_loc, env, Unrefuted_pattern pat'))
-=======
           Error.log_or_raise pat.pat_loc env (Unrefuted_pattern pat');
           Some pat
->>>>>>> Compiler:HEAD
       | r -> r)
     cases
 
@@ -5587,7 +5051,7 @@ let force_delayed_checks () =
   let w_old = Warnings.backup () in
   List.iter
     (fun (f, w) -> Warnings.restore w;
-      try f () with exn -> Msupport.raise_error exn)
+      try f () with exn -> Typing_recovery.log_or_raise exn)
     (List.rev !delayed_checks);
   Warnings.restore w_old;
   reset_delayed_checks ();
@@ -5742,14 +5206,8 @@ let check_curried_application_complete ~env ~app_loc args =
             | Arg (Eliminated_optional_arg _) | Omitted _ ->
               app_loc, `Entire_apply
           in
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-          raise (error(loc, env, Curried_application_complete (lbl, e, loc_kind)))
-||||||| Compiler:last-imported
-          raise (Error(loc, env, Curried_application_complete (lbl, e, loc_kind)))
-=======
           Error.log_and_raise loc env
             (Curried_application_complete (lbl, e, loc_kind))
->>>>>>> Compiler:HEAD
       in
       submode (With_locality.partial_apply mode_fun) mode_ret;
       submode (With_locality.partial_apply mode_arg) mode_ret;
@@ -5876,167 +5334,13 @@ let collect_unknown_apply_args env funct ty_fun0 mode_fun rev_args sargs
     | [] -> ty_fun, mode_fun, List.rev rev_args
     | (lbl, sarg) :: rest ->
         let (sort_arg, mode_arg, ty_arg_mono, mode_ret, ty_res) =
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-        try
-          let ty_fun = expand_head env ty_fun in
-          match get_desc ty_fun with
-          | Tvar { jkind; _ } ->
-              let ty_arg_mono, sort_arg = new_rep_var ~why:Function_argument () in
-              let ty_arg = newmono ty_arg_mono in
-              let ty_res =
-                newvar (Jkind.of_new_sort ~why:Function_result
-                          ~level:(Ctype.get_current_level ()))
-              in
-              if ret_tvar &&
-                 not (is_prim ~name:"%identity" funct) &&
-                 not (is_prim ~name:"%obj_magic" funct) &&
-                 not (Msupport.erroneous_expr_check funct)
-              then
-                Location.prerr_warning sarg.pexp_loc
-                  Warnings.Ignored_extra_argument;
-              let mode_arg = With_locality.newvar (get_current_level ()) in
-              let mode_ret = With_locality.newvar (get_current_level ()) in
-              let kind = (lbl, mode_arg, mode_ret) in
-              begin try
-                unify env ty_fun
-                  (newty (Tarrow(kind,ty_arg,ty_res,commu_var ())));
-              with
-              | Unify _ ->
-                (* need to calculate a location containing the function
-                   and any arguments already processed *)
-                let locs =
-                  funct.exp_loc :: sarg.pexp_loc ::
-                  List.filter_map get_arg_loc rev_args
-||||||| Compiler:last-imported
-          let ty_fun = expand_head env ty_fun in
-          match get_desc ty_fun with
-          | Tvar { jkind; _ } ->
-              let ty_arg_mono, sort_arg = new_rep_var ~why:Function_argument () in
-              let ty_arg = newmono ty_arg_mono in
-              let ty_res =
-                newvar (Jkind.of_new_sort ~why:Function_result
-                          ~level:(Ctype.get_current_level ()))
-              in
-              if ret_tvar &&
-                 not (is_prim ~name:"%identity" funct) &&
-                 not (is_prim ~name:"%obj_magic" funct)
-              then
-                Location.prerr_warning sarg.pexp_loc
-                  Warnings.Ignored_extra_argument;
-              let mode_arg = With_locality.newvar (get_current_level ()) in
-              let mode_ret = With_locality.newvar (get_current_level ()) in
-              let kind = (lbl, mode_arg, mode_ret) in
-              begin try
-                unify env ty_fun
-                  (newty (Tarrow(kind,ty_arg,ty_res,commu_var ())));
-              with
-              | Unify _ ->
-                (* need to calculate a location containing the function
-                   and any arguments already processed *)
-                let locs =
-                  funct.exp_loc :: sarg.pexp_loc ::
-                  List.filter_map get_arg_loc rev_args
-=======
           try
             let ty_fun = expand_head env ty_fun in
             match get_desc ty_fun with
             | Tvar { jkind; _ } ->
                 let ty_arg_mono, sort_arg =
                   new_rep_var ~why:Function_argument ()
->>>>>>> Compiler:HEAD
                 in
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-                let loc = Location.merge ~ghost:false locs in
-                let some_args_ok = not (Misc.Stdlib.List.is_empty rev_args) in
-                raise(error(loc, env,
-                            Impossible_function_jkind
-                              { some_args_ok; ty_fun; jkind }))
-              end;
-              (sort_arg, mode_arg, ty_arg_mono, mode_ret, ty_res)
-        | Tarrow ((l, mode_arg, mode_ret), ty_arg, ty_res, _)
-          when labels_match ~param:l ~arg:lbl ->
-            let sort_arg =
-              match
-                type_sort ~why:Function_argument ~fixed:false env ty_arg
-              with
-              | Ok sort -> sort
-              | Error err -> raise(error(funct.exp_loc, env,
-                                         Function_type_not_rep (ty_arg,err)))
-            in
-            (sort_arg, mode_arg, tpoly_get_mono ty_arg, mode_ret, ty_res)
-        | td ->
-            let ty_fun = match td with Tarrow _ -> newty td | _ -> ty_fun in
-            let ty_res =
-              remaining_function_type_for_error ty_fun mode_fun rev_args
-            in
-            match get_desc ty_res with
-            | Tarrow _ ->
-                if !Clflags.classic || not (has_label lbl ty_fun) then
-                  Msupport.resume_raise
-                    (error(sarg.pexp_loc, env,
-                               Apply_wrong_label(lbl, ty_res, false)))
-                else
-                  Msupport.resume_raise
-                    (error(funct.exp_loc, env, Incoherent_label_order))
-            | _ ->
-                Msupport.resume_raise
-                  (error(funct.exp_loc, env, Apply_non_function {
-                    funct;
-                    func_ty = expand_head env funct.exp_type;
-                    res_ty = expand_head env ty_res;
-                    previous_arg_loc = previous_arg_loc rev_args ~funct;
-                    extra_arg_loc = sarg.pexp_loc; }))
-    with Msupport.Resume ->
-      let ty_arg, kind_arg = new_rep_var ~why:Function_argument () in
-      kind_arg, Mode.With_locality.newvar (get_current_level ()), ty_arg,
-      Mode.With_locality.newvar (get_current_level ()), ty_fun
-    in
-    let arg = Unknown_arg { sarg; ty_arg_mono; mode_fun; mode_arg; sort_arg } in
-    loop ty_res mode_ret ((lbl, Arg arg) :: rev_args) rest
-||||||| Compiler:last-imported
-                let loc = Location.merge ~ghost:false locs in
-                let some_args_ok = not (Misc.Stdlib.List.is_empty rev_args) in
-                raise(Error(loc, env,
-                            Impossible_function_jkind
-                              { some_args_ok; ty_fun; jkind }))
-              end;
-              (sort_arg, mode_arg, ty_arg_mono, mode_ret, ty_res)
-        | Tarrow ((l, mode_arg, mode_ret), ty_arg, ty_res, _)
-          when labels_match ~param:l ~arg:lbl ->
-            let sort_arg =
-              match
-                type_sort ~why:Function_argument ~fixed:false env ty_arg
-              with
-              | Ok sort -> sort
-              | Error err -> raise(Error(funct.exp_loc, env,
-                                         Function_type_not_rep (ty_arg,err)))
-            in
-            (sort_arg, mode_arg, tpoly_get_mono ty_arg, mode_ret, ty_res)
-        | td ->
-            let ty_fun = match td with Tarrow _ -> newty td | _ -> ty_fun in
-            let ty_res =
-              remaining_function_type_for_error ty_fun mode_fun rev_args
-            in
-            match get_desc ty_res with
-            | Tarrow _ ->
-                if !Clflags.classic || not (has_label lbl ty_fun) then
-                  raise (Error(sarg.pexp_loc, env,
-                               Apply_wrong_label(lbl, ty_res, false)))
-                else
-                  raise (Error(funct.exp_loc, env, Incoherent_label_order))
-            | _ ->
-                raise(Error(funct.exp_loc, env, Apply_non_function {
-                    funct;
-                    func_ty = expand_head env funct.exp_type;
-                    res_ty = expand_head env ty_res;
-                    previous_arg_loc = previous_arg_loc rev_args ~funct;
-                    extra_arg_loc = sarg.pexp_loc; }))
-        in
-        let arg =
-          Unknown_arg { sarg; ty_arg_mono; mode_fun; mode_arg; sort_arg }
-        in
-        loop ty_res mode_ret ((lbl, Arg arg) :: rev_args) rest
-=======
                 let ty_arg = newmono ty_arg_mono in
                 let ty_res =
                   newvar (Jkind.of_new_sort ~why:Function_result
@@ -6116,7 +5420,6 @@ let collect_unknown_apply_args env funct ty_fun0 mode_fun rev_args sargs
           Unknown_arg { sarg; ty_arg_mono; mode_fun; mode_arg; sort_arg }
         in
         loop ty_res mode_ret ((lbl, Arg arg) :: rev_args) rest
->>>>>>> Compiler:HEAD
   in
   loop ty_fun0 mode_fun rev_args sargs
 
@@ -6179,16 +5482,8 @@ let collect_apply_args env funct ignore_labels ty_fun ty_fun0 mode_fun sargs
                 then
                   (sargs, None)
                 else
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-                  raise(error(sarg.pexp_loc, env,
-                              Apply_wrong_label(l', ty_fun', omittable)))
-||||||| Compiler:last-imported
-                  raise(Error(sarg.pexp_loc, env,
-                              Apply_wrong_label(l', ty_fun', omittable)))
-=======
                   Error.log_and_raise sarg.pexp_loc env
                     (Apply_wrong_label(l', ty_fun', omittable))
->>>>>>> Compiler:HEAD
           end else
             (* Arguments can be commuted, try to fetch the argument
               corresponding to the first parameter. *)
@@ -6202,22 +5497,8 @@ let collect_apply_args env funct ignore_labels ty_fun ty_fun0 mode_fun sargs
                   let label = Printtyp.string_of_label l in
                   if is_position l
                   then
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-                    raise
-                      (error
-                         ( sarg.pexp_loc
-                         , env
-                         , Nonoptional_call_pos_label label))
-||||||| Compiler:last-imported
-                    raise
-                      (Error
-                         ( sarg.pexp_loc
-                         , env
-                         , Nonoptional_call_pos_label label))
-=======
                     Error.log_and_raise sarg.pexp_loc env
                       (Nonoptional_call_pos_label label)
->>>>>>> Compiler:HEAD
                   else
                     Location.prerr_warning
                       sarg.pexp_loc
@@ -6234,16 +5515,8 @@ let collect_apply_args env funct ignore_labels ty_fun ty_fun0 mode_fun sargs
               with
               | Ok sort -> sort
               | Error err ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-                raise(error(first_arg_loc, env,
-                            Function_type_not_rep(ty_arg, err)))
-||||||| Compiler:last-imported
-                raise(Error(first_arg_loc, env,
-                            Function_type_not_rep(ty_arg, err)))
-=======
                   Error.log_and_raise first_arg_loc env
                     (Function_type_not_rep(ty_arg, err))
->>>>>>> Compiler:HEAD
             in
             let arg =
               match arg_opt with
@@ -6306,14 +5579,8 @@ let type_omitted_parameters_and_build_result_type expected_mode env loc ty_ret
                match type_sort ~why:Function_result ~fixed:false env ty_ret with
                | Ok sort -> sort
                | Error err ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-                 raise (error (loc, env, Function_type_not_rep (ty_ret, err)))
-||||||| Compiler:last-imported
-                 raise (Error (loc, env, Function_type_not_rep (ty_ret, err)))
-=======
                    Error.log_and_raise loc env
                      (Function_type_not_rep (ty_ret, err))
->>>>>>> Compiler:HEAD
              in
              let ty_ret =
                newty2 ~level
@@ -6682,23 +5949,6 @@ let rec maybe_computation exp =
 let annotate_recursive_bindings env valbinds =
   let ids = let_bound_idents valbinds in
   List.map
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-    (fun ({vb_pat; vb_expr; vb_rec_kind = _; vb_sort; vb_attributes; vb_loc}
-          as vb) ->
-       match (Value_rec_check.is_valid_recursive_expression ids vb_expr) with
-       | None ->
-         raise_error(error(vb_expr.exp_loc, env, Illegal_letrec_expr));
-         vb
-       | Some vb_rec_kind ->
-         { vb_pat; vb_expr; vb_rec_kind; vb_sort; vb_attributes; vb_loc})
-||||||| Compiler:last-imported
-    (fun {vb_pat; vb_expr; vb_rec_kind = _; vb_sort; vb_attributes; vb_loc} ->
-       match (Value_rec_check.is_valid_recursive_expression ids vb_expr) with
-       | None ->
-         raise(Error(vb_expr.exp_loc, env, Illegal_letrec_expr))
-       | Some vb_rec_kind ->
-         { vb_pat; vb_expr; vb_rec_kind; vb_sort; vb_attributes; vb_loc})
-=======
     (fun ({vb_pat; vb_expr; vb_rec_kind = _; vb_sort;
            vb_attributes; vb_loc} as vb) ->
       match (Value_rec_check.is_valid_recursive_expression ids vb_expr) with
@@ -6707,20 +5957,13 @@ let annotate_recursive_bindings env valbinds =
            vb
       | Some vb_rec_kind ->
           { vb_pat; vb_expr; vb_rec_kind; vb_sort; vb_attributes; vb_loc})
->>>>>>> Compiler:HEAD
     valbinds
 
 let check_recursive_class_bindings env ids exprs =
   List.iter
     (fun expr ->
        if not (Value_rec_check.is_valid_class_expr ids expr) then
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-         raise(error(expr.cl_loc, env, Illegal_class_expr)))
-||||||| Compiler:last-imported
-         raise(Error(expr.cl_loc, env, Illegal_class_expr)))
-=======
          Error.log_or_raise expr.cl_loc env Illegal_class_expr)
->>>>>>> Compiler:HEAD
     exprs
 
 (* The "rest of the function" extends from the start of the first parameter
@@ -6813,13 +6056,7 @@ let type_pattern_approx env spat ty_expected =
         | _ -> approx_type env sty
       in
       begin try unify env inferred_ty ty_expected with Unify trace ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-        raise(error(spat.ppat_loc, env, Pattern_type_clash(trace, None)))
-||||||| Compiler:last-imported
-        raise(Error(spat.ppat_loc, env, Pattern_type_clash(trace, None)))
-=======
         Error.log_and_raise spat.ppat_loc env (Pattern_type_clash(trace, None))
->>>>>>> Compiler:HEAD
       end;
   | _ -> ()
 
@@ -6828,25 +6065,13 @@ let type_approx_constraint ~loc env constraint_ ty_expected =
   | Pconstraint sty ->
       let ty_expected' = approx_type env sty in
       begin try unify env ty_expected' ty_expected with Unify err ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-        raise (error (loc, env, Expr_type_clash (err, None, None)))
-||||||| Compiler:last-imported
-        raise (Error (loc, env, Expr_type_clash (err, None, None)))
-=======
         Error.log_and_raise loc env (Expr_type_clash (err, None, None))
->>>>>>> Compiler:HEAD
       end;
       ty_expected'
   | Pcoerce (_sty1, sty2) ->
       let ty = approx_type env sty2 in
       begin try unify env ty ty_expected with Unify trace ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-        raise (error (loc, env, Expr_type_clash (trace, None, None)))
-||||||| Compiler:last-imported
-        raise (Error (loc, env, Expr_type_clash (trace, None, None)))
-=======
         Error.log_and_raise loc env (Expr_type_clash (trace, None, None))
->>>>>>> Compiler:HEAD
       end;
       ty_expected
 
@@ -6866,13 +6091,7 @@ let type_approx_fun_one_param
         let mode_annots = mode_annots_from_pat spat in
         let has_poly = has_poly_constraint spat in
         if has_poly && is_optional label then
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-          raise(error(spat.ppat_loc, env, Optional_poly_param));
-||||||| Compiler:last-imported
-          raise(Error(spat.ppat_loc, env, Optional_poly_param));
-=======
           Error.log_and_raise spat.ppat_loc env (Optional_poly_param);
->>>>>>> Compiler:HEAD
         Some mode_annots, has_poly
   in
   let loc_fun, ty_fun = in_function in
@@ -6882,11 +6101,6 @@ let type_approx_fun_one_param
       let err =
         error_of_filter_arrow_failure ~explanation:None ty_fun err ~first
       in
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-      raise (error(loc_fun, env, err))
-||||||| Compiler:last-imported
-      raise (Error(loc_fun, env, err))
-=======
       let level = get_level (instance ty_expected) in
       Error.log_or_raise loc_fun env err;
       let k_arg = Jkind.Builtin.any ~why:Inside_of_Tarrow in
@@ -6894,7 +6108,6 @@ let type_approx_fun_one_param
       let ret_mode = With_locality.newvar (get_current_level ()) in
       let ty_arg = newty2 ~level (Tpoly (newvar2 level k_arg, [])) in
       { ty_arg; arg_mode; ret_mode; ty_ret = ty_expected}
->>>>>>> Compiler:HEAD
   in
   Option.iter
     (fun mode_annots ->
@@ -6940,13 +6153,7 @@ and type_tuple_approx (env: Env.t) loc ty_expected l =
   in
   let ty = newty (Ttuple labeled_tys) in
   begin try unify env ty ty_expected with Unify err ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-    raise(error(loc, env, Expr_type_clash (err, None, None)))
-||||||| Compiler:last-imported
-    raise(Error(loc, env, Expr_type_clash (err, None, None)))
-=======
     Error.log_and_raise loc env (Expr_type_clash (err, None, None))
->>>>>>> Compiler:HEAD
   end;
   List.iter2
     (fun (_, e) (_, ty) -> type_approx env e ty)
@@ -6998,16 +6205,8 @@ let check_univars env kind exp ty_expected vars =
     let trace =
       (Ctype.expanded_diff env ~got:ty ~expected:ty_expected) :: errs
     in
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-    raise (error(exp.exp_loc, env,
-                 Less_general(kind, Errortrace.unification_error ~trace)))
-||||||| Compiler:last-imported
-    raise (Error(exp.exp_loc, env,
-                 Less_general(kind, Errortrace.unification_error ~trace)))
-=======
     Error.log_and_raise exp.exp_loc env
       (Less_general(kind, Errortrace.unification_error ~trace))
->>>>>>> Compiler:HEAD
   in
   let pty = instance ty_expected in
   let exp_ty, vars =
@@ -7454,13 +6653,7 @@ let with_explanation explanation f =
       with Error.In_context (loc', env', Expr_type_clash(err', None, exp'))
         when should_show_explanation ~loc:loc' ~explanation ->
         let err = Expr_type_clash(err', Some explanation, exp') in
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-        raise (error (loc', env', err))
-||||||| Compiler:last-imported
-        raise (Error (loc', env', err))
-=======
         Error.log_and_raise loc' env' err
->>>>>>> Compiler:HEAD
 
 (* Generalize expressions *)
 let generalize_structure_exp exp = generalize_structure exp.exp_type
@@ -7621,31 +6814,16 @@ let split_function_ty
           error_of_filter_arrow_failure ~explanation ~first:is_first_val_param
             ty_fun err
         in
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-        (* Merlin: we recover with an expected type of 'a -> 'b *)
-        let level = get_level (instance ty_expected) in
-        raise_error (error(loc_fun, env, err));
-        let arg_kind = Jkind.Builtin.any ~why:Inside_of_Tarrow in
-        let ret_kind = Jkind.Builtin.any ~why:Inside_of_Tarrow in
-        { ty_arg = newty (Tpoly (newvar2 level arg_kind, []))
-        ; arg_mode = Mode.With_locality.newvar level
-        ; ty_ret = newvar2 level ret_kind
-        ; ret_mode = Mode.With_locality.newvar level
-        }
-||||||| Compiler:last-imported
-        raise (Error(loc_fun, env, err))
-=======
         let level = get_level (instance ty_expected) in
         Error.log_or_raise loc_fun env err;
         Typing_recovery.erroneous_type_register ty_expected;
         let arg_kind = Jkind.Builtin.any ~why:Inside_of_Tarrow in
         let ret_kind = Jkind.Builtin.any ~why:Inside_of_Tarrow in
         { ty_arg = newty (Tpoly (newvar2 level arg_kind, []))
-        ; arg_mode = With_locality.newvar (get_current_level ())
+        ; arg_mode = With_locality.newvar level
         ; ty_ret = newvar2 level ret_kind
-        ; ret_mode = With_locality.newvar (get_current_level ())
+        ; ret_mode = With_locality.newvar level
         }
->>>>>>> Compiler:HEAD
     end
   in
   apply_mode_annots ~loc:param_loc Parameter mode_annots arg_mode;
@@ -7707,14 +6885,8 @@ let split_function_ty
   let type_sort ~why ty =
     match Ctype.type_sort ~why ~fixed:false env ty with
     | Ok sort -> sort
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-    | Error err -> raise (error (loc_fun, env, Function_type_not_rep (ty, err)))
-||||||| Compiler:last-imported
-    | Error err -> raise (Error (loc_fun, env, Function_type_not_rep (ty, err)))
-=======
     | Error err ->
         Error.log_and_raise loc_fun env (Function_type_not_rep (ty, err))
->>>>>>> Compiler:HEAD
   in
   let arg_sort = type_sort ~why:Function_argument ty_arg in
   let ret_sort = type_sort ~why:Function_result ty_ret in
@@ -8040,43 +7212,10 @@ let rec type_exp ?recarg ?(overwrite=No_overwrite) env expected_mode sexp =
 
 and check_layout_args_empty ~loc ~env layout_args ctx =
   if not (List.is_empty layout_args) then
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-    raise (error (loc, env, Layout_poly_inst_not_yet_supported ctx))
-||||||| Compiler:last-imported
-    raise (Error (loc, env, Layout_poly_inst_not_yet_supported ctx))
-=======
     Error.log_and_raise loc env (Layout_poly_inst_not_yet_supported ctx)
->>>>>>> Compiler:HEAD
 
 and type_expect ?recarg ?(overwrite=No_overwrite) env
       (expected_mode : expected_mode) sexp ty_expected_explained =
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-  Msupport.with_saved_types
-    ~warning_attribute:sexp.pexp_attributes ?save_part:None
-      (fun () ->
-        let saved = save_levels () in
-        try
-          type_expect_ ?recarg ~overwrite env
-            expected_mode sexp ty_expected_explained
-        with exn ->
-          Msupport.erroneous_type_register ty_expected_explained.ty;
-          raise_error exn;
-          set_levels saved;
-          let loc = sexp.pexp_loc in
-          create_merlin_type_error_node loc env ty_expected_explained.ty
-            ~attributes:(Msupport.recovery_attributes sexp.pexp_attributes))
-||||||| Compiler:last-imported
-  let previous_saved_types = Cmt_format.get_saved_types () in
-  let exp =
-    Builtin_attributes.warning_scope sexp.pexp_attributes
-      (fun () ->
-         type_expect_ ?recarg ~overwrite env expected_mode sexp ty_expected_explained
-      )
-  in
-  Cmt_format.set_saved_types
-    (Cmt_format.Partial_expression exp :: previous_saved_types);
-  exp
-=======
   let save_part =
     if !Clflags.typing_recovery then None
     else Some (fun e -> Cmt_format.Partial_expression e)
@@ -8123,7 +7262,6 @@ and type_expect ?recarg ?(overwrite=No_overwrite) env
           exp_attributes =
             Typing_recovery_state.recovery_attributes sexp.pexp_attributes }
     )
->>>>>>> Compiler:HEAD
 
 and type_expect_
     ?(recarg=Rejected) ?(overwrite=No_overwrite)
@@ -8141,13 +7279,7 @@ and type_expect_
   let type_expect_record (type rep) ~overwrite (record_form : rep record_form)
         (lid_sexp_list: (Longident.t loc * Parsetree.expression) list)
         (opt_sexp : Parsetree.expression option) =
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-      let saved_levels = save_levels () in
-      begin try
-||||||| Compiler:last-imported
-=======
     let delayed () =
->>>>>>> Compiler:HEAD
       assert (lid_sexp_list <> []);
       let opt_exp =
         match opt_sexp with
@@ -8174,22 +7306,10 @@ and type_expect_
           | Record_type (p0, p, _, _) ->
               Some (p0, p, is_principal ty)
           | Record_type_of_other_form ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-            raise (error (loc, env, other_form_error))
-||||||| Compiler:last-imported
-            raise (Error (loc, env, other_form_error))
-=======
               Error.log_and_raise loc env other_form_error
->>>>>>> Compiler:HEAD
           | Maybe_a_record_type -> None
           | Not_a_record_type ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-            raise (error (loc, env, not_a_record_error))
-||||||| Compiler:last-imported
-            raise (Error (loc, env, not_a_record_error))
-=======
               Error.log_and_raise loc env not_a_record_error
->>>>>>> Compiler:HEAD
         in
         let expected_opath =
           let wks = record_form_to_wrong_kind_sort record_form in
@@ -8270,13 +7390,7 @@ and type_expect_
       | (No_overwrite | Assigning _) -> ()
       | Overwriting _ ->
           if not is_boxed then
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-            raise (error (loc, env, Overwrite_of_invalid_term));
-||||||| Compiler:last-imported
-            raise (Error (loc, env, Overwrite_of_invalid_term));
-=======
             Error.log_and_raise loc env Overwrite_of_invalid_term;
->>>>>>> Compiler:HEAD
       end;
       let locality_mode, record_mode =
         if is_boxed then
@@ -8321,13 +7435,7 @@ and type_expect_
          disambiguate_sort_lid_a_list directly *)
       let rec check_duplicates = function
         | (_, lbl1, _) :: (_, lbl2, _) :: _ when lbl1.lbl_pos = lbl2.lbl_pos ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-          raise(error(loc, env, Label_multiply_defined lbl1.lbl_name))
-||||||| Compiler:last-imported
-          raise(Error(loc, env, Label_multiply_defined lbl1.lbl_name))
-=======
             Error.log_or_raise loc env (Label_multiply_defined lbl1.lbl_name)
->>>>>>> Compiler:HEAD
         | _ :: rem ->
             check_duplicates rem
         | [] -> ()
@@ -8430,18 +7538,8 @@ and type_expect_
                             else lbl :: missing_labels (n + 1) rem
                       in
                       let missing = missing_labels 0 label_names in
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-                      raise
-                        (error(loc, env,
-                               Label_missing (P record_form, missing))))
-||||||| Compiler:last-imported
-                      raise
-                        (Error(loc, env,
-                               Label_missing (P record_form, missing))))
-=======
                       Error.log_and_raise loc env
                         (Label_missing (P record_form, missing)))
->>>>>>> Compiler:HEAD
                 lbl.lbl_all
             in
             None, label_definitions
@@ -8468,13 +7566,7 @@ and type_expect_
               with
               | Ok sort -> sort
               | Error err ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-                raise (error (loc, env, Record_not_rep(ty_expected, err)))
-||||||| Compiler:last-imported
-                raise (Error (loc, env, Record_not_rep(ty_expected, err)))
-=======
                   Error.log_and_raise loc env (Record_not_rep(ty_expected, err))
->>>>>>> Compiler:HEAD
             in
             Some ({exp with exp_type = ty_exp}, sort, ubr), label_definitions
       in
@@ -8553,23 +7645,6 @@ and type_expect_
         exp_type = instance ty_expected;
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-    with exn ->
-      raise_error exn;
-      set_levels saved_levels;
-      re {
-        exp_desc = Texp_record {
-            fields = [||]; representation = Record_boxed;
-            extended_expression = None;
-            locality_mode = None
-          };
-        exp_loc = loc; exp_extra = [];
-        exp_type = instance ty_expected;
-        exp_attributes = Msupport.recovery_attributes sexp.pexp_attributes;
-        exp_env = env }
-    end
-||||||| Compiler:last-imported
-=======
     in
     (* Recovery is done here instead of in [type_expect] as for the other
          cases, because being a bit more precise about what is
@@ -8593,7 +7668,6 @@ and type_expect_
           Typing_recovery_state.recovery_attributes sexp.pexp_attributes;
         exp_env = env }
     end
->>>>>>> Compiler:HEAD
   in
   match sexp.pexp_desc with
   | Pexp_ident lid ->
@@ -8829,25 +7903,13 @@ and type_expect_
       begin
         match expected_mode.position with
         | RNontail ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-          raise (error (loc, env, Exclave_in_nontail_position))
-||||||| Compiler:last-imported
-          raise (Error (loc, env, Exclave_in_nontail_position))
-=======
             Error.log_and_raise loc env Exclave_in_nontail_position
->>>>>>> Compiler:HEAD
         | RTail (regionality, _) ->
           (* The middle-end relies on all functions which allocate into their
              parent's region having a return mode of local. *)
           (match Regionality.submode Regionality.local regionality with
           | Ok () -> ()
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-          | Error _ -> raise (error(loc, env, Exclave_returns_not_local))
-||||||| Compiler:last-imported
-          | Error _ -> raise (Error(loc, env, Exclave_returns_not_local))
-=======
           | Error _ -> Error.log_and_raise loc env Exclave_returns_not_local
->>>>>>> Compiler:HEAD
           );
           (* mode' is RNontail, because currently our language cannot construct
              region in the tail of another region.*)
@@ -9355,13 +8417,7 @@ and type_expect_
           type_label_exp ~overwrite:No_overwrite_label false env mode loc ty_record
             (lid, label, snewval) Legacy
         | Immutable ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-          raise(error(loc, env, Label_not_mutable lid.txt))
-||||||| Compiler:last-imported
-          raise(Error(loc, env, Label_not_mutable lid.txt))
-=======
             Error.log_and_raise loc env (Label_not_mutable lid.txt)
->>>>>>> Compiler:HEAD
       in
       let record =
         { record with exp_extra =
@@ -9538,20 +8594,8 @@ and type_expect_
       match Modality.Const.equate modality expected_modality with
       | Ok () -> ()
       | Error err ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-        raise (error(
-          loc, env,
-          Block_index_modality_mismatch { mut = is_mutable; err }
-        ))
-||||||| Compiler:last-imported
-        raise (Error(
-          loc, env,
-          Block_index_modality_mismatch { mut = is_mutable; err }
-        ))
-=======
         Error.log_and_raise loc env
           (Block_index_modality_mismatch { mut = is_mutable; err })
->>>>>>> Compiler:HEAD
     end;
     let ty = match mut with
       | Immutable -> Predef.type_idx_imm base_ty el_ty
@@ -9751,73 +8795,6 @@ and type_expect_
         exp_extra = (exp_extra, loc, sexp.pexp_attributes) :: arg.exp_extra;
       }
   | Pexp_send (e, met) ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-    submode ~loc ~env Mode.With_regionality.legacy expected_mode;
-    let obj = type_exp env mode_legacy e in
-    let pm = position_and_mode env expected_mode sexp in
-    begin try
-      let (obj,meth,typ) =
-        with_local_level_generalize_structure_if_principal
-          ~before_generalize:(fun (_, _, typ) -> generalize_structure typ)
-          (fun () -> type_send env loc explanation e met.txt)
-      in
-      let typ, obj_extra =
-        match get_desc typ with
-        | Tpoly (ty, []) ->
-            instance ty, None
-        | Tpoly (ty, tl) ->
-            if !Clflags.principal && get_level typ <> generic_level then
-              Location.prerr_warning loc
-                (not_principal "this use of a polymorphic method");
-            instance_poly tl ty,
-            Some (
-              Texp_inspected_type (Polymorphic_parameter (
-                Method (met, Ctype.instance ~partial:true typ))),
-              loc, [])
-        | Tvar _ ->
-            let ty' = newvar (Jkind.Builtin.value ~why:Object_field) in
-            unify env (instance typ) (newty(Tpoly(ty',[])));
-            (* if not !Clflags.nolabels then
-               Location.prerr_warning loc (Warnings.Unknown_method met); *)
-            ty', None
-        | _ ->
-            assert false
-      in
-      let obj =
-        { obj with exp_extra = Option.to_list obj_extra @ obj.exp_extra}
-||||||| Compiler:last-imported
-      submode ~loc ~env Mode.With_regionality.legacy expected_mode;
-      let pm = position_and_mode env expected_mode sexp in
-      let (obj,meth,typ) =
-        with_local_level_generalize_structure_if_principal
-          ~before_generalize:(fun (_, _, typ) -> generalize_structure typ)
-          (fun () -> type_send env loc explanation e met.txt)
-      in
-      let typ, obj_extra =
-        match get_desc typ with
-        | Tpoly (ty, []) ->
-            instance ty, None
-        | Tpoly (ty, tl) ->
-            if !Clflags.principal && get_level typ <> generic_level then
-              Location.prerr_warning loc
-                (not_principal "this use of a polymorphic method");
-            instance_poly tl ty,
-            Some (
-              Texp_inspected_type (Polymorphic_parameter (
-                Method (met, Ctype.instance ~partial:true typ))),
-              loc, [])
-        | Tvar _ ->
-            let ty' = newvar (Jkind.Builtin.value ~why:Object_field) in
-            unify env (instance typ) (newty(Tpoly(ty',[])));
-            (* if not !Clflags.nolabels then
-               Location.prerr_warning loc (Warnings.Unknown_method met); *)
-            ty', None
-        | _ ->
-            assert false
-      in
-      let obj =
-        { obj with exp_extra = Option.to_list obj_extra @ obj.exp_extra}
-=======
       let suspended () =
         submode ~loc ~env Mode.With_regionality.legacy expected_mode;
         let pm = position_and_mode env expected_mode sexp in
@@ -9857,48 +8834,7 @@ and type_expect_
           exp_type = typ;
           exp_attributes = sexp.pexp_attributes;
           exp_env = env }
->>>>>>> Compiler:HEAD
       in
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-      rue {
-        exp_desc = Texp_send(obj, meth, pm.apply_position);
-        exp_loc = loc; exp_extra = [];
-          exp_type = typ;
-          exp_attributes = sexp.pexp_attributes;
-          exp_env = env }
-      with Error (_, _, Undefined_method (_, _, valid_methods)) ->
-        let valid_methods =
-          match valid_methods with
-          | Some meths -> Some meths
-          | None ->
-            match get_desc (expand_head env obj.exp_type) with
-            | Tobject (fields, _) ->
-                let (fields, _) = Ctype.flatten_fields fields in
-                let collect_fields li (meth, meth_kind, _meth_ty) =
-                  if field_kind_repr meth_kind = Fpublic then meth::li else li in
-                Some (List.fold_left collect_fields [] fields)
-            | _ -> None
-        in
-        Msupport.erroneous_type_register ty_expected;
-        raise_error
-          (error(e.pexp_loc, env,
-                Undefined_method (obj.exp_type, met.txt, valid_methods)));
-        rue {
-          exp_desc = Texp_send(obj, Tmeth_name met.txt, pm.apply_position);
-          exp_loc = loc; exp_extra = [];
-          exp_type = ty_expected;
-          exp_attributes = Msupport.recovery_attributes sexp.pexp_attributes;
-          exp_env = env;
-        }
-      end
-||||||| Compiler:last-imported
-      rue {
-        exp_desc = Texp_send(obj, meth, pm.apply_position);
-        exp_loc = loc; exp_extra = [];
-        exp_type = typ;
-        exp_attributes = sexp.pexp_attributes;
-        exp_env = env }
-=======
       begin
         try suspended ()
         with Error.In_context
@@ -9912,7 +8848,6 @@ and type_expect_
                 Typing_recovery_state.recovery_attributes sexp.pexp_attributes;
               exp_env = env }
       end
->>>>>>> Compiler:HEAD
   | Pexp_new cl ->
       submode ~loc ~env With_regionality.legacy expected_mode;
       let (cl_path, cl_decl, cl_mode) =
@@ -9925,13 +8860,7 @@ and type_expect_
       let pm = position_and_mode env expected_mode sexp in
       begin match cl_decl.cty_new with
           None ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-            raise(error(loc, env, Virtual_class cl.txt))
-||||||| Compiler:last-imported
-            raise(Error(loc, env, Virtual_class cl.txt))
-=======
             Error.log_and_raise loc env (Virtual_class cl.txt)
->>>>>>> Compiler:HEAD
         | Some ty ->
             rue {
               exp_desc = Texp_new (cl_path, cl, cl_decl, pm.apply_position);
@@ -9956,14 +8885,6 @@ and type_expect_
                 env
             in
             Texp_setinstvar(path_self, path, lab, newval)
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-        | Instance_variable (_,Immutable,_,_) ->
-            raise(error(loc, env, Instance_variable_not_mutable lab.txt))
-||||||| Compiler:last-imported
-        | Instance_variable (_,Immutable,_,_) ->
-            raise(Error(loc, env, Instance_variable_not_mutable lab.txt))
-=======
->>>>>>> Compiler:HEAD
         | Mutable_variable (id, mode, ty, sort) ->
             let newval =
               type_expect env (mode_default mode)
@@ -9984,15 +8905,7 @@ and type_expect_
        List.fold_right
         (fun (lab, _) l ->
            if List.exists (fun l -> l.txt = lab.txt) l then
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-             raise(error(loc, env,
-                         Value_multiply_overridden lab.txt));
-||||||| Compiler:last-imported
-             raise(Error(loc, env,
-                         Value_multiply_overridden lab.txt));
-=======
              Error.log_and_raise loc env (Value_multiply_overridden lab.txt);
->>>>>>> Compiler:HEAD
            lab::l)
         lst
         [] in
@@ -10001,13 +8914,7 @@ and type_expect_
           Env.find_value_by_name (Longident.Lident "selfpat-*") env,
           Env.find_value_by_name_lazy (Longident.Lident "self-*") env
         with Not_found ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-          raise(error(loc, env, Outside_class))
-||||||| Compiler:last-imported
-          raise(Error(loc, env, Outside_class))
-=======
           Error.log_and_raise loc env Outside_class
->>>>>>> Compiler:HEAD
       with
         (_, {val_type = self_ty; val_kind = Val_self (sign, _, vars, _)}),
         (path_self, _) ->
@@ -10019,16 +8926,8 @@ and type_expect_
             with
               Not_found ->
                 let vars = Vars.fold (fun var _ li -> var::li) vars [] in
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-                raise(error(loc, env,
-                            Unbound_instance_variable (lab.txt, vars)))
-||||||| Compiler:last-imported
-                raise(Error(loc, env,
-                            Unbound_instance_variable (lab.txt, vars)))
-=======
                 Error.log_and_raise loc env
                   (Unbound_instance_variable (lab.txt, vars))
->>>>>>> Compiler:HEAD
             end
           in
           let modifs = List.map type_override lst in
@@ -10260,21 +9159,9 @@ and type_expect_
                   (not_principal "this module packing");
               pack
           | Tvar _ ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-              raise (error (loc, env, Cannot_infer_signature))
-||||||| Compiler:last-imported
-              raise (Error (loc, env, Cannot_infer_signature))
-=======
               Error.log_and_raise loc env Cannot_infer_signature
->>>>>>> Compiler:HEAD
           | _ ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-              raise (error (loc, env, Not_a_packed_module ty_expected))
-||||||| Compiler:last-imported
-              raise (Error (loc, env, Not_a_packed_module ty_expected))
-=======
               Error.log_and_raise loc env (Not_a_packed_module ty_expected)
->>>>>>> Compiler:HEAD
           in
           let (modl, pack') = !type_package env m pack in
           let exp_type = newty (Tpackage pack') in
@@ -10297,44 +9184,6 @@ and type_expect_
       | _ -> Env.check_no_open_quotations loc env Open_qt
       end;
       let tv = newvar (Jkind.Builtin.any ~why:Dummy_jkind) in
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-      begin match !type_open_decl env od with
-      | (od, newenv) ->
-        let exp = type_expect newenv expected_mode e ty_expected_explained in
-        (* Force the return type to be well-formed in the original
-           environment. *)
-        unify_var newenv tv exp.exp_type;
-        re {
-          exp_desc = Texp_open (od, exp);
-          exp_type = exp.exp_type;
-          exp_loc = loc;
-          exp_extra = [];
-          exp_attributes = sexp.pexp_attributes;
-          exp_env = env;
-        }
-      | exception exn ->
-        raise_error exn;
-        (* We're dropping the local open node and keeping only its body.
-           We also don't report any error in the body, as there's no way to
-           tell if it is due to the failed open. *)
-        Msupport.catch_errors (Warnings.backup ()) (ref [])
-          (fun () -> type_expect env expected_mode e ty_expected_explained)
-      end
-||||||| Compiler:last-imported
-      let (od, newenv) = !type_open_decl env od in
-      let exp = type_expect newenv expected_mode e ty_expected_explained in
-      (* Force the return type to be well-formed in the original
-         environment. *)
-      unify_var newenv tv exp.exp_type;
-      re {
-        exp_desc = Texp_open (od, exp);
-        exp_type = exp.exp_type;
-        exp_loc = loc;
-        exp_extra = [];
-        exp_attributes = sexp.pexp_attributes;
-        exp_env = env;
-      }
-=======
       begin match !type_open_decl env od with
       | (od, newenv) ->
           let exp = type_expect newenv expected_mode e ty_expected_explained in
@@ -10357,7 +9206,6 @@ and type_expect_
           Typing_recovery.catch_errors (ref [])
             (fun () -> type_expect env expected_mode e ty_expected_explained)
       end
->>>>>>> Compiler:HEAD
   | Pexp_letop{ let_ = slet; ands = sands; body = sbody } ->
       submode ~loc ~env With_regionality.legacy expected_mode;
       let rec loop spat_acc ty_acc ty_acc_sort sands =
@@ -10412,14 +9260,8 @@ and type_expect_
           begin try
             unify env op_type ty_op
           with Unify err ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-            raise(error(let_loc, env, Letop_type_clash(slet.pbop_op.txt, err)))
-||||||| Compiler:last-imported
-            raise(Error(let_loc, env, Letop_type_clash(slet.pbop_op.txt, err)))
-=======
             Error.log_or_raise let_loc env
               (Letop_type_clash(slet.pbop_op.txt, err))
->>>>>>> Compiler:HEAD
           end;
           (op_path, op_desc, op_type, spat_params, ty_params, param_sort,
            ty_func_result, body_sort, ty_result, op_result_sort,
@@ -10497,13 +9339,7 @@ and type_expect_
             ignore held_locks;
             match cd.cstr_tag with
             | Extension path -> path
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-            | _ -> raise (error (lid.loc, env, Not_an_extension_constructor))
-||||||| Compiler:last-imported
-            | _ -> raise (Error (lid.loc, env, Not_an_extension_constructor))
-=======
             | _ -> Error.log_and_raise lid.loc env Not_an_extension_constructor
->>>>>>> Compiler:HEAD
           in
           rue {
             exp_desc = Texp_extension_constructor (lid, path);
@@ -10512,25 +9348,13 @@ and type_expect_
             exp_attributes = sexp.pexp_attributes;
             exp_env = env }
       | _ ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-          raise (error (loc, env, Invalid_extension_constructor_payload))
-||||||| Compiler:last-imported
-          raise (Error (loc, env, Invalid_extension_constructor_payload))
-=======
           Error.log_and_raise loc env Invalid_extension_constructor_payload
->>>>>>> Compiler:HEAD
       end
 
   | Pexp_extension ({ txt = ("probe" | "ocaml.probe"); _ }, payload) ->
     begin match Builtin_attributes.get_tracing_probe_payload payload with
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-    | Error () -> raise (error (loc, env, Probe_format))
-||||||| Compiler:last-imported
-    | Error () -> raise (Error (loc, env, Probe_format))
-=======
     | Error () ->
         Error.log_and_raise loc env Probe_format
->>>>>>> Compiler:HEAD
     | Ok { name; name_loc; enabled_at_init; arg; } ->
         check_probe_name name name_loc env;
         Env.add_probe name;
@@ -10563,26 +9387,14 @@ and type_expect_
         (* add_delayed_check
           (fun () ->
              if not (Env.has_probe name) then
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-               raise(error(name_loc, env, (Probe_name_undefined name)))); *)
-||||||| Compiler:last-imported
-               raise(Error(name_loc, env, (Probe_name_undefined name))));
-=======
-               Error.log_and_raise name_loc env (Probe_name_undefined name));
->>>>>>> Compiler:HEAD
+                Error.log_and_raise name_loc env (Probe_name_undefined name)); *)
         rue {
           exp_desc = Texp_probe_is_enabled {name};
           exp_loc = loc; exp_extra = [];
           exp_type = instance Predef.type_bool;
           exp_attributes = sexp.pexp_attributes;
           exp_env = env }
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-      | _ -> raise (error (loc, env, Probe_is_enabled_format))
-||||||| Compiler:last-imported
-      | _ -> raise (Error (loc, env, Probe_is_enabled_format))
-=======
       | _ -> Error.log_and_raise loc env Probe_is_enabled_format
->>>>>>> Compiler:HEAD
     end
   | Pexp_extension ({ txt = "src_pos"; _ }, _) ->
       rue (src_pos loc sexp.pexp_attributes env)
@@ -10629,13 +9441,7 @@ and type_expect_
               exp_env = env;
             }
       | _ ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-          raise (error (loc, env, Invalid_atomic_loc_payload))
-||||||| Compiler:last-imported
-          raise (Error (loc, env, Invalid_atomic_loc_payload))
-=======
           Error.log_and_raise loc env Invalid_atomic_loc_payload
->>>>>>> Compiler:HEAD
       end
   | Pexp_extension ext ->
       raise (Error_forward (Builtin_attributes.error_of_extension ext))
@@ -10649,22 +9455,10 @@ and type_expect_
   | Pexp_stack e ->
       let exp = type_expect env expected_mode e ty_expected_explained in
       let always_heap category =
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-        raise (error (exp.exp_loc, env, Always_heap_allocation category))
-||||||| Compiler:last-imported
-        raise (Error (exp.exp_loc, env, Always_heap_allocation category))
-=======
         Error.log_and_raise exp.exp_loc env (Always_heap_allocation category)
->>>>>>> Compiler:HEAD
       in
       let always_static category =
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-        raise (error (exp.exp_loc, env, Always_static_allocation category))
-||||||| Compiler:last-imported
-        raise (Error (exp.exp_loc, env, Always_static_allocation category))
-=======
         Error.log_and_raise exp.exp_loc env (Always_static_allocation category)
->>>>>>> Compiler:HEAD
       in
       begin match exp.exp_desc with
       | Texp_function { locality_mode; _} | Texp_tuple (_, locality_mode)
@@ -10703,13 +9497,7 @@ and type_expect_
             (With_regionality.min_with_comonadic Areality Regionality.local)
             expected_mode;
       | _ ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-        raise (error (exp.exp_loc, env, Not_allocation))
-||||||| Compiler:last-imported
-        raise (Error (exp.exp_loc, env, Not_allocation))
-=======
         Error.log_or_raise exp.exp_loc env Not_allocation
->>>>>>> Compiler:HEAD
       end;
       let exp_extra = (Texp_stack, loc, []) :: exp.exp_extra in
       {exp with exp_extra}
@@ -10726,13 +9514,7 @@ and type_expect_
         Typetexp.Error.log_or_raise loc env
           (Unsupported_extension Overwriting);
       if not (can_be_overwritten exp2.pexp_desc) then
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-        raise (error (exp2.pexp_loc, env, Overwrite_of_invalid_term));
-||||||| Compiler:last-imported
-        raise (Error (exp2.pexp_loc, env, Overwrite_of_invalid_term));
-=======
         Error.log_or_raise exp2.pexp_loc env Overwrite_of_invalid_term;
->>>>>>> Compiler:HEAD
       let cell_mode, _ =
         (* The overwritten cell has to be unique
            and should have the areality expected here: *)
@@ -10856,18 +9638,12 @@ and type_expect_
           exp_type = ty_expected_explained.ty;
           exp_attributes = sexp.pexp_attributes;
           exp_env = env }
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
       | _ ->
         { exp_desc = Texp_typed_hole;
           exp_loc = loc; exp_extra = [];
           exp_type = instance ty_expected;
           exp_attributes = sexp.pexp_attributes;
           exp_env = env };
-||||||| Compiler:last-imported
-      | _ -> raise (Error (loc, env, Unexpected_hole));
-=======
-      | _ -> Error.log_and_raise loc env Unexpected_hole;
->>>>>>> Compiler:HEAD
       end
 
 and type_block_access env expected_base_ty principal
@@ -10971,13 +9747,7 @@ and type_unboxed_access env loc el_ty ua =
       try unify_exp_types loc env ty_res el_ty
       with Error.In_context (_, _, Expr_type_clash _) ->
         let err = Invalid_unboxed_access { prev_el_type = el_ty; ua } in
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-        raise (error (lid.loc, env, err))
-||||||| Compiler:last-imported
-        raise (Error (lid.loc, env, err))
-=======
         Error.log_and_raise lid.loc env err
->>>>>>> Compiler:HEAD
     end;
     let rep =
       update_labels env Unboxed_product ~representative_label:label ~loc:lid.loc
@@ -11056,29 +9826,15 @@ and type_coerce
                 (not_principal "this ground coercion");
           with Subtype err ->
             (* prerr_endline "coercion failed"; *)
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-            raise (error (loc, env, Not_subtype err))
-||||||| Compiler:last-imported
-            raise (Error (loc, env, Not_subtype err))
-=======
             Error.log_and_raise loc env (Not_subtype err)
->>>>>>> Compiler:HEAD
           end;
       | _ ->
           let ty, b = enlarge_type env (generic_instance ty') in
           force ();
           begin try Ctype.unify env arg_type ty with Unify err ->
             let expanded = full_expand ~may_forget_scope:true env ty' in
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-            raise(error(loc_arg, env,
-                        Coercion_failure ({ ty = ty'; expanded }, err, b)))
-||||||| Compiler:last-imported
-            raise(Error(loc_arg, env,
-                        Coercion_failure ({ ty = ty'; expanded }, err, b)))
-=======
             Error.log_and_raise loc_arg env
               (Coercion_failure ({ ty = ty'; expanded }, err, b))
->>>>>>> Compiler:HEAD
           end
       end;
       (arg, ty', Texp_coerce (None, cty'))
@@ -11102,13 +9858,7 @@ and type_coerce
         in
         force (); force' (); force'' ()
       with Subtype err ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-        raise (error (loc, env, Not_subtype err))
-||||||| Compiler:last-imported
-        raise (Error (loc, env, Not_subtype err))
-=======
         Error.log_and_raise loc env (Not_subtype err)
->>>>>>> Compiler:HEAD
       end;
       (type_with_constraint env expected_mode ty,
        instance ty', Texp_coerce (Some cty, cty'))
@@ -11278,13 +10028,7 @@ and type_ident env ?(recarg=Rejected) lid =
   | false, Rejected, _ -> ()
   | true, Rejected, _
   | false, Required, (Tvar _ | Tconstr _) ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-      raise (error (lid.loc, env, Inlined_record_escape))
-||||||| Compiler:last-imported
-      raise (Error (lid.loc, env, Inlined_record_escape))
-=======
       Error.log_and_raise lid.loc env Inlined_record_escape
->>>>>>> Compiler:HEAD
   | false, Required, _  -> () (* will fail later *)
   end;
   let layout_args, val_type, kind =
@@ -11350,53 +10094,6 @@ and type_binding_op_ident env s =
   assert (kind = Id_value);
   path, desc
 
-and type_function
-    env (expected_mode : expected_mode) ty_expected
-      params_suffix body_constraint body ~first ~in_function
-  : type_function_result
-  =
-  let _, (loc_fun : Location.t) = in_function in
-  let loc =
-    loc_rest_of_function ~first ~loc_function:loc_fun params_suffix body
-  in
-  Msupport.with_saved_types (fun () ->
-    let saved = save_levels () in
-    try
-      type_function_
-        env expected_mode ty_expected
-        params_suffix body_constraint body ~first ~loc ~in_function
-    with exn ->
-      Msupport.erroneous_type_register ty_expected;
-      raise_error exn;
-      set_levels saved;
-      let fun_ty =
-        newvar (Jkind.of_new_sort ~why:Merlin ~level:(Ctype.get_current_level ()))
-      in
-      let fun_body =
-        Tfunction_body
-          (create_merlin_type_error_node loc env ty_expected
-             ~attributes:(Msupport.recovery_attributes []))
-      in
-      let ret_info =
-        { ret_mode =
-            { mode_modes =
-                Typedtree.create_return_mode
-                  (Locality.newvar 0);
-              mode_desc = [] };
-          ret_sort = Var (Jkind.Sort.new_var ~level:(Ctype.get_current_level ()));
-          cases_arg_yielding = None;
-        }
-      in
-      { function_ = fun_ty, [], fun_body;
-        newtypes = [];
-        params_contain_gadt = No_gadt;
-        fun_alloc_mode =
-          Some { locality_mode = Locality.newvar 0;
-                 fun_closure_mode =
-                   With_locality.Comonadic.newvar (get_current_level ()) };
-        ret_info = Some ret_info;
-        calling_convention_sorts = []
-      })
 
 (* Typecheck parameters one at a time followed by the body. Later parameters
    are checked in the scope of earlier ones. That's necessary to support
@@ -11411,15 +10108,18 @@ and type_function
 
    See [type_function_result] for the meaning of the returned type.
 *)
-and type_function_
+and type_function
       env (expected_mode : expected_mode) ty_expected
-      params_suffix body_constraint body ~loc ~first ~in_function
+      params_suffix body_constraint body ~first ~in_function
   : type_function_result
   =
   (* Merlin: [loc] is computed in [type_function] and passed through to
      here. (We use it in the error recovery in [type_function].)
   *)
-  let ty_fun, _ = in_function in
+  let ty_fun, (loc_fun : Location.t) = in_function in
+  let loc =
+    loc_rest_of_function ~first ~loc_function:loc_fun params_suffix body
+  in
   match params_suffix with
   | { pparam_desc = Pparam_newtype (newtype_var, jkind_annot) } :: rest ->
       (* Check everything else in the scope of (type a). *)
@@ -11444,51 +10144,6 @@ and type_function_
           exp_type)
       in
       let newtype = id, newtype_var, jkind_annot, uid in
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-      begin
-        try with_explanation ty_fun.explanation (fun () ->
-              unify_exp_types loc env exp_type (instance ty_expected));
-        with exn ->
-          (* Merlin: We recover from this error in [type_function]. *)
-          record_exp_and_reraise ~exn
-            { exp_desc =
-               (let params = List.map (fun { param; _ } -> param) params in
-                let ret_mode, ret_sort =
-                  match ret_info with
-                  | Some { ret_mode; ret_sort; _ } -> ret_mode, ret_sort
-                  | None ->
-                    ({ mode_modes =
-                         Typedtree.create_return_mode
-                           (Locality.newvar 0);
-                       mode_desc = [] },
-                     Var (Jkind.Sort.new_var ~level:(Ctype.get_current_level ())))
-                in
-                let locality_mode =
-                  Typedtree.create_locality_mode_r @@ Locality.disallow_left @@
-                  match fun_alloc_mode with
-                  | Some { locality_mode; _ } -> locality_mode
-                  | None -> Locality.newvar 0
-                in
-                Texp_function
-                  { params;
-                    body;
-                    ret_mode;
-                    ret_sort;
-                    locality_mode;
-                    zero_alloc=Zero_alloc.default;
-                    yielding = Yielding.newvar 0
-                  });
-              exp_loc = loc;
-              exp_extra = [];
-              exp_type;
-              exp_attributes = [];
-              exp_env = env;
-            }
-      end;
-||||||| Compiler:last-imported
-      with_explanation ty_fun.explanation (fun () ->
-          unify_exp_types loc env exp_type (instance ty_expected));
-=======
       begin
         try
           with_explanation ty_fun.explanation (fun () ->
@@ -11497,7 +10152,6 @@ and type_function_
                    && Typing_recovery.is_recoverable exn ->
             Typing_recovery.erroneous_type_register ty_expected
       end;
->>>>>>> Compiler:HEAD
       { function_ = exp_type, params, body;
         params_contain_gadt = contains_gadt; newtypes = newtype :: newtypes;
         fun_alloc_mode; ret_info; calling_convention_sorts;
@@ -11511,13 +10165,7 @@ and type_function_
       let mode_annots = mode_annots_from_pat pat in
       let has_poly = has_poly_constraint pat in
       if has_poly && is_optional_parsetree arg_label then
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-        raise(error(pat.ppat_loc, env, Optional_poly_param));
-||||||| Compiler:last-imported
-        raise(Error(pat.ppat_loc, env, Optional_poly_param));
-=======
         Error.log_and_raise pat.ppat_loc env Optional_poly_param;
->>>>>>> Compiler:HEAD
       if has_poly
       && not (Language_extension.is_enabled Polymorphic_parameters) then
         Typetexp.Error.log_or_raise loc env
@@ -11681,16 +10329,8 @@ and type_function_
                         (With_locality.Comonadic.proj Areality arg_mode)
                         locality_mode
                     | Error e ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-                      raise (error(loc, env,
-                        Uncurried_function_escapes_comonadic e))
-||||||| Compiler:last-imported
-                      raise (Error(loc_fun, env,
-                        Uncurried_function_escapes_comonadic e))
-=======
                         Error.log_or_raise loc_fun env
                           (Uncurried_function_escapes_comonadic e)
->>>>>>> Compiler:HEAD
                   end;
                   begin match
                       With_locality.Comonadic.submode
@@ -11702,16 +10342,8 @@ and type_function_
                         (With_locality.Comonadic.proj Areality closure_mode)
                         locality_mode
                     | Error e ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-                      raise
-                        (error(loc, env, Uncurried_function_escapes_comonadic e))
-||||||| Compiler:last-imported
-                      raise (Error(loc_fun, env,
-                        Uncurried_function_escapes_comonadic e));
-=======
                         Error.log_or_raise loc_fun env
                           (Uncurried_function_escapes_comonadic e);
->>>>>>> Compiler:HEAD
                   end;
                   More_args
                     { partial_mode =
@@ -11740,43 +10372,6 @@ and type_function_
          type for each new parameter. Now that functions are n-ary, we
          could possibly run this once.
       *)
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-      begin
-        try with_explanation ty_fun.explanation (fun () ->
-          unify_exp_types loc env exp_type (instance ty_expected));
-        with exn ->
-          (* Merlin: We recover from this error in [type_function]. *)
-          record_exp_and_reraise ~exn
-            { exp_desc =
-               (let params = List.map (fun { param; _ } -> param) params in
-                let ret_mode, ret_sort =
-                  match ret_info with
-                  | Some { ret_mode; ret_sort; _ } -> ret_mode, ret_sort
-                  | None ->
-                    ( { mode_modes =
-                          create_allocation_mode_l ret_mode
-                          |> Typedtree.create_return_mode;
-                        mode_desc = [] }
-                    , ret_sort )
-                in
-                Texp_function
-                  { params; body; ret_mode; ret_sort;
-                    locality_mode =
-                      Typedtree.create_locality_mode_r
-                        (Locality.disallow_left locality_mode);
-                    zero_alloc = Zero_alloc.default;
-                    yielding = Yielding.newvar 0 });
-              exp_loc = loc;
-              exp_extra = [];
-              exp_type;
-              exp_attributes = [];
-              exp_env = env;
-            }
-      end;
-||||||| Compiler:last-imported
-      with_explanation ty_fun.explanation (fun () ->
-          unify_exp_types loc env exp_type (instance ty_expected));
-=======
       if not (Typing_recovery.erroneous_type_check ty_expected) then
         (try
            with_explanation ty_fun.explanation (fun () ->
@@ -11784,7 +10379,6 @@ and type_function_
          with exn when !Clflags.typing_recovery
                     && Typing_recovery.is_recoverable exn ->
              Typing_recovery.erroneous_type_register ty_expected);
->>>>>>> Compiler:HEAD
       (* This is quadratic, as it extracts all of the parameters from an arrow
          type for each parameter that's added. Now that functions are n-ary,
          there might be an opportunity to improve this.
@@ -12043,27 +10637,11 @@ and type_label_access
         Some(p0, p, is_principal ty_exp)
     | Maybe_a_record_type -> None
     | Record_type_of_other_form ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-        let err = Expr_record_type_has_wrong_boxing (P record_form, ty_exp) in
-        raise (error (record.exp_loc, env, err))
-||||||| Compiler:last-imported
-        let error = Expr_record_type_has_wrong_boxing (P record_form, ty_exp) in
-        raise (Error (record.exp_loc, env, error))
-=======
         let error = Expr_record_type_has_wrong_boxing (P record_form, ty_exp) in
         Error.log_and_raise record.exp_loc env error
->>>>>>> Compiler:HEAD
     | Not_a_record_type ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-        let err = Expr_not_a_record_type (P record_form, ty_exp) in
-        raise (error (record.exp_loc, env, err))
-||||||| Compiler:last-imported
-        let error = Expr_not_a_record_type (P record_form, ty_exp) in
-        raise (Error (record.exp_loc, env, error))
-=======
         let error = Expr_not_a_record_type (P record_form, ty_exp) in
         Error.log_and_raise record.exp_loc env error
->>>>>>> Compiler:HEAD
   in
   try
   let labels =
@@ -12073,39 +10651,6 @@ and type_label_access
       (label_disambiguate record_form usage lid env expected_type) labels in
   (record, record_sort, Mode.With_regionality.disallow_right mode,
    label, expected_type, ambiguity)
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-  with exn ->
-    raise_error exn;
-    let arg_kind, _ =
-      Jkind.of_new_sort_var ~why:Record_projection ~level:(Ctype.get_current_level ())
-    in
-    let make_fake_label (type rep) (record_form : rep record_form) : rep gen_label_description =
-      {
-        lbl_name = "";
-        lbl_res = ty_exp;
-        lbl_arg = newvar arg_kind;
-        lbl_mut =
-          Mutable
-            { mode = Mode.With_regionality.Comonadic.legacy;
-              atomic = Nonatomic };
-        lbl_modalities = Mode.Modality.Const.id;
-        lbl_pos = 0;
-        lbl_all = [||];
-        lbl_repres =
-          (match record_form with
-          | Legacy -> Record_boxed
-          | Unboxed_product -> Record_unboxed_product);
-        lbl_private = Public;
-        lbl_loc = lid.loc;
-        lbl_attributes = [];
-        lbl_uid = Uid.internal_not_actually_unique;
-        lbl_sort = None;
-      }
-    in
-    (record, record_sort, Mode.With_regionality.disallow_right mode,
-     make_fake_label record_form, expected_type, Unambiguous)
-||||||| Compiler:last-imported
-=======
   with exn when !Clflags.typing_recovery
              && Typing_recovery.is_recoverable exn ->
     Typing_recovery.erroneous_type_register ty_exp;
@@ -12138,7 +10683,6 @@ and type_label_access
     in
     (record, record_sort, Mode.With_regionality.disallow_right mode,
      make_fake_label record_form, expected_type, Unambiguous)
->>>>>>> Compiler:HEAD
 
 and solve_Pexp_field
   : 'rep . label_usage:_ -> _ -> _ -> _ -> _ -> 'rep record_form -> _ ->
@@ -12428,13 +10972,7 @@ and type_format loc str env =
       mk_constr "Format" [ mk_fmt fmt; mk_string str ]
     ))
   with Failure msg ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-    raise (error (loc, env, Invalid_format msg))
-||||||| Compiler:last-imported
-    raise (Error (loc, env, Invalid_format msg))
-=======
     Error.log_and_raise loc env (Invalid_format msg)
->>>>>>> Compiler:HEAD
 
 and type_option_some env expected_mode sarg ty ty0 =
   let ty' = extract_option_type env ty in
@@ -12480,16 +11018,8 @@ and type_label_exp
           begin try
             unify env (instance ty_res) (instance ty_expected)
           with Unify err ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-            raise
-              (error(lid.loc, env, Label_mismatch(P record_form, lid.txt, err)))
-||||||| Compiler:last-imported
-            raise
-              (Error(lid.loc, env, Label_mismatch(P record_form, lid.txt, err)))
-=======
               Error.log_and_raise lid.loc env
                  (Label_mismatch(P record_form, lid.txt, err))
->>>>>>> Compiler:HEAD
           end;
           (* Instantiate so that we can generalize internal nodes *)
           let ty_arg = instance ty_arg in
@@ -12499,21 +11029,9 @@ and type_label_exp
       let (vars, ty_arg) = unify_as_label ty_expected in
       if label.lbl_private = Private then
         if create then
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-          raise (error(loc, env, Private_type ty_expected))
-||||||| Compiler:last-imported
-          raise (Error(loc, env, Private_type ty_expected))
-=======
           Error.log_and_raise loc env (Private_type ty_expected)
->>>>>>> Compiler:HEAD
         else
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-          raise (error(lid.loc, env, Private_label(lid.txt, ty_expected)));
-||||||| Compiler:last-imported
-          raise (Error(lid.loc, env, Private_label(lid.txt, ty_expected)));
-=======
           Error.log_and_raise lid.loc env (Private_label(lid.txt, ty_expected));
->>>>>>> Compiler:HEAD
       let overwrite =
         match overwrite with
         | No_overwrite_label -> No_overwrite
@@ -12535,16 +11053,8 @@ and type_label_exp
   if is_poly then check_univars env "field value" arg label.lbl_arg vars;
   (lid, label, {arg with exp_type = instance arg.exp_type})
 
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-and type_argument_ ?explanation ?recarg ~overwrite env (mode : expected_mode) sarg
-      ty_expected' ty_expected =
-||||||| Compiler:last-imported
-and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sarg
-      ty_expected' ty_expected =
-=======
 and type_argument_ ?explanation ?recarg ~overwrite env
       (mode : expected_mode) sarg ty_expected' ty_expected =
->>>>>>> Compiler:HEAD
   (* ty_expected' may be generic *)
   let no_labels ty =
     let ls, tvar = list_labels env ty in
@@ -12711,14 +11221,8 @@ and type_argument_ ?explanation ?recarg ~overwrite env
         match type_sort ~why ~fixed:false env ty with
         | Ok sort -> sort
         | Error err ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-          raise(error(sarg.pexp_loc, env, Function_type_not_rep (ty, err)))
-||||||| Compiler:last-imported
-          raise(Error(sarg.pexp_loc, env, Function_type_not_rep (ty, err)))
-=======
             Error.log_and_raise sarg.pexp_loc env
               (Function_type_not_rep (ty, err))
->>>>>>> Compiler:HEAD
       in
       let arg_sort = type_sort ~why:Function_argument ty_arg in
       let ret_sort = type_sort ~why:Function_result ty_res in
@@ -12806,25 +11310,6 @@ and type_argument_ ?explanation ?recarg ~overwrite env
       unify_exp ~sexp:sarg env texp ty_expected;
       texp
 
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-and type_argument ?explanation ?recarg ~overwrite env mode sarg ty_expected' ty_expected =
-  Msupport.with_saved_types
-    ~warning_attribute:sarg.pexp_attributes ?save_part:None
-      (fun () ->
-        let saved = save_levels () in
-        try
-          type_argument_ ?explanation ?recarg ~overwrite env mode sarg ty_expected'
-            ty_expected
-        with exn ->
-          Msupport.erroneous_type_register ty_expected;
-          raise_error exn;
-          set_levels saved;
-          let loc = sarg.pexp_loc in
-          create_merlin_type_error_node loc env ty_expected
-            ~attributes:(Msupport.recovery_attributes sarg.pexp_attributes))
-
-||||||| Compiler:last-imported
-=======
 and type_argument ?explanation ?recarg ~overwrite env mode sarg
       ty_expected' ty_expected =
   let delayed () =
@@ -12872,7 +11357,6 @@ and type_argument ?explanation ?recarg ~overwrite env mode sarg
           })
   else delayed ()
 
->>>>>>> Compiler:HEAD
 (* See Note [Type-checking applications] for an overview *)
 and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app
       (lbl, arg) =
@@ -12988,15 +11472,8 @@ and type_application env app_loc expected_mode position_and_mode
       let type_sort ~why ty =
         match Ctype.type_sort ~why ~fixed:false env ty with
         | Ok sort -> sort
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-        | Error err -> raise (error (app_loc, env, Function_type_not_rep (ty, err)))
-||||||| Compiler:last-imported
-        | Error err ->
-          raise (Error (app_loc, env, Function_type_not_rep (ty, err)))
-=======
         | Error err ->
           Error.log_and_raise app_loc env (Function_type_not_rep (ty, err))
->>>>>>> Compiler:HEAD
       in
       let arg_sort = type_sort ~why:Function_argument ty_arg in
       let arg_mode, _ =
@@ -13087,8 +11564,7 @@ and type_application env app_loc expected_mode position_and_mode
             type_omitted_parameters_and_build_result_type expected_mode env
               app_loc ty_ret mode_ret args
           in
-          (try check_curried_application_complete ~env ~app_loc untyped_args
-          with exn -> raise_error exn);
+          check_curried_application_complete ~env ~app_loc untyped_args;
           (* example:
              [ty_ret] becomes [a:bar -> unit]
              [args] becomes [(Label "a", Omitted ());
@@ -13106,13 +11582,7 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
   let arity = List.length sexpl in
   assert (arity >= 2);
   Option.iter
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-    (fun l -> raise (error (loc, env, Repeated_tuple_exp_label l)))
-||||||| Compiler:last-imported
-    (fun l -> raise (Error (loc, env, Repeated_tuple_exp_label l)))
-=======
     (fun l -> Error.log_or_raise loc env (Repeated_tuple_exp_label l))
->>>>>>> Compiler:HEAD
     (Misc.repeated_label sexpl);
   let locality_mode, value_mode =
     register_allocation_value_mode ~loc expected_mode.mode
@@ -13188,13 +11658,7 @@ and type_unboxed_tuple ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
   let arity = List.length sexpl in
   assert (arity >= 2);
   Option.iter
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-    (fun l -> raise (error (loc, env, Repeated_tuple_exp_label l)))
-||||||| Compiler:last-imported
-    (fun l -> raise (Error (loc, env, Repeated_tuple_exp_label l)))
-=======
     (fun l -> Error.log_or_raise loc env (Repeated_tuple_exp_label l))
->>>>>>> Compiler:HEAD
     (Misc.repeated_label sexpl);
   let argument_mode =
     expected_mode.mode
@@ -13266,16 +11730,8 @@ and type_construct ~overwrite ~sexp env (expected_mode : expected_mode) lid sarg
     | Not_a_variant_type ->
         let srt = wrong_kind_sort_of_constructor lid.txt in
         let ctx = Expression explanation in
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-        let err = Wrong_expected_kind(srt, ctx, ty_expected) in
-        raise (error (sexp.pexp_loc, env, err))
-||||||| Compiler:last-imported
-        let error = Wrong_expected_kind(srt, ctx, ty_expected) in
-        raise (Error (sexp.pexp_loc, env, error))
-=======
         let err = Wrong_expected_kind(srt, ctx, ty_expected) in
         Error.log_and_raise sexp.pexp_loc env err
->>>>>>> Compiler:HEAD
   in
   let constrs =
     Env.lookup_all_constructors ~loc:lid.loc Env.Positive lid.txt env
@@ -13295,30 +11751,14 @@ and type_construct ~overwrite ~sexp env (expected_mode : expected_mode) lid sarg
       List.map (fun (l, se) ->
         match l with
         | Some _ ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-          raise (error(sexp.pexp_loc, env, Constructor_labeled_arg))
-||||||| Compiler:last-imported
-          raise (Error(sexp.pexp_loc, env, Constructor_labeled_arg))
-=======
           Error.log_and_raise sexp.pexp_loc env Constructor_labeled_arg
->>>>>>> Compiler:HEAD
         | None -> se
       ) sel
     | Some se -> [se] in
   if List.length sargs <> constr.cstr_arity then
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-    raise(error(sexp.pexp_loc, env,
-                Constructor_arity_mismatch
-                  (lid.txt, constr.cstr_arity, List.length sargs)));
-||||||| Compiler:last-imported
-    raise(Error(sexp.pexp_loc, env,
-                Constructor_arity_mismatch
-                  (lid.txt, constr.cstr_arity, List.length sargs)));
-=======
     Error.log_and_raise sexp.pexp_loc env
       (Constructor_arity_mismatch
          (lid.txt, constr.cstr_arity, List.length sargs));
->>>>>>> Compiler:HEAD
   let separate = !Clflags.principal || Env.has_local_constraints env in
   let unify_as_construct ty_expected =
     with_local_level_generalize_structure_if separate
@@ -13383,30 +11823,16 @@ and type_construct ~overwrite ~sexp env (expected_mode : expected_mode) lid sarg
               Pexp_record (_, (Some {pexp_desc = Pexp_ident _}| None))})}] ->
         Required
       | _ ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-        raise (error(sexp.pexp_loc, env, Inlined_record_expected))
-||||||| Compiler:last-imported
-        raise (Error(sexp.pexp_loc, env, Inlined_record_expected))
-=======
         Error.log_and_raise sexp.pexp_loc env Inlined_record_expected
->>>>>>> Compiler:HEAD
       end
   in
   let constructor_mode =
     match Ctype.check_constructor_crossing_creation env lid
       constr.cstr_tag ~res:ty_res ~args:ty_args locks with
     | Ok mode -> mode
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-    | Error e -> raise (error (lid.loc, env,
-        Submode_failed (e, Constructor lid.txt)))
-||||||| Compiler:last-imported
-    | Error e -> raise (Error (lid.loc, env,
-        Submode_failed (e, Constructor lid.txt)))
-=======
     | Error e ->
         Error.log_and_raise lid.loc env
           (Submode_failed (e, Constructor lid.txt))
->>>>>>> Compiler:HEAD
   in
   let expected_mode =
     { expected_mode with mode =
@@ -13424,13 +11850,7 @@ and type_construct ~overwrite ~sexp env (expected_mode : expected_mode) lid sarg
   in
   begin match overwrite, constr.cstr_repr with
   | Overwriting(_, _, _), Variant_unboxed ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-    raise (error (sexp.pexp_loc, env, Overwrite_of_invalid_term));
-||||||| Compiler:last-imported
-    raise (Error (sexp.pexp_loc, env, Overwrite_of_invalid_term));
-=======
     Error.log_and_raise sexp.pexp_loc env Overwrite_of_invalid_term;
->>>>>>> Compiler:HEAD
   | _, _ -> ()
   end;
   let overwrites =
@@ -13467,22 +11887,10 @@ and type_construct ~overwrite ~sexp env (expected_mode : expected_mode) lid sarg
   if constr.cstr_private = Private then
     begin match constr.cstr_repr with
     | Variant_extensible ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-        raise(error(sexp.pexp_loc, env, Private_constructor (constr, ty_res)))
-||||||| Compiler:last-imported
-        raise(Error(sexp.pexp_loc, env, Private_constructor (constr, ty_res)))
-=======
         Error.log_and_raise sexp.pexp_loc env
           (Private_constructor (constr, ty_res))
->>>>>>> Compiler:HEAD
     | Variant_boxed _ | Variant_unboxed ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-        raise (error(sexp.pexp_loc, env, Private_type ty_res));
-||||||| Compiler:last-imported
-        raise (Error(sexp.pexp_loc, env, Private_type ty_res));
-=======
         Error.log_and_raise sexp.pexp_loc env (Private_type ty_res);
->>>>>>> Compiler:HEAD
     | Variant_with_null -> assert false
       (* [Variant_with_null] can't be made private due to [or_null_reexport]. *)
     end;
@@ -13504,15 +11912,10 @@ and type_construct ~overwrite ~sexp env (expected_mode : expected_mode) lid sarg
 (* Typing of statements (expressions whose values are discarded) *)
 
 and type_statement ?explanation ?(position=RNontail) env sexp =
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-  let has_errors = Msupport.monitor_errors () in
-||||||| Compiler:last-imported
-=======
   let recovery_errors = Typing_recovery.monitor_errors () in
   let has_recovery_errors () =
     !Clflags.typing_recovery && !recovery_errors
   in
->>>>>>> Compiler:HEAD
   (* OCaml 5.2.0 changed the type of 'while' to give 'while true do e done'
      a polymorphic type.  The change has the potential to trigger a
      nonreturning-statement warning in existing code that follows
@@ -13547,14 +11950,7 @@ and type_statement ?explanation ?(position=RNontail) env sexp =
   ~before_generalize: begin fun (exp, _sort) ->
     let subexp = final_subexpression exp in
     let ty = expand_head env exp.exp_type in
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-    if is_Tvar ty
-    && not !has_errors
-||||||| Compiler:last-imported
-    if is_Tvar ty
-=======
     if is_Tvar ty && (not (has_recovery_errors ()))
->>>>>>> Compiler:HEAD
     && get_level ty > get_current_level ()
     && not (allow_polymorphic subexp) then
       Location.prerr_warning
@@ -13575,27 +11971,13 @@ and type_statement ?explanation ?(position=RNontail) env sexp =
       with_explanation explanation (fun () ->
         unify_exp ~sexp env exp expected_ty)
     end else begin
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-      if not !has_errors then check_partial_application ~statement:true exp;
-||||||| Compiler:last-imported
-      check_partial_application ~statement:true exp;
-=======
       if not (has_recovery_errors ()) then
         check_partial_application ~statement:true exp;
->>>>>>> Compiler:HEAD
       with_explanation explanation (fun () ->
         try unify_var env ty expected_ty
         with Unify err ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-          raise(error(exp.exp_loc, env,
-            Expr_type_clash(err, None, Some sexp))));
-||||||| Compiler:last-imported
-          raise(Error(exp.exp_loc, env,
-            Expr_type_clash(err, None, Some sexp))));
-=======
           Error.log_and_raise exp.exp_loc env
             (Expr_type_clash(err, None, Some sexp)));
->>>>>>> Compiler:HEAD
     end
   end
 
@@ -13631,15 +12013,10 @@ and map_half_typed_cases
   = fun ?additional_checks_for_split_cases ?conts
     category env pat_mode
     ty_arg sort_arg ty_res loc caselist ~type_body ~check_if_total ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-  let has_errors = Msupport.monitor_errors () in
-||||||| Compiler:last-imported
-=======
   let recovery_errors = Typing_recovery.monitor_errors () in
   let has_recovery_errors () =
     !Clflags.typing_recovery && !recovery_errors
   in
->>>>>>> Compiler:HEAD
   (* ty_arg is _fully_ generalized *)
   let patterns = List.map (fun ((x : untyped_case), _) -> x.pattern) caselist in
   let contains_polyvars = List.exists contains_polymorphic_variant patterns in
@@ -13848,13 +12225,7 @@ and map_half_typed_cases
   let val_cases = List.map fst val_cases_with_result in
   let exn_cases = List.map fst exn_cases_with_result in
   if val_cases = [] && exn_cases <> [] then
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-    raise (error (loc, env, No_value_clauses));
-||||||| Compiler:last-imported
-    raise (Error (loc, env, No_value_clauses));
-=======
     Error.log_and_raise loc env No_value_clauses;
->>>>>>> Compiler:HEAD
   let partial =
     if check_if_total then
       check_partial ~lev env ty_arg_check loc val_cases
@@ -13870,35 +12241,6 @@ and map_half_typed_cases
       check_unused ~lev env Predef.type_exn exn_cases ;
     end;
   in
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-  if not !has_errors then (
-    (if contains_polyvars then
-      add_delayed_check (fun () -> unused_check true)
-    else
-      (* Check for unused cases, do not delay because of gadts *)
-      unused_check false);
-    begin
-      match additional_checks_for_split_cases with
-      | None -> ()
-      | Some check ->
-          check val_cases_with_result;
-          check exn_cases_with_result;
-    end
-  );
-||||||| Compiler:last-imported
-  if contains_polyvars then
-    add_delayed_check (fun () -> unused_check true)
-  else
-    (* Check for unused cases, do not delay because of gadts *)
-    unused_check false;
-  begin
-    match additional_checks_for_split_cases with
-    | None -> ()
-    | Some check ->
-        check val_cases_with_result;
-        check exn_cases_with_result;
-  end;
-=======
   if not (has_recovery_errors ()) then begin
     if contains_polyvars then
       add_delayed_check (fun () -> unused_check true)
@@ -13913,7 +12255,6 @@ and map_half_typed_cases
         check val_cases_with_result;
         check exn_cases_with_result;
   end;
->>>>>>> Compiler:HEAD
   (result, partial), [ty_res']
   end
   (* Ensure that existential types do not escape *)
@@ -14032,17 +12373,12 @@ and type_function_cases_expect
         (newgenty
            (Tarrow ((Nolabel, arg_mode, ret_mode), ty_arg, ty_ret, commu_ok)))
     in
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-||||||| Compiler:last-imported
-    unify_exp_types loc env ty_fun (instance ty_expected);
-=======
     begin try
       unify_exp_types loc env ty_fun (instance ty_expected)
     with exn when !Clflags.typing_recovery
                && Typing_recovery.is_recoverable exn ->
          Typing_recovery.erroneous_type_register ty_expected
     end;
->>>>>>> Compiler:HEAD
     let fc_arg_mode =
       create_allocation_mode_l arg_mode
       |> Typedtree.create_locality_mode_l
@@ -14176,14 +12512,8 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
       end;
       List.iter (fun binding ->
         if binding.pvb_is_poly <> first.pvb_is_poly then
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-          raise (error(binding.pvb_loc, env, Mixed_poly_nonpoly_bindings))
-||||||| Compiler:last-imported
-          raise (Error(binding.pvb_loc, env, Mixed_poly_nonpoly_bindings))
-=======
           Error.log_and_raise binding.pvb_loc env
             Mixed_poly_nonpoly_bindings
->>>>>>> Compiler:HEAD
       ) rest;
       first.pvb_is_poly
   in
@@ -14281,14 +12611,8 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
               match constrain_type_jkind env pv_type value with
               | Ok () -> ()
               | Error e ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-                raise (error(pv_loc, env, Non_value_let_rec (e, pv_type)))
-||||||| Compiler:last-imported
-                raise (Error(pv_loc, env, Non_value_let_rec (e, pv_type)))
-=======
                   Error.log_and_raise pv_loc env
                     (Non_value_let_rec (e, pv_type))
->>>>>>> Compiler:HEAD
             ) pvs
           end;
           (* Polymorphic variant processing *)
@@ -14455,13 +12779,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
     List.iter
       (fun {vb_pat=pat} -> match pat.pat_desc with
            Tpat_var _ | Tpat_fun_layout _ -> ()
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-         | _ -> raise_error(error(pat.pat_loc, env, Illegal_letrec_pat)))
-||||||| Compiler:last-imported
-         | _ -> raise(Error(pat.pat_loc, env, Illegal_letrec_pat)))
-=======
          | _ -> Error.log_or_raise pat.pat_loc env Illegal_letrec_pat)
->>>>>>> Compiler:HEAD
       l;
   List.iter (fun vb ->
       if pattern_needs_partial_application_check vb.vb_pat then
@@ -14652,13 +12970,7 @@ and type_andops env sarg sands expected_sort expected_ty =
             begin try
               unify env op_type ty_op
             with Unify err ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-              raise(error(sop.loc, env, Andop_type_clash(sop.txt, err)))
-||||||| Compiler:last-imported
-              raise(Error(sop.loc, env, Andop_type_clash(sop.txt, err)))
-=======
               Error.log_and_raise sop.loc env (Andop_type_clash(sop.txt, err))
->>>>>>> Compiler:HEAD
             end;
             (op_path, op_desc, op_type, ty_arg, sort_arg, ty_rest, sort_rest,
              ty_result, op_result_sort), [ty_rest; ty_arg; ty_result]
@@ -14671,13 +12983,7 @@ and type_andops env sarg sands expected_sort expected_ty =
         begin try
           unify env (instance ty_result) (instance expected_ty)
         with Unify err ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-          raise(error(loc, env, Bindings_type_clash(err)))
-||||||| Compiler:last-imported
-          raise(Error(loc, env, Bindings_type_clash(err)))
-=======
           Error.log_and_raise loc env (Bindings_type_clash(err))
->>>>>>> Compiler:HEAD
         end;
         let andop =
           { bop_op_name = sop;
@@ -14819,13 +13125,7 @@ and type_n_ary_function
                     trace;
                   }
               in
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-              raise (error (loc, env, err))
-||||||| Compiler:last-imported
-              raise (Error (loc, env, err))
-=======
               Error.log_and_raise loc env err
->>>>>>> Compiler:HEAD
         in
         let ret_ty =
           List.fold_left (fun ret_ty { param; has_poly } ->
@@ -15190,16 +13490,8 @@ and type_send env loc explanation e met =
                     let valid_methods =
                       Meths.fold (fun lab _ acc -> lab :: acc) meths []
                     in
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-                    raise (error(e.pexp_loc, env,
-                                 Undefined_self_method (met, valid_methods)))
-||||||| Compiler:last-imported
-                    raise (Error(e.pexp_loc, env,
-                                 Undefined_self_method (met, valid_methods)))
-=======
                     Error.log_and_raise e.pexp_loc env
                       (Undefined_self_method (met, valid_methods))
->>>>>>> Compiler:HEAD
               in
               let typ = Btype.method_type met sign in
               id, typ
@@ -15225,16 +13517,8 @@ and type_send env loc explanation e met =
               let valid_methods =
                 Meths.fold (fun lab _ acc -> lab :: acc) meths []
               in
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-              raise (error(e.pexp_loc, env,
-                           Undefined_self_method (met, valid_methods)))
-||||||| Compiler:last-imported
-              raise (Error(e.pexp_loc, env,
-                           Undefined_self_method (met, valid_methods)))
-=======
               Error.log_and_raise e.pexp_loc env
                 (Undefined_self_method (met, valid_methods))
->>>>>>> Compiler:HEAD
         in
         let typ = Btype.method_type met sign in
         let (self_path, _) =
@@ -15247,13 +13531,7 @@ and type_send env loc explanation e met =
           match filter_method env met obj.exp_type with
           | ty -> ty
           | exception Filter_method_failed err ->
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-              let error_ =
-||||||| Compiler:last-imported
-              let error =
-=======
               let err =
->>>>>>> Compiler:HEAD
                 match err with
                 | Unification_error err ->
                     Expr_type_clash(err, explanation, None)
@@ -15277,13 +13555,7 @@ and type_send env loc explanation e met =
                 | Not_a_value err ->
                     Non_value_object (err, explanation)
               in
-<<<<<<< Merlin:typing-recovery-from-ocaml-541
-              raise (error(e.pexp_loc, env, error_))
-||||||| Compiler:last-imported
-              raise (Error(e.pexp_loc, env, error))
-=======
               Error.log_and_raise e.pexp_loc env err
->>>>>>> Compiler:HEAD
         in
         Tmeth_name met, ty
   in
