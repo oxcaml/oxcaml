@@ -792,7 +792,8 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
                ~default:Loopify_attribute.Default_loopify_and_not_tailrec
         in
         let cost_metrics =
-          Cost_metrics.from_size (Code_size.of_int code_size)
+          Cost_metrics.from_size
+            (Code_size.create ~x86_64:code_size.x86_64 ~arm64:code_size.arm64)
         in
         (* CR ncourant: allow fexpr to specify modes? *)
         let param_modes =

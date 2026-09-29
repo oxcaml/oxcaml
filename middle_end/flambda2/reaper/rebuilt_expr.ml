@@ -46,7 +46,7 @@ let create_let bound_pattern defining_expr ~size_of_defining_expr ~body =
   let code_size =
     if Name_mode.is_phantom (Bound_pattern.name_mode bound_pattern)
     then body.code_size
-    else Code_size.( + ) body.code_size size_of_defining_expr
+    else Code_size.seq size_of_defining_expr body.code_size
   in
   let expr = Flambda.Expr.create_let let_expr in
   { expr; free_names; code_size }
@@ -87,7 +87,10 @@ let create_non_recursive_let_cont cont (cont_handler : continuation_handler)
       (Name_occurrences.remove_continuation body.free_names ~continuation:cont)
       cont_handler.free_names
   in
-  let code_size = Code_size.( + ) body.code_size cont_handler.code_size in
+  let code_size =
+    Code_size.with_out_of_line body.code_size
+      ~out_of_line:cont_handler.code_size
+  in
   { expr; free_names; code_size }
 
 let create_recursive_let_cont ~invariant_params handlers0 ~body =
@@ -110,7 +113,9 @@ let create_recursive_let_cont ~invariant_params handlers0 ~body =
         Name_occurrences.remove_continuation free_names ~continuation:cont)
       handlers0 free_names
   in
-  let code_size = Code_size.( + ) body.code_size handlers.code_size in
+  let code_size =
+    Code_size.with_out_of_line body.code_size ~out_of_line:handlers.code_size
+  in
   { expr; free_names; code_size }
 
 let from_expr ~expr ~free_names ~code_size = { expr; free_names; code_size }

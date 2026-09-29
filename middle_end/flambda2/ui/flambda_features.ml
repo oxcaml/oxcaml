@@ -193,6 +193,14 @@ let dump_fexpr_annot () = !Oxcaml_flags.Flambda2.Dump.fexpr_annot
 
 let dump_fexpr_annot_after () = !Oxcaml_flags.Flambda2.Dump.fexpr_annot_after
 
+let dump_code_sizes () = !Oxcaml_flags.Flambda2.Dump.code_sizes
+
+type code_size_model = Oxcaml_flags.Flambda2.code_size_model =
+  | V1
+  | V2
+
+let code_size_model () = !Oxcaml_flags.Flambda2.code_size_model
+
 type pass = Oxcaml_flags.Flambda2.Dump.pass =
   | Last_pass
   | This_pass of string

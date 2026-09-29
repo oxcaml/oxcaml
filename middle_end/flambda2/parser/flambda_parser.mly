@@ -977,7 +977,8 @@ code_id:
 ;
 
 code_size:
-  | i = plain_int { i }
+  | x = plain_int { { x86_64 = x; arm64 = x } }
+  | x = plain_int; COMMA; a = plain_int { { x86_64 = x; arm64 = a } }
 
 function_slot:
   | v = variable { v }

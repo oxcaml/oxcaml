@@ -236,6 +236,7 @@ module Flambda2 : sig
     val flow : bool ref
     val simplify : bool ref
     val reaper : bool ref
+    val code_sizes : bool ref
   end
 
   (** In the result types of functors, keep the types of variables that are only
@@ -247,6 +248,12 @@ module Flambda2 : sig
       not functors.  Only has an effect when result types are computed for such
       functions (see [function_result_types]). *)
   val function_result_types_through_value_slots : bool ref
+
+  (** Which model estimates the size of the machine code for Flambda terms:
+      [V1] is the original model, [V2] the current one (see [Code_size]). *)
+  type code_size_model = V1 | V2
+
+  val code_size_model : code_size_model ref
 
   module Expert : sig
     module Default : sig

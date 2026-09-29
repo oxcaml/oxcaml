@@ -658,7 +658,8 @@ let loopify_attribute ppf (loopify : loopify_attribute) =
 let loopify_attribute_opt ~space ppf l =
   pp_option ~space loopify_attribute ppf l
 
-let code_size ppf code_size = Format.fprintf ppf "%d" code_size
+let code_size ppf ({ x86_64; arm64 } : code_size) =
+  Format.fprintf ppf "%d, %d" x86_64 arm64
 
 let or_blank f ppf ob =
   match ob with None -> Format.pp_print_string ppf "_" | Some a -> f ppf a

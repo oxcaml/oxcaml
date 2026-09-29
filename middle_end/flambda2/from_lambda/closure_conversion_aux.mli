@@ -291,7 +291,14 @@ module Acc : sig
 
   val cost_metrics : t -> Cost_metrics.t
 
+  (** Add the metrics of code placed before the code whose metrics have been
+      accumulated so far (terms being built from the end of each sequence of
+      code to its start). *)
   val increment_metrics : Cost_metrics.t -> t -> t
+
+  (** Add the metrics of code placed elsewhere, such as the handler of a
+      continuation bound around the code accumulated so far. *)
+  val increment_metrics_out_of_line : Cost_metrics.t -> t -> t
 
   val with_cost_metrics : Cost_metrics.t -> t -> t
 

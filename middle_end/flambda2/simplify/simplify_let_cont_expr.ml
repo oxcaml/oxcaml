@@ -434,8 +434,8 @@ let rebuild_let_cont (data : rebuild_let_cont_data) ~after_rebuild body uacc =
       in
       let uacc =
         UA.with_cost_metrics
-          (Cost_metrics.( + ) cost_metrics_of_body
-             data.cost_metrics_of_subsequent_exprs)
+          (Cost_metrics.with_out_of_line cost_metrics_of_body
+             ~out_of_line:data.cost_metrics_of_subsequent_exprs)
           uacc
       in
       let uacc = UA.with_uenv uacc data.uenv_of_subsequent_exprs in
@@ -494,10 +494,12 @@ let rebuild_let_cont (data : rebuild_let_cont_data) ~after_rebuild body uacc =
             let name_occurrences =
               NO.union name_occurrences_body handler.name_occurrences_of_handler
             in
+            (* The body is placed first, followed by the handler. *)
             let cost_metrics =
-              Cost_metrics.( + ) cost_metrics_of_body
-                (Cost_metrics.increase_due_to_let_cont_non_recursive
-                   ~cost_metrics_of_handler:handler.cost_metrics_of_handler)
+              Cost_metrics.with_out_of_line cost_metrics_of_body
+                ~out_of_line:
+                  (Cost_metrics.increase_due_to_let_cont_non_recursive
+                     ~cost_metrics_of_handler:handler.cost_metrics_of_handler)
             in
             let expr =
               RE.create_non_recursive_let_cont'
@@ -542,7 +544,10 @@ let rebuild_let_cont (data : rebuild_let_cont_data) ~after_rebuild body uacc =
         Cost_metrics.increase_due_to_let_cont_recursive
           ~cost_metrics_of_handlers
       in
-      let cost_metrics = Cost_metrics.( + ) cost_metrics cost_metrics_of_body in
+      let cost_metrics =
+        Cost_metrics.with_out_of_line cost_metrics_of_body
+          ~out_of_line:cost_metrics
+      in
       rebuild_groups expr name_occurrences cost_metrics uacc groups
   in
   rebuild_groups body name_occurrences_body cost_metrics_of_body uacc

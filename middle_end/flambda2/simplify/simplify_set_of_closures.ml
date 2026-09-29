@@ -525,7 +525,10 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
     extract_accumulators_from_function outer_dacc ~dacc_after_body
       ~uacc_after_upwards_traversal
   in
-  let cost_metrics = UA.cost_metrics uacc_after_upwards_traversal in
+  let cost_metrics =
+    UA.cost_metrics uacc_after_upwards_traversal
+    |> Cost_metrics.add_function_frame
+  in
   let old_code_id = code_id in
   let code_id, newer_version_of =
     match

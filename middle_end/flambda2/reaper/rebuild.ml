@@ -832,7 +832,8 @@ let make_apply_wrapper env
   | Never_returns ->
     let apply = make_apply ~continuation:Never_returns in
     RE.from_expr ~expr:(Expr.create_apply apply)
-      ~free_names:(Apply.free_names apply) ~code_size:(Code_size.apply apply)
+      ~free_names:(Apply.free_names apply)
+      ~code_size:(Code_size.apply ~is_tail:false apply)
   | Return return_cont -> (
     let return_decisions = List.map freshen_decisions return_decisions in
     let apply_decisions =
@@ -932,7 +933,7 @@ let make_apply_wrapper env
         let apply = make_apply ~continuation:(Return return_cont) in
         RE.from_expr ~expr:(Expr.create_apply apply)
           ~free_names:(Apply.free_names apply)
-          ~code_size:(Code_size.apply apply)
+          ~code_size:(Code_size.apply ~is_tail:false apply)
       else
         let apply_expr = Expr.create_apply apply in
         let handler =
@@ -952,7 +953,7 @@ let make_apply_wrapper env
         in
         let body =
           RE.from_expr ~expr:apply_expr ~free_names:(Apply.free_names apply)
-            ~code_size:(Code_size.apply apply)
+            ~code_size:(Code_size.apply ~is_tail:false apply)
         in
         RE.create_non_recursive_let_cont return_cont_wrapper cont_handler ~body
     | Invalid ->
@@ -987,14 +988,14 @@ let make_apply_wrapper env
         let body =
           RE.from_expr ~expr:(Expr.create_apply apply)
             ~free_names:(Apply.free_names apply)
-            ~code_size:(Code_size.apply apply)
+            ~code_size:(Code_size.apply ~is_tail:false apply)
         in
         RE.create_non_recursive_let_cont return_cont_wrapper cont_handler ~body
       else
         let apply = make_apply ~continuation:Never_returns in
         RE.from_expr ~expr:(Expr.create_apply apply)
           ~free_names:(Apply.free_names apply)
-          ~code_size:(Code_size.apply apply))
+          ~code_size:(Code_size.apply ~is_tail:false apply))
 
 let rewrite_call_kind env (call_kind : Call_kind.t) =
   let rewrite_simple = rewrite_simple env in
@@ -2257,7 +2258,9 @@ and rebuild_function_params_and_body (env : env) res code_metadata
       Code_metadata.with_result_types result_types code_metadata
   in
   let update_size code_metadata (body : RE.t) =
-    let cost_metrics = Cost_metrics.from_size body.code_size in
+    let cost_metrics =
+      Cost_metrics.from_size body.code_size |> Cost_metrics.add_function_frame
+    in
     Code_metadata.with_inlining_decision
       (Function_decl_inlining_decision.make_decision
          ~inlining_arguments:(Code_metadata.inlining_arguments code_metadata)

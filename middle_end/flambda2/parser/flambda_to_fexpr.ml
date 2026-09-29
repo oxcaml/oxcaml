@@ -504,8 +504,9 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
               body
             })
       in
-      let code_size =
-        Code.cost_metrics code |> Cost_metrics.size |> Code_size.to_int
+      let code_size : Fexpr.code_size =
+        let size = Code.cost_metrics code |> Cost_metrics.size in
+        { x86_64 = Code_size.x86_64 size; arm64 = Code_size.arm64 size }
       in
       let result_mode : Fexpr.alloc_mode_for_return =
         match Code.result_mode code with

@@ -653,7 +653,8 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
               ~relative_history:Inlining_history.Relative.empty
           in
           let cost_metrics =
-            Cost_metrics.from_size (Code_size.apply full_application)
+            Cost_metrics.from_size
+              (Code_size.apply ~is_tail:false full_application)
           in
           List.fold_left
             (fun (expr, cost_metrics, free_names) applied_value ->
@@ -688,9 +689,10 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
                   |> Expr.create_let
                 in
                 ( expr,
-                  Cost_metrics.( + ) cost_metrics
+                  Cost_metrics.seq
                     (Cost_metrics.increase_due_to_let_expr ~is_phantom:false
-                       ~cost_metrics_of_defining_expr),
+                       ~cost_metrics_of_defining_expr)
+                    cost_metrics,
                   free_names ))
             ( Expr.create_apply full_application,
               cost_metrics,

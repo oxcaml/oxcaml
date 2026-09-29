@@ -77,7 +77,14 @@ val clear_cost_metrics : t -> t
 
 val with_cost_metrics : Cost_metrics.t -> t -> t
 
+(** Add the metrics of code placed before the code whose metrics have been
+    accumulated so far (terms being rebuilt from the end of each sequence of
+    code to its start). *)
 val add_cost_metrics : Cost_metrics.t -> t -> t
+
+(** Add the metrics of code placed elsewhere, such as the handler of a
+    continuation bound around the code accumulated so far. *)
+val add_out_of_line_cost_metrics : Cost_metrics.t -> t -> t
 
 (* CR lmaurer: This is tragic. We can be rid of it once we have PDCE, if I
    understand correctly. *)
@@ -86,6 +93,7 @@ val add_cost_metrics : Cost_metrics.t -> t -> t
 val add_cost_metrics_and_with_name_occurrences :
   t -> Cost_metrics.t -> Name_occurrences.t -> t
 
+(** As [add_cost_metrics]. *)
 val notify_added : code_size:Code_size.t -> t -> t
 
 val notify_removed : operation:Removed_operations.t -> t -> t

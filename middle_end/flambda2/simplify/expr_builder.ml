@@ -519,7 +519,7 @@ let bind_let_cont (uacc : UA.t) (body : RE.t)
   in
   let uacc =
     UA.with_name_occurrences uacc ~name_occurrences
-    |> UA.add_cost_metrics
+    |> UA.add_out_of_line_cost_metrics
          (Cost_metrics.increase_due_to_let_cont_non_recursive
             ~cost_metrics_of_handler)
   in
@@ -756,11 +756,49 @@ let rewrite_fixed_arity_continuation uacc cont ~use_id arity ~around =
     let body, uacc = around uacc new_let_cont.cont in
     bind_let_cont body uacc new_let_cont
 
+let apply_is_in_tail_position uacc apply =
+  let rec is_function_return_or_exn_continuation k =
+    let uenv = UA.uenv uacc in
+    (* Continuations reached through shortcuts may be absent from the
+       environment; those are never the function's own continuations. *)
+    UE.mem_continuation uenv k
+    &&
+    match UE.find_continuation uenv k with
+    | Toplevel_or_function_return_or_exn_continuation _ -> true
+    | Linearly_used_and_inlinable { params; handler; _ } -> (
+      (* A continuation that just returns its parameters will be inlined by
+         [To_cmm], leaving a tail call. *)
+      match RE.to_apply_cont handler with
+      | Some apply_cont ->
+        Option.is_none (Apply_cont.trap_action apply_cont)
+        && is_function_return_or_exn_continuation
+             (Apply_cont.continuation apply_cont)
+        && List.equal Simple.equal
+             (Apply_cont.args apply_cont)
+             (Bound_parameters.simples params)
+      | None -> false)
+    | Non_inlinable_zero_arity _ | Non_inlinable_non_zero_arity _ | Invalid _ ->
+      false
+  in
+  match Apply.position apply with
+  | Nontail -> false
+  | Normal -> (
+    match Apply.continuation apply with
+    | Never_returns -> false
+    | Return k ->
+      let exn_continuation = Apply.exn_continuation apply in
+      is_function_return_or_exn_continuation k
+      && is_function_return_or_exn_continuation
+           (Exn_continuation.exn_handler exn_continuation)
+      && Misc.Stdlib.List.is_empty
+           (Exn_continuation.extra_args exn_continuation))
+
 let rewrite_fixed_arity_apply uacc ~use_id arity apply =
   let make_apply apply =
+    let is_tail = apply_is_in_tail_position uacc apply in
     let uacc =
       UA.add_free_names uacc (Apply.free_names apply)
-      |> UA.notify_added ~code_size:(Code_size.apply apply)
+      |> UA.notify_added ~code_size:(Code_size.apply ~is_tail apply)
     in
     uacc, RE.create_apply (UA.are_rebuilding_terms uacc) apply
   in

@@ -170,8 +170,9 @@ let bind_no_simplification are_rebuilding ~bindings ~body ~cost_metrics_of_body
         Cost_metrics.from_size size_of_defining_expr
       in
       let cost_metrics =
-        Cost_metrics.( + ) cost_metrics
+        Cost_metrics.seq
           (Cost_metrics.increase_due_to_let_expr ~is_phantom
              ~cost_metrics_of_defining_expr)
+          cost_metrics
       in
       expr, cost_metrics, free_names)

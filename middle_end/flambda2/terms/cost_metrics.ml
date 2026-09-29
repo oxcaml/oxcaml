@@ -41,6 +41,8 @@ let print ppf t =
 
 let from_size size = { size; removed = Removed_operations.zero }
 
+let add_function_frame t = { t with size = Code_size.add_function_frame t.size }
+
 let notify_added ~code_size t =
   { t with size = Code_size.( + ) t.size code_size }
 
@@ -52,6 +54,16 @@ let ( + ) a b =
     removed = Removed_operations.( + ) a.removed b.removed
   }
 
+let seq a b =
+  { size = Code_size.seq a.size b.size;
+    removed = Removed_operations.( + ) a.removed b.removed
+  }
+
+let with_out_of_line t ~out_of_line =
+  { size = Code_size.with_out_of_line t.size ~out_of_line:out_of_line.size;
+    removed = Removed_operations.( + ) t.removed out_of_line.removed
+  }
+
 (* The metrics for a set of closures are the sum of the metrics for each closure
    it contains. The intuition behind it is that if we do inline a function f in
    which a set of closure is defined then we will copy the body of all functions
@@ -59,8 +71,14 @@ let ( + ) a b =
 (*
  * A set of closures introduces implicitly an alloc whose size (as in OCaml 4.11)
  * is:
- *   total number of value slots + sum of s(arity) for each closure
- * where s(a) = if a = 1 then 2 else 3
+ *   total number of value slots + sum of (function_slot_size + 1) - 1 for each
+ * closure where the "+ 1" is for the size of the infix header, and "- 1" to
+ * exclude the header of the set of closures.
+ *
+ * Each word of the block needs one store, except that the words of the
+ * function slots themselves (code pointers and closure information) hold
+ * constants that must first be loaded into a register, so they are counted
+ * twice.
  *)
 let set_of_closures ~find_code_characteristics set_of_closures =
   let func_decls = Set_of_closures.function_decls set_of_closures in
@@ -68,25 +86,26 @@ let set_of_closures ~find_code_characteristics set_of_closures =
   let num_clos_vars =
     Set_of_closures.value_slots set_of_closures |> Value_slot.Map.cardinal
   in
-  let cost_metrics, num_words =
+  let cost_metrics, num_stores =
     Function_slot.Map.fold
       (fun _ (code_id : Function_declarations.code_id_in_function_declaration)
-           (metrics, num_words) ->
+           (metrics, num_stores) ->
         match code_id with
         | Deleted { function_slot_size; _ } ->
-          metrics, Stdlib.( + ) num_words function_slot_size
+          metrics, Stdlib.( + ) num_stores (2 * function_slot_size)
         | Code_id { code_id; only_full_applications = _ } ->
           let { cost_metrics; function_slot_size } =
             find_code_characteristics code_id
           in
-          (* CR poechsel: valid until OCaml 4.12, as for named_size *)
-          metrics + cost_metrics, Stdlib.( + ) num_words function_slot_size)
+          (* We need to include the size of the infix headers *)
+          ( metrics + cost_metrics,
+            Stdlib.( + ) num_stores (Stdlib.( + ) (2 * function_slot_size) 1) ))
       funs (zero, num_clos_vars)
   in
-  let alloc_size =
-    Code_size.( + ) Code_size.alloc_size (Code_size.of_int num_words)
-  in
-  cost_metrics + from_size alloc_size
+  (* The code of the functions is not placed with the allocation. *)
+  with_out_of_line
+    (from_size (Code_size.set_of_closures_allocation ~num_stores))
+    ~out_of_line:cost_metrics
 
 let increase_due_to_let_expr ~is_phantom ~cost_metrics_of_defining_expr =
   if is_phantom then zero else cost_metrics_of_defining_expr

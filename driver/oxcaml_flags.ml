@@ -314,6 +314,7 @@ module Flambda2 = struct
     let flow = ref false
     let simplify = ref false
     let reaper = ref false
+    let code_sizes = ref false (* -dcode-sizes *)
   end
 
   let functor_result_types_through_value_slots = ref false
@@ -321,6 +322,10 @@ module Flambda2 = struct
 
   let function_result_types_through_value_slots = ref false
     (* -flambda2-function-result-types-through-value-slots *)
+
+  type code_size_model = V1 | V2
+
+  let code_size_model = ref V2 (* -flambda2-code-size-model *)
 
   module Expert = struct
     module Default = struct

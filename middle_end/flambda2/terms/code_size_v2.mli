@@ -14,14 +14,11 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(* Computes an approximation for the code size corresponding to flambda terms.
-   The code size of a given term should be a rough estimate of the size of the
-   generated machine code.
-
-   Two models are available, selected by [-flambda2-code-size-model]: the
-   original one ([Code_size_v1]) and the current one ([Code_size_v2]), whose
-   representation of sizes is used whichever model is selected. The rest of this
-   comment describes the current model.
+(* The current ("v2") code size model: an approximation of the size of the
+   machine code generated for Flambda terms. [Code_size] dispatches between this
+   model and the original one ([Code_size_v1]) according to
+   [-flambda2-code-size-model]; the representation of sizes defined here is the
+   one stored in terms whichever model is selected.
 
    Sizes are measured in machine instructions rather than bytes. Instruction
    lengths vary widely on x86-64 (typically from one to ten bytes, averaging
@@ -67,12 +64,15 @@ val zero : t
 val ( + ) : t -> t -> t
 
 (** [seq a b] is the size of the code [a] followed, in the same basic block, by
-    the code [b] (for example the defining expression of a [Let] and its body):
-    see [Code_size_v2.seq]. *)
+    the code [b] (for example the defining expression of a [Let] and its body).
+    Unlike [a + b], this accounts for the combination of an allocation at the
+    end of [a] with one at the start of [b]. *)
 val seq : t -> t -> t
 
 (** [with_out_of_line t ~out_of_line] is the size of the code [t] together with
-    code that is placed elsewhere: see [Code_size_v2.with_out_of_line]. *)
+    code that is placed elsewhere (for example the handlers of continuations
+    bound around [t]), which does not affect how allocations in [t] can be
+    combined with code before or after it. *)
 val with_out_of_line : t -> out_of_line:t -> t
 
 val ( - ) : t -> t -> t
@@ -115,3 +115,8 @@ val evaluate : args:Inlining_arguments.t -> t -> float
 (** The size of the allocation of a set of closures that needs [num_stores]
     stores, including that of the header. *)
 val set_of_closures_allocation : num_stores:int -> t
+
+(** The code needed, in the module initialiser, to initialise one field of a
+    statically allocated block from a variable ([pointer] says whether the field
+    may hold a pointer). *)
+val static_field_initialization : pointer:bool -> t
