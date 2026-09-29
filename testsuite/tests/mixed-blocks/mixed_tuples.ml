@@ -283,22 +283,27 @@ module M = struct
 
   let f (type a) (r1 : a repr) (r2 : a repr) (a : a) =
     match r1, r2, a with
-    | R1, _, (#3.0, "") -> ()
-    | _, R2, (1.0, "") -> ()
+    | R1, _, (#3.0, "") -> true
+    | _, R2, (1.0, "") -> false
 end
 [%%expect{|
-Lines 5-7, characters 4-28:
+Lines 5-7, characters 4-31:
 5 | ....match r1, r2, a with
-6 |     | R1, _, (#3.0, "") -> ()
-7 |     | _, R2, (1.0, "") -> ()
+6 |     | R1, _, (#3.0, "") -> true
+7 |     | _, R2, (1.0, "") -> false
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
   Here is an example of a case that is not matched: "(R1, R1, (#3.0, "*"))"
 
 module M :
   sig
     type _ repr = R1 : (float# * string) repr | R2 : (float * string) repr
-    val f : 'a repr -> 'a repr -> 'a -> unit
+    val f : 'a repr -> 'a repr -> 'a -> bool
   end
+|}]
+
+let partial_gadt_results = M.f R1 R1 (#3.0, ""), M.f R2 R2 (1.0, "")
+[%%expect{|
+val partial_gadt_results : bool * bool = (true, false)
 |}]
 
 (* [let*] and [and*] desugar into a mixed tuple. *)
@@ -317,13 +322,22 @@ val letop_mixed : int * string * bool = (4, "hi", true)
 (* works with recursive construction of recursive data *)
 
 type rec_record = { r : (rec_record * float#) ; i : int }
+
 let _ =
-  let rec recursive = { r = (recursive, #2.0) ; i = 42 } in
+  let rec recursive_rec = { r = (recursive_rec, #2.0) ; i = 42 } in
   (* no layout poly first, so we need to make our own *)
   let fst (x, _) = x in
-  assert (recursive == fst recursive.r)
+  assert (recursive_rec == fst recursive_rec.r)
 [%%expect{|
 type rec_record = { r : rec_record * float#; i : int; }
+- : unit = ()
+|}]
+
+let _ =
+  let rec recursive_tup = ({ r = recursive_tup ; i = 42 }, #2.0) in
+  let fst (x, _) = x in
+  assert (recursive_tup == (fst recursive_tup).r)
+[%%expect{|
 - : unit = ()
 |}]
 
@@ -336,4 +350,18 @@ let _ =
 [%%expect{|
 type rec_constr = C of (#(rec_constr option * float#) * int)
 - : unit = ()
+|}]
+
+(* Tuple elements must be representable *)
+let f (type a : any) (g : unit -> a) = (g (), 1)
+[%%expect{|
+Line 1, characters 40-44:
+1 | let f (type a : any) (g : unit -> a) = (g (), 1)
+                                            ^^^^
+Error: This expression has type "a" but an expression was expected of type
+         "('a : '_representable_layout_1)"
+       The layout of a is any
+         because of the annotation on the abstract type declaration for a.
+       But the layout of a must be representable
+         because it's the type of a tuple element.
 |}]
