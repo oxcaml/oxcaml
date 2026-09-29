@@ -612,14 +612,11 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
   | Texp_unboxed_bool b ->
       Lconst(Const_base(Const_untagged_int8(Bool.to_int b)))
   | Texp_tuple (el, locality_mode) ->
-      let el =
-        List.map (fun (l, e, s) ->
-          (l, e, Jkind.Sort.default_for_transl_and_get s)) el
-      in
-      let layouts = List.map (fun (_, e, s) -> layout_exp s e) el in
-      let ll =
-        List.map2 (fun (_, e, _) layout -> transl_exp ~scopes layout e)
-          el layouts
+      let ll, sorts, layouts =
+        transl_list_with_layout ~scopes
+          (List.map
+             (fun (_, e, s) -> e, Jkind.Sort.default_for_transl_and_get s) el)
+        |> Misc.Stdlib.List.split3
       in
       let shape =
         Array.of_list (List.map Lambda.mixed_block_element_of_layout layouts)
@@ -629,9 +626,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         match List.map extract_constant ll with
         | exception Not_constant -> None
         | constants ->
-            if
-              List.for_all (fun (_, _, s) -> Jkind.Sort.Const.is_scannable s) el
-            then
+            if List.for_all Jkind.Sort.Const.is_scannable sorts then
               (* Ensure that uniform tuple constants are optimized *)
               Some (Const_block(0, constants))
             else if !Clflags.native_code then
