@@ -383,14 +383,14 @@ let initial_env ~loc ~initially_opened_module ~open_implicit_args =
     let lexbuf = Lexing.from_string m in
     let txt =
       Location.init lexbuf (Printf.sprintf "command line argument: -open %S" m);
-      Parse.simple_module_path lexbuf
+      Ocaml_preprocess.Parse.simple_module_path lexbuf
     in
     try
       let _, _, newenv = type_open_ Override env loc {txt;loc} in
       newenv
     with
       (Typetexp.Error.In_context _
-      | Cmi_format.Error _
+      | Magic_numbers.Cmi.Error _
       | Env.Error.In_context _
       | Persistent_env.Error _) as exn when !Clflags.typing_recovery ->
         (* Handles errors when the file is empty (but the context is
@@ -2280,7 +2280,7 @@ and add_implicit_jkinds env attrs =
    so we need this to take the signature of the previously checked portion
    to support include functor. *)
 
-and transl_signature ?(keep_warnings = false) ?(interface_toplevel = false) env sig_acc
+and transl_signature ?(interface_toplevel = false) env sig_acc
       {psg_items; psg_modalities; psg_loc} =
   let names = Signature_names.create () in
 
@@ -2668,11 +2668,12 @@ and transl_signature ?(keep_warnings = false) ?(interface_toplevel = false) env 
         match transl_sig_item env sig_type item with
         | exception exn when
             !Clflags.typing_recovery && Typing_recovery.is_recoverable exn ->
-            transl_sig env sig_items sig_type srem
+            transl_sig env sig_items sig_type sig_type_include_functor srem
         | new_item, new_types, env ->
             transl_sig env
               (new_item :: sig_items)
               (List.rev_append new_types sig_type)
+              (List.rev_append new_types sig_type_include_functor)
               srem
       end
   in
@@ -2682,7 +2683,7 @@ and transl_signature ?(keep_warnings = false) ?(interface_toplevel = false) env 
        Builtin_attributes.warning_scope []
          (fun () ->
             let (trem, rem, final_env) =
-              transl_sig (Env.in_signature true env) [] [] psg_items
+              transl_sig (Env.in_signature true env) [] [] sig_acc psg_items
             in
             let rem = Signature_names.simplify final_env names rem in
             { sig_items = trem; sig_type = rem; sig_final_env = final_env;
@@ -3782,7 +3783,6 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
               match param with
               | None -> mty_res
               | Some param ->
-                  let parent_env = env in
                   let env =
                     Env.add_module ~arg:true param Mp_present arg.mod_type env
                   in
@@ -3953,7 +3953,7 @@ and type_open_decl_aux ?used_slot ?toplevel ~funct_body names env od =
    we're not in the toplevel (because it can incrementally type and cache parts of the
    module).  We don't want the typing tweaks that occur for the toplevel, so we need an
    extra argument (sig_acc), but leave `toplevel` alone to minimize the diff *)
-and type_structure ?(toplevel = None) ?(keep_warnings = false) ~funct_body
+and type_structure ?(toplevel = None) ~funct_body
     anchor env sig_acc sstr =
   let names = Signature_names.create () in
   let loc_md = location_of_structure sstr in
@@ -4496,14 +4496,7 @@ let type_module =
 let type_module_maybe_hold_locks =
   type_module_maybe_hold_locks ~strengthen:true ~funct_body:false None
 
-let merlin_type_structure env sig_acc str =
-  let (str, sg, _mode, _sg_names, _shape, env) =
-    type_structure ~keep_warnings:true ~funct_body:false None env sig_acc str
-  in
-  str, sg, env
 let type_structure env = type_structure ~funct_body:false None env []
-let merlin_transl_signature ?interface_toplevel env sig_acc sg =
-  transl_signature ?interface_toplevel ~keep_warnings:true env sig_acc sg
 let transl_signature ?interface_toplevel env sg =
   transl_signature ?interface_toplevel env [] sg
 

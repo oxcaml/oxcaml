@@ -7132,34 +7132,34 @@ let pat_modes ~force_toplevel rec_mode_var ~is_lpoly (attrs, spat) =
   in
   attrs, pat_mode, env_locality_mode, exp_mode, spat
 
-let create_merlin_type_error_node loc env ty_expected ~attributes =
-    { exp_desc =
-        Texp_ident
-          { path = Path.Pident (Ident.create_local "*type-error*");
-            lid = Location.mkloc (Longident.Lident "*type-error*") loc;
-            desc =
-              { Types.val_type = ty_expected;
-                val_kind =
-                  Val_reg (Var (Jkind.Sort.new_var ~level:(Ctype.get_current_level ())));
-                val_lpoly = Lpoly.determined [];
-                val_loc = loc;
-                val_attributes = [];
-                val_uid = Uid.internal_not_actually_unique;
-                val_zero_alloc = Zero_alloc.default;
-                val_modalities = Modality.of_const Modality.Const.id
-              };
-            kind = Id_value;
-            unique_use = (Uniqueness.newvar (get_current_level ()),
-                          Linearity.newvar (get_current_level ()));
-            mode = Mode.With_regionality.newvar (get_current_level ());
-            staticity = Staticity.newvar (get_current_level ())
-          };
-      exp_loc = loc;
-      exp_extra = [];
-      exp_type = ty_expected;
-      exp_env = env;
-      exp_attributes = attributes;
-    }
+(* let create_merlin_type_error_node loc env ty_expected ~attributes = *)
+(*     { exp_desc = *)
+(*         Texp_ident *)
+(*           { path = Path.Pident (Ident.create_local "*type-error*"); *)
+(*             lid = Location.mkloc (Longident.Lident "*type-error*") loc; *)
+(*             desc = *)
+(*               { Types.val_type = ty_expected; *)
+(*                 val_kind = *)
+(*                   Val_reg (Var (Jkind.Sort.new_var ~level:(Ctype.get_current_level ()))); *)
+(*                 val_lpoly = Lpoly.determined []; *)
+(*                 val_loc = loc; *)
+(*                 val_attributes = []; *)
+(*                 val_uid = Uid.internal_not_actually_unique; *)
+(*                 val_zero_alloc = Zero_alloc.default; *)
+(*                 val_modalities = Modality.of_const Modality.Const.id *)
+(*               }; *)
+(*             kind = Id_value; *)
+(*             unique_use = (Uniqueness.newvar (get_current_level ()), *)
+(*                           Linearity.newvar (get_current_level ())); *)
+(*             mode = Mode.With_regionality.newvar (get_current_level ()); *)
+(*             staticity = Staticity.newvar (get_current_level ()) *)
+(*           }; *)
+(*       exp_loc = loc; *)
+(*       exp_extra = []; *)
+(*       exp_type = ty_expected; *)
+(*       exp_env = env; *)
+(*       exp_attributes = attributes; *)
+(*     } *)
 
 let add_zero_alloc_attribute expr attributes =
   let open Builtin_attributes in
