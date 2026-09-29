@@ -29,10 +29,9 @@ module Make (T : Branch_relaxation_intf.S) = struct
     let rec fill_map pc instr sizes =
       match instr.desc with
       | Lend -> pc, map
-      | Llabel_for_jump_target lbl ->
+      | Llabel_for_jump_target lbl | Llabel_for_dwarf lbl ->
         Hashtbl.add map lbl pc;
         fill_map pc instr.next (List.tl sizes)
-      | Llabel_for_dwarf _ -> assert false
       | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr | Lreturn
       | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _ | Lbranch _
       | Lcondbranch (_, _)
