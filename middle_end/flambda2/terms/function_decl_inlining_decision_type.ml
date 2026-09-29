@@ -126,7 +126,7 @@ let report_decision ppf t =
   | Small_function { size; small_function_size } ->
     Format.fprintf ppf
       "the@ function's@ body@ is@ smaller@ than@ the@ threshold@ size@ for@ \
-       small@ functions: size=%a <= large@ function@ size=%a"
+       small@ functions: size=%a <= small@ function@ threshold=%a"
       Code_size.print size Code_size.print small_function_size
   | Small_functor { size; small_functor_size } ->
     Format.fprintf ppf
