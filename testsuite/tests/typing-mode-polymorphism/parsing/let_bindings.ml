@@ -60,5 +60,5 @@ Error: Mode variables and mode bounds are only allowed on function types.
 
 let f (_ : unit -> 'a @ 'm) : unit -> 'a @ 'm = fun () -> ""
 [%%expect{|
-val f : (unit -> string @ 'm) @ 'p -> (unit -> string @ 'o) @ 'n = <fun>
+val f : (unit -> string @ 'm) @ 'o -> unit -> string @ 'n = <fun>
 |}]
