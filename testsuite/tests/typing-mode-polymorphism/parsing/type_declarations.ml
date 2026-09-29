@@ -8,31 +8,41 @@
  * type declarations
 *)
 
-(* Mode variables are allowed on function types in record fields *)
+(* Unbound mode variables in record fields cause an error *)
 
 type ('a, 'b) fn = { f : 'a @ [< 'm] -> 'b @ [> 'm] }
 [%%expect{|
 type ('a, 'b) fn = { f : 'a @ [< 'm] -> 'b @ [> 'm]; }
 |}]
 
-(* Mode variables are allowed on function types in constructor arguments *)
+(* Unbound mode variables in constructor arguments cause an error *)
 
 type ('a, 'b) v = Fn of ('a @ [< 'm] -> 'b @ [> 'm])
 [%%expect{|
 type ('a, 'b) v = Fn of ('a @ [< 'm] -> 'b @ [> 'm])
 |}]
 
-(* Mode variables are allowed on function types in type abbreviations *)
+(* Unbound mode variables in type abbreviations cause an error *)
 
 type ('a, 'b) arrow = 'a @ [< 'm] -> 'b @ [> 'm]
 [%%expect{|
 type ('a, 'b) arrow = 'a @ [< 'm] -> 'b @ [> 'm]
 |}]
 
-(* Mode variables are allowed on function types in GADT constructors *)
+(* Unbound mode variables in GADT constructors are implicitly quantified *)
 
-type ('a, 'b) g = G : ('a @ [< 'm] -> 'b @ [> 'm]) -> ('a, 'b) g
+type (_, _) g = G : ('a @ [< 'm] -> 'b @ [> 'm]) -> ('a, 'b) g
 [%%expect{|
-type ('a, 'b) g = G : ('a @ [< 'm] -> 'b @ [> 'm]) -> ('a, 'b) g
+type (_, _) g = G : ('a @ [< 'm] -> 'b @ [> 'm]) -> ('a, 'b) g
 |}]
 
+(* Unbound mode variables in constraints are implicitly quantified *)
+
+type ghost
+type ('a, 'nonsense) t = 'a @ [< 'm] -> 'a @ [> 'm]
+  constraint 'nonsense = ghost -> unit @ 'm
+[%%expect{|
+type ghost
+type ('a, 'b) t = 'a @ [< 'n] -> 'a @ [> 'n]
+  constraint 'b = ghost -> unit @ 'm
+|}]
