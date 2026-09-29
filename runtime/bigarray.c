@@ -248,7 +248,7 @@ caml_ba_alloc(int flags, int num_dims, void * data, intnat * dim)
   CAMLassert(0 <= num_dims);
   CAMLassert(num_dims <= CAML_BA_MAX_NUM_DIMS);
   CAMLassert((flags & CAML_BA_KIND_MASK) < CAML_BA_FIRST_UNIMPLEMENTED_KIND);
-  flags &= ~CAML_BA_STACK;
+  CAMLassert((flags & CAML_BA_STACK) == 0);
   for (int i = 0; i < num_dims; i++) dimcopy[i] = dim[i];
   num_elts = 1;
   for (int i = 0; i < num_dims; i++) {
@@ -1356,7 +1356,7 @@ CAMLprim value caml_ba_slice(value vb, value vind)
     (char *) b->data +
     offset * caml_ba_element_size[b->flags & CAML_BA_KIND_MASK];
   /* Allocate an OCaml bigarray to hold the result */
-  res = caml_ba_alloc(b->flags | CAML_BA_SUBARRAY,
+  res = caml_ba_alloc((b->flags & ~CAML_BA_STACK) | CAML_BA_SUBARRAY,
                       b->num_dims - num_inds, sub_data, sub_dims);
   /* Copy the finalization function from the original array (PR#8568) */
   Custom_ops_val(res) = Custom_ops_val(vb);
@@ -1434,7 +1434,7 @@ CAMLprim value caml_ba_sub(value vb, value vofs, value vlen)
     (char *) b->data +
     ofs * mul * caml_ba_element_size[b->flags & CAML_BA_KIND_MASK];
   /* Allocate an OCaml bigarray to hold the result */
-  res = caml_ba_alloc(b->flags | CAML_BA_SUBARRAY,
+  res = caml_ba_alloc((b->flags & ~CAML_BA_STACK) | CAML_BA_SUBARRAY,
                       b->num_dims, sub_data, b->dim);
   /* Copy the finalization function from the original array (PR#8568) */
   Custom_ops_val(res) = Custom_ops_val(vb);
@@ -1628,7 +1628,8 @@ CAMLprim value caml_ba_reshape(value vb, value vdim)
   if (num_elts != caml_ba_num_elts(b))
     caml_invalid_argument("Bigarray.reshape: size mismatch");
   /* Create bigarray with same data and new dimensions */
-  res = caml_ba_alloc(b->flags | CAML_BA_SUBARRAY, num_dims, b->data, dim);
+  res = caml_ba_alloc((b->flags & ~CAML_BA_STACK) | CAML_BA_SUBARRAY,
+                      num_dims, b->data, dim);
   /* Copy the finalization function from the original array (PR#8568) */
   Custom_ops_val(res) = Custom_ops_val(vb);
   /* Create or update proxy in case of managed bigarray */
