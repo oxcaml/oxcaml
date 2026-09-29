@@ -261,6 +261,7 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
   in
   match inlined with
   | Inline (dacc, inlined) ->
+    let is_cold = Code_metadata.cold callee's_code_metadata in
     let down_to_up dacc ~rebuild =
       let rebuild uacc ~after_rebuild =
         let uacc =
@@ -271,6 +272,11 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
           else uacc
         in
         let uacc = UA.notify_removed ~operation:Removed_operations.call uacc in
+        let after_rebuild =
+          if is_cold
+          then fun inlined uacc -> after_rebuild (RE.mark_as_cold inlined) uacc
+          else after_rebuild
+        in
         rebuild uacc ~after_rebuild
       in
       down_to_up dacc ~rebuild
