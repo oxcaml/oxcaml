@@ -3512,9 +3512,9 @@ and type_pat_aux
     let args =
       match get_desc (expand_head !!penv expected_ty) with
       (* If it's a principally-known tuple pattern, try to reorder *)
-      | Ttuple labeled_tl when is_principal expected_ty ->
+      | Ttuple labeled_tl when not is_unboxed && is_principal expected_ty ->
         reorder_pat loc penv spl closed labeled_tl expected_ty
-      | Tunboxed_tuple labeled_tl when is_principal expected_ty ->
+      | Tunboxed_tuple labeled_tl when is_unboxed && is_principal expected_ty ->
         reorder_pat loc penv spl closed labeled_tl expected_ty
       (* If not, it's not allowed to be open (partial) *)
       | _ ->
