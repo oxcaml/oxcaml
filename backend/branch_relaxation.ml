@@ -29,9 +29,10 @@ module Make (T : Branch_relaxation_intf.S) = struct
     let rec fill_map pc instr sizes =
       match instr.desc with
       | Lend -> pc, map
-      | Llabel { label = lbl; is_dwarf_only_label = _ } ->
+      | Llabel_for_jump_target lbl ->
         Hashtbl.add map lbl pc;
         fill_map pc instr.next (List.tl sizes)
+      | Llabel_for_dwarf _ -> assert false
       | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr | Lreturn
       | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _ | Lbranch _
       | Lcondbranch (_, _)
@@ -103,8 +104,9 @@ module Make (T : Branch_relaxation_intf.S) = struct
           | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
           | Name_for_debugger _ )
       | Lprologue | Lepilogue_open | Lepilogue_close | Lend | Lreloadretaddr
-      | Lreturn | Lentertrap | Lpoptrap _ | Lcall_op _ | Llabel _ | Lbranch _
-      | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _ ->
+      | Lreturn | Lentertrap | Lpoptrap _ | Lcall_op _
+      | Llabel_for_jump_target _ | Llabel_for_dwarf _ | Lbranch _ | Lswitch _
+      | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _ ->
         Misc.fatal_error "Unsupported instruction for branch relaxation")
 
   let fixup_branches ~code_size ~max_out_of_line_code_offset map code sizes =
@@ -123,7 +125,8 @@ module Make (T : Branch_relaxation_intf.S) = struct
       match instr.desc with
       | Lend -> did_fix, []
       | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr | Lreturn
-      | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _ | Llabel _ | Lbranch _
+      | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _ | Llabel_for_jump_target _
+      | Llabel_for_dwarf _ | Lbranch _
       | Lcondbranch (_, _)
       | Lcondbranch3 (_, _, _)
       | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
@@ -160,7 +163,7 @@ module Make (T : Branch_relaxation_intf.S) = struct
             relax_instr (T.relax_stackcheck ~max_frame_size_bytes)
           | Lcondbranch (test, lbl) ->
             let lbl2 = Cmm.new_label () in
-            let llabel = Llabel { label = lbl2; is_dwarf_only_label = false } in
+            let llabel = Llabel_for_jump_target lbl2 in
             let ri_branch = T.relax_branch lbl in
             let branch_instr =
               instr_cons
@@ -213,8 +216,9 @@ module Make (T : Branch_relaxation_intf.S) = struct
                     T.relax_condbranch test lbl ~arg:i.arg
                   | Lprologue | Lepilogue_open | Lepilogue_close | Lend
                   | Lreloadretaddr | Lreturn | Lentertrap | Lpoptrap _ | Lop _
-                  | Lcall_op _ | Llabel _ | Lbranch _ | Lcondbranch3 _
-                  | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
+                  | Lcall_op _ | Llabel_for_jump_target _ | Llabel_for_dwarf _
+                  | Lbranch _ | Lcondbranch3 _ | Lswitch _
+                  | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
                   | Lstackcheck _ ->
                     Misc.fatal_error
                       "Branch_relaxation.measure_expanded: expected \
@@ -226,9 +230,9 @@ module Make (T : Branch_relaxation_intf.S) = struct
             let new_sizes = List.rev (measure_expanded instr []) @ rest in
             fixup true pc instr new_sizes
           | Lprologue | Lepilogue_open | Lepilogue_close | Lend | Lreloadretaddr
-          | Lreturn | Lentertrap | Lpoptrap _ | Lcall_op _ | Llabel _
-          | Lbranch _ | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _
-          | Lraise _
+          | Lreturn | Lentertrap | Lpoptrap _ | Lcall_op _
+          | Llabel_for_jump_target _ | Llabel_for_dwarf _ | Lbranch _
+          | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
           | Lop
               ( Move | Spill | Reload | Opaque | Pause | Begin_region
               | End_region | Dls_get | Tls_get | Domain_index | Const_int _

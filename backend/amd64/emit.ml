@@ -2028,6 +2028,11 @@ let prologue_stack_offset () =
   assert !frame_required;
   frame_size () - 8 - if fp then 8 else 0
 
+let emit_linear_label ~fallthrough ~is_dwarf_only_label label =
+  let lbl = L.create_int ~is_dwarf_only_label Text (Label.to_int label) in
+  if (not fallthrough) && !fastcode_flag then D.align ~fill:Nop ~bytes:4;
+  D.define_label lbl
+
 (* Emit an instruction *)
 let emit_instr ~first ~last ~fallthrough i =
   let open Simd_instrs in
@@ -2662,10 +2667,10 @@ let emit_instr ~first ~last ~fallthrough i =
   | Lop Domain_index -> I.mov (domain_field Domainstate.Domain_id) (res i 0)
   | Lreloadretaddr -> ()
   | Lreturn -> I.ret ()
-  | Llabel { label; is_dwarf_only_label } ->
-    let lbl = L.create_int ~is_dwarf_only_label Text (Label.to_int label) in
-    if (not fallthrough) && !fastcode_flag then D.align ~fill:Nop ~bytes:4;
-    D.define_label lbl
+  | Llabel_for_jump_target label ->
+    emit_linear_label ~fallthrough ~is_dwarf_only_label:false label
+  | Llabel_for_dwarf label ->
+    emit_linear_label ~fallthrough ~is_dwarf_only_label:true label
   | Lbranch lbl -> I.jmp (emit_label_arg ~section:Text lbl)
   | Lcondbranch (tst, lbl) ->
     emit_test i tst ~taken:(fun c -> I.j c (emit_label_arg ~section:Text lbl))
