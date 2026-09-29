@@ -23,6 +23,8 @@ let () =
     Arg.usage speclist usage;
     exit 2
   end;
+  if !archives = [] then
+    failwith "gen.exe: none of the given archives exist";
   let oc = open_out !output in
   let archive_fns = List.rev !archives in
 
