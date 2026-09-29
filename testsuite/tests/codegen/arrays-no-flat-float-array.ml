@@ -13,6 +13,7 @@
  flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
  flags += " -regalloc-param AFFINITY:on -regalloc irc";
  flags += " -cfg-merge-blocks";
+ flags += " -g -gdwarf-inlined-frames";
  expect.opt;
 *)
 

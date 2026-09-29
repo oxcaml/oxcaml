@@ -50,8 +50,10 @@ type t
     to [initialize], below). *)
 val create : Asm_section.t -> t
 
-(** Create an integer-valued label. The int must be positive. *)
-val create_int : Asm_section.t -> int -> t
+(** Create an integer-valued label. The int must be positive.
+    [is_dwarf_only_label] (default [false]) marks labels that only delimit DWARF
+    ranges, so they must not be jump targets. *)
+val create_int : ?is_dwarf_only_label:bool -> Asm_section.t -> int -> t
 
 (** A label rendered as an "l"-prefixed private symbol ("l_caml<n>"). On Mach-O
     these survive into the object symbol table (unlike "L" temporaries), so they
@@ -80,6 +82,10 @@ val initialize : new_label:(unit -> int) -> unit
 
 (** Which section a label is in. *)
 val section : t -> Asm_section.t
+
+(** Whether the label only delimits DWARF ranges, in particular this means it
+    cannot be a jump target. *)
+val is_dwarf_only_label : t -> bool
 
 include Identifiable.S with type t := t
 

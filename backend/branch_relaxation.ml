@@ -29,7 +29,7 @@ module Make (T : Branch_relaxation_intf.S) = struct
     let rec fill_map pc instr sizes =
       match instr.desc with
       | Lend -> pc, map
-      | Llabel lbl ->
+      | Llabel { label = lbl; is_dwarf_only_label = _ } ->
         Hashtbl.add map lbl pc;
         fill_map pc instr.next (List.tl sizes)
       | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr | Lreturn
@@ -160,7 +160,7 @@ module Make (T : Branch_relaxation_intf.S) = struct
             relax_instr (T.relax_stackcheck ~max_frame_size_bytes)
           | Lcondbranch (test, lbl) ->
             let lbl2 = Cmm.new_label () in
-            let llabel = Llabel lbl2 in
+            let llabel = Llabel { label = lbl2; is_dwarf_only_label = false } in
             let ri_branch = T.relax_branch lbl in
             let branch_instr =
               instr_cons

@@ -3,6 +3,7 @@
  flags = " -O3";
  flags += " -experimental-optimizations";
  flags += " -flambda2-simplify-stubs";
+ flags += " -g -gdwarf-inlined-frames";
  expect.opt;
 *)
 
@@ -10,13 +11,12 @@ let immutable_load l = (List.hd l) + (List.hd l)
 [%%expect_asm X86_64{|
 immutable_load:
   testb $1, %al
-  je    .L0
+  je    .L1
+  subq  $8, %rsp
   movq  camlStdlib__List__Pmakeblock2543_19@GOTPCREL(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  call  caml_reraise_exn@PLT
 .L0:
+.L1:
   movq  (%rax), %rax
   leaq  -1(%rax,%rax), %rax
   ret

@@ -1,6 +1,7 @@
 (* TEST
  flags += " -cfg-merge-blocks";
  only-default-codegen;
+ flags += " -g -gdwarf-inlined-frames";
  expect.opt;
 *)
 

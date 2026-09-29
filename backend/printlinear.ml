@@ -89,7 +89,8 @@ let instr' ?(print_reg = Printreg.reg) ppf i =
     call_operation ppf op i.arg
   | Lreloadretaddr -> fprintf ppf "reload retaddr"
   | Lreturn -> fprintf ppf "return %a" regs i.arg
-  | Llabel lbl -> fprintf ppf "%a:" label lbl
+  | Llabel { label = lbl; is_dwarf_only_label = _ } ->
+    fprintf ppf "%a:" label lbl
   | Lbranch lbl -> fprintf ppf "goto %a" label lbl
   | Lcondbranch (tst, lbl) ->
     fprintf ppf "if %a goto %a" (test tst) i.arg label lbl

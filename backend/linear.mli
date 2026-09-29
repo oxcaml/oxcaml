@@ -96,7 +96,11 @@ and instruction_desc =
   | Lcall_op of call_operation
   | Lreloadretaddr
   | Lreturn
-  | Llabel of label
+  | Llabel of
+      { label : label;
+        is_dwarf_only_label : bool
+            (** Only delimits DWARF ranges, never a jump target. *)
+      }
   | Lbranch of label
   | Lcondbranch of Operation.test * label
   | Lcondbranch3 of label option * label option * label option

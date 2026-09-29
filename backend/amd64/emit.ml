@@ -58,8 +58,6 @@ let asm_collected_for_expect_asm = ref []
 let expect_asm_whole_function = ref false
 
 let register_expect_asm_callback f =
-  (* Reset label counter to make assembly more predictable. *)
-  Label.reset ();
   expect_asm_callbacks := f :: !expect_asm_callbacks
 
 let invoke_expect_asm_callbacks () =
@@ -2664,8 +2662,8 @@ let emit_instr ~first ~last ~fallthrough i =
   | Lop Domain_index -> I.mov (domain_field Domainstate.Domain_id) (res i 0)
   | Lreloadretaddr -> ()
   | Lreturn -> I.ret ()
-  | Llabel lbl ->
-    let lbl = label_to_asm_label ~section:Text lbl in
+  | Llabel { label; is_dwarf_only_label } ->
+    let lbl = L.create_int ~is_dwarf_only_label Text (Label.to_int label) in
     if (not fallthrough) && !fastcode_flag then D.align ~fill:Nop ~bytes:4;
     D.define_label lbl
   | Lbranch lbl -> I.jmp (emit_label_arg ~section:Text lbl)
