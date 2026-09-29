@@ -325,7 +325,8 @@ Error: This type "anp" should be an instance of type "('a : any mod external_)"
          because of the definition of require_external at line 1, characters 0-46.
 |}]
 
-(* Similarly, [non_pointer] abstract kinds are not [mod external_] *)
+(* Similarly, [non_pointer] abstract kinds are not [mod external_], since [k]
+   could be [value & value] *)
 
 module F_np (X : sig
     kind_ k
@@ -366,7 +367,8 @@ type np64e : value non_pointer64 mod external_
 type np64e : value non_pointer64 mod external_
 |}]
 
-(* Likewise for a with-bound modality at or above the implied bound *)
+(* We also don't print a modality on a with-bound when the layout-implied bound
+   makes it redundant *)
 
 type 'a npie : immediate64 with 'a @@ external_
 [%%expect{|
