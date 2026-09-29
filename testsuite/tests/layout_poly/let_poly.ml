@@ -611,3 +611,42 @@ let poly_get_set_ptr =
 [%%expect{|
 val poly_get_set_ptr : unit = ()
 |}]
+
+(* test peek/poke primitives *)
+
+type ('a : any) ptr = nativeint_u
+
+external read : ('a : any mod external_). 'a ptr -> 'a = "%peek"
+  [@@layout_poly]
+
+external write : ('a : any mod external_). 'a ptr -> 'a -> unit = "%poke"
+  [@@layout_poly]
+
+let poly_ f (_ : 'a ptr) (x : 'a) = x
+
+[%%expect{|
+type ('a : any) ptr = nativeint_u
+external read : ('a : any mod external_). 'a ptr -> 'a = "%peek"
+  [@@layout_poly]
+external write : ('a : any mod external_). 'a ptr -> 'a -> unit = "%poke"
+  [@@layout_poly]
+val poly_ f : 'a ptr -> 'a -> 'a = <lpoly>
+|}]
+
+let poly_ f (p : 'a ptr) (_ : 'a) : 'a = read p
+
+[%%expect{|
+Line 1, characters 41-47:
+1 | let poly_ f (p : 'a ptr) (_ : 'a) : 'a = read p
+                                             ^^^^^^
+Error: The peek primitive does not currently support layout polymorphic arguments
+|}]
+
+let poly_ f (p : 'a ptr) (x : 'a) = write p x
+
+[%%expect{|
+Line 1, characters 36-45:
+1 | let poly_ f (p : 'a ptr) (x : 'a) = write p x
+                                        ^^^^^^^^^
+Error: The poke primitive does not currently support layout polymorphic arguments
+|}]
