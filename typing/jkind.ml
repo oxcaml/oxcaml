@@ -3208,6 +3208,10 @@ let apply_or_null_l env jkind =
       Some { nullability = Maybe_null; separability }
   in
   let rec or_null_layout : Sort.t Layout.t -> Sort.t Layout.t option = function
+    (* CR-someday layouts: Currently, this function succeeds for [any] and sort
+       variables, but as [or_null] can only take scannable arguments, it also
+       seems reasonable to fail for [any] and unify a sort variable with
+       [scannable]. We should investigate. *)
     | Any sa -> or_null_axes sa |> Option.map (fun sa -> Layout.Any sa)
     | Sort (s, sa) ->
       if Sort.is_scannable_or_var s
