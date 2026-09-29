@@ -2513,17 +2513,9 @@ let get_expr_args_tuple ~is_unboxed ~scopes shape head { arg; mut; _ } rem =
       let block_shape =
         Array.of_list (List.map Lambda.mixed_block_element_of_layout layouts)
       in
-      let read =
-        (* CR zeisbach: this isn't strictly necessary (backend won't fail here),
-           but I don't know enough about how [Pmixedfield] is lowered to
-           determine whether emitting it would lead to performance regressions.
-           Regardless, I think the longer-term goal is to combine these two
-           anyways. *)
-        if List.for_all (fun (sort, _) -> Jkind.Sort.Const.is_scannable sort)
-             shape
-        then fun pos -> Pfield (pos, Pointer, sem)
-        else fun pos -> Pmixedfield ([pos], block_shape, sem)
-      in
+      (* No need to differentiate between [Pfield] and a [Pmixedfield] with
+         all value [block_shape], as they are treated the same. *)
+      let read pos = Pmixedfield ([pos], block_shape, sem) in
       read, add_barrier_to_let_kind ubr Alias
     end
   in
