@@ -12,21 +12,30 @@
 
 type ('a, 'b) fn = { f : 'a @ [< 'm] -> 'b @ [> 'm] }
 [%%expect{|
-type ('a, 'b) fn = { f : 'a @ [< 'm] -> 'b @ [> 'm]; }
+Line 1, characters 33-35:
+1 | type ('a, 'b) fn = { f : 'a @ [< 'm] -> 'b @ [> 'm] }
+                                     ^^
+Error: The mode variable "'m" is unbound in this type declaration.
 |}]
 
 (* Unbound mode variables in constructor arguments cause an error *)
 
 type ('a, 'b) v = Fn of ('a @ [< 'm] -> 'b @ [> 'm])
 [%%expect{|
-type ('a, 'b) v = Fn of ('a @ [< 'm] -> 'b @ [> 'm])
+Line 1, characters 33-35:
+1 | type ('a, 'b) v = Fn of ('a @ [< 'm] -> 'b @ [> 'm])
+                                     ^^
+Error: The mode variable "'m" is unbound in this type declaration.
 |}]
 
 (* Unbound mode variables in type abbreviations cause an error *)
 
 type ('a, 'b) arrow = 'a @ [< 'm] -> 'b @ [> 'm]
 [%%expect{|
-type ('a, 'b) arrow = 'a @ [< 'm] -> 'b @ [> 'm]
+Line 1, characters 30-32:
+1 | type ('a, 'b) arrow = 'a @ [< 'm] -> 'b @ [> 'm]
+                                  ^^
+Error: The mode variable "'m" is unbound in this type declaration.
 |}]
 
 (* Unbound mode variables in GADT constructors are implicitly quantified *)
@@ -43,6 +52,6 @@ type ('a, 'nonsense) t = 'a @ [< 'm] -> 'a @ [> 'm]
   constraint 'nonsense = ghost -> unit @ 'm
 [%%expect{|
 type ghost
-type ('a, 'b) t = 'a @ [< 'n] -> 'a @ [> 'n]
-  constraint 'b = ghost -> unit @ 'm
+type ('a, 'b) t = 'a @ [< 'o & 'n] -> 'a @ [> 'o | 'm]
+  constraint 'b = ghost -> unit @ [< 'm > 'n]
 |}]
