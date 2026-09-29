@@ -11,6 +11,24 @@ open Bigarray
 
 type bigstring = (char, int8_unsigned_elt, c_layout) Array1.t
 
+external sub_local
+  : bigstring @ local -> int -> int -> bigstring @ local
+  @@ portable
+  = "local_bigstring_sub_local"
+
+let with_sub_local (a : bigstring @ local) ofs len
+    (f : (bigstring @ local -> 'a) @ local once) =
+  let view = sub_local a ofs len in
+  (* Keep [a] alive manually --- the stack-allocated [view] can't use e.g. the
+     usual refcount mechanism to keep [a] alive. *)
+  match f view with
+  | result ->
+      let _ = Sys.opaque_identity a in
+      result
+  | exception exn ->
+      let _ = Sys.opaque_identity a in
+      raise_notrace exn
+
 external has_finalizer : ('a, 'b, 'c) Array1.t @ local -> bool
   = "local_bigstring_has_finalizer" [@@noalloc]
 external owns_data : bigstring @ local -> bool
@@ -39,7 +57,7 @@ let to_string a = String.init (Array1.dim a) (fun i -> a.{i})
 
 let mutate_view s ofs len c =
   let a = of_string s in
-  (Array1.with_sub_local [@inlined never]) a ofs len (fun view ->
+  (with_sub_local [@inlined never]) a ofs len (fun view ->
     Array1.fill view c);
   (* The backing storage remains usable after the local region has ended. *)
   collect ();
@@ -61,15 +79,15 @@ let test_bounds () =
       let len = last - first in
       let heap = raises_invalid (fun () -> ignore (Array1.sub a first len)) in
       let local = raises_invalid (fun () ->
-        Array1.with_sub_local a first len (fun _ -> ())) in
+        with_sub_local a first len (fun _ -> ())) in
       assert (heap = local)
     done
   done
 
 let marshal_shared_views s ofs len =
   let a = of_string s in
-  let x, y = Array1.with_sub_local a ofs len (fun view ->
-    Array1.with_sub_local view 0 len (fun alias ->
+  let x, y = with_sub_local a ofs len (fun view ->
+    with_sub_local view 0 len (fun alias ->
       assert (view != alias);
       Array1.fill view '#';
       round_trip (stack_ (view, alias)) [@nontail]) [@nontail]) in
@@ -93,7 +111,7 @@ let test_marshal () =
 
 let globalize_view s ofs len =
   let a = of_string s in
-  let b = (Array1.with_sub_local [@inlined never]) a ofs len (fun view ->
+  let b = (with_sub_local [@inlined never]) a ofs len (fun view ->
     let was_stack = Array1.is_stack view in
     let b = Array1.unsafe_smart_globalize view in
     assert ((b != view) = was_stack);
@@ -133,13 +151,13 @@ let check_live weak (view : bigstring @ local) =
    scope, but can be collected after the function exits. *)
 
 let[@inline never] normal_scope weak =
-  Array1.with_sub_local (make_backing weak) 1 3 (fun view ->
+  with_sub_local (make_backing weak) 1 3 (fun view ->
     collect ();
     check_live weak view;
     String.make 3 'R')
 
 let[@inline never] exceptional_scope weak =
-  Array1.with_sub_local (make_backing weak) 1 3 (fun view ->
+  with_sub_local (make_backing weak) 1 3 (fun view ->
     collect ();
     check_live weak view;
     raise Exit)
