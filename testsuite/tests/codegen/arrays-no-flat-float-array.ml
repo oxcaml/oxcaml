@@ -52,10 +52,9 @@ push:
   ret
 .L0:
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L1:
 |}]
 
 
@@ -420,11 +419,11 @@ int_safe_get:
   movq  -4(%rax,%rbx,4), %rax
   ret
 .L0:
+  subq  $8, %rsp
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L1:
 |}]
 
 let ref_safe_set (a : string array) (i : int) (v : string) =
@@ -445,10 +444,9 @@ ref_safe_set:
   ret
 .L0:
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L1:
 |}]
 
 let poly_safe_get (a : 'a array) (i : int) =
@@ -463,11 +461,11 @@ poly_safe_get:
   movq  -4(%rax,%rbx,4), %rax
   ret
 .L0:
+  subq  $8, %rsp
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L1:
 |}]
 
 let poly_safe_set (a : 'a array) (i : int) (v : 'a) =
@@ -488,10 +486,9 @@ poly_safe_set:
   ret
 .L0:
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L1:
 |}]
 
 (* CR ttebbi: shrq $18 followed by salq $1 could be shrq $17. *)
@@ -508,11 +505,11 @@ int64_safe_get:
   movq  -4(%rax,%rbx,4), %rax
   ret
 .L0:
+  subq  $8, %rsp
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L1:
 |}]
 
 let float_safe_get (a : float# array) (i : int) =
@@ -527,11 +524,11 @@ float_safe_get:
   vmovsd -4(%rax,%rbx,4), %xmm0
   ret
 .L0:
+  subq  $8, %rsp
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L1:
 |}]
 
 let float_safe_get_plain (a : float array) (i : int) =
@@ -547,11 +544,11 @@ float_safe_get_plain:
   vmovsd (%rax), %xmm0
   ret
 .L0:
+  subq  $8, %rsp
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L1:
 |}]
 
 let int32_safe_get (a : int32_u array) (i : int) =
@@ -571,9 +568,9 @@ int32_safe_get:
   movslq -2(%rax,%rbx,2), %rax
   ret
 .L0:
+  subq  $8, %rsp
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L1:
 |}]
