@@ -7113,6 +7113,35 @@ let pat_modes ~force_toplevel rec_mode_var ~is_lpoly (attrs, spat) =
   in
   attrs, pat_mode, env_locality_mode, exp_mode, spat
 
+let create_typing_recovery_error_node loc env ty_expected ~attributes =
+    { exp_desc =
+        Texp_ident
+          { path = Path.Pident (Ident.create_local "*type-error*");
+            lid = Location.mkloc (Longident.Lident "*type-error*") loc;
+            desc =
+              { Types.val_type = ty_expected;
+                val_kind =
+                  Val_reg (Var (Jkind.Sort.new_var ~level:(Ctype.get_current_level ())));
+                val_lpoly = Lpoly.determined [];
+                val_loc = loc;
+                val_attributes = [];
+                val_uid = Uid.internal_not_actually_unique;
+                val_zero_alloc = Zero_alloc.default;
+                val_modalities = Modality.of_const Modality.Const.id
+              };
+            kind = Id_value;
+            unique_use = (Uniqueness.newvar (get_current_level ()),
+                          Linearity.newvar (get_current_level ()));
+            mode = Mode.With_regionality.newvar (get_current_level ());
+            staticity = Staticity.newvar (get_current_level ())
+          };
+      exp_loc = loc;
+      exp_extra = [];
+      exp_type = ty_expected;
+      exp_env = env;
+      exp_attributes = attributes;
+    }
+
 let add_zero_alloc_attribute expr attributes =
   let open Builtin_attributes in
   let to_string : zero_alloc_attribute -> string = function
@@ -7182,37 +7211,9 @@ and type_expect ?recarg ?(overwrite=No_overwrite) env
                  && Typing_recovery.is_recoverable exn ->
         Typing_recovery.erroneous_type_register ty_expected_explained.ty;
         let loc = sexp.pexp_loc in
-        let exp =
-          Texp_ident {
-            path = Path.Pident (Ident.create_local "*type-error*");
-            lid = Location.mkloc (Longident.Lident "*type-error*") loc;
-            kind = Id_value;
-            unique_use = (Uniqueness.disallow_left Uniqueness.legacy,
-             Linearity.disallow_right Linearity.legacy);
-            staticity = proj_staticity Mode.With_regionality.legacy;
-            mode =
-              Mode.With_regionality.disallow_right Mode.With_regionality.legacy;
-            desc = Types.{
-                val_type = ty_expected_explained.ty;
-                val_kind =
-                  Val_reg (Var (Jkind.Sort.new_var
-                                  ~level:(Ctype.get_current_level ())));
-                val_loc = loc;
-                val_attributes = [];
-                val_modalities = Modality.of_const Modality.Const.id;
-                val_zero_alloc = Zero_alloc.default;
-                val_uid = Uid.internal_not_actually_unique;
-                val_lpoly = Lpoly.determined []
-              }
-          }
-        in
-        { exp_desc = exp;
-          exp_loc = loc;
-          exp_extra = [];
-          exp_type = ty_expected_explained.ty;
-          exp_env = env;
-          exp_attributes =
-            Typing_recovery_state.recovery_attributes sexp.pexp_attributes }
+        create_typing_recovery_error_node loc env ty_expected_explained.ty
+          ~attributes:(Typing_recovery_state.recovery_attributes
+                         sexp.pexp_attributes)
     )
 
 and type_expect_
