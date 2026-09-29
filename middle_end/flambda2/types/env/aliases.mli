@@ -147,5 +147,3 @@ val add_alias_set :
 val get_aliases : t -> Simple.t -> Alias_set.t
 
 val get_canonical_ignoring_name_mode : t -> Name.t -> Simple.t
-
-val apply_renaming : t -> Renaming.t -> t

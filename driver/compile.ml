@@ -28,16 +28,16 @@ let interface ~source_file ~output_prefix =
   in
   with_info ~dump_ext:"cmi" unit_info @@ fun info ->
   Compile_common.interface
-    ~hook_parse_tree:(fun _ -> ())
-    ~hook_typed_tree:(fun _ -> ())
+    ~hook_parse_tree:Fun.id
+    ~hook_typed_tree:ignore
     info
 
 (** Bytecode compilation backend for .ml files. *)
 
-let make_arg_descr ~param ~arg_block_idx ~main_repr : Lambda.arg_descr option =
+let make_arg_descr ~param ~arg_block_idx : Lambda.arg_descr option =
   match param, arg_block_idx with
   | Some arg_param, Some arg_block_idx ->
-    Some { arg_param; arg_block_idx; main_repr }
+    Some { arg_param; arg_block_idx }
   | None, None -> None
   | Some _, None -> Misc.fatal_error "No argument field"
   | None, Some _ -> Misc.fatal_error "Unexpected argument field"
@@ -51,11 +51,14 @@ let tlambda_to_bytecode i tlambda ~as_arg_for =
        tlambda
        |> print_if i.ppf_dump Clflags.dump_tlambda Printlambda.lambda
        |> Slambda.eval
+            ~cu_static_data:(fun _ ->
+              Misc.fatal_errorf
+                "Cross-module static evaluation not implemented in bytecode")
             (print_if i.ppf_dump Clflags.dump_slambda Printlambda.slambda)
-       |> fun { Slambda.slv_comptime = _; slv_runtime } ->
+       |> fun (_static_data, lambda) ->
           (* CR layout poly: Drop the comptime part until top-level modules can
              be static. *)
-          slv_runtime
+          lambda
        |> print_if i.ppf_dump Clflags.dump_debug_uid_tables
           (fun ppf _ -> Type_shape.print_debug_uid_tables ppf)
        |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.lambda
@@ -67,11 +70,7 @@ let tlambda_to_bytecode i tlambda ~as_arg_for =
        |> Bytegen.compile_implementation i.module_name
        |> print_if i.ppf_dump Clflags.dump_instr Printinstr.instrlist
        |> fun bytecode ->
-          let arg_descr =
-            make_arg_descr ~param:as_arg_for ~arg_block_idx
-              ~main_repr:(
-                Lambda.main_module_representation main_module_block_format)
-          in
+          let arg_descr = make_arg_descr ~param:as_arg_for ~arg_block_idx in
           bytecode, required_globals, main_module_block_format, arg_descr
     )
 
@@ -97,6 +96,11 @@ let emit_bytecode i
          (Emitcode.to_file oc i.module_name cmo ~required_globals
             ~main_module_block_format ~arg_descr);
     )
+
+let emit_lambda_program info program =
+  let bytecode = tlambda_to_bytecode info program ~as_arg_for:None in
+  if not (Clflags.should_stop_after Clflags.Compiler_pass.Lambda)
+  then emit_bytecode info bytecode
 
 type starting_point =
   | Parsing
@@ -131,8 +135,8 @@ let implementation_aux ~start_from ~source_file ~output_prefix
       emit_bytecode info bytecode
     in
     Compile_common.implementation
-      ~hook_parse_tree:(fun _ -> ())
-      ~hook_typed_tree:(fun _ -> ())
+      ~hook_parse_tree:Fun.id
+      ~hook_typed_tree:ignore
       info ~backend
   | Instantiation { runtime_args; main_module_block_repr; arg_descr } ->
     begin

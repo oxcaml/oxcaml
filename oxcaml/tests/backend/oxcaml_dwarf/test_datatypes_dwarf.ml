@@ -55,7 +55,7 @@ let _ = f_mixed_record { a = 0; b = #0.0; c = false; d = 0l }
 
 (* Unboxed variants *)
 type unboxed_variant_float = Simple of float# [@@unboxed]
-type unboxed_variant_int = Complex of int32# [@@unboxed]
+type unboxed_variant_int = Complex of int32_u [@@unboxed]
 
 let[@inline never] [@local never] f_unboxed_variant_float
     (x: unboxed_variant_float) = x
@@ -172,7 +172,7 @@ let _ = f_poly_bits32 #42l
 let _ = f_poly_bits32 (-#123l)
 
 (* Unboxed tuple field *)
-type t = { f : #(int64# * int); s : string; b : bool }
+type t = { f : #(int64_u * int); s : string; b : bool }
 
 let[@inline never] [@local never] f_unboxed_tuple_field (x: t) =
   let { f; s; b } = x in { f; s; b }
@@ -357,5 +357,92 @@ let _ = for i = 0 to 1 do for j = 0 to 1 do for k = 0 to 1 do
 done done done
 let _ = f_bigarray3_int32 bigarray3_int32
 
+type void_ty : void
+external unbox_unit : unit -> void_ty = "%unbox_unit"
+
+(* All-void constructors are tagged immediates with
+   [@immediate_all_void_constructor] and blocks without. *)
+type all_void_variant =
+  | Imm_void of void_ty [@immediate_all_void_constructor]
+  | Blk_void of void_ty
+  | Const
+  | Boxed of int
+
+let[@inline never] [@local never] f_all_void_variant (x : all_void_variant) = x
+let _ = f_all_void_variant (Imm_void (unbox_unit ()))
+let _ = f_all_void_variant (Blk_void (unbox_unit ()))
+let _ = f_all_void_variant Const
+let _ = f_all_void_variant (Boxed 42)
+
+(* Unboxed versions of boxed types *)
+type record_for_unboxing = { rfu_i : int; rfu_s : string }
+let[@inline never] [@local never] f_unboxed_version_record
+    (x: record_for_unboxing#) =
+  let #{ rfu_i; rfu_s } = x in #{ rfu_i; rfu_s }
+let _ = f_unboxed_version_record #{ rfu_i = 42; rfu_s = "hello" }
+
+type mixed_record_for_unboxing = { mrfu_f : float#; mrfu_i : int }
+let[@inline never] [@local never] f_unboxed_version_mixed_record
+    (x: mixed_record_for_unboxing#) =
+  let #{ mrfu_f; mrfu_i } = x in #{ mrfu_f; mrfu_i }
+let _ = f_unboxed_version_mixed_record #{ mrfu_f = #2.5; mrfu_i = 7 }
+
+type ('a, 'b) params_for_unboxing = { pfu_a : 'a; pfu_b : 'b }
+let[@inline never] [@local never] f_unboxed_version_params
+    (x: (string, int) params_for_unboxing#) =
+  let #{ pfu_a; pfu_b } = x in #{ pfu_a; pfu_b }
+let _ = f_unboxed_version_params #{ pfu_a = "param"; pfu_b = 3 }
+
+type record_alias_for_unboxing = record_for_unboxing
+let[@inline never] [@local never] f_unboxed_version_alias
+    (x: record_alias_for_unboxing#) = x
+let _ = f_unboxed_version_alias #{ rfu_i = 8; rfu_s = "alias" }
+
+module For_unboxing_m = struct
+  type t = { fum_i : int; fum_s : string }
+end
+let[@inline never] [@local never] f_unboxed_version_cross_module
+    (x: For_unboxing_m.t#) =
+  let #{ For_unboxing_m.fum_i; fum_s } = x in #{ For_unboxing_m.fum_i; fum_s }
+let _ = f_unboxed_version_cross_module #{ For_unboxing_m.fum_i = 9; fum_s = "mod" }
+
+type recursive_for_unboxing = { rec_self : (recursive_for_unboxing# * int) option }
+let[@inline never] [@local never] f_unboxed_version_recursive
+    (x: recursive_for_unboxing#) =
+  let #{ rec_self } = x in #{ rec_self }
+let _ = f_unboxed_version_recursive #{ rec_self = None }
+let _ = f_unboxed_version_recursive #{ rec_self = Some (#{ rec_self = None }, 1) }
+
+type also_recursive_for_unboxing =
+  { arec_u : (recursive_for_unboxing# * int) option }
+let[@inline never] [@local never] f_unboxed_version_recursive_indirect
+    (x: also_recursive_for_unboxing#) =
+  let #{ arec_u } = x in #{ arec_u }
+let _ = f_unboxed_version_recursive_indirect #{ arec_u = None }
+
+(* Void fields *)
+type variant_with_void_field = Void_and_int of unit# * int | No_field
+let[@inline never] [@local never] f_variant_with_void_field
+    (x: variant_with_void_field) = x
+let _ = f_variant_with_void_field (Void_and_int (#(), 42))
+let _ = f_variant_with_void_field No_field
+
+type record_with_void_field = { rwv_u : unit#; rwv_i : int }
+let[@inline never] [@local never] f_record_with_void_field
+    (x: record_with_void_field) = x
+let _ = f_record_with_void_field { rwv_u = #(); rwv_i = 13 }
+
+let[@inline never] [@local never] f_unboxed_version_void_field
+    (x: record_with_void_field#) =
+  let #{ rwv_u; rwv_i } = x in #{ rwv_u; rwv_i }
+let _ = f_unboxed_version_void_field #{ rwv_u = #(); rwv_i = 13 }
+
+type record_with_void_and_two_fields =
+  { rwv2_u : unit#; rwv2_i : int; rwv2_s : string }
+let[@inline never] [@local never] f_unboxed_version_void_two_fields
+    (x: record_with_void_and_two_fields#) =
+  let #{ rwv2_u; rwv2_i; rwv2_s } = x in #{ rwv2_u; rwv2_i; rwv2_s }
+let _ = f_unboxed_version_void_two_fields
+    #{ rwv2_u = #(); rwv2_i = 21; rwv2_s = "two" }
 
 (* CR sspies: Add testing for Maps and Hashtables once oxcaml dwarf is enabled on the compiler. *)

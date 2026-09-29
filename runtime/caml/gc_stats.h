@@ -42,6 +42,11 @@ struct heap_stats {
   intnat large_words;        /* words in large blocks, including large block headers */
   intnat large_max_words;    /* maximum of large_words over time */
   intnat large_blocks;       /* number of large blocks */
+  intnat extents;            /* number of heap extents */
+  intnat extent_words;       /* words in heap extents (including free blocks) */
+  intnat extent_live_words;  /* words of live blocks in heap extents */
+  intnat extent_blocks;      /* number of live blocks in heap extents */
+  intnat extent_max_words;   /* maximum heap extent words over time */
   intnat dependent_bytes;
 };
 
@@ -101,6 +106,9 @@ void caml_compute_gc_stats(struct gc_stats* buf);
 void caml_init_gc_stats (uintnat max_domains);
 
 void caml_free_gc_stats(void);
+
+/* Called at runtime exit; reports using the STATS facility of caml_verb_gc */
+void caml_report_gc_stats(void);
 
 #endif /* CAML_INTERNALS */
 

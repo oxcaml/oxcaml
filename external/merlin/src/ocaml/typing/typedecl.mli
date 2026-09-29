@@ -37,7 +37,7 @@ type transl_value_decl_modal =
   (** A primitive in structure, in which case the modality syntax is treated as
     modes, and the returned value description will have empty modalities. *)
   (* CR zqian: avoid the above hack *)
-  | Sig_value of Mode.Value.l * Mode.Modality.Const.t
+  | Sig_value of Mode.With_regionality.l * Mode.Modality.Const.t
   (** A value description in a signature, in which case we require the mode of
       the structure that the value lives in, as well as the default modalities
       of the signature. *)
@@ -48,7 +48,7 @@ val transl_value_decl:
     Env.t -> modal:transl_value_decl_modal ->
     why:Jkind.History.concrete_creation_reason -> Location.t ->
     Parsetree.value_description ->
-    Typedtree.value_description * Mode.Value.l * Env.t
+    Typedtree.value_description * Mode.With_regionality.l * Env.t
 
 (* If the [fixed_row_path] optional argument is provided,
    the [Parsetree.type_declaration] argument should satisfy [is_fixed_type] *)
@@ -99,15 +99,7 @@ type unrepresentable_constructor =
   | Unrepresentable_argument of int
   | Unrepresentable_argument_field of string
 
-(* Update the representation of a constructor whose representation at
-   declaration time was [None] because it has an argument of kind [any]. *)
-val update_constructor_representation:
-    Env.t -> Types.constructor_arguments -> (_ * _) jkind list ->
-    loc:Location.t -> is_extension_constructor:bool ->
-    (Types.constructor_representation, unrepresentable_constructor) Result.t
-
-(* Same as above, but also computes sorts of arguments *)
-val update_constructor_representation_and_arg_sorts :
+val update_constructor_representation :
   Env.t -> Location.t -> Types.constructor_arguments ->
   is_extension_constructor:bool ->
   Types.constructor_arguments * constant:bool *
@@ -117,16 +109,28 @@ val update_constructor_representation_and_arg_sorts :
 type unrepresentable_record =
   | Unrepresentable_field of string
 
-(* Update the representation of a record whose representation at declaration
-   time was variable because it has a field of kind [any] *)
-val update_record_representation:
+(* Instantiate the representation of a record whose representation at
+   declaration time was undetermined because it has a field of kind [any] *)
+val instance_record_representation:
     why:Jkind_intf.History.concrete_creation_reason -> old_repres:'rep ->
     Env.t -> Location.t -> 'rep Data_types.record_form ->
     (Types.label_declaration * Types.type_expr) list ->
-    (Jkind.sort list * 'rep, unrepresentable_record) Result.t
+    'rep
+
+module Element_repr : sig
+  type t
+
+  val classify_base : Jkind.Sort.base -> Jkind.Scannable_axes.t -> t
+  val to_shape_element : t -> Types.mixed_block_element
+end
 
 val mixed_block_element :
     Env.t -> type_expr -> _ jkind -> mixed_block_element option
+
+(* Does not default sorts or check whether the block can be constructed. *)
+val compute_block_shape :
+    Env.t -> type_expr list ->
+    [ `Not_mixed | `Mixed of mixed_product_shape | `Undetermined ]
 
 type native_repr_kind = Unboxed | Untagged | Unpacked
 
@@ -155,6 +159,7 @@ module Mixed_product_kind : sig
     | Cstr_tuple
     | Cstr_record
     | Module
+    | Block
 end
 
 val assert_mixed_product_support :
@@ -213,8 +218,8 @@ type error =
   | Multiple_native_repr_attributes
   | Cannot_unbox_or_untag_type of native_repr_kind
   | Deep_unbox_or_untag_attribute of native_repr_kind
-  | Jkind_mismatch_of_type of Env.t * type_expr * Jkind.Violation.t
-  | Jkind_mismatch_of_path of Env.t * Path.t * Jkind.Violation.t
+  | Jkind_mismatch_of_type of Env.t * type_expr * Ikind.subjkind_error
+  | Jkind_mismatch_of_path of Env.t * Path.t * Ikind.subjkind_error
   | Jkind_mismatch_due_to_bad_inference of
       Env.t * type_expr * Jkind.Violation.t * bad_jkind_inference_location
   | Jkind_sort of
@@ -223,7 +228,6 @@ type error =
       ; typ : type_expr
       ; err : Jkind.Violation.t
       }
-  | Jkind_empty_record
   | Non_representable_in_module of Env.t * Jkind.Violation.t * type_expr
   | Invalid_jkind_in_block of type_expr * Jkind.Sort.Const.t * jkind_sort_loc
   | Illegal_mixed_product of mixed_product_violation
@@ -249,13 +253,12 @@ type error =
   | Illegal_baggage of Env.t * jkind_l
   | No_unboxed_version of Path.t
   | Atomic_field_must_be_mutable of string
-  | Constructor_submode_failed of Mode.Value.error
+  | Constructor_submode_failed of Mode.With_regionality.error
   | Non_value_atomic_field
   | Layout_poly_unsupported
   | Misplaced_flatten_floats
   | Recursive_jkind_definition of Path.t * Env.t * reaching_kind_path
   | Bad_represent_as_float_array_attribute
-  | Missing_immediate_all_void_constructor_attribute of string
 
 exception Error of Location.t * error
 

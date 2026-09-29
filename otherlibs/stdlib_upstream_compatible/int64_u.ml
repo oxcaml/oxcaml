@@ -17,7 +17,7 @@ open! Stdlib
 
 [@@@ocaml.flambda_o3]
 
-type t = int64#
+type t = int64_u
 
 external to_int64 : t -> (int64[@local_opt]) @@ portable =
   "%box_int64" [@@warning "-187"]

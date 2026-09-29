@@ -80,15 +80,10 @@ let backend_flags env =
     Ocaml_variables.ocamlc_flags
     Ocaml_variables.ocamlopt_flags
 
-let env_setting env_reader default_setting =
-  Printf.sprintf "%s=%s"
-    env_reader.Clflags.env_var
-    (env_reader.Clflags.print default_setting)
-
 let default_ocaml_env = [|
   "TERM=dumb";
-  env_setting Clflags.color_reader Misc.Color.default_setting;
-  env_setting Clflags.error_style_reader Misc.Error_style.default_setting;
+  "OCAML_COLOR=auto";
+  "OCAML_ERROR_STYLE=contextual"
 |]
 
 type module_generator = {
@@ -187,12 +182,20 @@ let get_program_file backend env =
 
 let is_c_file (_filename, filetype) = filetype=Ocaml_filetypes.C
 
-let cmas_need_dynamic_loading directories libraries =
+let cmas_need_dynamic_loading _directories _libraries =
+  None
+  (* Upstream OCaml uses the following logic to handle the case of
+     tests requiring `-custom` bytecode builds on platforms with
+     no shared library support. This is unused in OxCaml, and
+     disabled here to remove the dependency on the Cma format.
+
   let loads_c_code library =
-    match Misc.find_in_path directories library with
+    match find_in_path directories library with
     | exception Not_found ->
       Some (Error ("file not found in include path: " ^ library))
-    | library ->
+    | _library ->
+       None
+
       let ic = open_in_bin library in
       try
         let len_magic_number = String.length Config.cma_magic_number in
@@ -210,7 +213,7 @@ let cmas_need_dynamic_loading directories libraries =
            begin try close_in ic with Sys_error _ -> () end;
            Some (Error ("Corrupt or non-CMA file: " ^ library))
   in
-  List.find_map loads_c_code (String.words libraries)
+  List.find_map loads_c_code (String.words libraries) *)
 
 let compile_program (compiler : Ocaml_compilers.compiler) log env =
   let (module Compiler) = compiler in
@@ -657,6 +660,7 @@ let run_fexpr log env =
   let commandline =
   [
     Ocaml_commands.fexprc;
+    backend_default_flags env Ocaml_backends.Native;
     backend_flags env Ocaml_backends.Native;
     testfile
   ] in
@@ -891,6 +895,7 @@ let run_expect_once input_file principal log env ~backend =
     command;
     expect_flags;
     Ocaml_flags.toplevel_default_flags;
+    backend_default_flags env backend;
     backend_flags env backend;
     Ocaml_flags.stdlib;
     directory_flags env;

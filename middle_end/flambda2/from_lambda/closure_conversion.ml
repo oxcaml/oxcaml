@@ -35,9 +35,9 @@ type 'a close_program_metadata =
   | Normal : [`Normal] close_program_metadata
   | Classic :
       (Exported_code.t
+      * Code_or_metadata.t Value_approximation.t Symbol.Map.t
       * Name_occurrences.t
-      * Flambda_cmx_format.raw option
-      * Exported_offsets.t)
+      * Slot_offsets.t)
       -> [`Classic] close_program_metadata
 
 type 'a close_program_result =
@@ -53,36 +53,28 @@ type close_functions_result =
       * Alloc_mode.For_allocations.t
       * Env.value_approximation Function_slot.Map.t
 
-let manufacture_symbol acc proposed_name =
-  let acc, linkage_name =
-    if Flambda_features.Expert.shorten_symbol_names ()
-    then Acc.manufacture_symbol_short_name acc
-    else acc, Linkage_name.of_string proposed_name
-  in
-  let symbol = Symbol.create (Current_unit.get_cu_exn ()) linkage_name in
-  acc, symbol
+let manufacture_symbol proposed_name =
+  Symbol.manufacture (Current_unit.get_cu_exn ()) proposed_name
 
-let declare_symbol_for_function_slot env acc ident function_slot :
-    Env.t * Acc.t * Symbol.t =
-  let acc, symbol =
-    manufacture_symbol acc (Function_slot.to_string function_slot)
+let manufacture_symbol_of_variable v =
+  let name = Variable.canonical_name v in
+  manufacture_symbol name
+
+let declare_symbol_for_function_slot env ident function_slot : Env.t * Symbol.t
+    =
+  let symbol =
+    manufacture_symbol (Function_slot.canonical_name function_slot)
   in
   let env =
     Env.add_simple_to_substitute env ident (Simple.symbol symbol)
       K.With_subkind.any_value
   in
-  env, acc, symbol
+  env, symbol
 
 let register_const0 acc constant name =
   match Static_const.Map.find constant (Acc.shareable_constants acc) with
   | exception Not_found ->
-    (* Create a variable to ensure uniqueness of the symbol. *)
-    let var = Variable.create name K.value in
-    let acc, symbol =
-      manufacture_symbol acc
-        (* CR mshinwell: this Variable.rename looks to be redundant *)
-        (Variable.unique_name (Variable.rename var))
-    in
+    let symbol = manufacture_symbol name in
     let acc = Acc.add_declared_symbol ~symbol ~constant acc in
     let acc =
       if Static_const.can_share constant
@@ -388,7 +380,8 @@ module Inlining = struct
         Inlining_report.record_decision_at_call_site_for_known_function ~tracker
           ~apply ~pass:After_closure_conversion ~unrolling_depth:None
           ~callee:(Inlining_history.Absolute.empty compilation_unit)
-          ~are_rebuilding_terms Definition_says_not_to_inline;
+          ~are_rebuilding_terms ~inlined_forwarded_from:None
+          Definition_says_not_to_inline;
         Not_inlinable)
       else
         (* These calculations are all in terms of non-unarized parameters. *)
@@ -415,7 +408,7 @@ module Inlining = struct
               Not_inlinable )
           | Always_inlined _ | Hint_inlined ->
             Call_site_inlining_decision_type.Attribute_always, Inlinable code
-          | Default_inlined | Unroll _ ->
+          | Default_inlined | Forward_inlined | Unroll _ ->
             (* Closure ignores completely [@unrolled] attributes, so it seems
                safe to do the same. *)
             ( Call_site_inlining_decision_type.Definition_says_inline
@@ -425,13 +418,14 @@ module Inlining = struct
         Inlining_report.record_decision_at_call_site_for_known_function ~tracker
           ~apply ~pass:After_closure_conversion ~unrolling_depth:None
           ~callee:(Code.absolute_history code)
-          ~are_rebuilding_terms decision;
+          ~are_rebuilding_terms ~inlined_forwarded_from:None decision;
         res
 
-  let make_inlined_body acc ~callee ~called_code_id ~region_inlined_into ~params
-      ~args ~my_closure ~my_alloc_mode ~my_depth ~body ~free_names_of_body
-      ~exn_continuation ~return_continuation ~apply_exn_continuation
-      ~apply_return_continuation ~apply_depth ~apply_dbg =
+  let make_inlined_body acc ~callee ~called_code_id ~region_inlined_into
+      ~inlined_attribute ~params ~args ~my_closure ~my_alloc_mode ~my_depth
+      ~body ~free_names_of_body ~exn_continuation ~return_continuation
+      ~apply_exn_continuation ~apply_return_continuation ~apply_depth ~apply_dbg
+      =
     let my_depth_duid = Flambda_debug_uid.none in
     let my_closure_duid = Flambda_debug_uid.none in
     let rec_info =
@@ -481,7 +475,8 @@ module Inlining = struct
       (Bound_pattern.singleton
          (VB.create inlined_dbg_var inlined_dbg_var_duid Name_mode.normal))
       (Named.create_prim
-         (Nullary (Enter_inlined_apply { dbg = inlined_debuginfo }))
+         (Nullary
+            (Enter_inlined_apply { dbg = inlined_debuginfo; inlined_attribute }))
          Debuginfo.none)
       ~body
 
@@ -515,6 +510,7 @@ module Inlining = struct
            function call."
     in
     let region_inlined_into = Apply.return_mode apply in
+    let inlined_attribute = Apply.inlined apply in
     let args = Apply.args apply in
     let apply_return_continuation = Apply.continuation apply in
     let apply_exn_continuation = Apply.exn_continuation apply in
@@ -541,7 +537,7 @@ module Inlining = struct
         in
         let make_inlined_body =
           make_inlined_body ~callee ~called_code_id:(Code.code_id code)
-            ~region_inlined_into
+            ~region_inlined_into ~inlined_attribute
             ~params:(Bound_parameters.vars_and_uids params)
             ~args ~my_closure ~my_alloc_mode ~my_depth ~body ~free_names_of_body
             ~exn_continuation ~return_continuation ~apply_depth ~apply_dbg
@@ -640,6 +636,9 @@ let rec unarize_const_sort_for_extern_repr (sort : Jkind.Sort.Const.t) =
   | Univar _ -> Misc.fatal_error "unarize_const_sort_for_extern_repr: Univar"
   | Genvar _ -> Misc.fatal_error "unarize_const_sort_for_extern_repr: Genvar"
   | Product sorts -> List.concat_map unarize_const_sort_for_extern_repr sorts
+  | Addressable sort ->
+    (* Addressability does not affect the non-boxed representation *)
+    unarize_const_sort_for_extern_repr sort
 
 let unarize_extern_repr ~machine_width alloc_mode
     (extern_repr : Lambda.extern_repr) =
@@ -659,6 +658,9 @@ let unarize_extern_repr ~machine_width alloc_mode
     Misc.fatal_error "unarize_extern_repr: unexpected genvar"
   | Same_as_ocaml_repr (Product sorts) ->
     List.concat_map unarize_const_sort_for_extern_repr sorts
+  | Same_as_ocaml_repr (Addressable sort) ->
+    (* Addressability does not affect the non-boxed representation *)
+    unarize_const_sort_for_extern_repr sort
   | Unboxed_float Boxed_float64 ->
     [ { kind = K.naked_float;
         arg_transformer = Some (P.Unbox_number Naked_float);
@@ -1249,21 +1251,16 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
     let acc, sym =
       match prim with
       | Pmakeblock (tag, _, shape, _mode) ->
-        if tag <> 0
+        if Lambda.is_uniform_block_shape shape
         then
-          (* There should not be any way to reach this from Ocaml code. *)
-          Misc.fatal_error
-            "Non-zero tag on empty block allocation in [Closure_conversion]"
+          register_const0 acc
+            (Static_const.block
+               (Tag.Scannable.create_exn tag)
+               Immutable Value_only [])
+            "empty_block"
         else
-          begin if Lambda.is_uniform_block_shape shape
-          then
-            register_const0 acc
-              (Static_const.block Tag.Scannable.zero Immutable Value_only [])
-              "empty_block"
-          else
-            Misc.fatal_error
-              "Unexpected empty mixed block in [Closure_conversion]"
-          end
+          Misc.fatal_error
+            "Unexpected empty mixed block in [Closure_conversion]"
       | Pmakefloatblock _ ->
         Misc.fatal_error "Unexpected empty float block in [Closure_conversion]"
       | Pmakeufloatblock _ ->
@@ -1286,14 +1283,16 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Pstring_load_i8 _ | Pstring_load_i16 _ | Pstring_load_16 _
       | Pstring_load_32 _ | Pstring_load_f32 _ | Pstring_load_64 _
       | Pstring_load_vec _ | Pbytes_load_i8 _ | Pbytes_load_i16 _
-      | Pbytes_load_16 _ | Pbytes_load_32 _ | Pbytes_load_f32 _
-      | Pbytes_load_64 _ | Pbytes_load_vec _ | Pbytes_set_8 _ | Pbytes_set_16 _
-      | Pbytes_set_32 _ | Pbytes_set_f32 _ | Pbytes_set_64 _ | Pbytes_set_vec _
-      | Pbigstring_load_i8 _ | Pbigstring_load_i16 _ | Pbigstring_load_16 _
-      | Pbigstring_load_32 _ | Pbigstring_load_f32 _ | Pbigstring_load_64 _
-      | Pbigstring_load_vec _ | Pbigstring_set_8 _ | Pbigstring_set_16 _
-      | Pbigstring_set_32 _ | Pbigstring_set_f32 _ | Pbigstring_set_64 _
-      | Pbigstring_set_vec _ | Pfloatarray_load_vec _ | Pint_array_load_vec _
+      | Pstring_load_mask _ | Pbytes_load_16 _ | Pbytes_load_32 _
+      | Pbytes_load_f32 _ | Pbytes_load_64 _ | Pbytes_load_vec _
+      | Pbytes_set_8 _ | Pbytes_set_16 _ | Pbytes_load_mask _ | Pbytes_set_32 _
+      | Pbytes_set_f32 _ | Pbytes_set_64 _ | Pbytes_set_vec _
+      | Pbytes_set_mask _ | Pbigstring_load_i8 _ | Pbigstring_load_i16 _
+      | Pbigstring_load_16 _ | Pbigstring_load_32 _ | Pbigstring_load_f32 _
+      | Pbigstring_load_64 _ | Pbigstring_load_vec _ | Pbigstring_set_8 _
+      | Pbigstring_set_16 _ | Pbigstring_load_mask _ | Pbigstring_set_32 _
+      | Pbigstring_set_f32 _ | Pbigstring_set_64 _ | Pbigstring_set_vec _
+      | Pfloatarray_load_vec _ | Pint_array_load_vec _ | Pbigstring_set_mask _
       | Punboxed_float_array_load_vec _ | Punboxed_float32_array_load_vec _
       | Puntagged_int8_array_load_vec _ | Puntagged_int16_array_load_vec _
       | Punboxed_int32_array_load_vec _ | Punboxed_int64_array_load_vec _
@@ -1317,7 +1316,15 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Pget_ext_ptr _ | Pset_ext_ptr _ | Patomic_exchange_field _
       | Patomic_compare_exchange_field _ | Patomic_compare_set_field _
       | Patomic_fetch_add_field | Patomic_add_field | Patomic_sub_field
-      | Patomic_land_field | Patomic_lor_field | Patomic_lxor_field | Pdls_get
+      | Patomic_land_field | Patomic_lor_field | Patomic_lxor_field
+      | Patomic_load_idx _ | Patomic_set_idx _ | Patomic_exchange_idx _
+      | Patomic_compare_exchange_idx _ | Patomic_compare_set_idx _
+      | Patomic_fetch_add_idx | Patomic_add_idx | Patomic_sub_idx
+      | Patomic_land_idx | Patomic_lor_idx | Patomic_lxor_idx
+      | Patomic_load_ptr _ | Patomic_set_ptr _ | Patomic_exchange_ptr _
+      | Patomic_compare_exchange_ptr _ | Patomic_compare_set_ptr _
+      | Patomic_fetch_add_ptr | Patomic_add_ptr | Patomic_sub_ptr
+      | Patomic_land_ptr | Patomic_lor_ptr | Patomic_lxor_ptr | Pdls_get
       | Ptls_get | Pdomain_index | Ppoll | Patomic_load_field _
       | Patomic_load_mixed_field _ | Patomic_set_field _
       | Patomic_set_mixed_field _ | Preinterpret_tagged_int63_as_unboxed_int64
@@ -1625,9 +1632,7 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
               (* This is a inconstant statically-allocated value, so cannot go
                  through [register_const0]. The definition must be placed right
                  away. *)
-              let acc, symbol =
-                manufacture_symbol acc (Variable.unique_name var)
-              in
+              let symbol = manufacture_symbol_of_variable var in
               let static_consts =
                 [Static_const_or_code.create_static_const static_const]
               in
@@ -1677,7 +1682,7 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
                && Env.at_toplevel env
                && Flambda_features.classic_mode () ->
           (* Special case to lift toplevel exception declarations *)
-          let acc, symbol = manufacture_symbol acc (Variable.unique_name var) in
+          let symbol = manufacture_symbol_of_variable var in
           let transform_arg arg = Simple.With_debuginfo.create arg dbg in
           (* This is an inconstant statically-allocated value, so cannot go
              through [register_const0]. The definition must be placed right
@@ -1825,7 +1830,7 @@ let close_exact_or_unknown_apply acc env
       ~current_region ~current_ghost_region
   in
   let dbg = Debuginfo.from_location loc in
-  let acc, call_kind, can_erase_callee =
+  let acc, call_kind, can_erase_callee, replace_by_invalid =
     match kind with
     | Function -> (
       match (callee_approx : Env.value_approximation option) with
@@ -1836,29 +1841,41 @@ let close_exact_or_unknown_apply acc env
           (* CR keryan : We could do better here since we know the arity, but we
              would have to untuple the arguments and we lack information for
              now *)
-          acc, Call_kind.indirect_function_call_unknown_arity, false
+          acc, Call_kind.indirect_function_call_unknown_arity, false, false
         else
           let result_arity_from_code = Code_metadata.result_arity meta in
           if
             (* See comment about when this check can be done, in
                simplify_apply_expr.ml *)
-            Flambda_features.kind_checks ()
-            && not
-                 (Flambda_arity.equal_ignoring_subkinds return_arity
-                    result_arity_from_code)
+            not
+              (Flambda_arity.equal_ignoring_subkinds return_arity
+                 result_arity_from_code
+              && Misc.Stdlib.List.equal
+                   (Misc.Stdlib.List.equal K.With_subkind.equal_ignoring_subkind)
+                   (Flambda_arity.unarize_per_parameter args_arity)
+                   (Flambda_arity.unarize_per_parameter
+                      (Code_metadata.params_arity meta)))
           then
-            Misc.fatal_errorf
-              "Wrong return arity for direct OCaml function call to %a@ \
-               (expected %a, found %a):@ %a@ code metadata:@ %a"
-              Ident.print func Flambda_arity.print result_arity_from_code
-              Flambda_arity.print return_arity Debuginfo.print_compact dbg
-              Code_metadata.print meta;
-          let can_erase_callee =
-            Flambda_features.classic_mode ()
-            && not (Code_metadata.is_my_closure_used meta)
-          in
-          acc, Call_kind.direct_function_call code_id, can_erase_callee
-      | None -> acc, Call_kind.indirect_function_call_unknown_arity, false
+            if Flambda_features.kind_checks ()
+            then
+              Misc.fatal_errorf
+                "Wrong arity for direct OCaml function call to %a@ (expected \
+                 parameters (%a) and result (%a),@ found arguments (%a) and \
+                 return (%a)):@ %a@ code metadata:@ %a"
+                Ident.print func Flambda_arity.print
+                (Code_metadata.params_arity meta)
+                Flambda_arity.print result_arity_from_code Flambda_arity.print
+                args_arity Flambda_arity.print return_arity
+                Debuginfo.print_compact dbg Code_metadata.print meta
+            else acc, Call_kind.direct_function_call code_id, false, true
+          else
+            let can_erase_callee =
+              Flambda_features.classic_mode ()
+              && not (Code_metadata.is_my_closure_used meta)
+            in
+            acc, Call_kind.direct_function_call code_id, can_erase_callee, false
+      | None ->
+        acc, Call_kind.indirect_function_call_unknown_arity, false, false
       | Some (Unknown _ | Value_symbol _ | Value_const _ | Block_approximation _)
         ->
         assert false (* See [close_apply] *))
@@ -1866,58 +1883,66 @@ let close_exact_or_unknown_apply acc env
       let acc, obj = find_simple acc env obj in
       ( acc,
         Call_kind.method_call (Call_kind.Method_kind.from_lambda kind) ~obj,
+        false,
         false )
   in
-  let acc, apply_exn_continuation =
-    close_exn_continuation acc env exn_continuation
-  in
-  let acc, args = find_simples acc env args in
-  let inlined_call = Inlined_attribute.from_lambda inlined in
-  let probe = Probe.from_lambda probe in
-  let position =
-    match region_close with
-    | Rc_normal | Rc_close_at_apply -> Apply.Position.Normal
-    | Rc_nontail -> Apply.Position.Nontail
-  in
-  let apply =
-    Apply.create
-      ~callee:(if can_erase_callee then None else Some callee)
-      ~continuation:(Return continuation) apply_exn_continuation ~args
-      ~args_arity ~return_arity ~call_kind ~return_mode:mode dbg
-      ~inlined:inlined_call
-      ~inlining_state:(Inlining_state.default ~round:0)
-      ~probe ~position
-      ~relative_history:(Env.relative_history_from_scoped ~loc env)
-  in
-  if Flambda_features.classic_mode ()
+  if replace_by_invalid
   then
-    if !Clflags.jsir
+    ( acc,
+      Expr.create_invalid
+        (Application_result_kind_mismatch_in_lambda
+           (Debuginfo.from_location loc)) )
+  else
+    let acc, apply_exn_continuation =
+      close_exn_continuation acc env exn_continuation
+    in
+    let acc, args = find_simples acc env args in
+    let inlined_call = Inlined_attribute.from_lambda inlined in
+    let probe = Probe.from_lambda probe in
+    let position =
+      match region_close with
+      | Rc_normal | Rc_close_at_apply -> Apply.Position.Normal
+      | Rc_nontail -> Apply.Position.Nontail
+    in
+    let apply =
+      Apply.create
+        ~callee:(if can_erase_callee then None else Some callee)
+        ~continuation:(Return continuation) apply_exn_continuation ~args
+        ~args_arity ~return_arity ~call_kind ~return_mode:mode dbg
+        ~inlined:inlined_call
+        ~inlining_state:(Inlining_state.default ~round:0)
+        ~probe ~position
+        ~relative_history:(Env.relative_history_from_scoped ~loc env)
+    in
+    if Flambda_features.classic_mode ()
     then
-      let apply =
-        Apply.with_inlined_attribute apply
-          (Inlined_attribute.with_use_info (Apply.inlined apply)
-             Jsir_inlining_disabled)
-      in
-      Expr_with_acc.create_apply acc apply
-    else
-      match Inlining.inlinable env apply callee_approx with
-      | Not_inlinable ->
+      if !Clflags.jsir
+      then
         let apply =
           Apply.with_inlined_attribute apply
             (Inlined_attribute.with_use_info (Apply.inlined apply)
-               Unused_because_function_unknown)
+               Jsir_inlining_disabled)
         in
         Expr_with_acc.create_apply acc apply
-      | Inlinable func_desc ->
-        let acc = Acc.mark_continuation_as_untrackable continuation acc in
-        let acc =
-          Acc.mark_continuation_as_untrackable
-            (Exn_continuation.exn_handler apply_exn_continuation)
-            acc
-        in
-        Inlining.inline acc ~apply ~apply_depth:(Env.current_depth env)
-          ~func_desc
-  else Expr_with_acc.create_apply acc apply
+      else
+        match Inlining.inlinable env apply callee_approx with
+        | Not_inlinable ->
+          let apply =
+            Apply.with_inlined_attribute apply
+              (Inlined_attribute.with_use_info (Apply.inlined apply)
+                 Unused_because_function_unknown)
+          in
+          Expr_with_acc.create_apply acc apply
+        | Inlinable func_desc ->
+          let acc = Acc.mark_continuation_as_untrackable continuation acc in
+          let acc =
+            Acc.mark_continuation_as_untrackable
+              (Exn_continuation.exn_handler apply_exn_continuation)
+              acc
+          in
+          Inlining.inline acc ~apply ~apply_depth:(Env.current_depth env)
+            ~func_desc
+    else Expr_with_acc.create_apply acc apply
 
 let close_apply_cont acc env ~dbg cont trap_action args : Expr_with_acc.t =
   let acc, args = find_simples acc env args in
@@ -2135,8 +2160,18 @@ let boxing_primitive (k : Function_decl.unboxing_kind) alloc_mode
 let compute_body_of_unboxed_function acc my_region my_alloc_region my_closure
     ~unarized_params:params params_arity ~unarized_param_modes:param_modes
     function_slot compute_body return return_continuation unboxed_params
-    unboxed_return unboxed_function_slot =
+    unboxed_return unboxed_function_slot ~needs_region_wrapper =
   let my_closure_duid = Flambda_debug_uid.none in
+  let local_param_region =
+    if needs_region_wrapper
+    then Some (Variable.create "unboxed_param_region" K.region)
+    else None
+  in
+  let current_region =
+    match local_param_region with
+    | None -> my_region
+    | Some region -> Some region
+  in
   let rec box_params params params_arity param_modes params_unboxing body =
     match params, params_arity, param_modes, params_unboxing with
     | [], [], [], [] -> [], [], [], body
@@ -2161,7 +2196,7 @@ let compute_body_of_unboxed_function acc my_region my_alloc_region my_closure
           let acc, body = body acc in
           let alloc_mode =
             Alloc_mode.For_allocations.from_lambda
-              ~current_alloc_region:my_alloc_region ~current_region:my_region
+              ~current_alloc_region:my_alloc_region ~current_region
               (Alloc_mode.For_types.to_lambda param_mode)
           in
           let param_duid = Flambda_debug_uid.none in
@@ -2209,9 +2244,56 @@ let compute_body_of_unboxed_function acc my_region my_alloc_region my_closure
   in
   let acc, unboxed_body, result_arity_main_code, unboxed_return_continuation =
     match unboxed_return with
-    | None ->
-      let acc, body = body acc in
-      acc, body, return, return_continuation
+    | None -> (
+      match local_param_region with
+      | None ->
+        let acc, body = body acc in
+        acc, body, return, return_continuation
+      | Some local_param_region ->
+        (* We need to close the region we used for the unboxed parameter before
+           returning from the function, so we need a return wrapper. *)
+        let outer_return_continuation =
+          Continuation.create ~sort:Return ~name:"return" ()
+        in
+        let handler_params =
+          Bound_parameters.create
+            (List.mapi
+               (fun i kind ->
+                 let var =
+                   Variable.create
+                     ("unboxed_param_result" ^ string_of_int i)
+                     (Flambda_kind.With_subkind.kind kind)
+                 in
+                 Bound_parameter.create var kind Flambda_debug_uid.none)
+               (Flambda_arity.unarized_components return))
+        in
+        let handler acc =
+          let acc, apply_cont =
+            Apply_cont_with_acc.create acc outer_return_continuation
+              ~args:
+                (List.map Bound_parameter.simple
+                   (Bound_parameters.to_list handler_params))
+              ~dbg:Debuginfo.none
+          in
+          let acc, apply_cont =
+            Expr_with_acc.create_apply_cont acc apply_cont
+          in
+          Let_with_acc.create acc
+            (Bound_pattern.singleton
+               (Bound_var.create
+                  (Variable.create "unit" K.value)
+                  Flambda_debug_uid.none Name_mode.normal))
+            (Named.create_prim
+               (Flambda_primitive.Unary
+                  (End_region { ghost = false }, Simple.var local_param_region))
+               Debuginfo.none)
+            ~body:apply_cont
+        in
+        let acc, unboxed_body =
+          Let_cont_with_acc.build_non_recursive acc return_continuation
+            ~handler_params ~handler ~body ~is_exn_handler:false ~is_cold:false
+        in
+        acc, unboxed_body, return, outer_return_continuation)
     | Some (k, _) ->
       let vars_with_kinds = variables_for_unboxing "result" k in
       let unboxed_return_continuation =
@@ -2241,6 +2323,21 @@ let compute_body_of_unboxed_function acc my_region my_alloc_region my_closure
             ~dbg:Debuginfo.none
         in
         let acc, apply_cont = Expr_with_acc.create_apply_cont acc apply_cont in
+        let acc, expr =
+          match local_param_region with
+          | None -> acc, apply_cont
+          | Some local_param_region ->
+            Let_with_acc.create acc
+              (Bound_pattern.singleton
+                 (Bound_var.create
+                    (Variable.create "unit" K.value)
+                    Flambda_debug_uid.none Name_mode.normal))
+              (Named.create_prim
+                 (Flambda_primitive.Unary
+                    (End_region { ghost = false }, Simple.var local_param_region))
+                 Debuginfo.none)
+              ~body:apply_cont
+        in
         let (acc, expr), _ =
           List.fold_left
             (fun ((acc, expr), i) (var, var_duid, _kind) ->
@@ -2253,7 +2350,7 @@ let compute_body_of_unboxed_function acc my_region my_alloc_region my_closure
                      Debuginfo.none)
                   ~body:expr,
                 Target_ocaml_int.(add (one (Acc.machine_width acc)) i) ))
-            ((acc, apply_cont), Target_ocaml_int.zero (Acc.machine_width acc))
+            ((acc, expr), Target_ocaml_int.zero (Acc.machine_width acc))
             vars_with_kinds
         in
         acc, expr
@@ -2267,6 +2364,19 @@ let compute_body_of_unboxed_function acc my_region my_alloc_region my_closure
         Flambda_arity.create_singletons
           (List.map (fun (_, _, kind) -> kind) vars_with_kinds),
         unboxed_return_continuation )
+  in
+  let acc, unboxed_body =
+    match local_param_region with
+    | None -> acc, unboxed_body
+    | Some local_param_region ->
+      Let_with_acc.create acc
+        (Bound_pattern.singleton
+           (Bound_var.create local_param_region Flambda_debug_uid.none
+              Name_mode.normal))
+        (Named.create_prim
+           (Flambda_primitive.Variadic (Begin_region { ghost = false }, []))
+           Debuginfo.none)
+        ~body:unboxed_body
   in
   let my_unboxed_closure = Variable.create "my_unboxed_closure" K.value in
   let acc, unboxed_body =
@@ -2398,7 +2508,8 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
              (Function_decl.result_mode decl)
              ~current_alloc_region:my_alloc_region ~current_region:my_region
              ~current_ghost_region:my_ghost_region)
-        Debuginfo.none ~inlined:Inlined_attribute.Default_inlined
+        Debuginfo.none
+        ~inlined:(Inlined_attribute.forward_inlined ())
         ~inlining_state:(Inlining_state.default ~round:0)
         ~probe:None ~position:Normal
         ~relative_history:(Env.relative_history_from_scoped ~loc external_env)
@@ -2859,11 +2970,15 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
         return_continuation,
         my_closure )
     | Unboxed_calling_convention
-        (unboxed_params, unboxed_return, unboxed_function_slot) ->
+        { params_unboxing;
+          return_unboxing;
+          unboxed_function_slot;
+          needs_region_wrapper
+        } ->
       compute_body_of_unboxed_function acc my_region alloc_region my_closure
         ~unarized_params params_arity ~unarized_param_modes function_slot
-        compute_body return return_continuation unboxed_params unboxed_return
-        unboxed_function_slot
+        compute_body return return_continuation params_unboxing return_unboxing
+        unboxed_function_slot ~needs_region_wrapper
   in
   let contains_subfunctions = Acc.seen_a_function acc in
   let cost_metrics = Acc.cost_metrics acc in
@@ -2975,14 +3090,18 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
     | Normal_calling_convention ->
       main_code, by_function_slot, function_code_ids, acc
     | Unboxed_calling_convention
-        (unboxed_params, unboxed_return, unboxed_function_slot) ->
+        { params_unboxing;
+          return_unboxing;
+          unboxed_function_slot;
+          needs_region_wrapper = _
+        } ->
       make_unboxed_function_wrapper acc function_slot ~unarized_params
         params_arity ~unarized_param_modes return result_arity_main_code code_id
         main_code_id decl loc external_env recursive
         contains_no_escaping_local_allocs cost_metrics dbg is_tupled
         inlining_decision absolute_history relative_history main_code
-        by_function_slot function_code_ids unboxed_function_slot unboxed_params
-        unboxed_return
+        by_function_slot function_code_ids unboxed_function_slot params_unboxing
+        return_unboxing
   in
   let approx =
     let code = Code_or_metadata.create code in
@@ -3149,8 +3268,8 @@ let close_functions acc external_env ~current_alloc_region ~current_region
     then
       Ident.Map.fold
         (fun ident function_slot (acc, env, symbol_map) ->
-          let env, acc, symbol =
-            declare_symbol_for_function_slot env acc ident function_slot
+          let env, symbol =
+            declare_symbol_for_function_slot env ident function_slot
           in
           let approx =
             match Function_slot.Map.find function_slot approx_map with
@@ -3457,7 +3576,7 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
         args_arity = arity;
         continuation = return_continuation;
         exn_continuation;
-        inlined = Lambda.Default_inlined;
+        inlined = Lambda.forward_inlined_attribute ();
         mode = result_mode;
         return_arity = result_arity;
         region = my_region;
@@ -3497,9 +3616,15 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
     then Lambda.alloc_heap, first_complex_local_param - num_provided
     else Lambda.alloc_local, 0
   in
-  if not (Lambda.locality_return_compat closure_alloc_mode apply.IR.mode)
+  (* This can happen in a dead GADT match case. *)
+  if not (Flambda_arity.is_one_param_of_kind_value apply.IR.return_arity)
   then
-    (* This can happen in a dead GADT match case. *)
+    ( acc,
+      Expr.create_invalid
+        (Application_result_kind_mismatch_in_lambda
+           (Debuginfo.from_location apply.loc)) )
+  else if not (Lambda.locality_return_compat closure_alloc_mode apply.IR.mode)
+  then
     ( acc,
       Expr.create_invalid
         (Partial_application_mode_mismatch_in_lambda
@@ -3812,33 +3937,41 @@ let close_apply acc env (apply : IR.apply) : Expr_with_acc.t =
           (Warnings.Inlining_impossible
              Inlining_helpers.(
                inlined_attribute_on_partial_application_msg Inlined))
-      | Never_inlined | Hint_inlined | Default_inlined -> ());
+      | Never_inlined | Hint_inlined | Forward_inlined | Default_inlined -> ());
       wrap_partial_application acc env apply.continuation apply approx ~provided
         ~provided_arity ~missing_arity ~missing_param_modes ~result_arity
         ~arity:params_arity ~first_complex_local_param ~result_mode
     | Over_app { full; provided_arity; remaining; remaining_arity; result_mode }
       ->
-      let full_args_call apply_continuation ~region ~ghost_region acc =
-        let replace_region =
-          match region, ghost_region with
-          | None, None -> None
-          | Some region, Some ghost_region -> Some (region, ghost_region)
-          | Some _, None | None, Some _ -> Misc.fatal_error "Mismatched regions"
+      if not (Flambda_arity.is_one_param_of_kind_value result_arity)
+      then
+        ( acc,
+          Expr.create_invalid
+            (Application_result_kind_mismatch_in_lambda
+               (Debuginfo.from_location apply.loc)) )
+      else
+        let full_args_call apply_continuation ~region ~ghost_region acc =
+          let replace_region =
+            match region, ghost_region with
+            | None, None -> None
+            | Some region, Some ghost_region -> Some (region, ghost_region)
+            | Some _, None | None, Some _ ->
+              Misc.fatal_error "Mismatched regions"
+          in
+          close_exact_or_unknown_apply acc env
+            { apply with
+              args = full;
+              args_arity = provided_arity;
+              continuation = apply_continuation;
+              mode = result_mode;
+              return_arity =
+                Flambda_arity.create_singletons
+                  [Flambda_kind.With_subkind.any_value]
+            }
+            (Some approx) ~replace_region
         in
-        close_exact_or_unknown_apply acc env
-          { apply with
-            args = full;
-            args_arity = provided_arity;
-            continuation = apply_continuation;
-            mode = result_mode;
-            return_arity =
-              Flambda_arity.create_singletons
-                [Flambda_kind.With_subkind.any_value]
-          }
-          (Some approx) ~replace_region
-      in
-      wrap_over_application acc env full_args_call apply ~remaining
-        ~remaining_arity ~result_mode)
+        wrap_over_application acc env full_args_call apply ~remaining
+          ~remaining_arity ~result_mode)
 
 module CIS = Code_id_or_symbol
 module GroupMap = Numbers.Int.Map
@@ -4004,6 +4137,10 @@ let final_module_block_representation acc
   in
   block_shape, field_count, block_access, kind_of_field
 
+type final_module_block_field =
+  | Simple of Simple.t
+  | Let_bound of Variable.t * Flambda_debug_uid.t * Named.t
+
 let wrap_final_module_block acc env ~program ~prog_return_cont
     ~(module_repr : Lambda.module_representation) ~return_cont ~module_symbol =
   let module_block_var = Variable.create "module_block" K.value in
@@ -4025,18 +4162,34 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
       | _ -> simple_var
     in
     let field_vars =
-      List.init field_count (fun pos ->
+      List.init field_count (fun pos : final_module_block_field ->
           let pos_str = string_of_int pos in
-          ( pos,
-            Variable.create ("field_" ^ pos_str) (kind_of_field pos),
-            Flambda_debug_uid.none ))
+          let field = Target_ocaml_int.of_int (Acc.machine_width acc) pos in
+          let block = module_block_simple in
+          match simplify_block_load acc env ~block ~field with
+          | Unknown | Not_a_block | Block_but_cannot_simplify _ ->
+            Let_bound
+              ( Variable.create ("field_" ^ pos_str) (kind_of_field pos),
+                Flambda_debug_uid.none,
+                Named.create_prim
+                  (Unary
+                     ( Block_load
+                         { kind = block_access pos; mut = Immutable; field },
+                       block ))
+                  Debuginfo.none )
+          | Field_contents sim -> Simple sim)
     in
     let acc, body =
       let static_const : Static_const.t =
         let field_vars =
           List.map
-            (fun (_, var, _) ->
-              Simple.With_debuginfo.create (Simple.var var) Debuginfo.none)
+            (fun field ->
+              let s =
+                match field with
+                | Simple simple -> simple
+                | Let_bound (var, _, _) -> Simple.var var
+              in
+              Simple.With_debuginfo.create s Debuginfo.none)
             field_vars
         in
         Static_const.block module_block_tag Immutable block_shape field_vars
@@ -4063,24 +4216,13 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
         named ~body:return
     in
     List.fold_left
-      (fun (acc, body) (pos, var, var_duid) ->
-        let var = VB.create var var_duid Name_mode.normal in
-        let pat = Bound_pattern.singleton var in
-        let field = Target_ocaml_int.of_int (Acc.machine_width acc) pos in
-        let block = module_block_simple in
-        match simplify_block_load acc env ~block ~field with
-        | Unknown | Not_a_block | Block_but_cannot_simplify _ ->
-          let named =
-            Named.create_prim
-              (Unary
-                 ( Block_load { kind = block_access pos; mut = Immutable; field },
-                   block ))
-              Debuginfo.none
-          in
+      (fun (acc, body) field ->
+        match field with
+        | Let_bound (var, var_duid, named) ->
+          let var = VB.create var var_duid Name_mode.normal in
+          let pat = Bound_pattern.singleton var in
           Let_with_acc.create acc pat named ~body
-        | Field_contents sim ->
-          let named = Named.create_simple sim in
-          Let_with_acc.create acc pat named ~body)
+        | Simple _ -> acc, body)
       (acc, body) (List.rev field_vars)
   in
   let load_fields_handler_param =
@@ -4102,8 +4244,7 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
 
 let close_program (type mode) ~(mode : mode Flambda_features.mode)
     ~machine_width ~big_endian ~cmx_loader ~compilation_unit ~module_repr
-    ~program ~prog_return_cont ~exn_continuation ~toplevel_my_region
-    ~toplevel_my_ghost_region ~toplevel_my_alloc_region ~sections :
+    ~program ~prog_return_cont ~exn_continuation ~toplevel_my_alloc_region :
     mode close_program_result =
   let env = Env.create ~big_endian in
   let module_symbol =
@@ -4111,14 +4252,6 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
       (Flambda2_import.Symbol.for_compilation_unit compilation_unit)
   in
   let return_cont = Continuation.create ~sort:Toplevel_return () in
-  let env, toplevel_my_region =
-    Env.add_var_like env toplevel_my_region Not_user_visible
-      Flambda_kind.With_subkind.region
-  in
-  let env, toplevel_my_ghost_region =
-    Env.add_var_like env toplevel_my_ghost_region Not_user_visible
-      Flambda_kind.With_subkind.region
-  in
   let env, toplevel_my_alloc_region =
     Env.add_var_like env toplevel_my_alloc_region Not_user_visible
       Flambda_kind.With_subkind.region
@@ -4151,7 +4284,7 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
          - we have already called [bind_static_consts_and_code]; and
 
          - this symbol definition must be the very first. *)
-      let acc, symbol = manufacture_symbol acc "first_const" in
+      let symbol = manufacture_symbol "first_const" in
       let bound_static =
         Bound_static.singleton (Bound_static.Pattern.block_like symbol)
       in
@@ -4174,9 +4307,6 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
   if Option.is_some (Acc.top_closure_info acc)
   then
     Misc.fatal_error "Information on nested closures should be empty at the end";
-  let get_code_metadata code_id =
-    Code_id.Map.find code_id (Acc.code_map acc) |> Code.code_metadata
-  in
   let code_slot_offsets = Acc.code_slot_offsets acc in
   match mode with
   | Normal ->
@@ -4185,8 +4315,7 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
        offsets constraints accumulation is not needed in "normal" mode. *)
     let unit =
       Flambda_unit.create ~return_continuation:return_cont ~exn_continuation
-        ~toplevel_my_region ~toplevel_my_ghost_region ~toplevel_my_alloc_region
-        ~body ~module_symbol ~used_value_slots:Unknown
+        ~toplevel_my_alloc_region ~body ~module_symbol
     in
     { unit; code_slot_offsets; metadata = Normal }
   | Classic ->
@@ -4196,34 +4325,16 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
         (Exported_code.mark_as_imported
            (Flambda_cmx.get_imported_code cmx_loader ()))
     in
-    let Slot_offsets.{ used_value_slots; exported_offsets } =
-      let used_slots =
-        let free_names = Acc.free_names acc in
-        Slot_offsets.
-          { function_slots_in_normal_projections =
-              Name_occurrences.function_slots_in_normal_projections free_names;
-            all_function_slots =
-              Name_occurrences.all_function_slots_at_normal_mode free_names;
-            value_slots_in_normal_projections =
-              Name_occurrences.value_slots_in_normal_projections free_names;
-            all_value_slots =
-              Name_occurrences.all_value_slots_at_normal_mode free_names
-          }
-      in
-      Slot_offsets.finalize_offsets (Acc.slot_offsets acc) ~get_code_metadata
-        ~used_slots
-    in
-    let reachable_names, cmx =
-      Flambda_cmx.prepare_cmx_from_approx ~machine_width:(Acc.machine_width acc)
-        ~approxs:symbols_approximations ~module_symbol ~exported_offsets
-        ~used_value_slots ~sections all_code
-    in
     let unit =
       Flambda_unit.create ~return_continuation:return_cont ~exn_continuation
-        ~toplevel_my_region ~toplevel_my_ghost_region ~toplevel_my_alloc_region
-        ~body ~module_symbol ~used_value_slots:(Known used_value_slots)
+        ~toplevel_my_alloc_region ~body ~module_symbol
     in
     { unit;
       code_slot_offsets;
-      metadata = Classic (all_code, reachable_names, cmx, exported_offsets)
+      metadata =
+        Classic
+          ( all_code,
+            symbols_approximations,
+            Acc.free_names acc,
+            Acc.slot_offsets acc )
     }

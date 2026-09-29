@@ -405,7 +405,9 @@ let make_rewrite_for_recursive_continuation uacc ~cont
   let uacc =
     UA.map_uenv uacc ~f:(fun uenv ->
         let uenv = UE.add_apply_cont_rewrite uenv cont rewrite in
-        UE.add_non_inlinable_continuation uenv cont ~params ~handler:Unknown)
+        UE.add_non_inlinable_continuation
+          (UA.are_rebuilding_terms uacc)
+          uenv cont ~params ~handler:Unknown)
   in
   uacc
 
@@ -582,6 +584,29 @@ let add_lets_around_handler cont at_unit_toplevel uacc handler =
         Continuation.print cont
   in
   let handler, uacc =
+    (* We might need to place lifted constants now, as they could depend on
+       continuation parameters. As such we must also compute the unused
+       parameters after placing any constants! *)
+    if not at_unit_toplevel
+    then handler, uacc
+    else
+      let uacc, lifted_constants_from_body =
+        UA.get_and_clear_lifted_constants uacc
+      in
+      EB.place_lifted_constants uacc
+        ~lifted_constants_from_defining_expr:LCS.empty
+        ~lifted_constants_from_body
+        ~put_bindings_around_body:(fun uacc ~body -> body, uacc)
+        ~body:handler
+  in
+  (* The [lets_to_introduce] rebind parameters that the alias analysis has
+     removed from the continuation. These lets must be placed outside any lifted
+     constants placed above, since such constants can reference the removed
+     parameters, which are not bound anywhere else. Conversely, each let's
+     defining expression is the parameter's canonical dominator, which must be
+     in scope at the continuation's use sites, so it cannot be bound by the
+     lifted constants placed inside. *)
+  let handler, uacc =
     Variable.Lmap.fold
       (fun var bound_to (handler, uacc) ->
         let var_duid = Flambda_debug_uid.none in
@@ -600,22 +625,6 @@ let add_lets_around_handler cont at_unit_toplevel uacc handler =
         in
         handler, uacc)
       continuation_parameters.lets_to_introduce (handler, uacc)
-  in
-  let handler, uacc =
-    (* We might need to place lifted constants now, as they could depend on
-       continuation parameters. As such we must also compute the unused
-       parameters after placing any constants! *)
-    if not at_unit_toplevel
-    then handler, uacc
-    else
-      let uacc, lifted_constants_from_body =
-        UA.get_and_clear_lifted_constants uacc
-      in
-      EB.place_lifted_constants uacc
-        ~lifted_constants_from_defining_expr:LCS.empty
-        ~lifted_constants_from_body
-        ~put_bindings_around_body:(fun uacc ~body -> body, uacc)
-        ~body:handler
   in
   let free_names = UA.name_occurrences uacc in
   let cost_metrics = UA.cost_metrics uacc in
@@ -711,13 +720,15 @@ let rebuild_single_non_recursive_handler ~at_unit_toplevel
       let handler, uacc =
         add_phantom_params_bindings uacc handler new_phantom_params
       in
-      let free_names = remove_params new_phantom_params free_names in
+      let free_names_of_handler = remove_params new_phantom_params free_names in
       let cont_handler =
         RE.Continuation_handler.create
           (UA.are_rebuilding_terms uacc)
-          params ~handler ~free_names_of_handler:free_names ~is_exn_handler
-          ~is_cold
+          params ~handler ~free_names_of_handler ~is_exn_handler ~is_cold
       in
+      (* The parameters are removed from the free name information as they are
+         no longer in scope. *)
+      let free_names = remove_params params free_names_of_handler in
       let uacc =
         UA.map_uenv uacc ~f:(fun uenv ->
             UE.add_apply_cont_rewrite uenv cont rewrite)
@@ -740,8 +751,7 @@ let rebuild_single_non_recursive_handler ~at_unit_toplevel
           (* We pass the parameters and the handler expression, rather than the
              [CH.t], to avoid re-opening the name abstraction. *)
           UE.add_linearly_used_inlinable_continuation uenv cont ~params ~handler
-            ~free_names_of_handler:free_names
-            ~cost_metrics_of_handler:cost_metrics)
+            ~free_names_of_handler ~cost_metrics_of_handler:cost_metrics)
         else
           let behaviour =
             (* CR-someday mshinwell: This could be replaced by a more
@@ -757,12 +767,20 @@ let rebuild_single_non_recursive_handler ~at_unit_toplevel
                 | None ->
                   let args = Apply_cont.args apply_cont in
                   Shortcut_to (Apply_cont.continuation apply_cont, args))
-              | None ->
+              | None -> (
                 if
                   RE.can_be_removed_as_invalid handler
                     (UA.are_rebuilding_terms uacc)
                 then Invalid
-                else Unknown
+                else
+                  match
+                    UE.find_unique_continuation_handler
+                      (UA.are_rebuilding_terms uacc)
+                      uenv ~params ~handler ~is_exn_handler
+                      ~free_names_without_params:free_names
+                  with
+                  | Some (cont, args) -> Shortcut_to (cont, args)
+                  | None -> Unknown)
           in
           match behaviour with
           | Invalid ->
@@ -771,13 +789,19 @@ let rebuild_single_non_recursive_handler ~at_unit_toplevel
           | Shortcut_to (shortcut_to, args) ->
             UE.add_continuation_shortcut uenv cont ~params ~shortcut_to ~args
           | Unknown ->
-            UE.add_non_inlinable_continuation uenv cont ~params
-              ~handler:(if is_cold then Unknown else Known handler)
+            UE.add_non_inlinable_continuation
+              (UA.are_rebuilding_terms uacc)
+              uenv cont ~params
+              ~handler:
+                (if is_cold
+                 then Unknown
+                 else
+                   Known
+                     ( handler,
+                       ~is_exn_handler,
+                       ~free_names_without_params:free_names ))
       in
       let uacc = UA.with_uenv uacc uenv in
-      (* The parameters are removed from the free name information as they are
-         no longer in scope. *)
-      let free_names = remove_params params free_names in
       let rebuilt_handler : rebuilt_handler =
         { handler = cont_handler;
           handler_expr = handler;

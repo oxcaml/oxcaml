@@ -191,19 +191,10 @@ let temporary_breakpoint_position = ref (None : pc option)
 (* Execute `funct' with a breakpoint added at `pc'. *)
 (* --- Used by `finish'. *)
 let exec_with_temporary_breakpoint pc funct =
-  let previous_version = !current_version in
-    let remove () =
-      temporary_breakpoint_position := None;
-      current_version := previous_version;
-      let count = List.assoc pc !positions in
-        decr count;
-        if !count = 0 then begin
-          positions := List.remove_assoc pc !positions;
-          reset_instr pc;
-          Symbols.set_event_at_pc pc
-        end
-
-    in
-      Exec.protect (function () -> insert_position pc);
-      temporary_breakpoint_position := Some pc;
-      Fun.protect ~finally:(fun () -> Exec.protect remove) funct
+  let remove () =
+    temporary_breakpoint_position := None;
+    remove_position pc
+  in
+  Exec.protect (function () -> insert_position pc);
+  temporary_breakpoint_position := Some pc;
+  Fun.protect ~finally:(fun () -> Exec.protect remove) funct

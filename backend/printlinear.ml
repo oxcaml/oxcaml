@@ -23,10 +23,6 @@ open Linear
 
 let label ppf l = Format.fprintf ppf "L%a" Label.format l
 
-let section_name_to_string ppf = function
-  | None -> ()
-  | Some name -> fprintf ppf " in %s section" name
-
 let call_operation ?(print_reg = Printreg.reg) ppf op arg =
   let regs = Printreg.regs' ~print_reg in
   match op with
@@ -49,28 +45,32 @@ let instr' ?(print_reg = Printreg.reg) ppf i =
   let regsetaddr = Printreg.regsetaddr' ~print_reg in
   let test = Operation.format_test ~print_reg in
   let operation = Printoperation.operation ~print_reg in
-  (if !Oxcaml_flags.davail || !Dwarf_flags.debug_avail_sets
-   then
-     let module RAS = Reg_availability_set in
-     let ras_is_nonempty (set : RAS.t) =
-       match set with
-       | Ok set ->
-         not
-           (Reg_with_debug_info.Set_distinguishing_names_and_locations.is_empty
-              set)
-       | Unreachable -> true
-     in
-     if ras_is_nonempty i.available_before || ras_is_nonempty i.available_across
-     then
-       if RAS.equal i.available_before i.available_across
-       then
-         fprintf ppf "@[<1>AB=AA={%a}@]@," (RAS.print ~print_reg:reg)
-           i.available_before
-       else (
-         fprintf ppf "@[<1>AB={%a}" (RAS.print ~print_reg:reg)
-           i.available_before;
-         fprintf ppf ",AA={%a}" (RAS.print ~print_reg:reg) i.available_across;
-         fprintf ppf "@]@,"));
+  if !Oxcaml_flags.davail || !Dwarf_flags.debug_avail_sets
+  then (
+    let module RAS = Reg_availability_set in
+    let ras_is_nonempty (set : RAS.t) =
+      match set with
+      | Ok set ->
+        not
+          (Reg_with_debug_info.Set_distinguishing_names_and_locations.is_empty
+             set)
+      | Unreachable -> true
+    in
+    if ras_is_nonempty i.available_before || ras_is_nonempty i.available_across
+    then
+      if RAS.equal i.available_before i.available_across
+      then
+        fprintf ppf "@[<1>AB=AA={%a}@]@," (RAS.print ~print_reg:reg)
+          i.available_before
+      else (
+        fprintf ppf "@[<1>AB={%a}" (RAS.print ~print_reg:reg) i.available_before;
+        fprintf ppf ",AA={%a}" (RAS.print ~print_reg:reg) i.available_across;
+        fprintf ppf "@]@,");
+    match i.phantom_available_before with
+    | None -> ()
+    | Some phantom_vars ->
+      if not (Backend_var.Set.is_empty phantom_vars)
+      then fprintf ppf "@[<1>PAB={%a}@]@," Backend_var.Set.print phantom_vars);
   (match i.desc with
   | Lend -> ()
   | Lprologue -> fprintf ppf "prologue"
@@ -89,8 +89,7 @@ let instr' ?(print_reg = Printreg.reg) ppf i =
     call_operation ppf op i.arg
   | Lreloadretaddr -> fprintf ppf "reload retaddr"
   | Lreturn -> fprintf ppf "return %a" regs i.arg
-  | Llabel { label = lbl; section_name } ->
-    fprintf ppf "%a%a:" label lbl section_name_to_string section_name
+  | Llabel lbl -> fprintf ppf "%a:" label lbl
   | Lbranch lbl -> fprintf ppf "goto %a" label lbl
   | Lcondbranch (tst, lbl) ->
     fprintf ppf "if %a goto %a" (test tst) i.arg label lbl
@@ -134,5 +133,4 @@ let fundecl ppf f =
     then ""
     else " " ^ Debuginfo.to_string f.fun_dbg
   in
-  fprintf ppf "@[<v 2>%s:%s%a@,%a@]" f.fun_name dbg section_name_to_string
-    f.fun_section_name all_instr f.fun_body
+  fprintf ppf "@[<v 2>%s:%s@,%a@]" f.fun_name dbg all_instr f.fun_body

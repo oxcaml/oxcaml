@@ -21,11 +21,7 @@ val print_stats : Format.formatter -> stats -> unit
 
 type rule
 
-type deduction =
-  [ `Atom of Datalog.atom
-  | `And of deduction list ]
-
-val deduce : deduction -> (Heterogenous_list.nil, rule) Datalog.program
+val create_rule : Lang.Variable.t_ list -> Lang.rule -> rule
 
 type t
 

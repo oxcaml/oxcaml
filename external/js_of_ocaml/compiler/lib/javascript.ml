@@ -30,7 +30,7 @@ module Num : sig
 
   val of_float : float -> t
 
-  val to_string : t -> string
+  val to_string : ?minify:bool -> t -> string
 
   val to_targetint : t -> Targetint.t
 
@@ -56,15 +56,13 @@ end = struct
 
   let of_string_unsafe s = s
 
-  let to_string s = s
-
   let to_targetint s =
     if
       String.starts_with s ~prefix:"0"
       && String.length s > 1
       && String.for_all s ~f:(function
-           | '0' .. '7' -> true
-           | _ -> false)
+        | '0' .. '7' -> true
+        | _ -> false)
     then (* legacy octal notation *)
       Targetint.of_string_exn ("0o" ^ s)
     else Targetint.of_string_exn s
@@ -88,25 +86,75 @@ end = struct
       | None -> find_smaller ~f ~bad:mid ~good ~good_s
       | Some s -> find_smaller ~f ~bad ~good:mid ~good_s:s
 
-  (* Windows uses 3 digits for the exponent, let's fix it. *)
+  (* Radix-prefixed literals such as [0xfe] or [0x1e3] use [e]/[E] as digits,
+     not as an exponent marker, and have no leading zero to strip — they must
+     not go through [fix_exponent]. *)
+  let is_radix_prefixed s =
+    let i = if String.length s > 0 && Char.equal s.[0] '-' then 1 else 0 in
+    i + 1 < String.length s
+    && Char.equal s.[i] '0'
+    &&
+    match s.[i + 1] with
+    | 'x' | 'X' | 'b' | 'B' | 'o' | 'O' -> true
+    | _ -> false
+
+  (* Normalize the exponent of a printed decimal number: drop Windows-style
+     padding zeros and the redundant '+' sign after [e]/[E]. Must only be
+     called on decimal literals (see [is_radix_prefixed]).
+     [1e+05] → [1e5], [1e+5] → [1e5], [1e-05] → [1e-5], [1E+3] → [1E3]. *)
   let fix_exponent s =
-    try
-      let start = String.index_from s 0 'e' + 1 in
-      let start =
-        match String.get s start with
-        | '-' | '+' -> succ start
-        | _ -> start
-      in
-      let stop = ref start in
-      while Char.equal (String.get s !stop) '0' do
-        incr stop
-      done;
-      if start = !stop
-      then s
-      else
-        String.sub s ~pos:0 ~len:start
-        ^ String.sub s ~pos:!stop ~len:(String.length s - !stop)
-    with Not_found -> s
+    let e_pos =
+      match String.index_from_opt s 0 'e' with
+      | Some _ as r -> r
+      | None -> String.index_from_opt s 0 'E'
+    in
+    match e_pos with
+    | None -> s
+    | Some e_pos ->
+        let len = String.length s in
+        let after_e = e_pos + 1 in
+        assert (after_e < len);
+        let drop_plus, after_sign =
+          match String.get s after_e with
+          | '+' -> true, after_e + 1
+          | '-' -> false, after_e + 1
+          | _ -> false, after_e
+        in
+        (* Skip leading zeros but keep at least one digit. *)
+        let rec first_nonzero i =
+          if i < len - 1 && Char.equal (String.get s i) '0'
+          then first_nonzero (i + 1)
+          else i
+        in
+        let stop = first_nonzero after_sign in
+        if (not drop_plus) && stop = after_sign
+        then s
+        else
+          let sign =
+            if drop_plus then "" else String.sub s ~pos:after_e ~len:(after_sign - after_e)
+          in
+          String.sub s ~pos:0 ~len:after_e
+          ^ sign
+          ^ String.sub s ~pos:stop ~len:(len - stop)
+
+  let to_string ?(minify = false) s =
+    if (not minify) || is_radix_prefixed s
+    then s
+    else
+      (* Cosmetic compaction for compact-mode output: normalize the exponent
+         and drop the leading zero of [0.D…]/[-0.D…] literals. *)
+      let s = fix_exponent s in
+      let len = String.length s in
+      if len >= 3 && Char.equal s.[0] '0' && Char.equal s.[1] '.' && Char.is_digit s.[2]
+      then String.sub s ~pos:1 ~len:(len - 1)
+      else if
+        len >= 4
+        && Char.equal s.[0] '-'
+        && Char.equal s.[1] '0'
+        && Char.equal s.[2] '.'
+        && Char.is_digit s.[3]
+      then "-" ^ String.sub s ~pos:2 ~len:(len - 2)
+      else s
 
   let of_float v =
     match Float.classify_float v with
@@ -389,6 +437,8 @@ and variable_declaration_kind =
   | Var
   | Let
   | Const
+  | Using
+  | AwaitUsing
 
 and case_clause = expression * statement_list
 
@@ -403,14 +453,18 @@ and function_kind =
   ; generator : bool
   }
 
+and decorator = expression
+
 and class_declaration =
-  { extends : expression option
+  { decorators : decorator list
+  ; extends : expression option
   ; body : class_element list
   }
 
 and class_element =
-  | CEMethod of bool * class_element_name * method_
-  | CEField of bool * class_element_name * initialiser option
+  | CEMethod of decorator list * bool * class_element_name * method_
+  | CEField of decorator list * bool * class_element_name * initialiser option
+  | CEAccessor of decorator list * bool * class_element_name * initialiser option
   | CEStaticBLock of statement_list
 
 and class_element_name =
@@ -477,6 +531,7 @@ and export =
   | ExportFrom of
       { kind : export_from_kind
       ; from : Utf8_string.t
+      ; withClause : withClause option
       }
   | CoverExportFrom of early_error
 
@@ -487,11 +542,15 @@ and export_from_kind =
 and import =
   { from : Utf8_string.t
   ; kind : import_kind
+  ; withClause : withClause option
   }
+
+and withClause = (Utf8_string.t * Utf8_string.t) list
 
 and import_default = ident
 
 and import_kind =
+  | DeferNamespace of ident
   | Namespace of import_default option * ident
   (* import * as name from "fname" *)
   (* import defaultname, * as name from "fname" *)

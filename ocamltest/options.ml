@@ -61,6 +61,8 @@ let list_tests = ref []
 
 let show_timings = ref false
 
+let run_ocamlrunparam = ref ""
+
 let translate = ref false
 let style = ref Translate.Plain
 let compact = ref false
@@ -90,6 +92,8 @@ let commandline_options =
    " List tests in given directory.");
   ("-keep-test-dir-on-success", Arg.Set keep_test_dir_on_success,
    " Keep the test directory (with the generated test artefacts) on success.");
+  ("-run-ocamlrunparam", Arg.Set_string run_ocamlrunparam,
+   "<params> Append <params> to OCAMLRUNPARAM when running test programs.");
   ("-translate", Arg.Set translate,
    " Translate the test script from old to new syntax");
   ("-compact", Arg.Set compact,
@@ -98,20 +102,6 @@ let commandline_options =
    " If translating, preserve line numbers in the output.");
   ("-keep-chars", Arg.Unit (fun () -> style := Translate.Chars),
    " If translating, preserve char offsets in the output.");
-  ("-color",
-   Arg.Symbol (["auto"; "always"; "never"],
-     (Misc.set_or_ignore Clflags.color_reader.parse Clflags.color)),
-   Printf.sprintf
-     "  Enable or disable colors in compiler messages\n\
-     \    The following settings are supported:\n\
-     \      auto    use heuristics to enable colors only if supported\n\
-     \      always  enable colors\n\
-     \      never   disable colors\n\
-     \    The default setting is 'auto', and the current heuristic\n\
-     \    checks that the TERM environment variable exists and is\n\
-     \    not empty or \"dumb\", and that isatty(stderr) holds.\n\
-     \  If the option is not specified, these setting can alternatively\n\
-     \  be set through the OCAML_COLOR environment variable.");
 ]
 
 let files_to_test = ref []
@@ -120,8 +110,6 @@ let usage = "Usage: ocamltest [options] <files...>"
 
 let () =
   Arg.parse (Arg.align commandline_options) (add_to_list files_to_test) usage;
-  Location.read_clflags_from_env ();
-  Misc.Style.setup !Clflags.color;
   ()
 
 let log_to_stderr = !log_to_stderr
@@ -132,6 +120,7 @@ let find_test_dirs = !find_test_dirs
 let list_tests = !list_tests
 let keep_test_dir_on_success = !keep_test_dir_on_success
 let show_timings = !show_timings
+let run_ocamlrunparam = !run_ocamlrunparam
 let translate = !translate
 let style = !style
 let compact = !compact

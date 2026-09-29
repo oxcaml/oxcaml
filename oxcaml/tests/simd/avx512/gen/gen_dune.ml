@@ -120,7 +120,8 @@ let () =
       "consts512";
       "arrays512";
       "arrays512_u";
-      "arrays512_mask" ]
+      "arrays512_mask";
+      "strings512_mask" ]
   in
   List.iter (print_test ?extra_flag:None) tests;
   List.iter (print_test ~extra_flag:"-nodynlink") tests;

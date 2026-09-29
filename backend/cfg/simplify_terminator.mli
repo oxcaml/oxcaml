@@ -23,11 +23,15 @@
  * SOFTWARE.                                                                      *
  *                                                                                *
  **********************************************************************************)
-(** Merge successors that go to the same label and simplify their conditions.
-    Modifies the terminators in place. Does not merge blocks. *)
+(** Simplify the terminators of blocks: merge successors that go to the same
+    label, simplify conditions whose value is statically known, and
+    short-circuit jumps to empty blocks. Modifies the terminators in place. Does
+    not merge blocks. *)
 
 [@@@ocaml.warning "+a-40-41-42"]
 
-val block : Cfg.t -> Cfg.basic_block -> bool
-
+(** Simplification can change the set of successor labels of a block, and can
+    hence make other blocks unreachable. [run] re-registers the predecessors of
+    all blocks whenever that may have happened, so that predecessor sets are
+    consistent with successor sets when it returns. *)
 val run : Cfg.t -> unit

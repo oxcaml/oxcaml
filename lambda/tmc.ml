@@ -685,7 +685,8 @@ let rec choice ctx t =
     | Lexclave lam ->
         let+ lam = choice ctx ~tail lam in
         Lexclave lam
-    | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ ->
+    | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _
+    | Linstantiate _ ->
       fatal_error_invalid_constructor t
 
   and choice_apply ctx ~tail apply =
@@ -919,6 +920,16 @@ let rec choice ctx t =
     | Patomic_lor_field | Patomic_lxor_field
     | Patomic_load_field _ | Patomic_load_mixed_field _
     | Patomic_set_field _ | Patomic_set_mixed_field _
+    | Patomic_load_idx _ | Patomic_set_idx _
+    | Patomic_exchange_idx _ | Patomic_compare_exchange_idx _
+    | Patomic_compare_set_idx _ | Patomic_fetch_add_idx
+    | Patomic_add_idx | Patomic_sub_idx | Patomic_land_idx
+    | Patomic_lor_idx | Patomic_lxor_idx
+    | Patomic_load_ptr _ | Patomic_set_ptr _
+    | Patomic_exchange_ptr _ | Patomic_compare_exchange_ptr _
+    | Patomic_compare_set_ptr _ | Patomic_fetch_add_ptr
+    | Patomic_add_ptr | Patomic_sub_ptr | Patomic_land_ptr
+    | Patomic_lor_ptr | Patomic_lxor_ptr
     | Pcpu_relax
     | Punbox_vector _ | Pbox_vector (_, _)
     | Punbox_mask | Pbox_mask _
@@ -958,18 +969,23 @@ let rec choice ctx t =
     | Pstring_load_i8 _ | Pstring_load_i16 _
     | Pstring_load_16 _ | Pstring_load_32 _ | Pstring_load_f32 _
     | Pstring_load_64 _ | Pstring_load_vec _
+    | Pstring_load_mask _
     | Pbytes_load_i8 _ | Pbytes_load_i16 _
     | Pbytes_load_16 _ | Pbytes_load_32 _ | Pbytes_load_f32 _
     | Pbytes_load_64 _ | Pbytes_load_vec _
+    | Pbytes_load_mask _
     | Pbytes_set_8 _
     | Pbytes_set_16 _ | Pbytes_set_32 _ | Pbytes_set_f32 _
     | Pbytes_set_64 _ | Pbytes_set_vec _
+    | Pbytes_set_mask _
     | Pbigstring_load_i8 _ | Pbigstring_load_i16 _
     | Pbigstring_load_16 _ | Pbigstring_load_32 _ | Pbigstring_load_f32 _
     | Pbigstring_load_64 _ | Pbigstring_load_vec _
+    | Pbigstring_load_mask _
     | Pbigstring_set_8 _
     | Pbigstring_set_16 _ | Pbigstring_set_32 _ | Pbigstring_set_f32 _
     | Pbigstring_set_64 _ | Pbigstring_set_vec _
+    | Pbigstring_set_mask _
     | Pfloatarray_load_vec _
     | Pint_array_load_vec _
     | Puntagged_int8_array_load_vec _

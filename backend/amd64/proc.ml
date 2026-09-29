@@ -590,7 +590,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
        | Begin_region
        | End_region
        | Specific (Ilea _ | Ioffset_loc _ | Ibswap _
-                  | Isextend32 | Izextend32
+                  | Isextend32 | Izextend32 | Ineg
                   | Ilfence | Isfence | Imfence)
        | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Pause)
   | Poptrap _ | Prologue | Epilogue ->
@@ -776,6 +776,7 @@ let operation_supported = function
 let expression_supported = function
   | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
   | Cconst_vec128 _ | Cconst_symbol _  | Cvar _ | Clet _ | Cphantom_let _
+  | Cname_for_debugger _
   | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _ | Cswitch _ | Ccatch _
   | Cexit _ | Cinvalid _ -> true
   | Cconst_vec256 _ -> Arch.Extension.enabled_vec256 ()

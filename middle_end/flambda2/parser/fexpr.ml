@@ -50,8 +50,6 @@ type continuation_sort =
 type region =
   | Named of variable
   | Toplevel_alloc_region
-  | Toplevel_region
-  | Toplevel_ghost_region
 
 type tag_scannable = int
 
@@ -285,6 +283,7 @@ type inline_attribute = Inline_attribute.t =
 type inlined_attribute =
   | Always_inlined
   | Hint_inlined
+  | Forward_inlined
   | Never_inlined
   | Unroll of int
   | Default_inlined

@@ -74,8 +74,6 @@ type env =
     continuations : (Continuation.t * int) CM.t;
     exn_continuations : Continuation.t CM.t;
     toplevel_alloc_region : Variable.t;
-    toplevel_region : Variable.t;
-    toplevel_ghost_region : Variable.t;
     variables : Variable.t VM.t;
     symbols : Symbol.t SM.t;
     code_ids : Code_id.t DM.t;
@@ -94,17 +92,11 @@ let init_env () =
   let toplevel_alloc_region =
     Variable.create "toplevel_alloc_region" Flambda_kind.region
   in
-  let toplevel_region = Variable.create "toplevel_region" Flambda_kind.region in
-  let toplevel_ghost_region =
-    Variable.create "toplevel_ghost_region" Flambda_kind.region
-  in
   { done_continuation;
     error_continuation;
     continuations = CM.empty;
     exn_continuations = CM.empty;
-    toplevel_region;
     toplevel_alloc_region;
-    toplevel_ghost_region;
     variables = VM.empty;
     symbols = SM.create 10;
     code_ids = DM.create 10;
@@ -116,8 +108,6 @@ let enter_code env =
   { continuations = CM.empty;
     exn_continuations = CM.empty;
     toplevel_alloc_region = env.toplevel_alloc_region;
-    toplevel_region = env.toplevel_region;
-    toplevel_ghost_region = env.toplevel_ghost_region;
     variables = env.variables;
     done_continuation = env.done_continuation;
     error_continuation = env.error_continuation;
@@ -264,8 +254,6 @@ let find_var env v =
 let find_region env (r : Fexpr.region) =
   match r with
   | Toplevel_alloc_region -> env.toplevel_alloc_region
-  | Toplevel_region -> env.toplevel_region
-  | Toplevel_ghost_region -> env.toplevel_ghost_region
   | Named v -> find_var env v
 
 let find_code_id env code_id = fresh_or_existing_code_id env code_id

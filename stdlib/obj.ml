@@ -59,11 +59,11 @@ external floatarray_set :
 let [@inline always] double_field x i = floatarray_get (obj x : floatarray) i
 let [@inline always] set_double_field x i v =
   floatarray_set (obj x : floatarray) i v
-external box_int64 : int64# -> int64 @@ portable = "%box_int64"
-external unbox_int64 : int64 -> int64# @@ portable = "%unbox_int64"
-external unsafe_get_int64_field : t -> int64# -> int64# @@ portable
+external box_int64 : int64_u -> int64 @@ portable = "%box_int64"
+external unbox_int64 : int64 -> int64_u @@ portable = "%unbox_int64"
+external unsafe_get_int64_field : t -> int64_u -> int64_u @@ portable
   = "%get_idx"
-external unsafe_set_int64_field : t -> int64# -> int64# -> unit @@ portable
+external unsafe_set_int64_field : t -> int64_u -> int64_u -> unit @@ portable
   = "%set_idx"
 external raw_field_bytecode : t -> int -> raw_data @@ portable
   = "caml_obj_raw_field"
@@ -94,6 +94,20 @@ external new_block : int -> int -> t @@ portable = "caml_obj_block"
 external dup : t -> t @@ portable = "%obj_dup"
 external add_offset : t -> Int32.t -> t @@ portable = "caml_obj_add_offset"
 external with_tag : int -> t -> t @@ portable = "caml_obj_with_tag"
+
+(* Prevent module dependency on String and Char *)
+external string_get : string -> int -> char @@ portable = "%string_safe_get"
+external string_length : string -> int @@ portable = "%string_length"
+external char_code: char -> int @@ portable = "%identity"
+let hash_variant s =
+  let accu = ref 0 in
+  for i = 0 to string_length s - 1 do
+    accu := 223 * !accu + char_code (string_get s i)
+  done;
+  (* reduce to 31 bits *)
+  accu := !accu land (1 lsl 31 - 1);
+  (* make it signed for 64 bits architectures *)
+  if !accu > 0x3FFFFFFF then !accu - (1 lsl 31) else !accu
 
 let first_non_constant_constructor_tag = 0
 let last_non_constant_constructor_tag = 243

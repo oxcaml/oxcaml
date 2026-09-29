@@ -40,5 +40,5 @@ _DLLAPI void _CALLPROC start_caml_engine() {
   wchar_t * argv[2];
   argv[0] = L"--";
   argv[1] = NULL;
-  caml_startup(argv);
+  caml_startup((char_os const * const *) argv);
 }

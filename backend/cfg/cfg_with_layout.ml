@@ -33,15 +33,24 @@ module DLL = Doubly_linked_list
 
 type layout = Label.t DLL.t
 
+type layout_index = Label.t DLL.cell Label.Tbl.t
+
 type t =
   { cfg : Cfg.t;
     mutable layout : layout;
-    sections : (Label.t, string) Hashtbl.t
+    mutable index : layout_index
   }
 
-let create cfg ~layout = { cfg; layout; sections = Hashtbl.create 3 }
+let make_index layout =
+  let tbl = Label.Tbl.create (DLL.length layout) in
+  DLL.iter_cell layout ~f:(fun c -> Label.Tbl.replace tbl (DLL.value c) c);
+  tbl
+
+let create cfg ~layout = { cfg; layout; index = make_index layout }
 
 let cfg t = t.cfg
+
+let with_cfg t cfg = { t with cfg }
 
 let layout t = t.layout
 
@@ -63,22 +72,8 @@ let set_layout t layout =
        Misc.fatal_error
          "Cfg set_layout: new layout is not a permutation of the current \
           layout, or first label is not entry");
-  t.layout <- layout
-
-let assign_blocks_to_section t labels name =
-  List.iter
-    (fun label ->
-      match Hashtbl.find_opt t.sections label with
-      | Some new_name ->
-        Misc.fatal_errorf
-          "Cannot add %a->%s section mapping, already have %a->%s" Label.format
-          label name Label.format label new_name ()
-      | None -> Hashtbl.replace t.sections label name)
-    labels
-
-let get_section t label = Hashtbl.find_opt t.sections label
-
-exception Found_all
+  t.layout <- layout;
+  t.index <- make_index layout
 
 let remove_blocks t labels_to_remove =
   let num_to_remove = Label.Set.cardinal labels_to_remove in
@@ -87,24 +82,23 @@ let remove_blocks t labels_to_remove =
     (* remove from cfg *)
     Cfg.remove_blocks t.cfg labels_to_remove;
     (* remove from layout *)
-    let num_removed = ref 0 in
-    try
-      DLL.iter_cell t.layout ~f:(fun cell ->
-          if !num_removed = num_to_remove then raise Found_all;
-          let l = DLL.value cell in
-          if Label.Set.mem l labels_to_remove
-          then (
-            DLL.delete_curr cell;
-            incr num_removed))
-    with Found_all -> ())
+    labels_to_remove
+    |> Label.Set.iter (fun lbl ->
+        let cell =
+          try Label.Tbl.find t.index lbl
+          with Not_found ->
+            Misc.fatal_error "Cfg_with_layout.remove_blocks: unknown block"
+        in
+        DLL.delete_curr cell;
+        Label.Tbl.remove t.index lbl))
 
 let add_block t (block : Cfg.basic_block) ~after =
-  match
-    DLL.find_cell_opt t.layout ~f:(fun label -> Label.equal label after)
-  with
-  | None -> Misc.fatal_error "Cfg set_layout: 'after' block is not present"
-  | Some cell ->
-    DLL.insert_after cell block.start;
+  match Label.Tbl.find t.index after with
+  | exception Not_found ->
+    Misc.fatal_error "Cfg_with_layout.add_block: 'after' block is not present"
+  | cell ->
+    let new_cell = DLL.insert_and_return_after cell block.start in
+    Label.Tbl.replace t.index block.start new_cell;
     Cfg.add_block_exn t.cfg block
 
 let is_trap_handler t label =
@@ -405,27 +399,59 @@ let insert_block :
   let successors =
     match only_successor with
     | None -> Cfg.successor_labels ~normal:true ~exn:false predecessor_block
-    | Some only_successor -> Label.Set.singleton only_successor.start
+    | Some only_successor ->
+      if
+        not
+          (Label.Set.mem only_successor.start
+             (Cfg.successor_labels ~normal:true ~exn:false predecessor_block))
+      then
+        Misc.fatal_errorf
+          "Cannot insert a block between block %a and block %a: the latter is \
+           not a normal successor of the former"
+          Label.print predecessor_block.start Label.print only_successor.start;
+      Label.Set.singleton only_successor.start
   in
   if Label.Set.cardinal successors = 0
   then
     Misc.fatal_errorf
       "Cannot insert a block after block %a: it has no successors" Label.print
       predecessor_block.start;
-  let dbg, fdo, live, stack_offset, available_before, available_across =
+  let ( dbg,
+        fdo,
+        live,
+        available_before,
+        available_across,
+        phantom_available_before ) =
     match DLL.last body with
     | None ->
       ( Debuginfo.none,
         Fdo_info.none,
         Reg.Set.empty,
-        predecessor_block.terminator.stack_offset,
         Reg_availability_set.Unreachable,
-        Reg_availability_set.Unreachable )
+        Reg_availability_set.Unreachable,
+        None )
     | Some
-        { dbg; fdo; live; stack_offset; available_before; available_across; _ }
-      ->
-      dbg, fdo, live, stack_offset, available_before, available_across
+        { dbg;
+          fdo;
+          live;
+          available_before;
+          available_across;
+          phantom_available_before;
+          _
+        } ->
+      ( dbg,
+        fdo,
+        live,
+        available_before,
+        available_across,
+        phantom_available_before )
   in
+  (* The inserted blocks sit on edges out of [predecessor_block], so the offset
+     after their body must be the offset at the edge, i.e. at the predecessor's
+     terminator. (An instruction's [stack_offset] field is the offset before the
+     instruction executes, so the last body instruction's field would be wrong
+     whenever that instruction changes the offset.) *)
+  let stack_offset = predecessor_block.terminator.stack_offset in
   let copy (i : Cfg.basic Cfg.instruction) : Cfg.basic Cfg.instruction =
     { i with id = InstructionId.get_and_incr cfg.next_instruction_id }
   in
@@ -459,11 +485,12 @@ let insert_block :
               stack_offset;
               id = InstructionId.get_and_incr cfg.next_instruction_id;
               available_before;
-              available_across
+              available_across;
+              phantom_available_before
             };
           (* The [predecessor_block] is the only predecessor. *)
           predecessors = Label.Set.singleton predecessor_block.start;
-          stack_offset = predecessor_block.terminator.stack_offset;
+          stack_offset;
           exn = None;
           can_raise = false;
           is_trap_handler = false;

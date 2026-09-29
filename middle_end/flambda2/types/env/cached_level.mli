@@ -43,17 +43,12 @@ val find_symbol_projection : t -> Variable.t -> Symbol_projection.t option
 
 val symbol_projections : t -> Symbol_projection.t Variable.Map.t
 
-val clean_for_export : t -> reachable_names:Name_occurrences.t -> t
-
-val apply_renaming : t -> Renaming.t -> t
-
-include Contains_ids.S with type t := t
-
-val merge : t -> t -> t
+val clean_for_export :
+  t ->
+  reachable_names:Name_occurrences.t ->
+  (Type_grammar.t * Binding_time.With_name_mode.t) Name.Map.t
 
 val remove_unused_value_slots_and_shortcut_aliases :
   t -> used_value_slots:Value_slot.Set.t -> t
 
 val canonicalise : t -> Simple.t -> Simple.t
-
-val free_function_slots_and_value_slots : t -> Name_occurrences.t

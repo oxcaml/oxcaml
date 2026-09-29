@@ -67,12 +67,12 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 
 @camlId_fn__gc_roots = global { i64 } { i64 0 }, section ".data", align 8
 @header.camlId_fn = global i64 1792, section ".data", align 8
-@camlId_fn = global { ptr } { ptr @camlId_fn__f_1 }, section ".data", align 8
-@header.camlId_fn__f_1 = global i64 3063, section ".data", align 8
-@camlId_fn__f_1 = global { ptr, i64 } { ptr @camlId_fn__f_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@camlId_fn = global { ptr } { ptr @camlId_fn__f_HIDE_STAMP }, section ".data", align 8
+@header.camlId_fn__f_HIDE_STAMP = global i64 3063, section ".data", align 8
+@camlId_fn__f_0_1 = global { ptr, i64 } { ptr @camlId_fn__f_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
 
 
 
 !0 = !{ i32 1, !"oxcaml_module", !"Id_fn" }
-!1 = !{ i32 1, !"oxcaml_short_frametables", i32 0 }
+!1 = !{ i32 1, !"oxcaml_short_frametables", i32 1 }
 !llvm.module.flags = !{ !0, !1 }

@@ -319,9 +319,9 @@ let pat
           vs;
         sub.typ sub ct) vto
   | Tpat_variant (_, po, _) -> Option.iter (sub.pat sub) po
-  | Tpat_record (l, _, _, _) ->
+  | Tpat_record (l, _, _) ->
       List.iter (fun (lid, _, i) -> iter_loc_lid sub lid; sub.pat sub i) l
-  | Tpat_record_unboxed_product (l, _, _, _) ->
+  | Tpat_record_unboxed_product (l, _, _) ->
       List.iter (fun (lid, _, i) -> iter_loc_lid sub lid; sub.pat sub i) l
   | Tpat_array (_, _, l) -> List.iter (sub.pat sub) l
   | Tpat_alias { pattern = p; name = s; _ } -> sub.pat sub p; iter_loc sub s
@@ -436,7 +436,7 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
       Option.iter (fun (expr, _) -> sub.expr sub expr) expo
   | Texp_record { fields; extended_expression; _} ->
       iter_fields fields;
-      Option.iter (fun (exp, _, _) -> sub.expr sub exp) extended_expression;
+      Option.iter (fun (exp, _, _, _) -> sub.expr sub exp) extended_expression;
   | Texp_record_unboxed_product { fields; extended_expression; _} ->
       iter_fields fields;
       Option.iter (fun (exp, _) -> sub.expr sub exp) extended_expression;
@@ -533,8 +533,8 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
     sub.expr sub exp1;
     sub.expr sub exp2
   | Texp_hole _ -> ()
-  | Texp_quotation exp -> sub.expr sub exp
-  | Texp_antiquotation exp -> sub.expr sub exp
+  | Texp_quote exp -> sub.expr sub exp
+  | Texp_splice exp -> sub.expr sub exp
 
 let package_type sub {tpt_cstrs; tpt_txt; _} =
   List.iter (fun (lid, p) -> iter_loc_lid sub lid; sub.typ sub p) tpt_cstrs;
@@ -648,6 +648,7 @@ let module_coercion sub = function
   | Tcoerce_primitive {pc_loc; pc_env; _} ->
       sub.location sub pc_loc;
       sub.env sub pc_env
+  | Tcoerce_kindtemplate _ -> ()
   | Tcoerce_invalid -> ()
 
 let module_expr sub {mod_loc; mod_desc; mod_mode; mod_env; mod_attributes; _} =
@@ -662,10 +663,10 @@ let module_expr sub {mod_loc; mod_desc; mod_mode; mod_env; mod_attributes; _} =
   | Tmod_typed_hole  -> ()
   | Tmod_ident (_, lid) -> iter_loc_lid sub lid
   | Tmod_structure st -> sub.structure sub st
-  | Tmod_functor (arg, mexpr) ->
+  | Tmod_functor (arg, mexpr, _) ->
       functor_parameter sub arg;
       sub.module_expr sub mexpr
-  | Tmod_apply (mexp1, mexp2, c, _) ->
+  | Tmod_apply (mexp1, mexp2, c, _, _) ->
       sub.module_expr sub mexp1;
       sub.module_expr sub mexp2;
       sub.module_coercion sub c

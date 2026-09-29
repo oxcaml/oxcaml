@@ -1,10 +1,10 @@
 # Benchmarks 
 
-These benchmarks are used to generate charts such as the ones available at https://ocsigen.org/js_of_ocaml/dev/manual/performances.
+These benchmarks are used to generate charts such as the ones available at https://ocsigen.org/js_of_ocaml/latest/js_of_ocaml/performances.html.
 
 ## Quick start
 ```
-# build/copy additionnal bytecode executable inside `./programs/`
+# build/copy additional bytecode executable inside `./programs/`
 # used when generating the size report.
 make copy-extra-bc
 

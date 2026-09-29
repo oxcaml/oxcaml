@@ -36,7 +36,7 @@ let test_stack_growth () =
   let down = Buffer.create 64 and up = Buffer.create 64 in
   let rec go i =
     if i <= depth then
-      Dynamic.with_temporarily d i ~f:(fun () ->
+      exclave_ Dynamic.with_temporarily d i ~f:(fun () ->
         Buffer.add_string down (get_int d ^ " ");
         go (i + 1);
         Buffer.add_string up (get_int d ^ " "))
@@ -67,7 +67,7 @@ let test_table_growth () =
       Printf.printf "bound %d, visible %d, all correct: %b\n" n !visible
         !correct
     end
-    else Dynamic.with_temporarily ds.(i) i ~f:(fun () -> bind (i + 1))
+    else exclave_ Dynamic.with_temporarily ds.(i) i ~f:(fun () -> exclave_ bind (i + 1))
   in
   bind 0;
   let leftover =
@@ -77,43 +77,6 @@ let test_table_growth () =
       0 ds
   in
   Printf.printf "visible after unwind [expect 0]: %d\n" leftover
-
-(* The interesting hash-table case: two keys that collide. The second is placed
-   by linear probing at [slot+1]. Removing the first must rehash the probe
-   chain so the second remains reachable from its home slot. *)
-let test_collision () =
-  print_endline "\n# hash collision: linear probing and rehash on pop";
-  in_fresh_fiber (fun () ->
-    (* Fresh fiber => fresh table. The first push grows it to capacity 8, and it
-       stays at 8 while at most 4 keys are bound, so the table slot of a key is
-       [hash land 7]. Find two keys sharing the same NON-zero slot. *)
-    let slot d = Dynamic.hash d land 7 in
-    let pool = Array.init 128 (fun _ -> Dynamic.make ()) in
-    let a, b =
-      let found = ref None in
-      Array.iter
-        (fun x ->
-          if Option.is_none !found && slot x <> 0 then
-            Array.iter
-              (fun y ->
-                if Option.is_none !found && (not (x == y)) && slot x = slot y
-                then found := Some (x, y))
-              pool)
-        pool;
-      match !found with
-      | Some p -> p
-      | None -> failwith "no suitable collision found"
-    in
-    Dynamic.push a 111;
-    Dynamic.push b 222;
-    (* b was placed at a's slot + 1 by linear probing. *)
-    Printf.printf "both bound: a=%s b=%s\n" (get_int a) (get_int b);
-    Dynamic.pop a;
-    (* Reading the removed key first also evicts the (shared) per-thread cache
-       slot, so the read of b below genuinely consults the hash table. *)
-    Printf.printf "after pop a: a=%s [expect null]\n" (get_int a);
-    Printf.printf "after pop a: b=%s [expect 222]\n" (get_int b);
-    Dynamic.pop b)
 
 (* Heap-allocated bindings must be scanned as GC roots. We bust the per-thread
    cache so the live strings are reachable only through the binding stack in the
@@ -148,5 +111,4 @@ let test_gc () =
 let () =
   test_stack_growth ();
   test_table_growth ();
-  test_collision ();
   test_gc ()

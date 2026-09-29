@@ -30,7 +30,7 @@ val ( + ) : t -> t -> t
 
 type code_characteristics =
   { cost_metrics : t;
-    params_arity : int
+    function_slot_size : int
   }
 
 val set_of_closures :

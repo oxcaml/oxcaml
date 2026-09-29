@@ -33,7 +33,6 @@ type compile_time_constant =
   | Ostype_win32
   | Ostype_cygwin
   | Backend_type
-  | Runtime5
   | Arch_amd64
   | Arch_arm64
 
@@ -179,7 +178,7 @@ type primitive =
       * initialization_or_assignment
     (** The same comment about the index as for [Pmixedfield] applies to
         [Psetmixedfield]. *)
-  | Pduprecord of Types.record_representation * int
+  | Pduprecord of record_representation * int
   (* Unboxed products *)
   | Pmake_unboxed_product of layout list
   | Punboxed_product_field of int * (layout list)
@@ -266,6 +265,8 @@ type primitive =
   | Pstring_load_vec of
       { size : boxed_vector; unsafe : bool; index_kind : array_index_kind;
         mode : locality_mode; boxed : bool }
+  | Pstring_load_mask of { unsafe : bool; index_kind : array_index_kind;
+                           mode : locality_mode; boxed : bool }
   | Pbytes_load_i8 of { unsafe : bool; index_kind : array_index_kind;
                         tagged : bool }
   | Pbytes_load_i16 of { unsafe : bool; index_kind : array_index_kind;
@@ -280,6 +281,8 @@ type primitive =
   | Pbytes_load_vec of
       { size : boxed_vector; unsafe : bool; index_kind : array_index_kind;
         mode : locality_mode; boxed : bool }
+  | Pbytes_load_mask of { unsafe : bool; index_kind : array_index_kind;
+                          mode : locality_mode; boxed : bool }
   | Pbytes_set_8 of { unsafe : bool; index_kind : array_index_kind;
                       tagged : bool }
   | Pbytes_set_16 of { unsafe : bool; index_kind : array_index_kind;
@@ -292,6 +295,8 @@ type primitive =
       boxed : bool }
   | Pbytes_set_vec of { size : boxed_vector; unsafe : bool;
                         index_kind : array_index_kind; boxed : bool }
+  | Pbytes_set_mask of { unsafe : bool; index_kind : array_index_kind;
+                         boxed : bool }
   (* load/set 8,16,32,64 bits from a
      (char, int8_unsigned_elt, c_layout) Bigarray.Array1.t : (unsafe) *)
   (* load_i8/i16 is sign-extended *)
@@ -314,6 +319,8 @@ type primitive =
       mode : locality_mode;
       aligned : bool;
       boxed : bool }
+  | Pbigstring_load_mask of { unsafe : bool; index_kind : array_index_kind;
+                              mode : locality_mode; boxed : bool }
   | Pbigstring_set_8 of { unsafe : bool; index_kind : array_index_kind;
                           tagged : bool }
   | Pbigstring_set_16 of { unsafe : bool; index_kind : array_index_kind;
@@ -331,6 +338,8 @@ type primitive =
       index_kind : array_index_kind;
       aligned : bool;
       boxed : bool }
+  | Pbigstring_set_mask of { unsafe : bool; index_kind : array_index_kind;
+                             boxed : bool }
   (* load/set SIMD vectors in GC-managed arrays *)
   | Pfloatarray_load_vec of { size : boxed_vector; unsafe : bool;
                               index_kind : array_index_kind;
@@ -397,21 +406,53 @@ type primitive =
         into [shape] -- not a field index. *)
     shape : mixed_block_shape;
   }
-  | Patomic_set_field of { immediate_or_pointer : immediate_or_pointer }
+  | Patomic_set_field of
+    { immediate_or_pointer : immediate_or_pointer; mode : modify_mode }
   | Patomic_set_mixed_field of {
     index : int;
     shape : mixed_block_shape;
+    mode : modify_mode;
   }
-  | Patomic_exchange_field of { immediate_or_pointer : immediate_or_pointer }
+  | Patomic_exchange_field of
+    { immediate_or_pointer : immediate_or_pointer; mode : modify_mode }
   | Patomic_compare_exchange_field of
-    { immediate_or_pointer : immediate_or_pointer }
-  | Patomic_compare_set_field of { immediate_or_pointer : immediate_or_pointer }
+    { immediate_or_pointer : immediate_or_pointer; mode : modify_mode }
+  | Patomic_compare_set_field of
+    { immediate_or_pointer : immediate_or_pointer; mode : modify_mode }
   | Patomic_fetch_add_field
   | Patomic_add_field
   | Patomic_sub_field
   | Patomic_land_field
   | Patomic_lor_field
   | Patomic_lxor_field
+  | Patomic_load_idx of { layout : layout }
+  | Patomic_set_idx of { layout : layout; mode : modify_mode }
+  | Patomic_exchange_idx of
+    { layout : layout; mode : modify_mode }
+  | Patomic_compare_exchange_idx of
+    { layout : layout; mode : modify_mode }
+  | Patomic_compare_set_idx of
+    { layout : layout; mode : modify_mode }
+  | Patomic_fetch_add_idx
+  | Patomic_add_idx
+  | Patomic_sub_idx
+  | Patomic_land_idx
+  | Patomic_lor_idx
+  | Patomic_lxor_idx
+  | Patomic_load_ptr of { layout : layout }
+  | Patomic_set_ptr of { layout : layout; mode : modify_mode }
+  | Patomic_exchange_ptr of
+    { layout : layout; mode : modify_mode }
+  | Patomic_compare_exchange_ptr of
+    { layout : layout; mode : modify_mode }
+  | Patomic_compare_set_ptr of
+    { layout : layout; mode : modify_mode }
+  | Patomic_fetch_add_ptr
+  | Patomic_add_ptr
+  | Patomic_sub_ptr
+  | Patomic_land_ptr
+  | Patomic_lor_ptr
+  | Patomic_lxor_ptr
   (* Inhibition of optimisation *)
   | Popaque of layout
   (* Statically-defined probes *)
@@ -630,9 +671,32 @@ and mixed_block_shape = unit mixed_block_element array
 and mixed_block_shape_with_locality_mode
   = locality_mode mixed_block_element array
 
-and constructor_shape =
-  | Constructor_uniform of value_kind list
+(** Compare to [Types.record_representation]. *)
+and record_representation =
+  | Record_unboxed
+  | Record_inlined of
+      Types.tag * constructor_representation * variant_representation
+  | Record_boxed
+  | Record_float
+  | Record_ufloat
+  | Record_mixed of mixed_block_shape
+
+(** Compare to [Types.constructor_representation]. *)
+and constructor_representation =
+  | Constructor_uniform_value
   | Constructor_mixed of mixed_block_shape
+  | Constructor_immediate_all_void
+
+(** Compare to [Types.variant_representation]. *)
+and variant_representation =
+  | Variant_unboxed
+  | Variant_boxed
+  | Variant_extensible
+  | Variant_with_null
+
+and constructor_shape =
+  | Constructor_shape_uniform of value_kind list
+  | Constructor_shape_mixed of mixed_block_shape
 
 and unboxed_float = Primitive.unboxed_float =
   | Unboxed_float64
@@ -701,6 +765,10 @@ val equal_raise_kind : raise_kind -> raise_kind -> bool
 
 val equal_value_kind : value_kind -> value_kind -> bool
 
+(** Compares record layouts, ignoring the [value_kind] of [Value] fields. *)
+val equal_record_representation_up_to_value_kinds :
+  record_representation -> record_representation -> bool
+
 val join_value_kind : value_kind -> value_kind -> value_kind
 
 (** Join of two layouts, must be of the same kind. *)
@@ -760,11 +828,14 @@ type inlined_attribute =
   | Always_inlined (* [@inlined] or [@inlined always] *)
   | Never_inlined (* [@inlined never] *)
   | Hint_inlined (* [@inlined hint] *)
+  | Forward_inlined (* [@inlined forward] *)
   | Unroll of int (* [@unroll x] *)
   | Default_inlined (* no [@inlined] attribute *)
 
 val equal_inline_attribute : inline_attribute -> inline_attribute -> bool
 val equal_inlined_attribute : inlined_attribute -> inlined_attribute -> bool
+
+val forward_inlined_attribute : unit -> inlined_attribute
 
 type probe_desc = { name: string; enabled_at_init: bool; }
 type probe = probe_desc option
@@ -911,8 +982,6 @@ type debug_uid = Shape.Uid.t
     WARNING: Unlike the name sugggests, these identifiers are not always unique.
     Instead, in many cases, we use [debug_uid_none] below, and multiple
     variables at the level of Lambda or below can use the same [debug_uid]. *)
-(* CR sspies: This comment is currently not accurate, since we do not yet
-  emit these ids into dwarf code. *)
 
 val debug_uid_none : debug_uid
 (** [debug_uid_none] should be used for those identifiers that are not
@@ -1006,6 +1075,10 @@ type lambda =
   | Lkindtemplate of lkindtemplate
   (* [Lkindinstantiate] should only exist in the tlambda stage. *)
   | Lkindinstantiate of lkindinstantiate
+  (* [Ltemplate] should only exist in the tlambda stage. *)
+  | Ltemplate of ltemplate
+  (* [Linstantiate] should only exist in the tlambda stage. *)
+  | Linstantiate of lambda_apply
 
 and slambda =
   | SLlayout of layout
@@ -1071,9 +1144,7 @@ and lfunction = private
 
 and lkindtemplate =
   { ktmpl_params: Slambdaident.t list;
-    ktmpl_return: layout;
-    ktmpl_body: lambda;
-    ktmpl_ret_mode: return_mode;
+    ktmpl_body: lfunction;
     ktmpl_env: (lambda * layout) Ident.Map.t;
     ktmpl_env_mode: locality_mode;
     ktmpl_loc: scoped_location;
@@ -1083,8 +1154,13 @@ and lkindinstantiate =
   { kinst_func: lambda;
     kinst_args: layout list;
     kinst_result_layout: layout;
-    kinst_mode: locality_mode;
+    kinst_mode: return_mode;
     kinst_loc: scoped_location;
+  }
+
+and ltemplate =
+  { tmpl_func: lfunction;
+    tmpl_env: (lambda * layout) Ident.Map.t;
   }
 
 and lambda_while =
@@ -1240,9 +1316,6 @@ type arg_descr =
                                            that of the parameter, which is in
                                            general a supertype of this
                                            compilation unit's signature. *)
-    main_repr: module_representation;   (* The representation of the main
-                                           module, which is required to index
-                                           into it *)
   }
 
 (* Sharing key *)
@@ -1267,6 +1340,7 @@ val layout_int : layout
 val layout_array : array_kind -> layout
 val layout_block : layout
 val layout_list : layout
+val layout_extensible_variant_constructor : layout
 val layout_exception : layout
 val layout_function : layout
 val layout_object : layout
@@ -1403,6 +1477,9 @@ val value_kind_of_pointerness : immediate_or_pointer -> value_kind_non_null
 val pointerness_of_separability
   : Jkind_axis.Separability.t -> immediate_or_pointer
 
+val transl_mixed_product_element :
+  Types.mixed_block_element -> unit mixed_block_element
+
 val transl_mixed_product_shape : Types.mixed_product_shape -> mixed_block_shape
 
 val block_shape_of_value_kinds : value_kind list option -> block_shape
@@ -1416,9 +1493,11 @@ val is_uniform_block_shape : block_shape -> bool
    non-value. Errors if there's a splice variable *)
 val mixed_block_of_block_shape : block_shape -> mixed_block_shape option
 
-val transl_mixed_product_shape_for_read :
+val mixed_block_shape_has_splices : 'a mixed_block_element array -> bool
+
+val mixed_product_shape_for_read :
   get_value_kind:(int -> value_kind) -> get_mode:(int -> 'a)
-  -> Types.mixed_product_shape
+  -> mixed_block_shape
   -> 'a mixed_block_element array
 
 val transl_module_representation :
@@ -1427,9 +1506,14 @@ val transl_module_representation :
 val make_sequence: ('a -> lambda) -> 'a list -> lambda
 
 val subst:
-  (Ident.t -> Subst.Lazy.value_description * Mode.Value.l -> Env.t -> Env.t) ->
+  (Ident.t ->
+   Subst.Lazy.value_description * Mode.With_regionality.l ->
+   Env.t ->
+   Env.t) ->
   ?freshen_bound_variables:bool ->
-  lambda Ident.Map.t -> lambda -> lambda
+  lambda Ident.Map.t ->
+  lambda ->
+  lambda
 (** [subst update_env ?freshen_bound_variables s lt]
     applies a substitution [s] to the lambda-term [lt].
 
@@ -1447,6 +1531,9 @@ val rename : Ident.t Ident.Map.t -> lambda -> lambda
 (** A version of [subst] specialized for the case where we're just renaming
     idents. *)
 
+val rename_lfun : Ident.t Ident.Map.t -> lfunction -> lfunction
+(** Identical to [rename] but operates on [lfunction] rather than [lambda]. *)
+
 val duplicate_function : lfunction -> lfunction
 (** Duplicate a term, freshening all locally-bound identifiers. *)
 
@@ -1456,6 +1543,17 @@ val map : (lambda -> lambda) -> lambda -> lambda
 
 val map_lfunction : (lambda -> lambda) -> lfunction -> lfunction
   (** Apply the given transformation on the function's body *)
+
+val extract_free_var_env :
+  layout_of_ident:(Ident.t -> layout option) ->
+  lfunction ->
+  lfunction * (lambda * layout) Ident.Map.t
+(** [extract_free_var_env ~layout_of_ident lfun] computes an environment for the
+    provided function by renaming the free variables of [lfun] to fresh idents,
+    and returning the freshened function together with the mapping from new
+    idents to (lambda that evaluates to) the old idents.
+    Free variables for which [layout_of_ident] returns [None] are not
+    freshened. *)
 
 val shallow_map  :
   tail:(lambda -> lambda) ->
@@ -1491,7 +1589,6 @@ val is_maybe_alloc_stack : return_mode -> bool
 val is_not_alloc_stack : return_mode -> bool
 val eq_return_mode : return_mode -> return_mode -> bool
 val locality_return_compat : locality_mode -> return_mode -> bool
-val return_mode_of_locality_mode : locality_mode -> return_mode
 
 val primitive_may_allocate : primitive -> locality_mode option
   (** Whether and where a primitive may allocate.

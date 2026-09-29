@@ -131,6 +131,14 @@ let toplevel_value id =
   try Ident.find_same id !remembered
   with _ -> failwith ("Unknown ident: " ^ Ident.unique_name id)
 
+let phrase_static_data : Slambdaeval.CU_data.t Compilation_unit.Tbl.t =
+  Compilation_unit.Tbl.create 16
+
+let cu_static_data cu =
+  match Compilation_unit.Tbl.find_opt phrase_static_data cu with
+  | Some _ as data -> data
+  | None -> Compilenv.get_static_data cu
+
 let close_phrase lam =
   let open Lambda in
   Ident.Set.fold (fun id l ->
@@ -138,7 +146,7 @@ let close_phrase lam =
     let layout = Lambda.layout_of_module_field repr pos in
     let glob =
       Lprim (mod_field pos repr,
-             [Lprim (Pgetglobal (glb, Dynamic), [], Loc_unknown)],
+             [Lprim (Pgetglobal (glb, Static), [], Loc_unknown)],
              Loc_unknown)
     in
     Llet(Strict, layout, id, Lambda.debug_uid_none, glob, l)
@@ -172,7 +180,7 @@ let mod_field obj (module_repr : Lambda.module_representation) pos =
         else None (* [pos] points to an unboxed singleton *))
 
 let rec eval_address = function
-  | Env.Aunit cu ->
+  | Env.Aunit (cu, _) ->
       global_symbol cu
   | Env.Alocal id ->
       let glob, pos, repr = toplevel_value id in
@@ -352,17 +360,16 @@ let default_load ppf (program : Lambda.program) =
 let load_tlambda ppf ~compilation_unit ~required_globals tlam repr =
   if !Clflags.dump_debug_uid_tables then Type_shape.print_debug_uid_tables ppf;
   if !Clflags.dump_tlambda then fprintf ppf "%a@." Printlambda.lambda tlam;
-  let { Slambda.slv_comptime = _; slv_runtime = rawlam } =
-    (* CR layout poly: If this toplevel value is static we should keep the
-       comptime part in a separate table so we can use it in later expressions.
-    *)
-    Slambda.eval (print_if ppf Clflags.dump_slambda Printlambda.slambda) tlam
+  let (static_data, rawlam) =
+    Slambda.eval ~cu_static_data
+      (print_if ppf Clflags.dump_slambda Printlambda.slambda) tlam
   in
+  Compilation_unit.Tbl.replace phrase_static_data compilation_unit static_data;
   if !Clflags.dump_rawlambda then fprintf ppf "%a@." Printlambda.lambda rawlam;
   let lam =
     Simplif.simplify_lambda rawlam
       ~restrict_to_upstream_dwarf:
-        !Dwarf_flags.restrict_to_upstream_dwarf
+        !Clflags.restrict_to_upstream_dwarf
       ~gdwarf_may_alter_codegen:!Dwarf_flags.gdwarf_may_alter_codegen
   in
   if !Clflags.dump_lambda then fprintf ppf "%a@." Printlambda.lambda lam;
@@ -444,7 +451,9 @@ let name_expression ~loc ~attrs sort exp =
   let pat =
     { pat_desc =
         Tpat_var { id; name = mknoloc name; uid = vd.val_uid; sort;
-                   mode = Mode.Value.disallow_right Mode.Value.legacy };
+                   mode =
+                      Mode.With_regionality.disallow_right
+                        Mode.With_regionality.legacy };
       pat_loc = loc;
       pat_extra = [];
       pat_type = exp.exp_type;
@@ -465,7 +474,9 @@ let name_expression ~loc ~attrs sort exp =
       str_loc = loc;
       str_env = exp.exp_env; }
   in
-  let final_env = Env.add_value ~mode:Mode.Value.legacy id vd exp.exp_env in
+  let final_env =
+     Env.add_value ~mode:Mode.With_regionality.legacy id vd exp.exp_env
+   in
   let str =
     { str_items = [item];
       str_type = sg;
@@ -647,6 +658,7 @@ let use_channel ppf ~wrap_in_module ic name filename =
   (* Skip initial #! line if any *)
   Lexer.skip_hash_bang lb;
   let success =
+    Lexer.protect_syntax_mode @@ fun () ->
     protect_refs [ R (Location.input_name, filename) ] (fun () ->
       try
         List.iter

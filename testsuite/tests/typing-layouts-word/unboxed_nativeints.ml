@@ -20,7 +20,7 @@
  }
 *)
 
-(* This file contains various tests for [nativeint#].  It's not an expect test
+(* This file contains various tests for [nativeint_u].  It's not an expect test
    to make sure it gets tested for native code. *)
 
 (*****************************************)
@@ -224,9 +224,9 @@ let _ =
      minus_four #3n)
 
 (**********************************)
-(* Test 3: nativeint# in closures *)
+(* Test 3: nativeint_u in closures *)
 
-(* [go]'s closure should haave an [int] (immediate), a [nativeint#] (word) and a
+(* [go]'s closure should haave an [int] (immediate), a [nativeint_u] (word) and a
    [nativeint array] (value). *)
 let[@inline never] f3 n m steps () =
   let[@inline never] rec go k =
@@ -304,14 +304,14 @@ let[@inline never] test4 () =
   print_nativeintu "Test 4, 1 + 2" (Nativeint_u.of_nativeint x1);
   print_nativeintu "Test 4, 1 - 2" (Nativeint_u.of_nativeint x2);
 
-  (* partial application to nativeint# *)
+  (* partial application to nativeint_u *)
   let steps = Array.init 10 (fun _ -> 0n) in
   let f = Sys.opaque_identity (f3 5 #3n) in
   let five_times_three = f steps in
   print_nativeintu "Test 4, 5 * 3: " (five_times_three ());
   Array.iteri (Printf.printf "  Test 4, step %d: %nd\n") steps;
 
-  (* partial application with nativeint# remaining *)
+  (* partial application with nativeint_u remaining *)
   let steps = Array.init 10 (fun _ -> 0n) in
   let f = Sys.opaque_identity (f3 6) in
   let six_times_three = f #3n steps in
@@ -341,7 +341,7 @@ let _ = test4 ()
 
 let[@inline never] f5 n m =
   let open Nativeint_u in
-  (* Also testing a closure with only nativeint# values *)
+  (* Also testing a closure with only nativeint_u values *)
   let[@inline never] go f =
     f (n + m)
   in
@@ -364,7 +364,7 @@ let _ = test5 ()
 (* CR layouts: add tests that capture nativeints in objects, once that is
    allowed. *)
 
-(* nativeint# args and returns *)
+(* nativeint_u args and returns *)
 let f6_1 () = object
   method f6_m1 f1 f2 f3 =
     let open Nativeint_u in
@@ -379,7 +379,7 @@ let f6_2 n = object(self)
     else f (self#f6_m2 (n3+1) m1 f)
 end
 
-(* overapplication to nativeint# and non-nativeint# args *)
+(* overapplication to nativeint_u and non-nativeint_u args *)
 let f6_3 n k = object
   method f6_m3 n3 m1 f =
     let n = ((Sys.opaque_identity fst) n) + ((Sys.opaque_identity snd) n) in

@@ -14,6 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 let dump_cfg = ref false                (* -dcfg *)
+let dump_ssa = ref false                (* -dssa *)
 let cfg_invariants = ref false          (* -dcfg-invariants *)
 let regalloc = ref Clflags.Register_allocator.Cfg (* -regalloc *)
 let default_regalloc_linscan_threshold = 100_000
@@ -35,6 +36,7 @@ let x86_peephole_remove_mov_to_dead_register = ref true
 let x86_peephole_remove_redundant_cmp = ref true
 let x86_peephole_remove_redundant_extension = ref true
 let x86_peephole_combine_add_rsp = ref true
+let x86_peephole_remove_redundant_test = ref true
 
 let cfg_stack_checks = ref true         (* -[no-]cfg-stack-check *)
 let cfg_stack_checks_threshold = ref 16384 (* -cfg-stack-threshold *)
@@ -51,19 +53,19 @@ let omit_leaf_frame_pointers = ref false (* -[no-]omit-leaf-frame-pointers *)
 
 let cfg_merge_blocks = ref false        (* -[no]-cfg-merge-blocks *)
 
+let cfg_block_layout = ref false        (* -[no]-cfg-block-layout *)
+
 let cfg_value_propagation = ref true    (* -[no]-cfg-value-propagation *)
 let cfg_value_propagation_float = ref false
                                         (* -[no]-cfg-value-propagation-float *)
 let cfg_value_propagation_flow = ref false
                                         (* -[no]-cfg-value-propagation-flow *)
 let reorder_blocks_random = ref None    (* -reorder-blocks-random seed *)
-let basic_block_sections = ref false    (* -basic-block-sections *)
 (* -module-entry-functions-section *)
 let module_entry_functions_section = ref false
 
 let dasm_comments = ref false (* -dasm-comments *)
 
-let frametables_in_rodata = ref true (* -frametables-in-rodata *)
 
 let default_heap_reduction_threshold = 500_000_000 / (Sys.word_size / 8)
 let heap_reduction_threshold = ref default_heap_reduction_threshold (* -heap-reduction-threshold *)
@@ -136,6 +138,12 @@ let branch_relaxation_max_displacement =
   ref max_int (* -dbranch-relaxation-max-displacement n *)
 
 let caml_apply_inline_fast_path = ref false  (* -caml-apply-inline-fast-path *)
+
+let use_ssa = ref false                      (* -use-ssa *)
+
+let ssa_simplify = ref true                 (* -ssa-simplify *)
+
+let ssa_validate = ref true                 (* -ssa-validate *)
 
 type function_result_types = Never | Functors_only | All_functions
 type join_algorithm = Binary | N_way | Checked

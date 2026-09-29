@@ -50,6 +50,8 @@ module type S = sig
 
   val instantiate : src:string -> args:string list -> string -> unit
 
+  val functorize : Compilation_unit.Name.Set.t -> string -> unit
+
   val package_files :
     ppf_dump:Format.formatter -> Env.t -> string list -> string -> unit
 end
@@ -81,11 +83,9 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
 
   (** Native compilation backend for .ml files. *)
 
-  let make_arg_descr ~param ~arg_block_idx ~main_repr : Lambda.arg_descr option
-      =
+  let make_arg_descr ~param ~arg_block_idx : Lambda.arg_descr option =
     match param, arg_block_idx with
-    | Some arg_param, Some arg_block_idx ->
-      Some { arg_param; arg_block_idx; main_repr }
+    | Some arg_param, Some arg_block_idx -> Some { arg_param; arg_block_idx }
     | None, None -> None
     | Some _, None -> Misc.fatal_error "No argument field"
     | None, Some _ -> Misc.fatal_error "Unexpected argument field"
@@ -96,12 +96,10 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         Builtin_attributes.warn_unused ();
         program.code
         |> print_if i.ppf_dump Clflags.dump_tlambda Printlambda.lambda
-        |> Slambda.eval
+        |> Slambda.eval ~cu_static_data:Compilenv.get_static_data
              (print_if i.ppf_dump Clflags.dump_slambda Printlambda.slambda)
-        |> fun { Slambda.slv_comptime = _; slv_runtime } ->
-        (* CR layout poly: Drop the comptime part until top-level modules can be
-           static. *)
-        { program with Lambda.code = slv_runtime }
+        |> fun (static_data, lambda) ->
+        { program with Lambda.code = lambda }
         |> print_if i.ppf_dump Clflags.dump_debug_uid_tables (fun ppf _ ->
             Type_shape.print_debug_uid_tables ppf)
         |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.program
@@ -109,7 +107,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         |> fun program ->
         let code =
           Simplif.simplify_lambda program.Lambda.code
-            ~restrict_to_upstream_dwarf:!Dwarf_flags.restrict_to_upstream_dwarf
+            ~restrict_to_upstream_dwarf:!Clflags.restrict_to_upstream_dwarf
             ~gdwarf_may_alter_codegen:!Dwarf_flags.gdwarf_may_alter_codegen
         in
         { program with Lambda.code }
@@ -126,15 +124,12 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
           let arg_descr =
             make_arg_descr ~param:as_arg_for
               ~arg_block_idx:program.arg_block_idx
-              ~main_repr:
-                (Lambda.main_module_representation
-                   program.main_module_block_format)
           in
           Compilenv.save_unit_info
             (Unit_info.Artifact.filename
                (Unit_info.artifact i.target ~extension:Backend.ext_flambda_obj))
             ~main_module_block_format:program.main_module_block_format
-            ~arg_descr))
+            ~arg_descr ~static_data))
 
   let compile_from_typed i typed ~keep_symbol_tables ~as_arg_for =
     let loc = Location.in_file (Unit_info.original_source_file i.target) in
@@ -250,6 +245,20 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     Instantiator.instantiate ~src ~args targetcmx
       ~expected_extension:ext_flambda_obj ~read_unit_info
       ~compile:(instance ~keep_symbol_tables:false)
+
+  let compile_program info program =
+    if !Oxcaml_flags.internal_assembler
+    then Emitaux.binary_backend_available := true;
+    Compilenv.reset info.Compile_common.target;
+    if not (Config.flambda || Config.flambda2) then Clflags.set_oclassic ();
+    compile_from_tlambda info program ~as_arg_for:None ~keep_symbol_tables:false
+
+  let functorize input_module_names target =
+    Functorizer.functorize input_module_names target ~with_info ~impl_ext:"cmx"
+      ~read_format:(fun filename ->
+        let unit_info, _crc = Compilenv.read_unit_info filename in
+        unit_info.ui_format, unit_info.ui_arg_descr)
+      ~compile_program
 end
 
 let native unix
@@ -313,6 +322,7 @@ let native unix
     let extra_libraries_for_eval =
       [ "unix/unix";
         "compiler-libs/ocamlcommon";
+        "compiler-libs/ocamlfrontend";
         "compiler-libs/ocamloptcomp";
         "dynlink/dynlink";
         "compiler-libs/ocamlopttoplevel";

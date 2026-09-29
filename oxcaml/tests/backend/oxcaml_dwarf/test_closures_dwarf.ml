@@ -126,3 +126,56 @@ let nested_closure = factory_result 10
 let _ = nested_closure 5
 
 let _ = nested_closure 8
+
+(* Trampoline to force closure allocation and indirect call *)
+let[@inline never] [@local never] f_apply_closure (f : int -> int) (x : int) =
+  f x
+
+(** Test: captured variable visibility inside a closure body. We break inside
+    [use_captured] to see whether [captured_val] appears in the debug info.
+    [Sys.opaque_identity] prevents [captured_val] from being substituted away by
+    the optimizer, so we can isolate whether the issue is closure capture vs
+    general local-variable tracking.
+
+    The generated assembly for [f_captured_var_test] builds the closure block
+    and stores [captured_val] into it:
+    {v
+     leaq  <use_captured_code>, %rdi
+     movq  %rdi, (%rax)          ; code pointer at offset 0
+     movq  <arity>, 0x8(%rax)    ; arity/info at offset 8
+     movq  %rbx, 0x10(%rax)      ; captured_val at offset 16
+    v}
+
+    And [use_captured] reads it back from the closure environment:
+    {v
+     movq  0x10(%rbx), %rbx      ; load captured_val from closure block
+     leaq  -0x1(%rbx,%rax), %rax ; captured_val + arg (with tag adjustment)
+     retq
+    v}
+
+    So [captured_val] is genuinely accessed from the closure block at runtime.
+    However, the DWARF for [use_captured] only contains [arg]:
+    {v
+    DW_TAG_subprogram
+      DW_AT_linkage_name ("Test_closures_dwarf.f_captured_var_test.use_captured")
+      DW_TAG_formal_parameter
+        DW_AT_name ("arg")
+        DW_AT_type ("int @ value")
+    v}
+
+    [captured_val] should ideally appear as a DW_TAG_variable here, e.g.:
+    {v
+     DW_TAG_variable
+       DW_AT_name ("captured_val")
+       DW_AT_type ("int @ value")
+       DW_AT_location (DW_OP_breg3 +16)  ; offset 16 from closure in %rbx
+    v} *)
+let[@inline never] [@local never] f_captured_var_test (base : int)
+    (offset : int) =
+  let captured_val = Sys.opaque_identity (base + offset) in
+  let[@inline never] use_captured (arg : int) = captured_val + arg in
+  f_apply_closure use_captured 7
+
+let _ = f_captured_var_test 100 5
+
+let _ = f_captured_var_test 50 3

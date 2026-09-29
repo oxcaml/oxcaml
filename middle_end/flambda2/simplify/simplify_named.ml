@@ -231,7 +231,7 @@ let simplify_named0 dacc (bound_pattern : Bound_pattern.t) (named : Named.t)
     let new_rec_info_expr =
       Simplify_rec_info_expr.simplify_rec_info_expr dacc rec_info_expr
     in
-    let ty = T.this_rec_info rec_info_expr in
+    let ty = T.this_rec_info new_rec_info_expr in
     let dacc = DA.add_variable dacc bound_var ty in
     let machine_width = DE.machine_width (DA.denv dacc) in
     let defining_expr =

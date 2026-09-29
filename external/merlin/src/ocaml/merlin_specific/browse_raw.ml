@@ -86,7 +86,7 @@ type node =
   | Module_binding_name of module_binding
   | Module_declaration_name of module_declaration
   | Module_type_declaration_name of module_type_declaration
-  | Mode of Mode.Alloc.atom Location.loc
+  | Mode of Mode.With_locality.atom Location.loc
   | Modality of Mode.Modality.atom Location.loc
   | Jkind_annotation of Parsetree.jkind_annotation
   | Jkind_declaration of Typedtree.jkind_declaration
@@ -404,12 +404,12 @@ let of_pattern_desc (type k) (desc : k pattern_desc) =
            ** list_fold (fun (_, jkind) -> of_jkind_annotation_opt jkind) jkinds)
          t
   | Tpat_array (_, _, ps) -> list_fold of_pattern ps
-  | Tpat_record (ls, _, _, _) ->
+  | Tpat_record (ls, _, _) ->
     list_fold
       (fun (lid_loc, desc, p) ->
         of_pat_record_field p lid_loc desc Legacy ** of_pattern p)
       ls
-  | Tpat_record_unboxed_product (ls, _, _, _) ->
+  | Tpat_record_unboxed_product (ls, _, _) ->
     list_fold
       (fun (lid_loc, desc, p) ->
         of_pat_record_field p lid_loc desc Unboxed_product ** of_pattern p)
@@ -465,7 +465,7 @@ let rec of_expression_desc loc = function
   | Texp_setinstvar (_, _, _, e) -> of_expression e
   | Texp_setmutvar (_, _, e) -> of_expression e
   | Texp_record { fields; extended_expression } ->
-    option_fold (fun (e, _, _) -> of_expression e) extended_expression
+    option_fold (fun (e, _, _, _) -> of_expression e) extended_expression
     **
     let fold_field = function
       | _, _, Typedtree.Kept _ -> id_fold
@@ -505,7 +505,6 @@ let rec of_expression_desc loc = function
         label = lbl;
         newval = e2;
         record_repres = _;
-        record_sorts = _;
         modality = _
       } ->
     of_expression e1 ** of_expression e2
@@ -567,11 +566,11 @@ let rec of_expression_desc loc = function
         record_repres = _;
         lid = _;
         label = _;
-        alloc_mode = _
+        locality_mode = _
       } -> of_expression record
   | Texp_hole _ -> id_fold
-  | Texp_quotation exp -> of_expression exp
-  | Texp_antiquotation exp -> of_expression exp
+  | Texp_quote exp -> of_expression exp
+  | Texp_splice exp -> of_expression exp
   | Texp_apply_layout (exp, _) -> of_expression exp
 
 (* We should consider taking into account param.fp_loc at some point, as it
@@ -628,10 +627,10 @@ and of_class_field_desc = function
 and of_module_expr_desc = function
   | Tmod_ident _ -> id_fold
   | Tmod_structure str -> app (Structure str)
-  | Tmod_functor (Unit, me) -> of_module_expr me
-  | Tmod_functor (Named (_, _, mt, modes), me) ->
+  | Tmod_functor (Unit, me, _) -> of_module_expr me
+  | Tmod_functor (Named (_, _, mt, modes), me, _) ->
     of_module_type mt ** of_module_expr me ** of_modes modes
-  | Tmod_apply (me1, me2, _, _) -> of_module_expr me1 ** of_module_expr me2
+  | Tmod_apply (me1, me2, _, _, _) -> of_module_expr me1 ** of_module_expr me2
   | Tmod_apply_unit (me1, _) -> of_module_expr me1
   | Tmod_constraint (me, _, mtc, _) ->
     of_module_expr me ** app (Module_type_constraint mtc)
@@ -796,7 +795,9 @@ let of_node node =
                 name = { txt = name; loc = vd.val_loc };
                 uid = vd.val_uid;
                 sort;
-                mode = Mode.Value.disallow_right Mode.Value.legacy
+                mode =
+                  Mode.With_regionality.disallow_right
+                    Mode.With_regionality.legacy
               };
           pat_loc = vd.val_loc;
           pat_extra = [];
@@ -1029,7 +1030,7 @@ let pattern_paths (type k) { Typedtree.pat_desc; pat_extra; _ } =
 let module_expr_paths { Typedtree.mod_desc } =
   match mod_desc with
   | Tmod_ident (path, loc) -> [ (reloc path loc, Some loc.txt) ]
-  | Tmod_functor (Named (Some id, loc, _, _), _) ->
+  | Tmod_functor (Named (Some id, loc, _, _), _, _) ->
     [ (reloc (Path.Pident id) loc, Option.map ~f:mk_lident loc.txt) ]
   | _ -> []
 

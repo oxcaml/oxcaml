@@ -10,3 +10,18 @@ Or_null atomic get after set to This: This 456
 Float or_null atomic get initial: This 1.23
 Float or_null atomic get after set to Null: Null
 Float or_null atomic get after set to This: This 4.56
+String atomic get initial: hello
+String atomic get after set: world
+Loc exchange returned: hello
+After loc exchange: world
+Loc compare_and_set returned: true
+After loc compare_and_set: waldo
+Loc compare_exchange returned: waldo
+After loc compare_exchange: plugh
+Stack atomic get initial: hello
+Stack atomic get after set: world
+Stack atomic exchange returned: world
+Stack atomic compare_and_set returned: false
+Stack atomic get final: waldo
+Mixed atomic get initial: hello
+Mixed atomic get after set: world
