@@ -1572,7 +1572,7 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
       List.iter
         (fun sdef ->
           if sdef.pvb_is_poly then
-            Typecore.Error.log_and_raise sdef.pvb_loc val_env
+            Typecore.Error.log_or_raise sdef.pvb_loc val_env
               (Layout_poly_not_yet_supported Class))
         sdefs;
       let (defs, val_env) =
