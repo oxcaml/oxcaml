@@ -52,7 +52,8 @@ val create : Asm_section.t -> t
 
 (** Create an integer-valued label. The int must be positive.
     [is_dwarf_only_label] (default [false]) marks labels that only delimit DWARF
-    ranges, so they must not be jump targets. *)
+    ranges, so they must not be jump targets. The other label creation functions
+    all set it to [false]. *)
 val create_int : ?is_dwarf_only_label:bool -> Asm_section.t -> int -> t
 
 (** A label rendered as an "l"-prefixed private symbol ("l_caml<n>"). On Mach-O
