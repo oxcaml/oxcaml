@@ -4767,7 +4767,8 @@ let assign_pat ~scopes body_layout opt nraise catch_ids loc pat pat_sort lam =
           (fun acc (_, pat, sort) lam ->
              collect (Jkind.Sort.default_for_transl_and_get sort) acc pat lam)
           acc patl lams
-    | Tpat_tuple patl, Lconst (Const_block (_, scl)) ->
+    | Tpat_tuple patl,
+      Lconst (Const_block (_, scl) | Const_mixed_block (_, _, scl)) ->
         opt := true;
         let collect_const acc (_, pat, sort) sc =
           collect
