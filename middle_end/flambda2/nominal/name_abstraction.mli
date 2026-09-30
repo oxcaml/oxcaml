@@ -57,7 +57,6 @@ val apply_renaming :
   (module Bindable.S with type t = 'bindable) ->
   ('bindable, 'term) t ->
   Renaming.t ->
-  apply_renaming_to_term:('term -> Renaming.t -> 'term) ->
   ('bindable, 'term) t
 
 val pattern_match :

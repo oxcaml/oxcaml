@@ -114,9 +114,10 @@ let[@inline always] pattern_match_pair (type bindable)
       f fresh_bindable fresh_term0 fresh_term1)
 
 let apply_renaming (type bindable)
-    (module _ : Bindable.S with type t = bindable) t renaming
-    ~apply_renaming_to_term:_ =
-  With_delayed_renaming.apply_renaming t renaming
+    (module _ : Bindable.S with type t = bindable) t renaming =
+  if Renaming.is_identity renaming
+  then t
+  else With_delayed_renaming.apply_renaming t renaming
 
 let free_names (type bindable)
     (module Bindable : Bindable.S with type t = bindable) t ~free_names_of_term
@@ -153,10 +154,7 @@ module Make (Bindable : Bindable.S) (Term : Term) = struct
       (module Bindable)
       t0 t1 ~f ~apply_renaming_to_term:Term.apply_renaming
 
-  let apply_renaming t renaming =
-    apply_renaming
-      (module Bindable)
-      t renaming ~apply_renaming_to_term:Term.apply_renaming
+  let apply_renaming t renaming = apply_renaming (module Bindable) t renaming
 
   let[@inline always] ( let<> ) t f =
     pattern_match t ~f:(fun bindable term -> f (bindable, term))

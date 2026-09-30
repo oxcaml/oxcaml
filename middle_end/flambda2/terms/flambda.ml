@@ -171,9 +171,7 @@ and apply_renaming_let_expr_t0
 
 and apply_renaming_let_expr ({ let_abst; defining_expr } as t) renaming =
   let let_abst' =
-    Name_abstraction.apply_renaming
-      (module Bound_pattern)
-      let_abst renaming ~apply_renaming_to_term:apply_renaming_let_expr_t0
+    Name_abstraction.apply_renaming (module Bound_pattern) let_abst renaming
   in
   let defining_expr' = apply_renaming_named defining_expr renaming in
   if let_abst == let_abst' && defining_expr == defining_expr'
@@ -207,7 +205,7 @@ and apply_renaming_non_recursive_let_cont_handler
   let continuation_and_body' =
     Name_abstraction.apply_renaming
       (module Bound_continuation)
-      continuation_and_body renaming ~apply_renaming_to_term:apply_renaming
+      continuation_and_body renaming
   in
   let handler' = apply_renaming_continuation_handler handler renaming in
   { handler = handler'; continuation_and_body = continuation_and_body' }
@@ -218,10 +216,7 @@ and apply_renaming_recursive_let_cont_handlers_t0 { handlers; body } renaming =
   { handlers = handlers'; body = body' }
 
 and apply_renaming_recursive_let_cont_handlers t renaming =
-  Name_abstraction.apply_renaming
-    (module Bound_continuations)
-    t renaming
-    ~apply_renaming_to_term:apply_renaming_recursive_let_cont_handlers_t0
+  Name_abstraction.apply_renaming (module Bound_continuations) t renaming
 
 and apply_renaming_continuation_handler_t0
     ({ handler; num_normal_occurrences_of_params } as t) renaming =
@@ -246,16 +241,13 @@ and apply_renaming_continuation_handler
     Name_abstraction.apply_renaming
       (module Bound_parameters)
       cont_handler_abst renaming
-      ~apply_renaming_to_term:apply_renaming_continuation_handler_t0
   in
   if cont_handler_abst == cont_handler_abst'
   then t
   else { cont_handler_abst = cont_handler_abst'; is_exn_handler; is_cold }
 
 and apply_renaming_continuation_handlers t renaming =
-  Name_abstraction.apply_renaming
-    (module Bound_parameters)
-    t renaming ~apply_renaming_to_term:apply_renaming_continuations_handlers_t0
+  Name_abstraction.apply_renaming (module Bound_parameters) t renaming
 
 and apply_renaming_continuations_handlers_t0 t renaming =
   Continuation.Lmap.of_list
@@ -277,10 +269,7 @@ and apply_renaming_function_params_and_body_base { expr; free_names } renaming =
 and apply_renaming_function_params_and_body ({ abst; is_my_closure_used } as t)
     renaming =
   let abst' =
-    Name_abstraction.apply_renaming
-      (module Bound_for_function)
-      abst renaming
-      ~apply_renaming_to_term:apply_renaming_function_params_and_body_base
+    Name_abstraction.apply_renaming (module Bound_for_function) abst renaming
   in
   if abst == abst' then t else { abst = abst'; is_my_closure_used }
 
