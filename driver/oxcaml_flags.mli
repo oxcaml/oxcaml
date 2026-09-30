@@ -18,6 +18,7 @@
 
 val dump_cfg : bool ref
 val dump_ssa : bool ref
+val dump_fdo : bool ref
 val cfg_invariants : bool ref
 val regalloc : Clflags.Register_allocator.t ref
 val default_regalloc_linscan_threshold : int
@@ -148,17 +149,34 @@ val keep_llvmir : bool ref
 val llvm_path : string option ref
 val llvm_flags : string ref
 
+val fdo_profile_path : string option ref
+
+(** [-fdo-profile <file>]: sets [fdo_profile_path]. *)
+val set_fdo_profile_path : string -> unit
+
+(** The source-position FDO profile named by [-fdo-profile], loaded once on
+    first call (or [None] if the flag is unset). Raises
+    {!Source_position_profile.Error} if the profile is malformed. *)
+val fdo_profile : unit -> Source_position_profile.t option
+
 val fdo_counters : bool ref
 
 (** Whether to create pseudo-instrumentation counters for branching constructs
     (and emit the "fdo_metadata" section describing the emitted code and
-    conditional branches): when [-fdo-counters] was passed. *)
+    conditional branches): when [-fdo-counters] was passed, or when a profile is
+    being consumed via [-fdo-profile] (whose edge counts are matched back
+    against the counters). *)
 val fdo_counters_enabled : unit -> bool
 
 (** [-fdo-names]: also record in the "fdo_metadata" section the names of the
     counters it refers to by hash, so that oxcaml-fdo-decode can print a
     profile readably. *)
 val fdo_names : bool ref
+
+(** Fail when the profile's measurements contradict the flow of the code being
+    compiled (they come from different code); [-no-fdo-profile-check] proceeds
+    with the contradictory counts instead. *)
+val fdo_profile_check : bool ref
 
 module Flambda2 : sig
   val debug : bool ref
