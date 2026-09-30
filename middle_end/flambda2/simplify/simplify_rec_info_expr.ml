@@ -66,14 +66,15 @@ let rec simplify_rec_info_expr0 denv orig ~on_unknown : Rec_info_expr.t =
       | Known_result rec_info_expr ->
         (* All bound names are fresh, so fine to use the same environment *)
         simplify_rec_info_expr0 denv rec_info_expr ~on_unknown
-      | Need_meet -> (
+      | Need_meet | Invalid -> (
+        (* The invalid case can happen if the current context is itself invalid,
+           which should be rare but not anomalous. Treat invalid cases as
+           unknown -- it is annoying to propagate the invalid to coercions and
+           smiples, and we'll figure out that the context is invalid as soon as
+           we simplify a regular primitive anyways. *)
         match on_unknown with
         | Leave_unevaluated -> orig
         | Assume_value value -> value)
-      | Invalid ->
-        (* Shouldn't currently be possible *)
-        Misc.fatal_errorf "Invalid result from [check_rec_info] of %a" T.print
-          ty
     in
     (* Normally, we would expect that all variables appearing in a
        [Rec_info_expr] are available in the current context.

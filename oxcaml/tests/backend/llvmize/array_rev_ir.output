@@ -288,13 +288,13 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 
 @camlArray_rev__gc_roots = global { i64 } { i64 0 }, section ".data", align 8
 @header.camlArray_rev = global i64 1792, section ".data", align 8
-@camlArray_rev = global { ptr } { ptr @camlArray_rev__rev_1 }, section ".data", align 8
-@header.camlArray_rev__rev_1 = global i64 3063, section ".data", align 8
-@camlArray_rev__rev_1 = global { ptr, i64 } { ptr @camlArray_rev__rev_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@camlArray_rev = global { ptr } { ptr @camlArray_rev__rev_HIDE_STAMP }, section ".data", align 8
+@header.camlArray_rev__rev_HIDE_STAMP = global i64 3063, section ".data", align 8
+@camlArray_rev__rev_0_1 = global { ptr, i64 } { ptr @camlArray_rev__rev_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
 @camlArray_rev_data = external global ptr
 
 
 
 !0 = !{ i32 1, !"oxcaml_module", !"Array_rev" }
-!1 = !{ i32 1, !"oxcaml_short_frametables", i32 0 }
+!1 = !{ i32 1, !"oxcaml_short_frametables", i32 1 }
 !llvm.module.flags = !{ !0, !1 }

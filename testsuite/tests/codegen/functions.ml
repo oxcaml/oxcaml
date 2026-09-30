@@ -50,7 +50,7 @@ mutual_recursion:
   movq  %rbx, 40(%rdi)
   leaq  24(%rdi), %rbx
   addq  $8, %rsp
-  jmp   camlTOP3__f_5_8_code@PLT
+  jmp   camlTOP3__f_3_8_code@PLT
 
 mutual_recursion.f:
   movq  %rbx, %rdi
@@ -62,7 +62,7 @@ mutual_recursion.f:
   movq  16(%rdi), %rdi
   subq  %rdi, %rax
   incq  %rax
-  jmp   camlTOP3__g_6_9_code@PLT
+  jmp   camlTOP3__g_4_9_code@PLT
 
 mutual_recursion.g:
   cmpq  $1, %rax
@@ -71,7 +71,7 @@ mutual_recursion.g:
 .L0:
   addq  $24, %rbx
   addq  $-60, %rax
-  jmp   camlTOP3__f_5_8_code@PLT
+  jmp   camlTOP3__f_3_8_code@PLT
 |}]
 
 
@@ -81,7 +81,7 @@ let rec f x = (if x < 0 then (fun () -> f (x-100)) else (fun () -> x)) ()
 f.(fun):
   movq  16(%rbx), %rax
   addq  $-200, %rax
-  jmp   camlTOP4__f_8_13_code@PLT
+  jmp   camlTOP4__f_5_13_code@PLT
 
 f.(fun):
   movq  16(%rbx), %rax
@@ -138,14 +138,14 @@ let just_one_allocation (x: int) : int option = Some x
 [%%expect_asm X86_64{|
 just_one_allocation:
   subq  $8, %rsp
-  movq  %rax, %rbx
   subq  $16, %r15
   cmpq  (%r14), %r15
   jb    <hidden GC jump pad>
 .L0:
-  leaq  8(%r15), %rax
-  movq  $1024, -8(%rax)
-  movq  %rbx, (%rax)
+  leaq  8(%r15), %rbx
+  movq  $1024, -8(%rbx)
+  movq  %rax, (%rbx)
+  movq  %rbx, %rax
   addq  $8, %rsp
   ret
 |}]

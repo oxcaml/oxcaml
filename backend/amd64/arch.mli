@@ -41,6 +41,7 @@ module Extension : sig
     | AVX512CD
     | AVX512BW
     | AVX512VL
+    | AES
 
   val name : t -> string
 
@@ -94,6 +95,7 @@ type specific_operation =
                                           extension *)
   | Izextend32                         (* 32 to 64 bit conversion with zero
                                           extension *)
+  | Ineg                               (* integer negation *)
   | Irdtsc                             (* read timestamp *)
   | Irdpmc                             (* read performance counter *)
   | Ilfence                            (* load fence *)
@@ -127,6 +129,11 @@ val size_addr : int
 val size_int : int
 
 val size_float : int
+
+(** Registers encodable in the short frame descriptors' hot-register bitmap,
+    numbered as in [compute_live_offset]; must agree with
+    [caml_frame_hot_regs] in runtime/caml/frame_descriptors.h. *)
+val frame_hot_regs : int array
 
 val size_vec128 : int
 

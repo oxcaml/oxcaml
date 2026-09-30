@@ -781,12 +781,14 @@ let get_fields_usage_of_constructors :
          | None, Some m -> Some (Or_unknown.Known m))
        out1 out2)
 
-type set_of_closures_def =
+type 'a set_of_closures_def =
   | Not_a_set_of_closures
-  | Set_of_closures of (Function_slot.t * Code_id_or_name.t) list
+  | Set_of_closures of 'a
 
 let get_set_of_closures_def :
-    Datalog.database -> Code_id_or_name.t -> set_of_closures_def =
+    Datalog.database ->
+    Code_id_or_name.t ->
+    (Function_slot.t * Code_id_or_name.t) list set_of_closures_def =
   let q =
     query
       (let^$ [x], [relation; y] = ["x"], ["relation"; "y"] in
@@ -800,6 +802,58 @@ let get_set_of_closures_def :
           (Field.must_be_function_slot f, y) :: l)
     in
     match l with [] -> Not_a_set_of_closures | _ :: _ -> Set_of_closures l
+
+type function_and_value_slots =
+  { function_slots : (Function_slot.t * Code_id_or_name.t) list;
+    value_slots : (Value_slot.t * Code_id_or_name.t) list
+  }
+
+let get_set_of_closures_def_with_value_slots :
+    Datalog.database ->
+    Code_id_or_name.t ->
+    function_and_value_slots set_of_closures_def =
+  let q =
+    query
+      (let^$ [x], [relation; y] = ["x"], ["relation"; "y"] in
+       [ constructor ~base:x relation ~from:y;
+         when1
+           (fun field ->
+             Field.is_function_slot field || Field.is_value_slot field)
+           relation ]
+       =>? [relation; y])
+  in
+  fun db v ->
+    let function_slots, value_slots =
+      Cursor.fold_with_parameters q [v] db ~init:([], [])
+        ~f:(fun [field; y] (function_slots, value_slots) ->
+          match Field.view field with
+          | Function_slot function_slot ->
+            (function_slot, y) :: function_slots, value_slots
+          | Value_slot value_slot ->
+            function_slots, (value_slot, y) :: value_slots
+          | Block _ | Call_witness _ | Is_int | Get_tag | Boxed_number _
+          | Return_of_call _ | Code_id_of_call_witness ->
+            (* Excluded by the filter in the query above. *)
+            Misc.fatal_errorf
+              "[get_set_of_closures_def_with_value_slots] found unexpected \
+               field %a"
+              Field.print field)
+    in
+    match function_slots with
+    | [] -> Not_a_set_of_closures
+    | _ :: _ -> Set_of_closures { function_slots; value_slots }
+
+let all_closure_names : Datalog.database -> Code_id_or_name.Set.t =
+  let q =
+    query
+      (let$ [x; relation; y] = ["x"; "relation"; "y"] in
+       [ constructor ~base:x relation ~from:y;
+         when1 Field.is_function_slot relation ]
+       =>? [x])
+  in
+  fun db ->
+    Datalog.Cursor.fold q db ~init:Code_id_or_name.Set.empty ~f:(fun [x] acc ->
+        Code_id_or_name.Set.add x acc)
 
 let any_usage_query =
   let^? [x], [] = ["x"], [] in

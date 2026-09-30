@@ -49,11 +49,19 @@ let seq_or_avx sse vex ?i args =
   let seq = if Arch.Extension.enabled AVX then vex else sse in
   cfg_operation (Simd.sequence seq i) args
 
-let seq_or_avx_zeroed ~dbg seq instr ?i args =
+let seq_or_avx_with_merge ~dbg seq instr ?i args =
   if Arch.Extension.enabled AVX
   then
-    cfg_operation (Simd.instruction instr i)
-      (Cmm_helpers.vec128 ~dbg { word0 = 0L; word1 = 0L } :: args)
+    let args =
+      match[@warning "-4"] args with
+      | [(Cmm.Cvar _ as arg)] ->
+        (* The first operand only supplies the upper bits of the result, which
+           are irrelevant here. Using the source avoids materializing a zero,
+           and does not add a dependency since the source is read anyway. *)
+        [arg; arg]
+      | _ -> Cmm_helpers.vec128 ~dbg { word0 = 0L; word1 = 0L } :: args
+    in
+    cfg_operation (Simd.instruction instr i) args
   else cfg_operation (Simd.sequence seq i) args
 
 let simd_load ~mode instr args =
@@ -99,7 +107,7 @@ let extract_constant args name ~max =
       | Cvar _
       | Clet (_, _, _)
       | Cphantom_let (_, _, _)
-      | Ctuple _
+      | Cname_for_debugger _ | Ctuple _
       | Cop (_, _, _)
       | Csequence (_, _)
       | Cifthenelse (_, _, _, _, _, _)
@@ -127,6 +135,21 @@ let check_float_rounding = function
   (* Starts at 8, as these rounding modes also imply _MM_FROUND_NO_EXC (0x8) *)
   | 0x8 | 0x9 | 0xA | 0xB | 0xC -> ()
   | i -> bad_immediate "Invalid float rounding immediate: %d" i
+
+let select_operation_aes ~dbg:_ op args =
+  if not (Arch.Extension.enabled AES)
+  then None
+  else
+    match op with
+    | "caml_aes_dec" -> sse_or_avx aesdec vaesdec args
+    | "caml_aes_declast" -> sse_or_avx aesdeclast vaesdeclast args
+    | "caml_aes_enc" -> sse_or_avx aesenc vaesenc args
+    | "caml_aes_enclast" -> sse_or_avx aesenclast vaesenclast args
+    | "caml_aes_imc" -> sse_or_avx aesimc vaesimc args
+    | "caml_aes_keygenassist" ->
+      let i, args = extract_constant args ~max:255 op in
+      sse_or_avx aeskeygenassist vaeskeygenassist ~i args
+    | _ -> None
 
 let select_operation_clmul ~dbg:_ op args =
   if not (Arch.Extension.enabled CLMUL)
@@ -223,7 +246,7 @@ let select_operation_sse ~dbg op args =
     simd_store_sse_or_avx ~mode:Arch.identity_addressing movntps vmovntps_m128_X
       args
   | "caml_sse_float32_sqrt" | "sqrtf" ->
-    seq_or_avx_zeroed ~dbg Seq.sqrtss vsqrtss_X_X_Xm32 args
+    seq_or_avx_with_merge ~dbg Seq.sqrtss vsqrtss_X_X_Xm32 args
   | "caml_simd_float32_max" | "caml_sse_float32_max" ->
     sse_or_avx maxss vmaxss_X_X_Xm32 args
   | "caml_simd_float32_min" | "caml_sse_float32_min" ->
@@ -295,7 +318,7 @@ let select_operation_sse2 ~dbg op args =
     (* Does not have a mode; base address is always in rdi. *)
     sse_or_avx maskmovdqu vmaskmovdqu args
   | "caml_sse2_float64_sqrt" | "sqrt" ->
-    seq_or_avx_zeroed ~dbg Seq.sqrtsd vsqrtsd_X_X_Xm64 args
+    seq_or_avx_with_merge ~dbg Seq.sqrtsd vsqrtsd_X_X_Xm64 args
   | "caml_simd_float64_max" | "caml_sse2_float64_max" ->
     sse_or_avx maxsd vmaxsd_X_X_Xm64 args
   | "caml_simd_float64_min" | "caml_sse2_float64_min" ->
@@ -606,43 +629,43 @@ let select_operation_sse41 ~dbg op args =
     | "caml_sse41_float64_round" ->
       let i, args = extract_constant args ~max:15 op in
       check_float_rounding i;
-      seq_or_avx_zeroed ~dbg Seq.roundsd vroundsd ~i args
+      seq_or_avx_with_merge ~dbg Seq.roundsd vroundsd ~i args
     | "caml_simd_float64_round_current" | "caml_sse41_float64_round_current" ->
-      seq_or_avx_zeroed ~dbg Seq.roundsd vroundsd
+      seq_or_avx_with_merge ~dbg Seq.roundsd vroundsd
         ~i:(int_of_float_rounding RoundCurrent)
         args
     | "caml_simd_float64_round_neg_inf" | "caml_sse41_float64_round_neg_inf" ->
-      seq_or_avx_zeroed ~dbg Seq.roundsd vroundsd
+      seq_or_avx_with_merge ~dbg Seq.roundsd vroundsd
         ~i:(int_of_float_rounding RoundDown)
         args
     | "caml_simd_float64_round_pos_inf" | "caml_sse41_float64_round_pos_inf" ->
-      seq_or_avx_zeroed ~dbg Seq.roundsd vroundsd
+      seq_or_avx_with_merge ~dbg Seq.roundsd vroundsd
         ~i:(int_of_float_rounding RoundUp)
         args
     | "caml_simd_float64_round_towards_zero"
     | "caml_sse41_float64_round_towards_zero" ->
-      seq_or_avx_zeroed ~dbg Seq.roundsd vroundsd
+      seq_or_avx_with_merge ~dbg Seq.roundsd vroundsd
         ~i:(int_of_float_rounding RoundTruncate)
         args
     | "caml_sse41_float32_round" ->
       let i, args = extract_constant args ~max:15 op in
       check_float_rounding i;
-      seq_or_avx_zeroed ~dbg Seq.roundss vroundss ~i args
+      seq_or_avx_with_merge ~dbg Seq.roundss vroundss ~i args
     | "caml_simd_float32_round_current" | "caml_sse41_float32_round_current" ->
-      seq_or_avx_zeroed ~dbg Seq.roundss vroundss
+      seq_or_avx_with_merge ~dbg Seq.roundss vroundss
         ~i:(int_of_float_rounding RoundCurrent)
         args
     | "caml_simd_float32_round_neg_inf" | "caml_sse41_float32_round_neg_inf" ->
-      seq_or_avx_zeroed ~dbg Seq.roundss vroundss
+      seq_or_avx_with_merge ~dbg Seq.roundss vroundss
         ~i:(int_of_float_rounding RoundDown)
         args
     | "caml_simd_float32_round_pos_inf" | "caml_sse41_float32_round_pos_inf" ->
-      seq_or_avx_zeroed ~dbg Seq.roundss vroundss
+      seq_or_avx_with_merge ~dbg Seq.roundss vroundss
         ~i:(int_of_float_rounding RoundUp)
         args
     | "caml_simd_float32_round_towards_zero"
     | "caml_sse41_float32_round_towards_zero" ->
-      seq_or_avx_zeroed ~dbg Seq.roundss vroundss
+      seq_or_avx_with_merge ~dbg Seq.roundss vroundss
         ~i:(int_of_float_rounding RoundTruncate)
         args
     | "caml_sse41_int8x16_max" -> sse_or_avx pmaxsb vpmaxsb_X_X_Xm128 args
@@ -1221,6 +1244,7 @@ let select_operation_cfg ~dbg op args =
     match opt with Some x -> Some x | None -> try_ ~dbg op args
   in
   None
+  |> or_else select_operation_aes
   |> or_else select_operation_clmul
   |> or_else select_operation_popcnt
   |> or_else select_operation_lzcnt
@@ -1608,7 +1632,7 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
             | Iindexed2scaled (scale, displ) -> Some scale, Some displ
             | Ibased _ -> None, None)
           | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ibswap _
-          | Isextend32 | Izextend32 | Irdtsc | Irdpmc | Ilfence | Isfence
+          | Isextend32 | Izextend32 | Ineg | Irdtsc | Irdpmc | Ilfence | Isfence
           | Imfence | Ipackf32 | Isimd _ | Isimd_mem _ | Iprefetch _
           | Icldemote _ | Illvm_intrinsic _ ->
             assert false)
@@ -1744,7 +1768,7 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
               ( Ifloatarithmem _ | Ioffset_loc _ | Iprefetch _ | Icldemote _
               | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence | Ipackf32
               | Isimd _ | Isimd_mem _ | Ilea _ | Ibswap _ | Isextend32
-              | Izextend32 | Illvm_intrinsic _ )
+              | Izextend32 | Ineg | Illvm_intrinsic _ )
           | Intop_imm _ | Move | Load _ | Store _ | Intop _ | Int128op _
           | Alloc _ | Reinterpret_cast _ | Static_cast _ | Spill | Reload
           | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
@@ -1846,8 +1870,8 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
         Some [load; arith]
     | Isimd_mem _ ->
       Misc.fatal_error "Unexpected simd operation with memory arguments"
-    | Ioffset_loc _ | Ibswap _ | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence
-    | Ipackf32 | Isimd _ | Iprefetch _ | Icldemote _ ->
+    | Ioffset_loc _ | Ibswap _ | Ineg | Irdtsc | Irdpmc | Ilfence | Isfence
+    | Imfence | Ipackf32 | Isimd _ | Iprefetch _ | Icldemote _ ->
       None
     | Illvm_intrinsic intr ->
       Misc.fatal_errorf

@@ -588,3 +588,5 @@ let use_meet_env_strict ~meet_expanded_head t ~f : _ Or_bottom.t =
     let t = f (create t) in
     let tenv = final_typing_env ~meet_expanded_head t in
     if TE.is_bottom tenv then Bottom else Ok tenv
+
+let make_bottom t = map_typing_env ~f:TE.make_bottom t

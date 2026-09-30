@@ -592,6 +592,14 @@ let emit_directive state ~current_section ~all_sections
     | None -> Misc.fatal_error "Cannot emit ULEB128 for external symbol")
   | Delta_uleb128 { delta } -> (
     (* ULEB128 difference of two labels in the same text section *)
+    (* CR mshinwell: this uses the generic [Constant.eval], whose label and
+       symbol lookups discard the section that the definition was found in, so
+       a difference of two labels in different sections is silently evaluated
+       rather than rejected.  This relies on cross-section references having
+       been routed to relocations beforehand.  Consider aligning this with the
+       section-tracked evaluator used by the x86 binary emitter, which tracks
+       the section of each operand and accepts only differences within a single
+       section. *)
     match eval_constant state ~all_sections delta with
     | Some value -> D.Directive.emit_uleb128 buf value
     | None -> Misc.fatal_error "Delta_uleb128: cannot resolve label difference")

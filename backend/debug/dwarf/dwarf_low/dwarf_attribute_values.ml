@@ -43,18 +43,18 @@ module Value = struct
 
   let uleb128 ?comment i = Dwarf_value (V.uleb128 ?comment i)
 
+  let sleb128 ?comment i = Dwarf_value (V.sleb128 ?comment i)
+
   let string ?comment s = Dwarf_value (V.string ?comment s)
 
   let indirect_string ?comment ptr =
     Dwarf_value (V.indirect_string ?comment ptr)
 
+  (* Like the [_32_bit_with_offset(s)] functions below, this emits a 32-bit-wide
+     value regardless of the target address size; the assembler checks that the
+     value does not overflow. *)
   let distance_between_symbols_32_bit ?comment ~upper ~lower () =
-    assert (Dwarf_arch_sizes.size_addr = 4);
-    Dwarf_value (V.code_address_from_symbol_diff ?comment ~upper ~lower ())
-
-  let distance_between_symbols_64_bit ?comment ~upper ~lower () =
-    assert (Dwarf_arch_sizes.size_addr = 8);
-    Dwarf_value (V.code_address_from_symbol_diff ?comment ~upper ~lower ())
+    Dwarf_value (V.distance_between_symbols_32_bit ?comment ~upper ~lower ())
 
   let distance_between_labels_32_bit ?comment ~upper ~lower () =
     Dwarf_value (V.distance_between_labels_32_bit ?comment ~upper ~lower ())
@@ -62,23 +62,20 @@ module Value = struct
   let distance_between_labels_64_bit ?comment ~upper ~lower () =
     Dwarf_value (V.distance_between_labels_64_bit ?comment ~upper ~lower ())
 
-  let distance_between_labels_64_bit_with_offsets ?comment ~upper ~upper_offset
+  (* Unlike [distance_between_labels_32_bit] and its relatives above, the
+     following two functions emit 32-bit-wide values regardless of the target
+     address size; the assembler checks that the values do not overflow. *)
+  let distance_between_labels_32_bit_with_offsets ?comment ~upper ~upper_offset
       ~lower ~lower_offset () =
     Dwarf_value
-      (V.distance_between_labels_64_bit_with_offsets ?comment ~upper
+      (V.distance_between_labels_32_bit_with_offsets ?comment ~upper
          ~upper_offset ~lower ~lower_offset ())
 
-  let distance_between_label_and_symbol_32_bit ?comment ~upper ~lower () =
-    assert (Dwarf_arch_sizes.size_addr = 4);
+  let distance_between_label_and_symbol_32_bit_with_offset ?comment ~upper
+      ~offset_upper ~lower () =
     Dwarf_value
-      (V.code_address_from_label_symbol_diff ?comment ~upper ~lower
-         ~offset_upper:Targetint.zero ())
-
-  let distance_between_label_and_symbol_64_bit ?comment ~upper ~lower () =
-    assert (Dwarf_arch_sizes.size_addr = 8);
-    Dwarf_value
-      (V.code_address_from_label_symbol_diff ?comment ~upper ~lower
-         ~offset_upper:Targetint.zero ())
+      (V.distance_between_label_and_symbol_32_bit ?comment ~upper ~offset_upper
+         ~lower ())
 
   let code_address_from_label ?comment lbl =
     Dwarf_value (V.code_address_from_label ?comment lbl)

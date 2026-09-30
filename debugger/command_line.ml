@@ -975,7 +975,8 @@ let info_events _ppf lexbuf =
            end_char
            ((match ev.ev_kind with
                Event_before   -> "before"
-             | Event_after _  -> "after"
+             | Event_after _
+             | Event_after_untyped -> "after"
              | Event_pseudo   -> "pseudo")
             ^
             (match ev.ev_info with

@@ -94,8 +94,15 @@ and variant_subkind consts non_consts : Fexpr.subkind =
   in
   let non_consts =
     non_consts |> Tag.Scannable.Map.bindings
-    |> List.map (fun (tag, (_shape, sk)) ->
-        Tag.Scannable.to_int tag, List.map kind_with_subkind sk)
+    |> List.map (fun (tag, shape_and_fields) ->
+        ( Tag.Scannable.to_int tag,
+          match
+            (shape_and_fields
+              : Flambda_kind.With_subkind.Non_null_value_subkind
+                .constructor_shape)
+          with
+          | Undetermined -> None
+          | Determined (_shape, sk) -> Some (List.map kind_with_subkind sk) ))
   in
   Variant { consts; non_consts }
 
@@ -692,6 +699,7 @@ and apply_expr env (app : Apply_expr.t) : Fexpr.expr =
       match Apply_expr.inlined app with
       | Default_inlined -> Some Default_inlined
       | Hint_inlined -> Some Hint_inlined
+      | Forward_inlined -> Some Forward_inlined
       | Always_inlined _ -> Some Always_inlined
       | Unroll (n, _) -> Some (Unroll n)
       | Never_inlined -> Some Never_inlined
@@ -866,13 +874,6 @@ let conv flambda_unit =
   let env =
     Env.bind_toplevel_alloc_region env
       (Flambda_unit.toplevel_my_alloc_region flambda_unit)
-  in
-  let env =
-    Env.bind_toplevel_region env (Flambda_unit.toplevel_my_region flambda_unit)
-  in
-  let env =
-    Env.bind_toplevel_ghost_region env
-      (Flambda_unit.toplevel_my_ghost_region flambda_unit)
   in
   (* Bind all code ids in toplevel let bindings at the start, since they don't
      necessarily occur in dependency order *)

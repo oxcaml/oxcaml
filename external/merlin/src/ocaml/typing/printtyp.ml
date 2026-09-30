@@ -122,7 +122,7 @@ module Doc = struct
       Outcometree.ocstr_name = name;
       ocstr_args = args;
       ocstr_return_type = ret;
-      ocstr_all_void = false;
+      ocstr_immediate_all_void = false;
     }
 
   (* Print a signature body (used by -i when compiling a .ml) *)

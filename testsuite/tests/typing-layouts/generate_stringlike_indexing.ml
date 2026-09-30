@@ -424,6 +424,9 @@ let small_int_extra_bounds_template ~module_ =
 type index =
   { boxed_type : string
   ; tested_type : string
+  ; prim_index_type : string
+    (* spelling of the index type in primitive names, which use "#" even for
+       types whose unboxed versions are spelled "_u" *)
   ; of_int : string
   ; unbox : string
   ; extra_bounds : string
@@ -447,11 +450,19 @@ type container =
   ; test_setters : bool
   }
 
+(* The unboxed versions of [int32] and [int64] are spelled "_u", but their
+   primitive names still use "#" (like the other scalars). *)
+let unboxed_type_name = function
+  | "int32" -> "int32_u"
+  | "int64" -> "int64_u"
+  | "nativeint" -> "nativeint_u"
+  | type_ -> type_ ^ "#"
+
 let int_result ~width ~unboxed ~module_ ~examples =
   let type_ = String.lowercase_ascii module_ in
   let unboxed_sigil = if unboxed then "#" else "" in
   { boxed_type = type_
-  ; tested_type = type_ ^ unboxed_sigil
+  ; tested_type = (if unboxed then unboxed_type_name type_ else type_)
   ; width
   ; unboxed_sigil
   ; box =
@@ -469,7 +480,8 @@ let int_result ~width ~unboxed ~module_ ~examples =
 
 let indices =
   [ { boxed_type = "nativeint"
-    ; tested_type = "nativeint#"
+    ; tested_type = "nativeint_u"
+    ; prim_index_type = "nativeint#"
     ; of_int = "Nativeint.of_int"
     ; unbox = "Nativeint_u.of_nativeint"
     ; extra_bounds = int_extra_bounds_template ~module_:"Nativeint"
@@ -477,6 +489,7 @@ let indices =
     }
   ; { boxed_type = "int8"
     ; tested_type = "int8#"
+    ; prim_index_type = "int8#"
     ; of_int = "Int8.of_int"
     ; unbox = "Int8_u.of_int8"
     ; extra_bounds = small_int_extra_bounds_template ~module_:"Int8"
@@ -484,20 +497,23 @@ let indices =
     }
   ; { boxed_type = "int16"
     ; tested_type = "int16#"
+    ; prim_index_type = "int16#"
     ; of_int = "Int16.of_int"
     ; unbox = "Int16_u.of_int16"
     ; extra_bounds = int_extra_bounds_template ~module_:"Int16"
     ; max_index = "Int16.(to_int max_int) - 1"
     }
   ; { boxed_type = "int32"
-    ; tested_type = "int32#"
+    ; tested_type = "int32_u"
+    ; prim_index_type = "int32#"
     ; of_int = "Int32.of_int"
     ; unbox = "Int32_u.of_int32"
     ; extra_bounds = int_extra_bounds_template ~module_:"Int32"
     ; max_index = "Int32.(to_int max_int) - 1"
     }
   ; { boxed_type = "int64"
-    ; tested_type = "int64#"
+    ; tested_type = "int64_u"
+    ; prim_index_type = "int64#"
     ; of_int = "Int64.of_int"
     ; unbox = "Int64_u.of_int64"
     ; extra_bounds = int_extra_bounds_template ~module_:"Int64"
@@ -539,7 +555,7 @@ let datas =
       width = "f32";
       unboxed_sigil = "#";
       boxed_type = "float32";
-      tested_type = "float32#";
+      tested_type = "float32_u";
       box = "Float32_u.to_float32";
       unbox = "Float32_u.of_float32";
       eq = "Float32.equal";
@@ -558,6 +574,7 @@ let tests =
   let ( let* ) x f = List.concat_map f x in
   let* { boxed_type = boxed_index
        ; tested_type = tested_index
+       ; prim_index_type
        ; of_int
        ; unbox = unbox_index
        ; extra_bounds
@@ -604,7 +621,7 @@ let tests =
           ~index:tested_index
           ~boxed_data
           ~tested_data
-          ~index_sigil:("_indexed_by_" ^ tested_index)
+          ~index_sigil:("_indexed_by_" ^ prim_index_type)
           ~get_sigil:width
           ~set_sigil
           ~unboxed_sigil

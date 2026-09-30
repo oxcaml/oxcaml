@@ -599,8 +599,8 @@ let check_for_unset_parameters penv global =
 
 let mode_pers_mod staticity =
   let hint : _ Mode.Hint.const = Legacy Compilation_unit in
-  Mode.Value.of_const
-    { Mode.Value.Const.legacy with staticity }
+  Mode.With_regionality.of_const
+    { Mode.With_regionality.Const.legacy with staticity }
     ~hint_monadic:hint ~hint_comonadic:hint
 
 let rec global_of_global_name penv ~check name ~allow_excess_args =
@@ -616,6 +616,16 @@ let rec global_of_global_name penv ~check name ~allow_excess_args =
   | exception Not_found -> load ()
 
 and compute_global penv modname ~params ~check ~allow_excess_args =
+  let args =
+    if allow_excess_args then
+      (* Drop anything we already know is an excess argument, since otherwise
+         we'll resolve it now only to throw it away in Global.subst. *)
+      List.filter
+        (fun ({ param; _ } : Global_module.Name.argument) ->
+           List.exists (Global_module.Parameter_name.equal param) params)
+        modname.Global_module.Name.args
+    else modname.Global_module.Name.args
+  in
   let arg_global_by_param_name =
     List.map
       (fun ({ param = name; value } : Global_module.Name.argument) ->
@@ -624,12 +634,12 @@ and compute_global penv modname ~params ~check ~allow_excess_args =
          | exception Not_found ->
              error
                (Unbound_module_as_argument_value { instance = modname; value }))
-      modname.Global_module.Name.args
+      args
   in
   let subst : Global_module.subst =
     Global_module.Parameter_name.Map.of_list arg_global_by_param_name
   in
-  if check && modname.Global_module.Name.args <> [] then begin
+  if check && args <> [] then begin
     let compare_by_param param1 (param2, _) =
       Global_module.Parameter_name.compare param1 param2
     in
@@ -745,7 +755,7 @@ and acknowledge_new_pers_name penv check global_name global import =
     sign.bound_globals;
   let pn_sign =
     let signature, staticity = sign.sign in
-    let mode = Mode.Value.disallow_right (mode_pers_mod staticity) in
+    let mode = Mode.With_regionality.disallow_right (mode_pers_mod staticity) in
     let mode =
       match import.imp_visibility with
       | Visible { cmx_guaranteed = true } ->
@@ -754,9 +764,9 @@ and acknowledge_new_pers_name penv check global_name global import =
         (* Without a guaranteed [.cmx], the unit is not available for
            compile-time evaluation, so its staticity is forced to [Dynamic]
            regardless of what the [.cmi] claims. *)
-        Mode.Value.join
+        Mode.With_regionality.join
           [ mode;
-            Mode.Value.min_with_monadic Staticity
+            Mode.With_regionality.min_with_monadic Staticity
               (Mode.Staticity.of_const
                  ~hint:(Cmx_not_guaranteed import.imp_impl)
                  Mode.Staticity.Dynamic) ]
@@ -861,7 +871,7 @@ let make_binding penv (global : Global_module.t) (impl : CU.t option) : binding 
     Constant unit
 
 type address =
-  | Aunit of Compilation_unit.t
+  | Aunit of Compilation_unit.t * Mode.With_regionality.l
   | Alocal of Ident.t
   | Adot of address * Types.module_representation * int
 
@@ -881,7 +891,7 @@ let acknowledge_new_pers_struct penv modname pers_name val_of_pers_sig short_pat
   let {persistent_structures; locals_bound_to_runtime_parameters; _} = penv in
   let import = pers_name.pn_import in
   let global = pers_name.pn_global in
-  let sign = pers_name.pn_sign in
+  let (_, mode) as sign = pers_name.pn_sign in
   let is_param = import.imp_is_param in
   let impl = import.imp_impl in
   let filename = import.imp_filename in
@@ -899,7 +909,7 @@ let acknowledge_new_pers_struct penv modname pers_name val_of_pers_sig short_pat
   let address : address =
     match binding with
     | Runtime_parameter id -> Alocal id
-    | Constant unit -> Aunit unit
+    | Constant unit -> Aunit (unit, mode)
   in
   let shape =
     match import.imp_impl, import.imp_params with
@@ -1127,6 +1137,10 @@ let loaded_transitive_dependencies penv intfs =
   in
   Compilation_unit.Name.Set.iter add_loaded_deps intfs;
   !names
+
+let find_import penv modname =
+  let import = find_import ~allow_hidden:true penv ~check:true modname in
+  import.imp_impl, import.imp_params, import.imp_raw_sign
 
 let require_impl_for_quote {quoted_impls; _} name =
   quoted_impls := CU.Set.add name !quoted_impls

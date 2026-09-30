@@ -158,7 +158,8 @@ let collect_in_stats (cfg_with_infos : Cfg_with_infos.t)
         let is_destruction_point =
           Proc.is_destruction_point
             ~more_destruction_points:
-              (Lazy.force Regalloc_split_utils.split_more_destruction_points)
+              (Regalloc_utils.Param.get
+                 Regalloc_split_utils.split_more_destruction_points)
             block.terminator.desc
         in
         let num_destruction_points =

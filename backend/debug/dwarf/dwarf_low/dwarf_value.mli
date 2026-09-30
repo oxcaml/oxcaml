@@ -72,7 +72,11 @@ val code_address_from_label_symbol_diff :
 val code_address_from_symbol_diff :
   ?comment:string -> upper:Asm_symbol.t -> lower:Asm_symbol.t -> unit -> t
 
-val code_address_from_symbol_plus_bytes : Asm_symbol.t -> Targetint.t -> t
+val code_address_from_symbol_plus_offset :
+  ?comment:string -> Asm_symbol.t -> offset_in_bytes:Targetint.t -> t
+
+val code_address_from_label_or_symbol_plus_offset :
+  ?comment:string -> Asm_label_or_symbol.t -> offset_in_bytes:Targetint.t -> t
 
 val offset_into_debug_info : ?comment:string -> Asm_label.t -> t
 
@@ -108,7 +112,12 @@ val distance_between_labels_32_bit :
 val distance_between_labels_64_bit :
   ?comment:string -> upper:Asm_label.t -> lower:Asm_label.t -> unit -> t
 
-val distance_between_labels_64_bit_with_offsets :
+(** As [distance_between_labels_32_bit] or [distance_between_labels_64_bit],
+    according to the current DWARF format. *)
+val distance_between_labels_format_width :
+  ?comment:string -> upper:Asm_label.t -> lower:Asm_label.t -> unit -> t
+
+val distance_between_labels_32_bit_with_offsets :
   ?comment:string ->
   upper:Asm_label.t ->
   upper_offset:Targetint.t ->
@@ -116,6 +125,20 @@ val distance_between_labels_64_bit_with_offsets :
   lower_offset:Targetint.t ->
   unit ->
   t
+
+val distance_between_label_and_symbol_32_bit :
+  ?comment:string ->
+  upper:Asm_label.t ->
+  offset_upper:Targetint.t ->
+  lower:Asm_symbol.t ->
+  unit ->
+  t
+
+(** The distance between two symbols in the current compilation unit, emitted as
+    a 32-bit-wide value regardless of the target address size. The assembler
+    checks that the value does not overflow. *)
+val distance_between_symbols_32_bit :
+  ?comment:string -> upper:Asm_symbol.t -> lower:Asm_symbol.t -> unit -> t
 
 val append_to_comment : t -> string -> t
 

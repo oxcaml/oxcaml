@@ -60,7 +60,7 @@ val add_or_replace_attribute_value :
   t -> Dwarf_attribute_values.Attribute_value.t -> unit
 
 val replace_all_attribute_values :
-  t -> Dwarf_attribute_values.Attribute_value.t list -> t
+  t -> Dwarf_attribute_values.Attribute_value.t list -> unit
 
 (* CR-someday mshinwell: add a [name] argument to the creation functions *)
 val set_name : t -> Asm_symbol.t -> unit
@@ -77,7 +77,7 @@ type fold_arg = private
         has_children : Child_determination.t;
         attribute_values :
           Dwarf_attribute_values.Attribute_value.t
-          Dwarf_attributes.Attribute_specification.Sealed.Map.t;
+          Dwarf_attributes.Attribute.Sealed.Map.t;
         label : Asm_label.t;
         name : Asm_symbol.t option;
         location_list_in_debug_loc_table :

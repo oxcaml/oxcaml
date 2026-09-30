@@ -17,7 +17,7 @@ open! Stdlib
 
 [@@@ocaml.flambda_o3]
 
-type t = nativeint#
+type t = nativeint_u
 
 external to_nativeint : t -> (nativeint[@local_opt]) @@ portable =
   "%box_nativeint" [@@warning "-187"]

@@ -3,6 +3,8 @@
 This directory contains tests that verify DWARF debugging information produced by the OxCaml compiler.
 Each test compiles an OCaml program with debugging flags, runs it under LLDB with a script of debugger commands, and compares the output against expected results. The output shows what LLDB displays when inspecting OCaml values, function calls, and program state.
 
+The `dwarf5/` subdirectory builds and runs the same tests compiled with `-gdwarf-version 5`, copying the sources and LLDB scripts verbatim. The filtered output must be identical to the DWARF-4 expected outputs in this directory, so a diff there indicates a DWARF-5-specific bug.
+
 **Running Tests** From the repository root:
 
 ```bash

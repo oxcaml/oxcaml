@@ -17,7 +17,7 @@
 
 open! Int_replace_polymorphic_compare
 
-[@@@ocaml.warning "+a-4-40-41-42"]
+[@@@ocaml.warning "+a-40-41-42"]
 
 open Arch
 open Proc
@@ -33,7 +33,7 @@ type addressing_expr =
 
 let rec select_addr exp =
   let default = Alinear exp, 0 in
-  match exp with
+  match[@ocaml.warning "-fragile-match"] exp with
   | Cmm.Cconst_symbol (s, _) when not !Clflags.dlcode -> Asymbol s, 0
   | Cmm.Cop ((Caddi | Caddv | Cadda), [arg; Cconst_int (m, _)], _)
   | Cmm.Cop ((Caddi | Caddv | Cadda), [Cconst_int (m, _); arg], _) ->
@@ -86,7 +86,12 @@ let rec select_addr exp =
     match select_addr arg with
     | Ascale (e, scale), off when scale mod 2 = 0 ->
       Ascale (e, scale), off lor 1
-    | _ -> default)
+    | ( ( Asymbol _ | Alinear _
+        | Aadd (_, _)
+        | Ascale (_, _)
+        | Ascaledadd (_, _, _) ),
+        _ ) ->
+      default)
   | _ -> default
 
 (* Special constraints on operand and result registers *)
@@ -161,6 +166,7 @@ let pseudoregs_for_operation op arg res =
   | Intop_imm ((Imul | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr), _)
   | Floatop ((Float64 | Float32), (Iabsf | Inegf))
   | Specific (Ibswap { bitwidth = Thirtytwo | Sixtyfour })
+  | Specific Ineg
   | Opaque ->
     res, res
   (* For xchg, args must be a register allowing access to high 8 bit register
@@ -244,14 +250,15 @@ let is_immediate (op : Operation.integer_operation) n :
   match op with
   | Iadd | Isub | Imul | Iand | Ior | Ixor | Icomp _ ->
     Is_immediate (int_is_immediate n)
-  | _ -> Use_default
+  | Imulh _ | Idiv _ | Imod _ | Ilsl | Ilsr | Iasr | Iclz | Ictz | Ipopcnt ->
+    Use_default
 
 let is_immediate_test _cmp n : Cfg_selectgen_target_intf.is_immediate_result =
   Is_immediate (int_is_immediate n)
 
 let is_simple_expr (expr : Cmm.expression) :
     Cfg_selectgen_target_intf.is_simple_expr_result =
-  match expr with
+  match[@ocaml.warning "-fragile-match"] expr with
   | Cop (Cextcall { func = fn; _ }, args, _) when List.mem fn inline_ops ->
     (* inlined ops are simple if their arguments are *)
     Simple_if_all_expressions_are args
@@ -259,7 +266,7 @@ let is_simple_expr (expr : Cmm.expression) :
 
 let effects_of (expr : Cmm.expression) :
     Cfg_selectgen_target_intf.effects_of_result =
-  match expr with
+  match[@ocaml.warning "-fragile-match"] expr with
   | Cop (Cextcall { func = fn; _ }, args, _) when List.mem fn inline_ops ->
     Effects_of_all_expressions args
   | _ -> Use_default
@@ -290,7 +297,10 @@ let select_addressing chunk exp : addressing_mode * Cmm.expression =
 let select_store' ~is_assign addr (exp : Cmm.expression) :
     Cfg_selectgen_target_intf.select_store_result =
   match exp with
-  | Cconst_int (n, _dbg) when int_is_immediate n ->
+  (* The immediate of a store is never negated, so the full signed 32-bit range
+     applies (hence [is_immediate_natint] rather than [int_is_immediate], whose
+     range is symmetric). *)
+  | Cconst_int (n, _dbg) when is_immediate_natint (Nativeint.of_int n) ->
     Rewritten
       (Specific (Istore_int (Nativeint.of_int n, addr, is_assign)), Ctuple [])
   | Cconst_natint (n, _dbg) when is_immediate_natint n ->
@@ -304,7 +314,7 @@ let select_store' ~is_assign addr (exp : Cmm.expression) :
   | Cvar _
   | Clet (_, _, _)
   | Cphantom_let (_, _, _)
-  | Ctuple _
+  | Cname_for_debugger _ | Ctuple _
   | Cop (_, _, _)
   | Csequence (_, _)
   | Cifthenelse (_, _, _, _, _, _)
@@ -346,7 +356,7 @@ let insert_move_extcall_arg _exttype (src : Reg.t array) (dst : Reg.t array) :
 let select_floatarith commutative width (regular_op : Operation.float_operation)
     mem_op args : Cfg_selectgen_target_intf.select_operation_result =
   let open Cmm in
-  match width, args with
+  match[@ocaml.warning "-fragile-match"] width, args with
   | Float64, [arg1; Cop (Cload { memory_chunk = Double as chunk; _ }, [loc2], _)]
   | ( Float32,
       [ arg1;
@@ -381,12 +391,17 @@ let select_operation'
     (args : Cmm.expression list) dbg ~label_after:_ :
     Cfg_selectgen_target_intf.select_operation_result =
   match op with
-  (* Recognize the LEA instruction *)
+  (* Recognize the NEG and LEA instructions *)
   | Caddi | Caddv | Cadda | Csubi | Cor | Cmuli -> (
-    match select_addressing Word_int (Cop (op, args, dbg)) with
-    | Iindexed _, _ | Iindexed2 0, _ -> Use_default
-    | ((Iindexed2 _ | Iscaled _ | Iindexed2scaled _ | Ibased _) as addr), arg ->
-      Rewritten (specific (Ilea addr), [arg]))
+    match[@ocaml.warning "-fragile-match"] op, args with
+    | Csubi, ([Cconst_int (0, _); arg] | [Cconst_natint (0n, _); arg]) ->
+      Rewritten (specific Ineg, [arg])
+    | _, _ -> (
+      match select_addressing Word_int (Cop (op, args, dbg)) with
+      | Iindexed _, _ | Iindexed2 0, _ -> Use_default
+      | ((Iindexed2 _ | Iscaled _ | Iindexed2scaled _ | Ibased _) as addr), arg
+        ->
+        Rewritten (specific (Ilea addr), [arg])))
   (* Recognize float arithmetic with memory. *)
   | Caddf width -> select_floatarith true width Iaddf Ifloatadd args
   | Csubf width -> select_floatarith false width Isubf Ifloatsub args
@@ -417,7 +432,7 @@ let select_operation'
       | None -> Use_default))
   (* Recognize store instructions *)
   | Cstore (((Word_int | Word_val) as chunk), _init) -> (
-    match args with
+    match[@ocaml.warning "-fragile-match"] args with
     | [loc; Cop (Caddi, [Cop (Cload _, [loc'], _); Cconst_int (n, _dbg)], _)]
       when Stdlib.( = ) loc loc' && int_is_immediate n ->
       let addr, arg = select_addressing chunk loc in
@@ -426,20 +441,20 @@ let select_operation'
   | Cbswap { bitwidth } ->
     let bitwidth = select_bitwidth bitwidth in
     Rewritten (specific (Ibswap { bitwidth }), args)
+  (* Recognize sign extension *)
   | Casr -> (
-    (* Recognize sign extension *)
-    match args with
+    match[@ocaml.warning "-fragile-match"] args with
     | [Cop (Clsl, [k; Cconst_int (32, _)], _); Cconst_int (32, _)] ->
       Rewritten (specific Isextend32, [k])
     | _ -> Use_default)
   (* Recognize zero extension *)
   | Clsr -> (
-    match args with
+    match[@ocaml.warning "-fragile-match"] args with
     | [Cop (Clsl, [k; Cconst_int (32, _)], _); Cconst_int (32, _)] ->
       Rewritten (specific Izextend32, [k])
     | _ -> Use_default)
   | Cand -> (
-    match args with
+    match[@ocaml.warning "-fragile-match"] args with
     | [arg; Cconst_int (0xffff_ffff, _)]
     | [arg; Cconst_natint (0xffff_ffffn, _)]
     | [Cconst_int (0xffff_ffff, _); arg]
@@ -457,7 +472,13 @@ let select_operation'
            arguments. *)
         Rewritten
           (Basic (Op (Csel (Ifloattest (w, CFneq)))), [earg; ifnot; ifso])
-      | _ -> Rewritten (Basic (Op (Csel cond)), [earg; ifso; ifnot]))
+      | Ifloattest
+          ( _,
+            (CFneq | CFlt | CFnlt | CFgt | CFngt | CFle | CFnle | CFge | CFnge)
+          )
+      | Itruetest | Ifalsetest | Iinttest _ | Iinttest_imm _ | Ioddtest
+      | Ieventest ->
+        Rewritten (Basic (Op (Csel cond)), [earg; ifso; ifnot]))
     | _ -> Use_default)
   | Cprefetch { is_write; locality } ->
     (* Emit prefetch for read hint when prefetchw is not supported. Matches the
@@ -471,11 +492,34 @@ let select_operation'
       match select_locality locality with
       | Moderate when is_write && not (Arch.Extension.enabled PREFETCHWT1) ->
         High
-      | l -> l
+      | (Nonlocal | Low | Moderate | High) as l -> l
     in
     let addr, eloc = select_addressing Word_int (one_arg "prefetch" args) in
     Rewritten (specific (Iprefetch { is_write; addr; locality }), [eloc])
-  | _ -> Use_default
+  | Cextcall
+      { func = _;
+        ty = _;
+        ty_args = _;
+        alloc = _;
+        builtin = false;
+        returns = _;
+        effects = _;
+        coeffects = _
+      }
+  | Cstore
+      ( ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
+        | Thirtytwo_unsigned | Thirtytwo_signed | Word_mask | Single _ | Double
+        | Onetwentyeight_unaligned | Onetwentyeight_aligned
+        | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
+        | Fivetwelve_aligned ),
+        _ )
+  | Capply _ | Cload _ | Calloc _ | Cmulhi _ | Cdivi _ | Cmodi _ | Caddi128
+  | Csubi128 | Cmuli64 _ | Cxor | Clsl | Cclz | Cctz | Cpopcnt | Catomic _
+  | Ccmpi _ | Cnegf _ | Cabsf _ | Creinterpret_cast _ | Cstatic_cast _ | Ccmpf _
+  | Craise _ | Cprobe _ | Cprobe_is_enabled _ | Copaque | Cbeginregion
+  | Cendregion | Ctuple_field _ | Cdls_get | Ctls_get | Cdomain_index | Cpoll
+  | Cpause ->
+    Use_default
 
 let select_operation
     ~(generic_select_condition :
@@ -492,7 +536,25 @@ let select_operation
       (* Illvm_intrinsic must not allocate on the OCaml heap. See
          [Arch.operation_allocates]. *)
       Rewritten (specific (Illvm_intrinsic func), args)
-    | _ -> Use_default
+    | Cextcall
+        { func = _;
+          ty = _;
+          ty_args = _;
+          alloc = _;
+          builtin = false;
+          returns = _;
+          effects = _;
+          coeffects = _
+        }
+    | Capply _ | Cload _ | Calloc _ | Cstore _ | Caddi | Csubi | Cmuli
+    | Cmulhi _ | Cdivi _ | Cmodi _ | Caddi128 | Csubi128 | Cmuli64 _ | Cand
+    | Cor | Cxor | Clsl | Clsr | Casr | Ccsel _ | Cclz | Cctz | Cpopcnt
+    | Cprefetch _ | Catomic _ | Ccmpi _ | Caddv | Cadda | Cnegf _ | Cabsf _
+    | Caddf _ | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32 | Creinterpret_cast _
+    | Cstatic_cast _ | Ccmpf _ | Craise _ | Cprobe _ | Cprobe_is_enabled _
+    | Copaque | Cbeginregion | Cendregion | Ctuple_field _ | Cdls_get | Ctls_get
+    | Cdomain_index | Cpoll | Cpause ->
+      Use_default
     (* LLVM backend doesn't need target-specific instructons/operands since they
        will be generated by LLVM itself anyways. *)
   else select_operation' ~generic_select_condition op args dbg ~label_after
@@ -514,3 +576,10 @@ let insert_op_debug env sub_cfg op dbg rs rd :
   if !Clflags.llvm_backend
   then Use_default
   else insert_op_debug' env sub_cfg op dbg rs rd
+
+let pseudoregs_for_operation op rs rd :
+    Cfg_selectgen_target_intf.pseudoregs_for_operation_result =
+  try
+    let rsrc, rdst = pseudoregs_for_operation op rs rd in
+    Constrained (rsrc, rdst)
+  with Use_default_exn -> Use_default_regs

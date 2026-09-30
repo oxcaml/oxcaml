@@ -15,15 +15,10 @@
 open Ocamltest_stdlib
 open Actions
 
-let env_setting env_reader default_setting =
-  Printf.sprintf "%s=%s"
-    env_reader.Clflags.env_var
-    (env_reader.Clflags.print default_setting)
-
 let default_debugger_env = [|
     "TERM=dumb";
-    env_setting Clflags.color_reader Misc.Color.default_setting;
-    env_setting Clflags.error_style_reader Misc.Error_style.default_setting;
+    "OCAML_COLOR=auto";
+    "OCAML_ERROR_STYLE=contextual"
   |]
 
 let env_with_lib_unix env =

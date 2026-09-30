@@ -84,27 +84,27 @@ Error: The kind of type "float#" is float64 mod everything
          because of the definition of t at line 1, characters 0-19.
 |}]
 
-type t : k = int64#
+type t : k = int64_u
 [%%expect{|
-Line 1, characters 0-19:
-1 | type t : k = int64#
-    ^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "int64#" is bits64 mod everything
-         because it is the unboxed version of the primitive type int64.
-       But the kind of type "int64#" must be a subkind of k
-         because of the definition of t at line 1, characters 0-19.
+Line 1, characters 0-20:
+1 | type t : k = int64_u
+    ^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "int64_u" is bits64 mod everything
+         because it is the primitive type int64_u.
+       But the kind of type "int64_u" must be a subkind of k
+         because of the definition of t at line 1, characters 0-20.
 |}]
 
-type t : k = #(float# * int64#)
+type t : k = #(float# * int64_u)
 [%%expect{|
-Line 1, characters 0-31:
-1 | type t : k = #(float# * int64#)
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "#(float# * int64#)" is
+Line 1, characters 0-32:
+1 | type t : k = #(float# * int64_u)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "#(float# * int64_u)" is
            float64 mod everything & bits64 mod everything
          because it is an unboxed tuple.
-       But the kind of type "#(float# * int64#)" must be a subkind of k
-         because of the definition of t at line 1, characters 0-31.
+       But the kind of type "#(float# * int64_u)" must be a subkind of k
+         because of the definition of t at line 1, characters 0-32.
 |}]
 
 (**********************************************)

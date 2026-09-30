@@ -21,7 +21,7 @@ let emit0_delayed ~asm_directives:_ = ()
 
 let emit0 ~asm_directives ~compilation_unit_proto_die
     ~compilation_unit_header_label ~debug_loc_table ~debug_ranges_table
-    ~address_table ~location_list_table =
+    ~address_table ~location_list_table ~range_list_table =
   (* CR-soon mshinwell: the [compilation_unit_die] member of the record returned
      from [Assign_abbrevs.run] is now unused *)
   let assigned_abbrevs =
@@ -63,18 +63,24 @@ let emit0 ~asm_directives ~compilation_unit_proto_die
           (Debug_ranges_table.emit ~asm_directives)
           debug_ranges_table
       | Five ->
+        A.switch_to_section (DWARF Debug_addr);
         Profile.record "addr_table"
           (Address_table.emit ~asm_directives)
           address_table;
         A.switch_to_section (DWARF Debug_loclists);
         Profile.record "loclists_table"
           (Location_list_table.emit ~asm_directives)
-          location_list_table)
+          location_list_table;
+        A.switch_to_section (DWARF Debug_rnglists);
+        Profile.record "rnglists_table"
+          (Range_list_table.emit ~asm_directives)
+          range_list_table)
     ()
 
 let emit ~asm_directives ~compilation_unit_proto_die
     ~compilation_unit_header_label ~debug_loc_table ~debug_ranges_table
-    ~address_table ~location_list_table ~binary_backend_available =
+    ~address_table ~location_list_table ~range_list_table
+    ~binary_backend_available =
   if
     (* CR mshinwell: support the internal assembler *)
     binary_backend_available
@@ -82,7 +88,7 @@ let emit ~asm_directives ~compilation_unit_proto_die
   else
     emit0 ~asm_directives ~compilation_unit_proto_die
       ~compilation_unit_header_label ~debug_loc_table ~debug_ranges_table
-      ~address_table ~location_list_table
+      ~address_table ~location_list_table ~range_list_table
 
 let emit_delayed ~asm_directives ~binary_backend_available =
   if

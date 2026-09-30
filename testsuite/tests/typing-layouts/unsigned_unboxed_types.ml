@@ -39,31 +39,31 @@ Error: The value "x" has type "int16#" but an expression was expected of type
          "uint16_u"
 |}]
 
-let f (x : int32#) : uint32_u = x
+let f (x : int32_u) : uint32_u = x
 [%%expect{|
-Line 1, characters 32-33:
-1 | let f (x : int32#) : uint32_u = x
-                                    ^
-Error: The value "x" has type "int32#" but an expression was expected of type
+Line 1, characters 33-34:
+1 | let f (x : int32_u) : uint32_u = x
+                                     ^
+Error: The value "x" has type "int32_u" but an expression was expected of type
          "uint32_u"
 |}]
 
-let f (x : int64#) : uint64_u = x
+let f (x : int64_u) : uint64_u = x
 [%%expect{|
-Line 1, characters 32-33:
-1 | let f (x : int64#) : uint64_u = x
-                                    ^
-Error: The value "x" has type "int64#" but an expression was expected of type
+Line 1, characters 33-34:
+1 | let f (x : int64_u) : uint64_u = x
+                                     ^
+Error: The value "x" has type "int64_u" but an expression was expected of type
          "uint64_u"
 |}]
 
-let f (x : nativeint#) : unativeint_u = x
+let f (x : nativeint_u) : unativeint_u = x
 [%%expect{|
-Line 1, characters 40-41:
-1 | let f (x : nativeint#) : unativeint_u = x
-                                            ^
-Error: The value "x" has type "nativeint#" but an expression was expected of type
-         "unativeint_u"
+Line 1, characters 41-42:
+1 | let f (x : nativeint_u) : unativeint_u = x
+                                             ^
+Error: The value "x" has type "nativeint_u"
+       but an expression was expected of type "unativeint_u"
 |}]
 
 (* They can be used as GADT indices and distinguished from the signed
@@ -74,11 +74,11 @@ type ('a : any) width =
   | U8 : uint8_u width
   | I16 : int16# width
   | U16 : uint16_u width
-  | I32 : int32# width
+  | I32 : int32_u width
   | U32 : uint32_u width
-  | I64 : int64# width
+  | I64 : int64_u width
   | U64 : uint64_u width
-  | IW : nativeint# width
+  | IW : nativeint_u width
   | UW : unativeint_u width
 [%%expect{|
 type ('a : any) width =
@@ -86,11 +86,11 @@ type ('a : any) width =
   | U8 : uint8_u width
   | I16 : int16# width
   | U16 : uint16_u width
-  | I32 : int32# width
+  | I32 : int32_u width
   | U32 : uint32_u width
-  | I64 : int64# width
+  | I64 : int64_u width
   | U64 : uint64_u width
-  | IW : nativeint# width
+  | IW : nativeint_u width
   | UW : unativeint_u width
 |}]
 
@@ -152,8 +152,8 @@ let bad (x : unativeint_u width) = match x with
 Line 2, characters 4-6:
 2 |   | IW -> ()
         ^^
-Error: This pattern matches values of type "nativeint# width"
+Error: This pattern matches values of type "nativeint_u width"
        but a pattern was expected which matches values of type
          "unativeint_u width"
-       Type "nativeint#" is not compatible with type "unativeint_u"
+       Type "nativeint_u" is not compatible with type "unativeint_u"
 |}]

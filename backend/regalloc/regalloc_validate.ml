@@ -416,7 +416,7 @@ end = struct
 
   let do_create cfg =
     Regalloc_invariants.precondition cfg;
-    if Lazy.force Regalloc_utils.validator_debug
+    if Regalloc_utils.Param.get Regalloc_utils.validator_debug
     then
       (* CR-someday: We don't save the file with [fun_name] in the filename
          because there is an appended stamp that is fragile and is annoying when
@@ -883,23 +883,23 @@ end = struct
       t1.for_loc
 
   let union t1 t2 =
-    { for_loc =
-        Location.Map.merge
-          (fun _loc regs1 regs2 ->
-            match regs1, regs2 with
-            | None, None -> None
-            | Some r, None | None, Some r -> Some r
-            | Some r1, Some r2 -> Some (Register.Set.union r1 r2))
-          t1.for_loc t2.for_loc;
-      for_reg =
-        Register.Map.merge
-          (fun _reg locs1 locs2 ->
-            match locs1, locs2 with
-            | None, None -> None
-            | Some l, None | None, Some l -> Some l
-            | Some l1, Some l2 -> Some (Location.Set.union l1 l2))
-          t1.for_reg t2.for_reg
-    }
+    (* [Map.union] shares the subtrees that occur in only one operand, so this
+       costs O(overlap) rather than O(size); the guard keeps the join with an
+       empty set allocation-free. *)
+    if is_empty t1
+    then t2
+    else if is_empty t2
+    then t1
+    else
+      { for_loc =
+          Location.Map.union
+            (fun _loc regs1 regs2 -> Some (Register.Set.union regs1 regs2))
+            t1.for_loc t2.for_loc;
+        for_reg =
+          Register.Map.union
+            (fun _reg locs1 locs2 -> Some (Location.Set.union locs1 locs2))
+            t1.for_reg t2.for_reg
+      }
 
   let array_fold2 f acc arr1 arr2 =
     let acc = ref acc in
@@ -1423,7 +1423,7 @@ let verify_entrypoint (equations : Equation_set.t) (desc : Description.t)
 
 let test (desc : Description.t) (cfg : Cfg_with_layout.t) :
     (Cfg_with_layout.t, Error.t) Result.t =
-  if Lazy.force Regalloc_utils.validator_debug
+  if Regalloc_utils.Param.get Regalloc_utils.validator_debug
   then
     (* CR-someday: We don't save the file with [fun_name] in the filename
        because there is an appended stamp that is fragile and is annoying when
@@ -1451,7 +1451,7 @@ let test (desc : Description.t) (cfg : Cfg_with_layout.t) :
         "Unable to compute validation equation sets from CFG for function %s@."
         (Cfg_with_layout.cfg cfg).fun_name
   in
-  if Lazy.force Regalloc_utils.validator_debug
+  if Regalloc_utils.Param.get Regalloc_utils.validator_debug
   then
     (* CR-someday: We don't save the file with [fun_name] in the filename
        because there is an appended stamp that is fragile and is annoying when

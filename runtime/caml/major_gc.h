@@ -18,6 +18,8 @@
 
 #ifdef CAML_INTERNALS
 
+#include <stdbool.h>
+
 typedef enum {
   Phase_sweep_main,
   Phase_sweep_and_mark_main,
@@ -33,7 +35,26 @@ Caml_inline int caml_marking_started(void) {
 extern atomic_uintnat caml_gc_mark_phase_requested;
 
 intnat caml_opportunistic_major_work_available (caml_domain_state*);
-void caml_opportunistic_major_collection_slice (intnat);
+
+/* Run an opportunistic slice; returns the amount of work done. */
+uintnat caml_opportunistic_major_collection_slice (intnat);
+
+/* Aggregated work for opportunistic slices of one spin phase,
+   used to log events at the end of the span. */
+struct caml_opportunistic_events {
+  bool span_open;
+  uintnat work_done;
+};
+
+void caml_opportunistic_events_add(struct caml_opportunistic_events *,
+                                   uintnat work_done);
+void caml_opportunistic_events_end(struct caml_opportunistic_events *);
+
+/* Runs one bounded opportunistic slice if any work is available, recording
+   it in [evs]; returns whether work was available. Used as spin work while
+   waiting for synchronisation. */
+bool caml_do_opportunistic_major_slice(caml_domain_state *,
+                                       struct caml_opportunistic_events *evs);
 /* auto-triggered slice from within the GC */
 #define AUTO_TRIGGERED_MAJOR_SLICE -1
 /* external triggered slice, but GC will compute the amount of work */
@@ -61,7 +82,8 @@ void caml_finish_major_cycle(int compaction_mode);
  * For use at times when we have disturbed the usual pacing, for
  * example, after any synchronous major collection.
  */
-void caml_reset_major_pacing(void);
+void caml_init_major_pacing(void);
+void caml_reset_major_pacing(bool add_overhead);
 #ifdef DEBUG
 int caml_mark_stack_is_empty(void);
 #endif

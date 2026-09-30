@@ -19,7 +19,7 @@ readonly_files = "use_module.ml use_field.ml use_open.ml";
 setup-ocamlc.byte-build-env;
 
 (* Compile the static library module S. *)
-flags = "-I slib -nocwd";
+flags = "-extension layout_poly_alpha -I slib -nocwd";
 module = "slib/s.mli";
 ocamlc.byte;
 module = "slib/s.ml";
@@ -27,14 +27,14 @@ ocamlc.byte;
 
 (* Scenario 1: rebind the whole module S at [@ static]. *)
 {
-  flags = "-Ix slib -nocwd";
+  flags = "-extension layout_poly_alpha -Ix slib -nocwd";
   module = "use_module.ml";
   setup-ocamlc.byte-build-env;
   ocamlc_byte_exit_status = "0";
   ocamlc.byte;
 }
 {
-  flags = "-I slib -nocwd";
+  flags = "-extension layout_poly_alpha -I slib -nocwd";
   module = "use_module.ml";
   setup-ocamlc.byte-build-env;
   ocamlc_byte_exit_status = "2";
@@ -45,14 +45,14 @@ ocamlc.byte;
 
 (* Scenario 2: use the value [S.x] at [@ static]. *)
 {
-  flags = "-Ix slib -nocwd";
+  flags = "-extension layout_poly_alpha -Ix slib -nocwd";
   module = "use_field.ml";
   setup-ocamlc.byte-build-env;
   ocamlc_byte_exit_status = "0";
   ocamlc.byte;
 }
 {
-  flags = "-I slib -nocwd";
+  flags = "-extension layout_poly_alpha -I slib -nocwd";
   module = "use_field.ml";
   setup-ocamlc.byte-build-env;
   ocamlc_byte_exit_status = "2";
@@ -63,14 +63,14 @@ ocamlc.byte;
 
 (* Scenario 3: [open S], with the [@ static] use occurring later. *)
 {
-  flags = "-Ix slib -nocwd";
+  flags = "-extension layout_poly_alpha -Ix slib -nocwd";
   module = "use_open.ml";
   setup-ocamlc.byte-build-env;
   ocamlc_byte_exit_status = "0";
   ocamlc.byte;
 }
 {
-  flags = "-I slib -nocwd";
+  flags = "-extension layout_poly_alpha -I slib -nocwd";
   module = "use_open.ml";
   setup-ocamlc.byte-build-env;
   ocamlc_byte_exit_status = "2";

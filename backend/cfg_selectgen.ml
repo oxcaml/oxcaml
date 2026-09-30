@@ -20,7 +20,7 @@
 
 open! Int_replace_polymorphic_compare
 
-[@@@ocaml.warning "+a-4-9-40-41-42"]
+[@@@ocaml.warning "+a-40-41-42"]
 
 module DLL = Doubly_linked_list
 module Or_never_returns = Select_utils.Or_never_returns
@@ -28,6 +28,22 @@ module SU = Select_utils
 module V = Backend_var
 module VP = Backend_var.With_provenance
 open SU.Or_never_returns.Syntax
+
+(* Marking a handler's blocks as cold is gated by [-cfg-block-layout] out of an
+   abundance of caution: the [cold] flag also influences prologue placement
+   under shrink-wrapping, and the behaviour with the flag disabled should be
+   exactly the historical one. *)
+let mark_sub_cfg_as_cold sub_cfg =
+  if !Oxcaml_flags.cfg_block_layout
+  then Sub_cfg.iter_basic_blocks sub_cfg ~f:(fun block -> block.cold <- true)
+
+let which_parameter_of_provenance provenance =
+  match (provenance : V.Provenance.t option) with
+  | None -> None
+  | Some provenance -> (
+    match V.Provenance.is_parameter provenance with
+    | Local -> None
+    | Parameter { index } -> Some index)
 
 type error = Builtin_not_recognized of string
 
@@ -56,16 +72,46 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Ctuple el -> List.for_all is_simple_expr el
     | Clet (_id, arg, body) -> is_simple_expr arg && is_simple_expr body
     | Cphantom_let (_var, _defining_expr, body) -> is_simple_expr body
+    | Cname_for_debugger (_, body) -> is_simple_expr body
     | Csequence (e1, e2) -> is_simple_expr e1 && is_simple_expr e2
     | Cop (op, args, _) -> (
       match op with
       (* Cextcall with neither effects nor coeffects is simple if its arguments
          are *)
-      | Cextcall { effects = No_effects; coeffects = No_coeffects } ->
+      | Cextcall
+          { func = _;
+            ty = _;
+            ty_args = _;
+            alloc = _;
+            builtin = _;
+            returns = _;
+            effects = No_effects;
+            coeffects = No_coeffects
+          } ->
         List.for_all is_simple_expr args
         (* The following may have side effects *)
-      | Capply _ | Cextcall _ | Calloc _ | Cstore _ | Craise _ | Catomic _
-      | Cprobe _ | Cprobe_is_enabled _ | Copaque | Cpoll | Cpause ->
+      | Cextcall
+          { func = _;
+            ty = _;
+            ty_args = _;
+            alloc = _;
+            builtin = _;
+            returns = _;
+            effects = Arbitrary_effects;
+            coeffects = _
+          }
+      | Cextcall
+          { func = _;
+            ty = _;
+            ty_args = _;
+            alloc = _;
+            builtin = _;
+            returns = _;
+            effects = No_effects;
+            coeffects = Has_coeffects
+          }
+      | Capply _ | Calloc _ | Cstore _ | Craise _ | Catomic _ | Cprobe _
+      | Cprobe_is_enabled _ | Copaque | Cpoll | Cpause ->
         false
       | Cprefetch _ | Cbeginregion | Cendregion ->
         false
@@ -107,13 +153,23 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Ctuple el -> EC.join_list_map el effects_of
     | Clet (_id, arg, body) -> EC.join (effects_of arg) (effects_of body)
     | Cphantom_let (_var, _defining_expr, body) -> effects_of body
+    | Cname_for_debugger (_, body) -> effects_of body
     | Csequence (e1, e2) -> EC.join (effects_of e1) (effects_of e2)
     | Cifthenelse (cond, _ifso_dbg, ifso, _ifnot_dbg, ifnot, _dbg) ->
       EC.join (effects_of cond) (EC.join (effects_of ifso) (effects_of ifnot))
     | Cop (op, args, _) ->
       let from_op =
         match op with
-        | Cextcall { effects = e; coeffects = ce } ->
+        | Cextcall
+            { func = _;
+              ty = _;
+              ty_args = _;
+              alloc = _;
+              builtin = _;
+              returns = _;
+              effects = e;
+              coeffects = ce
+            } ->
           EC.create (SU.select_effects e) (SU.select_coeffects ce)
         | Capply _ | Cprobe _ | Copaque | Cpoll | Cpause -> EC.arbitrary
         | Calloc (Heap, _) -> EC.none
@@ -123,10 +179,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         | Cprefetch _ -> EC.arbitrary
         | Catomic _ -> EC.arbitrary
         | Craise _ -> EC.effect_only Raise
-        | Cload { mutability = Immutable } -> EC.none
-        | Cload { mutability = Mutable } | Cdls_get | Ctls_get | Cdomain_index
-          ->
-          EC.coeffect_only Read_mutable
+        | Cload { memory_chunk = _; mutability = Immutable; is_atomic } ->
+          if is_atomic then EC.arbitrary else EC.none
+        | Cload { memory_chunk = _; mutability = Mutable; is_atomic } ->
+          if is_atomic then EC.arbitrary else EC.coeffect_only Read_mutable
+        | Cdls_get | Ctls_get | Cdomain_index -> EC.coeffect_only Read_mutable
         | Cprobe_is_enabled _ -> EC.coeffect_only Arbitrary
         | Ctuple_field _ | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _
         | Caddi128 | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Cbswap _
@@ -153,31 +210,59 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Use_default -> (
       match op with
       | Ilsl | Ilsr | Iasr -> n >= 0 && n < Arch.size_int * 8
-      | _ -> false)
+      | Iadd | Isub | Imul | Imulh _ | Idiv _ | Imod _ | Iand | Ior | Ixor
+      | Iclz | Ictz | Ipopcnt | Icomp _ ->
+        false)
 
   let is_immediate_test cmp n =
     match Target.is_immediate_test cmp n with
     | Is_immediate result -> result
     | Use_default -> is_immediate (Icomp cmp) n
 
+  (* Turn integer constants that fit in an OCaml integer into [Cconst_int], so
+     that the [Cconst_int] patterns below suffice to recognize all constants
+     that may be used as immediate arguments. *)
+  let normalize_int_constant (expr : Cmm.expression) : Cmm.expression =
+    match expr with
+    | Cconst_natint (n, dbg)
+      when Nativeint.equal (Nativeint.of_int (Nativeint.to_int n)) n ->
+      Cconst_int (Nativeint.to_int n, dbg)
+    | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
+    | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_mask _
+    | Cconst_symbol _ | Cvar _ | Clet _ | Cphantom_let _ | Cname_for_debugger _
+    | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _ | Cswitch _ | Ccatch _
+    | Cexit _ | Cinvalid _ ->
+      expr
+
   (* Instruction selection for conditionals *)
 
   let select_condition (arg : Cmm.expression) : Operation.test * Cmm.expression
       =
-    match arg with
-    | Cop (Ccmpi cmp, [arg1; Cconst_int (n, _)], _) when is_immediate_test cmp n
-      ->
-      Iinttest_imm (cmp, n), arg1
-    | Cop (Ccmpi cmp, [Cconst_int (n, _); arg2], _)
-      when is_immediate_test (Cmm.swap_integer_comparison cmp) n ->
-      Iinttest_imm (Cmm.swap_integer_comparison cmp, n), arg2
+    match[@ocaml.warning "-fragile-match"] arg with
+    | Cop (Ccmpi cmp, [arg1; arg2], _) -> (
+      match normalize_int_constant arg1, normalize_int_constant arg2 with
+      | arg1, Cconst_int (n, _) when is_immediate_test cmp n ->
+        Iinttest_imm (cmp, n), arg1
+      | Cconst_int (n, _), arg2
+        when is_immediate_test (Cmm.swap_integer_comparison cmp) n ->
+        Iinttest_imm (Cmm.swap_integer_comparison cmp, n), arg2
+      | arg1, arg2 -> Iinttest cmp, Ctuple [arg1; arg2])
     | Cop (Ccmpi cmp, args, _) -> Iinttest cmp, Ctuple args
     | Cop (Ccmpf (width, cmp), args, _) -> Ifloattest (width, cmp), Ctuple args
     | Cop (Cand, [arg1; Cconst_int (1, _)], _) -> Ioddtest, arg1
     | _ -> Itruetest, arg
 
   let is_store (op : Operation.t) =
-    match op with Store (_, _, _) -> true | _ -> false
+    match op with
+    | Store (_, _, _) -> true
+    | Move | Spill | Reload | Const_int _ | Const_float32 _ | Const_float _
+    | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+    | Const_mask _ | Stackoffset _ | Load _ | Intop _ | Int128op _ | Intop_imm _
+    | Intop_atomic _ | Floatop _ | Csel _ | Reinterpret_cast _ | Static_cast _
+    | Probe_is_enabled _ | Opaque | Begin_region | End_region | Specific _
+    | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Poll | Pause
+    | Alloc _ ->
+      false
 
   let bind_let (env : SU.environment) sub_cfg v r1 =
     let env =
@@ -189,7 +274,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     (if Option.is_some provenance
      then
        let naming_op =
-         SU.make_name_for_debugger ~ident:(VP.var v) ~which_parameter:None
+         SU.make_name_for_debugger ~ident:(VP.var v)
+           ~which_parameter:(which_parameter_of_provenance provenance)
            ~provenance ~regs:r1
        in
        SU.insert_debug env sub_cfg naming_op Debuginfo.none [||] [||]);
@@ -225,7 +311,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
   let select_arith_comm (op : Operation.integer_operation)
       (args : Cmm.expression list) :
       Cfg.basic_or_terminator * Cmm.expression list =
-    match args with
+    match[@ocaml.warning "-fragile-match"]
+      List.map normalize_int_constant args
+    with
     | [arg; Cconst_int (n, _)] when is_immediate op n ->
       SU.basic_op (Intop_imm (op, n)), [arg]
     | [Cconst_int (n, _); arg] when is_immediate op n ->
@@ -235,7 +323,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
   let select_arith (op : Operation.integer_operation)
       (args : Cmm.expression list) :
       Cfg.basic_or_terminator * Cmm.expression list =
-    match args with
+    match[@ocaml.warning "-fragile-match"]
+      List.map normalize_int_constant args
+    with
     | [arg; Cconst_int (n, _)] when is_immediate op n ->
       SU.basic_op (Intop_imm (op, n)), [arg]
     | _ -> SU.basic_op (Intop op), args
@@ -243,7 +333,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
   let select_arith_comp (cmp : Operation.integer_comparison)
       (args : Cmm.expression list) :
       Cfg.basic_or_terminator * Cmm.expression list =
-    match args with
+    match[@ocaml.warning "-fragile-match"]
+      List.map normalize_int_constant args
+    with
     | [arg; Cconst_int (n, _)] when is_immediate (Operation.Icomp cmp) n ->
       SU.basic_op (Intop_imm (Icomp cmp, n)), [arg]
     | [Cconst_int (n, _); arg]
@@ -282,7 +374,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | Cconst_symbol (func, _dbg) :: rem ->
         Terminator (Call { op = Direct func; label_after }), rem
       | _ -> Terminator (Call { op = Indirect callees; label_after }), args)
-    | Cextcall { func; alloc; ty; ty_args; returns; builtin; effects } ->
+    | Cextcall
+        { func; alloc; ty; ty_args; returns; builtin; effects; coeffects = _ }
+      ->
       if builtin && not !Oxcaml_flags.disable_builtin_check
       then raise (Error (Builtin_not_recognized func, dbg));
       let external_call =
@@ -445,7 +539,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
               in
               Cfg.Poptrap { lbl_handler }
           in
-          Sub_cfg.add_instruction sub_cfg instr_desc [||] [||] Debuginfo.none)
+          let phantom_available_before = SU.phantom_vars_from_env env in
+          Sub_cfg.add_instruction sub_cfg instr_desc [||] [||] Debuginfo.none
+            ~phantom_available_before)
         traps;
       let loc = Proc.loc_results_return (Reg.typv r) in
       SU.insert_moves env sub_cfg r loc;
@@ -453,15 +549,20 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
 
   (* Buffering of instruction sequences *)
 
-  let insert_debug _env sub_cfg basic dbg arg res =
-    Sub_cfg.add_instruction sub_cfg basic arg res dbg
+  let insert_debug env sub_cfg basic dbg arg res =
+    let phantom_available_before = SU.phantom_vars_from_env env in
+    Sub_cfg.add_instruction sub_cfg basic arg res dbg ~phantom_available_before
 
-  let insert_op_debug_returning_id _env sub_cfg op dbg arg res =
-    let instr = Sub_cfg.make_instr (Cfg.Op op) arg res dbg in
+  let insert_op_debug_returning_id env sub_cfg op dbg arg res =
+    let phantom_available_before = SU.phantom_vars_from_env env in
+    let instr =
+      Sub_cfg.make_instr (Cfg.Op op) arg res dbg ~phantom_available_before
+    in
     Sub_cfg.add_instruction' sub_cfg instr;
     instr.id
 
-  let setup_catch_handler (flag : Cmm.ccatch_flag) rs sub_cfg =
+  let setup_catch_handler (flag : Cmm.ccatch_flag) rs sub_cfg ~dbg
+      ~phantom_available_before =
     match flag with
     | Normal | Recursive -> ()
     | Exn_handler ->
@@ -472,7 +573,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         | r :: _ -> r
       in
       Sub_cfg.add_instruction_at_start sub_cfg (Cfg.Op Move)
-        [| Proc.loc_exn_bucket |] exn_bucket_in_handler Debuginfo.none
+        [| Proc.loc_exn_bucket |] exn_bucket_in_handler dbg
+        ~phantom_available_before
 
   let unreachable_handler : (Operation.trap_stack * Cmm.expression) Lazy.t =
     lazy
@@ -497,10 +599,18 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           function. *)
        Uncaught, Csequence (segfault, dummy_raise))
 
+  let join_branch (r : _ Or_never_returns.t) sub_cfg : Sub_cfg.join_branch =
+    { sub_cfg;
+      may_fall_through = (match r with Ok _ -> true | Never_returns -> false)
+    }
+
   (* The following two functions, [emit_parts] and [emit_parts_list], force
      right-to-left evaluation order as required by the Flambda [Un_anf] pass
      (and to be consistent with the bytecode compiler). *)
 
+  (* CR ttebbi: This duplicates [Select_utils.emit_parts_list], which the SSA
+     pipeline uses. Once [Cfg_compare] has validated the two against each other
+     for a while, we can use the [Select_utils] version. *)
   let rec emit_parts env sub_cfg ~effects_after exp : _ Or_never_returns.t =
     let module EC = SU.Effect_and_coeffect in
     let may_defer_evaluation =
@@ -669,19 +779,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         | None ->
           for i = 0 to Array.length regs - 1 do
             let r = regs.(i) in
-            let chunk : Cmm.memory_chunk =
-              match r.Reg.typ with
-              | Float -> Double
-              | Float32 -> Single { reg = Float32 }
-              (* SIMD memory operations are unaligned by default. Aligned
-                 bigarray operations are handled separately via cmm. *)
-              | Vec128 -> Onetwentyeight_unaligned
-              | Vec256 -> Twofiftysix_unaligned
-              | Vec512 -> Fivetwelve_unaligned
-              | Mask -> Word_mask
-              | Val | Addr | Int -> Word_val
-              | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
-            in
+            let chunk = SU.chunk_of_machtype_component r.Reg.typ in
             insert_debug env sub_cfg
               (Op (Store (chunk, !addressing_mode, false)))
               dbg
@@ -760,8 +858,27 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       match emit_expr env sub_cfg e1 ~bound_name:(Some v) with
       | Never_returns -> Never_returns
       | Ok r1 -> emit_expr (bind_let env sub_cfg v r1) sub_cfg e2 ~bound_name)
-    | Cphantom_let (_var, _defining_expr, body) ->
+    | Cphantom_let (var, defining_expr, body) ->
+      let env = SU.env_add_phantom_let var defining_expr env in
       emit_expr env sub_cfg body ~bound_name
+    | Cname_for_debugger (var, body) -> (
+      match emit_expr env sub_cfg body ~bound_name with
+      | Never_returns -> Never_returns
+      | Ok regs ->
+        let provenance = VP.provenance var in
+        (if Option.is_some provenance
+         then
+           let ident = VP.var var in
+           let naming_op =
+             Operation.Name_for_debugger
+               { ident;
+                 provenance;
+                 which_parameter = which_parameter_of_provenance provenance;
+                 regs
+               }
+           in
+           insert_debug env sub_cfg (Op naming_op) Debuginfo.none [||] [||]);
+        Ok regs)
     | Ctuple [] -> Ok [||]
     | Ctuple exp_list -> (
       match emit_parts_list env sub_cfg exp_list with
@@ -789,7 +906,19 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           Array.sub loc_exp size_before (Array.length fields_layout.(field))
         in
         Ok field_slice)
-    | Cop (op, args, dbg) -> emit_expr_op env sub_cfg bound_name op args dbg
+    | Cop
+        ( (( Capply _ | Cextcall _ | Cload _ | Calloc _ | Cstore _ | Caddi
+           | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _ | Caddi128 | Csubi128
+           | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr | Cbswap _
+           | Ccsel _ | Cclz | Cctz | Cpopcnt | Cprefetch _ | Catomic _ | Ccmpi _
+           | Caddv | Cadda | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _
+           | Cdivf _ | Cpackf32 | Creinterpret_cast _ | Cstatic_cast _ | Ccmpf _
+           | Cprobe _ | Cprobe_is_enabled _ | Cbeginregion | Cendregion
+           | Ctuple_field _ | Cdls_get | Ctls_get | Cdomain_index | Cpoll
+           | Cpause ) as op),
+          args,
+          dbg ) ->
+      emit_expr_op env sub_cfg bound_name op args dbg
     | Csequence (e1, e2) -> (
       match emit_expr env sub_cfg e1 ~bound_name:None with
       | Never_returns -> Never_returns
@@ -812,9 +941,14 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       match emit_expr env sub_cfg e1 ~bound_name:None with
       | Never_returns -> ()
       | Ok r1 -> emit_tail (bind_let env sub_cfg v r1) sub_cfg e2)
-    | Cphantom_let (_var, _defining_expr, body) -> emit_tail env sub_cfg body
-    | Cop ((Capply { result_type = ty; region = Rc_normal; _ } as op), args, dbg)
-      ->
+    | Cphantom_let (var, defining_expr, body) ->
+      let env = SU.env_add_phantom_let var defining_expr env in
+      emit_tail env sub_cfg body
+    | Cname_for_debugger (_, body) -> emit_tail env sub_cfg body
+    | Cop
+        ( (Capply { result_type = ty; region = Rc_normal; callees = _ } as op),
+          args,
+          dbg ) ->
       emit_tail_apply env sub_cfg ty op args dbg
     | Csequence (e1, e2) -> (
       match emit_expr env sub_cfg e1 ~bound_name:None with
@@ -830,7 +964,24 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Cinvalid { message; symbol } ->
       let ok = emit_invalid env sub_cfg message symbol in
       insert_return env sub_cfg ok (SU.pop_all_traps env)
-    | Cop _ | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
+    | Cop
+        ( ( Capply
+              { result_type = _;
+                region = Rc_nontail | Rc_close_at_apply;
+                callees = _
+              }
+          | Cextcall _ | Cload _ | Calloc _ | Cstore _ | Caddi | Csubi | Cmuli
+          | Cmulhi _ | Cdivi _ | Cmodi _ | Caddi128 | Csubi128 | Cmuli64 _
+          | Cand | Cor | Cxor | Clsl | Clsr | Casr | Cbswap _ | Ccsel _ | Cclz
+          | Cctz | Cpopcnt | Cprefetch _ | Catomic _ | Ccmpi _ | Caddv | Cadda
+          | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32
+          | Creinterpret_cast _ | Cstatic_cast _ | Ccmpf _ | Craise _ | Cprobe _
+          | Cprobe_is_enabled _ | Copaque | Cbeginregion | Cendregion
+          | Ctuple_field _ | Cdls_get | Ctls_get | Cdomain_index | Cpoll
+          | Cpause ),
+          _,
+          _ )
+    | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
     | Cconst_symbol _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
     | Cconst_mask _ | Cvar _ | Ctuple _ | Cexit _ ->
       emit_return env sub_cfg exp (SU.pop_all_traps env)
@@ -903,10 +1054,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           let provenance = VP.provenance bound_name in
           if Option.is_some provenance
           then
+            let which_parameter = which_parameter_of_provenance provenance in
             let bound_name = VP.var bound_name in
             let naming_op =
               Operation.Name_for_debugger
-                { ident = bound_name; provenance; which_parameter = None; regs }
+                { ident = bound_name; provenance; which_parameter; regs }
             in
             insert_debug env sub_cfg (Op naming_op) Debuginfo.none [||] [||]
       in
@@ -1005,14 +1157,28 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         Misc.fatal_errorf
           "Selection Alloc: expected a single placehold in dbginfo, found %d"
           (List.length dbginfo)
-      | Basic (Op op) ->
+      | Basic
+          (Op
+             (( Move | Spill | Reload | Const_int _ | Const_float32 _
+              | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
+              | Const_vec512 _ | Const_mask _ | Stackoffset _ | Load _ | Store _
+              | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _ | Floatop _
+              | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
+              | Opaque | Begin_region | End_region | Specific _
+              | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Poll
+              | Pause ) as op)) ->
         let* r1 = emit_tuple env sub_cfg new_args in
         let rd = Reg.createv ty in
         add_naming_op_for_bound_name sub_cfg rd;
         Ok (insert_op_debug env sub_cfg op dbg r1 rd)
-      | Basic basic ->
+      | Basic
+          (( Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
+           | Stack_check _ ) as basic) ->
         Misc.fatal_errorf "unexpected basic (%a)" Printcfg.basic_desc basic
-      | Terminator term ->
+      | Terminator
+          (( Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
+           | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
+           | Tailcall_func _ | Invalid _ ) as term) ->
         Misc.fatal_errorf "unexpected terminator (%a)"
           (Printcfg.terminator_desc ~sep:"")
           term)
@@ -1034,8 +1200,12 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           ~label_true:(Sub_cfg.start_label sub_if)
           ~label_false:(Sub_cfg.start_label sub_else)
       in
-      Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rarg;
-      Sub_cfg.join ~from:[sub_if; sub_else] ~to_:sub_cfg;
+      let phantom_available_before = SU.phantom_vars_from_env env in
+      Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rarg
+        ~phantom_available_before;
+      Sub_cfg.join
+        ~from:[join_branch rif sub_if; join_branch relse sub_else]
+        ~to_:sub_cfg ~phantom_available_before;
       r
 
   and emit_expr_switch env sub_cfg bound_name esel index ecases
@@ -1055,8 +1225,14 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       let term_desc : Cfg.terminator =
         Switch (Array.map (fun idx -> Sub_cfg.start_label subs.(idx)) index)
       in
-      Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rsel;
-      Sub_cfg.join ~from:(Array.to_list subs) ~to_:sub_cfg;
+      let phantom_available_before = SU.phantom_vars_from_env env in
+      Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rsel
+        ~phantom_available_before;
+      Sub_cfg.join
+        ~from:
+          (Array.to_list
+             (Array.map (fun (r, sub) -> join_branch r sub) sub_cases))
+        ~to_:sub_cfg ~phantom_available_before;
       r
 
   and emit_expr_catch env sub_cfg bound_name (flag : Cmm.ccatch_flag) handlers
@@ -1090,7 +1266,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     in
     let r_body, sub_body = emit_new_sub_cfg env body ~bound_name in
     let translate_one_handler _nfail
-        (trap_info, (ids, rs, e2, _dbg, _is_cold, label)) =
+        (trap_info, (ids, rs, e2, dbg, is_cold, label)) =
       assert (List.length ids = List.length rs);
       let trap_stack, e2 =
         match (!trap_info : SU.trap_stack_info) with
@@ -1113,20 +1289,19 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
                 let provenance = VP.provenance var in
                 if Option.is_some provenance
                 then
+                  let which_parameter =
+                    which_parameter_of_provenance provenance
+                  in
                   let var = VP.var var in
                   let naming_op =
                     Operation.Name_for_debugger
-                      { ident = var;
-                        provenance;
-                        which_parameter = None;
-                        regs = r
-                      }
+                      { ident = var; provenance; which_parameter; regs = r }
                   in
                   insert_debug new_env sub_cfg (Op naming_op) Debuginfo.none
                     [||] [||])
               ids_and_rs)
       in
-      (rs, label), (r, sub)
+      (rs, label, dbg, SU.phantom_vars_from_env new_env, is_cold), (r, sub)
     in
     let rec build_all_reachable_handlers ~already_built ~not_built =
       let not_built, to_build =
@@ -1165,15 +1340,20 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     assert (Sub_cfg.exit_has_never_terminator sub_cfg);
     let sub_handlers =
       List.map
-        (fun ((rs, label), (_, sub_handler)) ->
+        (fun ( (rs, label, dbg, phantom_available_before, is_cold),
+               (r, sub_handler) ) ->
           Sub_cfg.add_empty_block_at_start sub_handler ~label;
-          setup_catch_handler flag rs sub_handler;
-          sub_handler)
+          setup_catch_handler flag rs sub_handler ~dbg ~phantom_available_before;
+          if is_cold then mark_sub_cfg_as_cold sub_handler;
+          join_branch r sub_handler)
         l
     in
     let term_desc = Cfg.Always (Sub_cfg.start_label sub_body) in
-    Sub_cfg.update_exit_terminator sub_cfg term_desc;
-    Sub_cfg.join ~from:(sub_body :: sub_handlers) ~to_:sub_cfg;
+    let phantom_available_before = SU.phantom_vars_from_env env in
+    Sub_cfg.update_exit_terminator sub_cfg term_desc ~phantom_available_before;
+    Sub_cfg.join
+      ~from:(join_branch r_body sub_body :: sub_handlers)
+      ~to_:sub_cfg ~phantom_available_before;
     r
 
   and emit_expr_exit env sub_cfg (lbl : Cmm.exit_label) args traps :
@@ -1223,9 +1403,12 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
                 in
                 Cfg.Poptrap { lbl_handler }
             in
-            Sub_cfg.add_instruction sub_cfg instr_desc [||] [||] Debuginfo.none)
+            let phantom_available_before = SU.phantom_vars_from_env env in
+            Sub_cfg.add_instruction sub_cfg instr_desc [||] [||] Debuginfo.none
+              ~phantom_available_before)
           traps;
-        Sub_cfg.update_exit_terminator sub_cfg (Always handler.label);
+        Sub_cfg.update_exit_terminator sub_cfg (Always handler.label)
+          ~phantom_available_before:(SU.phantom_vars_from_env env);
         SU.set_traps nfail handler.SU.traps_ref env.SU.trap_stack traps;
         Never_returns
       | Return_lbl -> (
@@ -1309,7 +1492,12 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           SU.set_traps_for_raise env;
           SU.insert_move_results env sub_cfg loc_res rd stack_ofs;
           insert_return env sub_cfg (Ok rd) (SU.pop_all_traps env))
-      | _ -> Misc.fatal_error "Cfg_selectgen.emit_tail")
+      | Basic _
+      | Terminator
+          ( Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
+          | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
+          | Tailcall_func _ | Invalid _ | Call_no_return _ | Prim _ ) ->
+        Misc.fatal_error "Cfg_selectgen.emit_tail")
 
   and emit_tail_ifthenelse env sub_cfg econd (_ifso_dbg : Debuginfo.t) eif
       (_ifnot_dbg : Debuginfo.t) eelse (_dbg : Debuginfo.t) =
@@ -1326,7 +1514,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           ~label_true:(Sub_cfg.start_label sub_if)
           ~label_false:(Sub_cfg.start_label sub_else)
       in
-      Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rarg;
+      Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rarg
+        ~phantom_available_before:(SU.phantom_vars_from_env env);
       Sub_cfg.join_tail ~from:[sub_if; sub_else] ~to_:sub_cfg
 
   and emit_tail_switch env sub_cfg esel index ecases (_dbg : Debuginfo.t) =
@@ -1342,7 +1531,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         Switch
           (Array.map (fun idx -> Sub_cfg.start_label sub_cases.(idx)) index)
       in
-      Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rsel;
+      Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rsel
+        ~phantom_available_before:(SU.phantom_vars_from_env env);
       Sub_cfg.join_tail ~from:(Array.to_list sub_cases) ~to_:sub_cfg
 
   and emit_tail_catch env sub_cfg (flag : Cmm.ccatch_flag) handlers e1 =
@@ -1374,7 +1564,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     assert (Sub_cfg.exit_has_never_terminator sub_cfg);
     let s_body = emit_tail_new_sub_cfg env e1 in
     let translate_one_handler _nfail
-        (trap_info, (ids, rs, e2, _dbg, _is_cold, label)) =
+        (trap_info, (ids, rs, e2, dbg, is_cold, label)) =
       assert (List.length ids = List.length rs);
       let trap_stack, e2 =
         match (!trap_info : SU.trap_stack_info) with
@@ -1397,21 +1587,21 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
                 let provenance = VP.provenance var in
                 if Option.is_some provenance
                 then
+                  let which_parameter =
+                    which_parameter_of_provenance provenance
+                  in
                   let var = VP.var var in
                   let naming_op =
                     Operation.Name_for_debugger
-                      { ident = var;
-                        provenance;
-                        which_parameter = None;
-                        regs = r
-                      }
+                      { ident = var; provenance; which_parameter; regs = r }
                   in
                   insert_debug new_env sub_cfg (Op naming_op) Debuginfo.none
                     [||] [||])
               ids_and_rs)
       in
       Sub_cfg.add_empty_block_at_start seq ~label;
-      rs, seq
+      if is_cold then mark_sub_cfg_as_cold seq;
+      rs, seq, dbg, SU.phantom_vars_from_env new_env
     in
     let rec build_all_reachable_handlers ~already_built ~not_built =
       let not_built, to_build =
@@ -1431,7 +1621,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         in
         build_all_reachable_handlers ~already_built ~not_built
     in
-    let new_handlers : (Reg.t array list * Sub_cfg.t) list =
+    let new_handlers :
+        (Reg.t array list * Sub_cfg.t * Debuginfo.t * V.Set.t option) list =
       match flag with
       | Normal | Recursive ->
         build_all_reachable_handlers ~already_built:[] ~not_built:handlers_map
@@ -1447,11 +1638,12 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     in
     assert (Sub_cfg.exit_has_never_terminator sub_cfg);
     let term_desc = Cfg.Always (Sub_cfg.start_label s_body) in
-    Sub_cfg.update_exit_terminator sub_cfg term_desc;
+    Sub_cfg.update_exit_terminator sub_cfg term_desc
+      ~phantom_available_before:(SU.phantom_vars_from_env env);
     let s_handlers =
       List.map
-        (fun (rs, s) ->
-          setup_catch_handler flag rs s;
+        (fun (rs, s, dbg, phantom_available_before) ->
+          setup_catch_handler flag rs s ~dbg ~phantom_available_before;
           s)
         new_handlers
     in
@@ -1463,7 +1655,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     emit_tail env sub_cfg exp;
     sub_cfg
 
-  let insert_param_name_for_debugger block fun_args loc_arg num_regs_per_arg =
+  let insert_param_name_for_debugger env block fun_args loc_arg num_regs_per_arg
+      =
+    (* No phantom lets are in scope at the start of the function, so the phantom
+       availability comes from the initial environment. *)
+    let phantom_available_before = SU.phantom_vars_from_env env in
     let loc_arg_index = ref 0 in
     List.iteri
       (fun param_index (var, _ty) ->
@@ -1486,7 +1682,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
               }
           in
           DLL.add_end block.Cfg.body
-            (Sub_cfg.make_instr (Cfg.Op naming_op) [||] [||] Debuginfo.none))
+            (Sub_cfg.make_instr (Cfg.Op naming_op) [||] [||] Debuginfo.none
+               ~phantom_available_before))
       fun_args
 
   (* Sequentialization of a function definition *)
@@ -1533,14 +1730,16 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         ~fun_dbg:f.Cmm.fun_dbg ~fun_contains_calls:true
         ~fun_num_stack_slots:(Stack_class.Tbl.make 0) ~fun_poll:f.Cmm.fun_poll
         ~next_instruction_id:Sub_cfg.instr_id ~fun_ret_type:f.Cmm.fun_ret_type
+        ~fun_phantom_lets:(SU.phantom_lets_for_fundecl env)
         ~allowed_to_be_irreducible:false
     in
     let layout = DLL.make_empty () in
     let entry_block =
       Cfg.make_empty_block ~label:(Cfg.entry_label cfg)
-        (Sub_cfg.make_instr (Cfg.Always tailrec_label) [||] [||] Debuginfo.none)
+        (Sub_cfg.make_instr (Cfg.Always tailrec_label) [||] [||] Debuginfo.none
+           ~phantom_available_before:None)
     in
-    insert_param_name_for_debugger entry_block f.Cmm.fun_args loc_arg
+    insert_param_name_for_debugger env entry_block f.Cmm.fun_args loc_arg
       num_regs_per_arg;
     Cfg.add_block_exn cfg entry_block;
     DLL.add_end layout entry_block.start;
@@ -1548,9 +1747,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       Cfg.make_empty_block ~label:tailrec_label
         (Sub_cfg.make_instr
            (Cfg.Always (Sub_cfg.start_label body))
-           [||] [||] Debuginfo.none)
+           [||] [||] Debuginfo.none ~phantom_available_before:None)
     in
-    insert_param_name_for_debugger tailrec_block f.Cmm.fun_args loc_arg
+    insert_param_name_for_debugger env tailrec_block f.Cmm.fun_args loc_arg
       num_regs_per_arg;
     Cfg.add_block_exn cfg tailrec_block;
     DLL.add_end layout tailrec_block.start;
@@ -1561,7 +1760,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           if Cfg.is_return_terminator block.terminator.desc
           then
             DLL.add_end block.body
-              (Sub_cfg.make_instr Cfg.Reloadretaddr [||] [||] Debuginfo.none);
+              (Sub_cfg.make_instr Cfg.Reloadretaddr [||] [||] Debuginfo.none
+                 ~phantom_available_before:None);
           Cfg.add_block_exn cfg block;
           DLL.add_end layout block.start)
         else assert (DLL.is_empty block.body));

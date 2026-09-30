@@ -212,6 +212,8 @@ module Block_access_field_kind : sig
   val print : Format.formatter -> t -> unit
 
   val compare : t -> t -> int
+
+  val from_kind : Flambda_kind.With_subkind.full_kind -> t
 end
 
 module Mixed_block_access_field_kind : sig
@@ -329,6 +331,7 @@ type string_accessor_width =
   | One_twenty_eight of { aligned : bool }
   | Two_fifty_six of { aligned : bool }
   | Five_twelve of { aligned : bool }
+  | Mask
 
 val byte_width_of_string_accessor_width : string_accessor_width -> int
 
@@ -372,7 +375,10 @@ type nullary_primitive =
           Semaphore initialization code may be emitted as a consequence of
           seeing this instruction, but the emitter checks that all occurrences
           of [enabled_at_init] are consistent for a given probe [name]. *)
-  | Enter_inlined_apply of { dbg : Inlined_debuginfo.t }
+  | Enter_inlined_apply of
+      { dbg : Inlined_debuginfo.t;
+        inlined_attribute : Inlined_attribute.t
+      }
       (** Used in classic mode to denote the start of an inlined function body.
           This is then used in to_cmm to correctly add inlined debuginfo. *)
   | Dls_get  (** Obtain the domain-local state block. *)
@@ -542,6 +548,10 @@ type binary_float_arith_op =
   | Mul
   | Div
 
+type atomic_offset_units =
+  | Field_index
+  | Byte_offset
+
 (** Primitives taking exactly two arguments. *)
 type binary_primitive =
   | Block_set of
@@ -566,9 +576,9 @@ type binary_primitive =
   | Float_arith of float_bitwidth * binary_float_arith_op
   | Float_comp of float_bitwidth * unit comparison_behaviour
   | Bigarray_get_alignment of int
-  | Atomic_load_field of Block_access_field_kind.t
+  | Atomic_load of atomic_offset_units * Block_access_field_kind.t
   (* CR mshinwell: consider putting atomicity onto [Peek] and [Poke] then
-     deleting [Atomic_load_field] *)
+     deleting [Atomic_load] *)
   | Poke of Flambda_kind.Standard_int_or_float.t
   | Read_offset of Flambda_kind.With_subkind.t * Asttypes.mutable_flag
 
@@ -596,9 +606,15 @@ type ternary_primitive =
           more details on the unarization. *)
   | Bytes_or_bigstring_set of bytes_like_value * string_accessor_width
   | Bigarray_set of num_dimensions * Bigarray_kind.t * Bigarray_layout.t
-  | Atomic_field_int_arith of int_atomic_op
-  | Atomic_set_field of Block_access_field_kind.t
-  | Atomic_exchange_field of Block_access_field_kind.t
+  | Atomic_int_arith of atomic_offset_units * int_atomic_op
+  | Atomic_set of
+      atomic_offset_units
+      * Block_access_field_kind.t
+      * Alloc_mode.For_assignments.t
+  | Atomic_exchange of
+      atomic_offset_units
+      * Block_access_field_kind.t
+      * Alloc_mode.For_assignments.t
   | Write_offset of
       Write_offset_kind.t
       * Flambda_kind.With_subkind.t
@@ -615,15 +631,20 @@ type ternary_primitive =
 
 (** Primitives taking exactly four arguments. *)
 type quaternary_primitive =
-  | Atomic_compare_and_set_field of Block_access_field_kind.t
-  | Atomic_compare_exchange_field of
-      { atomic_kind : Block_access_field_kind.t;
+  | Atomic_compare_and_set of
+      atomic_offset_units
+      * Block_access_field_kind.t
+      * Alloc_mode.For_assignments.t
+  | Atomic_compare_exchange of
+      { offset_units : atomic_offset_units;
+        atomic_kind : Block_access_field_kind.t;
             (** The kind of values which the atomic can hold. *)
-        args_kind : Block_access_field_kind.t
+        args_kind : Block_access_field_kind.t;
             (** The kind of values which the compare-exchange operation is to be
                 used with on this particular occasion. Note that this might be
                 [Immediate] even though the atomic is marked as [Any_value], for
                 example. *)
+        mode : Alloc_mode.For_assignments.t
       }
 
 (** Primitives taking zero or more arguments. *)
@@ -673,10 +694,16 @@ module Without_args : sig
 
   val print : Format.formatter -> t -> unit
 
+  val equal : t -> t -> bool
+
+  val free_names : t -> Name_occurrences.t
+
   (** Describe the effects and coeffects that the application of the given
       primitive may have. *)
   val effects_and_coeffects : t -> Effects_and_coeffects.t
 end
+
+val without_args : t -> Without_args.t
 
 (** A description of the kind of values which a unary primitive expects as its
     arguments. *)

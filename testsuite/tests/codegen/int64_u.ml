@@ -15,13 +15,10 @@ open Intrinsics
 
 (* Codegen tests for Int64_u operations *)
 
-(* CR ttebbi: This should use the neg instruction. *)
 let neg x = Int64_u.neg x
 [%%expect_asm X86_64{|
 neg:
-  movq  %rax, %rbx
-  xorl  %eax, %eax
-  subq  %rbx, %rax
+  neg   %rax
   ret
 |}]
 
@@ -46,7 +43,6 @@ mul:
   ret
 |}]
 
-(* CR ttebbi: imul could be replaced with lea (x*2+x) *)
 let mul_3 x = Int64_u.mul x #3L
 [%%expect_asm X86_64{|
 mul_3:
@@ -66,9 +62,7 @@ div:
   idivq %rcx
   ret
 .L0:
-  xorl  %ebx, %ebx
-  subq  %rax, %rbx
-  movq  %rbx, %rax
+  neg   %rax
   ret
 .L1:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
@@ -242,12 +236,10 @@ unsigned_rem_7:
   ret
 |}]
 
-(* CR ttebbi: Could instead start with [cmpq $-1, %rax] *)
 let unsigned_div_umaxint x = Int64_u.unsigned_div x (-#1L)
 [%%expect_asm X86_64{|
 unsigned_div_umaxint:
-  movq  $-1, %rbx
-  cmpq  %rbx, %rax
+  cmpq  $-1, %rax
   jne   .L0
   movl  $1, %eax
   ret
@@ -259,8 +251,7 @@ unsigned_div_umaxint:
 let unsigned_rem_umaxint x = Int64_u.unsigned_rem x (-#1L)
 [%%expect_asm X86_64{|
 unsigned_rem_umaxint:
-  movq  $-1, %rbx
-  cmpq  %rbx, %rax
+  cmpq  $-1, %rax
   jne   .L0
   xorl  %eax, %eax
   ret
@@ -290,9 +281,7 @@ abs:
   jl    .L0
   ret
 .L0:
-  xorl  %ebx, %ebx
-  subq  %rax, %rbx
-  movq  %rbx, %rax
+  neg   %rax
   ret
 |}]
 
@@ -431,17 +420,17 @@ let to_int32 x = Int64_u.to_int32 x
 [%%expect_asm X86_64{|
 to_int32:
   subq  $8, %rsp
-  movq  %rax, %rbx
   subq  $24, %r15
   cmpq  (%r14), %r15
   jb    <hidden GC jump pad>
 .L0:
-  leaq  8(%r15), %rax
-  movq  $2303, -8(%rax)
+  leaq  8(%r15), %rbx
+  movq  $2303, -8(%rbx)
   movq  caml_int32_ops@GOTPCREL(%rip), %rdi
-  movq  %rdi, (%rax)
-  movslq %ebx, %rbx
-  movq  %rbx, 8(%rax)
+  movq  %rdi, (%rbx)
+  movslq %eax, %rax
+  movq  %rax, 8(%rbx)
+  movq  %rbx, %rax
   addq  $8, %rsp
   ret
 |}]
@@ -457,16 +446,16 @@ let to_nativeint x = Int64_u.to_nativeint x
 [%%expect_asm X86_64{|
 to_nativeint:
   subq  $8, %rsp
-  movq  %rax, %rbx
   subq  $24, %r15
   cmpq  (%r14), %r15
   jb    <hidden GC jump pad>
 .L0:
-  leaq  8(%r15), %rax
-  movq  $2303, -8(%rax)
+  leaq  8(%r15), %rbx
+  movq  $2303, -8(%rbx)
   movq  caml_nativeint_ops@GOTPCREL(%rip), %rdi
-  movq  %rdi, (%rax)
-  movq  %rbx, 8(%rax)
+  movq  %rdi, (%rbx)
+  movq  %rax, 8(%rbx)
+  movq  %rbx, %rax
   addq  $8, %rsp
   ret
 |}]
@@ -477,6 +466,7 @@ of_int32_u:
   ret
 |}]
 
+(* CR ttebbi: could be [cltq] *)
 let to_int32_u x = Int64_u.to_int32_u x
 [%%expect_asm X86_64{|
 to_int32_u:
@@ -508,15 +498,15 @@ let float_of_bits x = Int64_u.float_of_bits x
 [%%expect_asm X86_64{|
 float_of_bits:
   subq  $8, %rsp
-  movq  %rax, %rbx
   subq  $16, %r15
   cmpq  (%r14), %r15
   jb    <hidden GC jump pad>
 .L0:
-  leaq  8(%r15), %rax
-  movq  $1277, -8(%rax)
-  vmovq %rbx, %xmm0
-  vmovsd %xmm0, (%rax)
+  leaq  8(%r15), %rbx
+  movq  $1277, -8(%rbx)
+  vmovq %rax, %xmm0
+  vmovsd %xmm0, (%rbx)
+  movq  %rbx, %rax
   addq  $8, %rsp
   ret
 |}]
@@ -562,18 +552,10 @@ equal:
   ret
 |}]
 
-(* CR ttebbi: This is very inefficient, should be like `equal`. *)
 let equal_using_compare x y = Int64_u.compare x y = 0
 [%%expect_asm X86_64{|
 equal_using_compare:
-  movq  %rax, %rsi
-  movq  $-1, %rdi
-  xorl  %eax, %eax
-  cmpq  %rbx, %rsi
-  setg  %al
-  cmovge %rax, %rdi
-  leaq  1(%rdi,%rdi), %rax
-  cmpq  $1, %rax
+  cmpq  %rbx, %rax
   sete  %al
   movzbq %al, %rax
   leaq  1(%rax,%rax), %rax
@@ -608,16 +590,16 @@ let to_int64 x = Int64_u.to_int64 x
 [%%expect_asm X86_64{|
 to_int64:
   subq  $8, %rsp
-  movq  %rax, %rbx
   subq  $24, %r15
   cmpq  (%r14), %r15
   jb    <hidden GC jump pad>
 .L0:
-  leaq  8(%r15), %rax
-  movq  $2303, -8(%rax)
+  leaq  8(%r15), %rbx
+  movq  $2303, -8(%rbx)
   movq  caml_int64_ops@GOTPCREL(%rip), %rdi
-  movq  %rdi, (%rax)
-  movq  %rbx, 8(%rax)
+  movq  %rdi, (%rbx)
+  movq  %rax, 8(%rbx)
+  movq  %rbx, %rax
   addq  $8, %rsp
   ret
 |}]

@@ -20,7 +20,7 @@
 
 open! Int_replace_polymorphic_compare
 
-[@@@ocaml.warning "+a-4-40-41-42"]
+[@@@ocaml.warning "+a-40-41-42"]
 
 open Arch
 module Validated_mem_offset = Arm64_ast.Ast.DSL.Validated_mem_offset
@@ -37,6 +37,8 @@ let scale_of_chunk : Cmm.memory_chunk -> int = function
 
 let is_offset chunk n =
   Validated_mem_offset.is_valid ~scale:(scale_of_chunk chunk) ~offset:n
+
+let is_symbol_offset chunk n = n mod scale_of_chunk chunk = 0
 
 let is_logical_immediate_int n =
   Arm64_ast.Logical_immediates.is_logical_immediate (Nativeint.of_int n)
@@ -57,7 +59,10 @@ let inline_ops = ["sqrt"]
 let use_direct_addressing _symb = (not !Clflags.dlcode) && not Arch.macosx
 
 let is_stack_slot rv =
-  Reg.(match rv with [| { loc = Stack _; _ } |] -> true | _ -> false)
+  match rv with
+  | [| r |] -> (
+    Reg.(match r.loc with Stack _ -> true | Reg _ | Unknown -> false))
+  | _ -> false
 
 let select_bitwidth : Cmm.bswap_bitwidth -> Arch.bswap_bitwidth = function
   | Sixteen -> Sixteen
@@ -72,14 +77,16 @@ let is_immediate (op : Operation.integer_operation) n :
   | Iadd | Isub -> Is_immediate (n <= 0xFFF_FFF && n >= -0xFFF_FFF)
   | Iand | Ior | Ixor -> Is_immediate (is_logical_immediate_int n)
   | Icomp _ -> Is_immediate (int_is_immediate n)
-  | _ -> Use_default
+  | Imul | Imulh _ | Idiv _ | Imod _ | Ilsl | Ilsr | Iasr | Iclz | Ictz
+  | Ipopcnt ->
+    Use_default
 
 let is_immediate_test _cmp n : Cfg_selectgen_target_intf.is_immediate_result =
   Is_immediate (int_is_immediate n)
 
 let is_simple_expr (expr : Cmm.expression) :
     Cfg_selectgen_target_intf.is_simple_expr_result =
-  match expr with
+  match[@ocaml.warning "-fragile-match"] expr with
   (* inlined floating-point ops are simple if their arguments are *)
   | Cop (Cextcall { func; _ }, args, _) when List.mem func inline_ops ->
     Simple_if_all_expressions_are args
@@ -87,7 +94,7 @@ let is_simple_expr (expr : Cmm.expression) :
 
 let effects_of (expr : Cmm.expression) :
     Cfg_selectgen_target_intf.effects_of_result =
-  match expr with
+  match[@ocaml.warning "-fragile-match"] expr with
   | Cop (Cextcall { func; _ }, args, _) when List.mem func inline_ops ->
     Effects_of_all_expressions args
   | _ -> Use_default
@@ -108,9 +115,9 @@ let validated_offset chunk n =
 
 let select_addressing' chunk (expr : Cmm.expression) :
     addressing_mode * Cmm.expression =
-  match expr with
+  match[@ocaml.warning "-fragile-match"] expr with
   | Cop ((Caddv | Cadda), [Cconst_symbol (s, _); Cconst_int (n, _)], _)
-    when use_direct_addressing s ->
+    when use_direct_addressing s && is_symbol_offset chunk n ->
     Ibased (asm_symbol_of_cmm s, n), Ctuple []
   | Cop ((Caddv | Cadda), [arg; Cconst_int (n, _)], _) when is_offset chunk n ->
     validated_offset chunk n, arg
@@ -139,7 +146,7 @@ let select_operation' ~generic_select_condition:_ (op : Cmm.operation)
         args2,
         dbg,
         fun (basic_or_terminator : Cfg.basic_or_terminator) ~args ->
-          match basic_or_terminator, args with
+          match[@ocaml.warning "-fragile-match"] basic_or_terminator, args with
           | Basic (Op (Intop_imm (Ilsl, l))), [arg3] ->
             Rewritten (specific (Ishiftarith (shift_op, l)), [arg1; arg3])
           | Basic (Op (Intop Imul)), [arg3; arg4] ->
@@ -149,7 +156,7 @@ let select_operation' ~generic_select_condition:_ (op : Cmm.operation)
   match op with
   (* Integer addition *)
   | Caddi | Caddv | Cadda -> (
-    match args with
+    match[@ocaml.warning "-fragile-match"] args with
     (* Shift-add *)
     | [arg1; Cop (Clsl, [arg2; Cconst_int (n, _)], _)] when n > 0 && n < 64 ->
       Rewritten (specific (Ishiftarith (Ishiftadd, n)), [arg1; arg2])
@@ -165,7 +172,7 @@ let select_operation' ~generic_select_condition:_ (op : Cmm.operation)
     | _ -> Use_default)
   (* Integer subtraction *)
   | Csubi -> (
-    match args with
+    match[@ocaml.warning "-fragile-match"] args with
     (* Shift-sub *)
     | [arg1; Cop (Clsl, [arg2; Cconst_int (n, _)], _)] when n > 0 && n < 64 ->
       Rewritten (specific (Ishiftarith (Ishiftsub, n)), [arg1; arg2])
@@ -177,7 +184,7 @@ let select_operation' ~generic_select_condition:_ (op : Cmm.operation)
     | _ -> Use_default)
   (* Recognize sign extension *)
   | Casr -> (
-    match args with
+    match[@ocaml.warning "-fragile-match"] args with
     | [Cop (Clsl, [k; Cconst_int (n, _)], _); Cconst_int (n', _)]
       when n' = n && 0 < n && n < 64 ->
       Rewritten (specific (Isignext (64 - n)), [k])
@@ -196,18 +203,18 @@ let select_operation' ~generic_select_condition:_ (op : Cmm.operation)
         args )
   (* Recognize floating-point negate and multiply *)
   | Cnegf Float64 -> (
-    match args with
+    match[@ocaml.warning "-fragile-match"] args with
     | [Cop (Cmulf Float64, args, _)] -> Rewritten (specific Inegmulf, args)
     | _ -> Use_default)
   (* Recognize floating-point multiply and add/sub *)
   | Caddf Float64 -> (
-    match args with
+    match[@ocaml.warning "-fragile-match"] args with
     | [arg; Cop (Cmulf Float64, args, _)] | [Cop (Cmulf Float64, args, _); arg]
       ->
       Rewritten (specific Imuladdf, arg :: args)
     | _ -> Use_default)
   | Csubf Float64 -> (
-    match args with
+    match[@ocaml.warning "-fragile-match"] args with
     | [arg; Cop (Cmulf Float64, args, _)] ->
       Rewritten (specific Imulsubf, arg :: args)
     | [Cop (Cmulf Float64, args, _); arg] ->
@@ -226,7 +233,28 @@ let select_operation' ~generic_select_condition:_ (op : Cmm.operation)
     let bitwidth = select_bitwidth bitwidth in
     Rewritten (specific (Ibswap { bitwidth }), args)
   (* Other operations are regular *)
-  | _ -> Use_default
+  | Cload { memory_chunk = _; mutability = _; is_atomic = false }
+  | Cnegf Float32
+  | Caddf Float32
+  | Csubf Float32
+  | Cextcall
+      { func = _;
+        ty = _;
+        ty_args = _;
+        alloc = _;
+        builtin = false;
+        returns = _;
+        effects = _;
+        coeffects = _
+      }
+  | Capply _ | Calloc _ | Cstore _ | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _
+  | Caddi128 | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Ccsel _
+  | Cclz | Cctz | Cpopcnt | Cprefetch _ | Catomic _ | Ccmpi _ | Cabsf _
+  | Cmulf _ | Cdivf _ | Creinterpret_cast _ | Cstatic_cast _ | Ccmpf _
+  | Craise _ | Cprobe _ | Cprobe_is_enabled _ | Copaque | Cbeginregion
+  | Cendregion | Ctuple_field _ | Cdls_get | Ctls_get | Cdomain_index | Cpoll
+  | Cpause ->
+    Use_default
 
 let select_operation
     ~(generic_select_condition :
@@ -309,3 +337,10 @@ let insert_op_debug env sub_cfg op dbg rs rd :
   if !Clflags.llvm_backend
   then Use_default
   else insert_op_debug' env sub_cfg op dbg rs rd
+
+let pseudoregs_for_operation op rs rd :
+    Cfg_selectgen_target_intf.pseudoregs_for_operation_result =
+  try
+    let rsrc, rdst = pseudoregs_for_operation op rs rd in
+    Constrained (rsrc, rdst)
+  with Use_default_exn -> Use_default_regs

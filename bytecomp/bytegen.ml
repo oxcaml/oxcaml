@@ -190,15 +190,18 @@ let merge_events ev ev' =
     | Event_pseudo, _ -> ev', ev
     | _, Event_pseudo -> ev, ev'
     (* Keep following event, supposedly more informative *)
-    | Event_before, (Event_after _ | Event_before) -> ev', ev
+    | Event_before, (Event_after _ | Event_after_untyped | Event_before) ->
+      ev', ev
     (* Discard following events, supposedly less informative *)
-    | Event_after _, (Event_after _ | Event_before) -> ev, ev'
+    | ( (Event_after _ | Event_after_untyped),
+        (Event_after _ | Event_after_untyped | Event_before) ) ->
+      ev, ev'
   in
   copy_event maj maj.ev_kind (merge_infos maj min) (merge_repr maj min)
 
 let weaken_event ev cont =
   match ev.ev_kind with
-  | Event_after _ -> (
+  | Event_after _ | Event_after_untyped -> (
     match cont with
     | Kpush :: Kevent ({ ev_repr = Event_none } as ev') :: c -> (
       match ev.ev_info with
@@ -217,6 +220,10 @@ let weaken_event ev cont =
 let add_event ev = function
   | Kevent ev' :: cont -> weaken_event (merge_events ev ev') cont
   | cont -> weaken_event ev cont
+
+let strip_event_kind = function
+  | Event_after _ -> Event_after_untyped
+  | (Event_after_untyped | Event_before | Event_pseudo) as k -> k
 
 (**** Compilation of a lambda expression ****)
 
@@ -708,14 +715,19 @@ and comp_expr stack_info env exp sz cont =
       string_of_scoped_location ~include_zero_alloc:false lev.lev_loc
     in
     let event kind info =
+      let ev_typenv, ev_kind =
+        if !Clflags.debug_ocamldebug_types
+        then Env.summary lev.lev_env, kind
+        else Env.Env_empty, strip_event_kind kind
+      in
       { ev_pos = 0;
         (* patched in emitcode *)
         ev_module = Compilation_unit.full_path_as_string !compunit_name;
         ev_loc = to_location lev.lev_loc;
-        ev_kind = kind;
+        ev_kind;
         ev_defname;
         ev_info = info;
-        ev_typenv = Env.summary lev.lev_env;
+        ev_typenv;
         ev_typsubst = Subst.identity;
         ev_compenv = env;
         ev_stacksize = sz;

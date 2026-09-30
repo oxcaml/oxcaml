@@ -9,7 +9,7 @@ let enabled_if =
     (= %{architecture} "amd64")
     (<> %{system} macosx)))|}
 
-let flags = "-extension simd_alpha -favx512f -favx512vl -favx512dq -favx512bw"
+let flags = "-extension simd_beta -favx512f -favx512vl -favx512dq -favx512bw"
 
 let impl name = name ^ ".ml"
 
@@ -120,7 +120,8 @@ let () =
       "consts512";
       "arrays512";
       "arrays512_u";
-      "arrays512_mask" ]
+      "arrays512_mask";
+      "strings512_mask" ]
   in
   List.iter (print_test ?extra_flag:None) tests;
   List.iter (print_test ~extra_flag:"-nodynlink") tests;

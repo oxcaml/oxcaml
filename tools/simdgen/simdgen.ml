@@ -497,6 +497,7 @@ let print_one bind instr =
     | POPCNT -> "POPCNT"
     | LZCNT -> "LZCNT"
     | PCLMULQDQ -> "PCLMULQDQ"
+    | AES -> "AES"
     | BMI -> "BMI"
     | BMI2 -> "BMI2"
     | AVX -> "AVX"
@@ -741,6 +742,7 @@ let parse_ext = function
   | "POPCNT" -> Some POPCNT
   | "LZCNT" -> Some LZCNT
   | "PCLMULQDQ" -> Some PCLMULQDQ
+  | "AES" -> Some AES
   | "BMI1" -> Some BMI
   | "BMI2" -> Some BMI2
   | "AVX" -> Some AVX

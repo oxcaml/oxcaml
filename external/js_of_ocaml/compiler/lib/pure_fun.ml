@@ -27,14 +27,19 @@ open Code
 
 (****)
 
+let pure pure_funs x = Var.Set.mem x pure_funs
+
+let empty = Var.Set.empty
+
 let pure_expr pure_funs e =
   match e with
   | Block _ | Field _ | Closure _ | Constant _ -> true
   | Special (Alias_prim _) -> true
-  | Apply { f; exact; _ } -> exact && Var.Set.mem f pure_funs
+  | Apply { f; exact; _ } ->
+      exact && (Var.Set.mem f pure_funs || Shape.State.is_pure_fun f)
   | Prim (p, _l) -> (
       match p with
-      | Extern f -> Primitive.is_pure f
+      | Extern (f, _) -> Primitive.is_pure f
       | _ -> true)
 
 let pure_instr pure_funs i =
@@ -47,7 +52,16 @@ let pure_instr pure_funs i =
 
 let rec traverse blocks pc visited pure_blocks funs =
   if BitSet.mem visited pc
-  then BitSet.mem pure_blocks pc
+  then
+    (* Back-edge (cycle in the CFG): conservatively treat as impure.
+       We cannot determine whether the loop terminates, so we treat
+       it as potentially non-terminating. This is consistent with how
+       we handle recursive function calls in [pure_expr], where a
+       call to a function not yet known to be pure is considered
+       impure. Since dead code elimination relies on purity to remove
+       unused calls, incorrectly marking a non-terminating loop as
+       pure could change program behavior. *)
+    BitSet.mem pure_blocks pc
   else (
     BitSet.set visited pc;
     let pure = block blocks pc visited pure_blocks funs in

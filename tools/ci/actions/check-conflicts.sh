@@ -30,7 +30,8 @@ end_marker=">>>>>>>"
 matches=$(git grep --no-color -n \
   -e "^${start_marker}" \
   -e "^${middle_marker}" \
-  -e "^${end_marker}") || true
+  -e "^${end_marker}" \
+  -- .) || true
 
 if [ -n "$matches" ]; then
   {

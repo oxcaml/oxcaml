@@ -377,15 +377,8 @@ module Acc = struct
       seen_a_function : bool;
       slot_offsets : Slot_offsets.t;
       code_slot_offsets : Slot_offsets.t Code_id.Map.t;
-      closure_infos : closure_info list;
-      symbol_short_name_counter : int
+      closure_infos : closure_info list
     }
-
-  let manufacture_symbol_short_name t =
-    let counter = t.symbol_short_name_counter in
-    let t = { t with symbol_short_name_counter = counter + 1 } in
-    let name = Linkage_name.of_string ("s" ^ string_of_int counter) in
-    t, name
 
   let cost_metrics t = t.cost_metrics
 
@@ -475,8 +468,7 @@ module Acc = struct
       seen_a_function = false;
       slot_offsets = Slot_offsets.empty;
       code_slot_offsets = Code_id.Map.empty;
-      closure_infos = [];
-      symbol_short_name_counter = 0
+      closure_infos = []
     }
 
   let declared_symbols t = t.declared_symbols
@@ -785,9 +777,11 @@ module Function_decls = struct
     type calling_convention =
       | Normal_calling_convention
       | Unboxed_calling_convention of
-          unboxing_kind option list
-          * unboxing_return_kind option
-          * Function_slot.t
+          { params_unboxing : unboxing_kind option list;
+            return_unboxing : unboxing_return_kind option;
+            unboxed_function_slot : Function_slot.t;
+            needs_region_wrapper : bool
+          }
 
     type t =
       { let_rec_ident : Ident.t;
@@ -1117,7 +1111,7 @@ module Let_with_acc = struct
             ~find_code_characteristics:(fun code_id ->
               let code = Code_id.Map.find code_id code_mapping in
               { cost_metrics = Code.cost_metrics code;
-                params_arity = Flambda_arity.num_params (Code.params_arity code)
+                function_slot_size = Code.function_slot_size code
               })
             set_of_closures
         | Rec_info _ -> Cost_metrics.zero

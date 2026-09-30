@@ -27,7 +27,7 @@ open Stdlib_upstream_compatible
    See README.md in this test directory. *)
 type boxed_t = (int or_null) * nativeint
 
-type unboxed_t = #((int or_null) * nativeint#)
+type unboxed_t = #((int or_null) * nativeint_u)
 
 let elem : boxed_t elem =
   Tup2 (Or_null int_elem, nativeint_elem)

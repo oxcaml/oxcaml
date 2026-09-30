@@ -29,6 +29,7 @@ val strict_sequence      : bool ref
 val applicative_functors : bool ref
 val nopervasives         : bool ref
 val strict_formats       : bool ref
+val syntax_quotations    : bool ref
 type open_arg =
   | Open of string
   | Open_cmi of string
@@ -66,7 +67,8 @@ val unboxed_types        : bool ref
 val profile_columns : profile_column list ref
 val dwarf_pedantic : bool ref
 val gdwarf_config_shape_eval_depth : int option ref
-val gdwarf_config_max_type_to_shape_depth : int option ref
+val type_to_shape_max_depth : int option ref
+val restrict_to_upstream_dwarf : bool ref
 val gdwarf_config_max_evaluation_steps_per_variable : int option ref
 val locs : bool ref
 val locations            : bool ref

@@ -20,6 +20,8 @@ type _ t =
   | Mode : maturity t
   | Unique : maturity t
   | Overwriting : unit t
+  | Mode_polymorphism : maturity t
+  | Mode_polymorphism_printing : unit t
   | Include_functor : unit t
   | Polymorphic_parameters : unit t
   | Immutable_arrays : unit t

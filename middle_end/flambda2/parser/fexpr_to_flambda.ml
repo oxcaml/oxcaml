@@ -59,8 +59,13 @@ let rec subkind :
       non_consts
       |> List.map (fun (tag, sk) ->
           ( tag_scannable tag,
-            ( Flambda_kind.Block_shape.Scannable Value_only,
-              List.map value_kind_with_subkind sk ) ))
+            match sk with
+            | None ->
+              Flambda_kind.With_subkind.Non_null_value_subkind.Undetermined
+            | Some sk ->
+              Flambda_kind.With_subkind.Non_null_value_subkind.Determined
+                ( Flambda_kind.Block_shape.Scannable Value_only,
+                  List.map value_kind_with_subkind sk ) ))
       |> Tag.Scannable.Map.of_list
     in
     Variant { consts; non_consts }
@@ -920,6 +925,7 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
       match inlined with
       | None | Some Default_inlined -> Default_inlined
       | Some Hint_inlined -> Hint_inlined
+      | Some Forward_inlined -> Forward_inlined
       | Some Always_inlined -> Always_inlined Expected_to_be_used
       | Some (Unroll n) -> Unroll (n, Expected_to_be_used)
       | Some Never_inlined -> Never_inlined
@@ -1011,8 +1017,6 @@ let conv comp_unit (fexpr : Fexpr.flambda_unit) : conv_result =
   let { done_continuation = return_continuation;
         error_continuation;
         toplevel_alloc_region;
-        toplevel_region;
-        toplevel_ghost_region;
         _
       } =
     env
@@ -1023,9 +1027,6 @@ let conv comp_unit (fexpr : Fexpr.flambda_unit) : conv_result =
   let code_slot_offsets = acc.Acc.code_slot_offsets in
   let unit =
     Flambda_unit.create ~return_continuation ~exn_continuation
-      ~toplevel_my_alloc_region:toplevel_alloc_region
-      ~toplevel_my_region:toplevel_region
-      ~toplevel_my_ghost_region:toplevel_ghost_region ~body ~module_symbol
-      ~used_value_slots:Unknown
+      ~toplevel_my_alloc_region:toplevel_alloc_region ~body ~module_symbol
   in
   { unit; code_slot_offsets }

@@ -45,6 +45,7 @@ let mk_no_ocamlcfg f =
   ("-no-ocamlcfg", Arg.Unit f, " Do not use ocamlcfg (deprecated, does nothing)")
 
 let mk_dcfg f = ("-dcfg", Arg.Unit f, " (undocumented)")
+let mk_dssa f = ("-dssa", Arg.Unit f, " (undocumented)")
 
 let mk_dcfg_invariants f =
   ("-dcfg-invariants", Arg.Unit f, " Extra sanity checks on Cfg")
@@ -123,10 +124,20 @@ let mk_no_x86_peephole_remove_redundant_cmp f =
     Arg.Unit f,
     " Disable x86 peephole: remove redundant cmp" )
 
+let mk_no_x86_peephole_remove_redundant_extension f =
+  ( "-no-x86-peephole-remove-redundant-extension",
+    Arg.Unit f,
+    " Disable x86 peephole: remove redundant sign/zero extension" )
+
 let mk_no_x86_peephole_combine_add_rsp f =
   ( "-no-x86-peephole-combine-add-rsp",
     Arg.Unit f,
     " Disable x86 peephole: combine adjacent add rsp" )
+
+let mk_no_x86_peephole_remove_redundant_test f =
+  ( "-no-x86-peephole-remove-redundant-test",
+    Arg.Unit f,
+    " Disable x86 peephole: remove redundant test" )
 
 let mk_cfg_cse_optimize f =
   ("-cfg-cse-optimize", Arg.Unit f, " Apply CSE optimizations to CFG")
@@ -208,6 +219,15 @@ let mk_cfg_merge_blocks f =
 let mk_no_cfg_merge_blocks f =
   ("-no-cfg-merge-blocks", Arg.Unit f, " Do not merge equivalent CFG blocks")
 
+let mk_cfg_block_layout f =
+  ( "-cfg-block-layout",
+    Arg.Unit f,
+    " Reorder CFG blocks to improve layout (affects coldness and prologue \
+     placement)" )
+
+let mk_no_cfg_block_layout f =
+  ("-no-cfg-block-layout", Arg.Unit f, " Do not reorder CFG blocks")
+
 let mk_cfg_value_propagation f =
   ("-cfg-value-propagation", Arg.Unit f, " Propagate value to simplify CFG")
 
@@ -249,21 +269,6 @@ let mk_reorder_blocks_random f =
       "<seed> Randomly reorder basic blocks in every function, using the \
        provided seed (intended for testing, off by default)." )
 
-let mk_basic_block_sections f =
-  if Config.function_sections then
-    ( "-basic-block-sections",
-      Arg.Unit f,
-      " Emit each basic block in a separate section if target supports it. \
-       Requires -ocamlcfg." )
-  else
-    let err () =
-      raise
-        (Arg.Bad
-           "OCaml has been configured without support for -function-sections \
-            which is required for -basic-block-sections")
-    in
-    ("-basic-block-sections", Arg.Unit err, " (option not available)")
-
 let mk_module_entry_functions_section f =
   if Config.function_sections then
     ( "-module-entry-functions-section",
@@ -284,16 +289,6 @@ let mk_dasm_comments f =
 
 let mk_dno_asm_comments f =
   ("-dno-asm-comments", Arg.Unit f, " Do not add comments in .s files")
-
-let mk_frametables_in_rodata f =
-  ( "-frametables-in-rodata",
-    Arg.Unit f,
-    " Emit GC frametables into the .rodata section (default)" )
-
-let mk_no_frametables_in_rodata f =
-  ( "-no-frametables-in-rodata",
-    Arg.Unit f,
-    " Do not emit GC frametables into the .rodata section" )
 
 let mk_heap_reduction_threshold f =
   ( "-heap-reduction-threshold",
@@ -414,6 +409,28 @@ let mk_caml_apply_inline_fast_path f =
   ( "-caml-apply-inline-fast-path",
     Arg.Unit f,
     " Inline the fast path of caml_applyN" )
+
+let mk_use_ssa f =
+  ("-use-ssa", Arg.Unit f, " Use SSA intermediate representation (EXPERIMENTAL)")
+
+let mk_no_use_ssa f =
+  ("-no-use-ssa", Arg.Unit f, " Disable SSA intermediate representation")
+
+let mk_ssa_simplify f =
+  ( "-ssa-simplify",
+    Arg.Unit f,
+    " Run the SSA simplification pass (EXPERIMENTAL)" )
+
+let mk_no_ssa_simplify f =
+  ("-no-ssa-simplify", Arg.Unit f, " Disable the SSA simplification pass")
+
+let mk_ssa_validate f =
+  ( "-ssa-validate",
+    Arg.Unit f,
+    " Validate the SSA pipeline by comparing against the legacy CFG" )
+
+let mk_no_ssa_validate f =
+  ("-no-ssa-validate", Arg.Unit f, " Disable SSA pipeline validation")
 
 let mk_dump_inlining_paths f =
   ( "-dump-inlining-paths",
@@ -762,11 +779,21 @@ let mk_simplify_stubs f =
       (format_default Flambda2.Default.simplify_stubs) )
 
 let mk_no_simplify_stubs f =
-  ( "-flambda2-no-simplify-stubs",
+  ( "-no-flambda2-simplify-stubs",
     Arg.Unit f,
     Printf.sprintf
-      " Prevent the simplification of stub functions%s (Flambda2 only)"
-      (format_not_default Flambda2.Default.simplify_stubs) )
+      " Prevent the simplification of stub functions (Flambda2 only)" )
+
+let mk_stubs_forward_inlining f =
+  ( "-stubs-forward-inlining",
+    Arg.Unit f,
+    Printf.sprintf " Forward inlining information on stubs (Flambda2 only)" )
+
+let mk_no_stubs_forward_inlining f =
+  ( "-no-stubs-forward-inlining",
+    Arg.Unit f,
+    Printf.sprintf
+      " Do not forward inlining information on stubs (Flambda2 only)" )
 
 let mk_flambda2_expert_fallback_inlining_heuristic f =
   ( "-flambda2-expert-fallback-inlining-heuristic",
@@ -1176,17 +1203,6 @@ module Debugging = Dwarf_flags
 
 (* CR mshinwell: These help texts should show the default values. *)
 
-let mk_restrict_to_upstream_dwarf f =
-  ( "-gupstream-dwarf",
-    Arg.Unit f,
-    " Only emit the same DWARF information as the upstream compiler" )
-
-let mk_no_restrict_to_upstream_dwarf f =
-  ( "-gno-upstream-dwarf",
-    Arg.Unit f,
-    " Emit potentially more DWARF information than the upstream compiler. \
-     Implies -shape-format debugging-shapes." )
-
 let mk_dwarf_inlined_frames f =
   ("-gdwarf-inlined-frames", Arg.Unit f, " Emit DWARF inlined frame information")
 
@@ -1194,6 +1210,12 @@ let mk_no_dwarf_inlined_frames f =
   ( "-gno-dwarf-inlined-frames",
     Arg.Unit f,
     " Do not emit DWARF inlined frame information" )
+
+let mk_gdwarf_version f =
+  ( "-gdwarf-version",
+    Arg.String f,
+    "<version>  Set the DWARF version for OxCaml debugging information\n\
+    \         (4 (default) or 5)" )
 
 let mk_ddebug_avail_sets f =
   ( "-ddebug-avail-sets",
@@ -1314,6 +1336,7 @@ module type Oxcaml_options = sig
   val ddwarf_metrics : unit -> unit
   val ddwarf_metrics_output_file : string -> unit
   val dcfg : unit -> unit
+  val dssa : unit -> unit
   val dcfg_invariants : unit -> unit
   val regalloc : Clflags.Register_allocator.t -> unit
   val regalloc_linscan_threshold : int -> unit
@@ -1330,7 +1353,9 @@ module type Oxcaml_options = sig
   val no_x86_peephole_optimize : unit -> unit
   val no_x86_peephole_remove_mov_to_dead_register : unit -> unit
   val no_x86_peephole_remove_redundant_cmp : unit -> unit
+  val no_x86_peephole_remove_redundant_extension : unit -> unit
   val no_x86_peephole_combine_add_rsp : unit -> unit
+  val no_x86_peephole_remove_redundant_test : unit -> unit
   val cfg_stack_checks : unit -> unit
   val no_cfg_stack_checks : unit -> unit
   val cfg_stack_checks_threshold : int -> unit
@@ -1345,6 +1370,8 @@ module type Oxcaml_options = sig
   val no_omit_leaf_frame_pointers : unit -> unit
   val cfg_merge_blocks : unit -> unit
   val no_cfg_merge_blocks : unit -> unit
+  val cfg_block_layout : unit -> unit
+  val no_cfg_block_layout : unit -> unit
   val cfg_value_propagation : unit -> unit
   val no_cfg_value_propagation : unit -> unit
   val cfg_value_propagation_float : unit -> unit
@@ -1353,12 +1380,9 @@ module type Oxcaml_options = sig
   val no_cfg_value_propagation_flow : unit -> unit
   val experimental_optimizations : unit -> unit
   val reorder_blocks_random : int -> unit
-  val basic_block_sections : unit -> unit
   val module_entry_functions_section : unit -> unit
   val dasm_comments : unit -> unit
   val dno_asm_comments : unit -> unit
-  val frametables_in_rodata : unit -> unit
-  val no_frametables_in_rodata : unit -> unit
   val heap_reduction_threshold : int -> unit
   val zero_alloc_check : string -> unit
   val zero_alloc_assert : string -> unit
@@ -1381,6 +1405,12 @@ module type Oxcaml_options = sig
   val long_frames_threshold : int -> unit
   val dbranch_relaxation_max_displacement : int -> unit
   val caml_apply_inline_fast_path : unit -> unit
+  val use_ssa : unit -> unit
+  val no_use_ssa : unit -> unit
+  val ssa_simplify : unit -> unit
+  val no_ssa_simplify : unit -> unit
+  val ssa_validate : unit -> unit
+  val no_ssa_validate : unit -> unit
   val internal_assembler : unit -> unit
   val verify_binary_emitter : unit -> unit
   val dissector : unit -> unit
@@ -1432,6 +1462,8 @@ module type Oxcaml_options = sig
   val no_flambda2_match_in_match : unit -> unit
   val simplify_stubs : unit -> unit
   val no_simplify_stubs : unit -> unit
+  val stubs_forward_inlining : unit -> unit
+  val no_stubs_forward_inlining : unit -> unit
   val flambda2_expert_fallback_inlining_heuristic : unit -> unit
   val no_flambda2_expert_fallback_inlining_heuristic : unit -> unit
   val flambda2_expert_inline_effects_in_cmm : unit -> unit
@@ -1504,6 +1536,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_ocamlcfg F.ocamlcfg;
       mk_no_ocamlcfg F.no_ocamlcfg;
       mk_dcfg F.dcfg;
+      mk_dssa F.dssa;
       mk_dcfg_invariants F.dcfg_invariants;
       mk_regalloc F.regalloc;
       mk_regalloc_linscan_threshold F.regalloc_linscan_threshold;
@@ -1522,7 +1555,11 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
         F.no_x86_peephole_remove_mov_to_dead_register;
       mk_no_x86_peephole_remove_redundant_cmp
         F.no_x86_peephole_remove_redundant_cmp;
+      mk_no_x86_peephole_remove_redundant_extension
+        F.no_x86_peephole_remove_redundant_extension;
       mk_no_x86_peephole_combine_add_rsp F.no_x86_peephole_combine_add_rsp;
+      mk_no_x86_peephole_remove_redundant_test
+        F.no_x86_peephole_remove_redundant_test;
       mk_cfg_stack_checks F.cfg_stack_checks;
       mk_no_cfg_stack_checks F.no_cfg_stack_checks;
       mk_cfg_stack_checks_threshold F.cfg_stack_checks_threshold;
@@ -1538,6 +1575,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_no_omit_leaf_frame_pointers F.no_omit_leaf_frame_pointers;
       mk_cfg_merge_blocks F.cfg_merge_blocks;
       mk_no_cfg_merge_blocks F.no_cfg_merge_blocks;
+      mk_cfg_block_layout F.cfg_block_layout;
+      mk_no_cfg_block_layout F.no_cfg_block_layout;
       mk_cfg_value_propagation F.cfg_value_propagation;
       mk_no_cfg_value_propagation F.no_cfg_value_propagation;
       mk_cfg_value_propagation_float F.cfg_value_propagation_float;
@@ -1546,12 +1585,9 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_no_cfg_value_propagation_flow F.no_cfg_value_propagation_flow;
       mk_experimental_optimizations F.experimental_optimizations;
       mk_reorder_blocks_random F.reorder_blocks_random;
-      mk_basic_block_sections F.basic_block_sections;
       mk_module_entry_functions_section F.module_entry_functions_section;
       mk_dasm_comments F.dasm_comments;
       mk_dno_asm_comments F.dno_asm_comments;
-      mk_frametables_in_rodata F.frametables_in_rodata;
-      mk_no_frametables_in_rodata F.no_frametables_in_rodata;
       mk_heap_reduction_threshold F.heap_reduction_threshold;
       mk_zero_alloc_check F.zero_alloc_check;
       mk_zero_alloc_assert F.zero_alloc_assert;
@@ -1576,6 +1612,12 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_dbranch_relaxation_max_displacement
         F.dbranch_relaxation_max_displacement;
       mk_caml_apply_inline_fast_path F.caml_apply_inline_fast_path;
+      mk_use_ssa F.use_ssa;
+      mk_no_use_ssa F.no_use_ssa;
+      mk_ssa_simplify F.ssa_simplify;
+      mk_no_ssa_simplify F.no_ssa_simplify;
+      mk_ssa_validate F.ssa_validate;
+      mk_no_ssa_validate F.no_ssa_validate;
       mk_internal_assembler F.internal_assembler;
       mk_verify_binary_emitter F.verify_binary_emitter;
       mk_dissector F.dissector;
@@ -1635,6 +1677,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_no_flambda2_match_in_match F.no_flambda2_match_in_match;
       mk_simplify_stubs F.simplify_stubs;
       mk_no_simplify_stubs F.no_simplify_stubs;
+      mk_stubs_forward_inlining F.stubs_forward_inlining;
+      mk_no_stubs_forward_inlining F.no_stubs_forward_inlining;
       mk_flambda2_expert_fallback_inlining_heuristic
         F.flambda2_expert_fallback_inlining_heuristic;
       mk_no_flambda2_expert_fallback_inlining_heuristic
@@ -1839,6 +1883,7 @@ module Oxcaml_options_impl = struct
   let ocamlcfg () = ()
   let no_ocamlcfg () = ()
   let dcfg = set' Oxcaml_flags.dump_cfg
+  let dssa = set' Oxcaml_flags.dump_ssa
   let dcfg_invariants = set' Oxcaml_flags.cfg_invariants
   let regalloc x = Oxcaml_flags.regalloc := x
 
@@ -1865,8 +1910,14 @@ module Oxcaml_options_impl = struct
   let no_x86_peephole_remove_redundant_cmp =
     clear' Oxcaml_flags.x86_peephole_remove_redundant_cmp
 
+  let no_x86_peephole_remove_redundant_extension =
+    clear' Oxcaml_flags.x86_peephole_remove_redundant_extension
+
   let no_x86_peephole_combine_add_rsp =
     clear' Oxcaml_flags.x86_peephole_combine_add_rsp
+
+  let no_x86_peephole_remove_redundant_test =
+    clear' Oxcaml_flags.x86_peephole_remove_redundant_test
 
   let cfg_stack_checks = set' Oxcaml_flags.cfg_stack_checks
   let no_cfg_stack_checks = clear' Oxcaml_flags.cfg_stack_checks
@@ -1891,6 +1942,8 @@ module Oxcaml_options_impl = struct
   let no_omit_leaf_frame_pointers = clear' Oxcaml_flags.omit_leaf_frame_pointers
   let cfg_merge_blocks = set' Oxcaml_flags.cfg_merge_blocks
   let no_cfg_merge_blocks = clear' Oxcaml_flags.cfg_merge_blocks
+  let cfg_block_layout = set' Oxcaml_flags.cfg_block_layout
+  let no_cfg_block_layout = clear' Oxcaml_flags.cfg_block_layout
   let cfg_value_propagation = set' Oxcaml_flags.cfg_value_propagation
   let no_cfg_value_propagation = clear' Oxcaml_flags.cfg_value_propagation
 
@@ -1905,32 +1958,14 @@ module Oxcaml_options_impl = struct
   let no_cfg_value_propagation_flow =
     clear' Oxcaml_flags.cfg_value_propagation_flow
 
-  (* Bundle of experimental codegen optimizations enabled by
-     [-experimental-optimizations]. *)
-  let experimental_optimizations () =
-    cfg_prologue_shrink_wrap ();
-    cfg_prologue_validate ();
-    x86_peephole_optimize ();
-    regalloc_param "SPLIT_AROUND_LOOPS:on";
-    regalloc_param "AFFINITY:on";
-    regalloc_param "BIT_MATRIX_THRESHOLD:8192";
-    regalloc_param "IRC_INTERF_THRESHOLD:4096";
-    cfg_merge_blocks ();
-    cfg_eliminate_dead_trap_handlers ();
-    cfg_value_propagation_flow ()
-
   let reorder_blocks_random seed =
     Oxcaml_flags.reorder_blocks_random := Some seed
-
-  let basic_block_sections () = set' Oxcaml_flags.basic_block_sections ()
 
   let module_entry_functions_section () =
     set' Oxcaml_flags.module_entry_functions_section ()
 
   let dasm_comments = set' Oxcaml_flags.dasm_comments
   let dno_asm_comments = clear' Oxcaml_flags.dasm_comments
-  let frametables_in_rodata = set' Oxcaml_flags.frametables_in_rodata
-  let no_frametables_in_rodata = clear' Oxcaml_flags.frametables_in_rodata
   let dump_inlining_paths = set' Oxcaml_flags.dump_inlining_paths
   let davail = set' Oxcaml_flags.davail
   let dranges = set' Oxcaml_flags.dranges
@@ -2014,6 +2049,12 @@ module Oxcaml_options_impl = struct
   let caml_apply_inline_fast_path =
     set' Oxcaml_flags.caml_apply_inline_fast_path
 
+  let use_ssa = set' Oxcaml_flags.use_ssa
+  let no_use_ssa = clear' Oxcaml_flags.use_ssa
+  let ssa_simplify = set' Oxcaml_flags.ssa_simplify
+  let no_ssa_simplify = clear' Oxcaml_flags.ssa_simplify
+  let ssa_validate = set' Oxcaml_flags.ssa_validate
+  let no_ssa_validate = clear' Oxcaml_flags.ssa_validate
   let internal_assembler = set' Oxcaml_flags.internal_assembler
   let verify_binary_emitter = set' Oxcaml_flags.verify_binary_emitter
   let dissector = set' Clflags.dissector
@@ -2124,6 +2165,8 @@ module Oxcaml_options_impl = struct
 
   let simplify_stubs = set Flambda2.simplify_stubs
   let no_simplify_stubs = clear Flambda2.simplify_stubs
+  let stubs_forward_inlining = set' Clflags.stubs_forward_inlining
+  let no_stubs_forward_inlining = clear' Clflags.stubs_forward_inlining
 
   let flambda2_expert_fallback_inlining_heuristic =
     set Flambda2.Expert.fallback_inlining_heuristic
@@ -2291,13 +2334,27 @@ module Oxcaml_options_impl = struct
     Oxcaml_flags.cached_generic_functions_path := file
 
   let x = Extra_options.parse_one_arg
+
+  (* Bundle of experimental codegen optimizations enabled by
+     [-experimental-optimizations]. *)
+  let experimental_optimizations () =
+    cfg_prologue_shrink_wrap ();
+    cfg_prologue_validate ();
+    x86_peephole_optimize ();
+    regalloc_param "SPLIT_AROUND_LOOPS:on";
+    regalloc_param "AFFINITY:on";
+    regalloc_param "BIT_MATRIX_THRESHOLD:8192";
+    regalloc_param "IRC_INTERF_THRESHOLD:4096";
+    cfg_merge_blocks ();
+    cfg_eliminate_dead_trap_handlers ();
+    cfg_value_propagation_flow ();
+    use_ssa ()
 end
 
 module type Debugging_options = sig
-  val restrict_to_upstream_dwarf : unit -> unit
-  val no_restrict_to_upstream_dwarf : unit -> unit
   val dwarf_inlined_frames : unit -> unit
   val no_dwarf_inlined_frames : unit -> unit
+  val gdwarf_version : string -> unit
   val ddebug_avail_sets : unit -> unit
   val dwarf_for_startup_file : unit -> unit
   val no_dwarf_for_startup_file : unit -> unit
@@ -2314,10 +2371,9 @@ end
 module Make_debugging_options (F : Debugging_options) = struct
   let list3 =
     [
-      mk_restrict_to_upstream_dwarf F.restrict_to_upstream_dwarf;
-      mk_no_restrict_to_upstream_dwarf F.no_restrict_to_upstream_dwarf;
       mk_dwarf_inlined_frames F.dwarf_inlined_frames;
       mk_no_dwarf_inlined_frames F.no_dwarf_inlined_frames;
+      mk_gdwarf_version F.gdwarf_version;
       mk_ddebug_avail_sets F.ddebug_avail_sets;
       mk_dwarf_for_startup_file F.dwarf_for_startup_file;
       mk_no_dwarf_for_startup_file F.no_dwarf_for_startup_file;
@@ -2335,20 +2391,19 @@ module Make_debugging_options (F : Debugging_options) = struct
 end
 
 module Debugging_options_impl = struct
-  let restrict_to_upstream_dwarf () =
-    Debugging.restrict_to_upstream_dwarf := true;
-    Clflags.shape_format := Clflags.Old_merlin
-
-  let no_restrict_to_upstream_dwarf () =
-    Debugging.restrict_to_upstream_dwarf := false;
-    Clflags.shape_format := Clflags.Debugging_shapes
-  (* CR sspies: We should only enable OxCaml DWARF on the compiler once we are
-     ready to switch, since it leads to a new format of shapes in the .cms and
-     .cmt files. Merlin should continue to work, but we should be careful and
-     probably should switch over to debugging shapes in general first. *)
-
   let dwarf_inlined_frames () = Debugging.dwarf_inlined_frames := true
   let no_dwarf_inlined_frames () = Debugging.dwarf_inlined_frames := false
+
+  let gdwarf_version version =
+    match version with
+    | "4" -> Debugging.gdwarf_version := Dwarf_flags.Four
+    | "5" -> Debugging.gdwarf_version := Dwarf_flags.Five
+    | _ ->
+        raise
+          (Arg.Bad
+             (Printf.sprintf "invalid DWARF version '%s' (must be 4 or 5)"
+                version))
+
   let ddebug_avail_sets () = Debugging.debug_avail_sets := true
   let dwarf_for_startup_file () = Debugging.dwarf_for_startup_file := true
   let no_dwarf_for_startup_file () = Debugging.dwarf_for_startup_file := false
@@ -2434,6 +2489,9 @@ module Extra_params = struct
       true
     in
     match name with
+    | "use-ssa" -> set' Oxcaml_flags.use_ssa
+    | "ssa-simplify" -> set' Oxcaml_flags.ssa_simplify
+    | "ssa-validate" -> set' Oxcaml_flags.ssa_validate
     | "internal-assembler" -> set' Oxcaml_flags.internal_assembler
     | "verify-binary-emitter" -> set' Oxcaml_flags.verify_binary_emitter
     | "dgc-timings" -> set' Oxcaml_flags.gc_timings
@@ -2478,6 +2536,7 @@ module Extra_params = struct
     | "cfg-prologue-shrink-wrap" -> set' Oxcaml_flags.cfg_prologue_shrink_wrap
     | "omit-leaf-frame-pointers" -> set' Oxcaml_flags.omit_leaf_frame_pointers
     | "cfg-merge-blocks" -> set' Oxcaml_flags.cfg_merge_blocks
+    | "cfg-block-layout" -> set' Oxcaml_flags.cfg_block_layout
     | "cfg-value-propagation" -> set' Oxcaml_flags.cfg_value_propagation
     | "cfg-value-propagation-float" ->
         set' Oxcaml_flags.cfg_value_propagation_float
@@ -2500,7 +2559,6 @@ module Extra_params = struct
         true
     | "reorder-blocks-random" ->
         set_int_option' Oxcaml_flags.reorder_blocks_random
-    | "basic-block-sections" -> set' Oxcaml_flags.basic_block_sections
     | "module-entry-functions-section" ->
         set' Oxcaml_flags.module_entry_functions_section
     | "heap-reduction-threshold" ->
@@ -2578,7 +2636,6 @@ module Extra_params = struct
     | "caml-apply-inline-fast-path" ->
         set' Oxcaml_flags.caml_apply_inline_fast_path
     | "dasm-comments" -> set' Oxcaml_flags.dasm_comments
-    | "gupstream-dwarf" -> set' Debugging.restrict_to_upstream_dwarf
     | "gdwarf-inlined-frames" -> set' Debugging.dwarf_inlined_frames
     | "gdwarf-may-alter-codegen" -> set' Debugging.gdwarf_may_alter_codegen
     | "gdwarf-may-alter-codegen-experimental" ->
@@ -2766,6 +2823,7 @@ module Extra_params = struct
     | "reaper-change-calling-conventions" ->
         set Flambda2.reaper_change_calling_conventions
     | "flambda2-simplify-stubs" -> set Flambda2.simplify_stubs
+    | "stubs-forward-inlining" -> set' Clflags.stubs_forward_inlining
     | "dissector" -> set' Clflags.dissector
     | "dissector-partition-size" -> (
         match float_of_string_opt v with

@@ -40,6 +40,8 @@ type mutable_flag = Immutable | Mutable
 
 type atomic_flag = Nonatomic | Atomic
 
+type access_flag = Immutable_access | Mutable_access | Atomic_access
+
 type virtual_flag = Virtual | Concrete
 
 type override_flag = Override | Fresh

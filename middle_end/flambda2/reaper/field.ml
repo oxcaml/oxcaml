@@ -227,3 +227,5 @@ let print_for_variable_name ppf x =
         "[Field.print_for_variable_name] got field %a but this field was not \
          expected to be possible to occur in unboxed blocks"
         print_view view
+
+let equal (t1 : t) (t2 : t) = t1 = t2

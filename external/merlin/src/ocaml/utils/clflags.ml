@@ -22,6 +22,7 @@ let applicative_functors = ref true
 
 let nopervasives        = ref false
 let strict_formats      = ref true
+let syntax_quotations   = ref Config.syntax_quotations
 
 type open_arg =
   | Open of string
@@ -57,7 +58,10 @@ let unboxed_types       = ref false
 let profile_columns     = ref []
 let dwarf_pedantic      = ref false
 let gdwarf_config_shape_eval_depth = ref None
-let gdwarf_config_max_type_to_shape_depth = ref None
+let type_to_shape_max_depth = ref None
+(* Merlin never emits DWARF debug info; keep the upstream-only
+   restriction on. *)
+let restrict_to_upstream_dwarf = ref true
 let gdwarf_config_max_evaluation_steps_per_variable = ref None
 let locs = ref true
 let locations = ref true

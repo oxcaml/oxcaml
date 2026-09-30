@@ -10,8 +10,7 @@ let function_is_assumed_to_never_poll func =
   || String.begins_with ~prefix:"caml_send" func
 
 let is_disabled fun_name =
-  (not Config.poll_insertion)
-  || !Oxcaml_flags.disable_poll_insertion
+  !Oxcaml_flags.disable_poll_insertion
   || function_is_assumed_to_never_poll fun_name
 
 (* These are used for the poll error annotation later on*)
@@ -474,8 +473,7 @@ let instrument_fundecl :
     let safe_map = safe_map_of_cfg cfg in
     (* CR-soon xclerc for xclerc: consider using `Cfg_with_infos` to cache the
        computations *)
-    let doms = Cfg_dominators.build cfg in
-    let back_edges = Cfg_loop_infos.compute_back_edges cfg doms in
+    let back_edges = Cfg_loop_infos.compute_back_edges cfg in
     let added_poll =
       instr_cfg_with_layout cfg_with_layout ~safe_map ~back_edges
     in
@@ -497,7 +495,7 @@ let instrument_fundecl :
       cfg.fun_contains_calls || added_poll || contains_polls cfg
     in
     let cfg = { cfg with fun_contains_calls = new_contains_calls } in
-    Cfg_with_layout.create cfg ~layout:(Cfg_with_layout.layout cfg_with_layout)
+    Cfg_with_layout.with_cfg cfg_with_layout cfg
 
 let requires_prologue_poll :
     future_funcnames:Misc.Stdlib.String.Set.t ->

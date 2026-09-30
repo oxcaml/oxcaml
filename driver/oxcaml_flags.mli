@@ -17,6 +17,7 @@
 (** OxCaml specific command line flags *)
 
 val dump_cfg : bool ref
+val dump_ssa : bool ref
 val cfg_invariants : bool ref
 val regalloc : Clflags.Register_allocator.t ref
 val default_regalloc_linscan_threshold : int
@@ -34,7 +35,9 @@ val cfg_peephole_optimize: bool ref
 val x86_peephole_optimize : bool ref
 val x86_peephole_remove_mov_to_dead_register : bool ref
 val x86_peephole_remove_redundant_cmp : bool ref
+val x86_peephole_remove_redundant_extension : bool ref
 val x86_peephole_combine_add_rsp : bool ref
+val x86_peephole_remove_redundant_test : bool ref
 
 val cfg_stack_checks : bool ref
 val cfg_stack_checks_threshold : int ref
@@ -48,17 +51,17 @@ val omit_leaf_frame_pointers : bool ref
 
 val cfg_merge_blocks : bool ref
 
+val cfg_block_layout : bool ref
+
 val cfg_value_propagation : bool ref
 val cfg_value_propagation_float : bool ref
 val cfg_value_propagation_flow : bool ref
 
 val reorder_blocks_random : int option ref
-val basic_block_sections : bool ref
 val module_entry_functions_section : bool ref
 
 val dasm_comments : bool ref
 
-val frametables_in_rodata : bool ref
 
 val default_heap_reduction_threshold : int
 val heap_reduction_threshold : int ref
@@ -106,6 +109,12 @@ val max_long_frames_threshold : int
 val long_frames_threshold : int ref
 val branch_relaxation_max_displacement : int ref
 val caml_apply_inline_fast_path : bool ref
+
+val use_ssa : bool ref
+
+val ssa_simplify : bool ref
+
+val ssa_validate : bool ref
 
 type function_result_types = Never | Functors_only | All_functions
 type reaper_preserve_direct_calls = Never | Always | Zero_alloc | Auto
