@@ -349,7 +349,6 @@ static void restore_runtime_state(caml_thread_t th)
   Caml_state->local_roots = th->local_roots;
   Caml_state->backtrace_pos = th->backtrace_pos;
   Caml_state->backtrace_buffer = th->backtrace_buffer;
-  /* Current stack changed; recompute cached TLS state. */
   caml_tls_update_cache();
   caml_modify_generational_global_root
     (&Caml_state->backtrace_last_exn, th->backtrace_last_exn);
