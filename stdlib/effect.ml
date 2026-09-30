@@ -343,8 +343,6 @@ module Shallow = struct
   type ('a,'b) continuation =
     | Cont : ('a,'b,'x) cont -> ('a,'b) continuation [@@unboxed]
 
-  (* Whether a fiber is preemptible is fixed here, at creation. A preemptible
-     fiber starts without a tick handler; resuming it sets one. *)
   let make_fiber : type a b.
       preemptible:bool -> (a -> b) -> (a, b) continuation =
     fun ~preemptible f ->
@@ -453,11 +451,9 @@ module Shallow = struct
   end
 
   module Preemptible = struct
-    type ('a,'b) continuation =
-      | Cont : ('a,'b,'x) cont -> ('a,'b) continuation [@@unboxed]
+    type nonrec ('a,'b) continuation = ('a,'b) continuation
 
-    let fiber f : _ continuation =
-      match make_fiber ~preemptible:true f with Cont k -> Cont k
+    let fiber f : _ continuation = make_fiber ~preemptible:true f
 
     type ('a,'b) handler =
         { retc: 'a -> 'b;
