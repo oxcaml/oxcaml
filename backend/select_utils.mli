@@ -216,20 +216,22 @@ val result_needs_mask_of_int64 : Reg.t -> Reg.t -> bool
 
 val float_test_of_float_comparison :
   Cmm.float_width ->
-  Scalar.Float_comparison.t ->
-  label_false:Label.t ->
-  label_true:Label.t ->
+  Cmm.float_comparison ->
+  ifnot:Cfg.successor ->
+  ifso:Cfg.successor ->
   Cfg.float_test
 
 val int_test_of_integer_comparison :
-  Scalar.Integer_comparison.t ->
+  Cmm.integer_comparison ->
   immediate:int option ->
-  label_false:Label.t ->
-  label_true:Label.t ->
+  ifnot:Cfg.successor ->
+  ifso:Cfg.successor ->
   Cfg.int_test
 
+(** The terminator branching on [test] to [ifso] when it holds and to [ifnot]
+    otherwise; the successors keep their edge counters. *)
 val terminator_of_test :
-  Operation.test -> label_false:Label.t -> label_true:Label.t -> Cfg.terminator
+  Operation.test -> ifnot:Cfg.successor -> ifso:Cfg.successor -> Cfg.terminator
 
 module Stack_offset_and_exn : sig
   val update_cfg : Cfg.t -> unit

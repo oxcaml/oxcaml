@@ -229,7 +229,7 @@ module Polls_before_prtc_transfer = struct
       Ok dom
     | Raise _ -> Ok exn
     | Tailcall_self _ | Tailcall_func (Indirect _) -> Ok Might_not_poll
-    | Tailcall_func (Direct func) ->
+    | Tailcall_func (Direct { sym = func; callsite_counter = _ }) ->
       if
         String.Set.mem func.sym_name future_funcnames
         || function_is_assumed_to_never_poll func.sym_name

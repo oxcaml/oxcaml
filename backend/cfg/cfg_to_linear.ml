@@ -171,7 +171,7 @@ let linearize_terminator (func : string)
     | Return -> [L.Lreturn], None
     | Raise kind -> [L.Lraise kind], None
     | Tailcall_func (Indirect _) -> [L.Lcall_op Ltailcall_ind], None
-    | Tailcall_func (Direct func_symbol) ->
+    | Tailcall_func (Direct { sym = func_symbol; callsite_counter = _ }) ->
       [L.Lcall_op (Ltailcall_imm { func = func_symbol })], None
     | Tailcall_self { destination } ->
       ( [ L.Lcall_op
@@ -216,7 +216,8 @@ let linearize_terminator (func : string)
       let op : Linear.call_operation =
         match op with
         | Indirect _ -> Lcall_ind
-        | Direct func_symbol -> Lcall_imm { func = func_symbol }
+        | Direct { sym = func_symbol; callsite_counter = _ } ->
+          Lcall_imm { func = func_symbol }
       in
       branch_or_fallthrough [L.Lcall_op op] label_after, None
     | Prim { op; label_after } ->
@@ -244,14 +245,23 @@ let linearize_terminator (func : string)
           Lprobe { name; handler_code_sym; enabled_at_init }
       in
       branch_or_fallthrough [L.Lcall_op op] label_after, None
-    | Switch labels -> single (L.Lswitch labels)
+    | Switch successors ->
+      single
+        (L.Lswitch
+           (Array.map
+              (fun (successor : Cfg.successor) -> successor.target)
+              successors))
     | Never -> Misc.fatal_error "Cannot linearize terminator: Never"
     | Always label -> branch_or_fallthrough [] label, None
     | Parity_test { ifso; ifnot } ->
-      emit_bool (Ieventest, ifso) (Ioddtest, ifnot), None
+      emit_bool (Ieventest, ifso.target) (Ioddtest, ifnot.target), None
     | Truth_test { ifso; ifnot } ->
-      emit_bool (Itruetest, ifso) (Ifalsetest, ifnot), None
+      emit_bool (Itruetest, ifso.target) (Ifalsetest, ifnot.target), None
     | Float_test { width; lt; eq; gt; uo } -> (
+      let lt = lt.target
+      and eq = eq.target
+      and gt = gt.target
+      and uo = uo.target in
       let successor_labels =
         Label.Set.singleton lt |> Label.Set.add gt |> Label.Set.add eq
         |> Label.Set.add uo
@@ -304,6 +314,7 @@ let linearize_terminator (func : string)
         branches @ branch_or_fallthrough [] last, None
       | _ -> assert false)
     | Int_test { lt; eq; gt; imm; is_signed } -> (
+      let lt = lt.target and eq = eq.target and gt = gt.target in
       let successor_labels =
         Label.Set.singleton lt |> Label.Set.add gt |> Label.Set.add eq
       in

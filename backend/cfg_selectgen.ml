@@ -369,11 +369,16 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | [] | _ :: _ -> wrong_num_args 3
     in
     match[@ocaml.warning "+fragile-match"] op with
-    | Capply { callees; _ } -> (
+    | Capply { callees; callsite_counter; _ } -> (
       match[@ocaml.warning "-fragile-match"] args with
       | Cconst_symbol (func, _dbg) :: rem ->
-        Terminator (Call { op = Direct func; label_after }), rem
-      | _ -> Terminator (Call { op = Indirect callees; label_after }), args)
+        ( Terminator
+            (Call { op = Direct { sym = func; callsite_counter }; label_after }),
+          rem )
+      | _ ->
+        ( Terminator
+            (Call { op = Indirect { callees; callsite_counter }; label_after }),
+          args ))
     | Cextcall
         { func; alloc; ty; ty_args; returns; builtin; effects; coeffects = _ }
       ->
@@ -923,9 +928,18 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       match emit_expr env sub_cfg e1 ~bound_name:None with
       | Never_returns -> Never_returns
       | Ok _ -> emit_expr env sub_cfg e2 ~bound_name)
-    | Cifthenelse { cond; ifso_dbg; ifso; ifnot_dbg; ifnot; dbg; _ } ->
-      emit_expr_ifthenelse env sub_cfg bound_name cond ifso_dbg ifso ifnot_dbg
-        ifnot dbg
+    | Cifthenelse
+        { cond;
+          ifso_dbg;
+          ifso_counters;
+          ifso;
+          ifnot_dbg;
+          ifnot_counters;
+          ifnot;
+          dbg
+        } ->
+      emit_expr_ifthenelse env sub_cfg bound_name cond ifso_dbg ifso_counters
+        ifso ifnot_dbg ifnot_counters ifnot dbg
     | Cswitch (esel, index, ecases, dbg) ->
       emit_expr_switch env sub_cfg bound_name esel index ecases dbg
     | Ccatch (_, [], e1) -> emit_expr env sub_cfg e1 ~bound_name
@@ -959,8 +973,18 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       match emit_expr env sub_cfg e1 ~bound_name:None with
       | Never_returns -> ()
       | Ok _ -> emit_tail env sub_cfg e2)
-    | Cifthenelse { cond; ifso_dbg; ifso; ifnot_dbg; ifnot; dbg; _ } ->
-      emit_tail_ifthenelse env sub_cfg cond ifso_dbg ifso ifnot_dbg ifnot dbg
+    | Cifthenelse
+        { cond;
+          ifso_dbg;
+          ifso_counters;
+          ifso;
+          ifnot_dbg;
+          ifnot_counters;
+          ifnot;
+          dbg
+        } ->
+      emit_tail_ifthenelse env sub_cfg cond ifso_dbg ifso_counters ifso
+        ifnot_dbg ifnot_counters ifnot dbg
     | Cswitch (esel, index, ecases, dbg) ->
       emit_tail_switch env sub_cfg esel index ecases dbg
     | Ccatch (_, [], e1) -> emit_tail env sub_cfg e1
@@ -1189,8 +1213,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           (Printcfg.terminator_desc ~sep:"")
           term)
 
-  and emit_expr_ifthenelse env sub_cfg bound_name econd _ifso_dbg eif
-      (_ifnot_dbg : Debuginfo.t) eelse (_dbg : Debuginfo.t) :
+  and emit_expr_ifthenelse env sub_cfg bound_name econd _ifso_dbg ifso_counters
+      eif (_ifnot_dbg : Debuginfo.t) ifnot_counters eelse (_dbg : Debuginfo.t) :
       _ Or_never_returns.t =
     (* CR-someday xclerc for xclerc: use the `_dbg` parameter *)
     let cond, earg = select_condition econd in
@@ -1203,8 +1227,14 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       let r = SU.join env rif sub_if relse sub_else ~bound_name in
       let term_desc =
         SU.terminator_of_test cond
-          ~label_true:(Sub_cfg.start_label sub_if)
-          ~label_false:(Sub_cfg.start_label sub_else)
+          ~ifso:
+            (Cfg.successor
+               (Sub_cfg.start_label sub_if)
+               ~fdo_counters:ifso_counters)
+          ~ifnot:
+            (Cfg.successor
+               (Sub_cfg.start_label sub_else)
+               ~fdo_counters:ifnot_counters)
       in
       let phantom_available_before = SU.phantom_vars_from_env env in
       Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rarg
@@ -1229,7 +1259,12 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       let r = SU.join_array env sub_cases ~bound_name in
       let subs = Array.map (fun (_, sub_cfg) -> sub_cfg) sub_cases in
       let term_desc : Cfg.terminator =
-        Switch (Array.map (fun idx -> Sub_cfg.start_label subs.(idx)) index)
+        Switch
+          (Array.map
+             (fun idx ->
+               let _, _, fdo_counters = ecases.(idx) in
+               Cfg.successor (Sub_cfg.start_label subs.(idx)) ~fdo_counters)
+             index)
       in
       let phantom_available_before = SU.phantom_vars_from_env env in
       Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rsel
@@ -1446,7 +1481,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       let label_after = Cmm.new_label () in
       let new_op, new_args = select_operation op simple_args dbg ~label_after in
       match new_op with
-      | Terminator (Call { op = Indirect callees; label_after } as term) ->
+      | Terminator (Call { op = Indirect _ as op; label_after } as term) ->
         let** r1 = emit_tuple env sub_cfg new_args in
         let rd = Reg.createv ty in
         let rarg = Array.sub r1 1 (Array.length r1 - 1) in
@@ -1455,7 +1490,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         let stack_ofs = Stdlib.Int.max stack_ofs_args stack_ofs_res in
         if stack_ofs = 0 && SU.trap_stack_is_empty env
         then (
-          let call = Cfg.Tailcall_func (Indirect callees) in
+          let call = Cfg.Tailcall_func op in
           SU.insert_moves env sub_cfg rarg loc_arg;
           SU.insert_debug' env sub_cfg call dbg
             (Array.append [| r1.(0) |] loc_arg)
@@ -1469,7 +1504,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           SU.set_traps_for_raise env;
           SU.insert_move_results env sub_cfg loc_res rd stack_ofs;
           insert_return env sub_cfg (Ok rd) (SU.pop_all_traps env))
-      | Terminator (Call { op = Direct func; label_after } as term) ->
+      | Terminator
+          (Call
+             { op = Direct { sym = func; callsite_counter = _ } as op;
+               label_after
+             } as term) ->
         let** r1 = emit_tuple env sub_cfg new_args in
         let rd = Reg.createv ty in
         let loc_arg, stack_ofs_args = Proc.loc_arguments (Reg.typv r1) in
@@ -1488,7 +1527,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           SU.insert_debug' env sub_cfg call dbg loc_arg' [||])
         else if stack_ofs = 0 && SU.trap_stack_is_empty env
         then (
-          let call = Cfg.Tailcall_func (Direct func) in
+          let call = Cfg.Tailcall_func op in
           SU.insert_moves env sub_cfg r1 loc_arg;
           SU.insert_debug' env sub_cfg call dbg loc_arg [||])
         else (
@@ -1505,8 +1544,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           | Tailcall_func _ | Invalid _ | Call_no_return _ | Prim _ ) ->
         Misc.fatal_error "Cfg_selectgen.emit_tail")
 
-  and emit_tail_ifthenelse env sub_cfg econd (_ifso_dbg : Debuginfo.t) eif
-      (_ifnot_dbg : Debuginfo.t) eelse (_dbg : Debuginfo.t) =
+  and emit_tail_ifthenelse env sub_cfg econd (_ifso_dbg : Debuginfo.t)
+      ifso_counters eif (_ifnot_dbg : Debuginfo.t) ifnot_counters eelse
+      (_dbg : Debuginfo.t) =
     (* CR-someday xclerc for xclerc: use the `_dbg` parameter *)
     let cond, earg = select_condition econd in
     match emit_expr env sub_cfg earg ~bound_name:None with
@@ -1517,8 +1557,14 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       let sub_else = emit_tail_new_sub_cfg env eelse in
       let term_desc =
         SU.terminator_of_test cond
-          ~label_true:(Sub_cfg.start_label sub_if)
-          ~label_false:(Sub_cfg.start_label sub_else)
+          ~ifso:
+            (Cfg.successor
+               (Sub_cfg.start_label sub_if)
+               ~fdo_counters:ifso_counters)
+          ~ifnot:
+            (Cfg.successor
+               (Sub_cfg.start_label sub_else)
+               ~fdo_counters:ifnot_counters)
       in
       Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rarg
         ~phantom_available_before:(SU.phantom_vars_from_env env);
@@ -1537,7 +1583,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       in
       let term_desc : Cfg.terminator =
         Switch
-          (Array.map (fun idx -> Sub_cfg.start_label sub_cases.(idx)) index)
+          (Array.map
+             (fun idx ->
+               let _, _, fdo_counters = ecases.(idx) in
+               Cfg.successor (Sub_cfg.start_label sub_cases.(idx)) ~fdo_counters)
+             index)
       in
       Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rsel
         ~phantom_available_before:(SU.phantom_vars_from_env env);
@@ -1735,9 +1785,12 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       Cfg.create ~fun_name:f.Cmm.fun_name.sym_name ~fun_args:loc_arg
         ~fun_codegen_options:
           (Cfg.of_cmm_codegen_option f.Cmm.fun_codegen_options)
-        ~fun_dbg:f.Cmm.fun_dbg ~fun_contains_calls:true
-        ~fun_num_stack_slots:(Stack_class.Tbl.make 0) ~fun_poll:f.Cmm.fun_poll
-        ~next_instruction_id:Sub_cfg.instr_id ~fun_ret_type:f.Cmm.fun_ret_type
+        ~fun_dbg:f.Cmm.fun_dbg
+        ~fun_fdo_entry_counters:f.Cmm.fun_fdo_entry_counters
+        ~fun_function_body_hash:f.Cmm.fun_function_body_hash
+        ~fun_contains_calls:true ~fun_num_stack_slots:(Stack_class.Tbl.make 0)
+        ~fun_poll:f.Cmm.fun_poll ~next_instruction_id:Sub_cfg.instr_id
+        ~fun_ret_type:f.Cmm.fun_ret_type
         ~fun_phantom_lets:(SU.phantom_lets_for_fundecl env)
         ~allowed_to_be_irreducible:false
     in

@@ -388,8 +388,9 @@ and emit_call env c ~ty ~nontail (new_op : Cfg.terminator) arg_instrs dbg :
     Ok (Block.params cont_block)
   in
   match new_op with
-  | Call { op = Direct sym; _ } -> call_returning_to (Direct sym) ty
-  | Call { op = Indirect candidates; _ } ->
+  | Call { op = Direct { sym; callsite_counter = _ }; _ } ->
+    call_returning_to (Direct sym) ty
+  | Call { op = Indirect { callees = candidates; callsite_counter = _ }; _ } ->
     call_returning_to (Indirect candidates) ty
   | Prim { op = External ({ ty_res; _ } as ext_call); _ } ->
     call_returning_to (External ext_call) ty_res
@@ -646,7 +647,9 @@ let convert ~ppf_dump (cmm : Cmm.fundecl) ~keep_unused_ops : finished Ssa.graph
         codegen_options = cmm.fun_codegen_options;
         dbg = cmm.fun_dbg;
         poll = cmm.fun_poll;
-        ret_type = cmm.fun_ret_type
+        ret_type = cmm.fun_ret_type;
+        fdo_entry_counters = cmm.fun_fdo_entry_counters;
+        function_body_hash = cmm.fun_function_body_hash
       }
     in
     let g = Ssa.create_graph function_info ~keep_unused_ops in
