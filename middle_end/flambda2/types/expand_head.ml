@@ -710,6 +710,14 @@ let make_suitable_for_environment env (to_erase : to_erase) bind_to_and_types =
         in
         TG.project_variables_out ~to_project ~expand ty
       in
+      (* Sort the unavailable vars so that their binding order does not depend
+         on [Int_ids] hashing. *)
+      let unavailable_vars_renamed =
+        List.sort
+          (fun var1 var2 ->
+            TE.stable_compare_simples env (Simple.var var1) (Simple.var var2))
+          unavailable_vars_renamed
+      in
       let equations =
         ListLabels.fold_left unavailable_vars_renamed ~init:[]
           ~f:(fun equations var ->
