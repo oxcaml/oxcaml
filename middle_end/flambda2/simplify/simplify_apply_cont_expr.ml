@@ -166,6 +166,13 @@ let simplify_apply_cont dacc apply_cont ~down_to_up =
       (AC.continuation apply_cont)
       use_kind ~env_at_use:(DA.denv dacc) ~arg_types
   in
+  (* The current region continues into the handler (see [Region_counters]). *)
+  let denv = DA.denv dacc in
+  (match DE.fdo_region denv with
+  | Some region when DE.tracking_region_counters denv ->
+    Region_counters.add_continuation_into (DE.region_counters denv) region
+      (AC.continuation apply_cont)
+  | Some _ | None -> ());
   let dacc =
     let record_args_for_data_flow data_flow =
       Flow.Acc.add_apply_cont_args
@@ -176,5 +183,11 @@ let simplify_apply_cont dacc apply_cont ~down_to_up =
   in
   let dbg = AC.debuginfo apply_cont in
   let dbg = DE.add_inlined_debuginfo (DA.denv dacc) dbg in
-  let apply_cont = AC.with_debuginfo apply_cont ~dbg in
+  let apply_cont =
+    AC.with_fdo_counters
+      (AC.with_debuginfo apply_cont ~dbg)
+      (List.map
+         (DE.add_inlined_fdo_counter (DA.denv dacc))
+         (AC.fdo_counters apply_cont))
+  in
   down_to_up dacc ~rebuild:(rebuild_apply_cont apply_cont ~args ~rewrite_id)

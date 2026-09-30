@@ -75,7 +75,7 @@ module type Code_metadata_accessors_result_type = sig
   (** The pseudo-instrumentation counters of the function's entry edge (see
       [Fdo_counter]): its own entry counter first, then the entry counters of
       the calls inlined at the head of its body, which execute as often (see
-      [Inlined_call_counters]). *)
+      [Region_counters]). *)
   val fdo_entry_counters : 'a t -> Fdo_counter.t list
 
   (** The body hash the function's interior counters were numbered with (see

@@ -175,3 +175,14 @@ val merge : t -> from_apply_expr:t -> t
     and the uids enable disambiguation between different instances of inlining
     the same functions. *)
 val rewrite : t -> Debuginfo.t -> Debuginfo.t
+
+(** For a pseudo-instrumentation counter from the body of a function inlined by
+    [t]: the call sites of the inlinings, innermost first, are appended to its
+    inlining stack (see [Fdo_counter.inline]). *)
+val inline_fdo_counter : t -> Fdo_counter.t -> Fdo_counter.t
+
+(** For a pseudo-instrumentation counter from the body of a function that the
+    inlinings [t] copied (it was defined in the inlined body, e.g. by an inlined
+    functor application): the counter becomes that of the copy (see
+    [Fdo_counter.specialize]). *)
+val specialize_fdo_counter : t -> Fdo_counter.t -> Fdo_counter.t

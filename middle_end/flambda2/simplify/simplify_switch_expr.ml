@@ -106,7 +106,14 @@ let rebuild_arm uacc arm (action, use_id, arity, env_at_use)
         else
           let check_handler ~handler ~action =
             match RE.to_apply_cont handler with
-            | Some action -> Some action
+            | Some handler_action ->
+              (* The arm now jumps straight to the handler's destination: its
+                 edge is the arm's and the handler's jump at once. *)
+              Some
+                (Apply_cont.with_fdo_counters handler_action
+                   (Fdo_counter.add_all
+                      (Apply_cont.fdo_counters action)
+                      (Apply_cont.fdo_counters handler_action)))
             | None -> Some action
           in
           match cont_info_from_uenv with
@@ -745,10 +752,56 @@ let recognize_mergeable_argument ~machine_width ~scrutinee required_names ~dbg
           | Naked_mask -> single_kind Naked_masks Naked_masks)
         | Region | Rec_info -> None))
 
+(* The counters preserved in the handlers the arms lead to are attached to the
+   arms (see [Region_counters]). When every arm leads to the same continuation
+   the switch is about to disappear (in one way or another, below) and the
+   current region simply continues into that handler. *)
+let attach_region_counters ~dacc_before_switch arms =
+  let denv = DA.denv dacc_before_switch in
+  match DE.fdo_region denv with
+  | Some region when DE.tracking_region_counters denv -> (
+    let counters = DE.region_counters denv in
+    let conts =
+      TI.Map.fold
+        (fun _ (action, _, _, _) conts ->
+          Continuation.Set.add (AC.continuation action) conts)
+        arms Continuation.Set.empty
+    in
+    match Continuation.Set.get_singleton conts with
+    | Some cont ->
+      Region_counters.add_continuation_into counters region cont;
+      arms
+    | None ->
+      TI.Map.map
+        (fun (action, rewrite_id, arity, env_at_use) ->
+          let preserved =
+            Region_counters.counters_into counters
+              (Handler (AC.continuation action))
+          in
+          ( AC.with_fdo_counters action
+              (Fdo_counter.add_all (AC.fdo_counters action) preserved),
+            rewrite_id,
+            arity,
+            env_at_use ))
+        arms)
+  | Some _ | None -> arms
+
 let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
     ~dacc_before_switch uacc ~after_rebuild =
+  let arms = attach_region_counters ~dacc_before_switch arms in
   let new_let_conts, arms, mergeable_arms =
     TI.Map.fold (rebuild_arm uacc) arms ([], TI.Map.empty, No_arms)
+  in
+  (* When the switch collapses into a single jump, its edges become that jump,
+     which runs every time: their counters are preserved in the current region
+     (see [Region_counters]). *)
+  let preserve_counters arms =
+    DE.preserve_counters
+      (DA.denv dacc_before_switch)
+      (TI.Map.fold
+         (fun _ action counters ->
+           Fdo_counter.add_all counters (AC.fdo_counters action))
+         arms [])
   in
   let num_arms = TI.Map.cardinal arms in
   let switch_merged =
@@ -783,6 +836,7 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
            branches wouldn't have been taken during execution anyway. *)
         let expr, uacc =
           EB.create_switch uacc ~condition_dbg ~scrutinee ~arms
+            ~preserve_counters
         in
         if
           Flambda_features.check_invariants ()
@@ -810,6 +864,7 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
                of continuations in [Name_occurrences] and then try to inline out
                [dest]. This might happen anyway in the backend though so this
                probably isn't that important for now. *)
+            preserve_counters arms;
             let apply_cont =
               Apply_cont.create ~fdo_counters:[] dest ~args ~dbg
             in
@@ -848,7 +903,13 @@ let simplify_arm arm (action, env_at_use) (arms, dacc) =
   let action = Apply_cont.update_args action ~args in
   let dbg = AC.debuginfo action in
   let dbg = DE.add_inlined_debuginfo (DA.denv dacc) dbg in
-  let action = AC.with_debuginfo action ~dbg in
+  let action =
+    AC.with_fdo_counters
+      (AC.with_debuginfo action ~dbg)
+      (List.map
+         (DE.add_inlined_fdo_counter (DA.denv dacc))
+         (AC.fdo_counters action))
+  in
   let dacc =
     DA.map_flow_acc dacc
       ~f:
@@ -1028,8 +1089,16 @@ let simplify_switch dacc switch ~down_to_up =
   in
   match TI.Map.get_singleton arms with
   | Some (_, (apply_cont, env_at_use)) ->
-    (* Rewrite to a regular apply_cont so that it is an inlinable use. *)
+    (* Rewrite to a regular apply_cont so that it is an inlinable use. The arm's
+       edge disappears with the switch, but the code it led to runs as often:
+       its counters are preserved in the current region (see
+       [Region_counters]). *)
     let denv_at_use = DE.with_typing_env (DA.denv dacc) env_at_use in
+    DE.preserve_counters denv_at_use
+      (List.map
+         (DE.add_inlined_fdo_counter denv_at_use)
+         (AC.fdo_counters apply_cont));
+    let apply_cont = AC.with_fdo_counters apply_cont [] in
     let dacc = DA.with_denv dacc denv_at_use in
     Simplify_apply_cont_expr.simplify_apply_cont dacc apply_cont
       ~down_to_up:(fun dacc ~rebuild ->

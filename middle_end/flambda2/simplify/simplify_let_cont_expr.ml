@@ -1455,6 +1455,9 @@ and simplify_handler ~simplify_expr ~is_recursive ~is_exn_handler
       ~cont_uses_env:(CUE.reset_uses (DA.continuation_uses_env dacc))
   in
   let dacc =
+    DA.map_denv dacc ~f:(fun denv -> DE.set_fdo_region denv (Handler cont))
+  in
+  let dacc =
     DA.map_flow_acc
       ~f:
         (Flow.Acc.enter_continuation cont ~recursive:is_recursive

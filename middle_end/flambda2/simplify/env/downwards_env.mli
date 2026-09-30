@@ -144,6 +144,11 @@ val find_code_metadata_exn : t -> Code_id.t -> Code_metadata.t
 
 val set_inlined_debuginfo : t -> from:t -> t
 
+(** Forget the specializations recorded by [enter_set_of_closures], for a
+    function being simplified again (its counters are already those of the
+    copy). *)
+val clear_specializations : t -> t
+
 val merge_inlined_debuginfo_and_forward_inlined_attribute :
   t ->
   from_apply_expr:Inlined_debuginfo.t ->
@@ -151,6 +156,34 @@ val merge_inlined_debuginfo_and_forward_inlined_attribute :
   t
 
 val add_inlined_debuginfo : t -> Debuginfo.t -> Debuginfo.t
+
+(** A pseudo-instrumentation counter of the code being simplified, in the
+    context of the inlinings and specializations it is part of. *)
+val add_inlined_fdo_counter : t -> Fdo_counter.t -> Fdo_counter.t
+
+(** The entry counter of a code binding defined in an inlined body: it is
+    specialized as the counters in its body will be (see
+    [enter_set_of_closures]). *)
+val fdo_counter_of_code_binding : t -> Fdo_counter.t -> Fdo_counter.t
+
+(** The pseudo-instrumentation counters preserved for removed instructions (see
+    [Region_counters]), shared by the whole simplification, and the region
+    (function body or continuation handler) being traversed, [None] at the unit
+    toplevel. *)
+val region_counters : t -> Region_counters.t
+
+(** Whether to collect them: counters are enabled and terms are being rebuilt
+    for real (the inlinings of speculative inlining are provisional). *)
+val tracking_region_counters : t -> bool
+
+val fdo_region : t -> Region_counters.region option
+
+val set_fdo_region : t -> Region_counters.region -> t
+
+(** Preserve, in the region being traversed, the counters of an instruction that
+    is removed while the code it counts stays (see [Region_counters]). They must
+    already be in the current inlining context. *)
+val preserve_counters : t -> Fdo_counter.t list -> unit
 
 val round : t -> int
 

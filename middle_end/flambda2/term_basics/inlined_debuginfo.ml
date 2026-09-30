@@ -129,3 +129,19 @@ let rewrite t dbg =
   (* This could be optimized in terms of freshening uids, but for the moment use
      a more obviously-correct implementation. *)
   List.fold_left (fun dbg one_step -> One_step.rewrite one_step dbg) dbg t
+
+let inline_fdo_counter t counter =
+  List.fold_left
+    (fun counter (one_step : One_step.t) ->
+      match one_step.callsite_counter with
+      | None -> counter
+      | Some at -> Fdo_counter.inline counter ~at)
+    counter t
+
+let specialize_fdo_counter t counter =
+  List.fold_left
+    (fun counter (one_step : One_step.t) ->
+      match one_step.callsite_counter with
+      | None -> counter
+      | Some at -> Fdo_counter.specialize counter ~at)
+    counter t

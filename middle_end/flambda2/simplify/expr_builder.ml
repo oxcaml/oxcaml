@@ -462,13 +462,17 @@ let place_lifted_constants uacc ~lifted_constants_from_defining_expr
   let body, uacc = put_bindings_around_body uacc ~body in
   place_constants uacc ~around:body lifted_constants_from_defining_expr
 
-let create_switch uacc ~condition_dbg ~scrutinee ~arms =
+let create_switch uacc ~condition_dbg ~scrutinee ~arms ~preserve_counters =
   if Target_ocaml_int.Map.cardinal arms < 1
   then
     ( RE.create_invalid Zero_switch_arms,
       UA.notify_added ~code_size:Code_size.invalid uacc )
   else
     let change_to_apply_cont action =
+      (* The branch disappears and its edges become a single jump, which runs
+         every time: [preserve_counters] keeps their counters. *)
+      preserve_counters arms;
+      let action = Apply_cont.with_fdo_counters action [] in
       let uacc =
         UA.add_free_names uacc (Apply_cont.free_names action)
         |> UA.notify_added ~code_size:(Code_size.apply_cont action)
