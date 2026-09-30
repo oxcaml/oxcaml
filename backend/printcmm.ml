@@ -258,7 +258,8 @@ let static_cast : Cmm.static_cast -> string = function
   | V512_of_scalar ty -> Printf.sprintf "scalar->%s" (vec512_name ty)
 
 let operation d = function
-  | Capply { result_type = _ty; region = _; callees = _ } -> "app" ^ location d
+  | Capply { result_type = _ty; region = _; callees = _; callsite_counter = _ } ->
+    "app" ^ location d
   | Cextcall { func = lbl; _ } ->
     Printf.sprintf "extcall \"%s\"%s" lbl (location d)
   | Cload { memory_chunk; mutability; is_atomic } -> (
@@ -425,13 +426,8 @@ let rec expr ppf = function
   | Csequence (e1, e2) ->
     fprintf ppf "@[<2>(seq@ %a@ %a)@]" sequence e1 sequence e2
   | Cifthenelse
-      { cond = e1;
-        ifso_dbg = e2_dbg;
-        ifso = e2;
-        ifnot_dbg = e3_dbg;
-        ifnot = e3;
-        dbg
-      } ->
+      { cond = e1; ifso_dbg = e2_dbg; ifso = e2; ifnot_dbg = e3_dbg;
+        ifnot = e3; dbg; _ } ->
     with_location_mapping ~label:"Cifthenelse-e1" ~dbg ppf (fun () ->
         fprintf ppf "@[<2>(if@ %a@ " expr e1;
         with_location_mapping ~label:"Cifthenelse-e2" ~dbg:e2_dbg ppf (fun () ->
@@ -448,8 +444,8 @@ let rec expr ppf = function
         in
         let print_cases ppf =
           for i = 0 to Array.length cases - 1 do
-            fprintf ppf "@ @[<2>%t@ %a@]" (print_case i) sequence
-              (fst cases.(i))
+            let case, _, _ = cases.(i) in
+            fprintf ppf "@ @[<2>%t@ %a@]" (print_case i) sequence case
           done
         in
         fprintf ppf "@[<v 0>@[<2>(switch@ %a@ @]%t)@]" expr e1 print_cases)

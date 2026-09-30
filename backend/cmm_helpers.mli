@@ -719,7 +719,11 @@ val setfield_computed :
 
 (** [transl_switch_clambda loc kind arg index cases] *)
 val transl_switch_clambda :
-  Debuginfo.t -> expression -> int array -> expression array -> expression
+  Debuginfo.t ->
+  expression ->
+  int array ->
+  (expression * fdo_counters) array ->
+  expression
 
 (** Method call : [send kind met obj args dbg]
 
@@ -732,6 +736,7 @@ val transl_switch_clambda :
       any way for the frontend to generate any arguments other than the cache
       and cache position) *)
 val send :
+  callsite_counter:Fdo_counter.t option ->
   Lambda.meth_kind ->
   expression ->
   expression ->
@@ -878,8 +883,10 @@ val sequence : expression -> expression -> expression
 val ite :
   dbg:Debuginfo.t ->
   then_dbg:Debuginfo.t ->
+  then_counters:fdo_counters ->
   then_:expression ->
   else_dbg:Debuginfo.t ->
+  else_counters:fdo_counters ->
   else_:expression ->
   expression ->
   expression
@@ -1082,6 +1089,7 @@ val caml_modify_local :
     If a closure needs to be passed, it must be included in [args]. *)
 val direct_call :
   dbg:Debuginfo.t ->
+  callsite_counter:Fdo_counter.t option ->
   machtype ->
   Lambda.region_close ->
   symbol ->
@@ -1091,6 +1099,7 @@ val direct_call :
 (** Same as {!direct_call} but for an indirect call. *)
 val indirect_call :
   dbg:Debuginfo.t ->
+  callsite_counter:Fdo_counter.t option ->
   Extended_machtype.t ->
   Lambda.region_close ->
   Cmx_format.return_mode ->
@@ -1103,6 +1112,7 @@ val indirect_call :
     application (since this enables a few optimisations). *)
 val indirect_full_call :
   dbg:Debuginfo.t ->
+  callsite_counter:Fdo_counter.t option ->
   Extended_machtype.t ->
   Lambda.region_close ->
   expression ->
@@ -1177,6 +1187,8 @@ val fundecl :
   expression ->
   codegen_option list ->
   Debuginfo.t ->
+  fdo_entry_counters:fdo_counters ->
+  function_body_hash:Fdo_counter.Function_body_hash.t option ->
   Lambda.poll_attribute ->
   machtype ->
   fundecl

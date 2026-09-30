@@ -311,6 +311,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     match Apply.probe apply with
     | None ->
       ( C.direct_call ~dbg
+          ~callsite_counter:(Apply.callsite_counter apply)
           (C.Extended_machtype.to_machtype return_ty)
           pos code_sym args,
         free_vars,
@@ -335,7 +336,9 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
           "Application expression did not provide callee for indirect call:@ %a"
           Apply.print apply
     in
-    ( C.indirect_call ~dbg return_ty pos
+    ( C.indirect_call ~dbg
+        ~callsite_counter:(Apply.callsite_counter apply)
+        return_ty pos
         (C.alloc_mode_for_applications_to_cmx (Apply_expr.return_mode apply))
         callee args_ty (split_args ()),
       free_vars,
@@ -369,7 +372,9 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         "To_cmm expects indirect_known_arity calls to be full applications in \
          order to translate them"
     else
-      ( C.indirect_full_call ~dbg return_ty pos callee ~callees args_ty args,
+      ( C.indirect_full_call ~dbg
+          ~callsite_counter:(Apply.callsite_counter apply)
+          return_ty pos callee ~callees args_ty args,
         free_vars,
         env,
         res,
@@ -400,8 +405,9 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     let alloc_mode =
       C.alloc_mode_for_applications_to_cmx (Apply_expr.return_mode apply)
     in
-    ( C.send kind callee obj (split_args ()) args_ty return_ty (pos, alloc_mode)
-        dbg,
+    ( C.send
+        ~callsite_counter:(Apply.callsite_counter apply)
+        kind callee obj (split_args ()) args_ty return_ty (pos, alloc_mode) dbg,
       free_vars,
       env,
       res,
@@ -1305,6 +1311,7 @@ and switch env res switch =
       apply_cont env res action
     in
     ( ( d,
+        Apply_cont.fdo_counters action,
         cmm_action,
         action_free_vars,
         action_symbol_inits,
@@ -1323,10 +1330,10 @@ and switch env res switch =
        before creating an if-then-else, introducing an indirection that might
        prevent some optimizations performed by Selectgen/Emit when the condition
        is inlined in the if-then-else. Instead we use [C.ite]. *)
-    | ( (0, else_, else_free_vars, else_inits, else_dbg),
-        (_, then_, then_free_vars, then_inits, then_dbg) )
-    | ( (_, then_, then_free_vars, then_inits, then_dbg),
-        (0, else_, else_free_vars, else_inits, else_dbg) ) ->
+    | ( (0, else_counters, else_, else_free_vars, else_inits, else_dbg),
+        (_, then_counters, then_, then_free_vars, then_inits, then_dbg) )
+    | ( (_, then_counters, then_, then_free_vars, then_inits, then_dbg),
+        (0, else_counters, else_, else_free_vars, else_inits, else_dbg) ) ->
       let free_vars =
         Backend_var.Set.union scrutinee_free_vars
           (Backend_var.Set.union else_free_vars then_free_vars)
@@ -1335,15 +1342,21 @@ and switch env res switch =
       let symbol_inits = Env.Symbol_inits.merge then_inits else_inits in
       let cmm, free_vars, symbol_inits =
         wrap
-          (C.ite ~dbg scrutinee ~then_dbg ~then_ ~else_dbg ~else_)
+          (C.ite ~dbg scrutinee ~then_dbg ~then_counters ~then_ ~else_dbg
+             ~else_counters ~else_)
           free_vars symbol_inits
       in
       cmm, free_vars, symbol_inits, res
     (* Similar case to the previous but none of the arms match 0, so we have to
        generate an equality test, and make sure it is inside the condition to
        ensure Selectgen and Emit can take advantage of it. *)
-    | ( (x, if_x, if_x_free_vars, if_x_symbol_inits, if_x_dbg),
-        (_, if_not, if_not_free_vars, if_not_symbol_inits, if_not_dbg) ) ->
+    | ( (x, if_x_counters, if_x, if_x_free_vars, if_x_symbol_inits, if_x_dbg),
+        ( _,
+          if_not_counters,
+          if_not,
+          if_not_free_vars,
+          if_not_symbol_inits,
+          if_not_dbg ) ) ->
       let free_vars =
         Backend_var.Set.union scrutinee_free_vars
           (Backend_var.Set.union if_x_free_vars if_not_free_vars)
@@ -1351,7 +1364,8 @@ and switch env res switch =
       let expr =
         C.ite ~dbg
           (C.eq ~dbg (C.int ~dbg x) scrutinee)
-          ~then_dbg:if_x_dbg ~then_:if_x ~else_dbg:if_not_dbg ~else_:if_not
+          ~then_dbg:if_x_dbg ~then_counters:if_x_counters ~then_:if_x
+          ~else_dbg:if_not_dbg ~else_counters:if_not_counters ~else_:if_not
       in
       (* See comment below about symbol inits and branches *)
       let symbol_inits =
@@ -1370,8 +1384,13 @@ and switch env res switch =
     let _, res, free_vars, symbol_inits =
       Target_ocaml_int.Map.fold
         (fun discriminant action (i, res, free_vars, symbol_inits) ->
-          let (d, cmm_action, action_free_vars, action_symbol_inits, _dbg), res
-              =
+          let ( ( d,
+                  counters,
+                  cmm_action,
+                  action_free_vars,
+                  action_symbol_inits,
+                  _dbg ),
+                res ) =
             make_arm ~must_tag_discriminant env res (discriminant, action)
           in
           (* Note about symbol inits and branches: symbol allocation can occur
@@ -1386,7 +1405,7 @@ and switch env res switch =
             Env.Symbol_inits.merge symbol_inits action_symbol_inits
           in
           let free_vars = Backend_var.Set.union free_vars action_free_vars in
-          cases.(i) <- Some cmm_action;
+          cases.(i) <- Some (cmm_action, counters);
           index.(d) <- i;
           i + 1, res, free_vars, symbol_inits)
         arms
@@ -1400,7 +1419,7 @@ and switch env res switch =
         let unreachable, res =
           C.invalid res ~message:"unreachable switch case"
         in
-        cases.(n) <- Some unreachable;
+        cases.(n) <- Some (unreachable, []);
         cases, res
     in
     (* CR-someday poechsel: Put a more precise value kind here *)

@@ -111,12 +111,22 @@ module type S =
     (* [arg_as_test arg] casts [arg], known to be either 0 or 1,
        to a boolean test *)
     val arg_as_test : arg -> test
-    (* [make_if cond ifso ifnot] generates a conditional branch *)
-    val make_if : layout -> test -> act -> act -> act
+    (* [make_if kind loc ~ifso ~ifnot cond act_so act_not] generates a
+       conditional branch; [loc] is the source position of the switch being
+       compiled, attached to the branch for debug info.  [ifso] and [ifnot]
+       list the inclusive intervals of (original) scrutinee values that the
+       branch sends to each side, so that per-value information carried by
+       [loc] can be distributed onto the branch's edges *)
+    val make_if :
+      layout -> loc -> ifso:(int * int) list -> ifnot:(int * int) list ->
+      test -> act -> act -> act
    (* construct an actual switch :
-      make_switch arg cases acts
-      NB:  cases is in the value form *)
-    val make_switch : loc -> layout -> arg -> int array -> act array -> act
+      make_switch loc kind arg ~first_value cases acts
+      NB:  cases is in the value form; entry [k] of [cases] is taken for the
+      original scrutinee value [first_value + k] *)
+    val make_switch :
+      loc -> layout -> arg -> first_value:int -> int array -> act array ->
+      act
 
    (* Build last minute sharing of action stuff *)
    val make_catch : layout -> act -> Static_label.t * (act -> act)

@@ -923,7 +923,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       match emit_expr env sub_cfg e1 ~bound_name:None with
       | Never_returns -> Never_returns
       | Ok _ -> emit_expr env sub_cfg e2 ~bound_name)
-    | Cifthenelse { cond; ifso_dbg; ifso; ifnot_dbg; ifnot; dbg } ->
+    | Cifthenelse { cond; ifso_dbg; ifso; ifnot_dbg; ifnot; dbg; _ } ->
       emit_expr_ifthenelse env sub_cfg bound_name cond ifso_dbg ifso ifnot_dbg
         ifnot dbg
     | Cswitch (esel, index, ecases, dbg) ->
@@ -946,7 +946,12 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       emit_tail env sub_cfg body
     | Cname_for_debugger (_, body) -> emit_tail env sub_cfg body
     | Cop
-        ( (Capply { result_type = ty; region = Rc_normal; callees = _ } as op),
+        ( (Capply
+             { result_type = ty;
+               region = Rc_normal;
+               callees = _;
+               callsite_counter = _
+             } as op),
           args,
           dbg ) ->
       emit_tail_apply env sub_cfg ty op args dbg
@@ -954,7 +959,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       match emit_expr env sub_cfg e1 ~bound_name:None with
       | Never_returns -> ()
       | Ok _ -> emit_tail env sub_cfg e2)
-    | Cifthenelse { cond; ifso_dbg; ifso; ifnot_dbg; ifnot; dbg } ->
+    | Cifthenelse { cond; ifso_dbg; ifso; ifnot_dbg; ifnot; dbg; _ } ->
       emit_tail_ifthenelse env sub_cfg cond ifso_dbg ifso ifnot_dbg ifnot dbg
     | Cswitch (esel, index, ecases, dbg) ->
       emit_tail_switch env sub_cfg esel index ecases dbg
@@ -968,7 +973,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         ( ( Capply
               { result_type = _;
                 region = Rc_nontail | Rc_close_at_apply;
-                callees = _
+                callees = _;
+                callsite_counter = _
               }
           | Cextcall _ | Cload _ | Calloc _ | Cstore _ | Caddi | Csubi | Cmuli
           | Cmulhi _ | Cdivi _ | Cmodi _ | Caddi128 | Csubi128 | Cmuli64 _
@@ -1217,7 +1223,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       assert (Sub_cfg.exit_has_never_terminator sub_cfg);
       let sub_cases : (Reg.t array Or_never_returns.t * Sub_cfg.t) array =
         Array.map
-          (fun (case, _dbg) -> emit_new_sub_cfg env case ~bound_name)
+          (fun (case, _dbg, _counters) -> emit_new_sub_cfg env case ~bound_name)
           ecases
       in
       let r = SU.join_array env sub_cases ~bound_name in
@@ -1525,7 +1531,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Ok rsel ->
       assert (Sub_cfg.exit_has_never_terminator sub_cfg);
       let sub_cases =
-        Array.map (fun (case, _dbg) -> emit_tail_new_sub_cfg env case) ecases
+        Array.map
+          (fun (case, _dbg, _counters) -> emit_tail_new_sub_cfg env case)
+          ecases
       in
       let term_desc : Cfg.terminator =
         Switch
