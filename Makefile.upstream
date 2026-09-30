@@ -1234,6 +1234,15 @@ libasmruni_OBJECTS = \
 libasmrunpic_OBJECTS = $(runtime_NATIVE_C_SOURCES:.c=.npic.$(O)) \
   $(runtime_ASM_OBJECTS:.$(O)=_libasmrunpic.$(O))
 
+# The single-stepping LBR emulator (see runtime/singlestep_profiler.c) is
+# x86-specific and only exercised on Linux.
+ifeq "$(ARCH)-$(SYSTEM)" "amd64-linux"
+libasmrun_OBJECTS += runtime/singlestep_profiler.n.$(O)
+libasmrund_OBJECTS += runtime/singlestep_profiler.nd.$(O)
+libasmruni_OBJECTS += runtime/singlestep_profiler.ni.$(O)
+libasmrunpic_OBJECTS += runtime/singlestep_profiler.npic.$(O)
+endif
+
 libcomprmarsh_OBJECTS = runtime/zstd.npic.$(O)
 
 ## General (non target-specific) assembler and compiler flags
