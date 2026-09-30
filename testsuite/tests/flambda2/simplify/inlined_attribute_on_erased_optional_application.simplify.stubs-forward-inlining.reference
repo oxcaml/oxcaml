@@ -1,7 +1,8 @@
 let code default_0 deleted in
 let code f_inner_2 deleted in
 let code loopify(never) size(27) stub
-      f_1 (`*opt*x` : [ 0 | 0 of val ], y : imm tagged, z : imm tagged)
+      f_1
+        (`*opt*x` : [ 0 | 0 of imm tagged ], y : imm tagged, z : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
