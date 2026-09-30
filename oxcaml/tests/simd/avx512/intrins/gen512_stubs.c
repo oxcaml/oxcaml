@@ -9664,10 +9664,14 @@ __m128d ctest_mm_mask_sqrt_round_sd_8(__m128d p0, __mmask8 p1, __m128d p2, __m12
 __m128d ctest_mm_mask_sqrt_round_sd_9(__m128d p0, __mmask8 p1, __m128d p2, __m128d p3) { return _mm_mask_sqrt_round_sd(p0, p1, p2, p3, 9); }
 __m128d ctest_mm_mask_sqrt_round_sd_10(__m128d p0, __mmask8 p1, __m128d p2, __m128d p3) { return _mm_mask_sqrt_round_sd(p0, p1, p2, p3, 10); }
 __m128d ctest_mm_mask_sqrt_round_sd_11(__m128d p0, __mmask8 p1, __m128d p2, __m128d p3) { return _mm_mask_sqrt_round_sd(p0, p1, p2, p3, 11); }
+__m128d ctest_mm_mask_sqrt_round_sd_4(__m128d p0, __mmask8 p1, __m128d p2, __m128d p3) { return _mm_move_sd(p2, (p1 & 1) ? _mm_sqrt_sd(p3, p3) : p0); }
 __m128 ctest_mm_mask_sqrt_round_ss_8(__m128 p0, __mmask8 p1, __m128 p2, __m128 p3) { return _mm_mask_sqrt_round_ss(p0, p1, p2, p3, 8); }
 __m128 ctest_mm_mask_sqrt_round_ss_9(__m128 p0, __mmask8 p1, __m128 p2, __m128 p3) { return _mm_mask_sqrt_round_ss(p0, p1, p2, p3, 9); }
 __m128 ctest_mm_mask_sqrt_round_ss_10(__m128 p0, __mmask8 p1, __m128 p2, __m128 p3) { return _mm_mask_sqrt_round_ss(p0, p1, p2, p3, 10); }
 __m128 ctest_mm_mask_sqrt_round_ss_11(__m128 p0, __mmask8 p1, __m128 p2, __m128 p3) { return _mm_mask_sqrt_round_ss(p0, p1, p2, p3, 11); }
+__m128 ctest_mm_mask_sqrt_round_ss_4(__m128 p0, __mmask8 p1, __m128 p2, __m128 p3) { return _mm_move_ss(p2, (p1 & 1) ? _mm_sqrt_ss(p3) : p0); }
+__m128d ctest_mm_mask_sqrt_sd(__m128d p0, __mmask8 p1, __m128d p2, __m128d p3) { return _mm_move_sd(p2, (p1 & 1) ? _mm_sqrt_sd(p3, p3) : p0); }
+__m128 ctest_mm_mask_sqrt_ss(__m128 p0, __mmask8 p1, __m128 p2, __m128 p3) { return _mm_move_ss(p2, (p1 & 1) ? _mm_sqrt_ss(p3) : p0); }
 __m128i ctest_mm_mask_sra_epi16(__m128i p0, __mmask8 p1, __m128i p2, __m128i p3) { return _mm_mask_sra_epi16(p0, p1, p2, p3); }
 __m128i ctest_mm_mask_sra_epi32(__m128i p0, __mmask8 p1, __m128i p2, __m128i p3) { return _mm_mask_sra_epi32(p0, p1, p2, p3); }
 __m128i ctest_mm_mask_sra_epi64(__m128i p0, __mmask8 p1, __m128i p2, __m128i p3) { return _mm_mask_sra_epi64(p0, p1, p2, p3); }
@@ -10383,10 +10387,14 @@ __m128d ctest_mm_maskz_sqrt_round_sd_8(__mmask8 p0, __m128d p1, __m128d p2) { re
 __m128d ctest_mm_maskz_sqrt_round_sd_9(__mmask8 p0, __m128d p1, __m128d p2) { return _mm_maskz_sqrt_round_sd(p0, p1, p2, 9); }
 __m128d ctest_mm_maskz_sqrt_round_sd_10(__mmask8 p0, __m128d p1, __m128d p2) { return _mm_maskz_sqrt_round_sd(p0, p1, p2, 10); }
 __m128d ctest_mm_maskz_sqrt_round_sd_11(__mmask8 p0, __m128d p1, __m128d p2) { return _mm_maskz_sqrt_round_sd(p0, p1, p2, 11); }
+__m128d ctest_mm_maskz_sqrt_round_sd_4(__mmask8 p0, __m128d p1, __m128d p2) { return _mm_move_sd(p1, (p0 & 1) ? _mm_sqrt_sd(p2, p2) : _mm_setzero_pd()); }
 __m128 ctest_mm_maskz_sqrt_round_ss_8(__mmask8 p0, __m128 p1, __m128 p2) { return _mm_maskz_sqrt_round_ss(p0, p1, p2, 8); }
 __m128 ctest_mm_maskz_sqrt_round_ss_9(__mmask8 p0, __m128 p1, __m128 p2) { return _mm_maskz_sqrt_round_ss(p0, p1, p2, 9); }
 __m128 ctest_mm_maskz_sqrt_round_ss_10(__mmask8 p0, __m128 p1, __m128 p2) { return _mm_maskz_sqrt_round_ss(p0, p1, p2, 10); }
 __m128 ctest_mm_maskz_sqrt_round_ss_11(__mmask8 p0, __m128 p1, __m128 p2) { return _mm_maskz_sqrt_round_ss(p0, p1, p2, 11); }
+__m128 ctest_mm_maskz_sqrt_round_ss_4(__mmask8 p0, __m128 p1, __m128 p2) { return _mm_move_ss(p1, (p0 & 1) ? _mm_sqrt_ss(p2) : _mm_setzero_ps()); }
+__m128d ctest_mm_maskz_sqrt_sd(__mmask8 p0, __m128d p1, __m128d p2) { return _mm_move_sd(p1, (p0 & 1) ? _mm_sqrt_sd(p2, p2) : _mm_setzero_pd()); }
+__m128 ctest_mm_maskz_sqrt_ss(__mmask8 p0, __m128 p1, __m128 p2) { return _mm_move_ss(p1, (p0 & 1) ? _mm_sqrt_ss(p2) : _mm_setzero_ps()); }
 __m128i ctest_mm_maskz_sra_epi16(__mmask8 p0, __m128i p1, __m128i p2) { return _mm_maskz_sra_epi16(p0, p1, p2); }
 __m128i ctest_mm_maskz_sra_epi32(__mmask8 p0, __m128i p1, __m128i p2) { return _mm_maskz_sra_epi32(p0, p1, p2); }
 __m128i ctest_mm_maskz_sra_epi64(__mmask8 p0, __m128i p1, __m128i p2) { return _mm_maskz_sra_epi64(p0, p1, p2); }

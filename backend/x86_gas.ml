@@ -106,10 +106,10 @@ let i3 b s x y z = bprintf b "\t%s\t%a, %a, %a" s arg x arg y arg z
 let i4 b s x y z w = bprintf b "\t%s\t%a, %a, %a, %a" s arg x arg y arg z arg w
 
 let evex_rounding : Amd64_simd_defs.evex_rounding -> string = function
-  | Rnd_near -> "{rn-sae}, "
-  | Rnd_down -> "{rd-sae}, "
-  | Rnd_up -> "{ru-sae}, "
-  | Rnd_zero -> "{rz-sae}, "
+  | Rnd_near -> "{rn-sae}"
+  | Rnd_down -> "{rd-sae}"
+  | Rnd_up -> "{ru-sae}"
+  | Rnd_zero -> "{rz-sae}"
 
 let evex_broadcast evex_w (len : Amd64_simd_defs.evex_length) =
   let bits = match len with L128 -> 128 | L256 -> 256 | L512 -> 512 in
@@ -128,7 +128,7 @@ let ievex b (instr : Amd64_simd_instrs.instr) args =
           then "", ""
           else if has_mem
           then "", evex_broadcast evex_w len
-          else "{sae}, ", ""
+          else "{sae}", ""
       in
       (if evex_z then "{z}" else ""), rounding, broadcast
     | Legacy _ | Vex _ -> Misc.fatal_error "expected EVEX encoding"
@@ -183,20 +183,15 @@ let ievex b (instr : Amd64_simd_instrs.instr) args =
         false)
   in
   (match imm with Some imm -> bprintf b "%a, " arg imm | None -> ());
-  if not rounding_after_gpr then Buffer.add_string b rounding;
-  let rounding_no_sep =
-    (* [rounding] is either empty or "{..}, "; drop the trailing ", ". *)
-    if String.length rounding = 0
-    then rounding
-    else String.sub rounding 0 (String.length rounding - 2)
-  in
+  if (not rounding_after_gpr) && String.length rounding > 0
+  then bprintf b "%s, " rounding;
   let last = Array.length args - 1 in
   Array.iteri
     (fun i a ->
       if i > 0 then Buffer.add_string b ", ";
       arg b a;
-      if i = 0 && rounding_after_gpr && String.length rounding_no_sep > 0
-      then bprintf b ", %s" rounding_no_sep;
+      if i = 0 && rounding_after_gpr && String.length rounding > 0
+      then bprintf b ", %s" rounding;
       if X86_ast_utils.is_mem a then Buffer.add_string b broadcast;
       if i = last then bprintf b "%a%s" mask writemask zeroing)
     args

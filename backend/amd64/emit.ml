@@ -2016,27 +2016,20 @@ let emit_simd ?mode (op : Simd.operation) instr =
       emit_simd_instr ?mode seq.instr imm instr;
       I.set cond (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0)
-    | Ptestz | Vptestz_X | Vptestz_Y ->
+    | Ptestz | Vptestz_X | Vptestz_Y | Kflag (Kortestz | Ktestz) ->
+      (* KORTEST/KTEST set ZF when the mask OR/AND is all-zero. *)
       emit_simd_instr ?mode seq.instr imm instr;
       I.set E (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0)
-    | Ptestc | Vptestc_X | Vptestc_Y ->
+    | Ptestc | Vptestc_X | Vptestc_Y | Kflag (Kortestc | Ktestc) ->
+      (* KORTEST sets CF when the OR is all-ones; KTEST when (~a & b) is
+         zero. *)
       emit_simd_instr ?mode seq.instr imm instr;
       I.set B (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0)
     | Ptestnzc | Vptestnzc_X | Vptestnzc_Y ->
       emit_simd_instr ?mode seq.instr imm instr;
       I.set A (res8 instr 0);
-      I.movzx (res8 instr 0) (res instr 0)
-    | Kflag (Kortestz | Ktestz) ->
-      (* KORTEST/KTEST set ZF when the mask OR/AND is all-zero. *)
-      emit_simd_instr ?mode seq.instr imm instr;
-      I.set E (res8 instr 0);
-      I.movzx (res8 instr 0) (res instr 0)
-    | Kflag (Kortestc | Ktestc) ->
-      (* ... and CF when it is all-ones. *)
-      emit_simd_instr ?mode seq.instr imm instr;
-      I.set B (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0))
 
 let emit_simd_instr_with_memory_arg (simd : Simd.Mem.operation) i mode =

@@ -20,6 +20,9 @@ BUILTIN(caml_mm512_i32gather_epi32);
 BUILTIN(caml_mm512_mask_i32gather_epi32);
 BUILTIN(caml_mm512_i32scatter_epi32);
 BUILTIN(caml_mm512_mask_i32scatter_epi32);
+BUILTIN(caml_mm512_mask_i64gather_epi32);
+BUILTIN(caml_mm512_mask_i64scatter_epi32);
+BUILTIN(caml_mm_mask_cvtepi64_storeu_epi32);
 
 void *vec_aligned_alloc(intnat align, intnat size) { return aligned_alloc(align, size); }
 intnat buf_eq64(void *a, void *b)
@@ -37,6 +40,13 @@ int64_t vec512_wi(__m512i v, int i) { return ex(v, i); }
 __m512i vec512_of_int64s(int64_t a, int64_t b, int64_t c, int64_t d, int64_t e,
                          int64_t f, int64_t g, int64_t h)
 { return _mm512_set_epi64(h, g, f, e, d, c, b, a); }
+
+__m256i vec256_of_int64s(int64_t a, int64_t b, int64_t c, int64_t d)
+{ return _mm256_set_epi64x(d, c, b, a); }
+int64_t vec256_wi(__m256i v, int i)
+{ int64_t t[4]; _mm256_storeu_si256((void *)t, v); return t[i]; }
+__m128i vec128_of_int64s(int64_t a, int64_t b)
+{ return _mm_set_epi64x(b, a); }
 
 __m512i ctest_loadu_epi32(void *p) { return _mm512_loadu_epi32(p); }
 __m512i ctest_load_epi32(void *p) { return _mm512_load_epi32(p); }
@@ -67,4 +77,10 @@ __m512i ctest_mask_i32gather_epi32(int scale, __m512i src, __mmask16 k, __m512i 
 { assert(scale == 4); return _mm512_mask_i32gather_epi32(src, k, vindex, base, 4); }
 void ctest_mask_i32scatter_epi32(int scale, void *base, __mmask16 k, __m512i vindex, __m512i a)
 { assert(scale == 4); _mm512_mask_i32scatter_epi32(base, k, vindex, a, 4); }
+__m256i ctest_mask_i64gather_epi32(__m256i src, __mmask8 k, __m512i idx, void *base)
+{ return _mm512_mask_i64gather_epi32(src, k, idx, base, 4); }
+void ctest_mask_i64scatter_epi32(void *base, __mmask8 k, __m512i idx, __m256i a)
+{ _mm512_mask_i64scatter_epi32(base, k, idx, a, 4); }
+void ctest_mask_cvtepi64_storeu_epi32(void *base, __mmask8 k, __m128i a)
+{ _mm_mask_cvtepi64_storeu_epi32(base, k, a); }
 #endif

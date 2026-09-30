@@ -44,6 +44,13 @@
    amd64_simd_intrins.ml
    (run ./simdgen.exe intrins selection))))
 
+(alias
+ (name runtest)
+ (deps
+  amd64_simd_instrs.ml
+  amd64_simd_intrins.ml
+  amd64_simd_intrins_skiplist.txt))
+
 (rule
  (enabled_if
   (and

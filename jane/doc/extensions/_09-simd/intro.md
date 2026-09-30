@@ -42,7 +42,7 @@ Masks convert to and from integers with the `caml_mask_of_int64` /
 general-purpose registers, per the C ABI.
 
 The types ending with `#` are unboxed: they are passed between functions in
-XMM/YMM registers, stored in structures as flat data, and may be stored in flat
+XMM/YMM/ZMM registers, stored in structures as flat data, and may be stored in flat
 arrays. The corresponding intrinsics operate on unboxed vectors. For more detail
 on unboxed types, see the [docs](../../unboxed-types/intro).
 
@@ -99,10 +99,10 @@ let z = Int32x4.blend [%blend 0, 1, 0, 1] x y
 ## AVX512
 
 AVX512 support is gated by CPU extension flags: `-favx512f` enables the
-foundation instructions and, because the hardware sets are mutually required,
-implies `-favx512cd`, `-favx512dq`, `-favx512bw`, and `-favx512vl` (and
-transitively AVX2 and below). Building with these flags assumes the resulting
-binary runs on a machine with the corresponding CPUID bits.
+foundation instructions. The compiler currently treats these extensions as a
+group, so this also implies `-favx512cd`, `-favx512dq`, `-favx512bw`, and
+`-favx512vl` (and transitively AVX2 and below). Building with these flags assumes
+the resulting binary runs on a machine with the corresponding CPUID bits.
 
 Unlike the hand-written SSE/AVX intrinsics, the AVX512 surface is generated
 from the Intel Intrinsics Guide data by `tools/simdgen`: every supported Intel
@@ -124,7 +124,7 @@ The externals follow the C signatures with these conventions:
   and are passed as `(int [@untagged])`; they must be compile-time constants,
   and out-of-range values are compile-time errors;
 - scalar operands map to `(int32 [@unboxed])`, `(int64 [@unboxed])`, or
-  `(int [@untagged])` for sub-word types; pointers map to `nativeint#`;
+  `(int [@untagged])` for sub-word types; pointers map to `nativeint_u`;
 - embedded-rounding intrinsics (`_mm512_*_round_*`) accept the C macro values
   (`_MM_FROUND_TO_NEAREST_INT|_MM_FROUND_NO_EXC` = 8, ..., and
   `_MM_FROUND_CUR_DIRECTION` = 4), selecting the rounded or plain instruction.

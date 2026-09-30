@@ -4,11 +4,11 @@
 open Stdlib
 
 type void : void
-type addr = nativeint#
+type addr = nativeint_u
 
 external aligned_alloc
-  :  align:nativeint#
-  -> size:nativeint#
+  :  align:nativeint_u
+  -> size:nativeint_u
   -> addr
   = "" "vec_aligned_alloc"
 
@@ -37,6 +37,17 @@ external mask_of_int64 : int64 -> mask = "caml_vec512_unreachable" "caml_mask_of
 
 external memeq : addr -> addr -> (int[@untagged]) = "" "buf_eq64" [@@noalloc]
 
+external reint : 'a -> 'b = "%identity"
+
+external of_w256 : int64 -> int64 -> int64 -> int64 -> int32x8
+  = "" "vec256_of_int64s" [@@noalloc] [@@unboxed]
+
+external w256 : (int32x8[@unboxed]) -> (int[@untagged]) -> (int64[@unboxed])
+  = "" "vec256_wi" [@@noalloc]
+
+external of_w128 : int64 -> int64 -> int64x2
+  = "" "vec128_of_int64s" [@@noalloc] [@@unboxed]
+
 let failures = ref 0
 
 let checkv name (a : int32x16) (b : int32x16) =
@@ -48,6 +59,14 @@ let checkv name (a : int32x16) (b : int32x16) =
   then (
     incr failures;
     Printf.printf "MISMATCH %s\n" name)
+;;
+
+let checkv256 name a b =
+  for i = 0 to 3 do
+    if not (Int64.equal (w256 a i) (w256 b i)) then (
+      incr failures;
+      Printf.printf "MISMATCH %s lane %d\n" name i)
+  done
 ;;
 
 let checkbuf name p q =
@@ -69,7 +88,7 @@ let va =
     0x0f0f0f0ff0f0f0f0L
 ;;
 
-let mk = mask_of_int64 0xA5A5L
+let vb = of_w (-1L) (-1L) (-1L) (-1L) (-1L) (-1L) (-1L) (-1L)
 
 external caml_mm512_loadu_epi32
   :  addr
@@ -233,7 +252,33 @@ external c_mask_i32scatter_epi32 :
   (int32x16[@unboxed]) -> void
   = "" "ctest_mask_i32scatter_epi32" [@@noalloc]
 
-let () =
+external gather64 :
+  (int[@untagged]) -> (int32x8[@unboxed]) -> (mask[@unboxed]) ->
+  (int64x8[@unboxed]) -> addr -> (int32x8[@unboxed])
+  = "" "caml_mm512_mask_i64gather_epi32" [@@noalloc] [@@builtin]
+
+external c_gather64 :
+  (int32x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> addr ->
+  (int32x8[@unboxed]) = "" "ctest_mask_i64gather_epi32" [@@noalloc]
+
+external scatter64 :
+  (int[@untagged]) -> addr -> (mask[@unboxed]) -> (int64x8[@unboxed]) ->
+  (int32x8[@unboxed]) -> void
+  = "" "caml_mm512_mask_i64scatter_epi32" [@@noalloc] [@@builtin]
+
+external c_scatter64 :
+  addr -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int32x8[@unboxed]) -> void
+  = "" "ctest_mask_i64scatter_epi32" [@@noalloc]
+
+external narrow_store :
+  addr -> (mask[@unboxed]) -> (int64x2[@unboxed]) -> void
+  = "" "caml_mm_mask_cvtepi64_storeu_epi32" [@@noalloc] [@@builtin]
+
+external c_narrow_store :
+  addr -> (mask[@unboxed]) -> (int64x2[@unboxed]) -> void
+  = "" "ctest_mask_cvtepi64_storeu_epi32" [@@noalloc]
+
+let test mk =
   let src = aligned_alloc ~align:#64n ~size:#64n in
   let d1 = aligned_alloc ~align:#64n ~size:#64n in
   let d2 = aligned_alloc ~align:#64n ~size:#64n in
@@ -245,14 +290,13 @@ let () =
   checkv "load_epi32" (caml_mm512_load_epi32 src) (c_load_epi32 src);
   checkv
     "mask_loadu_epi32"
-    (caml_mm512_mask_loadu_epi32 va mk src)
-    (c_mask_loadu_epi32 va mk src);
+    (caml_mm512_mask_loadu_epi32 vb mk src)
+    (c_mask_loadu_epi32 vb mk src);
   checkv
     "maskz_loadu_epi32"
     (caml_mm512_maskz_loadu_epi32 mk src)
     (c_maskz_loadu_epi32 mk src);
   (* Seed both destinations with the same baseline so masked-off lanes match. *)
-  let vb = of_w (-1L) (-1L) (-1L) (-1L) (-1L) (-1L) (-1L) (-1L) in
   let _ = caml_mm512_storeu_epi32 d1 vb in
   let _ = caml_mm512_storeu_epi32 d2 vb in
   let _ = caml_mm512_mask_storeu_epi32 d1 mk va in
@@ -327,5 +371,27 @@ let () =
   let _ = caml_mm512_mask_i32scatter_epi32 4 s1 mk idx4 va in
   let _ = c_mask_i32scatter_epi32 4 s2 mk idx4 va in
   checkbuf "mask_i32scatter_epi32" s1 s2;
+  (* A 512-bit index with a 256-bit result exercises mixed-width VSIB operands.
+     Keep the mask live across two gathers: the instructions overwrite it. *)
+  let idx64 = reint (of_w 15L 13L 11L 9L 7L 5L 3L 1L) in
+  let merge = of_w256 (-1L) (-2L) (-3L) (-4L) in
+  let g1 = gather64 4 merge mk idx64 table in
+  let g2 = gather64 4 merge mk idx64 src in
+  checkv256 "mask_i64gather_epi32/first" g1 (c_gather64 merge mk idx64 table);
+  checkv256 "mask_i64gather_epi32/reused_mask" g2 (c_gather64 merge mk idx64 src);
+  reset ();
+  let _ = scatter64 4 s1 mk idx64 merge in
+  let _ = c_scatter64 s2 mk idx64 merge in
+  checkbuf "mask_i64scatter_epi32" s1 s2;
+  (* Narrow stores must leave all bytes outside the destination untouched. *)
+  reset ();
+  let small = of_w128 0x1122334455667788L 0x8877665544332211L in
+  let _ = narrow_store s1 mk small in
+  let _ = c_narrow_store s2 mk small in
+  checkbuf "mask_cvtepi64_storeu_epi32" s1 s2
+;;
+
+let () =
+  List.iter (fun bits -> test (mask_of_int64 bits)) [0L; 0xffffL; 0xa5a5L; 1L; 0x8000L];
   if !failures <> 0 then exit 1
 ;;

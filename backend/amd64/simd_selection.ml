@@ -1186,31 +1186,27 @@ module Intrins = Amd64_simd_intrins.Make (struct
 
   let ktestc simd args = kflag Simd.Seq.ktestc simd args
 
-  let simd_load_mode = simd_load
-
-  let simd_store_mode = simd_store
-
-  let simd_load simd args =
-    if Arch.Extension.enabled_instruction simd
-    then simd_load_mode ~mode:Arch.identity_addressing simd args
-    else None
-
-  let simd_store simd args =
-    if Arch.Extension.enabled_instruction simd
-    then simd_store_mode ~mode:Arch.identity_addressing simd args
-    else None
-
-  let extract_scale args op = extract_scale args op
-
   let simd_load_scaled simd ~scale args =
     if Arch.Extension.enabled_instruction simd
-    then simd_load_mode ~mode:(Iindexed2scaled (scale, 0)) simd args
+    then simd_load ~mode:(Iindexed2scaled (scale, 0)) simd args
     else None
 
   let simd_store_scaled simd ~scale args =
     if Arch.Extension.enabled_instruction simd
-    then simd_store_mode ~mode:(Iindexed2scaled (scale, 0)) simd args
+    then simd_store ~mode:(Iindexed2scaled (scale, 0)) simd args
     else None
+
+  let simd_load simd args =
+    if Arch.Extension.enabled_instruction simd
+    then simd_load ~mode:Arch.identity_addressing simd args
+    else None
+
+  let simd_store simd args =
+    if Arch.Extension.enabled_instruction simd
+    then simd_store ~mode:Arch.identity_addressing simd args
+    else None
+
+  let extract_scale = extract_scale
 
   (* Constants synthesized for the unmasked gather/scatter intrinsics: the
      AVX512 instructions always take a write mask, and gathers overwrite the
