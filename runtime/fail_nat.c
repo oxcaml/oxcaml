@@ -144,8 +144,10 @@ CAMLno_asan void caml_raise_async(value v)
   Caml_state->local_top = Caml_state->current_stack->local_top;
   Caml_state->local_limit = Caml_state->current_stack->local_limit;
 
-  /* Fiber switch: flush dynamic binding cache */
+  /* Fiber switch: flush dynamic binding cache and recompute the cached TLS
+     state */
   caml_dynamic_cache_flush(Caml_state->dynamic_bindings);
+  caml_tls_recompute_mirror();
 
   /* Do not run callbacks here: we are already raising an async exn,
      so no need to check for another one, and avoiding polling here

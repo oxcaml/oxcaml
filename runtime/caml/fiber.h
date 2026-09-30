@@ -79,6 +79,20 @@ struct stack_info {
 
   /* Whether the fiber was allocated by [caml_alloc_stack_preemptible]. */
   bool is_preemptible;
+
+  /* TLS (Thread.TLS / Domain.TLS) storage.
+
+     A stack owns TLS state iff [tls_state != Val_null]. Owners are main
+     stacks (domain and thread) and preemptible fibers; as preemptibility is
+     fixed at creation, so is ownership. Owners start with the empty array
+     [Atom(0)], grown lazily from the OCaml side. A non-owner shares the
+     state of the nearest owner on its parent chain. Every running chain
+     ends at a main stack, so this owner always exists.
+
+     [Caml_state->tls_state] caches the [tls_state] of the nearest owner on
+     the current stack's parent chain, so that reading TLS is a single load.
+     It is recomputed at every stack switch and kept in sync on writes. */
+  value tls_state;
 };
 
 #ifdef STACK_GUARD_PAGES
@@ -351,6 +365,14 @@ CAMLextern uintnat caml_get_init_stack_wsize(int context);
 void caml_change_max_stack_size (uintnat new_max_wsize);
 void caml_maybe_expand_stack(void);
 CAMLextern void caml_free_stack(struct stack_info* stk);
+
+/* Walk the parent chain of a running [stack] to the nearest TLS-owning stack
+   ([tls_state != Val_null]). */
+struct stack_info* caml_tls_find_owner(struct stack_info* stack);
+
+/* Recompute [Caml_state->tls_state] from the nearest TLS owner on the
+   current stack's parent chain. */
+CAMLextern void caml_tls_recompute_mirror(void);
 
 /* gc_regs_buckets is allocated on-demand by [maybe_expand_stack]. */
 CAMLextern void caml_free_gc_regs_buckets(value *gc_regs_buckets);

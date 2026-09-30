@@ -175,8 +175,18 @@ module DLS : sig
 end
 
 (** Thread-local storage. Like {!DLS}, but stores a distinct value for each
-    thread. Domains can contain multiple threads, so [TLS] should be preferred
-    in nearly all cases. *)
+    thread and for each preemptible fiber. Domains can contain multiple
+    threads, so [TLS] should be preferred in nearly all cases.
+
+    TLS state is owned by preemptible fibers (see {!Effect.Deep.Preemptible}
+    and {!Effect.Shallow.Preemptible}) and by threads. Whether a fiber is
+    preemptible is fixed when it is created. A non-preemptible fiber shares
+    the state of its nearest enclosing owner, and its writes are visible to
+    it. A preemptible fiber starts with fresh state (populated from the keys
+    registered with [split_from_parent], split when the fiber is created)
+    which travels with the fiber: it is preserved across suspension and
+    resumption, including when the fiber is resumed on another thread or
+    domain. *)
 module TLS : sig
 
     type 'a key : value mod portable contended
@@ -194,12 +204,15 @@ module TLS : sig
     [@@alert unsafe_multidomain "Use [Domain.Safe.TLS.set]."]
     (** Like {!DLS.set}, but sets the value for the current thread. *)
 
-    (** For use by the threading library. *)
+    (** For use by the threading library and [Effect]. *)
     module Private : sig @@ portable
         type keys
         val init : unit -> unit
         val get_initial_keys : unit -> keys
         val set_initial_keys : keys -> unit
+
+        (** Whether any key was registered with [split_from_parent]. *)
+        val has_initial_keys : unit -> bool
     end
 end
 

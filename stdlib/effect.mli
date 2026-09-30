@@ -180,7 +180,15 @@ module Deep : sig
         preempt the current fiber on tick.
 
         To set the tick interval, call [Domain.Tick.acquire] before running a
-        preemptible fiber. *)
+        preemptible fiber.
+
+        A preemptible fiber owns its own TLS state (see {!Domain.TLS}): it
+        starts with fresh state, populated from the keys registered with
+        [split_from_parent] (split from the state current at [match_with] /
+        [try_with], like [Thread.create]), and keeps that state across
+        suspension and resumption, including when resumed on another thread
+        or domain. [tickc] must not touch TLS, since it must be
+        signal-safe. *)
 
     type ('a,'b) handler =
         { retc: 'a -> 'b;
@@ -354,7 +362,14 @@ module Shallow : sig
         Whether a fiber is preemptible is fixed when it is created: fibers
         created by {!fiber} can only be resumed with preemptible handlers,
         and fibers created by {!Shallow.fiber} only with non-preemptible
-        ones. *)
+        ones.
+
+        A preemptible fiber owns its own TLS state (see {!Domain.TLS}): it
+        starts with fresh state, populated from the keys registered with
+        [split_from_parent] (split from the state current at {!fiber}, like
+        [Thread.create]), and keeps that state across suspension and
+        resumption. [tickc] must not touch TLS, since it must be
+        signal-safe. *)
 
     type ('a,'b) continuation
     (** [('a,'b) continuation] is a delimited continuation of a preemptible

@@ -422,6 +422,11 @@ module TLS0 = struct
 
     let set_initial_keys (l : key_value list) =
       List.iter (fun (KV (k, v)) -> set k (v ())) l
+
+    let has_initial_keys () =
+      match (Atomic.get parent_keys : key_initializer_list) with
+      | [] -> false
+      | _ :: _ -> true
   end
 end
 

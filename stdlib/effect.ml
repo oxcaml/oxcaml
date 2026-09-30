@@ -155,6 +155,16 @@ let[@inline never] discontinue_with_handler_with_backtrace
     (Prim.update_cont_handler_noexc cont valuec exnc effc tickc)
     e bt
 
+(* A preemptible fiber owns fresh TLS state from creation. [split_tls comp]
+   splits the keys registered with [split_from_parent] from the current state
+   now (parity with [Thread.create]) and sets them in the new fiber before
+   running [comp]. *)
+let[@inline] split_tls comp =
+  if Domain.TLS.Private.has_initial_keys () then begin
+    let keys = Domain.TLS.Private.get_initial_keys () in
+    fun arg -> Domain.TLS.Private.set_initial_keys keys; comp arg
+  end else comp
+
 module Deep = struct
 
   type nonrec ('a,'b) continuation = ('a,'b) continuation
@@ -275,8 +285,12 @@ module Deep = struct
         | None -> Prim.reperform eff k last_fiber
       in
       Prim.with_stack_preemptible
+<<<<<<< HEAD
         handler.retc handler.exnc effc (This handler.tickc)
-        comp arg
+=======
+        handler.retc handler.exnc effc handler.tickc
+>>>>>>> 091cbbf717c2dc0a9488da2012bd567584234f21
+        (split_tls comp) arg
 
     let try_with ~on_tick comp arg (handler : _ effect_handler) =
       match_with comp arg
@@ -317,8 +331,12 @@ module Deep = struct
           Prim.with_stack_preemptible
             (fun x -> handler.retc (Handler.unsafe_make ()) x)
             (fun e -> handler.exnc (Handler.unsafe_make ()) e)
+<<<<<<< HEAD
             effc (This handler.tickc)
-            (fun arg -> comp (Handler.unsafe_make ()) arg)
+=======
+            effc handler.tickc
+>>>>>>> 091cbbf717c2dc0a9488da2012bd567584234f21
+            (split_tls (fun arg -> comp (Handler.unsafe_make ()) arg))
             arg
 
         let try_with (h @ local) ~on_tick comp arg
@@ -453,7 +471,7 @@ module Shallow = struct
   module Preemptible = struct
     type nonrec ('a,'b) continuation = ('a,'b) continuation
 
-    let fiber f : _ continuation = make_fiber ~preemptible:true f
+    let fiber f : _ continuation = make_fiber ~preemptible:true (split_tls f)
 
     type ('a,'b) handler =
         { retc: 'a -> 'b;

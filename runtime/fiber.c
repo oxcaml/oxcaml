@@ -357,6 +357,8 @@ alloc_size_class_stack_noexc(mlsize_t wosize, int cache_bucket, value hval,
   stack->dynamic = Val_null;
   stack->is_task = false;
   stack->is_preemptible = preemptible;
+  /* Preemptible fibers own TLS state; see fiber.h. */
+  stack->tls_state = preemptible ? Atom(0) : Val_null;
 #ifdef DEBUG
   stack->magic = 42;
 #endif
@@ -701,6 +703,7 @@ void caml_scan_stack(
     f(fdata, Stack_handle_exception(stack), &Stack_handle_exception(stack));
     f(fdata, Stack_handle_effect(stack), &Stack_handle_effect(stack));
     f(fdata, Stack_handle_tick(stack), &Stack_handle_tick(stack));
+    f(fdata, stack->tls_state, &stack->tls_state);
 
     scan_local_allocations(f, fdata, locals, stack->local_sp);
 
@@ -848,6 +851,8 @@ void caml_scan_stack(
       f(fdata, Stack_handle_effect(stack), &Stack_handle_effect(stack));
     if (is_scannable(fflags, Stack_handle_tick(stack)))
       f(fdata, Stack_handle_tick(stack), &Stack_handle_tick(stack));
+    if (is_scannable(fflags, stack->tls_state))
+      f(fdata, stack->tls_state, &stack->tls_state);
 
     stack = Stack_parent(stack);
   }
@@ -999,14 +1004,16 @@ int caml_try_realloc_stack(asize_t required_space)
   new_stack->local_limit = old_stack->local_limit;
   new_stack->dynamic = old_stack->dynamic;
   new_stack->is_task = old_stack->is_task;
+  new_stack->tls_state = old_stack->tls_state;
 
-  // Detach locals stack and dynamic bindings from old_stack
+  // Detach locals stack, dynamic bindings and TLS state from old_stack
   old_stack->local_arenas = NULL;
   old_stack->local_sp = 0;
   old_stack->local_top = NULL;
   old_stack->local_limit = 0;
   old_stack->dynamic = Val_null;
   old_stack->is_task = false;
+  old_stack->tls_state = Val_null;
 
 #ifdef NATIVE_CODE
   /* There's no need to do another pass rewriting from
@@ -1078,6 +1085,9 @@ struct stack_info* caml_alloc_main_stack (uintnat init_wsize)
   const int64_t id = new_fiber_id();
   struct stack_info* stk =
     caml_alloc_stack_noexc(init_wsize, Val_unit, Val_unit, Val_unit, id);
+  /* Main stacks own TLS state even though they are not preemptible;
+     see fiber.h. */
+  if (stk != NULL) stk->tls_state = Atom(0);
   return stk;
 }
 
@@ -1200,6 +1210,8 @@ void caml_free_stack (struct stack_info* stack)
   // Don't need to update local_sp since this is no longer the current stack.
   caml_free_local_arenas(stack->local_arenas);
 
+  stack->tls_state = Val_null;
+
   if (cache_bucket != -1) {
 #if defined(DEBUG) && defined(STACK_CHECKS_ENABLED)
     memset(Stack_base(stack), 0x42,
@@ -1224,6 +1236,21 @@ void caml_free_stack (struct stack_info* stack)
   } else {
     free_stack_memory(stack);
   }
+}
+
+struct stack_info* caml_tls_find_owner(struct stack_info* stack)
+{
+  while (stack->tls_state == Val_null) {
+    stack = Stack_parent(stack);
+    CAMLassert(stack != NULL);
+  }
+  return stack;
+}
+
+void caml_tls_recompute_mirror(void)
+{
+  Caml_state->tls_state =
+    caml_tls_find_owner(Caml_state->current_stack)->tls_state;
 }
 
 void caml_free_gc_regs_buckets(value *gc_regs_buckets)
