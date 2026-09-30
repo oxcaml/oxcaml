@@ -683,10 +683,17 @@ let make_suitable_for_environment env (to_erase : to_erase) bind_to_and_types =
       (* Fetch the type equation for each free variable. Also add in the
          equations about the "bind-to" names provided to this function. If any
          of the "bind-to" names are already defined in [env], the type given in
-         [bind_to_and_types] takes precedence over such definition. All
-         occurrences of variables that only occur once are expanded directly.
-         All occurrences of variables that are only reachable through closure
-         variables are replaced with an Unknown type. *)
+         [bind_to_and_types] takes precedence over such definition.
+
+         Projected variables are replaced with a non-projected alias, unless
+         they are canonical. In that case:
+
+         - Variables reachable only through value slots are replaced with an
+         Unknown type.
+
+         - Variables with a single occurrences (that is reachable without going
+         through value slots) are expanded to their concrete (non-alias)
+         type. *)
       let to_expand = Variable.Set.of_list unavailable_vars_expanded in
       let to_remove = Variable.Set.of_list unavailable_vars_removed in
       let to_project = Variable.Set.union to_expand to_remove in
@@ -699,25 +706,6 @@ let make_suitable_for_environment env (to_erase : to_erase) bind_to_and_types =
             then MTC.unknown_like ty
             else TG.project_variables_out ~to_project ~expand ty
           | simple ->
-            (* We need to follow aliases for both expanded *and* removed
-               variables: a removed variable could be an alias to something that
-               doesn't get projected (a constant, a symbol, or a variable being
-               kept), in which case we want to keep that information.
-
-               Note that there can't be aliases between removed (only reachable
-               through value slots) and expanded (single occurrence reachable
-               *without* going through value slots):
-
-               - An alias from a removed variable to an expanded variable could
-               not be the single occurence of the expanded variable (the alias
-               would go through value slots).
-
-               - An alias from an expanded variable to a removed variable would
-               make the removed variable reachable without going through value
-               slots.
-
-               Thus, we can't accidentally expand value slot types by following
-               aliases for removed variables. *)
             Simple.pattern_match' simple
               ~const:(fun _ -> ty)
               ~symbol:(fun _ ~coercion:_ -> ty)
