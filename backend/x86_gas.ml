@@ -226,6 +226,7 @@ let print_instr b = function
   | MOVSXD (arg1, arg2) -> i2 b "movslq" arg1 arg2
   | MOVZX (arg1, arg2) -> i2_ss b "movz" arg1 arg2
   | NEG arg -> i1 b "neg" arg
+  | NOT arg -> i1_s b "not" arg
   | NOP -> i0 b "nop"
   | OR (arg1, arg2) -> i2_s b "or" arg1 arg2
   | PAUSE -> i0 b "pause"
@@ -324,6 +325,7 @@ let map_arg (f : arg -> arg) (instr : instruction) : instruction =
   | MOVSXD (a, b) -> MOVSXD (f a, f b)
   | MOVZX (a, b) -> MOVZX (f a, f b)
   | NEG a -> NEG (f a)
+  | NOT a -> NOT (f a)
   | NOP -> NOP
   | OR (a, b) -> OR (f a, f b)
   | PAUSE -> PAUSE
