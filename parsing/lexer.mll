@@ -50,6 +50,7 @@ let all_keywords =
   let always = None in
   let oxcaml = None in
   [
+    "addr_", ADDR, oxcaml;
     "and", AND, always;
     "as", AS, always;
     "assert", ASSERT, v1_6;

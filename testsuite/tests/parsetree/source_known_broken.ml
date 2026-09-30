@@ -8,3 +8,4 @@
 let f1 (exception e) = ()
 let f2 (effect E, k) = ()
 let f3 = function lazy (exception e) -> () | _ -> ()
+let f4 = function addr_ (exception e) -> () | _ -> ()

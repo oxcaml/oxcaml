@@ -1868,3 +1868,39 @@ let f ~l:((x : int) [@test.attr] @ local) = x
 [%%expect{|
 val f : l:int @ local -> int = <fun>
 |}]
+
+(*********************)
+(* Address patterns *)
+
+(* CR address-patterns: These tests are failing for now because address
+   pattern typing isn't implemented yet. This is only testing parsing for
+   now. *)
+
+let f = function
+  | addr_ (A foo) -> foo
+  | Some addr_ x -> x
+  | addr_ x :: _ -> x
+  | addr_ _ | addr_ (addr_ _) -> ()
+  | addr_ (None | Some _) -> ()
+[%%expect{|
+Line 2, characters 4-17:
+2 |   | addr_ (A foo) -> foo
+        ^^^^^^^^^^^^^
+Error: Address patterns "addr_" are not supported yet.
+|}]
+
+let f (addr_ x) = x
+[%%expect{|
+Line 1, characters 6-15:
+1 | let f (addr_ x) = x
+          ^^^^^^^^^
+Error: Address patterns "addr_" are not supported yet.
+|}]
+
+let addr_ x = y
+[%%expect{|
+Line 1, characters 4-11:
+1 | let addr_ x = y
+        ^^^^^^^
+Error: Address patterns "addr_" are not supported yet.
+|}]
