@@ -1,0 +1,124 @@
+float#, length 0: Array.length 0, tag 0, size 0, words 0, stack false
+float#, length 1: Array.length 1, tag 254, size 1, words 2, stack true
+float#, length 2: Array.length 2, tag 254, size 2, words 3, stack true
+float#, length 3: Array.length 3, tag 254, size 3, words 4, stack true
+float#, length 4: Array.length 4, tag 254, size 4, words 5, stack true
+float#, length 5: Array.length 5, tag 254, size 5, words 6, stack true
+float#, length 7: Array.length 7, tag 254, size 7, words 8, stack true
+float#, length 8: Array.length 8, tag 254, size 8, words 9, stack true
+float#, length 9: Array.length 9, tag 254, size 9, words 10, stack true
+float#, length 100: Array.length 100, tag 254, size 100, words 101, stack true
+float#: checked known lengths 1, 3, 256
+float32_u, length 0: Array.length 0, tag 0, size 0, words 0, stack false
+float32_u, length 1: Array.length 1, tag 5, size 1, words 2, stack true
+float32_u, length 2: Array.length 2, tag 4, size 1, words 2, stack true
+float32_u, length 3: Array.length 3, tag 5, size 2, words 3, stack true
+float32_u, length 4: Array.length 4, tag 4, size 2, words 3, stack true
+float32_u, length 5: Array.length 5, tag 5, size 3, words 4, stack true
+float32_u, length 7: Array.length 7, tag 5, size 4, words 5, stack true
+float32_u, length 8: Array.length 8, tag 4, size 4, words 5, stack true
+float32_u, length 9: Array.length 9, tag 5, size 5, words 6, stack true
+float32_u, length 100: Array.length 100, tag 4, size 50, words 51, stack true
+float32_u: checked known lengths 1, 2, 3, 512
+int#, length 0: Array.length 0, tag 0, size 0, words 0, stack false
+int#, length 1: Array.length 1, tag 10, size 1, words 2, stack true
+int#, length 2: Array.length 2, tag 10, size 2, words 3, stack true
+int#, length 3: Array.length 3, tag 10, size 3, words 4, stack true
+int#, length 4: Array.length 4, tag 10, size 4, words 5, stack true
+int#, length 5: Array.length 5, tag 10, size 5, words 6, stack true
+int#, length 7: Array.length 7, tag 10, size 7, words 8, stack true
+int#, length 8: Array.length 8, tag 10, size 8, words 9, stack true
+int#, length 9: Array.length 9, tag 10, size 9, words 10, stack true
+int#, length 100: Array.length 100, tag 10, size 100, words 101, stack true
+int#: checked known lengths 1, 3
+int8#, length 0: Array.length 0, tag 0, size 0, words 0, stack false
+int8#, length 1: Array.length 1, tag 23, size 1, words 2, stack true
+int8#, length 2: Array.length 2, tag 22, size 1, words 2, stack true
+int8#, length 3: Array.length 3, tag 21, size 1, words 2, stack true
+int8#, length 4: Array.length 4, tag 20, size 1, words 2, stack true
+int8#, length 5: Array.length 5, tag 19, size 1, words 2, stack true
+int8#, length 7: Array.length 7, tag 17, size 1, words 2, stack true
+int8#, length 8: Array.length 8, tag 16, size 1, words 2, stack true
+int8#, length 9: Array.length 9, tag 23, size 2, words 3, stack true
+int8#, length 100: Array.length 100, tag 20, size 13, words 14, stack true
+int8#: checked known lengths 1, 2, 3, 4, 5, 6, 7, 8, 9, 2048
+int16#, length 0: Array.length 0, tag 0, size 0, words 0, stack false
+int16#, length 1: Array.length 1, tag 15, size 1, words 2, stack true
+int16#, length 2: Array.length 2, tag 14, size 1, words 2, stack true
+int16#, length 3: Array.length 3, tag 13, size 1, words 2, stack true
+int16#, length 4: Array.length 4, tag 12, size 1, words 2, stack true
+int16#, length 5: Array.length 5, tag 15, size 2, words 3, stack true
+int16#, length 7: Array.length 7, tag 13, size 2, words 3, stack true
+int16#, length 8: Array.length 8, tag 12, size 2, words 3, stack true
+int16#, length 9: Array.length 9, tag 15, size 3, words 4, stack true
+int16#, length 100: Array.length 100, tag 12, size 25, words 26, stack true
+int16#: checked known lengths 1, 2, 3, 4, 5
+int32_u, length 0: Array.length 0, tag 0, size 0, words 0, stack false
+int32_u, length 1: Array.length 1, tag 3, size 1, words 2, stack true
+int32_u, length 2: Array.length 2, tag 2, size 1, words 2, stack true
+int32_u, length 3: Array.length 3, tag 3, size 2, words 3, stack true
+int32_u, length 4: Array.length 4, tag 2, size 2, words 3, stack true
+int32_u, length 5: Array.length 5, tag 3, size 3, words 4, stack true
+int32_u, length 7: Array.length 7, tag 3, size 4, words 5, stack true
+int32_u, length 8: Array.length 8, tag 2, size 4, words 5, stack true
+int32_u, length 9: Array.length 9, tag 3, size 5, words 6, stack true
+int32_u, length 100: Array.length 100, tag 2, size 50, words 51, stack true
+int32_u: checked known lengths 1, 2, 3
+int64_u, length 0: Array.length 0, tag 0, size 0, words 0, stack false
+int64_u, length 1: Array.length 1, tag 1, size 1, words 2, stack true
+int64_u, length 2: Array.length 2, tag 1, size 2, words 3, stack true
+int64_u, length 3: Array.length 3, tag 1, size 3, words 4, stack true
+int64_u, length 4: Array.length 4, tag 1, size 4, words 5, stack true
+int64_u, length 5: Array.length 5, tag 1, size 5, words 6, stack true
+int64_u, length 7: Array.length 7, tag 1, size 7, words 8, stack true
+int64_u, length 8: Array.length 8, tag 1, size 8, words 9, stack true
+int64_u, length 9: Array.length 9, tag 1, size 9, words 10, stack true
+int64_u, length 100: Array.length 100, tag 1, size 100, words 101, stack true
+int64_u: checked known lengths 1, 3
+nativeint_u, length 0: Array.length 0, tag 0, size 0, words 0, stack false
+nativeint_u, length 1: Array.length 1, tag 9, size 1, words 2, stack true
+nativeint_u, length 2: Array.length 2, tag 9, size 2, words 3, stack true
+nativeint_u, length 3: Array.length 3, tag 9, size 3, words 4, stack true
+nativeint_u, length 4: Array.length 4, tag 9, size 4, words 5, stack true
+nativeint_u, length 5: Array.length 5, tag 9, size 5, words 6, stack true
+nativeint_u, length 7: Array.length 7, tag 9, size 7, words 8, stack true
+nativeint_u, length 8: Array.length 8, tag 9, size 8, words 9, stack true
+nativeint_u, length 9: Array.length 9, tag 9, size 9, words 10, stack true
+nativeint_u, length 100: Array.length 100, tag 9, size 100, words 101, stack true
+nativeint_u: checked known lengths 1, 3
+product, length 0: Array.length 0, tag 0, size 0, words 0, stack false
+product, length 1: Array.length 1, tag 0, size 3, words 4, stack true
+product, length 2: Array.length 2, tag 0, size 6, words 7, stack true
+product, length 3: Array.length 3, tag 0, size 9, words 10, stack true
+product, length 4: Array.length 4, tag 0, size 12, words 13, stack true
+product, length 5: Array.length 5, tag 0, size 15, words 16, stack true
+product, length 7: Array.length 7, tag 0, size 21, words 22, stack true
+product, length 8: Array.length 8, tag 0, size 24, words 25, stack true
+product, length 9: Array.length 9, tag 0, size 27, words 28, stack true
+product, length 100: Array.length 100, tag 0, size 300, words 301, stack true
+product: checked known lengths 1, 3, 85
+float# (heap): checked known lengths 0, 3, 256
+int8# (heap): checked known lengths 5, 2048
+product (heap): checked known lengths 3, 85
+initialized arrays: done
+float#, -1: Invalid_argument "Float.Array.create_local"
+float#, min_int: Invalid_argument "Float.Array.create_local"
+float#, max_int: Invalid_argument "Float.Array.create_local"
+float#, max_length + 1: Invalid_argument "Float.Array.create_local"
+int8#, -1: Invalid_argument "Array.make"
+int8#, min_int: Invalid_argument "Array.make"
+int8#, max_int: Invalid_argument "Array.make"
+int8#, max_length + 1: Invalid_argument "Array.make"
+int32_u, -1: Invalid_argument "Array.make"
+int32_u, min_int: Invalid_argument "Array.make"
+int32_u, max_int: Invalid_argument "Array.make"
+int32_u, max_length + 1: Invalid_argument "Array.make"
+product, -1: Invalid_argument "%makearray_dynamic: array size too large (> Max_array_wosize)"
+product, min_int: Invalid_argument "%makearray_dynamic: array size too large (> Max_array_wosize)"
+product, max_int: Invalid_argument "%makearray_dynamic: array size too large (> Max_array_wosize)"
+product, max_length + 1: Invalid_argument "%makearray_dynamic: array size too large (> Max_array_wosize)"
+float#, known length -1: Invalid_argument "Float.Array.create_local"
+int8#, known length -1: Invalid_argument "Array.make"
+int8#, known length max_int: Invalid_argument "Array.make"
+product, known length -1: Invalid_argument "%makearray_dynamic: array size too large (> Max_array_wosize)"
+grow_local_stack: done

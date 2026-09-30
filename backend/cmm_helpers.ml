@@ -5589,6 +5589,70 @@ let allocate_unboxed_vec512_array ~elements mode dbg =
     ~tag:Unboxed_or_untagged_array_tags.unboxed_vec512_array_tag ~elements mode
     dbg
 
+type unscanned_array_layout =
+  | Float_array
+  | Words_per_element of
+      { words : int;
+        tag : int
+      }
+  | Elements_per_word of
+      { elements : int;
+        zero_tag : int
+      }
+
+let allocate_uninitialized_array (mode : Cmm.Alloc_mode.t) layout
+    alloc_block_kind ~length dbg =
+  let elements_per_word =
+    match layout with
+    | Float_array | Words_per_element _ -> 1
+    | Elements_per_word { elements; zero_tag = _ } -> elements
+  in
+  if length < 0 || length > Config.max_young_wosize * elements_per_word
+  then
+    (* Arrays of more than [Config.max_young_wosize] words are left to the
+       runtime, which allocates them directly on the major heap if they are not
+       local. The cost of calling it is small compared with that of filling such
+       arrays. The runtime also raises the exception for invalid lengths.
+       (Checking the length first rules out overflow below.) *)
+    None
+  else
+    let block_kind, tag, wosize =
+      match layout with
+      | Float_array -> Regular_block, Obj.double_array_tag, length
+      | Words_per_element { words; tag } ->
+        Mixed_block { scannable_prefix = 0 }, tag, length * words
+      | Elements_per_word { elements; zero_tag } ->
+        let unused_elements_in_last_word =
+          (elements - (length mod elements)) mod elements
+        in
+        ( Mixed_block { scannable_prefix = 0 },
+          zero_tag + unused_elements_in_last_word,
+          (length + elements - 1) / elements )
+    in
+    if wosize = 0
+    then
+      (* Blocks of size zero must be statically allocated, so use the empty
+         array shared by the runtime ([Atom (0)]), as it does. *)
+      Some
+        (Cop
+           ( Caddv,
+             [ Cconst_symbol (global_symbol "caml_atom_0", dbg);
+               Cconst_int (size_addr, dbg) ],
+             dbg ))
+    else if wosize > Config.max_young_wosize
+    then None
+    else
+      let header =
+        match mode with
+        | Heap -> block_header ~block_kind tag wosize
+        | Local -> local_block_header ~block_kind tag wosize
+      in
+      Some
+        (Cop
+           ( Calloc_uninitialized { mode; wosize; alloc_block_kind },
+             [Cconst_natint (header, dbg)],
+             dbg ))
+
 (* Drop internal optional arguments from exported interface *)
 let block_header x y = block_header x y
 

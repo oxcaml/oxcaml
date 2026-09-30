@@ -270,6 +270,10 @@ let operation d = function
       Printf.sprintf "load_mut%s %s" atomic (chunk memory_chunk))
   | Calloc (Alloc_mode.Heap, _) -> "alloc" ^ location d
   | Calloc (Alloc_mode.Local, _) -> "alloc_local" ^ location d
+  | Calloc_uninitialized { mode = Heap; wosize; alloc_block_kind = _ } ->
+    Printf.sprintf "alloc_uninitialized %d%s" wosize (location d)
+  | Calloc_uninitialized { mode = Local; wosize; alloc_block_kind = _ } ->
+    Printf.sprintf "alloc_local_uninitialized %d%s" wosize (location d)
   | Cstore (c, init) ->
     let init =
       match init with Initialization -> "(init)" | Assignment -> ""
