@@ -685,15 +685,24 @@ let make_suitable_for_environment env (to_erase : to_erase) bind_to_and_types =
          of the "bind-to" names are already defined in [env], the type given in
          [bind_to_and_types] takes precedence over such definition.
 
-         Projected variables are replaced with a non-projected alias, unless
-         they are canonical. In that case:
+         Variables reachable only through value slots and variables with a
+         single occurrence (that is reachable without going through value slots)
+         are projected out and replaced with a non-projected alias, unless they
+         are canonical. In that case:
 
-         - Variables reachable only through value slots are replaced with an
-         Unknown type.
+         - Variables reachable only through value slots are removed and replaced
+         with an Unknown type.
 
          - Variables with a single occurrences (that is reachable without going
-         through value slots) are expanded to their concrete (non-alias)
-         type. *)
+         through value slots) are expanded to their concrete (non-alias) type.
+
+         Note that we can't have aliases between variables in these categories
+         (a variable reachable only through value slots cannot have an alias
+         with a single occurrence that is not from value slots, and a variable
+         with a single occurrence not from value slots cannot have an alias
+         reachable only from value slots), so the recursive calls to [expand]
+         below cannot accidentally move a variable from one category to the
+         other. *)
       let to_expand = Variable.Set.of_list unavailable_vars_expanded in
       let to_remove = Variable.Set.of_list unavailable_vars_removed in
       let to_project = Variable.Set.union to_expand to_remove in
