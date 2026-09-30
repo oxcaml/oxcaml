@@ -140,7 +140,7 @@ and simplify_function_body dacc expr ~return_continuation ~return_arity
     let call_self_cont_expr =
       let args = Bound_parameters.simples params in
       Expr.create_apply_cont
-        (Apply_cont_expr.create cont ~args ~dbg:Debuginfo.none)
+        (Apply_cont_expr.create ~fdo_counters:[] cont ~args ~dbg:Debuginfo.none)
     in
     let handlers =
       Continuation.Lmap.singleton cont

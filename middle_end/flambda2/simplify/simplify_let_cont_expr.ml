@@ -1901,7 +1901,8 @@ let simplify_let_cont0 ~(simplify_expr : _ Simplify_common.expr_simplifier) dacc
                 (Bound_parameters.to_list non_rec_handler.params)
             in
             let apply_cont =
-              Apply_cont.create lifted_cont ~dbg:Debuginfo.none ~args
+              Apply_cont.create ~fdo_counters:[] lifted_cont ~dbg:Debuginfo.none
+                ~args
             in
             Flambda.Expr.create_apply_cont apply_cont
           in
@@ -1933,7 +1934,8 @@ let simplify_let_cont0 ~(simplify_expr : _ Simplify_common.expr_simplifier) dacc
                       @ Bound_parameters.to_list one_recursive_handler.params)
                   in
                   let apply_cont =
-                    Apply_cont.create lifted_cont ~dbg:Debuginfo.none ~args
+                    Apply_cont.create ~fdo_counters:[] lifted_cont
+                      ~dbg:Debuginfo.none ~args
                   in
                   Flambda.Expr.create_apply_cont apply_cont
                 in

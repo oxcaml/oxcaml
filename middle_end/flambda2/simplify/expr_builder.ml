@@ -690,7 +690,9 @@ let rewrite_fixed_arity_continuation0 uacc cont_or_apply_cont ~use_id arity :
       in
       let args = List.map BP.simple params in
       let params = Bound_parameters.create params in
-      let apply_cont = Apply_cont.create cont ~args ~dbg:Debuginfo.none in
+      let apply_cont =
+        Apply_cont.create ~fdo_counters:[] cont ~args ~dbg:Debuginfo.none
+      in
       let ctx : Apply_cont_rewrite.rewrite_apply_cont_ctx = Apply_expr args in
       match rewrite_apply_cont0 uacc rewrite use_id ~ctx apply_cont with
       | Invalid { message } -> Invalid { message }

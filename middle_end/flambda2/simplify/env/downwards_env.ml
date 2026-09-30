@@ -721,6 +721,7 @@ let enter_inlined_apply ~called_code ~apply ~was_inline_always t =
   let inlined_debuginfo =
     Inlined_debuginfo.create ~called_code_id:(Code.code_id called_code)
       ~apply_dbg:(Apply.dbg apply)
+      ~apply_callsite_counter:(Apply.callsite_counter apply)
   in
   let inlined_attribute_to_forward =
     inlined_attribute_to_forward_through_inlined_apply t

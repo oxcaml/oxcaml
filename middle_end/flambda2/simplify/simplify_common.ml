@@ -171,8 +171,12 @@ let split_direct_over_application apply ~callee's_code_id
       ~args:remaining_args ~args_arity:remaining_arity
       ~return_arity:(Apply.return_arity apply)
       ~call_kind:Call_kind.indirect_function_call_unknown_arity
-      ~return_mode:outer_apply_alloc_mode (Apply.dbg apply)
-      ~inlined:(Apply.inlined apply)
+      ~return_mode:outer_apply_alloc_mode
+      (Apply.dbg apply)
+      (* The call site's counter belongs to the full application: joined with
+         the callee's entry, it describes that call. As in closure conversion,
+         the application of its result gets none. *)
+      ~callsite_counter:None ~inlined:(Apply.inlined apply)
       ~inlining_state:(Apply.inlining_state apply)
       ~probe:(Apply.probe apply) ~position:(Apply.position apply)
       ~relative_history:(Apply.relative_history apply)
@@ -205,7 +209,7 @@ let split_direct_over_application apply ~callee's_code_id
         match Apply.continuation apply with
         | Return return_cont ->
           let apply_cont =
-            Apply_cont.create return_cont
+            Apply_cont.create ~fdo_counters:[] return_cont
               ~args:(List.map BP.simple over_application_results)
               ~dbg:(Apply.dbg apply)
           in
@@ -295,6 +299,7 @@ let split_direct_over_application apply ~callee's_code_id
       ~return_arity:(Code_metadata.result_arity callee's_code_metadata)
       ~call_kind:(Call_kind.direct_function_call callee's_code_id)
       ~return_mode:inner_apply_alloc_mode (Apply.dbg apply)
+      ~callsite_counter:(Apply.callsite_counter apply)
       ~inlined:(Apply.inlined apply)
       ~inlining_state:(Apply.inlining_state apply)
       ~probe:(Apply.probe apply) ~position:(Apply.position apply)

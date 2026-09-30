@@ -56,7 +56,11 @@ val is_none : t -> bool
 (** [create ~called_code_id ~apply_dbg] should be used when a function
     application (i.e. [Apply_expr] term) with debuginfo [apply_dbg] is to be
     inlined out. [create] must be called for each such instance of inlining. *)
-val create : called_code_id:Code_id.t -> apply_dbg:Debuginfo.t -> t
+val create :
+  called_code_id:Code_id.t ->
+  apply_dbg:Debuginfo.t ->
+  apply_callsite_counter:Fdo_counter.t option ->
+  t
 
 (** Merge an existing value of type [t] with [from_apply_expr], the latter
     corresponding to an [Apply_expr] term that is being inlined out. *)

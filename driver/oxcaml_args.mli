@@ -126,6 +126,7 @@ module type Oxcaml_options = sig
   val keep_llvmir : unit -> unit
   val llvm_path : string -> unit
   val llvm_flags : string -> unit
+  val fdo_counters : unit -> unit
   val flambda2_debug : unit -> unit
   val no_flambda2_debug : unit -> unit
   val reaper_debug_flags : string -> unit

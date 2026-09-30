@@ -324,6 +324,7 @@
   allowance
   ;; lambda/
   debuginfo
+  fdo_fingerprint
   lambda
   static_label
   matching
