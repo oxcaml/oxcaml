@@ -139,21 +139,25 @@ let terminator_body_with_args ?(print_reg = Printreg.reg) ?(args = [||])
              { sym_name =
                  Printf.sprintf "self(%s)" (Label.to_string destination);
                sym_global = Local
-             }
+             };
+           callsite_counter = None
          })
   | Tailcall_func call ->
     (* CR ncourant: here and below, maybe the callees should be printed when
        they are known *)
     dump_linear_call_op ppf
       (match call with
-      | Indirect _ -> Linear.Ltailcall_ind
-      | Direct { sym = func; callsite_counter = _ } ->
-        Linear.Ltailcall_imm { func })
+      | Indirect { callees = _; callsite_counter } ->
+        Linear.Ltailcall_ind { callsite_counter }
+      | Direct { sym = func; callsite_counter } ->
+        Linear.Ltailcall_imm { func; callsite_counter })
   | Call { op = call; label_after } ->
     dump_linear_call_op ppf
       (match call with
-      | Indirect _ -> Linear.Lcall_ind
-      | Direct { sym = func; callsite_counter = _ } -> Linear.Lcall_imm { func });
+      | Indirect { callees = _; callsite_counter } ->
+        Linear.Lcall_ind { callsite_counter }
+      | Direct { sym = func; callsite_counter } ->
+        Linear.Lcall_imm { func; callsite_counter });
     Format.fprintf ppf "%s\n           goto %a" sep Label.format label_after
   | Prim { op = prim; label_after } ->
     dump_linear_call_op ppf

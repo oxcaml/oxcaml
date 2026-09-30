@@ -2161,15 +2161,15 @@ let emit_instr ~first ~last ~fallthrough i =
   | Lop (Const_symbol s) ->
     add_used_symbol s.sym_name;
     load_symbol_addr s (res i 0)
-  | Lcall_op Lcall_ind ->
+  | Lcall_op (Lcall_ind _) ->
     I.call (arg i 0);
     record_frame i.live (Dbg_other i.dbg)
-  | Lcall_op (Lcall_imm { func }) ->
+  | Lcall_op (Lcall_imm { func; callsite_counter = _ }) ->
     add_used_symbol func.sym_name;
     emit_call func;
     record_frame i.live (Dbg_other i.dbg)
-  | Lcall_op Ltailcall_ind -> I.jmp (arg i 0)
-  | Lcall_op (Ltailcall_imm { func }) ->
+  | Lcall_op (Ltailcall_ind _) -> I.jmp (arg i 0)
+  | Lcall_op (Ltailcall_imm { func; callsite_counter = _ }) ->
     if String.equal func.sym_name !function_name
     then
       match !tailrec_entry_point with
@@ -2669,9 +2669,12 @@ let emit_instr ~first ~last ~fallthrough i =
     if (not fallthrough) && !fastcode_flag then D.align ~fill:Nop ~bytes:4;
     D.define_label lbl
   | Lbranch lbl -> I.jmp (emit_label_arg ~section:Text lbl)
-  | Lcondbranch (tst, lbl) ->
-    emit_test i tst ~taken:(fun c -> I.j c (emit_label_arg ~section:Text lbl))
-  | Lcondbranch3 (lbl0, lbl1, lbl2) -> (
+  | Lcondbranch { test = tst; taken; fallthrough_counters = _ } ->
+    emit_test i tst ~taken:(fun c ->
+        I.j c (emit_label_arg ~section:Text taken.target))
+  | Lcondbranch3 { lt; eq; gt; fallthrough_counters = _ } -> (
+    let target = Option.map (fun (s : Linear.successor) -> s.target) in
+    let lbl0 = target lt and lbl1 = target eq and lbl2 = target gt in
     I.cmp (int 1) (arg i 0);
     (match lbl0 with
     | None -> ()
@@ -2699,7 +2702,11 @@ let emit_instr ~first ~last ~fallthrough i =
       (reg tmp2);
     I.add (reg tmp2) (reg tmp1);
     I.jmp (reg tmp1);
-    let table = { table_lbl = lbl; elems = jumptbl } in
+    let table =
+      { table_lbl = lbl;
+        elems = Array.map (fun (s : Linear.successor) -> s.target) jumptbl
+      }
+    in
     jump_tables := table :: !jump_tables
   | Lentertrap ->
     if fp
