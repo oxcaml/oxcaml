@@ -77,9 +77,9 @@ and instrument = function
      Ccatch (Exn_handler, cases, instrument body)
   | Cswitch (e, cases, handlers, dbg) ->
      let handlers =
-       Array.map (fun (handler, handler_dbg) ->
+       Array.map (fun (handler, handler_dbg, handler_counters) ->
            let handler = with_afl_logging handler handler_dbg in
-           handler, handler_dbg)
+           handler, handler_dbg, handler_counters)
          handlers
      in
      Cswitch (instrument e, cases, handlers, dbg)

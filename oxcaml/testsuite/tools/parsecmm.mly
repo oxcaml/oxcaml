@@ -32,11 +32,11 @@ let make_switch n selector caselist =
   let index = Array.make n 0 in
   let casev = Array.of_list caselist in
   let dbg = Debuginfo.none in
-  let actv = Array.make (Array.length casev) (Cexit(Cmm.Lbl Static_label.fail,[],[]), dbg) in
+  let actv = Array.make (Array.length casev) (Cexit(Cmm.Lbl Static_label.fail,[],[]), dbg, []) in
   for i = 0 to Array.length casev - 1 do
     let (posl, e) = casev.(i) in
     List.iter (fun pos -> index.(pos) <- i) posl;
-    actv.(i) <- (e, dbg)
+    actv.(i) <- (e, dbg, [])
   done;
   Cswitch(selector, index, actv, dbg)
 
@@ -182,6 +182,8 @@ fundecl:
            else [ Reduce_code_size ];
          fun_poll = Lambda.Default_poll;
          fun_dbg = debuginfo ();
+         fun_fdo_entry_counters = [];
+         fun_function_body_hash = None;
          (* CR yusumez: Adding return types to the parser might require a lot
             of changes, so we assume this for now. *)
          fun_ret_type = Cmm.typ_val } }
@@ -224,7 +226,8 @@ expr:
                 { Cop(Capply {
                         result_type = $6;
                         region = Lambda.Rc_normal;
-                        callees = None
+                        callees = None;
+                        callsite_counter = None
                       },
                       $4 :: List.rev $5, debuginfo ?loc:$3 ()) }
   | LPAREN EXTCALL STRING exprlist machtype RPAREN
@@ -244,9 +247,9 @@ expr:
   | LPAREN binaryop expr expr RPAREN { Cop($2, [$3; $4], debuginfo ()) }
   | LPAREN SEQ sequence RPAREN { $3 }
   | LPAREN IF expr expr expr RPAREN
-      { Cifthenelse { cond = $3; ifso_dbg = debuginfo (); ifso = $4;
-                      ifnot_dbg = debuginfo (); ifnot = $5;
-                      dbg = debuginfo () } }
+      { Cifthenelse { cond = $3; ifso_dbg = debuginfo (); ifso_counters = [];
+                      ifso = $4; ifnot_dbg = debuginfo (); ifnot_counters = [];
+                      ifnot = $5; dbg = debuginfo () } }
   | LPAREN SWITCH INTCONST expr caselist RPAREN { make_switch $3 $4 $5 }
   | LPAREN WHILE expr sequence RPAREN
       {
@@ -255,8 +258,9 @@ expr:
         let body =
           match $3 with
             Cconst_int (x, _) when x <> 0 -> $4
-          | _ -> Cifthenelse { cond = $3; ifso_dbg = debuginfo (); ifso = $4;
-                               ifnot_dbg = debuginfo ();
+          | _ -> Cifthenelse { cond = $3; ifso_dbg = debuginfo ();
+                               ifso_counters = []; ifso = $4;
+                               ifnot_dbg = debuginfo (); ifnot_counters = [];
                                ifnot = Cexit(Cmm.Lbl lbl0,[],[]);
                                dbg = debuginfo () } in
         Ccatch(Normal, [{ label = lbl0; params = []; body = Ctuple []; dbg = debuginfo (); is_cold =  false }],

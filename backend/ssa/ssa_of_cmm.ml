@@ -490,7 +490,9 @@ and emit_ifthenelse env c ~tail econd eif eelse : result =
 and emit_switch env c ~tail esel index ecases : result =
   let* rsel = emit env c esel ~tail:false in
   let case_blocks =
-    Array.map (fun (_case_expr, _dbg) -> new_block env ~params:[||]) ecases
+    Array.map
+      (fun (_case_expr, _dbg, _counters) -> new_block env ~params:[||])
+      ecases
   in
   let targets = Array.map (fun idx -> case_blocks.(idx)) index in
   let index =
@@ -500,7 +502,7 @@ and emit_switch env c ~tail esel index ecases : result =
   finish_block env c ~dbg:Debuginfo.none (Switch { index; targets });
   let case_results =
     Array.mapi
-      (fun i (case_expr, _dbg) ->
+      (fun i (case_expr, _dbg, _counters) ->
         let case_c = Cursor.start case_blocks.(i) in
         emit env case_c case_expr ~tail, case_c)
       ecases

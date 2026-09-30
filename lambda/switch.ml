@@ -130,8 +130,11 @@ sig
   val make_is_nonzero : loc -> arg -> test
   val arg_as_test : arg -> test
 
-  val make_if : layout -> test -> act -> act -> act
-  val make_switch : loc -> layout -> arg -> int array -> act array -> act
+  val make_if :
+    layout -> loc -> ifso:(int * int) list -> ifnot:(int * int) list ->
+    test -> act -> act -> act
+  val make_switch :
+    loc -> layout -> arg -> first_value:int -> int array -> act array -> act
 
   val make_catch : layout -> act -> Static_label.t * (act -> act)
   val make_exit : Static_label.t -> act
@@ -668,65 +671,89 @@ let rec pkey chan  = function
 
      In the example above, [a5] would be represented with [off = -5].
   *)
-  type 'a t_ctx =  {off : int ; arg : 'a; loc : Arg.loc}
+  type 'a t_ctx =
+    {off : int ; arg : 'a; loc : Arg.loc;
+     excluded : (int * int) list
+       (* The intervals of original values that enclosing tests already
+          sent elsewhere, so cannot reach the code being generated (the
+          cases may still mention them: [case_append] merges the cases
+          around a removed interval when their actions agree). *)}
 
-  let make_if_test kind loc test arg i ifso ifnot =
-    Arg.make_if kind
+  (* [remove (l,h) excluded] is [l..h] minus the excluded intervals. *)
+  let rec remove (l,h) = function
+    | [] -> [(l,h)]
+    | (el,eh) :: rest ->
+        if eh < l || el > h then remove (l,h) rest
+        else
+          (if el > l then remove (l,el-1) rest else []) @
+          (if eh < h then remove (eh+1,h) rest else [])
+
+  (* The intervals of original scrutinee values that reach [cases] in a
+     context excluding [excluded], for [Arg.make_if]. *)
+  let values_of cases ~excluded =
+    List.concat_map (fun (l,h,_) -> remove (l,h) excluded)
+      (Array.to_list cases)
+
+  let make_if_test kind loc ~ifso ~ifnot test arg i act_so act_not =
+    Arg.make_if kind loc ~ifso ~ifnot
       (Arg.make_prim loc test [arg ; Arg.make_const loc i])
-      ifso ifnot
+      act_so act_not
 
-  let make_if_lt kind loc arg i  ifso ifnot = match i with
+  let make_if_lt kind loc ~ifso ~ifnot arg i act_so act_not = match i with
     | 1 ->
-        make_if_test kind loc Arg.leint arg 0 ifso ifnot
+        make_if_test kind loc ~ifso ~ifnot Arg.leint arg 0 act_so act_not
     | _ ->
-        make_if_test kind loc Arg.ltint arg i ifso ifnot
+        make_if_test kind loc ~ifso ~ifnot Arg.ltint arg i act_so act_not
 
-  and make_if_ge kind loc arg i  ifso ifnot = match i with
+  and make_if_ge kind loc ~ifso ~ifnot arg i act_so act_not = match i with
     | 1 ->
-        make_if_test kind loc Arg.gtint arg 0 ifso ifnot
+        make_if_test kind loc ~ifso ~ifnot Arg.gtint arg 0 act_so act_not
     | _ ->
-        make_if_test kind loc Arg.geint arg i ifso ifnot
+        make_if_test kind loc ~ifso ~ifnot Arg.geint arg i act_so act_not
 
-  and make_if_eq kind loc arg i ifso ifnot =
-    make_if_test kind loc Arg.eqint arg i ifso ifnot
+  and make_if_eq kind loc ~ifso ~ifnot arg i act_so act_not =
+    make_if_test kind loc ~ifso ~ifnot Arg.eqint arg i act_so act_not
 
-  and make_if_ne kind loc arg i ifso ifnot =
-    make_if_test kind loc Arg.neint arg i ifso ifnot
+  and make_if_ne kind loc ~ifso ~ifnot arg i act_so act_not =
+    make_if_test kind loc ~ifso ~ifnot Arg.neint arg i act_so act_not
 
-  let make_if_nonzero kind loc arg ifso ifnot =
-    Arg.make_if kind (Arg.make_is_nonzero loc arg) ifso ifnot
+  let make_if_nonzero kind loc ~ifso ~ifnot arg act_so act_not =
+    Arg.make_if kind loc ~ifso ~ifnot (Arg.make_is_nonzero loc arg)
+      act_so act_not
 
-  let make_if_bool kind arg ifso ifnot =
-    Arg.make_if kind (Arg.arg_as_test arg) ifso ifnot
+  let make_if_bool kind loc ~ifso ~ifnot arg act_so act_not =
+    Arg.make_if kind loc ~ifso ~ifnot (Arg.arg_as_test arg) act_so act_not
 
-  let do_make_if_out kind loc h arg ifso ifno =
-    Arg.make_if kind (Arg.make_isout loc h arg) ifso ifno
+  let do_make_if_out kind loc ~ifso ~ifnot h arg act_so act_not =
+    Arg.make_if kind loc ~ifso ~ifnot (Arg.make_isout loc h arg)
+      act_so act_not
 
-  let make_if_out kind ctx l d mk_ifso mk_ifno = match l with
+  let make_if_out kind ctx ~ifso ~ifnot l d mk_ifso mk_ifno = match l with
     | 0 ->
-        do_make_if_out kind ctx.loc
+        do_make_if_out kind ctx.loc ~ifso ~ifnot
           (Arg.make_const ctx.loc d) ctx.arg (mk_ifso ctx) (mk_ifno ctx)
     | _ ->
         Arg.bind
           (Arg.make_offset ctx.loc ctx.arg (-l))
           (fun arg ->
-             let ctx = {off= (-l+ctx.off) ; arg=arg; loc=ctx.loc} in
-             do_make_if_out kind ctx.loc
+             let ctx = {ctx with off= (-l+ctx.off) ; arg=arg} in
+             do_make_if_out kind ctx.loc ~ifso ~ifnot
                (Arg.make_const ctx.loc d) arg (mk_ifso ctx) (mk_ifno ctx))
 
-  let do_make_if_in kind loc h arg ifso ifno =
-    Arg.make_if kind (Arg.make_isin loc h arg) ifso ifno
+  let do_make_if_in kind loc ~ifso ~ifnot h arg act_so act_not =
+    Arg.make_if kind loc ~ifso ~ifnot (Arg.make_isin loc h arg)
+      act_so act_not
 
-  let make_if_in kind ctx l d mk_ifso mk_ifno = match l with
+  let make_if_in kind ctx ~ifso ~ifnot l d mk_ifso mk_ifno = match l with
     | 0 ->
-        do_make_if_in kind ctx.loc
+        do_make_if_in kind ctx.loc ~ifso ~ifnot
           (Arg.make_const ctx.loc d) ctx.arg (mk_ifso ctx) (mk_ifno ctx)
     | _ ->
         Arg.bind
           (Arg.make_offset ctx.loc ctx.arg (-l))
           (fun arg ->
-             let ctx = {off= (-l+ctx.off) ; arg=arg; loc=ctx.loc} in
-             do_make_if_in kind ctx.loc
+             let ctx = {ctx with off= (-l+ctx.off) ; arg=arg} in
+             do_make_if_in kind ctx.loc ~ifso ~ifnot
                (Arg.make_const ctx.loc d) arg (mk_ifso ctx) (mk_ifno ctx))
 
   (* Generate the code for a good test sequence. *)
@@ -750,69 +777,91 @@ let rec pkey chan  = function
           let low,high,inside, outside = coupe_inter i j cases in
           let _,(cinside,_) = opt_count inside
           and _,(coutside,_) = opt_count outside in
+          (* The values reaching each side, and the contexts of each side:
+             inside [low..high] and outside it respectively. *)
+          let inside_excluded =
+            (min_int,low-1) :: (high+1,max_int) :: ctx.excluded
+          and outside_excluded = (low,high) :: ctx.excluded in
+          let inside_values = values_of inside ~excluded:ctx.excluded
+          and outside_values = values_of outside ~excluded:outside_excluded
+          in
+          let c_inside ctx =
+            c_test kind {ctx with excluded=inside_excluded}
+              {s with cases=inside}
+          and c_outside ctx =
+            c_test kind {ctx with excluded=outside_excluded}
+              {s with cases=outside} in
           (* Costs are retrieved to put the code with more remaining tests
              in the privileged (positive) branch of ``if'' *)
           if low=high then begin
             if less_tests coutside cinside then
               make_if_eq
                 kind ctx.loc
+                ~ifso:inside_values ~ifnot:outside_values
                 ctx.arg
                 (low+ctx.off)
-                (c_test kind ctx {s with cases=inside})
-                (c_test kind ctx {s with cases=outside})
+                (c_inside ctx) (c_outside ctx)
             else
               make_if_ne
                 kind ctx.loc
+                ~ifso:outside_values ~ifnot:inside_values
                 ctx.arg
                 (low+ctx.off)
-                (c_test kind ctx {s with cases=outside})
-                (c_test kind ctx {s with cases=inside})
+                (c_outside ctx) (c_inside ctx)
           end else begin
             if less_tests coutside cinside then
               make_if_in
                 kind
                 ctx
+                ~ifso:inside_values ~ifnot:outside_values
                 (low+ctx.off)
                 (high-low)
-                (fun ctx -> c_test kind ctx {s with cases=inside})
-                (fun ctx -> c_test kind ctx {s with cases=outside})
+                c_inside c_outside
             else
               make_if_out
                 kind
                 ctx
+                ~ifso:outside_values ~ifnot:inside_values
                 (low+ctx.off)
                 (high-low)
-                (fun ctx -> c_test kind ctx {s with cases=outside})
-                (fun ctx -> c_test kind ctx {s with cases=inside})
+                c_outside c_inside
           end
       | Sep i ->
           let lim,left,right = coupe cases i in
           let _,(cleft,_) = opt_count left
           and _,(cright,_) = opt_count right in
-          let left = {s with cases=left}
-          and right = {s with cases=right} in
+          (* The values reaching each side, and the contexts of each side:
+             below [lim] and from [lim] on respectively. *)
+          let left_values = values_of left ~excluded:ctx.excluded
+          and right_values = values_of right ~excluded:ctx.excluded in
+          let c_left =
+            c_test kind {ctx with excluded=(lim,max_int) :: ctx.excluded}
+              {s with cases=left}
+          and c_right =
+            c_test kind {ctx with excluded=(min_int,lim-1) :: ctx.excluded}
+              {s with cases=right} in
 
           if i=1 && (lim+ctx.off)=1 && get_low cases 0+ctx.off=0 then
             if lcases = 2 && get_high cases 1+ctx.off = 1 then
               make_if_bool
-                kind
+                kind ctx.loc ~ifso:right_values ~ifnot:left_values
                 ctx.arg
-                (c_test kind ctx right) (c_test kind ctx left)
+                c_right c_left
             else
               make_if_nonzero
-                kind ctx.loc
+                kind ctx.loc ~ifso:right_values ~ifnot:left_values
                 ctx.arg
-                (c_test kind ctx right) (c_test kind ctx left)
+                c_right c_left
           else if less_tests cright cleft then
             make_if_lt
-              kind ctx.loc
+              kind ctx.loc ~ifso:left_values ~ifnot:right_values
               ctx.arg (lim+ctx.off)
-              (c_test kind ctx left) (c_test kind ctx right)
+              c_left c_right
           else
             make_if_ge
-              kind ctx.loc
+              kind ctx.loc ~ifso:right_values ~ifnot:left_values
               ctx.arg (lim+ctx.off)
-              (c_test kind ctx right) (c_test kind ctx left)
+              c_right c_left
 
     end
 
@@ -915,11 +964,12 @@ let rec pkey chan  = function
       t ;
     (fun ctx ->
        match -ll-ctx.off with
-       | 0 -> Arg.make_switch loc kind ctx.arg tbl acts
+       | 0 -> Arg.make_switch loc kind ctx.arg ~first_value:ll tbl acts
        | _ ->
            Arg.bind
              (Arg.make_offset ctx.loc ctx.arg (-ll-ctx.off))
-             (fun arg -> Arg.make_switch loc kind arg tbl acts))
+             (fun arg ->
+                Arg.make_switch loc kind arg ~first_value:ll tbl acts))
 
   (* Generate code from a clustering choice. *)
   let make_clusters loc kind ({cases=cases ; actions=actions} as s) n_clusters k =
@@ -979,7 +1029,7 @@ let rec pkey chan  = function
 *)
     let n_clusters,k = comp_clusters s in
     let clusters = make_clusters loc kind s n_clusters k in
-    c_test kind {arg=arg ; off=0; loc} clusters
+    c_test kind {arg=arg ; off=0; loc; excluded=[]} clusters
 
   let abstract_shared kind actions =
     let handlers = ref (fun x -> x) in
@@ -1018,6 +1068,6 @@ let rec pkey chan  = function
   pcases stderr cases ;
   prerr_endline "" ;
 *)
-    hs (c_test kind {arg=arg ; off=0; loc} s)
+    hs (c_test kind {arg=arg ; off=0; loc; excluded=[]} s)
 
 end
