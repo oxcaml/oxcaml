@@ -1747,11 +1747,13 @@ module Jkind0 = struct
         { jkind =
             mk_jkind
               (Layout.Const.product
-                 [ base Scannable Scannable_axes.value_axes;
+                 [ base Scannable
+                     { nullability = Maybe_null;
+                       separability = Maybe_separable };
                    base Bits64 Scannable_axes.max ])
               ~crossing:Mode.Crossing.max
               ~externality:Mod_bounds.Externality.max;
-          name = "value & bits64"
+          name = "value_or_null & bits64"
         }
 
       let vec128 =
