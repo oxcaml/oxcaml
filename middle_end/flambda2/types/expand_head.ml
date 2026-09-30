@@ -693,20 +693,38 @@ let make_suitable_for_environment env (to_erase : to_erase) bind_to_and_types =
       let expand_type ty =
         let rec expand var =
           let ty = TE.find env (Name.var var) None in
-          if Variable.Set.mem var to_remove
-          then MTC.unknown_like ty
-          else
-            match TG.get_alias_exn ty with
-            | exception Not_found ->
-              TG.project_variables_out ~to_project ~expand ty
-            | simple ->
-              Simple.pattern_match' simple
-                ~const:(fun _ -> ty)
-                ~symbol:(fun _ ~coercion:_ -> ty)
-                ~var:(fun var ~coercion ->
-                  if Variable.Set.mem var to_expand
-                  then TG.apply_coercion (expand var) coercion
-                  else ty)
+          match TG.get_alias_exn ty with
+          | exception Not_found ->
+            if Variable.Set.mem var to_remove
+            then MTC.unknown_like ty
+            else TG.project_variables_out ~to_project ~expand ty
+          | simple ->
+            (* We need to follow aliases for both expanded *and* removed
+               variables: a removed variable could be an alias to something that
+               doesn't get projected (a constant, a symbol, or a variable being
+               kept), in which case we want to keep that information.
+
+               Note that there can't be aliases between removed (only reachable
+               through value slots) and expanded (single occurrence reachable
+               *without* going through value slots):
+
+               - An alias from a removed variable to an expanded variable could
+               not be the single occurence of the expanded variable (the alias
+               would go through value slots).
+
+               - An alias from an expanded variable to a removed variable would
+               make the removed variable reachable without going through value
+               slots.
+
+               Thus, we can't accidentally expand value slot types by following
+               aliases for removed variables. *)
+            Simple.pattern_match' simple
+              ~const:(fun _ -> ty)
+              ~symbol:(fun _ ~coercion:_ -> ty)
+              ~var:(fun var ~coercion ->
+                if Variable.Set.mem var to_project
+                then TG.apply_coercion (expand var) coercion
+                else ty)
         in
         TG.project_variables_out ~to_project ~expand ty
       in
