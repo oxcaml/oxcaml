@@ -1,0 +1,24 @@
+; The oxcaml-fdo-decode tool: reads the FDO metadata of OxCaml-compiled
+; executables.
+
+(library
+ (name fdo_decode_lib)
+ (modes native)
+ (flags
+  (:standard -w +a-30-40-41-42))
+ (libraries ocamlcommon compiler_owee unix)
+ (modules fdo_metadata_decode elf_info))
+
+(executable
+ (name oxcaml_fdo_decode)
+ (modes native)
+ (flags
+  (:standard -w +a-30-40-41-42))
+ (libraries fdo_decode_lib ocamlcommon unix)
+ (modules oxcaml_fdo_decode))
+
+(install
+ (files
+  (oxcaml_fdo_decode.exe as oxcaml-fdo-decode))
+ (section bin)
+ (package ocaml))

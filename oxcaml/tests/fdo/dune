@@ -11,3 +11,114 @@
   (= %{context_name} "main"))
  (action
   (run ./fdo_counters_test.exe)))
+
+; The test programs call the single-stepping LBR emulator, which comes with
+; the LBR decoder; for now, a stand-in runs their traced code untraced.
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (target singlestep_stub.o)
+ (deps singlestep_stub.c)
+ (action
+  (run %{bin:ocamlopt.opt} -c singlestep_stub.c)))
+
+; specialize.ml, compiled with counters (see its FDO metadata below).
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (target specialize.exe)
+ (deps specialize.ml singlestep_stub.o)
+ (action
+  (run
+   %{bin:ocamlopt.opt}
+   -O3
+   -fdo-counters
+   -fdo-names
+   -ccopt
+   -no-pie
+   singlestep_stub.o
+   specialize.ml
+   -o
+   specialize.exe)))
+
+; jump_table.ml: a switch compiled to a jump table.
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (target jump_table.exe)
+ (deps jump_table.ml singlestep_stub.o)
+ (action
+  (run
+   %{bin:ocamlopt.opt}
+   -O3
+   -fdo-counters
+   -fdo-names
+   -ccopt
+   -no-pie
+   singlestep_stub.o
+   jump_table.ml
+   -o
+   jump_table.exe)))
+
+; The executables' FDO metadata as the decoder reads it back: the round trip
+; of what the compiler emits.
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (target specialize.metadata.corrected)
+ (deps specialize.exe)
+ (action
+  (with-outputs-to
+   specialize.metadata.corrected
+   (run %{bin:oxcaml-fdo-decode} -dump-metadata -binary specialize.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (deps specialize.metadata specialize.metadata.corrected)
+ (action
+  (diff specialize.metadata specialize.metadata.corrected)))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (target jump_table.metadata.corrected)
+ (deps jump_table.exe)
+ (action
+  (with-outputs-to
+   jump_table.metadata.corrected
+   (run %{bin:oxcaml-fdo-decode} -dump-metadata -binary jump_table.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (deps jump_table.metadata jump_table.metadata.corrected)
+ (action
+  (diff jump_table.metadata jump_table.metadata.corrected)))
