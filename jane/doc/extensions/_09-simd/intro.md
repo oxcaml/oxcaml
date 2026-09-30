@@ -125,9 +125,15 @@ The externals follow the C signatures with these conventions:
   and out-of-range values are compile-time errors;
 - scalar operands map to `(int32 [@unboxed])`, `(int64 [@unboxed])`, or
   `(int [@untagged])` for sub-word types; pointers map to `nativeint_u`;
-- embedded-rounding intrinsics (`_mm512_*_round_*`) accept the C macro values
-  (`_MM_FROUND_TO_NEAREST_INT|_MM_FROUND_NO_EXC` = 8, ..., and
-  `_MM_FROUND_CUR_DIRECTION` = 4), selecting the rounded or plain instruction.
+- embedded-rounding intrinsics (`_mm512_*_round_*` with a `rounding`
+  parameter) accept the C macro values
+  (`_MM_FROUND_TO_NEAREST_INT|_MM_FROUND_NO_EXC` = 8, ...,
+  `_MM_FROUND_TO_ZERO|_MM_FROUND_NO_EXC` = 11, and
+  `_MM_FROUND_CUR_DIRECTION` = 4), selecting the rounded or plain instruction;
+- exception-suppressing intrinsics (`_mm512_*_round_*` with an `sae`
+  parameter) accept `_MM_FROUND_NO_EXC` = 8 (or 12, combined with
+  `_MM_FROUND_CUR_DIRECTION`), selecting the `{sae}` form, and
+  `_MM_FROUND_CUR_DIRECTION` = 4, selecting the plain instruction.
 
 ```ocaml
 external add_ps :

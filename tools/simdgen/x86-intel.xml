@@ -1,3 +1,4 @@
+<!-- Local correction: VPMOVM2* and VPBROADCASTM* forms include their k source. -->
 <intrinsics_list version="3.6.9" date="07/12/2024">
 <intrinsic name="_addcarryx_u32" tech="Other">
 	<return etype="UI8" type="unsigned char" varname="dst" />
@@ -11093,7 +11094,7 @@ FOR j := 0 to 31
 ENDFOR
 dst[MAX:256] := 0
 	</operation>
-	<instruction form="ymm" name="VPMOVM2B" xed="VPMOVM2B_YMMu8_MASKmskw_AVX512" />
+	<instruction form="ymm, k" name="VPMOVM2B" xed="VPMOVM2B_YMMu8_MASKmskw_AVX512" />
 	<CPUID>AVX512BW</CPUID>
 	<CPUID>AVX512VL</CPUID>
 	<header>immintrin.h</header>
@@ -11114,7 +11115,7 @@ FOR j := 0 to 15
 ENDFOR
 dst[MAX:128] := 0
 	</operation>
-	<instruction form="xmm" name="VPMOVM2B" xed="VPMOVM2B_XMMu8_MASKmskw_AVX512" />
+	<instruction form="xmm, k" name="VPMOVM2B" xed="VPMOVM2B_XMMu8_MASKmskw_AVX512" />
 	<CPUID>AVX512BW</CPUID>
 	<CPUID>AVX512VL</CPUID>
 	<header>immintrin.h</header>
@@ -11135,7 +11136,7 @@ FOR j := 0 to 15
 ENDFOR
 dst[MAX:256] := 0
 	</operation>
-	<instruction form="ymm" name="VPMOVM2W" xed="VPMOVM2W_YMMu16_MASKmskw_AVX512" />
+	<instruction form="ymm, k" name="VPMOVM2W" xed="VPMOVM2W_YMMu16_MASKmskw_AVX512" />
 	<CPUID>AVX512BW</CPUID>
 	<CPUID>AVX512VL</CPUID>
 	<header>immintrin.h</header>
@@ -11156,7 +11157,7 @@ FOR j := 0 to 7
 ENDFOR
 dst[MAX:128] := 0
 	</operation>
-	<instruction form="xmm" name="VPMOVM2W" xed="VPMOVM2W_XMMu16_MASKmskw_AVX512" />
+	<instruction form="xmm, k" name="VPMOVM2W" xed="VPMOVM2W_XMMu16_MASKmskw_AVX512" />
 	<CPUID>AVX512BW</CPUID>
 	<CPUID>AVX512VL</CPUID>
 	<header>immintrin.h</header>
@@ -23460,7 +23461,7 @@ FOR j := 0 to 63
 ENDFOR
 dst[MAX:512] := 0
 	</operation>
-	<instruction form="zmm" name="VPMOVM2B" xed="VPMOVM2B_ZMMu8_MASKmskw_AVX512" />
+	<instruction form="zmm, k" name="VPMOVM2B" xed="VPMOVM2B_ZMMu8_MASKmskw_AVX512" />
 	<CPUID>AVX512BW</CPUID>
 	<header>immintrin.h</header>
 	<category>Miscellaneous</category>
@@ -23480,7 +23481,7 @@ FOR j := 0 to 31
 ENDFOR
 dst[MAX:512] := 0
 	</operation>
-	<instruction form="zmm" name="VPMOVM2W" xed="VPMOVM2W_ZMMu16_MASKmskw_AVX512" />
+	<instruction form="zmm, k" name="VPMOVM2W" xed="VPMOVM2W_ZMMu16_MASKmskw_AVX512" />
 	<CPUID>AVX512BW</CPUID>
 	<header>immintrin.h</header>
 	<category>Miscellaneous</category>
@@ -30365,7 +30366,7 @@ FOR j := 0 to 3
 ENDFOR
 dst[MAX:256] := 0
 	</operation>
-	<instruction form="ymm" name="VPBROADCASTMB2Q" xed="VPBROADCASTMB2Q_YMMu64_MASKu64_AVX512" />
+	<instruction form="ymm, k" name="VPBROADCASTMB2Q" xed="VPBROADCASTMB2Q_YMMu64_MASKu64_AVX512" />
 	<CPUID>AVX512CD</CPUID>
 	<CPUID>AVX512VL</CPUID>
 	<header>immintrin.h</header>
@@ -30382,7 +30383,7 @@ FOR j := 0 to 1
 ENDFOR
 dst[MAX:128] := 0
 	</operation>
-	<instruction form="xmm" name="VPBROADCASTMB2Q" xed="VPBROADCASTMB2Q_XMMu64_MASKu64_AVX512" />
+	<instruction form="xmm, k" name="VPBROADCASTMB2Q" xed="VPBROADCASTMB2Q_XMMu64_MASKu64_AVX512" />
 	<CPUID>AVX512CD</CPUID>
 	<CPUID>AVX512VL</CPUID>
 	<header>immintrin.h</header>
@@ -30399,7 +30400,7 @@ FOR j := 0 to 7
 ENDFOR
 dst[MAX:256] := 0
 	</operation>
-	<instruction form="ymm" name="VPBROADCASTMW2D" xed="VPBROADCASTMW2D_YMMu32_MASKu32_AVX512" />
+	<instruction form="ymm, k" name="VPBROADCASTMW2D" xed="VPBROADCASTMW2D_YMMu32_MASKu32_AVX512" />
 	<CPUID>AVX512CD</CPUID>
 	<CPUID>AVX512VL</CPUID>
 	<header>immintrin.h</header>
@@ -30416,7 +30417,7 @@ FOR j := 0 to 3
 ENDFOR
 dst[MAX:128] := 0
 	</operation>
-	<instruction form="xmm" name="VPBROADCASTMW2D" xed="VPBROADCASTMW2D_XMMu32_MASKu32_AVX512" />
+	<instruction form="xmm, k" name="VPBROADCASTMW2D" xed="VPBROADCASTMW2D_XMMu32_MASKu32_AVX512" />
 	<CPUID>AVX512CD</CPUID>
 	<CPUID>AVX512VL</CPUID>
 	<header>immintrin.h</header>
@@ -31039,7 +31040,7 @@ FOR j := 0 to 7
 ENDFOR
 dst[MAX:512] := 0
 	</operation>
-	<instruction form="zmm" name="VPBROADCASTMB2Q" xed="VPBROADCASTMB2Q_ZMMu64_MASKu64_AVX512CD" />
+	<instruction form="zmm, k" name="VPBROADCASTMB2Q" xed="VPBROADCASTMB2Q_ZMMu64_MASKu64_AVX512CD" />
 	<CPUID>AVX512CD</CPUID>
 	<header>immintrin.h</header>
 	<category>Swizzle</category>
@@ -31055,7 +31056,7 @@ FOR j := 0 to 15
 ENDFOR
 dst[MAX:512] := 0
 	</operation>
-	<instruction form="zmm" name="VPBROADCASTMW2D" xed="VPBROADCASTMW2D_ZMMu32_MASKu32_AVX512CD" />
+	<instruction form="zmm, k" name="VPBROADCASTMW2D" xed="VPBROADCASTMW2D_ZMMu32_MASKu32_AVX512CD" />
 	<CPUID>AVX512CD</CPUID>
 	<header>immintrin.h</header>
 	<category>Swizzle</category>
@@ -32954,7 +32955,7 @@ FOR j := 0 to 7
 ENDFOR
 dst[MAX:256] := 0
 	</operation>
-	<instruction form="ymm" name="VPMOVM2D" xed="VPMOVM2D_YMMu32_MASKmskw_AVX512" />
+	<instruction form="ymm, k" name="VPMOVM2D" xed="VPMOVM2D_YMMu32_MASKmskw_AVX512" />
 	<CPUID>AVX512DQ</CPUID>
 	<CPUID>AVX512VL</CPUID>
 	<header>immintrin.h</header>
@@ -32975,7 +32976,7 @@ FOR j := 0 to 3
 ENDFOR
 dst[MAX:128] := 0
 	</operation>
-	<instruction form="xmm" name="VPMOVM2D" xed="VPMOVM2D_XMMu32_MASKmskw_AVX512" />
+	<instruction form="xmm, k" name="VPMOVM2D" xed="VPMOVM2D_XMMu32_MASKmskw_AVX512" />
 	<CPUID>AVX512DQ</CPUID>
 	<CPUID>AVX512VL</CPUID>
 	<header>immintrin.h</header>
@@ -32996,7 +32997,7 @@ FOR j := 0 to 3
 ENDFOR
 dst[MAX:256] := 0
 	</operation>
-	<instruction form="ymm" name="VPMOVM2Q" xed="VPMOVM2Q_YMMu64_MASKmskw_AVX512" />
+	<instruction form="ymm, k" name="VPMOVM2Q" xed="VPMOVM2Q_YMMu64_MASKmskw_AVX512" />
 	<CPUID>AVX512DQ</CPUID>
 	<CPUID>AVX512VL</CPUID>
 	<header>immintrin.h</header>
@@ -33017,7 +33018,7 @@ FOR j := 0 to 1
 ENDFOR
 dst[MAX:128] := 0
 	</operation>
-	<instruction form="xmm" name="VPMOVM2Q" xed="VPMOVM2Q_XMMu64_MASKmskw_AVX512" />
+	<instruction form="xmm, k" name="VPMOVM2Q" xed="VPMOVM2Q_XMMu64_MASKmskw_AVX512" />
 	<CPUID>AVX512DQ</CPUID>
 	<CPUID>AVX512VL</CPUID>
 	<header>immintrin.h</header>
@@ -37250,7 +37251,7 @@ FOR j := 0 to 15
 ENDFOR
 dst[MAX:512] := 0
 	</operation>
-	<instruction form="zmm" name="VPMOVM2D" xed="VPMOVM2D_ZMMu32_MASKmskw_AVX512" />
+	<instruction form="zmm, k" name="VPMOVM2D" xed="VPMOVM2D_ZMMu32_MASKmskw_AVX512" />
 	<CPUID>AVX512DQ</CPUID>
 	<header>immintrin.h</header>
 	<category>Miscellaneous</category>
@@ -37270,7 +37271,7 @@ FOR j := 0 to 7
 ENDFOR
 dst[MAX:512] := 0
 	</operation>
-	<instruction form="zmm" name="VPMOVM2Q" xed="VPMOVM2Q_ZMMu64_MASKmskw_AVX512" />
+	<instruction form="zmm, k" name="VPMOVM2Q" xed="VPMOVM2Q_ZMMu64_MASKmskw_AVX512" />
 	<CPUID>AVX512DQ</CPUID>
 	<header>immintrin.h</header>
 	<category>Miscellaneous</category>

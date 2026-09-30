@@ -97,27 +97,17 @@ module Pcompare_string = struct
 end
 
 module Kflag = struct
-  (* Mask flag-reader pseudo-ops: KORTEST/KTEST followed by a SETcc reading ZF
-     (the [z] forms) or CF (the [c] forms). The mask width is carried by the
-     underlying instruction. *)
+  (* Mask flag-reader pseudo-ops: a KORTEST/KTEST followed by a SETcc reading ZF
+     or CF. The underlying instruction determines KORTEST vs KTEST and the mask
+     width. *)
   type t =
-    | Kortestz
-    | Kortestc
-    | Ktestz
-    | Ktestc
+    | Zf
+    | Cf
 
   let equal t1 t2 =
-    match t1, t2 with
-    | Kortestz, Kortestz | Kortestc, Kortestc | Ktestz, Ktestz | Ktestc, Ktestc
-      ->
-      true
-    | (Kortestz | Kortestc | Ktestz | Ktestc), _ -> false
+    match t1, t2 with Zf, Zf | Cf, Cf -> true | (Zf | Cf), _ -> false
 
-  let mnemonic = function
-    | Kortestz -> "kortestz"
-    | Kortestc -> "kortestc"
-    | Ktestz -> "ktestz"
-    | Ktestc -> "ktestc"
+  let suffix = function Zf -> "z" | Cf -> "c"
 end
 
 module Seq = struct
@@ -210,15 +200,9 @@ module Seq = struct
 
   let vptestnzc_Y = { id = Vptestnzc_Y; instr = vptest_r64_Y_Ym256 }
 
-  let kortestz instr = { id = Kflag Kortestz; instr }
+  let kflag flag instr = { id = Kflag flag; instr }
 
-  let kortestc instr = { id = Kflag Kortestc; instr }
-
-  let ktestz instr = { id = Kflag Ktestz; instr }
-
-  let ktestc instr = { id = Kflag Ktestc; instr }
-
-  let mnemonic ({ id; _ } : t) =
+  let mnemonic ({ id; instr } : t) =
     match id with
     | Sqrtss -> "sqrtss"
     | Sqrtsd -> "sqrtsd"
@@ -232,7 +216,7 @@ module Seq = struct
     | Vptestz_X | Vptestz_Y -> "vptestz"
     | Vptestc_X | Vptestc_Y -> "vptestc"
     | Vptestnzc_X | Vptestnzc_Y -> "vptestnzc"
-    | Kflag k -> Kflag.mnemonic k
+    | Kflag k -> instr.mnemonic ^ Kflag.suffix k
 
   let equal { id = id0; instr = instr0 } { id = id1; instr = instr1 } =
     let return_true () =

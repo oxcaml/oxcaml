@@ -581,13 +581,57 @@ let print_one bind instr =
       args
     |> print_args
   in
+  (* A result written straight to its spill slot must overwrite the whole slot:
+     the register form of e.g. [vpmovqb xmm1/m64, zmm2] zeroes the upper lanes
+     of [xmm1], but the memory form writes only 64 bits, leaving the rest of a
+     128-bit slot stale. Drop memory from result locations whose memory width is
+     narrower than the register (GPR results zero-extend to 64 bits). *)
+  let print_result_args args =
+    let reg_width = function
+      | R8 | R16 | R32 | R64 | MM | K -> 64
+      | XMM -> 128
+      | YMM -> 256
+      | ZMM -> 512
+      | M8 | M16 | M32 | M64 | M128 | M256 | M512 | VM32X | VM32Y | VM32Z
+      | VM64X | VM64Y | VM64Z ->
+        0
+    in
+    let mem_width = function
+      | M8 -> 8
+      | M16 -> 16
+      | M32 -> 32
+      | M64 -> 64
+      | M128 -> 128
+      | M256 -> 256
+      | M512 -> 512
+      | R8 | R16 | R32 | R64 | MM | K | XMM | YMM | ZMM | VM32X | VM32Y | VM32Z
+      | VM64X | VM64Y | VM64Z ->
+        max_int
+    in
+    Array.map
+      (fun ({ loc; _ } as arg : arg) ->
+        match loc with
+        | Pin _ -> arg
+        | Temp temps ->
+          let reg = Array.fold_left (fun w t -> max w (reg_width t)) 0 temps in
+          let mem =
+            Array.fold_left (fun w t -> min w (mem_width t)) max_int temps
+          in
+          if mem < reg
+          then
+            let regs = List.filter temp_is_reg (Array.to_list temps) in
+            { arg with loc = Temp (Array.of_list regs) }
+          else arg)
+      args
+    |> print_args
+  in
   let print_idxs idxs =
     Array.map Int.to_string idxs |> Array.to_list |> String.concat ";"
   in
   let print_res : res -> string = function
     | Res_none -> "Res_none"
     | Arg rr -> sprintf "Arg [|%s|]" (print_idxs rr)
-    | Res rr -> sprintf "Res [|%s|]" (print_args rr)
+    | Res rr -> sprintf "Res [|%s|]" (print_result_args rr)
   in
   let print_legacy_prefix : legacy_prefix -> string = function
     | Prx_none -> "Prx_none"
@@ -912,12 +956,11 @@ let intrins subcommand =
   let bindings = bindings_assoc () in
   let intrinsics = Simdgen_intrins.parse_intrinsics xml in
   match subcommand with
-  | "report" -> Simdgen_intrins.report ~bindings intrinsics
   | "skiplist" -> Simdgen_intrins.print_skiplist ~bindings intrinsics
   | "selection" -> Simdgen_intrins.print_selection ~bindings intrinsics
-  | "tests-ml" -> Simdgen_intrins.tests_ml ~bindings intrinsics
+  | "tests-ml" -> Simdgen_intrins.tests_ml ~memory:false ~bindings intrinsics
+  | "tests-mem-ml" -> Simdgen_intrins.tests_ml ~memory:true ~bindings intrinsics
   | "tests-c" -> Simdgen_intrins.tests_c ~bindings intrinsics
-  | "dump" -> Simdgen_intrins.print_dump ~bindings intrinsics
   | other -> failwith ("unknown intrins subcommand: " ^ other)
 
 let () =

@@ -1145,95 +1145,148 @@ let select_operation_fma ~dbg:_ op args =
     | "caml_fma_float32_neg_mul_sub" -> instr vfnmsub213ss_X_X_Xm32 args
     | _ -> None
 
-(* Generated selection for the AVX512 [caml_<intel-name>] intrinsics. The
-   functor is parameterized over the arch-independent selection primitives so
-   that the generated module (compiled on every arch) never mentions
-   arch-specific types; it is instantiated only here, on amd64. Extension gating
-   happens per arm: a disabled instruction selects [None], falling through to an
+(* The AVX512 [caml_<intel-name>] builtins, selected by interpreting the
+   generated [Amd64_simd_intrins] table. Extension gating happens per
+   instruction: a disabled instruction selects [None], falling through to an
    ordinary extcall (and a link error against the nonexistent C symbol), as with
    the hand-written intrinsics. *)
-module Intrins = Amd64_simd_intrins.Make (struct
-  type expr = Cmm.expression
-
-  type result = (Operation.t * Cmm.expression list) option
-
-  let instr simd ?i args =
-    if Arch.Extension.enabled_instruction simd then instr simd ?i args else None
-
-  let none = None
+module Intrins = struct
+  module T = Amd64_simd_intrins
 
   let bad_arity op =
     (* A user-declared external with the wrong number of parameters. *)
-    raise
-      (Error
-         (Bad_arity
-            (Printf.sprintf "Wrong number of arguments for SIMD intrinsic %s" op)))
+    let msg = "Wrong number of arguments for SIMD intrinsic " ^ op in
+    raise (Error (Bad_arity msg))
 
-  let bad_immediate op = bad_immediate "Invalid immediate for %s" op
+  let invalid_immediate op = bad_immediate "Invalid immediate for %s" op
 
-  let extract_constant args ~max op = extract_constant args op ~max
+  let bind : T.bind -> Amd64_simd_instrs.instr = function
+    | Instr simd -> simd
+    | Zeroing (simd, z) -> simd ~z
 
-  let kflag mk simd args =
-    if Arch.Extension.enabled_instruction simd
-    then cfg_operation (Simd.sequence (mk simd) None) args
-    else None
+  let imm op args : T.imm -> int option * Cmm.expression list = function
+    | No_imm -> None, args
+    | Imm max ->
+      let i, args = extract_constant args op ~max in
+      Some i, args
+    | Getmant (interval, sign) ->
+      let i0, args = extract_constant args op ~max:interval in
+      let i1, args = extract_constant args op ~max:sign in
+      Some ((i1 lsl 2) lor i0), args
+    | Fixed i -> Some i, args
 
-  let kortestz simd args = kflag Simd.Seq.kortestz simd args
-
-  let kortestc simd args = kflag Simd.Seq.kortestc simd args
-
-  let ktestz simd args = kflag Simd.Seq.ktestz simd args
-
-  let ktestc simd args = kflag Simd.Seq.ktestc simd args
-
-  let simd_load_scaled simd ~scale args =
-    if Arch.Extension.enabled_instruction simd
-    then simd_load ~mode:(Iindexed2scaled (scale, 0)) simd args
-    else None
-
-  let simd_store_scaled simd ~scale args =
-    if Arch.Extension.enabled_instruction simd
-    then simd_store ~mode:(Iindexed2scaled (scale, 0)) simd args
-    else None
-
-  let simd_load simd args =
-    if Arch.Extension.enabled_instruction simd
-    then simd_load ~mode:Arch.identity_addressing simd args
-    else None
-
-  let simd_store simd args =
-    if Arch.Extension.enabled_instruction simd
-    then simd_store ~mode:Arch.identity_addressing simd args
-    else None
-
-  let extract_scale = extract_scale
-
-  (* Constants synthesized for the unmasked gather/scatter intrinsics: the
-     AVX512 instructions always take a write mask, and gathers overwrite the
+  (* Constants synthesized for the unmasked gathers and scatters: the AVX512
+     instructions always take a write mask, and gathers overwrite the
      destination completely under an all-ones mask. *)
-  let all_ones_mask = Cmm_helpers.mask ~dbg:Debuginfo.none (-1L)
+  let operand args : T.operand -> Cmm.expression =
+    let dbg = Debuginfo.none in
+    function
+    | Value j -> args.(j)
+    | All_ones_mask -> Cmm_helpers.mask ~dbg (-1L)
+    | Zero_vec128 -> Cmm_helpers.vec128 ~dbg { word0 = 0L; word1 = 0L }
+    | Zero_vec256 ->
+      Cmm_helpers.vec256 ~dbg { word0 = 0L; word1 = 0L; word2 = 0L; word3 = 0L }
+    | Zero_vec512 ->
+      Cmm_helpers.vec512 ~dbg
+        { word0 = 0L;
+          word1 = 0L;
+          word2 = 0L;
+          word3 = 0L;
+          word4 = 0L;
+          word5 = 0L;
+          word6 = 0L;
+          word7 = 0L
+        }
 
-  let zero_vec128 =
-    Cmm_helpers.vec128 ~dbg:Debuginfo.none { word0 = 0L; word1 = 0L }
+  (* The (non-constant) arguments in instruction operand order. *)
+  let operands op ~arity (ops : T.operand array) args =
+    let args = Array.of_list args in
+    if Array.length args <> arity then bad_arity op;
+    Array.fold_right (fun o operands -> operand args o :: operands) ops []
 
-  let zero_vec256 =
-    Cmm_helpers.vec256 ~dbg:Debuginfo.none
-      { word0 = 0L; word1 = 0L; word2 = 0L; word3 = 0L }
+  let rounding : int -> Amd64_simd_defs.evex_rounding option = function
+    | 8 -> Some Rnd_near
+    | 9 -> Some Rnd_down
+    | 10 -> Some Rnd_up
+    | 11 -> Some Rnd_zero
+    | _ -> None
 
-  let zero_vec512 =
-    Cmm_helpers.vec512 ~dbg:Debuginfo.none
-      { word0 = 0L;
-        word1 = 0L;
-        word2 = 0L;
-        word3 = 0L;
-        word4 = 0L;
-        word5 = 0L;
-        word6 = 0L;
-        word7 = 0L
-      }
-end)
+  (* _MM_FROUND_CUR_DIRECTION, selecting the non-rounding form. *)
+  let cur_direction = 4
 
-let select_operation_intrins ~dbg:_ op args = Intrins.select_operation op args
+  let kflag : T.flag -> Simd.Kflag.t = function Zf -> Zf | Cf -> Cf
+
+  (* The instruction and the (ungated) selection. *)
+  let select_ungated op (spec : T.t) args =
+    match spec with
+    | Register { arity; imm = imm_spec; bind = b; args = ops } ->
+      let i, args = imm op args imm_spec in
+      let simd = bind b in
+      simd, instr simd ?i (operands op ~arity ops args)
+    | Embedded_rounding { arity; bind = b; cur; args = ops } -> (
+      let control, args = extract_constant args op ~max:255 in
+      let args = operands op ~arity ops args in
+      match rounding control, cur with
+      | Some rnd, (Some _ | None) ->
+        let simd =
+          match b with
+          | Rnd simd -> simd ~rnd
+          | Rnd_zeroing (simd, z) -> simd ~rnd ~z
+        in
+        simd, instr simd args
+      | None, Some cur when control = cur_direction ->
+        let simd = bind cur in
+        simd, instr simd args
+      | None, (Some _ | None) -> invalid_immediate op)
+    | Suppress_all_exceptions
+        { arity; imm = imm_spec; bind = b; cur; args = ops } -> (
+      let i, args = imm op args imm_spec in
+      let sae, args = extract_constant args op ~max:255 in
+      let args = operands op ~arity ops args in
+      (* _MM_FROUND_NO_EXC, alone or with _MM_FROUND_CUR_DIRECTION. *)
+      if sae = 8 || sae = 12
+      then
+        let simd =
+          match b with
+          | Sae simd -> simd ~sae:()
+          | Sae_zeroing (simd, z) -> simd ~sae:() ~z
+        in
+        simd, instr simd ?i args
+      else
+        match cur with
+        | Some cur when sae = cur_direction ->
+          let simd = bind cur in
+          simd, instr simd ?i args
+        | Some _ | None -> invalid_immediate op)
+    | Flag_reader { flag; instr = simd } ->
+      let args = operands op ~arity:2 [| Value 0; Value 1 |] args in
+      simd, seq (Seq.kflag (kflag flag) simd) args
+    | Load { arity; bind = b; args = ops } ->
+      let simd = bind b in
+      let args = operands op ~arity ops args in
+      simd, simd_load ~mode:Arch.identity_addressing simd args
+    | Store { arity; bind = b; args = ops } ->
+      let simd = bind b in
+      let args = operands op ~arity ops args in
+      simd, simd_store ~mode:Arch.identity_addressing simd args
+    | Gather { arity; instr = simd; args = ops } ->
+      let scale, args = extract_scale args op in
+      let args = operands op ~arity ops args in
+      simd, simd_load ~mode:(Iindexed2scaled (scale, 0)) simd args
+    | Scatter { arity; instr = simd; args = ops } ->
+      let scale, args = extract_scale args op in
+      let args = operands op ~arity ops args in
+      simd, simd_store ~mode:(Iindexed2scaled (scale, 0)) simd args
+
+  let select op spec args =
+    let simd, selected = select_ungated op spec args in
+    if Arch.Extension.enabled_instruction simd then selected else None
+end
+
+let select_operation_intrins ~dbg:_ op args =
+  match Amd64_simd_intrins.find op with
+  | None -> None
+  | Some spec -> Intrins.select op spec args
 
 let select_operation_cfg ~dbg op args =
   let or_else try_ opt =
