@@ -285,7 +285,8 @@ let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
   if Flambda_features.classic_mode () && Oxcaml_flags.fdo_counters_enabled ()
   then
     Location.raise_errorf
-      "-fdo-counters is not supported in classic mode (-Oclassic)";
+      "-fdo-counters and -fdo-profile are not supported in classic mode \
+       (-Oclassic)";
   Misc.Style.setup (Flambda_features.colour ());
   (* CR-someday mshinwell: Note for future WebAssembly work: this thing about
      the length of arrays will need fixing, I don't think it only applies to the

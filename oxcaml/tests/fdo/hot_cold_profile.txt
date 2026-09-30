@@ -1,0 +1,5 @@
+# [f]'s entry, and its first conditional on the edge leading to [hot]. The body
+# hash comes from -dfdo. The other arm must become cold and sink to the
+# end.
+100 Hot_cold.f 0 61349092 entry
+100 Hot_cold.f 0 61349092 0 then

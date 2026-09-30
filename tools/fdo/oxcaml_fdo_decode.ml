@@ -10,9 +10,10 @@
    executable's link-time addresses through perf's mmap events, so
    position-independent executables work like any other (see [Perf_script]). The
    executable's own FDO metadata section (it must have been compiled with
-   -fdo-counters; no debug info is needed) supplies the static stacks to count
-   and the actions that track dynamic callers. Locations are handled hashed, so
-   -dump prints hashes unless names are present. *)
+   -fdo-counters or -fdo-profile; no debug info is needed) supplies the static
+   stacks to count and the actions that track dynamic callers. Counters are
+   handled hashed, so -dump prints hashes unless names are present; the
+   compiler's -dfdo shows the same counts by position. *)
 
 module P = Source_position_profile
 module Elf_info = Fdo_decode_lib.Elf_info

@@ -1,0 +1,341 @@
+*** FDO block frequencies for camlSpecialize__classify_0_15_code
+  body: same
+  entry: ["Specialize.classify":0]
+  block 1: 180
+  block 101: 180
+  block 103: 40
+  block 108: 140
+  block 111: 40
+  block 113: 100
+  edge entry -> 1: 180
+  edge 1 -> 101: 180 (derived)
+  edge 101 -> 108 ["Specialize.classify":0:10d1b4fa:0:else]: 140
+  edge 108 -> 113 ["Specialize.classify":0:10d1b4fa:1:else]: 100
+  edge 113 -> exit: 100 (derived)
+  edge 101 -> 103 ["Specialize.classify":0:10d1b4fa:0:then]: 40
+  edge 103 -> exit: 40 (derived)
+  edge 108 -> 111 ["Specialize.classify":0:10d1b4fa:1:then]: 40
+  edge 111 -> exit: 40 (derived)
+*** FDO block frequencies for camlSpecialize__bump_1_16_code
+  body: same
+  entry: ["Specialize.bump":0]
+  block 1: 40
+  block 121: 40
+  edge entry -> 1: 40
+  edge 1 -> 121: 40 (derived)
+  edge 121 -> exit: 40 (derived)
+*** FDO block frequencies for camlSpecialize__tally_2_17_code
+  body: same
+  entry: ["Specialize.tally":0]
+  block 1: 40
+  block 126: 40
+  edge entry -> 1: 40
+  edge 1 -> 126: 40 (derived)
+  edge 126 -> exit: 40 (derived)
+*** FDO block frequencies for camlSpecialize__Make_3_18_code
+  body: same
+  entry: ["Specialize.Make":0]
+  block 1: 0
+  block 131: 0
+  edge entry -> 1: 0
+  edge 1 -> 131: 0 (derived)
+  edge 131 -> exit: 0 (derived)
+*** FDO block frequencies for camlSpecialize__count_4_19_code
+  body: same
+  entry: ["Specialize.Make.count":0]
+  block 1: 0
+  block 140: 0
+  block 149: 0
+  block 154: 0
+  block 162: 0
+  block 168: 0
+  block 171: 0
+  block 173: 0
+  block 182: 0
+  block 185: 0
+  block 187: 0
+  block 190: 0
+  block 193: 0
+  block 196: 0
+  block 199: 0
+  block 204: 0
+  edge entry -> 1: 0
+  edge 1 -> 140: 0 (derived)
+  edge 140 -> 149: 0 (derived)
+  edge 149 -> 154 ["Specialize.Make.count":0:e2227555:0:then] +["Specialize.classify":0 <- "Specialize.Make.count":0:e2227555:1:call]: 0
+  edge 149 -> 204 ["Specialize.Make.count":0:e2227555:0:else]: 0
+  edge 154 -> 162 ["Specialize.classify":0:10d1b4fa:0:then <- "Specialize.Make.count":0:e2227555:1:call]: 0
+  edge 154 -> 168 ["Specialize.classify":0:10d1b4fa:0:else <- "Specialize.Make.count":0:e2227555:1:call]: 0
+  edge 162 -> 182 ["Specialize.Make.count":0:e2227555:2:then]: 0
+  edge 162 -> 185 ["Specialize.Make.count":0:e2227555:2:else]: 0
+  edge 168 -> 171 ["Specialize.Make.count":0:e2227555:2:else] ["Specialize.classify":0:10d1b4fa:1:then <- "Specialize.Make.count":0:e2227555:1:call]: 0
+  edge 168 -> 173 ["Specialize.Make.count":0:e2227555:2:then] ["Specialize.classify":0:10d1b4fa:1:else <- "Specialize.Make.count":0:e2227555:1:call]: 0
+  edge 171 -> 185: 0 (derived)
+  edge 173 -> 182: 0 (derived)
+  edge 182 -> 199: 0 (derived)
+  edge 185 -> 187 ["Specialize.Make.count":0:e2227555:3:case(0)]: 0
+  edge 185 -> 190 ["Specialize.Make.count":0:e2227555:3:case(1)]: 0
+  edge 185 -> 193 ["Specialize.Make.count":0:e2227555:3:case(2)] +["Specialize.bump":0 <- "Specialize.Make.count":0:e2227555:4:call]: 0
+  edge 187 -> 199: 0 (derived)
+  edge 190 -> 199: 0 (derived)
+  edge 193 -> 196: 0 (derived)
+  edge 193 -> escape: 0 (derived)
+  edge 196 -> 199: 0 (derived)
+  edge 199 -> 149: 0 (derived)
+  edge 204 -> exit: 0 (derived)
+*** FDO block frequencies for camlSpecialize__count_4_25_code
+  body: same
+  entry: ["Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.High":0))]
+  block 1: 1
+  block 232: 1
+  block 241: 81
+  block 246: 80
+  block 252: 30
+  block 258: 50
+  block 260: 30
+  block 262: 20
+  block 271: 20
+  block 274: 60
+  block 276: 15
+  block 279: 15
+  block 282: 30
+  block 285: 30
+  block 288: 80
+  block 293: 1
+  edge 241 -> 246 ["Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.High":0)):e2227555:0:then] +["Specialize.classify":0 <- "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.High":0)):e2227555:1:call]: 80
+  edge 288 -> 241: 80 (derived)
+  edge 246 -> 258 ["Specialize.classify":0:10d1b4fa:0:else <- "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.High":0)):e2227555:1:call]: 50
+  edge 246 -> 252 ["Specialize.classify":0:10d1b4fa:0:then <- "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.High":0)):e2227555:1:call]: 30
+  edge 252 -> 274 ["Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.High":0)):e2227555:2:else]: 30 (derived)
+  edge 258 -> 260 ["Specialize.classify":0:10d1b4fa:1:then <- "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.High":0)):e2227555:1:call] ["Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.High":0)):e2227555:2:else]: 30
+  edge 260 -> 274: 30 (derived)
+  edge 274 -> 282 ["Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.High":0)):e2227555:3:case(2)] +["Specialize.bump":0 <- "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.High":0)):e2227555:4:call]: 30
+  edge 282 -> 285: 30 (derived)
+  edge 285 -> 288: 30 (derived)
+  edge 258 -> 262 ["Specialize.classify":0:10d1b4fa:1:else <- "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.High":0)):e2227555:1:call] ["Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.High":0)):e2227555:2:then]: 20
+  edge 262 -> 271: 20 (derived)
+  edge 271 -> 288: 20 (derived)
+  edge 274 -> 276 ["Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.High":0)):e2227555:3:case(0)]: 15
+  edge 274 -> 279 ["Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.High":0)):e2227555:3:case(1)]: 15
+  edge 276 -> 288: 15 (derived)
+  edge 279 -> 288: 15 (derived)
+  edge entry -> 1: 1
+  edge 1 -> 232: 1 (derived)
+  edge 232 -> 241: 1 (derived)
+  edge 241 -> 293 ["Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.High":0)):e2227555:0:else]: 1
+  edge 293 -> exit: 1 (derived)
+  edge 252 -> 271 ["Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.High":0)):e2227555:2:then]: 0 (derived)
+  edge 282 -> escape: 0 (derived)
+*** FDO block frequencies for camlSpecialize__count_4_21_code
+  body: same
+  entry: ["Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))]
+  block 1: 0
+  block 321: 0
+  block 330: 0
+  block 335: 0
+  block 343: 0
+  block 349: 0
+  block 352: 0
+  block 354: 0
+  block 363: 0
+  block 366: 0
+  block 368: 0
+  block 371: 0
+  block 374: 0
+  block 377: 0
+  block 380: 0
+  block 385: 0
+  edge entry -> 1: 0
+  edge 1 -> 321: 0 (derived)
+  edge 321 -> 330: 0 (derived)
+  edge 330 -> 335 ["Specialize.Make.count":0@(module("Specialize.Outer.Inner":0)):e2227555:0:then] +["Specialize.classify":0 <- "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0)):e2227555:1:call]: 0
+  edge 330 -> 385 ["Specialize.Make.count":0@(module("Specialize.Outer.Inner":0)):e2227555:0:else]: 0
+  edge 335 -> 343 ["Specialize.classify":0:10d1b4fa:0:then <- "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0)):e2227555:1:call]: 0
+  edge 335 -> 349 ["Specialize.classify":0:10d1b4fa:0:else <- "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0)):e2227555:1:call]: 0
+  edge 343 -> 363 ["Specialize.Make.count":0@(module("Specialize.Outer.Inner":0)):e2227555:2:then]: 0
+  edge 343 -> 366 ["Specialize.Make.count":0@(module("Specialize.Outer.Inner":0)):e2227555:2:else]: 0
+  edge 349 -> 352 ["Specialize.classify":0:10d1b4fa:1:then <- "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0)):e2227555:1:call] ["Specialize.Make.count":0@(module("Specialize.Outer.Inner":0)):e2227555:2:else]: 0
+  edge 349 -> 354 ["Specialize.classify":0:10d1b4fa:1:else <- "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0)):e2227555:1:call] ["Specialize.Make.count":0@(module("Specialize.Outer.Inner":0)):e2227555:2:then]: 0
+  edge 352 -> 366: 0 (derived)
+  edge 354 -> 363: 0 (derived)
+  edge 363 -> 380: 0 (derived)
+  edge 366 -> 368 ["Specialize.Make.count":0@(module("Specialize.Outer.Inner":0)):e2227555:3:case(0)]: 0
+  edge 366 -> 371 ["Specialize.Make.count":0@(module("Specialize.Outer.Inner":0)):e2227555:3:case(1)]: 0
+  edge 366 -> 374 ["Specialize.Make.count":0@(module("Specialize.Outer.Inner":0)):e2227555:3:case(2)] +["Specialize.bump":0 <- "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0)):e2227555:4:call]: 0
+  edge 368 -> 380: 0 (derived)
+  edge 371 -> 380: 0 (derived)
+  edge 374 -> 377: 0 (derived)
+  edge 374 -> escape: 0 (derived)
+  edge 377 -> 380: 0 (derived)
+  edge 380 -> 330: 0 (derived)
+  edge 385 -> exit: 0 (derived)
+*** FDO block frequencies for camlSpecialize__count_4_23_code
+  body: same
+  entry: ["Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.Low":0))]
+  block 1: 1
+  block 413: 1
+  block 422: 101
+  block 427: 100
+  block 433: 10
+  block 439: 90
+  block 441: 10
+  block 443: 80
+  block 452: 80
+  block 455: 20
+  block 457: 5
+  block 460: 5
+  block 463: 10
+  block 466: 10
+  block 469: 100
+  block 474: 1
+  edge 422 -> 427 ["Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.Low":0)):e2227555:0:then] +["Specialize.classify":0 <- "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.Low":0)):e2227555:1:call]: 100
+  edge 469 -> 422: 100 (derived)
+  edge 427 -> 439 ["Specialize.classify":0:10d1b4fa:0:else <- "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.Low":0)):e2227555:1:call]: 90
+  edge 439 -> 443 ["Specialize.classify":0:10d1b4fa:1:else <- "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.Low":0)):e2227555:1:call] ["Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.Low":0)):e2227555:2:then]: 80
+  edge 443 -> 452: 80 (derived)
+  edge 452 -> 469: 80 (derived)
+  edge 427 -> 433 ["Specialize.classify":0:10d1b4fa:0:then <- "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.Low":0)):e2227555:1:call]: 10
+  edge 433 -> 455 ["Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.Low":0)):e2227555:2:else]: 10 (derived)
+  edge 439 -> 441 ["Specialize.classify":0:10d1b4fa:1:then <- "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.Low":0)):e2227555:1:call] ["Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.Low":0)):e2227555:2:else]: 10
+  edge 441 -> 455: 10 (derived)
+  edge 455 -> 463 ["Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.Low":0)):e2227555:3:case(2)] +["Specialize.bump":0 <- "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.Low":0)):e2227555:4:call]: 10
+  edge 463 -> 466: 10 (derived)
+  edge 466 -> 469: 10 (derived)
+  edge 455 -> 457 ["Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.Low":0)):e2227555:3:case(0)]: 5
+  edge 455 -> 460 ["Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.Low":0)):e2227555:3:case(1)]: 5
+  edge 457 -> 469: 5 (derived)
+  edge 460 -> 469: 5 (derived)
+  edge entry -> 1: 1
+  edge 1 -> 413: 1 (derived)
+  edge 413 -> 422: 1 (derived)
+  edge 422 -> 474 ["Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.Low":0)):e2227555:0:else]: 1
+  edge 474 -> exit: 1 (derived)
+  edge 433 -> 452 ["Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.Low":0)):e2227555:2:then]: 0 (derived)
+  edge 463 -> escape: 0 (derived)
+*** FDO block frequencies for camlSpecialize__Outer_5_20_code
+  body: same
+  entry: ["Specialize.Outer":0]
+  entry: +["Specialize.Make":0 <- module("Specialize.Outer.Inner":0)]
+  block 1: 0
+  block 502: 0
+  edge entry -> 1: 0
+  edge 1 -> 502: 0 (derived)
+  edge 502 -> exit: 0 (derived)
+*** FDO block frequencies for camlSpecialize__run_6_22_code
+  body: same
+  entry: ["Specialize.Outer.run":0]
+  block 1: 0
+  block 513: 0
+  edge entry -> 1: 0
+  edge 1 -> 513: 0 (derived)
+  edge 513 -> exit: 0 (derived)
+*** FDO block frequencies for camlSpecialize__run_6_26_code
+  body: same
+  entry: ["Specialize.Outer.run":0@(module("Specialize.High":0))]
+  block 1: 1
+  block 521: 1
+  edge entry -> 1: 1
+  edge 1 -> 521: 1 (derived)
+  edge 521 -> exit: 1 (derived)
+*** FDO block frequencies for camlSpecialize__run_6_24_code
+  body: same
+  entry: ["Specialize.Outer.run":0@(module("Specialize.Low":0))]
+  block 1: 1
+  block 527: 1
+  edge entry -> 1: 1
+  edge 1 -> 527: 1 (derived)
+  edge 527 -> exit: 1 (derived)
+*** FDO block frequencies for camlSpecialize__fn[specialize.ml:84,37--70]_9_29_code
+  body: same
+  entry: ["Specialize.(fun)@param,block0,field1,Low,a":0]
+  block 1: 1
+  block 533: 1
+  block 535: 1
+  block 537: 1
+  edge entry -> 1: 1
+  edge 1 -> 533: 1 (derived)
+  edge 533 -> 535: 1 (estimated in 0..1)
+  edge 535 -> 537: 1 (estimated in 0..1)
+  edge 537 -> exit: 1 (derived)
+  edge 533 -> escape: 0 (estimated in 0..1)
+  edge 535 -> escape: 0 (estimated in 0..1)
+*** FDO block frequencies for camlSpecialize__fail_or_return_10_30_code
+  body: same
+  entry: ["Specialize.fail_or_return":0]
+  block 1: 2
+  block 551: 2
+  block 553: 1
+  block 555: 1
+  edge entry -> 1: 2
+  edge 1 -> 551: 2 (derived)
+  edge 551 -> 553 ["Specialize.fail_or_return":0:fed247dc:0:then]: 1
+  edge 551 -> 555 ["Specialize.fail_or_return":0:fed247dc:0:else]: 1
+  edge 553 -> exit: 1 (derived)
+  edge 555 -> exit: 1 (derived)
+*** FDO block frequencies for camlSpecialize__tail_fail_11_31_code
+  body: same
+  entry: ["Specialize.tail_fail":0]
+  block 1: 2
+  block 561: 2
+  edge entry -> 1: 2
+  edge 1 -> 561: 2 (derived)
+  edge 561 -> exit: 2 (derived)
+*** FDO block frequencies for camlSpecialize__protected_12_32_code
+  body: same
+  entry: ["Specialize.protected":0]
+  block 1: 2
+  block 567: 2
+  block 585: 1
+  block 577: 1
+  block 590: 1
+  block 599: 1
+  block 602: 1
+  block 604: 0
+  edge entry -> 1: 2
+  edge 1 -> 567: 2 (derived)
+  edge 567 -> 585: 1 (derived)
+  edge 567 -> 577: 1 (derived)
+  edge 585 -> exit: 1 (derived)
+  edge 577 -> 590 ["Specialize.protected":0:41ea4828:1:then]: 1
+  edge 590 -> 599: 1 (derived)
+  edge 599 -> 602 ["Specialize.protected":0:41ea4828:2:then]: 1
+  edge 602 -> exit: 1 (derived)
+  edge 577 -> 599 ["Specialize.protected":0:41ea4828:1:else]: 0
+  edge 599 -> 604 ["Specialize.protected":0:41ea4828:2:else]: 0
+  edge 604 -> exit: 0 (derived)
+*** FDO block frequencies for camlSpecialize__after_protected_13_33_code
+  body: same
+  entry: ["Specialize.after_protected":0]
+  block 1: 2
+  block 617: 2
+  block 619: 2
+  edge entry -> 1: 2
+  edge 1 -> 617: 2 (derived)
+  edge 617 -> 619: 2 (estimated in 0..2)
+  edge 619 -> exit: 2 (derived)
+  edge 617 -> escape: 0 (estimated in 0..2)
+*** FDO block frequencies for camlSpecialize__fn[specialize.ml:105,36--93]_14_34_code
+  body: same
+  entry: ["Specialize.(fun)@param,%int_add,after_protected,0,3":0]
+  block 1: 1
+  block 626: 1
+  block 628: 1
+  block 629: 1
+  edge entry -> 1: 1
+  edge 1 -> 626: 1 (derived)
+  edge 626 -> 628: 1 (estimated in 0..1)
+  edge 628 -> 629: 1 (estimated in 0..1)
+  edge 629 -> exit: 1 (derived)
+  edge 626 -> escape: 0 (estimated in 0..1)
+  edge 628 -> escape: 0 (estimated in 0..1)
+*** FDO block frequencies for camlSpecialize__entry: not profiled
+  edge 688 -> 691 +["Specialize.(fun)@i":1]
+  edge 688 -> 693
+  edge 659 -> 662 +["Specialize.(fun)@i":0]
+  edge 659 -> 664 +["Specialize.(fun)@i":1]
+  edge 726 -> 730 ["Specialize":0:1e27a3bc:7:else]
+  edge 726 -> 728 ["Specialize":0:1e27a3bc:7:then]
+  edge 717 -> 736 ["Specialize":0:1e27a3bc:6:else]
+  edge 717 -> 724 ["Specialize":0:1e27a3bc:6:then]
+  edge 702 -> 742 ["Specialize":0:1e27a3bc:4:else]
+  edge 702 -> 709 ["Specialize":0:1e27a3bc:4:then]

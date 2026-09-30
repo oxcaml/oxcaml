@@ -336,19 +336,23 @@ let cfg_with_infos_profile ?accumulate pass f x =
 
 let ( ++ ) x f = f x
 
-let reorder_blocks_random ppf_dump cl =
-  match !Oxcaml_flags.reorder_blocks_random with
-  | None -> cl
-  | Some seed ->
-    (* Initialize random state based on user-provided seed and function name.
-       Per-function random state (instead of per call to ocamlopt) is good for
-       debugging: it gives us deterministic builds for each user-provided seed,
-       regardless of the order of files on the command line. *)
-    let fun_name = (Cfg_with_layout.cfg cl).fun_name in
-    let random_state = Random.State.make [| seed; Hashtbl.hash fun_name |] in
-    Cfg_with_layout.reorder_blocks_random ~random_state cl;
-    pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg
-      "After reorder_blocks_random" cl
+let reorder_blocks_random cl seed =
+  (* Initialize random state based on user-provided seed and function name.
+      Per-function random state (instead of per call to ocamlopt) is good for
+      debugging: it gives us deterministic builds for each user-provided seed,
+      regardless of the order of files on the command line. *)
+  let fun_name = (Cfg_with_layout.cfg cl).fun_name in
+  let random_state = Random.State.make [| seed; Hashtbl.hash fun_name |] in
+  Cfg_with_layout.reorder_blocks_random ~random_state cl
+
+let reorder_blocks ppf_dump cl =
+  Oxcaml_flags.fdo_profile ()
+  |> Option.iter (fun profile ->
+      let counts = Cfg_fdo_counts.compute profile cl in
+      if !Oxcaml_flags.dump_fdo then Cfg_fdo_counts.dump ppf_dump counts);
+  !Oxcaml_flags.reorder_blocks_random |> Option.iter (reorder_blocks_random cl);
+  pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After reorder_blocks_random"
+    cl
 
 let block_layout ppf_dump cl =
   match !Oxcaml_flags.cfg_block_layout with
@@ -486,7 +490,7 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
   ++ cfg_with_layout_profile ~accumulate:true "cfg_block_layout"
        (block_layout ppf_dump)
   ++ cfg_with_layout_profile ~accumulate:true "cfg_reorder_blocks"
-       (reorder_blocks_random ppf_dump)
+       (reorder_blocks ppf_dump)
   ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)
   ++ Profile.record ~accumulate:true "cfg_available_regs"
        (available_regs
