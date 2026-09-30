@@ -76,9 +76,7 @@ incr_foo:
 let incr_bar (t : counters) = t.bar <- t.bar + 1
 [%%expect_asm X86_64{|
 incr_bar:
-  movq  8(%rax), %rbx
-  addq  $2, %rbx
-  movq  %rbx, 8(%rax)
+  addq  $2, 8(%rax)
   movl  $1, %eax
   ret
 |}]
