@@ -71,6 +71,7 @@ DISTCLEAN_FILES = \
   utils/config.common.ml \
   utils/config.generated.ml \
   compilerlibs/META \
+  external/ocaml-jit/lib/META \
   otherlibs/dynlink/dynlink_cmo_format.mli \
   otherlibs/dynlink/dynlink_cmxs_format.mli \
   otherlibs/dynlink/dynlink_config.ml \
@@ -141,6 +142,18 @@ ci-no-coverage: runtest runtest-upstream minimizer
 
 .PHONY: ci-coverage
 ci-coverage: boot-runtest coverage
+
+# Check an existing install at $(prefix); these targets do not install.
+# Both check compiler location, META paths/dependencies, native archive ownership,
+# Dune availability and native toplevel/JIT/eval consumers. The bundled target
+# also checks inventories and native consumers for the complete Nix library set.
+.PHONY: check-installed
+check-installed:
+	bash tools/ci/actions/check-installed.sh "$(prefix)"
+
+.PHONY: check-installed-bundled
+check-installed-bundled:
+	bash tools/ci/actions/check-installed.sh "$(prefix)" --bundled
 
 # CR mshinwell: build is broken
 # .PHONY: minimizer-upstream

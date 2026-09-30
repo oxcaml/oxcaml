@@ -28,6 +28,7 @@ jobs:
             os: warp-ubuntu-latest-x64-8x
             build_debug: true
             build_ast_dependent_libs: true
+            check_installed: true
             sysdeps: gdb
 
           - name: dissector-assembler (x86_64-linux)
@@ -442,6 +443,12 @@ jobs:
           OCAMLPARAM: ${{ matrix.ocamlparam }}
           OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
           USE_RUNTIME: ${{ matrix.use_runtime }}
+
+      - name: Check installed library metadata
+        if: matrix.check_installed == true
+        run: |
+          make install
+          make check-installed
 
       - name: Run minimizer
         if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true && steps.build.conclusion == 'success' && always()
