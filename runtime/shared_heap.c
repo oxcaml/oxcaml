@@ -16,6 +16,7 @@
 #define CAML_INTERNALS
 
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include "caml/addrmap.h"
@@ -35,6 +36,10 @@
 #include "caml/sizeclasses.h"
 #include "caml/startup_aux.h"
 #include "caml/weak.h"
+
+#ifdef HAS_MALLOC_TRIM
+#include <malloc.h> /* for malloc_trim; HAS_MALLOC_TRIM is from s.h */
+#endif
 
 CAMLexport atomic_uintnat caml_compactions_count;
 uintnat caml_pool_min_chunk_bsz = 8 * 1024 * 1024; /* 8 MB */
@@ -2210,6 +2215,32 @@ static bool should_run_phase_two = false;
   very specific conditions the compaction algorithm expects.
 */
 
+/* TCMalloc's entry point for returning free memory to the OS. weak,
+   so NULL unless linked with TCMalloc (weakness is ELF only). */
+#if defined(__GNUC__) && defined(__ELF__)
+#define MAYBE_HAS_TCMALLOC
+extern void TCMalloc_MallocExtension_ReleaseMemoryToSystem(size_t num_bytes)
+  CAMLweakdef;
+#endif
+
+/* After compaction, tell the C allocator to release memory to the OS:
+ * TCMalloc via its release call if linked, otherwise glibc via
+ * malloc_trim. */
+static void compact_release_malloc_memory(void)
+{
+#ifdef MAYBE_HAS_TCMALLOC
+  if (TCMalloc_MallocExtension_ReleaseMemoryToSystem != NULL) {
+    TCMalloc_MallocExtension_ReleaseMemoryToSystem(SIZE_MAX);
+    CAML_GC_MESSAGE(COMPACT, "Released TCMalloc free memory to the OS.\n");
+    return;
+  }
+#endif
+#ifdef HAS_MALLOC_TRIM
+  if (malloc_trim(0))
+    CAML_GC_MESSAGE(COMPACT, "Released malloc free memory to the OS.\n");
+#endif
+}
+
 void caml_compact_heap(caml_domain_state* domain_state,
                        int participating_count,
                        caml_domain_state** participants)
@@ -2250,6 +2281,7 @@ void caml_compact_heap(caml_domain_state* domain_state,
 
   caml_global_barrier(participating_count);
   if (participants[0] == Caml_state) {
+    compact_release_malloc_memory();
      /* We are done, increment the compaction count */
     (void)caml_atomic_counter_incr(&caml_compactions_count);
     CAML_GC_MESSAGE(COMPACT,
