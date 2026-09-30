@@ -813,7 +813,7 @@ let preproc_stack_check ~fun_body ~frame_size ~trap_size =
     | Lop (Stackoffset n) ->
       let s = fs + n in
       loop i.next s (max s max_fs) nontail_flag
-    | Lcall_op (Lcall_ind | Lcall_imm _) -> loop i.next fs max_fs true
+    | Lcall_op (Lcall_ind _ | Lcall_imm _) -> loop i.next fs max_fs true
     | Lprologue | Lepilogue_open | Lepilogue_close
     | Lop
         ( Move | Spill | Reload | Opaque | Begin_region | End_region | Dls_get
@@ -827,7 +827,7 @@ let preproc_stack_check ~fun_body ~frame_size ~trap_size =
         | Floatop (_, _)
         | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
         | Specific _ | Name_for_debugger _ | Alloc _ )
-    | Lcall_op (Ltailcall_ind | Ltailcall_imm _ | Lextcall _ | Lprobe _)
+    | Lcall_op (Ltailcall_ind _ | Ltailcall_imm _ | Lextcall _ | Lprobe _)
     | Lreloadretaddr | Lreturn | Llabel_for_jump_target _ | Llabel_for_dwarf _
     | Lbranch _ | Lcondbranch _ | Lcondbranch3 _ | Lswitch _ | Lentertrap
     | Lraise _ ->

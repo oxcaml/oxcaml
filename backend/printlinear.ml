@@ -26,10 +26,10 @@ let label ppf l = Format.fprintf ppf "L%a" Label.format l
 let call_operation ?(print_reg = Printreg.reg) ppf op arg =
   let regs = Printreg.regs' ~print_reg in
   match op with
-  | Lcall_ind -> fprintf ppf "call %a" regs arg
-  | Lcall_imm { func } -> fprintf ppf "call \"%s\" %a" func.sym_name regs arg
-  | Ltailcall_ind -> fprintf ppf "tailcall %a" regs arg
-  | Ltailcall_imm { func } ->
+  | Lcall_ind _ -> fprintf ppf "call %a" regs arg
+  | Lcall_imm { func; _ } -> fprintf ppf "call \"%s\" %a" func.sym_name regs arg
+  | Ltailcall_ind _ -> fprintf ppf "tailcall %a" regs arg
+  | Ltailcall_imm { func; _ } ->
     fprintf ppf "tailcall \"%s\" %a" func.sym_name regs arg
   | Lextcall { func; alloc; _ } ->
     fprintf ppf "extcall \"%s\" %a%s" func regs arg
@@ -83,22 +83,24 @@ let instr' ?(print_reg = Printreg.reg) ppf i =
     operation op i.arg ppf i.res
   | Lcall_op op ->
     (match op with
-    | Lcall_ind | Lcall_imm _ | Lextcall _ | Lprobe _ ->
+    | Lcall_ind _ | Lcall_imm _ | Lextcall _ | Lprobe _ ->
       fprintf ppf "@[<1>{%a}@]@," regsetaddr i.live
-    | Ltailcall_imm _ | Ltailcall_ind -> ());
+    | Ltailcall_imm _ | Ltailcall_ind _ -> ());
     call_operation ppf op i.arg
   | Lreloadretaddr -> fprintf ppf "reload retaddr"
   | Lreturn -> fprintf ppf "return %a" regs i.arg
   | Llabel_for_jump_target lbl -> fprintf ppf "%a:" label lbl
   | Llabel_for_dwarf lbl -> fprintf ppf "%a: (DWARF only label)" label lbl
   | Lbranch lbl -> fprintf ppf "goto %a" label lbl
-  | Lcondbranch (tst, lbl) ->
-    fprintf ppf "if %a goto %a" (test tst) i.arg label lbl
-  | Lcondbranch3 (lbl0, lbl1, lbl2) ->
+  | Lcondbranch { test = tst; taken; fallthrough_counters = _ } ->
+    fprintf ppf "if %a goto %a" (test tst) i.arg label taken.target
+  | Lcondbranch3 { lt = lbl0; eq = lbl1; gt = lbl2; fallthrough_counters = _ }
+    ->
     fprintf ppf "switch3 %a" reg i.arg.(0);
     let case n = function
       | None -> ()
-      | Some lbl -> fprintf ppf "@,case %i: goto %a" n label lbl
+      | Some (successor : successor) ->
+        fprintf ppf "@,case %i: goto %a" n label successor.target
     in
     case 0 lbl0;
     case 1 lbl1;
@@ -107,7 +109,7 @@ let instr' ?(print_reg = Printreg.reg) ppf i =
   | Lswitch lblv ->
     fprintf ppf "switch %a" reg i.arg.(0);
     for i = 0 to Array.length lblv - 1 do
-      fprintf ppf "case %i: goto %a" i label lblv.(i)
+      fprintf ppf "case %i: goto %a" i label lblv.(i).target
     done;
     fprintf ppf "@,endswitch"
   | Lentertrap -> fprintf ppf "enter trap"

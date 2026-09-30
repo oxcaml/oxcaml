@@ -1517,14 +1517,14 @@ let emit_instr env i =
       emit_load_literal i.res.(0) lbl)
   | Lop (Const_symbol s) ->
     emit_load_symbol_addr i.res.(0) (symbol_of_cmm_symbol s)
-  | Lcall_op Lcall_ind ->
+  | Lcall_op (Lcall_ind _) ->
     A.ins1 BLR (H.reg_x i.arg.(0));
     record_frame env i.live (Dbg_other i.dbg)
-  | Lcall_op (Lcall_imm { func }) ->
+  | Lcall_op (Lcall_imm { func; callsite_counter = _ }) ->
     A.ins1 BL (symbol (Needs_reloc CALL26) (symbol_of_cmm_symbol func));
     record_frame env i.live (Dbg_other i.dbg)
-  | Lcall_op Ltailcall_ind -> A.ins1 BR (H.reg_x i.arg.(0))
-  | Lcall_op (Ltailcall_imm { func }) ->
+  | Lcall_op (Ltailcall_ind _) -> A.ins1 BR (H.reg_x i.arg.(0))
+  | Lcall_op (Ltailcall_imm { func; callsite_counter = _ }) ->
     if String.equal func.sym_name (Env.function_name env)
     then
       match Env.tailrec_entry_point env with
@@ -1933,14 +1933,16 @@ let emit_instr env i =
     let lbl = label_to_asm_label ~section:Text lbl in
     D.define_label lbl
   | Lbranch lbl -> emit_branch lbl
-  | Lcondbranch (tst, lbl) -> emit_condbranch i.arg tst lbl
-  | Lcondbranch3 (lbl0, lbl1, lbl2) ->
+  | Lcondbranch { test = tst; taken; fallthrough_counters = _ } ->
+    emit_condbranch i.arg tst taken.target
+  | Lcondbranch3 { lt = lbl0; eq = lbl1; gt = lbl2; fallthrough_counters = _ }
+    ->
     let section = Asm_targets.Asm_section.Text in
     let ins_cond cond lbl =
       Option.iter
-        (fun lbl ->
+        (fun ({ target; fdo_counters = _ } : Linear.successor) ->
           A.ins1 (B_cond (Branch_cond.Int cond))
-            (local_label (label_to_asm_label ~section lbl)))
+            (local_label (label_to_asm_label ~section target)))
         lbl
     in
     A.ins_cmp (H.reg_x i.arg.(0)) (O.imm 1) O.optional_none;
@@ -1956,7 +1958,7 @@ let emit_instr env i =
     A.ins1 BR reg_x_tmp1;
     D.define_label lbltbl;
     for j = 0 to Array.length jumptbl - 1 do
-      let jumplbl = label_to_asm_label ~section:Text jumptbl.(j) in
+      let jumplbl = label_to_asm_label ~section:Text jumptbl.(j).target in
       A.ins1 B (local_label jumplbl)
     done
   (*= Alternative:
@@ -2134,7 +2136,14 @@ let relax_branches env body =
         Lop (Specific (Ifar_alloc { bytes = num_bytes; dbginfo; mode }))
       | Far_stackcheck { max_frame_size_bytes } ->
         Lop (Specific (Ifar_stackcheck { max_frame_size_bytes }))
-      | Condbranch { test; lbl; arg = _ } -> Lcondbranch (test, lbl)
+      | Condbranch { test; lbl; arg = _ } ->
+        (* The relaxed sequence has no pseudo-instrumentation: this target
+           records no FDO metadata. *)
+        Lcondbranch
+          { test;
+            taken = { target = lbl; fdo_counters = [] };
+            fallthrough_counters = []
+          }
       | Branch lbl -> Lbranch lbl
 
     let relax_poll () = Far_poll
