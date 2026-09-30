@@ -26,6 +26,8 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
+open! Stdlib
+
 (* CR metaprogramming aivaskovic: This file has not been code reviewed *)
 
 type 'a lam = 'a
