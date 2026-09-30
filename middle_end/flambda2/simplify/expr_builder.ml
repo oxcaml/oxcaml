@@ -469,6 +469,16 @@ let create_switch uacc ~condition_dbg ~scrutinee ~arms =
       UA.notify_added ~code_size:Code_size.invalid uacc )
   else
     let change_to_apply_cont action =
+      (* The branch disappears and its edges become one. Keep all their
+         counters: assuming every arm executed is safer than assuming none
+         did. *)
+      let action =
+        Apply_cont.with_fdo_counters action
+          (Target_ocaml_int.Map.fold
+             (fun _ arm counters ->
+               Fdo_counter.add_all counters (Apply_cont.fdo_counters arm))
+             arms [])
+      in
       let uacc =
         UA.add_free_names uacc (Apply_cont.free_names action)
         |> UA.notify_added ~code_size:(Code_size.apply_cont action)

@@ -144,6 +144,24 @@ let inline dacc ~apply ~unroll_to ~was_inline_always function_decl =
   | Maybe_alloc_stack _, Not_alloc_stack (* This is allowed by subtyping *)
   | Maybe_alloc_stack _, Maybe_alloc_stack
   | Not_alloc_stack _, Not_alloc_stack ->
+    (* The call's pseudo-instrumentation counter, as the decoded call graph
+       would count the call if it were not inlined out: the entry counters of
+       the callee (its own, then those of the calls inlined at its head) in the
+       context of the call site. They are attached to the edges into the current
+       region (see [Inlined_call_counters]). *)
+    (match DE.fdo_region denv with
+    | Some region when DE.tracking_inlined_call_counters denv ->
+      let call_site = Apply.callsite_counter apply in
+      Inlined_call_counters.add_inlined_calls
+        (DE.inlined_call_counters denv)
+        region
+        (List.map
+           (fun counter ->
+             match call_site with
+             | None -> counter
+             | Some at -> Fdo_counter.inline counter ~at)
+           (Code.fdo_entry_counters code))
+    | Some _ | None -> ());
     let denv =
       DE.enter_inlined_apply ~called_code:code ~apply ~was_inline_always denv
     in
