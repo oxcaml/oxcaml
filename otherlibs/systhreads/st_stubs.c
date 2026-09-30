@@ -139,9 +139,6 @@ struct caml_thread_struct {
   value descr;              /* The heap-allocated descriptor (root) */
   struct caml_thread_struct * next; /* Doubly-linked list of running threads */
   struct caml_thread_struct * prev;
-  /* Note: there is no saved TLS state. TLS state is owned by stacks (see
-     fiber.h); this thread's state is reachable from [current_stack] and
-     the cached [Caml_state->tls_state] is recomputed from it on restore. */
   int domain_id;      /* The id of the domain to which this thread belongs */
   struct stack_info* current_stack;      /* saved Caml_state->current_stack */
   struct c_stack_link* c_stack;          /* saved Caml_state->c_stack */
@@ -352,9 +349,8 @@ static void restore_runtime_state(caml_thread_t th)
   Caml_state->local_roots = th->local_roots;
   Caml_state->backtrace_pos = th->backtrace_pos;
   Caml_state->backtrace_buffer = th->backtrace_buffer;
-  /* Recompute the cached TLS state from the restored stack chain (walk
-     depth is 1 unless the thread was suspended inside nested fibers). */
-  caml_tls_recompute_mirror();
+  /* Current stack changed; recompute cached TLS state. */
+  caml_tls_update_cache();
   caml_modify_generational_global_root
     (&Caml_state->backtrace_last_exn, th->backtrace_last_exn);
   Caml_state->preemption = th->preemption_scheduled ? Val_long(1) : Val_long(0);

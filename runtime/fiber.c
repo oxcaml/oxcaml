@@ -1247,7 +1247,7 @@ struct stack_info* caml_tls_find_owner(struct stack_info* stack)
   return stack;
 }
 
-void caml_tls_recompute_mirror(void)
+void caml_tls_update_cache(void)
 {
   Caml_state->tls_state =
     caml_tls_find_owner(Caml_state->current_stack)->tls_state;

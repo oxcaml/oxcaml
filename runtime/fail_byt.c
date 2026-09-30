@@ -90,7 +90,7 @@ CAMLexport void caml_raise_async(value v)
   /* Fiber switch: flush dynamic binding cache and recompute the cached TLS
      state */
   caml_dynamic_cache_flush(Caml_state->dynamic_bindings);
-  caml_tls_recompute_mirror();
+  caml_tls_update_cache();
 
   *Caml_state->external_raise_async->exn_bucket = v;
 

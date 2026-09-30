@@ -372,7 +372,7 @@ struct stack_info* caml_tls_find_owner(struct stack_info* stack);
 
 /* Recompute [Caml_state->tls_state] from the nearest TLS owner on the
    current stack's parent chain. */
-CAMLextern void caml_tls_recompute_mirror(void);
+CAMLextern void caml_tls_update_cache(void);
 
 /* gc_regs_buckets is allocated on-demand by [maybe_expand_stack]. */
 CAMLextern void caml_free_gc_regs_buckets(value *gc_regs_buckets);
