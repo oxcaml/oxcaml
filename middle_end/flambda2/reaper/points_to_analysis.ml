@@ -454,6 +454,16 @@ module Datalog_schedule = struct
       (let$$ [from; relation; base] = ["from"; "relation"; "base"] in
        [has_source from; rev_constructor ~from relation ~base]
        ==> has_source base);
+      (* Since a block is said to have a source if one of its fields has a
+         source, where the real condition (but harder to express in datalog)
+         should be that it has a source if all of its non-function-slot fields
+         have a source, we need to force [has_source] for sets of closures,
+         otherwise sets of closures with no value slots and only deleted
+         code_ids will miss their has_source. *)
+      (let$$ [from; relation; base] = ["from"; "relation"; "base"] in
+       [ rev_constructor ~from relation ~base;
+         when1 Field.is_function_slot relation ]
+       ==> has_source base);
       (let$$ [to_; relation; base] = ["to_"; "relation"; "base"] in
        [has_usage to_; rev_parameter ~to_ relation ~base] ==> has_source base)
     ]
