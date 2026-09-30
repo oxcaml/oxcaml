@@ -193,6 +193,7 @@ Error: Signature mismatch:
        The type "'a @ portable contended -> unit -> unit"
        is not compatible with the type
          "'a @ portable contended -> (unit -> unit) @ portable"
+       The return mode was expected to be "portable" but is "nonportable"
 |}]
 
 
