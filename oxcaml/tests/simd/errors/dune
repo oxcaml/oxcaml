@@ -33,7 +33,7 @@
     2
     (run
      %{bin:ocamlopt.opt}
-     f32c1.ml
+     %{ml}
      -extension
      simd
      -color
@@ -54,7 +54,7 @@
     2
     (run
      %{bin:ocamlopt.opt}
-     f32c4.ml
+     %{ml}
      -extension
      simd
      -color
@@ -75,7 +75,7 @@
     2
     (run
      %{bin:ocamlopt.opt}
-     i32c1.ml
+     %{ml}
      -extension
      simd
      -color
@@ -96,7 +96,7 @@
     2
     (run
      %{bin:ocamlopt.opt}
-     i32c4.ml
+     %{ml}
      -extension
      simd
      -color
@@ -117,7 +117,7 @@
     2
     (run
      %{bin:ocamlopt.opt}
-     f64c1.ml
+     %{ml}
      -extension
      simd
      -color
@@ -138,7 +138,7 @@
     2
     (run
      %{bin:ocamlopt.opt}
-     f64c2.ml
+     %{ml}
      -extension
      simd
      -color
@@ -159,7 +159,7 @@
     2
     (run
      %{bin:ocamlopt.opt}
-     i16c1.ml
+     %{ml}
      -extension
      simd
      -color
@@ -180,7 +180,7 @@
     2
     (run
      %{bin:ocamlopt.opt}
-     i16c8.ml
+     %{ml}
      -extension
      simd
      -color
@@ -201,7 +201,7 @@
     2
     (run
      %{bin:ocamlopt.opt}
-     i8c1.ml
+     %{ml}
      -extension
      simd
      -color
@@ -222,7 +222,7 @@
     2
     (run
      %{bin:ocamlopt.opt}
-     i8c16.ml
+     %{ml}
      -extension
      simd
      -color
@@ -243,7 +243,7 @@
     2
     (run
      %{bin:ocamlopt.opt}
-     i64c1.ml
+     %{ml}
      -extension
      simd
      -color
@@ -264,7 +264,7 @@
     2
     (run
      %{bin:ocamlopt.opt}
-     i64c2.ml
+     %{ml}
      -extension
      simd
      -color
@@ -281,7 +281,8 @@
  (deps %{bin:ocamlopt.opt}))
 
 ; AVX512 negative tests: bad immediates are compile-time errors. The filename is
-; passed literally (not via %{ml}) so the error's location line is stable.
+; passed literally because newer dune versions expand %{ml} to ./avx512imm.ml,
+; which changes the error's location line.
 (rule
  (alias runtest)
  (enabled_if
