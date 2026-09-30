@@ -141,6 +141,8 @@
   hash_consed
   type_shape
   zero_alloc_utils
+  fdo_prehash
+  fdo_counter
   diffing
   diffing_with_keys
   predef
@@ -273,6 +275,10 @@
 (copy_files ../../utils/hash_consed.ml)
 
 (copy_files ../../utils/zero_alloc_utils.ml)
+
+(copy_files ../../utils/fdo_prehash.ml)
+
+(copy_files ../../utils/fdo_counter.ml)
 
 (copy_files ../../utils/diffing.ml)
 
@@ -480,6 +486,10 @@
 (copy_files ../../utils/hash_consed.mli)
 
 (copy_files ../../utils/zero_alloc_utils.mli)
+
+(copy_files ../../utils/fdo_prehash.mli)
+
+(copy_files ../../utils/fdo_counter.mli)
 
 (copy_files ../../utils/diffing.mli)
 
@@ -765,6 +775,8 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Signature_with_global_bindings.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Bytesections.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Cmi_format.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Fdo_prehash.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Fdo_counter.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Debuginfo.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Consistbl.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Data_types.cmo
@@ -900,6 +912,8 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Signature_with_global_bindings.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Bytesections.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Cmi_format.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Fdo_prehash.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Fdo_counter.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Debuginfo.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Consistbl.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Data_types.cmx
