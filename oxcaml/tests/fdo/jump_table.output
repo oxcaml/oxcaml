@@ -64,6 +64,7 @@ cfg for camlJump_table__step_0_4_code
   edge 139 -> 163 ["Jump_table.run":0:ff235bef:0:else]: 0
   edge 152 -> escape: 0 (derived)
   edge 163 -> exit: 0 (derived)
+  call from block 152 ["Jump_table.run":0:ff235bef:1:call] to caml_fdo_1625265d: 36
 cfg for camlJump_table__run_1_5_code
   block 1
   block 139
@@ -95,6 +96,7 @@ cfg for camlJump_table__fn[jump_table.ml:27,36--67]_2_6_code
   edge entry -> 1: 1
   edge 1 -> 182: 1 (derived)
   edge 182 -> exit: 1 (derived)
+  call from block 182 ["Jump_table.(fun)@param,run,a":0:7e43de39:0:call] to caml_fdo_2a45a67d: 1
 cfg for camlJump_table__fn[jump_table.ml:28,48--65]_3_7_code
   block 1
   block 182

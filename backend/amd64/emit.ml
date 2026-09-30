@@ -2067,6 +2067,33 @@ let record_jcc ~pos ~taken ~fallthrough =
       recorded_branches
         := (pos, Branch { taken; fallthrough }) :: !recorded_branches
 
+(* The alias symbols naming functions by entry counter for the linker's call
+   graph profile (see [Fdo_call_graph]) defined so far in this compilation unit:
+   an alias is defined once even when several functions share it (the unboxed
+   wrapper of a function shares its position). *)
+let defined_aliases : unit Misc.Stdlib.String.Tbl.t =
+  Misc.Stdlib.String.Tbl.create 16
+
+(* With a profile, define the alias of a function whose entry the profile knows
+   (calls to it may be edges of other units' call graphs): a weak hidden symbol
+   at its entry, in its own section, which is what the linker resolves it to. *)
+let define_fdo_aliases (fundecl : Linear.fundecl) =
+  match Oxcaml_flags.fdo_profile (), fundecl.fun_fdo_entry_counters with
+  | None, _ | Some _, [] -> ()
+  | Some profile, entry :: _ ->
+    if
+      Int64.compare (Source_position_profile.recorded_count profile entry) 0L
+      > 0
+    then
+      let alias = Fdo_call_graph.alias_symbol (Fdo_counter.hash entry) in
+      let name = S.encode alias in
+      if not (Misc.Stdlib.String.Tbl.mem defined_aliases name)
+      then (
+        Misc.Stdlib.String.Tbl.replace defined_aliases name ();
+        D.weak alias;
+        D.hidden alias;
+        D.define_symbol_label ~section:Text alias)
+
 (* The instruction just emitted is a call or tail jump to an OCaml function. *)
 let record_call callsite_counter =
   match callsite_counter with
@@ -2932,6 +2959,7 @@ let fundecl fundecl =
          ...
   *)
   D.define_joint_label_and_symbol ~section:Text fundecl_sym;
+  define_fdo_aliases fundecl;
   recorded_branches := [];
   fdo_handler_labels := [];
   let fdo_start_pos = current_output_pos () in
@@ -3064,6 +3092,8 @@ let reset_all () =
   X86_proc.reset_asm_code ();
   fdo_metadata
     := Fdo_metadata_encode.create ~record_names:!Oxcaml_flags.fdo_names;
+  Fdo_call_graph.reset ();
+  Misc.Stdlib.String.Tbl.reset defined_aliases;
   Emitaux.reset ();
   reset_debug_info ();
   (* PR#5603 *)
@@ -3472,6 +3502,7 @@ let end_assembly () =
   D.data ();
   Probe_emission.emit_probe_notes ~add_def_symbol;
   Fdo_metadata_encode.emit_section !fdo_metadata;
+  Fdo_call_graph.emit_section ();
   emit_trap_notes ();
   D.mark_stack_non_executable ();
   (* Note that [mark_stack_non_executable] switches the section on Linux. *)

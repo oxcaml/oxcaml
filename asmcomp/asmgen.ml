@@ -348,8 +348,10 @@ let reorder_blocks_random cl seed =
 let reorder_blocks ppf_dump cl =
   Oxcaml_flags.fdo_profile ()
   |> Option.iter (fun profile ->
+      let dump = if !Oxcaml_flags.dump_fdo then Some ppf_dump else None in
       let counts = Cfg_fdo_counts.compute profile cl in
-      if !Oxcaml_flags.dump_fdo then Cfg_fdo_counts.dump ppf_dump counts;
+      Option.iter (fun ppf -> Cfg_fdo_counts.dump ppf counts) dump;
+      Cfg_fdo_call_graph.record ~dump profile counts (Cfg_with_layout.cfg cl);
       Cfg_fdo_layout.reorder_blocks counts cl);
   !Oxcaml_flags.reorder_blocks_random |> Option.iter (reorder_blocks_random cl);
   pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After cfg_fdo_layout" cl

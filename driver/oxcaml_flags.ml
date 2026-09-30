@@ -187,7 +187,17 @@ let llvm_flags = ref "" (* -llvm-flags *)
 
 let fdo_profile_path = ref None (* -fdo-profile *)
 
-let set_fdo_profile_path path = fdo_profile_path := Some path
+let set_fdo_profile_path path =
+  if not Config.function_sections
+  then
+    raise
+      (Arg.Bad
+         "OCaml has been configured without support for -function-sections \
+          which is required for -fdo-profile");
+  (* As [-function-sections] does (see [Main_args]). *)
+  Compenv.first_ccopts := "-ffunction-sections" :: !Compenv.first_ccopts;
+  Clflags.function_sections := true;
+  fdo_profile_path := Some path
 
 (* The profile is loaded once, on first use, from [fdo_profile_path] (which is
    set during argument parsing, before this is forced). Held here so that any

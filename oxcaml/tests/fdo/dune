@@ -281,6 +281,56 @@
  (action
   (diff specialize.output specialize.output.corrected)))
 
+; Function reordering: the pass-1 compilation also hands the linker a call graph
+; profile (see backend/fdo_call_graph.ml), which lld lays the functions out by.
+; Link with lld and check the order it prints (the edges themselves are in
+; specialize.output, from -dfdo). Needs lld: set OXCAML_LLD to enable. Depends on
+; specialize.output.corrected to be sequenced after the other compilations of
+; specialize.ml.
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")
+   (<> %{env:OXCAML_LLD=} "")))
+ (targets specialize_lld.exe specialize.order.corrected)
+ (deps specialize.ml specialize.fdo specialize.output.corrected)
+ (action
+  (progn
+   (run
+    %{bin:ocamlopt.opt}
+    -O3
+    -fdo-profile
+    specialize.fdo
+    -ccopt
+    -no-pie
+    -ccopt
+    -fuse-ld=lld
+    -ccopt
+    -Wl,--call-graph-profile-sort=hfsort
+    -ccopt
+    -Wl,--print-symbol-order=specialize.order.all
+    specialize.ml
+    -o
+    specialize_lld.exe)
+   (with-outputs-to
+    specialize.order.corrected
+    (run grep camlSpecialize specialize.order.all)))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")
+   (<> %{env:OXCAML_LLD=} "")))
+ (deps specialize.order specialize.order.corrected)
+ (action
+  (diff specialize.order specialize.order.corrected)))
+
 ; The metadata follows ordinary debug splitting and compression. Keep using
 ; the executable for address translation, and read names/data from the sidecar.
 
