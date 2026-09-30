@@ -457,7 +457,7 @@ module Shallow = struct
   module Preemptible = struct
     type nonrec ('a,'b) continuation = ('a,'b) continuation
 
-    let fiber f : _ continuation = make_fiber ~preemptible:true f
+    let fiber f = make_fiber ~preemptible:true f
 
     type ('a,'b) handler =
         { retc: 'a -> 'b;
