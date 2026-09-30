@@ -611,6 +611,7 @@ and variant_representation =
 and constructor_shape =
   | Constructor_shape_uniform of value_kind list
   | Constructor_shape_mixed of mixed_block_shape
+  | Constructor_shape_undetermined
 
 and array_kind =
     Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
@@ -828,7 +829,9 @@ and equal_constructor_shape x y =
       && List.for_all2 equal_value_kind fields1 fields2
   | Constructor_shape_mixed shape1, Constructor_shape_mixed shape2 ->
       equal_mixed_block_shape shape1 shape2
-  | (Constructor_shape_uniform _ | Constructor_shape_mixed _), _ -> false
+  | Constructor_shape_undetermined, Constructor_shape_undetermined -> true
+  | (Constructor_shape_uniform _ | Constructor_shape_mixed _
+    | Constructor_shape_undetermined), _ -> false
 
 let equal_mixed_block_shape_up_to_value_kinds shape1 shape2 =
   Misc.Stdlib.Array.equal
@@ -878,26 +881,26 @@ let rec join_value_kind_non_null x y =
   else
     match x, y with
     | Pvariant { consts = consts1; non_consts = non_consts1 },
-      Pvariant { consts = consts2; non_consts = non_consts2 } -> begin
-        match join_non_consts non_consts1 non_consts2 with
-        | Some non_consts ->
-            let consts = List.sort_uniq Int.compare (consts1 @ consts2) in
-            Pvariant { consts; non_consts }
-        | None -> Pgenval
-      end
+      Pvariant { consts = consts2; non_consts = non_consts2 } ->
+        let non_consts = join_non_consts non_consts1 non_consts2 in
+        let consts = List.sort_uniq Int.compare (consts1 @ consts2) in
+        Pvariant { consts; non_consts }
     | _, _ -> Pgenval
 
 and join_constructor_shape shape1 shape2 =
   match shape1, shape2 with
+  | Constructor_shape_undetermined, _ | _, Constructor_shape_undetermined ->
+      Constructor_shape_undetermined
   | Constructor_shape_uniform fields1, Constructor_shape_uniform fields2
     when List.length fields1 = List.length fields2 ->
-      Some
-        (Constructor_shape_uniform (List.map2 join_value_kind fields1 fields2))
-  | Constructor_shape_mixed shape1, Constructor_shape_mixed shape2 ->
-      Option.map
-        (fun shape -> Constructor_shape_mixed shape)
-        (join_mixed_block_shape shape1 shape2)
-  | (Constructor_shape_uniform _ | Constructor_shape_mixed _), _ -> None
+      Constructor_shape_uniform (List.map2 join_value_kind fields1 fields2)
+  | Constructor_shape_mixed shape1, Constructor_shape_mixed shape2 -> begin
+      match join_mixed_block_shape shape1 shape2 with
+      | Some shape -> Constructor_shape_mixed shape
+      | None -> Constructor_shape_undetermined
+    end
+  | (Constructor_shape_uniform _ | Constructor_shape_mixed _), _ ->
+      Constructor_shape_undetermined
 
 and join_mixed_block_shape shape1 shape2 =
   if Array.length shape1 <> Array.length shape2 then None
@@ -936,17 +939,15 @@ and join_non_consts non_consts1 non_consts2 =
   let sorted = List.sort (fun (tag1, _) (tag2, _) -> Int.compare tag1 tag2) in
   let rec merge l1 l2 =
     match l1, l2 with
-    | [], l | l, [] -> Some l
+    | [], l | l, [] -> l
     | (tag1, shape1) :: rest1, (tag2, shape2) :: rest2 ->
         if tag1 < tag2 then
-          Option.map (fun l -> (tag1, shape1) :: l) (merge rest1 l2)
+          (tag1, shape1) :: merge rest1 l2
         else if tag2 < tag1 then
-          Option.map (fun l -> (tag2, shape2) :: l) (merge l1 rest2)
+          (tag2, shape2) :: merge l1 rest2
         else
-          match join_constructor_shape shape1 shape2 with
-          | Some shape ->
-              Option.map (fun l -> (tag1, shape) :: l) (merge rest1 rest2)
-          | None -> None
+          let shape = join_constructor_shape shape1 shape2 in
+          (tag1, shape) :: merge rest1 rest2
   in
   merge (sorted non_consts1) (sorted non_consts2)
 

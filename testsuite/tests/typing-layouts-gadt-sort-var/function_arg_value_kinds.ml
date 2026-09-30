@@ -200,10 +200,9 @@ type _ rep2 = RI : im rep2 | RS : sm rep2
 val mixed : 'a rep2 * 'a -> int = <fun>
 |}]
 
-(* Sound: two mixed blocks whose flat suffixes disagree ([float#] versus
-   [float32_u]) cannot be joined -- their representations differ -- so the
-   whole component widens to a generic value even though the scannable
-   prefixes agree. *)
+(* Sound: for two mixed blocks whose flat suffixes disagree ([float#] versus
+   [float32_u]), the join preserves the fact that the tag is [0], but marks the
+   constructor shape as undetermined. *)
 type fa = { fx : int; fd : float# }
 type fb = { gx : int; ge : float32_u }
 type _ rep3 = RF : fa rep3 | RG : fb rep3
@@ -221,7 +220,11 @@ type _ rep3 = RF : fa rep3 | RG : fb rep3
 (let
   (mixed_flat =
      (function {nlocal = 0}
-       param[value<(consts ()) (non_consts ([0: value<int>, *]))>] : int
+       param[value<
+              (consts ())
+               (non_consts ([0: value<int>,
+                             value<(consts ()) (non_consts ([0: ?]))>]))>]
+       : int
        (if (field_imm 0 param)
          (mixedfield 0  (value<int>,float32) (field_imm 1 param))
          (mixedfield 0  (value<int>,float64) (field_imm 1 param)))))
