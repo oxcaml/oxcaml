@@ -94,7 +94,7 @@ module Prim = struct
     ('x -> 'b) ->
     (exn -> 'b) ->
     ('a . ('a,'x,'b) effc) ->
-    (unit -> tick_outcome) ->
+    (unit -> tick_outcome) or_null ->
     ('d -> 'x) ->
     'd ->
     'b = "%with_stack_preemptible"
@@ -275,7 +275,7 @@ module Deep = struct
         | None -> Prim.reperform eff k last_fiber
       in
       Prim.with_stack_preemptible
-        handler.retc handler.exnc effc handler.tickc
+        handler.retc handler.exnc effc (This handler.tickc)
         comp arg
 
     let try_with ~on_tick comp arg (handler : _ effect_handler) =
@@ -317,7 +317,7 @@ module Deep = struct
           Prim.with_stack_preemptible
             (fun x -> handler.retc (Handler.unsafe_make ()) x)
             (fun e -> handler.exnc (Handler.unsafe_make ()) e)
-            effc handler.tickc
+            effc (This handler.tickc)
             (fun arg -> comp (Handler.unsafe_make ()) arg)
             arg
 
@@ -344,8 +344,7 @@ module Shallow = struct
     | Cont : ('a,'b,'x) cont -> ('a,'b) continuation [@@unboxed]
 
   (* Whether a fiber is preemptible is fixed here, at creation. A preemptible
-     fiber starts with a placeholder tick handler, replaced when it is first
-     resumed. *)
+     fiber starts without a tick handler; resuming it sets one. *)
   let make_fiber : type a b.
       preemptible:bool -> (a -> b) -> (a, b) continuation =
     fun ~preemptible f ->
@@ -364,9 +363,7 @@ module Shallow = struct
     in
     match
       if preemptible
-      then
-        Prim.with_stack_preemptible error error effc (fun () -> Continue)
-          f' ()
+      then Prim.with_stack_preemptible error error effc Null f' ()
       else Prim.with_stack error error effc f' ()
     with
     | exception E k -> k
