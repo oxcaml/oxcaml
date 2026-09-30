@@ -1,5 +1,6 @@
-; The oxcaml-fdo-decode tool: decodes Linux perf LBR profiles of
-; OxCaml-compiled executables with their FDO metadata.
+; The oxcaml-fdo-decode tool: decodes a Linux perf profile of an
+; OxCaml-compiled executable into a source-position FDO profile
+; (Source_position_profile).
 
 (library
  (name fdo_decode_lib)

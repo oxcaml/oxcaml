@@ -1,3 +1,18 @@
+; Round-trip tests for the source-position FDO profile format
+; ([Source_position_profile] in ocamlcommon).
+
+(executable
+ (name source_position_profile_test)
+ (modules source_position_profile_test)
+ (libraries ocamlcommon))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (run ./source_position_profile_test.exe)))
+
 ; The operations on pseudo-instrumentation counters ([Fdo_counter]).
 
 (executable
@@ -26,7 +41,8 @@
 
 ; End-to-end test through the runtime's single-stepping LBR emulator (see
 ; runtime/singlestep_profiler.c, x86-64 Linux only): compile specialize.ml
-; with counters and run it collecting a complete trace of its hot part.
+; with counters, run it collecting a complete trace of its hot part, decode the
+; trace into a profile and check it (specialize.profile).
 
 (rule
  (enabled_if
@@ -63,7 +79,119 @@
    specialize.run
    (run ./specialize.exe specialize.lbr))))
 
-; jump_table.ml: a switch compiled to a jump table.
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (target specialize.fdo)
+ (deps specialize.lbr specialize.exe)
+ (action
+  (run
+   %{bin:oxcaml-fdo-decode}
+   -perf-script-output
+   specialize.lbr
+   -binary
+   specialize.exe
+   -o
+   specialize.fdo)))
+
+; The decoded profile itself: its trie of counters and counts, named after
+; the executable's -fdo-names metadata.
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (target specialize.profile.corrected)
+ (deps specialize.fdo specialize.exe)
+ (action
+  (with-outputs-to
+   specialize.profile.corrected
+   (run %{bin:oxcaml-fdo-decode} -dump specialize.fdo -binary specialize.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (deps specialize.profile specialize.profile.corrected)
+ (action
+  (diff specialize.profile specialize.profile.corrected)))
+
+; The metadata follows ordinary debug splitting and compression. Keep using
+; the executable for address translation, and read names/data from the sidecar.
+
+(rule
+ (targets
+  specialize.exe.debug
+  specialize_stripped.exe
+  specialize_split.fdo
+  specialize_split.profile)
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (deps
+  specialize.exe
+  specialize.lbr
+  specialize.fdo
+  specialize.profile.corrected)
+ (action
+  (progn
+   (run
+    %{bin:objcopy}
+    --only-keep-debug
+    --compress-debug-sections=zlib
+    specialize.exe
+    specialize.exe.debug)
+   (run
+    %{bin:objcopy}
+    --strip-debug
+    --add-gnu-debuglink=specialize.exe.debug
+    specialize.exe
+    specialize_stripped.exe)
+   (run
+    %{bin:oxcaml-fdo-decode}
+    -perf-script-output
+    specialize.lbr
+    -binary
+    specialize_stripped.exe
+    -debug-file
+    specialize.exe.debug
+    -o
+    specialize_split.fdo)
+   (run cmp specialize.fdo specialize_split.fdo)
+   (with-outputs-to
+    specialize_split.profile
+    (run
+     %{bin:oxcaml-fdo-decode}
+     -dump
+     specialize_split.fdo
+     -debug-file
+     specialize.exe.debug))
+   (run cmp specialize.profile.corrected specialize_split.profile)
+   (ignore-outputs
+    (with-accepted-exit-codes
+     1
+     (run
+      %{bin:oxcaml-fdo-decode}
+      -perf-script-output
+      specialize.lbr
+      -binary
+      specialize_stripped.exe
+      -o
+      missing_metadata.fdo))))))
+
+; End-to-end test of a switch compiled to a jump table, through the same
+; pipeline as specialize.ml: the edges of the indirect jump are profiled.
 
 (rule
  (enabled_if
@@ -99,6 +227,48 @@
   (with-outputs-to
    jump_table.run
    (run ./jump_table.exe jump_table.lbr))))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (target jump_table.fdo)
+ (deps jump_table.lbr jump_table.exe)
+ (action
+  (run
+   %{bin:oxcaml-fdo-decode}
+   -perf-script-output
+   jump_table.lbr
+   -binary
+   jump_table.exe
+   -o
+   jump_table.fdo)))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (target jump_table.profile.corrected)
+ (deps jump_table.fdo jump_table.exe)
+ (action
+  (with-outputs-to
+   jump_table.profile.corrected
+   (run %{bin:oxcaml-fdo-decode} -dump jump_table.fdo -binary jump_table.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (deps jump_table.profile jump_table.profile.corrected)
+ (action
+  (diff jump_table.profile jump_table.profile.corrected)))
 
 ; The executables' FDO metadata as the decoder reads it back: the round trip
 ; of what the compiler emits.

@@ -178,6 +178,7 @@
   doubly_linked_list
   fdo_prehash
   fdo_counter
+  source_position_profile
   file_sections
   lru
   id_counter
