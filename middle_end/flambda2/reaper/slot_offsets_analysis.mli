@@ -30,9 +30,5 @@
     output by simplify. *)
 val compute :
   free_names:Name_occurrences.t ->
-  closure_function_decls:
-    Function_declarations.code_id_in_function_declaration Code_id_or_name.Map.t ->
-  code_changes:Unboxing_analysis.code_changes ->
-  get_code_metadata:(Code_id.t -> Code_metadata.t) ->
   Unboxing_analysis.result ->
   Slot_offsets.result

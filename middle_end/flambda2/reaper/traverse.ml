@@ -115,7 +115,6 @@ let record_set_of_closures_deps denv names_and_function_slots set_of_closures
           (Function_slot.Map.find function_slot funs
             : Function_declarations.code_id_in_function_declaration)
         in
-        Acc.add_closure_function_decl acc name code_id;
         let code_id =
           match code_id with
           | Deleted _ -> Or_unknown.Unknown
@@ -831,10 +830,7 @@ type result =
     code_deps : Traverse_acc.code_dep Code_id.Map.t;
     applications : Acc.Applications.t;
     all_sets_of_closures :
-      (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list;
-    closure_function_decls :
-      Function_declarations.code_id_in_function_declaration
-      Code_id_or_name.Map.t
+      (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list
   }
 
 let create_symbol_and_add_any_source acc name =
@@ -896,6 +892,5 @@ let run (unit : Flambda_unit.t) =
     continuation_info;
     code_deps;
     applications = Acc.applications acc;
-    all_sets_of_closures = Acc.get_all_sets_of_closures acc;
-    closure_function_decls = Acc.get_closure_function_decls acc
+    all_sets_of_closures = Acc.get_all_sets_of_closures acc
   }

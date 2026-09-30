@@ -23,10 +23,7 @@ type result =
     code_deps : Traverse_acc.code_dep Code_id.Map.t;
     applications : Traverse_acc.Applications.t;
     all_sets_of_closures :
-      (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list;
-    closure_function_decls :
-      Function_declarations.code_id_in_function_declaration
-      Code_id_or_name.Map.t
+      (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list
   }
 
 val run : Flambda_unit.t -> result
