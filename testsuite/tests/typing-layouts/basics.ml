@@ -1,7 +1,11 @@
 (* TEST
  include stdlib_upstream_compatible;
- flags = "-extension layouts_beta";
- expect;
+ {
+   expect;
+ }{
+   flags = "-extension layouts_beta";
+   expect;
+ }
 *)
 
 type t_value : value
