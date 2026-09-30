@@ -1072,8 +1072,8 @@ module Layout = struct
 
     let rec implied_externality : t -> Externality.t = function
       | Any _ | Univar _ | Genvar _ -> Internal
-      | Base (b, sa) ->
-        Sort.base_implied_externality ~separability:sa.separability b
+      | Base (b, { separability; nullability = _ }) ->
+        Sort.base_implied_externality ~separability b
       | Product ts ->
         List.fold_left
           (fun acc t -> Externality.join acc (implied_externality t))
