@@ -173,7 +173,7 @@ let make_candidate ~get_doc ~attrs ~exact ~prefix_path name ?loc ?path ty =
       let desc =
         Types.(
           Tarrow
-            ( (Nolabel, Mode.Alloc.legacy, Mode.Alloc.legacy),
+            ( (Nolabel, Mode.With_locality.legacy, Mode.With_locality.legacy),
               label_descr.lbl_res,
               label_descr.lbl_arg,
               commu_ok ))
@@ -183,7 +183,7 @@ let make_candidate ~get_doc ~attrs ~exact ~prefix_path name ?loc ?path ty =
       let desc =
         Types.(
           Tarrow
-            ( (Nolabel, Mode.Alloc.legacy, Mode.Alloc.legacy),
+            ( (Nolabel, Mode.With_locality.legacy, Mode.With_locality.legacy),
               ty,
               label_decl.ld_type,
               commu_ok ))

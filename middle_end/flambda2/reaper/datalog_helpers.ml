@@ -190,10 +190,9 @@ module Fixit : sig
 
   val ( let@ ) : ('a -> 'b) -> 'a -> 'b
 end = struct
-  let empty columns =
-    Datalog.create_table ~name:"empty" ~default_value:() columns
+  let empty columns = Datalog.create_relation ~name:"empty" columns
 
-  let local name columns = Datalog.create_table ~name ~default_value:() columns
+  let local name columns = Datalog.create_relation ~name columns
 
   module Table = struct
     type ('t, 'k, 'v) t = ('t, 'k, 'v) Datalog.table

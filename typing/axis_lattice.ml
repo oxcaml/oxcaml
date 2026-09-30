@@ -572,8 +572,8 @@ let immediate : t =
 
 let object_legacy : t =
   let ({ linearity; areality; portability; forkable; yielding; statefulness }
-        : Mode.Value.Comonadic.Const.t) =
-    Mode.Value.Comonadic.Const.legacy
+        : Mode.With_regionality.Comonadic.Const.t) =
+    Mode.With_regionality.Comonadic.Const.legacy
   in
   create ~linearity ~areality ~uniqueness:Mode.Uniqueness.Const.Aliased
     ~portability ~contention:Mode.Contention.Const.Uncontended ~forkable

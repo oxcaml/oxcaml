@@ -4,23 +4,23 @@ open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
 open! Regalloc_utils
 module Substitution = Regalloc_substitution
 
-let split_live_ranges : bool Lazy.t =
+let split_live_ranges : bool Param.t =
   bool_of_param ~default:true "SPLIT_LIVE_RANGES"
 
-let split_more_destruction_points : bool Lazy.t =
+let split_more_destruction_points : bool Param.t =
   bool_of_param "SPLIT_MORE_DESTR_POINTS"
 
-let split_around_loops : bool Lazy.t =
+let split_around_loops : bool Param.t =
   bool_of_param "SPLIT_AROUND_LOOPS" ~default:true
 
-let log_function = lazy (make_log_function ~label:"split")
+let log_function = Param.make (fun () -> make_log_function ~label:"split")
 
-let indent () = (Lazy.force log_function).indent ()
+let indent () = (Param.get log_function).indent ()
 
-let dedent () = (Lazy.force log_function).dedent ()
+let dedent () = (Param.get log_function).dedent ()
 
 let log : type a. ?no_eol:unit -> (a, Format.formatter, unit) format -> a =
- fun ?no_eol fmt -> (Lazy.force log_function).log ?no_eol fmt
+ fun ?no_eol fmt -> (Param.get log_function).log ?no_eol fmt
 
 let log_dominance_frontier : Cfg.t -> Cfg_dominators.t -> unit =
  fun cfg doms ->
@@ -103,7 +103,7 @@ let equal_destruction_kind left right =
 
 let destruction_point_at_end : Cfg.basic_block -> destruction_kind option =
  fun block ->
-  let more_destruction_points = Lazy.force split_more_destruction_points in
+  let more_destruction_points = Param.get split_more_destruction_points in
   if Proc.is_destruction_point ~more_destruction_points block.terminator.desc
   then Some Destruction_on_all_paths
   else if Option.is_none block.exn

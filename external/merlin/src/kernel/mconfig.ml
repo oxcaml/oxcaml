@@ -18,6 +18,7 @@ type ocaml =
     applicative_functors : bool;
     nopervasives : bool;
     strict_formats : bool;
+    syntax_quotations : bool;
     open_args : Clflags.open_arg list;
     ppx : string with_workdir list;
     pp : string with_workdir option;
@@ -55,6 +56,7 @@ let dump_ocaml x =
       ("applicative_functors", `Bool x.applicative_functors);
       ("nopervasives", `Bool x.nopervasives);
       ("strict_formats", `Bool x.strict_formats);
+      ("syntax_quotations", `Bool x.syntax_quotations);
       ( "open_args",
         Json.list
           (fun (arg : Clflags.open_arg) ->
@@ -530,7 +532,6 @@ let ocaml_ignored_flags =
     "-safe-matching";
     "-bin-annot-occurrences";
     (* flambda-backend specific *)
-    "-basic-block-sections";
     "-caml-apply-inline-fast-path";
     "-debug-ocaml";
     "-dgc-timings";
@@ -611,6 +612,8 @@ let ocaml_ignored_flags =
     "-fno-simd-regalloc";
     "-fclmul";
     "-fno-clmul";
+    "-faes";
+    "-fno-aes";
     "-fcssc";
     "-no-auto-include-otherlibs";
     "-fbmi2";
@@ -685,6 +688,13 @@ let ocaml_ignored_flags =
     "-no-cfg-value-propagation-float";
     "-cfg-value-propagation-flow";
     "-no-cfg-value-propagation-flow";
+    "-use-ssa";
+    "-no-use-ssa";
+    "-ssa-simplify";
+    "-no-ssa-simplify";
+    "-ssa-validate";
+    "-no-ssa-validate";
+    "-dssa";
     "-gdwarf-pedantic";
     "-ddwarf-metrics";
     "-afl-instrument";
@@ -785,8 +795,10 @@ let ocaml_ignored_flags =
     "-no-flambda2-match-in-match";
     "-frametables-in-rodata";
     "-no-frametables-in-rodata";
-    "-flambda2-no-simplify-stubs";
-    "-flambda2-simplify-stubs"
+    "-no-flambda2-simplify-stubs";
+    "-flambda2-simplify-stubs";
+    "-stubs-forward-inlining";
+    "-no-stubs-forward-inlining"
   ]
 
 let ocaml_ignored_parametrized_flags =
@@ -988,6 +1000,13 @@ let ocaml_flags =
     ( "-strict-formats",
       Marg.unit (fun ocaml -> { ocaml with strict_formats = true }),
       " Reject invalid formats accepted by legacy implementations" );
+    ( "-syntax-quotations",
+      Marg.unit (fun ocaml -> { ocaml with syntax_quotations = true }),
+      " Lex quotation syntax in files without a #syntax quotations directive" );
+    ( "-no-syntax-quotations",
+      Marg.unit (fun ocaml -> { ocaml with syntax_quotations = false }),
+      " Do not lex quotation syntax in files without a #syntax quotations \
+       directive" );
     ( "-open",
       Marg.param "module" (fun md ocaml ->
           { ocaml with open_args = Clflags.Open md :: ocaml.open_args }),
@@ -1099,6 +1118,7 @@ let initial =
         applicative_functors = true;
         nopervasives = false;
         strict_formats = false;
+        syntax_quotations = Config.syntax_quotations;
         open_args = [];
         ppx = [];
         pp = None;

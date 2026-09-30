@@ -244,9 +244,11 @@ and variant_subkind ppf consts non_consts =
       | _ :: _, _ :: _ -> Format.fprintf ppf "@ | "
     in
     let pp_pair ppf (tag, sk) =
-      Format.fprintf ppf "@[<hov 2>%d of %a@]" tag
-        (pp_star_list kind_with_subkind)
-        sk
+      let pp_fields ppf = function
+        | None -> Format.pp_print_string ppf "any"
+        | Some fields -> pp_star_list kind_with_subkind ppf fields
+      in
+      Format.fprintf ppf "@[<hov 2>%d of %a@]" tag pp_fields sk
     in
     pp_pipe_list pp_pair ppf non_consts;
     Format.fprintf ppf "@ ]@]"
@@ -632,6 +634,7 @@ let inlined_attribute ~space ppf (i : Fexpr.inlined_attribute) =
     match i with
     | Always_inlined -> Some "inlined(always)"
     | Hint_inlined -> Some "inlined(hint)"
+    | Forward_inlined -> Some "inlined(forward)"
     | Never_inlined -> Some "inlined(never)"
     | Unroll i -> Some (Format.sprintf "unroll(%d)" i)
     | Default_inlined -> None

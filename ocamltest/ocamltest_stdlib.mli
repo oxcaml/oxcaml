@@ -40,7 +40,8 @@ module List : sig
 end
 
 module String : sig
-  include module type of Misc.Stdlib.String
+  include module type of Stdlib.String
+  module Set : Set.S with type elt = string
   val words : string -> string list
 end
 

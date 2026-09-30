@@ -1010,7 +1010,9 @@ and is_useful_block ~non_consts env ~blocks =
     | Known row_like_for_blocks ->
       TG.Row_like_for_blocks.is_bottom row_like_for_blocks
       || Tag.Scannable.Map.exists
-           (fun tag (_block_shape, field_kinds) ->
+           (fun tag
+                (shape_and_fields :
+                  K.With_subkind.Non_null_value_subkind.constructor_shape) ->
              let tag = Tag.Scannable.to_tag tag in
              let[@local] process_case
                  (row_like_block_case : TG.row_like_block_case) =
@@ -1018,16 +1020,19 @@ and is_useful_block ~non_consts env ~blocks =
                   to return [true]; we should be able to prove [Bottom] during
                   inlining. *)
                let types = row_like_block_case.maps_to in
-               try
-                 List.iteri
-                   (fun ix field_kind ->
-                     if
-                       ix >= Array.length types
-                       || is_useful field_kind env types.(ix)
-                     then raise_notrace Maybe_useful)
-                   field_kinds;
-                 false
-               with Maybe_useful -> true
+               match shape_and_fields with
+               | Undetermined -> true
+               | Determined (_block_shape, field_kinds) -> (
+                 try
+                   List.iteri
+                     (fun ix field_kind ->
+                       if
+                         ix >= Array.length types
+                         || is_useful field_kind env types.(ix)
+                       then raise_notrace Maybe_useful)
+                     field_kinds;
+                   false
+                 with Maybe_useful -> true)
              in
              match Tag.Map.find tag row_like_for_blocks.known_tags with
              | Unknown -> false

@@ -73,17 +73,6 @@ module Datalog : sig
 
   type (!'t, !'k, !'v) table
 
-  (** The [provenance] argument is [true] by default. If set to [false],
-      provenance tracking will be disabled for this table. This is useful for
-      derived tables that are defined by a single rule, such as indices defined
-      by a permutation of another table. *)
-  val create_table :
-    ?provenance:bool ->
-    name:string ->
-    default_value:'v ->
-    ('t, 'k, 'v) Column.hlist ->
-    ('t, 'k, 'v) table
-
   val columns : ('t, 'k, 'v) table -> ('t, 'k, 'v) Column.hlist
 
   type ('t, 'k) relation = ('t, 'k, unit) table
@@ -99,7 +88,10 @@ module Datalog : sig
       implication for the performance of iterations on the relation, and needs
       to be chosen carefully.
 
-      See documentation of [create_table] for the [provenance] argument.
+      The [provenance] argument is [true] by default. If set to [false],
+      provenance tracking will be disabled for this table. This is useful for
+      derived tables that are defined by a single rule, such as indices defined
+      by a permutation of another table.
 
       @raise Misc.Fatal_error if [schema] is empty.
 
@@ -527,7 +519,7 @@ module Datalog : sig
 
       val columns : (t, keys, value) Column.hlist
 
-      val default_value : value
+      val result_repr : value Table.result_repr
 
       val create : name:string -> (t, keys, value) table
 
@@ -540,8 +532,6 @@ module Datalog : sig
       val add_or_replace : keys Constant.hlist -> value -> t -> t
 
       val remove : keys Constant.hlist -> t -> t
-
-      val union : (value -> value -> value option) -> t -> t -> t
 
       val find_opt : keys Constant.hlist -> t -> value option
     end

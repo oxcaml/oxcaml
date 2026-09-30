@@ -16,12 +16,20 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *)
 
-open Stdlib
+open! Stdlib
 
 module Wasm_binary : sig
+  type importdesc =
+    | Func of int
+    | Table
+    | Mem
+    | Global
+    | Tag
+
   type import =
     { module_ : string
     ; name : string
+    ; desc : importdesc
     }
 
   val check : contents:string -> bool
@@ -32,31 +40,30 @@ module Wasm_binary : sig
 
   val read_imports : file:string -> import list
 
+  val function_start_offsets : file:string -> int list
+  (** Offset of the start of each function body in the code section of the
+      module, in increasing order. This is the position profilers report
+      for stack frames within a function. *)
+
   val append_source_map_section : file:string -> url:string -> unit
 end
 
 type unit_data =
   { unit_name : string
   ; unit_info : Unit_info.t
-  ; strings : string list
   ; fragments : (string * Javascript.expression) list
   }
 
 val add_info :
-     Zip.output
-  -> ?predefined_exceptions:StringSet.t
-  -> build_info:Build_info.t
-  -> unit_data:unit_data list
-  -> unit
-  -> unit
+  Zip.output -> build_info:Build_info.t -> unit_data:unit_data list -> unit -> unit
 
 val build_runtime_arguments :
      link_spec:(string * int list option) list
   -> separate_compilation:bool
   -> missing_primitives:string list
   -> wasm_dir:string
-  -> generated_js:
-       (string option * (string list * (string * Javascript.expression) list)) list
+  -> generated_js:(string option * (string * Javascript.expression) list) list
+  -> embedded_files:(string * string) list
   -> unit
   -> Javascript.expression
 
@@ -67,6 +74,7 @@ val link :
   -> linkall:bool
   -> mklib:bool
   -> enable_source_maps:bool
+  -> embedded_files:(string * string) list
   -> files:string list
   -> unit
 

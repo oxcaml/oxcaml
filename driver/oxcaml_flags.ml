@@ -14,6 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 let dump_cfg = ref false                (* -dcfg *)
+let dump_ssa = ref false                (* -dssa *)
 let cfg_invariants = ref false          (* -dcfg-invariants *)
 let regalloc = ref Clflags.Register_allocator.Cfg (* -regalloc *)
 let default_regalloc_linscan_threshold = 100_000
@@ -60,7 +61,6 @@ let cfg_value_propagation_float = ref false
 let cfg_value_propagation_flow = ref false
                                         (* -[no]-cfg-value-propagation-flow *)
 let reorder_blocks_random = ref None    (* -reorder-blocks-random seed *)
-let basic_block_sections = ref false    (* -basic-block-sections *)
 (* -module-entry-functions-section *)
 let module_entry_functions_section = ref false
 
@@ -138,6 +138,12 @@ let branch_relaxation_max_displacement =
   ref max_int (* -dbranch-relaxation-max-displacement n *)
 
 let caml_apply_inline_fast_path = ref false  (* -caml-apply-inline-fast-path *)
+
+let use_ssa = ref false                      (* -use-ssa *)
+
+let ssa_simplify = ref true                 (* -ssa-simplify *)
+
+let ssa_validate = ref true                 (* -ssa-validate *)
 
 type function_result_types = Never | Functors_only | All_functions
 type join_algorithm = Binary | N_way | Checked

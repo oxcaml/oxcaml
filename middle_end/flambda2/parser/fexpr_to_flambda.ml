@@ -59,8 +59,13 @@ let rec subkind :
       non_consts
       |> List.map (fun (tag, sk) ->
           ( tag_scannable tag,
-            ( Flambda_kind.Block_shape.Scannable Value_only,
-              List.map value_kind_with_subkind sk ) ))
+            match sk with
+            | None ->
+              Flambda_kind.With_subkind.Non_null_value_subkind.Undetermined
+            | Some sk ->
+              Flambda_kind.With_subkind.Non_null_value_subkind.Determined
+                ( Flambda_kind.Block_shape.Scannable Value_only,
+                  List.map value_kind_with_subkind sk ) ))
       |> Tag.Scannable.Map.of_list
     in
     Variant { consts; non_consts }
@@ -920,6 +925,7 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
       match inlined with
       | None | Some Default_inlined -> Default_inlined
       | Some Hint_inlined -> Hint_inlined
+      | Some Forward_inlined -> Forward_inlined
       | Some Always_inlined -> Always_inlined Expected_to_be_used
       | Some (Unroll n) -> Unroll (n, Expected_to_be_used)
       | Some Never_inlined -> Never_inlined

@@ -157,7 +157,7 @@ end
 let parse_js file =
   let content = file |> Filetype.read_js |> Filetype.string_of_js_text in
   let filename = Filetype.path_of_js_file file in
-  try Jsoo.Parse_js.Lexer.of_string ~filename content |> Jsoo.Parse_js.parse
+  try Jsoo.Parse_js.Lexer.of_string ~filename content |> Jsoo.Parse_js.parse `Module
   with Jsoo.Parse_js.Parsing_error pi as e ->
     Printf.eprintf "failed to parse %s:%d:%d\n%s\n" filename pi.line pi.col content;
     raise e
@@ -236,14 +236,31 @@ let run_javascript file =
     ~cmd:(Format.sprintf "%s %s" node (Filetype.path_of_js_file file))
     ()
 
+(* QuickJS has no [--check] equivalent; under that profile, skip the
+   parse-only validation entirely rather than emulating it. *)
+let check_supported =
+  match Sys.getenv_opt "JSOO_TEST_ENGINE" with
+  | Some "quickjs" -> false
+  | _ -> true
+
 let check_javascript file =
-  exec_to_string_exn
-    ~fail:false
-    ~cmd:(Format.sprintf "%s --check %s" node (Filetype.path_of_js_file file))
-    ()
+  if check_supported
+  then
+    exec_to_string_exn
+      ~fail:false
+      ~cmd:(Format.sprintf "%s --check %s" node (Filetype.path_of_js_file file))
+      ()
+  else ""
 
 let check_javascript_source source =
-  exec_to_string_exn ~input:source ~fail:false ~cmd:(Format.sprintf "%s --check" node) ()
+  if check_supported
+  then
+    exec_to_string_exn
+      ~input:source
+      ~fail:false
+      ~cmd:(Format.sprintf "%s --check" node)
+      ()
+  else ""
 
 let run_bytecode file =
   exec_to_string_exn
@@ -272,6 +289,11 @@ let compile_to_javascript
     ~sourcemap
     file =
   let out_file = swap_extention file ~ext:"js" in
+  let is_qjs =
+    match Sys.getenv_opt "JSOO_TEST_ENGINE" with
+    | Some "quickjs" -> true
+    | _ -> false
+  in
   let extra_args =
     List.flatten
       [ (if pretty then [ "--pretty"; "--debug"; "var" ] else [])
@@ -279,10 +301,15 @@ let compile_to_javascript
       ; (match effects with
         | `Double_translation -> [ "--effects=double-translation" ]
         | `Cps -> [ "--effects=cps" ]
-        | `Disabled -> [])
+        | `Disabled -> [ "--effects=disabled" ])
       ; (if use_js_string
          then [ "--enable=use-js-string" ]
          else [ "--disable=use-js-string" ])
+      ; (* The qjs runtime needs +fs_quickjs.js for host-fs access. The
+           dune env stanza adds it for in-tree builds, but
+           [compile_and_run] invokes [js_of_ocaml.exe] as a subprocess
+           and bypasses that, so pass it explicitly. *)
+        (if is_qjs then [ "+fs_quickjs.js" ] else [])
       ; flags
       ; (if werror then [ "--Werror" ] else [])
       ]
@@ -366,7 +393,7 @@ let compile_ocaml_to_cmo ?(debug = true) file =
   print_string stdout;
   Filetype.cmo_file_of_path out_file
 
-let compile_ocaml_to_bc ?(debug = true) ?(unix = false) file =
+let compile_ocaml_to_bc ?(debug = true) ?(unix = false) ?(ocaml_flags = []) file =
   let file = Filetype.path_of_ocaml_file file in
   let out_file = swap_extention file ~ext:"bc" in
   let (stdout : string) =
@@ -374,10 +401,11 @@ let compile_ocaml_to_bc ?(debug = true) ?(unix = false) file =
       ~fail:true
       ~cmd:
         (Format.sprintf
-           "%s -no-check-prims -alert -unsafe_multidomain %s %s %s -o %s"
+           "%s -no-check-prims %s %s %s %s -o %s"
            ocamlc
            (if debug then "-g" else "")
            (if unix then "-I +unix unix.cma" else "")
+           (String.concat ~sep:" " ocaml_flags)
            file
            out_file)
       ()
@@ -551,13 +579,22 @@ let compile_and_run_bytecode ?unix s =
       |> run_bytecode
       |> print_endline)
 
-let compile_and_run ?debug ?pretty ?(flags = []) ?effects ?use_js_string ?unix ?werror s =
+let compile_and_run
+    ?debug
+    ?pretty
+    ?(flags = [])
+    ?(ocaml_flags = [])
+    ?effects
+    ?use_js_string
+    ?unix
+    ?werror
+    s =
   with_temp_dir ~f:(fun () ->
       let bytecode_file =
         s
         |> Filetype.ocaml_text_of_string
         |> Filetype.write_ocaml ~name:"test.ml"
-        |> compile_ocaml_to_bc ?debug ?unix
+        |> compile_ocaml_to_bc ?debug ?unix ~ocaml_flags
       in
       let output =
         compile_bc_to_javascript

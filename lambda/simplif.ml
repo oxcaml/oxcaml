@@ -430,7 +430,7 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
     && not restrict_to_upstream_dwarf
     && gdwarf_may_alter_codegen
   in
-  let optimize = !Clflags.native_code || not !Clflags.debug in
+  let optimize = !Clflags.native_code || not !Clflags.debug  in
   let optimize_except_alias_bindings =
     (* The debug info degrades when we substitute let x = y in ... bindings. We
        disable their simplification when [dwarf_wants_to_prevent_substitutions].
@@ -917,7 +917,7 @@ let split_default_wrapper ~id:fun_id ~debug_uid:fun_duid ~kind ~params ~return
                which ignores [ap_yielding]. *)
             ap_yielding = May_yield;
             ap_tailcall = Default_tailcall;
-            ap_inlined = Default_inlined;
+            ap_inlined = forward_inlined_attribute ();
             ap_specialised = Default_specialise;
             ap_probe=None;
           }

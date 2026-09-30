@@ -163,7 +163,7 @@ module Axis = struct
       let (P ax) =
         P ax |> Mode.Crossing.Axis.to_modality |> Mode.Modality.Axis.to_value
       in
-      Fmt.asprintf "%a" Mode.Value.Axis.print ax
+      Fmt.asprintf "%a" Mode.With_regionality.Axis.print ax
     | Nonmodal Externality -> "externality"
 end
 

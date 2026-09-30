@@ -85,11 +85,11 @@ let print_parameter_offset ~arg:argument ppf buffer env label ty =
 
 let omitted : Typedtree.omitted_parameter =
   let mode_closure =
-    Typedtree.create_alloc_mode_r
+    Typedtree.create_locality_mode_r
       (Mode.Locality.disallow_left Mode.Locality.legacy)
   in
   let mode_arg =
-    Typedtree.create_alloc_mode_l
+    Typedtree.create_locality_mode_l
       (Mode.Locality.disallow_right Mode.Locality.legacy)
   in
   let mode_ret =

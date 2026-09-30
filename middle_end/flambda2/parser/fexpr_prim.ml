@@ -617,7 +617,16 @@ let kind_with_subkind =
             fun _ num_fields -> Float_block { num_fields } )
         in
         let| variant =
-          let item = param2 block_shape (list full_kind) in
+          let item =
+            maps
+              (option (param2 block_shape (list full_kind)))
+              ~from:(fun _ -> function
+                | None -> Undetermined
+                | Some (shape, fields) -> Determined (shape, fields))
+              ~to_:(fun _ -> function
+                | Undetermined -> None
+                | Determined (shape, fields) -> Some (shape, fields))
+          in
           let map_bind = positional (param2 scannable_tag item) in
           let tag_map =
             maps (list map_bind)
@@ -728,7 +737,8 @@ let probe_is_enabled =
 let enter_inlined_apply =
   D.(
     nullary "%inlined_apply" ~params:param0 (fun _env () ->
-        P.Enter_inlined_apply { dbg = Inlined_debuginfo.none }))
+        P.Enter_inlined_apply
+          { dbg = Inlined_debuginfo.none; inlined_attribute = Default_inlined }))
 
 let domain_index =
   D.(nullary "%domain_index" ~params:param0 (fun _env () -> P.Domain_index))
@@ -1340,7 +1350,8 @@ module OfFlambda = struct
     | Optimised_out kind -> optimised_out env kind
     | Probe_is_enabled { name; enabled_at_init } ->
       probe_is_enabled env (wrap_loc name, enabled_at_init)
-    | Enter_inlined_apply { dbg = _ } -> enter_inlined_apply env ()
+    | Enter_inlined_apply { dbg = _; inlined_attribute = _ } ->
+      enter_inlined_apply env ()
     | Domain_index -> domain_index env ()
     | Dls_get -> dls_get env ()
     | Tls_get -> tls_get env ()

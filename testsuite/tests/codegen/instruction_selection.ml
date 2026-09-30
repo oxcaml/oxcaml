@@ -96,36 +96,29 @@ let combine_comparisons r f =
 ;;
 [%%expect_asm X86_64{|
 combine_comparisons:
-  movq  (%rax), %rdi
-  xorl  %ebx, %ebx
-  cmpq  $41, %rdi
-  setl  %bl
-  movq  %rdi, %rax
+  movq  (%rax), %rax
   cmpq  $11, %rax
   jle   .L0
-  testq %rbx, %rbx
-  je    .L0
+  cmpq  $41, %rax
+  jge   .L0
   ret
 .L0:
   movl  $1, %eax
   ret
 |}]
 
-(* CR ttebbi: We branch twice on the same comparison, materializing a boolean
-   for the second branch. *)
+(* CR ttebbi: We branch twice on the same comparison. *)
 let repeat_comparisons r _f =
   let a = !r > 5 in
   let b = !r > 5 in
   if a && b then 1 else 2
 [%%expect_asm X86_64{|
 repeat_comparisons:
-  movq  (%rax), %rbx
-  xorl  %eax, %eax
-  cmpq  $11, %rbx
-  setg  %al
+  movq  (%rax), %rax
+  cmpq  $11, %rax
   jle   .L0
-  testq %rax, %rax
-  je    .L0
+  cmpq  $11, %rax
+  jle   .L0
   movl  $3, %eax
   ret
 .L0:
@@ -214,20 +207,20 @@ let two_element_list x = [x; x]
 [%%expect_asm X86_64{|
 two_element_list:
   subq  $8, %rsp
-  movq  %rax, %rdi
   subq  $48, %r15
   cmpq  (%r14), %r15
   jb    <hidden GC jump pad>
 .L0:
-  leaq  8(%r15), %rbx
-  addq  $24, %rbx
+  leaq  8(%r15), %rdi
+  addq  $24, %rdi
+  movq  $2048, -8(%rdi)
+  movq  %rax, (%rdi)
+  movq  $1, 8(%rdi)
+  leaq  -24(%rdi), %rbx
   movq  $2048, -8(%rbx)
-  movq  %rdi, (%rbx)
-  movq  $1, 8(%rbx)
-  leaq  -24(%rbx), %rax
-  movq  $2048, -8(%rax)
-  movq  %rdi, (%rax)
-  movq  %rbx, 8(%rax)
+  movq  %rax, (%rbx)
+  movq  %rdi, 8(%rbx)
+  movq  %rbx, %rax
   addq  $8, %rsp
   ret
 |}]
@@ -268,9 +261,9 @@ let int32_box_unbox_after_call (a : ptr) (b : ptr) =
 [%%expect_asm X86_64{|
 int32_box_unbox_after_call:
   subq  $8, %rsp
+  movl  $5, %edx
   movq  %rax, %rdi
   movq  %rbx, %rsi
-  movl  $5, %edx
   call  memcmp@PLT
   movslq %eax, %rax
   addq  $8, %rsp

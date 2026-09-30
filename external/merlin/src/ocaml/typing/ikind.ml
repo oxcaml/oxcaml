@@ -286,7 +286,7 @@ module Solver = struct
     | _ -> !Clflags.recursive_types
 
   let is_principal_type (ty : Types.type_expr) : bool =
-    (not !Clflags.principal) || Types.get_level ty = Btype.generic_level
+    (not !Clflags.principal) || Types.get_level ty >= Btype.subject_level
 
   let crossing_externality (node : Ldd.node) : Ldd.node =
     Ldd.meet node

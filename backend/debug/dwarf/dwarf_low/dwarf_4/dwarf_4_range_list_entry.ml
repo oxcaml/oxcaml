@@ -22,22 +22,30 @@ module Range_list_entry = struct
   type t =
     { start_of_code_symbol : Asm_symbol.t;
       beginning_address_label : Asm_label.t;
+      beginning_address_offset : int option;
       ending_address_label : Asm_label.t;
       ending_address_offset : int option
     }
 
   let create ~start_of_code_symbol ~first_address_when_in_scope
-      ~first_address_when_not_in_scope ~first_address_when_not_in_scope_offset =
+      ~first_address_when_in_scope_offset ~first_address_when_not_in_scope
+      ~first_address_when_not_in_scope_offset =
     { start_of_code_symbol;
       beginning_address_label = first_address_when_in_scope;
+      beginning_address_offset = first_address_when_in_scope_offset;
       ending_address_label = first_address_when_not_in_scope;
       ending_address_offset = first_address_when_not_in_scope_offset
     }
 
   let beginning_value t =
+    let offset_upper =
+      match t.beginning_address_offset with
+      | None -> Targetint.zero
+      | Some offset -> Targetint.of_int_exn offset
+    in
     Dwarf_value.code_address_from_label_symbol_diff ~comment:"beginning address"
       ~upper:t.beginning_address_label ~lower:t.start_of_code_symbol
-      ~offset_upper:Targetint.zero ()
+      ~offset_upper ()
 
   let ending_value t =
     let offset_upper =
@@ -87,10 +95,12 @@ type t =
   | Base_address_selection_entry of Base_address_selection_entry.t
 
 let create_range_list_entry ~start_of_code_symbol ~first_address_when_in_scope
-    ~first_address_when_not_in_scope ~first_address_when_not_in_scope_offset =
+    ~first_address_when_in_scope_offset ~first_address_when_not_in_scope
+    ~first_address_when_not_in_scope_offset =
   Range_list_entry
     (Range_list_entry.create ~start_of_code_symbol ~first_address_when_in_scope
-       ~first_address_when_not_in_scope ~first_address_when_not_in_scope_offset)
+       ~first_address_when_in_scope_offset ~first_address_when_not_in_scope
+       ~first_address_when_not_in_scope_offset)
 
 let create_base_address_selection_entry ~base_address_symbol =
   Base_address_selection_entry

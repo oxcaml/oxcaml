@@ -6,9 +6,11 @@ updates:
   - package-ecosystem: github-actions
     directory: / # scans .github/workflows/ (and action.yml files at the root)
     schedule:
-      interval: weekly
+      interval: monthly
+    assignees:
+      - jvanburen
     groups:
-      # One combined PR per week instead of one PR per action.
+      # One combined PR per month instead of one PR per action.
       actions:
         patterns:
           - "*"

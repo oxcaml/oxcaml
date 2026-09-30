@@ -29,13 +29,13 @@ let transl_locality_mode_l locality =
 let transl_return_mode_l locality =
   Locality.zap_to_floor_exn locality |> transl_ret_mode
 
-let transl_alloc_mode_l mode =
-  Typedtree.alloc_mode_l_zap_to_floor mode |> transl_locality_mode
+let transl_typed_locality_mode_l mode =
+  Typedtree.locality_mode_l_zap_to_floor mode |> transl_locality_mode
 
-let transl_alloc_mode_r mode =
+let transl_typed_locality_mode_r mode =
   (* r mode are for allocations; [optimise_allocations] should have pushed it
      to ceil and determined; here we push it again just to get the constant. *)
-  Typedtree.alloc_mode_r_zap_to_ceil mode |> transl_locality_mode
+  Typedtree.locality_mode_r_zap_to_ceil mode |> transl_locality_mode
 
 let transl_yielding_mode_l yielding =
   match Yielding.zap_to_floor_exn yielding with

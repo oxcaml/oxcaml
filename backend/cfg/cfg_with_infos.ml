@@ -65,8 +65,7 @@ let dominators t =
   compute_if_necessary t.dominators ~f:(fun () -> Cfg_dominators.build (cfg t))
 
 let loop_infos t =
-  compute_if_necessary t.loop_infos ~f:(fun () ->
-      Cfg_loop_infos.build (cfg t) (dominators t))
+  compute_if_necessary t.loop_infos ~f:(fun () -> Cfg_loop_infos.build (cfg t))
 
 let invalidate_loop_infos t = t.loop_infos := None
 
