@@ -1299,9 +1299,7 @@ void caml_continuation_replace(value cont, struct stack_info* stk)
   (void)b; /* squash unused warning */
 }
 
-/* Only fibers allocated as preemptible may have a tick handler (see
-   [is_preemptible] in fiber.h). */
-static void check_tick_handler_allowed(struct stack_info* stk, value htick)
+static void check_preemptable(struct stack_info* stk, value htick)
 {
   if (htick != Val_null && !Stack_is_preemptible(stk))
     caml_fatal_error("cannot add a tick handler to a non-preemptible fiber");
@@ -1324,7 +1322,7 @@ CAMLprim value caml_continuation_update_handler_noexc
     return cont;
   }
   stk = Ptr_val(Field(cont, 1));
-  check_tick_handler_allowed(stk, htick);
+  check_preemptable(stk, htick);
   Stack_handle_value(stk) = hval;
   Stack_handle_exception(stk) = hexn;
   Stack_handle_effect(stk) = heff;
@@ -1353,7 +1351,7 @@ CAMLprim value caml_continuation_update_tick_handler_noexc
     return cont;
   }
   while (Stack_parent(stk) != NULL) stk = Stack_parent(stk);
-  check_tick_handler_allowed(stk, htick);
+  check_preemptable(stk, htick);
   Stack_handle_tick(stk) = htick;
   caml_continuation_replace(cont, Ptr_val(stack));
 
