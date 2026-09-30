@@ -44,8 +44,9 @@
  (action
   (run ./fdo_decode_test.exe)))
 
-; Deterministic test of -fdo-profile: build a profile that marks one branch
-; of hot_cold.ml hot, compile with it, and check the block frequencies.
+; Deterministic test of -fdo-profile cold-block sinking: build a profile
+; that marks one branch of hot_cold.ml hot, compile with it, and check the
+; resulting block layouts.
 
 (executable
  (name filter_fdo_dump)
@@ -157,7 +158,7 @@
 ; runtime/singlestep_profiler.c, x86-64 Linux only): compile specialize.ml
 ; with counters, run it collecting a complete trace of its hot part, decode the
 ; trace into a profile and check it (specialize.profile), recompile with it,
-; and check the block frequencies (specialize.output).
+; and check the block frequencies and layouts (specialize.output).
 
 (rule
  (enabled_if

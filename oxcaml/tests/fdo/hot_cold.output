@@ -1,9 +1,17 @@
 *** FDO block frequencies for camlHot_cold__hot_0_3_code: not profiled
   body: unknown
   entry: ["Hot_cold.hot":0]
+cfg for camlHot_cold__hot_0_3_code
+  block 1
+  block 113
+  block 115
 *** FDO block frequencies for camlHot_cold__cold_1_4_code: not profiled
   body: unknown
   entry: ["Hot_cold.cold":0]
+cfg for camlHot_cold__cold_1_4_code
+  block 1
+  block 121
+  block 123
 *** FDO block frequencies for camlHot_cold__f_2_5_code
   body: same
   entry: ["Hot_cold.f":0]
@@ -17,4 +25,14 @@
   edge 134 -> exit: 100 (derived)
   edge 129 -> 131 ["Hot_cold.f":0:61349092:0:else]: 0
   edge 131 -> exit: 0 (derived)
+cfg for camlHot_cold__f_2_5_code
+  block 1
+  block 129
+  block 134
+  block 131
 *** FDO block frequencies for camlHot_cold__entry: not profiled
+cfg for camlHot_cold__entry
+  block 1
+  block 147
+  block 149
+  block 150

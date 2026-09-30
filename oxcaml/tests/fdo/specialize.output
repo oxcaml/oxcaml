@@ -16,6 +16,13 @@
   edge 103 -> exit: 40 (derived)
   edge 108 -> 111 ["Specialize.classify":0:10d1b4fa:1:then]: 40
   edge 111 -> exit: 40 (derived)
+cfg for camlSpecialize__classify_0_15_code
+  block 1
+  block 101
+  block 108
+  block 113
+  block 111
+  block 103
 *** FDO block frequencies for camlSpecialize__bump_1_16_code
   body: same
   entry: ["Specialize.bump":0]
@@ -24,6 +31,9 @@
   edge entry -> 1: 40
   edge 1 -> 121: 40 (derived)
   edge 121 -> exit: 40 (derived)
+cfg for camlSpecialize__bump_1_16_code
+  block 1
+  block 121
 *** FDO block frequencies for camlSpecialize__tally_2_17_code
   body: same
   entry: ["Specialize.tally":0]
@@ -32,6 +42,9 @@
   edge entry -> 1: 40
   edge 1 -> 126: 40 (derived)
   edge 126 -> exit: 40 (derived)
+cfg for camlSpecialize__tally_2_17_code
+  block 1
+  block 126
 *** FDO block frequencies for camlSpecialize__Make_3_18_code
   body: same
   entry: ["Specialize.Make":0]
@@ -40,6 +53,9 @@
   edge entry -> 1: 0
   edge 1 -> 131: 0 (derived)
   edge 131 -> exit: 0 (derived)
+cfg for camlSpecialize__Make_3_18_code
+  block 1
+  block 131
 *** FDO block frequencies for camlSpecialize__count_4_19_code
   body: same
   entry: ["Specialize.Make.count":0]
@@ -83,6 +99,23 @@
   edge 196 -> 199: 0 (derived)
   edge 199 -> 149: 0 (derived)
   edge 204 -> exit: 0 (derived)
+cfg for camlSpecialize__count_4_19_code
+  block 1
+  block 140
+  block 149
+  block 154
+  block 162
+  block 168
+  block 171
+  block 173
+  block 182
+  block 185
+  block 187
+  block 190
+  block 193
+  block 196
+  block 199
+  block 204
 *** FDO block frequencies for camlSpecialize__count_4_25_code
   body: same
   entry: ["Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.High":0))]
@@ -126,6 +159,23 @@
   edge 293 -> exit: 1 (derived)
   edge 252 -> 271 ["Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.High":0)):e2227555:2:then]: 0 (derived)
   edge 282 -> escape: 0 (derived)
+cfg for camlSpecialize__count_4_25_code
+  block 1
+  block 232
+  block 276
+  block 279
+  block 252
+  block 274
+  block 282
+  block 285
+  block 288
+  block 241
+  block 246
+  block 258
+  block 260
+  block 262
+  block 271
+  block 293
 *** FDO block frequencies for camlSpecialize__count_4_21_code
   body: same
   entry: ["Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))]
@@ -169,6 +219,23 @@
   edge 377 -> 380: 0 (derived)
   edge 380 -> 330: 0 (derived)
   edge 385 -> exit: 0 (derived)
+cfg for camlSpecialize__count_4_21_code
+  block 1
+  block 321
+  block 330
+  block 335
+  block 343
+  block 349
+  block 352
+  block 354
+  block 363
+  block 366
+  block 368
+  block 371
+  block 374
+  block 377
+  block 380
+  block 385
 *** FDO block frequencies for camlSpecialize__count_4_23_code
   body: same
   entry: ["Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.Low":0))]
@@ -212,6 +279,23 @@
   edge 474 -> exit: 1 (derived)
   edge 433 -> 452 ["Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.Low":0)):e2227555:2:then]: 0 (derived)
   edge 463 -> escape: 0 (derived)
+cfg for camlSpecialize__count_4_23_code
+  block 1
+  block 413
+  block 460
+  block 457
+  block 443
+  block 452
+  block 469
+  block 422
+  block 427
+  block 439
+  block 441
+  block 455
+  block 463
+  block 466
+  block 433
+  block 474
 *** FDO block frequencies for camlSpecialize__Outer_5_20_code
   body: same
   entry: ["Specialize.Outer":0]
@@ -221,6 +305,9 @@
   edge entry -> 1: 0
   edge 1 -> 502: 0 (derived)
   edge 502 -> exit: 0 (derived)
+cfg for camlSpecialize__Outer_5_20_code
+  block 1
+  block 502
 *** FDO block frequencies for camlSpecialize__run_6_22_code
   body: same
   entry: ["Specialize.Outer.run":0]
@@ -229,6 +316,9 @@
   edge entry -> 1: 0
   edge 1 -> 513: 0 (derived)
   edge 513 -> exit: 0 (derived)
+cfg for camlSpecialize__run_6_22_code
+  block 1
+  block 513
 *** FDO block frequencies for camlSpecialize__run_6_26_code
   body: same
   entry: ["Specialize.Outer.run":0@(module("Specialize.High":0))]
@@ -237,6 +327,9 @@
   edge entry -> 1: 1
   edge 1 -> 521: 1 (derived)
   edge 521 -> exit: 1 (derived)
+cfg for camlSpecialize__run_6_26_code
+  block 1
+  block 521
 *** FDO block frequencies for camlSpecialize__run_6_24_code
   body: same
   entry: ["Specialize.Outer.run":0@(module("Specialize.Low":0))]
@@ -245,6 +338,9 @@
   edge entry -> 1: 1
   edge 1 -> 527: 1 (derived)
   edge 527 -> exit: 1 (derived)
+cfg for camlSpecialize__run_6_24_code
+  block 1
+  block 527
 *** FDO block frequencies for camlSpecialize__fn[specialize.ml:84,37--70]_9_29_code
   body: same
   entry: ["Specialize.(fun)@param,block0,field1,Low,a":0]
@@ -259,6 +355,11 @@
   edge 537 -> exit: 1 (derived)
   edge 533 -> escape: 0 (estimated in 0..1)
   edge 535 -> escape: 0 (estimated in 0..1)
+cfg for camlSpecialize__fn[specialize.ml:84,37--70]_9_29_code
+  block 1
+  block 533
+  block 535
+  block 537
 *** FDO block frequencies for camlSpecialize__fail_or_return_10_30_code
   body: same
   entry: ["Specialize.fail_or_return":0]
@@ -272,6 +373,11 @@
   edge 551 -> 555 ["Specialize.fail_or_return":0:fed247dc:0:else]: 1
   edge 553 -> exit: 1 (derived)
   edge 555 -> exit: 1 (derived)
+cfg for camlSpecialize__fail_or_return_10_30_code
+  block 1
+  block 551
+  block 553
+  block 555
 *** FDO block frequencies for camlSpecialize__tail_fail_11_31_code
   body: same
   entry: ["Specialize.tail_fail":0]
@@ -280,6 +386,9 @@
   edge entry -> 1: 2
   edge 1 -> 561: 2 (derived)
   edge 561 -> exit: 2 (derived)
+cfg for camlSpecialize__tail_fail_11_31_code
+  block 1
+  block 561
 *** FDO block frequencies for camlSpecialize__protected_12_32_code
   body: same
   entry: ["Specialize.protected":0]
@@ -303,6 +412,15 @@
   edge 577 -> 599 ["Specialize.protected":0:41ea4828:1:else]: 0
   edge 599 -> 604 ["Specialize.protected":0:41ea4828:2:else]: 0
   edge 604 -> exit: 0 (derived)
+cfg for camlSpecialize__protected_12_32_code
+  block 1
+  block 567
+  block 585
+  block 577
+  block 590
+  block 599
+  block 602
+  block 604
 *** FDO block frequencies for camlSpecialize__after_protected_13_33_code
   body: same
   entry: ["Specialize.after_protected":0]
@@ -314,6 +432,10 @@
   edge 617 -> 619: 2 (estimated in 0..2)
   edge 619 -> exit: 2 (derived)
   edge 617 -> escape: 0 (estimated in 0..2)
+cfg for camlSpecialize__after_protected_13_33_code
+  block 1
+  block 617
+  block 619
 *** FDO block frequencies for camlSpecialize__fn[specialize.ml:105,36--93]_14_34_code
   body: same
   entry: ["Specialize.(fun)@param,%int_add,after_protected,0,3":0]
@@ -328,6 +450,11 @@
   edge 629 -> exit: 1 (derived)
   edge 626 -> escape: 0 (estimated in 0..1)
   edge 628 -> escape: 0 (estimated in 0..1)
+cfg for camlSpecialize__fn[specialize.ml:105,36--93]_14_34_code
+  block 1
+  block 626
+  block 628
+  block 629
 *** FDO block frequencies for camlSpecialize__entry: not profiled
   edge 688 -> 691 +["Specialize.(fun)@i":1]
   edge 688 -> 693
@@ -339,3 +466,34 @@
   edge 717 -> 724 ["Specialize":0:1e27a3bc:6:then]
   edge 702 -> 742 ["Specialize":0:1e27a3bc:4:else]
   edge 702 -> 709 ["Specialize":0:1e27a3bc:4:then]
+cfg for camlSpecialize__entry
+  block 1
+  block 645
+  block 647
+  block 651
+  block 655
+  block 657
+  block 659
+  block 662
+  block 664
+  block 671
+  block 676
+  block 680
+  block 684
+  block 686
+  block 688
+  block 691
+  block 693
+  block 700
+  block 702
+  block 709
+  block 711
+  block 713
+  block 714
+  block 717
+  block 724
+  block 726
+  block 728
+  block 730
+  block 736
+  block 742
