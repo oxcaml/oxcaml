@@ -246,7 +246,8 @@ module Violation : sig
   (** Set [?missing_cmi] to mark [t] as having arisen from a missing cmi *)
 
   val of_ :
-    context:jkind_context -> ?missing_cmi:Path.t -> Env.t -> violation -> t
+    context:jkind_context -> ?missing_cmi:Path.t ->
+    Env.t -> violation -> t
 
   (** Is this error from a missing cmi? *)
   val is_missing_cmi : t -> bool
@@ -657,7 +658,8 @@ val equal_unsafe_mode_crossing :
   bool
 
 val get_externality_upper_bound :
-  context:jkind_context -> Env.t -> 'd Types.jkind -> Jkind_axis.Externality.t
+  context:jkind_context -> Env.t ->
+  'd Types.jkind -> Jkind_axis.Externality.t
 
 (** Computes a jkind that is the same as the input but with an updated maximum
     mode for the externality axis *)

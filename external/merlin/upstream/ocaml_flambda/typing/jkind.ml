@@ -1105,18 +1105,10 @@ module Base_and_axes = struct
      into the result. It may avoid expanding with-bounds that can contribute
      only below [ambient_bounds]. Passing [Axis_lattice.bot] gives exact
      normalization. *)
-  let normalize : type l r.
-      context:_ ->
-      mode:normalize_mode ->
-      ambient_bounds:Axis_lattice.t ->
-      previously_ran_out_of_fuel:bool ->
-      ?map_type_info:
-        (type_expr -> With_bounds_type_info.t -> With_bounds_type_info.t) ->
-      Env.t ->
-      (_, l * r) base_and_axes ->
-      (_, l * r) base_and_axes * Fuel_status.t =
-   fun ~context ~mode ~ambient_bounds ~previously_ran_out_of_fuel ?map_type_info
-       env t ->
+  let normalize (type l r) ~context ~(mode : normalize_mode) ~ambient_bounds
+      ~previously_ran_out_of_fuel ?map_type_info env
+      (t : (_, l * r) base_and_axes) : (_, l * r) base_and_axes * Fuel_status.t
+      =
     let t = fully_expand_aliases env t in
     let t_has_abstract_base =
       (* If the kind's base is abstract, optimization that skip axes where the
@@ -1294,12 +1286,12 @@ module Base_and_axes = struct
            cutting off the recursion, it continues until it runs out of fuel.
         *)
 
-        let rec check ~bounds_mask
+        let rec check context ~bounds_mask
             ({ tuple_fuel; seen_constrs; seen_row_vars; fuel_status = _ } as t)
             ty =
           match Types.get_desc ty with
-          | Tmod (ty, _) -> check ~bounds_mask t ty
-          | Tpoly (ty, _) | Trepr (ty, _) -> check ~bounds_mask t ty
+          | Tmod (ty, _) -> check context ~bounds_mask t ty
+          | Tpoly (ty, _) | Trepr (ty, _) -> check context ~bounds_mask t ty
           | Ttuple _ ->
             if tuple_fuel > 0
             then
@@ -1417,7 +1409,7 @@ module Base_and_axes = struct
             { ctl with fuel_status = Sufficient_fuel } )
         | (ty, ti) :: bs -> (
           (* Map the type's info before expanding the type *)
-          let ti =
+          let ti : With_bounds_type_info.t =
             match map_type_info with
             | None -> ti
             | Some map_type_info -> map_type_info ty ti
@@ -1497,7 +1489,8 @@ module Base_and_axes = struct
                     ctl )
               in
               match
-                Loop_control.check ~bounds_mask:bounds_mask_for_ty ctl ty
+                Loop_control.check context ~bounds_mask:bounds_mask_for_ty ctl
+                  ty
               with
               | Stop ctl -> (
                 match mode with
@@ -4046,12 +4039,12 @@ let combine_histories ~type_equal ~context env reason (Pack_jkind k1)
     match Base_and_axes.(try_allow_l k1.jkind, try_allow_r k2.jkind) with
     | Some k1_l, Some k2_r ->
       choose_subjkind_history k1_l k1.history
-        k1.ran_out_of_fuel_during_normalize k2_r k2.history
+        k1.ran_out_of_fuel_during_normalize k2_r k2.history [@nontail]
     | _ -> (
       match Base_and_axes.(try_allow_r k1.jkind, try_allow_l k2.jkind) with
       | Some k1_r, Some k2_l ->
         choose_subjkind_history k2_l k2.history
-          k2.ran_out_of_fuel_during_normalize k1_r k1.history
+          k2.ran_out_of_fuel_during_normalize k1_r k1.history [@nontail]
       | _ -> choose_higher_scored_history k1.history k2.history)
   else
     Interact
@@ -4124,8 +4117,10 @@ let round_up (type l r) ~context env (t : (allowed * r) jkind) :
   | With_bounds _ -> None
 
 (* this is hammered on; it must be fast! *)
-let check_sub ~context env sub super =
-  Jkind_desc.sub ~context env sub.jkind super.jkind
+let check_sub ~type_equal ~sub_previously_ran_out_of_fuel ~context env sub super
+    =
+  Jkind_desc.sub ~type_equal ~sub_previously_ran_out_of_fuel ~context env
+    sub.jkind super.jkind
 
 let sub_with_reason ~type_equal ~context env sub super =
   Sub_result.require_le
@@ -4184,128 +4179,138 @@ let equal_unsafe_mode_crossing ~type_equal ~context env umc1 umc2 =
   let wb2 = With_bounds.to_best_eff_map umc2.unsafe_with_bounds in
   (* Best-effort maps may contain equivalent keys. Aggregate them after capping
      each occurrence by the bound type's direct bounds. *)
-  let bounds_mask_for_type ty bounds =
-    With_bounds_types.to_seq bounds
-    |> Seq.fold_left
-         (fun bounds_mask (ty', (info : With_bounds_type_info.t)) ->
-           if type_equal ty ty'
-           then
-             Bounds_mask.join bounds_mask
-               (Bounds_mask.meet info.bounds_mask
-                  (direct_bounds_for_type ~context env ty'))
-           else bounds_mask)
-         Bounds_mask.bot
-    |> fun bounds_mask -> Bounds_mask.residual bounds_mask direct_bounds
+  let rec bounds_mask_for_type context ty bounds_mask bounds =
+    match bounds () with
+    | Seq.Nil -> Bounds_mask.residual bounds_mask direct_bounds
+    | Seq.Cons ((ty', (info : With_bounds_type_info.t)), rest) ->
+      let bounds_mask =
+        if type_equal ty ty'
+        then
+          Bounds_mask.join bounds_mask
+            (Bounds_mask.meet info.bounds_mask
+               (direct_bounds_for_type ~context env ty'))
+        else bounds_mask
+      in
+      bounds_mask_for_type context ty bounds_mask rest
   in
-  let same_bounds_mask ty =
-    Bounds_mask.equal
-      (bounds_mask_for_type ty wb1)
-      (bounds_mask_for_type ty wb2)
+  let rec same_bounds_masks context bounds =
+    match bounds () with
+    | Seq.Nil -> true
+    | Seq.Cons ((ty, _), rest) ->
+      Bounds_mask.equal
+        (bounds_mask_for_type context ty Bounds_mask.bot
+           (With_bounds_types.to_seq wb1))
+        (bounds_mask_for_type context ty Bounds_mask.bot
+           (With_bounds_types.to_seq wb2))
+      && same_bounds_masks context rest
   in
-  With_bounds_types.for_all (fun ty _info -> same_bounds_mask ty) wb1
-  && With_bounds_types.for_all (fun ty _info -> same_bounds_mask ty) wb2
+  same_bounds_masks context (With_bounds_types.to_seq wb1)
+  && same_bounds_masks context (With_bounds_types.to_seq wb2)
 
 let sub_jkind_l ~type_equal ~context ?(allow_any_crossing = false) env sub super
     =
   (* This function implements the "SUB" judgement from kind-inference.md. *)
-  let open Misc.Stdlib.Monad.Result.Syntax in
   let require_le sub_result =
-    Sub_result.require_le sub_result
-    |> Result.map_error (fun reasons ->
-        (* When we report an error, we want to show the best-normalized
+    match Sub_result.require_le sub_result with
+    | Ok () -> Ok ()
+    | Error reasons ->
+      (* When we report an error, we want to show the best-normalized
               version of sub, but the original super. When this check fails, it
               is usually the case that the super was written by the user and the
               sub was inferred. Thus, we should display the user-written jkind,
               but simplify the inferred one, since the inferred one is probably
               overly complex. *)
-        (* CR layouts v2.8: It would be useful report to the user why this
+      (* CR layouts v2.8: It would be useful report to the user why this
               violation occurred, specifically which axes the violation is
               along. Internal ticket 5100. *)
-        let best_sub = normalize ~mode:Require_best ~context env sub in
-        Violation.of_ ~context env
-          (Not_a_subjkind (best_sub, super, Nonempty_list.to_list reasons)))
+      let best_sub = normalize ~mode:Require_best ~context env sub in
+      Error
+        (Violation.of_ ~context env
+           (Not_a_subjkind (best_sub, super, Nonempty_list.to_list reasons)))
   in
   let sub_jkind = Base_and_axes.fully_expand_aliases env sub.jkind in
   let super_jkind = Base_and_axes.fully_expand_aliases env super.jkind in
-  let* () =
-    (* Validate layouts *)
-    require_le (Base.sub_expanded sub_jkind.base super_jkind.base)
-  in
-  match allow_any_crossing with
-  | true -> Ok ()
-  | false -> (
-    let best_super, _ =
-      (* MB_EXPAND_R *)
-      Base_and_axes.normalize ~context ~ambient_bounds:Axis_lattice.bot
-        ~mode:Require_best ~previously_ran_out_of_fuel:false env super_jkind
-    in
-    let right_bounds = With_bounds.to_best_eff_map best_super.with_bounds in
-    let ambient_bounds_on_right =
-      (* Direct bounds on the right are already part of the final comparison,
+  (* Validate layouts *)
+  match require_le (Base.sub_expanded sub_jkind.base super_jkind.base) with
+  | Error _ as error -> error
+  | Ok () -> (
+    match allow_any_crossing with
+    | true -> Ok ()
+    | false -> (
+      let best_super, _ =
+        (* MB_EXPAND_R *)
+        Base_and_axes.normalize ~context ~ambient_bounds:Axis_lattice.bot
+          ~mode:Require_best ~previously_ran_out_of_fuel:false env super_jkind
+      in
+      let right_bounds = With_bounds.to_best_eff_map best_super.with_bounds in
+      let ambient_bounds_on_right =
+        (* Direct bounds on the right are already part of the final comparison,
          so normalization of the left can avoid computing contributions below
          those bounds. Unlike in [Jkind_desc.sub], [best_super] here is
          [Require_best]-normalized, and we preserve the old optimization for
          an abstract base: skip axes whose bound is fully max on the right. *)
-      match best_super.base with
-      | Layout _ -> Mod_bounds.to_axis_lattice best_super.mod_bounds
-      | Kconstr _ ->
-        Mod_bounds.get_max_axes best_super.mod_bounds
-        |> Axis_lattice.of_axis_set
-    in
-    let right_bounds_seq = right_bounds |> With_bounds_types.to_seq in
-    let sub, _ =
-      (* MB_EXPAND_L *)
-      (* Expand left-side types only along bounds not covered by an equivalent
-         right-side occurrence or saturated by the right direct bounds. *)
-      Base_and_axes.normalize env sub_jkind
-        ~ambient_bounds:ambient_bounds_on_right
-        ~previously_ran_out_of_fuel:sub.ran_out_of_fuel_during_normalize
-        ~context ~mode:Ignore_best
-        ~map_type_info:(fun ty { bounds_mask = left_bounds_mask } ->
-          let direct_bounds_for_type = direct_bounds_for_type ~context env ty in
-          let left_bounds_mask =
-            Bounds_mask.meet left_bounds_mask direct_bounds_for_type
-          in
-          let right_bounds_mask =
-            right_bounds_seq
-            (* CR layouts v2.8: maybe it's worth memoizing using a best-effort
-               type map? Internal ticket 5086. *)
-            |> Seq.fold_left
-                 (fun acc (ty2, ti) ->
-                   match type_equal ty ty2 with
-                   | true ->
-                     Bounds_mask.join acc ti.With_bounds_type_info.bounds_mask
-                   | false -> acc)
-                 Bounds_mask.bot
-            |> Bounds_mask.meet direct_bounds_for_type
-          in
-          let saturated_by_right_direct_bounds =
-            Mod_bounds.saturated_mask best_super.mod_bounds left_bounds_mask
-          in
-          let remaining_bounds_mask =
-            Bounds_mask.residual left_bounds_mask
-              (Bounds_mask.join right_bounds_mask
-                 saturated_by_right_direct_bounds)
-          in
-          (* MB_WITH : drop types from the left that appear on the right *)
-          { bounds_mask = remaining_bounds_mask })
-    in
-    match sub with
-    | { base = _; mod_bounds = sub_upper_bounds; with_bounds = No_with_bounds }
-      ->
-      let* () =
-        (* MB_MODE : verify that the remaining upper_bounds from sub are <=
-           super's bounds *)
-        let super_lower_bounds = best_super.mod_bounds in
-        require_le
-          (Mod_bounds.less_or_equal sub_upper_bounds super_lower_bounds)
+        match best_super.base with
+        | Layout _ -> Mod_bounds.to_axis_lattice best_super.mod_bounds
+        | Kconstr _ ->
+          Mod_bounds.get_max_axes best_super.mod_bounds
+          |> Axis_lattice.of_axis_set
       in
-      Ok ()
-    | { base = Kconstr _; with_bounds = With_bounds _; _ } ->
-      require_le (Not_le [With_bounds_on_left])
-    | { base = Layout _; with_bounds = With_bounds _; _ } ->
-      Misc.fatal_error
-        "Jkind.sub_jkind_l: Ignore_best normalize invariant violation.")
+      let right_bounds_seq = right_bounds |> With_bounds_types.to_seq in
+      let sub, _ =
+        (* MB_EXPAND_L *)
+        (* Expand left-side types only along bounds not covered by an equivalent
+         right-side occurrence or saturated by the right direct bounds. *)
+        Base_and_axes.normalize env sub_jkind
+          ~ambient_bounds:ambient_bounds_on_right
+          ~previously_ran_out_of_fuel:sub.ran_out_of_fuel_during_normalize
+          ~context ~mode:Ignore_best
+          ~map_type_info:(fun ty { bounds_mask = left_bounds_mask } ->
+            let direct_bounds_for_type =
+              direct_bounds_for_type ~context env ty
+            in
+            let left_bounds_mask =
+              Bounds_mask.meet left_bounds_mask direct_bounds_for_type
+            in
+            let right_bounds_mask =
+              right_bounds_seq
+              (* CR layouts v2.8: maybe it's worth memoizing using a best-effort
+               type map? Internal ticket 5086. *)
+              |> Seq.fold_left
+                   (fun acc (ty2, ti) ->
+                     match type_equal ty ty2 with
+                     | true ->
+                       Bounds_mask.join acc ti.With_bounds_type_info.bounds_mask
+                     | false -> acc)
+                   Bounds_mask.bot
+              |> Bounds_mask.meet direct_bounds_for_type
+            in
+            let saturated_by_right_direct_bounds =
+              Mod_bounds.saturated_mask best_super.mod_bounds left_bounds_mask
+            in
+            let remaining_bounds_mask =
+              Bounds_mask.residual left_bounds_mask
+                (Bounds_mask.join right_bounds_mask
+                   saturated_by_right_direct_bounds)
+            in
+            (* MB_WITH : drop types from the left that appear on the right *)
+            { bounds_mask = remaining_bounds_mask })
+      in
+      match sub with
+      | { base = _;
+          mod_bounds = sub_upper_bounds;
+          with_bounds = No_with_bounds
+        } ->
+        (* MB_MODE : verify that the remaining upper_bounds from sub are <=
+         super's bounds *)
+        let super_lower_bounds = best_super.mod_bounds in
+        (require_le
+           (Mod_bounds.less_or_equal sub_upper_bounds super_lower_bounds)
+         [@nontail])
+      | { base = Kconstr _; with_bounds = With_bounds _; _ } ->
+        require_le (Not_le [With_bounds_on_left]) [@nontail]
+      | { base = Layout _; with_bounds = With_bounds _; _ } ->
+        Misc.fatal_error
+          "Jkind.sub_jkind_l: Ignore_best normalize invariant violation."))
 
 let is_obviously_max (t : (_ * allowed) jkind) =
   match t with
@@ -4329,7 +4334,8 @@ let mod_bounds_are_obviously_max (type l r) (t : (l * r) jkind) =
     false
 
 let fully_expand_aliases env ({ jkind; _ } as jk) =
-  { jk with jkind = Base_and_axes.fully_expand_aliases env jkind }
+  let expanded = Base_and_axes.fully_expand_aliases env jkind in
+  if expanded == jkind then jk else { jk with jkind = expanded }
 
 let has_layout_any env jkind =
   let rec is_any : _ Layout.t -> bool = function

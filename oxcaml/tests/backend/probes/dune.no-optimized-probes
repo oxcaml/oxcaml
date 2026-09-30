@@ -40,7 +40,7 @@
  (deps t3.ml)
  (action (with-outputs-to %{target}
          (with-accepted-exit-codes 2
-         (run %{bin:ocamlopt.opt} -no-probes-optimized %{deps} -color never -error-style short -warn-error "+190" -c)))))
+         (run %{bin:ocamlopt.opt} -no-probes-optimized t3.ml -color never -error-style short -warn-error "+190" -c)))))
 
 (rule
  (enabled_if
@@ -63,7 +63,7 @@
 (rule
  (target test_ocamldep.output)
  (deps for_test_ocamldep1.ml for_test_ocamldep2.ml test_ocamldep.ml)
- (action (with-outputs-to %{target} (run %{bin:ocamlopt.opt} -depend %{deps}))))
+ (action (with-outputs-to %{target} (run %{bin:ocamlopt.opt} -depend for_test_ocamldep1.ml for_test_ocamldep2.ml test_ocamldep.ml))))
 
 (rule
  (alias   runtest)

@@ -2,20 +2,23 @@ type signature_elt =
   | Item of Types.signature_item
   | Type of Asttypes.rec_flag * Parsetree.type_declaration list
 
-val module_type : Types.module_type -> Parsetree.module_type
+val module_type : Env.t -> Types.module_type -> Parsetree.module_type
 
 val core_type : Types.type_expr -> Parsetree.core_type
 
 val modtype_declaration :
-  Ident.t -> Types.modtype_declaration -> Parsetree.module_type_declaration
+  Env.t ->
+  Ident.t ->
+  Types.modtype_declaration ->
+  Parsetree.module_type_declaration
 
 val module_declaration :
-  Ident.t -> Types.module_declaration -> Parsetree.module_declaration
+  Env.t -> Ident.t -> Types.module_declaration -> Parsetree.module_declaration
 
 val jkind_declaration :
   Ident.t -> Types.jkind_declaration -> Parsetree.jkind_declaration
 
-val signature_item : Types.signature_item -> Parsetree.signature_item
+val signature_item : Env.t -> Types.signature_item -> Parsetree.signature_item
 
 val extension_constructor :
   Ident.t -> Types.extension_constructor -> Parsetree.extension_constructor
@@ -34,7 +37,7 @@ val constructor_declaration :
 val type_declaration :
   Ident.t -> Types.type_declaration -> Parsetree.type_declaration
 
-val signature : Types.signature -> Parsetree.signature
+val signature : Env.t -> Types.signature -> Parsetree.signature
 
 (** [group_items sig_items] groups items from a signature in a more meaningful
   way: type declaration of the same recursive type are group together and items

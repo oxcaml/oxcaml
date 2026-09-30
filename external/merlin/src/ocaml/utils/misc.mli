@@ -122,6 +122,10 @@ module Stdlib : sig
   module List : sig
     type 'a t = 'a list
 
+    val iter : ('a -> unit) -> 'a list -> unit
+
+    val fold_left : ('a -> 'b -> 'a) -> 'a -> 'b list -> 'a
+
     val is_empty : 'a list -> bool
     (** [is_empty l] is true if and only if [l] has no elements. It is equivalent to
         [compare_length_with l 0 = 0].  *)
@@ -160,6 +164,9 @@ module Stdlib : sig
         r1 is [List.map2 f l1 h1] and r2 is t2. *)
 
     val map3 : ('a -> 'b -> 'c -> 'd) -> 'a list -> 'b list -> 'c list -> 'd list
+
+    val iter3
+      : ('a -> 'b -> 'c -> unit) -> 'a list -> 'b list -> 'c list -> unit
 
     val concat_map2 : ('a -> 'b -> 'c list) -> 'a list -> 'b list -> 'c list
     (** [concat_map2 f l1 l2] gives the same result as [concat (map2 f l1 l2)].
@@ -259,6 +266,8 @@ module Stdlib : sig
   module Option : sig
     type 'a t = 'a option
 
+    val map : ('a -> 'b) -> 'a t -> 'b t
+
     val exists : ('a -> bool) -> 'a option -> bool
     (** [exists p o] is [p x] if [o] is [Some x], and [false] otherwise. *)
 
@@ -278,6 +287,8 @@ module Stdlib : sig
 
 (** {2 Extensions to the Array module} *)
   module Array : sig
+    val iter : ('a -> unit) -> 'a array -> unit
+
     val exists2 : ('a -> 'b -> bool) -> 'a array -> 'b array -> bool
     (** Same as [Array.exists2] from the standard library. *)
 

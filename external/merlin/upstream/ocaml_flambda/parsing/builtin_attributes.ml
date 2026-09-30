@@ -155,6 +155,7 @@ let builtin_attrs =
   ; "flatten_floats"
   ; "represent_as_float_array"
   ; "immediate_all_void_constructor"
+  ; "rec"
   ]
 
 let builtin_attrs =
@@ -471,6 +472,14 @@ let has_attribute nm attrs =
        if attr_equals_builtin a nm
        then (mark_used a.attr_name; true)
        else false)
+    attrs
+
+let attribute_location nm attrs =
+  List.find_map
+    (fun a ->
+       if attr_equals_builtin a nm
+       then (mark_used a.attr_name; Some a.attr_name.loc)
+       else None)
     attrs
 
 type attr_action = Mark_used_only | Return

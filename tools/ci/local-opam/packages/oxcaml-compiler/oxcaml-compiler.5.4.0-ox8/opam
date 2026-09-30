@@ -1,0 +1,94 @@
+opam-version: "2.0"
+synopsis: "Pinned OxCaml compiler for bootstrapping CI"
+maintainer: "oxcaml-team"
+authors: "Xavier Leroy and many contributors"
+license: "LGPL-2.1-or-later WITH OCaml-LGPL-linking-exception"
+homepage: "https://oxcaml.org"
+bug-reports: "https://github.com/oxcaml/oxcaml/issues"
+dev-repo: "git+https://github.com/oxcaml/oxcaml.git"
+depends: [
+  "conf-autoconf" {build}
+  "conf-which" {build}
+  "ocaml-variants" {= "5.4.0+ox" & post}
+  "oxcaml" {post}
+  "base-unix" {post}
+  "base-bigarray" {post}
+  "base-threads" {post}
+  "base-domains" {post}
+  "base-nnp" {post}
+  "ocaml-options-vanilla" {post}
+  "oxcaml-patch-guards" {post}
+]
+flags: compiler
+setenv: CAML_LD_LIBRARY_PATH = "%{lib}%/stublibs"
+# Bootstrap this release using upstream OCaml, Dune and Menhir in a private
+# prefix. Keep the source revision in sync with bootOxcamlSrc in default.nix.
+build: [
+  ["sh" "-ec" """
+    echo '(dirs (:standard \\ init_deps init_ocaml init_dune init_menhir))' >> dune
+    mkdir init_ocaml init_dune init_menhir
+    tar -xf init-compiler.tar.gz -C init_ocaml --strip-components=1
+    patch -d init_ocaml -p1 -i ../init-compiler.patch
+    tar -xf init-dune.tbz -C init_dune --strip-components=1
+    tar -xf init-menhir.tar.gz -C init_menhir --strip-components=1
+    export PATH="%{build}%/init_deps/bin:$PATH"
+    (
+      cd init_ocaml
+      case "%{os}%" in
+        macos|openbsd) export CC=cc ASPP='cc -c' ;;
+      esac
+      ./configure --prefix="%{build}%/init_deps" --disable-ocamldoc
+      make -j%{jobs}%
+      make install
+    )
+    (
+      cd init_dune
+      ocaml boot/bootstrap.ml -j %{jobs}%
+      ./_boot/dune.exe build dune.install --release \
+        --profile dune-bootstrap -j %{jobs}%
+      ./_boot/dune.exe install --root . --prefix="%{build}%/init_deps" dune
+    )
+    (
+      cd init_menhir
+      dune build --root . --profile release @install -j %{jobs}%
+      dune install --prefix="%{build}%/init_deps" \
+        -p menhirLib,menhir -j %{jobs}%
+    )
+    autoconf || autoconf27
+    ./configure --enable-stack-checks --enable-poll-insertion \
+      --enable-multidomain --prefix="%{prefix}%" \
+      --with-dune="%{build}%/init_deps/bin/dune"
+    unset INSIDE_DUNE
+    make -j%{jobs}%
+  """]
+  ["sh" "./write-config.sh" name
+    "-v" "release:string" "5.4.0-ox8"
+    "-v" "commit:string" "cedb02e4747905c331fc3742c338b2213f7beed9"]
+]
+install: ["sh" "-ec" """
+  PATH="%{build}%/init_deps/bin:$PATH" make install
+"""]
+url {
+  src: "git+https://github.com/oxcaml/oxcaml.git#cedb02e4747905c331fc3742c338b2213f7beed9"
+}
+extra-source "init-compiler.tar.gz" {
+  src: "https://github.com/ocaml/ocaml/archive/5.4.0.tar.gz"
+  checksum: "sha256=4ab55ac30d247e20f35df20a9f7596e5eb5f92fbbd0f8e3e54838bbc3edf931e"
+}
+# Match the ARM64 fix used by Nix's upstream bootstrap compiler.
+extra-source "init-compiler.patch" {
+  src: "https://raw.githubusercontent.com/oxcaml/oxcaml/cedb02e4747905c331fc3742c338b2213f7beed9/tools/ci/local-opam/packages/ocaml-base-compiler/ocaml-base-compiler.5.4.0+oxcaml/files/ocaml-base-compiler.5.4.0+oxcaml.patch"
+  checksum: "sha256=0d9e699cf91890a5baab3a3841ad383a1d7244e0183801753508a885100e2369"
+}
+extra-source "init-dune.tbz" {
+  src: "https://github.com/ocaml/dune/releases/download/3.23.1/dune-3.23.1.tbz"
+  checksum: "sha256=93b4e7157f6ba8feb61cfc5f86008efd2c59037ba78a017d92b4abf30632348f"
+}
+extra-source "init-menhir.tar.gz" {
+  src: "https://gitlab.inria.fr/fpottier/menhir/-/archive/20231231/archive.tar.gz"
+  checksum: "sha512=620ff3443143535e03ac98c5e8ee2ddf9ba48f8cfe441302118def1da3e03ffac7f48d4d4cb129766b625ecad0fb341da1baa0169dee8b6d07a5b0bbb735cf2f"
+}
+extra-source "write-config.sh" {
+  src: "https://raw.githubusercontent.com/dra27/mingw-w64-shims/refs/tags/1.0.1/write-config.sh"
+  checksum: "sha256=b6cc5f98c2cfc23a7bc7774038621a2e7e7b94ed3d3080db40bc455a2575fc7a"
+}

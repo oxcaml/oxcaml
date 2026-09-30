@@ -85,18 +85,26 @@ m4_define([MENHIR_REQUIRED_VERSION], [20231231])
 m4_define([OCAML_REQUIRED_RELEASE], [5.4])
 
 AS_IF([test x"$enable_optional_checks" != 'xno'], [
-  AS_CASE([$ocamlopt_version],
-    [*+ox], [AC_MSG_ERROR(m4_normalize(
-      [OxCaml ($ocamlopt_version) cannot be used to build OxCaml;
-       upstream OCaml is required]))])
-
   # eq2 compares only the first 2 version components (major.minor)
   AX_COMPARE_VERSION([$ocamlopt_version], [eq2], OCAML_REQUIRED_RELEASE, [],
     [AC_MSG_ERROR(m4_normalize([OCaml ]OCAML_REQUIRED_RELEASE[.x is required
                                but $ocamlopt_version was found]))])
 ])
 
-AC_MSG_NOTICE([Using OCaml $ocamlopt_version])
+# Both compilers are used in the boot workspace, which requires OxCaml flags.
+for compiler in ocamlc ocamlopt; do
+  AC_MSG_CHECKING([whether $compiler supports the required extension universe])
+  AS_IF([PATH="$tool_search_path" "$compiler" \
+           -extension-universe upstream_compatible -version >/dev/null 2>&1],
+    [AC_MSG_RESULT([yes])],
+    [AC_MSG_RESULT([no])
+     AC_MSG_ERROR(m4_normalize([
+       An OxCaml bootstrap compiler is required: $compiler must accept
+       -extension-universe upstream_compatible. Install the dependencies in
+       oxcaml-dev.opam and activate that switch, or use --with-opam-switch.]))])
+done
+
+AC_MSG_NOTICE([Using OxCaml $ocamlopt_version])
 
 AC_PATH_PROG([dune], [dune], [], [$tool_search_path])
 

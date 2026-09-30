@@ -293,9 +293,10 @@ jobs:
       - name: Set up Opam
         uses: ocaml/setup-ocaml@605a7e998e76e035b82c14d618a6e1010732c4ce # v3.7.1
         with:
-          ocaml-compiler: oxcaml-ci-deps.5.4.0-with-ocaml.5.4.0-with-ocamlformat.0.29.0
+          ocaml-compiler: oxcaml-ci-bootstrap.5.4.0-ox8
           opam-repositories: |
             local: file://${{ github.workspace }}/tools/ci/local-opam
+            ox: https://github.com/oxcaml/opam-repository.git
             default: https://github.com/ocaml/opam-repository.git
           opam-disable-sandboxing: true
           opam-pin: false
@@ -386,9 +387,19 @@ jobs:
           codesign -s - -f --entitlements /tmp/core.entitlements $OCAML_BIN/ocamlc.opt
           codesign -s - -f --entitlements /tmp/core.entitlements $OCAML_BIN/ocamlopt.opt
 
-      - name: Build AST-dependent libraries against bootstrap compiler
+      - name: Build AST-dependent libraries against upstream OCaml
         if: matrix.build_ast_dependent_libs == true
-        run: make ast-dependent-libs-build-boot
+        run: |
+          # These isolated builds exercise ppxlib_jane's upstream shim.
+          # Keep their compiler and ppxlib separate from the OxCaml bootstrap.
+          if ! opam switch list --short | grep -qxF ast-dependent-libs; then
+            opam switch create ast-dependent-libs ocaml-base-compiler.5.4.0 \
+              --no-switch --yes --repositories=local,default
+          fi
+          opam install --switch=ast-dependent-libs --yes \
+            dune.3.24.2 ppxlib.0.37.0
+          opam exec --switch=ast-dependent-libs -- \
+            make ast-dependent-libs-build-boot DUNE=dune
 
       - name: Build OxCaml
         if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true

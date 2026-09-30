@@ -1934,3 +1934,49 @@ type u = AppG.t
 [%%expect{|
 type u = AppG.t
 |}]
+
+(***************************************************)
+(* Test: kind abbreviations in signature inclusion *)
+
+(* The two kinds only differ in mod bounds, which should be rejected by module
+   inclusion check, through the abbreviation. *)
+
+kind_ portable_value = value mod portable
+
+module type Portable_id = sig
+  val id : ('a : portable_value). 'a -> 'a
+end
+
+module type Value_id = sig
+  val id : ('a : value). 'a -> 'a
+end
+
+module Bad_widen (X : Portable_id) : Value_id = X
+[%%expect{|
+kind_ portable_value = value mod portable
+module type Portable_id =
+  sig val id : ('a : value mod portable). 'a -> 'a end
+module type Value_id = sig val id : 'a -> 'a end
+Line 11, characters 48-49:
+11 | module Bad_widen (X : Portable_id) : Value_id = X
+                                                     ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val id : ('a : value mod portable). 'a -> 'a end
+       is not included in
+         Value_id
+       Values do not match:
+         val id : ('a : value mod portable). 'a -> 'a
+       is not included in
+         val id : 'a -> 'a
+       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The kind of 'a is value
+         because of the definition of id at line 8, characters 2-33.
+       But the kind of 'a must be a subkind of value mod portable
+         because of the definition of id at line 4, characters 2-42.
+|}]
+
+module Ok_narrow (X : Value_id) : Portable_id = X
+[%%expect{|
+module Ok_narrow : functor (X : Value_id) -> Portable_id
+|}]

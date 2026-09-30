@@ -160,12 +160,12 @@ val set_static_row_name: type_declaration -> Path.t -> unit
 (**** Utilities for type traversal ****)
 
 val iter_type_expr:
-  (type_expr -> unit) -> (Mode.With_locality.lr -> unit) ->
-  type_expr -> unit
+  (type_expr -> unit) ->
+  (Mode.With_locality.lr -> unit) -> type_expr -> unit
         (* Iteration on types *)
 val fold_type_expr:
-  ('a -> type_expr -> 'a) -> ('a -> Mode.With_locality.lr -> 'a) ->
-  'a -> type_expr -> 'a
+  ('a -> type_expr -> 'a) ->
+  ('a -> Mode.With_locality.lr -> 'a) -> 'a -> type_expr -> 'a
 val iter_row: (type_expr -> unit) -> row_desc -> unit
         (* Iteration on types in a row *)
 val fold_row: ('a -> type_expr -> 'a) -> 'a -> row_desc -> 'a
@@ -226,7 +226,8 @@ val type_iterators_without_type_expr: type_iterators_without_type_expr
 
 val copy_type_desc:
     ?keep_names:bool -> (type_expr -> type_expr) ->
-    (Mode.With_locality.lr -> Mode.With_locality.lr) -> type_desc -> type_desc
+    (Mode.With_locality.lr -> Mode.With_locality.lr) ->
+    type_desc -> type_desc
         (* Copy on types *)
 val copy_row:
     (type_expr -> type_expr) ->

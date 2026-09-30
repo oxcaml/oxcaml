@@ -119,7 +119,9 @@ and out_sort_genvar = string
 and out_type_param = {
     ot_non_gen: bool;
     ot_name: string;
-    ot_variance: Asttypes.variance * Asttypes.injectivity;
+    ot_variance: Asttypes.variance;
+    ot_injectivity: Asttypes.injectivity;
+    ot_rec: bool; (* true = print [@rec] *)
     ot_jkind : out_jkind option;
 }
 

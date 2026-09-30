@@ -462,7 +462,7 @@ let check_recmod_decls env decls =
 
 (* Merge one "with" constraint in a signature *)
 
-let check_type_decl env sg loc id row_id newdecl decl =
+let check_type_decl ?sg_for_env env sg loc id row_id newdecl decl =
   let fresh_id = Ident.rename id in
   let path = Pident fresh_id in
   let sub = Subst.add_type id path Subst.identity in
@@ -476,14 +476,20 @@ let check_type_decl env sg loc id row_id newdecl decl =
   in
   let newdecl = Subst.type_declaration sub newdecl in
   let decl = Subst.type_declaration sub decl in
-  let sg = List.map (Subst.signature_item Keep sub) sg in
   let env = Env.add_type ~check:false fresh_id newdecl env in
   let env =
     match fresh_row_id with
     | None -> env
     | Some fresh_row_id -> Env.add_type ~check:false fresh_row_id newdecl env
   in
-  let env = Env.add_signature sg env in
+  let env = match sg_for_env with
+    | None ->
+        let sg = List.map (Subst.signature_item Keep sub) sg in
+        Env.add_signature sg env
+    | Some sg ->
+        let sg = List.map (Subst.Lazy.signature_item Keep sub) sg in
+        Env.add_signature_lazy sg env
+  in
   Includemod.type_declarations ~mark:true ~loc env fresh_id newdecl decl;
   Typedecl.check_coherence env loc path newdecl
     (* The use of [check_coherence] here skips the manifest subkind check
@@ -552,6 +558,9 @@ let iterator_with_env super env =
       env := env_before
     );
     Btype.it_module_type = (fun self -> function
+    | Mty_with _ as mty ->
+      self.Btype.it_module_type self
+        (Mtype.scrape_alias (Lazy.force !env) mty)
     | Mty_functor (param, mty_body, _) ->
       let env_before = !env in
       begin match param with
@@ -717,6 +726,50 @@ let check_well_formed_module env loc context mty =
 
 let () = Env.check_well_formed_module := check_well_formed_module
 
+module With_checks : sig
+  val register : Ident.t -> (unit -> unit) -> unit
+  val force : Ident.t -> unit
+end = struct
+  module Table = Ephemeron.K1.Make(struct
+    type t = Ident.t
+    let equal = Ident.same
+    let hash id = Hashtbl.hash (Ident.unique_name id)
+  end)
+
+  type check = {
+    validation : unit Lazy.t;
+    mutable checking : bool;
+  }
+
+  let pending = Table.create 17
+
+  let force id =
+    match Table.find_opt pending id with
+    | None -> ()
+    | Some check ->
+        if not check.checking then begin
+          (* Validation traverses the wrapper itself. Reentrant forcing is
+             part of this check, not a second validation. Any temporary copies
+             made by that traversal must not escape a failed check. *)
+          check.checking <- true;
+          Fun.protect ~finally:(fun () -> check.checking <- false) (fun () ->
+            Lazy.force check.validation;
+            Table.remove pending id)
+          (* Lazy.force caches failures; a failed check stays pending and
+             subsequent attempts raise again instead of treating it as valid. *)
+        end
+
+  let register id validate =
+    (* Check before first use: recursive signatures can otherwise loop while
+       being copied or expanded. The delayed-check queue also rejects invalid
+       wrappers that are never used. Ephemerons release abandoned environments
+       after errors; they do not represent validation success. *)
+    Table.add pending id { validation = lazy (validate ()); checking = false };
+    !Env.add_delayed_check_forward (fun () -> force id)
+end
+
+let () = Subst.check_with := With_checks.force
+
 let type_decl_is_alias sdecl = (* assuming no explicit constraint *)
   let eq_vars x y =
     (* Why not handle jkind annotations?
@@ -810,6 +863,17 @@ and remove_modality_and_zero_alloc_variables_mty env ~zap_modality mty =
       remove_modality_and_zero_alloc_variables_mty env ~zap_modality mty
     in
     Mty_functor (param, mty, mm)
+  | Mty_with (mty, id, names, cstr) ->
+      let mty = remove_modality_and_zero_alloc_variables_mty env
+          ~zap_modality mty in
+      let cstr = match cstr with
+        | With_module md ->
+            let md_type = remove_modality_and_zero_alloc_variables_mty env
+                ~zap_modality md.md_type in
+            With_module { md with md_type }
+        | With_type _ | With_modtype _ | With_jkind _ -> cstr
+      in
+      Mty_with (mty, id, names, cstr)
   | Mty_strengthen (mty, path, alias) ->
       let mty =
         remove_modality_and_zero_alloc_variables_mty env
@@ -985,7 +1049,9 @@ module Merge = struct
       at the point of the constrained item (at [lid]), and returned via the
       [late_typedtree] mechanism. It is then returned along the merged
       signature *)
-  let merge_type ~destructive env loc sg lid sdecl =
+  let merge_type ?sg_for_env:full_sg ?outer_env
+      ~destructive env loc sg lid sdecl =
+    let outer_env = Option.value outer_env ~default:env in
     let patch item s sig_env sg_for_env ~ghosts =
       match item, sdecl.ptype_kind with
       | Sig_type(id, decl, rs, priv), Ptype_abstract
@@ -1031,7 +1097,7 @@ module Merge = struct
             }
           and id_row = Ident.create_local (s^"#row") in
           let initial_env =
-            Env.add_type ~check:false id_row decl_row env
+            Env.add_type ~check:false id_row decl_row outer_env
           in
           let sig_env = Env.add_signature sg_for_env sig_env in
           let tdecl =
@@ -1039,7 +1105,7 @@ module Merge = struct
               ~sig_env ~sig_decl:decl ~outer_env:initial_env sdecl in
           let newdecl = tdecl.typ_type in
           let before_ghosts, row_id, after_ghosts = split_row_id s ghosts in
-          check_type_decl sig_env sg_for_env sdecl.ptype_loc
+          check_type_decl ?sg_for_env:full_sg sig_env sg_for_env sdecl.ptype_loc
             id row_id newdecl decl;
           let decl_row = {decl_row with type_params = newdecl.type_params} in
           let rs' = if rs = Trec_first then Trec_not else rs in
@@ -1056,12 +1122,12 @@ module Merge = struct
           let sig_env = Env.add_signature sg_for_env sig_env in
           let tdecl =
             Typedecl.transl_with_constraint id
-              ~sig_env ~sig_decl ~outer_env:env sdecl in
+              ~sig_env ~sig_decl ~outer_env sdecl in
           let newdecl = tdecl.typ_type in
           let newloc = sdecl.ptype_loc in
           let before_ghosts, row_id, after_ghosts = split_row_id s ghosts in
           let ghosts = List.rev_append before_ghosts after_ghosts in
-          check_type_decl sig_env sg_for_env newloc
+          check_type_decl ?sg_for_env:full_sg sig_env sg_for_env newloc
             id row_id newdecl sig_decl;
           let path = Pident id in
           let item_opt =
@@ -1264,14 +1330,15 @@ module Merge = struct
       use the more complicated [return_payload] (rather then [return]) because
       we want to get out the computed declaration for the purpose of building
       the subst for post-processing. *)
-  let merge_jkind ~destructive env loc sg lid
+  let merge_jkind ?outer_env ~destructive env loc sg lid
         (sdecl : Parsetree.jkind_declaration) =
+    let outer_env = Option.value outer_env ~default:env in
     let patch item s sig_env sg_for_env ~ghosts =
       match item with
       | Sig_jkind(id, orig_decl, vis) when Ident.name id = s ->
           let sig_env = Env.add_signature sg_for_env sig_env in
           let jdecl =
-            Typedecl.transl_jkind_constraint id env orig_decl sdecl
+            Typedecl.transl_jkind_constraint id outer_env orig_decl sdecl
           in
           let new_decl = jdecl.jkind_jkind in
           check_jkind_decl sig_env sdecl.pjkind_loc id ~orig_decl ~new_decl;
@@ -1420,6 +1487,8 @@ let rec apply_modalities_signature ~recursive env modalities sg =
   ) sg
 
 and apply_modalities_module_type env modalities = function
+  | Mty_with _ as mty ->
+      apply_modalities_module_type env modalities (Mtype.scrape_alias env mty)
   | Mty_ident p ->
       let mtd = Env.find_modtype p env in
       begin match mtd.mtd_type with
@@ -2042,6 +2111,73 @@ let has_remove_aliases_attribute attr =
   | None -> false
   | Some _ -> true
 
+type with_component = {
+  path : Path.t;
+  declaration : Types.signature_item;
+  signature_env : Env.t;
+  signature_items : Subst.Lazy.signature_item list;
+  prefix_subst : Subst.t;
+}
+
+let rec with_signature ~loc env mty =
+  match mty with
+  | Subst.Lazy.Mty_signature _ -> mty
+  | _ ->
+      match Mtype.reduce_alias_lazy env mty with
+      | Some mty -> with_signature ~loc env mty
+      | None -> raise (Error (loc, env, Signature_expected))
+
+let lookup_with_component ~loc env binder lid ~names constr lookup_type =
+  let missing () =
+    raise (Error (loc, env, With_no_component lid.txt)) in
+  let rec find sig_env root subst names mty =
+    let items = match with_signature ~loc sig_env mty with
+      | Subst.Lazy.Mty_signature sg ->
+          Subst.Lazy.force_signature_once sg
+      | _ -> Misc.fatal_error "Typemod.lookup_with_component: signature"
+    in
+    let sig_env = Env.add_signature_lazy items sig_env in
+    let subst = Subst.Lazy.prefix_signature root items subst in
+    let item = List.find_opt (fun item ->
+      let open Subst.Lazy in
+      match names, item, constr with
+      (* Signature_group treats the type following a class declaration as
+         a ghost component. It must not be selected as an ordinary type. *)
+      | [name], Sig_type (id, _, _, _), Pwith_type _ ->
+          Ident.name id = name &&
+          not (List.exists (function
+            | Sig_class (id, _, _, _) | Sig_class_type (id, _, _, _) ->
+                Ident.name id = name
+            | _ -> false) items)
+      | [name], Sig_module (id, _, _, _, _), Pwith_module _
+      | [name], Sig_modtype (id, _, _), Pwith_modtype _
+      | [name], Sig_jkind (id, _, _), Pwith_jkind _
+      | name :: _ :: _, Sig_module (id, _, _, _, _), _ ->
+          Ident.name id = name
+      | _ -> false) items
+    in
+    match names, item with
+    | name :: (_ :: _ as rest),
+      Some (Subst.Lazy.Sig_module (id, _, md, _, _)) ->
+        let component =
+          find sig_env (Pdot (root, name)) subst rest md.md_type in
+        { component with path = path_concat id component.path }
+    | [_], Some item ->
+        let id = match item with
+          | Subst.Lazy.Sig_type (id, _, _, _)
+          | Sig_module (id, _, _, _, _)
+          | Sig_modtype (id, _, _) | Sig_jkind (id, _, _) -> id
+          | _ -> Misc.fatal_error "Typemod.lookup_with_component: item"
+        in
+        { path = Pident id;
+          declaration = Subst.Lazy.force_signature_item item;
+          signature_env = sig_env;
+          signature_items = items;
+          prefix_subst = subst }
+    | _ -> missing ()
+  in
+  find env (Pident binder) Subst.identity names lookup_type
+
 (* Check and translate a module type expression *)
 
 let transl_modtype_longident loc env lid =
@@ -2132,14 +2268,11 @@ and transl_modtype_aux env smty =
         smty.pmty_attributes
   | Pmty_with(sbody, constraints) ->
       let body = transl_modtype env sbody in
-      let init_sg = extract_sig env sbody.pmty_loc body.mty_type in
       let remove_aliases = has_remove_aliases_attribute smty.pmty_attributes in
-      let (rev_tcstrs, final_sg) =
-        List.fold_left (transl_with ~loc:smty.pmty_loc env remove_aliases)
-        ([],init_sg) constraints in
-      let scope = Ctype.create_scope () in
-      mkmty (Tmty_with ( body, List.rev rev_tcstrs))
-        (Mtype.freshen ~scope (Mty_signature final_sg)) env loc
+      let rev_tcstrs, mty, _ =
+        List.fold_left (transl_with_delayed ~loc env remove_aliases)
+          ([], body.mty_type, None) constraints in
+      mkmty (Tmty_with (body, List.rev rev_tcstrs)) mty env loc
         smty.pmty_attributes
   | Pmty_typeof smod ->
       let env = Env.in_signature false env in
@@ -2170,13 +2303,97 @@ and transl_modtype_aux env smty =
         raise(Error(loc, env, Strengthening_mismatch(mod_id.txt, explanation)))
       ;
 
-and transl_with ~loc env remove_aliases (rev_tcstrs, sg) constr =
+and transl_with_delayed ~loc env remove_aliases
+    (rev_tcstrs, body, lookup_type) constr =
+  let eager () =
+    let sg = extract_sig env loc body in
+    let rev_tcstrs, sg =
+      transl_with ~loc env remove_aliases (rev_tcstrs, sg) constr in
+    let scope = Ctype.create_scope () in
+    rev_tcstrs, Mtype.freshen ~scope (Mty_signature sg), None
+  in
+  match constr with
+  | Pwith_typesubst _ | Pwith_modsubst _ | Pwith_modtypesubst _
+  | Pwith_jkindsubst _ -> eager ()
+  | Pwith_type (_, decl) when Typedecl.is_fixed_type decl -> eager ()
+  | Pwith_type (lid, _) | Pwith_module (lid, _)
+  | Pwith_modtype (lid, _) | Pwith_jkind (lid, _) ->
+      let lookup_type = with_signature ~loc env (match lookup_type with
+        | Some mty -> mty
+        | None -> Subst.Lazy.of_modtype body) in
+      let scope = Ctype.create_scope () in
+      let binder = Ident.create_scoped ~scope "$with" in
+      let names = Longident.flatten lid.txt in
+      let component =
+        lookup_with_component ~loc env binder lid ~names constr lookup_type in
+      let name = Longident.last lid.txt in
+      let has_row = List.exists (function
+        | Subst.Lazy.Sig_type (id, _, _, _) ->
+            Ident.name id = name ^ "#row"
+        | _ -> false) component.signature_items in
+      (* Private rows are Signature_group.pre_ghosts. The singleton checker
+         below cannot update that group, so retain the eager path. *)
+      if has_row then eager () else
+      let tcstrs, cstr =
+        transl_with_replacement ~loc ~outer_env:env ~name remove_aliases
+          component lid constr in
+      let lazy_cstr = match cstr with
+        | With_type td -> Subst.Lazy.With_type td
+        | With_module md ->
+            Subst.Lazy.With_module (Subst.Lazy.of_module_decl md)
+        | With_modtype mtd ->
+            Subst.Lazy.With_modtype (Subst.Lazy.of_modtype_decl mtd)
+        | With_jkind jd -> Subst.Lazy.With_jkind jd
+      in
+      let lookup_type =
+        Subst.Lazy.Mty_with (lookup_type, binder, names, lazy_cstr) in
+      With_checks.register binder (fun () ->
+        check_well_formed_module env loc "this instantiated signature"
+          (Subst.Lazy.force_modtype lookup_type));
+      tcstrs @ rev_tcstrs, Mty_with (body, binder, names, cstr),
+      Some lookup_type
+
+and transl_with_replacement ~loc ~outer_env ~name remove_aliases
+    component lid constr =
+  let leaf = { lid with txt = Lident name } in
+  let leaf_constr = match constr with
+    | Pwith_type (_, decl) -> Pwith_type (leaf, decl)
+    | Pwith_module (_, rhs) -> Pwith_module (leaf, rhs)
+    | Pwith_modtype (_, rhs) -> Pwith_modtype (leaf, rhs)
+    | Pwith_jkind (_, rhs) -> Pwith_jkind (leaf, rhs)
+    | _ -> Misc.fatal_error "Typemod.transl_with_delayed"
+  in
+  let tcstrs, patch =
+    try transl_with ~outer_env ~sg_for_env:component.signature_items
+          ~loc component.signature_env remove_aliases
+          ([], [component.declaration]) leaf_constr
+    with Error (loc, error_env, With_mismatch (_, explanation)) ->
+      raise (Error (loc, error_env, With_mismatch (lid.txt, explanation)))
+  in
+  let cstr = match patch with
+    | [Sig_type (_, td, _, _)] ->
+        With_type (Subst.type_declaration component.prefix_subst td)
+    | [Sig_module (_, _, md, _, _)] ->
+        With_module (Subst.module_declaration Keep component.prefix_subst md)
+    | [Sig_modtype (_, mtd, _)] ->
+        With_modtype (Subst.modtype_declaration Keep component.prefix_subst mtd)
+    | [Sig_jkind (_, jd, _)] ->
+        With_jkind (Subst.jkind_declaration component.prefix_subst jd)
+    | _ -> Misc.fatal_error "Typemod.transl_with_delayed: patch"
+  in
+  let tcstrs =
+    List.map (fun (_, _, tcstr) -> component.path, lid, tcstr) tcstrs in
+  tcstrs, cstr
+
+and transl_with ?sg_for_env ?outer_env
+    ~loc env remove_aliases (rev_tcstrs, sg) constr =
+  let outer_env = Option.value outer_env ~default:env in
   let destructive = Merge.is_destructive constr in
   let constr, (path, lid, sg) = match constr with
     | Pwith_type (l, decl)
     | Pwith_typesubst (l, decl) ->
         let tdecl, merge_res =
-          Merge.merge_type ~destructive env loc sg l decl
+          Merge.merge_type ?sg_for_env ~outer_env ~destructive env loc sg l decl
         in
         let constr = if destructive then
             (Twith_typesubst tdecl)
@@ -2187,7 +2404,7 @@ and transl_with ~loc env remove_aliases (rev_tcstrs, sg) constr =
 
     | Pwith_module (l, l')
     | Pwith_modsubst (l,l') ->
-        let path, md, _ = Env.lookup_module ~loc l'.txt env in
+        let path, md, _ = Env.lookup_module ~loc l'.txt outer_env in
         let constr = if destructive then
             (Twith_modsubst (path, l'))
           else
@@ -2198,7 +2415,7 @@ and transl_with ~loc env remove_aliases (rev_tcstrs, sg) constr =
 
     | Pwith_modtype (l,smty)
     | Pwith_modtypesubst (l,smty) ->
-        let tmty = transl_modtype env smty in
+        let tmty = transl_modtype outer_env smty in
         let constr = if destructive then
             (Twith_modtypesubst tmty)
           else
@@ -2209,7 +2426,7 @@ and transl_with ~loc env remove_aliases (rev_tcstrs, sg) constr =
     | Pwith_jkind (l, sjd)
     | Pwith_jkindsubst (l, sjd) ->
         let jd, merge_res =
-          Merge.merge_jkind ~destructive env loc sg l sjd
+          Merge.merge_jkind ~outer_env ~destructive env loc sg l sjd
         in
         let constr = if destructive then
             (Twith_jkindsubst jd)
@@ -2823,6 +3040,8 @@ let rec nongen_modtype env f g = function
             Env.add_module ~arg:true id Mp_present param ~mode env
       in
       nongen_modtype env f g body
+  | Mty_with _ as mty ->
+      nongen_modtype env f g (Mtype.scrape_alias env mty)
   | Mty_strengthen (mty,_ ,_) -> nongen_modtype env f g mty
 
 (** Recursively iterate a signature, and:
@@ -3114,7 +3333,7 @@ and package_constraints env loc mty constrs =
     | mty ->
       let rec ident = function
           Mty_ident p -> p
-        | Mty_strengthen (mty,_,_) -> ident mty
+        | Mty_strengthen (mty,_,_) | Mty_with (mty,_,_,_) -> ident mty
         | Mty_functor _ | Mty_alias _ | Mty_signature _ -> assert false
       in
       raise(Error(loc, env, Cannot_scrape_package_type (ident mty)))
@@ -3728,7 +3947,7 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
     end
   | Mty_alias path ->
       raise(Error(app_view.f_loc, env, Cannot_scrape_alias path))
-  | Mty_ident _ | Mty_signature _ | Mty_strengthen _ ->
+  | Mty_ident _ | Mty_signature _ | Mty_strengthen _ | Mty_with _ ->
       let args = List.map simplify_app_summary args in
       let mty_f = md_f.mod_type in
       let app_name = match sfunct.pmod_desc with
@@ -4336,6 +4555,13 @@ let rec normalize_modtype = function
   | Mty_alias _ -> ()
   | Mty_signature sg -> normalize_signature sg
   | Mty_functor(_param, body, _) -> normalize_modtype body
+  | Mty_with (mty, _, _, cstr) ->
+      normalize_modtype mty;
+      begin match cstr with
+      | With_module md -> normalize_modtype md.md_type
+      | With_modtype mtd -> Option.iter normalize_modtype mtd.mtd_type
+      | With_type _ | With_jkind _ -> ()
+      end
   | Mty_strengthen (mty,_,_) -> normalize_modtype mty
 
 and normalize_signature sg = List.iter normalize_signature_item sg

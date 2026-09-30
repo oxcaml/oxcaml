@@ -8,30 +8,44 @@ type signature_elt =
   | Item of Types.signature_item
   | Type of Asttypes.rec_flag * Parsetree.type_declaration list
 
-let rec module_type =
+let rec module_type env =
   let open Ast_helper in
   function
   | Mty_for_hole -> failwith "Holes are not allowed in module types"
-  | Mty_signature signature_items -> Mty.signature @@ signature signature_items
+  | Mty_signature signature_items ->
+    Mty.signature @@ signature env signature_items
   | Mty_ident path ->
     Ast_helper.Mty.ident (Location.mknoloc (Untypeast.lident_of_path path))
   | Mty_alias path ->
     Ast_helper.Mty.alias (Location.mknoloc (Untypeast.lident_of_path path))
   | Mty_functor (param, type_out, ret_mode) ->
-    let param =
+    let param, env =
       match param with
-      | Unit -> Parsetree.Unit
+      | Unit -> (Parsetree.Unit, env)
       | Named (id, type_in, param_mode) ->
-        Parsetree.Named
-          ( Location.mknoloc (Option.map ~f:Ident.name id),
-            module_type type_in,
-            modes ~arg:true param_mode )
+        let param =
+          Parsetree.Named
+            ( Location.mknoloc (Option.map ~f:Ident.name id),
+              module_type env type_in,
+              modes ~arg:true param_mode )
+        in
+        let env =
+          match id with
+          | None -> env
+          | Some id -> Env.add_module ~arg:true id Mp_present type_in env
+        in
+        (param, env)
     in
-    let out = module_type type_out in
+    let out = module_type env type_out in
     Mty.functor_ ~ret_mode:(modes ~arg:false ret_mode) param out
   | Mty_strengthen (mty, path, _aliasability) ->
-    Mty.strengthen ~loc:Location.none (module_type mty)
+    Mty.strengthen ~loc:Location.none (module_type env mty)
       (Location.mknoloc (Untypeast.lident_of_path path))
+  | Mty_with _ as mty -> (
+    match Mtype.scrape env mty with
+    | Mty_with _ ->
+      Location.raise_errorf "Could not expand constrained module type."
+    | mty -> module_type env mty)
 
 and core_type type_expr =
   let open Ast_helper in
@@ -150,14 +164,14 @@ and core_type type_expr =
     (* At the moment, there's no user syntax to represent Tmod *)
     core_type ty
 
-and modtype_declaration id { mtd_type; mtd_attributes; _ } =
+and modtype_declaration env id { mtd_type; mtd_attributes; _ } =
   Ast_helper.Mtd.mk ~attrs:mtd_attributes
-    ?typ:(Option.map ~f:module_type mtd_type)
+    ?typ:(Option.map ~f:(module_type env) mtd_type)
     (var_of_id id)
 
-and module_declaration id { md_type; md_attributes; _ } =
+and module_declaration env id { md_type; md_attributes; _ } =
   let name = Location.mknoloc (Some (Ident.name id)) in
-  Ast_helper.Md.mk ~attrs:md_attributes name @@ module_type md_type
+  Ast_helper.Md.mk ~attrs:md_attributes name @@ module_type env md_type
 
 and jkind_declaration id { jkind_manifest; jkind_attributes; _ } :
     Parsetree.jkind_declaration =
@@ -270,7 +284,7 @@ and type_declaration id
   Ast_helper.Type.mk ~attrs:type_attributes ~params ~kind ~priv:type_private
     ?manifest (var_of_id id)
 
-and signature_item (str_item : Types.signature_item) =
+and signature_item env (str_item : Types.signature_item) =
   let open Ast_helper in
   match str_item with
   | Sig_value (id, vd, _visibility) ->
@@ -286,9 +300,9 @@ and signature_item (str_item : Types.signature_item) =
     (* mutually recursive types are really handled by [signature] *)
     Sig.type_ rec_flag [ type_declaration id type_decl ]
   | Sig_modtype (id, modtype_decl, _visibility) ->
-    Sig.modtype @@ modtype_declaration id modtype_decl
+    Sig.modtype @@ modtype_declaration env id modtype_decl
   | Sig_module (id, _, mod_decl, _, _) ->
-    Sig.module_ @@ module_declaration id mod_decl
+    Sig.module_ @@ module_declaration env id mod_decl
   | Sig_jkind (id, jkind_decl, _visibility) ->
     Sig.jkind @@ jkind_declaration id jkind_decl
   | Sig_typext (id, ext_constructor, _, _) ->
@@ -315,10 +329,11 @@ and signature_item (str_item : Types.signature_item) =
     in
     Sig.text [ Docstrings.docstring str Location.none ] |> List.hd
 
-and signature (items : Types.signature) =
+and signature env (items : Types.signature) =
+  let env = Env.add_signature items env in
   Ast_helper.Sg.mk
     (List.map (group_items items) ~f:(function
-      | Item item -> signature_item item
+      | Item item -> signature_item env item
       | Type (rec_flag, type_decls) -> Ast_helper.Sig.type_ rec_flag type_decls))
 
 and group_items (items : Types.signature_item list) =

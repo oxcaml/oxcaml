@@ -46,7 +46,10 @@ let build : State.t -> Cfg_with_infos.t -> unit =
       Reg.Set.iter
         (fun reg1 ->
           if move_src == Reg.dummy || not (Reg.same reg1 move_src)
-          then Array.iter def ~f:(fun reg2 -> State.add_edge state reg1 reg2))
+          then
+            Misc.Stdlib.Array.iter
+              (fun reg2 -> State.add_edge state reg1 reg2)
+              def [@nontail])
         live.across;
       (* Add interference edges between all pairs of results, since they are all
          defined simultaneously and must be in different registers. *)
@@ -60,7 +63,9 @@ let build : State.t -> Cfg_with_infos.t -> unit =
     then
       Reg.Set.iter
         (fun reg1 ->
-          Array.iter destroyed ~f:(fun reg2 -> State.add_edge state reg1 reg2))
+          (Misc.Stdlib.Array.iter
+             (fun reg2 -> State.add_edge state reg1 reg2)
+             destroyed [@nontail]))
         live.across
   in
   let cfg_with_layout = Cfg_with_infos.cfg_with_layout cfg_with_infos in
@@ -96,9 +101,9 @@ let build : State.t -> Cfg_with_infos.t -> unit =
         let live = InstructionId.Tbl.find liveness first_id in
         Reg.Set.iter
           (fun reg1 ->
-            Array.iter
-              (filter_unavailable (Proc.destroyed_at_raise ()))
-              ~f:(fun reg2 -> State.add_edge state reg1 reg2))
+            (Misc.Stdlib.Array.iter
+               (fun reg2 -> State.add_edge state reg1 reg2)
+               (filter_unavailable (Proc.destroyed_at_raise ())) [@nontail]))
           (Reg.Set.remove Proc.loc_exn_bucket live.before))
 
 let make_work_list : State.t -> unit =

@@ -303,7 +303,7 @@ let whole_cfg_counters (cfg : Cfg.t) =
   in
   Profile.Counters.create () |> Profile.Counters.set "stack_slot" stack_slots
 
-let cfg_profile to_cfg =
+let cfg_profile to_cfg ?accumulate pass f x =
   let total_counters = ref (Profile.Counters.create ()) in
   let block_f label block =
     match !Clflags.profile_granularity with
@@ -326,7 +326,7 @@ let cfg_profile to_cfg =
     Cfg.iter_blocks cfg ~f:block_f;
     Profile.Counters.union !total_counters (whole_cfg_counters cfg)
   in
-  Profile.record_with_counters ~counter_f
+  Profile.record_with_counters ?accumulate ~counter_f pass f x
 
 let cfg_with_layout_profile ?accumulate pass f x =
   cfg_profile Cfg_with_layout.cfg ?accumulate pass f x

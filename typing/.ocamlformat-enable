@@ -1,5 +1,4 @@
 jkind.ml
-jkind.mli
 jkind_types.ml
 jkind_types.mli
 jkind_intf.ml
@@ -31,7 +30,6 @@ axis_lattice.mli
 global_module.ml
 global_module.mli
 ikind.ml
-ikind.mli
 ldd.ml
 ldd.mli
 ldd_intf.ml
