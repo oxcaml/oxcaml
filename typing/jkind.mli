@@ -123,7 +123,7 @@ module Layout : sig
 
   val is_surely_addressable_flat : Sort.Flat.t t -> bool
 
-  val crosses_externality : Sort.t t -> bool
+  val implied_externality : Sort.t t -> Jkind_axis.Externality.t
 
   (** Updates the nullability on the layout's scannable axis. *)
   val set_root_nullability : Sort.t t -> Jkind_axis.Nullability.t -> Sort.t t
