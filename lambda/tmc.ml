@@ -182,7 +182,8 @@ end = struct
               let v = Ident.create_local
                   (Printf.sprintf "block%d_arg%d" block_id (arg_offset + i)) in
               let v_duid = Lambda.debug_uid_none in
-              let layout = match shape with
+              let layout =
+                match shape with
                 | All_value -> Lambda.layout_value_field
                 | Shape shape ->
                   Lambda.layout_of_mixed_block_element shape.(arg_offset + i)
@@ -199,11 +200,9 @@ end = struct
         ) bindings body in
     fun ~block_id constr body ->
     bind_list ~shape:constr.shape ~block_id ~arg_offset:0 constr.before
-      @@ fun vbefore ->
-    let arg_offset = List.length constr.before + 1 in
+    @@ fun vbefore -> let arg_offset = List.length constr.before + 1 in
     bind_list ~shape:constr.shape ~block_id ~arg_offset constr.after
-      @@ fun vafter ->
-    body { constr with before = vbefore; after = vafter }
+    @@ fun vafter -> body { constr with before = vbefore; after = vafter }
 end
 
 (** The type ['a Dps.t] (destination-passing-style) represents a
@@ -795,6 +794,9 @@ let rec choice ctx t =
 
   and choice_makeblock ctx ~tail:_ (tag, flag, shape, mode) blockargs loc =
     let choices =
+      (* We look at each position in the block to find candidates for the TMC
+         hole transformation. We only consider fields of layout
+         Value. *)
       match shape with
       | All_value -> List.map (fun arg -> choice ctx ~tail:false arg) blockargs
       | Shape shape ->
