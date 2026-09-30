@@ -1,5 +1,4 @@
 (* TEST
-   include stdlib_alpha;
    expect;
 *)
 
