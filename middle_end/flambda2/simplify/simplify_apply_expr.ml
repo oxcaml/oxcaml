@@ -954,8 +954,8 @@ let simplify_direct_function_call ~simplify_expr dacc apply
     ~callee's_code_id_from_type ~callee's_code_metadata_from_type
     ~callee's_code_ids_from_call_kind ~callee's_function_slot
     ~coming_from_indirect ~result_arity ~result_types ~recursive
-    ~must_be_detupled ~closure_alloc_mode_from_type function_decl ~down_to_up
-    ~call ~inlined_forwarded_from =
+    ~coming_from_unknown_arity ~closure_alloc_mode_from_type function_decl
+    ~down_to_up ~call ~inlined_forwarded_from =
   (match Apply.probe apply, Apply.inlined apply with
   | None, _ | Some _, Never_inlined -> ()
   | ( Some _,
@@ -1004,7 +1004,7 @@ let simplify_direct_function_call ~simplify_expr dacc apply
     let params_arity = Code_metadata.params_arity callee's_code_metadata in
     let is_indirect_tuple_application, params_arity =
       match params_arity with
-      | Tupled arity -> must_be_detupled, arity
+      | Tupled arity -> coming_from_unknown_arity, arity
       | Non_tupled arity -> false, arity
     in
     (* A function declaration with [is_tupled = true] must be treated specially:
@@ -1141,7 +1141,7 @@ let simplify_function_call ~simplify_expr dacc apply ~callee_ty
      calling convention, but we simplify it into a direct call, which uses the
      callee's code calling convention. In this case, we need to "detuple" the
      call in order to correctly adapt to the change in calling convention. *)
-  let must_be_detupled =
+  let coming_from_unknown_arity =
     match call with
     | Direct _ | Indirect_known_arity _ ->
       (* In these cases, the calling convention already used in the application
@@ -1221,8 +1221,8 @@ let simplify_function_call ~simplify_expr dacc apply ~callee_ty
           ~result_types:
             (Code_metadata.result_types callee's_code_metadata_from_type)
           ~recursive:(Code_metadata.recursive callee's_code_metadata_from_type)
-          ~must_be_detupled ~closure_alloc_mode_from_type func_decl_type
-          ~down_to_up ~call ~inlined_forwarded_from)
+          ~coming_from_unknown_arity ~closure_alloc_mode_from_type
+          func_decl_type ~down_to_up ~call ~inlined_forwarded_from)
     | Need_meet -> (
       match call with
       | Direct _ | Indirect_known_arity _ -> type_unavailable call

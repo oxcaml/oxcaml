@@ -800,14 +800,15 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
             (fun _ -> Alloc_mode.For_types.heap)
             (Flambda_arity.unarize params_arity)
         in
-        let first_complex_local_param =
-          First_complex_local_param.Index
-            (Flambda_arity.num_params params_arity)
-        in
-        let params_arity =
+        let params_arity, first_complex_local_param =
           if is_tupled
-          then Code_metadata.Tupled params_arity
-          else Code_metadata.Non_tupled params_arity
+          then
+            ( Code_metadata.Tupled params_arity,
+              First_complex_local_param.Never_partially_applied )
+          else
+            ( Code_metadata.Non_tupled params_arity,
+              First_complex_local_param.Index
+                (Flambda_arity.num_params params_arity) )
         in
         let code =
           (* CR mshinwell: [inlining_decision] should maybe be set properly *)
