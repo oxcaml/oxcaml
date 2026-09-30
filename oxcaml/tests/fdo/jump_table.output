@@ -31,6 +31,18 @@
   edge 112 -> exit: 2 (derived)
   edge 106 -> 109 ["Jump_table.step":0:06db6050:1:case(0)]: 1
   edge 109 -> exit: 1 (derived)
+cfg for camlJump_table__step_0_4_code
+  block 1
+  block 101
+  block 106
+  block 128
+  block 103
+  block 125
+  block 122
+  block 115
+  block 118
+  block 112
+  block 109
 *** FDO block frequencies for camlJump_table__run_1_5_code
   body: same
   entry: ["Jump_table.run":0]
@@ -52,6 +64,14 @@
   edge 139 -> 163 ["Jump_table.run":0:ff235bef:0:else]: 0
   edge 152 -> escape: 0 (derived)
   edge 163 -> exit: 0 (derived)
+cfg for camlJump_table__run_1_5_code
+  block 1
+  block 139
+  block 146
+  block 152
+  block 154
+  block 159
+  block 163
 *** FDO block frequencies for camlJump_table__fn[jump_table.ml:27,36--67]_2_6_code
   body: same
   entry: ["Jump_table.(fun)@k,caml_array_make,%int_add,1":0]
@@ -63,6 +83,10 @@
   edge 174 -> 176: 0 (derived)
   edge 174 -> escape: 0 (derived)
   edge 176 -> exit: 0 (derived)
+cfg for camlJump_table__fn[jump_table.ml:27,36--67]_2_6_code
+  block 1
+  block 174
+  block 176
 *** FDO block frequencies for camlJump_table__fn[jump_table.ml:28,48--65]_3_7_code
   body: same
   entry: ["Jump_table.(fun)@param,run,a":0]
@@ -71,6 +95,21 @@
   edge entry -> 1: 1
   edge 1 -> 182: 1 (derived)
   edge 182 -> exit: 1 (derived)
+cfg for camlJump_table__fn[jump_table.ml:28,48--65]_3_7_code
+  block 1
+  block 182
 *** FDO block frequencies for camlJump_table__entry: not profiled
   edge 198 -> 215 ["Jump_table":0:28b531e8:2:else]
   edge 198 -> 205 ["Jump_table":0:28b531e8:2:then]
+cfg for camlJump_table__entry
+  block 1
+  block 192
+  block 194
+  block 195
+  block 196
+  block 198
+  block 205
+  block 207
+  block 209
+  block 210
+  block 215

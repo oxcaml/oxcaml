@@ -669,6 +669,8 @@
   cfg_reducibility
   cfg_to_linear
   cfg_fdo_counts
+  cfg_fdo_ext_tsp
+  cfg_fdo_layout
   cfg_with_layout
   cfg_with_infos
   cfg_comballoc

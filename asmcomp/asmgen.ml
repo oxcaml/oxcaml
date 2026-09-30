@@ -349,10 +349,10 @@ let reorder_blocks ppf_dump cl =
   Oxcaml_flags.fdo_profile ()
   |> Option.iter (fun profile ->
       let counts = Cfg_fdo_counts.compute profile cl in
-      if !Oxcaml_flags.dump_fdo then Cfg_fdo_counts.dump ppf_dump counts);
+      if !Oxcaml_flags.dump_fdo then Cfg_fdo_counts.dump ppf_dump counts;
+      Cfg_fdo_layout.reorder_blocks counts cl);
   !Oxcaml_flags.reorder_blocks_random |> Option.iter (reorder_blocks_random cl);
-  pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After reorder_blocks_random"
-    cl
+  pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After cfg_fdo_layout" cl
 
 let block_layout ppf_dump cl =
   match !Oxcaml_flags.cfg_block_layout with
