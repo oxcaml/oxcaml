@@ -188,6 +188,8 @@ let fdo_counters = ref false (* -fdo-counters *)
 
 let fdo_counters_enabled () = !fdo_counters
 
+let fdo_names = ref false (* -fdo-names *)
+
 module Flambda2 = struct
   let debug = ref false (* -flambda2-debug *)
   let reaper_debug_flags = ref [] (* -reaper-debug-flags *)
