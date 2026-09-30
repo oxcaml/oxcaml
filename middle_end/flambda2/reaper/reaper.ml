@@ -33,7 +33,7 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
           applications;
           all_sets_of_closures
         } =
-    Traverse.run unit
+    Traverse.run unit ~free_names
   in
   let solved_dep, uses =
     Profile.record_call ~accumulate:true "solver" (fun () ->

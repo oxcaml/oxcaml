@@ -26,4 +26,4 @@ type result =
       (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list
   }
 
-val run : Flambda_unit.t -> result
+val run : Flambda_unit.t -> free_names:Name_occurrences.t -> result
