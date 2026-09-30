@@ -517,6 +517,9 @@ module Directive : sig
     | Delta_uleb128 of { delta : Constant.t }
         (** Variable-width return-address delta for a short frame descriptor *)
 
+  (** A directive defining the given label at the current position. *)
+  val new_label : Asm_label.t -> t
+
   (** Translate the given directive to textual form. This produces output
       suitable for either gas or MASM as appropriate. *)
   val print : Buffer.t -> t -> unit

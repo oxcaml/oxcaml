@@ -153,9 +153,15 @@ val llvm_flags : string ref
 
 val fdo_counters : bool ref
 
-(** Whether to create pseudo-instrumentation counters for branching constructs:
-    when [-fdo-counters] was passed. *)
+(** Whether to create pseudo-instrumentation counters for branching constructs
+    (and emit the "fdo_metadata" section describing the emitted code and
+    conditional branches): when [-fdo-counters] was passed. *)
 val fdo_counters_enabled : unit -> bool
+
+(** [-fdo-names]: also record in the "fdo_metadata" section the names of the
+    counters it refers to by hash, so that oxcaml-fdo-decode can print a
+    profile readably. *)
+val fdo_names : bool ref
 
 module Flambda2 : sig
   val debug : bool ref

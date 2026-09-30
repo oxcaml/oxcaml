@@ -626,6 +626,7 @@
   probe_emission
   simd
   simd_selection
+  fdo_metadata_encode
   amd64_simd_defs
   amd64_simd_instrs
   stack_check

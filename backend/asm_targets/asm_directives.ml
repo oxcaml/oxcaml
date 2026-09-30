@@ -310,6 +310,8 @@ module Directive = struct
     | Delta_uleb128 of { delta : Constant.t }
   (* A constant (typically a label difference) emitted as ULEB128 *)
 
+  let new_label label = New_label (Label label, Code)
+
   let bprintf = Printf.bprintf
 
   (* Fresh names for Mach-O [Delta_uleb128] .set temporaries. Never reset:
