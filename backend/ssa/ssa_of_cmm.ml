@@ -259,7 +259,7 @@ and emit env c (exp : Cmm.expression) ~tail : result =
     | Csequence (e1, e2) ->
       let* _ = emit env c e1 ~tail:false in
       emit env c e2 ~tail
-    | Cifthenelse (econd, _ifso_dbg, eif, _ifnot_dbg, eelse, _dbg) ->
+    | Cifthenelse { cond = econd; ifso = eif; ifnot = eelse; _ } ->
       emit_ifthenelse env c ~tail econd eif eelse
     | Cswitch (esel, index, ecases, _dbg) ->
       emit_switch env c ~tail esel index ecases

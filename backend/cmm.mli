@@ -576,12 +576,13 @@ and expression =
   | Cop of operation * expression list * Debuginfo.t
   | Csequence of expression * expression
   | Cifthenelse of
-      expression
-      * Debuginfo.t
-      * expression
-      * Debuginfo.t
-      * expression
-      * Debuginfo.t
+      { cond : expression;
+        ifso_dbg : Debuginfo.t;
+        ifso : expression;
+        ifnot_dbg : Debuginfo.t;
+        ifnot : expression;
+        dbg : Debuginfo.t
+      }
   | Cswitch of
       expression * int array * (expression * Debuginfo.t) array * Debuginfo.t
   | Ccatch of ccatch_flag * static_handler list * expression

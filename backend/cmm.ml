@@ -693,12 +693,13 @@ and expression =
   | Cop of operation * expression list * Debuginfo.t
   | Csequence of expression * expression
   | Cifthenelse of
-      expression
-      * Debuginfo.t
-      * expression
-      * Debuginfo.t
-      * expression
-      * Debuginfo.t
+      { cond : expression;
+        ifso_dbg : Debuginfo.t;
+        ifso : expression;
+        ifnot_dbg : Debuginfo.t;
+        ifnot : expression;
+        dbg : Debuginfo.t
+      }
   | Cswitch of
       expression * int array * (expression * Debuginfo.t) array * Debuginfo.t
   | Ccatch of ccatch_flag * static_handler list * expression
@@ -779,7 +780,7 @@ let iter_shallow_tail f = function
     ->
     f body;
     true
-  | Cifthenelse (_cond, _ifso_dbg, ifso, _ifnot_dbg, ifnot, _dbg) ->
+  | Cifthenelse { ifso; ifnot; _ } ->
     f ifso;
     f ifnot;
     true
@@ -818,8 +819,7 @@ let map_shallow_tail f = function
   | Clet (id, exp, body) -> Clet (id, exp, f body)
   | Cphantom_let (id, exp, body) -> Cphantom_let (id, exp, f body)
   | Cname_for_debugger (var, body) -> Cname_for_debugger (var, f body)
-  | Cifthenelse (cond, ifso_dbg, ifso, ifnot_dbg, ifnot, dbg) ->
-    Cifthenelse (cond, ifso_dbg, f ifso, ifnot_dbg, f ifnot, dbg)
+  | Cifthenelse r -> Cifthenelse { r with ifso = f r.ifso; ifnot = f r.ifnot }
   | Csequence (e1, e2) -> Csequence (e1, f e2)
   | Cswitch (e, tbl, el, dbg') ->
     Cswitch (e, tbl, Array.map (fun (e, dbg) -> f e, dbg) el, dbg')
@@ -860,7 +860,7 @@ let map_tail f =
       | Cphantom_let (_, _, _)
       | Cname_for_debugger _
       | Csequence (_, _)
-      | Cifthenelse (_, _, _, _, _, _)
+      | Cifthenelse _
       | Cswitch (_, _, _, _)
       | Ccatch (_, _, _) ) as cmm ->
       map_shallow_tail loop cmm
@@ -878,7 +878,7 @@ let iter_shallow f = function
   | Csequence (e1, e2) ->
     f e1;
     f e2
-  | Cifthenelse (cond, _ifso_dbg, ifso, _ifnot_dbg, ifnot, _dbg) ->
+  | Cifthenelse { cond; ifso; ifnot; _ } ->
     f cond;
     f ifso;
     f ifnot
