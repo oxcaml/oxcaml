@@ -628,6 +628,7 @@
   simd
   simd_selection
   fdo_metadata_encode
+  fdo_call_graph
   amd64_simd_defs
   amd64_simd_instrs
   stack_check
@@ -668,6 +669,7 @@
   cfg_quick_hash
   cfg_reducibility
   cfg_to_linear
+  cfg_fdo_call_graph
   cfg_fdo_counts
   cfg_fdo_ext_tsp
   cfg_fdo_layout

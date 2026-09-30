@@ -1,7 +1,7 @@
 (* Filters a -dcfg -dfdo dump down to what the FDO tests compare: the -dfdo
-   lines (per function: its entry counter, the block frequencies and the edges
-   with their counters and weights) and the block order of each
-   "After cfg_fdo_layout" section. *)
+   lines (per function: its entry counter, the block frequencies, the edges with
+   their counters and weights, and the call graph edges) and the block order of
+   each "After cfg_fdo_layout" section. *)
 
 let () =
   let file =

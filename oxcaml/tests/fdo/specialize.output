@@ -159,6 +159,7 @@ cfg for camlSpecialize__count_4_19_code
   edge 293 -> exit: 1 (derived)
   edge 252 -> 271 ["Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.High":0)):e2227555:2:then]: 0 (derived)
   edge 282 -> escape: 0 (derived)
+  call from block 282 ["Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.High":0)):e2227555:5:call] to caml_fdo_5f5c8485: 30
 cfg for camlSpecialize__count_4_25_code
   block 1
   block 232
@@ -279,6 +280,7 @@ cfg for camlSpecialize__count_4_21_code
   edge 474 -> exit: 1 (derived)
   edge 433 -> 452 ["Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.Low":0)):e2227555:2:then]: 0 (derived)
   edge 463 -> escape: 0 (derived)
+  call from block 463 ["Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.Low":0)):e2227555:5:call] to caml_fdo_5f5c8485: 10
 cfg for camlSpecialize__count_4_23_code
   block 1
   block 413
@@ -327,6 +329,7 @@ cfg for camlSpecialize__run_6_22_code
   edge entry -> 1: 1
   edge 1 -> 521: 1 (derived)
   edge 521 -> exit: 1 (derived)
+  call from block 521 ["Specialize.Outer.run":0@(module("Specialize.High":0)):77039d72:0:call] to caml_fdo_2f979e13: 1
 cfg for camlSpecialize__run_6_26_code
   block 1
   block 521
@@ -338,6 +341,7 @@ cfg for camlSpecialize__run_6_26_code
   edge entry -> 1: 1
   edge 1 -> 527: 1 (derived)
   edge 527 -> exit: 1 (derived)
+  call from block 527 ["Specialize.Outer.run":0@(module("Specialize.Low":0)):77039d72:0:call] to caml_fdo_1daa8179: 1
 cfg for camlSpecialize__run_6_24_code
   block 1
   block 527
@@ -355,6 +359,8 @@ cfg for camlSpecialize__run_6_24_code
   edge 537 -> exit: 1 (derived)
   edge 533 -> escape: 0 (estimated in 0..1)
   edge 535 -> escape: 0 (estimated in 0..1)
+  call from block 533 ["Specialize.(fun)@param,block0,field1,Low,a":0:72f66934:0:call] to caml_fdo_63f1c5cd: 1
+  call from block 535 ["Specialize.(fun)@param,block0,field1,Low,a":0:72f66934:1:call] to caml_fdo_b70ef981: 1
 cfg for camlSpecialize__fn[specialize.ml:84,37--70]_9_29_code
   block 1
   block 533
@@ -386,6 +392,7 @@ cfg for camlSpecialize__fail_or_return_10_30_code
   edge entry -> 1: 2
   edge 1 -> 561: 2 (derived)
   edge 561 -> exit: 2 (derived)
+  call from block 561 ["Specialize.tail_fail":0:fc2dd0fe:0:call] to caml_fdo_d91b09ff: 2
 cfg for camlSpecialize__tail_fail_11_31_code
   block 1
   block 561
@@ -412,6 +419,7 @@ cfg for camlSpecialize__tail_fail_11_31_code
   edge 577 -> 599 ["Specialize.protected":0:41ea4828:1:else]: 0
   edge 599 -> 604 ["Specialize.protected":0:41ea4828:2:else]: 0
   edge 604 -> exit: 0 (derived)
+  call from block 567 ["Specialize.protected":0:41ea4828:0:call] to caml_fdo_b0b75525: 2
 cfg for camlSpecialize__protected_12_32_code
   block 1
   block 567
@@ -432,6 +440,7 @@ cfg for camlSpecialize__protected_12_32_code
   edge 617 -> 619: 2 (estimated in 0..2)
   edge 619 -> exit: 2 (derived)
   edge 617 -> escape: 0 (estimated in 0..2)
+  call from block 617 ["Specialize.after_protected":0:2d07165d:0:call] to caml_fdo_fefab207: 2
 cfg for camlSpecialize__after_protected_13_33_code
   block 1
   block 617
@@ -450,6 +459,8 @@ cfg for camlSpecialize__after_protected_13_33_code
   edge 629 -> exit: 1 (derived)
   edge 626 -> escape: 0 (estimated in 0..1)
   edge 628 -> escape: 0 (estimated in 0..1)
+  call from block 626 ["Specialize.(fun)@param,%int_add,after_protected,0,3":0:b9f10cb3:0:call] to caml_fdo_4e203245: 1
+  call from block 628 ["Specialize.(fun)@param,%int_add,after_protected,0,3":0:b9f10cb3:1:call] to caml_fdo_4e203245: 1
 cfg for camlSpecialize__fn[specialize.ml:105,36--93]_14_34_code
   block 1
   block 626

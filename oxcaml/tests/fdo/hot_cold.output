@@ -25,6 +25,7 @@ cfg for camlHot_cold__cold_1_4_code
   edge 134 -> exit: 100 (derived)
   edge 129 -> 131 ["Hot_cold.f":0:61349092:0:else]: 0
   edge 131 -> exit: 0 (derived)
+  call from block 134 ["Hot_cold.f":0:61349092:2:call] to camlHot_cold__hot_0_3_code: 100
 cfg for camlHot_cold__f_2_5_code
   block 1
   block 129

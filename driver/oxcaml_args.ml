@@ -590,7 +590,8 @@ let mk_fdo_profile f =
   ( "-fdo-profile",
     Arg.String f,
     "<file>  Use the source-position FDO profile in <file> to guide code\n\
-    \     layout" )
+    \     layout (implies -function-sections: the linker lays out the\n\
+    \     functions from the profile's call graph)" )
 
 let mk_fdo_counters f =
   ( "-fdo-counters",

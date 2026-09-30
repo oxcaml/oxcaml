@@ -154,7 +154,11 @@ val llvm_flags : string ref
 
 val fdo_profile_path : string option ref
 
-(** [-fdo-profile <file>]: sets [fdo_profile_path]. *)
+(** [-fdo-profile <file>]: sets [fdo_profile_path] and turns on
+    [-function-sections], which the profile-guided function layout needs (the
+    linker lays functions out from the profile's call graph, and it can only move
+    whole sections). Raises [Arg.Bad] when the configuration does not support
+    function sections. *)
 val set_fdo_profile_path : string -> unit
 
 (** The source-position FDO profile named by [-fdo-profile], loaded once on
