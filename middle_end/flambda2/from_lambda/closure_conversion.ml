@@ -3509,7 +3509,11 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
   let function_slot =
     Function_slot.create
       (Current_unit.get_cu_exn ())
-      ~name:(Ident.name wrapper_id) ~is_always_immediate:false K.value
+      ~name:(Ident.name wrapper_id)
+      ~size:
+        (Function_slot.size_from_arity
+           ~num_complex_params:(Flambda_arity.num_params missing_arity)
+           ~is_tupled:false)
   in
   let num_provided = Flambda_arity.num_params provided_arity in
   let missing_arity_and_param_modes =

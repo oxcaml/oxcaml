@@ -183,8 +183,7 @@ let unknown_accessor ~machine_width = function
   | Is_int -> MTC.any_naked_bool ~machine_width
   | Block_field (_, kind) | Array_field (_, kind) -> MTC.unknown kind
   | Value_slot value_slot -> MTC.unknown (Value_slot.kind value_slot)
-  | Function_slot function_slot ->
-    MTC.unknown (Function_slot.kind function_slot)
+  | Function_slot _ -> MTC.unknown Flambda_kind.value
   | Rec_info _ -> MTC.unknown K.rec_info
   | Unbox_number boxable_number ->
     MTC.unknown (K.Boxable_number.unboxed_kind boxable_number)
