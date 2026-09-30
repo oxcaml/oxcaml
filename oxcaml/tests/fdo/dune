@@ -12,21 +12,21 @@
  (action
   (run ./fdo_counters_test.exe)))
 
-; The test programs call the single-stepping LBR emulator, which comes with
-; the LBR decoder; for now, a stand-in runs their traced code untraced.
+(executable
+ (name fdo_decode_test)
+ (modules fdo_decode_test)
+ (libraries fdo_decode_lib))
 
 (rule
+ (alias runtest)
  (enabled_if
-  (and
-   (= %{context_name} "main")
-   (= %{architecture} "amd64")
-   (= %{system} "linux")))
- (target singlestep_stub.o)
- (deps singlestep_stub.c)
+  (= %{context_name} "main"))
  (action
-  (run %{bin:ocamlopt.opt} -c singlestep_stub.c)))
+  (run ./fdo_decode_test.exe)))
 
-; specialize.ml, compiled with counters (see its FDO metadata below).
+; End-to-end test through the runtime's single-stepping LBR emulator (see
+; runtime/singlestep_profiler.c, x86-64 Linux only): compile specialize.ml
+; with counters and run it collecting a complete trace of its hot part.
 
 (rule
  (enabled_if
@@ -35,7 +35,9 @@
    (= %{architecture} "amd64")
    (= %{system} "linux")))
  (target specialize.exe)
- (deps specialize.ml singlestep_stub.o)
+ ; The emulator is linked from the installed runtime, which dune does not
+ ; track.
+ (deps specialize.ml %{project_root}/runtime/singlestep_profiler.c)
  (action
   (run
    %{bin:ocamlopt.opt}
@@ -44,10 +46,22 @@
    -fdo-names
    -ccopt
    -no-pie
-   singlestep_stub.o
    specialize.ml
    -o
    specialize.exe)))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (targets specialize.lbr specialize.run)
+ (deps specialize.exe)
+ (action
+  (with-outputs-to
+   specialize.run
+   (run ./specialize.exe specialize.lbr))))
 
 ; jump_table.ml: a switch compiled to a jump table.
 
@@ -58,7 +72,9 @@
    (= %{architecture} "amd64")
    (= %{system} "linux")))
  (target jump_table.exe)
- (deps jump_table.ml singlestep_stub.o)
+ ; The emulator is linked from the installed runtime, which dune does not
+ ; track.
+ (deps jump_table.ml %{project_root}/runtime/singlestep_profiler.c)
  (action
   (run
    %{bin:ocamlopt.opt}
@@ -67,10 +83,22 @@
    -fdo-names
    -ccopt
    -no-pie
-   singlestep_stub.o
    jump_table.ml
    -o
    jump_table.exe)))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (targets jump_table.lbr jump_table.run)
+ (deps jump_table.exe)
+ (action
+  (with-outputs-to
+   jump_table.run
+   (run ./jump_table.exe jump_table.lbr))))
 
 ; The executables' FDO metadata as the decoder reads it back: the round trip
 ; of what the compiler emits.
@@ -122,3 +150,70 @@
  (deps jump_table.metadata jump_table.metadata.corrected)
  (action
   (diff jump_table.metadata jump_table.metadata.corrected)))
+
+; The decoder's decisions for each sample of a trace of decode_trace.ml.
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (target decode_trace.exe)
+ ; The emulator is linked from the installed runtime, which dune does not
+ ; track.
+ (deps decode_trace.ml %{project_root}/runtime/singlestep_profiler.c)
+ (action
+  (run
+   %{bin:ocamlopt.opt}
+   -O3
+   -fdo-counters
+   -fdo-names
+   -ccopt
+   -no-pie
+   decode_trace.ml
+   -o
+   decode_trace.exe)))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (targets decode_trace.lbr decode_trace.run)
+ (deps decode_trace.exe)
+ (action
+  (with-outputs-to
+   decode_trace.run
+   (run ./decode_trace.exe decode_trace.lbr))))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (target decode_trace.trace.corrected)
+ (deps decode_trace.lbr decode_trace.exe)
+ (action
+  (with-outputs-to
+   decode_trace.trace.corrected
+   (run
+    %{bin:oxcaml-fdo-decode}
+    -dump-trace
+    -perf-script-output
+    decode_trace.lbr
+    -binary
+    decode_trace.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (deps decode_trace.trace decode_trace.trace.corrected)
+ (action
+  (diff decode_trace.trace decode_trace.trace.corrected)))

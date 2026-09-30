@@ -1,5 +1,5 @@
-; The oxcaml-fdo-decode tool: reads the FDO metadata of OxCaml-compiled
-; executables.
+; The oxcaml-fdo-decode tool: decodes Linux perf LBR profiles of
+; OxCaml-compiled executables with their FDO metadata.
 
 (library
  (name fdo_decode_lib)
@@ -7,7 +7,7 @@
  (flags
   (:standard -w +a-30-40-41-42))
  (libraries ocamlcommon compiler_owee unix)
- (modules fdo_metadata_decode elf_info))
+ (modules perf_script fdo_metadata_decode elf_info))
 
 (executable
  (name oxcaml_fdo_decode)

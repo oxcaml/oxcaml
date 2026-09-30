@@ -1,0 +1,125 @@
+sample
+branches in unannotated code
+branch ? -> "Decode_trace.(fun)@param,run,opaque,3":0
+  count "Decode_trace.(fun)@param,run,opaque,3":0
+branch "Decode_trace.(fun)@param,run,opaque,3":0 -> "Decode_trace.run":0
+  count "Decode_trace.(fun)@param,run,opaque,3":0:814cc4c4:0:call
+  tailcall "Decode_trace.(fun)@param,run,opaque,3":0:814cc4c4:0:call
+  count "Decode_trace.run":0 < "Decode_trace.(fun)@param,run,opaque,3":0:814cc4c4:0:call
+  count "Decode_trace.inlined":0 < "Decode_trace.run":0:09aefa75:2:call < "Decode_trace.(fun)@param,run,opaque,3":0:814cc4c4:0:call
+branch "Decode_trace.run":0 -> "Decode_trace.outside":0
+  count "Decode_trace.run":0:09aefa75:0:call < "Decode_trace.(fun)@param,run,opaque,3":0:814cc4c4:0:call
+  call "Decode_trace.run":0:09aefa75:0:call
+  count "Decode_trace.outside":0 < "Decode_trace.run":0:09aefa75:0:call < "Decode_trace.(fun)@param,run,opaque,3":0:814cc4c4:0:call
+branch "Decode_trace.outside":0 -> ?
+  discard context
+branches in unannotated code
+sample
+branches in unannotated code
+sample
+branches in unannotated code
+sample
+branches in unannotated code
+sample
+branches in unannotated code
+branch ? -> "Decode_trace.outside":0
+branch "Decode_trace.outside":0 -> "Decode_trace.run":0
+branch "Decode_trace.run":0 -> "Decode_trace.callback":0
+  count "Decode_trace.run":0:09aefa75:1:call
+  call "Decode_trace.run":0:09aefa75:1:call
+sample
+branch "Decode_trace.run":0 -> "Decode_trace.callback":0
+  call "Decode_trace.run":0:09aefa75:1:call
+  count "Decode_trace.callback":0 < "Decode_trace.run":0:09aefa75:1:call
+branch "Decode_trace.callback":0 -> ?
+  count "Decode_trace.callback":0:e6498f21:0:call < "Decode_trace.run":0:09aefa75:1:call
+  tailcall "Decode_trace.callback":0:e6498f21:0:call
+branches in unannotated code
+branch ? -> "Decode_trace.callback.(fun)@acc,x,%int_add,leaf":0
+  count "Decode_trace.callback.(fun)@acc,x,%int_add,leaf":0 < "Decode_trace.callback":0:e6498f21:0:call < "Decode_trace.run":0:09aefa75:1:call
+branch "Decode_trace.callback.(fun)@acc,x,%int_add,leaf":0 -> "Decode_trace.leaf":0
+  count "Decode_trace.callback.(fun)@acc,x,%int_add,leaf":0:77f0100a:0:call < "Decode_trace.callback":0:e6498f21:0:call < "Decode_trace.run":0:09aefa75:1:call
+  call "Decode_trace.callback.(fun)@acc,x,%int_add,leaf":0:77f0100a:0:call
+  count "Decode_trace.leaf":0 < "Decode_trace.callback.(fun)@acc,x,%int_add,leaf":0:77f0100a:0:call < "Decode_trace.callback":0:e6498f21:0:call < "Decode_trace.run":0:09aefa75:1:call
+branch "Decode_trace.leaf":0 -> "Decode_trace.leaf":0
+  count "Decode_trace.leaf":0:9cb3ee05:0:else < "Decode_trace.callback.(fun)@acc,x,%int_add,leaf":0:77f0100a:0:call < "Decode_trace.callback":0:e6498f21:0:call < "Decode_trace.run":0:09aefa75:1:call
+branch "Decode_trace.leaf":0 -> "Decode_trace.callback.(fun)@acc,x,%int_add,leaf":0
+  return
+branch "Decode_trace.callback.(fun)@acc,x,%int_add,leaf":0 -> ?
+  discard context
+branches in unannotated code
+branch ? -> "Decode_trace.callback.(fun)@acc,x,%int_add,leaf":0
+  count "Decode_trace.callback.(fun)@acc,x,%int_add,leaf":0
+branch "Decode_trace.callback.(fun)@acc,x,%int_add,leaf":0 -> "Decode_trace.leaf":0
+  count "Decode_trace.callback.(fun)@acc,x,%int_add,leaf":0:77f0100a:0:call
+  call "Decode_trace.callback.(fun)@acc,x,%int_add,leaf":0:77f0100a:0:call
+  count "Decode_trace.leaf":0 < "Decode_trace.callback.(fun)@acc,x,%int_add,leaf":0:77f0100a:0:call
+branch "Decode_trace.leaf":0 -> "Decode_trace.leaf":0
+  count "Decode_trace.leaf":0:9cb3ee05:0:else < "Decode_trace.callback.(fun)@acc,x,%int_add,leaf":0:77f0100a:0:call
+branch "Decode_trace.leaf":0 -> "Decode_trace.callback.(fun)@acc,x,%int_add,leaf":0
+  return
+branch "Decode_trace.callback.(fun)@acc,x,%int_add,leaf":0 -> ?
+sample
+branch "Decode_trace.callback.(fun)@acc,x,%int_add,leaf":0 -> ?
+branches in unannotated code
+branch ? -> "Decode_trace.run":0
+branch "Decode_trace.run":0 -> "Decode_trace.run":0
+  count "Decode_trace.inlined":0:81abf7dc:0:else < "Decode_trace.run":0:09aefa75:2:call
+branch "Decode_trace.run":0 -> "Decode_trace.protected":0
+  count "Decode_trace.run":0:09aefa75:3:call
+  call "Decode_trace.run":0:09aefa75:3:call
+  count "Decode_trace.protected":0 < "Decode_trace.run":0:09aefa75:3:call
+branch "Decode_trace.protected":0 -> "Decode_trace.fail":0
+  count "Decode_trace.protected":0:3bb4abd8:0:call < "Decode_trace.run":0:09aefa75:3:call
+  call "Decode_trace.protected":0:3bb4abd8:0:call
+  count "Decode_trace.fail":0 < "Decode_trace.protected":0:3bb4abd8:0:call < "Decode_trace.run":0:09aefa75:3:call
+  count "Decode_trace.fail":0:4d0a4903:0:then < "Decode_trace.protected":0:3bb4abd8:0:call < "Decode_trace.run":0:09aefa75:3:call
+branch "Decode_trace.fail":0 -> "Decode_trace.protected":0
+  reset
+  count "Decode_trace.protected":0:3bb4abd8:1:then
+branch "Decode_trace.protected":0 -> "Decode_trace.run":0
+branch "Decode_trace.run":0 -> "Decode_trace.depth":0
+  count "Decode_trace.run":0:09aefa75:4:call
+  call "Decode_trace.run":0:09aefa75:4:call
+  count "Decode_trace.depth":0 < "Decode_trace.run":0:09aefa75:4:call
+branch "Decode_trace.depth":0 -> "Decode_trace.depth":0
+  count "Decode_trace.depth":0:39fbd843:0:else < "Decode_trace.run":0:09aefa75:4:call
+branch "Decode_trace.depth":0 -> "Decode_trace.depth":0
+  count "Decode_trace.depth":0:39fbd843:1:call < "Decode_trace.run":0:09aefa75:4:call
+  call "Decode_trace.depth":0:39fbd843:1:call
+  count "Decode_trace.depth":0 < "Decode_trace.depth":0:39fbd843:1:call < "Decode_trace.run":0:09aefa75:4:call
+branch "Decode_trace.depth":0 -> "Decode_trace.depth":0
+  count "Decode_trace.depth":0:39fbd843:0:else < "Decode_trace.depth":0:39fbd843:1:call < "Decode_trace.run":0:09aefa75:4:call
+branch "Decode_trace.depth":0 -> "Decode_trace.depth":0
+  count "Decode_trace.depth":0:39fbd843:1:call < "Decode_trace.depth":0:39fbd843:1:call < "Decode_trace.run":0:09aefa75:4:call
+  call "Decode_trace.depth":0:39fbd843:1:call
+  count "Decode_trace.depth":0 < "Decode_trace.depth":0:39fbd843:1:call < "Decode_trace.depth":0:39fbd843:1:call < "Decode_trace.run":0:09aefa75:4:call
+  count "Decode_trace.depth":0:39fbd843:0:then < "Decode_trace.depth":0:39fbd843:1:call < "Decode_trace.depth":0:39fbd843:1:call < "Decode_trace.run":0:09aefa75:4:call
+branch "Decode_trace.depth":0 -> "Decode_trace.depth":0
+  return
+branch "Decode_trace.depth":0 -> "Decode_trace.depth":0
+  return
+branch "Decode_trace.depth":0 -> "Decode_trace.run":0
+  return
+sample
+branch "Decode_trace.depth":0 -> "Decode_trace.run":0
+branch "Decode_trace.run":0 -> "Decode_trace.tail":0
+  count "Decode_trace.run":0:09aefa75:5:call
+  call "Decode_trace.run":0:09aefa75:5:call
+  count "Decode_trace.tail":0 < "Decode_trace.run":0:09aefa75:5:call
+branch "Decode_trace.tail":0 -> "Decode_trace.leaf":0
+  count "Decode_trace.tail":0:c55fceb9:0:call < "Decode_trace.run":0:09aefa75:5:call
+  tailcall "Decode_trace.tail":0:c55fceb9:0:call
+  count "Decode_trace.leaf":0 < "Decode_trace.tail":0:c55fceb9:0:call < "Decode_trace.run":0:09aefa75:5:call
+  count "Decode_trace.leaf":0:9cb3ee05:0:then < "Decode_trace.tail":0:c55fceb9:0:call < "Decode_trace.run":0:09aefa75:5:call
+branch "Decode_trace.leaf":0 -> "Decode_trace.run":0
+  return
+branch "Decode_trace.run":0 -> "Decode_trace.leaf":0
+  count "Decode_trace.run":0:09aefa75:6:call
+  call "Decode_trace.run":0:09aefa75:6:call
+  count "Decode_trace.leaf":0 < "Decode_trace.run":0:09aefa75:6:call
+  count "Decode_trace.leaf":0:9cb3ee05:0:then < "Decode_trace.run":0:09aefa75:6:call
+branch "Decode_trace.leaf":0 -> "Decode_trace.run":0
+  return
+branch "Decode_trace.run":0 -> ?
+branches in unannotated code
