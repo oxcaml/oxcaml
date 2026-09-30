@@ -597,13 +597,6 @@ let option_argument_sort = None
 let option_argument_jkind = Jkind.Builtin.any ~why:(
   Type_argument {parent_path = path_option; position = 1; arity = 1})
 
-(* The jkind of an optional argument, as opposed to
-   [option_argument_jkind], the jkind of the argument to the [option]
-   type. *)
-(* CR-soon lmaurer: Consider removing this or [option_argument_jkind] now that
-   they're the same. *)
-let optional_argument_jkind = option_argument_jkind
-
 let unrestricted tvar ca_sort =
   {
     ca_type=tvar;
