@@ -74,26 +74,26 @@ let print = TG.Env_extension.print
 
 module With_extra_variables = struct
   type t =
-    { existential_vars : Flambda_kind.t Variable.Map.t;
+    { existential_vars : Flambda_kind.t Variable.Lmap.t;
       equations : TG.t Name.Map.t
     }
 
   let print ppf { existential_vars; equations } =
     Format.fprintf ppf
       "@[<hov 1>(@[<hov 1>(variables@ @[<hov 1>%a@])@]@ @[<hov 1>%a@])@ @]"
-      (Variable.Map.print Flambda_kind.print)
+      (Variable.Lmap.print Flambda_kind.print)
       existential_vars TG.Env_extension.print
       (TG.Env_extension.create ~equations)
 
   let fold ~variable ~equation t acc =
-    let acc = Variable.Map.fold variable t.existential_vars acc in
+    let acc = Variable.Lmap.fold variable t.existential_vars acc in
     Name.Map.fold equation t.equations acc
 
   let empty =
-    { existential_vars = Variable.Map.empty; equations = Name.Map.empty }
+    { existential_vars = Variable.Lmap.empty; equations = Name.Map.empty }
 
   let add_definition t var kind =
-    let existential_vars = Variable.Map.add var kind t.existential_vars in
+    let existential_vars = Variable.Lmap.add var kind t.existential_vars in
     { existential_vars; equations = t.equations }
 
   let add_or_replace_equation t name ty =
@@ -103,7 +103,11 @@ module With_extra_variables = struct
     }
 
   let free_names { existential_vars; equations } =
-    let variables = Variable.Map.keys existential_vars in
+    let variables =
+      Variable.Lmap.fold
+        (fun var _ acc -> Variable.Set.add var acc)
+        existential_vars Variable.Set.empty
+    in
     let free_names =
       Name_occurrences.create_variables variables Name_mode.in_types
     in
@@ -117,11 +121,11 @@ module With_extra_variables = struct
 
   let apply_renaming { existential_vars; equations } renaming =
     let existential_vars =
-      Variable.Map.fold
+      Variable.Lmap.fold
         (fun var kind result ->
           let var' = Renaming.apply_variable renaming var in
-          Variable.Map.add var' kind result)
-        existential_vars Variable.Map.empty
+          Variable.Lmap.add var' kind result)
+        existential_vars Variable.Lmap.empty
     in
     let equations =
       Name.Map.fold
@@ -134,7 +138,11 @@ module With_extra_variables = struct
     { existential_vars; equations }
 
   let ids_for_export { existential_vars; equations } =
-    let variables = Variable.Map.keys existential_vars in
+    let variables =
+      Variable.Lmap.fold
+        (fun var _ acc -> Variable.Set.add var acc)
+        existential_vars Variable.Set.empty
+    in
     let ids = Ids_for_export.create ~variables () in
     Name.Map.fold
       (fun name ty ids ->
@@ -143,7 +151,7 @@ module With_extra_variables = struct
       equations ids
 
   let existential_vars { existential_vars; _ } =
-    Variable.Map.keys existential_vars
+    Variable.Lmap.keys existential_vars
 
   let map_types ({ existential_vars; equations } as t) ~f =
     let equations' = Name.Map.map_sharing f equations in
