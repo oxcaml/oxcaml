@@ -686,27 +686,30 @@ let make_suitable_for_environment env (to_erase : to_erase) bind_to_and_types =
          [bind_to_and_types] takes precedence over such definition. All
          occurrences of variables that only occur once are expanded directly.
          All occurrences of variables that are only reachable through closure
-         variables are replaced with an Unknown type. *)
+         variables are replaced with an Unknown type, unless their type is an
+         alias, in which case the alias is followed. *)
       let to_expand = Variable.Set.of_list unavailable_vars_expanded in
       let to_remove = Variable.Set.of_list unavailable_vars_removed in
       let to_project = Variable.Set.union to_expand to_remove in
       let expand_type ty =
         let rec expand var =
           let ty = TE.find env (Name.var var) None in
-          if Variable.Set.mem var to_remove
-          then MTC.unknown_like ty
-          else
-            match TG.get_alias_exn ty with
-            | exception Not_found ->
-              TG.project_variables_out ~to_project ~expand ty
-            | simple ->
-              Simple.pattern_match' simple
-                ~const:(fun _ -> ty)
-                ~symbol:(fun _ ~coercion:_ -> ty)
-                ~var:(fun var ~coercion ->
-                  if Variable.Set.mem var to_expand
-                  then TG.apply_coercion (expand var) coercion
-                  else ty)
+          match TG.get_alias_exn ty with
+          | exception Not_found ->
+            if Variable.Set.mem var to_remove
+            then MTC.unknown_like ty
+            else TG.project_variables_out ~to_project ~expand ty
+          | simple ->
+            (* An alias is kept even for a variable that is to be removed: the
+               target is either available in the destination environment,
+               renamed, or itself expanded here. *)
+            Simple.pattern_match' simple
+              ~const:(fun _ -> ty)
+              ~symbol:(fun _ ~coercion:_ -> ty)
+              ~var:(fun var ~coercion ->
+                if Variable.Set.mem var to_project
+                then TG.apply_coercion (expand var) coercion
+                else ty)
         in
         TG.project_variables_out ~to_project ~expand ty
       in

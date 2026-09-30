@@ -38,22 +38,15 @@ apply direct(Make_3_1 &toplevel) inlined(never)
     ($camlExistential_alias_c__Pmakeblock_10)
     -> k * error
   where k (T : val) =
-    let $camlExistential_alias_c__test_11 =
-      closure test_5_1 @test &toplevel
-    and code loopify(never) size(11) newer_version_of(test_5)
+    let code loopify(never) size(1) newer_version_of(test_5)
           test_5_1 (param : imm tagged)
             my_closure &my_alloc_region my_depth
             -> k * k1
             : imm tagged =
-      let T_1 =
-        %project_value_slot.[test].[T] ($camlExistential_alias_c__test_11)
-      in
-      let Pfield = %block_load.[`2`] (T_1) in
-      let Pfield_1 = %block_load.[`0`] (Pfield) in
-      let D = %project_value_slot.[h].[D] (Pfield_1) in
-      let Pfield_2 = %block_load.[`0`] (D) in
-      apply &my_alloc_region inlining_state(depth(10))
-        Pfield_2 (41) -> k * k1
+      cont k (42)
+    in
+    let $camlExistential_alias_c__test_11 =
+      closure test_5_1 @test &toplevel
       with { T = T }
     in
     let $camlExistential_alias_c =
