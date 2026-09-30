@@ -40,7 +40,7 @@ let resume_preemptible_with_different_tickc () =
     Preemptible.continue_with k ()
       { retc = (fun () -> failwith "should be preempted, not return")
       ; exnc = raise
-      ; tickc = (fun () -> incr count_a; Preempt)
+      ; tickc = This (fun () -> incr count_a; Preempt)
       ; effc = (fun (type a) (eff : a Effect.t) ->
           match eff with
           | Preemption -> Some (fun (k : (a, _) Preemptible.continuation) ->
@@ -64,7 +64,7 @@ let resume_preemptible_with_different_tickc () =
     Preemptible.continue_with k ()
       { retc = (fun () -> ())
       ; exnc = raise
-      ; tickc = (fun () -> incr count_b; Preempt)
+      ; tickc = This (fun () -> incr count_b; Preempt)
       ; effc = (fun (type a) (eff : a Effect.t) ->
           match eff with
           | Preemption -> Some (fun (k : (a, _) Preemptible.continuation) ->

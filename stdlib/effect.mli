@@ -186,7 +186,7 @@ module Deep : sig
         { retc: 'a -> 'b;
           exnc: exn -> 'b;
           effc: 'c.'c t -> (('c,'b) continuation -> 'b) option;
-          tickc: unit -> tick_outcome }
+          tickc: (unit -> tick_outcome) or_null }
     (** [('a,'b) handler] is a handler record with four fields -- [retc]
         is the value handler, [exnc] handles exceptions, [effc] handles the
         effects performed by the computation enclosed by the handler, and
@@ -200,9 +200,9 @@ module Deep : sig
         @raise Out_of_fibers if unable to allocate a fiber. *)
 
     val try_with :
-      on_tick:(unit -> tick_outcome) -> ('b -> 'a) -> 'b ->
+      ?on_tick:(unit -> tick_outcome) -> ('b -> 'a) -> 'b ->
       'a effect_handler -> 'a
-      (** [try_with ~on_tick f x h] runs the computation [f x] under the handler
+      (** [try_with ?on_tick f x h] runs the computation [f x] under the handler
           [h], calling [on_tick] whenever a tick occurs. [on_tick] should
           be signal-safe. If it returns [Preempt], a [Preemption] effect is
           performed.
@@ -218,7 +218,7 @@ module Deep : sig
         -> 'b
 
       val try_with
-        :  on_tick:(unit -> tick_outcome)
+        :  ?on_tick:(unit -> tick_outcome)
         -> (Handler.t @ local -> 'b -> 'a) @ unyielding
         -> 'b
         -> 'a effect_handler
@@ -232,7 +232,7 @@ module Deep : sig
               exnc: Handler.t @ local -> exn -> 'b;
               effc: 'c. Handler.t @ local -> 'c t
                     -> (('c,'b) continuation -> 'b) option @ local;
-              tickc: unit -> tick_outcome }
+              tickc: (unit -> tick_outcome) or_null }
         (** Like {!Deep.Preemptible.handler}, but [retc], [exnc] and [effc] each
             receive a {!Handler.t} token, allowing them to perform effects.
             [tickc] does not, since it must be signal-safe. *)
@@ -246,7 +246,7 @@ module Deep : sig
 
         val try_with
           :  Handler.t @ local
-          -> on_tick:(unit -> tick_outcome)
+          -> ?on_tick:(unit -> tick_outcome)
           -> (Handler.t @ local -> 'b -> 'a) @ unyielding
           -> 'b
           -> 'a Safe.With_handler.effect_handler
@@ -310,8 +310,8 @@ module Shallow : sig
    *)
 
   module Safe : sig
-    (** OxCaml version of [fiber], which provides a [Handler.t @ local
-        unyielding] to the computation to run. *)
+    (** OxCaml version of [fiber], which provides a [Handler.t @ local] to an
+        [unyielding] computation. *)
     val fiber
       : (Handler.t @ local -> 'a -> 'b) @ unyielding -> ('a, 'b) continuation
 
@@ -349,12 +349,7 @@ module Shallow : sig
         preempt the current fiber on tick.
 
         To set the tick interval, call [Domain.Tick.acquire] before running a
-        preemptible fiber.
-
-        Whether a fiber is preemptible is fixed when it is created: fibers
-        created by {!fiber} can only be resumed with preemptible handlers,
-        and fibers created by {!Shallow.fiber} only with non-preemptible
-        ones. *)
+        preemptible fiber. *)
 
     type ('a,'b) continuation
     (** [('a,'b) continuation] is a delimited continuation of a preemptible
@@ -370,7 +365,7 @@ module Shallow : sig
         { retc: 'a -> 'b;
           exnc: exn -> 'b;
           effc: 'c.'c t -> (('c,'a) continuation -> 'b) option;
-          tickc: unit -> tick_outcome }
+          tickc: (unit -> tick_outcome) or_null }
     (** [('a,'b) handler] is a handler record with four fields -- [retc]
         is the value handler, [exnc] handles exceptions, [effc] handles the
         effects performed by the computation enclosed by the handler, and
@@ -405,8 +400,8 @@ module Shallow : sig
     *)
 
     module Safe : sig
-      (** OxCaml version of [fiber], which provides a [Handler.t @ local
-          unyielding] to the computation to run. *)
+      (** OxCaml version of [fiber], which provides a [Handler.t @ local] to an
+          [unyielding] computation. *)
       val fiber
         : (Handler.t @ local -> 'a -> 'b) @ unyielding -> ('a, 'b) continuation
 
@@ -418,7 +413,7 @@ module Shallow : sig
               exnc: Handler.t @ local -> exn -> 'b;
               effc: 'c. Handler.t @ local -> 'c t
                     -> (('c,'a) continuation -> 'b) option @ local;
-              tickc: unit -> tick_outcome }
+              tickc: (unit -> tick_outcome) or_null }
         (** Like {!Shallow.Preemptible.handler}, but [retc], [exnc] and [effc]
             each receive a {!Handler.t} token, allowing them to perform effects.
             [tickc] does not, since it must be signal-safe. *)
