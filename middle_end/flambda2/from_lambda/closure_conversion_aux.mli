@@ -380,6 +380,8 @@ module Function_decls : sig
       body:(Acc.t -> Env.t -> Acc.t * Flambda.Import.Expr.t) ->
       attr:Lambda.function_attribute ->
       loc:Lambda.scoped_location ->
+      fdo_function_id:
+        (Fdo_counter.function_id * Fdo_counter.Function_body_hash.t) option ->
       free_idents_of_body:Ident.Set.t ->
       Recursive.t ->
       closure_alloc_mode:Lambda.locality_mode ->
@@ -438,6 +440,11 @@ module Function_decls : sig
     val stub : t -> bool
 
     val loc : t -> Lambda.scoped_location
+
+    (** The function's id (see [Fdo_counter]), when counters are enabled and the
+        function has one. *)
+    val fdo_function_id :
+      t -> (Fdo_counter.function_id * Fdo_counter.Function_body_hash.t) option
 
     val recursive : t -> Recursive.t
 

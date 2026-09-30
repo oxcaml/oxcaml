@@ -86,7 +86,8 @@ let make_inlined_body ~callee ~called_code_id ~unroll_to ~params ~args
 let wrap_inlined_body_for_exn_extra_args ~extra_args ~apply_exn_continuation
     ~apply_return_continuation ~result_arity ~make_inlined_body =
   let apply_cont_create () ~trap_action cont ~args ~dbg =
-    Apply_cont.create ~trap_action cont ~args ~dbg |> Expr.create_apply_cont
+    Apply_cont.create ~fdo_counters:[] ~trap_action cont ~args ~dbg
+    |> Expr.create_apply_cont
   in
   let let_cont_create () cont ~handler_params ~handler ~body ~is_exn_handler
       ~is_cold =

@@ -72,6 +72,16 @@ module type Code_metadata_accessors_result_type = sig
 
   val dbg : 'a t -> Debuginfo.t
 
+  (** The pseudo-instrumentation counters of the function's entry edge (see
+      [Fdo_counter]): its own entry counter first, then the entry counters of
+      the calls inlined at the head of its body, which execute as often (see
+      [Inlined_call_counters]). *)
+  val fdo_entry_counters : 'a t -> Fdo_counter.t list
+
+  (** The body hash the function's interior counters were numbered with (see
+      [Fdo_fingerprint]). *)
+  val function_body_hash : 'a t -> Fdo_counter.Function_body_hash.t option
+
   val is_tupled : 'a t -> bool
 
   val is_my_closure_used : 'a t -> bool
@@ -114,6 +124,8 @@ type 'a create_type =
   cost_metrics:Cost_metrics.t ->
   inlining_arguments:Inlining_arguments.t ->
   dbg:Debuginfo.t ->
+  fdo_entry_counters:Fdo_counter.t list ->
+  function_body_hash:Fdo_counter.Function_body_hash.t option ->
   is_tupled:bool ->
   is_my_closure_used:bool ->
   inlining_decision:Function_decl_inlining_decision_type.t ->
@@ -145,6 +157,8 @@ val with_first_complex_local_param : First_complex_local_param.t -> t -> t
 val with_is_tupled : bool -> t -> t
 
 val with_result_types : Result_types.t Or_unknown_or_bottom.t -> t -> t
+
+val with_fdo_entry_counters : Fdo_counter.t list -> t -> t
 
 val with_inlining_decision : Function_decl_inlining_decision_type.t -> t -> t
 

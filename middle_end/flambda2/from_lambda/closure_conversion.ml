@@ -468,6 +468,7 @@ module Inlining = struct
     in
     let inlined_debuginfo =
       Inlined_debuginfo.create ~called_code_id ~apply_dbg
+        ~apply_callsite_counter:None
     in
     let inlined_dbg_var = Variable.create "inlined_dbg" K.value in
     let inlined_dbg_var_duid = Flambda_debug_uid.none in
@@ -897,7 +898,8 @@ let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
         Apply.create ~callee:(Some callee)
           ~continuation:(Return return_continuation) exn_continuation ~args
           ~args_arity:param_arity ~return_arity ~call_kind
-          ~return_mode:alloc_mode_app dbg ~inlined:Default_inlined
+          ~return_mode:alloc_mode_app dbg ~callsite_counter:None
+          ~inlined:Default_inlined
           ~inlining_state:(Inlining_state.default ~round:0)
           ~probe:None ~position:Normal
           ~relative_history:(Env.relative_history_from_scoped ~loc env)
@@ -1136,7 +1138,7 @@ let close_effect_primitive acc env ~dbg exn_continuation
         ~return_mode:
           (Alloc_mode.For_applications.not_alloc_stack
              ~alloc_region:current_alloc_region)
-        dbg ~inlined:Never_inlined
+        dbg ~callsite_counter:None ~inlined:Never_inlined
         ~inlining_state:(Inlining_state.default ~round:0)
         ~probe:None ~position:Normal
         ~relative_history:Inlining_history.Relative.empty
@@ -1909,7 +1911,7 @@ let close_exact_or_unknown_apply acc env
         ~callee:(if can_erase_callee then None else Some callee)
         ~continuation:(Return continuation) apply_exn_continuation ~args
         ~args_arity ~return_arity ~call_kind ~return_mode:mode dbg
-        ~inlined:inlined_call
+        ~callsite_counter:None ~inlined:inlined_call
         ~inlining_state:(Inlining_state.default ~round:0)
         ~probe ~position
         ~relative_history:(Env.relative_history_from_scoped ~loc env)
@@ -2405,6 +2407,17 @@ let compute_body_of_unboxed_function acc my_region my_alloc_region my_closure
 let first_complex_local_param_of_function_decl decl =
   First_complex_local_param.Index (Function_decl.first_complex_local_param decl)
 
+(* The counters of a function's entry edge and the body hash of its interior
+   counters, when the function has an id (see [Fdo_counter]). *)
+let fdo_entry decl =
+  match Function_decl.fdo_function_id decl with
+  | Some (function_id, function_body_hash) ->
+    ( [ { Fdo_counter.position = Fdo_counter.function_entry function_id;
+          inlining_stack = []
+        } ],
+      Some function_body_hash )
+  | None -> [], None
+
 let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
     params_arity ~unarized_param_modes:param_modes return result_arity_main_code
     code_id main_code_id decl loc external_env recursive
@@ -2508,7 +2521,7 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
              (Function_decl.result_mode decl)
              ~current_alloc_region:my_alloc_region ~current_region:my_region
              ~current_ghost_region:my_ghost_region)
-        Debuginfo.none
+        Debuginfo.none ~callsite_counter:None
         ~inlined:(Inlined_attribute.forward_inlined ())
         ~inlining_state:(Inlining_state.default ~round:0)
         ~probe:None ~position:Normal
@@ -2560,7 +2573,7 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
         let boxed_return = Variable.create "boxed_return" K.value in
         let boxed_return_duid = Flambda_debug_uid.none in
         let return_apply_cont =
-          Apply_cont.create return_continuation
+          Apply_cont.create ~fdo_counters:[] return_continuation
             ~args:[Simple.var boxed_return]
             ~dbg:Debuginfo.none
         in
@@ -2658,8 +2671,11 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
       ~cold:false ~is_opaque:false ~recursive ~newer_version_of:None
       ~cost_metrics
       ~inlining_arguments:(Inlining_arguments.create ~round:0)
-      ~dbg ~is_tupled ~is_my_closure_used:true ~inlining_decision
-      ~absolute_history ~relative_history ~loopify:Never_loopify
+      ~dbg
+      ~fdo_entry_counters:(fst (fdo_entry decl))
+      ~function_body_hash:(snd (fdo_entry decl))
+      ~is_tupled ~is_my_closure_used:true ~inlining_decision ~absolute_history
+      ~relative_history ~loopify:Never_loopify
   in
   let main_approx =
     let code = Code_or_metadata.create main_code in
@@ -2690,6 +2706,7 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
   let body = Function_decl.body decl in
   let loc = Function_decl.loc decl in
   let dbg = Debuginfo.from_location loc in
+  let fdo_entry_counters, function_body_hash = fdo_entry decl in
   let unarized_params = Function_decl.params decl in
   let params_arity = Function_decl.params_arity decl in
   let unarized_param_modes =
@@ -3079,7 +3096,8 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
       ~is_opaque:(Function_decl.is_opaque decl)
       ~recursive ~newer_version_of:None ~cost_metrics
       ~inlining_arguments:(Inlining_arguments.create ~round:0)
-      ~dbg ~is_tupled:main_code_is_tupled
+      ~dbg ~fdo_entry_counters ~function_body_hash
+      ~is_tupled:main_code_is_tupled
       ~is_my_closure_used:
         (Function_params_and_body.is_my_closure_used params_and_body)
       ~inlining_decision ~absolute_history ~relative_history ~loopify
@@ -3230,6 +3248,7 @@ let close_functions acc external_env ~current_alloc_region ~current_region
         in
         let cost_metrics = Cost_metrics.zero in
         let dbg = Debuginfo.from_location (Function_decl.loc decl) in
+        let fdo_entry_counters, function_body_hash = fdo_entry decl in
         let is_tupled =
           match Function_decl.kind decl with
           | Curried _ -> false
@@ -3249,8 +3268,8 @@ let close_functions acc external_env ~current_alloc_region ~current_region
             ~recursive:(Function_decl.recursive decl)
             ~newer_version_of:None ~cost_metrics
             ~inlining_arguments:(Inlining_arguments.create ~round:0)
-            ~dbg ~is_tupled ~is_my_closure_used:true
-            ~inlining_decision:Recursive
+            ~dbg ~fdo_entry_counters ~function_body_hash ~is_tupled
+            ~is_my_closure_used:true ~inlining_decision:Recursive
             ~absolute_history:(Inlining_history.Absolute.empty compilation_unit)
             ~relative_history:Inlining_history.Relative.empty
             ~loopify:Never_loopify
@@ -3646,9 +3665,9 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
           ~params ~params_arity ~removed_params:Ident.Set.empty
           ~return:result_arity ~calling_convention:Normal_calling_convention
           ~return_continuation ~exn_continuation ~my_alloc_region ~my_region
-          ~my_ghost_region ~body:fbody ~attr ~loc:apply.loc ~free_idents_of_body
-          ~closure_alloc_mode ~first_complex_local_param ~result_mode
-          Recursive.Non_recursive ]
+          ~my_ghost_region ~body:fbody ~attr ~loc:apply.loc
+          ~fdo_function_id:None ~free_idents_of_body ~closure_alloc_mode
+          ~first_complex_local_param ~result_mode Recursive.Non_recursive ]
     in
     let body acc env =
       let arg = find_simple_from_id env wrapper_id in
@@ -3724,7 +3743,7 @@ let wrap_over_application acc env full_call (apply : IR.apply) ~remaining
         ~continuation apply_exn_continuation ~args:remaining
         ~args_arity:remaining_arity ~return_arity:apply.return_arity
         ~call_kind:Call_kind.indirect_function_call_unknown_arity ~return_mode
-        apply_dbg ~inlined
+        apply_dbg ~callsite_counter:None ~inlined
         ~inlining_state:(Inlining_state.default ~round:0)
         ~probe ~position
         ~relative_history:(Env.relative_history_from_scoped ~loc:apply.loc env)

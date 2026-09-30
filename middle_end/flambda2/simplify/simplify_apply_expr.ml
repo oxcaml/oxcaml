@@ -97,7 +97,7 @@ let loopify_decision_for_call dacc apply =
 
 let simplify_self_tail_call dacc apply self_cont ~down_to_up =
   Simplify_apply_cont_expr.simplify_apply_cont dacc
-    (Apply_cont_expr.create self_cont ~args:(Apply.args apply)
+    (Apply_cont_expr.create ~fdo_counters:[] self_cont ~args:(Apply.args apply)
        ~dbg:(Apply.dbg apply))
     ~down_to_up
 
@@ -654,7 +654,9 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
             Apply.create ~callee ~continuation:(Return return_continuation)
               exn_continuation ~args ~args_arity:param_arity
               ~return_arity:result_arity ~call_kind ~return_mode:my_alloc_mode
-              dbg ~inlined
+              dbg
+              ~callsite_counter:(Apply.callsite_counter apply)
+              ~inlined
               ~inlining_state:(Apply.inlining_state apply)
               ~position:Normal ~probe:None
               ~relative_history:Inlining_history.Relative.empty
@@ -743,7 +745,8 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
               ~cold:false ~is_a_functor:false ~is_opaque:false ~recursive
               ~cost_metrics:cost_metrics_of_body
               ~inlining_arguments:(DE.inlining_arguments (DA.denv dacc))
-              ~dbg ~is_tupled:false
+              ~dbg ~fdo_entry_counters:[] ~function_body_hash:None
+              ~is_tupled:false
               ~is_my_closure_used:
                 (Function_params_and_body.is_my_closure_used params_and_body)
               ~inlining_decision:Stub ~absolute_history ~relative_history
@@ -774,7 +777,9 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
           code )
       in
       let apply_cont =
-        Apply_cont.create apply_continuation ~args:[Simple.var wrapper_var] ~dbg
+        Apply_cont.create ~fdo_counters:[] apply_continuation
+          ~args:[Simple.var wrapper_var]
+          ~dbg
       in
       let expr =
         let wrapper_var =
@@ -1312,6 +1317,7 @@ let simplify_apply_shared dacc apply : _ simplify_apply_shared_result =
         ~call_kind:(Apply.call_kind apply)
         ~return_mode:(Apply.return_mode apply)
         (DE.add_inlined_debuginfo (DA.denv dacc) (Apply.dbg apply))
+        ~callsite_counter:(Apply.callsite_counter apply)
         ~inlined ~inlining_state ~probe:(Apply.probe apply)
         ~position:(Apply.position apply)
         ~relative_history:

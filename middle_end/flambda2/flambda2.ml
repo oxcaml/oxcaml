@@ -281,6 +281,11 @@ let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
      processing time because there may be an [@@@flambda_oclassic] or
      [@@@flambda_o3] attribute. *)
   if Flambda_features.classic_mode () then Clflags.use_linscan := true;
+  (* Checked here for the same reason. *)
+  if Flambda_features.classic_mode () && Oxcaml_flags.fdo_counters_enabled ()
+  then
+    Location.raise_errorf
+      "-fdo-counters is not supported in classic mode (-Oclassic)";
   Misc.Style.setup (Flambda_features.colour ());
   (* CR-someday mshinwell: Note for future WebAssembly work: this thing about
      the length of arrays will need fixing, I don't think it only applies to the
@@ -319,6 +324,16 @@ let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
         Lambda_to_flambda.lambda_to_flambda ~mode ~machine_width
           ~big_endian:Arch.big_endian ~cmx_loader ~compilation_unit ~module_repr
           module_initializer)
+  in
+  let raw_flambda =
+    if Oxcaml_flags.fdo_counters_enabled ()
+    then
+      Profile.record_call "fdo_instrumentation" (fun () ->
+          Fdo_instrumentation.add_to_unit ~compilation_unit
+            ~function_body_hash:
+              (Fdo_fingerprint.of_function ~params:[] module_initializer)
+            raw_flambda)
+    else raw_flambda
   in
   invoke_compilation_unit_callbacks compilation_unit;
   flambda_to_flambda0 ~ppf_dump:ppf ~prefixname ~cmx_loader ~machine_width ~mode

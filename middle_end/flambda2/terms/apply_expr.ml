@@ -78,6 +78,7 @@ type t =
     call_kind : Call_kind.t;
     return_mode : Alloc_mode.For_applications.t;
     dbg : Debuginfo.t;
+    callsite_counter : Fdo_counter.t option;
     inlined : Inlined_attribute.t;
     inlining_state : Inlining_state.t;
     probe : Probe.t;
@@ -92,7 +93,7 @@ let [@ocamlformat "disable"] print_inlining_paths ppf relative_history =
 
 let [@ocamlformat "disable"] print_normal ppf
     { callee; continuation; exn_continuation; args; args_arity;
-      return_arity; call_kind; return_mode; dbg; inlined; inlining_state; probe;
+      return_arity; call_kind; return_mode; dbg; callsite_counter = _; inlined; inlining_state; probe;
       position; relative_history } =
   Format.fprintf ppf "@[<hov 1>(\
       @[<hov 1>(%a\u{3008}%a\u{3009}\u{300a}%a\u{300b}\
@@ -131,7 +132,7 @@ let [@ocamlformat "disable"] print_normal ppf
 
 let [@ocamlformat "disable"] print_effect ppf
     { callee = _; continuation; exn_continuation; args = _; args_arity = _;
-      return_arity = _; call_kind; return_mode; dbg; inlined = _; inlining_state = _;
+      return_arity = _; call_kind; return_mode; dbg; callsite_counter = _; inlined = _; inlining_state = _;
       probe = _; position; relative_history = _ } =
   Format.fprintf ppf "@[<hov 1>(\
       @[<hov 1>%a@]@ \
@@ -168,6 +169,7 @@ let invariant
        call_kind;
        return_mode = _;
        dbg = _;
+       callsite_counter = _;
        inlined = _;
        inlining_state = _;
        probe = _;
@@ -213,8 +215,8 @@ let invariant
       "Length of argument and arity lists disagree in [Apply]:@ %a" print t
 
 let create ~callee ~continuation exn_continuation ~args ~args_arity
-    ~return_arity ~(call_kind : Call_kind.t) ~return_mode dbg ~inlined
-    ~inlining_state ~probe ~position ~relative_history =
+    ~return_arity ~(call_kind : Call_kind.t) ~return_mode dbg ~callsite_counter
+    ~inlined ~inlining_state ~probe ~position ~relative_history =
   let t =
     { callee;
       continuation;
@@ -225,6 +227,7 @@ let create ~callee ~continuation exn_continuation ~args ~args_arity
       call_kind;
       return_mode;
       dbg;
+      callsite_counter;
       inlined;
       inlining_state;
       probe;
@@ -267,6 +270,7 @@ let free_names_without_exn_continuation
       call_kind;
       return_mode;
       dbg = _;
+      callsite_counter = _;
       inlined = _;
       inlining_state = _;
       probe = _;
@@ -292,6 +296,7 @@ let free_names_except_callee
       call_kind;
       return_mode;
       dbg = _;
+      callsite_counter = _;
       inlined = _;
       inlining_state = _;
       probe = _;
@@ -322,6 +327,7 @@ let apply_renaming
        call_kind;
        return_mode;
        dbg;
+       callsite_counter;
        inlined;
        inlining_state;
        probe;
@@ -362,6 +368,7 @@ let apply_renaming
       call_kind = call_kind';
       return_mode = return_mode';
       dbg;
+      callsite_counter;
       inlined;
       inlining_state;
       probe;
@@ -379,6 +386,7 @@ let ids_for_export
       call_kind;
       return_mode;
       dbg = _;
+      callsite_counter = _;
       inlined = _;
       inlining_state = _;
       probe = _;
@@ -434,3 +442,7 @@ let args_arity t = t.args_arity
 let return_arity t = t.return_arity
 
 let with_inlined_attribute t inlined = { t with inlined }
+
+let callsite_counter t = t.callsite_counter
+
+let with_callsite_counter t callsite_counter = { t with callsite_counter }

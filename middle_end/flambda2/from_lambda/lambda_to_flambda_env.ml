@@ -91,11 +91,13 @@ type t =
     region_closure_continuations :
       region_closure_continuation Region_stack_element.Map.t;
     my_alloc_region : Ident.t;
-    ident_stamp_upon_starting : int
+    ident_stamp_upon_starting : int;
+    function_path : string;
+    function_id_occurrences : int Misc.Stdlib.String.Tbl.t
   }
 
 let create ~current_unit ~machine_width ~return_continuation ~exn_continuation
-    ~my_region ~my_alloc_region =
+    ~my_region ~my_alloc_region ~function_path ~function_id_occurrences =
   let mutables_needed_by_continuations =
     Continuation.Map.of_list
       [return_continuation, Ident.Set.empty; exn_continuation, Ident.Set.empty]
@@ -117,10 +119,26 @@ let create ~current_unit ~machine_width ~return_continuation ~exn_continuation
       Continuation.Map.singleton return_continuation [];
     region_closure_continuations = Region_stack_element.Map.empty;
     my_alloc_region;
-    ident_stamp_upon_starting
+    ident_stamp_upon_starting;
+    function_path;
+    function_id_occurrences
   }
 
 let current_unit t = t.current_unit
+
+let function_path t = t.function_path
+
+let function_id_occurrences t = t.function_id_occurrences
+
+let fresh_function_id_occurrence t ~path =
+  let key = path in
+  let index =
+    Option.value
+      (Misc.Stdlib.String.Tbl.find_opt t.function_id_occurrences key)
+      ~default:0
+  in
+  Misc.Stdlib.String.Tbl.replace t.function_id_occurrences key (index + 1);
+  index
 
 let machine_width t = t.machine_width
 

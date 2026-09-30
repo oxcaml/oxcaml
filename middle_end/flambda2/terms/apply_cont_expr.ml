@@ -18,7 +18,8 @@ type t =
   { k : Continuation.t;
     args : Simple.t list;
     trap_action : Trap_action.Option.t;
-    dbg : Debuginfo.t
+    dbg : Debuginfo.t;
+    fdo_counters : Fdo_counter.t list
   }
 
 let print_or_elide_debuginfo ppf dbg =
@@ -31,7 +32,7 @@ let print_or_elide_debuginfo ppf dbg =
 include Container_types.Make (struct
   type nonrec t = t
 
-  let [@ocamlformat "disable"] print ppf { k; args; trap_action; dbg; } =
+  let [@ocamlformat "disable"] print ppf { k; args; trap_action; dbg; fdo_counters = _ } =
     let name, trap_action =
       match Continuation.sort k, trap_action, args with
       | Normal_or_exn, None, [] -> "goto", None
@@ -86,8 +87,19 @@ include Container_types.Make (struct
 
   let hash _ = Misc.fatal_error "Not yet implemented"
 
-  let compare { k = k1; args = args1; trap_action = trap_action1; dbg = dbg1 }
-      { k = k2; args = args2; trap_action = trap_action2; dbg = dbg2 } =
+  let compare
+      { k = k1;
+        args = args1;
+        trap_action = trap_action1;
+        dbg = dbg1;
+        fdo_counters = _
+      }
+      { k = k2;
+        args = args2;
+        trap_action = trap_action2;
+        dbg = dbg2;
+        fdo_counters = _
+      } =
     let c = Continuation.compare k1 k2 in
     if c <> 0
     then c
@@ -103,9 +115,11 @@ include Container_types.Make (struct
 end)
 
 (* CR mshinwell: Check the sort of [k]. *)
-let create ?trap_action k ~args ~dbg = { k; args; trap_action; dbg }
+let create ?trap_action ~fdo_counters k ~args ~dbg =
+  { k; args; trap_action; dbg; fdo_counters }
 
-let goto k = { k; args = []; trap_action = None; dbg = Debuginfo.none }
+let goto ~fdo_counters k =
+  { k; args = []; trap_action = None; dbg = Debuginfo.none; fdo_counters }
 
 let continuation t = t.k
 
@@ -115,7 +129,9 @@ let trap_action t = t.trap_action
 
 let debuginfo t = t.dbg
 
-let free_names { k; args; trap_action; dbg = _ } =
+let fdo_counters t = t.fdo_counters
+
+let free_names { k; args; trap_action; dbg = _; fdo_counters = _ } =
   let default = Simple.List.free_names args in
   match trap_action with
   | None -> Name_occurrences.add_continuation default k ~has_traps:false
@@ -124,15 +140,15 @@ let free_names { k; args; trap_action; dbg = _ } =
       (Name_occurrences.union default (Trap_action.free_names trap_action))
       k ~has_traps:true
 
-let apply_renaming ({ k; args; trap_action; dbg } as t) renaming =
+let apply_renaming ({ k; args; trap_action; dbg; fdo_counters } as t) renaming =
   let k' = Renaming.apply_continuation renaming k in
   let args' = Simple.List.apply_renaming args renaming in
   let trap_action' = Trap_action.Option.apply_renaming trap_action renaming in
   if k == k' && args == args' && trap_action == trap_action'
   then t
-  else { k = k'; args = args'; trap_action = trap_action'; dbg }
+  else { k = k'; args = args'; trap_action = trap_action'; dbg; fdo_counters }
 
-let ids_for_export { k; args; trap_action; dbg = _ } =
+let ids_for_export { k; args; trap_action; dbg = _; fdo_counters = _ } =
   List.fold_left
     (fun ids arg -> Ids_for_export.add_simple ids arg)
     (Ids_for_export.add_continuation
@@ -150,6 +166,8 @@ let with_continuation_and_args t cont ~args =
 let update_args t ~args = if args == t.args then t else { t with args }
 
 let with_debuginfo t ~dbg = if dbg == t.dbg then t else { t with dbg }
+
+let with_fdo_counters t fdo_counters = { t with fdo_counters }
 
 let no_args t = match args t with [] -> true | _ :: _ -> false
 

@@ -151,6 +151,12 @@ val keep_llvmir : bool ref
 val llvm_path : string option ref
 val llvm_flags : string ref
 
+val fdo_counters : bool ref
+
+(** Whether to create pseudo-instrumentation counters for branching constructs:
+    when [-fdo-counters] was passed. *)
+val fdo_counters_enabled : unit -> bool
+
 module Flambda2 : sig
   val debug : bool ref
   val reaper_debug_flags : string list ref

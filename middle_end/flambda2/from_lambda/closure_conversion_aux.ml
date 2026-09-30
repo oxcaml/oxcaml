@@ -802,6 +802,8 @@ module Function_decls = struct
         free_idents_of_body : Ident.Set.t;
         attr : Lambda.function_attribute;
         loc : Lambda.scoped_location;
+        fdo_function_id :
+          (Fdo_counter.function_id * Fdo_counter.Function_body_hash.t) option;
         recursive : Recursive.t;
         closure_alloc_mode : Lambda.locality_mode;
         first_complex_local_param : int;
@@ -812,7 +814,7 @@ module Function_decls = struct
         ~params_arity ~removed_params ~return ~calling_convention
         ~return_continuation ~exn_continuation ~my_alloc_region ~my_region
         ~my_ghost_region ~body ~(attr : Lambda.function_attribute) ~loc
-        ~free_idents_of_body recursive ~closure_alloc_mode
+        ~fdo_function_id ~free_idents_of_body recursive ~closure_alloc_mode
         ~first_complex_local_param ~result_mode =
       let let_rec_ident =
         match let_rec_ident with
@@ -849,6 +851,7 @@ module Function_decls = struct
         free_idents_of_body;
         attr;
         loc;
+        fdo_function_id;
         recursive;
         closure_alloc_mode;
         first_complex_local_param;
@@ -908,6 +911,8 @@ module Function_decls = struct
     let stub t = t.attr.stub
 
     let loc t = t.loc
+
+    let fdo_function_id t = t.fdo_function_id
 
     let recursive t = t.recursive
 
@@ -1064,7 +1069,9 @@ end
 
 module Apply_cont_with_acc = struct
   let create acc ?trap_action ?args_approx cont ~args ~dbg =
-    let apply_cont = Apply_cont.create ?trap_action cont ~args ~dbg in
+    let apply_cont =
+      Apply_cont.create ~fdo_counters:[] ?trap_action cont ~args ~dbg
+    in
     let acc = Acc.add_continuation_application ~cont args_approx acc in
     let acc =
       Acc.add_free_names_and_check_my_closure_use

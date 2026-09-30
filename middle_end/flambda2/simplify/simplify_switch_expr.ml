@@ -166,7 +166,11 @@ let rebuild_arm uacc arm (action, use_id, arity, env_at_use)
             new_let_conts, arms, Mergeable { cont; args }))
   | New_wrapper new_let_cont ->
     let new_let_conts = new_let_cont :: new_let_conts in
-    let action = Apply_cont.goto new_let_cont.cont in
+    let action =
+      Apply_cont.goto
+        ~fdo_counters:(Apply_cont.fdo_counters action)
+        new_let_cont.cont
+    in
     let arms = TI.Map.add arm action arms in
     new_let_conts, arms, Not_mergeable
 
@@ -806,7 +810,9 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
                of continuations in [Name_occurrences] and then try to inline out
                [dest]. This might happen anyway in the backend though so this
                probably isn't that important for now. *)
-            let apply_cont = Apply_cont.create dest ~args ~dbg in
+            let apply_cont =
+              Apply_cont.create ~fdo_counters:[] dest ~args ~dbg
+            in
             return
               (RE.create_apply_cont apply_cont)
               ~added_code_size:(Code_size.apply_cont apply_cont)
