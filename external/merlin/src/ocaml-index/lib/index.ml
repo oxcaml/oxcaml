@@ -6,9 +6,10 @@ let with_root ?root file =
   | None -> file
   | Some root -> Filename.concat root file
 
-let add_root ~root (lid : Longident.t Location.loc) =
+let add_root ~root (lid : 'a Location.loc) =
   match root with
   | None -> lid
+  | Some _ when Location.is_none lid.loc -> lid
   | Some root ->
     let pos_fname = Filename.concat root lid.loc.loc_start.pos_fname in
     { lid with
@@ -106,10 +107,40 @@ let init_load_path_once ~do_not_use_cmt_loadpath =
       Load_path.(init ~auto_include:no_auto_include ~visible ~hidden);
       loaded := true)
 
+let rewrite_module_facts ~root ~rewrite_root
+    (facts : Module_implementation_facts.t) =
+  if not rewrite_root then facts
+  else
+    let open Module_implementation_facts in
+    match root with
+    | None -> facts
+    | Some _ ->
+      let add_root_to_location loc = (add_root ~root { txt = (); loc }).loc in
+      let rewrite_node : Node.t -> Node.t = function
+        | Node.Uid _ as node -> node
+        | Node.Location (compilation_unit, loc) ->
+          Node.Location (compilation_unit, add_root_to_location loc)
+      in
+      map_checks facts ~f:(fun (check : Check.t) ->
+          { check with
+            implementation = rewrite_node check.implementation;
+            site = add_root_to_location check.site
+          })
+
+let merge_module_facts left right =
+  match (left, right) with
+  | None, _ | _, None -> None
+  | Some left, Some right ->
+    Some
+      (link_module_facts
+         (Module_implementation_facts.union (fetch_module_facts left)
+            (fetch_module_facts right)))
+
 let index_of_artifact ~into ~root ~rewrite_root ~build_path
     ~do_not_use_cmt_loadpath ~shapes ~store_shapes ~cmt_loadpath ~cmt_impl_shape
     ~cmt_modname ~uid_to_loc ~cmt_ident_occurrences ~cmt_initial_env
-    ~cmt_sourcefile ~cmt_source_digest ~cmt_declaration_dependencies =
+    ~cmt_sourcefile ~cmt_source_digest ~cmt_declaration_dependencies
+    ~module_implementation_facts =
   init_load_path_once ~do_not_use_cmt_loadpath ~dirs:build_path cmt_loadpath;
   let module Reduce = Shape_reduce.Make (Reduce_conf (struct
     let shapes = shapes
@@ -135,6 +166,12 @@ let index_of_artifact ~into ~root ~rewrite_root ~build_path
         | Some uid, true -> (acc_defs, add_one uid lid acc_apx)
         | None, _ -> acc)
       (defs, into.approximated) cmt_ident_occurrences
+  in
+  let module_facts =
+    Option.map
+      (rewrite_module_facts ~root ~rewrite_root)
+      module_implementation_facts
+    |> Option.map link_module_facts
   in
   let cu_shape = into.cu_shape in
   if store_shapes then
@@ -178,6 +215,7 @@ let index_of_artifact ~into ~root ~rewrite_root ~build_path
     cu_shape;
     stats;
     related_uids;
+    module_facts = merge_module_facts into.module_facts module_facts;
     root_directory = into.root_directory
   }
 
@@ -189,7 +227,8 @@ let shape_of_artifact ~impl_shape ~modname =
     cu_shape;
     stats = Stats.empty;
     root_directory = None;
-    related_uids = Uid_map.empty ()
+    related_uids = Uid_map.empty ();
+    module_facts = None
   }
 
 let shape_of_cmt { Cmt_format.cmt_impl_shape; cmt_modname; _ } =
@@ -209,6 +248,7 @@ let index_of_cmt ~into ~root ~rewrite_root ~build_path ~do_not_use_cmt_loadpath
         cmt_sourcefile;
         cmt_source_digest;
         cmt_declaration_dependencies;
+        cmt_module_implementation_facts;
         _
       } =
     cmt_infos
@@ -223,6 +263,7 @@ let index_of_cmt ~into ~root ~rewrite_root ~build_path ~do_not_use_cmt_loadpath
     ~do_not_use_cmt_loadpath ~shapes ~store_shapes ~cmt_loadpath ~cmt_impl_shape
     ~cmt_modname ~uid_to_loc ~cmt_ident_occurrences ~cmt_initial_env
     ~cmt_sourcefile ~cmt_source_digest ~cmt_declaration_dependencies
+    ~module_implementation_facts:cmt_module_implementation_facts
 
 let index_of_cms ~into ~root ~rewrite_root ~build_path ~do_not_use_cmt_loadpath
     ~shapes ~store_shapes cms_infos =
@@ -234,6 +275,7 @@ let index_of_cms ~into ~root ~rewrite_root ~build_path ~do_not_use_cmt_loadpath
         cms_source_digest;
         cms_initial_env;
         cms_declaration_dependencies;
+        cms_module_implementation_facts;
         _
       } =
     cms_infos
@@ -251,6 +293,7 @@ let index_of_cms ~into ~root ~rewrite_root ~build_path ~do_not_use_cmt_loadpath
     ~cmt_initial_env:(Option.value cms_initial_env ~default:Env.empty)
     ~cmt_sourcefile:cms_sourcefile ~cmt_source_digest:cms_source_digest
     ~cmt_declaration_dependencies:cms_declaration_dependencies
+    ~module_implementation_facts:cms_module_implementation_facts
 
 let merge_index ~store_shapes ~into index =
   let defs = merge index.defs into.defs in
@@ -263,7 +306,13 @@ let merge_index ~store_shapes ~into index =
   in
   if store_shapes then
     Hashtbl.add_seq into.cu_shape (Hashtbl.to_seq index.cu_shape);
-  { into with defs; approximated; stats; related_uids }
+  { into with
+    defs;
+    approximated;
+    stats;
+    related_uids;
+    module_facts = merge_module_facts into.module_facts index.module_facts
+  }
 
 let from_files ~store_shapes ~output_file ~root ~rewrite_root ~build_path
     ~do_not_use_cmt_loadpath files =
@@ -274,7 +323,8 @@ let from_files ~store_shapes ~output_file ~root ~rewrite_root ~build_path
       cu_shape = Hashtbl.create 64;
       stats = Stats.empty;
       root_directory = root;
-      related_uids = Uid_map.empty ()
+      related_uids = Uid_map.empty ();
+      module_facts = Some (link_module_facts Module_implementation_facts.empty)
     }
   in
   let final_index =
@@ -306,7 +356,7 @@ let from_files ~store_shapes ~output_file ~root ~rewrite_root ~build_path
           | exception _ -> (
             match read ~file with
             | Index index -> merge_index ~store_shapes index ~into
-            | _ ->
+            | Cmt _ | Cms _ | Unknown ->
               Log.error "Unknown file type: %s" file;
               exit 1)))
       initial_index files
@@ -325,7 +375,8 @@ let gather_shapes ~output_file files =
       cu_shape = Hashtbl.create 64;
       stats = Stats.empty;
       root_directory = None;
-      related_uids = Uid_map.empty ()
+      related_uids = Uid_map.empty ();
+      module_facts = None
     }
   in
   let final_index =
@@ -334,7 +385,7 @@ let gather_shapes ~output_file files =
         let index =
           match Cache.read file with
           | Cmt cmt_infos -> Some (shape_of_cmt cmt_infos)
-          | Cms cmt_infos -> Some (shape_of_cms cmt_infos)
+          | Cms cms_infos -> Some (shape_of_cms cms_infos)
           | Index index -> Some index
           | Unknown | (exception _) ->
             Log.error "Not a valid file %S" file;

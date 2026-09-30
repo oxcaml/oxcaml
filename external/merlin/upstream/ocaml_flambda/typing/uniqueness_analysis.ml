@@ -2605,7 +2605,7 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
       (List.map
          (fun (_, _, e) -> check_uniqueness_exp ~overwrite:None ienv e)
          ls)
-  | Texp_letmodule (_, _, _, mod_expr, body) ->
+  | Texp_letmodule { module_expr = mod_expr; body; _ } ->
     let uf_mod =
       mark_aliased_open_variables ienv
         (fun iter -> iter.module_expr iter mod_expr)

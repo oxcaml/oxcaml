@@ -13,7 +13,7 @@
 type (_,_) pass =
   | Parse_tree_intf : (Parsetree.signature, Parsetree.signature) pass
   | Parse_tree_impl : (Parsetree.structure, Parsetree.structure) pass
-  | Typed_tree_intf : (Typedtree.signature,unit) pass
+  | Typed_tree_intf : (Typedtree.interface,unit) pass
   | Typed_tree_impl : (Typedtree.implementation,unit) pass
   | Raw_lambda : (Lambda.program,unit) pass
   | Lambda : (Lambda.program,unit) pass
@@ -34,7 +34,7 @@ type (_,_) pass =
 type t = {
   mutable parse_tree_intf : (Parsetree.signature -> Parsetree.signature) list;
   mutable parse_tree_impl : (Parsetree.structure -> Parsetree.structure) list;
-  mutable typed_tree_intf : (Typedtree.signature -> unit) list;
+  mutable typed_tree_intf : (Typedtree.interface -> unit) list;
   mutable typed_tree_impl : (Typedtree.implementation -> unit) list;
   mutable raw_lambda : (Lambda.program -> unit) list;
   mutable lambda : (Lambda.program -> unit) list;

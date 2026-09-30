@@ -67,6 +67,7 @@ type cmt_infos = {
   cmt_modname : Compilation_unit.t;
   cmt_annots : binary_annots;
   cmt_declaration_dependencies : (dependency_kind * Uid.t * Uid.t) list;
+  cmt_module_implementation_facts : Module_implementation_facts.t option;
   cmt_comments : (string * Location.t) list;
   cmt_args : string array;
   cmt_sourcefile : string option;
@@ -126,6 +127,21 @@ let iter_on_declaration f decl =
 let iter_on_declarations ~(f: Shape.Uid.t -> item_declaration -> unit) = {
   Tast_iterator.default_iterator with
   item_declaration = (fun _sub decl -> iter_on_declaration f decl);
+  expr = (fun sub expr ->
+    (match expr.exp_desc with
+     | Texp_letmodule { id; name; presence; uid; module_expr; _ } ->
+         f uid
+           (Module_binding
+              { mb_id = id;
+                mb_name = name;
+                mb_uid = uid;
+                mb_presence = presence;
+                mb_expr = module_expr;
+                mb_attributes = [];
+                mb_loc = module_expr.mod_loc
+              })
+     | _ -> ());
+    Tast_iterator.default_iterator.expr sub expr);
 }
 
 let need_to_clear_env =
@@ -522,7 +538,8 @@ let record_declaration_dependency (rk, uid1, uid2) =
   if not (Uid.equal uid1 uid2) then
     uids_deps := (rk, uid1, uid2) :: !uids_deps
 
-let save_cmt target cu binary_annots initial_env cmi shape =
+let save_cmt target cu binary_annots initial_env cmi shape
+    cmt_module_implementation_facts =
   if !Clflags.binary_annotations && not !Clflags.print_types then begin
     Misc.output_to_file_via_temporary
        ~mode:[Open_binary] (Unit_info.Artifact.filename target)
@@ -565,6 +582,7 @@ let save_cmt target cu binary_annots initial_env cmi shape =
            cmt_modname = cu;
            cmt_annots;
            cmt_declaration_dependencies = !uids_deps;
+           cmt_module_implementation_facts;
            cmt_comments = [];
            cmt_args;
            cmt_sourcefile = sourcefile;

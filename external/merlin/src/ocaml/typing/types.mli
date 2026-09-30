@@ -1257,7 +1257,7 @@ module type Wrapped = sig
 
   and functor_parameter =
   | Unit
-  | Named of Ident.t option * module_type * Mode.With_locality.lr
+  | Named of Ident.t option * module_type * Uid.t option * Mode.With_locality.lr
 
   and signature = signature_item list wrapped
 

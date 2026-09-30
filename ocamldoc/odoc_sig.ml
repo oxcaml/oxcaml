@@ -1670,7 +1670,7 @@ module Analyser =
                let mp_name, mp_kind =
                  match param2, param with
                    Parsetree.Named (_, pmty, _),
-                   Types.Named (Some ident, mty, _) ->
+                   Types.Named (Some ident, mty, _, _) ->
                      Name.from_ident ident,
                      analyse_module_type_kind env current_module_name pmty mty
                  | _ -> "*", Module_type_struct []
@@ -1681,7 +1681,7 @@ module Analyser =
                    mp_type =
                      (match param with
                       | Types.Unit -> None
-                      | Types.Named (_, mty, _) ->
+                      | Types.Named (_, mty, _, _) ->
                         Some (Odoc_env.subst_module_type env mty));
                    mp_type_code = mp_type_code ;
                    mp_kind = mp_kind ;
@@ -1769,7 +1769,7 @@ module Analyser =
                let mp_name, mp_kind =
                  match param2, param with
                    Parsetree.Named (_, pmty, _),
-                   Types.Named (Some ident, mty, _) ->
+                   Types.Named (Some ident, mty, _, _) ->
                      Name.from_ident ident,
                      analyse_module_type_kind env current_module_name pmty mty
                  | _ -> "*", Module_type_struct []
@@ -1780,7 +1780,7 @@ module Analyser =
                    mp_type =
                      (match param with
                       | Types.Unit -> None
-                      | Types.Named(_, mty, _) ->
+                      | Types.Named(_, mty, _, _) ->
                           Some (Odoc_env.subst_module_type env mty));
                    mp_type_code = mp_type_code ;
                    mp_kind = mp_kind ;

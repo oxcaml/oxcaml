@@ -1316,16 +1316,16 @@ and subst_lazy_modtype copy_scope scoping s = function
   | Mty_functor(Unit, res, mres) ->
       Mty_functor(Unit, subst_lazy_modtype copy_scope scoping s res,
                   subst_mode copy_scope s mres)
-  | Mty_functor(Named (None, arg, marg), res, mres) ->
+  | Mty_functor(Named (None, arg, expectation, marg), res, mres) ->
       Mty_functor(Named (None, subst_lazy_modtype copy_scope scoping s arg,
-                        subst_mode copy_scope s marg),
+                        expectation, subst_mode copy_scope s marg),
                   subst_lazy_modtype copy_scope scoping s res,
                   subst_mode copy_scope s mres)
-  | Mty_functor(Named (Some id, arg, marg), res, mres) ->
+  | Mty_functor(Named (Some id, arg, expectation, marg), res, mres) ->
       let id' = rename_ident s id in
       Mty_functor(Named (Some id',
                         subst_lazy_modtype copy_scope scoping s arg,
-                        subst_mode copy_scope s marg),
+                        expectation, subst_mode copy_scope s marg),
                   subst_lazy_modtype copy_scope scoping
                     (add_module id (Pident id') s) res,
                   subst_mode copy_scope s mres)
