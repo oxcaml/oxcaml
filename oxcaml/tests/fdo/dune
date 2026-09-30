@@ -1,0 +1,13 @@
+; The operations on pseudo-instrumentation counters ([Fdo_counter]).
+
+(executable
+ (name fdo_counters_test)
+ (modules fdo_counters_test)
+ (libraries ocamlcommon))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (run ./fdo_counters_test.exe)))

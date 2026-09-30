@@ -176,6 +176,8 @@
   zero_alloc_utils
   zero_alloc_annotations
   doubly_linked_list
+  fdo_prehash
+  fdo_counter
   file_sections
   lru
   id_counter
