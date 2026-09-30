@@ -2726,6 +2726,10 @@ AC_CHECK_FUNC([accept4], [AC_DEFINE([HAS_ACCEPT4], [1])])
 
 AC_CHECK_FUNC([getauxval], [AC_DEFINE([HAS_GETAUXVAL], [1])])
 
+## malloc_trim
+
+AC_CHECK_FUNC([malloc_trim], [AC_DEFINE([HAS_MALLOC_TRIM], [1])])
+
 ## shmat
 AC_CHECK_HEADER([sys/shm.h],
   [
