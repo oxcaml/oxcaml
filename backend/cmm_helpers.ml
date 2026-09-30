@@ -1444,12 +1444,13 @@ let make_safe_divmod operator ~if_divisor_is_negative_one
     bind "divisor" c2 (fun c2 ->
         bind "dividend" c1 (fun c1 ->
             Cifthenelse
-              ( Cop (Ccmpi Cne, [c2; Cconst_int (-1, dbg)], dbg),
-                dbg,
-                Cop (operator, [c1; c2], dbg),
-                dbg,
-                if_divisor_is_negative_one ~dividend:c1 ~dbg,
-                dbg )))
+              { cond = Cop (Ccmpi Cne, [c2; Cconst_int (-1, dbg)], dbg);
+                ifso_dbg = dbg;
+                ifso = Cop (operator, [c1; c2], dbg);
+                ifnot_dbg = dbg;
+                ifnot = if_divisor_is_negative_one ~dividend:c1 ~dbg;
+                dbg
+              }))
 
 let is_power_of_2_or_zero n = Nativeint.logand n (Nativeint.pred n) = 0n
 
@@ -1470,12 +1471,13 @@ let div_int ?dividend_cannot_be_min_int c1 c2 dbg =
       (* integer division by min_int always returns 0 unless the dividend is
          also min_int, in which case it's 1. *)
       Cifthenelse
-        ( Cop (Ccmpi Ceq, [c1; Cconst_natint (divisor, dbg)], dbg),
-          dbg,
-          Cconst_int (1, dbg),
-          dbg,
-          Cconst_int (0, dbg),
-          dbg )
+        { cond = Cop (Ccmpi Ceq, [c1; Cconst_natint (divisor, dbg)], dbg);
+          ifso_dbg = dbg;
+          ifso = Cconst_int (1, dbg);
+          ifnot_dbg = dbg;
+          ifnot = Cconst_int (0, dbg);
+          dbg
+        }
     else if is_power_of_2_or_zero divisor
     then
       (* [divisor] must be positive be here since we already handled zero and
@@ -1542,12 +1544,13 @@ let unsigned_div_int c1 c2 dbg =
     (* unsigned division by unsigned max_int always returns 0 unless the
        dividend is also max_int, in which case it's 1. *)
     Cifthenelse
-      ( Cop (Ccmpi Ceq, [c1; Cconst_natint (-1n, dbg)], dbg),
-        dbg,
-        Cconst_int (1, dbg),
-        dbg,
-        Cconst_int (0, dbg),
-        dbg )
+      { cond = Cop (Ccmpi Ceq, [c1; Cconst_natint (-1n, dbg)], dbg);
+        ifso_dbg = dbg;
+        ifso = Cconst_int (1, dbg);
+        ifnot_dbg = dbg;
+        ifnot = Cconst_int (0, dbg);
+        dbg
+      }
   | _, Some divisor ->
     if is_power_of_2_or_zero divisor
     then
@@ -1603,12 +1606,13 @@ let mod_int ?dividend_cannot_be_min_int c1 c2 dbg =
       bind "dividend" c1 (fun c1 ->
           let min_int = Cconst_natint (Nativeint.min_int, dbg) in
           Cifthenelse
-            ( Cop (Ccmpi Ceq, [c1; min_int], dbg),
-              dbg,
-              Cconst_int (0, dbg),
-              dbg,
-              c1,
-              dbg ))
+            { cond = Cop (Ccmpi Ceq, [c1; min_int], dbg);
+              ifso_dbg = dbg;
+              ifso = Cconst_int (0, dbg);
+              ifnot_dbg = dbg;
+              ifnot = c1;
+              dbg
+            })
     else if is_power_of_2_or_zero n
     then
       (* [divisor] must be positive be here since we already handled zero and
@@ -1651,12 +1655,13 @@ let unsigned_mod_int c1 c2 dbg =
        max_int, in which case it is 0 *)
     bind "dividend" c1 (fun c1 ->
         Cifthenelse
-          ( Cop (Ccmpi Ceq, [c1; Cconst_natint (-1n, dbg)], dbg),
-            dbg,
-            Cconst_int (0, dbg),
-            dbg,
-            c1,
-            dbg ))
+          { cond = Cop (Ccmpi Ceq, [c1; Cconst_natint (-1n, dbg)], dbg);
+            ifso_dbg = dbg;
+            ifso = Cconst_int (0, dbg);
+            ifnot_dbg = dbg;
+            ifnot = c1;
+            dbg
+          })
   | _, Some divisor ->
     if is_power_of_2_or_zero divisor
     then and_const c1 (Nativeint.pred divisor) dbg
@@ -3532,7 +3537,13 @@ module SArgBlocks = struct
 
   let make_if () cond ifso ifnot =
     Cifthenelse
-      (cond, Debuginfo.none, ifso, Debuginfo.none, ifnot, Debuginfo.none)
+      { cond;
+        ifso_dbg = Debuginfo.none;
+        ifso;
+        ifnot_dbg = Debuginfo.none;
+        ifnot;
+        dbg = Debuginfo.none
+      }
 
   let make_switch dbg () arg cases actions =
     let actions = Array.map (fun expr -> expr, dbg) actions in
@@ -3647,23 +3658,26 @@ let call_caml_apply extended_ty extended_args_type mut clos args pos mode dbg =
     bind_list "arg" args (fun args ->
         bind "fun" clos (fun clos ->
             Cifthenelse
-              ( Cop
-                  ( Ccmpi Ceq,
-                    [ Cop
-                        ( Casr,
-                          [ get_field_gen mut clos 1 dbg;
-                            Cconst_int (pos_arity_in_closinfo, dbg) ],
-                          dbg );
-                      Cconst_int (List.length extended_args_type, dbg) ],
-                    dbg ),
-                dbg,
-                Cop
-                  ( Capply { result_type = ty; region = pos; callees = None },
-                    (get_field_codepointer mut clos 2 dbg :: args) @ [clos],
-                    dbg ),
-                dbg,
-                really_call_caml_apply clos args,
-                dbg )))
+              { cond =
+                  Cop
+                    ( Ccmpi Ceq,
+                      [ Cop
+                          ( Casr,
+                            [ get_field_gen mut clos 1 dbg;
+                              Cconst_int (pos_arity_in_closinfo, dbg) ],
+                            dbg );
+                        Cconst_int (List.length extended_args_type, dbg) ],
+                      dbg );
+                ifso_dbg = dbg;
+                ifso =
+                  Cop
+                    ( Capply { result_type = ty; region = pos; callees = None },
+                      (get_field_codepointer mut clos 2 dbg :: args) @ [clos],
+                      dbg );
+                ifnot_dbg = dbg;
+                ifnot = really_call_caml_apply clos args;
+                dbg
+              }))
   else really_call_caml_apply clos args
 
 (* CR mshinwell: These will be filled in by later pull requests. *)
@@ -3671,16 +3685,19 @@ let placeholder_dbg () = Debuginfo.none
 
 let maybe_reset_current_region ~dbg ~body_tail ~body_nontail old_region =
   Cifthenelse
-    ( Cop (Ccmpi Ceq, [old_region; Cop (Cbeginregion, [], dbg ())], dbg ()),
-      dbg (),
-      body_tail,
-      dbg (),
-      (let res = V.create_local "result" in
-       Clet
-         ( VP.create res,
-           body_nontail,
-           Csequence (Cop (Cendregion, [old_region], dbg ()), Cvar res) )),
-      dbg () )
+    { cond =
+        Cop (Ccmpi Ceq, [old_region; Cop (Cbeginregion, [], dbg ())], dbg ());
+      ifso_dbg = dbg ();
+      ifso = body_tail;
+      ifnot_dbg = dbg ();
+      ifnot =
+        (let res = V.create_local "result" in
+         Clet
+           ( VP.create res,
+             body_nontail,
+             Csequence (Cop (Cendregion, [old_region], dbg ()), Cvar res) ));
+      dbg = dbg ()
+    }
 
 let apply_or_call_caml_apply result arity mut clos args pos mode dbg =
   match arity with
@@ -3803,12 +3820,13 @@ let cache_public_method meths tag cache dbg =
     (* Here we check whether the interval [li; hi] is a singleton, and exit the
        loop if so. *)
     Cifthenelse
-      ( Cop (Ccmpi Cge, [Cvar check_li; Cvar check_hi], dbg),
-        dbg,
-        Cexit (Lbl found_cont, [Cvar check_li], []),
-        dbg,
-        Cexit (Lbl loop_cont, [Cvar check_li; Cvar check_hi], []),
-        dbg )
+      { cond = Cop (Ccmpi Cge, [Cvar check_li; Cvar check_hi], dbg);
+        ifso_dbg = dbg;
+        ifso = Cexit (Lbl found_cont, [Cvar check_li], []);
+        ifnot_dbg = dbg;
+        ifnot = Cexit (Lbl loop_cont, [Cvar check_li; Cvar check_hi], []);
+        dbg
+      }
   in
   let dichotomy_expr =
     Clet
@@ -3820,27 +3838,31 @@ let cache_public_method meths tag cache dbg =
               cconst_int 1 ],
             dbg ),
         Cifthenelse
-          ( Cop
-              ( Ccmpi Clt,
-                [ tag;
-                  Cop
-                    ( mk_load_mut Word_int,
-                      [ Cop
-                          ( Cadda,
-                            [meths; lsl_const (Cvar mi) log2_size_addr dbg],
-                            dbg ) ],
-                      dbg ) ],
-                dbg ),
-            dbg,
-            (* tag < a.(mi) : interval is now [ li; mi - 2 ] *)
-            Cexit
-              ( Lbl check_cont,
-                [Cvar li; Cop (Csubi, [Cvar mi; cconst_int 2], dbg)],
-                [] ),
-            dbg,
-            (* tag >= a.(mi) : interval is now [ mi; hi ] *)
-            Cexit (Lbl check_cont, [Cvar mi; Cvar hi], []),
-            dbg ) )
+          { cond =
+              Cop
+                ( Ccmpi Clt,
+                  [ tag;
+                    Cop
+                      ( mk_load_mut Word_int,
+                        [ Cop
+                            ( Cadda,
+                              [meths; lsl_const (Cvar mi) log2_size_addr dbg],
+                              dbg ) ],
+                        dbg ) ],
+                  dbg );
+            ifso_dbg = dbg;
+            ifso =
+              (* tag < a.(mi) : interval is now [ li; mi - 2 ] *)
+              Cexit
+                ( Lbl check_cont,
+                  [Cvar li; Cop (Csubi, [Cvar mi; cconst_int 2], dbg)],
+                  [] );
+            ifnot_dbg = dbg;
+            ifnot =
+              (* tag >= a.(mi) : interval is now [ mi; hi ] *)
+              Cexit (Lbl check_cont, [Cvar mi; Cvar hi], []);
+            dbg
+          } )
   in
   let loop_body =
     ccatch
@@ -3949,24 +3971,28 @@ let apply_function_body arity result (mode : Cmx_format.return_mode) =
     then code
     else
       Cifthenelse
-        ( Cop
-            ( Ccmpi Ceq,
-              [ Cop
-                  ( Casr,
-                    [ get_field_gen Asttypes.Immutable (Cvar clos) 1 (dbg ());
-                      Cconst_int (pos_arity_in_closinfo, dbg ()) ],
-                    dbg () );
-                Cconst_int (List.length arity, dbg ()) ],
-              dbg () ),
-          dbg (),
-          Cop
-            ( Capply { result_type = result; region = Rc_normal; callees = None },
-              get_field_codepointer Asttypes.Immutable (Cvar clos) 2 (dbg ())
-              :: List.map (fun s -> Cvar s) all_args,
-              dbg () ),
-          dbg (),
-          code,
-          dbg () ) )
+        { cond =
+            Cop
+              ( Ccmpi Ceq,
+                [ Cop
+                    ( Casr,
+                      [ get_field_gen Asttypes.Immutable (Cvar clos) 1 (dbg ());
+                        Cconst_int (pos_arity_in_closinfo, dbg ()) ],
+                      dbg () );
+                  Cconst_int (List.length arity, dbg ()) ],
+                dbg () );
+          ifso_dbg = dbg ();
+          ifso =
+            Cop
+              ( Capply
+                  { result_type = result; region = Rc_normal; callees = None },
+                get_field_codepointer Asttypes.Immutable (Cvar clos) 2 (dbg ())
+                :: List.map (fun s -> Cvar s) all_args,
+                dbg () );
+          ifnot_dbg = dbg ();
+          ifnot = code;
+          dbg = dbg ()
+        } )
 
 let send_function (arity, result, mode) =
   let dbg = placeholder_dbg in
@@ -4013,13 +4039,15 @@ let send_function (arity, result, mode) =
                 Clet
                   ( VP.create real,
                     Cifthenelse
-                      ( Cop (Ccmpi Cne, [tag'; tag], dbg ()),
-                        dbg (),
-                        cache_public_method (Cvar meths) tag cache_ptr_cvar
-                          (dbg ()),
-                        dbg (),
-                        cached_pos,
-                        dbg () ),
+                      { cond = Cop (Ccmpi Cne, [tag'; tag], dbg ());
+                        ifso_dbg = dbg ();
+                        ifso =
+                          cache_public_method (Cvar meths) tag cache_ptr_cvar
+                            (dbg ());
+                        ifnot_dbg = dbg ();
+                        ifnot = cached_pos;
+                        dbg = dbg ()
+                      },
                     Cop
                       ( mk_load_mut Word_val,
                         [ Cop
@@ -4760,12 +4788,13 @@ let entry_point namelist =
     let incr_i id = Cop (Caddi, [Cvar id; Cconst_int (1, dbg)], dbg) in
     let exit_if_last_iteration id =
       Cifthenelse
-        ( Cop (Ccmpi Ceq, [Cvar id; high], dbg),
-          dbg,
-          Cexit (Lbl raise_num, [], []),
-          dbg,
-          Ctuple [],
-          dbg )
+        { cond = Cop (Ccmpi Ceq, [Cvar id; high], dbg);
+          ifso_dbg = dbg;
+          ifso = Cexit (Lbl raise_num, [], []);
+          ifnot_dbg = dbg;
+          ifnot = Ctuple [];
+          dbg
+        }
     in
     let cont = Lambda.next_raise_count () in
     let id = Backend_var.create_local "*id*" in
@@ -5056,7 +5085,14 @@ let sequence x y =
   | _, _ -> Csequence (x, y)
 
 let ite ~dbg ~then_dbg ~then_ ~else_dbg ~else_ cond =
-  Cifthenelse (cond, then_dbg, then_, else_dbg, else_, dbg)
+  Cifthenelse
+    { cond;
+      ifso_dbg = then_dbg;
+      ifso = then_;
+      ifnot_dbg = else_dbg;
+      ifnot = else_;
+      dbg
+    }
 
 let trywith ~dbg ~body ~exn_var ~extra_args ~handler_cont ~handler () =
   Ccatch

@@ -155,7 +155,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Cphantom_let (_var, _defining_expr, body) -> effects_of body
     | Cname_for_debugger (_, body) -> effects_of body
     | Csequence (e1, e2) -> EC.join (effects_of e1) (effects_of e2)
-    | Cifthenelse (cond, _ifso_dbg, ifso, _ifnot_dbg, ifnot, _dbg) ->
+    | Cifthenelse { cond; ifso; ifnot; _ } ->
       EC.join (effects_of cond) (EC.join (effects_of ifso) (effects_of ifnot))
     | Cop (op, args, _) ->
       let from_op =
@@ -923,9 +923,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       match emit_expr env sub_cfg e1 ~bound_name:None with
       | Never_returns -> Never_returns
       | Ok _ -> emit_expr env sub_cfg e2 ~bound_name)
-    | Cifthenelse (econd, ifso_dbg, eif, ifnot_dbg, eelse, dbg) ->
-      emit_expr_ifthenelse env sub_cfg bound_name econd ifso_dbg eif ifnot_dbg
-        eelse dbg
+    | Cifthenelse { cond; ifso_dbg; ifso; ifnot_dbg; ifnot; dbg } ->
+      emit_expr_ifthenelse env sub_cfg bound_name cond ifso_dbg ifso ifnot_dbg
+        ifnot dbg
     | Cswitch (esel, index, ecases, dbg) ->
       emit_expr_switch env sub_cfg bound_name esel index ecases dbg
     | Ccatch (_, [], e1) -> emit_expr env sub_cfg e1 ~bound_name
@@ -954,8 +954,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       match emit_expr env sub_cfg e1 ~bound_name:None with
       | Never_returns -> ()
       | Ok _ -> emit_tail env sub_cfg e2)
-    | Cifthenelse (econd, ifso_dbg, eif, ifnot_dbg, eelse, dbg) ->
-      emit_tail_ifthenelse env sub_cfg econd ifso_dbg eif ifnot_dbg eelse dbg
+    | Cifthenelse { cond; ifso_dbg; ifso; ifnot_dbg; ifnot; dbg } ->
+      emit_tail_ifthenelse env sub_cfg cond ifso_dbg ifso ifnot_dbg ifnot dbg
     | Cswitch (esel, index, ecases, dbg) ->
       emit_tail_switch env sub_cfg esel index ecases dbg
     | Ccatch (_, [], e1) -> emit_tail env sub_cfg e1

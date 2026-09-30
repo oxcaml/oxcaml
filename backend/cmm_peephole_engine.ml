@@ -308,8 +308,8 @@ module Cmm_comparator = struct
       equal_operation op1 op2 && List.equal equivalent args1 args2
     | Csequence (before1, after1), Csequence (before2, after2) ->
       equivalent before1 before2 && equivalent after1 after2
-    | ( Cifthenelse (cond1, _, ifso1, _, ifnot1, _),
-        Cifthenelse (cond2, _, ifso2, _, ifnot2, _) ) ->
+    | ( Cifthenelse { cond = cond1; ifso = ifso1; ifnot = ifnot1; _ },
+        Cifthenelse { cond = cond2; ifso = ifso2; ifnot = ifnot2; _ } ) ->
       equivalent cond1 cond2 && equivalent ifso1 ifso2
       && equivalent ifnot1 ifnot2
     | ( Cswitch (scrutinee1, cases1, actions1, _),
@@ -371,7 +371,7 @@ module Cmm_comparator = struct
         | Cname_for_debugger _ | Ctuple _
         | Cop (_, _, _)
         | Csequence (_, _)
-        | Cifthenelse (_, _, _, _, _, _)
+        | Cifthenelse _
         | Cswitch (_, _, _, _)
         | Ccatch (_, _, _)
         | Cexit (_, _, _)
