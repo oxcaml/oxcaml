@@ -2426,7 +2426,7 @@ let solve_Ppat_tuple ~is_unboxed ~pat_mode loc env args expected_ty =
       (fun (label, _) mode ->
          let jkind, sort =
            Jkind.of_new_sort_var ~why:Jkind.History.Tuple_element
-             ~level:(Ctype.get_current_level ())
+             ~level:generic_level
          in
         ( label,
           newgenvar jkind,
