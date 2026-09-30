@@ -2852,14 +2852,10 @@ and n_way_join_row_like_for_closures env
     (closures : TG.Row_like_for_closures.t Join_env.join_arg list) :
     TG.Row_like_for_closures.t * _ =
   let known =
-    match closures with
-    | [] -> Misc.fatal_error "Join row_like for no closures."
-    | (id1, { known_closures = known1 }) :: other_closures ->
-      List.fold_left
-        (fun known (id2, { TG.known_closures = known2 }) ->
-          (id2, (known2, Or_bottom.Bottom)) :: known)
-        [id1, (known1, Or_bottom.Bottom)]
-        other_closures
+    List.rev_map
+      (fun (id, { TG.known_closures }) ->
+        id, (known_closures, Or_bottom.Bottom))
+      closures
   in
   let merge_map_known join_case env knowns =
     generic_merge_map_known ~filter_map:Function_slot.Map.filter_map
