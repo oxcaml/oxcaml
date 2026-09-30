@@ -221,8 +221,6 @@ module Layout : sig
 
   val of_const : Const.t -> Sort.t t
 
-  val of_new_sort_var : level:int -> Scannable_axes.t -> Sort.t t * Sort.t
-
   val get_const : Sort.t t -> Const.t option
 
   val get_flat_const : Sort.Flat.t t -> Const.t option

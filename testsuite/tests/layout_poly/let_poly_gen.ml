@@ -167,9 +167,8 @@ module Test = struct
 end;;
 Test.k 42 #17l, Test.k 42 #11s
 [%%expect{|
->> Fatal error: Jkind_types.instance_var: free genvar
-Uncaught exception: Misc.Fatal_error
-
+module Test : sig val id : 'a -> 'a val poly_ k : 'a. 'a -> 'b -> 'a end
+- : int * int = (42, 42)
 |}]
 
 module Test = struct
@@ -178,9 +177,9 @@ module Test = struct
 end;;
 Test.k () 42 "abc"
 [%%expect{|
->> Fatal error: Jkind_types.instance_var: free genvar
-Uncaught exception: Misc.Fatal_error
-
+module Test :
+  sig val id : 'a -> 'a val poly_ k : 'b 'c. 'a -> 'b -> 'c -> 'b end
+- : int = 42
 |}]
 
 module Test = struct
@@ -189,9 +188,8 @@ module Test = struct
 end;;
 Test.k 42 "abc", box_float (Test.k #3.14 "xyz")
 [%%expect{|
->> Fatal error: Jkind_types.instance_var: free genvar
-Uncaught exception: Misc.Fatal_error
-
+module Test : sig val id : 'a -> 'a val poly_ k : 'b. 'a -> 'b -> 'a end
+- : int * float = (42, 3.14)
 |}]
 
 (* [id] is generalised, so we can freely generalise [k] *)
@@ -333,9 +331,9 @@ end;;
 let #(a, b) = Test.id () #(42, 3.14) in
 a, b
 [%%expect{|
->> Fatal error: slambda eval: unexpected missing value
-Uncaught exception: Misc.Fatal_error
-
+module Test :
+  sig val poly_ id : ('b : value_or_null & value_or_null). 'a -> 'b -> 'b end
+- : int * float = (42, 3.14)
 |}]
 
 module Test = struct
@@ -389,7 +387,6 @@ module Test = struct
 end;;
 Test.f () () 42 "abc"
 [%%expect{|
->> Fatal error: Jkind_types.instance_var: free genvar
-Uncaught exception: Misc.Fatal_error
-
+module Test : sig val f : unit -> 'a -> 'o -> 'b -> 'b end
+- : string = "abc"
 |}]
