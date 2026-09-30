@@ -129,6 +129,12 @@ type t =
     fun_codegen_options : codegen_option list;
         (** Code generation options passed from Cmm. *)
     fun_dbg : Debuginfo.t;  (** Dwarf debug info for function entry. *)
+    mutable fun_fdo_entry_counters : fdo_counters;
+        (** The pseudo-instrumentation counters of the function's entry edge:
+            its own entry counter first, then those of the calls inlined at the
+            head of its body. *)
+    fun_function_body_hash : Fdo_counter.Function_body_hash.t option;
+        (** The body hash its interior counters were numbered with. *)
     entry_label : Label.t;
         (** This label must be the first in all layouts of this cfg. *)
     fun_contains_calls : bool;
@@ -161,6 +167,8 @@ val create :
   fun_args:Reg.t array ->
   fun_codegen_options:codegen_option list ->
   fun_dbg:Debuginfo.t ->
+  fun_fdo_entry_counters:fdo_counters ->
+  fun_function_body_hash:Fdo_counter.Function_body_hash.t option ->
   fun_contains_calls:bool ->
   fun_num_stack_slots:int Stack_class.Tbl.t ->
   fun_poll:Lambda.poll_attribute ->
@@ -184,6 +192,14 @@ val predecessor_labels : basic_block -> Label.t list
 (** [exn] does not account for exceptional flow from the block that goes outside
     of the function. *)
 val successor_labels : normal:bool -> exn:bool -> basic_block -> Label.Set.t
+
+(** The successors of a branching terminator, with their edge counters, in the
+    order of its fields ([ifso]/[ifnot], [lt]/[eq]/[gt](/[uo]), the arms of a
+    switch); empty for other terminators. *)
+val branch_successors : terminator -> successor list
+
+(** A successor without edge counters, or with the given ones. *)
+val successor : ?fdo_counters:fdo_counters -> Label.t -> successor
 
 val replace_successor_labels :
   t -> normal:bool -> exn:bool -> basic_block -> f:(Label.t -> Label.t) -> unit
@@ -236,6 +252,16 @@ val fold_all_instructions : t -> f:'a instruction_folder -> init:'a -> 'a
    added so that the caller has to explicitly decide whether or not to clear the
    sets before registration . *)
 val register_predecessors_for_all_blocks : t -> unit
+
+(** [add_counters_to_edges_into t label counters] preserves the counters of an
+    instruction or edge that is removed from the start of block [label] while
+    the code it counts stays: they are added to the branch edges leading to the
+    block, through predecessors that continue into it unconditionally, and to
+    the entry counters when the entry leads to it. Every traversal of those
+    edges reaches the block, so the counters keep counting its executions
+    (exceptional edges, which carry no counters, are not followed). Requires
+    up-to-date predecessors. *)
+val add_counters_to_edges_into : t -> Label.t -> fdo_counters -> unit
 
 (* CR-someday gyorsh: Current version of cfg is a half-way house in terms of its
    exception handling. It has a lot of redundancy and the result of the

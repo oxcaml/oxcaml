@@ -127,6 +127,8 @@ type t =
     fun_args : Reg.t array;
     fun_codegen_options : codegen_option list;
     fun_dbg : Debuginfo.t;
+    mutable fun_fdo_entry_counters : fdo_counters;
+    fun_function_body_hash : Fdo_counter.Function_body_hash.t option;
     entry_label : Label.t;
     fun_contains_calls : bool;
     (* CR-someday gyorsh: compute locally. *)
@@ -143,13 +145,16 @@ type t =
     mutable register_locations_are_set : bool
   }
 
-let create ~fun_name ~fun_args ~fun_codegen_options ~fun_dbg ~fun_contains_calls
+let create ~fun_name ~fun_args ~fun_codegen_options ~fun_dbg
+    ~fun_fdo_entry_counters ~fun_function_body_hash ~fun_contains_calls
     ~fun_num_stack_slots ~fun_poll ~next_instruction_id ~fun_ret_type
     ~fun_phantom_lets ~allowed_to_be_irreducible =
   { fun_name;
     fun_args;
     fun_codegen_options;
     fun_dbg;
+    fun_fdo_entry_counters;
+    fun_function_body_hash;
     entry_label = Label.entry_label;
     (* CR gyorsh: We should use [Cmm.new_label ()] here, but validator tests
        currently rely on it to be initialized as above. *)
@@ -168,21 +173,53 @@ let create ~fun_name ~fun_args ~fun_codegen_options ~fun_dbg ~fun_contains_calls
 
 let mem_block t label = Label.Tbl.mem t.blocks label
 
+let successor ?(fdo_counters = []) target = { target; fdo_counters }
+
+let branch_successors (terminator : terminator) =
+  match terminator with
+  | Parity_test { ifso; ifnot } | Truth_test { ifso; ifnot } -> [ifso; ifnot]
+  | Int_test { lt; eq; gt; is_signed = _; imm = _ } -> [lt; eq; gt]
+  | Float_test { lt; eq; gt; uo; width = _ } -> [lt; eq; gt; uo]
+  | Switch successors -> Array.to_list successors
+  | Never | Always _ | Return | Raise _ | Tailcall_self _ | Tailcall_func _
+  | Call_no_return _ | Invalid _ | Call _ | Prim _ ->
+    []
+
+(* The successors of a branching terminator transformed by [f]. *)
+let map_branch_successors (terminator : terminator) ~f : terminator =
+  match terminator with
+  | Parity_test { ifso; ifnot } ->
+    Parity_test { ifso = f ifso; ifnot = f ifnot }
+  | Truth_test { ifso; ifnot } -> Truth_test { ifso = f ifso; ifnot = f ifnot }
+  | Int_test { lt; eq; gt; is_signed; imm } ->
+    Int_test { lt = f lt; eq = f eq; gt = f gt; is_signed; imm }
+  | Float_test { lt; eq; gt; uo; width } ->
+    Float_test { lt = f lt; eq = f eq; gt = f gt; uo = f uo; width }
+  | Switch successors -> Switch (Array.map f successors)
+  | ( Never | Always _ | Return | Raise _ | Tailcall_self _ | Tailcall_func _
+    | Call_no_return _ | Invalid _ | Call _ | Prim _ ) as terminator ->
+    terminator
+
 let successor_labels_normal ti =
   match ti.desc with
   | Tailcall_self { destination } -> Label.Set.singleton destination
-  | Switch labels -> Array.to_seq labels |> Label.Set.of_seq
+  | Switch successors ->
+    Array.to_seq successors
+    |> Seq.map (fun { target; fdo_counters = _ } -> target)
+    |> Label.Set.of_seq
   | Return | Raise _ | Tailcall_func _ -> Label.Set.empty
   | Call_no_return _ -> Label.Set.empty
   | Never -> Label.Set.empty
   | Always l -> Label.Set.singleton l
   | Parity_test { ifso; ifnot } | Truth_test { ifso; ifnot } ->
-    Label.Set.singleton ifso |> Label.Set.add ifnot
+    Label.Set.singleton ifso.target |> Label.Set.add ifnot.target
   | Float_test { width = _; lt; gt; eq; uo } ->
-    Label.Set.singleton lt |> Label.Set.add gt |> Label.Set.add eq
-    |> Label.Set.add uo
+    Label.Set.singleton lt.target
+    |> Label.Set.add gt.target |> Label.Set.add eq.target
+    |> Label.Set.add uo.target
   | Int_test { lt; gt; eq; imm = _; is_signed = _ } ->
-    Label.Set.singleton lt |> Label.Set.add gt |> Label.Set.add eq
+    Label.Set.singleton lt.target
+    |> Label.Set.add gt.target |> Label.Set.add eq.target
   | Call { op = _; label_after }
   | Prim { op = _; label_after }
   | Invalid { label_after = Some label_after; _ } ->
@@ -219,19 +256,21 @@ let replace_successor_labels t ~normal ~exn block ~f =
   if exn then block.exn <- Option.map f block.exn;
   if normal
   then
+    (* The edge counters stay with the edge. *)
+    let fs successor = { successor with target = f successor.target } in
     let desc =
       match block.terminator.desc with
       | Never -> Never
       | Always l -> Always (f l)
       | Parity_test { ifso; ifnot } ->
-        Parity_test { ifso = f ifso; ifnot = f ifnot }
+        Parity_test { ifso = fs ifso; ifnot = fs ifnot }
       | Truth_test { ifso; ifnot } ->
-        Truth_test { ifso = f ifso; ifnot = f ifnot }
+        Truth_test { ifso = fs ifso; ifnot = fs ifnot }
       | Int_test { lt; eq; gt; is_signed; imm } ->
-        Int_test { lt = f lt; eq = f eq; gt = f gt; is_signed; imm }
+        Int_test { lt = fs lt; eq = fs eq; gt = fs gt; is_signed; imm }
       | Float_test { width; lt; eq; gt; uo } ->
-        Float_test { width; lt = f lt; eq = f eq; gt = f gt; uo = f uo }
-      | Switch labels -> Switch (Array.map f labels)
+        Float_test { width; lt = fs lt; eq = fs eq; gt = fs gt; uo = fs uo }
+      | Switch successors -> Switch (Array.map fs successors)
       | Tailcall_self { destination } ->
         Tailcall_self { destination = f destination }
       | Tailcall_func (Indirect _)
@@ -353,6 +392,50 @@ let register_predecessors_for_all_blocks (t : t) =
             <- Label.Set.add label target_block.predecessors)
         targets)
     t.blocks
+
+let add_counters_to_edges_into t label counters =
+  if not (List.is_empty counters)
+  then
+    let visited = ref Label.Set.empty in
+    let rec into label =
+      if not (Label.Set.mem label !visited)
+      then (
+        visited := Label.Set.add label !visited;
+        if Label.equal label t.entry_label
+        then
+          t.fun_fdo_entry_counters
+            <- Fdo_counter.add_all t.fun_fdo_entry_counters counters;
+        Label.Set.iter
+          (fun pred_label ->
+            let pred = get_block_exn t pred_label in
+            if Label.Set.mem label (successor_labels_normal pred.terminator)
+            then
+              match pred.terminator.desc with
+              | Parity_test _ | Truth_test _ | Int_test _ | Float_test _
+              | Switch _ ->
+                pred.terminator
+                  <- { pred.terminator with
+                       desc =
+                         map_branch_successors pred.terminator.desc
+                           ~f:(fun successor ->
+                             if Label.equal successor.target label
+                             then
+                               { successor with
+                                 fdo_counters =
+                                   Fdo_counter.add_all successor.fdo_counters
+                                     counters
+                               }
+                             else successor)
+                     }
+              | Always _ | Tailcall_self _ | Call _ | Prim _ | Invalid _ ->
+                (* Control goes on from [pred] to [label] unconditionally:
+                   whatever enters [pred] reaches [label]. *)
+                into pred_label
+              | Never | Return | Raise _ | Tailcall_func _ | Call_no_return _ ->
+                ())
+          (get_block_exn t label).predecessors)
+    in
+    into label
 
 let can_raise_terminator (i : terminator) =
   match i with
@@ -760,9 +843,13 @@ let equal_basic left right =
       _ ) ->
     false
 
+(* Edge counters are metadata about the edges, and do not take part in the
+   comparison. *)
+let equal_successor left right = Label.equal left.target right.target
+
 let equal_bool_test ({ ifso = left_ifso; ifnot = left_ifnot } : bool_test)
     ({ ifso = right_ifso; ifnot = right_ifnot } : bool_test) =
-  Label.equal left_ifso right_ifso && Label.equal left_ifnot right_ifnot
+  equal_successor left_ifso right_ifso && equal_successor left_ifnot right_ifnot
 
 let equal_int_test
     ({ lt = left_lt;
@@ -779,9 +866,9 @@ let equal_int_test
        imm = right_imm
      } :
       int_test) =
-  Label.equal left_lt right_lt
-  && Label.equal left_eq right_eq
-  && Label.equal left_gt right_gt
+  equal_successor left_lt right_lt
+  && equal_successor left_eq right_eq
+  && equal_successor left_gt right_gt
   && Scalar.Signedness.equal left_is_signed right_is_signed
   && Option.equal Int.equal left_imm right_imm
 
@@ -801,16 +888,19 @@ let equal_float_test
      } :
       float_test) =
   Cmm.equal_float_width left_width right_width
-  && Label.equal left_lt right_lt
-  && Label.equal left_eq right_eq
-  && Label.equal left_gt right_gt
-  && Label.equal left_uo right_uo
+  && equal_successor left_lt right_lt
+  && equal_successor left_eq right_eq
+  && equal_successor left_gt right_gt
+  && equal_successor left_uo right_uo
 
 let equal_func_call_operation left right =
   match left, right with
-  | Indirect left_callees, Indirect right_callees ->
+  | ( Indirect { callees = left_callees; callsite_counter = _ },
+      Indirect { callees = right_callees; callsite_counter = _ } ) ->
     Option.equal (List.equal Cmm.equal_symbol) left_callees right_callees
-  | Direct left_sym, Direct right_sym -> Cmm.equal_symbol left_sym right_sym
+  | ( Direct { sym = left_sym; callsite_counter = _ },
+      Direct { sym = right_sym; callsite_counter = _ } ) ->
+    Cmm.equal_symbol left_sym right_sym
   | (Indirect _ | Direct _), _ -> false
 
 let equal_external_call_operation
@@ -873,9 +963,9 @@ let equal_terminator left right =
     equal_float_test left_test right_test
   | Int_test left_test, Int_test right_test ->
     equal_int_test left_test right_test
-  | Switch left_labels, Switch right_labels ->
-    Int.equal (Array.length left_labels) (Array.length right_labels)
-    && Array.for_all2 Label.equal left_labels right_labels
+  | Switch left_successors, Switch right_successors ->
+    Int.equal (Array.length left_successors) (Array.length right_successors)
+    && Array.for_all2 equal_successor left_successors right_successors
   | Return, Return -> true
   | Raise left_kind, Raise right_kind ->
     Lambda.equal_raise_kind left_kind right_kind

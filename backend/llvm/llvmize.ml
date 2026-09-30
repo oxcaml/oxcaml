@@ -537,7 +537,7 @@ let call ?(tail = false) t (i : Cfg.terminator Cfg.instruction)
   in
   let func =
     match op with
-    | Direct { sym_name; sym_global = _ } ->
+    | Direct { sym = { sym_name; sym_global = _ }; callsite_counter = _ } ->
       add_referenced_symbol t sym_name;
       LL.Ident.global sym_name
     | Indirect _ -> load_reg_to_temp ~typ:T.ptr t i.arg.(0) |> V.get_ident_exn
@@ -733,11 +733,13 @@ let emit_terminator t (i : Cfg.terminator Cfg.instruction) =
     (* ifso -> even / ifnot -> odd, so labels are flipped *)
     let cond = odd_test t i in
     emit_ins_no_res t
-      (I.br_cond ~cond ~ifso:(V.of_label ifnot) ~ifnot:(V.of_label ifso))
+      (I.br_cond ~cond ~ifso:(V.of_label ifnot.target)
+         ~ifnot:(V.of_label ifso.target))
   | Truth_test { ifso; ifnot } ->
     let cond = test t Itruetest i in
     emit_ins_no_res t
-      (I.br_cond ~cond ~ifso:(V.of_label ifso) ~ifnot:(V.of_label ifnot))
+      (I.br_cond ~cond ~ifso:(V.of_label ifso.target)
+         ~ifnot:(V.of_label ifnot.target))
   | Return -> return t i
   | Int_test { lt; eq; gt; is_signed; imm } ->
     let open struct
@@ -752,9 +754,9 @@ let emit_terminator t (i : Cfg.terminator Cfg.instruction) =
       | Unsigned, Lt -> Cult
       | Unsigned, Gt -> Cugt
     in
-    let lt = V.of_label lt in
-    let eq = V.of_label eq in
-    let gt = V.of_label gt in
+    let lt = V.of_label lt.target in
+    let eq = V.of_label eq.target in
+    let gt = V.of_label gt.target in
     let ge = Cmm.new_label () |> V.of_label in
     let is_lt = int_comp t (make_comp Lt) i ~imm in
     emit_ins_no_res t (I.br_cond ~cond:is_lt ~ifso:lt ~ifnot:ge);
@@ -763,10 +765,10 @@ let emit_terminator t (i : Cfg.terminator Cfg.instruction) =
     emit_ins_no_res t (I.br_cond ~cond:is_gt ~ifso:gt ~ifnot:eq)
   | Float_test { width; lt; eq; gt; uo } ->
     let typ = T.of_float_width width in
-    let lt = V.of_label lt in
-    let eq = V.of_label eq in
-    let gt = V.of_label gt in
-    let uo = V.of_label uo in
+    let lt = V.of_label lt.target in
+    let eq = V.of_label eq.target in
+    let gt = V.of_label gt.target in
+    let uo = V.of_label uo.target in
     let ge = V.of_label (Cmm.new_label ()) in
     let eq_or_uo = V.of_label (Cmm.new_label ()) in
     let is_lt = float_comp t Cmm.CFlt i typ in
@@ -777,14 +779,14 @@ let emit_terminator t (i : Cfg.terminator Cfg.instruction) =
     emit_label t eq_or_uo;
     let is_eq = float_comp t Cmm.CFeq i typ in
     emit_ins_no_res t (I.br_cond ~cond:is_eq ~ifso:eq ~ifnot:uo)
-  | Switch labels ->
+  | Switch successors ->
     let discr = load_reg_to_temp ~typ:T.i64 t i.arg.(0) in
     let default = V.of_label (Cmm.new_label ()) in
     let branches =
       List.mapi
-        (fun i label : I.switch_branch ->
-          { index = V.of_int i; label = V.of_label label })
-        (Array.to_list labels)
+        (fun i (successor : Cfg.successor) : I.switch_branch ->
+          { index = V.of_int i; label = V.of_label successor.target })
+        (Array.to_list successors)
     in
     emit_ins_no_res t (I.switch ~discr ~default ~branches);
     (* note: [Switch] does not take a default label, as switches are assumed to
@@ -1494,6 +1496,8 @@ let prepare_fun_info t (cfg : Cfg.t) =
         fun_args;
         fun_codegen_options;
         fun_dbg;
+        fun_fdo_entry_counters = _;
+        fun_function_body_hash = _;
         fun_contains_calls = _ (* not used at this point *);
         fun_num_stack_slots = _ (* only available after regalloc *);
         fun_frame_required = _ (* only available after prologue insertion *);
