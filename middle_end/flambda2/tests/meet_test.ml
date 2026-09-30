@@ -557,10 +557,10 @@ let test_make_suitable_with_removed_alias () =
       TE.print env TE.print outer_env
       T.Typing_env_extension.With_extra_variables.print teev;
     let env' = TE.add_env_extension_with_extra_variables outer_env teev in
-    let wrong_result =
+    let wrong_result msg =
       Misc.fatal_errorf
         "Expected type of value slot %a to be (= %a), but got: %t instead."
-        Value_slot.print value_slot Variable.print x
+        Value_slot.print value_slot Variable.print x msg
     in
     match
       T.meet_project_value_slot_simple env' ~min_name_mode:Name_mode.normal
