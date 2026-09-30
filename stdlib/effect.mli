@@ -349,7 +349,22 @@ module Shallow : sig
         preempt the current fiber on tick.
 
         To set the tick interval, call [Domain.Tick.acquire] before running a
-        preemptible fiber. *)
+        preemptible fiber.
+
+        Whether a fiber is preemptible is fixed when it is created: fibers
+        created by {!fiber} can only be resumed with preemptible handlers,
+        and fibers created by {!Shallow.fiber} only with non-preemptible
+        ones. *)
+
+    type ('a,'b) continuation
+    (** [('a,'b) continuation] is a delimited continuation of a preemptible
+        fiber that expects a ['a] value and returns a ['b] value. *)
+
+    val fiber : ('a -> 'b) -> ('a, 'b) continuation
+    (** [fiber f] constructs a continuation of a preemptible fiber that runs
+        the computation [f].
+
+        @raise Out_of_fibers if unable to allocate a fiber. *)
 
     type ('a,'b) handler =
         { retc: 'a -> 'b;
@@ -390,6 +405,10 @@ module Shallow : sig
     *)
 
     module Safe : sig
+      (** OxCaml version of [fiber], which provides a [Handler.t @ local
+          unyielding] to the computation to run. *)
+      val fiber
+        : (Handler.t @ local -> 'a -> 'b) @ unyielding -> ('a, 'b) continuation
 
       (** Like {!Shallow.Preemptible}, but allow threading [Handler.t @ local]
           for the parent stack to the handler callbacks *)
@@ -438,6 +457,12 @@ module Shallow : sig
         *)
       end
     end
+
+    external get_callstack :
+      ('a,'b) continuation -> int -> Printexc.raw_backtrace =
+      "caml_get_continuation_callstack"
+    (** [get_callstack c n] returns a description of the top of the call
+        stack on the continuation [c], with at most [n] entries. *)
   end
 
   external get_callstack :

@@ -343,7 +343,12 @@ module Shallow = struct
   type ('a,'b) continuation =
     | Cont : ('a,'b,'x) cont -> ('a,'b) continuation [@@unboxed]
 
-  let fiber : type a b. (a -> b) -> (a, b) continuation = fun f ->
+  (* Whether a fiber is preemptible is fixed here, at creation. A preemptible
+     fiber starts with a placeholder tick handler, replaced when it is first
+     resumed. *)
+  let make_fiber : type a b.
+      preemptible:bool -> (a -> b) -> (a, b) continuation =
+    fun ~preemptible f ->
     let module M = struct type _ t += Initial_setup__ : a t end in
     let exception E of (a,b) continuation in
     let f' () = f (Safe.perform (Handler.unsafe_make ()) M.Initial_setup__) in
@@ -357,9 +362,17 @@ module Shallow = struct
           continue (Handler.unsafe_make ()) k ()
       | _ -> error ()
     in
-    match Prim.with_stack error error effc f' () with
+    match
+      if preemptible
+      then
+        Prim.with_stack_preemptible error error effc (fun () -> Continue)
+          f' ()
+      else Prim.with_stack error error effc f' ()
+    with
     | exception E k -> k
     | _ -> error ()
+
+  let fiber f = make_fiber ~preemptible:false f
 
   type ('a,'b) handler =
     { retc: 'a -> 'b;
@@ -443,6 +456,12 @@ module Shallow = struct
   end
 
   module Preemptible = struct
+    type ('a,'b) continuation =
+      | Cont : ('a,'b,'x) cont -> ('a,'b) continuation [@@unboxed]
+
+    let fiber f : _ continuation =
+      match make_fiber ~preemptible:true f with Cont k -> Cont k
+
     type ('a,'b) handler =
         { retc: 'a -> 'b;
           exnc: exn -> 'b;
@@ -483,6 +502,9 @@ module Shallow = struct
         k handler.retc handler.exnc effc (This handler.tickc) e bt
 
     module Safe = struct
+      let fiber f =
+        fiber (fun arg -> f (Handler.unsafe_make ()) arg)
+
       module With_handler = struct
         type ('a,'b) handler =
             { retc: Handler.t @ local -> 'a -> 'b;
@@ -534,6 +556,10 @@ module Shallow = struct
             effc (This handler.tickc) e bt
       end
     end
+
+    external get_callstack :
+      ('a,'b) continuation -> int -> Printexc.raw_backtrace =
+      "caml_get_continuation_callstack"
   end
 
   external get_callstack :

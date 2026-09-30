@@ -35,7 +35,8 @@ struct stack_handler {
   value handle_value;
   value handle_exn;
   value handle_effect;
-  value handle_tick; /* tick handler callback, NULL if not preemptible */
+  value handle_tick; /* tick handler callback, or NULL. Only preemptible
+                        fibers may have one. */
   struct stack_info* parent; /* parent OCaml stack if any */
 };
 
@@ -76,6 +77,10 @@ struct stack_info {
      fields: dynamic key, bound value, and nullable parent node. */
   value dynamic;
   bool is_task;
+  /* Whether the fiber was allocated by [caml_alloc_stack_preemptible]. Only
+     preemptible fibers may have a tick handler, which may be added,
+     replaced or removed when they are resumed. */
+  bool is_preemptible;
 };
 
 #ifdef STACK_GUARD_PAGES
@@ -95,7 +100,7 @@ struct stack_info {
 #define Stack_handle_effect(stk) (stk)->handler->handle_effect
 #define Stack_handle_tick(stk) (stk)->handler->handle_tick
 #define Stack_parent(stk) (stk)->handler->parent
-#define Stack_is_preemptible(stk) (Stack_handle_tick(stk) != Val_null)
+#define Stack_is_preemptible(stk) ((stk)->is_preemptible)
 
 /* Stack layout for native code. Stack grows downwards.
  *
