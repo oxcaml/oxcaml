@@ -42,7 +42,7 @@ let () =
         ()
         { retc = Fun.id; exnc = raise;
           effc = (fun (type a) (_ : a Effect.t) -> None);
-          tickc = (fun () -> Continue) })
+          tickc = This (fun () -> Continue) })
   with
   | Sys.Break -> assert !finished
   | _ -> assert false);

@@ -19,7 +19,7 @@ let plain_key = Domain.TLS.new_key (fun () -> "init")
 let handler () =
   { Preemptible.retc = Fun.id; exnc = raise;
     effc = (fun (type a) (_ : a Effect.t) -> None);
-    tickc = (fun () -> Continue) }
+    tickc = This (fun () -> Continue) }
 
 let () =
   Domain.TLS.set split_key 21;

@@ -29,7 +29,7 @@ let sh_handler k2ref =
             Some
               (Obj.magic k2 : (unit, unit) Shallow.Preemptible.continuation))
       | _ -> None);
-    tickc = (fun () -> Continue) }
+    tickc = This (fun () -> Continue) }
 
 let () =
   Domain.TLS.set split_key 5;

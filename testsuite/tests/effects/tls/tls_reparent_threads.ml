@@ -41,7 +41,7 @@ let () =
                   Atomic.set stash (Cont k');
                   "suspended")
               | _ -> None);
-            tickc = (fun () -> Continue) }
+            tickc = This (fun () -> Continue) }
       in
       assert (r = "suspended")) ()
   in

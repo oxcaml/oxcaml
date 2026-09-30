@@ -50,7 +50,7 @@ let () =
                 incr preemptions;
                 continue k ())
             | _ -> None);
-          tickc = (fun () -> Preempt) });
+          tickc = This (fun () -> Preempt) });
   (* The thread's own keys were never set. *)
   assert (Domain.TLS.get keys.(0) = -1);
   print_endline "OK"

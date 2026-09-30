@@ -49,7 +49,7 @@ let () =
                       assert (Domain.TLS.get k0 = "set-in-callback");
                       continue k ())
                   | _ -> None);
-                tickc = (fun () -> Continue) }
+                tickc = This (fun () -> Continue) }
           in
           assert (r = "fiber-in-callback"));
       (* Back in the fiber: writes made during the callback are visible. *)

@@ -58,7 +58,7 @@ module Scheduler = struct
         Preemptible.continue_with k ()
           { retc = (fun _result -> ());
             exnc = raise;
-            tickc = (fun () -> Preempt);
+            tickc = This (fun () -> Preempt);
             effc = fun (type a) (e : a t) ->
               match e with
               | Preemption ->

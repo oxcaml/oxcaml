@@ -35,6 +35,6 @@ let () =
             Domain.TLS.set k "handler";
             continue k' ())
         | _ -> None);
-      tickc = (fun () -> Continue) };
+      tickc = This (fun () -> Continue) };
   assert (Domain.TLS.get k = "handler");
   print_endline "OK"

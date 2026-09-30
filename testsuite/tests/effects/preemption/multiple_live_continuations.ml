@@ -34,7 +34,7 @@ let () =
         ()
         { retc = (fun () -> ());
           exnc = raise;
-          tickc = (fun () -> Preempt);
+          tickc = This (fun () -> Preempt);
           effc = fun (type a) (e : a t) ->
             match e with
             | Preemption -> Some (fun (k : (a, _) continuation) ->
