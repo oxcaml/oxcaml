@@ -1300,7 +1300,15 @@ let never_holds_locally_allocated_values env var : _ proof_of_property =
       match alloc_mode with
       | Heap -> Proved ()
       | Local | Heap_or_local -> Unknown)
-    | String _ -> Proved ())
+    | String str_infos ->
+      (* Constant strings are statically allocated, but strings allocated at
+         runtime may be local. *)
+      let is_constant (str_info : String_info.t) =
+        match str_info with Immutable _ -> true | Mutable _ -> false
+      in
+      if String_info.Set.for_all is_constant str_infos
+      then Proved ()
+      else Unknown)
   | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
   | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_vec128 _
   | Naked_vec256 _ | Naked_vec512 _ | Naked_nativeint _ | Naked_mask _

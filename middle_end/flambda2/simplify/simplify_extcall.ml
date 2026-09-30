@@ -56,6 +56,19 @@ let let_prim ~dbg v v_duid prim (free_names, body) =
 (* Exported simplification function *)
 (* ******************************** *)
 
+(* [Bytes.create] and the corresponding C API functions allocate strings with
+   uninitialized contents. Knowing the length of the string allows bounds checks
+   to be removed. *)
+let simplify_uninitialized_string_creation
+    (lengths : Target_ocaml_int.Set.t T.meet_shortcut) : t =
+  match lengths with
+  | Known_result lengths -> (
+    match Target_ocaml_int.Set.get_singleton lengths with
+    | Some length when Target_ocaml_int.is_non_negative length ->
+      Unchanged { return_types = Known [T.mutable_string ~length] }
+    | Some _ | None -> Unchanged { return_types = Unknown })
+  | Need_meet | Invalid -> Unchanged { return_types = Unknown }
+
 let simplify_comparison_of_tagged_immediates ~dbg dacc ~cmp_prim cont a b =
   let v_comp = Variable.create "comp" K.naked_immediate in
   let v_comp_duid = Flambda_debug_uid.none in
@@ -181,6 +194,13 @@ let simplify_uninitialized_array_creation ~len_ty alloc_mode : t =
 let simplify_returning_extcall ~dbg ~cont ~exn_cont:_ dacc fun_name args
     ~arg_types =
   match fun_name, args, arg_types with
+  | ("caml_create_bytes" | "caml_create_local_bytes"), [_], [length_ty] ->
+    simplify_uninitialized_string_creation
+      (T.meet_equals_tagged_immediates (DA.typing_env dacc) length_ty)
+  | ("caml_alloc_string" | "caml_alloc_local_string"), [_], [length_ty] ->
+    (* The C API functions take untagged lengths. *)
+    simplify_uninitialized_string_creation
+      (T.meet_naked_immediates (DA.typing_env dacc) length_ty)
   (* Polymorphic comparisons *)
   | "caml_compare", [a; b], [a_ty; b_ty] ->
     simplify_comparison ~dbg ~dacc ~cont a b a_ty b_ty
