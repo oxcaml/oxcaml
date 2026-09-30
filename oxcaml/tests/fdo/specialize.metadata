@@ -1,0 +1,151 @@
+function
+  both normal "Specialize.classify":0
+  taken normal "Specialize.classify":0:10d1b4fa:0:else
+  fallthrough normal "Specialize.classify":0:10d1b4fa:0:then
+  taken normal "Specialize.classify":0:10d1b4fa:1:else
+  fallthrough normal "Specialize.classify":0:10d1b4fa:1:then
+function
+  both normal "Specialize.bump":0
+function
+  both normal "Specialize.tally":0
+function
+  both normal "Specialize.Make":0
+function
+  both normal "Specialize.Make.count":0
+  taken normal "Specialize.Make.count":0:e2227555:0:else
+  fallthrough normal "Specialize.classify":0 < "Specialize.Make.count":0:e2227555:1:call
+  fallthrough normal "Specialize.Make.count":0:e2227555:0:then
+  taken normal "Specialize.classify":0:10d1b4fa:0:else < "Specialize.Make.count":0:e2227555:1:call
+  fallthrough normal "Specialize.classify":0:10d1b4fa:0:then < "Specialize.Make.count":0:e2227555:1:call
+  taken normal "Specialize.Make.count":0:e2227555:2:else
+  fallthrough normal "Specialize.Make.count":0:e2227555:2:then
+  taken normal "Specialize.Make.count":0:e2227555:2:then
+  taken normal "Specialize.classify":0:10d1b4fa:1:else < "Specialize.Make.count":0:e2227555:1:call
+  fallthrough normal "Specialize.classify":0:10d1b4fa:1:then < "Specialize.Make.count":0:e2227555:1:call
+  fallthrough normal "Specialize.Make.count":0:e2227555:2:else
+  taken normal "Specialize.Make.count":0:e2227555:3:case(1)
+  taken normal "Specialize.bump":0 < "Specialize.Make.count":0:e2227555:4:call
+  taken normal "Specialize.Make.count":0:e2227555:3:case(2)
+  fallthrough normal "Specialize.Make.count":0:e2227555:3:case(0)
+  taken call "Specialize.Make.count":0:e2227555:5:call
+function
+  both normal "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.High":0))
+  taken normal "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.High":0)):e2227555:0:else
+  fallthrough normal "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.High":0)):e2227555:0:then
+  fallthrough normal "Specialize.classify":0 < "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.High":0)):e2227555:1:call
+  taken normal "Specialize.classify":0:10d1b4fa:0:else < "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.High":0)):e2227555:1:call
+  fallthrough normal "Specialize.classify":0:10d1b4fa:0:then < "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.High":0)):e2227555:1:call
+  taken normal "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.High":0)):e2227555:2:else
+  fallthrough normal "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.High":0)):e2227555:2:then
+  taken normal "Specialize.classify":0:10d1b4fa:1:else < "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.High":0)):e2227555:1:call
+  taken normal "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.High":0)):e2227555:2:then
+  fallthrough normal "Specialize.classify":0:10d1b4fa:1:then < "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.High":0)):e2227555:1:call
+  fallthrough normal "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.High":0)):e2227555:2:else
+  taken normal "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.High":0)):e2227555:3:case(1)
+  taken normal "Specialize.bump":0 < "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.High":0)):e2227555:4:call
+  taken normal "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.High":0)):e2227555:3:case(2)
+  fallthrough normal "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.High":0)):e2227555:3:case(0)
+  taken call "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.High":0)):e2227555:5:call
+function
+  both normal "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))
+  taken normal "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0)):e2227555:0:else
+  fallthrough normal "Specialize.classify":0 < "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0)):e2227555:1:call
+  fallthrough normal "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0)):e2227555:0:then
+  taken normal "Specialize.classify":0:10d1b4fa:0:else < "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0)):e2227555:1:call
+  fallthrough normal "Specialize.classify":0:10d1b4fa:0:then < "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0)):e2227555:1:call
+  taken normal "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0)):e2227555:2:else
+  fallthrough normal "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0)):e2227555:2:then
+  taken normal "Specialize.classify":0:10d1b4fa:1:else < "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0)):e2227555:1:call
+  taken normal "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0)):e2227555:2:then
+  fallthrough normal "Specialize.classify":0:10d1b4fa:1:then < "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0)):e2227555:1:call
+  fallthrough normal "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0)):e2227555:2:else
+  taken normal "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0)):e2227555:3:case(1)
+  taken normal "Specialize.bump":0 < "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0)):e2227555:4:call
+  taken normal "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0)):e2227555:3:case(2)
+  fallthrough normal "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0)):e2227555:3:case(0)
+  taken call "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0)):e2227555:5:call
+function
+  both normal "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.Low":0))
+  taken normal "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.Low":0)):e2227555:0:else
+  fallthrough normal "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.Low":0)):e2227555:0:then
+  fallthrough normal "Specialize.classify":0 < "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.Low":0)):e2227555:1:call
+  taken normal "Specialize.classify":0:10d1b4fa:0:else < "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.Low":0)):e2227555:1:call
+  fallthrough normal "Specialize.classify":0:10d1b4fa:0:then < "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.Low":0)):e2227555:1:call
+  taken normal "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.Low":0)):e2227555:2:else
+  fallthrough normal "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.Low":0)):e2227555:2:then
+  taken normal "Specialize.classify":0:10d1b4fa:1:else < "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.Low":0)):e2227555:1:call
+  taken normal "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.Low":0)):e2227555:2:then
+  fallthrough normal "Specialize.classify":0:10d1b4fa:1:then < "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.Low":0)):e2227555:1:call
+  fallthrough normal "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.Low":0)):e2227555:2:else
+  taken normal "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.Low":0)):e2227555:3:case(1)
+  taken normal "Specialize.bump":0 < "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.Low":0)):e2227555:4:call
+  taken normal "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.Low":0)):e2227555:3:case(2)
+  fallthrough normal "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.Low":0)):e2227555:3:case(0)
+  taken call "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.Low":0)):e2227555:5:call
+function
+  both normal "Specialize.Make":0 < module("Specialize.Outer.Inner":0)
+  both normal "Specialize.Outer":0
+function
+  both normal "Specialize.Outer.run":0
+  taken tailcall "Specialize.Outer.run":0:77039d72:0:call
+function
+  both normal "Specialize.Outer.run":0@(module("Specialize.High":0))
+  taken tailcall "Specialize.Outer.run":0@(module("Specialize.High":0)):77039d72:0:call
+function
+  both normal "Specialize.Outer.run":0@(module("Specialize.Low":0))
+  taken tailcall "Specialize.Outer.run":0@(module("Specialize.Low":0)):77039d72:0:call
+function
+  both normal "Specialize.(fun)@param,block0,field1,Low,a":0
+  taken call "Specialize.(fun)@param,block0,field1,Low,a":0:72f66934:0:call
+  taken call "Specialize.(fun)@param,block0,field1,Low,a":0:72f66934:1:call
+function
+  both normal "Specialize.fail_or_return":0
+  taken normal "Specialize.fail_or_return":0:fed247dc:0:else
+  fallthrough normal "Specialize.fail_or_return":0:fed247dc:0:then
+function
+  both normal "Specialize.tail_fail":0
+  taken tailcall "Specialize.tail_fail":0:fc2dd0fe:0:call
+function
+  both normal "Specialize.protected":0
+  both reset
+  taken call "Specialize.protected":0:41ea4828:0:call
+  taken normal "Specialize.protected":0:41ea4828:1:else
+  fallthrough normal "Specialize.protected":0:41ea4828:1:then
+  taken normal "Specialize.protected":0:41ea4828:2:else
+  fallthrough normal "Specialize.protected":0:41ea4828:2:then
+function
+  both normal "Specialize.after_protected":0
+  taken call "Specialize.after_protected":0:2d07165d:0:call
+function
+  both normal "Specialize.(fun)@param,%int_add,after_protected,0,3":0
+  taken call "Specialize.(fun)@param,%int_add,after_protected,0,3":0:b9f10cb3:0:call
+  taken call "Specialize.(fun)@param,%int_add,after_protected,0,3":0:b9f10cb3:1:call
+function
+  taken normal "Specialize.(fun)@i":1
+  fallthrough normal "Specialize.(fun)@i":0
+  fallthrough normal "Specialize.(fun)@i":1
+  taken normal "Specialize":0:1e27a3bc:4:else
+  fallthrough normal "Specialize":0:1e27a3bc:4:then
+  taken normal "Specialize":0:1e27a3bc:6:else
+  fallthrough normal "Specialize":0:1e27a3bc:6:then
+  taken normal "Specialize":0:1e27a3bc:7:else
+  fallthrough normal "Specialize":0:1e27a3bc:7:then
+bodies:
+  "Specialize.(fun)@param,%int_add,after_protected,0,3":0: b9f10cb3
+  "Specialize.(fun)@param,block0,field1,Low,a":0: 72f66934
+  "Specialize.Make":0: 253b1dc4
+  "Specialize.Make.count":0: e2227555
+  "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0)): e2227555
+  "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.High":0)): e2227555
+  "Specialize.Make.count":0@(module("Specialize.Outer.Inner":0))@(module("Specialize.Low":0)): e2227555
+  "Specialize.Outer":0: ccb1fe49
+  "Specialize.Outer.run":0: 77039d72
+  "Specialize.Outer.run":0@(module("Specialize.High":0)): 77039d72
+  "Specialize.Outer.run":0@(module("Specialize.Low":0)): 77039d72
+  "Specialize.after_protected":0: 2d07165d
+  "Specialize.bump":0: 6a747d23
+  "Specialize.classify":0: 10d1b4fa
+  "Specialize.fail_or_return":0: fed247dc
+  "Specialize.protected":0: 41ea4828
+  "Specialize.tail_fail":0: fc2dd0fe
+  "Specialize.tally":0: 6a747d23
