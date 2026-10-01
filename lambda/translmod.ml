@@ -1908,7 +1908,7 @@ let transl_functorization compilation_unit
     | Tcoerce_structure { output_repr; _ } ->
         transl_module_representation output_repr
     | Tcoerce_functor _ | Tcoerce_primitive _ | Tcoerce_alias _
-    | Tcoerce_invalid ->
+    | Tcoerce_kindtemplate _ | Tcoerce_invalid ->
         Misc.fatal_error
           "transl_functorization: unexpected compilation-unit coercion"
   in
