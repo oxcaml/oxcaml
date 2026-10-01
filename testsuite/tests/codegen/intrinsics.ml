@@ -366,6 +366,8 @@ module Int64_u = struct
   external unsafe_unsigned_rem : t -> t -> t @@ portable
     = "%int64#_unsafe_unsigned_mod"
 
+  external lognot : t -> t @@ portable = "%int64#_not"
+
   let[@inline always] neg x = of_int64 (Int64.neg (to_int64 x))
   let[@inline always] add x y =
     of_int64 (Int64.add (to_int64 x) (to_int64 y))
@@ -386,9 +388,6 @@ module Int64_u = struct
 
   let[@inline always] logxor x y =
     of_int64 (Int64.logxor (to_int64 x) (to_int64 y))
-
-  let[@inline always] lognot x =
-    of_int64 (Int64.logxor (to_int64 x) (-1L))
 
   let[@inline always] shift_left x y =
     of_int64 (Int64.shift_left (to_int64 x) y)
@@ -485,6 +484,7 @@ module Int16_u = struct
   external bit_and : t -> t -> t @@ portable = "%int16#_and"
   external bit_or : t -> t -> t @@ portable = "%int16#_or"
   external bit_xor : t -> t -> t @@ portable = "%int16#_xor"
+  external bit_not : t -> t @@ portable = "%int16#_not"
   external bswap : t -> t @@ portable = "%int16#_bswap"
   external neg : t -> t @@ portable = "%int16#_neg"
   external pred : t -> t @@ portable = "%int16#_pred"
@@ -579,6 +579,7 @@ module Int8_u = struct
   external bit_and : t -> t -> t @@ portable = "%int8#_and"
   external bit_or : t -> t -> t @@ portable = "%int8#_or"
   external bit_xor : t -> t -> t @@ portable = "%int8#_xor"
+  external bit_not : t -> t @@ portable = "%int8#_not"
   external bswap : t -> t @@ portable = "%int8#_bswap"
   external neg : t -> t @@ portable = "%int8#_neg"
   external pred : t -> t @@ portable = "%int8#_pred"
