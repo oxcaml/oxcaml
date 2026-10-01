@@ -81,3 +81,86 @@ let%expect_test "inline_recursively must duplicate closure" =
     function hash_char(x){return hash_fold_int(0, x);}
     //end
     |}]
+
+(* Inlining [some] into [apply_some] must not make [call_some] look like its
+   last use. *)
+let%expect_test "function inlined both as an argument and directly" =
+  (try
+     compile_and_run
+       ~flags:[ "--debug"; "invariant" ]
+       {|
+    let some x = Some x
+    let apply f x = f x
+    let apply_some x = apply some x
+    let call_some x = some x
+    let () =
+      List.iter (fun x -> print_int (Option.get x)) [ apply_some 0; apply_some 1; call_some 2 ]
+  |}
+   with Failure e -> print_endline e);
+  [%expect
+    {|
+    <...>/js_of_ocaml.exe: You found a bug. Please report it at https://github.com/ocsigen/js_of_ocaml/issues :
+    Error: File "code.ml", line 1094, characters 8-14: Assertion failed
+    Raised by primitive operation at Stdlib__Sys.(partial) in file "sys.ml.in", line 239, characters 0-82
+    Called from Bin_prefix_js_of_ocaml__Js_of_ocaml in file "js_of_ocaml.ml", lines 55-77, characters 4-623
+
+    process exited with error code 125
+     <...>/js_of_ocaml.exe --pretty --debug var --sourcemap --effects=disabled --disable=use-js-string --debug invariant --Werror test.bc -o test.js
+
+    non-zero exit code
+    |}]
+
+let%expect_test "inlining nested continuations keeps the code size linear" =
+  let open Js_of_ocaml_compiler in
+  Config.set_target `JavaScript;
+  Config.set_effects_backend `Disabled;
+  let nested_binds depth =
+    let vars = List.init depth (Printf.sprintf "x%d") in
+    Printf.sprintf
+      "let bind m f = f m\nlet x = %s%s%s"
+      (String.concat "" (List.map (Printf.sprintf "bind 0 (fun %s -> ") vars))
+      (String.concat " + " vars)
+      (String.make depth ')')
+  in
+  let blocks_after_inlining depth =
+    with_temp_dir ~f:(fun () ->
+        let cmo =
+          Filetype.ocaml_text_of_string (nested_binds depth)
+          |> Filetype.write_ocaml ~name:"test.ml"
+          |> compile_ocaml_to_cmo
+        in
+        let ic = open_in_bin (Filetype.path_of_cmo_file cmo) in
+        let p =
+          match Parse_bytecode.from_channel ic with
+          | `Cmo unit -> (Parse_bytecode.from_cmo unit ic).code
+          | _ -> assert false
+        in
+        close_in ic;
+        (* Mark calls as exact, as the driver does before inlining *)
+        let p, info = Flow.f p in
+        let shape, set_shape =
+          Flow.the_shape_of
+            ~return_values:(Code.return_values p)
+            ~pure:Pure_fun.empty
+            ~blocks:false
+            info
+        in
+        let p =
+          Specialize.f ~shape ~set_shape ~update_def:(Flow.Info.update_def info) p
+        in
+        let p, live_vars = Deadcode.f (Pure_fun.f p) p in
+        let p = Inline.f ~profile:Profile.O3 p live_vars in
+        Code.Addr.Map.fold (fun _ _ n -> n + 1) p.blocks 0)
+  in
+  List.iter
+    (fun depth -> Printf.printf "depth %d: %d blocks\n" depth (blocks_after_inlining depth))
+    [ 1; 2; 3; 4; 5; 6 ];
+  [%expect
+    {|
+    depth 1: 8 blocks
+    depth 2: 12 blocks
+    depth 3: 16 blocks
+    depth 4: 20 blocks
+    depth 5: 24 blocks
+    depth 6: 28 blocks
+    |}]
