@@ -724,6 +724,7 @@ module P = struct
         constraint_ ~loc ~attrs (sub.pat sub p) (Option.map (sub.typ sub) t) (sub.modes sub m)
     | Ppat_type s -> type_ ~loc ~attrs (map_loc_lid sub s)
     | Ppat_addr p -> addr ~loc ~attrs (sub.pat sub p)
+    | Ppat_addr_imm p -> addr_imm ~loc ~attrs (sub.pat sub p)
     | Ppat_lazy p -> lazy_ ~loc ~attrs (sub.pat sub p)
     | Ppat_unpack s -> unpack ~loc ~attrs (map_loc sub s)
     | Ppat_open (lid,p) ->

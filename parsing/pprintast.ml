@@ -850,6 +850,8 @@ and simple_pattern ctxt (f:Format.formatter) (x:pattern) : unit =
         pp f "@[<2>(%a@;:@;%a)@]" (pattern1 ctxt) p (core_type ctxt) (Option.get ct)
     | Ppat_addr p ->
         pp f "@[<2>(addr_@;%a)@]" (simple_pattern ctxt) p
+    | Ppat_addr_imm p ->
+        pp f "@[<2>(addr_imm_@;%a)@]" (simple_pattern ctxt) p
     | Ppat_lazy p ->
         pp f "@[<2>(lazy@;%a)@]" (simple_pattern ctxt) p
     | Ppat_exception p ->

@@ -326,6 +326,9 @@ and pattern i ppf x =
   | Ppat_addr p ->
       line i ppf "Ppat_addr\n";
       pattern i ppf p;
+  | Ppat_addr_imm p ->
+      line i ppf "Ppat_addr_imm\n";
+      pattern i ppf p;
   | Ppat_lazy p ->
       line i ppf "Ppat_lazy\n";
       pattern i ppf p;
