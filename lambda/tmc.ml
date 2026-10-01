@@ -137,12 +137,10 @@ end = struct
        reconizable. *)
     Lambda.dummy_constant
 
-  let with_placeholder constr (body : offset destination -> lambda) =
-    let k_with_placeholder =
-      apply { constr with flag = Mutable } tmc_placeholder in
-    let placeholder_pos =
-      let field = List.length constr.before in
-      (* Bytecode boxes products and preserves the source field order. *)
+  let placeholder_pos constr =
+    let field = List.length constr.before in
+    (* Bytecode boxes products and preserves the source field order. *)
+    let pos =
       match constr.shape with
       | _ when not !Clflags.native_code -> field
       | All_value -> field
@@ -153,14 +151,19 @@ end = struct
         in
         Mixed_block_shape.lookup_singleton_field shape field
     in
-    let placeholder_pos_lam = Lconst (Const_base (Const_int placeholder_pos)) in
+    Lconst (Const_base (Const_int pos))
+
+  let with_placeholder constr (body : offset destination -> lambda) =
+    let k_with_placeholder =
+      apply { constr with flag = Mutable } tmc_placeholder in
+    let placeholder_pos = placeholder_pos constr in
     let block_var = Ident.create_local "block" in
     let block_var_duid = Lambda.debug_uid_none in
     Llet (Strict, Lambda.layout_block, block_var, block_var_duid,
           k_with_placeholder,
           body {
             var = block_var;
-            offset = Offset placeholder_pos_lam ;
+            offset = Offset placeholder_pos;
             loc = constr.loc;
           })
 
@@ -200,9 +203,11 @@ end = struct
         ) bindings body in
     fun ~block_id constr body ->
     bind_list ~shape:constr.shape ~block_id ~arg_offset:0 constr.before
-    @@ fun vbefore -> let arg_offset = List.length constr.before + 1 in
+      @@ fun vbefore ->
+    let arg_offset = List.length constr.before + 1 in
     bind_list ~shape:constr.shape ~block_id ~arg_offset constr.after
-    @@ fun vafter -> body { constr with before = vbefore; after = vafter }
+      @@ fun vafter ->
+    body { constr with before = vbefore; after = vafter }
 end
 
 (** The type ['a Dps.t] (destination-passing-style) represents a
@@ -795,16 +800,17 @@ let rec choice ctx t =
   and choice_makeblock ctx ~tail:_ (tag, flag, shape, mode) blockargs loc =
     let choices =
       (* We look at each position in the block to find candidates for the TMC
-         hole transformation. We only consider fields of layout
-         Value. *)
+         hole transformation. We only consider fields of layout Value. *)
+      let[@inline always] of_value arg = choice ctx ~tail:false arg in
+      let[@inline always] of_non_value arg = Choice.lambda (traverse ctx arg) in
       match shape with
-      | All_value -> List.map (fun arg -> choice ctx ~tail:false arg) blockargs
+      | All_value -> List.map of_value blockargs
       | Shape shape ->
         List.mapi
           (fun index arg ->
              match shape.(index) with
-             | Value _ -> choice ctx ~tail:false arg
-             | _ -> Choice.lambda (traverse ctx arg))
+             | Value _ -> of_value arg
+             | _ -> of_non_value arg)
           blockargs
     in
     match Choice.find_nonambiguous_tmc_call choices with
