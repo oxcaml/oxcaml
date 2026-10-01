@@ -74,6 +74,8 @@
  (ocamlopt_flags
   (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
  (modules
+  with_backtracking
+  union_find
   binutils
   local_store
   config
@@ -112,6 +114,8 @@
   builtin_attributes
   global_module
   ident
+  scheduler
+  ivar
   path
   unit_info
   current_unit
@@ -278,6 +282,10 @@
 
 (copy_files ../../utils/diffing_with_keys.ml)
 
+(copy_files ../../utils/with_backtracking.ml)
+
+(copy_files ../../utils/union_find.ml)
+
 (copy_files ../../parsing/location.ml)
 
 (copy_files ../../parsing/language_extension.ml)
@@ -313,6 +321,10 @@
 (copy_files ../../typing/path.ml)
 
 (copy_files ../../typing/jkind_axis.ml)
+
+(copy_files ../../typing/scheduler.ml)
+
+(copy_files ../../typing/ivar.ml)
 
 (copy_files ../../typing/jkind.ml)
 

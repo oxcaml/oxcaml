@@ -211,7 +211,7 @@ let rec classify ~classify_product env ty layout : _ classification =
     if Ctype.check_type_nullability env ty Non_null
     then Immediate else Immediate_or_null
   else match get_desc ty with
-  | Tvar _ | Tunivar _ | Tof_kind _ ->
+  | Tvar _ | Tivar _ | Tunivar _ | Tof_kind _ ->
       Any
   | Tmod _ -> Misc.fatal_error "Typeopt.classify: unexpected Tmod"
   | Tconstr (p, _args, _abbrev) ->
@@ -815,7 +815,8 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
     if Btype.tvariant_not_immediate row
     then non_nullable Pgenval
     else non_nullable Pintval
-  | Tvar { jkind; _ } | Tunivar { jkind; _ } | Tof_kind jkind ->
+  | Tvar { jkind; _ } | Tivar { jkind; _ } | Tunivar { jkind; _ }
+  | Tof_kind jkind ->
     num_nodes_visited,
     add_nullability_from_ty env scty
       (value_kind_of_scannable_jkind env (Jkind.disallow_right jkind))
@@ -882,7 +883,7 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
                because [scrape_ty] looks though them. *)
             unknown ()
           end
-        | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil
+        | Tvar _ | Tivar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil
         | Tlink _ | Tsubst _ | Tvariant _ | Tunivar _ | Tpoly _ | Tpackage _
         | Tquote _ | Tsplice _ | Tquote_eval _ | Tof_kind _ | Tbox _ ->
           unknown ()

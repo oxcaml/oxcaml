@@ -158,6 +158,11 @@ and type_expr = transient_expr
 
 and type_desc =
   | Tvar of { name : string option; jkind : jkind_lr }
+  | Tivar of
+      { name : string option;
+        jkind : jkind_lr;
+        ivar : type_shape Ivar.t
+      }
   | Tarrow of arrow_desc * type_expr * type_expr * commutable
   | Ttuple of (string option * type_expr) list
   | Tunboxed_tuple of (string option * type_expr) list
@@ -187,6 +192,15 @@ and arg_label =
 
 and arrow_desc =
   arg_label * Mode.With_locality.lr * Mode.With_locality.lr
+
+and type_shape =
+  | Sarrow of arg_label
+  | Stuple of string option list
+  | Sunboxed_tuple of string option list
+  | Sconstr of Path.t
+  | Sobject
+  | Svariant
+  | Spackage of Path.t
 
 and package =
     { pack_path : Path.t;
@@ -1205,6 +1219,11 @@ type change =
   | Cmodes : Mode.changes -> change
   | Csort : Jkind_types.Sort.change -> change
   | Czero_alloc : Zero_alloc.change -> change
+  | Cscheduler : Scheduler.Change.t -> change
+  | Civar : Ivar.Change.t -> change
+  | Cadd_ivar
+  | Ctake_ivars of type_shape Ivar.t list
+
 
 type changes =
     Change of change * changes ref
@@ -1221,7 +1240,9 @@ let log_change ch =
 let () =
   Mode.set_append_changes (fun changes -> log_change (Cmodes !changes));
   Jkind_types.Sort.set_change_log (fun change -> log_change (Csort change));
-  Zero_alloc.set_change_log (fun change -> log_change (Czero_alloc change))
+  Zero_alloc.set_change_log (fun change -> log_change (Czero_alloc change));
+  Scheduler.set_log (fun change -> log_change (Cscheduler change));
+  Ivar.set_log (fun change -> log_change (Civar change))
 
 (* constructor and accessors for [field_kind] *)
 
@@ -1343,6 +1364,8 @@ module Transient_expr = struct
     match ty.desc with
     | Tvar { name; _ } ->
       set_desc ty (Tvar { name; jkind = jkind' })
+    | Tivar { name; ivar; _ } ->
+      set_desc ty (Tivar { name; jkind = jkind'; ivar })
     | _ -> Misc.fatal_error "set_var_jkind called on non-var"
   let get_scope ty = ty.scope land scope_mask
   let get_marks ty = ty.scope lsr 27
@@ -1407,6 +1430,7 @@ let best_effort_compare_type_expr te1 te2 =
         match get_desc ty with
         (* Types which must be compared by id *)
         | Tvar _
+        | Tivar _
         | Tunivar _
         | Tobject (_, _)
         | Tfield (_, _, _, _)
@@ -1673,23 +1697,41 @@ let proto_newty3 ~level ~scope desc  =
   incr new_id;
   create_expr desc ~level ~scope ~id:!new_id
 
+(**** Management of ivars ****)
+
+let global_ivars = Local_store.s_ref []
+
+let add_ivar ivar =
+  log_change Cadd_ivar;
+  global_ivars := ivar :: !global_ivars
+
+let take_ivars () =
+  let ivars = !global_ivars in
+  log_change (Ctake_ivars ivars);
+  global_ivars := [];
+  ivars
+
                   (**********************************)
                   (*  Utilities for backtracking    *)
                   (**********************************)
 
 let undo_change = function
-    Ctype  (ty, desc) -> Transient_expr.set_desc ty desc
+  | Ctype (ty, desc) -> Transient_expr.set_desc ty desc
   | Ccompress (ty, desc, _) -> Transient_expr.set_desc ty desc
   | Clevel (ty, level) -> Transient_expr.set_level ty level
   | Cscope (ty, scope) -> Transient_expr.set_scope ty scope
-  | Cname  (r, v)    -> r := v
-  | Crow   r         -> r := RFnone
-  | Ckind  (FKvar r) -> r.field_kind <- FKprivate
-  | Ccommu (Cvar r)  -> r.commu <- Cunknown
-  | Cuniv  (r, v)    -> r := v
-  | Cmodes c          -> Mode.undo_changes c
+  | Cname (r, v) -> r := v
+  | Crow r -> r := RFnone
+  | Ckind (FKvar r) -> r.field_kind <- FKprivate
+  | Ccommu (Cvar r) -> r.commu <- Cunknown
+  | Cuniv (r, v) -> r := v
+  | Cmodes c -> Mode.undo_changes c
   | Csort change -> Jkind_types.Sort.undo_change change
   | Czero_alloc c -> Zero_alloc.undo_change c
+  | Cscheduler c -> Scheduler.Change.undo c
+  | Civar c -> Ivar.Change.undo c
+  | Cadd_ivar -> global_ivars := List.tl !global_ivars
+  | Ctake_ivars old_global_ivars -> global_ivars := old_global_ivars
 
 type snapshot = changes ref * int
 let last_snapshot = Local_store.s_ref 0

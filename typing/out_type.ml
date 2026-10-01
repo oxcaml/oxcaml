@@ -878,7 +878,9 @@ type type_or_scheme = Type | Type_scheme
 
 let is_non_gen mode ty =
   match mode with
-  | Type_scheme -> is_Tvar ty && get_level ty <> generic_level
+  | Type_scheme ->
+    (match get_desc ty with Tvar _ | Tivar _ -> true | _ -> false)
+    && get_level ty <> generic_level
   | Type        -> false
 
 let nameable_row row =
@@ -1386,7 +1388,8 @@ end = struct
 
   let add_named_var tty =
     match tty.desc with
-      Tvar { name = Some name } | Tunivar { name = Some name } ->
+      Tvar { name = Some name } | Tivar { name = Some name; _ }
+    | Tunivar { name = Some name } ->
         if List.mem name !named_vars then () else
         named_vars := name :: !named_vars
     | _ -> ()
@@ -1397,7 +1400,7 @@ end = struct
     if not (List.memq px !visited_for_named_vars) then begin
       visited_for_named_vars := px :: !visited_for_named_vars;
       match tty.desc with
-      | Tvar _ | Tunivar _ ->
+      | Tvar _ | Tivar _ | Tunivar _ ->
           add_named_var tty
       | _ ->
           printer_iter_type_expr add_named_vars (Fun.const ()) ty
@@ -2339,7 +2342,8 @@ end = struct
       try TransientTypeMap.find t !weak_var_map with Not_found ->
       let name =
         match t.desc with
-          Tvar { name = Some name } | Tunivar { name = Some name } ->
+          Tvar { name = Some name } | Tivar { name = Some name; _ }
+        | Tunivar { name = Some name } ->
             (* Some part of the type we've already printed has assigned another
              * unification variable to that name. We want to keep the name, so
              * try adding a number until we find a name that's not taken. *)
@@ -2458,7 +2462,7 @@ module Aliases = struct
 
   let aliasable ty =
     match get_desc ty with
-      Tvar _ | Tunivar _ | Tpoly _ | Trepr _ -> false
+      Tvar _ | Tivar _ | Tunivar _ | Tpoly _ | Trepr _ -> false
     | Tconstr (p, _, _) ->
         not (is_nth (snd (best_type_path p)))
     | _ -> true
@@ -2685,7 +2689,7 @@ let rec tree_of_modal_typexp mode modal ty =
   let pr_typ acc_mode =
     let tty = Transient_expr.repr ty in
     match tty.desc with
-    | Tvar _ ->
+    | Tvar _ | Tivar _ ->
         let non_gen = is_non_gen mode ty in
         let name_gen = Variable_names.new_var_name ~non_gen ty in
         Otyp_var (non_gen, Variable_names.name_of_type name_gen tty)

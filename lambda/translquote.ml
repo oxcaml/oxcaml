@@ -2617,9 +2617,13 @@ let type_for_annotation ~env ~loc typ =
       else
         let go = go (ty :: aliased) in
         match get_desc ty with
-        | Tvar { name = _; jkind } | Tof_kind jkind ->
+        | Tvar { name = _; jkind }
+        | Tof_kind jkind ->
           assert_no_jkinds jkind.annotation;
           Ttyp_var (None, jkind.annotation)
+        | Tivar { name = _; jkind = _; ivar = _ } ->
+          Misc.fatal_errorf "Transquote [at %a]: no support for Tivar"
+            Location.print_loc_in_lowercase loc
         | Tunivar _ ->
           let name, jkind_annotation = unwrap_univar ty |> Option.get in
           Ttyp_var (Some name, jkind_annotation)
