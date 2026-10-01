@@ -601,6 +601,9 @@ module Jkind0 : sig
       (** The jkind of block indices with mode crossing. *)
       val kind_of_idx : t
 
+      (** The jkind of addresses with mode crossing *)
+      val kind_of_addr : t
+
       (** The jkind of unboxed 128-bit vectors with no mode crossing. *)
       val vec128 : t
 
