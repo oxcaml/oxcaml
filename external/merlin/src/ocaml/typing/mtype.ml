@@ -311,7 +311,8 @@ and expand_paths_lazy_sig_items paths env sg =
         let md = { md with md_type = expand_paths_lazy paths env md.md_type }
         in
         let env =
-          Env.add_module_declaration_lazy ~update_summary:false id pres md env
+          Env.add_module_declaration_lazy ~update_summary:false ~vis id pres md
+            env
         in
         env, Sig_module (id,pres,md,rs,vis)
       | Sig_modtype (id,mtd,vis) ->
@@ -674,14 +675,26 @@ and type_and_jkind_paths_sig env p sg =
     let { types; jkinds } = type_and_jkind_paths_sig env p rem in
     { types = (Pdot(p, Ident.name id) :: types); jkinds }
   | Sig_jkind(id, _decl, _) :: rem ->
+<<<<<<< Merlin:nonmentionable
     let { types; jkinds } = type_and_jkind_paths_sig env p rem in
     { types; jkinds = (Pdot(p, Ident.name id) :: jkinds) }
   | Sig_module(id, pres, md, _, _) :: rem ->
     let { types = nested_types; jkinds = nested_jkinds } =
+||||||| Compiler:last-imported
+    let ~types, ~jkinds = type_and_jkind_paths_sig env p rem in
+    ~types, ~jkinds:(Pdot(p, Ident.name id) :: jkinds)
+  | Sig_module(id, pres, md, _, _) :: rem ->
+    let ~types:nested_types, ~jkinds:nested_jkinds =
+=======
+    let ~types, ~jkinds = type_and_jkind_paths_sig env p rem in
+    ~types, ~jkinds:(Pdot(p, Ident.name id) :: jkinds)
+  | Sig_module(id, pres, md, _, vis) :: rem ->
+    let ~types:nested_types, ~jkinds:nested_jkinds =
+>>>>>>> Compiler:HEAD
       type_and_jkind_paths env (Pdot(p, Ident.name id)) md.md_type
     in
     let env =
-      Env.add_module_declaration ~check:false id pres md env
+      Env.add_module_declaration ~check:false ~vis id pres md env
     in
     let { types = rem_types; jkinds = rem_jkinds } =
       type_and_jkind_paths_sig env p rem
@@ -713,10 +726,10 @@ and no_code_needed_sig env sg =
       | Val_prim _ -> no_code_needed_sig env rem
       | _ -> false
       end
-  | Sig_module(id, pres, md, _, _) :: rem ->
+  | Sig_module(id, pres, md, _, vis) :: rem ->
       no_code_needed_mod env pres md.md_type &&
       no_code_needed_sig
-        (Env.add_module_declaration ~check:false id pres md env) rem
+        (Env.add_module_declaration ~check:false ~vis id pres md env) rem
   | (Sig_type _ | Sig_modtype _ | Sig_class_type _ | Sig_jkind _) :: rem ->
       no_code_needed_sig env rem
   | (Sig_typext _ | Sig_class _) :: _ ->
