@@ -114,6 +114,9 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
     |> DE.set_loopify_state loopify_state
     |> DE.increment_continuation_scope
   in
+  let denv =
+    if Code_metadata.cold code_metadata then DE.mark_as_cold denv else denv
+  in
   let dacc = DA.with_denv dacc denv in
   let code_ids_to_remember = DA.code_ids_to_remember outer_dacc in
   let code_ids_to_never_delete = DA.code_ids_to_never_delete outer_dacc in
