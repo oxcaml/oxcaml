@@ -70,6 +70,8 @@ type abstract_non_value_type_constr = [
   | `Idx_imm
   | `Idx_mut
   | `Idx_atomic
+  | `Addr
+  | `Addr_imm
   | `Int8x16
   | `Int16x8
   | `Int32x4
@@ -138,6 +140,8 @@ let base_type_constrs : type_constr list = [
   `Idx_imm;
   `Idx_mut;
   `Idx_atomic;
+  `Addr;
+  `Addr_imm;
 ]
 
 let or_null_extension_type_constrs : type_constr list = [
@@ -240,6 +244,8 @@ and ident_or_null = ident_create "or_null"
 and ident_idx_imm = ident_create "idx_imm"
 and ident_idx_mut = ident_create "idx_mut"
 and ident_idx_atomic = ident_create "idx_atomic"
+and ident_addr = ident_create "addr"
+and ident_addr_imm = ident_create "addr_imm"
 
 and ident_int8x16 = ident_create "int8x16"
 and ident_int16x8 = ident_create "int16x8"
@@ -305,6 +311,8 @@ let ident_of_type_constr : type_constr -> Ident.t = function
   | `Idx_imm -> ident_idx_imm
   | `Idx_mut -> ident_idx_mut
   | `Idx_atomic -> ident_idx_atomic
+  | `Addr -> ident_addr
+  | `Addr_imm -> ident_addr_imm
   | `Int8x16 -> ident_int8x16
   | `Int16x8 -> ident_int16x8
   | `Int32x4 -> ident_int32x4
@@ -366,6 +374,8 @@ and path_unativeint_u = Pident ident_unativeint_u
 and path_idx_imm = Pident ident_idx_imm
 and path_idx_mut = Pident ident_idx_mut
 and path_idx_atomic = Pident ident_idx_atomic
+and path_addr = Pident ident_addr
+and path_addr_imm = Pident ident_addr_imm
 and path_expr = Pident ident_expr
 and path_eval = Pident ident_eval
 and path_box = Pident ident_box
@@ -477,6 +487,8 @@ and type_or_null t = tconstr path_or_null [t]
 and type_idx_imm t1 t2 = tconstr path_idx_imm [t1; t2]
 and type_idx_mut t1 t2 = tconstr path_idx_mut [t1; t2]
 and type_idx_atomic t1 t2 = tconstr path_idx_atomic [t1; t2]
+and type_addr t = tconstr path_addr [t]
+and type_addr_imm t = tconstr path_addr_imm [t]
 
 and type_int8x16 = tconstr path_int8x16 []
 and type_int16x8 = tconstr path_int16x8 []
@@ -986,6 +998,26 @@ let decl_of_type_constr type_constr =
            arity = 2;
          }))
        ~jkind:(builtin2 Jkind.Const.Builtin.kind_of_idx)
+       ()
+  | `Addr ->
+    decl1 ~variance:Variance.full
+       ~param_jkind:(
+         Jkind.Builtin.any ~why:(Type_argument {
+           parent_path = Path.Pident ident_addr;
+           position = 1;
+           arity = 1;
+         }))
+       ~jkind:(builtin1 Jkind.Const.Builtin.kind_of_addr)
+       ()
+  | `Addr_imm ->
+    decl1 ~variance:Variance.covariant
+       ~param_jkind:(
+         Jkind.Builtin.any ~why:(Type_argument {
+           parent_path = Path.Pident ident_addr_imm;
+           position = 1;
+           arity = 1;
+         }))
+       ~jkind:(builtin1 Jkind.Const.Builtin.kind_of_addr)
        ()
   | `Lexing_position ->
     decl0
