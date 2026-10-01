@@ -24,6 +24,7 @@ module Context : sig
     | Core_type : core_type t
     | Expression : expression t
     | Value_description : value_description t
+    | Law_declaration : law_declaration t
     | Class_type : class_type t
     | Class_type_field : class_type_field t
     | Class_infos : _ class_infos t
@@ -56,6 +57,7 @@ module Context : sig
   val core_type : core_type t
   val expression : expression t
   val value_description : value_description t
+  val law_declaration : law_declaration t
   val class_type : class_type t
   val class_type_field : class_type_field t
   val class_infos : _ class_infos t

@@ -1,0 +1,4 @@
+File "laws_implies.ml", line 10, characters 6-10:
+10 | let ( ===> ) a b = not a || b
+           ^^^^
+Error: Syntax error: operator expected.

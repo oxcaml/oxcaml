@@ -390,6 +390,20 @@ and copy_jkind_declaration :
     pjkind_attributes = copy_attributes pjkind_attributes;
     pjkind_loc = copy_location pjkind_loc }
 
+and copy_law_declaration :
+  Ast_999.Parsetree.law_declaration -> Ast_500.Parsetree.law_declaration =
+  fun { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
+        plaw_attributes; plaw_loc } ->
+  { plaw_name = copy_loc (fun x -> x) plaw_name;
+    plaw_params =
+      List.map
+        (fun (x, ty) -> copy_loc (fun x -> x) x, Option.map copy_core_type ty)
+        plaw_params;
+    plaw_assumptions = List.map copy_expression plaw_assumptions;
+    plaw_conclusion = copy_expression plaw_conclusion;
+    plaw_attributes = copy_attributes plaw_attributes;
+    plaw_loc = copy_location plaw_loc }
+
 and copy_direction_flag :
     Ast_999.Asttypes.direction_flag -> Ast_500.Asttypes.direction_flag =
   function
@@ -876,6 +890,8 @@ and copy_structure_item_desc :
       Ast_500.Parsetree.Pstr_extension (copy_extension x0, copy_attributes x1)
   | Ast_999.Parsetree.Pstr_jkind x0 ->
       Ast_500.Parsetree.Pstr_jkind (copy_jkind_declaration x0)
+  | Ast_999.Parsetree.Pstr_law x0 ->
+      Ast_500.Parsetree.Pstr_law (copy_law_declaration x0)
 
 and copy_include_declaration :
     Ast_999.Parsetree.include_declaration ->
@@ -1212,6 +1228,8 @@ and copy_signature_item_desc :
       Ast_500.Parsetree.Psig_extension (copy_extension x0, copy_attributes x1)
   | Ast_999.Parsetree.Psig_jkind x0 ->
       Ast_500.Parsetree.Psig_jkind (copy_jkind_declaration x0)
+  | Ast_999.Parsetree.Psig_law x0 ->
+      Ast_500.Parsetree.Psig_law (copy_law_declaration x0)
 
 and copy_class_type_declaration :
     Ast_999.Parsetree.class_type_declaration ->

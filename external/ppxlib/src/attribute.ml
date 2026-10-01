@@ -18,6 +18,7 @@ module Context = struct
     | Core_type : core_type t
     | Expression : expression t
     | Value_description : value_description t
+    | Law_declaration : law_declaration t
     | Class_type : class_type t
     | Class_type_field : class_type_field t
     | Class_infos : _ class_infos t
@@ -50,6 +51,7 @@ module Context = struct
   let core_type = Core_type
   let expression = Expression
   let value_description = Value_description
+  let law_declaration = Law_declaration
   let class_type = Class_type
   let class_type_field = Class_type_field
   let class_infos = Class_infos
@@ -103,6 +105,7 @@ module Context = struct
     | Core_type -> x.ptyp_attributes
     | Expression -> x.pexp_attributes
     | Value_description -> x.pval_attributes
+    | Law_declaration -> x.plaw_attributes
     | Class_type -> x.pcty_attributes
     | Class_type_field -> x.pctf_attributes
     | Class_infos -> x.pci_attributes
@@ -140,6 +143,7 @@ module Context = struct
     | Core_type -> { x with ptyp_attributes = attrs }
     | Expression -> { x with pexp_attributes = attrs }
     | Value_description -> { x with pval_attributes = attrs }
+    | Law_declaration -> { x with plaw_attributes = attrs }
     | Class_type -> { x with pcty_attributes = attrs }
     | Class_type_field -> { x with pctf_attributes = attrs }
     | Class_infos -> { x with pci_attributes = attrs }
@@ -184,6 +188,7 @@ module Context = struct
     | Core_type -> "core type"
     | Expression -> "expression"
     | Value_description -> "value"
+    | Law_declaration -> "law declaration"
     | Class_type -> "class type"
     | Class_type_field -> "class type field"
     | Class_infos -> "class declaration"
@@ -611,6 +616,10 @@ let collect_unused_attributes_errors =
       let res, errors = self#check_node Value_description x in
       super#value_description res (acc @ errors)
 
+    method! law_declaration x acc =
+      let res, errors = self#check_node Law_declaration x in
+      super#law_declaration res (acc @ errors)
+
     method! class_type x acc =
       let res, errors = self#check_node Class_type x in
       super#class_type res (acc @ errors)
@@ -781,6 +790,9 @@ let check_unused =
     method! value_description x =
       collect_unused_attributes_errors#value_description x []
       |> raise_if_non_empty
+
+    method! law_declaration x =
+      collect_unused_attributes_errors#law_declaration x [] |> raise_if_non_empty
 
     method! class_type x =
       collect_unused_attributes_errors#class_type x [] |> raise_if_non_empty

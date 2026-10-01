@@ -366,6 +366,7 @@ module Sig:
     val extension: ?loc:loc -> ?attrs:attrs -> extension -> signature_item
     val attribute: ?loc:loc -> attribute -> signature_item
     val jkind: ?loc:loc -> jkind_declaration -> signature_item
+    val law: ?loc:loc -> law_declaration -> signature_item
     val text: text -> signature_item list
   end
 
@@ -395,6 +396,7 @@ module Str:
     val include_: ?loc:loc -> include_declaration -> structure_item
     val extension: ?loc:loc -> ?attrs:attrs -> extension -> structure_item
     val jkind: ?loc:loc -> jkind_declaration -> structure_item
+    val law: ?loc:loc -> law_declaration -> structure_item
     val attribute: ?loc:loc -> attribute -> structure_item
     val text: text -> structure_item list
   end
