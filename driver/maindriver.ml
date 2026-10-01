@@ -36,6 +36,7 @@ let main argv ppf =
         (ppf,
          Compile.implementation,
          Compile.interface,
+         Laws_gen.generate,
          ".cmo",
          ".cma");
     with Arg.Bad msg ->

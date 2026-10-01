@@ -129,6 +129,8 @@ module type Compiler_options = sig
   val _stop_after : string -> unit
   val _i : unit -> unit
   val _i_variance : unit -> unit
+  val _generate_laws_implementation : unit -> unit
+  val _generate_laws_interface : unit -> unit
   val _impl : string -> unit
   val _instantiate : unit -> unit
   val _functorize : unit -> unit

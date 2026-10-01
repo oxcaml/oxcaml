@@ -361,6 +361,8 @@
   ;; some of COMP
   main_args
   compmisc
+  parsetree_of_outcometree
+  laws_gen
   compile_common
   instantiator
   functorizer

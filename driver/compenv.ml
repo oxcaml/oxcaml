@@ -744,7 +744,8 @@ let c_object_of_filename name =
   Filename.chop_suffix (Filename.basename name) ".c" ^ Config.ext_obj
 
 let process_action
-    (ppf, implementation, interface, ocaml_mod_ext, ocaml_lib_ext) action
+    (ppf, implementation, interface, laws_file, ocaml_mod_ext, ocaml_lib_ext)
+    action
     ~keep_symbol_tables =
   let impl ~start_from name =
     readenv ppf (Before_compile name);
@@ -782,6 +783,9 @@ let process_action
       else if Filename.check_suffix name ocaml_mod_ext
       || Filename.check_suffix name ocaml_lib_ext then
         objfiles := name :: !objfiles
+      else if Filename.check_suffix name ".cmi"
+              && Option.is_some !generate_laws then
+        laws_file (Option.get !generate_laws) ~cmi:name ~output:!output_name
       else if Filename.check_suffix name ".cmi" && !make_package then
         objfiles := name :: !objfiles
       else if Filename.check_suffix name Config.ext_obj
@@ -838,6 +842,9 @@ let process_deferred_actions env =
               | ProcessCFile _
               | ProcessImplementation _
               | ProcessInterface _ -> true
+              | ProcessOtherFile name ->
+                  Option.is_some !generate_laws
+                  && Filename.check_suffix name ".cmi"
               | _ -> false) !deferred_actions) > 1 then
             fatal "Options -c -o are incompatible with compiling multiple files"
         end;

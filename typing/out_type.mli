@@ -190,6 +190,12 @@ val tree_of_law_description:
 val tree_of_law_params:
     (Ident.t * type_expr) list -> (string * out_type) list
 
+(** The types of the parameters of a law, and its type variables with their
+    kinds, nullability included. *)
+val tree_of_law_quantification:
+    (Ident.t * type_expr) list ->
+    (string * out_jkind) list * (string * out_type) list
+
 (** {1 Module types }*)
 
 val tree_of_module:

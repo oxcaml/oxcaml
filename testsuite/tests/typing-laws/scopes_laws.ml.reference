@@ -1,0 +1,432 @@
+[@@@ocaml.warning "-27"]
+module Laws_gen_Scopes = Scopes
+module Laws_gen_Stdlib = Stdlib
+type 'a each =
+  {
+  n_double_add: 'a ;
+  map_find_elem: 'a ;
+  map_set_elem: 'a ;
+  map_empty_find_empty: 'a ;
+  lex_refl: 'a ;
+  order_max_max_comm: 'a ;
+  order_max_pair_pair_refl: 'a ;
+  idem_idem: 'a ;
+  p_h_pos: 'a ;
+  q_idem: 'a ;
+  twice_g_idem: 'a ;
+  outer_inner_mk_ok: 'a }
+let names =
+  {
+    n_double_add = "n_double_add";
+    map_find_elem = "map_find_elem";
+    map_set_elem = "map_set_elem";
+    map_empty_find_empty = "map_empty_find_empty";
+    lex_refl = "lex_refl";
+    order_max_max_comm = "order_max_max_comm";
+    order_max_pair_pair_refl = "order_max_pair_pair_refl";
+    idem_idem = "idem_idem";
+    p_h_pos = "p_h_pos";
+    q_idem = "q_idem";
+    twice_g_idem = "twice_g_idem";
+    outer_inner_mk_ok = "outer_inner_mk_ok"
+  }
+let map
+  { n_double_add; map_find_elem; map_set_elem; map_empty_find_empty;
+    lex_refl; order_max_max_comm; order_max_pair_pair_refl; idem_idem;
+    p_h_pos; q_idem; twice_g_idem; outer_inner_mk_ok }
+  ~f =
+  {
+    n_double_add = (f n_double_add);
+    map_find_elem = (f map_find_elem);
+    map_set_elem = (f map_set_elem);
+    map_empty_find_empty = (f map_empty_find_empty);
+    lex_refl = (f lex_refl);
+    order_max_max_comm = (f order_max_max_comm);
+    order_max_pair_pair_refl = (f order_max_pair_pair_refl);
+    idem_idem = (f idem_idem);
+    p_h_pos = (f p_h_pos);
+    q_idem = (f q_idem);
+    twice_g_idem = (f twice_g_idem);
+    outer_inner_mk_ok = (f outer_inner_mk_ok)
+  }
+let to_list
+  { n_double_add; map_find_elem; map_set_elem; map_empty_find_empty;
+    lex_refl; order_max_max_comm; order_max_pair_pair_refl; idem_idem;
+    p_h_pos; q_idem; twice_g_idem; outer_inner_mk_ok }
+  =
+  [n_double_add;
+  map_find_elem;
+  map_set_elem;
+  map_empty_find_empty;
+  lex_refl;
+  order_max_max_comm;
+  order_max_pair_pair_refl;
+  idem_idem;
+  p_h_pos;
+  q_idem;
+  twice_g_idem;
+  outer_inner_mk_ok]
+type n_double_add_input =
+  | N_double_add_input: {
+  x: int } -> n_double_add_input 
+type idem_idem_input =
+  | Idem_idem_input: {
+  x: int } -> idem_idem_input 
+type p_h_pos_input =
+  | P_h_pos_input: {
+  x: int } -> p_h_pos_input 
+type q_idem_input =
+  | Q_idem_input: {
+  x: Laws_gen_Scopes.Q.t } -> q_idem_input 
+module Instantiate(Choice:CamlinternalLaw.Choice) =
+  struct
+    module Law = (CamlinternalLaw.Make)(Choice)
+    module type Map_choices  =
+      sig
+        module Key : Laws_gen_Scopes.Comparable
+        type find_elem_input =
+          | Find_elem_input: ('a : value) .
+          {
+          k: Key.t ;
+          m: 'a Laws_gen_Scopes.Map(Key).t } -> find_elem_input 
+        type set_elem_input =
+          | Set_elem_input: ('a : value) .
+          {
+          k: Key.t ;
+          v: 'a ;
+          m: 'a Laws_gen_Scopes.Map(Key).t } -> set_elem_input 
+        type empty_find_empty_input =
+          | Empty_find_empty_input: {
+          k: Key.t } -> empty_find_empty_input 
+        val find_elem : find_elem_input Choice.t
+        val set_elem : set_elem_input Choice.t
+        val empty_find_empty : empty_find_empty_input Choice.t
+      end
+    module type Lex_choices  =
+      sig
+        module A : Laws_gen_Scopes.Comparable
+        module B : Laws_gen_Scopes.Comparable
+        type refl_input =
+          | Refl_input: {
+          p: (A.t * B.t) } -> refl_input 
+        val refl : refl_input Choice.t
+      end
+    module type Order_max_choices  =
+      sig
+        module X : Laws_gen_Scopes.Comparable
+        type max_comm_input =
+          | Max_comm_input: {
+          a: X.t ;
+          b: X.t } -> max_comm_input 
+        module type Pair_choices  =
+          sig
+            module Y : sig type t val equal : t -> t -> bool end
+            type pair_refl_input =
+              | Pair_refl_input: {
+              a: X.t ;
+              b: Y.t } -> pair_refl_input 
+            val pair_refl : pair_refl_input Choice.t
+          end
+        val max_comm : max_comm_input Choice.t
+        val pair : (module Pair_choices) Choice.t
+      end
+    module type Twice_choices  =
+      sig
+        module X :
+        sig
+          val f : int -> int
+          law? idem (x : int) : Laws_gen_Stdlib.(=) (f (f x)) (f x)
+        end
+        type g_idem_input =
+          | G_idem_input: {
+          x: int } -> g_idem_input 
+        val g_idem : g_idem_input Choice.t
+      end
+    module type Outer_choices  =
+      sig
+        module X : Laws_gen_Scopes.Comparable
+        module type Inner_choices  =
+          sig
+            module X_1 : Laws_gen_Scopes.Comparable
+            type mk_ok_input =
+              | Mk_ok_input: {
+              x: X_1.t } -> mk_ok_input 
+            val mk_ok : mk_ok_input Choice.t
+          end
+        val inner : (module Inner_choices) Choice.t
+      end
+    module type Choices  =
+      sig
+        val n_double_add : n_double_add_input Choice.t
+        val map : (module Map_choices) Choice.t
+        val lex : (module Lex_choices) Choice.t
+        val order_max : (module Order_max_choices) Choice.t
+        val idem_idem : idem_idem_input Choice.t
+        val p_h_pos : p_h_pos_input Choice.t
+        val q_idem : q_idem_input Choice.t
+        val twice : (module Twice_choices) Choice.t
+        val outer : (module Outer_choices) Choice.t
+      end
+    let n_double_add ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.n_double_add),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.n_double_add;
+                 predicate =
+                   (fun ((N_double_add_input { x }) : n_double_add_input) ->
+                      (Laws_gen_Stdlib.(=) (Laws_gen_Scopes.N.double x)
+                         (Laws_gen_Stdlib.(+) x x) : bool));
+                 text = "(double x) = (x + x)"
+               }))
+    let map_find_elem ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.map),
+          (fun ((module M)  : (module Map_choices)) ->
+             let module I = (Laws_gen_Scopes.Map)(M.Key) in
+               Law.Bind
+                 ((Law.Choose M.find_elem),
+                   (fun input ->
+                      Law.Bind
+                        ((Law.Assumption
+                            {
+                              value = input;
+                              source = M.find_elem;
+                              predicate =
+                                (fun
+                                   ((M.Find_elem_input { k; m }) :
+                                      M.find_elem_input)
+                                   ->
+                                   (Laws_gen_Stdlib.not (I.elem m k) : 
+                                   bool));
+                              text = "not (elem m k)"
+                            }),
+                          (fun () ->
+                             Law.Assertion
+                               {
+                                 value = input;
+                                 source = M.find_elem;
+                                 predicate =
+                                   (fun
+                                      ((M.Find_elem_input { k; m }) :
+                                         M.find_elem_input)
+                                      ->
+                                      (Laws_gen_Stdlib.Option.is_none
+                                         (I.find m k) : bool));
+                                 text = "Option.is_none (find m k)"
+                               }))))))
+    let map_set_elem ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.map),
+          (fun ((module M)  : (module Map_choices)) ->
+             let module I = (Laws_gen_Scopes.Map)(M.Key) in
+               Law.Bind
+                 ((Law.Choose M.set_elem),
+                   (fun input ->
+                      Law.Assertion
+                        {
+                          value = input;
+                          source = M.set_elem;
+                          predicate =
+                            (fun
+                               ((M.Set_elem_input { k; v; m }) :
+                                  M.set_elem_input)
+                               -> (I.elem (I.set m ~key:k ~data:v) k : 
+                               bool));
+                          text = "elem (set m ~key:k ~data:v) k"
+                        }))))
+    let map_empty_find_empty ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.map),
+          (fun ((module M)  : (module Map_choices)) ->
+             let module I = (Laws_gen_Scopes.Map)(M.Key) in
+               Law.Bind
+                 ((Law.Choose M.empty_find_empty),
+                   (fun input ->
+                      Law.Assertion
+                        {
+                          value = input;
+                          source = M.empty_find_empty;
+                          predicate =
+                            (fun
+                               ((M.Empty_find_empty_input { k }) :
+                                  M.empty_find_empty_input)
+                               ->
+                               (Laws_gen_Stdlib.Option.is_none
+                                  (I.find I.empty k) : bool));
+                          text = "Option.is_none (find empty k)"
+                        }))))
+    let lex_refl ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.lex),
+          (fun ((module M)  : (module Lex_choices)) ->
+             let module I = ((Laws_gen_Scopes.Lex)(M.A))(M.B) in
+               Law.Bind
+                 ((Law.Choose M.refl),
+                   (fun input ->
+                      Law.Assertion
+                        {
+                          value = input;
+                          source = M.refl;
+                          predicate =
+                            (fun ((M.Refl_input { p }) : M.refl_input) ->
+                               (Laws_gen_Stdlib.(=) (I.compare p p) 0 : 
+                               bool));
+                          text = "(compare p p) = 0"
+                        }))))
+    let order_max_max_comm ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.order_max),
+          (fun ((module M)  : (module Order_max_choices)) ->
+             let module I = (Laws_gen_Scopes.Order.Max)(M.X) in
+               Law.Bind
+                 ((Law.Choose M.max_comm),
+                   (fun input ->
+                      Law.Assertion
+                        {
+                          value = input;
+                          source = M.max_comm;
+                          predicate =
+                            (fun
+                               ((M.Max_comm_input { a; b }) :
+                                  M.max_comm_input)
+                               ->
+                               (Laws_gen_Stdlib.(=)
+                                  (M.X.compare (I.max a b) (I.max b a)) 0 : 
+                               bool));
+                          text = "(X.compare (max a b) (max b a)) = 0"
+                        }))))
+    let order_max_pair_pair_refl ((module C)  : (module Choices))  :
+      unit Law.t =
+      Law.Bind
+        ((Law.Choose C.order_max),
+          (fun ((module M)  : (module Order_max_choices)) ->
+             let module I = (Laws_gen_Scopes.Order.Max)(M.X) in
+               Law.Bind
+                 ((Law.Choose M.pair),
+                   (fun ((module M1)  : (module M.Pair_choices)) ->
+                      let module I1 = (I.Pair)(M1.Y) in
+                        Law.Bind
+                          ((Law.Choose M1.pair_refl),
+                            (fun input ->
+                               Law.Assertion
+                                 {
+                                   value = input;
+                                   source = M1.pair_refl;
+                                   predicate =
+                                     (fun
+                                        ((M1.Pair_refl_input { a; b }) :
+                                           M1.pair_refl_input)
+                                        ->
+                                        (Laws_gen_Stdlib.(&&)
+                                           (Laws_gen_Stdlib.(=)
+                                              (M.X.compare (I.max a a) a) 0)
+                                           (M1.Y.equal b b) : bool));
+                                   text =
+                                     "((X.compare (max a a) a) = 0) && (Y.equal b b)"
+                                 }))))))
+    let idem_idem ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.idem_idem),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.idem_idem;
+                 predicate =
+                   (fun ((Idem_idem_input { x }) : idem_idem_input) ->
+                      (Laws_gen_Stdlib.(=)
+                         (Laws_gen_Scopes.Idem.f (Laws_gen_Scopes.Idem.f x))
+                         (Laws_gen_Scopes.Idem.f x) : bool));
+                 text = "(f (f x)) = (f x)"
+               }))
+    let p_h_pos ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.p_h_pos),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.p_h_pos;
+                 predicate =
+                   (fun ((P_h_pos_input { x }) : p_h_pos_input) ->
+                      (Laws_gen_Stdlib.(>=) (Laws_gen_Scopes.P.h x) 0 : 
+                      bool));
+                 text = "(h x) >= 0"
+               }))
+    let q_idem ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.q_idem),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.q_idem;
+                 predicate =
+                   (fun ((Q_idem_input { x }) : q_idem_input) ->
+                      (Laws_gen_Stdlib.(=)
+                         (Laws_gen_Scopes.Q.f (Laws_gen_Scopes.Q.f x))
+                         (Laws_gen_Scopes.Q.f x) : bool));
+                 text = "(f (f x)) = (f x)"
+               }))
+    let twice_g_idem ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.twice),
+          (fun ((module M)  : (module Twice_choices)) ->
+             let module I = (Laws_gen_Scopes.Twice)(M.X) in
+               Law.Bind
+                 ((Law.Choose M.g_idem),
+                   (fun input ->
+                      Law.Assertion
+                        {
+                          value = input;
+                          source = M.g_idem;
+                          predicate =
+                            (fun ((M.G_idem_input { x }) : M.g_idem_input) ->
+                               (Laws_gen_Stdlib.(=) (I.g (I.g x)) (I.g x) : 
+                               bool));
+                          text = "(g (g x)) = (g x)"
+                        }))))
+    let outer_inner_mk_ok ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.outer),
+          (fun ((module M)  : (module Outer_choices)) ->
+             let module I = (Laws_gen_Scopes.Outer)(M.X) in
+               Law.Bind
+                 ((Law.Choose M.inner),
+                   (fun ((module M1)  : (module M.Inner_choices)) ->
+                      let module I1 = (I.Inner)(M1.X_1) in
+                        Law.Bind
+                          ((Law.Choose M1.mk_ok),
+                            (fun input ->
+                               Law.Assertion
+                                 {
+                                   value = input;
+                                   source = M1.mk_ok;
+                                   predicate =
+                                     (fun
+                                        ((M1.Mk_ok_input { x }) :
+                                           M1.mk_ok_input)
+                                        ->
+                                        (Laws_gen_Stdlib.(=) (I1.mk x)
+                                           (I1.mk x) : bool));
+                                   text = "(mk x) = (mk x)"
+                                 }))))))
+    let laws choices =
+      {
+        n_double_add = (n_double_add choices);
+        map_find_elem = (map_find_elem choices);
+        map_set_elem = (map_set_elem choices);
+        map_empty_find_empty = (map_empty_find_empty choices);
+        lex_refl = (lex_refl choices);
+        order_max_max_comm = (order_max_max_comm choices);
+        order_max_pair_pair_refl = (order_max_pair_pair_refl choices);
+        idem_idem = (idem_idem choices);
+        p_h_pos = (p_h_pos choices);
+        q_idem = (q_idem choices);
+        twice_g_idem = (twice_g_idem choices);
+        outer_inner_mk_ok = (outer_inner_mk_ok choices)
+      }
+  end

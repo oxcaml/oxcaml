@@ -1,0 +1,7 @@
+unzip_zip                passed 4, discarded 12
+zip_unzip                passed 4, discarded 0
+init_length              passed 3, discarded 1
+length_nonneg            passed 5, discarded 0
+trivial                  passed 1, discarded 0
+init_length              FAILED: (length (init n ~f)) = n raised Failure("boom")
+  counterexample: 7

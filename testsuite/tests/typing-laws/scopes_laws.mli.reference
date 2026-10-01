@@ -1,0 +1,123 @@
+module Laws_gen_Scopes = Scopes
+module Laws_gen_Stdlib = Stdlib
+type 'a each =
+  {
+  n_double_add: 'a ;
+  map_find_elem: 'a ;
+  map_set_elem: 'a ;
+  map_empty_find_empty: 'a ;
+  lex_refl: 'a ;
+  order_max_max_comm: 'a ;
+  order_max_pair_pair_refl: 'a ;
+  idem_idem: 'a ;
+  p_h_pos: 'a ;
+  q_idem: 'a ;
+  twice_g_idem: 'a ;
+  outer_inner_mk_ok: 'a }
+val names : string each
+val map : 'a each -> f:('a -> 'b) -> 'b each
+val to_list : 'a each -> 'a list
+type n_double_add_input =
+  | N_double_add_input: {
+  x: int } -> n_double_add_input 
+type idem_idem_input =
+  | Idem_idem_input: {
+  x: int } -> idem_idem_input 
+type p_h_pos_input =
+  | P_h_pos_input: {
+  x: int } -> p_h_pos_input 
+type q_idem_input =
+  | Q_idem_input: {
+  x: Laws_gen_Scopes.Q.t } -> q_idem_input 
+module Instantiate :
+(Choice : CamlinternalLaw.Choice) ->
+  sig
+    module Law : sig type 'a t = 'a CamlinternalLaw.Make(Choice).t end
+    module type Map_choices  =
+      sig
+        module Key : Laws_gen_Scopes.Comparable
+        type find_elem_input =
+          | Find_elem_input: ('a : value) .
+          {
+          k: Key.t ;
+          m: 'a Laws_gen_Scopes.Map(Key).t } -> find_elem_input 
+        type set_elem_input =
+          | Set_elem_input: ('a : value) .
+          {
+          k: Key.t ;
+          v: 'a ;
+          m: 'a Laws_gen_Scopes.Map(Key).t } -> set_elem_input 
+        type empty_find_empty_input =
+          | Empty_find_empty_input: {
+          k: Key.t } -> empty_find_empty_input 
+        val find_elem : find_elem_input Choice.t
+        val set_elem : set_elem_input Choice.t
+        val empty_find_empty : empty_find_empty_input Choice.t
+      end
+    module type Lex_choices  =
+      sig
+        module A : Laws_gen_Scopes.Comparable
+        module B : Laws_gen_Scopes.Comparable
+        type refl_input =
+          | Refl_input: {
+          p: (A.t * B.t) } -> refl_input 
+        val refl : refl_input Choice.t
+      end
+    module type Order_max_choices  =
+      sig
+        module X : Laws_gen_Scopes.Comparable
+        type max_comm_input =
+          | Max_comm_input: {
+          a: X.t ;
+          b: X.t } -> max_comm_input 
+        module type Pair_choices  =
+          sig
+            module Y : sig type t val equal : t -> t -> bool end
+            type pair_refl_input =
+              | Pair_refl_input: {
+              a: X.t ;
+              b: Y.t } -> pair_refl_input 
+            val pair_refl : pair_refl_input Choice.t
+          end
+        val max_comm : max_comm_input Choice.t
+        val pair : (module Pair_choices) Choice.t
+      end
+    module type Twice_choices  =
+      sig
+        module X :
+        sig
+          val f : int -> int
+          law? idem (x : int) : Laws_gen_Stdlib.(=) (f (f x)) (f x)
+        end
+        type g_idem_input =
+          | G_idem_input: {
+          x: int } -> g_idem_input 
+        val g_idem : g_idem_input Choice.t
+      end
+    module type Outer_choices  =
+      sig
+        module X : Laws_gen_Scopes.Comparable
+        module type Inner_choices  =
+          sig
+            module X_1 : Laws_gen_Scopes.Comparable
+            type mk_ok_input =
+              | Mk_ok_input: {
+              x: X_1.t } -> mk_ok_input 
+            val mk_ok : mk_ok_input Choice.t
+          end
+        val inner : (module Inner_choices) Choice.t
+      end
+    module type Choices  =
+      sig
+        val n_double_add : n_double_add_input Choice.t
+        val map : (module Map_choices) Choice.t
+        val lex : (module Lex_choices) Choice.t
+        val order_max : (module Order_max_choices) Choice.t
+        val idem_idem : idem_idem_input Choice.t
+        val p_h_pos : p_h_pos_input Choice.t
+        val q_idem : q_idem_input Choice.t
+        val twice : (module Twice_choices) Choice.t
+        val outer : (module Outer_choices) Choice.t
+      end
+    val laws : (module Choices) -> unit Law.t each
+  end

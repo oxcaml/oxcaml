@@ -1,0 +1,443 @@
+[@@@ocaml.warning "-27"]
+module Laws_gen_CamlinternalFormatBasics = CamlinternalFormatBasics
+module Laws_gen_Shapes = Shapes
+module Laws_gen_Stdlib = Stdlib
+type 'a each =
+  {
+  area_nonneg: 'a ;
+  rect: 'a ;
+  origin_x: 'a ;
+  bad: 'a ;
+  poly: 'a ;
+  variant: 'a ;
+  disamb: 'a ;
+  optional: 'a ;
+  modes: 'a ;
+  fmt: 'a ;
+  fake_format: 'a ;
+  optional_none: 'a ;
+  unboxed: 'a ;
+  \#type: 'a ;
+  inferred: 'a }
+let names =
+  {
+    area_nonneg = "area_nonneg";
+    rect = "rect";
+    origin_x = "origin_x";
+    bad = "bad";
+    poly = "poly";
+    variant = "variant";
+    disamb = "disamb";
+    optional = "optional";
+    modes = "modes";
+    fmt = "fmt";
+    fake_format = "fake_format";
+    optional_none = "optional_none";
+    unboxed = "unboxed";
+    \#type = "type";
+    inferred = "inferred"
+  }
+let map
+  { area_nonneg; rect; origin_x; bad; poly; variant; disamb; optional; 
+    modes; fmt; fake_format; optional_none; unboxed; \#type; inferred }
+  ~f =
+  {
+    area_nonneg = (f area_nonneg);
+    rect = (f rect);
+    origin_x = (f origin_x);
+    bad = (f bad);
+    poly = (f poly);
+    variant = (f variant);
+    disamb = (f disamb);
+    optional = (f optional);
+    modes = (f modes);
+    fmt = (f fmt);
+    fake_format = (f fake_format);
+    optional_none = (f optional_none);
+    unboxed = (f unboxed);
+    \#type = (f \#type);
+    inferred = (f inferred)
+  }
+let to_list
+  { area_nonneg; rect; origin_x; bad; poly; variant; disamb; optional; 
+    modes; fmt; fake_format; optional_none; unboxed; \#type; inferred }
+  =
+  [area_nonneg;
+  rect;
+  origin_x;
+  bad;
+  poly;
+  variant;
+  disamb;
+  optional;
+  modes;
+  fmt;
+  fake_format;
+  optional_none;
+  unboxed;
+  \#type;
+  inferred]
+type area_nonneg_input =
+  | Area_nonneg_input: {
+  s: Laws_gen_Shapes.t } -> area_nonneg_input 
+type rect_input =
+  | Rect_input: {
+  w: float ;
+  h: float } -> rect_input 
+type origin_x_input =
+  | Origin_x_input: {
+  p: Laws_gen_Shapes.point } -> origin_x_input 
+type bad_input =
+  | Bad_input: {
+  s: string } -> bad_input 
+type poly_input =
+  | Poly_input: ('a : value_or_null) ('b : value_or_null) .
+  {
+  xs: 'a list ;
+  f: 'a -> 'b } -> poly_input 
+type variant_input =
+  | Variant_input: {
+  v: [ `A  | `B of int ] } -> variant_input 
+type disamb_input =
+  | Disamb_input: {
+  c: Laws_gen_Shapes.t } -> disamb_input 
+type optional_input =
+  | Optional_input: {
+  f: ?y:int -> x:int -> unit -> int } -> optional_input 
+type modes_input =
+  | Modes_input: {
+  g: int @ local -> int } -> modes_input 
+type fmt_input =
+  | Fmt_input: {
+  n: int } -> fmt_input 
+type fake_format_input =
+  | Fake_format_input: fake_format_input 
+type optional_none_input =
+  | Optional_none_input: optional_none_input 
+type unboxed_input =
+  | Unboxed_input: {
+  x: float# } -> unboxed_input 
+type type_input =
+  | Type_input: {
+  \#method: int } -> type_input 
+type inferred_input =
+  | Inferred_input: {
+  x: int ;
+  y: int } -> inferred_input 
+module Instantiate(Choice:CamlinternalLaw.Choice) =
+  struct
+    module Law = (CamlinternalLaw.Make)(Choice)
+    module type Choices  =
+      sig
+        val area_nonneg : area_nonneg_input Choice.t
+        val rect : rect_input Choice.t
+        val origin_x : origin_x_input Choice.t
+        val bad : bad_input Choice.t
+        val poly : poly_input Choice.t
+        val variant : variant_input Choice.t
+        val disamb : disamb_input Choice.t
+        val optional : optional_input Choice.t
+        val modes : modes_input Choice.t
+        val fmt : fmt_input Choice.t
+        val fake_format : fake_format_input Choice.t
+        val optional_none : optional_none_input Choice.t
+        val unboxed : unboxed_input Choice.t
+        val \#type : type_input Choice.t
+        val inferred : inferred_input Choice.t
+      end
+    let area_nonneg ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.area_nonneg),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.area_nonneg;
+                 predicate =
+                   (fun ((Area_nonneg_input { s }) : area_nonneg_input) ->
+                      (Laws_gen_Stdlib.(>=) (Laws_gen_Shapes.area s) 0. : 
+                      bool));
+                 text = "(area s) >= 0."
+               }))
+    let rect ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.rect),
+          (fun input ->
+             Law.Bind
+               ((Law.Assumption
+                   {
+                     value = input;
+                     source = C.rect;
+                     predicate =
+                       (fun ((Rect_input { w; h }) : rect_input) ->
+                          (Laws_gen_Stdlib.(>=) w 0. : bool));
+                     text = "w >= 0."
+                   }),
+                 (fun () ->
+                    Law.Bind
+                      ((Law.Assumption
+                          {
+                            value = input;
+                            source = C.rect;
+                            predicate =
+                              (fun ((Rect_input { w; h }) : rect_input) ->
+                                 (Laws_gen_Stdlib.(>=) h 0. : bool));
+                            text = "h >= 0."
+                          }),
+                        (fun () ->
+                           Law.Assertion
+                             {
+                               value = input;
+                               source = C.rect;
+                               predicate =
+                                 (fun ((Rect_input { w; h }) : rect_input) ->
+                                    (Laws_gen_Stdlib.(=)
+                                       (Laws_gen_Shapes.area
+                                          (Laws_gen_Shapes.Rect { w; h } : 
+                                          Laws_gen_Shapes.t))
+                                       (Laws_gen_Stdlib.( *. ) w h) : 
+                                    bool));
+                               text = "(area (Rect { w; h })) = (w *. h)"
+                             }))))))
+    let origin_x ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.origin_x),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.origin_x;
+                 predicate =
+                   (fun ((Origin_x_input { p }) : origin_x_input) ->
+                      (Laws_gen_Stdlib.(=)
+                         ({ p with Laws_gen_Shapes.x = 0. } : Laws_gen_Shapes.point).Laws_gen_Shapes.x
+                         (Laws_gen_Shapes.origin : Laws_gen_Shapes.point).Laws_gen_Shapes.x : 
+                      bool));
+                 text = "{ p with x = 0. }.x = origin.x"
+               }))
+    let bad ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.bad),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.bad;
+                 predicate =
+                   (fun ((Bad_input { s }) : bad_input) ->
+                      (Laws_gen_Stdlib.(||)
+                         (try Laws_gen_Shapes.fail s
+                          with
+                          | Laws_gen_Shapes.Bad s' ->
+                              Laws_gen_Stdlib.(=) s s')
+                         (Laws_gen_Stdlib.(=) Laws_gen_Shapes.Sub.k 1) : 
+                      bool));
+                 text = "(try fail s with | Bad s' -> s = s') || (Sub.k = 1)"
+               }))
+    let poly ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.poly),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.poly;
+                 predicate =
+                   (fun ((Poly_input { xs; f }) : poly_input) ->
+                      (Laws_gen_Stdlib.(=)
+                         (Laws_gen_Stdlib.List.length
+                            (Laws_gen_Stdlib.List.map f xs))
+                         (Laws_gen_Stdlib.List.length xs) : bool));
+                 text = "(List.length (List.map f xs)) = (List.length xs)"
+               }))
+    let variant ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.variant),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.variant;
+                 predicate =
+                   (fun ((Variant_input { v }) : variant_input) ->
+                      (match v with
+                       | `A -> true
+                       | `B n -> Laws_gen_Stdlib.(=) n n : bool));
+                 text = "match v with | `A -> true | `B n -> n = n"
+               }))
+    let disamb ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.disamb),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.disamb;
+                 predicate =
+                   (fun ((Disamb_input { c }) : disamb_input) ->
+                      (Laws_gen_Stdlib.(||)
+                         (Laws_gen_Stdlib.(=)
+                            (Laws_gen_Shapes.Circle 1. : Laws_gen_Shapes.t) c)
+                         (Laws_gen_Stdlib.(=)
+                            (Laws_gen_Shapes.Sub.U : Laws_gen_Shapes.Sub.u)
+                            (Laws_gen_Shapes.Sub.U : Laws_gen_Shapes.Sub.u)) : 
+                      bool));
+                 text = "((Circle 1.) = c) || (Sub.U = Sub.U)"
+               }))
+    let optional ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.optional),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.optional;
+                 predicate =
+                   (fun ((Optional_input { f }) : optional_input) ->
+                      (Laws_gen_Stdlib.(&&)
+                         (Laws_gen_Stdlib.(=) (f ?y:None ~x:1 ())
+                            (Laws_gen_Shapes.opt ?y:None ~x:1 ()))
+                         (Laws_gen_Stdlib.(=) (f ?y:(Some 2) ~x:1 ())
+                            (Laws_gen_Shapes.opt ?y:(Some 2) ~x:1 ())) : 
+                      bool));
+                 text =
+                   "((f ?y:None ~x:1 ()) = (opt ?y:None ~x:1 ())) && ((f ?y:(Some 2) ~x:1 ()) = (opt ?y:(Some 2) ~x:1 ()))"
+               }))
+    let modes ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.modes),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.modes;
+                 predicate =
+                   (fun ((Modes_input { g }) : modes_input) ->
+                      (Laws_gen_Stdlib.(=) (Laws_gen_Shapes.apply g)
+                         (Laws_gen_Shapes.apply g) : bool));
+                 text = "(apply g) = (apply g)"
+               }))
+    let fmt ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.fmt),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.fmt;
+                 predicate =
+                   (fun ((Fmt_input { n }) : fmt_input) ->
+                      (Laws_gen_Stdlib.(=)
+                         (Laws_gen_Stdlib.Printf.sprintf
+                            (Laws_gen_CamlinternalFormatBasics.Format
+                               ((Laws_gen_CamlinternalFormatBasics.Int
+                                   ((Laws_gen_CamlinternalFormatBasics.Int_d : 
+                                     Laws_gen_CamlinternalFormatBasics.int_conv),
+                                     (Laws_gen_CamlinternalFormatBasics.No_padding : 
+                                     (_, _)
+                                       Laws_gen_CamlinternalFormatBasics.padding),
+                                     (Laws_gen_CamlinternalFormatBasics.No_precision : 
+                                     (_, _)
+                                       Laws_gen_CamlinternalFormatBasics.precision),
+                                     (Laws_gen_CamlinternalFormatBasics.End_of_format : 
+                                     (_, _, _, _, _, _)
+                                       Laws_gen_CamlinternalFormatBasics.fmt)) : 
+                                 (_, _, _, _, _, _)
+                                   Laws_gen_CamlinternalFormatBasics.fmt),
+                                 "%d") : (_, _, _) Laws_gen_Stdlib.format) n)
+                         (Laws_gen_Stdlib.string_of_int n) : bool));
+                 text =
+                   "(Printf.sprintf (CamlinternalFormatBasics.Format ((CamlinternalFormatBasics.Int (CamlinternalFormatBasics.Int_d, CamlinternalFormatBasics.No_padding, CamlinternalFormatBasics.No_precision, CamlinternalFormatBasics.End_of_format)), \"%d\")) n) = (string_of_int n)"
+               }))
+    let fake_format ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.fake_format),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.fake_format;
+                 predicate =
+                   (fun ((Fake_format_input) : fake_format_input) ->
+                      (Laws_gen_Stdlib.(<>)
+                         (Laws_gen_Shapes.Format (1, "hello") : Laws_gen_Shapes.format6)
+                         (Laws_gen_Shapes.Format (2, "hello") : Laws_gen_Shapes.format6) : 
+                      bool));
+                 text = "(Format (1, \"hello\")) <> (Format (2, \"hello\"))"
+               }))
+    let optional_none ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.optional_none),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.optional_none;
+                 predicate =
+                   (fun ((Optional_none_input) : optional_none_input) ->
+                      (let pair = ((Laws_gen_Shapes.opt ?y:None), ()) in
+                       Laws_gen_Stdlib.(=) (Laws_gen_Stdlib.fst pair ~x:1 ())
+                         (Laws_gen_Shapes.opt ?y:None ~x:1 ()) : bool));
+                 text =
+                   "let pair = ((opt ?y:None), ()) in (fst pair ~x:1 ()) = (opt ?y:None ~x:1 ())"
+               }))
+    let unboxed ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.unboxed),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.unboxed;
+                 predicate =
+                   (fun ((Unboxed_input { x }) : unboxed_input) ->
+                      (Laws_gen_Stdlib.(=) (Laws_gen_Shapes.of_unboxed x)
+                         (Laws_gen_Shapes.of_unboxed x) : bool));
+                 text = "(of_unboxed x) = (of_unboxed x)"
+               }))
+    let \#type ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.\#type),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.\#type;
+                 predicate =
+                   (fun ((Type_input { \#method }) : type_input) ->
+                      (Laws_gen_Stdlib.(=) \#method \#method : bool));
+                 text = "\\#method = \\#method"
+               }))
+    let inferred ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.inferred),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.inferred;
+                 predicate =
+                   (fun ((Inferred_input { x; y }) : inferred_input) ->
+                      (Laws_gen_Stdlib.(=) (Laws_gen_Stdlib.(+) x y)
+                         (Laws_gen_Stdlib.(+) y x) : bool));
+                 text = "(x + y) = (y + x)"
+               }))
+    let laws choices =
+      {
+        area_nonneg = (area_nonneg choices);
+        rect = (rect choices);
+        origin_x = (origin_x choices);
+        bad = (bad choices);
+        poly = (poly choices);
+        variant = (variant choices);
+        disamb = (disamb choices);
+        optional = (optional choices);
+        modes = (modes choices);
+        fmt = (fmt choices);
+        fake_format = (fake_format choices);
+        optional_none = (optional_none choices);
+        unboxed = (unboxed choices);
+        \#type = (\#type choices);
+        inferred = (inferred choices)
+      }
+  end

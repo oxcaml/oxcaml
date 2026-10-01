@@ -1,0 +1,11 @@
+type 'a each = unit
+val names : string each
+val map : 'a each -> f:('a -> 'b) -> 'b each
+val to_list : 'a each -> 'a list
+module Instantiate :
+(Choice : CamlinternalLaw.Choice) ->
+  sig
+    module Law : sig type 'a t = 'a CamlinternalLaw.Make(Choice).t end
+    module type Choices  = sig  end
+    val laws : (module Choices) -> unit Law.t each
+  end

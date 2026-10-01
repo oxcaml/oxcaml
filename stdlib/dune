@@ -94,6 +94,8 @@
   camlinternalFormat.mli
   camlinternalFormatBasics.ml
   camlinternalFormatBasics.mli
+  camlinternalLaw.ml
+  camlinternalLaw.mli
   camlinternalLazy.ml
   camlinternalLazy.mli
   camlinternalMod.ml
@@ -563,6 +565,7 @@
   .stdlib.objs/byte/camlinternalComprehension.cmi
   .stdlib.objs/byte/camlinternalMod.cmi
   .stdlib.objs/byte/camlinternalFormatBasics.cmi
+  .stdlib.objs/byte/camlinternalLaw.cmi
   .stdlib.objs/byte/camlinternalLazy.cmi
   .stdlib.objs/byte/camlinternalOO.cmi
   .stdlib.objs/byte/camlinternalFormat.cmi
@@ -571,6 +574,7 @@
   .stdlib.objs/byte/camlinternalComprehension.cms
   .stdlib.objs/byte/camlinternalMod.cms
   .stdlib.objs/byte/camlinternalFormatBasics.cms
+  .stdlib.objs/byte/camlinternalLaw.cms
   .stdlib.objs/byte/camlinternalLazy.cms
   .stdlib.objs/byte/camlinternalOO.cms
   .stdlib.objs/byte/camlinternalFormat.cms
@@ -579,6 +583,7 @@
   .stdlib.objs/byte/camlinternalComprehension.cmsi
   .stdlib.objs/byte/camlinternalMod.cmsi
   .stdlib.objs/byte/camlinternalFormatBasics.cmsi
+  .stdlib.objs/byte/camlinternalLaw.cmsi
   .stdlib.objs/byte/camlinternalLazy.cmsi
   .stdlib.objs/byte/camlinternalOO.cmsi
   .stdlib.objs/byte/camlinternalFormat.cmsi
@@ -587,6 +592,7 @@
   .stdlib.objs/byte/camlinternalComprehension.cmt
   .stdlib.objs/byte/camlinternalMod.cmt
   .stdlib.objs/byte/camlinternalFormatBasics.cmt
+  .stdlib.objs/byte/camlinternalLaw.cmt
   .stdlib.objs/byte/camlinternalLazy.cmt
   .stdlib.objs/byte/camlinternalOO.cmt
   .stdlib.objs/byte/camlinternalFormat.cmt
@@ -595,6 +601,7 @@
   .stdlib.objs/byte/camlinternalComprehension.cmti
   .stdlib.objs/byte/camlinternalMod.cmti
   .stdlib.objs/byte/camlinternalFormatBasics.cmti
+  .stdlib.objs/byte/camlinternalLaw.cmti
   .stdlib.objs/byte/camlinternalLazy.cmti
   .stdlib.objs/byte/camlinternalOO.cmti
   .stdlib.objs/byte/camlinternalFormat.cmti
@@ -603,6 +610,7 @@
   .stdlib.objs/native/camlinternalComprehension.cmx
   .stdlib.objs/native/camlinternalMod.cmx
   .stdlib.objs/native/camlinternalFormatBasics.cmx
+  .stdlib.objs/native/camlinternalLaw.cmx
   .stdlib.objs/native/camlinternalLazy.cmx
   .stdlib.objs/native/camlinternalOO.cmx
   .stdlib.objs/native/camlinternalFormat.cmx

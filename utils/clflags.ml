@@ -75,6 +75,8 @@ type visible_include =
     cmx_guaranteed : bool;
   }
 
+type laws_file = Laws_implementation | Laws_interface
+
 let compile_only = ref false            (* -c *)
 and output_name = ref (None : string option) (* -o *)
 and include_dirs = ref ([] : visible_include list)  (* -I, -Ix *)
@@ -85,6 +87,8 @@ and no_std_include = ref false          (* -nostdlib *)
 and no_cwd = ref false                  (* -nocwd *)
 and print_types = ref false             (* -i *)
 and print_variance = ref false          (* -i-variance *)
+and generate_laws = ref (None : laws_file option)
+                         (* -generate-laws-implementation, -interface *)
 and make_archive = ref false            (* -a *)
 and debug = ref false                   (* -g *)
 and debug_ocamldebug_types = ref true   (* -gno-ocamldebug-types *)

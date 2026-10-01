@@ -1,0 +1,22 @@
+module Laws_gen_Capture_parameter = Capture_parameter
+module Laws_gen_Captured = Captured
+type 'a each = {
+  f_l: 'a }
+val names : string each
+val map : 'a each -> f:('a -> 'b) -> 'b each
+val to_list : 'a each -> 'a list
+module Instantiate :
+(Choice : CamlinternalLaw.Choice) ->
+  sig
+    module Law : sig type 'a t = 'a CamlinternalLaw.Make(Choice).t end
+    module type F_choices  =
+      sig
+        module Captured : sig  end
+        module X : sig law? l : Laws_gen_Captured.p end
+        type l_input =
+          | L_input: l_input 
+        val l : l_input Choice.t
+      end
+    module type Choices  = sig val f : (module F_choices) Choice.t end
+    val laws : (module Choices) -> unit Law.t each
+  end

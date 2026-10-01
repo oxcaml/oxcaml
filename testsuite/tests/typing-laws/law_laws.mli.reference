@@ -1,0 +1,17 @@
+module Laws_gen_Law = Law
+module Laws_gen_Stdlib = Stdlib
+type 'a each = {
+  identity: 'a }
+val names : string each
+val map : 'a each -> f:('a -> 'b) -> 'b each
+val to_list : 'a each -> 'a list
+type identity_input =
+  | Identity_input: {
+  x: int } -> identity_input 
+module Instantiate :
+(Choice : CamlinternalLaw.Choice) ->
+  sig
+    module Law : sig type 'a t = 'a CamlinternalLaw.Make(Choice).t end
+    module type Choices  = sig val identity : identity_input Choice.t end
+    val laws : (module Choices) -> unit Law.t each
+  end

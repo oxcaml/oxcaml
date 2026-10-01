@@ -187,6 +187,17 @@ let mk_i f =
 let mk_i_variance f =
   "-i-variance", Arg.Unit f, " Print inferred variances"
 
+let mk_generate_laws_implementation f =
+  "-generate-laws-implementation", Arg.Unit f,
+  " Generate the implementation of the laws file of the given\
+  \n     compiled interface (.cmi), to the file given by -o, or standard\
+  \n     output"
+
+let mk_generate_laws_interface f =
+  "-generate-laws-interface", Arg.Unit f,
+  " Generate the interface of the laws file of the given compiled\
+  \n     interface (.cmi), to the file given by -o, or standard output"
+
 let mk_I f =
   "-I", Arg.String f, "<dir>  Add <dir> to the list of include directories"
 
@@ -1285,6 +1296,8 @@ module type Compiler_options = sig
   val _stop_after : string -> unit
   val _i : unit -> unit
   val _i_variance : unit -> unit
+  val _generate_laws_implementation : unit -> unit
+  val _generate_laws_interface : unit -> unit
   val _impl : string -> unit
   val _instantiate : unit -> unit
   val _functorize : unit -> unit
@@ -1557,6 +1570,8 @@ struct
     mk_stop_after ~native:false F._stop_after;
     mk_i F._i;
     mk_i_variance F._i_variance;
+    mk_generate_laws_implementation F._generate_laws_implementation;
+    mk_generate_laws_interface F._generate_laws_interface;
     mk_I F._I;
     mk_Ix F._Ix;
     mk_H F._H;
@@ -1838,6 +1853,8 @@ struct
     mk_no_probes_optimized F._no_probes_optimized;
     mk_i F._i;
     mk_i_variance F._i_variance;
+    mk_generate_laws_implementation F._generate_laws_implementation;
+    mk_generate_laws_interface F._generate_laws_interface;
     mk_I F._I;
     mk_Ix F._Ix;
     mk_H F._H;
@@ -2189,6 +2206,8 @@ struct
     mk_no_g F._no_g;
     mk_stop_after ~native:false F._stop_after;
     mk_i F._i;
+    mk_generate_laws_implementation F._generate_laws_implementation;
+    mk_generate_laws_interface F._generate_laws_interface;
     mk_I F._I;
     mk_Ix F._Ix;
     mk_H F._H;
@@ -2678,6 +2697,15 @@ module Default = struct
     let _g = set debug
     let _no_g = clear debug
     let _i = set print_types
+    let generate_laws file () =
+      match !generate_laws with
+      | Some file' when file' <> file ->
+          Compenv.fatal
+            "Options -generate-laws-implementation and \
+             -generate-laws-interface are incompatible"
+      | Some _ | None -> generate_laws := Some file; compile_only := true
+    let _generate_laws_implementation = generate_laws Laws_implementation
+    let _generate_laws_interface = generate_laws Laws_interface
     let _impl = Compenv.impl
     let _instantiate = set instantiate
     let _functorize = set functorize

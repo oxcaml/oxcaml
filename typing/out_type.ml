@@ -3941,6 +3941,24 @@ let tree_of_law_params params =
           kinds, (x, ty))
        kinds params)
 
+(* For the generated code of the laws file: the parameters with every type
+   variable and its full kind, nullability included *)
+let tree_of_law_quantification params =
+  let tys = List.map snd params in
+  prepare_for_printing tys;
+  let params =
+    List.map (fun (x, ty) -> (Ident.name x, tree_of_typexp Type_scheme ty))
+      params
+  in
+  let vars =
+    List.map
+      (fun (v, jkind) ->
+         (Variable_names.name_of_type Variable_names.new_name v,
+          out_jkind_of_jkind !printing_env jkind))
+      (extract_qtvs tys)
+  in
+  vars, params
+
 let tree_of_law_description id decl =
   let olaw_params = tree_of_law_params decl.law_params in
   Osig_law
