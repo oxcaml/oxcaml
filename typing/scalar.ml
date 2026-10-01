@@ -413,14 +413,16 @@ module Operation = struct
         | Succ  (** add 1 *)
         | Pred  (** subtract 1 *)
         | Bswap
+        | Not
 
-      let all = [Neg; Succ; Pred; Bswap]
+      let all = [Neg; Succ; Pred; Bswap; Not]
 
       let to_string = function
         | Neg -> "neg"
         | Succ -> "succ"
         | Pred -> "pred"
         | Bswap -> "bswap"
+        | Not -> "not"
     end
 
     module Float_op = struct
@@ -434,7 +436,7 @@ module Operation = struct
     end
 
     type nonrec 'mode t =
-      (* CR jvanburen: logical Not, int Abs, float bitcast *)
+      (* CR jvanburen: int Abs, float bitcast *)
       | Integral of 'mode Integral.t * Int_op.t
       | Floating of 'mode Floating.t * Float_op.t
       | Static_cast of
@@ -459,7 +461,7 @@ module Operation = struct
       | Static_cast { src; dst } -> Static_cast { src; dst = map dst ~f }
 
     let info = function
-      | Integral (size, (Neg | Bswap | Succ | Pred)) ->
+      | Integral (size, (Neg | Bswap | Succ | Pred | Not)) ->
         { result = integral size; can_raise = false }
       | Floating (size, (Neg | Abs)) ->
         { result = floating size; can_raise = false }
