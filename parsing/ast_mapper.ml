@@ -60,6 +60,7 @@ type mapper = {
   jkind_annotation: mapper -> jkind_annotation -> jkind_annotation;
   jkind_declaration: mapper -> jkind_declaration -> jkind_declaration;
   label_declaration: mapper -> label_declaration -> label_declaration;
+  law_declaration: mapper -> law_declaration -> law_declaration;
   location: mapper -> Location.t -> Location.t;
   module_binding: mapper -> module_binding -> module_binding;
   module_declaration: mapper -> module_declaration -> module_declaration;
@@ -435,6 +436,7 @@ module MT = struct
         extension ~loc ~attrs (sub.extension sub x)
     | Psig_attribute x -> attribute ~loc (sub.attribute sub x)
     | Psig_jkind x -> jkind ~loc (sub.jkind_declaration sub x)
+    | Psig_law x -> law ~loc (sub.law_declaration sub x)
 end
 
 
@@ -490,6 +492,7 @@ module M = struct
         extension ~loc ~attrs (sub.extension sub x)
     | Pstr_attribute x -> attribute ~loc (sub.attribute sub x)
     | Pstr_jkind x -> jkind ~loc (sub.jkind_declaration sub x)
+    | Pstr_law x -> law ~loc (sub.law_declaration sub x)
 end
 
 module E = struct
@@ -1038,6 +1041,23 @@ let default_mapper =
          let pjkind_attributes = this.attributes this pjkind_attributes in
          let pjkind_loc = this.location this pjkind_loc in
          { pjkind_name; pjkind_manifest; pjkind_attributes; pjkind_loc });
+
+    law_declaration =
+      (fun this { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
+                  plaw_attributes; plaw_loc } ->
+         let plaw_name = map_loc this plaw_name in
+         let plaw_params =
+           List.map
+             (fun (name, ty) ->
+                (map_loc this name, Option.map (this.typ this) ty))
+             plaw_params
+         in
+         let plaw_assumptions = List.map (this.expr this) plaw_assumptions in
+         let plaw_conclusion = this.expr this plaw_conclusion in
+         let plaw_attributes = this.attributes this plaw_attributes in
+         let plaw_loc = this.location this plaw_loc in
+         { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
+           plaw_attributes; plaw_loc });
 
     modes = (fun this m ->
       List.map (map_loc this) m);
