@@ -72,6 +72,26 @@ let class_of_operation (op : Operation.t)
   | Begin_region | End_region | Poll | Dls_get | Tls_get | Domain_index
     -> Use_default
 
-let is_cheap_operation _op
+(* An integer constant that fits in 32 bits, sign- or zero-extended, is
+   loaded with a single instruction of at most 7 bytes (see [Const_int] in
+   [Emit]). Wider constants need a 10-byte [movabs], so reusing a register
+   that already holds the value is preferable to reloading it. *)
+let is_cheap_operation (op : Operation.t)
     : Cfg_cse_target_intf.is_cheap_operation_result =
-  Use_default
+  match op with
+  | Const_int n ->
+    Cheap (Nativeint.compare n (-0x8000_0000n) >= 0
+           && Nativeint.compare n 0xFFFF_FFFFn <= 0)
+  | Specific _
+  | Move | Spill | Reload
+  | Floatop _
+  | Csel _
+  | Reinterpret_cast _ | Static_cast _
+  | Const_float32 _ | Const_float _
+  | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+  | Const_mask _
+  | Stackoffset _ | Load _ | Store _ | Alloc _
+  | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _
+  | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Pause
+  | Begin_region | End_region | Poll | Dls_get | Tls_get | Domain_index
+    -> Use_default
