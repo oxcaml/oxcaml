@@ -121,6 +121,10 @@ module type Int_number_kind = sig
   module Num : sig
     include Num_common
 
+    val min_value : Target_system.Machine_width.t -> t
+
+    val max_value : Target_system.Machine_width.t -> t
+
     val and_ : t -> t -> t
 
     val or_ : t -> t -> t
@@ -514,6 +518,10 @@ module For_int8s : Int_number_kind = struct
 
     let minus_one _machine_width = Int8.of_int (-1)
 
+    let min_value _machine_width = Int8.of_int (-128)
+
+    let max_value _machine_width = Int8.of_int 127
+
     let neg x = of_int (Int.neg (to_int x))
 
     let add x y = of_int (Int.add (to_int x) (to_int y))
@@ -637,6 +645,10 @@ module For_int16s : Int_number_kind = struct
     let one _machine_width = Int16.one
 
     let minus_one _machine_width = Int16.of_int (-1)
+
+    let min_value _machine_width = Int16.of_int (-32768)
+
+    let max_value _machine_width = Int16.of_int 32767
 
     let neg x = of_int (Int.neg (to_int x))
 
@@ -766,6 +778,10 @@ module For_int32s : Boxable_int_number_kind = struct
 
     let minus_one _machine_width = Int32.minus_one
 
+    let min_value _machine_width = Int32.min_int
+
+    let max_value _machine_width = Int32.max_int
+
     let xor = logxor
 
     let or_ = logor
@@ -855,6 +871,10 @@ module For_int64s : Boxable_int_number_kind = struct
 
     let minus_one _machine_width = Int64.minus_one
 
+    let min_value _machine_width = Int64.min_int
+
+    let max_value _machine_width = Int64.max_int
+
     let xor = logxor
 
     let or_ = logor
@@ -932,6 +952,10 @@ end
 module For_nativeints : Boxable_int_number_kind = struct
   module Num = struct
     include Targetint_32_64
+
+    let min_value = Targetint_32_64.min_int
+
+    let max_value = Targetint_32_64.max_int
 
     let strictly_negative t =
       let zero_val = zero_like t in
