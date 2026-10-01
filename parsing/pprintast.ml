@@ -132,7 +132,7 @@ let tyvar_of_name s =
     (* without the space, this would be parsed as
        a character literal *)
     "' " ^ s
-  else if Lexer.is_keyword s then
+  else if Keywords.is_keyword s then
     "'\\#" ^ s
   else if String.equal s "_" then
     s
@@ -147,7 +147,7 @@ module Doc_internal = struct
    operator. *)
   let ident_of_name ~kind ppf txt =
     let format : (_, _, _) format =
-      if Lexer.is_keyword txt then begin
+      if Keywords.is_keyword txt then begin
         match kind, txt with
         | Constr, ("true"|"false") -> "%s"
         | _ ->  "\\#%s"

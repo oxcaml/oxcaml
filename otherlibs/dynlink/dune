@@ -97,6 +97,7 @@
   location
   longident
   docstrings
+  keywords
   lexer
   camlinternalMenhirLib
   parser_types
@@ -254,6 +255,8 @@
 (copy_files ../../parsing/longident.ml)
 
 (copy_files ../../parsing/docstrings.ml)
+
+(copy_files ../../parsing/keywords.ml)
 
 (copy_files ../../parsing/lexer.ml)
 
@@ -415,6 +418,8 @@
 (copy_files ../../parsing/longident.mli)
 
 (copy_files ../../parsing/docstrings.mli)
+
+(copy_files ../../parsing/keywords.mli)
 
 (copy_files ../../parsing/lexer.mli)
 
@@ -610,6 +615,7 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Structured_mangling.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Symbol.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Docstrings.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Keywords.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Lexer.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Path.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Syntaxerr.cmo
@@ -723,6 +729,7 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Structured_mangling.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Symbol.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Docstrings.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Keywords.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Lexer.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Path.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Lazy_backtrack.cmx

@@ -188,6 +188,7 @@
   ast_helper
   camlinternalMenhirLib
   ast_iterator
+  keywords
   parser
   lexer
   parse
