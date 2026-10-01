@@ -22,3 +22,6 @@ structured_mangling.ml
 structured_mangling.mli
 opt_fuel.ml
 opt_fuel.mli
+union_find.ml
+union_find.mli
+with_backtracking.ml

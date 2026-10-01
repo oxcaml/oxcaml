@@ -235,7 +235,8 @@ module Type_shape = struct
           | Tmod _ ->
             Misc.fatal_error "Type_shape.of_type_expr: unexpected Tmod"
           | Ttuple exprs -> Shape.tuple (of_expr_list (List.map snd exprs))
-          | Tvar { name = _; jkind } -> unknown_shape_from_jkind jkind
+          | Tvar { name = _; jkind } | Tivar { name = _; jkind; ivar = _ } ->
+            unknown_shape_from_jkind jkind
           | Tpoly (type_expr, _type_vars) ->
             of_type_expr_go ~depth ~visited type_expr subst shape_for_constr
           | Trepr (type_expr, _sort_vars) ->

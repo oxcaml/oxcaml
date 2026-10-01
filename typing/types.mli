@@ -179,6 +179,15 @@ and type_desc =
   (** [Tvar (Some "a")] ==> ['a] or ['_a]
       [Tvar None]       ==> [_] *)
 
+  | Tivar of
+      { name : string option;
+        jkind : jkind_lr;
+        ivar : type_shape Ivar.t
+      }
+  (** A type variable whose [ivar] is filled with the shape of the type it is
+      unified with. Handlers waiting on [ivar] are how suspended constraints
+      of omnidirectional type inference wake up. *)
+
   | Tarrow of arrow_desc * type_expr * type_expr * commutable
   (** [Tarrow (Nolabel,      e1, e2, c)] ==> [e1    -> e2]
       [Tarrow (Labelled "l", e1, e2, c)] ==> [l:e1  -> e2]
@@ -317,6 +326,17 @@ and arg_label =
 
 and arrow_desc =
   arg_label * Mode.With_locality.lr * Mode.With_locality.lr
+
+(** The head type former of a type, after expanding abbreviations. This is
+    the value a [Tivar]'s ivar is filled with. *)
+and type_shape =
+  | Sarrow of arg_label
+  | Stuple of string option list
+  | Sunboxed_tuple of string option list
+  | Sconstr of Path.t
+  | Sobject
+  | Svariant
+  | Spackage of Path.t
 
 (** [package] corresponds to the type of a first-class module *)
 and package =
@@ -1329,6 +1349,8 @@ val item_visibility : signature_item -> visibility
 (* Constructors are the same *)
 val equal_tag :  tag -> tag -> bool
 
+val equal_type_shape : type_shape -> type_shape -> bool
+
 (* Comparison of tags to store them in sets. *)
 val compare_tag :  tag -> tag -> int
 
@@ -1421,7 +1443,7 @@ val set_type_desc: type_expr -> type_desc -> unit
 val set_level: type_expr -> int -> unit
 val set_scope: type_expr -> int -> unit
 val set_var_jkind: type_expr -> jkind_lr -> unit
-        (* May only be called on Tvars *)
+        (* May only be called on Tvars and Tivars *)
 val set_name:
     (Path.t * type_expr list) option ref ->
     (Path.t * type_expr list) option -> unit

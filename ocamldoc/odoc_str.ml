@@ -40,6 +40,7 @@ let rec is_arrow_type t =
     Types.Tarrow _ -> true
   | Types.Tlink t2 -> is_arrow_type t2
   | Types.Tmod _ -> Misc.fatal_error "Odoc_str.is_arrow_type: unexpected Tmod"
+  | Types.Tivar _ -> Misc.fatal_error "Odoc_str.is_arrow_type: unexpected Tivar"
   | Types.Ttuple _
   | Types.Tunboxed_tuple _
   | Types.Tconstr _
@@ -56,6 +57,7 @@ let rec need_parent t =
     Types.Tarrow _ | Types.Ttuple _ | Tunboxed_tuple _ -> true
   | Types.Tlink t2 -> need_parent t2
   | Types.Tmod _ -> Misc.fatal_error "Odoc_str.need_parent: unexpected Tmod"
+  | Types.Tivar _ -> Misc.fatal_error "Odoc_str.need_parent: unexpected Tivar"
   | Types.Tconstr _
   | Types.Tvar _ | Types.Tunivar _ | Types.Tobject _ | Types.Tpoly _
   | Types.Tquote _ | Types.Tsplice _ | Types.Tquote_eval _ | Types.Trepr _
