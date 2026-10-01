@@ -213,7 +213,7 @@ module Template_store = struct
 end
 
 module Mangling : sig
-  val symbol_arg_of_value : Types.value -> string
+  val symbol_arg_of_value : Types.value Or_missing.t -> string
 end = struct
   let symbol_arg_of_value_kind_non_null = function
     | Pintval -> "immediate"
@@ -260,11 +260,12 @@ end = struct
     | Ptop | Pbottom | Psplicevar _ ->
       Misc.fatal_error "Slambda.symbol_arg_of_layout: unexpected layout"
 
-  let symbol_arg_of_value (v : Types.value) =
+  let symbol_arg_of_value (v : Types.value Or_missing.t) =
     match v with
-    | Vlayout l -> symbol_arg_of_layout l
-    | Vrecord { id; values = _ } -> id
-    | Vclosure id -> Fmt.asprintf "%a" Template_id.print id
+    | Missing -> "missing"
+    | Present (Vlayout l) -> symbol_arg_of_layout l
+    | Present (Vrecord { id; values = _ }) -> id
+    | Present (Vclosure id) -> Fmt.asprintf "%a" Template_id.print id
 end
 
 module CU_data = struct
@@ -307,9 +308,9 @@ module Ctx : sig
   val instantiate :
     t ->
     loc:scoped_location ->
-    eval_apply:(Types.closure -> Types.value array -> Types.halves) ->
+    eval_apply:(Types.closure -> Types.value Or_missing.t array -> Types.halves) ->
     Template_id.t ->
-    Types.value array ->
+    Types.value Or_missing.t array ->
     Types.halves
 
   (** All of the template instantiations cached by [instantiate]. These are in
@@ -598,16 +599,25 @@ and eval_constructor_shape env old_constructor_shape =
 
 let dynamic slv_runtime = { slv_comptime = Missing; slv_runtime }
 
+(* An all-Missing record carries no static information. Use Missing so its fresh
+   identity doesn't cause needless template specializations. *)
 let make_record ?name ctx fields : value Or_missing.t =
-  let id =
-    Fmt.asprintf "%a/%a"
-      (Fmt.pp_print_option Compilation_unit.print)
-      (Current_unit.get_cu ())
-      (Fmt.pp_print_option Fmt.pp_print_string)
-      (Option.map Ident.name name)
-    |> Ctx.uniqueify ctx
-  in
-  Present (Vrecord { id; values = Array.of_list fields })
+  if
+    List.for_all
+      (fun (field : value Or_missing.t) ->
+        match field with Missing -> true | Present _ -> false)
+      fields
+  then Missing
+  else
+    let id =
+      Fmt.asprintf "%a/%a"
+        (Fmt.pp_print_option Compilation_unit.print)
+        (Current_unit.get_cu ())
+        (Fmt.pp_print_option Fmt.pp_print_string)
+        (Option.map Ident.name name)
+      |> Ctx.uniqueify ctx
+    in
+    Present (Vrecord { id; values = Array.of_list fields })
 
 let project_field (value : value Or_missing.t) pos : value Or_missing.t =
   match value with
@@ -937,7 +947,8 @@ let rec eval_lam ?name ctx env old_lambda : halves =
     let new_func = eval_lam ctx env old_func in
     let new_args =
       Misc.Stdlib.Array.of_list_map
-        (fun old_layout_arg -> Vlayout (eval_layout env old_layout_arg))
+        (fun old_layout_arg ->
+          Or_missing.Present (Vlayout (eval_layout env old_layout_arg)))
         old_args
     in
     let instantiated =
@@ -976,7 +987,7 @@ let rec eval_lam ?name ctx env old_lambda : halves =
     let new_args_c, new_args_r = eval_args_reverse ctx env old_args in
     let instantiated =
       instantiate ctx ~loc:old_apply.ap_loc new_func.slv_comptime
-        (Misc.Stdlib.Array.of_list_map expect_not_missing new_args_c)
+        (Array.of_list new_args_c)
     in
     { slv_comptime = instantiated.slv_comptime;
       slv_runtime =
@@ -1422,10 +1433,7 @@ and instantiate ctx ~loc func args =
     ]}*)
 and eval_apply ctx { clo_template; clo_runtime_env; clo_env } args =
   let bind_params params =
-    try
-      Misc.Stdlib.Array.fold_left2
-        (fun env param arg -> Env.add env param (Present arg))
-        clo_env params args
+    try Misc.Stdlib.Array.fold_left2 Env.add clo_env params args
     with Invalid_argument _ ->
       Misc.fatal_error
         "Slambda eval doesn't support partial or over application of functors."
