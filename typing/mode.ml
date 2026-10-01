@@ -599,6 +599,30 @@ module Lattices = struct
       | Unique -> Fmt.fprintf ppf "unique"
   end
 
+  module Borrowedness = struct
+    type t =
+      | Owned
+      | Borrowed
+
+    include Total (struct
+      type nonrec t = t
+
+      let min = Owned
+
+      let max = Borrowed
+
+      let ord = function Owned -> 0 | Borrowed -> 1
+    end)
+
+    let legacy = Borrowed
+
+    let all = lazy [Owned; Borrowed]
+
+    let print ppf = function
+      | Borrowed -> Fmt.fprintf ppf "borrowed"
+      | Owned -> Fmt.fprintf ppf "owned"
+  end
+
   module Linearity = struct
     type t =
       | Many
@@ -707,6 +731,30 @@ module Lattices = struct
     let print ppf = function
       | Unforkable -> Fmt.fprintf ppf "unforkable"
       | Forkable -> Fmt.fprintf ppf "forkable"
+  end
+
+  module Borrowability = struct
+    type t =
+      | Borrowable
+      | Unborrowable
+
+    include Total (struct
+      type nonrec t = t
+
+      let min = Borrowable
+
+      let max = Unborrowable
+
+      let ord = function Borrowable -> 0 | Unborrowable -> 1
+    end)
+
+    let legacy = Borrowable
+
+    let all = lazy [Borrowable; Unborrowable]
+
+    let print ppf = function
+      | Unborrowable -> Fmt.fprintf ppf "unborrowable"
+      | Borrowable -> Fmt.fprintf ppf "borrowable"
   end
 
   module Yielding = struct
@@ -823,7 +871,8 @@ module Lattices = struct
     { uniqueness : Uniqueness.t;
       contention : Contention.t;
       visibility : Visibility.t;
-      staticity : Staticity.t
+      staticity : Staticity.t;
+      borrowedness : Borrowedness.t
     }
 
   module Monadic = struct
@@ -834,21 +883,24 @@ module Lattices = struct
       let contention = Contention.min in
       let visibility = Visibility.min in
       let staticity = Staticity.min in
-      { uniqueness; contention; visibility; staticity }
+      let borrowedness = Borrowedness.min in
+      { uniqueness; contention; visibility; staticity; borrowedness }
 
     let max =
       let uniqueness = Uniqueness.max in
       let contention = Contention.max in
       let visibility = Visibility.max in
       let staticity = Staticity.max in
-      { uniqueness; contention; visibility; staticity }
+      let borrowedness = Borrowedness.max in
+      { uniqueness; contention; visibility; staticity; borrowedness }
 
     let legacy =
       let uniqueness = Uniqueness.legacy in
       let contention = Contention.legacy in
       let visibility = Visibility.legacy in
       let staticity = Staticity.legacy in
-      { uniqueness; contention; visibility; staticity }
+      let borrowedness = Borrowedness.legacy in
+      { uniqueness; contention; visibility; staticity; borrowedness }
 
     (** All product values, including every combination of axis values. *)
     let all =
@@ -858,8 +910,9 @@ module Lattices = struct
          let* uniqueness = Lazy.force Uniqueness.all in
          let* contention = Lazy.force Contention.all in
          let* visibility = Lazy.force Visibility.all in
-         let+ staticity = Lazy.force Staticity.all in
-         { uniqueness; contention; visibility; staticity })
+         let* staticity = Lazy.force Staticity.all in
+         let+ borrowedness = Lazy.force Borrowedness.all in
+         { uniqueness; contention; visibility; staticity; borrowedness })
 
     (* CR-someday ageorges: the following code manually enumerates axes. It would be nice
        to use the later definition of Lattices.Monadic.Axis.all *)
@@ -878,7 +931,9 @@ module Lattices = struct
                (let+ visibility = Lazy.force Visibility.all in
                 { base with visibility });
                (let+ staticity = Lazy.force Staticity.all in
-                { base with staticity }) ]
+                { base with staticity });
+               (let+ borrowedness = Lazy.force Borrowedness.all in
+                { base with borrowedness }) ]
          in
          with_base min @ with_base max)
 
@@ -886,14 +941,16 @@ module Lattices = struct
       let { uniqueness = uniqueness1;
             contention = contention1;
             visibility = visibility1;
-            staticity = staticity1
+            staticity = staticity1;
+            borrowedness = borrowedness1
           } =
         m1
       in
       let { uniqueness = uniqueness2;
             contention = contention2;
             visibility = visibility2;
-            staticity = staticity2
+            staticity = staticity2;
+            borrowedness = borrowedness2
           } =
         m2
       in
@@ -901,19 +958,22 @@ module Lattices = struct
       && Contention.le contention1 contention2
       && Visibility.le visibility1 visibility2
       && Staticity.le staticity1 staticity2
+      && Borrowedness.le borrowedness1 borrowedness2
 
     let equal m1 m2 =
       let { uniqueness = uniqueness1;
             contention = contention1;
             visibility = visibility1;
-            staticity = staticity1
+            staticity = staticity1;
+            borrowedness = borrowedness1
           } =
         m1
       in
       let { uniqueness = uniqueness2;
             contention = contention2;
             visibility = visibility2;
-            staticity = staticity2
+            staticity = staticity2;
+            borrowedness = borrowedness2
           } =
         m2
       in
@@ -921,6 +981,7 @@ module Lattices = struct
       && Contention.equal contention1 contention2
       && Visibility.equal visibility1 visibility2
       && Staticity.equal staticity1 staticity2
+      && Borrowedness.equal borrowedness1 borrowedness2
 
     let compare_total m1 m2 =
       let c = Uniqueness.compare_total m1.uniqueness m2.uniqueness in
@@ -934,33 +995,42 @@ module Lattices = struct
           let c = Visibility.compare_total m1.visibility m2.visibility in
           if c <> 0
           then c
-          else Staticity.compare_total m1.staticity m2.staticity
+          else
+            let c = Staticity.compare_total m1.staticity m2.staticity in
+            if c <> 0
+            then c
+            else Borrowedness.compare_total m1.borrowedness m2.borrowedness
 
     let join m1 m2 =
       let uniqueness = Uniqueness.join m1.uniqueness m2.uniqueness in
       let contention = Contention.join m1.contention m2.contention in
       let visibility = Visibility.join m1.visibility m2.visibility in
       let staticity = Staticity.join m1.staticity m2.staticity in
-      { uniqueness; contention; visibility; staticity }
+      let borrowedness = Borrowedness.join m1.borrowedness m2.borrowedness in
+      { uniqueness; contention; visibility; staticity; borrowedness }
 
     let meet m1 m2 =
       let uniqueness = Uniqueness.meet m1.uniqueness m2.uniqueness in
       let contention = Contention.meet m1.contention m2.contention in
       let visibility = Visibility.meet m1.visibility m2.visibility in
       let staticity = Staticity.meet m1.staticity m2.staticity in
-      { uniqueness; contention; visibility; staticity }
+      let borrowedness = Borrowedness.meet m1.borrowedness m2.borrowedness in
+      { uniqueness; contention; visibility; staticity; borrowedness }
 
     let subtract m1 m2 =
       let uniqueness = Uniqueness.subtract m1.uniqueness m2.uniqueness in
       let contention = Contention.subtract m1.contention m2.contention in
       let visibility = Visibility.subtract m1.visibility m2.visibility in
       let staticity = Staticity.subtract m1.staticity m2.staticity in
-      { uniqueness; contention; visibility; staticity }
+      let borrowedness =
+        Borrowedness.subtract m1.borrowedness m2.borrowedness
+      in
+      { uniqueness; contention; visibility; staticity; borrowedness }
 
     let print ppf m =
-      Fmt.fprintf ppf "%a,%a,%a,%a" Uniqueness.print m.uniqueness
+      Fmt.fprintf ppf "%a,%a,%a,%a,%a" Uniqueness.print m.uniqueness
         Contention.print m.contention Visibility.print m.visibility
-        Staticity.print m.staticity
+        Staticity.print m.staticity Borrowedness.print m.borrowedness
   end
 
   type 'areality comonadic_with =
@@ -969,7 +1039,8 @@ module Lattices = struct
       portability : Portability.t;
       forkable : Forkable.t;
       yielding : Yielding.t;
-      statefulness : Statefulness.t
+      statefulness : Statefulness.t;
+      borrowability : Borrowability.t
     }
 
   module Comonadic_with (Areality : Areality) = struct
@@ -982,7 +1053,15 @@ module Lattices = struct
       let forkable = Forkable.min in
       let yielding = Yielding.min in
       let statefulness = Statefulness.min in
-      { areality; linearity; portability; forkable; yielding; statefulness }
+      let borrowability = Borrowability.min in
+      { areality;
+        linearity;
+        portability;
+        forkable;
+        yielding;
+        statefulness;
+        borrowability
+      }
 
     let max =
       let areality = Areality.max in
@@ -991,7 +1070,15 @@ module Lattices = struct
       let forkable = Forkable.max in
       let yielding = Yielding.max in
       let statefulness = Statefulness.max in
-      { areality; linearity; portability; forkable; yielding; statefulness }
+      let borrowability = Borrowability.max in
+      { areality;
+        linearity;
+        portability;
+        forkable;
+        yielding;
+        statefulness;
+        borrowability
+      }
 
     let legacy =
       let areality = Areality.legacy in
@@ -1000,7 +1087,15 @@ module Lattices = struct
       let forkable = Forkable.legacy in
       let yielding = Yielding.legacy in
       let statefulness = Statefulness.legacy in
-      { areality; linearity; portability; forkable; yielding; statefulness }
+      let borrowability = Borrowability.legacy in
+      { areality;
+        linearity;
+        portability;
+        forkable;
+        yielding;
+        statefulness;
+        borrowability
+      }
 
     (** All product values, including every combination of axis values. *)
     let all =
@@ -1012,8 +1107,16 @@ module Lattices = struct
          let* portability = Lazy.force Portability.all in
          let* forkable = Lazy.force Forkable.all in
          let* yielding = Lazy.force Yielding.all in
-         let+ statefulness = Lazy.force Statefulness.all in
-         { areality; linearity; portability; forkable; yielding; statefulness })
+         let* statefulness = Lazy.force Statefulness.all in
+         let+ borrowability = Lazy.force Borrowability.all in
+         { areality;
+           linearity;
+           portability;
+           forkable;
+           yielding;
+           statefulness;
+           borrowability
+         })
 
     (* CR-someday ageorges: the following code manually enumerates axes. It would be nice
        to use the later definition of Lattices.Comonadic_with.Axis.all *)
@@ -1036,7 +1139,9 @@ module Lattices = struct
                (let+ yielding = Lazy.force Yielding.all in
                 { base with yielding });
                (let+ statefulness = Lazy.force Statefulness.all in
-                { base with statefulness }) ]
+                { base with statefulness });
+               (let+ borrowability = Lazy.force Borrowability.all in
+                { base with borrowability }) ]
          in
          with_base min @ with_base max)
 
@@ -1046,7 +1151,8 @@ module Lattices = struct
             portability = portability1;
             forkable = forkable1;
             yielding = yielding1;
-            statefulness = statefulness1
+            statefulness = statefulness1;
+            borrowability = borrowability1
           } =
         m1
       in
@@ -1055,7 +1161,8 @@ module Lattices = struct
             portability = portability2;
             forkable = forkable2;
             yielding = yielding2;
-            statefulness = statefulness2
+            statefulness = statefulness2;
+            borrowability = borrowability2
           } =
         m2
       in
@@ -1065,6 +1172,7 @@ module Lattices = struct
       && Forkable.le forkable1 forkable2
       && Yielding.le yielding1 yielding2
       && Statefulness.le statefulness1 statefulness2
+      && Borrowability.le borrowability1 borrowability2
 
     let equal m1 m2 =
       let { areality = areality1;
@@ -1072,7 +1180,8 @@ module Lattices = struct
             portability = portability1;
             forkable = forkable1;
             yielding = yielding1;
-            statefulness = statefulness1
+            statefulness = statefulness1;
+            borrowability = borrowability1
           } =
         m1
       in
@@ -1081,7 +1190,8 @@ module Lattices = struct
             portability = portability2;
             forkable = forkable2;
             yielding = yielding2;
-            statefulness = statefulness2
+            statefulness = statefulness2;
+            borrowability = borrowability2
           } =
         m2
       in
@@ -1091,6 +1201,7 @@ module Lattices = struct
       && Forkable.equal forkable1 forkable2
       && Yielding.equal yielding1 yielding2
       && Statefulness.equal statefulness1 statefulness2
+      && Borrowability.equal borrowability1 borrowability2
 
     let compare_total m1 m2 =
       let c = Areality.compare_total m1.areality m2.areality in
@@ -1112,7 +1223,14 @@ module Lattices = struct
               let c = Yielding.compare_total m1.yielding m2.yielding in
               if c <> 0
               then c
-              else Statefulness.compare_total m1.statefulness m2.statefulness
+              else
+                let c =
+                  Statefulness.compare_total m1.statefulness m2.statefulness
+                in
+                if c <> 0
+                then c
+                else
+                  Borrowability.compare_total m1.borrowability m2.borrowability
 
     let join m1 m2 =
       let areality = Areality.join m1.areality m2.areality in
@@ -1121,7 +1239,17 @@ module Lattices = struct
       let forkable = Forkable.join m1.forkable m2.forkable in
       let yielding = Yielding.join m1.yielding m2.yielding in
       let statefulness = Statefulness.join m1.statefulness m2.statefulness in
-      { areality; linearity; portability; forkable; yielding; statefulness }
+      let borrowability =
+        Borrowability.join m1.borrowability m2.borrowability
+      in
+      { areality;
+        linearity;
+        portability;
+        forkable;
+        yielding;
+        statefulness;
+        borrowability
+      }
 
     let meet m1 m2 =
       let areality = Areality.meet m1.areality m2.areality in
@@ -1130,7 +1258,17 @@ module Lattices = struct
       let forkable = Forkable.meet m1.forkable m2.forkable in
       let yielding = Yielding.meet m1.yielding m2.yielding in
       let statefulness = Statefulness.meet m1.statefulness m2.statefulness in
-      { areality; linearity; portability; forkable; yielding; statefulness }
+      let borrowability =
+        Borrowability.meet m1.borrowability m2.borrowability
+      in
+      { areality;
+        linearity;
+        portability;
+        forkable;
+        yielding;
+        statefulness;
+        borrowability
+      }
 
     let imply m1 m2 =
       let areality = Areality.imply m1.areality m2.areality in
@@ -1139,13 +1277,23 @@ module Lattices = struct
       let forkable = Forkable.imply m1.forkable m2.forkable in
       let yielding = Yielding.imply m1.yielding m2.yielding in
       let statefulness = Statefulness.imply m1.statefulness m2.statefulness in
-      { areality; linearity; portability; forkable; yielding; statefulness }
+      let borrowability =
+        Borrowability.imply m1.borrowability m2.borrowability
+      in
+      { areality;
+        linearity;
+        portability;
+        forkable;
+        yielding;
+        statefulness;
+        borrowability
+      }
 
     let print ppf m =
-      Fmt.fprintf ppf "%a,%a,%a,%a,%a,%a" Areality.print m.areality
+      Fmt.fprintf ppf "%a,%a,%a,%a,%a,%a,%a" Areality.print m.areality
         Linearity.print m.linearity Portability.print m.portability
         Forkable.print m.forkable Yielding.print m.yielding Statefulness.print
-        m.statefulness
+        m.statefulness Borrowability.print m.borrowability
   end
   [@@inline]
 
@@ -1190,6 +1338,7 @@ module Lattices = struct
      ordering. See [module Monadic_gen] and [module Monadic].
   *)
   module Uniqueness_op = Opposite (Uniqueness)
+  module Borrowedness_op = Opposite (Borrowedness)
   module Contention_op = Opposite (Contention)
   module Visibility_op = Opposite (Visibility)
   module Staticity_op = Opposite (Staticity)
@@ -1206,9 +1355,11 @@ module Lattices = struct
     | Forkable : Forkable.t obj
     | Yielding : Yielding.t obj
     | Statefulness : Statefulness.t obj
+    | Borrowability : Borrowability.t obj
     | Contention_op : Contention_op.t obj
     | Visibility_op : Visibility_op.t obj
     | Staticity_op : Staticity_op.t obj
+    | Borrowedness_op : Borrowedness_op.t obj
     | Monadic_op : Monadic_op.t obj
     | Comonadic_with_regionality : Comonadic_with_regionality.t obj
     | Comonadic_with_locality : Comonadic_with_locality.t obj
@@ -1228,7 +1379,8 @@ module Lattices = struct
     | Regionality -> Regionality
     | Uniqueness_op | Linearity | Monadic_op | Comonadic_with_regionality
     | Comonadic_with_locality | Contention_op | Visibility_op | Portability
-    | Forkable | Yielding | Statefulness | Staticity_op ->
+    | Forkable | Yielding | Statefulness | Borrowability | Staticity_op
+    | Borrowedness_op ->
       assert false
 
   let comonadic_with_obj : type a. a obj -> a comonadic_with obj =
@@ -1243,9 +1395,11 @@ module Lattices = struct
     | Forkable -> false
     | Yielding -> false
     | Statefulness -> false
+    | Borrowability -> false
     | Contention_op -> true
     | Visibility_op -> true
     | Staticity_op -> true
+    | Borrowedness_op -> true
     | Monadic_op -> true
     | Comonadic_with_locality -> false
     | Comonadic_with_regionality -> false
@@ -1260,9 +1414,11 @@ module Lattices = struct
     | Forkable -> Fmt.fprintf ppf "Forkable"
     | Yielding -> Fmt.fprintf ppf "Yielding"
     | Statefulness -> Fmt.fprintf ppf "Statefulness"
+    | Borrowability -> Fmt.fprintf ppf "Borrowability"
     | Contention_op -> Fmt.fprintf ppf "Contention_op"
     | Visibility_op -> Fmt.fprintf ppf "Visibility_op"
     | Staticity_op -> Fmt.fprintf ppf "Staticity_op"
+    | Borrowedness_op -> Fmt.fprintf ppf "Borrowedness_op"
     | Monadic_op -> Fmt.fprintf ppf "Monadic_op"
     | Comonadic_with_locality -> Fmt.fprintf ppf "Comonadic_with_locality"
     | Comonadic_with_regionality -> Fmt.fprintf ppf "Comonadic_with_regionality"
@@ -1276,9 +1432,11 @@ module Lattices = struct
     | Forkable -> Forkable.min
     | Yielding -> Yielding.min
     | Statefulness -> Statefulness.min
+    | Borrowability -> Borrowability.min
     | Linearity -> Linearity.min
     | Portability -> Portability.min
     | Staticity_op -> Staticity_op.min
+    | Borrowedness_op -> Borrowedness_op.min
     | Monadic_op -> Monadic_op.min
     | Comonadic_with_locality -> Comonadic_with_locality.min
     | Comonadic_with_regionality -> Comonadic_with_regionality.min
@@ -1294,7 +1452,9 @@ module Lattices = struct
     | Forkable -> Forkable.max
     | Yielding -> Yielding.max
     | Statefulness -> Statefulness.max
+    | Borrowability -> Borrowability.max
     | Staticity_op -> Staticity_op.max
+    | Borrowedness_op -> Borrowedness_op.max
     | Monadic_op -> Monadic_op.max
     | Comonadic_with_locality -> Comonadic_with_locality.max
     | Comonadic_with_regionality -> Comonadic_with_regionality.max
@@ -1312,7 +1472,9 @@ module Lattices = struct
     | Forkable -> Forkable.le a b
     | Yielding -> Yielding.le a b
     | Statefulness -> Statefulness.le a b
+    | Borrowability -> Borrowability.le a b
     | Staticity_op -> Staticity_op.le a b
+    | Borrowedness_op -> Borrowedness_op.le a b
     | Monadic_op -> Monadic_op.le a b
     | Comonadic_with_locality -> Comonadic_with_locality.le a b
     | Comonadic_with_regionality -> Comonadic_with_regionality.le a b
@@ -1330,7 +1492,9 @@ module Lattices = struct
     | Forkable -> Forkable.compare_total a b
     | Yielding -> Yielding.compare_total a b
     | Statefulness -> Statefulness.compare_total a b
+    | Borrowability -> Borrowability.compare_total a b
     | Staticity_op -> Staticity_op.compare_total a b
+    | Borrowedness_op -> Borrowedness_op.compare_total a b
     | Monadic_op -> Monadic_op.compare_total a b
     | Comonadic_with_locality -> Comonadic_with_locality.compare_total a b
     | Comonadic_with_regionality -> Comonadic_with_regionality.compare_total a b
@@ -1348,7 +1512,9 @@ module Lattices = struct
     | Forkable -> Forkable.equal a b
     | Yielding -> Yielding.equal a b
     | Statefulness -> Statefulness.equal a b
+    | Borrowability -> Borrowability.equal a b
     | Staticity_op -> Staticity_op.equal a b
+    | Borrowedness_op -> Borrowedness_op.equal a b
     | Monadic_op -> Monadic_op.equal a b
     | Comonadic_with_locality -> Comonadic_with_locality.equal a b
     | Comonadic_with_regionality -> Comonadic_with_regionality.equal a b
@@ -1366,7 +1532,9 @@ module Lattices = struct
     | Forkable -> Forkable.join a b
     | Yielding -> Yielding.join a b
     | Statefulness -> Statefulness.join a b
+    | Borrowability -> Borrowability.join a b
     | Staticity_op -> Staticity_op.join a b
+    | Borrowedness_op -> Borrowedness_op.join a b
     | Monadic_op -> Monadic_op.join a b
     | Comonadic_with_locality -> Comonadic_with_locality.join a b
     | Comonadic_with_regionality -> Comonadic_with_regionality.join a b
@@ -1384,7 +1552,9 @@ module Lattices = struct
     | Forkable -> Forkable.meet a b
     | Yielding -> Yielding.meet a b
     | Statefulness -> Statefulness.meet a b
+    | Borrowability -> Borrowability.meet a b
     | Staticity_op -> Staticity_op.meet a b
+    | Borrowedness_op -> Borrowedness_op.meet a b
     | Monadic_op -> Monadic_op.meet a b
     | Comonadic_with_locality -> Comonadic_with_locality.meet a b
     | Comonadic_with_regionality -> Comonadic_with_regionality.meet a b
@@ -1402,7 +1572,9 @@ module Lattices = struct
     | Forkable -> Forkable.imply a b
     | Yielding -> Yielding.imply a b
     | Statefulness -> Statefulness.imply a b
+    | Borrowability -> Borrowability.imply a b
     | Staticity_op -> Staticity_op.imply a b
+    | Borrowedness_op -> Borrowedness_op.imply a b
     | Comonadic_with_locality -> Comonadic_with_locality.imply a b
     | Comonadic_with_regionality -> Comonadic_with_regionality.imply a b
     | Monadic_op -> Monadic_op.imply a b
@@ -1419,7 +1591,9 @@ module Lattices = struct
     | Forkable -> Forkable.print
     | Yielding -> Yielding.print
     | Statefulness -> Statefulness.print
+    | Borrowability -> Borrowability.print
     | Staticity_op -> Staticity_op.print
+    | Borrowedness_op -> Borrowedness_op.print
     | Monadic_op -> Monadic_op.print
     | Comonadic_with_locality -> Comonadic_with_locality.print
     | Comonadic_with_regionality -> Comonadic_with_regionality.print
@@ -1436,7 +1610,9 @@ module Lattices = struct
     | Forkable -> Forkable.min
     | Yielding -> Yielding.min
     | Statefulness -> Statefulness.min
+    | Borrowability -> Borrowability.min
     | Staticity_op -> Staticity_op.min
+    | Borrowedness_op -> Borrowedness_op.min
     | Monadic_op -> Monadic_op.min
     | Comonadic_with_locality -> Comonadic_with_locality.min
     | Comonadic_with_regionality -> Comonadic_with_regionality.min
@@ -1468,6 +1644,9 @@ module Lattices = struct
     | Statefulness, Statefulness -> 0
     | Statefulness, _ -> -1
     | _, Statefulness -> 1
+    | Borrowability, Borrowability -> 0
+    | Borrowability, _ -> -1
+    | _, Borrowability -> 1
     | Contention_op, Contention_op -> 0
     | Contention_op, _ -> -1
     | _, Contention_op -> 1
@@ -1477,6 +1656,9 @@ module Lattices = struct
     | Staticity_op, Staticity_op -> 0
     | Staticity_op, _ -> -1
     | _, Staticity_op -> 1
+    | Borrowedness_op, Borrowedness_op -> 0
+    | Borrowedness_op, _ -> -1
+    | _, Borrowedness_op -> 1
     | Monadic_op, Monadic_op -> 0
     | Monadic_op, _ -> -1
     | _, Monadic_op -> 1
@@ -1496,16 +1678,18 @@ module Lattices = struct
     | Forkable, Forkable -> Misc.Is_eq
     | Yielding, Yielding -> Misc.Is_eq
     | Statefulness, Statefulness -> Misc.Is_eq
+    | Borrowability, Borrowability -> Misc.Is_eq
     | Contention_op, Contention_op -> Misc.Is_eq
     | Visibility_op, Visibility_op -> Misc.Is_eq
     | Staticity_op, Staticity_op -> Misc.Is_eq
+    | Borrowedness_op, Borrowedness_op -> Misc.Is_eq
     | Monadic_op, Monadic_op -> Misc.Is_eq
     | Comonadic_with_regionality, Comonadic_with_regionality -> Misc.Is_eq
     | Comonadic_with_locality, Comonadic_with_locality -> Misc.Is_eq
     | ( ( Locality | Regionality | Uniqueness_op | Linearity | Portability
-        | Forkable | Yielding | Statefulness | Contention_op | Visibility_op
-        | Staticity_op | Monadic_op | Comonadic_with_regionality
-        | Comonadic_with_locality ),
+        | Forkable | Yielding | Statefulness | Borrowability | Contention_op
+        | Visibility_op | Staticity_op | Borrowedness_op | Monadic_op
+        | Comonadic_with_regionality | Comonadic_with_locality ),
         _ ) ->
       Misc.Is_not_eq
 end
@@ -1519,12 +1703,14 @@ module Lattices_mono = struct
       | Forkable : ('areality comonadic_with, Forkable.t) t
       | Yielding : ('areality comonadic_with, Yielding.t) t
       | Linearity : ('areality comonadic_with, Linearity.t) t
+      | Borrowability : ('areality comonadic_with, Borrowability.t) t
       | Statefulness : ('areality comonadic_with, Statefulness.t) t
       | Portability : ('areality comonadic_with, Portability.t) t
       | Uniqueness : (Monadic_op.t, Uniqueness_op.t) t
       | Visibility : (Monadic_op.t, Visibility_op.t) t
       | Contention : (Monadic_op.t, Contention_op.t) t
       | Staticity : (Monadic_op.t, Staticity_op.t) t
+      | Borrowedness : (Monadic_op.t, Borrowedness_op.t) t
 
     let print : type p r. _ -> (p, r) t -> unit =
      fun ppf -> function
@@ -1538,6 +1724,8 @@ module Lattices_mono = struct
       | Statefulness -> Fmt.fprintf ppf "statefulness"
       | Visibility -> Fmt.fprintf ppf "visibility"
       | Staticity -> Fmt.fprintf ppf "staticity"
+      | Borrowability -> Fmt.fprintf ppf "borrowability"
+      | Borrowedness -> Fmt.fprintf ppf "borrowedness"
 
     let equal : type p r1 r2. (p, r1) t -> (p, r2) t -> (r1, r2) Misc.is_eq =
      fun ax1 ax2 ->
@@ -1552,8 +1740,11 @@ module Lattices_mono = struct
       | Statefulness, Statefulness -> Is_eq
       | Visibility, Visibility -> Is_eq
       | Staticity, Staticity -> Is_eq
+      | Borrowability, Borrowability -> Is_eq
+      | Borrowedness, Borrowedness -> Is_eq
       | ( ( Areality | Linearity | Uniqueness | Portability | Contention
-          | Forkable | Yielding | Statefulness | Visibility | Staticity ),
+          | Forkable | Yielding | Statefulness | Visibility | Staticity
+          | Borrowability | Borrowedness ),
           _ ) ->
         Is_not_eq
 
@@ -1563,12 +1754,14 @@ module Lattices_mono = struct
       | Forkable -> 1
       | Yielding -> 2
       | Linearity -> 3
-      | Uniqueness -> 4
-      | Statefulness -> 5
-      | Visibility -> 6
-      | Portability -> 7
-      | Contention -> 8
-      | Staticity -> 9
+      | Borrowability -> 4
+      | Uniqueness -> 5
+      | Borrowedness -> 6
+      | Statefulness -> 7
+      | Visibility -> 8
+      | Portability -> 9
+      | Contention -> 10
+      | Staticity -> 11
 
     (** Compare two axes in implication order. If A implies B, then A is before
         B. This is also observed by [printtyp]. *)
@@ -1584,10 +1777,12 @@ module Lattices_mono = struct
       | Forkable -> t.forkable
       | Yielding -> t.yielding
       | Statefulness -> t.statefulness
+      | Borrowability -> t.borrowability
       | Uniqueness -> t.uniqueness
       | Contention -> t.contention
       | Visibility -> t.visibility
       | Staticity -> t.staticity
+      | Borrowedness -> t.borrowedness
 
     let set : type p r. (p, r) t -> r -> p -> p =
      fun ax r t ->
@@ -1598,10 +1793,12 @@ module Lattices_mono = struct
       | Forkable -> { t with forkable = r }
       | Yielding -> { t with yielding = r }
       | Statefulness -> { t with statefulness = r }
+      | Borrowability -> { t with borrowability = r }
       | Uniqueness -> { t with uniqueness = r }
       | Contention -> { t with contention = r }
       | Visibility -> { t with visibility = r }
       | Staticity -> { t with staticity = r }
+      | Borrowedness -> { t with borrowedness = r }
 
     type 'a from = From : ('a, 'b) t -> 'a from
 
@@ -1611,6 +1808,7 @@ module Lattices_mono = struct
           From Forkable;
           From Yielding;
           From Linearity;
+          From Borrowability;
           From Statefulness;
           From Portability ]
       | Comonadic_with_regionality ->
@@ -1618,13 +1816,18 @@ module Lattices_mono = struct
           From Forkable;
           From Yielding;
           From Linearity;
+          From Borrowability;
           From Statefulness;
           From Portability ]
       | Monadic_op ->
-        [From Uniqueness; From Visibility; From Contention; From Staticity]
+        [ From Uniqueness;
+          From Borrowedness;
+          From Visibility;
+          From Contention;
+          From Staticity ]
       | Locality | Regionality | Uniqueness_op | Linearity | Portability
-      | Forkable | Yielding | Statefulness | Contention_op | Visibility_op
-      | Staticity_op ->
+      | Forkable | Yielding | Statefulness | Borrowability | Contention_op
+      | Visibility_op | Staticity_op | Borrowedness_op ->
         []
 
     type 'b to_ = To : 'a obj * ('a, 'b) t -> 'b to_
@@ -1651,9 +1854,13 @@ module Lattices_mono = struct
       | Statefulness ->
         [ To (Comonadic_with_locality, Statefulness);
           To (Comonadic_with_regionality, Statefulness) ]
+      | Borrowability ->
+        [ To (Comonadic_with_locality, Borrowability);
+          To (Comonadic_with_regionality, Borrowability) ]
       | Contention_op -> [To (Monadic_op, Contention)]
       | Visibility_op -> [To (Monadic_op, Visibility)]
       | Staticity_op -> [To (Monadic_op, Staticity)]
+      | Borrowedness_op -> [To (Monadic_op, Borrowedness)]
 
     type ('a, 'p) owner =
       | Monadic : (Monadic_op.t, 'p) t -> (Monadic_op.t, 'p) owner
@@ -1669,11 +1876,13 @@ module Lattices_mono = struct
       | Yielding -> Comonadic (obj, ax)
       | Linearity -> Comonadic (obj, ax)
       | Statefulness -> Comonadic (obj, ax)
+      | Borrowability -> Comonadic (obj, ax)
       | Portability -> Comonadic (obj, ax)
       | Uniqueness -> Monadic ax
       | Visibility -> Monadic ax
       | Contention -> Monadic ax
       | Staticity -> Monadic ax
+      | Borrowedness -> Monadic ax
   end
 
   type packed_obj = Obj : 'a obj -> packed_obj
@@ -1687,9 +1896,11 @@ module Lattices_mono = struct
       Obj Forkable;
       Obj Yielding;
       Obj Statefulness;
+      Obj Borrowability;
       Obj Contention_op;
       Obj Visibility_op;
       Obj Staticity_op;
+      Obj Borrowedness_op;
       Obj Monadic_op;
       Obj Comonadic_with_locality;
       Obj Comonadic_with_regionality ]
@@ -1706,9 +1917,11 @@ module Lattices_mono = struct
       | Forkable -> Forkable.all
       | Yielding -> Yielding.all
       | Statefulness -> Statefulness.all
+      | Borrowability -> Borrowability.all
       | Contention_op -> Contention.all
       | Visibility_op -> Visibility.all
       | Staticity_op -> Staticity.all
+      | Borrowedness_op -> Borrowedness.all
       | Monadic_op -> if full then Monadic.all else Monadic.spanning_elements
       | Comonadic_with_locality ->
         if full
@@ -2060,7 +2273,8 @@ module Lattices_mono = struct
           'a areality
           -> ('a comonadic_with, Monadic_op.t, 'l * disallowed) t
           (** Dualize the comonadic fragment to the monadic fragment. The
-              areality axis is ignored, the staticity axis is set to min. *)
+              areality axis is ignored, the staticity and borrowedness axes are
+              set to min. *)
       | Monadic_op_to_comonadic_max :
           (Monadic_op.t, 'a comonadic_with, disallowed * 'r) t
           (** Dualize the monadic fragment to the comonadic fragment. The
@@ -2069,7 +2283,8 @@ module Lattices_mono = struct
           'a areality
           -> ('a comonadic_with, Monadic_op.t, disallowed * 'r) t
           (** Dualize the comonadic fragment to the monadic fragment. The
-              areality axis is ignored, the staticity axis is set to max. *)
+              areality axis is ignored, the staticity and borrowedness axes are
+              set to max. *)
 
     let allow_left : type a b l r. (a, b, allowed * r) t -> (a, b, l * r) t =
       function
@@ -2310,7 +2525,15 @@ module Lattices_mono = struct
       let forkable = Forkable.min in
       let yielding = Yielding.min in
       let statefulness = visibility_op_to_statefulness m.visibility in
-      { areality; linearity; portability; forkable; yielding; statefulness }
+      let borrowability = Borrowability.min in
+      { areality;
+        linearity;
+        portability;
+        forkable;
+        yielding;
+        statefulness;
+        borrowability
+      }
 
     let comonadic_to_monadic_op_min : type a.
         a areality -> a comonadic_with -> Monadic_op.t =
@@ -2319,7 +2542,8 @@ module Lattices_mono = struct
       let contention = portability_to_contention_op m.portability in
       let visibility = statefulness_to_visibility_op m.statefulness in
       let staticity = Staticity_op.min in
-      { uniqueness; contention; visibility; staticity }
+      let borrowedness = Borrowedness_op.min in
+      { uniqueness; contention; visibility; staticity; borrowedness }
 
     let monadic_op_to_comonadic_max : type a.
         a comonadic_with obj -> Monadic_op.t -> a comonadic_with =
@@ -2334,7 +2558,15 @@ module Lattices_mono = struct
       let forkable = Forkable.max in
       let yielding = Yielding.max in
       let statefulness = visibility_op_to_statefulness m.visibility in
-      { areality; linearity; portability; forkable; yielding; statefulness }
+      let borrowability = Borrowability.max in
+      { areality;
+        linearity;
+        portability;
+        forkable;
+        yielding;
+        statefulness;
+        borrowability
+      }
 
     let comonadic_to_monadic_op_max : type a.
         a areality -> a comonadic_with -> Monadic_op.t =
@@ -2343,7 +2575,8 @@ module Lattices_mono = struct
       let contention = portability_to_contention_op m.portability in
       let visibility = statefulness_to_visibility_op m.statefulness in
       let staticity = Staticity_op.max in
-      { uniqueness; contention; visibility; staticity }
+      let borrowedness = Borrowedness_op.max in
+      { uniqueness; contention; visibility; staticity; borrowedness }
 
     let apply : type a b d. b obj -> (a, b, d) t -> a -> b =
      fun dst f a ->
@@ -2549,6 +2782,7 @@ module Lattices_mono = struct
       | Yielding -> Proj_id (Yielding, src)
       | Linearity -> Proj_id (Linearity, src)
       | Statefulness -> Proj_id (Statefulness, src)
+      | Borrowability -> Proj_id (Borrowability, src)
       | Portability -> Proj_id (Portability, src)
       | Areality -> Proj_core (Locality_restricted lm1, Areality, src)
 
@@ -2559,6 +2793,7 @@ module Lattices_mono = struct
       | Monadic_op_to_comonadic_min, Areality -> Proj_const_min Monadic_op
       | Monadic_op_to_comonadic_min, Forkable -> Proj_const_min Monadic_op
       | Monadic_op_to_comonadic_min, Yielding -> Proj_const_min Monadic_op
+      | Monadic_op_to_comonadic_min, Borrowability -> Proj_const_min Monadic_op
       | Monadic_op_to_comonadic_min, Linearity ->
         Proj_core (Uniqueness_op_to_linearity, Uniqueness, Monadic_op)
       | Monadic_op_to_comonadic_min, Statefulness ->
@@ -2582,9 +2817,12 @@ module Lattices_mono = struct
             areality_comonadic_obj areality )
       | Comonadic_to_monadic_op_min areality, Staticity ->
         Proj_const_min (areality_comonadic_obj areality)
+      | Comonadic_to_monadic_op_min areality, Borrowedness ->
+        Proj_const_min (areality_comonadic_obj areality)
       | Monadic_op_to_comonadic_max, Areality -> Proj_const_max Monadic_op
       | Monadic_op_to_comonadic_max, Forkable -> Proj_const_max Monadic_op
       | Monadic_op_to_comonadic_max, Yielding -> Proj_const_max Monadic_op
+      | Monadic_op_to_comonadic_max, Borrowability -> Proj_const_max Monadic_op
       | Monadic_op_to_comonadic_max, Linearity ->
         Proj_core (Uniqueness_op_to_linearity, Uniqueness, Monadic_op)
       | Monadic_op_to_comonadic_max, Statefulness ->
@@ -2607,6 +2845,8 @@ module Lattices_mono = struct
             Portability,
             areality_comonadic_obj areality )
       | Comonadic_to_monadic_op_max areality, Staticity ->
+        Proj_const_max (areality_comonadic_obj areality)
+      | Comonadic_to_monadic_op_max areality, Borrowedness ->
         Proj_const_max (areality_comonadic_obj areality)
       | Locality_full lm, (_ as ax0) -> compose_projection_locality_full ax0 lm
       | _, _ -> .
@@ -2656,6 +2896,13 @@ module Lattices_mono = struct
         | Regional_to_local | Locality_as_regionality | Regional_to_global
         | Regional_to_local_regionality | Regional_to_global_regionality ->
           And_max_id Statefulness)
+      | Borrowability -> (
+        match lm1 with
+        | Local_to_regional -> Disallowed
+        | Local_to_regional_regionality -> Disallowed
+        | Regional_to_local | Locality_as_regionality | Regional_to_global
+        | Regional_to_local_regionality | Regional_to_global_regionality ->
+          And_max_id Borrowability)
       | Portability -> (
         match lm1 with
         | Local_to_regional -> Disallowed
@@ -2679,8 +2926,10 @@ module Lattices_mono = struct
         And_max_core (Uniqueness, Linearity_to_uniqueness_op)
       | Comonadic_to_monadic_op_max _, Yielding -> Const_max_core
       | Comonadic_to_monadic_op_max _, Forkable -> Const_max_core
+      | Comonadic_to_monadic_op_max _, Borrowability -> Const_max_core
       | Comonadic_to_monadic_op_max _, Areality -> Const_max_core
       | Monadic_op_to_comonadic_max, Staticity -> Const_max_core
+      | Monadic_op_to_comonadic_max, Borrowedness -> Const_max_core
       | Monadic_op_to_comonadic_max, Contention ->
         And_max_core (Portability, Contention_op_to_portability)
       | Monadic_op_to_comonadic_max, Visibility ->
@@ -2713,6 +2962,7 @@ module Lattices_mono = struct
       | Yielding -> And_min_id Yielding
       | Linearity -> And_min_id Linearity
       | Statefulness -> And_min_id Statefulness
+      | Borrowability -> And_min_id Borrowability
       | Portability -> And_min_id Portability
       | Areality -> And_min_core (Areality, Locality_restricted lm1)
 
@@ -2730,8 +2980,10 @@ module Lattices_mono = struct
         And_min_core (Uniqueness, Linearity_to_uniqueness_op)
       | Comonadic_to_monadic_op_min _, Yielding -> Const_min_core
       | Comonadic_to_monadic_op_min _, Forkable -> Const_min_core
+      | Comonadic_to_monadic_op_min _, Borrowability -> Const_min_core
       | Comonadic_to_monadic_op_min _, Areality -> Const_min_core
       | Monadic_op_to_comonadic_min, Staticity -> Const_min_core
+      | Monadic_op_to_comonadic_min, Borrowedness -> Const_min_core
       | Monadic_op_to_comonadic_min, Contention ->
         And_min_core (Portability, Contention_op_to_portability)
       | Monadic_op_to_comonadic_min, Visibility ->
@@ -2849,10 +3101,12 @@ module Lattices_mono = struct
       | Portability -> [To Contention_op_to_portability]
       | Forkable -> []
       | Yielding -> []
+      | Borrowability -> []
       | Statefulness -> [To Visibility_op_to_statefulness]
       | Contention_op -> [To Portability_to_contention_op]
       | Visibility_op -> [To Statefulness_to_visibility_op]
       | Staticity_op -> []
+      | Borrowedness_op -> []
       | Monadic_op ->
         [ To (Comonadic_to_monadic_op_min Locality);
           To (Comonadic_to_monadic_op_min Regionality) ]
@@ -2877,10 +3131,12 @@ module Lattices_mono = struct
       | Portability -> [To Contention_op_to_portability]
       | Forkable -> []
       | Yielding -> []
+      | Borrowability -> []
       | Statefulness -> [To Visibility_op_to_statefulness]
       | Contention_op -> [To Portability_to_contention_op]
       | Visibility_op -> [To Statefulness_to_visibility_op]
       | Staticity_op -> []
+      | Borrowedness_op -> []
       | Monadic_op ->
         [ To (Comonadic_to_monadic_op_max Locality);
           To (Comonadic_to_monadic_op_max Regionality) ]
@@ -2909,10 +3165,13 @@ module Lattices_mono = struct
     | Yielding, Comonadic_with_regionality -> Yielding
     | Statefulness, Comonadic_with_locality -> Statefulness
     | Statefulness, Comonadic_with_regionality -> Statefulness
+    | Borrowability, Comonadic_with_locality -> Borrowability
+    | Borrowability, Comonadic_with_regionality -> Borrowability
     | Uniqueness, Monadic_op -> Uniqueness_op
     | Contention, Monadic_op -> Contention_op
     | Visibility, Monadic_op -> Visibility_op
     | Staticity, Monadic_op -> Staticity_op
+    | Borrowedness, Monadic_op -> Borrowedness_op
 
   let min_with dst ax a = Axis.set ax a (min dst)
 
@@ -4196,11 +4455,15 @@ module Lattices_mono = struct
 
   let morphs_to_statefulness = morphs_to_obj Statefulness
 
+  let morphs_to_borrowability = morphs_to_obj Borrowability
+
   let morphs_to_contention_op = morphs_to_obj Contention_op
 
   let morphs_to_visibility_op = morphs_to_obj Visibility_op
 
   let morphs_to_staticity_op = morphs_to_obj Staticity_op
+
+  let morphs_to_borrowedness_op = morphs_to_obj Borrowedness_op
 
   let morphs_to_monadic_op = morphs_to_obj Monadic_op
 
@@ -4219,9 +4482,11 @@ module Lattices_mono = struct
     | Forkable -> force_by_coverage ~full morphs_to_forkable
     | Yielding -> force_by_coverage ~full morphs_to_yielding
     | Statefulness -> force_by_coverage ~full morphs_to_statefulness
+    | Borrowability -> force_by_coverage ~full morphs_to_borrowability
     | Contention_op -> force_by_coverage ~full morphs_to_contention_op
     | Visibility_op -> force_by_coverage ~full morphs_to_visibility_op
     | Staticity_op -> force_by_coverage ~full morphs_to_staticity_op
+    | Borrowedness_op -> force_by_coverage ~full morphs_to_borrowedness_op
     | Monadic_op -> force_by_coverage ~full morphs_to_monadic_op
     | Comonadic_with_locality ->
       force_by_coverage ~full morphs_to_comonadic_with_locality
@@ -4267,11 +4532,13 @@ module Lattices_mono = struct
       | Locality_full _, (Yielding as ax) -> Axis ax
       | Locality_full _, (Linearity as ax) -> Axis ax
       | Locality_full _, (Statefulness as ax) -> Axis ax
+      | Locality_full _, (Borrowability as ax) -> Axis ax
       | Locality_full _, (Portability as ax) -> Axis ax
       | Locality_full _, _ -> .
       | Monadic_op_to_comonadic_min, Areality -> None_responsible
       | Monadic_op_to_comonadic_min, Forkable -> None_responsible
       | Monadic_op_to_comonadic_min, Yielding -> None_responsible
+      | Monadic_op_to_comonadic_min, Borrowability -> None_responsible
       | Monadic_op_to_comonadic_min, Linearity -> Axis Uniqueness
       | Monadic_op_to_comonadic_min, Statefulness -> Axis Visibility
       | Monadic_op_to_comonadic_min, Portability -> Axis Contention
@@ -4279,9 +4546,11 @@ module Lattices_mono = struct
       | Comonadic_to_monadic_op_min _, Visibility -> Axis Statefulness
       | Comonadic_to_monadic_op_min _, Contention -> Axis Portability
       | Comonadic_to_monadic_op_min _, Staticity -> None_responsible
+      | Comonadic_to_monadic_op_min _, Borrowedness -> None_responsible
       | Monadic_op_to_comonadic_max, Areality -> None_responsible
       | Monadic_op_to_comonadic_max, Forkable -> None_responsible
       | Monadic_op_to_comonadic_max, Yielding -> None_responsible
+      | Monadic_op_to_comonadic_max, Borrowability -> None_responsible
       | Monadic_op_to_comonadic_max, Linearity -> Axis Uniqueness
       | Monadic_op_to_comonadic_max, Statefulness -> Axis Visibility
       | Monadic_op_to_comonadic_max, Portability -> Axis Contention
@@ -4289,6 +4558,7 @@ module Lattices_mono = struct
       | Comonadic_to_monadic_op_max _, Visibility -> Axis Statefulness
       | Comonadic_to_monadic_op_max _, Contention -> Axis Portability
       | Comonadic_to_monadic_op_max _, Staticity -> None_responsible
+      | Comonadic_to_monadic_op_max _, Borrowedness -> None_responsible
 
     let rec find_responsible_axis_proj_simple : type a b b_ax l r.
         (a, b, l * r) Simple_morph.t -> (b, b_ax) Axis.t -> a responsible_axis =
@@ -4451,7 +4721,8 @@ type monadic = C.monadic =
   { uniqueness : C.Uniqueness.t;
     contention : C.Contention.t;
     visibility : C.Visibility.t;
-    staticity : C.Staticity.t
+    staticity : C.Staticity.t;
+    borrowedness : C.Borrowedness.t
   }
 
 type 'a comonadic_with = 'a C.comonadic_with =
@@ -4460,7 +4731,8 @@ type 'a comonadic_with = 'a C.comonadic_with =
     portability : C.Portability.t;
     forkable : C.Forkable.t;
     yielding : C.Yielding.t;
-    statefulness : C.Statefulness.t
+    statefulness : C.Statefulness.t;
+    borrowability : C.Borrowability.t
   }
 
 module Axis = C.Axis
@@ -6105,6 +6377,26 @@ module Uniqueness = struct
   let zap_to_legacy_force = zap_to_ceil_force
 end
 
+module Borrowedness = struct
+  module Const = C.Borrowedness
+
+  module Obj = struct
+    type const = Const.t
+
+    let obj = C.Borrowedness_op
+  end
+
+  include Monadic_gen (Obj)
+
+  let owned = of_const Owned
+
+  let borrowed = of_const Borrowed
+
+  let legacy = of_const Const.legacy
+
+  let zap_to_legacy_force = zap_to_ceil_force
+end
+
 module Contention = struct
   module Const = C.Contention
 
@@ -6186,6 +6478,26 @@ module Yielding = struct
     | false -> zap_to_ceil_force ?commit
 end
 
+module Borrowability = struct
+  module Const = C.Borrowability
+
+  module Obj = struct
+    type const = Const.t
+
+    let obj : _ C.obj = C.Borrowability
+  end
+
+  include Comonadic_gen (Obj)
+
+  let borrowable = of_const Borrowable
+
+  let unborrowable = of_const Unborrowable
+
+  let legacy = of_const Const.legacy
+
+  let zap_to_legacy_force = zap_to_floor_force
+end
+
 module Staticity = struct
   module Const = C.Staticity
 
@@ -6249,7 +6561,8 @@ module Comonadic_with (Areality : Areality) = struct
         P Portability;
         P Forkable;
         P Yielding;
-        P Statefulness ]
+        P Statefulness;
+        P Borrowability ]
       |> List.sort (fun (P ax1) (P ax2) -> compare ax1 ax2)
   end
 
@@ -6344,7 +6657,17 @@ module Comonadic_with (Areality : Areality) = struct
     let yielding =
       proj Yielding m |> Yielding.zap_to_legacy_force ?commit ~global
     in
-    { areality; linearity; portability; forkable; yielding; statefulness }
+    let borrowability =
+      proj Borrowability m |> Borrowability.zap_to_legacy_force ?commit
+    in
+    { areality;
+      linearity;
+      portability;
+      forkable;
+      yielding;
+      statefulness;
+      borrowability
+    }
 
   let legacy = of_const Const.legacy
 
@@ -6407,7 +6730,7 @@ module Monadic = struct
     let proj = Axis.proj
 
     let all =
-      [P Uniqueness; P Contention; P Visibility; P Staticity]
+      [P Uniqueness; P Contention; P Visibility; P Staticity; P Borrowedness]
       |> List.sort (fun (P ax1) (P ax2) -> compare ax1 ax2)
   end
 
@@ -6501,7 +6824,10 @@ module Monadic = struct
       |> Contention.zap_to_legacy_force ?commit ~visibility ~arg
     in
     let staticity = proj Staticity m |> Staticity.zap_to_legacy_force ?commit in
-    { uniqueness; contention; visibility; staticity }
+    let borrowedness =
+      proj Borrowedness m |> Borrowedness.zap_to_legacy_force ?commit
+    in
+    { uniqueness; contention; visibility; staticity; borrowedness }
 
   let legacy = of_const Const.legacy
 
@@ -6592,7 +6918,7 @@ module Mode_with (Areality : Areality) = struct
 
   (* CR-soon zqian: make a functor [Mode.With_regionality.Const.Make] to generalize over any type
      operator applied on each mode constants. *)
-  type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) modes =
+  type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j, 'k, 'l) modes =
     { areality : 'a;
       linearity : 'b;
       uniqueness : 'c;
@@ -6602,7 +6928,9 @@ module Mode_with (Areality : Areality) = struct
       yielding : 'g;
       statefulness : 'h;
       visibility : 'i;
-      staticity : 'j
+      staticity : 'j;
+      borrowability : 'k;
+      borrowedness : 'l
     }
 
   let split
@@ -6612,25 +6940,42 @@ module Mode_with (Areality : Areality) = struct
         forkable;
         yielding;
         statefulness;
+        borrowability;
         uniqueness;
         contention;
         visibility;
-        staticity
+        staticity;
+        borrowedness
       } =
     let monadic : Monadic.Const.t =
-      { uniqueness; contention; visibility; staticity }
+      { uniqueness; contention; visibility; staticity; borrowedness }
     in
     let comonadic : Comonadic.Const.t =
-      { areality; linearity; portability; forkable; yielding; statefulness }
+      { areality;
+        linearity;
+        portability;
+        forkable;
+        yielding;
+        statefulness;
+        borrowability
+      }
     in
     { comonadic; monadic }
 
   let merge { comonadic; monadic } =
-    let ({ areality; linearity; portability; forkable; yielding; statefulness }
+    let ({ areality;
+           linearity;
+           portability;
+           forkable;
+           yielding;
+           statefulness;
+           borrowability
+         }
           : Comonadic.Const.t) =
       comonadic
     in
-    let ({ uniqueness; contention; visibility; staticity } : Monadic.Const.t) =
+    let ({ uniqueness; contention; visibility; staticity; borrowedness }
+          : Monadic.Const.t) =
       monadic
     in
     { areality;
@@ -6639,10 +6984,12 @@ module Mode_with (Areality : Areality) = struct
       forkable;
       yielding;
       statefulness;
+      borrowability;
       uniqueness;
       contention;
       visibility;
-      staticity
+      staticity;
+      borrowedness
     }
 
   let print ?verbose () ppf { monadic; comonadic } =
@@ -6693,7 +7040,9 @@ module Mode_with (Areality : Areality) = struct
         Yielding.Const.t,
         Statefulness.Const.t,
         Visibility.Const.t,
-        Staticity.Const.t )
+        Staticity.Const.t,
+        Borrowability.Const.t,
+        Borrowedness.Const.t )
       modes
 
     let min =
@@ -6758,7 +7107,9 @@ module Mode_with (Areality : Areality) = struct
           Yielding.Const.t option,
           Statefulness.Const.t option,
           Visibility.Const.t option,
-          Staticity.Const.t option )
+          Staticity.Const.t option,
+          Borrowability.Const.t option,
+          Borrowedness.Const.t option )
         modes
 
       let none =
@@ -6771,7 +7122,9 @@ module Mode_with (Areality : Areality) = struct
           yielding = None;
           statefulness = None;
           visibility = None;
-          staticity = None
+          staticity = None;
+          borrowability = None;
+          borrowedness = None
         }
 
       let value opt ~default =
@@ -6795,6 +7148,12 @@ module Mode_with (Areality : Areality) = struct
           Option.value opt.visibility ~default:default.visibility
         in
         let staticity = Option.value opt.staticity ~default:default.staticity in
+        let borrowability =
+          Option.value opt.borrowability ~default:default.borrowability
+        in
+        let borrowedness =
+          Option.value opt.borrowedness ~default:default.borrowedness
+        in
         { areality;
           uniqueness;
           linearity;
@@ -6804,7 +7163,9 @@ module Mode_with (Areality : Areality) = struct
           yielding;
           statefulness;
           visibility;
-          staticity
+          staticity;
+          borrowability;
+          borrowedness
         }
 
       let proj (type a) (ax : a Axis.t) (t : t) : a option =
@@ -6814,7 +7175,8 @@ module Mode_with (Areality : Areality) = struct
           | Uniqueness -> t.uniqueness
           | Contention -> t.contention
           | Visibility -> t.visibility
-          | Staticity -> t.staticity)
+          | Staticity -> t.staticity
+          | Borrowedness -> t.borrowedness)
         | Comonadic ax -> (
           match ax with
           | Areality -> t.areality
@@ -6822,7 +7184,8 @@ module Mode_with (Areality : Areality) = struct
           | Portability -> t.portability
           | Forkable -> t.forkable
           | Yielding -> t.yielding
-          | Statefulness -> t.statefulness)
+          | Statefulness -> t.statefulness
+          | Borrowability -> t.borrowability)
 
       let set (type a) (ax : a Axis.t) (a : a option) (t : t) : t =
         match ax with
@@ -6831,7 +7194,8 @@ module Mode_with (Areality : Areality) = struct
           | Uniqueness -> { t with uniqueness = a }
           | Contention -> { t with contention = a }
           | Visibility -> { t with visibility = a }
-          | Staticity -> { t with staticity = a })
+          | Staticity -> { t with staticity = a }
+          | Borrowedness -> { t with borrowedness = a })
         | Comonadic ax -> (
           match ax with
           | Areality -> { t with areality = a }
@@ -6839,7 +7203,8 @@ module Mode_with (Areality : Areality) = struct
           | Portability -> { t with portability = a }
           | Yielding -> { t with yielding = a }
           | Forkable -> { t with forkable = a }
-          | Statefulness -> { t with statefulness = a })
+          | Statefulness -> { t with statefulness = a }
+          | Borrowability -> { t with borrowability = a })
 
       let print ppf
           { areality;
@@ -6851,13 +7216,15 @@ module Mode_with (Areality : Areality) = struct
             yielding;
             statefulness;
             visibility;
-            staticity
+            staticity;
+            borrowability;
+            borrowedness
           } =
         let option_print print ppf = function
           | None -> Fmt.fprintf ppf "None"
           | Some a -> Fmt.fprintf ppf "Some %a" print a
         in
-        Fmt.fprintf ppf "%a,%a,%a,%a,%a,%a,%a,%a,%a,%a"
+        Fmt.fprintf ppf "%a,%a,%a,%a,%a,%a,%a,%a,%a,%a,%a,%a"
           (option_print Areality.Const.print)
           areality
           (option_print Linearity.Const.print)
@@ -6878,6 +7245,10 @@ module Mode_with (Areality : Areality) = struct
           visibility
           (option_print Staticity.Const.print)
           staticity
+          (option_print Borrowability.Const.print)
+          borrowability
+          (option_print Borrowedness.Const.print)
+          borrowedness
 
       let partial_print ppf
           { areality;
@@ -6889,7 +7260,9 @@ module Mode_with (Areality : Areality) = struct
             yielding;
             statefulness;
             visibility;
-            staticity
+            staticity;
+            borrowability;
+            borrowedness
           } =
         let option_to_string print a =
           Option.map (fun a -> Fmt.asprintf "%a" print a) a
@@ -6904,7 +7277,9 @@ module Mode_with (Areality : Areality) = struct
             option_to_string Yielding.Const.print yielding;
             option_to_string Statefulness.Const.print statefulness;
             option_to_string Visibility.Const.print visibility;
-            option_to_string Staticity.Const.print staticity ]
+            option_to_string Staticity.Const.print staticity;
+            option_to_string Borrowability.Const.print borrowability;
+            option_to_string Borrowedness.Const.print borrowedness ]
         in
         let l = List.filter_map Fun.id l in
         Fmt.fprintf ppf "%a"
@@ -6930,6 +7305,12 @@ module Mode_with (Areality : Areality) = struct
       in
       let visibility = diff Visibility.Const.le m1.visibility m2.visibility in
       let staticity = diff Staticity.Const.le m1.staticity m2.staticity in
+      let borrowability =
+        diff Borrowability.Const.le m1.borrowability m2.borrowability
+      in
+      let borrowedness =
+        diff Borrowedness.Const.le m1.borrowedness m2.borrowedness
+      in
       { areality;
         linearity;
         uniqueness;
@@ -6939,7 +7320,9 @@ module Mode_with (Areality : Areality) = struct
         yielding;
         statefulness;
         visibility;
-        staticity
+        staticity;
+        borrowability;
+        borrowedness
       }
 
     let comonadic_to_monadic_min =
@@ -7072,7 +7455,8 @@ module Mode_with (Areality : Areality) = struct
         { c with
           areality = Areality.Const.max;
           forkable = Forkable.Const.max;
-          yielding = Yielding.Const.max
+          yielding = Yielding.Const.max;
+          borrowability = Borrowability.Const.max
         }
       in
       pretty_print_mod
@@ -7381,7 +7765,9 @@ module Mode_with (Areality : Areality) = struct
     | Visibility_op -> Visibility.zap_to_legacy_force mode |> ignore
     | Linearity -> Linearity.zap_to_legacy_force mode |> ignore
     | Statefulness -> Statefulness.zap_to_legacy_force mode |> ignore
+    | Borrowability -> Borrowability.zap_to_legacy_force mode |> ignore
     | Staticity_op -> Staticity.zap_to_legacy_force mode |> ignore
+    | Borrowedness_op -> Borrowedness.zap_to_legacy_force mode |> ignore
     | Monadic_op -> Monadic.zap_to_legacy_force ~arg:false mode |> ignore
     | Comonadic_with_regionality ->
       let module M = Comonadic_with (Regionality) in
@@ -7689,7 +8075,9 @@ module Const = struct
          yielding;
          statefulness;
          visibility;
-         staticity
+         staticity;
+         borrowability;
+         borrowedness
        } :
         With_locality.Const.t) : With_regionality.Const.t =
     let areality = locality_as_regionality areality in
@@ -7702,7 +8090,9 @@ module Const = struct
       yielding;
       statefulness;
       visibility;
-      staticity
+      staticity;
+      borrowability;
+      borrowedness
     }
 
   module Axis = struct
@@ -7716,10 +8106,12 @@ module Const = struct
       | Comonadic Forkable -> Right (Comonadic Forkable)
       | Comonadic Yielding -> Right (Comonadic Yielding)
       | Comonadic Statefulness -> Right (Comonadic Statefulness)
+      | Comonadic Borrowability -> Right (Comonadic Borrowability)
       | Monadic Uniqueness -> Right (Monadic Uniqueness)
       | Monadic Contention -> Right (Monadic Contention)
       | Monadic Visibility -> Right (Monadic Visibility)
       | Monadic Staticity -> Right (Monadic Staticity)
+      | Monadic Borrowedness -> Right (Monadic Borrowedness)
 
     let with_locality_as_regionality :
         With_locality.Axis.packed -> With_regionality.Axis.packed =
@@ -8473,8 +8865,11 @@ module Crossing = struct
     let create ~uniqueness:(Atom.Modality (Join_const uniqueness))
         ~contention:(Atom.Modality (Join_const contention))
         ~visibility:(Atom.Modality (Join_const visibility))
-        ~staticity:(Atom.Modality (Join_const staticity)) =
-      Modality (Join_const { uniqueness; contention; visibility; staticity })
+        ~staticity:(Atom.Modality (Join_const staticity))
+        ~borrowedness:(Atom.Modality (Join_const borrowedness)) =
+      Modality
+        (Join_const
+           { uniqueness; contention; visibility; staticity; borrowedness })
 
     let modality m (Modality t) = Modality (Modality.Const.concat ~then_:t m)
 
@@ -8565,7 +8960,8 @@ module Crossing = struct
         ~portability:(Atom.Modality (Meet_const portability))
         ~forkable:(Atom.Modality (Meet_const forkable))
         ~yielding:(Atom.Modality (Meet_const yielding))
-        ~statefulness:(Atom.Modality (Meet_const statefulness)) =
+        ~statefulness:(Atom.Modality (Meet_const statefulness))
+        ~borrowability:(Atom.Modality (Meet_const borrowability)) =
       Modality
         (Meet_const
            { areality;
@@ -8573,7 +8969,8 @@ module Crossing = struct
              portability;
              statefulness;
              forkable;
-             yielding
+             yielding;
+             borrowability
            })
 
     let always_constructed_at c = Modality (Meet_const c)
@@ -8823,7 +9220,8 @@ module Crossing = struct
       { monadic; comonadic = (Comonadic.set [@inlined hint]) ax a comonadic }
 
   let create ~regionality ~linearity ~uniqueness ~portability ~contention
-      ~forkable ~yielding ~statefulness ~visibility ~staticity =
+      ~forkable ~yielding ~statefulness ~visibility ~staticity ~borrowability
+      ~borrowedness =
     let comonadic b ax =
       if b then Per_axis.min (Comonadic ax) else Per_axis.max (Comonadic ax)
     in
@@ -8840,12 +9238,15 @@ module Crossing = struct
     let statefulness = comonadic statefulness Statefulness in
     let visibility = monadic visibility Visibility in
     let staticity = monadic staticity Staticity in
+    let borrowability = comonadic borrowability Borrowability in
+    let borrowedness = monadic borrowedness Borrowedness in
     let monadic =
       Monadic.create ~uniqueness ~contention ~visibility ~staticity
+        ~borrowedness
     in
     let comonadic =
       Comonadic.create ~regionality ~linearity ~portability ~yielding ~forkable
-        ~statefulness
+        ~statefulness ~borrowability
     in
     { monadic; comonadic }
 

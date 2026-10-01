@@ -194,6 +194,7 @@ Error: Signature mismatch:
          linearity: mod many with 'a ≰ mod many
          forkable: mod forkable with 'a ≰ mod forkable
          yielding: mod unyielding with 'a ≰ mod unyielding
+         borrowability: mod borrowable with 'a ≰ mod borrowable
 |}]
 
 module M : sig

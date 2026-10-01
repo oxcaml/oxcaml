@@ -21,10 +21,12 @@ type t
           many
           stateless
           immutable
+          borrowable
           portable
           contended
           local
           unique
+          owned
           static
           internal
 |}]
@@ -40,6 +42,9 @@ type t
           forkable
           unyielding
           aliased
+          borrowed
+          borrowable
+          borrowed
           portable
           contended
           external_
@@ -55,7 +60,9 @@ type t
           unforkable
           yielding
           once
+          unborrowable
           unique
+          owned
           stateful
           read_write
           nonportable
@@ -71,7 +78,9 @@ type t
           unforkable
           yielding
           once
+          unborrowable
           unique
+          owned
           stateful
           read_write
           nonportable
@@ -89,7 +98,9 @@ type t
           unforkable
           yielding
           once
+          unborrowable
           unique
+          owned
           stateful
           read_write
           uncontended
@@ -107,7 +118,9 @@ type t
           unforkable
           yielding
           once
+          unborrowable
           unique
+          owned
           read_write
           uncontended
           static
@@ -123,10 +136,12 @@ type 'a t
           many
           stateless
           immutable
+          borrowable
           portable
           contended
           local
           unique
+          owned
           static
           internal
       with 'a
@@ -141,10 +156,12 @@ type ('a
              many
              stateless
              immutable
+             borrowable
              portable
              contended
              local
              unique
+             owned
              static
              internal)
      t
@@ -160,7 +177,9 @@ type ('a
              unforkable
              yielding
              once
+             unborrowable
              unique
+             owned
              read_write
              uncontended
              static
@@ -178,7 +197,9 @@ type 'a t
           unforkable
           yielding
           once
+          unborrowable
           unique
+          owned
           stateful
           read_write
           uncontended
@@ -195,7 +216,9 @@ type 'a t
           unforkable
           yielding
           once
+          unborrowable
           unique
+          owned
           stateful
           read_write
           nonportable
@@ -212,10 +235,12 @@ type 'a t
           many
           stateless
           immutable
+          borrowable
           portable
           contended
           local
           unique
+          owned
           static
           internal
       with 'a

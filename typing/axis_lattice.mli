@@ -56,6 +56,8 @@ val create :
   statefulness:Mode.Statefulness.Const.t ->
   visibility:Mode.Visibility.Const.t ->
   staticity:Mode.Staticity.const ->
+  borrowability:Mode.Borrowability.Const.t ->
+  borrowedness:Mode.Borrowedness.Const.t ->
   externality:Jkind_axis.Externality.t ->
   t
 
@@ -81,6 +83,10 @@ val statefulness : t -> Mode.Statefulness.Const.t
 val visibility : t -> Mode.Visibility.Const.t
 
 val staticity : t -> Mode.Staticity.const
+
+val borrowability : t -> Mode.Borrowability.Const.t
+
+val borrowedness : t -> Mode.Borrowedness.Const.t
 
 val externality : t -> Jkind_axis.Externality.t
 
