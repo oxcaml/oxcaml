@@ -74,6 +74,8 @@
  (ocamlopt_flags
   (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
  (modules
+  with_backtracking
+  union_find
   binutils
   local_store
   config
@@ -112,6 +114,8 @@
   builtin_attributes
   global_module
   ident
+  scheduler
+  ivar
   path
   unit_info
   current_unit
@@ -278,6 +282,10 @@
 
 (copy_files ../../utils/diffing_with_keys.ml)
 
+(copy_files ../../utils/with_backtracking.ml)
+
+(copy_files ../../utils/union_find.ml)
+
 (copy_files ../../parsing/location.ml)
 
 (copy_files ../../parsing/language_extension.ml)
@@ -313,6 +321,10 @@
 (copy_files ../../typing/path.ml)
 
 (copy_files ../../typing/jkind_axis.ml)
+
+(copy_files ../../typing/scheduler.ml)
+
+(copy_files ../../typing/ivar.ml)
 
 (copy_files ../../typing/jkind.ml)
 
@@ -525,6 +537,12 @@
 
 (copy_files ../../typing/jkind_axis.mli)
 
+(copy_files ../../utils/union_find.mli)
+
+(copy_files ../../typing/scheduler.mli)
+
+(copy_files ../../typing/ivar.mli)
+
 (copy_files ../../typing/oprint.mli)
 
 (copy_files ../../typing/primitive.mli)
@@ -697,8 +715,12 @@
   ; NOTE: Be sure to keep these arguments in dependency order!
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Runtimetags.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Int_replace_polymorphic_compare.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__With_backtracking.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Union_find.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Binutils.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Local_store.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Scheduler.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ivar.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Build_path_prefix_map.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Config.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Format_doc.cmo
@@ -832,8 +854,12 @@
   ; NOTE: Be sure to keep these arguments in dependency order!
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Runtimetags.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Int_replace_polymorphic_compare.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__With_backtracking.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Union_find.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Binutils.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Local_store.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Scheduler.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ivar.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Build_path_prefix_map.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Config.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Format_doc.cmx
