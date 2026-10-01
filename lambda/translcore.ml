@@ -2585,8 +2585,10 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
     let init_expr_layout = layout_exp init_expr_sort init_expr in
     assert (is_heap_mode (Option.get mode)); (* Pduprecord must be Alloc_heap and not unboxed *)
     Llet(Strict, Lambda.layout_block, copy_id, copy_id_duid,
-         Lprim(Pduprecord (repres, size),
-               [transl_exp ~scopes init_expr_layout init_expr],
+         Lprim(Popaque Lambda.layout_block,
+               [Lprim(Pduprecord (repres, size),
+                      [transl_exp ~scopes init_expr_layout init_expr],
+                      of_location ~scopes loc)],
                of_location ~scopes loc),
          Array.fold_left update_field (Lvar copy_id) fields)
   | Some _ | None ->
