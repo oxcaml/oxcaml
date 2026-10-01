@@ -79,11 +79,19 @@ let find_all_aliases env arg =
       | None -> find_all_aliases ())
     arg
 
-let rebuild_arm uacc arm (action, use_id, arity, env_at_use)
+let rebuild_arm uacc arm (action, ~likelihood, use_id, arity, env_at_use)
     (new_let_conts, arms, (mergeable_arms : mergeable_arms)) =
   let action =
     Simplify_common.clear_demoted_trap_action_and_patch_unused_exn_bucket uacc
       action
+  in
+  let create_arm action =
+    let likelihood =
+      if UE.is_cold_continuation (UA.uenv uacc) (Apply_cont.continuation action)
+      then Likelihood.cold
+      else likelihood
+    in
+    Switch.create_arm_with_likelihood ~likelihood action
   in
   match EB.rewrite_switch_arm uacc action ~use_id arity with
   | Invalid _ ->
@@ -137,7 +145,7 @@ let rebuild_arm uacc arm (action, use_id, arity, env_at_use)
       (* The destination is unreachable; delete the [Switch] arm. *)
       new_let_conts, arms, mergeable_arms
     | Some action -> (
-      let arms = TI.Map.add arm action arms in
+      let arms = TI.Map.add arm (create_arm action) arms in
       (* Check to see if this arm may be merged with others. *)
       if Option.is_some (Apply_cont.trap_action action)
       then new_let_conts, arms, Not_mergeable
@@ -167,7 +175,7 @@ let rebuild_arm uacc arm (action, use_id, arity, env_at_use)
   | New_wrapper new_let_cont ->
     let new_let_conts = new_let_cont :: new_let_conts in
     let action = Apply_cont.goto new_let_cont.cont in
-    let arms = TI.Map.add arm action arms in
+    let arms = TI.Map.add arm (create_arm action) arms in
     new_let_conts, arms, Not_mergeable
 
 let filter_and_choose_alias required_names alias_set =
@@ -822,7 +830,9 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
   let uacc, expr = EB.bind_let_conts uacc ~body new_let_conts in
   after_rebuild expr uacc
 
-let simplify_arm arm (action, env_at_use) (arms, dacc) =
+let simplify_arm arm (switch_arm, env_at_use) (arms, dacc) =
+  let action = Switch_expr.arm_action switch_arm in
+  let likelihood = Switch_expr.arm_likelihood switch_arm in
   let denv_at_use = DE.with_typing_env (DA.denv dacc) env_at_use in
   let args = AC.args action in
   let use_kind =
@@ -830,6 +840,11 @@ let simplify_arm arm (action, env_at_use) (arms, dacc) =
   in
   let { S.simples = args; simple_tys = arg_types } =
     S.simplify_simples (DA.with_denv dacc denv_at_use) args
+  in
+  let denv_at_use =
+    if Switch_expr.arm_is_cold switch_arm
+    then DE.mark_as_cold denv_at_use
+    else denv_at_use
   in
   let dacc, rewrite_id =
     DA.record_continuation_use dacc (AC.continuation action) use_kind
@@ -851,7 +866,9 @@ let simplify_arm arm (action, env_at_use) (arms, dacc) =
            (Apply_cont.continuation action)
            args)
   in
-  let arms = TI.Map.add arm (action, rewrite_id, arity, env_at_use) arms in
+  let arms =
+    TI.Map.add arm (action, ~likelihood, rewrite_id, arity, env_at_use) arms
+  in
   arms, dacc
 
 let decide_continuation_specialization0 ~dacc ~switch ~scrutinee =
@@ -1022,12 +1039,12 @@ let simplify_switch dacc switch ~down_to_up =
       (Switch.arms switch)
   in
   match TI.Map.get_singleton arms with
-  | Some (_, (apply_cont, env_at_use)) ->
+  | Some (_, (arm, env_at_use)) ->
     (* Rewrite to a regular apply_cont so that it is an inlinable use. *)
     let denv_at_use = DE.with_typing_env (DA.denv dacc) env_at_use in
     let dacc = DA.with_denv dacc denv_at_use in
-    Simplify_apply_cont_expr.simplify_apply_cont dacc apply_cont
-      ~down_to_up:(fun dacc ~rebuild ->
+    Simplify_apply_cont_expr.simplify_apply_cont dacc
+      (Switch_expr.arm_action arm) ~down_to_up:(fun dacc ~rebuild ->
         down_to_up dacc ~rebuild:(fun uacc ~after_rebuild ->
             let uacc =
               UA.notify_removed ~operation:Removed_operations.branch uacc

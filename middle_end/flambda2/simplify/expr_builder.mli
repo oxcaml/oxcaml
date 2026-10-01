@@ -86,7 +86,7 @@ val create_switch :
   Upwards_acc.t ->
   condition_dbg:Debuginfo.t ->
   scrutinee:Simple.t ->
-  arms:Apply_cont.t Target_ocaml_int.Map.t ->
+  arms:Switch_expr.arm Target_ocaml_int.Map.t ->
   Rebuilt_expr.t * Upwards_acc.t
 
 type new_let_cont =

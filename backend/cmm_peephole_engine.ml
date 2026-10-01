@@ -308,8 +308,8 @@ module Cmm_comparator = struct
       equal_operation op1 op2 && List.equal equivalent args1 args2
     | Csequence (before1, after1), Csequence (before2, after2) ->
       equivalent before1 before2 && equivalent after1 after2
-    | ( Cifthenelse (cond1, _, ifso1, _, ifnot1, _),
-        Cifthenelse (cond2, _, ifso2, _, ifnot2, _) ) ->
+    | ( Cifthenelse (cond1, _, _, ifso1, _, _, ifnot1, _),
+        Cifthenelse (cond2, _, _, ifso2, _, _, ifnot2, _) ) ->
       equivalent cond1 cond2 && equivalent ifso1 ifso2
       && equivalent ifnot1 ifnot2
     | ( Cswitch (scrutinee1, cases1, actions1, _),
@@ -317,7 +317,8 @@ module Cmm_comparator = struct
       equivalent scrutinee1 scrutinee2
       && Misc.Stdlib.Array.equal Int.equal cases1 cases2
       && Misc.Stdlib.Array.equal
-           (fun (act1, _) (act2, _) -> equivalent act1 act2)
+           (fun (act1, _, ~likelihood:_) (act2, _, ~likelihood:_) ->
+             equivalent act1 act2)
            actions1 actions2
     | Ccatch (flag1, handlers1, body1), Ccatch (flag2, handlers2, body2) ->
       let equal_handler
@@ -371,7 +372,7 @@ module Cmm_comparator = struct
         | Cname_for_debugger _ | Ctuple _
         | Cop (_, _, _)
         | Csequence (_, _)
-        | Cifthenelse (_, _, _, _, _, _)
+        | Cifthenelse (_, _, _, _, _, _, _, _)
         | Cswitch (_, _, _, _)
         | Ccatch (_, _, _)
         | Cexit (_, _, _)

@@ -14,26 +14,73 @@
 (*                                                                        *)
 (**************************************************************************)
 
+type arm =
+  { action : Apply_cont_expr.t;
+    likelihood : Likelihood.t
+  }
+
+let create_arm_with_likelihood ~likelihood action = { action; likelihood }
+
+let create_arm ?weight action =
+  let likelihood =
+    Option.value ~default:Likelihood.default
+      (Option.map Likelihood.from_weight weight)
+  in
+  { action; likelihood }
+
+let create_arm_cold action =
+  create_arm_with_likelihood ~likelihood:Likelihood.cold action
+
+let arm_action { action; likelihood = _ } = action
+
+let arm_likelihood { likelihood; action = _ } = likelihood
+
+let arm_is_cold { likelihood; _ } = Likelihood.is_cold likelihood
+
+let map_arm_action f ({ action; _ } as arm) =
+  let action' = f action in
+  if action == action' then arm else { arm with action = action' }
+
+let scale_for_printing arms =
+  let likelihoods =
+    Target_ocaml_int.Map.fold
+      (fun _ { likelihood; _ } likelihoods -> likelihood :: likelihoods)
+      arms []
+  in
+  let uniform = Likelihood.is_uniform likelihoods in
+  let total_likelihood = Likelihood.sum_list likelihoods in
+  total_likelihood, ~uniform
+
 type t =
   { condition_dbg : Debuginfo.t;
     scrutinee : Simple.t;
-    arms : Apply_cont_expr.t Target_ocaml_int.Map.t
+    arms : arm Target_ocaml_int.Map.t
   }
 
 let fprintf = Format.fprintf
 
+let print_probability ~uniform ppf (probability : Likelihood.classification) =
+  match probability with
+  | Cold -> Format.fprintf ppf "[cold]"
+  | Hot -> Format.fprintf ppf "[hot]"
+  | Weight p -> if not uniform then Format.fprintf ppf "[p = %f]" p
+
 let print_arms ppf arms =
+  let total, ~uniform = scale_for_printing arms in
   let arms =
     Target_ocaml_int.Map.fold
-      (fun discr action arms_inverse ->
+      (fun discr { action; likelihood } arms_inverse ->
+        let probability =
+          Likelihood.rescale ~total likelihood |> Likelihood.classify
+        in
         match Apply_cont_expr.Map.find action arms_inverse with
         | exception Not_found ->
           Apply_cont_expr.Map.add action
-            (Target_ocaml_int.Set.singleton discr)
+            (Target_ocaml_int.Map.singleton discr probability)
             arms_inverse
         | discrs ->
           Apply_cont_expr.Map.add action
-            (Target_ocaml_int.Set.add discr discrs)
+            (Target_ocaml_int.Map.add discr probability discrs)
             arms_inverse)
       arms Apply_cont_expr.Map.empty
   in
@@ -41,23 +88,27 @@ let print_arms ppf arms =
   let arms =
     List.sort
       (fun (action1, discrs1) (action2, discrs2) ->
-        let min1 = Target_ocaml_int.Set.min_elt_opt discrs1 in
-        let min2 = Target_ocaml_int.Set.min_elt_opt discrs2 in
+        let min1 = Target_ocaml_int.Map.min_binding_opt discrs1 in
+        let min2 = Target_ocaml_int.Map.min_binding_opt discrs2 in
         match min1, min2 with
         | None, None -> Apply_cont_expr.compare action1 action2
         | None, Some _ -> -1
         | Some _, None -> 1
-        | Some min1, Some min2 -> Target_ocaml_int.compare min1 min2)
+        | Some (min1, _), Some (min2, _) -> Target_ocaml_int.compare min1 min2)
       (Apply_cont_expr.Map.bindings arms)
   in
   List.iter
     (fun (action, discrs) ->
       if !spc then fprintf ppf "@ " else spc := true;
-      let discrs = Target_ocaml_int.Set.elements discrs in
+      let discrs = Target_ocaml_int.Map.bindings discrs in
       fprintf ppf "@[<hov 2>@[<hov 0>| %a %t\u{21a6}%t@ @]%a@]"
         (Format.pp_print_list
            ~pp_sep:(fun ppf () -> Format.fprintf ppf "@ | ")
-           Target_ocaml_int.print)
+           (fun ppf (discr, probability) ->
+             Format.fprintf ppf "%a%t%a%t" Target_ocaml_int.print discr
+               Flambda_colours.continuation_annotation
+               (print_probability ~uniform)
+               probability Flambda_colours.pop))
         discrs Flambda_colours.elide Flambda_colours.pop Apply_cont_expr.print
         action)
     arms
@@ -92,7 +143,7 @@ let arms t = t.arms
 let free_names { condition_dbg = _; scrutinee; arms } =
   let free_names_of_scrutinee = Simple.free_names scrutinee in
   Target_ocaml_int.Map.fold
-    (fun _discr action free_names ->
+    (fun _discr { action; _ } free_names ->
       Name_occurrences.union (Apply_cont_expr.free_names action) free_names)
     arms free_names_of_scrutinee
 
@@ -100,7 +151,9 @@ let apply_renaming ({ condition_dbg; scrutinee; arms } as t) renaming =
   let scrutinee' = Simple.apply_renaming scrutinee renaming in
   let arms' =
     Target_ocaml_int.Map.map_sharing
-      (fun action -> Apply_cont_expr.apply_renaming action renaming)
+      (fun ({ action; likelihood } as arm) ->
+        let action' = Apply_cont_expr.apply_renaming action renaming in
+        if action == action' then arm else { action = action'; likelihood })
       arms
   in
   if scrutinee == scrutinee' && arms == arms'
@@ -110,6 +163,6 @@ let apply_renaming ({ condition_dbg; scrutinee; arms } as t) renaming =
 let ids_for_export { condition_dbg = _; scrutinee; arms } =
   let scrutinee_ids = Ids_for_export.from_simple scrutinee in
   Target_ocaml_int.Map.fold
-    (fun _discr action ids ->
+    (fun _discr { action; likelihood = _ } ids ->
       Ids_for_export.union ids (Apply_cont_expr.ids_for_export action))
     arms scrutinee_ids
