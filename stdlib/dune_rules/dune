@@ -1,0 +1,49 @@
+(rule
+ (targets build_settings.txt ld.conf)
+ (deps
+  (glob_files ../../Makefile.*)
+  ../../.depend.menhir ../../config.status ../StdlibModules)
+ (action (chdir ../../ (run make -s -f Makefile.upstream V=1 COMPUTE_DEPS=false stdlib/dune_rules/build_settings.txt stdlib/dune_rules/ld.conf))))
+
+(executable
+ (name gen)
+ (modules gen)
+ (modes native))
+
+(rule
+ (target runtime.dune)
+ (enabled_if (<> %{context_name} main))
+ (action
+   (with-stdout-to %{target} (run
+     %{dep:gen.exe}
+     %{dep:build_settings.txt}
+     runtime))))
+
+(rule
+ (target stdlib_module_deps.txt)
+ (deps (:stdlib (glob_files ../*.ml) (glob_files ../*.mli)))
+ (action (with-stdout-to %{target} (chdir .. (run %{dep:../../tools/ocamldep.exe} -one-line -as-map %{stdlib})))))
+
+(rule
+ (target stdlib.dune)
+ (enabled_if (<> %{context_name} main))
+ (action
+   (with-stdout-to %{target} (run
+     %{dep:gen.exe}
+     %{dep:build_settings.txt}
+     stdlib
+     %{dep:stdlib_module_deps.txt}))))
+
+;; In the main build, don't rebuild the runtime and stdlib
+(rule
+ (target runtime.dune)
+ (enabled_if (= %{context_name} main))
+ (action
+   (with-stdout-to %{target} (run
+     %{dep:gen.exe}
+     %{dep:build_settings.txt}
+     primitives))))
+(rule
+ (target stdlib.dune)
+ (enabled_if (= %{context_name} main))
+ (action (write-file %{target} "")))

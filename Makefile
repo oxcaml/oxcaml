@@ -15,8 +15,6 @@ ocamldir = .
 toplevels_installed = top opttop
 
 CLEAN_DUNE_WORKSPACES = \
-  duneconf/boot.ws \
-  duneconf/runtime_stdlib.ws \
   duneconf/main.ws
 
 # These are getting rm -rf'd, so be careful with this.
@@ -167,7 +165,7 @@ boot-minimizer:
 	$(dune) build $(ws_boot) @chamelon/all
 
 .PHONY: minimizer
-minimizer: runtime-stdlib
+minimizer: boot-compiler
 	cp chamelon/compat/dune.ox chamelon/compat/dune
 	$(dune) build $(ws_main) @chamelon/all
 
@@ -183,7 +181,7 @@ hacking-runtest: _build/_bootinstall
 # Only needed for running the test tools by hand; runtest will take care of
 # building them using Dune
 .PHONY: test-tools
-test-tools: runtime-stdlib
+test-tools: boot-compiler
 	$(dune) build $(ws_main) @middle_end/flambda2/tests/tools/all
 
 ARCHES=amd64 arm64
