@@ -1515,8 +1515,37 @@ type t6 = float64x2
 (**************)
 (* zero_alloc *)
 
-(* CR gyorsh or ccasinghino: Add examples *)
-(* CR gyorsh or ccasinghino: Add documentation to GitHub *)
+let state = ref (ref 0)
+let allocate () = state := ref 42
+
+let   no_parens =  zero_alloc_  allocate  ()
+let  left_assoc = (zero_alloc_  allocate) ()
+let right_assoc =  zero_alloc_ (allocate  ())
+[%%expect{|
+val state : int ref ref = {contents = {contents = 0}}
+val allocate : unit -> unit = <fun>
+val no_parens : unit = ()
+val left_assoc : unit = ()
+val right_assoc : unit = ()
+|}]
+
+let   no_parens_seq =  zero_alloc_  () ; allocate ()
+let  left_assoc_seq = (zero_alloc_  ()); allocate ()
+let right_assoc_seq =  zero_alloc_ (() ; allocate ())
+[%%expect{|
+val no_parens_seq : unit = ()
+val left_assoc_seq : unit = ()
+val right_assoc_seq : unit = ()
+|}]
+
+let outside_closure    = zero_alloc_ fun () ->             allocate ()
+let  inside_closure    =             fun () -> zero_alloc_ allocate ()
+let  inside_sugared () =                       zero_alloc_ allocate ()
+[%%expect{|
+val outside_closure : unit -> unit = <fun>
+val inside_closure : unit -> unit = <fun>
+val inside_sugared : unit -> unit = <fun>
+|}]
 
 (*****************)
 (* error_message *)
