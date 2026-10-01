@@ -303,10 +303,16 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
         | Never_returns, (Unknown | Bottom | Ok _) | Return _, Bottom ->
           dacc, None, Apply.Result_continuation.Never_returns
         | Return apply_return_continuation, Unknown ->
+          let env_at_use = DA.denv dacc in
+          let env_at_use =
+            if Code_metadata.cold callee's_code_metadata
+            then DE.mark_as_cold env_at_use
+            else env_at_use
+          in
           let dacc, use_id =
             DA.record_continuation_use dacc apply_return_continuation
               (Non_inlinable { escaping = true })
-              ~env_at_use:(DA.denv dacc)
+              ~env_at_use
               ~arg_types:
                 (T.unknown_types_from_arity result_arity
                    ~alloc_mode:
@@ -383,18 +389,30 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
                   result_arity results
               in
               let dacc = DA.with_denv dacc denv in
+              let env_at_use = DA.denv dacc in
+              let env_at_use =
+                if Code_metadata.cold callee's_code_metadata
+                then DE.mark_as_cold env_at_use
+                else env_at_use
+              in
               let dacc, use_id =
                 DA.record_continuation_use dacc apply_return_continuation
                   (Non_inlinable { escaping = true })
-                  ~env_at_use:(DA.denv dacc) ~arg_types
+                  ~env_at_use ~arg_types
               in
               dacc, Some use_id, result_continuation)
+      in
+      let env_at_use = DA.denv dacc in
+      let env_at_use =
+        if Code_metadata.cold callee's_code_metadata
+        then DE.mark_as_cold env_at_use
+        else env_at_use
       in
       let dacc, exn_cont_use_id =
         DA.record_continuation_use dacc
           (Exn_continuation.exn_handler (Apply.exn_continuation apply))
           (Non_inlinable { escaping = true })
-          ~env_at_use:(DA.denv dacc)
+          ~env_at_use
           ~arg_types:
             (T.unknown_types_from_arity
                (Exn_continuation.arity (Apply.exn_continuation apply))
