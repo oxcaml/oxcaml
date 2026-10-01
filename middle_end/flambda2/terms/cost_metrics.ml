@@ -86,25 +86,29 @@ let set_of_closures ~find_code_characteristics set_of_closures =
   let num_clos_vars =
     Set_of_closures.value_slots set_of_closures |> Value_slot.Map.cardinal
   in
-  let cost_metrics, num_stores =
+  let cost_metrics, num_words, num_stores =
     Function_slot.Map.fold
       (fun _ (code_id : Function_declarations.code_id_in_function_declaration)
-           (metrics, num_stores) ->
+           (metrics, num_words, num_stores) ->
         match code_id with
         | Deleted { function_slot_size; _ } ->
-          metrics, Stdlib.( + ) num_stores (2 * function_slot_size)
+          ( metrics,
+            Stdlib.( + ) num_words function_slot_size,
+            Stdlib.( + ) num_stores (2 * function_slot_size) )
         | Code_id { code_id; only_full_applications = _ } ->
           let { cost_metrics; function_slot_size } =
             find_code_characteristics code_id
           in
           (* We need to include the size of the infix headers *)
           ( metrics + cost_metrics,
+            Stdlib.( + ) num_words (Stdlib.( + ) function_slot_size 1),
             Stdlib.( + ) num_stores (Stdlib.( + ) (2 * function_slot_size) 1) ))
-      funs (zero, num_clos_vars)
+      funs
+      (zero, num_clos_vars, num_clos_vars)
   in
   (* The code of the functions is not placed with the allocation. *)
   with_out_of_line
-    (from_size (Code_size.set_of_closures_allocation ~num_stores))
+    (from_size (Code_size.set_of_closures_allocation ~num_words ~num_stores))
     ~out_of_line:cost_metrics
 
 let increase_due_to_let_expr ~is_phantom ~cost_metrics_of_defining_expr =

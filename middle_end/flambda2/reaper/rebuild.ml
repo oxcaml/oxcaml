@@ -83,6 +83,7 @@ type env =
     should_preserve_direct_calls : should_preserve_direct_calls;
     old_typing_env : Typing_env.t option;
     inside_code_definition : bool;
+    function_continuations : (Continuation.t * Continuation.t) option;
     types_rewrite_context : Types_rewriter.rewrite_context
   }
 
@@ -825,6 +826,20 @@ let rewrite_apply_cont_expr env ac =
 let reaper_produce_invalid_when_never_returns =
   Sys.getenv_opt "REAPER_INVALIDS" <> None
 
+let apply_is_in_tail_position env apply =
+  match
+    env.function_continuations, Apply.continuation apply, Apply.position apply
+  with
+  | Some (return_continuation, exn_continuation), Return cont, Normal ->
+    let exn = Apply.exn_continuation apply in
+    Continuation.equal cont return_continuation
+    && Continuation.equal (Exn_continuation.exn_handler exn) exn_continuation
+    && Misc.Stdlib.List.is_empty (Exn_continuation.extra_args exn)
+  | None, (Return _ | Never_returns), (Normal | Nontail)
+  | Some _, Never_returns, (Normal | Nontail)
+  | Some _, Return _, Nontail ->
+    false
+
 let make_apply_wrapper env
     (make_apply : continuation:Apply_expr.Result_continuation.t -> Apply_expr.t)
     apply_continuation return_decisions =
@@ -833,7 +848,8 @@ let make_apply_wrapper env
     let apply = make_apply ~continuation:Never_returns in
     RE.from_expr ~expr:(Expr.create_apply apply)
       ~free_names:(Apply.free_names apply)
-      ~code_size:(Code_size.apply ~is_tail:false apply)
+      ~code_size:
+        (Code_size.apply ~is_tail:(apply_is_in_tail_position env apply) apply)
   | Return return_cont -> (
     let return_decisions = List.map freshen_decisions return_decisions in
     let apply_decisions =
@@ -933,7 +949,10 @@ let make_apply_wrapper env
         let apply = make_apply ~continuation:(Return return_cont) in
         RE.from_expr ~expr:(Expr.create_apply apply)
           ~free_names:(Apply.free_names apply)
-          ~code_size:(Code_size.apply ~is_tail:false apply)
+          ~code_size:
+            (Code_size.apply
+               ~is_tail:(apply_is_in_tail_position env apply)
+               apply)
       else
         let apply_expr = Expr.create_apply apply in
         let handler =
@@ -953,7 +972,10 @@ let make_apply_wrapper env
         in
         let body =
           RE.from_expr ~expr:apply_expr ~free_names:(Apply.free_names apply)
-            ~code_size:(Code_size.apply ~is_tail:false apply)
+            ~code_size:
+              (Code_size.apply
+                 ~is_tail:(apply_is_in_tail_position env apply)
+                 apply)
         in
         RE.create_non_recursive_let_cont return_cont_wrapper cont_handler ~body
     | Invalid ->
@@ -988,14 +1010,20 @@ let make_apply_wrapper env
         let body =
           RE.from_expr ~expr:(Expr.create_apply apply)
             ~free_names:(Apply.free_names apply)
-            ~code_size:(Code_size.apply ~is_tail:false apply)
+            ~code_size:
+              (Code_size.apply
+                 ~is_tail:(apply_is_in_tail_position env apply)
+                 apply)
         in
         RE.create_non_recursive_let_cont return_cont_wrapper cont_handler ~body
       else
         let apply = make_apply ~continuation:Never_returns in
         RE.from_expr ~expr:(Expr.create_apply apply)
           ~free_names:(Apply.free_names apply)
-          ~code_size:(Code_size.apply ~is_tail:false apply))
+          ~code_size:
+            (Code_size.apply
+               ~is_tail:(apply_is_in_tail_position env apply)
+               apply))
 
 let rewrite_call_kind env (call_kind : Call_kind.t) =
   let rewrite_simple = rewrite_simple env in
@@ -2168,6 +2196,11 @@ and rebuild_function_params_and_body (env : env) res code_metadata
       } =
     params_and_body
   in
+  let env =
+    { env with
+      function_continuations = Some (return_continuation, exn_continuation)
+    }
+  in
   let code_id = Code_metadata.code_id code_metadata in
   let updating_calling_convention, params_vars, results_vars =
     match Code_id.Map.find_opt code_id env.code_deps with
@@ -2605,6 +2638,7 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
       should_preserve_direct_calls;
       old_typing_env = final_typing_env;
       inside_code_definition = false;
+      function_continuations = None;
       types_rewrite_context
     }
   in

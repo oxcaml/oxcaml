@@ -108,7 +108,7 @@ let array num_fields =
     ~v1:(fun () -> Code_size_v1.array num_fields)
     ~v2:(fun () -> Code_size_v2.array num_fields)
 
-let set_of_closures_allocation ~num_stores =
+let set_of_closures_allocation ~num_words ~num_stores =
   select
-    ~v1:(fun () -> Int.sub (Int.add Code_size_v1.alloc_size num_stores) 1)
+    ~v1:(fun () -> Int.sub (Int.add Code_size_v1.alloc_size num_words) 1)
     ~v2:(fun () -> Code_size_v2.set_of_closures_allocation ~num_stores)

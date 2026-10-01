@@ -53,7 +53,8 @@ val arm64 : t -> int
 
 (** Add the cost of the prologue and epilogue of a function whose body has the
     given size, if that body needs a stack frame (because it contains a call, an
-    allocation or a poll). *)
+    allocation or a poll). The result is a standalone function size: its frame
+    requirements and allocation context do not propagate into enclosing code. *)
 val add_function_frame : t -> t
 
 (* Both are only there temporarly *)
@@ -112,6 +113,7 @@ val invalid : t
 
 val evaluate : args:Inlining_arguments.t -> t -> float
 
-(** The size of the allocation of a set of closures that needs [num_stores]
-    stores, including that of the header. *)
-val set_of_closures_allocation : num_stores:int -> t
+(** The size of the allocation of a set of closures. [num_words] is the v1 word
+    count; [num_stores] also counts materialisation of function-slot constants
+    for v2. Both include the header. *)
+val set_of_closures_allocation : num_words:int -> num_stores:int -> t

@@ -50,7 +50,8 @@ val arm64 : t -> int
 
 (** Add the cost of the prologue and epilogue of a function whose body has the
     given size, if that body needs a stack frame (because it contains a call, an
-    allocation or a poll). *)
+    allocation or a poll). The result is a standalone function size: its frame
+    requirements and allocation context do not propagate into enclosing code. *)
 val add_function_frame : t -> t
 
 (* Both are only there temporarly *)

@@ -79,9 +79,8 @@ type alloc_kind =
   | Heap_alloc
   | Local_alloc
 
-type t =
-  { x86_64 : int;
-    arm64 : int;
+type size =
+  { instructions : int;
     needs_frame : bool;
         (* The code contains a call, an allocation or a poll, so the enclosing
            function needs a stack frame. *)
@@ -98,9 +97,15 @@ type t =
         (* Nothing in the code stops the combination of allocations. *)
   }
 
-let zero =
-  { x86_64 = 0;
-    arm64 = 0;
+(* Frame requirements and allocation barriers can differ between targets, e.g.
+   an atomic operation is native on x86-64 but a call on arm64. *)
+type t =
+  { x86_64 : size;
+    arm64 : size
+  }
+
+let zero_size =
+  { instructions = 0;
     needs_frame = false;
     calls_ocaml = false;
     first_alloc = None;
@@ -108,82 +113,100 @@ let zero =
     straight_line = true
   }
 
+let zero = { x86_64 = zero_size; arm64 = zero_size }
+
+let map t ~f = { x86_64 = f t.x86_64; arm64 = f t.arm64 }
+
+let map2 a b ~f = { x86_64 = f a.x86_64 b.x86_64; arm64 = f a.arm64 b.arm64 }
+
 let equal_alloc_kind k1 k2 =
   match k1, k2 with
   | Heap_alloc, Heap_alloc | Local_alloc, Local_alloc -> true
   | (Heap_alloc | Local_alloc), _ -> false
 
-let equal
-    { x86_64 = x1;
-      arm64 = a1;
+let equal_size
+    { instructions = n1;
       needs_frame = f1;
       calls_ocaml = c1;
       first_alloc = fa1;
       last_alloc = la1;
       straight_line = s1
     }
-    { x86_64 = x2;
-      arm64 = a2;
+    { instructions = n2;
       needs_frame = f2;
       calls_ocaml = c2;
       first_alloc = fa2;
       last_alloc = la2;
       straight_line = s2
     } =
-  Int.equal x1 x2 && Int.equal a1 a2 && Bool.equal f1 f2 && Bool.equal c1 c2
+  Int.equal n1 n2 && Bool.equal f1 f2 && Bool.equal c1 c2
   && Option.equal equal_alloc_kind fa1 fa2
   && Option.equal equal_alloc_kind la1 la2
   && Bool.equal s1 s2
+
+let equal a b = equal_size a.x86_64 b.x86_64 && equal_size a.arm64 b.arm64
 
 (* The size of two pieces of code whose relative placement is unknown (for
    example the arms of a switch), so that neither may have its allocations
    combined with code outside them. Use [seq] for code placed one after the
    other. *)
 let ( + ) a b =
-  { x86_64 = Int.add a.x86_64 b.x86_64;
-    arm64 = Int.add a.arm64 b.arm64;
-    needs_frame = a.needs_frame || b.needs_frame;
-    calls_ocaml = a.calls_ocaml || b.calls_ocaml;
-    first_alloc = None;
-    last_alloc = None;
-    straight_line = a.straight_line && b.straight_line
-  }
+  map2 a b ~f:(fun a b ->
+      { instructions = Int.add a.instructions b.instructions;
+        needs_frame = a.needs_frame || b.needs_frame;
+        calls_ocaml = a.calls_ocaml || b.calls_ocaml;
+        first_alloc = None;
+        last_alloc = None;
+        straight_line = a.straight_line && b.straight_line
+      })
 
 let ( - ) a b =
-  { a with x86_64 = Int.sub a.x86_64 b.x86_64; arm64 = Int.sub a.arm64 b.arm64 }
+  map2 a b ~f:(fun a b ->
+      { a with instructions = Int.sub a.instructions b.instructions })
 
 (* The same number of instructions on both architectures. *)
-let both n = { zero with x86_64 = n; arm64 = n }
+let both n =
+  let size = { zero_size with instructions = n } in
+  { x86_64 = size; arm64 = size }
 
-let per_arch ~x86_64 ~arm64 = { zero with x86_64; arm64 }
+let per_arch ~x86_64 ~arm64 =
+  { x86_64 = { zero_size with instructions = x86_64 };
+    arm64 = { zero_size with instructions = arm64 }
+  }
 
 (* Code, other than an allocation, that does not stop the combination of
    allocations around it. *)
-let transparent t =
+let transparent_size t =
   { t with first_alloc = None; last_alloc = None; straight_line = true }
 
+let transparent t = map t ~f:transparent_size
+
 (* Code that stops the combination of allocations. *)
-let barrier t =
+let barrier_size t =
   { t with first_alloc = None; last_alloc = None; straight_line = false }
+
+let barrier t = map t ~f:barrier_size
 
 (* An allocation, together with code that does not stop combinations (such as
    the initialisation of its fields). *)
 let allocation kind t =
-  { t with
-    first_alloc = Some kind;
-    last_alloc = Some kind;
-    straight_line = true
-  }
+  map t ~f:(fun t ->
+      { t with
+        first_alloc = Some kind;
+        last_alloc = Some kind;
+        straight_line = true
+      })
 
 let scale k t =
-  { t with x86_64 = Int.mul k t.x86_64; arm64 = Int.mul k t.arm64 }
+  map t ~f:(fun t -> { t with instructions = Int.mul k t.instructions })
 
 (* Code that contains a call, an allocation or a poll, and hence requires the
    enclosing function to have a stack frame. *)
-let calls t = { t with needs_frame = true }
+let calls t = map t ~f:(fun t -> { t with needs_frame = true })
 
 (* Code that contains a non-tail call to an OCaml function. *)
-let calls_ocaml t = { t with needs_frame = true; calls_ocaml = true }
+let calls_ocaml t =
+  map t ~f:(fun t -> { t with needs_frame = true; calls_ocaml = true })
 
 type arch =
   | X86_64
@@ -200,7 +223,9 @@ let arch =
     | AArch64 | ARM | POWER | Z | Riscv -> Arm64)
 
 let target t =
-  match Lazy.force arch with X86_64 -> t.x86_64 | Arm64 -> t.arm64
+  match Lazy.force arch with
+  | X86_64 -> t.x86_64.instructions
+  | Arm64 -> t.arm64.instructions
 
 let of_int n = both n
 
@@ -208,20 +233,12 @@ let to_int t = target t
 
 let create ~x86_64 ~arm64 = per_arch ~x86_64 ~arm64
 
-let x86_64 t = t.x86_64
+let x86_64 t = t.x86_64.instructions
 
-let arm64 t = t.arm64
+let arm64 t = t.arm64.instructions
 
-let print ppf
-    { x86_64;
-      arm64;
-      needs_frame = _;
-      calls_ocaml = _;
-      first_alloc = _;
-      last_alloc = _;
-      straight_line = _
-    } =
-  Format.fprintf ppf "%d (x86-64) / %d (arm64)" x86_64 arm64
+let print ppf t =
+  Format.fprintf ppf "%d (x86-64) / %d (arm64)" (x86_64 t) (arm64 t)
 
 (* Allocation on the OCaml heap (fast path). On x86-64 (see [Lop (Alloc { mode =
    Heap })] in [amd64/emit.ml]):
@@ -271,17 +288,16 @@ let combined_alloc_saving kind =
     | Heap_alloc -> heap_alloc_size
     | Local_alloc -> local_alloc_size
   in
-  per_arch ~x86_64:(Int.sub alloc.x86_64 3) ~arm64:(Int.sub alloc.arm64 4)
+  per_arch ~x86_64:(Int.sub (x86_64 alloc) 3) ~arm64:(Int.sub (arm64 alloc) 4)
 
-let seq a b =
+let seq_size a b ~saving_for_arch =
   let saving =
     match a.last_alloc, b.first_alloc with
     | Some kind_a, Some kind_b when equal_alloc_kind kind_a kind_b ->
-      combined_alloc_saving kind_a
-    | (None | Some _), _ -> zero
+      saving_for_arch (combined_alloc_saving kind_a)
+    | (None | Some _), _ -> 0
   in
-  { x86_64 = Int.sub (Int.add a.x86_64 b.x86_64) saving.x86_64;
-    arm64 = Int.sub (Int.add a.arm64 b.arm64) saving.arm64;
+  { instructions = Int.sub (Int.add a.instructions b.instructions) saving;
     needs_frame = a.needs_frame || b.needs_frame;
     calls_ocaml = a.calls_ocaml || b.calls_ocaml;
     first_alloc =
@@ -295,12 +311,18 @@ let seq a b =
     straight_line = a.straight_line && b.straight_line
   }
 
-let with_out_of_line t ~out_of_line =
-  { (t + out_of_line) with
-    first_alloc = t.first_alloc;
-    last_alloc = t.last_alloc;
-    straight_line = t.straight_line
+let seq a b =
+  { x86_64 = seq_size a.x86_64 b.x86_64 ~saving_for_arch:x86_64;
+    arm64 = seq_size a.arm64 b.arm64 ~saving_for_arch:arm64
   }
+
+let with_out_of_line t ~out_of_line =
+  map2 t (t + out_of_line) ~f:(fun t sum ->
+      { sum with
+        first_alloc = t.first_alloc;
+        last_alloc = t.last_alloc;
+        straight_line = t.straight_line
+      })
 
 (* Direct call to a known function: a single [call] / [bl] instruction, plus an
    allowance for spilling and reloading values that are live across the call
@@ -439,10 +461,26 @@ let stack_check_size =
   per_arch ~x86_64:(if Config.no_stack_checks then 0 else 7) ~arm64:9
 
 let add_function_frame t =
-  if t.needs_frame
-  then
-    t + function_frame_size + if t.calls_ocaml then stack_check_size else zero
-  else t
+  let finish size ~frame ~stack_check =
+    let instructions =
+      Int.add size.instructions
+        (Int.add
+           (if size.needs_frame then frame else 0)
+           (if size.calls_ocaml then stack_check else 0))
+    in
+    (* A completed function contributes its instructions, not its frame or
+       allocation context, when included in another function's metrics. *)
+    { zero_size with instructions }
+  in
+  { x86_64 =
+      finish t.x86_64
+        ~frame:(x86_64 function_frame_size)
+        ~stack_check:(x86_64 stack_check_size);
+    arm64 =
+      finish t.arm64
+        ~frame:(arm64 function_frame_size)
+        ~stack_check:(arm64 stack_check_size)
+  }
 
 (* Storing one field of a freshly allocated block: one store, plus the extra
    instructions needed to materialise constants and symbol addresses. *)
@@ -677,14 +715,14 @@ let modulo_size = both 2
 
 let naked_div_or_mod ~signed ~is_mod (kind : Flambda_kind.Standard_int.t) =
   let operation = if is_mod then modulo_size else division_size in
-  (* [Cmm_helpers.make_safe_divmod] guards against [min_int / -1] when the
-     dividend might be [min_int], which is only possible for register-width
-     kinds:
+  (* On x86-64, [Cmm_helpers.make_safe_divmod] guards against [min_int / -1]
+     when the dividend might be [min_int], which is only possible for
+     register-width kinds. arm64 division does not trap on overflow:
 
      cmp $-1, %divisor; jne; neg %dividend (or xor); jmp *)
   let overflow_check =
     match kind with
-    | (Naked_int64 | Naked_nativeint) when signed -> both 4
+    | (Naked_int64 | Naked_nativeint) when signed -> per_arch ~x86_64:4 ~arm64:0
     | Naked_int64 | Naked_nativeint | Naked_immediate | Naked_int8 | Naked_int16
     | Naked_int32 | Tagged_immediate ->
       zero
@@ -985,7 +1023,10 @@ let binary_prim_size prim ~arg2 =
 
 (* Atomic operations other than loads are only supported natively on x86-64 (see
    [Proc.operation_supported]); elsewhere they are external calls. *)
-let native_atomic ~x86_64 = calls { c_call_size with x86_64 }
+let native_atomic ~x86_64 =
+  { x86_64 = { zero_size with instructions = x86_64 };
+    arm64 = c_call_size.arm64
+  }
 
 let ternary_prim_size prim ~arg3 =
   match (prim : Flambda_primitive.ternary_primitive) with
@@ -1052,31 +1093,120 @@ let quaternary_prim_size prim =
       } ->
     c_call_size
 
+(* [Cmm_helpers.make_alloc_generic] uses an external allocation followed by
+   field initialisation above [max_young_wosize]. Packed and naked-number arrays
+   use [Calloc] directly instead; this layout only describes the
+   generic-allocation path. *)
+type generic_allocation_layout =
+  { num_words : int;
+    num_scannable_fields : int;
+    num_alloc_args : int
+  }
+
+let generic_allocation_layout (prim : Flambda_primitive.variadic_primitive)
+    ~num_fields =
+  let regular ~scannable =
+    { num_words = num_fields;
+      num_scannable_fields = (if scannable then num_fields else 0);
+      num_alloc_args = 2
+    }
+  in
+  match prim with
+  | Make_block (Values _, _, mode)
+  | Make_array ((Immediates | Values | Gc_ignorable_values), _, mode) ->
+    Some (mode, regular ~scannable:true)
+  | Make_block (Naked_floats, _, mode) | Make_array (Naked_floats, _, mode) ->
+    Some (mode, regular ~scannable:false)
+  | Make_block (Mixed (_, shape), _, mode) ->
+    Some
+      ( mode,
+        { num_words = Flambda_kind.Mixed_block_shape.size_in_words shape;
+          num_scannable_fields =
+            Flambda_kind.Mixed_block_shape.value_prefix_size shape;
+          num_alloc_args = 3
+        } )
+  | Make_array ((Unboxed_product _ as kind), _, mode) ->
+    if Flambda_primitive.Array_kind.must_be_gc_scannable kind
+    then Some (mode, regular ~scannable:true)
+    else
+      let element_kinds = Flambda_primitive.Array_kind.element_kinds kind in
+      let words_per_element =
+        List.fold_left
+          (fun words kind ->
+            let width =
+              match Flambda_kind.With_subkind.kind kind with
+              | Naked_number Naked_vec128 -> 2
+              | Naked_number Naked_vec256 -> 4
+              | Naked_number Naked_vec512 -> 8
+              | Value | Naked_number _ | Region | Rec_info -> 1
+            in
+            Int.add words width)
+          0 element_kinds
+      in
+      Some
+        ( mode,
+          { num_words =
+              Int.mul (num_fields / List.length element_kinds) words_per_element;
+            num_scannable_fields = 0;
+            num_alloc_args = 3
+          } )
+  | Make_array _ | Begin_region _ | Begin_try_region _ -> None
+
+let is_major_allocation (mode : Alloc_mode.For_allocations.t) layout =
+  match mode with
+  | Heap _ -> layout.num_words > Config.max_young_wosize
+  | Local _ -> false
+
+let major_allocation_size layout args =
+  let initialize_field arg =
+    (* Field address, argument move and [caml_initialize]. Noalloc calls also
+       switch stacks on arm64 and on x86-64 with stack checks enabled. *)
+    calls
+      (per_arch ~x86_64:(if Config.no_stack_checks then 2 else 5) ~arm64:6
+      + move_size ~for_call:true arg)
+  in
+  let _, fields =
+    List.fold_left
+      (fun (index, size) arg ->
+        let field =
+          if index < layout.num_scannable_fields
+          then initialize_field arg
+          else field_store_size arg
+        in
+        Int.succ index, size + field)
+      (0, zero) args
+  in
+  c_call_size + both layout.num_alloc_args + fields
+
 let variadic_prim_size prim args =
   let field_stores args =
     List.fold_left (fun size arg -> size + field_store_size arg) zero args
   in
-  match (prim : Flambda_primitive.variadic_primitive) with
-  (* A load from the domain state. *)
-  | Begin_region { ghost } -> if ghost then zero else both 1
-  | Begin_try_region { ghost } -> if ghost then zero else both 1
-  (* Allocation plus one store per field. *)
-  | Make_block (_, _mut, alloc_mode) ->
-    alloc_size_for_mode alloc_mode + field_stores args
-  | Make_array (kind, _mut, alloc_mode) -> (
-    let num_elements = List.length args in
-    let alloc_size = alloc_size_for_mode alloc_mode in
-    match kind with
-    | Immediates | Values | Gc_ignorable_values | Naked_floats | Naked_ints
-    | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
-    | Naked_vec512s | Naked_masks | Unboxed_product _ ->
-      alloc_size + field_stores args
-    (* Packed arrays: elements must be combined into words first with [and],
-       [shl] and [or] (see [Cmm_helpers.pack_small_ints_into_word]), or
-       [unpcklps] / [zip1] for float32 pairs. *)
-    | Naked_int8s | Naked_int16s -> alloc_size + both (Int.mul 3 num_elements)
-    | Naked_int32s -> alloc_size + both (Int.mul 2 num_elements)
-    | Naked_float32s -> alloc_size + both num_elements)
+  match generic_allocation_layout prim ~num_fields:(List.length args) with
+  | Some (mode, layout) when is_major_allocation mode layout ->
+    major_allocation_size layout args
+  | Some _ | None -> (
+    match (prim : Flambda_primitive.variadic_primitive) with
+    (* A load from the domain state. *)
+    | Begin_region { ghost } -> if ghost then zero else both 1
+    | Begin_try_region { ghost } -> if ghost then zero else both 1
+    (* Allocation plus one store per field. *)
+    | Make_block (_, _mut, alloc_mode) ->
+      alloc_size_for_mode alloc_mode + field_stores args
+    | Make_array (kind, _mut, alloc_mode) -> (
+      let num_elements = List.length args in
+      let alloc_size = alloc_size_for_mode alloc_mode in
+      match kind with
+      | Immediates | Values | Gc_ignorable_values | Naked_floats | Naked_ints
+      | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
+      | Naked_vec512s | Naked_masks | Unboxed_product _ ->
+        alloc_size + field_stores args
+      (* Packed arrays: elements must be combined into words first with [and],
+         [shl] and [or] (see [Cmm_helpers.pack_small_ints_into_word]), or
+         [unpcklps] / [zip1] for float32 pairs. *)
+      | Naked_int8s | Naked_int16s -> alloc_size + both (Int.mul 3 num_elements)
+      | Naked_int32s -> alloc_size + both (Int.mul 2 num_elements)
+      | Naked_float32s -> alloc_size + both num_elements))
 
 (* The kind of the allocation performed by a primitive, if any. *)
 let prim_allocation (prim : Flambda_primitive.t) =
@@ -1086,8 +1216,12 @@ let prim_allocation (prim : Flambda_primitive.t) =
   | Unary (Make_lazy _, _)
   | Binary (Bigarray_load (_, (Complex32 | Complex64), _), _, _) ->
     Some Heap_alloc
-  | Variadic ((Make_block (_, _, mode) | Make_array (_, _, mode)), _ :: _) ->
-    Some (alloc_kind_of_mode mode)
+  | Variadic
+      ( ((Make_block (_, _, mode) | Make_array (_, _, mode)) as prim),
+        (_ :: _ as args) ) -> (
+    match generic_allocation_layout prim ~num_fields:(List.length args) with
+    | Some (mode, layout) when is_major_allocation mode layout -> None
+    | Some _ | None -> Some (alloc_kind_of_mode mode))
   | Nullary _ | Unary _ | Binary _ | Ternary _ | Quaternary _ | Variadic _ ->
     None
 
@@ -1118,7 +1252,11 @@ let prim ~machine_width:_ (prim : Flambda_primitive.t) =
   in
   match prim_allocation prim with
   | Some kind -> allocation kind size
-  | None -> if prim_is_barrier prim size then barrier size else transparent size
+  | None ->
+    map size ~f:(fun size ->
+        if prim_is_barrier prim size
+        then barrier_size size
+        else transparent_size size)
 
 let box_number ~machine_width:_ kind =
   box_number0 ~alloc_size:heap_alloc_size kind
@@ -1133,7 +1271,9 @@ let set_of_closures_allocation ~num_stores =
    allocation at runtime; the numbers are kept comparable with those of dynamic
    allocations. *)
 let block num_fields =
-  { (heap_alloc_size + both num_fields) with needs_frame = false }
+  map
+    (heap_alloc_size + both num_fields)
+    ~f:(fun size -> { size with needs_frame = false })
 
 let array num_fields = block num_fields
 
