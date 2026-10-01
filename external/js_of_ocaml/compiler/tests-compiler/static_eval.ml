@@ -311,7 +311,7 @@ let%expect_test "static eval of bits_of_float on nan" =
   [%expect
     {|
     7ff0000000000001
-    7ff8000000000001
-    fff8000000000001
-    ffc00000
+    7ff0000000000001
+    7ff0000000000001
+    7fc00000
     |}]
