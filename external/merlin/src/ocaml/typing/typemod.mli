@@ -90,7 +90,7 @@ val package_units:
 val functorize_interface:
   Env.t ->
   params:(Global_module.Parameter_name.t * Ident.t) list ->
-  module_sigs:(Ident.t * Types.signature) list ->
+  module_sigs:(Ident.t * Types.visibility * Types.signature) list ->
   Unit_info.t -> Compilation_unit.t -> unit
 
 (** Type-check a [-functorize] bundle implementation: build the bundle's
@@ -101,7 +101,7 @@ val functorize_implementation:
   Env.t ->
   params:(Global_module.Parameter_name.t * Ident.t) list ->
   modules:Global_module.t list ->
-  module_sigs:(Ident.t * Types.signature) list ->
+  module_sigs:(Ident.t * Types.visibility * Types.signature) list ->
   Unit_info.t -> Compilation_unit.t -> Typedtree.module_coercion
 
 (* Should be in Envaux, but it breaks the build of the debugger *)
