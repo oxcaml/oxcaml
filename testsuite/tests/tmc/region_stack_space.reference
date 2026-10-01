@@ -1,0 +1,14 @@
+rev_map                          constant stack: true
+rev_map_with_local               constant stack: true
+map_plain                        constant stack: true
+map_exclave                      constant stack: true
+map_local                        constant stack: true
+map_local_param                  constant stack: true
+map_using_local                  constant stack: false
+map_nested_regions               constant stack: true
+map_nested_regions_shared        constant stack: true
+map_via_helper                   constant stack: true
+map_local_args                   constant stack: true
+map_pass_local                   constant stack: false
+map_float_field                  constant stack: false
+map_pass_local results: 1 3 5 7

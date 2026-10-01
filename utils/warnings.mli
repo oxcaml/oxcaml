@@ -173,6 +173,7 @@ type t =
   | Useless_valpoly                         (* 219 *)
   | Redundant_modality                      (* 220 *)
   | Unused_alert_disable of string          (* 221 *)
+  | Tmc_breaks_tailcall_region              (* 222 *)
 
 type alert = {kind:string; message:string; def:loc; use:loc}
 
