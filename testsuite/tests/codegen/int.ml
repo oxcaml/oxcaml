@@ -222,8 +222,7 @@ logxor:
 let lognot x = lnot x
 [%%expect_asm X86_64{|
 lognot:
-  xorq  $-1, %rax
-  orq   $1, %rax
+  xorq  $-2, %rax
   ret
 |}]
 
