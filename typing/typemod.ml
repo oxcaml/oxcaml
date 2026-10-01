@@ -1827,6 +1827,7 @@ end = struct
     classes: names_infos;
     class_types: names_infos;
     jkinds: names_infos;
+    laws: names_infos;
   }
 
   let new_names () = {
@@ -1838,6 +1839,7 @@ end = struct
     classes = Hashtbl.create 16;
     class_types = Hashtbl.create 16;
     jkinds = Hashtbl.create 16;
+    laws = Hashtbl.create 16;
   }
 
   type t = {
@@ -1864,6 +1866,7 @@ end = struct
     | Class -> names.classes
     | Class_type -> names.class_types
     | Jkind -> names.jkinds
+    | Law -> names.laws
 
   let check_unsafe_subst loc env: _ result -> _ = function
     | Ok x -> x
@@ -1931,6 +1934,7 @@ end = struct
     | Sig_class (id, _, _, _) -> Class, id
     | Sig_class_type (id, _, _, _) -> Class_type, id
     | Sig_jkind (id, _, _) -> Jkind, id
+    | Sig_law (id, _, _) -> Law, id
 
   let check_item ?info names loc kind id ids =
     let info =
@@ -1983,6 +1987,7 @@ end = struct
         | Sig_class (id, c, _, _) -> Class, id, c.cty_loc
         | Sig_class_type (id, ct, _, _) -> Class_type, id, ct.clty_loc
         | Sig_jkind (id, jkd, _) -> Jkind, id, jkd.jkind_loc
+        | Sig_law (id, ld, _) -> Law, id, ld.law_loc
       in
       if Ident.Map.mem user_id to_remove.hide then
         None
@@ -3813,6 +3818,7 @@ and type_open_decl_aux ?used_slot ?toplevel ~funct_body names env od =
         | Sig_class_type(id, ctd, rs, _) ->
             Sig_class_type(id, ctd, rs, visibility)
         | Sig_jkind(id, jkd, _) -> Sig_jkind(id, jkd, visibility)
+        | Sig_law(id, ld, _) -> Sig_law(id, ld, visibility)
       ) sg
     in
     let open_descr = {
@@ -5225,7 +5231,7 @@ let invalid_part_of_user_kind : Sig_component_kind.t -> string  = function
   | Type -> "kind"
   | Jkind -> "definition"
   | ( Value | Constructor | Label | Unboxed_label | Module | Module_type
-    | Extension_constructor | Class | Class_type ) ->
+    | Extension_constructor | Class | Class_type | Law ) ->
     "type"
 
 let report_error ~loc _env = function

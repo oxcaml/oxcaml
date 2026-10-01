@@ -977,6 +977,7 @@ and print_out_sig_item ppf =
   | Osig_ellipsis ->
       fprintf ppf "..."
   | Osig_jkind jkd -> print_out_jkind_decl ppf jkd
+  | Osig_law ld -> print_out_law_decl ppf ld
 
 and print_out_type_decl kwd ppf td =
   let print_constraints ppf =
@@ -1157,6 +1158,16 @@ and print_out_jkind_decl ppf jkd =
     | Some jkind -> fprintf ppf " =@ %a" print_out_jkind jkind
   in
   fprintf ppf "@[kind_ %s%a@]" jkd.ojkind_name print_manifest jkd.ojkind_jkind
+
+and print_out_law_decl ppf ld =
+  let print_param ppf (x, ty) =
+    fprintf ppf "@ (%a : %a)" print_lident x !out_type ty
+  in
+  let print_assumption ppf doc = fprintf ppf "%a ===>@ " pp_doc doc in
+  fprintf ppf "@[<2>law? %a%a :@ %a%a@]" print_lident ld.olaw_name
+    (fun ppf -> List.iter (print_param ppf)) ld.olaw_params
+    (fun ppf -> List.iter (print_assumption ppf)) ld.olaw_assumptions
+    pp_doc ld.olaw_conclusion
 
 let out_constr = ref print_out_constr
 let out_constr_args = ref print_out_constr_args

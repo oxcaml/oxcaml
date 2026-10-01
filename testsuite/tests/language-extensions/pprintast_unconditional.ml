@@ -157,6 +157,7 @@ end = struct
   let longident = test "longident" longident Example.longident
   let constr = test "constr" constr Example.constr
   let expression = test "expression" expression Example.expression
+  let law_clause = test "law_clause" law_clause Example.expression
   let pattern = test "pattern" pattern Example.pattern
   let core_type = test "core_type" core_type Example.core_type
   let signature = test "signature" signature Example.signature

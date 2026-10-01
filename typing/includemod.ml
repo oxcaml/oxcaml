@@ -345,6 +345,7 @@ type field_kind =
   | Field_class
   | Field_classtype
   | Field_jkind
+  | Field_law
 
 
 
@@ -360,6 +361,7 @@ let kind_of_field_desc fd = match fd.kind with
   | Field_class -> "class"
   | Field_classtype -> "class type"
   | Field_jkind -> "kind"
+  | Field_law -> "law"
 
 let field_desc kind id = { kind; name = Ident.name id }
 
@@ -389,6 +391,7 @@ let item_ident_name =
   | Sig_class_type(id, d, _, _) ->
       (id, d.clty_loc, field_desc Field_classtype id)
   | Sig_jkind(id, d, _) -> (id, d.jkind_loc, field_desc Field_jkind id)
+  | Sig_law(id, d, _) -> (id, d.law_loc, field_desc Field_law id)
 
 let is_runtime_component =
   let open Subst.Lazy in
@@ -398,7 +401,8 @@ let is_runtime_component =
   | Sig_module(_,Mp_absent,_,_,_)
   | Sig_modtype(_,_,_)
   | Sig_class_type(_,_,_,_)
-  | Sig_jkind (_,_,_) -> false
+  | Sig_jkind (_,_,_)
+  | Sig_law (_,_,_) -> false
   | Sig_value(_,_,_)
   | Sig_typext(_,_,_,_)
   | Sig_module(_,Mp_present,_,_,_)
@@ -415,6 +419,7 @@ let item_visibility =
   | Sig_class (_, _, _, vis)
   | Sig_class_type (_, _, _, vis) -> vis
   | Sig_jkind (_, _, vis) -> vis
+  | Sig_law (_, _, vis) -> vis
 
 
 (* Print a coercion *)
@@ -538,7 +543,7 @@ let pair_components subst sig1_comps sig2 =
           | Sig_jkind _ ->
               Subst.add_jkind id2 (Path.Pident id1) subst
           | Sig_value _ | Sig_typext _
-          | Sig_class _ | Sig_class_type _ ->
+          | Sig_class _ | Sig_class_type _ | Sig_law _ ->
               subst
         in
         pair new_subst

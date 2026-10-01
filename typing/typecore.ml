@@ -5524,6 +5524,7 @@ and is_nonexpansive_mod mexp =
           | Tstr_class _ -> false (* could be more precise *)
           | Tstr_attribute _ -> true
           | Tstr_jkind _ -> true
+          | Tstr_law _ -> true
         )
         str.str_items
   | Tmod_apply _ | Tmod_apply_unit _ -> false

@@ -979,6 +979,22 @@ and jkind_declaration i ppf x =
   line i ppf "pjkind_manifest =\n";
   option (i+1) jkind_annotation ppf x.jkind_annotation
 
+and law_declaration i ppf x =
+  line i ppf "law_declaration %a %a\n" fmt_ident x.law_id
+       fmt_location x.law_loc;
+  attributes i ppf x.law_attributes;
+  let i = i+1 in
+  line i ppf "law_params =\n";
+  list (i+1) law_param ppf x.law_params;
+  line i ppf "law_assumptions =\n";
+  list (i+1) expression ppf x.law_assumptions;
+  line i ppf "law_conclusion =\n";
+  expression (i+1) ppf x.law_conclusion
+
+and law_param i ppf x =
+  line i ppf "%a\n" fmt_ident x.lp_id;
+  option (i+1) core_type ppf x.lp_type
+
 and type_extension i ppf x =
   line i ppf "type_extension\n";
   attributes i ppf x.tyext_attributes;
@@ -1266,6 +1282,9 @@ and signature_item i ppf x =
   | Tsig_jkind jd ->
       line i ppf "Tsig_jkind";
       jkind_declaration i ppf jd
+  | Tsig_law ld ->
+      line i ppf "Tsig_law\n";
+      law_declaration i ppf ld
 
 and module_declaration i ppf md =
   line i ppf "%a\n" fmt_modname md.md_id;
@@ -1394,6 +1413,9 @@ and structure_item i ppf x =
   | Tstr_jkind jd ->
       line i ppf "Tstr_jkind";
       jkind_declaration i ppf jd
+  | Tstr_law ld ->
+      line i ppf "Tstr_law\n";
+      law_declaration i ppf ld
 
 and longident_x_with_constraint i ppf (li, _, wc) =
   line i ppf "%a\n" fmt_path li;

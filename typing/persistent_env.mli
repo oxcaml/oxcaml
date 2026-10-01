@@ -187,6 +187,7 @@ val make_cmi : 'a t
   -> Cmi_format.kind
   -> Subst.Lazy.signature * Mode.Staticity.Const.t
   -> alerts
+  -> has_laws:bool
   -> Cmi_format.cmi_infos_lazy
 
 val save_cmi : 'a t -> Persistent_signature.t -> unit

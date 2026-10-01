@@ -704,6 +704,7 @@ and structure_item_desc =
   | Tstr_include of include_declaration
   | Tstr_attribute of attribute
   | Tstr_jkind of jkind_declaration
+  | Tstr_law of law_declaration
 
 and module_binding =
     {
@@ -808,6 +809,7 @@ and signature_item_desc =
   | Tsig_class_type of class_type_declaration list
   | Tsig_attribute of attribute
   | Tsig_jkind of jkind_declaration
+  | Tsig_law of law_declaration
 
 and module_declaration =
     {
@@ -1122,6 +1124,23 @@ and jkind_declaration =
     jkind_annotation: Parsetree.jkind_annotation option;
     jkind_attributes: attribute list;
     jkind_loc: Location.t
+   }
+
+and law_declaration =
+  { law_id: Ident.t;
+    law_name: string loc;
+    law_law: Types.law_description;
+    law_params: law_param list;
+    law_assumptions: expression list;
+    law_conclusion: expression;
+    law_attributes: attribute list;
+    law_loc: Location.t
+   }
+
+and law_param =
+  { lp_id: Ident.t;
+    lp_name: string loc;
+    lp_type: core_type option
    }
 
 type argument_interface = {

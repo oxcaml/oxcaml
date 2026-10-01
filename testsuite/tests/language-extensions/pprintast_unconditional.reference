@@ -7,6 +7,8 @@ constr: No.Longidents.Require.extensions
 
 expression: [x for x = 1 to 10]
 
+law_clause: [x for x = 1 to 10]
+
 pattern: [:_:]
 
 core_type: ('a : value) @ local -> unit
@@ -73,6 +75,8 @@ longident: No.Longidents.Require.extensions
 constr: No.Longidents.Require.extensions
 
 expression: [x for x = 1 to 10]
+
+law_clause: [x for x = 1 to 10]
 
 pattern: [:_:]
 
