@@ -40,10 +40,6 @@ let mode () = if classic_mode () then Mode Classic else Mode Normal
 let join_points () =
   !Oxcaml_flags.Flambda2.join_points |> with_default ~f:(fun d -> d.join_points)
 
-let unbox_along_intra_function_control_flow () =
-  !Oxcaml_flags.Flambda2.unbox_along_intra_function_control_flow
-  |> with_default ~f:(fun d -> d.unbox_along_intra_function_control_flow)
-
 let backend_cse_at_toplevel () =
   !Oxcaml_flags.Flambda2.backend_cse_at_toplevel
   |> with_default ~f:(fun d -> d.backend_cse_at_toplevel)
