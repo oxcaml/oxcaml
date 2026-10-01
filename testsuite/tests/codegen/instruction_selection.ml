@@ -432,9 +432,8 @@ let shift_of_logand (a : int64_u) =
 ;;
 [%%expect_asm X86_64{|
 shift_of_logand:
-  movl  $1, %ebx
   movq  %rax, %rcx
-  andq  %rbx, %rcx
+  andl  $1, %ecx
   movl  $3, %eax
   shrq  %cl, %rax
   orq   $1, %rax
