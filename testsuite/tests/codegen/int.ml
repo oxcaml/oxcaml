@@ -84,8 +84,8 @@ div_by_constant:
 
 (* CR ttebbi:
     The last two instructions:
-      sarq  $1, %rax
-      leaq  1(%rax,%rax), %rax
+      andq  $-2, %rax
+      incq  %rax
     are the same as
       orq $1, %rax
 *)
@@ -96,8 +96,8 @@ div_2:
   movq  %rax, %rbx
   shrq  $63, %rbx
   addq  %rbx, %rax
-  sarq  $1, %rax
-  leaq  1(%rax,%rax), %rax
+  andq  $-2, %rax
+  incq  %rax
   ret
 |}]
 
@@ -360,15 +360,13 @@ collatz:
   sarq  $1, %rdi
   movq  %rdi, %rsi
   shrq  $63, %rsi
-  leaq  (%rdi,%rsi), %rdx
-  movq  %rdx, %rsi
+  addq  %rdi, %rsi
   andq  $-2, %rsi
   subq  %rsi, %rdi
   leaq  1(%rdi,%rdi), %rdi
   cmpq  $1, %rdi
   jne   .L2
-  sarq  $1, %rdx
-  leaq  1(%rdx,%rdx), %rbx
+  leaq  1(%rsi), %rbx
   cmpq  $3, %rbx
   jg    .L1
   jmp   .L0
