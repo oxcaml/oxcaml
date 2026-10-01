@@ -2057,6 +2057,7 @@ module Element_repr = struct
       let rec layout_to_t : Jkind_types.Layout.Const.t -> t option = function
       | Any _ -> None
       | Base (base, sa) -> Some (classify_base base sa)
+      | Box (_, sa) -> Some (Value_element sa)
       | Product l ->
         Misc.Stdlib.List.some_if_all_elements_are_some
           (List.map layout_to_t l)
@@ -3294,6 +3295,7 @@ let check_unboxed_recursion ~abs_env env loc path0 ty0 to_check =
       | Base _ -> true
       | Product l -> List.for_all is_representable l
       | Addressable layout -> is_representable layout
+      | Box _ -> true
       | Univar _ -> Misc.fatal_error "Unboxed_recursion: univar"
       | Genvar _ -> Misc.fatal_error "Unboxed_recursion: genvar"
     in

@@ -2216,6 +2216,22 @@ let instance_prim_layout env (desc : Primitive.description) ty =
   (* Instantiate a jkind with layout
      [any <scannable axes> <addressability>] to one with
      ['s <scannable axes> <addressability>], where all ['s] are shared. *)
+  (* CR-someday layout-polymorphism: It's somewhat odd that this function
+     decides to instantiate variables for [any] and [any]-under-[addressable],
+     but not [any] under products or [box].
+
+     There is no obvious choice here, given that the design of [@layout_poly]
+     does not allow specifying *which* sort variables are equivalent. For
+     example, if we instantiated sort variables under products, then the
+     following hypothetical primitive would only support unboxed pairs whose
+     components have the same sorts.
+     {[
+       external usnd : ('a : any) ('b : any). #('a * 'b) -> 'b
+     ]}
+
+     We should probably instead just replace [@layout_poly] with "real" layout
+     polymorphism.
+  *)
   let instance_sort_var_for_lpoly_jkind jkind =
     let rec instance_layout
       : Jkind.Sort.t Jkind.Layout.t -> _ option = function
@@ -2224,7 +2240,7 @@ let instance_prim_layout env (desc : Primitive.description) ty =
         Option.map
           (fun l -> Jkind.Layout.Addressable l)
           (instance_layout layout)
-      | Sort _ | Product _ -> None
+      | Sort _ | Product _ | Box _ -> None
     in
     match Jkind.extract_layout env jkind with
     | Error _ -> None
@@ -3173,14 +3189,11 @@ let apply_jkind_wrapping_r ~env ~unwrapped_ty:{ ty = _; modality; or_null }
          [assert false]. But we don't have a principled reason why (one likely
          exists by thinking sufficiently hard about the sole callsite in
          [constrain_type_jkind].) *)
-      match Jkind.apply_or_null_r env jkind with
-      | Ok jkind -> jkind
-      | Error () ->
-        Misc.fatal_error "Ctype.apply_jkind_wrapping_r: nested or_nulls"
+      Jkind.apply_or_null_r env jkind
     else
-      jkind
+      Ok jkind
   end
-  |> Jkind.apply_modality_r modality
+  |> Result.map (Jkind.apply_modality_r modality)
 
 let maybe_expand_component env ty ~expand_components =
   match expand_components with
@@ -3561,9 +3574,13 @@ let constrain_type_jkind ~fixed env ty jkind =
                let results =
                  Misc.Stdlib.List.map3
                    (fun unwrapped_ty ty's_jkind jkind ->
-                      let jkind =
-                        apply_jkind_wrapping_r ~env jkind ~unwrapped_ty
-                      in
+                      match apply_jkind_wrapping_r ~env jkind ~unwrapped_ty with
+                      | Error () ->
+                        Error
+                          (Jkind.Violation.of_ ~context env
+                             (Not_a_subjkind
+                                (ty's_jkind, jkind, sub_failure_reasons)))
+                      | Ok jkind ->
                       match Jkind.extract_layout env ty's_jkind with
                       | Ok (Any _) ->
                         (* We re-estimate in this case rather than reuse the
