@@ -2332,6 +2332,11 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         | Pred ->
           Binary
             (Int_arith (width, Sub), arg, Simple (const ~machine_width width 1))
+        | Not ->
+          Binary
+            ( Int_arith (width, Xor),
+              arg,
+              Simple (const ~machine_width width (-1)) )
       in
       [to_expr (maybe_wrap (Prim result))]
     | Floating (outer, op) ->
