@@ -103,6 +103,7 @@ type error =
       old_source_file : Misc.filepath;
     }
   | Duplicate_parameter_name of Global_module.Parameter_name.t
+  | Laws_not_supported
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
@@ -2604,6 +2605,8 @@ and transl_signature ?(interface_toplevel = false) ~md_mode env
         Signature_names.check_jkind names decl.jkind_loc decl.jkind_id;
         let item = Sig_jkind(id, decl.jkind_jkind, Exported) in
         mksig (Tsig_jkind decl) env loc, [item], newenv
+    | Psig_law _ ->
+        raise (Error (loc, env, Laws_not_supported))
   in
   let rec transl_sig env sig_items sig_type = function
     | [] -> List.rev sig_items, List.rev sig_type, env
@@ -4276,6 +4279,8 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
         in
         let item = Sig_jkind(id, decl.jkind_jkind, Exported) in
         Tstr_jkind decl, [item], shape_map, env
+    | Pstr_law _ ->
+        raise (Error (loc, env, Laws_not_supported))
   in
   let toplevel_sig = Option.value toplevel ~default:[] in
   let rec type_struct env shape_map sstr str_acc sig_acc
@@ -5533,6 +5538,8 @@ let report_error ~loc _env = function
       Location.errorf ~loc
         "This instance has multiple arguments with the name %a."
         (Style.as_inline_code Global_module.Parameter_name.print) name
+  | Laws_not_supported ->
+      Location.errorf ~loc "Laws are not supported yet."
 
 let report_error env ~loc err =
   Printtyp.wrap_printing_env ~error:true env
