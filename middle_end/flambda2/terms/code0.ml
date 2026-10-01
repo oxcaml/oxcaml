@@ -77,9 +77,14 @@ let with_newer_version_of newer_version_of t =
 
 let print ~print_function_params_and_body ppf
     { params_and_body; code_metadata; free_names_of_params_and_body = _ } =
-  Format.fprintf ppf "@[<hov 1>(@[<hov 1>(code_metadata@ %a)@]@ %a)@]"
-    Code_metadata.print code_metadata print_function_params_and_body
-    params_and_body
+  if Flambda_features.dump_compact ()
+  then
+    Format.fprintf ppf "@[<hov 1>(%a)@]" print_function_params_and_body
+      params_and_body
+  else
+    Format.fprintf ppf "@[<hov 1>(@[<hov 1>(code_metadata@ %a)@]@ %a)@]"
+      Code_metadata.print code_metadata print_function_params_and_body
+      params_and_body
 
 let compare t1 t2 = Code_id.compare (code_id t1) (code_id t2)
 
