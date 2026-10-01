@@ -68,6 +68,8 @@ module Sort = struct
       id : int
     }
 
+  exception Lower_rigid
+
   let is_genvar var =
     assert (Option.is_none var.contents);
     var.level = generic_level
@@ -517,13 +519,12 @@ module Sort = struct
 
   let[@inline] equate_var (v : var) (t : t) =
     assert (Option.is_none v.contents);
-    (* Variables at [subject_level] are rigid. *)
-    if v.level != subject_level
-    then (
+    if v.level = subject_level
+    then match t with Var _ -> raise Lower_rigid | _ -> false
+    else (
       update_level v.level t;
       set_var_contents v (Some t);
       true)
-    else false
 
   module Static = struct
     (* Statically allocated values of various consts and sorts to save

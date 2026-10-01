@@ -34,10 +34,8 @@ Error: Signature mismatch:
        is not included in
          val poly_ id : 'a -> 'a
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
-       The kind of 'a is 's2 separable non_null
-         because of the definition of id at line 4, characters 2-25.
-       But the kind of 'a must be representable
-         because of the definition of id at line 2, characters 9-14.
+       The type "'b" is layout polymorphic,
+       but "'a" is not layout polymorphic.
 |}];;
 
 (module struct
@@ -97,10 +95,8 @@ Error: Signature mismatch:
        is not included in
          val poly_ k : 'a -> 'b -> 'a
        The type "'a -> 'b -> 'a" is not compatible with the type "'c -> 'd -> 'c"
-       The kind of 'a is 's5 separable non_null
-         because of the definition of k at line 4, characters 2-30.
-       But the kind of 'a must be representable
-         because of the definition at line 3, characters 14-31.
+       The type "'c" is layout polymorphic,
+       but "'a" is not layout polymorphic.
 |}];;
 
 (module struct
@@ -123,10 +119,8 @@ Error: Signature mismatch:
        is not included in
          val poly_ k : 'a -> 'b -> 'a
        The type "'a -> 'b -> 'a" is not compatible with the type "'a -> 'c -> 'a"
-       The kind of 'a is 's6 separable non_null
-         because of the definition of k at line 4, characters 2-30.
-       But the kind of 'a must be representable
-         because of the definition at line 3, characters 14-31.
+       The type "'c" is layout polymorphic,
+       but "'b" is not layout polymorphic.
 |}];;
 
 (module struct
@@ -147,10 +141,8 @@ Error: Signature mismatch:
        is not included in
          val poly_ k : 'a -> 'b -> 'a
        The type "'a -> 'b -> 'a" is not compatible with the type "'c -> 'd -> 'c"
-       The kind of 'a is 's7 separable non_null
-         because of the definition of k at line 4, characters 2-30.
-       But the kind of 'a must be representable
-         because of the definition of k at line 2, characters 8-15.
+       The type "'c" is layout polymorphic,
+       but "'a" is not layout polymorphic.
 |}];;
 
 (** partially layout-polymorphic K combinator **)
@@ -196,10 +188,8 @@ Error: Signature mismatch:
        is not included in
          val poly_ k : 'b. 'a -> 'b -> 'a
        The type "'a -> 'b -> 'a" is not compatible with the type "'c -> 'd -> 'c"
-       The kind of 'a is 's8
-         because of the definition of k at line 4, characters 2-45.
-       But the kind of 'a must be representable
-         because of the definition at line 3, characters 14-31.
+       The type "'c" is layout polymorphic,
+       but "'a" is not layout polymorphic.
 |}];;
 
 (module struct
@@ -228,10 +218,8 @@ Error: Signature mismatch:
        is not included in
          val poly_ k : 'b. 'a -> 'b -> 'a
        The type "'a -> 'b -> 'a" is not compatible with the type "'c -> 'd -> 'c"
-       The kind of 'a is 's9
-         because of the definition of k at line 4, characters 2-45.
-       But the kind of 'a must be representable
-         because of the definition of k at line 2, characters 8-15.
+       The type "'c" is layout polymorphic,
+       but "'a" is not layout polymorphic.
 |}];;
 
 (** Product layout with polymorphic components **)
@@ -273,22 +261,20 @@ Error: Signature mismatch:
        Modules do not match:
          sig
            val id :
-             ('a : '_representable_layout_10 & '_representable_layout_11).
+             ('a : '_representable_layout_4 & '_representable_layout_5).
                'a -> 'a
          end
        is not included in
          Id
        Values do not match:
          val id :
-           ('a : '_representable_layout_10 & '_representable_layout_11).
+           ('a : '_representable_layout_4 & '_representable_layout_5).
              'a -> 'a
        is not included in
          val id : layout_ l l0. ('a : l & l0). 'a -> 'a @@ stateless
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
-       The kind of 'a is 's10 & 's11
-         because of the definition at line 7, characters 15-40.
-       But the kind of 'a must be representable
-         because of the definition of id at line 2, characters 9-14.
+       The type "'b" is layout polymorphic,
+       but "'a" is not layout polymorphic.
 |}];;
 
 (* Alternative construction with a product _sort_ *)
@@ -430,20 +416,21 @@ Error: Signature mismatch:
        Modules do not match:
          sig
            val id :
-             ('a : '_representable_layout_13 & value_or_null). 'a -> 'a
+             ('a : '_representable_layout_7 & '_representable_layout_8).
+               'a -> 'a
          end
        is not included in
          Id
        Values do not match:
-         val id : ('a : '_representable_layout_13 & value_or_null). 'a -> 'a
+         val id :
+           ('a : '_representable_layout_7 & '_representable_layout_8).
+             'a -> 'a
        is not included in
          val poly_ id : #('a * int) -> #('a * int)
        The type "'a -> 'a" is not compatible with the type
          "#('b * int) -> #('b * int)"
-       The kind of #('a * int) is 's13 separable non_null & immediate with 'a
-         because it is an unboxed tuple.
-       But the kind of #('a * int) must be representable
-         because of the definition of id at line 2, characters 9-14.
+       The type "#('b * int)" is layout polymorphic,
+       but "'a" is not layout polymorphic.
 |}];;
 
 (** Product layout with weakly- and generically-polymorphic components **)
