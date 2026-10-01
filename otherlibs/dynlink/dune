@@ -38,28 +38,6 @@
  (modules dynlink_internal_native)
  (libraries dynlink_compilerlibs dynlink_internal_common))
 
-(rule
- (targets parser.ml)
- (deps ../../parser.ml)
- (action
-  (with-stdout-to
-   %{targets}
-   (progn
-    (echo "module MenhirLib = CamlinternalMenhirLib")
-    (cat %{deps})))))
-
-(rule
- (targets parser.mli)
- (deps ../../parser.mli)
- (action
-  (with-stdout-to
-   %{targets}
-   (progn
-    (echo "module MenhirLib = CamlinternalMenhirLib")
-    (cat %{deps})))))
-
-(copy_files ../../parsing/camlinternalMenhirLib.ml{,i})
-
 (library
  (name dynlink_compilerlibs)
  (wrapped true)
@@ -98,10 +76,6 @@
   longident
   docstrings
   keywords
-  lexer
-  camlinternalMenhirLib
-  parser_types
-  parser
   pprintast
   syntaxerr
   ast_iterator
@@ -257,10 +231,6 @@
 (copy_files ../../parsing/docstrings.ml)
 
 (copy_files ../../parsing/keywords.ml)
-
-(copy_files ../../parsing/lexer.ml)
-
-(copy_files ../../parsing/parser_types.ml)
 
 (copy_files ../../parsing/pprintast.ml)
 
@@ -420,10 +390,6 @@
 (copy_files ../../parsing/docstrings.mli)
 
 (copy_files ../../parsing/keywords.mli)
-
-(copy_files ../../parsing/lexer.mli)
-
-(copy_files ../../parsing/parser_types.mli)
 
 (copy_files ../../parsing/pprintast.mli)
 
@@ -616,7 +582,6 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Symbol.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Docstrings.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Keywords.cmo
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Lexer.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Path.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Syntaxerr.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Lazy_backtrack.cmo
@@ -656,9 +621,6 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Consistbl.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Data_types.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Datarepr.cmo
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__CamlinternalMenhirLib.cmo
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Parser_types.cmo
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Parser.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Persistent_env.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Type_shape.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Env.cmo
@@ -730,7 +692,6 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Symbol.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Docstrings.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Keywords.cmx
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Lexer.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Path.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Lazy_backtrack.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Hash_consed.cmx
@@ -770,9 +731,6 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Consistbl.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Data_types.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Datarepr.cmx
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__CamlinternalMenhirLib.cmx
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Parser_types.cmx
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Parser.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Persistent_env.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Type_shape.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Env.cmx
