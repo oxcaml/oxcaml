@@ -1,0 +1,44 @@
+module Laws_gen_Shapes = Shapes
+module Laws_gen_Stdlib = Stdlib
+type 'a each = {
+  poly: 'a ;
+  modes: 'a ;
+  unboxed: 'a ;
+  \#type: 'a ;
+  inferred: 'a }
+val names : string each
+val locations : CamlinternalLaw.location each
+val map : 'a each -> f:('a -> 'b) -> 'b each
+val to_list : 'a each -> 'a list
+type poly_input =
+  | Poly_input: ('a : value_or_null) ('b : value_or_null) .
+  {
+  xs: 'a list ;
+  f: 'a -> 'b } -> poly_input 
+type modes_input =
+  | Modes_input: {
+  g: int @ local -> int } -> modes_input 
+type unboxed_input =
+  | Unboxed_input: {
+  x: float# } -> unboxed_input 
+type type_input =
+  | Type_input: {
+  \#method: int } -> type_input 
+type inferred_input =
+  | Inferred_input: {
+  x: int ;
+  y: int } -> inferred_input 
+module Instantiate :
+(Choice : CamlinternalLaw.Choice) ->
+  sig
+    module Law : sig type 'a t = 'a CamlinternalLaw.Make(Choice).t end
+    module type Choices  =
+      sig
+        val poly : poly_input Choice.t
+        val modes : modes_input Choice.t
+        val unboxed : unboxed_input Choice.t
+        val \#type : type_input Choice.t
+        val inferred : inferred_input Choice.t
+      end
+    val laws : (module Choices) -> unit Law.t each
+  end

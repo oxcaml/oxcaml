@@ -1,0 +1,214 @@
+[@@@ocaml.warning "-27"]
+module Laws_gen_Shapes = Shapes
+module Laws_gen_Stdlib = Stdlib
+type 'a each = {
+  poly: 'a ;
+  modes: 'a ;
+  unboxed: 'a ;
+  \#type: 'a ;
+  inferred: 'a }
+let names =
+  {
+    poly = "poly";
+    modes = "modes";
+    unboxed = "unboxed";
+    \#type = "type";
+    inferred = "inferred"
+  }
+let locations =
+  {
+    poly =
+      {
+        CamlinternalLaw.file = "shapes.mli";
+        start_line = 21;
+        start_col = 0;
+        end_line = 22;
+        end_col = 46
+      };
+    modes =
+      {
+        CamlinternalLaw.file = "shapes.mli";
+        start_line = 23;
+        start_col = 0;
+        end_line = 23;
+        end_col = 54
+      };
+    unboxed =
+      {
+        CamlinternalLaw.file = "shapes.mli";
+        start_line = 24;
+        start_col = 0;
+        end_line = 24;
+        end_col = 55
+      };
+    \#type =
+      {
+        CamlinternalLaw.file = "shapes.mli";
+        start_line = 25;
+        start_col = 0;
+        end_line = 25;
+        end_col = 50
+      };
+    inferred =
+      {
+        CamlinternalLaw.file = "shapes.mli";
+        start_line = 26;
+        start_col = 0;
+        end_line = 26;
+        end_col = 33
+      }
+  }
+let map { poly; modes; unboxed; \#type; inferred } ~f =
+  {
+    poly = (f poly);
+    modes = (f modes);
+    unboxed = (f unboxed);
+    \#type = (f \#type);
+    inferred = (f inferred)
+  }
+let to_list { poly; modes; unboxed; \#type; inferred } =
+  [poly; modes; unboxed; \#type; inferred]
+type poly_input =
+  | Poly_input: ('a : value_or_null) ('b : value_or_null) .
+  {
+  xs: 'a list ;
+  f: 'a -> 'b } -> poly_input 
+type modes_input =
+  | Modes_input: {
+  g: int @ local -> int } -> modes_input 
+type unboxed_input =
+  | Unboxed_input: {
+  x: float# } -> unboxed_input 
+type type_input =
+  | Type_input: {
+  \#method: int } -> type_input 
+type inferred_input =
+  | Inferred_input: {
+  x: int ;
+  y: int } -> inferred_input 
+module Instantiate(Choice:CamlinternalLaw.Choice) =
+  struct
+    module Law = (CamlinternalLaw.Make)(Choice)
+    module type Choices  =
+      sig
+        val poly : poly_input Choice.t
+        val modes : modes_input Choice.t
+        val unboxed : unboxed_input Choice.t
+        val \#type : type_input Choice.t
+        val inferred : inferred_input Choice.t
+      end
+    let poly ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.poly),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.poly;
+                 predicate =
+                   (fun ((Poly_input { xs; f }) : poly_input) ->
+                      (Laws_gen_Stdlib.(=)
+                         (Laws_gen_Stdlib.List.length
+                            (Laws_gen_Stdlib.List.map f xs))
+                         (Laws_gen_Stdlib.List.length xs) : bool));
+                 location =
+                   {
+                     CamlinternalLaw.file = "shapes.mli";
+                     start_line = 22;
+                     start_col = 2;
+                     end_line = 22;
+                     end_col = 46
+                   }
+               }))
+    let modes ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.modes),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.modes;
+                 predicate =
+                   (fun ((Modes_input { g }) : modes_input) ->
+                      (Laws_gen_Stdlib.(=) (Laws_gen_Shapes.apply g)
+                         (Laws_gen_Shapes.apply g) : bool));
+                 location =
+                   {
+                     CamlinternalLaw.file = "shapes.mli";
+                     start_line = 23;
+                     start_col = 37;
+                     end_line = 23;
+                     end_col = 54
+                   }
+               }))
+    let unboxed ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.unboxed),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.unboxed;
+                 predicate =
+                   (fun ((Unboxed_input { x }) : unboxed_input) ->
+                      (Laws_gen_Stdlib.(=) (Laws_gen_Shapes.of_unboxed x)
+                         (Laws_gen_Shapes.of_unboxed x) : bool));
+                 location =
+                   {
+                     CamlinternalLaw.file = "shapes.mli";
+                     start_line = 24;
+                     start_col = 28;
+                     end_line = 24;
+                     end_col = 55
+                   }
+               }))
+    let \#type ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.\#type),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.\#type;
+                 predicate =
+                   (fun ((Type_input { \#method }) : type_input) ->
+                      (Laws_gen_Stdlib.(=) \#method \#method : bool));
+                 location =
+                   {
+                     CamlinternalLaw.file = "shapes.mli";
+                     start_line = 25;
+                     start_col = 31;
+                     end_line = 25;
+                     end_col = 50
+                   }
+               }))
+    let inferred ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.inferred),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.inferred;
+                 predicate =
+                   (fun ((Inferred_input { x; y }) : inferred_input) ->
+                      (Laws_gen_Stdlib.(=) (Laws_gen_Stdlib.(+) x y)
+                         (Laws_gen_Stdlib.(+) y x) : bool));
+                 location =
+                   {
+                     CamlinternalLaw.file = "shapes.mli";
+                     start_line = 26;
+                     start_col = 20;
+                     end_line = 26;
+                     end_col = 33
+                   }
+               }))
+    let laws choices =
+      {
+        poly = (poly choices);
+        modes = (modes choices);
+        unboxed = (unboxed choices);
+        \#type = (\#type choices);
+        inferred = (inferred choices)
+      }
+  end
