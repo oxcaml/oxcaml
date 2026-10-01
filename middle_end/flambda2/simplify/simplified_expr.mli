@@ -120,6 +120,7 @@ and simplified_apply_cont = private
 and simplified_switch = private
   { arms :
       (Apply_cont_expr.t
+      * likelihood:Likelihood.t
       * Apply_cont_rewrite_id.t
       * [`Unarized] Flambda_arity.t
       * Typing_env.t)
@@ -175,6 +176,7 @@ val simplified_apply_cont :
 val simplified_switch :
   arms:
     (Apply_cont_expr.t
+    * likelihood:Likelihood.t
     * Apply_cont_rewrite_id.t
     * [`Unarized] Flambda_arity.t
     * Typing_env.t)

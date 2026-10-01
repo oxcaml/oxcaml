@@ -155,7 +155,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Cphantom_let (_var, _defining_expr, body) -> effects_of body
     | Cname_for_debugger (_, body) -> effects_of body
     | Csequence (e1, e2) -> EC.join (effects_of e1) (effects_of e2)
-    | Cifthenelse (cond, _ifso_dbg, ifso, _ifnot_dbg, ifnot, _dbg) ->
+    | Cifthenelse
+        (cond, _ifso_dbg, _ifso_p, ifso, _ifnot_dbg, _ifnot_p, ifnot, _dbg) ->
       EC.join (effects_of cond) (EC.join (effects_of ifso) (effects_of ifnot))
     | Cop (op, args, _) ->
       let from_op =
@@ -923,9 +924,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       match emit_expr env sub_cfg e1 ~bound_name:None with
       | Never_returns -> Never_returns
       | Ok _ -> emit_expr env sub_cfg e2 ~bound_name)
-    | Cifthenelse (econd, ifso_dbg, eif, ifnot_dbg, eelse, dbg) ->
-      emit_expr_ifthenelse env sub_cfg bound_name econd ifso_dbg eif ifnot_dbg
-        eelse dbg
+    | Cifthenelse (econd, ifso_dbg, ifso_p, eif, ifnot_dbg, ifnot_p, eelse, dbg)
+      ->
+      emit_expr_ifthenelse env sub_cfg bound_name econd ifso_dbg ifso_p eif
+        ifnot_dbg ifnot_p eelse dbg
     | Cswitch (esel, index, ecases, dbg) ->
       emit_expr_switch env sub_cfg bound_name esel index ecases dbg
     | Ccatch (_, [], e1) -> emit_expr env sub_cfg e1 ~bound_name
@@ -954,8 +956,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       match emit_expr env sub_cfg e1 ~bound_name:None with
       | Never_returns -> ()
       | Ok _ -> emit_tail env sub_cfg e2)
-    | Cifthenelse (econd, ifso_dbg, eif, ifnot_dbg, eelse, dbg) ->
-      emit_tail_ifthenelse env sub_cfg econd ifso_dbg eif ifnot_dbg eelse dbg
+    | Cifthenelse (econd, ifso_dbg, ifso_p, eif, ifnot_dbg, ifnot_p, eelse, dbg)
+      ->
+      emit_tail_ifthenelse env sub_cfg econd ifso_dbg ifso_p eif ifnot_dbg
+        ifnot_p eelse dbg
     | Cswitch (esel, index, ecases, dbg) ->
       emit_tail_switch env sub_cfg esel index ecases dbg
     | Ccatch (_, [], e1) -> emit_tail env sub_cfg e1
@@ -1183,8 +1187,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           (Printcfg.terminator_desc ~sep:"")
           term)
 
-  and emit_expr_ifthenelse env sub_cfg bound_name econd _ifso_dbg eif
-      (_ifnot_dbg : Debuginfo.t) eelse (_dbg : Debuginfo.t) :
+  and emit_expr_ifthenelse env sub_cfg bound_name econd _ifso_dbg ifso_p eif
+      (_ifnot_dbg : Debuginfo.t) ifnot_p eelse (_dbg : Debuginfo.t) :
       _ Or_never_returns.t =
     (* CR-someday xclerc for xclerc: use the `_dbg` parameter *)
     let cond, earg = select_condition econd in
@@ -1192,8 +1196,16 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Never_returns -> Never_returns
     | Ok rarg ->
       assert (Sub_cfg.exit_has_never_terminator sub_cfg);
-      let rif, sub_if = emit_new_sub_cfg env eif ~bound_name in
-      let relse, sub_else = emit_new_sub_cfg env eelse ~bound_name in
+      let rif, sub_if =
+        emit_new_sub_cfg
+          ~is_cold:(Likelihood.is_cold ifso_p)
+          env eif ~bound_name
+      in
+      let relse, sub_else =
+        emit_new_sub_cfg
+          ~is_cold:(Likelihood.is_cold ifnot_p)
+          env eelse ~bound_name
+      in
       let r = SU.join env rif sub_if relse sub_else ~bound_name in
       let term_desc =
         SU.terminator_of_test cond
@@ -1217,7 +1229,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       assert (Sub_cfg.exit_has_never_terminator sub_cfg);
       let sub_cases : (Reg.t array Or_never_returns.t * Sub_cfg.t) array =
         Array.map
-          (fun (case, _dbg) -> emit_new_sub_cfg env case ~bound_name)
+          (fun (case, _dbg, ~likelihood) ->
+            emit_new_sub_cfg
+              ~is_cold:(Likelihood.is_cold likelihood)
+              env case ~bound_name)
           ecases
       in
       let r = SU.join_array env sub_cases ~bound_name in
@@ -1421,10 +1436,12 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           Misc.fatal_error "Selection.emit_expr: Return with too many arguments"
         ))
 
-  and emit_new_sub_cfg ?at_start env exp ~bound_name : _ * Sub_cfg.t =
+  and emit_new_sub_cfg ?at_start ?(is_cold = false) env exp ~bound_name :
+      _ * Sub_cfg.t =
     let sub_cfg = Sub_cfg.make_empty () in
     (match at_start with None -> () | Some f -> f sub_cfg);
     let r = emit_expr env sub_cfg exp ~bound_name in
+    if is_cold then mark_sub_cfg_as_cold sub_cfg;
     r, sub_cfg
 
   (* Same, but in tail position *)
@@ -1499,16 +1516,20 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           | Tailcall_func _ | Invalid _ | Call_no_return _ | Prim _ ) ->
         Misc.fatal_error "Cfg_selectgen.emit_tail")
 
-  and emit_tail_ifthenelse env sub_cfg econd (_ifso_dbg : Debuginfo.t) eif
-      (_ifnot_dbg : Debuginfo.t) eelse (_dbg : Debuginfo.t) =
+  and emit_tail_ifthenelse env sub_cfg econd (_ifso_dbg : Debuginfo.t) ifso_p
+      eif (_ifnot_dbg : Debuginfo.t) ifnot_p eelse (_dbg : Debuginfo.t) =
     (* CR-someday xclerc for xclerc: use the `_dbg` parameter *)
     let cond, earg = select_condition econd in
     match emit_expr env sub_cfg earg ~bound_name:None with
     | Never_returns -> ()
     | Ok rarg ->
       assert (Sub_cfg.exit_has_never_terminator sub_cfg);
-      let sub_if = emit_tail_new_sub_cfg env eif in
-      let sub_else = emit_tail_new_sub_cfg env eelse in
+      let sub_if =
+        emit_tail_new_sub_cfg ~is_cold:(Likelihood.is_cold ifso_p) env eif
+      in
+      let sub_else =
+        emit_tail_new_sub_cfg ~is_cold:(Likelihood.is_cold ifnot_p) env eelse
+      in
       let term_desc =
         SU.terminator_of_test cond
           ~label_true:(Sub_cfg.start_label sub_if)
@@ -1525,7 +1546,12 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Ok rsel ->
       assert (Sub_cfg.exit_has_never_terminator sub_cfg);
       let sub_cases =
-        Array.map (fun (case, _dbg) -> emit_tail_new_sub_cfg env case) ecases
+        Array.map
+          (fun (case, _dbg, ~likelihood) ->
+            emit_tail_new_sub_cfg
+              ~is_cold:(Likelihood.is_cold likelihood)
+              env case)
+          ecases
       in
       let term_desc : Cfg.terminator =
         Switch
@@ -1649,10 +1675,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     in
     Sub_cfg.join_tail ~from:(s_body :: s_handlers) ~to_:sub_cfg
 
-  and emit_tail_new_sub_cfg ?at_start env exp : Sub_cfg.t =
+  and emit_tail_new_sub_cfg ?at_start ?(is_cold = false) env exp : Sub_cfg.t =
     let sub_cfg = Sub_cfg.make_empty () in
     (match at_start with None -> () | Some f -> f sub_cfg);
     emit_tail env sub_cfg exp;
+    if is_cold then mark_sub_cfg_as_cold sub_cfg;
     sub_cfg
 
   let insert_param_name_for_debugger env block fun_args loc_arg num_regs_per_arg

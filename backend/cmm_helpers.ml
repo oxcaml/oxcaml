@@ -1461,8 +1461,10 @@ let make_safe_divmod operator ~if_divisor_is_negative_one
             Cifthenelse
               ( Cop (Ccmpi Cne, [c2; Cconst_int (-1, dbg)], dbg),
                 dbg,
+                Likelihood.default,
                 Cop (operator, [c1; c2], dbg),
                 dbg,
+                Likelihood.default,
                 if_divisor_is_negative_one ~dividend:c1 ~dbg,
                 dbg )))
 
@@ -1487,8 +1489,10 @@ let div_int ?dividend_cannot_be_min_int c1 c2 dbg =
       Cifthenelse
         ( Cop (Ccmpi Ceq, [c1; Cconst_natint (divisor, dbg)], dbg),
           dbg,
+          Likelihood.default,
           Cconst_int (1, dbg),
           dbg,
+          Likelihood.default,
           Cconst_int (0, dbg),
           dbg )
     else if is_power_of_2_or_zero divisor
@@ -1559,8 +1563,10 @@ let unsigned_div_int c1 c2 dbg =
     Cifthenelse
       ( Cop (Ccmpi Ceq, [c1; Cconst_natint (-1n, dbg)], dbg),
         dbg,
+        Likelihood.default,
         Cconst_int (1, dbg),
         dbg,
+        Likelihood.default,
         Cconst_int (0, dbg),
         dbg )
   | _, Some divisor ->
@@ -1620,8 +1626,10 @@ let mod_int ?dividend_cannot_be_min_int c1 c2 dbg =
           Cifthenelse
             ( Cop (Ccmpi Ceq, [c1; min_int], dbg),
               dbg,
+              Likelihood.default,
               Cconst_int (0, dbg),
               dbg,
+              Likelihood.default,
               c1,
               dbg ))
     else if is_power_of_2_or_zero n
@@ -1668,8 +1676,10 @@ let unsigned_mod_int c1 c2 dbg =
         Cifthenelse
           ( Cop (Ccmpi Ceq, [c1; Cconst_natint (-1n, dbg)], dbg),
             dbg,
+            Likelihood.default,
             Cconst_int (0, dbg),
             dbg,
+            Likelihood.default,
             c1,
             dbg ))
   | _, Some divisor ->
@@ -3461,7 +3471,7 @@ let make_switch arg cases actions dbg =
       | Constant_rev of Cmm.data_item list
       | Jump_rev of Cmm.exit_label * Cmm.data_item list
   end in
-  let classify (action, _dbg) : Classify.elt =
+  let classify (action, _dbg, ~likelihood:_) : Classify.elt =
     match action with
     | Cexit (lbl, [arg], []) -> (
       match extract_uconstant arg with
@@ -3523,9 +3533,9 @@ module SArgBlocks = struct
 
   type act = expression
 
-  (* The module [SArgBlocks] must conform to the signature `Switch.S`. Since we
-     do not need a layout, we pick unit as the layout. *)
-  type layout = unit
+  (* The module [SArgBlocks] must conform to the signature `Switch.S`. We do not
+     need a layout, but we use it to encode likelihoods instead. *)
+  type layout = Likelihood.t array
 
   type loc = Debuginfo.t
 
@@ -3545,17 +3555,35 @@ module SArgBlocks = struct
 
   let arg_as_test arg = arg
 
-  let make_if () cond ifso ifnot =
+  let make_if _likelihoods cond ifso ifnot =
     Cifthenelse
-      (cond, Debuginfo.none, ifso, Debuginfo.none, ifnot, Debuginfo.none)
+      ( cond,
+        Debuginfo.none,
+        Likelihood.default,
+        ifso,
+        Debuginfo.none,
+        Likelihood.default,
+        ifnot,
+        Debuginfo.none )
 
-  let make_switch dbg () arg cases actions =
-    let actions = Array.map (fun expr -> expr, dbg) actions in
+  let make_switch dbg likelihoods arg cases actions =
+    let action_likelihoods = Array.make (Array.length actions) [] in
+    Array.iteri
+      (fun i a ->
+        action_likelihoods.(a) <- likelihoods.(i) :: action_likelihoods.(a))
+      cases;
+    let actions =
+      Array.mapi
+        (fun a expr ->
+          let likelihood = Likelihood.sum_list action_likelihoods.(a) in
+          expr, dbg, ~likelihood)
+        actions
+    in
     make_switch arg cases actions dbg
 
   let bind arg body = bind "switcher" arg body
 
-  let make_catch () handler =
+  let make_catch _likelihoods handler =
     match handler with
     | Cexit (Lbl i, [], []) -> i, fun e -> e
     | _ -> (
@@ -3602,7 +3630,20 @@ module SwitcherBlocks = Switch.Make (SArgBlocks)
 
 let transl_switch_clambda loc arg index cases =
   let store = StoreExpForSwitch.mk_store () in
-  let index = Array.map (fun j -> store.Switch.act_store j cases.(j)) index in
+  let index =
+    Array.map
+      (fun j ->
+        let case, ~likelihood:_ = cases.(j) in
+        store.Switch.act_store j case)
+      index
+  in
+  let likelihoods =
+    Array.map
+      (fun j ->
+        let _, ~likelihood = cases.(j) in
+        likelihood)
+      index
+  in
   let n_index = Array.length index in
   let inters = ref []
   and this_high = ref (n_index - 1)
@@ -3620,10 +3661,12 @@ let transl_switch_clambda loc arg index cases =
   done;
   inters := (0, !this_high, !this_act) :: !inters;
   match !inters with
-  | [_] -> cases.(0)
+  | [_] ->
+    let case, ~likelihood:_ = cases.(0) in
+    case
   | inters ->
     bind "switcher" arg (fun a ->
-        SwitcherBlocks.zyva loc ()
+        SwitcherBlocks.zyva loc likelihoods
           (0, n_index - 1)
           a (Array.of_list inters) store)
 
@@ -3672,11 +3715,13 @@ let call_caml_apply extended_ty extended_args_type mut clos args pos mode dbg =
                       Cconst_int (List.length extended_args_type, dbg) ],
                     dbg ),
                 dbg,
+                Likelihood.default,
                 Cop
                   ( Capply { result_type = ty; region = pos; callees = None },
                     (get_field_codepointer mut clos 2 dbg :: args) @ [clos],
                     dbg ),
                 dbg,
+                Likelihood.default,
                 really_call_caml_apply clos args,
                 dbg )))
   else really_call_caml_apply clos args
@@ -3688,8 +3733,10 @@ let maybe_reset_current_region ~dbg ~body_tail ~body_nontail old_region =
   Cifthenelse
     ( Cop (Ccmpi Ceq, [old_region; Cop (Cbeginregion, [], dbg ())], dbg ()),
       dbg (),
+      Likelihood.default,
       body_tail,
       dbg (),
+      Likelihood.default,
       (let res = V.create_local "result" in
        Clet
          ( VP.create res,
@@ -3820,8 +3867,10 @@ let cache_public_method meths tag cache dbg =
     Cifthenelse
       ( Cop (Ccmpi Cge, [Cvar check_li; Cvar check_hi], dbg),
         dbg,
+        Likelihood.default,
         Cexit (Lbl found_cont, [Cvar check_li], []),
         dbg,
+        Likelihood.default,
         Cexit (Lbl loop_cont, [Cvar check_li; Cvar check_hi], []),
         dbg )
   in
@@ -3847,12 +3896,14 @@ let cache_public_method meths tag cache dbg =
                       dbg ) ],
                 dbg ),
             dbg,
+            Likelihood.default,
             (* tag < a.(mi) : interval is now [ li; mi - 2 ] *)
             Cexit
               ( Lbl check_cont,
                 [Cvar li; Cop (Csubi, [Cvar mi; cconst_int 2], dbg)],
                 [] ),
             dbg,
+            Likelihood.default,
             (* tag >= a.(mi) : interval is now [ mi; hi ] *)
             Cexit (Lbl check_cont, [Cvar mi; Cvar hi], []),
             dbg ) )
@@ -3974,12 +4025,14 @@ let apply_function_body arity result (mode : Cmx_format.return_mode) =
                 Cconst_int (List.length arity, dbg ()) ],
               dbg () ),
           dbg (),
+          Likelihood.default,
           Cop
             ( Capply { result_type = result; region = Rc_normal; callees = None },
               get_field_codepointer Asttypes.Immutable (Cvar clos) 2 (dbg ())
               :: List.map (fun s -> Cvar s) all_args,
               dbg () ),
           dbg (),
+          Likelihood.default,
           code,
           dbg () ) )
 
@@ -4030,9 +4083,11 @@ let send_function (arity, result, mode) =
                     Cifthenelse
                       ( Cop (Ccmpi Cne, [tag'; tag], dbg ()),
                         dbg (),
+                        Likelihood.default,
                         cache_public_method (Cvar meths) tag cache_ptr_cvar
                           (dbg ()),
                         dbg (),
+                        Likelihood.default,
                         cached_pos,
                         dbg () ),
                     Cop
@@ -4779,8 +4834,10 @@ let entry_point namelist =
       Cifthenelse
         ( Cop (Ccmpi Ceq, [Cvar id; high], dbg),
           dbg,
+          Likelihood.default,
           Cexit (Lbl raise_num, [], []),
           dbg,
+          Likelihood.default,
           Ctuple [],
           dbg )
     in
@@ -5072,8 +5129,8 @@ let sequence x y =
   | _, Ctuple [] -> x
   | _, _ -> Csequence (x, y)
 
-let ite ~dbg ~then_dbg ~then_ ~else_dbg ~else_ cond =
-  Cifthenelse (cond, then_dbg, then_, else_dbg, else_, dbg)
+let ite ~dbg ~then_dbg ~then_p ~then_ ~else_dbg ~else_p ~else_ cond =
+  Cifthenelse (cond, then_dbg, then_p, then_, else_dbg, else_p, else_, dbg)
 
 let trywith ~dbg ~body ~exn_var ~extra_args ~handler_cont ~handler () =
   Ccatch

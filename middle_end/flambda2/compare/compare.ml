@@ -459,10 +459,13 @@ and subst_apply_cont env apply_cont =
   let dbg = Apply_cont_expr.debuginfo apply_cont in
   Apply_cont_expr.create ?trap_action cont ~args ~dbg
 
+and subst_switch_arm env arm =
+  Switch_expr.map_arm_action (subst_apply_cont env) arm
+
 and subst_switch env switch =
   let scrutinee = subst_simple env (Switch_expr.scrutinee switch) in
   let arms =
-    Target_ocaml_int.Map.map_sharing (subst_apply_cont env)
+    Target_ocaml_int.Map.map_sharing (subst_switch_arm env)
       (Switch_expr.arms switch)
   in
   Expr.create_switch
@@ -1099,15 +1102,21 @@ let apply_cont_exprs env apply_cont1 apply_cont2 : Apply_cont.t Comparison.t =
           ~dbg:(Apply_cont.debuginfo apply_cont1))
   else Different { approximant = subst_apply_cont env apply_cont1 }
 
+let switch_arms env arm1 arm2 : Switch_expr.arm Comparison.t =
+  let action1 = Switch_expr.arm_action arm1 in
+  let action2 = Switch_expr.arm_action arm2 in
+  apply_cont_exprs env action1 action2
+  |> Comparison.map ~f:(fun action ->
+      Switch_expr.map_arm_action (fun _ -> action) arm1)
+
 let switch_exprs env switch1 switch2 : Expr.t Comparison.t =
   let compare_arms env arms1 arms2 =
     lists
       ~f:
         (pairs
            ~f1:(Comparator.of_predicate Target_ocaml_int.equal)
-           ~f2:apply_cont_exprs ~subst2:subst_apply_cont)
-      ~subst:(fun env (target_imm, apply_cont) ->
-        target_imm, subst_apply_cont env apply_cont)
+           ~f2:switch_arms ~subst2:subst_switch_arm)
+      ~subst:(fun env (target_imm, arm) -> target_imm, subst_switch_arm env arm)
       ~subst_snd:true env
       (Target_ocaml_int.Map.bindings arms1)
       (Target_ocaml_int.Map.bindings arms2)

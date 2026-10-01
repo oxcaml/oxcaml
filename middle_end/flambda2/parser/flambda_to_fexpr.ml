@@ -742,7 +742,8 @@ and switch_expr env switch : Fexpr.expr =
   let scrutinee = simple env (Switch_expr.scrutinee switch) in
   let cases =
     List.map
-      (fun (imm, app_cont) ->
+      (fun (imm, arm) ->
+        let app_cont = Switch_expr.arm_action arm in
         let tag =
           (* TODO: machine_width should be passed through properly here *)
           let machine_width = Target_system.Machine_width.Sixty_four in

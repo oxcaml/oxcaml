@@ -473,8 +473,9 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
             (* CR mshinwell: Should get machine_width from fexpr context when
                available *)
             let acc, apply = apply_cont env acc apply in
+            let arm = Switch_expr.create_arm apply in
             ( (acc, build_let_ks),
-              (Target_ocaml_int.of_int machine_width case, apply) )
+              (Target_ocaml_int.of_int machine_width case, arm) )
           | Inlined_goto body ->
             let (acc : Acc.t), build_let, (apply : Apply_cont_expr.t) =
               inlined_goto env acc body
@@ -483,8 +484,9 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
               let acc, let_k = build_let acc body in
               build_let_ks acc let_k
             in
+            let arm = Switch_expr.create_arm apply in
             ( (acc, build_let_ks),
-              (Target_ocaml_int.of_int machine_width case, apply) ))
+              (Target_ocaml_int.of_int machine_width case, arm) ))
         (acc, fun acc e -> acc, e)
         cases
     in

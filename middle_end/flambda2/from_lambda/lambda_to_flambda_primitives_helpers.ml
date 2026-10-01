@@ -333,9 +333,9 @@ let rec bind_recs acc exn_cont ~register_const0 (prim : expr_primitive)
                      ~arms:
                        (Target_ocaml_int.Map.of_list
                           [ ( Target_ocaml_int.bool_true machine_width,
-                              condition_passed );
-                            Target_ocaml_int.bool_false machine_width, failure
-                          ])))
+                              Switch_expr.create_arm condition_passed );
+                            ( Target_ocaml_int.bool_false machine_width,
+                              Switch_expr.create_arm_cold failure ) ])))
           in
           Let_cont_with_acc.build_non_recursive acc condition_passed_cont
             ~handler_params:Bound_parameters.empty
@@ -389,8 +389,10 @@ let rec bind_recs acc exn_cont ~register_const0 (prim : expr_primitive)
           (Switch.create ~condition_dbg:dbg ~scrutinee:(Simple.var cond_result)
              ~arms:
                (Target_ocaml_int.Map.of_list
-                  [ Target_ocaml_int.bool_true machine_width, ifso_cont;
-                    Target_ocaml_int.bool_false machine_width, ifnot_cont ]))
+                  [ ( Target_ocaml_int.bool_true machine_width,
+                      Switch_expr.create_arm ifso_cont );
+                    ( Target_ocaml_int.bool_false machine_width,
+                      Switch_expr.create_arm ifnot_cont ) ]))
       in
       Let_with_acc.create acc
         (Bound_pattern.singleton cond_result_pat)
