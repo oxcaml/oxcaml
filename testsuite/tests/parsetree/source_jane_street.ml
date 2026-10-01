@@ -1535,24 +1535,30 @@ let left_assoc = (zero_alloc_ allocate) ()
 val left_assoc : unit = ()
 |}]
 
-let   no_parens_seq =  zero_alloc_  () ; allocate ()
-let  left_assoc_seq = (zero_alloc_  ()); allocate ()
-let right_assoc_seq =  zero_alloc_ (() ; allocate ())
+let no_parens_seq = zero_alloc_ (); allocate ()
 [%%expect{|
-val no_parens_seq : unit = ()
+(* CR wsturgeon for wsturgeon: this needs to fail *)
+|}]
+let right_assoc_seq = zero_alloc_ ((); allocate ())
+[%%expect{|
+(* CR wsturgeon for wsturgeon: this needs to fail *)
+|}]
+let left_assoc_seq = (zero_alloc_ ()); allocate ()
+[%%expect{|
 val left_assoc_seq : unit = ()
-val right_assoc_seq : unit = ()
-(* CR wsturgeon: some of these should fail *)
 |}]
 
-let outside_closure    = zero_alloc_ fun () ->             allocate ()
-let  inside_closure    =             fun () -> zero_alloc_ allocate ()
-let  inside_sugared () =                       zero_alloc_ allocate ()
+let outside_closure = zero_alloc_ fun () -> allocate ()
 [%%expect{|
 val outside_closure : unit -> unit = <fun>
-val inside_closure : unit -> unit = <fun>
-val inside_sugared : unit -> unit = <fun>
-(* CR wsturgeon: some of these should fail *)
+|}]
+let inside_closure = fun () -> zero_alloc_ allocate ()
+[%%expect{|
+(* CR wsturgeon for wsturgeon: this needs to fail *)
+|}]
+let inside_sugared () = zero_alloc_ allocate ()
+[%%expect{|
+(* CR wsturgeon for wsturgeon: this needs to fail *)
 |}]
 
 (*****************)
