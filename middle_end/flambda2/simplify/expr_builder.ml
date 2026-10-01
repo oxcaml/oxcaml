@@ -479,12 +479,16 @@ let create_switch uacc ~condition_dbg ~scrutinee ~arms =
       RE.create_apply_cont ~is_cold action, uacc
     in
     match Target_ocaml_int.Map.get_singleton arms with
-    | Some (_discriminant, action) -> change_to_apply_cont action
+    | Some (_discriminant, action) ->
+      change_to_apply_cont (Switch_expr.arm_action action)
     | None -> (
       (* At that point, we've already applied the apply cont rewrite to the
          action of the arms. *)
       let actions =
-        Apply_cont_expr.Set.of_list (Target_ocaml_int.Map.data arms)
+        Target_ocaml_int.Map.fold
+          (fun _ arm actions ->
+            Apply_cont_expr.Set.add (Switch_expr.arm_action arm) actions)
+          arms Apply_cont_expr.Set.empty
       in
       match Apply_cont_expr.Set.get_singleton actions with
       | Some action ->
@@ -500,9 +504,7 @@ let create_switch uacc ~condition_dbg ~scrutinee ~arms =
         in
         let is_cold =
           Target_ocaml_int.Map.for_all
-            (fun _ apply_cont ->
-              UE.is_cold_continuation (UA.uenv uacc)
-                (Apply_cont.continuation apply_cont))
+            (fun _ arm -> Switch.arm_is_cold arm)
             arms
         in
         RE.create_switch (UA.are_rebuilding_terms uacc) ~is_cold switch, uacc)
