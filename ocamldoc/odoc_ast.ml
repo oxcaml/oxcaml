@@ -1026,7 +1026,8 @@ module Analyser =
           (* don't care *)
           (0, env, [])
       | Parsetree.Pstr_attribute _
-      | Parsetree.Pstr_extension _ ->
+      | Parsetree.Pstr_extension _
+      | Parsetree.Pstr_law _ ->
           (0, env, [])
       | Parsetree.Pstr_value (rec_flag, pat_exp_list) ->
           (* of rec_flag * (pattern * expression) list *)
