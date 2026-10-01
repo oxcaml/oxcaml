@@ -30,41 +30,27 @@ let imm_record () =
   { i_int = 5; i_str = "efgh"; i_pair = #{ a = #7L; b = #6L } }
 
 let () =
-  print_endline "of_idx and deepen";
+  print_endline "of_idx";
   let r = imm_record () in
   print_int_ln (Addr_imm.get (Addr_imm.of_idx r (.i_int)));
-  print_int_ln (Addr_imm.get__read (Addr_imm.of_idx__read r (.i_int)));
-  print_int_ln (Addr_imm.get__write (Addr_imm.of_idx__write r (.i_int)));
+  print_int_ln (Addr_imm.get_read (Addr_imm.of_idx_read r (.i_int)));
+  print_int_ln (Addr_imm.get_write (Addr_imm.of_idx_write r (.i_int)));
   print_endline
-    (Addr_imm.get__immutable (Addr_imm.of_idx__immutable r (.i_str)));
-  let addr = Addr_imm.of_idx r (.i_pair) in
-  let addr = Addr_imm.deepen addr ~f:(fun i -> (.idx_imm(i).#a)) in
-  print_i64_ln (Addr_imm.get addr);
-  let addr = Addr_imm.of_idx__read r (.i_pair) in
-  let addr = Addr_imm.deepen__read addr ~f:(fun i -> (.idx_imm(i).#b)) in
-  print_i64_ln (Addr_imm.get__read addr);
-  let addr = Addr_imm.of_idx__write r (.i_pair) in
-  let addr = Addr_imm.deepen__write addr ~f:(fun i -> (.idx_imm(i).#a)) in
-  print_i64_ln (Addr_imm.get__write addr);
-  let addr = Addr_imm.of_idx__immutable r (.i_pair) in
-  let addr = Addr_imm.deepen__immutable addr ~f:(fun i -> (.idx_imm(i).#b)) in
-  print_i64_ln (Addr_imm.get__immutable addr);
+    (Addr_imm.get_immutable (Addr_imm.of_idx_immutable r (.i_str)));
+  print_i64_ln (Addr_imm.get (Addr_imm.of_idx r (.i_pair.#a)));
+  print_i64_ln
+    (Addr_imm.get_immutable (Addr_imm.of_idx_immutable r (.i_pair.#b)));
   print_newline ()
 
 let () =
-  print_endline "local";
+  print_endline "local of_idx";
   let r =
     stack_ { i_int = 5; i_str = "efgh"; i_pair = #{ a = #7L; b = #6L } }
   in
-  print_int_ln (Addr_imm.get (Addr_imm.of_idx__local r (.i_int)));
+  print_int_ln (Addr_imm.get (Addr_imm.of_idx_local r (.i_int)));
   print_endline
-    (Addr_imm.get__immutable (Addr_imm.of_idx__immutable__local r (.i_str)));
-  let addr = Addr_imm.of_idx__local r (.i_pair) in
-  let addr = Addr_imm.deepen__local addr ~f:(fun i -> (.idx_imm(i).#a)) in
-  print_i64_ln (Addr_imm.get addr);
-  let addr = Addr_imm.of_idx__immutable__local r (.i_pair) in
-  let addr =
-    Addr_imm.deepen__immutable__local addr ~f:(fun i -> (.idx_imm(i).#b))
-  in
-  print_i64_ln (Addr_imm.get__immutable addr);
+    (Addr_imm.get_immutable (Addr_imm.of_idx_immutable_local r (.i_str)));
+  print_i64_ln (Addr_imm.get (Addr_imm.of_idx_local r (.i_pair.#a)));
+  print_i64_ln
+    (Addr_imm.get_immutable (Addr_imm.of_idx_immutable_local r (.i_pair.#b)));
   print_newline ()

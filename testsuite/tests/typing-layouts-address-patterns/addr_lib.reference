@@ -1,4 +1,4 @@
-of_idx and deepen
+of_idx
 1
 42
 42
@@ -6,9 +6,8 @@ of_idx and deepen
 2
 -1
 3
-10
 
-modify
+set
 abcd
 wxyz
 wxyz
@@ -17,7 +16,7 @@ of_imm
 efgh
 6
 
-local
+local of_idx
 42
 wxyz
 10
