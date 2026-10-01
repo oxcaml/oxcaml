@@ -2870,7 +2870,7 @@ let build_or_pat env loc lid =
    synthesized name for an [_] ([Ppat_any]), and [var] takes all the fields
    necessary for a [pattern_variable] so that one can be created or, similarly,
    so [enter_variable] can be called, depending on the usage. *)
-let type_for_loop_like_index ~error:err ~loc ~env ~param ~any ~var =
+let type_for_loop_like_index ~error ~loc ~env ~param ~any ~var =
   match param.ppat_desc with
   | Ppat_any ->
     any (Ident.create_local "_for",
@@ -2883,7 +2883,7 @@ let type_for_loop_like_index ~error:err ~loc ~env ~param ~any ~var =
           ~pv_as_var:false
           ~pv_attributes:[]
   | _ ->
-      Error.log_and_raise param.ppat_loc env err
+      Error.log_and_raise param.ppat_loc env error
 
 let type_for_loop_index ~loc ~env ~param =
   type_for_loop_like_index
@@ -3832,9 +3832,9 @@ and type_pat_aux
             let ty = generic_instance expected_ty in
             Some (p0, p, is_principal expected_ty), ty
         | Record_type_of_other_form ->
-          let err =
+          let error =
             Wrong_expected_record_boxing(Pattern, P record_form, expected_ty) in
-          Error.log_and_raise loc !!penv err
+          Error.log_and_raise loc !!penv error
         | Maybe_a_record_type ->
           None,
           newvar (Jkind.of_new_sort ~level:(Ctype.get_current_level ())
