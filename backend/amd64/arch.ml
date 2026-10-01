@@ -288,6 +288,10 @@ type prefetch_info = {
 
 type bswap_bitwidth = Sixteen | Thirtytwo | Sixtyfour
 
+type rotate_direction = Rotate_left | Rotate_right
+
+type rotate_bitwidth = Rotate32 | Rotate64
+
 type float_width = Cmm.float_width
 
 (* Specific operations, including [Simd], must not raise. *)
@@ -300,6 +304,14 @@ type specific_operation =
   | Ifloatarithmem of float_width * float_operation * addressing_mode
                                        (* Float arith operation with memory *)
   | Ibswap of { bitwidth: bswap_bitwidth; } (* endianness conversion *)
+  | Irotate of                         (* rotation of the low [bitwidth] bits;
+                                          the count is [imm] (already reduced
+                                          modulo the bit width) if present,
+                                          otherwise the second argument *)
+      { direction: rotate_direction;
+        bitwidth: rotate_bitwidth;
+        imm: int option;
+      }
   | Isextend32                         (* 32 to 64 bit conversion with sign
                                           extension *)
   | Izextend32                         (* 32 to 64 bit conversion with zero
@@ -424,7 +436,8 @@ let fold_delta_into_specific_operation op ~arg_is_folded_reg ~delta =
       then None
       else Some (Ilea (offset_addressing addr displ_delta))
     end
-  | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ibswap _ | Isextend32
+  | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ibswap _ | Irotate _
+  | Isextend32
   | Izextend32 | Ineg | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence
   | Ipackf32 | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _
   | Illvm_intrinsic _ ->
@@ -458,6 +471,20 @@ let int_of_bswap_bitwidth = function
   | Sixteen -> 16
   | Thirtytwo -> 32
   | Sixtyfour -> 64
+
+let int_of_rotate_bitwidth = function
+  | Rotate32 -> 32
+  | Rotate64 -> 64
+
+let equal_rotate_direction left right =
+  match left, right with
+  | Rotate_left, Rotate_left | Rotate_right, Rotate_right -> true
+  | (Rotate_left | Rotate_right), _ -> false
+
+let equal_rotate_bitwidth left right =
+  match left, right with
+  | Rotate32, Rotate32 | Rotate64, Rotate64 -> true
+  | (Rotate32 | Rotate64), _ -> false
 
 let print_addressing printreg addr ppf arg =
   match addr with
@@ -505,6 +532,12 @@ let print_specific_operation printreg op ppf arg =
                    (Array.sub arg 1 (Array.length arg - 1))
   | Ibswap { bitwidth } ->
     fprintf ppf "bswap_%i %a" (int_of_bswap_bitwidth bitwidth) printreg arg.(0)
+  | Irotate { direction; bitwidth; imm } ->
+    fprintf ppf "%s_%i %a%s"
+      (match direction with Rotate_left -> "rotl" | Rotate_right -> "rotr")
+      (int_of_rotate_bitwidth bitwidth)
+      printreg arg.(0)
+      (match imm with None -> "" | Some n -> " " ^ Int.to_string n)
   | Isextend32 ->
       fprintf ppf "sextend32 %a" printreg arg.(0)
   | Izextend32 ->
@@ -546,6 +579,9 @@ let specific_operation_name : specific_operation -> string = fun op ->
   | Ifloatarithmem (width, op, _addr) -> floatartith_name width op
   | Ibswap { bitwidth } ->
       "bswap " ^ (bitwidth |> int_of_bswap_bitwidth |> string_of_int)
+  | Irotate { direction; bitwidth; imm = _ } ->
+      (match direction with Rotate_left -> "rotl " | Rotate_right -> "rotr ")
+      ^ (bitwidth |> int_of_rotate_bitwidth |> string_of_int)
   | Isextend32 -> "sextend32"
   | Izextend32 -> "zextend32"
   | Ineg -> "neg"
@@ -571,7 +607,7 @@ let win64 =
 (* Specific operations that are pure *)
 (* Keep in sync with [Vectorize_specific] *)
 let operation_is_pure = function
-  | Ilea _ | Ibswap _ | Isextend32 | Izextend32 | Ineg
+  | Ilea _ | Ibswap _ | Irotate _ | Isextend32 | Izextend32 | Ineg
   | Ifloatarithmem _  -> true
   | Irdtsc | Irdpmc
   | Ilfence | Isfence | Imfence
@@ -587,7 +623,7 @@ let operation_is_pure = function
 
 (* Keep in sync with [Vectorize_specific] *)
 let operation_allocates = function
-  | Ilea _ | Ibswap _ | Isextend32 | Izextend32 | Ineg
+  | Ilea _ | Ibswap _ | Irotate _ | Isextend32 | Izextend32 | Ineg
   | Ifloatarithmem _
   | Irdtsc | Irdpmc  | Ipackf32
   | Isimd _ | Isimd_mem _
@@ -662,6 +698,10 @@ let equal_specific_operation left right =
     equal_addressing_mode x' y'
   | Ibswap { bitwidth = left }, Ibswap { bitwidth = right } ->
     Int.equal (int_of_bswap_bitwidth left) (int_of_bswap_bitwidth right)
+  | Irotate { direction = ld; bitwidth = lb; imm = li },
+    Irotate { direction = rd; bitwidth = rb; imm = ri } ->
+    equal_rotate_direction ld rd && equal_rotate_bitwidth lb rb
+    && Option.equal Int.equal li ri
   | Isextend32, Isextend32 ->
     true
   | Izextend32, Izextend32 ->
@@ -692,7 +732,7 @@ let equal_specific_operation left right =
     Simd.Mem.equal_operation l r && equal_addressing_mode al ar
   | Illvm_intrinsic l, Illvm_intrinsic r -> String.equal l r
   | (Ilea _ | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ibswap _ |
-     Isextend32 | Izextend32 | Ineg |
+     Irotate _ | Isextend32 | Izextend32 | Ineg |
      Irdtsc | Irdpmc | Ilfence | Isfence | Imfence |
      Ipackf32 | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _ |
      Illvm_intrinsic _), _ ->
@@ -777,6 +817,10 @@ let isomorphic_specific_operation op1 op2 =
     equal_addressing_mode_without_displ a1 a2
   | Ibswap { bitwidth = left }, Ibswap { bitwidth = right } ->
     Int.equal (int_of_bswap_bitwidth left) (int_of_bswap_bitwidth right)
+  | Irotate { direction = ld; bitwidth = lb; imm = li },
+    Irotate { direction = rd; bitwidth = rb; imm = ri } ->
+    equal_rotate_direction ld rd && equal_rotate_bitwidth lb rb
+    && Option.equal Int.equal li ri
   | Isextend32, Isextend32 ->
     true
   | Izextend32, Izextend32 ->
@@ -807,7 +851,7 @@ let isomorphic_specific_operation op1 op2 =
     Simd.Mem.equal_operation l r && equal_addressing_mode_without_displ al ar
   | Illvm_intrinsic l, Illvm_intrinsic r -> String.equal l r
   | (Ilea _ | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ibswap _ |
-     Isextend32 | Izextend32 | Ineg |
+     Irotate _ | Isextend32 | Izextend32 | Ineg |
      Irdtsc | Irdpmc | Ilfence | Isfence | Imfence |
      Ipackf32 | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _ |
      Illvm_intrinsic _), _ ->

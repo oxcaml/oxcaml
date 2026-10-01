@@ -1865,6 +1865,50 @@ let emit_instr env i =
       A.ins4 UBFM res_w res_w (O.imm_six 0) (O.imm_six 15)
     | Thirtytwo -> A.ins2 REV (H.reg_w i.res.(0)) (H.reg_w i.arg.(0))
     | Sixtyfour -> A.ins2 REV (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)))
+  | Lop (Specific (Irotate { direction; bitwidth; imm })) -> (
+    (* ROR <Xd>, <Xn>, #<count> is an alias of EXTR <Xd>, <Xn>, <Xn>, #<count>.
+       Left rotations by an immediate rotate right by the complement; left
+       rotations by a variable count were rewritten into right rotations in
+       [Cfg_selection]. *)
+    let bits = int_of_rotate_bitwidth bitwidth in
+    match imm with
+    | Some count -> (
+      let count =
+        match direction with
+        | Rotate_right -> count
+        | Rotate_left -> (bits - count) land (bits - 1)
+      in
+      match bitwidth with
+      | Rotate64 ->
+        A.ins4 EXTR
+          (H.reg_x i.res.(0))
+          (H.reg_x i.arg.(0))
+          (H.reg_x i.arg.(0))
+          (O.imm_six count)
+      | Rotate32 ->
+        A.ins4 EXTR
+          (H.reg_w i.res.(0))
+          (H.reg_w i.arg.(0))
+          (H.reg_w i.arg.(0))
+          (O.imm_six count))
+    | None -> (
+      match direction with
+      | Rotate_left ->
+        Misc.fatal_errorf
+          "emit_instr: rotation by a register count must rotate right: %a"
+          Printlinear.instr i
+      | Rotate_right -> (
+        match bitwidth with
+        | Rotate64 ->
+          A.ins3 RORV
+            (H.reg_x i.res.(0))
+            (H.reg_x i.arg.(0))
+            (H.reg_x i.arg.(1))
+        | Rotate32 ->
+          A.ins3 RORV
+            (H.reg_w i.res.(0))
+            (H.reg_w i.arg.(0))
+            (H.reg_w i.arg.(1)))))
   | Lop (Specific (Isignext size)) ->
     let rd, rn = H.reg_x i.res.(0), H.reg_x i.arg.(0) in
     A.ins4 SBFM rd rn (O.imm_six 0) (O.imm_six (size - 1))

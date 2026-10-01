@@ -2510,6 +2510,18 @@ let emit_instr ~first ~last ~fallthrough i =
     I.movzx (res16 i 0) (res i 0)
   | Lop (Specific (Ibswap { bitwidth = Thirtytwo })) -> I.bswap (res32 i 0)
   | Lop (Specific (Ibswap { bitwidth = Sixtyfour })) -> I.bswap (res i 0)
+  | Lop (Specific (Irotate { direction; bitwidth; imm })) -> (
+    let instr =
+      match direction with Rotate_left -> I.rol | Rotate_right -> I.ror
+    in
+    let dst =
+      match bitwidth with Rotate32 -> res32 i 0 | Rotate64 -> res i 0
+    in
+    (* We have i.arg.(0) = i.res.(0), and i.arg.(1) = %rcx if there is no
+       immediate count *)
+    match imm with
+    | Some n -> instr (int n) dst
+    | None -> instr cl dst)
   | Lop (Specific Isextend32) -> I.movsxd (arg32 i 0) (res i 0)
   | Lop (Specific Izextend32) -> I.mov (arg32 i 0) (res32 i 0)
   | Lop (Specific Ineg) -> I.neg (res i 0)
