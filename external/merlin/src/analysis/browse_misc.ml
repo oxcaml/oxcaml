@@ -55,7 +55,7 @@ let summary_prev = function
   | Env.Env_value (s, _, _, _)
   | Env.Env_type (s, _, _)
   | Env.Env_extension (s, _, _)
-  | Env.Env_module (s, _, _, _, _, _)
+  | Env.Env_module (s, _, _, _, _, _, _)
   | Env.Env_modtype (s, _, _)
   | Env.Env_class (s, _, _)
   | Env.Env_cltype (s, _, _)
@@ -84,7 +84,7 @@ let signature_of_env ?(ignore_extensions = true) env =
         Some (Sig_typext (i, e, Text_exception, Exported))
       | _ -> Some (Sig_typext (i, e, Text_first, Exported))
       end
-    | Env_module (_, i, pr, m, _, _) ->
+    | Env_module (_, i, pr, m, _, _, _) ->
       Some (Sig_module (i, pr, m, Trec_not, Exported))
     | Env_modtype (_, i, m) -> Some (Sig_modtype (i, m, Exported))
     | Env_class (_, i, c) -> Some (Sig_class (i, c, Trec_not, Exported))
@@ -100,7 +100,7 @@ let signature_of_env ?(ignore_extensions = true) env =
     | Env_module_unbound _ -> None
   in
   let summary_module_ident_opt = function
-    | Env.Env_module (_, i, _, _, _, _) -> Some i
+    | Env.Env_module (_, i, _, _, _, _, _) -> Some i
     | _ -> None
   in
   let sg = ref [] in
