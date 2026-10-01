@@ -97,18 +97,7 @@ let%expect_test "function inlined both as an argument and directly" =
       List.iter (fun x -> print_int (Option.get x)) [ apply_some 0; apply_some 1; call_some 2 ]
   |}
    with Failure e -> print_endline e);
-  [%expect
-    {|
-    <...>/js_of_ocaml.exe: You found a bug. Please report it at https://github.com/ocsigen/js_of_ocaml/issues :
-    Error: File "code.ml", line 1094, characters 8-14: Assertion failed
-    Raised by primitive operation at Stdlib__Sys.(partial) in file "sys.ml.in", line 239, characters 0-82
-    Called from Bin_prefix_js_of_ocaml__Js_of_ocaml in file "js_of_ocaml.ml", lines 55-77, characters 4-623
-
-    process exited with error code 125
-     <...>/js_of_ocaml.exe --pretty --debug var --sourcemap --effects=disabled --disable=use-js-string --debug invariant --Werror test.bc -o test.js
-
-    non-zero exit code
-    |}]
+  [%expect {| 012 |}]
 
 let%expect_test "inlining nested continuations keeps the code size linear" =
   let open Js_of_ocaml_compiler in
