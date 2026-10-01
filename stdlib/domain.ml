@@ -25,7 +25,7 @@ open Modes.Portable
 external cpu_relax : unit -> unit @@ portable = "%cpu_relax"
 
 module Obj_opt : sig @@ portable
-  type t
+  type t : value non_float
   val some : 'a -> t
   val is_some : t -> bool
   val fresh : unit -> t array
@@ -39,16 +39,19 @@ module Obj_opt : sig @@ portable
       [Obj.obj (Obj.repr v)]. *)
   val unsafe_get : t -> 'a
 end = struct
-  type t = Obj.t
-  let none = Obj.magic_portable (Obj.repr (ref 0))
+  type not_a_float = Immediate | Block of { mutable _value: int }
+  let _immediate = Immediate
+  type t = not_a_float
+  let none : t =
+    Obj.magic_portable (Obj.magic (Sys.opaque_identity (Block { _value = 0 })))
   let fresh () = Array.make 7 (Obj.magic_uncontended none)
   let[@inline] some v =
    (* [Sys.opaque_identity] ensures that flambda does not look at the type of
     * [x], which may be a [float] and conclude that the [st] is a float array.
     * We do not want OCaml's float array optimisation kicking in here. *)
-    Obj.repr (Sys.opaque_identity v)
+    Obj.magic (Sys.opaque_identity v)
   let[@inline] is_some obj = (obj != Obj.magic_uncontended none)
-  let[@inline] unsafe_get obj = Obj.obj obj
+  let[@inline] unsafe_get obj = Obj.magic obj
 
   let[@inline never] grow_array st idx size =
     let rec compute_new_size s =
