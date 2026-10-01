@@ -2768,6 +2768,20 @@ module DSL = struct
       | Scaled, Scaled | Unscaled, Unscaled -> true
       | (Scaled | Unscaled), _ -> false
 
+    let compare t1 t2 =
+      let c = Int.compare t1.scale t2.scale in
+      if c <> 0
+      then c
+      else
+        let c = Int.compare t1.offset t2.offset in
+        if c <> 0
+        then c
+        else
+          match t1.kind, t2.kind with
+          | Scaled, Scaled | Unscaled, Unscaled -> 0
+          | Scaled, Unscaled -> -1
+          | Unscaled, Scaled -> 1
+
     let offset t = t.offset
 
     let scale t = t.scale
