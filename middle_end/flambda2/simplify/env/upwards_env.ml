@@ -116,11 +116,14 @@ let add_non_inlinable_continuation are_rebuilding_terms t cont ~is_cold ~params
   let t = if is_cold then add_cold_continuation t cont else t in
   let t, handler =
     match (handler : _ Or_unknown.t) with
-    | Known (handler, ~is_exn_handler, ~free_names_without_params) ->
+    | Known (handler, ~is_exn_handler, ~free_names_without_params)
+      when not is_cold ->
+      (* CR-someday bclement: support deduplication of cold handlers, but don't
+         merge cold and hot handlers. *)
       ( add_unique_continuation_handler are_rebuilding_terms t cont ~params
           ~handler ~is_exn_handler ~free_names_without_params,
         Or_unknown.Known handler )
-    | Unknown -> t, Or_unknown.Unknown
+    | Known _ | Unknown -> t, Or_unknown.Unknown
   in
   if Bound_parameters.is_empty params
   then add_continuation0 t cont (Non_inlinable_zero_arity { handler })
@@ -177,7 +180,8 @@ let add_linearly_used_inlinable_continuation t cont ~params ~handler
     (Linearly_used_and_inlinable
        { handler; free_names_of_handler; params; cost_metrics_of_handler })
 
-let add_function_return_or_exn_continuation t cont arity =
+let add_function_return_or_exn_continuation t cont ~is_cold arity =
+  let t = if is_cold then add_cold_continuation t cont else t in
   add_continuation0 t cont
     (Toplevel_or_function_return_or_exn_continuation { arity })
 

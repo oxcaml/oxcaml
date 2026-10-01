@@ -97,13 +97,16 @@ type t =
         (* This cost is the number of parameters that would have to be created
            if we lifted all continuations that are defined in the current
            continuation's handler. *)
-    has_seen_a_non_liftable_continuation : bool
+    has_seen_a_non_liftable_continuation : bool;
         (* This flag is used to mark as non-liftable any continuation that is
            bound after a non-liftable continuation, since any continuation bound
            after a non-liftable continuation may refer to it.
 
            CR gbury: we may not need to do this if we had free_names on handlers
            that we have not explored yet. *)
+    is_cold : bool
+        (* This flag is used to mark cold contexts, i.e. the body of cold
+           functions and continuations. *)
   }
 
 let [@ocamlformat "disable"] print ppf { round; machine_width; typing_env;
@@ -118,7 +121,7 @@ let [@ocamlformat "disable"] print ppf { round; machine_width; typing_env;
                 get_imported_code = _; inlining_history_tracker = _;
                 loopify_state; replay_history; specialization_cost; defined_variables_by_scope;
                 lifted = _; cost_of_lifting_continuations_out_of_current_one;
-                has_seen_a_non_liftable_continuation; join_analysis;
+                has_seen_a_non_liftable_continuation; join_analysis; is_cold;
               } =
   Format.fprintf ppf "@[<hov 1>(\
       @[<hov 1>(round@ %d)@]@ \
@@ -146,6 +149,7 @@ let [@ocamlformat "disable"] print ppf { round; machine_width; typing_env;
       @[<hov 1>(join_analysis@ %a)@]@ \
       @[<hov 1>(defined_variables_by_scope@ %a)@]@ \
       @[<hov 1>(cost_of_lifting_continuation_out_of_current_one %d)@]@ \
+      @[<hov 1>(is_cold %b)@]@ \
       @[<hov 1>(has_seen_a_non_liftable_continuation %b)@]\
       )@]"
     round
@@ -176,7 +180,7 @@ let [@ocamlformat "disable"] print ppf { round; machine_width; typing_env;
     (Format.pp_print_option Join_analysis.print
       ~none:(fun ppf () -> Format.fprintf ppf "()")) join_analysis
     (Format.pp_print_list ~pp_sep:Format.pp_print_space Lifted_cont_params.print) defined_variables_by_scope
-    cost_of_lifting_continuations_out_of_current_one
+    cost_of_lifting_continuations_out_of_current_one is_cold
     has_seen_a_non_liftable_continuation
 
 let define_continuations ~can_be_lifted t conts =
@@ -263,7 +267,8 @@ let create ~round ~machine_width ~(resolver : resolver)
     lifted = Variable.Set.empty;
     cost_of_lifting_continuations_out_of_current_one = 0;
     has_seen_a_non_liftable_continuation = false;
-    join_analysis = None
+    join_analysis = None;
+    is_cold = false
   }
 
 let all_code t = t.all_code
@@ -357,7 +362,8 @@ let enter_set_of_closures
       lifted = _;
       cost_of_lifting_continuations_out_of_current_one = _;
       has_seen_a_non_liftable_continuation = _;
-      join_analysis = _
+      join_analysis = _;
+      is_cold = _
     } =
   { machine_width;
     round;
@@ -387,7 +393,8 @@ let enter_set_of_closures
     defined_variables_by_scope = [Lifted_cont_params.empty];
     lifted = Variable.Set.empty;
     cost_of_lifting_continuations_out_of_current_one = 0;
-    has_seen_a_non_liftable_continuation = false
+    has_seen_a_non_liftable_continuation = false;
+    is_cold = false
   }
 
 let define_symbol t sym kind =
@@ -814,6 +821,10 @@ let set_has_seen_a_non_liftable_continuation t =
   then t
   else { t with has_seen_a_non_liftable_continuation = true }
 
+let is_cold t = t.is_cold
+
+let mark_as_cold t = if t.is_cold then t else { t with is_cold = true }
+
 let must_inline t = Replay_history.must_inline t.replay_history
 
 let replay_history t = t.replay_history
@@ -865,6 +876,7 @@ let denv_for_lifted_continuation ~denv_for_join ~denv =
       denv_for_join.cost_of_lifting_continuations_out_of_current_one;
     has_seen_a_non_liftable_continuation =
       denv_for_join.has_seen_a_non_liftable_continuation;
+    is_cold = denv_for_join.is_cold;
     (* For the following fields, both denvs should have the same value of these
        fields *)
     round = denv.round;

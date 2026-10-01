@@ -808,13 +808,10 @@ let rebuild_single_non_recursive_handler ~at_unit_toplevel
               (UA.are_rebuilding_terms uacc)
               uenv cont ~params
               ~handler:
-                (if is_cold
-                 then Unknown
-                 else
-                   Known
-                     ( handler,
-                       ~is_exn_handler,
-                       ~free_names_without_params:free_names ))
+                (Known
+                   ( handler,
+                     ~is_exn_handler,
+                     ~free_names_without_params:free_names ))
       in
       let uacc = UA.with_uenv uacc uenv in
       let rebuilt_handler : rebuilt_handler =
@@ -1108,7 +1105,7 @@ let sort_handlers data handlers =
             | [] | _ :: _ :: _ -> false
             | [use] -> (
               match One_continuation_use.use_kind use with
-              | Inlinable -> not handler.is_cold
+              | Inlinable -> true
               | Non_inlinable _ -> false)
           in
           Non_recursive { cont; handler; is_single_inlinable_use }
@@ -1502,6 +1499,10 @@ and simplify_single_recursive_handler ~simplify_expr cont_uses_env_so_far
     assert (not (DE.at_unit_toplevel denv_to_reset));
     DE.add_parameters_with_unknown_types ~extra:false denv_to_reset params
   in
+  let handler_env =
+    if is_cold then DE.mark_as_cold handler_env else handler_env
+  in
+  let is_cold = DE.is_cold handler_env in
   let handler_env = LCS.add_to_denv handler_env consts_lifted_after_fork in
   let code_age_relation = TE.code_age_relation (DA.typing_env dacc) in
   let handler_env = DE.with_code_age_relation code_age_relation handler_env in
@@ -1674,6 +1675,8 @@ and simplify_handlers ~simplify_expr ~down_to_up ~denv_for_join ~rebuild_body
                 [cont; DE.unit_toplevel_exn_continuation denv])
       in
       let denv = DE.set_at_unit_toplevel_state denv at_unit_toplevel in
+      let denv = if is_cold then DE.mark_as_cold denv else denv in
+      let is_cold = DE.is_cold denv in
       let dacc, unbox_decisions, is_exn_handler, extra_params_and_args =
         prepare_dacc_for_handlers dacc ~env_at_fork:denv ~params ~lifted_params
           ~consts_lifted_after_fork:consts_lifted_during_body

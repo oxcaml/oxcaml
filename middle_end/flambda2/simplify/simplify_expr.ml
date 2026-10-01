@@ -68,8 +68,21 @@ let simplify_toplevel_common dacc simplify ~params ~implicit_params
             ~return_continuation ~exn_continuation
             ~machine_width:(DE.machine_width (DA.denv dacc))
         in
+        (* Propagate upwards the coldness information on the return/exn
+           continuation that we collected downwards. *)
+        let continuation_is_cold cont =
+          match
+            CUE.get_continuation_uses (DA.continuation_uses_env dacc) cont
+          with
+          | None -> (* never returned *) false
+          | Some uses ->
+            Continuation_uses.get_uses uses
+            |> List.for_all (fun use ->
+                One_continuation_use.env_at_use use |> DE.is_cold)
+        in
         let uenv =
           UE.add_function_return_or_exn_continuation
+            ~is_cold:(continuation_is_cold return_continuation)
             (UE.create
                (DA.are_rebuilding_terms dacc)
                ~machine_width:(DE.machine_width (DA.denv dacc)))
@@ -77,6 +90,7 @@ let simplify_toplevel_common dacc simplify ~params ~implicit_params
         in
         let uenv =
           UE.add_function_return_or_exn_continuation uenv exn_continuation
+            ~is_cold:(continuation_is_cold exn_continuation)
             (Flambda_arity.create_singletons [K.With_subkind.any_value])
         in
         let uacc =
