@@ -16,9 +16,5 @@
 )
 
 (package
-  (name ocaml_runtime_stdlib)
-)
-
-(package
   (name oxcaml-dev)
 )
