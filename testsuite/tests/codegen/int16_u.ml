@@ -131,8 +131,6 @@ bit_xor:
 let bit_not x = Int16_u.bit_not x
 [%%expect_asm X86_64{|
 bit_not:
-  salq  $48, %rax
-  sarq  $48, %rax
   xorq  $-1, %rax
   ret
 |}]

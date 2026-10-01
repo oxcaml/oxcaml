@@ -58,11 +58,17 @@ let array_length_size = 2
 
 (* Helper functions for computing sizes of primitives *)
 
-let unary_int_prim_size ~machine_width:_ kind op =
+let unary_int_prim_size ~machine_width kind op =
   match
     ( (kind : Flambda_kind.Standard_int.t),
       (op : Flambda_primitive.unary_int_arith_op) )
   with
+  | Naked_int64, Not when Target_system.Machine_width.is_32_bit machine_width ->
+    does_not_need_caml_c_call_extcall_size + 1
+  | ( ( Tagged_immediate | Naked_immediate | Naked_int8 | Naked_int16
+      | Naked_int32 | Naked_int64 | Naked_nativeint ),
+      Not ) ->
+    1
   | Tagged_immediate, Swap_byte_endianness ->
     (* CR pchambart: size depends a lot of the architecture. If the backend
        handles it, this is a single arith op. *)
