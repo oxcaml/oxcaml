@@ -1873,9 +1873,13 @@ val f : l:int @ local -> int = <fun>
 (* exclave_ sequence precedence *)
 
 let no_parens () = exclave_ (); ()
-[%%expect{| val no_parens : unit -> unit @ local = <fun> |}]
+[%%expect{|
+val no_parens : unit -> unit @ local = <fun>
+|}]
 let right_parens () = exclave_ ((); ())
-[%%expect{| val right_parens : unit -> unit @ local = <fun> |}]
+[%%expect{|
+val right_parens : unit -> unit @ local = <fun>
+|}]
 let left_parens () = (exclave_ ()); ()
 [%%expect{|
 Line 1, characters 21-34:
