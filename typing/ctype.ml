@@ -271,7 +271,7 @@ let with_local_level_gen ~begin_def ~structure ?before_generalize f =
        in [structure] mode. *)
     iter_var s ~f:(fun v ->
       let t = of_var v in
-      if get_level t = generic_level then () else
+      if get_level t >= subject_level then () else
       update_level !current_level t;
       add_to_sort_pool ~level:(get_level t) t)
   end sort_pool;
