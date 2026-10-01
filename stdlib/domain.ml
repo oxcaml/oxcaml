@@ -369,37 +369,29 @@ module TLS0 = struct
     end;
     k
 
-  (* If necessary, grow the current domain's local state array such that [idx]
-    * is a valid index in the array. *)
-  let[@inline] maybe_grow idx =
+  let[@cold] grow_and_set idx x =
+    let old_st = get_tls_state () in
+    let new_st = Obj_opt.grow_array old_st idx (Array.length old_st) in
+    Array.unsafe_set new_st idx (Obj_opt.some x);
+    set_tls_state new_st
+
+  let[@inline] set (type a) ((idx, _) : a key) (x : a) =
     let st = get_tls_state () in
-    let size = Array.length st in
-    if idx < size then st
-    else begin
-      let new_st = Obj_opt.grow_array st idx size in
-      set_tls_state new_st;
-      new_st
-    end
+    if idx < Array.length st
+    then Array.unsafe_set st idx (Obj_opt.some x)
+    else grow_and_set idx x
 
-  let[@inline] set (type a) (idx, _init) (x : a) =
-    (* Assures [idx] is in range. *)
-    let st = maybe_grow idx in
-    Array.unsafe_set st idx (Obj_opt.some x)
+  let[@cold] init (type a) ((_, { portable = init }) as key : a key) : a =
+    let x = init () in
+    set key x;
+    x
 
-  let[@inline never] init_idx (type a) idx (init : _ -> a) =
-    let v : a = init () in
-    let new_obj = Obj_opt.some v in
+  let[@inline] get (type a) ((idx, _) as key : a key) : a =
     let st = get_tls_state () in
-    Array.unsafe_set st idx new_obj;
-    v
-
-  let[@inline] get (type a) ((idx, init) : a key) : a =
-    (* Assures [idx] is in range. *)
-    let st = maybe_grow idx in
-    let obj = Array.unsafe_get st idx in
-    if Obj_opt.is_some obj
-    then (Obj_opt.unsafe_get obj : a)
-    else init_idx idx init.portable
+    if idx < Array.length st
+       && Obj_opt.is_some (Array.unsafe_get st idx)
+    then Obj_opt.unsafe_get (Array.unsafe_get st idx)
+    else init key
 
   type key_value : value mod portable contended =
       KV : 'a key * (unit -> 'a) @@ portable -> key_value
