@@ -313,7 +313,6 @@ Error: Coercing this module constructs a new layout-polymorphic value,
        which is not supported yet.
 |}];;
 
-(* CR jbachurski: This is unsound! Type-checking should fail. *)
 (module struct
   let id x = x
 end : Id)
@@ -322,8 +321,15 @@ Lines 1-3, characters 8-3:
 1 | ........struct
 2 |   let id x = x
 3 | end......
-Error: Coercing this module constructs a new layout-polymorphic value,
-       which is not supported yet.
+Error: Signature mismatch:
+       Modules do not match: sig val id : 'a -> 'a end is not included in Id
+       Values do not match:
+         val id : 'a -> 'a
+       is not included in
+         val id : layout_ l l0. ('a : l & l0). 'a -> 'a @@ stateless
+       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The type "'b" is layout polymorphic,
+       but "'a" is not layout polymorphic.
 |}];;
 
 (** Product layout with one polymorphic component **)

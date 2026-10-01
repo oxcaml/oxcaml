@@ -499,6 +499,7 @@ module Sort = struct
   let[@inline] set_var_level (v : var) (level : int) =
     if level < v.level
     then (
+      if v.level = subject_level then raise Lower_rigid;
       log_change (v, Clevel v.level);
       v.level <- level)
 
