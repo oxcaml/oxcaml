@@ -35,5 +35,9 @@ val query : config:Config.t -> string list -> Package.t list result
 (** [None] when the package is not installed. *)
 val package_directory : config:Config.t -> string -> string option result
 
+(** The directory of the OCaml standard library, as reported by
+    [ocamlfind printconf stdlib]. *)
+val ocaml_stdlib : config:Config.t -> string result
+
 (** Resolves findlib's path notations, like [+] and [@]. *)
 val resolve_path : config:Config.t -> base:string -> string -> string result

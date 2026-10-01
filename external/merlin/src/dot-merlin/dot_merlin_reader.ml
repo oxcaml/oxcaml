@@ -198,12 +198,18 @@ let ppx_of_package ~findlib_config:config setup (package : Findlib.Package.t) =
          Ppxsetup.add_ppxopts ppx opts setup))
 
 let standard_library =
-  match Sys.getenv_opt "OCAMLLIB" with
-  | Some stdlib -> stdlib
-  | None -> (
-    match Sys.getenv_opt "CAMLLIB" with
+  lazy
+    (match Sys.getenv_opt "OCAMLLIB" with
     | Some stdlib -> stdlib
-    | None -> Standard_library.path)
+    | None -> (
+      match Sys.getenv_opt "CAMLLIB" with
+      | Some stdlib -> stdlib
+      | None -> (
+        match Findlib.ocaml_stdlib ~config:Findlib.Config.default with
+        | Ok stdlib -> stdlib
+        | Error message ->
+          log ~title:"standard_library" "%s" message;
+          Standard_library.path)))
 
 let is_package_optional name =
   let last = String.length name - 1 in
@@ -350,7 +356,11 @@ let expand =
     expand_glob ~filter path []
 
 let postprocess cfg =
-  let stdlib = Option.value ~default:standard_library cfg.stdlib in
+  let stdlib =
+    match cfg.stdlib with
+    | Some stdlib -> stdlib
+    | None -> Lazy.force standard_library
+  in
   let pkg_paths, ppxsetup, failures =
     path_of_packages ~findlib_config:cfg.findlib cfg.packages_to_load
   in
