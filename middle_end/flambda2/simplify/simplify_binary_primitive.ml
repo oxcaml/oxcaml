@@ -21,6 +21,7 @@ type 'a binary_arith_outcome_for_one_side_only =
   | Exactly of 'a
   | The_other_side
   | Negation_of_the_other_side
+  | Bitwise_not_of_the_other_side of K.Standard_int.t
   | Float_negation_of_the_other_side of Flambda_primitive.float_bitwidth
   | Cannot_simplify
   | Invalid
@@ -223,6 +224,9 @@ end = struct
                   Binary (Int_arith (standard_int_kind, Sub), zero, other_side)
                 in
                 Some (PR.Set.add (Prim prim) possible_results)
+              | Bitwise_not_of_the_other_side kind ->
+                let prim : P.t = Unary (Int_arith (kind, Not), other_side) in
+                Some (PR.Set.add (Prim prim) possible_results)
               | Float_negation_of_the_other_side width ->
                 let prim : P.t = Unary (Float_arith (width, Neg), other_side) in
                 Some (PR.Set.add (Prim prim) possible_results)
@@ -373,6 +377,8 @@ end = struct
     | Xor ->
       if Num.equal this_side (Num.zero machine_width)
       then The_other_side
+      else if Num.equal this_side (Num.minus_one machine_width)
+      then Bitwise_not_of_the_other_side I.standard_int_kind
       else Cannot_simplify
 
   let op_lhs_unknown ~machine_width (op : P.binary_int_arith_op) ~rhs :

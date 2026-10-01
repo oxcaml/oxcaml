@@ -75,7 +75,8 @@ let int_shift_op =
 let unary_int_arith_op =
   D.(
     constructor_flag
-      (["bswp", Swap_byte_endianness] : (string * P.unary_int_arith_op) list))
+      (["bswp", Swap_byte_endianness; "not", Not]
+        : (string * P.unary_int_arith_op) list))
 
 let binary_int_arith_op =
   D.(
