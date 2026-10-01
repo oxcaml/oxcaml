@@ -8830,6 +8830,23 @@ let nondep_cltype_declaration env ids decl =
   clear_hash ();
   decl
 
+let nondep_law_description env ids decl =
+  let ty = nondep_type_rec env ids in
+  let path p =
+    match Path.find_free_opt ids p with
+    | Some id -> raise (Nondep_cannot_erase id)
+    | None -> p
+  in
+  let spec = Spec.map ~ty ~value_path:path ~type_path:path in
+  let decl =
+    { decl with
+      law_params = List.map (fun (x, ty_) -> (x, ty ty_)) decl.law_params;
+      law_assumptions = List.map spec decl.law_assumptions;
+      law_conclusion = spec decl.law_conclusion }
+  in
+  clear_hash ();
+  decl
+
 let nondep_jkind_declaration env ids decl =
   match decl.jkind_manifest with
   | None -> decl

@@ -36,6 +36,7 @@ type iterator =
     extension_constructor: iterator -> extension_constructor -> unit;
     jkind_annotation: iterator -> Parsetree.jkind_annotation -> unit;
     jkind_declaration: iterator -> jkind_declaration -> unit;
+    law_declaration: iterator -> law_declaration -> unit;
     location: iterator -> Location.t -> unit;
     modalities: iterator -> modalities -> unit;
     (* CR-someday lstevenson: If we ever want to inspect the [mode_modes] field,
@@ -179,6 +180,7 @@ let structure_item sub {str_loc; str_desc; str_env; _} =
   | Tstr_open od -> sub.open_declaration sub od
   | Tstr_attribute attr -> sub.attribute sub attr
   | Tstr_jkind jd -> sub.jkind_declaration sub jd
+  | Tstr_law ld -> sub.law_declaration sub ld
 
 let value_description sub x =
   sub.item_declaration sub (Value x);
@@ -272,6 +274,19 @@ let[@warning "+9"] jkind_declaration sub
   sub.attributes sub jkind_attributes;
   iter_loc sub jkind_name;
   Option.iter (sub.jkind_annotation sub) jkind_annotation
+
+let[@warning "+9"] law_declaration sub
+      {law_id = _; law_name; law_law = _; law_params; law_assumptions;
+       law_conclusion; law_attributes; law_loc} =
+  sub.location sub law_loc;
+  sub.attributes sub law_attributes;
+  iter_loc sub law_name;
+  List.iter
+    (fun {lp_id = _; lp_name; lp_type} ->
+       iter_loc sub lp_name; Option.iter (sub.typ sub) lp_type)
+    law_params;
+  List.iter (sub.expr sub) law_assumptions;
+  sub.expr sub law_conclusion
 
 let pat_extra sub (e, loc, attrs) =
   sub.location sub loc;
@@ -569,6 +584,7 @@ let signature_item sub {sig_loc; sig_desc; sig_env; _} =
   | Tsig_open od -> sub.open_description sub od
   | Tsig_attribute _ -> ()
   | Tsig_jkind d -> sub.jkind_declaration sub d
+  | Tsig_law d -> sub.law_declaration sub d
 
 let class_description sub x =
   sub.item_declaration sub (Class_type x);
@@ -868,6 +884,7 @@ let default_iterator =
     extension_constructor;
     jkind_annotation;
     jkind_declaration;
+    law_declaration;
     location;
     modalities;
     modes;

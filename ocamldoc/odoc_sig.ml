@@ -57,6 +57,7 @@ module Signature_search =
           Hashtbl.add table (MT (Name.from_ident ident)) signat
       | Types.Sig_jkind _ ->
           Misc.fatal_error "Unsupported: Sig_jkind"
+      | Types.Sig_law _ -> ()
 
     let table signat =
       let t = Hashtbl.create 13 in

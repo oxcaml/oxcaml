@@ -2533,6 +2533,11 @@ let expression f x =
 
 let expression = print_with_maximal_extensions expression
 
+let law_clause f x =
+  pp f "@[%a@]" (law_clause reset_ctxt) x
+
+let law_clause = print_with_maximal_extensions law_clause
+
 let string_of_expression x =
   ignore (flush_str_formatter ()) ;
   let f = str_formatter in

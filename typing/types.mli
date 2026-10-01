@@ -474,6 +474,16 @@ and jkind_declaration =
     jkind_loc : Location.t
   }
 
+and law_description =
+  {
+    law_params : (Ident.t * type_expr) list;
+    law_assumptions : type_expr Spec.expression list;
+    law_conclusion : type_expr Spec.expression;
+    law_attributes : Parsetree.attributes;
+    law_uid : Shape.Uid.t;
+    law_loc : Location.t
+  }
+
 val ikinds_todo : string -> type_ikind
 (* A map from [type_expr] to [With_bounds_type_info.t], specifically defined with a
    (best-effort) semantic comparison function on types to be used in the with-bounds of a
@@ -1274,6 +1284,7 @@ module type Wrapped = sig
   | Sig_class of Ident.t * class_declaration * rec_status * visibility
   | Sig_class_type of Ident.t * class_type_declaration * rec_status * visibility
   | Sig_jkind of Ident.t * jkind_declaration * visibility
+  | Sig_law of Ident.t * law_description * visibility
 
   and module_declaration =
   {

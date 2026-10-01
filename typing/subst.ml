@@ -74,6 +74,7 @@ type s =
     modules: Path.t Path.Map.t;
     modtypes: module_type Path.Map.t;
     jkinds: kind_replacement Path.Map.t;
+    values: Path.t Path.Map.t;
 
     additional_action: additional_action;
     sort_var_mapping: sort_map;
@@ -111,6 +112,7 @@ let identity =
     modules = Path.Map.empty;
     modtypes = Path.Map.empty;
     jkinds = Path.Map.empty;
+    values = Path.Map.empty;
     additional_action = No_action;
     sort_var_mapping = Nothing;
     loc = None;
@@ -163,6 +165,18 @@ let add_jkind_path id p s =
   { s with jkinds = Path.Map.add id (Jkind_path p) s.jkinds;
            last_compose = None }
 let add_jkind id p s = add_jkind_path (Pident id) p s
+
+let value_substitution = ref false
+
+let enable_value_substitution () = value_substitution := true
+
+let value_substitution_enabled () = !value_substitution
+
+let add_value id p s =
+  if !value_substitution then
+    { s with values = Path.Map.add (Pident id) p s.values;
+             last_compose = None }
+  else s
 
 type additional_action_config =
   | Duplicate_variables
@@ -412,10 +426,13 @@ let jkind_path s path =
 
 (* For values, extension constructors, classes and class types *)
 let value_path s path =
-  match path with
-  | Pident _ -> path
-  | Pdot(p, n) -> Pdot(module_path s p, n)
-  | Papply _ | Pextra_ty _ -> fatal_error "Subst.value_path"
+  match Path.Map.find path s.values with
+  | p -> p
+  | exception Not_found ->
+    match path with
+    | Pident _ -> path
+    | Pdot(p, n) -> Pdot(module_path s p, n)
+    | Papply _ | Pextra_ty _ -> fatal_error "Subst.value_path"
 
 let rec type_path s path =
   match Path.Map.find path s.types with
@@ -910,6 +927,23 @@ let jkind_declaration s decl =
     jkind_attributes = attrs s decl.jkind_attributes;
   }
 
+let law_description' copy_scope s decl =
+  let ty = typexp copy_scope s decl.law_loc in
+  let spec e =
+    Spec.map ~ty ~value_path:(value_path s) ~type_path:(type_path s) e
+  in
+  { law_params =
+      List.map (fun (x, ty_) -> (x, ty ty_)) decl.law_params;
+    law_assumptions = List.map spec decl.law_assumptions;
+    law_conclusion = spec decl.law_conclusion;
+    law_attributes = attrs s decl.law_attributes;
+    law_uid = decl.law_uid;
+    law_loc = loc s decl.law_loc;
+  }
+
+let law_description s decl =
+  For_copy.with_scope (fun copy_scope -> law_description' copy_scope s decl)
+
 let rec type_declaration' copy_scope s decl =
   let unsafe_mode_crossing =
     Option.map (unsafe_mode_crossing copy_scope s decl.type_loc)
@@ -1202,16 +1236,25 @@ let rename_bound_idents scoping s sg =
     | Sig_value(id, vd, vis) :: rest ->
         (* scope doesn't matter for value identifiers. *)
         let id' = rename_ident s id in
-        rename_bound_idents s (Sig_value(id', vd, vis) :: sg) rest
+        rename_bound_idents
+          (add_value id (Pident id') s)
+          (Sig_value(id', vd, vis) :: sg)
+          rest
     | Sig_typext(id, ec, es, vis) :: rest ->
         let id' = rename id in
-        rename_bound_idents s (Sig_typext(id',ec,es,vis) :: sg) rest
+        rename_bound_idents
+          (add_type id (Pident id') s)
+          (Sig_typext(id',ec,es,vis) :: sg)
+          rest
     | Sig_jkind (id, jkd, vis) :: rest ->
         let id' = rename id in
         rename_bound_idents
           (add_jkind id (Pident id') s)
           (Sig_jkind(id', jkd, vis) :: sg)
           rest
+    | Sig_law (id, ld, vis) :: rest ->
+        let id' = rename_ident s id in
+        rename_bound_idents s (Sig_law (id', ld, vis) :: sg) rest
   in
   rename_bound_idents s [] sg
 
@@ -1375,6 +1418,8 @@ and subst_lazy_signature_item' copy_scope scoping s comp =
       Sig_class_type(id, cltype_declaration' copy_scope s d, rs, vis)
   | Sig_jkind(id, d, vis) ->
       Sig_jkind(id, jkind_declaration s d, vis)
+  | Sig_law(id, d, vis) ->
+      Sig_law(id, law_description' copy_scope s d, vis)
 
 and modtype scoping s t =
   For_copy.with_scope (fun copy_scope ->
@@ -1395,6 +1440,7 @@ and compose s1 s2 =
           modules = merge_path_maps (module_path s2) s1.modules s2.modules;
           modtypes = merge_path_maps (modtype Keep s2) s1.modtypes s2.modtypes;
           jkinds = merge_path_maps (jkind_replacement s2) s1.jkinds s2.jkinds;
+          values = merge_path_maps (value_path s2) s1.values s2.values;
           additional_action = begin
             match s1.additional_action, s2.additional_action with
             | action, No_action | No_action, action -> action

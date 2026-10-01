@@ -1834,6 +1834,7 @@ let find_shape env (ns : Shape.Sig_component_kind.t) id =
       (IdTbl.find_same id env.cltypes).cltda_shape
   | Jkind ->
       (IdTbl.find_same id env.jkinds).jkda_shape
+  | Law -> raise Not_found
 
 
 let shape_of_path ~namespace env =
@@ -2256,7 +2257,9 @@ let prefix_idents root prefixing_sub sg =
     | Sig_value(id, _, _) as item :: rem ->
       let p = Pdot(root, Ident.name id) in
       prefix_idents root
-        ((item, p) :: items_and_paths) prefixing_sub rem
+        ((item, p) :: items_and_paths)
+        (Subst.add_value id p prefixing_sub)
+        rem
     | Sig_type(id, td, rs, vis) :: rem ->
       let p = Pdot(root, Ident.name id) in
       prefix_idents root
@@ -2300,6 +2303,12 @@ let prefix_idents root prefixing_sub sg =
       prefix_idents root
         ((Sig_jkind(id, jkd, vis), p) :: items_and_paths)
         (Subst.add_jkind id p prefixing_sub)
+        rem
+    | Sig_law(id, ld, vis) :: rem ->
+      let p = Pdot(root, Ident.name id) in
+      prefix_idents root
+        ((Sig_law(id, ld, vis), p) :: items_and_paths)
+        prefixing_sub
         rem
   in
   let sg = Subst.Lazy.force_signature_once sg in
@@ -2551,6 +2560,7 @@ let rec components_of_module_maker
             let shape = Shape.proj cm_shape (Shape.Item.jkind id) in
             let jkda = { jkda_declaration = decl'; jkda_shape = shape } in
             c.comp_jkinds <- NameMap.add (Ident.name id) jkda c.comp_jkinds
+        | Sig_law _ -> ()
       )
         items_and_paths;
       inner_full_env := !env;
@@ -3239,6 +3249,7 @@ end) = struct
     | Sig_jkind(id, decl, _) ->
         let map, shape = proj_shape map mod_shape (Shape.Item.jkind id) in
         map, add_jkind ~check:false ?shape id decl env
+    | Sig_law _ -> map, env
 
   let add_signature
       map
@@ -3363,12 +3374,14 @@ let save_signature_with_transform cmi_transform ~alerts (sg, staticity) modname
       kind cmi_info =
   Btype.cleanup_abbrev ();
   Subst.reset_additional_action_id ();
+  let has_laws = Btype.signature_has_laws sg in
   let sg = Subst.Lazy.of_signature sg
     |> Subst.Lazy.signature Make_local
         (Subst.with_additional_action Prepare_for_saving Subst.identity)
   in
   let cmi =
     Persistent_env.make_cmi !persistent_env modname kind (sg, staticity) alerts
+      ~has_laws
     |> cmi_transform in
   let filename = Unit_info.Artifact.filename cmi_info in
   let pers_sig =

@@ -201,6 +201,7 @@ type 'a type_iterators =
     it_class_type_declaration:
         'a type_iterators -> class_type_declaration -> unit;
     it_jkind_declaration: 'a type_iterators -> jkind_declaration -> unit;
+    it_law_description: 'a type_iterators -> law_description -> unit;
     it_functor_param: 'a type_iterators -> functor_parameter -> unit;
     it_module_type: 'a type_iterators -> module_type -> unit;
     it_class_type: 'a type_iterators -> class_type -> unit;
@@ -221,6 +222,10 @@ val type_iterators: type_mark -> type_iterators_full
 val type_iterators_without_type_expr: type_iterators_without_type_expr
         (* Iteration on arbitrary type information.
            Cannot recurse on [type_expr]. *)
+
+val signature_has_laws: signature -> bool
+        (* Whether a signature contains laws, possibly in submodules or
+           module types (not expanding module type paths). *)
 
 (**** Utilities for copying ****)
 
