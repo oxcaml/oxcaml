@@ -1095,6 +1095,10 @@ let store ~dbg memory_chunk init ~addr ~new_value =
 let tag_int i dbg =
   match low_bits i ~bits:(arch_bits - 1) ~dbg with
   | Cconst_int (n, _) -> int_const dbg n
+  | Cop (Casr, [e; Cconst_int (right, _)], dbg_op) when right > 0 ->
+    or_const (asr_const e (right - 1) dbg_op) 1n dbg
+  | Cop (Clsr, [e; Cconst_int (right, _)], dbg_op) when right > 0 ->
+    or_const (lsr_const e (right - 1) dbg_op) 1n dbg
   | c -> incr_int (lsl_const c 1 dbg) dbg
 
 let untag_int i dbg =
