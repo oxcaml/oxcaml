@@ -414,6 +414,30 @@ module Usage : sig
   (** Extract an arbitrary occurrence from a usage *)
   val extract_occurrence : t -> Occurrence.t option
 
+  type action =
+    | Use
+    | Borrow
+    | Read
+    | Write
+
+  type pattern_kind =
+    | Lazy
+    | Array
+    | Constant
+
+  type context =
+    | Direct
+    | In_pattern of pattern_kind
+    | In_closure_that_might_be_called_later
+    | While_being_borrowed
+
+  type view =
+    { action : action;
+      context : context
+    }
+
+  val view : t -> view
+
   type cannot_force_error =
     { cannot_force : Maybe_unique.cannot_force;
       there : t;  (** The other usage *)
@@ -529,6 +553,55 @@ end = struct
     | Aliased t -> Some (Aliased.extract_occurrence t)
     | Maybe_unique t -> Some (Maybe_unique.extract_occurrence t)
     | Antiquote t -> extract_occurrence t
+
+  type action =
+    | Use
+    | Borrow
+    | Read
+    | Write
+
+  type pattern_kind =
+    | Lazy
+    | Array
+    | Constant
+
+  type context =
+    | Direct
+    | In_pattern of pattern_kind
+    | In_closure_that_might_be_called_later
+    | While_being_borrowed
+
+  type view =
+    { action : action;
+      context : context
+    }
+
+  let action_of_access = function
+    | Maybe_aliased.Read _ -> Read
+    | Maybe_aliased.Write -> Write
+
+  let view_of_aliased_reason = function
+    | Aliased.Forced -> { action = Use; context = Direct }
+    | Aliased.Lazy -> { action = Use; context = In_pattern Lazy }
+    | Aliased.Array -> { action = Use; context = In_pattern Array }
+    | Aliased.Constant -> { action = Use; context = In_pattern Constant }
+    | Aliased.Lifted access ->
+      { action = action_of_access access;
+        context = In_closure_that_might_be_called_later
+      }
+    | Aliased.Lifted_borrowed ->
+      { action = Borrow; context = In_closure_that_might_be_called_later }
+    | Aliased.In_borrowing -> { action = Use; context = While_being_borrowed }
+
+  let view = function
+    | Unused | Maybe_unique _ | Antiquote _ ->
+      { action = Use; context = Direct }
+    | Borrowed _ -> { action = Borrow; context = Direct }
+    | Maybe_aliased t ->
+      { action = action_of_access (Maybe_aliased.extract_access t);
+        context = Direct
+      }
+    | Aliased t -> view_of_aliased_reason (Aliased.reason t)
 
   let empty = Unused
 
