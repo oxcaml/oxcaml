@@ -426,6 +426,11 @@ and add_binding_op bv bv' pbop =
   add_expr bv pbop.pbop_exp;
   add_pattern bv' pbop.pbop_pat
 
+and add_law_declaration bv ld =
+  List.iter (fun (_, ty) -> Option.iter (add_type bv) ty) ld.plaw_params;
+  List.iter (add_expr bv) ld.plaw_assumptions;
+  add_expr bv ld.plaw_conclusion
+
 and add_modtype bv mty =
   match mty.pmty_desc with
     Pmty_ident l -> add bv l
@@ -556,6 +561,9 @@ and add_sig_item (bv, m) item =
       (bv, m)
   | Psig_jkind d ->
       add_jkind_declaration bv d;
+      (bv, m)
+  | Psig_law d ->
+      add_law_declaration bv d;
       (bv, m)
 
 and open_description bv od =
@@ -717,6 +725,9 @@ and add_struct_item (bv, m) item : _ String.Map.t * _ String.Map.t =
       (bv, m)
   | Pstr_jkind d ->
       add_jkind_declaration bv d;
+      (bv, m)
+  | Pstr_law d ->
+      add_law_declaration bv d;
       (bv, m)
 
 and add_use_file bv top_phrs =

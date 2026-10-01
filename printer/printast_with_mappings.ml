@@ -701,6 +701,24 @@ and jkind_declaration i ppf
   line i ppf "pjkind_manifest =\n";
   option (i+1) jkind_annotation ppf pjkind_manifest
 
+and law_declaration i ppf
+      { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
+        plaw_attributes; plaw_loc } =
+  line i ppf "law_declaration %a %a\n" fmt_string_loc plaw_name
+       fmt_location plaw_loc;
+  attributes i ppf plaw_attributes;
+  let i = i+1 in
+  line i ppf "plaw_params =\n";
+  list (i+1) string_loc_x_core_type_option ppf plaw_params;
+  line i ppf "plaw_assumptions =\n";
+  list (i+1) expression ppf plaw_assumptions;
+  line i ppf "plaw_conclusion =\n";
+  expression (i+1) ppf plaw_conclusion
+
+and string_loc_x_core_type_option i ppf (s, ty) =
+  string_loc i ppf s;
+  option (i+1) core_type ppf ty
+
 and attribute i ppf k a =
   line i ppf "%s \"%s\"\n" k a.attr_name.txt;
   payload i ppf a.attr_payload;
@@ -1066,6 +1084,9 @@ and signature_item i ppf x =
   | Psig_jkind jd ->
       line i ppf "Psig_jkind";
       jkind_declaration i ppf jd
+  | Psig_law ld ->
+      line i ppf "Psig_law";
+      law_declaration i ppf ld
   )
 
 and modtype_declaration i ppf = function
@@ -1214,6 +1235,9 @@ and structure_item i ppf x =
   | Pstr_jkind jd ->
       line i ppf "Pstr_kind";
       jkind_declaration i ppf jd
+  | Pstr_law ld ->
+      line i ppf "Pstr_law";
+      law_declaration i ppf ld
   )
 
 and module_declaration i ppf pmd =
