@@ -400,6 +400,16 @@ let mk_debug_long_frames_threshold f =
     Arg.Int f,
     "<n>  debug only: set long frames threshold" )
 
+let mk_frametable_index f =
+  ( "-frametable-index",
+    Arg.Unit f,
+    " Store a frame-descriptor lookup index in the executable (default)" )
+
+let mk_no_frametable_index f =
+  ( "-no-frametable-index",
+    Arg.Unit f,
+    " Do not store a frame-descriptor lookup index in the executable" )
+
 let mk_dbranch_relaxation_max_displacement f =
   ( "-dbranch-relaxation-max-displacement",
     Arg.Int f,
@@ -1403,6 +1413,8 @@ module type Oxcaml_options = sig
   val long_frames : unit -> unit
   val no_long_frames : unit -> unit
   val long_frames_threshold : int -> unit
+  val frametable_index : unit -> unit
+  val no_frametable_index : unit -> unit
   val dbranch_relaxation_max_displacement : int -> unit
   val caml_apply_inline_fast_path : unit -> unit
   val use_ssa : unit -> unit
@@ -1609,6 +1621,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_long_frames F.long_frames;
       mk_no_long_frames F.no_long_frames;
       mk_debug_long_frames_threshold F.long_frames_threshold;
+      mk_frametable_index F.frametable_index;
+      mk_no_frametable_index F.no_frametable_index;
       mk_dbranch_relaxation_max_displacement
         F.dbranch_relaxation_max_displacement;
       mk_caml_apply_inline_fast_path F.caml_apply_inline_fast_path;
@@ -2042,6 +2056,8 @@ module Oxcaml_options_impl = struct
   let long_frames = set' Oxcaml_flags.allow_long_frames
   let no_long_frames = clear' Oxcaml_flags.allow_long_frames
   let long_frames_threshold n = set_long_frames_threshold n
+  let frametable_index = set' Oxcaml_flags.frametable_index
+  let no_frametable_index = clear' Oxcaml_flags.frametable_index
 
   let dbranch_relaxation_max_displacement n =
     Oxcaml_flags.branch_relaxation_max_displacement := n
@@ -2856,6 +2872,10 @@ module Extra_params = struct
     | "manual-module-init" -> set' Oxcaml_flags.manual_module_init
     | "no-manual-module-init" ->
         Oxcaml_flags.manual_module_init := false;
+        true
+    | "frametable-index" -> set' Oxcaml_flags.frametable_index
+    | "no-frametable-index" ->
+        Oxcaml_flags.frametable_index := false;
         true
     | _ -> Extra_options.read_one_param ppf name v
 end

@@ -210,6 +210,18 @@ let call_linker_shared ?(native_toplevel = false) file_list output_name =
 let not_output_to_dev_null output_name =
   not (String.equal output_name "/dev/null")
 
+(* Whether the executable being linked gets a frame-descriptor index (see
+   [Frame_index]): an ELF executable, linked by the native backend, and not
+   discarded. In every other case the startup object still reserves the
+   header-only section that marks the index as absent. *)
+let frame_index_enabled output_name =
+  !Oxcaml_flags.frametable_index
+  && (not !Clflags.llvm_backend)
+  && (not (Target_system.is_macos ()))
+  && (not (Target_system.is_windows ()))
+  && (not !Clflags.output_c_object)
+  && not_output_to_dev_null output_name
+
 let link_shared_actual unix ml_objfiles output_name ~genfns ~units_tolink
     ~ppf_dump =
   if !Oxcaml_flags.use_cached_generic_functions
@@ -252,7 +264,8 @@ let link_shared unix ml_objfiles output_name ~genfns ~units_tolink ~ppf_dump =
       link_shared_actual unix ml_objfiles output_name ~genfns ~units_tolink
         ~ppf_dump)
 
-let call_linker ?dissector_args file_list_rev startup_file output_name =
+let call_linker unix ?dissector_args ~frame_index file_list_rev startup_file
+    output_name =
   let main_dll =
     !Clflags.output_c_object && Filename.check_suffix output_name Config.ext_dll
   and main_obj_runtime = !Clflags.output_complete_object in
@@ -331,7 +344,15 @@ let call_linker ?dissector_args file_list_rev startup_file output_name =
   then (
     if needs_objcopy_workflow then Misc.remove_file link_output_name;
     raise (Linkenv.Error (Linking_error exitcode)))
-  else
+  else (
+    (* Fill in the frame-descriptor index reserved by the startup object, before
+       any stripping: the builder needs the symbol table. *)
+    if frame_index
+    then (
+      try Frame_index.build unix ~file:link_output_name
+      with exn ->
+        if needs_objcopy_workflow then Misc.remove_file link_output_name;
+        raise exn);
     (* Handle DWARF fission if requested and linking succeeded *)
     match !Clflags.dwarf_fission with
     | Fission_none -> ()
@@ -394,7 +415,7 @@ let call_linker ?dissector_args file_list_rev startup_file output_name =
         let dsymutil_exit =
           Profile.record_call "dsymutil" (fun () -> Ccomp.command dsymutil_cmd)
         in
-        if dsymutil_exit <> 0 then raise (Error (Dsymutil_error dsymutil_exit))
+        if dsymutil_exit <> 0 then raise (Error (Dsymutil_error dsymutil_exit)))
 
 (* Main entry point *)
 
@@ -434,6 +455,29 @@ let link_actual unix linkenv ml_objfiles output_name ~cached_genfns_imports
     | Some bundled_cm_obj ->
       { Linkenv.path = bundled_cm_obj; units = [] } :: ml_objfiles
   in
+  let frame_index = frame_index_enabled output_name in
+  (if not !Clflags.llvm_backend
+   then
+     (* Size the frame-descriptor index from the descriptor counts of every
+        other object the linker will receive; the startup unit adds its own
+        count when it emits the reservation. *)
+     let other_descriptors =
+       if frame_index
+       then
+         let cached_genfns =
+           if !Oxcaml_flags.use_cached_generic_functions
+           then [!Oxcaml_flags.cached_generic_functions_path]
+           else []
+         in
+         Frame_index.estimate_descriptors unix
+           (ml_objfiles
+           @ List.map
+               (fun path -> { Linkenv.path; units = [] })
+               (List.rev !Clflags.ccobjs @ runtime_lib () @ cached_genfns))
+       else 0
+     in
+     Emitaux.frame_index_reservation
+       := Some { Emitaux.other_descriptors; full = frame_index });
   Asmgen.compile_unit unix ~output_prefix:output_name ~asm_filename:startup
     ~keep_asm:!Clflags.keep_startup_file ~obj_filename:startup_obj
     ~may_reduce_heap:true ~ppf_dump (fun () ->
@@ -490,7 +534,9 @@ let link_actual unix linkenv ml_objfiles output_name ~cached_genfns_imports
       else Misc.remove_dir_contents dir
   in
   Misc.try_finally
-    (fun () -> call_linker ?dissector_args ml_objfiles startup_obj output_name)
+    (fun () ->
+      call_linker unix ?dissector_args ~frame_index ml_objfiles startup_obj
+        output_name)
     ~always:(fun () ->
       remove_file startup_obj;
       Option.iter remove_file bundled_cm_obj;
