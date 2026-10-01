@@ -1517,17 +1517,22 @@ type t6 = float64x2
 
 let state = ref (ref 0)
 let allocate () = state := ref 42
-
-let   no_parens =  zero_alloc_  allocate  ()
-let  left_assoc = (zero_alloc_  allocate) ()
-let right_assoc =  zero_alloc_ (allocate  ())
 [%%expect{|
 val state : int ref ref = {contents = {contents = 0}}
 val allocate : unit -> unit = <fun>
-val no_parens : unit = ()
+|}]
+
+let no_parens = zero_alloc_ allocate ()
+[%%expect{|
+(* CR wsturgeon for wsturgeon: this needs to fail *)
+|}]
+let right_assoc = zero_alloc_ (allocate ())
+[%%expect{|
+(* CR wsturgeon for wsturgeon: this needs to fail *)
+|}]
+let left_assoc = (zero_alloc_ allocate) ()
+[%%expect{|
 val left_assoc : unit = ()
-val right_assoc : unit = ()
-(* CR wsturgeon: some of these should fail *)
 |}]
 
 let   no_parens_seq =  zero_alloc_  () ; allocate ()
