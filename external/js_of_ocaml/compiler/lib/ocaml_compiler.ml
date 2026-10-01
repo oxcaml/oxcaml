@@ -93,7 +93,7 @@ let rec is_module_in_summary deep ident' summary =
       then deep, Module
       else is_module_in_summary (deep + 1) ident' summary
   | ((Env.Env_module (summary, ident, _, _)) [@if not oxcaml])
-  | ((Env.Env_module (summary, ident, _, _, _, _)) [@if oxcaml])
+  | ((Env.Env_module (summary, ident, _, _, _, _, _)) [@if oxcaml])
   | ((Env.Env_functor_arg (summary, ident)) [@if ocaml_version < (5, 5, 0)])
   | Env.Env_persistent (summary, ident) ->
       if Ident.same ident ident'
