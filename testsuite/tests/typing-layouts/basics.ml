@@ -1545,44 +1545,19 @@ val f : ('a. 'a t2_float) -> 'b t2_float = <fun>
 let f : ?x:t_float64 -> unit -> unit = fun ?x () -> ignore x
 
 [%%expect{|
-Line 1, characters 11-20:
-1 | let f : ?x:t_float64 -> unit -> unit = fun ?x () -> ignore x
-               ^^^^^^^^^
-Error: Optional argument types must have layout value.
-       The layout of "t_float64" is float64
-         because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of "t_float64" must be a value layout
-         because it's the type of an optional argument.
+val f : ?x:t_float64 -> unit -> unit = <fun>
 |}]
 
 let f (g : ?x:t_float64 -> unit) = g
 
 [%%expect{|
-Line 1, characters 14-23:
-1 | let f (g : ?x:t_float64 -> unit) = g
-                  ^^^^^^^^^
-Error: Optional argument types must have layout value.
-       The layout of "t_float64" is float64
-         because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of "t_float64" must be a value layout
-         because it's the type of an optional argument.
+val f : (?x:t_float64 -> unit) -> ?x:t_float64 -> unit = <fun>
 |}]
-
-(* The next two are rejected by unification in [Typecore] rather than the
-   check in [Typetexp] *)
 
 let f ?x:(y : t_float64 option) () = ignore y
 
 [%%expect{|
-Line 1, characters 10-30:
-1 | let f ?x:(y : t_float64 option) () = ignore y
-              ^^^^^^^^^^^^^^^^^^^^
-Error: This pattern matches values of type "t_float64 option"
-       but a pattern was expected which matches values of type "'a option"
-       The layout of t_float64 is float64
-         because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a value layout
-         because it's the type of an optional argument.
+val f : ?x:t_float64 -> unit -> unit = <fun>
 |}]
 
 let f (x : t_float64) =
@@ -1590,15 +1565,7 @@ let f (x : t_float64) =
   ()
 
 [%%expect{|
-Line 2, characters 16-17:
-2 |   let _g ?(x2 = x) () = () in
-                    ^
-Error: The value "x" has type "t_float64" but an expression was expected of type
-         "('a : value_or_null)"
-       The layout of t_float64 is float64
-         because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a value layout
-         because it's the type of an optional argument.
+val f : t_float64 -> unit = <fun>
 |}]
 
 (* Payloads of kind [any] are also allowed in optional argument types; what
@@ -1610,27 +1577,13 @@ Error: The value "x" has type "t_float64" but an expression was expected of type
 let f_any : ?x:t_any -> unit -> unit = fun ?x () -> ignore x
 
 [%%expect{|
-Line 1, characters 15-20:
-1 | let f_any : ?x:t_any -> unit -> unit = fun ?x () -> ignore x
-                   ^^^^^
-Error: Optional argument types must have layout value.
-       The layout of "t_any" is any
-         because of the definition of t_any at line 5, characters 0-18.
-       But the layout of "t_any" must be a value layout
-         because it's the type of an optional argument.
+val f_any : ?x:t_any -> unit -> unit = <fun>
 |}]
 
 let higher_order (g : ?x:t_any -> unit) = g
 
 [%%expect{|
-Line 1, characters 25-30:
-1 | let higher_order (g : ?x:t_any -> unit) = g
-                             ^^^^^
-Error: Optional argument types must have layout value.
-       The layout of "t_any" is any
-         because of the definition of t_any at line 5, characters 0-18.
-       But the layout of "t_any" must be a value layout
-         because it's the type of an optional argument.
+val higher_order : (?x:t_any -> unit) -> ?x:t_any -> unit = <fun>
 |}]
 
 (* This one used to reach a fatal error in [type_option_some] via the
@@ -1641,39 +1594,19 @@ module type S_any = sig
 end
 
 [%%expect{|
-Line 2, characters 13-18:
-2 |   val f : ?x:t_any -> unit -> unit
-                 ^^^^^
-Error: Optional argument types must have layout value.
-       The layout of "t_any" is any
-         because of the definition of t_any at line 5, characters 0-18.
-       But the layout of "t_any" must be a value layout
-         because it's the type of an optional argument.
+module type S_any = sig val f : ?x:t_any -> unit -> unit end
 |}]
 
 let infer ?x () = (x : t_any option)
 
 [%%expect{|
-Line 1, characters 19-20:
-1 | let infer ?x () = (x : t_any option)
-                       ^
-Error: The value "x" has type "'a option" but an expression was expected of type
-         "t_any option"
-       The layout of t_any is any
-         because of the definition of t_any at line 5, characters 0-18.
-       But the layout of t_any must be a value layout
-         because it's the type of an optional argument.
+val infer : ?x:t_any -> unit -> t_any option = <fun>
 |}]
 
 let f_univ : ('a : any). ?x:'a -> unit -> unit = fun ?x () -> ignore x
 
 [%%expect{|
-Line 1, characters 13-46:
-1 | let f_univ : ('a : any). ?x:'a -> unit -> unit = fun ?x () -> ignore x
-                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The universal type variable 'a was declared to have kind any.
-       But it was inferred to have kind value_or_null
-         because it's the type of an optional argument.
+val f_univ : ('a : any). ?x:'a -> unit -> unit = <fun>
 |}]
 
 (* Calls that never construct or deconstruct the [Some] are fine... *)
@@ -1681,19 +1614,13 @@ Error: The universal type variable 'a was declared to have kind any.
 let call_omitted () = f_any ()
 
 [%%expect{|
-Line 1, characters 22-27:
-1 | let call_omitted () = f_any ()
-                          ^^^^^
-Error: Unbound value "f_any"
+val call_omitted : unit -> unit = <fun>
 |}]
 
 let call_passthrough (o : t_any option) = f_any ?x:o ()
 
 [%%expect{|
-Line 1, characters 42-47:
-1 | let call_passthrough (o : t_any option) = f_any ?x:o ()
-                                              ^^^^^
-Error: Unbound value "f_any"
+val call_passthrough : t_any option -> unit = <fun>
 |}]
 
 let apply_thunk (h : unit -> unit) = h ()
@@ -1701,10 +1628,7 @@ let call_eliminated () = apply_thunk f_any
 
 [%%expect{|
 val apply_thunk : (unit -> unit) -> unit = <fun>
-Line 2, characters 37-42:
-2 | let call_eliminated () = apply_thunk f_any
-                                         ^^^^^
-Error: Unbound value "f_any"
+val call_eliminated : unit -> unit = <fun>
 |}]
 
 (* ...but passing a value must build a [Some], so it needs the payload to be
@@ -1713,19 +1637,27 @@ Error: Unbound value "f_any"
 let call_value () = f_any ~x:(assert false) ()
 
 [%%expect{|
-Line 1, characters 20-25:
+Line 1, characters 29-43:
 1 | let call_value () = f_any ~x:(assert false) ()
-                        ^^^^^
-Error: Unbound value "f_any"
+                                 ^^^^^^^^^^^^^^
+Error: Function arguments and returns must be representable.
+       The layout of t_any is any
+         because of the definition of t_any at line 5, characters 0-18.
+       But the layout of t_any must be representable
+         because we must know concretely how to pass a function argument.
 |}]
 
 let call_some () = f_any ?x:(Some (assert false)) ()
 
 [%%expect{|
-Line 1, characters 19-24:
+Line 1, characters 34-48:
 1 | let call_some () = f_any ?x:(Some (assert false)) ()
-                       ^^^^^
-Error: Unbound value "f_any"
+                                      ^^^^^^^^^^^^^^
+Error: Constructor arguments must be representable.
+       The layout of t_any is any
+         because of the definition of t_any at line 5, characters 0-18.
+       But the layout of t_any must be representable
+         because it's the type of a constructor argument being assigned a value.
 |}]
 
 (* Likewise, a default must take the [Some] apart. *)
@@ -1733,14 +1665,14 @@ Error: Unbound value "f_any"
 let default_ascribed : ?x:t_any -> unit -> unit = fun ?(x = assert false) () -> ()
 
 [%%expect{|
-Line 1, characters 26-31:
+Line 1, characters 56-57:
 1 | let default_ascribed : ?x:t_any -> unit -> unit = fun ?(x = assert false) () -> ()
-                              ^^^^^
-Error: Optional argument types must have layout value.
-       The layout of "t_any" is any
+                                                            ^
+Error: Optional arguments with defaults must be representable.
+       The layout of t_any is any
          because of the definition of t_any at line 5, characters 0-18.
-       But the layout of "t_any" must be a value layout
-         because it's the type of an optional argument.
+       But the layout of t_any must be representable
+         because it's the type of an optional argument default.
 |}]
 
 let default_annotated ?(x : t_any = assert false) () = ()
@@ -1750,11 +1682,11 @@ Line 1, characters 36-48:
 1 | let default_annotated ?(x : t_any = assert false) () = ()
                                         ^^^^^^^^^^^^
 Error: This expression has type "t_any" but an expression was expected of type
-         "('a : value_or_null)"
+         "('a : '_representable_layout_6)"
        The layout of t_any is any
          because of the definition of t_any at line 5, characters 0-18.
-       But the layout of t_any must be a value layout
-         because it's the type of an optional argument.
+       But the layout of t_any must be representable
+         because it's the type of an optional argument default.
 |}]
 
 (*********************************************************)
@@ -2094,7 +2026,7 @@ Line 1, characters 10-22:
 1 | let () = (assert false : t_any); ()
               ^^^^^^^^^^^^
 Error: This expression has type "t_any" but an expression was expected of type
-         "('a : '_representable_layout_6)"
+         "('a : '_representable_layout_7)"
        because it is in the left-hand side of a sequence
        The layout of t_any is any
          because of the definition of t_any at line 5, characters 0-18.
@@ -2113,7 +2045,7 @@ Line 1, characters 25-37:
 1 | let () = while false do (assert false : t_any); done
                              ^^^^^^^^^^^^
 Error: This expression has type "t_any" but an expression was expected of type
-         "('a : '_representable_layout_7)"
+         "('a : '_representable_layout_8)"
        because it is in the body of a while-loop
        The layout of t_any is any
          because of the definition of t_any at line 5, characters 0-18.
@@ -2132,7 +2064,7 @@ Line 1, characters 28-40:
 1 | let () = for i = 0 to 0 do (assert false : t_any); done
                                 ^^^^^^^^^^^^
 Error: This expression has type "t_any" but an expression was expected of type
-         "('a : '_representable_layout_8)"
+         "('a : '_representable_layout_9)"
        because it is in the body of a for-loop
        The layout of t_any is any
          because of the definition of t_any at line 5, characters 0-18.
