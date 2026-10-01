@@ -369,6 +369,7 @@ and pattern_desc =
          *)
   | Ppat_type of Longident.t loc  (** Pattern [#tconst] *)
   | Ppat_addr of pattern  (** Pattern [addr_ P] *)
+  | Ppat_addr_imm of pattern  (** Pattern [addr_imm_ P] *)
   | Ppat_lazy of pattern  (** Pattern [lazy P] *)
   | Ppat_unpack of string option loc
       (** [Ppat_unpack(s)] represents:

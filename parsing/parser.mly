@@ -994,6 +994,7 @@ let maybe_pmod_constraint mode expr =
    is used in the definition of [type_variance]. */
 
 %token ADDR                   "addr_"
+%token ADDR_IMM               "addr_imm_"
 %token AMPERAMPER             "&&"
 %token AMPERSAND              "&"
 %token AND                    "and"
@@ -3749,6 +3750,8 @@ pattern_gen:
     ) { $1 }
   | ADDR ext_attributes simple_pattern
       { mkpat_attrs ~loc:$sloc (Ppat_addr $3) $2}
+  | ADDR_IMM ext_attributes simple_pattern
+      { mkpat_attrs ~loc:$sloc (Ppat_addr_imm $3) $2}
   | LAZY ext_attributes simple_pattern
       { mkpat_attrs ~loc:$sloc (Ppat_lazy $3) $2}
 ;
@@ -5452,6 +5455,7 @@ single_attr_id:
     LIDENT { $1 }
   | UIDENT { $1 }
   | ADDR { "addr_" }
+  | ADDR_IMM { "addr_imm_" }
   | AND { "and" }
   | AS { "as" }
   | ASSERT { "assert" }

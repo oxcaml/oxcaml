@@ -1886,7 +1886,7 @@ let f = function
 Line 2, characters 4-17:
 2 |   | addr_ (A foo) -> foo
         ^^^^^^^^^^^^^
-Error: Address patterns "addr_" are not supported yet.
+Error: Address patterns "addr_" and "addr_imm_" are not supported yet.
 |}]
 
 let f (addr_ x) = x
@@ -1894,7 +1894,7 @@ let f (addr_ x) = x
 Line 1, characters 6-15:
 1 | let f (addr_ x) = x
           ^^^^^^^^^
-Error: Address patterns "addr_" are not supported yet.
+Error: Address patterns "addr_" and "addr_imm_" are not supported yet.
 |}]
 
 let addr_ x = y
@@ -1902,5 +1902,34 @@ let addr_ x = y
 Line 1, characters 4-11:
 1 | let addr_ x = y
         ^^^^^^^
-Error: Address patterns "addr_" are not supported yet.
+Error: Address patterns "addr_" and "addr_imm_" are not supported yet.
+|}]
+
+let f = function
+  | addr_imm_ (A foo) -> foo
+  | Some addr_imm_ x -> x
+  | addr_imm_ x :: _ -> x
+  | addr_imm_ _ | addr_imm_ (addr_imm_ _) -> ()
+  | addr_imm_ (None | Some _) -> ()
+[%%expect{|
+Line 2, characters 4-21:
+2 |   | addr_imm_ (A foo) -> foo
+        ^^^^^^^^^^^^^^^^^
+Error: Address patterns "addr_" and "addr_imm_" are not supported yet.
+|}]
+
+let f (addr_imm_ x) = x
+[%%expect{|
+Line 1, characters 6-19:
+1 | let f (addr_imm_ x) = x
+          ^^^^^^^^^^^^^
+Error: Address patterns "addr_" and "addr_imm_" are not supported yet.
+|}]
+
+let addr_imm_ x = y
+[%%expect{|
+Line 1, characters 4-15:
+1 | let addr_imm_ x = y
+        ^^^^^^^^^^^
+Error: Address patterns "addr_" and "addr_imm_" are not supported yet.
 |}]
