@@ -129,6 +129,7 @@
   scalar
   primitive
   zero_alloc
+  spec
   types
   oprint
   typemode
@@ -156,6 +157,7 @@
   errortrace
   ctype
   signature_group
+  untypespec
   out_type
   printtyp
   errortrace_report
@@ -344,6 +346,8 @@
 
 (copy_files ../../typing/zero_alloc.ml)
 
+(copy_files ../../typing/spec.ml)
+
 (copy_files ../../typing/types.ml)
 
 (copy_files ../../typing/errortrace.ml)
@@ -353,6 +357,8 @@
 (copy_files ../../typing/ctype.ml)
 
 (copy_files ../../typing/out_type.ml)
+
+(copy_files ../../typing/untypespec.ml)
 
 (copy_files ../../typing/printtyp.ml)
 
@@ -547,6 +553,8 @@
 
 (copy_files ../../typing/zero_alloc.mli)
 
+(copy_files ../../typing/spec.mli)
+
 (copy_files ../../typing/types.mli)
 
 (copy_files ../../typing/errortrace.mli)
@@ -558,6 +566,8 @@
 (copy_files ../../typing/signature_group.mli)
 
 (copy_files ../../typing/out_type.mli)
+
+(copy_files ../../typing/untypespec.mli)
 
 (copy_files ../../typing/printtyp.mli)
 

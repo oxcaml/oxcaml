@@ -101,6 +101,11 @@ let exists_free ids p =
   | None -> false
   | _ -> true
 
+let rec contains_apply = function
+  | Pident _ -> false
+  | Pdot (p, _) | Pextra_ty (p, _) -> contains_apply p
+  | Papply _ -> true
+
 let rec scope = function
     Pident id -> Ident.scope id
   | Pdot(p, _) | Pextra_ty (p, _) -> scope p

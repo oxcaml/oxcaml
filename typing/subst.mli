@@ -82,6 +82,7 @@ val change_locs: 'k subst -> Location.t -> 'k subst
 
 val module_path: t -> Path.t -> Path.t
 val type_path: t -> Path.t -> Path.t
+val value_path: t -> Path.t -> Path.t
 val modtype_path: t -> Path.t -> Path.t
 
 val type_expr: t -> type_expr -> type_expr
