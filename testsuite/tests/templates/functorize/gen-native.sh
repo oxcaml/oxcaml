@@ -41,6 +41,7 @@ gen_native crc_mismatch/test_byte.ml crc_mismatch/test_native.ml
 gen_native uses_plain/test_byte.ml uses_plain/test_native.ml
 gen_native module_alias/test_byte.ml module_alias/test_native.ml
 gen_native dunelike/test_byte.ml dunelike/test_native.ml
+gen_native unmentionable/test_byte.ml unmentionable/test_native.ml
 gen_native partial_deps/test_byte.ml partial_deps/test_native.ml
 gen_native missing_impl/test_byte.ml missing_impl/test_native.ml
 gen_native cmifile/test_byte.ml cmifile/test_native.ml
