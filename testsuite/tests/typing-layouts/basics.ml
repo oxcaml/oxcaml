@@ -1601,6 +1601,162 @@ Error: The value "x" has type "t_float64" but an expression was expected of type
          because it's the type of an optional argument.
 |}]
 
+(* Payloads of kind [any] are also allowed in optional argument types; what
+   requires a representable layout is passing a value with [~] (which must
+   build a [Some]) or supplying a default (which must take one apart). Those
+   are checked at each call site or definition rather than restricting the
+   type. *)
+
+let f_any : ?x:t_any -> unit -> unit = fun ?x () -> ignore x
+
+[%%expect{|
+Line 1, characters 15-20:
+1 | let f_any : ?x:t_any -> unit -> unit = fun ?x () -> ignore x
+                   ^^^^^
+Error: Optional argument types must have layout value.
+       The layout of "t_any" is any
+         because of the definition of t_any at line 5, characters 0-18.
+       But the layout of "t_any" must be a value layout
+         because it's the type of an optional argument.
+|}]
+
+let higher_order (g : ?x:t_any -> unit) = g
+
+[%%expect{|
+Line 1, characters 25-30:
+1 | let higher_order (g : ?x:t_any -> unit) = g
+                             ^^^^^
+Error: Optional argument types must have layout value.
+       The layout of "t_any" is any
+         because of the definition of t_any at line 5, characters 0-18.
+       But the layout of "t_any" must be a value layout
+         because it's the type of an optional argument.
+|}]
+
+(* This one used to reach a fatal error in [type_option_some] via the
+   unchecked [val] declaration. *)
+
+module type S_any = sig
+  val f : ?x:t_any -> unit -> unit
+end
+
+[%%expect{|
+Line 2, characters 13-18:
+2 |   val f : ?x:t_any -> unit -> unit
+                 ^^^^^
+Error: Optional argument types must have layout value.
+       The layout of "t_any" is any
+         because of the definition of t_any at line 5, characters 0-18.
+       But the layout of "t_any" must be a value layout
+         because it's the type of an optional argument.
+|}]
+
+let infer ?x () = (x : t_any option)
+
+[%%expect{|
+Line 1, characters 19-20:
+1 | let infer ?x () = (x : t_any option)
+                       ^
+Error: The value "x" has type "'a option" but an expression was expected of type
+         "t_any option"
+       The layout of t_any is any
+         because of the definition of t_any at line 5, characters 0-18.
+       But the layout of t_any must be a value layout
+         because it's the type of an optional argument.
+|}]
+
+let f_univ : ('a : any). ?x:'a -> unit -> unit = fun ?x () -> ignore x
+
+[%%expect{|
+Line 1, characters 13-46:
+1 | let f_univ : ('a : any). ?x:'a -> unit -> unit = fun ?x () -> ignore x
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The universal type variable 'a was declared to have kind any.
+       But it was inferred to have kind value_or_null
+         because it's the type of an optional argument.
+|}]
+
+(* Calls that never construct or deconstruct the [Some] are fine... *)
+
+let call_omitted () = f_any ()
+
+[%%expect{|
+Line 1, characters 22-27:
+1 | let call_omitted () = f_any ()
+                          ^^^^^
+Error: Unbound value "f_any"
+|}]
+
+let call_passthrough (o : t_any option) = f_any ?x:o ()
+
+[%%expect{|
+Line 1, characters 42-47:
+1 | let call_passthrough (o : t_any option) = f_any ?x:o ()
+                                              ^^^^^
+Error: Unbound value "f_any"
+|}]
+
+let apply_thunk (h : unit -> unit) = h ()
+let call_eliminated () = apply_thunk f_any
+
+[%%expect{|
+val apply_thunk : (unit -> unit) -> unit = <fun>
+Line 2, characters 37-42:
+2 | let call_eliminated () = apply_thunk f_any
+                                         ^^^^^
+Error: Unbound value "f_any"
+|}]
+
+(* ...but passing a value must build a [Some], so it needs the payload to be
+   representable, just like passing any other function argument. *)
+
+let call_value () = f_any ~x:(assert false) ()
+
+[%%expect{|
+Line 1, characters 20-25:
+1 | let call_value () = f_any ~x:(assert false) ()
+                        ^^^^^
+Error: Unbound value "f_any"
+|}]
+
+let call_some () = f_any ?x:(Some (assert false)) ()
+
+[%%expect{|
+Line 1, characters 19-24:
+1 | let call_some () = f_any ?x:(Some (assert false)) ()
+                       ^^^^^
+Error: Unbound value "f_any"
+|}]
+
+(* Likewise, a default must take the [Some] apart. *)
+
+let default_ascribed : ?x:t_any -> unit -> unit = fun ?(x = assert false) () -> ()
+
+[%%expect{|
+Line 1, characters 26-31:
+1 | let default_ascribed : ?x:t_any -> unit -> unit = fun ?(x = assert false) () -> ()
+                              ^^^^^
+Error: Optional argument types must have layout value.
+       The layout of "t_any" is any
+         because of the definition of t_any at line 5, characters 0-18.
+       But the layout of "t_any" must be a value layout
+         because it's the type of an optional argument.
+|}]
+
+let default_annotated ?(x : t_any = assert false) () = ()
+
+[%%expect{|
+Line 1, characters 36-48:
+1 | let default_annotated ?(x : t_any = assert false) () = ()
+                                        ^^^^^^^^^^^^
+Error: This expression has type "t_any" but an expression was expected of type
+         "('a : value_or_null)"
+       The layout of t_any is any
+         because of the definition of t_any at line 5, characters 0-18.
+       But the layout of t_any must be a value layout
+         because it's the type of an optional argument.
+|}]
+
 (*********************************************************)
 (* Test 26: Inferring an application to an exotic layout *)
 
