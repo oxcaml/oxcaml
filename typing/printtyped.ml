@@ -649,6 +649,9 @@ and expression_extra i ppf (extra, loc, attrs) =
   | Texp_stack ->
       line i ppf "Texp_stack\n";
       attributes i ppf attrs
+  | Texp_zero_alloc ->
+      line i ppf "Texp_zero_alloc\n";
+      attributes i ppf attrs
   | Texp_mode m ->
       line i ppf "Texp_mode\n";
       attributes i ppf attrs;

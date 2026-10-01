@@ -1527,6 +1527,7 @@ val allocate : unit -> unit = <fun>
 val no_parens : unit = ()
 val left_assoc : unit = ()
 val right_assoc : unit = ()
+(* CR wsturgeon: some of these should fail *)
 |}]
 
 let   no_parens_seq =  zero_alloc_  () ; allocate ()
@@ -1536,6 +1537,7 @@ let right_assoc_seq =  zero_alloc_ (() ; allocate ())
 val no_parens_seq : unit = ()
 val left_assoc_seq : unit = ()
 val right_assoc_seq : unit = ()
+(* CR wsturgeon: some of these should fail *)
 |}]
 
 let outside_closure    = zero_alloc_ fun () ->             allocate ()
@@ -1545,6 +1547,7 @@ let  inside_sugared () =                       zero_alloc_ allocate ()
 val outside_closure : unit -> unit = <fun>
 val inside_closure : unit -> unit = <fun>
 val inside_sugared : unit -> unit = <fun>
+(* CR wsturgeon: some of these should fail *)
 |}]
 
 (*****************)
