@@ -124,6 +124,23 @@ module Unique_barrier = struct
     print !t
 end
 
+module Hole = struct
+  type 'a t = 'a option ref
+
+  let create () = ref None
+
+  let filled x = ref (Some x)
+
+  let fill t x = t := Some x
+
+  let peek t = !t
+
+  let get t =
+    match !t with
+    | Some x -> x
+    | None -> Misc.fatal_error "Typedtree.Hole.get: unfilled hole"
+end
+
 type unique_use = Mode.Uniqueness.r * Mode.Linearity.l
 
 let print_unique_use ppf (u,l) =
@@ -338,6 +355,12 @@ and expression_desc =
   | Texp_unboxed_bool of bool
   | Texp_tuple of (string option * expression) list * locality_mode_r
   | Texp_unboxed_tuple of (string option * expression * Jkind.sort) list
+  | Texp_tuple_proj of {
+      tuple : expression;
+      field : tuple_field;
+      unique_use : unique_use;
+      unique_barrier : Unique_barrier.t;
+    }
   | Texp_construct of
       Longident.t loc * constructor_description * constructor_representation *
       (Jkind.sort * expression) list
@@ -451,6 +474,9 @@ and expression_desc =
   | Texp_hole of unique_use
   | Texp_quote of expression
   | Texp_splice of expression
+
+and tuple_field =
+  | Ttf_label of { label : string loc; index : int Hole.t }
 
 and ident_kind =
   | Id_value

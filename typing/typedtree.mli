@@ -94,6 +94,31 @@ module Unique_barrier : sig
   val print : Format.formatter -> t -> unit
 end
 
+(** A hole in the typed tree for information that depends on a suspended
+    constraint. Every hole is filled by the end of type checking. *)
+module Hole : sig
+  type 'a t
+
+  val create : unit -> 'a t
+
+  (** [filled x] is a hole already filled with [x]. *)
+  val filled : 'a -> 'a t
+
+  (** [fill t x] sets the contents of [t] to [x]. A filled hole may be filled
+      again: if the fill is backtracked, the suspended constraint runs again
+      and refills it. *)
+  val fill : 'a t -> 'a -> unit
+
+  (** [peek t] is the contents of [t], if filled. Use this while type checking
+      is in progress. *)
+  val peek : 'a t -> 'a option
+
+  (** [get t] is the contents of [t]. Use this after type checking.
+
+      @raise Misc.Fatal_error if [t] is unfilled. *)
+  val get : 'a t -> 'a
+end
+
 (** The uniqueness/linearity of a usage (such as [Pexp_ident]) inferred by the
     type checker. It is derived during type checking as follows:
       [unique_use.uniqueness = expected_mode.uniqueness]
@@ -597,6 +622,14 @@ and expression_desc =
             - Any mix, e.g. [#(L1: E1, E2)]
                 when [el] is [(Some L1, E1, s1); (None, E2, s2)]
           *)
+  | Texp_tuple_proj of {
+      tuple : expression;
+      field : tuple_field;
+      unique_use : unique_use;
+      unique_barrier : Unique_barrier.t;
+    }
+        (** [E.~l]. As for [Texp_field], [unique_use] is the use of the
+            projected component and [unique_barrier] guards the read of [E]. *)
   | Texp_construct of
       Longident.t loc * Data_types.constructor_description *
       Types.constructor_representation * (Jkind.sort * expression) list *
@@ -763,6 +796,11 @@ and expression_desc =
   | Texp_hole of unique_use (** _ *)
   | Texp_quote of expression
   | Texp_splice of expression
+
+and tuple_field =
+  | Ttf_label of { label : string loc; index : int Hole.t }
+      (** [Ttf_label { label = L; index }] represents [.~L]. [index] is the
+          0-based position of [L] in the tuple type. *)
 
 and meth =
     Tmeth_name of string

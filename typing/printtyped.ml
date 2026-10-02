@@ -749,6 +749,14 @@ and expression i ppf x =
   | Texp_unboxed_tuple l ->
       line i ppf "Texp_unboxed_tuple\n";
       list i labeled_sorted_expression ppf l;
+  | Texp_tuple_proj { tuple; field = Ttf_label { label; index }; _ } ->
+      let index =
+        match Hole.peek index with
+        | Some index -> Int.to_string index
+        | None -> "?"
+      in
+      line i ppf "Texp_tuple_proj ~%s index=%s\n" label.txt index;
+      expression i ppf tuple;
   | Texp_construct (li, _, _, eo, am) ->
       line i ppf "Texp_construct %a\n" fmt_longident li;
       locality_mode_option i ppf am;

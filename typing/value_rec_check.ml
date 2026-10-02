@@ -276,6 +276,7 @@ let classify_expression : Typedtree.expression -> sd =
     | Texp_send _
     | Texp_field _
     | Texp_unboxed_field _
+    | Texp_tuple_proj _
     | Texp_assert _
     | Texp_try _
     | Texp_override _
@@ -932,6 +933,13 @@ let rec expression : Typedtree.expression -> term_judg =
       *)
       expression e << Dereference
     | Texp_unboxed_field { record = e; _ } ->
+      expression e << Dereference
+    | Texp_tuple_proj { tuple = e; _ } ->
+      (*
+        G |- e: m[Dereference]
+        -----------------------
+        G |- e.~l: m
+      *)
       expression e << Dereference
     | Texp_setinstvar (pth,_,_,e) ->
       (*

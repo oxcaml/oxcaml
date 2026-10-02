@@ -345,6 +345,9 @@ type error =
   | Layout_poly_inst_not_yet_supported of layout_poly_inst_restriction
   | Let_poly_not_function
   | Useless_lpoly
+  | Ambiguous_tuple_type
+  | Tuple_label_not_found of type_expr * string loc
+  | Expr_not_a_tuple_type of type_expr
 
 let not_principal fmt =
   Format_doc.Doc.kmsg (fun x -> Warnings.Not_principal x) fmt
@@ -5445,6 +5448,7 @@ let rec is_nonexpansive exp =
       List.for_all (fun (_,e) -> is_nonexpansive e) el
   | Texp_unboxed_tuple el ->
       List.for_all (fun (_,e,_) -> is_nonexpansive e) el
+  | Texp_tuple_proj { tuple; _ } -> is_nonexpansive tuple
   | Texp_construct(_, _, _, el, _) ->
       List.for_all (fun (_, e) -> is_nonexpansive e) el
   | Texp_variant(_, arg) -> is_nonexpansive_opt (Option.map fst arg)
@@ -5624,6 +5628,8 @@ let rec maybe_computation exp =
     List.exists (fun (_, exp) -> maybe_computation exp) exps
   | Texp_unboxed_tuple exps ->
     List.exists (fun (_, exp, _) -> maybe_computation exp) exps
+  | Texp_tuple_proj { tuple; _ } ->
+    maybe_computation tuple
   | Texp_construct (_, _, _, exps, _) ->
     List.exists (fun (_, exp) -> maybe_computation exp) exps
   | Texp_variant (_, Some (exp, _)) ->
@@ -6079,6 +6085,7 @@ let check_partial_application ~statement exp =
             match exp_desc with
             | Texp_ident _ | Texp_constant _ | Texp_unboxed_unit
             | Texp_unboxed_bool _ | Texp_tuple _ | Texp_unboxed_tuple _
+            | Texp_tuple_proj _
             | Texp_construct _ | Texp_variant _ | Texp_record _
             | Texp_atomic_loc _
             | Texp_record_unboxed_product _ | Texp_unboxed_field _
@@ -6339,7 +6346,8 @@ let rec is_inferred sexp =
       ({ pexp_desc = Pexp_extension({ txt }, PStr []) },
         [Nolabel, sbody]) when is_exclave_extension_node txt ->
       is_inferred sbody
-  | Pexp_ident _ | Pexp_apply _ | Pexp_field _ | Pexp_constraint (_, Some _, _)
+  | Pexp_ident _ | Pexp_apply _ | Pexp_field _ | Pexp_tuple_proj _
+  | Pexp_constraint (_, Some _, _)
   | Pexp_coerce _ | Pexp_send _ | Pexp_new _ | Pexp_pack (_, Some _) -> true
   | Pexp_sequence (_, e) | Pexp_open (_, e) | Pexp_constraint (e, None, _) ->
       is_inferred e
@@ -7914,6 +7922,80 @@ and type_expect_
   | Pexp_record_unboxed_product(lid_sexp_list, opt_sexp) ->
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
       type_expect_record ~overwrite Unboxed_product lid_sexp_list opt_sexp
+  | Pexp_tuple_proj (stuple, Ptf_label label) ->
+      let mode = With_regionality.newvar (get_current_level ()) in
+      let tuple_jkind, _tuple_sort =
+        Jkind.of_new_sort_var ~why:Record_projection
+          ~level:(Ctype.get_current_level ())
+      in
+      let tuple =
+        (* We don't generalize if principal since principality for
+           labeled tuple projections is defined by omnidirectionality
+           and not generalization *)
+        type_expect env (mode_default mode) stuple
+          (mk_expected (newvar tuple_jkind))
+      in
+      let ty_tuple = tuple.exp_type in
+      (* Suspend on the type of [tuple], filling [index]. *)
+      let new_ty_field () =
+        newvar (Jkind.Builtin.value_or_null ~why:Tuple_element)
+      in
+      let ty_field = new_ty_field () in
+      let index = Hole.create () in
+      let field = Ttf_label { label; index } in
+      (* CR aobrien: temporary direct use of [Ctype.upon_shape].
+         We should instead defunctionalize the [run] and [cancel]
+         functions in the unimplemented [Suspended] module. *)
+      Ctype.upon_shape env ty_tuple
+        ~run:(function
+          | Stuple labels -> (
+            (* Unify with tuple.exp_type to get components *)
+            let comps = List.map (fun comp -> comp, new_ty_field ()) labels in
+            unify_exp_types loc env ty_tuple (newty (Ttuple comps));
+            (* Find the label *)
+            match
+              List.find_mapi
+                (fun i comp ->
+                  match comp with
+                  | Some label', ty_field when label.txt = label' ->
+                    Some (i, ty_field)
+                  | _ -> None)
+                comps
+            with
+            | None ->
+              raise (Error (loc, env, Tuple_label_not_found (ty_tuple, label)))
+            | Some (i, ty_field') ->
+              (* Unify [ty_field] with the discovered field type [ty_field'] *)
+              unify_exp_types loc env ty_field ty_field';
+              (* Submoding *)
+              let is_contained_by : Mode.Hint.is_contained_by =
+                { containing = Tuple; container = tuple.exp_loc, Expression }
+              in
+              submode ~loc ~env
+                (cross_left env ty_field
+                   (apply_left_is_contained_by is_contained_by mode))
+                expected_mode;
+              (* Fill the [index] hole *)
+              Hole.fill index i)
+          | _ -> raise (Error (loc, env, Expr_not_a_tuple_type ty_tuple)))
+        ~cancel:(fun () -> raise (Error (loc, env, Ambiguous_tuple_type)));
+      let unique_use =
+        unique_use ~loc ~env mode (as_single_mode expected_mode)
+      in
+      rue
+        { exp_desc =
+            Texp_tuple_proj
+              { tuple;
+                field;
+                unique_use;
+                unique_barrier = Unique_barrier.not_computed ()
+              };
+          exp_loc = loc;
+          exp_extra = [];
+          exp_type = ty_field;
+          exp_attributes = sexp.pexp_attributes;
+          exp_env = env
+        }
   | Pexp_field(srecord, lid) ->
       let record, record_sort, mode, label, ambiguity,
           ty_arg, record_repres =
@@ -14275,6 +14357,20 @@ let report_error ~loc env =
          Consider using a regular %a instead."
         Style.inline_code "poly_"
         Style.inline_code "let"
+  | Ambiguous_tuple_type ->
+    Location.errorf ~loc
+      "@[The type of the tuple express is ambiguous.@ Could not determine the \
+       type of the tuple projection.@]"
+  | Expr_not_a_tuple_type ty ->
+      Location.errorf ~loc
+        "@[This expression has type %a@ \
+         which is not a tuple.@]"
+        (Style.as_inline_code Printtyp.type_expr) ty
+  | Tuple_label_not_found (ty, label) ->
+      Location.errorf ~loc
+        "@[No field %a for the tuple %a.@]"
+         (Style.as_inline_code Format_doc.pp_print_string) label.txt
+         (Style.as_inline_code Printtyp.type_expr) ty
 
 let report_error ~loc env err =
   Printtyp.wrap_printing_env ~error:true env

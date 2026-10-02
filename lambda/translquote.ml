@@ -3672,6 +3672,9 @@ and quote_expression_desc ~scopes ~transl stage e : Exp_desc.t =
       let rcd = quote_expression ~scopes ~transl stage rcd in
       let lbl = quote_record_field (of_location ~scopes lid.loc) env lbl in
       Exp_desc.field loc rcd lbl
+    | Texp_tuple_proj _ ->
+      fatal_errorf "Translquote [at %a]: tuple projections are not supported."
+        Location.print_loc loc'
     | Texp_setfield { record = rcd; lid; label = lbl; newval = exp; _ } ->
       let rcd = quote_expression ~scopes ~transl stage rcd in
       let lbl = quote_record_field (of_location ~scopes lid.loc) env lbl in
