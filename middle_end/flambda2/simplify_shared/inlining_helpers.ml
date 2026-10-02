@@ -156,6 +156,19 @@ let wrap_inlined_body_for_exn_extra_args acc ~extra_args ~apply_exn_continuation
     ~handler:wrapper_handler ~body:body_with_push ~is_exn_handler:true
     ~is_cold:false
 
+let wrap_inlined_body acc ~apply_exn_continuation ~apply_return_continuation
+    ~result_arity ~make_inlined_body ~apply_cont_create ~let_cont_create =
+  match Exn_continuation.extra_args apply_exn_continuation with
+  | [] ->
+    make_inlined_body acc
+      ~apply_exn_continuation:
+        (Exn_continuation.exn_handler apply_exn_continuation)
+      ~apply_return_continuation
+  | extra_args ->
+    wrap_inlined_body_for_exn_extra_args acc ~extra_args ~apply_exn_continuation
+      ~apply_return_continuation ~result_arity ~make_inlined_body
+      ~apply_cont_create ~let_cont_create
+
 type attribute_kind =
   | Inlined
   | Unrolled

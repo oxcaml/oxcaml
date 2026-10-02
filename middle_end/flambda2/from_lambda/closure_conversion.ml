@@ -480,23 +480,22 @@ module Inlining = struct
          Debuginfo.none)
       ~body
 
-  let wrap_inlined_body_for_exn_extra_args acc ~extra_args
-      ~apply_exn_continuation ~apply_return_continuation ~result_arity
-      ~make_inlined_body =
+  let let_cont_create acc cont ~handler_params ~handler ~body ~is_exn_handler
+      ~is_cold =
+    Let_cont_with_acc.build_non_recursive acc cont ~handler_params ~handler
+      ~body ~is_exn_handler ~is_cold
+
+  let wrap_inlined_body acc ~apply_exn_continuation ~apply_return_continuation
+      ~result_arity ~make_inlined_body =
     let apply_cont_create acc ~trap_action cont ~args ~dbg =
       let acc, apply_cont =
         Apply_cont_with_acc.create acc ~trap_action cont ~args ~dbg
       in
       Expr_with_acc.create_apply_cont acc apply_cont
     in
-    let let_cont_create acc cont ~handler_params ~handler ~body ~is_exn_handler
-        ~is_cold =
-      Let_cont_with_acc.build_non_recursive acc cont ~handler_params ~handler
-        ~body ~is_exn_handler ~is_cold
-    in
-    Inlining_helpers.wrap_inlined_body_for_exn_extra_args acc ~extra_args
-      ~apply_exn_continuation ~apply_return_continuation ~result_arity
-      ~make_inlined_body ~apply_cont_create ~let_cont_create
+    Inlining_helpers.wrap_inlined_body acc ~apply_exn_continuation
+      ~apply_return_continuation ~result_arity ~make_inlined_body
+      ~apply_cont_create ~let_cont_create
 
   let inline acc ~apply ~apply_depth ~func_desc:code =
     let apply_dbg = Apply.dbg apply in
@@ -544,16 +543,8 @@ module Inlining = struct
         in
         let acc = Acc.with_free_names Name_occurrences.empty acc in
         let acc = Acc.increment_metrics cost_metrics acc in
-        match Exn_continuation.extra_args apply_exn_continuation with
-        | [] ->
-          make_inlined_body acc
-            ~apply_exn_continuation:
-              (Exn_continuation.exn_handler apply_exn_continuation)
-            ~apply_return_continuation
-        | extra_args ->
-          wrap_inlined_body_for_exn_extra_args acc ~extra_args
-            ~apply_exn_continuation ~apply_return_continuation
-            ~result_arity:(Code.result_arity code) ~make_inlined_body)
+        wrap_inlined_body acc ~apply_exn_continuation ~apply_return_continuation
+          ~result_arity:(Code.result_arity code) ~make_inlined_body)
 end
 
 type unarized_extern_repr =
