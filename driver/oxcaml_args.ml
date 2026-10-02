@@ -1838,6 +1838,20 @@ module Extra_options = struct
   let int loc kwd default =
     register loc (ref default) set_int Compenv.int_setter kwd
 
+  let int_action loc kwd action =
+    let parser arg r opt =
+      set_int arg r opt;
+      action !r
+    in
+    let setter ppf name option s =
+      match int_of_string_opt s with
+      | Some i ->
+          option := i;
+          action i
+      | None -> Compenv.int_setter ppf name option s
+    in
+    ignore (register loc (ref 0) parser setter kwd : unit -> int)
+
   let bool_arg arg r opt =
     match opt with
     | "0" -> r := false
@@ -1891,6 +1905,26 @@ module Extra_options = struct
       | None -> false
     else false
 end
+
+let () =
+  List.iter
+    (fun (name, update) ->
+      Extra_options.int_action __LOC__ ("gc-" ^ name) (fun n ->
+          Gc.set (update (Gc.get ()) n)))
+    [
+      ("minor-heap-size", fun c n -> { c with Gc.minor_heap_size = n });
+      ("major-heap-increment", fun c n -> { c with Gc.major_heap_increment = n });
+      ("space-overhead", fun c n -> { c with Gc.space_overhead = n });
+      ("verbose", fun c n -> { c with Gc.verbose = n });
+      ("max-overhead", fun c n -> { c with Gc.max_overhead = n });
+      ("stack-limit", fun c n -> { c with Gc.stack_limit = n });
+      ("allocation-policy", fun c n -> { c with Gc.allocation_policy = n });
+      ("window-size", fun c n -> { c with Gc.window_size = n });
+      ("custom-major-ratio", fun c n -> { c with Gc.custom_major_ratio = n });
+      ("custom-minor-ratio", fun c n -> { c with Gc.custom_minor_ratio = n });
+      ( "custom-minor-max-size",
+        fun c n -> { c with Gc.custom_minor_max_size = n } );
+    ]
 
 module Oxcaml_options_impl = struct
   let set r () = r := Oxcaml_flags.Set true
