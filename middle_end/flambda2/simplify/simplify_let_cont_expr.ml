@@ -767,21 +767,11 @@ let rebuild_single_non_recursive_handler ~at_unit_toplevel
             else
               match RE.to_apply_cont handler with
               | Some apply_cont -> (
-                let is_cold_shortcut =
-                  UE.is_cold_continuation uenv
-                    (Apply_cont.continuation apply_cont)
-                in
-                (* Do not introduce a shortcut if our [let cont] was explicitly
-                   marked as cold but is calling another continuation that is
-                   not, or we would lose the coldness information. *)
-                if is_cold && not is_cold_shortcut
-                then Unknown
-                else
-                  match Apply_cont.trap_action apply_cont with
-                  | Some _ -> Unknown
-                  | None ->
-                    let args = Apply_cont.args apply_cont in
-                    Shortcut_to (Apply_cont.continuation apply_cont, args))
+                match Apply_cont.trap_action apply_cont with
+                | Some _ -> Unknown
+                | None ->
+                  let args = Apply_cont.args apply_cont in
+                  Shortcut_to (Apply_cont.continuation apply_cont, args))
               | None -> (
                 if
                   RE.can_be_removed_as_invalid handler
