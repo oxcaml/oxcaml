@@ -65,8 +65,8 @@ let peek  (aon : 'a portended or_null) =
 ;;
 [%%expect{|
 type ('a : value_or_null) portended = { a : 'a; } [@@unboxed]
-val peek : ('a : value_maybe_separable) 'b. 'a portended or_null -> 'b =
-  <fun>
+val peek :
+  ('a : value_maybe_separable) ('b : any). 'a portended or_null -> 'b = <fun>
 |}]
 
 (* These are regression tests for an intermediate version of the bug fix that

@@ -900,6 +900,15 @@ let call_in_scrutinee (type a : any) (w : a w) : a =
   match get w 3 with
   | _ -> raise_any Exit
 [%%expect{|
+Line 2, characters 12-13:
+2 |   match get w 3 with
+                ^
+Error: The value "w" has type "a w" but an expression was expected of type "'a w"
+       The layout of a is any
+         because of the annotation on the abstract type declaration for a.
+       But the layout of a must be representable
+         because a value of this type is matched against a pattern.
+|}, Principal{|
 Line 2, characters 8-15:
 2 |   match get w 3 with
             ^^^^^^^
@@ -915,6 +924,14 @@ let call_in_argument (type a : any) (w : a w) : a =
   ignore (get w 3);
   raise_any Exit
 [%%expect{|
+Line 2, characters 14-15:
+2 |   ignore (get w 3);
+                  ^
+Error: The value "w" has type "a w" but an expression was expected of type "'a w"
+       The layout of a is any
+         because of the annotation on the abstract type declaration for a.
+       But the layout of a must be a value layout.
+|}, Principal{|
 Line 2, characters 9-18:
 2 |   ignore (get w 3);
              ^^^^^^^^^
@@ -929,6 +946,17 @@ Error: This expression has type "a" but an expression was expected of type
 
 let top_level : t_any = raise_any Exit
 [%%expect{|
+Line 1, characters 4-13:
+1 | let top_level : t_any = raise_any Exit
+        ^^^^^^^^^
+Error: This pattern matches values of type "t_any"
+       but a pattern was expected which matches values of type
+         "('a : '_representable_layout_20)"
+       The layout of t_any is any
+         because of the definition of t_any at line 4, characters 0-16.
+       But the layout of t_any must be representable
+         because it's the type of a variable bound by a `let`.
+|}, Principal{|
 Line 1, characters 4-13:
 1 | let top_level : t_any = raise_any Exit
         ^^^^^^^^^
@@ -949,7 +977,7 @@ Line 2, characters 10-34:
 2 |   let x = (raise_any Exit : t_any)
               ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "t_any" but an expression was expected of type
-         "('a : '_representable_layout_22)"
+         "('a : '_representable_layout_21)"
        The layout of t_any is any
          because of the definition of t_any at line 4, characters 0-16.
        But the layout of t_any must be representable
@@ -969,6 +997,16 @@ Error: This pattern matches values of type "t_any"
 
 let _ = (raise_any Exit : t_any)
 [%%expect{|
+Line 1, characters 8-32:
+1 | let _ = (raise_any Exit : t_any)
+            ^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "t_any" but an expression was expected of type
+         "('a : '_representable_layout_22)"
+       The layout of t_any is any
+         because of the definition of t_any at line 4, characters 0-16.
+       But the layout of t_any must be representable
+         because it's the type of a variable bound by a `let`.
+|}, Principal{|
 Line 1, characters 8-32:
 1 | let _ = (raise_any Exit : t_any)
             ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1097,6 +1135,16 @@ Line 2, characters 8-22:
 2 |   match (never () : a) with
             ^^^^^^^^^^^^^^
 Error: This expression has type "a" but an expression was expected of type
+         "('a : '_representable_layout_23)"
+       The layout of a is any
+         because of the annotation on the abstract type declaration for a.
+       But the layout of a must be representable
+         because a value of this type is matched against a pattern.
+|}, Principal{|
+Line 2, characters 8-22:
+2 |   match (never () : a) with
+            ^^^^^^^^^^^^^^
+Error: This expression has type "a" but an expression was expected of type
          "('a : '_representable_layout_24)"
        The layout of a is any
          because of the annotation on the abstract type declaration for a.
@@ -1195,6 +1243,20 @@ external[@layout_poly] raise_poly : ('a : any). exn -> 'a = "%raise"
 let raise_poly_float () : float# = raise_poly Exit
 let raise_poly_never (type a : any) () : a = raise_poly Exit
 [%%expect{|
+external raise_poly : ('a : any). exn -> 'a = "%raise" [@@layout_poly]
+val raise_poly_float : unit -> float# = <fun>
+Line 3, characters 45-60:
+3 | let raise_poly_never (type a : any) () : a = raise_poly Exit
+                                                 ^^^^^^^^^^^^^^^
+Error: This expression has type "('a : '_representable_layout_24)"
+       but an expression was expected of type "a"
+       The layout of a is any
+         because of the annotation on the abstract type declaration for a.
+       But the layout of a must be representable
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
+|}, Principal{|
 external raise_poly : ('a : any). exn -> 'a = "%raise" [@@layout_poly]
 val raise_poly_float : unit -> float# = <fun>
 Line 3, characters 45-60:

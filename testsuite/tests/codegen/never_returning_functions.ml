@@ -68,7 +68,7 @@ Curry.partial_fail3:
 .L0:
   leaq  8(%r15), %rax
   movq  $5367, -8(%rax)
-  movq  caml_curry2_RF@GOTPCREL(%rip), %rdi
+  movq  caml_curry2@GOTPCREL(%rip), %rdi
   movq  %rdi, (%rax)
   movabsq $180143985094819849, %rdi
   movq  %rdi, 8(%rax)

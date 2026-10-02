@@ -1788,7 +1788,7 @@ let q () =
 
 [%%expect{|
 val ( let* ) : 'a -> 'b -> unit = <fun>
-val ( and* ) : 'a -> 'b -> 'c = <fun>
+val ( and* ) : 'a 'b ('c : any). 'a -> 'b -> 'c = <fun>
 val q : unit -> unit = <fun>
 |}]
 

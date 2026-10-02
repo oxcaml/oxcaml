@@ -956,7 +956,7 @@ let ~x:(T x), T y = ~x:(T 5), T 10
 [%%expect{|
 val z : int = 4
 val punned : int = 5
-val x_must_be_even : 'a -> 'b = <fun>
+val x_must_be_even : 'a ('b : any). 'a -> 'b = <fun>
 exception Odd
 type 'a t = T of 'a
 val x : x:int * y:int = (~x:1, ~y:2)

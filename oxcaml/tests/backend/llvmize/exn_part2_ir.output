@@ -843,7 +843,7 @@ L226:
   ret { { i64, i64 }, { i64 } } %44
 }
 
-define  oxcamlcc { { i64, i64 }, { i64 } } @camlExn_part2__raise_2_HIDE_STAMP(i64 %0, i64 %1, i64 %2) gc "oxcaml" {
+define  oxcamlcc { { i64, i64 }, {  } } @camlExn_part2__raise_2_HIDE_STAMP(i64 %0, i64 %1, i64 %2) gc "oxcaml" {
   %ds = alloca i64
   store i64 %0, ptr %ds
   %alloc = alloca i64
@@ -882,7 +882,7 @@ L229:
   unreachable
 }
 
-define  oxcamlcc { { i64, i64 }, { i64 } } @camlExn_part2__raise_3_HIDE_STAMP(i64 %0, i64 %1, i64 %2) gc "oxcaml" {
+define  oxcamlcc { { i64, i64 }, {  } } @camlExn_part2__raise_3_HIDE_STAMP(i64 %0, i64 %1, i64 %2) gc "oxcaml" {
   %ds = alloca i64
   store i64 %0, ptr %ds
   %alloc = alloca i64
