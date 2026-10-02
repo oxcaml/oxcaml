@@ -131,12 +131,12 @@ Error: This pattern matches values of type "t_any"
 |}]
 
 (* Function_result *)
-let f (): t_any = assert false
+let f (g : unit -> t_any) : t_any = g ()
 
 [%%expect{|
-Line 1, characters 6-30:
-1 | let f (): t_any = assert false
-          ^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 6-40:
+1 | let f (g : unit -> t_any) : t_any = g ()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Function arguments and returns must be representable.
        The layout of t_any is any
          because of the definition of t_any at line 1, characters 0-16.
