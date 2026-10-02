@@ -114,24 +114,24 @@ Error: Signature mismatch:
            get:('t -> int -> 'elt) @ local ->
            compare:('elt -> 'key -> int) @ local -> 'key -> int option
        The type
-         "'a @ [< past('mm44) & past('mm25) & 'm & 'n & global many read_write] ->
-         (length:('a @ [< past('mm5) & past('mm6) & past('mm7) & past('mm8) & past('mm9) & past('mm2) & global many read_write > 'n | aliased] ->
-                  int @ [< past('mm3) & past('mm4) & many read_write > dynamic]) @ [< past('mm43) & past('mm50) & past('mm24) & past('mm36) & past('mm15) & many > local] ->
-          (get:('a @ [< past('mm29) & past('mm30) & past('mm22) & past('mm31) & past('mm14) & past('mm1) & global many read_write > 'm | aliased] ->
-                (int @ [> aliased] ->
-                 'b @ [< past('mm26) & past('mm27) & past('mm21) & past('mm28) & past('mm13) & past('mm0) & global many read_write > aliased stateful dynamic]) @ [> past('mm16) | past('mm17) | past('mm18) | past('mm19) | past('mm20) | past('mm21) | past('mm22) | past('mm23) | past('mm4) | past('mm7) | past('mm24) | past('mm25) | local stateful dynamic]) @ [< past('mm42) & past('mm49) & past('mm23) & past('mm35) & many > local] ->
-           (compare:('b @ [< past('mm40) & past('mm46) & past('mm19) & past('mm34) & past('mm12) & past('q) & global many read_write > aliased stateful dynamic] ->
-                     ('c @ [< past('mm39) & past('mm45) & past('mm18) & past('mm33) & past('mm11) & past('p) & global many read_write > aliased stateful dynamic] ->
-                      int @ [< past('mm38) & past('mm17) & many read_write > dynamic]) @ [> past('mm37) | past('mm38) | past('mm39) | past('mm40) | past('mm41) | past('mm26) | past('mm29) | past('mm42) | past('mm3) | past('mm5) | past('mm43) | past('mm44) | local stateful dynamic]) @ [< past('mm41) & past('mm48) & past('mm20) & many > local] ->
-            ('c @ [< past('mm37) & past('mm47) & past('mm16) & past('mm32) & past('mm10) & past('o) & global many read_write > aliased stateful dynamic] ->
-             int option @ [> local aliased dynamic]) @ [> close('m) | close('n) | past('mm47) | past('mm45) | past('mm46) | past('mm48) | past('mm27) | past('mm30) | past('mm49) | past('mm6) | past('mm50) | local stateful]) @ [> close('m) | close('n) | past('mm32) | past('mm33) | past('mm34) | past('mm28) | past('mm31) | past('mm35) | past('mm8) | past('mm36) | local stateful]) @ [> close('m) | close('n) | past('mm10) | past('mm11) | past('mm12) | past('mm13) | past('mm14) | past('mm9) | past('mm15) | local stateful]) @ [> close('m) | close('n) | past('o) | past('p) | past('q) | past('mm0) | past('mm1) | past('mm2) | stateful]"
+         "'a @ [< 'n & 'm & global many read_write] ->
+         length:('a @ [< global many read_write > 'm | aliased] ->
+                 int @ [< many read_write > dynamic]) @ [< many > local] ->
+         get:('a @ [< global many read_write > 'n | aliased] ->
+              int @ [> aliased] ->
+              'b @ [< global many read_write > aliased stateful dynamic]) @ [< many > local] ->
+         compare:('b @ [< global many read_write > aliased stateful dynamic] ->
+                  'c @ [< global many read_write > aliased stateful dynamic] ->
+                  int @ [< many read_write > dynamic]) @ [< many > local] ->
+         'c @ [< global many read_write > aliased stateful dynamic] ->
+         int option @ [> local aliased dynamic]"
        is not compatible with the type
          "'a ->
          length:('a -> int) @ local ->
          get:('a -> int -> 'b) @ local ->
          compare:('b -> 'c -> int) @ local -> 'c -> int option"
        Type
-         "'c @ [< past('mm37) & past('mm47) & past('mm16) & past('mm32) & past('mm10) & past('o) & global many read_write > aliased stateful dynamic] ->
+         "'c @ [< global many read_write > aliased stateful dynamic] ->
          int option @ [> local aliased dynamic]"
        is not compatible with type "'c -> int option"
        The return mode was expected to be "global" but is "local"
