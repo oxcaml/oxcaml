@@ -29,7 +29,7 @@
   act_get_shared : retrieve table, with sharing explicit
 *)
 
-type 'a shared = Shared of 'a | Single of 'a
+type 'a shared = Shared of 'a * int | Single of 'a
 
 type ('a, 'ctx) t_store =
     {act_get : unit -> 'a array ;
@@ -83,6 +83,8 @@ module type S =
     type act
     (* type of layouts *)
     type layout
+    (* type of action weights *)
+    type weight
 
     (* Various constructors, for making a binder,
         adding one integer, etc. *)
@@ -119,8 +121,8 @@ module type S =
     val make_switch : loc -> layout -> arg -> int array -> act array -> act
 
    (* Build last minute sharing of action stuff *)
-   val make_catch : layout -> act -> Static_label.t * (act -> act)
-   val make_exit : Static_label.t -> act
+   val make_catch : layout -> act -> int -> Static_label.t * weight * (act -> act)
+   val make_exit : Static_label.t -> weight -> act
   end
 
 

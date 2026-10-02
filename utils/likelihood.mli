@@ -61,6 +61,8 @@ val is_cold : t -> bool
 
 val rescale : total:t -> t -> t
 
+val scale : int -> t -> t
+
 val sum_list : t list -> t
 
 val is_uniform : t list -> bool

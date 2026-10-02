@@ -15,7 +15,7 @@
 
 (* see high-level comments in switch.mli *)
 
-type 'a shared = Shared of 'a | Single of 'a
+type 'a shared = Shared of 'a * int | Single of 'a
 
 type ('a, 'ctx) t_store =
   {act_get : unit -> 'a array ;
@@ -41,7 +41,7 @@ module CtxStore(A:CtxStored) = struct
     Map.Make(struct type t = A.key let compare = A.compare_key end)
 
   type intern =
-    { mutable map : (bool * int)  AMap.t ;
+    { mutable map : (shares:int * int)  AMap.t ;
       mutable next : int ;
       mutable acts : (bool * A.t) list; }
 
@@ -60,12 +60,12 @@ module CtxStore(A:CtxStored) = struct
     let store mustshare ctx act = match A.make_key ctx act with
       | Some key ->
           begin try
-            let (shared,i) = AMap.find key st.map in
-            if not shared then st.map <- AMap.add key (true,i) st.map ;
+            let (~shares,i) = AMap.find key st.map in
+            st.map <- AMap.add key (~shares:(shares + 1),i) st.map ;
             i
           with Not_found ->
             let i = add mustshare act in
-            st.map <- AMap.add key (mustshare,i) st.map ;
+            st.map <- AMap.add key (~shares:1,i) st.map ;
             i
           end
       | None ->
@@ -77,13 +77,12 @@ module CtxStore(A:CtxStored) = struct
       let acts =
         Array.of_list
           (List.rev_map
-             (fun (shared,act) ->
-                if shared then Shared act else Single act)
+             (fun (_shared,act) -> Single act)
              st.acts) in
       AMap.iter
-        (fun _ (shared,i) ->
-           if shared then match acts.(i) with
-             | Single act -> acts.(i) <- Shared act
+        (fun _ (~shares,i) ->
+           if shares > 1 then match acts.(i) with
+             | Single act -> acts.(i) <- Shared (act, shares)
              | Shared _ -> ())
         st.map ;
       acts in
@@ -120,6 +119,7 @@ sig
   type test
   type act
   type layout
+  type weight
 
   val bind : arg -> (arg -> act) -> act
   val make_const : loc -> int -> arg
@@ -133,8 +133,8 @@ sig
   val make_if : layout -> test -> act -> act -> act
   val make_switch : loc -> layout -> arg -> int array -> act array -> act
 
-  val make_catch : layout -> act -> Static_label.t * (act -> act)
-  val make_exit : Static_label.t -> act
+  val make_catch : layout -> act -> int -> Static_label.t * weight * (act -> act)
+  val make_exit : Static_label.t -> weight -> act
 end
 
 (* The module will ``produce good code for the case statement''
@@ -987,11 +987,11 @@ let rec pkey chan  = function
       Array.map
         (fun act -> match  act with
            | Single act -> act
-           | Shared act ->
-               let i,h = Arg.make_catch kind act in
+           | Shared (act, shares) ->
+               let i,s,h = Arg.make_catch kind act shares in
                let oh = !handlers in
                handlers := (fun act -> h (oh act)) ;
-               Arg.make_exit i)
+               Arg.make_exit i s)
         actions in
     !handlers,actions
 
