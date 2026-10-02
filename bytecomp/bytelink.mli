@@ -29,7 +29,8 @@ val check_consistency: filepath -> Cmo_format.compilation_unit_descr -> unit
 val linkdeps_unit :
   Linkdeps.t -> filename:string -> Cmo_format.compilation_unit_descr -> unit
 
-val extract_crc_interfaces: unit -> Import_info.t list
+val extract_crc_interfaces:
+  unit -> (Compilation_unit.Name.t * Import_info.Intf.Nonalias.t option) list
 
 type error =
   | File_not_found of filepath

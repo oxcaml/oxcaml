@@ -29,6 +29,8 @@ let standard_library =
   with Not_found ->
     standard_library_default
 
+let caml_symbol_prefix = {@QS@|@caml_symbol_prefix@|@QS@}
+
 let exec_magic_number = {magic|@EXEC_MAGIC_NUMBER@|magic}
     (* exec_magic_number is duplicated in runtime/caml/exec.h *)
 and cmi_magic_number = {magic|@CMI_MAGIC_NUMBER@|magic}

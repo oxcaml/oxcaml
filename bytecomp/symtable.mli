@@ -63,7 +63,7 @@ val transl_const: Lambda.structured_constant -> Obj.t
 
 type global_map
 
-val init_toplevel: unit -> Import_info.t array
+val init_toplevel: unit -> Cmo_format.crcs
 val update_global_table: unit -> unit
 val get_global_value: Global.t -> Obj.t
 val is_global_defined: Global.t -> bool

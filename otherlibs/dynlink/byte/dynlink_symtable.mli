@@ -15,13 +15,12 @@
 
 (* Assign locations and numbers to globals and primitives *)
 
-open! Dynlink_compilerlibs
+open Dynlink_support
 open Cmo_format
 
 module Compunit : sig
   type t = compunit
   val name : t -> string
-  val is_packed : compunit -> bool
 end
 
 module Global : sig
@@ -38,7 +37,7 @@ val patch_object:
   (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t ->
   (reloc_info * int) list -> unit
 
-val init_toplevel: unit -> (string * Digest.t option) list
+val init_toplevel: unit -> Cmo_format.crcs
 val update_global_table: unit -> unit
 val get_global_value: Global.t -> Obj.t
 val check_global_initialized: (reloc_info * int) list -> unit
@@ -51,6 +50,8 @@ val empty_global_map: global_map
 val current_state: unit -> global_map
 val hide_additions: global_map -> unit
 val is_defined_in_global_map: global_map -> Global.t -> bool
+val fold_global_map :
+  (Global.t -> int -> 'a -> 'a) -> global_map -> 'a -> 'a
 
 (* Error report *)
 
