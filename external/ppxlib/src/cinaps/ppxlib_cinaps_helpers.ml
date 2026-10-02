@@ -7,11 +7,10 @@ let str_to_sig =
   in
   let map s =
     match Str.matched_string s with
-    | "st" -> "sg_items"
-    | "Str" -> "Sig_items"
-    | "structure_item" -> "signature_item"
-    | "structure" -> "signature_item list"
-    | "Structure" -> "(List Signature_item)"
+    | "st" -> "sg"
+    | "Str" -> "Sig"
+    | "structure" -> "signature"
+    | "Structure" -> "Signature"
     | "_structure" -> "_signature"
     | "_Structure" -> "_Signature"
     | "str_" -> "sig_"
