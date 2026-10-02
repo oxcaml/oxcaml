@@ -209,8 +209,8 @@ module Reserved_namespaces = struct
   let () = reserve "metaocaml"
   let () = reserve "ocamlformat"
   let () = reserve "ppxlib.migration"
-  let () = reserve "extension" (* deprecated namespace for OxCaml syntax *)
-  let () = reserve "jane" (* OxCaml syntax *)
+  let () = reserve "extension" (* deprecated namespace for jane street syntax *)
+  let () = reserve "jane" (* jane street syntax *)
 
   let check_not_reserved ~kind name =
     let kind, list =

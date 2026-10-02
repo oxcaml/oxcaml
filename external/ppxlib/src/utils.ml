@@ -176,7 +176,7 @@ module Ast_io = struct
       lexbuf.lex_curr_p <-
         { pos_fname = input_name; pos_lnum = 1; pos_bol = 0; pos_cnum = 0 };
       Skip_hash_bang.skip_hash_bang lexbuf;
-      (* Force-enable all OxCaml language extensions, which enables standalone
+      (* Force-enable all Jane Street language extensions, which enables standalone
          ppx drivers to parse all constructs. *)
       Ocaml_common.Language_extension.(set_universe_and_enable_all Universe.maximal);
       let ast : Intf_or_impl.t =

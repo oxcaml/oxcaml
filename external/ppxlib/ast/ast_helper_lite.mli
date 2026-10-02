@@ -418,7 +418,6 @@ module Mod : sig
 
   val unpack : ?loc:loc -> ?attrs:attrs -> expression -> module_expr
   val extension : ?loc:loc -> ?attrs:attrs -> extension -> module_expr
-  val hole : ?loc:loc -> ?attrs:attrs -> unit -> module_expr
 end
 
 (** Signature items *)
@@ -500,7 +499,13 @@ end
 
 (** Value bindings *)
 module Vb : sig
-  val mk : ?loc:loc -> ?attrs:attrs -> pattern -> expression -> value_binding
+  val mk :
+    ?loc:loc ->
+    ?attrs:attrs ->
+    ?value_constraint:value_constraint ->
+    pattern ->
+    expression ->
+    value_binding
 end
 
 (** {1 Class language} *)

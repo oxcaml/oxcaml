@@ -29,3 +29,4 @@ let parse s =
       (* should not happen, but don't put assert false
                           so as not to crash the toplevel (see Genprintval) *)
   | Some v -> v
+

@@ -207,7 +207,8 @@ val type_declaration :
 val value_binding
   :  pat:(pattern, 'a, 'b) t
   -> expr:(expression, 'b, 'c) t
-  -> (value_binding, 'a, 'c) t
+  -> constraint_:(value_constraint option, 'c, 'd) t
+  -> (value_binding, 'a, 'd) t
 
 val value_description
   :  name:(string, 'a, 'b) t
@@ -263,7 +264,11 @@ val pint64 : (int64, 'a, 'b) t -> (pattern, 'a, 'b) t
 val pnativeint : (nativeint, 'a, 'b) t -> (pattern, 'a, 'b) t
 val single_expr_payload : (expression, 'a, 'b) t -> (payload, 'a, 'b) t
 
-val pexp_function : (case list, 'a, 'b) t -> (expression, 'a, 'b) t
+val pexp_function
+  :  (function_param list, 'a, 'b) t
+  -> (type_constraint option, 'b, 'c) t
+  -> (function_body, 'c, 'd) t
+  -> (expression, 'a, 'd) t
 
 val no_label :
   (expression, 'a, 'b) t -> (Asttypes.arg_label * expression, 'a, 'b) t

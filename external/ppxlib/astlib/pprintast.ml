@@ -1,4 +1,4 @@
-(* OxCaml uses the compiler's implementation of pprintast, not ppxlib's. *)
+(* Jane Street: We use the compiler's implementation of pprintast, not ppxlib's. *)
 
 module Janestreet = Ocaml_common.Pprintast
 

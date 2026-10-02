@@ -1,5 +1,5 @@
 (* 5.0 has the same parsetree as 4.14, but uses different magic numbers.  We also
-   expose the current compiler's [Longident] shape here so OxCaml ppxes can handle it
+   expose the current compiler's [Longident] shape here so Jane ppxes can handle it
    through [ppxlib_jane] while the rest of ppxlib keeps using its 5.2 parsetree view. *)
 
 module Longident = struct

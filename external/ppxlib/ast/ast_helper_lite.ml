@@ -314,7 +314,6 @@ module Mod = struct
   let constraint_ ?loc ?attrs m mty = mk ?loc ?attrs (Pmod_constraint (m, Some mty, []))
   let unpack ?loc ?attrs e = mk ?loc ?attrs (Pmod_unpack e)
   let extension ?loc ?attrs a = mk ?loc ?attrs (Pmod_extension a)
-  let hole ?loc ?attrs () = mk ?loc ?attrs Pmod_hole
 end
 
 module Sig = struct
@@ -471,8 +470,10 @@ module Incl = struct
 end
 
 module Vb = struct
-  let mk ?(loc = !default_loc) ?(attrs = []) pat expr =
-    { pvb_is_poly = false; pvb_pat = pat; pvb_expr = expr; pvb_modes = []; pvb_attributes = attrs; pvb_loc = loc }
+  let mk ?(loc = !default_loc) ?(attrs = []) ?value_constraint pat expr =
+    { pvb_is_poly = false; pvb_pat = pat; pvb_expr = expr;
+      pvb_constraint = value_constraint; pvb_modes = [];
+      pvb_attributes = attrs; pvb_loc = loc }
 end
 
 module Ci = struct

@@ -24,8 +24,6 @@ module Asttypes = struct
 
   type mutable_flag (*IF_CURRENT = Asttypes.mutable_flag *) = Immutable | Mutable
 
-  type atomic_flag (*IF_CURRENT = Asttypes.atomic_flag *) = Nonatomic | Atomic
-
   type access_flag (*IF_CURRENT = Asttypes.access_flag *) =
     | Immutable_access
     | Mutable_access
@@ -699,9 +697,9 @@ module Parsetree = struct
     | Baccess_field of Longident.t loc
         (** [.foo] *)
     | Baccess_block of access_flag * expression
-        (** Access using another block index: [.idx_imm(E)], [.idx_mut(E)]
-            (usually followed by unboxed accesses, to deepen the index).
-        *)
+        (** Access using another block index: [.idx_imm(E)], [.idx_mut(E)],
+            [.idx_atomic(E)] (usually followed by unboxed accesses,
+            to deepen the index). *)
 
   and unboxed_access (*IF_CURRENT = Parsetree.unboxed_access *) =
     | Uaccess_unboxed_field of Longident.t loc
@@ -1307,7 +1305,6 @@ module Parsetree = struct
         (** [(ME : MT @@ modes)] *)
     | Pmod_unpack of expression  (** [(val E)] *)
     | Pmod_extension of extension  (** [[%id]] *)
-    | Pmod_hole  (** [_] *)
     | Pmod_instance of module_instance
         (** [Foo(Param1)(Arg1(Param2)(Arg2)) [@jane.non_erasable.instances]] *)
 
