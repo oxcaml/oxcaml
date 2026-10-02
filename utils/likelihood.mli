@@ -36,20 +36,14 @@
     The use of unnormalized probabilities (weights) allows to freely delete
     switch arms without having to recompute normalized probabilities.
 
-    In addition, there are two special cases:
-
-     - Cold arms are expected to be chosen a minuscule aount of time compared to
-       the other arms (they effectively have probability 0).
-
-     - Hot arms are expected to be chosen almost always; they effectively have
-       probability 1.
+    As a special case, "cold" arms are supported: they are expected to be chosen
+    a minuscule amount of time compared to the other arms and effectively have
+    probability 0.
  *)
 
 type t
 
 val cold : t
-
-val hot : t
 
 val default : t
 (** [default] is [from_weight 1.] *)
@@ -59,19 +53,16 @@ val from_weight : float -> t
 
 type classification =
   | Cold
-  | Hot
   | Weight of float
 
 val classify : t -> classification
 
 val is_cold : t -> bool
 
-val is_hot : t -> bool
-
 val rescale : total:t -> t -> t
 
 val sum_list : t list -> t
 
 val is_uniform : t list -> bool
-(** [is_uniform l] is [true] iff all elements in the list that are not either
-    [hot] or [cold] have the same relative likelihood. *)
+(** [is_uniform l] is [true] iff all elements in the list that are not [cold]
+have the same relative likelihood. *)
