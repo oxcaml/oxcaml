@@ -33,7 +33,7 @@ let compile_file filename =
     let out_name = Filename.chop_extension filename ^ ".s" in
     Emitaux.output_channel := open_out out_name
   end; (* otherwise, stdout *)
-  let compilation_unit = "test" |> Compilation_unit.of_string in
+  let compilation_unit = "test" |> Compilation_unit.of_string_unsafe in
   let unit_info = Unit_info.make_dummy ~input_name:"test" compilation_unit in
   Compilenv.reset unit_info;
   Emit.begin_assembly (module Unix_for_owee : Compiler_owee.Unix_intf.S);

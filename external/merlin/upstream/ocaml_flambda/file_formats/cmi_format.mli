@@ -30,7 +30,7 @@ type kind =
   | Parameter
 
 type 'sg cmi_infos_generic = {
-    cmi_name : Compilation_unit.Name.t;
+    cmi_name : Compilation_unit_intf.t;
     cmi_kind : kind;
     cmi_globals : Global_module.With_precision.t array;
     cmi_sign : 'sg * Mode.Staticity.Const.t;

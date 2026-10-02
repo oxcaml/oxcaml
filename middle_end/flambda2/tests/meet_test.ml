@@ -576,7 +576,7 @@ let test_make_suitable_with_removed_alias () =
   make_extension env_removed_alias
 
 let () =
-  let comp_unit = "Meet_test" |> Compilation_unit.of_string in
+  let comp_unit = "Meet_test" |> Compilation_unit.of_string_unsafe in
   let unit_info = Unit_info.make_dummy ~input_name:"meet_test" comp_unit in
   Env.set_current_unit unit_info;
   Format.eprintf "MEET CHAINS WITH TWO VARS@\n@.";

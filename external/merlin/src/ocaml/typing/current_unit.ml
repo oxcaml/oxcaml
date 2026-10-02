@@ -43,6 +43,11 @@ let set cu =
 let unset () =
   current_unit := None
 
+let is_intf intf =
+  match !current_unit with
+  | None -> false
+  | Some cu -> Compilation_unit_intf.equal (Unit_info.intf cu) intf
+
 module Name = struct
   let get () =
     match !current_unit with

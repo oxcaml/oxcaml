@@ -20,18 +20,17 @@ open Misc
 open Cmi_format
 
 module CU = Compilation_unit
+module CUI = Compilation_unit_intf
 module Consistbl_data = Import_info.Intf.Nonalias.Kind
-module Consistbl = Consistbl.Make (CU.Name) (Consistbl_data)
+module Consistbl = Consistbl.Make (CUI) (Consistbl_data)
 module Style = Misc.Style
 
 let add_delayed_check_forward = ref (fun _ -> assert false)
 
 type error =
-  | Illegal_renaming of CU.Name.t * CU.Name.t * filepath
-  | Inconsistent_import of CU.Name.t * filepath * filepath
-  | Need_recursive_types of CU.Name.t
-  | Inconsistent_package_declaration_between_imports of
-      filepath * CU.t * CU.t
+  | Illegal_renaming of CUI.t * CUI.t * filepath
+  | Inconsistent_import of CUI.t * filepath * filepath
+  | Need_recursive_types of CUI.t
   | Direct_reference_from_wrong_package of
       CU.t * filepath * CU.Prefix.t
   | Illegal_import_of_parameter of Global_module.Name.t * filepath
@@ -41,7 +40,7 @@ type error =
         parameter : Global_module.Parameter_name.t;
       }
   | Imported_module_has_no_such_parameter of
-      { imported : CU.Name.t;
+      { imported : CUI.t;
         valid_parameters : Global_module.Parameter_name.t list;
         parameter : Global_module.Parameter_name.t;
         value : Global_module.Name.t;
@@ -72,7 +71,7 @@ module Persistent_signature = struct
       visibility : Load_path.visibility }
 
   let load = ref (fun ~allow_hidden ~unit_name ->
-    let unit_name = CU.Name.to_string unit_name in
+    let unit_name = CUI.to_string unit_name in
     match Load_path.find_normalized_with_visibility (unit_name ^ ".cmi") with
     | filename, visibility when allow_hidden ->
       Some { filename; cmi = read_cmi_lazy filename; visibility}
@@ -147,14 +146,14 @@ module Param_set = Global_module.Parameter_name.Set
 (* If you add something here, _do not forget_ to add it to [clear]! *)
 type 'a t = {
   globals : (Global_module.Name.t, global_name_info) Hashtbl.t;
-  imports : (CU.Name.t, import_info) Hashtbl.t;
+  imports : (CUI.t, import_info) Hashtbl.t;
   persistent_names : (Global_module.Name.t, pers_name) Hashtbl.t;
   persistent_structures :
     (Global_module.Name.t, 'a pers_struct_info) Hashtbl.t;
   locals_bound_to_runtime_parameters : unit Ident.Tbl.t;
-  imported_units: CU.Name.Set.t ref;
-  imported_opaque_units: CU.Name.Set.t ref;
-  quoted_intfs: CU.Name.Set.t ref;
+  imported_units: CUI.Set.t ref;
+  imported_opaque_impls: CU.Set.t ref;
+  quoted_intfs: CUI.Set.t ref;
   quoted_impls: CU.Set.t ref;
   param_imports : Param_set.t ref;
   crc_units: Consistbl.t;
@@ -167,9 +166,9 @@ let empty () = {
   persistent_names = Hashtbl.create 17;
   persistent_structures = Hashtbl.create 17;
   locals_bound_to_runtime_parameters = Ident.Tbl.create 17;
-  imported_units = ref CU.Name.Set.empty;
-  imported_opaque_units = ref CU.Name.Set.empty;
-  quoted_intfs = ref CU.Name.Set.empty;
+  imported_units = ref CUI.Set.empty;
+  imported_opaque_impls = ref CU.Set.empty;
+  quoted_intfs = ref CUI.Set.empty;
   quoted_impls = ref CU.Set.empty;
   param_imports = ref Param_set.empty;
   crc_units = Consistbl.create ();
@@ -184,7 +183,7 @@ let clear penv =
     persistent_structures;
     locals_bound_to_runtime_parameters;
     imported_units;
-    imported_opaque_units;
+    imported_opaque_impls;
     quoted_intfs;
     quoted_impls;
     param_imports;
@@ -196,9 +195,9 @@ let clear penv =
   Hashtbl.clear persistent_names;
   Hashtbl.clear persistent_structures;
   Ident.Tbl.clear locals_bound_to_runtime_parameters;
-  imported_units := CU.Name.Set.empty;
-  imported_opaque_units := CU.Name.Set.empty;
-  quoted_intfs := CU.Name.Set.empty;
+  imported_units := CUI.Set.empty;
+  imported_opaque_impls := CU.Set.empty;
+  quoted_intfs := CUI.Set.empty;
   quoted_impls := CU.Set.empty;
   param_imports := Param_set.empty;
   Consistbl.clear crc_units;
@@ -214,18 +213,18 @@ let clear_missing {imports; _} =
   List.iter (Hashtbl.remove imports) missing_entries
 
 let add_import {imported_units; _} s =
-  imported_units := CU.Name.Set.add s !imported_units
+  imported_units := CUI.Set.add s !imported_units
 
 let rec add_imports_in_name penv (g : Global_module.Name.t) =
-  add_import penv (g |> CU.Name.of_head_of_global_name);
+  add_import penv g.head;
   let add_in_arg ({ param; value } : Global_module.Name.argument) =
-    add_import penv (param |> CU.Name.of_parameter_name);
+    add_import penv (param :> CUI.t);
     add_imports_in_name penv value
   in
   List.iter add_in_arg g.args
 
-let register_import_as_opaque {imported_opaque_units; _} s =
-  imported_opaque_units := CU.Name.Set.add s !imported_opaque_units
+let register_impl_as_opaque {imported_opaque_impls; _} cu =
+  imported_opaque_impls := CU.Set.add cu !imported_opaque_impls
 
 let find_import_info_in_cache {imports; _} import =
   match Hashtbl.find imports import with
@@ -247,7 +246,7 @@ let find_in_cache penv name =
   find_info_in_cache penv name |> Option.map (fun ps -> ps.ps_val)
 
 let register_parameter ({param_imports; _} as penv) modname =
-  let import = CU.Name.of_parameter_name modname in
+  let import = (modname : Global_module.Parameter_name.t :> CUI.t) in
   begin match find_import_info_in_cache penv import with
   | None ->
       (* Not loaded yet; if it's wrong, we'll get an error at load time *)
@@ -277,23 +276,16 @@ let check_consistency penv imp =
       unit_name = name;
       inconsistent_source = source;
       original_source = auth;
-      inconsistent_data = source_kind;
-      original_data = auth_kind;
+      inconsistent_data = _;
+      original_data = _;
     } ->
-    match source_kind, auth_kind with
-    | Normal source_unit, Normal auth_unit
-      when not (CU.equal source_unit auth_unit) ->
-        error (Inconsistent_package_declaration_between_imports(
-            imp.imp_filename, auth_unit, source_unit))
-    | (Normal _ | Parameter), _ ->
-      error (Inconsistent_import(name, auth, source))
+    error (Inconsistent_import(name, auth, source))
 
 let is_registered_parameter_import {param_imports; _} name =
   Global_module.Name.mem_parameter_set name !param_imports
 
-let is_parameter_import t modname =
-  let import = CU.Name.of_head_of_global_name modname in
-  match find_import_info_in_cache t import with
+let is_parameter_import t (modname : Global_module.Name.t) =
+  match find_import_info_in_cache t modname.head with
   | Some { imp_is_param; _ } -> imp_is_param
   | None -> is_registered_parameter_import t modname
 
@@ -319,14 +311,8 @@ let fold {persistent_structures; _} f x =
 
 (* Reading persistent structures from .cmi files *)
 
-let save_import penv crc modname impl flags filename =
+let save_import penv crc modname impl filename =
   let {crc_units; _} = penv in
-  List.iter
-    (function
-        | Rectypes -> ()
-        | Alerts _ -> ()
-        | Opaque -> register_import_as_opaque penv modname)
-    flags;
   Consistbl.check crc_units modname impl crc filename;
   add_import penv modname
 
@@ -341,7 +327,7 @@ let acknowledge_import penv ~check modname pers_sig =
   let crcs = cmi.cmi_crcs in
   let flags = cmi.cmi_flags in
   let sign = Signature_with_global_bindings.read_from_cmi cmi in
-  if not (CU.Name.equal modname found_name) then
+  if not (CUI.equal modname found_name) then
     error (Illegal_renaming(modname, found_name, filename));
   List.iter
     (function
@@ -349,7 +335,10 @@ let acknowledge_import penv ~check modname pers_sig =
             if not !Clflags.recursive_types then
               error (Need_recursive_types(modname))
         | Alerts _ -> ()
-        | Opaque -> register_import_as_opaque penv modname)
+        | Opaque ->
+            (match kind with
+             | Normal { cmi_impl; _ } -> register_impl_as_opaque penv cmi_impl
+             | Parameter -> ()))
     flags;
   begin match kind, Current_unit.get_cu () with
   | Normal { cmi_impl = imported_unit }, Some current_unit ->
@@ -380,7 +369,7 @@ let acknowledge_import penv ~check modname pers_sig =
        to. Then we wouldn't need [cmi_impl] at all. *)
     match kind with
     | Normal { cmi_impl; _ } -> Shape.Uid.of_compilation_unit_id cmi_impl
-    | Parameter -> Shape.Uid.of_compilation_unit_name modname
+    | Parameter -> Shape.Uid.of_compilation_unit_intf modname
   in
   let {imports; _} = penv in
   let import =
@@ -417,7 +406,7 @@ let check_visibility ~allow_hidden imp =
 
 let find_import ~allow_hidden penv ~check modname =
   let {imports; _} = penv in
-  if CU.Name.equal modname CU.Name.predef_exn then raise Not_found;
+  if CUI.equal modname CUI.predef_exn then raise Not_found;
   match Hashtbl.find imports modname with
   | Found imp -> check_visibility ~allow_hidden imp; imp
   | Missing -> raise Not_found
@@ -504,7 +493,7 @@ let current_unit_is_aux name ~allow_args =
       match CU.to_global_name current with
       | Some { head; args } ->
           (args = [] || allow_args)
-          && CU.Name.equal name (head |> CU.Name.of_string)
+          && CUI.equal name head
       | None -> false
 
 let current_unit_is name =
@@ -607,7 +596,7 @@ and compute_global penv modname ~params ~check ~allow_excess_args =
             if not allow_excess_args then
               raise
                 (Error (Imported_module_has_no_such_parameter {
-                          imported = CU.Name.of_head_of_global_name modname;
+                          imported = modname.Global_module.Name.head;
                           valid_parameters = params;
                           parameter = param;
                           value = value |> Global_module.to_name;
@@ -736,13 +725,12 @@ and find_pers_name ~allow_hidden penv ~check name ~allow_excess_args =
   match Hashtbl.find persistent_names name with
   | pn -> pn
   | exception Not_found ->
-      let unit_name = CU.Name.of_head_of_global_name name in
+      let unit_name = name.Global_module.Name.head in
       let import = find_import ~allow_hidden penv ~check unit_name in
       acknowledge_pers_name penv check name import ~allow_excess_args
 
-let read_pers_name penv check name filename =
-  let unit_name = CU.Name.of_head_of_global_name name in
-  let import = read_import penv ~check unit_name filename in
+let read_pers_name penv check (name : Global_module.Name.t) filename =
+  let import = read_import penv ~check name.head filename in
   acknowledge_pers_name penv check name import
 
 let normalize_global_name penv modname =
@@ -765,7 +753,7 @@ let need_local_ident penv (global : Global_module.t) =
      functor calls that instantiate open modules happen elsewhere (so that they
      can happen exactly once). *)
   let global_name = global |> Global_module.to_name in
-  let name = global_name |> CU.Name.of_head_of_global_name in
+  let name = global_name.Global_module.Name.head in
   if is_registered_parameter_import penv global_name
   then
     (* Already a parameter *)
@@ -808,9 +796,9 @@ let make_binding penv (global : Global_module.t) (impl : CU.t option) : binding 
       match global.visible_args with
       | [] ->
           (* Make sure the names are consistent up to the pack prefix *)
-          assert (Global_module.Name.equal
-                    (unit_from_cmi |> CU.to_global_name_without_prefix)
-                    name);
+          assert (String.equal
+                    (CU.name_as_string unit_from_cmi)
+                    (CUI.to_string name.head));
           unit_from_cmi
       | _ ->
           (* Make sure the unit isn't supposed to be packed *)
@@ -922,8 +910,8 @@ let describe_prefix ppf prefix =
     Format_doc.fprintf ppf "package %a" CU.Prefix.print prefix
 
 (* Emits a warning if there is no valid cmi for name *)
-let check_pers_struct ~allow_hidden penv f ~loc name =
-  let name_as_string = CU.Name.to_string (CU.Name.of_head_of_global_name name) in
+let check_pers_struct ~allow_hidden penv f ~loc (name : Global_module.Name.t) =
+  let name_as_string = CUI.to_string name.head in
   try
     ignore (find_pers_struct ~allow_hidden penv f ~check:false name
               ~allow_excess_args:true)
@@ -944,18 +932,15 @@ let check_pers_struct ~allow_hidden penv f ~loc name =
               " %a@ contains the compiled interface for @ \
                %a when %a was expected"
               Location.Doc.quoted_filename filename
-              CU.Name.print_as_inline_code ps_name
-              CU.Name.print_as_inline_code name
+              CUI.print_as_inline_code ps_name
+              CUI.print_as_inline_code name
         | Inconsistent_import _ ->
             (* Can't be raised by [find_pers_struct ~check:false] *)
             assert false
         | Need_recursive_types name ->
             Format_doc.doc_printf
               "%a uses recursive types"
-              CU.Name.print_as_inline_code name
-        | Inconsistent_package_declaration_between_imports _ ->
-            (* Can't be raised by [find_pers_struct ~check:false] *)
-            assert false
+              CUI.print_as_inline_code name
         | Direct_reference_from_wrong_package (unit, _filename, prefix) ->
             Format_doc.doc_printf "%a is inaccessible from %a"
               CU.print_as_inline_code unit
@@ -973,7 +958,7 @@ let check_pers_struct ~allow_hidden penv f ~loc name =
               parameter
         | Imported_module_has_no_such_parameter { imported; parameter; _ } ->
             Format_doc.doc_printf "%a has no parameter %a"
-              CU.Name.print_as_inline_code imported
+              CUI.print_as_inline_code imported
               (Style.as_inline_code Global_module.Parameter_name.print)
               parameter
         | Not_compiled_as_argument { value; _ } ->
@@ -998,7 +983,7 @@ let read penv modname a =
 let read_cmi_file penv filename =
   let cmi = read_cmi_lazy filename in
   let unit_name = cmi.cmi_name in
-  let modname = CU.Name.to_global_name unit_name in
+  let modname = Global_module.Name.create_no_args unit_name in
   add_import penv unit_name;
   (* Register as hidden so that direct user-code references to the module
      are still reported as unbound; only transitive lookups can reach it. *)
@@ -1059,31 +1044,31 @@ let crc_of_unit penv name =
 
 let imports {imported_units; crc_units; _} =
   let imports =
-    Consistbl.extract (CU.Name.Set.elements !imported_units)
+    Consistbl.extract (CUI.Set.elements !imported_units)
       crc_units
   in
-  List.map (fun (cu_name, spec) -> Import_info.Intf.create cu_name spec)
-    imports
+  List.map (fun (intf, spec) -> Import_info.Intf.create intf spec) imports
 
 let require_intf_for_quote {quoted_intfs; _} name =
-  quoted_intfs := CU.Name.Set.add name !quoted_intfs
+  quoted_intfs := CUI.Set.add name !quoted_intfs
 
 let quoted_intfs { quoted_intfs; _ } = !quoted_intfs
 
 let loaded_transitive_dependencies penv intfs =
-  let names = ref Compilation_unit.Name.Set.empty in
+  let names = ref CUI.Set.empty in
   let rec add_loaded_deps name =
     match find_import_info_in_cache penv name with
     | None -> ()
     | Some { imp_crcs; _ } ->
-      if not (CU.Name.Set.mem name !names)
+      if not (CUI.Set.mem name !names)
       then (
-        names := CU.Name.Set.add name !names;
+        names := CUI.Set.add name !names;
         Array.iter
-          (fun import_info -> add_loaded_deps (Import_info.name import_info))
+          (fun import_info ->
+            add_loaded_deps (Import_info.Intf.name import_info))
           imp_crcs)
   in
-  Compilation_unit.Name.Set.iter add_loaded_deps intfs;
+  CUI.Set.iter add_loaded_deps intfs;
   !names
 
 let find_import penv modname =
@@ -1137,8 +1122,8 @@ let parameters {param_imports; _} =
 let looked_up {persistent_structures; _} modname =
   Hashtbl.mem persistent_structures modname
 
-let is_imported_opaque {imported_opaque_units; _} s =
-  CU.Name.Set.mem s !imported_opaque_units
+let is_opaque_impl {imported_opaque_impls; _} cu =
+  CU.Set.mem cu !imported_opaque_impls
 
 let implemented_parameter penv modname =
   match find_name_info_in_cache penv modname with
@@ -1189,7 +1174,7 @@ let save_cmi penv psig =
       let {
         cmi_name = modname;
         cmi_kind = kind;
-        cmi_flags = flags;
+        _
       } = cmi in
       let crc =
         output_to_file_via_temporary (* see MPR#7472, MPR#4991 *)
@@ -1199,10 +1184,10 @@ let save_cmi penv psig =
          also return its crc *)
       let data : Import_info.Intf.Nonalias.Kind.t =
         match kind with
-        | Normal { cmi_impl } -> Normal cmi_impl
+        | Normal _ -> Normal
         | Parameter -> Parameter
       in
-      save_import penv crc modname data flags filename
+      save_import penv crc modname data filename
     )
     ~exceptionally:(fun () -> remove_file filename)
 
@@ -1213,26 +1198,20 @@ let report_error_doc ppf =
       "Wrong file naming: %a@ contains the compiled interface for@ \
        %a when %a was expected"
       Location.Doc.quoted_filename filename
-      CU.Name.print_as_inline_code ps_name
-      CU.Name.print_as_inline_code modname
+      CUI.print_as_inline_code ps_name
+      CUI.print_as_inline_code modname
   | Inconsistent_import(name, source1, source2) -> fprintf ppf
       "@[<hov>The files %a@ and %a@ \
               make inconsistent assumptions@ over interface %a@]"
       Location.Doc.quoted_filename source1
       Location.Doc.quoted_filename source2
-      CU.Name.print_as_inline_code name
+      CUI.print_as_inline_code name
   | Need_recursive_types(import) ->
       fprintf ppf
         "@[<hov>Invalid import of %a, which uses recursive types.@ \
          The compilation flag %a is required@]"
-        CU.Name.print_as_inline_code import
+        CUI.print_as_inline_code import
         Style.inline_code "-rectypes"
-  | Inconsistent_package_declaration_between_imports (filename, unit1, unit2) ->
-      fprintf ppf
-        "@[<hov>The file %s@ is imported both as %a@ and as %a.@]"
-        filename
-        CU.print_as_inline_code unit1
-        CU.print_as_inline_code unit2
   | Direct_reference_from_wrong_package(unit, filename, prefix) ->
       fprintf ppf
         "@[<hov>Invalid reference to %a (in file %s) from %a.@ %s]"
@@ -1279,7 +1258,7 @@ let report_error_doc ppf =
             fprintf ppf
               "Compile %a@ with @{<inline_code>-parameter %a@}@ to make it a \
                parameter."
-              CU.Name.print_as_inline_code modname
+              CUI.print_as_inline_code modname
               Global_module.Parameter_name.print param
         | _ ->
           let print_params =
@@ -1287,13 +1266,13 @@ let report_error_doc ppf =
               (Style.as_inline_code Global_module.Parameter_name.print)
           in
           fprintf ppf "Parameters for %a:@ @[<hov>%a@]"
-            CU.Name.print_as_inline_code modname
+            CUI.print_as_inline_code modname
             print_params valid_parameters
       in
       fprintf ppf
         "@[<hov>The module %a@ has no parameter %a.@]@.\
          @[<hov>@{<hint>Hint@}: @[<hov>%a@]@]"
-        CU.Name.print_as_inline_code modname
+        CUI.print_as_inline_code modname
         (Style.as_inline_code Global_module.Parameter_name.print ) param
         pp_hint ()
   | Not_compiled_as_argument { param; value; filename } ->

@@ -40,6 +40,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
 
   type unit_link_info = Linkenv.unit_link_info =
     { name : Compilation_unit.t;
+      intf : Compilation_unit_intf.t;
       defines : Compilation_unit.t list;
       file_name : string;
       crc : Digest.t;
@@ -164,6 +165,10 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
       in
       let unit =
         { name = info.ui_unit;
+          intf =
+            Unit_info.Artifact.intf
+              (Unit_info.Artifact.from_filename ~for_pack_prefix:CU.Prefix.empty
+                 resolved_pathname);
           crc;
           defines = info.ui_defines;
           file_name = resolved_pathname;
@@ -312,6 +317,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
               in
               let unit =
                 { name = info.li_name;
+                  intf = info.li_intf;
                   crc = info.li_crc;
                   defines = info.li_defines;
                   file_name = resolved_pathname;
@@ -510,6 +516,10 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     let unit =
       { file_name;
         name = u.ui_unit;
+        intf =
+          Unit_info.Artifact.intf
+            (Unit_info.Artifact.from_filename ~for_pack_prefix:CU.Prefix.empty
+               file_name);
         defines = u.ui_defines;
         crc;
         imports_cmx = u.ui_imports_cmx;

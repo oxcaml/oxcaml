@@ -59,7 +59,8 @@ type base_layout = Jkind_types.Sort.base
     stored to that effect in the [uid_to_decl] table of cmt files. *)
 module Uid : sig
   type t = private
-    | Compilation_unit of string
+    | Compilation_unit of Compilation_unit.t
+    | Compilation_unit_intf of Compilation_unit_intf.t
     | Item of { comp_unit: string; id: int; from: Unit_info.intf_or_impl }
     | Internal
     | Predef of string
@@ -69,7 +70,7 @@ module Uid : sig
 
   val mk : current_unit:(Unit_info.t option) -> t
   val of_compilation_unit_id : Compilation_unit.t -> t
-  val of_compilation_unit_name : Compilation_unit.Name.t -> t
+  val of_compilation_unit_intf : Compilation_unit_intf.t -> t
   val of_predef_id : Ident.t -> t
   val internal_not_actually_unique : t
   val unboxed_version : t -> t

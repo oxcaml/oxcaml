@@ -15,6 +15,7 @@
 
 (* Build libraries of .cmx files *)
 open Format
+module CUI = Compilation_unit_intf
 
 module type S = sig
   val create_archive : string list -> string -> unit
@@ -65,10 +66,10 @@ end) : S = struct
            Compilenv.ensure_sharing_between_cmi_and_cmx_imports cmis cmxs in *)
         let cmis = Array.of_list cmis in
         let cmxs = Array.of_list cmxs in
-        let cmi_index = Compilation_unit.Name.Tbl.create 42 in
+        let cmi_index = Misc.Stdlib.String.Tbl.create 42 in
         Array.iteri
           (fun i import ->
-            Compilation_unit.Name.Tbl.add cmi_index (Import_info.name import) i)
+            Misc.Stdlib.String.Tbl.add cmi_index (Import_info.name import) i)
           cmis;
         let cmx_index = Compilation_unit.Tbl.create 42 in
         Array.iteri
@@ -78,11 +79,9 @@ end) : S = struct
         let quoted_cmi =
           List.fold_left
             (fun quoted_cmi (unit, _crc) ->
-              Compilation_unit.Name.Set.add_seq
-                (List.to_seq unit.ui_quoted_cmi)
-                quoted_cmi)
-            Compilation_unit.Name.Set.empty descr_list
-          |> Compilation_unit.Name.Set.elements |> Array.of_list
+              CUI.Set.add_seq (List.to_seq unit.ui_quoted_cmi) quoted_cmi)
+            CUI.Set.empty descr_list
+          |> CUI.Set.elements |> Array.of_list
         in
         let quoted_cmx =
           List.fold_left
@@ -93,12 +92,8 @@ end) : S = struct
             Compilation_unit.Set.empty descr_list
           |> Compilation_unit.Set.elements |> Array.of_list
         in
-        let quoted_cmi_index =
-          Compilation_unit.Name.Tbl.create (Array.length quoted_cmi)
-        in
-        Array.iteri
-          (fun i cu -> Compilation_unit.Name.Tbl.add quoted_cmi_index cu i)
-          quoted_cmi;
+        let quoted_cmi_index = CUI.Tbl.create (Array.length quoted_cmi) in
+        Array.iteri (fun i cu -> CUI.Tbl.add quoted_cmi_index cu i) quoted_cmi;
         let quoted_cmx_index =
           Compilation_unit.Tbl.create (Array.length quoted_cmx)
         in
@@ -113,31 +108,34 @@ end) : S = struct
           b
         in
         let units =
-          List.map
-            (fun (unit, crc) ->
+          List.map2
+            (fun file_name (unit, crc) ->
               ignore
                 (Generic_fns.Tbl.add ~imports:Generic_fns.Partition.Set.empty
                    genfns unit.ui_generic_fns);
               { li_name = unit.ui_unit;
+                li_intf =
+                  Unit_info.Artifact.intf
+                    (Unit_info.Artifact.from_filename
+                       ~for_pack_prefix:Compilation_unit.Prefix.empty file_name);
                 li_crc = crc;
                 li_defines = unit.ui_defines;
                 li_force_link = unit.ui_force_link || !Clflags.link_everything;
                 li_imports_cmi =
                   mk_bitmap cmis cmi_index unit.ui_imports_cmi
-                    ~find:Compilation_unit.Name.Tbl.find
-                    ~get_name:Import_info.name;
+                    ~find:Misc.Stdlib.String.Tbl.find ~get_name:Import_info.name;
                 li_imports_cmx =
                   mk_bitmap cmxs cmx_index unit.ui_imports_cmx
                     ~find:Compilation_unit.Tbl.find ~get_name:Import_info.cu;
                 li_quoted_cmi =
                   mk_bitmap quoted_cmi quoted_cmi_index unit.ui_quoted_cmi
-                    ~find:Compilation_unit.Name.Tbl.find ~get_name:Fun.id;
+                    ~find:CUI.Tbl.find ~get_name:Fun.id;
                 li_quoted_cmx =
                   mk_bitmap quoted_cmx quoted_cmx_index unit.ui_quoted_cmx
                     ~find:Compilation_unit.Tbl.find ~get_name:Fun.id;
                 li_external_symbols = Array.of_list unit.ui_external_symbols
               })
-            descr_list
+            file_list descr_list
         in
         let infos =
           { lib_units = units;

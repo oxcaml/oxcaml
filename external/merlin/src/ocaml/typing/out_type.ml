@@ -463,7 +463,8 @@ let instance_name global =
     (* We can avoid calling [ident_name_simple] here because instance names are
        always global (which is bad - but the syntax is currently bad anyway) *)
     let ({ head; args } : Global_module.Name.t) = global in
-    String.concat "" (head :: List.map string_of_arg args)
+    String.concat ""
+      (Compilation_unit_intf.to_string head :: List.map string_of_arg args)
   and string_of_arg arg =
     let ({ param; value } : Global_module.Name.argument) = arg in
     Printf.sprintf "(%s)(%s)"
@@ -647,7 +648,7 @@ type best_path = Paths of Path.t list | Best of Path.t
     cache for short-paths
  *)
 let printing_old = ref Env.empty
-let printing_pers = ref Compilation_unit.Name.Set.empty
+let printing_pers = ref Compilation_unit_intf.Set.empty
 (** {!printing_old} and  {!printing_pers} are the keys of the one-slot cache *)
 
 let printing_depth = ref 0
@@ -695,7 +696,7 @@ let rec normalize_type_path ?(cache=false) env p =
 let same_printing_env env =
   let used_pers = Env.used_persistent () in
   Env.same_types !printing_old env
-  && Compilation_unit.Name.Set.equal !printing_pers used_pers
+  && Compilation_unit_intf.Set.equal !printing_pers used_pers
 
 let set_printing_env env =
   printing_env := env;

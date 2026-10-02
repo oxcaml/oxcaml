@@ -20,6 +20,7 @@ open Config
 open Cmo_format
 
 module CU = Compilation_unit
+module CUI = Compilation_unit_intf
 
 module Dep = struct
   type t = CU.t * CU.t
@@ -35,7 +36,7 @@ type error =
   | Not_an_object_file of filepath
   | Wrong_object_name of filepath
   | Symbol_error of filepath * Symtable.error
-  | Inconsistent_import of CU.Name.t * filepath * filepath
+  | Inconsistent_import of CUI.t * filepath * filepath
   | Custom_runtime
   | File_exists of filepath
   | Cannot_open_dll of filepath
@@ -168,16 +169,16 @@ let scan_file ldeps obj_name tolink =
 
 (* Consistency check between interfaces *)
 
-module Consistbl = Consistbl.Make (CU.Name) (Import_info.Intf.Nonalias.Kind)
+module Consistbl = Consistbl.Make (CUI) (Import_info.Intf.Nonalias.Kind)
 
 let crc_interfaces = Consistbl.create ()
-let interfaces = ref ([] : CU.Name.t list)
+let interfaces = ref ([] : CUI.t list)
 
 let check_consistency file_name cu =
   try
     Array.iter
       (fun import ->
-        let name = Import_info.name import in
+        let name = Import_info.Intf.name import in
         let info = Import_info.Intf.info import in
         interfaces := name :: !interfaces;
         match info with
@@ -917,7 +918,7 @@ let report_error_doc ppf = function
                  make inconsistent assumptions over interface %a@]"
         Location.Doc.quoted_filename file1
         Location.Doc.quoted_filename file2
-        CU.Name.print_as_inline_code intf
+        CUI.print_as_inline_code intf
   | Custom_runtime ->
       fprintf ppf "Error while building custom runtime system"
   | File_exists file ->
