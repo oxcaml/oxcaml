@@ -94,11 +94,13 @@ module Unique_barrier : sig
   val print : Format.formatter -> t -> unit
 end
 
-module Zero_alloc_obligations_invalidated : sig
+(** A set of zero-alloc obligations pointing to their origins in Typedtree.
+    This `t` is intentionally uninstantiable outside `typedtree.ml`,
+    but it's included as a field all the way to CFG (in `Cfg.Operation.Alloc`)
+    to force future additions to thread provenance through compiler passes. *)
+module Zero_alloc_obligations : sig
   type t
-  type redundancy = Not_redundant | Redundant
-  val empty : t
-  val add : Zero_alloc.t -> t -> (redundancy * t)
+  val iter : f:(Zero_alloc.t -> unit) -> t -> unit
 end
 
 (** The uniqueness/linearity of a usage (such as [Pexp_ident]) inferred by the

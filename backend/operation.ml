@@ -328,7 +328,8 @@ type t =
   | Alloc of
       { bytes : int;
         dbginfo : Cmm.alloc_dbginfo;
-        mode : Cmm.Alloc_mode.t
+        mode : Cmm.Alloc_mode.t;
+        zero_alloc_obligations : Typedtree.Zero_alloc_obligations.t
       }
 
 let is_pure = function

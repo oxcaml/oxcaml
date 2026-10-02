@@ -97,7 +97,16 @@ let to_linear_instr ?(like : _ Cfg.instruction option) desc ~next :
     phantom_available_before
   }
 
+let check_zero_alloc : _ Cfg.instruction -> unit = function
+  | { desc = Cfg.Op (Operation.Alloc
+      { mode = Cmm.Alloc_mode.Heap;
+        zero_alloc_obligations; _ }); _ } ->
+    Typedtree.Zero_alloc_obligations.iter zero_alloc_obligations ~f:(fun _ ->
+      Misc.fatal_error "zero_alloc: heap allocation survived optimization")
+  | _ -> ()
+
 let basic_to_linear (i : _ Cfg.instruction) ~next =
+  check_zero_alloc i;
   let desc = Cfg_to_linear_desc.from_basic i.desc in
   to_linear_instr ~like:i desc ~next
 
