@@ -26,11 +26,12 @@ external cpu_relax : unit -> unit @@ portable = "%cpu_relax"
 
 module Obj_opt : sig @@ portable
   type t : value non_float
+  val none : unit -> t
   val some : 'a -> t
   val is_some : t -> bool
   val fresh : unit -> t array
   val grow_array : t array -> int -> int -> t array
-  val compare_and_set : t array -> int -> t -> t -> bool
+  val compare_exchange : t array -> int -> t -> t -> t
 
   (** [unsafe_get obj] may only be called safely
       if [is_some] is true.
@@ -57,18 +58,16 @@ end = struct
       if idx < s then s else compute_new_size (2 * s + 1)
     in
     let new_size = compute_new_size size in
-    let new_st =
-      Array.make new_size (Obj.magic_uncontended none)
-    in
+    let new_st = Array.make new_size (none ()) in
     Array.blit st 0 new_st 0 size;
     new_st
 
-  external compare_and_set_field
-    : t array -> int -> t -> t -> bool @@ portable = "%atomic_cas_field"
+  external compare_exchange_field : t array -> int -> t -> t -> t @@ portable
+    = "%atomic_compare_exchange_field"
 
-  let[@inline] compare_and_set st idx old new_ =
+  let[@inline] compare_exchange st idx old new_ =
     (* In Flambda 2 there is a strict distinction between arrays and blocks. *)
-    compare_and_set_field (Sys.opaque_identity st) idx old new_
+    compare_exchange_field (Sys.opaque_identity st) idx old new_
 end
 
 module Raw = struct
@@ -151,63 +150,60 @@ module DLS0 = struct
     k
 
   (* If necessary, grow the current domain's local state array such that [idx]
-  * is a valid index in the array. *)
+     is a valid index in the array. *)
   let[@inline] rec maybe_grow idx =
     let st = get_dls_state () in
     let sz = Array.length st in
     if idx < sz then st
     else begin
       let new_st = Obj_opt.grow_array st idx sz in
-      (* We want a implementation that is safe with respect to
-        single-domain multi-threading: retry if the DLS state has
-        changed under our feet.
-        Note that the number of retries will be very small in
-        contended scenarios, as the array only grows, with
-        exponential resizing. *)
+      (* We want an implementation that is safe with respect to single-domain
+         multi-threading: retry if the DLS state has changed under our feet.
+
+         Note that the number of retries will be very small in contended
+         scenarios, as the array only grows, with exponential resizing. *)
       if compare_and_set_dls_state st new_st
       then new_st
       else maybe_grow idx
     end
 
-  (* Disable inlining to assure poll points are never inserted between grow
-     and set, which could cause us to drop the update. *)
-  let[@inline never] set (type a) (idx, _init) (x : a) =
-    (* Assures [idx] is in range. *)
-    let st = maybe_grow idx in
-    Array.unsafe_set st idx (Obj_opt.some x)
-
-  let[@inline never] init_idx (type a) idx old_obj (init : _ -> a) =
-    let v : a = init () in
-    let new_obj = Obj_opt.some v in
-    (* At this point, [st] or [st.(idx)] may have been changed
-      by another thread on the same domain.
-
-      If [st] changed, it was resized into a larger value,
-      we can just reuse the new value.
-
-      If [st.(idx)] changed, we drop the current value to avoid
-      letting other threads observe a 'revert' that forgets
-      previous modifications. *)
+  (* Disable inlining to assure poll points are never inserted between
+     [get_dls_state]/[maybe_grow] and [unsafe_set], which could cause us to drop
+     the update. *)
+  let[@inline never] set (type a) ((idx, _init) : a key) (x : a) =
     let st = get_dls_state () in
-    if Obj_opt.compare_and_set st idx old_obj new_obj
-    then v
+    if idx < Array.length st
+    then Array.unsafe_set st idx (Obj_opt.some x)
     else begin
-      (* if st.(idx) changed, someone must have initialized
-        the key in the meantime. *)
-      let updated_obj = Array.unsafe_get st idx in
-      if Obj_opt.is_some updated_obj
-      then (Obj_opt.unsafe_get updated_obj : a)
-      else assert false
+      let st = maybe_grow idx in
+      Array.unsafe_set st idx (Obj_opt.some x)
     end
 
-  (* Inlining is ok because it's safe to return a stale value. *)
-  let[@inline] get (type a) ((idx, init) : a key) : a =
-    (* Assures [idx] is in range. *)
+  let[@cold] get_or_init (type a) ((idx, { portable = init }) : a key) : a =
+    let x = init () in
+    (* At this point, [st] or [st.(idx)] may have been changed by another thread
+       on the same domain.
+
+       If [st] changed, it was resized into a larger value, we can just reuse
+       the new value.
+
+       If [st.(idx)] changed, we drop the current value to avoid letting other
+       threads observe a 'revert' that forgets previous modifications. *)
     let st = maybe_grow idx in
-    let obj = Array.unsafe_get st idx in
-    if Obj_opt.is_some obj
-    then (Obj_opt.unsafe_get obj : a)
-    else init_idx idx obj init.portable
+    let before =
+      Obj_opt.compare_exchange st idx (Obj_opt.none ()) (Obj_opt.some x)
+    in
+    if Obj_opt.is_some before
+    then Obj_opt.unsafe_get before
+    else x
+
+  (* Inlining is ok because it's safe to return a stale value. *)
+  let[@inline] get (type a) ((idx, _) as key : a key) : a =
+    let st = get_dls_state () in
+    if idx < Array.length st
+       && Obj_opt.is_some (Array.unsafe_get st idx)
+    then Obj_opt.unsafe_get (Array.unsafe_get st idx)
+    else get_or_init key
 
   type key_value : value mod portable contended =
       KV : 'a key * (unit -> 'a) @@ portable -> key_value
