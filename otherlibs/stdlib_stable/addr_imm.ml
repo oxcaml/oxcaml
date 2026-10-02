@@ -14,36 +14,51 @@
 
 type ('a : any) t : value_or_null & bits64 = 'a addr_imm
 
-external magic_of_parts
+external of_parts
+  : ('c : value_or_null) ('a : any).
+  (#('c * ('c, 'a) idx_imm)[@local_opt])
+  -> ('a t[@local_opt])
+  = "%identity"
+external of_parts_read
+  : ('c : value_or_null) ('a : any).
+  (#('c * ('c, 'a) idx_imm)[@local_opt]) @ read
+  -> ('a t[@local_opt]) @ read
+  = "%identity"
+external of_parts_write
+  : ('c : value_or_null) ('a : any).
+  (#('c * ('c, 'a) idx_imm)[@local_opt]) @ write
+  -> ('a t[@local_opt]) @ write
+  = "%identity"
+external of_parts_immutable
   : ('c : value_or_null) ('a : any).
   (#('c * ('c, 'a) idx_imm)[@local_opt]) @ immutable
-  -> ('a t[@local_opt])
+  -> ('a t[@local_opt]) @ immutable
   = "%identity"
 
 let[@zero_alloc] of_idx : ('a : value) ('b : any).
   'a -> ('a, 'b) idx_imm -> 'b t =
- fun obj idx -> magic_of_parts #(obj, idx)
+ fun obj idx -> of_parts #(obj, idx)
 let[@zero_alloc] of_idx_local : ('a : value) ('b : any).
   'a @ local -> ('a, 'b) idx_imm -> 'b t @ local =
- fun obj idx -> exclave_ magic_of_parts #(obj, idx)
+ fun obj idx -> exclave_ of_parts #(obj, idx)
 let[@zero_alloc] of_idx_read : ('a : value) ('b : any).
   'a @ read -> ('a, 'b) idx_imm -> 'b t @ read =
- fun obj idx -> magic_of_parts #(obj, idx)
+ fun obj idx -> of_parts_read #(obj, idx)
 let[@zero_alloc] of_idx_read_local : ('a : value) ('b : any).
   'a @ local read -> ('a, 'b) idx_imm -> 'b t @ local read =
- fun obj idx -> exclave_ magic_of_parts #(obj, idx)
+ fun obj idx -> exclave_ of_parts_read #(obj, idx)
 let[@zero_alloc] of_idx_write : ('a : value) ('b : any).
   'a @ write -> ('a, 'b) idx_imm -> 'b t @ write =
- fun obj idx -> magic_of_parts #(obj, idx)
+ fun obj idx -> of_parts_write #(obj, idx)
 let[@zero_alloc] of_idx_write_local : ('a : value) ('b : any).
   'a @ local write -> ('a, 'b) idx_imm -> 'b t @ local write =
- fun obj idx -> exclave_ magic_of_parts #(obj, idx)
+ fun obj idx -> exclave_ of_parts_write #(obj, idx)
 let[@zero_alloc] of_idx_immutable : ('a : value) ('b : any).
   'a @ immutable -> ('a, 'b) idx_imm -> 'b t @ immutable =
- fun obj idx -> magic_of_parts #(obj, idx)
+ fun obj idx -> of_parts_immutable #(obj, idx)
 let[@zero_alloc] of_idx_immutable_local : ('a : value) ('b : any).
   'a @ local immutable -> ('a, 'b) idx_imm -> 'b t @ local immutable =
- fun obj idx -> exclave_ magic_of_parts #(obj, idx)
+ fun obj idx -> exclave_ of_parts_immutable #(obj, idx)
 
 external get
   : ('a : any).
