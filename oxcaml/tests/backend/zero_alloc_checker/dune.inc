@@ -1402,6 +1402,26 @@
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (targets fail30.output.corrected)
+ (deps (:ml fail30.ml) filter.sh)
+ (action
+   (with-outputs-to fail30.output.corrected
+    (pipe-outputs
+    (with-accepted-exit-codes 2
+     (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
+          -zero-alloc-checker-details-extra
+          -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
+    (run "./filter.sh")
+   ))))
+
+(rule
+ (alias   runtest)
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (deps fail30.output fail30.output.corrected)
+ (action (diff fail30.output fail30.output.corrected)))
+
+(rule
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
  (targets test_assume_unless_opt.output.corrected)
  (deps (:ml test_assume_unless_opt.ml) filter.sh)
  (action

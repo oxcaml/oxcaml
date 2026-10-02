@@ -1,0 +1,5 @@
+File "fail30.ml", line 1, characters 5-15:
+Error: Annotation check for zero_alloc strict failed on function Fail30.allocate_forever (camlFail30__allocate_forever_HIDE_STAMP).
+
+File "fail30.ml", line 3, characters 12-18:
+Error: allocation of 16 bytes on a path to diverge

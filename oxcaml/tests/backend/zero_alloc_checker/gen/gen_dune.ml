@@ -295,6 +295,8 @@ let () =
     ~extra_flags:"-zero-alloc-check all"
     ~extra_deps:["fail29_opt2.cmi"; "fail29_opt2.mli"]
     ~extra_sources:[] ~exit_code:2 "fail29_opt2";
+  print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
+    ~extra_sources:[] ~exit_code:2 "fail30";
   print_test_expected_output ~extra_flags:"-zero-alloc-check all"
     ~cutoff:default_cutoff ~extra_deps:[] ~extra_sources:[] ~exit_code:2
     "test_assume_unless_opt";
