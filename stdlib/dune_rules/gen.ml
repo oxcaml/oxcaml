@@ -264,7 +264,7 @@ let write_runtime_dune ppf =
   fprintf ppf
     "(rule
        (target prims.c)
-       (deps (:c %s) primitives ../Makefile.config (glob_files *.h) (glob_files caml/*.{h,tbl}))
+       (deps (:c %s) primitives)
        (action (with-stdout-to %%{target} (run %%{dep:gen_primsc.sh} primitives %%{c}))))\n"
     (String.concat " " prim_files);
 
