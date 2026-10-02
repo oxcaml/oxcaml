@@ -26,8 +26,6 @@ depends: [
   "ppx_derivers" {>= "1.0"}
   "sexp_type"
   "stdlib-shims"
-  "ppxlib_ast"
-  "ppxlib_jane"
   "ocamlfind" {with-test}
   "re" {with-test & >= "1.9.0"}
   "cinaps" {with-test & >= "v0.12.1"}
