@@ -284,7 +284,11 @@ Lines 1-7, characters 38-3:
 7 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig kind_ k = bits8 type t = int8# val mk : unit -> 'a end
+         sig
+           kind_ k = bits8
+           type t = int8#
+           val mk : ('a : any). unit -> 'a
+         end
        is not included in
          sig
            kind_ k = bits8
