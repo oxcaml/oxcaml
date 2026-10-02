@@ -848,6 +848,10 @@ and simple_pattern ctxt (f:Format.formatter) (x:pattern) : unit =
     | Ppat_variant (l,None) ->  pp f "`%a" ident_of_name l
     | Ppat_constraint (p, ct, _) ->
         pp f "@[<2>(%a@;:@;%a)@]" (pattern1 ctxt) p (core_type ctxt) (Option.get ct)
+    | Ppat_addr p ->
+        pp f "@[<2>(addr_@;%a)@]" (simple_pattern ctxt) p
+    | Ppat_addr_imm p ->
+        pp f "@[<2>(addr_imm_@;%a)@]" (simple_pattern ctxt) p
     | Ppat_lazy p ->
         pp f "@[<2>(lazy@;%a)@]" (simple_pattern ctxt) p
     | Ppat_exception p ->

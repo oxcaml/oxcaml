@@ -628,6 +628,8 @@ module P = struct
     | Ppat_constraint (p, t, m) ->
         sub.pat sub p; Option.iter (sub.typ sub) t; sub.modes sub m;
     | Ppat_type s -> iter_loc_lid sub s
+    | Ppat_addr p -> sub.pat sub p
+    | Ppat_addr_imm p -> sub.pat sub p
     | Ppat_lazy p -> sub.pat sub p
     | Ppat_unpack s -> iter_loc sub s
     | Ppat_effect (p1,p2) -> sub.pat sub p1; sub.pat sub p2

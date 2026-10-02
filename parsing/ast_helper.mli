@@ -148,6 +148,8 @@ module Pat:
     val constraint_: ?loc:loc -> ?attrs:attrs -> pattern -> core_type option
                      -> mode with_loc list -> pattern
     val type_: ?loc:loc -> ?attrs:attrs -> lid -> pattern
+    val addr: ?loc:loc -> ?attrs:attrs -> pattern -> pattern
+    val addr_imm: ?loc:loc -> ?attrs:attrs -> pattern -> pattern
     val lazy_: ?loc:loc -> ?attrs:attrs -> pattern -> pattern
     val unpack: ?loc:loc -> ?attrs:attrs -> str_opt -> pattern
     val open_: ?loc:loc -> ?attrs:attrs  -> lid -> pattern -> pattern

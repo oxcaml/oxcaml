@@ -341,6 +341,12 @@ and pattern i ppf x =
       line i ppf "Ppat_or\n";
       pattern i ppf p1;
       pattern i ppf p2;
+  | Ppat_addr p ->
+      line i ppf "Ppat_addr\n";
+      pattern i ppf p;
+  | Ppat_addr_imm p ->
+      line i ppf "Ppat_addr_imm\n";
+      pattern i ppf p;
   | Ppat_lazy p ->
       line i ppf "Ppat_lazy\n";
       pattern i ppf p;

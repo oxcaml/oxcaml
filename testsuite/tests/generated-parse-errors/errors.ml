@@ -1336,6 +1336,24 @@ let* ` UIdent with
 #0 "implementation: LETOP HASH WITH"
 let* # with
 ;;
+#0 "implementation: LETOP ADDR LBRACKETAT AND RBRACKET ASSERT"
+let* addr_ [@ and ] assert
+;;
+#0 "implementation: LETOP ADDR PERCENT AND WHILE"
+let* addr_ % and while
+;;
+#0 "implementation: LETOP ADDR WITH"
+let* addr_ with
+;;
+#0 "implementation: LETOP ADDR_IMM LBRACKETAT AND RBRACKET ASSERT"
+let* addr_imm_ [@ and ] assert
+;;
+#0 "implementation: LETOP ADDR_IMM PERCENT AND WHILE"
+let* addr_imm_ % and while
+;;
+#0 "implementation: LETOP ADDR_IMM WITH"
+let* addr_imm_ with
+;;
 #0 "implementation: LETOP LAZY LBRACKETAT AND RBRACKET ASSERT"
 let* lazy [@ and ] assert
 ;;
