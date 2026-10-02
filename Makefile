@@ -267,6 +267,18 @@ endef
 duneconf/ast-dependent-libs.ws: export contents = $(dune_ast_dependent_libs_context)
 duneconf/ast-dependent-libs.ws: Makefile
 
+# Building them during the compiler build: `make compiler WITH_JSOO=1` adds
+# the @jsoo-early alias of the root dune file, whose rule runs
+# scripts/jsoo-early.sh as soon as the compiler libraries exist. The script
+# assembles a staging install in $(early_install) and runs `make jsoo-build`
+# against it, overlapping with the rest of the compiler build. With
+# WITH_JSOO=1, OXCAML_INSTALL defaults to that staging install, so that the
+# install targets below reuse the build.
+early_install = $(CURDIR)/_build/_early_install
+ifeq ($(WITH_JSOO),1)
+OXCAML_INSTALL ?= $(early_install)
+AST_DEPENDENT_LIBS_PREFIX ?= $(CURDIR)/_install
+endif
 OXCAML_INSTALL ?= $(CURDIR)/_install
 
 # OCAMLPARAM turns syntax quotations off for every compiler and ocamldep
@@ -288,6 +300,14 @@ ast_dependent_libs_dune = \
 # Refresh the local compiler, but never rebuild an externally supplied install.
 ifeq ($(abspath $(OXCAML_INSTALL)),$(CURDIR)/_install)
 ast-dependent-libs-compiler: _install
+endif
+# The staging install comes from the compiler build (see above), unless it
+# exists already, notably in the sub-make run by the jsoo-early rule.
+ifeq ($(abspath $(OXCAML_INSTALL)),$(early_install))
+jsoo_early_target = @jsoo-early
+ifeq ($(wildcard $(early_install)/bin/ocamlc.opt),)
+ast-dependent-libs-compiler: compiler
+endif
 endif
 ast-dependent-libs-compiler:
 	@test -x "$(OXCAML_INSTALL)/bin/ocamlc.opt" || { \
@@ -373,8 +393,29 @@ JSOO_PACKAGES = $(PPXLIB_PACKAGES) gen sedlex cmdliner menhirLib menhirSdk \
 AST_DEPENDENT_LIBS_PREFIX ?= $(OXCAML_INSTALL)
 
 ast_dependent_libs_install = \
+  $(call check_early_install) \
   $(ast_dependent_libs_env) $(dune) install $(ws_ast_dependent_libs) \
     --prefix="$(AST_DEPENDENT_LIBS_PREFIX)" $(1)
+
+# When installing from the staging build, check that it saw exactly the
+# compiler-libs interfaces the installed compiler ships: the ocaml-compiler-libs
+# shims are generated from them.
+define check_early_install
+if [ "$(abspath $(OXCAML_INSTALL))" = "$(early_install)" ]; then \
+  diff <(cd "$(early_install)/lib/ocaml/compiler-libs" && ls *.cmi) \
+    <(cd "$(AST_DEPENDENT_LIBS_PREFIX)/lib/ocaml/compiler-libs" && ls *.cmi) \
+  || { echo "error: the interfaces in" \
+            "$(early_install)/lib/ocaml/compiler-libs differ from those" \
+            "installed in $(AST_DEPENDENT_LIBS_PREFIX);" \
+            "update scripts/jsoo-early.sh" >&2; exit 1; }; \
+fi;
+endef
+
+# Installing into the local _install refreshes it first (when the libraries
+# are built against it, ast-dependent-libs-compiler already does).
+ifeq ($(abspath $(AST_DEPENDENT_LIBS_PREFIX)),$(CURDIR)/_install)
+ppxlib-install jsoo-install jsoo-install-shipped: _install
+endif
 
 .PHONY: ppxlib-install
 ppxlib-install: ppxlib-build

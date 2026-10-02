@@ -118,7 +118,7 @@ compiler: runtime-stdlib
 	SYSTEM=$(SYSTEM) MODEL=$(MODEL) \
           ASPP="$(ASPP)" ASPPFLAGS="$(ASPPFLAGS)" \
           $(dune) build $(ws_main) \
-          --only-package=ocaml @install \
+          --only-package=ocaml @install $(jsoo_early_target) \
           tools/regalloc/regalloc.exe \
           oxcaml/testsuite/tools/expect.exe \
           oxcaml/testsuite/tools/expectnat.exe \
