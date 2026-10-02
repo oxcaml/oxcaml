@@ -433,10 +433,28 @@ let get_unarized_vars id env =
   | None -> [IR.Var id]
   | Some (_, fields) -> List.map (fun (id, _) -> IR.Var id) fields
 
-let maybe_insert_let_cont result_var_name layout k acc env ccenv body =
-  match k with
-  | Tail k -> body acc env ccenv k
-  | Non_tail k ->
+let maybe_insert_let_cont result_var_name (layout : L.layout) k acc env ccenv
+    body =
+  match layout, k with
+  (* We only need this to avoid changing code generation for existing code. We
+     can probably drop this together with [is_never_called_continuation].*)
+  | Pbottom, Tail k when Env.is_never_called_continuation env k ->
+    body acc env ccenv k
+  | Pbottom, (Tail _ | Non_tail _) ->
+    let_cont_nonrecursive_with_extra_params acc env ccenv ~is_exn_handler:false
+      ~params:[]
+      ~handler:(fun acc _env _ccenv ->
+        Expr_with_acc.create_invalid acc
+          (Message "Continuation of an expression that never returns"))
+      ~body:(fun acc env ccenv k ->
+        body acc (Env.add_never_called_continuation env k) ccenv k)
+  | ( ( Ptop | Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _
+      | Punboxed_vector _ | Punboxed_mask | Punboxed_product _ | Psplicevar _ ),
+      Tail k ) ->
+    body acc env ccenv k
+  | ( ( Ptop | Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _
+      | Punboxed_vector _ | Punboxed_mask | Punboxed_product _ | Psplicevar _ ),
+      Non_tail k ) ->
     let arity_component =
       Flambda_arity.Component_for_creation.from_lambda layout
         ~machine_width:(Acc.machine_width acc)
@@ -1476,12 +1494,13 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
           raw_kind = Pgenval | Pintval | Pvariant _ | Parrayval _
         }
     | Pvalue { nullable = Nullable; raw_kind = _ }
-    | Ptop | Pbottom | Punboxed_float _ | Punboxed_or_untagged_integer _
+    | Ptop | Punboxed_float _ | Punboxed_or_untagged_integer _
     | Punboxed_vector _ | Punboxed_mask | Punboxed_product _ ->
       Location.prerr_warning
         (Debuginfo.Scoped_location.to_location loc)
         Warnings.Unboxing_impossible;
       None
+    | Pbottom -> None
     | Psplicevar ident -> Lambda.fatal_error_unevaluated_splice_var ident
   in
   let params_arity =
@@ -1633,12 +1652,18 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
   in
   let unboxed_products = !unboxed_products in
   let removed_params = Ident.Map.keys unboxed_products in
-  let return =
-    Flambda_arity.with_unknown
-      (Flambda_arity.unarize_t
-         (Flambda_arity.create
-            [ Flambda_arity.Component_for_creation.from_lambda return
-                ~machine_width:(Env.machine_width env) ]))
+  let new_env, return =
+    match (return : L.layout) with
+    | Pbottom ->
+      Env.add_never_called_continuation new_env body_cont, Flambda_arity.unknown
+    | Ptop | Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _
+    | Punboxed_vector _ | Punboxed_mask | Punboxed_product _ | Psplicevar _ ->
+      ( new_env,
+        Flambda_arity.with_unknown
+          (Flambda_arity.unarize_t
+             (Flambda_arity.create
+                [ Flambda_arity.Component_for_creation.from_lambda return
+                    ~machine_width:(Env.machine_width env) ])) )
   in
   (* CR ncourant: now that the following two statements are in this order, I
      believe we can remove [removed_params]. *)
