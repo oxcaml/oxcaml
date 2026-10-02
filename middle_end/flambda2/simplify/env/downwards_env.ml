@@ -643,6 +643,34 @@ let enter_closure code_id ~return_continuation ~exn_continuation ~my_closure
 
 let closure_info t = t.closure_info
 
+let apply_is_in_tail_position t apply =
+  let continuations =
+    match t.closure_info with
+    | Closure { return_continuation; exn_continuation; _ } ->
+      Some (return_continuation, exn_continuation)
+    | Not_in_a_closure ->
+      Some
+        (t.unit_toplevel_return_continuation, t.unit_toplevel_exn_continuation)
+    | In_a_set_of_closures_but_not_yet_in_a_specific_closure -> None
+  in
+  match continuations with
+  | None -> false
+  | Some (return_continuation, exn_continuation) -> (
+    let is_function_continuation k =
+      Continuation.equal k return_continuation
+      || Continuation.equal k exn_continuation
+    in
+    match Apply.position apply with
+    | Nontail -> false
+    | Normal -> (
+      match Apply.continuation apply with
+      | Never_returns -> false
+      | Return k ->
+        let exn = Apply.exn_continuation apply in
+        is_function_continuation k
+        && is_function_continuation (Exn_continuation.exn_handler exn)
+        && Misc.Stdlib.List.is_empty (Exn_continuation.extra_args exn)))
+
 let inlining_arguments { inlining_state; _ } =
   Inlining_state.arguments inlining_state
 

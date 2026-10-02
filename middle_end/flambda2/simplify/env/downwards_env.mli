@@ -213,6 +213,15 @@ val enter_closure :
 
 val closure_info : t -> Closure_info.t
 
+(** Whether the application is in tail position with respect to the function
+    being simplified (or the unit's toplevel code): its continuation and
+    exception continuation are the function's own, with no extra arguments.
+    Unlike the test made when rebuilding terms, this does not recognise
+    continuations whose handlers merely forward their parameters to the return
+    continuation, since such handlers have not been simplified yet on the way
+    down. *)
+val apply_is_in_tail_position : t -> Apply_expr.t -> bool
+
 val inlining_arguments : t -> Inlining_arguments.t
 
 val set_inlining_arguments : Inlining_arguments.t -> t -> t

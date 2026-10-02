@@ -127,11 +127,11 @@ let rec simplify_expr dacc expr ~down_to_up =
         ~down_to_up
     | Apply apply ->
       let dacc =
-        (* Whether the application is in tail position is only known on the way
-           up, so charge it as a non-tail call (an over-estimate of a few
-           instructions). *)
+        let is_tail =
+          Downwards_env.apply_is_in_tail_position (DA.denv dacc) apply
+        in
         DA.charge_speculative_inlining_budget dacc
-          (Cost_metrics.from_size (Code_size.apply ~is_tail:false apply))
+          (Cost_metrics.from_size (Code_size.apply ~is_tail apply))
       in
       Simplify_apply_expr.simplify_apply ~simplify_expr dacc apply ~down_to_up
     | Apply_cont apply_cont ->

@@ -409,10 +409,9 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
                   Flambda_features.Inlining
                   .speculative_inlining_credit_call_site ()
                 then
-                  (* Whether the call is in tail position is not known on the
-                     way down; count it as a non-tail call. *)
+                  let is_tail = DE.apply_is_in_tail_position denv apply in
                   Float.of_int
-                    (Code_size.to_int (Code_size.apply ~is_tail:false apply))
+                    (Code_size.to_int (Code_size.apply ~is_tail apply))
                 else 0.
               in
               let ( (criterion :
