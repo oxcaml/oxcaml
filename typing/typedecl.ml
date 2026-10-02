@@ -2043,7 +2043,6 @@ module Element_repr = struct
      otherwise the element is classified as [None]. See the CR in
      [update_label_sorts]. *)
   let classify env ty jkind ~default_to_scannable =
-
     if is_float env ty
     then Some Float_element
     else
