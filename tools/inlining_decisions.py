@@ -108,7 +108,8 @@ def parse_file(path, fundecls, calls):
                     size = (int(sm.group(1)), int(sm.group(2)))
             if size is not None:
                 rec = {'unit': unit, 'path': unit + '::' + prev + name, 'dbg': dbg,
-                       'x86': size[0], 'arm64': size[1]}
+                       'x86': size[0], 'arm64': size[1],
+                       'functor': "functor's body" in text or 'functor' in text.split('because', 1)[-1][:120]}
                 if uid:
                     fundecls['uid'][uid] = rec
                 fundecls['path'][unit + '::' + prev + name] = rec
@@ -147,8 +148,8 @@ def parse_file(path, fundecls, calls):
                     limit=cm.group(3), limit_kind='max code size', remaining_budget=cm.group(4)))
 
 
-def main():
-    roots, out = sys.argv[1:-1], sys.argv[-1]
+def collect(roots, out):
+    """Parse every report under [roots] into the CSV [out]; return a summary."""
     fundecls, calls, nfiles = {'uid': {}, 'path': {}}, [], 0
     for root in roots:
         for d, _, files in os.walk(root):
@@ -170,6 +171,9 @@ def main():
         c['orig_x86'] = c.get('orig_x86_decl') or (rec['x86'] if rec else '')
         c['orig_arm64'] = c.get('orig_arm64_decl') or (rec['arm64'] if rec else '')
         c['callee_dbg'] = rec['dbg'] if rec else ''
+        if c.get('functor') in ('', None) and rec:
+            # Aborted and refused speculations do not say; use the definition.
+            c['functor'] = rec['functor']
     with open(out, 'w', newline='') as f:
         w = csv.DictWriter(f, fieldnames=FIELDS, extrasaction='ignore')
         w.writeheader()
@@ -178,8 +182,15 @@ def main():
     outcomes = {}
     for c in calls:
         outcomes[c['outcome']] = outcomes.get(c['outcome'], 0) + 1
-    print(f'files={nfiles} decisions={len(calls)} {outcomes} '
-          f'matched_by_uid={by_uid} matched_by_path={by_path} unmatched={unmatched}')
+    return {'files': nfiles, 'decisions': len(calls), 'outcomes': outcomes,
+            'matched_by_uid': by_uid, 'matched_by_path': by_path, 'unmatched': unmatched}
+
+
+def main():
+    if len(sys.argv) < 3:
+        sys.exit(__doc__)
+    summary = collect(sys.argv[1:-1], sys.argv[-1])
+    print(' '.join(f'{k}={v}' for k, v in summary.items()))
 
 
 if __name__ == '__main__':
