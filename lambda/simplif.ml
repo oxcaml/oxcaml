@@ -986,6 +986,7 @@ type slot =
     function_scope: lambda;
     mutable scope: lambda option;
     mutable closed_region: lambda option;
+    mutable scope_layout: layout;
   }
 
 type exclave_status =
@@ -1042,12 +1043,13 @@ let simplify_local_functions lam =
           { func = lf;
             function_scope = !current_function_scope;
             scope = None;
-            closed_region = None }
+            closed_region = None;
+            scope_layout = lf.return }
         in
         Hashtbl.add slots id r;
         tail cont;
         begin match Hashtbl.find_opt slots id with
-        | Some {scope = Some scope; closed_region; _} ->
+        | Some {scope = Some scope; closed_region; scope_layout; _} ->
             let st = next_raise_count () in
             let sc, exclave =
               (* Do not move higher than current lambda *)
@@ -1061,7 +1063,7 @@ let simplify_local_functions lam =
               end else scope, No_exclave
             in
             Hashtbl.add static_id id st;
-            LamTbl.add static sc (st, lf, exclave);
+            LamTbl.add static sc (st, lf, exclave, scope_layout);
             (* The body of the function will become an handler
                in that "scope". *)
             with_scope ~scope lf.body
@@ -1070,7 +1072,8 @@ let simplify_local_functions lam =
             (* note: if scope = None, the function is unused *)
             function_definition lf
         end
-    | Lapply {ap_func = Lvar id; ap_args; ap_region_close; _} ->
+    | Lapply {ap_func = Lvar id; ap_args; ap_region_close; ap_result_layout;
+              _} ->
         let curr_scope, closed_region =
           match ap_region_close with
           | Rc_normal | Rc_nontail -> !current_scope, None
@@ -1092,7 +1095,13 @@ let simplify_local_functions lam =
         | Some ({scope = None; _} as slot) ->
             (* First use of the function: remember the current tail scope *)
             slot.scope <- Some curr_scope;
-            slot.closed_region <- closed_region
+            slot.closed_region <- closed_region;
+            begin match slot.func.return with
+            | Pbottom -> slot.scope_layout <- ap_result_layout
+            | Ptop | Pvalue _ | Punboxed_float _
+            | Punboxed_or_untagged_integer _ | Punboxed_vector _
+            | Punboxed_mask | Pvoid | Punboxed_product _ | Psplicevar _ -> ()
+            end
         | Some ({closed_region = Some old_closed_region} as slot) -> begin
             match closed_region with
             | Some closed_region when closed_region == old_closed_region ->
@@ -1165,7 +1174,7 @@ let simplify_local_functions lam =
         (fun (p: lparam) -> (p.name, p.debug_uid, p.layout)) lf.params
     in
     List.fold_right
-      (fun (st, lf, exclave) lam ->
+      (fun (st, lf, exclave, scope_layout) lam ->
          let body = rewrite lf.body in
          let body, r =
            match exclave with
@@ -1173,7 +1182,7 @@ let simplify_local_functions lam =
            | Exclave -> Lexclave body, Same_region
            | Within_exclave -> body, Popped_region
          in
-         Lstaticcatch (lam, (st, new_params lf), body, r, lf.return)
+         Lstaticcatch (lam, (st, new_params lf), body, r, scope_layout)
       )
       (LamTbl.find_all static lam0)
       lam
