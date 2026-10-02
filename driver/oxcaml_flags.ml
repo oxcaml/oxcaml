@@ -581,6 +581,8 @@ module Flambda2 = struct
       speculative_inlining_budget := true;
       speculative_inlining_criterion := Ratio;
       speculative_inlining_credit_call_site := true;
+      function_result_types := Set Functors_and_closures;
+      functor_result_types_through_value_slots := true;
       I.parse
         (string_of_int inline_2026_small_function_size)
         "-flambda2-inline-2026" small_function_size

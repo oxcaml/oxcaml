@@ -1235,9 +1235,10 @@ let mk_flambda2_inline_2026 f =
     Printf.sprintf
       " Enable the 2026 inlining configuration: the v2 code size model,\n\
       \    lifted-constant tracking, the speculative inlining budget, the\n\
-      \    ratio criterion with the call-site credit, and a small function\n\
-      \    size of %d; later flags override individual settings\n\
-      \    (Flambda 2 only)"
+      \    ratio criterion with the call-site credit, a small function\n\
+      \    size of %d, -flambda2-result-types-functors-and-closures and\n\
+      \    -flambda2-functor-result-types-through-value-slots; later flags\n\
+      \    override individual settings (Flambda 2 only)"
       Flambda2.Inlining.inline_2026_small_function_size )
 
 let mk_flambda2_speculative_inlining_criterion f =

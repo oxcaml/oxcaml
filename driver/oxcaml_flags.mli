@@ -417,7 +417,9 @@ module Flambda2 : sig
 
     (** Enable the v2 code size model, lifted-constant tracking, the
         speculative inlining budget, the ratio criterion with the call-site
-        credit, and a small function size of [inline_2026_small_function_size]. *)
+        credit, a small function size of [inline_2026_small_function_size],
+        result types for functors and closures, and functor result types
+        through value slots. *)
     val set_inline_2026 : unit -> unit
   end
 end
