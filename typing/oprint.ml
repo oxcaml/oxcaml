@@ -24,7 +24,7 @@ let cautious f ppf arg =
 
 let print_lident ppf = function
   | "::" -> pp_print_string ppf "(::)"
-  | s when Lexer.is_keyword s -> fprintf ppf "\\#%s" s
+  | s when Keywords.is_keyword s -> fprintf ppf "\\#%s" s
   | s -> pp_print_string ppf s
 
 let rec print_ident ppf =
@@ -46,7 +46,7 @@ let parenthesized_ident name =
 let value_ident ppf name =
   if parenthesized_ident name then
     fprintf ppf "( %s )" name
-  else if Lexer.is_keyword name then
+  else if Keywords.is_keyword name then
     fprintf ppf "\\#%s" name
   else
     pp_print_string ppf name

@@ -188,6 +188,7 @@
   ast_helper
   camlinternalMenhirLib
   ast_iterator
+  keywords
   parser
   lexer
   parse
@@ -779,7 +780,9 @@
   flambda2_datalog
   compiler_owee
   gc_timings
+  asm_targets
   arm64_ast
+  arm64_binary_emitter
   dwarf_low
   dwarf_high
   binary_emitter_intf))
@@ -805,10 +808,7 @@
   (backend bisect_ppx))
  (libraries
   ocamlfrontend
-  dwarf_flags
-  asm_targets
-  arm64_ast
-  arm64_binary_emitter)
+  dwarf_flags)
  (modules oxcaml_args oxcaml_flags))
 
 (executable
