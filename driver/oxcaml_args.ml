@@ -1280,7 +1280,7 @@ let mk_flambda2_code_size_model f =
   ( "-flambda2-code-size-model",
     Arg.Symbol ([ "v1"; "v2" ], f),
     " <model> Code size model used for inlining decisions:\n\
-    \     v1 (the original) or v2 (the default) (Flambda 2 only)" )
+    \     v1 (the original, the default) or v2 (Flambda 2 only)" )
 
 let mk_dcode_sizes f =
   ( "-dcode-sizes",
