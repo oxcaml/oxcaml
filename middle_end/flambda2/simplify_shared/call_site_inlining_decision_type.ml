@@ -317,7 +317,7 @@ let charged_code_size (t : t) =
   | Missing_code | Definition_says_not_to_inline | In_a_stub
   | Argument_types_not_useful | Unrolling_depth_exceeded
   | Max_inlining_depth_exceeded | Recursion_depth_exceeded
-  | Never_inlined_attribute | Forward_inlined_attribute_but_nothing_to_forward
+  | Never_inlined_attribute
   | Speculative_inlining_budget_exhausted _ | Speculative_inlining_aborted _
   | Speculatively_not_inline _ | Attribute_always
   | Replay_history_says_must_inline _ | Begin_unrolling _ | Continue_unrolling
@@ -335,7 +335,6 @@ let rec speculative_inlining_cost_and_threshold (t : t) =
   | Doing_speculative_inlining _ | Argument_types_not_useful
   | Unrolling_depth_exceeded | Max_inlining_depth_exceeded
   | Recursion_depth_exceeded | Never_inlined_attribute
-  | Forward_inlined_attribute_but_nothing_to_forward
   | Speculative_inlining_budget_exhausted _ | Speculative_inlining_aborted _
   | Speculatively_not_inline _ | Attribute_always | Begin_unrolling _
   | Continue_unrolling | Definition_says_inline _ | Jsir_inlining_disabled ->
