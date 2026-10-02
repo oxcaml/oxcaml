@@ -373,9 +373,14 @@ Error: The type constraints are not consistent.
 
 let f1 () : t_any = assert false;;
 [%%expect{|
-Line 1, characters 7-32:
-1 | let f1 () : t_any = assert false;;
-           ^^^^^^^^^^^^^^^^^^^^^^^^^
+val f1 : unit -> t_any = <fun>
+|}];;
+
+let f1 (g : unit -> t_any) : t_any = g ();;
+[%%expect{|
+Line 1, characters 7-41:
+1 | let f1 (g : unit -> t_any) : t_any = g ();;
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Function arguments and returns must be representable.
        The layout of t_any is any
          because of the definition of t_any at line 5, characters 0-18.
@@ -2844,7 +2849,7 @@ let refute (x : t is_value) =
 [%%expect{|
 type ('a : any) is_value = V : 'a is_value
 type t : float64
-val refute : t is_value -> 'a = <fun>
+val refute : ('a : any). t is_value -> 'a = <fun>
 |}]
 
 type ('a : any) is_value =
@@ -2859,7 +2864,7 @@ let refute (x : 'a t is_value) =
 [%%expect{|
 type ('a : any) is_value = V : 'a is_value
 type 'a t : float64
-val refute : 'a t is_value -> 'b = <fun>
+val refute : 'a ('b : any). 'a t is_value -> 'b = <fun>
 |}]
 
 (***********************************)
@@ -2899,13 +2904,24 @@ type ('a : any) s = 'a
 module F :
   functor (X : S) ->
     sig
-      val f1 : ([ `K of 'a X.bits64 inj ], [ `K of 'a X.value inj ]) eq -> 'b
+      val f1 :
+        'a ('b : any).
+          ([ `K of 'a X.bits64 inj ], [ `K of 'a X.value inj ]) eq -> 'b
       val f2 :
-        ([ `K of 'a X.bits64 inj ], [ `K of (int -> int) inj ]) eq -> 'b
-      val f3 : ([ `K of 'a X.bits64 inj ], [ `K of 'b inj ]) eq -> 'c
-      val f4 : ([ `K of 'b inj ], [ `K of 'a X.bits64 inj ]) eq -> 'c
-      val f5 : ([ `K of 'a X.bits64 s inj ], [ `K of 'b s inj ]) eq -> 'c
-      val f6 : ([ `K of 'b s inj ], [ `K of 'a X.bits64 s inj ]) eq -> 'c
+        'a ('b : any).
+          ([ `K of 'a X.bits64 inj ], [ `K of (int -> int) inj ]) eq -> 'b
+      val f3 :
+        'a 'b ('c : any).
+          ([ `K of 'a X.bits64 inj ], [ `K of 'b inj ]) eq -> 'c
+      val f4 :
+        'b 'a ('c : any).
+          ([ `K of 'b inj ], [ `K of 'a X.bits64 inj ]) eq -> 'c
+      val f5 :
+        'a 'b ('c : any).
+          ([ `K of 'a X.bits64 s inj ], [ `K of 'b s inj ]) eq -> 'c
+      val f6 :
+        'b 'a ('c : any).
+          ([ `K of 'b s inj ], [ `K of 'a X.bits64 s inj ]) eq -> 'c
     end
 |}]
 

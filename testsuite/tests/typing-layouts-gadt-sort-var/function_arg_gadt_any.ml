@@ -54,6 +54,24 @@ Error: This function's argument has type a,
 |}]
 
 (* The result sort is part of the calling convention for the same reason. *)
+let f_ret : type (a : any). a t -> (unit -> a) -> a = fun V g -> g ()
+[%%expect{|
+Line 1, characters 58-59:
+1 | let f_ret : type (a : any). a t -> (unit -> a) -> a = fun V g -> g ()
+                                                              ^
+Warning 8 [partial-match]: this pattern-matching is not exhaustive.
+  Here is an example of a case that is not matched: "B"
+
+Line 1, characters 60-69:
+1 | let f_ret : type (a : any). a t -> (unit -> a) -> a = fun V g -> g ()
+                                                                ^^^^^^^^^
+Error: This function's result has type a,
+       whose layout is known only from the GADT pattern match at line 1, characters 58-59.
+       That match is not exhaustive, so a caller could reach this result at a different layout.
+       Function arguments and results must be representable independently of any non-exhaustive match.
+|}]
+
+(* A function that never returns has no result sort. *)
 let f_ret : type (a : any). a t -> unit -> a = fun V () -> assert false
 [%%expect{|
 Line 1, characters 51-52:
@@ -62,13 +80,7 @@ Line 1, characters 51-52:
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
   Here is an example of a case that is not matched: "B"
 
-Line 1, characters 53-71:
-1 | let f_ret : type (a : any). a t -> unit -> a = fun V () -> assert false
-                                                         ^^^^^^^^^^^^^^^^^^
-Error: This function's result has type a,
-       whose layout is known only from the GADT pattern match at line 1, characters 51-52.
-       That match is not exhaustive, so a caller could reach this result at a different layout.
-       Function arguments and results must be representable independently of any non-exhaustive match.
+val f_ret : ('a : any). 'a t -> unit -> 'a = <fun>
 |}]
 
 (* Trailing [function] cases form one function with the preceding parameters,
