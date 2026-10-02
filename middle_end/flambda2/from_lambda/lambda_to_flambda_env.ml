@@ -91,7 +91,8 @@ type t =
     region_closure_continuations :
       region_closure_continuation Region_stack_element.Map.t;
     my_alloc_region : Ident.t;
-    ident_stamp_upon_starting : int
+    ident_stamp_upon_starting : int;
+    never_called_continuations : Continuation.Set.t
   }
 
 let create ~current_unit ~machine_width ~return_continuation ~exn_continuation
@@ -117,8 +118,18 @@ let create ~current_unit ~machine_width ~return_continuation ~exn_continuation
       Continuation.Map.singleton return_continuation [];
     region_closure_continuations = Region_stack_element.Map.empty;
     my_alloc_region;
-    ident_stamp_upon_starting
+    ident_stamp_upon_starting;
+    never_called_continuations = Continuation.Set.empty
   }
+
+let add_never_called_continuation t cont =
+  { t with
+    never_called_continuations =
+      Continuation.Set.add cont t.never_called_continuations
+  }
+
+let is_never_called_continuation t cont =
+  Continuation.Set.mem cont t.never_called_continuations
 
 let current_unit t = t.current_unit
 

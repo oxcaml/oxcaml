@@ -125,7 +125,8 @@ module Component_for_creation = struct
     | Pvoid -> Unboxed_product []
     | Punboxed_product layouts ->
       Unboxed_product (List.map (from_lambda ~machine_width) layouts)
-    | Ptop | Pbottom ->
+    | Pbottom -> Unboxed_product []
+    | Ptop ->
       Misc.fatal_errorf
         "Cannot convert %a to Flambda_arity.Component_for_creation"
         Printlambda.layout layout
