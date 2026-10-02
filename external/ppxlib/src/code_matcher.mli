@@ -8,10 +8,10 @@ val match_structure_res :
   mismatch_handler:(Location.t -> structure -> unit) ->
   structure ->
   (unit, Location.Error.t NonEmptyList.t) result
-(** Checks that the given code starts with [expected] followed by [@@@ppxlib.inline.end]
-    (or its prefixes; see documentation for [Attribute.declare]).
+(** Checks that the given code starts with [expected] followed by
+    [@@@deriving.end] or [@@@end].
 
-    Returns an error if there is no [@@@end].
+    Returns an error if there is no [@@@deriving.end].
 
     If some items don't match, it calls [mismatch_handler] with the location of
     the source items and the expected code. *)
@@ -26,21 +26,16 @@ val match_structure :
 
 val match_signature_res :
   pos:Lexing.position ->
-  expected:signature_item list ->
-  mismatch_handler:(Location.t -> signature_item list -> unit) ->
-  signature_item list ->
+  expected:signature ->
+  mismatch_handler:(Location.t -> signature -> unit) ->
+  signature ->
   (unit, Location.Error.t NonEmptyList.t) result
 (** Same for signatures *)
 
 val match_signature :
   pos:Lexing.position ->
-  expected:signature_item list ->
-  mismatch_handler:(Location.t -> signature_item list -> unit) ->
-  signature_item list ->
+  expected:signature ->
+  mismatch_handler:(Location.t -> signature -> unit) ->
+  signature ->
   unit
 (** Same for signatures *)
-
-val allow_deriving_end : bool ref
-(** The legacy attribute [@@@deriving.end] is disabled by default, and superseded by
-    [@@@ppxlib.inline.end]. It can be enabled by setting [allow_deriving_end := true]. See
-    [-allow-deriving-end] in [Driver]. *)
