@@ -174,19 +174,10 @@ module DLS : sig
         to [k], which cannot be restored later. *)
 end
 
-(** Thread-local storage. Like {!DLS}, but stores a distinct value for each
-    thread and for each preemptible fiber. Domains can contain multiple
-    threads, so [TLS] should be preferred in nearly all cases.
-
-    TLS state is owned by preemptible fibers (see {!Effect.Deep.Preemptible}
-    and {!Effect.Shallow.Preemptible}) and by threads. Whether a fiber is
-    preemptible is fixed when it is created. A non-preemptible fiber shares
-    the state of its nearest enclosing owner, and its writes are visible to
-    it. A preemptible fiber starts with fresh state (populated from the keys
-    registered with [split_from_parent], split when the fiber is created)
-    which travels with the fiber: it is preserved across suspension and
-    resumption, including when the fiber is resumed on another thread or
-    domain. *)
+(** Thread-local storage. Like {!Domain.DLS}, but stores a distinct value
+    for every preemptible fiber (see {!Domain.TLS} for the ownership rules).
+    Preemptable fibers are the fundamental unit of preemptive concurrency,
+    so [TLS] should be preferred in nearly all cases. *)
 module TLS : sig
 
     type 'a key : value mod portable contended

@@ -159,10 +159,6 @@ let[@inline never] discontinue_with_handler_with_backtrace
     (Prim.update_cont_handler_noexc cont valuec exnc effc tickc)
     e bt
 
-(* A preemptible fiber owns fresh TLS state from creation. [split_tls comp]
-   splits the keys registered with [split_from_parent] from the current state
-   now (parity with [Thread.create]) and sets them in the new fiber before
-   running [comp]. *)
 let[@inline] split_tls comp =
   let keys = Domain.TLS.Private.get_initial_keys () in
   fun arg -> Domain.TLS.Private.set_initial_keys keys; comp arg

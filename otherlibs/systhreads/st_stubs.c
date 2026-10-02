@@ -280,9 +280,10 @@ static void caml_thread_scan_roots(
       /* Don't rescan the stack of the current thread, it was done already */
       if (th != active) {
         if (th->current_stack != NULL)
+          /* A descheduled thread has no cached TLS state. */
           caml_do_local_roots(action, fflags, fdata,
                               th->local_roots, th->current_stack, th->gc_regs,
-                              th->dynamic, th->c_stack);
+                              th->dynamic, /*tls_state=*/NULL, th->c_stack);
       }
       th = th->next;
     } while (th != active);

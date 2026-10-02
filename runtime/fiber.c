@@ -865,6 +865,7 @@ CAMLexport void caml_do_local_roots (
   struct stack_info *current_stack,
   value * v_gc_regs,
   dynamic_cache_t dynamic_bindings,
+  value * tls_state,
   struct c_stack_link* c_stack)
 {
 #ifdef NATIVE_CODE
@@ -872,6 +873,8 @@ CAMLexport void caml_do_local_roots (
 #endif
 
   caml_dynamic_cache_scan_roots(dynamic_bindings, f, fflags, fdata);
+  if (tls_state != NULL) f(fdata, *tls_state, tls_state);
+
   for (struct caml__roots_block *lr = local_roots; lr != NULL; lr = lr->next) {
 #ifdef NATIVE_CODE
     /* c_stack marks the boundary between C stack segments. Distinct C stack

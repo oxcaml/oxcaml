@@ -757,13 +757,10 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
 #endif
 
   CAML_EV_BEGIN(EV_MINOR_LOCAL_ROOTS);
-  /* [tls_state] is a plain domain root (not a generational global root)
-     because it is updated by plain stores from assembly code. */
-  oldify_one(&st, domain->tls_state, &domain->tls_state);
   caml_do_local_roots(
     &oldify_one, oldify_scanning_flags, &st,
     domain->local_roots, domain->current_stack, domain->gc_regs,
-    domain->dynamic_bindings,
+    domain->dynamic_bindings, &domain->tls_state,
     domain->c_stack);
 
   scan_roots_hook = atomic_load(&caml_scan_roots_hook);
