@@ -139,7 +139,12 @@ let branch_relaxation_max_displacement =
 
 let caml_apply_inline_fast_path = ref false  (* -caml-apply-inline-fast-path *)
 
-type function_result_types = Never | Functors_only | All_functions
+type function_result_types =
+  | Never
+  | Functors_only
+  | Functors_and_static_closures
+  | Functors_and_closures
+  | All_functions
 type join_algorithm = Binary | N_way | Checked
 type reaper_preserve_direct_calls = Never | Always | Zero_alloc | Auto
 type opt_level = Oclassic | O2 | O3 | O4
