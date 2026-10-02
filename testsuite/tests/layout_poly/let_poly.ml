@@ -329,10 +329,22 @@ Error: This binding has no layout variables, so "poly_" has no effect.
        Consider using a regular "let" instead.
 |}]
 
-(* [assert false] is layout poly *)
+(* A function that never returns needs no layout variables: its result can
+   have any layout. *)
 let poly_ f () = assert false
 [%%expect{|
-val poly_ f : unit -> 'a = <lpoly>
+Line 1, characters 10-11:
+1 | let poly_ f () = assert false
+              ^
+Error: This binding has no layout variables, so "poly_" has no effect.
+       Consider using a regular "let" instead.
+|}]
+
+(* A function that never returns can still be layout-polymorphic through its
+   parameters. *)
+let poly_ f (_ : 'a) : 'a = assert false
+[%%expect{|
+val poly_ f : 'a -> 'a = <lpoly>
 |}]
 
 (* We observe that foo is polymorphic on two types sharing the same polymorphic

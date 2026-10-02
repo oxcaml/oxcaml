@@ -102,9 +102,14 @@ Error: The type constraints are not consistent.
 
 let f1 () : t_any = assert false;;
 [%%expect{|
-Line 1, characters 7-32:
-1 | let f1 () : t_any = assert false;;
-           ^^^^^^^^^^^^^^^^^^^^^^^^^
+val f1 : unit -> t_any = <fun>
+|}];;
+
+let f1 (g : unit -> t_any) : t_any = g ();;
+[%%expect{|
+Line 1, characters 7-41:
+1 | let f1 (g : unit -> t_any) : t_any = g ();;
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Function arguments and returns must be representable.
        The layout of t_any is any
          because of the definition of t_any at line 1, characters 0-18.
