@@ -79,26 +79,19 @@ Error: Function arguments and returns must be representable.
 
 let leaf_raise_stdlib (type a : any) () : a = raise Exit
 [%%expect{|
-Line 1, characters 46-56:
-1 | let leaf_raise_stdlib (type a : any) () : a = raise Exit
-                                                  ^^^^^^^^^^
-Error: This expression has type "('a : value_or_null)"
-       but an expression was expected of type "a"
-       The layout of a is any
-         because of the annotation on the abstract type declaration for a.
-       But the layout of a must be a value layout.
+val leaf_raise_stdlib : ('a : any). unit -> 'a = <fun>
 |}]
 
 let leaf_failwith (type a : any) () : a = failwith "no"
 [%%expect{|
-Line 1, characters 42-55:
+Line 1, characters 18-55:
 1 | let leaf_failwith (type a : any) () : a = failwith "no"
-                                              ^^^^^^^^^^^^^
-Error: This expression has type "('a : value_or_null)"
-       but an expression was expected of type "a"
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Function arguments and returns must be representable.
        The layout of a is any
          because of the annotation on the abstract type declaration for a.
-       But the layout of a must be a value layout.
+       But the layout of a must be representable
+         because we must know concretely how to return a function result.
 |}]
 
 let leaf_alias (type a : any) () : a =

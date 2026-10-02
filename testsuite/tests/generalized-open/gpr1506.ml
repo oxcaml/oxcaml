@@ -42,7 +42,7 @@ include struct
     match run() with exception Interrupt -> () | _ -> assert false
 end
 [%%expect{|
-val run : unit -> 'a = <fun>
+val run : ('a : any). unit -> 'a = <fun>
 |}];;
 
 (* It was decided to not allow this anymore. *)
