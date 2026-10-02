@@ -28,9 +28,9 @@ type t
     [reachable_names] specifies which names are reachable from outside the
     compilation unit (same terminology as used in [Flambda_cmx]).
 
-    [all_code] is consulted for cohort membership (see [Cohort_id]): the newest
-    member of each cohort defined in this unit is given the cohort's canonical
-    symbols with weak linkage. *)
+    [all_code] is consulted for cohort membership (see [Cohort_id]): code
+    belonging to a cohort, whether defined here or imported, is referred to by
+    the cohort's shared symbol with weak linkage. *)
 val create :
   module_symbol:Symbol.t ->
   reachable_names:Name_occurrences.t ->

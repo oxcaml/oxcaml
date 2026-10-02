@@ -2263,50 +2263,10 @@ let emit_data_item_actions : Emitaux.emit_data_item_actions =
     symbol_used = (fun _ -> ())
   }
 
-(* Switch to a COMDAT read-only-data section for a weak data symbol. Mirrors the
-   amd64 emitter; arm64 GAS uses [%progbits] instead of [@progbits]. *)
-let emit_weak_data_section_for_symbol sym_name =
-  if macosx
-  then
-    Misc.fatal_errorf
-      "COMDAT / weak data emission is not yet implemented on macOS (symbol %s)"
-      sym_name
-  else
-    let encoded = S.encode (S.create_global sym_name) in
-    let section_name = Printf.sprintf ".rodata.%s" encoded in
-    D.switch_to_section_raw ~names:[section_name] ~flags:(Some "aG")
-      ~args:[Printf.sprintf "%%progbits,%s,comdat" encoded]
-      ~is_delayed:false;
-    D.unsafe_set_internal_section_ref Data
-
 let data l =
   D.data ();
   D.align ~fill:Zero ~bytes:8;
-  (* See the matching comment in [backend/amd64/emit.ml]: wrap each run of items
-     that starts with a weak [Cdefine_symbol] in its own COMDAT section. *)
-  let in_weak = ref false in
-  List.iter
-    (fun (item : Cmm.data_item) ->
-      (match[@ocaml.warning "-4"] item with
-      | Cdefine_symbol { sym_global; sym_name } -> (
-        if !in_weak
-        then (
-          D.data ();
-          D.align ~fill:Zero ~bytes:8;
-          in_weak := false);
-        match sym_global with
-        | Cmm.Weak ->
-          emit_weak_data_section_for_symbol sym_name;
-          D.align ~fill:Zero ~bytes:8;
-          in_weak := true
-        | Cmm.Global | Cmm.Local -> ())
-      | _ -> ());
-      Emitaux.emit_data_item emit_data_item_actions item)
-    l;
-  if !in_weak
-  then (
-    D.data ();
-    in_weak := false)
+  List.iter (Emitaux.emit_data_item emit_data_item_actions) l
 
 let file_emitter ~file_num ~file_name =
   D.file ~file_num:(Some file_num) ~file_name

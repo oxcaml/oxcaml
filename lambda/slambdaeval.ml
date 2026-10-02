@@ -392,12 +392,9 @@ end = struct
     in
     let name = Ident.create_persistent name_string in
     let cohort_id =
-      if not !Cohort_id.enabled
-      then None
-      else
-        match id.owner, Current_unit.get_cu () with
-        | Some cu, _ | None, Some cu -> Some (Cohort_id.create cu name_string)
-        | None, None -> None
+      match id.owner, Current_unit.get_cu () with
+      | Some cu, _ | None, Some cu -> Some (Cohort_id.create cu name_string)
+      | None, None -> None
     in
     let slv_comptime =
       match Ident.Tbl.find_opt t.instantiated_templates name with

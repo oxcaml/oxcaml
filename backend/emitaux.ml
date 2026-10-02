@@ -942,14 +942,9 @@ let emit_data_item actions (d : Cmm.data_item) =
       actions.symbol_defined s.sym_name;
       D.define_joint_label_and_symbol ~section:Data sym
     | Weak ->
-      (* The section switch into a COMDAT group (and the matching switch back to
-         [.data]) is handled by the arch-specific [data] driver, which scans the
-         data-item list and wraps each weak symbol's items in a dedicated
-         section. Here we just emit the [.weak] directive and the label/symbol
-         definition itself. *)
-      D.weak sym;
-      actions.symbol_defined s.sym_name;
-      D.define_joint_label_and_symbol ~section:Data sym)
+      (* Only functions are deduplicated across units; see [Cmm.is_global]. *)
+      Misc.fatal_errorf "Weak data symbols are not supported (symbol %s)"
+        s.sym_name)
   | Cint8 n -> D.int8 (Numbers.Int8.of_int_exn n)
   | Cint16 n -> D.int16 (Numbers.Int16.of_int_exn n)
   | Cint32 n -> D.int32 (Numbers.Int64.to_int32_exn (Int64.of_nativeint n))

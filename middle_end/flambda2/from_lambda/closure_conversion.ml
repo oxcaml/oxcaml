@@ -60,15 +60,10 @@ let manufacture_symbol_of_variable v =
   let name = Variable.canonical_name v in
   manufacture_symbol name
 
-let declare_symbol_for_function_slot env ident function_slot ~cohort :
-    Env.t * Symbol.t =
+let declare_symbol_for_function_slot env ident function_slot : Env.t * Symbol.t
+    =
   let symbol =
-    match cohort with
-    | None -> manufacture_symbol (Function_slot.canonical_name function_slot)
-    | Some cohort ->
-      Symbol.unsafe_create
-        (Current_unit.get_cu_exn ())
-        (Cohort_id.closure_linkage_name cohort)
+    manufacture_symbol (Function_slot.canonical_name function_slot)
   in
   let env =
     Env.add_simple_to_substitute env ident (Simple.symbol symbol)
@@ -3202,15 +3197,6 @@ let close_functions acc external_env ~current_alloc_region ~current_region
         Function_slot.Map.add function_slot code_id map)
       Function_slot.Map.empty func_decl_list
   in
-  let function_cohorts =
-    List.fold_left
-      (fun map decl ->
-        Function_slot.Map.add
-          (Function_decl.function_slot decl)
-          (Function_decl.cohort decl)
-          map)
-      Function_slot.Map.empty func_decl_list
-  in
   let approx_map =
     List.fold_left
       (fun approx_map decl ->
@@ -3289,7 +3275,6 @@ let close_functions acc external_env ~current_alloc_region ~current_region
         (fun ident function_slot (acc, env, symbol_map) ->
           let env, symbol =
             declare_symbol_for_function_slot env ident function_slot
-              ~cohort:(Function_slot.Map.find function_slot function_cohorts)
           in
           let approx =
             match Function_slot.Map.find function_slot approx_map with

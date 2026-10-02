@@ -22,9 +22,7 @@ type t =
     current_data : Cmm.data_item list;
     reachable_names : Name_occurrences.t;
     cohort_code_names : string Code_id.Map.t;
-    (* Canonical function symbol for the newest member of each cohort. *)
-    cohort_closure_names : String.Set.t;
-    (* Canonical closure-block symbols of all cohorts in this unit. *)
+    (* Shared function symbol for every code id that belongs to a cohort. *)
     symbols : Cmm.symbol String.Map.t;
     (* This map is only used for symbols not directly translated from
        [Symbol.t], e.g. module entry point names. *)
@@ -33,20 +31,28 @@ type t =
     invalid_message_symbols : Symbol.t String.Map.t
   }
 
-(* A cohort may have several members in this unit, related by [newer_version_of]
+(* Every reference to a cohort member, whether the member belongs to this unit
+   or was imported, goes to the shared symbol: the member's private symbol is
+   never emitted, and the linker keeps just one group's worth of definitions.
+
+   A cohort may have several members in this unit, related by [newer_version_of]
    as the simplifier produces new versions of the code. Only the newest is
-   emitted under the canonical weak symbol; any older member whose body survives
+   emitted under the shared symbol; an older member whose body somehow survives
    keeps its own private symbol. *)
-let cohort_names all_code =
+let cohort_code_names all_code =
   let current_unit = Current_unit.get_cu_exn () in
-  let members, superseded =
+  let code_names, members, superseded =
     Exported_code.fold_code_metadata all_code
-      ~init:(Cohort_id.Map.empty, Code_id.Set.empty)
-      ~f:(fun code_id metadata ((members, superseded) as acc) ->
+      ~init:(Code_id.Map.empty, Cohort_id.Map.empty, Code_id.Set.empty)
+      ~f:(fun code_id metadata ((code_names, members, superseded) as acc) ->
         match Code_metadata.cohort metadata with
         | None -> acc
-        | Some _ when not (Code_id.in_compilation_unit code_id current_unit) ->
-          acc
+        | Some cohort
+          when not (Code_id.in_compilation_unit code_id current_unit) ->
+          let name =
+            Linkage_name.to_string (Cohort_id.code_linkage_name cohort)
+          in
+          Code_id.Map.add code_id name code_names, members, superseded
         | Some cohort ->
           let members =
             Cohort_id.Map.update cohort
@@ -59,10 +65,10 @@ let cohort_names all_code =
             | None -> superseded
             | Some older -> Code_id.Set.add older superseded
           in
-          members, superseded)
+          code_names, members, superseded)
   in
   Cohort_id.Map.fold
-    (fun cohort members (code_names, closure_names) ->
+    (fun cohort members code_names ->
       let newest =
         List.filter
           (fun code_id -> not (Code_id.Set.mem code_id superseded))
@@ -70,30 +76,24 @@ let cohort_names all_code =
       in
       match newest with
       | [code_id] ->
-        ( Code_id.Map.add code_id
-            (Linkage_name.to_string (Cohort_id.code_linkage_name cohort))
-            code_names,
-          String.Set.add
-            (Linkage_name.to_string (Cohort_id.closure_linkage_name cohort))
-            closure_names )
+        Code_id.Map.add code_id
+          (Linkage_name.to_string (Cohort_id.code_linkage_name cohort))
+          code_names
       | [] | _ :: _ :: _ ->
         Misc.fatal_errorf
           "Cohort %a should have exactly one newest member in this compilation \
            unit, but has: %a"
           Cohort_id.print cohort Code_id.Set.print
           (Code_id.Set.of_list newest))
-    members
-    (Code_id.Map.empty, String.Set.empty)
+    members code_names
 
 let create ~module_symbol ~reachable_names ~all_code =
-  let cohort_code_names, cohort_closure_names = cohort_names all_code in
   { gc_roots = [];
     data_list = [];
     functions = [];
     current_data = [];
     reachable_names;
-    cohort_code_names;
-    cohort_closure_names;
+    cohort_code_names = cohort_code_names all_code;
     symbols = String.Map.empty;
     module_symbol;
     module_symbol_defined = false;
@@ -120,9 +120,7 @@ let raw_symbol res ~global:sym_global sym_name : t * Cmm.symbol =
 let symbol res sym =
   let sym_name = Linkage_name.to_string (Symbol.linkage_name sym) in
   let sym_global =
-    if String.Set.mem sym_name res.cohort_closure_names
-    then Cmm.Weak
-    else if
+    if
       Current_unit.is_current (Symbol.compilation_unit sym)
       && not (Name_occurrences.mem_symbol res.reachable_names sym)
     then Cmm.Local
@@ -132,20 +130,20 @@ let symbol res sym =
   s
 
 let symbol_of_code_id res code_id ~currently_in_inlined_body : Cmm.symbol =
+  let () =
+    (* In classic mode, ensure that all .cmx files have been loaded, so that the
+       zero-alloc check can see the function summaries. We only need to do this
+       for inlined bodies, which are not traversed during [Lambda_to_flambda].
+       (When using [Simplify], all inlined bodies are traversed and any
+       referenced .cmx files will have been loaded.) *)
+    if Flambda_features.classic_mode () && currently_in_inlined_body
+    then Compilenv.require_global (Code_id.get_compilation_unit code_id)
+    else ()
+  in
   match Code_id.Map.find_opt code_id res.cohort_code_names with
   | Some sym_name -> { sym_name; sym_global = Weak }
   | None ->
     let sym_name = Linkage_name.to_string (Code_id.linkage_name code_id) in
-    let () =
-      (* In classic mode, ensure that all .cmx files have been loaded, so that
-         the zero-alloc check can see the function summaries. We only need to do
-         this for inlined bodies, which are not traversed during
-         [Lambda_to_flambda]. (When using [Simplify], all inlined bodies are
-         traversed and any referenced .cmx files will have been loaded.) *)
-      if Flambda_features.classic_mode () && currently_in_inlined_body
-      then Compilenv.require_global (Code_id.get_compilation_unit code_id)
-      else ()
-    in
     let sym_global =
       if
         Current_unit.is_current (Code_id.get_compilation_unit code_id)

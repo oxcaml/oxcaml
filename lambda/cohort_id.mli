@@ -27,20 +27,16 @@
 
 (** A cohort is a set of definitions, spread across compilation units, that are
     all equivalent (typically instantiations of one layout-polymorphic template
-    at the same arguments). The linker keeps a single member of each cohort, so
-    every member must be emitted under the same weak symbol; a cohort id is the
-    globally unique key from which that symbol is derived.
+    at the same arguments). Within the compiler each member keeps its own
+    private names; when its code is emitted, definitions and references are
+    rewritten to a weak symbol shared by the whole cohort, so the linker keeps a
+    single copy. A cohort id is the globally unique key from which that symbol
+    is derived.
 
     A cohort id pairs the compilation unit that defined the template with a name
     that is deterministic given the template and its arguments. *)
 
 type t
-
-(** Toplevels set this to [false]: every phrase is a compilation unit within a
-    single process, and the process-wide symbol tables identify symbols by
-    linkage name, so a canonical name shared across units would clash. Nothing
-    is lost since there is no link step to deduplicate. *)
-val enabled : bool ref
 
 val create : Compilation_unit.t -> string -> t
 
@@ -58,8 +54,5 @@ val print : Format.formatter -> t -> unit
 
 module Map : Map.S with type key = t
 
-(** The linkage name of a member's code. *)
+(** The shared linkage name under which every member's code is emitted. *)
 val code_linkage_name : t -> Linkage_name.t
-
-(** The linkage name of a member's statically-allocated closure block. *)
-val closure_linkage_name : t -> Linkage_name.t

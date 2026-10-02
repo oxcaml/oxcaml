@@ -769,7 +769,6 @@ let _ =
   Sys.interactive := true;
   Compmisc.init_path ();
   Clflags.dlcode := true;
-  Cohort_id.enabled := false;
   ()
 
 let find_ocamlinit () =

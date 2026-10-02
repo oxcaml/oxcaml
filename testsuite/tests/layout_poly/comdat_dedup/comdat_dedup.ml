@@ -1,7 +1,7 @@
 (* TEST
  arch_amd64;
  not-macos;
- readonly_files = "lpoly_lib.mli lpoly_lib.ml user1.ml user2.ml";
+ readonly_files = "lpoly_lib.mli lpoly_lib.ml user1.ml user2.ml user3.ml";
  setup-ocamlopt.byte-build-env;
  {
   flags = "-extension layout_poly_alpha -nocwd -Ix .";
@@ -13,11 +13,13 @@
   ocamlopt.byte;
   module = "user2.ml";
   ocamlopt.byte;
+  module = "user3.ml";
+  ocamlopt.byte;
   module = "comdat_dedup.ml";
   ocamlopt.byte;
   unset module;
   program = "${test_build_directory}/comdat_dedup.exe";
-  all_modules = "lpoly_lib.cmx user1.cmx user2.cmx comdat_dedup.cmx";
+  all_modules = "lpoly_lib.cmx user1.cmx user2.cmx user3.cmx comdat_dedup.cmx";
   ocamlopt.byte;
   run;
  }{
@@ -30,11 +32,13 @@
   ocamlopt.byte;
   module = "user2.ml";
   ocamlopt.byte;
+  module = "user3.ml";
+  ocamlopt.byte;
   module = "comdat_dedup.ml";
   ocamlopt.byte;
   unset module;
   program = "${test_build_directory}/comdat_dedup.exe";
-  all_modules = "lpoly_lib.cmx user1.cmx user2.cmx comdat_dedup.cmx";
+  all_modules = "lpoly_lib.cmx user1.cmx user2.cmx user3.cmx comdat_dedup.cmx";
   ocamlopt.byte;
   run;
  }
@@ -42,8 +46,10 @@
 
 (* [user1.ml] and [user2.ml] both instantiate [Lpoly_lib.lpoly_pair] at
    (float64, float64), so each object file carries a weak copy of the
-   instance's code and of its closure block, both named after the cohort.
-   After linking, COMDAT deduplication must leave exactly one of each.
+   instance's code under the cohort's shared symbol. After linking, COMDAT
+   deduplication must leave exactly one. [user3.ml] calls [User1]'s instance
+   from outside [User1], which only links if that call also uses the shared
+   symbol.
 
    The test runs the linked program and then shells out to [nm] to inspect
    the symbol table. *)
@@ -51,11 +57,11 @@
 let () =
   let _ = Sys.opaque_identity User1.pair () in
   let _ = Sys.opaque_identity User2.pair () in
+  let _ = Sys.opaque_identity User3.call_user1 () in
   ()
 
 let expected_symbol_res =
-  [ "camlLpoly_lib__cohort__Lpoly_lib_lpoly_pair_.*float64_float64_code$";
-    "camlLpoly_lib__cohort__Lpoly_lib_lpoly_pair_.*float64_float64$" ]
+  ["camlLpoly_lib__Lpoly_lib_lpoly_pair_.*float64_float64__cohort_code$"]
 
 let () =
   let exe = Filename.quote Sys.executable_name in

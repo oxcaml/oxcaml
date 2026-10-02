@@ -30,8 +30,6 @@ type t =
     name : string
   }
 
-let enabled = ref true
-
 let create cu name = { cu; name }
 
 let compilation_unit t = t.cu
@@ -64,10 +62,8 @@ let sanitise name =
       match c with 'A' .. 'Z' | 'a' .. 'z' | '0' .. '9' | '_' -> c | _ -> '_')
     name
 
-let linkage_name t ~suffix =
-  Symbol.for_name t.cu ("cohort__" ^ sanitise t.name ^ suffix)
+(* The [__cohort_code] marker keeps these names apart from ordinary symbols of
+   the template's unit, whose code symbols end in [_code]. *)
+let code_linkage_name t =
+  Symbol.for_name t.cu (sanitise t.name ^ "__cohort_code")
   |> Symbol.linkage_name
-
-let code_linkage_name t = linkage_name t ~suffix:"_code"
-
-let closure_linkage_name t = linkage_name t ~suffix:""

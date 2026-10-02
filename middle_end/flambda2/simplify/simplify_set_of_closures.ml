@@ -710,25 +710,9 @@ let simplify_and_lift_set_of_closures dacc ~closure_bound_vars_inverse
   let function_decls = Set_of_closures.function_decls set_of_closures in
   let closure_symbols =
     Function_slot.Lmap.mapi
-      (fun function_slot
-           (func_decl : Function_declarations.code_id_in_function_declaration)
-         ->
-        let cohort =
-          match func_decl with
-          | Deleted _ -> None
-          | Code_id { code_id; _ } -> (
-            match DE.find_code_exn (DA.denv dacc) code_id with
-            | code -> Code_metadata.cohort (Code_or_metadata.code_metadata code)
-            | exception Not_found -> None)
-        in
-        match cohort with
-        | Some cohort ->
-          Symbol.unsafe_create
-            (Current_unit.get_cu_exn ())
-            (Cohort_id.closure_linkage_name cohort)
-        | None ->
-          let name = Function_slot.canonical_name function_slot in
-          Symbol.manufacture (Current_unit.get_cu_exn ()) name)
+      (fun function_slot _func_decl ->
+        let name = Function_slot.canonical_name function_slot in
+        Symbol.manufacture (Current_unit.get_cu_exn ()) name)
       (Function_declarations.funs_in_order function_decls)
   in
   let closure_symbols_map =

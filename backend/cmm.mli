@@ -213,8 +213,9 @@ val equal_is_global : is_global -> is_global -> bool
 
    Symbols defined as [Weak] are like [Global] but are expected to have the same
    definition in more than one compilation unit; the linker deduplicates them
-   (via COMDAT on ELF). They are used for instantiations of layout-polymorphic
-   functions (see [Cohort_id]) and their closure blocks.
+   (via COMDAT on ELF). They are used for the code of instantiations of
+   layout-polymorphic functions (see [Cohort_id]); only functions may be [Weak],
+   not data.
 
    (Marking symbols in this way speeds up linking, as many references can then
    be resolved early) *)

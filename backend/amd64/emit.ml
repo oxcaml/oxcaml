@@ -2872,9 +2872,9 @@ let fundecl fundecl =
   (match fundecl.fun_sym_global with
   | Cmm.Weak ->
     (* Place this function body in its own COMDAT group so the linker keeps
-       exactly one copy across all compilation units that instantiate the same
-       monomorphized layout-polymorphic function. This overrides the normal
-       [-function-sections] / [module_entry_functions_section] handling. *)
+       exactly one copy across all compilation units that define the same cohort
+       member (see [Cohort_id]). This overrides the normal [-function-sections]
+       / [module_entry_functions_section] handling. *)
     emit_weak_text_section_for_symbol fundecl.fun_name
   | Global | Local -> emit_function_or_basic_block_section_name ());
   D.align ~fill:Nop ~bytes:16;
@@ -2955,59 +2955,10 @@ let emit_data_item_actions : Emitaux.emit_data_item_actions =
     symbol_used = add_used_symbol
   }
 
-(* Switch to a COMDAT read-only-data section for a weak data symbol. Used to
-   wrap static data associated with monomorphized layout-polymorphic instances
-   so the linker deduplicates the symbol and its bytes together.
-
-   CR-someday: we always use [.rodata] here since the current caller (weak
-   closure records / lifted constants) is effectively read-only code-adjacent
-   data. If mutable weak data is ever needed, this will need to become
-   [.data.rel.ro]. *)
-let emit_weak_data_section_for_symbol sym_name =
-  match[@ocaml.warning "-4"] system with
-  | S_macosx | S_win32 | S_win64 | S_mingw64 | S_cygwin ->
-    Misc.fatal_errorf
-      "COMDAT / weak data emission is not yet implemented on this target \
-       system (symbol %s)"
-      sym_name
-  | _ ->
-    let section_name = Printf.sprintf ".rodata.%s" (emit_symbol sym_name) in
-    D.switch_to_section_raw ~names:[section_name] ~flags:(Some "aG")
-      ~args:[Printf.sprintf "@progbits,%s,comdat" (emit_symbol sym_name)]
-      ~is_delayed:false;
-    D.unsafe_set_internal_section_ref Data
-
 let data l =
   D.data ();
   D.align ~fill:Zero ~bytes:8;
-  (* Walk the data-item list, wrapping each weak [Cdefine_symbol] and the data
-     items that follow it in a dedicated COMDAT section. The run of items that
-     "belongs" to a weak symbol extends up to (but not including) the next
-     [Cdefine_symbol]. *)
-  let in_weak = ref false in
-  List.iter
-    (fun (item : Cmm.data_item) ->
-      (match[@ocaml.warning "-4"] item with
-      | Cdefine_symbol { sym_global; sym_name } -> (
-        if !in_weak
-        then (
-          (* End of the previous weak symbol's data region. *)
-          D.data ();
-          D.align ~fill:Zero ~bytes:8;
-          in_weak := false);
-        match sym_global with
-        | Cmm.Weak ->
-          emit_weak_data_section_for_symbol sym_name;
-          D.align ~fill:Zero ~bytes:8;
-          in_weak := true
-        | Cmm.Global | Cmm.Local -> ())
-      | _ -> ());
-      Emitaux.emit_data_item emit_data_item_actions item)
-    l;
-  if !in_weak
-  then (
-    D.data ();
-    in_weak := false)
+  List.iter (Emitaux.emit_data_item emit_data_item_actions) l
 
 (* Beginning / end of an assembly file *)
 
