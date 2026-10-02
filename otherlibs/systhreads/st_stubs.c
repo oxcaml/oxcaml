@@ -800,6 +800,9 @@ static void thread_init_current(caml_thread_t th)
   th->signal_stack = caml_init_signal_stack(&th->signal_stack_size);
 }
 
+static const value * _Atomic acquire_tick_cache = NULL;
+static const value * _Atomic release_tick_cache = NULL;
+
 static const value * cached_named_value(const value * _Atomic * cache,
                                         const char * name)
 {
@@ -815,7 +818,6 @@ static const value * cached_named_value(const value * _Atomic * cache,
 CAMLprim value caml_thread_acquire_tick(value interval_usec)
 {
   CAMLparam1(interval_usec);
-  static const value * _Atomic acquire_tick_cache = NULL;
   const value * acquire_tick =
     cached_named_value(&acquire_tick_cache, "Domain.Tick.acquire");
   CAMLreturn(caml_callback(*acquire_tick, interval_usec));
@@ -824,7 +826,6 @@ CAMLprim value caml_thread_acquire_tick(value interval_usec)
 CAMLprim value caml_thread_release_tick(value tick)
 {
   CAMLparam1(tick);
-  static const value * _Atomic release_tick_cache = NULL;
   const value * release_tick =
     cached_named_value(&release_tick_cache, "Domain.Tick.release");
   CAMLreturn(caml_callback(*release_tick, tick));
@@ -932,7 +933,6 @@ CAMLexport int caml_c_thread_register(void)
      This must happen after the thread is fully set up, since the tick
      acquire may start the tick thread which sends interrupts to all
      domains. */
-  static const value * _Atomic acquire_tick_cache = NULL;
   const value * acquire_tick =
     cached_named_value(&acquire_tick_cache, "Domain.Tick.acquire");
   value tick =
@@ -968,7 +968,6 @@ CAMLexport int caml_c_thread_unregister(void)
 
   /* Release the tick */
   if (c_thread_tick != 0) {
-    static const value * _Atomic release_tick_cache = NULL;
     const value * release_tick =
       cached_named_value(&release_tick_cache, "Domain.Tick.release");
     result = caml_callback_exn(*release_tick, Val_long(c_thread_tick));
