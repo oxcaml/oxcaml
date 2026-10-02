@@ -157,6 +157,14 @@ let bind name arg fn =
     let id = V.create_local name in
     Clet (VP.create id, arg, fn (Cvar id))
 
+let bind_with_likelihood name arg fn =
+  match arg with
+  | Cvar _ | Cconst_int _ | Cconst_natint _ | Cconst_symbol _ -> fn arg
+  | _ ->
+    let id = V.create_local name in
+    let body, ~likelihood = fn (Cvar id) in
+    Clet (VP.create id, arg, body), ~likelihood
+
 let bind_list name args fn =
   let rec aux bound_args = function
     | [] -> fn bound_args
@@ -3531,11 +3539,13 @@ module SArgBlocks = struct
 
   type test = expression
 
-  type act = expression
+  type act = expression * likelihood:Likelihood.t
 
-  (* The module [SArgBlocks] must conform to the signature `Switch.S`. We do not
-     need a layout, but we use it to encode likelihoods instead. *)
-  type layout = Likelihood.t array
+  (* The module [SArgBlocks] must conform to the signature `Switch.S`. Since we
+     do not need a layout, we pick unit as the layout. *)
+  type layout = unit
+
+  type weight = Likelihood.t
 
   type loc = Debuginfo.t
 
@@ -3555,50 +3565,49 @@ module SArgBlocks = struct
 
   let arg_as_test arg = arg
 
-  let make_if _likelihoods cond ifso ifnot =
-    Cifthenelse
-      ( cond,
-        Debuginfo.none,
-        Likelihood.default,
-        ifso,
-        Debuginfo.none,
-        Likelihood.default,
-        ifnot,
-        Debuginfo.none )
+  let make_if () cond (ifso, ~likelihood:ifso_p) (ifnot, ~likelihood:ifnot_p) =
+    ( Cifthenelse
+        ( cond,
+          Debuginfo.none,
+          ifso_p,
+          ifso,
+          Debuginfo.none,
+          ifnot_p,
+          ifnot,
+          Debuginfo.none ),
+      ~likelihood:(Likelihood.sum_list [ifso_p; ifnot_p]) )
 
-  let make_switch dbg likelihoods arg cases actions =
-    let action_likelihoods = Array.make (Array.length actions) [] in
-    Array.iteri
-      (fun i a ->
-        action_likelihoods.(a) <- likelihoods.(i) :: action_likelihoods.(a))
-      cases;
-    let actions =
-      Array.mapi
-        (fun a expr ->
-          let likelihood = Likelihood.sum_list action_likelihoods.(a) in
-          expr, dbg, ~likelihood)
-        actions
+  let make_switch dbg () arg cases actions =
+    let likelihood =
+      Likelihood.sum_list
+        (Array.map (fun (_, ~likelihood) -> likelihood) actions |> Array.to_list)
     in
-    make_switch arg cases actions dbg
+    let actions =
+      Array.map (fun (expr, ~likelihood) -> expr, dbg, ~likelihood) actions
+    in
+    make_switch arg cases actions dbg, ~likelihood
 
-  let bind arg body = bind "switcher" arg body
+  let bind arg body = bind_with_likelihood "switcher" arg body
 
-  let make_catch _likelihoods handler =
+  let make_catch () (handler, ~likelihood) n =
+    let likelihood = Likelihood.scale n likelihood in
     match handler with
-    | Cexit (Lbl i, [], []) -> i, fun e -> e
-    | _ -> (
+    | Cexit (Lbl i, [], []) -> i, likelihood, fun e -> e
+    | _ ->
       let dbg = Debuginfo.none in
       let i = Lambda.next_raise_count () in
       (* Printf.eprintf "SHARE CMM: %i\n" i ; Printcmm.expression
          Format.str_formatter handler ; Printf.eprintf "%s\n"
          (Format.flush_str_formatter ()) ; *)
       ( i,
-        fun body ->
-          match body with
-          | Cexit (j, _, _) -> if j = Lbl i then handler else body
-          | _ -> ccatch (i, [], body, handler, dbg, false) ))
+        likelihood,
+        fun (body, ~likelihood) ->
+          ( (match body with
+            | Cexit (j, _, _) -> if j = Lbl i then handler else body
+            | _ -> ccatch (i, [], body, handler, dbg, false)),
+            ~likelihood ) )
 
-  let make_exit i = Cexit (Lbl i, [], [])
+  let make_exit i likelihood = Cexit (Lbl i, [], []), ~likelihood
 end
 
 (* cmm store, as sharing as normally been detected in previous phases, we only
@@ -3608,13 +3617,13 @@ end
    the index in the action array as context allows to share them correctly
    without duplication. *)
 module StoreExpForSwitch = Switch.CtxStore (struct
-  type t = expression
+  type t = expression * likelihood:Likelihood.t
 
   type key = Static_label.t option * int
 
   type context = int
 
-  let make_key index expr =
+  let make_key index (expr, ~likelihood:_) =
     let continuation =
       match expr with Cexit (Lbl i, [], []) -> Some i | _ -> None
     in
@@ -3630,20 +3639,7 @@ module SwitcherBlocks = Switch.Make (SArgBlocks)
 
 let transl_switch_clambda loc arg index cases =
   let store = StoreExpForSwitch.mk_store () in
-  let index =
-    Array.map
-      (fun j ->
-        let case, ~likelihood:_ = cases.(j) in
-        store.Switch.act_store j case)
-      index
-  in
-  let likelihoods =
-    Array.map
-      (fun j ->
-        let _, ~likelihood = cases.(j) in
-        likelihood)
-      index
-  in
+  let index = Array.map (fun j -> store.Switch.act_store j cases.(j)) index in
   let n_index = Array.length index in
   let inters = ref []
   and this_high = ref (n_index - 1)
@@ -3666,9 +3662,12 @@ let transl_switch_clambda loc arg index cases =
     case
   | inters ->
     bind "switcher" arg (fun a ->
-        SwitcherBlocks.zyva loc likelihoods
-          (0, n_index - 1)
-          a (Array.of_list inters) store)
+        let body, ~likelihood:_ =
+          SwitcherBlocks.zyva loc ()
+            (0, n_index - 1)
+            a (Array.of_list inters) store
+        in
+        body)
 
 let split_arity_for_apply arity args =
   (* Decides whether a caml_applyN needs to be split. If N <= max_arity, then
