@@ -1,6 +1,6 @@
 - : unit = ()
 exception E
-val f : unit -> 'a = <fun>
+val f : ('a : any). unit -> 'a = <fun>
 Line 1, characters 11-15:
 1 | let g () = f (); 1;;
                ^^^^
