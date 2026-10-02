@@ -814,6 +814,7 @@ end = struct
     let modes_to_equate = ref [] in
     LocalVarMap.iter Mode
       (fun name (mode, loc) ->
+        With_locality.update_level (get_global_level ()) mode;
         match lookup_global_mode name with
         | mode' ->
           modes_to_equate := (loc, name, mode, mode') :: !modes_to_equate
