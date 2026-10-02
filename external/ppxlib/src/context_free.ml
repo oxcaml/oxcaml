@@ -74,12 +74,16 @@ module Rule = struct
   module Attr_floating_inline = struct
     type ('a, 'b) unpacked = {
       attribute : ('a, 'b) Attribute.Floating.t;
+      expand_items : bool;
       expand : ctxt:Expansion_context.Deriver.t -> 'b -> 'a list;
     }
 
     type 'a t = T : ('a, _) unpacked -> 'a t
 
     let attr_name (T t) = Attribute.Floating.name t.attribute
+
+    let split_normal_and_expand l =
+      List.partition l ~f:(fun (T t) -> not t.expand_items)
   end
 
   module Special_function = struct
@@ -220,6 +224,11 @@ module Rule = struct
       T (Attr_replace kind, T { name; attributes; expand })
   end
 
+  module Attribute_list = Attr_multiple_replace.Attribute_list
+  module Parsed_payload_list = Attr_multiple_replace.Parsed_payload_list
+
+  let attr_multiple_replace = Attr_multiple_replace.attr_multiple_replace
+
   let attr_str_type_decl attribute expand =
     T (Attr_str_type_decl, T { attribute; expand; expect = false })
 
@@ -292,11 +301,17 @@ module Rule = struct
   let attr_sig_class_type_decl_expect attribute expand =
     T (Attr_sig_class_type_decl, T { attribute; expand; expect = true })
 
+  let attr_str_floating_expect attribute expand =
+    T (Attr_str_floating, T { attribute; expand; expand_items = false })
+
+  let attr_sig_floating_expect attribute expand =
+    T (Attr_sig_floating, T { attribute; expand; expand_items = false })
+
   let attr_str_floating_expect_and_expand attribute expand =
-    T (Attr_str_floating, T { attribute; expand })
+    T (Attr_str_floating, T { attribute; expand; expand_items = true })
 
   let attr_sig_floating_expect_and_expand attribute expand =
-    T (Attr_sig_floating, T { attribute; expand })
+    T (Attr_sig_floating, T { attribute; expand; expand_items = true })
 end
 
 module Generated_code_hook = struct
@@ -807,11 +822,15 @@ class map_top_down ?(expect_mismatch_handler = Expect_mismatch_handler.nop)
     |> sort_attr_group_inline |> Rule.Attr_group_inline.split_normal_and_expect
   in
 
-  let attr_str_floating_expect_and_expand =
-    Rule.filter Attr_str_floating rules |> sort_attr_floating_inline
+  let attr_str_floating_expect, attr_str_floating_expect_and_expand =
+    Rule.filter Attr_str_floating rules
+    |> sort_attr_floating_inline
+    |> Rule.Attr_floating_inline.split_normal_and_expand
   in
-  let attr_sig_floating_expect_and_expand =
-    Rule.filter Attr_sig_floating rules |> sort_attr_floating_inline
+  let attr_sig_floating_expect, attr_sig_floating_expect_and_expand =
+    Rule.filter Attr_sig_floating rules
+    |> sort_attr_floating_inline
+    |> Rule.Attr_floating_inline.split_normal_and_expand
   in
 
   let map_node = map_node ~hook ~embed_errors in
@@ -1053,6 +1072,9 @@ class map_top_down ?(expect_mismatch_handler = Expect_mismatch_handler.nop)
                         item.pstr_loc (Many items);
                     loop rest ~in_generated_code >>| fun rest -> items @ rest)
             | Pstr_attribute at ->
+                handle_attr_floating_inline attr_str_floating_expect ~item:at
+                  ~loc ~base_ctxt ~convert_exn
+                >>= fun expect_items ->
                 handle_attr_floating_inline attr_str_floating_expect_and_expand
                   ~item:at ~loc ~base_ctxt ~convert_exn
                 >>= fun expect_items_unexpanded ->
@@ -1060,9 +1082,10 @@ class map_top_down ?(expect_mismatch_handler = Expect_mismatch_handler.nop)
                 |> combine_errors
                 >>= fun expect_items_expanded ->
                 (* Shouldn't matter if we use [rev_concat] or [List.concat] here, there
-                   should be only one (outer) list among [expect_items_expanded] unless
-                   a single floating attribute is somehow registered twice. *)
-                (match rev_concat expect_items_expanded with
+                   should be only one (outer) list among [expect_items] and
+                   [expect_items_expanded] unless a single floating attribute is
+                   somehow registered twice. *)
+                (match rev_concat (expect_items @ expect_items_expanded) with
                   | [] -> return ()
                   | expected ->
                       Code_matcher.match_structure_res rest
@@ -1144,7 +1167,7 @@ class map_top_down ?(expect_mismatch_handler = Expect_mismatch_handler.nop)
       in
       loop st ~in_generated_code:false
 
-    method! signature base_ctxt sg =
+    method! signature_items base_ctxt psg_items =
       let convert_exn = exn_to_sigi in
       let rec with_extra_items item ~extra_items ~expect_items ~rest
           ~in_generated_code =
@@ -1184,7 +1207,8 @@ class map_top_down ?(expect_mismatch_handler = Expect_mismatch_handler.nop)
                 >>= function
                 | None ->
                     super#signature_item base_ctxt item >>= fun item ->
-                    self#signature base_ctxt rest >>| fun rest -> item :: rest
+                    self#signature_items base_ctxt rest >>| fun rest ->
+                    item :: rest
                 | Some items ->
                     ((), attributes_errors attrs) >>= fun () ->
                     (* assert_no_attributes attrs; *)
@@ -1194,16 +1218,21 @@ class map_top_down ?(expect_mismatch_handler = Expect_mismatch_handler.nop)
                         item.psig_loc (Many items);
                     loop rest ~in_generated_code >>| fun rest -> items @ rest)
             | Psig_attribute at ->
+                handle_attr_floating_inline attr_sig_floating_expect ~item:at
+                  ~loc ~base_ctxt ~convert_exn
+                >>= fun expect_items ->
                 handle_attr_floating_inline attr_sig_floating_expect_and_expand
                   ~item:at ~loc ~base_ctxt ~convert_exn
                 >>= fun expect_items_unexpanded ->
-                List.map expect_items_unexpanded ~f:(self#signature base_ctxt)
+                List.map expect_items_unexpanded
+                  ~f:(self#signature_items base_ctxt)
                 |> combine_errors
                 >>= fun expect_items_expanded ->
                 (* Shouldn't matter if we use [rev_concat] or [List.concat] here, there
-                   should be only one (outer) list among [expect_items_expanded] unless
-                   a single floating attribute is somehow registered twice. *)
-                (match rev_concat expect_items_expanded with
+                   should be only one (outer) list among [expect_items] and
+                   [expect_items_expanded] unless a single floating attribute is
+                   somehow registered twice. *)
+                (match rev_concat (expect_items @ expect_items_expanded) with
                   | [] -> return ()
                   | expected ->
                       Code_matcher.match_signature_res rest
@@ -1281,8 +1310,12 @@ class map_top_down ?(expect_mismatch_handler = Expect_mismatch_handler.nop)
                     with_extra_items expanded_item ~extra_items ~expect_items
                       ~rest ~in_generated_code
                 | _, _ ->
-                    self#signature base_ctxt rest >>| fun rest ->
+                    self#signature_items base_ctxt rest >>| fun rest ->
                     expanded_item :: rest))
       in
-      loop sg ~in_generated_code:false
+      loop psg_items ~in_generated_code:false
+
+    method! signature base_ctxt { psg_items; psg_modalities; psg_loc } =
+      self#signature_items base_ctxt psg_items >>| fun psg_items ->
+      { psg_items; psg_modalities; psg_loc }
   end

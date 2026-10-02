@@ -13,7 +13,7 @@ type quoted_attributes = {
 
 let coalesce_arity_expr (input : expression) super =
   match input with
-  | { pexp_desc = Pexp_function _; pexp_loc = loc; _ } ->
+  | { pexp_desc = Pexp_function _ | Pexp_newtype _; pexp_loc = loc; _ } ->
       let ppxlib_coalesce_arity =
         Ldot
           ( Ldot (Ldot (Lident "Ppxlib", "Ast_builder"), "Default"),
@@ -306,10 +306,15 @@ let () =
           let lift = lifter loc in
           lift#typed (lift#signature s) "signature");
       E.declare "metaquot.sigi" ctx
-        A.(psig (__ ^:: nil))
+        A.(psig (signature (__ ^:: nil)))
         (fun ~loc ~path:_ s ->
           let lift = lifter loc in
           lift#typed (lift#signature_item s) "signature_item");
+      E.declare "metaquot.sigil" ctx
+        A.(psig (signature __))
+        (fun ~loc ~path:_ s ->
+          let lift = lifter loc in
+          lift#typed (lift#signature_items s) "signature_items");
       E.declare "metaquot.type" ctx
         A.(ptyp __)
         (fun ~loc ~path:_ t ->

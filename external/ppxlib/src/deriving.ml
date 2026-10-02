@@ -279,14 +279,15 @@ module Deriver = struct
         (structure, module_type_declaration) Generator.t option;
       str_module_binding : (structure, module_binding) Generator.t option;
       sig_type_decl :
-        (signature, rec_flag * type_declaration list) Generator.t option;
+        (signature_item list, rec_flag * type_declaration list) Generator.t option;
       sig_class_type_decl :
-        (signature, class_type_declaration list) Generator.t option;
-      sig_type_ext : (signature, type_extension) Generator.t option;
-      sig_exception : (signature, type_exception) Generator.t option;
+        (signature_item list, class_type_declaration list) Generator.t option;
+      sig_type_ext : (signature_item list, type_extension) Generator.t option;
+      sig_exception : (signature_item list, type_exception) Generator.t option;
       sig_module_type_decl :
-        (signature, module_type_declaration) Generator.t option;
-      sig_module_decl : (signature, module_declaration) Generator.t option;
+        (signature_item list, module_type_declaration) Generator.t option;
+      sig_module_decl :
+        (signature_item list, module_declaration) Generator.t option;
     }
   end
 
@@ -640,7 +641,7 @@ let mk_deriving_attr context ~prefix ~suffix =
                  (map1 (many __) ~f:parse_arguments))
       in
       let generators =
-        pexp_tuple (many (generator ()))
+        (pexp_tuple (many (generator ())))
         ||| map (generator ()) ~f:(fun f x -> f [ x ])
       in
       pstr (pstr_eval generators nil ^:: nil))
@@ -734,7 +735,7 @@ let wrap_sig ~loc ~hide ~unused_code_warnings sg =
   let warnings =
     if
       keep_w60_intf ()
-      || (not (Ignore_unused_warning.binds_module_names#signature sg false))
+      || (not (Ignore_unused_warning.binds_module_names#signature_items sg false))
       || unused_code_warnings
     then warnings
     else 60 :: warnings
@@ -755,6 +756,14 @@ let wrap_sig ~loc ~hide list =
    | Main expansion                                                  |
    +-----------------------------------------------------------------+ *)
 
+let remove_attributes =
+  object
+    inherit Ast_traverse0.map
+
+    method! attributes _ = []
+  end
+;;
+
 let types_used_by_deriving (tds : type_declaration list)
     ~unused_code_warnings:ppx_allows_unused_code_warnings : structure_item list
     =
@@ -767,7 +776,9 @@ let types_used_by_deriving (tds : type_declaration list)
   if keep_w32_impl () || unused_code_warnings || unused_type_warnings then []
   else
     List.map tds ~f:(fun td ->
-        let typ = Common.core_type_of_type_declaration td in
+        (* TODO: Stop removing attributes, and fix [deriving_inline] so it doesn't result
+           in unused attribute errors when adding e.g. [let _ = fun (_ : t[@x]) -> ()] *)
+        let typ = remove_attributes#core_type (Common.core_type_of_type_declaration td) in
         let loc = td.ptype_loc in
         pstr_value ~loc Nonrecursive
           [

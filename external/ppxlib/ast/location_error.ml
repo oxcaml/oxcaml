@@ -10,15 +10,18 @@ let to_extension (error : Astlib.Location.Error.t) =
   let sub_msgs = sub_msgs error in
   let main_msg = main_msg error in
   let err_extension_name loc = { Location.loc; txt = "ocaml.error" } in
-  let mk_string_constant x = Str.eval (Exp.constant (Const.string x)) in
+  let ghost loc = { loc with Location.loc_ghost = true } in
+  let mk_string_constant (msg : string Location.loc) =
+    let loc = ghost msg.loc in
+    Str.eval ~loc (Exp.constant ~loc (Const.string ~loc:msg.loc msg.txt))
+  in
   let extension_of_sub_msg (sub_msg : string Location.loc) =
     Str.extension
-      (err_extension_name sub_msg.loc, PStr [ mk_string_constant sub_msg.txt ])
+      ~loc:(ghost sub_msg.loc)
+      (err_extension_name sub_msg.loc, PStr [ mk_string_constant sub_msg ])
   in
   ( err_extension_name main_msg.loc,
-    Parsetree.PStr
-      (mk_string_constant main_msg.txt :: List.map extension_of_sub_msg sub_msgs)
-  )
+    Parsetree.PStr (mk_string_constant main_msg :: List.map extension_of_sub_msg sub_msgs) )
 
 let register_error_of_exn = Astlib.Location.register_error_of_exn
 

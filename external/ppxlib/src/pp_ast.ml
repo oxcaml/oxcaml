@@ -232,11 +232,14 @@ class lift_repr =
       match config.show_attrs with
       | true -> super#signature sig_
       | false ->
-          List.filter
-            ~f:(function
-              | { psig_desc = Psig_attribute _; _ } -> false | _ -> true)
-            sig_
-          |> super#signature
+          let psg_items =
+            List.filter
+              ~f:(function
+                | { psig_desc = Psig_attribute _; _ } -> false | _ -> true)
+              sig_.psg_items
+          in
+          super#signature { sig_ with psg_items }
+
 
     method! class_structure cstr =
       match config.show_attrs with
