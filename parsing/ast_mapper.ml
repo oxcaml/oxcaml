@@ -495,6 +495,9 @@ end
 module E = struct
   (* Value expressions for the core language *)
 
+  let map_tuple_field sub = function
+    | Ptf_label lbl -> Ptf_label (map_loc sub lbl)
+
   let map_function_param sub { pparam_loc = loc; pparam_desc = desc } =
     let loc = sub.location sub loc in
     let desc =
@@ -590,6 +593,8 @@ module E = struct
     | Pexp_unboxed_tuple el ->
         unboxed_tuple ~loc ~attrs
           (List.map (fun (l, e) -> l, sub.expr sub e) el)
+    | Pexp_tuple_proj (e, fld) ->
+        tuple_proj ~loc ~attrs (sub.expr sub e) (map_tuple_field sub fld)
     | Pexp_construct (lid, arg) ->
         construct ~loc ~attrs (map_loc_lid sub lid) (map_opt (sub.expr sub) arg)
     | Pexp_variant (lab, eo) ->

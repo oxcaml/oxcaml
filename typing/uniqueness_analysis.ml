@@ -2520,6 +2520,9 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
   | Texp_field _ as exp_desc ->
     let value, uf = check_uniqueness_exp_desc_as_value ienv ~loc exp_desc in
     UF.seq uf (Value.mark_maybe_unique value)
+  | Texp_tuple_proj _ as exp_desc ->
+    let value, uf = check_uniqueness_exp_desc_as_value ienv ~loc exp_desc in
+    UF.seq uf (Value.mark_maybe_unique value)
   | Texp_unboxed_field _ as exp_desc ->
     let value, uf = check_uniqueness_exp_desc_as_value ienv ~loc exp_desc in
     UF.seq uf (Value.mark_maybe_unique value)
@@ -2699,9 +2702,9 @@ and check_uniqueness_exp ~borrows ~overwrite (ienv : Ienv.t) exp : UF.t =
 (** Corresponds to the first mode.
 
     Look at exp and see if it can be treated as an alias. Currently only
-    [Texp_ident] and [Texp_field] (and recursively so) are treated so. If it
-    returns [Some Value.t], the caller is responsible to mark it as used as
-    needed *)
+    [Texp_ident], [Texp_field] and [Texp_tuple_proj] (and recursively so) are
+    treated so. If it returns [Some Value.t], the caller is responsible to mark
+    it as used as needed *)
 and check_uniqueness_exp_desc_as_value ~borrows ienv ~loc : _ -> Value.t * UF.t
     = function
   | Texp_ident { path; unique_use; _ } ->
@@ -2741,6 +2744,23 @@ and check_uniqueness_exp_desc_as_value ~borrows ienv ~loc : _ -> Value.t * UF.t
             Value.fresh )
       in
       value, UF.seqs [uf; uf_read; uf_boxing])
+  | Texp_tuple_proj
+      { tuple = e; field = Ttf_label { index; _ }; unique_use; unique_barrier }
+    -> (
+    let value, uf = check_uniqueness_exp_as_value ~borrows ienv e in
+    Unique_barrier.enable unique_barrier;
+    match Value.paths value with
+    | None ->
+      (* No barrier: the expression 'e' is not overwritable. *)
+      Value.fresh, uf
+    | Some paths ->
+      (* As for [Texp_field]: borrow the tuple's memory block. *)
+      let uf_read =
+        Value.mark_implicit_borrow_memory_address (Read unique_barrier) value
+      in
+      let occ = Occurrence.mk loc in
+      let paths = Paths.tuple_field (Hole.get index) paths in
+      Value.existing paths unique_use occ, UF.seq uf uf_read)
   | Texp_unboxed_field { record = e; label = l; unique_use; _ } -> (
     let value, uf = check_uniqueness_exp_as_value ~borrows ienv e in
     match Value.paths value with

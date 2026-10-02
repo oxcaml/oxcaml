@@ -261,6 +261,7 @@ let rec add_expr bv exp =
   | Pexp_unboxed_bool _ -> ()
   | Pexp_tuple el -> List.iter (fun (_, e) -> add_expr bv e) el
   | Pexp_unboxed_tuple el -> List.iter (fun (_, e) -> add_expr bv e) el
+  | Pexp_tuple_proj (e, _) -> add_expr bv e
   | Pexp_construct(c, opte) -> add bv c; add_opt add_expr bv opte
   | Pexp_variant(_, opte) -> add_opt add_expr bv opte
   | Pexp_record(lblel, opte)

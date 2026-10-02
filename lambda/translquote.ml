@@ -2617,8 +2617,7 @@ let type_for_annotation ~env ~loc typ =
       else
         let go = go (ty :: aliased) in
         match get_desc ty with
-        | Tvar { name = _; jkind }
-        | Tof_kind jkind ->
+        | Tvar { name = _; jkind } | Tof_kind jkind ->
           assert_no_jkinds jkind.annotation;
           Ttyp_var (None, jkind.annotation)
         | Tivar { name = _; jkind = _; ivar = _ } ->
@@ -3672,6 +3671,9 @@ and quote_expression_desc ~scopes ~transl stage e : Exp_desc.t =
       let rcd = quote_expression ~scopes ~transl stage rcd in
       let lbl = quote_record_field (of_location ~scopes lid.loc) env lbl in
       Exp_desc.field loc rcd lbl
+    | Texp_tuple_proj _ ->
+      fatal_errorf "Translquote [at %a]: tuple projections are not supported."
+        Location.print_loc loc'
     | Texp_setfield { record = rcd; lid; label = lbl; newval = exp; _ } ->
       let rcd = quote_expression ~scopes ~transl stage rcd in
       let lbl = quote_record_field (of_location ~scopes lid.loc) env lbl in

@@ -422,6 +422,9 @@ end
 module E = struct
   (* Value expressions for the core language *)
 
+  let iter_tuple_field sub = function
+    | Ptf_label lbl -> iter_loc sub lbl
+
   let iter_iterator sub = function
     | Pcomp_range { start; stop; direction = _ } ->
       sub.expr sub start;
@@ -509,6 +512,7 @@ module E = struct
     | Pexp_unboxed_bool _ -> ()
     | Pexp_tuple el -> List.iter (fun (_, e) -> sub.expr sub e) el
     | Pexp_unboxed_tuple el -> List.iter (fun (_, e) -> sub.expr sub e) el
+    | Pexp_tuple_proj (e, fld) -> sub.expr sub e; iter_tuple_field sub fld
     | Pexp_construct (lid, arg) ->
         iter_loc_lid sub lid; iter_opt (sub.expr sub) arg
     | Pexp_variant (_lab, eo) ->

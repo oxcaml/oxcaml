@@ -12,13 +12,14 @@ module Job = struct
     let run t = if not t.skip then t.job ()
   end
 end
+
 type t = { jobs : Job.With_skip.t Queue.t }
 
 module Change = struct
   (** To support backtracking in the scheduler, we need to backtrack on [add]
       and [take] operations:
-      - For [add], we use a [skip] bit on jobs. The scheduler will clear up
-        any skipped garbage jobs on [run]
+      - For [add], we use a [skip] bit on jobs. The scheduler will clear up any
+        skipped garbage jobs on [run]
       - For [take], we log the [job] taken from the scheduler. *)
   type nonrec t =
     | Add of Job.With_skip.t

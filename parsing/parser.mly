@@ -3181,6 +3181,8 @@ block_access:
       { Pexp_field($1, $3) }
   | simple_expr DOTHASH mkrhs(label_longident)
       { Pexp_unboxed_field($1, $3) }
+  | simple_expr DOT tuple_field
+      { Pexp_tuple_proj($1, $3) }
   | LPAREN block_access llist(unboxed_access) RPAREN
       { Pexp_idx ($2, $3) }
   | od=open_dot_declaration DOT LPAREN seq_expr RPAREN
@@ -5294,6 +5296,11 @@ clty_longident:
 ;
 class_longident:
    mk_longident(mod_longident,LIDENT) { $1 }
+;
+
+tuple_field:
+  TILDE label = mkrhs(LIDENT)
+    { Ptf_label label }
 ;
 
 /* BEGIN AVOID */

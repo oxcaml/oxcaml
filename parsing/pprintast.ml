@@ -213,6 +213,10 @@ module Doc_internal = struct
           Option.map
             (printf "#%s" meth.txt)
             (nominal_exp doc parent)
+      | Pexp_tuple_proj (parent, Ptf_label lbl) ->
+          Option.map
+            (printf ".~%s" lbl.txt)
+            (nominal_exp doc parent)
       (* String constants are syntactically too complex. For example, the
          quotes conflict with the 'inline_code' style and they might contain
          spaces. *)
@@ -1228,6 +1232,8 @@ and expression2 ctxt f x =
         pp f "@[<hov2>%a.#%a@]" (simple_expr ctxt) e value_longident_loc li
     | Pexp_send (e, s) ->
         pp f "@[<hov2>%a#%a@]" (simple_expr ctxt) e ident_of_name s.txt
+    | Pexp_tuple_proj (e, Ptf_label lbl) ->
+        pp f "@[<hov2>%a.~%a@]" (simple_expr ctxt) e ident_of_name lbl.txt
 
     | _ -> simple_expr ctxt f x
 

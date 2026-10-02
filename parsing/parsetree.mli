@@ -461,6 +461,7 @@ and expression_desc =
 
           Invariant: [n >= 2]
         *)
+  | Pexp_tuple_proj of expression * tuple_field  (** [E.f] *)
   | Pexp_construct of Longident.t loc * expression option
       (** [Pexp_construct(C, exp)] represents:
            - [C]               when [exp] is [None],
@@ -564,6 +565,10 @@ and expression_desc =
   | Pexp_hole (** _ *)
   | Pexp_borrow of expression
     (** borrow_ exp *)
+
+and tuple_field =
+  | Ptf_label of string loc
+      (** Labeled tuple projections [E.~l]. *)
 
 and case =
     {

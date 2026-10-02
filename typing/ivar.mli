@@ -1,10 +1,10 @@
 (** Write-once variables whose readers are suspended until the variable is
     filled.
 
-    Ivars can be merged, after which they behave as a single ivar. All
-    mutations are reported to the log installed by [set_log], so they can be
-    undone with [Change.undo]. Jobs enqueued on the scheduler are logged
-    separately, via [Scheduler.set_log].
+    Ivars can be merged, after which they behave as a single ivar. All mutations
+    are reported to the log installed by [set_log], so they can be undone with
+    [Change.undo]. Jobs enqueued on the scheduler are logged separately, via
+    [Scheduler.set_log].
 
     Handlers may run in any order. *)
 
@@ -29,12 +29,12 @@ module Fill_result : sig
 end
 
 (** [fill t v ~scheduler] fills [t] with [v] and enqueues the [run] of each
-    waiting handler on [scheduler]. Does not run
-    [scheduler]. If [t] is already full, [t] is unchanged. *)
+    waiting handler on [scheduler]. Does not run [scheduler]. If [t] is already
+    full, [t] is unchanged. *)
 val fill : 'a t -> 'a -> scheduler:Scheduler.t -> 'a Fill_result.t
 
-(** [upon t ~run ~cancel ~scheduler] registers a handler on [t]. Each handler
-    is either run or cancelled, exactly once:
+(** [upon t ~run ~cancel ~scheduler] registers a handler on [t]. Each handler is
+    either run or cancelled, exactly once:
     - [run v] once [t] is filled with [v]. If [t] is already full, it is
       enqueued immediately.
     - [cancel ()] if the handler is detached by {!cancel_all}.
@@ -47,14 +47,14 @@ val upon :
   scheduler:Scheduler.t ->
   unit
 
-(** [cancel_all t ~scheduler] detaches all handlers waiting on [t] and
-    enqueues each [cancel]. Does nothing if [t] is full. *)
+(** [cancel_all t ~scheduler] detaches all handlers waiting on [t] and enqueues
+    each [cancel]. Does nothing if [t] is full. *)
 val cancel_all : 'a t -> scheduler:Scheduler.t -> unit
 
 (** [merge t1 t2 ~f ~scheduler] makes [t1] and [t2] the same ivar. If both are
     empty, their handlers are combined. If exactly one is full, the other's
-    handlers are enqueued as if by {!fill}. If both are full, [f] combines
-    their values. *)
+    handlers are enqueued as if by {!fill}. If both are full, [f] combines their
+    values. *)
 val merge : 'a t -> 'a t -> f:('a -> 'a -> 'a) -> scheduler:Scheduler.t -> unit
 
 include With_backtracking.S

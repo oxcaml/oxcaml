@@ -586,6 +586,18 @@ let expr sub x =
     | Texp_unboxed_tuple list ->
         Texp_unboxed_tuple
           (List.map (fun (label, e, s) -> label, sub.expr sub e, s) list)
+    | Texp_tuple_proj
+        { tuple;
+          field = Ttf_label { label; index };
+          unique_use;
+          unique_barrier
+        } ->
+      Texp_tuple_proj
+        { tuple = sub.expr sub tuple;
+          field = Ttf_label { label = map_loc sub label; index };
+          unique_use;
+          unique_barrier
+        }
     | Texp_construct (lid, cd, rep, args, am) ->
         Texp_construct (map_loc_lid sub lid, cd, rep,
                         List.map (fun (sort, arg) -> sort, sub.expr sub arg)

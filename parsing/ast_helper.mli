@@ -180,6 +180,10 @@ module Exp:
                        -> (string option * expression) list -> expression
     val tuple: ?loc:loc -> ?attrs:attrs -> (string option * expression) list
                -> expression
+
+    val tuple_proj :
+      ?loc:loc -> ?attrs:attrs -> expression -> tuple_field -> expression
+
     val construct: ?loc:loc -> ?attrs:attrs -> lid -> expression option
                    -> expression
     val variant: ?loc:loc -> ?attrs:attrs -> label -> expression option

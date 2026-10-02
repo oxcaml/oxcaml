@@ -407,6 +407,10 @@ and expression i ppf x =
   | Pexp_unboxed_tuple (l) ->
       line i ppf "Pexp_unboxed_tuple\n";
       list i (labeled_tuple_element expression) ppf l;
+  | Pexp_tuple_proj (e, Ptf_label lbl) ->
+      line i ppf "Pexp_tuple_proj\n";
+      expression i ppf e;
+      string_loc i ppf lbl;
   | Pexp_construct (li, eo) ->
       line i ppf "Pexp_construct %a\n" fmt_longident_loc li;
       option i expression ppf eo;

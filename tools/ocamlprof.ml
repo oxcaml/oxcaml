@@ -242,6 +242,9 @@ and rw_exp iflag sexp =
   | Pexp_field(sarg, _) ->
     rewrite_exp iflag sarg
 
+  | Pexp_tuple_proj(sarg, _) ->
+    rewrite_exp iflag sarg
+
   | Pexp_setfield(srecord, _, snewval) ->
     rewrite_exp iflag srecord;
     rewrite_exp iflag snewval

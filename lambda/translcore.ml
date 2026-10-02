@@ -860,6 +860,21 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                 shape,
                 transl_typed_locality_mode_r locality_mode),
              [arg; lbl], loc)
+  | Texp_tuple_proj
+      { tuple;
+        field = Ttf_label { label = _; index };
+        unique_use = _;
+        unique_barrier = ubr
+      } ->
+      let targ =
+        transl_exp ~scopes (layout_exp Jkind.Sort.Const.for_tuple tuple) tuple
+      in
+      let sem = add_barrier_to_read (transl_unique_barrier ubr) Reads_agree in
+      let immediate_or_pointer, _ = maybe_pointer e in
+      Lprim
+        ( Pfield (Hole.get index, immediate_or_pointer, sem),
+          [targ],
+          of_location ~scopes e.exp_loc )
   | Texp_field { record = arg; record_sort = arg_sort;
                  record_repres; lid = _; label = lbl; boxing = float;
                  unique_barrier = ubr } ->

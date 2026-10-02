@@ -427,6 +427,9 @@ type error =
   | Layout_poly_inst_not_yet_supported of layout_poly_inst_restriction
   | Let_poly_not_function
   | Useless_lpoly
+  | Ambiguous_tuple_type
+  | Tuple_label_not_found of type_expr * string loc
+  | Expr_not_a_tuple_type of type_expr
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error

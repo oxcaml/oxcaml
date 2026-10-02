@@ -253,6 +253,7 @@ module Exp = struct
   let unboxed_bool ?loc ?attrs b = mk ?loc ?attrs (Pexp_unboxed_bool b)
   let tuple ?loc ?attrs a = mk ?loc ?attrs (Pexp_tuple a)
   let unboxed_tuple ?loc ?attrs a = mk ?loc ?attrs (Pexp_unboxed_tuple a)
+  let tuple_proj ?loc ?attrs a b = mk ?loc ?attrs (Pexp_tuple_proj (a, b))
   let construct ?loc ?attrs a b = mk ?loc ?attrs (Pexp_construct (a, b))
   let variant ?loc ?attrs a b = mk ?loc ?attrs (Pexp_variant (a, b))
   let record ?loc ?attrs a b = mk ?loc ?attrs (Pexp_record (a, b))
