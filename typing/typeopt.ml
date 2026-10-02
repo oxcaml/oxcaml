@@ -1202,9 +1202,9 @@ and value_kind_tuple env ~loc ~visited ~depth ~num_nodes_visited elements =
   in
   match Typedecl.compute_block_shape env types with
   | `Undetermined ->
-    (* Some element's layout is unknown or not representable, so computing
-       a more precise value kind is useless. This arises from [any] in tuples *)
-    num_nodes_visited, non_nullable Pgenval
+    (* Some element's layout is unknown (e.g. [any]), so we can't know whether
+       the tuple is mixed, but it is still a block with tag 0. *)
+    num_nodes_visited, tuple_kind Constructor_shape_undetermined
   | `Not_mixed ->
     let num_nodes_visited, fields =
       List.fold_left_map (fun num_nodes_visited field ->
