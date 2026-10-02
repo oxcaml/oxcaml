@@ -15,24 +15,38 @@
 
 val enabled : unit -> bool
 
+type counters := (string * int) list
+
 module Event : sig
   type t
 
   val instant :
     ?args:(string * Json.t) list ->
-    category:string -> name:string -> time_in_nanoseconds:int -> unit -> t
+    ?counters:counters ->
+    category:string ->
+    name:string ->
+    time_in_nanoseconds:int ->
+    unit ->
+    t
 
   val span :
     ?args:(string * Json.t) list ->
-    category:string -> name:string -> start_in_nanoseconds:int ->
-    finish_in_nanoseconds:int -> unit -> t
+    ?counters:counters ->
+    category:string ->
+    name:string ->
+    start_in_nanoseconds:int ->
+    finish_in_nanoseconds:int ->
+    unit ->
+    t
 end
 
 module Context : sig
   type t
 
   val create : name:string -> t
+
   val emit : t -> Event.t -> unit
+
   val close : t -> unit
 end
 
