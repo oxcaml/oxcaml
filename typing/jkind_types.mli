@@ -189,9 +189,15 @@ module Layout : sig
 
     module Static : sig
       val of_base : Sort.base -> Scannable_axes.t -> t
+
+      (** The layout of arrows, tuples, objects and first-class modules. *)
+      val scannable_non_null_non_float : t
     end
 
     val equal : t -> t -> bool
+
+    (** Unlike [Jkind.Layout.sub], this never mutates anything. *)
+    val less_or_equal : t -> t -> Misc.Le_result.t
 
     val max : t
 

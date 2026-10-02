@@ -1047,6 +1047,46 @@ module Layout = struct
       | (Base _ | Any _ | Product _ | Univar _ | Genvar _ | Addressable _), _ ->
         false
 
+    let rec is_surely_addressable = function
+      | Base (b, _) -> Sort.base_is_addressable b
+      | Product cs -> List.for_all is_surely_addressable cs
+      | Any _ | Univar _ | Genvar _ -> false
+      | Addressable _ -> true
+
+    (* Mirrors [Jkind.Layout.sub] on [of_const c1] and [of_const c2], but
+       without mutation. *)
+    let rec less_or_equal c1 c2 : Misc.Le_result.t =
+      match c1, c2 with
+      | Addressable c1, Addressable c2 -> less_or_equal c1 c2
+      | Addressable c1, Any _ ->
+        Misc.Le_result.combine (less_or_equal c1 c2) Less
+      | Addressable c1, _ ->
+        if is_surely_addressable c2 then less_or_equal c1 c2 else Not_le
+      | _, Addressable c2 ->
+        if is_surely_addressable c1 then less_or_equal c1 c2 else Not_le
+      | Any sa1, Any sa2 -> Scannable_axes.less_or_equal sa1 sa2
+      | Base (Scannable, sa1), Any sa2 -> (
+        match Scannable_axes.less_or_equal sa1 sa2 with
+        | Equal | Less -> Less
+        | Not_le -> Not_le)
+      | Base _, Any _ | Product _, Any _ -> Less
+      | (Univar _ | Genvar _), Any sa2 ->
+        (* [of_const] gives these [Scannable_axes.max] *)
+        if Scannable_axes.equal sa2 Scannable_axes.max then Less else Not_le
+      | Any _, _ -> Not_le
+      | Base (Scannable, sa1), Base (Scannable, sa2) ->
+        Scannable_axes.less_or_equal sa1 sa2
+      | Base (b1, _), Base (b2, _) ->
+        if Sort.equal_base b1 b2 then Equal else Not_le
+      | Product cs1, Product cs2 ->
+        if List.compare_lengths cs1 cs2 = 0
+        then Misc.Le_result.combine_list (List.map2 less_or_equal cs1 cs2)
+        else Not_le
+      | Univar uv1, Univar uv2 ->
+        if Sort.equal_univar_univar uv1 uv2 then Equal else Not_le
+      | Genvar v1, Genvar v2 -> if v1.id = v2.id then Equal else Not_le
+      | (Base _ | Product _ | Univar _ | Genvar _), _ -> Not_le
+
     let rec get_sort : t -> Sort.Const.t option = function
       | Any _ -> None
       | Base (b, _) -> Sort.Const.some (Base b)
@@ -1079,12 +1119,6 @@ module Layout = struct
           (fun acc t -> Externality.join acc (implied_externality t))
           Externality.min ts
       | Addressable t -> implied_externality t
-
-    let rec is_surely_addressable = function
-      | Base (b, _) -> Sort.base_is_addressable b
-      | Product cs -> List.for_all is_surely_addressable cs
-      | Any _ | Univar _ | Genvar _ -> false
-      | Addressable _ -> true
 
     let addressable c = if is_surely_addressable c then c else Addressable c
 

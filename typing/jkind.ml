@@ -4359,6 +4359,36 @@ let mod_bounds_are_obviously_max (type l r) (t : (l * r) jkind) =
   | { jkind = { base = _; mod_bounds = _; with_bounds = With_bounds _ }; _ } ->
     false
 
+let is_obviously_sub (type r l) (sub : (allowed * r) jkind)
+    (super : (l * allowed) jkind) =
+  let base_le =
+    match sub.jkind.base, super.jkind.base with
+    | Layout l1, Layout l2 -> (
+      (* Only compare constant layouts, as [Layout.sub] may mutate *)
+      match Layout.get_const l1, Layout.get_const l2 with
+      | Some c1, Some c2 ->
+        Misc.Le_result.is_le (Layout.Const.less_or_equal c1 c2)
+      | (Some _ | None), _ -> false)
+    | Kconstr (p1, sa1, op1), Kconstr (p2, sa2, op2) ->
+      Path.same p1 p2
+      && Kind_operator.equal op1 op2
+      && Scannable_axes.le sa1 sa2
+    | Kconstr (_, sa1, _), Layout (Any sa2) -> Scannable_axes.le sa1 sa2
+    | Kconstr _, Layout _ | Layout _, Kconstr _ -> false
+  in
+  base_le
+  &&
+  let { base = _; mod_bounds = super_bounds; with_bounds = No_with_bounds } =
+    super.jkind
+  in
+  match sub.jkind.with_bounds with
+  | No_with_bounds ->
+    Sub_result.is_le
+      (Mod_bounds.less_or_equal sub.jkind.mod_bounds super_bounds)
+  | With_bounds _ ->
+    (* With-bounds can only matter if [super]'s mod bounds aren't max *)
+    Mod_bounds.is_max super_bounds
+
 let fully_expand_aliases env ({ jkind; _ } as jk) =
   { jk with jkind = Base_and_axes.fully_expand_aliases env jkind }
 

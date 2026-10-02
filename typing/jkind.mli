@@ -937,6 +937,12 @@ val is_obviously_max : ('l * allowed) Types.jkind -> bool
     Is conservative and does not do any expansion. *)
 val mod_bounds_are_obviously_max : 'd Types.jkind -> bool
 
+(** Checks whether [sub] is a subjkind of [super]. Never does any mutation. Is
+    conservative: it does not do any expansion, and only compares constant
+    layouts. *)
+val is_obviously_sub :
+  (allowed * 'r) Types.jkind -> ('l * allowed) Types.jkind -> bool
+
 (** Fully expands the jkind's base - useful to avoid expanding twice for clients
     that both want to inspect the mod bounds and apply other functions to the
     jkind that would expand it. Also lowers the resulting externality bound to
