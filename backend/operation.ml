@@ -469,9 +469,9 @@ let dump ppf op =
   | Domain_index -> Format.fprintf ppf "domain_index"
   | Poll -> Format.fprintf ppf "poll"
   | Pause -> Format.fprintf ppf "pause"
-  | Alloc { bytes; dbginfo = _; mode = Heap } ->
+  | Alloc { bytes; dbginfo = _; mode = Heap; zero_alloc_obligations = _ } ->
     Format.fprintf ppf "alloc %i" bytes
-  | Alloc { bytes; dbginfo = _; mode = Local } ->
+  | Alloc { bytes; dbginfo = _; mode = Local; zero_alloc_obligations = _ } ->
     Format.fprintf ppf "alloc_local %i" bytes
 
 let equal_test left right =
@@ -611,8 +611,19 @@ let equal left right =
   | Domain_index, Domain_index -> true
   | Int128op left_op, Int128op right_op ->
     equal_int128_operation left_op right_op
-  | ( Alloc { bytes = left_bytes; dbginfo = left_dbg; mode = left_mode },
-      Alloc { bytes = right_bytes; dbginfo = right_dbg; mode = right_mode } ) ->
+  | ( Alloc
+        { bytes = left_bytes;
+          dbginfo = left_dbg;
+          mode = left_mode;
+          zero_alloc_obligations = _
+        },
+      Alloc
+        {
+          bytes = right_bytes;
+          dbginfo = right_dbg;
+          mode = right_mode;
+          zero_alloc_obligations = _
+        } ) ->
     Int.equal left_bytes right_bytes
     && Cmm.equal_alloc_dbginfo left_dbg right_dbg
     && Cmm.Alloc_mode.equal left_mode right_mode
