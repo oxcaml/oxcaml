@@ -3685,7 +3685,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       Shape (Array.of_list (List.map L.mixed_block_element_of_layout layouts))
     in
     (* A boxed all-void product must be [Immutable] for the middle-end *)
-    (* CR layouts-box: we default to [Mutable], but we should consider storing
+    (* CR box: we default to [Mutable], but we should consider storing
        mutability information in the primitive and refining it from the type to
        get better code generation. For now, we don't, and instead choose to be
        entirely layout directed. *)
@@ -3704,7 +3704,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       Alloc_mode.For_allocations.from_lambda mode ~current_alloc_region
         ~current_region
     in
-    (* CR layouts-box: always [Mutable], see above. *)
+    (* CR box: always [Mutable], see above. *)
     let mutability = Mutability.Mutable in
     let mixed_singleton (elt : K.flat_suffix_element) : H.expr_primitive list =
       let shape =
@@ -3714,11 +3714,11 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
           ( Make_block (Mixed (Tag.Scannable.zero, shape), mutability, mode),
             [arg] ) ]
     in
-    (* CR layouts-box: the current state of the world is a little sad. We either
-       box small numbers as tagged immediates and break representation
-       invariants for singleton unboxed records, or box them as tag-0 blocks and
-       break numeric layout invariants / optimizations. We pick the latter, but
-       we need addressability to properly handle these cases. *)
+    (* CR box: the current state of the world is a little sad. We either box
+       small numbers as tagged immediates and break representation invariants
+       for singleton unboxed records, or box them as tag-0 blocks and break
+       numeric layout invariants / optimizations. We pick the latter, but we
+       need addressability to properly handle these cases. *)
     match layout with
     | Pvalue value_kind ->
       let shape =
@@ -3758,9 +3758,9 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         (Target_ocaml_int.of_int machine_width
            (Array.length flattened_reordered_shape))
     in
-    (* CR layouts-box: always [Mutable], see [Pbox] above. In this case, we may
-       actually want to store a list of mutabilities to determine which fields
-       should be read (im)mutably. *)
+    (* CR box: always [Mutable], see [Pbox] above. In this case, we may actually
+       want to store a list of mutabilities to determine which fields should be
+       read (im)mutably. *)
     let mut = Mutability.Mutable in
     let all_indices =
       List.concat
@@ -3783,7 +3783,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
          | Punboxed_or_untagged_integer _ | Punboxed_vector _ | Punboxed_mask )
          as layout),
       [[arg]] ) -> (
-    (* CR layouts-box: always [Mutable], see above. *)
+    (* CR box: always [Mutable], see above. *)
     let mutability = Mutability.Mutable in
     let tag = Or_unknown.Known Tag.Scannable.zero in
     let size = Or_unknown.Known (Target_ocaml_int.of_int machine_width 1) in
@@ -3797,8 +3797,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       in
       [Unary (Block_load { kind; mut = mutability; field }, arg)]
     in
-    (* CR layouts-box: like [Pbox], this assumes that everything is addressable
-       and hence boxed as a singleton tag-0 block. *)
+    (* CR box: like [Pbox], this assumes that everything is addressable and
+       hence boxed as a singleton tag-0 block. *)
     match layout with
     | Pvalue _ ->
       let kind : P.Block_access_kind.t =
