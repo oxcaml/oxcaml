@@ -62,6 +62,11 @@ let max_list l =
     neg_infinity l
   |> from_logit
 
+let scale n t =
+  if n = 1 then t else
+  (* log (n * exp logit) = log n + logit *)
+  from_logit (to_logit t+. log (float n))
+
 let sum_list l =
   let max_t = max_list l in
   if Float.is_infinite max_t.logit then max_t
