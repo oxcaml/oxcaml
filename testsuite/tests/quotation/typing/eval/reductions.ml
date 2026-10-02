@@ -138,7 +138,10 @@ val f :
 let f (x : <[$('a) * $('b) * $('c)]> expr)
     : 'a eval * 'b eval * 'c eval = eval x
 [%%expect {|
-val f : <[$('a) * $('b) * $('c)]> expr -> 'a eval * 'b eval * 'c eval = <fun>
+val f :
+  ('a : any) ('b : any) ('c : any).
+    <[$('a) * $('b) * $('c)]> expr -> 'a eval * 'b eval * 'c eval =
+  <fun>
 |}]
 
 (* Unboxed tuples *)

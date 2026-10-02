@@ -161,6 +161,8 @@ module Stdlib : sig
 
     val map3 : ('a -> 'b -> 'c -> 'd) -> 'a list -> 'b list -> 'c list -> 'd list
 
+    val split3 : ('a * 'b * 'c) list -> 'a list * 'b list * 'c list
+
     val concat_map2 : ('a -> 'b -> 'c list) -> 'a list -> 'b list -> 'c list
     (** [concat_map2 f l1 l2] gives the same result as [concat (map2 f l1 l2)].
         Tail-recursive. *)
