@@ -12,14 +12,18 @@ let f : 'a @ [< 'm] -> 'a @ [> 'm] = fun x -> x
 [%%expect{|
 val f : 'a @ [< 'm] -> 'a @ [> 'm] = <fun>
 |}, Principal{|
-val f : 'a @ [< past('m)] -> 'a @ [> past('m)] = <fun>
+val f :
+  'a @ [< global many portable uncontended forkable unyielding stateless read_write] ->
+  'a @ [> aliased nonportable contended stateful immutable dynamic] = <fun>
 |}]
 
 let i = (fun x -> x : 'a @ [< 'm] -> 'a @ [> 'm])
 [%%expect{|
 val i : 'a @ [< 'm] -> 'a @ [> 'm] = <fun>
 |}, Principal{|
-val i : 'a @ [< past('m)] -> 'a @ [> past('m)] = <fun>
+val i :
+  'a @ [< global many portable uncontended forkable unyielding stateless read_write] ->
+  'a @ [> aliased nonportable contended stateful immutable dynamic] = <fun>
 |}]
 
 (* Constant bounds are allowed in let binding annotations *)
@@ -28,7 +32,9 @@ let j : 'a @ [< 'm & portable] -> 'a @ [> 'm] = fun x -> x
 [%%expect{|
 val j : 'a @ [< 'm & portable] -> 'a @ [> 'm] = <fun>
 |}, Principal{|
-val j : 'a @ [< past('m) & portable] -> 'a @ [> past('m)] = <fun>
+val j :
+  'a @ [< global many portable uncontended forkable unyielding stateless read_write] ->
+  'a @ [> aliased nonportable contended stateful immutable dynamic] = <fun>
 |}]
 
 (* Combined bounds are allowed in let binding annotations *)
@@ -36,6 +42,11 @@ val j : 'a @ [< past('m) & portable] -> 'a @ [> past('m)] = <fun>
 let k : 'a @ [< 'n > 'm] -> 'a @ [< 'm > 'n] = fun x -> x
 [%%expect{|
 val k : 'a @ [< 'n > 'm] -> 'a @ [< 'm > 'n] = <fun>
+|}, Principal{|
+val k :
+  'a @ [< global many uncontended forkable unyielding read_write > aliased nonportable stateful dynamic] ->
+  'a @ [< global many uncontended forkable unyielding read_write > aliased nonportable stateful dynamic] =
+  <fun>
 |}]
 
 (* Invalid: mode variables are only allowed on function types *)
@@ -60,5 +71,7 @@ Error: Mode variables and mode bounds are only allowed on function types.
 
 let f (_ : unit -> 'a @ 'm) : unit -> 'a @ 'm = fun () -> ""
 [%%expect{|
-val f : (unit -> string @ 'm) @ 'p -> (unit -> string @ 'o) @ 'n = <fun>
+val f :
+  (unit -> string @ [< 'm > 'n]) @ 'p -> (unit -> string @ [< 'n > 'm]) @ 'o =
+  <fun>
 |}]

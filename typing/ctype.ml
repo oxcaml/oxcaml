@@ -175,6 +175,7 @@ let global_level = s_ref 0
 let saved_level = s_ref []
 
 let get_current_level () = !current_level
+let get_global_level () = !global_level
 let init_def level = current_level := level; nongen_level := level
 let begin_def () =
   saved_level := (!current_level, !nongen_level) :: !saved_level;
