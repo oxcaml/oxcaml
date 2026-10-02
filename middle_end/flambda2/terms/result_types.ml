@@ -128,9 +128,7 @@ let print ppf t =
         other_vars TEEV.print env_extension)
 
 let create ~params ~results env_extension =
-  let other_vars =
-    TEEV.existential_vars env_extension |> Variable.Set.elements
-  in
+  let other_vars = TEEV.existential_vars env_extension in
   let bound = { Bound.params; results; other_vars } in
   A.create bound env_extension
 
