@@ -373,11 +373,10 @@ Error: The type constraints are not consistent.
 
 let f1 () : t_any = assert false;;
 [%%expect{|
-Line 1, characters 20-32:
+Line 1, characters 7-32:
 1 | let f1 () : t_any = assert false;;
-                        ^^^^^^^^^^^^
-Error: This expression has type "t_any" but an expression was expected of type
-         "('a : '_representable_layout_4)"
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Function arguments and returns must be representable.
        The layout of t_any is any
          because of the definition of t_any at line 5, characters 0-18.
        But the layout of t_any must be representable
@@ -391,7 +390,7 @@ Line 1, characters 7-18:
            ^^^^^^^^^^^
 Error: This pattern matches values of type "t_any"
        but a pattern was expected which matches values of type
-         "('a : '_representable_layout_5)"
+         "('a : '_representable_layout_4)"
        The layout of t_any is any
          because of the definition of t_any at line 5, characters 0-18.
        But the layout of t_any must be representable
@@ -1646,7 +1645,7 @@ Line 1, characters 36-48:
 1 | let default_annotated ?(x : t_any = assert false) () = ()
                                         ^^^^^^^^^^^^
 Error: This expression has type "t_any" but an expression was expected of type
-         "('a : '_representable_layout_6)"
+         "('a : '_representable_layout_5)"
        The layout of t_any is any
          because of the definition of t_any at line 5, characters 0-18.
        But the layout of t_any must be representable
@@ -1974,7 +1973,7 @@ Line 1, characters 10-22:
 1 | let () = (assert false : t_any); ()
               ^^^^^^^^^^^^
 Error: This expression has type "t_any" but an expression was expected of type
-         "('a : '_representable_layout_7)"
+         "('a : '_representable_layout_6)"
        because it is in the left-hand side of a sequence
        The layout of t_any is any
          because of the definition of t_any at line 5, characters 0-18.
@@ -1993,7 +1992,7 @@ Line 1, characters 25-37:
 1 | let () = while false do (assert false : t_any); done
                              ^^^^^^^^^^^^
 Error: This expression has type "t_any" but an expression was expected of type
-         "('a : '_representable_layout_8)"
+         "('a : '_representable_layout_7)"
        because it is in the body of a while-loop
        The layout of t_any is any
          because of the definition of t_any at line 5, characters 0-18.
@@ -2012,7 +2011,7 @@ Line 1, characters 28-40:
 1 | let () = for i = 0 to 0 do (assert false : t_any); done
                                 ^^^^^^^^^^^^
 Error: This expression has type "t_any" but an expression was expected of type
-         "('a : '_representable_layout_9)"
+         "('a : '_representable_layout_8)"
        because it is in the body of a for-loop
        The layout of t_any is any
          because of the definition of t_any at line 5, characters 0-18.
