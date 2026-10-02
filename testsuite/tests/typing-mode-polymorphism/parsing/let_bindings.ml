@@ -23,6 +23,10 @@ val i : 'a @ [< 'm] -> 'a @ [> 'm] = <fun>
 let j : 'a @ [< 'm & portable] -> 'a @ [> 'm] = fun x -> x
 [%%expect{|
 val j : 'a @ [< 'm & portable] -> 'a @ [> 'm] = <fun>
+|}, Principal{|
+val j :
+  'a @ [< 'm & portable] ->
+  'a @ [> 'm | local once unforkable yielding stateful] = <fun>
 |}]
 
 (* Combined bounds are allowed in let binding annotations *)
@@ -48,4 +52,13 @@ Line 1, characters 14-20:
 1 | let x : int @ [< 'm] = 5
                   ^^^^^^
 Error: Mode variables and mode bounds are only allowed on function types.
+|}]
+
+(* Mode variables are scoped like type variables *)
+
+let f (_ : unit -> 'a @ 'm) : unit -> 'a @ 'm = fun () -> ""
+[%%expect{|
+val f :
+  (unit -> string @ [< 'm > 'n]) @ 'p -> (unit -> string @ [< 'n > 'm]) @ 'o =
+  <fun>
 |}]
