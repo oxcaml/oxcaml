@@ -486,7 +486,7 @@ module Inlining = struct
       ~body ~is_exn_handler ~is_cold
 
   let wrap_inlined_body acc ~apply_exn_continuation ~apply_return_continuation
-      ~result_arity ~make_inlined_body =
+      ~result_arity ~make_inlined_body ~invalid =
     let apply_cont_create acc ~trap_action cont ~args ~dbg =
       let acc, apply_cont =
         Apply_cont_with_acc.create acc ~trap_action cont ~args ~dbg
@@ -494,7 +494,7 @@ module Inlining = struct
       Expr_with_acc.create_apply_cont acc apply_cont
     in
     Inlining_helpers.wrap_inlined_body acc ~apply_exn_continuation
-      ~apply_return_continuation ~result_arity ~make_inlined_body
+      ~apply_return_continuation ~result_arity ~make_inlined_body ~invalid
       ~apply_cont_create ~let_cont_create
 
   let inline acc ~apply ~apply_depth ~func_desc:code =
@@ -544,7 +544,9 @@ module Inlining = struct
         let acc = Acc.with_free_names Name_occurrences.empty acc in
         let acc = Acc.increment_metrics cost_metrics acc in
         wrap_inlined_body acc ~apply_exn_continuation ~apply_return_continuation
-          ~result_arity:(Code.result_arity code) ~make_inlined_body)
+          ~result_arity:(Code.result_arity code) ~make_inlined_body
+          ~invalid:(fun acc ->
+            Expr_with_acc.create_invalid acc (Application_never_returns apply)))
 end
 
 type unarized_extern_repr =
@@ -1835,8 +1837,8 @@ let close_exact_or_unknown_apply acc env
             (* See comment about when this check can be done, in
                simplify_apply_expr.ml *)
             not
-              (Flambda_arity.equal_ignoring_subkinds return_arity
-                 result_arity_from_code
+              (Flambda_arity.is_instance_ignoring_subkinds return_arity
+                 ~of_:result_arity_from_code
               && Misc.Stdlib.List.equal
                    (Misc.Stdlib.List.equal K.With_subkind.equal_ignoring_subkind)
                    (Flambda_arity.unarize_per_parameter args_arity)
@@ -2242,6 +2244,7 @@ let compute_body_of_unboxed_function acc my_region my_alloc_region my_closure
         let outer_return_continuation =
           Continuation.create ~sort:Return ~name:"return" ()
         in
+        let return_arity = Flambda_arity.receiving_arity return in
         let handler_params =
           Bound_parameters.create
             (List.mapi
@@ -2252,7 +2255,7 @@ let compute_body_of_unboxed_function acc my_region my_alloc_region my_closure
                      (Flambda_kind.With_subkind.kind kind)
                  in
                  Bound_parameter.create var kind Flambda_debug_uid.none)
-               (Flambda_arity.unarized_components return))
+               (Flambda_arity.unarized_components return_arity))
         in
         let handler acc =
           let acc, apply_cont =
@@ -2289,7 +2292,10 @@ let compute_body_of_unboxed_function acc my_region my_alloc_region my_closure
       let boxed_variable = Variable.create "boxed_result" K.value in
       let boxed_variable_duid = Flambda_debug_uid.none in
       let return =
-        match Flambda_arity.unarized_components return with
+        match
+          Flambda_arity.unarized_components
+            (Flambda_arity.receiving_arity return)
+        with
         | [return] -> return
         | [] | _ :: _ :: _ ->
           Misc.fatal_error
@@ -2348,8 +2354,9 @@ let compute_body_of_unboxed_function acc my_region my_alloc_region my_closure
       in
       ( acc,
         unboxed_body,
-        Flambda_arity.create_singletons
-          (List.map (fun (_, _, kind) -> kind) vars_with_kinds),
+        Flambda_arity.with_unknown
+          (Flambda_arity.create_singletons
+             (List.map (fun (_, _, kind) -> kind) vars_with_kinds)),
         unboxed_return_continuation )
   in
   let acc, unboxed_body =
@@ -2488,7 +2495,8 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
         ~callee:(Some (Simple.var main_closure))
         ~continuation:(Return cont)
         (Exn_continuation.create ~exn_handler:exn_continuation ~extra_args:[])
-        ~args ~args_arity ~return_arity:result_arity_main_code
+        ~args ~args_arity
+        ~return_arity:(Flambda_arity.receiving_arity result_arity_main_code)
         ~call_kind:(Call_kind.direct_function_call main_code_id)
         ~return_mode:
           (Alloc_mode.For_applications.from_lambda
@@ -2541,7 +2549,8 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
                in
                let var_duid = Flambda_debug_uid.none in
                Bound_parameter.create var kind var_duid)
-             (Flambda_arity.unarized_components result_arity_main_code))
+             (Flambda_arity.unarized_components
+                (Flambda_arity.receiving_arity result_arity_main_code)))
       in
       let handler, free_names_of_handler =
         let boxed_return = Variable.create "boxed_return" K.value in
@@ -3569,7 +3578,7 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
         exn_continuation;
         inlined = Lambda.forward_inlined_attribute ();
         mode = result_mode;
-        return_arity = result_arity;
+        return_arity = Flambda_arity.receiving_arity result_arity;
         region = my_region;
         ghost_region = my_ghost_region;
         alloc_region = my_alloc_region
@@ -3807,7 +3816,7 @@ type call_args_split =
         provided_arity : [`Complex] Flambda_arity.t;
         missing_arity : [`Complex] Flambda_arity.t;
         missing_param_modes : Alloc_mode.For_types.t list;
-        result_arity : [`Unarized] Flambda_arity.t
+        result_arity : [`Unarized | `Unknown] Flambda_arity.t
       }
   | Over_app of
       { full : IR.simple list;
@@ -3934,7 +3943,11 @@ let close_apply acc env (apply : IR.apply) : Expr_with_acc.t =
         ~arity:params_arity ~first_complex_local_param ~result_mode
     | Over_app { full; provided_arity; remaining; remaining_arity; result_mode }
       ->
-      if not (Flambda_arity.is_one_param_of_kind_value result_arity)
+      if
+        not
+          (Flambda_arity.is_instance_ignoring_subkinds
+             (Flambda_arity.create_singletons [K.With_subkind.any_value])
+             ~of_:result_arity)
       then
         ( acc,
           Expr.create_invalid

@@ -264,7 +264,8 @@ let split_direct_over_application apply ~callee's_code_id
   in
   let after_full_application = Continuation.create () in
   let full_apply_result_arity =
-    Code_metadata.result_arity callee's_code_metadata
+    Flambda_arity.receiving_arity
+      (Code_metadata.result_arity callee's_code_metadata)
   in
   let after_full_application_handler =
     if not (Flambda_arity.is_one_param_of_kind_value full_apply_result_arity)
@@ -297,7 +298,7 @@ let split_direct_over_application apply ~callee's_code_id
       ~continuation:(Return after_full_application)
       (Apply.exn_continuation apply)
       ~args:first_args ~args_arity:callee's_params_arity
-      ~return_arity:(Code_metadata.result_arity callee's_code_metadata)
+      ~return_arity:full_apply_result_arity
       ~call_kind:(Call_kind.direct_function_call callee's_code_id)
       ~return_mode:inner_apply_alloc_mode (Apply.dbg apply)
       ~inlined:(Apply.inlined apply)

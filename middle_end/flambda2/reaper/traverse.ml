@@ -36,7 +36,7 @@ let apply_cont_deps denv acc apply_cont =
     params args
 
 let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
-  let result_arity = Code.result_arity code in
+  let result_arity = Flambda_arity.receiving_arity (Code.result_arity code) in
   let return =
     List.mapi
       (fun i kind ->
@@ -743,7 +743,8 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
     ~params:return
     ~arity:
       (Flambda_arity.unarized_components
-         (Code_metadata.result_arity code_metadata));
+         (Flambda_arity.receiving_arity
+            (Code_metadata.result_arity code_metadata)));
   Acc.continuation_info acc exn_continuation ~is_exn_handler:true ~params:[exn]
     ~arity:[KS.any_value];
   Acc.fixed_arity_continuation acc return_continuation;

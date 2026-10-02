@@ -1039,9 +1039,21 @@ let decide_whether_apply_needs_calling_convention_change env apply =
     | C_call _ | Method _ | Effect _ -> None, call_kind
   in
   match code_id_actually_called with
-  | None -> Unboxing_analysis.Not_changing_calling_convention, call_kind
-  | Some code_id ->
-    Analysis.get_calling_convention_change env.solution code_id, call_kind
+  | None ->
+    ( Unboxing_analysis.Not_changing_calling_convention,
+      call_kind,
+      `Callee_may_return )
+  | Some code_id -> (
+    ( Analysis.get_calling_convention_change env.solution code_id,
+      call_kind,
+      match Analysis.find_code_metadata env.solution code_id with
+      | None -> `Callee_may_return
+      | Some code_metadata -> (
+        match
+          Flambda_arity.known (Code_metadata.result_arity code_metadata)
+        with
+        | Some _ -> `Callee_may_return
+        | None -> `Callee_never_returns) ))
 
 let rebuild_apply env apply =
   let callee_is_dead =
@@ -1068,7 +1080,7 @@ let rebuild_apply env apply =
     (* CR ncourant: we never rewrite alloc_mode. This is currently ok because we
        never remove begin- or end-region primitives, but might be needed later
        if we chose to handle them. *)
-    let updating_calling_convention, call_kind =
+    let updating_calling_convention, call_kind, callee_returns =
       decide_whether_apply_needs_calling_convention_change env apply
     in
     let exn_continuation = Apply.exn_continuation apply in
@@ -1351,9 +1363,13 @@ let rebuild_apply env apply =
         in
         Flambda_arity.create (List.map components_for args)
       in
-      let return_arity =
-        Flambda_arity.unarize_t
-          (Unboxing_analysis.arity_of_decisions return_decisions)
+      let return_arity, return_decisions =
+        match callee_returns with
+        | `Callee_may_return ->
+          ( Flambda_arity.unarize_t
+              (Unboxing_analysis.arity_of_decisions return_decisions),
+            return_decisions )
+        | `Callee_never_returns -> caller_side_return ()
       in
       let args = List.map fst (List.flatten args) in
       let make_apply ~continuation =

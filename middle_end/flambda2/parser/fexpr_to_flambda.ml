@@ -697,9 +697,12 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
         in
         let result_arity =
           match ret_arity with
-          | None ->
-            Flambda_arity.create_singletons [Flambda_kind.With_subkind.any_value]
-          | Some ar -> arity ar
+          | Code_returns None ->
+            Flambda_arity.with_unknown
+              (Flambda_arity.create_singletons
+                 [Flambda_kind.With_subkind.any_value])
+          | Code_returns (Some ar) -> Flambda_arity.with_unknown (arity ar)
+          | Code_unknown_arity -> Flambda_arity.unknown
         in
         let ( _params,
               params_and_body,
@@ -757,7 +760,9 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
           (* CR sspies: In the future, consider propagating these debug UIDs. *)
           let return_continuation, env =
             fresh_cont env ret_cont ~sort:Return
-              ~arity:(Flambda_arity.cardinal_unarized result_arity)
+              ~arity:
+                (Flambda_arity.cardinal_unarized
+                   (Flambda_arity.receiving_arity result_arity))
           in
           let exn_continuation, env = fresh_exn_cont env exn_cont ~arity:1 in
           let acc = Acc.push_closure_info acc ~code_id in

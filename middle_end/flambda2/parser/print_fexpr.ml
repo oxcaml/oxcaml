@@ -293,6 +293,11 @@ let arity ppf (a : arity) =
   | [] -> directive Flambda_colours.kind Format.pp_print_string ppf "unit"
   | _ -> Format.fprintf ppf "@[<hv>%a@]" (pp_star_list kind_with_subkind) a
 
+let code_return_arity ppf (a : code_return_arity) =
+  match a with
+  | Code_returns a -> pp_option ~space:Before (pp_like ": %a" arity) ppf a
+  | Code_unknown_arity -> Format.fprintf ppf "@ : any"
+
 let kinded_variable ppf (v, (k : kind_with_subkind option)) =
   match k with
   | None -> variable ppf v
@@ -878,9 +883,7 @@ and code_binding ppf
     params variable closure_var
     (alloc_mode_for_applications variable ~space:Before)
     region_vars variable depth_var continuation_id ret_cont continuation_id
-    exn_cont
-    (pp_option ~space:Before (pp_like ": %a" arity))
-    ret_arity
+    exn_cont code_return_arity ret_arity
     (match result_mode with
     | Not_alloc_stack -> ""
     | Maybe_alloc_stack -> " stack")

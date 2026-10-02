@@ -218,9 +218,24 @@ type inlining_decision =
 (* CR vlaviron: fetch [params_arity], [result_arity] and [result_types] from
    [callee's_code_metadata] to prevent using the wrong one by mistake *)
 let simplify_direct_full_application ~simplify_expr ~rebuild_expr dacc apply
-    function_type ~params_arity ~result_arity
+    function_type ~params_arity
+    ~(result_arity : [`Unarized | `Unknown] Flambda_arity.t)
     ~(result_types : _ Or_unknown_or_bottom.t) ~down_to_up ~coming_from_indirect
     ~callee's_code_metadata ~inlined_forwarded_from =
+  let result_arity, (result_types : _ Or_unknown_or_bottom.t) =
+    match Flambda_arity.known result_arity with
+    | Some result_arity -> result_arity, result_types
+    | None -> (
+      ( Apply.return_arity apply,
+        (* Even though this never returns, we only mark the result type as
+           [Bottom] if we already have a [Bottom] to avoid changing codegen. We
+           can probably always return [Bottom] here.
+
+           See [typing-layouts/never_returning_functions_backtrace.ml] *)
+        match result_types with
+        | Bottom -> Bottom
+        | Unknown | Ok _ -> Unknown ))
+  in
   let inlined =
     match function_type with
     | None ->
@@ -407,8 +422,9 @@ let simplify_direct_full_application ~simplify_expr ~rebuild_expr dacc apply
 
 let simplify_direct_partial_application ~simplify_expr dacc apply
     ~callee's_code_id ~callee's_code_metadata ~callee's_function_slot
-    ~param_arity ~param_modes ~args_arity ~result_arity ~recursive ~down_to_up
-    ~coming_from_indirect
+    ~param_arity ~param_modes ~args_arity
+    ~(result_arity : [`Unarized | `Unknown] Flambda_arity.t) ~recursive
+    ~down_to_up ~coming_from_indirect
     ~(closure_alloc_mode_from_type : Alloc_mode.For_types.t)
     ~first_complex_local_param =
   (* Partial-applications are converted in full applications. Let's assume that
@@ -652,8 +668,8 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
           let full_application =
             Apply.create ~callee ~continuation:(Return return_continuation)
               exn_continuation ~args ~args_arity:param_arity
-              ~return_arity:result_arity ~call_kind ~return_mode:my_alloc_mode
-              dbg ~inlined
+              ~return_arity:(Flambda_arity.receiving_arity result_arity)
+              ~call_kind ~return_mode:my_alloc_mode dbg ~inlined
               ~inlining_state:(Apply.inlining_state apply)
               ~position:Normal ~probe:None
               ~relative_history:Inlining_history.Relative.empty
@@ -947,9 +963,10 @@ let simplify_function_call_where_callee's_type_unavailable dacc apply
 let simplify_direct_function_call ~simplify_expr ~rebuild_expr dacc apply
     ~callee's_code_id_from_type ~callee's_code_metadata_from_type
     ~callee's_code_ids_from_call_kind ~callee's_function_slot
-    ~coming_from_indirect ~result_arity ~result_types ~recursive
-    ~must_be_detupled ~closure_alloc_mode_from_type function_decl ~down_to_up
-    ~call ~inlined_forwarded_from =
+    ~coming_from_indirect
+    ~(result_arity : [`Unarized | `Unknown] Flambda_arity.t) ~result_types
+    ~recursive ~must_be_detupled ~closure_alloc_mode_from_type function_decl
+    ~down_to_up ~call ~inlined_forwarded_from =
   (match Apply.probe apply, Apply.inlined apply with
   | None, _ | Some _, Never_inlined -> ()
   | ( Some _,
@@ -1040,8 +1057,8 @@ let simplify_direct_function_call ~simplify_expr ~rebuild_expr dacc apply
              present on the application expression, so all we can do is check
              that the function being overapplied returns kind Value. *)
           not
-            (Flambda_arity.equal_ignoring_subkinds result_arity
-               result_arity_of_application)
+            (Flambda_arity.is_instance_ignoring_subkinds
+               result_arity_of_application ~of_:result_arity)
         then
           if Flambda_features.kind_checks ()
           then
@@ -1052,7 +1069,8 @@ let simplify_direct_function_call ~simplify_expr ~rebuild_expr dacc apply
               result_arity_of_application Apply.print apply
           else
             replace_apply_by_invalid dacc ~down_to_up
-              (Application_result_kind_mismatch (result_arity, apply))
+              (Application_result_kind_mismatch
+                 (Flambda_arity.receiving_arity result_arity, apply))
         else
           simplify_direct_full_application ~simplify_expr ~rebuild_expr dacc
             apply (Some function_decl) ~params_arity ~result_arity ~result_types
@@ -1062,7 +1080,10 @@ let simplify_direct_function_call ~simplify_expr ~rebuild_expr dacc apply
       then
         if
           (* See comment above. *)
-          not (Flambda_arity.is_one_param_of_kind_value result_arity)
+          not
+            (Flambda_arity.is_instance_ignoring_subkinds
+               (Flambda_arity.create_singletons [K.With_subkind.any_value])
+               ~of_:result_arity)
         then
           if Flambda_features.kind_checks ()
           then
@@ -1072,7 +1093,8 @@ let simplify_direct_function_call ~simplify_expr ~rebuild_expr dacc apply
               Apply.print apply
           else
             replace_apply_by_invalid dacc ~down_to_up
-              (Application_result_kind_mismatch (result_arity, apply))
+              (Application_result_kind_mismatch
+                 (Flambda_arity.receiving_arity result_arity, apply))
         else
           simplify_direct_over_application ~simplify_expr dacc apply ~down_to_up
             ~coming_from_indirect ~callee's_code_id ~callee's_code_metadata
