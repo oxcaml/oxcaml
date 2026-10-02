@@ -793,6 +793,8 @@ let ocaml_ignored_flags =
     "-long-frames";
     "-no-insn-sched";
     "-no-long-frames";
+    "-frametable-index";
+    "-no-frametable-index";
     "-no-unbox-free-vars-of-closures";
     "-verify-binary-emitter";
     "-ikinds-debug";
