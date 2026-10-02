@@ -2617,8 +2617,7 @@ let type_for_annotation ~env ~loc typ =
       else
         let go = go (ty :: aliased) in
         match get_desc ty with
-        | Tvar { name = _; jkind }
-        | Tof_kind jkind ->
+        | Tvar { name = _; jkind } | Tof_kind jkind ->
           assert_no_jkinds jkind.annotation;
           Ttyp_var (None, jkind.annotation)
         | Tivar { name = _; jkind = _; ivar = _ } ->
