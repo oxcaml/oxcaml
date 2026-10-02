@@ -6583,22 +6583,23 @@ let moregen_mode_fast v m1 m2 =
   in
   if not ok then raise_notrace Complicated_moregen
 
-(* The layout of [ty], for the shapes of [ty] where computing it is cheap and
-   needs no mutation; raises [Complicated_moregen] otherwise. *)
-let mgen_fast_estimate_layout _env _subst ty =
+let mgen_fast_tuple_jkind : jkind_l = Jkind.for_non_float ~why:Tuple
+
+let mgen_fast_package_jkind : jkind_l =
+  Jkind.for_non_float ~why:First_class_module
+
+(* An upper bound on the jkind of [ty], for the shapes of [ty] where computing
+   one is cheap and needs no mutation; raises [Complicated_moregen] otherwise.
+*)
+let mgen_fast_estimate_jkind ty =
   match get_desc ty with
-  | Tvar { jkind } ->
-    (* Expanding a kind abbreviation needs the environment; bail instead. *)
-    begin match jkind.jkind.base with
-    | Kconstr _ -> raise_notrace Complicated_moregen
-    | Layout layout ->
-      match Jkind_types.Layout.get_const layout with
-      | Some layout -> layout
-      | None -> raise_notrace Complicated_moregen
-    end
+  | Tvar { jkind } -> Jkind.disallow_right jkind
+  | Tarrow _ -> Jkind.for_arrow
+  | Tobject _ -> Jkind.for_object
+  (* These have with-bounds, so for simplicity we use an upper bound *)
+  | Ttuple _ -> mgen_fast_tuple_jkind
+  | Tpackage _ -> mgen_fast_package_jkind
   (* FIXME: maybe a better [Tconstr] check could be done? *)
-  | Tarrow _ | Ttuple _ | Tobject _ | Tpackage _ ->
-    Jkind_types.Layout.Const.Static.scannable_non_null_non_float
   | _ -> raise_notrace Complicated_moregen
 
 let rec mgen_fast env subst scope maxnodes variance t1 t2 =
@@ -6608,23 +6609,12 @@ let rec mgen_fast env subst scope maxnodes variance t1 t2 =
   match get_desc t1, get_desc t2 with
   | Tsubst (ty, _), _ when eq_type ty t2 -> ()
   | Tvar { jkind }, _ when get_level t1 = generic_level ->
-    (* Properly computing the mod bounds of [t2] is expensive, so we avoid it.
-       But if the mod bounds of [jkind] are max (and the kind isn't abstract),
-       then only the layouts matter, and we can compare those. This is cheap
-       based on [t2]'s shape; otherwise, bail. *)
-    if not (Jkind.is_obviously_max jkind) then begin
-      let layout1 =
-        match jkind.jkind.base with
-        | Kconstr _ -> raise_notrace Complicated_moregen
-        | Layout layout1 -> layout1
-      in
-      if not (Jkind.mod_bounds_are_obviously_max jkind) then
-        raise_notrace Complicated_moregen;
-      let layout2 = mgen_fast_estimate_layout env subst t2 in
-      match Jkind_types.Layout.get_const layout1 with
-      | Some layout1 when Jkind_types.Layout.Const.equal layout1 layout2 -> ()
-      | _ -> raise_notrace Complicated_moregen
-    end;
+    (* Properly computing the jkind of [t2] is expensive, so we avoid it.
+       Instead, we compare against an upper bound that is cheap to compute
+       based on [t2]'s shape; if that is not obviously a subjkind, bail. *)
+    if not (Jkind.is_obviously_max jkind
+            || Jkind.is_obviously_sub (mgen_fast_estimate_jkind t2) jkind)
+    then raise_notrace Complicated_moregen;
     For_copy.redirect_desc scope t1 (Tsubst (t2, None))
   | Tarrow ((l1,a1,r1), t1, u1, _), Tarrow ((l2,a2,r2), t2, u2, _)
        when l1 = l2 ->

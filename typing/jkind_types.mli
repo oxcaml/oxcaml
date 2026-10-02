@@ -196,6 +196,9 @@ module Layout : sig
 
     val equal : t -> t -> bool
 
+    (** Unlike [Jkind.Layout.sub], this never mutates anything. *)
+    val less_or_equal : t -> t -> Misc.Le_result.t
+
     val max : t
 
     val get_sort : t -> Sort.Const.t option
