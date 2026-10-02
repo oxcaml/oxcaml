@@ -64,15 +64,15 @@ val output_to_csv :
 Format.formatter -> Clflags.profile_column list -> timings_precision:int -> unit
 (** Outputs the selected recorded profiling information in CSV format to the formatter. *)
 
-val record_action :
+val with_action_trace :
   gettimeofday:(unit -> float) -> name:string -> (unit -> 'a) -> 'a
-(** When Dune action tracing is enabled, record a span covering the call,
-    with the complete [-dprofile] hierarchy in its [profile] argument,
-    regardless of the selected profile columns. The columns are [time]
-    (seconds on the pass's selected clock), [alloc], [top-heap],
-    [absolute-top-heap] (all in bytes), and [counters] (an object of integer
-    counts). Each row also includes [calls], the number of CPU-clock reads
-    attributed to it. The span uses wall-clock time.
+(** When Dune action tracing is enabled, write a trace with a span covering
+    the call and a span for each profiling recording made during it,
+    regardless of the selected profile columns. Spans use wall-clock time and
+    have these counters: [time] (nanoseconds on the recording's selected
+    clock), [calls] (the number of CPU-clock reads), [alloc], [top-heap]
+    (the increase in top heap size), [absolute-top-heap] (the top heap size
+    at the end) (all in bytes), and any counters from [counter_f].
     Pass [Unix.gettimeofday] as the clock; compiler-libs itself does not
     depend on [Unix]. *)
 

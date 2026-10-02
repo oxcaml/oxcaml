@@ -7,7 +7,7 @@
 let () =
   assert (not (Action_trace.enabled ()));
   let gettimeofday () = failwith "Clock called with tracing disabled" in
-  assert (Profile.record_action ~gettimeofday ~name:"disabled"
+  assert (Profile.with_action_trace ~gettimeofday ~name:"disabled"
     (fun () -> 42) = 42);
   Action_trace.with_fresh_context ~name:"disabled" ~f:(fun context ->
     Action_trace.Context.emit context
