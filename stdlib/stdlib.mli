@@ -31,19 +31,19 @@
 
 (** {1 Exceptions} *)
 
-external raise : ('a : value_or_null). exn -> 'a @ portable unique = "%reraise"
+external raise : ('a : any). exn -> 'a @ portable unique = "%reraise"
 (** Raise the given exception value *)
 
-external raise_notrace : ('a : value_or_null). exn -> 'a @ portable unique
+external raise_notrace : ('a : any). exn -> 'a @ portable unique
   = "%raise_notrace"
 (** A faster version [raise] which does not record the backtrace.
     @since 4.02
 *)
 
-val invalid_arg : ('a : value_or_null) . string -> 'a @ portable unique
+val invalid_arg : ('a : any) . string -> 'a @ portable unique
 (** Raise exception [Invalid_argument] with the given string. *)
 
-val failwith : ('a : value_or_null) . string -> 'a @ portable unique
+val failwith : ('a : any) . string -> 'a @ portable unique
 (** Raise exception [Failure] with the given string. *)
 
 exception Exit

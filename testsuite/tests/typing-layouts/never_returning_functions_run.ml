@@ -88,6 +88,9 @@ let check name (f : string -> bool -> unit) =
   | () -> Printf.printf "%s: returned\n" name
   | exception Fail s -> Printf.printf "%s: Fail %s\n" name s
   | exception Assert_failure _ -> Printf.printf "%s: Assert_failure\n" name
+  | exception Failure s -> Printf.printf "%s: Failure %s\n" name s
+  | exception Invalid_argument s ->
+    Printf.printf "%s: Invalid_argument %s\n" name s
 
 (* Direct calls *)
 
@@ -524,3 +527,26 @@ let[@inline never] bound_result fail =
 let () =
   check "immediately applied, bound, float#" (fun name fail ->
     print_float name (if fail then bound_result true else #57.5))
+
+(* Stdlib functions that never return *)
+
+let () =
+  check "Stdlib.failwith, float#" (fun name fail ->
+    print_float name (if fail then failwith "ca" else #57.5));
+  check "Stdlib.invalid_arg, product" (fun name fail ->
+    print_product name (if fail then invalid_arg "cb" else #(58, #58.5)));
+  check "Stdlib.failwith, not inlined, void" (fun name fail ->
+    let #() = if fail then (failwith [@inlined never]) "cc" else #() in
+    print_string name "void");
+  check "Stdlib.invalid_arg, indirect, int64_u" (fun name fail ->
+    let f : string -> int64_u = Sys.opaque_identity invalid_arg in
+    print_int64 name (if fail then f "cd" else #59L));
+  check "Stdlib.raise, float#" (fun name fail ->
+    print_float name (if fail then raise (Fail "ce") else #60.5));
+  check "Stdlib.raise_notrace, product" (fun name fail ->
+    print_product name
+      (if fail then raise_notrace (Fail "cf") else #(61, #61.5)));
+  check "Printexc.raise_with_backtrace, int64_u" (fun name fail ->
+    let bt = Printexc.get_callstack 0 in
+    print_int64 name
+      (if fail then Printexc.raise_with_backtrace (Fail "cg") bt else #62L))

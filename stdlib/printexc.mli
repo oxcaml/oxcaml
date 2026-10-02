@@ -177,7 +177,7 @@ val raw_backtrace_to_string: raw_backtrace -> string
     @since 4.01
 *)
 
-external raise_with_backtrace: ('a : value_or_null)
+external raise_with_backtrace: ('a : any)
   . exn -> raw_backtrace -> 'a @ portable unique
   = "%raise_with_backtrace"
 (** Reraise the exception using the given raw_backtrace for the
