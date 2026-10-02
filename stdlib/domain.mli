@@ -210,9 +210,6 @@ module TLS : sig
         val init : unit -> unit
         val get_initial_keys : unit -> keys
         val set_initial_keys : keys -> unit
-
-        (** Whether any key was registered with [split_from_parent]. *)
-        val has_initial_keys : unit -> bool
     end
 end
 

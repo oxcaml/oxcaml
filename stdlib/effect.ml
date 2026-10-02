@@ -164,10 +164,8 @@ let[@inline never] discontinue_with_handler_with_backtrace
    now (parity with [Thread.create]) and sets them in the new fiber before
    running [comp]. *)
 let[@inline] split_tls comp =
-  if Domain.TLS.Private.has_initial_keys () then begin
-    let keys = Domain.TLS.Private.get_initial_keys () in
-    fun arg -> Domain.TLS.Private.set_initial_keys keys; comp arg
-  end else comp
+  let keys = Domain.TLS.Private.get_initial_keys () in
+  fun arg -> Domain.TLS.Private.set_initial_keys keys; comp arg
 
 module Deep = struct
 

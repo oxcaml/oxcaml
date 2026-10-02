@@ -786,9 +786,8 @@ static void domain_create(uintnat initial_minor_heap_wsize,
 
   /* This call may fail, but fatally so we don't need an error path */
   domain_root_register(&domain_state->dls_state, Atom(0) /* Empty array */);
-  /* [tls_state] is not a generational global root because it is updated by
-     plain stores from assembly code at stack switches; it is scanned
-     directly in [caml_do_roots] and by the minor GC. */
+
+  /* [tls_state] is scanned directly in [caml_do_roots] and by the minor GC. */
   domain_state->tls_state = Atom(0) /* Empty array */;
 
   // Must happen after taking the domain lock
@@ -2946,11 +2945,7 @@ CAMLprim value caml_domain_dls_compare_and_set(value old, value new)
 CAMLprim value caml_domain_tls_set(value t)
 {
   CAMLnoalloc;
-  /* [tls_state] is not a generational global root; it is scanned directly
-     as a domain root, so a plain store suffices. The store must also reach
-     the owning stack, from which [Caml_state->tls_state] is recomputed at
-     stack switches. The owner's field is a plain store too: the owner is on a
-     scanned stack chain, like the handler values (see fiber.h). */
+  /* Update both the owning stack and [Caml_state->tls_state]. */
   caml_tls_find_owner(Caml_state->current_stack)->tls_state = t;
   Caml_state->tls_state = t;
   return Val_unit;

@@ -356,7 +356,6 @@ alloc_size_class_stack_noexc(mlsize_t wosize, int cache_bucket, value hval,
   stack->local_limit = 0;
   stack->dynamic = Val_null;
   stack->is_task = false;
-  stack->is_preemptible = preemptible;
   /* Preemptible fibers own TLS state; see fiber.h. */
   stack->tls_state = preemptible ? Atom(0) : Val_null;
 #ifdef DEBUG
@@ -988,7 +987,7 @@ int caml_try_realloc_stack(asize_t required_space)
                                            Stack_handle_exception(old_stack),
                                            Stack_handle_effect(old_stack),
                                            Stack_handle_tick(old_stack),
-                                           old_stack->is_preemptible,
+                                           Stack_is_preemptible(old_stack),
                                            old_stack->id);
 
   if (!new_stack) return 0;
@@ -1006,7 +1005,7 @@ int caml_try_realloc_stack(asize_t required_space)
   new_stack->is_task = old_stack->is_task;
   new_stack->tls_state = old_stack->tls_state;
 
-  // Detach locals stack, dynamic bindings and TLS state from old_stack
+  // Detach locals stack, dynamic bindings, and TLS state from old_stack
   old_stack->local_arenas = NULL;
   old_stack->local_sp = 0;
   old_stack->local_top = NULL;
@@ -1083,12 +1082,10 @@ int caml_try_realloc_stack(asize_t required_space)
 struct stack_info* caml_alloc_main_stack (uintnat init_wsize)
 {
   const int64_t id = new_fiber_id();
-  struct stack_info* stk =
-    caml_alloc_stack_noexc(init_wsize, Val_unit, Val_unit, Val_unit, id);
-  /* Main stacks own TLS state even though they are not preemptible;
-     see fiber.h. */
-  if (stk != NULL) stk->tls_state = Atom(0);
-  return stk;
+  return alloc_size_class_stack_noexc(init_wsize,
+                                      stack_cache_bucket(init_wsize),
+                                      Val_unit, Val_unit, Val_unit,
+                                      /*htick=*/Val_null, true, id);
 }
 
 static void free_stack_memory(struct stack_info* stack)

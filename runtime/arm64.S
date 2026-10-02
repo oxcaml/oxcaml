@@ -187,7 +187,7 @@ G(name):
 #define Stack_local_sp(reg)     [reg, #64]
 #define Stack_local_top(reg)    [reg, #72]
 #define Stack_local_limit(reg)  [reg, #80]
-#define Stack_tls_state(reg)    [reg, #104]
+#define Stack_tls_state(reg)    [reg, #88]
 
 /* struct c_stack_link */
 #define Cstack_stack(reg)       [reg]
@@ -374,12 +374,10 @@ G(name):
         str     xzr, [TMP, (Dynamic_cache + 7*Dynamic_binding_size + Dynamic_binding_var)]
 .endm
 
-/* Update the cached TLS state (Caml_state->tls_state) from the nearest
-   TLS-owning stack (Stack_tls_state != Val_null (0)), starting at \stk and
-   walking parent links (see fiber.h). \stk must be on a running chain,
-   which always contains an owner. Clobbers \stk and TMP. */
+/* See [caml_tls_update_cache]: set (Caml_state->tls_state) to the nearest TLS.
+   Must occur after switching stacks. Clobbers \stk and TMP. */
 
-.macro UPDATE_TLS_MIRROR stk
+.macro UPDATE_TLS_CACHE stk
 9:      ldr     TMP, Stack_tls_state(\stk)
         cbnz    TMP, 8f
         ldr     \stk, Stack_handler(\stk)
@@ -1269,14 +1267,13 @@ L(do_perform):
     /*  we have to null the Handler_parent after the switch because
         the Handler_parent is needed to unwind the stack for backtraces */
         str     xzr, Handler_parent(x9) /* Set parent of performer to NULL */
-    /* If the departing stack owned the TLS state (it was captured into
-       the continuation), recompute the cached state from the new chain.
-       Perform and reperform capture one fiber per switch, so only x2
-       ever leaves the running chain here. */
+    /* If the departing stack owned the TLS state, recompute the cache.
+       Note each [caml_perform] only exits a single fiber, so we will find
+       the owner while reperforming (if needed). */
         ldr     TMP, Stack_tls_state(x2)
         cbz     TMP, 6f
         mov     x8, x10
-        UPDATE_TLS_MIRROR x8
+        UPDATE_TLS_CACHE x8
 6:
         ldr     TMP, Handler_effect(x9)
         mov     x2, x3                 /* x2 := last_fiber */
@@ -1304,9 +1301,9 @@ L(do_perform):
         cbz     x10, 2f
         ldr     x9, Caml_state(current_stack)
         SWITCH_OCAML_STACKS x9, x10
-    /* Recompute the cached TLS state on the resumed chain. */
+    /* Recompute the cached TLS state. */
         mov     x8, x10
-        UPDATE_TLS_MIRROR x8
+        UPDATE_TLS_CACHE x8
     /*  No parent stack. If this is a preemption effect (wosize of the
         continuation is 3, meaning we have a gc_regs present) then just
         continue execution. Otherwise, raise Effect.Unhandled. */
@@ -1432,11 +1429,9 @@ END_FUNCTION(caml_reperform)
         CFI_ADJUST(-16)
         SWITCH_OCAML_STACKS x9, x0
         FLUSH_DYNAMIC_CACHE
-    /* Recompute the cached TLS state from the resumed stack: the resumed
-       chain's owner takes over, or, as the chain was re-parented above,
-       the walk falls through into the old chain and finds the old owner. */
+    /* Recompute the cached TLS state. */
         mov     x8, x0
-        UPDATE_TLS_MIRROR x8
+        UPDATE_TLS_CACHE x8
     /* Is this a preemption continuation? */
         cbnz    x25, L(resume_preemption)
 .endm
@@ -1572,9 +1567,7 @@ FUNCTION(caml_runstack)
     /* Switch to the new stack */
         mov     sp, x9
         FLUSH_DYNAMIC_CACHE
-    /* If the new fiber owns TLS state (it is preemptible), cache its
-       state; otherwise it inherits the current cached state, since its
-       parent is the old current stack. */
+    /* If the new fiber is preemptible, cache its TLS state. */
         ldr     TMP, Stack_tls_state(x0)
         cbz     TMP, 6f
         str     TMP, Caml_state(tls_state)
@@ -1621,12 +1614,11 @@ L(frame_runstack):
         CFI_REMEMBER_STATE
         CFI_DEF_CFA_REGISTER(DW_REG_x21)
         FLUSH_DYNAMIC_CACHE
-    /* If the dying fiber owned the TLS state, recompute the cached state
-       from the parent chain. Preserves x0 (the dying stack). */
+    /* If the dying fiber owned the TLS state, recompute the cache. */
         ldr     TMP, Stack_tls_state(x0)
         cbz     TMP, 6f
         ldr     x8, Caml_state(current_stack)
-        UPDATE_TLS_MIRROR x8
+        UPDATE_TLS_CACHE x8
 6:
         ldr     TMP, Caml_state(c_stack)
         mov     sp, TMP
