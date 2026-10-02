@@ -121,7 +121,8 @@ module type S =
     val make_switch : loc -> layout -> arg -> int array -> act array -> act
 
    (* Build last minute sharing of action stuff *)
-   val make_catch : layout -> act -> int -> Static_label.t * weight * (act -> act)
+   val make_catch :
+     layout -> act -> int -> Static_label.t * weight * (act -> act)
    val make_exit : Static_label.t -> weight -> act
   end
 
