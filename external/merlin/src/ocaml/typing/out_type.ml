@@ -4232,7 +4232,7 @@ and tree_of_sigitem ?abbrev = function
       tree_of_type_declaration id decl rs
   | Sig_typext(id, ext, es, _) ->
       tree_of_extension_constructor id ext es
-  | Sig_module(id, _, md, rs, _) ->
+  | Sig_module(id, _, md, rs, vis) ->
       let abbrev =
         if List.exists (function
             | Parsetree.{attr_name = {txt="..."}; attr_payload = PStr []} ->
@@ -4242,7 +4242,7 @@ and tree_of_sigitem ?abbrev = function
           then Some (Abbrev.ellipsis ())
           else abbrev
       in
-      tree_of_module ?abbrev id md rs
+      tree_of_module ?abbrev ~vis id md rs
   | Sig_modtype(id, decl, _) ->
       tree_of_modtype_declaration ?abbrev id decl
   | Sig_class(id, decl, rs, _) ->
@@ -4260,14 +4260,21 @@ and tree_of_modtype_declaration ?abbrev id decl =
   in
   Osig_modtype (Ident.name id, mty)
 
-and tree_of_module ?abbrev id md rs = wrap_mutation (fun () ->
+and tree_of_module ?abbrev ~vis id md rs = wrap_mutation (fun () ->
   let moda =
     if Mode.Modality.is_undefined md.md_modalities then
       Mode.Modality.Const.id
     else
       Ctype.zap_modalities_to_floor_if_at_least Alpha md.md_modalities
   in
-    Osig_module (Ident.name id, tree_of_modtype ?abbrev md.md_type,
+  (* CR-someday zqian: unmentionable items of the other kinds should be
+     bracketed as well. *)
+  let name =
+    match vis with
+    | Unmentionable -> "[" ^ Ident.name id ^ "]"
+    | Exported | Hidden -> Ident.name id
+  in
+    Osig_module (name, tree_of_modtype ?abbrev md.md_type,
     tree_of_modalities Immutable moda,
     tree_of_rec rs)
   )
@@ -4370,7 +4377,7 @@ let abbreviate ~abbrev f =
 
 (* let tree_of_path = tree_of_path None *)
 let tree_of_module ident ?(ellipsis = false) =
-  tree_of_module ident
+  tree_of_module ~vis:Exported ident
     ?abbrev:(if ellipsis then Some (Abbrev.ellipsis ()) else None)
 let tree_of_signature sg = tree_of_signature sg
 let tree_of_modtype ?(abbrev = false) ty =

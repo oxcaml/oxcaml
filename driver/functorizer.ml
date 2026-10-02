@@ -49,10 +49,8 @@ type state = {
   mutable param_map : Ident.t GM.Parameter_name.Map.t;
   mutable module_map : chain GM.Name.Map.t;
       (** Bundled module → the shortest [chain] through which it has been
-          reached so far. Modules whose shortest chain is non-empty are bound
-          under a [DEP__]-prefixed name to discourage users from accessing them
-          through the bundle. CR-soon zqian: make these nonmentionable instead.
-      *)
+          reached so far. Modules whose shortest chain is non-empty are bound as
+          [Unmentionable]: they cannot be accessed through the bundle. *)
 }
 
 let new_empty_state () =
@@ -181,9 +179,9 @@ and maybe_insert_module ~chain ((gm, prec) : GM.With_precision.t) state =
 
 type result = {
   modules : GM.t list;  (** The modules to bundle, for translation. *)
-  module_sigs : (Ident.t * Types.signature) list;
-      (** The substituted signatures of [modules] (same order), for the bundle's
-          own signature. *)
+  module_sigs : (Ident.t * Types.visibility * Types.signature) list;
+      (** The substituted signatures of [modules] (same order), with their
+          visibility, for the bundle's own signature. *)
   params : (GM.Parameter_name.t * Ident.t) list;
 }
 
@@ -223,14 +221,15 @@ let analyze (src_names : CU.Name.Set.t) : result =
   let id_map =
     GM.Name.Map.mapi
       (fun (name : GM.Name.t) (chain : chain) ->
-        let base = GM.Name.to_string name in
-        let local_name = if List.is_empty chain then base else "DEP__" ^ base in
-        Ident.create_local local_name)
+        let visibility : Types.visibility =
+          if List.is_empty chain then Exported else Unmentionable
+        in
+        (Ident.create_local (GM.Name.to_string name), visibility))
       state.module_map
   in
   let subst =
     GM.Name.Map.fold
-      (fun (name : GM.Name.t) id subst ->
+      (fun (name : GM.Name.t) (id, _visibility) subst ->
         Subst.add_module (Ident.create_global name) (Path.Pident id) subst)
       id_map Subst.identity
   in
@@ -250,8 +249,8 @@ let analyze (src_names : CU.Name.Set.t) : result =
            across files. *)
         let sign_lazy = Subst.Lazy.signature Keep subst sign_lazy in
         let sign = Subst.Lazy.force_signature sign_lazy in
-        let id = GM.Name.Map.find (GM.to_name gm) id_map in
-        (gm, (id, sign)))
+        let id, visibility = GM.Name.Map.find (GM.to_name gm) id_map in
+        (gm, (id, visibility, sign)))
       state.rev_modules
     |> List.split
   in
