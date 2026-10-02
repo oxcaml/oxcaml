@@ -157,17 +157,31 @@ let wrap_inlined_body_for_exn_extra_args acc ~extra_args ~apply_exn_continuation
     ~is_cold:false
 
 let wrap_inlined_body acc ~apply_exn_continuation ~apply_return_continuation
-    ~result_arity ~make_inlined_body ~apply_cont_create ~let_cont_create =
-  match Exn_continuation.extra_args apply_exn_continuation with
-  | [] ->
-    make_inlined_body acc
-      ~apply_exn_continuation:
-        (Exn_continuation.exn_handler apply_exn_continuation)
-      ~apply_return_continuation
-  | extra_args ->
-    wrap_inlined_body_for_exn_extra_args acc ~extra_args ~apply_exn_continuation
-      ~apply_return_continuation ~result_arity ~make_inlined_body
-      ~apply_cont_create ~let_cont_create
+    ~(result_arity : [`Unarized | `Unknown] Flambda_arity.t) ~make_inlined_body
+    ~invalid ~apply_cont_create ~let_cont_create =
+  let with_exn_extra_args acc ~apply_return_continuation =
+    match Exn_continuation.extra_args apply_exn_continuation with
+    | [] ->
+      make_inlined_body acc
+        ~apply_exn_continuation:
+          (Exn_continuation.exn_handler apply_exn_continuation)
+        ~apply_return_continuation
+    | extra_args ->
+      wrap_inlined_body_for_exn_extra_args acc ~extra_args
+        ~apply_exn_continuation ~apply_return_continuation
+        ~result_arity:(Flambda_arity.receiving_arity result_arity)
+        ~make_inlined_body ~apply_cont_create ~let_cont_create
+  in
+  match Flambda_arity.known result_arity with
+  | Some _ -> with_exn_extra_args acc ~apply_return_continuation
+  | None ->
+    let never_returns = Continuation.create () in
+    let_cont_create acc never_returns ~handler_params:Bound_parameters.empty
+      ~handler:invalid
+      ~body:(fun acc ->
+        with_exn_extra_args acc
+          ~apply_return_continuation:(RC.Return never_returns))
+      ~is_exn_handler:false ~is_cold:true
 
 type attribute_kind =
   | Inlined
