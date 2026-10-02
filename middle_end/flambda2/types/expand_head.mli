@@ -154,8 +154,16 @@ type to_erase =
     supplied environment then the types provided as input to this function will
     be used instead of the types in such environment. (This situation does not
     usually occur but does arise when this function is called during function
-    result type computation.) *)
+    result type computation.)
+
+    By default, variables that are only reachable through the value slots of
+    closures are replaced by Unknown rather than being expanded or bound
+    existentially, to limit the size of the resulting extension.
+    [keep_variables_through_value_slots] disables this (used for the result
+    types of functions returning closures, in particular functors, where the
+    environments of the returned closures are the useful part). *)
 val make_suitable_for_environment :
+  ?keep_variables_through_value_slots:bool ->
   Typing_env.t ->
   to_erase ->
   (Name.t * Type_grammar.t) list ->

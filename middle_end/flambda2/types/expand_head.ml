@@ -590,7 +590,8 @@ let free_variables_transitive ~free_names_of_type env free_vars_acc ty =
   in
   free_variables_transitive0 ty ~free_vars_acc
 
-let make_suitable_for_environment env (to_erase : to_erase) bind_to_and_types =
+let make_suitable_for_environment ?(keep_variables_through_value_slots = false)
+    env (to_erase : to_erase) bind_to_and_types =
   (match to_erase with
   | Everything_not_in suitable_for ->
     List.iter
@@ -648,6 +649,30 @@ let make_suitable_for_environment env (to_erase : to_erase) bind_to_and_types =
             not (TE.mem suitable_for (Name.var var))
           | All_variables_except to_keep -> not (Variable.Set.mem var to_keep)
         in
+        (* A variable to be erased whose type is an alias to something that
+           will remain available (a constant, a symbol, or a variable that is
+           not being erased) can always be expanded, since the expansion is
+           just the alias type: there is no risk of duplicating a large type,
+           and no need for an existential variable. In particular this applies
+           to variables only reachable through value slots, which would
+           otherwise be replaced by Unknown.  This case arises when the result
+           types of a function (or functor) record that a closure's value slot
+           holds one of the function's parameters, via a renamed parameter
+           variable aliased to the real one at an application. *)
+        let is_alias_to_available var =
+          match TE.find env (Name.var var) None with
+          | exception Not_found -> false
+          | ty -> (
+            match TG.get_alias_exn ty with
+            | exception Not_found -> false
+            | simple ->
+              Simple.pattern_match simple
+                ~const:(fun _ -> true)
+                ~name:(fun name ~coercion:_ ->
+                  Name.pattern_match name
+                    ~symbol:(fun _ -> true)
+                    ~var:(fun var' -> not (erase var'))))
+        in
         Name_occurrences.fold_variables free_vars ~init:([], [], [])
           ~f:(fun
               (( unavailable_vars_renamed,
@@ -656,10 +681,16 @@ let make_suitable_for_environment env (to_erase : to_erase) bind_to_and_types =
               var
             ->
             if erase var
-            then
-              if
-                Name_occurrences.mem_var free_vars_except_through_value_slots
-                  var
+            then (
+              if keep_variables_through_value_slots && is_alias_to_available var
+              then
+                ( unavailable_vars_renamed,
+                  var :: unavailable_vars_expanded,
+                  unavailable_vars_removed )
+              else if
+                keep_variables_through_value_slots
+                || Name_occurrences.mem_var
+                     free_vars_except_through_value_slots var
               then
                 match Name_occurrences.count_variable free_vars var with
                 | Zero ->
@@ -677,7 +708,7 @@ let make_suitable_for_environment env (to_erase : to_erase) bind_to_and_types =
               else
                 ( unavailable_vars_renamed,
                   unavailable_vars_expanded,
-                  var :: unavailable_vars_removed )
+                  var :: unavailable_vars_removed ))
             else unavailable_vars)
       in
       (* Fetch the type equation for each free variable. Also add in the

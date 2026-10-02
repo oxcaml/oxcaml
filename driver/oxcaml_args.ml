@@ -562,7 +562,36 @@ let mk_flambda2_result_types_functors_only f =
       (format_default
          (match Flambda2.Default.function_result_types with
          | Functors_only -> true
-         | Never | All_functions -> false)) )
+         | Never | Functors_and_static_closures | Functors_and_closures
+         | All_functions ->
+           false)) )
+
+let mk_flambda2_result_types_functors_and_static_closures f =
+  ( "-flambda2-result-types-functors-and-static-closures",
+    Arg.Unit f,
+    Printf.sprintf
+      " Infer result types for functors, and for functions\n\
+      \     returning closures whose environments only refer to the\n\
+      \     functions' parameters (so that such closures would be statically\n\
+      \     allocated at a call site with known arguments)%s (Flambda 2 only)"
+      (format_default
+         (match Flambda2.Default.function_result_types with
+         | Functors_and_static_closures -> true
+         | Never | Functors_only | Functors_and_closures | All_functions ->
+           false)) )
+
+let mk_flambda2_result_types_functors_and_closures f =
+  ( "-flambda2-result-types-functors-and-closures",
+    Arg.Unit f,
+    Printf.sprintf
+      " Infer result types for functors, and for all functions\n\
+      \     returning closures%s (Flambda 2 only)"
+      (format_default
+         (match Flambda2.Default.function_result_types with
+         | Functors_and_closures -> true
+         | Never | Functors_only | Functors_and_static_closures | All_functions
+           ->
+           false)) )
 
 let mk_flambda2_result_types_all_functions f =
   ( "-flambda2-result-types-all-functions",
@@ -573,7 +602,9 @@ let mk_flambda2_result_types_all_functions f =
       (format_default
          (match Flambda2.Default.function_result_types with
          | All_functions -> true
-         | Never | Functors_only -> false)) )
+         | Never | Functors_only | Functors_and_static_closures
+         | Functors_and_closures ->
+           false)) )
 
 let mk_no_flambda2_result_types f =
   ( "-no-flambda2-result-types",
@@ -584,7 +615,48 @@ let mk_no_flambda2_result_types f =
       (format_default
          (match Flambda2.Default.function_result_types with
          | Never -> true
-         | Functors_only | All_functions -> false)) )
+         | Functors_only | Functors_and_static_closures | Functors_and_closures
+         | All_functions ->
+           false)) )
+
+let mk_flambda2_functor_result_types_through_value_slots f =
+  ( "-flambda2-functor-result-types-through-value-slots",
+    Arg.Unit f,
+    Printf.sprintf
+      " In the result types of functors, keep the types of\n\
+      \     variables only reachable through the value slots of the\n\
+      \     returned closures%s (Flambda 2 only)"
+      (format_default !Flambda2.functor_result_types_through_value_slots) )
+
+let mk_no_flambda2_functor_result_types_through_value_slots f =
+  ( "-no-flambda2-functor-result-types-through-value-slots",
+    Arg.Unit f,
+    Printf.sprintf
+      " In the result types of functors, replace the types of\n\
+      \     variables only reachable through the value slots of the\n\
+      \     returned closures by Unknown%s (Flambda 2 only)"
+      (format_not_default !Flambda2.functor_result_types_through_value_slots) )
+
+let mk_flambda2_function_result_types_through_value_slots f =
+  ( "-flambda2-function-result-types-through-value-slots",
+    Arg.Unit f,
+    Printf.sprintf
+      " In the result types of functions that are not functors,\n\
+      \     keep the types of variables only reachable through the value\n\
+      \     slots of the returned closures (only has an effect when\n\
+      \     result types are computed for such functions, see\n\
+      \     -flambda2-result-types-*)%s (Flambda 2 only)"
+      (format_default !Flambda2.function_result_types_through_value_slots) )
+
+let mk_no_flambda2_function_result_types_through_value_slots f =
+  ( "-no-flambda2-function-result-types-through-value-slots",
+    Arg.Unit f,
+    Printf.sprintf
+      " In the result types of functions that are not functors,\n\
+      \     replace the types of variables only reachable through the\n\
+      \     value slots of the returned closures by Unknown%s\n\
+      \     (Flambda 2 only)"
+      (format_not_default !Flambda2.function_result_types_through_value_slots) )
 
 let mk_flambda2_basic_meet f =
   ( "-flambda2-basic-meet",
@@ -1407,8 +1479,14 @@ module type Oxcaml_options = sig
   val flambda2_join_points : unit -> unit
   val no_flambda2_join_points : unit -> unit
   val flambda2_result_types_functors_only : unit -> unit
+  val flambda2_result_types_functors_and_static_closures : unit -> unit
+  val flambda2_result_types_functors_and_closures : unit -> unit
   val flambda2_result_types_all_functions : unit -> unit
   val no_flambda2_result_types : unit -> unit
+  val flambda2_functor_result_types_through_value_slots : unit -> unit
+  val no_flambda2_functor_result_types_through_value_slots : unit -> unit
+  val flambda2_function_result_types_through_value_slots : unit -> unit
+  val no_flambda2_function_result_types_through_value_slots : unit -> unit
   val flambda2_basic_meet : unit -> unit
   val flambda2_advanced_meet : unit -> unit
   val flambda2_join_algorithm : string -> unit
@@ -1609,9 +1687,21 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_no_flambda2_join_points F.no_flambda2_join_points;
       mk_flambda2_result_types_functors_only
         F.flambda2_result_types_functors_only;
+      mk_flambda2_result_types_functors_and_static_closures
+        F.flambda2_result_types_functors_and_static_closures;
+      mk_flambda2_result_types_functors_and_closures
+        F.flambda2_result_types_functors_and_closures;
       mk_flambda2_result_types_all_functions
         F.flambda2_result_types_all_functions;
       mk_no_flambda2_result_types F.no_flambda2_result_types;
+      mk_flambda2_functor_result_types_through_value_slots
+        F.flambda2_functor_result_types_through_value_slots;
+      mk_no_flambda2_functor_result_types_through_value_slots
+        F.no_flambda2_functor_result_types_through_value_slots;
+      mk_flambda2_function_result_types_through_value_slots
+        F.flambda2_function_result_types_through_value_slots;
+      mk_no_flambda2_function_result_types_through_value_slots
+        F.no_flambda2_function_result_types_through_value_slots;
       mk_flambda2_basic_meet F.flambda2_basic_meet;
       mk_flambda2_advanced_meet F.flambda2_advanced_meet;
       mk_flambda2_join_algorithm F.flambda2_join_algorithm;
@@ -2063,6 +2153,14 @@ module Oxcaml_options_impl = struct
     Flambda2.function_result_types :=
       Oxcaml_flags.Set Oxcaml_flags.Functors_only
 
+  let flambda2_result_types_functors_and_static_closures () =
+    Flambda2.function_result_types :=
+      Oxcaml_flags.Set Oxcaml_flags.Functors_and_static_closures
+
+  let flambda2_result_types_functors_and_closures () =
+    Flambda2.function_result_types :=
+      Oxcaml_flags.Set Oxcaml_flags.Functors_and_closures
+
   let flambda2_result_types_all_functions () =
     Flambda2.function_result_types :=
       Oxcaml_flags.Set Oxcaml_flags.All_functions
@@ -2070,6 +2168,18 @@ module Oxcaml_options_impl = struct
   let no_flambda2_result_types () =
     Flambda2.function_result_types :=
       Oxcaml_flags.Set (Oxcaml_flags.Never : Oxcaml_flags.function_result_types)
+
+  let flambda2_functor_result_types_through_value_slots =
+    set' Flambda2.functor_result_types_through_value_slots
+
+  let no_flambda2_functor_result_types_through_value_slots =
+    clear' Flambda2.functor_result_types_through_value_slots
+
+  let flambda2_function_result_types_through_value_slots =
+    set' Flambda2.function_result_types_through_value_slots
+
+  let no_flambda2_function_result_types_through_value_slots =
+    clear' Flambda2.function_result_types_through_value_slots
 
   let flambda2_basic_meet () = ()
   let flambda2_advanced_meet () = ()
@@ -2606,12 +2716,24 @@ module Extra_params = struct
               Oxcaml_flags.(Set (Never : function_result_types))
         | "functors-only" ->
             Flambda2.function_result_types := Oxcaml_flags.(Set Functors_only)
+        | "functors-and-static-closures" ->
+            Flambda2.function_result_types :=
+              Oxcaml_flags.(Set Functors_and_static_closures)
+        | "functors-and-closures" ->
+            Flambda2.function_result_types :=
+              Oxcaml_flags.(Set Functors_and_closures)
         | "all-functions" ->
             Flambda2.function_result_types := Oxcaml_flags.(Set All_functions)
         | _ ->
             Misc.fatal_error
-              "Syntax: flambda2-result-types=never|functors-only|all-functions");
+              "Syntax: flambda2-result-types=never|functors-only|\
+               functors-and-static-closures|functors-and-closures|\
+               all-functions");
         true
+    | "flambda2-functor-result-types-through-value-slots" ->
+        set' Flambda2.functor_result_types_through_value_slots
+    | "flambda2-function-result-types-through-value-slots" ->
+        set' Flambda2.function_result_types_through_value_slots
     | "flambda2-result-types-all-functions" ->
         (Flambda2.function_result_types := Oxcaml_flags.(Set All_functions));
         true

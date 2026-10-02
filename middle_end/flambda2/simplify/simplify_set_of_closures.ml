@@ -306,6 +306,32 @@ let simplify_function_body context ~outer_dacc function_slot_opt
       my_closure Expr.print body DA.print dacc;
     Printexc.raise_with_backtrace Misc.Fatal_error bt
 
+(* For [Compute_if_returning_closures] (see [Flambda_features]): does [ty], the
+   type of one of the results of the function, describe a single closure, and
+   if [only_if_statically_allocatable], one whose environment only refers to
+   the function's own parameters, symbols or constants? *)
+let result_type_is_closure typing_env ~params ~only_if_statically_allocatable ty
+    =
+  match T.prove_single_closures_entry typing_env ty with
+  | Unknown -> false
+  | Proved (_function_slot, _alloc_mode, closures_entry, _function_type) ->
+    (not only_if_statically_allocatable)
+    || Value_slot.Map.for_all
+         (fun _value_slot slot_ty ->
+           match
+             TE.get_alias_then_canonical_simple_exn typing_env
+               ~min_name_mode:Name_mode.in_types slot_ty
+           with
+           | exception Not_found -> false
+           | simple ->
+             Simple.pattern_match simple
+               ~const:(fun _ -> true)
+               ~name:(fun name ~coercion:_ ->
+                 Name.pattern_match name
+                   ~symbol:(fun _ -> true)
+                   ~var:(fun var -> Variable.Set.mem var params)))
+         (T.Closures_entry.value_slot_types closures_entry)
+
 let compute_result_types ~is_a_functor ~is_opaque ~return_cont_uses
     ~dacc_after_body ~dacc_at_function_entry ~return_cont_params
     ~lifted_consts_this_function ~params : _ Or_unknown_or_bottom.t =
@@ -316,8 +342,8 @@ let compute_result_types ~is_a_functor ~is_opaque ~return_cont_uses
   with
   | true, _, _ -> Unknown
   | false, _, None -> Bottom
-  | false, false, Some _ -> Unknown
-  | false, true, Some uses ->
+  | false, Do_not_compute, Some _ -> Unknown
+  | false, (Compute | Compute_if_returning_closures _), Some uses ->
     let env_at_fork =
       (* We use [C.dacc_inside_functions] not [C.dacc_prior_to_sets] to ensure
          that the environment contains bindings for any symbols being defined by
@@ -352,13 +378,41 @@ let compute_result_types ~is_a_functor ~is_opaque ~return_cont_uses
           name, ty)
         (Bound_parameters.to_list bound_params_and_results)
     in
-    let env_extension =
-      (* This call is important for compilation time performance, to cut down
-         the size of the return types. *)
-      T.make_suitable_for_environment typing_env
-        (All_variables_except params_and_results) results_and_types
+    let compute =
+      match Flambda_features.function_result_types ~is_a_functor with
+      | Do_not_compute -> assert false
+      | Compute -> true
+      | Compute_if_returning_closures { only_if_statically_allocatable } ->
+        let params_set = Bound_parameters.var_set params in
+        List.for_all
+          (fun result ->
+            let kind = K.With_subkind.kind (BP.kind result) in
+            result_type_is_closure typing_env ~params:params_set
+              ~only_if_statically_allocatable
+              (TE.find typing_env (BP.name result) (Some kind)))
+          (Bound_parameters.to_list return_cont_params)
     in
-    Ok (Result_types.create ~params ~results:return_cont_params env_extension)
+    if not compute
+    then Unknown
+    else
+      let env_extension =
+        (* This call is important for compilation time performance, to cut
+           down the size of the return types.  With
+           [-flambda2-{functor,function}-result-types-through-value-slots], we
+           keep the types of variables only reachable through the value slots
+           of the returned closures: these describe the environments of the
+           returned functions (e.g. for a functor, the module built in its body
+           and passed to an inner functor), and are what allow calls made by
+           such functions to be direct at a non-inlined application of the
+           functor or function. *)
+        T.make_suitable_for_environment
+          ~keep_variables_through_value_slots:
+            (Flambda_features.result_types_through_value_slots ~is_a_functor)
+          typing_env
+          (All_variables_except params_and_results)
+          results_and_types
+      in
+      Ok (Result_types.create ~params ~results:return_cont_params env_extension)
 
 type rebuilt_code =
   | Rebuilding of Code.t
