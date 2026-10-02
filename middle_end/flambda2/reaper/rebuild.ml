@@ -1104,6 +1104,42 @@ let rebuild_apply env apply =
       in
       Exn_continuation.create ~exn_handler ~extra_args
     in
+    (* The return arity of the application as seen by the caller, and decisions
+       for a callee that returns at that arity. *)
+    let caller_side_return () =
+      let return_arity =
+        match Apply.continuation apply with
+        | Never_returns -> Apply.return_arity apply
+        | Return cont ->
+          let cont_decisions =
+            Continuation.Map.find cont env.cont_params_to_keep
+          in
+          Flambda_arity.create_singletons
+            (List.map2
+               (fun (decision : Unboxing_analysis.param_decision) kind ->
+                 match decision with
+                 | Keep (_, kind) ->
+                   (* The subkind has already been rewritten when computing
+                      [cont_params_to_keep] *)
+                   kind
+                 | Unbox _ ->
+                   (* This can happen if the function can never return. The
+                      return continuation should be deleted anyway by
+                      [make_apply_wrapper]; conservatively erase the subkind. *)
+                   Types_rewriter.erase_subkind kind
+                 | Delete -> Types_rewriter.erase_subkind kind)
+               cont_decisions
+               (Flambda_arity.unarized_components (Apply.return_arity apply)))
+      in
+      let func_decisions =
+        List.map
+          (fun kind ->
+            Unboxing_analysis.Keep
+              (Variable.create "function_return" (KS.kind kind), kind))
+          (Flambda_arity.unarized_components return_arity)
+      in
+      return_arity, func_decisions
+    in
     match updating_calling_convention with
     | Not_changing_calling_convention -> (
       match Apply.callee apply with
@@ -1193,31 +1229,7 @@ let rebuild_apply env apply =
                (Flambda_arity.group_by_parameter (Apply.args_arity apply)
                   args_arity))
         in
-        let return_arity =
-          match Apply.continuation apply with
-          | Never_returns -> Apply.return_arity apply
-          | Return cont ->
-            let cont_decisions =
-              Continuation.Map.find cont env.cont_params_to_keep
-            in
-            Flambda_arity.create_singletons
-              (List.map2
-                 (fun (decision : Unboxing_analysis.param_decision) kind ->
-                   match decision with
-                   | Keep (_, kind) ->
-                     (* The subkind has already been rewritten when computing
-                        [cont_params_to_keep] *)
-                     kind
-                   | Unbox _ ->
-                     (* This can happen if the function can never return. The
-                        return continuation should be deleted anyway by
-                        [make_apply_wrapper]; conservatively erase the
-                        subkind. *)
-                     Types_rewriter.erase_subkind kind
-                   | Delete -> Types_rewriter.erase_subkind kind)
-                 cont_decisions
-                 (Flambda_arity.unarized_components (Apply.return_arity apply)))
-        in
+        let return_arity, func_decisions = caller_side_return () in
         let make_apply =
           Apply.create
           (* Note here that callee is rewritten with [rewrite_simple_opt], which
@@ -1231,13 +1243,6 @@ let rebuild_apply env apply =
             ~inlining_state:(Apply.inlining_state apply)
             ~probe:(Apply.probe apply) ~position:(Apply.position apply)
             ~relative_history:(Apply.relative_history apply)
-        in
-        let func_decisions =
-          List.map
-            (fun kind ->
-              Unboxing_analysis.Keep
-                (Variable.create "function_return" (KS.kind kind), kind))
-            (Flambda_arity.unarized_components return_arity)
         in
         make_apply_wrapper env make_apply (Apply.continuation apply)
           func_decisions)
