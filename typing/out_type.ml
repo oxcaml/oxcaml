@@ -1152,9 +1152,7 @@ module Variable_names : sig
   val check_name_of_type : non_gen:bool -> transient_expr -> unit
 
 
-  val reserve_with_base: With_locality.Const.t -> type_expr -> unit
-
-  val reserve: type_expr -> unit
+  val reserve: base:With_locality.Const.t -> type_expr -> unit
 
   val remove_names : transient_expr list -> unit
 
@@ -2395,7 +2393,7 @@ end = struct
     named_weak_vars := s;
     weak_var_map := m
 
-  let reserve_with_base base ty =
+  let reserve ~base ty =
     normalize_type ty;
     add_named_vars ty;
     if mode_polymorphism_printing_enabled () then begin
@@ -2406,8 +2404,6 @@ end = struct
       add_visible_edges ();
       Btype.backtrack snap
     end
-
-  let reserve ty = reserve_with_base With_locality.Const.legacy ty
 end
 
 (** Whether the return mode [m] of an arrow can be elided: the arrow is
@@ -2500,7 +2496,7 @@ module Aliases = struct
 end
 
 let prepare_type_with_base base ty =
-  Variable_names.reserve_with_base base ty;
+  Variable_names.reserve ~base ty;
   Aliases.mark_loops ty
 
 let prepare_type ty = prepare_type_with_base With_locality.Const.legacy ty
@@ -2513,12 +2509,9 @@ let reset () =
   Ident_conflicts.reset ();
   reset_except_conflicts ()
 
-let prepare_for_printing_with_base base tyl =
+let prepare_for_printing ~base tyl =
   reset_except_conflicts ();
   List.iter (prepare_type_with_base base) tyl
-
-let prepare_for_printing tyl =
-  prepare_for_printing_with_base With_locality.Const.legacy tyl
 
 let add_type_to_preparation = prepare_type
 
@@ -3043,11 +3036,11 @@ and tree_of_package mode {pack_path; pack_cstrs} =
             tree_of_typexp mode With_locality.Const.legacy ty))
         pack_cstrs }
 
-let tree_of_typexp_with_base mode base ty =
+let tree_of_typexp ~base mode ty =
   (* [tree_of_typexp] mutates state, which we need to backtrack. *)
   wrap_mutation (fun () -> tree_of_typexp mode base ty)
 
-let tree_of_typexp_with_base mode base ty =
+let tree_of_typexp ~base mode ty =
   (* CR metaprogramming jbachurski: Remove this [Env.enter_future] hack once
      errors track their stage, as we should usually print at stage 0.
      See ticket 6726. *)
@@ -3055,15 +3048,12 @@ let tree_of_typexp_with_base mode base ty =
   then
     wrap_printing_env_unguarded
       (Env.enter_future !printing_env)
-      (fun () -> tree_of_typexp_with_base mode base ty)
+      (fun () -> tree_of_typexp ~base mode ty)
   else
-    tree_of_typexp_with_base mode base ty
-
-let tree_of_typexp mode ty =
-  tree_of_typexp_with_base mode With_locality.Const.legacy ty
+    tree_of_typexp ~base mode ty
 
 let typexp mode ppf ty =
-  !Oprint.out_type ppf (tree_of_typexp mode ty)
+  !Oprint.out_type ppf (tree_of_typexp ~base:With_locality.Const.legacy mode ty)
 
 let prepared_type_expr ppf ty = typexp Type ppf ty
 
@@ -3077,8 +3067,8 @@ let type_expr_with_reserved_names ppf ty =
 let prepared_type_scheme ppf ty = typexp Type_scheme ppf ty
 
 let tree_of_type_scheme ty =
-  prepare_for_printing [ty];
-  tree_of_typexp Type_scheme ty
+  prepare_for_printing ~base:With_locality.Const.legacy [ty];
+  tree_of_typexp ~base:With_locality.Const.legacy Type_scheme ty
 
 (* Print one type declaration *)
 
@@ -3087,8 +3077,9 @@ let tree_of_constraints params =
     (fun ty list ->
        let ty' = unalias ty in
        if proxy ty != proxy ty' then
-         let tr = tree_of_typexp Type_scheme ty in
-         (tr, tree_of_typexp Type_scheme ty') :: list
+         let base = With_locality.Const.legacy in
+         let tr = tree_of_typexp ~base Type_scheme ty in
+         (tr, tree_of_typexp ~base Type_scheme ty') :: list
        else list)
     params []
 
@@ -3158,7 +3149,7 @@ let tree_of_label l =
   {
     olab_name = Ident.name l.ld_id;
     olab_mut = mut;
-    olab_type = tree_of_typexp Type l.ld_type;
+    olab_type = tree_of_typexp ~base:With_locality.Const.legacy Type l.ld_type;
     olab_modalities = ld_modalities;
   }
 
@@ -3170,7 +3161,7 @@ let extension_constructor_args_and_ret_type_subtree args ret_type =
   match ret_type with
   | None -> (tree_of_constructor_arguments args, None)
   | Some res ->
-      let out_ret = tree_of_typexp Type res in
+      let out_ret = tree_of_typexp ~base:With_locality.Const.legacy Type res in
       let out_args = tree_of_constructor_arguments args in
       let qtvs =
         (res :: tys_of_constr_args args)
@@ -3306,7 +3297,8 @@ let tree_of_type_decl id decl =
     in
     let mk_param ty variance =
       let jkind = param_jkind ty in
-      type_param variance jkind (tree_of_typexp Type ty)
+      type_param variance jkind
+        (tree_of_typexp ~base:With_locality.Const.legacy Type ty)
     in
     (Ident.name id,
      List.map2 mk_param params vari)
@@ -3314,7 +3306,9 @@ let tree_of_type_decl id decl =
   let tree_of_manifest ty1 =
     match ty_manifest with
     | None -> ty1
-    | Some ty -> Otyp_manifest (tree_of_typexp Type ty, ty1)
+    | Some ty ->
+        Otyp_manifest
+          (tree_of_typexp ~base:With_locality.Const.legacy Type ty, ty1)
   in
   let (name, args) = type_defined decl in
   let constraints = tree_of_constraints params in
@@ -3324,7 +3318,8 @@ let tree_of_type_decl id decl =
         begin match ty_manifest with
         | None -> (Otyp_abstract, Public, false, None, false)
         | Some ty ->
-            tree_of_typexp Type ty, decl.type_private, false, None, false
+            tree_of_typexp ~base:With_locality.Const.legacy Type ty,
+            decl.type_private, false, None, false
         end
     | Type_variant (cstrs, rep, umc) ->
         let unboxed =
@@ -3501,7 +3496,11 @@ let prepared_tree_of_extension_constructor
     param_scope
       (fun () ->
          List.iter (Aliases.add_printed ~non_gen:false) ty_params;
-         List.map (fun ty -> type_param (tree_of_typexp Type ty)) ty_params
+         List.map
+           (fun ty ->
+              type_param
+                (tree_of_typexp ~base:With_locality.Const.legacy Type ty))
+           ty_params
       )
   in
   let name = Ident.name id in
@@ -3581,8 +3580,8 @@ let tree_of_value_description id decl =
     Mode.Modality.Const.apply_const moda Mode.With_regionality.Const.legacy
     |> Mode.Const.value_to_alloc_r2l
   in
-  let () = prepare_for_printing_with_base base [decl.val_type] in
-  let ty = tree_of_typexp_with_base Type_scheme base decl.val_type in
+  let () = prepare_for_printing ~base [decl.val_type] in
+  let ty = tree_of_typexp ~base Type_scheme decl.val_type in
   (* Important: process the fvs *after* the type; tree_of_type_scheme
      resets the naming context *)
   let oval_poly, qsvs, qtvs =
@@ -3659,7 +3658,7 @@ let prepare_method _lab (priv, _virt, ty) =
 
 let tree_of_method mode (lab, priv, virt, ty) =
   let (ty, tyl) = method_type priv ty in
-  let tty = tree_of_typexp mode ty in
+  let tty = tree_of_typexp ~base:With_locality.Const.legacy mode ty in
   let tyl = List.map Transient_expr.repr tyl in
   let qtvs = tree_of_univars tyl in
   let qtvs = zap_qtvs_if_boring qtvs in
@@ -3721,7 +3720,8 @@ let rec tree_of_class_type mode params =
         List.fold_left
           (fun csil (l, m, v, t) ->
             Ocsg_value
-              (l, m = Asttypes.Mutable, v = Virtual, tree_of_typexp mode t)
+              (l, m = Asttypes.Mutable, v = Virtual,
+               tree_of_typexp ~base:With_locality.Const.legacy mode t)
             :: csil)
           csil all_vars
       in
@@ -3746,9 +3746,9 @@ let rec tree_of_class_type mode params =
        if is_optional l then
          match get_desc (Ctype.expand_head !printing_env ty) with
          | Tconstr(path, [ty], _) when Path.same path Predef.path_option ->
-             tree_of_typexp mode ty
+             tree_of_typexp ~base:With_locality.Const.legacy mode ty
          | _ -> Otyp_stuff "<hidden>"
-       else tree_of_typexp mode ty in
+       else tree_of_typexp ~base:With_locality.Const.legacy mode ty in
       Octy_arrow (lab, tr, tree_of_class_type mode params cty)
 
 
@@ -3758,7 +3758,7 @@ let tree_of_class_param param variance =
   (* CR layouts: fix next line when adding support for jkind
      annotations on class type parameters *)
   let ot_jkind = param_jkind param in
-  match tree_of_typexp Type_scheme param with
+  match tree_of_typexp ~base:With_locality.Const.legacy Type_scheme param with
     Otyp_var (ot_non_gen, ot_name) ->
       {ot_non_gen; ot_name; ot_variance; ot_jkind}
   | _ -> {ot_non_gen=false; ot_name="?"; ot_variance; ot_jkind}
@@ -4169,7 +4169,7 @@ type 'a diff = Same of 'a | Diff of 'a * 'a
 let trees_of_type_expansion'
       ~var_jkinds mode Errortrace.{ty = t; expanded = t'} =
   let tree_of_typexp' ty =
-    let out = tree_of_typexp mode ty in
+    let out = tree_of_typexp ~base:With_locality.Const.legacy mode ty in
     if var_jkinds then
       match get_desc ty with
       | Tvar { jkind; _ } | Tunivar { jkind; _ } ->
@@ -4227,8 +4227,9 @@ let hide_variant_name t =
 
 let prepare_expansion Errortrace.{ty; expanded} =
   let expanded = hide_variant_name expanded in
-  Variable_names.reserve ty;
-  if not (same_path ty expanded) then Variable_names.reserve  expanded;
+  Variable_names.reserve ~base:With_locality.Const.legacy ty;
+  if not (same_path ty expanded) then
+    Variable_names.reserve ~base:With_locality.Const.legacy expanded;
   Errortrace.{ty; expanded}
 
 (* Adapt functions to exposed interface *)

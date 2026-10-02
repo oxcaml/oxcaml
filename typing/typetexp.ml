@@ -1977,12 +1977,13 @@ let report_error_doc loc env = function
         ]
   | Constructor_mismatch (ty, ty') ->
       wrap_printing_env ~error:true env (fun ()  ->
-        Out_type.prepare_for_printing [ty; ty'];
+        let base = Mode.With_locality.Const.legacy in
+        Out_type.prepare_for_printing ~base [ty; ty'];
         Location.errorf ~loc
           "This variant type contains a constructor %a@ \
            which should be@ %a"
-          pp_out_type (Out_type.tree_of_typexp Type ty)
-          pp_out_type (Out_type.tree_of_typexp Type ty')
+          pp_out_type (Out_type.tree_of_typexp ~base Type ty)
+          pp_out_type (Out_type.tree_of_typexp ~base Type ty')
         )
   | Not_a_variant ty ->
       Location.aligned_error_hint ~loc

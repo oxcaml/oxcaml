@@ -2228,14 +2228,9 @@ and add_implicit_jkinds env attrs =
   in
   List.fold_left register_default env attrs
 
-and transl_signature ?(interface_toplevel = false) ?md_mode env
+and transl_signature ?(interface_toplevel = false) ~md_mode env
       {psg_items; psg_modalities; psg_loc} =
   let names = Signature_names.create () in
-
-  (* We assume the structure (described by the signature) to be at legacy mode,
-  for backward compatibility *)
-  (* CR-soon zqian: make it a parameter instead *)
-  let md_mode = Option.value md_mode ~default:With_regionality.Const.legacy in
 
   let sig_modalities =
     transl_modalities ~allow_redundant_staticity:interface_toplevel
@@ -2259,6 +2254,7 @@ and transl_signature ?(interface_toplevel = false) ?md_mode env
     in
     let mty = tmty.mty_type in
     let scope = Ctype.create_scope () in
+    let md_mode = With_regionality.of_const md_mode in
     let incl_kind, sg =
       match sincl.pincl_kind with
       | Functor ->
@@ -2266,7 +2262,7 @@ and transl_signature ?(interface_toplevel = false) ?md_mode env
         let funct_mode = With_regionality.disallow_right With_regionality.max in
         let sg, mode, incl_kind =
           extract_sig_functor_open false env smty.pmty_loc mty sig_acc
-            (With_regionality.of_const md_mode) ~funct_mode
+            md_mode ~funct_mode
         in
         let zap_modality =
           Ctype.zap_modalities_to_floor_if_modes_enabled_at Stable
@@ -2274,7 +2270,7 @@ and transl_signature ?(interface_toplevel = false) ?md_mode env
         let sg =
           sg
           |> rebase_modalities_sg ~loc:smty.pmty_loc ~loc_md:psg_loc
-              ~md_mode:(With_regionality.of_const md_mode) ~mode
+              ~md_mode ~mode
           |> remove_modality_and_zero_alloc_variables_sg env ~zap_modality
         in
         incl_kind, sg
@@ -2291,10 +2287,7 @@ and transl_signature ?(interface_toplevel = false) ?md_mode env
       | false ->
         apply_modalities_signature ~recursive env modalities.moda_modalities sg
     in
-    let sg, newenv =
-      Env.enter_signature ~scope sg
-        ~mode:(With_regionality.of_const md_mode) env
-    in
+    let sg, newenv = Env.enter_signature ~scope sg ~mode:md_mode env in
     Signature_group.iter
       (Signature_names.check_sig_item names loc)
       sg;
@@ -4879,7 +4872,11 @@ let type_interface ~sourcefile modulename env ast =
     let uid = Shape.Uid.of_compilation_unit_id modulename in
     cms_register_toplevel_signature_attributes ~uid ~sourcefile ast
   end;
-  let sg = transl_signature ~interface_toplevel:true env ast in
+  let sg =
+    transl_signature
+      ~md_mode:With_regionality.Const.legacy
+      ~interface_toplevel:true env ast
+  in
   let arg_type =
     !Clflags.as_argument_for
     |> Option.map Global_module.Parameter_name.of_string
@@ -5321,7 +5318,7 @@ let report_error ~loc _env = function
         (Sig_component_kind.to_string kind) Style.inline_code name
   | Non_generalizable { vars; expression } ->
       let[@manual.ref "ss:valuerestriction"] manual_ref = [ 6; 1; 2 ] in
-      Out_type.prepare_for_printing vars;
+      Out_type.prepare_for_printing ~base:Mode.With_locality.Const.legacy vars;
       Out_type.add_type_to_preparation expression;
       Location.errorf ~loc
         "@[The type of this expression,@ %a,@ \
@@ -5332,7 +5329,7 @@ let report_error ~loc _env = function
         Misc.print_see_manual manual_ref
   | Non_generalizable_module { vars; mty; item } ->
       let[@manual.ref "ss:valuerestriction"] manual_ref = [ 6; 1; 2 ] in
-      Out_type.prepare_for_printing vars;
+      Out_type.prepare_for_printing ~base:Mode.With_locality.Const.legacy vars;
       Out_type.add_type_to_preparation item.val_type;
       Location.errorf ~loc
         "@[The type of this module,@ %a,@ \
