@@ -133,7 +133,8 @@ sig
   val make_if : layout -> test -> act -> act -> act
   val make_switch : loc -> layout -> arg -> int array -> act array -> act
 
-  val make_catch : layout -> act -> int -> Static_label.t * weight * (act -> act)
+  val make_catch :
+    layout -> act -> int -> Static_label.t * weight * (act -> act)
   val make_exit : Static_label.t -> weight -> act
 end
 
