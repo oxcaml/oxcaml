@@ -63,6 +63,9 @@ PRESETS = {
         'tree': REPO,
         'report_dirs': ['_build/runtime_stdlib', '_build/main'],
         'object_dirs': ['_build/runtime_stdlib', '_build/main'],
+        'watch_callees': ['Flambda2_algorithms__Patricia_tree', 'Flambda2_algorithms__Container_types',
+                          'Flambda2_algorithms__Lmap', 'Stdlib__Set.Make', 'Stdlib__Map.Make',
+                          'Stdlib__Hashtbl.Make'],
         'configs': [
             {'name': 'current',
              'label': 'current (v1 size model, threshold criterion)',
@@ -188,6 +191,54 @@ def text_sizes(paths):
     return sizes, 'text section'
 
 
+def objdump_available():
+    try:
+        subprocess.run(['objdump', '--version'], capture_output=True)
+        return True
+    except OSError:
+        return False
+
+
+def count_calls(path):
+    """(direct calls, indirect calls, generic applications) in one object.
+
+    Direct calls are `bl` (arm64) or `call` to a symbol (x86-64); indirect
+    calls are `blr` or `call *reg`; generic applications are relocations to
+    caml_applyN or caml_sendN, the calls made when the callee or its arity is
+    unknown. Works with GNU and LLVM objdump."""
+    direct = indirect = generic = 0
+    r = subprocess.run(['objdump', '-d', '-r', path], capture_output=True, text=True,
+                       errors='replace')
+    for line in r.stdout.splitlines():
+        if 'caml_apply' in line or 'caml_send' in line:
+            if 'RELOC' in line or 'R_' in line:
+                generic += 1
+                continue
+        # GNU objdump: "addr:<tab>bytes<tab>mnemonic<tab>operands" (x86 puts the
+        # operands in the mnemonic's field); LLVM objdump: "addr: bytes<tab>
+        # mnemonic<tab>operands". Take the first field that starts like a
+        # mnemonic.
+        parts = line.split('\t')
+        m = ops = None
+        for i in range(1, len(parts)):
+            toks = parts[i].split()
+            if not toks or all(re.fullmatch(r'[0-9a-f]{2}', t) for t in toks) \
+                    or (len(toks) == 1 and re.fullmatch(r'[0-9a-f]{8}', toks[0])):
+                continue  # the instruction's bytes
+            mm = re.match(r'^([a-z][a-z0-9.]*)(?:\s+(.*))?$', parts[i].strip())
+            if mm:
+                m = mm.group(1)
+                ops = mm.group(2) or (parts[i + 1].strip() if i + 1 < len(parts) else '')
+                break
+        if m is None:
+            continue
+        if m == 'bl' or (m in ('call', 'callq') and not ops.startswith('*')):
+            direct += 1
+        elif m == 'blr' or (m in ('call', 'callq') and ops.startswith('*')):
+            indirect += 1
+    return direct, indirect, generic
+
+
 def harvest(cfg, c, data_dir, build_timing):
     tree = cfg['tree']
     cdir = os.path.join(data_dir, c['name'])
@@ -207,6 +258,18 @@ def harvest(cfg, c, data_dir, build_timing):
         for p in objs:
             w.writerow([os.path.relpath(p, tree), sizes.get(p, 0)])
     print(f"  objects: {len(objs)} files, {sum(sizes.values()):,} text bytes")
+    if objdump_available():
+        with open(os.path.join(cdir, 'calls.csv'), 'w', newline='') as f:
+            w = csv.writer(f)
+            w.writerow(['path', 'direct_calls', 'indirect_calls', 'generic_applies'])
+            tot = [0, 0, 0]
+            for p in objs:
+                d, i, g = count_calls(p)
+                tot[0] += d; tot[1] += i; tot[2] += g
+                w.writerow([os.path.relpath(p, tree), d, i, g])
+        print(f"  calls: {tot[0]:,} direct, {tot[1]:,} indirect, {tot[2]:,} generic applications")
+    else:
+        print("  warning: objdump not found; call instructions not counted", flush=True)
     commit = subprocess.run(['git', 'rev-parse', '--short', 'HEAD'], cwd=tree,
                             capture_output=True, text=True).stdout.strip()
     meta = {'name': c['name'], 'label': c['label'], 'clean': c['clean'],
@@ -337,6 +400,77 @@ def per_config_stats(rows, arch):
     ratios = [s / o for o, s, _ in st['shrink']]
     st['shrink_median_ratio'] = median(ratios) if ratios else None
     return st
+
+
+def load_calls(cdir):
+    p = os.path.join(cdir, 'calls.csv')
+    out = {}
+    if os.path.exists(p):
+        with open(p) as f:
+            for r in csv.DictReader(f):
+                out[r['path']] = (int(r['direct_calls']), int(r['indirect_calls']), int(r['generic_applies']))
+    return out
+
+
+def load_callsites(cdir):
+    p = os.path.join(cdir, 'decisions.callsites.csv')
+    out = []
+    if os.path.exists(p):
+        with open(p) as f:
+            for r in csv.DictReader(f):
+                out.append((r['callee'], r['outcome'], r['reason'], int(r['count'])))
+    return out
+
+
+REASONS = ['inlined: definition', 'inlined: speculation', 'inlined: attribute', 'inlined: other',
+           'not inlined: never inlinable', 'not inlined: speculation', 'not inlined: aborted',
+           'not inlined: budget refused', 'not inlined: arguments not useful',
+           'not inlined: inside speculation', 'not inlined: depth', 'not inlined: other']
+
+
+def watch_table(callsites, prefix):
+    """Call sites to callees whose path contains [prefix], by outcome and reason."""
+    out = Counter()
+    for callee, outcome, reason, n in callsites:
+        if outcome == 'unknown' or prefix not in callee:
+            continue
+        key = f'{outcome}: {reason}'
+        if key not in REASONS:
+            key = f'{outcome}: other'
+        out[key] += n
+    table = {k: out.get(k, 0) for k in REASONS if out.get(k, 0)}
+    table['sites'] = sum(out.values())
+    return table
+
+
+def load_unknown(cdir):
+    p = os.path.join(cdir, 'decisions.unknown_calls.csv')
+    out = {}
+    if os.path.exists(p):
+        with open(p) as f:
+            for r in csv.DictReader(f):
+                out[r['unit']] = int(r['unknown_callee_sites'])
+    return out
+
+
+def functor_table(rows):
+    by = defaultdict(lambda: {'applications': 0, 'inlined': 0, 'rejected': 0, 'aborted': 0, 'size': 0})
+    for r in rows:
+        if r['functor'] != 'True':
+            continue
+        k = r['callee'].split('::', 1)[-1]
+        b = by[k]
+        b['applications'] += 1
+        if r['outcome'] != 'decided':
+            b['aborted'] += 1
+        elif r['inlined'] == 'True':
+            b['inlined'] += 1
+        else:
+            b['rejected'] += 1
+        if r['orig_arm64'] or r['orig_x86']:
+            b['size'] = int(f(r['orig_' + arch_col()], 0))
+    top = sorted(by.items(), key=lambda kv: -kv[1]['applications'])[:12]
+    return [dict(functor=k, **v) for k, v in top]
 
 
 def load_objects(cdir):
@@ -488,9 +622,30 @@ def analyse(data_dir):
             metas[c['name']] = json.load(f)
         rows = load_decisions(cdir)
         stats[c['name']] = per_config_stats(rows, arch)
+        stats[c['name']]['functors'] = functor_table(rows)
         objects[c['name']] = load_objects(cdir)
         stats[c['name']]['object_text_total'] = sum(objects[c['name']].values())
         stats[c['name']]['object_count'] = len(objects[c['name']])
+        calls = load_calls(cdir)
+        stats[c['name']]['calls'] = calls
+        stats[c['name']]['direct_calls'] = sum(v[0] for v in calls.values()) if calls else None
+        stats[c['name']]['indirect_calls'] = sum(v[1] for v in calls.values()) if calls else None
+        stats[c['name']]['generic_applies'] = sum(v[2] for v in calls.values()) if calls else None
+        unknown = load_unknown(cdir)
+        stats[c['name']]['unknown_by_unit'] = unknown
+        stats[c['name']]['unknown_callee_sites'] = sum(unknown.values()) if unknown else None
+        callsites = load_callsites(cdir)
+        watched = {}
+        for prefix in cfg.get('watch_callees', []):
+            unit = prefix.split('.')[0].split('::')[0]
+            entry = watch_table(callsites, prefix)
+            entry['unknown_sites_in_unit'] = sum(v for u, v in unknown.items() if u == unit)
+            objs = [(p, v) for p, v in calls.items() if os.path.basename(p).lower() == unit.lower() + '.o']
+            if objs:
+                entry['unit_calls'] = {'direct': sum(v[0] for _, v in objs), 'indirect': sum(v[1] for _, v in objs),
+                                       'generic': sum(v[2] for _, v in objs)}
+            watched[prefix] = entry
+        stats[c['name']]['watched'] = watched
     figdir = os.path.join(data_dir, 'figures')
     os.makedirs(figdir, exist_ok=True)
     fig_lines(os.path.join(figdir, 'probability.png'), configs, stats, 'share',
@@ -514,9 +669,25 @@ def analyse(data_dir):
             deltas[d] = by_dir_b[d] - by_dir_a[d]
         fig_objects(os.path.join(figdir, 'objects.png'), deltas,
                     [configs[0]['name'], configs[-1]['name']])
+    call_deltas, unknown_deltas = [], []
+    if len(configs) >= 2:
+        a, b = configs[0]['name'], configs[-1]['name']
+        ca, cb = stats[a]['calls'], stats[b]['calls']
+        for p in set(ca) & set(cb):
+            d = (cb[p][1] + cb[p][2]) - (ca[p][1] + ca[p][2])
+            if d:
+                call_deltas.append((p, ca[p][1] + ca[p][2], cb[p][1] + cb[p][2], d))
+        call_deltas.sort(key=lambda t: -t[3])
+        ua, ub = stats[a]['unknown_by_unit'], stats[b]['unknown_by_unit']
+        for u in set(ua) & set(ub):
+            if ub[u] != ua[u]:
+                unknown_deltas.append((u, ua[u], ub[u], ub[u] - ua[u]))
+        unknown_deltas.sort(key=lambda t: -t[3])
     out = {'generated': datetime.datetime.now().isoformat(timespec='seconds'),
+           'call_deltas_top': call_deltas[:15], 'call_deltas_bottom': call_deltas[-10:],
+           'unknown_deltas_top': unknown_deltas[:15],
            'arch': arch, 'configs': [c['name'] for c in configs],
-           'stats': {k: {kk: vv for kk, vv in v.items() if kk != 'shrink'} for k, v in stats.items()},
+           'stats': {k: {kk: vv for kk, vv in v.items() if kk not in ('shrink', 'calls', 'unknown_by_unit')} for k, v in stats.items()},
            'metas': metas,
            'object_dir_deltas': dict(sorted(deltas.items(), key=lambda kv: -abs(kv[1]))[:30])}
     with open(os.path.join(data_dir, 'stats.json'), 'w') as fh:
@@ -538,6 +709,9 @@ SECTIONS = [
     ('fig-shrink', 'Commentary on figure 4 (how much speculation shrinks a callee, with the fitted curve): what the shape says about the size reduction and the fitted parameters.'),
     ('fig-objects', 'Commentary on figure 5 (change in generated code size by directory), if present.'),
     ('table-callees', 'Remarks on the table of callees contributing most inlined code in each configuration.'),
+    ('functors', 'Functor applications: how each configuration treated them (table 4) and, from the call counts, whether the calls to the resulting modules and inside them stayed direct; name any functor whose treatment looks harmful.'),
+    ('calls', 'Direct and indirect calls in the generated code (table 5 and the per-unit changes): did the configuration add indirect calls or generic applications, and where.'),
+    ('watched', 'The watched callees (table 7): for each, how its call sites fared in each configuration and whether its own code gained indirect calls; say plainly whether the treatment changed and whether that matters.'),
     ('conclusions', 'Conclusions and recommendations: three to six bullet points, including caveats about what the measurements cannot show.'),
 ]
 
@@ -601,6 +775,10 @@ def write_prompt(data_dir, cfg, out):
     row('inlined body size, median (model units)', 'inlined_body_median', lambda x: f'{x:.0f}')
     row('speculation work: callee sizes speculated on, total (model units)', 'speculation_work')
     row('median simplified/original size ratio (completed speculations)', 'shrink_median_ratio', lambda x: f'{x:.2f}')
+    row('direct call instructions in the objects', 'direct_calls')
+    row('indirect call instructions (register calls)', 'indirect_calls')
+    row('generic applications (calls to caml_applyN / caml_sendN)', 'generic_applies')
+    row('call sites whose callee was unknown to Flambda 2 (from the reports)', 'unknown_callee_sites')
     if len(names) >= 2:
         a, b = names[0], names[-1]
         L.append('')
@@ -610,7 +788,11 @@ def write_prompt(data_dir, cfg, out):
                                 ('build wall time', 'wall_seconds', metas),
                                 ('inlined decisions', 'inlined', st),
                                 ('inlined body total', 'inlined_body_total', st),
-                                ('speculation work', 'speculation_work', st)]:
+                                ('speculation work', 'speculation_work', st),
+                                ('direct calls', 'direct_calls', st),
+                                ('indirect calls', 'indirect_calls', st),
+                                ('generic applications', 'generic_applies', st),
+                                ('unknown-callee call sites', 'unknown_callee_sites', st)]:
             va, vb = src[a].get(key), src[b].get(key)
             if va and vb is not None:
                 L.append(f'- {label}: {fmt_int(va)} -> {fmt_int(vb)} ({100.0 * (vb - va) / va:+.1f}%)')
@@ -648,6 +830,41 @@ def write_prompt(data_dir, cfg, out):
         for d, v in out['object_dir_deltas'].items():
             L.append(f'- {d}: {v:+,}')
     L.append('')
+    L.append('## Table 4: functor applications by functor (applications; inlined; rejected; aborted or refused; size before inlining)')
+    for n in names:
+        L.append(f'`{n}`:')
+        for t in st[n]['functors']:
+            L.append(f"- {t['functor']}; {t['applications']}; {t['inlined']}; {t['rejected']}; {t['aborted']}; {fmt_int(t['size'])}")
+    if out.get('call_deltas_top'):
+        a, b = names[0], names[-1]
+        L.append('')
+        L.append(f'## Table 5: objects with the largest increase in indirect calls plus generic applications ({b} minus {a}; path; {a}; {b}; change)')
+        for p, va, vb, d in out['call_deltas_top']:
+            L.append(f'- {p}; {va}; {vb}; {d:+}')
+        L.append(f'Largest decreases:')
+        for p, va, vb, d in out['call_deltas_bottom']:
+            L.append(f'- {p}; {va}; {vb}; {d:+}')
+    if out.get('unknown_deltas_top'):
+        a, b = names[0], names[-1]
+        L.append('')
+        L.append(f'## Units with the largest increase in unknown-callee call sites in the reports ({b} minus {a}; unit; {a}; {b}; change)')
+        for u, va, vb, d in out['unknown_deltas_top']:
+            L.append(f'- {u}; {va}; {vb}; {d:+}')
+    if cfg.get('watch_callees'):
+        L.append('')
+        L.append('## Table 7: watched callees. For each, per configuration: call sites to it by outcome and reason; '
+                 'unknown-callee sites inside its own unit; and the call instructions of its own object '
+                 '(direct / indirect / generic)')
+        for prefix in cfg['watch_callees']:
+            L.append(f'`{prefix}`:')
+            for n in names:
+                w = st[n]['watched'].get(prefix, {})
+                parts = [f"{k} {v}" for k, v in w.items() if k not in ('sites', 'unknown_sites_in_unit', 'unit_calls')]
+                uc = w.get('unit_calls')
+                L.append(f"- `{n}`: {w.get('sites', 0)} sites: " + ('; '.join(parts) or 'none') +
+                         f"; unknown-callee sites in the unit: {w.get('unknown_sites_in_unit', 0)}" +
+                         (f"; own object calls {uc['direct']} / {uc['indirect']} / {uc['generic']}" if uc else ''))
+    L.append('')
     L.append('## Things to keep in mind')
     L.append('- The two configurations measure sizes with different models, so sizes are not '
              'comparable across configurations except where the text says "model units" and '
@@ -663,6 +880,12 @@ def write_prompt(data_dir, cfg, out):
     L.append('- In the per-bin data and figure 1, aborted and refused speculations count as not '
              'inlined; in figure 4 they are absent because they have no simplified size.')
     L.append('- Decisions from every optimisation level are pooled.')
+    L.append('- Call instruction counts come from disassembling the objects: a direct call is `bl` or '
+             '`call symbol`, an indirect call is `blr` or `call *reg`, and a generic application is a '
+             'relocation to caml_applyN or caml_sendN (the runtime helpers used when the callee or its '
+             'arity is unknown). They count call sites in the code, not calls executed.')
+    L.append('- Unknown-callee call sites are those the inlining report marks as calls Flambda 2 could '
+             'not make direct; they overlap with, but are not the same as, the indirect call instructions.')
     L.append('- The figures are in the `figures/` directory next to this file if you want to look at them.')
     with open(os.path.join(data_dir, 'NARRATIVE_PROMPT.md'), 'w') as fh:
         fh.write('\n'.join(L) + '\n')
@@ -810,6 +1033,10 @@ def render(data_dir, out_pdf, narrative):
     trow('inlined body size, total (model units)', 'inlined_body_total', comparable=False)
     trow('inlined body size, median (model units)', 'inlined_body_median', lambda x: f'{x:.0f}', comparable=False)
     trow('speculation work (model units)', 'speculation_work', comparable=False)
+    trow('direct call instructions', 'direct_calls')
+    trow('indirect call instructions', 'indirect_calls')
+    trow('generic applications (caml_apply, caml_send)', 'generic_applies')
+    trow('unknown-callee call sites (reports)', 'unknown_callee_sites')
     story.append(Spacer(1, 4))
     ncols = len(names) + (1 if two else 0)
     story.append(KeepTogether([table(rows, [W * 0.46] + [W * 0.54 / ncols] * ncols),
@@ -844,6 +1071,50 @@ def render(data_dir, out_pdf, narrative):
         story.append(KeepTogether([table(rows, [W * 0.52, W * 0.1, W * 0.12, W * 0.14, W * 0.12]),
                                    Paragraph(f'<b>Table 2 ({html.escape(n)}).</b> Callees by total inlined body size ({html.escape(metas[n]["size_units"])}).', styles['caption'])]))
     story += narrative_flowables(nar.get('table-callees'), styles)
+
+    story.append(Paragraph('Functor applications', styles['h2']))
+    for n in names:
+        rows = [[Paragraph(h, styles['th']) for h in ('functor', 'applications', 'inlined', 'rejected', 'aborted or refused', 'size before')]]
+        for t in st[n]['functors']:
+            rows.append([Paragraph(html.escape(t['functor']), styles['td']), str(t['applications']), str(t['inlined']),
+                         str(t['rejected']), str(t['aborted']), fmt_int(t['size'])])
+        if len(rows) > 1:
+            story.append(KeepTogether([table(rows, [W * 0.46, W * 0.12, W * 0.09, W * 0.09, W * 0.13, W * 0.11]),
+                                       Paragraph(f'<b>Table 4 ({html.escape(n)}).</b> Functor applications by functor, most applied first ({html.escape(metas[n]["size_units"])}).', styles['caption'])]))
+    story += narrative_flowables(nar.get('functors'), styles)
+
+    if out.get('call_deltas_top'):
+        story.append(Paragraph('Direct and indirect calls', styles['h2']))
+        a, b = names[0], names[-1]
+        rows = [[Paragraph(h, styles['th']) for h in ('object', a, b, 'change')]]
+        for p, va, vb, d in out['call_deltas_top'][:12]:
+            rows.append([Paragraph(html.escape(p.split('/')[-1]), styles['td']), str(va), str(vb), f'{d:+}'])
+        story.append(KeepTogether([table(rows, [W * 0.55, W * 0.15, W * 0.15, W * 0.15]),
+                                   Paragraph('<b>Table 5.</b> Objects with the largest increase in indirect calls plus generic applications.', styles['caption'])]))
+        if out.get('unknown_deltas_top'):
+            rows = [[Paragraph(h, styles['th']) for h in ('unit', a, b, 'change')]]
+            for u, va, vb, d in out['unknown_deltas_top'][:12]:
+                rows.append([Paragraph(html.escape(u), styles['td']), str(va), str(vb), f'{d:+}'])
+            story.append(KeepTogether([table(rows, [W * 0.55, W * 0.15, W * 0.15, W * 0.15]),
+                                       Paragraph('<b>Table 6.</b> Units with the largest increase in call sites whose callee was unknown to Flambda 2.', styles['caption'])]))
+        story += narrative_flowables(nar.get('calls'), styles)
+
+    if cfg.get('watch_callees'):
+        story.append(Paragraph('Watched callees', styles['h2']))
+        for prefix in cfg['watch_callees']:
+            rows = [[Paragraph(h, styles['th']) for h in ('outcome and reason',) + tuple(names)]]
+            keys = [k for k in REASONS if any(st[n]['watched'].get(prefix, {}).get(k) for n in names)]
+            for k in keys:
+                rows.append([Paragraph(html.escape(k), styles['td'])] + [str(st[n]['watched'].get(prefix, {}).get(k, 0)) for n in names])
+            rows.append([Paragraph('<b>call sites in total</b>', styles['td'])] + [str(st[n]['watched'].get(prefix, {}).get('sites', 0)) for n in names])
+            rows.append([Paragraph('unknown-callee sites inside its unit', styles['td'])] + [str(st[n]['watched'].get(prefix, {}).get('unknown_sites_in_unit', 0)) for n in names])
+            if any(st[n]['watched'].get(prefix, {}).get('unit_calls') for n in names):
+                rows.append([Paragraph('its object: direct / indirect / generic calls', styles['td'])] +
+                            [(lambda uc: f"{uc['direct']} / {uc['indirect']} / {uc['generic']}" if uc else 'n/a')(st[n]['watched'].get(prefix, {}).get('unit_calls')) for n in names])
+            story.append(KeepTogether([table(rows, [W * 0.5] + [W * 0.5 / len(names)] * len(names)),
+                                       Paragraph(f'<b>Table 7.</b> Call sites to {html.escape(prefix)} by outcome.', styles['caption'])]))
+        story += narrative_flowables(nar.get('watched'), styles)
+
     story.append(Paragraph('Conclusions', styles['h2']))
     story += narrative_flowables(nar.get('conclusions'), styles)
 

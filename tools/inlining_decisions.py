@@ -61,10 +61,49 @@ def unit_of_file(path):
     return base[:1].upper() + base[1:]
 
 
-def parse_file(path, fundecls, calls):
+def classify_call_site(text):
+    """(outcome, reason) of a call-site entry's first decision, for the
+    per-callee tabulation of every call site, speculative or not."""
+    if 'unavailable to do a direct call' in text and 'The function call' not in text:
+        return 'unknown', 'unknown callee'
+    m = re.search(r'The function call has( not)? been inlined because (.{0,160})', text)
+    if not m:
+        return 'other', 'no decision'
+    outcome = 'not inlined' if m.group(1) else 'inlined'
+    why = m.group(2)
+    if 'after speculation' in why:
+        reason = 'speculation'
+    elif 'aborted' in why:
+        reason = 'aborted'
+    elif 'not speculated upon' in why:
+        reason = 'budget refused'
+    elif 'definition site' in why or 'small enough' in why:
+        reason = 'definition'
+    elif 'never be inlinable' in why:
+        reason = 'never inlinable'
+    elif 'no useful information' in why:
+        reason = 'arguments not useful'
+    elif 'maximum inlining depth' in why or 'recursion depth' in why or 'unrolling depth' in why:
+        reason = 'depth'
+    elif 'attribute' in why or 'unrolled' in why:
+        reason = 'attribute'
+    elif 'speculative inlining is in progress' in why:
+        reason = 'inside speculation'
+    elif 'could not be found' in why:
+        reason = 'missing code'
+    else:
+        reason = 'other'
+    return outcome, reason
+
+
+def parse_file(path, fundecls, calls, unknown=None, callsites=None):
     unit = unit_of_file(path)
     with open(path, errors='replace') as f:
-        lines = f.read().split('\n')
+        text_all = f.read()
+        lines = text_all.split('\n')
+    if unknown is not None:
+        # Call sites whose callee was not known, i.e. indirect calls.
+        unknown[unit] = text_all.count('unavailable to do a direct call')
     entries, cur = [], None
     for line in lines:
         m = TITLE_RE.match(line)
@@ -114,6 +153,8 @@ def parse_file(path, fundecls, calls):
                     fundecls['uid'][uid] = rec
                 fundecls['path'][unit + '::' + prev + name] = rec
         elif kind == 'Application of':
+            if callsites is not None:
+                callsites[(name, *classify_call_site(text))] += 1
             dm = DEFINED_RE.search(text)
             bm = BUDGET_RE.search(text)
             base = {'caller_unit': unit, 'caller_path': prev, 'callee': name, 'dbg': dbg,
@@ -150,13 +191,25 @@ def parse_file(path, fundecls, calls):
 
 def collect(roots, out):
     """Parse every report under [roots] into the CSV [out]; return a summary."""
+    from collections import Counter
     fundecls, calls, nfiles = {'uid': {}, 'path': {}}, [], 0
+    unknown, callsites = {}, Counter()
     for root in roots:
         for d, _, files in os.walk(root):
             for fn in files:
                 if fn.endswith('.inlining.org'):
                     nfiles += 1
-                    parse_file(os.path.join(d, fn), fundecls, calls)
+                    parse_file(os.path.join(d, fn), fundecls, calls, unknown, callsites)
+    with open(out.rsplit('.', 1)[0] + '.callsites.csv', 'w', newline='') as f:
+        w = csv.writer(f)
+        w.writerow(['callee', 'outcome', 'reason', 'count'])
+        for (callee, outcome, reason), n in sorted(callsites.items()):
+            w.writerow([callee, outcome, reason, n])
+    with open(out.rsplit('.', 1)[0] + '.unknown_calls.csv', 'w', newline='') as f:
+        w = csv.writer(f)
+        w.writerow(['unit', 'unknown_callee_sites'])
+        for u in sorted(unknown):
+            w.writerow([u, unknown[u]])
     by_uid = by_path = unmatched = 0
     for c in calls:
         rec = None
@@ -183,7 +236,8 @@ def collect(roots, out):
     for c in calls:
         outcomes[c['outcome']] = outcomes.get(c['outcome'], 0) + 1
     return {'files': nfiles, 'decisions': len(calls), 'outcomes': outcomes,
-            'matched_by_uid': by_uid, 'matched_by_path': by_path, 'unmatched': unmatched}
+            'matched_by_uid': by_uid, 'matched_by_path': by_path, 'unmatched': unmatched,
+            'unknown_callee_sites': sum(unknown.values())}
 
 
 def main():
