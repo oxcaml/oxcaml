@@ -992,7 +992,7 @@ let binary_prim_size prim ~arg2 =
   | Bigarray_get_alignment _ -> both 3
   (* A plain [mov] on x86-64; [dmb ishld; ldar] on arm64, where the address must
      also be computed into a register ([add]) when the offset is non-zero. *)
-  | Atomic_load (_, _) ->
+  | Atomic_load_field _ ->
     let address =
       Simple.pattern_match arg2
         ~const:(fun const ->
@@ -1037,13 +1037,13 @@ let ternary_prim_size prim ~arg3 =
     bigarray_access_size kind + both 2
   | Bigarray_set (_dims, kind, _layout) -> bigarray_access_size kind
   (* Untagging of the operand, then e.g. [lock xadd]. *)
-  | Atomic_int_arith _ -> native_atomic ~x86_64:2
+  | Atomic_field_int_arith _ -> native_atomic ~x86_64:2
   (* [xchg]; values that might be pointers go through the runtime. *)
-  | Atomic_set (_, Immediate, (Heap | Local))
-  | Atomic_exchange (_, Immediate, (Heap | Local)) ->
+  | Atomic_set_field (Immediate, (Heap | Local))
+  | Atomic_exchange_field (Immediate, (Heap | Local)) ->
     native_atomic ~x86_64:1
-  | Atomic_set (_, Any_value, (Heap | Local))
-  | Atomic_exchange (_, Any_value, (Heap | Local)) ->
+  | Atomic_set_field (Any_value, (Heap | Local))
+  | Atomic_exchange_field (Any_value, (Heap | Local)) ->
     c_call_size
   | Write_offset (write_offset_kind, kind, (Heap | Local)) ->
     if Flambda_kind.With_subkind.must_be_gc_scannable kind
@@ -1074,20 +1074,18 @@ let ternary_prim_size prim ~arg3 =
 let quaternary_prim_size prim =
   match (prim : Flambda_primitive.quaternary_primitive) with
   (* [mov %old, %rax; lock cmpxchg; sete; movzx], then tagging. *)
-  | Atomic_compare_and_set (_, Immediate, (Heap | Local)) ->
+  | Atomic_compare_and_set_field (Immediate, (Heap | Local)) ->
     native_atomic ~x86_64:5
   (* [mov %old, %rax; lock cmpxchg] *)
-  | Atomic_compare_exchange
-      { offset_units = _;
-        atomic_kind = _;
+  | Atomic_compare_exchange_field
+      { atomic_kind = _;
         args_kind = Immediate;
         mode = Heap | Local
       } ->
     native_atomic ~x86_64:2
-  | Atomic_compare_and_set (_, Any_value, (Heap | Local))
-  | Atomic_compare_exchange
-      { offset_units = _;
-        atomic_kind = _;
+  | Atomic_compare_and_set_field (Any_value, (Heap | Local))
+  | Atomic_compare_exchange_field
+      { atomic_kind = _;
         args_kind = Any_value;
         mode = Heap | Local
       } ->
