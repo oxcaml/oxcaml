@@ -37,16 +37,16 @@ end
 val reset : unit -> unit
 (** erase all recorded profile information *)
 
-val record_call : ?accumulate:bool -> string -> (unit -> 'a) -> 'a
+val record_call : ?accumulate:bool -> ?cheap:(unit -> float) -> string -> (unit -> 'a) -> 'a
 (** [record_call pass f] calls [f] and records its profile information. *)
 
 val record_call_with_counters :
-  ?accumulate:bool -> counter_f:('a -> Counters.t) -> string -> (unit -> 'a) -> 'a
+  ?accumulate:bool -> counter_f:('a -> Counters.t) -> ?cheap:(unit -> float) -> string -> (unit -> 'a) -> 'a
 (** [record_call_with_counters counter_f pass f] calls [f] and records its profile
     information (including counter information given by calling [counter_f] on the
     result of calling [f]) *)
 
-val record : ?accumulate:bool -> string -> ('a -> 'b) -> 'a -> 'b
+val record : ?accumulate:bool -> ?cheap:(unit -> float) -> string -> ('a -> 'b) -> 'a -> 'b
 (** [record pass f arg] records the profile information of [f arg] *)
 
 val record_with_counters :
@@ -63,6 +63,20 @@ val print : Format.formatter -> Clflags.profile_column list -> timings_precision
 val output_to_csv :
 Format.formatter -> Clflags.profile_column list -> timings_precision:int -> unit
 (** Outputs the selected recorded profiling information in CSV format to the formatter. *)
+
+val with_action_trace :
+  gettimeofday:(unit -> float) -> name:string -> (unit -> 'a) -> 'a
+(** When Dune action tracing is enabled, write a trace with a span covering
+    the call and a span for each profiling recording made during it,
+    regardless of the selected profile columns. Spans use wall-clock time and
+    have these counters: [time] (nanoseconds on the recording's selected
+    clock), [calls] (the number of CPU-clock reads), [alloc], [top-heap]
+    (the increase in top heap size), [absolute-top-heap] (the top heap size
+    at the end) (all in bytes), and any counters from [counter_f]. Each
+    span's [path] argument lists the names of the spans enclosing it, from
+    the outermost (the one covering the call) down to the span itself.
+    Pass [Unix.gettimeofday] as the clock; compiler-libs itself does not
+    depend on [Unix]. *)
 
 (** Command line flags *)
 
