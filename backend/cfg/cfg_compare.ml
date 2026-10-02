@@ -324,23 +324,23 @@ let terminator_structure_match ~map_label (old_term : Cfg.terminator)
       Parity_test { ifso = new_ifso; ifnot = new_ifnot } )
   | ( Truth_test { ifso = old_ifso; ifnot = old_ifnot },
       Truth_test { ifso = new_ifso; ifnot = new_ifnot } ) ->
-    map_label old_ifso new_ifso;
-    map_label old_ifnot new_ifnot;
+    map_label old_ifso.target new_ifso.target;
+    map_label old_ifnot.target new_ifnot.target;
     true
   (* Truth_test ≈ Int_test against [0] when [lt = gt] (both miss-the-equality
      arms go to the same label, so only the equality bit matters). [is_signed]
      is irrelevant when comparing to [0]. *)
   | ( Int_test { lt; eq; gt; imm = Some 0; is_signed = _ },
       Truth_test { ifso; ifnot } )
-    when Label.equal lt gt ->
-    map_label lt ifso;
-    map_label eq ifnot;
+    when Label.equal lt.target gt.target ->
+    map_label lt.target ifso.target;
+    map_label eq.target ifnot.target;
     true
   | ( Truth_test { ifso; ifnot },
       Int_test { lt; eq; gt; imm = Some 0; is_signed = _ } )
-    when Label.equal lt gt ->
-    map_label ifso lt;
-    map_label ifnot eq;
+    when Label.equal lt.target gt.target ->
+    map_label ifso.target lt.target;
+    map_label ifnot.target eq.target;
     true
   | ( Int_test
         { lt = old_lt;
@@ -356,9 +356,9 @@ let terminator_structure_match ~map_label (old_term : Cfg.terminator)
           is_signed = new_is_signed;
           imm = new_imm
         } ) ->
-    map_label old_lt new_lt;
-    map_label old_eq new_eq;
-    map_label old_gt new_gt;
+    map_label old_lt.target new_lt.target;
+    map_label old_eq.target new_eq.target;
+    map_label old_gt.target new_gt.target;
     Scalar.Signedness.equal old_is_signed new_is_signed
     && Option.equal Int.equal old_imm new_imm
   | ( Float_test
@@ -375,15 +375,18 @@ let terminator_structure_match ~map_label (old_term : Cfg.terminator)
           gt = new_gt;
           uo = new_uo
         } ) ->
-    map_label old_lt new_lt;
-    map_label old_eq new_eq;
-    map_label old_gt new_gt;
-    map_label old_uo new_uo;
+    map_label old_lt.target new_lt.target;
+    map_label old_eq.target new_eq.target;
+    map_label old_gt.target new_gt.target;
+    map_label old_uo.target new_uo.target;
     Cmm.equal_float_width old_width new_width
   | Switch old_labels, Switch new_labels ->
     if Array.length old_labels = Array.length new_labels
     then (
-      Array.iter2 map_label old_labels new_labels;
+      Array.iter2
+        (fun (old_succ : Cfg.successor) (new_succ : Cfg.successor) ->
+          map_label old_succ.target new_succ.target)
+        old_labels new_labels;
       true)
     else false
   | Return, Return -> true
@@ -805,6 +808,8 @@ let compare ~old_cfg ~new_cfg ppf =
           fun_args = _ (* feed the entry block's instructions, phase 2 *);
           fun_codegen_options = old_fun_codegen_options;
           fun_dbg = old_fun_dbg;
+          fun_fdo_entry_counters = old_fun_fdo_entry_counters;
+          fun_function_body_hash = old_fun_function_body_hash;
           entry_label = _;
           fun_contains_calls = old_fun_contains_calls;
           fun_num_stack_slots = _ (* not populated at this pipeline stage *);
@@ -826,6 +831,8 @@ let compare ~old_cfg ~new_cfg ppf =
           fun_name = new_fun_name;
           fun_codegen_options = new_fun_codegen_options;
           fun_dbg = new_fun_dbg;
+          fun_fdo_entry_counters = new_fun_fdo_entry_counters;
+          fun_function_body_hash = new_fun_function_body_hash;
           fun_contains_calls = new_fun_contains_calls;
           fun_poll = new_fun_poll;
           fun_ret_type = new_fun_ret_type;
@@ -862,6 +869,16 @@ let compare ~old_cfg ~new_cfg ppf =
     then
       Format.fprintf ppf_m "fun_dbg mismatch: old=%a new=%a@."
         Debuginfo.print_compact old_fun_dbg Debuginfo.print_compact new_fun_dbg;
+    if
+      not
+        (List.equal Fdo_counter.equal old_fun_fdo_entry_counters
+           new_fun_fdo_entry_counters)
+    then Format.fprintf ppf_m "fun_fdo_entry_counters mismatch@.";
+    if
+      not
+        (Option.equal Fdo_counter.Function_body_hash.equal
+           old_fun_function_body_hash new_fun_function_body_hash)
+    then Format.fprintf ppf_m "fun_function_body_hash mismatch@.";
     if Stdlib.( <> ) old_fun_poll new_fun_poll
     then Format.fprintf ppf_m "fun_poll mismatch@.";
     if not (Cmm.equal_machtype old_fun_ret_type new_fun_ret_type)

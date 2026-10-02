@@ -139,6 +139,63 @@ let mk_float_cond ~lt ~eq ~gt ~uo =
   | false, false, false, true -> Must_be_last
   | true, false, false, true -> Must_be_last
 
+(* Resolve for each emitted conditional branch the counters of its two machine
+   edges. The taken edge collects the counters of the successor positions that
+   jump to the branch's target. The machine fallthrough of a branch commits to a
+   successor only when the next control-flow instruction is not another
+   conditional branch: then it carries the counters of the positions matching
+   the fallthrough destination (an explicit trailing jump, or the next block in
+   the layout); in the middle of a branch cascade it carries none.
+   [Lcondbranch3] and [Lswitch] were given their counters when created. *)
+let resolve_edge_counters (terminator : Cfg.terminator Cfg.instruction)
+    (desc_list : L.instruction_desc list) ~(fallthrough_label : Label.t) :
+    L.instruction_desc list =
+  let successors = Cfg.branch_successors terminator.desc in
+  let counters_of target =
+    List.fold_left
+      (fun counters (successor : Cfg.successor) ->
+        if Label.equal successor.target target
+        then Fdo_counter.add_all counters successor.fdo_counters
+        else counters)
+      [] successors
+  in
+  let is_control (desc : L.instruction_desc) =
+    match[@ocaml.warning "-4"] desc with
+    | L.Lcondbranch _ | L.Lcondbranch3 _ | L.Lbranch _ -> true
+    | _ -> false
+  in
+  let rec map = function
+    | [] -> []
+    | desc :: rest ->
+      let desc : L.instruction_desc =
+        match[@ocaml.warning "-4"] desc with
+        | L.Lcondbranch { test; taken; fallthrough_counters = _ } ->
+          let fallthrough_counters =
+            match List.find_opt is_control rest with
+            | Some (L.Lbranch label) -> counters_of label
+            | Some _ -> []
+            | None -> counters_of fallthrough_label
+          in
+          L.Lcondbranch
+            { test;
+              taken = { taken with fdo_counters = counters_of taken.target };
+              fallthrough_counters
+            }
+        | desc -> desc
+      in
+      desc :: map rest
+  in
+  map desc_list
+
+(* A conditional branch to [target]; its counters are filled in by
+   [resolve_edge_counters]. *)
+let condbranch test target : L.instruction_desc =
+  L.Lcondbranch
+    { test; taken = { target; fdo_counters = [] }; fallthrough_counters = [] }
+
+let linear_successor ({ target; fdo_counters } : Cfg.successor) : L.successor =
+  { target; fdo_counters }
+
 let linearize_terminator (func : string)
     (terminator : Cfg.terminator Cfg.instruction)
     ~(next : Linear_utils.labelled_insn) ~has_epilogue :
@@ -159,24 +216,28 @@ let linearize_terminator (func : string)
     (* c1 must be the inverse of c2 *)
     match Label.equal l1 next.label, Label.equal l2 next.label with
     | true, true -> []
-    | false, true -> [L.Lcondbranch (c1, l1)]
-    | true, false -> [L.Lcondbranch (c2, l2)]
+    | false, true -> [condbranch c1 l1]
+    | true, false -> [condbranch c2 l2]
     | false, false ->
       if Label.equal l1 l2
       then [L.Lbranch l1]
-      else [L.Lcondbranch (c1, l1); L.Lbranch l2]
+      else [condbranch c1 l1; L.Lbranch l2]
   in
   let desc_list, tailrec_label =
     match terminator.desc with
     | Return -> [L.Lreturn], None
     | Raise kind -> [L.Lraise kind], None
-    | Tailcall_func (Indirect _) -> [L.Lcall_op Ltailcall_ind], None
-    | Tailcall_func (Direct func_symbol) ->
-      [L.Lcall_op (Ltailcall_imm { func = func_symbol })], None
+    | Tailcall_func (Indirect { callees = _; callsite_counter }) ->
+      [L.Lcall_op (Ltailcall_ind { callsite_counter })], None
+    | Tailcall_func (Direct { sym = func_symbol; callsite_counter }) ->
+      ( [L.Lcall_op (Ltailcall_imm { func = func_symbol; callsite_counter })],
+        None )
     | Tailcall_self { destination } ->
       ( [ L.Lcall_op
-            (Ltailcall_imm { func = { sym_name = func; sym_global = Local } })
-        ],
+            (Ltailcall_imm
+               { func = { sym_name = func; sym_global = Local };
+                 callsite_counter = None
+               }) ],
         Some destination )
     | Call_no_return
         { func_symbol;
@@ -215,8 +276,10 @@ let linearize_terminator (func : string)
     | Call { op; label_after } ->
       let op : Linear.call_operation =
         match op with
-        | Indirect _ -> Lcall_ind
-        | Direct func_symbol -> Lcall_imm { func = func_symbol }
+        | Indirect { callees = _; callsite_counter } ->
+          Lcall_ind { callsite_counter }
+        | Direct { sym = func_symbol; callsite_counter } ->
+          Lcall_imm { func = func_symbol; callsite_counter }
       in
       branch_or_fallthrough [L.Lcall_op op] label_after, None
     | Prim { op; label_after } ->
@@ -244,14 +307,19 @@ let linearize_terminator (func : string)
           Lprobe { name; handler_code_sym; enabled_at_init }
       in
       branch_or_fallthrough [L.Lcall_op op] label_after, None
-    | Switch labels -> single (L.Lswitch labels)
+    | Switch successors ->
+      single (L.Lswitch (Array.map linear_successor successors))
     | Never -> Misc.fatal_error "Cannot linearize terminator: Never"
     | Always label -> branch_or_fallthrough [] label, None
     | Parity_test { ifso; ifnot } ->
-      emit_bool (Ieventest, ifso) (Ioddtest, ifnot), None
+      emit_bool (Ieventest, ifso.target) (Ioddtest, ifnot.target), None
     | Truth_test { ifso; ifnot } ->
-      emit_bool (Itruetest, ifso) (Ifalsetest, ifnot), None
-    | Float_test { width; lt; eq; gt; uo } -> (
+      emit_bool (Itruetest, ifso.target) (Ifalsetest, ifnot.target), None
+    | Float_test { width; lt = lt_successor; eq; gt; uo } -> (
+      let lt = lt_successor.target
+      and eq = eq.target
+      and gt = gt.target
+      and uo = uo.target in
       let successor_labels =
         Label.Set.singleton lt |> Label.Set.add gt |> Label.Set.add eq
         |> Label.Set.add uo
@@ -298,12 +366,21 @@ let linearize_terminator (func : string)
             (fun (c, lbl) ->
               if Label.equal lbl last
               then None
-              else Some (L.Lcondbranch (Ifloattest (width, c), lbl)))
+              else Some (condbranch (Ifloattest (width, c)) lbl))
             any
         in
         branches @ branch_or_fallthrough [] last, None
       | _ -> assert false)
-    | Int_test { lt; eq; gt; imm; is_signed } -> (
+    | Int_test
+        { lt = lt_successor;
+          eq = eq_successor;
+          gt = gt_successor;
+          imm;
+          is_signed
+        } -> (
+      let lt = lt_successor.target
+      and eq = eq_successor.target
+      and gt = gt_successor.target in
       let successor_labels =
         Label.Set.singleton lt |> Label.Set.add gt |> Label.Set.add eq
       in
@@ -331,8 +408,25 @@ let linearize_terminator (func : string)
         if Label.Set.cardinal cond_successor_labels = 2 && can_emit_Lcondbranch3
         then
           (* generates one cmp instruction for all conditional jumps here *)
-          let find l = if Label.equal next.label l then None else Some l in
-          [L.Lcondbranch3 (find lt, find eq, find gt)], None
+          let find (successor : Cfg.successor) =
+            if Label.equal next.label successor.target
+            then None
+            else Some (linear_successor successor)
+          in
+          let lt = find lt_successor
+          and eq = find eq_successor
+          and gt = find gt_successor in
+          (* The outcomes without a jump fall through. *)
+          let fallthrough_counters =
+            List.fold_left
+              (fun counters ((successor : Cfg.successor), jump) ->
+                match (jump : L.successor option) with
+                | Some _ -> counters
+                | None -> Fdo_counter.add_all counters successor.fdo_counters)
+              []
+              [lt_successor, lt; eq_successor, eq; gt_successor, gt]
+          in
+          [L.Lcondbranch3 { lt; eq; gt; fallthrough_counters }], None
         else
           let init = branch_or_fallthrough [] last in
           ( Label.Set.fold
@@ -353,7 +447,7 @@ let linearize_terminator (func : string)
                     | None -> Operation.Iinttest comp
                     | Some n -> Operation.Iinttest_imm (comp, n)
                   in
-                  L.Lcondbranch (test, lbl) :: acc)
+                  condbranch test lbl :: acc)
               cond_successor_labels init,
             None )
       | _ -> assert false)
@@ -378,7 +472,10 @@ let linearize_terminator (func : string)
            they were already added to Lepilogue_open. *)
         | true -> { instr with L.dbg = Debuginfo.none }
         | false -> instr)
-      next.insn (List.rev desc_list)
+      next.insn
+      (List.rev
+         (resolve_edge_counters terminator desc_list
+            ~fallthrough_label:next.label))
   in
   instr, tailrec_label
 
@@ -506,6 +603,8 @@ let run cfg_with_layout =
     fun_tailrec_entry_point_label = !tailrec_label;
     fun_fast = not (List.mem Cfg.Reduce_code_size cfg.fun_codegen_options);
     fun_dbg = cfg.fun_dbg;
+    fun_fdo_entry_counters = cfg.fun_fdo_entry_counters;
+    fun_function_body_hash = cfg.fun_function_body_hash;
     fun_contains_calls = cfg.fun_contains_calls;
     fun_num_stack_slots = cfg.fun_num_stack_slots;
     fun_frame_required = cfg.fun_frame_required;

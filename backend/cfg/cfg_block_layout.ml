@@ -77,13 +77,13 @@ let preferred_successors (block : Cfg.basic_block) ~position =
   | Always label -> [label]
   | Call { op = _; label_after } | Prim { op = _; label_after } -> [label_after]
   | Parity_test { ifso; ifnot } | Truth_test { ifso; ifnot } ->
-    sorted_distinct [ifso; ifnot]
+    sorted_distinct [ifso.target; ifnot.target]
   | Int_test { lt; eq; gt; is_signed = _; imm = _ } ->
-    sorted_distinct [lt; eq; gt]
+    sorted_distinct [lt.target; eq.target; gt.target]
   | Float_test { width = _; lt; eq; gt; uo } ->
     (* The unordered outcome is assumed unlikely, and is used as a fallthrough
        only if no other successor is available. *)
-    sorted_distinct [lt; eq; gt] @ [uo]
+    sorted_distinct [lt.target; eq.target; gt.target] @ [uo.target]
   | Never | Switch _ | Return | Raise _ | Tailcall_self _ | Tailcall_func _
   | Call_no_return _ | Invalid _ ->
     (* Either no successor, or no fallthrough at linearization ([Switch],

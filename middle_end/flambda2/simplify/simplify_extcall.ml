@@ -38,7 +38,7 @@ let fun_symbol simple =
 
 let apply_cont cont v ~dbg =
   let args = [Simple.name (Name.var v)] in
-  let apply_cont = Apply_cont.create cont ~args ~dbg in
+  let apply_cont = Apply_cont.create ~fdo_counters:[] cont ~args ~dbg in
   let free_names = Apply_cont.free_names apply_cont in
   let expr = Expr.create_apply_cont apply_cont in
   free_names, expr

@@ -468,6 +468,55 @@ let name_if_not_var acc ccenv name simple kind body =
       [id, id_duid, kind]
       Not_user_visible (IR.Simple simple) ~body:(body id)
 
+(* The id of a function (see [Fdo_counter]): its scope path and occurrence, with
+   its body hash. A named function keeps its id across edits of its body; the
+   occurrence only separates functions of the same name in one scope. An
+   anonymous function (or a wrapper, or a lazy body; a function without scopes
+   is treated as anonymous within the enclosing one) has no name to be stable
+   under, and an occurrence among its scope's anonymous functions would change
+   whenever one is added before it; its first few tokens (parameters,
+   identifiers, primitives, constants) are part of its name instead
+   ("Foo.(fun)@x,acc,+"), so it survives changes around it and changes further
+   into its body. The occurrence still separates anonymous functions of one
+   scope that start alike. *)
+let function_id_of_function env ({ loc; params; body; _ } : L.lfunction) =
+  let params = List.map (fun (p : L.lparam) -> p.name) params in
+  let function_body_hash = Fdo_fingerprint.of_function ~params body in
+  let path, anonymous =
+    match loc with
+    | Loc_known { scopes; loc = _ } ->
+      let anonymous =
+        match scopes with
+        | Cons
+            { item = Sc_anonymous_function | Sc_partial_or_eta_wrapper | Sc_lazy;
+              _
+            } ->
+          true
+        | Cons
+            { item =
+                ( Sc_value_definition | Sc_module_definition
+                | Sc_class_definition | Sc_method_definition );
+              _
+            }
+        | Empty ->
+          false
+      in
+      ( Debuginfo.Scoped_location.string_of_scopes ~include_zero_alloc:false
+          scopes,
+        anonymous )
+    | Loc_unknown -> Env.function_path env ^ ".(fun)", true
+  in
+  let path =
+    if anonymous
+    then
+      path ^ "@"
+      ^ String.concat "," (Fdo_fingerprint.leading_tokens ~params body)
+    else path
+  in
+  let discriminator = Env.fresh_function_id_occurrence env ~path in
+  ( Fdo_counter.function_id ~unmangled_name:path ~discriminator,
+    function_body_hash )
+
 let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
     (k_exn : Continuation.t) : Expr_with_acc.t =
   match lam with
@@ -1397,8 +1446,14 @@ and cps_function_bindings env (bindings : Lambda.rec_binding list) =
 
 and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
     ?precomputed_free_idents
-    ({ kind; params; return; body; attr; loc; mode; ret_mode; yielding = _ } :
+    ({ kind; params; return; body; attr; loc; mode; ret_mode; yielding = _ } as
+     func :
       L.lfunction) : Function_decl.t =
+  let fdo_function_id =
+    if Oxcaml_flags.fdo_counters_enabled ()
+    then Some (function_id_of_function env func)
+    else None
+  in
   let contains_no_escaping_local_allocs =
     match ret_mode with Not_alloc_stack -> true | Maybe_alloc_stack -> false
   in
@@ -1579,6 +1634,11 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
       ~machine_width:(Env.machine_width env) ~return_continuation:body_cont
       ~exn_continuation:body_exn_cont ~my_region:my_region_stack_elt
       ~my_alloc_region
+      ~function_path:
+        (match fdo_function_id with
+        | Some (Fdo_counter.Function { unmangled_name; _ }, _) -> unmangled_name
+        | Some (Fdo_counter.Specialized _, _) | None -> Env.function_path env)
+      ~function_id_occurrences:(Env.function_id_occurrences env)
   in
   let exn_continuation : IR.exn_continuation =
     { exn_handler = body_exn_cont; extra_args = [] }
@@ -1663,7 +1723,7 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
     ~function_slot ~kind ~params ~params_arity ~removed_params ~return
     ~calling_convention ~return_continuation:body_cont ~exn_continuation
     ~my_region ~my_ghost_region ~my_alloc_region ~body ~attr ~loc
-    ~free_idents_of_body recursive ~closure_alloc_mode:mode
+    ~fdo_function_id ~free_idents_of_body recursive ~closure_alloc_mode:mode
     ~first_complex_local_param ~result_mode:ret_mode
 
 and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
@@ -1885,6 +1945,8 @@ let lambda_to_flambda ~mode ~machine_width ~big_endian ~cmx_loader
     Env.create ~current_unit:compilation_unit ~machine_width
       ~return_continuation ~exn_continuation ~my_region:None
       ~my_alloc_region:toplevel_my_alloc_region
+      ~function_path:(Compilation_unit.full_path_as_string compilation_unit)
+      ~function_id_occurrences:(Misc.Stdlib.String.Tbl.create 64)
   in
   let program acc ccenv =
     cps_tail acc env ccenv lam return_continuation exn_continuation

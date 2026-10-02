@@ -89,7 +89,9 @@ module Function_info : sig
       codegen_options : Cmm.codegen_option list;
       dbg : Debuginfo.t;
       poll : Lambda.poll_attribute;
-      ret_type : Cmm.machtype
+      ret_type : Cmm.machtype;
+      fdo_entry_counters : Cmm.fdo_counters;
+      function_body_hash : Fdo_counter.Function_body_hash.t option
     }
 
   val flattened_parameters : t -> Cmm.machtype

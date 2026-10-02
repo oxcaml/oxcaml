@@ -41,6 +41,7 @@
 module One_step = struct
   type t =
     { dbg : Debuginfo.t;
+      callsite_counter : Fdo_counter.t option;
       function_symbol : Linkage_name.t;
       uid : string
     }
@@ -50,7 +51,7 @@ module One_step = struct
     then Format.pp_print_string ppf "None"
     else Debuginfo.print_compact ppf dbg
 
-  let print ppf { dbg; function_symbol; uid } =
+  let print ppf { dbg; callsite_counter = _; function_symbol; uid } =
     Format.fprintf ppf
       "@[<hov 1>(@[<hov 1>(dbg@ %a)@]@ @[<hov 1>(function_symbol@ %a)@]@ \
        @[<hov 1>(uid@ %a)@])@]"
@@ -106,7 +107,7 @@ let print ppf t =
 
 let inlining_counter = ref 0
 
-let create ~called_code_id ~apply_dbg =
+let create ~called_code_id ~apply_dbg ~apply_callsite_counter =
   let function_symbol = Code_id.linkage_name called_code_id in
   let uid =
     incr inlining_counter;
@@ -114,7 +115,11 @@ let create ~called_code_id ~apply_dbg =
     Hashtbl.hash (apply_dbg, function_symbol, !inlining_counter)
     |> string_of_int
   in
-  [{ One_step.dbg = apply_dbg; function_symbol; uid }]
+  [ { One_step.dbg = apply_dbg;
+      callsite_counter = apply_callsite_counter;
+      function_symbol;
+      uid
+    } ]
 
 let merge t ~from_apply_expr = from_apply_expr @ t
 
@@ -124,3 +129,19 @@ let rewrite t dbg =
   (* This could be optimized in terms of freshening uids, but for the moment use
      a more obviously-correct implementation. *)
   List.fold_left (fun dbg one_step -> One_step.rewrite one_step dbg) dbg t
+
+let inline_fdo_counter t counter =
+  List.fold_left
+    (fun counter (one_step : One_step.t) ->
+      match one_step.callsite_counter with
+      | None -> counter
+      | Some at -> Fdo_counter.inline counter ~at)
+    counter t
+
+let specialize_fdo_counter t counter =
+  List.fold_left
+    (fun counter (one_step : One_step.t) ->
+      match one_step.callsite_counter with
+      | None -> counter
+      | Some at -> Fdo_counter.specialize counter ~at)
+    counter t

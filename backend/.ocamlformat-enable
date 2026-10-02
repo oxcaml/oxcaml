@@ -63,6 +63,10 @@ debug/**/*.ml
 debug/**/*.mli
 emitaux.ml
 emitaux.mli
+fdo_call_graph.ml
+fdo_call_graph.mli
+fdo_metadata_encode.ml
+fdo_metadata_encode.mli
 generic_fns.ml
 generic_fns.mli
 operation.ml

@@ -1444,12 +1444,15 @@ let make_safe_divmod operator ~if_divisor_is_negative_one
     bind "divisor" c2 (fun c2 ->
         bind "dividend" c1 (fun c1 ->
             Cifthenelse
-              ( Cop (Ccmpi Cne, [c2; Cconst_int (-1, dbg)], dbg),
-                dbg,
-                Cop (operator, [c1; c2], dbg),
-                dbg,
-                if_divisor_is_negative_one ~dividend:c1 ~dbg,
-                dbg )))
+              { cond = Cop (Ccmpi Cne, [c2; Cconst_int (-1, dbg)], dbg);
+                ifso_dbg = dbg;
+                ifso_counters = [];
+                ifso = Cop (operator, [c1; c2], dbg);
+                ifnot_dbg = dbg;
+                ifnot_counters = [];
+                ifnot = if_divisor_is_negative_one ~dividend:c1 ~dbg;
+                dbg
+              }))
 
 let is_power_of_2_or_zero n = Nativeint.logand n (Nativeint.pred n) = 0n
 
@@ -1470,12 +1473,15 @@ let div_int ?dividend_cannot_be_min_int c1 c2 dbg =
       (* integer division by min_int always returns 0 unless the dividend is
          also min_int, in which case it's 1. *)
       Cifthenelse
-        ( Cop (Ccmpi Ceq, [c1; Cconst_natint (divisor, dbg)], dbg),
-          dbg,
-          Cconst_int (1, dbg),
-          dbg,
-          Cconst_int (0, dbg),
-          dbg )
+        { cond = Cop (Ccmpi Ceq, [c1; Cconst_natint (divisor, dbg)], dbg);
+          ifso_dbg = dbg;
+          ifso_counters = [];
+          ifso = Cconst_int (1, dbg);
+          ifnot_dbg = dbg;
+          ifnot_counters = [];
+          ifnot = Cconst_int (0, dbg);
+          dbg
+        }
     else if is_power_of_2_or_zero divisor
     then
       (* [divisor] must be positive be here since we already handled zero and
@@ -1542,12 +1548,15 @@ let unsigned_div_int c1 c2 dbg =
     (* unsigned division by unsigned max_int always returns 0 unless the
        dividend is also max_int, in which case it's 1. *)
     Cifthenelse
-      ( Cop (Ccmpi Ceq, [c1; Cconst_natint (-1n, dbg)], dbg),
-        dbg,
-        Cconst_int (1, dbg),
-        dbg,
-        Cconst_int (0, dbg),
-        dbg )
+      { cond = Cop (Ccmpi Ceq, [c1; Cconst_natint (-1n, dbg)], dbg);
+        ifso_dbg = dbg;
+        ifso_counters = [];
+        ifso = Cconst_int (1, dbg);
+        ifnot_dbg = dbg;
+        ifnot_counters = [];
+        ifnot = Cconst_int (0, dbg);
+        dbg
+      }
   | _, Some divisor ->
     if is_power_of_2_or_zero divisor
     then
@@ -1603,12 +1612,15 @@ let mod_int ?dividend_cannot_be_min_int c1 c2 dbg =
       bind "dividend" c1 (fun c1 ->
           let min_int = Cconst_natint (Nativeint.min_int, dbg) in
           Cifthenelse
-            ( Cop (Ccmpi Ceq, [c1; min_int], dbg),
-              dbg,
-              Cconst_int (0, dbg),
-              dbg,
-              c1,
-              dbg ))
+            { cond = Cop (Ccmpi Ceq, [c1; min_int], dbg);
+              ifso_dbg = dbg;
+              ifso_counters = [];
+              ifso = Cconst_int (0, dbg);
+              ifnot_dbg = dbg;
+              ifnot_counters = [];
+              ifnot = c1;
+              dbg
+            })
     else if is_power_of_2_or_zero n
     then
       (* [divisor] must be positive be here since we already handled zero and
@@ -1651,12 +1663,15 @@ let unsigned_mod_int c1 c2 dbg =
        max_int, in which case it is 0 *)
     bind "dividend" c1 (fun c1 ->
         Cifthenelse
-          ( Cop (Ccmpi Ceq, [c1; Cconst_natint (-1n, dbg)], dbg),
-            dbg,
-            Cconst_int (0, dbg),
-            dbg,
-            c1,
-            dbg ))
+          { cond = Cop (Ccmpi Ceq, [c1; Cconst_natint (-1n, dbg)], dbg);
+            ifso_dbg = dbg;
+            ifso_counters = [];
+            ifso = Cconst_int (0, dbg);
+            ifnot_dbg = dbg;
+            ifnot_counters = [];
+            ifnot = c1;
+            dbg
+          })
   | _, Some divisor ->
     if is_power_of_2_or_zero divisor
     then and_const c1 (Nativeint.pred divisor) dbg
@@ -2598,8 +2613,8 @@ let send_function_name arity result (mode : Cmx_format.return_mode) =
   in
   global_symbol ("caml_send" ^ unique_arity_identifier arity ^ res ^ suff)
 
-let call_cached_method obj tag cache pos args args_type result (apos, mode) dbg
-    =
+let call_cached_method ~callsite_counter obj tag cache pos args args_type result
+    (apos, mode) dbg =
   Compilenv.need_send_fun
     (List.map Extended_machtype.change_tagged_int_to_val args_type)
     (Extended_machtype.change_tagged_int_to_val result)
@@ -2614,7 +2629,8 @@ let call_cached_method obj tag cache pos args args_type result (apos, mode) dbg
     ( Capply
         { result_type = Extended_machtype.to_machtype result;
           region = apos;
-          callees = Some [sym]
+          callees = Some [sym];
+          callsite_counter
         },
       (* See the cases for caml_apply regarding [change_tagged_int_to_val]. *)
       Cconst_symbol (sym, dbg) :: obj :: tag :: cache :: pos :: args,
@@ -3446,7 +3462,7 @@ let make_switch arg cases actions dbg =
       | Constant_rev of Cmm.data_item list
       | Jump_rev of Cmm.exit_label * Cmm.data_item list
   end in
-  let classify (action, _dbg) : Classify.elt =
+  let classify (action, _dbg, _counters) : Classify.elt =
     match action with
     | Cexit (lbl, [arg], []) -> (
       match extract_uconstant arg with
@@ -3512,31 +3528,72 @@ module SArgBlocks = struct
      do not need a layout, we pick unit as the layout. *)
   type layout = unit
 
-  type loc = Debuginfo.t
+  (* The debug info of the switch being translated, and the edge counters of
+     each of its scrutinee values (those of the case the value selects). *)
+  type loc =
+    { dbg : Debuginfo.t;
+      value_counters : fdo_counters array
+    }
 
   (* CR mshinwell: GPR#2294 will fix the Debuginfo here *)
 
-  let make_const dbg i = Cconst_int (i, dbg)
+  let make_const loc i = Cconst_int (i, loc.dbg)
 
-  let make_prim dbg p args = Cop (p, args, dbg)
+  let make_prim loc p args = Cop (p, args, loc.dbg)
 
-  let make_offset dbg arg n = add_const arg n dbg
+  let make_offset loc arg n = add_const arg n loc.dbg
 
-  let make_isout dbg h arg = Cop (Ccmpi Cult, [h; arg], dbg)
+  let make_isout loc h arg = Cop (Ccmpi Cult, [h; arg], loc.dbg)
 
-  let make_isin dbg h arg = Cop (Ccmpi Cuge, [h; arg], dbg)
+  let make_isin loc h arg = Cop (Ccmpi Cuge, [h; arg], loc.dbg)
 
-  let make_is_nonzero _dbg arg = arg
+  let make_is_nonzero _loc arg = arg
 
   let arg_as_test arg = arg
 
-  let make_if () cond ifso ifnot =
-    Cifthenelse
-      (cond, Debuginfo.none, ifso, Debuginfo.none, ifnot, Debuginfo.none)
+  (* The tests and sub-tables the switch compiler generates implement the edges
+     of the switch being translated, split by scrutinee value: a test edge
+     carries the counters of the values it sends that way, and a case of a
+     sub-table those of the values selecting it. No counters are created, the
+     existing ones are distributed. *)
+  let counters_of_values loc values =
+    List.fold_left
+      (fun acc value ->
+        if value >= 0 && value < Array.length loc.value_counters
+        then Fdo_counter.add_all acc loc.value_counters.(value)
+        else acc)
+      [] values
 
-  let make_switch dbg () arg cases actions =
-    let actions = Array.map (fun expr -> expr, dbg) actions in
-    make_switch arg cases actions dbg
+  let values_of_intervals intervals =
+    List.concat_map
+      (fun (lo, hi) -> List.init (Int.max 0 (hi - lo + 1)) (fun k -> lo + k))
+      intervals
+
+  let make_if () loc ~ifso ~ifnot cond act_so act_not =
+    Cifthenelse
+      { cond;
+        ifso_dbg = Debuginfo.none;
+        ifso_counters = counters_of_values loc (values_of_intervals ifso);
+        ifso = act_so;
+        ifnot_dbg = Debuginfo.none;
+        ifnot_counters = counters_of_values loc (values_of_intervals ifnot);
+        ifnot = act_not;
+        dbg = Debuginfo.none
+      }
+
+  let make_switch loc () arg ~first_value cases actions =
+    let actions =
+      Array.mapi
+        (fun action expr ->
+          let values = ref [] in
+          Array.iteri
+            (fun k a ->
+              if a = action then values := (first_value + k) :: !values)
+            cases;
+          expr, loc.dbg, counters_of_values loc (List.rev !values))
+        actions
+    in
+    make_switch arg cases actions loc.dbg
 
   let bind arg body = bind "switcher" arg body
 
@@ -3585,7 +3642,11 @@ end)
 
 module SwitcherBlocks = Switch.Make (SArgBlocks)
 
-let transl_switch_clambda loc arg index cases =
+let transl_switch_clambda dbg arg index cases =
+  let loc : SArgBlocks.loc =
+    { dbg; value_counters = Array.map (fun case -> snd cases.(case)) index }
+  in
+  let cases = Array.map fst cases in
   let store = StoreExpForSwitch.mk_store () in
   let index = Array.map (fun j -> store.Switch.act_store j cases.(j)) index in
   let n_index = Array.length index in
@@ -3623,7 +3684,8 @@ let split_arity_for_apply arity args =
     let args1, args2 = Misc.Stdlib.List.split_at max_arity args in
     (a1, args1), Some (a2, args2)
 
-let call_caml_apply extended_ty extended_args_type mut clos args pos mode dbg =
+let call_caml_apply ~callsite_counter extended_ty extended_args_type mut clos
+    args pos mode dbg =
   (* Treat tagged int arguments and results as [typ_val], to avoid generating
      excessive numbers of caml_apply functions. *)
   let ty = Extended_machtype.to_machtype extended_ty in
@@ -3631,7 +3693,12 @@ let call_caml_apply extended_ty extended_args_type mut clos args pos mode dbg =
     let sym = apply_function_sym extended_args_type extended_ty mode in
     let cargs = (Cconst_symbol (sym, dbg) :: args) @ [clos] in
     Cop
-      ( Capply { result_type = ty; region = pos; callees = Some [sym] },
+      ( Capply
+          { result_type = ty;
+            region = pos;
+            callees = Some [sym];
+            callsite_counter
+          },
         cargs,
         dbg )
   in
@@ -3647,23 +3714,33 @@ let call_caml_apply extended_ty extended_args_type mut clos args pos mode dbg =
     bind_list "arg" args (fun args ->
         bind "fun" clos (fun clos ->
             Cifthenelse
-              ( Cop
-                  ( Ccmpi Ceq,
-                    [ Cop
-                        ( Casr,
-                          [ get_field_gen mut clos 1 dbg;
-                            Cconst_int (pos_arity_in_closinfo, dbg) ],
-                          dbg );
-                      Cconst_int (List.length extended_args_type, dbg) ],
-                    dbg ),
-                dbg,
-                Cop
-                  ( Capply { result_type = ty; region = pos; callees = None },
-                    (get_field_codepointer mut clos 2 dbg :: args) @ [clos],
-                    dbg ),
-                dbg,
-                really_call_caml_apply clos args,
-                dbg )))
+              { cond =
+                  Cop
+                    ( Ccmpi Ceq,
+                      [ Cop
+                          ( Casr,
+                            [ get_field_gen mut clos 1 dbg;
+                              Cconst_int (pos_arity_in_closinfo, dbg) ],
+                            dbg );
+                        Cconst_int (List.length extended_args_type, dbg) ],
+                      dbg );
+                ifso_dbg = dbg;
+                ifso_counters = [];
+                ifso =
+                  Cop
+                    ( Capply
+                        { result_type = ty;
+                          region = pos;
+                          callees = None;
+                          callsite_counter
+                        },
+                      (get_field_codepointer mut clos 2 dbg :: args) @ [clos],
+                      dbg );
+                ifnot_dbg = dbg;
+                ifnot_counters = [];
+                ifnot = really_call_caml_apply clos args;
+                dbg
+              }))
   else really_call_caml_apply clos args
 
 (* CR mshinwell: These will be filled in by later pull requests. *)
@@ -3671,18 +3748,24 @@ let placeholder_dbg () = Debuginfo.none
 
 let maybe_reset_current_region ~dbg ~body_tail ~body_nontail old_region =
   Cifthenelse
-    ( Cop (Ccmpi Ceq, [old_region; Cop (Cbeginregion, [], dbg ())], dbg ()),
-      dbg (),
-      body_tail,
-      dbg (),
-      (let res = V.create_local "result" in
-       Clet
-         ( VP.create res,
-           body_nontail,
-           Csequence (Cop (Cendregion, [old_region], dbg ()), Cvar res) )),
-      dbg () )
+    { cond =
+        Cop (Ccmpi Ceq, [old_region; Cop (Cbeginregion, [], dbg ())], dbg ());
+      ifso_dbg = dbg ();
+      ifso_counters = [];
+      ifso = body_tail;
+      ifnot_dbg = dbg ();
+      ifnot_counters = [];
+      ifnot =
+        (let res = V.create_local "result" in
+         Clet
+           ( VP.create res,
+             body_nontail,
+             Csequence (Cop (Cendregion, [old_region], dbg ()), Cvar res) ));
+      dbg = dbg ()
+    }
 
-let apply_or_call_caml_apply result arity mut clos args pos mode dbg =
+let apply_or_call_caml_apply ~callsite_counter result arity mut clos args pos
+    mode dbg =
   match arity with
   | [_] ->
     bind "fun" clos (fun clos ->
@@ -3690,33 +3773,38 @@ let apply_or_call_caml_apply result arity mut clos args pos mode dbg =
           ( Capply
               { result_type = Extended_machtype.to_machtype result;
                 region = pos;
-                callees = None
+                callees = None;
+                callsite_counter
               },
             (get_field_codepointer mut clos 0 dbg :: args) @ [clos],
             dbg ))
-  | _ -> call_caml_apply result arity mut clos args pos mode dbg
+  | _ ->
+    call_caml_apply ~callsite_counter result arity mut clos args pos mode dbg
 
-let rec might_split_call_caml_apply ?old_region result arity mut clos args pos
-    mode dbg =
+let rec might_split_call_caml_apply ?old_region ~callsite_counter result arity
+    mut clos args pos mode dbg =
   match split_arity_for_apply arity args with
   | (arity, args), None -> (
     match old_region with
-    | None -> apply_or_call_caml_apply result arity mut clos args pos mode dbg
+    | None ->
+      apply_or_call_caml_apply ~callsite_counter result arity mut clos args pos
+        mode dbg
     | Some old_region ->
       maybe_reset_current_region ~dbg:placeholder_dbg
         ~body_tail:
-          (apply_or_call_caml_apply result arity mut clos args pos mode dbg)
+          (apply_or_call_caml_apply ~callsite_counter result arity mut clos args
+             pos mode dbg)
         ~body_nontail:
-          (apply_or_call_caml_apply result arity mut clos args Rc_normal
-             Cmx_format.Maybe_alloc_stack dbg)
+          (apply_or_call_caml_apply ~callsite_counter result arity mut clos args
+             Rc_normal Cmx_format.Maybe_alloc_stack dbg)
         old_region)
   | (arity, args), Some (arity', args') -> (
     let body old_region =
       bind "result"
-        (call_caml_apply [| Val |] arity mut clos args Rc_normal
-           Cmx_format.Maybe_alloc_stack dbg) (fun clos ->
-          might_split_call_caml_apply ?old_region result arity' mut clos args'
-            pos mode dbg)
+        (call_caml_apply ~callsite_counter [| Val |] arity mut clos args
+           Rc_normal Cmx_format.Maybe_alloc_stack dbg) (fun clos ->
+          might_split_call_caml_apply ?old_region ~callsite_counter result
+            arity' mut clos args' pos mode dbg)
     in
     (* When splitting [caml_applyM] into [caml_applyN] and [caml_applyK] it is
        possible for [caml_applyN] to allocate on the local stack. If we are not
@@ -3735,14 +3823,16 @@ let rec might_split_call_caml_apply ?old_region result arity mut clos args pos
         (fun region -> body (Some region))
     | _ -> body old_region)
 
-let generic_apply mut clos args args_type result (pos, mode) dbg =
-  might_split_call_caml_apply result args_type mut clos args pos mode dbg
+let generic_apply ~callsite_counter mut clos args args_type result (pos, mode)
+    dbg =
+  might_split_call_caml_apply ~callsite_counter result args_type mut clos args
+    pos mode dbg
 
-let send kind met obj args args_type result akind dbg =
+let send ~callsite_counter kind met obj args args_type result akind dbg =
   let call_met obj args args_type clos =
     (* met is never a simple expression, so it never gets turned into an
        Immutable load *)
-    generic_apply Asttypes.Mutable clos (obj :: args)
+    generic_apply ~callsite_counter Asttypes.Mutable clos (obj :: args)
       (Extended_machtype.typ_val :: args_type)
       result akind dbg
   in
@@ -3751,7 +3841,8 @@ let send kind met obj args args_type result akind dbg =
       | Self, _, _ ->
         bind "met" (lookup_label obj met dbg) (call_met obj args args_type)
       | Cached, cache :: pos :: args, _ :: _ :: args_type ->
-        call_cached_method obj met cache pos args args_type result akind dbg
+        call_cached_method ~callsite_counter obj met cache pos args args_type
+          result akind dbg
       | _ -> bind "met" (lookup_tag obj met dbg) (call_met obj args args_type))
 
 (*
@@ -3803,12 +3894,15 @@ let cache_public_method meths tag cache dbg =
     (* Here we check whether the interval [li; hi] is a singleton, and exit the
        loop if so. *)
     Cifthenelse
-      ( Cop (Ccmpi Cge, [Cvar check_li; Cvar check_hi], dbg),
-        dbg,
-        Cexit (Lbl found_cont, [Cvar check_li], []),
-        dbg,
-        Cexit (Lbl loop_cont, [Cvar check_li; Cvar check_hi], []),
-        dbg )
+      { cond = Cop (Ccmpi Cge, [Cvar check_li; Cvar check_hi], dbg);
+        ifso_dbg = dbg;
+        ifso_counters = [];
+        ifso = Cexit (Lbl found_cont, [Cvar check_li], []);
+        ifnot_dbg = dbg;
+        ifnot_counters = [];
+        ifnot = Cexit (Lbl loop_cont, [Cvar check_li; Cvar check_hi], []);
+        dbg
+      }
   in
   let dichotomy_expr =
     Clet
@@ -3820,27 +3914,33 @@ let cache_public_method meths tag cache dbg =
               cconst_int 1 ],
             dbg ),
         Cifthenelse
-          ( Cop
-              ( Ccmpi Clt,
-                [ tag;
-                  Cop
-                    ( mk_load_mut Word_int,
-                      [ Cop
-                          ( Cadda,
-                            [meths; lsl_const (Cvar mi) log2_size_addr dbg],
-                            dbg ) ],
-                      dbg ) ],
-                dbg ),
-            dbg,
-            (* tag < a.(mi) : interval is now [ li; mi - 2 ] *)
-            Cexit
-              ( Lbl check_cont,
-                [Cvar li; Cop (Csubi, [Cvar mi; cconst_int 2], dbg)],
-                [] ),
-            dbg,
-            (* tag >= a.(mi) : interval is now [ mi; hi ] *)
-            Cexit (Lbl check_cont, [Cvar mi; Cvar hi], []),
-            dbg ) )
+          { cond =
+              Cop
+                ( Ccmpi Clt,
+                  [ tag;
+                    Cop
+                      ( mk_load_mut Word_int,
+                        [ Cop
+                            ( Cadda,
+                              [meths; lsl_const (Cvar mi) log2_size_addr dbg],
+                              dbg ) ],
+                        dbg ) ],
+                  dbg );
+            ifso_dbg = dbg;
+            ifso_counters = [];
+            ifso =
+              (* tag < a.(mi) : interval is now [ li; mi - 2 ] *)
+              Cexit
+                ( Lbl check_cont,
+                  [Cvar li; Cop (Csubi, [Cvar mi; cconst_int 2], dbg)],
+                  [] );
+            ifnot_dbg = dbg;
+            ifnot_counters = [];
+            ifnot =
+              (* tag >= a.(mi) : interval is now [ mi; hi ] *)
+              Cexit (Lbl check_cont, [Cvar mi; Cvar hi], []);
+            dbg
+          } )
   in
   let loop_body =
     ccatch
@@ -3906,7 +4006,12 @@ let apply_function_body arity result (mode : Cmx_format.return_mode) =
     | [arg] -> (
       let app =
         Cop
-          ( Capply { result_type = result; region = Rc_normal; callees = None },
+          ( Capply
+              { result_type = result;
+                region = Rc_normal;
+                callees = None;
+                callsite_counter = None
+              },
             (* The code pointer and closure info of a closure are write-once;
                reading them immutably is correct and lets the debugger describe
                the call target (and closure projections) for call sites. *)
@@ -3929,7 +4034,11 @@ let apply_function_body arity result (mode : Cmx_format.return_mode) =
         ( VP.create newclos,
           Cop
             ( Capply
-                { result_type = typ_val; region = Rc_normal; callees = None },
+                { result_type = typ_val;
+                  region = Rc_normal;
+                  callees = None;
+                  callsite_counter = None
+                },
               [ get_field_codepointer Asttypes.Immutable (Cvar clos) 0 (dbg ());
                 Cvar arg;
                 Cvar clos ],
@@ -3949,24 +4058,34 @@ let apply_function_body arity result (mode : Cmx_format.return_mode) =
     then code
     else
       Cifthenelse
-        ( Cop
-            ( Ccmpi Ceq,
-              [ Cop
-                  ( Casr,
-                    [ get_field_gen Asttypes.Immutable (Cvar clos) 1 (dbg ());
-                      Cconst_int (pos_arity_in_closinfo, dbg ()) ],
-                    dbg () );
-                Cconst_int (List.length arity, dbg ()) ],
-              dbg () ),
-          dbg (),
-          Cop
-            ( Capply { result_type = result; region = Rc_normal; callees = None },
-              get_field_codepointer Asttypes.Immutable (Cvar clos) 2 (dbg ())
-              :: List.map (fun s -> Cvar s) all_args,
-              dbg () ),
-          dbg (),
-          code,
-          dbg () ) )
+        { cond =
+            Cop
+              ( Ccmpi Ceq,
+                [ Cop
+                    ( Casr,
+                      [ get_field_gen Asttypes.Immutable (Cvar clos) 1 (dbg ());
+                        Cconst_int (pos_arity_in_closinfo, dbg ()) ],
+                      dbg () );
+                  Cconst_int (List.length arity, dbg ()) ],
+                dbg () );
+          ifso_dbg = dbg ();
+          ifso_counters = [];
+          ifso =
+            Cop
+              ( Capply
+                  { result_type = result;
+                    region = Rc_normal;
+                    callees = None;
+                    callsite_counter = None
+                  },
+                get_field_codepointer Asttypes.Immutable (Cvar clos) 2 (dbg ())
+                :: List.map (fun s -> Cvar s) all_args,
+                dbg () );
+          ifnot_dbg = dbg ();
+          ifnot_counters = [];
+          ifnot = code;
+          dbg = dbg ()
+        } )
 
 let send_function (arity, result, mode) =
   let dbg = placeholder_dbg in
@@ -4013,13 +4132,17 @@ let send_function (arity, result, mode) =
                 Clet
                   ( VP.create real,
                     Cifthenelse
-                      ( Cop (Ccmpi Cne, [tag'; tag], dbg ()),
-                        dbg (),
-                        cache_public_method (Cvar meths) tag cache_ptr_cvar
-                          (dbg ()),
-                        dbg (),
-                        cached_pos,
-                        dbg () ),
+                      { cond = Cop (Ccmpi Cne, [tag'; tag], dbg ());
+                        ifso_dbg = dbg ();
+                        ifso_counters = [];
+                        ifso =
+                          cache_public_method (Cvar meths) tag cache_ptr_cvar
+                            (dbg ());
+                        ifnot_dbg = dbg ();
+                        ifnot_counters = [];
+                        ifnot = cached_pos;
+                        dbg = dbg ()
+                      },
                     Cop
                       ( mk_load_mut Word_val,
                         [ Cop
@@ -4042,6 +4165,8 @@ let send_function (arity, result, mode) =
       fun_body = body;
       fun_codegen_options = [];
       fun_dbg;
+      fun_fdo_entry_counters = [];
+      fun_function_body_hash = None;
       fun_poll = Default_poll;
       fun_ret_type = result
     }
@@ -4057,6 +4182,8 @@ let apply_function (arity, result, mode) =
       fun_body = body;
       fun_codegen_options = [];
       fun_dbg;
+      fun_fdo_entry_counters = [];
+      fun_function_body_hash = None;
       fun_poll = Default_poll;
       fun_ret_type = result
     }
@@ -4089,7 +4216,12 @@ let tuplify_function arity return =
       fun_args = [VP.create arg, typ_val; VP.create clos, typ_val];
       fun_body =
         Cop
-          ( Capply { result_type = return; region = Rc_normal; callees = None },
+          ( Capply
+              { result_type = return;
+                region = Rc_normal;
+                callees = None;
+                callsite_counter = None
+              },
             (* The closure code pointer is write-once; see
                [apply_function_body]. *)
             get_field_codepointer Asttypes.Immutable (Cvar clos) 2 (dbg ())
@@ -4098,6 +4230,8 @@ let tuplify_function arity return =
             dbg () );
       fun_codegen_options = [];
       fun_dbg;
+      fun_fdo_entry_counters = [];
+      fun_function_body_hash = None;
       fun_poll = Default_poll;
       fun_ret_type = return
     }
@@ -4242,7 +4376,12 @@ let rec make_curry_apply result narity args_type args clos n =
   match args_type with
   | [] ->
     Cop
-      ( Capply { result_type = result; region = Rc_normal; callees = None },
+      ( Capply
+          { result_type = result;
+            region = Rc_normal;
+            callees = None;
+            callsite_counter = None
+          },
         (* Code pointer and chain links of a partial-application closure are
            write-once; reading them immutably lets the debugger describe the
            call target and the recovered arguments as closure projections. *)
@@ -4283,6 +4422,8 @@ let final_curry_function nlocal arity result =
           last_clos (narity - 1);
       fun_codegen_options = [];
       fun_dbg;
+      fun_fdo_entry_counters = [];
+      fun_function_body_hash = None;
       fun_poll = Default_poll;
       fun_ret_type = result
     }
@@ -4344,6 +4485,8 @@ let intermediate_curry_functions ~nlocal ~arity result =
                 dbg () );
           fun_codegen_options = [];
           fun_dbg;
+          fun_fdo_entry_counters = [];
+          fun_function_body_hash = None;
           fun_poll = Default_poll;
           fun_ret_type = result
         }
@@ -4376,6 +4519,8 @@ let intermediate_curry_functions ~nlocal ~arity result =
                    clos (num + 1);
                fun_codegen_options = [];
                fun_dbg;
+               fun_fdo_entry_counters = [];
+               fun_function_body_hash = None;
                fun_poll = Default_poll;
                fun_ret_type = result
              }
@@ -4687,6 +4832,8 @@ let fail_if_called_indirectly_function () =
       fun_args = [];
       fun_body;
       fun_codegen_options = [];
+      fun_fdo_entry_counters = [];
+      fun_function_body_hash = None;
       fun_poll = Default_poll;
       fun_dbg = Debuginfo.none;
       fun_ret_type =
@@ -4740,7 +4887,12 @@ let entry_point namelist =
     in
     Csequence
       ( Cop
-          ( Capply { result_type = typ_void; region = Rc_normal; callees = None },
+          ( Capply
+              { result_type = typ_void;
+                region = Rc_normal;
+                callees = None;
+                callsite_counter = None
+              },
             [Cop (mk_load_immut Word_int, [f], dbg ())],
             dbg () ),
         incr_global_inited () )
@@ -4760,12 +4912,15 @@ let entry_point namelist =
     let incr_i id = Cop (Caddi, [Cvar id; Cconst_int (1, dbg)], dbg) in
     let exit_if_last_iteration id =
       Cifthenelse
-        ( Cop (Ccmpi Ceq, [Cvar id; high], dbg),
-          dbg,
-          Cexit (Lbl raise_num, [], []),
-          dbg,
-          Ctuple [],
-          dbg )
+        { cond = Cop (Ccmpi Ceq, [Cvar id; high], dbg);
+          ifso_dbg = dbg;
+          ifso_counters = [];
+          ifso = Cexit (Lbl raise_num, [], []);
+          ifnot_dbg = dbg;
+          ifnot_counters = [];
+          ifnot = Ctuple [];
+          dbg
+        }
     in
     let cont = Lambda.next_raise_count () in
     let id = Backend_var.create_local "*id*" in
@@ -4798,6 +4953,8 @@ let entry_point namelist =
         fun_body = Csequence (body, cconst_int 1);
         fun_codegen_options = [Reduce_code_size; Use_linscan_regalloc];
         fun_dbg;
+        fun_fdo_entry_counters = [];
+        fun_function_body_hash = None;
         fun_poll = Default_poll;
         fun_ret_type = typ_val
       } ]
@@ -5055,8 +5212,18 @@ let sequence x y =
   | _, Ctuple [] -> x
   | _, _ -> Csequence (x, y)
 
-let ite ~dbg ~then_dbg ~then_ ~else_dbg ~else_ cond =
-  Cifthenelse (cond, then_dbg, then_, else_dbg, else_, dbg)
+let ite ~dbg ~then_dbg ~then_counters ~then_ ~else_dbg ~else_counters ~else_
+    cond =
+  Cifthenelse
+    { cond;
+      ifso_dbg = then_dbg;
+      ifso_counters = then_counters;
+      ifso = then_;
+      ifnot_dbg = else_dbg;
+      ifnot_counters = else_counters;
+      ifnot = else_;
+      dbg
+    }
 
 let trywith ~dbg ~body ~exn_var ~extra_args ~handler_cont ~handler () =
   Ccatch
@@ -5245,17 +5412,22 @@ let probe ~dbg ~name ~handler_code_linkage_name ~enabled_at_init ~args =
 let load ~dbg memory_chunk mutability ~addr =
   Cop (Cload { memory_chunk; mutability; is_atomic = false }, [addr], dbg)
 
-let direct_call ~dbg ty pos f_code_sym args =
+let direct_call ~dbg ~callsite_counter ty pos f_code_sym args =
   Cop
-    ( Capply { result_type = ty; region = pos; callees = Some [f_code_sym] },
+    ( Capply
+        { result_type = ty;
+          region = pos;
+          callees = Some [f_code_sym];
+          callsite_counter
+        },
       Cconst_symbol (f_code_sym, dbg) :: args,
       dbg )
 
-let indirect_call ~dbg ty pos alloc_mode f args_type args =
-  might_split_call_caml_apply ty args_type Asttypes.Mutable f args pos
-    alloc_mode dbg
+let indirect_call ~dbg ~callsite_counter ty pos alloc_mode f args_type args =
+  might_split_call_caml_apply ~callsite_counter ty args_type Asttypes.Mutable f
+    args pos alloc_mode dbg
 
-let indirect_full_call ~dbg ty pos f ~callees args_type args =
+let indirect_full_call ~dbg ~callsite_counter ty pos f ~callees args_type args =
   (* Use a variable to avoid duplicating the cmm code of the closure [f]. *)
   let v = Backend_var.create_local "*closure*" in
   let v' = Backend_var.With_provenance.create v in
@@ -5276,7 +5448,8 @@ let indirect_full_call ~dbg ty pos f ~callees args_type args =
          ( Capply
              { result_type = Extended_machtype.to_machtype ty;
                region = pos;
-               callees
+               callees;
+               callsite_counter
              },
            (fun_ptr :: args) @ [Cvar v],
            dbg ))
@@ -5360,13 +5533,15 @@ let cfunction decl = Cmm.Cfunction decl
 
 let cdata d = Cmm.Cdata d
 
-let fundecl fun_name fun_args fun_body fun_codegen_options fun_dbg fun_poll
-    fun_ret_type =
+let fundecl fun_name fun_args fun_body fun_codegen_options fun_dbg
+    ~fdo_entry_counters ~function_body_hash fun_poll fun_ret_type =
   { Cmm.fun_name;
     fun_args;
     fun_body;
     fun_codegen_options;
     fun_dbg;
+    fun_fdo_entry_counters = fdo_entry_counters;
+    fun_function_body_hash = function_body_hash;
     fun_poll;
     fun_ret_type
   }
@@ -5617,14 +5792,24 @@ let perform ~dbg eff =
      improves backtraces of paused fibers. *)
   let sym = Cmm.global_symbol "caml_perform" in
   Cop
-    ( Capply { result_type = typ_val; region = Rc_nontail; callees = Some [sym] },
+    ( Capply
+        { result_type = typ_val;
+          region = Rc_nontail;
+          callees = Some [sym];
+          callsite_counter = None
+        },
       [Cconst_symbol (sym, dbg); eff; cont],
       dbg )
 
 let with_stack ~dbg ~valuec ~exnc ~effc ~f ~arg =
   let sym = Cmm.global_symbol "caml_runstack" in
   Cop
-    ( Capply { result_type = typ_val; region = Rc_normal; callees = Some [sym] },
+    ( Capply
+        { result_type = typ_val;
+          region = Rc_normal;
+          callees = Some [sym];
+          callsite_counter = None
+        },
       [ Cconst_symbol (Cmm.global_symbol "caml_runstack", dbg);
         Cop
           ( Cextcall
@@ -5646,7 +5831,12 @@ let with_stack ~dbg ~valuec ~exnc ~effc ~f ~arg =
 let with_stack_preemptible ~dbg ~valuec ~exnc ~effc ~handle_tick ~f ~arg =
   let sym = Cmm.global_symbol "caml_runstack" in
   Cop
-    ( Capply { result_type = typ_val; region = Rc_normal; callees = Some [sym] },
+    ( Capply
+        { result_type = typ_val;
+          region = Rc_normal;
+          callees = Some [sym];
+          callsite_counter = None
+        },
       [ Cconst_symbol (Cmm.global_symbol "caml_runstack", dbg);
         Cop
           ( Cextcall
@@ -5673,21 +5863,36 @@ let with_stack_preemptible ~dbg ~valuec ~exnc ~effc ~handle_tick ~f ~arg =
 let continue ~dbg ~cont ~value =
   let sym = Cmm.global_symbol "caml_continue" in
   Cop
-    ( Capply { result_type = typ_val; region = Rc_normal; callees = Some [sym] },
+    ( Capply
+        { result_type = typ_val;
+          region = Rc_normal;
+          callees = Some [sym];
+          callsite_counter = None
+        },
       [Cconst_symbol (sym, dbg); cont; value],
       dbg )
 
 let discontinue ~dbg ~cont ~exn =
   let sym = Cmm.global_symbol "caml_discontinue" in
   Cop
-    ( Capply { result_type = typ_val; region = Rc_normal; callees = Some [sym] },
+    ( Capply
+        { result_type = typ_val;
+          region = Rc_normal;
+          callees = Some [sym];
+          callsite_counter = None
+        },
       [Cconst_symbol (sym, dbg); cont; exn],
       dbg )
 
 let discontinue_with_backtrace ~dbg ~cont ~exn ~bt =
   let sym = Cmm.global_symbol "caml_discontinue_with_backtrace" in
   Cop
-    ( Capply { result_type = typ_val; region = Rc_normal; callees = Some [sym] },
+    ( Capply
+        { result_type = typ_val;
+          region = Rc_normal;
+          callees = Some [sym];
+          callsite_counter = None
+        },
       [Cconst_symbol (sym, dbg); cont; exn; bt],
       dbg )
 
@@ -5696,7 +5901,12 @@ let reperform ~dbg ~eff ~cont ~last_fiber =
      call. *)
   let sym = Cmm.global_symbol "caml_reperform" in
   Cop
-    ( Capply { result_type = typ_val; region = Rc_normal; callees = Some [sym] },
+    ( Capply
+        { result_type = typ_val;
+          region = Rc_normal;
+          callees = Some [sym];
+          callsite_counter = None
+        },
       [Cconst_symbol (sym, dbg); eff; cont; last_fiber],
       dbg )
 

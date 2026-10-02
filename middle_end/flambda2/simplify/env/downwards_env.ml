@@ -53,6 +53,14 @@ type t =
     machine_width : Target_system.Machine_width.t;
     typing_env : TE.t;
     inlined_debuginfo : Inlined_debuginfo.t;
+    specializations : Inlined_debuginfo.t;
+        (* The inlinings whose bodies defined the function being simplified,
+           making it a copy (specialization) of the original definition: they do
+           not add inlined frames to its debuginfo, which keeps describing the
+           original, but they do rename its pseudo-instrumentation counters
+           ([Inlined_debuginfo.specialize_fdo_counter]). *)
+    inlined_call_counters : Inlined_call_counters.t;
+    fdo_region : Inlined_call_counters.region option;
     disable_inlining : Disable_inlining.t;
     disable_partial_application_stub_generation : bool;
     inlined_attribute_to_forward :
@@ -107,7 +115,8 @@ type t =
   }
 
 let [@ocamlformat "disable"] print ppf { round; machine_width; typing_env;
-                inlined_debuginfo; disable_inlining;
+                inlined_debuginfo; specializations = _; inlined_call_counters = _;
+                fdo_region = _; disable_inlining;
                 disable_partial_application_stub_generation;
                 inlined_attribute_to_forward;
                 inlining_state; propagating_float_consts;
@@ -238,6 +247,9 @@ let create ~round ~machine_width ~(resolver : resolver)
     machine_width;
     typing_env;
     inlined_debuginfo = Inlined_debuginfo.none;
+    specializations = Inlined_debuginfo.none;
+    inlined_call_counters = Inlined_call_counters.create ();
+    fdo_region = None;
     disable_inlining = Do_not_disable_inlining;
     disable_partial_application_stub_generation = false;
     inlined_attribute_to_forward = None;
@@ -332,7 +344,10 @@ let enter_set_of_closures
     { machine_width;
       round;
       typing_env;
-      inlined_debuginfo = _;
+      inlined_debuginfo;
+      specializations;
+      inlined_call_counters;
+      fdo_region = _;
       disable_inlining;
       disable_partial_application_stub_generation;
       inlined_attribute_to_forward = _;
@@ -363,6 +378,18 @@ let enter_set_of_closures
     round;
     typing_env = TE.closure_env typing_env;
     inlined_debuginfo = Inlined_debuginfo.none;
+    (* A code binding encountered while simplifying an inlined body is a copy of
+       the original definition, freshly created by that instance of inlining
+       (e.g. the functions of a functor whose application is inlined out). Its
+       pseudo-instrumentation counters must not be conflated with the original's
+       or other copies': see [add_inlined_fdo_counter]. The rewrite must be
+       applied only on the first simplification of a code binding; see
+       [Simplify_set_of_closures.dacc_inside_function]. *)
+    specializations =
+      Inlined_debuginfo.merge specializations ~from_apply_expr:inlined_debuginfo;
+    inlined_call_counters;
+    (* Set when entering each function's body. *)
+    fdo_region = None;
     disable_inlining;
     disable_partial_application_stub_generation;
     inlined_attribute_to_forward = None;
@@ -659,6 +686,9 @@ let set_inlining_arguments arguments t =
 let set_inlined_debuginfo t ~from =
   { t with inlined_debuginfo = from.inlined_debuginfo }
 
+let clear_specializations t =
+  { t with specializations = Inlined_debuginfo.none }
+
 let inlined_attribute_to_forward_through_inlined_apply t ~from_apply_expr
     ~inlined_attribute =
   match (inlined_attribute : Inlined_attribute.t) with
@@ -687,6 +717,29 @@ let merge_inlined_debuginfo_and_forward_inlined_attribute t ~from_apply_expr
 
 let add_inlined_debuginfo t dbg =
   Inlined_debuginfo.rewrite t.inlined_debuginfo dbg
+
+let add_inlined_fdo_counter t counter =
+  Inlined_debuginfo.specialize_fdo_counter t.specializations
+    (Inlined_debuginfo.inline_fdo_counter t.inlined_debuginfo counter)
+
+let fdo_counter_of_code_binding t counter =
+  (* The code binding's entry counter belongs to the copied function, whose
+     counters are specialized rather than inlined (see
+     [enter_set_of_closures]). *)
+  Inlined_debuginfo.specialize_fdo_counter
+    (Inlined_debuginfo.merge t.specializations
+       ~from_apply_expr:t.inlined_debuginfo)
+    counter
+
+let inlined_call_counters t = t.inlined_call_counters
+
+let tracking_inlined_call_counters t =
+  Oxcaml_flags.fdo_counters_enabled ()
+  && Are_rebuilding_terms.do_rebuild_terms t.are_rebuilding_terms
+
+let fdo_region t = t.fdo_region
+
+let set_fdo_region t region = { t with fdo_region = Some region }
 
 let enter_inlined_apply ~called_code ~apply ~was_inline_always t =
   let arguments =
@@ -721,6 +774,7 @@ let enter_inlined_apply ~called_code ~apply ~was_inline_always t =
   let inlined_debuginfo =
     Inlined_debuginfo.create ~called_code_id:(Code.code_id called_code)
       ~apply_dbg:(Apply.dbg apply)
+      ~apply_callsite_counter:(Apply.callsite_counter apply)
   in
   let inlined_attribute_to_forward =
     inlined_attribute_to_forward_through_inlined_apply t
@@ -843,6 +897,9 @@ let denv_for_lifted_continuation ~denv_for_join ~denv =
   { (* denv *)
     machine_width = denv.machine_width;
     inlined_debuginfo = denv.inlined_debuginfo;
+    specializations = denv.specializations;
+    inlined_call_counters = denv.inlined_call_counters;
+    fdo_region = denv.fdo_region;
     disable_inlining = denv.disable_inlining;
     disable_partial_application_stub_generation =
       denv.disable_partial_application_stub_generation;

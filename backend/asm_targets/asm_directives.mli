@@ -370,6 +370,11 @@ val offset_into_dwarf_section_symbol :
 val reloc_x86_64_plt32 :
   offset_from_this:int64 -> target_symbol:Asm_symbol.t -> addend:int64 -> unit
 
+(** A relocation at the current position that patches nothing but records a
+    reference to the symbol (the linker's call graph profile section names its
+    symbols this way). *)
+val reloc_x86_64_none : target_symbol:Asm_symbol.t -> unit
+
 module Directive : sig
   module Constant : sig
     type t = private
@@ -440,7 +445,9 @@ module Directive : sig
   type comment = private string
 
   (* ELF specific *)
-  type reloc_type = R_X86_64_PLT32
+  type reloc_type =
+    | R_X86_64_PLT32
+    | R_X86_64_NONE
   (* X86 only *)
 
   (** Internal representation of directives. Only needed if writing a custom
@@ -516,6 +523,9 @@ module Directive : sig
         }
     | Delta_uleb128 of { delta : Constant.t }
         (** Variable-width return-address delta for a short frame descriptor *)
+
+  (** A directive defining the given label at the current position. *)
+  val new_label : Asm_label.t -> t
 
   (** Translate the given directive to textual form. This produces output
       suitable for either gas or MASM as appropriate. *)

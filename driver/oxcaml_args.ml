@@ -47,6 +47,11 @@ let mk_no_ocamlcfg f =
 let mk_dcfg f = ("-dcfg", Arg.Unit f, " (undocumented)")
 let mk_dssa f = ("-dssa", Arg.Unit f, " (undocumented)")
 
+let mk_dfdo f =
+  ( "-dfdo",
+    Arg.Unit f,
+    " Dump the block frequencies used for profile-guided layout" )
+
 let mk_dcfg_invariants f =
   ("-dcfg-invariants", Arg.Unit f, " Extra sanity checks on Cfg")
 
@@ -580,6 +585,31 @@ let mk_llvm_flags f =
   ( "-llvm-flags",
     Arg.String f,
     " Extra flags to pass to LLVM (like -march or -mtune)" )
+
+let mk_fdo_profile f =
+  ( "-fdo-profile",
+    Arg.String f,
+    "<file>  Use the source-position FDO profile in <file> to guide code\n\
+    \     layout (implies -function-sections: the linker lays out the\n\
+    \     functions from the profile's call graph)" )
+
+let mk_fdo_counters f =
+  ( "-fdo-counters",
+    Arg.Unit f,
+    " Create pseudo-instrumentation counters for branching constructs and\n\
+    \     emit the FDO metadata section (implied by -fdo-profile)" )
+
+let mk_fdo_names f =
+  ( "-fdo-names",
+    Arg.Unit f,
+    " Also record the names of the counters in the FDO metadata section,\n\
+    \     for readable oxcaml-fdo-decode -dump output" )
+
+let mk_no_fdo_profile_check f =
+  ( "-no-fdo-profile-check",
+    Arg.Unit f,
+    " Do not fail when the FDO profile's counts contradict the flow of the\n\
+    \     code being compiled" )
 
 module Flambda2 = Oxcaml_flags.Flambda2
 
@@ -1359,6 +1389,7 @@ module type Oxcaml_options = sig
   val ddwarf_metrics_output_file : string -> unit
   val dcfg : unit -> unit
   val dssa : unit -> unit
+  val dfdo : unit -> unit
   val dcfg_invariants : unit -> unit
   val regalloc : Clflags.Register_allocator.t -> unit
   val regalloc_linscan_threshold : int -> unit
@@ -1459,6 +1490,10 @@ module type Oxcaml_options = sig
   val keep_llvmir : unit -> unit
   val llvm_path : string -> unit
   val llvm_flags : string -> unit
+  val fdo_profile : string -> unit
+  val fdo_counters : unit -> unit
+  val fdo_names : unit -> unit
+  val no_fdo_profile_check : unit -> unit
   val flambda2_debug : unit -> unit
   val no_flambda2_debug : unit -> unit
   val reaper_debug_flags : string -> unit
@@ -1565,6 +1600,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_no_ocamlcfg F.no_ocamlcfg;
       mk_dcfg F.dcfg;
       mk_dssa F.dssa;
+      mk_dfdo F.dfdo;
       mk_dcfg_invariants F.dcfg_invariants;
       mk_regalloc F.regalloc;
       mk_regalloc_linscan_threshold F.regalloc_linscan_threshold;
@@ -1675,6 +1711,10 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_keep_llvmir F.keep_llvmir;
       mk_llvm_path F.llvm_path;
       mk_llvm_flags F.llvm_flags;
+      mk_fdo_profile F.fdo_profile;
+      mk_fdo_counters F.fdo_counters;
+      mk_fdo_names F.fdo_names;
+      mk_no_fdo_profile_check F.no_fdo_profile_check;
       mk_flambda2_debug F.flambda2_debug;
       mk_no_flambda2_debug F.no_flambda2_debug;
       mk_reaper_debug_flags F.reaper_debug_flags;
@@ -1919,6 +1959,7 @@ module Oxcaml_options_impl = struct
   let no_ocamlcfg () = ()
   let dcfg = set' Oxcaml_flags.dump_cfg
   let dssa = set' Oxcaml_flags.dump_ssa
+  let dfdo = set' Oxcaml_flags.dump_fdo
   let dcfg_invariants = set' Oxcaml_flags.cfg_invariants
   let regalloc x = Oxcaml_flags.regalloc := x
 
@@ -2125,6 +2166,10 @@ module Oxcaml_options_impl = struct
   let keep_llvmir () = set' Oxcaml_flags.keep_llvmir ()
   let llvm_path s = Oxcaml_flags.llvm_path := Some s
   let llvm_flags s = Oxcaml_flags.llvm_flags := s
+  let fdo_profile = Oxcaml_flags.set_fdo_profile_path
+  let fdo_counters = set' Oxcaml_flags.fdo_counters
+  let fdo_names = set' Oxcaml_flags.fdo_names
+  let no_fdo_profile_check = clear' Oxcaml_flags.fdo_profile_check
   let flambda2_debug = set' Oxcaml_flags.Flambda2.debug
   let no_flambda2_debug = clear' Oxcaml_flags.Flambda2.debug
 
@@ -2705,6 +2750,12 @@ module Extra_params = struct
         true
     | "keep-llvmir" -> set' Oxcaml_flags.keep_llvmir
     | "llvm-flags" -> set_string Oxcaml_flags.llvm_flags
+    | "fdo-profile" ->
+        Oxcaml_flags.set_fdo_profile_path v;
+        true
+    | "fdo-counters" -> set' Oxcaml_flags.fdo_counters
+    | "fdo-names" -> set' Oxcaml_flags.fdo_names
+    | "fdo-profile-check" -> set' Oxcaml_flags.fdo_profile_check
     | "flambda2-debug" -> set' Oxcaml_flags.Flambda2.debug
     | "reaper-debug-flags" ->
         Oxcaml_flags.Flambda2.reaper_debug_flags :=

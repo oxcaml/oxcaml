@@ -880,7 +880,8 @@ let make_apply_wrapper env
         let apply_expr = Expr.create_apply apply in
         let handler =
           let apply_cont =
-            Apply_cont_expr.create return_cont ~args ~dbg:(Apply.dbg apply)
+            Apply_cont_expr.create ~fdo_counters:[] return_cont ~args
+              ~dbg:(Apply.dbg apply)
           in
           RE.from_expr
             ~expr:(Expr.create_apply_cont apply_cont)
@@ -1231,6 +1232,7 @@ let rebuild_apply env apply =
             ~callee:(rewrite_simple_opt env (Apply.callee apply))
             exn_continuation ~args ~args_arity ~return_arity ~call_kind
             ~return_mode:(Apply.return_mode apply) (Apply.dbg apply)
+            ~callsite_counter:(Apply.callsite_counter apply)
             ~inlined:(Apply.inlined apply)
             ~inlining_state:(Apply.inlining_state apply)
             ~probe:(Apply.probe apply) ~position:(Apply.position apply)
@@ -1358,7 +1360,9 @@ let rebuild_apply env apply =
       let make_apply ~continuation =
         Apply.create ~callee ~continuation exn_continuation ~args ~args_arity
           ~return_arity ~call_kind ~return_mode:(Apply.return_mode apply)
-          (Apply.dbg apply) ~inlined:(Apply.inlined apply)
+          (Apply.dbg apply)
+          ~callsite_counter:(Apply.callsite_counter apply)
+          ~inlined:(Apply.inlined apply)
           ~inlining_state:(Apply.inlining_state apply)
           ~probe:(Apply.probe apply) ~position:(Apply.position apply)
           ~relative_history:(Apply.relative_history apply)

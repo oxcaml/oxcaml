@@ -106,7 +106,12 @@ let rebuild_arm uacc arm (action, use_id, arity, env_at_use)
         else
           let check_handler ~handler ~action =
             match RE.to_apply_cont handler with
-            | Some action -> Some action
+            | Some handler_action ->
+              (* The arm now jumps straight to the handler's destination; its
+                 edge is still the arm's. *)
+              Some
+                (Apply_cont.with_fdo_counters handler_action
+                   (Apply_cont.fdo_counters action))
             | None -> Some action
           in
           match cont_info_from_uenv with
@@ -166,7 +171,11 @@ let rebuild_arm uacc arm (action, use_id, arity, env_at_use)
             new_let_conts, arms, Mergeable { cont; args }))
   | New_wrapper new_let_cont ->
     let new_let_conts = new_let_cont :: new_let_conts in
-    let action = Apply_cont.goto new_let_cont.cont in
+    let action =
+      Apply_cont.goto
+        ~fdo_counters:(Apply_cont.fdo_counters action)
+        new_let_cont.cont
+    in
     let arms = TI.Map.add arm action arms in
     new_let_conts, arms, Not_mergeable
 
@@ -741,10 +750,54 @@ let recognize_mergeable_argument ~machine_width ~scrutinee required_names ~dbg
           | Naked_mask -> single_kind Naked_masks Naked_masks)
         | Region | Rec_info -> None))
 
+(* The counters of the calls inlined in the handlers the arms lead to are
+   attached to the arms (see [Inlined_call_counters]). When every arm leads to
+   the same continuation the switch is about to disappear (in one way or
+   another, below) and the current region simply continues into that handler. *)
+let attach_inlined_call_counters ~dacc_before_switch arms =
+  let denv = DA.denv dacc_before_switch in
+  match DE.fdo_region denv with
+  | Some region when DE.tracking_inlined_call_counters denv -> (
+    let counters = DE.inlined_call_counters denv in
+    let conts =
+      TI.Map.fold
+        (fun _ (action, _, _, _) conts ->
+          Continuation.Set.add (AC.continuation action) conts)
+        arms Continuation.Set.empty
+    in
+    match Continuation.Set.get_singleton conts with
+    | Some cont ->
+      Inlined_call_counters.add_continuation_into counters region cont;
+      arms
+    | None ->
+      TI.Map.map
+        (fun (action, rewrite_id, arity, env_at_use) ->
+          let inlined_calls =
+            Inlined_call_counters.counters_into counters
+              (Handler (AC.continuation action))
+          in
+          ( AC.with_fdo_counters action
+              (Fdo_counter.add_all (AC.fdo_counters action) inlined_calls),
+            rewrite_id,
+            arity,
+            env_at_use ))
+        arms)
+  | Some _ | None -> arms
+
 let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
     ~dacc_before_switch uacc ~after_rebuild =
+  let arms = attach_inlined_call_counters ~dacc_before_switch arms in
   let new_let_conts, arms, mergeable_arms =
     TI.Map.fold (rebuild_arm uacc) arms ([], TI.Map.empty, No_arms)
+  in
+  (* When the switch collapses into a single jump, its edges become one. Keep
+     all their counters: assuming every arm executed is safer than assuming none
+     did. *)
+  let collapsed_fdo_counters =
+    TI.Map.fold
+      (fun _ action counters ->
+        Fdo_counter.add_all counters (AC.fdo_counters action))
+      arms []
   in
   let num_arms = TI.Map.cardinal arms in
   let switch_merged =
@@ -806,7 +859,10 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
                of continuations in [Name_occurrences] and then try to inline out
                [dest]. This might happen anyway in the backend though so this
                probably isn't that important for now. *)
-            let apply_cont = Apply_cont.create dest ~args ~dbg in
+            let apply_cont =
+              Apply_cont.create ~fdo_counters:collapsed_fdo_counters dest ~args
+                ~dbg
+            in
             return
               (RE.create_apply_cont apply_cont)
               ~added_code_size:(Code_size.apply_cont apply_cont)
@@ -842,7 +898,13 @@ let simplify_arm arm (action, env_at_use) (arms, dacc) =
   let action = Apply_cont.update_args action ~args in
   let dbg = AC.debuginfo action in
   let dbg = DE.add_inlined_debuginfo (DA.denv dacc) dbg in
-  let action = AC.with_debuginfo action ~dbg in
+  let action =
+    AC.with_fdo_counters
+      (AC.with_debuginfo action ~dbg)
+      (List.map
+         (DE.add_inlined_fdo_counter (DA.denv dacc))
+         (AC.fdo_counters action))
+  in
   let dacc =
     DA.map_flow_acc dacc
       ~f:

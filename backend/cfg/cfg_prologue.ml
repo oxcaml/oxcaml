@@ -61,7 +61,7 @@ module Instruction_requirements = struct
       (* These will cause the function to return, and therefore the stack should
          be unwound. *)
       | Cfg.Return | Tailcall_func (Indirect _) -> Requires_no_prologue
-      | Tailcall_func (Direct func)
+      | Tailcall_func (Direct { sym = func; callsite_counter = _ })
         when not (String.equal func.sym_name fun_name) ->
         Requires_no_prologue
       (* These are implemented by calling a function when emitted and therefore

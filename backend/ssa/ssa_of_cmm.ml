@@ -259,7 +259,7 @@ and emit env c (exp : Cmm.expression) ~tail : result =
     | Csequence (e1, e2) ->
       let* _ = emit env c e1 ~tail:false in
       emit env c e2 ~tail
-    | Cifthenelse (econd, _ifso_dbg, eif, _ifnot_dbg, eelse, _dbg) ->
+    | Cifthenelse { cond = econd; ifso = eif; ifnot = eelse; _ } ->
       emit_ifthenelse env c ~tail econd eif eelse
     | Cswitch (esel, index, ecases, _dbg) ->
       emit_switch env c ~tail esel index ecases
@@ -388,8 +388,9 @@ and emit_call env c ~ty ~nontail (new_op : Cfg.terminator) arg_instrs dbg :
     Ok (Block.params cont_block)
   in
   match new_op with
-  | Call { op = Direct sym; _ } -> call_returning_to (Direct sym) ty
-  | Call { op = Indirect candidates; _ } ->
+  | Call { op = Direct { sym; callsite_counter = _ }; _ } ->
+    call_returning_to (Direct sym) ty
+  | Call { op = Indirect { callees = candidates; callsite_counter = _ }; _ } ->
     call_returning_to (Indirect candidates) ty
   | Prim { op = External ({ ty_res; _ } as ext_call); _ } ->
     call_returning_to (External ext_call) ty_res
@@ -490,7 +491,9 @@ and emit_ifthenelse env c ~tail econd eif eelse : result =
 and emit_switch env c ~tail esel index ecases : result =
   let* rsel = emit env c esel ~tail:false in
   let case_blocks =
-    Array.map (fun (_case_expr, _dbg) -> new_block env ~params:[||]) ecases
+    Array.map
+      (fun (_case_expr, _dbg, _counters) -> new_block env ~params:[||])
+      ecases
   in
   let targets = Array.map (fun idx -> case_blocks.(idx)) index in
   let index =
@@ -500,7 +503,7 @@ and emit_switch env c ~tail esel index ecases : result =
   finish_block env c ~dbg:Debuginfo.none (Switch { index; targets });
   let case_results =
     Array.mapi
-      (fun i (case_expr, _dbg) ->
+      (fun i (case_expr, _dbg, _counters) ->
         let case_c = Cursor.start case_blocks.(i) in
         emit env case_c case_expr ~tail, case_c)
       ecases
@@ -644,7 +647,9 @@ let convert ~ppf_dump (cmm : Cmm.fundecl) ~keep_unused_ops : finished Ssa.graph
         codegen_options = cmm.fun_codegen_options;
         dbg = cmm.fun_dbg;
         poll = cmm.fun_poll;
-        ret_type = cmm.fun_ret_type
+        ret_type = cmm.fun_ret_type;
+        fdo_entry_counters = cmm.fun_fdo_entry_counters;
+        function_body_hash = cmm.fun_function_body_hash
       }
     in
     let g = Ssa.create_graph function_info ~keep_unused_ops in

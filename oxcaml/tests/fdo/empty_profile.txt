@@ -1,0 +1,2 @@
+# No counters: every function is unknown to the profile; -dfdo still
+# prints the entry counters.

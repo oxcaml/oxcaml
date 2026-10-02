@@ -22,6 +22,16 @@ module Options = Oxcaml_args.Make_optcomp_options
 
 let main unix argv ppf ~flambda2 =
   native_code := true;
+  (* FDO profiles are memory-mapped, so that queries fault in only the pages
+     they touch; [Unix] is only available here. *)
+  Source_position_profile.register_mmap (fun filename ->
+      let module U = (val unix : Compiler_owee.Unix_intf.S) in
+      let fd = U.openfile filename [U.O_RDONLY] 0 in
+      Fun.protect
+        ~finally:(fun () -> U.close fd)
+        (fun () ->
+           Bigarray.array1_of_genarray
+             (U.map_file fd Bigarray.char Bigarray.c_layout false [| -1 |])));
   let columns =
     match Sys.getenv "COLUMNS" with
     | exception Not_found -> None

@@ -1,0 +1,24 @@
+anonymous.dump:
+  "Anonymous.apply":0
+  "Anonymous.twice":0
+  "Anonymous.a.(fun)@x,%int_add,1":0
+  "Anonymous.b.(fun)@y,%int_mul,2":0
+  "Anonymous.inner":0
+  "Anonymous.inner.(fun)@x,%int_sub,n":0
+  "Anonymous.inner.(fun)@y,%int_add,n":0
+  "Anonymous.inner.(fun)@y,x,%int_add,n,p":0
+anonymous_more.dump:
+  "Anonymous.apply":0
+  "Anonymous.twice":0
+  "Anonymous.a0.(fun)@z":0
+  "Anonymous.a.(fun)@x,%int_add,1":0
+  "Anonymous.b.(fun)@y,%int_mul,2":0
+  "Anonymous.inner":0
+  "Anonymous.inner.(fun)@z,%int_mul,n":0
+  "Anonymous.inner.(fun)@x,%int_sub,n":0
+  "Anonymous.inner.(fun)@y,%int_add,n":0
+  "Anonymous.inner.(fun)@y,x,%int_add,n,p":0
+only in anonymous.dump:
+only in anonymous_more.dump:
+  "Anonymous.a0.(fun)@z":0
+  "Anonymous.inner.(fun)@z,%int_mul,n":0

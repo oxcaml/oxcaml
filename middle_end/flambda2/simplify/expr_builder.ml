@@ -469,6 +469,16 @@ let create_switch uacc ~condition_dbg ~scrutinee ~arms =
       UA.notify_added ~code_size:Code_size.invalid uacc )
   else
     let change_to_apply_cont action =
+      (* The branch disappears and its edges become one. Keep all their
+         counters: assuming every arm executed is safer than assuming none
+         did. *)
+      let action =
+        Apply_cont.with_fdo_counters action
+          (Target_ocaml_int.Map.fold
+             (fun _ arm counters ->
+               Fdo_counter.add_all counters (Apply_cont.fdo_counters arm))
+             arms [])
+      in
       let uacc =
         UA.add_free_names uacc (Apply_cont.free_names action)
         |> UA.notify_added ~code_size:(Code_size.apply_cont action)
@@ -690,7 +700,9 @@ let rewrite_fixed_arity_continuation0 uacc cont_or_apply_cont ~use_id arity :
       in
       let args = List.map BP.simple params in
       let params = Bound_parameters.create params in
-      let apply_cont = Apply_cont.create cont ~args ~dbg:Debuginfo.none in
+      let apply_cont =
+        Apply_cont.create ~fdo_counters:[] cont ~args ~dbg:Debuginfo.none
+      in
       let ctx : Apply_cont_rewrite.rewrite_apply_cont_ctx = Apply_expr args in
       match rewrite_apply_cont0 uacc rewrite use_id ~ctx apply_cont with
       | Invalid { message } -> Invalid { message }

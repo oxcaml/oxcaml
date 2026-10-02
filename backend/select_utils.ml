@@ -550,72 +550,72 @@ let chunk_of_machtype_component : Cmm.machtype_component -> Cmm.memory_chunk =
   | Val | Addr | Int -> Word_val
   | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
 
+(* The successors of the tests take the true and false successors of the
+   condition, with their edge counters. *)
 let float_test_of_float_comparison :
     Cmm.float_width ->
     Cmm.float_comparison ->
-    label_false:Label.t ->
-    label_true:Label.t ->
+    ifnot:Cfg.successor ->
+    ifso:Cfg.successor ->
     Cfg.float_test =
- fun width comparison ~label_false ~label_true ->
+ fun width comparison ~ifnot ~ifso ->
   let lt, eq, gt, uo =
     match comparison with
-    | CFeq -> label_false, label_true, label_false, label_false
-    | CFneq -> label_true, label_false, label_true, label_true
-    | CFlt -> label_true, label_false, label_false, label_false
-    | CFnlt -> label_false, label_true, label_true, label_true
-    | CFgt -> label_false, label_false, label_true, label_false
-    | CFngt -> label_true, label_true, label_false, label_true
-    | CFle -> label_true, label_true, label_false, label_false
-    | CFnle -> label_false, label_false, label_true, label_true
-    | CFge -> label_false, label_true, label_true, label_false
-    | CFnge -> label_true, label_false, label_false, label_true
+    | CFeq -> ifnot, ifso, ifnot, ifnot
+    | CFneq -> ifso, ifnot, ifso, ifso
+    | CFlt -> ifso, ifnot, ifnot, ifnot
+    | CFnlt -> ifnot, ifso, ifso, ifso
+    | CFgt -> ifnot, ifnot, ifso, ifnot
+    | CFngt -> ifso, ifso, ifnot, ifso
+    | CFle -> ifso, ifso, ifnot, ifnot
+    | CFnle -> ifnot, ifnot, ifso, ifso
+    | CFge -> ifnot, ifso, ifso, ifnot
+    | CFnge -> ifso, ifnot, ifnot, ifso
   in
   { width; lt; eq; gt; uo }
 
 let int_test_of_integer_comparison :
     Cmm.integer_comparison ->
     immediate:int option ->
-    label_false:Label.t ->
-    label_true:Label.t ->
+    ifnot:Cfg.successor ->
+    ifso:Cfg.successor ->
     Cfg.int_test =
- fun comparison ~immediate:imm ~label_false ~label_true ->
+ fun comparison ~immediate:imm ~ifnot ~ifso ->
   let lt, eq, gt, is_signed =
     let module S = Scalar.Signedness in
     match comparison with
-    | Ceq -> label_false, label_true, label_false, S.Signed
-    | Cne -> label_true, label_false, label_true, S.Signed
-    | Clt -> label_true, label_false, label_false, S.Signed
-    | Cgt -> label_false, label_false, label_true, S.Signed
-    | Cle -> label_true, label_true, label_false, S.Signed
-    | Cge -> label_false, label_true, label_true, S.Signed
-    | Cult -> label_true, label_false, label_false, S.Unsigned
-    | Cugt -> label_false, label_false, label_true, S.Unsigned
-    | Cule -> label_true, label_true, label_false, S.Unsigned
-    | Cuge -> label_false, label_true, label_true, S.Unsigned
+    | Ceq -> ifnot, ifso, ifnot, S.Signed
+    | Cne -> ifso, ifnot, ifso, S.Signed
+    | Clt -> ifso, ifnot, ifnot, S.Signed
+    | Cgt -> ifnot, ifnot, ifso, S.Signed
+    | Cle -> ifso, ifso, ifnot, S.Signed
+    | Cge -> ifnot, ifso, ifso, S.Signed
+    | Cult -> ifso, ifnot, ifnot, S.Unsigned
+    | Cugt -> ifnot, ifnot, ifso, S.Unsigned
+    | Cule -> ifso, ifso, ifnot, S.Unsigned
+    | Cuge -> ifnot, ifso, ifso, S.Unsigned
   in
   { lt; eq; gt; is_signed; imm }
 
 let terminator_of_test :
     Operation.test ->
-    label_false:Label.t ->
-    label_true:Label.t ->
+    ifnot:Cfg.successor ->
+    ifso:Cfg.successor ->
     Cfg.terminator =
- fun test ~label_false ~label_true ->
+ fun test ~ifnot ~ifso ->
   let int_test comparison immediate =
-    int_test_of_integer_comparison comparison ~immediate ~label_false
-      ~label_true
+    int_test_of_integer_comparison comparison ~immediate ~ifnot ~ifso
   in
   match test with
-  | Itruetest -> Truth_test { ifso = label_true; ifnot = label_false }
-  | Ifalsetest -> Truth_test { ifso = label_false; ifnot = label_true }
+  | Itruetest -> Truth_test { ifso; ifnot }
+  | Ifalsetest -> Truth_test { ifso = ifnot; ifnot = ifso }
   | Iinttest comparison -> Int_test (int_test comparison None)
   | Iinttest_imm (comparison, value) ->
     Int_test (int_test comparison (Some value))
   | Ifloattest (w, comparison) ->
-    Float_test
-      (float_test_of_float_comparison w comparison ~label_false ~label_true)
-  | Ioddtest -> Parity_test { ifso = label_false; ifnot = label_true }
-  | Ieventest -> Parity_test { ifso = label_true; ifnot = label_false }
+    Float_test (float_test_of_float_comparison w comparison ~ifnot ~ifso)
+  | Ioddtest -> Parity_test { ifso = ifnot; ifnot = ifso }
+  | Ieventest -> Parity_test { ifso; ifnot }
 
 module Stack_offset_and_exn = struct
   (* This module relies on the field `can_raise` of basic blocks but does not

@@ -3054,9 +3054,11 @@ module SArg = struct
 
   let arg_as_test arg = arg
 
-  let make_if kind cond ifso ifnot = Lifthenelse (cond, ifso, ifnot, kind)
+  (* Lambda-level switches carry no per-value information to distribute. *)
+  let make_if kind _loc ~ifso:_ ~ifnot:_ cond ifso ifnot =
+    Lifthenelse (cond, ifso, ifnot, kind)
 
-  let make_switch loc kind arg cases acts =
+  let make_switch loc kind arg ~first_value:_ cases acts =
     (* The [acts] array can contain arbitrary terms.
        If several entries in the [cases] array point to the same action,
        we must share it to avoid duplicating terms.

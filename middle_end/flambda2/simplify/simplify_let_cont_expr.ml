@@ -1455,6 +1455,9 @@ and simplify_handler ~simplify_expr ~is_recursive ~is_exn_handler
       ~cont_uses_env:(CUE.reset_uses (DA.continuation_uses_env dacc))
   in
   let dacc =
+    DA.map_denv dacc ~f:(fun denv -> DE.set_fdo_region denv (Handler cont))
+  in
+  let dacc =
     DA.map_flow_acc
       ~f:
         (Flow.Acc.enter_continuation cont ~recursive:is_recursive
@@ -1924,7 +1927,8 @@ let simplify_let_cont0 ~(simplify_expr : _ Simplify_common.expr_simplifier) dacc
                 (Bound_parameters.to_list non_rec_handler.params)
             in
             let apply_cont =
-              Apply_cont.create lifted_cont ~dbg:Debuginfo.none ~args
+              Apply_cont.create ~fdo_counters:[] lifted_cont ~dbg:Debuginfo.none
+                ~args
             in
             Flambda.Expr.create_apply_cont apply_cont
           in
@@ -1956,7 +1960,8 @@ let simplify_let_cont0 ~(simplify_expr : _ Simplify_common.expr_simplifier) dacc
                       @ Bound_parameters.to_list one_recursive_handler.params)
                   in
                   let apply_cont =
-                    Apply_cont.create lifted_cont ~dbg:Debuginfo.none ~args
+                    Apply_cont.create ~fdo_counters:[] lifted_cont
+                      ~dbg:Debuginfo.none ~args
                   in
                   Flambda.Expr.create_apply_cont apply_cont
                 in

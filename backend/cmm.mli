@@ -424,13 +424,22 @@ type alloc_dbginfo = alloc_dbginfo_item list
 
 val equal_alloc_dbginfo : alloc_dbginfo -> alloc_dbginfo -> bool
 
+(** The pseudo-instrumentation counters (see [Fdo_counter]) of a control-flow
+    edge, attached to the successor they describe: the branches of
+    [Cifthenelse], the cases of [Cswitch]. *)
+type fdo_counters = Fdo_counter.t list
+
 type operation =
   | Capply of
       { result_type : machtype;
         region : Lambda.region_close;
-        callees : symbol list option
+        callees : symbol list option;
             (* List of possible callees, or [None] if not known. The actual
                callee might be a re-optimized versions of one these callees. *)
+        callsite_counter : Fdo_counter.t option
+            (* The pseudo-instrumentation counter of the call site, joined at
+               profile decoding time with the entry counter of the function the
+               call lands in. *)
       }
   | Cextcall of
       { func : string;
@@ -576,14 +585,20 @@ and expression =
   | Cop of operation * expression list * Debuginfo.t
   | Csequence of expression * expression
   | Cifthenelse of
-      expression
-      * Debuginfo.t
-      * expression
-      * Debuginfo.t
-      * expression
-      * Debuginfo.t
+      { cond : expression;
+        ifso_dbg : Debuginfo.t;
+        ifso_counters : fdo_counters;
+        ifso : expression;
+        ifnot_dbg : Debuginfo.t;
+        ifnot_counters : fdo_counters;
+        ifnot : expression;
+        dbg : Debuginfo.t
+      }
   | Cswitch of
-      expression * int array * (expression * Debuginfo.t) array * Debuginfo.t
+      expression
+      * int array
+      * (expression * Debuginfo.t * fdo_counters) array
+      * Debuginfo.t
   | Ccatch of ccatch_flag * static_handler list * expression
   | Cexit of exit_label * expression list * trap_action list
   | Cinvalid of
@@ -617,6 +632,11 @@ type fundecl =
     fun_codegen_options : codegen_option list;
     fun_poll : Lambda.poll_attribute;
     fun_dbg : Debuginfo.t;
+    fun_fdo_entry_counters : fdo_counters;
+        (** The counters of the function's entry edge: its own entry counter
+            first, then those of the calls inlined at the head of its body. *)
+    fun_function_body_hash : Fdo_counter.Function_body_hash.t option;
+        (** The body hash its interior counters were numbered with. *)
     fun_ret_type : machtype
   }
 

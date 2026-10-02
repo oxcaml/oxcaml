@@ -86,7 +86,8 @@ let make_inlined_body ~callee ~called_code_id ~unroll_to ~params ~args
 let wrap_inlined_body_for_exn_extra_args ~extra_args ~apply_exn_continuation
     ~apply_return_continuation ~result_arity ~make_inlined_body =
   let apply_cont_create () ~trap_action cont ~args ~dbg =
-    Apply_cont.create ~trap_action cont ~args ~dbg |> Expr.create_apply_cont
+    Apply_cont.create ~fdo_counters:[] ~trap_action cont ~args ~dbg
+    |> Expr.create_apply_cont
   in
   let let_cont_create () cont ~handler_params ~handler ~body ~is_exn_handler
       ~is_cold =
@@ -143,6 +144,24 @@ let inline dacc ~apply ~unroll_to ~was_inline_always function_decl =
   | Maybe_alloc_stack _, Not_alloc_stack (* This is allowed by subtyping *)
   | Maybe_alloc_stack _, Maybe_alloc_stack
   | Not_alloc_stack _, Not_alloc_stack ->
+    (* The call's pseudo-instrumentation counter, as the decoded call graph
+       would count the call if it were not inlined out: the entry counters of
+       the callee (its own, then those of the calls inlined at its head) in the
+       context of the call site. They are attached to the edges into the current
+       region (see [Inlined_call_counters]). *)
+    (match DE.fdo_region denv with
+    | Some region when DE.tracking_inlined_call_counters denv ->
+      let call_site = Apply.callsite_counter apply in
+      Inlined_call_counters.add_inlined_calls
+        (DE.inlined_call_counters denv)
+        region
+        (List.map
+           (fun counter ->
+             match call_site with
+             | None -> counter
+             | Some at -> Fdo_counter.inline counter ~at)
+           (Code.fdo_entry_counters code))
+    | Some _ | None -> ());
     let denv =
       DE.enter_inlined_apply ~called_code:code ~apply ~was_inline_always denv
     in

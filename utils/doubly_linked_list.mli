@@ -10,6 +10,11 @@ val insert_after : 'a cell -> 'a -> unit
 
 val value : 'a cell -> 'a
 
+(** Whether two cell handles denote the same element of the list. (Cells are
+    allocated by each accessor, so physical equality of cells is meaningless.)
+*)
+val same_cell : 'a cell -> 'a cell -> bool
+
 val set_value : 'a cell -> 'a -> unit
 
 val prev : 'a cell -> 'a cell option

@@ -552,11 +552,14 @@ type alloc_dbginfo = alloc_dbginfo_item list
 let equal_alloc_dbginfo left right =
   List.equal equal_alloc_dbginfo_item left right
 
+type fdo_counters = Fdo_counter.t list
+
 type operation =
   | Capply of
       { result_type : machtype;
         region : Lambda.region_close;
-        callees : symbol list option
+        callees : symbol list option;
+        callsite_counter : Fdo_counter.t option
       }
   | Cextcall of
       { func : string;
@@ -693,14 +696,20 @@ and expression =
   | Cop of operation * expression list * Debuginfo.t
   | Csequence of expression * expression
   | Cifthenelse of
-      expression
-      * Debuginfo.t
-      * expression
-      * Debuginfo.t
-      * expression
-      * Debuginfo.t
+      { cond : expression;
+        ifso_dbg : Debuginfo.t;
+        ifso_counters : fdo_counters;
+        ifso : expression;
+        ifnot_dbg : Debuginfo.t;
+        ifnot_counters : fdo_counters;
+        ifnot : expression;
+        dbg : Debuginfo.t
+      }
   | Cswitch of
-      expression * int array * (expression * Debuginfo.t) array * Debuginfo.t
+      expression
+      * int array
+      * (expression * Debuginfo.t * fdo_counters) array
+      * Debuginfo.t
   | Ccatch of ccatch_flag * static_handler list * expression
   | Cexit of exit_label * expression list * trap_action list
   | Cinvalid of
@@ -734,6 +743,8 @@ type fundecl =
     fun_codegen_options : codegen_option list;
     fun_poll : Lambda.poll_attribute;
     fun_dbg : Debuginfo.t;
+    fun_fdo_entry_counters : fdo_counters;
+    fun_function_body_hash : Fdo_counter.Function_body_hash.t option;
     fun_ret_type : machtype
   }
 
@@ -779,7 +790,7 @@ let iter_shallow_tail f = function
     ->
     f body;
     true
-  | Cifthenelse (_cond, _ifso_dbg, ifso, _ifnot_dbg, ifnot, _dbg) ->
+  | Cifthenelse { ifso; ifnot; _ } ->
     f ifso;
     f ifnot;
     true
@@ -787,7 +798,7 @@ let iter_shallow_tail f = function
     f e2;
     true
   | Cswitch (_e, _tbl, el, _dbg') ->
-    Array.iter (fun (e, _dbg) -> f e) el;
+    Array.iter (fun (e, _dbg, _counters) -> f e) el;
     true
   | Ccatch (_flag, handlers, body) ->
     List.iter (fun { body = h; _ } -> f h) handlers;
@@ -818,11 +829,11 @@ let map_shallow_tail f = function
   | Clet (id, exp, body) -> Clet (id, exp, f body)
   | Cphantom_let (id, exp, body) -> Cphantom_let (id, exp, f body)
   | Cname_for_debugger (var, body) -> Cname_for_debugger (var, f body)
-  | Cifthenelse (cond, ifso_dbg, ifso, ifnot_dbg, ifnot, dbg) ->
-    Cifthenelse (cond, ifso_dbg, f ifso, ifnot_dbg, f ifnot, dbg)
+  | Cifthenelse r -> Cifthenelse { r with ifso = f r.ifso; ifnot = f r.ifnot }
   | Csequence (e1, e2) -> Csequence (e1, f e2)
   | Cswitch (e, tbl, el, dbg') ->
-    Cswitch (e, tbl, Array.map (fun (e, dbg) -> f e, dbg) el, dbg')
+    Cswitch
+      (e, tbl, Array.map (fun (e, dbg, counters) -> f e, dbg, counters) el, dbg')
   | Ccatch (flag, handlers, body) ->
     let map_h { label; params; body = handler; dbg; is_cold } =
       { label; params; body = f handler; dbg; is_cold }
@@ -860,7 +871,7 @@ let map_tail f =
       | Cphantom_let (_, _, _)
       | Cname_for_debugger _
       | Csequence (_, _)
-      | Cifthenelse (_, _, _, _, _, _)
+      | Cifthenelse _
       | Cswitch (_, _, _, _)
       | Ccatch (_, _, _) ) as cmm ->
       map_shallow_tail loop cmm
@@ -878,13 +889,13 @@ let iter_shallow f = function
   | Csequence (e1, e2) ->
     f e1;
     f e2
-  | Cifthenelse (cond, _ifso_dbg, ifso, _ifnot_dbg, ifnot, _dbg) ->
+  | Cifthenelse { cond; ifso; ifnot; _ } ->
     f cond;
     f ifso;
     f ifnot
   | Cswitch (e, _ia, ea, _dbg) ->
     f e;
-    Array.iter (fun (e, _) -> f e) ea
+    Array.iter (fun (e, _, _) -> f e) ea
   | Ccatch (_f, hl, body) ->
     let iter_h { body = handler; _ } = f handler in
     List.iter iter_h hl;

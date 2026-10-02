@@ -1653,9 +1653,9 @@ module Let_cont_expr = struct
       (Non_recursive
          { handler; num_free_occurrences; is_applied_with_traps; can_be_lifted })
 
-  let create_non_recursive' ~cont handler ~body
+  let create_non_recursive' ?(can_be_lifted = true) ~cont handler ~body
       ~num_free_occurrences_of_cont_in_body ~is_applied_with_traps =
-    create0 ~can_be_lifted:true ~cont handler ~body
+    create0 ~can_be_lifted ~cont handler ~body
       ~num_free_occurrences_of_cont_in_body ~is_applied_with_traps
 
   let create_non_recursive0 ~can_be_lifted cont handler ~body

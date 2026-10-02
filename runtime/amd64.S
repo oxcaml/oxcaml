@@ -504,13 +504,15 @@ X(16) X(17) X(18) X(19) X(20) X(21) X(22) X(23) X(24) X(25) X(26) X(27) X(28) X(
 /* The section names, and matching symbols, caml_hot__code_begin and
    caml_hot__code_end are used by OCamlFDO. They need to match each
    other, have C linkage names, and match the hard-wired names in OCamlFDO.
-*/
+   The sections are deliberately not named .text.caml.*, so that a linker
+   script placing all OCaml code (*(.text.caml.*)) between the two markers
+   does not match the markers themselves. */
 
-        TEXT_SECTION(caml_hot__code_begin)
+        .section .text.caml_hot.code_begin,"ax",%progbits
         .globl  G(caml_hot__code_begin)
 G(caml_hot__code_begin):
 
-        TEXT_SECTION(caml_hot__code_end)
+        .section .text.caml_hot.code_end,"ax",%progbits
         .globl  G(caml_hot__code_end)
 G(caml_hot__code_end):
 #endif
