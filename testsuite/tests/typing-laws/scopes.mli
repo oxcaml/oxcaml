@@ -9,6 +9,19 @@ end
 module N : sig
   val double : int -> int
   law? double_add (x : int) : double x = x + x
+  module Inner : sig
+    law? double_twice (x : int) : double (double x) = 4 * x
+  end
+end
+
+(* A structure including a module: the included laws are about the items
+   of the structure, which are those of the included module. *)
+module Included : sig
+  val double : int -> int
+  law? double_add (x : int) : double x = x + x
+  module Inner : sig
+    law? double_twice (x : int) : double (double x) = 4 * x
+  end
 end
 
 (* A functor. *)

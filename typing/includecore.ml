@@ -508,7 +508,6 @@ type law_mismatch =
   | Law_arity of int * int
   | Law_parameter_types of string option * Errortrace.moregen_error
   | Law_clauses
-  | Law_module_path of { path : Path.t; name : string }
   | Law_applied_path of Path.t
 
 module Printtyp = Printtyp.Doc
@@ -950,12 +949,6 @@ let report_law_mismatch env ppf err =
         (msg "but it is expected to have type")
   | Law_clauses ->
       pr "The clauses of the laws differ."
-  | Law_module_path { path; name } ->
-      pr "@[<hov>The@ first@ refers@ to@ %a@ where@ the@ second@ refers@ \
-          to@ %a.@ The@ laws@ of@ a@ module@ referred@ to@ by@ a@ path@ \
-          cannot@ be@ compared@ with@ the@ laws@ of@ a@ signature.@]"
-        (Style.as_inline_code Printtyp.path) path
-        Style.inline_code name
   | Law_applied_path path ->
       pr "@[<hov>The@ law@ refers@ to@ %a@ through@ a@ functor@ \
           application,@ which@ names@ no@ particular@ instance.@]"
@@ -1944,8 +1937,9 @@ let extension_constructors ~loc env ~mark id ext1 ext2 =
       | _, _ -> None
 
 (* Inclusion between laws. The global paths of the clauses are compared
-   like the paths of types: by identity once module aliases are normalized
-   and type abbreviations expanded. *)
+   like the paths of types: by identity once module aliases are normalized,
+   type abbreviations expanded, and values and extension constructors
+   expanded through their [val_alias]/[ext_alias]. *)
 
 let normalize_type_path env p =
   let p = Env.normalize_type_path None env p in
@@ -1958,39 +1952,36 @@ let normalize_type_path env p =
       end
   | exception Not_found -> p
 
+(* [alias] is the alias recorded for the declaration at [p], if any.
+   Expansion stops at paths that cannot be looked up, at cycles, and at
+   aliases through a functor application, which names no particular
+   instance. *)
+let rec normalize_alias_path alias env seen p =
+  let p = Env.normalize_value_path None env p in
+  match alias p with
+  | Some q
+    when not (List.exists (Path.same q) seen || Path.contains_apply q) ->
+      normalize_alias_path alias env (p :: seen) q
+  | Some _ | None | exception Not_found -> p
+
+let normalize_value_path env p =
+  let alias p = (Env.find_value p env).val_alias in
+  normalize_alias_path alias env [] p
+
+let normalize_extension_path env p =
+  normalize_alias_path (fun p -> Env.find_extension_alias p env) env [] p
+
 let same_path env (ns : Spec.namespace) p1 p2 =
   let normalize =
     match ns with
-    | Value | Extension -> Env.normalize_value_path None env
+    | Value -> normalize_value_path env
+    | Extension -> normalize_extension_path env
     | Type -> normalize_type_path env
   in
   Path.same p1 p2 || Path.same (normalize p1) (normalize p2)
 
 let law_paths (decl : Types.law_description) =
   List.concat_map Spec.paths (decl.law_conclusion :: decl.law_assumptions)
-
-(* The clauses of the laws of a module refer to its values through its
-   path once it is in the environment (see [Env.prefix_idents]), whereas
-   those of a signature refer to them by name. Nothing relates the two,
-   so such laws are reported rather than compared. *)
-let law_module_path (decl1 : Types.law_description)
-      (decl2 : Types.law_description) =
-  let names =
-    List.filter_map
-      (fun ((ns : Spec.namespace), (path : Path.t)) ->
-         match ns, path with
-         | (Value | Extension), Pident id -> Some (ns, Ident.name id)
-         | (Value | Extension), (Pdot _ | Papply _ | Pextra_ty _) | Type, _ ->
-             None)
-      (law_paths decl2)
-  in
-  List.find_map
-    (fun (ns, (path : Path.t)) ->
-       match path with
-       | Pdot (_, name) when List.mem (ns, name) names ->
-           Some (Law_module_path { path; name })
-       | Pdot _ | Pident _ | Papply _ | Pextra_ty _ -> None)
-    (law_paths decl1)
 
 (* A functor application names no particular instance of its values. *)
 let law_applied_path decl1 decl2 =
@@ -2048,10 +2039,7 @@ let law_descriptions ~loc env name
          && List.for_all2 equal decl1.law_assumptions decl2.law_assumptions
          && equal decl1.law_conclusion decl2.law_conclusion
       then None
-      else
-        match law_module_path decl1 decl2 with
-        | Some err -> Some err
-        | None -> Some Law_clauses
+      else Some Law_clauses
 
 (* Inclusion between jkind declarations *)
 let jkind_declarations ~loc env name

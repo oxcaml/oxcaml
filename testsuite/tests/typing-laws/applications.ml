@@ -391,6 +391,141 @@ module type Open_bound = sig law? p : Bound.y = Bound.y end
 module type Good = sig law? p : Bound.x == Bound.x end
 |}]
 
+(* The values of a functor returning its parameter are those of the
+   argument, when the argument is a bound module: applied to an
+   application, the result's values are those of no instance. *)
+
+module Id (X : sig val x : int ref exception E end) = X
+module Id_bound = Id (Bound)
+module Id_bound' = Id (Bound)
+module Same_instance : sig
+  law? p : Id_bound.x == Id_bound'.x
+  law? q : Id_bound.x == Bound.x
+  law? e : Id_bound.E = Id_bound'.E
+end = struct
+  law? p : Bound.x == Bound.x
+  law? q : Bound.x == Bound.x
+  law? e : Bound.E = Bound.E
+end
+[%%expect {|
+module Id :
+  functor (X : sig val x : int ref exception E end) ->
+    sig val x : int ref exception E end
+module Id_bound : sig val x : int ref exception E end
+module Id_bound' : sig val x : int ref exception E end
+module Same_instance :
+  sig
+    law? p : Id_bound.x == Id_bound'.x
+    law? q : Id_bound.x == Bound.x
+    law? e : Id_bound.E = Id_bound'.E
+  end
+|}]
+
+module Id_applied = Id (F (A))
+module Id_applied' = Id (F (A))
+module Different_results : sig
+  law? p : Id_applied.x == Id_applied'.x
+end = struct
+  law? p : Id_applied.x == Id_applied.x
+end
+[%%expect {|
+module Id_applied : sig val x : int ref exception E end
+module Id_applied' : sig val x : int ref exception E end
+Lines 5-7, characters 6-3:
+5 | ......struct
+6 |   law? p : Id_applied.x == Id_applied.x
+7 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig law? p : Id_applied.x == Id_applied.x end
+       is not included in
+         sig law? p : Id_applied.x == Id_applied'.x end
+       Laws do not match:
+         law? p : Id_applied.x == Id_applied.x
+       is not included in
+         law? p : Id_applied.x == Id_applied'.x
+       The clauses of the laws differ.
+|}]
+
+module Different_result_exceptions : sig
+  law? e : Id_applied.E = Id_applied'.E
+end = struct
+  law? e : Id_applied.E = Id_applied.E
+end
+[%%expect {|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   law? e : Id_applied.E = Id_applied.E
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig law? e : Id_applied.E = Id_applied.E end
+       is not included in
+         sig law? e : Id_applied.E = Id_applied'.E end
+       Laws do not match:
+         law? e : Id_applied.E = Id_applied.E
+       is not included in
+         law? e : Id_applied.E = Id_applied'.E
+       The clauses of the laws differ.
+|}]
+
+(* The laws of a submodule of an application are checked through a module
+   bound to the application. *)
+
+module type Idem = sig
+  val f : int -> int
+  law? idem (x : int) : f (f x) = f x
+end
+module G (X : sig end) = struct
+  module M = struct
+    let f x = x
+    law? idem (x : int) : f (f x) = f x
+  end
+end
+module GY = G (struct end)
+module Z : Idem = GY.M
+[%%expect {|
+module type Idem =
+  sig val f : int -> int law? idem (x : int) : (f (f x)) = (f x) end
+module G :
+  functor (X : sig end) ->
+    sig
+      module M :
+        sig val f : 'a -> 'a law? idem (x : int) : (f (f x)) = (f x) end
+    end
+module GY :
+  sig
+    module M :
+      sig val f : 'a -> 'a law? idem (x : int) : (f (f x)) = (f x) end
+  end
+module Z : Idem
+|}]
+
+(* A functor whose body is a module path returns that module: the values
+   of the result are those of the path. *)
+
+module X_idem = struct
+  let f x = x
+  law? idem (x : int) : f (f x) = f x
+end
+module Generative () = X_idem
+module Generated = Generative ()
+module Through_result : sig
+  law? l (x : int) : Generated.f x = x
+end = struct
+  law? l (x : int) : X_idem.f x = x
+end
+[%%expect {|
+module X_idem :
+  sig val f : 'a -> 'a law? idem (x : int) : (f (f x)) = (f x) end
+module Generative :
+  functor () ->
+    sig val f : 'a -> 'a law? idem (x : int) : (f (f x)) = (f x) end
+module Generated :
+  sig val f : 'a -> 'a law? idem (x : int) : (f (f x)) = (f x) end
+module Through_result : sig law? l (x : int) : (Generated.f x) = x end
+|}]
+
 (* An alias of an application is the application. *)
 
 module Make (X : sig end) = struct
@@ -417,16 +552,10 @@ module Through_alias : sig law? l (x : int) : (IM.f x) = x end
 (* The laws of the body of an applicative functor are checked against its
    result signature as a structure against a signature. *)
 
-module type Idem = sig
-  val f : int -> int
-  law? idem (x : int) : f (f x) = f x
-end
 module H (X : sig end) : Idem = struct
   let f x = x
   law? idem (x : int) : f (f x) = f x
 end
 [%%expect {|
-module type Idem =
-  sig val f : int -> int law? idem (x : int) : (f (f x)) = (f x) end
 module H : functor (X : sig end) -> Idem
 |}]

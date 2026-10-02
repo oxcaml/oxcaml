@@ -8765,6 +8765,10 @@ let nondep_extension_constructor env ids ext =
         ext_attributes = ext.ext_attributes;
         ext_loc = ext.ext_loc;
         ext_uid = ext.ext_uid;
+        ext_alias =
+          (* As the manifest of a type (see [nondep_type_decl]) *)
+          Option.bind ext.ext_alias (fun p ->
+            if Path.exists_free ids p then None else Some p);
       }
   with Nondep_cannot_erase _ as exn ->
     clear_hash ();

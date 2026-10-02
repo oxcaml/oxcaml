@@ -4,6 +4,9 @@ module Laws_gen_Stdlib = Stdlib
 type 'a each =
   {
   n_double_add: 'a ;
+  n_inner_double_twice: 'a ;
+  included_double_add: 'a ;
+  included_inner_double_twice: 'a ;
   map_find_elem: 'a ;
   map_set_elem: 'a ;
   map_empty_find_empty: 'a ;
@@ -18,6 +21,9 @@ type 'a each =
 let names =
   {
     n_double_add = "n_double_add";
+    n_inner_double_twice = "n_inner_double_twice";
+    included_double_add = "included_double_add";
+    included_inner_double_twice = "included_inner_double_twice";
     map_find_elem = "map_find_elem";
     map_set_elem = "map_set_elem";
     map_empty_find_empty = "map_empty_find_empty";
@@ -31,12 +37,17 @@ let names =
     outer_inner_mk_ok = "outer_inner_mk_ok"
   }
 let map
-  { n_double_add; map_find_elem; map_set_elem; map_empty_find_empty;
-    lex_refl; order_max_max_comm; order_max_pair_pair_refl; idem_idem;
-    p_h_pos; q_idem; twice_g_idem; outer_inner_mk_ok }
+  { n_double_add; n_inner_double_twice; included_double_add;
+    included_inner_double_twice; map_find_elem; map_set_elem;
+    map_empty_find_empty; lex_refl; order_max_max_comm;
+    order_max_pair_pair_refl; idem_idem; p_h_pos; q_idem; twice_g_idem;
+    outer_inner_mk_ok }
   ~f =
   {
     n_double_add = (f n_double_add);
+    n_inner_double_twice = (f n_inner_double_twice);
+    included_double_add = (f included_double_add);
+    included_inner_double_twice = (f included_inner_double_twice);
     map_find_elem = (f map_find_elem);
     map_set_elem = (f map_set_elem);
     map_empty_find_empty = (f map_empty_find_empty);
@@ -50,11 +61,16 @@ let map
     outer_inner_mk_ok = (f outer_inner_mk_ok)
   }
 let to_list
-  { n_double_add; map_find_elem; map_set_elem; map_empty_find_empty;
-    lex_refl; order_max_max_comm; order_max_pair_pair_refl; idem_idem;
-    p_h_pos; q_idem; twice_g_idem; outer_inner_mk_ok }
+  { n_double_add; n_inner_double_twice; included_double_add;
+    included_inner_double_twice; map_find_elem; map_set_elem;
+    map_empty_find_empty; lex_refl; order_max_max_comm;
+    order_max_pair_pair_refl; idem_idem; p_h_pos; q_idem; twice_g_idem;
+    outer_inner_mk_ok }
   =
   [n_double_add;
+  n_inner_double_twice;
+  included_double_add;
+  included_inner_double_twice;
   map_find_elem;
   map_set_elem;
   map_empty_find_empty;
@@ -69,6 +85,15 @@ let to_list
 type n_double_add_input =
   | N_double_add_input: {
   x: int } -> n_double_add_input 
+type n_inner_double_twice_input =
+  | N_inner_double_twice_input: {
+  x: int } -> n_inner_double_twice_input 
+type included_double_add_input =
+  | Included_double_add_input: {
+  x: int } -> included_double_add_input 
+type included_inner_double_twice_input =
+  | Included_inner_double_twice_input: {
+  x: int } -> included_inner_double_twice_input 
 type idem_idem_input =
   | Idem_idem_input: {
   x: int } -> idem_idem_input 
@@ -158,6 +183,10 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
     module type Choices  =
       sig
         val n_double_add : n_double_add_input Choice.t
+        val n_inner_double_twice : n_inner_double_twice_input Choice.t
+        val included_double_add : included_double_add_input Choice.t
+        val included_inner_double_twice :
+          included_inner_double_twice_input Choice.t
         val map : (module Map_choices) Choice.t
         val lex : (module Lex_choices) Choice.t
         val order_max : (module Order_max_choices) Choice.t
@@ -180,6 +209,63 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                       (Laws_gen_Stdlib.(=) (Laws_gen_Scopes.N.double x)
                          (Laws_gen_Stdlib.(+) x x) : bool));
                  text = "(double x) = (x + x)"
+               }))
+    let n_inner_double_twice ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.n_inner_double_twice),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.n_inner_double_twice;
+                 predicate =
+                   (fun
+                      ((N_inner_double_twice_input { x }) :
+                         n_inner_double_twice_input)
+                      ->
+                      (Laws_gen_Stdlib.(=)
+                         (Laws_gen_Scopes.N.double
+                            (Laws_gen_Scopes.N.double x))
+                         (Laws_gen_Stdlib.( * ) 4 x) : bool));
+                 text = "(double (double x)) = (4 * x)"
+               }))
+    let included_double_add ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.included_double_add),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.included_double_add;
+                 predicate =
+                   (fun
+                      ((Included_double_add_input { x }) :
+                         included_double_add_input)
+                      ->
+                      (Laws_gen_Stdlib.(=)
+                         (Laws_gen_Scopes.Included.double x)
+                         (Laws_gen_Stdlib.(+) x x) : bool));
+                 text = "(double x) = (x + x)"
+               }))
+    let included_inner_double_twice ((module C)  : (module Choices))  :
+      unit Law.t =
+      Law.Bind
+        ((Law.Choose C.included_inner_double_twice),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.included_inner_double_twice;
+                 predicate =
+                   (fun
+                      ((Included_inner_double_twice_input { x }) :
+                         included_inner_double_twice_input)
+                      ->
+                      (Laws_gen_Stdlib.(=)
+                         (Laws_gen_Scopes.Included.double
+                            (Laws_gen_Scopes.Included.double x))
+                         (Laws_gen_Stdlib.( * ) 4 x) : bool));
+                 text = "(double (double x)) = (4 * x)"
                }))
     let map_find_elem ((module C)  : (module Choices))  : unit Law.t =
       Law.Bind
@@ -417,6 +503,9 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
     let laws choices =
       {
         n_double_add = (n_double_add choices);
+        n_inner_double_twice = (n_inner_double_twice choices);
+        included_double_add = (included_double_add choices);
+        included_inner_double_twice = (included_inner_double_twice choices);
         map_find_elem = (map_find_elem choices);
         map_set_elem = (map_set_elem choices);
         map_empty_find_empty = (map_empty_find_empty choices);

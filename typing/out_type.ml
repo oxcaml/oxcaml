@@ -4143,7 +4143,7 @@ let rec tree_of_modtype ?abbrev = function
       Omty_alias (tree_of_path (Some Module) p)
   | Mty_strengthen _ as mty ->
       begin match !expand_module_type !printing_env mty with
-      | Mty_strengthen (mty,p,a) ->
+      | Mty_strengthen (mty,p,a,_) ->
           let unaliasable =
             not (Aliasability.is_aliasable a)
             && not (Env.is_functor_arg p !printing_env)

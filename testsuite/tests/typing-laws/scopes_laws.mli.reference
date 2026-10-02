@@ -3,6 +3,9 @@ module Laws_gen_Stdlib = Stdlib
 type 'a each =
   {
   n_double_add: 'a ;
+  n_inner_double_twice: 'a ;
+  included_double_add: 'a ;
+  included_inner_double_twice: 'a ;
   map_find_elem: 'a ;
   map_set_elem: 'a ;
   map_empty_find_empty: 'a ;
@@ -20,6 +23,15 @@ val to_list : 'a each -> 'a list
 type n_double_add_input =
   | N_double_add_input: {
   x: int } -> n_double_add_input 
+type n_inner_double_twice_input =
+  | N_inner_double_twice_input: {
+  x: int } -> n_inner_double_twice_input 
+type included_double_add_input =
+  | Included_double_add_input: {
+  x: int } -> included_double_add_input 
+type included_inner_double_twice_input =
+  | Included_inner_double_twice_input: {
+  x: int } -> included_inner_double_twice_input 
 type idem_idem_input =
   | Idem_idem_input: {
   x: int } -> idem_idem_input 
@@ -110,6 +122,10 @@ module Instantiate :
     module type Choices  =
       sig
         val n_double_add : n_double_add_input Choice.t
+        val n_inner_double_twice : n_inner_double_twice_input Choice.t
+        val included_double_add : included_double_add_input Choice.t
+        val included_inner_double_twice :
+          included_inner_double_twice_input Choice.t
         val map : (module Map_choices) Choice.t
         val lex : (module Lex_choices) Choice.t
         val order_max : (module Order_max_choices) Choice.t

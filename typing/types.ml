@@ -622,6 +622,7 @@ type extension_constructor =
     ext_loc: Location.t;
     ext_attributes: Parsetree.attributes;
     ext_uid: Uid.t;
+    ext_alias: Path.t option;
   }
 
 and type_transparence =
@@ -692,6 +693,10 @@ module Aliasability = struct
     | Not_aliasable -> false
 end
 
+module Value_equations = struct
+  type t = Recorded | Not_recorded
+end
+
 module type Wrap = sig
   type 'a t
 end
@@ -730,6 +735,7 @@ module type Wrapped = sig
       val_zero_alloc: Zero_alloc.t;
       val_attributes: Parsetree.attributes;
       val_uid: Uid.t;
+      val_alias: Path.t option;
     }
 
   type module_type =
@@ -737,7 +743,8 @@ module type Wrapped = sig
   | Mty_signature of signature
   | Mty_functor of functor_parameter * module_type * Mode.With_locality.lr
   | Mty_alias of Path.t
-  | Mty_strengthen of module_type * Path.t * Aliasability.t
+  | Mty_strengthen of
+      module_type * Path.t * Aliasability.t * Value_equations.t
       (* See comments about the aliasability of strengthening in mtype.ml *)
 
   and functor_parameter =
@@ -830,8 +837,8 @@ module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
     | Mty_functor (parm,mty,mm) ->
         To.Mty_functor (functor_parameter m parm, module_type m mty, mm)
     | Mty_signature sg -> To.Mty_signature (signature m sg)
-    | Mty_strengthen (mty,p,aliasable) ->
-        To.Mty_strengthen (module_type m mty, p, aliasable)
+    | Mty_strengthen (mty,p,aliasable,value_equations) ->
+        To.Mty_strengthen (module_type m mty, p, aliasable, value_equations)
 
   and functor_parameter m = function
       | Unit -> To.Unit
