@@ -971,6 +971,10 @@ let rec choice ctx t =
     | Punbox_mask | Pbox_mask _
     | Pjoin_vec256 | Psplit_vec256
 
+    (* we don't yet handle box, though we should be able to *)
+    (* CR box: support TMC for layouts boxed by allocating a block *)
+    | Pbox _
+
     (* we don't handle array indices as destinations yet *)
     | (Pmakearray _ | Pduparray _ | Pmakearray_dynamic _)
 
@@ -1047,7 +1051,7 @@ let rec choice ctx t =
     | Pmake_idx_array _
     | Pget_idx _ | Pset_idx _ | Pget_ptr _ | Pset_ptr _
     | Pget_ext_ptr _ | Pset_ext_ptr _
-    | Pbox _ | Punbox _ ->
+    | Punbox _ ->
         let primargs = traverse_list ctx primargs in
         Choice.lambda (Lprim (prim, primargs, loc))
 

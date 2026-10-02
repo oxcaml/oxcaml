@@ -1209,8 +1209,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       match layout with
       | Pvalue _ -> pseudo_event (unary (Makeblock { tag = 0 }))
       | Punboxed_float _ | Punboxed_or_untagged_integer _ ->
-        (* CR layouts-box: will we want to compile non-addressable to tagged
-           immediates once we have addressability information? *)
+        (* CR box: This will have to be updated once addressability affects
+           boxed representations *)
         pseudo_event (unary (Make_faux_mixedblock { total_len = 1; tag = 0 }))
       | Punboxed_product layouts ->
         let arg =

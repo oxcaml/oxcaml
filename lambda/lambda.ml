@@ -3899,7 +3899,11 @@ let primitive_result_layout (p : primitive) =
   | Pget_ext_ptr (layout, _) -> layout
   | Pset_ext_ptr _ -> layout_unit
   | Pbox (_layout, _) ->
-    (* a more precise layout here does not seem to buy us anything *)
+    (* CR box: Once we box some things as tagged immediates, we should compute
+       a more precise layout here. For instance, a [bits8 box] could get
+       [layout_int]. If we add mutability tracking (depending on when
+       specialization happens), we could compute more precise layouts too,
+       like that of a tuple. *)
     layout_block
   | Punbox layout -> layout
 
