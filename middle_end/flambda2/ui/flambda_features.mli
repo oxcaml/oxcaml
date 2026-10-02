@@ -85,6 +85,11 @@ type function_result_types =
 
 val function_result_types : is_a_functor:bool -> function_result_types
 
+(** Whether the result types of the given kind of function (functor or not)
+    should keep the types of variables that are only reachable through the
+    value slots of the returned closures. *)
+val result_types_through_value_slots : is_a_functor:bool -> bool
+
 val debug : unit -> bool
 
 val opaque : unit -> bool

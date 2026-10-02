@@ -238,6 +238,16 @@ module Flambda2 : sig
     val reaper : bool ref
   end
 
+  (** In the result types of functors, keep the types of variables that are only
+      reachable through the value slots of the returned closures (instead of
+      replacing them by Unknown). *)
+  val functor_result_types_through_value_slots : bool ref
+
+  (** As [functor_result_types_through_value_slots], but for functions that are
+      not functors.  Only has an effect when result types are computed for such
+      functions (see [function_result_types]). *)
+  val function_result_types_through_value_slots : bool ref
+
   module Expert : sig
     module Default : sig
       val fallback_inlining_heuristic : bool

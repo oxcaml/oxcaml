@@ -397,8 +397,20 @@ let compute_result_types ~is_a_functor ~is_opaque ~return_cont_uses
     else
       let env_extension =
         (* This call is important for compilation time performance, to cut
-           down the size of the return types. *)
-        T.make_suitable_for_environment typing_env
+           down the size of the return types.  With
+           [-flambda2-{functor,function}-result-types-through-value-slots], we
+           keep the types of variables only reachable through the value slots
+           of the returned closures, instead of replacing them by Unknown.
+           These describe the environments of the returned functions; the
+           case that matters is a value (typically another closure, built in
+           the body or returned by a callee) that is captured by a returned
+           closure but is not otherwise reachable from the results, since
+           aliases to parameters or to variables that are kept anyway are
+           already followed by [make_suitable_for_environment]. *)
+        T.make_suitable_for_environment
+          ~keep_variables_through_value_slots:
+            (Flambda_features.result_types_through_value_slots ~is_a_functor)
+          typing_env
           (All_variables_except params_and_results)
           results_and_types
       in

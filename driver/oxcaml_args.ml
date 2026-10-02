@@ -619,6 +619,45 @@ let mk_no_flambda2_result_types f =
          | All_functions ->
            false)) )
 
+let mk_flambda2_functor_result_types_through_value_slots f =
+  ( "-flambda2-functor-result-types-through-value-slots",
+    Arg.Unit f,
+    Printf.sprintf
+      " In the result types of functors, keep the types of\n\
+      \     variables only reachable through the value slots of the\n\
+      \     returned closures%s (Flambda 2 only)"
+      (format_default !Flambda2.functor_result_types_through_value_slots) )
+
+let mk_no_flambda2_functor_result_types_through_value_slots f =
+  ( "-no-flambda2-functor-result-types-through-value-slots",
+    Arg.Unit f,
+    Printf.sprintf
+      " In the result types of functors, replace the types of\n\
+      \     variables only reachable through the value slots of the\n\
+      \     returned closures by Unknown%s (Flambda 2 only)"
+      (format_not_default !Flambda2.functor_result_types_through_value_slots) )
+
+let mk_flambda2_function_result_types_through_value_slots f =
+  ( "-flambda2-function-result-types-through-value-slots",
+    Arg.Unit f,
+    Printf.sprintf
+      " In the result types of functions that are not functors,\n\
+      \     keep the types of variables only reachable through the value\n\
+      \     slots of the returned closures (only has an effect when\n\
+      \     result types are computed for such functions, see\n\
+      \     -flambda2-result-types-*)%s (Flambda 2 only)"
+      (format_default !Flambda2.function_result_types_through_value_slots) )
+
+let mk_no_flambda2_function_result_types_through_value_slots f =
+  ( "-no-flambda2-function-result-types-through-value-slots",
+    Arg.Unit f,
+    Printf.sprintf
+      " In the result types of functions that are not functors,\n\
+      \     replace the types of variables only reachable through the\n\
+      \     value slots of the returned closures by Unknown%s\n\
+      \     (Flambda 2 only)"
+      (format_not_default !Flambda2.function_result_types_through_value_slots) )
+
 let mk_flambda2_basic_meet f =
   ( "-flambda2-basic-meet",
     Arg.Unit f,
@@ -1444,6 +1483,10 @@ module type Oxcaml_options = sig
   val flambda2_result_types_functors_and_closures : unit -> unit
   val flambda2_result_types_all_functions : unit -> unit
   val no_flambda2_result_types : unit -> unit
+  val flambda2_functor_result_types_through_value_slots : unit -> unit
+  val no_flambda2_functor_result_types_through_value_slots : unit -> unit
+  val flambda2_function_result_types_through_value_slots : unit -> unit
+  val no_flambda2_function_result_types_through_value_slots : unit -> unit
   val flambda2_basic_meet : unit -> unit
   val flambda2_advanced_meet : unit -> unit
   val flambda2_join_algorithm : string -> unit
@@ -1651,6 +1694,14 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_flambda2_result_types_all_functions
         F.flambda2_result_types_all_functions;
       mk_no_flambda2_result_types F.no_flambda2_result_types;
+      mk_flambda2_functor_result_types_through_value_slots
+        F.flambda2_functor_result_types_through_value_slots;
+      mk_no_flambda2_functor_result_types_through_value_slots
+        F.no_flambda2_functor_result_types_through_value_slots;
+      mk_flambda2_function_result_types_through_value_slots
+        F.flambda2_function_result_types_through_value_slots;
+      mk_no_flambda2_function_result_types_through_value_slots
+        F.no_flambda2_function_result_types_through_value_slots;
       mk_flambda2_basic_meet F.flambda2_basic_meet;
       mk_flambda2_advanced_meet F.flambda2_advanced_meet;
       mk_flambda2_join_algorithm F.flambda2_join_algorithm;
@@ -2117,6 +2168,18 @@ module Oxcaml_options_impl = struct
   let no_flambda2_result_types () =
     Flambda2.function_result_types :=
       Oxcaml_flags.Set (Oxcaml_flags.Never : Oxcaml_flags.function_result_types)
+
+  let flambda2_functor_result_types_through_value_slots =
+    set' Flambda2.functor_result_types_through_value_slots
+
+  let no_flambda2_functor_result_types_through_value_slots =
+    clear' Flambda2.functor_result_types_through_value_slots
+
+  let flambda2_function_result_types_through_value_slots =
+    set' Flambda2.function_result_types_through_value_slots
+
+  let no_flambda2_function_result_types_through_value_slots =
+    clear' Flambda2.function_result_types_through_value_slots
 
   let flambda2_basic_meet () = ()
   let flambda2_advanced_meet () = ()
@@ -2667,6 +2730,10 @@ module Extra_params = struct
                functors-and-static-closures|functors-and-closures|\
                all-functions");
         true
+    | "flambda2-functor-result-types-through-value-slots" ->
+        set' Flambda2.functor_result_types_through_value_slots
+    | "flambda2-function-result-types-through-value-slots" ->
+        set' Flambda2.function_result_types_through_value_slots
     | "flambda2-result-types-all-functions" ->
         (Flambda2.function_result_types := Oxcaml_flags.(Set All_functions));
         true

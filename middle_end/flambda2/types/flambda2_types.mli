@@ -358,6 +358,7 @@ type to_erase =
     the resulting type is to be valid; or a set of variables may be supplied
     which are the only ones allowed to occur in the resulting type. *)
 val make_suitable_for_environment :
+  ?keep_variables_through_value_slots:bool ->
   Typing_env.t ->
   to_erase ->
   (Name.t * flambda_type) list ->
