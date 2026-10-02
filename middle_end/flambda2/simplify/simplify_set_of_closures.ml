@@ -229,7 +229,8 @@ let simplify_function_body context ~outer_dacc function_slot_opt
   let my_depth_duid = Flambda_debug_uid.none in
   match
     C.simplify_function_body context dacc body ~return_continuation
-      ~exn_continuation ~return_arity:(Code.result_arity code)
+      ~exn_continuation
+      ~return_arity:(Flambda_arity.receiving_arity (Code.result_arity code))
       ~implicit_params:
         (Bound_parameters.create
            ([ Bound_parameter.create my_closure
@@ -413,7 +414,7 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
         in
         let result_var_duid = Flambda_debug_uid.none in
         BP.create result_var kind_with_subkind result_var_duid)
-      (Flambda_arity.unarize result_arity)
+      (Flambda_arity.unarize (Flambda_arity.receiving_arity result_arity))
     |> Bound_parameters.create
   in
   let { params;

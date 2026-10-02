@@ -273,6 +273,10 @@ type function_arities =
     ret_arity : arity
   }
 
+type code_return_arity =
+  | Code_returns of arity option
+  | Code_unknown_arity
+
 type inline_attribute = Inline_attribute.t =
   | Always_inline
   | Available_inline
@@ -406,7 +410,7 @@ and code =
   { id : code_id;
     newer_version_of : code_id option;
     param_arity : arity option;
-    ret_arity : arity option;
+    ret_arity : code_return_arity;
     recursive : is_recursive;
     inline : inline_attribute option;
     params_and_body : params_and_body;

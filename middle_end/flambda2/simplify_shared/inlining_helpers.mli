@@ -46,12 +46,13 @@ val wrap_inlined_body :
   'acc ->
   apply_exn_continuation:Exn_continuation.t ->
   apply_return_continuation:Flambda.Apply.Result_continuation.t ->
-  result_arity:_ Flambda_arity.t ->
+  result_arity:[`Complex | `Unknown] Flambda_arity.t ->
   make_inlined_body:
     ('acc ->
     apply_exn_continuation:Continuation.t ->
     apply_return_continuation:Flambda.Apply.Result_continuation.t ->
     'expr_with_acc) ->
+  invalid:('acc -> 'expr_with_acc) ->
   apply_cont_create:
     ('acc ->
     trap_action:Trap_action.t ->

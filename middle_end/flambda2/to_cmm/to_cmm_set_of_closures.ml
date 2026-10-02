@@ -56,8 +56,14 @@ let get_func_decl_params_arity t code_id =
       (Flambda_arity.unarize_per_parameter (Code_metadata.params_arity info))
   in
   let result_machtype =
-    C.extended_machtype_of_return_arity (Code_metadata.result_arity info)
-    |> C.Extended_machtype.change_tagged_int_to_val
+    match Flambda_arity.known (Code_metadata.result_arity info) with
+    | Some result_arity ->
+      C.extended_machtype_of_return_arity result_arity
+      |> C.Extended_machtype.change_tagged_int_to_val
+    | None ->
+      (* The intermediate curry functions return closures, and the result type
+         of the last one does not matter for code that never returns. *)
+      Cmm.typ_val
   in
   let kind : Lambda.function_kind =
     if Code_metadata.is_tupled info
@@ -623,8 +629,8 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
   in
   let fun_ret_type =
     Env.get_code_metadata env code_id
-    |> Code_metadata.result_arity |> C.extended_machtype_of_return_arity
-    |> C.Extended_machtype.to_machtype
+    |> Code_metadata.result_arity |> Flambda_arity.receiving_arity
+    |> C.extended_machtype_of_return_arity |> C.Extended_machtype.to_machtype
   in
   ( C.fundecl fun_sym fun_params fun_body fun_flags fun_dbg fun_poll fun_ret_type,
     res )

@@ -1628,9 +1628,10 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
   let unboxed_products = !unboxed_products in
   let removed_params = Ident.Map.keys unboxed_products in
   let return =
-    Flambda_arity.create
-      [ Flambda_arity.Component_for_creation.from_lambda return
-          ~machine_width:(Env.machine_width env) ]
+    Flambda_arity.with_unknown
+      (Flambda_arity.create
+         [ Flambda_arity.Component_for_creation.from_lambda return
+             ~machine_width:(Env.machine_width env) ])
   in
   (* CR ncourant: now that the following two statements are in this order, I
      believe we can remove [removed_params]. *)

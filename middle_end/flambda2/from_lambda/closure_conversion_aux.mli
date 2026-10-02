@@ -370,7 +370,7 @@ module Function_decls : sig
       params:param list ->
       params_arity:[`Complex] Flambda_arity.t ->
       removed_params:Ident.Set.t ->
-      return:[`Complex] Flambda_arity.t ->
+      return:[`Complex | `Unknown] Flambda_arity.t ->
       calling_convention:calling_convention ->
       return_continuation:Continuation.t ->
       exn_continuation:IR.exn_continuation ->
@@ -399,7 +399,7 @@ module Function_decls : sig
 
     val params_arity : t -> [`Complex] Flambda_arity.t
 
-    val return : t -> [`Complex] Flambda_arity.t
+    val return : t -> [`Complex | `Unknown] Flambda_arity.t
 
     val calling_convention : t -> calling_convention
 

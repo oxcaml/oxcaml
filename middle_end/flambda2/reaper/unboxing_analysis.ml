@@ -1010,12 +1010,14 @@ let compute_code_changes uses ~analysis_scope ~rewrite_kind_with_subkind
                        (Flambda_arity.unarize original_arity))))
           in
           let result_arity =
-            let original_result_arity =
-              Code_metadata.result_arity code_metadata
-            in
-            Flambda_arity.with_unarized_kinds original_result_arity
-              (rewrite_kinds code_dep.return
-                 (Flambda_arity.unarize original_result_arity))
+            let result_arity = Code_metadata.result_arity code_metadata in
+            match Flambda_arity.known result_arity with
+            | None -> result_arity
+            | Some result_arity ->
+              Flambda_arity.with_unknown
+                (Flambda_arity.with_unarized_kinds result_arity
+                   (rewrite_kinds code_dep.return
+                      (Flambda_arity.unarize result_arity)))
           in
           ( Not_changing_calling_convention,
             Code_metadata.with_params_arity params_arity
@@ -1050,9 +1052,17 @@ let compute_code_changes uses ~analysis_scope ~rewrite_kind_with_subkind
                   if is_var_used v then Keep (v, kind) else Delete
                 | Some fields -> Unbox fields)
               code_dep.return
-              (Flambda_arity.unarize (Code_metadata.result_arity code_metadata))
+              (Flambda_arity.unarize
+                 (Flambda_arity.receiving_arity
+                    (Code_metadata.result_arity code_metadata)))
           in
-          let result_arity = arity_of_decisions return_decisions in
+          let result_arity =
+            let result_arity = Code_metadata.result_arity code_metadata in
+            match Flambda_arity.known result_arity with
+            | None -> result_arity
+            | Some _ ->
+              Flambda_arity.with_unknown (arity_of_decisions return_decisions)
+          in
           let code_metadata =
             Code_metadata.with_is_tupled false
               (Code_metadata.with_result_arity result_arity code_metadata)
