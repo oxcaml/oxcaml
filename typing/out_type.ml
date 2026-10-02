@@ -2701,12 +2701,11 @@ let rec tree_of_modal_typexp mode modal ty =
         let arg_acc = const_or_generic_of_mode ~arg:true marg in
         let t1 =
           if is_optional l then
-            match
-              get_desc (Ctype.expand_head !printing_env (tpoly_get_mono ty1))
-            with
-            | Tconstr(path, [ty], _)
+            let ty_option_body, vars = tpoly_get_poly ty1 in
+            match get_desc (Ctype.expand_head !printing_env ty_option_body) with
+            | Tconstr (path, [ ty_body ], _)
               when Path.same path Predef.path_option ->
-                tree_of_acc_typexp mode arg_acc ty
+                tree_of_acc_poly_typexp mode arg_acc ty_body vars
             | _ -> Otyp_stuff "<hidden>"
           else
             tree_of_acc_typexp mode arg_acc ty1
@@ -2785,22 +2784,10 @@ let rec tree_of_modal_typexp mode modal ty =
         Otyp_stuff "<Tsubst>"
     | Tlink _ ->
         fatal_error "Out_type.tree_of_typexp"
-    | Tpoly (ty, []) | Trepr (ty, []) ->
+    | Tpoly (ty, vars) ->
+        tree_of_acc_poly_typexp mode acc_mode ty vars
+    | Trepr (ty, []) ->
         tree_of_acc_typexp mode acc_mode ty
-    | Tpoly (ty, tyl) ->
-        (*let print_names () =
-          List.iter (fun (_, name) -> prerr_string (name ^ " ")) !names;
-          prerr_string "; " in *)
-        let tyl = List.map Transient_expr.repr tyl in
-        let old_delayed = !Aliases.delayed in
-        (* Make the names delayed, so that the real type is
-           printed once when used as proxy *)
-        List.iter Aliases.add_delayed tyl;
-        let tl = tree_of_univars tyl in
-        let tr = Otyp_poly (tl, tree_of_acc_typexp mode acc_mode ty) in
-        (* Forget names when we leave scope *)
-        Variable_names.remove_names tyl;
-        Aliases.delayed := old_delayed; tr
     | Trepr (ty, sort_vars) ->
         (* Trepr wraps a Tpoly that contains the type variables
            corresponding to the sort variables. Extract them and print. *)
@@ -2881,6 +2868,22 @@ let rec tree_of_modal_typexp mode modal ty =
         let ty = pr_typ acc_mode in
         Otyp_ret (rm, ty)
     | Other acc_mode -> pr_typ acc_mode
+
+and tree_of_acc_poly_typexp mode acc_mode ty vars =
+  if List.is_empty vars
+  then tree_of_acc_typexp mode acc_mode ty
+  else
+    let vars = List.map Transient_expr.repr vars in
+    let old_delayed = !Aliases.delayed in
+    (* Make the names delayed, so that the real type is
+        printed once when used as proxy *)
+    List.iter Aliases.add_delayed vars;
+    let tl = tree_of_univars vars in
+    let tr = Otyp_poly (tl, tree_of_acc_typexp mode acc_mode ty) in
+    (* Forget names when we leave scope *)
+    Variable_names.remove_names vars;
+    Aliases.delayed := old_delayed;
+    tr
 
 and tree_of_acc_typexp mode acc_mode ty =
   tree_of_modal_typexp mode (Other acc_mode) ty

@@ -415,12 +415,14 @@ val foo : ?x:int @ local once unique -> (unit -> unit) @ local = <fun>
 val foo : ?x:int @ local once unique -> unit -> unit = <fun>
 |}]
 
-let foo ?(local_ x : 'a. ('a -> 'a) @ unique once) = ()
+let foo ?(local_ x : 'a. ('a -> 'a) option @ unique once) = ()
 [%%expect{|
-Line 1, characters 10-49:
-1 | let foo ?(local_ x : 'a. ('a -> 'a) @ unique once) = ()
-              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Optional parameters cannot be polymorphic
+Line 1, characters 17-18:
+1 | let foo ?(local_ x : 'a. ('a -> 'a) option @ unique once) = ()
+                     ^
+Warning 16 [unerasable-optional-argument]: this optional argument cannot be erased.
+
+val foo : ?x:('a. 'a -> 'a) @ local once unique -> unit = <fun>
 |}]
 
 let foo ?x:(local_ (x,y) @ unique once = (42, 42)) () = ()
@@ -437,12 +439,15 @@ val foo : ?x:int * int @ local once unique -> (unit -> unit) @ local = <fun>
 val foo : ?x:int * int @ local once unique -> unit -> unit = <fun>
 |}]
 
-let foo ?x:(local_ (x,y) : 'a.('a->'a) @ unique once) () = ()
+(* CR aobrien: what is this testing. Surely the pattern here would always fail? *)
+let foo ?x:(local_ (x,y) : 'a. ('a -> 'a) option @ unique once) () = ()
 [%%expect{|
-Line 1, characters 12-52:
-1 | let foo ?x:(local_ (x,y) : 'a.('a->'a) @ unique once) () = ()
-                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Optional parameters cannot be polymorphic
+Line 1, characters 19-24:
+1 | let foo ?x:(local_ (x,y) : 'a. ('a -> 'a) option @ unique once) () = ()
+                       ^^^^^
+Error: This pattern matches values of type "'b * 'c"
+       but a pattern was expected which matches values of type
+         "('a -> 'a) option"
 |}]
 
 (* let-bound function *)
