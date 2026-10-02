@@ -443,6 +443,10 @@ module Flambda2 = struct
       threshold : float;
     }
 
+    type speculative_inlining_criterion =
+      | Threshold
+      | Ratio
+
     module Default = struct
       let cost_divisor = 8.
 
@@ -475,6 +479,24 @@ module Flambda2 = struct
       let speculative_inlining_budget = false
 
       let speculative_inlining_budget_size_ratio = 0.0
+
+      let speculative_inlining_criterion = Threshold
+
+      let speculative_inlining_ratio = 0.8
+
+      let speculative_inlining_credit_call_site = false
+
+      let speculative_inlining_bonus_call = 2.
+
+      let speculative_inlining_bonus_alloc = 4.
+
+      let speculative_inlining_bonus_prim = 0.
+
+      let speculative_inlining_bonus_branch = 0.
+
+      let speculative_inlining_bonus_indirect_call = 3.
+
+      let speculative_inlining_bonus_poly_compare = 20.
     end
 
     let max_depth = ref (I.default Default.default_arguments.max_depth)
@@ -517,6 +539,32 @@ module Flambda2 = struct
 
     let speculative_inlining_budget_size_ratio =
       ref Default.speculative_inlining_budget_size_ratio
+
+    let speculative_inlining_criterion =
+      ref Default.speculative_inlining_criterion
+
+    let speculative_inlining_ratio = ref Default.speculative_inlining_ratio
+
+    let speculative_inlining_credit_call_site =
+      ref Default.speculative_inlining_credit_call_site
+
+    let speculative_inlining_bonus_call =
+      ref Default.speculative_inlining_bonus_call
+
+    let speculative_inlining_bonus_alloc =
+      ref Default.speculative_inlining_bonus_alloc
+
+    let speculative_inlining_bonus_prim =
+      ref Default.speculative_inlining_bonus_prim
+
+    let speculative_inlining_bonus_branch =
+      ref Default.speculative_inlining_bonus_branch
+
+    let speculative_inlining_bonus_indirect_call =
+      ref Default.speculative_inlining_bonus_indirect_call
+
+    let speculative_inlining_bonus_poly_compare =
+      ref Default.speculative_inlining_bonus_poly_compare
 
     let report_bin = ref false
 

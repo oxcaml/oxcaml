@@ -44,4 +44,9 @@ val print : Format.formatter -> t -> unit
 
 val evaluate : args:Inlining_arguments.t -> t -> float
 
+(** The bonus, in instructions, credited for the removed operations when a
+    speculative inlining is judged by the ratio criterion (see the
+    [speculative_inlining_bonus_*] flags in [Flambda_features.Inlining]). *)
+val bonus : t -> float
+
 val equal : t -> t -> bool

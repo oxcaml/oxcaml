@@ -326,6 +326,17 @@ module Flambda2 : sig
       threshold : float;
     }
 
+    (** How the result of a speculative inlining is judged: [Threshold]
+        compares the evaluated cost metrics against the inlining threshold;
+        [Ratio] compares the size of the inlined body, less the call-site
+        credit and the bonuses for removed operations, as a fraction of the
+        callee's size before inlining, against [speculative_inlining_ratio].
+        With a speculative inlining budget, the threshold remains the
+        budget of each speculation under either criterion. *)
+    type speculative_inlining_criterion =
+      | Threshold
+      | Ratio
+
     module Default : sig
       val default_arguments : inlining_arguments
       val speculative_inlining_only_if_arguments_useful : bool
@@ -334,6 +345,15 @@ module Flambda2 : sig
       val speculative_inlining_uninlined_call_cost_factor : float
       val speculative_inlining_budget : bool
       val speculative_inlining_budget_size_ratio : float
+      val speculative_inlining_criterion : speculative_inlining_criterion
+      val speculative_inlining_ratio : float
+      val speculative_inlining_credit_call_site : bool
+      val speculative_inlining_bonus_call : float
+      val speculative_inlining_bonus_alloc : float
+      val speculative_inlining_bonus_prim : float
+      val speculative_inlining_bonus_branch : float
+      val speculative_inlining_bonus_indirect_call : float
+      val speculative_inlining_bonus_poly_compare : float
     end
 
     val oclassic_arguments : inlining_arguments
@@ -369,6 +389,24 @@ module Flambda2 : sig
     val speculative_inlining_budget : bool ref
 
     val speculative_inlining_budget_size_ratio : float ref
+
+    val speculative_inlining_criterion : speculative_inlining_criterion ref
+
+    val speculative_inlining_ratio : float ref
+
+    val speculative_inlining_credit_call_site : bool ref
+
+    val speculative_inlining_bonus_call : float ref
+
+    val speculative_inlining_bonus_alloc : float ref
+
+    val speculative_inlining_bonus_prim : float ref
+
+    val speculative_inlining_bonus_branch : float ref
+
+    val speculative_inlining_bonus_indirect_call : float ref
+
+    val speculative_inlining_bonus_poly_compare : float ref
 
     val report_bin : bool ref
   end

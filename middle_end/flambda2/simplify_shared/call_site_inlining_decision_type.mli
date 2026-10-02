@@ -17,6 +17,19 @@
 (* CR-someday mshinwell: Maybe have two types, one giving the reasons why
    something can be inlined, and one giving the reasons why something cannot be
    inlined. *)
+(** How the result of a speculative inlining was judged (see
+    [Flambda_features.Inlining.speculative_inlining_criterion]). *)
+type speculative_criterion =
+  | Threshold of { evaluated_to : float }
+  | Ratio of
+      { adjusted_size : float;
+            (** The size of the inlined body less the call-site credit and the
+                bonus for removed operations. *)
+        bonus : float;
+        ratio : float;  (** [adjusted_size] over [original_size]. *)
+        max_ratio : float
+      }
+
 type t =
   | Missing_code
   | Definition_says_not_to_inline
@@ -39,7 +52,9 @@ type t =
   | Speculatively_not_inline of
       { cost_metrics : Cost_metrics.t;
         cost_metrics_of_lifted_constants : Cost_metrics.t;
-        evaluated_to : float;
+        original_size : Code_size.t;
+        call_site_credit : float;
+        criterion : speculative_criterion;
         threshold : float;
         threshold_is_remaining_budget : bool;
         is_a_functor : bool
@@ -52,7 +67,9 @@ type t =
   | Speculatively_inline of
       { cost_metrics : Cost_metrics.t;
         cost_metrics_of_lifted_constants : Cost_metrics.t;
-        evaluated_to : float;
+        original_size : Code_size.t;
+        call_site_credit : float;
+        criterion : speculative_criterion;
         threshold : float;
         threshold_is_remaining_budget : bool;
         is_a_functor : bool
@@ -77,6 +94,6 @@ val can_inline : t -> can_inline
 val charged_code_size : t -> Code_size.t
 
 (** For a decision to inline after speculation (possibly via a replay), the
-    evaluated cost of the inlined body together with the threshold it was
-    compared against. *)
-val speculative_inlining_cost_and_threshold : t -> (float * float) option
+    threshold it was judged against, which is also the budget of the
+    speculation. *)
+val speculative_inlining_threshold : t -> float option

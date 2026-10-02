@@ -30,6 +30,7 @@ module Context : sig
       cost_metrics : Cost_metrics.t option;
       depth : int option;
       unrolling_depth : int option option;
+      remaining_speculative_inlining_budget : float option;
       are_rebuilding_terms : Are_rebuilding_terms.t;
       pass : Pass.t
     }
@@ -110,6 +111,7 @@ val record_decision_at_call_site_for_known_function :
   pass:Pass.t ->
   callee:Inlining_history.Absolute.t ->
   are_rebuilding_terms:Are_rebuilding_terms.t ->
+  remaining_speculative_inlining_budget:float option ->
   Call_site_inlining_decision_type.t ->
   unit
 

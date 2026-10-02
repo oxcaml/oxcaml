@@ -240,10 +240,10 @@ let enter_inlined_body_for_speculative_inlining_budget dacc decision =
   else
     match
       ( DA.speculative_inlining_budget dacc,
-        Call_site_inlining_decision_type.speculative_inlining_cost_and_threshold
-          decision )
+        Call_site_inlining_decision_type.speculative_inlining_threshold decision
+      )
     with
-    | Not_in_speculative_region, Some (_evaluated_to, threshold) ->
+    | Not_in_speculative_region, Some threshold ->
       DA.with_speculative_inlining_budget dacc (Remaining threshold), true
     | (Not_in_speculative_region | Remaining _ | Exhausted), _ -> dacc, false
 
@@ -276,6 +276,10 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
           ~callee:(Code_metadata.absolute_history callee's_code_metadata)
           ~tracker:(DE.inlining_history_tracker (DA.denv dacc))
           ~are_rebuilding_terms:(DA.are_rebuilding_terms dacc)
+          ~remaining_speculative_inlining_budget:
+            (if Flambda_features.Inlining.speculative_inlining_budget ()
+             then DA.remaining_speculative_inlining_budget dacc
+             else None)
           ~apply decision;
       match Call_site_inlining_decision_type.can_inline decision with
       | Do_not_inline { erase_attribute_if_ignored } ->

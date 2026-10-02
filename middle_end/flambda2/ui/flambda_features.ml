@@ -333,6 +333,38 @@ module Inlining = struct
 
   let speculative_inlining_budget_size_ratio () =
     !Oxcaml_flags.Flambda2.Inlining.speculative_inlining_budget_size_ratio
+
+  type speculative_inlining_criterion =
+        Oxcaml_flags.Flambda2.Inlining.speculative_inlining_criterion =
+    | Threshold
+    | Ratio
+
+  let speculative_inlining_criterion () =
+    !Oxcaml_flags.Flambda2.Inlining.speculative_inlining_criterion
+
+  let speculative_inlining_ratio () =
+    !Oxcaml_flags.Flambda2.Inlining.speculative_inlining_ratio
+
+  let speculative_inlining_credit_call_site () =
+    !Oxcaml_flags.Flambda2.Inlining.speculative_inlining_credit_call_site
+
+  let speculative_inlining_bonus_call () =
+    !Oxcaml_flags.Flambda2.Inlining.speculative_inlining_bonus_call
+
+  let speculative_inlining_bonus_alloc () =
+    !Oxcaml_flags.Flambda2.Inlining.speculative_inlining_bonus_alloc
+
+  let speculative_inlining_bonus_prim () =
+    !Oxcaml_flags.Flambda2.Inlining.speculative_inlining_bonus_prim
+
+  let speculative_inlining_bonus_branch () =
+    !Oxcaml_flags.Flambda2.Inlining.speculative_inlining_bonus_branch
+
+  let speculative_inlining_bonus_indirect_call () =
+    !Oxcaml_flags.Flambda2.Inlining.speculative_inlining_bonus_indirect_call
+
+  let speculative_inlining_bonus_poly_compare () =
+    !Oxcaml_flags.Flambda2.Inlining.speculative_inlining_bonus_poly_compare
 end
 
 module Debug = struct

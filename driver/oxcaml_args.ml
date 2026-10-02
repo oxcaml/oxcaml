@@ -1229,6 +1229,100 @@ let mk_flambda2_speculative_inlining_budget_size_ratio f =
     \    the inlining threshold) (Flambda 2 only)" )
 
 let mk_flambda2_inlining_report_bin f =
+let mk_flambda2_speculative_inlining_criterion f =
+  ( "-flambda2-speculative-inlining-criterion",
+    Arg.Symbol ([ "threshold"; "ratio" ], f),
+    " <criterion> How the result of a speculative inlining is judged:\n\
+    \     threshold (evaluated cost metrics against the inlining threshold,\n\
+    \     the default) or ratio (size of the inlined body, less credits, as\n\
+    \     a fraction of the callee's size, against\n\
+    \     -flambda2-speculative-inlining-ratio) (Flambda 2 only)" )
+
+let mk_flambda2_speculative_inlining_ratio f =
+  ( "-flambda2-speculative-inlining-ratio",
+    Arg.Float f,
+    Printf.sprintf
+      "<float>  Largest ratio of the adjusted size of a speculatively\n\
+      \    inlined body to the callee's size before inlining for which the\n\
+      \    call is inlined, under the ratio criterion (default %g)\n\
+      \    (Flambda 2 only)"
+      Flambda2.Inlining.Default.speculative_inlining_ratio )
+
+let mk_flambda2_speculative_inlining_credit_call_site f =
+  ( "-flambda2-speculative-inlining-credit-call-site",
+    Arg.Unit f,
+    Printf.sprintf
+      " Credit the size of the call being inlined when judging a speculative\n\
+      \    inlining%s (Flambda 2 only)"
+      (format_default
+         Flambda2.Inlining.Default.speculative_inlining_credit_call_site) )
+
+let mk_no_flambda2_speculative_inlining_credit_call_site f =
+  ( "-no-flambda2-speculative-inlining-credit-call-site",
+    Arg.Unit f,
+    Printf.sprintf
+      " Do not credit the size of the call being inlined when judging a\n\
+      \    speculative inlining%s (Flambda 2 only)"
+      (format_not_default
+         Flambda2.Inlining.Default.speculative_inlining_credit_call_site) )
+
+let mk_flambda2_speculative_inlining_bonus_call f =
+  ( "-flambda2-speculative-inlining-bonus-call",
+    Arg.Float f,
+    Printf.sprintf
+      "<float>  Bonus, in instructions, credited for an inlined call\n\
+      \    removed by a speculative inlining judged by the ratio criterion\n\
+      \    (default %g) (Flambda 2 only)"
+      Flambda2.Inlining.Default.speculative_inlining_bonus_call )
+
+let mk_flambda2_speculative_inlining_bonus_alloc f =
+  ( "-flambda2-speculative-inlining-bonus-alloc",
+    Arg.Float f,
+    Printf.sprintf
+      "<float>  Bonus, in instructions, credited for an allocation\n\
+      \    removed by a speculative inlining judged by the ratio criterion\n\
+      \    (default %g) (Flambda 2 only)"
+      Flambda2.Inlining.Default.speculative_inlining_bonus_alloc )
+
+let mk_flambda2_speculative_inlining_bonus_prim f =
+  ( "-flambda2-speculative-inlining-bonus-prim",
+    Arg.Float f,
+    Printf.sprintf
+      "<float>  Bonus, in instructions, credited for a primitive\n\
+      \    removed by a speculative inlining judged by the ratio criterion\n\
+      \    (default %g) (Flambda 2 only)"
+      Flambda2.Inlining.Default.speculative_inlining_bonus_prim )
+
+let mk_flambda2_speculative_inlining_bonus_branch f =
+  ( "-flambda2-speculative-inlining-bonus-branch",
+    Arg.Float f,
+    Printf.sprintf
+      "<float>  Bonus, in instructions, credited for a branch (a switch \
+       collapsing to one arm)\n\
+      \    removed by a speculative inlining judged by the ratio criterion\n\
+      \    (default %g) (Flambda 2 only)"
+      Flambda2.Inlining.Default.speculative_inlining_bonus_branch )
+
+let mk_flambda2_speculative_inlining_bonus_indirect_call f =
+  ( "-flambda2-speculative-inlining-bonus-indirect-call",
+    Arg.Float f,
+    Printf.sprintf
+      "<float>  Bonus, in instructions, credited for an indirect call made \
+       direct\n\
+      \    removed by a speculative inlining judged by the ratio criterion\n\
+      \    (default %g) (Flambda 2 only)"
+      Flambda2.Inlining.Default.speculative_inlining_bonus_indirect_call )
+
+let mk_flambda2_speculative_inlining_bonus_poly_compare f =
+  ( "-flambda2-speculative-inlining-bonus-poly-compare",
+    Arg.Float f,
+    Printf.sprintf
+      "<float>  Bonus, in instructions, credited for a polymorphic comparison \
+       specialised\n\
+      \    removed by a speculative inlining judged by the ratio criterion\n\
+      \    (default %g) (Flambda 2 only)"
+      Flambda2.Inlining.Default.speculative_inlining_bonus_poly_compare )
+
   ( "-flambda2-inlining-report-bin",
     Arg.Unit f,
     " Write inlining report\n     in binary format (Flambda 2 only)" )
@@ -1625,6 +1719,16 @@ module type Oxcaml_options = sig
   val no_flambda2_speculative_inlining_budget : unit -> unit
   val flambda2_speculative_inlining_budget_size_ratio : float -> unit
   val flambda2_inlining_report_bin : unit -> unit
+  val flambda2_speculative_inlining_criterion : string -> unit
+  val flambda2_speculative_inlining_ratio : float -> unit
+  val flambda2_speculative_inlining_credit_call_site : unit -> unit
+  val no_flambda2_speculative_inlining_credit_call_site : unit -> unit
+  val flambda2_speculative_inlining_bonus_call : float -> unit
+  val flambda2_speculative_inlining_bonus_alloc : float -> unit
+  val flambda2_speculative_inlining_bonus_prim : float -> unit
+  val flambda2_speculative_inlining_bonus_branch : float -> unit
+  val flambda2_speculative_inlining_bonus_indirect_call : float -> unit
+  val flambda2_speculative_inlining_bonus_poly_compare : float -> unit
   val flambda2_unicode : unit -> unit
   val flambda2_kind_checks : unit -> unit
   val drawfexpr : unit -> unit
@@ -1880,6 +1984,26 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_flambda2_speculative_inlining_budget_size_ratio
         F.flambda2_speculative_inlining_budget_size_ratio;
       mk_flambda2_inlining_report_bin F.flambda2_inlining_report_bin;
+      mk_flambda2_speculative_inlining_criterion
+        F.flambda2_speculative_inlining_criterion;
+      mk_flambda2_speculative_inlining_ratio
+        F.flambda2_speculative_inlining_ratio;
+      mk_flambda2_speculative_inlining_credit_call_site
+        F.flambda2_speculative_inlining_credit_call_site;
+      mk_no_flambda2_speculative_inlining_credit_call_site
+        F.no_flambda2_speculative_inlining_credit_call_site;
+      mk_flambda2_speculative_inlining_bonus_call
+        F.flambda2_speculative_inlining_bonus_call;
+      mk_flambda2_speculative_inlining_bonus_alloc
+        F.flambda2_speculative_inlining_bonus_alloc;
+      mk_flambda2_speculative_inlining_bonus_prim
+        F.flambda2_speculative_inlining_bonus_prim;
+      mk_flambda2_speculative_inlining_bonus_branch
+        F.flambda2_speculative_inlining_bonus_branch;
+      mk_flambda2_speculative_inlining_bonus_indirect_call
+        F.flambda2_speculative_inlining_bonus_indirect_call;
+      mk_flambda2_speculative_inlining_bonus_poly_compare
+        F.flambda2_speculative_inlining_bonus_poly_compare;
       mk_flambda2_unicode F.flambda2_unicode;
       mk_flambda2_kind_checks F.flambda2_kind_checks;
       mk_drawfexpr F.drawfexpr;
@@ -2492,6 +2616,42 @@ module Oxcaml_options_impl = struct
     Flambda2.Inlining.speculative_inlining_budget_size_ratio := ratio
 
   let flambda2_inlining_report_bin = set' Flambda2.Inlining.report_bin
+  let flambda2_speculative_inlining_criterion criterion =
+    Flambda2.Inlining.speculative_inlining_criterion :=
+      match criterion with
+      | "threshold" -> Flambda2.Inlining.Threshold
+      | "ratio" -> Flambda2.Inlining.Ratio
+      | _ ->
+          Misc.fatal_errorf "Unknown speculative inlining criterion %s"
+            criterion
+
+  let flambda2_speculative_inlining_ratio ratio =
+    Flambda2.Inlining.speculative_inlining_ratio := ratio
+
+  let flambda2_speculative_inlining_credit_call_site =
+    set' Flambda2.Inlining.speculative_inlining_credit_call_site
+
+  let no_flambda2_speculative_inlining_credit_call_site =
+    clear' Flambda2.Inlining.speculative_inlining_credit_call_site
+
+  let flambda2_speculative_inlining_bonus_call bonus =
+    Flambda2.Inlining.speculative_inlining_bonus_call := bonus
+
+  let flambda2_speculative_inlining_bonus_alloc bonus =
+    Flambda2.Inlining.speculative_inlining_bonus_alloc := bonus
+
+  let flambda2_speculative_inlining_bonus_prim bonus =
+    Flambda2.Inlining.speculative_inlining_bonus_prim := bonus
+
+  let flambda2_speculative_inlining_bonus_branch bonus =
+    Flambda2.Inlining.speculative_inlining_bonus_branch := bonus
+
+  let flambda2_speculative_inlining_bonus_indirect_call bonus =
+    Flambda2.Inlining.speculative_inlining_bonus_indirect_call := bonus
+
+  let flambda2_speculative_inlining_bonus_poly_compare bonus =
+    Flambda2.Inlining.speculative_inlining_bonus_poly_compare := bonus
+
   let flambda2_unicode = set Flambda2.unicode
   let flambda2_kind_checks = set Flambda2.kind_checks
   let drawfexpr () = Flambda2.Dump.rawfexpr := Flambda2.Dump.Main_dump_stream
@@ -2985,6 +3145,84 @@ module Extra_params = struct
         (match float_of_string_opt v with
         | Some ratio ->
             Flambda2.Inlining.speculative_inlining_budget_size_ratio := ratio
+        | None ->
+            Location.print_warning Location.none ppf
+              (Warnings.Bad_env_variable
+                 ("OCAMLPARAM", Printf.sprintf "bad value %s for %s" v name)));
+        true
+    | "flambda2-speculative-inlining-criterion" ->
+        (match v with
+        | "threshold" ->
+            Flambda2.Inlining.speculative_inlining_criterion :=
+              Flambda2.Inlining.Threshold
+        | "ratio" ->
+            Flambda2.Inlining.speculative_inlining_criterion :=
+              Flambda2.Inlining.Ratio
+        | _ ->
+            raise
+              (Arg.Bad
+                 (Printf.sprintf
+                    "Unknown speculative inlining criterion %s in OCAMLPARAM" v)));
+        true
+    | "flambda2-speculative-inlining-ratio" ->
+        (match float_of_string_opt v with
+        | Some value -> Flambda2.Inlining.speculative_inlining_ratio := value
+        | None ->
+            Location.print_warning Location.none ppf
+              (Warnings.Bad_env_variable
+                 ("OCAMLPARAM", Printf.sprintf "bad value %s for %s" v name)));
+        true
+    | "flambda2-speculative-inlining-credit-call-site" ->
+        set' Flambda2.Inlining.speculative_inlining_credit_call_site
+    | "flambda2-speculative-inlining-bonus-call" ->
+        (match float_of_string_opt v with
+        | Some value ->
+            Flambda2.Inlining.speculative_inlining_bonus_call := value
+        | None ->
+            Location.print_warning Location.none ppf
+              (Warnings.Bad_env_variable
+                 ("OCAMLPARAM", Printf.sprintf "bad value %s for %s" v name)));
+        true
+    | "flambda2-speculative-inlining-bonus-alloc" ->
+        (match float_of_string_opt v with
+        | Some value ->
+            Flambda2.Inlining.speculative_inlining_bonus_alloc := value
+        | None ->
+            Location.print_warning Location.none ppf
+              (Warnings.Bad_env_variable
+                 ("OCAMLPARAM", Printf.sprintf "bad value %s for %s" v name)));
+        true
+    | "flambda2-speculative-inlining-bonus-prim" ->
+        (match float_of_string_opt v with
+        | Some value ->
+            Flambda2.Inlining.speculative_inlining_bonus_prim := value
+        | None ->
+            Location.print_warning Location.none ppf
+              (Warnings.Bad_env_variable
+                 ("OCAMLPARAM", Printf.sprintf "bad value %s for %s" v name)));
+        true
+    | "flambda2-speculative-inlining-bonus-branch" ->
+        (match float_of_string_opt v with
+        | Some value ->
+            Flambda2.Inlining.speculative_inlining_bonus_branch := value
+        | None ->
+            Location.print_warning Location.none ppf
+              (Warnings.Bad_env_variable
+                 ("OCAMLPARAM", Printf.sprintf "bad value %s for %s" v name)));
+        true
+    | "flambda2-speculative-inlining-bonus-indirect-call" ->
+        (match float_of_string_opt v with
+        | Some value ->
+            Flambda2.Inlining.speculative_inlining_bonus_indirect_call := value
+        | None ->
+            Location.print_warning Location.none ppf
+              (Warnings.Bad_env_variable
+                 ("OCAMLPARAM", Printf.sprintf "bad value %s for %s" v name)));
+        true
+    | "flambda2-speculative-inlining-bonus-poly-compare" ->
+        (match float_of_string_opt v with
+        | Some value ->
+            Flambda2.Inlining.speculative_inlining_bonus_poly_compare := value
         | None ->
             Location.print_warning Location.none ppf
               (Warnings.Bad_env_variable

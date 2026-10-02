@@ -571,6 +571,8 @@ let ocaml_ignored_flags =
     "-no-flambda2-speculative-inlining-track-lifted-constants";
     "-no-flambda2-speculative-inlining-charge-uninlined-calls";
     "-no-flambda2-speculative-inlining-budget";
+    "-flambda2-speculative-inlining-credit-call-site";
+    "-no-flambda2-speculative-inlining-credit-call-site";
     "-no-flambda2-unbox-along-intra-function-control-flow";
     "-ocamlcfg";
     "-no-ocamlcfg";
@@ -856,6 +858,14 @@ let ocaml_ignored_parametrized_flags =
     "-flambda2-inline-threshold";
     "-flambda2-speculative-inlining-uninlined-call-cost-factor";
     "-flambda2-speculative-inlining-budget-size-ratio";
+    "-flambda2-speculative-inlining-criterion";
+    "-flambda2-speculative-inlining-ratio";
+    "-flambda2-speculative-inlining-bonus-call";
+    "-flambda2-speculative-inlining-bonus-alloc";
+    "-flambda2-speculative-inlining-bonus-prim";
+    "-flambda2-speculative-inlining-bonus-branch";
+    "-flambda2-speculative-inlining-bonus-indirect-call";
+    "-flambda2-speculative-inlining-bonus-poly-compare";
     "-flambda2-inline-small-functor-size";
     "-flambda2-inline-large-functor-size";
     "-flambda2-join-algorithm";

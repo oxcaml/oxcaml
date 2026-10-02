@@ -157,13 +157,22 @@ module Context = struct
       cost_metrics : Cost_metrics.t option;
       depth : int option;
       unrolling_depth : int option option;
+      remaining_speculative_inlining_budget : float option;
       are_rebuilding_terms : Are_rebuilding_terms.t;
       pass : Pass.t
     }
 
-  let create ?depth ?unrolling_depth ?cost_metrics ~are_rebuilding_terms ~args
-      ~pass () =
-    { args; depth; unrolling_depth; cost_metrics; are_rebuilding_terms; pass }
+  let create ?depth ?unrolling_depth ?cost_metrics
+      ?remaining_speculative_inlining_budget ~are_rebuilding_terms ~args ~pass
+      () =
+    { args;
+      depth;
+      unrolling_depth;
+      cost_metrics;
+      remaining_speculative_inlining_budget;
+      are_rebuilding_terms;
+      pass
+    }
 
   let print_cost_metrics ppf c =
     let Removed_operations.
@@ -208,9 +217,19 @@ module Context = struct
         cost_metrics;
         depth;
         unrolling_depth;
+        remaining_speculative_inlining_budget;
         are_rebuilding_terms;
         pass = _
       } =
+    let print_remaining_budget ppf = function
+      | None -> ()
+      | Some budget ->
+        Format.fprintf ppf
+          "@[<h>Remaining@ speculative@ inlining@ budget@ of@ the@ enclosing@ \
+           inlined@ body:@ %f@]@,\
+           @,"
+          budget
+    in
     let print_unrolling_depth ppf = function
       | None -> ()
       | Some (Some unroll) ->
@@ -267,7 +286,8 @@ module Context = struct
     print_args ppf args;
     print_cost_metrics ppf cost_metrics;
     print_depth ppf depth;
-    print_unrolling_depth ppf unrolling_depth
+    print_unrolling_depth ppf unrolling_depth;
+    print_remaining_budget ppf remaining_speculative_inlining_budget
 end
 
 module Decision_with_context = struct
@@ -304,7 +324,8 @@ type raw_decision =
 let log : raw_decision list ref = ref []
 
 let record_decision_at_call_site_for_known_function ~tracker ~unrolling_depth
-    ~apply ~pass ~callee ~are_rebuilding_terms decision =
+    ~apply ~pass ~callee ~are_rebuilding_terms
+    ~remaining_speculative_inlining_budget decision =
   if
     Flambda_features.inlining_report ()
     || Flambda_features.inlining_report_bin ()
@@ -320,7 +341,8 @@ let record_decision_at_call_site_for_known_function ~tracker ~unrolling_depth
       Context.create
         ~depth:(Inlining_state.depth state)
         ~args:(Inlining_state.arguments state)
-        ~unrolling_depth ~are_rebuilding_terms ~pass ()
+        ~unrolling_depth ?remaining_speculative_inlining_budget
+        ~are_rebuilding_terms ~pass ()
     in
     log
       := { decision_with_context = Some { decision = Call decision; context };

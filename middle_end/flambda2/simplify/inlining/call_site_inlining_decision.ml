@@ -401,18 +401,60 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
               Speculative_inlining_aborted
                 { budget = threshold; threshold_is_remaining_budget }
             | Completed { cost_metrics; cost_metrics_of_lifted_constants } ->
-              let evaluated_to =
-                Cost_metrics.evaluate ~args:inlining_args cost_metrics
+              let original_size =
+                Code_metadata.cost_metrics code_metadata |> Cost_metrics.size
               in
-              let is_under_inline_threshold =
-                Float.compare evaluated_to threshold <= 0
+              let call_site_credit =
+                if
+                  Flambda_features.Inlining
+                  .speculative_inlining_credit_call_site ()
+                then
+                  (* Whether the call is in tail position is not known on the
+                     way down; count it as a non-tail call. *)
+                  Float.of_int
+                    (Code_size.to_int (Code_size.apply ~is_tail:false apply))
+                else 0.
               in
-              if is_under_inline_threshold
+              let ( (criterion :
+                      Call_site_inlining_decision_type.speculative_criterion),
+                    inline ) =
+                match
+                  Flambda_features.Inlining.speculative_inlining_criterion ()
+                with
+                | Threshold ->
+                  let evaluated_to =
+                    Cost_metrics.evaluate ~args:inlining_args cost_metrics
+                    -. call_site_credit
+                  in
+                  ( Threshold { evaluated_to },
+                    Float.compare evaluated_to threshold <= 0 )
+                | Ratio ->
+                  let size =
+                    Float.of_int
+                      (Code_size.to_int (Cost_metrics.size cost_metrics))
+                  in
+                  let bonus =
+                    Removed_operations.bonus (Cost_metrics.removed cost_metrics)
+                  in
+                  let adjusted_size = size -. call_site_credit -. bonus in
+                  let original =
+                    Float.of_int (Int.max 1 (Code_size.to_int original_size))
+                  in
+                  let ratio = adjusted_size /. original in
+                  let max_ratio =
+                    Flambda_features.Inlining.speculative_inlining_ratio ()
+                  in
+                  ( Ratio { adjusted_size; bonus; ratio; max_ratio },
+                    Float.compare ratio max_ratio <= 0 )
+              in
+              if inline
               then
                 Speculatively_inline
                   { cost_metrics;
                     cost_metrics_of_lifted_constants;
-                    evaluated_to;
+                    original_size;
+                    call_site_credit;
+                    criterion;
                     threshold;
                     threshold_is_remaining_budget;
                     is_a_functor
@@ -421,7 +463,9 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
                 Speculatively_not_inline
                   { cost_metrics;
                     cost_metrics_of_lifted_constants;
-                    evaluated_to;
+                    original_size;
+                    call_site_credit;
+                    criterion;
                     threshold;
                     threshold_is_remaining_budget;
                     is_a_functor

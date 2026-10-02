@@ -103,6 +103,17 @@ let evaluate ~args (t : t) =
   +. float_of_int t.specialized_poly_compare
      *. Inlining_arguments.poly_compare_cost args
 
+let bonus (t : t) =
+  let module I = Flambda_features.Inlining in
+  (float_of_int t.call *. I.speculative_inlining_bonus_call ())
+  +. (float_of_int t.alloc *. I.speculative_inlining_bonus_alloc ())
+  +. (float_of_int t.prim *. I.speculative_inlining_bonus_prim ())
+  +. (float_of_int t.branch *. I.speculative_inlining_bonus_branch ())
+  +. float_of_int t.direct_call_of_indirect
+     *. I.speculative_inlining_bonus_indirect_call ()
+  +. float_of_int t.specialized_poly_compare
+     *. I.speculative_inlining_bonus_poly_compare ()
+
 let equal
     { call = call1;
       alloc = alloc1;

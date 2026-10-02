@@ -201,6 +201,29 @@ module Inlining : sig
   val speculative_inlining_budget : unit -> bool
 
   val speculative_inlining_budget_size_ratio : unit -> float
+
+  type speculative_inlining_criterion =
+        Oxcaml_flags.Flambda2.Inlining.speculative_inlining_criterion =
+    | Threshold
+    | Ratio
+
+  val speculative_inlining_criterion : unit -> speculative_inlining_criterion
+
+  val speculative_inlining_ratio : unit -> float
+
+  val speculative_inlining_credit_call_site : unit -> bool
+
+  val speculative_inlining_bonus_call : unit -> float
+
+  val speculative_inlining_bonus_alloc : unit -> float
+
+  val speculative_inlining_bonus_prim : unit -> float
+
+  val speculative_inlining_bonus_branch : unit -> float
+
+  val speculative_inlining_bonus_indirect_call : unit -> float
+
+  val speculative_inlining_bonus_poly_compare : unit -> float
 end
 
 module Debug : sig
