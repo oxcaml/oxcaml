@@ -45,7 +45,6 @@ get_or:
   ret
 |}]
 
-(* CR ttebbi: This should simplify to a single comparison. *)
 let equal_int (a : int or_null) (b : int or_null) =
   let equal eq t0 t1 =
     match t0, t1 with
@@ -56,20 +55,21 @@ let equal_int (a : int or_null) (b : int or_null) =
   equal Int.equal a b
 [%%expect_asm X86_64{|
 equal_int:
-  testq %rax, %rax
-  jne   .L0
-  xorl  %eax, %eax
-  testq %rbx, %rbx
+  cmpq  %rbx, %rax
   sete  %al
+  movzbq %al, %rax
   leaq  1(%rax,%rax), %rax
   ret
-.L0:
-  testq %rbx, %rbx
-  jne   .L1
-  movl  $1, %eax
-  ret
-.L1:
-  cmpq  %rbx, %rax
+|}]
+
+(* A non-null sentinel, inverted tests, and swapped equality operands. *)
+let equal_with_sentinel (a : int) (b : int) =
+  if 0 <> a then
+    if 0 <> b then b = a else false
+  else 0 = b
+[%%expect_asm X86_64{|
+equal_with_sentinel:
+  cmpq  %rax, %rbx
   sete  %al
   movzbq %al, %rax
   leaq  1(%rax,%rax), %rax
