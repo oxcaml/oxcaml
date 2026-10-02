@@ -94,6 +94,13 @@ module Unique_barrier : sig
   val print : Format.formatter -> t -> unit
 end
 
+module Zero_alloc_obligations_invalidated : sig
+  type t
+  type redundancy = Not_redundant | Redundant
+  val empty : t
+  val add : Zero_alloc.t -> t -> (redundancy * t)
+end
+
 (** The uniqueness/linearity of a usage (such as [Pexp_ident]) inferred by the
     type checker. It is derived during type checking as follows:
       [unique_use.uniqueness = expected_mode.uniqueness]

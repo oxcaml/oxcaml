@@ -124,6 +124,19 @@ module Unique_barrier = struct
     print !t
 end
 
+(* This could alternatively be implemented with lists of obligations,
+   but it's fine and probably more efficient to handle one at a time
+   (since we can stop traversing the Typedtree when we see one),
+   and users can see later failures after fixing earlier ones. *)
+module Zero_alloc_obligations_invalidated = struct
+  type t = Zero_alloc.t option
+  type redundancy = Not_redundant | Redundant
+  let empty = None
+  let add (incoming : Zero_alloc.t) : t -> (redundancy * t) = function
+    | None -> (Not_redundant, Some incoming)
+    | Some already -> (Redundant, Some already)
+end
+
 type unique_use = Mode.Uniqueness.r * Mode.Linearity.l
 
 let print_unique_use ppf (u,l) =
