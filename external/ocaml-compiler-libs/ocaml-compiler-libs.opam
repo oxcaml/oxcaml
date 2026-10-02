@@ -10,7 +10,7 @@ build: [
 ]
 depends: [
   "ocaml" {>= "5.2.0"}
-  "dune" {>= "1.5.1"}
+  "dune" {>= "3.15"}
 ]
 synopsis: """OCaml compiler libraries repackaged"""
 description: """
