@@ -204,8 +204,10 @@ module TLS : sig
 end
 
 module Tick : sig @@ portable
-  (** [with_ ~interval_usec f] runs [f] with the tick thread ticking at least as
-      frequently as [interval_usec] *)
+  (** [with_ ~interval_usec f] runs [f] with the tick thread ticking at least
+      as frequently as [interval_usec]. The caller must assure we do not switch
+      domains for the duration of [f]. (This is true if the current execution
+      context is not preemptable.) *)
   val with_
     : ('r : value_or_null).
        interval_usec:int

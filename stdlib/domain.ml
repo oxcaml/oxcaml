@@ -554,7 +554,6 @@ module Tick = struct
       | Null -> set_tick_interval_usec 0
       | This interval -> set_tick_interval_usec interval)
 
-  (* [f] being [unyielding] implies it cannot switch domains. *)
   let with_ ~interval_usec (f @ unyielding) = exclave_
     let t = acquire ~interval_usec in
     match f () with
