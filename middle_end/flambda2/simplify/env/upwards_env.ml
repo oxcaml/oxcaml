@@ -119,7 +119,9 @@ let add_non_inlinable_continuation are_rebuilding_terms t cont ~is_cold ~params
     | Known (handler, ~is_exn_handler, ~free_names_without_params)
       when not is_cold ->
       (* CR-someday bclement: support deduplication of cold handlers, but don't
-         merge cold and hot handlers. *)
+         merge cold and hot handlers. At the moment, we can deduplicate a cold
+         handler into a hot handler in scope, but not conversely, which would be
+         bad without proper tracking of temperature in shortcuts. *)
       ( add_unique_continuation_handler are_rebuilding_terms t cont ~params
           ~handler ~is_exn_handler ~free_names_without_params,
         Or_unknown.Known handler )
