@@ -277,6 +277,11 @@ Caml_inline bool frame_has_debug(frame_descr *d) {
 
 void caml_init_frame_descriptors(void);
 
+/* The per-domain lookup cache (Caml_state->frame_descr_cache), allocated when a
+   domain's state is created. May return NULL. */
+struct caml_frame_descr_cache;
+struct caml_frame_descr_cache *caml_frame_descr_cache_create(void);
+
 void caml_register_frametables(void **tables, int ntables);
 void caml_register_frametable(void *table);
 
@@ -296,11 +301,14 @@ void caml_unregister_frametable(void *table);
 
 /* a linked list of frametables */
 typedef struct caml_frametable_list {
+  /* Count-prefixed table, or first descriptor of a range */
   intnat* frametable;
+  /* One past the last descriptor of a range; NULL if count-prefixed */
+  const unsigned char *end;
   struct caml_frametable_list *next;
 } caml_frametable_list;
 
-/* a hashtable of frame descriptors */
+/* the frame-descriptor lookup structures (see frame_descriptors.c) */
 typedef struct caml_frame_descrs caml_frame_descrs;
 
 caml_frame_descrs* caml_get_frame_descrs(void);

@@ -59,6 +59,7 @@ typedef cpuset_t cpu_set_t;
 #include "caml/camlatomic.h"
 #include "caml/debugger.h"
 #include "caml/domain.h"
+#include "caml/frame_descriptors.h"
 #include "caml/domain_state.h"
 #include "caml/runtime_events.h"
 #include "caml/fail.h"
@@ -702,6 +703,12 @@ static void domain_create(uintnat initial_minor_heap_wsize,
     domain_state->stack_caches = caml_alloc_stack_caches();
     if(domain_state->stack_caches == NULL)
       goto fail_stack_caches;
+
+#ifdef NATIVE_CODE
+    /* Also per domain index and never freed; NULL is allowed (lookups are then
+       uncached). */
+    domain_state->frame_descr_cache = caml_frame_descr_cache_create();
+#endif
 
     d->state = domain_state;
     domain_state->id = d->id;
