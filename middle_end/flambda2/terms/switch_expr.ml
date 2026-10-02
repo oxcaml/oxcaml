@@ -62,7 +62,6 @@ let fprintf = Format.fprintf
 let print_probability ~uniform ppf (probability : Likelihood.classification) =
   match probability with
   | Cold -> Format.fprintf ppf "[cold]"
-  | Hot -> Format.fprintf ppf "[hot]"
   | Weight p -> if not uniform then Format.fprintf ppf "[p = %f]" p
 
 let print_arms ppf arms =
