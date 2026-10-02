@@ -72,7 +72,9 @@ val with_action_trace :
     have these counters: [time] (nanoseconds on the recording's selected
     clock), [calls] (the number of CPU-clock reads), [alloc], [top-heap]
     (the increase in top heap size), [absolute-top-heap] (the top heap size
-    at the end) (all in bytes), and any counters from [counter_f].
+    at the end) (all in bytes), and any counters from [counter_f]. Each
+    span's [path] argument lists the names of the spans enclosing it, from
+    the outermost (the one covering the call) down to the span itself.
     Pass [Unix.gettimeofday] as the clock; compiler-libs itself does not
     depend on [Unix]. *)
 
