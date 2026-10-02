@@ -568,6 +568,23 @@ module Flambda2 = struct
 
     let report_bin = ref false
 
+    let inline_2026 = ref false (* -flambda2-inline-2026 *)
+
+    let inline_2026_small_function_size = 30
+
+    (* The flags that -flambda2-inline-2026 sets; see [Oxcaml_args] for the
+       description. *)
+    let set_inline_2026 () =
+      inline_2026 := true;
+      code_size_model := V2;
+      speculative_inlining_track_lifted_constants := true;
+      speculative_inlining_budget := true;
+      speculative_inlining_criterion := Ratio;
+      speculative_inlining_credit_call_site := true;
+      I.parse
+        (string_of_int inline_2026_small_function_size)
+        "-flambda2-inline-2026" small_function_size
+
     let use_inlining_arguments_set ?round (arg : inlining_arguments) =
       let set_int = Clflags.set_int_arg round in
       let set_float = Clflags.set_float_arg round in

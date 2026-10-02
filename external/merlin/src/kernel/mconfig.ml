@@ -571,6 +571,7 @@ let ocaml_ignored_flags =
     "-no-flambda2-speculative-inlining-track-lifted-constants";
     "-no-flambda2-speculative-inlining-charge-uninlined-calls";
     "-no-flambda2-speculative-inlining-budget";
+    "-flambda2-inline-2026";
     "-flambda2-speculative-inlining-credit-call-site";
     "-no-flambda2-speculative-inlining-credit-call-site";
     "-no-flambda2-unbox-along-intra-function-control-flow";

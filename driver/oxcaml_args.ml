@@ -1229,6 +1229,17 @@ let mk_flambda2_speculative_inlining_budget_size_ratio f =
     \    budget (a value <= 0 means: the large function size divided by\n\
     \    the inlining threshold) (Flambda 2 only)" )
 
+let mk_flambda2_inline_2026 f =
+  ( "-flambda2-inline-2026",
+    Arg.Unit f,
+    Printf.sprintf
+      " Enable the 2026 inlining configuration: the v2 code size model,\n\
+      \    lifted-constant tracking, the speculative inlining budget, the\n\
+      \    ratio criterion with the call-site credit, and a small function\n\
+      \    size of %d; later flags override individual settings\n\
+      \    (Flambda 2 only)"
+      Flambda2.Inlining.inline_2026_small_function_size )
+
 let mk_flambda2_speculative_inlining_criterion f =
   ( "-flambda2-speculative-inlining-criterion",
     Arg.Symbol ([ "threshold"; "ratio" ], f),
@@ -1719,6 +1730,7 @@ module type Oxcaml_options = sig
   val flambda2_speculative_inlining_budget : unit -> unit
   val no_flambda2_speculative_inlining_budget : unit -> unit
   val flambda2_speculative_inlining_budget_size_ratio : float -> unit
+  val flambda2_inline_2026 : unit -> unit
   val flambda2_speculative_inlining_criterion : string -> unit
   val flambda2_speculative_inlining_ratio : float -> unit
   val flambda2_speculative_inlining_credit_call_site : unit -> unit
@@ -1984,6 +1996,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
         F.no_flambda2_speculative_inlining_budget;
       mk_flambda2_speculative_inlining_budget_size_ratio
         F.flambda2_speculative_inlining_budget_size_ratio;
+      mk_flambda2_inline_2026 F.flambda2_inline_2026;
       mk_flambda2_speculative_inlining_criterion
         F.flambda2_speculative_inlining_criterion;
       mk_flambda2_speculative_inlining_ratio
@@ -2616,6 +2629,8 @@ module Oxcaml_options_impl = struct
   let flambda2_speculative_inlining_budget_size_ratio ratio =
     Flambda2.Inlining.speculative_inlining_budget_size_ratio := ratio
 
+  let flambda2_inline_2026 () = Flambda2.Inlining.set_inline_2026 ()
+
   let flambda2_speculative_inlining_criterion criterion =
     Flambda2.Inlining.speculative_inlining_criterion :=
       match criterion with
@@ -3149,6 +3164,10 @@ module Extra_params = struct
             Location.print_warning Location.none ppf
               (Warnings.Bad_env_variable
                  ("OCAMLPARAM", Printf.sprintf "bad value %s for %s" v name)));
+        true
+    | "flambda2-inline-2026" ->
+        if Compenv.check_bool ppf name v then
+          Flambda2.Inlining.set_inline_2026 ();
         true
     | "flambda2-speculative-inlining-criterion" ->
         (match v with

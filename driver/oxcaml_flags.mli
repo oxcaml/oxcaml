@@ -409,6 +409,16 @@ module Flambda2 : sig
     val speculative_inlining_bonus_poly_compare : float ref
 
     val report_bin : bool ref
+
+    (** Whether [-flambda2-inline-2026] was given. *)
+    val inline_2026 : bool ref
+
+    val inline_2026_small_function_size : int
+
+    (** Enable the v2 code size model, lifted-constant tracking, the
+        speculative inlining budget, the ratio criterion with the call-site
+        credit, and a small function size of [inline_2026_small_function_size]. *)
+    val set_inline_2026 : unit -> unit
   end
 end
 
