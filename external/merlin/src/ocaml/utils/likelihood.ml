@@ -27,7 +27,7 @@
  ******************************************************************************)
 
 (* Likelihoods are represented in log space, with "cold" (probability 0) being
-   -infty and "hot" (probability 1) being +infty. *)
+   -infty. *)
 
 type t = { logit : float } [@@unboxed]
 
@@ -39,22 +39,17 @@ let cold = from_logit neg_infinity
 
 let is_cold { logit } = Float.equal logit neg_infinity
 
-let hot = from_logit infinity
-
-let is_hot { logit } = Float.equal logit infinity
-
 let default = from_logit 0.
 
 let from_weight weight = from_logit (log weight)
 
 type classification =
   | Cold
-  | Hot
   | Weight of float
 
 let classify { logit } =
-  if Float.is_infinite logit
-  then if Float.equal logit neg_infinity then Cold else Hot
+  if Float.equal logit neg_infinity
+  then Cold
   else Weight (exp logit)
 
 let rescale ~total:{ logit = sum_logit } { logit } =
