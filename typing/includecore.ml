@@ -100,6 +100,7 @@ let child_modes_with_modalities id ~modalities:(moda0, moda1) = function
 let check_modes env ~crossing ~static ~item ?typ = function
   | All -> Ok ()
   | Specific ((m0, c), m1) ->
+      let crossing = crossing () in
       let m0 =
         match c with
         | None -> m0 |> Mode.With_regionality.disallow_right
@@ -183,7 +184,7 @@ let value_descriptions_consistency _env vd1 vd2 =
   | (_, _) -> Tcoerce_none
 
 let moregeneral_lpoly ~self_check env pat_lpoly subj_lpoly ty1 subst ty2 =
-  let tc_args =
+  let tc_args, subst_ty2 =
     Ctype.moregeneral ~self_check env true pat_lpoly subj_lpoly ty1 subst ty2
   in
   (* We can set uninstantiated variables (given by [None]) to anything,
@@ -198,7 +199,7 @@ let moregeneral_lpoly ~self_check env pat_lpoly subj_lpoly ty1 subst ty2 =
           | _, None -> true
           | _, Some _ -> false)
         subj_lpoly tc_args
-  then None
+  then None, subst_ty2
   else
     (* Set uninstantiated variables to [void] *)
     let tc_args =
@@ -206,7 +207,7 @@ let moregeneral_lpoly ~self_check env pat_lpoly subj_lpoly ty1 subst ty2 =
         (Option.value ~default:Jkind.Sort.Const.void)
         tc_args
     in
-    Some { tc_params = subj_lpoly; tc_args }
+    Some { tc_params = subj_lpoly; tc_args }, subst_ty2
 
 let kindtemplate_coercion_instantiates { tc_args; tc_params = _ } =
   match tc_args with
@@ -248,7 +249,7 @@ let uid_is_from_current_unit uid =
 let value_descriptions_without_modes ~loc env name ~self_check
     (vd1 : Types.value_description)
     subst2 (vd2 : Types.value_description)
-    : module_coercion * static:bool =
+    : module_coercion * static:bool * subst_ty2:type_expr option =
   Builtin_attributes.check_alerts_inclusion
     ~def:vd1.val_loc
     ~use:vd2.val_loc
@@ -285,8 +286,8 @@ let value_descriptions_without_modes ~loc env name ~self_check
              Option.iter (Mode.Yielding.equate_exn yield) mode_y2;
              match moregeneral_lpoly ~self_check env
                  val_lpoly1 val_lpoly2 ty1 Subst.identity ty2 with
-             | None -> ()
-             | Some _ ->
+             | None, _ -> ()
+             | Some _, _ ->
               Misc.fatal_errorf
                 "Primitives cannot be layout-polymorphic,@ \
                 but a kind-template coercion is necessary@ \
@@ -298,7 +299,7 @@ let value_descriptions_without_modes ~loc env name ~self_check
           ) forkable
          ) locality;
          match primitive_descriptions p1 p2 with
-         | None -> Tcoerce_none, ~static:false
+         | None -> Tcoerce_none, ~static:false, ~subst_ty2:(Some vd2.val_type)
          | Some err -> raise (Dont_match (Primitive_mismatch err))
        end
      | _ ->
@@ -309,6 +310,7 @@ let value_descriptions_without_modes ~loc env name ~self_check
           try
             moregeneral_lpoly ~self_check env
               val_lpoly1 val_lpoly2 ty1 Subst.identity vd2.val_type
+            |> fst
             |> Option.value ~default:{ tc_params = []; tc_args = [] }
           with Ctype.Moregen err -> raise (Dont_match (Type err))
         in
@@ -336,36 +338,40 @@ let value_descriptions_without_modes ~loc env name ~self_check
           }
         in
         Tcoerce_primitive pc,
-        ~static:(kindtemplate_coercion_instantiates tc)
+        ~static:(kindtemplate_coercion_instantiates tc),
+        ~subst_ty2:(Some vd2.val_type)
      end
   | _ ->
      match moregeneral_lpoly ~self_check env
              val_lpoly1 val_lpoly2 vd1.val_type subst2 vd2.val_type with
      | exception Ctype.Moregen err -> raise (Dont_match (Type err))
-     | tc -> begin
+     | tc, subst_ty2 -> begin
        match vd2.val_kind with
          | Val_prim _ -> raise (Dont_match Not_a_primitive)
          | _ ->
           match tc with
           | Some tc ->
             Tcoerce_kindtemplate tc,
-            ~static:(kindtemplate_coercion_instantiates tc)
-          | None -> Tcoerce_none, ~static:false
+            ~static:(kindtemplate_coercion_instantiates tc),
+            ~subst_ty2
+          | None -> Tcoerce_none, ~static:false, ~subst_ty2
      end
 
 let value_descriptions ~loc env name ~mmodes ~self_check vd1 subst2 vd2 =
-  let cc, ~static =
+  let cc, ~static, ~subst_ty2 =
     value_descriptions_without_modes ~loc env name ~self_check vd1 subst2 vd2
   in
   let () =
-    (* CR zeisbach: [vd2] is no longer substituted eagerly, but the crossing
-       must be computed on a type whose paths make sense in [env]. Substituting
-       here preserves the previous behaviour at the cost of a copy, which
-       undoes the saving from the fast path in [Ctype.moregeneral]. A better
-       option would be for [Ctype.moregeneral] to return the substituted
-       subject when it takes the slow path, so that the copy is shared. *)
-    let crossing =
-      Ctype.crossing_of_ty env (Subst.type_expr subst2 vd2.val_type)
+    (* The crossing must be computed on a type whose paths make sense in
+       [env], so [vd2]'s type must be substituted. If moregen does a
+       substitution, we thread it through to avoid re-substituting. *)
+    let crossing () =
+      let ty2 =
+        match subst_ty2 with
+        | Some ty2 -> ty2
+        | None -> Subst.type_expr subst2 vd2.val_type
+      in
+      Ctype.crossing_of_ty env ty2
     in
     let modalities = vd1.val_modalities, vd2.val_modalities in
     let modes =
@@ -382,7 +388,7 @@ let value_descriptions ~loc env name ~mmodes ~self_check vd1 subst2 vd2 =
   cc
 
 let check_modes env ?(crossing = Crossing.max) ~item ?typ =
-  check_modes env ~crossing ~static:false ~item ?typ
+  check_modes env ~crossing:(fun () -> crossing) ~static:false ~item ?typ
 
 (* Inclusion between manifest types (particularly for private row types) *)
 

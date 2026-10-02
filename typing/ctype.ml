@@ -6559,8 +6559,6 @@ let rec expand_path_fast env p =
     | _ -> Env.normalize_type_path None env p, Some (params, body)
 
 let expand_paths_fast env p1 p2 =
-  (* CR zeisbach: STYLE: annoying duplication but alternatives that return
-     the correctly matched [expN]s all seemed worse... *)
   if path_scope p1 >= path_scope p2 then begin
     let p1, exp1 = expand_path_fast env p1 in
     if Path.same p1 p2 then p1, exp1, p2, None
@@ -6575,7 +6573,6 @@ let expand_paths_fast env p1 p2 =
       p1, exp1, p2, exp2
   end
 
-(* CR zeisbach: still room for more fast mode paths... *)
 let moregen_mode_fast v m1 m2 =
   let ok =
     match v with
@@ -6590,7 +6587,6 @@ let moregen_mode_fast v m1 m2 =
    needs no mutation; raises [Complicated_moregen] otherwise. *)
 let mgen_fast_estimate_layout _env _subst ty =
   match get_desc ty with
-  (* CR zeisbach: maybe we could improve the cases we cover here... *)
   | Tvar { jkind } ->
     (* Expanding a kind abbreviation needs the environment; bail instead. *)
     begin match jkind.jkind.base with
@@ -7087,11 +7083,14 @@ let moregeneral ~self_check env inst_nongen
     | [], [] -> moregeneral_fast env pat_sch subst subj_sch
     | _, _ -> false
   in
-  if fast then []
+  if fast then [], None
   else
     let subj_sch = Subst.type_expr subst subj_sch in
-    moregeneral_slow ~self_check env inst_nongen
-      pat_sch_sorts subj_sch_sorts pat_sch subj_sch
+    let tc_args =
+      moregeneral_slow ~self_check env inst_nongen
+        pat_sch_sorts subj_sch_sorts pat_sch subj_sch
+    in
+    tc_args, Some subj_sch
 
 let is_moregeneral env inst_nongen pat_sch subj_sch =
   match
