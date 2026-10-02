@@ -2066,8 +2066,8 @@ let close_switch acc env ~condition_dbg scrutinee (sw : IR.switch) :
               Target_ocaml_int.Map.fold
                 (fun case action (acc, arms) ->
                   let acc, arm = action acc in
-                  (* CR bclement: use likelihood information to compute
-                     logits *)
+                  (* CR bclement: use likelihood annotations from lambda to
+                     compute logits *)
                   ( acc,
                     Target_ocaml_int.Map.add case
                       (Switch_expr.create_arm arm)
