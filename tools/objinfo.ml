@@ -119,14 +119,8 @@ let print_main_module_block_format mbf =
 let print_required_compunit id =
   printf "\t%a\n" Compilation_unit.output id
 
-let print_arg_descr arg_descr =
-  let ({ arg_param; arg_block_idx = _ } : Lambda.arg_descr) = arg_descr in
-  printf "Parameter implemented: %a\n"
-    Global_module.Parameter_name.output arg_param
-
 let print_cmo_infos cu =
   printf "Unit name: %a\n" Compilation_unit.output cu.cu_name;
-  Option.iter print_arg_descr cu.cu_arg_descr;
   print_string "Interfaces imported:\n";
   Array.iter print_intf_import cu.cu_imports;
   print_main_module_block_format cu.cu_format;
@@ -171,9 +165,9 @@ let print_cmi_infos name crcs kind params global_name_bindings =
     List.iter print_parameter_name_line params;
     begin
       match kind with
-      | Normal { cmi_arg_for = Some arg_for; _ } ->
+      | Normal { cmi_arg_for = Some { Types.arg_param; _ }; _ } ->
         printf "Argument for parameter:\n";
-        print_parameter_name_line arg_for
+        print_parameter_name_line arg_param
       | Normal _ | Parameter ->
         ()
     end;
@@ -295,13 +289,12 @@ let print_cms_infos cms =
   printf "Source file: %s\n"
     (match cms.cms_sourcefile with None -> "(none)" | Some f -> f)
 
-let print_general_infos print_name name crc defines arg_descr mbf
+let print_general_infos print_name name crc defines mbf
     iter_cmi iter_cmx iter_qcmi iter_qcmx =
   printf "Name: %a\n" print_name name;
   printf "CRC of implementation: %s\n" (string_of_crc crc);
   printf "Globals defined:\n";
   List.iter print_name_line defines;
-  Option.iter print_arg_descr arg_descr;
   printf "Interfaces imported:\n";
   iter_cmi print_intf_import;
   printf "Implementations imported:\n";
@@ -363,7 +356,7 @@ let print_generic_fns gfns =
 
 let print_cmx_infos (uir, sections, crc) =
   print_general_infos Compilation_unit.output uir.uir_unit crc uir.uir_defines
-    uir.uir_arg_descr (Some uir.uir_format)
+    (Some uir.uir_format)
     (fun f -> Array.iter f uir.uir_imports_cmi)
     (fun f -> Array.iter f uir.uir_imports_cmx)
     (fun f -> Array.iter f uir.uir_quoted_cmi)
@@ -403,7 +396,7 @@ let print_cmxa_infos (lib : Cmx_format.library_infos) =
   lib.lib_units
   |> List.iter (fun u ->
         print_general_infos Compilation_unit.output u.li_name u.li_crc
-          u.li_defines None None
+          u.li_defines None
           (fun f ->
             B.iter (fun i -> f lib.lib_imports_cmi.(i)) u.li_imports_cmi)
           (fun f ->
@@ -419,7 +412,6 @@ let print_cmxs_infos header =
          Compilation_unit.output ui.dynu_name
          ui.dynu_crc
          ui.dynu_defines
-         None
          None
          (fun f -> Array.iter f ui.dynu_imports_cmi)
          (fun f -> Array.iter f ui.dynu_imports_cmx)

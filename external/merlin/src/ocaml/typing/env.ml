@@ -967,7 +967,7 @@ type error =
   | Unsupported_inside_quotation of Location.t * no_open_quotations_context
   | Cmi_not_found of
       { modname : Compilation_unit.Name.t;
-        chain : Compilation_unit.Name.t list;
+        chain : Global_module.t list;
       }
 
 exception Error of error
@@ -1355,8 +1355,15 @@ let is_parameter_unit modname =
 let is_imported_parameter modname =
   Persistent_env.is_imported_parameter !persistent_env modname
 
-let implemented_parameter modname =
-  Persistent_env.implemented_parameter !persistent_env modname
+let find_import_with_arg_for ~chain modname =
+  try Persistent_env.find_import !persistent_env modname
+  with Not_found -> error (Cmi_not_found { modname; chain })
+
+let implemented_parameter ~chain modname =
+  let _impl, _params, arg_for, _sign =
+    find_import_with_arg_for ~chain modname
+  in
+  arg_for
 
 let reset_declaration_caches () =
   Stamped_hashtable.clear value_declarations;
@@ -3468,8 +3475,8 @@ let read_signature modname cmi =
   (Mode.With_regionality.zap_to_floor_exn mode).staticity
 
 let find_import ~chain modname =
-  try Persistent_env.find_import !persistent_env modname
-  with Not_found -> error (Cmi_not_found { modname; chain })
+  let impl, params, _arg_for, sign = find_import_with_arg_for ~chain modname in
+  impl, params, sign
 
 let register_parameter modname =
   Persistent_env.register_parameter !persistent_env modname
@@ -5778,7 +5785,7 @@ let report_error_doc = function
         List.iter
           (fun loader ->
             Format_doc.fprintf ppf ",@ referenced from %a"
-              (Style.as_inline_code Compilation_unit.Name.print) loader)
+              (Style.as_inline_code Global_module.print) loader)
           chain
       in
       Location.errorf ~loc:Location.none

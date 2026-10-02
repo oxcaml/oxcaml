@@ -73,7 +73,9 @@ val typecheck_intf :
     the typedtree of the associated signature.
 *)
 
-val emit_signature : info -> Misc.alerts -> Typedtree.signature -> unit
+val emit_signature :
+  info -> Misc.alerts -> Typedtree.signature ->
+  cmi_arg_for:Types.arg_for option -> unit
 (** [emit_signature info parsetree typedtree] emits the [.cmi] file
     containing the given signature.
 *)

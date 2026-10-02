@@ -63,6 +63,13 @@ val transl_signature:
    CR-soon zqian: all persistent modules should always be [Static]. *)
 val staticity_of_modalities:
   Typedtree.modalities -> Mode.Staticity.Const.t
+
+(* [cmi_arg_for sg arg_param] is the [Types.arg_for] to record in the cmi of a
+   unit with signature [sg] compiled with [-as-argument-for arg_param]. *)
+val cmi_arg_for:
+  Types.signature -> Global_module.Parameter_name.t option ->
+  Types.arg_for option
+
 val check_nongen_signature:
         Env.t -> Types.signature -> unit
         (*
