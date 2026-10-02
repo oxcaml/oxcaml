@@ -15,7 +15,7 @@ external box : ('a : any). ('a [@local_opt]) -> ('a box [@local_opt])
    layout as a record with a single field of type [t]. When [t] is an unboxed
    record, the block has the same layout as the boxed record. *)
 
-(* comparison using [Obj] to avoid (busted) polymorphic compare *)
+(* comparison using [Obj] to as polymorphic compare raises for mixed blocks *)
 
 let native () = match Sys.backend_type with Native -> true | _ -> false
 
