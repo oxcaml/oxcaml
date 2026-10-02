@@ -80,6 +80,10 @@ let rebuild_apply_cont apply_cont ~args ~rewrite_id uacc ~after_rebuild =
     | exception Not_found -> cont, apply_cont
     | specialized -> specialized, AC.with_continuation apply_cont specialized
   in
+  (* Get temperature information from the original apply cont before applying
+     shortcuts, so that we don't lose it when following a shortcut from a cold
+     to a hot continuation. *)
+  let is_cold = UE.is_cold_continuation (UA.uenv uacc) cont in
   let apply_cont = AC.update_args apply_cont ~args in
   let rewrite = UE.find_apply_cont_rewrite uenv cont in
   let create_apply_cont ~apply_cont_to_expr =
@@ -137,6 +141,7 @@ let rebuild_apply_cont apply_cont ~args ~rewrite_id uacc ~after_rebuild =
          (branches can be moved by the backend, their runtime depends on the
          branch predictor...). Underestimating the number of removed branches is
          fine. *)
+      let handler = if is_cold then RE.mark_as_cold handler else handler in
       inline_linearly_used_continuation uacc ~params ~handler
         ~free_names_of_handler ~cost_metrics_of_handler apply_cont
     | Invalid { arity = _ } ->
@@ -148,8 +153,19 @@ let rebuild_apply_cont apply_cont ~args ~rewrite_id uacc ~after_rebuild =
         Name_occurrences.empty )
     | Non_inlinable_zero_arity _ | Non_inlinable_non_zero_arity _
     | Toplevel_or_function_return_or_exn_continuation _ ->
+      (* Update temperature from the actual continuation after taking shortcuts,
+         as we could have a shortcut from a hot to a cold continuation.
+
+         CR-someday bclement: we can sometimes lose temperature information if
+         we merge a [k1] (hot) -> [k2] (cold) -> [k3] (hot) shortcut chain: this
+         should be replaced by a cold (rebuilt) apply_cont to [k3], but we'll
+         currently create a hot one because we don't store temperature
+         information in the shortcuts themselves. This seems rare enough not to
+         worry about too much. *)
       let is_cold =
-        UE.is_cold_continuation uenv (Apply_cont.continuation apply_cont)
+        is_cold
+        || UE.is_cold_continuation (UA.uenv uacc)
+             (Apply_cont.continuation apply_cont)
       in
       ( RE.create_apply_cont ~is_cold apply_cont,
         Cost_metrics.from_size (Code_size.apply_cont apply_cont),
