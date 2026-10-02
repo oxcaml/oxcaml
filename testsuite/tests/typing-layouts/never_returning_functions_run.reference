@@ -1,0 +1,98 @@
+never inlined, float#: 1.5
+never inlined, float#: Fail a
+never inlined, int64_u: 2
+never inlined, int64_u: Fail b
+never inlined, product: 3, 3.5
+never inlined, product: Fail c
+never inlined, value: four
+never inlined, value: Fail d
+inlined, float#: 5.5
+inlined, float#: Fail e
+inlined, product: 6, 6.5
+inlined, product: Fail f
+default, int64_u: 7
+default, int64_u: Fail g
+opaque, float#: 8.5
+opaque, float#: Fail h
+assert false, product: 9, 9.5
+assert false, product: Assert_failure
+match, int64_u: 10
+match, int64_u: Fail i
+try, float#: 11.5
+try, float#: Fail j
+tail call, float#: 12.5
+tail call, float#: Fail k
+tail call, product: 13, 13.5
+tail call, product: Fail l
+indirect, float#: 14.5
+indirect, float#: Fail m
+indirect, product: 15, 15.5
+indirect, product: Fail n
+indirect, primitive: 14.5
+indirect, primitive: Fail m
+method, float#: 16.5
+method, float#: Fail o
+partial application, float#: 17.5
+partial application, float#: Fail p1
+partial application, product: 18, 18.5
+partial application, product: Fail q2
+over-application, int64_u: 19
+over-application, int64_u: Fail r
+partial application in a closure, product: 28, 28.5
+partial application in a closure, product: Fail ab3
+optional argument omitted, float#: 29.5
+optional argument omitted, float#: Fail default ac
+optional argument given, product: 30, 30.5
+optional argument given, product: Fail given ad
+optional argument, indirect, float#: 14.5
+optional argument, indirect, float#: Fail default m
+refined result, float#: 31.5
+refined result, float#: Fail match failure
+refined result, value: 32
+refined result, value: Fail af
+optional argument, opaque, float#: 33.5
+optional argument, opaque, float#: Fail default ag
+optional argument, opaque, not inlined, value: thirty-four
+optional argument, opaque, not inlined, value: Fail default ah
+several call sites, float#: 20.5
+several call sites, float#: Fail s
+several layouts, product: 21, 21.5
+several layouts, product: Fail u
+immediately applied, float#: 22.5
+immediately applied, float#: Fail v
+immediately applied, product: 23, 23.5
+immediately applied, product: Fail w
+inside try, float#: 24.5
+inside try, float#: Fail x
+caught and raised again, int64_u: 25
+caught and raised again, int64_u: Fail yy
+local allocation in callee, float#: 26.5
+local allocation in callee, float#: Fail z
+local allocation in caller, product: 27, 27.5
+local allocation in caller, product: Fail aa
+concrete primitive, float#: 35.5
+concrete primitive, float#: Fail ai
+concrete primitive, int32_u: 36
+concrete primitive, int32_u: Fail aj
+concrete primitive, int64_u: 37
+concrete primitive, int64_u: Fail ak
+concrete primitive, nativeint_u: 38
+concrete primitive, nativeint_u: Fail al
+concrete primitive, float32_u: 39.5
+concrete primitive, float32_u: Fail am
+concrete primitive, product: 40, 40.5
+concrete primitive, product: Fail an
+concrete primitive, void: void
+concrete primitive, void: Fail ao
+concrete primitive, tail call: 41, 41.5
+concrete primitive, tail call: Fail at
+concrete reraise, product: 42, 42.5
+concrete reraise, product: Fail ap
+concrete raise_notrace, float#: 43.5
+concrete raise_notrace, float#: Fail aq
+concrete primitive, [@unboxed]: 44.5
+concrete primitive, [@unboxed]: Fail ar
+concrete primitive in a function, float#: 45.5
+concrete primitive in a function, float#: Fail as
+concrete primitive, indirect, float#: 14.5
+concrete primitive, indirect, float#: Fail m
