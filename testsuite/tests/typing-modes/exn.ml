@@ -60,7 +60,7 @@ val foo : unit -> unit = <fun>
 let (foo @ portable) g =
     raise (Nonportable g)
 [%%expect{|
-val foo : (unit -> unit) @ portable -> 'a = <fun>
+val foo : ('a : any). (unit -> unit) @ portable -> 'a = <fun>
 |}]
 
 let (foo @ portable) (g @ nonportable) =
@@ -78,13 +78,13 @@ Error: This value is "nonportable"
 let (foo @ portable) () =
     raise (Portable ())
 [%%expect{|
-val foo : unit -> 'a = <fun>
+val foo : ('a : any). unit -> 'a = <fun>
 |}]
 
 let (foo @ portable) () =
     raise (Portable' (fun () -> ()))
 [%%expect{|
-val foo : unit -> 'a = <fun>
+val foo : ('a : any). unit -> 'a = <fun>
 |}]
 
 (* rebinding counts as usage *)
@@ -120,7 +120,7 @@ let (cross @ portable) () =
     end in
     raise (M.Crossing' [3; 4; 5])
 [%%expect{|
-val cross : unit -> 'a = <fun>
+val cross : ('a : any). unit -> 'a = <fun>
 |}, Principal{|
 Line 3, characters 30-38:
 3 |         exception Crossing' = Crossing
@@ -195,13 +195,13 @@ Error: This value is "contended"
 let (foo @ portable) () =
     raise (Uncontended ())
 [%%expect{|
-val foo : unit -> 'a = <fun>
+val foo : ('a : any). unit -> 'a = <fun>
 |}]
 
 let (foo @ portable) () =
     raise (Uncontended' (ref 42))
 [%%expect{|
-val foo : unit -> 'a = <fun>
+val foo : ('a : any). unit -> 'a = <fun>
 |}]
 
 let (foo @ portable) () =
@@ -238,7 +238,7 @@ let (bar @ portable) () =
     end in
     raise (M.Uncontended'' ())
 [%%expect{|
-val bar : unit -> 'a = <fun>
+val bar : ('a : any). unit -> 'a = <fun>
 |}, Principal{|
 Line 3, characters 34-45:
 3 |         exception Uncontended'' = Uncontended
