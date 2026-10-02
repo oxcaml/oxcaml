@@ -32,7 +32,11 @@ let make_switch n selector caselist =
   let index = Array.make n 0 in
   let casev = Array.of_list caselist in
   let dbg = Debuginfo.none in
-  let actv = Array.make (Array.length casev) (Cexit(Cmm.Lbl Static_label.fail,[],[]), dbg) in
+  let actv =
+    Array.make
+      (Array.length casev)
+      (Cexit(Cmm.Lbl Static_label.fail,[],[]), dbg, ~likelihood:Likelihood.normal)
+  in
   for i = 0 to Array.length casev - 1 do
     let (posl, e) = casev.(i) in
     List.iter (fun pos -> index.(pos) <- i) posl;
