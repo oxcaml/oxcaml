@@ -202,6 +202,10 @@ and _ poly_param =
   (** [Method (m, t)] is used when applying a polymorphic method [m]
       with type scheme [t] *)
 
+type function_return_sort =
+  | Function_returns of Jkind.sort
+  | Function_never_returns
+
 type pattern = value general_pattern
 and 'k general_pattern = 'k pattern_desc pattern_data
 
@@ -516,7 +520,7 @@ and expression_desc =
         (* Whether the function may return a value allocated in its caller's
            region: [local] for ['a -> 'b @ local], [global] for ['a -> 'b].
            Becomes [Lambda.return_mode] via [Translmode.transl_ret_mode]. *)
-        ret_sort : Jkind.sort;
+        ret_sort : function_return_sort;
         locality_mode : locality_mode_r;
         (* Mode at which the closure is allocated *)
         yielding : Mode.Yielding.l;
