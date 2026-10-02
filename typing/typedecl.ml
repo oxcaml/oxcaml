@@ -4598,6 +4598,26 @@ let make_native_repr
   | Native_repr_attr_present Unsafe_unextended, Sort (Univar _ | Genvar _) ->
     Misc.fatal_error "typedecl: Univar/Genvar in concrete type"
 
+(* The result of a primitive that never returns need not be representable,
+   unless a representation is asked for explicitly. *)
+let make_native_repr_of_result
+      env core_type ty ~global_repr ~is_layout_poly ~prim_name =
+  let never_returns =
+    match prim_name with
+    | None -> false
+    | Some name -> Primitive.prim_name_never_returns name
+  in
+  match
+    get_native_repr_attribute core_type.ptyp_attributes ~global_repr
+  with
+  | Native_repr_attr_absent when never_returns ->
+    error_if_has_deep_native_repr_attributes core_type;
+    Repr_never_returns
+  | Native_repr_attr_absent | Native_repr_attr_present _ ->
+    make_native_repr
+      env core_type ty ~global_repr
+      ~is_layout_poly ~why:External_result ~is_return:true
+
 let prim_const_mode m =
   match Mode.Locality.Guts.check_const m with
   | Some Global -> Prim_global
@@ -4605,7 +4625,7 @@ let prim_const_mode m =
   | None -> assert false
 
 let rec parse_native_repr_attributes env core_type ty rmode
-        ~global_repr ~is_layout_poly =
+        ~global_repr ~is_layout_poly ~prim_name =
   match core_type.ptyp_desc, get_desc ty,
     get_native_repr_attribute core_type.ptyp_attributes ~global_repr:None
   with
@@ -4627,11 +4647,12 @@ let rec parse_native_repr_attributes env core_type ty rmode
     let repr_args, repr_res =
       parse_native_repr_attributes env ct2 t2
         (prim_const_mode (Mode.With_locality.proj_comonadic Areality mret))
-        ~global_repr ~is_layout_poly
+        ~global_repr ~is_layout_poly ~prim_name
     in
     ((mode, repr_arg) :: repr_args, repr_res)
   | (Ptyp_poly (_, t) | Ptyp_alias (t, _, _)), _, _ ->
      parse_native_repr_attributes env t ty rmode ~global_repr ~is_layout_poly
+       ~prim_name
   | _ ->
      let rmode =
        if Builtin_attributes.has_local_opt core_type.ptyp_attributes
@@ -4639,9 +4660,8 @@ let rec parse_native_repr_attributes env core_type ty rmode
        else rmode
      in
      let repr_res =
-       make_native_repr
-        env core_type ty ~global_repr
-        ~is_layout_poly ~why:External_result ~is_return:true
+       make_native_repr_of_result
+        env core_type ty ~global_repr ~is_layout_poly ~prim_name
      in
      ([], (rmode, repr_res))
 
@@ -4903,9 +4923,15 @@ let transl_value_decl env loc ~modal ~why valdecl =
       if is_layout_poly &&
          not (has_ty_var_with_layout_any env ty) then
         Error.log_and_raise valdecl.pval_type.ptyp_loc Useless_layout_poly;
+      let prim_name =
+        match valdecl.pval_prim with
+        | name :: _ -> Some name
+        | [] -> None
+      in
       let native_repr_args, native_repr_res =
         parse_native_repr_attributes
           env valdecl.pval_type ty Prim_global ~global_repr ~is_layout_poly
+          ~prim_name
       in
       let prim =
         Primitive.parse_declaration valdecl

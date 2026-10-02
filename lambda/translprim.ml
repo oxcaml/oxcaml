@@ -231,6 +231,7 @@ let extern_repr_of_native_repr:
     (* The product sort is unarized into separate C arguments by
        [unarize_extern_repr] in [closure_conversion.ml]. *)
     Same_as_ocaml_repr sort
+  | Repr_never_returns, _ -> Repr_never_returns
 
 let sort_of_native_repr ~poly_sort repr =
   match extern_repr_of_native_repr ~poly_sort repr with
@@ -238,6 +239,8 @@ let sort_of_native_repr ~poly_sort repr =
   | (Unboxed_float _ | Unboxed_or_untagged_integer _ |
      Unboxed_vector _ | Unboxed_mask) ->
     Jkind.Sort.Const.scannable
+  | Repr_never_returns ->
+    Misc.fatal_error "A primitive that never returns has no result sort"
 
 let to_lambda_prim prim ~poly_sort =
   let native_repr_args =
@@ -2630,6 +2633,7 @@ let transl_primitive
   let error_loc = to_location loc in
   let rec make_params ty repr_args repr_res =
     match repr_args, repr_res with
+    | [], (_, Primitive.Repr_never_returns) -> [], Lambda.layout_bottom
     | [], (_, res_repr) ->
       let res_sort = sort_of_native_repr res_repr ~poly_sort in
       [], Typeopt.layout env error_loc res_sort ty
