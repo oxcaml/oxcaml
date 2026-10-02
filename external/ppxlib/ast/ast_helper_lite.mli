@@ -418,7 +418,6 @@ module Mod : sig
 
   val unpack : ?loc:loc -> ?attrs:attrs -> expression -> module_expr
   val extension : ?loc:loc -> ?attrs:attrs -> extension -> module_expr
-  val hole : ?loc:loc -> ?attrs:attrs -> unit -> module_expr
 end
 
 (** Signature items *)
