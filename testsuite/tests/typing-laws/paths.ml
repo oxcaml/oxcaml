@@ -86,12 +86,10 @@ Error: Signature mismatch:
        The clauses of the laws differ.
 |}]
 
-(* Once a module is in the environment, the clauses of its laws refer to
-   its values through its path: the law of [M.N], looked up through [M],
-   refers to [M.f], whereas the law of a signature refers to [f] by name.
-   Nothing relates the two, so the laws of a submodule that refer to the
-   values of the enclosing module cannot be compared, not even with the
-   signature inferred for the module. *)
+(* Strengthening the signature of [M] with its path records that its
+   value [f] is [M.f], as it gives its types manifests: the law of [M.N],
+   which refers to [f], matches the law of [T]'s [N] when [M] is checked
+   against [T]. *)
 
 module M = struct
   let f x = x
@@ -100,28 +98,8 @@ module M = struct
   end
 end
 [%%expect {|
-Line 1:
-Error: In module "M":
-       Modules do not match:
-         sig val f : 'a -> 'a module N = M.N end
-       is not included in
-         sig
-           val f : 'a -> 'a
-           module N : sig law? l (x : int) : (f x) = x end
-         end
-       In module "M.N":
-       Modules do not match:
-         sig law? l (x : int) : (M.f x) = x end
-       is not included in
-         sig law? l (x : int) : (f x) = x end
-       In module "M.N":
-       Laws do not match:
-         law? l (x : int) : (M.f x) = x
-       is not included in
-         law? l (x : int) : (f x) = x
-       The first refers to "M.f" where the second refers to "f". The laws of a
-       module referred to by a path cannot be compared with the laws of a
-       signature.
+module M :
+  sig val f : 'a -> 'a module N : sig law? l (x : int) : (f x) = x end end
 |}]
 
 (* A structure is not looked up through a path: its laws, including those
@@ -139,15 +117,18 @@ module M7 : T = struct
     law? l (x : int) : f x = x
   end
 end
+module M5 = (M : T)
+module M6 : T = M
 [%%expect {|
 module type T =
   sig val f : int -> int module N : sig law? l (x : int) : (f x) = x end end
 module M7 : T
+module M5 : T
+module M6 : T
 |}]
 
-(* The laws of a module that is compared as a whole refer to its values by
-   name, as the laws of the signature do: a module path given as a functor
-   argument matches, with or without a constraint. *)
+(* The same holds for a module path given as a functor argument, with or
+   without a constraint. *)
 
 module type Idem = sig
   val f : int -> int
@@ -276,10 +257,9 @@ module With_module :
 module type Without_module = sig end
 |}]
 
-(* A law of the structure that refers to the value [f] of another module
-   is not the law of the signature, which refers to the [f] of the
-   structure. It is rejected as the laws of a module referred to by a path
-   are: only the name tells the two apart. *)
+(* A law of the structure that refers to the value of another module is
+   not the law of the signature, which refers to the value of the
+   structure itself. *)
 
 module Other = struct let f x = x end
 module Not_own = struct
@@ -309,13 +289,11 @@ Error: Signature mismatch:
          law? idem (x : int) : (Other.f (Other.f x)) = (Other.f x)
        is not included in
          law? idem (x : int) : (f (f x)) = (f x)
-       The first refers to "Other.f" where the second refers to "f". The laws of
-       a module referred to by a path cannot be compared with the laws of a
-       signature.
+       The clauses of the laws differ.
 |}]
 
-(* The laws of a module bound to another module refer to its values by
-   name too: the result of a functor whose body is a module path
+(* The equations are part of the signature, so they survive its binding
+   to another module: the result of a functor whose body is a module path
    (generative or applicative), or a module ascribed to the module type of
    a structure including the module. *)
 
@@ -362,10 +340,10 @@ module Through_type_of : Type_of_included
 module Through_type_of' : Idem
 |}]
 
-(* Nothing identifies the values of such modules with those of the
-   original: [Generated.f] is not [X_idem.f], nor is [Q.f] [P.f] for an
-   alias [Q] of the parameter [P]. A value copied into a structure ([Y.f])
-   is a different value. *)
+(* The equations also identify paths through such modules with the paths
+   through the original: [Generated.f] is [X_idem.f], and [Q.f] is [P.f]
+   for an alias [Q] of the parameter. A value copied into a structure
+   ([Y.f]) is a different value. *)
 
 module Through_result : sig
   law? l (x : int) : Generated.f x = x
@@ -373,20 +351,7 @@ end = struct
   law? l (x : int) : X_idem.f x = x
 end
 [%%expect {|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   law? l (x : int) : X_idem.f x = x
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig law? l (x : int) : (X_idem.f x) = x end
-       is not included in
-         sig law? l (x : int) : (Generated.f x) = x end
-       Laws do not match:
-         law? l (x : int) : (X_idem.f x) = x
-       is not included in
-         law? l (x : int) : (Generated.f x) = x
-       The clauses of the laws differ.
+module Through_result : sig law? l (x : int) : (Generated.f x) = x end
 |}]
 
 module Through_parameter (P : Idem) : sig
@@ -396,28 +361,8 @@ end = struct
   law? q (x : int) : Q.f x = x
 end
 [%%expect {|
-Lines 3-6, characters 6-3:
-3 | ......struct
-4 |   module Q = P
-5 |   law? q (x : int) : Q.f x = x
-6 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig
-           module Q :
-             sig
-               val f : int -> int
-               law? idem (x : int) : (f (f x)) = (f x)
-             end
-           law? q (x : int) : (Q.f x) = x
-         end
-       is not included in
-         sig law? q (x : int) : (P.f x) = x end
-       Laws do not match:
-         law? q (x : int) : (Q.f x) = x
-       is not included in
-         law? q (x : int) : (P.f x) = x
-       The clauses of the laws differ.
+module Through_parameter :
+  functor (P : Idem) -> sig law? q (x : int) : (P.f x) = x end
 |}]
 
 module Not_through_structure : sig

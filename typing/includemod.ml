@@ -671,7 +671,7 @@ let rec shallow_modtypes env subst mty1 mty2 =
       not (Env.is_functor_arg p2 env) && equal_module_paths env p1 subst p2
   | Mty_ident p1, Mty_ident p2 ->
       equal_modtype_paths env p1 subst p2
-  | Mty_strengthen (mty1,p1,a1), Mty_strengthen (mty2,p2,a2)
+  | Mty_strengthen (mty1,p1,a1,_), Mty_strengthen (mty2,p2,a2,_)
         when sub_aliasable a1 a2
               (* Destructive substitution can introduce this, similar to the
                  Mty_alias check *)
@@ -679,7 +679,7 @@ let rec shallow_modtypes env subst mty1 mty2 =
           && shallow_modtypes env subst mty1 mty2
           && shallow_module_paths env subst p1 mty2 p2 ->
       true
-  | Mty_strengthen (mty1,_,_), mty2 ->
+  | Mty_strengthen (mty1,_,_,_), mty2 ->
       (* S with M <= S *)
       shallow_modtypes env subst mty1 mty2
   | (Mty_alias _ | Mty_ident _ | Mty_signature _ | Mty_functor _), _  -> false
@@ -689,7 +689,7 @@ and shallow_module_paths env subst p1 mty2 p2 =
   (* This shortcut is a significant win in some cases. Note we don't apply it
      recursively as doing seems to be a net loss. *)
   match (Env.find_module_lazy p1 env).md_type with
-    | Mty_strengthen (mty1,p1,_) ->
+    | Mty_strengthen (mty1,p1,_,_) ->
         shallow_modtypes env subst mty1 mty2
           && equal_module_paths env p1 subst p2
     | Mty_alias _ | Mty_ident _ | Mty_signature _ | Mty_functor _
@@ -867,7 +867,7 @@ and try_modtypes ~core ~direction ~loc env subst ~modes
     | None ->
         (* Report error *)
         match mty1, mty2 with
-        | _, Mty_strengthen (_,p,Aliasable) when Env.is_functor_arg p env ->
+        | _, Mty_strengthen (_,p,Aliasable,_) when Env.is_functor_arg p env ->
             Error (Error.Invalid_module_alias p)
         | (Mty_ident _ | Mty_strengthen _), _ ->
             Error (Error.Mt_core Abstract_module_type)
@@ -934,13 +934,17 @@ and equate_one_functor_param subst env arg2' name1 name2  =
 
 and strengthened_modtypes ~core ~direction ~loc ~aliasable env
     subst mty1 path1 mty2 shape =
-  let mty1 = Mtype.strengthen_lazy ~aliasable mty1 path1 in
+  let mty1 =
+    Mtype.strengthen_lazy ~aliasable ~value_equations:Recorded mty1 path1
+  in
   modtypes ~core ~direction ~loc env subst mty1 mty2 shape
 
 and strengthened_module_decl ~loc ~aliasable ~core ~direction env
     subst ~mmodes  md1 path1 md2 shape =
   let md1 = Subst.Lazy.of_module_decl md1 in
-  let md1 = Mtype.strengthen_lazy_decl ~aliasable md1 path1 in
+  let md1 =
+    Mtype.strengthen_lazy_decl ~aliasable ~value_equations:Recorded md1 path1
+  in
   let mty2 = Subst.Lazy.of_modtype md2.md_type in
   let modes = mmodes in
   modtypes ~core ~direction ~loc env subst ~modes md1.md_type mty2 shape
@@ -1385,7 +1389,10 @@ let check_functor_application_in_path
       if errors then
         let prepare_arg (arg_path, arg_mty) =
           let aliasable = can_alias env arg_path in
-          let smd = Mtype.strengthen ~aliasable arg_mty arg_path in
+          let smd =
+            Mtype.strengthen ~aliasable ~value_equations:Recorded arg_mty
+              arg_path
+          in
           (* The current function is used for type checking F(M).t, which does
           not involve modes, so we fill in the strongest modes such that error
           messages would not mention modes. *)
@@ -1477,7 +1484,7 @@ module Functor_inclusion_diff = struct
   let rec keep_expansible_param = function
     | Mty_ident _ | Mty_alias _ as mty -> Some mty
     | Mty_signature _ | Mty_functor _ -> None
-    | Mty_strengthen (mty,_,_) -> keep_expansible_param mty
+    | Mty_strengthen (mty,_,_,_) -> keep_expansible_param mty
 
   let lookup_expansion { env ; res ; _ } = match res with
     | None -> None
@@ -1747,7 +1754,8 @@ let strengthened_module_decl ~loc ~aliasable env ~mark ~mmodes md1 path1 md2 =
 
 let expand_module_alias ~strengthen env path =
   try
-    Mtype.find_type_of_module ~strengthen ~aliasable:true env path
+    Mtype.find_type_of_module ~strengthen ~aliasable:true
+      ~value_equations:Recorded env path
   with Not_found ->
     raise (Error(env,In_Expansion(Error.Unbound_module_path path)))
 

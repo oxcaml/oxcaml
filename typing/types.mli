@@ -1186,6 +1186,13 @@ module Aliasability : sig
   val is_aliasable : t -> bool
 end
 
+(* Whether a strengthening records that the values and extension
+   constructors of the signature are those of the path (see [val_alias]):
+   [Not_recorded] for a user-written [S with M], which is an obligation. *)
+module Value_equations : sig
+  type t = Recorded | Not_recorded
+end
+
 (* Wrap.t encapsulates bits of module types which can be lazy *)
 module type Wrap = sig
   type 'a t
@@ -1254,6 +1261,11 @@ module type Wrapped = sig
       val_zero_alloc: Zero_alloc.t;
       val_attributes: Parsetree.attributes;
       val_uid: Uid.t;
+      val_alias: Path.t option;
+      (** [Some p.x] in the signature of a module strengthened with [p],
+          as a type [t] gets the manifest [p.t] (see [Mtype.strengthen]).
+          Only the clauses of laws use it (see
+          [Includecore.law_descriptions]). *)
     }
 
   type module_type =
@@ -1261,7 +1273,8 @@ module type Wrapped = sig
   | Mty_signature of signature
   | Mty_functor of functor_parameter * module_type * Mode.With_locality.lr
   | Mty_alias of Path.t
-  | Mty_strengthen of module_type * Path.t * Aliasability.t
+  | Mty_strengthen of
+      module_type * Path.t * Aliasability.t * Value_equations.t
       (* See comments about the aliasability of strengthening in mtype.ml *)
 
   and functor_parameter =

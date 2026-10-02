@@ -4,6 +4,9 @@ module Laws_gen_Stdlib = Stdlib
 type 'a each =
   {
   n_double_add: 'a ;
+  n_inner_double_twice: 'a ;
+  included_double_add: 'a ;
+  included_inner_double_twice: 'a ;
   map_find_elem: 'a ;
   map_set_elem: 'a ;
   map_empty_find_empty: 'a ;
@@ -18,6 +21,9 @@ type 'a each =
 let names =
   {
     n_double_add = "n_double_add";
+    n_inner_double_twice = "n_inner_double_twice";
+    included_double_add = "included_double_add";
+    included_inner_double_twice = "included_inner_double_twice";
     map_find_elem = "map_find_elem";
     map_set_elem = "map_set_elem";
     map_empty_find_empty = "map_empty_find_empty";
@@ -40,52 +46,76 @@ let locations =
         end_line = 11;
         end_col = 46
       };
-    map_find_elem =
+    n_inner_double_twice =
+      {
+        CamlinternalLaw.file = "scopes.mli";
+        start_line = 13;
+        start_col = 4;
+        end_line = 13;
+        end_col = 59
+      };
+    included_double_add =
       {
         CamlinternalLaw.file = "scopes.mli";
         start_line = 21;
         start_col = 2;
-        end_line = 22;
+        end_line = 21;
+        end_col = 46
+      };
+    included_inner_double_twice =
+      {
+        CamlinternalLaw.file = "scopes.mli";
+        start_line = 23;
+        start_col = 4;
+        end_line = 23;
+        end_col = 59
+      };
+    map_find_elem =
+      {
+        CamlinternalLaw.file = "scopes.mli";
+        start_line = 34;
+        start_col = 2;
+        end_line = 35;
         end_col = 49
       };
     map_set_elem =
       {
         CamlinternalLaw.file = "scopes.mli";
-        start_line = 23;
+        start_line = 36;
         start_col = 2;
-        end_line = 24;
+        end_line = 37;
         end_col = 33
       };
     map_empty_find_empty =
       {
         CamlinternalLaw.file = "scopes.mli";
-        start_line = 26;
+        start_line = 39;
         start_col = 4;
-        end_line = 26;
+        end_line = 39;
         end_col = 63
       };
     lex_refl =
       {
         CamlinternalLaw.file = "scopes.mli";
-        start_line = 33;
+        start_line = 46;
         start_col = 2;
-        end_line = 33;
+        end_line = 46;
         end_col = 45
       };
     order_max_max_comm =
       {
         CamlinternalLaw.file = "scopes.mli";
-        start_line = 40;
+        start_line = 53;
         start_col = 4;
-        end_line = 40;
+        end_line = 53;
         end_col = 73
       };
     order_max_pair_pair_refl =
       {
         CamlinternalLaw.file = "scopes.mli";
-        start_line = 42;
+        start_line = 55;
         start_col = 6;
-        end_line = 43;
+        end_line = 56;
         end_col = 48
       };
     idem_idem =
@@ -99,43 +129,48 @@ let locations =
     p_h_pos =
       {
         CamlinternalLaw.file = "scopes.mli";
-        start_line = 60;
+        start_line = 73;
         start_col = 4;
-        end_line = 60;
+        end_line = 73;
         end_col = 35
       };
     q_idem =
       {
         CamlinternalLaw.file = "scopes.mli";
-        start_line = 67;
+        start_line = 80;
         start_col = 2;
-        end_line = 67;
+        end_line = 80;
         end_col = 35
       };
     twice_g_idem =
       {
         CamlinternalLaw.file = "scopes.mli";
-        start_line = 81;
+        start_line = 94;
         start_col = 2;
-        end_line = 81;
+        end_line = 94;
         end_col = 39
       };
     outer_inner_mk_ok =
       {
         CamlinternalLaw.file = "scopes.mli";
-        start_line = 89;
+        start_line = 102;
         start_col = 4;
-        end_line = 89;
+        end_line = 102;
         end_col = 38
       }
   }
 let map
-  { n_double_add; map_find_elem; map_set_elem; map_empty_find_empty;
-    lex_refl; order_max_max_comm; order_max_pair_pair_refl; idem_idem;
-    p_h_pos; q_idem; twice_g_idem; outer_inner_mk_ok }
+  { n_double_add; n_inner_double_twice; included_double_add;
+    included_inner_double_twice; map_find_elem; map_set_elem;
+    map_empty_find_empty; lex_refl; order_max_max_comm;
+    order_max_pair_pair_refl; idem_idem; p_h_pos; q_idem; twice_g_idem;
+    outer_inner_mk_ok }
   ~f =
   {
     n_double_add = (f n_double_add);
+    n_inner_double_twice = (f n_inner_double_twice);
+    included_double_add = (f included_double_add);
+    included_inner_double_twice = (f included_inner_double_twice);
     map_find_elem = (f map_find_elem);
     map_set_elem = (f map_set_elem);
     map_empty_find_empty = (f map_empty_find_empty);
@@ -149,11 +184,16 @@ let map
     outer_inner_mk_ok = (f outer_inner_mk_ok)
   }
 let to_list
-  { n_double_add; map_find_elem; map_set_elem; map_empty_find_empty;
-    lex_refl; order_max_max_comm; order_max_pair_pair_refl; idem_idem;
-    p_h_pos; q_idem; twice_g_idem; outer_inner_mk_ok }
+  { n_double_add; n_inner_double_twice; included_double_add;
+    included_inner_double_twice; map_find_elem; map_set_elem;
+    map_empty_find_empty; lex_refl; order_max_max_comm;
+    order_max_pair_pair_refl; idem_idem; p_h_pos; q_idem; twice_g_idem;
+    outer_inner_mk_ok }
   =
   [n_double_add;
+  n_inner_double_twice;
+  included_double_add;
+  included_inner_double_twice;
   map_find_elem;
   map_set_elem;
   map_empty_find_empty;
@@ -168,6 +208,15 @@ let to_list
 type n_double_add_input =
   | N_double_add_input: {
   x: int } -> n_double_add_input 
+type n_inner_double_twice_input =
+  | N_inner_double_twice_input: {
+  x: int } -> n_inner_double_twice_input 
+type included_double_add_input =
+  | Included_double_add_input: {
+  x: int } -> included_double_add_input 
+type included_inner_double_twice_input =
+  | Included_inner_double_twice_input: {
+  x: int } -> included_inner_double_twice_input 
 type idem_idem_input =
   | Idem_idem_input: {
   x: int } -> idem_idem_input 
@@ -257,6 +306,10 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
     module type Choices  =
       sig
         val n_double_add : n_double_add_input Choice.t
+        val n_inner_double_twice : n_inner_double_twice_input Choice.t
+        val included_double_add : included_double_add_input Choice.t
+        val included_inner_double_twice :
+          included_inner_double_twice_input Choice.t
         val map : (module Map_choices) Choice.t
         val lex : (module Lex_choices) Choice.t
         val order_max : (module Order_max_choices) Choice.t
@@ -287,6 +340,84 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                      end_col = 46
                    }
                }))
+    let n_inner_double_twice ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.n_inner_double_twice),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.n_inner_double_twice;
+                 predicate =
+                   (fun
+                      ((N_inner_double_twice_input { x }) :
+                         n_inner_double_twice_input)
+                      ->
+                      (Laws_gen_Stdlib.(=)
+                         (Laws_gen_Scopes.N.double
+                            (Laws_gen_Scopes.N.double x))
+                         (Laws_gen_Stdlib.( * ) 4 x) : bool));
+                 location =
+                   {
+                     CamlinternalLaw.file = "scopes.mli";
+                     start_line = 13;
+                     start_col = 34;
+                     end_line = 13;
+                     end_col = 59
+                   }
+               }))
+    let included_double_add ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.included_double_add),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.included_double_add;
+                 predicate =
+                   (fun
+                      ((Included_double_add_input { x }) :
+                         included_double_add_input)
+                      ->
+                      (Laws_gen_Stdlib.(=)
+                         (Laws_gen_Scopes.Included.double x)
+                         (Laws_gen_Stdlib.(+) x x) : bool));
+                 location =
+                   {
+                     CamlinternalLaw.file = "scopes.mli";
+                     start_line = 21;
+                     start_col = 30;
+                     end_line = 21;
+                     end_col = 46
+                   }
+               }))
+    let included_inner_double_twice ((module C)  : (module Choices))  :
+      unit Law.t =
+      Law.Bind
+        ((Law.Choose C.included_inner_double_twice),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.included_inner_double_twice;
+                 predicate =
+                   (fun
+                      ((Included_inner_double_twice_input { x }) :
+                         included_inner_double_twice_input)
+                      ->
+                      (Laws_gen_Stdlib.(=)
+                         (Laws_gen_Scopes.Included.double
+                            (Laws_gen_Scopes.Included.double x))
+                         (Laws_gen_Stdlib.( * ) 4 x) : bool));
+                 location =
+                   {
+                     CamlinternalLaw.file = "scopes.mli";
+                     start_line = 23;
+                     start_col = 34;
+                     end_line = 23;
+                     end_col = 59
+                   }
+               }))
     let map_find_elem ((module C)  : (module Choices))  : unit Law.t =
       Law.Bind
         ((Law.Choose C.map),
@@ -310,9 +441,9 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                               location =
                                 {
                                   CamlinternalLaw.file = "scopes.mli";
-                                  start_line = 22;
+                                  start_line = 35;
                                   start_col = 4;
-                                  end_line = 22;
+                                  end_line = 35;
                                   end_col = 18
                                 }
                             }),
@@ -331,9 +462,9 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                                  location =
                                    {
                                      CamlinternalLaw.file = "scopes.mli";
-                                     start_line = 22;
+                                     start_line = 35;
                                      start_col = 24;
-                                     end_line = 22;
+                                     end_line = 35;
                                      end_col = 49
                                    }
                                }))))))
@@ -358,9 +489,9 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                           location =
                             {
                               CamlinternalLaw.file = "scopes.mli";
-                              start_line = 24;
+                              start_line = 37;
                               start_col = 4;
-                              end_line = 24;
+                              end_line = 37;
                               end_col = 33
                             }
                         }))))
@@ -386,9 +517,9 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                           location =
                             {
                               CamlinternalLaw.file = "scopes.mli";
-                              start_line = 26;
+                              start_line = 39;
                               start_col = 34;
-                              end_line = 26;
+                              end_line = 39;
                               end_col = 63
                             }
                         }))))
@@ -411,9 +542,9 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                           location =
                             {
                               CamlinternalLaw.file = "scopes.mli";
-                              start_line = 33;
+                              start_line = 46;
                               start_col = 30;
-                              end_line = 33;
+                              end_line = 46;
                               end_col = 45
                             }
                         }))))
@@ -440,9 +571,9 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                           location =
                             {
                               CamlinternalLaw.file = "scopes.mli";
-                              start_line = 40;
+                              start_line = 53;
                               start_col = 40;
-                              end_line = 40;
+                              end_line = 53;
                               end_col = 73
                             }
                         }))))
@@ -475,9 +606,9 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                                    location =
                                      {
                                        CamlinternalLaw.file = "scopes.mli";
-                                       start_line = 43;
+                                       start_line = 56;
                                        start_col = 8;
-                                       end_line = 43;
+                                       end_line = 56;
                                        end_col = 48
                                      }
                                  }))))))
@@ -518,9 +649,9 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                  location =
                    {
                      CamlinternalLaw.file = "scopes.mli";
-                     start_line = 60;
+                     start_line = 73;
                      start_col = 27;
-                     end_line = 60;
+                     end_line = 73;
                      end_col = 35
                    }
                }))
@@ -540,9 +671,9 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                  location =
                    {
                      CamlinternalLaw.file = "scopes.mli";
-                     start_line = 67;
+                     start_line = 80;
                      start_col = 22;
-                     end_line = 67;
+                     end_line = 80;
                      end_col = 35
                    }
                }))
@@ -565,9 +696,9 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                           location =
                             {
                               CamlinternalLaw.file = "scopes.mli";
-                              start_line = 81;
+                              start_line = 94;
                               start_col = 26;
-                              end_line = 81;
+                              end_line = 94;
                               end_col = 39
                             }
                         }))))
@@ -597,15 +728,18 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                                    location =
                                      {
                                        CamlinternalLaw.file = "scopes.mli";
-                                       start_line = 89;
+                                       start_line = 102;
                                        start_col = 27;
-                                       end_line = 89;
+                                       end_line = 102;
                                        end_col = 38
                                      }
                                  }))))))
     let laws choices =
       {
         n_double_add = (n_double_add choices);
+        n_inner_double_twice = (n_inner_double_twice choices);
+        included_double_add = (included_double_add choices);
+        included_inner_double_twice = (included_inner_double_twice choices);
         map_find_elem = (map_find_elem choices);
         map_set_elem = (map_set_elem choices);
         map_empty_find_empty = (map_empty_find_empty choices);

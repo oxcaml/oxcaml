@@ -1273,6 +1273,7 @@ let to_lazy =
       val_attributes = vd.val_attributes;
       val_loc = vd.val_loc;
       val_uid = vd.val_uid;
+      val_alias = vd.val_alias;
     }
   in
   To_lazy.{map_signature; map_type_expr; map_value_description}
@@ -1321,6 +1322,7 @@ let rec subst_lazy_value_description s descr =
       | _ -> descr.val_zero_alloc);
     val_attributes = attrs s descr.val_attributes;
     val_uid = descr.val_uid;
+    val_alias = Option.map (value_path s) descr.val_alias;
   }
 
 and subst_lazy_module_decl copy_scope scoping s md =
@@ -1370,9 +1372,9 @@ and subst_lazy_modtype copy_scope scoping s = function
                   subst_mode copy_scope s mres)
   | Mty_alias p ->
       Mty_alias (module_path s p)
-  | Mty_strengthen (mty, p, a) ->
+  | Mty_strengthen (mty, p, a, value_equations) ->
       Mty_strengthen (subst_lazy_modtype copy_scope scoping s mty,
-                      module_path s p, a)
+                      module_path s p, a, value_equations)
 
 and subst_lazy_modtype_decl copy_scope scoping s mtd =
   { mtd_type =
@@ -1488,6 +1490,7 @@ and from_lazy =
       val_attributes = vd.val_attributes;
       val_loc = vd.val_loc;
       val_uid = vd.val_uid;
+      val_alias = vd.val_alias;
     }
   in
   From_lazy.{map_signature; map_type_expr; map_value_description}

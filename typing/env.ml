@@ -2247,7 +2247,10 @@ let find_shadowed_types path env =
        (fun env -> env.types) (fun comps -> comps.comp_types) path env)
 
 (* Given a signature and a root path, prefix all idents in the signature
-   by the root path and build the corresponding substitution. *)
+   by the root path and build the corresponding substitution.
+
+   Values and extension constructors keep the aliases of their
+   declarations (see [Types.val_alias]). *)
 
 let prefix_idents root prefixing_sub sg =
   let open Subst.Lazy in
@@ -2581,7 +2584,8 @@ let rec components_of_module_maker
           fcomp_shape = cm_shape;
           fcomp_cache = Hashtbl.create 17;
           fcomp_subst_cache = Hashtbl.create 17 })
-  | Mty_ident p | Mty_strengthen (_, p, _) -> Error (No_components_abstract p)
+  | Mty_ident p | Mty_strengthen (_, p, _, _) ->
+      Error (No_components_abstract p)
   | Mty_alias p -> Error (No_components_alias p)
 
 (* Insertion of bindings by identifier + path *)

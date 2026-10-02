@@ -3,10 +3,10 @@
  expect;
 *)
 
-(* The laws of an included module refer to its values by name, as its
-   signature binds them, and so become laws about the items of the
-   structure that rebinds them. The structure matches a signature stating
-   them through its own items, but [Included.f] is not known to be [I.f]. *)
+(* The values of a structure including a module are recorded to be those
+   of the module: the included laws, which refer to them, are about the
+   items of the structure, and the structure matches a signature stating
+   them, whether through its own items or through the included module. *)
 
 module type Id = sig
   val f : int -> int
@@ -32,19 +32,8 @@ module Included_checked' : sig
   law? id (x : int) : I.f x = x
 end = Included
 [%%expect {|
-Line 4, characters 6-14:
-4 | end = Included
-          ^^^^^^^^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val f : int -> int law? id (x : int) : (f x) = x end
-       is not included in
-         sig val f : int -> int law? id (x : int) : (I.f x) = x end
-       Laws do not match:
-         law? id (x : int) : (f x) = x
-       is not included in
-         law? id (x : int) : (I.f x) = x
-       The clauses of the laws differ.
+module Included_checked' :
+  sig val f : int -> int law? id (x : int) : (I.f x) = x end
 |}]
 
 (* Shadowing an included value that an included law refers to is an
@@ -65,8 +54,8 @@ Line 3, characters 2-29:
   The law "id" refers to the value "f".
 |}]
 
-(* Laws in a submodule or a module type of a module cannot refer to its
-   values (see paths.ml), so neither can those of an included module. *)
+(* The same for laws in a submodule or a module type of the included
+   module, which are included as an alias and a path. *)
 
 module I_nested = struct
   let f x = x
@@ -74,29 +63,19 @@ module I_nested = struct
     law? l (x : int) : f x = x
   end
 end
+module Included_nested = struct include I_nested end
+module Included_nested_checked : sig
+  val f : int -> int
+  module N : sig
+    law? l (x : int) : f x = x
+  end
+end = Included_nested
 [%%expect {|
-Line 1:
-Error: In module "I_nested":
-       Modules do not match:
-         sig val f : 'a -> 'a module N = I_nested.N end
-       is not included in
-         sig
-           val f : 'a -> 'a
-           module N : sig law? l (x : int) : (f x) = x end
-         end
-       In module "I_nested.N":
-       Modules do not match:
-         sig law? l (x : int) : (I_nested.f x) = x end
-       is not included in
-         sig law? l (x : int) : (f x) = x end
-       In module "I_nested.N":
-       Laws do not match:
-         law? l (x : int) : (I_nested.f x) = x
-       is not included in
-         law? l (x : int) : (f x) = x
-       The first refers to "I_nested.f" where the second refers to "f". The laws
-       of a module referred to by a path cannot be compared with the laws of
-       a signature.
+module I_nested :
+  sig val f : 'a -> 'a module N : sig law? l (x : int) : (f x) = x end end
+module Included_nested : sig val f : 'a -> 'a module N = I_nested.N end
+module Included_nested_checked :
+  sig val f : int -> int module N : sig law? l (x : int) : (f x) = x end end
 |}]
 
 module I_modtype = struct
@@ -105,31 +84,18 @@ module I_modtype = struct
     law? l : v = 0
   end
 end
+module Included_modtype = struct include I_modtype end
+module Included_modtype_checked : sig
+  val v : int
+  module type S = sig
+    law? l : v = 0
+  end
+end = Included_modtype
 [%%expect {|
-Line 1:
-Error: In module "I_modtype":
-       Modules do not match:
-         sig val v : int module type S = I_modtype.S end
-       is not included in
-         sig val v : int module type S = sig law? l : v = 0 end end
-       In module "I_modtype":
-       Module type declarations do not match:
-         module type S = I_modtype.S
-       does not match
-         module type S = sig law? l : v = 0 end
-       At position "module I_modtype : sig module type S = <here> end"
-       Module types do not match:
-         I_modtype.S
-       is not equal to
-         sig law? l : v = 0 end
-       At position "module I_modtype : sig module type S = <here> end"
-       Laws do not match:
-         law? l : I_modtype.v = 0
-       is not included in
-         law? l : v = 0
-       The first refers to "I_modtype.v" where the second refers to "v". The laws
-       of a module referred to by a path cannot be compared with the laws of
-       a signature.
+module I_modtype : sig val v : int module type S = sig law? l : v = 0 end end
+module Included_modtype : sig val v : int module type S = I_modtype.S end
+module Included_modtype_checked :
+  sig val v : int module type S = sig law? l : v = 0 end end
 |}]
 
 (* The same holds when including the application of a functor to a path,

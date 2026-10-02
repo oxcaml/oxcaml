@@ -22,7 +22,8 @@
  ocamlopt.opt;
 *)
 
-(* The laws file of an interface with laws in submodules, functors
+(* The laws file of an interface with laws in submodules (referring to the
+   values of the enclosing module, in an included module), functors
    (several parameters, nested, in submodules, with parameters whose
    signatures have laws or shadow enclosing parameters), module types
    from other units, and a module alias (see scopes.mli). The law of the
