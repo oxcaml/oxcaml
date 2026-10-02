@@ -326,19 +326,17 @@ val map : ('a -> 'b) -> 'a list -> 'b list = <fun>
 let map f l = List.map f l
 [%%expect{|
 val map :
-  ('a @ [> past('m) | aliased stateful dynamic] ->
-   'b @ [< global many read_write]) @ [< past('n) & past('m) & global many] ->
+  ('a @ [> aliased stateful dynamic] -> 'b @ [< global many read_write]) @ [< global many] ->
   'a list @ [< global many read_write] ->
-  'b list @ [> past('n) | aliased stateful dynamic] = <fun>
+  'b list @ [> aliased stateful dynamic] = <fun>
 |}]
 
 let map_eta f = fun l -> List.map f l
 [%%expect{|
 val map_eta :
-  ('a @ [> past('m) | aliased stateful dynamic] ->
-   'b @ [< global many read_write]) @ [< past('n) & past('m) & global many] ->
+  ('a @ [> aliased stateful dynamic] -> 'b @ [< global many read_write]) @ [< global many] ->
   'a list @ [< global many read_write] ->
-  'b list @ [> past('n) | aliased stateful dynamic] = <fun>
+  'b list @ [> aliased stateful dynamic] = <fun>
 |}]
 
 (* modules *)
