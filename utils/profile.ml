@@ -119,6 +119,8 @@ type action_trace = {
   (* Most recent first. Spans are only written out once the action finishes,
      so that the file IO doesn't distort the measurements. *)
   mutable spans : Action_trace.Event.t list;
+  (* Names of the spans currently running, innermost first. *)
+  mutable path : string list;
 }
 
 (* Set while [with_action_trace] is running. *)
@@ -126,9 +128,13 @@ let action_trace = ref None
 
 (* Returns a function that records the span, given the measure at its end. *)
 let start_span action_trace ~name (start_measure : Measure.t) =
+  let parent_path = action_trace.path in
+  let path = name :: parent_path in
+  action_trace.path <- path;
   let start = action_trace.gettimeofday () in
   fun (end_measure : Measure.t) ->
     let finish = action_trace.gettimeofday () in
+    action_trace.path <- parent_path;
     let nanoseconds seconds = int_of_float (seconds *. 1e9) in
     let bytes words = words * (Sys.word_size / 8) in
     let counters =
@@ -143,8 +149,11 @@ let start_span action_trace ~name (start_measure : Measure.t) =
       :: ("absolute-top-heap", bytes end_measure.top_heap_words)
       :: String.Map.bindings end_measure.counters
     in
+    let args =
+      ["path", `Array (List.rev_map (fun name -> `String name) path)]
+    in
     let span =
-      Action_trace.Event.span ~category:"compiler" ~name ~counters
+      Action_trace.Event.span ~category:"compiler" ~name ~counters ~args
         ~start_in_nanoseconds:(nanoseconds start)
         ~finish_in_nanoseconds:(nanoseconds finish) ()
     in
@@ -208,7 +217,7 @@ let record_with_counters ?accumulate ~counter_f pass f x =
 
 let with_action_trace ~gettimeofday ~name f =
   if not (Action_trace.enabled ()) then f () else begin
-    let trace = { gettimeofday; spans = [] } in
+    let trace = { gettimeofday; spans = []; path = [] } in
     action_trace := Some trace;
     let finish_span = start_span trace ~name (Measure.create cpu_time) in
     Fun.protect f ~finally:(fun () ->
