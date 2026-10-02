@@ -2883,7 +2883,7 @@ let handle_shared kind =
   let handle_shared act =
     match act with
     | Switch.Single act -> act
-    | Switch.Shared act ->
+    | Switch.Shared (act, _shares) ->
         let i, h = make_catch_delayed kind act in
         let ohs = !hs in
         (hs := fun act -> h (ohs act));
@@ -3007,6 +3007,7 @@ module SArg = struct
   type act = Lambda.lambda
 
   type layout = Lambda.layout
+  type weight = unit
 
   let make_prim loc p args = Lprim (p, args, loc)
 
@@ -3077,10 +3078,11 @@ module SArg = struct
         },
         loc, kind ))
 
-  let make_catch kind handler =
-    make_catch_delayed kind handler
+  let make_catch kind handler _ =
+    let l, f = make_catch_delayed kind handler in
+    l, (), f
 
-  let make_exit i = make_exit i
+  let make_exit i _ = make_exit i
 end
 
 (* Action sharing for Lswitch argument *)
