@@ -379,8 +379,9 @@ module Test = struct
   let f () =
     let poly_ k _ x y =
       let id = M.id in
-      M.ignore #(id x, id y);
-      M.ignore (x : 'o);
+      M.ignore #(id x, id y); (* set sorts of x and y equal *)
+      M.ignore (x : 'o);      (* lower [x]'s type below the scope of [poly_],
+                                 lowering its and [y]'s sorts too *)
       y
     in
     k
