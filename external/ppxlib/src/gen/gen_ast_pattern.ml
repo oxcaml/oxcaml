@@ -22,9 +22,7 @@ let assert_no_attributes ~path ~prefix =
 
 let gen_combinator_for_constructor ?wrapper path ~prefix cd =
   match cd.pcd_args with
-  | Pcstr_record _ ->
-
-      None
+  | Pcstr_record _ -> failwith "Pcstr_record not supported"
   | Pcstr_tuple cd_args ->
       let args = List.mapi cd_args ~f:(fun i _ -> sprintf "x%d" i) in
       let funcs = List.mapi cd_args ~f:(fun i _ -> sprintf "f%d" i) in
@@ -36,9 +34,7 @@ let gen_combinator_for_constructor ?wrapper path ~prefix cd =
           | [ x ] -> Some (pvar x)
           | _ -> Some (Pat.tuple (List.map args ~f:pvar)))
       in
-      let exp, _ = apply_parsers funcs (List.map args ~f:evar)
-                     (List.map cd_args ~f:(fun ca -> ca.pca_type))
-      in
+      let exp, _ = apply_parsers funcs (List.map args ~f:evar) cd_args in
       let expected = without_prefix ~prefix cd.pcd_name.txt in
       let body =
         M.expr
@@ -76,10 +72,9 @@ let gen_combinator_for_constructor ?wrapper path ~prefix cd =
         List.fold_right funcs ~init:body ~f:(fun func acc ->
             M.expr "fun (T %a) -> %a" A.patt (pvar func) A.expr acc)
       in
-      Some (
-        M.stri "let %a = %a" A.patt
-          (pvar (function_name_of_id ~prefix cd.pcd_name.txt))
-          A.expr body)
+      M.stri "let %a = %a" A.patt
+        (pvar (function_name_of_id ~prefix cd.pcd_name.txt))
+        A.expr body
 
 let gen_combinator_for_record path ~prefix ~has_attrs lds =
   let fields = List.map lds ~f:(fun ld -> fqn_longident path ld.pld_name.txt) in
@@ -103,9 +98,7 @@ let gen_combinator_for_record path ~prefix ~has_attrs lds =
   in
   let body =
     List.fold_right funcs ~init:body ~f:(fun func acc ->
-      Ppxlib_jane.Ast_builder.Default.add_fun_param
-        ~loc:!Ast_helper.default_loc
-        (Labelled func) None (M.patt "T %a" A.patt (pvar func)) acc)
+        Exp.fun_ (Labelled func) None (M.patt "T %a" A.patt (pvar func)) acc)
   in
   M.stri "let %a = %a" A.patt (pvar (function_name_of_path path)) A.expr body
 
@@ -148,7 +141,7 @@ let gen_td ?wrapper path td =
           common_prefix (List.map cds ~f:(fun cd -> cd.pcd_name.txt))
         in
         let items =
-          List.filter_map cds ~f:(fun cd ->
+          List.map cds ~f:(fun cd ->
               gen_combinator_for_constructor ?wrapper path ~prefix cd)
         in
         match wrapper with
@@ -185,8 +178,6 @@ let gen_td ?wrapper path td =
             ~name:(function_name_of_path path ^ "_attributes")
           :: items
         else items
-    | Ptype_record_unboxed_product _ ->
-        failwith "Gen_ast_pattern.gen_td: unboxed records are not yet supported"
     | Ptype_abstract | Ptype_open -> []
 
 let is_abstract td =
