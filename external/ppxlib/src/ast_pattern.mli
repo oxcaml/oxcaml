@@ -109,6 +109,9 @@ val map1 : ('a, 'v1 -> 'b, 'c) t -> f:('v1 -> 'v) -> ('a, 'v -> 'b, 'c) t
 val map2 :
   ('a, 'v1 -> 'v2 -> 'b, 'c) t -> f:('v1 -> 'v2 -> 'v) -> ('a, 'v -> 'b, 'c) t
 
+val map3 :
+  ('a, 'v1 -> 'v2 -> 'v3 -> 'b, 'c) t -> f:('v1 -> 'v2 -> 'v3 -> 'v) -> ('a, 'v -> 'b, 'c) t
+
 val map0' : ('a, 'b, 'c) t -> f:(Location.t -> 'v) -> ('a, 'v -> 'b, 'c) t
 
 val map1' :
@@ -117,6 +120,11 @@ val map1' :
 val map2' :
   ('a, 'v1 -> 'v2 -> 'b, 'c) t ->
   f:(Location.t -> 'v1 -> 'v2 -> 'v) ->
+  ('a, 'v -> 'b, 'c) t
+
+val map3' :
+  ('a, 'v1 -> 'v2 -> 'v3 -> 'b, 'c) t ->
+  f:(Location.t -> 'v1 -> 'v2 -> 'v3 -> 'v) ->
   ('a, 'v -> 'b, 'c) t
 
 val map_value : ('a, 'b, 'c) t -> f:('d -> 'a) -> ('d, 'b, 'c) t
@@ -172,6 +180,73 @@ include module type of Ast_pattern_generated
         (expression, 'a, 'c) t
     ]} *)
 
+(*-------------------------------------------------------*)
+
+(* override changed nodes *)
+
+val ptyp_arrow
+  :  (arg_label, 'a, 'b) t
+  -> (core_type, 'b, 'c) t
+  -> (core_type, 'c, 'd) t
+  -> (core_type, 'a, 'd) t
+
+val ptyp_tuple
+  :  (core_type list, 'a, 'b) t
+  -> (core_type, 'a, 'b) t
+
+val ptyp_var : (string, 'a, 'b) t -> (core_type, 'a, 'b) t
+
+val type_declaration :
+  name:(string, 'a, 'b) t ->
+  params:((core_type * (variance * injectivity)) list, 'b, 'c) t ->
+  cstrs:((core_type * core_type * Location.t) list, 'c, 'd) t ->
+  kind:(type_kind, 'd, 'e) t ->
+  private_:(private_flag, 'e, 'f) t ->
+  manifest:(core_type option, 'f, 'g) t ->
+  (type_declaration, 'a, 'g) t
+
+val value_binding
+  :  pat:(pattern, 'a, 'b) t
+  -> expr:(expression, 'b, 'c) t
+  -> constraint_:(value_constraint option, 'c, 'd) t
+  -> (value_binding, 'a, 'd) t
+
+val value_description
+  :  name:(string, 'a, 'b) t
+  -> type_:(core_type, 'b, 'c) t
+  -> prim:(string list, 'c, 'd) t
+  -> (value_description, 'a, 'd) t
+
+val ppat_constraint
+  :  (pattern, 'a, 'b) t
+  -> (core_type, 'b, 'c) t
+  -> (pattern, 'a, 'c) t
+
+val ppat_tuple
+  :  (pattern list, 'a, 'b) t
+  -> (pattern, 'a, 'b) t
+
+val pexp_constraint
+  :  (expression, 'a, 'b) t
+  -> (core_type, 'b, 'c) t
+  -> (expression, 'a, 'c) t
+
+val pexp_tuple
+  :  (expression list, 'a, 'b) t
+  -> (expression, 'a, 'b) t
+
+val signature : (signature_item list, 'a, 'b) t -> (signature, 'a, 'b) t
+
+val module_declaration: name:(string option, 'a, 'b) t -> type_:(module_type, 'b, 'c) t ->
+  (module_declaration, 'a, 'c) t
+
+val pexp_let :
+  (rec_flag, 'a, 'b) t ->
+  (value_binding list, 'b, 'c) t ->
+  (expression, 'c, 'd) t -> (expression, 'a, 'd) t
+
+(* ----------------------------------------------------- *)
+
 val true_ : (bool, 'a, 'a) t
 val false_ : (bool, 'a, 'a) t
 val eint : (int, 'a, 'b) t -> (expression, 'a, 'b) t
@@ -190,6 +265,12 @@ val pint64 : (int64, 'a, 'b) t -> (pattern, 'a, 'b) t
 val pnativeint : (nativeint, 'a, 'b) t -> (pattern, 'a, 'b) t
 val single_expr_payload : (expression, 'a, 'b) t -> (payload, 'a, 'b) t
 
+val pexp_function
+  :  (function_param list, 'a, 'b) t
+  -> (type_constraint option, 'b, 'c) t
+  -> (function_body, 'c, 'd) t
+  -> (expression, 'a, 'd) t
+
 val no_label :
   (expression, 'a, 'b) t -> (Asttypes.arg_label * expression, 'a, 'b) t
 
@@ -206,6 +287,9 @@ val elist : (expression, 'a -> 'a, 'b) t -> (expression, 'b list -> 'c, 'c) t
 val esequence :
   (expression, 'a -> 'a, 'b) t -> (expression, 'b list -> 'c, 'c) t
 
+val fail : Location.t -> string -> _
+(** Raises the exception that [Ast_pattern] recognizes as a matching failure. *)
+
 type context
 
 val of_func : (context -> Location.t -> 'a -> 'b -> 'c) -> ('a, 'b, 'c) t
@@ -217,24 +301,20 @@ val fail : Location.t -> string -> _
 
 (** {2:future-asts Compat functions for future AST nodes}
 
-    The functions in this section provide a safe interface to match over AST
-    nodes that cannot be represented with Ppxlib's own AST but are available
-    with more recent versions of the compiler. *)
-
-val ppat_effect :
-  (pattern, 'a, 'b) t -> (pattern, 'b, 'c) t -> (pattern, 'a, 'c) t
-(** Match over an encoded OCaml 5.3 effect pattern. *)
+    Upstream ppxlib provides these functions to match over encodings of AST
+    nodes that its own AST cannot represent. The OxCaml AST represents them
+    directly. *)
 
 val ptyp_labeled_tuple :
   ((string option * core_type) list, 'a, 'b) t -> (core_type, 'a, 'b) t
-(** Match over an encoded OCaml 5.4 labeled tuple type.
+(** Match over an OCaml 5.4 labeled tuple type.
 
     It will fail on a regular tuple type and as a consequence, if it matches, at
     least one type in the tuple is guaranteed to be labeled. *)
 
 val pexp_labeled_tuple :
   ((string option * expression) list, 'a, 'b) t -> (expression, 'a, 'b) t
-(** Match over an encoded OCaml 5.4 labeled tuple expression.
+(** Match over an OCaml 5.4 labeled tuple expression.
 
     It will fail on a regular tuple expression and as a consequence, if it
     matches, at least one expression in the tuple is guaranteed to be labeled.
@@ -243,14 +323,11 @@ val pexp_labeled_tuple :
 val ppat_labeled_tuple :
   ((string option * pattern) list * closed_flag, 'a, 'b) t ->
   (pattern, 'a, 'b) t
-(** Match over an encoded OCaml 5.4 labeled tuple pattern.
+(** Match over an OCaml 5.4 labeled tuple pattern.
 
     It will fail on a regular tuple expression and as a consequence, if it
     matches, either at least one pattern in the tuple is guaranteed to be
     labeled or the flag to be [Open]. *)
 
 val pexp_hole : (expression, 'a, 'a) t
-(** Match over an encoded OCaml 5.6 expression hole. *)
-
-val pmod_hole : (module_expr, 'a, 'a) t
-(** Match over an encoded OCaml 5.6 module expression hole. *)
+(** Match over an OCaml 5.6 expression hole. *)

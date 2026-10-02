@@ -77,6 +77,6 @@ let error_extensionf ~loc fmt =
 exception Error = L.Error
 
 let () =
-  Stdlib.Printexc.register_printer (function
+  (Stdlib.Printexc.register_printer [@alert "-unsafe_multidomain"]) (function
     | Error e -> Some (Error.message e)
     | _ -> None)
