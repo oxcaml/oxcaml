@@ -8,6 +8,7 @@
  only-default-codegen;
  flags = " -O3 -I ocamlopt.opt";
  flags += " -experimental-optimizations";
+ flags += " -g -gdwarf-inlined-frames";
  expect.opt;
 *)
 
@@ -246,4 +247,21 @@ select_and_if:
 .L0:
   movq  (%rax), %rbx
   jmp   *%rbx
+|}]
+
+(* The inlined [min] and [max] have distinct DWARF ranges, but the peephole
+   optimizer should still remove the redundant comparison. *)
+let min_max (x : int) y =
+  let[@inline always] min x y = Builtins.select (x <= y) x y in
+  let[@inline always] max x y = Builtins.select (x >= y) x y in
+  #(min x y, max x y)
+[%%expect_asm X86_64{|
+min_max:
+  movq  %rbx, %rdi
+  cmpq  %rbx, %rax
+  cmovge %rax, %rdi
+  cmovle %rax, %rbx
+  movq  %rbx, %rax
+  movq  %rdi, %rbx
+  ret
 |}]

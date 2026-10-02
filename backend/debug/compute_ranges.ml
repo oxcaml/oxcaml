@@ -48,7 +48,7 @@ module Make (S : Compute_ranges_intf.S_functor) = struct
     let create ~(start_insn : L.instruction) ~start_pos ~start_pos_offset
         ~end_pos ~end_pos_offset ~subrange_info =
       match start_insn.desc with
-      | Llabel _ ->
+      | Llabel_for_dwarf _ ->
         { start_pos; start_pos_offset; end_pos; end_pos_offset; subrange_info }
       | _ ->
         Misc.fatal_errorf "Subrange.create: bad [start_insn]: %a"
@@ -349,7 +349,7 @@ module Make (S : Compute_ranges_intf.S_functor) = struct
            on the ordering of range-related labels. *)
         let label = Cmm.new_label () in
         let label_insn : L.instruction =
-          { desc = Llabel label;
+          { desc = Llabel_for_dwarf label;
             next = insn;
             arg = [||];
             res = [||];
@@ -521,9 +521,10 @@ module Make (S : Compute_ranges_intf.S_functor) = struct
     match insn.desc with
     | Lend -> first_insn
     | Lprologue | Lepilogue_open | Lepilogue_close | Lop _ | Lcall_op _
-    | Lreloadretaddr | Lreturn | Llabel _ | Lbranch _ | Lcondbranch _
-    | Lcondbranch3 _ | Lswitch _ | Lentertrap | Lpushtrap _ | Lpoptrap _
-    | Ladjust_stack_offset _ | Lraise _ | Lstackcheck _ ->
+    | Lreloadretaddr | Lreturn | Llabel_for_jump_target _ | Llabel_for_dwarf _
+    | Lbranch _ | Lcondbranch _ | Lcondbranch3 _ | Lswitch _ | Lentertrap
+    | Lpushtrap _ | Lpoptrap _ | Ladjust_stack_offset _ | Lraise _
+    | Lstackcheck _ ->
       let subrange_state =
         Subrange_state.advance_over_instruction subrange_state insn
       in
