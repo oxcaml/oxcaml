@@ -1,21 +1,9 @@
-(**************************************************************************)
-(*                                                                        *)
-(*                         OCaml Migrate Parsetree                        *)
-(*                                                                        *)
-(*                         Frédéric Bour, Facebook                        *)
-(*            Jérémie Dimino and Leo White, Jane Street Europe            *)
-(*            Xavier Leroy, projet Cristal, INRIA Rocquencourt            *)
-(*                         Alain Frisch, LexiFi                           *)
-(*       Daniel de Rauglaudre, projet Cristal, INRIA Rocquencourt         *)
-(*                                                                        *)
-(*   Copyright 2018 Institut National de Recherche en Informatique et     *)
-(*     en Automatique (INRIA).                                            *)
-(*                                                                        *)
-(*   All rights reserved.  This file is distributed under the terms of    *)
-(*   the GNU Lesser General Public License version 2.1, with the          *)
-(*   special exception on linking described in the file LICENSE.          *)
-(*                                                                        *)
-(**************************************************************************)
+module Longident = struct
+  type t = Longident_504.t =
+    | Lident of string
+    | Ldot of t Location.loc * string Location.loc
+    | Lapply of t Location.loc * t Location.loc
+end
 
 module Asttypes = struct
   type constant (*IF_CURRENT = Asttypes.constant *) =
@@ -63,6 +51,7 @@ module Asttypes = struct
     | Covariant
     | Contravariant
     | NoVariance
+    | Bivariant
 
   type injectivity (*IF_CURRENT = Asttypes.injectivity *) =
     | Injective
@@ -73,7 +62,12 @@ end
 module Parsetree = struct
   open Asttypes
 
-  type constant (*IF_CURRENT = Parsetree.constant *) =
+  type constant (*IF_CURRENT = Parsetree.constant *) = {
+    pconst_desc : constant_desc;
+    pconst_loc : Location.t;
+  }
+
+  and constant_desc (*IF_CURRENT = Parsetree.constant_desc *) =
     | Pconst_integer of string * char option
         (** Integer constants such as [3] [3l] [3L] [3n].
 
@@ -84,7 +78,8 @@ module Parsetree = struct
     (** Integer constants such as [#3] [#3l] [#3L] [#3n].
 
         A suffix [[g-z][G-Z]] is required by the parser.
-        Suffixes except ['l'], ['L'] and ['n'] are rejected by the typechecker
+        Suffixes except ['s'], ['S'], ['l'], ['L'], ['n'], and ['m'] are
+        rejected by the typechecker
     *)
     | Pconst_char of char  (** Character such as ['c']. *)
     | Pconst_untagged_char of char (** Untagged character such as [#'c']. *)
@@ -97,13 +92,13 @@ module Parsetree = struct
     | Pconst_float of string * char option
         (** Float constant such as [3.4], [2e5] or [1.4e-4].
 
-            Suffixes [[g-z][G-Z]] are accepted by the parser.
-            Suffixes are rejected by the typechecker.
+            Suffixes [g-z][G-Z] are accepted by the parser.
+            Suffixes except ['s'] are rejected by the typechecker.
     *)
     | Pconst_unboxed_float of string * char option
     (** Float constant such as [#3.4], [#2e5] or [#1.4e-4].
 
-        Suffixes [[g-z][G-Z]] are accepted by the parser.
+        Suffixes [g-z][G-Z] are accepted by the parser.
         Suffixes except ['s'] are rejected by the typechecker.
     *)
 
@@ -135,7 +130,7 @@ module Parsetree = struct
   and extension = string loc * payload
   (** Extension points such as [[%id ARG] and [%%id ARG]].
 
-      Sub-language placeholder -- rejected by the typechecker.
+     Sub-language placeholder -- rejected by the typechecker.
   *)
 
   and attributes = attribute list
@@ -227,8 +222,9 @@ module Parsetree = struct
            *)
     | Ptyp_poly of (string loc * jkind_annotation option) list * core_type
         (** ['a1 ... 'an. T]
+            [('a1 : k1) ... ('an : kn). T]
 
-           Can only appear in the following context:
+             Can only appear in the following context:
 
              - As the {!core_type} of a
             {{!pattern_desc.Ppat_constraint}[Ppat_constraint]} node corresponding
@@ -252,19 +248,34 @@ module Parsetree = struct
 
              - As the {{!value_description.pval_type}[pval_type]} field of a
              {!value_description}.
+
+             - As the {!core_type} of a
+             {{!function_param_desc.Pparam_val}[Pparam_val]}.
            *)
     | Ptyp_newlayout of string loc list * core_type
     | Ptyp_package of package_type  (** [(module S)]. *)
+    | Ptyp_open of Longident.t loc * core_type (** [M.(T)] *)
     | Ptyp_quote of core_type (** [<[T]>] *)
     | Ptyp_splice of core_type (** [$T] *)
     | Ptyp_of_kind of jkind_annotation (** [(type : k)] *)
     | Ptyp_repr of string loc list * core_type
     | Ptyp_extension of extension  (** [[%id]]. *)
 
-  and package_type = Longident.t loc * (Longident.t loc * core_type) list
+  and arg_label (*IF_CURRENT = Asttypes.arg_label *) =
+      Nolabel
+    | Labelled of string
+    | Optional of string
+
+  and package_type (*IF_CURRENT = Parsetree.package_type *) =
+    {
+      ppt_path: Longident.t loc;
+      ppt_cstrs: (Longident.t loc * core_type) list;
+      ppt_loc: Location.t;
+      ppt_attrs: attributes;
+    }
   (** As {!package_type} typed values:
-           - [(S, [])] represents [(module S)],
-           - [(S, [(t1, T1) ; ... ; (tn, Tn)])]
+           - [{ppt_path: S; ppt_cstrs: []}] represents [(module S)],
+           - [{ppt_path: S; ppt_cstrs: [(t1, T1) ; ... ; (tn, Tn)]}]
             represents [(module S with type t1 = T1 and ... and tn = Tn)].
          *)
 
@@ -323,6 +334,15 @@ module Parsetree = struct
              but rejected by the type-checker. *)
     | Ppat_unboxed_unit (** [#()] *)
     | Ppat_unboxed_bool of bool (** [#false] or [#true] *)
+    | Ppat_unboxed_tuple of (string option * pattern) list * Asttypes.closed_flag
+        (** Unboxed tuple patterns: [#(l1:P1, ..., ln:Pn)] is [([(Some
+            l1,P1);...;(Some l2,Pn)], Closed)], and the labels are optional.  An
+            [Open] pattern ends in [..].
+
+            Invariant:
+            - If Closed, [n >= 2]
+            - If Open, [n >= 1]
+          *)
     | Ppat_tuple of (string option * pattern) list * Asttypes.closed_flag
         (** [Ppat_tuple(pl, Closed)] represents
             - [(P1, ..., Pn)]       when [pl] is [(None, P1);...;(None, Pn)]
@@ -335,16 +355,8 @@ module Parsetree = struct
             - If Closed, [n >= 2].
             - If Open, [n >= 1].
         *)
-    | Ppat_unboxed_tuple of (string option * pattern) list * Asttypes.closed_flag
-        (** Unboxed tuple patterns: [#(l1:P1, ..., ln:Pn)] is [([(Some
-            l1,P1);...;(Some l2,Pn)], Closed)], and the labels are optional.  An
-            [Open] pattern ends in [..].
-
-            Invariant:
-            - If Closed, [n >= 2]
-            - If Open, [n >= 1]
-          *)
-    | Ppat_construct of Longident.t loc * ((string loc * jkind_annotation option) list * pattern) option
+    | Ppat_construct of
+        Longident.t loc * ((string loc * jkind_annotation option) list * pattern) option
         (** [Ppat_construct(C, args)] represents:
               - [C]               when [args] is [None],
               - [C P]             when [args] is [Some ([], P)]
@@ -396,6 +408,7 @@ module Parsetree = struct
              [Ppat_constraint(Ppat_unpack(Some "P"), Ptyp_package S)]
            *)
     | Ppat_exception of pattern  (** Pattern [exception P] *)
+    | Ppat_effect of pattern * pattern (** Pattern [effect P P] *)
     | Ppat_extension of extension  (** Pattern [[%id]] *)
     | Ppat_open of Longident.t loc * pattern  (** Pattern [M.(P)] *)
 
@@ -416,7 +429,7 @@ module Parsetree = struct
     | Pexp_constant of constant
         (** Expressions constant such as [1], ['a'], ["true"], [1.0], [1l],
               [1L], [1n] *)
-  | Pexp_let of mutable_flag * rec_flag * value_binding list * expression
+    | Pexp_let of mutable_flag * rec_flag * value_binding list * expression
       (** [Pexp_let(mut, rec, [(P1,E1) ; ... ; (Pn,En)], E)] represents:
             - [let P1 = E1 and ... and Pn = EN in E]
                when [rec] is {{!Asttypes.rec_flag.Nonrecursive}[Nonrecursive]}
@@ -552,11 +565,9 @@ module Parsetree = struct
              values). *)
     | Pexp_object of class_structure  (** [object ... end] *)
     | Pexp_newtype of string loc * jkind_annotation option * expression
-    | Pexp_pack of module_expr
-        (** [(module ME)].
-
-             [(module ME : S)] is represented as
-             [Pexp_constraint(Pexp_pack ME, Ptyp_package S)] *)
+        (** [fun (type t) -> E] or [fun (type t : k) -> E] *)
+    | Pexp_pack of module_expr * package_type option
+        (** [(module ME)] or [(module ME : S)]. *)
     | Pexp_open of open_declaration * expression
         (** - [M.(E)]
               - [let open M in E]
@@ -663,22 +674,22 @@ module Parsetree = struct
   (** See the comment on {{!expression_desc.Pexp_function}[Pexp_function]}. *)
 
   and function_constraint (*IF_CURRENT = Parsetree.function_constraint *) =
-    { mode_annotations : modes;
-      (** The mode annotation placed on a function let-binding, e.g.
-        [let local_ f x : int -> int = ...].
-        The [local_] syntax is parsed into two nodes: the field here, and [pvb_modes].
-        This field only affects the interpretation of [ret_type_constraint], while the
-        latter is translated in [typecore] to [Pexp_constraint] to contrain the mode of the
-        function.
+  { mode_annotations : modes;
+    (** The mode annotation placed on a function let-binding, e.g.
+       [let local_ f x : int -> int = ...].
+       The [local_] syntax is parsed into two nodes: the field here, and [pvb_modes].
+       This field only affects the interpretation of [ret_type_constraint], while the
+       latter is translated in [typecore] to [Pexp_constraint] to contrain the mode of the
+       function.
 
-      *)
-      ret_mode_annotations : modes;
-      (** The mode annotation placed on a function's body, e.g.
-        [let f x : int -> int @@ local = ...].
-        This field constrains the mode of function's body.
-      *)
-      ret_type_constraint : type_constraint option;
-      (** The type constraint placed on a function's body. *)
+    *)
+    ret_mode_annotations : modes;
+    (** The mode annotation placed on a function's body, e.g.
+       [let f x : int -> int @@ local = ...].
+       This field constrains the mode of function's body.
+    *)
+    ret_type_constraint : type_constraint option;
+    (** The type constraint placed on a function's body. *)
     }
   (** See the comment on {{!expression_desc.Pexp_function}[Pexp_function]}. *)
 
@@ -901,7 +912,7 @@ module Parsetree = struct
                  {ul {- [existentials] is [[]],}
                      {- [c_args] is [[T1; ...; Tn]],}
                      {- [t_opt] is [Some T0].}}
-            - [C: 'a... . T1 * ... * Tn -> T0] when
+            - [C: ('a : k)... . T1 * ... * Tn -> T0] when
                  {ul {- [existentials] is [['a;...]],}
                      {- [c_args] is [[T1; ... ; Tn]],}
                      {- [t_opt] is [Some T0].}}
@@ -1139,10 +1150,11 @@ module Parsetree = struct
               - [(_ : MT)] when [name] is [None] *)
 
   and signature (*IF_CURRENT = Parsetree.signature *) =
-    { psg_modalities : modalities;
-      psg_items: signature_item list;
-      psg_loc : Location.t;
-     }
+    {
+      psg_modalities: modalities;
+      psg_items : signature_item list;
+      psg_loc: Location.t;
+    }
 
   and signature_item (*IF_CURRENT = Parsetree.signature_item *) =
     {
@@ -1170,7 +1182,7 @@ module Parsetree = struct
     | Psig_modtypesubst of module_type_declaration
         (** [module type S :=  ...]  *)
     | Psig_open of open_description  (** [open X] *)
-    | Psig_include of include_description * modalities (** [include MT] *)
+    | Psig_include of include_description * modalities  (** [include MT] *)
     | Psig_class of class_description list
         (** [class c1 : ... and ... and cn : ...] *)
     | Psig_class_type of class_type_declaration list
@@ -1289,7 +1301,8 @@ module Parsetree = struct
         (** [functor(X : MT1) -> ME] *)
     | Pmod_apply of module_expr * module_expr  (** [ME1(ME2)] *)
     | Pmod_apply_unit of module_expr (** [ME1()] *)
-    | Pmod_constraint of module_expr * module_type option * modes  (** [(ME : MT)] *)
+    | Pmod_constraint of module_expr * module_type option * modes
+        (** [(ME : MT @@ modes)] *)
     | Pmod_unpack of expression  (** [(val E)] *)
     | Pmod_extension of extension  (** [[%id]] *)
     | Pmod_instance of module_instance
@@ -1299,7 +1312,7 @@ module Parsetree = struct
     { pmod_instance_head : string;
       pmod_instance_args : (string * module_instance) list
     }
-  (** [M(P1)(MI1)...(Pn)(MIn)] *)
+    (** [M(P1)(MI1)...(Pn)(MIn)] *)
 
   and structure = structure_item list
 
@@ -1387,7 +1400,6 @@ module Parsetree = struct
     ; pjka_desc : jkind_annotation_desc
     }
 
-
   (** {1 Toplevel} *)
 
   (** {2 Toplevel phrases} *)
@@ -1417,6 +1429,6 @@ module Parsetree = struct
 end
 
 module Config = struct
-  let ast_impl_magic_number = "Caml1999M031"
-  let ast_intf_magic_number = "Caml1999N031"
+  let ast_impl_magic_number = Ocaml_common.Config.ast_impl_magic_number
+  let ast_intf_magic_number = Ocaml_common.Config.ast_intf_magic_number
 end

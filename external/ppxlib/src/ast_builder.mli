@@ -20,6 +20,8 @@ module Default : sig
 
   include module type of Ast_builder_generated.M
 
+  val pexp_apply : loc:location -> expression -> (arg_label * expression) list -> expression
+
   module Latest : sig
     (** This module contains updated versions of node constructors that were
         kept stable when the node changed. For every function in this module,
@@ -32,7 +34,7 @@ module Default : sig
     val ppat_construct :
       loc:location ->
       longident loc ->
-      (label loc list * pattern) option ->
+      ((label loc * jkind_annotation option) list * pattern) option ->
       pattern
 
     val constructor_declaration :
@@ -43,10 +45,28 @@ module Default : sig
       res:core_type option ->
       unit ->
       constructor_declaration
+
+    val pmty_signature : loc:location -> signature -> module_type
+
+    val signature : loc:location -> ?modalities:modalities -> signature_item list -> signature
+
+    val label_declaration :
+      loc:location -> name:string loc ->
+      mutable_:mutable_flag ->
+      modalities:modalities ->
+      type_:core_type ->
+      label_declaration
   end
 
   val ppat_construct :
     loc:location -> longident loc -> pattern option -> pattern
+
+  val coalesce_arity : expression -> expression
+  (** If an expression [e] is a function of arity [n] with a body that is
+      another function with arity [m], then [coalesce_arity e] will produce a
+      function of arity [n + m]. This will not run recursively, so an expression
+      [fun x -> fun y -> fun z -> x + y + z] will become
+      [fun x y -> fun z -> x + y + z]. *)
 
   val constructor_declaration :
     loc:location ->
@@ -75,7 +95,7 @@ module type S = sig
         missing a feature you need. *)
 
     val ppat_construct :
-      longident loc -> (label loc list * pattern) option -> pattern
+      longident loc -> ((label loc * jkind_annotation option) list * pattern) option -> pattern
 
     val constructor_declaration :
       name:label loc ->
@@ -84,6 +104,16 @@ module type S = sig
       res:core_type option ->
       unit ->
       constructor_declaration
+
+    val pmty_signature : signature -> module_type
+    val signature : ?modalities:modalities -> signature_item list -> signature
+
+    val label_declaration :
+      name:string loc ->
+      mutable_:mutable_flag ->
+      modalities:modalities ->
+      type_:core_type ->
+      label_declaration
   end
 
   val ppat_construct : longident loc -> pattern option -> pattern
