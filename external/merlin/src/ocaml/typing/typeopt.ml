@@ -762,20 +762,8 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
         ~default:(num_nodes_visited, non_nullable Pgenval) (fun () ->
         let visited = Numbers.Int.Set.add (get_id ty) visited in
         let depth = depth + 1 in
-        let num_nodes_visited, fields =
-          List.fold_left_map (fun num_nodes_visited (_, field) ->
-            let num_nodes_visited = num_nodes_visited + 1 in
-            (* CR layouts v5 - this is fine because voids are not allowed in
-               tuples.  When they are, we'll need to make sure that elements
-               are values before recurring.
-            *)
-            value_kind env ~loc ~visited ~depth ~num_nodes_visited field)
-            num_nodes_visited labeled_fields
-        in
-        num_nodes_visited,
-        non_nullable
-          (Pvariant { consts = [];
-                      non_consts = [0, Constructor_shape_uniform fields] }))
+        value_kind_tuple env ~loc ~visited ~depth ~num_nodes_visited
+          labeled_fields)
   | Tvariant row ->
     num_nodes_visited,
     if Btype.tvariant_not_immediate row
@@ -1173,6 +1161,31 @@ and value_kind_immutable_record env ~loc ~visited ~depth ~num_nodes_visited
       of_shape num_nodes_visited fields
     end
 
+and value_kind_tuple env ~loc ~visited ~depth ~num_nodes_visited elements =
+  let types = List.map snd elements in
+  let tuple_kind constructor_shape =
+    non_nullable (Pvariant { consts = []; non_consts = [0, constructor_shape] })
+  in
+  match Typedecl.compute_block_shape env types with
+  | `Undetermined ->
+    (* Some element's layout is unknown (e.g. [any]), so we can't know whether
+       the tuple is mixed, but it is still a block with tag 0. *)
+    num_nodes_visited, tuple_kind Constructor_shape_undetermined
+  | `Not_mixed ->
+    let num_nodes_visited, fields =
+      List.fold_left_map (fun num_nodes_visited field ->
+        let num_nodes_visited = num_nodes_visited + 1 in
+        value_kind env ~loc ~visited ~depth ~num_nodes_visited field)
+        num_nodes_visited types
+    in
+    num_nodes_visited, tuple_kind (Constructor_shape_uniform fields)
+  | `Mixed shape ->
+    let num_nodes_visited, constructor_shape =
+      value_kind_mixed_block env ~loc ~visited ~depth ~num_nodes_visited
+        ~shape (List.map Option.some types)
+    in
+    num_nodes_visited, tuple_kind constructor_shape
+
 let value_kind env loc ty =
   try
     let (_num_nodes_visited, value_kind) =
@@ -1210,14 +1223,7 @@ let transl_instantiated_shape env loc sorts_and_types kind =
       (fun (sort, _ty) -> Jkind.Sort.default_for_transl_and_get sort)
       sorts_and_types
   in
-  let all_scannable =
-    let rec is_scannable : Jkind.Sort.Const.t -> bool = function
-      | Base Scannable -> true
-      | Addressable const -> is_scannable const
-      | Base _ | Product _ | Univar _ | Genvar _ -> false
-    in
-    Array.for_all is_scannable consts
-  in
+  let all_scannable = Array.for_all Jkind.Sort.Const.is_scannable consts in
   let shape =
     if all_scannable then `Not_mixed
     else
