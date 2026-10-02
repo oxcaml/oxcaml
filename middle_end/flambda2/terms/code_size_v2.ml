@@ -1078,17 +1078,11 @@ let quaternary_prim_size prim =
     native_atomic ~x86_64:5
   (* [mov %old, %rax; lock cmpxchg] *)
   | Atomic_compare_exchange_field
-      { atomic_kind = _;
-        args_kind = Immediate;
-        mode = Heap | Local
-      } ->
+      { atomic_kind = _; args_kind = Immediate; mode = Heap | Local } ->
     native_atomic ~x86_64:2
   | Atomic_compare_and_set_field (Any_value, (Heap | Local))
   | Atomic_compare_exchange_field
-      { atomic_kind = _;
-        args_kind = Any_value;
-        mode = Heap | Local
-      } ->
+      { atomic_kind = _; args_kind = Any_value; mode = Heap | Local } ->
     c_call_size
 
 (* [Cmm_helpers.make_alloc_generic] uses an external allocation followed by

@@ -564,7 +564,7 @@ let mk_flambda2_result_types_functors_only f =
          | Functors_only -> true
          | Never | Functors_and_static_closures | Functors_and_closures
          | All_functions ->
-           false)) )
+             false)) )
 
 let mk_flambda2_result_types_functors_and_static_closures f =
   ( "-flambda2-result-types-functors-and-static-closures",
@@ -578,7 +578,7 @@ let mk_flambda2_result_types_functors_and_static_closures f =
          (match Flambda2.Default.function_result_types with
          | Functors_and_static_closures -> true
          | Never | Functors_only | Functors_and_closures | All_functions ->
-           false)) )
+             false)) )
 
 let mk_flambda2_result_types_functors_and_closures f =
   ( "-flambda2-result-types-functors-and-closures",
@@ -591,7 +591,7 @@ let mk_flambda2_result_types_functors_and_closures f =
          | Functors_and_closures -> true
          | Never | Functors_only | Functors_and_static_closures | All_functions
            ->
-           false)) )
+             false)) )
 
 let mk_flambda2_result_types_all_functions f =
   ( "-flambda2-result-types-all-functions",
@@ -604,7 +604,7 @@ let mk_flambda2_result_types_all_functions f =
          | All_functions -> true
          | Never | Functors_only | Functors_and_static_closures
          | Functors_and_closures ->
-           false)) )
+             false)) )
 
 let mk_no_flambda2_result_types f =
   ( "-no-flambda2-result-types",
@@ -617,7 +617,7 @@ let mk_no_flambda2_result_types f =
          | Never -> true
          | Functors_only | Functors_and_static_closures | Functors_and_closures
          | All_functions ->
-           false)) )
+             false)) )
 
 let mk_flambda2_functor_result_types_through_value_slots f =
   ( "-flambda2-functor-result-types-through-value-slots",
@@ -656,7 +656,8 @@ let mk_no_flambda2_function_result_types_through_value_slots f =
       \     replace the types of variables only reachable through the\n\
       \     value slots of the returned closures by Unknown%s\n\
       \     (Flambda 2 only)"
-      (format_not_default !Flambda2.function_result_types_through_value_slots) )
+      (format_not_default !Flambda2.function_result_types_through_value_slots)
+  )
 
 let mk_flambda2_basic_meet f =
   ( "-flambda2-basic-meet",
@@ -1228,7 +1229,6 @@ let mk_flambda2_speculative_inlining_budget_size_ratio f =
     \    budget (a value <= 0 means: the large function size divided by\n\
     \    the inlining threshold) (Flambda 2 only)" )
 
-let mk_flambda2_inlining_report_bin f =
 let mk_flambda2_speculative_inlining_criterion f =
   ( "-flambda2-speculative-inlining-criterion",
     Arg.Symbol ([ "threshold"; "ratio" ], f),
@@ -1323,6 +1323,7 @@ let mk_flambda2_speculative_inlining_bonus_poly_compare f =
       \    (default %g) (Flambda 2 only)"
       Flambda2.Inlining.Default.speculative_inlining_bonus_poly_compare )
 
+let mk_flambda2_inlining_report_bin f =
   ( "-flambda2-inlining-report-bin",
     Arg.Unit f,
     " Write inlining report\n     in binary format (Flambda 2 only)" )
@@ -1718,7 +1719,6 @@ module type Oxcaml_options = sig
   val flambda2_speculative_inlining_budget : unit -> unit
   val no_flambda2_speculative_inlining_budget : unit -> unit
   val flambda2_speculative_inlining_budget_size_ratio : float -> unit
-  val flambda2_inlining_report_bin : unit -> unit
   val flambda2_speculative_inlining_criterion : string -> unit
   val flambda2_speculative_inlining_ratio : float -> unit
   val flambda2_speculative_inlining_credit_call_site : unit -> unit
@@ -1729,6 +1729,7 @@ module type Oxcaml_options = sig
   val flambda2_speculative_inlining_bonus_branch : float -> unit
   val flambda2_speculative_inlining_bonus_indirect_call : float -> unit
   val flambda2_speculative_inlining_bonus_poly_compare : float -> unit
+  val flambda2_inlining_report_bin : unit -> unit
   val flambda2_unicode : unit -> unit
   val flambda2_kind_checks : unit -> unit
   val drawfexpr : unit -> unit
@@ -1983,7 +1984,6 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
         F.no_flambda2_speculative_inlining_budget;
       mk_flambda2_speculative_inlining_budget_size_ratio
         F.flambda2_speculative_inlining_budget_size_ratio;
-      mk_flambda2_inlining_report_bin F.flambda2_inlining_report_bin;
       mk_flambda2_speculative_inlining_criterion
         F.flambda2_speculative_inlining_criterion;
       mk_flambda2_speculative_inlining_ratio
@@ -2004,6 +2004,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
         F.flambda2_speculative_inlining_bonus_indirect_call;
       mk_flambda2_speculative_inlining_bonus_poly_compare
         F.flambda2_speculative_inlining_bonus_poly_compare;
+      mk_flambda2_inlining_report_bin F.flambda2_inlining_report_bin;
       mk_flambda2_unicode F.flambda2_unicode;
       mk_flambda2_kind_checks F.flambda2_kind_checks;
       mk_drawfexpr F.drawfexpr;
@@ -2615,7 +2616,6 @@ module Oxcaml_options_impl = struct
   let flambda2_speculative_inlining_budget_size_ratio ratio =
     Flambda2.Inlining.speculative_inlining_budget_size_ratio := ratio
 
-  let flambda2_inlining_report_bin = set' Flambda2.Inlining.report_bin
   let flambda2_speculative_inlining_criterion criterion =
     Flambda2.Inlining.speculative_inlining_criterion :=
       match criterion with
@@ -2652,6 +2652,7 @@ module Oxcaml_options_impl = struct
   let flambda2_speculative_inlining_bonus_poly_compare bonus =
     Flambda2.Inlining.speculative_inlining_bonus_poly_compare := bonus
 
+  let flambda2_inlining_report_bin = set' Flambda2.Inlining.report_bin
   let flambda2_unicode = set Flambda2.unicode
   let flambda2_kind_checks = set Flambda2.kind_checks
   let drawfexpr () = Flambda2.Dump.rawfexpr := Flambda2.Dump.Main_dump_stream
@@ -3004,9 +3005,8 @@ module Extra_params = struct
             Flambda2.function_result_types := Oxcaml_flags.(Set All_functions)
         | _ ->
             Misc.fatal_error
-              "Syntax: flambda2-result-types=never|functors-only|\
-               functors-and-static-closures|functors-and-closures|\
-               all-functions");
+              "Syntax: \
+               flambda2-result-types=never|functors-only|functors-and-static-closures|functors-and-closures|all-functions");
         true
     | "flambda2-functor-result-types-through-value-slots" ->
         set' Flambda2.functor_result_types_through_value_slots

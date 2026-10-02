@@ -319,13 +319,13 @@ let simplify_function_body context ~outer_dacc function_slot_opt
     Printexc.raise_with_backtrace Misc.Fatal_error bt
 
 (* For [Compute_if_returning_closures] (see [Flambda_features]): does [ty], the
-   type of one of the results of the function, describe a single closure, or
-   an immutable block (e.g. a tuple or record, possibly nested) at least one
-   field of which is such a closure?  If [only_if_statically_allocatable], the
-   closures must additionally have environments that only refer to the
-   function's own parameters, symbols or constants, and the other fields of
-   blocks must be symbols or constants (so that the whole result would be
-   statically allocated at a call site with known arguments). *)
+   type of one of the results of the function, describe a single closure, or an
+   immutable block (e.g. a tuple or record, possibly nested) at least one field
+   of which is such a closure? If [only_if_statically_allocatable], the closures
+   must additionally have environments that only refer to the function's own
+   parameters, symbols or constants, and the other fields of blocks must be
+   symbols or constants (so that the whole result would be statically allocated
+   at a call site with known arguments). *)
 let result_type_is_closure typing_env ~params ~only_if_statically_allocatable ty
     =
   let simple_is_static simple =
@@ -445,23 +445,21 @@ let compute_result_types ~is_a_functor ~is_opaque ~return_cont_uses
     then Unknown
     else
       let env_extension =
-        (* This call is important for compilation time performance, to cut
-           down the size of the return types.  With
+        (* This call is important for compilation time performance, to cut down
+           the size of the return types. With
            [-flambda2-{functor,function}-result-types-through-value-slots], we
-           keep the types of variables only reachable through the value slots
-           of the returned closures, instead of replacing them by Unknown.
-           These describe the environments of the returned functions; the
-           case that matters is a value (typically another closure, built in
-           the body or returned by a callee) that is captured by a returned
-           closure but is not otherwise reachable from the results, since
-           aliases to parameters or to variables that are kept anyway are
-           already followed by [make_suitable_for_environment]. *)
+           keep the types of variables only reachable through the value slots of
+           the returned closures, instead of replacing them by Unknown. These
+           describe the environments of the returned functions; the case that
+           matters is a value (typically another closure, built in the body or
+           returned by a callee) that is captured by a returned closure but is
+           not otherwise reachable from the results, since aliases to parameters
+           or to variables that are kept anyway are already followed by
+           [make_suitable_for_environment]. *)
         T.make_suitable_for_environment
           ~keep_variables_through_value_slots:
             (Flambda_features.result_types_through_value_slots ~is_a_functor)
-          typing_env
-          (All_variables_except params_and_results)
-          results_and_types
+          typing_env (All_variables_except params_and_results) results_and_types
       in
       Ok (Result_types.create ~params ~results:return_cont_params env_extension)
 

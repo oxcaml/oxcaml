@@ -498,17 +498,11 @@ let quaternary_prim_size prim =
   match (prim : Flambda_primitive.quaternary_primitive) with
   | Atomic_compare_and_set_field (Immediate, (Heap | Local)) -> 3
   | Atomic_compare_exchange_field
-      { atomic_kind = _;
-        args_kind = Immediate;
-        mode = Heap | Local
-      } ->
+      { atomic_kind = _; args_kind = Immediate; mode = Heap | Local } ->
     1
   | Atomic_compare_and_set_field (Any_value, (Heap | Local))
   | Atomic_compare_exchange_field
-      { atomic_kind = _;
-        args_kind = Any_value;
-        mode = Heap | Local
-      } ->
+      { atomic_kind = _; args_kind = Any_value; mode = Heap | Local } ->
     does_not_need_caml_c_call_extcall_size
 
 let block num_fields = alloc_size + num_fields

@@ -78,16 +78,16 @@ type function_result_types =
   | Compute
   | Compute_if_returning_closures of { only_if_statically_allocatable : bool }
       (** Only keep the result types if every result is a closure; with
-          [only_if_statically_allocatable], additionally only if the value
-          slots of those closures are the function's own parameters, symbols
-          or constants (so that the closure would be statically allocated at a
-          call site where the arguments are known). *)
+          [only_if_statically_allocatable], additionally only if the value slots
+          of those closures are the function's own parameters, symbols or
+          constants (so that the closure would be statically allocated at a call
+          site where the arguments are known). *)
 
 val function_result_types : is_a_functor:bool -> function_result_types
 
 (** Whether the result types of the given kind of function (functor or not)
-    should keep the types of variables that are only reachable through the
-    value slots of the returned closures. *)
+    should keep the types of variables that are only reachable through the value
+    slots of the returned closures. *)
 val result_types_through_value_slots : is_a_functor:bool -> bool
 
 val debug : unit -> bool

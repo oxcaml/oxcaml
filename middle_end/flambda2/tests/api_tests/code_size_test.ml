@@ -47,8 +47,7 @@ let () =
   let atomic =
     size
       (P.Ternary
-         ( Atomic_exchange_field
-             (Immediate, Alloc_mode.For_assignments.heap),
+         ( Atomic_exchange_field (Immediate, Alloc_mode.For_assignments.heap),
            value,
            zero,
            value ))
@@ -67,8 +66,7 @@ let () =
   let modify =
     size
       (P.Ternary
-         ( Atomic_exchange_field
-             (Any_value, Alloc_mode.For_assignments.heap),
+         ( Atomic_exchange_field (Any_value, Alloc_mode.For_assignments.heap),
            value,
            zero,
            value ))
