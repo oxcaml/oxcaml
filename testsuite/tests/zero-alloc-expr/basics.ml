@@ -4,7 +4,7 @@
 
 (* Define a clearly allocating function, to be used later: *)
 let state = ref (ref 0)
-let allocate () = state := ref 42
+let allocate () = state := ref (Sys.opaque_identity 42)
 [%%expect{|
 val state : int ref ref = {contents = {contents = 0}}
 val allocate : unit -> unit = <fun>
@@ -114,4 +114,36 @@ let inside_try b =
   try zero_alloc_ sometimes_allocate_then_raise b with After_allocating -> ()
 [%%expect{|
 val inside_try : bool -> unit = <fun>
+|}]
+
+let creating_lazy_is_fine () =
+  zero_alloc_ lazy (allocate ())
+[%%expect{|
+val creating_lazy_is_fine : unit -> unit Lazy.t = <fun>
+|}]
+
+let forcing_lazy_is_not_fine () =
+  zero_alloc_ Lazy.force (creating_lazy_is_fine ())
+[%%expect{|
+(* CR wsturgeon for wsturgeon: this needs to fail *)
+|}]
+
+(* Inlining should be able to eliminate allocations: *)
+let inlined r =
+  let choose b r = if b then ref 42 else r in
+  zero_alloc_ (choose[@inlined always]) false r
+[%%expect{|
+val inlined : int ref -> int ref = <fun>
+|}]
+let not_inlined r =
+  let choose b r = if b then ref 42 else r in
+  zero_alloc_ (choose[@inlined never]) false r
+[%%expect{|
+(* CR wsturgeon for wsturgeon: this needs to fail *)
+|}]
+let inlined_alloc r =
+  let choose b r = if b then ref 42 else r in
+  zero_alloc_ (choose[@inlined always]) true r
+[%%expect{|
+(* CR wsturgeon for wsturgeon: this needs to fail *)
 |}]
