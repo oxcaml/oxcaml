@@ -6934,8 +6934,7 @@ type type_function_result =
 and type_function_ret_info =
   { (* The mode the function returns at. *)
     ret_mode: return_mode modes;
-    (* The sort returned by the function. *)
-    ret_sort: Jkind.sort;
+    ret_sort: Typedtree.function_return_sort;
     cases_arg_yielding: Mode.Yielding.l option;
   }
 
@@ -10355,7 +10354,8 @@ and type_function
           let ret_mode =
             {ret_mode_annots with mode_modes = ret_mode }
           in
-          Some { ret_sort ; ret_mode; cases_arg_yielding = None }
+          Some { ret_sort = Function_returns ret_sort; ret_mode;
+                 cases_arg_yielding = None }
       in
       let fun_alloc_mode =
         { fun_closure_mode = closure_mode;
@@ -11139,7 +11139,7 @@ and type_argument_ ?explanation ?recarg ~overwrite env
               ret_mode =
                 { mode_modes = fc_ret_mode;
                   mode_desc = [] };
-              ret_sort;
+              ret_sort = Function_returns ret_sort;
               locality_mode = Typedtree.create_locality_mode_r locality_mode;
               yielding = Yielding.disallow_right Yielding.yielding;
               zero_alloc = Zero_alloc.default
@@ -12248,7 +12248,7 @@ and type_function_cases_expect
     in
     let return_from_exclave = !excl in
     cases, ty_fun, fun_alloc_mode,
-      { ret_sort;
+      { ret_sort = Function_returns ret_sort;
         ret_mode =
           { mode_modes =
               create_function_return_mode ~return_from_exclave ret_mode;
