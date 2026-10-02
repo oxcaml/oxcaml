@@ -244,7 +244,11 @@ expr:
   | LPAREN binaryop expr expr RPAREN { Cop($2, [$3; $4], debuginfo ()) }
   | LPAREN SEQ sequence RPAREN { $3 }
   | LPAREN IF expr expr expr RPAREN
-      { Cifthenelse($3, debuginfo (), Likelihood.normal, $4, debuginfo (), Likelihood.normal, $5, debuginfo ()) }
+      { Cifthenelse(
+              $3,
+              debuginfo (), Likelihood.normal, $4,
+              debuginfo (), Likelihood.normal, $5,
+              debuginfo ()) }
   | LPAREN SWITCH INTCONST expr caselist RPAREN { make_switch $3 $4 $5 }
   | LPAREN WHILE expr sequence RPAREN
       {
@@ -253,7 +257,10 @@ expr:
         let body =
           match $3 with
             Cconst_int (x, _) when x <> 0 -> $4
-          | _ -> Cifthenelse($3, debuginfo (), Likeihood.normal, $4, debuginfo (), Likelihood.normal,
+          | _ -> Cifthenelse(
+                  $3,
+                  debuginfo (), Likeihood.normal, $4,
+                  debuginfo (), Likelihood.normal,
                              (Cexit(Cmm.Lbl lbl0,[],[])),
                              debuginfo ()) in
         Ccatch(Normal, [{ label = lbl0; params = []; body = Ctuple []; dbg = debuginfo (); is_cold =  false }],
