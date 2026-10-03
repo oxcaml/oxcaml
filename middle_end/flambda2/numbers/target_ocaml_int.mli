@@ -181,6 +181,12 @@ val shift_right : t -> int -> t
     [y >= bitsize]. *)
 val shift_right_logical : t -> int -> t
 
+val leading_zeros : t -> int
+
+val trailing_zeros : t -> int
+
+val popcount : t -> int
+
 (** Returns the smaller integer. *)
 val min : t -> t -> t
 
