@@ -135,9 +135,14 @@ module Zero_alloc_obligations = struct
   let add (incoming : Zero_alloc.t) : t -> (redundancy * t) = function
     | None -> (Not_redundant, Some incoming)
     | Some already -> (Redundant, Some already)
+  let union (lhs : t) (rhs : t) : t =
+    match lhs, rhs with
+    | Some za, _ | _, Some za -> Some za
+    | None, None -> None
   let iter ~(f : Zero_alloc.t -> unit) : t -> unit = function
     | None -> ()
     | Some za -> f za
+  let generated_intermediate_curry_function = empty
 end
 
 type unique_use = Mode.Uniqueness.r * Mode.Linearity.l

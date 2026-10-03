@@ -104,6 +104,90 @@ end = struct
            left_body right_body
 end
 
+let merge_external_zero_alloc_obligations
+    ~(from : Cfg.external_call_operation)
+    ~(into : Cfg.external_call_operation) :
+    Cfg.external_call_operation option =
+  match from.alloc, into.alloc with
+  | May_use_gc from_za, May_use_gc into_za ->
+    let obligations = Typedtree.Zero_alloc_obligations.union into_za from_za in
+    Some { into with alloc = May_use_gc obligations }
+  | (Won't_use_gc | May_use_gc _), _ -> None
+
+let merge_prim_zero_alloc_obligations
+    ~(from : Cfg.prim_call_operation Cfg.with_label_after)
+    ~(into : Cfg.prim_call_operation Cfg.with_label_after) :
+    Cfg.prim_call_operation Cfg.with_label_after option =
+  match from.op, into.op with
+  | Cfg.External from_call, Cfg.External into_call -> (
+    match
+      merge_external_zero_alloc_obligations
+        ~from:from_call ~into:into_call
+    with
+    | Some updated -> Some { into with op = Cfg.External updated }
+    | None -> None)
+  | (Cfg.External _ | Cfg.Probe _), _ -> None
+
+
+let merge_terminator_zero_alloc_obligations
+    ~(from : Cfg.terminator Cfg.instruction)
+    ~(into : Cfg.terminator Cfg.instruction) :
+    Cfg.terminator Cfg.instruction option =
+  match from.desc, into.desc with
+  | Cfg.Call_no_return from_call, Cfg.Call_no_return into_call ->
+    merge_external_zero_alloc_obligations ~from:from_call ~into:into_call
+    |> Option.map (fun call -> { into with desc = Cfg.Call_no_return call })
+  | Cfg.Prim from_prim, Cfg.Prim into_prim ->
+    merge_prim_zero_alloc_obligations
+      ~from:from_prim ~into:into_prim
+    |> Option.map (fun prim -> { into with desc = Cfg.Prim prim })
+  | ( Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
+    | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
+    | Tailcall_func _ | Call_no_return _ | Invalid _ | Call _ | Prim _ ), _ ->
+    None
+
+let merge_op_zero_alloc_obligations
+    ~(from : Operation.t)
+    ~(into : Operation.t) :
+    Operation.t option =
+  match[@ocaml.warning "-4"] from, into with
+  | Operation.Alloc from_alloc, Operation.Alloc into_alloc ->
+    let zero_alloc_obligations =
+      Typedtree.Zero_alloc_obligations.union
+        into_alloc.zero_alloc_obligations
+        from_alloc.zero_alloc_obligations
+    in
+    Some (Operation.Alloc { into_alloc with zero_alloc_obligations })
+  | _, _ -> None
+
+let merge_basic_zero_alloc_obligations
+    ~(from : Cfg.basic Cfg.instruction)
+    ~(into : Cfg.basic Cfg.instruction) :
+    Cfg.basic Cfg.instruction option =
+  match from.desc, into.desc with
+  | Cfg.Op from_op, Cfg.Op into_op ->
+    merge_op_zero_alloc_obligations ~from:from_op ~into:into_op
+    |> Option.map (fun op -> { into with desc = Cfg.Op op })
+  | ( Reloadretaddr | Op _ | Prologue | Epilogue | Pushtrap _ | Poptrap _
+    | Stack_check _ ), _ ->
+    None
+
+let merge_zero_alloc_obligations
+    ~(from : Cfg.basic_block)
+    ~(into : Cfg.basic_block) :
+    unit =
+  let f from_cell into_cell =
+    let from = DLL.value from_cell in
+    let into = DLL.value into_cell in
+    merge_basic_zero_alloc_obligations ~from ~into
+    |> Option.iter (DLL.set_value into_cell)
+  in
+  DLL.iter_cell2 from.body into.body ~f;
+  merge_terminator_zero_alloc_obligations
+    ~from:from.terminator
+    ~into:into.terminator
+  |> Option.iter (fun term -> (into.terminator <- term))
+
 let run :
     equal_reg:(Reg.t -> Reg.t -> bool) -> Cfg_with_layout.t -> Cfg_with_layout.t
     =
@@ -146,6 +230,7 @@ let run :
               with
               | None -> block :: seen
               | Some (repr : Cfg.basic_block) ->
+                merge_zero_alloc_obligations ~from:block ~into:repr;
                 (* CR-someday xclerc for xclerc: double check whether it is
                    actually a good idea to merge blocks that disagree on
                    coldness, and if so what the resulting coldness should be. *)

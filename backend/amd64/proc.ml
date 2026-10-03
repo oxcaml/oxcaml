@@ -619,7 +619,7 @@ let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
   | Prim {op = External { func_symbol = _; alloc; ty_res = _; ty_args = _;
                           stack_ofs; stack_align = _; effects = _; }; _} ->
     assert (stack_ofs >= 0);
-    if alloc || stack_ofs > 0
+    if May_use_gc.may_use_gc alloc || stack_ofs > 0
     then Lazy.force all_phys_regs
     else Lazy.force destroyed_at_c_call
   | Invalid { message = _; stack_ofs; stack_align = _; label_after = _ } ->
@@ -653,7 +653,7 @@ let is_destruction_point ~(more_destruction_points : bool) (terminator : Cfg_int
     if more_destruction_points then
       true
     else
-      if alloc || stack_ofs > 0 then true else false
+      (May_use_gc.may_use_gc alloc || stack_ofs > 0)
   | Invalid _ -> more_destruction_points
   | Call {op = Indirect _ | Direct _; _} ->
     true

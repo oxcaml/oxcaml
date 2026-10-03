@@ -12,7 +12,8 @@ type allocation =
   { bytes : int;
     dbginfo : Cmm.alloc_dbginfo;
     mode : Cmm.Alloc_mode.t;
-    cell : cell
+    cell : cell;
+    zero_alloc_obligations : Typedtree.Zero_alloc_obligations.t
   }
 
 (* Description of allocations that can be folded into a previous one, and a cell
@@ -31,7 +32,8 @@ let rec find_next_allocation : cell option -> allocation option =
   | Some cell -> (
     let instr = DLL.value cell in
     match instr.desc with
-    | Op (Alloc { bytes; dbginfo; mode }) -> Some { bytes; dbginfo; mode; cell }
+    | Op (Alloc { bytes; dbginfo; mode; zero_alloc_obligations }) ->
+      Some { bytes; dbginfo; mode; cell; zero_alloc_obligations }
     | Op
         ( Move | Spill | Reload | Const_int _ | Const_float _ | Const_float32 _
         | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
@@ -74,7 +76,7 @@ let find_compatible_allocations :
         { allocations = List.rev allocations; next_cell = Some cell }
       in
       match instr.desc with
-      | Op (Alloc { bytes; dbginfo; mode }) ->
+      | Op (Alloc { bytes; dbginfo; mode; zero_alloc_obligations }) ->
         let is_compatible =
           Cmm.Alloc_mode.equal mode curr_mode
           && (curr_size + bytes
@@ -83,7 +85,7 @@ let find_compatible_allocations :
         in
         if is_compatible
         then
-          let allocation = { bytes; dbginfo; mode; cell } in
+          let allocation = { bytes; dbginfo; mode; cell; zero_alloc_obligations } in
           loop
             (allocation :: allocations)
             (DLL.next cell) ~curr_mode ~curr_size:(curr_size + bytes)
@@ -141,7 +143,7 @@ let rec combine : instr_id:InstructionId.sequence -> cell option -> unit =
   let first_allocation = find_next_allocation cell in
   match first_allocation with
   | None -> ()
-  | Some { bytes; dbginfo; mode; cell } ->
+  | Some { bytes; dbginfo; mode; cell; zero_alloc_obligations } ->
     if List.length dbginfo <> 1
     then
       Misc.fatal_errorf
@@ -159,20 +161,33 @@ let rec combine : instr_id:InstructionId.sequence -> cell option -> unit =
       let first_allocation_res0 = first_allocation_instr.res.(0) in
       (* First, replace the "other" allocations with a reference to the result
          of the previous allocation and compute the total size. *)
-      let total_size_of_other_allocations, dbginfo_of_other_allocations, _ =
-        List.fold_left other_allocations ~init:(0, [], first_allocation_res0)
-          ~f:(fun (size, dbginfos, prev_res0) other_allocation ->
-            let other_allocation_instr = DLL.value other_allocation.cell in
-            let res0 = other_allocation_instr.res.(0) in
-            DLL.set_value other_allocation.cell
-              { other_allocation_instr with
-                desc =
-                  Cfg.Op (Intop_imm (Operation.Iadd, -other_allocation.bytes));
-                arg = [| prev_res0 |]
-              };
-            ( size + other_allocation.bytes,
-              other_allocation.dbginfo @ dbginfos,
-              res0 ))
+      let (
+        total_size_of_other_allocations,
+        dbginfo_of_other_allocations,
+        _,
+        combined_zero_alloc_obligations
+      ) =
+        let init = (0, [], first_allocation_res0, zero_alloc_obligations) in
+        let f (size, dbginfos, prev_res0, prev_za) other_allocation =
+          let other_allocation_instr = DLL.value other_allocation.cell in
+          let res0 = other_allocation_instr.res.(0) in
+          DLL.set_value other_allocation.cell
+            { other_allocation_instr with
+              desc =
+                Cfg.Op (Intop_imm (Operation.Iadd, -other_allocation.bytes));
+              arg = [| prev_res0 |]
+            };
+          let za =
+            Typedtree.Zero_alloc_obligations.union
+              prev_za
+              other_allocation.zero_alloc_obligations
+          in
+          ( size + other_allocation.bytes,
+            other_allocation.dbginfo @ dbginfos,
+            res0,
+            za )
+        in
+        List.fold_left other_allocations ~init ~f
       in
       (* Then, change the size of the first allocation so that it is the sum of
          all allocations, and update the debug info. *)
@@ -183,7 +198,8 @@ let rec combine : instr_id:InstructionId.sequence -> cell option -> unit =
               (Alloc
                  { bytes = bytes + total_size_of_other_allocations;
                    dbginfo = dbginfo_of_other_allocations @ dbginfo;
-                   mode
+                   mode;
+                   zero_alloc_obligations = combined_zero_alloc_obligations;
                  })
         };
       DLL.insert_after cell

@@ -97,7 +97,7 @@ let to_linear_instr ?(like : _ Cfg.instruction option) desc ~next :
     phantom_available_before
   }
 
-let check_zero_alloc : _ Cfg.instruction -> unit = function
+let check_zero_alloc : _ Cfg.instruction -> unit = function[@ocaml.warning "-4"]
   | { desc = Cfg.Op (Operation.Alloc
       { mode = Cmm.Alloc_mode.Heap;
         zero_alloc_obligations; _ }); _ } ->
@@ -212,7 +212,7 @@ let linearize_terminator (func : string)
         (L.Lcall_op
            (Lextcall
               { func = Cmm.caml_flambda2_invalid;
-                alloc = false;
+                alloc = Won't_use_gc;
                 ty_args = (* Arg is a statically allocated symbol. *) [XInt];
                 ty_res = Cmm.typ_void;
                 returns = false;

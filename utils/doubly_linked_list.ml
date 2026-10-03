@@ -333,6 +333,21 @@ let iter2 t t' ~f =
   in
   aux f t.first t'.first
 
+let iter_cell2 t t' ~f =
+  let rec aux t t' f curr curr' =
+    match curr, curr' with
+    | Empty, Empty -> ()
+    | Node node, Node node' ->
+      let next = node.next in
+      let next' = node'.next in
+      let cell = { node = curr; t } in
+      let cell' = { node = curr'; t = t' } in
+      f cell cell';
+      aux t t' f next next'
+    | Node _, Empty | Empty, Node _ -> invalid_arg "DoublyLinkedList.iter_cell2"
+  in
+  aux t t' f t.first t'.first
+
 let fold_left t ~f ~init =
   let rec aux f curr acc =
     match curr with

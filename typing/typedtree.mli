@@ -95,12 +95,35 @@ module Unique_barrier : sig
 end
 
 (** A set of zero-alloc obligations pointing to their origins in Typedtree.
-    This `t` is intentionally uninstantiable outside `typedtree.ml`,
+    This `t` is intentionally impossible to create outside `typedtree.ml`,
     but it's included as a field all the way to CFG (in `Cfg.Operation.Alloc`)
     to force future additions to thread provenance through compiler passes. *)
 module Zero_alloc_obligations : sig
-  type t
+
+  (* A set of zero-alloc obligations that will be invalidated if this
+     allocation survives optimization. *)
+  type t (* CR-someday wsturgeon for wsturgeon: [t @ relevant]? (pipe dream) *)
+
+  (* Whether the allocation we just added to the set was redundant, for some
+     definition of redundant relevant to the structure of `t`. This is useful
+     when traversing a tree, so we know when to stop. *)
+  type redundancy =
+    | Not_redundant
+    | Redundant
+
+  (* Insert a single obligation into this set. *)
+  val add : Zero_alloc.t -> t -> (redundancy * t)
+
+  (* Combine this set with another. *)
+  val union : t -> t -> t
+
+  (* Iterate over all obligations in this set, performing some side effect(s)
+     for each. *)
   val iter : f:(Zero_alloc.t -> unit) -> t -> unit
+
+  (* Edge case to be used *only* in `Cmm_helpers.intermediate_curry_functions`
+     to check compiler-generated indirect calls without source attribution. *)
+  val generated_intermediate_curry_function : t
 end
 
 (** The uniqueness/linearity of a usage (such as [Pexp_ident]) inferred by the
