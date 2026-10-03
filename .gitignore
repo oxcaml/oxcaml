@@ -291,6 +291,7 @@ ocaml/primitives.new
 /parsing/camlinternalMenhirLib.mli
 
 /runtime/domain_state.inc
+/runtime/asm_offsets.inc
 /runtime/caml/m.h
 /runtime/caml/s.h
 /runtime/primitives
@@ -305,6 +306,7 @@ ocaml/primitives.new
 /runtime/.gdb_history
 /runtime/build_config.h
 /runtime/sak
+/runtime/gen_asm_offsets
 
 /stdlib/runtime.info
 /stdlib/runtime-launch-info
