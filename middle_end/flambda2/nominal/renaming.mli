@@ -27,6 +27,12 @@ module Simple = Int_ids.Simple
 
 type t
 
+type import_map
+
+val imported_variables : import_map -> Variable.importer
+
+val imported_symbols : import_map -> Symbol.importer
+
 val empty : t
 
 val print : Format.formatter -> t -> unit
@@ -42,7 +48,9 @@ val create_import_map :
   continuations:Continuation.importer ->
   used_value_slots:Value_slot.Set.t ->
   original_compilation_unit:Compilation_unit.t ->
-  t
+  import_map
+
+val from_import_map : import_map -> t
 
 val has_import_map : t -> bool
 
@@ -55,6 +63,8 @@ val compose : second:t -> first:t -> t
 val add_variable : t -> Variable.t -> Variable.t -> t
 
 val add_fresh_variable : t -> Variable.t -> guaranteed_fresh:Variable.t -> t
+
+val bind_variable : t -> Variable.t -> t * Variable.t
 
 val apply_variable : t -> Variable.t -> Variable.t
 
@@ -71,6 +81,8 @@ val add_continuation : t -> Continuation.t -> Continuation.t -> t
 
 val add_fresh_continuation :
   t -> Continuation.t -> guaranteed_fresh:Continuation.t -> t
+
+val bind_continuation : t -> Continuation.t -> t * Continuation.t
 
 val apply_continuation : t -> Continuation.t -> Continuation.t
 
