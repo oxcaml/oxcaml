@@ -35,9 +35,23 @@ type view = private
   | Return_of_call of return_kind
   | Code_id_of_call_witness
 
+(** A stable total order on views. *)
+val compare_view : view -> view -> int
+
 type t
 
-include Datalog.Column.S with type t := t
+module Set : Container_types.Set with type elt = t
+
+module Map : sig
+  include
+    Container_types.Map_plus_iterator with type key = t and module Set = Set
+
+  (** Like [fold], but iterates in increasing order of [compare_view]. *)
+  val ordered_fold : (key -> 'a -> 'b -> 'b) -> 'a t -> 'b -> 'b
+end
+
+include
+  Datalog.Column.S with type t := t and module Set := Set and module Map := Map
 
 val view : t -> view
 
