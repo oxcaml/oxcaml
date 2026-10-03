@@ -32,14 +32,11 @@ type continuation_info =
     when processing function bodies and call sites at the end of the traversal.
 *)
 type code_dep =
-  { arity : [`Complex] Flambda_arity.t;
-    result_arity : [`Unarized] Flambda_arity.t;
-    code_metadata : Code_metadata.t;
+  { code_metadata : Code_metadata.t;
     params : Variable.t list;
     my_closure : Variable.t;
     return : Variable.t list;
     exn : Variable.t;
-    is_tupled : bool;
     known_arity_call_witness : Code_id_or_name.t;
     unknown_arity_call_witnesses : Code_id_or_name.t list
   }
