@@ -3854,12 +3854,95 @@ let tree_of_law_clause clause =
   Format_doc.doc_printf "%a"
     (Format_doc.deprecated Pprintast.law_clause) clause
 
-let tree_of_law_description id decl =
-  prepare_for_printing (List.map snd decl.law_params);
-  let olaw_params =
-    List.map (fun (x, ty) -> (Ident.name x, tree_of_typexp Type_scheme ty))
-      decl.law_params
+(* The kind of a type variable with one worth printing (see [val f : ('a :
+   k). ...]) is annotated at its first occurrence in the parameters, which
+   share their variables: [(x : ('a : k))]. *)
+let rec annotate_first_occurrence kinds (ty : out_type) =
+  let annotate = annotate_first_occurrence in
+  let labelled kinds (label, ty) =
+    let kinds, ty = annotate kinds ty in
+    kinds, (label, ty)
   in
+  match ty with
+  | Otyp_var (_, name) ->
+      begin match List.assoc_opt name kinds with
+      | Some kind -> List.remove_assoc name kinds, Otyp_jkind_annot (ty, kind)
+      | None -> kinds, ty
+      end
+  | Otyp_constr (p, args) ->
+      let kinds, args = List.fold_left_map annotate kinds args in
+      kinds, Otyp_constr (p, args)
+  | Otyp_arrow (label, modes, arg, ret) ->
+      let kinds, arg = annotate kinds arg in
+      let kinds, ret = annotate kinds ret in
+      kinds, Otyp_arrow (label, modes, arg, ret)
+  | Otyp_ret (modes, ty) ->
+      let kinds, ty = annotate kinds ty in
+      kinds, Otyp_ret (modes, ty)
+  | Otyp_tuple tys ->
+      let kinds, tys = List.fold_left_map labelled kinds tys in
+      kinds, Otyp_tuple tys
+  | Otyp_unboxed_tuple tys ->
+      let kinds, tys = List.fold_left_map labelled kinds tys in
+      kinds, Otyp_unboxed_tuple tys
+  | Otyp_alias { non_gen; aliased; alias } ->
+      let kinds, aliased = annotate kinds aliased in
+      kinds, Otyp_alias { non_gen; aliased; alias }
+  | Otyp_poly (vars, ty) ->
+      let kinds, ty = annotate kinds ty in
+      kinds, Otyp_poly (vars, ty)
+  | Otyp_variant (Ovar_fields fields, closed, tags) ->
+      let field kinds (tag, empty, tys) =
+        let kinds, tys = List.fold_left_map annotate kinds tys in
+        kinds, (tag, empty, tys)
+      in
+      let kinds, fields = List.fold_left_map field kinds fields in
+      kinds, Otyp_variant (Ovar_fields fields, closed, tags)
+  | Otyp_variant (Ovar_typ ty, closed, tags) ->
+      let kinds, ty = annotate kinds ty in
+      kinds, Otyp_variant (Ovar_typ ty, closed, tags)
+  | Otyp_object { fields; open_row } ->
+      let kinds, fields = List.fold_left_map labelled kinds fields in
+      kinds, Otyp_object { fields; open_row }
+  | Otyp_class (p, args) ->
+      let kinds, args = List.fold_left_map annotate kinds args in
+      kinds, Otyp_class (p, args)
+  | Otyp_module { opack_path; opack_cstrs } ->
+      let kinds, opack_cstrs = List.fold_left_map labelled kinds opack_cstrs in
+      kinds, Otyp_module { opack_path; opack_cstrs }
+  | Otyp_mod (ty, modalities) ->
+      let kinds, ty = annotate kinds ty in
+      kinds, Otyp_mod (ty, modalities)
+  | Otyp_attribute (ty, attr) ->
+      let kinds, ty = annotate kinds ty in
+      kinds, Otyp_attribute (ty, attr)
+  | Otyp_abstract | Otyp_open | Otyp_manifest _ | Otyp_record _
+  | Otyp_record_unboxed_product _ | Otyp_stuff _ | Otyp_sum _ | Otyp_quote _
+  | Otyp_splice _ | Otyp_repr _ | Otyp_newlayout _ | Otyp_jkind_annot _
+  | Otyp_of_kind _ ->
+      kinds, ty
+
+let tree_of_law_params params =
+  let tys = List.map snd params in
+  prepare_for_printing tys;
+  let params =
+    List.map (fun (x, ty) -> (Ident.name x, tree_of_typexp Type_scheme ty))
+      params
+  in
+  let kinds =
+    List.filter_map
+      (fun (name, kind) -> Option.map (fun kind -> (name, kind)) kind)
+      (zap_qtvs_if_boring (tree_of_qtvs (extract_qtvs tys)))
+  in
+  snd
+    (List.fold_left_map
+       (fun kinds (x, ty) ->
+          let kinds, ty = annotate_first_occurrence kinds ty in
+          kinds, (x, ty))
+       kinds params)
+
+let tree_of_law_description id decl =
+  let olaw_params = tree_of_law_params decl.law_params in
   Osig_law
     { olaw_name = Ident.name id;
       olaw_params;

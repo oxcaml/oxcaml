@@ -504,6 +504,13 @@ type jkind_mismatch =
   | Manifest_missing
   | Manifest_mismatch
 
+type law_mismatch =
+  | Law_arity of int * int
+  | Law_parameter_types of string option * Errortrace.moregen_error
+  | Law_clauses
+  | Law_module_path of { path : Path.t; name : string }
+  | Law_applied_path of Path.t
+
 module Printtyp = Printtyp.Doc
 
 let report_modality_sub_error first second ppf e =
@@ -923,6 +930,36 @@ let report_type_mismatch first second decl env ppf err =
       (fun ppf (first, second, mismatch) ->
          report_unsafe_mode_crossing_mismatch first second ppf mismatch)
       (first, second, mismatch)
+
+let report_law_mismatch env ppf err =
+  let pr fmt = Fmt.fprintf ppf fmt in
+  pr "@ ";
+  match err with
+  | Law_arity (n1, n2) ->
+      pr "The first has %d parameter%s, but the second has %d." n1
+        (if n1 = 1 then "" else "s") n2
+  | Law_parameter_types (None, err) ->
+      let msg = Fmt.Doc.msg in
+      Errortrace_report.moregen ppf Type_scheme env err
+        (msg "The parameter types")
+        (msg "are not compatible with the parameter types")
+  | Law_parameter_types (Some x, err) ->
+      let msg = Fmt.Doc.msg in
+      Errortrace_report.moregen ppf Type_scheme env err
+        (Fmt.doc_printf "The parameter %a has type" Style.inline_code x)
+        (msg "but it is expected to have type")
+  | Law_clauses ->
+      pr "The clauses of the laws differ."
+  | Law_module_path { path; name } ->
+      pr "@[<hov>The@ first@ refers@ to@ %a@ where@ the@ second@ refers@ \
+          to@ %a.@ The@ laws@ of@ a@ module@ referred@ to@ by@ a@ path@ \
+          cannot@ be@ compared@ with@ the@ laws@ of@ a@ signature.@]"
+        (Style.as_inline_code Printtyp.path) path
+        Style.inline_code name
+  | Law_applied_path path ->
+      pr "@[<hov>The@ law@ refers@ to@ %a@ through@ a@ functor@ \
+          application,@ which@ names@ no@ particular@ instance.@]"
+        (Style.as_inline_code Printtyp.path) path
 
 let report_jkind_mismatch first second ppf err =
   let pr fmt = Fmt.fprintf ppf fmt in
@@ -1905,6 +1942,116 @@ let extension_constructors ~loc env ~mark id ext1 ext2 =
       match ext1.ext_private, ext2.ext_private with
       | Private, Public -> Some Constructor_privacy
       | _, _ -> None
+
+(* Inclusion between laws. The global paths of the clauses are compared
+   like the paths of types: by identity once module aliases are normalized
+   and type abbreviations expanded. *)
+
+let normalize_type_path env p =
+  let p = Env.normalize_type_path None env p in
+  match Env.find_type p env with
+  | decl ->
+      let ty = Ctype.expand_head env (Ctype.newconstr p decl.type_params) in
+      begin match get_desc ty with
+      | Tconstr (p', _, _) -> Env.normalize_type_path None env p'
+      | _ -> p
+      end
+  | exception Not_found -> p
+
+let same_path env (ns : Spec.namespace) p1 p2 =
+  let normalize =
+    match ns with
+    | Value | Extension -> Env.normalize_value_path None env
+    | Type -> normalize_type_path env
+  in
+  Path.same p1 p2 || Path.same (normalize p1) (normalize p2)
+
+let law_paths (decl : Types.law_description) =
+  List.concat_map Spec.paths (decl.law_conclusion :: decl.law_assumptions)
+
+(* The clauses of the laws of a module refer to its values through its
+   path once it is in the environment (see [Env.prefix_idents]), whereas
+   those of a signature refer to them by name. Nothing relates the two,
+   so such laws are reported rather than compared. *)
+let law_module_path (decl1 : Types.law_description)
+      (decl2 : Types.law_description) =
+  let names =
+    List.filter_map
+      (fun ((ns : Spec.namespace), (path : Path.t)) ->
+         match ns, path with
+         | (Value | Extension), Pident id -> Some (ns, Ident.name id)
+         | (Value | Extension), (Pdot _ | Papply _ | Pextra_ty _) | Type, _ ->
+             None)
+      (law_paths decl2)
+  in
+  List.find_map
+    (fun (ns, (path : Path.t)) ->
+       match path with
+       | Pdot (_, name) when List.mem (ns, name) names ->
+           Some (Law_module_path { path; name })
+       | Pdot _ | Pident _ | Papply _ | Pextra_ty _ -> None)
+    (law_paths decl1)
+
+(* A functor application names no particular instance of its values. *)
+let law_applied_path decl1 decl2 =
+  List.find_map
+    (fun ((ns : Spec.namespace), path) ->
+       match ns with
+       | (Value | Extension) when Path.contains_apply path ->
+           Some (Law_applied_path path)
+       | Value | Extension | Type -> None)
+    (law_paths decl1 @ law_paths decl2)
+
+let law_descriptions ~loc env name
+      (decl1 : Types.law_description) (decl2 : Types.law_description) =
+  Builtin_attributes.check_alerts_inclusion
+    ~def:decl1.law_loc
+    ~use:decl2.law_loc
+    loc
+    decl1.law_attributes decl2.law_attributes
+    name;
+  let n1 = List.length decl1.law_params
+  and n2 = List.length decl2.law_params in
+  let applied = law_applied_path decl1 decl2 in
+  if Option.is_some applied then applied
+  else if n1 <> n2 then Some (Law_arity (n1, n2))
+  else
+    let moregeneral ty1 ty2 =
+      Ctype.moregeneral ~self_check:false env true [] [] ty1 ty2
+    in
+    (* The parameters are compared together, as a tuple, since they share
+       type variables. On failure, one by one to find a culprit to report. *)
+    let tuple (decl : Types.law_description) =
+      Btype.newgenty
+        (Ttuple (List.map (fun (_, ty) -> (None, ty)) decl.law_params))
+    in
+    match moregeneral (tuple decl1) (tuple decl2) with
+    | exception Ctype.Moregen err ->
+      let culprit =
+        List.find_map
+          (fun ((x, ty1), (_, ty2)) ->
+             match moregeneral ty1 ty2 with
+             | _ -> None
+             | exception Ctype.Moregen err -> Some (Ident.name x, err))
+          (List.combine decl1.law_params decl2.law_params)
+      in
+      (match culprit with
+       | Some (x, err) -> Some (Law_parameter_types (Some x, err))
+       | None -> Some (Law_parameter_types (None, err)))
+    | _ ->
+      let vars =
+        List.map2 (fun (x1, _) (x2, _) -> (x1, x2))
+          decl1.law_params decl2.law_params
+      in
+      let equal = Spec.alpha_equal ~same_path:(same_path env) ~vars in
+      if List.compare_lengths decl1.law_assumptions decl2.law_assumptions = 0
+         && List.for_all2 equal decl1.law_assumptions decl2.law_assumptions
+         && equal decl1.law_conclusion decl2.law_conclusion
+      then None
+      else
+        match law_module_path decl1 decl2 with
+        | Some err -> Some err
+        | None -> Some Law_clauses
 
 (* Inclusion between jkind declarations *)
 let jkind_declarations ~loc env name

@@ -1,0 +1,10 @@
+File "applied_decl.mli", line 1:
+Error: Laws do not match:
+         law? p : F(A).x == F(A).x
+       is not included in
+         law? p : F(A).x == F(A).x
+       The law refers to F(A).x through a functor application, which names no
+       particular instance.
+       File "applied_decl.mli", line 15, characters 0-19:
+         Expected declaration
+       File "applied_decl.mli", line 15, characters 0-19: Actual declaration

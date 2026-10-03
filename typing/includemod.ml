@@ -77,6 +77,8 @@ module Error = struct
     | Modalities of Mode.Modality.error
     | Jkind_declarations of
         (jkind_declaration, Includecore.jkind_mismatch) diff
+    | Law_descriptions of
+        (law_description, Includecore.law_mismatch) diff
 
   type core_module_type_symptom =
     | Not_an_alias
@@ -307,6 +309,17 @@ module Core_inclusion = struct
     | Some err ->
       Error Error.(Core(Jkind_declarations (diff decl1 decl2 err)))
 
+  (* Inclusion between laws *)
+
+  let law_descriptions ~loc env ~direction:_ subst id ~mmodes:_ decl1 decl2 =
+    let decl2 = Subst.law_description subst decl2 in
+    match
+      Includecore.law_descriptions ~loc env (Ident.name id) decl1 decl2
+    with
+    | None -> Ok Tcoerce_none
+    | Some err ->
+      Error Error.(Core(Law_descriptions (diff decl1 decl2 err)))
+
   (* Inclusion between class declarations *)
 
   let class_type_declarations ~loc env ~direction:_ subst _id ~mmodes:_ decl1
@@ -512,7 +525,10 @@ let build_component_table pos_rep sg =
    identifying the names along the way.
    Return a coercion list indicating, for all run-time components
    of sig2, the position of the matching run-time components of sig1
-   and the coercion to be applied to it. *)
+   and the coercion to be applied to it.
+
+   Value and extension constructor paths, which only the clauses of laws
+   use, are substituted too. *)
 let pair_components subst sig1_comps sig2 =
   let open Subst.Lazy in
   let rec pair subst paired unpaired = function
@@ -542,6 +558,12 @@ let pair_components subst sig1_comps sig2 =
               Subst.add_modtype id2 (Path.Pident id1) subst
           | Sig_jkind _ ->
               Subst.add_jkind id2 (Path.Pident id1) subst
+          | Sig_value _ when Subst.value_substitution_enabled () ->
+              Subst.add_value id2 (Path.Pident id1) subst
+          | Sig_typext _ when Subst.value_substitution_enabled () ->
+              (* Extension constructors are substituted like types (see
+                 [Env.prefix_idents]). *)
+              Subst.add_type id2 (Path.Pident id1) subst
           | Sig_value _ | Sig_typext _
           | Sig_class _ | Sig_class_type _ | Sig_law _ ->
               subst
@@ -633,6 +655,7 @@ type core_relation = {
   class_declarations: Types.class_declaration core_incl;
   class_type_declarations: Types.class_type_declaration core_incl;
   jkind_declarations: Types.jkind_declaration core_incl;
+  law_descriptions: Types.law_description core_incl;
 }
 
 (* Quickly compare module types without expanding them, succeeding only if mty1
@@ -1105,6 +1128,13 @@ and signature_components :
            let item = mark_error_as_unrecoverable item in
            let shape_map = Shape.Map.add_jkind_proj shape_map id1 orig_shape in
            id1, item, (jd1.jkind_uid, jd2.jkind_uid), shape_map, false
+        | Sig_law (id1, ld1, _), Sig_law (_id2, ld2, _) ->
+           let item =
+             core.law_descriptions ~loc env ~direction subst id1 ~mmodes ld1
+               ld2
+           in
+           let item = mark_error_as_unrecoverable item in
+           id1, item, (ld1.law_uid, ld2.law_uid), shape_map, false
         | _ ->
             assert false
       in
@@ -1269,6 +1299,7 @@ let make_core_inclusion ~self_check = Core_inclusion.{
   class_type_declarations;
   class_declarations;
   jkind_declarations;
+  law_descriptions;
 }
 
 let core_inclusion = make_core_inclusion ~self_check:false
@@ -1297,6 +1328,7 @@ let core_consistency =
     class_type_declarations=accept;
     extension_constructors=accept;
     jkind_declarations=accept;
+    law_descriptions=accept;
   }
 
 type explanation = Env.t * Error.all
