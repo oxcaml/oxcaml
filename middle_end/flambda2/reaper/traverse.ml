@@ -106,42 +106,51 @@ let record_set_of_closures_deps denv names_and_function_slots set_of_closures
     Function_declarations.funs (Set_of_closures.function_decls set_of_closures)
   in
   let names_and_code_ids =
-    Function_slot.Lmap.mapi
+    Function_slot.Lmap.filter_map
       (fun function_slot name ->
-        let code_id =
-          (Function_slot.Map.find function_slot funs
-            : Function_declarations.code_id_in_function_declaration)
-        in
-        let code_id =
-          match code_id with
-          | Deleted _ -> Or_unknown.Unknown
-          | Code_id { code_id; only_full_applications } ->
-            Acc.add_set_of_closures_dep acc name ~closure_code_id:code_id
-              ~only_full_applications
-              ~defined_in_code_id:(Env.current_code_id denv);
-            Or_unknown.Known code_id
-        in
-        name, code_id)
+        if not (Traverse_env.should_keep_function_slot denv function_slot)
+        then None
+        else
+          let code_id =
+            (Function_slot.Map.find function_slot funs
+              : Function_declarations.code_id_in_function_declaration)
+          in
+          let code_id =
+            match code_id with
+            | Deleted _ -> Or_unknown.Unknown
+            | Code_id { code_id; only_full_applications } ->
+              Acc.add_set_of_closures_dep acc name ~closure_code_id:code_id
+                ~only_full_applications
+                ~defined_in_code_id:(Env.current_code_id denv);
+              Or_unknown.Known code_id
+          in
+          Some (name, code_id))
       names_and_function_slots
   in
   Acc.add_set_of_closures acc names_and_code_ids;
   Function_slot.Lmap.iter
-    (fun _function_slot function_slot_name ->
-      Value_slot.Map.iter
-        (fun value_slot simple ->
-          let from = Acc.simple_to_node acc ~denv simple in
-          Acc.add_constructor_dep acc
-            ~base:(Code_id_or_name.name function_slot_name)
-            (Field.value_slot value_slot)
-            ~from)
-        (Set_of_closures.value_slots set_of_closures);
-      Function_slot.Lmap.iter
-        (fun function_slot name ->
-          Acc.add_constructor_dep acc
-            ~base:(Code_id_or_name.name function_slot_name)
-            (Field.function_slot function_slot)
-            ~from:(Code_id_or_name.name name))
-        names_and_function_slots)
+    (fun function_slot function_slot_name ->
+      if Traverse_env.should_keep_function_slot denv function_slot
+      then (
+        Value_slot.Map.iter
+          (fun value_slot simple ->
+            if Traverse_env.should_keep_value_slot denv value_slot
+            then
+              let from = Acc.simple_to_node acc ~denv simple in
+              Acc.add_constructor_dep acc
+                ~base:(Code_id_or_name.name function_slot_name)
+                (Field.value_slot value_slot)
+                ~from)
+          (Set_of_closures.value_slots set_of_closures);
+        Function_slot.Lmap.iter
+          (fun function_slot name ->
+            if Traverse_env.should_keep_function_slot denv function_slot
+            then
+              Acc.add_constructor_dep acc
+                ~base:(Code_id_or_name.name function_slot_name)
+                (Field.function_slot function_slot)
+                ~from:(Code_id_or_name.name name))
+          names_and_function_slots))
     names_and_function_slots
 
 let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
@@ -568,6 +577,8 @@ let rec traverse_let denv acc let_expr : rev_expr =
               traverse_code acc code_id code
                 ~le_monde_exterieur:(Env.le_monde_exterieur denv)
                 ~all_constants:(Env.all_constants denv)
+                ~function_slots_to_keep:(Env.function_slots_to_keep denv)
+                ~value_slots_to_keep:(Env.value_slots_to_keep denv)
             in
             Acc.add_code acc code_id code;
             Code :: rev_group)
@@ -694,7 +705,8 @@ and traverse_cont_handler : type a.
       k handler acc)
 
 and traverse_code (acc : acc) (code_id : Code_id.t) (code : Code.t)
-    ~le_monde_exterieur ~all_constants : rev_code =
+    ~le_monde_exterieur ~all_constants ~function_slots_to_keep
+    ~value_slots_to_keep : rev_code =
   let params_and_body = Code.params_and_body code in
   Function_params_and_body.pattern_match params_and_body
     ~f:(fun
@@ -710,11 +722,13 @@ and traverse_code (acc : acc) (code_id : Code_id.t) (code : Code.t)
       ->
       traverse_function_params_and_body acc code_id code ~return_continuation
         ~exn_continuation params ~body ~my_closure ~my_alloc_mode ~my_depth
-        ~le_monde_exterieur ~all_constants)
+        ~le_monde_exterieur ~all_constants ~function_slots_to_keep
+        ~value_slots_to_keep)
 
 and traverse_function_params_and_body acc code_id code ~return_continuation
     ~exn_continuation params ~body ~my_closure ~my_alloc_mode
-    ~le_monde_exterieur ~all_constants ~my_depth : rev_code =
+    ~le_monde_exterieur ~all_constants ~function_slots_to_keep
+    ~value_slots_to_keep ~my_depth : rev_code =
   let code_metadata = Code.code_metadata code in
   let free_names_of_params_and_body = Code0.free_names code in
   (* Note: this significantly degrades the analysis on code being checked by the
@@ -763,6 +777,7 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
   let denv =
     Env.create ~parent:Hole ~conts ~should_preserve_direct_calls
       ~current_code_id:(Some code_id) ~le_monde_exterieur ~all_constants
+      ~function_slots_to_keep ~value_slots_to_keep
   in
   if not is_opaque
   then (
@@ -836,7 +851,7 @@ let create_symbol_and_add_any_source acc name =
   Acc.add_any_source acc (Code_id_or_name.symbol sym);
   sym
 
-let run0 unit acc ~all_constants () =
+let run0 unit ~free_names acc ~all_constants () =
   let le_monde_exterieur =
     create_symbol_and_add_any_source acc "le_monde_extérieur"
   in
@@ -863,18 +878,26 @@ let run0 unit acc ~all_constants () =
     | Always -> Yes
     | Auto -> Auto
   in
+  let function_slots_to_keep =
+    Name_occurrences.function_slots_in_normal_projections free_names
+  in
+  let value_slots_to_keep =
+    Name_occurrences.value_slots_in_normal_projections free_names
+  in
   traverse
     (Env.create ~parent:Hole ~conts ~should_preserve_direct_calls
        ~current_code_id:None
        ~le_monde_exterieur:(Name.symbol le_monde_exterieur)
-       ~all_constants:(Name.symbol all_constants))
+       ~all_constants:(Name.symbol all_constants)
+       ~function_slots_to_keep ~value_slots_to_keep)
     acc (Flambda_unit.body unit)
 
-let run (unit : Flambda_unit.t) =
+let run (unit : Flambda_unit.t) ~free_names =
   let acc = Acc.create () in
   let all_constants = create_symbol_and_add_any_source acc "all_constants" in
   let holed =
-    Profile.record_call ~accumulate:false "down" (run0 unit acc ~all_constants)
+    Profile.record_call ~accumulate:false "down"
+      (run0 unit ~free_names acc ~all_constants)
   in
   let deps = Acc.deps ~all_constants:(Name.symbol all_constants) acc in
   let fixed_arity_continuations = Acc.fixed_arity_continuations acc in
