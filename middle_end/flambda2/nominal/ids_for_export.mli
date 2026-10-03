@@ -63,3 +63,5 @@ val add_continuation : t -> Continuation.t -> t
 val union : t -> t -> t
 
 val union_list : t list -> t
+
+val without_variables_or_continuations : t -> t
