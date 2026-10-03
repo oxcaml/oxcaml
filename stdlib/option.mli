@@ -26,10 +26,10 @@ open! Stdlib
 
 (** {1:options Options} *)
 
-type ('a : value_or_null) t = 'a option = None | Some of 'a (**)
+type ('a : any) t = 'a option = None | Some of 'a (**)
 (** The type for option values. Either [None] or a value [Some v]. *)
 
-val none : ('a : value_or_null). 'a option
+val none : ('a : any). 'a option
 (** [none] is [None]. *)
 
 val some : ('a : value_or_null). 'a -> 'a option
@@ -43,11 +43,11 @@ val get : ('a : value_or_null). 'a option -> 'a
 
     @raise Invalid_argument if [o] is [None]. *)
 
-val bind : ('a : value_or_null) ('b : value_or_null)
+val bind : ('a : value_or_null) ('b : any)
   . 'a option -> ('a -> 'b option) -> 'b option
 (** [bind o f] is [f v] if [o] is [Some v] and [None] if [o] is [None]. *)
 
-val join : ('a : value_or_null). 'a option option -> 'a option
+val join : ('a : any). 'a option option -> 'a option
 (** [join oo] is [Some v] if [oo] is [Some (Some v)] and [None] otherwise. *)
 
 val map : ('a : value_or_null) ('b : value_or_null)
@@ -64,10 +64,10 @@ val iter : ('a : value_or_null). ('a -> unit) -> 'a option -> unit
 
 (** {1:preds Predicates and comparisons} *)
 
-val is_none : ('a : value_or_null). 'a option -> bool
+val is_none : ('a : any). 'a option -> bool
 (** [is_none o] is [true] if and only if [o] is [None]. *)
 
-val is_some : ('a : value_or_null). 'a option -> bool
+val is_some : ('a : any). 'a option -> bool
 (** [is_some o] is [true] if and only if [o] is [Some o]. *)
 
 val equal : ('a : value_or_null)

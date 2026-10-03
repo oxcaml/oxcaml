@@ -88,7 +88,7 @@ let bind t f =
   | Some x -> f x
 (* val bind : 'a option -> ('a -> 'b option) -> 'b option *)
 [%%expect{|
-val bind : 'a option -> ('a -> 'b option) -> 'b option = <fun>
+val bind : 'a ('b : any). 'a option -> ('a -> 'b option) -> 'b option = <fun>
 |}];;
 
 let rec thick : type n. n succ fin -> n succ fin -> n fin option =
