@@ -507,6 +507,9 @@ and expression i ppf x =
   | Pexp_stack e ->
       line i ppf "Pexp_stack\n";
       expression i ppf e
+  | Pexp_zero_alloc e ->
+      line i ppf "Pexp_zero_alloc\n";
+      expression i ppf e
   | Pexp_comprehension c ->
       line i ppf "Pexp_comprehension\n";
       comprehension_expression i ppf c

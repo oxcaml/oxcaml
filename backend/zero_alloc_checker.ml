@@ -2659,7 +2659,7 @@ end = struct
              poll insertion is enabled. [@poll error] should be used instead. *)
           next
         | Alloc { mode = Local; _ } -> next
-        | Alloc { mode = Heap; bytes; dbginfo } ->
+        | Alloc { mode = Heap; bytes; dbginfo; zero_alloc_obligations = _ } ->
           let w = create_witnesses t (Alloc { bytes; dbginfo }) dbg in
           let effect_ =
             match Metadata.assume_value dbg ~can_raise:false w with
@@ -2716,22 +2716,22 @@ end = struct
           in
           transform_top t ~next:Value.normal_return ~exn:Value.exn_escape w
             "indirect tailcall" dbg
-        | Call_no_return { alloc = false; _ } ->
+        | Call_no_return { alloc = Won't_use_gc; _ } ->
           (* Sound to ignore [next] and [exn] because the call never returns or
              raises. *)
           Value.bot
-        | Call_no_return { alloc = true; func_symbol = func; _ } ->
+        | Call_no_return { alloc = May_use_gc _; func_symbol = func; _ } ->
           (* Sound to ignore [next] because the call never returns. *)
           (* CR gyorsh: we do not currently generate this, but may later. *)
           let w = create_witnesses t (Extcall { callee = func }) dbg in
           transform_top t ~next:Value.bot ~exn w
             ("external call to " ^ func)
             dbg
-        | Prim { op = External { alloc = false; _ }; _ } ->
+        | Prim { op = External { alloc = Won't_use_gc; _ }; _ } ->
           (* Sound to ignore [exn] because external call marked as noalloc does
              not raise. *)
           next
-        | Prim { op = External { alloc = true; func_symbol = func; _ }; _ } ->
+        | Prim { op = External { alloc = May_use_gc _; func_symbol = func; _ }; _ } ->
           let w = create_witnesses t (Extcall { callee = func }) dbg in
           transform_top t ~next ~exn w ("external call to " ^ func) dbg
         | Prim { op = Probe { name; handler_code_sym; enabled_at_init = _ }; _ }

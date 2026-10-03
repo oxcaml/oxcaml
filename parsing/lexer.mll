@@ -113,6 +113,7 @@ let all_keywords =
     "when", WHEN, always;
     "while", WHILE, always;
     "with", WITH, always;
+    "zero_alloc_", ZERO_ALLOC, oxcaml;
 
     "lor", INFIXOP3("lor"), always; (* Should be INFIXOP2 *)
     "lxor", INFIXOP3("lxor"), always; (* Should be INFIXOP2 *)

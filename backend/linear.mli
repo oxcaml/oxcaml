@@ -117,7 +117,7 @@ and call_operation =
       { func : string;
         ty_res : Cmm.machtype;
         ty_args : Cmm.exttype list;
-        alloc : bool;
+        alloc : Cmm.May_use_gc.t;
         returns : bool;
         stack_ofs : int;
         stack_align : Cmm.stack_align

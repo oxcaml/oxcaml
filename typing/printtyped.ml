@@ -641,11 +641,16 @@ and expression_extra i ppf (extra, loc, attrs) =
       line i ppf "Texp_newtype %a\n" (typevar_jkind ~print_quote:false) (s.txt, k);
       attributes i ppf attrs;
   | Texp_borrowed ->
-      line i ppf "Texp_borrowed\n"
+      line i ppf "Texp_borrowed\n";
+      attributes i ppf attrs
   | Texp_ghost_region ->
-      line i ppf "Texp_ghost_region\n"
+      line i ppf "Texp_ghost_region\n";
+      attributes i ppf attrs
   | Texp_stack ->
       line i ppf "Texp_stack\n";
+      attributes i ppf attrs
+  | Texp_zero_alloc ->
+      line i ppf "Texp_zero_alloc\n";
       attributes i ppf attrs
   | Texp_mode m ->
       line i ppf "Texp_mode\n";

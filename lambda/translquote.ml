@@ -1859,6 +1859,8 @@ and Exp_desc : sig
 
   val stack : Debuginfo.Scoped_location.t -> Exp.t -> t'
 
+  val zero_alloc : Debuginfo.Scoped_location.t -> Exp.t -> t'
+
   val borrow : Debuginfo.Scoped_location.t -> Exp.t -> t'
 
   val extension_constructor : Debuginfo.Scoped_location.t -> Name.t -> t'
@@ -2017,6 +2019,8 @@ end = struct
   let src_pos = use "Exp_desc" "src_pos"
 
   let stack loc a1 = apply1 "Exp_desc" "stack" loc (extract a1)
+
+  let zero_alloc loc a1 = apply1 "Exp_desc" "zero_alloc" loc (extract a1)
 
   let borrow loc a1 = apply1 "Exp_desc" "borrow" loc (extract a1)
 
@@ -3370,6 +3374,8 @@ and quote_expression_extra ~env ~scopes _stage extra lambda =
     in
     Exp_desc.constraint_ loc (mk_exp_noattr loc lambda) coerce |> Exp_desc.wrap
   | Texp_stack -> Exp_desc.stack loc (mk_exp_noattr loc lambda) |> Exp_desc.wrap
+  | Texp_zero_alloc ->
+    Exp_desc.zero_alloc loc (mk_exp_noattr loc lambda) |> Exp_desc.wrap
   | Texp_poly _ ->
     fatal_errorf "Translquote [at %a]: Texp_poly not implemented"
       Location.print_loc (to_location loc)
@@ -3444,7 +3450,7 @@ and update_env_with_extra ~loc extra =
   let extra, _, _ = extra in
   match extra with
   | Texp_newtype (id, _, _, _) -> with_new_idents_types_constr [id]
-  | Texp_constraint _ | Texp_coerce _ | Texp_stack -> ()
+  | Texp_constraint _ | Texp_coerce _ | Texp_stack | Texp_zero_alloc -> ()
   | Texp_poly _ ->
     fatal_errorf "Translquote [at %a]: Texp_poly not implemented"
       Location.print_loc (to_location loc)
@@ -3457,7 +3463,7 @@ and update_env_without_extra ~loc extra =
   let extra, _, _ = extra in
   match extra with
   | Texp_newtype (id, _, _, _) -> without_idents_types_constr [id]
-  | Texp_constraint _ | Texp_coerce _ | Texp_stack -> ()
+  | Texp_constraint _ | Texp_coerce _ | Texp_stack | Texp_zero_alloc -> ()
   | Texp_poly _ ->
     fatal_errorf "Translquote [at %a]: Texp_poly not implemented"
       Location.print_loc (to_location loc)
