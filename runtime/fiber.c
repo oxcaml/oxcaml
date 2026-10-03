@@ -229,6 +229,9 @@ Caml_inline struct stack_info* alloc_for_stack (mlsize_t wosize, int64_t id)
   // mmap is always expected to return a page-aligned value.
   CAMLassert((uintnat)stack % page_size == 0);
 
+  /* The compiler probes large frames at [Stack_guard_size]-byte strides; a
+     guard page at least that big can never be stepped over. */
+  CAMLassert(page_size >= Stack_guard_size);
   if (mprotect(Protected_stack_page(stack), page_size, PROT_NONE)) {
     caml_mem_unmap(stack, len);
     return NULL;
