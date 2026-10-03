@@ -1,9 +1,12 @@
+;; config.status isn't needed for the rule, the -o config.status allows the rule
+;; to run in an unconfigured tree.
 (rule
  (targets build_settings.txt ld.conf)
  (deps
-  (glob_files ../../Makefile.*)
-  ../../.depend.menhir ../../config.status ../StdlibModules)
- (action (chdir ../../ (run make -s -f Makefile.upstream V=1 COMPUTE_DEPS=false stdlib/dune_rules/build_settings.txt stdlib/dune_rules/ld.conf))))
+  ../../Makefile.upstream ../../Makefile.common ../../Makefile.config_if_required
+  ../../Makefile.build_config ../../Makefile.config ../../Makefile.best_binaries
+  ../../Makefile.menhir ../../.depend.menhir ../../Makefile.dev ../StdlibModules)
+ (action (chdir ../../ (run make -s -o config.status -f Makefile.upstream V=1 COMPUTE_DEPS=false stdlib/dune_rules/build_settings.txt stdlib/dune_rules/ld.conf))))
 
 (executable
  (name gen)
@@ -24,15 +27,22 @@
  (deps (:stdlib (glob_files ../*.ml) (glob_files ../*.mli)))
  (action (with-stdout-to %{target} (chdir .. (run %{dep:../../tools/ocamldep.exe} -one-line -as-map %{stdlib})))))
 
+;; stdlib.dune needs ocamldep which cannot be built in an unconfigured tree. In
+;; an unconfigured tree ../META will be empty.
 (rule
  (target stdlib.dune)
- (enabled_if (<> %{context_name} main))
+ (enabled_if (and (<> %{context_name} main) (<> %{read:../META} "")))
  (action
    (with-stdout-to %{target} (run
      %{dep:gen.exe}
      %{dep:build_settings.txt}
      stdlib
      %{dep:stdlib_module_deps.txt}))))
+
+(rule
+ (target stdlib.dune)
+ (enabled_if (and (<> %{context_name} main) (= %{read:../META} "")))
+ (action (write-file %{target} "")))
 
 ;; In the main build, don't rebuild the runtime and stdlib
 (rule

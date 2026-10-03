@@ -1,5 +1,8 @@
 (subdir build (dynamic_include ../dune_rules/stdlib.dune))
 
+;; Write an empty file in an unconfigured tree
+(rule (target META) (mode fallback) (action (write-file %{target} "")))
+
 ;; We're trying to copy a few files around, but copy_files triggers a bug
 ;; in dependency cycle detection when in a statically visible dune stanza.
 ;; So here's a weird workaround, to hide copy_files inside dynamic_include.
