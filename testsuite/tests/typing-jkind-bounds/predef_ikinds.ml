@@ -44,13 +44,8 @@ type ('a : immutable_data) t = 'a option
 
 type 'a t : immutable_data = 'a option
 [%%expect {|
-Line 1, characters 0-38:
-1 | type 'a t : immutable_data = 'a option
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "'a option" is immutable_data with 'a
-         because it's a boxed variant type.
-       But the kind of type "'a option" must be a subkind of immutable_data
-         because of the definition of t at line 1, characters 0-38.
+type ('a : value mod forkable unyielding many stateless immutable) t =
+    'a option
 |}]
 
 type t : immutable_data = int ref option
@@ -173,17 +168,7 @@ Error: The kind of type "int ref" is mutable_data.
 
 type 'a t : mutable_data = 'a ref
 [%%expect {|
-Line 1, characters 0-33:
-1 | type 'a t : mutable_data = 'a ref
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "'a ref" is
-           mutable_data with 'a @@ forkable unyielding many.
-       But the kind of type "'a ref" must be a subkind of mutable_data
-         because of the definition of t at line 1, characters 0-33.
-
-       The first mode-crosses less than the second along:
-         portability: mod portable with 'a ≰ mod portable
-         statefulness: mod stateless with 'a ≰ mod stateless
+type ('a : value mod stateless) t = 'a ref
 |}]
 
 type t_test = int ref require_portable
@@ -266,13 +251,8 @@ type 'a t = 'a list
 
 type 'a t : immutable_data = 'a list
 [%%expect {|
-Line 1, characters 0-36:
-1 | type 'a t : immutable_data = 'a list
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "'a list" is immutable_data with 'a
-         because it's a boxed variant type.
-       But the kind of type "'a list" must be a subkind of immutable_data
-         because of the definition of t at line 1, characters 0-36.
+type ('a : value mod forkable unyielding many stateless immutable) t =
+    'a list
 |}]
 
 type t : immutable_data = int ref list
@@ -395,13 +375,7 @@ Error: The kind of type "int array" is mutable_data
 
 type 'a t : mutable_data = 'a array
 [%%expect {|
-Line 1, characters 0-35:
-1 | type 'a t : mutable_data = 'a array
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "'a array" is mutable_data with 'a
-         because it is the primitive value type array.
-       But the kind of type "'a array" must be a subkind of mutable_data
-         because of the definition of t at line 1, characters 0-35.
+type ('a : value mod forkable unyielding many stateless) t = 'a array
 |}]
 
 type t_test = int array require_portable
@@ -476,13 +450,8 @@ type ('a : immutable_data) t = 'a iarray
 
 type 'a t : immutable_data = 'a iarray
 [%%expect {|
-Line 1, characters 0-38:
-1 | type 'a t : immutable_data = 'a iarray
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "'a iarray" is immutable_data with 'a
-         because it is the primitive value type iarray.
-       But the kind of type "'a iarray" must be a subkind of immutable_data
-         because of the definition of t at line 1, characters 0-38.
+type ('a : value mod forkable unyielding many stateless immutable) t =
+    'a iarray
 |}]
 
 type t : immutable_data = int ref iarray
