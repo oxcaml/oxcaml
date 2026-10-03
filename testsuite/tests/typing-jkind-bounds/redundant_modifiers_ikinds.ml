@@ -276,7 +276,7 @@ type t : value mod everything
 
 type t : value mod everything non_float
 [%%expect{|
-type t : value mod everything non_float
+type t : (value mod everything) non_float
 |}]
 
 (**************************************************************************)
