@@ -98,7 +98,7 @@ let compute_variance env visited vari ty =
     | Tquote_eval ty ->
         compute_variance_rec (Env.enter_quote env) vari ty
     | Tbox ty ->
-        compute_same ty
+        compute_variance_rec env Variance.(compose vari full) ty
     | Tfield (_, _, ty1, ty2) ->
         compute_same ty1;
         compute_same ty2
