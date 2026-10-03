@@ -19,8 +19,8 @@ let () =
     obj
   in
 
-  let result = Domain.Tick.with_ ~interval_usec:100_000 (fun _ ->
-    Preemptible.try_with
+  let result = Domain.Tick.with_ ~interval_usec:100_000 (fun () ->
+    let result = Preemptible.try_with
       ~on_tick:(fun () -> Preempt)
       (fun () ->
          let obj = make_finalizable 42 in
@@ -48,8 +48,12 @@ let () =
             preempted := true;
             Gc.full_major ();
             continue k ())
-          | _ -> None) })
+          | _ -> None) }
+    in
+    { Modes.Global.global =
+        { Modes.Aliased.aliased = { Modes.Many.many = result } } })
   in
+  let result = result.global.aliased.many in
 
   assert (!result > 42);
   Gc.full_major ();

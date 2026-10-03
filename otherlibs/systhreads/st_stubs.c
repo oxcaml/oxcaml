@@ -811,6 +811,37 @@ static void thread_init_current(caml_thread_t th)
   th->signal_stack = caml_init_signal_stack(&th->signal_stack_size);
 }
 
+static const value * _Atomic acquire_tick_cache = NULL;
+static const value * _Atomic release_tick_cache = NULL;
+
+static const value * cached_named_value(const value * _Atomic * cache,
+                                        const char * name)
+{
+  const value * v = atomic_load_acquire(cache);
+  if (v == NULL) {
+    v = caml_named_value(name);
+    if (v == NULL) caml_fatal_error("named value %s not found", name);
+    atomic_store_release(cache, v);
+  }
+  return v;
+}
+
+CAMLprim value caml_thread_acquire_tick(value interval_usec)
+{
+  CAMLparam1(interval_usec);
+  const value * acquire_tick =
+    cached_named_value(&acquire_tick_cache, "Domain.Tick.acquire");
+  CAMLreturn(caml_callback(*acquire_tick, interval_usec));
+}
+
+CAMLprim value caml_thread_release_tick(value tick)
+{
+  CAMLparam1(tick);
+  const value * release_tick =
+    cached_named_value(&release_tick_cache, "Domain.Tick.release");
+  CAMLreturn(caml_callback(*release_tick, tick));
+}
+
 /* Create a thread */
 
 /* the thread lock is not held when entering */
@@ -913,10 +944,8 @@ CAMLexport int caml_c_thread_register(void)
      This must happen after the thread is fully set up, since the tick
      acquire may start the tick thread which sends interrupts to all
      domains. */
-  const value* acquire_tick = caml_named_value("Domain.Tick.acquire");
-  if (!acquire_tick) {
-    caml_fatal_error("named value Domain.Tick.acquire not found");
-  }
+  const value * acquire_tick =
+    cached_named_value(&acquire_tick_cache, "Domain.Tick.acquire");
   value tick =
     caml_callback_exn(*acquire_tick, Val_long(Thread_timeout_usec));
   if (Is_exception_result(tick)) {
@@ -950,10 +979,8 @@ CAMLexport int caml_c_thread_unregister(void)
 
   /* Release the tick */
   if (c_thread_tick != 0) {
-    const value* release_tick = caml_named_value("Domain.Tick.release");
-    if (!release_tick) {
-      caml_fatal_error("Named value Domain.Tick.release not found");
-    }
+    const value * release_tick =
+      cached_named_value(&release_tick_cache, "Domain.Tick.release");
     result = caml_callback_exn(*release_tick, Val_long(c_thread_tick));
   }
 

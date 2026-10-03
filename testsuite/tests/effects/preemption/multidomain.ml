@@ -17,7 +17,7 @@ let () =
   let workers = Array.init 2 (fun i ->
     Domain.spawn (fun () ->
       Gc.set { (Gc.get ()) with minor_heap_size = 1024 };
-      Domain.Tick.with_ ~interval_usec:100 (fun _ ->
+      Domain.Tick.with_ ~interval_usec:100 (fun () ->
         Preemptible.try_with
           ~on_tick:(fun () -> Preempt)
           (fun () ->
@@ -37,6 +37,8 @@ let () =
             | Preemption -> Some (fun (k : (a,_) continuation) ->
               Gc.full_major ();
               continue k ())
-            | _ -> None) }))) in
+            | _ -> None) };
+        ());
+      ())) in
   Unix.sleepf 10.0;
   Array.iter Domain.join workers
