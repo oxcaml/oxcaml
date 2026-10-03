@@ -1,6 +1,7 @@
 let get_target modname =
   let base = String.uncapitalize_ascii modname in
-  if base = "stdlib" || base = "std_exit" || String.starts_with base ~prefix:"camlinternal"
+  if base = "stdlib" || base = "std_exit"
+     || String.starts_with base ~prefix:"camlinternal"
   then base
   else "stdlib__" ^ String.capitalize_ascii base
 
@@ -58,7 +59,9 @@ let rec trans_closure ~dst ~src s =
   | exception Not_found ->
      let (_base, imm_deps) =
        try StrTbl.find src s with Not_found -> failwith s in
-     let deps = StrSet.fold (fun dep acc -> StrSet.union acc (trans_closure ~dst ~src dep)) imm_deps imm_deps in
+     let deps =
+       let f dep acc = StrSet.union acc (trans_closure ~dst ~src dep) in
+       StrSet.fold f imm_deps imm_deps in
      StrTbl.add dst s deps;
      deps
 
@@ -71,8 +74,17 @@ let gen_rule ~ppf ~tgt_file ~base ~deps =
     | ".cmx" -> `Cmx, false
     | s -> failwith ("Unexpected extension " ^ s)
   in
-  let flags = "-nopervasives -directory stdlib -strict-sequence -g -absname -extension runtime_metaprogramming -nostdlib -safe-string -strict-formats -no-alias-deps -w +a-4-9-40-41-42-44-45-48-66-67-70 -w -221" in
-  let flags = if annot then flags ^ " -bin-annot -bin-annot-occurrences -bin-annot-cms" else flags in
+  let flags =
+    "-nopervasives -directory stdlib -strict-sequence -g -absname \
+     -extension runtime_metaprogramming -nostdlib -safe-string -strict-formats \
+     -no-alias-deps -w +a-4-9-40-41-42-44-45-48-66-67-70 -w -221"
+  in
+  let flags =
+    if annot then
+      flags ^ " -bin-annot -bin-annot-occurrences -bin-annot-cms"
+    else
+      flags
+  in
   let src =
     match ext with
     | `Cmi -> base ^ ".mli"
@@ -94,13 +106,15 @@ let gen_rule ~ppf ~tgt_file ~base ~deps =
      rule ~ppf ~target ~exts:["cmi";"cmsi";"cmti"] ~src ~deps ~action
   | `Cmx ->
      let action =
-       sprintf "(run %%{exe:../../boot_ocamlopt.exe} %s -cmi-file %s.cmi -o %s.cmx -c %%{src})"
+       sprintf "(run %%{exe:../../boot_ocamlopt.exe} %s -cmi-file %s.cmi \
+                                                     -o %s.cmx -c %%{src})"
          flags target target
      in
      rule ~ppf ~target ~exts:["o";"cmx"] ~src ~deps ~action
   | `Cmo ->
      let action =
-       sprintf "(run %%{exe:../../main_native.exe} %s -cmi-file %s.cmi -o %s.cmo -c %%{src})"
+       sprintf "(run %%{exe:../../main_native.exe} %s -cmi-file %s.cmi \
+                                                   -o %s.cmo -c %%{src})"
          flags target target
      in
      rule ~ppf ~target ~exts:["cmo";"cms";"cmt"] ~src ~deps ~action
@@ -117,29 +131,35 @@ let write_stdlib_dune ppf =
     |> StrTbl.to_seq
     |> Seq.map (fun (tgt_file, deps) ->
       let basename = Filename.remove_extension tgt_file in
-      let tgt_file = rename_file tgt_file and deps = List.map rename_file deps in
+      let tgt_file =
+        rename_file tgt_file and deps = List.map rename_file deps
+      in
       tgt_file, (basename, StrSet.of_list deps))
     |> StrTbl.of_seq
   in
   let trans_table = StrTbl.create 10 in
   table |> StrTbl.iter (fun tgt_file (base, _imm_deps) ->
-    let deps = trans_closure ~src:table ~dst:trans_table tgt_file |> StrSet.to_list in
+    let deps =
+      trans_closure ~src:table ~dst:trans_table tgt_file |> StrSet.to_list
+    in
     gen_rule ~ppf ~tgt_file ~base ~deps);
   let modnames = setting "stdlib_modules" in
   let action =
-    let flags = "-g -nostdlib" in
-    sprintf "(run %%{exe:../../boot_ocamlopt.exe} %s -a -o stdlib.cmxa %s)"
-      flags
-      (modnames |> List.map (fun m -> sprintf "%%{dep:%s.cmx}" (get_target m)) |> String.concat " ")
+    modnames
+    |> List.map (fun m -> sprintf "%%{dep:%s.cmx}" (get_target m))
+    |> String.concat " "
+    |> sprintf "(run %%{exe:../../boot_ocamlopt.exe} -g -nostdlib -a \
+                                                     -o stdlib.cmxa %s)"
   in
   rule ~ppf ~target:"stdlib" ~exts:["cmxa";"a"] ~src:"stdlib.ml"
     ~deps:(modnames |> List.map (fun m -> get_target m ^ ".o"))
     ~action;
   let action =
-    let flags = "-g -nostdlib" in
-    sprintf "(run %%{exe:../../main_native.exe} %s -a -o stdlib.cma %s)"
-      flags
-      (modnames |> List.map (fun m -> sprintf "%%{dep:%s.cmo}" (get_target m)) |> String.concat " ")
+    modnames
+    |> List.map (fun m -> sprintf "%%{dep:%s.cmo}" (get_target m))
+    |> String.concat " "
+    |> sprintf "(run %%{exe:../../main_native.exe} -g -nostdlib -a \
+                                                   -o stdlib.cma %s)"
   in
   rule ~ppf ~target:"stdlib" ~exts:["cma"] ~src:"stdlib.ml"
     ~deps:(modnames |> List.map (fun m -> get_target m ^ ".cmo"))
@@ -167,7 +187,10 @@ let write_primitives_dune ppf =
   let prim_files =
     setting "runtime_sources.byte" |> List.map Filename.basename in
   fprintf ppf
-    "(rule (target primitives) (deps %s) (action (run %%{dep:gen_primitives.sh} primitives %%{deps})))\n"
+    "(rule \n\
+    \ (target primitives)\n\
+    \ (deps %s)\n\
+    \ (action (run %%{dep:gen_primitives.sh} primitives %%{deps})))\n"
     (String.concat " " prim_files)
 
 (* Generate runtime.dune for the bootstrap build (which builds the runtime) *)
@@ -201,7 +224,8 @@ let write_runtime_dune ppf =
   in
   let sources ~variant ~mode =
     match mode with
-    | `Byte when variant = `Debug -> setting "runtime_sources.byte" @ ["runtime/instrtrace.c"]
+    | `Byte when variant = `Debug ->
+        setting "runtime_sources.byte" @ ["runtime/instrtrace.c"]
     | `Byte -> setting "runtime_sources.byte"
     | `Native -> setting "runtime_sources.native"
   in
@@ -217,7 +241,10 @@ let write_runtime_dune ppf =
          | s -> failwith ("Unknown source type " ^ s)
        in
        fprintf ppf
-         "(rule\n (target %s)\n (deps %s (glob_files caml/*.{h,tbl}) (glob_files *.h))\n (action (chdir .. (run %s %s -o %%{target}))))\n"
+         "(rule\n\
+         \ (target %s)\n\
+         \ (deps %s (glob_files caml/*.{h,tbl}) (glob_files *.h))\n\
+         \ (action (chdir .. (run %s %s -o %%{target}))))\n"
          (obj_name ~variant ~mode src)
          (Filename.basename src)
          (String.concat " " cmd)
@@ -239,16 +266,18 @@ let write_runtime_dune ppf =
          setting "ar" @ ["rc"; "%{target}"; "%{deps}"]
       | `Shared, `Byte ->
          "libcamlrun_shared.so",
-         let cmd = setting "mkdll" @ ["-o"; "%{target}"; "%{deps}"] @ setting "bytecclibs" in
-         cmd
+         setting "mkdll" @ ["-o"; "%{target}"; "%{deps}"] @ setting "bytecclibs"
       | `Shared, `Native ->
          "libasmrun_shared.so",
-         let cmd = setting "mkdll" @ ["-o"; "%{target}"; "%{deps}"] @ setting "nativecclibs" in
-         cmd
+         setting "mkdll" @ ["-o"; "%{target}"; "%{deps}"]
+           @ setting "nativecclibs"
     in
     (* ar likes appending to existing archives, so delete the target first *)
     fprintf ppf
-      "(rule\n (target %s)\n (deps %s)\n (action (progn (run rm -f %%{target}) (run %s))))\n"
+      "(rule\n\
+      \ (target %s)\n\
+      \ (deps %s)\n\
+      \ (action (progn (run rm -f %%{target}) (run %s))))\n"
       target (String.concat " " objs) (String.concat " " cmd)
   in
   
@@ -260,12 +289,15 @@ let write_runtime_dune ppf =
 
   (* primitives *)
   write_primitives_dune ppf;
-  let prim_files = setting "runtime_sources.byte" |> List.map Filename.basename in
+  let prim_files =
+    setting "runtime_sources.byte" |> List.map Filename.basename
+  in
   fprintf ppf
     "(rule
        (target prims.c)
        (deps (:c %s) primitives)
-       (action (with-stdout-to %%{target} (run %%{dep:gen_primsc.sh} primitives %%{c}))))\n"
+       (action (with-stdout-to %%{target} \
+         (run %%{dep:gen_primsc.sh} primitives %%{c}))))\n"
     (String.concat " " prim_files);
 
   (* ocamlrun and ocamlrund *)
@@ -273,7 +305,10 @@ let write_runtime_dune ppf =
   [`Normal; `Debug] |> List.iter (fun variant ->
     let target = "ocamlrun" ^ variant_suff ~variant in
     fprintf ppf
-      "(rule\n (target %s)\n (deps prims.b.o %s)\n (action (run %s -o %%{target} %%{deps} %s)))\n"
+      "(rule\n\
+      \ (target %s)\n\
+      \ (deps prims.b.o %s)\n\
+      \ (action (run %s -o %%{target} %%{deps} %s)))\n"
       target
       ("libcamlrun" ^ variant_suff ~variant ^ ".a")
       (setting ("mkexe" ^ variant_suff ~variant) |> String.concat " ")
@@ -290,7 +325,9 @@ let write_runtime_dune ppf =
     (glob_files caml/*.h)
      ../.depend.menhir ../config.status ../stdlib/StdlibModules)
   (action
-    (chdir .. (run make -s -f Makefile.upstream V=1 SAK=runtime/sak_dune COMPUTE_DEPS=false runtime/build_config.h))
+    (chdir ..
+     (run make -s -f Makefile.upstream
+       V=1 SAK=runtime/sak_dune COMPUTE_DEPS=false runtime/build_config.h))
   ))
 |}
 
