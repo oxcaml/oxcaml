@@ -148,19 +148,12 @@ void caml_stash_backtrace(value exn, uintnat pc, char * sp, const char* trapsp)
   }
 }
 
+/* With guard pages and a stack overflow, the stack pointer may have
+   been fixed to point to Stack_base, in which case this is going to
+   produce a dodgy backtrace. There's nothing to be done about that,
+   and at least it's readable. */
 void caml_stash_backtrace_wrapper(value exn, char* rsp, char* trapsp)
 {
-#ifdef STACK_GUARD_PAGES
-  /* If we get an rsp that lies in the guard page, just do nothing - using rsp
-   * would trigger another segfault, and we are probably in the process of
-   * raising the exception from a segfault. */
-  struct stack_info *block = Caml_state->current_stack;
-  char* protected_low = Protected_stack_page(block);
-  char* protected_high = protected_low + caml_plat_pagesize;
-  if ((rsp >= protected_low) && (rsp < protected_high)) {
-    return;
-  }
-#endif
   char* pc;
   char* sp;
 #ifdef WITH_FRAME_POINTERS
