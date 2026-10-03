@@ -24,3 +24,5 @@ let ids_for_export t = Ids_for_export.singleton_continuation t
 
 let renaming t ~guaranteed_fresh =
   Renaming.add_fresh_continuation Renaming.empty t ~guaranteed_fresh
+
+let import_and_rename t renaming = Renaming.bind_continuation renaming t
