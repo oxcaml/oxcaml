@@ -825,7 +825,13 @@ let perform_analysis0 db ~stats =
                         (Function_slot.create
                            (Current_unit.get_cu_exn ())
                            ~name:(Function_slot.name fs)
-                           ~is_always_immediate:false Flambda_kind.value)
+                             (* CR-someday ncourant: The reaper currently never
+                                changes the function slot size of changed arity
+                                functions, as it preserves their number of
+                                complex parameters. It would be possible to
+                                change it, but only for functions that have a
+                                changed representation as well. *)
+                           ~size:(Function_slot.size fs))
                         acc)
                     Function_slot.Map.empty l
                 in

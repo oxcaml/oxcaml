@@ -465,9 +465,14 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
   let wrapper_var = Variable.create "partial_app" K.value in
   let wrapper_var_duid = Flambda_debug_uid.none in
   let compilation_unit = Current_unit.get_cu_exn () in
+  (* CR ncourant: it would be good to share that computation with the other
+     places the function_slot_size is computed *)
   let wrapper_function_slot =
     Function_slot.create compilation_unit ~name:"partial_app_closure"
-      ~is_always_immediate:false K.value
+      ~size:
+        (Function_slot.size_from_arity
+           ~num_complex_params:(num_non_unarized_params - num_non_unarized_args)
+           ~is_tupled:false)
   in
   (* The allocation mode of the closure is directly determined by
      [first_complex_local_param]. We check that it is consistent with the
