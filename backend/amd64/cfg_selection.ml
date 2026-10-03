@@ -434,7 +434,8 @@ let select_operation'
   | Cstore (((Word_int | Word_val) as chunk), _init) -> (
     match[@ocaml.warning "-fragile-match"] args with
     | [loc; Cop (Caddi, [Cop (Cload _, [loc'], _); Cconst_int (n, _dbg)], _)]
-      when Stdlib.( = ) loc loc' && int_is_immediate n ->
+      when Cmm_peephole_engine.Cmm_comparator.equivalent loc loc'
+           && int_is_immediate n ->
       let addr, arg = select_addressing chunk loc in
       Rewritten (specific (Ioffset_loc (n, addr)), [arg])
     | _ -> Use_default)
