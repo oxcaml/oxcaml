@@ -337,6 +337,8 @@
 
 #undef HAS_GETAUXVAL
 
+#undef HAS_MALLOC_TRIM
+
 #undef HAS_SYS_SHM_H
 
 #undef HAS_SHMAT
