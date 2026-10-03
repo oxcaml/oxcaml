@@ -112,10 +112,8 @@ type flambda_result =
     reachable_names : NO.t
   }
 
-let finalize_offsets ~free_names ~all_code slot_offsets =
-  Slot_offsets.finalize_offsets_from_free_names slot_offsets
-    ~get_code_metadata:(Exported_code.get_code_metadata all_code)
-    ~free_names
+let finalize_offsets ~free_names slot_offsets =
+  Slot_offsets.finalize_offsets_from_free_names slot_offsets ~free_names
 
 let run_reaper ~ppf ~prefixname ~machine_width ~cmx_loader ~all_code
     ~final_typing_env ~free_names flambda =
@@ -190,9 +188,7 @@ let flambda_to_flambda0 : type m.
         in
         flambda, all_code, slot_offsets, prepare_cmx, "reaper"
       else
-        let slot_offsets =
-          finalize_offsets ~free_names ~all_code slot_offsets
-        in
+        let slot_offsets = finalize_offsets ~free_names slot_offsets in
         let prepare_cmx ~module_symbol ~used_value_slots ~exported_offsets
             all_code =
           Flambda_cmx.prepare_cmx_from_approx ~machine_width ~approxs
@@ -237,9 +233,7 @@ let flambda_to_flambda0 : type m.
           in
           flambda, all_code, slot_offsets, final_typing_env, "reaper"
         else
-          let slot_offsets =
-            finalize_offsets ~free_names ~all_code slot_offsets
-          in
+          let slot_offsets = finalize_offsets ~free_names slot_offsets in
           flambda, all_code, slot_offsets, final_typing_env, last_pass_name
       in
       let prepare_cmx ~module_symbol ~used_value_slots ~exported_offsets

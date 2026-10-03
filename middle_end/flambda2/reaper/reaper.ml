@@ -31,8 +31,7 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
           continuation_info;
           code_deps;
           applications;
-          all_sets_of_closures;
-          closure_function_decls
+          all_sets_of_closures
         } =
     Traverse.run unit
   in
@@ -62,10 +61,7 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
                ~old_typing_env ~my_closure ~params ~results types))
       ~code_deps
   in
-  let slot_offsets =
-    Slot_offsets_analysis.compute ~free_names ~closure_function_decls
-      ~code_changes ~get_code_metadata solved_dep
-  in
+  let slot_offsets = Slot_offsets_analysis.compute ~free_names solved_dep in
   let Rebuild.{ body; all_code; code_ids_to_remember } =
     Rebuild.rebuild ~machine_width ~ordered_code_ids ~fixed_arity_continuations
       ~continuation_info ~final_typing_env ~types_rewrite_context ~code_changes
