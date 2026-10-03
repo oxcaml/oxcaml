@@ -55,6 +55,25 @@
 (cram
  (applies_to split_toplevel_pieces)
  (deps split_toplevel.ml split_toplevel_switch.ml))
+(tests
+ (names bigarray_generic)
+ (modes wasm)
+ ; Generic bigarray accesses are only specialized when the type analysis knows
+ ; the kind and layout of the bigarray, which requires whole-program
+ ; compilation.
+ (wasm_of_ocaml
+  (compilation_mode whole_program)
+  (flags :standard)))
+
+(tests
+ (names string_interning)
+ (modes wasm))
+
+; The programs compiled here run Wasm code and rely on Node's module
+; resolution (`require`, `require.main`). QuickJS provides neither, so these
+; tests are skipped under the `quickjs` profile.
 
 (cram
- (deps %{bin:wasm_of_ocaml}))
+ (deps %{bin:wasm_of_ocaml})
+ (enabled_if
+  (<> %{profile} quickjs)))

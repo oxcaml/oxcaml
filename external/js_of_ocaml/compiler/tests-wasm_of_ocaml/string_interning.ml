@@ -18,9 +18,8 @@ let short2 = "short string"
 let cell = ref ("", 0)
 
 let () =
-  cell :=
-    ("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", 17);
-  if Array.length Sys.argv > 999 then cell := ("unreachable", 0)
+  cell := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", 17;
+  if Array.length Sys.argv > 999 then cell := "unreachable", 0
 
 let () =
   let s, n = !cell in
