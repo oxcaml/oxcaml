@@ -130,6 +130,12 @@ let write_stdlib_dune ppf =
     parse_table Sys.argv.(3)
     |> StrTbl.to_seq
     |> Seq.map (fun (tgt_file, deps) ->
+      let strip s =
+        if String.starts_with s ~prefix:"./" then
+          String.sub s 2 (String.length s - 2)
+        else s
+      in
+      let tgt_file = strip tgt_file and deps = List.map strip deps in
       let basename = Filename.remove_extension tgt_file in
       let tgt_file =
         rename_file tgt_file and deps = List.map rename_file deps
