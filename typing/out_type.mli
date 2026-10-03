@@ -185,6 +185,11 @@ val tree_of_jkind_declaration:
 val tree_of_law_description:
     Ident.t -> law_description -> out_sig_item
 
+(** The types of the parameters of a law, which share their type variables,
+    with the kinds of the variables annotated at their first occurrence. *)
+val tree_of_law_params:
+    (Ident.t * type_expr) list -> (string * out_type) list
+
 (** {1 Module types }*)
 
 val tree_of_module:

@@ -135,6 +135,13 @@ type type_mismatch =
   | Jkind of Ikind.subjkind_error
   | Unsafe_mode_crossing of unsafe_mode_crossing_mismatch
 
+type law_mismatch =
+  | Law_arity of int * int
+  | Law_parameter_types of string option * Errortrace.moregen_error
+  | Law_clauses
+  | Law_module_path of { path : Path.t; name : string }
+  | Law_applied_path of Path.t
+
 type jkind_mismatch =
   | Manifest_missing
   | Manifest_mismatch
@@ -201,6 +208,11 @@ val jkind_declarations:
   jkind_declaration -> jkind_declaration ->
   jkind_mismatch option
 
+val law_descriptions:
+  loc:Location.t -> Env.t -> string ->
+  law_description -> law_description ->
+  law_mismatch option
+
 (** The functions [value_descriptions_consistency] and
     [type_declarations_consistency] check if two declaration are consistent.
     Declarations are consistent when there exists an environment such that the
@@ -249,3 +261,6 @@ val report_extension_constructor_mismatch :
 
 val report_jkind_mismatch :
   string -> string -> Format_doc.formatter -> jkind_mismatch -> unit
+
+val report_law_mismatch :
+  Env.t -> Format_doc.formatter -> law_mismatch -> unit
