@@ -92,6 +92,12 @@ val mark_persistent_in_quotations : Env.t -> Env.t
 val newty: type_desc -> type_expr
 val new_scoped_ty: int -> type_desc -> type_expr
 val newvar: ?name:string -> jkind_lr -> type_expr
+val newivar: ?name:string -> jkind_lr -> type_expr
+        (* Return a fresh [Tivar] with an empty ivar *)
+
+(** The scheduler on which filling a [Tivar] during unification
+    enqueues the ivar's handlers. Unification never runs it. *)
+val scheduler: unit -> Scheduler.t
 
 val new_rep_var
   : ?name:string
@@ -327,6 +333,21 @@ val try_expand_safe_opt: Env.t -> type_expr -> type_expr
 
 val expand_head_once: Env.t -> type_expr -> type_expr
 val expand_head: Env.t -> type_expr -> type_expr
+
+(** [upon_shape env ty ~run ~cancel] waits for the shape of [ty]'s expanded
+    head. If the head is a [Tvar], it is turned into a [Tivar]. Then exactly
+    one of the following is enqueued on {!scheduler}:
+    - [run shape], once the head has a shape;
+    - [cancel ()], if the head's ivar is defaulted, or if the head is a type
+      with no shape (e.g. a [Tunivar]).
+
+    Both run with the current levels at the time of the call to [upon_shape].
+
+    Safety: if [cancel] runs because the ivar was defaulted, it must fill the
+    ivar, e.g. by unifying [ty] with a type that has a shape. *)
+val upon_shape:
+  Env.t -> type_expr ->
+  run:(type_shape -> unit) -> cancel:(unit -> unit) -> unit
 val expand_head_opt: Env.t -> type_expr -> type_expr
 (** The compiler's own version of [expand_head] necessary for type-based
     optimisations. *)

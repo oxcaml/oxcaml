@@ -1,3 +1,7 @@
+scheduler.ml
+scheduler.mli
+ivar.ml
+ivar.mli
 jkind.ml
 jkind.mli
 jkind_types.ml

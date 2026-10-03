@@ -107,6 +107,10 @@ and raw_type_desc ppf ty =
     Tvar { name; jkind } ->
       fprintf ppf "Tvar (@,%a,@,%a)"
         print_name name (Format_doc.compat (Jkind.format env)) jkind
+  | Tivar { name; jkind; ivar } ->
+      fprintf ppf "Tivar (@,%a,@,%a,@,%s)"
+        print_name name (Format_doc.compat (Jkind.format env)) jkind
+        (match Ivar.peek ivar with None -> "empty" | Some _ -> "full")
   | Tarrow((l,arg,ret),t1,t2,c) ->
       fprintf ppf "@[<hov1>Tarrow((\"%s\",%a,%a),@,%a,@,%a,@,%s)@]"
         (string_of_label l)
