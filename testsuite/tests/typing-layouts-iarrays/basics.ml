@@ -244,6 +244,16 @@ module M6_2 = struct
 end
 
 [%%expect{|
+Line 10, characters 29-32:
+10 |   let f2 idx : int32_u = get arr idx
+                                  ^^^
+Error: The value "arr" has type "'a iarray"
+       but an expression was expected of type "int32_u iarray"
+       The layout of int32_u is bits32
+         because it is the primitive type int32_u.
+       But the layout of int32_u must be a sublayout of float64
+         because of the definition of arr at line 7, characters 12-16.
+|}, Principal{|
 Line 10, characters 25-36:
 10 |   let f2 idx : int32_u = get arr idx
                               ^^^^^^^^^^^
