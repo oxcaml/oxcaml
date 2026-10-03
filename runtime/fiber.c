@@ -295,7 +295,8 @@ Caml_inline int stack_cache_bucket (mlsize_t wosize) {
 
 static struct stack_info*
 alloc_size_class_stack_noexc(mlsize_t wosize, int cache_bucket, value hval,
-                             value hexn, value heff, value htick, int64_t id)
+                             value hexn, value heff, value htick,
+                             bool preemptible, int64_t id)
 {
   struct stack_info* stack;
   struct stack_cache* caches = Caml_state->stack_caches;
@@ -355,6 +356,7 @@ alloc_size_class_stack_noexc(mlsize_t wosize, int cache_bucket, value hval,
   stack->local_limit = 0;
   stack->dynamic = Val_null;
   stack->is_task = false;
+  stack->is_preemptible = preemptible;
 #ifdef DEBUG
   stack->magic = 42;
 #endif
@@ -371,7 +373,7 @@ caml_alloc_stack_noexc(mlsize_t wosize, value hval, value hexn, value heff, int6
 {
   int cache_bucket = stack_cache_bucket (wosize);
   return alloc_size_class_stack_noexc(wosize, cache_bucket, hval, hexn, heff,
-                                      /*htick=*/Val_null, id);
+                                      /*htick=*/Val_null, false, id);
 }
 
 static int64_t new_fiber_id(void)
@@ -388,7 +390,7 @@ value caml_alloc_stack (value hval, value hexn, value heff) {
   const int64_t id = new_fiber_id();
   struct stack_info *stack =
       alloc_size_class_stack_noexc(caml_fiber_wsz, 0 /* first bucket */, hval,
-                                   hexn, heff, /*htick=*/Val_null, id);
+                                   hexn, heff, /*htick=*/Val_null, false, id);
 
   if (!stack)
 #if defined(USE_MMAP_MAP_STACK) || defined(STACK_GUARD_PAGES)
@@ -408,7 +410,7 @@ value caml_alloc_stack_preemptible(value hval, value hexn, value heff,
   const int64_t id = new_fiber_id();
   struct stack_info* stack =
     alloc_size_class_stack_noexc(caml_fiber_wsz, 0 /* first bucket */,
-                                 hval, hexn, heff, htick, id);
+                                 hval, hexn, heff, htick, true, id);
 
   if (!stack)
 #if defined(USE_MMAP_MAP_STACK) || defined(STACK_GUARD_PAGES)
@@ -747,7 +749,7 @@ CAMLprim value caml_alloc_stack(value hval, value hexn, value heff)
   const int64_t id = new_fiber_id();
   struct stack_info *stack =
       alloc_size_class_stack_noexc(caml_fiber_wsz, 0 /* first bucket */, hval,
-                                   hexn, heff, /*htick=*/Val_null, id);
+                                   hexn, heff, /*htick=*/Val_null, false, id);
 
   if (!stack)
 #if defined(USE_MMAP_MAP_STACK) || defined(STACK_GUARD_PAGES)
@@ -772,7 +774,7 @@ CAMLprim value caml_alloc_stack_preemptible(value hval, value hexn,
   const int64_t id = new_fiber_id();
   struct stack_info* stack =
     alloc_size_class_stack_noexc(caml_fiber_wsz, 0 /* first bucket */,
-                                 hval, hexn, heff, htick, id);
+                                 hval, hexn, heff, htick, true, id);
 
   if (!stack)
 #if defined(USE_MMAP_MAP_STACK) || defined(STACK_GUARD_PAGES)
@@ -981,6 +983,7 @@ int caml_try_realloc_stack(asize_t required_space)
                                            Stack_handle_exception(old_stack),
                                            Stack_handle_effect(old_stack),
                                            Stack_handle_tick(old_stack),
+                                           old_stack->is_preemptible,
                                            old_stack->id);
 
   if (!new_stack) return 0;
@@ -1296,6 +1299,12 @@ void caml_continuation_replace(value cont, struct stack_info* stk)
   (void)b; /* squash unused warning */
 }
 
+static void check_preemptable(struct stack_info* stk, value htick)
+{
+  if (htick != Val_null && !Stack_is_preemptible(stk))
+    caml_fatal_error("cannot add a tick handler to a non-preemptible fiber");
+}
+
 CAMLprim value caml_continuation_update_handler_noexc
   (value cont, value hval, value hexn, value heff, value htick)
 {
@@ -1313,6 +1322,7 @@ CAMLprim value caml_continuation_update_handler_noexc
     return cont;
   }
   stk = Ptr_val(Field(cont, 1));
+  check_preemptable(stk, htick);
   Stack_handle_value(stk) = hval;
   Stack_handle_exception(stk) = hexn;
   Stack_handle_effect(stk) = heff;
@@ -1341,6 +1351,7 @@ CAMLprim value caml_continuation_update_tick_handler_noexc
     return cont;
   }
   while (Stack_parent(stk) != NULL) stk = Stack_parent(stk);
+  check_preemptable(stk, htick);
   Stack_handle_tick(stk) = htick;
   caml_continuation_replace(cont, Ptr_val(stack));
 
@@ -1443,7 +1454,7 @@ caml_result caml_tick_fiber_res(struct stack_info *stack) {
     }
   }
 
-  if (Stack_is_preemptible(stack)) {
+  if (Stack_handle_tick(stack) != Val_null) {
     res = caml_callback_res(Stack_handle_tick(stack), Val_unit);
     if (caml_result_is_exception(res)) {
       return res;
