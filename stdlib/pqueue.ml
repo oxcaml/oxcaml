@@ -12,6 +12,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open! Stdlib
+
 (* Priority queues over ordered elements.
 
    We choose to have polymorphic elements here, so that we can later

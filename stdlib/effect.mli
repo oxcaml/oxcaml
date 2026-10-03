@@ -22,6 +22,8 @@
     "The Effect interface may change in incompatible ways in the future."
 ]
 
+open! Stdlib
+
 type 'a t = 'a eff = ..
 (** The type of effects. *)
 
