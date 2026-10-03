@@ -1260,7 +1260,7 @@ and codes env (code1 : Code.t) (code2 : Code.t) =
   |> Comparison.add_condition
        ~approximant:(fun () -> subst_code env code1)
        ~cond:
-         (Flambda_arity.equal_exact (Code.params_arity code1)
+         (Code_metadata.equal_exact_params_arity (Code.params_arity code1)
             (Code.params_arity code2)
          && Flambda_arity.equal_exact (Code.result_arity code1)
               (Code.result_arity code2)

@@ -50,6 +50,7 @@ let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
   let my_closure = Variable.create "my_closure" K.value in
   let arity = Code.params_arity code in
   let params =
+    let arity = match arity with Tupled arity | Non_tupled arity -> arity in
     List.mapi
       (fun i kind ->
         Variable.create (Printf.sprintf "function_param_%i" i) (KS.kind kind))
@@ -64,13 +65,12 @@ let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
     | Assume _ -> false
     | Check _ -> true
   in
-  let is_tupled = Code.is_tupled code in
   let known_arity_call_witness =
     Acc.create_known_arity_call_witness acc code_id ~params ~returns:return ~exn
   in
   let unknown_arity_call_witnesses =
-    Acc.create_unknown_arity_call_witnesses acc code_id ~is_tupled ~arity
-      ~params ~returns:return ~exn
+    Acc.create_unknown_arity_call_witnesses acc code_id ~arity ~params
+      ~returns:return ~exn
   in
   let code_dep =
     { Traverse_acc.arity;
@@ -80,7 +80,6 @@ let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
       my_closure;
       exn;
       params;
-      is_tupled;
       known_arity_call_witness;
       unknown_arity_call_witnesses
     }

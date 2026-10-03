@@ -367,26 +367,30 @@ module Inlining = struct
     | Some (Value_const _)
     | Some (Block_approximation _) ->
       assert false
-    | Some (Closure_approximation { code; _ }) ->
+    | Some (Closure_approximation { code; _ }) -> (
       let metadata = Code_or_metadata.code_metadata code in
       (* CR-someday mshinwell/bclement: we should handle tupled functions
          correctly here rather than bailing out. (Tupled functions have detupled
          params in the code metadata but the apply has a single tuple
          argument) *)
-      if
-        (not (Code_or_metadata.code_present code))
-        || Code_metadata.is_tupled metadata
-      then (
+      let untupled_params_arity =
+        match Code_metadata.params_arity metadata with
+        | Non_tupled params_arity when Code_or_metadata.code_present code ->
+          Some params_arity
+        | Tupled _ | Non_tupled _ -> None
+      in
+      match untupled_params_arity with
+      | None ->
         Inlining_report.record_decision_at_call_site_for_known_function ~tracker
           ~apply ~pass:After_closure_conversion ~unrolling_depth:None
           ~callee:(Inlining_history.Absolute.empty compilation_unit)
           ~are_rebuilding_terms ~inlined_forwarded_from:None
           Definition_says_not_to_inline;
-        Not_inlinable)
-      else
+        Not_inlinable
+      | Some params_arity_from_code_metadata ->
         (* These calculations are all in terms of non-unarized parameters. *)
         let params_length_from_code_metadata =
-          Code_metadata.params_arity metadata |> Flambda_arity.num_params
+          params_arity_from_code_metadata |> Flambda_arity.num_params
         in
         let params_length_from_args =
           Flambda_arity.num_params (Apply_expr.args_arity apply)
@@ -419,7 +423,7 @@ module Inlining = struct
           ~apply ~pass:After_closure_conversion ~unrolling_depth:None
           ~callee:(Code.absolute_history code)
           ~are_rebuilding_terms ~inlined_forwarded_from:None decision;
-        res
+        res)
 
   let make_inlined_body acc ~callee ~called_code_id ~region_inlined_into
       ~inlined_attribute ~params ~args ~my_closure ~my_alloc_mode ~my_depth
@@ -1834,15 +1838,15 @@ let close_exact_or_unknown_apply acc env
     match kind with
     | Function -> (
       match (callee_approx : Env.value_approximation option) with
-      | Some (Closure_approximation { code_id; code = code_or_meta; _ }) ->
+      | Some (Closure_approximation { code_id; code = code_or_meta; _ }) -> (
         let meta = Code_or_metadata.code_metadata code_or_meta in
-        if Code_metadata.is_tupled meta
-        then
+        match Code_metadata.params_arity meta with
+        | Tupled _ ->
           (* CR keryan : We could do better here since we know the arity, but we
              would have to untuple the arguments and we lack information for
              now *)
           acc, Call_kind.indirect_function_call_unknown_arity, false, false
-        else
+        | Non_tupled params_arity_from_code ->
           let result_arity_from_code = Code_metadata.result_arity meta in
           if
             (* See comment about when this check can be done, in
@@ -1853,8 +1857,8 @@ let close_exact_or_unknown_apply acc env
               && Misc.Stdlib.List.equal
                    (Misc.Stdlib.List.equal K.With_subkind.equal_ignoring_subkind)
                    (Flambda_arity.unarize_per_parameter args_arity)
-                   (Flambda_arity.unarize_per_parameter
-                      (Code_metadata.params_arity meta)))
+                   (Flambda_arity.unarize_per_parameter params_arity_from_code)
+              )
           then
             if Flambda_features.kind_checks ()
             then
@@ -1862,8 +1866,7 @@ let close_exact_or_unknown_apply acc env
                 "Wrong arity for direct OCaml function call to %a@ (expected \
                  parameters (%a) and result (%a),@ found arguments (%a) and \
                  return (%a)):@ %a@ code metadata:@ %a"
-                Ident.print func Flambda_arity.print
-                (Code_metadata.params_arity meta)
+                Ident.print func Flambda_arity.print params_arity_from_code
                 Flambda_arity.print result_arity_from_code Flambda_arity.print
                 args_arity Flambda_arity.print return_arity
                 Debuginfo.print_compact dbg Code_metadata.print meta
@@ -1874,6 +1877,7 @@ let close_exact_or_unknown_apply acc env
               && not (Code_metadata.is_my_closure_used meta)
             in
             acc, Call_kind.direct_function_call code_id, can_erase_callee, false
+        )
       | None ->
         acc, Call_kind.indirect_function_call_unknown_arity, false, false
       | Some (Unknown _ | Value_symbol _ | Value_const _ | Block_approximation _)
@@ -2394,9 +2398,8 @@ let compute_body_of_unboxed_function acc my_region my_alloc_region my_closure
   ( acc,
     unboxed_body,
     Bound_parameters.create main_code_params,
-    Flambda_arity.create main_code_params_arity,
+    Code_metadata.Non_tupled (Flambda_arity.create main_code_params_arity),
     main_code_param_modes,
-    false,
     First_complex_local_param.Never_partially_applied,
     result_arity_main_code,
     unboxed_return_continuation,
@@ -2408,10 +2411,9 @@ let first_complex_local_param_of_function_decl decl =
 let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
     params_arity ~unarized_param_modes:param_modes return result_arity_main_code
     code_id main_code_id decl loc external_env recursive
-    contains_no_escaping_local_allocs cost_metrics dbg is_tupled
-    inlining_decision absolute_history relative_history main_code
-    by_function_slot function_code_ids unboxed_function_slot unboxed_params
-    unboxed_return =
+    contains_no_escaping_local_allocs cost_metrics dbg inlining_decision
+    absolute_history relative_history main_code by_function_slot
+    function_code_ids unboxed_function_slot unboxed_params unboxed_return =
   (* The outside caller gave us the function slot and code ID meant for the
      boxed function, which will be a wrapper. So in this branch everything
      starting with 'main_' refers to the version with unboxed return/params. *)
@@ -2658,8 +2660,8 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
       ~cold:false ~is_opaque:false ~recursive ~newer_version_of:None
       ~cost_metrics
       ~inlining_arguments:(Inlining_arguments.create ~round:0)
-      ~dbg ~is_tupled ~is_my_closure_used:true ~inlining_decision
-      ~absolute_history ~relative_history ~loopify:Never_loopify
+      ~dbg ~is_my_closure_used:true ~inlining_decision ~absolute_history
+      ~relative_history ~loopify:Never_loopify
   in
   let main_approx =
     let code = Code_or_metadata.create main_code in
@@ -2951,7 +2953,6 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
         main_code_unarized_params,
         main_code_params_arity,
         main_code_unarized_param_modes,
-        main_code_is_tupled,
         first_complex_local_param_main_code,
         result_arity_main_code,
         return_continuation,
@@ -2959,12 +2960,16 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
     match calling_convention with
     | Normal_calling_convention ->
       let acc, body = compute_body acc in
+      let params_arity =
+        if is_tupled
+        then Code_metadata.Tupled params_arity
+        else Code_metadata.Non_tupled params_arity
+      in
       ( acc,
         body,
         unarized_params,
         params_arity,
         unarized_param_modes,
-        is_tupled,
         first_complex_local_param_of_function_decl decl,
         return,
         return_continuation,
@@ -3079,7 +3084,7 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
       ~is_opaque:(Function_decl.is_opaque decl)
       ~recursive ~newer_version_of:None ~cost_metrics
       ~inlining_arguments:(Inlining_arguments.create ~round:0)
-      ~dbg ~is_tupled:main_code_is_tupled
+      ~dbg
       ~is_my_closure_used:
         (Function_params_and_body.is_my_closure_used params_and_body)
       ~inlining_decision ~absolute_history ~relative_history ~loopify
@@ -3095,13 +3100,17 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
           unboxed_function_slot;
           needs_region_wrapper = _
         } ->
+      let params_arity =
+        if is_tupled
+        then Code_metadata.Tupled params_arity
+        else Code_metadata.Non_tupled params_arity
+      in
       make_unboxed_function_wrapper acc function_slot ~unarized_params
         params_arity ~unarized_param_modes return result_arity_main_code code_id
         main_code_id decl loc external_env recursive
-        contains_no_escaping_local_allocs cost_metrics dbg is_tupled
-        inlining_decision absolute_history relative_history main_code
-        by_function_slot function_code_ids unboxed_function_slot params_unboxing
-        return_unboxing
+        contains_no_escaping_local_allocs cost_metrics dbg inlining_decision
+        absolute_history relative_history main_code by_function_slot
+        function_code_ids unboxed_function_slot params_unboxing return_unboxing
   in
   let approx =
     let code = Code_or_metadata.create code in
@@ -3230,10 +3239,10 @@ let close_functions acc external_env ~current_alloc_region ~current_region
         in
         let cost_metrics = Cost_metrics.zero in
         let dbg = Debuginfo.from_location (Function_decl.loc decl) in
-        let is_tupled =
+        let params_arity =
           match Function_decl.kind decl with
-          | Curried _ -> false
-          | Tupled -> true
+          | Curried _ -> Code_metadata.Non_tupled params_arity
+          | Tupled -> Code_metadata.Tupled params_arity
         in
         let metadata =
           Code_metadata.create code_id ~params_arity
@@ -3249,8 +3258,7 @@ let close_functions acc external_env ~current_alloc_region ~current_region
             ~recursive:(Function_decl.recursive decl)
             ~newer_version_of:None ~cost_metrics
             ~inlining_arguments:(Inlining_arguments.create ~round:0)
-            ~dbg ~is_tupled ~is_my_closure_used:true
-            ~inlining_decision:Recursive
+            ~dbg ~is_my_closure_used:true ~inlining_decision:Recursive
             ~absolute_history:(Inlining_history.Absolute.empty compilation_unit)
             ~relative_history:Inlining_history.Relative.empty
             ~loopify:Never_loopify
@@ -3836,7 +3844,6 @@ let close_apply acc env (apply : IR.apply) : Expr_with_acc.t =
       Some
         ( Code_metadata.params_arity metadata,
           Code_metadata.result_arity metadata,
-          Code_metadata.is_tupled metadata,
           Code_metadata.param_modes metadata,
           Code_metadata.first_complex_local_param metadata,
           Code_metadata.result_mode metadata )
@@ -3855,19 +3862,18 @@ let close_apply acc env (apply : IR.apply) : Expr_with_acc.t =
   | Some
       ( params_arity,
         result_arity,
-        is_tupled,
         param_modes,
         first_complex_local_param,
         result_mode ) -> (
     let split_args =
       let non_unarized_arity, arity =
         let arity =
-          if is_tupled
-          then
+          match params_arity with
+          | Non_tupled arity -> arity
+          | Tupled arity ->
             Flambda_arity.create_singletons
               [ Flambda_kind.With_subkind.block Tag.zero
-                  (Flambda_arity.unarize params_arity) ]
-          else params_arity
+                  (Flambda_arity.unarize arity) ]
         in
         arity, Flambda_arity.unarize arity
       in
@@ -3938,9 +3944,12 @@ let close_apply acc env (apply : IR.apply) : Expr_with_acc.t =
              Inlining_helpers.(
                inlined_attribute_on_partial_application_msg Inlined))
       | Never_inlined | Hint_inlined | Forward_inlined | Default_inlined -> ());
+      let arity =
+        match params_arity with Non_tupled arity | Tupled arity -> arity
+      in
       wrap_partial_application acc env apply.continuation apply approx ~provided
-        ~provided_arity ~missing_arity ~missing_param_modes ~result_arity
-        ~arity:params_arity ~first_complex_local_param ~result_mode
+        ~provided_arity ~missing_arity ~missing_param_modes ~result_arity ~arity
+        ~first_complex_local_param ~result_mode
     | Over_app { full; provided_arity; remaining; remaining_arity; result_mode }
       ->
       if not (Flambda_arity.is_one_param_of_kind_value result_arity)

@@ -41,6 +41,22 @@ type closure_code_pointers =
 
 let get_func_decl_params_arity t code_id =
   let info = Env.get_code_metadata t code_id in
+  let params_arity, kind =
+    match Code_metadata.params_arity info with
+    | Tupled params_arity -> params_arity, Lambda.Tupled
+    | Non_tupled params_arity ->
+      let nlocal =
+        match
+          (Code_metadata.first_complex_local_param info
+            : First_complex_local_param.t)
+        with
+        | Index index -> Flambda_arity.num_params params_arity - index
+        | Never_partially_applied ->
+          (* This value should never be observed. *)
+          0
+      in
+      params_arity, Lambda.Curried { nlocal }
+  in
   (* Avoid generation of excessive amounts of caml_curry functions that only
      distinguish between values and tagged integers; see comments in
      cmm_helpers.ml. *)
@@ -53,28 +69,11 @@ let get_func_decl_params_arity t code_id =
             |> C.Extended_machtype.change_tagged_int_to_val)
           ks
         |> Array.concat)
-      (Flambda_arity.unarize_per_parameter (Code_metadata.params_arity info))
+      (Flambda_arity.unarize_per_parameter params_arity)
   in
   let result_machtype =
     C.extended_machtype_of_return_arity (Code_metadata.result_arity info)
     |> C.Extended_machtype.change_tagged_int_to_val
-  in
-  let kind : Lambda.function_kind =
-    if Code_metadata.is_tupled info
-    then Lambda.Tupled
-    else
-      let nlocal =
-        match
-          (Code_metadata.first_complex_local_param info
-            : First_complex_local_param.t)
-        with
-        | Index index ->
-          Flambda_arity.num_params (Code_metadata.params_arity info) - index
-        | Never_partially_applied ->
-          (* This value should never be observed. *)
-          0
-      in
-      Lambda.Curried { nlocal }
   in
   let closure_code_pointers =
     match kind, params_ty with

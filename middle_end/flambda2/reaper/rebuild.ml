@@ -2181,11 +2181,15 @@ and rebuild_function_params_and_body (env : env) res code_metadata
   | Not_changing_calling_convention ->
     (* The value_kind of the parameters might have been rewritten and stored in
        the metadata; update the parameters to match *)
+    let params_arity =
+      match Code_metadata.params_arity code_metadata with
+      | Tupled params_arity | Non_tupled params_arity -> params_arity
+    in
     let params =
       Bound_parameters.create
         (List.map2 Bound_parameter.with_kind
            (Bound_parameters.to_list params)
-           (Flambda_arity.unarize (Code_metadata.params_arity code_metadata)))
+           (Flambda_arity.unarize params_arity))
     in
     let body, res = rebuild_body env in
     let code_metadata = update_size code_metadata body in

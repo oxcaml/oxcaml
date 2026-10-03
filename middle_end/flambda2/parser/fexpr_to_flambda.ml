@@ -805,14 +805,22 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
             (fun _ -> Alloc_mode.For_types.heap)
             (Flambda_arity.unarize params_arity)
         in
+        let params_arity, first_complex_local_param =
+          if is_tupled
+          then
+            ( Code_metadata.Tupled params_arity,
+              First_complex_local_param.Never_partially_applied )
+          else
+            ( Code_metadata.Non_tupled params_arity,
+              First_complex_local_param.Index
+                (Flambda_arity.num_params params_arity) )
+        in
         let code =
           (* CR mshinwell: [inlining_decision] should maybe be set properly *)
           Code.create code_id ~params_and_body ~free_names_of_params_and_body
             ~newer_version_of ~params_arity ~param_modes
-            ~first_complex_local_param:
-              (First_complex_local_param.Index
-                 (Flambda_arity.num_params params_arity))
-            ~result_arity ~result_types:Unknown ~result_mode ~stub ~inline
+            ~first_complex_local_param ~result_arity ~result_types:Unknown
+            ~result_mode ~stub ~inline
             ~zero_alloc_attribute:Default_zero_alloc
               (* CR gyorsh: should [check] be set properly? *)
             ~is_a_functor:false ~is_opaque:false ~recursive
@@ -820,7 +828,7 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
             ~inlining_arguments:(Inlining_arguments.create ~round:0)
             ~poll_attribute:Default ~regalloc_attribute:Default_regalloc
             ~regalloc_param_attribute:Default_regalloc_params ~cold:false
-            ~dbg:Debuginfo.none ~is_tupled ~is_my_closure_used
+            ~dbg:Debuginfo.none ~is_my_closure_used
             ~inlining_decision:Never_inline_attribute
             ~absolute_history:
               (Inlining_history.Absolute.empty (Current_unit.get_cu_exn ()))
