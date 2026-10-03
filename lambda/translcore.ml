@@ -1278,7 +1278,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       Llet(Strict, Lambda.layout_object, cpy, cpy_duid,
            Lapply{
              ap_loc=Loc_unknown;
-             ap_func=Translobj.oo_prim "copy";
+             ap_func=transl_prim "CamlinternalOO" "copy";
              ap_args=[self];
              ap_result_layout=Lambda.layout_object;
              ap_region_close=Rc_normal;

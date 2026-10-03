@@ -2323,10 +2323,10 @@ let prim_obj_tag =
   Lambda.simple_prim_on_values ~name:"caml_obj_tag" ~arity:1 ~alloc:false
 
 let code_force_lazy_block =
-  lazy (transl_prim "CamlinternalLazy" "force_lazy_block")
+  lazy (Typeopt.transl_prim "CamlinternalLazy" "force_lazy_block")
 
 let code_force_lazy =
-  lazy (transl_prim "CamlinternalLazy" "force_gen")
+  lazy (Typeopt.transl_prim "CamlinternalLazy" "force_gen")
 
 (* inline_lazy_force inlines the beginning of the code of Lazy.force. When
    the value argument is tagged as:
@@ -3707,7 +3707,7 @@ let combine_extension_constructor value_kind loc arg pat_env pat_barrier partial
           let tests =
             List.fold_right
               (fun (path, act) rem ->
-                let ext = transl_extension_path loc pat_env path in
+                let ext = Typeopt.transl_extension_path loc pat_env path in
                 Lifthenelse
                   (phys_equal ~loc (Lvar tag) ext, act, rem, value_kind))
               nonconsts default
@@ -3721,7 +3721,7 @@ let combine_extension_constructor value_kind loc arg pat_env pat_barrier partial
     in
     List.fold_right
       (fun (path, act) rem ->
-        let ext = transl_extension_path loc pat_env path in
+        let ext = Typeopt.transl_extension_path loc pat_env path in
         Lifthenelse (phys_equal ~loc arg ext, act, rem,
                       value_kind))
       consts nonconst_lambda
@@ -4551,7 +4551,7 @@ let failure_handler ~scopes loc ~failer () =
   | Raise_match_failure ->
     let sloc = Scoped_location.of_location ~scopes loc in
     let slot =
-      transl_extension_path sloc
+      Typeopt.transl_extension_path sloc
         (Lazy.force Env.initial) Predef.path_match_failure
     in
     let fname, line, char =

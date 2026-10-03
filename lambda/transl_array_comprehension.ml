@@ -222,7 +222,7 @@ end = struct
   let raise_overflow_exn ~loc =
     let loc' = Debuginfo.Scoped_location.to_location loc in
     let slot =
-      transl_extension_path loc (Lazy.force Env.initial)
+      Typeopt.transl_extension_path loc (Lazy.force Env.initial)
         Predef.path_invalid_argument
     in
     (* CR-someday aspectorzabusky: We might want to raise an event here for

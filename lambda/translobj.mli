@@ -15,8 +15,6 @@
 
 open Lambda
 
-val oo_prim: string -> lambda
-
 val share: structured_constant -> lambda
 val meth: lambda -> string -> lambda * lambda list
 

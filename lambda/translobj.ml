@@ -15,10 +15,6 @@
 
 open Lambda
 
-(* Get oo primitives identifiers *)
-
-let oo_prim = Lambda.transl_prim "CamlinternalOO"
-
 (* Share blocks *)
 
 let consts : (structured_constant, Ident.t) Hashtbl.t = Hashtbl.create 17

@@ -1378,6 +1378,85 @@ let label_sort_for_representation (label : Data_types.label_description)
     Misc.fatal_error
       "label_sort_for_representation: unexpected immediate representation"
 
+let transl_module_representation repr =
+  (* Potentially an underapproximation, since the scannable axes in [layouts]
+     will all be [max]. This should not matter, though, since it is not possible
+     to reassign / directly mutate a [val] in a module. *)
+  let layouts =
+    Array.map
+      (fun sort ->
+         let sort = Jkind.Sort.default_for_transl_and_get sort in
+         Jkind.Layout.Const.of_sort_const sort Jkind_types.Scannable_axes.max)
+      repr
+  in
+  (* These layouts come from sorts, so they will never be [any]. *)
+  if Array.for_all Jkind_types.Layout.Const.is_scannable_or_any layouts
+  then Module_value_only { field_count = Array.length layouts }
+  else
+    let shape = Array.map transl_layout layouts in
+    Module_mixed
+      ( shape,
+        mixed_product_shape_for_read
+        ~get_value_kind:(fun _ -> generic_value)
+        ~get_mode:(fun _ ->
+           Misc.fatal_error
+             "Typeopt.transl_module_representation: unexpected [Float_boxed].")
+        shape)
+
+(* Translate an access path *)
+
+let rec transl_address loc = function
+  | Env.Aunit (cu, mode) ->
+    let staticity = Mode.With_regionality.proj_monadic Staticity mode in
+    let staticity =
+      match Mode.Staticity.zap_to_floor_exn staticity with
+      | Static -> Static
+      | Dynamic -> Dynamic
+    in
+    Lprim(Pgetglobal (cu, staticity), [], loc)
+  | Env.Alocal id ->
+      if Ident.is_predef id
+      then Lprim (Pgetpredef id, [], loc)
+      else Lvar id
+  | Env.Adot(addr, module_repr, pos) ->
+      let module_repr = transl_module_representation module_repr in
+      Lprim(mod_field pos module_repr, [transl_address loc addr], loc)
+
+let transl_path find loc env path =
+  match find path env with
+  | exception Not_found ->
+      Misc.fatal_error ("Cannot find address for: " ^ (Path.name path))
+  | addr -> transl_address loc addr
+
+(* Translation of identifiers *)
+
+let transl_module_path loc env path =
+  transl_path Env.find_module_address loc env path
+
+let transl_value_path loc env path =
+  transl_path Env.find_value_address loc env path
+
+let transl_extension_path loc env path =
+  transl_path Env.find_constructor_address loc env path
+
+let transl_class_path loc env path =
+  transl_path Env.find_class_address loc env path
+
+let transl_prim modname field =
+  let mod_ident = Ident.create_persistent modname in
+  let env = Env.add_persistent_structure mod_ident (Lazy.force Env.initial) in
+  match Env.open_pers_signature modname env with
+  | exception Not_found ->
+      Misc.fatal_errorf "Module %s unavailable." modname
+    | _path, env -> (
+      match Env.find_value_by_name_lazy (Longident.Lident field) env with
+      | exception Not_found ->
+          Misc.fatal_errorf "Primitive %s.%s not found." modname field
+        (* Loc_unknown is appropriate here: this references a compiler-internal
+            primitive with no corresponding user source location. *)
+      | path, _ -> transl_value_path Loc_unknown env path
+    )
+
 let refine_mixed_block_element env loc ty mbe =
   try
     let (_num_nodes_visited, value_kind) =
