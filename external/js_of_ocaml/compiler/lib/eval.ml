@@ -140,6 +140,12 @@ let nativeint_shiftop (l : constant list) (f : Targetnativeint.t -> int -> Targe
 
 let quiet_nan n = Int64.logor n 0x00_08_00_00_00_00_00_00L
 
+(* The JavaScript runtime does not preserve NaN bits *)
+let can_fold_bits_of_float ~target f =
+  match target with
+  | `JavaScript -> not (Float.is_nan (Int64.float_of_bits f))
+  | `Wasm -> true
+
 let eval_prim ~target x =
   match x with
   | Not, [ Int i ] -> bool (Targetint.is_zero i)
@@ -230,7 +236,7 @@ let eval_prim ~target x =
       | "caml_ldexp_float", [ Float f; Int i ] ->
           Some (float (ldexp (Int64.float_of_bits f) (Targetint.to_int_exn i)))
       (* int32 *)
-      | "caml_int32_bits_of_float", [ Float f ] ->
+      | "caml_int32_bits_of_float", [ Float f ] when can_fold_bits_of_float ~target f ->
           int32 (Int32.bits_of_float (Int64.float_of_bits f))
       | "caml_int32_float_of_bits", [ Int32 i ]
         when match target with
@@ -265,7 +271,7 @@ let eval_prim ~target x =
       | "caml_nativeint_of_int32", [ Int32 i ] -> Some (NativeInt (Targetnativeint.of_int32_truncate i))
       | "caml_nativeint_to_int32", [ NativeInt i ] -> Some (Int32 (Targetnativeint.to_int32 i))
       (* nativeint *)
-      | "caml_nativeint_bits_of_float", [ Float f ] ->
+      | "caml_nativeint_bits_of_float", [ Float f ] when can_fold_bits_of_float ~target f ->
           nativeint (Targetnativeint.bits_of_float (Int64.float_of_bits f))
       | "caml_nativeint_float_of_bits", [ NativeInt i ]
         when match target with
@@ -310,7 +316,8 @@ let eval_prim ~target x =
           Some (Int (Targetint.of_int64_truncate i))
       | "caml_nativeint_of_int", [ Int i ] -> nativeint (Targetnativeint.of_int64_truncate (Targetint.to_int64 i))
       (* int64 *)
-      | "caml_int64_bits_of_float", [ Float f ] -> int64 f
+      | "caml_int64_bits_of_float", [ Float f ] when can_fold_bits_of_float ~target f ->
+          int64 f
       | "caml_int64_float_of_bits", [ Int64 i ]
         when match target with
              | `JavaScript ->
