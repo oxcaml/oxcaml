@@ -2085,7 +2085,14 @@ and rebuild_expr (env : env) (res : rebuild_result)
     | Switch switch ->
       let arms =
         Target_ocaml_int.Map.filter_map
-          (fun _ -> rewrite_apply_cont_expr env)
+          (fun _ arm ->
+            match rewrite_apply_cont_expr env (Switch_expr.arm_action arm) with
+            | None -> None
+            | Some action ->
+              Some
+                (Switch_expr.create_arm_with_likelihood
+                   ~likelihood:(Switch_expr.arm_likelihood arm)
+                   action))
           (Switch_expr.arms switch)
       in
       if Target_ocaml_int.Map.is_empty arms

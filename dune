@@ -179,6 +179,7 @@
   file_sections
   lru
   id_counter
+  likelihood
   ;; PARSING
   location
   longident
