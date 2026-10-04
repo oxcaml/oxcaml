@@ -433,7 +433,12 @@ let select_operation'
   (* Recognize store instructions *)
   | Cstore (((Word_int | Word_val) as chunk), _init) -> (
     match[@ocaml.warning "-fragile-match"] args with
-    | [loc; Cop (Caddi, [Cop (Cload _, [loc'], _); Cconst_int (n, _dbg)], _)]
+    | [ loc;
+        Cop
+          ( Caddi,
+            [ Cop (Cload { memory_chunk = Word_int | Word_val; _ }, [loc'], _);
+              Cconst_int (n, _dbg) ],
+            _ ) ]
       when Cmm_peephole_engine.Cmm_comparator.equivalent loc loc'
            && int_is_immediate n ->
       let addr, arg = select_addressing chunk loc in

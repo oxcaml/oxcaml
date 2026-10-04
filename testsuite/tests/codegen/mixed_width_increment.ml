@@ -13,7 +13,9 @@ let[@inline never] increment b =
     (Int64.succ (Int64.of_int32 (unsafe_get_int32 b 0)))
 [%%expect_asm X86_64{|
 increment:
-  addq  $1, (%rax)
+  movslq (%rax), %rbx
+  incq  %rbx
+  movq  %rbx, (%rax)
   movl  $1, %eax
   ret
 |}]
@@ -26,5 +28,5 @@ let () =
   increment b;
   Format.printf "%Ld@." (Bytes.get_int64_ne b 0)
 [%%expect {|
-4294967297
+1
 |}]
