@@ -639,6 +639,7 @@ let module_coercion sub = function
   | Tcoerce_primitive {pc_loc; pc_env; _} ->
       sub.location sub pc_loc;
       sub.env sub pc_env
+  | Tcoerce_kindtemplate _ -> ()
   | Tcoerce_invalid -> ()
 
 let module_expr sub {mod_loc; mod_desc; mod_mode; mod_env; mod_attributes; _} =

@@ -100,18 +100,6 @@ let rec remove0 : type t k r v.
 let remove : type t k v. (t, k, v) is_trie -> k Constant.hlist -> t -> t =
  fun w k t -> match k, w with [], _ -> . | k :: ks, _ -> remove0 w k ks t
 
-let rec union : type t k v.
-    (t, k, v) is_trie -> (v -> v -> v option) -> t -> t -> t =
- fun w f t1 t2 ->
-  match w with
-  | Map_is_trie -> Int.Map.union (fun _ left right -> f left right) t1 t2
-  | Nested_trie w' ->
-    Int.Map.union
-      (fun _ left right ->
-        let s = union w' f left right in
-        if is_empty w' s then None else Some s)
-      t1 t2
-
 let rec iter : type t k v.
     (t, k, v) is_trie -> (k Constant.hlist -> v -> unit) -> t -> unit =
  fun is_trie f t ->

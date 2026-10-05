@@ -21,26 +21,37 @@ open Js_of_ocaml_compiler
 
 let () =
   Sys.catch_break true;
-  let argv = Jsoo_cmdline.normalize_argv ~warn:(warn "%s") Sys.argv in
+  let argv = Sys.argv in
   let argv =
     let like_arg x = String.length x > 0 && Char.equal x.[0] '-' in
     let like_command x =
       String.length x > 0
       && (not (Char.equal x.[0] '-'))
       && String.for_all x ~f:(function
-           | 'a' .. 'z' | 'A' .. 'Z' | '-' -> true
-           | _ -> false)
+        | 'a' .. 'z' | 'A' .. 'Z' | '-' -> true
+        | _ -> false)
     in
-    match Array.to_list argv with
-    | exe :: maybe_command :: rest ->
-        if like_command maybe_command || like_arg maybe_command
-        then argv
-        else
-          (* Keep compatibility with js_of_ocaml < 3.6.0 *)
-          Array.of_list (exe :: Cmdliner.Cmd.name Compile.command :: maybe_command :: rest)
-    | _ -> argv
+    let prefix, rest =
+      match Array.to_list argv with
+      | exe :: ("--__complete" as comp) :: rest -> [ exe; comp ], rest
+      | exe :: rest -> [ exe ], rest
+      | [] -> assert false
+    in
+    let argv =
+      match rest with
+      | maybe_command :: rest ->
+          if like_command maybe_command || like_arg maybe_command
+          then prefix @ (maybe_command :: rest)
+          else
+            (* Keep compatibility with js_of_ocaml < 3.6.0 *)
+            prefix @ (Cmdliner.Cmd.name Compile.command :: maybe_command :: rest)
+      | _ -> prefix @ rest
+    in
+    Array.of_list argv
   in
   try
+    with_async_exns
+    @@ fun () ->
     match
       Cmdliner.Cmd.eval_value
         ~catch:false
@@ -57,11 +68,8 @@ let () =
            ])
     with
     | Ok (`Ok () | `Help | `Version) ->
-        if !warnings > 0 && !werror
-        then (
-          Format.eprintf "%s: all warnings being treated as errors@." Sys.argv.(0);
-          exit 1)
-        else exit 0
+        Warning.process_warnings ();
+        exit 0
     | Error `Term -> exit 1
     | Error `Parse -> exit Cmdliner.Cmd.Exit.cli_error
     | Error `Exn -> ()
@@ -84,7 +92,7 @@ let () =
       Format.eprintf "%s: Error: Bytecode version mismatch.@." Sys.argv.(0);
       let k =
         match Magic_number.kind h with
-        | (`Cmo | `Cma | `Cmj | `Cmja | `Exe) as x -> x
+        | (`Cmo | `Cma | `Exe) as x -> x
         | `Other _ -> assert false
       in
       let comp =

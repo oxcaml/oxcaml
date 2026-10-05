@@ -119,6 +119,8 @@ let register callback =
         fun _filename -> ())
   | _ -> Misc.fatal_error "JIT not supported on this architecture"
 
+let is_registered () = Option.is_some !current_callback
+
 let unregister () =
   current_callback := None;
   match Target_system.architecture () with

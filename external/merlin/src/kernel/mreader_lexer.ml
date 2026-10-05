@@ -76,6 +76,8 @@ let initial_position config =
 
 let make warnings keywords config source =
   Msupport.catch_errors warnings (ref []) @@ fun () ->
+  (* Forget any [#syntax] directive left over from a previous buffer. *)
+  Lexer_raw.reset_syntax_mode ();
   let items =
     get_tokens keywords (initial_position config) (Msource.text source) []
   in

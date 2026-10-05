@@ -2193,6 +2193,22 @@ let instance_prim_layout env (desc : Primitive.description) ty =
   (* Instantiate a jkind with layout
      [any <scannable axes> <addressability>] to one with
      ['s <scannable axes> <addressability>], where all ['s] are shared. *)
+  (* CR-someday layout-polymorphism: It's somewhat odd that this function
+     decides to instantiate variables for [any] and [any]-under-[addressable],
+     but not [any] under products or [box].
+
+     There is no obvious choice here, given that the design of [@layout_poly]
+     does not allow specifying *which* sort variables are equivalent. For
+     example, if we instantiated sort variables under products, then the
+     following hypothetical primitive would only support unboxed pairs whose
+     components have the same sorts.
+     {[
+       external usnd : ('a : any) ('b : any). #('a * 'b) -> 'b
+     ]}
+
+     We should probably instead just replace [@layout_poly] with "real" layout
+     polymorphism.
+  *)
   let instance_sort_var_for_lpoly_jkind jkind =
     let rec instance_layout
       : Jkind.Sort.t Jkind.Layout.t -> _ option = function
@@ -2201,7 +2217,7 @@ let instance_prim_layout env (desc : Primitive.description) ty =
         Option.map
           (fun l -> Jkind.Layout.Addressable l)
           (instance_layout layout)
-      | Sort _ | Product _ -> None
+      | Sort _ | Product _ | Box _ -> None
     in
     match Jkind.extract_layout env jkind with
     | Error _ -> None
@@ -2849,7 +2865,7 @@ let prim_params_yielding env ty ~arity =
     create_yielding_mode_l (Yielding.join yieldings)
 
 let is_principal ty =
-  not !Clflags.principal || get_level ty = generic_level
+  not !Clflags.principal || get_level ty >= subject_level
 
 type unwrapped_type_expr =
   { ty : type_expr
@@ -3062,21 +3078,21 @@ let type_jkind_purely_if_principal' =
 
 (* Helper functions for creating jkind contexts *)
 let mk_is_abstract env p =
-  let decl =
-    try Env.find_type p env
-    with Not_found ->
-      Misc.fatal_errorf_doc "mk_is_abstract: type %a not found in environment"
-        Path.print p
-  in
-  match decl.type_kind with
-  | Type_abstract _ ->
-    (* Check if it's truly abstract (no manifest) or just an abbreviation *)
-    begin match decl.type_manifest with
-    | None -> true  (* Truly abstract - no manifest *)
-    | Some _ -> false  (* Type abbreviation - has manifest *)
-    end
-  | Type_variant _ | Type_record _ | Type_open | Type_record_unboxed_product _
-  -> false
+  match Env.find_type p env with
+  | exception Not_found ->
+    (* [p]'s declaration is unavailable, most likely because its cmi is
+       missing. Treat [p] as abstract so normalization never skips it. *)
+    true
+  | decl ->
+    match decl.type_kind with
+    | Type_abstract _ ->
+      (* Check if it's truly abstract (no manifest) or just an abbreviation *)
+      begin match decl.type_manifest with
+      | None -> true  (* Truly abstract - no manifest *)
+      | Some _ -> false  (* Type abbreviation - has manifest *)
+      end
+    | Type_variant _ | Type_record _ | Type_open
+    | Type_record_unboxed_product _ -> false
 
 let mk_jkind_context env jkind_of_type =
   let lookup_type p =
@@ -3141,14 +3157,11 @@ let apply_jkind_wrapping_r ~env ~unwrapped_ty:{ ty = _; modality; or_null }
          [assert false]. But we don't have a principled reason why (one likely
          exists by thinking sufficiently hard about the sole callsite in
          [constrain_type_jkind].) *)
-      match Jkind.apply_or_null_r env jkind with
-      | Ok jkind -> jkind
-      | Error () ->
-        Misc.fatal_error "Ctype.apply_jkind_wrapping_r: nested or_nulls"
+      Jkind.apply_or_null_r env jkind
     else
-      jkind
+      Ok jkind
   end
-  |> Jkind.apply_modality_r modality
+  |> Result.map (Jkind.apply_modality_r modality)
 
 let maybe_expand_component env ty ~expand_components =
   match expand_components with
@@ -3529,9 +3542,13 @@ let constrain_type_jkind ~fixed env ty jkind =
                let results =
                  Misc.Stdlib.List.map3
                    (fun unwrapped_ty ty's_jkind jkind ->
-                      let jkind =
-                        apply_jkind_wrapping_r ~env jkind ~unwrapped_ty
-                      in
+                      match apply_jkind_wrapping_r ~env jkind ~unwrapped_ty with
+                      | Error () ->
+                        Error
+                          (Jkind.Violation.of_ ~context env
+                             (Not_a_subjkind
+                                (ty's_jkind, jkind, sub_failure_reasons)))
+                      | Ok jkind ->
                       match Jkind.extract_layout env ty's_jkind with
                       | Ok (Any _) ->
                         (* We re-estimate in this case rather than reuse the
@@ -3745,35 +3762,9 @@ let check_type_separability env ty sep =
   | Ok () -> true
   | Error _ -> false
 
-let type_is_gc_ignorable_scannable env ty =
-  (* Checking against the upper bound [scannable non_pointer(64)] ensures that
-     whenever [ty]'s layout is not scannable, the check will be [false]. *)
-  (* CR layouts-scannable: Since we check against [scannable non_pointer(64)],
-     a type of kind [value non_pointer & value non_pointer] will fail to be
-     recognized as being always_gc_ignorable, even though it is. To avoid this,
-     [non_pointer(64)] should imply [external(64)]. *)
-  let scannable = Jkind.Builtin.scannable ~why:Dummy_jkind in
-  let l =
-    match scannable.jkind.base with
-    | Layout l -> l
-    | Kconstr _ ->
-      Misc.fatal_error "Ctype.type_is_gc_ignorable_scannable: abstract Kconstr"
-  in
-  let sep =
-    Jkind_axis.Separability.upper_bound_if_is_always_gc_ignorable ()
-  in
-  let upper_bound =
-    Jkind.set_layout scannable (Jkind.Layout.set_root_separability l sep)
-  in
-  match check_type_jkind env ty upper_bound with
-  | Ok () -> true
-  | Error _ -> false
-
 let is_always_gc_ignorable env ty =
-  (* CR layouts: calling [check_type_jkind] two times (indirectly) is sad. *)
   check_type_externality env ty
     (Jkind_axis.Externality.upper_bound_if_is_always_gc_ignorable ())
-  || type_is_gc_ignorable_scannable env ty
 
 let check_type_jkind_exn env texn ty jkind =
   match check_type_jkind env ty jkind with
@@ -3850,9 +3841,6 @@ let check_and_update_generalized_ty_jkind ?name ~loc ty =
     end
   in
   with_type_mark (fun mark -> inner mark ty)
-
-let is_principal ty =
-  not !Clflags.principal || get_level ty = generic_level
 
 (* Recursively expand the head of a type.
    Also expand #-types.
@@ -5917,7 +5905,7 @@ let filter_arrow env t l ~force_tpoly =
               (* CR layouts v5: Change the Jkind.Builtin.value when option can
                  hold non-values. *)
               (Tconstr(Predef.path_option,
-                       [newvar2 level Predef.option_argument_jkind],
+                       [newvar2 level Predef.optional_argument_jkind],
                        ref Mnil))
           else if is_position l then
             newty2 ~level (Tconstr (Predef.path_lexing_position, [], ref Mnil))
@@ -6352,9 +6340,6 @@ let generalize_class_signature_spine sign =
                         (***********************************)
                         (*  Matching between type schemes  *)
                         (***********************************)
-
-(* Level of the subject, should be just below generic_level *)
-let subject_level = generic_level - 1
 
 (*
    Update the level of [ty]. First check that the levels of generic
@@ -6883,8 +6868,8 @@ and moregen_row inst_nongen variance type_pairs env row1 row2 =
    Usually, the subject is given by the user, and the pattern
    is unimportant.  So, no need to propagate abbreviations.
 *)
-let moregeneral ~self_check env inst_nongen pat_sort_vars
-    subj_sort_vars pat_sch subj_sch =
+let moregeneral ~self_check env inst_nongen
+    pat_sch_sorts subj_sch_sorts pat_sch subj_sch =
   let instantiate_modes = not self_check in
   (* Moregen splits the generic level into two finer levels:
      [generic_level] and [subject_level = generic_level - 1].
@@ -6907,48 +6892,50 @@ let moregeneral ~self_check env inst_nongen pat_sort_vars
         then copied with [duplicate_type].  That way, its levels won't be
         changed.
        *)
-      let (subj_sorts, subj_inst) =
-        Jkind_types.Sort.instance_with ~level:!current_level subj_sort_vars
+      let (subj_inst_sorts, subj_inst) =
+        Jkind_types.Sort.instance_with ~level:!current_level subj_sch_sorts
           (fun () -> instance_aux ~instantiate_modes subj_sch)
       in
-      let subj = duplicate_type subj_inst in
+      let subj_inst' = duplicate_type subj_inst in
       (* Duplicate generic variables *)
-      let (pat_sorts, patt) =
-        Jkind_types.Sort.instance_with ~level:generic_level pat_sort_vars
+      let (pat_inst_sorts, pat_inst) =
+        Jkind_types.Sort.instance_with ~level:generic_level pat_sch_sorts
           (fun () -> generic_instance_aux ~instantiate_modes pat_sch)
       in
       try
         with_univar_pairs [] begin fun () ->
           let type_pairs = fresh_moregen_pairs () in
-          moregen inst_nongen Covariant type_pairs env patt subj;
-          (* After [moregen], [pat_sorts] have been set to [subj_sorts].
-             [subj_sorts] are ephemeral rigid vars created by [instance_with] to
-             stand for [subj_sort_vars] during moregen.  Replace them back with
-             the originals so that the returned [pat_sort_refs] refer to
-             [subj_sort_vars], not to the short-lived rigid instances. *)
-          let subj_sort_vars =
-            List.map (fun v -> Jkind_types.Sort.Var v) subj_sort_vars
-          in
-          let subst_map = List.combine subj_sorts subj_sort_vars in
-          let sorts =
-            List.map
-              (fun v ->
-                (* We check whether the pattern variable [v] is unbound,
-                   which happens when it does not occur in the subject. *)
-                if Jkind.Sort.Var.is_root v
-                then None
-                else Some (Jkind_types.Sort.subst subst_map (Var v)))
-              pat_sorts
-          in
-          subj_inst, Ok sorts
-        end
+          moregen inst_nongen Covariant type_pairs env pat_inst subj_inst';
+        end;
+        subj_inst, Ok (subj_inst_sorts, pat_inst_sorts)
       with Moregen_trace trace -> subj_inst, Error trace
     end
       ~before_generalize:(fun (subj_inst, _) ->
         ignore
           (Jkind_types.Sort.generalize_with (fun () -> generalize subj_inst)))
     with
-    | _, Ok sorts -> sorts
+    | _, Ok (subj_inst_sorts, pat_inst_sorts) ->
+      (* After [moregen], [pat_inst_sorts] have been set to [subj_inst_sorts],
+         which are ephemeral instances of [subj_sch_sorts].
+         We replace [subj_inst_sorts] with [subj_sch_sorts], as the latter
+         appear in the externally known layout-polymorphic scheme.
+         By this point, we have left [subject_level] and we assert all variables
+         are generic by using [Sort.Const]s to represent them. *)
+      let subj_sch_sorts =
+        List.map Jkind_types.Sort.Const.genvar subj_sch_sorts
+      in
+      let subst_map = List.combine subj_inst_sorts subj_sch_sorts in
+      List.map
+        (fun v ->
+          (* We check whether the pattern variable [v] is unbound,
+              which happens when it does not occur in the subject. *)
+          match Jkind.Sort.Var.is_root v with
+          | true -> None
+          | false ->
+            Jkind_types.Sort.assert_const (Var v)
+            |> Jkind_types.Sort.Const.subst subst_map
+            |> Option.some)
+        pat_inst_sorts
     | _, Error trace -> raise (Moregen (expand_to_moregen_error env trace))
   end
 

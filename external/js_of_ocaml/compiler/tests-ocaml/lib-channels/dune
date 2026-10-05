@@ -1,3 +1,6 @@
+; buffered relies on Node's specific stdout/stderr flushing order at
+; exit, which differs under QuickJS.
+
 (tests
  (names close_in in_channel_length seek_in)
  (libraries ocaml_testing)
@@ -14,6 +17,8 @@
  (names buffered)
  (build_if
   (>= %{ocaml_version} 4.14))
+ (enabled_if
+  (<> %{profile} quickjs))
  (libraries ocaml_testing)
  (action
   (pipe-outputs

@@ -19,27 +19,28 @@
 
 open! Stdlib
 
+(* Virtual paths live in the unix-style pseudo filesystem of the runtime;
+   build them with '/' explicitly, since [Filename.concat] would introduce
+   '\\' when compiling on Windows. *)
+let virt_concat dir base = dir ^ "/" ^ base
+
 let expand_path exts real virt =
   let rec loop realfile virtfile acc =
     if try Sys.is_directory realfile with _ -> false
     then
       let l = Array.to_list (Sys.readdir realfile) |> List.sort ~cmp:String.compare in
       List.fold_left l ~init:acc ~f:(fun acc s ->
-          loop (Filename.concat realfile s) (Filename.concat virtfile s) acc)
+          loop (Filename.concat realfile s) (virt_concat virtfile s) acc)
     else
-      try
-        let exmatch =
-          try
-            let b = Filename.basename realfile in
-            let i = String.rindex b '.' in
-            let e = String.sub b ~pos:(i + 1) ~len:(String.length b - i - 1) in
-            List.mem ~eq:String.equal e exts
-          with Not_found -> List.mem ~eq:String.equal "" exts
-        in
-        if List.is_empty exts || exmatch then (virtfile, realfile) :: acc else acc
-      with exc ->
-        warn "ignoring %s: %s@." realfile (Printexc.to_string exc);
-        acc
+      let exmatch =
+        try
+          let b = Filename.basename realfile in
+          let i = String.rindex b '.' in
+          let e = String.sub b ~pos:(i + 1) ~len:(String.length b - i - 1) in
+          List.mem ~eq:String.equal e exts
+        with Not_found -> List.mem ~eq:String.equal "" exts
+      in
+      if List.is_empty exts || exmatch then (virtfile, realfile) :: acc else acc
   in
   loop real virt []
 
@@ -80,7 +81,7 @@ let find_cmi paths base =
         | Some cmi -> Some (name, cmi)
         | None -> None)
   with
-  | Some (name, filename) -> Some (Filename.concat "/static/cmis" name, filename)
+  | Some (name, filename) -> Some (virt_concat "/static/cmis" name, filename)
   | None -> None
 
 let instr_of_name_content prim ~name ~content =
@@ -94,7 +95,7 @@ let instr_of_name_content prim ~name ~content =
   Let
     ( Var.fresh ()
     , Prim
-        ( Extern prim
+        ( Extern (prim, None)
         , [ Pc (NativeString (Code.Native_string.of_string name))
           ; Pc (NativeString (Code.Native_string.of_bytestring content))
           ] ) )
@@ -102,9 +103,9 @@ let instr_of_name_content prim ~name ~content =
 let embed_file ~name ~filename =
   instr_of_name_content `create_file_extern ~name ~content:(Fs.read_file filename)
 
-let init () = Code.(Let (Var.fresh (), Prim (Extern "caml_fs_init", [])))
+let init () = Code.(Let (Var.fresh (), Prim (Extern ("caml_fs_init", None), [])))
 
-let f ~prim ~cmis ~files ~paths =
+let collect_cmis ~cmis ~paths =
   let cmi_files, missing_cmis =
     StringSet.fold
       (fun s (acc, missing) ->
@@ -124,11 +125,19 @@ let f ~prim ~cmis ~files ~paths =
       ([], [])
   in
   if not (List.is_empty missing_cmis)
-  then (
-    warn "Some OCaml interface files were not found.@.";
-    warn "Use [-I dir_of_cmis] option to bring them into scope@.";
-    (* [`ocamlc -where`/expunge in.byte out.byte moduleA moduleB ... moduleN] *)
-    List.iter missing_cmis ~f:(fun nm -> warn "  %s@." nm));
+  then
+    Warning.warn
+      `Missing_cmi
+      "Some OCaml interface files were not found.\n\
+       Use [-I dir_of_cmis] option to bring them into scope\n\
+       %a"
+      (Format.pp_print_list Format.pp_print_string)
+      missing_cmis;
+  cmi_files
+
+let f ~prim ~cmis ~files ~paths =
+  let cmi_files = collect_cmis ~cmis ~paths in
+  (* [`ocamlc -where`/expunge in.byte out.byte moduleA moduleB ... moduleN] *)
   let other_files =
     List.map files ~f:(fun f ->
         List.map (list_files f paths) ~f:(fun (name, filename) ->

@@ -230,6 +230,7 @@ let file_aux ~tool_name ~sourcefile:source_file inputfile (type a) parse_fun
         set_input_lexbuf ic
       in
       Location.init lexbuf source_file;
+      Lexer.reset_syntax_mode ();
       Profile.record_call "parser" (fun () ->
         { ast = parse_fun lexbuf ; source_file })
     end

@@ -1,7 +1,6 @@
 (* TEST
  flambda2;
  include stdlib_upstream_compatible;
- flags = "-extension layouts_beta";
  {
    expect;
  }
@@ -1105,8 +1104,8 @@ let f_external_kind_annot_mode_crosses_local_2
   : local_ t -> t = fun x -> x
 [%%expect{|
 type t
-  : value non_pointer mod global external_
-    & (float64 mod global & value non_pointer mod global external_)
+  : value non_pointer mod global
+    & (float64 mod global & value non_pointer mod global)
 val f_external_kind_annot_mode_crosses_local_2 : t @ local -> t = <fun>
 |}]
 
@@ -1997,8 +1996,8 @@ Line 6, characters 28-52:
 Error: Type "coerce_record" is not a subtype of "coerce_int_record"
 |}]
 
-(************************************************)
-(* Test 16: Not allowed as an optional argument *)
+(********************************************)
+(* Test 16: Allowed as an optional argument *)
 
 let f_optional_utuple ?(x = #(1,2)) () = x
 [%%expect{|
@@ -2011,7 +2010,7 @@ Error: This expression has type "#('a * 'b)"
            '_representable_layout_19 & '_representable_layout_20
          because it is an unboxed tuple.
        But the layout of #('a * 'b) must be a value layout
-         because the type argument of option has layout value_or_null.
+         because it's the type of an optional argument.
 |}]
 
 type optional_record = #{ i1 : int; i2 : int }
@@ -2026,7 +2025,7 @@ Error: This expression has type "optional_record"
        The layout of optional_record is value non_pointer & value non_pointer
          because of the definition of optional_record at line 1, characters 0-46.
        But the layout of optional_record must be a value layout
-         because the type argument of option has layout value_or_null.
+         because it's the type of an optional argument.
        Note: The layout of immediate is value non_pointer.
 |}]
 
@@ -2066,8 +2065,8 @@ Line 1, characters 19-27:
 Error: This type "string t" = "#(string u * string u)"
        should be an instance of type "('a : any mod global)"
        The kind of string t is
-           value mod everything non_float mod dynamic with string u
-           & value mod everything non_float mod dynamic with string u
+           (value mod everything) non_float mod dynamic with string u
+           & (value mod everything) non_float mod dynamic with string u
          because it is an unboxed tuple.
        But the kind of string t must be a subkind of any mod global
          because of the definition of needs_any_mod_global at line 4, characters 0-47.
@@ -2101,7 +2100,10 @@ Error: This type "#(int * string * int)" should be an instance of type
          "('a : any mod external_)"
        The kind of #(int * string * int) is
            immediate mod dynamic with int with string
-           & value mod everything non_float mod dynamic with int with string
+           & (value mod everything) non_float
+               mod dynamic
+               with int
+               with string
            & immediate mod dynamic with int with string
          because it is an unboxed tuple.
        But the kind of #(int * string * int) must be a subkind of

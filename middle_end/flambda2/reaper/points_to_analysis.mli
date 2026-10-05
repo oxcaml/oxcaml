@@ -60,7 +60,19 @@ module Relations : sig
 
   val escaping_field : Field.t term -> Code_id_or_name.t term -> _ atom
 
+  val has_usage_tbl :
+    ( unit Code_id_or_name.Map.t,
+      Code_id_or_name.t -> Datalog.nil,
+      unit )
+    Datalog.table
+
   val has_usage : Code_id_or_name.t term -> _ atom
+
+  val has_source_tbl :
+    ( unit Code_id_or_name.Map.t,
+      Code_id_or_name.t -> Datalog.nil,
+      unit )
+    Datalog.table
 
   val has_source : Code_id_or_name.t term -> _ atom
 
@@ -160,13 +172,10 @@ val code_id_actually_directly_called :
   Datalog.database -> Name.t -> Code_id.Set.t Or_unknown.t
 
 val arguments_used_by_known_arity_call :
-  Datalog.database -> Code_id_or_name.t -> 'a list -> ('a * keep_or_delete) list
+  Datalog.database -> Code_id_or_name.t -> int -> keep_or_delete list
 
 val arguments_used_by_unknown_arity_call :
-  Datalog.database ->
-  Code_id_or_name.t ->
-  'a list list ->
-  ('a * keep_or_delete) list list
+  Datalog.database -> Code_id_or_name.t -> int list -> keep_or_delete list list
 
 type single_field_source =
   | No_source

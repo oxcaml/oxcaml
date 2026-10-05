@@ -1598,10 +1598,9 @@ and meet_row_like_for_blocks env
     ~left_b:alloc_mode1 ~right_b:alloc_mode2
 
 and meet_row_like_for_closures env
-    ({ known_closures = known1; other_closures = other1 } :
-      TG.Row_like_for_closures.t)
-    ({ known_closures = known2; other_closures = other2 } :
-      TG.Row_like_for_closures.t) : TG.Row_like_for_closures.t meet_result =
+    ({ known_closures = known1 } : TG.Row_like_for_closures.t)
+    ({ known_closures = known2 } : TG.Row_like_for_closures.t) :
+    TG.Row_like_for_closures.t meet_result =
   let meet_shape () () : _ Or_bottom.t = Ok () in
   let merge_map_known merge_case known1 known2 =
     Function_slot.Map.merge
@@ -1617,7 +1616,11 @@ and meet_row_like_for_closures env
   in
   map_result
     ~f:(fun (known_closures, other_closures) ->
-      TG.Row_like_for_closures.create_raw ~known_closures ~other_closures)
+      (match other_closures with
+      | Or_bottom.Bottom -> ()
+      | Or_bottom.Ok _ ->
+        Misc.fatal_error "Unexpected non-bottom other case in meet of row-like");
+      TG.Row_like_for_closures.create_raw ~known_closures)
     (meet_row_like ~meet_expanded_head ~join_env_extension
        ~meet_maps_to:meet_closures_entry
        ~equal_index:Set_of_closures_contents.equal
@@ -1625,7 +1628,7 @@ and meet_row_like_for_closures env
        ~union_index:Set_of_closures_contents.union ~meet_shape
        ~is_empty_map_known:Function_slot.Map.is_empty
        ~get_singleton_map_known:Function_slot.Map.get_singleton ~merge_map_known
-       env ~known1 ~known2 ~other1 ~other2)
+       env ~known1 ~known2 ~other1:Bottom ~other2:Bottom)
 
 and meet_closures_entry (env : ME.t)
     ({ function_types = function_types1;
@@ -2322,10 +2325,9 @@ and join_row_like_for_blocks env
       TG.Row_like_for_blocks.create_raw ~known_tags ~other_tags ~alloc_mode)
 
 and join_row_like_for_closures env
-    ({ known_closures = known1; other_closures = other1 } :
-      TG.Row_like_for_closures.t)
-    ({ known_closures = known2; other_closures = other2 } :
-      TG.Row_like_for_closures.t) : TG.Row_like_for_closures.t =
+    ({ known_closures = known1 } : TG.Row_like_for_closures.t)
+    ({ known_closures = known2 } : TG.Row_like_for_closures.t) :
+    TG.Row_like_for_closures.t =
   let merge_map_known join_case known1 known2 =
     Function_slot.Map.merge
       (fun function_slot case1 case2 ->
@@ -2344,10 +2346,14 @@ and join_row_like_for_closures env
       ~equal_index:Set_of_closures_contents.equal
       ~inter_index:Set_of_closures_contents.inter
       ~join_shape:(fun () () -> Or_unknown.Known ())
-      ~merge_map_known env ~known1 ~known2 ~other1 ~other2
+      ~merge_map_known env ~known1 ~known2 ~other1:Bottom ~other2:Bottom
   with
   | Known (known_closures, other_closures) ->
-    TG.Row_like_for_closures.create_raw ~known_closures ~other_closures
+    (match other_closures with
+    | Or_bottom.Bottom -> ()
+    | Or_bottom.Ok _ ->
+      Misc.fatal_error "Unexpected non-bottom other case in join of row-like");
+    TG.Row_like_for_closures.create_raw ~known_closures
   | Unknown ->
     Misc.fatal_error "Join row_like case for closures returned Unknown"
 

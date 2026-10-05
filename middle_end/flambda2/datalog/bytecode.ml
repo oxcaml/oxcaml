@@ -28,9 +28,21 @@
 
 open Datalog_imports
 
+type _ columns =
+  | Nil : nil columns
+  | Cons : (_, 'h, _) Column.id * 'k columns -> ('h -> 'k) columns
+
+type 'a output_ref = { mutable contents : 'a Or_null.t }
+
+let create_output () = { contents = Or_null.null }
+
+let get_and_clear_output ({ contents } as t) =
+  t.contents <- Or_null.null;
+  contents
+
 type bindings_ref =
   | Bindings_ref_innermost_first :
-      ('a Value.hlist * 'a Or_null_receiver.hlist with_names)
+      ('k columns * 'k Or_null_receiver.hlist with_names)
       -> bindings_ref
 [@@unboxed]
 
@@ -62,7 +74,9 @@ module Make (Iterator : Leapfrog.Iterator) = struct
    * 005:  exit
    *)
   type code =
-    | Exit
+    | Exit of unit
+      (* Make sure this is represented as a block, not an immediate, to avoid a
+         nested switch on %is_int / %get_tag *)
     | Goto : label -> code
     | Init :
         'k Or_null_sender.t * string * 'k Join_iterator.t * string list * label
@@ -79,7 +93,7 @@ module Make (Iterator : Leapfrog.Iterator) = struct
         * label
         -> code
     | Distinct :
-        'k Value.repr
+        (_, 'k, _) Column.id
         * 'k Or_null_receiver.t
         * string
         * 'k Or_null_receiver.t
@@ -107,9 +121,19 @@ module Make (Iterator : Leapfrog.Iterator) = struct
         * 'b Or_null_receiver.hlist
         * string list
         -> code
+    | Union :
+        'v Table.result_repr
+        * ('t, 'k, 'v) Column.hlist
+        * 't output_ref
+        * string
+        * 'k Or_null_receiver.hlist
+        * string list
+        * 'v Or_null_receiver.t
+        * string
+        -> code
 
   let labels = function
-    | Exit | Call_with_bindings _ -> []
+    | Exit () | Union _ | Call_with_bindings _ -> []
     | Goto lab
     | Init (_, _, _, _, lab)
     | Advance (_, _, _, _, lab)
@@ -127,28 +151,31 @@ module Make (Iterator : Leapfrog.Iterator) = struct
   let print_label digits ppf (Label lab) = Format.fprintf ppf "%0*d" digits lab
 
   let print_code digits ppf = function
-    | Exit -> Format.fprintf ppf "exit"
+    | Exit () -> Format.fprintf ppf "exit"
     | Goto lab -> Format.fprintf ppf "goto@ %a" (print_label digits) lab
     | Init (_sender, name, _iterator, names, if_empty) ->
-      Format.fprintf ppf "init %s,@ @[[%a]@],@ %a" name print_list names
+      Format.fprintf ppf "init@ %s,@ [@[%a]@],@ %a" name print_list names
         (print_label digits) if_empty
     | Advance (_sender, name, _iterator, names, if_not_empty) ->
-      Format.fprintf ppf "advance %s,@ @[[%a]@],@ %a" name print_list names
+      Format.fprintf ppf "advance@ %s,@ [@[%a]@],@ %a" name print_list names
         (print_label digits) if_not_empty
     | Distinct (_, _, name1, _, name2, if_equal) ->
-      Format.fprintf ppf "distinct %s,@ %s,@ %a" name1 name2
+      Format.fprintf ppf "distinct@ %s,@ %s,@ %a" name1 name2
         (print_label digits) if_equal
     | Absent (_, _, table, _, args, if_not_in) ->
-      Format.fprintf ppf "absent @[[%a]@],@ %s,@ %a" print_list args table
+      Format.fprintf ppf "absent@ [@[%a]@],@ %s,@ %a" print_list args table
         (print_label digits) if_not_in
     | Seek (_, names, _, name, if_empty) ->
-      Format.fprintf ppf "seek %s,@ @[[%a]@],@ %a" name print_list names
+      Format.fprintf ppf "seek@ %s,@ [@[%a]@],@ %a" name print_list names
         (print_label digits) if_empty
     | Filter (_, name, _, names, if_false) ->
-      Format.fprintf ppf "filter %s,@ @[[%a]@],@ %a" name print_list names
+      Format.fprintf ppf "filter@ %s,@ [@[%a]@],@ %a" name print_list names
         (print_label digits) if_false
     | Call_with_bindings (_, name, _, _, names) ->
-      Format.fprintf ppf "call %s,@ @[[%a]@]" name print_list names
+      Format.fprintf ppf "call@ %s,@ [@[%a]@]" name print_list names
+    | Union (_, _, _, name, _, names, _, value_name) ->
+      Format.fprintf ppf "union@ %s,@ @[{[@[%a]@] ->@;<1 2>%s}@]" name
+        print_list names value_name
 
   let print_code_iarray ppf code =
     let length = Iarray.length code in
@@ -176,13 +203,11 @@ module Make (Iterator : Leapfrog.Iterator) = struct
         ()
       done;
       if i > 0 then Format.fprintf ppf "@ ";
-      Format.fprintf ppf "@[<h>";
       if Hashtbl.mem all_labels i
-      then Format.fprintf ppf "%0*d:@ " digits i
+      then Format.fprintf ppf "%0*d: " digits i
       else Format.pp_print_string ppf (String.make (digits + 2) ' ');
       Format.pp_print_string ppf (String.make (2 * !depth) ' ');
-      Format.fprintf ppf "%a" (print_code digits) instruction;
-      Format.fprintf ppf "@]";
+      Format.fprintf ppf "@[<hv 2>%a@]" (print_code digits) instruction;
       match[@warning "-fragile-match"] instruction with
       | Init (_, _, _, _, Label lab) when lab > i ->
         incr depth;
@@ -263,7 +288,7 @@ module Make (Iterator : Leapfrog.Iterator) = struct
       { st with
         bindings =
           Bindings_ref_innermost_first
-            ( repr.value :: reprs,
+            ( Cons (repr.value, reprs),
               { values = receiver :: receivers.values;
                 names = repr.name :: receivers.names
               } )
@@ -283,9 +308,9 @@ module Make (Iterator : Leapfrog.Iterator) = struct
     emit_with_label label (fun label ->
         Absent (is_trie, trie, name, args, names, label))
 
-  let distinct repr key1 key2 label =
+  let distinct column key1 key2 label =
     emit_with_label label (fun label ->
-        Distinct (repr, key1.value, key1.name, key2.value, key2.name, label))
+        Distinct (column, key1.value, key1.name, key2.value, key2.name, label))
 
   let seek iterator { value = receiver; name } label =
     emit_with_label label (fun label ->
@@ -331,13 +356,17 @@ module Make (Iterator : Leapfrog.Iterator) = struct
   let if_not_in is_trie table args body =
     if_template (absent is_trie table args) body
 
-  let if_not_equal repr arg1 arg2 body =
-    if_template (distinct repr arg1 arg2) body
+  let if_not_equal column arg1 arg2 body =
+    if_template (distinct column arg1 arg2) body
 
   let if_ fn args body = if_template (filter fn args) body
 
   let call_with_bindings { value = fn; name } { values = args; names } st =
     emit (Call_with_bindings (fn, name, st.bindings, args, names)) st
+
+  let union repr is_trie { value = table; name } { values = args; names }
+      { value; name = value_name } =
+    emit (Union (repr, is_trie, table, name, args, names, value, value_name))
 
   (* Use a [private] type from an anonymous module to ensure that we only ever
      construct bytecode that satisfies the requirements of [exec] below (namely,
@@ -351,7 +380,7 @@ module Make (Iterator : Leapfrog.Iterator) = struct
         List.for_all (fun (Label lab) -> 0 <= lab && lab < length) (labels code)
 
       let is_exit = function[@warning "-fragile-match"]
-        | Exit -> true
+        | Exit () -> true
         | _ -> false
 
       let create code =
@@ -375,14 +404,15 @@ module Make (Iterator : Leapfrog.Iterator) = struct
     let st =
       { code = delayed;
         after_loops = [];
-        bindings = Bindings_ref_innermost_first ([], { values = []; names = [] });
+        bindings =
+          Bindings_ref_innermost_first (Nil, { values = []; names = [] });
         labels
       }
     in
     text st;
     (* The last instruction is always an [Exit], which means we can use
        [unsafe_get] in [exec] after incrementing the program counter. *)
-    emit Exit st;
+    emit (Exit ()) st;
     let len = Dynarray.length delayed in
     let labels =
       Iarray.init (Dynarray.length labels) (fun i ->
@@ -403,6 +433,17 @@ module Make (Iterator : Leapfrog.Iterator) = struct
 
   let write = Or_null_sender.send
 
+  let rec read_singleton : type t k v.
+      (t, k, v) Column.hlist ->
+      k Or_null_receiver.hlist ->
+      v Or_null_receiver.t ->
+      t =
+   fun columns args value ->
+    match args, columns with
+    | [], [] -> read value
+    | arg :: args, column :: columns ->
+      Column.singleton column (read arg) (read_singleton columns args value)
+
   (* Isomorphic to [unit], but with a different type so that accidentally
      returning instead of calling [next] is a type error. *)
   type explicit_exit = Explicit_exit
@@ -417,7 +458,7 @@ module Make (Iterator : Leapfrog.Iterator) = struct
     let[@inline] goto (Label new_pc) = exec code new_pc in
     let[@inline] next () = goto (Label (pc + 1)) in
     match Iarray.unsafe_get code pc with
-    | Exit -> Explicit_exit
+    | Exit () -> Explicit_exit
     | Goto lab -> goto lab
     | Init (key_out, _name, iterator, _names, if_empty) -> (
       Join_iterator.init iterator;
@@ -449,14 +490,21 @@ module Make (Iterator : Leapfrog.Iterator) = struct
       match Trie.find_or_null is_trie (read_hlist args) (read table) with
       | This _ -> goto if_mem
       | Null -> next ())
-    | Distinct (repr, key1, _name1, key2, _name2, if_equal) ->
-      if Value.equal_repr repr (read key1) (read key2)
+    | Distinct (column, key1, _name1, key2, _name2, if_equal) ->
+      if Column.equal_key column (read key1) (read key2)
       then goto if_equal
       else next ()
     | Filter (func, _name, args, _names, if_false) ->
       if func (read_hlist args) then next () else goto if_false
     | Call_with_bindings (func, _name, bindings, args, _names) ->
       func bindings (read_hlist args);
+      next ()
+    | Union (repr, columns, table, _, args, _, value, _) ->
+      let entry = read_singleton columns args value in
+      (match table.contents with
+      | Null -> table.contents <- Or_null.this entry
+      | This contents ->
+        table.contents <- Or_null.this (Table.union columns repr contents entry));
       next ()
 
   let run t =
@@ -469,7 +517,7 @@ end
 
 type bindings =
   | Bindings_innermost_first :
-      'a Value.hlist * 'a Constant.hlist with_names
+      'a columns * 'a Constant.hlist with_names
       -> bindings
 
 let get_bindings (Bindings_ref_innermost_first (reprs, receivers)) =
@@ -478,20 +526,16 @@ let get_bindings (Bindings_ref_innermost_first (reprs, receivers)) =
 
 let print_bindings ppf (Bindings_innermost_first (reprs, { values; names })) =
   let rec loop : type a.
-      Format.formatter ->
-      a Value.hlist ->
-      a Constant.hlist ->
-      string list ->
-      bool =
+      Format.formatter -> a columns -> a Constant.hlist -> string list -> bool =
    fun ppf reprs values names ->
     match reprs, values, names with
-    | [], [], _ :: _ | _ :: _, _ :: _, [] ->
+    | Nil, [], _ :: _ | Cons (_, _), _ :: _, [] ->
       Misc.fatal_error "Wrong number of names"
-    | [], [], [] -> true
-    | repr :: reprs, value :: values, name :: names ->
+    | Nil, [], [] -> true
+    | Cons (column, reprs), value :: values, name :: names ->
       let first = loop ppf reprs values names in
       if not first then Format.fprintf ppf ";@,";
-      Format.fprintf ppf "@[<1>%s =@ %a@]" name (Value.print_repr repr) value;
+      Format.fprintf ppf "@[<1>%s =@ %a@]" name (Column.print_key column) value;
       false
   in
   Format.fprintf ppf "@[<2>{ @[<v>";

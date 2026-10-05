@@ -39,7 +39,7 @@ external[@layout_poly] unsafe_set_ptr :
 (* Mutating abstract types of kind value non_pointer should skip caml_modify *)
 
 module Mnp : sig
-  type t : value non_pointer (* not mod external_ *)
+  type t : value non_pointer
   val mk : int -> t
 end = struct
   type t = int

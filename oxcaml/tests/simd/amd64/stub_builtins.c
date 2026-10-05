@@ -1,6 +1,13 @@
 #include <assert.h>
 #define BUILTIN(name) void name() { assert(0); }
 
+BUILTIN(caml_aes_dec);
+BUILTIN(caml_aes_declast);
+BUILTIN(caml_aes_enc);
+BUILTIN(caml_aes_enclast);
+BUILTIN(caml_aes_imc);
+BUILTIN(caml_aes_keygenassist);
+
 BUILTIN(caml_sse_vec128_load_aligned);
 BUILTIN(caml_sse_vec128_load_unaligned);
 BUILTIN(caml_sse3_vec128_load_known_unaligned);

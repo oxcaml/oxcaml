@@ -21,11 +21,14 @@
 (tests
  (names md5)
  (modes js wasm)
+ (deps
+  some-random-file
+  (sandbox preserve_file_kind))
  (action
   (progn
-   (run node %{test} %{dep:some-random-file})
-   (run node %{test} %{dep:some-random-file} %{dep:some-random-file})
-   (run node %{test} -offset 2000 -length 4000 %{dep:some-random-file})
+   (run node %{test} some-random-file)
+   (run node %{test} some-random-file some-random-file)
+   (run node %{test} -offset 2000 -length 4000 some-random-file)
    (pipe-stdout
     (echo "tests")
     (run node %{test}))
@@ -40,11 +43,12 @@
  (names md5_nat)
  (modes
   (best exe))
+ (deps some-random-file)
  (action
   (progn
-   (run %{test} %{dep:some-random-file})
-   (run %{test} %{dep:some-random-file} %{dep:some-random-file})
-   (run %{test} -offset 2000 -length 4000 %{dep:some-random-file})
+   (run %{test} some-random-file)
+   (run %{test} some-random-file some-random-file)
+   (run %{test} -offset 2000 -length 4000 some-random-file)
    (pipe-stdout
     (echo "tests")
     (run %{test}))
@@ -85,6 +89,23 @@
   (flags
    (:standard --file "accentué"))))
 
+(tests
+ (names non_ascii_filenames_wasm)
+ (deps "accentué")
+ (modes wasm)
+ (enabled_if
+  (<> %{env:JSOO_TEST_ENGINE=node} wasi))
+ (wasm_of_ocaml
+  (compilation_mode whole_program)
+  (flags
+   (:standard --file "accentué"))))
+
+(rule
+ (copy non_ascii_filenames.ml non_ascii_filenames_wasm.ml))
+
+(rule
+ (copy non_ascii_filenames.expected.wasm non_ascii_filenames_wasm.expected))
+
 (rule
  (with-stdout-to
   "file.txt"
@@ -93,8 +114,14 @@
 (tests
  (names gh1856)
  (deps file.txt)
- (modes js)
+ (modes js wasm)
+ (enabled_if
+  (<> %{env:JSOO_TEST_ENGINE=node} wasi))
  (js_of_ocaml
+  (compilation_mode whole_program)
+  (flags
+   (:standard --file file.txt)))
+ (wasm_of_ocaml
   (compilation_mode whole_program)
   (flags
    (:standard --file file.txt))))

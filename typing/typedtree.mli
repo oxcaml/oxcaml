@@ -1152,6 +1152,13 @@ and module_coercion =
         struct module Sub = Some_alias end
       ]}
       Only occurs inside a [Tcoerce_structure] coercion. *)
+  | Tcoerce_kindtemplate of kindtemplate_coercion
+  (** Kind template instantiated and (optionally) re-templated.
+      {[
+        module M : sig val poly_ fst : ('a : bits64). 'a -> 'b -> 'a end =
+        struct let poly_ fst x y = x end
+      ]}
+      Only occurs inside a [Tcoerce_structure] coercion. *)
   | Tcoerce_invalid
   (** This coercion is only constructed by the recursive module consistency
       check, whose result is discarded. It's a bug if it shows up anywhere. *)
@@ -1183,8 +1190,21 @@ and primitive_coercion =
     pc_yielding: Mode.Yielding.l;
     (** As the [Mode.Yielding.l] in [Id_prim]. *)
     pc_zero_alloc_check: Zero_alloc.check option;
+    pc_kindtemplate: kindtemplate_coercion;
     pc_env: Env.t;
     pc_loc : Location.t;
+  }
+
+and kindtemplate_coercion =
+  {
+    tc_args: Jkind.Sort.Const.t list;
+    (** [tc_args] is the list of constant sorts, provided as arguments
+        to the initial template.
+        If [tc_args = []], the coercion argument is not instantiated. **)
+    tc_params: Jkind.Sort.var list;
+    (** [tc_params] is the list of parameters for the final template,
+        provided as generic sort variables.
+        If [tc_params = []], no final template is constructed. **)
   }
 
 and signature = {
@@ -1697,14 +1717,6 @@ val label_sort:
   -> 'rep
   -> record_sort:Jkind.sort
   -> Jkind.sort
-
-(** Compute a label's sort given its finalized representation (from
-    [Typedecl.finalize_record_representation_and_sorts]) *)
-val finalized_label_sort:
-  Data_types.label_description -> Types.record_representation
-  -> record_sort:Jkind.Sort.Const.t
-  -> variable_sorts:Jkind.Sort.Const.t array option
-  -> Jkind.Sort.Const.t
 
 (** [label_sort] specialized to unboxed records; doesn't need to know the record
     sort *)

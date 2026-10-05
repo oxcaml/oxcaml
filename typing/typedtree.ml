@@ -735,6 +735,7 @@ and module_coercion =
   | Tcoerce_functor of module_coercion * module_coercion * Mode.Yielding.l
   | Tcoerce_primitive of primitive_coercion
   | Tcoerce_alias of Env.t * Path.t * module_coercion
+  | Tcoerce_kindtemplate of kindtemplate_coercion
   | Tcoerce_invalid
 
 and module_type =
@@ -764,8 +765,15 @@ and primitive_coercion =
     pc_poly_sort: Jkind.Sort.t option;
     pc_yielding: Mode.Yielding.l;
     pc_zero_alloc_check: Zero_alloc.check option;
+    pc_kindtemplate: kindtemplate_coercion;
     pc_env: Env.t;
     pc_loc : Location.t;
+  }
+
+and kindtemplate_coercion =
+  {
+    tc_args: Jkind.Sort.Const.t list;
+    tc_params: Jkind.Sort.var list;
   }
 
 and signature = {
@@ -1611,34 +1619,6 @@ let label_sort (type rep)
     | Record_dummy _ ->
       Misc.fatal_error "label_sort: unexpected dummy representation"
     end
-
-let finalized_label_sort (label : Data_types.label_description)
-      (repres : Types.record_representation) ~record_sort ~variable_sorts =
-  match repres with
-  | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> record_sort
-  | Record_boxed | Record_float | Record_ufloat | Record_mixed _
-  | Record_inlined
-      (_, (Constructor_uniform_value | Constructor_mixed _), _) ->
-    begin match variable_sorts with
-    | Some sorts -> sorts.(label.lbl_pos)
-    | None ->
-      begin match label.lbl_sort with
-      | Some sort -> sort
-      | None ->
-        Misc.fatal_errorf
-          "no sort for label %s despite finalized representation"
-          label.lbl_name
-      end
-    end
-  | Record_undetermined | Record_variable _
-  | Record_inlined
-      (_, (Constructor_undetermined | Constructor_variable _), _) ->
-    Misc.fatal_error "finalized_label_sort: representation was not finalized"
-  | Record_inlined (_, Constructor_immediate_all_void, _) ->
-    Misc.fatal_error
-      "finalized_label_sort: unexpected immediate representation"
-  | Record_dummy _ ->
-    Misc.fatal_error "finalized_label_sort: unexpected dummy representation"
 
 let unboxed_label_all_sorts label repres =
   Array.map (fun lbl -> unboxed_label_sort lbl repres) label.lbl_all

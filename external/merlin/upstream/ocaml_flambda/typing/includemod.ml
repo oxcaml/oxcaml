@@ -445,6 +445,10 @@ let rec print_coercion ppf c =
       pr "@[<2>alias %a@ (%a)@]"
         Printtyp.path p
         print_coercion c
+  | Tcoerce_kindtemplate { tc_params; tc_args } ->
+      pr "@[<2>kindtemplate (%a => _ %a)@]"
+        (print_list Jkind.Sort.Debug_printers.var) tc_params
+        (print_list Jkind.Sort.Const.Debug_printers.t) tc_args
   | Tcoerce_invalid ->
       pr "invalid_coercion"
 and print_coercion2 ppf (n, c) =
@@ -476,7 +480,6 @@ let simplify_structure_coercion input_repr output_repr pos_cc_list id_pos_list =
   if is_identity_coercion 0 pos_cc_list
   then Tcoerce_none
   else Tcoerce_structure { input_repr; output_repr; pos_cc_list; id_pos_list }
-
 
 (* Build a table of the components of sig1, along with their positions.
    The table is indexed by kind and name of component *)
@@ -688,17 +691,14 @@ and try_modtypes ~core ~direction ~loc env subst ~modes
     begin match Includecore.check_modes env ~item:Module
       ~crossing:Ctype.mode_crossing_module modes with
     | Error e ->
-        let mty1 = Mtype.reduce_alias_lazy env mty1 in
-        let mty2 =
-          Subst.Lazy.modtype Keep subst mty2 |> Mtype.reduce_alias_lazy env
-        in
-        begin match mty1, mty2 with
-        | Some mty1, Some mty2 ->
-            try_modtypes ~core ~direction ~loc env subst ~modes mty1 mty2
-              orig_shape
-        | _, _ ->
-            Error (Error.Mode e)
-        end
+        let mty2 = Subst.Lazy.modtype Keep subst mty2 in
+        let mty1' = Mtype.scrape_alias_lazy env mty1 in
+        let mty2' = Mtype.scrape_alias_lazy env mty2 in
+        if mty1' == mty1 || mty2' == mty2 then
+          Error (Error.Mode e)
+        else
+          try_modtypes ~core ~direction ~loc env subst ~modes mty1' mty2'
+            orig_shape
     | Ok () ->
     Ok (Tcoerce_none, orig_shape)
     end

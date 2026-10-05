@@ -113,6 +113,7 @@ module Runtime_coercion = struct
     | Transposition of int * int
     | Primitive_coercion of string
     | Alias_coercion of Path.t
+    | Kindtemplate_coercion
 
   (** We extract a small change from a full coercion. *)
   let rec first_change_under path (coerc:Typedtree.module_coercion) =
@@ -126,7 +127,7 @@ module Runtime_coercion = struct
           (first_change_under (InArg::path)) arg
           (first_change_under (InBody::path)) res
     | Tcoerce_none -> None
-    | Tcoerce_alias _ | Tcoerce_primitive _ -> None
+    | Tcoerce_alias _ | Tcoerce_primitive _ | Tcoerce_kindtemplate _ -> None
     | Tcoerce_invalid ->
       Misc.fatal_error
         "Includemod_errorprinter.first_change_under: invalid coercion"
@@ -150,6 +151,8 @@ module Runtime_coercion = struct
     | (_, Typedtree.Tcoerce_primitive p) :: _ ->
         let name = Primitive.byte_name p.pc_desc in
         Some (List.rev path, Primitive_coercion name)
+    | (_, Typedtree.Tcoerce_kindtemplate _) :: _ ->
+        Some (List.rev path, Kindtemplate_coercion)
     | (_,c) :: q ->
         either
           (first_change_under (Item pos :: path)) c
@@ -194,7 +197,8 @@ module Runtime_coercion = struct
 
   let illegal_permutation ctx_printer env ppf (mty,c) =
     match first_change c with
-    | None | Some (_, (Primitive_coercion _ | Alias_coercion _)) ->
+    | None | Some (_, (Primitive_coercion _ | Alias_coercion _ |
+                       Kindtemplate_coercion)) ->
         (* those kind coercions are not inversible, and raise an error earlier
            when checking for module type equivalence *)
         assert false
@@ -233,6 +237,11 @@ module Runtime_coercion = struct
           "@[The two first-class module types differ by a coercion of@ \
            a module alias %a@ to a module%a.@]"
           (Style.as_inline_code Printtyp.path) path
+          ctx_printer ctx
+    | Kindtemplate_coercion ->
+        Fmt.fprintf ppf
+          "@[The two first-class module types differ by a coercion of@ \
+           kind templates%a.@]"
           ctx_printer ctx
     | Transposition (k,l) ->
         Fmt.fprintf ppf

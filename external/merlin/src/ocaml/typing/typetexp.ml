@@ -45,7 +45,7 @@ type unbound_variable_reason = | Upstream_compatibility
 type jkind_initialization_choice = Sort | Any
 
 type value_loc =
-    Tuple | Poly_variant | Object_field
+    Tuple | Poly_variant | Object_field | Optional_arg
 
 type sort_loc =
     Fun_arg | Fun_ret
@@ -960,7 +960,10 @@ let rec transl_type env ~policy ?(aliased=false) ~row_context mode styp =
        try
          transl_type_aux env ~policy ~aliased ~row_context mode styp
        with exn ->
-         let ty = new_global_var (Jkind.Builtin.value ~why:(Unknown "merlin")) in
+         let ty =
+           new_global_var
+             (Jkind.of_new_sort ~why:Merlin ~level:(Ctype.get_current_level ()))
+         in
          Msupport.erroneous_type_register ty;
          Msupport.raise_error exn;
            { ctyp_desc = Ttyp_var (None, None);
@@ -1029,8 +1032,19 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
             else begin
               if not (Btype.tpoly_is_mono arg_ty) then
                 raise (Error (arg.ptyp_loc, env, Polymorphic_optional_param));
-              newmono
-                (newconstr Predef.path_option [Btype.tpoly_get_mono arg_ty])
+              let arg_mono = Btype.tpoly_get_mono arg_ty in
+              (* CR lmaurer: remove value requirement *)
+              begin match
+                constrain_type_jkind env arg_mono
+                  Predef.optional_argument_jkind
+              with
+              | Ok _ -> ()
+              | Error e ->
+                raise (Error(arg.ptyp_loc, env,
+                             Non_value {vloc = Optional_arg; err = e;
+                                        typ = arg_mono}))
+              end;
+              newmono (newconstr Predef.path_option [arg_mono])
             end
           in
           let arg_mode_desc = With_locality.of_const arg_mode.mode_modes in
@@ -2054,7 +2068,8 @@ let report_error_doc loc env = function
                   ("a" :: Jkind.Scannable_axes.to_string_list sa)
               | Layout (Sort (Univar _, _)) ->
                 Misc.fatal_error "univar"
-              | Layout (Sort (Base _, _) | Any _ | Product _ | Addressable _)
+              | Layout (Sort (Base _, _) | Any _ | Product _ | Addressable _
+                       | Box _)
               | Kconstr _ ->
                 fprintf ppf "kind %a" (Jkind.format env)
                   inferred_jkind)))
@@ -2101,6 +2116,7 @@ let report_error_doc loc env = function
       | Tuple -> "Tuple element"
       | Poly_variant -> "Polymorphic variant constructor argument"
       | Object_field -> "Object field"
+      | Optional_arg -> "Optional argument"
     in
     Location.errorf ~loc "%s types must have layout value.@ %a"
       s (Jkind.Violation.report_with_offender

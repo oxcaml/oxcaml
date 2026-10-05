@@ -325,7 +325,7 @@
 
       {[
         module R_impl (P : P) = struct
-          let filler = 42                    (* not part of [R]'s sig *)
+          let filler = #3.5                  (* not part of [R]'s sig *)
           let greeting () = "R_impl greeting, P=" ^ ...
         end
         module Foo_r (R : R) = struct
@@ -338,12 +338,13 @@
       ]}
 
       [R_impl] is parameterised (by [P]) and its primary block has an
-      extra [filler] field before [greeting].  When the bundle runs,
-      [R_impl(P)]'s main block must be projected through
-      [mod_field arg_block_idx main_repr] to yield [R_impl]'s arg block
-      before being passed to [Foo_r]'s functor — otherwise [Foo_r]
-      reads offset 0 (= [filler]) as [R.greeting] and calling [filler]
-      as a function segfaults. *)
+      extra unboxed [filler] field before [greeting], making it a
+      MIXED block whose value fields (including the synthesized R-arg
+      block) are physically reordered ahead of the flat suffix.  When
+      the bundle runs, [R_impl(P)]'s main block must be projected with
+      [mod_field] at [arg_block_idx] — using the block's mixed
+      representation ([mb_returned_repr]) — to yield [R_impl]'s arg
+      block before being passed to [Foo_r]'s functor. *)
 
    (* Parameter R and argument R_int. *)
 

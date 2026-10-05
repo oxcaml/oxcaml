@@ -265,7 +265,6 @@ type error =
   | Label_not_atomic of Longident.t
   | Atomic_in_pattern of Longident.t
   | Atomic_in_functional_update of label
-  | Mixed_record_atomic_loc of Longident.t
   | Polymorphic_atomic_loc of Longident.t
   | Probe_format
   | Probe_name_format of string
@@ -781,10 +780,40 @@ tail-call. Returns [expected_mode] and [With_regionality.lr] which are backed by
 the same mode variable. We encode extra position information in the former.
 We need the latter to the both left and right mode
 because of how it will be used. *)
-let mode_argument ~funct ~index ~position_and_mode ~partial_app marg =
+let mode_argument ~funct ~index ~lbl ~position_and_mode ~partial_app marg =
+  let marg_as_regionality =
+    let callee : Mode.Hint.pinpoint =
+      match funct.exp_desc with
+      | Texp_ident { lid; _ } ->
+        funct.exp_loc, Ident { category = Value; lid = lid.txt }
+      | _ -> funct.exp_loc, Expression
+    in
+    let label =
+      match (lbl : Types.arg_label) with
+      | Nolabel -> Hint.Unlabelled
+      | Labelled label -> Hint.Labelled label
+      | Optional label -> Hint.Optional label
+      | Position label -> Hint.Position label
+    in
+    let parameter_to_argument : Mode.Hint.parameter_to_argument =
+      { parameter = { label; index_in_callee_arrow_type = index }; callee }
+    in
+    let monadic_hint : _ Mode.Hint.morph =
+      Parameter_to_argument (Monadic, parameter_to_argument)
+    in
+    let comonadic_hint : _ Mode.Hint.morph =
+      Parameter_to_argument (Comonadic, parameter_to_argument)
+    in
+    let { monadic; comonadic } =
+      With_regionality.disallow_left (with_locality_as_regionality marg)
+    in
+    { monadic = With_regionality.Monadic.apply_hint monadic_hint monadic;
+      comonadic = With_regionality.Comonadic.apply_hint comonadic_hint comonadic
+    }
+  in
   let vmode , _ =
     With_regionality.newvar_below
-      (Ctype.get_current_level ()) (with_locality_as_regionality marg)
+      (Ctype.get_current_level ()) marg_as_regionality
   in
   if partial_app then mode_default vmode, vmode
   else match funct.exp_desc, index, position_and_mode.apply_position with
@@ -1477,34 +1506,17 @@ let check_project_mutability ~loc ~env mut_name mutability mode =
   if Types.is_mutable mutability then
     submode ~loc ~env mode (mode_project_mutable mut_name)
 
-let check_atomic_loc_of_finalized_repr ~loc ~env label record_repres lid =
+let check_atomic_loc ~loc ~env label lid =
   if not (Types.is_atomic label.lbl_mut) then
     raise (Error (loc, env, Label_not_atomic lid));
   if is_poly_Tpoly label.lbl_arg then
     raise (Error (loc, env, Polymorphic_atomic_loc lid));
-  (match
-     Mode.Modality.Const.equate label.lbl_modalities
-       (Typemode.atomic_mutable_modalities)
-   with
-   | Ok () -> ()
-   | Error _ -> raise (Error (loc, env, Modalities_on_atomic_field lid)));
-  match record_repres with
-  | Record_boxed | Record_inlined (_, Constructor_uniform_value, _) -> ()
-  | Record_mixed _ | Record_inlined (_, Constructor_mixed _, _) ->
-      raise (Error (loc, env, Mixed_record_atomic_loc lid))
-  | Record_undetermined | Record_variable _
-  | Record_inlined
-      (_, (Constructor_undetermined | Constructor_variable _), _)
-  (* Inline records are never immediate. *)
-  | Record_inlined (_, Constructor_immediate_all_void, _)
-  (* [@@unboxed] prohibits mutable (and therefore atomic) fields. *)
-  | Record_unboxed
-  (* [@atomic] fields disable float record optimization. *)
-  | Record_float | Record_ufloat
-  (* Only exists as an intermediate step of typechecking the decl itself *)
-  | Record_dummy _ ->
-      Misc.fatal_error
-        "check_atomic_loc_of_finalized_repr: unexpected record representation"
+  match
+    Mode.Modality.Const.equate label.lbl_modalities
+      (Typemode.atomic_mutable_modalities)
+  with
+  | Ok () -> ()
+  | Error _ -> raise (Error (loc, env, Modalities_on_atomic_field lid))
 
 (* Mutable indices to polymorphic fields cannot be taken, as they would allow
    writing non-polymorphic values. *)
@@ -4288,7 +4300,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
       (* CR layouts v5: value restriction here to be relaxed *)
       if is_optional l then
         unify_pat val_env pat
-          (type_option (newvar Predef.option_argument_jkind));
+          (type_option (newvar Predef.optional_argument_jkind));
       tps.tps_pattern_variables, pat
     end
   in
@@ -5739,7 +5751,7 @@ let rec approx_type env sty =
   | Ptyp_arrow (p, ({ ptyp_desc = Ptyp_poly _ } as arg_sty), sty, arg_mode, _) ->
       let p = Typetexp.transl_label p (Some arg_sty) in
       (* CR layouts v5: value requirement here to be relaxed *)
-      if is_optional p then newvar Predef.option_argument_jkind
+      if is_optional p then newvar Predef.optional_argument_jkind
       else begin
         let arg_mode = Typemode.transl_mode_with_locality arg_mode in
         let arg_ty =
@@ -5759,7 +5771,7 @@ let rec approx_type env sty =
       let p = Typetexp.transl_label p (Some arg_sty) in
       let arg =
         if is_optional p
-        then type_option (newvar Predef.option_argument_jkind)
+        then type_option (newvar Predef.optional_argument_jkind)
         else newvar (Jkind.Builtin.any ~why:Inside_of_Tarrow)
       in
       let ret = approx_type env sty in
@@ -8996,14 +9008,7 @@ and type_expect_
               Legacy lid
           in
           Env.mark_label_used Env.Projection label.lbl_uid;
-          (* A variable representation is not determined until the end of
-             typechecking. *)
-          add_delayed_check (fun () ->
-            let record_repres =
-              Typedecl.finalize_record_representation env loc record_repres
-            in
-            check_atomic_loc_of_finalized_repr ~loc ~env label record_repres
-              lid.txt);
+          check_atomic_loc ~loc ~env label lid.txt;
           let locality_mode, argument_mode =
             register_allocation ~loc expected_mode
           in
@@ -10214,11 +10219,6 @@ and solve_Pexp_field
     type_label_access record_form env srecord label_usage lid
   in
   let ty_arg, record_repres =
-    (* XXX Not clear to me why this can't be done in [type_label_access] so that
-       the [Texp_setfield] case wouldn't have to have its own call to
-       [update_label], but doing it that way causes principality issues.
-       Notably, this call to [update_label] happens inside a local level and the
-       [Texp_setfield] call does not. *)
     with_local_level_generalize_structure_if_principal
       ~before_generalize:(fun (ty_arg, _) -> generalize_structure ty_arg)
       begin fun () ->
@@ -10231,10 +10231,6 @@ and solve_Pexp_field
         (* This redundantly calculates the sort again. But calling
            [type_sort] above let us infer that the type is representable,
            and it also gives a nicer error message *)
-        (* XXX Not entirely sure why it's necessary to do this in the inner
-           level, but weird errors happen if we don't, and it's also
-           necessary to do it in _this_ inner level so that the correct type
-           hits a [generalize_structure] *)
         update_labels env record_form ~representative_label:label ~loc
           ~why:Field_projection ~containing_type:record.exp_type
       in
@@ -10835,14 +10831,15 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app
   match arg with
   | Arg (Unknown_arg { sarg; ty_arg_mono; mode_fun; mode_arg; sort_arg }) ->
       let expected_mode, mode_arg =
-        mode_argument ~funct ~index ~position_and_mode ~partial_app mode_arg in
+        mode_argument ~funct ~index ~lbl ~position_and_mode ~partial_app
+          mode_arg in
       let arg = type_expect env expected_mode sarg (mk_expected ty_arg_mono) in
       (match lbl with
        | Labelled _ | Nolabel -> ()
        | Optional _ ->
            (* CR layouts v5: relax value requirement *)
            unify_exp ~sexp:sarg env arg
-             (type_option(newvar Predef.option_argument_jkind))
+             (type_option(newvar Predef.optional_argument_jkind))
        | Position _ ->
            unify_exp ~sexp:sarg env arg (instance Predef.type_lexing_position));
       (lbl, Arg (arg, mode_arg, sort_arg), None,
@@ -10850,7 +10847,8 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app
   | Arg (Known_arg { sarg; ty_arg; ty_arg0;
                      mode_fun; mode_arg; wrapped_in_some; sort_arg }) ->
       let expected_mode, mode_arg =
-        mode_argument ~funct ~index ~position_and_mode ~partial_app mode_arg in
+        mode_argument ~funct ~index ~lbl ~position_and_mode ~partial_app
+          mode_arg in
       let ty_arg', vars = tpoly_get_poly ty_arg in
       let arg, sch =
         if vars = [] then begin
@@ -10947,7 +10945,7 @@ and type_application env app_loc expected_mode position_and_mode
       in
       let arg_sort = type_sort ~why:Function_argument ty_arg in
       let arg_mode, _ =
-        mode_argument ~funct ~index:0 ~position_and_mode
+        mode_argument ~funct ~index:0 ~lbl:Nolabel ~position_and_mode
           ~partial_app:false arg_mode
       in
       let exp = type_expect env arg_mode sarg (mk_expected ty_arg) in
@@ -13827,11 +13825,6 @@ let report_error ~loc env =
          of an atomic field, do so explicitly:@ %a"
         Style.inline_code l
         Style.inline_code ("{ t with " ^ l ^ " = t." ^ l ^ " }")
-  | Mixed_record_atomic_loc lid ->
-      Location.errorf ~loc
-        "Use of %a with mixed record fields (here %a) is forbidden."
-        Style.inline_code "[%atomic.loc]"
-        quoted_longident lid
   | Polymorphic_atomic_loc lid ->
       Location.errorf ~loc
         "Use of %a with polymorphic record fields@ (here %a) is forbidden."

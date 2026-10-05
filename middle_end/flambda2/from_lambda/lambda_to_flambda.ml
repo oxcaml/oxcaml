@@ -1406,6 +1406,10 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
     List.length params
     - match kind with Curried { nlocal } -> nlocal | Tupled -> 0
   in
+  let function_slot_size =
+    Function_slot.size_from_arity ~num_complex_params:(List.length params)
+      ~is_tupled:(match kind with Tupled -> true | Curried _ -> false)
+  in
   let unboxing_kind (layout : Lambda.layout) :
       Function_decl.unboxing_kind option =
     match[@warning "-fragile-match"] layout with
@@ -1414,7 +1418,7 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
           raw_kind =
             Pvariant
               { consts = [];
-                non_consts = [(0, Constructor_uniform field_kinds)]
+                non_consts = [(0, Constructor_shape_uniform field_kinds)]
               }
         } ->
       Some
@@ -1428,7 +1432,7 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
           raw_kind =
             Pvariant
               { consts = [];
-                non_consts = [(tag, Constructor_uniform field_kinds)]
+                non_consts = [(tag, Constructor_shape_uniform field_kinds)]
               }
         }
       when tag = Obj.double_array_tag ->
@@ -1502,7 +1506,9 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
         Function_slot.create
           (Current_unit.get_cu_exn ())
           ~name:(Ident.name fid ^ "_unboxed")
-          ~is_always_immediate:false Flambda_kind.value
+          ~size:
+            (Function_slot.size_from_arity ~num_complex_params:1
+               ~is_tupled:false)
       in
       let return_unboxing =
         match unboxing_kind return, attr.unbox_return with
@@ -1586,7 +1592,7 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
   let function_slot =
     Function_slot.create
       (Current_unit.get_cu_exn ())
-      ~name:(Ident.name fid) ~is_always_immediate:false Flambda_kind.value
+      ~name:(Ident.name fid) ~size:function_slot_size
   in
   let unboxed_products = ref Ident.Map.empty in
   let params =
