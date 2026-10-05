@@ -34,7 +34,8 @@ module For_lto : sig
     Flambda_unit.t ->
     Solve_inputs.t * Rebuild_inputs.t
 
-  val solve : Solve_inputs.t -> Solution.t
+  (** [analysis_scope] is the set of compilation units analysed together. *)
+  val solve : analysis_scope:Analysis_scope.t -> Solve_inputs.t -> Solution.t
 
   (** Rebuild a single unit with the decisions coming from the solution. *)
   val rebuild :

@@ -91,10 +91,14 @@ val find_code_metadata : code_changes -> Code_id.t -> Code_metadata.t option
 val pp_result : Format.formatter -> result -> unit
 
 val perform_analysis :
-  Datalog.database -> stats:Datalog.Schedule.stats -> result
+  Datalog.database ->
+  stats:Datalog.Schedule.stats ->
+  analysis_scope:Analysis_scope.t ->
+  result
 
 val compute_code_changes :
   result ->
+  analysis_scope:Analysis_scope.t ->
   rewrite_kind_with_subkind:
     (Name.t -> Flambda_kind.With_subkind.t -> Flambda_kind.With_subkind.t) ->
   rewrite_result_types:
