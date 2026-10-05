@@ -28,13 +28,12 @@ type t
     [reachable_names] specifies which names are reachable from outside the
     compilation unit (same terminology as used in [Flambda_cmx]).
 
-    [all_code] is consulted for cohort membership (see [Cohort_id]): code
-    belonging to a cohort, whether defined here or imported, is referred to by
-    the cohort's shared symbol with weak linkage. *)
+    Each code id in [cohort_code_names] is defined and referred to under the
+    given symbol, with weak linkage (see [To_cmm_cohorts]). *)
 val create :
   module_symbol:Symbol.t ->
   reachable_names:Name_occurrences.t ->
-  all_code:Exported_code.t ->
+  cohort_code_names:string Code_id.Map.t ->
   t
 
 (** Translate an existing [Symbol.t] to a Cmm symbol. *)

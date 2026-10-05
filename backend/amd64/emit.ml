@@ -1121,17 +1121,15 @@ let global_maybe_protected (sym : S.t) =
    symbol use the [comdat] key, so the linker keeps exactly one copy across all
    object files that contain this group. *)
 let emit_weak_text_section_for_symbol sym_name =
-  match[@ocaml.warning "-4"] system with
-  | S_macosx | S_win32 | S_win64 | S_mingw64 | S_cygwin ->
-    (* CR-soon: implement the macOS / Windows side (Mach-O uses
-       [.weak_definition] plus [.subsections_via_symbols]; PE-COFF has its own
-       selectany COMDAT syntax). For now, bail so we don't silently emit code
-       that the linker will refuse to deduplicate. *)
+  if not (Cmm.weak_functions_supported ())
+  then
+    (* CR-someday: macOS could use [.weak_definition]; PE-COFF has its own
+       selectany COMDAT syntax. *)
     Misc.fatal_errorf
-      "COMDAT / weak function emission is not yet implemented on this target \
-       system (function %s)"
+      "COMDAT / weak function emission is not supported on this target \
+       (function %s)"
       sym_name
-  | _ ->
+  else
     let section_name = Printf.sprintf ".text.%s" (emit_symbol sym_name) in
     D.switch_to_section_raw ~names:[section_name] ~flags:(Some "axG")
       ~args:[Printf.sprintf "@progbits,%s,comdat" (emit_symbol sym_name)]

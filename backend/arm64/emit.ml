@@ -1276,13 +1276,12 @@ let emit_named_text_section func_name =
 (* Switch to a COMDAT text section for a weak function. Mirrors the amd64
    emitter; arm64 GAS uses [%progbits] instead of [@progbits]. *)
 let emit_weak_text_section_for_symbol sym_name =
-  if macosx
+  if not (Cmm.weak_functions_supported ())
   then
-    (* CR-soon: implement the macOS side using [.weak_definition] plus the
-       default [.subsections_via_symbols] mode. For now, bail so we don't
-       silently emit code the linker will refuse to deduplicate. *)
+    (* CR-someday: macOS could use [.weak_definition] plus the default
+       [.subsections_via_symbols] mode. *)
     Misc.fatal_errorf
-      "COMDAT / weak function emission is not yet implemented on macOS \
+      "COMDAT / weak function emission is not supported on this target \
        (function %s)"
       sym_name
   else

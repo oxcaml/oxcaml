@@ -311,6 +311,15 @@ let equal_is_global g g' =
   | Local, Local | Global, Global | Weak, Weak -> true
   | (Local | Global | Weak), _ -> false
 
+let weak_functions_supported () =
+  (not !Clflags.llvm_backend)
+  &&
+  match Target_system.system () with
+  | Linux | FreeBSD | NetBSD | OpenBSD | Generic_BSD | Solaris | Dragonfly | GNU
+    ->
+    true
+  | Windows _ | MacOS_like | BeOS | Unknown -> false
+
 type symbol =
   { sym_name : string;
     sym_global : is_global

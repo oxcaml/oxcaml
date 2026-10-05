@@ -201,6 +201,10 @@ type is_global =
 
 val equal_is_global : is_global -> is_global -> bool
 
+(** Whether the target and backend can deduplicate [Weak] functions (ELF COMDAT
+    groups, native emitters only). *)
+val weak_functions_supported : unit -> bool
+
 (* Symbols are marked with whether they are local, global, or weak, at both
    definition and use sites.
 
@@ -215,7 +219,7 @@ val equal_is_global : is_global -> is_global -> bool
    definition in more than one compilation unit; the linker deduplicates them
    (via COMDAT on ELF). They are used for the code of instantiations of
    layout-polymorphic functions (see [Cohort_id]); only functions may be [Weak],
-   not data.
+   not data, and only when [weak_functions_supported ()].
 
    (Marking symbols in this way speeds up linking, as many references can then
    be resolved early) *)

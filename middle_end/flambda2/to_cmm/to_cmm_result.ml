@@ -22,7 +22,6 @@ type t =
     current_data : Cmm.data_item list;
     reachable_names : Name_occurrences.t;
     cohort_code_names : string Code_id.Map.t;
-    (* Shared function symbol for every code id that belongs to a cohort. *)
     symbols : Cmm.symbol String.Map.t;
     (* This map is only used for symbols not directly translated from
        [Symbol.t], e.g. module entry point names. *)
@@ -31,69 +30,13 @@ type t =
     invalid_message_symbols : Symbol.t String.Map.t
   }
 
-(* Every reference to a cohort member, whether the member belongs to this unit
-   or was imported, goes to the shared symbol: the member's private symbol is
-   never emitted, and the linker keeps just one group's worth of definitions.
-
-   A cohort may have several members in this unit, related by [newer_version_of]
-   as the simplifier produces new versions of the code. Only the newest is
-   emitted under the shared symbol; an older member whose body somehow survives
-   keeps its own private symbol. *)
-let cohort_code_names all_code =
-  let current_unit = Current_unit.get_cu_exn () in
-  let code_names, members, superseded =
-    Exported_code.fold_code_metadata all_code
-      ~init:(Code_id.Map.empty, Cohort_id.Map.empty, Code_id.Set.empty)
-      ~f:(fun code_id metadata ((code_names, members, superseded) as acc) ->
-        match Code_metadata.cohort metadata with
-        | None -> acc
-        | Some cohort
-          when not (Code_id.in_compilation_unit code_id current_unit) ->
-          let name =
-            Linkage_name.to_string (Cohort_id.code_linkage_name cohort)
-          in
-          Code_id.Map.add code_id name code_names, members, superseded
-        | Some cohort ->
-          let members =
-            Cohort_id.Map.update cohort
-              (fun existing ->
-                Some (code_id :: Option.value existing ~default:[]))
-              members
-          in
-          let superseded =
-            match Code_metadata.newer_version_of metadata with
-            | None -> superseded
-            | Some older -> Code_id.Set.add older superseded
-          in
-          code_names, members, superseded)
-  in
-  Cohort_id.Map.fold
-    (fun cohort members code_names ->
-      let newest =
-        List.filter
-          (fun code_id -> not (Code_id.Set.mem code_id superseded))
-          members
-      in
-      match newest with
-      | [code_id] ->
-        Code_id.Map.add code_id
-          (Linkage_name.to_string (Cohort_id.code_linkage_name cohort))
-          code_names
-      | [] | _ :: _ :: _ ->
-        Misc.fatal_errorf
-          "Cohort %a should have exactly one newest member in this compilation \
-           unit, but has: %a"
-          Cohort_id.print cohort Code_id.Set.print
-          (Code_id.Set.of_list newest))
-    members code_names
-
-let create ~module_symbol ~reachable_names ~all_code =
+let create ~module_symbol ~reachable_names ~cohort_code_names =
   { gc_roots = [];
     data_list = [];
     functions = [];
     current_data = [];
     reachable_names;
-    cohort_code_names = cohort_code_names all_code;
+    cohort_code_names;
     symbols = String.Map.empty;
     module_symbol;
     module_symbol_defined = false;
