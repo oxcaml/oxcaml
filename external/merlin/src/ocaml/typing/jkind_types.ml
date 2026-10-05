@@ -1032,8 +1032,8 @@ module Layout = struct
       | Any of Scannable_axes.t
       | Base of Sort.base * Scannable_axes.t
       | Product of t list
-      | Univar of Sort.univar
-      | Genvar of Sort.var
+      | Univar of Sort.univar * Scannable_axes.t
+      | Genvar of Sort.var * Scannable_axes.t
       | Addressable of t
       | Box of t * Scannable_axes.t
 
@@ -1041,11 +1041,11 @@ module Layout = struct
 
     let product cs = Product cs
 
-    let univar uv = Univar uv
+    let univar uv sa = Univar (uv, sa)
 
-    let genvar (v : Sort.var) =
+    let genvar (v : Sort.var) sa =
       assert (v.contents = None && v.level = Sort.generic_level);
-      Genvar v
+      Genvar (v, sa)
 
     let max = Any Scannable_axes.max
 
@@ -1056,8 +1056,10 @@ module Layout = struct
       | Base (b1, _), Base (b2, _) -> Sort.equal_base b1 b2
       | Any sa1, Any sa2 -> Scannable_axes.equal sa1 sa2
       | Product cs1, Product cs2 -> List.equal equal cs1 cs2
-      | Univar uv1, Univar uv2 -> Sort.equal_univar_univar uv1 uv2
-      | Genvar v1, Genvar v2 -> v1.id = v2.id
+      | Univar (uv1, sa1), Univar (uv2, sa2) ->
+        Sort.equal_univar_univar uv1 uv2 && Scannable_axes.equal sa1 sa2
+      | Genvar (v1, sa1), Genvar (v2, sa2) ->
+        v1.id = v2.id && Scannable_axes.equal sa1 sa2
       | Addressable c1, Addressable c2 ->
         (* Relies on the invariant that consts have no redundant
            [Addressable] *)
@@ -1078,8 +1080,8 @@ module Layout = struct
         Option.map
           (fun x -> Sort.Const.Product x)
           (Misc.Stdlib.List.map_option get_sort ts)
-      | Univar uv -> Some (Sort.Const.Univar uv)
-      | Genvar v -> Some (Sort.Const.Genvar v)
+      | Univar (uv, _) -> Some (Sort.Const.Univar uv)
+      | Genvar (v, _) -> Some (Sort.Const.Genvar v)
       | Addressable t -> Option.map Sort.Const.addressable (get_sort t)
       | Box _ -> Sort.Const.some (Base Scannable)
 
@@ -1149,8 +1151,7 @@ module Layout = struct
       | Base (Scannable, sa) -> Some sa
       | Base (_, _) -> None
       | Product _ -> None
-      | Univar _ -> None
-      | Genvar _ -> None
+      | Univar (_, sa) | Genvar (_, sa) -> Some sa
       | Addressable t -> get_root_scannable_axes t
       | Box (_, sa) -> Some sa
 
@@ -1160,8 +1161,8 @@ module Layout = struct
       | Base (Scannable, _) -> Base (Scannable, sa)
       | Base (_, _) -> t
       | Product _ -> t
-      | Univar _ -> t
-      | Genvar _ -> t
+      | Univar (uv, _) -> Univar (uv, sa)
+      | Genvar (v, _) -> Genvar (v, sa)
       | Addressable t' -> Addressable (set_root_scannable_axes t' sa)
       | Box (t', _) -> box t' sa
 
@@ -1310,7 +1311,7 @@ module Layout = struct
     let of_sort s sa =
       let rec of_sort (s : Sort.t) sa =
         match s with
-        | Var v when Sort.is_genvar v -> Some (Genvar v)
+        | Var v when Sort.is_genvar v -> Some (Genvar (v, sa))
         | Var _ -> None
         | Base b -> Some (Static.of_base b sa)
         | Product sorts ->
@@ -1323,18 +1324,16 @@ module Layout = struct
             (Misc.Stdlib.List.map_option
                (fun s -> of_sort s Scannable_axes.max)
                sorts)
-        | Univar uv -> Some (Univar uv)
+        | Univar uv -> Some (Univar (uv, sa))
         | Addressable s -> Option.map addressable (of_sort s sa)
       in
       of_sort (Sort.get s) sa
 
-    let of_univar uv = Univar uv
-
     let of_flat_sort (s : Sort.Flat.t) sa =
       match s with
       | Var _ -> None
-      | Genvar v -> Some (Genvar v)
-      | Univar uv -> Some (of_univar uv)
+      | Genvar v -> Some (Genvar (v, sa))
+      | Univar uv -> Some (Univar (uv, sa))
       | Base b -> Some (Static.of_base b sa)
   end
 
@@ -1343,8 +1342,8 @@ module Layout = struct
     | Any sa -> Any sa
     | Base (b, sa) -> Sort (Sort.of_base b, sa)
     | Product cs -> Product (List.map of_const cs)
-    | Univar uv -> Sort (Sort.Univar uv, Scannable_axes.max)
-    | Genvar v -> Sort (Sort.Var v, Scannable_axes.max)
+    | Univar (uv, sa) -> Sort (Sort.Univar uv, sa)
+    | Genvar (v, sa) -> Sort (Sort.Var v, sa)
     | Addressable c -> Addressable (of_const c)
     | Box (c, sa) -> Box (of_const c, sa)
 
