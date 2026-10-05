@@ -576,11 +576,11 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
        | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Const_mask _
        | Stackoffset _
        | Intop (Iadd | Isub | Imul | Iand | Ior | Ixor | Ilsl | Ilsr
-               | Iasr | Ipopcnt | Iclz | Ictz
+               | Iasr | Ipopcnt | Inot | Iclz | Ictz
                )
        | Int128op (Iadd128 | Isub128 | Imul64 _)
        | Intop_imm ((Iadd | Isub | Imul | Imulh _ | Iand | Ior | Ixor | Ilsl
-                    | Ilsr | Iasr | Ipopcnt | Iclz | Ictz ),_)
+                    | Ilsr | Iasr | Ipopcnt | Inot | Iclz | Ictz ),_)
        | Floatop _
        | Csel _
        | Reinterpret_cast _
@@ -747,7 +747,7 @@ let operation_supported = function
   | Capply _ | Cextcall _ | Cload _ | Calloc _ | Cstore _
   | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _
   | Caddi128 | Csubi128 | Cmuli64 _
-  | Cand | Cor | Cxor | Clsl | Clsr | Casr
+  | Cand | Cor | Cxor | Cnot | Clsl | Clsr | Casr
   | Ccsel _
   | Cbswap _
   | Cclz | Cctz
