@@ -29,6 +29,15 @@ val main
     keep_symbol_tables:bool ->
     Lambda.program ->
     Cmm.phrase list)
+  -> reaped_flambda2_to_cmm:(
+    machine_width:Target_system.Machine_width.t ->
+    ltosol_filename:string ->
+    keep_symbol_tables:bool ->
+    cmx_filename:string ->
+    paused_unit_infos:Cmx_format.unit_infos ->
+    ppf_dump:Format.formatter ->
+    prefixname:string ->
+    Cmm.phrase list)
   -> reaper_lto_solve:(
     cmx_files:string list ->
     ltosol_file:string ->

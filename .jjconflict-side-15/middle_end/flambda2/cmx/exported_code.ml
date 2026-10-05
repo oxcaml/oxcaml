@@ -51,6 +51,14 @@ let add_code ~keep_code code_map t =
     code_map
   |> Code_id.Map.disjoint_union t
 
+let add_code_metadata t code_metadata =
+  Code_id.Map.add
+    (Code_metadata.code_id code_metadata)
+    (Code_or_metadata.create_metadata_only code_metadata)
+    t
+
+let filter t ~f = Code_id.Map.filter (fun code_id _ -> f code_id) t
+
 let mark_as_imported t =
   Code_id.Map.map_sharing Code_or_metadata.remember_only_metadata t
 
