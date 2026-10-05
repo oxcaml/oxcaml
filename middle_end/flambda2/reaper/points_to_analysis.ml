@@ -280,15 +280,19 @@ module Relations = struct
 
   let nontop_sources x y = `Only_if ([~~(any_source x)], sources x y)
 
+  let has_usage_tbl = Datalog.create_relation ~name:"has_usage" Cols.[n]
+
   (* [has_usage x] means that [x] must continue to exist at runtime, that is,
      either it has [any_usage], or some field of [x] is itself [has_usage]. *)
-  let has_usage = rel1 "has_usage" Cols.[n]
+  let has_usage x = has_usage_tbl % [x]
+
+  let has_source_tbl = Datalog.create_relation ~name:"has_source" Cols.[n]
 
   (* [has_source x] means that [x] can have been created at runtime.
      Unfortunately due to limitations of the datalog engine, it means that
      either [x] is [any_source], or that at least one field of [x] (instead of
      all fields of [x], which would be the exact answer) is [has_source]. *)
-  let has_source = rel1 "has_source" Cols.[n]
+  let has_source x = has_source_tbl % [x]
 
   let field_of_constructor_is_used_tbl =
     Datalog.create_relation ~name:"field_of_constructor_is_used" Cols.[n; f]
@@ -1111,36 +1115,33 @@ let cofield_has_use :
      in
      One.to_bool out)
 
-let rec arguments_used_by_call db ep callee_sources grouped_args =
-  match grouped_args with
+let rec arguments_used_by_call db ep callee_sources num_args =
+  match num_args with
   | [] -> []
-  | first_arg_group :: grouped_args_rest -> (
+  | num_first_arg :: num_args_rest -> (
     match callee_sources with
-    | Any_source -> List.map (List.map (fun x -> x, Keep)) grouped_args
+    | Any_source -> List.map (fun n -> List.init n (fun _ -> Keep)) num_args
     | Sources callee_sources -> (
       let witness_sources =
         get_field_sources db callee_sources (Field.call_witness ep)
       in
       match witness_sources with
-      | Any_source -> List.map (List.map (fun x -> x, Keep)) grouped_args
+      | Any_source -> List.map (fun n -> List.init n (fun _ -> Keep)) num_args
       | Sources witness_sources ->
         let first_arg_group =
-          List.mapi
-            (fun i x ->
-              ( x,
-                if cofield_has_use db witness_sources (Cofield.param i)
-                then Keep
-                else Delete ))
-            first_arg_group
+          List.init num_first_arg (fun i ->
+              if cofield_has_use db witness_sources (Cofield.param i)
+              then Keep
+              else Delete)
         in
         let grouped_args_rest =
-          match grouped_args_rest with
+          match num_args_rest with
           | [] -> [] (* Avoid computing sources of result if no more args *)
           | _ :: _ ->
             arguments_used_by_call db ep
               (get_field_sources db witness_sources
                  (Field.normal_return_of_call 0))
-              grouped_args_rest
+              num_args_rest
         in
         first_arg_group :: grouped_args_rest))
 

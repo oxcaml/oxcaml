@@ -33,6 +33,7 @@ type error =
   | Unknown_builtin_primitive of string
   | Wrong_arity_builtin_primitive of string
   | Wrong_layout_for_peek_or_poke of string
+  | Layout_poly_arguments_unsupported of string
   | Invalid_floatarray_glb
   | Invalid_array_kind_for_uninitialized_makearray_dynamic
   | Invalid_stack_primitive of invalid_stack_primitive
@@ -1768,6 +1769,14 @@ let glb_array_set_type loc t1 t2 =
 
 let peek_or_poke_layout_from_type ~prim_name error_loc env ty
       : Lambda.peek_or_poke option =
+  match Jkind.get_layout env (Ctype.type_jkind env ty) with
+  | Some layout when Jkind.Layout.Const.has_genvar layout ->
+    (* CR layout poly: We can't pick a [Lambda.peek_or_poke] constructor here if
+       the argument is layout polymorphic. Other primitives have similar
+       dilemmas. We should consider moving primitive specialization after
+       slambda eval. *)
+    raise (Error (error_loc, Layout_poly_arguments_unsupported prim_name))
+  | Some _ | None ->
   match Ctype.type_sort ~why:Peek_or_poke ~fixed:true env ty with
   | Error _ -> None
   | Ok sort ->
@@ -1805,24 +1814,24 @@ let should_specialize_primitive p =
     true
 
 let layout_of_ty_for_idx_set env loc ty =
-  (* CR layouts: This is gross - particularly the call to [type_jkind] and the
-    conversion to and from [mixed_block_element]! The slightly less gross
-    thing would be to change [layout_of_const_sort_generic] in the same way
-    that we have changed [transl_mixed_block_element] to desecend into
-    products. But that's a big change that (a) will have substantial
-    performance impacts for lots of cases that don't matter, and (b) will
-    become obsolete when we do complex values. So for now, the gross
-    thing. *)
+  (* CR layouts: This function is a bit sad. We call [type_jkind] (which is
+     already not ideal) and then immediately consult the type and jkind to
+     refine the [Lambda.mixed_block_element] and apply externality bounds,
+     respectively.
+
+     We should consider tracking primitives' sort variables in the typedtree
+     itself, similar to what the comment above [type_representable_layout]
+     in [Typeopt] suggests. *)
   let jkind = Ctype.type_jkind env ty in
-  let mbe = Typedecl.mixed_block_element env ty jkind in
-  let mbe =
-    match mbe with
-    | Some mbe -> mbe
-    | None ->
-      Misc.fatal_errorf "layout_of_ty_for_idx_set %a"
-        Printtyp.type_expr ty
+  let layout =
+    match Jkind.get_layout_defaulting_to_scannable env jkind with
+    | Some layout -> layout
+    | None -> Misc.fatal_error "layout_of_ty_for_idx_set: expected layout"
   in
-  let mbe = transl_mixed_block_element env (to_location loc) ty mbe in
+  let mbe =
+    transl_layout layout
+    |> refine_mixed_block_element env (to_location loc) ty
+  in
   let context = Ctype.mk_jkind_context_check_principal env in
   let ext = Jkind.get_externality_upper_bound ~context env jkind in
   layout_of_mixed_block_element_for_idx_set ext mbe
@@ -2949,6 +2958,11 @@ let report_error_doc ppf = function
         Style.inline_code prim_name
   | Wrong_layout_for_peek_or_poke prim_name ->
       fprintf ppf "Unsupported layout for the %s primitive" prim_name
+  | Layout_poly_arguments_unsupported prim_name ->
+      fprintf ppf
+        "The %s primitive does not currently support layout polymorphic \
+         arguments"
+        prim_name
   | Invalid_floatarray_glb ->
       fprintf ppf
         "@[Floatarray primitives can't be used on arrays containing@ \

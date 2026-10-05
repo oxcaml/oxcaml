@@ -122,6 +122,15 @@ bit_xor:
   ret
 |}]
 
+let bit_not x = Int8_u.bit_xor x (-#1s)
+[%%expect_asm X86_64{|
+bit_not:
+  salq  $56, %rax
+  sarq  $56, %rax
+  xorq  $-1, %rax
+  ret
+|}]
+
 let bswap x = Int8_u.bswap x
 [%%expect_asm X86_64{|
 bswap:

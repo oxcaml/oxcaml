@@ -632,8 +632,10 @@ AC_ARG_VAR([DLLIBS],
 AC_ARG_ENABLE([instrumented-runtime],
   [AS_HELP_STRING([--enable-instrumented-runtime],
     [build the instrumented runtime @<:@default=auto@:>@])],
-  [],
-  [enable_instrumented_runtime=auto])
+  [AS_IF([test "x$enableval" != 'xno'],
+    [AC_MSG_ERROR(m4_normalize([The instrumented runtime is not supported by
+      OxCaml]))])],
+  [enable_instrumented_runtime=no])
 
 AC_ARG_ENABLE([vmthreads], [],
   [AS_IF([test "x$enableval" != 'xno'],

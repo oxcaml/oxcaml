@@ -230,3 +230,147 @@ let ok_value_infer y =
 [%%expect{|
 val ok_value_infer : string M.f -> string M.f = <fun>
 |}]
+
+(* Scannable layouts with separability [non_pointer] inherently cross
+   externality (e.g. even given with-bounds), and [non_pointer64] crosses to
+   [external64] *)
+
+type np : value non_pointer
+type ok_np = np require_external
+[%%expect{|
+type np : value non_pointer
+type ok_np = np require_external
+|}]
+
+type 'a npi : immediate with 'a
+type ok_npi = string npi require_external
+[%%expect{|
+type 'a npi : immediate with 'a
+type ok_npi = string npi require_external
+|}]
+
+type np64 : value non_pointer64
+type ok_np64 = np64 require_external64
+[%%expect{|
+type np64 : value non_pointer64
+type ok_np64 = np64 require_external64
+|}]
+
+type 'a npi64 : immediate64 with 'a
+type ok_npi64 = string npi64 require_external64
+[%%expect{|
+type 'a npi64 : immediate64 with 'a
+type ok_npi64 = string npi64 require_external64
+|}]
+
+(* ...but [non_pointer64] does not cross to [external_] *)
+
+type bad_np64 = np64 require_external
+[%%expect{|
+Line 1, characters 16-20:
+1 | type bad_np64 = np64 require_external
+                    ^^^^
+Error: This type "np64" should be an instance of type "('a : any mod external_)"
+       The kind of np64 is value non_pointer64
+         because of the definition of np64 at line 1, characters 0-31.
+       But the kind of np64 must be a subkind of any mod external_
+         because of the definition of require_external at line 1, characters 0-46.
+|}]
+
+(* Products *)
+
+type npp : value non_pointer & value non_pointer
+type ok_npp = npp require_external
+[%%expect{|
+type npp : value non_pointer & value non_pointer
+type ok_npp = npp require_external
+|}]
+
+(* [any non_pointer] isn't [mod external_], as scannable axes only apply to
+   value layouts. If it did cross, then [value & value] would unsoundly be [mod
+   external_] *)
+
+type ('a : any non_pointer) require_any_non_pointer
+type vv : value & value
+type ok_vv_any_np = vv require_any_non_pointer
+[%%expect{|
+type ('a : any non_pointer) require_any_non_pointer
+type vv : value & value
+type ok_vv_any_np = vv require_any_non_pointer
+|}]
+
+type bad_vv = vv require_external
+[%%expect{|
+Line 1, characters 14-16:
+1 | type bad_vv = vv require_external
+                  ^^
+Error: This type "vv" should be an instance of type "('a : any mod external_)"
+       The kind of vv is value & value
+         because of the definition of vv at line 2, characters 0-23.
+       But the kind of vv must be a subkind of any mod external_
+         because of the definition of require_external at line 1, characters 0-46.
+|}]
+
+type anp : any non_pointer
+type bad_any_np = anp require_external
+[%%expect{|
+type anp : any non_pointer
+Line 2, characters 18-21:
+2 | type bad_any_np = anp require_external
+                      ^^^
+Error: This type "anp" should be an instance of type "('a : any mod external_)"
+       The kind of anp is any non_pointer
+         because of the definition of anp at line 1, characters 0-26.
+       But the kind of anp must be a subkind of any mod external_
+         because of the definition of require_external at line 1, characters 0-46.
+|}]
+
+(* Similarly, [non_pointer] abstract kinds are not [mod external_], since [k]
+   could be [value & value] *)
+
+module F_np (X : sig
+    kind_ k
+
+    type t : k non_pointer
+  end) =
+struct
+  type bad_np_abstract = X.t require_external
+end
+[%%expect{|
+Line 7, characters 25-28:
+7 |   type bad_np_abstract = X.t require_external
+                             ^^^
+Error: This type "X.t" should be an instance of type "('a : any mod external_)"
+       The kind of X.t is X.k non_pointer
+         because of the definition of t at line 4, characters 4-26.
+       But the kind of X.t must be a subkind of any mod external_
+         because of the definition of require_external at line 1, characters 0-46.
+|}]
+
+(* We don't print [mod external_] implied by [non_pointer], nor [mod external64]
+   implied by [non_pointer64] *)
+
+type npe : value non_pointer mod external_
+[%%expect{|
+type npe : value non_pointer
+|}]
+
+type npe64 : value non_pointer64 mod external64
+[%%expect{|
+type npe64 : value non_pointer64
+|}]
+
+(* ...but [mod external_] on a [non_pointer64] kind is not redundant *)
+
+type np64e : value non_pointer64 mod external_
+[%%expect{|
+type np64e : value non_pointer64 mod external_
+|}]
+
+(* We also don't print a modality on a with-bound when the layout-implied bound
+   makes it redundant *)
+
+type 'a npie : immediate64 with 'a @@ external_
+[%%expect{|
+type 'a npie : immediate64 with 'a
+|}]

@@ -128,6 +128,15 @@ bit_xor:
   ret
 |}]
 
+let bit_not x = Int16_u.bit_xor x (-#1S)
+[%%expect_asm X86_64{|
+bit_not:
+  salq  $48, %rax
+  sarq  $48, %rax
+  xorq  $-1, %rax
+  ret
+|}]
+
 (* CR-someday jrayman: Both gcc and clang recommend [rolw $8, %ax]
    over [xchg] *)
 let bswap x = Int16_u.bswap x
@@ -585,8 +594,8 @@ let to_int8 x = Int16_u.to_int8 x
 [%%expect_asm X86_64{|
 to_int8:
   salq  $56, %rax
-  sarq  $56, %rax
-  leaq  1(%rax,%rax), %rax
+  sarq  $55, %rax
+  orq   $1, %rax
   ret
 |}]
 
