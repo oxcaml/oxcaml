@@ -828,8 +828,9 @@ let preproc_stack_check ~fun_body ~frame_size ~trap_size =
         | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
         | Specific _ | Name_for_debugger _ | Alloc _ )
     | Lcall_op (Ltailcall_ind | Ltailcall_imm _ | Lextcall _ | Lprobe _)
-    | Lreloadretaddr | Lreturn | Llabel _ | Lbranch _ | Lcondbranch _
-    | Lcondbranch3 _ | Lswitch _ | Lentertrap | Lraise _ ->
+    | Lreloadretaddr | Lreturn | Llabel_for_jump_target _ | Llabel_for_dwarf _
+    | Lbranch _ | Lcondbranch _ | Lcondbranch3 _ | Lswitch _ | Lentertrap
+    | Lraise _ ->
       loop i.next fs max_fs nontail_flag
     | Lstackcheck _ ->
       (* should not be already present *)

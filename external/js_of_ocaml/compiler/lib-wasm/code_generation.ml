@@ -124,11 +124,14 @@ let register_data_segment x v st =
   st.context.data_segments <- Var.Map.add x v st.context.data_segments;
   (), st
 
-let lookup_string_global s st = String.Hashtbl.find_opt st.context.string_globals s, st
-
-let register_string_global s x st =
-  String.Hashtbl.add st.context.string_globals s x;
-  (), st
+let intern_string s gen st =
+  let context = st.context in
+  match String.Hashtbl.find_opt context.string_globals s with
+  | Some x -> x, st
+  | None ->
+      let x, st = gen () st in
+      String.Hashtbl.add context.string_globals s x;
+      x, st
 
 let get_context st = st.context, st
 
@@ -956,11 +959,6 @@ let need_dummy_fun ~cps ~arity st =
            ctx.dummy_funs <- IntMap.add arity x ctx.dummy_funs;
            x)
   , st )
-
-(* Initialization code is accumulated in reverse execution order.
-   Consumers must reverse the list so that fragments run in registration
-   order *)
-let init_code context = instrs (List.rev context.init_code)
 
 let function_body ~context ~param_names ~body =
   let st = { var_count = 0; vars = Var.Map.empty; instrs = []; context } in

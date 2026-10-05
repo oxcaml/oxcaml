@@ -62,7 +62,7 @@ type env =
     should_preserve_direct_calls : should_preserve_direct_calls;
     old_typing_env : Typing_env.t option;
     inside_code_definition : bool;
-    types_rewrite_context : Types_rewriter.rewrite_context
+    rewrite_kind_with_subkind : Name.t -> KS.t -> KS.t
   }
 
 type rebuild_result =
@@ -1175,8 +1175,7 @@ let rebuild_apply env apply =
                      Simple.pattern_match arg
                        ~const:(fun _ -> kind)
                        ~name:(fun name ~coercion:_ ->
-                         Types_rewriter.rewrite_kind_with_subkind
-                           env.types_rewrite_context name kind) )
+                         env.rewrite_kind_with_subkind name kind) )
                  | Delete ->
                    ( Simple.pattern_match arg
                        ~const:(fun _ -> arg)
@@ -1466,7 +1465,7 @@ let rebuild_singleton_binding_which_is_being_unboxed env bv
   in
   match[@ocaml.warning "-fragile-match"] defining_expr with
   | Prim (Variadic (Make_block (kind, _, _), args), _dbg) ->
-    Field.Map.fold
+    Field.Map.ordered_fold
       (fun field (var : _ Unboxed_fields.u) hole ->
         let arg : _ Either.t =
           match Field.view field with
@@ -1500,7 +1499,7 @@ let rebuild_singleton_binding_which_is_being_unboxed env bv
         | Right arg_fields -> bind_fields var (Unboxed arg_fields) hole)
       to_bind hole
   | Prim (Unary (Box_number (prim_bn, _), contents), _dbg) ->
-    Field.Map.fold
+    Field.Map.ordered_fold
       (fun field (var : _ Unboxed_fields.u) hole ->
         let arg =
           match Field.view field with
@@ -1565,7 +1564,7 @@ let rebuild_set_of_closures_binding_which_is_being_unboxed env bvs
                (Code_id_or_name.var (Bound_var.var bv)))
         in
         let value_slots = set_of_closures.value_slots in
-        Field.Map.fold
+        Field.Map.ordered_fold
           (fun field (var : _ Unboxed_fields.u) hole ->
             match Field.view field with
             | Value_slot value_slot ->
@@ -1738,10 +1737,7 @@ let rebuild_make_block_default_case env (bp : Bound_pattern.t)
              })
           Non_nullable
       in
-      let ks =
-        Types_rewriter.rewrite_kind_with_subkind env.types_rewrite_context
-          bound_name ks
-      in
+      let ks = env.rewrite_kind_with_subkind bound_name ks in
       let[@local] with_subkinds subkinds =
         P.Block_kind.Values (tag, subkinds)
       in
@@ -2355,7 +2351,7 @@ type result =
 
 let rebuild ~machine_width ~ordered_code_ids
     ~(continuation_info : Traverse_acc.continuation_info Continuation.Map.t)
-    ~fixed_arity_continuations ~final_typing_env ~types_rewrite_context
+    ~fixed_arity_continuations ~final_typing_env ~rewrite_kind_with_subkind
     ~code_changes (solved_dep : Analysis.result) get_code_metadata toplevel_expr
     code =
   let should_keep_param cont param kind : Unboxing_analysis.param_decision =
@@ -2376,11 +2372,7 @@ let rebuild ~machine_width ~ordered_code_ids
         ||
         let info = Continuation.Map.find cont continuation_info in
         info.is_exn_handler && Variable.equal param (List.hd info.params)
-      then
-        Keep
-          ( param,
-            Types_rewriter.rewrite_kind_with_subkind types_rewrite_context
-              (Name.var param) kind )
+      then Keep (param, rewrite_kind_with_subkind (Name.var param) kind)
       else Delete
     | Some fields -> Unbox fields
   in
@@ -2413,7 +2405,7 @@ let rebuild ~machine_width ~ordered_code_ids
       should_preserve_direct_calls;
       old_typing_env = final_typing_env;
       inside_code_definition = false;
-      types_rewrite_context
+      rewrite_kind_with_subkind
     }
   in
   let res =

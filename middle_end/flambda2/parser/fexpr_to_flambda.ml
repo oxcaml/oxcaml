@@ -276,7 +276,7 @@ let set_of_closures env fun_decls value_slots =
         (* By default, pun the code id as the function slot *)
         fun_decl.function_slot |> Option.value ~default:fun_decl.code_id
       in
-      let function_slot = fresh_or_existing_function_slot env function_slot in
+      let function_slot = find_function_slot env function_slot in
       function_slot, code_id
     in
     List.map translate_fun_decl fun_decls
@@ -539,7 +539,7 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
         match b with
         | Code { id; _ } ->
           (* All code ids were bound at the beginning; see
-             [bind_all_code_ids] *)
+             [bind_all_code_ids_and_function_slots] *)
           let code_id = find_code_id env id in
           Bound_static.Pattern.code code_id, env
         | Deleted_code id ->
@@ -556,9 +556,7 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
             let function_slot =
               function_slot |> Option.value ~default:code_id
             in
-            let function_slot =
-              fresh_or_existing_function_slot env function_slot
-            in
+            let function_slot = find_function_slot env function_slot in
             (function_slot, symbol), env
           in
           let closure_symbols, env =
@@ -975,33 +973,88 @@ and inlined_goto env acc (handler_body : Fexpr.expr) =
   in
   acc, build_let, apply
 
-let bind_all_code_ids env (unit : Fexpr.flambda_unit) =
-  let rec go env (e : Fexpr.expr) =
+let bind_all_code_ids_and_function_slots env (unit : Fexpr.flambda_unit) =
+  let add_code_id_of_slot code_ids_of_slots (fun_decl : Fexpr.fun_decl) =
+    ( fun_decl.code_id,
+      Option.value fun_decl.function_slot ~default:fun_decl.code_id )
+    :: code_ids_of_slots
+  in
+  let rec go env fs_size_of_code_ids code_ids_of_slots (e : Fexpr.expr) =
     match e with
     | Let_symbol { bindings; body; _ } ->
-      let env =
+      let env, fs_size_of_code_ids, code_ids_of_slots =
         List.fold_left
-          (fun env (binding : Fexpr.symbol_binding) ->
+          (fun (env, fs_size_of_code_ids, code_ids_of_slots)
+               (binding : Fexpr.symbol_binding) ->
             match binding with
-            | Code { id; _ } | Deleted_code id ->
+            | Deleted_code id ->
               let _ = fresh_or_existing_code_id env id in
-              env
-            | Data _ | Closure _ | Set_of_closures _ -> env)
-          env bindings
+              env, fs_size_of_code_ids, code_ids_of_slots
+            | Code { id; params_and_body; is_tupled; _ } ->
+              let code_id = fresh_or_existing_code_id env id in
+              let function_slot_size =
+                (* CR ncourant: this is only correct as long as fexpr does not
+                   support unboxed products *)
+                Function_slot.size_from_arity
+                  ~num_complex_params:(List.length params_and_body.params)
+                  ~is_tupled
+              in
+              let fs_size_of_code_ids =
+                Code_id.Map.add code_id function_slot_size fs_size_of_code_ids
+              in
+              go env fs_size_of_code_ids code_ids_of_slots params_and_body.body
+            | Closure { fun_decl; _ } ->
+              let code_ids_of_slots =
+                add_code_id_of_slot code_ids_of_slots fun_decl
+              in
+              env, fs_size_of_code_ids, code_ids_of_slots
+            | Set_of_closures { bindings; _ } ->
+              let code_ids_of_slots =
+                List.fold_left
+                  (fun code_ids_of_slots
+                       (binding : Fexpr.static_closure_binding) ->
+                    add_code_id_of_slot code_ids_of_slots binding.fun_decl)
+                  code_ids_of_slots bindings
+              in
+              env, fs_size_of_code_ids, code_ids_of_slots
+            | Data _ -> env, fs_size_of_code_ids, code_ids_of_slots)
+          (env, fs_size_of_code_ids, code_ids_of_slots)
+          bindings
       in
-      go env body
-    | Let { body; _ } -> go env body
-    | Let_cont { body; bindings; _ } ->
-      let env =
+      go env fs_size_of_code_ids code_ids_of_slots body
+    | Let { bindings; body; _ } ->
+      let code_ids_of_slots =
         List.fold_left
-          (fun env (binding : Fexpr.continuation_binding) ->
-            go env binding.handler)
-          env bindings
+          (fun code_ids_of_slots (binding : Fexpr.let_binding) ->
+            match binding.defining_expr with
+            | Closure fun_decl -> add_code_id_of_slot code_ids_of_slots fun_decl
+            | Simple _ | Prim _ | Rec_info _ -> code_ids_of_slots)
+          code_ids_of_slots bindings
       in
-      go env body
-    | Apply _ | Apply_cont _ | Switch _ | Invalid _ -> env
+      go env fs_size_of_code_ids code_ids_of_slots body
+    | Let_cont { body; bindings; _ } ->
+      let env, fs_size_of_code_ids, code_ids_of_slots =
+        List.fold_left
+          (fun (env, fs_size_of_code_ids, code_ids_of_slots)
+               (binding : Fexpr.continuation_binding) ->
+            go env fs_size_of_code_ids code_ids_of_slots binding.handler)
+          (env, fs_size_of_code_ids, code_ids_of_slots)
+          bindings
+      in
+      go env fs_size_of_code_ids code_ids_of_slots body
+    | Apply _ | Apply_cont _ | Switch _ | Invalid _ ->
+      env, fs_size_of_code_ids, code_ids_of_slots
   in
-  go env unit.body
+  let env, fs_size_of_code_ids, code_ids_of_slots =
+    go env Code_id.Map.empty [] unit.body
+  in
+  List.fold_left
+    (fun env (code_id, function_slot) ->
+      let code_id = find_code_id env code_id in
+      let size = Code_id.Map.find code_id fs_size_of_code_ids in
+      let _ = fresh_or_existing_function_slot env function_slot ~size in
+      env)
+    env code_ids_of_slots
 
 type conv_result =
   { unit : Flambda_unit.t;
@@ -1022,7 +1075,7 @@ let conv comp_unit (fexpr : Fexpr.flambda_unit) : conv_result =
     env
   in
   let exn_continuation = Exn_continuation.exn_handler error_continuation in
-  let env = bind_all_code_ids env fexpr in
+  let env = bind_all_code_ids_and_function_slots env fexpr in
   let acc, body = expr env Acc.empty fexpr.body in
   let code_slot_offsets = acc.Acc.code_slot_offsets in
   let unit =

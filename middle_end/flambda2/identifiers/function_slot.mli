@@ -23,4 +23,10 @@
     where the relevant information (code pointers, arity, etc.) will be stored
     at runtime, by the [Slot_offsets] module. *)
 
-include Slot.S
+include Slot.S with type payload := int
+
+val create : Compilation_unit.t -> name:string -> size:int -> t
+
+val size : t -> int
+
+val size_from_arity : num_complex_params:int -> is_tupled:bool -> int

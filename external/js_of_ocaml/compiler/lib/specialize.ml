@@ -251,9 +251,9 @@ end
 
 module SBT = Hashtbl.Make (Simple_block)
 
-(* For switches, at this point, we know that this it is sufficient to
-   check the [pc]. *)
-let equal (pc, _) (pc', _) = pc = pc'
+(* Optimization can merge targets while retaining distinct phi arguments. *)
+let equal (pc, args) (pc', args') =
+  pc = pc' && List.equal ~eq:Var.equal args args'
 
 type switch_to_cond =
   [ `All_equals
@@ -346,9 +346,9 @@ let switches p =
                           then (
                             let sb = Simple_block.make block in
                             match SBT.find_opt t sb with
-                            | Some cont' when not (equal cont' cont) ->
-                                rewrite := Addr.Set.add (fst cont') !rewrite;
-                                cont'
+                            | Some (pc', _) when pc' <> pc ->
+                                rewrite := Addr.Set.add pc' !rewrite;
+                                pc', snd cont
                             | Some _ | None ->
                                 SBT.add t sb cont;
                                 cont)

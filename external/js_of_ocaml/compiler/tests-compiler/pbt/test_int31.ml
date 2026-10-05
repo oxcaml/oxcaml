@@ -92,12 +92,12 @@ let%expect_test _ =
   let output = drop_cr [%expect.output] in
   let expected =
     Format.sprintf
-      "Warning [integer-overflow]: integer 0x%x (%d) truncated to 0x%x (%d); the \
+      "Warning [integer-overflow]: integer 0x%x (%d) truncated to 0x%lx (%ld); the \
        generated code might be incorrect.@."
       i
       i
-      (Int32.to_int i_trunc)
-      (Int32.to_int i_trunc)
+      i_trunc
+      i_trunc
   in
   if sixty_four && not (String.equal output expected)
   then Format.printf "Unexpected output string@.%s@.Expected:@.%s@." output expected;
@@ -110,12 +110,12 @@ let%expect_test _ =
   let output = drop_cr [%expect.output] in
   let expected =
     Format.sprintf
-      "Warning [integer-overflow]: native integer 0x%nx (%nd) truncated to 0x%nx (%nd); \
+      "Warning [integer-overflow]: native integer 0x%nx (%nd) truncated to 0x%lx (%ld); \
        the generated code might be incorrect.@."
       i
       i
-      (Nativeint.of_int32 i_trunc)
-      (Nativeint.of_int32 i_trunc)
+      i_trunc
+      i_trunc
   in
   if sixty_four && not (String.equal output expected)
   then Format.printf "Unexpected output string@.%s@.Expected:@.%s@." output expected;

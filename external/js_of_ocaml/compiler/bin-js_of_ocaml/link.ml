@@ -24,6 +24,7 @@ open Cmdliner
 type t =
   { common : Jsoo_cmdline.Arg.t
   ; source_map : Source_map.Encoding_spec.t option
+  ; manifests : string list
   ; js_files : string list
   ; output_file : string option
   ; resolve_sourcemap_url : bool
@@ -36,6 +37,14 @@ let options =
   let output_file =
     let doc = "Set output file name to [$(docv)]." in
     Arg.(value & opt (some string) None & info [ "o" ] ~docv:"FILE" ~doc)
+  in
+  let manifests =
+    let doc =
+      "Manifest file, relative to \\$MANIFEST_FILES_ROOT, mapping bare file names to \
+       their locations, in the format read by the OCaml compiler's -I-manifest. Bare file \
+       names given on the command line are looked up in these manifests."
+    in
+    Arg.(value & opt_all string [] & info [ "I-manifest" ] ~docv:"FILE" ~doc)
   in
   let no_sourcemap =
     let doc =
@@ -91,6 +100,7 @@ let options =
       sourcemap_root
       output_file
       resolve_sourcemap_url
+      manifests
       js_files
       linkall
       mklib
@@ -123,6 +133,7 @@ let options =
     `Ok
       { common
       ; output_file
+      ; manifests
       ; js_files
       ; source_map
       ; resolve_sourcemap_url
@@ -142,6 +153,7 @@ let options =
       $ sourcemap_root
       $ output_file
       $ resolve_sourcemap_url
+      $ manifests
       $ js_files
       $ linkall
       $ mklib
@@ -154,6 +166,7 @@ let f
     ; output_file
     ; source_map
     ; resolve_sourcemap_url
+    ; manifests
     ; js_files
     ; linkall
     ; mklib
@@ -168,6 +181,7 @@ let f
     } =
   Config.set_target `JavaScript;
   Jsoo_cmdline.Arg.eval common;
+  Dune_manifests_reader.set manifests;
   Linker.reset ();
   let with_output f =
     match output_file with

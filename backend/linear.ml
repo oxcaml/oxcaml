@@ -97,7 +97,8 @@ and instruction_desc =
   | Lcall_op of call_operation
   | Lreloadretaddr
   | Lreturn
-  | Llabel of label
+  | Llabel_for_jump_target of label
+  | Llabel_for_dwarf of label
   | Lbranch of label
   | Lcondbranch of Operation.test * label
   | Lcondbranch3 of label option * label option * label option
@@ -137,7 +138,7 @@ let has_fallthrough = function
     false
   | Lcall_op (Lcall_ind | Lcall_imm _ | Lextcall _ | Lprobe _)
   | Lprologue | Lepilogue_open | Lend | Lreloadretaddr | Lentertrap | Lpoptrap _
-  | Lop _ | Llabel _
+  | Lop _ | Llabel_for_jump_target _ | Llabel_for_dwarf _
   | Lcondbranch (_, _)
   | Lcondbranch3 (_, _, _)
   | Ladjust_stack_offset _ | Lpushtrap _ | Lstackcheck _ ->

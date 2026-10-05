@@ -298,3 +298,20 @@ let%expect_test "static eval int prims" =
       (globalThis));
     //end
     |}]
+
+let%expect_test "static eval of bits_of_float on nan" =
+  compile_and_run
+    {|
+    let () =
+      Printf.printf "%Lx\n" (Int64.bits_of_float (Int64.float_of_bits 0x7ff0000000000002L));
+      Printf.printf "%Lx\n" (Int64.bits_of_float (Int64.float_of_bits 0x7ff8000000000001L));
+      Printf.printf "%Lx\n" (Int64.bits_of_float (-. Int64.float_of_bits 0x7ff8000000000001L));
+      Printf.printf "%lx\n" (Int32.bits_of_float (-. Int64.float_of_bits 0x7ff8000000000001L))
+  |};
+  [%expect
+    {|
+    7ff0000000000001
+    7ff0000000000001
+    7ff0000000000001
+    7fc00000
+    |}]

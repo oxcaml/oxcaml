@@ -489,7 +489,8 @@ let run cfg_with_layout =
             if need_starting_label block ~prev_block
             then
               let instr =
-                to_linear_instr (Linear.Llabel block.start) ~next:body
+                to_linear_instr (Linear.Llabel_for_jump_target block.start)
+                  ~next:body
               in
               { instr with
                 available_before = body.available_before;
