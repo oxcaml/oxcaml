@@ -229,8 +229,7 @@ let rec add_pattern bv pat =
       Option.iter (fun ty -> add_type bv ty) ty;
   | Ppat_variant(_, op) -> add_opt add_pattern bv op
   | Ppat_type li -> add bv li
-  | Ppat_addr p -> add_pattern bv p
-  | Ppat_addr_imm p -> add_pattern bv p
+  | Ppat_addr (_, p) -> add_pattern bv p
   | Ppat_lazy p -> add_pattern bv p
   | Ppat_unpack id ->
       Option.iter

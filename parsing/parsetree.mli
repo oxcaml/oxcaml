@@ -368,8 +368,11 @@ and pattern_desc =
           - [(P @ modes)] when [tyopt] is [None]
          *)
   | Ppat_type of Longident.t loc  (** Pattern [#tconst] *)
-  | Ppat_addr of pattern  (** Pattern [addr_ P] *)
-  | Ppat_addr_imm of pattern  (** Pattern [addr_imm_ P] *)
+  | Ppat_addr of mutable_flag * pattern
+      (** [Ppat_addr(flag, P)] represents:
+          - [addr_ P]     when [flag] is [Mutable]
+          - [addr_imm_ P] when [flag] is [Immutable]
+       *)
   | Ppat_lazy of pattern  (** Pattern [lazy P] *)
   | Ppat_unpack of string option loc
       (** [Ppat_unpack(s)] represents:

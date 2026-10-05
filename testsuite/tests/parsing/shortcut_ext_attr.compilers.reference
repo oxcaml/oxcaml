@@ -305,7 +305,7 @@
                                                                   pattern (shortcut_ext_attr.ml[29,694+4]..[29,694+21]) ghost
                                                                     attribute "foo"
                                                                       []
-                                                                    Ppat_addr
+                                                                    Ppat_addr Mutable
                                                                     pattern (shortcut_ext_attr.ml[29,694+20]..[29,694+21])
                                                                       Ppat_var "x" (shortcut_ext_attr.ml[29,694+20]..[29,694+21])
                                                                 expression (shortcut_ext_attr.ml[29,694+25]..[29,694+27])
@@ -317,7 +317,7 @@
                                                                   pattern (shortcut_ext_attr.ml[30,722+4]..[30,722+25]) ghost
                                                                     attribute "foo"
                                                                       []
-                                                                    Ppat_addr_imm
+                                                                    Ppat_addr Immutable
                                                                     pattern (shortcut_ext_attr.ml[30,722+24]..[30,722+25])
                                                                       Ppat_var "x" (shortcut_ext_attr.ml[30,722+24]..[30,722+25])
                                                                 expression (shortcut_ext_attr.ml[30,722+29]..[30,722+31])

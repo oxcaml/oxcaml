@@ -3748,10 +3748,8 @@ pattern_gen:
     | name_tag pattern %prec prec_constr_appl
         { Ppat_variant($1, Some $2) }
     ) { $1 }
-  | ADDR ext_attributes simple_pattern
-      { mkpat_attrs ~loc:$sloc (Ppat_addr $3) $2}
-  | ADDR_IMM ext_attributes simple_pattern
-      { mkpat_attrs ~loc:$sloc (Ppat_addr_imm $3) $2}
+  | addr_pattern_keyword ext_attributes simple_pattern
+      { mkpat_attrs ~loc:$sloc (Ppat_addr ($1, $3)) $2}
   | LAZY ext_attributes simple_pattern
       { mkpat_attrs ~loc:$sloc (Ppat_lazy $3) $2}
 ;
@@ -5376,6 +5374,10 @@ private_flag:
 mutable_flag:
     /* empty */                                 { Immutable }
   | MUTABLE                                     { Mutable }
+;
+%inline addr_pattern_keyword:
+    ADDR                                        { Mutable }
+  | ADDR_IMM                                    { Immutable }
 ;
 poly_flag:
     /* empty */                                 { false }
