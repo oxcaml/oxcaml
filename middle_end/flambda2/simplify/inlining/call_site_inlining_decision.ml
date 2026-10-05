@@ -57,7 +57,7 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
     then
       (* The simplification of the inlined body will be aborted if what it has
          produced costs more than [budget] (see [Simplify_expr]). *)
-      DA.with_speculative_inlining_budget dacc (Remaining budget)
+      DA.enter_speculative_region dacc ~budget
     else dacc
   in
   (* CR-someday poechsel: [Inlining_transforms.inline] is preparing the body for

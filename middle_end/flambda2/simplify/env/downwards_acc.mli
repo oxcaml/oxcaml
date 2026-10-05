@@ -148,12 +148,20 @@ val prepare_for_speculative_inlining : t -> t
     traversal proceeds. *)
 type speculative_inlining_budget =
   | Not_in_speculative_region
-  | Remaining of float
+  | Remaining of
+      { remaining : float;
+        pending_credit : float;
+            (** Credit for removed operations not yet used to offset code. *)
+        creditable : float  (** Credit that may still be granted. *)
+      }
   | Exhausted
 
 val speculative_inlining_budget : t -> speculative_inlining_budget
 
 val with_speculative_inlining_budget : t -> speculative_inlining_budget -> t
+
+(** Start tracking a budget of the given size. *)
+val enter_speculative_region : t -> budget:float -> t
 
 (** [None] if not in a speculative region; [Some 0.] if exhausted. *)
 val remaining_speculative_inlining_budget : t -> float option

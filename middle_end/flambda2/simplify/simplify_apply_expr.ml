@@ -222,6 +222,13 @@ type inlining_decision =
         leaving_speculative_region : bool
       }
 
+(* Credit the speculative inlining budget, if any, for operations removed on the
+   way down. The corresponding [UA.notify_removed] on the way up still
+   determines the cost metrics of the rebuilt expression. *)
+let charge_removed_operation dacc operation =
+  DA.charge_speculative_inlining_budget dacc
+    (Cost_metrics.notify_removed ~operation Cost_metrics.zero)
+
 (* When [Flambda_features.Inlining.speculative_inlining_budget] is enabled, a
    speculative inlining whose call site is not already inside a
    speculatively-inlined body opens a "region" whose budget is the inlining
@@ -230,11 +237,7 @@ type inlining_decision =
    [Simplify_let_expr]), and speculations inside the region are limited to the
    remaining budget (see [Call_site_inlining_decision]). *)
 let enter_inlined_body_for_speculative_inlining_budget dacc decision =
-  let dacc =
-    DA.charge_speculative_inlining_budget dacc
-      (Cost_metrics.notify_removed ~operation:Removed_operations.call
-         Cost_metrics.zero)
-  in
+  let dacc = charge_removed_operation dacc Removed_operations.call in
   if not (Flambda_features.Inlining.speculative_inlining_budget ())
   then dacc, false
   else
@@ -244,7 +247,7 @@ let enter_inlined_body_for_speculative_inlining_budget dacc decision =
       )
     with
     | Not_in_speculative_region, Some threshold ->
-      DA.with_speculative_inlining_budget dacc (Remaining threshold), true
+      DA.enter_speculative_region dacc ~budget:threshold, true
     | (Not_in_speculative_region | Remaining _ | Exhausted), _ -> dacc, false
 
 (* CR vlaviron: fetch [params_arity], [result_arity] and [result_types] from
@@ -252,6 +255,12 @@ let enter_inlined_body_for_speculative_inlining_budget dacc decision =
 let simplify_direct_full_application ~simplify_expr dacc apply function_type
     ~params_arity ~result_arity ~(result_types : _ Or_unknown_or_bottom.t)
     ~down_to_up ~coming_from_indirect ~callee's_code_metadata =
+  let dacc =
+    if coming_from_indirect
+    then
+      charge_removed_operation dacc Removed_operations.direct_call_of_indirect
+    else dacc
+  in
   let inlined =
     match function_type with
     | None ->
@@ -877,6 +886,16 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
         let uacc = UA.notify_removed ~operation:Removed_operations.call uacc in
         rebuild uacc ~after_rebuild)
   in
+  let dacc =
+    let removed =
+      if coming_from_indirect
+      then
+        Removed_operations.( + ) Removed_operations.call
+          Removed_operations.direct_call_of_indirect
+      else Removed_operations.call
+    in
+    charge_removed_operation dacc removed
+  in
   simplify_expr dacc expr ~down_to_up
 
 let simplify_direct_over_application ~simplify_expr dacc apply ~down_to_up
@@ -898,6 +917,12 @@ let simplify_direct_over_application ~simplify_expr dacc apply ~down_to_up
       rebuild uacc ~after_rebuild
     in
     down_to_up dacc ~rebuild
+  in
+  let dacc =
+    if coming_from_indirect
+    then
+      charge_removed_operation dacc Removed_operations.direct_call_of_indirect
+    else dacc
   in
   simplify_expr dacc expr ~down_to_up
 
@@ -1404,6 +1429,7 @@ let simplify_c_call ~simplify_expr dacc apply ~callee_ty ~arg_types ~down_to_up
   in
   match simplified with
   | Specialised (dacc, expr, operation) ->
+    let dacc = charge_removed_operation dacc operation in
     let down_to_up dacc ~rebuild =
       let rebuild uacc ~after_rebuild =
         let uacc = UA.notify_removed uacc ~operation in

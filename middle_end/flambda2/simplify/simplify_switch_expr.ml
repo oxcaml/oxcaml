@@ -1023,6 +1023,31 @@ let simplify_switch dacc switch ~down_to_up =
       (Switch.arms switch) (TI.Map.empty, dacc)
   in
   let dacc =
+    (* Charge the speculative inlining budget for the switch as it will be
+       rebuilt, approximately: the arms that cannot be taken have been dropped,
+       and a switch left with at most one arm becomes a jump (see
+       [rebuild_switch]). *)
+    let cost_metrics =
+      if TI.Map.cardinal arms <= 1
+      then
+        let size =
+          match TI.Map.choose_opt arms with
+          | None -> Code_size.invalid
+          | Some (_, (action, _, _, _)) -> Code_size.apply_cont action
+        in
+        Cost_metrics.notify_removed ~operation:Removed_operations.branch
+          (Cost_metrics.from_size size)
+      else
+        Cost_metrics.from_size
+          (Code_size.switch
+             (Switch.create
+                ~condition_dbg:(Switch.condition_dbg switch)
+                ~scrutinee
+                ~arms:(TI.Map.map (fun (action, _, _, _) -> action) arms)))
+    in
+    DA.charge_speculative_inlining_budget dacc cost_metrics
+  in
+  let dacc =
     if TI.Map.cardinal arms <= 1
     then dacc
     else

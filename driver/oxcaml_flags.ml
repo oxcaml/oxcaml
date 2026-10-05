@@ -486,6 +486,8 @@ module Flambda2 = struct
 
       let speculative_inlining_budget_size = 0.
 
+      let speculative_inlining_budget_max_credit = 1.
+
       let speculative_inlining_credit_call_site = false
 
       let speculative_inlining_bonus_call = 2.
@@ -549,6 +551,9 @@ module Flambda2 = struct
 
     let speculative_inlining_budget_size =
       ref Default.speculative_inlining_budget_size
+
+    let speculative_inlining_budget_max_credit =
+      ref Default.speculative_inlining_budget_max_credit
 
     let speculative_inlining_credit_call_site =
       ref Default.speculative_inlining_credit_call_site

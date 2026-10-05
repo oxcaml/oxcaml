@@ -141,10 +141,8 @@ let rec simplify_expr dacc expr ~down_to_up =
       in
       Simplify_apply_cont_expr.simplify_apply_cont dacc apply_cont ~down_to_up
     | Switch switch ->
-      let dacc =
-        DA.charge_speculative_inlining_budget dacc
-          (Cost_metrics.from_size (Code_size.switch switch))
-      in
+      (* The budget is charged in [Simplify_switch_expr], once the arms that
+         cannot be taken are known. *)
       Simplify_switch_expr.simplify_switch dacc switch ~down_to_up
     | Invalid { message } -> simplify_invalid dacc ~down_to_up ~message
 

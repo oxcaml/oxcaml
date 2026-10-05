@@ -21,13 +21,21 @@ module TE = Flambda2_types.Typing_env
 
 type speculative_inlining_budget =
   | Not_in_speculative_region
-  | Remaining of float
+  | Remaining of
+      { remaining : float;
+        pending_credit : float;
+        creditable : float
+      }
   | Exhausted
 
 let print_speculative_inlining_budget ppf budget =
   match budget with
   | Not_in_speculative_region -> Format.fprintf ppf "Not_in_speculative_region"
-  | Remaining remaining -> Format.fprintf ppf "(Remaining %f)" remaining
+  | Remaining { remaining; pending_credit; creditable } ->
+    Format.fprintf ppf
+      "@[<hov 1>(Remaining@ (remaining %f)@ (pending_credit %f)@ (creditable \
+       %f))@]"
+      remaining pending_credit creditable
   | Exhausted -> Format.fprintf ppf "Exhausted"
 
 type t =
@@ -145,10 +153,22 @@ let speculative_inlining_budget t = t.speculative_inlining_budget
 let with_speculative_inlining_budget t speculative_inlining_budget =
   { t with speculative_inlining_budget }
 
+let enter_speculative_region t ~budget =
+  let creditable =
+    let max_credit =
+      Flambda_features.Inlining.speculative_inlining_budget_max_credit ()
+    in
+    if Float.compare max_credit 0. < 0
+    then Float.infinity
+    else max_credit *. budget
+  in
+  with_speculative_inlining_budget t
+    (Remaining { remaining = budget; pending_credit = 0.; creditable })
+
 let remaining_speculative_inlining_budget t =
   match t.speculative_inlining_budget with
   | Not_in_speculative_region -> None
-  | Remaining remaining -> Some remaining
+  | Remaining { remaining; _ } -> Some remaining
   | Exhausted -> Some 0.
 
 let speculative_inlining_budget_exhausted t =
@@ -156,16 +176,54 @@ let speculative_inlining_budget_exhausted t =
   | Exhausted -> true
   | Not_in_speculative_region | Remaining _ -> false
 
+(* The budget is charged with the cost of code as the downwards traversal
+   produces it, i.e. with post-simplification sizes, rather than with the
+   pre-simplification size of the code being inlined. This matters for dead
+   branches: when a function is inlined at a call site where some arguments are
+   known, switches on those arguments are resolved on the way down and the
+   continuation handlers for the other arms are never traversed (see
+   [Simplify_let_cont_expr]), so they cost neither compile time nor code size.
+   Charging the pre-simplification size of the inlined body would charge for
+   those arms, and the inlinings it would refuse are exactly the cheapest and
+   most valuable ones: specialisations that discard most of the callee.
+   (Charging as the traversal proceeds also keeps the budget a bound on compile
+   time, since only traversed code is charged.)
+
+   The charge for a piece of code is its size less the bonus for the operations
+   its simplification removed, and may be negative. The remaining budget never
+   increases, however: a net credit is kept aside and used to offset code
+   charged later, so removed operations still buy code, and the result is the
+   same as charging the adjusted size as long as the credit is used. What the
+   credit cannot do is refund budget already spent, so the budget is a bound on
+   the peak adjusted size. The total credit that may be granted within a region
+   is limited (see [enter_speculative_region]), which bounds the amount of code
+   traversed. *)
 let charge_speculative_inlining_budget t cost_metrics =
   match t.speculative_inlining_budget with
   | Not_in_speculative_region | Exhausted -> t
-  | Remaining remaining ->
+  | Remaining { remaining; pending_credit; creditable } ->
     let args = DE.inlining_arguments t.denv in
-    let remaining =
-      remaining -. Cost_metrics.budget_charge ~args cost_metrics
-    in
+    let charge = Cost_metrics.budget_charge ~args cost_metrics in
     let speculative_inlining_budget =
-      if Float.compare remaining 0. < 0 then Exhausted else Remaining remaining
+      if Float.compare charge 0. < 0
+      then
+        let credit = Float.min (-.charge) creditable in
+        Remaining
+          { remaining;
+            pending_credit = pending_credit +. credit;
+            creditable = creditable -. credit
+          }
+      else
+        let from_credit = Float.min charge pending_credit in
+        let remaining = remaining -. (charge -. from_credit) in
+        if Float.compare remaining 0. < 0
+        then Exhausted
+        else
+          Remaining
+            { remaining;
+              pending_credit = pending_credit -. from_credit;
+              creditable
+            }
     in
     { t with speculative_inlining_budget }
 

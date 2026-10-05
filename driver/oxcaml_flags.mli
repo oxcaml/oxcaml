@@ -348,6 +348,7 @@ module Flambda2 : sig
       val speculative_inlining_criterion : speculative_inlining_criterion
       val speculative_inlining_ratio : float
       val speculative_inlining_budget_size : float
+      val speculative_inlining_budget_max_credit : float
       val speculative_inlining_credit_call_site : bool
       val speculative_inlining_bonus_call : float
       val speculative_inlining_bonus_alloc : float
@@ -398,6 +399,10 @@ module Flambda2 : sig
     (** The budget of a speculative inlining (see [speculative_inlining_budget]);
         zero or less means: the inlining threshold. *)
     val speculative_inlining_budget_size : float ref
+
+    (** Removed operations may offset at most this multiple of the budget's
+        size within one speculative region; negative means no limit. *)
+    val speculative_inlining_budget_max_credit : float ref
 
     val speculative_inlining_credit_call_site : bool ref
 

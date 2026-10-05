@@ -205,6 +205,7 @@ module type Oxcaml_options = sig
   val flambda2_speculative_inlining_criterion : string -> unit
   val flambda2_speculative_inlining_ratio : float -> unit
   val flambda2_speculative_inlining_budget_size : float -> unit
+  val flambda2_speculative_inlining_budget_max_credit : float -> unit
   val flambda2_speculative_inlining_credit_call_site : unit -> unit
   val no_flambda2_speculative_inlining_credit_call_site : unit -> unit
   val flambda2_speculative_inlining_bonus_call : float -> unit

@@ -348,6 +348,9 @@ module Inlining = struct
   let speculative_inlining_budget_size () =
     !Oxcaml_flags.Flambda2.Inlining.speculative_inlining_budget_size
 
+  let speculative_inlining_budget_max_credit () =
+    !Oxcaml_flags.Flambda2.Inlining.speculative_inlining_budget_max_credit
+
   let speculative_inlining_credit_call_site () =
     !Oxcaml_flags.Flambda2.Inlining.speculative_inlining_credit_call_site
 
