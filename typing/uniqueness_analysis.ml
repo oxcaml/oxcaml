@@ -295,6 +295,7 @@ module Aliased : sig
   type reason =
     | Forced  (** aliased because forced due to multiple usage *)
     | Lazy  (** aliased because of a lazy pattern *)
+    | Address  (** aliased because of an address pattern *)
     | Array  (** aliased because of an array pattern *)
     | Constant  (** aliased because of an constant pattern *)
     | Lifted of Maybe_aliased.access
@@ -316,6 +317,7 @@ end = struct
   type reason =
     | Forced
     | Lazy
+    | Address
     | Array
     | Constant
     | Lifted of Maybe_aliased.access
@@ -335,6 +337,7 @@ end = struct
     let print_reason ppf = function
       | Forced -> fprintf ppf "Forced"
       | Lazy -> fprintf ppf "Lazy"
+      | Address -> fprintf ppf "Address"
       | Array -> fprintf ppf "Array"
       | Constant -> fprintf ppf "Constant"
       | Lifted ma -> fprintf ppf "Lifted(%a)" Maybe_aliased.print_access ma
@@ -2073,6 +2076,10 @@ and pattern_match_barrier pat paths : UF.t =
     (* Lazy patterns consume their memory anyway since
        forcing a lazy expression is like calling a nullary-function *)
     consume_memory_address Lazy
+  | Tpat_addr _ ->
+    (* CR address-patterns: immutable address dereferencing should pass through uniqueness
+       and affinity, too *)
+    consume_memory_address Address
   | Tpat_tuple _ -> borrow_memory_address ()
   | Tpat_unboxed_unit ->
     (* unboxed units are not allocations *)
@@ -2156,6 +2163,10 @@ and pattern_match_single pat paths : Ienv.Extension.t * UF.t =
       let uf_force = Paths.mark_aliased occ Lazy paths in
       let ext, uf_arg = pattern_match_single arg (Paths.fresh ()) in
       ext, UF.par uf_force uf_arg
+    | Tpat_addr (_, _, arg) ->
+      (* CR address-patterns: immutable address dereferencing should pass through
+         uniqueness and affinity, too *)
+      pattern_match_single arg Paths.untracked
     | Tpat_tuple args ->
       List.mapi
         (fun i (_, arg) ->
@@ -2958,6 +2969,7 @@ let report_multi_use inner first_is_of_second =
       match Aliased.reason t with
       | Forced -> "used"
       | Lazy -> "used in a lazy pattern"
+      | Address -> "used in an address pattern"
       | Array -> "used in an array pattern"
       | Constant -> "used in a constant pattern"
       | Lifted access ->

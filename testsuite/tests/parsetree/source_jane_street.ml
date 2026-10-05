@@ -1872,64 +1872,73 @@ val f : l:int @ local -> int = <fun>
 (*********************)
 (* Address patterns *)
 
-(* CR address-patterns: These tests are failing for now because address
-   pattern typing isn't implemented yet. This is only testing parsing for
-   now. *)
+type addr_variant = K of u addr | L of u addr_imm
+[%%expect{|
+type addr_variant = K of u addr | L of u addr_imm
+|}]
 
 let f = function
-  | addr_ (A foo) -> foo
-  | Some addr_ x -> x
-  | addr_ x :: _ -> x
-  | addr_ _ | addr_ (addr_ _) -> ()
-  | addr_ (None | Some _) -> ()
+  | K addr_ (A foo) -> foo
+  | K addr_ (B _ | C _ | D) -> ()
+  | L _ -> ()
 [%%expect{|
-Line 2, characters 4-17:
-2 |   | addr_ (A foo) -> foo
-        ^^^^^^^^^^^^^
-Error: Address patterns "addr_" and "addr_imm_" are not supported yet.
+val f : addr_variant -> unit = <fun>
 |}]
 
 let f (addr_ x) = x
 [%%expect{|
-Line 1, characters 6-15:
-1 | let f (addr_ x) = x
-          ^^^^^^^^^
-Error: Address patterns "addr_" and "addr_imm_" are not supported yet.
+val f : 'a addr -> 'a = <fun>
 |}]
 
-let addr_ x = y
+let f (addr_ (addr_ x)) = x
 [%%expect{|
-Line 1, characters 4-11:
-1 | let addr_ x = y
-        ^^^^^^^
-Error: Address patterns "addr_" and "addr_imm_" are not supported yet.
+val f : 'a addr addr -> 'a = <fun>
+|}]
+
+let f (addr_ x : int addr) = x
+[%%expect{|
+val f : int addr -> int = <fun>
+|}]
+
+let f (addr_ x : string addr @ local) = x
+[%%expect{|
+val f : string addr @ local -> string = <fun>
+|}]
+
+let f a = let addr_ x = a in x
+[%%expect{|
+val f : 'a addr -> 'a = <fun>
 |}]
 
 let f = function
-  | addr_imm_ (A foo) -> foo
-  | Some addr_imm_ x -> x
-  | addr_imm_ x :: _ -> x
-  | addr_imm_ _ | addr_imm_ (addr_imm_ _) -> ()
-  | addr_imm_ (None | Some _) -> ()
+  | L addr_imm_ (A foo) -> foo
+  | L addr_imm_ (B _ | C _ | D) -> ()
+  | K _ -> ()
 [%%expect{|
-Line 2, characters 4-21:
-2 |   | addr_imm_ (A foo) -> foo
-        ^^^^^^^^^^^^^^^^^
-Error: Address patterns "addr_" and "addr_imm_" are not supported yet.
+val f : addr_variant -> unit = <fun>
 |}]
 
 let f (addr_imm_ x) = x
 [%%expect{|
-Line 1, characters 6-19:
-1 | let f (addr_imm_ x) = x
-          ^^^^^^^^^^^^^
-Error: Address patterns "addr_" and "addr_imm_" are not supported yet.
+val f : 'a addr_imm -> 'a = <fun>
 |}]
 
-let addr_imm_ x = y
+let f (addr_imm_ (addr_imm_ x)) = x
 [%%expect{|
-Line 1, characters 4-15:
-1 | let addr_imm_ x = y
-        ^^^^^^^^^^^
-Error: Address patterns "addr_" and "addr_imm_" are not supported yet.
+val f : 'a addr_imm addr_imm -> 'a = <fun>
+|}]
+
+let f (addr_imm_ x : int addr_imm) = x
+[%%expect{|
+val f : int addr_imm -> int = <fun>
+|}]
+
+let f (addr_imm_ x : string addr_imm @ local) = x
+[%%expect{|
+val f : string addr_imm @ local -> string @ local = <fun>
+|}]
+
+let f a = let addr_imm_ x = a in x
+[%%expect{|
+val f : 'a addr_imm -> 'a = <fun>
 |}]

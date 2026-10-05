@@ -1415,6 +1415,8 @@ module Pat : sig
 
   val or_ : Debuginfo.Scoped_location.t -> t -> t -> t'
 
+  val addr : Debuginfo.Scoped_location.t -> t -> bool -> t'
+
   val lazy_ : Debuginfo.Scoped_location.t -> t -> t'
 
   val any_module : t'
@@ -1477,6 +1479,8 @@ end = struct
     apply1 "Pat" "array" loc (mk_list ~loc (List.map extract a1))
 
   let or_ loc a1 a2 = apply2 "Pat" "or_" loc (extract a1) (extract a2)
+
+  let addr loc a1 a2 = apply2 "Pat" "addr" loc (extract a1) (transl_bool a2)
 
   let lazy_ loc a1 = apply1 "Pat" "lazy_" loc (extract a1)
 
@@ -2473,7 +2477,7 @@ let rec with_new_idents_pat pat =
     List.iter (fun (_, pat, _) -> with_new_idents_pat pat) args
   | Tpat_record_unboxed_product (lbl_pats, _, _) ->
     List.iter (fun (_, _, pat) -> with_new_idents_pat pat) lbl_pats
-  | Tpat_lazy pat -> with_new_idents_pat pat
+  | Tpat_addr (_, _, pat) | Tpat_lazy pat -> with_new_idents_pat pat
   | Tpat_fun_layout { id; _ } -> with_new_idents_values [id]
 
 let rec without_idents_pat pat =
@@ -2505,7 +2509,7 @@ let rec without_idents_pat pat =
     List.iter (fun (_, pat, _) -> without_idents_pat pat) args
   | Tpat_record_unboxed_product (lbl_pats, _, _) ->
     List.iter (fun (_, _, pat) -> without_idents_pat pat) lbl_pats
-  | Tpat_lazy pat -> without_idents_pat pat
+  | Tpat_addr (_, _, pat) | Tpat_lazy pat -> without_idents_pat pat
   | Tpat_fun_layout { id; _ } -> without_idents_values [id]
 
 let with_new_param fp =
@@ -2858,6 +2862,9 @@ and quote_value_pattern ~scopes p =
         match closed with Asttypes.Closed -> true | Asttypes.Open -> false
       in
       Pat.unboxed_record loc lbl_pats closed
+    | Tpat_addr (mut, _, pat) ->
+      let pat = quote_value_pattern ~scopes pat in
+      Pat.addr loc pat (Types.is_mutable mut)
     | Tpat_lazy pat ->
       let pat = quote_value_pattern ~scopes pat in
       Pat.lazy_ loc pat

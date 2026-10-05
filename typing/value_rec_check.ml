@@ -1551,6 +1551,7 @@ and is_destructuring_pattern : type k . k general_pattern -> bool =
     | Tpat_record _ -> true
     | Tpat_record_unboxed_product _ -> true
     | Tpat_array _ -> true
+    | Tpat_addr _ -> true
     | Tpat_lazy _ -> true
     | Tpat_value pat -> is_destructuring_pattern (pat :> pattern)
     | Tpat_exception _ -> false
