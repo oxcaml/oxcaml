@@ -714,6 +714,8 @@ static void orph_ephe_list_verify_status (int status)
 }
 #endif
 
+static void commit_major_slice_work(intnat);
+
 void caml_orphan_ephemerons (caml_domain_state* domain_state)
 {
   CAMLassert (caml_gc_phase != Phase_sweep_main);
@@ -737,7 +739,9 @@ void caml_orphan_ephemerons (caml_domain_state* domain_state)
          case they stay orphaned until the next GC cycle. This mirrors
          the logic in [major_collection_slice] for [Phase_sweep_ephe]. */
       while (ephe_info->todo) {
-        ephe_sweep(domain_state, 100000);
+        intnat budget = 100000;
+        intnat leftover = ephe_sweep(domain_state, budget);
+        commit_major_slice_work(budget - leftover);
       }
       (void)caml_atomic_counter_decr(&num_domains_to_ephe_sweep);
     }
@@ -1105,6 +1109,7 @@ static uintnat gc_slice_work(uintnat allocated_words,
 
 }
 
+<<<<<<< OxCaml
 /* Values for the event counters describing a slice's inputs, computed by
    [update_major_slice_work] and logged by [slice_events_begin]. */
 struct slice_counters {
@@ -1116,6 +1121,19 @@ struct slice_counters {
    caller decides whether the slice is logged at all (in particular a domain
    being torn down must not write to the ring, as it is no longer in the STW
    participant set and the ring could be torn down concurrently). */
+||||||| Upstream OCaml
+static void commit_major_slice_work(intnat);
+
+/* The [log_events] parameter is used to disable writing to the ring
+   to prevent spamming the ring with numerous events generated during
+   an opportunistic GC slice.
+ */
+=======
+/* The [log_events] parameter is used to disable writing to the ring
+   to prevent spamming the ring with numerous events generated during
+   an opportunistic GC slice.
+ */
+>>>>>>> ocaml/ocaml#15099
 static void
 update_major_slice_work(intnat howmuch,
                         int may_access_gc_phase,
