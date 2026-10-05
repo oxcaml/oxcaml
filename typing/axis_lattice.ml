@@ -14,8 +14,8 @@
 
 (* Axis lattice: efficient bitfield encoding of jkind axes.
 
-   This module packs 11 axes into an OCaml immediate-sized integer. The axes
-   are indexed 0-10 and their values are ordered from most restrictive (0) to
+   This module packs 13 axes into an OCaml immediate-sized integer. The axes
+   are indexed 0-12 and their values are ordered from most restrictive (0) to
    least restrictive (max).
 
    Axis layout (index, name, values from level 0 to max):
@@ -29,10 +29,12 @@
    7. Statefulness: Stateless -> Writing / Reading -> Stateful
    8. Visibility (monadic): Immutable -> Read / Write -> Read_write
    9. Staticity (monadic): Dynamic -> Static
-   10. Externality: External -> External64 -> Internal
+   10. Borrowability: Borrowable -> Unborrowable
+   11. Borrowedness (monadic): Borrowed -> Owned
+   12. Externality: External -> External64 -> Internal
 
-   Axes 0-9 are modal axes (affect mode-crossing).
-   Axis 10 is the only non-modal axis (externality).
+   Axes 0-11 are modal axes (affect mode-crossing).
+   Axis 12 is the only non-modal axis (externality).
 
    Each 2-valued axis uses 1 bit. The 3-valued chain axes and 4-valued diamond
    axes use 2 bits.
@@ -72,6 +74,8 @@ let axis_shapes =
       | Modal (Comonadic Statefulness) -> Diamond4
       | Modal (Monadic Visibility) -> Diamond4
       | Modal (Monadic Staticity) -> Chain2
+      | Modal (Comonadic Borrowability) -> Chain2
+      | Modal (Monadic Borrowedness) -> Chain2
       | Nonmodal Externality -> Chain3)
     axis_by_number
 
@@ -106,7 +110,7 @@ type t = int
 
 let bot : t = 0
 
-(* For this layout top happens to be all 20 bits set: 0xF_FFFF. *)
+(* For this layout top happens to be all 19 bits set: 0x7_FFFF. *)
 let top : t = Array.fold_left ( lor ) 0 axis_mask
 
 let join (a : t) (b : t) : t = a lor b
@@ -192,7 +196,11 @@ let imply (a : t) (b : t) : t =
   let invalid_chain3_hi_bits = r land chain3_hi_mask land lnot (r lsl 1) in
   r land lnot invalid_chain3_hi_bits
 
-(* Build a mask from a set of relevant axes. *)
+(* Build a mask from a set of relevant axes. Axis-set bit [i] maps to the
+   packed slot at [offsets.(i)]; the shift constants below are hand-derived
+   from [offsets] and [has_hi], and must be updated whenever an axis is added.
+   They are checked against a reference implementation in
+   [oxcaml/tests/typing/axis_lattice_roundtrip_test.ml]. *)
 let of_axis_set (set : Jkind_axis.Axis_set.t) : t =
   let set : int = Obj.magic set in
   let lo =
@@ -201,10 +209,9 @@ let of_axis_set (set : Jkind_axis.Axis_set.t) : t =
     lor ((set land 0x010) lsl 2)
     lor ((set land 0x0E0) lsl 3)
     lor ((set land 0x100) lsl 4)
-    lor ((set land 0x600) lsl 5)
-    lor ((set land 0x1800) lsl 6)
+    lor ((set land 0x1E00) lsl 5)
   in
-  lo lor ((lo land 0x49451) lsl 1)
+  lo lor ((lo land 0x21451) lsl 1)
 
 (* Helpers to translate between axis enumerations and packed levels. *)
 module Levels = struct
@@ -264,6 +271,16 @@ module Levels = struct
 
   let level_of_staticity_monadic (x : Mode.Staticity.const) : int =
     match x with Mode.Staticity.Dynamic -> 0 | Mode.Staticity.Static -> 1
+
+  let level_of_borrowability (x : Mode.Borrowability.Const.t) : int =
+    match x with
+    | Mode.Borrowability.Const.Borrowable -> 0
+    | Mode.Borrowability.Const.Unborrowable -> 1
+
+  let level_of_borrowedness_monadic (x : Mode.Borrowedness.Const.t) : int =
+    match x with
+    | Mode.Borrowedness.Const.Borrowed -> 0
+    | Mode.Borrowedness.Const.Owned -> 1
 
   let level_of_externality (x : Jkind_axis.Externality.t) : int =
     match x with External -> 0 | External64 -> 1 | Internal -> 2
@@ -327,6 +344,16 @@ module Levels = struct
     | 1 -> Mode.Staticity.Static
     | _ -> invalid_arg "Axis_lattice.staticity_of_level_monadic"
 
+  let borrowability_of_level = function
+    | 0 -> Mode.Borrowability.Const.Borrowable
+    | 1 -> Mode.Borrowability.Const.Unborrowable
+    | _ -> invalid_arg "Axis_lattice.borrowability_of_level"
+
+  let borrowedness_of_level_monadic = function
+    | 0 -> Mode.Borrowedness.Const.Borrowed
+    | 1 -> Mode.Borrowedness.Const.Owned
+    | _ -> invalid_arg "Axis_lattice.borrowedness_of_level_monadic"
+
   let externality_of_level = function
     | 0 -> Jkind_axis.Externality.External
     | 1 -> Jkind_axis.Externality.External64
@@ -364,8 +391,14 @@ let visibility (x : t) : Mode.Visibility.Const.t =
 let staticity (x : t) : Mode.Staticity.const =
   Levels.staticity_of_level_monadic (get_axis x ~axis:9)
 
+let borrowability (x : t) : Mode.Borrowability.Const.t =
+  Levels.borrowability_of_level (get_axis x ~axis:10)
+
+let borrowedness (x : t) : Mode.Borrowedness.Const.t =
+  Levels.borrowedness_of_level_monadic (get_axis x ~axis:11)
+
 let externality (x : t) : Jkind_axis.Externality.t =
-  Levels.externality_of_level (get_axis x ~axis:10)
+  Levels.externality_of_level (get_axis x ~axis:12)
 
 let set_areality (a : Mode.Regionality.Const.t) (x : t) : t =
   set_axis x ~axis:0 ~level:(Levels.level_of_areality a)
@@ -397,8 +430,14 @@ let set_visibility (v : Mode.Visibility.Const.t) (x : t) : t =
 let set_staticity (s : Mode.Staticity.const) (x : t) : t =
   set_axis x ~axis:9 ~level:(Levels.level_of_staticity_monadic s)
 
+let set_borrowability (b : Mode.Borrowability.Const.t) (x : t) : t =
+  set_axis x ~axis:10 ~level:(Levels.level_of_borrowability b)
+
+let set_borrowedness (b : Mode.Borrowedness.Const.t) (x : t) : t =
+  set_axis x ~axis:11 ~level:(Levels.level_of_borrowedness_monadic b)
+
 let set_externality (e : Jkind_axis.Externality.t) (x : t) : t =
-  set_axis x ~axis:10 ~level:(Levels.level_of_externality e)
+  set_axis x ~axis:12 ~level:(Levels.level_of_externality e)
 
 let to_mode_crossing (x : t) : Mode.Crossing.t =
   let open Mode.Crossing in
@@ -416,6 +455,9 @@ let to_mode_crossing (x : t) : Mode.Crossing.t =
       ~staticity:
         (Monadic.Atom.Modality
            (Mode.Modality.Monadic.Atom.Join_const (staticity x)))
+      ~borrowedness:
+        (Monadic.Atom.Modality
+           (Mode.Modality.Monadic.Atom.Join_const (borrowedness x)))
   in
   let comonadic =
     Comonadic.create
@@ -437,17 +479,23 @@ let to_mode_crossing (x : t) : Mode.Crossing.t =
       ~statefulness:
         (Comonadic.Atom.Modality
            (Mode.Modality.Comonadic.Atom.Meet_const (statefulness x)))
+      ~borrowability:
+        (Comonadic.Atom.Modality
+           (Mode.Modality.Comonadic.Atom.Meet_const (borrowability x)))
   in
   { monadic; comonadic }
 
 let create ~areality ~linearity ~uniqueness ~portability ~contention ~forkable
-    ~yielding ~statefulness ~visibility ~staticity ~externality =
+    ~yielding ~statefulness ~visibility ~staticity ~borrowability ~borrowedness
+    ~externality =
   bot |> set_areality areality |> set_uniqueness uniqueness
   |> set_linearity linearity |> set_contention contention
   |> set_portability portability
   |> set_forkable forkable |> set_yielding yielding
   |> set_statefulness statefulness
   |> set_visibility visibility |> set_staticity staticity
+  |> set_borrowability borrowability
+  |> set_borrowedness borrowedness
   |> set_externality externality
 
 let of_mode_crossing (crossing : Mode.Crossing.t) ~externality =
@@ -470,7 +518,9 @@ let of_mode_crossing (crossing : Mode.Crossing.t) ~externality =
     ~uniqueness:(monadic Uniqueness) ~portability:(comonadic Portability)
     ~contention:(monadic Contention) ~forkable:(comonadic Forkable)
     ~yielding:(comonadic Yielding) ~statefulness:(comonadic Statefulness)
-    ~visibility:(monadic Visibility) ~staticity:(monadic Staticity) ~externality
+    ~visibility:(monadic Visibility) ~staticity:(monadic Staticity)
+    ~borrowability:(comonadic Borrowability)
+    ~borrowedness:(monadic Borrowedness) ~externality
 
 let mask_of_modality (modality : Mode.Modality.Const.t) : t =
   if Mode.Modality.Const.is_id modality
@@ -495,6 +545,8 @@ let mask_of_modality (modality : Mode.Modality.Const.t) : t =
       ~contention:(monadic Contention) ~forkable:(comonadic Forkable)
       ~yielding:(comonadic Yielding) ~statefulness:(comonadic Statefulness)
       ~visibility:(monadic Visibility) ~staticity:(monadic Staticity)
+      ~borrowability:(comonadic Borrowability)
+      ~borrowedness:(monadic Borrowedness)
       ~externality:Jkind_axis.Externality.max
 
 (* Canonical lattice constants used by ikinds. *)
@@ -506,7 +558,9 @@ let nonfloat_value : t =
     ~forkable:Mode.Forkable.Const.max ~yielding:Mode.Yielding.Const.max
     ~statefulness:Mode.Statefulness.Const.max
     ~visibility:Mode.Visibility.Const.Read_write
-    ~staticity:Mode.Staticity.Static ~externality:Jkind_axis.Externality.max
+    ~staticity:Mode.Staticity.Static ~borrowability:Mode.Borrowability.Const.max
+    ~borrowedness:Mode.Borrowedness.Const.Owned
+    ~externality:Jkind_axis.Externality.max
 
 let immutable_data : t =
   create ~areality:Mode.Regionality.Const.max
@@ -516,6 +570,8 @@ let immutable_data : t =
     ~forkable:Mode.Forkable.Const.min ~yielding:Mode.Yielding.Const.min
     ~statefulness:Mode.Statefulness.Const.min
     ~visibility:Mode.Visibility.Const.Immutable ~staticity:Mode.Staticity.Static
+    ~borrowability:Mode.Borrowability.Const.min
+    ~borrowedness:Mode.Borrowedness.Const.Owned
     ~externality:Jkind_axis.Externality.max
 
 let mutable_data : t =
@@ -526,7 +582,9 @@ let mutable_data : t =
     ~forkable:Mode.Forkable.Const.min ~yielding:Mode.Yielding.Const.min
     ~statefulness:Mode.Statefulness.Const.min
     ~visibility:Mode.Visibility.Const.Read_write
-    ~staticity:Mode.Staticity.Static ~externality:Jkind_axis.Externality.max
+    ~staticity:Mode.Staticity.Static ~borrowability:Mode.Borrowability.Const.min
+    ~borrowedness:Mode.Borrowedness.Const.Owned
+    ~externality:Jkind_axis.Externality.max
 
 let sync_data : t =
   create ~areality:Mode.Regionality.Const.max
@@ -536,7 +594,9 @@ let sync_data : t =
     ~forkable:Mode.Forkable.Const.min ~yielding:Mode.Yielding.Const.min
     ~statefulness:Mode.Statefulness.Const.min
     ~visibility:Mode.Visibility.Const.Read_write
-    ~staticity:Mode.Staticity.Static ~externality:Jkind_axis.Externality.max
+    ~staticity:Mode.Staticity.Static ~borrowability:Mode.Borrowability.Const.min
+    ~borrowedness:Mode.Borrowedness.Const.Owned
+    ~externality:Jkind_axis.Externality.max
 
 let value : t =
   create ~areality:Mode.Regionality.Const.max
@@ -546,7 +606,9 @@ let value : t =
     ~forkable:Mode.Forkable.Const.min ~yielding:Mode.Yielding.Const.max
     ~statefulness:Mode.Statefulness.Const.max
     ~visibility:Mode.Visibility.Const.Read_write
-    ~staticity:Mode.Staticity.Static ~externality:Jkind_axis.Externality.max
+    ~staticity:Mode.Staticity.Static ~borrowability:Mode.Borrowability.Const.max
+    ~borrowedness:Mode.Borrowedness.Const.Owned
+    ~externality:Jkind_axis.Externality.max
 
 let arrow : t =
   create ~areality:Mode.Regionality.Const.max
@@ -557,6 +619,8 @@ let arrow : t =
     ~forkable:Mode.Forkable.Const.max ~yielding:Mode.Yielding.Const.max
     ~statefulness:Mode.Statefulness.Const.max
     ~visibility:Mode.Visibility.Const.Immutable ~staticity:Mode.Staticity.Static
+    ~borrowability:Mode.Borrowability.Const.max
+    ~borrowedness:Mode.Borrowedness.Const.Borrowed
     ~externality:Jkind_axis.Externality.max
 
 let immediate : t =
@@ -568,17 +632,28 @@ let immediate : t =
     ~forkable:Mode.Forkable.Const.min ~yielding:Mode.Yielding.Const.min
     ~statefulness:Mode.Statefulness.Const.min
     ~visibility:Mode.Visibility.Const.Immutable ~staticity:Mode.Staticity.Static
+    ~borrowability:Mode.Borrowability.Const.min
+    ~borrowedness:Mode.Borrowedness.Const.Borrowed
     ~externality:Jkind_axis.Externality.min
 
 let object_legacy : t =
-  let ({ linearity; areality; portability; forkable; yielding; statefulness }
+  let ({ linearity;
+         areality;
+         portability;
+         forkable;
+         yielding;
+         statefulness;
+         borrowability
+       }
         : Mode.With_regionality.Comonadic.Const.t) =
     Mode.With_regionality.Comonadic.Const.legacy
   in
   create ~linearity ~areality ~uniqueness:Mode.Uniqueness.Const.Aliased
     ~portability ~contention:Mode.Contention.Const.Uncontended ~forkable
     ~yielding ~statefulness ~visibility:Mode.Visibility.Const.Read_write
-    ~staticity:Mode.Staticity.Static ~externality:Jkind_axis.Externality.max
+    ~staticity:Mode.Staticity.Static ~borrowability
+    ~borrowedness:Mode.Borrowedness.Const.Borrowed
+    ~externality:Jkind_axis.Externality.max
 
 let crossing_externality (x : t) : t =
   set_externality Jkind_axis.Externality.External x

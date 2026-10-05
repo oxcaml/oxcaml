@@ -972,6 +972,8 @@ module Jkind0 = struct
     let statefulness = Crossing.Axis.Comonadic Statefulness
     let visibility = Crossing.Axis.Monadic Visibility
     let staticity = Crossing.Axis.Monadic Staticity
+    let borrowability = Crossing.Axis.Comonadic Borrowability
+    let borrowedness = Crossing.Axis.Monadic Borrowedness
     let[@inline] externality t = t.externality
 
     let[@inline] create
@@ -1004,6 +1006,8 @@ module Jkind0 = struct
       let statefulness = modal statefulness in
       let visibility = modal visibility in
       let staticity = modal staticity in
+      let borrowability = modal borrowability in
+      let borrowedness = modal borrowedness in
       let externality =
         if mem min_axes (Nonmodal Externality)
         then Externality.min
@@ -1011,10 +1015,11 @@ module Jkind0 = struct
       in
       let monadic =
         Crossing.Monadic.create ~uniqueness ~contention ~visibility ~staticity
+          ~borrowedness
       in
       let comonadic =
         Crossing.Comonadic.create ~regionality ~linearity ~portability ~yielding
-          ~forkable ~statefulness
+          ~forkable ~statefulness ~borrowability
       in
       let crossing : Mode.Crossing.t = { monadic; comonadic } in
       {
@@ -1033,6 +1038,7 @@ module Jkind0 = struct
         Crossing.create ~linearity:false ~regionality:false ~uniqueness:true
           ~portability:false ~contention:true ~forkable:false ~yielding:false
           ~statefulness:false ~visibility:true ~staticity:false
+          ~borrowability:false ~borrowedness:true
       in
       create crossing ~externality:Externality.max
 
@@ -1396,6 +1402,7 @@ module Jkind0 = struct
           Crossing.create ~regionality:false ~linearity:true ~portability:true
             ~forkable:true ~yielding:true ~uniqueness:false ~contention:true
             ~statefulness:true ~visibility:true ~staticity:false
+            ~borrowability:true ~borrowedness:false
         in
         create crossing ~externality:Externality.max
 
@@ -1435,7 +1442,8 @@ module Jkind0 = struct
                    Crossing.create ~regionality:false ~linearity:false
                      ~portability:true ~forkable:false ~yielding:false
                      ~uniqueness:false ~contention:true ~statefulness:true
-                     ~visibility:true ~staticity:false
+                     ~visibility:true ~staticity:false ~borrowability:false
+                     ~borrowedness:false
                  in
                  create crossing ~externality:Externality.max);
               with_bounds = No_with_bounds
@@ -1449,6 +1457,7 @@ module Jkind0 = struct
           Crossing.create ~regionality:false ~linearity:true ~portability:true
             ~forkable:true ~yielding:true ~uniqueness:false ~contention:true
             ~statefulness:true ~visibility:false ~staticity:false
+            ~borrowability:true ~borrowedness:false
         in
         create crossing ~externality:Externality.max
 
@@ -1482,6 +1491,7 @@ module Jkind0 = struct
           Crossing.create ~regionality:false ~linearity:true ~portability:true
             ~forkable:true ~yielding:true ~contention:false ~uniqueness:false
             ~statefulness:true ~visibility:false ~staticity:false
+            ~borrowability:true ~borrowedness:false
         in
         create crossing ~externality:Externality.max
 
@@ -2483,6 +2493,7 @@ module Jkind0 = struct
         Mode.Crossing.create ~regionality:false ~linearity:true
           ~portability:true ~forkable:true ~yielding:true ~uniqueness:false
           ~contention:true ~statefulness:true ~visibility:true ~staticity:false
+          ~borrowability:true ~borrowedness:false
       in
       let mod_bounds =
         Mod_bounds.create crossing ~externality:Mod_bounds.Externality.max
