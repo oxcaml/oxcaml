@@ -179,25 +179,29 @@ let main unix argv ppf ~flambda2 ~reaped_flambda2_to_cmm ~reaper_lto_solve =
              (found %d: [%s])"
             (List.length ltosol_files) (String.concat ", " ltosol_files)
       in
-      let cmx_file = match
+      let cmx_files = match
         List.partition
           (fun f -> Filename.check_suffix f Compiler.ext_flambda_obj)
           other_inputs
       with
-        | [cmx_file], [] -> cmx_file
-        | ([] | _ :: _ :: _), [] ->
+        | [], _ ->
           Printf.ksprintf Compenv.fatal
-            "Must specify exactly one %s file with -reaper-rebuild"
+            "Must specify at least one %s file with -reaper-rebuild"
             Compiler.ext_flambda_obj
+        | cmx_files, [] -> cmx_files
         | _, other_files ->
           Printf.ksprintf Compenv.fatal
-            "Got unexpected files: [%s] (-reaper-rebuild expects one %s file \
-             and one .ltosol file)"
+            "Got unexpected files: [%s] (-reaper-rebuild expects %s files and \
+             one .ltosol file)"
             (String.concat ", " other_files) Compiler.ext_flambda_obj
       in
-      Compiler.reaper_rebuild ~ltosol_file ~cmx_file
-        ~output_prefix:(Compenv.output_prefix cmx_file ^ ".reaped")
-        ~keep_symbol_tables:false;
+      let units =
+        List.map
+          (fun cmx_file ->
+            cmx_file, Compenv.output_prefix cmx_file ^ ".reaped")
+          cmx_files
+      in
+      Compiler.reaper_rebuild ~ltosol_file ~units ~keep_symbol_tables:false;
       Warnings.check_fatal ();
     end
     else if !reaper_solve then begin
