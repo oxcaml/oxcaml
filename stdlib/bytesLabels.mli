@@ -14,7 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 open! Stdlib
 
@@ -61,7 +61,8 @@ open! Stdlib
 
 [@@@ocaml.nolabels]
 
-external length : (bytes[@local_opt]) @ immutable -> int = "%bytes_length"
+external length : (bytes[@local_opt]) @ immutable -> int
+  = "%bytes_length"
 (** Return the length (number of bytes) of the argument. *)
 
 external get : bytes -> int -> char = "%bytes_safe_get"
@@ -79,7 +80,8 @@ external create : int -> bytes = "caml_create_bytes"
     sequence is uninitialized and contains arbitrary bytes.
     @raise Invalid_argument if [n < 0] or [n > ]{!Sys.max_string_length}. *)
 
-external create__stack : int -> bytes @ local = "caml_create_local_bytes"
+external create__stack : int -> bytes @ local
+  = "caml_create_local_bytes"
 (** [create__stack n] is like {!create} but returns a stack-allocated bytes. *)
 
 val make : int -> char -> bytes
@@ -165,7 +167,7 @@ val blit_string :
     do not designate a valid range of [dst].
     @since 4.05 in BytesLabels *)
 
-val concat : sep:bytes -> bytes list -> bytes
+val concat : sep:bytes -> bytes list -> bytes @@ stateful portable
 (** [concat ~sep sl] concatenates the list of byte sequences [sl],
     inserting the separator byte sequence [sep] between each, and
     returns the result as a new byte sequence.
@@ -223,7 +225,7 @@ val exists : f:(char -> bool) -> bytes -> bool
     [p].
     @since 4.13 *)
 
-val trim : bytes -> bytes
+val trim : bytes -> bytes @@ stateful portable
 (** Return a copy of the argument, without leading and trailing
     whitespace. The bytes regarded as whitespace are the ASCII
     characters [' '], ['\012'], ['\n'], ['\r'], and ['\t']. *)

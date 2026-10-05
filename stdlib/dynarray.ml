@@ -102,7 +102,7 @@
     - makes it explicit where dummies are used
     - makes it hard to mistakenly mix data using distinct dummies,
       which would be unsound *)
-module Dummy : sig
+module Dummy : sig @@ stateless
 
   (** {4 Dummies} *)
 
@@ -111,9 +111,9 @@ module Dummy : sig
       so that two dummies with different stamps cannot be confused
       together. *)
 
-  type fresh_dummy : value mod portable contended =
+  type fresh_dummy : value mod stateless immutable =
     Fresh : 'stamp dummy -> fresh_dummy [@@unsafe_allow_any_mode_crossing]
-  val fresh : unit -> fresh_dummy
+  val fresh : unit -> fresh_dummy @@ stateful
   (** The type of [fresh] enforces a fresh/unknown/opaque stamp for
       the returned dummy, distinct from all previous stamps. *)
 
@@ -212,7 +212,7 @@ end = struct
      for how we do it.) *)
 
   type 'stamp dummy = < >
-  type fresh_dummy : value mod portable contended =
+  type fresh_dummy : value mod stateless immutable =
     Fresh : 'stamp dummy -> fresh_dummy [@@unsafe_allow_any_mode_crossing]
                              (* cf https://github.com/oxcaml/oxcaml/pull/5956 *)
 
@@ -1283,7 +1283,7 @@ let to_seq_rev_reentrant a =
   in
   aux (length a - 1)
 
-external unsafe_iarray_of_array : 'a array -> 'a iarray @@ portable = "%opaque"
+external unsafe_iarray_of_array : 'a array -> 'a iarray @@ stateless = "%opaque"
 
 let unsafe_to_iarray ~capacity (f : 'a t -> unit) =
   let a = create () in

@@ -661,7 +661,7 @@ module MakePortable(H: sig @@ portable include HashedType end)
    use - see #2202 *)
 
 external seeded_hash_param :
-  int -> int -> int -> 'a -> int @@ portable = "caml_hash_exn"
+  int -> int -> int -> 'a -> int @@ stateless = "caml_hash_exn"
 
 let hash x = seeded_hash_param 10 100 0 x
 let hash_param n1 n2 x = seeded_hash_param n1 n2 0 x

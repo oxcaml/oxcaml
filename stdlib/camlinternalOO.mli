@@ -14,7 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 open! Stdlib
 
@@ -33,43 +33,47 @@ type obj
 type closure
 val public_method_label : string -> tag
 val new_method : table -> label
-val new_variable : table -> string -> int
+val new_variable : table -> string -> int @@ stateful portable
 val new_methods_variables :
-    table -> string array -> string array -> label array
-val get_variable : table -> string -> int
-val get_variables : table -> string array -> int array
-val get_method_label : table -> string -> label
+    table -> string array -> string array -> label array @@ stateful portable
+val get_variable : table -> string -> int @@ stateful portable
+val get_variables : table -> string array -> int array @@ stateful portable
+val get_method_label : table -> string -> label @@ stateful portable
 val get_method_labels : table -> string array -> label array
+  @@ stateful portable
 val get_method : table -> label -> meth
-val set_method : table -> label -> meth -> unit
-val set_methods : table -> label array -> unit
+val set_method : table -> label -> meth -> unit @@ stateful portable
+val set_methods : table -> label array -> unit @@ stateful portable
 val narrow : table -> string array -> string array -> string array -> unit
-val widen : table -> unit
+  @@ stateful portable
+val widen : table -> unit @@ stateful portable
 val add_initializer : table -> (obj -> unit) -> unit
-val dummy_table : table @@ nonportable
-val create_table : string array -> table
-val init_class : table -> unit
+val dummy_table : table @@ stateful
+val create_table : string array -> table @@ stateful portable
+val init_class : table -> unit @@ stateful portable
 val inherits :
     table -> string array -> string array -> string array ->
     (t * (table -> obj -> Obj.t) * obj) -> bool -> Obj.t array
+  @@ stateful portable
 val make_class :
     string array -> (table -> Obj.t -> t) ->
-    (t * (table -> Obj.t -> t) * Obj.t)
+    (t * (table -> Obj.t -> t) * Obj.t) @@ stateful portable
 type init_table
 val make_class_store :
-    string array -> (table -> t) -> init_table -> unit
+    string array -> (table -> t) -> init_table -> unit @@ stateful portable
 val dummy_class :
     string * int * int ->
     (t * (table -> Obj.t -> t) * Obj.t)
 
 (** {1 Objects} *)
 
-val copy : (< .. > as 'a) -> 'a
-val create_object : table -> obj
-val create_object_opt : obj -> table -> obj
+val copy : (< .. > as 'a) -> 'a @@ stateful portable
+val create_object : table -> obj @@ stateful portable
+val create_object_opt : obj -> table -> obj @@ stateful portable
 val run_initializers : obj -> table -> unit
 val run_initializers_opt : obj -> obj -> table -> obj
 val create_object_and_run_initializers : obj -> table -> obj
+  @@ stateful portable
 external send : obj -> tag -> t = "%send"
 external sendcache : obj -> tag -> t -> int -> t = "%sendcache"
 external sendself : obj -> label -> t = "%sendself"
@@ -147,7 +151,7 @@ type params =
     mutable retry_count : int;
     mutable bucket_small_size : int }
 
-val params : params @@ nonportable
+val params : params
 
 (** {1 Statistics} *)
 
@@ -155,4 +159,4 @@ type stats =
   { classes : int;
     methods : int;
     inst_vars : int }
-val stats : unit -> stats
+val stats : unit -> stats @@ stateful portable

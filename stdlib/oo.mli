@@ -14,7 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 open! Stdlib
 
@@ -24,7 +24,7 @@ open! Stdlib
 
 (** [Oo.copy o] returns a copy of object [o], that is a fresh
    object with the same methods and instance variables as [o]. *)
-val copy : (< .. > as 'a) -> 'a
+val copy : (< .. > as 'a) -> 'a @@ stateful portable
 [@@alert unsynchronized_access
     "Unsynchronized accesses to mutable objects are a programming error."
 ]

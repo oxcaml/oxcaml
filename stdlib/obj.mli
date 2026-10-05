@@ -14,7 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 open! Stdlib
 
@@ -30,11 +30,17 @@ type raw_data = nativeint  (* @since 4.12 *)
 external repr : 'a -> t = "%obj_magic"
 external obj : t -> 'a = "%obj_magic"
 external magic : 'a -> 'b = "%obj_magic"
-external magic_portable : ('a[@local_opt]) -> ('a[@local_opt]) @ portable = "%identity"
-external magic_uncontended : ('a[@local_opt]) @ contended -> ('a[@local_opt]) = "%identity"
-external magic_unique : ('a[@local_opt]) -> ('a[@local_opt]) @ unique = "%identity"
-external magic_many : ('a[@local_opt]) @ once -> ('a[@local_opt]) = "%identity"
-external magic_at_unique : ('a[@local_opt]) @ unique -> ('b[@local_opt]) @ unique = "%identity"
+external magic_portable : ('a[@local_opt]) -> ('a[@local_opt]) @ portable
+  = "%identity"
+external magic_uncontended : ('a[@local_opt]) @ contended -> ('a[@local_opt])
+  = "%identity"
+external magic_unique : ('a[@local_opt]) -> ('a[@local_opt]) @ unique
+  = "%identity"
+external magic_many : ('a[@local_opt]) @ once -> ('a[@local_opt])
+  = "%identity"
+external magic_at_unique :
+  ('a[@local_opt]) @ unique -> ('b[@local_opt]) @ unique
+  = "%identity"
 val is_block : t @ contended -> bool
 external is_int : t @ contended -> bool = "%obj_is_int"
 external tag : t @ contended -> int = "caml_obj_tag" [@@noalloc]
@@ -48,7 +54,7 @@ val reachable_words : t -> int
      @since 4.04
   *)
 
-val uniquely_reachable_words : t array -> int array * int
+val uniquely_reachable_words : t array -> int array * int @@ reading portable
 (** For each element of the array, computes the total size (as defined
     above by [reachable_words]) of all heap blocks accessible from the
     argument but excluding all blocks accessible from any other arguments.
@@ -197,7 +203,8 @@ module Uniform_or_mixed : sig
 
   val repr : t -> repr
 
-  external of_block : obj_t -> t = "caml_succ_scannable_prefix_len" [@@noalloc]
+  external of_block : obj_t -> t @@ stateless
+    = "caml_succ_scannable_prefix_len" [@@noalloc]
 
   val is_uniform : t -> bool
   (** Equivalent to [repr] returning [Uniform]. *)

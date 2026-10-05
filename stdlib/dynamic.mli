@@ -12,7 +12,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 (** A value of type ['a Dynamic.t] is a dynamically scoped variable of type
     ['a].
@@ -35,7 +35,7 @@ val make : unit -> 'a t
 
     Because the dynamic binding may be accessed concurrently, its contents
     are contended. *)
-val get : 'a t -> 'a or_null @ contended portable
+val get : 'a t -> 'a or_null @ contended portable @@ reading portable
 
 (** [with_temporarily t v ~f] invokes [f] in a context where [t] is bound to
     [v], then restores [t] to its previous state.
@@ -46,4 +46,4 @@ val with_temporarily : ('b : value_or_null).
   'a t ->
   'a @ contended portable ->
   f:(unit -> 'b @ local unique once) @ local once ->
-  'b @ local unique once
+  'b @ local unique once @@ stateful portable
