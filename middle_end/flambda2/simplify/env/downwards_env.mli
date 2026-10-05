@@ -176,7 +176,10 @@ val with_cse : t -> Common_subexpression_elimination.t -> t
 module Disable_inlining_reason : sig
   type t =
     | Stub
-    | Speculative_inlining
+    | Speculative_inlining of { depth : int }
+        (** 1 for the outermost speculation, 2 for a speculation performed
+            inside it (see
+            [Flambda_features.Inlining.speculative_inlining_nested]). *)
 end
 
 val set_do_not_rebuild_terms_and_disable_inlining :

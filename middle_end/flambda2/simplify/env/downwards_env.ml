@@ -29,11 +29,12 @@ type get_imported_code = unit -> Exported_code.t
 module Disable_inlining_reason = struct
   type t =
     | Stub
-    | Speculative_inlining
+    | Speculative_inlining of { depth : int }
 
   let print ppf = function
     | Stub -> Format.fprintf ppf "Stub"
-    | Speculative_inlining -> Format.fprintf ppf "Speculative_inlining"
+    | Speculative_inlining { depth } ->
+      Format.fprintf ppf "(Speculative_inlining (depth %d))" depth
 end
 
 module Disable_inlining = struct

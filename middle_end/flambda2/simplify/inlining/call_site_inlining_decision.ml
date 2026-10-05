@@ -255,7 +255,13 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
   let in_a_stub, doing_speculative_inlining =
     match disable_inlining with
     | Disable_inlining Stub -> true, false
-    | Disable_inlining Speculative_inlining -> false, true
+    | Disable_inlining (Speculative_inlining { depth }) ->
+      (* Nested speculation is only performed, when enabled, directly inside the
+         outermost speculation. *)
+      ( false,
+        not
+          (depth = 1 && Flambda_features.Inlining.speculative_inlining_nested ())
+      )
     | Do_not_disable_inlining -> false, false
   in
   if in_a_stub

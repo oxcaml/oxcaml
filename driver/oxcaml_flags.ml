@@ -474,6 +474,8 @@ module Flambda2 = struct
 
       let speculative_inlining_charge_uninlined_calls = false
 
+      let speculative_inlining_nested = false
+
       let speculative_inlining_uninlined_call_cost_factor = 1.0
 
       let speculative_inlining_budget = false
@@ -535,6 +537,8 @@ module Flambda2 = struct
 
     let speculative_inlining_charge_uninlined_calls =
       ref Default.speculative_inlining_charge_uninlined_calls
+
+    let speculative_inlining_nested = ref Default.speculative_inlining_nested
 
     let speculative_inlining_uninlined_call_cost_factor =
       ref Default.speculative_inlining_uninlined_call_cost_factor

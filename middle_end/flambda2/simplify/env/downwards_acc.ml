@@ -414,8 +414,13 @@ let prepare_for_speculative_inlining dacc =
   let dacc =
     map_denv
       ~f:(fun denv ->
+        let depth =
+          match DE.disable_inlining denv with
+          | Disable_inlining (Speculative_inlining { depth }) -> depth + 1
+          | Disable_inlining Stub | Do_not_disable_inlining -> 1
+        in
         DE.set_do_not_rebuild_terms_and_disable_inlining denv
-          Speculative_inlining)
+          (Speculative_inlining { depth }))
       dacc
   in
   with_are_lifting_conts dacc
