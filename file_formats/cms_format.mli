@@ -34,6 +34,7 @@ type cms_infos = {
     (Longident.t Location.loc * Shape_reduce.result) array;
   cms_declaration_dependencies :
     (Cmt_format.dependency_kind * Uid.t * Uid.t) list;
+  cms_module_implementation_facts : Module_implementation_facts.t option;
   cms_externals: Vicuna_value_shapes.extfun array;
 }
 
@@ -56,6 +57,7 @@ val save_cms :
   Env.t -> (* initial env *)
   Shape.t option ->
   (Cmt_format.dependency_kind * Uid.t * Uid.t) list ->
+  Module_implementation_facts.t option ->
   unit
 
 val register_toplevel_attributes :

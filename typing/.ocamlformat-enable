@@ -39,4 +39,6 @@ signature_with_global_bindings.ml
 signature_with_global_bindings.mli
 zero_alloc.ml
 zero_alloc.mli
+module_implementation_facts.ml
+module_implementation_facts.mli
 ikinds/*
