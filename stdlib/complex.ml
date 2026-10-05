@@ -53,9 +53,7 @@ let inv x = div one x
 
 let norm2 x = x.re *. x.re +. x.im *. x.im
 
-external hypot : float -> float -> float @@ portable
-               = "caml_hypot_float" "caml_hypot" [@@unboxed] [@@noalloc]
-let norm x = hypot x.re x.im
+let norm x = Float.hypot x.re x.im
 
 let arg x = atan2 x.im x.re
 

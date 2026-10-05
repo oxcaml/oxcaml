@@ -67,7 +67,6 @@ let rec trans_closure ~dst ~src s =
 
 let gen_rule ~ppf ~tgt_file ~base ~deps =
   let ext, annot =
-    (* FIXME: cmo or cmx for annot? Need to pick one *)
     match Filename.extension tgt_file with
     | ".cmo" -> `Cmo, true
     | ".cmi" -> `Cmi, true
@@ -325,7 +324,6 @@ let write_runtime_dune ppf =
   fprintf ppf "%s\n" {|
 (rule
   (targets build_config.h)
-  (mode fallback)
   (deps sak.c 
     (glob_files ../Makefile.*)
     (glob_files caml/*.h)
