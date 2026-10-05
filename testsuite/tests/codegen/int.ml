@@ -218,7 +218,6 @@ logxor:
 |}]
 
 
-(* CR ttebbi: This could be `xorq  $-2, %rax` *)
 let lognot x = lnot x
 [%%expect_asm X86_64{|
 lognot:
