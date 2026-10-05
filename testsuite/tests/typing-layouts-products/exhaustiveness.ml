@@ -84,6 +84,11 @@ let redundant (x : u) =
   | #{ a = 1; b = _ } -> 1
 [%%expect{|
 type u = #{ a : int; b : int; }
+Line 6, characters 4-21:
+6 |   | #{ a = 1; b = _ } -> 1
+        ^^^^^^^^^^^^^^^^^
+Warning 11 [redundant-case]: this match case is unused.
+
 val redundant : u -> int = <fun>
 |}]
 
@@ -96,5 +101,10 @@ let redundant (x : u) =
   | #{ a = 1; b = _ } -> 1
 [%%expect{|
 type u = { a : int; b : int; }
+Line 6, characters 4-21:
+6 |   | #{ a = 1; b = _ } -> 1
+        ^^^^^^^^^^^^^^^^^
+Warning 11 [redundant-case]: this match case is unused.
+
 val redundant : u -> int = <fun>
 |}]
