@@ -1,8 +1,43 @@
 # dev
 
 ## Features/Changes
-* Compiler/Wasm: split the huge toplevel function of large programs into
-  smaller functions, which are faster to optimize (#2423)
+* Compiler: with `--effects={cps,double-translation}`, specialize calls to
+  known functions using the global flow analysis before the CPS transformation
+  (#2456)
+* Compiler: variable substitution (`Subst`) returns the original blocks,
+  instructions and expressions when they are not affected, rather than
+  rebuilding the whole program each time (#2447)
+* Compiler: `Js_traverse.free` is now an iterator (the class type `freevar`
+  inherits from `iterator`) and no longer modifies the program; the name of a
+  function expression that does not refer to itself is no longer removed, and
+  the `unused-js-vars` warning now reports such names (#2449)
+* Compiler: the worklist of the dataflow solvers is a fixed-size circular
+  buffer rather than a list copied into a queue (#2448)
+* Compiler: `Js_traverse.map` returns the original AST node when nothing
+  changed below it, rather than rebuilding the whole JavaScript program in each
+  of the passes using it (#2446)
+* Compiler: represent the map of blocks of a program as a trie indexed by
+  the bits of the addresses (`Int_trie`), rather than a balanced tree. Looking
+  up a block, which all passes do all the time, follows 3 or 4 pointers rather
+  than about 17 for a large program. Compilation is about 10% faster (#2445)
+* Compiler: speed up the JavaScript printer: buffered output, cheaper location
+  comparisons and line tracking (#2452)
+* Compiler: represent sets of addresses and variables as Patricia trees with
+  bitmap leaves (`Int_set`), which allocate much less than balanced trees for
+  the small sets of large integers the compiler mostly uses (#2454)
+* Compiler/Runtime: support building with Introcaml, an OCaml fork with
+  runtime introspection: parse the `NEXT_RESERVED_BITS` instruction and the
+  extended `Const_block`, skip the reserved header bits in marshaled data, and
+  provide stubs for the new primitives, gated by the `introspect` flag in
+  `//If:` directives and wasm `(@if $introspect ...)` blocks (#2409)
+* Compiler: emit large binary string constants (ocamllex/ocamlyacc/menhir
+  tables, embedded files, marshaled data, ...) as base64 literals decoded once
+  at initialisation, rather than as `\xNN`-escaped string literals. Each
+  non-printable byte costs four characters when escaped but only 4/3 in
+  base64, so generated code embedding binary data gets noticeably smaller
+  (e.g. -14% on the toplevel example). Decoding uses `atob`, or
+  `Uint8Array.fromBase64` when `use-js-string` is disabled, with a JavaScript
+  fallback for engines lacking them (#2432)
 * Lib: add `WebGL2` — bindings to the WebGL2 rendering context. The context
   inherits every method and constant of `WebGL`, and adds the WebGL2 objects
   (vertex array objects, queries, samplers, syncs, transform feedback), 3D and
@@ -55,8 +90,47 @@
   array from `Js.number_of_float` elements (#2416)
 * Compiler/wasm: add `--setenv`, matching js_of_ocaml: the variable is set both
   for the static evaluator and for `Sys.getenv` lookups at runtime (#2415)
+* Lib: the native stubs generated for the JavaScript primitives are now weak
+  symbols, so that libraries which link (but do not run) JavaScript primitives
+  in native code can override them with dummy implementations (#2435)
+* Compiler/Wasm: intern string constants: equal string constants now share a
+  single value, which reduces the size of the generated code. Sharing is
+  program-wide with whole-program compilation, and per compilation unit with
+  separate compilation (#2436)
+* Runtime: specialize one- and two-argument partial applications in
+  double-translation mode, avoiding an extra `caml_call_gen` frame (#2437)
+* Compiler/Wasm: with `--effects=cps`, no longer turn mutually recursive
+  functions into CPS: Wasm has proper tail calls, so this is only needed when
+  targeting JavaScript (#2441)
+* Compiler: with `--effects=double-translation`, only generate a CPS version
+  of the functions that may run below an effect handler (#2441)
 
 ## Bug fixes
+* Compiler: with `--effects=double-translation`, fix calls with too many
+  arguments to a function that does not perform effects (#2455)
+* Runtime/Wasm: with `--effects=native`, performing an effect that no
+  handler can receive (at toplevel, inside a JavaScript callback, or when
+  every handler lets it through) now raises `Effect.Unhandled` instead of
+  failing with a runtime error. With `--effects=native` and
+  `--effects=jspi`, a handler installed inside `assume_no_perform` now
+  handles the effects performed in its body, as documented (#2434)
+* Runtime: convert unit names to OCaml strings before calling the toplevel
+  relocation callback when `use-js-string` is disabled (#2429)
+* Compiler/Wasm: don't run the program on a JSPI stack when `--effects=cps`
+  (#2441)
+* Compiler/Wasm: with `--effects=disabled`, performing an effect on a
+  JSPI-capable engine now raises the intended `Failure` instead of a raw
+  `SuspendError` (#2441)
+* Compiler/Wasm: fix specialized generic bigarray accesses
+  (`Bigarray.Genarray.get`/`set` with a locally allocated index array): the
+  tag offset of the index array was accounted for twice, so each index was
+  read one field too far, returning a wrong value or accessing the array out
+  of bounds (#2427)
+* Compiler: keep `static` on the same line as the class element it modifies.
+  In compact mode the separator was a newline, and Safari 17 reads `static`
+  alone on a line as a field name rather than a modifier, so every static
+  class field became an instance field; `Int64.of_string` then threw on
+  `MlInt64.UNSIGNED_MAX` (#2420)
 * Compiler/Wasm: sourcemaps were silently disabled on Windows: the detection
   of Binaryen's sourcemap support used Unix redirection syntax, so it always
   concluded that sourcemaps were unsupported (#2418)
@@ -103,6 +177,9 @@
   instead of letting the last one silently overwrite the others (#968)
 * Preserve leading BOMs when converting OCaml strings to JavaScript strings
   (#2414)
+* Compiler: fix reference unboxing when a variable read from an unboxed
+  reference is stored into another unboxed reference in a nested closure
+  (#2426)
 # 6.4.1 (2026-06-30) - Lille
 
 ## Bug fixes
