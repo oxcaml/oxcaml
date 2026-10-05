@@ -11459,35 +11459,32 @@ and type_statement ?explanation ?(position=RNontail) env sexp =
 and type_if_no_else_branch ~loc ~ty_expected env expected_mode sexp =
   let principal_expected_unit =
     let ty = expand_head env ty_expected in
-    if is_principal ty && is_unboxed_unit_type env ty then
-      Some (disambiguate_unit ~loc env ty)
-    else None
+    is_principal ty && is_unboxed_unit_type env ty
   in
   let exp =
     with_local_level_generalize_structure_if_principal
       ~before_generalize:generalize_structure_exp
       (fun () ->
          let ty_expected =
-           if is_Tvar ty_expected then
-             newvar (Jkind.Builtin.any ~why:Dummy_jkind)
-           else ty_expected
+           match sexp.pexp_desc with
+           | Pexp_unboxed_unit -> Predef.type_unboxed_unit
+           | _ when is_Tvar ty_expected || is_inferred sexp ->
+               newvar (Jkind.Builtin.any ~why:Dummy_jkind)
+           | _ -> ty_expected
          in
          type_expect env expected_mode sexp
            (mk_expected ~explanation:If_no_else_branch ty_expected))
   in
-  let ty = expand_head env exp.exp_type in
-  let disambiguated_unit_ty, ~unboxed =
-    match principal_expected_unit with
-    | Some result -> result
-    | None -> disambiguate_unit ~loc env ty
-  in
   with_explanation (Some If_no_else_branch) (fun () ->
+    unify_exp ~sexp env { exp with exp_type = instance exp.exp_type }
+      (instance ty_expected);
+    let ty =
+      if principal_expected_unit then Predef.type_unboxed_unit
+      else expand_head env exp.exp_type
+    in
+    let disambiguated_unit_ty, ~unboxed = disambiguate_unit ~loc env ty in
     unify_exp ~sexp env exp disambiguated_unit_ty;
-    try unify_var env ty_expected disambiguated_unit_ty
-    with Unify err ->
-      raise(Error(exp.exp_loc, env,
-        Expr_type_clash(err, None, Some sexp))));
-  exp, ~unboxed
+    exp, ~unboxed)
 
 (* Most of the arguments are the same as [type_cases].
 
