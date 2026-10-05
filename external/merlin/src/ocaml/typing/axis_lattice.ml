@@ -580,8 +580,8 @@ let object_legacy : t =
     ~yielding ~statefulness ~visibility:Mode.Visibility.Const.Read_write
     ~staticity:Mode.Staticity.Static ~externality:Jkind_axis.Externality.max
 
-let crossing_externality (x : t) : t =
-  set_externality Jkind_axis.Externality.External x
+let meet_externality (e : Jkind_axis.Externality.t) (x : t) : t =
+  meet x (set_externality e top)
 
 let axis_number_to_axis_packed (axis_number : int) : Jkind_axis.Axis.packed =
   if axis_number < 0 || axis_number >= Array.length axis_by_number

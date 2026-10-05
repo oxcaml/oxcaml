@@ -1893,16 +1893,26 @@ let transl_functorization compilation_unit
     transl_functorization_make ~params ~modules ~find_impl_by_name
   in
   let intf_func = transl_functorization_intf ~params in
+  let fields = [intf_func; make_func] in
   let code =
     apply_coercion Loc_unknown Strict coercion
       (Lprim
          ( Pmakeblock (0, Immutable, All_value, alloc_heap),
-           [intf_func; make_func],
+           fields,
            Loc_unknown ))
   in
-  let main_module_block_format =
-    Mb_struct { mb_repr = Module_value_only { field_count = 2 } }
+  (* CR-someday zqian: rewrite [module_block_size] to do this *)
+  let mb_repr =
+    match (coercion : Typedtree.module_coercion) with
+    | Tcoerce_none -> Module_value_only { field_count = List.length fields }
+    | Tcoerce_structure { output_repr; _ } ->
+        transl_module_representation output_repr
+    | Tcoerce_functor _ | Tcoerce_primitive _ | Tcoerce_alias _
+    | Tcoerce_kindtemplate _ | Tcoerce_invalid ->
+        Misc.fatal_error
+          "transl_functorization: unexpected compilation-unit coercion"
   in
+  let main_module_block_format = Mb_struct { mb_repr } in
   { compilation_unit;
     main_module_block_format;
     arg_block_idx = None;

@@ -433,6 +433,7 @@ let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
   | Method _ | C_call _ | Effect _ -> default_acc acc
 
 let traverse_apply denv acc apply : rev_expr =
+  Acc.record_apply_for_rebuild acc apply;
   let return_args =
     match Apply.continuation apply with
     | Never_returns -> []
@@ -828,6 +829,7 @@ type result =
     fixed_arity_continuations : Continuation.Set.t;
     continuation_info : Acc.continuation_info Continuation.Map.t;
     code_deps : Traverse_acc.code_dep Code_id.Map.t;
+    applications : Acc.Applications.t;
     all_sets_of_closures :
       (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list;
     closure_function_decls :
@@ -893,6 +895,7 @@ let run (unit : Flambda_unit.t) =
     fixed_arity_continuations;
     continuation_info;
     code_deps;
+    applications = Acc.applications acc;
     all_sets_of_closures = Acc.get_all_sets_of_closures acc;
     closure_function_decls = Acc.get_closure_function_decls acc
   }

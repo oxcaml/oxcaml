@@ -51,10 +51,68 @@ type closure_dep =
     only_full_applications : bool
   }
 
+module Applications = struct
+  type bounds =
+    { known : int option;
+      unknown : int list option
+    }
+
+  type t = bounds Code_id_or_name.Map.t
+
+  let empty = Code_id_or_name.Map.empty
+
+  let union_option f a b =
+    match a, b with None, x | x, None -> x | Some a, Some b -> Some (f a b)
+
+  let rec max_widths a b =
+    match a, b with
+    | [], widths | widths, [] -> widths
+    | a :: rest_a, b :: rest_b -> max a b :: max_widths rest_a rest_b
+
+  let union_bounds a b =
+    { known = union_option max a.known b.known;
+      unknown = union_option max_widths a.unknown b.unknown
+    }
+
+  let add_apply t apply =
+    match Apply_expr.call_kind apply, Apply_expr.callee apply with
+    | Function { function_call }, Some callee ->
+      Simple.pattern_match callee
+        ~const:(fun _ -> t)
+        ~name:(fun name ~coercion:_ ->
+          let bounds =
+            match function_call with
+            | Direct _ | Indirect_known_arity _ ->
+              { known = Some (List.length (Apply_expr.args apply));
+                unknown = None
+              }
+            | Indirect_unknown_arity ->
+              let groups =
+                Flambda_arity.group_by_parameter
+                  (Apply_expr.args_arity apply)
+                  (Apply_expr.args apply)
+              in
+              { known = None; unknown = Some (List.map List.length groups) }
+          in
+          Code_id_or_name.Map.update
+            (Code_id_or_name.name name)
+            (fun previous ->
+              Some
+                (match previous with
+                | None -> bounds
+                | Some previous -> union_bounds previous bounds))
+            t)
+    | Function _, None | (C_call _ | Method _ | Effect _), _ -> t
+
+  let union a b =
+    Code_id_or_name.Map.union (fun _ a b -> Some (union_bounds a b)) a b
+end
+
 type t =
   { mutable code_deps : code_dep Code_id.Map.t;
     mutable code : Rev_expr.rev_code Code_id.Map.t;
     mutable apply_deps : apply_dep list;
+    mutable applications : Applications.t;
     mutable set_of_closures_deps : closure_dep list;
     deps : Graph.graph;
     mutable fixed_arity_conts : Continuation.Set.t;
@@ -69,10 +127,16 @@ type t =
 
 let code_deps t = t.code_deps
 
+let applications t = t.applications
+
+let record_apply_for_rebuild t apply =
+  t.applications <- Applications.add_apply t.applications apply
+
 let create () =
   { code_deps = Code_id.Map.empty;
     code = Code_id.Map.empty;
     apply_deps = [];
+    applications = Applications.empty;
     set_of_closures_deps = [];
     deps = Graph.create ();
     fixed_arity_conts = Continuation.Set.empty;

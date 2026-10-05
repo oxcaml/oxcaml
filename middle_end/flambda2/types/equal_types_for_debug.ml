@@ -220,7 +220,6 @@ let equal_row_like_for_closures ~equal_type env (t1 : TG.row_like_for_closures)
   in
   Function_slot.Map.equal equal_row_like_case t1.known_closures
     t2.known_closures
-  && equal_bottom equal_row_like_case t1.other_closures t2.other_closures
 
 let equal_array_contents ~equal_type env (t1 : TG.array_contents)
     (t2 : TG.array_contents) =

@@ -460,7 +460,7 @@ end = struct
   type t = #(int or_null * float#)
 end
 [%%expect{|
-module M : sig type t : value_or_null non_pointer mod external_ & float64 end
+module M : sig type t : value_or_null non_pointer & float64 end
 |}]
 
 (* modules and module inclusion *)
