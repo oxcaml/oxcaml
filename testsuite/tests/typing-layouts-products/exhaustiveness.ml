@@ -73,3 +73,28 @@ Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 
 val g : t -> t -> bool = <fun>
 |}]
+
+(* oxcaml/oxcaml#XXXX, the second case was not reported as unused. The
+   corresponding miscompilation is tested in [basic/patmatch.ml]. *)
+type u = #{ a : int; b : int }
+
+let redundant (x : u) =
+  match x with
+  | #{ a = _; b = _ } -> 0
+  | #{ a = 1; b = _ } -> 1
+[%%expect{|
+type u = #{ a : int; b : int; }
+val redundant : u -> int = <fun>
+|}]
+
+(* The same tests as above, but for implicit unboxed records *)
+type u = { a : int; b : int }
+
+let redundant (x : u) =
+  match #{ a = x.a; b = x.b } with
+  | #{ a = _; b = _ } -> 0
+  | #{ a = 1; b = _ } -> 1
+[%%expect{|
+type u = { a : int; b : int; }
+val redundant : u -> int = <fun>
+|}]
