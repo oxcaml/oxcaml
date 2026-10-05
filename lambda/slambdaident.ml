@@ -25,21 +25,9 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-open Local_store
-
 type t =
-  | Local of
-      { name : string;
-        stamp : int
-      }
   | Ident of Ident.t
   | Sort_var of Jkind_types.Sort.Var.id
-
-let currentstamp = s_ref 0
-
-let create_local name =
-  incr currentstamp;
-  Local { name; stamp = !currentstamp }
 
 let of_ident ident = Ident ident
 
@@ -48,37 +36,24 @@ let of_sort_var var =
   then Misc.fatal_error "Slambdaident.of_sort_var: not a root";
   Sort_var (Jkind_types.Sort.Var.get_id var)
 
-let name = function
-  | Local { name; _ } -> name
-  | Ident i -> Ident.name i
-  | Sort_var _ -> "sort_var"
-
 let equal i1 i2 =
   match i1, i2 with
-  | Local { stamp = s1; _ }, Local { stamp = s2; _ } -> s1 = s2
   | Ident i1, Ident i2 -> Ident.equal i1 i2
   | Sort_var var1, Sort_var var2 -> var1 = var2
   | _ -> false
 
 let hash = function
-  | Local { stamp = s; _ } -> Hashtbl.hash (0, s)
   | Ident i -> Hashtbl.hash (1, Ident.hash i)
   | Sort_var var -> Hashtbl.hash (2, var)
 
 let compare i1 i2 =
   match i1, i2 with
-  | Local { stamp = s1; _ }, Local { stamp = s2; _ } -> compare s1 s2
-  | Local _, _ -> 1
-  | _, Local _ -> -1
   | Ident i1, Ident i2 -> Ident.compare i1 i2
   | Ident _, _ -> 1
   | _, Ident _ -> -1
   | Sort_var var1, Sort_var var2 -> Int.compare (var1 :> int) (var2 :> int)
 
-let output oc =
-  let open Format in
-  function
-  | Local { name; stamp } -> output_string oc (sprintf "s_%s_%i" name stamp)
+let output oc = function
   | Ident ident ->
     output_string oc "l_";
     Ident.output oc ident
@@ -89,9 +64,6 @@ let output oc =
 let print ppf =
   let open Format in
   function
-  | Local { name; stamp } ->
-    fprintf ppf "#%s%s" name
-      (if !Clflags.unique_ids then sprintf "/%i" stamp else "")
   | Ident ident -> fprintf ppf "%a" Ident.print ident
   | Sort_var var -> fprintf ppf "layout_%i" (var :> int)
 
