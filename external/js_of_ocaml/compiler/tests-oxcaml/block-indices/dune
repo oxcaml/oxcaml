@@ -1,0 +1,9 @@
+; Mirrors of the compiler testsuite's block-index tests, run on the JS and
+; Wasm runtimes (and on bytecode, for comparison):
+; - testsuite/tests/typing-layouts-block-indices/ext_ptr_bytecode.ml
+
+(tests
+ (names ext_ptr_bytecode)
+ (build_if %{oxcaml_supported})
+ (libraries stdlib_stable stdlib_upstream_compatible)
+ (modes byte js wasm))

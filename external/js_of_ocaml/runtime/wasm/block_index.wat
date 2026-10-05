@@ -17,6 +17,7 @@
 
 (module
    (import "fail" "caml_invalid_argument" (func $caml_invalid_argument (param (ref eq))))
+   (import "fail" "caml_failwith" (func $caml_failwith (param (ref eq))))
    (import "obj" "null" (global $null (ref eq)))
    (import "bigarray" "caml_ba_get_1"
       (func $caml_ba_get_1
@@ -34,6 +35,8 @@
       "caml_get_idx_bytecode: attempted to read from an invalid index")
    (data $invalid_set_idx
       "caml_set_idx_bytecode: attempted to write to an invalid index")
+   (data $unimplemented_ext_ptr
+      "External ptrs are unimplemented on bytecode")
 
    ;; Indices with a non-zero tag are special --- the tag tells us how to
    ;; perform the indexing:
@@ -266,39 +269,59 @@
    ;; index. Unboxed products are represented as blocks in bytecode, so a
    ;; pointer arrives as a single tag-0 block [0; base; idx], and
    ;; reading/writing through it is exactly reading/writing at the block
-   ;; index. External pointers carry no base: they are represented as the
-   ;; block index alone, and behave like pointers whose base is [Null].
+   ;; index.
+   ;;
+   ;; External pointers (and generic pointers with [null] bases) are unsupported
+   ;; in bytecode and fail with an 'unimplemented' message.
+
+   ;; unimplemented_ext_ptr : unit -> 'a
+   ;; Raises [Failure]: external ptr primitives cannot be implemented here.
+   (func $unimplemented_ext_ptr (result (ref eq))
+      (call $caml_failwith
+         (array.new_data $string $unimplemented_ext_ptr
+            (i32.const 0) (i32.const 43)))
+      (ref.i31 (i32.const 0)))
+
+   ;; check_ptr_base : base -> unit
+   ;; Raises [Failure] if [base] is [Null].
+   (func $check_ptr_base (param $base (ref eq))
+      (if (ref.eq (local.get $base) (global.get $null))
+         (then (drop (call $unimplemented_ext_ptr)))))
 
    ;; caml_get_ptr_bytecode : ptr -> result
    (func (export "caml_get_ptr_bytecode")
       (param $ptr (ref eq)) (result (ref eq))
       (local $b (ref $block))
+      (local $base (ref eq))
       (local.set $b (ref.cast (ref $block) (local.get $ptr)))
+      (local.set $base (array.get $block (local.get $b) (i32.const 1)))
+      (call $check_ptr_base (local.get $base))
       (return_call $caml_get_idx_bytecode
-         (array.get $block (local.get $b) (i32.const 1))
+         (local.get $base)
          (array.get $block (local.get $b) (i32.const 2))))
 
    ;; caml_set_ptr_bytecode : ptr -> value -> unit
    (func (export "caml_set_ptr_bytecode")
       (param $ptr (ref eq)) (param $v (ref eq)) (result (ref eq))
       (local $b (ref $block))
+      (local $base (ref eq))
       (local.set $b (ref.cast (ref $block) (local.get $ptr)))
+      (local.set $base (array.get $block (local.get $b) (i32.const 1)))
+      (call $check_ptr_base (local.get $base))
       (return_call $caml_set_idx_bytecode
-         (array.get $block (local.get $b) (i32.const 1))
+         (local.get $base)
          (array.get $block (local.get $b) (i32.const 2))
          (local.get $v)))
 
    ;; caml_get_ext_ptr_bytecode : idx -> result
    (func (export "caml_get_ext_ptr_bytecode")
       (param $idx (ref eq)) (result (ref eq))
-      (return_call $caml_get_idx_bytecode
-         (global.get $null) (local.get $idx)))
+      (return_call $unimplemented_ext_ptr))
 
    ;; caml_set_ext_ptr_bytecode : idx -> value -> unit
    (func (export "caml_set_ext_ptr_bytecode")
       (param $idx (ref eq)) (param $v (ref eq)) (result (ref eq))
-      (return_call $caml_set_idx_bytecode
-         (global.get $null) (local.get $idx) (local.get $v)))
+      (return_call $unimplemented_ext_ptr))
 
    ;; caml_deepen_idx_bytecode : idx_prefix -> idx_suffix -> idx
    ;; Concatenates two block indices into a new one.

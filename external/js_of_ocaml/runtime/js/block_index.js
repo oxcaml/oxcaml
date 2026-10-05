@@ -143,38 +143,48 @@ function caml_deepen_idx_bytecode(idx_prefix, idx_suffix) {
 // index. Unboxed products are represented as blocks in bytecode, so a
 // pointer arrives as a single tag-0 block [0, base, idx], and
 // reading/writing through it is exactly reading/writing at the block index.
-// External pointers carry no base: they are represented as the block index
-// alone, and behave like pointers whose base is [Null] (represented as
-// [null] in JSOO).
+//
+// External pointers (and generic pointers with [null] bases) are unsupported
+// in bytecode and fail with an 'unimplemented' message.
 
-//Provides: caml_get_ptr_bytecode mutable (mutable)
-//Requires: caml_get_idx_bytecode
+//Provides: caml_unimplemented_ext_ptr
+//Requires: caml_failwith
+//Version: >= 5.2
+//If: oxcaml
+function caml_unimplemented_ext_ptr() {
+  caml_failwith("External ptrs are unimplemented on bytecode");
+}
+
+//Provides: caml_get_ptr_bytecode (mutable)
+//Requires: caml_get_idx_bytecode, caml_unimplemented_ext_ptr
 //Version: >= 5.2
 //If: oxcaml
 function caml_get_ptr_bytecode(ptr) {
+  if (ptr[1] === null) caml_unimplemented_ext_ptr();
   return caml_get_idx_bytecode(ptr[1], ptr[2]);
 }
 
 //Provides: caml_set_ptr_bytecode (mutable, mutable)
-//Requires: caml_set_idx_bytecode
+//Requires: caml_set_idx_bytecode, caml_unimplemented_ext_ptr
 //Version: >= 5.2
 //If: oxcaml
 function caml_set_ptr_bytecode(ptr, v) {
+  if (ptr[1] === null) caml_unimplemented_ext_ptr();
   return caml_set_idx_bytecode(ptr[1], ptr[2], v);
 }
 
-//Provides: caml_get_ext_ptr_bytecode mutable (mutable)
-//Requires: caml_get_idx_bytecode
+//Provides: caml_get_ext_ptr_bytecode (mutable)
+//Requires: caml_unimplemented_ext_ptr
 //Version: >= 5.2
 //If: oxcaml
-function caml_get_ext_ptr_bytecode(idx) {
-  return caml_get_idx_bytecode(null, idx);
+function caml_get_ext_ptr_bytecode(_idx) {
+  return caml_unimplemented_ext_ptr();
 }
 
 //Provides: caml_set_ext_ptr_bytecode (mutable, mutable)
-//Requires: caml_set_idx_bytecode
+//Requires: caml_unimplemented_ext_ptr
 //Version: >= 5.2
 //If: oxcaml
-function caml_set_ext_ptr_bytecode(idx, v) {
-  return caml_set_idx_bytecode(null, idx, v);
+function caml_set_ext_ptr_bytecode(_idx, _v) {
+  return caml_unimplemented_ext_ptr();
 }
