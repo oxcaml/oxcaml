@@ -1,9 +1,20 @@
 ; Mirrors of the compiler testsuite's block-index tests, run on the JS and
 ; Wasm runtimes (and on bytecode, for comparison):
-; - testsuite/tests/typing-layouts-block-indices/ext_ptr_bytecode.ml
+; - testsuite/tests/records-and-block-indices/idx_atomic.ml
+; - testsuite/tests/typing-layouts-block-indices/
+;     block_indices_using_atomic_ptr_primitives.ml
+;     ext_ptr_atomic_bytecode.ml
+;     ext_ptr_bytecode.ml
+
+(env
+ (_
+  (flags
+   (:standard
+    (-w -33)))))
 
 (tests
- (names ext_ptr_bytecode)
+ (names ext_ptr_bytecode idx_atomic
+  block_indices_using_atomic_ptr_primitives ext_ptr_atomic_bytecode)
  (build_if %{oxcaml_supported})
  (libraries stdlib_stable stdlib_upstream_compatible)
  (modes byte js wasm))
