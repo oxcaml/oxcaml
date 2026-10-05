@@ -1973,7 +1973,7 @@ module Const = struct
               if Crossing.Per_axis.le ax base_value actual_value
               then acc
               else Crossing.set ax actual_value acc)
-            Crossing.max Value.Axis.all
+            Crossing.max With_regionality.Axis.all
         in
         let externality =
           if
@@ -2777,7 +2777,8 @@ let for_object =
      produced/defined/allocated at legacy, which applies to only the
      comonadic axes. *)
   let comonadic =
-    Crossing.Comonadic.always_constructed_at Value.Comonadic.Const.legacy
+    Crossing.Comonadic.always_constructed_at
+      With_regionality.Comonadic.Const.legacy
   in
   let monadic =
     Crossing.Monadic.create

@@ -1099,7 +1099,10 @@ type nullary_primitive =
       { name : string;
         enabled_at_init : bool option
       }
-  | Enter_inlined_apply of { dbg : Inlined_debuginfo.t }
+  | Enter_inlined_apply of
+      { dbg : Inlined_debuginfo.t;
+        inlined_attribute : Inlined_attribute.t
+      }
   | Dls_get
   | Tls_get
   | Domain_index
@@ -1133,8 +1136,13 @@ let compare_nullary_primitive p1 p2 =
     if c <> 0
     then c
     else Option.compare Bool.compare enabled_at_init1 enabled_at_init2
-  | Enter_inlined_apply { dbg = dbg1 }, Enter_inlined_apply { dbg = dbg2 } ->
-    Inlined_debuginfo.compare dbg1 dbg2
+  | ( Enter_inlined_apply { dbg = dbg1; inlined_attribute = inlined_attribute1 },
+      Enter_inlined_apply { dbg = dbg2; inlined_attribute = inlined_attribute2 }
+    ) ->
+    let c = Inlined_debuginfo.compare dbg1 dbg2 in
+    if c <> 0
+    then c
+    else Inlined_attribute.compare inlined_attribute1 inlined_attribute2
   | Dls_get, Dls_get -> 0
   | Tls_get, Tls_get -> 0
   | Domain_index, Domain_index -> 0
@@ -1162,9 +1170,9 @@ let print_nullary_primitive ppf p =
       (match enabled_at_init with
       | None | Some false -> ""
       | Some true -> " enabled_at_init")
-  | Enter_inlined_apply { dbg } ->
-    Format.fprintf ppf "@[<hov 1>(Enter_inlined_apply@ %a)@]"
-      Inlined_debuginfo.print dbg
+  | Enter_inlined_apply { dbg; inlined_attribute } ->
+    Format.fprintf ppf "@[<hov 1>(Enter_inlined_apply@ %a@ %a)@]"
+      Inlined_debuginfo.print dbg Inlined_attribute.print inlined_attribute
   | Dls_get -> Format.pp_print_string ppf "Dls_get"
   | Tls_get -> Format.pp_print_string ppf "Tls_get"
   | Domain_index -> Format.pp_print_string ppf "Domain_index"
@@ -1209,6 +1217,12 @@ let nullary_classify_for_printing p =
   | Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
   | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax ->
     Neither
+
+let free_names_nullary_primitive p =
+  match p with
+  | Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
+  | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax ->
+    Name_occurrences.empty
 
 module Reinterpret_64_bit_word = struct
   type t =
@@ -2875,10 +2889,7 @@ let equal t1 t2 = compare t1 t2 = 0
 
 let free_names t =
   match t with
-  | Nullary
-      ( Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-      | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax ) ->
-    Name_occurrences.empty
+  | Nullary prim -> free_names_nullary_primitive prim
   | Unary (prim, x0) ->
     Name_occurrences.union
       (free_names_unary_primitive prim)
@@ -3311,6 +3322,28 @@ module Without_args = struct
     | Quaternary prim -> print_quaternary_primitive ppf prim
     | Variadic prim -> print_variadic_primitive ppf prim
 
+  let equal (t1 : t) (t2 : t) =
+    match t1, t2 with
+    | Nullary prim1, Nullary prim2 -> equal_nullary_primitive prim1 prim2
+    | Unary prim1, Unary prim2 -> equal_unary_primitive prim1 prim2
+    | Binary prim1, Binary prim2 -> equal_binary_primitive prim1 prim2
+    | Ternary prim1, Ternary prim2 -> equal_ternary_primitive prim1 prim2
+    | Quaternary prim1, Quaternary prim2 ->
+      equal_quaternary_primitive prim1 prim2
+    | Variadic prim1, Variadic prim2 -> equal_variadic_primitive prim1 prim2
+    | ( (Nullary _ | Unary _ | Binary _ | Ternary _ | Quaternary _ | Variadic _),
+        _ ) ->
+      false
+
+  let free_names (t : t) =
+    match t with
+    | Nullary prim -> free_names_nullary_primitive prim
+    | Unary prim -> free_names_unary_primitive prim
+    | Binary prim -> free_names_binary_primitive prim
+    | Ternary prim -> free_names_ternary_primitive prim
+    | Quaternary prim -> free_names_quaternary_primitive prim
+    | Variadic prim -> free_names_variadic_primitive prim
+
   let effects_and_coeffects (t : t) =
     match t with
     | Nullary prim -> effects_and_coeffects_of_nullary_primitive prim
@@ -3320,6 +3353,15 @@ module Without_args = struct
     | Quaternary prim -> effects_and_coeffects_of_quaternary_primitive prim
     | Variadic prim -> effects_and_coeffects_of_variadic_primitive prim
 end
+
+let without_args t : Without_args.t =
+  match t with
+  | Nullary prim -> Nullary prim
+  | Unary (prim, _) -> Unary prim
+  | Binary (prim, _, _) -> Binary prim
+  | Ternary (prim, _, _, _) -> Ternary prim
+  | Quaternary (prim, _, _, _, _) -> Quaternary prim
+  | Variadic (prim, _) -> Variadic prim
 
 let is_begin_or_end_region t =
   match t with

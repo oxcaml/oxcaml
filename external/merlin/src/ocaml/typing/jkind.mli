@@ -55,7 +55,7 @@ module Sort : sig
     (** A flat sort is returned from [get]. *)
     type t =
       | Var of Var.id (* [Var.id] is for debugging / printing only *)
-      | Genvar of var (* generic sort variable, level = Ident.highest_scope *)
+      | Genvar of var
       | Univar of univar
       | Base of base
   end

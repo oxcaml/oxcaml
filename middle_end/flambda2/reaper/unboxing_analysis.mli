@@ -82,6 +82,8 @@ type code_changes
 val get_calling_convention_change :
   code_changes -> Code_id.t -> calling_convention_change
 
+val is_changing_calling_convention : code_changes -> Code_id.t -> bool
+
 (* Should only be called on code_ids from the current unit. *)
 val get_code_metadata : code_changes -> Code_id.t -> Code_metadata.t
 

@@ -81,7 +81,68 @@ class MlFakeDevice {
     }
   }
 
-  mkdir(name, mode, raise_unix) {
+  rename_dir(oldname, newname, raise_unix) {
+    var old_slash = this.slash(oldname);
+    var new_slash = this.slash(newname);
+    if (newname !== oldname && new_slash.startsWith(old_slash))
+      // renaming a directory into its own subtree would recurse forever
+      caml_raise_system_error(
+        raise_unix,
+        "EINVAL",
+        "rename",
+        "invalid argument",
+        this.nm(newname),
+      );
+    if (this.exists(newname)) {
+      if (!this.is_dir(newname)) {
+        caml_raise_system_error(
+          raise_unix,
+          "ENOTDIR",
+          "rename",
+          "not a directory",
+          this.nm(newname),
+        );
+      }
+      if (this.readdir(newname).length > 0) {
+        caml_raise_system_error(
+          raise_unix,
+          "ENOTEMPTY",
+          "rename",
+          "directory not empty",
+          this.nm(newname),
+        );
+      }
+    }
+    this.create_dir_if_needed(new_slash);
+    for (const f of this.readdir(oldname)) {
+      this.rename(old_slash + f, new_slash + f, raise_unix);
+    }
+    delete this.content[old_slash];
+  }
+
+  rename(oldname, newname, raise_unix) {
+    if (!this.exists(oldname))
+      caml_raise_no_such_file(this.nm(oldname), raise_unix, "rename");
+    if (this.is_dir(oldname)) {
+      this.rename_dir(oldname, newname, raise_unix);
+    } else {
+      if (this.exists(newname) && this.is_dir(newname)) {
+        caml_raise_system_error(
+          raise_unix,
+          "EISDIR",
+          "rename",
+          "is a directory",
+          this.nm(newname),
+        );
+      }
+      if (newname !== oldname) {
+        this.content[newname] = this.content[oldname];
+        delete this.content[oldname];
+      }
+    }
+  }
+
+  mkdir(name, _mode, raise_unix) {
     if (this.exists(name))
       caml_raise_system_error(
         raise_unix,
@@ -113,7 +174,6 @@ class MlFakeDevice {
 
   rmdir(name, raise_unix) {
     var name_slash = name === "" ? "" : this.slash(name);
-    var r = new RegExp("^" + name_slash + "([^/]+)");
     if (!this.exists(name))
       caml_raise_system_error(
         raise_unix,
@@ -131,7 +191,7 @@ class MlFakeDevice {
         this.nm(name),
       );
     for (var n in this.content) {
-      if (n.match(r))
+      if (n.startsWith(name_slash) && n !== name_slash)
         caml_raise_system_error(
           raise_unix,
           "ENOTEMPTY",
@@ -143,29 +203,38 @@ class MlFakeDevice {
     delete this.content[name_slash];
   }
 
-  readdir(name) {
+  readdir(name, raise_unix) {
     var name_slash = name === "" ? "" : this.slash(name);
     if (!this.exists(name)) {
-      caml_raise_sys_error(name + ": No such file or directory");
+      caml_raise_no_such_file(this.nm(name), raise_unix, "readdir");
     }
     if (!this.is_dir(name)) {
-      caml_raise_sys_error(name + ": Not a directory");
+      caml_raise_system_error(
+        raise_unix,
+        "ENOTDIR",
+        "readdir",
+        "not a directory",
+        this.nm(name),
+      );
     }
-    var r = new RegExp("^" + name_slash + "([^/]+)");
     var seen = {};
     var a = [];
     for (var n in this.content) {
-      var m = n.match(r);
-      if (m && !seen[m[1]]) {
-        seen[m[1]] = true;
-        a.push(m[1]);
+      if (n.startsWith(name_slash) && n !== name_slash) {
+        var last = n.indexOf("/", name_slash.length);
+        if (last < 0) last = undefined;
+        var m = n.slice(name_slash.length, last);
+        if (m && !seen[m]) {
+          seen[m] = true;
+          a.push(m);
+        }
       }
     }
     return a;
   }
 
   opendir(name, raise_unix) {
-    var a = this.readdir(name);
+    var a = this.readdir(name, raise_unix);
     var c = false;
     var i = 0;
     return {
@@ -213,25 +282,22 @@ class MlFakeDevice {
         name,
       );
     }
+    if (this.is_dir(name))
+      caml_raise_system_error(
+        raise_unix,
+        "EISDIR",
+        "unlink",
+        "is a directory",
+        this.nm(name),
+      );
     delete this.content[name];
     return 0;
   }
 
-  access(name, f, raise_unix) {
-    var file;
+  access(name, _flags, raise_unix) {
     this.lookup(name);
-    if (this.content[name]) {
-      if (this.is_dir(name))
-        caml_raise_system_error(
-          raise_unix,
-          "EACCESS",
-          "access",
-          "permission denied,",
-          this.nm(name),
-        );
-    } else {
-      caml_raise_no_such_file(this.nm(name), raise_unix);
-    }
+    if (!this.exists(name))
+      caml_raise_no_such_file(this.nm(name), raise_unix, "access");
     return 0;
   }
 
@@ -256,13 +322,13 @@ class MlFakeDevice {
           this.nm(name),
         );
       file = this.content[name];
-      if (f.truncate) file.truncate();
+      if (f.truncate) file.truncate(0);
     } else if (f.create) {
       this.create_dir_if_needed(name);
       this.content[name] = new MlFakeFile(caml_create_bytes(0));
       file = this.content[name];
     } else {
-      caml_raise_no_such_file(this.nm(name), raise_unix);
+      caml_raise_no_such_file(this.nm(name), raise_unix, "open");
     }
     return new MlFakeFd(this.nm(name), file, f);
   }
@@ -282,7 +348,7 @@ class MlFakeDevice {
       file = this.content[name];
       file.truncate(len);
     } else {
-      caml_raise_no_such_file(this.nm(name), raise_unix);
+      caml_raise_no_such_file(this.nm(name), raise_unix, "truncate");
     }
   }
 
@@ -291,7 +357,7 @@ class MlFakeDevice {
     if (this.content[name])
       caml_raise_sys_error(this.nm(name) + " : file already exists");
     if (caml_is_ml_bytes(content)) file = new MlFakeFile(content);
-    if (caml_is_ml_string(content))
+    else if (caml_is_ml_string(content))
       file = new MlFakeFile(caml_bytes_of_string(content));
     else if (Array.isArray(content))
       file = new MlFakeFile(caml_bytes_of_array(content));
@@ -325,8 +391,9 @@ class MlFakeFile extends MlFile {
 
   truncate(len) {
     var old = this.data;
+    var old_len = caml_ml_bytes_length(old);
     this.data = caml_create_bytes(len | 0);
-    caml_blit_bytes(old, 0, this.data, 0, len);
+    caml_blit_bytes(old, 0, this.data, 0, Math.min(len, old_len));
   }
 
   length() {
@@ -356,12 +423,13 @@ class MlFakeFile extends MlFile {
     if (offset + len >= clen) {
       len = clen - offset;
     }
-    if (len) {
+    if (len > 0) {
       var data = caml_create_bytes(len | 0);
       caml_blit_bytes(this.data, offset, data, 0, len);
       buf.set(caml_uint8_array_of_bytes(data), pos);
+      return len;
     }
-    return len;
+    return 0;
   }
 }
 
@@ -371,13 +439,20 @@ class MlFakeFile extends MlFile {
 class MlFakeFd_out extends MlFakeFile {
   constructor(fd, flags) {
     super(caml_create_bytes(0));
-    this.log = function (s) {
-      return 0;
-    };
-    if (fd === 1 && typeof console.log === "function") this.log = console.log;
+    // Pick a stdout / stderr sink. console.log / console.error always
+    // append a newline, so wrap them to drop at most one trailing \n
+    // (otherwise OCaml's own newline doubles up).
+    var via_console = (sink) => (s) =>
+      sink(
+        s.length > 0 && s.charCodeAt(s.length - 1) === 10 ? s.slice(0, -1) : s,
+      );
+    if (fd === 1 && typeof console.log === "function")
+      this.log = via_console(console.log);
     else if (fd === 2 && typeof console.error === "function")
-      this.log = console.error;
-    else if (typeof console.log === "function") this.log = console.log;
+      this.log = via_console(console.error);
+    else if (typeof console.log === "function")
+      this.log = via_console(console.log);
+    else this.log = (_s) => 0;
     this.flags = flags;
   }
 
@@ -385,7 +460,7 @@ class MlFakeFd_out extends MlFakeFile {
     return 0;
   }
 
-  truncate(len, raise_unix) {
+  truncate(_len, raise_unix) {
     caml_raise_system_error(
       raise_unix,
       "EINVAL",
@@ -395,21 +470,11 @@ class MlFakeFd_out extends MlFakeFile {
   }
 
   write(buf, pos, len, raise_unix) {
-    var written = len;
     if (this.log) {
-      if (
-        len > 0 &&
-        pos >= 0 &&
-        pos + len <= buf.length &&
-        buf[pos + len - 1] === 10
-      )
-        len--;
-      // Do not output the last \n if present
-      // as console logging display a newline at the end
       var src = caml_create_bytes(len);
       caml_blit_bytes(caml_bytes_of_uint8_array(buf), pos, src, 0, len);
       this.log(src.toUtf16());
-      return written;
+      return len;
     }
     caml_raise_system_error(
       raise_unix,
@@ -419,19 +484,22 @@ class MlFakeFd_out extends MlFakeFile {
     );
   }
 
-  read(buf, pos, len, raise_unix) {
+  read(_buf, _pos, _len, raise_unix) {
     caml_raise_system_error(raise_unix, "EBADF", "read", "bad file descriptor");
   }
 
-  seek(len, whence, raise_unix) {
+  seek(_len, _whence, raise_unix) {
     caml_raise_system_error(raise_unix, "ESPIPE", "lseek", "illegal seek");
+  }
+  pos() {
+    return -1;
   }
 
   close() {
     this.log = undefined;
   }
 
-  check_stream_semantics(cmd) {}
+  check_stream_semantics(_cmd) {}
 }
 
 //Provides: MlFakeFd
@@ -442,6 +510,8 @@ class MlFakeFd {
     this.file = file;
     this.name = name;
     this.flags = flags;
+    // Like native [O_APPEND], the offset starts at the beginning of the file;
+    // it is each [write] that repositions to the end (see [write] below).
     this.offset = 0;
     this.seeked = false;
   }
@@ -450,9 +520,9 @@ class MlFakeFd {
     caml_raise_system_error(raise_unix, "EBADF", cmd, "bad file descriptor");
   }
 
-  length() {
+  length(raise_unix) {
     if (this.file) return this.file.length();
-    this.err_closed("length");
+    this.err_closed("length", raise_unix);
   }
 
   truncate(len, raise_unix) {
@@ -471,6 +541,9 @@ class MlFakeFd {
 
   write(buf, pos, len, raise_unix) {
     if (this.file && (this.flags.wronly || this.flags.rdwr)) {
+      // [O_APPEND]: every write goes to the end of the file, regardless of the
+      // current offset (which may have been moved by [seek]).
+      if (this.flags.append) this.offset = this.file.length();
       var offset = this.offset;
       len = this.file.write(offset, buf, pos, len);
       this.offset += len;
@@ -509,10 +582,15 @@ class MlFakeFd {
       );
     this.offset = offset;
     this.seeked = true;
+    return offset;
   }
 
-  close() {
-    if (!this.file) this.err_closed("close");
+  pos() {
+    return this.offset;
+  }
+
+  close(raise_unix) {
+    if (!this.file) this.err_closed("close", raise_unix);
     this.file = undefined;
   }
 

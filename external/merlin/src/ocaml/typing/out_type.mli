@@ -109,7 +109,7 @@ val tree_of_modalities:
   Types.mutability -> Mode.Modality.Const.t -> Outcometree.out_mode list
 
 val tree_of_modes_const:
-  Mode.Alloc.Const.t -> Outcometree.out_mode list
+  Mode.With_locality.Const.t -> Outcometree.out_mode list
 
 (** [out_jkind_of_jkind env jkind] converts a jkind to an [out_jkind]
     for printing. This uses the same naming scheme as error messages (e.g.,

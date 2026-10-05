@@ -490,6 +490,7 @@ AC_CONFIG_FILES([otherlibs/stdlib_alpha/META])
 AC_CONFIG_FILES([otherlibs/dynlink/META])
 AC_CONFIG_FILES([otherlibs/runtime_events/META])
 AC_CONFIG_FILES([otherlibs/eval/META])
+AC_CONFIG_FILES([external/ocaml-jit/lib/META])
 AC_CONFIG_FILES([stdlib/META])
 
 # Definitions related to the version of OCaml
@@ -3332,6 +3333,18 @@ int main(void) {
   }
 }
 ]])], AC_DEFINE([HAS_PCLMUL]) has_pclmul=yes, [])
+
+AC_SUBST([has_aes])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("aes")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_AES]) has_aes=yes, [])
 
 AC_SUBST([has_sse3])
 AC_RUN_IFELSE([AC_LANG_SOURCE([[

@@ -119,12 +119,12 @@ val transl_label_from_expr :
 val transl_simple_type:
         Env.t -> new_var_jkind:jkind_initialization_choice
         -> ?univars:TyVarEnv.poly_univars
-        -> closed:bool -> Alloc.Const.t
+        -> closed:bool -> With_locality.Const.t
         -> Parsetree.core_type -> Typedtree.core_type
 val transl_simple_type_univars:
         Env.t -> Parsetree.core_type -> Typedtree.core_type
 val transl_simple_type_delayed
-  :  Env.t -> Alloc.Const.t
+  :  Env.t -> With_locality.Const.t
   -> Parsetree.core_type
   -> Typedtree.core_type * type_expr * (unit -> unit)
         (* Translate a type using [Any] as the [jkind_initialization_choice],

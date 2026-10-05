@@ -208,6 +208,9 @@ and keep_camlprimc_file = ref false     (* -dcamlprimc *)
 
 let keyword_edition: string option ref = ref None
 
+let syntax_quotations = ref Config.syntax_quotations
+                                        (* -[no-]syntax-quotations *)
+
 let keep_asm_file = ref false           (* -S *)
 let optimize_for_speed = ref true       (* -compact *)
 and opaque = ref false                  (* -opaque *)
@@ -1096,6 +1099,9 @@ let ddissector_sizes = ref false               (* -ddissector-sizes *)
 let ddissector_verbose = ref false             (* -ddissector-verbose *)
 let ddissector_partitions = ref false          (* -ddissector-partitions *)
 let ddissector_inputs = ref None               (* -ddissector-inputs <file> *)
+
+(* CR bclement: should be changed to [true] after proper testing *)
+let stubs_forward_inlining = ref false         (* -stubs-forward-inlining *)
 
 let prepend_directory file_name =
   match !directory with

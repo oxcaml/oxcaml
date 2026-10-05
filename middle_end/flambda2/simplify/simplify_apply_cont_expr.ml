@@ -40,20 +40,25 @@ let inline_linearly_used_continuation uacc ~params:params' ~handler
       (RE.print (UA.are_rebuilding_terms uacc))
       handler;
   let bindings_outermost_first =
-    ListLabels.map2 params args ~f:(fun param arg ->
-        let let_bound =
-          let param_var, param_uid = BP.var_and_uid param in
-          Bound_var.create param_var param_uid Name_mode.normal
-          |> Bound_pattern.singleton
-        in
+    ListLabels.map2 params args
+      ~f:(fun param arg : Expr_builder.binding_to_place ->
+        let param_var, param_uid = BP.var_and_uid param in
         let named = Named.create_simple arg in
-        let machine_width = UE.machine_width (UA.uenv uacc) in
-        Expr_builder.Keep_binding
-          { let_bound;
-            simplified_defining_expr =
-              Simplified_named.create ~machine_width named;
-            original_defining_expr = Some named
-          })
+        (* Get rid of useless [let x = x] bindings from dataflow. *)
+        if Simple.equal arg (Simple.var param_var)
+        then Delete_binding { original_defining_expr = Some named }
+        else
+          let let_bound =
+            Bound_var.create param_var param_uid Name_mode.normal
+            |> Bound_pattern.singleton
+          in
+          let machine_width = UE.machine_width (UA.uenv uacc) in
+          Keep_binding
+            { let_bound;
+              simplified_defining_expr =
+                Simplified_named.create ~machine_width named;
+              original_defining_expr = Some named
+            })
   in
   let expr, uacc =
     let uacc =

@@ -29,7 +29,7 @@
   (name ocamldep)
   (modes byte native)
   (modules ocamldep)
-  (libraries ocamlfrontend ocamlbytecomp))
+  (libraries ocamlcommon))
 
 (install
   (files

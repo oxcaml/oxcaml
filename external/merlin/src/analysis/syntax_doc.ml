@@ -185,7 +185,7 @@ let get_mod_bound_doc ~loc mod_bound =
      }
     : syntax_info)
 
-let get_mode_doc (Atom (axis, mode) : Mode.Alloc.atom) =
+let get_mode_doc (Atom (axis, mode) : Mode.With_locality.atom) =
   let open Option.Infix in
   let* description =
     match (axis, mode) with

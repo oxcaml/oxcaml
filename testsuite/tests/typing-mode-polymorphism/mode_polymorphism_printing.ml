@@ -440,6 +440,7 @@ Error: Signature mismatch:
        The type
          "t @ [< 'm > stateful dynamic] -> t @ [> 'm | stateful dynamic]"
        is not compatible with the type "t -> t @ portable"
+       The return mode was expected to be "portable" but is "nonportable"
 |}]
 
 (* variant types *)

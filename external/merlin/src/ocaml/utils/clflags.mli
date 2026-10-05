@@ -29,6 +29,7 @@ val strict_sequence      : bool ref
 val applicative_functors : bool ref
 val nopervasives         : bool ref
 val strict_formats       : bool ref
+val syntax_quotations    : bool ref
 type open_arg =
   | Open of string
   | Open_cmi of string

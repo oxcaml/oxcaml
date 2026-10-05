@@ -682,3 +682,88 @@ let test_explicit_modal_alias2
 val test_explicit_modal_alias2 : (module SigWithExplicitModalAlias2) -> unit =
   <fun>
 |}]
+
+(* Mode crossing through a wrapped library's alias chain. *)
+module type Sexp = sig
+  module Utf8 : sig val to_string : int -> string @@ portable end
+end
+
+let alias_chain_crossing ((module Lib__Sexp) : (module Sexp) @ nonportable) =
+  let module Lib__ = struct module Sexp = Lib__Sexp end in
+  let module Lib = struct module Sexp = Lib__.Sexp end in
+  let module M : sig @@ portable module Utf8 = Lib.Sexp.Utf8 end = struct
+    include (Lib.Sexp : module type of struct include Lib.Sexp end)
+  end in
+  ()
+[%%expect{|
+module type Sexp =
+  sig module Utf8 : sig val to_string : int -> string @@ portable end end
+val alias_chain_crossing : (module Sexp) @ stateless nonportable -> unit =
+  <fun>
+|}]
+
+(* Abstract module types do not provide mode crossing. *)
+module type Abstract = sig
+  module type S
+  module M : S
+end
+
+let abstract_alias ((module X) : (module Abstract) @ nonportable) =
+  let module M : sig @@ portable module N = X.M end = struct
+    module N = X.M
+  end in
+  ()
+[%%expect{|
+module type Abstract = sig module type S module M : S end
+Lines 7-9, characters 54-5:
+7 | ......................................................struct
+8 |     module N = X.M
+9 |   end...
+Error: Signature mismatch:
+       Modules do not match:
+         sig module N = X.M @@ stateless nonportable end @ nonportable
+       is not included in
+         sig module N = X.M @@ portable end @ nonportable
+       In module "N":
+       Got "nonportable"
+       but expected "portable".
+|}]
+
+(* Nonportable contents prevent crossing. *)
+module type Sexp' = sig
+  module Utf8 : sig val to_string : int -> string end
+end
+
+let alias_chain_no_crossing
+    ((module Lib__Sexp) : (module Sexp') @ nonportable) =
+  let module Lib__ = struct module Sexp = Lib__Sexp end in
+  let module Lib = struct module Sexp = Lib__.Sexp end in
+  let module M : sig @@ portable module Utf8 = Lib.Sexp.Utf8 end = struct
+    include (Lib.Sexp : module type of struct include Lib.Sexp end)
+  end in
+  ()
+[%%expect{|
+module type Sexp' =
+  sig module Utf8 : sig val to_string : int -> string end end
+Lines 9-11, characters 67-5:
+ 9 | ...................................................................struct
+10 |     include (Lib.Sexp : module type of struct include Lib.Sexp end)
+11 |   end...
+Error: Signature mismatch:
+       Modules do not match:
+         sig module Utf8 = Lib.Sexp.Utf8 @@ stateless nonportable end @ nonportable
+       is not included in
+         sig module Utf8 = Lib.Sexp.Utf8 @@ portable end @ nonportable
+       In module "Utf8":
+       Modules do not match:
+         (module Lib.Sexp.Utf8) @ nonportable
+       is not included in
+         (module Lib.Sexp.Utf8) @ portable
+       In module "Utf8":
+       Values do not match:
+         val to_string : int -> string (* in a structure at nonportable *)
+       is not included in
+         val to_string : int -> string (* in a structure at portable *)
+       The first is "nonportable"
+       but the second is "portable".
+|}]

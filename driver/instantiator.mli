@@ -75,6 +75,10 @@ type error =
       arg1 : CU.t;
       arg2 : CU.t;
     }
+  | Argument_not_fully_instantiated of {
+      compilation_unit : CU.t;
+      filename : Misc.filepath;
+    }
 
 
 exception Error of error

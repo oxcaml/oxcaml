@@ -52,53 +52,23 @@ static caml_plat_barrier minor_gc_end_barrier = CAML_PLAT_BARRIER_INITIALIZER;
 
 static atomic_uintnat caml_minor_cycles_started = 0;
 
-/* Tables are allocated lazily at this size (in entries), grown by 4x
-   when full, and shrunk back to it if nearly empty after a minor
-   collection. */
-#define MINOR_TABLE_INITIAL_ENTRIES 1024
-
-/* On a table whose footprint has reached half the minor heap size,
-   the last [reserve] entries are held back: extending into them
-   requests a minor collection (the extension, and growth, still
-   happen until the collection). See [realloc_generic_table]. */
-#define MINOR_TABLE_RESERVE_ENTRIES 256
-
-/* After a minor GC, a table is shrunk if it is bigger than
- * MINOR_TABLE_INITIAL_ENTRIES, unless it used more than this fraction
- * of its entries in the last minor cycle. Prevents thrashing the VM
- * map when remembered sets are large. */
-
-#define MINOR_TABLE_MIN_FRACTION 10
-
-Caml_inline bool table_at_trigger_size (struct generic_table *tbl,
-                                        asize_t element_size)
-{
-  return tbl->size * element_size
-    >= (Caml_state->minor_heap_wsz / 2) * sizeof(value);
-}
-
-static void set_table_limit (struct generic_table *tbl, asize_t element_size)
-{
-  tbl->limit = tbl->end;
-  if (table_at_trigger_size (tbl, element_size) && tbl->reserve < tbl->size)
-    tbl->limit = tbl->end - tbl->reserve * element_size;
-}
-
+/* [sz] and [rsv] are numbers of entries */
 static void alloc_generic_table (struct generic_table *tbl, asize_t sz,
                                  asize_t rsv, asize_t element_size)
 {
   void *new_table;
 
-  CAMLassert (rsv < sz);
   tbl->size = sz;
   tbl->reserve = rsv;
-  new_table = (void *) caml_stat_alloc_noexc(tbl->size * element_size);
+  new_table = (void *) caml_stat_alloc_noexc((tbl->size + tbl->reserve) *
+                                             element_size);
   if (new_table == NULL) caml_fatal_error ("not enough memory");
   if (tbl->base != NULL) caml_stat_free (tbl->base);
   tbl->base = new_table;
   tbl->ptr = tbl->base;
-  tbl->end = tbl->base + tbl->size * element_size;
-  set_table_limit (tbl, element_size);
+  tbl->threshold = tbl->base + tbl->size * element_size;
+  tbl->limit = tbl->threshold;
+  tbl->end = tbl->base + (tbl->size + tbl->reserve) * element_size;
 }
 
 void caml_alloc_table (struct caml_ref_table *tbl, asize_t sz, asize_t rsv)
@@ -111,27 +81,22 @@ static void reset_table (struct generic_table *tbl)
   tbl->size = 0;
   tbl->reserve = 0;
   if (tbl->base != NULL) caml_stat_free (tbl->base);
-  tbl->base = tbl->ptr = tbl->limit = tbl->end = NULL;
+  tbl->base = tbl->ptr = tbl->threshold = tbl->limit = tbl->end = NULL;
 }
 
 static void clear_table (struct generic_table *tbl,
                          asize_t element_size,
                          const char *name)
 {
-  /* If table is small, or more than lightly used, just reset its pointer */
-  if (tbl->size <= MINOR_TABLE_INITIAL_ENTRIES ||
-      (tbl->ptr - tbl->base) * MINOR_TABLE_MIN_FRACTION >=
-      (tbl->end - tbl->base)) {
+  asize_t maxsz = Caml_state->minor_heap_wsz;
+  if (tbl->size <= maxsz) {
     tbl->ptr = tbl->base;
-    set_table_limit (tbl, element_size);
+    tbl->limit = tbl->threshold;
   } else {
-    /* Table is quite large and didn't use much of that space on the
-     * last cycle, so shrink it. */
-    CAML_GC_MESSAGE (TABLES, "Shrinking %s to %ld KiB\n",
-                     name, (long)((MINOR_TABLE_INITIAL_ENTRIES
-                                   * element_size) / 1024));
-    alloc_generic_table(tbl, MINOR_TABLE_INITIAL_ENTRIES,
-                        MINOR_TABLE_RESERVE_ENTRIES, element_size);
+    CAML_GC_MESSAGE (TABLES, "Shrinking %s to %ldk bytes\n",
+                     name,
+                     (long)((maxsz * element_size) / 1024));
+    alloc_generic_table(tbl, Caml_state->minor_heap_wsz, 256, element_size);
   }
 }
 
@@ -200,10 +165,7 @@ void caml_set_minor_heap_size (asize_t wsize)
 bool caml_maybe_minor_gc_before_writes(mlsize_t count)
 {
   struct caml_ref_table *table = &Caml_state->minor_tables->major_ref;
-  /* If the table grows to minor_heap_wsz/2 we will GC anyway */
-  size_t budget = Caml_state->minor_heap_wsz / 2;
-  size_t used = table->base ? (size_t)(table->ptr - table->base) : 0;
-  size_t space = budget > used ? budget - used : 0;
+  size_t space = table->base ? (table->limit - table->ptr) : table->size;
   if (count > (space * WRITE_PERCENT_TO_TRIGGER_MINOR_GC) / 100) {
     CAML_EV_COUNTER(EV_C_FORCE_MINOR_MAKE_VECT, 1);
     caml_minor_collection();
@@ -623,12 +585,6 @@ void caml_empty_minor_heap_domain_clear(caml_domain_state* domain)
   domain->minor_dependent_bsz = 0;
 }
 
-/* Try to do a major slice, returns nonzero if there was any work available,
-   used as useful spin work while waiting for synchronisation. The return type
-   is [int] and not [bool] since it is passed as a parameter to
-   [caml_try_run_on_all_domains_with_spin_work]. */
-int caml_do_opportunistic_major_slice
-  (caml_domain_state* domain_unused, void* unused);
 static void minor_gc_leave_barrier
   (caml_domain_state* domain, int participating_count);
 
@@ -968,16 +924,20 @@ static void nonatomic_increment_counter(atomic_uintnat* counter) {
 static void minor_gc_leave_barrier
   (caml_domain_state* domain, int participating_count)
 {
+  struct caml_opportunistic_events evs = { false, 0 };
+
   /* Spin while we have major work available */
   SPIN_WAIT_BOUNDED {
     if (caml_plat_barrier_is_released(&minor_gc_end_barrier)) {
+      caml_opportunistic_events_end(&evs);
       return;
     }
 
-    if (!caml_do_opportunistic_major_slice(domain, 0)) {
+    if (!caml_do_opportunistic_major_slice(domain, &evs)) {
       break;
     }
   }
+  caml_opportunistic_events_end(&evs);
 
   /* Spin a bit longer, which is far less fruitful if we're waiting on
      more than one thread */
@@ -991,21 +951,6 @@ static void minor_gc_leave_barrier
 
   /* If there's nothing to do, block */
   caml_plat_barrier_wait(&minor_gc_end_barrier);
-}
-
-int caml_do_opportunistic_major_slice
-  (caml_domain_state* domain_state, void* unused)
-{
-  int work_available = caml_opportunistic_major_work_available(domain_state);
-  if (work_available) {
-    /* NB: need to put guard around the ev logs to prevent spam when we poll */
-    uintnat log_events =
-        atomic_load_relaxed(&caml_verb_gc) & CAML_GC_MSG_SLICE;
-    if (log_events) CAML_EV_BEGIN(EV_MAJOR_MARK_OPPORTUNISTIC);
-    caml_opportunistic_major_collection_slice(Major_slice_work_min);
-    if (log_events) CAML_EV_END(EV_MAJOR_MARK_OPPORTUNISTIC);
-  }
-  return work_available;
 }
 
 /* Make sure the minor heap is empty by performing a minor collection
@@ -1139,11 +1084,9 @@ int caml_try_empty_minor_heap_on_all_domains (void)
   CAML_GC_MESSAGE(MINOR, "Requesting minor collection.\n");
   uintnat mark_requested;
   return caml_try_run_on_all_domains_with_spin_work(
-    1, /* synchronous */
     &caml_stw_empty_minor_heap, /* stw handler */
     &mark_requested,
-    &caml_empty_minor_heap_setup, /* leader setup */
-    &caml_do_opportunistic_major_slice, 0 /* enter spin work */);
+    &caml_empty_minor_heap_setup /* leader setup */);
     /* leaves when done by default*/
 }
 
@@ -1264,35 +1207,35 @@ CAMLexport value caml_check_urgent_gc (value extra_root)
 static void realloc_generic_table
 (struct generic_table *tbl, asize_t element_size,
  ev_runtime_counter ev_counter_name,
- const char *msg_growing, const char *msg_error)
+ const char *msg_threshold, const char *msg_growing, const char *msg_error)
 {
   CAMLassert (tbl->ptr == tbl->limit);
   CAMLassert (tbl->limit <= tbl->end);
+  CAMLassert (tbl->limit >= tbl->threshold);
 
   if (tbl->base == NULL){
-    alloc_generic_table (tbl, MINOR_TABLE_INITIAL_ENTRIES,
-                         MINOR_TABLE_RESERVE_ENTRIES, element_size);
-  }else if (tbl->limit != tbl->end){
-    /* Crossed into the reserve of a table at the triggering size: request
-       a minor collection, and keep appending meanwhile. */
-    CAML_GC_MESSAGE(TABLES, "table reached minor GC trigger size\n");
+    alloc_generic_table (tbl, Caml_state->minor_heap_wsz / 8, 256,
+                         element_size);
+  }else if (tbl->limit == tbl->threshold){
+    CAML_EV_COUNTER (ev_counter_name, 1);
+    CAML_GC_MESSAGE(TABLES, msg_threshold, 0);
     tbl->limit = tbl->end;
     caml_request_minor_gc ();
   }else{
     asize_t sz;
     asize_t cur_ptr = tbl->ptr - tbl->base;
-    CAML_EV_COUNTER (ev_counter_name, 1);
 
-    tbl->size *= 4;
-    sz = tbl->size * element_size;
+    tbl->size *= 2;
+    sz = (tbl->size + tbl->reserve) * element_size;
     CAML_GC_MESSAGE(TABLES, msg_growing, (intnat) sz/1024);
     tbl->base = caml_stat_resize_noexc (tbl->base, sz);
     if (tbl->base == NULL){
       caml_fatal_error ("%s", msg_error);
     }
-    tbl->end = tbl->base + sz;
+    tbl->end = tbl->base + (tbl->size + tbl->reserve) * element_size;
+    tbl->threshold = tbl->base + tbl->size * element_size;
     tbl->ptr = tbl->base + cur_ptr;
-    set_table_limit (tbl, element_size);
+    tbl->limit = tbl->end;
   }
 }
 
@@ -1301,6 +1244,7 @@ void caml_realloc_ref_table (struct caml_ref_table *tbl)
   realloc_generic_table
     ((struct generic_table *) tbl, sizeof (value *),
      EV_C_REQUEST_MINOR_REALLOC_REF_TABLE,
+     "ref_table threshold crossed\n",
      "Growing ref_table to %" ARCH_INTNAT_PRINTF_FORMAT "dk bytes\n",
      "ref_table overflow");
 }
@@ -1310,6 +1254,7 @@ void caml_realloc_ephe_ref_table (struct caml_ephe_ref_table *tbl)
   realloc_generic_table
     ((struct generic_table *) tbl, sizeof (struct caml_ephe_ref_elt),
      EV_C_REQUEST_MINOR_REALLOC_EPHE_REF_TABLE,
+     "ephe_ref_table threshold crossed\n",
      "Growing ephe_ref_table to %" ARCH_INTNAT_PRINTF_FORMAT "dk bytes\n",
      "ephe_ref_table overflow");
 }
@@ -1319,6 +1264,7 @@ void caml_realloc_custom_table (struct caml_custom_table *tbl)
   realloc_generic_table
     ((struct generic_table *) tbl, sizeof (struct caml_custom_elt),
      EV_C_REQUEST_MINOR_REALLOC_CUSTOM_TABLE,
+     "custom_table threshold crossed\n",
      "Growing custom_table to %" ARCH_INTNAT_PRINTF_FORMAT "dk bytes\n",
      "custom_table overflow");
 }
@@ -1328,6 +1274,7 @@ void caml_realloc_dependent_table (struct caml_dependent_table *tbl)
   realloc_generic_table
     ((struct generic_table *) tbl, sizeof (struct caml_dependent_elt),
      EV_C_REQUEST_MINOR_REALLOC_DEPENDENT_TABLE,
+     "dependent_table threshold crossed\n",
      "Growing dependent_table to %" ARCH_INTNAT_PRINTF_FORMAT "dk bytes\n",
      "dependent_table overflow");
 }

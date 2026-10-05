@@ -10,9 +10,9 @@
 let neg x = -x
 [%%expect_asm X86_64{|
 neg:
-  movq  %rax, %rbx
-  movl  $2, %eax
-  subq  %rbx, %rax
+  movl  $2, %ebx
+  subq  %rax, %rbx
+  movq  %rbx, %rax
   ret
 |}]
 

@@ -11,14 +11,14 @@ type ('a : any) t = { mutable v : 'a }
 type ('a : any) t = { mutable v : 'a; }
 |}]
 
-(* Control: assignment at a representable instantiation is fine. *)
+(* Assignment is fine when the field is representable *)
 let set_int (r : int t) (x : int) = r.v <- x
 [%%expect{|
 val set_int : int t -> int -> unit = <fun>
 |}]
 
-(* Assignment to a record whose representation is undetermined: the record
-   must be representable. *)
+(* Assignment to a record whose representation is undetermined fails, as the
+   field must be representable *)
 let set (type a : any) (r : a t) = r.v <- assert false
 [%%expect{|
 Line 1, characters 35-54:
@@ -31,8 +31,8 @@ Error: Record element types must have a representable layout.
          because it's the type of a field being assigned a value.
 |}]
 
-(* Assignment where the assigned value is ill-typed AND the record's
-   representation is undetermined: which error is reported? *)
+(* Ill-typed assignment error still takes precedence over
+   undetermined-representation error *)
 let set_bad (type a : any) (r : a t) = r.v <- "hello"
 [%%expect{|
 Line 1, characters 46-53:
@@ -42,13 +42,13 @@ Error: This constant has type "string" but an expression was expected of type "a
 |}]
 
 (* Atomic fields may be declared in a record whose representation is
-   undetermined; [%atomic.loc] computes the record's representation to check
-   that it supports atomic access, so it too requires representable fields. *)
+   undetermined *)
 type ('a : any) u = { mutable n : int [@atomic]; y : 'a }
 [%%expect{|
 type ('a : any) u = { mutable n : int [@atomic]; y : 'a; }
 |}]
 
+(* [%atomic.loc] requires a determined layout *)
 let atomic_loc_bad (type a : any) (r : a u) = [%atomic.loc r.n]
 [%%expect{|
 Line 1, characters 46-63:

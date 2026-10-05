@@ -153,6 +153,16 @@ nothing.
 \item["-sort"]
 Sort files according to their dependencies.
 
+\item[(ox) "-syntax-quotations"]
+Lex the quotation syntax in files that do not select a mode themselves
+with the "#syntax quotations" directive, as for the "ocamlc" option of
+the same name.
+
+\item[(ox) "-no-syntax-quotations"]
+Do not lex the quotation syntax in files that do not select a mode
+themselves with the "#syntax quotations" directive, as for the "ocamlc"
+option of the same name.
+
 \item["-version"]
 Print version string and exit.
 
