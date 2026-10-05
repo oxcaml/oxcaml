@@ -48,19 +48,24 @@ val one : int64
 val minus_one : int64
 (** The 64-bit integer -1. *)
 
-external neg : (int64[@local_opt]) -> (int64[@local_opt]) = "%int64_neg"
+external neg : (int64[@local_opt]) -> (int64[@local_opt]) @@ stateless
+  = "%int64_neg"
 (** Unary negation. *)
 
-external add : (int64[@local_opt]) -> (int64[@local_opt]) -> (int64[@local_opt]) = "%int64_add"
+external add : (int64[@local_opt]) -> (int64[@local_opt]) -> (int64[@local_opt])
+  @@ stateless = "%int64_add"
 (** Addition. *)
 
-external sub : (int64[@local_opt]) -> (int64[@local_opt]) -> (int64[@local_opt]) = "%int64_sub"
+external sub : (int64[@local_opt]) -> (int64[@local_opt]) -> (int64[@local_opt])
+  @@ stateless = "%int64_sub"
 (** Subtraction. *)
 
-external mul : (int64[@local_opt]) -> (int64[@local_opt]) -> (int64[@local_opt]) = "%int64_mul"
+external mul : (int64[@local_opt]) -> (int64[@local_opt]) -> (int64[@local_opt])
+  @@ stateless = "%int64_mul"
 (** Multiplication. *)
 
-external div : (int64[@local_opt]) -> (int64[@local_opt]) -> (int64[@local_opt]) = "%int64_div"
+external div : (int64[@local_opt]) -> (int64[@local_opt]) -> (int64[@local_opt])
+  @@ stateless = "%int64_div"
 (** Integer division.
    @raise Division_by_zero if the second
    argument is zero.  This division rounds the real quotient of
@@ -72,7 +77,8 @@ val unsigned_div : int64 -> int64 -> int64
 
     @since 4.08 *)
 
-external rem : (int64[@local_opt]) -> (int64[@local_opt]) -> (int64[@local_opt]) = "%int64_mod"
+external rem : (int64[@local_opt]) -> (int64[@local_opt]) -> (int64[@local_opt])
+  @@ stateless = "%int64_mod"
 (** Integer remainder.  If [y] is not zero, the result
    of [Int64.rem x y] satisfies the following property:
    [x = Int64.add (Int64.mul (Int64.div x y) y) (Int64.rem x y)].
@@ -100,39 +106,48 @@ val max_int : int64
 val min_int : int64
 (** The smallest representable 64-bit integer, -2{^63}. *)
 
-external logand : (int64[@local_opt]) -> (int64[@local_opt]) -> (int64[@local_opt]) = "%int64_and"
+external logand :
+  (int64[@local_opt]) -> (int64[@local_opt]) -> (int64[@local_opt])
+  @@ stateless = "%int64_and"
 (** Bitwise logical and. *)
 
-external logor : (int64[@local_opt]) -> (int64[@local_opt]) -> (int64[@local_opt]) = "%int64_or"
+external logor :
+  (int64[@local_opt]) -> (int64[@local_opt]) -> (int64[@local_opt])
+  @@ stateless = "%int64_or"
 (** Bitwise logical or. *)
 
-external logxor : (int64[@local_opt]) -> (int64[@local_opt]) -> (int64[@local_opt]) = "%int64_xor"
+external logxor :
+  (int64[@local_opt]) -> (int64[@local_opt]) -> (int64[@local_opt])
+  @@ stateless = "%int64_xor"
 (** Bitwise logical exclusive or. *)
 
 val lognot : int64 -> int64
 (** Bitwise logical negation. *)
 
-external shift_left : (int64[@local_opt]) -> int -> (int64[@local_opt]) = "%int64_lsl"
+external shift_left : (int64[@local_opt]) -> int -> (int64[@local_opt])
+  @@ stateless = "%int64_lsl"
 (** [Int64.shift_left x y] shifts [x] to the left by [y] bits.
    The result is unspecified if [y < 0] or [y >= 64]. *)
 
-external shift_right : (int64[@local_opt]) -> int -> (int64[@local_opt]) = "%int64_asr"
+external shift_right : (int64[@local_opt]) -> int -> (int64[@local_opt])
+  @@ stateless = "%int64_asr"
 (** [Int64.shift_right x y] shifts [x] to the right by [y] bits.
    This is an arithmetic shift: the sign bit of [x] is replicated
    and inserted in the vacated bits.
    The result is unspecified if [y < 0] or [y >= 64]. *)
 
-external shift_right_logical : (int64[@local_opt]) -> int -> (int64[@local_opt]) = "%int64_lsr"
+external shift_right_logical : (int64[@local_opt]) -> int -> (int64[@local_opt])
+  @@ stateless = "%int64_lsr"
 (** [Int64.shift_right_logical x y] shifts [x] to the right by [y] bits.
    This is a logical shift: zeroes are inserted in the vacated bits
    regardless of the sign of [x].
    The result is unspecified if [y < 0] or [y >= 64]. *)
 
-external of_int : int -> (int64[@local_opt]) = "%int64_of_int"
+external of_int : int -> (int64[@local_opt]) @@ stateless = "%int64_of_int"
 (** Convert the given integer (type [int]) to a 64-bit integer
     (type [int64]). *)
 
-external to_int : (int64[@local_opt]) -> int = "%int64_to_int"
+external to_int : (int64[@local_opt]) -> int @@ stateless = "%int64_to_int"
 (** Convert the given 64-bit integer (type [int64]) to an
    integer (type [int]).  On 64-bit platforms, the 64-bit integer
    is taken modulo 2{^63}, i.e. the high-order bit is lost
@@ -147,7 +162,7 @@ val unsigned_to_int : int64 -> int option
 
     @since 4.08 *)
 
-external of_float : float -> int64
+external of_float : float -> int64 @@ stateless
   = "caml_int64_of_float" "caml_int64_of_float_unboxed"
   [@@unboxed] [@@noalloc] [@@builtin]
 (** Convert the given floating-point number to a 64-bit integer,
@@ -156,33 +171,33 @@ external of_float : float -> int64
    \[{!Int64.min_int}, {!Int64.max_int}\], no exception is raised, and
    an unspecified, platform-dependent integer is returned. *)
 
-external to_float : int64 -> float
+external to_float : int64 -> float @@ stateless
   = "caml_int64_to_float" "caml_int64_to_float_unboxed"
   [@@unboxed] [@@noalloc] [@@builtin]
 (** Convert the given 64-bit integer to a floating-point number. *)
 
 
-external of_int32 : int32 -> int64 = "%int64_of_int32"
+external of_int32 : int32 -> int64 @@ stateless = "%int64_of_int32"
 (** Convert the given 32-bit integer (type [int32])
    to a 64-bit integer (type [int64]). *)
 
-external to_int32 : int64 -> int32 = "%int64_to_int32"
+external to_int32 : int64 -> int32 @@ stateless = "%int64_to_int32"
 (** Convert the given 64-bit integer (type [int64]) to a
    32-bit integer (type [int32]). The 64-bit integer
    is taken modulo 2{^32}, i.e. the top 32 bits are lost
    during the conversion.  *)
 
-external of_nativeint : nativeint -> int64 = "%int64_of_nativeint"
+external of_nativeint : nativeint -> int64 @@ stateless = "%int64_of_nativeint"
 (** Convert the given native integer (type [nativeint])
    to a 64-bit integer (type [int64]). *)
 
-external to_nativeint : int64 -> nativeint = "%int64_to_nativeint"
+external to_nativeint : int64 -> nativeint @@ stateless = "%int64_to_nativeint"
 (** Convert the given 64-bit integer (type [int64]) to a
    native integer.  On 32-bit platforms, the 64-bit integer
    is taken modulo 2{^32}.  On 64-bit platforms,
    the conversion is exact. *)
 
-external of_string : string -> (int64[@unboxed])
+external of_string : string -> (int64[@unboxed]) @@ stateless
   = "caml_int64_of_string" "caml_int64_of_string_unboxed"
 (** Convert the given string to a 64-bit integer.
    The string is read in decimal (by default, or if the string
@@ -207,7 +222,7 @@ val of_string_opt: string -> int64 option
 val to_string : int64 -> string
 (** Return the string representation of its argument, in decimal. *)
 
-external bits_of_float : float -> int64
+external bits_of_float : float -> int64 @@ stateless
   = "caml_int64_bits_of_float" "caml_int64_bits_of_float_unboxed"
   [@@unboxed] [@@noalloc]
 (** Return the internal representation of the given float according
@@ -216,7 +231,7 @@ external bits_of_float : float -> int64
    bits 62 to 52 represent the (biased) exponent; bits 51 to 0
    represent the mantissa. *)
 
-external float_of_bits : int64 -> float
+external float_of_bits : int64 -> float @@ stateless
   = "caml_int64_float_of_bits" "caml_int64_float_of_bits_unboxed"
   [@@unboxed] [@@noalloc]
 (** Return the floating-point number whose internal representation,
