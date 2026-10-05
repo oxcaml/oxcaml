@@ -73,12 +73,14 @@ let () =
    | exception Test_exception -> ());
   print_trace ()
 
-(* Each reading is one second after the previous one. *)
 let clock () =
   let calls = ref 0 in
   (fun () ->
     incr calls;
-    1_700_000_000. +. float_of_int !calls),
+    match !calls with
+    | 1 -> 1_700_000_000.
+    | 2 -> 1_700_000_002.
+    | _ -> failwith "Clock called more than twice"),
   calls
 
 let () =
@@ -96,35 +98,34 @@ let () =
     in
     assert (result = count)
   in
-  let result =
-    Profile.with_action_trace ~gettimeofday ~name:"compiler" (fun () ->
-      Profile.record_call "file=example.ml" (fun () ->
-        record "repeated" 2;
-        record "repeated" 3;
-        record ~accumulate:true "accumulated" 5;
-        record ~accumulate:true "accumulated" 7);
-      42)
+  let result = Profile.record_action ~gettimeofday ~name:"compiler" (fun () ->
+    Profile.record_call "file=example.ml" (fun () ->
+      record "repeated" 2;
+      record "repeated" 3;
+      record ~accumulate:true "accumulated" 5;
+      record ~accumulate:true "accumulated" 7);
+    42)
   in
-  assert (result = 42 && !calls = 12 && !counter_calls = 4);
+  assert (result = 42 && !calls = 2 && !counter_calls = 4);
   assert (!Clflags.profile_columns = []);
   print_trace ()
 
 let () =
   Profile.reset ();
   let gettimeofday, calls = clock () in
-  (match Profile.with_action_trace ~gettimeofday ~name:"failed" (fun () ->
+  (match Profile.record_action ~gettimeofday ~name:"failed" (fun () ->
      Profile.record_call_with_counters
        ~counter_f:(fun _ -> failwith "Counters called after an exception")
        "pass" (fun () -> raise Test_exception)) with
    | _ -> failwith "Unexpected success"
    | exception Test_exception -> ());
-  assert (!calls = 4);
+  assert (!calls = 2);
   print_trace ()
 
 let () =
   Profile.reset ();
   let gettimeofday, calls = clock () in
-  Profile.with_action_trace ~gettimeofday ~name:"empty-profile" (fun () -> ());
+  Profile.record_action ~gettimeofday ~name:"empty-profile" (fun () -> ());
   assert (!calls = 2);
   print_trace ()
 
@@ -138,10 +139,10 @@ let () =
     time
   in
   let result =
-    Profile.with_action_trace ~gettimeofday ~name:"cheap-clock" (fun () ->
+    Profile.record_action ~gettimeofday ~name:"cheap-clock" (fun () ->
       Profile.record ~cheap "cheap" (fun () ->
         Profile.record_call "child" (fun () -> 42)) ())
   in
-  assert (result = 42 && !calls = 6 && !cheap_calls = 4);
+  assert (result = 42 && !calls = 2 && !cheap_calls = 4);
   print_trace ();
   Sys.rmdir trace_dir
