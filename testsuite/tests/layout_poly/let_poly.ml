@@ -305,9 +305,12 @@ Error: This expression is not allowed in a "let poly_" definition;
 |}]
 
 (* RHS might constrain a layout and makes it not polymorphic *)
-let poly_ f x y = #(x, Some y)
+type ('a : value) t = T of 'a
+
+let poly_ f x y = #(x, T y)
 [%%expect{|
-val poly_ f : 'b. 'a -> 'b -> #('a * 'b option) = <lpoly>
+type 'a t = T of 'a
+val poly_ f : 'b. 'a -> 'b -> #('a * 'b t) = <lpoly>
 |}]
 
 (* [any] doesn't really constrain the layout *)
