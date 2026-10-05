@@ -12,25 +12,6 @@ else
   ocaml_subdirs_to_ignore=
 endif
 
-define dune_boot_context
-(lang dune 2.8)
-; We need to call the boot context "default" so that dune selects it for merlin
-(context (default
-  (name default)
-  (profile dev)
-  (env (_
-    (flags (:standard -warn-error +A -alert -unsafe_multidomain -alert -unsafe_effects))
-    (env-vars
-      ("OCAMLPARAM" "")
-
-      ; Avoid using the full OC_CFLAGS for C code compiled during the boot
-      ; In particular, we should avoid using ASan here even if it is otherwise
-      ; enabled, since (a) it is of little benefit, because it has no effect
-      ; on the final compiler, and (b) it breaks, because linking is missing
-      ; the matching -fsanitize=address flag
-      ("OC_CFLAGS_SEXP" "boot_oc_cflags.sexp"))))))
-endef
-
 ifneq ($(origin BUILD_OCAMLPARAM), undefined)
 ENV_VARS := (env-vars ("OCAMLPARAM" "$(BUILD_OCAMLPARAM)"))
 else
