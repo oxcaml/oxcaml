@@ -54,7 +54,10 @@ extern uintnat caml_percent_sweep_per_mark; /* see major_gc.c */
 extern uintnat caml_gc_overhead_adjustment; /* see major_gc.c */
 extern uintnat caml_nohugepage_stacks;    /* see fiber.c */
 extern uintnat caml_enable_segv_handler;  /* see signals.c / signals_nat.c */
-uintnat caml_measure_frametables = 0; /* see frame_descriptors.c */
+uintnat caml_measure_frametables = 0;  /* see frame_descriptors.c */
+uintnat caml_frame_index_check = 0;    /* see frame_descriptors.c */
+uintnat caml_frame_index_eager = 0;    /* see frame_descriptors.c */
+uintnat caml_frame_index_prewarm = 0;  /* see frame_descriptors.c */
 
 /* runtime config parameters set with caml_gc_set */
 extern atomic_uintnat caml_major_heap_increment; /* percent or words; see shared_heap.c */
@@ -469,6 +472,9 @@ static struct gc_tweak gc_tweaks[] = {
   { "cache_stacks_per_class", &caml_cache_stacks_per_class, 0 },
   { "tick_use_usleep", &caml_tick_use_usleep, 0 },
   { "measure_frametables", &caml_measure_frametables, 0 },
+  { "frame_index_check", &caml_frame_index_check, 0 },
+  { "frame_index_eager", &caml_frame_index_eager, 0 },
+  { "frame_index_prewarm", &caml_frame_index_prewarm, 0 },
 };
 
 enum {N_GC_TWEAKS = sizeof(gc_tweaks)/sizeof(gc_tweaks[0])};

@@ -242,5 +242,9 @@ DOMAIN_STATE(struct caml_exception_context*, external_raise_async)
 DOMAIN_STATE(struct memprof_domain_s *, memprof)
 DOMAIN_STATE(value *, memprof_young_trigger)
 
+DOMAIN_STATE(struct caml_frame_descr_cache*, frame_descr_cache)
+/* Cache in front of the frame-descriptor index (frame_descriptors.c); NULL if
+   allocation failed, in which case lookups go to the index directly. */
+
 DOMAIN_STATE(extra_params_area, extra_params)
 /* This member must occur last, because it is an array, not a scalar */
