@@ -2,6 +2,7 @@
  flags += " -O3";
  flags += " -experimental-optimizations";
  only-default-codegen;
+ flags += " -g -gdwarf-inlined-frames";
  expect.opt;
 *)
 
@@ -48,7 +49,8 @@ arr_sum:
   orq   $1, %rbx
   leaq  -2(%rbx), %rdi
   cmpq  $1, %rdi
-  jl    .L2
+  jl    .L3
+  subq  $8, %rsp
   sarq  $1, %rdi
   movl  $1, %eax
   xorl  %esi, %esi
@@ -61,14 +63,14 @@ arr_sum:
   incq  %rsi
   cmpq  %rdi, %rsi
   jle   .L0
+  addq  $8, %rsp
   ret
 .L1:
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
 .L2:
+.L3:
   movl  $1, %eax
   ret
 |}]
