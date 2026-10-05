@@ -27,17 +27,23 @@ type t
 
 type raw_data = nativeint  (* @since 4.12 *)
 
-external repr : 'a -> t = "%obj_magic"
-external obj : t -> 'a = "%obj_magic"
-external magic : 'a -> 'b = "%obj_magic"
-external magic_portable : ('a[@local_opt]) -> ('a[@local_opt]) @ portable = "%identity"
-external magic_uncontended : ('a[@local_opt]) @ contended -> ('a[@local_opt]) = "%identity"
-external magic_unique : ('a[@local_opt]) -> ('a[@local_opt]) @ unique = "%identity"
-external magic_many : ('a[@local_opt]) @ once -> ('a[@local_opt]) = "%identity"
-external magic_at_unique : ('a[@local_opt]) @ unique -> ('b[@local_opt]) @ unique = "%identity"
+external repr : 'a -> t @@ stateless = "%obj_magic"
+external obj : t -> 'a @@ stateless = "%obj_magic"
+external magic : 'a -> 'b @@ stateless = "%obj_magic"
+external magic_portable : ('a[@local_opt]) -> ('a[@local_opt]) @ portable
+  @@ stateless = "%identity"
+external magic_uncontended : ('a[@local_opt]) @ contended -> ('a[@local_opt])
+  @@ stateless = "%identity"
+external magic_unique : ('a[@local_opt]) -> ('a[@local_opt]) @ unique
+  @@ stateless = "%identity"
+external magic_many : ('a[@local_opt]) @ once -> ('a[@local_opt]) @@ stateless
+  = "%identity"
+external magic_at_unique :
+  ('a[@local_opt]) @ unique -> ('b[@local_opt]) @ unique
+  @@ stateless = "%identity"
 val is_block : t @ contended -> bool
-external is_int : t @ contended -> bool = "%obj_is_int"
-external tag : t @ contended -> int = "caml_obj_tag" [@@noalloc]
+external is_int : t @ contended -> bool @@ stateless = "%obj_is_int"
+external tag : t @ contended -> int @@ stateless = "caml_obj_tag" [@@noalloc]
 val size : t @ contended -> int
 val reachable_words : t -> int
   (**
@@ -83,15 +89,15 @@ val raw_field : t -> int -> raw_data
 val set_raw_field : t -> int -> raw_data -> unit
   (* @since 4.12 *)
 
-external new_block : int -> int -> t = "caml_obj_block"
+external new_block : int -> int -> t @@ stateless = "caml_obj_block"
 
-external dup : t -> t = "%obj_dup"
+external dup : t -> t @@ stateless = "%obj_dup"
 (** [dup t] returns a shallow copy of [t].  However if [t] is immutable then
     it might be returned unchanged. *)
 
-external add_offset : t -> Int32.t -> t = "caml_obj_add_offset"
+external add_offset : t -> Int32.t -> t @@ stateless = "caml_obj_add_offset"
          (* @since 3.12 *)
-external with_tag : int -> t -> t = "caml_obj_with_tag"
+external with_tag : int -> t -> t @@ stateless = "caml_obj_with_tag"
   (* @since 4.09 *)
 
 val hash_variant: string -> int
@@ -197,7 +203,8 @@ module Uniform_or_mixed : sig
 
   val repr : t -> repr
 
-  external of_block : obj_t -> t = "caml_succ_scannable_prefix_len" [@@noalloc]
+  external of_block : obj_t -> t @@ stateless
+    = "caml_succ_scannable_prefix_len" [@@noalloc]
 
   val is_uniform : t -> bool
   (** Equivalent to [repr] returning [Uniform]. *)
