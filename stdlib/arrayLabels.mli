@@ -43,7 +43,7 @@ external length : ('a : value_or_null mod separable).
 (** Return the length (number of elements) of the given array. *)
 
 external get : ('a : value_or_null mod separable).
-   ('a array[@local_opt]) -> int -> 'a = "%array_safe_get"
+   ('a array[@local_opt]) -> int -> 'a @@ stateless = "%array_safe_get"
 (** [get a n] returns the element number [n] of array [a].
    The first element has number 0.
    The last element has number [length a - 1].
@@ -53,7 +53,7 @@ external get : ('a : value_or_null mod separable).
    if [n] is outside the range 0 to [(length a - 1)]. *)
 
 external set : ('a : value_or_null mod separable).
-   ('a array[@local_opt]) -> int -> 'a -> unit = "%array_safe_set"
+   ('a array[@local_opt]) -> int -> 'a -> unit @@ stateless = "%array_safe_set"
 (** [set a n x] modifies array [a] in place, replacing
    element number [n] with [x].
    You can also write [a.(n) <- x] instead of [set a n x].
@@ -62,7 +62,7 @@ external set : ('a : value_or_null mod separable).
    if [n] is outside the range 0 to [length a - 1]. *)
 
 external make : ('a : value_or_null mod separable).
-   int -> 'a -> 'a array = "caml_array_make"
+   int -> 'a -> 'a array @@ stateless = "caml_array_make"
 (** [make n x] returns a fresh array of length [n],
    initialized with [x].
    All the elements of this new array are initially
@@ -76,7 +76,7 @@ external make : ('a : value_or_null mod separable).
    size is only [Sys.max_array_length / 2].*)
 
 external create_float : ('a : value_or_null mod separable).
-   int -> float array = "caml_array_create_float"
+   int -> float array @@ stateless = "caml_array_create_float"
 (** [create_float n] returns a fresh float array of length [n],
     with uninitialized data.
     @since 4.03 *)
@@ -509,23 +509,27 @@ let () = Domain.join d1; Domain.join d2
 (* The following is for system use only. Do not call directly. *)
 
 external unsafe_get : ('a : value_or_null mod separable).
-   ('a array[@local_opt]) -> int -> 'a = "%array_unsafe_get"
+   ('a array[@local_opt]) -> int -> 'a @@ stateless = "%array_unsafe_get"
 external unsafe_set : ('a : value_or_null mod separable).
-   ('a array[@local_opt]) -> int -> 'a -> unit
+   ('a array[@local_opt]) -> int -> 'a -> unit @@ stateless
   = "%array_unsafe_set"
 
 module Floatarray : sig
-  external create : int -> floatarray = "caml_floatarray_create"
+  external create : int -> floatarray @@ stateless = "caml_floatarray_create"
   external length : (floatarray[@local_opt]) @ immutable -> int @@ stateless
     = "%floatarray_length"
   external get : (floatarray[@local_opt]) @ shared -> int -> (float[@local_opt])
+    @@ stateless
     = "%floatarray_safe_get"
   external set : (floatarray[@local_opt]) -> int -> (float[@local_opt]) -> unit
+    @@ stateless
     = "%floatarray_safe_set"
   external unsafe_get
     : (floatarray[@local_opt]) @ shared -> int -> (float[@local_opt])
+    @@ stateless
     = "%floatarray_unsafe_get"
   external unsafe_set
     : (floatarray[@local_opt]) -> int -> (float[@local_opt]) -> unit
+    @@ stateless
     = "%floatarray_unsafe_set"
 end
