@@ -29,6 +29,9 @@ module For_lto : sig
     type t
   end
 
+  (** Traverse the compilation unit. The value passed to the unit's return
+      continuation is not marked as used by unknown code: a whole-program
+      analysis records those uses from the other units analysed. *)
   val traverse :
     free_names:Name_occurrences.t ->
     Flambda_unit.t ->

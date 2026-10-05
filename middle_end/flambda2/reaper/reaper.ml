@@ -71,7 +71,7 @@ module For_lto = struct
           applications;
           all_sets_of_closures = _
         } =
-      Traverse.run unit ~free_names
+      Traverse.run ~top_level_return_escapes:false unit ~free_names
     in
     let solve_inputs =
       { Solve_inputs.deps;
@@ -160,7 +160,7 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
           applications;
           all_sets_of_closures
         } =
-    Traverse.run unit ~free_names
+    Traverse.run ~top_level_return_escapes:true unit ~free_names
   in
   Traverse_acc.resolve_delayed_deps deps ~analysis_scope ~code_deps
     ~le_monde_exterieur delayed_deps;
