@@ -890,14 +890,19 @@ and remove_aliases_sig env args sg =
   | it :: rem ->
       it :: remove_aliases_sig env args rem
 
+let functor_arg_exclude env _id p =
+  try ignore (Env.find_module p env); true with Not_found -> false
+
 let scrape_for_functor_arg env mty =
-  let exclude _id p =
-    try ignore (Env.find_module p env); true with Not_found -> false
-  in
+  let exclude = functor_arg_exclude env in
   let _, mty =
     remove_aliases_mty env {modified=false; exclude; scrape} Mp_present mty
   in
   mty
+
+let scrape_sig_for_functor_arg env sg =
+  let exclude = functor_arg_exclude env in
+  remove_aliases_sig env {modified=false; exclude; scrape} sg
 
 let scrape_for_type_of ~remove_aliases env mty =
   if remove_aliases then begin
