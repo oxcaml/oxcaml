@@ -64,7 +64,7 @@ let answer_call_queries db (applications : Traverse_acc.Applications.t) result =
         })
     applications result
 
-let fixpoint (graph : Global_flow_graph.graph) ~applications =
+let fixpoint0 (graph : Global_flow_graph.graph) ~applications =
   let datalog = Global_flow_graph.to_datalog graph in
   let with_provenance = Flambda_features.debug_reaper "prov" in
   let stats = Datalog.Schedule.create_stats ~with_provenance datalog in
@@ -87,6 +87,18 @@ let fixpoint (graph : Global_flow_graph.graph) ~applications =
     }
   in
   unboxing, answer_call_queries db applications result
+
+let fixpoint graph ~applications =
+  if Flambda_features.debug_reaper "print-raw" then Dot_printer.print_dep graph;
+  let ((solved_dep, _) as result) =
+    Profile.record_call ~accumulate:true "solver" (fun () ->
+        fixpoint0 graph ~applications)
+  in
+  if Flambda_features.debug_reaper "print-solved"
+  then (
+    Format.printf "RESULT@ %a@." Unboxing_analysis.pp_result solved_dep;
+    Dot_printer.print_solved_dep solved_dep graph);
+  result
 
 let get_unboxed_fields uses cn =
   Code_id_or_name.Map.find_opt cn uses.unboxed_fields
