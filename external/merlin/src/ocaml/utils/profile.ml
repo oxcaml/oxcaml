@@ -63,11 +63,18 @@ module Measure = struct
     {
       time = cheap ();
       calls = !calls;
-      allocated_words = stat.minor_words +. stat.major_words; (* XXX -. stat.promoted_words and elsewhere *)
+      (* XXX -. stat.promoted_words and elsewhere *)
+      allocated_words = stat.minor_words +. stat.major_words;
       top_heap_words = stat.top_heap_words;
       counters = counters;
     }
-  let zero = { time = 0.; calls = 0; allocated_words = 0.; top_heap_words = 0; counters = Counters.create () }
+  let zero = {
+    time = 0.;
+    calls = 0;
+    allocated_words = 0.;
+    top_heap_words = 0;
+    counters = Counters.create ();
+  }
 end
 
 module Measure_diff = struct
@@ -114,54 +121,8 @@ let hierarchy = ref (cpu_time, create ())
 let initial_measure = ref None
 let reset () = hierarchy := cpu_time, create (); initial_measure := None
 
-type action_trace = {
-  gettimeofday : unit -> float;
-  (* Most recent first. Spans are only written out once the action finishes,
-     so that the file IO doesn't distort the measurements. *)
-  mutable spans : Action_trace.Event.t list;
-  (* Names of the spans currently running, innermost first. *)
-  mutable path : string list;
-}
-
-(* Set while [with_action_trace] is running. *)
-let action_trace = ref None
-
-(* Returns a function that records the span, given the measure at its end. *)
-let start_span action_trace ~name (start_measure : Measure.t) =
-  let parent_path = action_trace.path in
-  let path = name :: parent_path in
-  action_trace.path <- path;
-  let start = action_trace.gettimeofday () in
-  fun (end_measure : Measure.t) ->
-    let finish = action_trace.gettimeofday () in
-    action_trace.path <- parent_path;
-    let nanoseconds seconds = int_of_float (seconds *. 1e9) in
-    let bytes words = words * (Sys.word_size / 8) in
-    let counters =
-      ("time", nanoseconds (end_measure.time -. start_measure.time))
-      :: ("calls", end_measure.calls - start_measure.calls)
-      :: ("alloc",
-          bytes (int_of_float
-                   (end_measure.allocated_words
-                    -. start_measure.allocated_words)))
-      :: ("top-heap",
-          bytes (end_measure.top_heap_words - start_measure.top_heap_words))
-      :: ("absolute-top-heap", bytes end_measure.top_heap_words)
-      :: String.Map.bindings end_measure.counters
-    in
-    let args =
-      ["path", `Array (List.rev_map (fun name -> `String name) path)]
-    in
-    let span =
-      Action_trace.Event.span ~category:"compiler" ~name ~counters ~args
-        ~start_in_nanoseconds:(nanoseconds start)
-        ~finish_in_nanoseconds:(nanoseconds finish) ()
-    in
-    action_trace.spans <- span :: action_trace.spans
-
 let record_call_internal ?(accumulate = false) ?cheap ?counter_f name f =
-  let action_trace = !action_trace in
-  if !Clflags.profile_columns = [] && Option.is_none action_trace
+  if !Clflags.profile_columns = [] && not (Action_trace.enabled ())
   then f () else
   let last_time, E prev_hierarchy = !hierarchy in
   let cpu_time = Option.value ~default:last_time cheap in
@@ -180,10 +141,6 @@ let record_call_internal ?(accumulate = false) ?cheap ?counter_f name f =
   in
   let start_measure = Measure.create cpu_time in
   if !initial_measure = None then initial_measure := Some start_measure;
-  let finish_span =
-    Option.map (fun action_trace -> start_span action_trace ~name start_measure)
-      action_trace
-  in
   hierarchy := cpu_time, E this_table;
   let counters = ref (Counters.create ()) in
   Misc.try_finally (
@@ -192,7 +149,7 @@ let record_call_internal ?(accumulate = false) ?cheap ?counter_f name f =
         fun () ->
           let result = f () in
           if List.mem `Counters !Clflags.profile_columns
-             || Option.is_some action_trace then
+             || Action_trace.enabled () then
             counters := counter_f result;
           result
     | None -> f
@@ -200,7 +157,6 @@ let record_call_internal ?(accumulate = false) ?cheap ?counter_f name f =
     ~always:(fun () ->
         hierarchy := cpu_time, E prev_hierarchy;
         let end_measure = Measure.create ~counters:(!counters) cpu_time in
-        Option.iter (fun finish_span -> finish_span end_measure) finish_span;
         let measure_diff =
           Measure_diff.accumulate this_measure_diff start_measure end_measure in
         Hashtbl.add prev_hierarchy name (measure_diff, E this_table))
@@ -210,22 +166,11 @@ let record_call = record_call_internal ?counter_f:None
 let record_call_with_counters ?accumulate ~counter_f =
   record_call_internal ?accumulate ~counter_f
 
-let record ?accumulate ?cheap pass f x = record_call ?accumulate ?cheap pass (fun () -> f x)
+let record ?accumulate ?cheap pass f x =
+  record_call ?accumulate ?cheap pass (fun () -> f x)
 
 let record_with_counters ?accumulate ~counter_f pass f x =
   record_call_internal ?accumulate ~counter_f pass (fun () -> f x)
-
-let with_action_trace ~gettimeofday ~name f =
-  if not (Action_trace.enabled ()) then f () else begin
-    let trace = { gettimeofday; spans = []; path = [] } in
-    action_trace := Some trace;
-    let finish_span = start_span trace ~name (Measure.create cpu_time) in
-    Fun.protect f ~finally:(fun () ->
-      action_trace := None;
-      finish_span (Measure.create cpu_time);
-      Action_trace.with_fresh_context ~name ~f:(fun context ->
-        List.iter (Action_trace.Context.emit context) (List.rev trace.spans)))
-  end
 
 let file_prefix = "file="
 
@@ -248,7 +193,8 @@ let time_display precision c v : display =
      the first element of each row, we can't pad them with spaces. *)
   let to_string_without_unit v ~width = Printf.sprintf "%0*.*f" width precision v in
   let to_string ~max:_ ~width =
-    to_string_without_unit v ~width:(width - 1) ^ "s" ^ " (" ^ string_of_int c ^ ")" in
+    to_string_without_unit v ~width:(width - 1)
+    ^ "s (" ^ string_of_int c ^ ")" in
   let worth_displaying ~max:_ =
     float_of_string (to_string_without_unit v ~width:0) <> 0. || c > 1 in
   { to_string; worth_displaying }
@@ -334,32 +280,30 @@ let compute_other_category (E table : hierarchy) (total : Measure_diff.t) =
   ) table;
   !r
 
+let profile_list_with_other ~nesting hierarchy total =
+  let list = profile_list hierarchy in
+  if list <> [] || nesting = 0 then
+    list @ ["other", (compute_other_category hierarchy total, create ())]
+  else []
+
 type row = R of string * (float * display) list * row list
 
-let rec rows_of_hierarchy ~nesting make_row name measure_diff hierarchy env =
-  let rows =
-    rows_of_hierarchy_list
-      ~nesting:(nesting + 1) make_row hierarchy measure_diff env in
-  let values, env =
-    make_row env measure_diff ~toplevel_other:(nesting = 0 && name = "other") in
-  R (name, values, rows), env
-
-and rows_of_hierarchy_list ~nesting make_row hierarchy total env =
-  let list = profile_list hierarchy in
-  let list =
-    if list <> [] || nesting = 0
-    then list @ [ "other", (compute_other_category hierarchy total, create ()) ]
-    else []
-  in
+let rec map_hierarchy ~nesting make_row hierarchy total env =
+  let list = profile_list_with_other ~nesting hierarchy total in
   let env = ref env in
   List.map (fun (name, (measure_diff, hierarchy)) ->
-    let a, env' =
-      rows_of_hierarchy ~nesting make_row name measure_diff hierarchy !env in
+    let children =
+      map_hierarchy ~nesting:(nesting + 1) make_row hierarchy measure_diff !env
+    in
+    let row, env' =
+      make_row !env name measure_diff children
+        ~toplevel_other:(nesting = 0 && name = "other")
+    in
     env := env';
-    a
+    row
   ) list
 
-let rows_of_hierarchy hierarchy measure_diff initial_measure columns timings_precision =
+let map_profile make_row hierarchy measure_diff initial_measure =
   (* Computing top heap size is a bit complicated: if the compiler applies a
      list of passes n times (rather than applying pass1 n times, then pass2 n
      times etc), we only show one row for that pass but what does "top heap
@@ -374,31 +318,93 @@ let rows_of_hierarchy hierarchy measure_diff initial_measure columns timings_pre
      so that any increases that happened before the start of the compilation is
      correctly reported, as a lot of code may run before the start of the
      compilation (eg functor applications). *)
-    let make_row prev_top_heap_words (p : Measure_diff.t) ~toplevel_other =
-      let top_heap_words =
-        prev_top_heap_words
-        + p.top_heap_words_increase
-        - if toplevel_other
-          then initial_measure.Measure.top_heap_words
-          else 0
-      in
-      let make value ~f = value, f value in
-      List.map (function
-        | `Time ->
-          make p.duration ~f:(time_display timings_precision p.calls)
-        | `Alloc ->
-          make p.allocated_words ~f:memory_word_display
-        | `Top_heap ->
-          make (float_of_int p.top_heap_words_increase) ~f:memory_word_display
-        | `Abs_top_heap ->
-          make (float_of_int top_heap_words)
-           ~f:(memory_word_display ~previous:(float_of_int prev_top_heap_words))
-        | `Counters -> counters_display p.counters
-      ) columns,
-      top_heap_words
+  let make_row prev_top_heap_words name (p : Measure_diff.t) children
+      ~toplevel_other =
+    let top_heap_words =
+      prev_top_heap_words
+      + p.top_heap_words_increase
+      - if toplevel_other then initial_measure.Measure.top_heap_words else 0
+    in
+    make_row name p children ~prev_top_heap_words ~top_heap_words,
+    top_heap_words
   in
-  rows_of_hierarchy_list ~nesting:0 make_row hierarchy measure_diff
+  map_hierarchy ~nesting:0 make_row hierarchy measure_diff
     initial_measure.top_heap_words
+
+let rows_of_hierarchy hierarchy measure_diff initial_measure columns
+    timings_precision =
+  let make_row name (p : Measure_diff.t) children
+      ~prev_top_heap_words ~top_heap_words =
+    let make value ~f = value, f value in
+    let values = List.map (function
+      | `Time ->
+        make p.duration ~f:(time_display timings_precision p.calls)
+      | `Alloc ->
+        make p.allocated_words ~f:memory_word_display
+      | `Top_heap ->
+        make (float_of_int p.top_heap_words_increase) ~f:memory_word_display
+      | `Abs_top_heap ->
+        make (float_of_int top_heap_words)
+          ~f:(memory_word_display ~previous:(float_of_int prev_top_heap_words))
+      | `Counters -> counters_display p.counters
+    ) columns in
+    R (name, values, children)
+  in
+  map_profile make_row hierarchy measure_diff initial_measure
+
+let column_mapping = [
+  `Time, "time";
+  `Alloc, "alloc";
+  `Top_heap, "top-heap";
+  `Abs_top_heap, "absolute-top-heap";
+  `Counters, "counters"
+]
+
+let profile_json hierarchy measure_diff initial_measure =
+  let number value = `Number (Printf.sprintf "%.17g" value) in
+  let memory words = number (words *. float_of_int (Sys.word_size / 8)) in
+  let make_row name (p : Measure_diff.t) children
+      ~prev_top_heap_words:_ ~top_heap_words =
+    let values = List.map (fun (column, name) ->
+      name, match column with
+      | `Time -> number p.duration
+      | `Alloc -> memory p.allocated_words
+      | `Top_heap -> memory (float_of_int p.top_heap_words_increase)
+      | `Abs_top_heap -> memory (float_of_int top_heap_words)
+      | `Counters ->
+        `Object (List.map (fun (name, count) ->
+          name, `Number (string_of_int count)
+        ) (String.Map.bindings p.counters))
+    ) column_mapping in
+    `Object (("name", `String name)
+             :: ("calls", `Number (string_of_int p.calls))
+             :: values @ ["children", `Array children])
+  in
+  `Array (map_profile make_row hierarchy measure_diff initial_measure)
+
+let snapshot () =
+  let initial_measure =
+    match !initial_measure with
+    | Some v -> v
+    | None -> Measure.zero
+  in
+  (* XXX This the wrong cpu_time - it should come from hierarchy *)
+  let total = Measure_diff.of_diff Measure.zero (Measure.create cpu_time) in
+  snd !hierarchy, total, initial_measure
+
+let record_action ~gettimeofday ~name f =
+  if not (Action_trace.enabled ()) then f () else
+    let start = gettimeofday () in
+    Fun.protect f ~finally:(fun () ->
+      let finish = gettimeofday () in
+      let hierarchy, total, initial_measure = snapshot () in
+      let args = ["profile", profile_json hierarchy total initial_measure] in
+      let nanoseconds seconds = int_of_float (seconds *. 1e9) in
+      Action_trace.with_fresh_context ~name ~f:(fun context ->
+        Action_trace.Context.emit context
+          (Action_trace.Event.span ~category:"compiler" ~name ~args
+             ~start_in_nanoseconds:(nanoseconds start)
+             ~finish_in_nanoseconds:(nanoseconds finish) ())))
 
 let max_by_column ~n_columns rows =
   let a = Array.make n_columns 0. in
@@ -466,14 +472,10 @@ let output_columns output_rows_f columns ~timings_precision =
   match columns with
   | [] -> ()
   | _ :: _ ->
-     let initial_measure =
-       match !initial_measure with
-       | Some v -> v
-       | None -> Measure.zero
-     in
-     (* XXX This the wrong cpu_time - it should come from hierarchy *)
-     let total = Measure_diff.of_diff Measure.zero (Measure.create cpu_time) in
-     output_rows_f (rows_of_hierarchy (snd !hierarchy) total initial_measure columns timings_precision)
+     let hierarchy, total, initial_measure = snapshot () in
+     output_rows_f
+       (rows_of_hierarchy hierarchy total initial_measure columns
+          timings_precision)
 
 let print ppf =
   output_rows
@@ -483,14 +485,6 @@ let print ppf =
     ~always_output_ancestors:true
     ~pad_empty:true
   |> output_columns
-
-let column_mapping = [
-  `Time, "time";
-  `Alloc, "alloc";
-  `Top_heap, "top-heap";
-  `Abs_top_heap, "absolute-top-heap";
-  `Counters, "counters"
-]
 
 let output_to_csv ppf columns =
   let sanitise_for_csv =
