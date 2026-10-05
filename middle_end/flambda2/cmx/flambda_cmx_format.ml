@@ -46,7 +46,7 @@ let to_raw ~sections (t : t0 list) =
   File_sections.Builder.add sections (Obj.repr t)
 
 let create_raw ~final_typing_env ~all_code ~exported_offsets ~used_value_slots
-    ~sections =
+    ~extra_ids_for_lto ~sections =
   let typing_env_exported_ids =
     Option.fold ~none:Ids_for_export.empty
       ~some:Flambda2_types.Typing_env.Serializable.ids_for_export
@@ -54,7 +54,8 @@ let create_raw ~final_typing_env ~all_code ~exported_offsets ~used_value_slots
   in
   let all_code_exported_ids = Exported_code.ids_for_export all_code in
   let exported_ids =
-    Ids_for_export.union typing_env_exported_ids all_code_exported_ids
+    Ids_for_export.union_list
+      [typing_env_exported_ids; all_code_exported_ids; extra_ids_for_lto]
   in
   let symbols = Symbol.export exported_ids.symbols in
   let variables = Variable.export exported_ids.variables in

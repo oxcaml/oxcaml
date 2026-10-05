@@ -38,6 +38,8 @@ module type S = sig
   val payload : t -> payload
 
   val rename : t -> t
+
+  val export_stamp_counter : unit -> int
 end
 
 module Make (P : sig
@@ -108,6 +110,8 @@ end) : S with type payload := P.payload = struct
     let stamp = !next_stamp in
     incr next_stamp;
     stamp
+
+  let export_stamp_counter () = !next_stamp
 
   let create compilation_unit ~name payload =
     { compilation_unit; name; name_stamp = get_next_stamp (); payload }

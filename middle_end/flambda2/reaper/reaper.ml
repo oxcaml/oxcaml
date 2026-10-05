@@ -38,6 +38,73 @@ module For_lto = struct
         le_monde_exterieur : Symbol.t;
         applications : Traverse_acc.Applications.t
       }
+
+    let ids_for_export
+        { deps;
+          free_names;
+          code_deps;
+          delayed_deps;
+          le_monde_exterieur;
+          applications
+        } =
+      let ids =
+        Code_id.Map.fold
+          (fun code_id code_dep ids ->
+            Ids_for_export.union
+              (Ids_for_export.add_code_id ids code_id)
+              (Traverse_acc.ids_for_export_code_dep code_dep))
+          code_deps Ids_for_export.empty
+      in
+      Ids_for_export.union_list
+        [ Ids_for_export.add_symbol ids le_monde_exterieur;
+          Global_flow_graph.ids_for_export deps;
+          Name_occurrences.ids_for_export free_names;
+          Traverse_acc.ids_for_export_delayed_deps delayed_deps;
+          Traverse_acc.Applications.ids_for_export applications ]
+
+    let prune_for_lto t =
+      { t with
+        code_deps =
+          Code_id.Map.map
+            (fun (code_dep : Traverse_acc.code_dep) ->
+              { code_dep with
+                code_metadata =
+                  Code_metadata.with_result_types Unknown code_dep.code_metadata
+              })
+            t.code_deps
+      }
+
+    let fields_for_export t = Global_flow_graph.fields_for_export t.deps
+
+    let referenced_compilation_units t =
+      Traverse_acc.delayed_deps_compilation_units t.delayed_deps
+
+    let apply_renaming
+        { deps;
+          free_names;
+          code_deps;
+          delayed_deps;
+          le_monde_exterieur;
+          applications
+        } renaming ~rename_field =
+      let code_deps =
+        Code_id.Map.fold
+          (fun code_id code_dep map ->
+            Code_id.Map.add
+              (Renaming.apply_code_id renaming code_id)
+              (Traverse_acc.apply_renaming_code_dep code_dep renaming)
+              map)
+          code_deps Code_id.Map.empty
+      in
+      { deps = Global_flow_graph.apply_renaming deps renaming ~rename_field;
+        free_names = Name_occurrences.apply_renaming free_names renaming;
+        code_deps;
+        delayed_deps =
+          Traverse_acc.apply_renaming_delayed_deps delayed_deps renaming;
+        le_monde_exterieur = Renaming.apply_symbol renaming le_monde_exterieur;
+        applications =
+          Traverse_acc.Applications.apply_renaming applications renaming
+      }
   end
 
   module Rebuild_inputs = struct
@@ -47,6 +114,81 @@ module For_lto = struct
         ordered_code_ids : Code_id.t array;
         fixed_arity_continuations : Continuation.Set.t;
         continuation_info : Traverse_acc.continuation_info Continuation.Map.t
+      }
+
+    let ids_for_export
+        { toplevel_expr;
+          code;
+          ordered_code_ids;
+          fixed_arity_continuations;
+          continuation_info
+        } =
+      let ids = Rev_expr.ids_for_export toplevel_expr in
+      let ids =
+        Code_id.Map.fold
+          (fun code_id rev_code ids ->
+            Ids_for_export.union
+              (Ids_for_export.add_code_id ids code_id)
+              (Rev_expr.ids_for_export_code rev_code))
+          code ids
+      in
+      let ids =
+        Array.fold_left Ids_for_export.add_code_id ids ordered_code_ids
+      in
+      let ids =
+        Continuation.Set.fold
+          (fun cont ids -> Ids_for_export.add_continuation ids cont)
+          fixed_arity_continuations ids
+      in
+      Continuation.Map.fold
+        (fun cont info ids ->
+          Ids_for_export.union
+            (Ids_for_export.add_continuation ids cont)
+            (Traverse_acc.ids_for_export_continuation_info info))
+        continuation_info ids
+
+    let apply_renaming
+        { toplevel_expr;
+          code;
+          ordered_code_ids;
+          fixed_arity_continuations;
+          continuation_info
+        } renaming =
+      let toplevel_expr' = Rev_expr.apply_renaming toplevel_expr renaming in
+      let code' =
+        Code_id.Map.fold
+          (fun code_id rev_code code ->
+            Code_id.Map.add
+              (Renaming.apply_code_id renaming code_id)
+              (Rev_expr.apply_renaming_code rev_code renaming)
+              code)
+          code Code_id.Map.empty
+      in
+      let ordered_code_ids' =
+        Array.map (Renaming.apply_code_id renaming) ordered_code_ids
+      in
+      let fixed_arity_continuations' =
+        Continuation.Set.fold
+          (fun cont conts ->
+            Continuation.Set.add
+              (Renaming.apply_continuation renaming cont)
+              conts)
+          fixed_arity_continuations Continuation.Set.empty
+      in
+      let continuation_info' =
+        Continuation.Map.fold
+          (fun cont info map ->
+            Continuation.Map.add
+              (Renaming.apply_continuation renaming cont)
+              (Traverse_acc.apply_renaming_continuation_info info renaming)
+              map)
+          continuation_info Continuation.Map.empty
+      in
+      { toplevel_expr = toplevel_expr';
+        code = code';
+        ordered_code_ids = ordered_code_ids';
+        fixed_arity_continuations = fixed_arity_continuations';
+        continuation_info = continuation_info'
       }
   end
 
@@ -118,8 +260,8 @@ module For_lto = struct
     in
     { Solution.analysis; code_changes; slot_offsets }
 
-  let rebuild ~unit ~rebuild_inputs ~solution ~machine_width ~cmx_loader
-      ~all_code =
+  let rebuild ~unit_metadata ~rebuild_inputs ~solution ~machine_width
+      ~cmx_loader ~all_code =
     let get_code_metadata = get_code_metadata ~cmx_loader ~all_code in
     let { Rebuild_inputs.toplevel_expr;
           code;
@@ -140,7 +282,9 @@ module For_lto = struct
     let all_code =
       make_exported_code ~code_ids_to_remember ~all_code ~cmx_loader
     in
-    Flambda_unit.with_body unit body, all_code, slot_offsets
+    ( Flambda_unit.create_of_metadata_and_body unit_metadata body,
+      all_code,
+      slot_offsets )
 end
 
 let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names

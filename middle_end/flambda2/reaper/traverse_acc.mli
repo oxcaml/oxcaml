@@ -43,6 +43,13 @@ type code_dep =
 
 type delayed_deps
 
+val ids_for_export_delayed_deps : delayed_deps -> Ids_for_export.t
+
+(** The compilation units of the identifiers in the [delayed_deps]. *)
+val delayed_deps_compilation_units : delayed_deps -> Compilation_unit.Set.t
+
+val apply_renaming_delayed_deps : delayed_deps -> Renaming.t -> delayed_deps
+
 (** The function applications seen during traversal: for each callee, the size
     of the largest (complex) arguments. *)
 module Applications : sig
@@ -64,6 +71,10 @@ module Applications : sig
   val empty : t
 
   val union : t -> t -> t
+
+  val ids_for_export : t -> Ids_for_export.t
+
+  val apply_renaming : t -> Renaming.t -> t
 end
 
 (** The type of traversal accumulators. *)
@@ -281,3 +292,12 @@ val add_set_of_closures :
 
 val get_all_sets_of_closures :
   t -> (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list
+
+val ids_for_export_continuation_info : continuation_info -> Ids_for_export.t
+
+val ids_for_export_code_dep : code_dep -> Ids_for_export.t
+
+val apply_renaming_continuation_info :
+  continuation_info -> Renaming.t -> continuation_info
+
+val apply_renaming_code_dep : code_dep -> Renaming.t -> code_dep
