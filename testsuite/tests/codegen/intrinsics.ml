@@ -366,8 +366,6 @@ module Int64_u = struct
   external unsafe_unsigned_rem : t -> t -> t @@ portable
     = "%int64#_unsafe_unsigned_mod"
 
-  external lognot : t -> t @@ portable = "%int64#_not"
-
   let[@inline always] neg x = of_int64 (Int64.neg (to_int64 x))
   let[@inline always] add x y =
     of_int64 (Int64.add (to_int64 x) (to_int64 y))
@@ -388,6 +386,9 @@ module Int64_u = struct
 
   let[@inline always] logxor x y =
     of_int64 (Int64.logxor (to_int64 x) (to_int64 y))
+
+  let[@inline always] lognot x =
+    of_int64 (Int64.logxor (to_int64 x) (-1L))
 
   let[@inline always] shift_left x y =
     of_int64 (Int64.shift_left (to_int64 x) y)
