@@ -1234,11 +1234,12 @@ let mk_flambda2_inline_2026 f =
     Arg.Unit f,
     Printf.sprintf
       " Enable the 2026 inlining configuration: the v2 code size model,\n\
-      \    lifted-constant tracking, the speculative inlining budget, the\n\
-      \    ratio criterion with the call-site credit, a small function\n\
+      \    lifted-constant tracking, the speculative inlining budget (%g),\n\
+      \    the ratio criterion with the call-site credit, a small function\n\
       \    size of %d, -flambda2-result-types-functors-and-closures and\n\
       \    -flambda2-functor-result-types-through-value-slots; later flags\n\
       \    override individual settings (Flambda 2 only)"
+      Flambda2.Inlining.inline_2026_speculative_inlining_budget
       Flambda2.Inlining.inline_2026_small_function_size )
 
 let mk_flambda2_speculative_inlining_criterion f =
@@ -1259,6 +1260,14 @@ let mk_flambda2_speculative_inlining_ratio f =
       \    call is inlined, under the ratio criterion (default %g)\n\
       \    (Flambda 2 only)"
       Flambda2.Inlining.Default.speculative_inlining_ratio )
+
+let mk_flambda2_speculative_inlining_budget_size f =
+  ( "-flambda2-speculative-inlining-budget-size",
+    Arg.Float f,
+    " <float>  Budget of each speculative inlining when\n\
+    \    -flambda2-speculative-inlining-budget is enabled: the speculation is\n\
+    \    abandoned once the body produced so far costs more (a value <= 0\n\
+    \    means: the inlining threshold, the default) (Flambda 2 only)" )
 
 let mk_flambda2_speculative_inlining_credit_call_site f =
   ( "-flambda2-speculative-inlining-credit-call-site",
@@ -1734,6 +1743,7 @@ module type Oxcaml_options = sig
   val flambda2_inline_2026 : unit -> unit
   val flambda2_speculative_inlining_criterion : string -> unit
   val flambda2_speculative_inlining_ratio : float -> unit
+  val flambda2_speculative_inlining_budget_size : float -> unit
   val flambda2_speculative_inlining_credit_call_site : unit -> unit
   val no_flambda2_speculative_inlining_credit_call_site : unit -> unit
   val flambda2_speculative_inlining_bonus_call : float -> unit
@@ -2002,6 +2012,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
         F.flambda2_speculative_inlining_criterion;
       mk_flambda2_speculative_inlining_ratio
         F.flambda2_speculative_inlining_ratio;
+      mk_flambda2_speculative_inlining_budget_size
+        F.flambda2_speculative_inlining_budget_size;
       mk_flambda2_speculative_inlining_credit_call_site
         F.flambda2_speculative_inlining_credit_call_site;
       mk_no_flambda2_speculative_inlining_credit_call_site
@@ -2644,6 +2656,9 @@ module Oxcaml_options_impl = struct
   let flambda2_speculative_inlining_ratio ratio =
     Flambda2.Inlining.speculative_inlining_ratio := ratio
 
+  let flambda2_speculative_inlining_budget_size size =
+    Flambda2.Inlining.speculative_inlining_budget_size := size
+
   let flambda2_speculative_inlining_credit_call_site =
     set' Flambda2.Inlining.speculative_inlining_credit_call_site
 
@@ -3187,6 +3202,15 @@ module Extra_params = struct
     | "flambda2-speculative-inlining-ratio" ->
         (match float_of_string_opt v with
         | Some value -> Flambda2.Inlining.speculative_inlining_ratio := value
+        | None ->
+            Location.print_warning Location.none ppf
+              (Warnings.Bad_env_variable
+                 ("OCAMLPARAM", Printf.sprintf "bad value %s for %s" v name)));
+        true
+    | "flambda2-speculative-inlining-budget-size" ->
+        (match float_of_string_opt v with
+        | Some value ->
+            Flambda2.Inlining.speculative_inlining_budget_size := value
         | None ->
             Location.print_warning Location.none ppf
               (Warnings.Bad_env_variable

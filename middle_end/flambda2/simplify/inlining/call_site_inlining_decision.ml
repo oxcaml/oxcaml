@@ -50,14 +50,14 @@ type speculative_inlining_result =
       }
 
 let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
-    ~threshold =
+    ~budget =
   let dacc = DA.prepare_for_speculative_inlining dacc in
   let dacc =
     if Flambda_features.Inlining.speculative_inlining_budget ()
     then
-      (* The simplification of the inlined body will be aborted if its cost
-         exceeds [threshold] (see [Simplify_expr]). *)
-      DA.with_speculative_inlining_budget dacc (Remaining threshold)
+      (* The simplification of the inlined body will be aborted if what it has
+         produced costs more than [budget] (see [Simplify_expr]). *)
+      DA.with_speculative_inlining_budget dacc (Remaining budget)
     else dacc
   in
   (* CR-someday poechsel: [Inlining_transforms.inline] is preparing the body for
@@ -342,15 +342,33 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
           let threshold_from_args =
             Inlining_arguments.threshold inlining_args
           in
+          let budget_from_flags =
+            let size =
+              Flambda_features.Inlining.speculative_inlining_budget_size ()
+            in
+            if Float.compare size 0. > 0 then size else threshold_from_args
+          in
           let remaining_budget =
             if Flambda_features.Inlining.speculative_inlining_budget ()
             then DA.remaining_speculative_inlining_budget dacc
             else None
           in
-          let threshold, threshold_is_remaining_budget =
+          (* The budget of this speculation: that of the enclosing inlined body
+             when there is one, otherwise the configured one. Under the
+             threshold criterion it is also what the result is compared
+             against. *)
+          let budget, threshold_is_remaining_budget =
             match remaining_budget with
-            | None -> threshold_from_args, false
+            | None -> budget_from_flags, false
             | Some remaining_budget -> remaining_budget, true
+          in
+          let call_site_credit =
+            if
+              Flambda_features.Inlining.speculative_inlining_credit_call_site ()
+            then
+              let is_tail = DE.apply_is_in_tail_position denv apply in
+              Float.of_int (Code_size.to_int (Code_size.apply ~is_tail apply))
+            else 0.
           in
           let budget_exhausted =
             (* When inside a speculatively-inlined body, do not bother
@@ -394,25 +412,17 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
           | Some decision -> decision
           | None -> (
             match
+              (* The credit for the call being replaced is granted up front. *)
               speculative_inlining ~apply dacc ~simplify_expr ~return_arity
-                ~function_type ~threshold
+                ~function_type
+                ~budget:(budget +. call_site_credit)
             with
             | Aborted ->
               Speculative_inlining_aborted
-                { budget = threshold; threshold_is_remaining_budget }
+                { budget; threshold_is_remaining_budget }
             | Completed { cost_metrics; cost_metrics_of_lifted_constants } ->
               let original_size =
                 Code_metadata.cost_metrics code_metadata |> Cost_metrics.size
-              in
-              let call_site_credit =
-                if
-                  Flambda_features.Inlining
-                  .speculative_inlining_credit_call_site ()
-                then
-                  let is_tail = DE.apply_is_in_tail_position denv apply in
-                  Float.of_int
-                    (Code_size.to_int (Code_size.apply ~is_tail apply))
-                else 0.
               in
               let ( (criterion :
                       Call_site_inlining_decision_type.speculative_criterion),
@@ -425,17 +435,20 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
                     Cost_metrics.evaluate ~args:inlining_args cost_metrics
                     -. call_site_credit
                   in
+                  let threshold =
+                    if threshold_is_remaining_budget
+                    then budget
+                    else threshold_from_args
+                  in
                   ( Threshold { evaluated_to },
                     Float.compare evaluated_to threshold <= 0 )
                 | Ratio ->
-                  let size =
-                    Float.of_int
-                      (Code_size.to_int (Cost_metrics.size cost_metrics))
-                  in
                   let bonus =
                     Removed_operations.bonus (Cost_metrics.removed cost_metrics)
                   in
-                  let adjusted_size = size -. call_site_credit -. bonus in
+                  let adjusted_size =
+                    Cost_metrics.adjusted_size cost_metrics -. call_site_credit
+                  in
                   let original =
                     Float.of_int (Int.max 1 (Code_size.to_int original_size))
                   in
@@ -454,7 +467,7 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
                     original_size;
                     call_site_credit;
                     criterion;
-                    threshold;
+                    threshold = budget;
                     threshold_is_remaining_budget;
                     is_a_functor
                   }
@@ -465,7 +478,7 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
                     original_size;
                     call_site_credit;
                     criterion;
-                    threshold;
+                    threshold = budget;
                     threshold_is_remaining_budget;
                     is_a_functor
                   }))

@@ -64,4 +64,12 @@ val notify_removed : operation:Removed_operations.t -> t -> t
 
 val evaluate : args:Inlining_arguments.t -> t -> float
 
+(** The size less the bonus for the removed operations: what the ratio criterion
+    judges, before the call-site credit. *)
+val adjusted_size : t -> float
+
+(** What these metrics cost against a speculative inlining budget: [evaluate]
+    under the threshold criterion, [adjusted_size] under the ratio one. *)
+val budget_charge : args:Inlining_arguments.t -> t -> float
+
 val equal : t -> t -> bool

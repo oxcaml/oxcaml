@@ -161,7 +161,9 @@ let charge_speculative_inlining_budget t cost_metrics =
   | Not_in_speculative_region | Exhausted -> t
   | Remaining remaining ->
     let args = DE.inlining_arguments t.denv in
-    let remaining = remaining -. Cost_metrics.evaluate ~args cost_metrics in
+    let remaining =
+      remaining -. Cost_metrics.budget_charge ~args cost_metrics
+    in
     let speculative_inlining_budget =
       if Float.compare remaining 0. < 0 then Exhausted else Remaining remaining
     in

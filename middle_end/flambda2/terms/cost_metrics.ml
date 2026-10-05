@@ -123,6 +123,14 @@ let increase_due_to_let_cont_recursive ~cost_metrics_of_handlers =
 let evaluate ~args (t : t) =
   Code_size.evaluate ~args t.size -. Removed_operations.evaluate ~args t.removed
 
+let adjusted_size (t : t) =
+  Float.of_int (Code_size.to_int t.size) -. Removed_operations.bonus t.removed
+
+let budget_charge ~args (t : t) =
+  match Flambda_features.Inlining.speculative_inlining_criterion () with
+  | Threshold -> evaluate ~args t
+  | Ratio -> adjusted_size t
+
 let equal { size = size1; removed = removed1 }
     { size = size2; removed = removed2 } =
   Code_size.equal size1 size2 && Removed_operations.equal removed1 removed2

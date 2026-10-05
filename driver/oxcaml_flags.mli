@@ -347,6 +347,7 @@ module Flambda2 : sig
       val speculative_inlining_budget_size_ratio : float
       val speculative_inlining_criterion : speculative_inlining_criterion
       val speculative_inlining_ratio : float
+      val speculative_inlining_budget_size : float
       val speculative_inlining_credit_call_site : bool
       val speculative_inlining_bonus_call : float
       val speculative_inlining_bonus_alloc : float
@@ -394,6 +395,10 @@ module Flambda2 : sig
 
     val speculative_inlining_ratio : float ref
 
+    (** The budget of a speculative inlining (see [speculative_inlining_budget]);
+        zero or less means: the inlining threshold. *)
+    val speculative_inlining_budget_size : float ref
+
     val speculative_inlining_credit_call_site : bool ref
 
     val speculative_inlining_bonus_call : float ref
@@ -415,9 +420,12 @@ module Flambda2 : sig
 
     val inline_2026_small_function_size : int
 
+    val inline_2026_speculative_inlining_budget : float
+
     (** Enable the v2 code size model, lifted-constant tracking, the
         speculative inlining budget, the ratio criterion with the call-site
-        credit, a small function size of [inline_2026_small_function_size],
+        credit with a budget of [inline_2026_speculative_inlining_budget],
+        a small function size of [inline_2026_small_function_size],
         result types for functors and closures, and functor result types
         through value slots. *)
     val set_inline_2026 : unit -> unit

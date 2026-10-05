@@ -861,6 +861,7 @@ let ocaml_ignored_parametrized_flags =
     "-flambda2-speculative-inlining-budget-size-ratio";
     "-flambda2-speculative-inlining-criterion";
     "-flambda2-speculative-inlining-ratio";
+    "-flambda2-speculative-inlining-budget-size";
     "-flambda2-speculative-inlining-bonus-call";
     "-flambda2-speculative-inlining-bonus-alloc";
     "-flambda2-speculative-inlining-bonus-prim";

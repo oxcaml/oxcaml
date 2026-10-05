@@ -211,6 +211,9 @@ module Inlining : sig
 
   val speculative_inlining_ratio : unit -> float
 
+  (** Zero or less means: use the inlining threshold. *)
+  val speculative_inlining_budget_size : unit -> float
+
   val speculative_inlining_credit_call_site : unit -> bool
 
   val speculative_inlining_bonus_call : unit -> float

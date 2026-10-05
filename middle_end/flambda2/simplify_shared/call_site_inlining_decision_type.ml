@@ -247,6 +247,9 @@ let report_speculation fmt ~inlined ~cost_metrics
   let budget =
     if threshold_is_remaining_budget then "remaining budget" else "threshold"
   in
+  let budget_word =
+    if threshold_is_remaining_budget then "remaining budget" else "budget"
+  in
   match criterion with
   | Threshold { evaluated_to } ->
     Format.fprintf fmt
@@ -264,7 +267,7 @@ let report_speculation fmt ~inlined ~cost_metrics
        adjusted@ size@ %f,@ ratio@ %f@ %s@ maximum@ ratio@ %f@ (%s@ %f)"
       what outcome Code_size.print original_size Cost_metrics.print cost_metrics
       Cost_metrics.print cost_metrics_of_lifted_constants call_site_credit bonus
-      adjusted_size ratio comparison max_ratio budget threshold
+      adjusted_size ratio comparison max_ratio budget_word threshold
 
 (* CR mshinwell/gbury: tidy up by using Format.pp_print_text *)
 let rec report_reason fmt t =
@@ -331,7 +334,7 @@ let rec report_reason fmt t =
     Format.fprintf fmt
       "the@ speculation@ was@ aborted@ because@ the@ %s@ (%f)@ was@ exhausted@ \
        while@ simplifying@ the@ inlined@ body"
-      (if threshold_is_remaining_budget then "remaining budget" else "threshold")
+      (if threshold_is_remaining_budget then "remaining budget" else "budget")
       budget
   | Speculatively_not_inline
       { cost_metrics;

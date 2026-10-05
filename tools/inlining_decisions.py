@@ -41,9 +41,9 @@ RATIO_RE = re.compile(
     + r', cost metrics after speculation=size: ' + SZ + ' ' + RM + LIFTED
     + r', call-site credit ' + NUM + r', bonus for removed operations ' + NUM
     + r', adjusted size ' + NUM + r', ratio ' + NUM + r' (<=|>) maximum ratio ' + NUM
-    + r' \((threshold|remaining budget) ' + NUM + r'\)')
+    + r' \((threshold|budget|remaining budget) ' + NUM + r'\)')
 ABORTED_RE = re.compile(
-    r'the speculation was aborted because the (threshold|remaining budget) \(' + NUM
+    r'the speculation was aborted because the (threshold|budget|remaining budget) \(' + NUM
     + r'\) was exhausted while simplifying the inlined body')
 EXHAUSTED_RE = re.compile(
     r'the function was not speculated upon as its code size \(' + SZ + r'\) exceeds the maximum \('

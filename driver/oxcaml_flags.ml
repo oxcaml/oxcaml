@@ -484,6 +484,8 @@ module Flambda2 = struct
 
       let speculative_inlining_ratio = 0.8
 
+      let speculative_inlining_budget_size = 0.
+
       let speculative_inlining_credit_call_site = false
 
       let speculative_inlining_bonus_call = 2.
@@ -545,6 +547,9 @@ module Flambda2 = struct
 
     let speculative_inlining_ratio = ref Default.speculative_inlining_ratio
 
+    let speculative_inlining_budget_size =
+      ref Default.speculative_inlining_budget_size
+
     let speculative_inlining_credit_call_site =
       ref Default.speculative_inlining_credit_call_site
 
@@ -572,6 +577,8 @@ module Flambda2 = struct
 
     let inline_2026_small_function_size = 30
 
+    let inline_2026_speculative_inlining_budget = 150.
+
     (* The flags that -flambda2-inline-2026 sets; see [Oxcaml_args] for the
        description. *)
     let set_inline_2026 () =
@@ -579,6 +586,8 @@ module Flambda2 = struct
       code_size_model := V2;
       speculative_inlining_track_lifted_constants := true;
       speculative_inlining_budget := true;
+      speculative_inlining_budget_size
+        := inline_2026_speculative_inlining_budget;
       speculative_inlining_criterion := Ratio;
       speculative_inlining_credit_call_site := true;
       function_result_types := Set Functors_and_closures;
