@@ -765,9 +765,23 @@ let replace x ~with_ =
     with_
   | inner -> Csequence (inner, with_)
 
-let rec xor_const e n dbg =
+let rec not_int arg dbg =
+  map_tail1 arg ~f:(fun arg ->
+      match get_const arg with
+      | Some n -> natint_const_untagged dbg (Nativeint.lognot n)
+      | None -> (
+        match arg with
+        | Cop (Cnot, [x], _) -> x
+        | Cop (Cxor, [x; y], _) ->
+          if is_constant x
+          then xor_int y (not_int x dbg) dbg
+          else xor_int x (not_int y dbg) dbg
+        | _ -> Cop (Cnot, [arg], dbg)))
+
+and xor_const e n dbg =
   match n with
   | 0n -> e
+  | -1n -> not_int e dbg
   | n ->
     map_tail1 e ~f:(fun e ->
         match get_const e with
@@ -782,7 +796,16 @@ let rec xor_const e n dbg =
             match get_const y with
             | None -> default ()
             | Some y -> xor_const x (Nativeint.logxor y n) dbg)
+          | Cop (Cnot, [x], _) -> xor_const x (Nativeint.lognot n) dbg
           | _ -> default ()))
+
+and xor_int c1 c2 dbg =
+  map_tail2 c1 c2 ~f:(fun c1 c2 ->
+      match get_const c1, get_const c2 with
+      | Some c1, Some c2 -> natint_const_untagged dbg (Nativeint.logxor c1 c2)
+      | None, Some c2 -> xor_const c1 c2 dbg
+      | Some c1, None -> xor_const c2 c1 dbg
+      | None, None -> Cop (Cxor, [c1; c2], dbg))
 
 let rec or_const e n dbg =
   match n with
@@ -806,14 +829,6 @@ let rec or_const e n dbg =
             | None -> default ()
             | Some y -> or_const x (Nativeint.logor y n) dbg)
           | _ -> default ()))
-
-let xor_int c1 c2 dbg =
-  map_tail2 c1 c2 ~f:(fun c1 c2 ->
-      match get_const c1, get_const c2 with
-      | Some c1, Some c2 -> natint_const_untagged dbg (Nativeint.logxor c1 c2)
-      | None, Some c2 -> xor_const c1 c2 dbg
-      | Some c1, None -> xor_const c2 c1 dbg
-      | None, None -> Cop (Cxor, [c1; c2], dbg))
 
 let or_int c1 c2 dbg =
   map_tail2 c1 c2 ~f:(fun c1 c2 ->
@@ -1072,6 +1087,9 @@ and low_bits ~bits ~dbg x =
               | Cor -> or_int x1 x2 dbg
               | Cxor -> xor_int x1 x2 dbg
               | _ -> Misc.fatal_error "impossible")
+            | Cop (Cnot, [x], dbg) ->
+              let x = low_bits ~bits ~dbg x in
+              not_int x dbg
             | _ -> x)))
       x
 
@@ -2197,6 +2215,7 @@ let rec sign_extend ~bits ~dbg e =
           or_int (sign_extend ~bits x ~dbg) (sign_extend ~bits y ~dbg) dbg
         | Cop (Cxor, [x; y], _) when is_constant y ->
           xor_int (sign_extend ~bits x ~dbg) (sign_extend ~bits y ~dbg) dbg
+        | Cop (Cnot, [x], _) -> not_int (sign_extend ~bits x ~dbg) dbg
         | Cop (((Casr | Clsr) as op), [inner; Cconst_int (n, _)], _) as e
           when is_defined_shift n ->
           (* see middle_end/flambda2/z3/sign_extension.py for proof *)
@@ -5163,6 +5182,9 @@ let eq ~dbg x y =
      *   (check-sat)
      *)
     binary (Ccmpi Ceq) ~dbg c (Cconst_int (m - n, dbg))
+  | Cop (Cnot, [arg], _), ((Cconst_int _ | Cconst_natint _) as const)
+  | ((Cconst_int _ | Cconst_natint _) as const), Cop (Cnot, [arg], _) ->
+    binary (Ccmpi Ceq) ~dbg arg (not_int const dbg)
   | _, _ -> binary (Ccmpi Ceq) ~dbg x y
 
 let neq = binary (Ccmpi Cne)
@@ -5385,7 +5407,7 @@ let cmm_arith_size (e : Cmm.expression) =
     match e with
     | Cop
         ( ( Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _ | Cand | Cor
-          | Cxor | Clsl | Clsr | Casr ),
+          | Cxor | Cnot | Clsl | Clsr | Casr ),
           l,
           _ ) ->
       List.fold_left ( + ) 1 (List.map cmm_arith_size0 l)

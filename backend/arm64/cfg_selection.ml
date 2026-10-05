@@ -77,7 +77,7 @@ let is_immediate (op : Operation.integer_operation) n :
   | Iadd | Isub -> Is_immediate (n <= 0xFFF_FFF && n >= -0xFFF_FFF)
   | Iand | Ior | Ixor -> Is_immediate (is_logical_immediate_int n)
   | Icomp _ -> Is_immediate (int_is_immediate n)
-  | Imul | Imulh _ | Idiv _ | Imod _ | Ilsl | Ilsr | Iasr | Iclz | Ictz
+  | Imul | Imulh _ | Idiv _ | Imod _ | Ilsl | Ilsr | Iasr | Inot | Iclz | Ictz
   | Ipopcnt ->
     Use_default
 
@@ -248,9 +248,9 @@ let select_operation' ~generic_select_condition:_ (op : Cmm.operation)
         coeffects = _
       }
   | Capply _ | Calloc _ | Cstore _ | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _
-  | Caddi128 | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Ccsel _
-  | Cclz | Cctz | Cpopcnt | Cprefetch _ | Catomic _ | Ccmpi _ | Cabsf _
-  | Cmulf _ | Cdivf _ | Creinterpret_cast _ | Cstatic_cast _ | Ccmpf _
+  | Caddi128 | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Cnot | Clsl | Clsr
+  | Ccsel _ | Cclz | Cctz | Cpopcnt | Cprefetch _ | Catomic _ | Ccmpi _
+  | Cabsf _ | Cmulf _ | Cdivf _ | Creinterpret_cast _ | Cstatic_cast _ | Ccmpf _
   | Craise _ | Cprobe _ | Cprobe_is_enabled _ | Copaque | Cbeginregion
   | Cendregion | Ctuple_field _ | Cdls_get | Ctls_get | Cdomain_index | Cpoll
   | Cpause ->

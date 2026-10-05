@@ -896,6 +896,10 @@ let int_op t (i : Cfg.basic Cfg.instruction) (op : Operation.integer_operation)
     | Iand -> do_binary And
     | Ior -> do_binary Or
     | Ixor -> do_binary Xor
+    | Inot ->
+      reject_addr_regs i.res "int_op";
+      let arg1 = load_reg_to_temp ~typ:T.i64 t i.arg.(0) in
+      emit_ins t (I.binary Xor ~arg1 ~arg2:(V.of_int ~typ:T.i64 (-1)))
     | Ilsl -> do_binary Shl
     | Ilsr -> do_binary Lshr
     | Iasr -> do_binary Ashr

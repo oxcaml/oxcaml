@@ -164,6 +164,7 @@ let pseudoregs_for_operation op arg res =
     arg, res
   (* One-address unary operations: arg.(0) and res.(0) must be the same *)
   | Intop_imm ((Imul | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr), _)
+  | Intop Inot
   | Floatop ((Float64 | Float32), (Iabsf | Inegf))
   | Specific (Ibswap { bitwidth = Thirtytwo | Sixtyfour })
   | Specific Ineg
@@ -225,8 +226,8 @@ let pseudoregs_for_operation op arg res =
   | Intop_atomic { op = Add | Sub | Land | Lor | Lxor; _ }
   | Intop (Ipopcnt | Iclz | Ictz | Icomp _ | Iadd)
   | Intop_imm
-      ( ( Iadd | Isub | Imulh _ | Idiv _ | Imod _ | Icomp _ | Ipopcnt | Iclz
-        | Ictz ),
+      ( ( Iadd | Isub | Imulh _ | Idiv _ | Imod _ | Icomp _ | Ipopcnt | Inot
+        | Iclz | Ictz ),
         _ )
   | Specific
       ( Isextend32 | Izextend32 | Ilea _
@@ -250,7 +251,8 @@ let is_immediate (op : Operation.integer_operation) n :
   match op with
   | Iadd | Isub | Imul | Iand | Ior | Ixor | Icomp _ ->
     Is_immediate (int_is_immediate n)
-  | Imulh _ | Idiv _ | Imod _ | Ilsl | Ilsr | Iasr | Iclz | Ictz | Ipopcnt ->
+  | Imulh _ | Idiv _ | Imod _ | Ilsl | Ilsr | Iasr | Inot | Iclz | Ictz
+  | Ipopcnt ->
     Use_default
 
 let is_immediate_test _cmp n : Cfg_selectgen_target_intf.is_immediate_result =
@@ -514,11 +516,11 @@ let select_operation'
         | Fivetwelve_aligned ),
         _ )
   | Capply _ | Cload _ | Calloc _ | Cmulhi _ | Cdivi _ | Cmodi _ | Caddi128
-  | Csubi128 | Cmuli64 _ | Cxor | Clsl | Cclz | Cctz | Cpopcnt | Catomic _
-  | Ccmpi _ | Cnegf _ | Cabsf _ | Creinterpret_cast _ | Cstatic_cast _ | Ccmpf _
-  | Craise _ | Cprobe _ | Cprobe_is_enabled _ | Copaque | Cbeginregion
-  | Cendregion | Ctuple_field _ | Cdls_get | Ctls_get | Cdomain_index | Cpoll
-  | Cpause ->
+  | Csubi128 | Cmuli64 _ | Cxor | Cnot | Clsl | Cclz | Cctz | Cpopcnt
+  | Catomic _ | Ccmpi _ | Cnegf _ | Cabsf _ | Creinterpret_cast _
+  | Cstatic_cast _ | Ccmpf _ | Craise _ | Cprobe _ | Cprobe_is_enabled _
+  | Copaque | Cbeginregion | Cendregion | Ctuple_field _ | Cdls_get | Ctls_get
+  | Cdomain_index | Cpoll | Cpause ->
     Use_default
 
 let select_operation
@@ -548,7 +550,7 @@ let select_operation
         }
     | Capply _ | Cload _ | Calloc _ | Cstore _ | Caddi | Csubi | Cmuli
     | Cmulhi _ | Cdivi _ | Cmodi _ | Caddi128 | Csubi128 | Cmuli64 _ | Cand
-    | Cor | Cxor | Clsl | Clsr | Casr | Ccsel _ | Cclz | Cctz | Cpopcnt
+    | Cor | Cxor | Cnot | Clsl | Clsr | Casr | Ccsel _ | Cclz | Cctz | Cpopcnt
     | Cprefetch _ | Catomic _ | Ccmpi _ | Caddv | Cadda | Cnegf _ | Cabsf _
     | Caddf _ | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32 | Creinterpret_cast _
     | Cstatic_cast _ | Ccmpf _ | Craise _ | Cprobe _ | Cprobe_is_enabled _

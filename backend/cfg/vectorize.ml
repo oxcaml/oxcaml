@@ -811,7 +811,7 @@ end = struct
                   | Intop_imm (Isub, n) -> Some (reg, -n)
                   | Intop_imm
                       ( ( Imul | Idiv _ | Imod _ | Iand | Ior | Ixor | Ilsl
-                        | Ilsr | Iasr | Ipopcnt | Imulh _ | Iclz | Ictz
+                        | Ilsr | Iasr | Ipopcnt | Imulh _ | Inot | Iclz | Ictz
                         | Icomp _ ),
                         _ )
                   | Opaque | Begin_region | End_region | Dls_get | Tls_get

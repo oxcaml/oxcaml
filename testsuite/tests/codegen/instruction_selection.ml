@@ -90,7 +90,7 @@ let lognot_branch x y f = if Int64_u.equal (Int64_u.lognot x) #0L then f ()
 [%%expect_asm X86_64{|
 lognot_branch:
   movq  %rdi, %rbx
-  xorq  $-1, %rax
+  cmpq  $-1, %rax
   jne   .L0
   movl  $1, %eax
   movq  (%rbx), %rdi
