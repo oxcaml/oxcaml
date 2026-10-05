@@ -14,11 +14,25 @@
 (**************************************************************************)
 
 (** What the rebuild needs to know about the solved analysis. *)
-type result
+type data
+
+(** The answers as the rebuild queries them. A whole-program solution is
+    [Sharded]: the answers about a unit's identifiers come from that unit's
+    data. *)
+type result =
+  | Single of data
+  | Sharded of (Compilation_unit.t -> data)
 
 (** Returns the result used for the rebuild, and the result of unboxing
     containing the full database for the type rewriting, code changes and slot
     offsets computations. *)
+val fixpoint_data :
+  Global_flow_graph.graph ->
+  applications:Traverse_acc.Applications.t ->
+  analysis_scope:Analysis_scope.t ->
+  Unboxing_analysis.result * data
+
+(** [fixpoint_data], as a [Single] result. *)
 val fixpoint :
   Global_flow_graph.graph ->
   applications:Traverse_acc.Applications.t ->
@@ -53,3 +67,17 @@ val arguments_used_by_unknown_arity_call :
   Code_id_or_name.t ->
   'a list list ->
   ('a * Points_to_analysis.keep_or_delete) list list
+
+val empty : data
+
+val ids_for_export : data -> Ids_for_export.t
+
+(** Fields are hashconsed, so for serialisation the [Field.view] of each one
+    needs serialising separately. *)
+val fields_for_export : data -> Field.Set.t
+
+val apply_renaming :
+  data -> Renaming.t -> rename_field:(Field.t -> Field.t) -> data
+
+(** Partition by the compilation unit of each map's outermost key. *)
+val partition_by_compilation_unit : data -> data Compilation_unit.Map.t

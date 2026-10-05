@@ -534,6 +534,10 @@ module Datalog : sig
       val remove : keys Constant.hlist -> t -> t
 
       val find_opt : keys Constant.hlist -> t -> value option
+
+      (** Union of two relations; the values of shared keys are combined
+          according to [result_repr]. *)
+      val union : t -> t -> t
     end
 
     module Cons (C : Column.S) (S : S) :

@@ -799,6 +799,12 @@ let mk_no_support_lto f =
        file.%s (Flambda2 only)"
       (format_not_default Flambda2.Default.support_lto) )
 
+let mk_reaper_solve f =
+  ( "-reaper-solve",
+    Arg.Unit f,
+    " Produce a Reaper solution file (-o) from the given -support-lto .cmx \
+     files (Flambda 2 only)" )
+
 let mk_flambda2_match_in_match f =
   ( "-flambda2-match-in-match",
     Arg.Unit f,
@@ -1504,6 +1510,7 @@ module type Oxcaml_options = sig
   val no_reaper_change_calling_conventions : unit -> unit
   val support_lto : unit -> unit
   val no_support_lto : unit -> unit
+  val reaper_solve : unit -> unit
   val flambda2_match_in_match : unit -> unit
   val no_flambda2_match_in_match : unit -> unit
   val simplify_stubs : unit -> unit
@@ -1728,6 +1735,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
         F.no_reaper_change_calling_conventions;
       mk_support_lto F.support_lto;
       mk_no_support_lto F.no_support_lto;
+      mk_reaper_solve F.reaper_solve;
       mk_flambda2_match_in_match F.flambda2_match_in_match;
       mk_no_flambda2_match_in_match F.no_flambda2_match_in_match;
       mk_simplify_stubs F.simplify_stubs;
@@ -2230,6 +2238,7 @@ module Oxcaml_options_impl = struct
 
   let support_lto = set Flambda2.support_lto
   let no_support_lto = clear Flambda2.support_lto
+  let reaper_solve = set' Clflags.reaper_solve
   let simplify_stubs = set Flambda2.simplify_stubs
   let no_simplify_stubs = clear Flambda2.simplify_stubs
   let stubs_forward_inlining = set' Clflags.stubs_forward_inlining

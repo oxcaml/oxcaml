@@ -109,6 +109,8 @@ module Datalog = struct
       val remove : keys Constant.hlist -> t -> t
 
       val find_opt : keys Constant.hlist -> t -> value option
+
+      val union : t -> t -> t
     end
 
     module type Relation = S with type value = unit
@@ -149,6 +151,8 @@ module Datalog = struct
 
       include T
       include Column.Make_operations (T)
+
+      let union = Table.union columns result_repr
     end
 
     module Relation1 (C1 : C) = Cons (C1) (Nil)
