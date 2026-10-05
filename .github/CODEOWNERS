@@ -1,7 +1,9 @@
 # Later lines in the file take precedence.
 
-.github/CODEOWNERS      @mshinwell @lpw25
+.github/CODEOWNERS        @mshinwell @lpw25
 
-build_ocaml_compiler.sexp       @poechsel
+build_ocaml_compiler.sexp         @poechsel
 
-external/memtrace/              @stedolan
+external/memtrace/                @stedolan
+
+external/js_of_ocaml  @rickyvetter @rricard
