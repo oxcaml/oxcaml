@@ -491,6 +491,48 @@ Error: The constant "1" has type "int" but an expression was expected of type
          "bool"
 |}]
 
+module Inline_record = struct
+  (* [t3.B] takes an inline record, [u3.B] a [bool] *)
+  type t3 =
+    | A
+    | B of { n : int }
+
+  type u3 =
+    | A
+    | B of bool
+    | C
+end
+
+[%%expect
+{|
+module Inline_record :
+  sig type t3 = A | B of { n : int; } type u3 = A | B of bool | C end
+|}]
+
+let a11 =
+  let open Inline_record in
+  B { n = 1 } |> fun (x : t3) -> x
+
+[%%expect
+{|
+Line 3, characters 4-13:
+3 |   B { n = 1 } |> fun (x : t3) -> x
+        ^^^^^^^^^
+Error: This expression should not be a record, the expected type is "bool"
+|}]
+
+let a12 =
+  let open Inline_record in
+  function B { n = _ } -> 42 | (A : t3) -> 0
+
+[%%expect
+{|
+Line 3, characters 13-22:
+3 |   function B { n = _ } -> 42 | (A : t3) -> 0
+                 ^^^^^^^^^
+Error: This pattern should not be a record, the expected type is "bool"
+|}]
+
 (* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Stage 2 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ *)
 
 (* Many of the tests in this section ought to work in stage 1. However,
@@ -725,48 +767,6 @@ Warning 8 [partial-match]: this pattern-matching is not exhaustive.
   Here is an example of a case that is not matched: "E"
 
 val b15 : Three_way.v -> int = <fun>
-|}]
-
-module Inline_record = struct
-  (* [t3.B] takes an inline record, [u3.B] a [bool] *)
-  type t3 =
-    | A
-    | B of { n : int }
-
-  type u3 =
-    | A
-    | B of bool
-    | C
-end
-
-[%%expect
-{|
-module Inline_record :
-  sig type t3 = A | B of { n : int; } type u3 = A | B of bool | C end
-|}]
-
-let b16 =
-  let open Inline_record in
-  B { n = 1 } |> fun (x : t3) -> x
-
-[%%expect
-{|
-Line 3, characters 4-13:
-3 |   B { n = 1 } |> fun (x : t3) -> x
-        ^^^^^^^^^
-Error: This expression should not be a record, the expected type is "bool"
-|}]
-
-let b17 =
-  let open Inline_record in
-  function B { n = _ } -> 42 | (A : t3) -> 0
-
-[%%expect
-{|
-Line 3, characters 13-22:
-3 |   function B { n = _ } -> 42 | (A : t3) -> 0
-                 ^^^^^^^^^
-Error: This pattern should not be a record, the expected type is "bool"
 |}]
 
 module Cycle = struct
