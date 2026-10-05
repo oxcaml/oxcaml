@@ -405,11 +405,11 @@ module Result = struct
 
   module Option = struct
     let map ~f = function
-    | None -> Ok None
-    | Some x ->
-      let open Infix in
-      let* y = f x in
-      Ok (Some y)
+      | None -> Ok None
+      | Some x ->
+        let open Infix in
+        let* y = f x in
+        Ok (Some y)
   end
 end
 
