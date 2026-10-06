@@ -2,7 +2,7 @@
  expect;
 *)
 
-(* oxcaml#XXXX
+(* oxcaml#7459
 
    Without type information, a constructor shared by types in the same recursive
    group should resolve to the last one, whether the group is defined in the
