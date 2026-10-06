@@ -1187,8 +1187,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           (Printcfg.terminator_desc ~sep:"")
           term)
 
-  and emit_expr_ifthenelse env sub_cfg bound_name econd _ifso_dbg ifso_p eif
-      (_ifnot_dbg : Debuginfo.t) ifnot_p eelse (_dbg : Debuginfo.t) :
+  and emit_expr_ifthenelse env sub_cfg bound_name econd _ifso_dbg ifso_a eif
+      (_ifnot_dbg : Debuginfo.t) ifnot_a eelse (_dbg : Debuginfo.t) :
       _ Or_never_returns.t =
     (* CR-someday xclerc for xclerc: use the `_dbg` parameter *)
     let cond, earg = select_condition econd in
@@ -1198,12 +1198,12 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       assert (Sub_cfg.exit_has_never_terminator sub_cfg);
       let rif, sub_if =
         emit_new_sub_cfg
-          ~is_cold:(Likelihood.is_cold ifso_p)
+          ~is_cold:(Likelihood.is_cold (Branch_annotations.likelihood ifso_a))
           env eif ~bound_name
       in
       let relse, sub_else =
         emit_new_sub_cfg
-          ~is_cold:(Likelihood.is_cold ifnot_p)
+          ~is_cold:(Likelihood.is_cold (Branch_annotations.likelihood ifnot_a))
           env eelse ~bound_name
       in
       let r = SU.join env rif sub_if relse sub_else ~bound_name in
@@ -1229,9 +1229,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       assert (Sub_cfg.exit_has_never_terminator sub_cfg);
       let sub_cases : (Reg.t array Or_never_returns.t * Sub_cfg.t) array =
         Array.map
-          (fun (case, _dbg, ~likelihood) ->
+          (fun (case, _dbg, annots) ->
             emit_new_sub_cfg
-              ~is_cold:(Likelihood.is_cold likelihood)
+              ~is_cold:
+                (Likelihood.is_cold (Branch_annotations.likelihood annots))
               env case ~bound_name)
           ecases
       in
@@ -1516,8 +1517,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           | Tailcall_func _ | Invalid _ | Call_no_return _ | Prim _ ) ->
         Misc.fatal_error "Cfg_selectgen.emit_tail")
 
-  and emit_tail_ifthenelse env sub_cfg econd (_ifso_dbg : Debuginfo.t) ifso_p
-      eif (_ifnot_dbg : Debuginfo.t) ifnot_p eelse (_dbg : Debuginfo.t) =
+  and emit_tail_ifthenelse env sub_cfg econd (_ifso_dbg : Debuginfo.t) ifso_a
+      eif (_ifnot_dbg : Debuginfo.t) ifnot_a eelse (_dbg : Debuginfo.t) =
     (* CR-someday xclerc for xclerc: use the `_dbg` parameter *)
     let cond, earg = select_condition econd in
     match emit_expr env sub_cfg earg ~bound_name:None with
@@ -1525,10 +1526,14 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Ok rarg ->
       assert (Sub_cfg.exit_has_never_terminator sub_cfg);
       let sub_if =
-        emit_tail_new_sub_cfg ~is_cold:(Likelihood.is_cold ifso_p) env eif
+        emit_tail_new_sub_cfg
+          ~is_cold:(Likelihood.is_cold (Branch_annotations.likelihood ifso_a))
+          env eif
       in
       let sub_else =
-        emit_tail_new_sub_cfg ~is_cold:(Likelihood.is_cold ifnot_p) env eelse
+        emit_tail_new_sub_cfg
+          ~is_cold:(Likelihood.is_cold (Branch_annotations.likelihood ifnot_a))
+          env eelse
       in
       let term_desc =
         SU.terminator_of_test cond
@@ -1547,9 +1552,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       assert (Sub_cfg.exit_has_never_terminator sub_cfg);
       let sub_cases =
         Array.map
-          (fun (case, _dbg, ~likelihood) ->
+          (fun (case, _dbg, annots) ->
             emit_tail_new_sub_cfg
-              ~is_cold:(Likelihood.is_cold likelihood)
+              ~is_cold:
+                (Likelihood.is_cold (Branch_annotations.likelihood annots))
               env case)
           ecases
       in

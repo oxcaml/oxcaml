@@ -722,7 +722,7 @@ val transl_switch_clambda :
   Debuginfo.t ->
   expression ->
   int array ->
-  (expression * likelihood:Likelihood.t) array ->
+  (expression * Branch_annotations.t) array ->
   expression
 
 (** Method call : [send kind met obj args dbg]
@@ -882,10 +882,10 @@ val sequence : expression -> expression -> expression
 val ite :
   dbg:Debuginfo.t ->
   then_dbg:Debuginfo.t ->
-  then_p:Likelihood.t ->
+  then_annots:Branch_annotations.t ->
   then_:expression ->
   else_dbg:Debuginfo.t ->
-  else_p:Likelihood.t ->
+  else_annots:Branch_annotations.t ->
   else_:expression ->
   expression ->
   expression

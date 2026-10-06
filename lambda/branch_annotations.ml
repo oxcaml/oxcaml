@@ -26,21 +26,20 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(** Annotations for a given branch (i.e. switch arm). *)
-type t
+type t = { likelihood : Likelihood.t } [@@unboxed]
 
-val from_likelihood : Likelihood.t -> t
+let from_likelihood likelihood = { likelihood }
 
-val default : t
+let default = from_likelihood Likelihood.default
 
-val cold : t
+let cold = from_likelihood Likelihood.cold
 
-(** Likelihood of this branch being selected, relative to a specific set of
-    potential branches.
+let likelihood { likelihood } = likelihood
 
-    This is the (unnormalized) conditional probability of reaching the branch
-    target (continuation), knowing that we have reached its source (switch
-    expression). *)
-val likelihood : t -> Likelihood.t
+let with_likelihood _ likelihood = { likelihood }
 
-val with_likelihood : t -> Likelihood.t -> t
+let sum_list annots =
+  Likelihood.sum_list (List.map likelihood annots) |> from_likelihood
+
+let add { likelihood = likelihood1 } { likelihood = likelihood2 } =
+  from_likelihood (Likelihood.sum_list [likelihood1 ;likelihood2])

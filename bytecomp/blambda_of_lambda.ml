@@ -29,9 +29,14 @@ module Storer = Switch.Store (struct
 
   type key = t
 
+  let with_annotations t _ = t
+
   let compare_key = Stdlib.compare
 
-  let make_key = Lambda.make_key
+  let make_key t =
+    match Lambda.make_key t with
+    | None -> None
+    | Some k -> Some (k, Branch_annotations.default)
 end)
 
 let constant_int integral n : constant =
