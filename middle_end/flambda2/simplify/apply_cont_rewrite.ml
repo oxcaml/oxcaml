@@ -58,6 +58,10 @@ let [@ocamlformat "disable"] print ppf
        (Format.pp_print_list ~pp_sep:Format.pp_print_space EA.print)))
     extra_args
 
+let all_params_free_names { original_params; extra_params; _ } =
+  Bound_parameters.free_names
+    (Bound_parameters.append original_params extra_params)
+
 let does_nothing t =
   List.for_all
     (function Used -> true | Used_as_invariant | Unused -> false)

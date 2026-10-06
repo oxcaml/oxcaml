@@ -16,6 +16,24 @@
 
 module T = Flambda2_types
 
+module Id = struct
+  type t = int
+
+  let print = Format.pp_print_int
+
+  let mk =
+    let i = ref 0 in
+    fun () ->
+      incr i;
+      !i
+
+  module Tree = Patricia_tree.Make (struct
+    let print = print
+  end)
+
+  module Map = Tree.Map
+end
+
 module Definition = struct
   type descr =
     | Code of Code_id.t
@@ -134,15 +152,26 @@ module Definition = struct
         closure_symbols_with_types Symbol.Map.empty
     | Block_like { symbol; typing_env; ty; _ } ->
       Symbol.Map.singleton symbol (typing_env, ty)
+
+  let remove_unused_value_slots ~find_code_metadata ~used_value_slots
+      { defining_expr; descr } =
+    let defining_expr =
+      Rebuilt_static_const.remove_unused_value_slots ~find_code_metadata
+        ~used_value_slots defining_expr
+    in
+    { descr; defining_expr }
 end
 
 type t =
-  { definitions : Definition.t list;
+  { id : Id.t;
+    definitions : Definition.t list;
     bound_static : Bound_static.t;
     defining_exprs : Rebuilt_static_const.Group.t;
     symbol_projections : Symbol_projection.t Variable.Map.t;
     is_fully_static : bool
   }
+
+let id t = t.id
 
 let definitions t = t.definitions
 
@@ -151,14 +180,46 @@ let symbol_projections t = t.symbol_projections
 let free_names_of_defining_exprs t =
   Rebuilt_static_const.Group.free_names t.defining_exprs
 
+let free_names t =
+  ListLabels.fold_left t.definitions ~init:Name_occurrences.empty
+    ~f:(fun acc def -> Name_occurrences.union acc (Definition.free_names def))
+
 let is_fully_static t = t.is_fully_static
 
 let [@ocamlformat "disable"] print ppf
-      { definitions; bound_static = _; defining_exprs = _;
+    { id = _; definitions; bound_static = _; defining_exprs = _;
         is_fully_static = _; symbol_projections = _; } =
   Format.fprintf ppf "@[<hov 1>(%a)@]"
     (Format.pp_print_list ~pp_sep:Format.pp_print_space Definition.print)
     definitions
+
+module Set = struct
+  type elt = t
+
+  type t = elt Id.Map.t
+
+  let print ppf t = Id.Map.print print ppf t
+
+  let empty = Id.Map.empty
+
+  let mem elt (t : t) = Id.Map.mem (id elt) t
+
+  let add elt (t : t) = Id.Map.add (id elt) elt t
+
+  let fold f t acc = Id.Map.fold (fun _id elt acc -> f elt acc) t acc
+
+  let inter (t : t) t' =
+    Id.Map.inter
+      (fun _ x _y ->
+        (* since x and y have the same id, they should be equal, so we can keep
+           whichever *)
+        x)
+      t t'
+
+  let diff (t : t) t' = Id.Map.diff_shared (fun _ _ _ -> None) t t'
+
+  let elements (t : t) = Id.Map.fold (fun _ x l -> x :: l) t []
+end
 
 let compute_bound_static definitions =
   ListLabels.map definitions ~f:Definition.bound_static_pattern
@@ -177,7 +238,8 @@ let create_block_like symbol ~symbol_projections defining_expr denv ty =
     Definition.block_like denv symbol ty ~symbol_projections defining_expr
   in
   let definitions = [definition] in
-  { definitions;
+  { id = Id.mk ();
+    definitions;
     bound_static = compute_bound_static definitions;
     defining_exprs = compute_defining_exprs definitions;
     is_fully_static = Rebuilt_static_const.is_fully_static defining_expr;
@@ -195,7 +257,8 @@ let create_set_of_closures denv ~closure_symbols_with_types ~symbol_projections
       ~symbol_projections defining_expr
   in
   let definitions = [definition] in
-  { definitions;
+  { id = Id.mk ();
+    definitions;
     bound_static = compute_bound_static definitions;
     defining_exprs = compute_defining_exprs definitions;
     is_fully_static = Rebuilt_static_const.is_fully_static defining_expr;
@@ -209,7 +272,8 @@ let create_code code_id defining_expr =
       Rebuilt_static_const.print defining_expr;
   let definition = Definition.code code_id defining_expr in
   let definitions = [definition] in
-  { definitions;
+  { id = Id.mk ();
+    definitions;
     bound_static = compute_bound_static definitions;
     defining_exprs = compute_defining_exprs definitions;
     is_fully_static = Rebuilt_static_const.is_fully_static defining_expr;
@@ -218,7 +282,8 @@ let create_code code_id defining_expr =
 
 let create_definition definition =
   let definitions = [definition] in
-  { definitions;
+  { id = Id.mk ();
+    definitions;
     bound_static = compute_bound_static definitions;
     defining_exprs = compute_defining_exprs definitions;
     is_fully_static =
@@ -253,7 +318,8 @@ let concat ts =
           t.symbol_projections symbol_projections)
       Variable.Map.empty ts
   in
-  { definitions;
+  { id = Id.mk ();
+    definitions;
     bound_static;
     defining_exprs;
     is_fully_static;
@@ -322,3 +388,20 @@ let apply_projection t proj =
     Misc.fatal_errorf
       "Symbol projection@ %a@ matches more than one constant in:@ %a"
       Symbol_projection.print proj print t
+
+let remove_unused_value_slots ~find_code_metadata ~used_value_slots t =
+  let t' =
+    { t with
+      defining_exprs =
+        Rebuilt_static_const.Group.map t.defining_exprs
+          ~f:
+            (Rebuilt_static_const.remove_unused_value_slots ~find_code_metadata
+               ~used_value_slots);
+      definitions =
+        List.map
+          (Definition.remove_unused_value_slots ~find_code_metadata
+             ~used_value_slots)
+          t.definitions
+    }
+  in
+  t'

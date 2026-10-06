@@ -62,3 +62,7 @@ type binding_to_place =
         original_defining_expr : Named.t option
       }
   | Delete_binding of { original_defining_expr : Named.t option }
+
+val print_binding_to_place : Format.formatter -> binding_to_place -> unit
+
+val binding_to_place_bound_names : binding_to_place -> Name_occurrences.t

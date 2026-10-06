@@ -46,6 +46,10 @@ let run ~cmx_loader ~machine_width ~round ~code_slot_offsets unit =
       ~exn_continuation
   in
   let body = Rebuilt_expr.to_expr body (UA.are_rebuilding_terms uacc) in
+  if debug ()
+  then
+    Format.eprintf "/// Toplevel ///@\nuacc: %a@\nbody : %a@." UA.print uacc
+      Expr.print body;
   let name_occurrences = UA.name_occurrences uacc in
   NO.fold_names name_occurrences ~init:() ~f:(fun () name ->
       Name.pattern_match name
@@ -57,12 +61,11 @@ let run ~cmx_loader ~machine_width ~round ~code_slot_offsets unit =
                term:@ %a"
               Variable.print var Expr.print body)
         ~symbol:(fun _symbol -> ()));
-  if not (LCS.is_empty (UA.lifted_constants uacc))
+  let uacc, l = UA.pop_all_remaining_lifted_constants_to_place uacc in
+  if not (List.is_empty l)
   then
     Misc.fatal_errorf "Lifted constants accumulator should be empty:@ %a"
       UA.print uacc;
-  if Flambda_features.Expert.symbol_check () then
-    Symbol_check.check body;
   let final_typing_env =
     let cont_uses_env = DA.continuation_uses_env (UA.creation_dacc uacc) in
     Continuation_uses_env.get_typing_env_no_more_than_one_use cont_uses_env

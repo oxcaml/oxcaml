@@ -15,8 +15,8 @@
 (**************************************************************************)
 
 open! Flambda.Import
-module DE = Downwards_env
 module DA = Downwards_acc
+module DE = Downwards_env
 module T = Flambda2_types
 module TE = T.Typing_env
 module UA = Upwards_acc
@@ -118,7 +118,12 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~rebuild_expr
           return_arity
     in
     let uacc = UA.create ~flow_result ~compute_slot_offsets:false uenv dacc in
-    rebuild_expr expr uacc ~after_rebuild:(fun expr uacc -> expr, uacc)
+    rebuild_expr expr uacc ~after_rebuild:(fun expr uacc ->
+        (* Place any remaining lifted constants, but only when at toplevel *)
+        match UA.lifted_constants uacc with
+        | In_a_closure _ -> expr, uacc
+        | At_toplevel _ ->
+          Simplify_common.place_all_remaining_lifted_constants expr uacc)
   in
   let cost_metrics_of_lifted_constants =
     if Flambda_features.Inlining.speculative_inlining_track_lifted_constants ()
@@ -143,7 +148,7 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~rebuild_expr
          is always possible to compute a correct set of "used value slots" at
          the time we are doing speculative inlining, because some value slots
          could be used later in the compilation unit). *)
-      Lifted_constant_state.fold lifted_constants ~init:Cost_metrics.zero
+      UA.fold_lifted_constants lifted_constants ~init:Cost_metrics.zero
         ~f:(fun cost_metrics lifted_constant ->
           List.fold_left
             (fun cost_metrics definition ->

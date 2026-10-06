@@ -653,7 +653,10 @@ let add_variable_definition t var kind name_mode =
        %a@ in environment:@ %a"
       Variable.print var print t;
   let name = Name.var var in
-  if (Flambda_features.use_n_way_join ()) && Flambda_features.check_invariants () && mem t name
+  if
+    Flambda_features.use_n_way_join ()
+    && Flambda_features.check_invariants ()
+    && mem t name
   then
     Misc.fatal_errorf "Cannot rebind %a in environment:@ %a" Name.print name
       print t;
@@ -747,27 +750,28 @@ let invariant_for_new_equation (t : t) name ty =
   then (
     invariant_for_alias t name ty;
     (* CR bclement : re-enable this check *)
-    if false then (
-    let defined_names =
-      Name_occurrences.create_names (name_domain t) Name_mode.in_types
-    in
-    let free_names = Name_occurrences.with_only_names (TG.free_names ty) in
-    if not (Name_occurrences.subset_domain free_names defined_names)
+    if false
     then
-      let unbound_names =
-        Name_occurrences.diff free_names ~without:defined_names
+      let defined_names =
+        Name_occurrences.create_names (name_domain t) Name_mode.in_types
       in
-      let has_local_unbound_name =
-        Name_occurrences.fold_names unbound_names ~init:false
-          ~f:(fun acc name ->
-            acc || Current_unit.is_current (Name.compilation_unit name))
-      in
-      if has_local_unbound_name
+      let free_names = Name_occurrences.with_only_names (TG.free_names ty) in
+      if not (Name_occurrences.subset_domain free_names defined_names)
       then
-        Misc.fatal_errorf
-          "New equation@ %a@ =@ %a@ has unbound local names@ (%a):@ %a"
-          Name.print name TG.print ty Name_occurrences.print unbound_names print
-          t)
+        let unbound_names =
+          Name_occurrences.diff free_names ~without:defined_names
+        in
+        let has_local_unbound_name =
+          Name_occurrences.fold_names unbound_names ~init:false
+            ~f:(fun acc name ->
+              acc || Current_unit.is_current (Name.compilation_unit name))
+        in
+        if has_local_unbound_name
+        then
+          Misc.fatal_errorf
+            "New equation@ %a@ =@ %a@ has unbound local names@ (%a):@ %a"
+            Name.print name TG.print ty Name_occurrences.print unbound_names
+            print t)
 
 let replace_equation (t : t) name ty =
   (if Flambda_features.Debug.concrete_types_only_on_canonicals ()

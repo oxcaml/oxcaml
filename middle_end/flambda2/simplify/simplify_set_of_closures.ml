@@ -136,15 +136,12 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
 let extract_accumulators_from_function outer_dacc ~dacc_after_body
     ~uacc_after_upwards_traversal =
   let lifted_consts_this_function =
-    (* Subtle point: [uacc_after_upwards_traversal] must be used to retrieve all
-       of the lifted constants generated during the simplification of the
-       function, not [dacc_after_body]. The reason for this is that sometimes
-       the constants in [DA] are cleared (but remembered) and reinstated
-       afterwards, for example at a [Let_cont]. It follows that if the turning
-       point where the downwards traversal turns into an upwards traversal is in
-       such a context, not all of the constants may currently be present in
-       [DA]. *)
-    UA.lifted_constants uacc_after_upwards_traversal
+    match UA.lifted_constants uacc_after_upwards_traversal with
+    | At_toplevel _ ->
+      Misc.fatal_errorf
+        "Simplify_set_of_closures.extract_accumulators_from_function: uacc \
+         from function should not be at toplevel"
+    | In_a_closure lifted_constants -> lifted_constants
   in
   let code_ids_to_remember = DA.code_ids_to_remember dacc_after_body in
   let code_ids_to_never_delete = DA.code_ids_to_never_delete dacc_after_body in

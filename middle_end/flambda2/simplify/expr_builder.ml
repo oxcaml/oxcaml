@@ -17,7 +17,6 @@
 open! Flambda.Import
 module BP = Bound_parameter
 module LC = Lifted_constant
-module LCS = Lifted_constant_state
 module P = Flambda_primitive
 module RE = Rebuilt_expr
 module UA = Upwards_acc
@@ -289,36 +288,10 @@ let create_let_symbol0 uacc (bound_static : Bound_static.t)
   in
   expr, uacc
 
-let remove_unused_value_slots uacc static_const =
-  let find_code_metadata code_id =
-    let dacc = UA.creation_dacc uacc in
-    let env = DA.denv dacc in
-    (try Downwards_env.find_code_exn env code_id
-     with Not_found ->
-       Misc.fatal_errorf "Could not find code for %a" Code_id.print code_id)
-    |> Code_or_metadata.code_metadata
-  in
-  Rebuilt_static_const.map_set_of_closures static_const ~find_code_metadata
-    ~f:(fun set_of_closures ->
-      let name_occurrences = UA.used_value_slots uacc in
-      let value_slots =
-        Value_slot.Map.filter
-          (fun value_slot _ ->
-            Name_occurrences.value_slot_is_used_or_imported name_occurrences
-              value_slot)
-          (Set_of_closures.value_slots set_of_closures)
-      in
-      Set_of_closures.create ~value_slots
-        (Set_of_closures.function_decls set_of_closures))
-
 let create_let_symbols uacc lifted_constant ~body =
   let bound_static = LC.bound_static lifted_constant in
   let symbol_projections = LC.symbol_projections lifted_constant in
-  let static_consts =
-    Rebuilt_static_const.Group.map
-      (LC.defining_exprs lifted_constant)
-      ~f:(remove_unused_value_slots uacc)
-  in
+  let static_consts = LC.defining_exprs lifted_constant in
   let expr, uacc = create_let_symbol0 uacc bound_static static_consts ~body in
   Variable.Map.fold
     (fun var proj (expr, uacc) ->
@@ -431,28 +404,6 @@ let create_let_symbols uacc lifted_constant ~body =
          created for the first time here.*)
       expr, uacc)
     symbol_projections (expr, uacc)
-
-let place_lifted_constants uacc ~lifted_constants_from_defining_expr
-    ~lifted_constants_from_body ~put_bindings_around_body ~body =
-  (* Lifted constants are placed as soon as they reach toplevel. *)
-  if not (UA.no_lifted_constants uacc)
-  then
-    Misc.fatal_errorf
-      "All lifted constants of the body should have been\n\
-      \                        removed from the uacc";
-  let place_constants uacc ~around constants =
-    let sorted = LCS.sort constants in
-    ArrayLabels.fold_left sorted.innermost_first ~init:(around, uacc)
-      ~f:(fun (body, uacc) lifted_const ->
-        create_let_symbols uacc lifted_const ~body)
-  in
-  (* Place constants whose definitions may depend on the bound name(s) of the
-     current binding(s) to be introduced by [put_bindings_around_body]. *)
-  let body, uacc =
-    place_constants uacc ~around:body lifted_constants_from_body
-  in
-  let body, uacc = put_bindings_around_body uacc ~body in
-  place_constants uacc ~around:body lifted_constants_from_defining_expr
 
 let create_switch uacc ~condition_dbg ~scrutinee ~arms =
   if Target_ocaml_int.Map.cardinal arms < 1

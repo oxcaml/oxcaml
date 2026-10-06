@@ -36,6 +36,28 @@ val fold : t -> init:'a -> f:('a -> LC.t -> 'a) -> 'a
 
 val all_defined_symbols : t -> Symbol.Set.t
 
-type sort_result = private { innermost_first : LC.t array }
+module Sorted : sig
+  type t
 
-val sort : t -> sort_result
+  val print : Format.formatter -> t -> unit
+
+  val add :
+    find_code_metadata:(Code_id.t -> Code_metadata.t) ->
+    used_value_slots:Name_occurrences.t ->
+    t ->
+    LC.t ->
+    t
+
+  val pop_lifted_constants_to_place :
+    t -> bound_names:Name_occurrences.t -> LC.t list * t
+
+  val pop_all_remaining_lifted_constants : t -> LC.t list * t
+
+  val fold_in_any_order : t -> init:'a -> f:('a -> LC.t -> 'a) -> 'a
+end
+
+val sort :
+  find_code_metadata:(Code_id.t -> Code_metadata.t) ->
+  used_value_slots:Name_occurrences.t ->
+  t ->
+  Sorted.t

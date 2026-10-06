@@ -128,7 +128,14 @@ let simplify_toplevel_common dacc simplify ~params ~implicit_params
       then UA.set_resimplify uacc
       else uacc
     in
-    rebuild_expr expr uacc ~after_rebuild:(fun expr uacc -> expr, uacc)
+    rebuild_expr expr uacc ~after_rebuild:(fun expr uacc ->
+        (* Place any remaining lifted constants, but only when at toplevel. When
+           inside a closure, constants are accumulated and will be moved to the
+           outer downwards accumulator. *)
+        match UA.lifted_constants uacc with
+        | In_a_closure _ -> expr, uacc
+        | At_toplevel _ ->
+          Simplify_common.place_all_remaining_lifted_constants expr uacc)
   in
   (* We don't check occurrences of variables or symbols here because the check
      required depends on whether we're dealing with a lambda or the whole

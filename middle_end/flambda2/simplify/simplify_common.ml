@@ -477,3 +477,116 @@ let add_symbol_projection dacc ~projected_from projection ~projection_bound_to
         let var = Bound_var.var projection_bound_to in
         DA.map_denv dacc ~f:(fun denv -> DE.add_symbol_projection denv var proj))
       ~var:(fun _ ~coercion:_ -> dacc)
+
+(* (* Determine which lifted constants need to be placed when rebuilding a
+   Let-binding that binds one or more symbols.
+
+   We try and place lifted constants as high as possible, and to do that, we
+   only place a lifted constant if that constant depends on the names being
+   bound by the let binding we are currently rebuilding. *) let
+   compute_lifted_constants_to_place ~bound_names (lifted_constants :
+   LCS.sort_result) = if NO.is_empty bound_names then [], lifted_constants else
+   let _, to_place, remaining = List.fold_right (fun lc (being_defined,
+   to_place, remaining) -> let free_names = LC.free_names lc in (* if a lifted
+   constant depends on at least one of the name being defined, then that lifted
+   constant cannot be lifted higher than the current point *) if
+   NO.inter_domain_is_non_empty free_names being_defined then let being_defined
+   = NO.union being_defined (Bound_static.free_names (LC.bound_static lc)) in
+   being_defined, lc :: to_place, remaining else being_defined, to_place, lc ::
+   remaining ) lifted_constants.innermost_first (bound_names, [], []) in
+   to_place, LCS.create_sort_result remaining *)
+
+let is_lifted_constant_used uacc lifted_constant =
+  let bound = LC.bound_static lifted_constant in
+  let is_in_free_names =
+    Name_occurrences.inter_domain_is_non_empty
+      (Bound_static.free_names bound)
+      (UA.name_occurrences uacc)
+  in
+  let keep_code_id, code_ids_live =
+    match UA.reachable_code_ids uacc with
+    | Unknown ->
+      (* During speculative inlining at toplevel (which is the only situation
+         where we can try to place lifted constants, and have an unknown
+         reachable code ids), the Flow analysis does not keep the code ids (and
+         other linked symbols) live, so we do the same here.
+
+         CR gbury: this may result in under-estimating the cost of inlining at
+         top-level because the increase in code size due to newly lifted
+         constants will be under-estimated. *)
+      false, false
+    | Known { live_code_ids; ancestors_of_live_code_ids } ->
+      (* We use ancestors of live code ids (which is a superset of live code
+         ids) here so that even for code ids that we will delete, we include a
+         binding, explicitly marking those code ids are deleted (rather than not
+         having any binding for those). *)
+      let disjoint_from_kept_code_ids =
+        Code_id.Set.disjoint
+          (Bound_static.code_being_defined bound)
+          live_code_ids
+      in
+      let disjoint_from_ancestors =
+        Code_id.Set.disjoint
+          (Bound_static.code_being_defined bound)
+          ancestors_of_live_code_ids
+      in
+      not disjoint_from_kept_code_ids, not disjoint_from_ancestors
+  in
+  let symbols_live =
+    not
+      (Name.Set.disjoint
+         (Name.set_of_symbol_set (Bound_static.symbols_being_defined bound))
+         (UA.required_names uacc))
+  in
+  if false && debug ()
+  then
+    Format.eprintf
+      "@\n\
+       *** lifted constant used ? ( free_names:%b / required_names:%b / \
+       keep_code_id: %b / code_ids_live:%b )@\n\
+       %a@."
+      is_in_free_names symbols_live keep_code_id code_ids_live LC.print
+      lifted_constant;
+  (* test *)
+  if Flambda_features.check_light_invariants ()
+  then
+    if is_in_free_names && not (symbols_live || keep_code_id)
+    then
+      Misc.fatal_errorf
+        "Data flow analysis result (required_name + reachable code ids) should \
+         be a superset of name_occurrences/free names";
+  is_in_free_names || symbols_live || code_ids_live
+
+let rec place_lifted_constants_if_used ~uacc ~body = function
+  | [] -> body, uacc
+  | lifted_constant :: other_lifted_constants ->
+    let body, uacc =
+      if is_lifted_constant_used uacc lifted_constant
+      then EB.create_let_symbols uacc lifted_constant ~body
+      else body, uacc
+    in
+    place_lifted_constants_if_used ~uacc ~body other_lifted_constants
+
+let place_required_lifted_constants ~bound_names body uacc =
+  (* Determine which lifted constants need to be placed based on the names being
+     bound. Only place constants when at toplevel; when inside a closure,
+     constants are accumulated and will be placed at toplevel later. *)
+  match UA.pop_lifted_constants_for_placement ~bound_names uacc with
+  | In_a_closure () -> body, uacc
+  | At_toplevel (uacc, lifted_constants_to_place) ->
+    if false && debug ()
+    then Format.eprintf "--- start placing lifted constants ---@.";
+    let body, uacc =
+      place_lifted_constants_if_used ~uacc ~body lifted_constants_to_place
+    in
+    if false && debug ()
+    then Format.eprintf "--- end placing lifted constants ---@.";
+    body, uacc
+
+let place_all_remaining_lifted_constants expr uacc =
+  if false && debug ()
+  then Format.eprintf "@\n--- placing lifted constants at toplevel ---@.";
+  let uacc, lifted_constants_to_place =
+    UA.pop_all_remaining_lifted_constants_to_place uacc
+  in
+  place_lifted_constants_if_used ~uacc ~body:expr lifted_constants_to_place

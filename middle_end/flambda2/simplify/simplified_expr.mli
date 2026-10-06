@@ -49,9 +49,6 @@ and simplified_defining_expr =
      block). *)
   { bindings_to_place : Simplified_named.binding_to_place list;
     removed_operations : Removed_operations.t;
-    lifted_constants_from_defining_expr : Lifted_constant_state.t;
-    at_unit_toplevel : bool;
-    closure_info : Closure_info.t;
     rewrite_id : Named_rewrite_id.t
   }
 
@@ -136,9 +133,6 @@ val notify_removed : operation:Removed_operations.t -> t -> t
 val simplified_let :
   bindings_to_place:Simplified_named.binding_to_place list ->
   removed_operations:Removed_operations.t ->
-  lifted_constants_from_defining_expr:Lifted_constant_state.t ->
-  at_unit_toplevel:bool ->
-  closure_info:Closure_info.t ->
   rewrite_id:Named_rewrite_id.t ->
   t ->
   t

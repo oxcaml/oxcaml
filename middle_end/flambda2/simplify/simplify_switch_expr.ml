@@ -329,7 +329,7 @@ let ( let$ ) expr k uacc ~shareable_constants ~typing_env_before_switch
           Alloc_mode.For_types.heap ~machine_width
       in
       let uacc =
-        UA.add_lifted_constant uacc
+        UA.add_required_lifted_constant uacc
           (LC.create_block_like symbol array_const typing_env_before_switch
              block_type ~symbol_projections:Variable.Map.empty)
       in

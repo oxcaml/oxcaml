@@ -101,6 +101,12 @@ val bound_static : t -> Bound_static.t
 
 val defining_exprs : t -> Rebuilt_static_const.Group.t
 
+val remove_unused_value_slots :
+  find_code_metadata:(Code_id.t -> Code_metadata.t) ->
+  used_value_slots:Name_occurrences.t ->
+  t ->
+  t
+
 val types_of_symbols : t -> (Typing_env.t * Flambda2_types.t) Symbol.Map.t
 
 val symbol_projections : t -> Symbol_projection.t Variable.Map.t
@@ -113,4 +119,28 @@ val all_defined_symbols : t -> Symbol.Set.t
 
 val free_names_of_defining_exprs : t -> Name_occurrences.t
 
+val free_names : t -> Name_occurrences.t
+
 val apply_projection : t -> Symbol_projection.t -> Simple.t option
+
+module Set : sig
+  type elt = t
+
+  type t
+
+  val print : Format.formatter -> t -> unit
+
+  val empty : t
+
+  val mem : elt -> t -> bool
+
+  val add : elt -> t -> t
+
+  val fold : (elt -> 'acc -> 'acc) -> t -> 'acc -> 'acc
+
+  val inter : t -> t -> t
+
+  val diff : t -> t -> t
+
+  val elements : t -> elt list
+end

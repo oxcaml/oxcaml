@@ -59,3 +59,5 @@ val make_rewrite :
 
 val rewrite_exn_continuation :
   t -> Apply_cont_rewrite_id.t -> Exn_continuation.t -> Exn_continuation.t
+
+val all_params_free_names : t -> Name_occurrences.t

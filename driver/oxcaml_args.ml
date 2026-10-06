@@ -1769,10 +1769,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
         F.flambda2_expert_cont_lifting_budget;
       mk_flambda2_expert_cont_spec_threshold
         F.flambda2_expert_cont_spec_threshold;
-      mk_flambda2_expert_symbol_check
-        F.flambda2_expert_symbol_check;
-      mk_no_flambda2_expert_symbol_check
-        F.no_flambda2_expert_symbol_check;
+      mk_flambda2_expert_symbol_check F.flambda2_expert_symbol_check;
+      mk_no_flambda2_expert_symbol_check F.no_flambda2_expert_symbol_check;
       mk_flambda2_debug_concrete_types_only_on_canonicals
         F.flambda2_debug_concrete_types_only_on_canonicals;
       mk_no_flambda2_debug_concrete_types_only_on_canonicals

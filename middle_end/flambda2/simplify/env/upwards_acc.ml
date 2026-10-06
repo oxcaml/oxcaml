@@ -21,10 +21,12 @@ module LCS = Lifted_constant_state
 module TE = Flambda2_types.Typing_env
 module UE = Upwards_env
 
+type lifted_constants = (LCS.Sorted.t, LCS.t) At_toplevel_or_in_a_closure.t
+
 type t =
   { uenv : UE.t;
     creation_dacc : DA.t;
-    lifted_constants : LCS.t;
+    lifted_constants : lifted_constants;
     all_code : Exported_code.t;
     name_occurrences : Name_occurrences.t;
     cost_metrics : Cost_metrics.t;
@@ -34,9 +36,14 @@ type t =
   }
 
 let [@ocamlformat "disable"] print ppf
-      { uenv; creation_dacc = _; lifted_constants; name_occurrences;
-        all_code = _; cost_metrics; slot_offsets; flow_result; resimplify;
+      { uenv; creation_dacc = _; lifted_constants;
+        name_occurrences; all_code = _; cost_metrics; slot_offsets; flow_result;
+        resimplify;
       } =
+  let print_lifted_constants ppf lifted_constants =
+    At_toplevel_or_in_a_closure.print ~toplevel:LCS.Sorted.print
+      ~in_a_closure:LCS.print ppf lifted_constants
+  in
   Format.fprintf ppf "@[<hov 1>(\
       @[<hov 1>(uenv@ %a)@]@ \
       @[<hov 1>(lifted_constants@ %a)@]@ \
@@ -47,7 +54,7 @@ let [@ocamlformat "disable"] print ppf
       %a\
       )@]"
     UE.print uenv
-    LCS.print lifted_constants
+    print_lifted_constants lifted_constants
     Name_occurrences.print name_occurrences
     Cost_metrics.print cost_metrics
     (Or_unknown.print Slot_offsets.print) slot_offsets
@@ -57,13 +64,42 @@ let [@ocamlformat "disable"] print ppf
      else
        (fun _ppf () -> ())) ()
 
+let fold_lifted_constants lifted_constants ~init ~f =
+  match (lifted_constants : lifted_constants) with
+  | At_toplevel sorted -> LCS.Sorted.fold_in_any_order sorted ~init ~f
+  | In_a_closure lcs -> LCS.fold lcs ~init ~f
+
+let find_code_metadata dacc code_id =
+  let env = DA.denv dacc in
+  (try Downwards_env.find_code_exn env code_id
+   with Not_found ->
+     Misc.fatal_errorf "Could not find code for %a" Code_id.print code_id)
+  |> Code_or_metadata.code_metadata
+
 let create ~flow_result ~compute_slot_offsets uenv dacc =
   let slot_offsets : _ Or_unknown.t =
     if compute_slot_offsets then Known Slot_offsets.empty else Unknown
   in
+  let lcs = DA.get_lifted_constants dacc in
+  let lifted_constants : lifted_constants =
+    match DE.closure_info (DA.denv dacc) with
+    | Not_in_a_closure ->
+      let used_value_slots = DA.used_value_slots dacc in
+      let find_code_metadata = find_code_metadata dacc in
+      let lifted_constants =
+        LCS.sort ~find_code_metadata ~used_value_slots lcs
+      in
+      At_toplevel lifted_constants
+    | Closure _ -> In_a_closure lcs
+    | In_a_set_of_closures_but_not_yet_in_a_specific_closure ->
+      Misc.fatal_errorf
+        "We should never be \
+         In_a_set_of_closures_but_not_yet_in_a_specific_closure when creating \
+         a uacc"
+  in
   { uenv;
     creation_dacc = dacc;
-    lifted_constants = LCS.empty;
+    lifted_constants;
     all_code = Exported_code.empty;
     name_occurrences = Name_occurrences.empty;
     (* [used_value_slots] must be kept separate from the normal free names
@@ -84,19 +120,46 @@ let code_age_relation t = TE.code_age_relation (DA.typing_env t.creation_dacc)
 
 let lifted_constants t = t.lifted_constants
 
-let get_and_clear_lifted_constants t =
-  { t with lifted_constants = LCS.empty }, t.lifted_constants
+let pop_all_remaining_lifted_constants_to_place t =
+  match t.lifted_constants with
+  | At_toplevel sort_result ->
+    let l, sort_result =
+      LCS.Sorted.pop_all_remaining_lifted_constants sort_result
+    in
+    let t = { t with lifted_constants = At_toplevel sort_result } in
+    t, l
+  | In_a_closure _ ->
+    Misc.fatal_error
+      "all_remaining_lifted_constants_to_place called inside a closure"
 
-let add_lifted_constant t const =
-  { t with lifted_constants = LCS.add t.lifted_constants const }
+let pop_lifted_constants_for_placement ~bound_names t =
+  At_toplevel_or_in_a_closure.map t.lifted_constants
+    ~toplevel:(fun sort_result ->
+      let lifted_constants_to_place, sort_result =
+        LCS.Sorted.pop_lifted_constants_to_place sort_result ~bound_names
+      in
+      let t = { t with lifted_constants = At_toplevel sort_result } in
+      t, lifted_constants_to_place)
+    ~in_a_closure:(fun _ -> ())
+
+let add_required_lifted_constant t lc =
+  let lifted_constants : lifted_constants =
+    match t.lifted_constants with
+    | At_toplevel sort_result ->
+      let used_value_slots = DA.used_value_slots t.creation_dacc in
+      let find_code_metadata = find_code_metadata t.creation_dacc in
+      At_toplevel
+        (LCS.Sorted.add ~used_value_slots ~find_code_metadata sort_result lc)
+    | In_a_closure lcs -> In_a_closure (LCS.add lcs lc)
+  in
+  let flow_result =
+    Flow.Analysis.add_required_lifted_constant t.flow_result lc
+  in
+  { t with lifted_constants; flow_result }
 
 let cost_metrics t = t.cost_metrics
 
 let are_rebuilding_terms t = DE.are_rebuilding_terms (DA.denv t.creation_dacc)
-
-let with_lifted_constants t lifted_constants = { t with lifted_constants }
-
-let no_lifted_constants t = LCS.is_empty t.lifted_constants
 
 let map_uenv t ~f = { t with uenv = f t.uenv }
 

@@ -403,16 +403,9 @@ let simplify_static_consts dacc (bound_static : Bound_static.t) static_consts
                functions at the definition of the set of closures. *)
             not (Flambda_features.simplify_stubs ())
           then
-            let dacc, prior_lifted_constants =
-              DA.get_and_clear_lifted_constants dacc
-            in
             let static_const, dacc_after_function =
               Simplify_set_of_closures.simplify_static_stub_function dacc code
                 ~all_code ~simplify_function_body
-            in
-            let dacc_after_function =
-              DA.add_to_lifted_constant_accumulator dacc_after_function
-                prior_lifted_constants
             in
             match Rebuilt_static_const.to_const static_const with
             | None ->

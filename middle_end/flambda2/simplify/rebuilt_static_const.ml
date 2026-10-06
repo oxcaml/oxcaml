@@ -363,6 +363,18 @@ let map_set_of_closures t ~find_code_metadata ~f =
   | Block_not_rebuilt _ | Set_of_closures_not_rebuilt _ | Code_not_rebuilt _ ->
     t
 
+let remove_unused_value_slots ~find_code_metadata ~used_value_slots t =
+  map_set_of_closures ~find_code_metadata t ~f:(fun set_of_closures ->
+      let value_slots =
+        Value_slot.Map.filter
+          (fun value_slot _ ->
+            Name_occurrences.value_slot_is_used_or_imported used_value_slots
+              value_slot)
+          (Set_of_closures.value_slots set_of_closures)
+      in
+      Set_of_closures.create ~value_slots
+        (Set_of_closures.function_decls set_of_closures))
+
 let free_names t =
   match t with
   | Normal { free_names; _ } -> free_names

@@ -16,68 +16,9 @@
 
 open! Simplify_import
 
-let keep_lifted_constant_only_if_used uacc acc lifted_constant =
-  let bound = LC.bound_static lifted_constant in
-  let code_ids_live =
-    match UA.reachable_code_ids uacc with
-    | Unknown -> Bound_static.binds_code bound
-    | Known { live_code_ids = _; ancestors_of_live_code_ids } ->
-      (* CR bclement for gbury: This is likely no longer needed now that the
-         code age relation join has been removed. *)
-      not
-        (Code_id.Set.disjoint
-           (Bound_static.code_being_defined bound)
-           ancestors_of_live_code_ids)
-  in
-  let symbols_live =
-    not
-      (Name.Set.disjoint
-         (Name.set_of_symbol_set (Bound_static.symbols_being_defined bound))
-         (UA.required_names uacc))
-  in
-  if symbols_live || code_ids_live then LCS.add acc lifted_constant else acc
-
-let rebuild_let
-    ( { SE.bindings_to_place;
-        removed_operations;
-        lifted_constants_from_defining_expr;
-        at_unit_toplevel;
-        closure_info;
-        rewrite_id
-      },
-      body ) uacc ~after_rebuild =
-  let lifted_constants_from_defining_expr =
-    match Closure_info.in_or_out_of_closure closure_info with
-    | In_a_closure ->
-      (* See the comment in [simplify_let], below; this case is analogous. *)
-      lifted_constants_from_defining_expr
-    | Not_in_a_closure ->
-      (* We must filter even if not rebuilding terms, otherwise the free names
-         of the terms might get out of sync with [Data_flow]. *)
-      LCS.fold lifted_constants_from_defining_expr ~init:LCS.empty
-        ~f:(keep_lifted_constant_only_if_used uacc)
-  in
-  (* At this point, the free names in [uacc] are the free names of [body], plus
-     all used value slots seen in the whole compilation unit. *)
-  let no_constants_from_defining_expr =
-    LCS.is_empty lifted_constants_from_defining_expr
-  in
-  (* The lifted constants present in [uacc] are the ones arising from the
-     simplification of [body] which still have to be placed. We augment these
-     with any constants arising from the simplification of the defining
-     expression. Then we either place all of them, if we are at toplevel, or
-     else return them in [uacc] for an outer [Let]-binding to deal with.
-
-     It may be surprising that lifted constants can arise from the
-     simplification of the body in the case where they have also arisen from the
-     defining expression (since the latter implies that we must be at toplevel).
-     However this can happen in the case of recursive continuations, in which
-     constants cannot be placed. *)
-  (* CR mshinwell: We don't actually have to have this logic for placing lifted
-     constants here; it could be done before any other kind of expression. *)
-  let no_constants_to_place =
-    no_constants_from_defining_expr && UA.no_lifted_constants uacc
-  in
+let rebuild_let ({ SE.bindings_to_place; removed_operations; rewrite_id }, body)
+    uacc ~after_rebuild =
+  (* TODO: this does not need to be a function anymore *)
   let put_bindings_around_body uacc ~body =
     let uacc = UA.notify_removed ~operation:removed_operations uacc in
     let bindings =
@@ -112,6 +53,16 @@ let rebuild_let
                     }))
             | Simple _ | Set_of_closures _ | Rec_info _ -> binding))
         bindings_to_place
+    in
+    let body, uacc =
+      let bound_names =
+        List.fold_left
+          (fun bound_names binding_to_place ->
+            Name_occurrences.union bound_names
+              (Simplified_named.binding_to_place_bound_names binding_to_place))
+          Name_occurrences.empty bindings_to_place
+      in
+      Simplify_common.place_required_lifted_constants body uacc ~bound_names
     in
     (* Phantom let creation *)
     let generate_phantom_lets = UA.generate_phantom_lets uacc in
@@ -320,30 +271,8 @@ let rebuild_let
     in
     EB.make_new_let_bindings uacc ~bindings_outermost_first:bindings ~body
   in
-  (* Return as quickly as possible if there is nothing to do. In this case, all
-     constants get floated up to an outer binding. *)
-  if no_constants_to_place || not at_unit_toplevel
-  then
-    let uacc =
-      (* Avoid re-allocating [uacc] unless necessary. *)
-      if no_constants_from_defining_expr
-      then uacc
-      else
-        let lifted_constants_from_body = UA.lifted_constants uacc in
-        LCS.union lifted_constants_from_body lifted_constants_from_defining_expr
-        |> UA.with_lifted_constants uacc
-    in
-    let body, uacc = put_bindings_around_body uacc ~body in
-    after_rebuild body uacc
-  else
-    let uacc, lifted_constants_from_body =
-      UA.get_and_clear_lifted_constants uacc
-    in
-    let body, uacc =
-      EB.place_lifted_constants uacc ~lifted_constants_from_defining_expr
-        ~lifted_constants_from_body ~put_bindings_around_body ~body
-    in
-    after_rebuild body uacc
+  let body, uacc = put_bindings_around_body uacc ~body in
+  after_rebuild body uacc
 
 let record_new_defining_expression_binding_for_data_flow dacc ~rewrite_id
     data_flow (binding : Simplified_named.binding_to_place) : Flow.Acc.t =
@@ -437,7 +366,6 @@ let simplify_let0 ~simplify_expr ~simplify_function_body dacc let_expr
             (update_data_flow dacc closure_info ~rewrite_id
                ~lifted_constants_from_defining_expr simplify_named_result)
       in
-      let at_unit_toplevel = DE.at_unit_toplevel (DA.denv dacc) in
       (* Simplify the body of the let-expression and make the new [Let] bindings
          around the simplified body. [Simplify_named] will already have prepared
          [dacc] with the necessary bindings for the simplification of the
@@ -447,8 +375,7 @@ let simplify_let0 ~simplify_expr ~simplify_function_body dacc let_expr
           (SE.simplified_let
              ~bindings_to_place:
                (Simplify_named_result.bindings_to_place simplify_named_result)
-             ~removed_operations ~lifted_constants_from_defining_expr
-             ~at_unit_toplevel ~closure_info ~rewrite_id simplified_body)
+             ~removed_operations ~rewrite_id simplified_body)
       in
       simplify_expr dacc body ~down_to_up)
 
