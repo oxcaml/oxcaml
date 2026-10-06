@@ -8,7 +8,7 @@
 
 #show list;;
 [%%expect {|
-type ('a : value_or_null) list = [] | (::) of 'a * 'a list
+type ('a : any) list = [] | (::) of 'a * 'a list
 |}];;
 
 type 'a t;;

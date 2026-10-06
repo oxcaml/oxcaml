@@ -174,17 +174,23 @@ Error: This constant has type "string" but an expression was expected of type
 |}];;
 
 (* Type_argument *)
-let f (x: t_void) = [x]
+module Value_list = struct
+  type ('a : value_or_null) t = [] | (::) of 'a * 'a t
+end
+
+let f (x: t_void) = let open Value_list in [x]
 [%%expect{|
-Line 1, characters 21-22:
-1 | let f (x: t_void) = [x]
-                         ^
+module Value_list :
+  sig type ('a : value_or_null) t = [] | (::) of 'a * 'a t end
+Line 5, characters 44-45:
+5 | let f (x: t_void) = let open Value_list in [x]
+                                                ^
 Error: The value "x" has type "t_void" but an expression was expected of type
          "('a : value_or_null)"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
        But the layout of t_void must be a value layout
-         because the type argument of list has layout value_or_null.
+         because of the definition of t at line 2, characters 2-54.
 |}];;
 
 (* Tuple *)

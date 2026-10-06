@@ -31,50 +31,22 @@ type t = C : int8# -> t
 *)
 type t = int8# list;;
 [%%expect {|
-Line 1, characters 9-14:
-1 | type t = int8# list;;
-             ^^^^^
-Error: This type "int8#" should be an instance of type "('a : value_or_null)"
-       The layout of int8# is bits8
-         because it is the unboxed version of the primitive type int8.
-       But the layout of int8# must be a value layout
-         because the type argument of list has layout value_or_null.
+type t = int8# list
 |}];;
 
 let f (_ : int8# list) = ();;
 [%%expect {|
-Line 1, characters 11-16:
-1 | let f (_ : int8# list) = ();;
-               ^^^^^
-Error: This type "int8#" should be an instance of type "('a : value_or_null)"
-       The layout of int8# is bits8
-         because it is the unboxed version of the primitive type int8.
-       But the layout of int8# must be a value layout
-         because the type argument of list has layout value_or_null.
+val f : int8# list -> unit = <fun>
 |}];;
 
 type t = C of int8# list;;
 [%%expect {|
-Line 1, characters 14-19:
-1 | type t = C of int8# list;;
-                  ^^^^^
-Error: This type "int8#" should be an instance of type "('a : value_or_null)"
-       The layout of int8# is bits8
-         because it is the unboxed version of the primitive type int8.
-       But the layout of int8# must be a value layout
-         because the type argument of list has layout value_or_null.
+type t = C of int8# list
 |}];;
 
 type t = C : int8# list -> t;;
 [%%expect {|
-Line 1, characters 13-18:
-1 | type t = C : int8# list -> t;;
-                 ^^^^^
-Error: This type "int8#" should be an instance of type "('a : value_or_null)"
-       The layout of int8# is bits8
-         because it is the unboxed version of the primitive type int8.
-       But the layout of int8# must be a value layout
-         because the type argument of list has layout value_or_null.
+type t = C : int8# list -> t
 |}];;
 
 (* Syntax: int8#c

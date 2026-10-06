@@ -26,7 +26,9 @@ let f =
   in
   f', f';;
 [%%expect{|
-val f : ('a list -> 'b list) * ('c list -> 'd list) = (<fun>, <fun>)
+val f :
+  'a ('b : any) 'c ('d : any). ('a list -> 'b list) * ('c list -> 'd list) =
+  (<fun>, <fun>)
 |}]
 
 let f =
