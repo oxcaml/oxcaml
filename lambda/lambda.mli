@@ -627,7 +627,7 @@ and layout =
   | Punboxed_product of layout list
     (** Invariant: the layout list has length >= 2 *)
   | Pbottom
-  | Psplicevar of Slambdaident.t
+  | Psplicevar of Layout_ident.t
 
 and block_shape =
   | All_value
@@ -654,7 +654,7 @@ and 'a mixed_block_element =
   | Void
   | Product of 'a mixed_block_element array
     (** Invariant: the mixed_block_element array has length >= 2 *)
-  | Splice_variable of Slambdaident.t
+  | Splice_variable of Layout_ident.t
 
 and mixed_block_shape = unit mixed_block_element array
 
@@ -1097,7 +1097,7 @@ and lfunction = private
   }
 
 and lkindtemplate =
-  { ktmpl_params: Slambdaident.t list;
+  { ktmpl_params: Layout_ident.t list;
     ktmpl_body: lfunction;
   }
 
@@ -1661,5 +1661,5 @@ val static_cast
   -> loc:scoped_location
   -> lambda
 
-val fatal_error_unevaluated_splice_var : Slambdaident.t -> 'a
+val fatal_error_unevaluated_splice_var : Layout_ident.t -> 'a
 val fatal_error_invalid_constructor : lambda -> 'a
