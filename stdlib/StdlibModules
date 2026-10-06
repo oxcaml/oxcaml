@@ -43,7 +43,6 @@ STDLIB_MODULE_BASENAMES = \
   type \
   atomic \
   camlinternalLazy \
-  dynamic \
   lazy \
   seq \
   option \
@@ -77,22 +76,22 @@ STDLIB_MODULE_BASENAMES = \
   arg \
   printexc \
   fun \
-  gc \
   in_channel \
   out_channel \
+  callback \
   digest \
   mutex \
   condition \
   semaphore \
   modes \
   domain \
+  gc \
   bigarray \
   random \
   hashtbl \
   weak \
   format \
   scanf \
-  callback \
   camlinternalOO \
   oo \
   camlinternalMod \
@@ -107,6 +106,7 @@ STDLIB_MODULE_BASENAMES = \
   stringLabels \
   moreLabels \
   stdLabels \
+  dynamic \
   effect \
   camlinternalComprehension \
   camlinternalQuote \

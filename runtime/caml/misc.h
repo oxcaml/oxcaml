@@ -151,9 +151,7 @@ CAMLdeprecated_typedef(addr, char *);
 #endif
 
 #define CAMLexport
-#ifndef CAML_NO_DEFINE_CAMLprim
 #define CAMLprim
-#endif
 #define CAMLextern CAMLDLLIMPORT extern
 
 /* Weak function definitions that can be overridden by external libs */
