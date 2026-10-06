@@ -2492,29 +2492,32 @@ module Sexp = struct
   let print_field ~first ppf field =
     let fprintf colour ppf fmt =
       match colour with
-      | None -> Format.fprintf ppf fmt
+      | None ->
+        Format.fprintf ppf "%a@[<hov 1>" spacer first;
+        Format.kfprintf (fun ppf -> Format.fprintf ppf "@]") ppf fmt
       | Some colour ->
-        colour ppf;
-        Format.kfprintf (fun ppf -> Colours.pop ppf) ppf fmt
+        Format.fprintf ppf "%a@[<hov 1>%t" spacer first colour;
+        Format.kfprintf
+          (fun ppf -> Format.fprintf ppf "%t@]" Colours.pop) ppf fmt
     in
     match field with
     | String (colour, name, s) ->
-      fprintf colour ppf "%a@[<hov 1>(%s@ %s)@]" spacer first name s
+      fprintf colour ppf "(%s@ %s)" name s
     | Bool (colour, name, b) ->
-      fprintf colour ppf "%a@[<hov 1>(%s@ %b)@]" spacer first name b
+      fprintf colour ppf "(%s@ %b)" name b
     | Int (colour, name, i) ->
-      fprintf colour ppf "%a@[<hov 1>(%s@ %d)@]" spacer first name i
+      fprintf colour ppf "(%s@ %d)" name i
     | Float (colour, name, f) ->
-      fprintf colour ppf "%a@[<hov 1>(%s@ %f)@]" spacer first name f
+      fprintf colour ppf "(%s@ %f)" name f
     | Fmt (colour, t) ->
-      fprintf colour ppf "%a@[<hov 1>%t@]" spacer first t
+      fprintf colour ppf "%t" t
     | Print (colour, name, pp, x) ->
-      fprintf colour ppf "%a@[<hov 1>(%s@ @[<hov>%a@])@]" spacer first name pp x
+      fprintf colour ppf "(%s@ @[<hov>%a@])" name pp x
     | Option (colour, name, pp, opt) -> (
         match opt with
         | None -> ()
         | Some x ->
-          fprintf colour ppf "%a@[<hov 1>(%s@ %a)@]" spacer first name pp x
+          fprintf colour ppf "(%s@ %a)" name pp x
       )
 
   let print ppf (l : field list) =
