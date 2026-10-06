@@ -7,7 +7,7 @@
 
 (* Multiplication by 3, 5 and 9 should be strength-reduced to a single [lea],
    even when the operand is a computed expression (not just a variable) and for
-   [int32] / [int64], where it previously emitted [imul]. *)
+   [int32_u] / [int64_u], where it previously emitted [imul]. *)
 
 let mul5_var (x : int) = x * 5
 [%%expect_asm X86_64{|
@@ -44,44 +44,31 @@ mul9_expr:
   ret
 |}]
 
-let mul5_int64 (x : int64) = Int64.mul x 5L
+(* For the unboxed-int cases the operand must be a computed expression: with a
+   simple variable, instruction selection already produces a [lea] directly. *)
+
+external box_int64 : int64_u -> int64 = "%box_int64" [@@warning "-187"]
+external unbox_int64 : int64 -> int64_u = "%unbox_int64" [@@warning "-187"]
+
+let mul5_int64 (x : int64_u) (y : int64_u) =
+  unbox_int64 (Int64.mul (Int64.add (box_int64 x) (box_int64 y)) 5L)
 [%%expect_asm X86_64{|
 mul5_int64:
-  subq  $8, %rsp
-  subq  $24, %r15
-  cmpq  (%r14), %r15
-  jb    <hidden GC jump pad>
-.L0:
-  leaq  8(%r15), %rbx
-  movq  $2303, -8(%rbx)
-  movq  caml_int64_ops@GOTPCREL(%rip), %rdi
-  movq  %rdi, (%rbx)
-  movq  8(%rax), %rax
+  addq  %rbx, %rax
   leaq  (%rax,%rax,4), %rax
-  movq  %rax, 8(%rbx)
-  movq  %rbx, %rax
-  addq  $8, %rsp
   ret
 |}]
 
-let mul5_int32 (x : int32) = Int32.mul x 5l
+external box_int32 : int32_u -> int32 = "%box_int32" [@@warning "-187"]
+external unbox_int32 : int32 -> int32_u = "%unbox_int32" [@@warning "-187"]
+
+let mul5_int32 (x : int32_u) (y : int32_u) =
+  unbox_int32 (Int32.mul (Int32.add (box_int32 x) (box_int32 y)) 5l)
 [%%expect_asm X86_64{|
 mul5_int32:
-  subq  $8, %rsp
-  subq  $24, %r15
-  cmpq  (%r14), %r15
-  jb    <hidden GC jump pad>
-.L0:
-  leaq  8(%r15), %rbx
-  movq  $2303, -8(%rbx)
-  movq  caml_int32_ops@GOTPCREL(%rip), %rdi
-  movq  %rdi, (%rbx)
-  movslq 8(%rax), %rax
+  addq  %rbx, %rax
   leaq  (%rax,%rax,4), %rax
   movslq %eax, %rax
-  movq  %rax, 8(%rbx)
-  movq  %rbx, %rax
-  addq  $8, %rsp
   ret
 |}]
 
