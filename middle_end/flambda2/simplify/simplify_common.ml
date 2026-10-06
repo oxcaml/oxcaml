@@ -483,3 +483,93 @@ let add_symbol_projection dacc ~projected_from projection ~projection_bound_to
         let var = Bound_var.var projection_bound_to in
         DA.map_denv dacc ~f:(fun denv -> DE.add_symbol_projection denv var proj))
       ~var:(fun _ ~coercion:_ -> dacc)
+
+let is_lifted_constant_used uacc body lifted_constant =
+  let bound = LC.bound_static lifted_constant in
+  let is_in_free_names =
+    Name_occurrences.inter_domain_is_non_empty
+      (Bound_static.free_names bound)
+      (RE.free_names body)
+  in
+  let speculative_toplevel, keep_code_id, code_ids_live =
+    match UA.reachable_code_ids uacc with
+    | Unknown ->
+      (* During speculative inlining at toplevel (which is the only situation
+         where we can try to place lifted constants, and have an unknown
+         reachable code ids), the Flow analysis does not keep the code ids (and
+         other linked symbols) live, so we do the same here.
+
+         CR gbury: this may result in under-estimating the cost of inlining at
+         top-level because the increase in code size due to newly lifted
+         constants will be under-estimated. *)
+      true, false, false
+    | Known { live_code_ids; ancestors_of_live_code_ids } ->
+      (* We use ancestors of live code ids (which is a superset of live code
+         ids) here so that even for code ids that we will delete, we include a
+         binding, explicitly marking those code ids are deleted (rather than not
+         having any binding for those). *)
+      let disjoint_from_kept_code_ids =
+        Code_id.Set.disjoint
+          (Bound_static.code_being_defined bound)
+          live_code_ids
+      in
+      let disjoint_from_ancestors =
+        Code_id.Set.disjoint
+          (Bound_static.code_being_defined bound)
+          ancestors_of_live_code_ids
+      in
+      false, not disjoint_from_kept_code_ids, not disjoint_from_ancestors
+  in
+  let symbols_live =
+    not
+      (Name.Set.disjoint
+         (Name.set_of_symbol_set (Bound_static.symbols_being_defined bound))
+         (UA.required_names uacc))
+  in
+  (* test *)
+  if Flambda_features.check_light_invariants ()
+  then
+    (* During speculation at toplevel, we cannot check coherence between free
+       names and data flow result, since data flow did not perform any
+       meaningful analysis. *)
+    if
+      is_in_free_names
+      && (not (symbols_live || keep_code_id))
+      && not speculative_toplevel
+    then
+      Misc.fatal_errorf
+        "Data flow analysis result (required_name + reachable code ids) should \
+         be a superset of name_occurrences/free names.@\n\
+         symbols_live: %b / keep_code_id: %b / code_ids_live: %b@\n\
+         %a"
+        symbols_live keep_code_id code_ids_live Lifted_constant.print
+        lifted_constant;
+  is_in_free_names || symbols_live || code_ids_live
+
+let rec place_lifted_constants_if_used ~uacc ~body = function
+  | [] -> body, uacc
+  | lifted_constant :: other_lifted_constants ->
+    let body, uacc =
+      if is_lifted_constant_used uacc body lifted_constant
+      then EB.create_let_symbols uacc lifted_constant ~body
+      else body, uacc
+    in
+    place_lifted_constants_if_used ~uacc ~body other_lifted_constants
+
+let place_required_lifted_constants ~bound_names body uacc =
+  (* Determine which lifted constants need to be placed based on the names being
+     bound. Only place constants when at toplevel; when inside a closure,
+     constants are accumulated and will be placed at toplevel later. *)
+  match UA.pop_lifted_constants_for_placement ~bound_names uacc with
+  | In_a_closure () -> body, uacc
+  | At_toplevel (uacc, lifted_constants_to_place) ->
+    place_lifted_constants_if_used ~uacc ~body lifted_constants_to_place
+
+let place_all_remaining_lifted_constants expr uacc =
+  match UA.pop_all_remaining_lifted_constants_to_place uacc with
+  | At_toplevel (uacc, lifted_constants_to_place) ->
+    place_lifted_constants_if_used ~uacc ~body:expr lifted_constants_to_place
+  | In_a_closure _ ->
+    Misc.fatal_errorf
+      "[Lifted_constant_state]: Cannot place all remaining lifted constants \
+       inside of a closure !"

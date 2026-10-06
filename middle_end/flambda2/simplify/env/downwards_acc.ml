@@ -188,8 +188,6 @@ let get_and_clear_lifted_constants t =
   let t = clear_lifted_constants t in
   t, constants
 
-let set_lifted_constants t consts = { t with lifted_constants = consts }
-
 let find_shareable_constant t static_const =
   Static_const.Map.find_opt static_const t.shareable_constants
 

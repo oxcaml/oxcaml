@@ -31,7 +31,6 @@ module CSE = Common_subexpression_elimination
 module EPA = Continuation_extra_params_and_args
 module T = Flambda2_types
 module TE = T.Typing_env
-module LCS = Lifted_constant_state
 
 type t =
   { simplified_lets_and_let_conts : simplified_lets_and_let_conts;
@@ -49,9 +48,6 @@ and simplified_lets_and_let_conts =
 and simplified_defining_expr =
   { bindings_to_place : Simplified_named.binding_to_place list;
     removed_operations : Removed_operations.t;
-    lifted_constants_from_defining_expr : LCS.t;
-    at_unit_toplevel : bool;
-    closure_info : Closure_info.t;
     rewrite_id : Named_rewrite_id.t
   }
 
@@ -170,52 +166,11 @@ and print_lets_and_let_conts ~ctx ppf = function
     print_let_cont ~ctx ppf ~body let_cont
 
 and print_let_expr ~ctx ~body ppf
-    { bindings_to_place;
-      removed_operations = _;
-      lifted_constants_from_defining_expr;
-      at_unit_toplevel = _;
-      closure_info = _;
-      rewrite_id
-    } =
-  Format.fprintf ppf "@[<hv 2>let%a@ %a%a@;<1 -2>in@]@\n"
+    { bindings_to_place; removed_operations = _; rewrite_id } =
+  Format.fprintf ppf "@[<hv 2>let%a@ %a@;<1 -2>in@]@\n"
     (print_elide Named_rewrite_id.print)
-    rewrite_id print_lifted_constants lifted_constants_from_defining_expr
-    print_bindings_to_place bindings_to_place;
+    rewrite_id print_bindings_to_place bindings_to_place;
   print_lets_and_let_conts ~ctx ppf body
-
-and print_lifted_constants ppf lcs =
-  LCS.fold lcs ~init:() ~f:(fun () lc ->
-      let defs = Lifted_constant.definitions lc in
-      List.iter
-        (fun def ->
-          let expr = Lifted_constant.Definition.defining_expr def in
-          match Lifted_constant.Definition.descr def with
-          | Code code_id ->
-            Format.fprintf ppf "@[<hov 2>%a = <code>@]@\n" Code_id.print code_id
-          | Set_of_closures
-              { typing_env = _;
-                closure_symbols_with_types;
-                symbol_projections = _
-              } ->
-            let symbols =
-              Function_slot.Lmap.data closure_symbols_with_types |> List.map fst
-            in
-            Format.fprintf ppf "@[<hv 2>%a =@ %a@]@\n"
-              print_set_of_closures_symbols symbols Rebuilt_static_const.print
-              expr
-          | Block_like
-              { symbol; typing_env = _; ty = _; symbol_projections = _ } ->
-            Format.fprintf ppf "@[<hv 2>%a = @ %a@]@\n" Symbol.print symbol
-              Rebuilt_static_const.print expr)
-        defs)
-
-and print_set_of_closures_symbols ppf = function
-  | [] -> assert false (* CR gbury: this should never happen I think *)
-  | [symbol] -> Symbol.print ppf symbol
-  | _ :: _ as symbols ->
-    Format.fprintf ppf "@[<hov 1>(%a)@]"
-      (Format.pp_print_list ~pp_sep:Format.pp_print_space Symbol.print)
-      symbols
 
 and print_bindings_to_place ppf = function
   | [] ->
@@ -426,19 +381,11 @@ let notify_removed ~operation t =
 
 let mark_as_cold t = if t.is_cold then t else { t with is_cold = true }
 
-let simplified_let ~bindings_to_place ~removed_operations
-    ~lifted_constants_from_defining_expr ~at_unit_toplevel ~closure_info
-    ~rewrite_id t =
+let simplified_let ~bindings_to_place ~removed_operations ~rewrite_id t =
   { t with
     simplified_lets_and_let_conts =
       Simplified_let
-        ( { bindings_to_place;
-            removed_operations;
-            lifted_constants_from_defining_expr;
-            at_unit_toplevel;
-            closure_info;
-            rewrite_id
-          },
+        ( { bindings_to_place; removed_operations; rewrite_id },
           t.simplified_lets_and_let_conts )
   }
 

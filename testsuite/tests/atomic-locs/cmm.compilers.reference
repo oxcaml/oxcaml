@@ -10,20 +10,14 @@
  addr G:"camlCmm__cas_7")
 (data
  int 4087
- global "camlCmm__cas_7":
- addr G:"caml_curry3"
- int 252201579132747783
- addr G:"camlCmm__cas_6_13_code")
-(data
- int 4087
- global "camlCmm__set_imm_6":
+ global "camlCmm__standard_atomic_get_2":
  addr G:"caml_curry2"
  int 180143985094819847
- addr G:"camlCmm__set_imm_5_12_code")
+ addr G:"camlCmm__standard_atomic_get_1_8_code")
 (data
  int 3063
- global "camlCmm__get_imm_5":
- addr G:"camlCmm__get_imm_4_11_code"
+ global "camlCmm__get_3":
+ addr G:"camlCmm__get_2_9_code"
  int 108086391056891909)
 (data
  int 4087
@@ -33,15 +27,21 @@
  addr G:"camlCmm__set_3_10_code")
 (data
  int 3063
- global "camlCmm__get_3":
- addr G:"camlCmm__get_2_9_code"
+ global "camlCmm__get_imm_5":
+ addr G:"camlCmm__get_imm_4_11_code"
  int 108086391056891909)
 (data
  int 4087
- global "camlCmm__standard_atomic_get_2":
+ global "camlCmm__set_imm_6":
  addr G:"caml_curry2"
  int 180143985094819847
- addr G:"camlCmm__standard_atomic_get_1_8_code")
+ addr G:"camlCmm__set_imm_5_12_code")
+(data
+ int 4087
+ global "camlCmm__cas_7":
+ addr G:"caml_curry3"
+ int 252201579132747783
+ addr G:"camlCmm__cas_6_13_code")
 (function camlCmm__standard_atomic_get_1_8_code (r: val v: val) : int
  (extcall "caml_atomic_exchange_field" r 1 v ->val) 1 )
 

@@ -226,412 +226,7 @@ let code loopify(done) size(90) newer_version_of(rev_merge_rev_6)
                                in
                                cont `self` (l1_1, t2, Pmakeblock))))))
 in
-let code rec loopify(never) size(588) newer_version_of(rev_sort_8)
-      rev_sort_8_1
-        (n : imm tagged, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
-        my_closure &my_alloc_region my_depth
-        -> k * k1
-        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
-  let cmp = %project_value_slot.[rev_sort].[cmp_2] (my_closure) in
-  let rev_merge = %project_value_slot.[rev_sort].[rev_merge] (my_closure) in
-  let sort = %project_function_slot.[rev_sort].[sort] (my_closure) in
-  (let prim = %int_comp.ne (n, 2) in
-   switch prim
-     | 0 -> k3
-     | 1 -> k4
-     where k4 =
-       let prim_1 = %int_comp.ne (n, 3) in
-       (switch prim_1
-          | 0 -> k4
-          | 1 -> k2
-          where k4 =
-            let prim_2 = %is_int (l) in
-            (switch prim_2
-               | 0 -> k4
-               | 1 -> k2
-               where k4 =
-                 let `*match*` = %block_load.[`1`] (l) in
-                 let prim_3 = %is_int (`*match*`) in
-                 (switch prim_3
-                    | 0 -> k4
-                    | 1 -> k2
-                    where k4 =
-                      let `*match*_1` = %block_load.[`1`] (`*match*`) in
-                      let prim_4 = %is_int (`*match*_1`) in
-                      (switch prim_4
-                         | 0 -> k4
-                         | 1 -> k2
-                         where k4 =
-                           let x3 = %block_load.[`0`] (`*match*_1`) in
-                           let x2 = %block_load.[`0`] (`*match*`) in
-                           let x1 = %block_load.[`0`] (l) in
-                           (apply &my_alloc_region cmp (x1, x2) -> k4 * k1
-                              where k4 (c : imm tagged) =
-                                let prim_5 = %phys_eq (c, 0) in
-                                (switch prim_5
-                                   | 0 -> k4
-                                   | 1 -> k5
-                                   where k5 =
-                                     (apply &my_alloc_region
-                                        cmp (x2, x3) -> k5 * k1
-                                        where k5 (c_1 : imm tagged) =
-                                          let prim_6 = %phys_eq (c_1, 0) in
-                                          (switch prim_6
-                                             | 0 -> k5
-                                             | 1 -> k6
-                                             where k6 =
-                                               let Pmakeblock =
-                                                 %block.[`0`].my_alloc_region
-                                                   (x2, 0)
-                                               in
-                                               cont k (Pmakeblock)
-                                             where k5 =
-                                               let prim_7 =
-                                                 %int_comp.gt (c_1, 0)
-                                               in
-                                               (switch prim_7
-                                                  | 0 -> k5
-                                                  | 1 -> k6
-                                                  where k6 =
-                                                    let Pmakeblock =
-                                                      %block.[`0`].my_alloc_region
-                                                        (x3, 0)
-                                                    in
-                                                    let Pmakeblock_1 =
-                                                      %block.[`0`].my_alloc_region
-                                                        (x2, Pmakeblock)
-                                                    in
-                                                    cont k (Pmakeblock_1)
-                                                  where k5 =
-                                                    let Pmakeblock =
-                                                      %block.[`0`].my_alloc_region
-                                                        (x2, 0)
-                                                    in
-                                                    let Pmakeblock_1 =
-                                                      %block.[`0`].my_alloc_region
-                                                        (x3, Pmakeblock)
-                                                    in
-                                                    cont k (Pmakeblock_1))))
-                                   where k4 =
-                                     let prim_6 = %int_comp.gt (c, 0) in
-                                     (switch prim_6
-                                        | 0 -> k4
-                                        | 1 -> k5
-                                        where k5 =
-                                          (apply &my_alloc_region
-                                             cmp (x2, x3) -> k5 * k1
-                                             where k5 (c_1 : imm tagged) =
-                                               let prim_7 = %phys_eq (c_1, 0)
-                                               in
-                                               (switch prim_7
-                                                  | 0 -> k5
-                                                  | 1 -> k6
-                                                  where k6 =
-                                                    let Pmakeblock =
-                                                      %block.[`0`].my_alloc_region
-                                                        (x2, 0)
-                                                    in
-                                                    let Pmakeblock_1 =
-                                                      %block.[`0`].my_alloc_region
-                                                        (x1, Pmakeblock)
-                                                    in
-                                                    cont k (Pmakeblock_1)
-                                                  where k5 =
-                                                    let prim_8 =
-                                                      %int_comp.gt (c_1, 0)
-                                                    in
-                                                    (switch prim_8
-                                                       | 0 -> k5
-                                                       | 1 -> k6
-                                                       where k6 =
-                                                         let Pmakeblock =
-                                                           %block.[`0`].my_alloc_region
-                                                             (x3, 0)
-                                                         in
-                                                         let Pmakeblock_1 =
-                                                           %block.[`0`].my_alloc_region
-                                                             (x2, Pmakeblock)
-                                                         in
-                                                         let Pmakeblock_2 =
-                                                           %block.[`0`].my_alloc_region
-                                                             (x1,
-                                                              Pmakeblock_1)
-                                                         in
-                                                         cont k
-                                                                (Pmakeblock_2)
-                                                       where k5 =
-                                                         (apply
-                                                                 &my_alloc_region
-                                                            cmp
-                                                              (x1, x3)
-                                                              -> k5 * k1
-                                                            where k5
-                                                                    (
-                                                                    c_2 :
-                                                                    imm tagged) =
-                                                              let prim_9 =
-                                                                %phys_eq
-                                                                  (c_2, 0)
-                                                              in
-                                                              (switch prim_9
-                                                                 | 0 -> k5
-                                                                 | 1 -> k6
-                                                                 where 
-                                                                   k6 =
-                                                                   let Pmakeblock =
-                                                                    %block.[`0`].my_alloc_region
-                                                                    (x2, 0)
-                                                                   in
-                                                                   let Pmakeblock_1 =
-                                                                    %block.[`0`].my_alloc_region
-                                                                    (x1,
-                                                                    Pmakeblock)
-                                                                   in
-                                                                   cont 
-                                                                   k
-                                                                    (Pmakeblock_1)
-                                                                 where 
-                                                                   k5 =
-                                                                   let prim_10 =
-                                                                    %int_comp.gt
-                                                                    (c_2, 0)
-                                                                   in
-                                                                   (switch prim_10
-                                                                    | 0 -> k5
-                                                                    | 1 -> k6
-                                                                    where 
-                                                                    k6 =
-                                                                    let Pmakeblock =
-                                                                    %block.[`0`].my_alloc_region
-                                                                    (x2, 0)
-                                                                    in
-                                                                    let Pmakeblock_1 =
-                                                                    %block.[`0`].my_alloc_region
-                                                                    (x3,
-                                                                    Pmakeblock)
-                                                                    in
-                                                                    let Pmakeblock_2 =
-                                                                    %block.[`0`].my_alloc_region
-                                                                    (x1,
-                                                                    Pmakeblock_1)
-                                                                    in
-                                                                    cont 
-                                                                    k
-                                                                    (Pmakeblock_2)
-                                                                    where 
-                                                                    k5 =
-                                                                    let Pmakeblock =
-                                                                    %block.[`0`].my_alloc_region
-                                                                    (x2, 0)
-                                                                    in
-                                                                    let Pmakeblock_1 =
-                                                                    %block.[`0`].my_alloc_region
-                                                                    (x1,
-                                                                    Pmakeblock)
-                                                                    in
-                                                                    let Pmakeblock_2 =
-                                                                    %block.[`0`].my_alloc_region
-                                                                    (x3,
-                                                                    Pmakeblock_1)
-                                                                    in
-                                                                    cont 
-                                                                    k
-                                                                    (Pmakeblock_2)))))))
-                                        where k4 =
-                                          (apply &my_alloc_region
-                                             cmp (x1, x3) -> k4 * k1
-                                             where k4 (c_1 : imm tagged) =
-                                               let prim_7 = %phys_eq (c_1, 0)
-                                               in
-                                               (switch prim_7
-                                                  | 0 -> k4
-                                                  | 1 -> k5
-                                                  where k5 =
-                                                    let Pmakeblock =
-                                                      %block.[`0`].my_alloc_region
-                                                        (x1, 0)
-                                                    in
-                                                    let Pmakeblock_1 =
-                                                      %block.[`0`].my_alloc_region
-                                                        (x2, Pmakeblock)
-                                                    in
-                                                    cont k (Pmakeblock_1)
-                                                  where k4 =
-                                                    let prim_8 =
-                                                      %int_comp.gt (c_1, 0)
-                                                    in
-                                                    (switch prim_8
-                                                       | 0 -> k4
-                                                       | 1 -> k5
-                                                       where k5 =
-                                                         let Pmakeblock =
-                                                           %block.[`0`].my_alloc_region
-                                                             (x3, 0)
-                                                         in
-                                                         let Pmakeblock_1 =
-                                                           %block.[`0`].my_alloc_region
-                                                             (x1, Pmakeblock)
-                                                         in
-                                                         let Pmakeblock_2 =
-                                                           %block.[`0`].my_alloc_region
-                                                             (x2,
-                                                              Pmakeblock_1)
-                                                         in
-                                                         cont k
-                                                                (Pmakeblock_2)
-                                                       where k4 =
-                                                         (apply
-                                                                 &my_alloc_region
-                                                            cmp
-                                                              (x2, x3)
-                                                              -> k4 * k1
-                                                            where k4
-                                                                    (
-                                                                    c_2 :
-                                                                    imm tagged) =
-                                                              let prim_9 =
-                                                                %phys_eq
-                                                                  (c_2, 0)
-                                                              in
-                                                              (switch prim_9
-                                                                 | 0 -> k4
-                                                                 | 1 -> k5
-                                                                 where 
-                                                                   k5 =
-                                                                   let Pmakeblock =
-                                                                    %block.[`0`].my_alloc_region
-                                                                    (x1, 0)
-                                                                   in
-                                                                   let Pmakeblock_1 =
-                                                                    %block.[`0`].my_alloc_region
-                                                                    (x2,
-                                                                    Pmakeblock)
-                                                                   in
-                                                                   cont 
-                                                                   k
-                                                                    (Pmakeblock_1)
-                                                                 where 
-                                                                   k4 =
-                                                                   let prim_10 =
-                                                                    %int_comp.gt
-                                                                    (c_2, 0)
-                                                                   in
-                                                                   (switch prim_10
-                                                                    | 0 -> k4
-                                                                    | 1 -> k5
-                                                                    where 
-                                                                    k5 =
-                                                                    let Pmakeblock =
-                                                                    %block.[`0`].my_alloc_region
-                                                                    (x1, 0)
-                                                                    in
-                                                                    let Pmakeblock_1 =
-                                                                    %block.[`0`].my_alloc_region
-                                                                    (x3,
-                                                                    Pmakeblock)
-                                                                    in
-                                                                    let Pmakeblock_2 =
-                                                                    %block.[`0`].my_alloc_region
-                                                                    (x2,
-                                                                    Pmakeblock_1)
-                                                                    in
-                                                                    cont 
-                                                                    k
-                                                                    (Pmakeblock_2)
-                                                                    where 
-                                                                    k4 =
-                                                                    let Pmakeblock =
-                                                                    %block.[`0`].my_alloc_region
-                                                                    (x1, 0)
-                                                                    in
-                                                                    let Pmakeblock_1 =
-                                                                    %block.[`0`].my_alloc_region
-                                                                    (x2,
-                                                                    Pmakeblock)
-                                                                    in
-                                                                    let Pmakeblock_2 =
-                                                                    %block.[`0`].my_alloc_region
-                                                                    (x3,
-                                                                    Pmakeblock_1)
-                                                                    in
-                                                                    cont 
-                                                                    k
-                                                                    (Pmakeblock_2))))))))))))))
-     where k3 =
-       let prim_1 = %is_int (l) in
-       (switch prim_1
-          | 0 -> k3
-          | 1 -> k2
-          where k3 =
-            let `*match*` = %block_load.[`1`] (l) in
-            let prim_2 = %is_int (`*match*`) in
-            (switch prim_2
-               | 0 -> k3
-               | 1 -> k2
-               where k3 =
-                 let x2 = %block_load.[`0`] (`*match*`) in
-                 let x1 = %block_load.[`0`] (l) in
-                 (apply &my_alloc_region cmp (x1, x2) -> k3 * k1
-                    where k3 (c : imm tagged) =
-                      let prim_3 = %phys_eq (c, 0) in
-                      (switch prim_3
-                         | 0 -> k3
-                         | 1 -> k4
-                         where k4 =
-                           let Pmakeblock =
-                             %block.[`0`].my_alloc_region (x1, 0)
-                           in
-                           cont k (Pmakeblock)
-                         where k3 =
-                           let prim_4 = %int_comp.gt (c, 0) in
-                           (switch prim_4
-                              | 0 -> k3
-                              | 1 -> k4
-                              where k4 =
-                                let Pmakeblock =
-                                  %block.[`0`].my_alloc_region (x2, 0)
-                                in
-                                let Pmakeblock_1 =
-                                  %block.[`0`].my_alloc_region
-                                    (x1, Pmakeblock)
-                                in
-                                cont k (Pmakeblock_1)
-                              where k3 =
-                                let Pmakeblock =
-                                  %block.[`0`].my_alloc_region (x1, 0)
-                                in
-                                let Pmakeblock_1 =
-                                  %block.[`0`].my_alloc_region
-                                    (x2, Pmakeblock)
-                                in
-                                cont k (Pmakeblock_1)))))))
-    where k2 =
-      let n1 = %int_shift.asr (n, 1i) in
-      let n2 = %int_barith.sub (n, n1) in
-      (apply direct(chop_3_1 &my_alloc_region)
-         ($camlTests9__chop_6
-          : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
-           (n1, l)
-           -> k2 * k1
-         where k2 (l2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
-           (apply direct(sort_7_1 &my_alloc_region)
-              (sort ~ depth my_depth -> succ my_depth
-               : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
-                (n1, l)
-                -> k2 * k1
-              where k2 (s1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
-                (apply direct(sort_7_1 &my_alloc_region)
-                   (sort ~ depth my_depth -> succ my_depth
-                    : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
-                     (n2, l2)
-                     -> k2 * k1
-                   where k2 (s2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
-                     apply direct(rev_merge_5_1 &my_alloc_region)
-                       (rev_merge
-                        : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
-                         (s1, s2, 0)
-                         -> k * k1)))
-and code rec loopify(never) size(588) newer_version_of(sort_7)
+let code rec loopify(never) size(588) newer_version_of(sort_7)
       sort_7_1
         (n : imm tagged, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
         my_closure &my_alloc_region my_depth
@@ -1037,6 +632,411 @@ and code rec loopify(never) size(588) newer_version_of(sort_7)
                         : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
                          (s1, s2, 0)
                          -> k * k1)))
+and code rec loopify(never) size(588) newer_version_of(rev_sort_8)
+      rev_sort_8_1
+        (n : imm tagged, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  let cmp = %project_value_slot.[rev_sort].[cmp_2] (my_closure) in
+  let rev_merge = %project_value_slot.[rev_sort].[rev_merge] (my_closure) in
+  let sort = %project_function_slot.[rev_sort].[sort] (my_closure) in
+  (let prim = %int_comp.ne (n, 2) in
+   switch prim
+     | 0 -> k3
+     | 1 -> k4
+     where k4 =
+       let prim_1 = %int_comp.ne (n, 3) in
+       (switch prim_1
+          | 0 -> k4
+          | 1 -> k2
+          where k4 =
+            let prim_2 = %is_int (l) in
+            (switch prim_2
+               | 0 -> k4
+               | 1 -> k2
+               where k4 =
+                 let `*match*` = %block_load.[`1`] (l) in
+                 let prim_3 = %is_int (`*match*`) in
+                 (switch prim_3
+                    | 0 -> k4
+                    | 1 -> k2
+                    where k4 =
+                      let `*match*_1` = %block_load.[`1`] (`*match*`) in
+                      let prim_4 = %is_int (`*match*_1`) in
+                      (switch prim_4
+                         | 0 -> k4
+                         | 1 -> k2
+                         where k4 =
+                           let x3 = %block_load.[`0`] (`*match*_1`) in
+                           let x2 = %block_load.[`0`] (`*match*`) in
+                           let x1 = %block_load.[`0`] (l) in
+                           (apply &my_alloc_region cmp (x1, x2) -> k4 * k1
+                              where k4 (c : imm tagged) =
+                                let prim_5 = %phys_eq (c, 0) in
+                                (switch prim_5
+                                   | 0 -> k4
+                                   | 1 -> k5
+                                   where k5 =
+                                     (apply &my_alloc_region
+                                        cmp (x2, x3) -> k5 * k1
+                                        where k5 (c_1 : imm tagged) =
+                                          let prim_6 = %phys_eq (c_1, 0) in
+                                          (switch prim_6
+                                             | 0 -> k5
+                                             | 1 -> k6
+                                             where k6 =
+                                               let Pmakeblock =
+                                                 %block.[`0`].my_alloc_region
+                                                   (x2, 0)
+                                               in
+                                               cont k (Pmakeblock)
+                                             where k5 =
+                                               let prim_7 =
+                                                 %int_comp.gt (c_1, 0)
+                                               in
+                                               (switch prim_7
+                                                  | 0 -> k5
+                                                  | 1 -> k6
+                                                  where k6 =
+                                                    let Pmakeblock =
+                                                      %block.[`0`].my_alloc_region
+                                                        (x3, 0)
+                                                    in
+                                                    let Pmakeblock_1 =
+                                                      %block.[`0`].my_alloc_region
+                                                        (x2, Pmakeblock)
+                                                    in
+                                                    cont k (Pmakeblock_1)
+                                                  where k5 =
+                                                    let Pmakeblock =
+                                                      %block.[`0`].my_alloc_region
+                                                        (x2, 0)
+                                                    in
+                                                    let Pmakeblock_1 =
+                                                      %block.[`0`].my_alloc_region
+                                                        (x3, Pmakeblock)
+                                                    in
+                                                    cont k (Pmakeblock_1))))
+                                   where k4 =
+                                     let prim_6 = %int_comp.gt (c, 0) in
+                                     (switch prim_6
+                                        | 0 -> k4
+                                        | 1 -> k5
+                                        where k5 =
+                                          (apply &my_alloc_region
+                                             cmp (x2, x3) -> k5 * k1
+                                             where k5 (c_1 : imm tagged) =
+                                               let prim_7 = %phys_eq (c_1, 0)
+                                               in
+                                               (switch prim_7
+                                                  | 0 -> k5
+                                                  | 1 -> k6
+                                                  where k6 =
+                                                    let Pmakeblock =
+                                                      %block.[`0`].my_alloc_region
+                                                        (x2, 0)
+                                                    in
+                                                    let Pmakeblock_1 =
+                                                      %block.[`0`].my_alloc_region
+                                                        (x1, Pmakeblock)
+                                                    in
+                                                    cont k (Pmakeblock_1)
+                                                  where k5 =
+                                                    let prim_8 =
+                                                      %int_comp.gt (c_1, 0)
+                                                    in
+                                                    (switch prim_8
+                                                       | 0 -> k5
+                                                       | 1 -> k6
+                                                       where k6 =
+                                                         let Pmakeblock =
+                                                           %block.[`0`].my_alloc_region
+                                                             (x3, 0)
+                                                         in
+                                                         let Pmakeblock_1 =
+                                                           %block.[`0`].my_alloc_region
+                                                             (x2, Pmakeblock)
+                                                         in
+                                                         let Pmakeblock_2 =
+                                                           %block.[`0`].my_alloc_region
+                                                             (x1,
+                                                              Pmakeblock_1)
+                                                         in
+                                                         cont k
+                                                                (Pmakeblock_2)
+                                                       where k5 =
+                                                         (apply
+                                                                 &my_alloc_region
+                                                            cmp
+                                                              (x1, x3)
+                                                              -> k5 * k1
+                                                            where k5
+                                                                    (
+                                                                    c_2 :
+                                                                    imm tagged) =
+                                                              let prim_9 =
+                                                                %phys_eq
+                                                                  (c_2, 0)
+                                                              in
+                                                              (switch prim_9
+                                                                 | 0 -> k5
+                                                                 | 1 -> k6
+                                                                 where 
+                                                                   k6 =
+                                                                   let Pmakeblock =
+                                                                    %block.[`0`].my_alloc_region
+                                                                    (x2, 0)
+                                                                   in
+                                                                   let Pmakeblock_1 =
+                                                                    %block.[`0`].my_alloc_region
+                                                                    (x1,
+                                                                    Pmakeblock)
+                                                                   in
+                                                                   cont 
+                                                                   k
+                                                                    (Pmakeblock_1)
+                                                                 where 
+                                                                   k5 =
+                                                                   let prim_10 =
+                                                                    %int_comp.gt
+                                                                    (c_2, 0)
+                                                                   in
+                                                                   (switch prim_10
+                                                                    | 0 -> k5
+                                                                    | 1 -> k6
+                                                                    where 
+                                                                    k6 =
+                                                                    let Pmakeblock =
+                                                                    %block.[`0`].my_alloc_region
+                                                                    (x2, 0)
+                                                                    in
+                                                                    let Pmakeblock_1 =
+                                                                    %block.[`0`].my_alloc_region
+                                                                    (x3,
+                                                                    Pmakeblock)
+                                                                    in
+                                                                    let Pmakeblock_2 =
+                                                                    %block.[`0`].my_alloc_region
+                                                                    (x1,
+                                                                    Pmakeblock_1)
+                                                                    in
+                                                                    cont 
+                                                                    k
+                                                                    (Pmakeblock_2)
+                                                                    where 
+                                                                    k5 =
+                                                                    let Pmakeblock =
+                                                                    %block.[`0`].my_alloc_region
+                                                                    (x2, 0)
+                                                                    in
+                                                                    let Pmakeblock_1 =
+                                                                    %block.[`0`].my_alloc_region
+                                                                    (x1,
+                                                                    Pmakeblock)
+                                                                    in
+                                                                    let Pmakeblock_2 =
+                                                                    %block.[`0`].my_alloc_region
+                                                                    (x3,
+                                                                    Pmakeblock_1)
+                                                                    in
+                                                                    cont 
+                                                                    k
+                                                                    (Pmakeblock_2)))))))
+                                        where k4 =
+                                          (apply &my_alloc_region
+                                             cmp (x1, x3) -> k4 * k1
+                                             where k4 (c_1 : imm tagged) =
+                                               let prim_7 = %phys_eq (c_1, 0)
+                                               in
+                                               (switch prim_7
+                                                  | 0 -> k4
+                                                  | 1 -> k5
+                                                  where k5 =
+                                                    let Pmakeblock =
+                                                      %block.[`0`].my_alloc_region
+                                                        (x1, 0)
+                                                    in
+                                                    let Pmakeblock_1 =
+                                                      %block.[`0`].my_alloc_region
+                                                        (x2, Pmakeblock)
+                                                    in
+                                                    cont k (Pmakeblock_1)
+                                                  where k4 =
+                                                    let prim_8 =
+                                                      %int_comp.gt (c_1, 0)
+                                                    in
+                                                    (switch prim_8
+                                                       | 0 -> k4
+                                                       | 1 -> k5
+                                                       where k5 =
+                                                         let Pmakeblock =
+                                                           %block.[`0`].my_alloc_region
+                                                             (x3, 0)
+                                                         in
+                                                         let Pmakeblock_1 =
+                                                           %block.[`0`].my_alloc_region
+                                                             (x1, Pmakeblock)
+                                                         in
+                                                         let Pmakeblock_2 =
+                                                           %block.[`0`].my_alloc_region
+                                                             (x2,
+                                                              Pmakeblock_1)
+                                                         in
+                                                         cont k
+                                                                (Pmakeblock_2)
+                                                       where k4 =
+                                                         (apply
+                                                                 &my_alloc_region
+                                                            cmp
+                                                              (x2, x3)
+                                                              -> k4 * k1
+                                                            where k4
+                                                                    (
+                                                                    c_2 :
+                                                                    imm tagged) =
+                                                              let prim_9 =
+                                                                %phys_eq
+                                                                  (c_2, 0)
+                                                              in
+                                                              (switch prim_9
+                                                                 | 0 -> k4
+                                                                 | 1 -> k5
+                                                                 where 
+                                                                   k5 =
+                                                                   let Pmakeblock =
+                                                                    %block.[`0`].my_alloc_region
+                                                                    (x1, 0)
+                                                                   in
+                                                                   let Pmakeblock_1 =
+                                                                    %block.[`0`].my_alloc_region
+                                                                    (x2,
+                                                                    Pmakeblock)
+                                                                   in
+                                                                   cont 
+                                                                   k
+                                                                    (Pmakeblock_1)
+                                                                 where 
+                                                                   k4 =
+                                                                   let prim_10 =
+                                                                    %int_comp.gt
+                                                                    (c_2, 0)
+                                                                   in
+                                                                   (switch prim_10
+                                                                    | 0 -> k4
+                                                                    | 1 -> k5
+                                                                    where 
+                                                                    k5 =
+                                                                    let Pmakeblock =
+                                                                    %block.[`0`].my_alloc_region
+                                                                    (x1, 0)
+                                                                    in
+                                                                    let Pmakeblock_1 =
+                                                                    %block.[`0`].my_alloc_region
+                                                                    (x3,
+                                                                    Pmakeblock)
+                                                                    in
+                                                                    let Pmakeblock_2 =
+                                                                    %block.[`0`].my_alloc_region
+                                                                    (x2,
+                                                                    Pmakeblock_1)
+                                                                    in
+                                                                    cont 
+                                                                    k
+                                                                    (Pmakeblock_2)
+                                                                    where 
+                                                                    k4 =
+                                                                    let Pmakeblock =
+                                                                    %block.[`0`].my_alloc_region
+                                                                    (x1, 0)
+                                                                    in
+                                                                    let Pmakeblock_1 =
+                                                                    %block.[`0`].my_alloc_region
+                                                                    (x2,
+                                                                    Pmakeblock)
+                                                                    in
+                                                                    let Pmakeblock_2 =
+                                                                    %block.[`0`].my_alloc_region
+                                                                    (x3,
+                                                                    Pmakeblock_1)
+                                                                    in
+                                                                    cont 
+                                                                    k
+                                                                    (Pmakeblock_2))))))))))))))
+     where k3 =
+       let prim_1 = %is_int (l) in
+       (switch prim_1
+          | 0 -> k3
+          | 1 -> k2
+          where k3 =
+            let `*match*` = %block_load.[`1`] (l) in
+            let prim_2 = %is_int (`*match*`) in
+            (switch prim_2
+               | 0 -> k3
+               | 1 -> k2
+               where k3 =
+                 let x2 = %block_load.[`0`] (`*match*`) in
+                 let x1 = %block_load.[`0`] (l) in
+                 (apply &my_alloc_region cmp (x1, x2) -> k3 * k1
+                    where k3 (c : imm tagged) =
+                      let prim_3 = %phys_eq (c, 0) in
+                      (switch prim_3
+                         | 0 -> k3
+                         | 1 -> k4
+                         where k4 =
+                           let Pmakeblock =
+                             %block.[`0`].my_alloc_region (x1, 0)
+                           in
+                           cont k (Pmakeblock)
+                         where k3 =
+                           let prim_4 = %int_comp.gt (c, 0) in
+                           (switch prim_4
+                              | 0 -> k3
+                              | 1 -> k4
+                              where k4 =
+                                let Pmakeblock =
+                                  %block.[`0`].my_alloc_region (x2, 0)
+                                in
+                                let Pmakeblock_1 =
+                                  %block.[`0`].my_alloc_region
+                                    (x1, Pmakeblock)
+                                in
+                                cont k (Pmakeblock_1)
+                              where k3 =
+                                let Pmakeblock =
+                                  %block.[`0`].my_alloc_region (x1, 0)
+                                in
+                                let Pmakeblock_1 =
+                                  %block.[`0`].my_alloc_region
+                                    (x2, Pmakeblock)
+                                in
+                                cont k (Pmakeblock_1)))))))
+    where k2 =
+      let n1 = %int_shift.asr (n, 1i) in
+      let n2 = %int_barith.sub (n, n1) in
+      (apply direct(chop_3_1 &my_alloc_region)
+         ($camlTests9__chop_6
+          : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+           (n1, l)
+           -> k2 * k1
+         where k2 (l2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+           (apply direct(sort_7_1 &my_alloc_region)
+              (sort ~ depth my_depth -> succ my_depth
+               : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                (n1, l)
+                -> k2 * k1
+              where k2 (s1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+                (apply direct(sort_7_1 &my_alloc_region)
+                   (sort ~ depth my_depth -> succ my_depth
+                    : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                     (n2, l2)
+                     -> k2 * k1
+                   where k2 (s2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+                     apply direct(rev_merge_5_1 &my_alloc_region)
+                       (rev_merge
+                        : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                         (s1, s2, 0)
+                         -> k * k1)))
 in
 let code loopify(never) size(1412) newer_version_of(sort_uniq_4)
       sort_uniq_4_1
@@ -1074,7 +1074,19 @@ let code loopify(never) size(1412) newer_version_of(sort_uniq_4)
                -> k * k1)
 in
 let $camlTests9__sort_uniq_7 = closure sort_uniq_4_1 @sort_uniq &toplevel in
-let code rec loopify(never) size(77) newer_version_of(rev_sort_11)
+let code rec loopify(never) size(5) newer_version_of(sort_10)
+      sort_10_1
+        (n : imm tagged, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  let rev_sort = %project_function_slot.[sort_1].[rev_sort_1] (my_closure) in
+  apply direct(rev_sort_11_1 &my_alloc_region)
+    (rev_sort ~ depth my_depth -> succ my_depth
+     : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+      (n, l)
+      -> k * k1
+and code rec loopify(never) size(77) newer_version_of(rev_sort_11)
       rev_sort_11_1
         (n : imm tagged, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
         my_closure &my_alloc_region my_depth
@@ -1122,18 +1134,6 @@ let code rec loopify(never) size(77) newer_version_of(rev_sort_11)
          : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
           (n, l)
           -> k * k1
-and code rec loopify(never) size(5) newer_version_of(sort_10)
-      sort_10_1
-        (n : imm tagged, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
-        my_closure &my_alloc_region my_depth
-        -> k * k1
-        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
-  let rev_sort = %project_function_slot.[sort_1].[rev_sort_1] (my_closure) in
-  apply direct(rev_sort_11_1 &my_alloc_region)
-    (rev_sort ~ depth my_depth -> succ my_depth
-     : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
-      (n, l)
-      -> k * k1
 in
 let code loopify(never) size(99) newer_version_of(foo_9)
       foo_9_1 (cmp : val, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])

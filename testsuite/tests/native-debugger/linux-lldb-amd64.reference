@@ -76,6 +76,7 @@ frame 12: libc.so.6`__libc_start_call_main
 frame 13: libc.so.6`__libc_start_mainXXXX
 frame 14: meander`_start
 (lldb) continue
+warning: this version of LLDB has no plugin for the language "ocaml". Inspection of frame variables will be limited
 Process XXXX resuming
 Process XXXX stopped
 * thread #1, name = 'XXXX', stop reason = breakpoint 3.1

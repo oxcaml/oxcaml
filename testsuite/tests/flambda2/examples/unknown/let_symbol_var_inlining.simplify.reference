@@ -1,6 +1,5 @@
 let code f_0 deleted in
 let code g_1 deleted in
-let b = %block_load.[`4`] ($Stdlib__Sys.camlStdlib__Sys) in
 let code loopify(never) size(3) newer_version_of(f_0)
       f_0_1 (n : imm tagged)
         my_closure &my_alloc_region my_depth
@@ -19,6 +18,7 @@ let code loopify(never) size(5) newer_version_of(g_1)
   cont k (int_mul)
 in
 let $camlLet_symbol_var_inlining__g_3 = closure g_1_1 @g &toplevel in
+let b = %block_load.[`4`] ($Stdlib__Sys.camlStdlib__Sys) in
 let $camlLet_symbol_var_inlining =
   Block 0 ($Stdlib__List.camlStdlib__List__length_1_15,
            b,

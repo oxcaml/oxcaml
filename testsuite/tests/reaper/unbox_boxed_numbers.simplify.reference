@@ -238,15 +238,6 @@ in
 let $camlUnbox_boxed_numbers__test_value_slot_11 =
   closure test_value_slot_10_1 @test_value_slot &toplevel
 in
-let code inline(never) loopify(never) size(6) newer_version_of(indirect_14)
-      indirect_14_1 (read : val)
-        my_closure &my_alloc_region my_depth
-        -> k * k1 =
-  apply &my_alloc_region read (0) -> k * k1
-in
-let $camlUnbox_boxed_numbers__indirect_13 =
-  closure indirect_14_1 @indirect &toplevel
-in
 let code inline(never) loopify(never) size(6) newer_version_of(read_13)
       read_13_1 (param : imm tagged)
         my_closure &my_alloc_region my_depth
@@ -257,6 +248,15 @@ let code inline(never) loopify(never) size(6) newer_version_of(read_13)
   let prim_1 = %num_conv.[`int64`].[`imm`] (prim) in
   let int_of_int64 = %tag_imm (prim_1) in
   cont k (int_of_int64)
+in
+let code inline(never) loopify(never) size(6) newer_version_of(indirect_14)
+      indirect_14_1 (read : val)
+        my_closure &my_alloc_region my_depth
+        -> k * k1 =
+  apply &my_alloc_region read (0) -> k * k1
+in
+let $camlUnbox_boxed_numbers__indirect_13 =
+  closure indirect_14_1 @indirect &toplevel
 in
 let code loopify(never) size(29) newer_version_of(test_value_slot_not_unboxed_12)
       test_value_slot_not_unboxed_12_1 (n : imm tagged)

@@ -1,17 +1,3 @@
-let code h_0 deleted in
-let code q_1 deleted in
-let code loopify(never) size(4) newer_version_of(h_0)
-      h_0_1 (x : imm tagged)
-        my_closure &my_alloc_region my_depth
-        -> k * k1
-        : imm tagged =
-  apply direct(f_with_code_size_between_1_and_10_0 &my_alloc_region)
-         inlining_state(depth(10))
-    ($Lib.camlLib__f_with_code_size_between_1_and_10_1 : _ -> imm tagged)
-      (x)
-      -> k * k1
-in
-let $camlInlining_arguments_meet__h_1 = closure h_0_1 @h &toplevel in
 let code loopify(never) size(17) newer_version_of(g_with_code_size_between_11_and_20_3_1)
       g_with_code_size_between_11_and_20_3 (y : imm tagged)
         my_closure &my_alloc_region my_depth
@@ -28,6 +14,7 @@ let $camlInlining_arguments_meet__g_with_code_size_between_11_and_20_2 =
     @g_with_code_size_between_11_and_20 &toplevel
   with { x = 42 }
 in
+let code q_1 deleted in
 let code loopify(never) size(4) newer_version_of(q_1)
       q_1_1 (x : imm tagged)
         my_closure &my_alloc_region my_depth
@@ -40,6 +27,19 @@ let code loopify(never) size(4) newer_version_of(q_1)
       -> k * k1
 in
 let $camlInlining_arguments_meet__q_3 = closure q_1_1 @q &toplevel in
+let code h_0 deleted in
+let code loopify(never) size(4) newer_version_of(h_0)
+      h_0_1 (x : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  apply direct(f_with_code_size_between_1_and_10_0 &my_alloc_region)
+         inlining_state(depth(10))
+    ($Lib.camlLib__f_with_code_size_between_1_and_10_1 : _ -> imm tagged)
+      (x)
+      -> k * k1
+in
+let $camlInlining_arguments_meet__h_1 = closure h_0_1 @h &toplevel in
 let $camlInlining_arguments_meet =
   Block 0 ($camlInlining_arguments_meet__h_1,
            $camlInlining_arguments_meet__g_with_code_size_between_11_and_20_2,

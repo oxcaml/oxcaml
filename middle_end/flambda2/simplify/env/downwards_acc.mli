@@ -75,8 +75,6 @@ val get_and_clear_lifted_constants : t -> t * Lifted_constant_state.t
 
 val clear_lifted_constants : t -> t
 
-val set_lifted_constants : t -> Lifted_constant_state.t -> t
-
 val find_shareable_constant : t -> Static_const.t -> Symbol.t option
 
 val consider_constant_for_sharing : t -> Symbol.t -> Static_const.t -> t

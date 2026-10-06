@@ -122,8 +122,8 @@ let multiple_lookup_tables = function
   | D -> #(1, 0)
 [%%expect_fexpr Simplify{|
 let code multiple_lookup_tables_4 deleted in
-let $camlTOP7__switch_block_19 = Value_array [|1; 1; 0; 0|] in
 let $camlTOP7__switch_block_18 = Value_array [|0; 1; 0; 1|] in
+let $camlTOP7__switch_block_19 = Value_array [|1; 1; 0; 0|] in
 let code loopify(never) size(3) newer_version_of(multiple_lookup_tables_4)
       multiple_lookup_tables_4_1 (param : imm tagged)
         my_closure &my_alloc_region my_depth

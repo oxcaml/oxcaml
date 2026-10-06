@@ -14,6 +14,9 @@ apply ccall noalloc &toplevel
            Block immutable_unique
            248 ($camlDeep_try_with__immstring_1, Pccall_1)
          in
+         let $camlDeep_try_with =
+           Block 0 ($camlDeep_try_with__E1_2, $camlDeep_try_with__E2_3)
+         in
          ((let try_region = %begin_try_region () in
            let try_ghost_region = %begin_try_ghost_region () in
            (let try_region_1 = %begin_try_region () in
@@ -54,7 +57,4 @@ apply ccall noalloc &toplevel
             where k (x : imm tagged, y : imm tagged) =
               let int_add = %int_barith.add (x, y) in
               let Popaque = %opaque (int_add) in
-              let $camlDeep_try_with =
-                Block 0 ($camlDeep_try_with__E1_2, $camlDeep_try_with__E2_3)
-              in
               cont done ($camlDeep_try_with)))

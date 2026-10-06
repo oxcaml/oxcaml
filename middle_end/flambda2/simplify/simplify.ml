@@ -62,10 +62,15 @@ let run ~ppf_dump ~cmx_loader ~machine_width ~round ~code_slot_offsets unit =
                term:@ %a"
               Variable.print var Expr.print body)
         ~symbol:(fun _symbol -> ()));
-  if not (LCS.is_empty (UA.lifted_constants uacc))
-  then
-    Misc.fatal_errorf "Lifted constants accumulator should be empty:@ %a"
-      UA.print uacc;
+  let uacc =
+    match UA.pop_all_remaining_lifted_constants_to_place uacc with
+    | At_toplevel (uacc, []) -> uacc
+    | At_toplevel (_acc, _ :: _) ->
+      Misc.fatal_errorf "Lifted constants accumulator should be empty:@ %a"
+        UA.print uacc
+    | In_a_closure _ ->
+      Misc.fatal_errorf "Uacc at toplevel thinks it's in a closure"
+  in
   let final_typing_env =
     let cont_uses_env = DA.continuation_uses_env (UA.creation_dacc uacc) in
     match

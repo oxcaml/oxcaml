@@ -6,6 +6,12 @@
  addr G:"camlInvalid__bar_6"
  addr G:"camlInvalid__foo_7")
 (data
+ int 4087
+ global "camlInvalid__bar_6":
+ addr G:"caml_curry2"
+ int 180143985094819847
+ addr G:"camlInvalid__bar_1_4_code")
+(data
  int 3063
  global "camlInvalid__foo_7":
  addr G:"camlInvalid__foo_2_5_code"
@@ -19,12 +25,7 @@
    invalid.ml:29,2--23)))"
  skip 7
  byte 7)
-(data
- int 4087
- global "camlInvalid__bar_6":
- addr G:"caml_curry2"
- int 180143985094819847
- addr G:"camlInvalid__bar_1_4_code")
+(data int 768 "camlInvalid__empty_array_2":)
 (data
  int 4087
  global "camlInvalid__check_4":
@@ -36,7 +37,6 @@
  "camlInvalid__Pmakeblock_5":
  addr G:"caml_exn_Failure"
  addr L:"camlInvalid__immstring_0")
-(data int 768 "camlInvalid__empty_array_2":)
 (data int 2044 "camlInvalid__immstring_0": string "lengths" skip 0 byte 0)
 (function{invalid.ml:24,25-96} camlInvalid__check_0_3_code
      (t1/0: val t2/0: val) : int

@@ -30,18 +30,16 @@ in
 let $camlDirect_app_parameter_kind_check_simplify__create_2 =
   closure create_1_1 @create &toplevel
 in
-(let Pmakeblock_0 = 0 in
- let `*match*` = Pmakeblock_0 in
- let prim = %is_int (`*match*`) in
- switch prim
-   | 0 -> k1
-   | 1 -> k
-   where k1 =
-     invalid)
+let $camlDirect_app_parameter_kind_check_simplify =
+  Block 0 (0,
+           $camlDirect_app_parameter_kind_check_simplify__send_1,
+           $camlDirect_app_parameter_kind_check_simplify__create_2)
+in
+let Pmakeblock_0 = 0 in
+let `*match*` = Pmakeblock_0 in
+let prim = %is_int (`*match*`) in
+switch prim
+  | 0 -> k
+  | 1 -> done ($camlDirect_app_parameter_kind_check_simplify)
   where k =
-    let $camlDirect_app_parameter_kind_check_simplify =
-      Block 0 (0,
-               $camlDirect_app_parameter_kind_check_simplify__send_1,
-               $camlDirect_app_parameter_kind_check_simplify__create_2)
-    in
-    cont done ($camlDirect_app_parameter_kind_check_simplify)
+    invalid

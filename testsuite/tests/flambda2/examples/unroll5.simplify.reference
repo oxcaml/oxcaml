@@ -2,9 +2,7 @@ let code foo_0 deleted in
 let code test1_1 deleted in
 let code test2_2 deleted in
 let code test3_3 deleted in
-let $camlUnroll5__foo_1 =
-  closure foo_0_1 @foo &toplevel
-and code rec loopify(never) size(80) newer_version_of(foo_0)
+let code rec loopify(never) size(80) newer_version_of(foo_0)
       foo_0_1 (x : imm tagged) my_closure &my_alloc_region my_depth -> k * k1 =
   let Popaque = %opaque (1) in
   (let untagged = %untag_imm (Popaque) in
@@ -66,6 +64,8 @@ and code rec loopify(never) size(80) newer_version_of(foo_0)
         $camlUnroll5__foo_1 ~ depth my_depth -> succ my_depth
           (int_sub)
           -> k * k1
+and $camlUnroll5__foo_1 =
+  closure foo_0_1 @foo &toplevel
 in
 let code loopify(never) size(4) newer_version_of(test1_1)
       test1_1_1 (x : imm tagged)

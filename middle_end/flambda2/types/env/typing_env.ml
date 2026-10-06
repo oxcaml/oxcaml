@@ -653,7 +653,10 @@ let add_variable_definition t var kind name_mode =
        %a@ in environment:@ %a"
       Variable.print var print t;
   let name = Name.var var in
-  if Flambda_features.check_invariants () && mem t name
+  if
+    Flambda_features.use_n_way_join ()
+    && Flambda_features.check_invariants ()
+    && mem t name
   then
     Misc.fatal_errorf "Cannot rebind %a in environment:@ %a" Name.print name
       print t;

@@ -37,11 +37,7 @@ let code loopify(never) size(1) newer_version_of(g_1_1)
         : imm tagged =
   cont k (0)
 in
-let $camlUseless_function_simplification_in_recursive_set__g_2 =
-  closure g_1_2 @g &toplevel
-and $camlUseless_function_simplification_in_recursive_set__h_3 =
-  closure h_2_2 @h &toplevel
-and code rec loopify(never) size(5) newer_version_of(h_2_1)
+let code rec loopify(never) size(5) newer_version_of(h_2_1)
       h_2_2 (param : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1 =
@@ -52,6 +48,10 @@ and code rec loopify(never) size(5) newer_version_of(h_2_1)
       -> k2 * k1
     where k2 (param_1 : imm tagged) =
       cont k (0)
+and $camlUseless_function_simplification_in_recursive_set__g_2 =
+  closure g_1_2 @g &toplevel
+and $camlUseless_function_simplification_in_recursive_set__h_3 =
+  closure h_2_2 @h &toplevel
   with { x = 0 }
 in
 let $camlUseless_function_simplification_in_recursive_set =
