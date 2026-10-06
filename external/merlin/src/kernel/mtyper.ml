@@ -269,8 +269,8 @@ let type_interface config caught (parsetree : Parsetree.signature) =
          sig_sloc
        }
         : Typedtree.signature) =
-    Typemod.merlin_transl_signature
-      ~md_mode:Mode.With_regionality.Const.legacy Env.empty []
+    Typemod.merlin_transl_signature ~md_mode:Mode.With_regionality.Const.legacy
+      Env.empty []
       (Ast_helper.Sg.mk ~modalities:parsetree.psg_modalities
          ~loc:parsetree.psg_loc [])
   in
