@@ -38,6 +38,10 @@ val in_a_closure :
   my_alloc_region:Variable.t ->
   t
 
+(** Whether a specific closure's body is being simplified (as opposed to the
+    toplevel of the unit, or a set of closures but no closure yet). *)
+val is_in_a_closure : t -> bool
+
 type in_or_out_of_closure =
   | In_a_closure
   | Not_in_a_closure

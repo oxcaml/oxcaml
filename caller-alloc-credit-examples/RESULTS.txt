@@ -130,3 +130,91 @@ allocation bound by a Let (ex8 joins two branches).
 
 ex9 and ex10: credits add up over several arguments (2 x 14 in ex9), and an
 immutable record behaves like a tuple (ex10, credit 13 + 4).
+
+Merging the return continuation's handler into the inlined body
+================================================================
+
+Flag: -flambda2-speculative-inlining-merge-return-continuation (off by
+default, not part of -flambda2-inline-2026).
+
+What it does
+------------
+
+When a call's return continuation kr is bound by a Let_cont in the current
+function body and used exactly once (per the count stored in the Let_cont),
+every inlining of that call, speculative or not, produces
+
+  let_cont kr retval... = <handler of kr> in <inlined body>
+
+instead of just the inlined body, shadowing kr.  The handler is thus
+simplified with what is known about the returned values at each return
+point (the parameters of kr can be unboxed, matches on them resolved, dead
+arms dropped), and the original handler, now without any use, is deleted.
+The speculative inlining decision sees the simplified handler as part of
+the inlined body; in exchange the size of the original handler (measured
+by Code_size_report on the unsimplified handler) is added to the call-site
+credit, and so to the budget.  Only inside function bodies: at the unit
+toplevel every binding's continuation is single-use, and merging them nests
+the rest of the module into inlined bodies, which loses the static
+allocation of toplevel closures.
+
+During a speculation the merged handler may jump to continuations defined
+outside of the speculated expression (the function's return continuation,
+join points).  The upwards environment of the speculation is given every
+continuation in scope at the call site, with the arities recorded at their
+Let_conts, and the data flow analysis treats a jump to a continuation it
+does not know like a jump to the return continuation (its arguments are
+required and escape).
+
+Examples (rx*.ml; "medium" is a 9-line chunk of integer arithmetic, about
+50 instructions), compiled on arm64 with
+
+  ocamlopt.opt -O3 -flambda2-inline-2026 [flag] -inlining-report -S -c rxN.ml
+
+  ex    description                               2026                2026 + flag
+  ----  ----------------------------------------  ------------------  ---------------------
+  rx1   f returns Some/None, g matches at once    not inlined 0.91    inlined 0.66
+                                                  g: 24 instr, call   g: 54 instr, no call,
+                                                                      no Some allocated
+  rx2   as rx1 but kr shared by two calls to f    not inlined 0.91    not inlined 0.91
+  rx3   f returns a pair, g takes it apart        not inlined 0.90    inlined 0.65
+                                                  g: 23 instr         g: 49 instr, no pair
+  rx4   f returns a float, g adds to it           not inlined 0.90    inlined 0.39
+                                                  g: 31 instr         g: 62 instr, 5 boxes
+                                                                      fewer in the body
+  rx5   f returns Some on every path, g has a     not inlined 0.92    inlined (credit 151)
+        big None arm                              g: 115 instr        g: 50 instr: the None
+                                                                      arm is gone
+
+rx1 in detail: the handler (match, size 13) is credited, so the call-site
+credit goes from 3 to 16; after speculation the merged handler has its
+parameter unboxed, one allocation and seven primitives are removed, and the
+ratio falls from 0.905 to 0.662.  rx5: the big arm of the handler is
+unreachable once the handler sees that f only returns Some, so the credit
+of 151 (its size) far exceeds what is left.
+
+rmain.ml links rx1-rx5 and prints their results: identical under 2026,
+2026 + merge, and 2026 + merge + the allocation credit.  Likewise 46 of the
+programs under testsuite/tests/basic* print the same output under 2026 and
+2026 + both flags.
+
+Sanity check on typing/ (deps from _build/main, arm64, -O3, 2026 model)
+-----------------------------------------------------------------------
+
+  unit      text bytes                 call sites inlined  handlers merged
+  --------  -------------------------  ------------------  ---------------
+  env       277489 -> 279254 (+0.6%)   1350 -> 1333        515
+  ctype     494440 -> 500664 (+1.3%)   2902 -> 2705        695
+  typecore  693076 -> 680147 (-1.9%)   4284 -> 3962        976
+
+Compile times are unchanged within noise.  Fewer call sites are inlined
+with the flag: the speculated expression now contains the handler, whose
+own simplification (notably the small calls inlined inside it) can cost
+more than the size measured on the unsimplified handler, and the budget of
+150 is reached sooner (typecore: 1092 of 2133 speculations aborted before,
+947 of 1679 after).  The credit is an estimate of the handler's size before
+simplification; nothing better is available at decision time, since the
+handler is normally simplified after the body.
+
+Stats keys: speculation.return_continuation_merged (decisions with a merged
+handler) and speculation.return_continuation_credit (sum of the credits).

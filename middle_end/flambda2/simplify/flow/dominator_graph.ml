@@ -75,7 +75,7 @@ let add_edge ~src ~dst t =
 
 (* Import continuation info into the graph *)
 
-let add_continuation_info map _k (elt : T.Continuation_info.t) t
+let add_continuation_info map _k (elt : T.Continuation_info.t) t ~speculative
     ~return_continuation ~exn_continuation =
   let t =
     List.fold_left
@@ -96,19 +96,28 @@ let add_continuation_info map _k (elt : T.Continuation_info.t) t
   in
   Continuation.Map.fold
     (fun k rewrite_ids t ->
-      if
-        Continuation.equal return_continuation k
-        || Continuation.equal exn_continuation k
-      then t
-      else
-        let params =
+      let params =
+        if
+          Continuation.equal return_continuation k
+          || Continuation.equal exn_continuation k
+        then None
+        else
           match Continuation.Map.find k map with
           | elt ->
-            Array.of_list (Bound_parameters.vars elt.T.Continuation_info.params)
+            Some
+              (Array.of_list
+                 (Bound_parameters.vars elt.T.Continuation_info.params))
           | exception Not_found ->
-            Misc.fatal_errorf "Continuation not found during Data_flow: %a@."
-              Continuation.print k
-        in
+            (* See [Data_flow_graph]. *)
+            if speculative
+            then None
+            else
+              Misc.fatal_errorf "Continuation not found during Data_flow: %a@."
+                Continuation.print k
+      in
+      match params with
+      | None -> t
+      | Some params ->
         Apply_cont_rewrite_id.Map.fold
           (fun _rewrite_id args t ->
             Numeric_types.Int.Map.fold
@@ -130,11 +139,13 @@ let add_continuation_info map _k (elt : T.Continuation_info.t) t
           rewrite_ids t)
     elt.apply_cont_args t
 
-let create ~required_names ~return_continuation ~exn_continuation map =
+let create ~speculative ~required_names ~return_continuation ~exn_continuation
+    map =
   let t = empty ~required_names in
   let t =
     Continuation.Map.fold
-      (add_continuation_info ~return_continuation ~exn_continuation map)
+      (add_continuation_info ~speculative ~return_continuation ~exn_continuation
+         map)
       map t
   in
   let all_simples =

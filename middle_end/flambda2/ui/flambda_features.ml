@@ -333,6 +333,10 @@ module Inlining = struct
     !Oxcaml_flags.Flambda2.Inlining
      .speculative_inlining_credit_caller_allocations
 
+  let speculative_inlining_merge_return_continuation () =
+    !Oxcaml_flags.Flambda2.Inlining
+     .speculative_inlining_merge_return_continuation
+
   let speculative_inlining_uninlined_call_cost_factor () =
     !Oxcaml_flags.Flambda2.Inlining
      .speculative_inlining_uninlined_call_cost_factor

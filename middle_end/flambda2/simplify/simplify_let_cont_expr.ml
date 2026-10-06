@@ -1804,6 +1804,19 @@ and down_to_up_for_lifted_continuations ~simplify_expr ~denv_for_join
     down_to_up_for_lifted_continuations ~simplify_expr ~denv_for_join
       other_lifted_handlers ~down_to_up
 
+(* See [Downwards_env.add_continuation_arity]. *)
+let add_continuation_arities denv (handlers : Original_handlers.t) =
+  match handlers with
+  | Non_recursive { cont; params; _ } ->
+    DE.add_continuation_arity denv cont (Bound_parameters.arity params)
+  | Recursive { invariant_params; continuation_handlers; _ } ->
+    Continuation.Lmap.fold
+      (fun cont (handler : One_recursive_handler.t) denv ->
+        DE.add_continuation_arity denv cont
+          (Bound_parameters.arity
+             (Bound_parameters.append invariant_params handler.params)))
+      continuation_handlers denv
+
 let simplify_let_cont0 ~(simplify_expr : _ Simplify_common.expr_simplifier) dacc
     (data : simplify_let_cont_data) ~down_to_up =
   (* We begin to simplify a let cont by simplifying its body, so that we can see
@@ -1831,6 +1844,13 @@ let simplify_let_cont0 ~(simplify_expr : _ Simplify_common.expr_simplifier) dacc
      the scope will be bumped to `n + 2`, so that further lifted continuations
      can also perform their join at level `n + 1`. *)
   let denv_for_join = DE.increment_continuation_scope denv_before_body in
+  let denv_for_join =
+    if
+      Flambda_features.Inlining.speculative_inlining_merge_return_continuation
+        ()
+    then add_continuation_arities denv_for_join data.handlers
+    else denv_for_join
+  in
   let denv_for_body = DE.increment_continuation_scope denv_for_join in
   let denv_for_body =
     let lifting_cost =
@@ -1953,16 +1973,32 @@ let simplify_let_cont ~simplify_expr dacc let_cont ~down_to_up =
   (* This is the entry point to simplify a let cont expression. The only thing
      it does is to match all handlers to break the name abstraction, and then
      call [simplify_let_cont_stage1]. *)
-  let body, handlers =
+  let dacc, body, handlers =
     match (let_cont : Let_cont.t) with
-    | Non_recursive { handler; can_be_lifted; _ } ->
+    | Non_recursive { handler; can_be_lifted; num_free_occurrences; _ } ->
       let body, non_rec_handler =
         split_non_recursive_let_cont ~can_be_lifted handler
+      in
+      let dacc =
+        (* The handler of a continuation used once may be merged into the body
+           of a function inlined at a call returning to it, see
+           [Inlining_transforms.inline]. *)
+        match num_free_occurrences with
+        | Known Num_occurrences.One
+          when Flambda_features.Inlining
+               .speculative_inlining_merge_return_continuation ()
+               && (not non_rec_handler.is_exn_handler)
+               && Closure_info.is_in_a_closure (DE.closure_info (DA.denv dacc))
+          ->
+          DA.map_denv dacc ~f:(fun denv ->
+              DE.add_single_use_continuation denv non_rec_handler.cont
+                (Non_recursive_let_cont_handler.handler handler))
+        | Known (Num_occurrences.Zero | One | More_than_one) | Unknown -> dacc
       in
       let original_handlers =
         Original_handlers.create_non_recursive non_rec_handler
       in
-      body, original_handlers
+      dacc, body, original_handlers
     | Recursive handlers ->
       let lifted_params = Lifted_cont_params.empty in
       let body, invariant_params, continuation_handlers =
@@ -1972,7 +2008,7 @@ let simplify_let_cont ~simplify_expr dacc let_cont ~down_to_up =
         Original_handlers.create_recursive ~invariant_params ~lifted_params
           ~continuation_handlers ~can_be_lifted:true
       in
-      body, original_handlers
+      dacc, body, original_handlers
   in
   simplify_let_cont0 ~simplify_expr dacc { body; handlers } ~down_to_up
 

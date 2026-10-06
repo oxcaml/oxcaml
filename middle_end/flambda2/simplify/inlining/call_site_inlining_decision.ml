@@ -91,6 +91,78 @@ let caller_allocation_credit dacc ~apply ~inlining_args free_names =
         credit);
     credit
 
+(* When the handler of the return continuation is merged into the inlined body
+   (see [Inlining_transforms.inline]), the original handler is part of what the
+   inlining replaces: its size is credited, like that of the call. *)
+let return_continuation_credit denv ~apply =
+  match Apply.continuation apply with
+  | Never_returns -> 0.
+  | Return cont -> (
+    match DE.single_use_continuation denv cont with
+    | None -> 0.
+    | Some handler ->
+      let return_continuation, exn_continuation =
+        match DE.closure_info denv with
+        | Closure { return_continuation; exn_continuation; _ } ->
+          return_continuation, exn_continuation
+        | Not_in_a_closure
+        | In_a_set_of_closures_but_not_yet_in_a_specific_closure ->
+          ( DE.unit_toplevel_return_continuation denv,
+            DE.unit_toplevel_exn_continuation denv )
+      in
+      let function_slot_size code_id =
+        match DE.find_code_exn denv code_id with
+        | code_or_metadata ->
+          Code_metadata.function_slot_size
+            (Code_or_metadata.code_metadata code_or_metadata)
+        | exception Not_found -> 2
+      in
+      let _v1_size, size =
+        Flambda.Continuation_handler.pattern_match handler
+          ~f:(fun _params ~handler ->
+            Code_size_report.measure ~machine_width:(DE.machine_width denv)
+              ~function_slot_size ~return_continuation ~exn_continuation handler)
+      in
+      let credit = Float.of_int (Code_size_v2.to_int size) in
+      if Inlining_stats.enabled ()
+      then (
+        Inlining_stats_table.incr "speculation.return_continuation_merged";
+        Inlining_stats_table.add_float "speculation.return_continuation_credit"
+          credit);
+      credit)
+
+(* The handler merged into the inlined body may refer to any continuation in
+   scope at the call site: make them known to the upwards environment of the
+   speculation. *)
+let add_continuations_in_scope uenv denv =
+  let add uenv cont arity =
+    if UE.mem_continuation uenv cont
+    then uenv
+    else UE.add_function_return_or_exn_continuation uenv cont arity
+  in
+  let uenv =
+    Continuation.Map.fold
+      (fun cont arity uenv -> add uenv cont arity)
+      (DE.continuation_arities denv)
+      uenv
+  in
+  let exn_arity =
+    Flambda_arity.create_singletons [Flambda_kind.With_subkind.any_value]
+  in
+  match DE.closure_info denv with
+  | Closure { code_id; return_continuation; exn_continuation; _ } ->
+    let return_arity =
+      Code_metadata.result_arity
+        (Code_or_metadata.code_metadata (DE.find_code_exn denv code_id))
+    in
+    add (add uenv return_continuation return_arity) exn_continuation exn_arity
+  | Not_in_a_closure ->
+    add
+      (add uenv (DE.unit_toplevel_return_continuation denv) exn_arity)
+      (DE.unit_toplevel_exn_continuation denv)
+      exn_arity
+  | In_a_set_of_closures_but_not_yet_in_a_specific_closure -> uenv
+
 let speculative_inlining0 dacc ~apply ~function_type ~simplify_expr
     ~return_arity ~budget =
   let dacc = DA.prepare_for_speculative_inlining dacc in
@@ -171,9 +243,15 @@ let speculative_inlining0 dacc ~apply ~function_type ~simplify_expr
         let uenv =
           match Apply.continuation apply with
           | Never_returns -> uenv
-          | Return return_continuation ->
-            UE.add_function_return_or_exn_continuation uenv return_continuation
-              return_arity
+          | Return return_continuation -> (
+            let uenv =
+              UE.add_function_return_or_exn_continuation uenv
+                return_continuation return_arity
+            in
+            let denv = DA.denv dacc in
+            match DE.single_use_continuation denv return_continuation with
+            | None -> uenv
+            | Some _ -> add_continuations_in_scope uenv denv)
         in
         let uacc =
           UA.create ~flow_result ~compute_slot_offsets:false uenv dacc
@@ -431,6 +509,9 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
               let is_tail = DE.apply_is_in_tail_position denv apply in
               Float.of_int (Code_size.to_int (Code_size.apply ~is_tail apply))
             else 0.
+          in
+          let call_site_credit =
+            call_site_credit +. return_continuation_credit denv ~apply
           in
           let budget_exhausted =
             (* When inside a speculatively-inlined body, do not bother

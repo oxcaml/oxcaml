@@ -480,6 +480,8 @@ module Flambda2 = struct
 
       let speculative_inlining_credit_caller_allocations = false
 
+      let speculative_inlining_merge_return_continuation = false
+
       let speculative_inlining_uninlined_call_cost_factor = 1.0
 
       let speculative_inlining_budget = false
@@ -546,6 +548,9 @@ module Flambda2 = struct
 
     let speculative_inlining_credit_caller_allocations =
       ref Default.speculative_inlining_credit_caller_allocations
+
+    let speculative_inlining_merge_return_continuation =
+      ref Default.speculative_inlining_merge_return_continuation
 
     let speculative_inlining_uninlined_call_cost_factor =
       ref Default.speculative_inlining_uninlined_call_cost_factor

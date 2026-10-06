@@ -64,6 +64,9 @@ type t =
     unit_toplevel_alloc_region : Variable.t;
     variables_defined_at_toplevel : Variable.Set.t;
     single_use_allocations : Cost_metrics.t Variable.Map.t;
+    single_use_continuations :
+      Flambda.Continuation_handler.t Continuation.Map.t;
+    continuation_arities : [`Unarized] Flambda_arity.t Continuation.Map.t;
     cse : CSE.t;
     comparison_results : Comparison_result.t Variable.Map.t;
     are_rebuilding_terms : Are_rebuilding_terms.t;
@@ -112,6 +115,7 @@ let [@ocamlformat "disable"] print ppf { round; machine_width; typing_env;
                 inlining_state; propagating_float_consts;
                 at_unit_toplevel; unit_toplevel_exn_continuation;
                 variables_defined_at_toplevel; single_use_allocations = _;
+                single_use_continuations = _; continuation_arities = _;
                 cse; comparison_results;
                 are_rebuilding_terms; closure_info;
                 unit_toplevel_return_continuation; unit_toplevel_alloc_region; all_code;
@@ -244,6 +248,8 @@ let create ~round ~machine_width ~(resolver : resolver)
       unit_toplevel_alloc_region = toplevel_my_alloc_region;
       variables_defined_at_toplevel = Variable.Set.empty;
       single_use_allocations = Variable.Map.empty;
+      single_use_continuations = Continuation.Map.empty;
+      continuation_arities = Continuation.Map.empty;
       cse = CSE.empty;
       comparison_results = Variable.Map.empty;
       are_rebuilding_terms = Are_rebuilding_terms.are_rebuilding;
@@ -318,6 +324,25 @@ let add_single_use_allocation t var cost_metrics =
 let single_use_allocation t var =
   Variable.Map.find_opt var t.single_use_allocations
 
+(* The handlers of the non-recursive continuations in scope that are used
+   exactly once: see [Inlining_transforms.inline]. *)
+let add_single_use_continuation t cont handler =
+  { t with
+    single_use_continuations =
+      Continuation.Map.add cont handler t.single_use_continuations
+  }
+
+let single_use_continuation t cont =
+  Continuation.Map.find_opt cont t.single_use_continuations
+
+let add_continuation_arity t cont arity =
+  { t with
+    continuation_arities =
+      Continuation.Map.add cont arity t.continuation_arities
+  }
+
+let continuation_arities t = t.continuation_arities
+
 let is_defined_at_toplevel t var =
   Variable.Set.mem var t.variables_defined_at_toplevel
 
@@ -364,6 +389,8 @@ let enter_set_of_closures
       unit_toplevel_alloc_region;
       variables_defined_at_toplevel;
       single_use_allocations = _;
+      single_use_continuations = _;
+      continuation_arities = _;
       cse = _;
       comparison_results = _;
       are_rebuilding_terms;
@@ -394,6 +421,8 @@ let enter_set_of_closures
     unit_toplevel_alloc_region;
     variables_defined_at_toplevel;
     single_use_allocations = Variable.Map.empty;
+    single_use_continuations = Continuation.Map.empty;
+    continuation_arities = Continuation.Map.empty;
     cse = CSE.empty;
     comparison_results = Variable.Map.empty;
     are_rebuilding_terms;
@@ -877,6 +906,8 @@ let denv_for_lifted_continuation ~denv_for_join ~denv =
     at_unit_toplevel = denv_for_join.at_unit_toplevel;
     variables_defined_at_toplevel = denv_for_join.variables_defined_at_toplevel;
     single_use_allocations = denv_for_join.single_use_allocations;
+    single_use_continuations = denv_for_join.single_use_continuations;
+    continuation_arities = denv_for_join.continuation_arities;
     cse = denv_for_join.cse;
     comparison_results = denv_for_join.comparison_results;
     replay_history = denv_for_join.replay_history;

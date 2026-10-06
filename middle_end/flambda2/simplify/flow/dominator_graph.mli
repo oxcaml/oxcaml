@@ -29,6 +29,7 @@ type alias_map = Simple.t Variable.Map.t
 
 (** Create the data flow graph *)
 val create :
+  speculative:bool ->
   required_names:Name.Set.t ->
   return_continuation:Continuation.t ->
   exn_continuation:Continuation.t ->

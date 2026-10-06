@@ -74,3 +74,9 @@ let in_or_out_of_closure (t : t) : in_or_out_of_closure =
     Misc.fatal_errorf
       "Expected to be either inside or outside a closure, but not \
        [In_a_set_of_closures_but_not_yet_in_a_specific_closure]"
+
+let is_in_a_closure (t : t) =
+  match t with
+  | Closure _ -> true
+  | Not_in_a_closure | In_a_set_of_closures_but_not_yet_in_a_specific_closure ->
+    false

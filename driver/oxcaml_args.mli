@@ -201,6 +201,8 @@ module type Oxcaml_options = sig
   val no_flambda2_speculative_inlining_nested : unit -> unit
   val flambda2_speculative_inlining_credit_caller_allocations : unit -> unit
   val no_flambda2_speculative_inlining_credit_caller_allocations : unit -> unit
+  val flambda2_speculative_inlining_merge_return_continuation : unit -> unit
+  val no_flambda2_speculative_inlining_merge_return_continuation : unit -> unit
   val flambda2_speculative_inlining_uninlined_call_cost_factor : float -> unit
   val flambda2_speculative_inlining_budget : unit -> unit
   val no_flambda2_speculative_inlining_budget : unit -> unit

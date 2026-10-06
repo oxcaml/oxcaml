@@ -78,8 +78,9 @@ let analyze ?(speculative = false) ?print_name ~machine_width
       then Format.eprintf "SOURCE:@\n%a@\n@." T.Acc.print t;
       (* dependency graph *)
       let deps =
-        Data_flow_graph.create map ~return_continuation ~exn_continuation
-          ~code_age_relation ~used_value_slots ~code_ids_to_never_delete
+        Data_flow_graph.create map ~speculative ~return_continuation
+          ~exn_continuation ~code_age_relation ~used_value_slots
+          ~code_ids_to_never_delete
       in
       if Flambda_features.dump_flow ()
       then Format.eprintf "/// graph@\n%a@\n@." Data_flow_graph.print deps;
@@ -87,8 +88,8 @@ let analyze ?(speculative = false) ?print_name ~machine_width
       let dead_variable_result = Data_flow_graph.required_names deps in
       (* Aliases analysis *)
       let dom_graph =
-        Dominator_graph.create map ~return_continuation ~exn_continuation
-          ~required_names:dead_variable_result.required_names
+        Dominator_graph.create map ~speculative ~return_continuation
+          ~exn_continuation ~required_names:dead_variable_result.required_names
       in
       let aliases = Dominator_graph.dominator_analysis dom_graph in
       let aliases_kind = Dominator_graph.aliases_kind dom_graph aliases in

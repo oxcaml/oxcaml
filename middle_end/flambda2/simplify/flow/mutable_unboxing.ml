@@ -176,23 +176,28 @@ let escaping_by_return ~(dom : Dominator_graph.alias_map)
     ~(source_info : T.Acc.t) ~return_continuation ~exn_continuation =
   Continuation.Map.fold
     (fun _cont (elt : T.Continuation_info.t) escaping ->
-      let add_escaping cont escaping =
-        match Continuation.Map.find_or_null cont elt.apply_cont_args with
-        | Null -> escaping
-        | This apply_cont_args ->
-          Variable.Set.fold
-            (fun var escaping ->
-              let escaping =
-                match Variable.Map.find_or_null var dom with
-                | Null -> escaping
-                | This simple -> Simple.Set.add simple escaping
-              in
-              Simple.Set.add (Simple.var var) escaping)
-            (free_names_of_apply_cont_args apply_cont_args)
-            escaping
-      in
-      let escaping = add_escaping return_continuation escaping in
-      add_escaping exn_continuation escaping)
+      Continuation.Map.fold
+        (fun cont apply_cont_args escaping ->
+          (* The arguments of the return and exception continuations escape; so
+             do, during a speculative inlining, those of the continuations
+             defined outside of the inlined body (see [Data_flow_graph]). *)
+          if
+            Continuation.equal cont return_continuation
+            || Continuation.equal cont exn_continuation
+            || not (Continuation.Map.mem cont source_info.map)
+          then
+            Variable.Set.fold
+              (fun var escaping ->
+                let escaping =
+                  match Variable.Map.find_or_null var dom with
+                  | Null -> escaping
+                  | This simple -> Simple.Set.add simple escaping
+                in
+                Simple.Set.add (Simple.var var) escaping)
+              (free_names_of_apply_cont_args apply_cont_args)
+              escaping
+          else escaping)
+        elt.apply_cont_args escaping)
     source_info.map Simple.Set.empty
 
 let escaping ~(dom : Dominator_graph.alias_map) ~(dom_graph : Dominator_graph.t)

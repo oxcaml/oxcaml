@@ -345,6 +345,7 @@ module Flambda2 : sig
       val speculative_inlining_charge_uninlined_calls : bool
       val speculative_inlining_nested : bool
       val speculative_inlining_credit_caller_allocations : bool
+      val speculative_inlining_merge_return_continuation : bool
       val speculative_inlining_uninlined_call_cost_factor : float
       val speculative_inlining_budget : bool
       val speculative_inlining_budget_size_ratio : float
@@ -398,6 +399,12 @@ module Flambda2 : sig
         caller that flow only into the call and that the inlined body no
         longer refers to, since they will be deleted. *)
     val speculative_inlining_credit_caller_allocations : bool ref
+
+    (** When inlining a call whose return continuation is used only by that
+        call, copy the continuation's handler into the inlined body, so that
+        it is simplified (and judged, when the inlining is speculative) with
+        what is known about the returned values. *)
+    val speculative_inlining_merge_return_continuation : bool ref
 
     val speculative_inlining_uninlined_call_cost_factor : float ref
 

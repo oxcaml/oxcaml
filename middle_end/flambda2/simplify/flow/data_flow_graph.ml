@@ -247,8 +247,8 @@ let add_name_occurrences name_occurrences
   in
   { t with unconditionally_used; code_id_unconditionally_used }
 
-let add_continuation_info map ~return_continuation ~exn_continuation
-    ~used_value_slots _
+let add_continuation_info map ~speculative ~return_continuation
+    ~exn_continuation ~used_value_slots _
     T.Continuation_info.
       { apply_cont_args;
         (* CR pchambart: properly follow dependencies in exception extra args.
@@ -343,10 +343,30 @@ let add_continuation_info map ~return_continuation ~exn_continuation
      arguments. *)
   Continuation.Map.fold
     (fun k rewrite_ids t ->
-      if
-        Continuation.equal return_continuation k
-        || Continuation.equal exn_continuation k
-      then
+      let params =
+        if
+          Continuation.equal return_continuation k
+          || Continuation.equal exn_continuation k
+        then None
+        else
+          match Continuation.Map.find k map with
+          | elt ->
+            Some
+              (Array.of_list
+                 (Bound_parameters.vars elt.T.Continuation_info.params))
+          | exception Not_found ->
+            (* The body of a speculative inlining may jump to continuations
+               defined outside of it, when the handler of the return
+               continuation has been merged into it (see
+               [Inlining_transforms.inline]). *)
+            if speculative
+            then None
+            else
+              Misc.fatal_errorf "Continuation not found during Data_flow: %a@."
+                Continuation.print k
+      in
+      match params with
+      | None ->
         Apply_cont_rewrite_id.Map.fold
           (fun _rewrite_id args t ->
             Numeric_types.Int.Map.fold
@@ -362,15 +382,7 @@ let add_continuation_info map ~return_continuation ~exn_continuation
                 | Function_result -> t)
               args t)
           rewrite_ids t
-      else
-        let params =
-          match Continuation.Map.find k map with
-          | elt ->
-            Array.of_list (Bound_parameters.vars elt.T.Continuation_info.params)
-          | exception Not_found ->
-            Misc.fatal_errorf "Continuation not found during Data_flow: %a@."
-              Continuation.print k
-        in
+      | Some params ->
         Apply_cont_rewrite_id.Map.fold
           (fun rewrite_id args t ->
             let correct_number_of_arguments =
@@ -411,8 +423,8 @@ let add_continuation_info map ~return_continuation ~exn_continuation
           rewrite_ids t)
     apply_cont_args t
 
-let create ~return_continuation ~exn_continuation ~code_age_relation
-    ~used_value_slots ~code_ids_to_never_delete map =
+let create ~speculative ~return_continuation ~exn_continuation
+    ~code_age_relation ~used_value_slots ~code_ids_to_never_delete map =
   (* Build the dependencies using the regular params and args of continuations,
      and the let-bindings in continuations handlers. *)
   let is_toplevel =
@@ -422,8 +434,8 @@ let create ~return_continuation ~exn_continuation ~code_age_relation
   in
   let t =
     Continuation.Map.fold
-      (add_continuation_info map ~return_continuation ~exn_continuation
-         ~used_value_slots)
+      (add_continuation_info map ~speculative ~return_continuation
+         ~exn_continuation ~used_value_slots)
       map
       (empty code_age_relation is_toplevel ~code_ids_to_never_delete)
   in

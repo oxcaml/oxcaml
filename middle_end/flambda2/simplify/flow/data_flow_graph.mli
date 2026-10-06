@@ -20,6 +20,7 @@ val print : Format.formatter -> t -> unit
 
 (** Create the data flow graph *)
 val create :
+  speculative:bool ->
   return_continuation:Continuation.t ->
   exn_continuation:Continuation.t ->
   code_age_relation:Code_age_relation.t ->

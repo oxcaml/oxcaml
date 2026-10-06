@@ -204,6 +204,8 @@ module Inlining : sig
 
   val speculative_inlining_credit_caller_allocations : unit -> bool
 
+  val speculative_inlining_merge_return_continuation : unit -> bool
+
   val speculative_inlining_uninlined_call_cost_factor : unit -> float
 
   val speculative_inlining_budget : unit -> bool

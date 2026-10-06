@@ -556,6 +556,7 @@ let ocaml_ignored_flags =
     "-flambda2-speculative-inlining-charge-uninlined-calls";
     "-flambda2-speculative-inlining-nested";
     "-flambda2-speculative-inlining-credit-caller-allocations";
+    "-flambda2-speculative-inlining-merge-return-continuation";
     "-flambda2-speculative-inlining-budget";
     "-flambda2-unbox-along-intra-function-control-flow";
     "-flambda2-unicode";
@@ -576,6 +577,7 @@ let ocaml_ignored_flags =
     "-no-flambda2-speculative-inlining-charge-uninlined-calls";
     "-no-flambda2-speculative-inlining-nested";
     "-no-flambda2-speculative-inlining-credit-caller-allocations";
+    "-no-flambda2-speculative-inlining-merge-return-continuation";
     "-no-flambda2-speculative-inlining-budget";
     "-flambda2-inline-2026";
     "-flambda2-speculative-inlining-credit-call-site";

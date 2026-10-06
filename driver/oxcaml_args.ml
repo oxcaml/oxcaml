@@ -1229,6 +1229,28 @@ let mk_no_flambda2_speculative_inlining_credit_caller_allocations f =
          Flambda2.Inlining.Default
          .speculative_inlining_credit_caller_allocations) )
 
+let mk_flambda2_speculative_inlining_merge_return_continuation f =
+  ( "-flambda2-speculative-inlining-merge-return-continuation",
+    Arg.Unit f,
+    Printf.sprintf
+      " When inlining a call whose return continuation is used only by\n\
+      \    that call, copy the continuation's handler into the inlined body\n\
+      \    and simplify it with what is known about the returned values%s\n\
+      \    (Flambda 2 only)"
+      (format_default
+         Flambda2.Inlining.Default
+         .speculative_inlining_merge_return_continuation) )
+
+let mk_no_flambda2_speculative_inlining_merge_return_continuation f =
+  ( "-no-flambda2-speculative-inlining-merge-return-continuation",
+    Arg.Unit f,
+    Printf.sprintf
+      " Do not copy return continuation handlers into inlined bodies%s\n\
+      \    (Flambda 2 only)"
+      (format_not_default
+         Flambda2.Inlining.Default
+         .speculative_inlining_merge_return_continuation) )
+
 let mk_flambda2_speculative_inlining_uninlined_call_cost_factor f =
   ( "-flambda2-speculative-inlining-uninlined-call-cost-factor",
     Arg.Float f,
@@ -1790,6 +1812,8 @@ module type Oxcaml_options = sig
   val no_flambda2_speculative_inlining_nested : unit -> unit
   val flambda2_speculative_inlining_credit_caller_allocations : unit -> unit
   val no_flambda2_speculative_inlining_credit_caller_allocations : unit -> unit
+  val flambda2_speculative_inlining_merge_return_continuation : unit -> unit
+  val no_flambda2_speculative_inlining_merge_return_continuation : unit -> unit
   val flambda2_speculative_inlining_uninlined_call_cost_factor : float -> unit
   val flambda2_speculative_inlining_budget : unit -> unit
   val no_flambda2_speculative_inlining_budget : unit -> unit
@@ -2063,6 +2087,10 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
         F.flambda2_speculative_inlining_credit_caller_allocations;
       mk_no_flambda2_speculative_inlining_credit_caller_allocations
         F.no_flambda2_speculative_inlining_credit_caller_allocations;
+      mk_flambda2_speculative_inlining_merge_return_continuation
+        F.flambda2_speculative_inlining_merge_return_continuation;
+      mk_no_flambda2_speculative_inlining_merge_return_continuation
+        F.no_flambda2_speculative_inlining_merge_return_continuation;
       mk_flambda2_speculative_inlining_uninlined_call_cost_factor
         F.flambda2_speculative_inlining_uninlined_call_cost_factor;
       mk_flambda2_speculative_inlining_budget
@@ -2709,6 +2737,12 @@ module Oxcaml_options_impl = struct
   let no_flambda2_speculative_inlining_credit_caller_allocations =
     clear' Flambda2.Inlining.speculative_inlining_credit_caller_allocations
 
+  let flambda2_speculative_inlining_merge_return_continuation =
+    set' Flambda2.Inlining.speculative_inlining_merge_return_continuation
+
+  let no_flambda2_speculative_inlining_merge_return_continuation =
+    clear' Flambda2.Inlining.speculative_inlining_merge_return_continuation
+
   let flambda2_speculative_inlining_uninlined_call_cost_factor factor =
     Flambda2.Inlining.speculative_inlining_uninlined_call_cost_factor := factor
 
@@ -3260,6 +3294,8 @@ module Extra_params = struct
         set' Flambda2.Inlining.speculative_inlining_nested
     | "flambda2-speculative-inlining-credit-caller-allocations" ->
         set' Flambda2.Inlining.speculative_inlining_credit_caller_allocations
+    | "flambda2-speculative-inlining-merge-return-continuation" ->
+        set' Flambda2.Inlining.speculative_inlining_merge_return_continuation
     | "flambda2-speculative-inlining-budget" ->
         set' Flambda2.Inlining.speculative_inlining_budget
     | "flambda2-speculative-inlining-budget-size-ratio" ->

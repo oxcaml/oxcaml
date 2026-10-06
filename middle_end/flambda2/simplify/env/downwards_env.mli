@@ -62,6 +62,21 @@ val add_single_use_allocation : t -> Variable.t -> Cost_metrics.t -> t
 
 val single_use_allocation : t -> Variable.t -> Cost_metrics.t option
 
+(** Record the handler of a non-recursive continuation that is used exactly once
+    (see [Inlining_transforms.inline]). *)
+val add_single_use_continuation :
+  t -> Continuation.t -> Flambda.Continuation_handler.t -> t
+
+val single_use_continuation :
+  t -> Continuation.t -> Flambda.Continuation_handler.t option
+
+(** The arities of the continuations bound in the current function so far (only
+    maintained when the handlers above are recorded). *)
+val add_continuation_arity :
+  t -> Continuation.t -> [`Unarized] Flambda_arity.t -> t
+
+val continuation_arities : t -> [`Unarized] Flambda_arity.t Continuation.Map.t
+
 val add_symbol_projection : t -> Variable.t -> Symbol_projection.t -> t
 
 val find_symbol_projection : t -> Variable.t -> Symbol_projection.t option
