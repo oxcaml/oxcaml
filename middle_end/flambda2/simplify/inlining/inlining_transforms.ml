@@ -189,7 +189,7 @@ let inline dacc ~apply ~unroll_to ~was_inline_always function_decl =
           | Return cont -> (
             match DE.single_use_continuation (DA.denv dacc) cont with
             | None -> expr
-            | Some handler ->
+            | Some (handler, _size) ->
               Let_cont.create_non_recursive cont handler ~body:expr
                 ~free_names_of_body:Unknown)
         in

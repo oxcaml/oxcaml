@@ -278,10 +278,17 @@ let record_final_unit ~machine_width unit =
       | Some code -> Code.function_slot_size code
       | None -> 2
     in
+    let inlined_callee_size code_id ~inlined =
+      match Code_id.Map.find_opt code_id codes with
+      | Some code ->
+        Code_size_report.size_if_inlined
+          ~code_metadata:(Code.code_metadata code) ~inlined
+      | None -> None
+    in
     let measure ~return_continuation ~exn_continuation body =
       let v1, v2 =
         Code_size_report.measure ~machine_width ~function_slot_size
-          ~return_continuation ~exn_continuation body
+          ~inlined_callee_size ~return_continuation ~exn_continuation body
       in
       add "code.size.v1" v1;
       add "code.size.v2.x86_64" (Code_size_v2.x86_64 v2);

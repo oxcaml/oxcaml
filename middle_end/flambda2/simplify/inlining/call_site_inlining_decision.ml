@@ -93,37 +93,31 @@ let caller_allocation_credit dacc ~apply ~inlining_args free_names =
 
 (* When the handler of the return continuation is merged into the inlined body
    (see [Inlining_transforms.inline]), the original handler is part of what the
-   inlining replaces: its size is credited, like that of the call. *)
+   inlining replaces: its size is credited, like that of the call.
+
+   The size is that of the unsimplified handler, with the calls sure to be
+   inlined counted as their callees (see [Code_size_report.measure]); it is an
+   estimate, since the handler's cost without the inlining is only known by
+   simplifying it without the inlining. That was tried: simplifying "let_cont k
+   = handler in apply", with the call marked never to be inlined, in a throwaway
+   environment like a speculation, and crediting its cost (size plus the bonus
+   of the operations the handler loses regardless). On typing/ it lowered the
+   growth of text size by one to one and a half percent per unit, left the
+   number of call sites inlined unchanged, and cost about three percent of
+   compile time, so it was not kept. *)
 let return_continuation_credit denv ~apply =
   match Apply.continuation apply with
   | Never_returns -> 0.
   | Return cont -> (
     match DE.single_use_continuation denv cont with
-    | None -> 0.
-    | Some handler ->
-      let return_continuation, exn_continuation =
-        match DE.closure_info denv with
-        | Closure { return_continuation; exn_continuation; _ } ->
-          return_continuation, exn_continuation
-        | Not_in_a_closure
-        | In_a_set_of_closures_but_not_yet_in_a_specific_closure ->
-          ( DE.unit_toplevel_return_continuation denv,
-            DE.unit_toplevel_exn_continuation denv )
-      in
-      let function_slot_size code_id =
-        match DE.find_code_exn denv code_id with
-        | code_or_metadata ->
-          Code_metadata.function_slot_size
-            (Code_or_metadata.code_metadata code_or_metadata)
-        | exception Not_found -> 2
-      in
-      let _v1_size, size =
-        Flambda.Continuation_handler.pattern_match handler
-          ~f:(fun _params ~handler ->
-            Code_size_report.measure ~machine_width:(DE.machine_width denv)
-              ~function_slot_size ~return_continuation ~exn_continuation handler)
-      in
-      let credit = Float.of_int (Code_size_v2.to_int size) in
+    | None ->
+      if
+        Inlining_stats.enabled ()
+        && DE.single_use_continuation_is_too_large denv cont
+      then Inlining_stats_table.incr "speculation.return_continuation_too_large";
+      0.
+    | Some (_handler, size) ->
+      let credit = Float.of_int size in
       if Inlining_stats.enabled ()
       then (
         Inlining_stats_table.incr "speculation.return_continuation_merged";
@@ -510,8 +504,11 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
               Float.of_int (Code_size.to_int (Code_size.apply ~is_tail apply))
             else 0.
           in
+          let return_continuation_credit =
+            return_continuation_credit denv ~apply
+          in
           let call_site_credit =
-            call_site_credit +. return_continuation_credit denv ~apply
+            call_site_credit +. return_continuation_credit
           in
           let budget_exhausted =
             (* When inside a speculatively-inlined body, do not bother
@@ -566,17 +563,18 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
             | Completed
                 { cost_metrics; cost_metrics_of_lifted_constants; free_names }
               ->
+              let caller_allocation_credit =
+                caller_allocation_credit dacc ~apply ~inlining_args free_names
+              in
               let call_site_credit =
-                call_site_credit
-                +. caller_allocation_credit dacc ~apply ~inlining_args
-                     free_names
+                call_site_credit +. caller_allocation_credit
               in
               let original_size =
                 Code_metadata.cost_metrics code_metadata |> Cost_metrics.size
               in
-              let ( (criterion :
-                      Call_site_inlining_decision_type.speculative_criterion),
-                    inline ) =
+              let decide ~call_site_credit :
+                  Call_site_inlining_decision_type.speculative_criterion * bool
+                  =
                 match
                   Flambda_features.Inlining.speculative_inlining_criterion ()
                 with
@@ -609,6 +607,23 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
                   ( Ratio { adjusted_size; bonus; ratio; max_ratio },
                     Float.compare ratio max_ratio <= 0 )
               in
+              let criterion, inline = decide ~call_site_credit in
+              if inline && Inlining_stats.enabled ()
+              then (
+                (* Decisions that the credits of the new hints tipped. *)
+                let only_with credit key =
+                  if
+                    Float.compare credit 0. > 0
+                    && not
+                         (snd
+                            (decide
+                               ~call_site_credit:(call_site_credit -. credit)))
+                  then Inlining_stats_table.incr key
+                in
+                only_with caller_allocation_credit
+                  "speculation.inlined_only_with_caller_allocation_credit";
+                only_with return_continuation_credit
+                  "speculation.inlined_only_with_return_continuation_credit");
               if inline
               then
                 Speculatively_inline

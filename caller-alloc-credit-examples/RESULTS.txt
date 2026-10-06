@@ -218,3 +218,120 @@ handler is normally simplified after the body.
 
 Stats keys: speculation.return_continuation_merged (decisions with a merged
 handler) and speculation.return_continuation_credit (sum of the credits).
+
+Follow-up: handler measurement, size cap, tipped-decision stats, alloc bonus
+===========================================================================
+
+Three changes after the first results above.
+
+1. Code_size_report.measure now counts a direct call that is sure to be
+   inlined (callee decided Stub, Attribute_inline or Small_function, or an
+   [@inlined] call) as the size of the callee's body rather than as a
+   call.  This applies wherever measure is used: the handler credit of
+   the merge, the -dinlining-stats final shape and -dcode-sizes.
+
+2. -flambda2-speculative-inlining-merge-return-continuation-max-size
+   (default 150): a handler measured larger than this is not merged.  The
+   size is measured once per continuation, lazily, when a call returning
+   to it is first judged.
+
+3. Stats keys: speculation.inlined_only_with_caller_allocation_credit and
+   speculation.inlined_only_with_return_continuation_credit count the
+   decisions that pass only thanks to the respective credit;
+   speculation.return_continuation_too_large counts handlers over the cap.
+
+typing/ with both hints, and with -flambda2-speculative-inlining-bonus-alloc
+raised from 4 to 12 (deps from _build/main, arm64, -O3, 2026 model):
+
+  unit      config            text bytes        inlined  spec. inline/not/abort  tipped by return/arg  merged  too large
+  --------  ----------------  ----------------  -------  ----------------------  --------------------  ------  ---------
+  env       2026              277489            1350     329 / 146 / 363
+            2026+hints        281550 (+1.5%)    1347     324 / 104 / 348         102 / 0               516     10
+            2026+hints+a12    279958 (+0.9%)    1361     327 / 106 / 346          94 / 0               516     10
+            2026+a12          277441 (-0.0%)    1361     337 / 146 / 361
+  ctype     2026              494440            2902     461 / 312 / 639
+            2026+hints        518654 (+4.9%)    2927     526 / 164 / 562         134 / 24              747     35
+            2026+hints+a12    519612 (+5.1%)    2933     529 / 157 / 564         128 / 24              744     35
+            2026+a12          494858 (+0.1%)    2910     463 / 317 / 636
+  typecore  2026              693076            4284     659 / 379 / 1092
+            2026+hints        694725 (+0.2%)    4115     609 / 192 / 1082        143 / 6              1021    145
+            2026+hints+a12    703391 (+1.5%)    4154     644 / 170 / 1089        132 / 5              1037    146
+            2026+a12          702284 (+1.3%)    4319     687 / 361 / 1103
+
+(a12: alloc bonus 12.  "inlined" counts call sites in the inlining report;
+"spec." the outermost speculative decisions.)
+
+Reading
+-------
+
+The return-continuation credit now tips a lot of decisions (102 to 143 per
+unit), far more than the argument credit (0 to 24), and ctype grows by
+5%.  Counting the callees sure to be inlined moved the estimate's bias to
+the other side: a callee counted at its full body size is, after inlining
+into the handler, simplified with its arguments known and ends up smaller,
+so the credit now exceeds what the handler would have cost on its own and
+the inlining gets the handler's own specialisation gains for free.  The
+estimate cannot be both cheap and right: the handler's cost without the
+inlining is only known by simplifying it without the inlining.  With the
+cap on handler size that is affordable: simplifying "let_cont kr = H in
+apply f -> kr" with the call marked never-inline, in the same throwaway
+environment as the speculation, gives the exact baseline (size and
+operations removed in H regardless) to credit.
+
+Raising the alloc bonus to 12 on its own inlines a little more (typecore
++35 call sites, +1.3% text; ctype and env within 0.1%); on top of the hints
+it changes little.  The caller-allocation credit tips few decisions, so the
+bonus mostly acts through allocations removed inside inlined bodies.
+
+43 of the programs under testsuite/tests/basic* print the same output
+under 2026 and 2026 + both hints + alloc bonus 12; rmain likewise.
+
+Follow-up 2: the handler's baseline cost by simplification
+==========================================================
+
+The measured estimate of the handler's size is replaced by a simplification
+of what the inlining replaces: "let_cont kr = H in apply f args -> kr", with
+the call marked never to be inlined, simplified in the same throwaway
+environment as a speculation (budget unlimited).  Its cost, size plus the
+bonus of the operations removed in H regardless, is the whole call-site
+credit (it includes the call) and goes into the budget.  The measured size
+is still what the cap compares against.  The alloc bonus is back at its
+default of 4.
+
+  ex    2026 + flag before (measured)   2026 + flag now (simplified baseline)
+  ----  -----------------------------  -------------------------------------
+  rx1   credit 16, ratio 0.66          credit 12, ratio 0.72, inlined
+  rx3   credit 10, ratio 0.65          credit 10, ratio 0.65, inlined
+  rx4   credit 21, ratio 0.39          credit 24, ratio 0.35, inlined
+  rx5   credit 151, ratio -1.12        credit 135, ratio -0.93, inlined
+
+typing/ (deps from _build/main, arm64, -O3, 2026 model, both hints):
+
+  unit      text bytes            inlined       spec. inline/not/abort  tipped (return/arg)  merged  too large  baseline s
+  --------  --------------------  ------------  ----------------------  -------------------  ------  ---------  ----------
+  env       277489 -> 278851      1350 -> 1350  324 / 102 / 333         103 / 0              477     10         0.27 of 6.3
+            (+0.5%)
+  ctype     494440 -> 510569      2902 -> 2920  513 / 165 / 603         121 / 25             674     35         0.36 of 11.6
+            (+3.3%)
+  typecore  693076 -> 685871      4284 -> 4116  597 / 235 / 978         147 / 7              916     141        0.65 of 19.5
+            (-1.0%)
+
+Against the measured estimate the baseline is less generous (ctype +3.3%
+instead of +4.9%, typecore -1.0% instead of +0.2%) and costs about 3% of
+compile time for the extra simplifications, bounded by the handler cap.
+
+The "tipped by the return credit" key means something different from the
+argument one: once the handler is merged, the speculated body contains it,
+so nearly every accepted decision needs the handler's cost credited; the
+key counts accepted merged decisions, not decisions the hint changed.  What
+the merge changes relative to no merge can only be seen in the totals.
+
+43 of the programs under testsuite/tests/basic* and rmain print the same
+output with and without both hints.
+
+Outcome: the simplified baseline was not kept.  It changed text size by one
+to one and a half percent per unit relative to the measured estimate, left
+the number of call sites inlined unchanged, and cost about three percent of
+compile time.  The measured estimate (with calls sure to be inlined counted
+as their callees) stays, with a comment in Call_site_inlining_decision
+recording the experiment.

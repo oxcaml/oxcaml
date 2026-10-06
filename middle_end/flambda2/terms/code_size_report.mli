@@ -52,11 +52,23 @@ val iter_function_body :
 *)
 val collect_code : Flambda_unit.t -> Code.t Code_id.Map.t
 
+(** The size of the callee of a direct call, when the call is sure to be inlined
+    (a small function, a stub, or an [@inlined] call) and its body will thus
+    replace the call. *)
+val size_if_inlined :
+  code_metadata:Code_metadata.t ->
+  inlined:Inlined_attribute.t ->
+  Code_size.t option
+
 (** The size of a function body (or of the module initialiser) in the v1 and v2
-    models; see the comment in the implementation. *)
+    models; see the comment in the implementation. A direct call for which
+    [inlined_callee_size] returns a size counts as that size, see
+    [size_if_inlined]. *)
 val measure :
   machine_width:Target_system.Machine_width.t ->
   function_slot_size:(Code_id.t -> int) ->
+  inlined_callee_size:
+    (Code_id.t -> inlined:Inlined_attribute.t -> Code_size.t option) ->
   return_continuation:Continuation.t ->
   exn_continuation:Continuation.t ->
   Flambda.Expr.t ->

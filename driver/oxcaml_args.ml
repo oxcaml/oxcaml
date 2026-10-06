@@ -1251,6 +1251,15 @@ let mk_no_flambda2_speculative_inlining_merge_return_continuation f =
          Flambda2.Inlining.Default
          .speculative_inlining_merge_return_continuation) )
 
+let mk_flambda2_speculative_inlining_merge_return_continuation_max_size f =
+  ( "-flambda2-speculative-inlining-merge-return-continuation-max-size",
+    Arg.Int f,
+    Printf.sprintf
+      " <n>  Do not copy return continuation handlers larger than this\n\
+      \    (default %d) (Flambda 2 only)"
+      Flambda2.Inlining.Default
+      .speculative_inlining_merge_return_continuation_max_size )
+
 let mk_flambda2_speculative_inlining_uninlined_call_cost_factor f =
   ( "-flambda2-speculative-inlining-uninlined-call-cost-factor",
     Arg.Float f,
@@ -1814,6 +1823,10 @@ module type Oxcaml_options = sig
   val no_flambda2_speculative_inlining_credit_caller_allocations : unit -> unit
   val flambda2_speculative_inlining_merge_return_continuation : unit -> unit
   val no_flambda2_speculative_inlining_merge_return_continuation : unit -> unit
+
+  val flambda2_speculative_inlining_merge_return_continuation_max_size :
+    int -> unit
+
   val flambda2_speculative_inlining_uninlined_call_cost_factor : float -> unit
   val flambda2_speculative_inlining_budget : unit -> unit
   val no_flambda2_speculative_inlining_budget : unit -> unit
@@ -2091,6 +2104,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
         F.flambda2_speculative_inlining_merge_return_continuation;
       mk_no_flambda2_speculative_inlining_merge_return_continuation
         F.no_flambda2_speculative_inlining_merge_return_continuation;
+      mk_flambda2_speculative_inlining_merge_return_continuation_max_size
+        F.flambda2_speculative_inlining_merge_return_continuation_max_size;
       mk_flambda2_speculative_inlining_uninlined_call_cost_factor
         F.flambda2_speculative_inlining_uninlined_call_cost_factor;
       mk_flambda2_speculative_inlining_budget
@@ -2743,6 +2758,10 @@ module Oxcaml_options_impl = struct
   let no_flambda2_speculative_inlining_merge_return_continuation =
     clear' Flambda2.Inlining.speculative_inlining_merge_return_continuation
 
+  let flambda2_speculative_inlining_merge_return_continuation_max_size size =
+    Flambda2.Inlining.speculative_inlining_merge_return_continuation_max_size :=
+      size
+
   let flambda2_speculative_inlining_uninlined_call_cost_factor factor =
     Flambda2.Inlining.speculative_inlining_uninlined_call_cost_factor := factor
 
@@ -3296,6 +3315,10 @@ module Extra_params = struct
         set' Flambda2.Inlining.speculative_inlining_credit_caller_allocations
     | "flambda2-speculative-inlining-merge-return-continuation" ->
         set' Flambda2.Inlining.speculative_inlining_merge_return_continuation
+    | "flambda2-speculative-inlining-merge-return-continuation-max-size" ->
+        set_int'
+          Flambda2.Inlining
+          .speculative_inlining_merge_return_continuation_max_size
     | "flambda2-speculative-inlining-budget" ->
         set' Flambda2.Inlining.speculative_inlining_budget
     | "flambda2-speculative-inlining-budget-size-ratio" ->

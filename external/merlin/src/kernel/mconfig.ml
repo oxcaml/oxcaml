@@ -870,6 +870,7 @@ let ocaml_ignored_parametrized_flags =
     "-flambda2-speculative-inlining-criterion";
     "-flambda2-speculative-inlining-ratio";
     "-flambda2-speculative-inlining-budget-size";
+    "-flambda2-speculative-inlining-merge-return-continuation-max-size";
     "-flambda2-speculative-inlining-budget-max-credit";
     "-flambda2-speculative-inlining-bonus-call";
     "-flambda2-speculative-inlining-bonus-alloc";

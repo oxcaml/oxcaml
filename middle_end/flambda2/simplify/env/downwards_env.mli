@@ -67,8 +67,13 @@ val single_use_allocation : t -> Variable.t -> Cost_metrics.t option
 val add_single_use_continuation :
   t -> Continuation.t -> Flambda.Continuation_handler.t -> t
 
+(** The handler recorded for the continuation and its size, unless the size
+    exceeds -flambda2-speculative-inlining-merge-return-continuation-max-size.
+*)
 val single_use_continuation :
-  t -> Continuation.t -> Flambda.Continuation_handler.t option
+  t -> Continuation.t -> (Flambda.Continuation_handler.t * int) option
+
+val single_use_continuation_is_too_large : t -> Continuation.t -> bool
 
 (** The arities of the continuations bound in the current function so far (only
     maintained when the handlers above are recorded). *)

@@ -482,6 +482,8 @@ module Flambda2 = struct
 
       let speculative_inlining_merge_return_continuation = false
 
+      let speculative_inlining_merge_return_continuation_max_size = 150
+
       let speculative_inlining_uninlined_call_cost_factor = 1.0
 
       let speculative_inlining_budget = false
@@ -551,6 +553,9 @@ module Flambda2 = struct
 
     let speculative_inlining_merge_return_continuation =
       ref Default.speculative_inlining_merge_return_continuation
+
+    let speculative_inlining_merge_return_continuation_max_size =
+      ref Default.speculative_inlining_merge_return_continuation_max_size
 
     let speculative_inlining_uninlined_call_cost_factor =
       ref Default.speculative_inlining_uninlined_call_cost_factor

@@ -49,6 +49,11 @@ module Disable_inlining = struct
     | Do_not_disable_inlining -> Format.fprintf ppf "Do_not_disable_inlining"
 end
 
+type single_use_continuation =
+  { handler : Flambda.Continuation_handler.t;
+    size : int Lazy.t
+  }
+
 type t =
   { round : int;
     machine_width : Target_system.Machine_width.t;
@@ -64,8 +69,7 @@ type t =
     unit_toplevel_alloc_region : Variable.t;
     variables_defined_at_toplevel : Variable.Set.t;
     single_use_allocations : Cost_metrics.t Variable.Map.t;
-    single_use_continuations :
-      Flambda.Continuation_handler.t Continuation.Map.t;
+    single_use_continuations : single_use_continuation Continuation.Map.t;
     continuation_arities : [`Unarized] Flambda_arity.t Continuation.Map.t;
     cse : CSE.t;
     comparison_results : Comparison_result.t Variable.Map.t;
@@ -323,17 +327,6 @@ let add_single_use_allocation t var cost_metrics =
 
 let single_use_allocation t var =
   Variable.Map.find_opt var t.single_use_allocations
-
-(* The handlers of the non-recursive continuations in scope that are used
-   exactly once: see [Inlining_transforms.inline]. *)
-let add_single_use_continuation t cont handler =
-  { t with
-    single_use_continuations =
-      Continuation.Map.add cont handler t.single_use_continuations
-  }
-
-let single_use_continuation t cont =
-  Continuation.Map.find_opt cont t.single_use_continuations
 
 let add_continuation_arity t cont arity =
   { t with
@@ -625,6 +618,71 @@ let find_code_exn t id =
       TE.resolver t.typing_env (Code_id.get_compilation_unit id)
     in
     Exported_code.find_exn (t.get_imported_code ()) id
+
+(* The handlers of the non-recursive continuations in scope that are used
+   exactly once: see [Inlining_transforms.inline]. The size of a handler is that
+   of the unsimplified term, measured when first needed, with calls that are
+   sure to be inlined counted as their callees. *)
+let measure_handler t handler =
+  let return_continuation, exn_continuation =
+    match t.closure_info with
+    | Closure { return_continuation; exn_continuation; _ } ->
+      return_continuation, exn_continuation
+    | Not_in_a_closure | In_a_set_of_closures_but_not_yet_in_a_specific_closure
+      ->
+      t.unit_toplevel_return_continuation, t.unit_toplevel_exn_continuation
+  in
+  let find_code_metadata code_id =
+    match find_code_exn t code_id with
+    | code_or_metadata -> Some (Code_or_metadata.code_metadata code_or_metadata)
+    | exception Not_found -> None
+  in
+  let function_slot_size code_id =
+    match find_code_metadata code_id with
+    | Some code_metadata -> Code_metadata.function_slot_size code_metadata
+    | None -> 2
+  in
+  let inlined_callee_size code_id ~inlined =
+    match find_code_metadata code_id with
+    | Some code_metadata ->
+      Code_size_report.size_if_inlined ~code_metadata ~inlined
+    | None -> None
+  in
+  let _v1_size, size =
+    Flambda.Continuation_handler.pattern_match handler
+      ~f:(fun _params ~handler ->
+        Code_size_report.measure ~machine_width:t.machine_width
+          ~function_slot_size ~inlined_callee_size ~return_continuation
+          ~exn_continuation handler)
+  in
+  Code_size_v2.to_int size
+
+let add_single_use_continuation t cont handler =
+  let size = lazy (measure_handler t handler) in
+  { t with
+    single_use_continuations =
+      Continuation.Map.add cont { handler; size } t.single_use_continuations
+  }
+
+let single_use_continuation t cont =
+  match Continuation.Map.find_opt cont t.single_use_continuations with
+  | None -> None
+  | Some { handler; size } ->
+    let size = Lazy.force size in
+    if
+      size
+      > Flambda_features.Inlining
+        .speculative_inlining_merge_return_continuation_max_size ()
+    then None
+    else Some (handler, size)
+
+let single_use_continuation_is_too_large t cont =
+  match Continuation.Map.find_opt cont t.single_use_continuations with
+  | None -> false
+  | Some { handler = _; size } ->
+    Lazy.force size
+    > Flambda_features.Inlining
+      .speculative_inlining_merge_return_continuation_max_size ()
 
 let define_code t ~code_id ~code =
   if not (Code_id.in_compilation_unit code_id (Current_unit.get_cu_exn ()))

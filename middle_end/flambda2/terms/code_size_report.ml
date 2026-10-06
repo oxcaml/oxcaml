@@ -121,8 +121,23 @@ let seq_list f l = List.fold_left (fun size x -> seq size (f x)) zero_sizes l
    closures defined in the function are not included, only the allocation of the
    set of closures, so that the result is comparable with the code actually
    emitted for the function. *)
-let measure ~machine_width ~function_slot_size ~return_continuation
-    ~exn_continuation body =
+let size_if_inlined ~(code_metadata : Code_metadata.t)
+    ~(inlined : Inlined_attribute.t) =
+  let size () =
+    Some (Cost_metrics.size (Code_metadata.cost_metrics code_metadata))
+  in
+  match inlined with
+  | Never_inlined -> None
+  | Always_inlined _ | Unroll _ -> size ()
+  | Hint_inlined | Default_inlined ->
+    if
+      Function_decl_inlining_decision_type.must_be_inlined
+        (Code_metadata.inlining_decision code_metadata)
+    then size ()
+    else None
+
+let measure ~machine_width ~function_slot_size ~inlined_callee_size
+    ~return_continuation ~exn_continuation body =
   (* Continuations whose handler just jumps to the return continuation with the
      parameters it received. [To_cmm] inlines these, so a call whose
      continuation is one of them is compiled as a tail call. *)
@@ -322,8 +337,26 @@ let measure ~machine_width ~function_slot_size ~return_continuation
               zero_sizes
           in
           with_out_of_line body ~out_of_line:handlers)
-    | Apply apply ->
-      { v1 = V1.apply apply; v2 = V2.apply ~is_tail:(is_tail apply) apply }
+    | Apply apply -> (
+      (* A call that is sure to be inlined is measured as its callee's body. *)
+      let inlined_callee_size =
+        match Apply_expr.call_kind apply with
+        | Function { function_call = Direct code_id } ->
+          inlined_callee_size code_id ~inlined:(Apply_expr.inlined apply)
+        | Function
+            { function_call = Indirect_unknown_arity | Indirect_known_arity _ }
+        | Method _ | C_call _ | Effect _ ->
+          None
+      in
+      match inlined_callee_size with
+      | Some size ->
+        { v1 = Code_size.to_int size;
+          v2 =
+            Code_size_v2.create ~x86_64:(Code_size.x86_64 size)
+              ~arm64:(Code_size.arm64 size)
+        }
+      | None ->
+        { v1 = V1.apply apply; v2 = V2.apply ~is_tail:(is_tail apply) apply })
     | Apply_cont apply_cont ->
       { v1 = V1.apply_cont apply_cont; v2 = V2.apply_cont apply_cont }
     | Switch switch -> { v1 = V1.switch switch; v2 = V2.switch switch }
@@ -342,6 +375,12 @@ let dump ~prefixname ~machine_width unit =
     | Some code -> Code.function_slot_size code
     | None -> 2
   in
+  let inlined_callee_size code_id ~inlined =
+    match Code_id.Map.find_opt code_id codes with
+    | Some code ->
+      size_if_inlined ~code_metadata:(Code.code_metadata code) ~inlined
+    | None -> None
+  in
   Misc.protect_output_to_file (prefixname ^ ".code_sizes.csv") (fun out ->
       output_string out "symbol,debuginfo,v1,v2_x86_64,v2_arm64\n";
       let line symbol dbg (v1, v2) =
@@ -357,8 +396,8 @@ let dump ~prefixname ~machine_width unit =
               line
                 (Linkage_name.to_string (Code_id.linkage_name code_id))
                 (Code.dbg code)
-                (measure ~machine_width ~function_slot_size ~return_continuation
-                   ~exn_continuation body)))
+                (measure ~machine_width ~function_slot_size ~inlined_callee_size
+                   ~return_continuation ~exn_continuation body)))
         codes;
       let entry =
         Linkage_name.to_string
@@ -366,7 +405,7 @@ let dump ~prefixname ~machine_width unit =
         ^ "__entry"
       in
       line entry Debuginfo.none
-        (measure ~machine_width ~function_slot_size
+        (measure ~machine_width ~function_slot_size ~inlined_callee_size
            ~return_continuation:(Flambda_unit.return_continuation unit)
            ~exn_continuation:(Flambda_unit.exn_continuation unit)
            (Flambda_unit.body unit)))

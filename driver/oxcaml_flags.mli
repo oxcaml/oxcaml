@@ -346,6 +346,7 @@ module Flambda2 : sig
       val speculative_inlining_nested : bool
       val speculative_inlining_credit_caller_allocations : bool
       val speculative_inlining_merge_return_continuation : bool
+      val speculative_inlining_merge_return_continuation_max_size : int
       val speculative_inlining_uninlined_call_cost_factor : float
       val speculative_inlining_budget : bool
       val speculative_inlining_budget_size_ratio : float
@@ -405,6 +406,10 @@ module Flambda2 : sig
         it is simplified (and judged, when the inlining is speculative) with
         what is known about the returned values. *)
     val speculative_inlining_merge_return_continuation : bool ref
+
+    (** Handlers larger than this (as measured before simplification) are not
+        merged. *)
+    val speculative_inlining_merge_return_continuation_max_size : int ref
 
     val speculative_inlining_uninlined_call_cost_factor : float ref
 
