@@ -38,6 +38,8 @@ let scale_of_chunk : Cmm.memory_chunk -> int = function
 let is_offset chunk n =
   Validated_mem_offset.is_valid ~scale:(scale_of_chunk chunk) ~offset:n
 
+let is_symbol_offset chunk n = n mod scale_of_chunk chunk = 0
+
 let is_logical_immediate_int n =
   Arm64_ast.Logical_immediates.is_logical_immediate (Nativeint.of_int n)
 
@@ -115,7 +117,7 @@ let select_addressing' chunk (expr : Cmm.expression) :
     addressing_mode * Cmm.expression =
   match[@ocaml.warning "-fragile-match"] expr with
   | Cop ((Caddv | Cadda), [Cconst_symbol (s, _); Cconst_int (n, _)], _)
-    when use_direct_addressing s ->
+    when use_direct_addressing s && is_symbol_offset chunk n ->
     Ibased (asm_symbol_of_cmm s, n), Ctuple []
   | Cop ((Caddv | Cadda), [arg; Cconst_int (n, _)], _) when is_offset chunk n ->
     validated_offset chunk n, arg
@@ -335,3 +337,10 @@ let insert_op_debug env sub_cfg op dbg rs rd :
   if !Clflags.llvm_backend
   then Use_default
   else insert_op_debug' env sub_cfg op dbg rs rd
+
+let pseudoregs_for_operation op rs rd :
+    Cfg_selectgen_target_intf.pseudoregs_for_operation_result =
+  try
+    let rsrc, rdst = pseudoregs_for_operation op rs rd in
+    Constrained (rsrc, rdst)
+  with Use_default_exn -> Use_default_regs

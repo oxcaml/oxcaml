@@ -20,6 +20,7 @@
  let $camlPartial_app_kind_check_classic__s1 = closure f_1 @f &toplevel in
  cont k ($camlPartial_app_kind_check_classic__s2))
   where k define_root_symbol (module_block) =
-    let field_0 = $camlPartial_app_kind_check_classic__s0 in
-    let $camlPartial_app_kind_check_classic = Block 0 (field_0) in
+    let $camlPartial_app_kind_check_classic =
+      Block 0 ($camlPartial_app_kind_check_classic__s0)
+    in
     cont done ($camlPartial_app_kind_check_classic)

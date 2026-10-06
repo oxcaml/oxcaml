@@ -36,6 +36,7 @@ type ext =
   | AVX512CD
   | AVX512BW
   | AVX512VL
+  | AES
 
 (* Fixed machine register location *)
 type reg =
@@ -202,6 +203,7 @@ let equal_ext ext0 ext1 =
   | POPCNT, POPCNT
   | LZCNT, LZCNT
   | PCLMULQDQ, PCLMULQDQ
+  | AES, AES
   | BMI, BMI
   | BMI2, BMI2
   | AVX, AVX
@@ -215,8 +217,8 @@ let equal_ext ext0 ext1 =
   | AVX512VL, AVX512VL ->
     true
   | ( ( SSE | SSE2 | SSE3 | SSSE3 | SSE4_1 | SSE4_2 | POPCNT | LZCNT | PCLMULQDQ
-      | BMI | BMI2 | AVX | AVX2 | F16C | FMA | AVX512F | AVX512DQ | AVX512CD
-      | AVX512BW | AVX512VL ),
+      | AES | BMI | BMI2 | AVX | AVX2 | F16C | FMA | AVX512F | AVX512DQ
+      | AVX512CD | AVX512BW | AVX512VL ),
       _ ) ->
     false
 
@@ -443,6 +445,7 @@ let ext_to_string : ext -> string = function
   | POPCNT -> "POPCNT"
   | LZCNT -> "LZCNT"
   | PCLMULQDQ -> "PCLMULQDQ"
+  | AES -> "AES"
   | BMI -> "BMI"
   | BMI2 -> "BMI2"
   | AVX -> "AVX"

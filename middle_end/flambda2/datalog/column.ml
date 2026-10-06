@@ -29,6 +29,12 @@
 
 open Heterogenous_list
 
+module Int = struct
+  include Numbers.Int
+  module Tree = Patricia_tree.Make (Numbers.Int)
+  module Map = Tree.Map
+end
+
 type (_, _, _) repr =
   | Patricia_tree_repr : ('a Patricia_tree.map, int, 'a) repr
 
@@ -41,7 +47,24 @@ type ('t, 'k, 'v) id =
 let singleton : type t k v. (t, k, v) id -> k -> v -> t =
  fun { repr; _ } key value ->
   let Patricia_tree_repr = repr in
-  Trie.singleton Trie.patricia_tree_is_trie [key] value
+  Int.Map.singleton key value
+
+let union_total : type t k v. (t, k, v) id -> (v -> v -> v) -> t -> t -> t =
+ fun { repr; _ } f t1 t2 ->
+  let Patricia_tree_repr = repr in
+  Int.Map.union_total (fun _ v1 v2 -> f v1 v2) t1 t2
+
+let diff_or_null : type t k v.
+    (t, k, v) id -> (v -> v -> v Or_null.t) -> t -> t -> t Or_null.t =
+ fun { repr; _ } f t1 t2 ->
+  let Patricia_tree_repr = repr in
+  let t =
+    Int.Map.diff_sharing
+      (fun _ v1 v2 ->
+        match f v1 v2 with Null -> None | This datum -> Some datum)
+      t1 t2
+  in
+  if Int.Map.is_empty t then Or_null.null else Or_null.this t
 
 let equal_key : type t k v. (t, k, v) id -> k -> k -> bool =
  fun { repr = Patricia_tree_repr; _ } -> Int.equal

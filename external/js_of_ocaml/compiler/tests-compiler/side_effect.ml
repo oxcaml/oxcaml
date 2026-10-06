@@ -54,6 +54,7 @@ let%expect_test _ =
        "use strict";
        var
         runtime = globalThis.jsoo_runtime,
+        caml_get_global = runtime.caml_get_global,
         caml_string_of_jsbytes = runtime.caml_string_of_jsbytes;
        function caml_call1(f, a0){
         return (f.l >= 0 ? f.l : f.l = f.length) === 1
@@ -66,10 +67,8 @@ let%expect_test _ =
                 : runtime.caml_call_gen(f, [a0, a1]);
        }
        var
-        global_data = runtime.caml_get_global_data(),
-        Stdlib_Printf = global_data.Stdlib__Printf,
-        Stdlib = global_data.Stdlib,
-        i = [0, 0],
+        Stdlib_Printf = caml_get_global("Stdlib__Printf"),
+        Stdlib = caml_get_global("Stdlib"),
         cst_Success = caml_string_of_jsbytes("Success!");
        function log_success(param){return caml_call1(Stdlib[46], cst_Success);}
        var
@@ -84,7 +83,8 @@ let%expect_test _ =
            [11,
             caml_string_of_jsbytes("Side effect: "),
             [2, 0, [12, 10, [10, 0]]]],
-           caml_string_of_jsbytes("Side effect: %s\n%!")];
+           caml_string_of_jsbytes("Side effect: %s\n%!")],
+        i = [0, 0];
        function side_effect(yes, label){
         if(yes){caml_call2(Stdlib_Printf[2], _a_, label); i[1]++;}
         return 0;
@@ -114,8 +114,8 @@ let%expect_test _ =
         log_success(0);
        else
         caml_call1(log_failure, cst_side_effect_computed_twice);
-       var Test = [0, i, log_success, log_failure, side_effect, f];
-       runtime.caml_register_global(10, Test, "Test");
+       runtime.caml_register_global
+        ([0, i, log_success, log_failure, side_effect, f], "Test");
        return;
       }
       (globalThis));
@@ -150,3 +150,30 @@ let%expect_test _ =
     Side effect: Should only see this once
     Please don't optimize this away
     Success! |}]
+
+(* An infinite loop has no side effects, but it does not terminate.
+   Dead code elimination must not remove a call to a non-terminating
+   function, even if its result is unused — doing so would change
+   program behavior from "hangs forever" to "continues". This is
+   consistent with how we treat recursive function calls: a call to
+   a function not yet known to be pure is considered impure. *)
+let%expect_test "infinite loop is not treated as pure" =
+  let prog =
+    Util.compile_and_parse
+      {|
+      let f () : unit = while true do () done
+      let () = f (); print_endline "BUG"
+      |}
+  in
+  Util.print_program prog;
+  [%expect
+    {|
+    (function(globalThis){
+       "use strict";
+       var runtime = globalThis.jsoo_runtime;
+       runtime.caml_get_global("Stdlib");
+       for(;;) ;
+      }
+      (globalThis));
+    //end
+    |}]

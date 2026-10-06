@@ -748,6 +748,18 @@ Reject invalid formats that were accepted in legacy format
 implementations. You should use this flag to detect and fix such
 invalid formats, as they will be rejected by future OCaml versions.
 
+\item[(ox) "-syntax-quotations"]
+Lex the quotation syntax ("<[" ... "]>" and "$") in source files that do
+not select a mode themselves with the "#syntax quotations" directive.
+This overrides the default chosen when the compiler was configured (see
+the "--enable-syntax-quotations" configure option).
+
+\item[(ox) "-no-syntax-quotations"]
+Do not lex the quotation syntax in source files that do not select a
+mode themselves with the "#syntax quotations" directive; "$" is then an
+ordinary infix operator. This overrides the default chosen when the
+compiler was configured.
+
 \notop{%
 \item["-unboxed-types"]
 When a type is unboxable (i.e. a record with a single argument or a

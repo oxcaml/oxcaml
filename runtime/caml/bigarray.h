@@ -107,6 +107,10 @@ enum caml_ba_subarray {
   CAML_BA_SUBARRAY = 0x800     /* Data is shared with another bigarray */
 };
 
+enum caml_ba_allocation {
+  CAML_BA_STACK = 0x1000      /* Descriptor is allocated on the local stack */
+};
+
 struct caml_ba_proxy {
   atomic_uintnat refcount;      /* Reference count */
   void * data;                  /* Pointer to base of actual data */

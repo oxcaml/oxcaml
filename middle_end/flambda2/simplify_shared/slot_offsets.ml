@@ -33,8 +33,7 @@ type used_slots =
   }
 
 type set_of_closures_slots =
-  { function_slots :
-      Function_declarations.code_id_in_function_declaration Function_slot.Map.t;
+  { function_slots : Function_slot.Set.t;
     value_slots : Value_slot.Set.t
   }
 
@@ -279,11 +278,7 @@ module Greedy : sig
 
   val create_initial_state : unit -> state
 
-  val create_slots_for_set :
-    state ->
-    get_function_slot_size:(Code_id.t -> int) ->
-    set_of_closures_slots ->
-    unit
+  val create_slots_for_set : state -> set_of_closures_slots -> unit
 
   val finalize : used_slots:used_slots -> state -> result
 end = struct
@@ -727,17 +722,11 @@ end = struct
 
   (* Create slots (and create the cross-referencing). *)
 
-  let create_function_slot set state get_function_slot_size function_slot
-      (code_id : Function_declarations.code_id_in_function_declaration) =
+  let create_function_slot set state function_slot =
     if
       Current_unit.is_current (Function_slot.get_compilation_unit function_slot)
     then (
-      let size =
-        match code_id with
-        | Deleted { function_slot_size; _ } -> function_slot_size
-        | Code_id { code_id; only_full_applications = _ } ->
-          get_function_slot_size code_id
-      in
+      let size = Function_slot.size function_slot in
       let s = create_slot ~size (Function_slot function_slot) Unassigned in
       add_function_slot state function_slot s;
       add_unallocated_slot_to_set state s set;
@@ -851,26 +840,23 @@ end = struct
         add_allocated_slot_to_set s set;
         s
 
-  let create_slots_for_set state ~get_function_slot_size
+  let create_slots_for_set state
       ({ function_slots = closure_map; value_slots = env_set } :
         set_of_closures_slots) =
     let set =
       create_set
         ~num_value_slots:(Value_slot.Set.cardinal env_set)
-        ~num_function_slots:(Function_slot.Map.cardinal closure_map)
+        ~num_function_slots:(Function_slot.Set.cardinal closure_map)
     in
     state.sets_of_closures <- set :: state.sets_of_closures;
     (* Fill closure slots *)
-    Function_slot.Map.iter
-      (fun function_slot
-           (code_id : Function_declarations.code_id_in_function_declaration) ->
+    Function_slot.Set.iter
+      (fun function_slot ->
         let s =
           match
             Function_slot.Map.find_opt function_slot state.function_slots
           with
-          | None ->
-            create_function_slot set state get_function_slot_size function_slot
-              code_id
+          | None -> create_function_slot set state function_slot
           | Some s ->
             s.sets <- set :: s.sets;
             update_set_for_slot s set;
@@ -1151,19 +1137,10 @@ end
 
 type t = set_of_closures_slots list
 
-let print_code_id_in_function_declaration ppf
-    (code_id : Function_declarations.code_id_in_function_declaration) =
-  match code_id with
-  | Deleted _ -> Format.fprintf ppf "[deleted]"
-  | Code_id { code_id; only_full_applications } ->
-    Format.fprintf ppf "%a%s" Code_id.print code_id
-      (if only_full_applications then "[only_full_applications]" else "")
-
 let print_set_of_closures fmt { function_slots; value_slots } =
   Format.fprintf fmt
     "@[<hov 1>(@[<hov 1>(function_slots@ %a)@]@ @[<hov 1>(value_slots@ %a)@])@]"
-    (Function_slot.Map.print print_code_id_in_function_declaration)
-    function_slots Value_slot.Set.print value_slots
+    Function_slot.Set.print function_slots Value_slot.Set.print value_slots
 
 let print fmt l =
   Format.fprintf fmt "@[<hv>%a@]" (Format.pp_print_list print_set_of_closures) l
@@ -1176,8 +1153,9 @@ let add_set_of_closures_slots l ~is_phantom ~function_slots ~value_slots =
 let add_set_of_closures l ~is_phantom set_of_closures =
   add_set_of_closures_slots l ~is_phantom
     ~function_slots:
-      (Function_declarations.funs
-         (Set_of_closures.function_decls set_of_closures))
+      (Function_slot.Map.keys
+         (Function_declarations.funs
+            (Set_of_closures.function_decls set_of_closures)))
     ~value_slots:
       (Value_slot.Map.keys (Set_of_closures.value_slots set_of_closures))
 
@@ -1185,17 +1163,17 @@ let add_offsets_from_function l1 ~from_function:l2 =
   (* Order is irrelevant *)
   List.rev_append l2 l1
 
-let finalize_offsets ~get_function_slot_size ~used_slots l =
+let finalize_offsets l ~used_slots =
   let state = Greedy.create_initial_state () in
   Misc.try_finally
     (fun () ->
-      List.iter (Greedy.create_slots_for_set state ~get_function_slot_size) l;
+      List.iter (Greedy.create_slots_for_set state) l;
       Greedy.finalize ~used_slots state)
     ~always:(fun () ->
       if Flambda_features.dump_slot_offsets ()
       then Format.eprintf "%a@." Greedy.print state)
 
-let finalize_offsets_from_free_names l ~get_code_metadata ~free_names =
+let finalize_offsets_from_free_names l ~free_names =
   let used_slots =
     { function_slots_in_normal_projections =
         Name_occurrences.function_slots_in_normal_projections free_names;
@@ -1207,7 +1185,4 @@ let finalize_offsets_from_free_names l ~get_code_metadata ~free_names =
         Name_occurrences.all_value_slots_at_normal_mode free_names
     }
   in
-  let get_function_slot_size code_id =
-    Code_metadata.function_slot_size (get_code_metadata code_id)
-  in
-  finalize_offsets ~get_function_slot_size ~used_slots l
+  finalize_offsets l ~used_slots

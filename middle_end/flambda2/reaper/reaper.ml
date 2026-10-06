@@ -30,14 +30,19 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
           fixed_arity_continuations;
           continuation_info;
           code_deps;
-          all_sets_of_closures;
-          closure_function_decls
+          delayed_deps;
+          le_monde_exterieur;
+          applications;
+          all_sets_of_closures
         } =
-    Traverse.run unit
+    Traverse.run unit ~free_names
   in
-  let solved_dep =
+  Traverse_acc.resolve_delayed_deps deps ~code_deps ~le_monde_exterieur
+    delayed_deps;
+  if Flambda_features.debug_reaper "print-raw" then Dot_printer.print_dep deps;
+  let solved_dep, uses =
     Profile.record_call ~accumulate:true "solver" (fun () ->
-        Analysis.fixpoint deps)
+        Analysis.fixpoint deps ~applications)
   in
   let () =
     if Flambda_features.debug_reaper "print-solved"
@@ -61,15 +66,13 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
                ~old_typing_env ~my_closure ~params ~results types))
       ~code_deps
   in
-  let slot_offsets =
-    Slot_offsets_analysis.compute ~free_names ~closure_function_decls
-      ~code_changes ~get_code_metadata solved_dep
-  in
+  let slot_offsets = Slot_offsets_analysis.compute ~free_names solved_dep in
   let Rebuild.{ body; all_code; code_ids_to_remember } =
-    Rebuild.rebuild ~machine_width ~ordered_code_ids ~code_deps
-      ~fixed_arity_continuations ~continuation_info ~final_typing_env
-      ~types_rewrite_context ~code_changes solved_dep get_code_metadata
-      toplevel_expr code
+    Rebuild.rebuild ~machine_width ~ordered_code_ids ~fixed_arity_continuations
+      ~continuation_info ~final_typing_env
+      ~rewrite_kind_with_subkind:
+        (Types_rewriter.rewrite_kind_with_subkind types_rewrite_context)
+      ~code_changes uses get_code_metadata toplevel_expr code
   in
   let all_code =
     Exported_code.add_code

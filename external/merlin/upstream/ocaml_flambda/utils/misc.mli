@@ -161,6 +161,8 @@ module Stdlib : sig
 
     val map3 : ('a -> 'b -> 'c -> 'd) -> 'a list -> 'b list -> 'c list -> 'd list
 
+    val split3 : ('a * 'b * 'c) list -> 'a list * 'b list * 'c list
+
     val concat_map2 : ('a -> 'b -> 'c list) -> 'a list -> 'b list -> 'c list
     (** [concat_map2 f l1 l2] gives the same result as [concat (map2 f l1 l2)].
         Tail-recursive. *)
@@ -315,6 +317,10 @@ module Stdlib : sig
 
     val concat_arrays : 'a array array -> 'a array
     (** Concatenate an array of arrays into a single array. *)
+
+    val filteri : (int -> 'a -> bool) -> 'a array -> 'a array
+    (** Filter an array with the current index into a new array, possibly
+        reducing the array length. *)
   end
 
 (** {2 Extensions to the String module} *)

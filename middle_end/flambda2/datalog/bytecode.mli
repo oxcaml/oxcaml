@@ -28,6 +28,12 @@
 
 open Datalog_imports
 
+type 'a output_ref
+
+val create_output : unit -> 'a output_ref
+
+val get_and_clear_output : 'a output_ref -> 'a Or_null.t
+
 type bindings_ref
 
 type bindings
@@ -94,6 +100,14 @@ module Make (Iterator : Leapfrog.Iterator) : sig
   val call_with_bindings :
     (bindings_ref -> 'b Constant.hlist -> unit) with_name ->
     'b Or_null_receiver.hlist with_names ->
+    assembler
+
+  val union :
+    'v Table.result_repr ->
+    ('t, 'k, 'v) Column.hlist ->
+    't output_ref with_name ->
+    'k Or_null_receiver.hlist with_names ->
+    'v Or_null_receiver.t with_name ->
     assembler
 
   val ( ++ ) : assembler -> assembler -> assembler

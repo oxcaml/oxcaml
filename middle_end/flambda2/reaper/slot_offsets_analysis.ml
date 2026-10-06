@@ -28,12 +28,9 @@
 module PTA = Points_to_analysis
 module Unboxed_fields = Unboxing_analysis.Unboxed_fields
 
-let function_slots_to_be_built ~(uses : Unboxing_analysis.result) ~code_changes
-    ~get_code_metadata ~closure_function_decls ~function_slot_rewrites
-    ~function_slots =
-  let db = uses.db in
+let function_slots_to_be_built ~function_slot_rewrites ~function_slots =
   List.fold_left
-    (fun new_slots (slot, closure_name) ->
+    (fun new_slots (slot, _closure_name) ->
       let slot' =
         match function_slot_rewrites with
         | None -> slot
@@ -44,47 +41,8 @@ let function_slots_to_be_built ~(uses : Unboxing_analysis.result) ~code_changes
             Misc.fatal_errorf "Could not find rewritten function slot for %a"
               Function_slot.print slot)
       in
-      let code_id' : Function_declarations.code_id_in_function_declaration =
-        match
-          Code_id_or_name.Map.find_opt closure_name closure_function_decls
-        with
-        | Some (Function_declarations.Deleted _ as decl) -> decl
-        | Some
-            (Function_declarations.Code_id { code_id; only_full_applications })
-          ->
-          (* CR mvellacott: The following logic is duplicated from
-             [Rebuild.rewrite_set_of_closures] and must be kept in sync. In the
-             future it would be nice to avoid this duplication. *)
-          if
-            PTA.field_used db closure_name Field.known_arity_call_witness
-            || PTA.field_used db closure_name Field.unknown_arity_call_witness
-          then
-            let changed_calling_convention =
-              Unboxing_analysis.is_changing_calling_convention code_changes
-                code_id
-            in
-            Code_id
-              { code_id;
-                only_full_applications =
-                  only_full_applications || changed_calling_convention
-              }
-          else
-            let code_metadata =
-              if Current_unit.is_current (Code_id.get_compilation_unit code_id)
-              then Unboxing_analysis.get_code_metadata code_changes code_id
-              else get_code_metadata code_id
-            in
-            Deleted
-              { function_slot_size =
-                  Code_metadata.function_slot_size code_metadata;
-                dbg = Code_metadata.dbg code_metadata
-              }
-        | None ->
-          Misc.fatal_errorf "No function declaration found for closure %a"
-            Code_id_or_name.print closure_name
-      in
-      Function_slot.Map.add slot' code_id' new_slots)
-    Function_slot.Map.empty function_slots
+      Function_slot.Set.add slot' new_slots)
+    Function_slot.Set.empty function_slots
 
 let value_slots_to_be_built ~db ~unboxed_value_slots
     ({ function_slots; value_slots } : PTA.function_and_value_slots) =
@@ -111,7 +69,7 @@ let value_slots_to_be_built ~db ~unboxed_value_slots
    built at all, e.g. if it has no usages. [closure_name] should be the name of
    any one of the closures in the set. *)
 let slots_to_be_built_for_set_of_closures ~(uses : Unboxing_analysis.result)
-    ~code_changes ~get_code_metadata ~closure_function_decls ~unboxed_fields
+    ~unboxed_fields
     ~(changed_representation :
        (Unboxing_analysis.changed_representation * Code_id_or_name.t)
        Code_id_or_name.Map.t) ~closure_name (set : PTA.function_and_value_slots)
@@ -143,12 +101,11 @@ let slots_to_be_built_for_set_of_closures ~(uses : Unboxing_analysis.result)
         Some unboxed_value_slots, Some function_slot_rewrites
     in
     Some
-      ( function_slots_to_be_built ~uses ~code_changes ~get_code_metadata
-          ~closure_function_decls ~function_slot_rewrites
+      ( function_slots_to_be_built ~function_slot_rewrites
           ~function_slots:set.function_slots,
         value_slots_to_be_built ~db ~unboxed_value_slots set )
 
-let compute ~free_names ~closure_function_decls ~code_changes ~get_code_metadata
+let compute ~free_names
     ({ db; unboxed_fields; changed_representation; _ } as uses :
       Unboxing_analysis.result) =
   (* The query gives us the name of every closure, but we want one entry per set
@@ -173,8 +130,7 @@ let compute ~free_names ~closure_function_decls ~code_changes ~get_code_metadata
             in
             let set_slots' =
               match
-                slots_to_be_built_for_set_of_closures ~uses ~code_changes
-                  ~get_code_metadata ~closure_function_decls ~unboxed_fields
+                slots_to_be_built_for_set_of_closures ~uses ~unboxed_fields
                   ~changed_representation ~closure_name set
               with
               | None -> set_slots
@@ -193,10 +149,7 @@ let compute ~free_names ~closure_function_decls ~code_changes ~get_code_metadata
       Slot_offsets.empty set_slots_to_be_built
   in
   let built_function_slots =
-    Function_slot.Set.union_list
-      (List.map
-         (fun (function_slots, _) -> Function_slot.Map.keys function_slots)
-         set_slots_to_be_built)
+    Function_slot.Set.union_list (List.map fst set_slots_to_be_built)
   in
   let built_value_slots =
     Value_slot.Set.union_list (List.map snd set_slots_to_be_built)
@@ -238,12 +191,4 @@ let compute ~free_names ~closure_function_decls ~code_changes ~get_code_metadata
           built_value_slots
     }
   in
-  let get_function_slot_size code_id =
-    let code_metadata =
-      if Current_unit.is_current (Code_id.get_compilation_unit code_id)
-      then Unboxing_analysis.get_code_metadata code_changes code_id
-      else get_code_metadata code_id
-    in
-    Code_metadata.function_slot_size code_metadata
-  in
-  Slot_offsets.finalize_offsets ~get_function_slot_size ~used_slots slot_offsets
+  Slot_offsets.finalize_offsets ~used_slots slot_offsets

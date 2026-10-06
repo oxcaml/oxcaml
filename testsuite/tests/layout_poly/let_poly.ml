@@ -1,6 +1,7 @@
 (* TEST
- flags = "-extension layout_poly_alpha";
- expect.opt;
+ flags = "-extension layout_poly_alpha -extension layouts_beta";
+ { expect; }
+ { expect.opt; }
 *)
 
 external to_int64 : int64_u -> int64 = "%box_int64"
@@ -21,9 +22,36 @@ val poly_ id : 'a -> 'a = <lpoly>
 |}]
 
 let (a, b, c, d) =
-  let poly_ tuple x y = #(x, y) in
-  let #(a, b) = tuple "a" #1L in
-  let #(c, d) = tuple #42.0 "d" in
+  let poly_ tuple x y = (x, y) in
+  let (a, b) = tuple "a" #1L in
+  let (c, d) = tuple #42.0 "d" in
+  (a, to_int64 b, to_float c, d)
+[%%expect{|
+val a : string = "a"
+val b : int64 = 1L
+val c : float = 42.
+val d : string = "d"
+|}]
+
+let (a, b, c, d, e, f) =
+  let poly_ tuple x y = Sys.opaque_identity (x + 1, y) in
+  let (a, b) = tuple 1 #1L in
+  let (c, d) = tuple 2 #42.0 in
+  let (e, f) = tuple 3 "hi" in
+  (a, to_int64 b, c, to_float d, e, f)
+[%%expect{|
+val a : int = 2
+val b : int64 = 1L
+val c : int = 3
+val d : float = 42.
+val e : int = 4
+val f : string = "hi"
+|}]
+
+let (a, b, c, d) =
+  let poly_ tuple_u x y = #(x, y) in
+  let #(a, b) = tuple_u "a" #1L in
+  let #(c, d) = tuple_u #42.0 "d" in
   (a, to_int64 b, to_float c, d)
 [%%expect{|
 val a : string = "a"
@@ -277,9 +305,12 @@ Error: This expression is not allowed in a "let poly_" definition;
 |}]
 
 (* RHS might constrain a layout and makes it not polymorphic *)
-let poly_ f x y = #(x, (y, y))
+type ('a : value) t = T of 'a
+
+let poly_ f x y = #(x, T y)
 [%%expect{|
-val poly_ f : 'b. 'a -> 'b -> #('a * ('b * 'b)) = <lpoly>
+type 'a t = T of 'a
+val poly_ f : 'b. 'a -> 'b -> #('a * 'b t) = <lpoly>
 |}]
 
 (* [any] doesn't really constrain the layout *)
@@ -421,9 +452,21 @@ val b : float = 43.
 
 (* let poly_ instantiation with multiple variables *)
 let (a, b, c, d) =
-  let poly_ tuple x y = #(x, y) in
-  let #(a, b) = tuple #42s #43.0 in
-  let #(c, d) = tuple #44L #45n in
+  let poly_ tuple x y = (x, y) in
+  let (a, b) = tuple #42s #43.0 in
+  let (c, d) = tuple #44L #45n in
+  (to_int8 a, to_float b, to_int64 c, to_nativeint d)
+[%%expect{|
+val a : int8 = 42s
+val b : float = 43.
+val c : int64 = 44L
+val d : nativeint = 45n
+|}]
+
+let (a, b, c, d) =
+  let poly_ tuple_u x y = #(x, y) in
+  let #(a, b) = tuple_u #42s #43.0 in
+  let #(c, d) = tuple_u #44L #45n in
   (to_int8 a, to_float b, to_int64 c, to_nativeint d)
 [%%expect{|
 val a : int8 = 42s
@@ -502,23 +545,16 @@ val x : int8 = 1s
 |}]
 
 (* Tupled functions *)
-let poly_ f = fun (g, x) -> g x
-let x = f ((fun y -> y + 1), 41)
+let x =
+  (* We eagerly bail out of the tupled function optimization when
+     encountering non-[scannable] sorts, so we don't hit the fatal error seen
+     in let_poly_native.ml. However, we still don't get the tupled function
+     optimization. *)
+  let poly_ f = fun (g, x) -> g x in
+  f ((fun y -> y + 1), 41)
 
 [%%expect{|
->> Fatal error: Slambda does not currently support poly tupled functions
-Uncaught exception: Misc.Fatal_error
-
-|}]
-
-(* Environment arg shouldn't push things over the maximum arity *)
-let poly_ f x0 x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13 x14 x15 x16 x17 x18 x19 x20 x21 x22 x23 x24 x25 x26 x27 x28 x29 x30 x31 x32 x33 x34 x35 x36 x37 x38 x39 x40 x41 x42 x43 x44 x45 x46 x47 x48 x49 x50 x51 x52 x53 x54 x55 x56 x57 x58 x59 x60 x61 x62 x63 x64 x65 x66 x67 x68 x69 x70 x71 x72 x73 x74 x75 x76 x77 x78 x79 x80 x81 x82 x83 x84 x85 x86 x87 x88 x89 x90 x91 x92 x93 x94 x95 x96 x97 x98 x99 x100 x101 x102 x103 x104 x105 x106 x107 x108 x109 x110 x111 x112 x113 x114 x115 x116 x117 x118 x119 x120 x121 x122 x123 x124 y = y
-let () = Printf.printf "%.1f\n" (to_float (f 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 #7.0))
-
-[%%expect{|
->> Fatal error: Slambda does not currently support functions with over 125 arguments
-Uncaught exception: Misc.Fatal_error
-
+val x : int = 42
 |}];;
 
 (** Layout-polymorphic bindings in the top-level **)
@@ -557,13 +593,115 @@ Error: The value "id" is "dynamic"
          because it is layout-polymorphic and being instantiated here.
 |}];;
 
-(* Module binding *)
+(* lpoly primitives with sort variables *)
 
-module Id = struct
-  let poly_ id x = x
-end;;
-(Id.id 42, Id.id #3.14 |> to_float)
-[%%expect {|
-module Id : sig val poly_ id : 'a -> 'a end
-- : int * float = (42, 3.14)
-|}];;
+external[@layout_poly] id : ('a : any). 'a -> 'a = "%identity"
+let poly_id =
+  let[@inline never] poly_ f x = id x in
+  let a = f 2 in
+  let b = f #3.0 |> to_float in
+  (a, b)
+
+[%%expect{|
+external id : ('a : any). 'a -> 'a = "%identity" [@@layout_poly]
+val poly_id : int * float = (2, 3.)
+|}]
+
+external[@layout_poly] set_idx : ('a : value_or_null) ('b : any). 'a -> ('a, 'b) idx_mut -> 'b -> unit = "%set_idx"
+external[@layout_poly] get_idx : ('a : value_or_null) ('b : any). 'a -> ('a, 'b) idx_mut -> 'b = "%get_idx"
+type ('a : any) t = { mutable x : 'a ; y : int }
+
+[%%expect{|
+external set_idx : 'a ('b : any). 'a -> ('a, 'b) idx_mut -> 'b -> unit
+  = "%set_idx" [@@layout_poly]
+external get_idx : 'a ('b : any). 'a -> ('a, 'b) idx_mut -> 'b = "%get_idx"
+  [@@layout_poly]
+type ('a : any) t = { mutable x : 'a; y : int; }
+|}]
+
+let poly_get_set_idx =
+  let[@inline never] poly_ get_x r = get_idx r (.x) in
+  let[@inline never] poly_ set_x r v = set_idx r (.x) v in
+  let r1 = { x = 42 ; y = 3 } in
+  let r2 = { x = #42.5 ; y = 3 } in
+  let a = get_x r1 in
+  let b = get_x r2 |> to_float in
+  assert (a = 42 && b = 42.5);
+  set_x r1 43;
+  set_x r2 #43.5;
+  let a = get_x r1 in
+  let b = get_x r2 |> to_float in
+  assert (a = 43 && b = 43.5);
+  ()
+
+[%%expect{|
+val poly_get_set_idx : unit = ()
+|}]
+
+external[@layout_poly] set_ptr : ('a : value_or_null) ('b : any). #('a * ('a, 'b) idx_mut) -> 'b -> unit = "%unsafe_set_ptr"
+external[@layout_poly] get_ptr : ('a : value_or_null) ('b : any). #('a * ('a, 'b) idx_mut) -> 'b = "%unsafe_get_ptr"
+
+[%%expect{|
+external set_ptr : 'a ('b : any). #('a * ('a, 'b) idx_mut) -> 'b -> unit
+  = "%unsafe_set_ptr" [@@layout_poly]
+external get_ptr : 'a ('b : any). #('a * ('a, 'b) idx_mut) -> 'b
+  = "%unsafe_get_ptr" [@@layout_poly]
+|}]
+
+let poly_get_set_ptr =
+  let[@inline never] poly_ get_x r = get_ptr #(r, (.x)) in
+  let[@inline never] poly_ set_x r v = set_ptr #(r, (.x)) v in
+  let r1 = { x = 42 ; y = 3 } in
+  let r2 = { x = #42.5 ; y = 3 } in
+  let a = get_x r1 in
+  let b = get_x r2 |> to_float in
+  assert (a = 42 && b = 42.5);
+  set_x r1 43;
+  set_x r2 #43.5;
+  let a = get_x r1 in
+  let b = get_x r2 |> to_float in
+  assert (a = 43 && b = 43.5);
+  ()
+
+[%%expect{|
+val poly_get_set_ptr : unit = ()
+|}]
+
+(* test peek/poke primitives *)
+
+type ('a : any) ptr = nativeint_u
+
+external read : ('a : any mod external_). 'a ptr -> 'a = "%peek"
+  [@@layout_poly]
+
+external write : ('a : any mod external_). 'a ptr -> 'a -> unit = "%poke"
+  [@@layout_poly]
+
+let poly_ f (_ : 'a ptr) (x : 'a) = x
+
+[%%expect{|
+type ('a : any) ptr = nativeint_u
+external read : ('a : any mod external_). 'a ptr -> 'a = "%peek"
+  [@@layout_poly]
+external write : ('a : any mod external_). 'a ptr -> 'a -> unit = "%poke"
+  [@@layout_poly]
+val poly_ f : 'a ptr -> 'a -> 'a = <lpoly>
+|}]
+
+let poly_ f (p : 'a ptr) (_ : 'a) : 'a = read p
+
+[%%expect{|
+Line 1, characters 41-47:
+1 | let poly_ f (p : 'a ptr) (_ : 'a) : 'a = read p
+                                             ^^^^^^
+Error: The peek primitive does not currently support layout polymorphic arguments
+|}]
+
+let poly_ f (p : 'a ptr) (x : 'a) = write p x
+
+[%%expect{|
+Line 1, characters 36-45:
+1 | let poly_ f (p : 'a ptr) (x : 'a) = write p x
+                                        ^^^^^^^^^
+Error: The poke primitive does not currently support layout polymorphic arguments
+|}]

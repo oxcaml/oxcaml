@@ -12,21 +12,12 @@ Error: called function may allocate on a path to exceptional return (indirect ca
 inlined from
 repo/root/relative/dir/test_assume_fail.ml:12,33--39[Test_assume_fail.foo']
 
-File "printf.ml", line 46, characters 2-31:
-Error: called function may allocate on a path to exceptional return (direct call camlCamlinternalFormat__make_printf_HIDE_STAMP)
-inlined from
-stdlib/printf.ml:48,18--43[Stdlib__Printf.sprintf][camlStdlib__Printf__sprintf_HIDE_STAMP]
-repo/root/relative/dir/test_assume_fail.ml:9,25--53[Test_assume_fail.bar'][camlTest_assume_fail__bar'_HIDE_STAMP]
-repo/root/relative/dir/test_assume_fail.ml:12,33--39[Test_assume_fail.foo']
-
 File "test_assume_fail.ml", line 17, characters 5-15:
 Error: Annotation check for zero_alloc strict failed on function Test_assume_fail.test48 (camlTest_assume_fail__test48_HIDE_STAMP).
 
-File "printf.ml", line 46, characters 2-31:
-Error: called function may allocate on a path to exceptional return (direct call camlCamlinternalFormat__make_printf_HIDE_STAMP)
+File "test_assume_fail.ml", line 15, characters 54-58:
+Error: allocation of 24 bytes on a path to diverge
 inlined from
-stdlib/printf.ml:48,18--43[Stdlib__Printf.sprintf][camlStdlib__Printf__sprintf_HIDE_STAMP]
-repo/root/relative/dir/test_assume_fail.ml:15,25--48[Test_assume_fail.test46][camlTest_assume_fail__test46_HIDE_STAMP]
 repo/root/relative/dir/test_assume_fail.ml:18,2--56[Test_assume_fail.test48]
 
 File "test_assume_fail.ml", line 36, characters 5-15:

@@ -120,8 +120,7 @@ val f :
 |}]
 let f (x : <[?l:$('a) -> $('b)]> expr) : ?l:('a eval) -> 'b eval = eval x
 [%%expect {|
-val f :
-  ('a : any) ('b : any). <[?l:$('a) -> $('b)]> expr -> ?l:'a eval -> 'b eval =
+val f : 'a ('b : any). <[?l:$('a) -> $('b)]> expr -> ?l:'a eval -> 'b eval =
   <fun>
 |}]
 let f (x : <[$('a) @ local -> $('b) @ local]> expr)
@@ -138,7 +137,10 @@ val f :
 let f (x : <[$('a) * $('b) * $('c)]> expr)
     : 'a eval * 'b eval * 'c eval = eval x
 [%%expect {|
-val f : <[$('a) * $('b) * $('c)]> expr -> 'a eval * 'b eval * 'c eval = <fun>
+val f :
+  ('a : any) ('b : any) ('c : any).
+    <[$('a) * $('b) * $('c)]> expr -> 'a eval * 'b eval * 'c eval =
+  <fun>
 |}]
 
 (* Unboxed tuples *)

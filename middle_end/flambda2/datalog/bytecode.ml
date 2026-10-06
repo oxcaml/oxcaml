@@ -32,6 +32,14 @@ type _ columns =
   | Nil : nil columns
   | Cons : (_, 'h, _) Column.id * 'k columns -> ('h -> 'k) columns
 
+type 'a output_ref = { mutable contents : 'a Or_null.t }
+
+let create_output () = { contents = Or_null.null }
+
+let get_and_clear_output ({ contents } as t) =
+  t.contents <- Or_null.null;
+  contents
+
 type bindings_ref =
   | Bindings_ref_innermost_first :
       ('k columns * 'k Or_null_receiver.hlist with_names)
@@ -66,7 +74,9 @@ module Make (Iterator : Leapfrog.Iterator) = struct
    * 005:  exit
    *)
   type code =
-    | Exit
+    | Exit of unit
+      (* Make sure this is represented as a block, not an immediate, to avoid a
+         nested switch on %is_int / %get_tag *)
     | Goto : label -> code
     | Init :
         'k Or_null_sender.t * string * 'k Join_iterator.t * string list * label
@@ -111,9 +121,19 @@ module Make (Iterator : Leapfrog.Iterator) = struct
         * 'b Or_null_receiver.hlist
         * string list
         -> code
+    | Union :
+        'v Table.result_repr
+        * ('t, 'k, 'v) Column.hlist
+        * 't output_ref
+        * string
+        * 'k Or_null_receiver.hlist
+        * string list
+        * 'v Or_null_receiver.t
+        * string
+        -> code
 
   let labels = function
-    | Exit | Call_with_bindings _ -> []
+    | Exit () | Union _ | Call_with_bindings _ -> []
     | Goto lab
     | Init (_, _, _, _, lab)
     | Advance (_, _, _, _, lab)
@@ -131,28 +151,31 @@ module Make (Iterator : Leapfrog.Iterator) = struct
   let print_label digits ppf (Label lab) = Format.fprintf ppf "%0*d" digits lab
 
   let print_code digits ppf = function
-    | Exit -> Format.fprintf ppf "exit"
+    | Exit () -> Format.fprintf ppf "exit"
     | Goto lab -> Format.fprintf ppf "goto@ %a" (print_label digits) lab
     | Init (_sender, name, _iterator, names, if_empty) ->
-      Format.fprintf ppf "init %s,@ @[[%a]@],@ %a" name print_list names
+      Format.fprintf ppf "init@ %s,@ [@[%a]@],@ %a" name print_list names
         (print_label digits) if_empty
     | Advance (_sender, name, _iterator, names, if_not_empty) ->
-      Format.fprintf ppf "advance %s,@ @[[%a]@],@ %a" name print_list names
+      Format.fprintf ppf "advance@ %s,@ [@[%a]@],@ %a" name print_list names
         (print_label digits) if_not_empty
     | Distinct (_, _, name1, _, name2, if_equal) ->
-      Format.fprintf ppf "distinct %s,@ %s,@ %a" name1 name2
+      Format.fprintf ppf "distinct@ %s,@ %s,@ %a" name1 name2
         (print_label digits) if_equal
     | Absent (_, _, table, _, args, if_not_in) ->
-      Format.fprintf ppf "absent @[[%a]@],@ %s,@ %a" print_list args table
+      Format.fprintf ppf "absent@ [@[%a]@],@ %s,@ %a" print_list args table
         (print_label digits) if_not_in
     | Seek (_, names, _, name, if_empty) ->
-      Format.fprintf ppf "seek %s,@ @[[%a]@],@ %a" name print_list names
+      Format.fprintf ppf "seek@ %s,@ [@[%a]@],@ %a" name print_list names
         (print_label digits) if_empty
     | Filter (_, name, _, names, if_false) ->
-      Format.fprintf ppf "filter %s,@ @[[%a]@],@ %a" name print_list names
+      Format.fprintf ppf "filter@ %s,@ [@[%a]@],@ %a" name print_list names
         (print_label digits) if_false
     | Call_with_bindings (_, name, _, _, names) ->
-      Format.fprintf ppf "call %s,@ @[[%a]@]" name print_list names
+      Format.fprintf ppf "call@ %s,@ [@[%a]@]" name print_list names
+    | Union (_, _, _, name, _, names, _, value_name) ->
+      Format.fprintf ppf "union@ %s,@ @[{[@[%a]@] ->@;<1 2>%s}@]" name
+        print_list names value_name
 
   let print_code_iarray ppf code =
     let length = Iarray.length code in
@@ -180,13 +203,11 @@ module Make (Iterator : Leapfrog.Iterator) = struct
         ()
       done;
       if i > 0 then Format.fprintf ppf "@ ";
-      Format.fprintf ppf "@[<h>";
       if Hashtbl.mem all_labels i
-      then Format.fprintf ppf "%0*d:@ " digits i
+      then Format.fprintf ppf "%0*d: " digits i
       else Format.pp_print_string ppf (String.make (digits + 2) ' ');
       Format.pp_print_string ppf (String.make (2 * !depth) ' ');
-      Format.fprintf ppf "%a" (print_code digits) instruction;
-      Format.fprintf ppf "@]";
+      Format.fprintf ppf "@[<hv 2>%a@]" (print_code digits) instruction;
       match[@warning "-fragile-match"] instruction with
       | Init (_, _, _, _, Label lab) when lab > i ->
         incr depth;
@@ -343,6 +364,10 @@ module Make (Iterator : Leapfrog.Iterator) = struct
   let call_with_bindings { value = fn; name } { values = args; names } st =
     emit (Call_with_bindings (fn, name, st.bindings, args, names)) st
 
+  let union repr is_trie { value = table; name } { values = args; names }
+      { value; name = value_name } =
+    emit (Union (repr, is_trie, table, name, args, names, value, value_name))
+
   (* Use a [private] type from an anonymous module to ensure that we only ever
      construct bytecode that satisfies the requirements of [exec] below (namely,
      there are no out-of-range labels, and the code ends with an [Exit]
@@ -355,7 +380,7 @@ module Make (Iterator : Leapfrog.Iterator) = struct
         List.for_all (fun (Label lab) -> 0 <= lab && lab < length) (labels code)
 
       let is_exit = function[@warning "-fragile-match"]
-        | Exit -> true
+        | Exit () -> true
         | _ -> false
 
       let create code =
@@ -387,7 +412,7 @@ module Make (Iterator : Leapfrog.Iterator) = struct
     text st;
     (* The last instruction is always an [Exit], which means we can use
        [unsafe_get] in [exec] after incrementing the program counter. *)
-    emit Exit st;
+    emit (Exit ()) st;
     let len = Dynarray.length delayed in
     let labels =
       Iarray.init (Dynarray.length labels) (fun i ->
@@ -408,6 +433,17 @@ module Make (Iterator : Leapfrog.Iterator) = struct
 
   let write = Or_null_sender.send
 
+  let rec read_singleton : type t k v.
+      (t, k, v) Column.hlist ->
+      k Or_null_receiver.hlist ->
+      v Or_null_receiver.t ->
+      t =
+   fun columns args value ->
+    match args, columns with
+    | [], [] -> read value
+    | arg :: args, column :: columns ->
+      Column.singleton column (read arg) (read_singleton columns args value)
+
   (* Isomorphic to [unit], but with a different type so that accidentally
      returning instead of calling [next] is a type error. *)
   type explicit_exit = Explicit_exit
@@ -422,7 +458,7 @@ module Make (Iterator : Leapfrog.Iterator) = struct
     let[@inline] goto (Label new_pc) = exec code new_pc in
     let[@inline] next () = goto (Label (pc + 1)) in
     match Iarray.unsafe_get code pc with
-    | Exit -> Explicit_exit
+    | Exit () -> Explicit_exit
     | Goto lab -> goto lab
     | Init (key_out, _name, iterator, _names, if_empty) -> (
       Join_iterator.init iterator;
@@ -462,6 +498,13 @@ module Make (Iterator : Leapfrog.Iterator) = struct
       if func (read_hlist args) then next () else goto if_false
     | Call_with_bindings (func, _name, bindings, args, _names) ->
       func bindings (read_hlist args);
+      next ()
+    | Union (repr, columns, table, _, args, _, value, _) ->
+      let entry = read_singleton columns args value in
+      (match table.contents with
+      | Null -> table.contents <- Or_null.this entry
+      | This contents ->
+        table.contents <- Or_null.this (Table.union columns repr contents entry));
       next ()
 
   let run t =

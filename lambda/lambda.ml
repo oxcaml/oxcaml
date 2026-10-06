@@ -611,6 +611,7 @@ and variant_representation =
 and constructor_shape =
   | Constructor_shape_uniform of value_kind list
   | Constructor_shape_mixed of mixed_block_shape
+  | Constructor_shape_undetermined
 
 and array_kind =
     Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
@@ -828,7 +829,9 @@ and equal_constructor_shape x y =
       && List.for_all2 equal_value_kind fields1 fields2
   | Constructor_shape_mixed shape1, Constructor_shape_mixed shape2 ->
       equal_mixed_block_shape shape1 shape2
-  | (Constructor_shape_uniform _ | Constructor_shape_mixed _), _ -> false
+  | Constructor_shape_undetermined, Constructor_shape_undetermined -> true
+  | (Constructor_shape_uniform _ | Constructor_shape_mixed _
+    | Constructor_shape_undetermined), _ -> false
 
 let equal_mixed_block_shape_up_to_value_kinds shape1 shape2 =
   Misc.Stdlib.Array.equal
@@ -878,26 +881,26 @@ let rec join_value_kind_non_null x y =
   else
     match x, y with
     | Pvariant { consts = consts1; non_consts = non_consts1 },
-      Pvariant { consts = consts2; non_consts = non_consts2 } -> begin
-        match join_non_consts non_consts1 non_consts2 with
-        | Some non_consts ->
-            let consts = List.sort_uniq Int.compare (consts1 @ consts2) in
-            Pvariant { consts; non_consts }
-        | None -> Pgenval
-      end
+      Pvariant { consts = consts2; non_consts = non_consts2 } ->
+        let non_consts = join_non_consts non_consts1 non_consts2 in
+        let consts = List.sort_uniq Int.compare (consts1 @ consts2) in
+        Pvariant { consts; non_consts }
     | _, _ -> Pgenval
 
 and join_constructor_shape shape1 shape2 =
   match shape1, shape2 with
+  | Constructor_shape_undetermined, _ | _, Constructor_shape_undetermined ->
+      Constructor_shape_undetermined
   | Constructor_shape_uniform fields1, Constructor_shape_uniform fields2
     when List.length fields1 = List.length fields2 ->
-      Some
-        (Constructor_shape_uniform (List.map2 join_value_kind fields1 fields2))
-  | Constructor_shape_mixed shape1, Constructor_shape_mixed shape2 ->
-      Option.map
-        (fun shape -> Constructor_shape_mixed shape)
-        (join_mixed_block_shape shape1 shape2)
-  | (Constructor_shape_uniform _ | Constructor_shape_mixed _), _ -> None
+      Constructor_shape_uniform (List.map2 join_value_kind fields1 fields2)
+  | Constructor_shape_mixed shape1, Constructor_shape_mixed shape2 -> begin
+      match join_mixed_block_shape shape1 shape2 with
+      | Some shape -> Constructor_shape_mixed shape
+      | None -> Constructor_shape_undetermined
+    end
+  | (Constructor_shape_uniform _ | Constructor_shape_mixed _), _ ->
+      Constructor_shape_undetermined
 
 and join_mixed_block_shape shape1 shape2 =
   if Array.length shape1 <> Array.length shape2 then None
@@ -936,17 +939,15 @@ and join_non_consts non_consts1 non_consts2 =
   let sorted = List.sort (fun (tag1, _) (tag2, _) -> Int.compare tag1 tag2) in
   let rec merge l1 l2 =
     match l1, l2 with
-    | [], l | l, [] -> Some l
+    | [], l | l, [] -> l
     | (tag1, shape1) :: rest1, (tag2, shape2) :: rest2 ->
         if tag1 < tag2 then
-          Option.map (fun l -> (tag1, shape1) :: l) (merge rest1 l2)
+          (tag1, shape1) :: merge rest1 l2
         else if tag2 < tag1 then
-          Option.map (fun l -> (tag2, shape2) :: l) (merge l1 rest2)
+          (tag2, shape2) :: merge l1 rest2
         else
-          match join_constructor_shape shape1 shape2 with
-          | Some shape ->
-              Option.map (fun l -> (tag1, shape) :: l) (merge rest1 rest2)
-          | None -> None
+          let shape = join_constructor_shape shape1 shape2 in
+          (tag1, shape) :: merge rest1 rest2
   in
   merge (sorted non_consts1) (sorted non_consts2)
 
@@ -1680,9 +1681,7 @@ let layout_list =
             Constructor_shape_uniform
               [generic_value;
                { generic_value with nullable = Non_nullable}]] })
-let layout_tuple_element = nullable_value Pgenval
 let layout_value_field = nullable_value Pgenval
-let layout_tmc_field = nullable_value Pgenval
 let layout_optional_arg = nullable_value Pgenval
 let layout_variant_arg = nullable_value Pgenval
 let layout_extensible_variant_constructor = non_null_value Pgenval
@@ -2225,29 +2224,17 @@ let mod_field ?(read_semantics=Reads_agree) pos = function
     Pmixedfield([pos], shape_for_read, read_semantics)
 
 let transl_module_representation repr =
-  (* The shape here is potentially an underapproximation, since the scannable
-     axes in [shape] will all be [max]. This should not matter, though, since it
-     is not possible to reassign / directly mutate a [val] in a module. *)
-  let shape =
-    Array.map
-      (fun sort ->
-         sort
-         |> Jkind.Sort.default_for_transl_and_get
-         |> Types.mixed_block_element_of_const_sort)
-      repr
-  in
-  let rec is_value (elt : Types.mixed_block_element) =
-    match elt with
-    | Scannable _ -> true
-    | Addressable elt -> is_value elt
-    | Float_boxed | Float64 | Float32 | Bits8 | Bits16 | Untagged_immediate
-    | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word
-    | Product _ | Void -> false
-  in
-  if Array.for_all is_value shape
-  then Module_value_only { field_count = Array.length shape }
+  let sorts = Array.map Jkind.Sort.default_for_transl_and_get repr in
+  if Array.for_all Jkind.Sort.Const.is_scannable sorts
+  then Module_value_only { field_count = Array.length sorts }
   else
-    let shape = transl_mixed_product_shape shape in
+    (* The shape here is potentially an underapproximation, since the scannable
+       axes in [shape] will all be [max]. This should not matter, though, since
+       it is not possible to reassign / directly mutate a [val] in a module. *)
+    let shape =
+      transl_mixed_product_shape
+        (Array.map Types.mixed_block_element_of_const_sort sorts)
+    in
     Module_mixed
       ( shape,
         mixed_product_shape_for_read
@@ -2856,6 +2843,8 @@ let find_exact_application kind ~arity args =
           if arity <> List.length const_args
           then None
           else Some (List.map (fun cst -> Lconst cst) const_args)
+      (* CR layouts-mixed-tuplify: this should support [Const_mixed_block] once
+         there is proper support for mixed tupled functions *)
       | _ -> None
       end
 
@@ -3415,8 +3404,7 @@ let rec layout_of_const_sort (c : Jkind.Sort.Const.t) : layout =
     layout_of_const_sort sort
   | Univar _ ->
     Misc.fatal_error "layout_of_const_sort: unexpected univar"
-  | Genvar _ ->
-    Misc.fatal_error "layout_of_const_sort: unexpected genvar"
+  | Genvar var -> Psplicevar (Slambdaident.of_sort_var var)
 
 let layout_of_extern_repr : extern_repr -> _ = function
   | Unboxed_vector v -> layout_boxed_vector v
@@ -3565,7 +3553,8 @@ let rec mixed_block_element_of_layout (layout : layout) :
   match layout with
   | Punboxed_product layouts ->
     Product (List.map mixed_block_element_of_layout layouts |> Array.of_list)
-  | Ptop | Pbottom -> Misc.fatal_error "Pidxdeepen"
+  | Ptop | Pbottom ->
+    Misc.fatal_error "cannot convert top/bottom layout to mixed block element"
   | Pvalue value_kind -> Value value_kind
   | Punboxed_float Unboxed_float64 -> Float64
   | Punboxed_float Unboxed_float32 -> Float32

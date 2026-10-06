@@ -23,7 +23,7 @@ let alloc () =
 ;;
 
 let () =
-  Domain.Tick.with_ ~interval_usec:1_000 (fun _ ->
+  Domain.Tick.with_ ~interval_usec:1_000 (fun () ->
     Preemptible.try_with
       ~on_tick:(fun () -> Preempt)
       (fun () ->
@@ -39,4 +39,6 @@ let () =
           ) !accu;
         done)
       ()
-      { effc = (fun (type a) (_eff : a Effect.t) -> None) })
+      { effc = (fun (type a) (_eff : a Effect.t) -> None) };
+    ());
+  ()

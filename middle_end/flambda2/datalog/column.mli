@@ -33,6 +33,11 @@ type ('t, 'k, 'v) id
 
 val singleton : ('t, 'k, 'v) id -> 'k -> 'v -> 't
 
+val union_total : ('t, 'k, 'v) id -> ('v -> 'v -> 'v) -> 't -> 't -> 't
+
+val diff_or_null :
+  ('t, 'k, 'v) id -> ('v -> 'v -> 'v Or_null.t) -> 't -> 't -> 't Or_null.t
+
 type (_, _, _) hlist =
   | [] : ('v, nil, 'v) hlist
   | ( :: ) : ('t, 'k, 's) id * ('s, 'ks, 'v) hlist -> ('t, 'k -> 'ks, 'v) hlist

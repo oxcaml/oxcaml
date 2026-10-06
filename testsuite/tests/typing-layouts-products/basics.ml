@@ -1,7 +1,6 @@
 (* TEST
  flambda2;
  include stdlib_upstream_compatible;
- flags = "-extension layouts_beta";
  {
    expect;
  }
@@ -38,37 +37,17 @@ type t4_inner = #{ i : int; t4_inner2 : t4_inner2; co : char option; }
 type t4 = #{ s : string; t4_inner : t4_inner; }
 |}]
 
-(* But you can't put unboxed products into normal tuples (yet) *)
-type t_nope = string * #(string * bool)
+(* As well as (now) tuples as well *)
+type t5 = string * #(string * bool)
 [%%expect{|
-Line 1, characters 23-39:
-1 | type t_nope = string * #(string * bool)
-                           ^^^^^^^^^^^^^^^^
-Error: Tuple element types must have layout value.
-       The layout of "#(string * bool)" is value non_float & value non_pointer
-         because it is an unboxed tuple.
-       But the layout of "#(string * bool)" must be a value layout
-         because it's the type of a tuple element.
-       Note: The layout of immediate is value non_pointer.
-       Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_float.
+type t5 = string * #(string * bool)
 |}]
 
-type t_nope_inner = #{ s : string; b : bool }
-type t_nope = string * t_nope_inner
+type t6_inner = #{ s : string; b : bool }
+type t6 = string * t6_inner
 [%%expect{|
-type t_nope_inner = #{ s : string; b : bool; }
-Line 2, characters 23-35:
-2 | type t_nope = string * t_nope_inner
-                           ^^^^^^^^^^^^
-Error: Tuple element types must have layout value.
-       The layout of "t_nope_inner" is value non_float & value non_pointer
-         because of the definition of t_nope_inner at line 1, characters 0-45.
-       But the layout of "t_nope_inner" must be a value layout
-         because it's the type of a tuple element.
-       Note: The layout of immediate is value non_pointer.
-       Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_float.
+type t6_inner = #{ s : string; b : bool; }
+type t6 = string * t6_inner
 |}]
 
 (********************************************)
@@ -495,29 +474,12 @@ Error: This expression has type "#('a * 'b)"
 
 type tuple_type = (int * #(bool * float#))
 [%%expect{|
-Line 1, characters 25-41:
-1 | type tuple_type = (int * #(bool * float#))
-                             ^^^^^^^^^^^^^^^^
-Error: Tuple element types must have layout value.
-       The layout of "#(bool * float#)" is value non_pointer & float64
-         because it is an unboxed tuple.
-       But the layout of "#(bool * float#)" must be a value layout
-         because it's the type of a tuple element.
-       Note: The layout of immediate is value non_pointer.
+type tuple_type = int * #(bool * float#)
 |}]
 
 let tuple_term = ("hi", #(1, 2))
 [%%expect{|
-Line 1, characters 24-31:
-1 | let tuple_term = ("hi", #(1, 2))
-                            ^^^^^^^
-Error: This expression has type "#('a * 'b)"
-       but an expression was expected of type "('c : value_or_null)"
-       The layout of #('a * 'b) is
-           '_representable_layout_3 & '_representable_layout_4
-         because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a value layout
-         because it's the type of a tuple element.
+val tuple_term : string * #(int * int) = ("hi", #(1, 2))
 |}]
 
 type record = { x : #(int * bool) }
@@ -586,7 +548,7 @@ Line 3, characters 15-21:
 Error: This expression has type "#('a * 'b)"
        but an expression was expected of type "('c : value)"
        The layout of #('a * 'b) is
-           '_representable_layout_5 & '_representable_layout_6
+           '_representable_layout_3 & '_representable_layout_4
          because it is an unboxed tuple.
        But the layout of #('a * 'b) must be a value layout
          because it's the type of an object field.
@@ -604,7 +566,7 @@ Line 3, characters 17-21:
 Error: The value "utup" has type "('a : value_or_null)"
        but an expression was expected of type "#('b * 'c)"
        The layout of #('a * 'b) is
-           '_representable_layout_7 & '_representable_layout_8
+           '_representable_layout_5 & '_representable_layout_6
          because it is an unboxed tuple.
        But the layout of #('a * 'b) must be a value layout
          because it's the type of a variable captured in an object.
@@ -648,31 +610,14 @@ type record_inner = #{ b : bool; f : float# }
 type tuple_type = (int * record_inner)
 [%%expect{|
 type record_inner = #{ b : bool; f : float#; }
-Line 2, characters 25-37:
-2 | type tuple_type = (int * record_inner)
-                             ^^^^^^^^^^^^
-Error: Tuple element types must have layout value.
-       The layout of "record_inner" is value non_pointer & float64
-         because of the definition of record_inner at line 1, characters 0-45.
-       But the layout of "record_inner" must be a value layout
-         because it's the type of a tuple element.
-       Note: The layout of immediate is value non_pointer.
+type tuple_type = int * record_inner
 |}]
 
 type record = #{ i : int; i2 : int }
 let tuple_term = ("hi", #{ i = 1; i2 = 2 })
 [%%expect{|
 type record = #{ i : int; i2 : int; }
-Line 2, characters 24-42:
-2 | let tuple_term = ("hi", #{ i = 1; i2 = 2 })
-                            ^^^^^^^^^^^^^^^^^^
-Error: This expression has type "record" but an expression was expected of type
-         "('a : value_or_null)"
-       The layout of record is value non_pointer & value non_pointer
-         because of the definition of record at line 1, characters 0-36.
-       But the layout of record must be a value layout
-         because it's the type of a tuple element.
-       Note: The layout of immediate is value non_pointer.
+val tuple_term : string * record = ("hi", #{i = 1; i2 = 2})
 |}]
 
 type record_inner = #{ i : int; b : bool }
@@ -1105,8 +1050,8 @@ let f_external_kind_annot_mode_crosses_local_2
   : local_ t -> t = fun x -> x
 [%%expect{|
 type t
-  : value non_pointer mod global external_
-    & (float64 mod global & value non_pointer mod global external_)
+  : value non_pointer mod global
+    & (float64 mod global & value non_pointer mod global)
 val f_external_kind_annot_mode_crosses_local_2 : t @ local -> t = <fun>
 |}]
 
@@ -1566,7 +1511,7 @@ Line 2, characters 37-44:
 Error: This expression has type "#('a * 'b)"
        but an expression was expected of type "('c : value_or_null)"
        The layout of #('a * 'b) is
-           '_representable_layout_9 & '_representable_layout_10
+           '_representable_layout_7 & '_representable_layout_8
          because it is an unboxed tuple.
        But the layout of #('a * 'b) must be a value layout
          because it's the type of the recursive variable x.
@@ -1613,7 +1558,7 @@ Line 1, characters 21-29:
 Error: This expression has type "#('a * 'b)"
        but an expression was expected of type "('c : value_or_null)"
        The layout of #('a * 'b) is
-           '_representable_layout_11 & '_representable_layout_12
+           '_representable_layout_9 & '_representable_layout_10
          because it is an unboxed tuple.
        But the layout of #('a * 'b) must be a value layout
          because it's the type of the recursive variable _x.
@@ -1720,7 +1665,7 @@ Line 1, characters 31-37:
 Error: This expression has type "#('a * 'b)"
        but an expression was expected of type "('c : value_maybe_null)"
        The layout of #('a * 'b) is
-           '_representable_layout_13 & '_representable_layout_14
+           '_representable_layout_11 & '_representable_layout_12
          because it is an unboxed tuple.
        But the layout of #('a * 'b) must be a value layout.
 |}]
@@ -1840,7 +1785,7 @@ Line 2, characters 25-26:
 Error: The value "x" has type "('a : value)"
        but an expression was expected of type "#('b * 'c)"
        The layout of #('a * 'b) is
-           '_representable_layout_15 & '_representable_layout_16
+           '_representable_layout_13 & '_representable_layout_14
          because it is an unboxed tuple.
        But the layout of #('a * 'b) must be a value layout
          because it's the type of a term-level argument to a class constructor.
@@ -1892,7 +1837,7 @@ Line 1, characters 13-19:
 Error: This expression has type "#('a * 'b)"
        but an expression was expected of type "('c : value)"
        The layout of #('a * 'b) is
-           '_representable_layout_17 & '_representable_layout_18
+           '_representable_layout_15 & '_representable_layout_16
          because it is an unboxed tuple.
        But the layout of #('a * 'b) must be a value layout
          because it's the type of a lazy expression.
@@ -1997,8 +1942,8 @@ Line 6, characters 28-52:
 Error: Type "coerce_record" is not a subtype of "coerce_int_record"
 |}]
 
-(************************************************)
-(* Test 16: Not allowed as an optional argument *)
+(********************************************)
+(* Test 16: Allowed as an optional argument *)
 
 let f_optional_utuple ?(x = #(1,2)) () = x
 [%%expect{|
@@ -2008,10 +1953,10 @@ Line 1, characters 28-34:
 Error: This expression has type "#('a * 'b)"
        but an expression was expected of type "('c : value_or_null)"
        The layout of #('a * 'b) is
-           '_representable_layout_19 & '_representable_layout_20
+           '_representable_layout_17 & '_representable_layout_18
          because it is an unboxed tuple.
        But the layout of #('a * 'b) must be a value layout
-         because the type argument of option has layout value_or_null.
+         because it's the type of an optional argument.
 |}]
 
 type optional_record = #{ i1 : int; i2 : int }
@@ -2026,7 +1971,7 @@ Error: This expression has type "optional_record"
        The layout of optional_record is value non_pointer & value non_pointer
          because of the definition of optional_record at line 1, characters 0-46.
        But the layout of optional_record must be a value layout
-         because the type argument of option has layout value_or_null.
+         because it's the type of an optional argument.
        Note: The layout of immediate is value non_pointer.
 |}]
 
@@ -2066,8 +2011,8 @@ Line 1, characters 19-27:
 Error: This type "string t" = "#(string u * string u)"
        should be an instance of type "('a : any mod global)"
        The kind of string t is
-           value mod everything non_float mod dynamic with string u
-           & value mod everything non_float mod dynamic with string u
+           (value mod everything) non_float mod dynamic with string u
+           & (value mod everything) non_float mod dynamic with string u
          because it is an unboxed tuple.
        But the kind of string t must be a subkind of any mod global
          because of the definition of needs_any_mod_global at line 4, characters 0-47.
@@ -2101,7 +2046,10 @@ Error: This type "#(int * string * int)" should be an instance of type
          "('a : any mod external_)"
        The kind of #(int * string * int) is
            immediate mod dynamic with int with string
-           & value mod everything non_float mod dynamic with int with string
+           & (value mod everything) non_float
+               mod dynamic
+               with int
+               with string
            & immediate mod dynamic with int with string
          because it is an unboxed tuple.
        But the kind of #(int * string * int) must be a subkind of
@@ -2184,7 +2132,7 @@ Line 3, characters 30-31:
 3 | let g (type a) (x : a) = f () x
                                   ^
 Error: The value "x" has type "a" but an expression was expected of type
-         "('a : '_representable_layout_21 separable & value)"
+         "('a : '_representable_layout_19 separable & value)"
        The layout of a is value
          because it is or unifies with an unannotated universal variable.
        But the layout of a must be representable

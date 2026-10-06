@@ -8,6 +8,7 @@
  only-default-codegen;
  flags = " -O3 -I ocamlopt.opt";
  flags += " -experimental-optimizations";
+ flags += " -g -gdwarf-inlined-frames";
  expect.opt;
 *)
 
@@ -128,6 +129,15 @@ bit_xor:
   ret
 |}]
 
+let bit_not x = Int16_u.bit_xor x (-#1S)
+[%%expect_asm X86_64{|
+bit_not:
+  salq  $48, %rax
+  sarq  $48, %rax
+  xorq  $-1, %rax
+  ret
+|}]
+
 (* CR-someday jrayman: Both gcc and clang recommend [rolw $8, %ax]
    over [xchg] *)
 let bswap x = Int16_u.bswap x
@@ -179,11 +189,11 @@ div:
   sarq  $48, %rax
   ret
 .L0:
+  subq  $8, %rsp
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L1:
 |}]
 
 let rem x y = Int16_u.rem x y
@@ -199,11 +209,11 @@ rem:
   sarq  $48, %rax
   ret
 .L0:
+  subq  $8, %rsp
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L1:
 |}]
 
 let unsafe_div x y = Int16_u.unsafe_div x y
@@ -466,15 +476,15 @@ let to_float x = Int16_u.to_float x
 [%%expect_asm X86_64{|
 to_float:
   subq  $8, %rsp
-  movq  %rax, %rbx
   subq  $16, %r15
   cmpq  (%r14), %r15
   jb    <hidden GC jump pad>
 .L0:
-  leaq  8(%r15), %rax
-  movq  $1277, -8(%rax)
-  vcvtsi2sdq %rbx, %xmm0, %xmm0
-  vmovsd %xmm0, (%rax)
+  leaq  8(%r15), %rbx
+  movq  $1277, -8(%rbx)
+  vcvtsi2sdq %rax, %xmm0, %xmm0
+  vmovsd %xmm0, (%rbx)
+  movq  %rbx, %rax
   addq  $8, %rsp
   ret
 |}]
@@ -490,17 +500,17 @@ let to_float32 x = Int16_u.to_float32 x
 [%%expect_asm X86_64{|
 to_float32:
   subq  $8, %rsp
-  movq  %rax, %rbx
   subq  $24, %r15
   cmpq  (%r14), %r15
   jb    <hidden GC jump pad>
 .L0:
-  leaq  8(%r15), %rax
-  movq  $2303, -8(%rax)
+  leaq  8(%r15), %rbx
+  movq  $2303, -8(%rbx)
   movq  caml_float32_ops@GOTPCREL(%rip), %rdi
-  movq  %rdi, (%rax)
-  vcvtsi2ssq %rbx, %xmm0, %xmm0
-  vmovss %xmm0, 8(%rax)
+  movq  %rdi, (%rbx)
+  vcvtsi2ssq %rax, %xmm0, %xmm0
+  vmovss %xmm0, 8(%rbx)
+  movq  %rbx, %rax
   addq  $8, %rsp
   ret
 |}]
@@ -536,17 +546,17 @@ let to_int32 x = Int16_u.to_int32 x
 [%%expect_asm X86_64{|
 to_int32:
   subq  $8, %rsp
-  movq  %rax, %rbx
   subq  $24, %r15
   cmpq  (%r14), %r15
   jb    <hidden GC jump pad>
 .L0:
-  leaq  8(%r15), %rax
-  movq  $2303, -8(%rax)
+  leaq  8(%r15), %rbx
+  movq  $2303, -8(%rbx)
   movq  caml_int32_ops@GOTPCREL(%rip), %rdi
-  movq  %rdi, (%rax)
-  movslq %ebx, %rbx
-  movq  %rbx, 8(%rax)
+  movq  %rdi, (%rbx)
+  movslq %eax, %rax
+  movq  %rax, 8(%rbx)
+  movq  %rbx, %rax
   addq  $8, %rsp
   ret
 |}]
@@ -561,16 +571,16 @@ let to_int64 x = Int16_u.to_int64 x
 [%%expect_asm X86_64{|
 to_int64:
   subq  $8, %rsp
-  movq  %rax, %rbx
   subq  $24, %r15
   cmpq  (%r14), %r15
   jb    <hidden GC jump pad>
 .L0:
-  leaq  8(%r15), %rax
-  movq  $2303, -8(%rax)
+  leaq  8(%r15), %rbx
+  movq  $2303, -8(%rbx)
   movq  caml_int64_ops@GOTPCREL(%rip), %rdi
-  movq  %rdi, (%rax)
-  movq  %rbx, 8(%rax)
+  movq  %rdi, (%rbx)
+  movq  %rax, 8(%rbx)
+  movq  %rbx, %rax
   addq  $8, %rsp
   ret
 |}]
@@ -585,8 +595,8 @@ let to_int8 x = Int16_u.to_int8 x
 [%%expect_asm X86_64{|
 to_int8:
   salq  $56, %rax
-  sarq  $56, %rax
-  leaq  1(%rax,%rax), %rax
+  sarq  $55, %rax
+  orq   $1, %rax
   ret
 |}]
 
@@ -602,16 +612,16 @@ let to_nativeint x = Int16_u.to_nativeint x
 [%%expect_asm X86_64{|
 to_nativeint:
   subq  $8, %rsp
-  movq  %rax, %rbx
   subq  $24, %r15
   cmpq  (%r14), %r15
   jb    <hidden GC jump pad>
 .L0:
-  leaq  8(%r15), %rax
-  movq  $2303, -8(%rax)
+  leaq  8(%r15), %rbx
+  movq  $2303, -8(%rbx)
   movq  caml_nativeint_ops@GOTPCREL(%rip), %rdi
-  movq  %rdi, (%rax)
-  movq  %rbx, 8(%rax)
+  movq  %rdi, (%rbx)
+  movq  %rax, 8(%rbx)
+  movq  %rbx, %rax
   addq  $8, %rsp
   ret
 |}]

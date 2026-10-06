@@ -1,0 +1,17 @@
+(library
+ (name read_cma)
+ (modules read_cma compunit_name)
+ (flags :standard -safe-string)
+ (libraries compiler-libs.common compiler-libs.bytecomp)
+ (preprocess no_preprocessing))
+
+(rule
+ (enabled_if %{ocaml-config:ox})
+ (action
+  (write-file compunit_name.ml "let of_cu_name cu_name = Compilation_unit.name_as_string cu_name")))
+
+(rule
+ (enabled_if
+  (not %{ocaml-config:ox}))
+ (action
+  (write-file compunit_name.ml "let of_cu_name (Cmo_format.Compunit name) = name")))

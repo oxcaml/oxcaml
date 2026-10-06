@@ -24,13 +24,20 @@ end
 let read_anonymous_arg =
   Expectcommon.read_anonymous_arg ~object_extensions:[".cmxs"; ".cmx"; ".cmxa"]
 
-module Options = Oxcaml_args.Make_opttop_options (struct
-  include Oxcaml_args.Default.Opttopmain
-  let _stdin () = (* disabled *) ()
-  let _args = Arg.read_arg
-  let _args0 = Arg.read_arg0
-  let anonymous s = read_anonymous_arg s
-end);;
+module Options = struct
+  include Oxcaml_args.Make_opttop_options (struct
+    include Oxcaml_args.Default.Opttopmain
+    let _stdin () = (* disabled *) ()
+    let _args = Arg.read_arg
+    let _args0 = Arg.read_arg0
+    let anonymous s = read_anonymous_arg s
+  end)
+
+  (* Unlike the interactive toplevel, [expectnat] does not record debugging
+     information by default. *)
+  let list =
+    ("-g", Arg.Set Clflags.debug, " Record debugging information") :: list
+end;;
 
 let () =
   Expectcommon.register_assembly_callback :=

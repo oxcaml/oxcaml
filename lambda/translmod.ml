@@ -102,13 +102,7 @@ let transl_type_extension ~scopes env rootpath tyext body =
 let block_of_module_representation ~loc = function
   | Module_value_only _ -> Pmakeblock(0, Immutable, All_value, alloc_heap)
   | Module_mixed (shape, _) ->
-    let mpb = Mixed_product_bytes.count (Product shape) in
-    (* All-value/void shapes compile to uniform blocks, so the scannable
-       prefix length limit doesn't apply. *)
-    if not (Mixed_product_bytes.all_value mpb)
-    then
-      Typedecl.assert_mixed_product_support loc Module
-        ~value_prefix_len:(Mixed_product_bytes.value_prefix_len mpb);
+    Typeopt.assert_mixed_product_support_for_lambda_shape loc Module shape;
     Pmakeblock(0, Immutable, Shape shape, alloc_heap)
 
 (* Compile a coercion *)
@@ -995,7 +989,8 @@ and transl_structure ~scopes loc
           let let_kind, modl =
             match incl.incl_kind with
             | Tincl_structure ->
-                pure_module modl, transl_module ~scopes Tcoerce_none None modl
+                pure_module modl, transl_module ~scopes Tcoerce_none
+                  rootpath modl
             | Tincl_functor { input_coercion; input_repr; yielding } ->
                 Strict, transl_include_functor ~generative:false modl
                           input_coercion scopes loc ~input_repr ~yielding
@@ -1045,7 +1040,8 @@ and transl_structure ~scopes loc
                 rebind_idents 0 fields ids_with_sorts
               in
               Llet(pure, Lambda.layout_module, mid, mid_duid,
-                   transl_module ~scopes Tcoerce_none None od.open_expr, body),
+                   transl_module ~scopes Tcoerce_none rootpath od.open_expr,
+                   body),
               repr
           end
       | Tstr_modtype _
@@ -1891,16 +1887,26 @@ let transl_functorization compilation_unit
     transl_functorization_make ~params ~modules ~find_impl_by_name
   in
   let intf_func = transl_functorization_intf ~params in
+  let fields = [intf_func; make_func] in
   let code =
     apply_coercion Loc_unknown Strict coercion
       (Lprim
          ( Pmakeblock (0, Immutable, All_value, alloc_heap),
-           [intf_func; make_func],
+           fields,
            Loc_unknown ))
   in
-  let main_module_block_format =
-    Mb_struct { mb_repr = Module_value_only { field_count = 2 } }
+  (* CR-someday zqian: rewrite [module_block_size] to do this *)
+  let mb_repr =
+    match (coercion : Typedtree.module_coercion) with
+    | Tcoerce_none -> Module_value_only { field_count = List.length fields }
+    | Tcoerce_structure { output_repr; _ } ->
+        transl_module_representation output_repr
+    | Tcoerce_functor _ | Tcoerce_primitive _ | Tcoerce_alias _
+    | Tcoerce_kindtemplate _ | Tcoerce_invalid ->
+        Misc.fatal_error
+          "transl_functorization: unexpected compilation-unit coercion"
   in
+  let main_module_block_format = Mb_struct { mb_repr } in
   { compilation_unit;
     main_module_block_format;
     arg_block_idx = None;

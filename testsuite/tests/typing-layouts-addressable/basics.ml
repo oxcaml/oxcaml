@@ -91,6 +91,33 @@ Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
 type t : bits8 addressable & bits16 addressable
 |}]
 
+type t : (any mod portable) addressable addressable
+[%%expect{|
+Line 1, characters 40-51:
+1 | type t : (any mod portable) addressable addressable
+                                            ^^^^^^^^^^^
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "(any mod portable) addressable".
+
+type t : any addressable mod portable
+|}]
+
+(* Mod bounds print after the addressable operator *)
+type t : bits8 addressable mod portable
+[%%expect{|
+type t : bits8 addressable mod portable
+|}]
+
+type t : any addressable mod portable
+[%%expect{|
+type t : any addressable mod portable
+|}]
+
+type t : (bits8 & bits16) addressable mod portable
+[%%expect{|
+type t : (bits8 & bits16) addressable mod portable
+|}]
+
 (**** Equalities: [k addressable = k] for addressable [k] ****)
 
 module M : sig
@@ -779,20 +806,20 @@ type ('a : any non_null addressable) refined = 'a req
    [addressable] is not ignored *)
 type t : bits8 addressable non_null
 [%%expect{|
-Line 1, characters 9-35:
+Line 1, characters 27-35:
 1 | type t : bits8 addressable non_null
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_null" have no effect on the kind "bits8".
+                               ^^^^^^^^
+Warning 184 [ignored-kind-modifier]: The kind modifier "non_null" has no effect on the kind "bits8".
 
 type t : bits8 addressable
 |}]
 
 type t : bits8 non_null addressable
 [%%expect{|
-Line 1, characters 9-35:
+Line 1, characters 15-23:
 1 | type t : bits8 non_null addressable
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_null" have no effect on the kind "bits8".
+                   ^^^^^^^^
+Warning 184 [ignored-kind-modifier]: The kind modifier "non_null" has no effect on the kind "bits8".
 
 type t : bits8 addressable
 |}]

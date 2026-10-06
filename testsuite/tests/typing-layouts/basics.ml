@@ -1,7 +1,11 @@
 (* TEST
  include stdlib_upstream_compatible;
- flags = "-extension layouts_beta";
- expect;
+ {
+   expect;
+ }{
+   flags = "-extension layouts_beta";
+   expect;
+ }
 *)
 
 type t_value : value
@@ -782,36 +786,23 @@ Error: Polymorphic variant constructor argument types must have layout value.
          because it's the type of the field of a polymorphic variant.
 |}]
 
-(************************************************)
-(* Test 9: Tuples only work on values (for now) *)
+(***************************************)
+(* Test 9: Tuples work with non-values *)
 
 (* CR layouts v5: bring over void tests. *)
 module M9_1f = struct
   type foo1 = int * t_float64 * [ `Foo1 of int | `Bar1 of string ];;
 end
 [%%expect{|
-Line 2, characters 20-29:
-2 |   type foo1 = int * t_float64 * [ `Foo1 of int | `Bar1 of string ];;
-                        ^^^^^^^^^
-Error: Tuple element types must have layout value.
-       The layout of "t_float64" is float64
-         because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of "t_float64" must be a value layout
-         because it's the type of a tuple element.
+module M9_1f :
+  sig type foo1 = int * t_float64 * [ `Bar1 of string | `Foo1 of int ] end
 |}];;
 
 module M9_2f = struct
   type result = V of (string * t_float64) | I of int
 end;;
 [%%expect {|
-Line 2, characters 31-40:
-2 |   type result = V of (string * t_float64) | I of int
-                                   ^^^^^^^^^
-Error: Tuple element types must have layout value.
-       The layout of "t_float64" is float64
-         because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of "t_float64" must be a value layout
-         because it's the type of a tuple element.
+module M9_2f : sig type result = V of (string * t_float64) | I of int end
 |}];;
 
 module M9_4f = struct
@@ -822,15 +813,8 @@ module M9_4f = struct
     | (a, _) -> f_id a
 end;;
 [%%expect {|
-Line 6, characters 21-22:
-6 |     | (a, _) -> f_id a
-                         ^
-Error: The value "a" has type "('a : value_or_null)"
-       but an expression was expected of type "float#"
-       The layout of float# is float64
-         because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a value layout
-         because it's the type of a tuple element.
+module M9_4f :
+  sig val f_id : float# -> float# val foo : float# * 'a -> float# end
 |}];;
 
 module M9_5f = struct
@@ -853,30 +837,14 @@ module M9_6f = struct
   type 'a t = int * 'a constraint 'a = t_float64
 end;;
 [%%expect {|
-Line 2, characters 34-48:
-2 |   type 'a t = int * 'a constraint 'a = t_float64
-                                      ^^^^^^^^^^^^^^
-Error: The type constraints are not consistent.
-       Type "('a : value)" is not compatible with type "t_float64"
-       The layout of t_float64 is float64
-         because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a value layout
-         because it instantiates an unannotated type parameter of t,
-         chosen to have layout value.
+module M9_6f : sig type 'a t = int * 'a constraint 'a = t_float64 end
 |}];;
 
 module type S9_7f = sig
   val x : int * t_float64
 end;;
 [%%expect{|
-Line 2, characters 16-25:
-2 |   val x : int * t_float64
-                    ^^^^^^^^^
-Error: Tuple element types must have layout value.
-       The layout of "t_float64" is float64
-         because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of "t_float64" must be a value layout
-         because it's the type of a tuple element.
+module type S9_7f = sig val x : int * t_float64 end
 |}];;
 
 (*************************************************)
@@ -1264,30 +1232,14 @@ Error: The value "v" has type "('a : value)"
 |}];;
 
 (* option *)
-(* CR layouts v5: allow this *)
 type t13f = t_float64 option;;
 [%%expect{|
-Line 1, characters 12-21:
-1 | type t13f = t_float64 option;;
-                ^^^^^^^^^
-Error: This type "t_float64" should be an instance of type "('a : value_or_null)"
-       The layout of t_float64 is float64
-         because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a value layout
-         because the type argument of option has layout value_or_null.
+type t13f = t_float64 option
 |}];;
 
 let x13f (v : t_float64) = Some v;;
 [%%expect{|
-Line 1, characters 32-33:
-1 | let x13f (v : t_float64) = Some v;;
-                                    ^
-Error: The value "v" has type "t_float64" but an expression was expected of type
-         "('a : value_or_null)"
-       The layout of t_float64 is float64
-         because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a value layout
-         because the type argument of option has layout value_or_null.
+val x13f : t_float64 -> t_float64 option = <fun>
 |}];;
 
 let x13f v =
@@ -1295,15 +1247,7 @@ let x13f v =
   | Some v -> f_id v
   | None -> assert false
 [%%expect{|
-Line 3, characters 19-20:
-3 |   | Some v -> f_id v
-                       ^
-Error: The value "v" has type "('a : value_or_null)"
-       but an expression was expected of type "t_float64"
-       The layout of t_float64 is float64
-         because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a value layout
-         because the type argument of option has layout value_or_null.
+val x13f : t_float64 option -> t_float64 = <fun>
 |}];;
 
 (* list *)
@@ -1562,20 +1506,63 @@ val f : ('a. 'a t2_float) -> 'b t2_float = <fun>
 
 (* CR layouts v5: bring void version here from layouts_alpha *)
 
+let f : ?x:t_float64 -> unit -> unit = fun ?x () -> ignore x
+
+[%%expect{|
+Line 1, characters 11-20:
+1 | let f : ?x:t_float64 -> unit -> unit = fun ?x () -> ignore x
+               ^^^^^^^^^
+Error: Optional argument types must have layout value.
+       The layout of "t_float64" is float64
+         because of the definition of t_float64 at line 4, characters 0-24.
+       But the layout of "t_float64" must be a value layout
+         because it's the type of an optional argument.
+|}]
+
+let f (g : ?x:t_float64 -> unit) = g
+
+[%%expect{|
+Line 1, characters 14-23:
+1 | let f (g : ?x:t_float64 -> unit) = g
+                  ^^^^^^^^^
+Error: Optional argument types must have layout value.
+       The layout of "t_float64" is float64
+         because of the definition of t_float64 at line 4, characters 0-24.
+       But the layout of "t_float64" must be a value layout
+         because it's the type of an optional argument.
+|}]
+
+(* The next two are rejected by unification in [Typecore] rather than the
+   check in [Typetexp] *)
+
+let f ?x:(y : t_float64 option) () = ignore y
+
+[%%expect{|
+Line 1, characters 10-30:
+1 | let f ?x:(y : t_float64 option) () = ignore y
+              ^^^^^^^^^^^^^^^^^^^^
+Error: This pattern matches values of type "t_float64 option"
+       but a pattern was expected which matches values of type "'a option"
+       The layout of t_float64 is float64
+         because of the definition of t_float64 at line 4, characters 0-24.
+       But the layout of t_float64 must be a value layout
+         because it's the type of an optional argument.
+|}]
+
 let f (x : t_float64) =
-  let g ?(x2 = x) () = () in
+  let _g ?(x2 = x) () = () in
   ()
 
 [%%expect{|
-Line 2, characters 15-16:
-2 |   let g ?(x2 = x) () = () in
-                   ^
+Line 2, characters 16-17:
+2 |   let _g ?(x2 = x) () = () in
+                    ^
 Error: The value "x" has type "t_float64" but an expression was expected of type
          "('a : value_or_null)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 4, characters 0-24.
        But the layout of t_float64 must be a value layout
-         because the type argument of option has layout value_or_null.
+         because it's the type of an optional argument.
 |}]
 
 (*********************************************************)
@@ -1710,16 +1697,7 @@ let q () =
 [%%expect{|
 val ( let* ) : 'a -> 'b -> unit = <fun>
 val ( and* ) : 'a -> 'b -> 'c = <fun>
-Line 4, characters 9-22:
-4 |     let* x : t_float64 = assert false
-             ^^^^^^^^^^^^^
-Error: This pattern matches values of type "t_float64"
-       but a pattern was expected which matches values of type
-         "('a : value_or_null)"
-       The layout of t_float64 is float64
-         because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a value layout
-         because it's the type of a tuple element.
+val q : unit -> unit = <fun>
 |}]
 
 (*******************************************)
@@ -1781,15 +1759,8 @@ type ('a : float64) poly_var = [`A of int * 'a | `B]
 let f #poly_var = "hello"
 
 [%%expect{|
-Line 1, characters 44-46:
-1 | type ('a : float64) poly_var = [`A of int * 'a | `B]
-                                                ^^
-Error: Tuple element types must have layout value.
-       The layout of "'a" is float64
-         because of the annotation on 'a in the declaration of the type
-                                      poly_var.
-       But the layout of "'a" must be a value layout
-         because it's the type of a tuple element.
+type ('a : float64) poly_var = [ `A of int * 'a | `B ]
+val f : [< 'a poly_var ] -> string = <fun>
 |}]
 
 (*********************************************************)

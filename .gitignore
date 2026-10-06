@@ -383,3 +383,6 @@ ocaml/primitives.new
 /yacc/.gdb_history
 
 /natdynlinkops
+
+# Symlinks to nix-provided sources, created by make.
+/external/ast-dependent-libs/deps/

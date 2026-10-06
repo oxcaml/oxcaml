@@ -520,14 +520,71 @@ let compile_via_linear ~ppf_dump ~funcnames fd_cmm cfg_with_layout =
   | true -> fd)
   ++ Profile.record ~accumulate:true "emit_fundecl" emit_fundecl
 
+module Cfg_selection = Cfg_selectgen.Make (Cfg_selection)
+
+let compile_via_ssa ~ppf_dump ~funcnames (fd_cmm : Cmm.fundecl) :
+    Cfg_with_layout.t =
+  (* CR ttebbi: We should add LLVM backend support to SSA. *)
+  if !Clflags.llvm_backend
+  then Misc.fatal_error "The SSA pipeline does not support the LLVM backend.";
+  let report_pipeline_error exn ssa =
+    let backtrace = Printexc.get_raw_backtrace () in
+    Format.fprintf ppf_dump "*** CMM:@.%a@." Printcmm.fundecl fd_cmm;
+    Format.fprintf ppf_dump "*** SSA:@.%a@." Ssa_print.print ssa;
+    Printexc.raise_with_backtrace exn backtrace
+  in
+  let ssa =
+    fd_cmm
+    ++ Ssa_of_cmm.convert ~ppf_dump ~keep_unused_ops:true
+    ++ Ssa_tail_call.run ~ppf_dump ~keep_unused_ops:true
+  in
+  if !Oxcaml_flags.ssa_validate
+  then
+    begin try
+      let cfg_without_ssa =
+        Cfg_selection.emit_fundecl ~future_funcnames:funcnames fd_cmm
+      in
+      (* First conversion: used only for [Cfg_compare], so we emit a CFG that
+         stays faithful to plain [cfg_selectgen]. Note that both conversions
+         share the global [Sub_cfg.instr_id] counter and reset it, so
+         [cfg_without_ssa]'s [next_instruction_id] is stale by the time the
+         comparison runs; this is fine only because [Cfg_compare] never adds
+         instructions. *)
+      let cfg_from_ssa_for_compare =
+        Cfg_of_ssa.convert ~future_funcnames:funcnames ssa
+      in
+      Cfg_compare.compare ~old_cfg:cfg_without_ssa
+        ~new_cfg:cfg_from_ssa_for_compare ppf_dump
+    with exn -> report_pipeline_error exn ssa
+    end;
+  if !Oxcaml_flags.dump_ssa
+  then Format.fprintf ppf_dump "*** SSA@.@.%a" Ssa_print.print ssa;
+  (* Second conversion: produces the CFG that feeds the real pipeline. This is
+     where SSA-level optimizations run. *)
+  let ssa =
+    if !Oxcaml_flags.ssa_simplify then Ssa_simplify.run ~ppf_dump ssa else ssa
+  in
+  if !Oxcaml_flags.dump_ssa && !Oxcaml_flags.ssa_simplify
+  then
+    Format.fprintf ppf_dump "*** SSA after Ssa_simplify@.@.%a" Ssa_print.print
+      ssa;
+  try
+    (* Before creating the final CFG that will actually go through register
+       allocation, make sure to clear the global list of relocatable registers
+       again.*)
+    Reg.clear_relocatable_regs ();
+    Cfg_of_ssa.convert ~future_funcnames:funcnames ssa
+  with exn -> report_pipeline_error exn ssa
+
 let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
-  let module Cfg_selection = Cfg_selectgen.Make (Cfg_selection) in
   Reg.clear_relocatable_regs ();
   fd_cmm
   ++ Profile.record ~accumulate:true "cmm_invariants" (cmm_invariants ppf_dump)
-  ++ (fun (fd_cmm : Cmm.fundecl) ->
-  Cfg_selection.emit_fundecl ~future_funcnames:funcnames fd_cmm
-  ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After selection")
+  ++ (if !Oxcaml_flags.use_ssa
+      then compile_via_ssa ~ppf_dump ~funcnames
+      else Cfg_selection.emit_fundecl ~future_funcnames:funcnames)
+  ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg
+       (if !Oxcaml_flags.use_ssa then "After SSA" else "After selection")
   ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)
   ++ Profile.record ~accumulate:true "cfg" (fun cfg_with_layout ->
       if !Clflags.llvm_backend
@@ -672,10 +729,14 @@ let compile_unit unix ~output_prefix ~asm_filename ~keep_asm ~obj_filename
       raise (Error (Binary_emitter_mismatch obj_filename))
 
 let end_gen_implementation unix ?toplevel ~ppf_dump ~sourcefile make_cmm =
-  (* CR spies: Debug information is disabled for the top-level, because the
-     binary emitter does not support all directives emitted by the DWARF
-     emitter. See [testsuite/tests/tool-toplevel/dwarf_binary_emitter.ml]. *)
-  Emitaux.Dwarf_helpers.init ~ppf_dump ~disable_dwarf:(Option.is_some toplevel)
+  (* CR spies: Debug information is disabled for the top-level when using the
+     binary emitter (directly or through the JIT), because it does not support
+     all directives emitted by the DWARF emitter. See
+     [testsuite/tests/tool-toplevel/dwarf_binary_emitter.ml]. *)
+  Emitaux.Dwarf_helpers.init ~ppf_dump
+    ~disable_dwarf:
+      (Option.is_some toplevel
+      && (!Emitaux.binary_backend_available || Jit_backend.is_registered ()))
     ~sourcefile;
   emit_begin_assembly ~sourcefile unix;
   ( make_cmm ()

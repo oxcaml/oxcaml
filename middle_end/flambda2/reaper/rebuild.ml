@@ -51,9 +51,8 @@ type should_preserve_direct_calls =
 
 type env =
   { machine_width : Target_system.Machine_width.t;
-    uses : Unboxing_analysis.result;
+    uses : Analysis.result;
     code_changes : Unboxing_analysis.code_changes;
-    code_deps : Traverse_acc.code_dep Code_id.Map.t;
     get_code_metadata : Code_id.t -> Code_metadata.t;
     (* TODO change names *)
     cont_params_to_keep :
@@ -63,7 +62,7 @@ type env =
     should_preserve_direct_calls : should_preserve_direct_calls;
     old_typing_env : Typing_env.t option;
     inside_code_definition : bool;
-    types_rewrite_context : Types_rewriter.rewrite_context
+    rewrite_kind_with_subkind : Name.t -> KS.t -> KS.t
   }
 
 type rebuild_result =
@@ -468,13 +467,7 @@ let rewrite_set_of_closures env res ~(bound : Name.t list)
                     only_full_applications || changed_calling_convention
                 }
             else
-              let code_metadata =
-                if
-                  Current_unit.is_current (Code_id.get_compilation_unit code_id)
-                then
-                  Unboxing_analysis.get_code_metadata env.code_changes code_id
-                else env.get_code_metadata code_id
-              in
+              let code_metadata = env.get_code_metadata code_id in
               Deleted
                 { function_slot_size =
                     Code_metadata.function_slot_size code_metadata;
@@ -1050,12 +1043,9 @@ let decide_whether_apply_needs_calling_convention_change env apply =
   in
   match code_id_actually_called with
   | None -> Unboxing_analysis.Not_changing_calling_convention, call_kind
-  | Some code_id -> (
-    match Code_id.Map.find_opt code_id env.code_deps with
-    | None -> Unboxing_analysis.Not_changing_calling_convention, call_kind
-    | Some _ ->
-      ( Unboxing_analysis.get_calling_convention_change env.code_changes code_id,
-        call_kind ))
+  | Some code_id ->
+    ( Unboxing_analysis.get_calling_convention_change env.code_changes code_id,
+      call_kind )
 
 let rebuild_apply env apply =
   let callee_is_dead =
@@ -1185,8 +1175,7 @@ let rebuild_apply env apply =
                      Simple.pattern_match arg
                        ~const:(fun _ -> kind)
                        ~name:(fun name ~coercion:_ ->
-                         Types_rewriter.rewrite_kind_with_subkind
-                           env.types_rewrite_context name kind) )
+                         env.rewrite_kind_with_subkind name kind) )
                  | Delete ->
                    ( Simple.pattern_match arg
                        ~const:(fun _ -> arg)
@@ -1223,11 +1212,11 @@ let rebuild_apply env apply =
                         [cont_params_to_keep] *)
                      kind
                    | Unbox _ ->
-                     Misc.fatal_errorf
-                       "[rebuild_apply]: unexpected [Unbox] decision for \
-                        argument of return continuation of non-changing \
-                        calling convention apply %a"
-                       Apply.print apply
+                     (* This can happen if the function can never return. The
+                        return continuation should be deleted anyway by
+                        [make_apply_wrapper]; conservatively erase the
+                        subkind. *)
+                     Types_rewriter.erase_subkind kind
                    | Delete -> Types_rewriter.erase_subkind kind)
                  cont_decisions
                  (Flambda_arity.unarized_components (Apply.return_arity apply)))
@@ -1476,7 +1465,7 @@ let rebuild_singleton_binding_which_is_being_unboxed env bv
   in
   match[@ocaml.warning "-fragile-match"] defining_expr with
   | Prim (Variadic (Make_block (kind, _, _), args), _dbg) ->
-    Field.Map.fold
+    Field.Map.ordered_fold
       (fun field (var : _ Unboxed_fields.u) hole ->
         let arg : _ Either.t =
           match Field.view field with
@@ -1510,7 +1499,7 @@ let rebuild_singleton_binding_which_is_being_unboxed env bv
         | Right arg_fields -> bind_fields var (Unboxed arg_fields) hole)
       to_bind hole
   | Prim (Unary (Box_number (prim_bn, _), contents), _dbg) ->
-    Field.Map.fold
+    Field.Map.ordered_fold
       (fun field (var : _ Unboxed_fields.u) hole ->
         let arg =
           match Field.view field with
@@ -1575,7 +1564,7 @@ let rebuild_set_of_closures_binding_which_is_being_unboxed env bvs
                (Code_id_or_name.var (Bound_var.var bv)))
         in
         let value_slots = set_of_closures.value_slots in
-        Field.Map.fold
+        Field.Map.ordered_fold
           (fun field (var : _ Unboxed_fields.u) hole ->
             match Field.view field with
             | Value_slot value_slot ->
@@ -1743,14 +1732,12 @@ let rebuild_make_block_default_case env (bp : Bound_pattern.t)
           (Variant
              { consts = Target_ocaml_int.Set.empty;
                non_consts =
-                 Tag.Scannable.Map.singleton tag (block_shape, subkinds)
+                 Tag.Scannable.Map.singleton tag
+                   (KS.Non_null_value_subkind.Determined (block_shape, subkinds))
              })
           Non_nullable
       in
-      let ks =
-        Types_rewriter.rewrite_kind_with_subkind env.types_rewrite_context
-          bound_name ks
-      in
+      let ks = env.rewrite_kind_with_subkind bound_name ks in
       let[@local] with_subkinds subkinds =
         P.Block_kind.Values (tag, subkinds)
       in
@@ -1760,8 +1747,8 @@ let rebuild_make_block_default_case env (bp : Bound_pattern.t)
       match[@ocaml.warning "-fragile-match"] KS.non_null_value_subkind ks with
       | Variant { consts = _; non_consts } -> (
         match Tag.Scannable.Map.get_singleton non_consts with
-        | Some (_, (_, subkinds)) -> with_subkinds subkinds
-        | None -> default ())
+        | Some (_, Determined (_, subkinds)) -> with_subkinds subkinds
+        | Some (_, Undetermined) | None -> default ())
       | _ -> default ())
   in
   let bound_name = Code_id_or_name.name bound_name in
@@ -2289,7 +2276,11 @@ and rebuild_code env res code_id
      [unboxing_analysis.ml] so that they correctly propagate to other
      compilation units when in LTO mode. *)
   let code_metadata =
-    Unboxing_analysis.get_code_metadata env.code_changes code_id
+    match Unboxing_analysis.find_code_metadata env.code_changes code_id with
+    | Some code_metadata -> code_metadata
+    | None ->
+      Misc.fatal_errorf "[rebuild_code]: could not find code_metadata for %a"
+        Code_id.print code_id
   in
   let params_and_body, code_metadata, res =
     rebuild_function_params_and_body env res code_metadata params_and_body
@@ -2358,10 +2349,9 @@ type result =
     code_ids_to_remember : Code_id.Set.t
   }
 
-let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
-    ~ordered_code_ids
+let rebuild ~machine_width ~ordered_code_ids
     ~(continuation_info : Traverse_acc.continuation_info Continuation.Map.t)
-    ~fixed_arity_continuations ~final_typing_env ~types_rewrite_context
+    ~fixed_arity_continuations ~final_typing_env ~rewrite_kind_with_subkind
     ~code_changes (solved_dep : Analysis.result) get_code_metadata toplevel_expr
     code =
   let should_keep_param cont param kind : Unboxing_analysis.param_decision =
@@ -2382,11 +2372,7 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
         ||
         let info = Continuation.Map.find cont continuation_info in
         info.is_exn_handler && Variable.equal param (List.hd info.params)
-      then
-        Keep
-          ( param,
-            Types_rewriter.rewrite_kind_with_subkind types_rewrite_context
-              (Name.var param) kind )
+      then Keep (param, rewrite_kind_with_subkind (Name.var param) kind)
       else Delete
     | Some fields -> Unbox fields
   in
@@ -2402,18 +2388,24 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
     | Always -> Yes
     | Auto -> Auto
   in
+  (* Make sure [get_code_metadata] returns the updated code metadata in case it
+     exists *)
+  let get_code_metadata code_id =
+    match Unboxing_analysis.find_code_metadata code_changes code_id with
+    | Some code_metadata -> code_metadata
+    | None -> get_code_metadata code_id
+  in
   let env =
     { machine_width;
       uses = solved_dep;
       code_changes;
-      code_deps;
       get_code_metadata;
       cont_params_to_keep;
       should_keep_param;
       should_preserve_direct_calls;
       old_typing_env = final_typing_env;
       inside_code_definition = false;
-      types_rewrite_context
+      rewrite_kind_with_subkind
     }
   in
   let res =

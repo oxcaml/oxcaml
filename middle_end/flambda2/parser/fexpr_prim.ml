@@ -617,7 +617,16 @@ let kind_with_subkind =
             fun _ num_fields -> Float_block { num_fields } )
         in
         let| variant =
-          let item = param2 block_shape (list full_kind) in
+          let item =
+            maps
+              (option (param2 block_shape (list full_kind)))
+              ~from:(fun _ -> function
+                | None -> Undetermined
+                | Some (shape, fields) -> Determined (shape, fields))
+              ~to_:(fun _ -> function
+                | Undetermined -> None
+                | Determined (shape, fields) -> Some (shape, fields))
+          in
           let map_bind = positional (param2 scannable_tag item) in
           let tag_map =
             maps (list map_bind)
@@ -884,6 +893,9 @@ let project_value_slot =
      if the value slot's definition (in a "with" clause, where kinds are
      supported) has already been parsed, the slot registered under this name
      will have the correct kind and the kind here is ignored. *)
+  (* If a function slot is fresh when defining a primitive, it means it does not
+  exist in constructions, but only in projections. As such, it will be deleted
+  when computing the slot_offsets. This means we can give it a dummy size. *)
   let kind = Flambda_kind.value in
   D.(
     unary "%project_value_slot"
@@ -891,7 +903,8 @@ let project_value_slot =
         (param2
            (maps (positional string)
               ~from:(fun env pf ->
-                Fexpr_to_flambda_commons.fresh_or_existing_function_slot env pf)
+                Fexpr_to_flambda_commons.fresh_or_existing_function_slot env pf
+                  ~size:0)
               ~to_:(fun env pf ->
                 Flambda_to_fexpr_commons.Env.translate_function_slot env pf))
            (maps (positional string)
@@ -910,12 +923,14 @@ let project_function_slot =
         (param2
            (maps (positional string)
               ~from:(fun env mf ->
-                Fexpr_to_flambda_commons.fresh_or_existing_function_slot env mf)
+                Fexpr_to_flambda_commons.fresh_or_existing_function_slot env mf
+                  ~size:0)
               ~to_:(fun env mf ->
                 Flambda_to_fexpr_commons.Env.translate_function_slot env mf))
            (maps (positional string)
               ~from:(fun env mt ->
-                Fexpr_to_flambda_commons.fresh_or_existing_function_slot env mt)
+                Fexpr_to_flambda_commons.fresh_or_existing_function_slot env mt
+                  ~size:0)
               ~to_:(fun env mt ->
                 Flambda_to_fexpr_commons.Env.translate_function_slot env mt)))
       (fun _ (move_from, move_to) ->

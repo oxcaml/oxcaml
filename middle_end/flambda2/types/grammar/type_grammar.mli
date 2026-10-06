@@ -174,10 +174,7 @@ and row_like_for_blocks = private
 and row_like_for_closures = private
   { known_closures :
       (Set_of_closures_contents.t, unit, closures_entry) row_like_case
-      Function_slot.Map.t;
-    other_closures :
-      (Set_of_closures_contents.t, unit, closures_entry) row_like_case
-      Or_bottom.t
+      Function_slot.Map.t
   }
 
 and closures_entry = private
@@ -586,7 +583,7 @@ module Row_like_for_blocks : sig
   val create_exactly_multiple :
     machine_width:Target_system.Machine_width.t ->
     shape_and_field_tys_by_tag:
-      (Flambda_kind.Block_shape.t * flambda_type list) Tag.Map.t ->
+      (Flambda_kind.Block_shape.t * flambda_type list) Or_unknown.t Tag.Map.t ->
     Alloc_mode.For_types.t ->
     t
 
@@ -665,9 +662,6 @@ module Row_like_for_closures : sig
     known_closures:
       (Set_of_closures_contents.t, unit, closures_entry) row_like_case
       Function_slot.Map.t ->
-    other_closures:
-      (Set_of_closures_contents.t, unit, closures_entry) row_like_case
-      Or_bottom.t ->
     t
 
   type get_single_tag_result =

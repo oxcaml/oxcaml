@@ -55,6 +55,7 @@ module Mixed_product_kind = struct
     | Cstr_record
     | Module
     | Block
+    | Tuple
 
   let to_plural_string = function
     | Record -> "records"
@@ -62,6 +63,7 @@ module Mixed_product_kind = struct
     | Cstr_record -> "inline record arguments to constructors"
     | Module -> "modules"
     | Block -> "blocks"
+    | Tuple -> "tuples"
 end
 
 type mixed_product_violation =
@@ -1959,7 +1961,7 @@ let assert_mixed_product_support =
 (* Records and variants with a field or constructor argument of kind [any] get a
    variable representation, as oxcaml/oxcaml#5461. We gate this by extension. *)
 let assert_any_args_support loc =
-  Language_extension.assert_enabled ~loc Layouts Language_extension.Beta
+  Language_extension.assert_enabled ~loc Layouts Language_extension.Stable
 
 (* [Element_repr] is used to classify whether something is a "mixed product"
    (a mixed record or mixed variant constructor), meaning that some of the
@@ -2041,7 +2043,6 @@ module Element_repr = struct
      otherwise the element is classified as [None]. See the CR in
      [update_label_sorts]. *)
   let classify env ty jkind ~default_to_scannable =
-
     if is_float env ty
     then Some Float_element
     else
@@ -2053,6 +2054,7 @@ module Element_repr = struct
       let rec layout_to_t : Jkind_types.Layout.Const.t -> t option = function
       | Any _ -> None
       | Base (base, sa) -> Some (classify_base base sa)
+      | Box (_, sa) -> Some (Value_element sa)
       | Product l ->
         Misc.Stdlib.List.some_if_all_elements_are_some
           (List.map layout_to_t l)
@@ -3290,6 +3292,7 @@ let check_unboxed_recursion ~abs_env env loc path0 ty0 to_check =
       | Base _ -> true
       | Product l -> List.for_all is_representable l
       | Addressable layout -> is_representable layout
+      | Box _ -> true
       | Univar _ -> Misc.fatal_error "Unboxed_recursion: univar"
       | Genvar _ -> Misc.fatal_error "Unboxed_recursion: genvar"
     in
@@ -4315,17 +4318,10 @@ let native_repr_of_type ~loc env kind ty sort_or_poly ~is_return =
     then Location.prerr_warning loc Warnings.Untagged_external_small_int_return;
     let is_immediate = Ctype.is_always_gc_ignorable env ty in
     let is_non_nullable = Ctype.check_type_nullability env ty Non_null in
-    let rec sort_is_scannable : Jkind.Sort.Const.t -> bool = function
-      | Base Scannable -> true
-      | Base _ | Product _ -> false
-      | Addressable s -> sort_is_scannable s
-      | Univar _ -> Misc.fatal_error "typedecl: Univar in native repr"
-      | Genvar _ -> Misc.fatal_error "typedecl: Genvar in native repr"
-    in
     let is_scannable =
       match sort_or_poly with
       | Poly -> false
-      | Sort s -> sort_is_scannable s
+      | Sort s -> Jkind.Sort.Const.is_scannable s
     in
     if is_immediate && is_non_nullable && is_scannable
     then Some (Unboxed_or_untagged_integer Untagged_int)
