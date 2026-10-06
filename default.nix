@@ -771,6 +771,10 @@ stdenv.mkDerivation {
   separateDebugInfo = false;
   dontStrip = true;
 
+  # Build js_of_ocaml and the AST-dependent libraries during the compiler
+  # build rather than after it (see the top-level Makefile).
+  makeFlags = lib.optional withJsoo "WITH_JSOO=1";
+
   # Disable _multioutConfig hook which adds --libdir=$out/lib into
   # configureFlags when separateDebugInfo is enabled, breaking OCaml's configure
   # step, which expects --libdir to be $out/lib/ocaml
@@ -830,7 +834,7 @@ stdenv.mkDerivation {
       $out/bin/generate_cached_generic_functions.exe $out/lib/ocaml/cached-generic-functions
     ''
     + lib.optionalString withJsoo ''
-      make SHELL="$SHELL" jsoo-install-shipped OXCAML_INSTALL="$out" AST_DEPENDENT_LIBS_PREFIX="$out"
+      make SHELL="$SHELL" WITH_JSOO=1 jsoo-install-shipped AST_DEPENDENT_LIBS_PREFIX="$out"
       ${wrapWasmOfOcaml}
     ''
     # Get rid of unused artifacts
@@ -862,6 +866,7 @@ stdenv.mkDerivation {
       jsooCommands =
         if withJsoo then
           "  make jsoo-build          - Build js_of_ocaml and wasm_of_ocaml\n"
+          + "  make compiler WITH_JSOO=1 - Build them with the compiler\n"
           + "  make jsoo-install        - Install them (AST_DEPENDENT_LIBS_PREFIX=...)\n"
           + "  make jsoo-test           - Run core JSOO compiler and JS/Wasm regressions\n"
         else

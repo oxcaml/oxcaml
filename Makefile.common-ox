@@ -118,7 +118,7 @@ compiler: runtime-stdlib
 	SYSTEM=$(SYSTEM) MODEL=$(MODEL) \
           ASPP="$(ASPP)" ASPPFLAGS="$(ASPPFLAGS)" \
           $(dune) build $(ws_main) \
-          --only-package=ocaml @install \
+          --only-package=ocaml @install $(jsoo_early_target) \
           tools/regalloc/regalloc.exe \
           oxcaml/testsuite/tools/expect.exe \
           oxcaml/testsuite/tools/expectnat.exe \
@@ -545,6 +545,3 @@ boot-_install: runtime-stdlib
        -print0 | xargs -0 -I '{}' cp -f '{}' _install/lib/stublibs
 	mkdir -p _install/lib/ocaml/compiler-libs
 	cp _build/default/parser.cmly _install/lib/ocaml/compiler-libs/
-	find _build/default/ \( -name "flambda2*.cmi" \
-          -or -name "flambda2*.cmti" -or -name "flambda2*.cmt" \) \
-          -print0 | xargs -0 -I '{}' cp -f '{}' _install/lib/ocaml/compiler-libs
