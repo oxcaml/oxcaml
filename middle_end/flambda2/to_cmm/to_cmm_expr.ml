@@ -1301,7 +1301,7 @@ and switch env res switch =
   in
   let make_arm ~must_tag_discriminant env res (d, arm) =
     let d = prepare_discriminant ~must_tag:must_tag_discriminant d in
-    let action = Switch_expr.arm_action arm in
+    let action = Switch_arm.action arm in
     let cmm_action, action_free_vars, action_symbol_inits, res =
       apply_cont env res action
     in
@@ -1310,7 +1310,7 @@ and switch env res switch =
         action_free_vars,
         action_symbol_inits,
         Env.add_inlined_debuginfo env (Apply_cont.debuginfo action),
-        Switch_expr.arm_likelihood arm ),
+        Switch_arm.likelihood arm ),
       res )
   in
   match Target_ocaml_int.Map.cardinal arms with

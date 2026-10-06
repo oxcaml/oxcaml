@@ -459,8 +459,7 @@ and subst_apply_cont env apply_cont =
   let dbg = Apply_cont_expr.debuginfo apply_cont in
   Apply_cont_expr.create ?trap_action cont ~args ~dbg
 
-and subst_switch_arm env arm =
-  Switch_expr.map_arm_action (subst_apply_cont env) arm
+and subst_switch_arm env arm = Switch_arm.map_action (subst_apply_cont env) arm
 
 and subst_switch env switch =
   let scrutinee = subst_simple env (Switch_expr.scrutinee switch) in
@@ -1102,12 +1101,12 @@ let apply_cont_exprs env apply_cont1 apply_cont2 : Apply_cont.t Comparison.t =
           ~dbg:(Apply_cont.debuginfo apply_cont1))
   else Different { approximant = subst_apply_cont env apply_cont1 }
 
-let switch_arms env arm1 arm2 : Switch_expr.arm Comparison.t =
-  let action1 = Switch_expr.arm_action arm1 in
-  let action2 = Switch_expr.arm_action arm2 in
+let switch_arms env arm1 arm2 : Switch_arm.t Comparison.t =
+  let action1 = Switch_arm.action arm1 in
+  let action2 = Switch_arm.action arm2 in
   apply_cont_exprs env action1 action2
   |> Comparison.map ~f:(fun action ->
-      Switch_expr.map_arm_action (fun _ -> action) arm1)
+      Switch_arm.map_action (fun _ -> action) arm1)
 
 let switch_exprs env switch1 switch2 : Expr.t Comparison.t =
   let compare_arms env arms1 arms2 =

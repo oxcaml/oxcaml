@@ -79,19 +79,19 @@ let find_all_aliases env arg =
       | None -> find_all_aliases ())
     arg
 
-let rebuild_arm uacc arm (action, ~likelihood, use_id, arity, env_at_use)
+let rebuild_arm uacc arm (action, ~annotations, use_id, arity, env_at_use)
     (new_let_conts, arms, (mergeable_arms : mergeable_arms)) =
   let action =
     Simplify_common.clear_demoted_trap_action_and_patch_unused_exn_bucket uacc
       action
   in
   let create_arm action =
-    let likelihood =
+    let annotations =
       if UE.is_cold_continuation (UA.uenv uacc) (Apply_cont.continuation action)
-      then Likelihood.cold
-      else likelihood
+      then Branch_annotations.with_likelihood annotations Likelihood.cold
+      else annotations
     in
-    Switch.create_arm_with_likelihood ~likelihood action
+    Switch_arm.create ~annotations action
   in
   match EB.rewrite_switch_arm uacc action ~use_id arity with
   | Invalid _ ->
@@ -831,8 +831,8 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
   after_rebuild expr uacc
 
 let simplify_arm arm (switch_arm, env_at_use) (arms, dacc) =
-  let action = Switch_expr.arm_action switch_arm in
-  let likelihood = Switch_expr.arm_likelihood switch_arm in
+  let action = Switch_arm.action switch_arm in
+  let annotations = Switch_arm.annotations switch_arm in
   let denv_at_use = DE.with_typing_env (DA.denv dacc) env_at_use in
   let args = AC.args action in
   let use_kind =
@@ -842,7 +842,7 @@ let simplify_arm arm (switch_arm, env_at_use) (arms, dacc) =
     S.simplify_simples (DA.with_denv dacc denv_at_use) args
   in
   let denv_at_use =
-    if Switch_expr.arm_is_cold switch_arm
+    if Switch_arm.is_cold switch_arm
     then DE.mark_as_cold denv_at_use
     else denv_at_use
   in
@@ -867,7 +867,7 @@ let simplify_arm arm (switch_arm, env_at_use) (arms, dacc) =
            args)
   in
   let arms =
-    TI.Map.add arm (action, ~likelihood, rewrite_id, arity, env_at_use) arms
+    TI.Map.add arm (action, ~annotations, rewrite_id, arity, env_at_use) arms
   in
   arms, dacc
 
@@ -1043,8 +1043,8 @@ let simplify_switch dacc switch ~down_to_up =
     (* Rewrite to a regular apply_cont so that it is an inlinable use. *)
     let denv_at_use = DE.with_typing_env (DA.denv dacc) env_at_use in
     let dacc = DA.with_denv dacc denv_at_use in
-    Simplify_apply_cont_expr.simplify_apply_cont dacc
-      (Switch_expr.arm_action arm) ~down_to_up:(fun dacc ~rebuild ->
+    Simplify_apply_cont_expr.simplify_apply_cont dacc (Switch_arm.action arm)
+      ~down_to_up:(fun dacc ~rebuild ->
         down_to_up dacc ~rebuild:(fun uacc ~after_rebuild ->
             let uacc =
               UA.notify_removed ~operation:Removed_operations.branch uacc
