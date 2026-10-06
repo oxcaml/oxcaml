@@ -1260,18 +1260,30 @@ val remove_double_underscores : string -> string
 module Sexp : sig
 
   type field
+  (** Fields (or atoms) of s-expressions *)
 
-  val s : string -> string -> field
-  val i : string -> int -> field
-  val f : string -> float -> field
+  val d : string -> int -> field
   val b : string -> bool -> field
-  val p : string -> (Format.formatter -> 'a -> unit) -> 'a -> field
-  val o : string -> (Format.formatter -> 'a -> unit) -> 'a option -> field
+  val f : string -> float -> field
+  val s : string -> string -> field
+  val a : string -> 'a -> (Format.formatter -> 'a -> unit) -> field
+  (** Convenient functions for creating fields. These functions use the same
+      one-letter shorthands as found in printf/format strings:
+      - 'd' for integers
+      - 'b' for booleans
+      - 'f' for floating point numbers
+      - 's' for strings
+      - 'a' for a custom printing function *)
+
+  val o : string -> 'a option -> (Format.formatter -> 'a -> unit) -> field
+  (** Create an optional field: if the provided value is [None], then the field
+      will not be printed. *)
 
   val fmt : ('a, Format.formatter, unit, field) format4 -> 'a
+  (* Create an atom with no field name, from a custom format string. *)
 
   val print : Format.formatter -> field list -> unit
-  (** Print a list of named elements as an s-expression. *)
+  (** Print a list of fields/atoms as an s-expression. *)
 
 end
 
@@ -1392,6 +1404,13 @@ module Colours : sig
   (** Run [f] with colour output globally disabled, restoring the previous
       setting when [f] returns (or raises). *)
   val without_colours : f:(unit -> 'a) -> 'a
+
+  (* "wrap" a printing function, introducing the directive before it, and then
+     a pop afterwards *)
+  val wrap :
+    directive ->
+    (Format.formatter -> 'a -> unit) ->
+    (Format.formatter -> 'a -> unit)
 end
 
 (** Nullable values, unboxed via [@@or_null]. Not a full [Stdlib.Monad.S]: a
