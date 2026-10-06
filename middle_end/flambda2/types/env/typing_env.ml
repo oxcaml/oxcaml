@@ -387,6 +387,11 @@ let is_param_projection t name =
         (fun (x : name_info) -> x.param_projection)
         (Name.Map.find_opt canonical t.name_info))
 
+let is_param_projection_of_simple t simple =
+  Simple.pattern_match simple
+    ~const:(fun _ -> None)
+    ~name:(fun name ~coercion:_ -> is_param_projection t name)
+
 let machine_width t = t.machine_width
 
 let increment_scope t =

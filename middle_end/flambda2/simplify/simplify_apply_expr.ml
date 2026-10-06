@@ -869,6 +869,7 @@ let arity_mismatch ~(params_arity : [`Complex] Flambda_arity.t)
   has_mismatch params args
 
 let rebuild_function_call_where_callee's_type_unavailable apply ~use_id
+    ~param_projection
     ~exn_cont_use_id uacc ~after_rebuild =
   let apply =
     Simplify_common.update_exn_continuation_extra_args uacc ~exn_cont_use_id
@@ -881,6 +882,13 @@ let rebuild_function_call_where_callee's_type_unavailable apply ~use_id
   in
   let uacc, expr =
     EB.rewrite_fixed_arity_apply uacc ~use_id (Apply.return_arity apply) apply
+  in
+  let uacc =
+    match param_projection with
+    | None -> uacc
+    | Some source ->
+        let arity = Apply_expr.args_arity apply in
+        UA.add_param_use ~source ~use:(Apply_function arity) uacc
   in
   after_rebuild expr uacc
 
@@ -946,9 +954,16 @@ let simplify_function_call_where_callee's_type_unavailable dacc apply
   let dacc =
     record_free_names_of_apply_as_used ~use_id ~exn_cont_use_id dacc apply
   in
+  let param_projection =
+    match Apply_expr.callee apply with
+    | None -> None
+    | Some callee ->
+        TE.is_param_projection_of_simple (DE.typing_env denv) callee
+  in
   down_to_up dacc
     ~rebuild:
       (rebuild_function_call_where_callee's_type_unavailable apply ~use_id
+         ~param_projection
          ~exn_cont_use_id)
 
 let simplify_direct_function_call ~simplify_expr dacc apply

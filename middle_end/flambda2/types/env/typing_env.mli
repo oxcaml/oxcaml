@@ -205,3 +205,5 @@ val defined_symbols : t -> Symbol.Set.t
 val add_param_projection : t -> Name.t -> Param_projection.t -> t
 
 val is_param_projection : t -> Name.t -> Param_projection.t option
+
+val is_param_projection_of_simple : t -> Simple.t -> Param_projection.t option

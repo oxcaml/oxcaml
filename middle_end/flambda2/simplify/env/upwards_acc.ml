@@ -30,12 +30,15 @@ type t =
     cost_metrics : Cost_metrics.t;
     slot_offsets : Slot_offsets.t Or_unknown.t;
     flow_result : Flow_types.Flow_result.t;
+    param_uses : Param_use.uses;
     resimplify : bool
   }
 
 let [@ocamlformat "disable"] print ppf
       { uenv; creation_dacc = _; lifted_constants; name_occurrences;
-        all_code = _; cost_metrics; slot_offsets; flow_result; resimplify;
+        all_code = _; cost_metrics; slot_offsets; flow_result;
+        param_uses;
+        resimplify;
       } =
   Format.fprintf ppf "@[<hov 1>(\
       @[<hov 1>(uenv@ %a)@]@ \
@@ -44,6 +47,7 @@ let [@ocamlformat "disable"] print ppf
       @[<hov 1>(cost_metrics@ %a)@]@ \
       @[<hov 1>(slot_offsets@ %a@)@]@ \
       @[<hov 1>(flow_result@ %a)@]\
+      @[<hov 1>(param_uses@ %a)@]\
       %a\
       )@]"
     UE.print uenv
@@ -52,6 +56,7 @@ let [@ocamlformat "disable"] print ppf
     Cost_metrics.print cost_metrics
     (Or_unknown.print Slot_offsets.print) slot_offsets
     Flow_types.Flow_result.print flow_result
+    Param_use.print_uses param_uses
     (if resimplify then
        (fun ppf () -> Format.fprintf ppf "@ @[<hov 1>(should_resimplify)@]")
      else
@@ -73,6 +78,7 @@ let create ~flow_result ~compute_slot_offsets uenv dacc =
     cost_metrics = Cost_metrics.zero;
     slot_offsets;
     flow_result;
+    param_uses = Param_use.empty;
     resimplify = false
   }
 
@@ -181,3 +187,8 @@ let set_resimplify t = { t with resimplify = true }
 let resimplify t = t.resimplify
 
 let specialization_map t = DA.specialization_map (creation_dacc t)
+
+let add_param_use ~source ~use t =
+  { t with param_uses = Param_use.add ~source ~use t.param_uses }
+
+let param_uses t = t.param_uses

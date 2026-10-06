@@ -282,6 +282,8 @@ module Typing_env : sig
   val add_param_projection : t -> Name.t -> Param_projection.t -> t
 
   val is_param_projection : t -> Name.t -> Param_projection.t option
+
+  val is_param_projection_of_simple : t -> Simple.t -> Param_projection.t option
 end
 
 val meet : Typing_env.t -> t -> t -> (t * Typing_env.t) Or_bottom.t
