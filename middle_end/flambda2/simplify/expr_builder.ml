@@ -131,11 +131,11 @@ let create_coerced_singleton_let uacc var defining_expr
         (Bound_pattern.singleton var)
         defining_expr ~free_names_of_defining_expr ~body
         ~cost_metrics_of_defining_expr
-    | Unboxed_closure { closure; first_unarized_parameters } ->
+    | Specialise_closure { closure; specialised_parameters } ->
       let defining_expr =
-        Named.create_unboxed_closure
+        Named.create_specialise_closure
           ~closure:(Simple.apply_coercion_exn closure coercion_from_defining_expr_to_var)
-          ~first_unarized_parameters
+          ~specialised_parameters
       in
       create_let uacc
         (Bound_pattern.singleton var)
@@ -188,7 +188,7 @@ let make_new_let_bindings uacc ~bindings_outermost_first ~body =
       UA.notify_removed ~operation:(Removed_operations.prim prim) uacc
     | Some (Set_of_closures _) ->
       UA.notify_removed ~operation:Removed_operations.alloc uacc
-    | Some (Simple _ | Unboxed_closure _ | Static_consts _ | Rec_info _) | None -> uacc
+    | Some (Simple _ | Specialise_closure _ | Static_consts _ | Rec_info _) | None -> uacc
   in
   ListLabels.fold_left (List.rev bindings_outermost_first) ~init:(body, uacc)
     ~f:(fun (expr, uacc) binding ->

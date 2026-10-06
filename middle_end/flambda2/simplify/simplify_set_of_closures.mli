@@ -57,6 +57,6 @@ val specialise_closure :
   Downwards_acc.t ->
   Bound_pattern.t ->
   Simple.t ->
-  Simple.t list ->
+  Simple.t Parameter_id.Map.t ->
   simplify_function_body:Simplify_common.simplify_function_body ->
   Simplify_named_result.t

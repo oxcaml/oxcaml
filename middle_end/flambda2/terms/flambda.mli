@@ -76,10 +76,10 @@ and named = private
   | Set_of_closures of Set_of_closures.t * Alloc_mode.For_allocations.t
       (** Definition of a set of (dynamically allocated) possibly
           mutually-recursive closures. *)
-  | Unboxed_closure of { closure : Simple.t; first_unarized_parameters : Simple.t list }
-      (** Alias for the given unboxed closure, with the additional constraint that
-          when used with the new name it can only be applied with the first
-          unarized parameters provided here (or aliases thereof). *)
+  | Specialise_closure of { closure : Simple.t; specialised_parameters : Simple.t Parameter_id.Map.t }
+      (** Alias for the given closure, with the additional constraint that
+          when used with the new name it can only be applied with the parameters
+          provided here (or aliases thereof). *)
   | Static_consts of static_const_group
       (** Definition of one or more symbols representing statically-allocated
           constants (including sets of closures). *)
@@ -185,8 +185,8 @@ module Named : sig
     alloc_mode:Alloc_mode.For_allocations.t -> Set_of_closures.t -> t
 
   (** Convert a closure binding with specialisation hints into the defining expression of a [Let]. *)
-  val create_unboxed_closure :
-    closure:Simple.t -> first_unarized_parameters:Simple.t list -> t
+  val create_specialise_closure :
+    closure:Simple.t -> specialised_parameters:Simple.t Parameter_id.Map.t -> t
 
   (** Convert one or more statically-allocated constants into the defining
       expression of a [Let]. *)

@@ -20,7 +20,7 @@ type simplified_named =
   | Simple of Simple.t
   | Prim of Flambda_primitive.t * Debuginfo.t
   | Set_of_closures of Set_of_closures.t * Alloc_mode.For_allocations.t
-  | Unboxed_closure of { closure : Simple.t; first_unarized_parameters : Simple.t list }
+  | Specialise_closure of { closure : Simple.t; specialised_parameters : Simple.t Parameter_id.Map.t }
   | Rec_info of Rec_info_expr.t
 
 let to_named = function
@@ -28,8 +28,8 @@ let to_named = function
   | Prim (prim, dbg) -> Named.create_prim prim dbg
   | Set_of_closures (set, alloc_mode) ->
     Named.create_set_of_closures ~alloc_mode set
-  | Unboxed_closure { closure; first_unarized_parameters } ->
-    Named.create_unboxed_closure ~closure ~first_unarized_parameters
+  | Specialise_closure { closure; specialised_parameters } ->
+    Named.create_specialise_closure ~closure ~specialised_parameters
   | Rec_info rec_info_expr -> Named.create_rec_info rec_info_expr
 
 type t =
@@ -51,9 +51,9 @@ let create ~machine_width (named : Named.t) =
         "Cannot use [Simplified_named.create] on [Set_of_closures];@ use \
          [create_with_known_free_names] instead:@ %a"
         Named.print named
-    | Unboxed_closure _ ->
+    | Specialise_closure _ ->
       Misc.fatal_errorf
-        "Cannot use [Simplified_named.create] on [Unboxed_closure];@ use \
+        "Cannot use [Simplified_named.create] on [Specialise_closure];@ use \
          [create_with_known_free_names] instead:@ %a"
         Named.print named
     | Static_consts _ ->
@@ -80,8 +80,8 @@ let create_with_known_free_names ~machine_width ~find_code_characteristics
     | Set_of_closures (set, alloc_mode) ->
       ( Set_of_closures (set, alloc_mode),
         Cost_metrics.set_of_closures ~find_code_characteristics set )
-    | Unboxed_closure { closure; first_unarized_parameters } ->
-      ( Unboxed_closure { closure; first_unarized_parameters },
+    | Specialise_closure { closure; specialised_parameters } ->
+      ( Specialise_closure { closure; specialised_parameters },
         Cost_metrics.from_size (Code_size.simple closure) )
     | Static_consts _ ->
       Misc.fatal_errorf

@@ -24,7 +24,7 @@ type t =
       Bound_name.t Function_slot.Map.t list;
     old_to_new_code_ids_all_sets : Code_id.t Code_id.Map.t;
     previously_free_depth_variables : Variable.Set.t;
-    specialized_parameters : Simple.t list;
+    specialised_parameters : Simple.t Parameter_id.Map.t;
   }
 
 let function_decl_type ?new_code_id ~rec_info old_code_id =
@@ -54,7 +54,7 @@ let create_for_static_stub dacc ~all_code ~simplify_function_body =
     closure_bound_names_inside_functions_all_sets = [];
     old_to_new_code_ids_all_sets = Code_id.Map.empty;
     previously_free_depth_variables = Variable.Set.empty;
-    specialized_parameters = [];
+    specialised_parameters = Parameter_id.Map.empty;
   }
 
 let simplify_function_body t = t.simplify_function_body
@@ -75,7 +75,7 @@ let closure_bound_names_inside_functions_exactly_one_set t =
 
 let previously_free_depth_variables t = t.previously_free_depth_variables
 
-let specialized_parameters t = t.specialized_parameters
+let specialised_parameters t = t.specialised_parameters
 
 let stub_can_be_simplified denv =
   (* Stubs can only be simplified with "-flambda2-simplify-stubs". We want to
@@ -326,7 +326,7 @@ let compute_and_erase_depth_variables ~typing_env ~denv_inside_functions
     denv_inside_functions, free_depth_variables
 
 let create ~dacc_prior_to_sets ~simplify_function_body ~all_sets_of_closures
-    ~closure_bound_names_all_sets ~value_slot_types_all_sets ~specialized_parameters =
+    ~closure_bound_names_all_sets ~value_slot_types_all_sets ~specialised_parameters =
   let denv = DA.denv dacc_prior_to_sets in
   let denv_inside_functions =
     DE.enter_set_of_closures denv
@@ -363,5 +363,5 @@ let create ~dacc_prior_to_sets ~simplify_function_body ~all_sets_of_closures
     old_to_new_code_ids_all_sets;
     simplify_function_body;
     previously_free_depth_variables;
-    specialized_parameters;
+    specialised_parameters;
   }

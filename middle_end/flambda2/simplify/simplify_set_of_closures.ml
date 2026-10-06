@@ -39,20 +39,20 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
     |> DE.set_inlining_history_tracker
          (Inlining_history.Tracker.inside_function absolute_history)
   in
-  let rec add_specialized_parameters denv params specialized_params =
-    match params, specialized_params with
+  let rec add_specialised_parameters denv params specialised_params =
+    match params, specialised_params with
     | _, [] -> denv
-    | [], _ -> Misc.fatal_error "Specialization: not enough actual parameters"
-    | param :: params, simple :: specialized_params ->
+    | [], _ -> Misc.fatal_error "Specialisation: not enough actual parameters"
+    | param :: params, simple :: specialised_params ->
       let denv =
         DE.add_equation_on_variable denv (Bound_parameter.var param)
           (T.alias_type_of (K.With_subkind.kind (Bound_parameter.kind param)) simple) in
-      add_specialized_parameters denv params specialized_params
+      add_specialised_parameters denv params specialised_params
   in
   let denv =
-    add_specialized_parameters denv
+    add_specialised_parameters denv
       (Bound_parameters.to_list params)
-      (C.specialized_parameters context)
+      (C.specialised_parameters context)
   in
   let denv =
     if Code_metadata.stub code_metadata
@@ -718,11 +718,11 @@ let simplify_set_of_closures0 outer_dacc context set_of_closures alloc_mode
   in
   { set_of_closures; dacc }
 
-type lfting_or_specializing =
+type lfting_or_specialising =
   | Lifting
-  | Specializing of { specialized_parameters : Simple.t list }
+  | Specialising of { specialised_parameters : Simple.t Parameter_id.Map.t }
 
-let simplify_and_lift_set_of_closures dacc ~lifting_or_specializing ~closure_bound_vars_inverse
+let simplify_and_lift_set_of_closures dacc ~lifting_or_specialising ~closure_bound_vars_inverse
     ~closure_bound_vars set_of_closures alloc_mode ~value_slots
     ~symbol_projections ~simplify_function_body =
   let function_decls = Set_of_closures.function_decls set_of_closures in
@@ -765,10 +765,10 @@ let simplify_and_lift_set_of_closures dacc ~lifting_or_specializing ~closure_bou
               ~symbol:(fun _sym -> T.alias_type_of kind in_slot)))
       value_slots
   in
-  let specialized_parameters =
-    match lifting_or_specializing with
-    | Lifting -> []
-    | Specializing { specialized_parameters } -> specialized_parameters
+  let specialised_parameters =
+    match lifting_or_specialising with
+    | Lifting -> Parameter_id.Map.empty
+    | Specialising { specialised_parameters } -> specialised_parameters
   in
   let context =
     C.create ~dacc_prior_to_sets:dacc ~simplify_function_body
@@ -776,7 +776,7 @@ let simplify_and_lift_set_of_closures dacc ~lifting_or_specializing ~closure_bou
         [set_of_closures, Alloc_mode.For_allocations.as_type alloc_mode]
       ~closure_bound_names_all_sets:[closure_bound_names]
       ~value_slot_types_all_sets:[value_slot_types]
-      ~specialized_parameters
+      ~specialised_parameters
   in
   let closure_bound_names_inside =
     C.closure_bound_names_inside_functions_exactly_one_set context
@@ -820,10 +820,10 @@ let simplify_and_lift_set_of_closures dacc ~lifting_or_specializing ~closure_bou
       (LCS.singleton set_of_closures_lifted_constant)
   in
   let denv =
-    DE.map_specialization_cost (DA.denv dacc)
-      ~f:(Specialization_cost.add_lifted_set_of_closures set_of_closures)
+    DE.map_specialisation_cost (DA.denv dacc)
+      ~f:(Specialisation_cost.add_lifted_set_of_closures set_of_closures)
   in
-  match lifting_or_specializing with
+  match lifting_or_specialising with
   | Lifting ->
   let denv, bindings =
     List.fold_left_map
@@ -847,16 +847,16 @@ let simplify_and_lift_set_of_closures dacc ~lifting_or_specializing ~closure_bou
     (DA.with_denv dacc denv) bindings
     ~original_defining_expr:
       (Named.create_set_of_closures ~alloc_mode set_of_closures)
-  | Specializing { specialized_parameters } ->
+  | Specialising { specialised_parameters } ->
     let bound_var =
       match Function_slot.Map.get_singleton closure_bound_vars with
-      | None -> Misc.fatal_error "Specializing a non-singleton closure"
+      | None -> Misc.fatal_error "Specialising a non-singleton closure"
       | Some (_, var) -> var
     in
     let closure =
       let closure_symbol =
         match Function_slot.Map.get_singleton closure_symbols_map with
-        | None -> Misc.fatal_error "Specializing a non-singleton closure"
+        | None -> Misc.fatal_error "Specialising a non-singleton closure"
         | Some (_, symbol) -> symbol
       in
       Simple.symbol closure_symbol
@@ -864,7 +864,7 @@ let simplify_and_lift_set_of_closures dacc ~lifting_or_specializing ~closure_bou
     let binding : Expr_builder.binding_to_place =
       let let_bound = Bound_pattern.singleton bound_var in
       let machine_width = DE.machine_width denv in
-      let defining_expr = Named.create_unboxed_closure ~closure ~first_unarized_parameters:specialized_parameters in
+      let defining_expr = Named.create_specialise_closure ~closure ~specialised_parameters:specialised_parameters in
       let simplified_defining_expr = Simplified_named.create ~machine_width
           defining_expr
       in
@@ -876,8 +876,8 @@ let simplify_and_lift_set_of_closures dacc ~lifting_or_specializing ~closure_bou
     in
     let denv = DE.add_variable denv bound_var (T.alias_type_of K.value closure) in
     let denv =
-      DE.map_specialization_cost denv
-        ~f:(Specialization_cost.add_lifted_set_of_closures set_of_closures)
+      DE.map_specialisation_cost denv
+        ~f:(Specialisation_cost.add_lifted_set_of_closures set_of_closures)
     in
     Simplify_named_result.create (DA.with_denv dacc denv)
       binding
@@ -894,7 +894,7 @@ let simplify_non_lifted_set_of_closures0 dacc bound_vars ~closure_bound_vars
         [set_of_closures, Alloc_mode.For_allocations.as_type alloc_mode]
       ~closure_bound_names_all_sets:[closure_bound_names]
       ~value_slot_types_all_sets:[value_slot_types]
-      ~specialized_parameters:[]
+      ~specialised_parameters:[]
   in
   let closure_bound_names_inside =
     C.closure_bound_names_inside_functions_exactly_one_set context
@@ -971,8 +971,8 @@ let simplify_non_lifted_set_of_closures0 dacc bound_vars ~closure_bound_vars
   let dacc =
     DA.map_denv dacc
       ~f:
-        (DE.map_specialization_cost
-           ~f:(Specialization_cost.add_set_of_closures set_of_closures))
+        (DE.map_specialisation_cost
+           ~f:(Specialisation_cost.add_set_of_closures set_of_closures))
   in
   Simplify_named_result.create dacc
     (Expr_builder.Keep_binding
@@ -1110,7 +1110,7 @@ let simplify_non_lifted_set_of_closures dacc (bound_vars : Bound_pattern.t)
   then
     simplify_and_lift_set_of_closures dacc ~closure_bound_vars_inverse
       ~closure_bound_vars set_of_closures alloc_mode ~value_slots
-      ~symbol_projections ~lifting_or_specializing:Lifting
+      ~symbol_projections ~lifting_or_specialising:Lifting
   else
     simplify_non_lifted_set_of_closures0 dacc bound_vars ~closure_bound_vars
       set_of_closures alloc_mode ~value_slots ~value_slot_types
@@ -1144,8 +1144,8 @@ let simplify_lifted_set_of_closures0 dacc context ~closure_symbols
   let dacc =
     DA.map_denv dacc
       ~f:
-        (DE.map_specialization_cost
-           ~f:(Specialization_cost.add_lifted_set_of_closures set_of_closures))
+        (DE.map_specialisation_cost
+           ~f:(Specialisation_cost.add_lifted_set_of_closures set_of_closures))
   in
   set_of_closures_pattern, set_of_closures_static_const, dacc
 
@@ -1185,7 +1185,7 @@ let simplify_lifted_sets_of_closures dacc ~all_sets_of_closures_and_symbols
   let context =
     C.create ~dacc_prior_to_sets:dacc ~simplify_function_body
       ~all_sets_of_closures ~closure_bound_names_all_sets
-      ~value_slot_types_all_sets ~specialized_parameters:[]
+      ~value_slot_types_all_sets ~specialised_parameters:[]
   in
   let closure_bound_names_inside_functions_all_sets =
     C.closure_bound_names_inside_functions_all_sets context
@@ -1230,20 +1230,20 @@ let simplify_static_stub_function dacc code ~all_code ~simplify_function_body =
   in
   code, outer_dacc
 
-let specialise_closure dacc let_bound closure first_unarized_parameters ~simplify_function_body =
+let specialise_closure dacc let_bound closure specialised_parameters ~simplify_function_body =
   let typing_env = DE.typing_env (DA.denv dacc) in
   let ty, closure =
     S.simplify_simple dacc closure
       ~min_name_mode:Name_mode.normal
   in
-  let first_unarized_parameters = (Simplify_simple.simplify_simples dacc first_unarized_parameters).simples in
+  let specialised_parameters = (Simplify_simple.simplify_simples dacc specialised_parameters).simples in
   match T.meet_single_closures_entry typing_env ty with
   | Need_meet | Invalid ->
     let machine_width = DE.machine_width (DA.denv dacc) in
     Simplify_named_result.create dacc
       (Keep_binding { let_bound;
                       simplified_defining_expr =
-                        Simplified_named.create ~machine_width (Named.create_unboxed_closure ~closure ~first_unarized_parameters);
+                        Simplified_named.create ~machine_width (Named.create_unboxed_closure ~closure ~specialised_parameters);
                       original_defining_expr = None })
   | Known_result (function_slot, _alloc_mode, entry, function_type) ->
     let bound_var = Bound_pattern.must_be_singleton let_bound in
@@ -1257,7 +1257,7 @@ let specialise_closure dacc let_bound closure first_unarized_parameters ~simplif
             TE.get_alias_then_canonical_simple_exn (DE.typing_env (DA.denv dacc))
               ~min_name_mode:Name_mode.normal ty
           with Not_found ->
-            Misc.fatal_errorf "Specialize_closure: Closure %a has type %a for value slot %a, which does not have a canonical alias" Simple.print closure T.print ty Value_slot.print slot)
+            Misc.fatal_errorf "Specialise_closure: Closure %a has type %a for value slot %a, which does not have a canonical alias" Simple.print closure T.print ty Value_slot.print slot)
         value_slot_types
     in
     let code : Function_declarations.code_id_in_function_declaration =
@@ -1268,7 +1268,7 @@ let specialise_closure dacc let_bound closure first_unarized_parameters ~simplif
       Set_of_closures.create ~value_slots (Function_declarations.create (Function_slot.Lmap.singleton function_slot code))
     in
     let symbol_projections = Variable.Map.empty in
-    let lifting_or_specializing = Specializing { specialized_parameters = first_unarized_parameters } in
-    simplify_and_lift_set_of_closures dacc ~lifting_or_specializing ~closure_bound_vars_inverse
+    let lifting_or_specialising = Specialising { specialised_parameters = specialised_parameters } in
+    simplify_and_lift_set_of_closures dacc ~lifting_or_specialising ~closure_bound_vars_inverse
       ~closure_bound_vars set_of_closures alloc_mode ~value_slots
       ~symbol_projections ~simplify_function_body
