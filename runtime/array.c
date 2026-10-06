@@ -1120,7 +1120,7 @@ CAMLprim value caml_get_idx_bytecode(value base, value idx)
 
 static value unimplemented_ext_ptr(void)
 {
-  caml_failwith("External ptr primitives are unimplemented on bytecode");
+  caml_failwith("External ptrs are unimplemented on bytecode");
   return Val_unit;
 }
 
@@ -1244,16 +1244,14 @@ CAMLprim value caml_atomic_lxor_idx_bytecode(value base, value idx, value incr)
 CAMLprim value caml_get_ptr_bytecode(value ptr)
 {
   value base = Field(ptr, 0);
-  if (Is_null(base))
-    caml_failwith("External ptrs are unimplemented on bytecode");
+  if (Is_null(base)) unimplemented_ext_ptr();
   return caml_get_idx_bytecode(base, Field(ptr, 1));
 }
 
 CAMLprim value caml_set_ptr_bytecode(value ptr, value v)
 {
   value base = Field(ptr, 0);
-  if (Is_null(base))
-    caml_failwith("External ptrs are unimplemented on bytecode");
+  if (Is_null(base)) unimplemented_ext_ptr();
   return caml_set_idx_bytecode(base, Field(ptr, 1), v);
 }
 
