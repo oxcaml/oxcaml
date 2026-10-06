@@ -55,7 +55,7 @@ module Sort : sig
     (** A flat sort is returned from [get]. *)
     type t =
       | Var of Var.id (* [Var.id] is for debugging / printing only *)
-      | Genvar of var (* generic sort variable, level = Ident.highest_scope *)
+      | Genvar of var
       | Univar of univar
       | Base of base
   end
@@ -123,7 +123,7 @@ module Layout : sig
 
   val is_surely_addressable_flat : Sort.Flat.t t -> bool
 
-  val crosses_externality : Sort.t t -> bool
+  val implied_externality : Sort.t t -> Jkind_axis.Externality.t
 
   (** Updates the nullability on the layout's scannable axis. *)
   val set_root_nullability : Sort.t t -> Jkind_axis.Nullability.t -> Sort.t t

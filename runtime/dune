@@ -70,9 +70,9 @@
      (with-stdout-to prims.c (run bash %{dep:gen_primsc.sh} primitives %{deps})))))
 
 (rule
- (targets libasmrun.a libasmrund.a libasmruni.a libasmrun_pic.a
-    libasmrun_shared.so libcamlrun.a libcamlrund.a libcamlruni.a libcamlrun_pic.a
-    libcamlrun_shared.so ocamlrun ocamlrund ocamlruni ld.conf)
+ (targets libasmrun.a libasmrund.a libasmrun_pic.a
+    libasmrun_shared.so libcamlrun.a libcamlrund.a libcamlrun_pic.a
+    libcamlrun_shared.so ocamlrun ocamlrund ld.conf)
  (mode    fallback)
  (deps
    ../Makefile.config
@@ -98,15 +98,14 @@
  (no-infer
    (progn
      (bash "rm -f sak build_config.h")
-     (bash "cd .. && make V=1 -j8 -f Makefile.upstream runtime/libasmrun.a runtime/libasmrund.a runtime/libasmruni.a runtime/libasmrun_pic.a \
-    runtime/libasmrun_shared.so runtime/libcamlrun.a runtime/libcamlrund.a runtime/libcamlruni.a runtime/libcamlrun_pic.a \
-    runtime/libcamlrun_shared.so runtime/ocamlrun runtime/ocamlrund runtime/ocamlruni runtime/ld.conf COMPUTE_DEPS=false")))))
+     (bash "cd .. && make V=1 -j8 -f Makefile.upstream runtime/libasmrun.a runtime/libasmrund.a runtime/libasmrun_pic.a \
+    runtime/libasmrun_shared.so runtime/libcamlrun.a runtime/libcamlrund.a runtime/libcamlrun_pic.a \
+    runtime/libcamlrun_shared.so runtime/ocamlrun runtime/ocamlrund runtime/ld.conf COMPUTE_DEPS=false")))))
 
 (install
   (files
     ocamlrun
     ocamlrund
-    ocamlruni
   )
   (section bin)
   (package ocaml_runtime_stdlib))
@@ -117,7 +116,6 @@
 
     libcamlrun.a
     libcamlrund.a
-    libcamlruni.a
     libcamlrun_pic.a
     libcamlrun_shared.so
   )
@@ -128,7 +126,6 @@
   (files
     libasmrun.a
     libasmrund.a
-    libasmruni.a
     libasmrun_pic.a
     libasmrun_shared.so
   )
@@ -140,14 +137,11 @@
  (deps
     ocamlrun
     ocamlrund
-    ocamlruni
     libcamlrun.a
     libcamlrund.a
-    libcamlruni.a
     libcamlrun_pic.a
     libcamlrun_shared.so
     libasmrun.a
     libasmrund.a
-    libasmruni.a
     libasmrun_pic.a
     libasmrun_shared.so))

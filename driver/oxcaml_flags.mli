@@ -17,6 +17,7 @@
 (** OxCaml specific command line flags *)
 
 val dump_cfg : bool ref
+val dump_ssa : bool ref
 val cfg_invariants : bool ref
 val regalloc : Clflags.Register_allocator.t ref
 val default_regalloc_linscan_threshold : int
@@ -42,6 +43,9 @@ val cfg_stack_checks : bool ref
 val cfg_stack_checks_threshold : int ref
 
 val cfg_eliminate_dead_trap_handlers : bool ref
+val cfg_eliminate_dead_code_validate : bool ref
+val cfg_dominators_validate : bool ref
+val cfg_liveness_validate : bool ref
 
 val cfg_prologue_validate : bool ref
 val cfg_prologue_shrink_wrap : bool ref
@@ -57,7 +61,6 @@ val cfg_value_propagation_float : bool ref
 val cfg_value_propagation_flow : bool ref
 
 val reorder_blocks_random : int option ref
-val basic_block_sections : bool ref
 val module_entry_functions_section : bool ref
 
 val dasm_comments : bool ref
@@ -109,6 +112,12 @@ val max_long_frames_threshold : int
 val long_frames_threshold : int ref
 val branch_relaxation_max_displacement : int ref
 val caml_apply_inline_fast_path : bool ref
+
+val use_ssa : bool ref
+
+val ssa_simplify : bool ref
+
+val ssa_validate : bool ref
 
 type function_result_types = Never | Functors_only | All_functions
 type reaper_preserve_direct_calls = Never | Always | Zero_alloc | Auto

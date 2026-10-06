@@ -143,12 +143,34 @@ type 'd const =
   | Spliced : ('l * 'r, 'd) polarity -> 'd const
   | Contained_by : is_contained_by -> ('l * 'r) const
   | Annotation : annotation -> ('l * 'r) const
+  | Mod_unpack : ('l * disallowed) neg const
   constraint 'd = _ * _
 [@@ocaml.warning "-62"]
 
 type closure_details =
   { closure : pinpoint;
     closed : pinpoint
+  }
+
+type argument_label =
+  | Unlabelled
+  | Labelled of string
+  | Optional of string
+  | Position of string
+
+type parameter =
+  { label : argument_label;
+    index_in_callee_arrow_type : int
+  }
+
+type parameter_to_argument =
+  { parameter : parameter;
+    callee : pinpoint
+  }
+
+type argument_to_parameter =
+  { parameter : parameter;
+    argument : pinpoint
   }
 
 type allocation_desc =
@@ -199,6 +221,12 @@ type 'd morph =
   | Contains_l : ('l * disallowed, 'd) polarity * contains -> 'd morph
   | Is_contained_by : ('l * 'r, 'd) polarity * is_contained_by -> 'd morph
   | Contains_r : (disallowed * 'r, 'd) polarity * contains -> 'd morph
+  | Parameter_to_argument :
+      (disallowed * 'r, 'd) polarity * parameter_to_argument
+      -> 'd morph
+  | Argument_to_parameter :
+      ('l * disallowed, 'd) polarity * argument_to_parameter
+      -> 'd morph
     (* CR-someday zqian: add [Tail_of_region] which connects the mode of region
        to the mode of the region's tail *)
   constraint 'd = _ * _

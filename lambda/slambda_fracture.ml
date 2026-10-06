@@ -333,6 +333,35 @@ let rec fracture_lam lambda : slambda =
     fatal_error_invalid_constructor lambda
   | Lkindtemplate
       { ktmpl_params; ktmpl_body; ktmpl_env; ktmpl_env_mode; ktmpl_loc } ->
+    (* A kind template fractures into a compile-time template over its kind
+       parameters, paired with a runtime block capturing its free variables.
+
+       Kind templates always wrap functions (we only have kind polymorphic
+       functions), so this also merges the runtime part of the template with the
+       user function. That is:
+       [template k1 k2 ... -> fun arg1 arg2 ... -> body]
+       turns into a function like:
+       [fun env [k1] [k2] ... -> fun arg1 arg2 ... -> body]
+       But k1, k2 etc don't actually exist as they have no runtime
+       representation, so with that and the merging we get:
+       [fun env arg1 arg2 ... -> body]
+
+       Specifically, the compile-time template is from the kind arguments to a
+       pair. The compile-time half of that pair is missing (because runtime
+       functions have no compile-time part), the runtime half is the above
+       function of the env and function args.
+
+       {[
+         let <free_var_0> = <fracture free_var_0> in
+         ...
+         { c = template <...ktmpl_params> ->
+                { c = Missing
+                ; r = << fun closure $(ktmpl_body.args...)->
+                          let <free_var_0> = closure.<0> in
+                          ...
+                          $(fracture_dynamic ktmpl_body.body) >> }
+         ; r = << makeblock ($(<free_var_0>.r), ...) >> }
+       ]} *)
     let env = Ident.Map.to_list ktmpl_env in
     let free_vars_shape_locality_mode =
       Misc.Stdlib.Array.of_list_map
@@ -353,11 +382,9 @@ let rec fracture_lam lambda : slambda =
       let closure_param =
         { name = closure_id;
           debug_uid = debug_uid_none;
-          layout = layout_block;
+          layout = layout_template_env;
           attributes = default_param_attribute;
-          (* The env parameter can be local because we immediately
-              destructure it. *)
-          mode = alloc_local
+          mode = ktmpl_env_mode
         }
       in
       let _, body =
@@ -440,6 +467,11 @@ let rec fracture_lam lambda : slambda =
       kind_function env
   | Lkindinstantiate
       { kinst_func; kinst_args; kinst_result_layout; kinst_mode; kinst_loc } ->
+    (* {[
+         let fun = <fracture kinst_func> in
+         let app = fun.c <...kinst_args> in
+         { c = app.c; r = << $(app.r) $(fun.r) >> }
+       ]} *)
     slet_local "fun" kinst_func (fun fun_c fun_r ->
         let app_id = Slambdaident.create_local "app" in
         let app_var = SLvar app_id in
@@ -468,6 +500,156 @@ let rec fracture_lam lambda : slambda =
                       }
                 }
           })
+  | Ltemplate
+      { tmpl_func = { kind; params; return; body; attr; loc; mode; ret_mode };
+        tmpl_env
+      } ->
+    (* Like [Lkindtemplate] but parameters are static rather than erased so they
+       survive into the lambda code. Note that the arguments passed by
+       instantiation are the compile-time halves so we must bind the runtime
+       halves to their new name inside the function.
+
+       {[
+         let <free_var_0> = <fracture free_var_0> in
+         ...
+         { c = template <...params> ->
+                 let <param0> = { c = param0; r = << <param0> >> } in
+                 ...
+                 let body = <fracture body> in
+                 { c = body.c
+                 ; r = << fun closure <params> ->
+                            let <free_var_0> = closure.<0> in
+                            ...
+                            $(body.r) >> }
+         ; r = << makeblock ($(<free_var_0>.r), ...) >> }
+       ]} *)
+    let env = Ident.Map.to_list tmpl_env in
+    let free_vars_shape_locality_mode =
+      Misc.Stdlib.Array.of_list_map
+        (fun (_, (_, layout)) -> Lambda.mixed_block_element_of_layout layout)
+        env
+    in
+    let free_vars_shape_unit =
+      Misc.Stdlib.Array.of_list_map
+        (fun (_, (_, layout)) -> Lambda.mixed_block_element_of_layout layout)
+        env
+    in
+    let templated_function_body =
+      slet_local "body" body (fun body_c body_r ->
+          let closure_id = Ident.create_local "closure" in
+          let closure_param =
+            { name = closure_id;
+              debug_uid = debug_uid_none;
+              layout = layout_template_env;
+              attributes = default_param_attribute;
+              mode
+            }
+          in
+          let _, body =
+            List.fold_left
+              (fun (i, lam) (ident, (_, layout)) ->
+                ( i + 1,
+                  Llet
+                    ( Alias,
+                      layout,
+                      ident,
+                      debug_uid_none,
+                      Lprim
+                        ( Pmixedfield
+                            ([i], free_vars_shape_locality_mode, Reads_agree),
+                          [Lvar closure_id],
+                          loc ),
+                      lam ) ))
+              (0, body_r) env
+          in
+          let kind =
+            match kind, mode with
+            | Curried { nlocal }, Alloc_local -> Curried { nlocal = nlocal + 1 }
+            | Curried _, Alloc_heap -> kind
+            | Tupled, _ ->
+              Misc.fatal_error
+                "Tupled template functions are not supported, functors should \
+                 always be curried"
+          in
+          SLhalves
+            { sval_comptime = body_c;
+              sval_runtime =
+                lfunction ~kind ~params:(closure_param :: params) ~return ~body
+                  ~attr ~loc ~mode ~ret_mode
+            })
+    in
+    let templated_function_body =
+      List.fold_left
+        (fun body { name; _ } ->
+          let sname = Slambdaident.of_ident name in
+          SLlet
+            { slet_name = sname;
+              slet_value =
+                SLhalves
+                  { sval_comptime = SLvar sname; sval_runtime = Lvar name };
+              slet_body = body
+            })
+        templated_function_body params
+    in
+    let free_var_capture =
+      List.map
+        (fun (id, _) -> Lsplice (loc, SLvar (Slambdaident.of_ident id)))
+        env
+    in
+    let kind_function =
+      SLhalves
+        { sval_comptime =
+            SLtemplate
+              { sfun_params =
+                  Misc.Stdlib.Array.of_list_map
+                    (fun { name; _ } -> Slambdaident.of_ident name)
+                    params;
+                sfun_body = templated_function_body
+              };
+          sval_runtime =
+            Lprim
+              ( Pmakeblock (0, Immutable, Shape free_vars_shape_unit, mode),
+                free_var_capture,
+                loc )
+        }
+    in
+    List.fold_left
+      (fun slam (id, (lam, _)) ->
+        SLlet
+          { slet_name = Slambdaident.of_ident id;
+            slet_value = fracture_lam lam;
+            slet_body = slam
+          })
+      kind_function env
+  | Linstantiate ({ ap_func; ap_args; ap_loc; _ } as ap) ->
+    (* {[
+         let fun = <fracture ap_func> in
+         let argn = <fracture ap_args.(n)> in
+         ...
+         let arg0 = <fracture ap_args.(0)> in
+         let app = fun.c arg0.c ... in
+         { c = app.c; r = << $(app) $(fun.r) $(arg0.r) ... >> }
+       ]} *)
+    slet_local "fun" ap_func (fun fun_c fun_r ->
+        slet_local_list "arg" ap_args (fun args_c args_r ->
+            let app_id = Slambdaident.create_local "app" in
+            let app_var = SLvar app_id in
+            SLlet
+              { slet_name = app_id;
+                slet_value =
+                  SLinstantiate
+                    { sapp_func = fun_c; sapp_args = Array.of_list args_c };
+                slet_body =
+                  SLhalves
+                    { sval_comptime = SLproj_comptime app_var;
+                      sval_runtime =
+                        Lapply
+                          { ap with
+                            ap_func = Lsplice (ap_loc, app_var);
+                            ap_args = fun_r :: args_r
+                          }
+                    }
+              }))
 
 (** Fracture an [lfun]. Currently, functions only have a dynamic part so this
     can always return an [lfun]. *)
@@ -497,7 +679,7 @@ and fracture_prim lambda prim args loc =
   | Pgetglobal (cu, Static) ->
     check_arity ~arity:0;
     SLhalves { sval_comptime = SLglobal cu; sval_runtime = lambda }
-  | Pmakeblock _ ->
+  | Pmakeblock (_, (Immutable | Immutable_unique), _, _) ->
     let rec fracture_make_block unchanged i args_c args_r = function
       | [] ->
         SLhalves
@@ -517,7 +699,7 @@ and fracture_prim lambda prim args loc =
     (* Bind the fields in reverse because Lprim(Pmakeblock) evaluates its arguments in
        reverse order. *)
     fracture_make_block true (List.length args - 1) [] [] (List.rev args)
-  | Pfield (pos, _ptr, _sem) ->
+  | Pfield (pos, _ptr, Reads_agree) ->
     let arg = match args with [arg] -> arg | _ -> wrong_arity ~expected:1 in
     slet_local "arg" arg (fun arg_c arg_r ->
         SLhalves
@@ -525,7 +707,7 @@ and fracture_prim lambda prim args loc =
             sval_runtime =
               (if arg_r == arg then lambda else Lprim (prim, [arg_r], loc))
           })
-  | Pmixedfield (path, _shape, _sem) ->
+  | Pmixedfield (path, _shape, Reads_agree) ->
     let arg = match args with [arg] -> arg | _ -> wrong_arity ~expected:1 in
     slet_local "arg" arg (fun arg_c arg_r ->
         SLhalves
@@ -537,10 +719,15 @@ and fracture_prim lambda prim args loc =
   (* Dynamic output *)
   | Pbytes_to_string | Pbytes_of_string | Pignore
   | Pgetglobal (_, Dynamic)
-  | Pgetpredef _ | Pmakefloatblock _ | Pmakeufloatblock _ | Pmakelazyblock _
+  | Pgetpredef _
+  | Pmakeblock (_, Mutable, _, _)
+  | Pmakefloatblock _ | Pmakeufloatblock _ | Pmakelazyblock _
+  | Pfield (_, _, Reads_vary)
   | Pfield_computed _ | Psetfield _ | Psetfield_computed _ | Pfloatfield _
-  | Pufloatfield _ | Psetfloatfield _ | Psetufloatfield _ | Psetmixedfield _
-  | Pduprecord _ | Pmake_unboxed_product _ | Punboxed_product_field _
+  | Pufloatfield _
+  | Pmixedfield (_, _, Reads_vary)
+  | Psetfloatfield _ | Psetufloatfield _ | Psetmixedfield _ | Pduprecord _
+  | Pmake_unboxed_product _ | Punboxed_product_field _
   | Parray_element_size_in_bytes _ | Pmake_idx_field _ | Pmake_idx_mixed_field _
   | Pmake_idx_array _ | Pidx_deepen _ | Pwith_stack | Pwith_stack_preemptible
   | Pperform | Pcontinue | Pdiscontinue | Pdiscontinue_with_backtrace
@@ -628,6 +815,32 @@ and slet_local_slam name value value_lam body =
         slet_body =
           body (SLproj_comptime (SLvar name)) (Lsplice (loc, SLvar name))
       }
+
+(** [slet_local_list name values body] binds each item of [values] to [name0],
+    [name1], etc in [body] in slambda.
+
+    Note this will omit all the [SLlet]s that it can, however if the elements of
+    [values] have compile-time effects they are guaranteed to be run in reverse
+    order before (the slambda produced by) [body] is evaluated.
+
+    [body] is a function, called as [body values_c values_r], where the elements
+    of [values_c] and [values_r] evaluate to the compile-time and run-time
+    halves of each element of [values] respectively. The elements of [values_c]
+    are guaranteed to not contain any effects and [values_r] is physically equal
+    to [values] where possible. *)
+and slet_local_list name values body =
+  let rec slet_local_list_loop unchanged i values_c values_r = function
+    | [] -> body values_c (if unchanged then values else values_r)
+    | value :: values ->
+      slet_local
+        (name ^ string_of_int i)
+        value
+        (fun value_c value_r ->
+          let unchanged = unchanged && value_r == value in
+          slet_local_list_loop unchanged (i - 1) (value_c :: values_c)
+            (value_r :: values_r) values)
+  in
+  slet_local_list_loop true (List.length values - 1) [] [] (List.rev values)
 
 (** Helper function fracture [lambda] where we only need the dynamic part of the
     result. *)

@@ -45,7 +45,7 @@ type unbound_variable_reason = | Upstream_compatibility
 type jkind_initialization_choice = Sort | Any
 
 type value_loc =
-    Tuple | Poly_variant | Object_field
+    Tuple | Poly_variant | Object_field | Optional_arg
 
 type sort_loc =
     Fun_arg | Fun_ret
@@ -878,8 +878,8 @@ let get_type_param_name styp =
 let rec extract_params styp =
   match styp.ptyp_desc with
   | Ptyp_arrow (l, a, r, ma, mr) ->
-      let arg_mode = Typemode.transl_alloc_mode ma in
-      let ret_mode = Typemode.transl_alloc_mode mr in
+      let arg_mode = Typemode.transl_mode_with_locality ma in
+      let ret_mode = Typemode.transl_mode_with_locality mr in
       let params, ret, ret_mode =
         match r.ptyp_desc with
         | Ptyp_arrow _ when not (Builtin_attributes.has_curry r.ptyp_attributes) ->
@@ -1016,12 +1016,23 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
             else begin
               if not (Btype.tpoly_is_mono arg_ty) then
                 raise (Error (arg.ptyp_loc, env, Polymorphic_optional_param));
-              newmono
-                (newconstr Predef.path_option [Btype.tpoly_get_mono arg_ty])
+              let arg_mono = Btype.tpoly_get_mono arg_ty in
+              (* CR lmaurer: remove value requirement *)
+              begin match
+                constrain_type_jkind env arg_mono
+                  Predef.optional_argument_jkind
+              with
+              | Ok _ -> ()
+              | Error e ->
+                raise (Error(arg.ptyp_loc, env,
+                             Non_value {vloc = Optional_arg; err = e;
+                                        typ = arg_mono}))
+              end;
+              newmono (newconstr Predef.path_option [arg_mono])
             end
           in
-          let arg_mode_desc = Alloc.of_const arg_mode.mode_modes in
-          let ret_mode_desc = Alloc.of_const ret_mode.mode_modes in
+          let arg_mode_desc = With_locality.of_const arg_mode.mode_modes in
+          let ret_mode_desc = With_locality.of_const ret_mode.mode_modes in
           let arrow_desc = (l, arg_mode_desc, ret_mode_desc) in
           let ty =
             newty (Tarrow(arrow_desc, arg_ty, ret_cty.ctyp_type, commu_ok))
@@ -1045,7 +1056,8 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
     let tl =
       List.map
         (fun (label, t) ->
-           label, transl_type env ~policy ~row_context Alloc.Const.legacy t)
+           label,
+           transl_type env ~policy ~row_context With_locality.Const.legacy t)
         stl
     in
     let ctyp_type =
@@ -1066,7 +1078,9 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
                     Type_arity_mismatch(lid.txt, decl.type_arity,
                                         List.length stl)));
       let args =
-        List.map (transl_type env ~policy ~row_context Alloc.Const.legacy) stl
+        List.map
+          (transl_type env ~policy ~row_context With_locality.Const.legacy)
+          stl
       in
       let params = instance_list decl.type_params in
       let unify_param =
@@ -1128,7 +1142,9 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
                     Type_arity_mismatch(lid.txt, decl.type_arity,
                                         List.length stl)));
       let args =
-        List.map (transl_type env ~policy ~row_context Alloc.Const.legacy) stl
+        List.map
+          (transl_type env ~policy ~row_context With_locality.Const.legacy)
+          stl
       in
       let body = Option.get decl.type_manifest in
       let (params, body) = instance_parameterized_type decl.type_params body in
@@ -1190,7 +1206,11 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
               Builtin_attributes.warning_scope rf_attributes
                 (fun () ->
                    List.map
-                     (transl_type env ~policy ~row_context Alloc.Const.legacy)
+                     (transl_type
+                        env
+                        ~policy
+                        ~row_context
+                        With_locality.Const.legacy)
                      stl)
             in
             List.iter (fun {ctyp_type; ctyp_loc} ->
@@ -1221,7 +1241,12 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
               Ttag (l,c,tl)
         | Rinherit sty ->
             let cty =
-              transl_type env ~policy ~row_context Alloc.Const.legacy sty
+              transl_type
+                env
+                ~policy
+                ~row_context
+                With_locality.Const.legacy
+                sty
             in
             let ty = cty.ctyp_type in
             let nm =
@@ -1538,7 +1563,7 @@ and transl_type_aux_tuple env ~loc ~policy ~row_context stl =
   let ctys =
     List.map
       (fun (l, t) ->
-         l, transl_type env ~policy ~row_context Alloc.Const.legacy t)
+         l, transl_type env ~policy ~row_context With_locality.Const.legacy t)
       stl
   in
   List.iter (fun (_, {ctyp_type; ctyp_loc}) ->
@@ -1577,7 +1602,12 @@ and transl_fields env ~policy ~row_context o fields =
     | Otag (s, ty1) -> begin
         let ty1 =
           Builtin_attributes.warning_scope of_attributes
-            (fun () -> transl_type env ~policy ~row_context Alloc.Const.legacy
+            (fun () ->
+              transl_type
+                env
+                ~policy
+                ~row_context
+                With_locality.Const.legacy
                 (Ast_helper.Typ.force_poly ty1))
         in
         begin
@@ -1596,7 +1626,9 @@ and transl_fields env ~policy ~row_context o fields =
         field
       end
     | Oinherit sty -> begin
-        let cty = transl_type env ~policy ~row_context Alloc.Const.legacy sty in
+        let cty =
+          transl_type env ~policy ~row_context With_locality.Const.legacy sty
+        in
         let nm =
           match get_desc cty.ctyp_type with
             Tconstr(p, _, _) -> Some p
@@ -1655,7 +1687,7 @@ and transl_package env ~policy ~row_context ptyp =
   let ptys =
     List.map
       (fun (s, pty) ->
-         s, transl_type env ~policy ~row_context Alloc.Const.legacy pty)
+         s, transl_type env ~policy ~row_context With_locality.Const.legacy pty)
       l
   in
   let mty =
@@ -1714,7 +1746,7 @@ let transl_simple_type_univars env styp =
     TyVarEnv.collect_univars begin fun () ->
       with_local_level_generalize begin fun () ->
         let policy = TyVarEnv.univars_policy in
-        let typ = transl_type env policy Alloc.Const.legacy styp in
+        let typ = transl_type env policy With_locality.Const.legacy styp in
         TyVarEnv.globalize_used_variables policy env ();
         typ
       end
@@ -1746,7 +1778,12 @@ let transl_type_scheme_mono env styp =
   let typ =
     with_local_level_generalize begin fun () ->
       TyVarEnv.reset ();
-      transl_simple_type ~new_var_jkind:Sort env ~closed:false Alloc.Const.legacy styp
+      transl_simple_type
+        ~new_var_jkind:Sort
+        env
+        ~closed:false
+        With_locality.Const.legacy
+        styp
     end
     ~before_generalize:generalize_ctyp
   in
@@ -1754,7 +1791,7 @@ let transl_type_scheme_mono env styp =
      declarations from having undefaulted jkind variables. Without
      this line, we might accidentally export a jkind-flexible definition
      from a compilation unit, which would lead to miscompilation. *)
-  Alloc.with_zap_scope (fun ~zap_scope ->
+  With_locality.with_zap_scope (fun ~zap_scope ->
     remove_mode_and_jkind_variables ~zap_scope typ.ctyp_type);
   typ
 
@@ -1768,18 +1805,18 @@ let transl_type_scheme_poly env attrs loc vars inner_type =
       let typ =
         if Language_extension.erasable_extensions_only () then
           transl_simple_type_impl ~new_var_jkind:Sort env ~univars
-            ~policy:Closed_for_upstream_compatibility Alloc.Const.legacy
+            ~policy:Closed_for_upstream_compatibility With_locality.Const.legacy
             inner_type
         else
           transl_simple_type_impl ~new_var_jkind:Sort env ~univars ~policy:Open
-            Alloc.Const.legacy inner_type
+            With_locality.Const.legacy inner_type
       in
       (typed_vars, univars, typ)
     end
     ~before_generalize:(fun (_,_,typ) -> generalize_ctyp typ)
   in
   let _ : _ list = TyVarEnv.instance_poly_univars env loc univars in
-  Alloc.with_zap_scope (fun ~zap_scope ->
+  With_locality.with_zap_scope (fun ~zap_scope ->
     remove_mode_and_jkind_variables ~zap_scope typ.ctyp_type);
   { ctyp_desc = Ttyp_poly (typed_vars, typ);
     ctyp_type = typ.ctyp_type;
@@ -2062,6 +2099,7 @@ let report_error_doc loc env = function
       | Tuple -> "Tuple element"
       | Poly_variant -> "Polymorphic variant constructor argument"
       | Object_field -> "Object field"
+      | Optional_arg -> "Optional argument"
     in
     Location.errorf ~loc "%s types must have layout value.@ %a"
       s (Jkind.Violation.report_with_offender

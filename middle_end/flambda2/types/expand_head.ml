@@ -683,30 +683,45 @@ let make_suitable_for_environment env (to_erase : to_erase) bind_to_and_types =
       (* Fetch the type equation for each free variable. Also add in the
          equations about the "bind-to" names provided to this function. If any
          of the "bind-to" names are already defined in [env], the type given in
-         [bind_to_and_types] takes precedence over such definition. All
-         occurrences of variables that only occur once are expanded directly.
-         All occurrences of variables that are only reachable through closure
-         variables are replaced with an Unknown type. *)
+         [bind_to_and_types] takes precedence over such definition.
+
+         Variables reachable only through value slots and variables with a
+         single occurrence (that is reachable without going through value slots)
+         are projected out and replaced with a non-projected alias, unless they
+         are canonical. In that case:
+
+         - Variables reachable only through value slots are removed and replaced
+         with an Unknown type.
+
+         - Variables with a single occurrences (that is reachable without going
+         through value slots) are expanded to their concrete (non-alias) type.
+
+         Note that we can't have aliases between variables in these categories
+         (a variable reachable only through value slots cannot have an alias
+         with a single occurrence that is not from value slots, and a variable
+         with a single occurrence not from value slots cannot have an alias
+         reachable only from value slots), so the recursive calls to [expand]
+         below cannot accidentally move a variable from one category to the
+         other. *)
       let to_expand = Variable.Set.of_list unavailable_vars_expanded in
       let to_remove = Variable.Set.of_list unavailable_vars_removed in
       let to_project = Variable.Set.union to_expand to_remove in
       let expand_type ty =
         let rec expand var =
           let ty = TE.find env (Name.var var) None in
-          if Variable.Set.mem var to_remove
-          then MTC.unknown_like ty
-          else
-            match TG.get_alias_exn ty with
-            | exception Not_found ->
-              TG.project_variables_out ~to_project ~expand ty
-            | simple ->
-              Simple.pattern_match' simple
-                ~const:(fun _ -> ty)
-                ~symbol:(fun _ ~coercion:_ -> ty)
-                ~var:(fun var ~coercion ->
-                  if Variable.Set.mem var to_expand
-                  then TG.apply_coercion (expand var) coercion
-                  else ty)
+          match TG.get_alias_exn ty with
+          | exception Not_found ->
+            if Variable.Set.mem var to_remove
+            then MTC.unknown_like ty
+            else TG.project_variables_out ~to_project ~expand ty
+          | simple ->
+            Simple.pattern_match' simple
+              ~const:(fun _ -> ty)
+              ~symbol:(fun _ ~coercion:_ -> ty)
+              ~var:(fun var ~coercion ->
+                if Variable.Set.mem var to_project
+                then TG.apply_coercion (expand var) coercion
+                else ty)
         in
         TG.project_variables_out ~to_project ~expand ty
       in
@@ -1010,7 +1025,9 @@ and is_useful_block ~non_consts env ~blocks =
     | Known row_like_for_blocks ->
       TG.Row_like_for_blocks.is_bottom row_like_for_blocks
       || Tag.Scannable.Map.exists
-           (fun tag (_block_shape, field_kinds) ->
+           (fun tag
+                (shape_and_fields :
+                  K.With_subkind.Non_null_value_subkind.constructor_shape) ->
              let tag = Tag.Scannable.to_tag tag in
              let[@local] process_case
                  (row_like_block_case : TG.row_like_block_case) =
@@ -1018,16 +1035,19 @@ and is_useful_block ~non_consts env ~blocks =
                   to return [true]; we should be able to prove [Bottom] during
                   inlining. *)
                let types = row_like_block_case.maps_to in
-               try
-                 List.iteri
-                   (fun ix field_kind ->
-                     if
-                       ix >= Array.length types
-                       || is_useful field_kind env types.(ix)
-                     then raise_notrace Maybe_useful)
-                   field_kinds;
-                 false
-               with Maybe_useful -> true
+               match shape_and_fields with
+               | Undetermined -> true
+               | Determined (_block_shape, field_kinds) -> (
+                 try
+                   List.iteri
+                     (fun ix field_kind ->
+                       if
+                         ix >= Array.length types
+                         || is_useful field_kind env types.(ix)
+                       then raise_notrace Maybe_useful)
+                     field_kinds;
+                   false
+                 with Maybe_useful -> true)
              in
              match Tag.Map.find tag row_like_for_blocks.known_tags with
              | Unknown -> false

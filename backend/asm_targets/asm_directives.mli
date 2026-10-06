@@ -398,6 +398,10 @@ module Directive : sig
       lookup_variable:(string -> int64 option) ->
       t ->
       int64 option
+
+    (** Print a constant expression in a form independent of the assembler in
+        use. For error messages, not for assembly output. *)
+    val print_debug : Format.formatter -> t -> unit
   end
 
   module Constant_with_width : sig

@@ -101,7 +101,8 @@ module Sort : sig
       possibly under [Addressable] wrappers *)
   val is_scannable_or_var : t -> bool
 
-  val crosses_externality : t -> bool
+  val implied_externality :
+    separability:Jkind_axis.Separability.t -> t -> Jkind_axis.Externality.t
 
   (** Decompose a sort into a list (of the given length) of fresh sort
       variables, equating the input sort with the product of the output sorts.
@@ -172,11 +173,6 @@ module Layout : sig
       | Product of t list
       | Univar of Sort.univar
       | Genvar of Sort.var
-          (** A layout variable bound by a surrounding [val_lpoly]. It's a
-              "fake" constant that will be instantiated to real layout constant
-              by slambda. The [var] is used only for physical identity; its
-              contents are not consumed and its level must be
-              [Ident.highest_scope]. *)
       | Addressable of t
           (** See Note [Addressable kinds].
 
@@ -203,7 +199,7 @@ module Layout : sig
 
     val is_scannable_or_any : t -> bool
 
-    val crosses_externality : t -> bool
+    val implied_externality : t -> Jkind_axis.Externality.t
 
     val is_surely_addressable : t -> bool
 

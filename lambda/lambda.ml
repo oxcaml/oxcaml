@@ -221,7 +221,7 @@ type primitive =
   | Psetufloatfield of int * initialization_or_assignment
   | Psetmixedfield of int list * mixed_block_shape
       * initialization_or_assignment
-  | Pduprecord of Types.record_representation * int
+  | Pduprecord of record_representation * int
   (* Unboxed products *)
   | Pmake_unboxed_product of layout list
   | Punboxed_product_field of int * layout list
@@ -588,9 +588,30 @@ and mixed_block_shape = unit mixed_block_element array
 and mixed_block_shape_with_locality_mode
   = locality_mode mixed_block_element array
 
-and constructor_shape =
-  | Constructor_uniform of value_kind list
+and record_representation =
+  | Record_unboxed
+  | Record_inlined of
+      Types.tag * constructor_representation * variant_representation
+  | Record_boxed
+  | Record_float
+  | Record_ufloat
+  | Record_mixed of mixed_block_shape
+
+and constructor_representation =
+  | Constructor_uniform_value
   | Constructor_mixed of mixed_block_shape
+  | Constructor_immediate_all_void
+
+and variant_representation =
+  | Variant_unboxed
+  | Variant_boxed
+  | Variant_extensible
+  | Variant_with_null
+
+and constructor_shape =
+  | Constructor_shape_uniform of value_kind list
+  | Constructor_shape_mixed of mixed_block_shape
+  | Constructor_shape_undetermined
 
 and array_kind =
     Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
@@ -770,9 +791,9 @@ and equal_value_kind x y =
 
 and equal_mixed_block_element :
   type p.
-    (p -> p -> bool) -> p mixed_block_element -> p mixed_block_element
-    -> bool =
-  fun eq_param m1 m2 ->
+    (p -> p -> bool) -> equal_value_kind:(value_kind -> value_kind -> bool)
+    -> p mixed_block_element -> p mixed_block_element -> bool =
+  fun eq_param ~equal_value_kind m1 m2 ->
   match m1, m2 with
   | Value v1, Value v2 -> equal_value_kind v1 v2
   | Float_boxed param1, Float_boxed param2 -> eq_param param1 param2
@@ -789,8 +810,8 @@ and equal_mixed_block_element :
   | Word, Word
   | Untagged_immediate, Untagged_immediate -> true
   | Product es1, Product es2 ->
-    Misc.Stdlib.Array.equal (equal_mixed_block_element eq_param)
-      es1 es2
+    Misc.Stdlib.Array.equal
+      (equal_mixed_block_element eq_param ~equal_value_kind) es1 es2
   | Splice_variable id1, Splice_variable id2 -> Slambdaident.equal id1 id2
   | (Value _ | Float_boxed _ | Float64 | Float32
      | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
@@ -798,16 +819,57 @@ and equal_mixed_block_element :
      | Splice_variable _), _ -> false
 
 and equal_mixed_block_shape shape1 shape2 =
-  Misc.Stdlib.Array.equal (equal_mixed_block_element Unit.equal) shape1 shape2
+  Misc.Stdlib.Array.equal
+    (equal_mixed_block_element Unit.equal ~equal_value_kind) shape1 shape2
 
 and equal_constructor_shape x y =
   match x, y with
-  | Constructor_uniform fields1, Constructor_uniform fields2 ->
+  | Constructor_shape_uniform fields1, Constructor_shape_uniform fields2 ->
       List.length fields1 = List.length fields2
       && List.for_all2 equal_value_kind fields1 fields2
-  | Constructor_mixed shape1, Constructor_mixed shape2 ->
+  | Constructor_shape_mixed shape1, Constructor_shape_mixed shape2 ->
       equal_mixed_block_shape shape1 shape2
-  | (Constructor_uniform _ | Constructor_mixed _), _ -> false
+  | Constructor_shape_undetermined, Constructor_shape_undetermined -> true
+  | (Constructor_shape_uniform _ | Constructor_shape_mixed _
+    | Constructor_shape_undetermined), _ -> false
+
+let equal_mixed_block_shape_up_to_value_kinds shape1 shape2 =
+  Misc.Stdlib.Array.equal
+    (equal_mixed_block_element Unit.equal ~equal_value_kind:(fun _ _ -> true))
+    shape1 shape2
+
+let equal_constructor_representation_up_to_value_kinds r1 r2 =
+  match r1, r2 with
+  | Constructor_uniform_value, Constructor_uniform_value -> true
+  | Constructor_mixed shape1, Constructor_mixed shape2 ->
+      equal_mixed_block_shape_up_to_value_kinds shape1 shape2
+  | Constructor_immediate_all_void, Constructor_immediate_all_void -> true
+  | (Constructor_uniform_value | Constructor_mixed _
+    | Constructor_immediate_all_void), _ -> false
+
+let equal_variant_representation r1 r2 =
+  match r1, r2 with
+  | Variant_unboxed, Variant_unboxed
+  | Variant_boxed, Variant_boxed
+  | Variant_extensible, Variant_extensible
+  | Variant_with_null, Variant_with_null -> true
+  | (Variant_unboxed | Variant_boxed | Variant_extensible | Variant_with_null),
+    _ -> false
+
+let equal_record_representation_up_to_value_kinds r1 r2 =
+  match r1, r2 with
+  | Record_unboxed, Record_unboxed
+  | Record_boxed, Record_boxed
+  | Record_float, Record_float
+  | Record_ufloat, Record_ufloat -> true
+  | Record_inlined (tag1, cr1, vr1), Record_inlined (tag2, cr2, vr2) ->
+      Types.equal_tag tag1 tag2
+      && equal_constructor_representation_up_to_value_kinds cr1 cr2
+      && equal_variant_representation vr1 vr2
+  | Record_mixed shape1, Record_mixed shape2 ->
+      equal_mixed_block_shape_up_to_value_kinds shape1 shape2
+  | (Record_unboxed | Record_inlined _ | Record_boxed | Record_float
+    | Record_ufloat | Record_mixed _), _ -> false
 
 let join_nullable x y =
   match x, y with
@@ -819,25 +881,26 @@ let rec join_value_kind_non_null x y =
   else
     match x, y with
     | Pvariant { consts = consts1; non_consts = non_consts1 },
-      Pvariant { consts = consts2; non_consts = non_consts2 } -> begin
-        match join_non_consts non_consts1 non_consts2 with
-        | Some non_consts ->
-            let consts = List.sort_uniq Int.compare (consts1 @ consts2) in
-            Pvariant { consts; non_consts }
-        | None -> Pgenval
-      end
+      Pvariant { consts = consts2; non_consts = non_consts2 } ->
+        let non_consts = join_non_consts non_consts1 non_consts2 in
+        let consts = List.sort_uniq Int.compare (consts1 @ consts2) in
+        Pvariant { consts; non_consts }
     | _, _ -> Pgenval
 
 and join_constructor_shape shape1 shape2 =
   match shape1, shape2 with
-  | Constructor_uniform fields1, Constructor_uniform fields2
+  | Constructor_shape_undetermined, _ | _, Constructor_shape_undetermined ->
+      Constructor_shape_undetermined
+  | Constructor_shape_uniform fields1, Constructor_shape_uniform fields2
     when List.length fields1 = List.length fields2 ->
-      Some (Constructor_uniform (List.map2 join_value_kind fields1 fields2))
-  | Constructor_mixed shape1, Constructor_mixed shape2 ->
-      Option.map
-        (fun shape -> Constructor_mixed shape)
-        (join_mixed_block_shape shape1 shape2)
-  | (Constructor_uniform _ | Constructor_mixed _), _ -> None
+      Constructor_shape_uniform (List.map2 join_value_kind fields1 fields2)
+  | Constructor_shape_mixed shape1, Constructor_shape_mixed shape2 -> begin
+      match join_mixed_block_shape shape1 shape2 with
+      | Some shape -> Constructor_shape_mixed shape
+      | None -> Constructor_shape_undetermined
+    end
+  | (Constructor_shape_uniform _ | Constructor_shape_mixed _), _ ->
+      Constructor_shape_undetermined
 
 and join_mixed_block_shape shape1 shape2 =
   if Array.length shape1 <> Array.length shape2 then None
@@ -876,17 +939,15 @@ and join_non_consts non_consts1 non_consts2 =
   let sorted = List.sort (fun (tag1, _) (tag2, _) -> Int.compare tag1 tag2) in
   let rec merge l1 l2 =
     match l1, l2 with
-    | [], l | l, [] -> Some l
+    | [], l | l, [] -> l
     | (tag1, shape1) :: rest1, (tag2, shape2) :: rest2 ->
         if tag1 < tag2 then
-          Option.map (fun l -> (tag1, shape1) :: l) (merge rest1 l2)
+          (tag1, shape1) :: merge rest1 l2
         else if tag2 < tag1 then
-          Option.map (fun l -> (tag2, shape2) :: l) (merge l1 rest2)
+          (tag2, shape2) :: merge l1 rest2
         else
-          match join_constructor_shape shape1 shape2 with
-          | Some shape ->
-              Option.map (fun l -> (tag1, shape) :: l) (merge rest1 rest2)
-          | None -> None
+          let shape = join_constructor_shape shape1 shape2 in
+          (tag1, shape) :: merge rest1 rest2
   in
   merge (sorted non_consts1) (sorted non_consts2)
 
@@ -1005,6 +1066,7 @@ type inlined_attribute =
   | Always_inlined (* [@inlined] or [@inlined always] *)
   | Never_inlined (* [@inlined never] *)
   | Hint_inlined (* [@inlined hint] *)
+  | Forward_inlined (* [@inlined forward] *)
   | Unroll of int (* [@unroll x] *)
   | Default_inlined (* no [@inlined] attribute *)
 
@@ -1027,14 +1089,20 @@ let equal_inlined_attribute (x : inlined_attribute) (y : inlined_attribute) =
   | Always_inlined, Always_inlined
   | Never_inlined, Never_inlined
   | Hint_inlined, Hint_inlined
+  | Forward_inlined, Forward_inlined
   | Default_inlined, Default_inlined
     ->
     true
   | Unroll u, Unroll v ->
     u = v
   | (Always_inlined | Never_inlined
-    | Hint_inlined | Unroll _ | Default_inlined), _ ->
+    | Hint_inlined | Forward_inlined | Unroll _ | Default_inlined), _ ->
     false
+
+let forward_inlined_attribute () =
+  if !Clflags.native_code && !Clflags.stubs_forward_inlining
+  then Forward_inlined
+  else Default_inlined
 
 type probe_desc = { name: string; enabled_at_init: bool; }
 type probe = probe_desc option
@@ -1208,6 +1276,8 @@ type lambda =
   | Lsplice of scoped_location * slambda
   | Lkindtemplate of lkindtemplate
   | Lkindinstantiate of lkindinstantiate
+  | Ltemplate of ltemplate
+  | Linstantiate of lambda_apply
 
 and slambda =
   | SLlayout of layout
@@ -1281,6 +1351,11 @@ and lkindinstantiate =
     kinst_loc: scoped_location;
   }
 
+and ltemplate =
+  { tmpl_func: lfunction;
+    tmpl_env: (lambda * layout) Ident.Map.t;
+  }
+
 and lambda_while =
   { wh_cond : lambda;
     wh_body : lambda;
@@ -1336,9 +1411,11 @@ let rec try_to_find_location lam =
   | Lprim (_, _, loc)
   | Lfunction { loc; _ }
   | Lkindtemplate { ktmpl_loc = loc; _ }
+  | Ltemplate { tmpl_func = { loc; _ }; _ }
   | Lletrec ({ def = { loc; _ }; _ } :: _, _)
   | Lapply { ap_loc = loc; _ }
   | Lkindinstantiate { kinst_loc = loc; _ }
+  | Linstantiate { ap_loc = loc; _ }
   | Lfor { for_loc = loc; _ }
   | Lswitch (_, _, loc, _)
   | Lstringswitch (_, _, _, loc, _)
@@ -1397,6 +1474,8 @@ let fatal_error_invalid_constructor lambda =
     | Lsplice _ -> "Lsplice"
     | Lkindtemplate _ -> "Lkindtemplate"
     | Lkindinstantiate _ -> "Lkindinstantiate"
+    | Ltemplate _ -> "Ltemplate"
+    | Linstantiate _ -> "Linstantiate"
   in
   Misc.fatal_errorf "Lambda constructor %s is not valid at this stage: %a"
     name Location.print_loc loc
@@ -1435,8 +1514,7 @@ type program =
 
 type arg_descr =
   { arg_param: Global_module.Parameter_name.t;
-    arg_block_idx: int;
-    main_repr: module_representation; }
+    arg_block_idx: int; }
 
 let const_int n = Const_base (Const_int n)
 
@@ -1600,14 +1678,14 @@ let layout_list =
        { consts = [0];
          non_consts =
            [0,
-            Constructor_uniform
+            Constructor_shape_uniform
               [generic_value;
                { generic_value with nullable = Non_nullable}]] })
 let layout_tuple_element = nullable_value Pgenval
 let layout_value_field = nullable_value Pgenval
-let layout_tmc_field = nullable_value Pgenval
 let layout_variant_arg = nullable_value Pgenval
-let layout_exception = non_null_value Pgenval
+let layout_extensible_variant_constructor = non_null_value Pgenval
+let layout_exception = layout_extensible_variant_constructor
 let layout_function = non_null_value Pgenval
 let layout_object = non_null_value Pgenval
 let layout_poly_variant = non_null_value Pgenval
@@ -1650,7 +1728,8 @@ let layout_tupled_vector v =
   in
   Pvalue
     { raw_kind =
-        Pvariant { consts = []; non_consts = [0, Constructor_mixed fields] };
+        Pvariant
+          { consts = []; non_consts = [0, Constructor_shape_mixed fields] };
       nullable = Non_nullable
     }
 
@@ -1761,6 +1840,10 @@ let make_key e =
     | Lkindinstantiate inst ->
         Lkindinstantiate { inst with kinst_func = tr_rec env inst.kinst_func;
                                      kinst_loc = Loc_unknown}
+    | Linstantiate inst ->
+        Linstantiate { inst with ap_func = tr_rec env inst.ap_func;
+                                 ap_args = tr_recs env inst.ap_args;
+                                 ap_loc = Loc_unknown}
     | Llet (Alias,_k,x,_x_duid,ex,e) -> (* Ignore aliases -> substitute *)
         let ex = tr_rec env ex in
         tr_rec (Ident.add x ex env) e
@@ -1805,7 +1888,7 @@ let make_key e =
     | Lifused (id,e) -> Lifused (id,tr_rec env e)
     | Lregion (e,layout) -> Lregion (tr_rec env e,layout)
     | Lexclave e -> Lexclave (tr_rec env e)
-    | Lletrec _|Lfunction _ | Lkindtemplate _
+    | Lletrec _|Lfunction _ | Lkindtemplate _ | Ltemplate _
     | Lfor _ | Lwhile _
 (* Beware: (PR#6412) the event argument to Levent
    may include cyclic structure of type Type.typexpr *)
@@ -1918,6 +2001,10 @@ let shallow_iter ~tail ~non_tail:f = function
       f body
   | Lkindinstantiate {kinst_func} ->
       f kinst_func
+  | Ltemplate {tmpl_func = {body}} ->
+      f body
+  | Linstantiate {ap_func = fn; ap_args = args} ->
+      f fn; List.iter f args
 
 let iter_head_constructor f l =
   shallow_iter ~tail:f ~non_tail:f l
@@ -2017,6 +2104,12 @@ let rec free_variables = function
         ktmpl_env Ident.Set.empty
   | Lkindinstantiate {kinst_func = fn} ->
       free_variables fn
+  | Ltemplate {tmpl_env} ->
+      Ident.Map.fold
+        (fun _ (lam, _) acc -> Ident.Set.union (free_variables lam) acc)
+        tmpl_env Ident.Set.empty
+  | Linstantiate {ap_func = fn; ap_args = args} ->
+      free_variables_list (free_variables fn) args
 
 and free_variables_list set exprs =
   List.fold_left (fun set expr -> Ident.Set.union (free_variables expr) set)
@@ -2054,8 +2147,9 @@ let pointerness_of_separability sep =
   if Jkind_axis.Separability.(le sep (upper_bound_if_is_always_gc_ignorable ()))
   then Immediate else Pointer
 
-let rec transl_mixed_block_element (elt : Types.mixed_block_element) =
-  match elt with
+let rec transl_mixed_product_element (element : Types.mixed_block_element)
+  : unit mixed_block_element
+  = match element with
   | Scannable { separability; _ } ->
     let raw_kind =
       value_kind_of_pointerness (pointerness_of_separability separability)
@@ -2069,34 +2163,37 @@ let rec transl_mixed_block_element (elt : Types.mixed_block_element) =
   | Bits32 -> Bits32
   | Bits64 -> Bits64
   | Vec128 -> Vec128
-  | Vec256 ->
-    if split_vectors
-    then Product [|Vec128; Vec128|]
-    else Vec256
+  | Vec256 when split_vectors -> Product [| Vec128; Vec128 |]
+  | Vec256 -> Vec256
   | Vec512 -> Vec512
   | Mask -> Mask
   | Word -> Word
   | Untagged_immediate -> Untagged_immediate
-  | Product shapes ->
-    Product (transl_mixed_product_shape shapes)
+  | Product shape -> Product (transl_mixed_product_shape shape)
   | Void -> Product [||]
   | Addressable elt ->
     (* CR box: Addressability should be preserved here once it affects boxed
        representations *)
-    transl_mixed_block_element elt
+    transl_mixed_product_element elt
 
 and transl_mixed_product_shape shape =
-  Array.map transl_mixed_block_element shape
+  Array.map transl_mixed_product_element shape
 
-let rec transl_mixed_block_element_for_read ~get_value_kind ~get_mode i
-    (elt : Types.mixed_block_element) =
+let mixed_block_shape_has_splices shape =
+  let rec has_splices : 'a mixed_block_element -> bool = function
+    | Splice_variable _ -> true
+    | Product shape -> Array.exists has_splices shape
+    | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16
+    | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word
+    | Untagged_immediate -> false
+  in
+  Array.exists has_splices shape
+
+let rec mixed_block_element_for_read ~get_value_kind ~get_mode i
+    (elt : unit mixed_block_element) =
   match elt with
-  | Scannable { separability; _ } ->
-    let raw_kind =
-      value_kind_of_pointerness (pointerness_of_separability separability)
-    in
-    Value { (get_value_kind i) with raw_kind }
-  | Float_boxed -> Float_boxed (get_mode i)
+  | Value { raw_kind; _ } -> Value { (get_value_kind i) with raw_kind }
+  | Float_boxed () -> Float_boxed (get_mode i)
   | Float64 -> Float64
   | Float32 -> Float32
   | Bits8 -> Bits8
@@ -2114,18 +2211,11 @@ let rec transl_mixed_block_element_for_read ~get_value_kind ~get_mode i
   | Untagged_immediate -> Untagged_immediate
   | Product shapes ->
     let get_value_kind _ = generic_value in
-    Product
-      (transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shapes)
-  | Void -> Product [||]
-  | Addressable elt ->
-    (* CR box: Addressability should be preserved here once it affects boxed
-       representations *)
-    transl_mixed_block_element_for_read ~get_value_kind ~get_mode i elt
+    Product (mixed_product_shape_for_read ~get_value_kind ~get_mode shapes)
+  | Splice_variable id -> Splice_variable id
 
-and transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
-  Array.mapi
-    (transl_mixed_block_element_for_read ~get_value_kind ~get_mode)
-    shape
+and mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
+  Array.mapi (mixed_block_element_for_read ~get_value_kind ~get_mode) shape
 
 let mod_field ?(read_semantics=Reads_agree) pos = function
   | Module_value_only _ ->
@@ -2156,9 +2246,10 @@ let transl_module_representation repr =
   if Array.for_all is_value shape
   then Module_value_only { field_count = Array.length shape }
   else
+    let shape = transl_mixed_product_shape shape in
     Module_mixed
-      ( transl_mixed_product_shape shape,
-        transl_mixed_product_shape_for_read
+      ( shape,
+        mixed_product_shape_for_read
         ~get_value_kind:(fun _ -> generic_value)
         ~get_mode:(fun _ ->
            fatal_error "Lambda.transl_module_representation: \
@@ -2168,7 +2259,7 @@ let transl_module_representation repr =
 
 let rec transl_address loc = function
   | Env.Aunit (cu, mode) ->
-    let staticity = Mode.Value.proj_monadic Staticity mode in
+    let staticity = Mode.With_regionality.proj_monadic Staticity mode in
     let staticity =
       match Mode.Staticity.zap_to_floor_exn staticity with
       | Static -> Static
@@ -2290,6 +2381,9 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
                       ap_args = subst_list s l ap.ap_args}
     | Lkindinstantiate inst ->
         Lkindinstantiate { inst with kinst_func = subst s l inst.kinst_func }
+    | Linstantiate inst ->
+        Linstantiate { inst with ap_func = subst s l inst.ap_func;
+                                ap_args = subst_list s l inst.ap_args }
     | Lfunction lf ->
         Lfunction (subst_lfun s l lf)
     | Lkindtemplate ({ktmpl_env} as ktmpl) ->
@@ -2299,6 +2393,14 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
               Ident.Map.map
                 (fun (lam, layout) -> (subst s l lam, layout))
                 ktmpl_env;
+          }
+    | Ltemplate {tmpl_func; tmpl_env} ->
+        Ltemplate
+          { tmpl_func;
+            tmpl_env =
+              Ident.Map.map
+                (fun (lam, layout) -> (subst s l lam, layout))
+                tmpl_env;
           }
     | Llet(str, k, id, duid, arg, body) ->
         let id, duid, l' = bind id duid l in
@@ -2360,7 +2462,10 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
                for printing in debugger. *)
             let vd = Env.find_value (Path.Pident id) old_env in
             let vd = {vd with val_modalities = Mode.Modality.undefined} in
-            let mode = Mode.Value.max |> Mode.Value.disallow_right in
+            let mode =
+               Mode.With_regionality.max
+               |> Mode.With_regionality.disallow_right
+             in
             (vd, mode)
           in
           let rebind id id' new_env =
@@ -2436,6 +2541,38 @@ let map_lfunction f ({ kind; params; return; body = old_body; attr; loc;
   else { kind; params; return; body = new_body; attr; loc; mode; ret_mode;
          yielding }
 
+let extract_free_var_env ~layout_of_ident lfun =
+  let fresh_vars, env =
+      Ident.Set.fold
+    (fun ident (fresh_vars, env) ->
+       match layout_of_ident ident with
+       | None -> fresh_vars, env
+       | Some layout ->
+         let fresh_ident = Ident.rename ident in
+         Ident.Map.add ident fresh_ident fresh_vars,
+         Ident.Map.add fresh_ident (Lvar ident, layout) env)
+    (free_variables (Lfunction lfun))
+    (Ident.Map.empty, Ident.Map.empty)
+  in
+  let lfun =
+    if Ident.Map.is_empty fresh_vars
+    then lfun
+    else map_lfunction (rename fresh_vars) lfun
+  in
+  lfun, env
+
+let map_env f old_env =
+  let env_changed = ref false in
+  let new_env =
+    Ident.Map.map
+      (fun (old_lam, layout) ->
+        let new_lam = f old_lam in
+        env_changed := !env_changed || old_lam != new_lam;
+        (new_lam, layout))
+      old_env
+  in
+  if not !env_changed then old_env else new_env
+
 let shallow_map ~tail ~non_tail:f lam =
   match lam with
   | Lvar _
@@ -2476,6 +2613,27 @@ let shallow_map ~tail ~non_tail:f lam =
           kinst_mode;
           kinst_loc;
         }
+  | Linstantiate { ap_func = old_func; ap_args = old_args; ap_result_layout;
+                   ap_region_close; ap_mode; ap_yielding; ap_loc; ap_tailcall;
+                   ap_inlined; ap_specialised; ap_probe } ->
+      let new_func = f old_func in
+      let new_args = Misc.Stdlib.List.map_sharing f old_args in
+      if old_func == new_func && old_args == new_args
+      then lam
+      else
+        Linstantiate {
+          ap_func = new_func;
+          ap_args = new_args;
+          ap_result_layout;
+          ap_region_close;
+          ap_mode;
+          ap_yielding;
+          ap_loc;
+          ap_tailcall;
+          ap_inlined;
+          ap_specialised;
+          ap_probe;
+        }
   | Lfunction old_lfun ->
       let new_lfun = map_lfunction f old_lfun in
       if old_lfun == new_lfun then lam else Lfunction new_lfun
@@ -2483,16 +2641,8 @@ let shallow_map ~tail ~non_tail:f lam =
                     ktmpl_env = old_env; ktmpl_env_mode;
                     ktmpl_loc } ->
       let new_body = map_lfunction f old_body in
-      let env_changed = ref false in
-      let new_env =
-        Ident.Map.map
-          (fun (old_lam, layout) ->
-            let new_lam = f old_lam in
-            env_changed := !env_changed || old_lam != new_lam;
-            (new_lam, layout))
-          old_env
-      in
-      if old_body == new_body && not !env_changed
+      let new_env = map_env f old_env in
+      if old_body == new_body && old_env == new_env
       then lam
       else
         Lkindtemplate {
@@ -2501,6 +2651,16 @@ let shallow_map ~tail ~non_tail:f lam =
           ktmpl_env = new_env;
           ktmpl_env_mode;
           ktmpl_loc;
+        }
+  | Ltemplate { tmpl_func = old_lfun; tmpl_env = old_env } ->
+      let new_lfun = map_lfunction f old_lfun in
+      let new_env = map_env f old_env in
+      if old_lfun == new_lfun && old_env == new_env
+      then lam
+      else
+        Ltemplate {
+          tmpl_func = new_lfun;
+          tmpl_env = new_env;
         }
   | Llet (str, layout, v, v_duid, old_e1, old_e2) ->
       let new_e1 = f old_e1 in
@@ -3254,8 +3414,7 @@ let rec layout_of_const_sort (c : Jkind.Sort.Const.t) : layout =
     layout_of_const_sort sort
   | Univar _ ->
     Misc.fatal_error "layout_of_const_sort: unexpected univar"
-  | Genvar _ ->
-    Misc.fatal_error "layout_of_const_sort: unexpected genvar"
+  | Genvar var -> Psplicevar (Slambdaident.of_sort_var var)
 
 let layout_of_extern_repr : extern_repr -> _ = function
   | Unboxed_vector v -> layout_boxed_vector v
@@ -3803,14 +3962,14 @@ let may_allocate_in_region lam =
   and loop = function
     | Lvar _ | Lmutvar _ | Lconst _ -> ()
 
-    | Lfunction {mode=Alloc_heap} | Lkindtemplate {ktmpl_env_mode=Alloc_heap} ->
-      ()
+    | Lfunction {mode=Alloc_heap} | Lkindtemplate {ktmpl_env_mode=Alloc_heap}
+    | Ltemplate {tmpl_func = {mode=Alloc_heap}} -> ()
     | Lfunction {mode=Alloc_local} | Lkindtemplate {ktmpl_env_mode=Alloc_local}
-      ->
-      raise Exit
+    | Ltemplate {tmpl_func = {mode=Alloc_local}} -> raise Exit
 
     | Lapply {ap_mode=Maybe_alloc_stack}
     | Lkindinstantiate {kinst_mode=Maybe_alloc_stack}
+    | Linstantiate {ap_mode=Maybe_alloc_stack}
     | Lsend (_,_,_,_,_,Maybe_alloc_stack,_,_,_) -> raise Exit
 
     | Lprim (prim, args, _) ->
@@ -3830,10 +3989,10 @@ let may_allocate_in_region lam =
     | Lwhile {wh_cond; wh_body} -> loop wh_cond; loop wh_body
     | Lsplice _ -> fatal_error_invalid_constructor lam
     | Lfor {for_from; for_to; for_body} -> loop for_from; loop for_to; loop for_body
-    | ( Lapply _  | Lkindinstantiate _ | Llet _ | Lmutlet _ | Lletrec _
-      | Lswitch _ | Lstringswitch _ | Lstaticraise _ | Lstaticcatch _
-      | Ltrywith _ | Lifthenelse _ | Lsequence _ | Lassign _ | Lsend _
-      | Levent _ | Lifused _) as lam ->
+    | ( Lapply _  | Lkindinstantiate _ | Linstantiate _ | Llet _ | Lmutlet _
+      | Lletrec _ | Lswitch _ | Lstringswitch _ | Lstaticraise _
+      | Lstaticcatch _ | Ltrywith _ | Lifthenelse _ | Lsequence _ | Lassign _
+      | Lsend _ | Levent _ | Lifused _) as lam ->
        iter_head_constructor loop lam
   in
   if not Config.stack_allocation then false

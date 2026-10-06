@@ -64,6 +64,7 @@ let code_ranges_attributes ~code_layout
               Dwarf_4_range_list_entry.create_range_list_entry
                 ~start_of_code_symbol:range.function_symbol
                 ~first_address_when_in_scope:range.start_label
+                ~first_address_when_in_scope_offset:None
                 ~first_address_when_not_in_scope:range.end_label
                 ~first_address_when_not_in_scope_offset:
                   range.offset_past_end_label ])

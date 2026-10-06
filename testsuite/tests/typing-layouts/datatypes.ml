@@ -423,3 +423,17 @@ let zero x = { (id x) with l = #0L } [@@warning "-23"]
 [%%expect {|
 val zero : ('a : bits64). 'a r -> int64_u r = <fun>
 |}]
+
+(*******************************************************)
+(* Test 12: [@@unboxed] with an [any]-kinded field.    *)
+
+type ru = { x : t_any } [@@unboxed]
+type ('a : any) ru' = { x : 'a } [@@unboxed]
+type vu = VU of t_any [@@unboxed]
+type ('a : any) vu' = VU of 'a [@@unboxed]
+[%%expect{|
+type ru = { x : t_any; } [@@unboxed]
+type ('a : any) ru' = { x : 'a; } [@@unboxed]
+type vu = VU of t_any [@@unboxed]
+type ('a : any) vu' = VU of 'a [@@unboxed]
+|}]

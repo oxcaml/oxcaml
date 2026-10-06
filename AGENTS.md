@@ -4,7 +4,7 @@ This file provides guidance to AI agents when working with code in this reposito
 
 # OxCaml Compiler Development Guide
 
-Do not stage or commit your changes unless prompted to.
+Do not push your changes unless prompted to.
 Always check that your changes build with both (after configuration, see below):
 1. `make -s boot-compiler` - Quick build check
 2. `make -s test` - Full test suite (required before declaring success)

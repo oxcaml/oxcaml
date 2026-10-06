@@ -43,6 +43,13 @@
 
 open Lambda
 
+type error = | Recursive_template
+
+exception Error of (Location.t * error)
+
+let raise_error ~loc error =
+  raise (Error (Debuginfo.Scoped_location.to_location loc, error))
+
 (** Allocation and backpatching primitives *)
 
 let alloc_prim =
@@ -224,8 +231,8 @@ let compute_static_size lam =
           env bindings
       in
       compute_expression_size env body
-    | Lprim (p, args, _) ->
-      size_of_primitive env p args
+    | Lprim (p, args, loc) ->
+      size_of_primitive env loc p args
     | Lswitch (_, sw, _, _) ->
       let fail_case =
         match sw.sw_failaction with
@@ -269,7 +276,9 @@ let compute_static_size lam =
       fatal_error_invalid_constructor lam
     | Lkindtemplate _ ->
       Misc.fatal_error "letrec: poly_ not supported"
-    | Lkindinstantiate _ -> dynamic_size lam
+    | Ltemplate tmpl ->
+      raise_error ~loc:tmpl.tmpl_func.loc Recursive_template
+    | Lkindinstantiate _ | Linstantiate  _ -> dynamic_size lam
   and compute_and_join_sizes env branches =
     List.fold_left (fun size branch ->
         join_sizes branch size (compute_expression_size env branch))
@@ -290,11 +299,23 @@ let compute_static_size lam =
       Mixed_product_bytes.value_prefix_len
         (Mixed_product_bytes.count (Product shape))
     else Array.length shape
-  and all_value_mixed_block_size_types shape =
-    all_value_mixed_block_size (Lambda.transl_mixed_product_shape shape)
   and uniform_block_size ~tag size =
     if size = 0 then Empty_block { tag } else Regular_block size
-  and size_of_primitive env p args =
+  and size_of_primitive env loc p args =
+    let check_shape shape =
+      if Lambda.mixed_block_shape_has_splices shape then
+        Location.raise_errorf ~loc:(Debuginfo.Scoped_location.to_location loc)
+          "Recursive definitions of layout-polymorphic blocks are not \
+           currently supported."
+    in
+    begin match p with
+    | Pmakeblock (_, _, Shape shape, _)
+    | Pduprecord
+        ((Record_mixed shape
+         | Record_inlined (_, Constructor_mixed shape, _)), _) ->
+      check_shape shape
+    | _ -> ()
+    end;
     match p with
     | Pignore
     | Psetfield _
@@ -344,7 +365,7 @@ let compute_static_size lam =
     | Pduprecord (repres, size) ->
         begin match repres with
         | Record_boxed
-        | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
+        | Record_inlined (_, Constructor_uniform_value, Variant_boxed) ->
             Block (Regular_block size)
         | Record_inlined (_, Constructor_uniform_value, Variant_extensible) ->
             (* Extensible variants require an extra machine word
@@ -355,37 +376,27 @@ let compute_static_size lam =
         | Record_inlined
               (Ordinary { runtime_tag; _ },
                Constructor_mixed shape,
-               Variant_boxed _)
-              when Mixed_product_bytes.types_shape_is_all_value shape ->
-            let size = all_value_mixed_block_size_types shape in
+               Variant_boxed)
+              when Mixed_product_bytes.shape_is_all_value shape ->
+            let size = all_value_mixed_block_size shape in
             Block (uniform_block_size ~tag:runtime_tag size)
         | Record_inlined (_, Constructor_mixed shape,
-                          (Variant_boxed _ | Variant_extensible))
+                          (Variant_boxed | Variant_extensible))
         | Record_mixed shape ->
-            if Mixed_product_bytes.types_shape_is_all_value shape
+            if Mixed_product_bytes.shape_is_all_value shape
             then
               Block (Regular_block
-                (all_value_mixed_block_size_types shape))
+                (all_value_mixed_block_size shape))
             else
-              let size =
-                compute_mixed_block_size
-                  (Lambda.transl_mixed_product_shape shape)
+              let size = compute_mixed_block_size shape
               in
               Block (Mixed_block size)
         | Record_unboxed | Record_ufloat
         | Record_inlined (_, _, (Variant_unboxed | Variant_with_null)) ->
             Misc.fatal_error "size_of_primitive"
-        | Record_dummy _ ->
-            Misc.fatal_error
-              "size_of_primitive: unexpected dummy representation"
         | Record_inlined (_, Constructor_immediate_all_void, _) ->
             Misc.fatal_error
               "size_of_primitive: unexpected immediate representation"
-        | Record_undetermined | Record_variable _
-        | Record_inlined (_, (Constructor_undetermined
-                             | Constructor_variable _), _) ->
-            Misc.fatal_error
-              "size_of_primitive: unexpected variable representation"
         end
     | Pmakeblock (tag, _, shape, _) ->
         (* The block shape is unfortunately an option, so we rely on the
@@ -692,7 +703,7 @@ let rec split_static_function lfun block_var local_idents lam :
         ap_args = List.map (fun p -> Lvar (p.name)) params;
         ap_loc = no_loc;
         ap_tailcall = Default_tailcall;
-        ap_inlined = Default_inlined;
+        ap_inlined = forward_inlined_attribute ();
         ap_specialised = Default_specialise;
         ap_result_layout = lfun.return;
         ap_region_close = Rc_normal;
@@ -884,7 +895,9 @@ let rec split_static_function lfun block_var local_idents lam :
   | Lifused _
   | Lexclave _
   | Lkindtemplate _
-  | Lkindinstantiate _ ->
+  | Lkindinstantiate _
+  | Ltemplate _
+  | Linstantiate _ ->
     Misc.fatal_errorf
       "letrec binding is not a static function:@ lfun=%a@ lam=%a"
       Printlambda.lfunction lfun
@@ -1182,3 +1195,18 @@ let compile_letrec input_bindings body =
       body_with_dynamic_values all_bindings_rev.static
   in
   body_with_pre_allocations
+
+open Format_doc
+
+let report_error ppf = function
+  | Recursive_template ->
+    fprintf ppf "Recursive static functors are not supported"
+
+let () =
+  Location.register_error_of_exn
+    (function
+      | Error (loc, err) ->
+          Some (Location.error_of_printer ~loc report_error err)
+      | _ ->
+          None
+    )

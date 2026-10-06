@@ -53,11 +53,40 @@ type apply_dep =
     apply_call_witness : Code_id_or_name.t
   }
 
+(** The function applications seen during traversal: for each callee, the size
+    of the largest (complex) arguments. *)
+module Applications : sig
+  (* CR-someday ncourant: the arguments and return relations are *not* separated
+     by kind, unlike block fields, which means that they can introduce aliases
+     between variables of different kinds... We might want to change that; it
+     would require changing the type here as well to retain, for each possible
+     position, the possible kinds. *)
+  type bounds =
+    { (* The maximum number of arguments in a known-arity call, if any. *)
+      known : int option;
+      (* For each complex argument, the maximum number of unarized variables in
+         an unknown-arity call. *)
+      unknown : int list option
+    }
+
+  type t = bounds Code_id_or_name.Map.t
+
+  val empty : t
+
+  val union : t -> t -> t
+end
+
 (** The type of traversal accumulators. *)
 type t
 
 (** Create a fresh, empty accumulator. *)
 val create : unit -> t
+
+(** Record an application, so that the queries that will be needed for
+    rebuilding can be precomputed. *)
+val record_apply_for_rebuild : t -> Flambda.Apply.t -> unit
+
+val applications : t -> Applications.t
 
 (** Mark a continuation as having fixed arity (mostly function return
     continuations): the rebuild pass may not change its number of parameters. *)
@@ -242,3 +271,11 @@ val add_set_of_closures :
 
 val get_all_sets_of_closures :
   t -> (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list
+
+(** Record the function declaration a closure is bound to. *)
+val add_closure_function_decl :
+  t -> Name.t -> Function_declarations.code_id_in_function_declaration -> unit
+
+val get_closure_function_decls :
+  t ->
+  Function_declarations.code_id_in_function_declaration Code_id_or_name.Map.t

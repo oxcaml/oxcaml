@@ -39,6 +39,7 @@ module Extension = struct
       | AVX512CD
       | AVX512BW
       | AVX512VL
+      | AES
 
     let rank = function
       | POPCNT -> 0
@@ -61,6 +62,7 @@ module Extension = struct
       | AVX512CD -> 17
       | AVX512BW -> 18
       | AVX512VL -> 19
+      | AES -> 20
 
     let compare left right = Int.compare (rank left) (rank right)
   end
@@ -78,6 +80,7 @@ module Extension = struct
     | SSE4_1 -> "SSE41"
     | SSE4_2 -> "SSE42"
     | CLMUL -> "CLMUL"
+    | AES -> "AES"
     | BMI -> "BMI"
     | BMI2 -> "BMI2"
     | AVX -> "AVX"
@@ -99,7 +102,7 @@ module Extension = struct
     | SSSE3 -> "Core+"
     | SSE4_1 -> "Penryn+"
     | SSE4_2 -> "Nehalem+"
-    | CLMUL -> "Westmere+"
+    | CLMUL | AES -> "Westmere+"
     | BMI -> "Haswell+"
     | BMI2 -> "Haswell+"
     | AVX -> "Sandybridge+"
@@ -119,6 +122,7 @@ module Extension = struct
     | POPCNT -> Config.has_popcnt
     | LZCNT -> Config.has_lzcnt
     | CLMUL -> Config.has_pclmul
+    | AES -> Config.has_aes
     | SSE3 -> Config.has_sse3
     | SSSE3 -> Config.has_ssse3
     | SSE4_1 -> Config.has_sse4_1
@@ -137,7 +141,7 @@ module Extension = struct
     Set.of_list
       [ POPCNT; LZCNT; PREFETCHW; PREFETCHWT1; SSE3; SSSE3; SSE4_1; SSE4_2;
         CLMUL; BMI; BMI2; AVX; AVX2; F16C; FMA; AVX512F; AVX512DQ; AVX512CD;
-        AVX512BW; AVX512VL ]
+        AVX512BW; AVX512VL; AES ]
 
   let directly_implied_by e1 e2 =
     match e1, e2 with
@@ -159,7 +163,7 @@ module Extension = struct
     | BMI, BMI2 -> true
     | (POPCNT | LZCNT | PREFETCHW | PREFETCHWT1 | SSE3 | SSSE3 | SSE4_1 |
        SSE4_2 | CLMUL | BMI | BMI2 | AVX | AVX2 | F16C | FMA | AVX512F |
-       AVX512DQ | AVX512CD | AVX512BW | AVX512VL), _
+       AVX512DQ | AVX512CD | AVX512BW | AVX512VL | AES), _
        -> false
 
   let rec fix set less =
@@ -214,6 +218,7 @@ module Extension = struct
       | POPCNT -> enabled POPCNT
       | LZCNT -> enabled LZCNT
       | PCLMULQDQ -> enabled CLMUL
+      | AES -> enabled AES
       | BMI -> enabled BMI
       | BMI2 -> enabled BMI2
       | AVX -> enabled AVX

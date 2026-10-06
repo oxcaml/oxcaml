@@ -729,7 +729,6 @@ module Dwarf_helpers = struct
       let code_layout : Dwarf_state.code_layout =
         if
           !Clflags.function_sections
-          || !Oxcaml_flags.basic_block_sections
           || !Oxcaml_flags.module_entry_functions_section
         then
           (* Use Function_sections mode - ranges will be recorded via

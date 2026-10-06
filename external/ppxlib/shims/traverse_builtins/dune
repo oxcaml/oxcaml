@@ -1,0 +1,5 @@
+(library
+ (name ppxlib_traverse_builtins_shim)
+ (wrapped false)
+ (public_name ppxlib.traverse_builtins)
+ (libraries (re_export ppxlib_ast.traverse_builtins)))

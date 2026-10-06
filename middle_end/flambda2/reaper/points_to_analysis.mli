@@ -60,7 +60,19 @@ module Relations : sig
 
   val escaping_field : Field.t term -> Code_id_or_name.t term -> _ atom
 
+  val has_usage_tbl :
+    ( unit Code_id_or_name.Map.t,
+      Code_id_or_name.t -> Datalog.nil,
+      unit )
+    Datalog.table
+
   val has_usage : Code_id_or_name.t term -> _ atom
+
+  val has_source_tbl :
+    ( unit Code_id_or_name.Map.t,
+      Code_id_or_name.t -> Datalog.nil,
+      unit )
+    Datalog.table
 
   val has_source : Code_id_or_name.t term -> _ atom
 
@@ -122,12 +134,26 @@ val get_fields_usage_of_constructors :
   unit Code_id_or_name.Map.t ->
   unit Code_id_or_name.Map.t Or_unknown.t Field.Map.t
 
-type set_of_closures_def =
+type 'a set_of_closures_def =
   | Not_a_set_of_closures
-  | Set_of_closures of (Function_slot.t * Code_id_or_name.t) list
+  | Set_of_closures of 'a
 
 val get_set_of_closures_def :
-  Datalog.database -> Code_id_or_name.t -> set_of_closures_def
+  Datalog.database ->
+  Code_id_or_name.t ->
+  (Function_slot.t * Code_id_or_name.t) list set_of_closures_def
+
+type function_and_value_slots =
+  { function_slots : (Function_slot.t * Code_id_or_name.t) list;
+    value_slots : (Value_slot.t * Code_id_or_name.t) list
+  }
+
+val get_set_of_closures_def_with_value_slots :
+  Datalog.database ->
+  Code_id_or_name.t ->
+  function_and_value_slots set_of_closures_def
+
+val all_closure_names : Datalog.database -> Code_id_or_name.Set.t
 
 val any_usage : Datalog.database -> Code_id_or_name.t -> bool
 
@@ -146,13 +172,10 @@ val code_id_actually_directly_called :
   Datalog.database -> Name.t -> Code_id.Set.t Or_unknown.t
 
 val arguments_used_by_known_arity_call :
-  Datalog.database -> Code_id_or_name.t -> 'a list -> ('a * keep_or_delete) list
+  Datalog.database -> Code_id_or_name.t -> int -> keep_or_delete list
 
 val arguments_used_by_unknown_arity_call :
-  Datalog.database ->
-  Code_id_or_name.t ->
-  'a list list ->
-  ('a * keep_or_delete) list list
+  Datalog.database -> Code_id_or_name.t -> int list -> keep_or_delete list list
 
 type single_field_source =
   | No_source

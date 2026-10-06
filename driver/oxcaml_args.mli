@@ -31,6 +31,7 @@ module type Oxcaml_options = sig
   val ddwarf_metrics : unit -> unit
   val ddwarf_metrics_output_file : string -> unit
   val dcfg : unit -> unit
+  val dssa : unit -> unit
   val dcfg_invariants : unit -> unit
   val regalloc : Clflags.Register_allocator.t -> unit
   val regalloc_linscan_threshold : int -> unit
@@ -55,6 +56,12 @@ module type Oxcaml_options = sig
   val cfg_stack_checks_threshold : int -> unit
   val cfg_eliminate_dead_trap_handlers : unit -> unit
   val no_cfg_eliminate_dead_trap_handlers : unit -> unit
+  val cfg_eliminate_dead_code_validate : unit -> unit
+  val no_cfg_eliminate_dead_code_validate : unit -> unit
+  val cfg_dominators_validate : unit -> unit
+  val no_cfg_dominators_validate : unit -> unit
+  val cfg_liveness_validate : unit -> unit
+  val no_cfg_liveness_validate : unit -> unit
   val cfg_prologue_validate : unit -> unit
   val no_cfg_prologue_validate : unit -> unit
   val cfg_prologue_shrink_wrap : unit -> unit
@@ -74,7 +81,6 @@ module type Oxcaml_options = sig
   val no_cfg_value_propagation_flow : unit -> unit
   val experimental_optimizations : unit -> unit
   val reorder_blocks_random : int -> unit
-  val basic_block_sections : unit -> unit
   val module_entry_functions_section : unit -> unit
   val dasm_comments : unit -> unit
   val dno_asm_comments : unit -> unit
@@ -100,6 +106,12 @@ module type Oxcaml_options = sig
   val long_frames_threshold : int -> unit
   val dbranch_relaxation_max_displacement : int -> unit
   val caml_apply_inline_fast_path : unit -> unit
+  val use_ssa : unit -> unit
+  val no_use_ssa : unit -> unit
+  val ssa_simplify : unit -> unit
+  val no_ssa_simplify : unit -> unit
+  val ssa_validate : unit -> unit
+  val no_ssa_validate : unit -> unit
   val internal_assembler : unit -> unit
   val verify_binary_emitter : unit -> unit
   val dissector : unit -> unit
@@ -151,6 +163,8 @@ module type Oxcaml_options = sig
   val no_flambda2_match_in_match : unit -> unit
   val simplify_stubs : unit -> unit
   val no_simplify_stubs : unit -> unit
+  val stubs_forward_inlining : unit -> unit
+  val no_stubs_forward_inlining : unit -> unit
   val flambda2_expert_fallback_inlining_heuristic : unit -> unit
   val no_flambda2_expert_fallback_inlining_heuristic : unit -> unit
   val flambda2_expert_inline_effects_in_cmm : unit -> unit

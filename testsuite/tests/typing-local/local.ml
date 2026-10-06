@@ -1987,18 +1987,32 @@ Line 2, characters 2-32:
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Signature mismatch:
        Modules do not match:
-         sig val add : int32 @ local -> int32 @ local -> int32 @ local end
+         sig
+           val add :
+             int32 @ local forkable unyielding ->
+             int32 @ local forkable unyielding -> int32 @ local forkable
+             unyielding
+         end
        is not included in
          sig val add : int32 @ local -> int32 @ local -> int32 end
        Values do not match:
-         val add : int32 @ local -> int32 @ local -> int32 @ local
+         val add :
+           int32 @ local forkable unyielding ->
+           int32 @ local forkable unyielding -> int32 @ local forkable
+           unyielding
        is not included in
          val add : int32 @ local -> int32 @ local -> int32
-       The type "int32 @ local -> int32 @ local -> int32 @ local"
+       The type
+         "int32 @ local forkable unyielding ->
+         int32 @ local forkable unyielding -> int32 @ local forkable
+         unyielding"
        is not compatible with the type
          "int32 @ local -> int32 @ local -> int32"
-       Type "int32 @ local -> int32 @ local" is not compatible with type
-         "int32 @ local -> int32"
+       Type
+         "int32 @ local forkable unyielding -> int32 @ local forkable
+         unyielding"
+       is not compatible with type "int32 @ local -> int32"
+       The return mode was expected to be "global" but is "local"
 |}]
 module Opt32 : sig external add : (int32[@local_opt]) -> (int32[@local_opt]) -> (int32[@local_opt]) = "%int32_add" end = Int32
 module Bad32_2 : sig val add : local_ int32 -> local_ int32 -> int32 end =
@@ -2028,11 +2042,17 @@ Error: Signature mismatch:
            (int32 [@local_opt]) -> (int32 [@local_opt]) = "%int32_add"
        is not included in
          val add : int32 @ local -> int32 @ local -> int32
-       The type "int32 @ local -> int32 @ local -> int32 @ local"
+       The type
+         "int32 @ local forkable unyielding ->
+         int32 @ local forkable unyielding -> int32 @ local forkable
+         unyielding"
        is not compatible with the type
          "int32 @ local -> int32 @ local -> int32"
-       Type "int32 @ local -> int32 @ local" is not compatible with type
-         "int32 @ local -> int32"
+       Type
+         "int32 @ local forkable unyielding -> int32 @ local forkable
+         unyielding"
+       is not compatible with type "int32 @ local -> int32"
+       The return mode was expected to be "global" but is "local"
 |}]
 
 module Contravariant_instantiation : sig
@@ -2355,6 +2375,8 @@ Error: Signature mismatch:
          val foo : float @ local -> string
        The type "float -> string" is not compatible with the type
          "float @ local -> string"
+       The argument mode was expected to be "global"
+       because it crosses with something but is "local"
 |}]
 
 module F (X : sig val foo : float -> local_ string end) : sig
@@ -2375,6 +2397,7 @@ Error: Signature mismatch:
          val foo : float -> string
        The type "float -> string @ local" is not compatible with the type
          "float -> string"
+       The return mode was expected to be "global" but is "local"
 |}]
 
 module F (X : sig val foo : local_ float -> float -> string end) : sig
@@ -2395,6 +2418,8 @@ Error: Signature mismatch:
          val foo : float -> float -> string
        The type "float @ local -> float -> string"
        is not compatible with the type "float -> float -> string"
+       The return mode was expected to be "global"
+       because it crosses with something but is "local"
 |}]
 
 module F (X : sig val foo : local_ float -> float -> string end) : sig
@@ -2444,6 +2469,7 @@ Error: Signature mismatch:
          "(float -> string @ local) inv"
        Type "float -> string" is not compatible with type
          "float -> string @ local"
+       The return mode was expected to be "global" but is "local"
 |}]
 
 module F (X : sig val foo : (float -> string) co end) : sig
@@ -2475,6 +2501,7 @@ Error: Signature mismatch:
          "(float -> string @ local) contra"
        Type "float -> string" is not compatible with type
          "float -> string @ local"
+       The return mode was expected to be "global" but is "local"
 |}]
 
 module F (X : sig val foo : (float -> string) bi end) : sig
@@ -2506,6 +2533,7 @@ Error: Signature mismatch:
          "(float -> string) inv"
        Type "float -> string @ local" is not compatible with type
          "float -> string"
+       The return mode was expected to be "global" but is "local"
 |}]
 
 module F (X : sig val foo : (float -> local_ string) co end) : sig
@@ -2528,6 +2556,7 @@ Error: Signature mismatch:
          "(float -> string) co"
        Type "float -> string @ local" is not compatible with type
          "float -> string"
+       The return mode was expected to be "global" but is "local"
 |}]
 
 module F (X : sig val foo : (float -> local_ string) contra end) : sig
@@ -2855,16 +2884,19 @@ Error: Signature mismatch:
        Modules do not match:
          sig
            val g : 'a -> 'b -> string @ local
-           val f : 'a -> ('b -> string @ local) @ local
+           val f : 'a -> ('b -> string @ local) @ local forkable unyielding
          end
        is not included in
          sig val f : string -> string -> string @ local end
        Values do not match:
-         val f : 'a -> ('b -> string @ local) @ local
+         val f : 'a -> ('b -> string @ local) @ local forkable unyielding
        is not included in
          val f : string -> string -> string @ local
-       The type "string -> (string -> string @ local) @ local"
+       The type
+         "string -> (string -> string @ local) @ local forkable unyielding"
        is not compatible with the type "string -> string -> string @ local"
+       The return mode was expected to be "global"
+       because it crosses with something but is "local"
 |}]
 
 (* Escaping uncurried functions *)

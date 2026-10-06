@@ -16,7 +16,6 @@
 open Format
 open Asttypes
 open Primitive
-open Types
 open Lambda
 
 let unboxed_integer_suffix = function
@@ -194,10 +193,11 @@ let rec mixed_block_element print_value_kind ppf el =
 
 let constructor_shape print_value_kind ppf shape =
   match shape with
-  | Constructor_uniform fields ->
+  | Constructor_shape_undetermined -> fprintf ppf "?"
+  | Constructor_shape_uniform fields ->
      Format.pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ")
        print_value_kind ppf fields
-  | Constructor_mixed shape->
+  | Constructor_shape_mixed shape->
     fprintf ppf "%a"
       (Format.pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ")
          (mixed_block_element print_value_kind)) (Array.to_list shape)
@@ -337,16 +337,13 @@ let print_bigarray name unsafe kind ppf layout =
      | Pbigarray_c_layout -> "C"
      | Pbigarray_fortran_layout -> "Fortran")
 
-let record_rep ppf r = match r with
+let record_rep ppf (r : record_representation) = match r with
   | Record_unboxed -> fprintf ppf "unboxed"
   | Record_boxed -> fprintf ppf "boxed"
   | Record_inlined _ -> fprintf ppf "inlined"
   | Record_float -> fprintf ppf "float"
   | Record_ufloat -> fprintf ppf "ufloat"
   | Record_mixed _ -> fprintf ppf "mixed"
-  | Record_dummy _ -> fprintf ppf "dummy"
-  | Record_undetermined -> fprintf ppf "undetermined"
-  | Record_variable _ -> fprintf ppf "variable"
 
 let rec mixed_block_element
   : 'a. (_ -> 'a -> _) -> _ -> 'a mixed_block_element -> _ =
@@ -1324,6 +1321,7 @@ let apply_inlined_attribute ppf = function
   | Always_inlined -> fprintf ppf " always_inline"
   | Never_inlined -> fprintf ppf " never_inline"
   | Hint_inlined -> fprintf ppf " hint_inline"
+  | Forward_inlined -> fprintf ppf " forward_inline"
   | Unroll i -> fprintf ppf " never_inline(%i)" i
 
 let apply_specialised_attribute ppf = function
@@ -1600,25 +1598,12 @@ let rec lam ppf = function
       fprintf ppf "$%a" slam slambda
   | Lkindtemplate {ktmpl_params; ktmpl_body; ktmpl_env; ktmpl_env_mode;
                    ktmpl_loc = _} ->
-      let pr_env ppf env =
-        fprintf ppf "@[{";
-        Ident.Map.iter
-          (fun id (l, layout) ->
-            match l with
-            | Lvar id2 when Ident.same id id2 ->
-              fprintf ppf "@,%a%a;" Ident.print id layout_annotation layout
-            | _ ->
-              fprintf ppf "@,%a=%a%a;"
-                Ident.print id layout_annotation layout lam l)
-          env;
-        fprintf ppf "}@]"
-      in
       let pr_params ppf params =
         List.iter (fun l -> fprintf ppf "%a@ " Slambdaident.print l) params
       in
       fprintf ppf "@[<2>(ktemplate@ %a%a@ %a%a)@]"
         locality_mode ktmpl_env_mode
-        pr_env ktmpl_env
+        template_env ktmpl_env
         pr_params ktmpl_params
         lfunction ktmpl_body
   | Lkindinstantiate {kinst_func; kinst_args; kinst_result_layout = _;
@@ -1627,6 +1612,22 @@ let rec lam ppf = function
         List.iter (fun l -> fprintf ppf "@ %a" layout l) largs in
       fprintf ppf "@[<2>(kinstantiate@ %a%a)]"
         lam kinst_func lams kinst_args
+  | Ltemplate {tmpl_func = {kind; params; return; body; attr; ret_mode; mode};
+               tmpl_env} ->
+      fprintf ppf "@[<2>(template%s@ %a%a@ %a%a%a)@]"
+        (locality_kind mode) template_env tmpl_env
+        (function_params kind) params
+        function_attribute attr return_kind (ret_mode, return) lam body
+  | Linstantiate ap ->
+      let lams ppf largs =
+        List.iter (fun l -> fprintf ppf "@ %a" lam l) largs in
+      let form = apply_kind "instantiate" ap.ap_region_close ap.ap_mode in
+      fprintf ppf "@[<2>(%s@ %a%a%a%a%a%a)@]" form
+        lam ap.ap_func lams ap.ap_args
+        apply_tailcall_attribute ap.ap_tailcall
+        apply_inlined_attribute ap.ap_inlined
+        apply_specialised_attribute ap.ap_specialised
+        apply_probe ap.ap_probe
 
 and slam ppf = function
   | SLlayout l -> fprintf ppf "⟪layout %a⟫" layout l
@@ -1680,36 +1681,50 @@ and sequence ppf = function
   | l ->
       lam ppf l
 
+and function_params kind ppf params =
+  match kind with
+  | Curried {nlocal} ->
+      fprintf ppf "@ {nlocal = %d}" nlocal;
+      List.iter (fun (p : Lambda.lparam) ->
+          let { unbox_param } = p.attributes in
+          fprintf ppf "@ %a%a%s%a%s"
+            Ident.print p.name debug_uid p.debug_uid (locality_kind p.mode)
+            layout_annotation p.layout
+            (if unbox_param then "[@unboxable]" else "")
+        ) params
+  | Tupled ->
+      fprintf ppf " (";
+      let first = ref true in
+      List.iter
+        (fun (p : Lambda.lparam) ->
+           let { unbox_param } = p.attributes in
+           if !first then first := false else fprintf ppf ",@ ";
+           Ident.print ppf p.name;
+           debug_uid ppf p.debug_uid;
+           Format.fprintf ppf "%s" (locality_kind p.mode);
+           layout_annotation ppf p.layout;
+           if unbox_param then Format.fprintf ppf "[@unboxable]"
+        )
+        params;
+      fprintf ppf ")"
+
 and lfunction ppf {kind; params; return; body; attr; ret_mode; mode} =
-  let pr_params ppf params =
-    match kind with
-    | Curried {nlocal} ->
-        fprintf ppf "@ {nlocal = %d}" nlocal;
-        List.iter (fun (p : Lambda.lparam) ->
-            let { unbox_param } = p.attributes in
-            fprintf ppf "@ %a%a%s%a%s"
-              Ident.print p.name debug_uid p.debug_uid (locality_kind p.mode)
-              layout_annotation p.layout
-              (if unbox_param then "[@unboxable]" else "")
-          ) params
-    | Tupled ->
-        fprintf ppf " (";
-        let first = ref true in
-        List.iter
-          (fun (p : Lambda.lparam) ->
-             let { unbox_param } = p.attributes in
-             if !first then first := false else fprintf ppf ",@ ";
-             Ident.print ppf p.name;
-             debug_uid ppf p.debug_uid;
-             Format.fprintf ppf "%s" (locality_kind p.mode);
-             layout_annotation ppf p.layout;
-             if unbox_param then Format.fprintf ppf "[@unboxable]"
-          )
-          params;
-        fprintf ppf ")" in
   fprintf ppf "@[<2>(function%s%a@ %a%a%a)@]"
-    (locality_kind mode) pr_params params
+    (locality_kind mode) (function_params kind) params
     function_attribute attr return_kind (ret_mode, return) lam body
+
+and template_env ppf env =
+  fprintf ppf "{@[";
+  Ident.Map.iter
+    (fun id (l, layout) ->
+      match l with
+      | Lvar id2 when Ident.same id id2 ->
+        fprintf ppf "@,%a%a;" Ident.print id layout_annotation layout
+      | _ ->
+        fprintf ppf "@,%a=%a%a;"
+          Ident.print id layout_annotation layout lam l)
+    env;
+  fprintf ppf "@]}"
 
 let structured_constant = struct_const
 

@@ -1,6 +1,7 @@
 (* TEST
    flambda2;
    flags += "-flambda2-reaper -reaper-debug-flags=nostamps -extension small_numbers";
+   flags += " -X reaper-lambda-lifting=1";
    { native with dump-simplify, dump-reaper; check-fexpr-dump; }
  *)
 

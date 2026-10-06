@@ -30,6 +30,11 @@ let simplify_toplevel_common dacc simplify ~params ~implicit_params
          (Flow.Acc.init_toplevel ~dummy_toplevel_cont
             (Bound_parameters.append params implicit_params))
   in
+  let dacc = DA.record_continuation dacc return_continuation return_arity in
+  let dacc =
+    DA.record_continuation dacc exn_continuation
+      (Flambda_arity.create [Singleton K.With_subkind.any_value])
+  in
   let expr, uacc =
     simplify dacc ~down_to_up:(fun dacc ~rebuild ->
         let dacc =
