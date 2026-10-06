@@ -192,7 +192,7 @@ let prim_sys_argv =
 let to_locality ~poly = function
   | Prim_global, _ -> alloc_heap
   | Prim_local, _ -> alloc_local
-  | Prim_poly, _ ->
+  | (Prim_poly | Prim_mode_poly), _ ->
     match poly with
     | None -> assert false
     | Some locality -> transl_locality_mode_l locality
@@ -200,7 +200,7 @@ let to_locality ~poly = function
 let to_modify_mode ~poly = function
   | Prim_global, _ -> modify_heap
   | Prim_local, _ -> modify_maybe_stack
-  | Prim_poly, _ ->
+  | (Prim_poly | Prim_mode_poly), _ ->
     match poly with
     | None -> assert false
     | Some mode -> transl_modify_mode mode
@@ -208,7 +208,7 @@ let to_modify_mode ~poly = function
 let to_return_mode ~poly = function
   | Prim_global, _ -> not_alloc_stack
   | Prim_local, _ -> maybe_alloc_stack
-  | Prim_poly, _ ->
+  | (Prim_poly | Prim_mode_poly), _ ->
     match poly with
     | None -> assert false
     | Some locality -> transl_return_mode_l locality
@@ -2511,7 +2511,7 @@ let lambda_of_prim prim_name prim ~yielding loc args arg_exps =
 let check_primitive_arity loc p =
   let mode =
     match p.prim_native_repr_res with
-    | Prim_global, _ | Prim_poly, _ ->
+    | (Prim_global | Prim_poly | Prim_mode_poly), _ ->
       (* We assume all primitives are compiled to have the same arity for
          different modes and types, so just pick one of the modes in the
          [Prim_poly] case. *)

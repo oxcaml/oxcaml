@@ -106,7 +106,7 @@ let rec filter_trace = function
 let may_prepare_expansion compact (Errortrace.{ty; expanded} as ty_exp) =
   match Types.get_desc expanded with
     Tvariant _ | Tobject _ when compact ->
-      Variable_names.reserve ~base:Mode.With_locality.Const.legacy ty;
+      Variable_names.reserve ~base:Ctype.Curry_mode.legacy ty;
       Errortrace.{ty; expanded = ty}
   | _ -> prepare_expansion ty_exp
 
@@ -174,7 +174,7 @@ let explain_fixed_row pos expl = match expl with
   | Types.Fixed_private ->
     doc_printf "The %a variant type is private" Errortrace.print_pos pos
   | Types.Univar x ->
-    Variable_names.reserve ~base:Mode.With_locality.Const.legacy x;
+    Variable_names.reserve ~base:Ctype.Curry_mode.legacy x;
     doc_printf "The %a variant type is bound to the universal type variable %a"
       Errortrace.print_pos pos
       (Style.as_inline_code type_expr_with_reserved_names) x
@@ -230,7 +230,7 @@ let explain_variant (type variety) : variety Errortrace.variant -> _ = function
 
 let explain_escape pre = function
   | Errortrace.Univ u ->
-      Variable_names.reserve ~base:Mode.With_locality.Const.legacy u;
+      Variable_names.reserve ~base:Ctype.Curry_mode.legacy u;
       Some(
         doc_printf "%a@,The universal variable %a would escape its scope"
           pp_doc pre
@@ -247,7 +247,7 @@ let explain_escape pre = function
         pp_doc pre pp_path p
     )
   | Errortrace.Equation Errortrace.{ty = _; expanded = t} ->
-      Variable_names.reserve ~base:Mode.With_locality.Const.legacy t;
+      Variable_names.reserve ~base:Ctype.Curry_mode.legacy t;
       Some(
         doc_printf "%a@ @[<hov>This instance of %a is ambiguous:@ %s@]"
           pp_doc pre
@@ -275,8 +275,8 @@ let explain_object (type variety) : variety Errortrace.obj -> _ = function
            )
 
 let explain_incompatible_fields name (diff: Types.type_expr Errortrace.diff) =
-  Variable_names.reserve ~base:Mode.With_locality.Const.legacy diff.got;
-  Variable_names.reserve ~base:Mode.With_locality.Const.legacy diff.expected;
+  Variable_names.reserve ~base:Ctype.Curry_mode.legacy diff.got;
+  Variable_names.reserve ~base:Ctype.Curry_mode.legacy diff.expected;
   doc_printf "@,@[The method %a has type@ %a,@ \
   but the expected method type was@ %a@]"
     Style.inline_code name
@@ -331,7 +331,7 @@ let explanation (type variety) intro prev env
     let pre =
       match context, kind, prev with
       | Some ctx, _, _ ->
-        Variable_names.reserve ~base:Mode.With_locality.Const.legacy ctx;
+        Variable_names.reserve ~base:Ctype.Curry_mode.legacy ctx;
         doc_printf "@[%a@;<1 2>%a@]" pp_doc intro
           (Style.as_inline_code type_expr_with_reserved_names) ctx
       | None, Univ _, Some(Errortrace.Incompatible_fields {name; diff}) ->
@@ -390,7 +390,7 @@ let explanation (type variety) intro prev env
             (Jkind.Violation.report_with_offender
                ~offender:(fun ppf ->
                    prepare_for_printing
-                     ~base:Mode.With_locality.Const.legacy [t];
+                     ~base:Ctype.Curry_mode.legacy [t];
                    prepared_type_expr ppf t)
                env) e)
   | Errortrace.Bad_jkind_sort (t,e) ->
@@ -398,7 +398,7 @@ let explanation (type variety) intro prev env
             (Jkind.Violation.report_with_offender_sort
                ~offender:(fun ppf ->
                    prepare_for_printing
-                     ~base:Mode.With_locality.Const.legacy [t];
+                     ~base:Ctype.Curry_mode.legacy [t];
                    prepared_type_expr ppf t)
                env) e)
   | Errortrace.Unequal_var_jkinds (t1,k1,t2,k2) ->

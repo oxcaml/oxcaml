@@ -141,6 +141,7 @@ type error =
   | Local_not_enabled
   | Unexpected_layout_any_in_primitive of string
   | Useless_layout_poly
+  | Local_opt_with_mode_variables
   | Bad_or_null_attribute of string
   | Zero_alloc_attr_unsupported of Builtin_attributes.zero_alloc_attribute
   | Zero_alloc_attr_non_function
@@ -4561,7 +4562,31 @@ let prim_const_mode m =
   match Mode.Locality.Guts.check_const m with
   | Some Global -> Prim_global
   | Some Local -> Prim_local
-  | None -> assert false
+  | None ->
+    if Mode.Locality.check_generic m then Prim_mode_poly
+    else assert false
+
+let check_no_mixed_prim_modes loc ty (native_repr_args, native_repr_res) =
+  let has_local_opt =
+    List.exists
+      (fun (m, _) -> m = Prim_poly)
+      (native_repr_res :: native_repr_args)
+  in
+  let has_mode_variables () =
+    with_type_mark (fun mark ->
+      let rec loop ty =
+        if try_mark_node mark ty then
+          Btype.iter_type_expr loop
+            (fun m ->
+               if Mode.With_locality.check_generic m then raise Exit)
+            ty
+      in
+      match loop ty with
+      | () -> false
+      | exception Exit -> true)
+  in
+  if has_local_opt && has_mode_variables () then
+    raise (Error (loc, Local_opt_with_mode_variables))
 
 let rec parse_native_repr_attributes env core_type ty rmode
         ~global_repr ~is_layout_poly =
@@ -4776,6 +4801,11 @@ let transl_value_decl env loc ~modal ~why valdecl =
   let lpoly_flag =
     if valdecl.pval_poly then Typetexp.Lpoly else Typetexp.Lmono
   in
+  let curry_mode =
+    match valdecl.pval_prim with
+    | [] -> Ctype.Curry_mode.const curry_mode
+    | _ :: _ -> Ctype.Curry_mode.primitive curry_mode
+  in
   let lpoly, cty =
     Typetexp.transl_type_scheme env curry_mode valdecl.pval_type lpoly_flag
   in
@@ -4865,6 +4895,8 @@ let transl_value_decl env loc ~modal ~why valdecl =
         parse_native_repr_attributes
           env valdecl.pval_type ty Prim_global ~global_repr ~is_layout_poly
       in
+      check_no_mixed_prim_modes valdecl.pval_type.ptyp_loc ty
+        (native_repr_args, native_repr_res);
       let prim =
         Primitive.parse_declaration valdecl
           ~native_repr_args
@@ -5367,7 +5399,7 @@ let explain_unbound_gen ppf tv tl typ kwd pr =
     let ti = List.find (fun ti -> Ctype.deep_occur tv (typ ti)) tl in
     let ty0 = (* Hack to force aliasing when needed *)
       Btype.newgenty (Tobject(tv, ref None)) in
-    Out_type.prepare_for_printing ~base:Mode.With_locality.Const.legacy
+    Out_type.prepare_for_printing ~base:Ctype.Curry_mode.legacy
       [typ ti; ty0];
     fprintf ppf
       ".@ @[<hov2>In %s@ %a@;<1 -2>the variable %a is unbound@]"
@@ -5606,7 +5638,7 @@ let variance_error ~loc ~v1 ~v2 =
          lacks the [env]. Therefore, we clear [Ident_names] manually.
          It'd be good to come up with a better solution. *)
       Out_type.Ident_names.reset ();
-      Out_type.prepare_for_printing ~base:Mode.With_locality.Const.legacy
+      Out_type.prepare_for_printing ~base:Ctype.Curry_mode.legacy
         [ variable ];
       let intro = variance_context context in
       Location.errorf ~loc "%a%t" pp_doc intro
@@ -5701,7 +5733,7 @@ let report_error ~loc = function
              jkind_loc)
   | Non_regular { definition; used_as; defined_as; reaching_path } ->
       let reaching_path = Reaching_path.simplify reaching_path in
-      let base = Mode.With_locality.Const.legacy in
+      let base = Ctype.Curry_mode.legacy in
       Out_type.prepare_for_printing ~base [used_as; defined_as];
       Reaching_path.add_to_preparation reaching_path;
       Out_type.Ident_names.reset ();
@@ -6028,6 +6060,11 @@ let report_error ~loc = function
          effect. Consider removing it or adding a type@ \
          variable for it to operate on."
         Style.inline_code "[@layout_poly]"
+  | Local_opt_with_mode_variables ->
+      Location.errorf ~loc
+        "%a cannot be used in an external declaration@ \
+         that also uses mode variables."
+        Style.inline_code "[@local_opt]"
   | Bad_or_null_attribute msg ->
       Location.errorf ~loc "Invalid [@@or_null] declaration:@ %s." msg
   | Zero_alloc_attr_unsupported ca ->
