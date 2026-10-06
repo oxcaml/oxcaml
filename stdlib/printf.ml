@@ -23,9 +23,12 @@ open! Stdlib
 open CamlinternalFormatBasics
 open CamlinternalFormat
 
-let kfprintf k o (Format (fmt, _)) =
+(* The functions below are not inlined: each of them allocates a closure,
+   whose code would otherwise be copied at every call site for no benefit
+   beyond saving one call. *)
+let[@inline never] kfprintf k o (Format (fmt, _)) =
   make_printf (fun acc -> output_acc o acc; k o) End_of_acc fmt
-let kbprintf k b (Format (fmt, _)) =
+let[@inline never] kbprintf k b (Format (fmt, _)) =
   make_printf (fun acc -> bufput_acc b acc; k b) End_of_acc fmt
 let ikfprintf k oc (Format (fmt, _)) =
   make_iprintf k oc fmt
@@ -38,7 +41,7 @@ let ibprintf b fmt = ikbprintf ignore b fmt
 let printf fmt = fprintf stdout fmt
 let eprintf fmt = fprintf stderr fmt
 
-let ksprintf k (Format (fmt, _)) =
+let[@inline never] ksprintf k (Format (fmt, _)) =
   let k' acc =
     let buf = Buffer.create 64 in
     strput_acc buf acc;
