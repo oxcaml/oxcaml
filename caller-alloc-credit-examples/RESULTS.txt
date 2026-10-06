@@ -1,0 +1,132 @@
+Crediting the caller's allocations in speculative inlining decisions
+====================================================================
+
+Flag: -flambda2-speculative-inlining-credit-caller-allocations (off by
+default, not part of -flambda2-inline-2026).
+
+What it does
+------------
+
+When a Let binds an allocation (a block, or a set of closures with a single
+closure) to a variable that occurs exactly once in the rest of the function
+body, the allocation's cost is remembered.  When a call is judged after
+speculative inlining, each argument that is such a variable and that the
+simplified inlined body no longer mentions is counted as removed: its size
+plus the bonus for a removed allocation is added to the call-site credit.
+The occurrence counts come from the Let itself (they are stored in the term
+when it is built), so no extra pass is needed.
+
+Examples (this directory), compiled on arm64 with
+
+  ocamlopt.opt -O3 -flambda2-inline-2026 [flag] -inlining-report -S -c exN.ml
+
+  ex    description                       2026              2026 + flag
+  ----  --------------------------------  ----------------  ----------------
+  ex0   let f (x, y) = ... ; f (z, z)     not inlined 0.93  not inlined 0.93
+        (tupled function)                 no tuple at all   no tuple at all
+  ex1   let f p = let x, y = p in ...     not inlined 0.91  inlined 0.59
+        g z = f (z, z)                    1 allocation      0 allocations
+  ex2   as ex1, tuple also stored in a    not inlined 0.89  not inlined 0.89
+        ref after the call
+  ex3   as ex1, f stores the tuple in a   not inlined 0.86  not inlined 0.86
+        ref
+  ex4   closure (fun n -> n + z) passed   not inlined 0.83  inlined 0.67
+        to f, applied once in f           6 functions       4 functions
+                                          1 allocation      0 allocations
+
+The numbers are the ratio of the adjusted size after speculation to the
+original size (maximum 0.8).
+
+ex0 is the example as first stated.  [let f (x, y) = ...] is a "tupled"
+function: a direct call with a syntactic tuple passes the components as
+separate arguments, so no tuple is ever built, inlined or not.  ex1 takes the
+tuple as a single parameter and takes it apart inside.
+
+ex1 in detail (arm64 sizes):
+
+  original size                 46
+  size after speculation        44 (4 prims removed: the projections)
+  call-site credit              2  without the flag
+                                17 with it: 2 + 11 (the block allocation)
+                                   + 4 (bonus for a removed allocation)
+  adjusted size                 42 -> 27
+  ratio                         0.913 -> 0.587
+
+ex2: the tuple is used twice, so it is never recorded.  ex3: f keeps the
+tuple, so the inlined body still mentions it and nothing is credited.
+
+ex4: the closure's cost (allocation plus the out-of-line code of its
+function, 18) and the bonus (4) give a credit of 22 on top of the usual 2.
+After inlining, the closure's function is inlined at its single call and its
+code deleted, so both the allocation and a function disappear.
+
+Sanity check on typing/ (deps from _build/main, arm64, -O3, 2026 model)
+-----------------------------------------------------------------------
+
+  unit      text bytes         call sites inlined  credited  flipped
+  --------  -----------------  ------------------  --------  -------
+  typecore  693076 -> 696148   4284 -> 4304        sum 2351  5
+            (+0.4%)
+  ctype     494440 -> 503836   2902 -> 2944        sum 1267  22
+            (+1.9%)
+  env       277489 -> 277713   1350 -> 1351        sum 163   0
+            (+0.1%)
+
+Flipped decisions are real instances of the pattern: [Types.backtrack snap]
+where [snap] is a tuple built by the inlined [Btype.snapshot ()] (credit 5
+-> 20, ratio 0.89 -> 0.75), and [Misc.protect_refs [R (pool_stack, pool)]
+f] in [Btype.with_new_pool] inlined into ctype.ml:211, where the closure [f]
+is applied once (credit 4 -> 67, ratio 0.85 -> 0.24; ctype goes from 1892 to
+1870 functions).
+
+Stats keys (with -dinlining-stats): speculation.caller_allocation_credited
+(number of decisions given a credit) and speculation.caller_allocation_credit
+(sum of the credits).
+
+Callees that match on an option (or record) argument
+----------------------------------------------------
+
+Same compilation as above.  "big" is a 20-line chunk of integer arithmetic
+(about 120 instructions on arm64), "medium" a 9-line one (about 50).
+
+  ex    description                               2026                2026 + flag
+  ----  ----------------------------------------  ------------------  ------------------
+  ex5   None -> big | Some x -> x + 1             inlined 0.00        inlined -0.11
+        called with Some z                        0 allocations       0 allocations
+  ex6   None -> 0 | Some x -> big                 not inlined 0.94    not inlined 0.83
+        called with Some z
+  ex6b  None -> 0 | Some x -> medium              not inlined 0.87    inlined 0.64
+        called with Some z                        1 allocation        0 allocations
+  ex7   as ex6, Some arm also passes o to an      not inlined 0.92    not inlined 0.92
+        external function
+  ex8   as ex6, called with                       not inlined 0.97    not inlined 0.97
+        (if z > 0 then Some z else None)
+  ex9   two option parameters, both taken apart,  not inlined 0.89    inlined 0.69
+        called with (Some z) (Some (z + 1))       1 allocation        0 allocations
+  ex10  immutable record { count; name }, arm     not inlined 0.86    inlined 0.74
+        taken reads r.count; called with          1 allocation        0 allocations
+        { count = z; name = "g" } true
+  ex11  as ex10 with mutable count, read and      not inlined 0.87    not inlined 0.87
+        written in the arm taken
+
+Reading
+-------
+
+ex5: when the argument rules out the big arm, the speculation never visits
+it, the inlined body is three instructions, and the call is inlined without
+any help; the [Some] disappears in both configurations.  The credit only
+pushes the adjusted size below zero (ratio -0.11), which is harmless.
+
+ex6 and ex6b: when the big arm is the one taken, inlining saves only the
+match and the call (6 instructions on arm64) plus, with the flag, the [Some]
+(size 10, bonus 4).  Against a 0.8 maximum this flips functions up to about
+(6 + 2 + 14) / 0.2 = 110 instructions: ex6b at 61 flips (0.87 -> 0.64), ex6
+at 131 does not (0.94 -> 0.83).
+
+ex7, ex8 and ex11 are the three ways the credit does not apply: the inlined
+body still mentions the argument (ex7 passes it on, ex11 reads and writes a
+mutable field), or the value flowing into the call is not a single
+allocation bound by a Let (ex8 joins two branches).
+
+ex9 and ex10: credits add up over several arguments (2 x 14 in ex9), and an
+immutable record behaves like a tuple (ex10, credit 13 + 4).
