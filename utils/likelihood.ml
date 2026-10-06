@@ -82,5 +82,5 @@ let sum_list l =
 let is_uniform l =
   let max_logit = max_list l |> to_logit in
   List.for_all
-    (fun { logit } -> Float.is_infinite logit || Float.equal logit max_logit)
+    (fun t -> is_cold t || Float.equal t.logit max_logit)
     l
