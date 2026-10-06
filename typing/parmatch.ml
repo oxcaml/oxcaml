@@ -347,76 +347,91 @@ let records_args l1 l2 =
 
 
 
-module Compat
-    (Constr:sig
-      val equal :
-          Data_types.constructor_description ->
-            Data_types.constructor_description ->
-              bool
-    end) = struct
+module Compat (Constr : sig
+  val equal :
+    Data_types.constructor_description ->
+    Data_types.constructor_description ->
+    bool
+end) =
+struct
 
-  let rec compat p q = match p.pat_desc,q.pat_desc with
-(* Variables match any value *)
-  | ((Tpat_any|Tpat_var _),_)
-  | (_,(Tpat_any|Tpat_var _)) -> true
-(* Structural induction *)
-  | Tpat_alias { pattern = p; _ },_      -> compat p q
-  | _,Tpat_alias { pattern = q; _ }      -> compat p q
-  | Tpat_or (p1,p2,_),_ ->
-      (compat p1 q || compat p2 q)
-  | _,Tpat_or (q1,q2,_) ->
-      (compat p q1 || compat p q2)
-(* Constructors, with special case for extension *)
-  | Tpat_construct (_, c1, _, ps1, _), Tpat_construct (_, c2, _, ps2, _) ->
+  let rec compat p q =
+    match p.pat_desc, q.pat_desc with
+    (* Variables match any value *)
+    | (Tpat_any | Tpat_var _), _ | _, (Tpat_any | Tpat_var _) -> true
+    (* Structural induction *)
+    | Tpat_alias { pattern = p; _ }, _ -> compat p q
+    | _, Tpat_alias { pattern = q; _ } -> compat p q
+    | Tpat_or (p1, p2, _), _ -> compat p1 q || compat p2 q
+    | _, Tpat_or (q1, q2, _) -> compat p q1 || compat p q2
+    (* Constructors, with special case for extension *)
+    | Tpat_construct (_, c1, _, ps1, _), Tpat_construct (_, c2, _, ps2, _) ->
       let ps1 = List.map snd ps1 in
       let ps2 = List.map snd ps2 in
       Constr.equal c1 c2 && compats ps1 ps2
-(* More standard stuff *)
-  | Tpat_variant(l1,op1, _), Tpat_variant(l2,op2,_) ->
-      l1=l2 && ocompat op1 op2
-  | Tpat_constant c1, Tpat_constant c2 ->
-      const_compare c1 c2 = 0
-  | Tpat_unboxed_unit, Tpat_unboxed_unit -> true
-  | Tpat_unboxed_bool b1, Tpat_unboxed_bool b2 -> Bool.equal b1 b2
-  | Tpat_tuple labeled_ps, Tpat_tuple labeled_qs ->
+    (* More standard stuff *)
+    | Tpat_variant (l1, op1, _), Tpat_variant (l2, op2, _) ->
+      l1 = l2 && ocompat op1 op2
+    | Tpat_constant c1, Tpat_constant c2 -> const_compare c1 c2 = 0
+    | Tpat_unboxed_unit, Tpat_unboxed_unit -> true
+    | Tpat_unboxed_bool b1, Tpat_unboxed_bool b2 -> Bool.equal b1 b2
+    | Tpat_tuple labeled_ps, Tpat_tuple labeled_qs ->
       tuple_compat labeled_ps labeled_qs
-  | Tpat_unboxed_tuple labeled_ps, Tpat_unboxed_tuple labeled_qs ->
+    | Tpat_unboxed_tuple labeled_ps, Tpat_unboxed_tuple labeled_qs ->
       unboxed_tuple_compat labeled_ps labeled_qs
-  | Tpat_lazy p, Tpat_lazy q -> compat p q
-  | Tpat_record (l1,_,_),Tpat_record (l2,_,_) ->
-      let ps,qs = records_args l1 l2 in
+    | Tpat_lazy p, Tpat_lazy q -> compat p q
+    | Tpat_record (l1, _, _), Tpat_record (l2, _, _) ->
+      let ps, qs = records_args l1 l2 in
       compats ps qs
-  | Tpat_array (am1, _, ps), Tpat_array (am2, _, qs) ->
-      am1 = am2 &&
-      List.length ps = List.length qs &&
+    | ( Tpat_record_unboxed_product (l1, _, _),
+        Tpat_record_unboxed_product (l2, _, _) ) ->
+      let ps, qs = records_args l1 l2 in
       compats ps qs
-  | _,_  -> false
+    | Tpat_array (am1, _, ps), Tpat_array (am2, _, qs) ->
+      am1 = am2 && List.length ps = List.length qs && compats ps qs
+    | Tpat_fun_layout _, _
+    | Tpat_constant _, _
+    | Tpat_unboxed_unit, _
+    | Tpat_unboxed_bool _, _
+    | Tpat_tuple _, _
+    | Tpat_unboxed_tuple _, _
+    | Tpat_construct (_, _, _, _, _), _
+    | Tpat_variant (_, _, _), _
+    | Tpat_record (_, _, _), _
+    | Tpat_record_unboxed_product (_, _, _), _
+    | Tpat_array (_, _, _), _
+    | Tpat_lazy _, _ ->
+      false
 
-  and ocompat op oq = match op,oq with
-  | None,None -> true
-  | Some p,Some q -> compat p q
-  | (None,Some _)|(Some _,None) -> false
+  and ocompat op oq =
+    match op, oq with
+    | None, None -> true
+    | Some p, Some q -> compat p q
+    | None, Some _ | Some _, None -> false
 
-  and compats ps qs = match ps,qs with
-  | [], [] -> true
-  | p::ps, q::qs -> compat p q && compats ps qs
-  | _,_    -> false
+  and compats ps qs =
+    match ps, qs with
+    | [], [] -> true
+    | p :: ps, q :: qs -> compat p q && compats ps qs
+    | _, _ -> false
 
-  and tuple_compat labeled_ps labeled_qs = match labeled_ps,labeled_qs with
-  | [], [] -> true
-  | (p_label, p)::labeled_ps, (q_label, q)::labeled_qs ->
+  and tuple_compat labeled_ps labeled_qs =
+    match labeled_ps, labeled_qs with
+    | [], [] -> true
+    | (p_label, p) :: labeled_ps, (q_label, q) :: labeled_qs ->
       Option.equal String.equal p_label q_label
-      && compat p q && tuple_compat labeled_ps labeled_qs
-  | _,_    -> false
+      && compat p q
+      && tuple_compat labeled_ps labeled_qs
+    | _, _ -> false
 
   and unboxed_tuple_compat labeled_ps labeled_qs =
-    match labeled_ps,labeled_qs with
+    match labeled_ps, labeled_qs with
     | [], [] -> true
-    | (p_label, p, _)::labeled_ps, (q_label, q, _)::labeled_qs ->
-        Option.equal String.equal p_label q_label
-        && compat p q && unboxed_tuple_compat labeled_ps labeled_qs
-    | _,_    -> false
-
+    | (p_label, p, _) :: labeled_ps, (q_label, q, _) :: labeled_qs ->
+      Option.equal String.equal p_label q_label
+      && compat p q
+      && unboxed_tuple_compat labeled_ps labeled_qs
+    | _, _ -> false
 end
 
 module SyntacticCompat =
