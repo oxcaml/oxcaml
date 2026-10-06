@@ -33,8 +33,8 @@ let ocaml_unbox = function
   | false -> #false
   | true -> #true
 
-external c_not : bool# -> bool# = "not_bytecode" "not" 
-external c_box : bool# -> bool = "box_bytecode" "box" 
+external c_not : (bool#[@unsafe_unextended]) -> bool# = "not_bytecode" "not"
+external c_box : (bool#[@unsafe_unextended]) -> bool = "box_bytecode" "box"
 external c_unbox : bool -> bool# = "unbox_bytecode" "unbox" 
 
 (****************************)
