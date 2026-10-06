@@ -631,7 +631,7 @@ and switch ~env ~res e =
         let arm = Target_ocaml_int.Map.find_opt i arms in
         let last, res =
           match arm with
-          | Some arm -> apply_cont0 ~env ~res (Switch_expr.arm_action arm)
+          | Some arm -> apply_cont0 ~env ~res (Switch_arm.action arm)
           | None ->
             let res, addr = To_jsir_result.invalid_switch_block res in
             (Branch (addr, []) : Jsir.last), res

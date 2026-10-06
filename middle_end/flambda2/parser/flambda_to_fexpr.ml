@@ -743,7 +743,7 @@ and switch_expr env switch : Fexpr.expr =
   let cases =
     List.map
       (fun (imm, arm) ->
-        let app_cont = Switch_expr.arm_action arm in
+        let app_cont = Switch_arm.action arm in
         let tag =
           (* TODO: machine_width should be passed through properly here *)
           let machine_width = Target_system.Machine_width.Sixty_four in

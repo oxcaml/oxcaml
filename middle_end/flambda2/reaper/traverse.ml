@@ -498,7 +498,7 @@ let traverse_switch denv acc switch : rev_expr =
   let expr = Switch switch in
   Acc.add_cond_any_usage acc ~denv (Switch_expr.scrutinee switch);
   Target_ocaml_int.Map.iter
-    (fun _ arm -> apply_cont_deps denv acc (Switch_expr.arm_action arm))
+    (fun _ arm -> apply_cont_deps denv acc (Switch_arm.action arm))
     (Switch_expr.arms switch);
   { expr; holed_expr = Env.parent denv }
 

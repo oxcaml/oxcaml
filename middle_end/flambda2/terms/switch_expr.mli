@@ -23,25 +23,6 @@
     a [Likelihood.t]. An arm is expected to be selected at a frequency
     proportional to its likelihood. *)
 
-type arm
-
-val create_arm_with_likelihood :
-  likelihood:Likelihood.t -> Apply_cont_expr.t -> arm
-
-val create_arm : ?weight:float -> Apply_cont_expr.t -> arm
-
-(** A cold arm is an arm with zero weight (expected to be taken a minuscule
-    amount of time compared to the other arms). *)
-val create_arm_cold : Apply_cont_expr.t -> arm
-
-val arm_action : arm -> Apply_cont_expr.t
-
-val arm_likelihood : arm -> Likelihood.t
-
-val arm_is_cold : arm -> bool
-
-val map_arm_action : (Apply_cont_expr.t -> Apply_cont_expr.t) -> arm -> arm
-
 type t
 
 include Expr_std.S with type t := t
@@ -51,7 +32,7 @@ include Contains_ids.S with type t := t
 val create :
   condition_dbg:Debuginfo.t ->
   scrutinee:Simple.t ->
-  arms:arm Target_ocaml_int.Map.t ->
+  arms:Switch_arm.t Target_ocaml_int.Map.t ->
   t
 
 (** Create a [Switch] corresponding to a traditional if-then-else. *)
@@ -59,8 +40,8 @@ val if_then_else :
   machine_width:Target_system.Machine_width.t ->
   condition_dbg:Debuginfo.t ->
   scrutinee:Simple.t ->
-  if_true:arm ->
-  if_false:arm ->
+  if_true:Switch_arm.t ->
+  if_false:Switch_arm.t ->
   t
 
 (** The scrutinee of the switch. *)
@@ -71,10 +52,10 @@ val condition_dbg : t -> Debuginfo.t
 
 (** Call the given function [f] on each (discriminant, action) pair in the
     switch. *)
-val iter : t -> f:(Target_ocaml_int.t -> arm -> unit) -> unit
+val iter : t -> f:(Target_ocaml_int.t -> Switch_arm.t -> unit) -> unit
 
 (** What the switch will do for each possible value of the discriminant. *)
-val arms : t -> arm Target_ocaml_int.Map.t
+val arms : t -> Switch_arm.t Target_ocaml_int.Map.t
 
 (** How many cases the switch has. (Note that this is not the number of
     destinations reached by the switch, which may be a smaller number.) *)
