@@ -1471,12 +1471,11 @@ let can_group discr pat =
   | Variant _, Variant _
   | Lazy, Lazy ->
       true
-  | Addr (mut1, _), Addr (mut2, _) ->
-      Types.is_mutable mut1 = Types.is_mutable mut2
-  (* [addr_ _] and [_] can be grouped together: This might cause [Pget_ptr] to
-     be executed even in the [_] branch. That's okay because addresses are
-     always safe to read. *)
+  | Addr (mut1, _), Addr (mut2, _) -> mut1 = mut2
   | Addr _, Any ->
+      (* [addr_ _] and [_] can be grouped together: this might cause [Pget_ptr]
+         to be executed even in the [_] branch. That's okay because addresses
+         are always safe to read. *)
       true
   | ( _,
       ( Any
@@ -2486,6 +2485,48 @@ let divide_lazy ~scopes head ctx pm =
   divide_line (Context.specialize head)
     (get_expr_args_lazy ~scopes)
     get_pat_args_lazy
+    head ctx pm
+
+(* Matching against an address pattern *)
+
+let get_pat_args_addr p rem =
+  match p with
+  | { pat_desc = Tpat_any } -> Patterns.omega :: rem
+  | { pat_desc = Tpat_addr (_, _, arg) } -> arg :: rem
+  | _ -> assert false
+
+let get_expr_args_addr ~scopes head { arg; mut; _ } rem =
+  let loc = head_loc ~scopes head in
+  let addr_mut, sort =
+    match head.pat_desc with
+    | Patterns.Head.Addr (addr_mut, sort) ->
+        addr_mut, Jkind.Sort.default_for_transl_and_get sort
+    | _ -> assert false
+  in
+  let layout = Typeopt.layout_of_sort head.pat_loc sort in
+  let mut_flag : Asttypes.mutable_flag =
+    if Types.is_mutable addr_mut then Mutable else Immutable
+  in
+  let ubr = Translmode.transl_unique_barrier head.pat_unique_barrier in
+  let load_flag : Asttypes.mutable_flag =
+    match ubr with
+    | Must_stay_here -> Mutable
+    | May_be_pushed_down -> mut_flag
+  in
+  {
+    arg = Lprim (Pget_ptr (layout, load_flag), [ arg ], loc);
+    binding_kind =
+      add_barrier_to_let_kind ubr
+        (if Types.is_mutable addr_mut then StrictOpt else Alias);
+    mut = compose_mut mut mut_flag;
+    sort;
+    layout;
+  } :: rem
+
+let divide_addr ~scopes head ctx pm =
+  divide_line (Context.specialize head)
+    (get_expr_args_addr ~scopes)
+    get_pat_args_addr
     head ctx pm
 
 (* Matching against a tuple pattern *)
@@ -4517,27 +4558,9 @@ and do_compile_matching ~scopes value_kind repr partial ctx pmh =
             (divide_array ~scopes kind)
             (combine_array value_kind ploc arg kind arg_partial)
       | Addr _ ->
-          (* CR address-patterns: compile address patterns *)
-          let loc = ph.pat_loc in
-          let sloc = Scoped_location.of_location ~scopes loc in
-          let slot =
-            transl_extension_path sloc
-              (Lazy.force Env.initial) Predef.path_invalid_argument
-          in
-          let msg = "address patterns are not supported yet" in
-          let raise_invalid_argument =
-            Lprim
-              ( Praise Raise_regular,
-                [ Lprim
-                    ( Pmakeblock (0, Immutable, All_value, alloc_heap),
-                      [ slot;
-                        Lconst (Const_base (Const_string (msg, loc, None)))
-                      ],
-                      sloc )
-                ],
-                sloc )
-          in
-          (raise_invalid_argument, Jumps.empty Total)
+          compile_no_test
+            (divide_addr ~scopes ph)
+            Context.combine
       | Lazy ->
           compile_no_test
             (divide_lazy ~scopes ph)
