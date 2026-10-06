@@ -429,7 +429,9 @@ let rec expr ppf = function
         fprintf ppf ")@]")
   | Csequence (e1, e2) ->
     fprintf ppf "@[<2>(seq@ %a@ %a)@]" sequence e1 sequence e2
-  | Cifthenelse (e1, e2_dbg, e2_p, e2, e3_dbg, e3_p, e3, dbg) ->
+  | Cifthenelse (e1, e2_dbg, e2_a, e2, e3_dbg, e3_a, e3, dbg) ->
+    let e2_p = Branch_annotations.likelihood e2_a in
+    let e3_p = Branch_annotations.likelihood e3_a in
     let uniform = Likelihood.is_uniform [e2_p; e3_p] in
     let likely_or_unlikely =
       let total = Likelihood.sum_list [e2_p; e3_p] in
@@ -452,7 +454,8 @@ let rec expr ppf = function
     with_location_mapping ~label:"Cswitch" ~dbg ppf (fun () ->
         let likelihoods =
           Array.fold_left
-            (fun likelihoods (_, _, ~likelihood) -> likelihood :: likelihoods)
+            (fun likelihoods (_, _, annots) ->
+              Branch_annotations.likelihood annots :: likelihoods)
             [] cases
         in
         let uniform = Likelihood.is_uniform likelihoods in
@@ -468,9 +471,10 @@ let rec expr ppf = function
         in
         let print_cases ppf =
           for i = 0 to Array.length cases - 1 do
-            let case, _, ~likelihood = cases.(i) in
-            fprintf ppf "@ @[<2>%t@ %a@]" (print_case ~likelihood i) sequence
-              case
+            let case, _, annots = cases.(i) in
+            fprintf ppf "@ @[<2>%t@ %a@]"
+              (print_case ~likelihood:(Branch_annotations.likelihood annots) i)
+              sequence case
           done
         in
         fprintf ppf "@[<v 0>@[<2>(switch@ %a@ @]%t)@]" expr e1 print_cases)

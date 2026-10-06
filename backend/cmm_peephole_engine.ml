@@ -317,8 +317,7 @@ module Cmm_comparator = struct
       equivalent scrutinee1 scrutinee2
       && Misc.Stdlib.Array.equal Int.equal cases1 cases2
       && Misc.Stdlib.Array.equal
-           (fun (act1, _, ~likelihood:_) (act2, _, ~likelihood:_) ->
-             equivalent act1 act2)
+           (fun (act1, _, _) (act2, _, _) -> equivalent act1 act2)
            actions1 actions2
     | Ccatch (flag1, handlers1, body1), Ccatch (flag2, handlers2, body2) ->
       let equal_handler

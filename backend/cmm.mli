@@ -578,16 +578,16 @@ and expression =
   | Cifthenelse of
       expression
       * Debuginfo.t
-      * Likelihood.t
+      * Branch_annotations.t
       * expression
       * Debuginfo.t
-      * Likelihood.t
+      * Branch_annotations.t
       * expression
       * Debuginfo.t
   | Cswitch of
       expression
       * int array
-      * (expression * Debuginfo.t * likelihood:Likelihood.t) array
+      * (expression * Debuginfo.t * Branch_annotations.t) array
       * Debuginfo.t
   | Ccatch of ccatch_flag * static_handler list * expression
   | Cexit of exit_label * expression list * trap_action list

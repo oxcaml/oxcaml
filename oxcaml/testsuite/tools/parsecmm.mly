@@ -35,12 +35,12 @@ let make_switch n selector caselist =
   let actv =
     Array.make
       (Array.length casev)
-      (Cexit(Cmm.Lbl Static_label.fail,[],[]), dbg, ~likelihood:Likelihood.default)
+      (Cexit(Cmm.Lbl Static_label.fail,[],[]), dbg, Branch_annotations.default)
   in
   for i = 0 to Array.length casev - 1 do
     let (posl, e) = casev.(i) in
     List.iter (fun pos -> index.(pos) <- i) posl;
-    actv.(i) <- (e, dbg, ~likelihood:Likelihood.default)
+    actv.(i) <- (e, dbg, Branch_annotations.default)
   done;
   Cswitch(selector, index, actv, dbg)
 
@@ -250,8 +250,8 @@ expr:
   | LPAREN IF expr expr expr RPAREN
       { Cifthenelse(
               $3,
-              debuginfo (), Likelihood.default, $4,
-              debuginfo (), Likelihood.default, $5,
+              debuginfo (), Branch_annotations.default, $4,
+              debuginfo (), Branch_annotations.default, $5,
               debuginfo ()) }
   | LPAREN SWITCH INTCONST expr caselist RPAREN { make_switch $3 $4 $5 }
   | LPAREN WHILE expr sequence RPAREN
@@ -263,8 +263,8 @@ expr:
             Cconst_int (x, _) when x <> 0 -> $4
           | _ -> Cifthenelse(
                   $3,
-                  debuginfo (), Likeihood.normal, $4,
-                  debuginfo (), Likelihood.default,
+                  debuginfo (), Branch_annotations.default, $4,
+                  debuginfo (), Branch_annotations.default,
                              (Cexit(Cmm.Lbl lbl0,[],[])),
                              debuginfo ()) in
         Ccatch(Normal, [{ label = lbl0; params = []; body = Ctuple []; dbg = debuginfo (); is_cold =  false }],

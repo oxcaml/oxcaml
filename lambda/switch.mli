@@ -29,7 +29,7 @@
   act_get_shared : retrieve table, with sharing explicit
 *)
 
-type 'a shared = Shared of 'a * int | Single of 'a
+type 'a shared = Shared of 'a | Single of 'a
 
 type ('a, 'ctx) t_store =
     {act_get : unit -> 'a array ;
@@ -40,14 +40,15 @@ type ('a, 'ctx) t_store =
 module type Stored = sig
   type t
   type key
+  val with_annotations : t -> Branch_annotations.t -> t
   val compare_key : key -> key -> int
-  val make_key : t -> key option
+  val make_key : t -> (key * Branch_annotations.t) option
 end
 
 module type CtxStored = sig
   include Stored
   type context
-  val make_key : context -> t -> key option
+  val make_key : context -> t -> (key * Branch_annotations.t) option
 end
 
 module CtxStore(A:CtxStored) :
@@ -83,8 +84,6 @@ module type S =
     type act
     (* type of layouts *)
     type layout
-    (* type of action weights *)
-    type weight
 
     (* Various constructors, for making a binder,
         adding one integer, etc. *)
@@ -121,9 +120,8 @@ module type S =
     val make_switch : loc -> layout -> arg -> int array -> act array -> act
 
    (* Build last minute sharing of action stuff *)
-   val make_catch :
-     layout -> act -> int -> Static_label.t * weight * (act -> act)
-   val make_exit : Static_label.t -> weight -> act
+   val make_catch : layout -> act -> Static_label.t * Branch_annotations.t * (act -> act)
+   val make_exit : Static_label.t -> Branch_annotations.t -> act
   end
 
 
