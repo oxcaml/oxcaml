@@ -850,8 +850,8 @@ let add_stack_checks_if_needed (fundecl : Linear.fundecl) ~stack_offset
   let insert_stack_check =
     if Config.no_stack_checks
     then
-      Domainstate.stack_guard_size > 0
-      && max_frame_size >= Domainstate.stack_guard_size
+      Domainstate.stack_guard_stride > 0
+      && max_frame_size >= Domainstate.stack_guard_stride
     else contains_nontail_calls || max_frame_size >= stack_threshold_size
   in
   if insert_stack_check
