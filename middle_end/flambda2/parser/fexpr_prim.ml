@@ -893,6 +893,9 @@ let project_value_slot =
      if the value slot's definition (in a "with" clause, where kinds are
      supported) has already been parsed, the slot registered under this name
      will have the correct kind and the kind here is ignored. *)
+  (* If a function slot is fresh when defining a primitive, it means it does not
+  exist in constructions, but only in projections. As such, it will be deleted
+  when computing the slot_offsets. This means we can give it a dummy size. *)
   let kind = Flambda_kind.value in
   D.(
     unary "%project_value_slot"
@@ -900,7 +903,8 @@ let project_value_slot =
         (param2
            (maps (positional string)
               ~from:(fun env pf ->
-                Fexpr_to_flambda_commons.fresh_or_existing_function_slot env pf)
+                Fexpr_to_flambda_commons.fresh_or_existing_function_slot env pf
+                  ~size:0)
               ~to_:(fun env pf ->
                 Flambda_to_fexpr_commons.Env.translate_function_slot env pf))
            (maps (positional string)
@@ -919,12 +923,14 @@ let project_function_slot =
         (param2
            (maps (positional string)
               ~from:(fun env mf ->
-                Fexpr_to_flambda_commons.fresh_or_existing_function_slot env mf)
+                Fexpr_to_flambda_commons.fresh_or_existing_function_slot env mf
+                  ~size:0)
               ~to_:(fun env mf ->
                 Flambda_to_fexpr_commons.Env.translate_function_slot env mf))
            (maps (positional string)
               ~from:(fun env mt ->
-                Fexpr_to_flambda_commons.fresh_or_existing_function_slot env mt)
+                Fexpr_to_flambda_commons.fresh_or_existing_function_slot env mt
+                  ~size:0)
               ~to_:(fun env mt ->
                 Flambda_to_fexpr_commons.Env.translate_function_slot env mt)))
       (fun _ (move_from, move_to) ->

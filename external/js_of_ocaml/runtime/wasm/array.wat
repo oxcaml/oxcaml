@@ -685,13 +685,4 @@
                (local.get $len))))
       ))
       (ref.i31 (i32.const 0)))
-
-
-   (func (export "caml_iarray_of_array")
-      (param $a (ref eq)) (result (ref eq))
-      (local.get $a))
-
-   (func (export "caml_array_of_iarray")
-      (param $a (ref eq)) (result (ref eq))
-      (local.get $a))
 )

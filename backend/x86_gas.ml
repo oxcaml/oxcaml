@@ -383,6 +383,16 @@ let format_asm_for_expect_asm ~name ~body ~hidden_gc_jump_pads =
       s;
     Buffer.contents result
   in
+  (* Hide labels that only delimit DWARF ranges. *)
+  let body =
+    List.filter
+      (fun line ->
+        match[@warning "-4"] line with
+        | Directive (D.New_label (D.Label l, _)) ->
+          not (L.is_dwarf_only_label l)
+        | Ins _ | Directive _ -> true)
+      body
+  in
   let label_map : (string, L.t) Hashtbl.t = Hashtbl.create 16 in
   let next_id = ref 0 in
   List.iter

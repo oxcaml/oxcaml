@@ -373,6 +373,7 @@ type simplify_function_result =
 
 let simplify_function0 context ~outer_dacc function_slot_opt code_id code
     ~closure_bound_names_inside_function =
+  let original_outer_dacc = outer_dacc in
   let denv_prior_to_sets = C.dacc_prior_to_sets context |> DA.denv in
   let inlining_arguments_from_denv =
     denv_prior_to_sets |> DE.inlining_arguments
@@ -527,7 +528,31 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
       assert (Are_rebuilding_terms.do_rebuild_terms are_rebuilding);
       Rebuilding new_code
   in
-  { code_id; code = Some (code, code_const); outer_dacc; should_resimplify }
+  let is_newer_version =
+    let code_age_relation = DA.code_age_relation outer_dacc in
+    match
+      Code_age_relation.get_older_version_of code_age_relation old_code_id
+    with
+    | None -> false
+    | Some _older_version -> true
+  in
+  let zero_improvements =
+    let removed_ops = Cost_metrics.removed cost_metrics in
+    Removed_operations.(equal zero removed_ops)
+  in
+  if is_newer_version && (not should_resimplify) && zero_improvements
+  then
+    (* If there are no improvements to the specialisation, we keep the old
+       version.
+
+       We can't do that if the function was never specialised at least once. *)
+    { code_id = old_code_id;
+      code = None;
+      outer_dacc = original_outer_dacc;
+      should_resimplify
+    }
+  else
+    { code_id; code = Some (code, code_const); outer_dacc; should_resimplify }
 
 let introduce_code dacc code_id code_const =
   let code = LC.create_code code_id code_const in

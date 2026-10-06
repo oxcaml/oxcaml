@@ -51,6 +51,8 @@ val create :
   should_preserve_direct_calls:should_preserve_direct_calls ->
   le_monde_exterieur:Name.t ->
   all_constants:Name.t ->
+  function_slots_to_keep:Function_slot.Set.t ->
+  value_slots_to_keep:Value_slot.Set.t ->
   t
 
 (** The reversed expression context above the current point in the traversal. *)
@@ -81,3 +83,11 @@ val all_constants : t -> Name.t
 
 (** Return a copy of the environment with a new parent context. *)
 val with_parent : t -> Rev_expr.rev_expr_holed -> t
+
+val function_slots_to_keep : t -> Function_slot.Set.t
+
+val should_keep_function_slot : t -> Function_slot.t -> bool
+
+val value_slots_to_keep : t -> Value_slot.Set.t
+
+val should_keep_value_slot : t -> Value_slot.t -> bool

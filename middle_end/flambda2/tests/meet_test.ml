@@ -516,9 +516,7 @@ let test_make_suitable_with_removed_alias () =
   let outer_env = initial_env |> define f |> define x in
   let vs = Variable.create "vs" K.value in
   let function_slot =
-    Function_slot.create
-      (Current_unit.get_cu_exn ())
-      ~name:"f" ~is_always_immediate:false K.value
+    Function_slot.create (Current_unit.get_cu_exn ()) ~name:"f" ~size:0
   in
   let value_slot =
     Value_slot.create

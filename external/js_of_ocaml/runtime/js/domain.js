@@ -202,6 +202,14 @@ function caml_ml_domain_index(_unit) {
   return caml_domain_id;
 }
 
+//Provides: caml_ml_domain_index
+//Requires: caml_domain_id
+//Version: >= 5.2, < 5.3
+//If: oxcaml
+function caml_ml_domain_index(_unit) {
+  return caml_domain_id;
+}
+
 //Provides: caml_domain_id
 //Version: >= 5
 var caml_domain_id = 0;
@@ -304,11 +312,38 @@ function caml_domain_set_tick_interval_usec_bytecode(_interval_usec) {
   caml_failwith("[Domain.Tick] not implemented");
 }
 
+//Provides: caml_atomic_load_field
+//Version: >= 5.2, < 5.4
+//If: oxcaml
+function caml_atomic_load_field(ref, field) {
+  return ref[field + 1];
+}
+
 //Provides: caml_atomic_add_field
 //Version: >= 5.2
 //If: oxcaml
 function caml_atomic_add_field(ref, field, i) {
   ref[field + 1] += i;
+  return 0;
+}
+
+//Provides: caml_atomic_fetch_add_field
+//Version: >= 5.2, < 5.4
+//If: oxcaml
+function caml_atomic_fetch_add_field(ref, field, i) {
+  var old = ref[field + 1];
+  ref[field + 1] += i;
+  return old;
+}
+
+//Provides: caml_atomic_cas_field
+//Version: >= 5.2, < 5.4
+//If: oxcaml
+function caml_atomic_cas_field(ref, field, o, n) {
+  if (ref[field + 1] === o) {
+    ref[field + 1] = n;
+    return 1;
+  }
   return 0;
 }
 
@@ -329,6 +364,15 @@ function caml_atomic_compare_exchange_field(ref, field, o, n) {
 function caml_atomic_set_field(ref, field, v) {
   ref[field + 1] = v;
   return 0;
+}
+
+//Provides: caml_atomic_exchange_field
+//Version: >= 5.2, < 5.4
+//If: oxcaml
+function caml_atomic_exchange_field(ref, field, v) {
+  var old = ref[field + 1];
+  ref[field + 1] = v;
+  return old;
 }
 
 //Provides: caml_atomic_sub_field

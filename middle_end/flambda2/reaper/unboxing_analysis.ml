@@ -84,7 +84,7 @@ module Unboxed_fields = struct
 
   let rec fold_with_kind (f : Flambda_kind.t -> 'a -> 'b -> 'b) (fields : 'a t)
       acc =
-    Field.Map.fold
+    Field.Map.ordered_fold
       (fun field elt acc ->
         match elt with
         | Not_unboxed elt -> f (Field.kind field) elt acc
@@ -119,7 +119,7 @@ module Unboxed_fields = struct
     | Unboxed fields1, Unboxed fields2 -> fold2_subset f fields1 fields2 acc
 
   and fold2_subset f fields1 fields2 acc =
-    Field.Map.fold
+    Field.Map.ordered_fold
       (fun field f1 acc ->
         match Field.Map.find field fields2 with
         | exception Not_found ->
@@ -131,7 +131,7 @@ module Unboxed_fields = struct
       fields1 acc
 
   let rec fold2_subset_with_kind f fields1 fields2 acc =
-    Field.Map.fold
+    Field.Map.ordered_fold
       (fun field f1 acc ->
         match Field.Map.find field fields2 with
         | exception Not_found ->
@@ -825,7 +825,13 @@ let perform_analysis0 db ~stats =
                         (Function_slot.create
                            (Current_unit.get_cu_exn ())
                            ~name:(Function_slot.name fs)
-                           ~is_always_immediate:false Flambda_kind.value)
+                             (* CR-someday ncourant: The reaper currently never
+                                changes the function slot size of changed arity
+                                functions, as it preserves their number of
+                                complex parameters. It would be possible to
+                                change it, but only for functions that have a
+                                changed representation as well. *)
+                           ~size:(Function_slot.size fs))
                         acc)
                     Function_slot.Map.empty l
                 in
@@ -975,6 +981,7 @@ let compute_code_changes uses ~rewrite_kind_with_subkind ~rewrite_result_types
               (fun var kind -> rewrite_kind_with_subkind (Name.var var) kind)
               vars kinds
           in
+          let original_arity = Code_metadata.params_arity code_metadata in
           let params_arity =
             Flambda_arity.create
               (List.map
@@ -982,14 +989,15 @@ let compute_code_changes uses ~rewrite_kind_with_subkind ~rewrite_result_types
                    Flambda_arity.Component_for_creation.(
                      Unboxed_product
                        (List.map (fun kind -> Singleton kind) kinds)))
-                 (Flambda_arity.group_by_parameter code_dep.arity
+                 (Flambda_arity.group_by_parameter original_arity
                     (rewrite_kinds code_dep.params
-                       (Flambda_arity.unarize code_dep.arity))))
+                       (Flambda_arity.unarize original_arity))))
           in
           let result_arity =
             Flambda_arity.create_singletons
               (rewrite_kinds code_dep.return
-                 (Flambda_arity.unarized_components code_dep.result_arity))
+                 (Flambda_arity.unarized_components
+                    (Code_metadata.result_arity code_metadata)))
           in
           ( Not_changing_calling_convention,
             Code_metadata.with_params_arity params_arity
@@ -1004,7 +1012,7 @@ let compute_code_changes uses ~rewrite_kind_with_subkind ~rewrite_result_types
                   if is_var_used param then Keep (param, kind) else Delete
                 | Some fields -> Unbox fields)
               code_dep.params
-              (Flambda_arity.unarize code_dep.arity)
+              (Flambda_arity.unarize (Code_metadata.params_arity code_metadata))
           in
           let my_closure_decision, code_metadata =
             match
@@ -1024,7 +1032,8 @@ let compute_code_changes uses ~rewrite_kind_with_subkind ~rewrite_result_types
                   if is_var_used v then Keep (v, kind) else Delete
                 | Some fields -> Unbox fields)
               code_dep.return
-              (Flambda_arity.unarized_components code_dep.result_arity)
+              (Flambda_arity.unarized_components
+                 (Code_metadata.result_arity code_metadata))
           in
           let result_arity =
             Flambda_arity.unarize_t (arity_of_decisions return_decisions)
