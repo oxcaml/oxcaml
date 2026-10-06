@@ -93,6 +93,10 @@ let new_block env ~params =
 let handler_is_cold (handler : Cmm.static_handler) =
   handler.is_cold && !Oxcaml_flags.cfg_block_layout
 
+let branch_is_cold (branch : Branch_annotations.t) =
+  Likelihood.is_cold (Branch_annotations.likelihood branch)
+  && !Oxcaml_flags.cfg_block_layout
+
 let emit_name_for_debugger env c v args =
   match VP.provenance v with
   | None -> ()
@@ -479,15 +483,9 @@ and emit_expr_op env c op args dbg : result =
 and emit_ifthenelse env c ~tail econd ifa eif elsea eelse : result =
   let cond, earg = Sel.select_condition econd in
   let* rarg = emit env c earg ~tail:false in
-  let then_env =
-    if Likelihood.is_cold (Branch_annotations.likelihood ifa)
-    then { env with cold = true }
-    else env
-  in
+  let then_env = if branch_is_cold ifa then { env with cold = true } else env in
   let else_env =
-    if Likelihood.is_cold (Branch_annotations.likelihood elsea)
-    then { env with cold = true }
-    else env
+    if branch_is_cold elsea then { env with cold = true } else env
   in
   let then_block = new_block then_env ~params:[||] in
   let else_block = new_block else_env ~params:[||] in
@@ -504,9 +502,7 @@ and emit_switch env c ~tail esel index ecases : result =
     Array.map
       (fun (_case_expr, _dbg, annots) ->
         let env =
-          if Likelihood.is_cold (Branch_annotations.likelihood annots)
-          then { env with cold = true }
-          else env
+          if branch_is_cold annots then { env with cold = true } else env
         in
         new_block env ~params:[||])
       ecases
