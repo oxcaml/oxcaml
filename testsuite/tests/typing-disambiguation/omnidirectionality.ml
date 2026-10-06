@@ -2,13 +2,13 @@
    expect;
 *)
 
-(* Constructor disambiguation under omndirectional type inference.
+(* Constructor disambiguation under omnidirectional type inference.
 
    Tests are grouped by the first stage of the implementation at which they
    should behave as intended.
 
    - Defaulting: the existing default rule is preserved.
-   - Rejected programs: programs that are ill-typed under every stage,
+   - Always rejected: programs that are ill-typed under every stage,
      whether due to defaulting or otherwise.
    - Stage 1: region-local omnidirectionality (typically within spine)
    - Stage 2: guard-directed defaulting
@@ -236,7 +236,7 @@ Line 3, characters 4-11:
 Error: This expression has type "t" but an expression was expected of type "u"
 |}]
 
-(* In stages 1, [D] defaults to [u2.D]. In stages 2 & 3, [D] resolves to [t2.D],
+(* In stage 1, [D] defaults to [u2.D]. In stages 2 & 3, [D] resolves to [t2.D],
    so [C] is checked against [t] instead, which fails since [C] is absent from
    [t] *)
 let r6 x =
@@ -292,7 +292,7 @@ Error: The constant "1" has type "int" but an expression was expected of type "u
 
 (* [f]'s argument is defaulted to [u]. As a result, the [function] is missing a
    case for [C] and must report a partial-match warning. Additionally, [B] is
-   defaulted to [u.B] which takes an [bool], not a [string] *)
+   defaulted to [u.B] which takes a [bool], not a [string] *)
 let r10 =
   let f = function A -> 0 | B _ -> 1 in
   f A, f (B "s")
@@ -312,7 +312,7 @@ Error: This constant has type "string" but an expression was expected of type
          "bool"
 |}]
 
-(* In stage 2 & 3, we learn that [A] and [B] resolve to [u.A] and [u.B] resp.
+(* In stages 2 & 3, we learn that [A] and [B] resolve to [u.A] and [u.B] resp.
    due to closed world reasoning on [C]. However, [B] takes a [bool], not
    [int] *)
 let r11 = [A; B 1; C]
@@ -354,16 +354,19 @@ val a1 : u = C
 (* Omnidirectionality of applications [a2-a4] *)
 let a21 = (fun (x : t) -> x) A
 
+[%%expect {|
+val a21 : t = A
+|}]
+
+(* Principality warning will disappear *)
 let a22 = apply (fun (x : t) -> x) A
 
 [%%expect
 {|
-val a21 : t = A
 val a22 : t = A
 |}, Principal{|
-val a21 : t = A
-Line 3, characters 35-36:
-3 | let a22 = apply (fun (x : t) -> x) A
+Line 1, characters 35-36:
+1 | let a22 = apply (fun (x : t) -> x) A
                                        ^
 Warning 18 [not-principal]: this type-based constructor disambiguation is not
   principal.
@@ -373,10 +376,7 @@ val a22 : t = A
 
 let a31 = A |> fun (x : t) -> x
 
-let a32 = rev_apply A (fun (x : t) -> x)
-
-[%%expect
-{|
+[%%expect {|
 Line 1, characters 19-26:
 1 | let a31 = A |> fun (x : t) -> x
                        ^^^^^^^
@@ -384,12 +384,20 @@ Error: This pattern matches values of type "t"
        but a pattern was expected which matches values of type "u"
 |}]
 
-let a41 = B 1 |> fun (x : t) -> x
-
-let a42 = rev_apply (B 1) (fun (x : t) -> x)
+let a32 = rev_apply A (fun (x : t) -> x)
 
 [%%expect
 {|
+Line 1, characters 27-34:
+1 | let a32 = rev_apply A (fun (x : t) -> x)
+                               ^^^^^^^
+Error: This pattern matches values of type "t"
+       but a pattern was expected which matches values of type "u"
+|}]
+
+let a41 = B 1 |> fun (x : t) -> x
+
+[%%expect {|
 Line 1, characters 12-13:
 1 | let a41 = B 1 |> fun (x : t) -> x
                 ^
@@ -397,19 +405,24 @@ Error: The constant "1" has type "int" but an expression was expected of type
          "bool"
 |}]
 
-(* Omnidirectionality of if-then-else *)
-let a51 b = if b then (B 1 : t) else A
-
-let a52 b = if b then B 1 else (A : t)
+let a42 = rev_apply (B 1) (fun (x : t) -> x)
 
 [%%expect
 {|
-val a51 : bool -> t = <fun>
-Line 3, characters 24-25:
-3 | let a52 b = if b then B 1 else (A : t)
-                            ^
+Line 1, characters 23-24:
+1 | let a42 = rev_apply (B 1) (fun (x : t) -> x)
+                           ^
 Error: The constant "1" has type "int" but an expression was expected of type
          "bool"
+|}]
+
+(* Omnidirectionality of if-then-else *)
+
+(* Principality warning will disappear *)
+let a51 b = if b then (B 1 : t) else A
+
+[%%expect {|
+val a51 : bool -> t = <fun>
 |}, Principal{|
 Line 1, characters 37-38:
 1 | let a51 b = if b then (B 1 : t) else A
@@ -418,8 +431,14 @@ Warning 18 [not-principal]: this type-based constructor disambiguation is not
   principal.
 
 val a51 : bool -> t = <fun>
-Line 3, characters 24-25:
-3 | let a52 b = if b then B 1 else (A : t)
+|}]
+
+let a52 b = if b then B 1 else (A : t)
+
+[%%expect
+{|
+Line 1, characters 24-25:
+1 | let a52 b = if b then B 1 else (A : t)
                             ^
 Error: The constant "1" has type "int" but an expression was expected of type
          "bool"
@@ -521,22 +540,10 @@ Line 3, characters 4-13:
 Error: This expression should not be a record, the expected type is "bool"
 |}]
 
-let a12 =
-  let open Inline_record in
-  function B { n = _ } -> 42 | (A : t3) -> 0
-
-[%%expect
-{|
-Line 3, characters 13-22:
-3 |   function B { n = _ } -> 42 | (A : t3) -> 0
-                 ^^^^^^^^^
-Error: This pattern should not be a record, the expected type is "bool"
-|}]
-
 (* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Stage 2 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ *)
 
 (* Many of the tests in this section ought to work in stage 1. However,
-   because they (suprisingly) introduce local regions, they only work
+   because they (surprisingly) introduce local regions, they only work
    in stages 2 & 3 *)
 
 (* Omnidirectionality of sequences *)
@@ -565,11 +572,11 @@ Line 4, characters 3-4:
 Error: The value "y" has type "u" but an expression was expected of type "t"
 |}]
 
-(* In stage 1, [x] is unncessarily defaulted to [u.A]. Stages 2 & 3 correctly
+(* In stage 1, [A] is unnecessarily defaulted to [u.A]. Stages 2 & 3 correctly
    delay the constraint *)
 let b3 x =
   unify x A;
-  let y = 1 in
+  let _y = 1 in
   (x : t)
 
 [%%expect
@@ -632,7 +639,7 @@ Error: The constant "1" has type "int" but an expression was expected of type
          "bool"
 |}]
 
-(* Suspending in patterns (c.f. [a9] for the symmetric case) *)
+(* Suspending in patterns (cf. [a9] for the symmetric case) *)
 let b8 x = match x with A -> 0 | (B _ : t) -> 1
 
 [%%expect
@@ -754,19 +761,19 @@ end
 module Three_way : sig type v = A | B of string | E end
 |}]
 
+(* Partial-match after resolving a suspended constraint. Doesn't
+   take the defaulting path. *)
 let b15 x =
   let open Three_way in
-  match x with A -> 0 | (B _ : v) -> 1
+  match x with A -> 0 | (B _ : u) -> 1
 
 [%%expect
 {|
-Line 3, characters 2-38:
-3 |   match x with A -> 0 | (B _ : v) -> 1
-      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-  Here is an example of a case that is not matched: "E"
-
-val b15 : Three_way.v -> int = <fun>
+Line 3, characters 24-33:
+3 |   match x with A -> 0 | (B _ : u) -> 1
+                            ^^^^^^^^^
+Error: This pattern matches values of type "u"
+       but a pattern was expected which matches values of type "Three_way.v"
 |}]
 
 module Cycle = struct
@@ -833,15 +840,12 @@ val b19 : Cycle.ty -> Cycle.tx -> Cycle.ty = <fun>
 (* This is a breaking change. We expect defaulting to fail here.
 
    The current constructor disambiguation implementation succeeds by using a
-   lexical defaulting order: [Foo y] is defaulted to [tx.Foo]. As a result, [x]
-   resolves to [tx] and [y] to [ty].
-
-   CR aobrien: There is a fishy [List.rev] somewhere here, since one might
-   expect [ty.Foo] to be the default.
+   lexical defaulting order: [Foo y] is defaulted to [ty.Foo]. As a result, [x]
+   resolves to [ty] and [y] to [tx].
 
    The proposed defaulting implementation would default [Foo y] and [Foo x]
-   simulatenously, both to [ty.Foo]. As a result, [x] and [y] must both resolve
-   to [ty] and [tx], which leads to a type error *)
+   simultaneously, both to [ty.Foo]. As a result, [x] and [y] must both resolve
+   to [tx] and [ty], which leads to a type error *)
 let b20 x y =
   let open Cycle in
   unify x (Foo y);
@@ -860,7 +864,19 @@ Warning 18 [not-principal]: this type-based constructor disambiguation is not
 val b20 : Cycle.ty -> Cycle.tx -> unit = <fun>
 |}]
 
-(* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Stage 3 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ *)
+let b21 =
+  let open Inline_record in
+  function B { n = _ } -> 42 | (A : t3) -> 0
+
+[%%expect
+{|
+Line 3, characters 13-22:
+3 |   function B { n = _ } -> 42 | (A : t3) -> 0
+                 ^^^^^^^^^
+Error: This pattern should not be a record, the expected type is "bool"
+|}]
+
+(* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Stage 3 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ *)
 
 (* Suspended patterns that bind variables. The variable types will be
    generalized in [map_half_typed_cases] *)
@@ -921,7 +937,7 @@ Error: The constant "0" has type "int" but an expression was expected of type
 (* Backpropagation: information flows from an instance back to its
    let-definition *)
 
-(* In stages 1 & 2, [x] is defaulted to [u.A]. In stage 3, backpropagation
+(* In stages 1 & 2, [A] is defaulted to [u.A]. In stage 3, backpropagation
    occurs and the example typechecks *)
 let c6 =
   let x = A in
@@ -1098,7 +1114,7 @@ Error: The value "z" has type "u" but an expression was expected of type "t"
 |}]
 
 module Parameterized = struct
-  (* ex_8 in the paper: a parametrised overloaded constructor. [w] is declared
+  (* ex_8 in the paper: a parameterized overloaded constructor. [w] is declared
      last so that [pt] is not the default *)
   type 'a pt =
     | A
