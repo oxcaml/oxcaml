@@ -1493,8 +1493,9 @@ val rename : Ident.t Ident.Map.t -> lambda -> lambda
 val rename_lfun : Ident.t Ident.Map.t -> lfunction -> lfunction
 (** Identical to [rename] but operates on [lfunction] rather than [lambda]. *)
 
-val duplicate_function : lfunction -> lfunction
-(** Duplicate a term, freshening all locally-bound identifiers. *)
+val duplicate_function : ?rename:Ident.t Ident.Map.t -> lfunction -> lfunction
+(** Duplicate a term, freshening all locally-bound identifiers and renaming
+    free identifiers according to [rename]. *)
 
 val map : (lambda -> lambda) -> lambda -> lambda
   (** Bottom-up rewriting, applying the function on

@@ -180,6 +180,9 @@ and Env : sig
 
   val idents_and_layouts : t -> (Ident.t * layout) list
 
+  (** Rename every ident to a fresh one, returning the renaming. *)
+  val freshen_idents : t -> t * Ident.t Ident.Map.t
+
   val find_sort_var : t -> Layout_ident.t -> layout
 end = struct
   type t =
@@ -226,6 +229,18 @@ end = struct
   let idents_and_layouts t =
     Ident.Map.bindings t.idents
     |> List.map (fun (id, (layout, _)) -> id, layout)
+
+  let freshen_idents t =
+    let idents, renaming =
+      Ident.Map.fold
+        (fun id entry (idents, renaming) ->
+          let fresh_id = Ident.rename id in
+          ( Ident.Map.add fresh_id entry idents,
+            Ident.Map.add id fresh_id renaming ))
+        t.idents
+        (Ident.Map.empty, Ident.Map.empty)
+    in
+    { t with idents }, renaming
 
   let find_sort_var t var =
     match Layout_ident.Map.find_opt var t.sort_vars with
@@ -334,6 +349,31 @@ module CU_data = struct
       Template_store.print templates
 end
 
+(** Each instantiation gets its own copy of the closure with fresh idents, so
+    instantiations have distinct binders and the idents of closures loaded from
+    other compilation units can't clash with local ones. Instantiation
+    arguments are static values, which contain no idents, so they need no
+    renaming.
+
+    [clo_runtime_env] is renamed in place rather than rebuilt from [clo_env]
+    because its order must match the fields of the runtime environment block,
+    which may have been built in another compilation unit. *)
+let freshen_closure { Types.clo_template; clo_runtime_env; clo_env } =
+  let clo_env, renaming = Env.freshen_idents clo_env in
+  let duplicate = Lambda.duplicate_function ~rename:renaming in
+  let clo_template =
+    match clo_template with
+    | Types.Kind { ktmpl_params; ktmpl_body } ->
+      Types.Kind { ktmpl_params; ktmpl_body = duplicate ktmpl_body }
+    | Types.Static func -> Types.Static (duplicate func)
+  in
+  let clo_runtime_env =
+    List.map
+      (fun (id, layout) -> Ident.Map.find id renaming, layout)
+      clo_runtime_env
+  in
+  { Types.clo_template; clo_runtime_env; clo_env }
+
 module Ctx : sig
   type t
 
@@ -432,14 +472,11 @@ end = struct
         (* eval_apply might recursively call this function so mark this name as
            visited before calling it. *)
         Ident.Tbl.replace t.instantiated_templates name None;
-        let { Types.slv_comptime; slv_runtime } = eval_apply closure args in
-        Ident.Tbl.replace t.instantiated_templates name (Some slv_comptime);
-        let instantiation =
-          Lambda.subst
-            (fun _ _ env -> env)
-            ~freshen_bound_variables:true Ident.Map.empty slv_runtime
+        let { Types.slv_comptime; slv_runtime } =
+          eval_apply (freshen_closure closure) args
         in
-        t.instantiations <- (name, instantiation) :: t.instantiations;
+        Ident.Tbl.replace t.instantiated_templates name (Some slv_comptime);
+        t.instantiations <- (name, slv_runtime) :: t.instantiations;
         slv_comptime
         end
     in
