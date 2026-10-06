@@ -1244,7 +1244,7 @@ let transl_instantiated_shape env loc sorts_and_types kind =
       let rec element (layout : Jkind_types.Layout.Const.t)
           : unit Lambda.mixed_block_element =
         match layout with
-        | Genvar var -> Splice_variable (Slambdaident.of_sort_var var)
+        | Genvar var -> Splice_variable (Layout_ident.of_sort_var var)
         | Product layouts ->
             Product (Array.of_list (List.map element layouts))
         | Addressable layout -> element layout
@@ -1442,7 +1442,7 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
       | Product _) as const) ->
     error const
   | Univar _ -> Misc.fatal_error "layout: unexpected univar"
-  | Genvar var -> Psplicevar (Slambdaident.of_sort_var var)
+  | Genvar var -> Psplicevar (Layout_ident.of_sort_var var)
 
 let layout env loc sort ty =
   layout_of_const_sort_generic sort

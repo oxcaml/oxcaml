@@ -168,7 +168,7 @@
   mtype
   debuginfo
   static_label
-  slambdaident
+  layout_ident
   lambda
   mixed_product_bytes
   runtimedef
@@ -401,7 +401,7 @@
 
 (copy_files ../../lambda/static_label.ml)
 
-(copy_files ../../lambda/slambdaident.ml)
+(copy_files ../../lambda/layout_ident.ml)
 
 (copy_files ../../lambda/mixed_product_bytes.ml)
 
@@ -605,7 +605,7 @@
 
 (copy_files ../../lambda/static_label.mli)
 
-(copy_files ../../lambda/slambdaident.mli)
+(copy_files ../../lambda/layout_ident.mli)
 
 (copy_files ../../lambda/mixed_product_bytes.mli)
 
@@ -786,7 +786,7 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Includecore.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Typedtree.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Static_label.cmo
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Slambdaident.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Layout_ident.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Lambda.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Mixed_product_bytes.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Typedecl_properties.cmo
@@ -921,7 +921,7 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Includecore.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Typedtree.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Static_label.cmx
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Slambdaident.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Layout_ident.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Lambda.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Mixed_product_bytes.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Typedecl_properties.cmx

@@ -25,58 +25,11 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-type t =
-  | Ident of Ident.t
-  | Sort_var of Jkind_types.Sort.Var.id
+type t
 
-let of_ident ident = Ident ident
+include Identifiable.S with type t := t
 
-let of_sort_var var =
-  if not (Jkind_types.Sort.Var.is_root var)
-  then Misc.fatal_error "Slambdaident.of_sort_var: not a root";
-  Sort_var (Jkind_types.Sort.Var.get_id var)
-
-let equal i1 i2 =
-  match i1, i2 with
-  | Ident i1, Ident i2 -> Ident.equal i1 i2
-  | Sort_var var1, Sort_var var2 -> var1 = var2
-  | _ -> false
-
-let hash = function
-  | Ident i -> Hashtbl.hash (1, Ident.hash i)
-  | Sort_var var -> Hashtbl.hash (2, var)
-
-let compare i1 i2 =
-  match i1, i2 with
-  | Ident i1, Ident i2 -> Ident.compare i1 i2
-  | Ident _, _ -> 1
-  | _, Ident _ -> -1
-  | Sort_var var1, Sort_var var2 -> Int.compare (var1 :> int) (var2 :> int)
-
-let output oc = function
-  | Ident ident ->
-    output_string oc "l_";
-    Ident.output oc ident
-  | Sort_var var ->
-    output_string oc "s_";
-    output_binary_int oc (var :> int)
-
-let print ppf =
-  let open Format in
-  function
-  | Ident ident -> fprintf ppf "%a" Ident.print ident
-  | Sort_var var -> fprintf ppf "layout_%i" (var :> int)
-
-include Identifiable.Make (struct
-  type nonrec t = t
-
-  let equal = equal
-
-  let hash = hash
-
-  let compare = compare
-
-  let output = output
-
-  let print = print
-end)
+(** "Lifts" a [Jkind_types.Sort.var], equal [Jkind_types.Sort.var]s will produce
+    equal values. This function relies on the var being passed through to be
+    normalised such that its contents is none and will never be mutated. *)
+val of_sort_var : Jkind_types.Sort.var -> t

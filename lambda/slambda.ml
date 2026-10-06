@@ -170,26 +170,26 @@ and Env : sig
 
   val add_ident : t -> Ident.t -> layout -> Types.value Or_missing.t -> t
 
-  val add_sort_var : t -> Slambdaident.t -> layout -> t
+  val add_sort_var : t -> Layout_ident.t -> layout -> t
 
   val find_value : t -> Ident.t -> Types.value Or_missing.t
 
   val find_layout : t -> Ident.t -> layout
 
-  val find_sort_var : t -> Slambdaident.t -> layout
+  val find_sort_var : t -> Layout_ident.t -> layout
 end = struct
   type t =
     { idents : (layout * Types.value Or_missing.t) Ident.Map.t;
-      sort_vars : layout Slambdaident.Map.t
+      sort_vars : layout Layout_ident.Map.t
     }
 
-  let empty = { idents = Ident.Map.empty; sort_vars = Slambdaident.Map.empty }
+  let empty = { idents = Ident.Map.empty; sort_vars = Layout_ident.Map.empty }
 
   let add_ident t id layout value =
     { t with idents = Ident.Map.add id (layout, value) t.idents }
 
   let add_sort_var t var layout =
-    { t with sort_vars = Slambdaident.Map.add var layout t.sort_vars }
+    { t with sort_vars = Layout_ident.Map.add var layout t.sort_vars }
 
   let find_value t id =
     match Ident.Map.find_opt id t.idents with
@@ -204,11 +204,11 @@ end = struct
         id
 
   let find_sort_var t var =
-    match Slambdaident.Map.find_opt var t.sort_vars with
+    match Layout_ident.Map.find_opt var t.sort_vars with
     | Some layout -> layout
     | None ->
       Misc.fatal_errorf "Slambda: no layout bound for sort variable %a"
-        Slambdaident.print var
+        Layout_ident.print var
 end
 
 module Template_store = struct
