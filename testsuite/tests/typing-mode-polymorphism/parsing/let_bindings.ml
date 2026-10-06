@@ -28,6 +28,16 @@ val i :
 
 (* Constant bounds are allowed in let binding annotations *)
 
+(* CR ageorges: The following two examples have bad principal types. When looking at their
+   underlying graphs, this is due to an ill-leveled mode graph, which can result in
+   bad zapping for printing.
+
+   The ill-leveled graph is due to to a bug in the typing of let: In principal mode, the
+   typing of let stores a type which has a generalized structure into the environment
+   The type is then instantiated, inference continues, and finally the copy is fully
+   generalized. However, this does not yield the same modes as generalizing the original
+   type in the environment, and leads to an ill-leveled exposed mode graph. *)
+
 let j : 'a @ [< 'm & portable] -> 'a @ [> 'm] = fun x -> x
 [%%expect{|
 val j : 'a @ [< 'm & portable] -> 'a @ [> 'm] = <fun>
