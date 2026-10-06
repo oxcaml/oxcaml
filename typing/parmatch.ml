@@ -389,108 +389,18 @@ struct
       compats ps qs
     | Tpat_array (am1, _, ps), Tpat_array (am2, _, qs) ->
       am1 = am2 && List.length ps = List.length qs && compats ps qs
-    | ( Tpat_fun_layout _,
-        ( Tpat_fun_layout _ | Tpat_constant _ | Tpat_unboxed_unit
-        | Tpat_unboxed_bool _ | Tpat_tuple _ | Tpat_unboxed_tuple _
-        | Tpat_construct (_, _, _, _, _)
-        | Tpat_variant (_, _, _)
-        | Tpat_record (_, _, _)
-        | Tpat_record_unboxed_product (_, _, _)
-        | Tpat_array (_, _, _)
-        | Tpat_lazy _ ) )
-    | ( Tpat_constant _,
-        ( Tpat_fun_layout _ | Tpat_unboxed_unit | Tpat_unboxed_bool _
-        | Tpat_tuple _ | Tpat_unboxed_tuple _
-        | Tpat_construct (_, _, _, _, _)
-        | Tpat_variant (_, _, _)
-        | Tpat_record (_, _, _)
-        | Tpat_record_unboxed_product (_, _, _)
-        | Tpat_array (_, _, _)
-        | Tpat_lazy _ ) )
-    | ( Tpat_unboxed_unit,
-        ( Tpat_fun_layout _ | Tpat_constant _ | Tpat_unboxed_bool _
-        | Tpat_tuple _ | Tpat_unboxed_tuple _
-        | Tpat_construct (_, _, _, _, _)
-        | Tpat_variant (_, _, _)
-        | Tpat_record (_, _, _)
-        | Tpat_record_unboxed_product (_, _, _)
-        | Tpat_array (_, _, _)
-        | Tpat_lazy _ ) )
-    | ( Tpat_unboxed_bool _,
-        ( Tpat_fun_layout _ | Tpat_constant _ | Tpat_unboxed_unit | Tpat_tuple _
-        | Tpat_unboxed_tuple _
-        | Tpat_construct (_, _, _, _, _)
-        | Tpat_variant (_, _, _)
-        | Tpat_record (_, _, _)
-        | Tpat_record_unboxed_product (_, _, _)
-        | Tpat_array (_, _, _)
-        | Tpat_lazy _ ) )
-    | ( Tpat_tuple _,
-        ( Tpat_fun_layout _ | Tpat_constant _ | Tpat_unboxed_unit
-        | Tpat_unboxed_bool _ | Tpat_unboxed_tuple _
-        | Tpat_construct (_, _, _, _, _)
-        | Tpat_variant (_, _, _)
-        | Tpat_record (_, _, _)
-        | Tpat_record_unboxed_product (_, _, _)
-        | Tpat_array (_, _, _)
-        | Tpat_lazy _ ) )
-    | ( Tpat_unboxed_tuple _,
-        ( Tpat_fun_layout _ | Tpat_constant _ | Tpat_unboxed_unit
-        | Tpat_unboxed_bool _ | Tpat_tuple _
-        | Tpat_construct (_, _, _, _, _)
-        | Tpat_variant (_, _, _)
-        | Tpat_record (_, _, _)
-        | Tpat_record_unboxed_product (_, _, _)
-        | Tpat_array (_, _, _)
-        | Tpat_lazy _ ) )
-    | ( Tpat_construct (_, _, _, _, _),
-        ( Tpat_fun_layout _ | Tpat_constant _ | Tpat_unboxed_unit
-        | Tpat_unboxed_bool _ | Tpat_tuple _ | Tpat_unboxed_tuple _
-        | Tpat_variant (_, _, _)
-        | Tpat_record (_, _, _)
-        | Tpat_record_unboxed_product (_, _, _)
-        | Tpat_array (_, _, _)
-        | Tpat_lazy _ ) )
-    | ( Tpat_variant (_, _, _),
-        ( Tpat_fun_layout _ | Tpat_constant _ | Tpat_unboxed_unit
-        | Tpat_unboxed_bool _ | Tpat_tuple _ | Tpat_unboxed_tuple _
-        | Tpat_construct (_, _, _, _, _)
-        | Tpat_record (_, _, _)
-        | Tpat_record_unboxed_product (_, _, _)
-        | Tpat_array (_, _, _)
-        | Tpat_lazy _ ) )
-    | ( Tpat_record (_, _, _),
-        ( Tpat_fun_layout _ | Tpat_constant _ | Tpat_unboxed_unit
-        | Tpat_unboxed_bool _ | Tpat_tuple _ | Tpat_unboxed_tuple _
-        | Tpat_construct (_, _, _, _, _)
-        | Tpat_variant (_, _, _)
-        | Tpat_record_unboxed_product (_, _, _)
-        | Tpat_array (_, _, _)
-        | Tpat_lazy _ ) )
-    | ( Tpat_record_unboxed_product (_, _, _),
-        ( Tpat_fun_layout _ | Tpat_constant _ | Tpat_unboxed_unit
-        | Tpat_unboxed_bool _ | Tpat_tuple _ | Tpat_unboxed_tuple _
-        | Tpat_construct (_, _, _, _, _)
-        | Tpat_variant (_, _, _)
-        | Tpat_record (_, _, _)
-        | Tpat_array (_, _, _)
-        | Tpat_lazy _ ) )
-    | ( Tpat_array (_, _, _),
-        ( Tpat_fun_layout _ | Tpat_constant _ | Tpat_unboxed_unit
-        | Tpat_unboxed_bool _ | Tpat_tuple _ | Tpat_unboxed_tuple _
-        | Tpat_construct (_, _, _, _, _)
-        | Tpat_variant (_, _, _)
-        | Tpat_record (_, _, _)
-        | Tpat_record_unboxed_product (_, _, _)
-        | Tpat_lazy _ ) )
-    | ( Tpat_lazy _,
-        ( Tpat_fun_layout _ | Tpat_constant _ | Tpat_unboxed_unit
-        | Tpat_unboxed_bool _ | Tpat_tuple _ | Tpat_unboxed_tuple _
-        | Tpat_construct (_, _, _, _, _)
-        | Tpat_variant (_, _, _)
-        | Tpat_record (_, _, _)
-        | Tpat_record_unboxed_product (_, _, _)
-        | Tpat_array (_, _, _) ) ) ->
+    | Tpat_fun_layout _, _
+    | Tpat_constant _, _
+    | Tpat_unboxed_unit, _
+    | Tpat_unboxed_bool _, _
+    | Tpat_tuple _, _
+    | Tpat_unboxed_tuple _, _
+    | Tpat_construct (_, _, _, _, _), _
+    | Tpat_variant (_, _, _), _
+    | Tpat_record (_, _, _), _
+    | Tpat_record_unboxed_product (_, _, _), _
+    | Tpat_array (_, _, _), _
+    | Tpat_lazy _, _ ->
       false
 
   and ocompat op oq =
