@@ -108,8 +108,7 @@ let find_code_characteristics find_code_metadata code_id :
     Cost_metrics.code_characteristics =
   let code_metadata = find_code_metadata code_id in
   { cost_metrics = Code_metadata.cost_metrics code_metadata;
-    params_arity =
-      Flambda_arity.num_params (Code_metadata.params_arity code_metadata)
+    function_slot_size = Code_metadata.function_slot_size code_metadata
   }
 
 let create_set_of_closures are_rebuilding ~find_code_metadata set =

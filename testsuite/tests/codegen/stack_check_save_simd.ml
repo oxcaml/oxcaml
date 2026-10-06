@@ -1,6 +1,7 @@
 (* TEST
  flags += " -O3";
  only-stack-checks-codegen;
+ flags += " -g -gdwarf-inlined-frames";
  expect.opt;
 *)
 
@@ -36,7 +37,7 @@ f:
   ret
 .L1:
   pushq %r10
-  leaq  -368(%rsp), %r10
+  leaq  -376(%rsp), %r10
   cmpq  40(%r14), %r10
   popq  %r10
   jb    .L9

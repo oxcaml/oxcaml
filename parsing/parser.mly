@@ -1756,6 +1756,9 @@ module_expr:
     | (* An extension. *)
       ex = extension
         { Pmod_extension ex }
+    | (* A hole. *)
+      UNDERSCORE
+        { Pmod_hole }
     )
     { $1 }
 ;

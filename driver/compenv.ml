@@ -310,6 +310,7 @@ let read_one_param ppf position name v =
   | "safe-string" -> compat "safe-string" v (* kept for compatibility *)
   | "strict-sequence" -> set "strict-sequence" [ strict_sequence ] v
   | "strict-formats" -> set "strict-formats" [ strict_formats ] v
+  | "syntax-quotations" -> set "syntax-quotations" [ syntax_quotations ] v
   | "thread" -> set "thread" [ use_threads ] v
   | "unboxed-types" -> set "unboxed-types" [ unboxed_types ] v
   | "unsafe" -> set "unsafe" [ unsafe ] v

@@ -298,7 +298,7 @@ let mutable_ (mut : Types.mutability) : mutable_flag =
   match mut with
   | Immutable -> Immutable
   | Mutable { mode; atomic = _ } ->
-      let open Mode.Value.Comonadic in
+      let open Mode.With_regionality.Comonadic in
       equate_exn mode legacy;
       Mutable
 
@@ -693,7 +693,7 @@ let expression sub exp =
             | _, _, Overridden (lid, exp) -> (lid, sub.expr sub exp) :: l)
             [] fields
         in
-        Pexp_record (list, Option.map (fun (exp, _, _) -> sub.expr sub exp)
+        Pexp_record (list, Option.map (fun (exp, _, _, _) -> sub.expr sub exp)
                              extended_expression)
     | Texp_record_unboxed_product { fields; extended_expression; _ } ->
         let list = Array.fold_left (fun l -> function
@@ -1033,8 +1033,7 @@ let module_expr (sub : mapper) mexpr =
               Pmod_unpack (sub.expr sub exp)
               (* TODO , sub.package_type sub pack) *)
           | Tmod_typed_hole ->
-              let id = Location.mkloc hole_txt loc in
-              Pmod_extension (id, PStr [])
+              Pmod_hole
         in
         Mod.mk ~loc ~attrs desc
 

@@ -327,7 +327,7 @@ val nice : int -> int
 (** {1 Basic file input/output} *)
 
 
-type file_descr : immediate mod contended portable
+type file_descr : immediate
 (** The abstract type of file descriptors. *)
 (* CR mshinwell: file descriptors are custom blocks on Windows, but that
    platform is not currently supported *)

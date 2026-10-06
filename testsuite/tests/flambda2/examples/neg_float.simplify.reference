@@ -10,7 +10,7 @@ let code loopify(never) size(1) newer_version_of(make_pos_float_0)
   cont k ($camlNeg_float__float_sub_5)
 in
 let $camlNeg_float__make_pos_float_4 =
-  closure make_pos_float_0_1 @make_pos_float &toplevel.alloc_region
+  closure make_pos_float_0_1 @make_pos_float &toplevel
 in
 let $camlNeg_float__float_sub_7 = -0x1p+1 in
 let code loopify(never) size(1) newer_version_of(make_neg_float_1)
@@ -21,7 +21,7 @@ let code loopify(never) size(1) newer_version_of(make_neg_float_1)
   cont k ($camlNeg_float__float_sub_7)
 in
 let $camlNeg_float__make_neg_float_6 =
-  closure make_neg_float_1_1 @make_neg_float &toplevel.alloc_region
+  closure make_neg_float_1_1 @make_neg_float &toplevel
 in
 let $camlNeg_float =
   Block 0 ($camlNeg_float__float_0,

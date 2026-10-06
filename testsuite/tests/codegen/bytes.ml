@@ -8,6 +8,7 @@
  only-default-codegen;
  flags = " -O3 -I ocamlopt.opt";
  flags += " -experimental-optimizations";
+ flags += " -g -gdwarf-inlined-frames";
  expect.opt;
 *)
 
@@ -199,11 +200,11 @@ bytes_safe_get_int32:
   movslq (%rax,%rbx), %rax
   ret
 .L0:
+  subq  $8, %rsp
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L1:
 |}]
 
 let bytes_get_int64_indexed_by_int64
@@ -421,15 +422,20 @@ buf_length:
 |}]
 
 
-(* CR ttebbi: unnecessary int tag untag sequence*)
 let u8_to_int_unsafe_set (x : bytes) (y : Uint8_u.t) =
   Bytes.unsafe_set x 0 (Uint8_u.to_int y)
 [%%expect_asm X86_64{|
 u8_to_int_unsafe_set:
-  leaq  1(%rbx,%rbx), %rbx
-  andl  $511, %ebx
-  sarq  $1, %rbx
   movb  %bl, (%rax)
   movl  $1, %eax
+  ret
+|}]
+
+let unsafe_get_u8_to_int (x : bytes) =
+  Uint8_u.to_int (Bytes.unsafe_get_int8_u_indexed_by_int64 x #0L)
+[%%expect_asm X86_64{|
+unsafe_get_u8_to_int:
+  movzbq (%rax), %rax
+  leaq  1(%rax,%rax), %rax
   ret
 |}]

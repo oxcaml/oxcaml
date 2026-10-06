@@ -505,7 +505,9 @@ nonconst_ctors_nonempty:
   | ctors = separated_nonempty_list(PIPE, nonconst_ctor) { ctors }
 ;
 nonconst_ctor:
-  | tag = tag; KWD_OF; kinds = kinds_with_subkinds_nonempty { tag, kinds }
+  | tag = tag; KWD_OF; kinds = kinds_with_subkinds_nonempty
+      { tag, Some kinds }
+  | tag = tag; KWD_OF; KWD_ANY { tag, None }
 ;
 return_arity:
   | { None }
@@ -711,13 +713,7 @@ loopify:
 
 region:
   | v = variable { Named v }
-  | KWD_TOPLEVEL; DOT; i = IDENT {
-    match i with
-    | "alloc_region" -> Toplevel_alloc_region
-    | "region" -> Toplevel_region
-    | "ghost_region" -> Toplevel_ghost_region
-    | _ -> Misc.fatal_errorf "toplevel. must be followed \
-      by alloc_region, region or ghost_region" }
+  | KWD_TOPLEVEL { Toplevel_alloc_region }
 ;
 
 result_continuation:

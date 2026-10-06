@@ -24,7 +24,7 @@ let $camlOver_app_kind_check_simplify__first_const_0 = Block 0 () in
      where k3 (apply_result : val) =
        apply &my_alloc_region apply_result (0, 0) -> k1 * k2
  in
- let test = closure test_0 @test &toplevel.alloc_region in
+ let test = closure test_0 @test &toplevel in
  let Pmakeblock = %block.[`0`].`toplevel` (test) in
  cont k (Pmakeblock))
   where k define_root_symbol (module_block) =

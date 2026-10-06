@@ -16,7 +16,7 @@
    script = "sh ${test_source_directory}/check-has-123456.sh rewrite_type_of_constants_classic.cmx.ocamlobjinfo.no-reaper.output";
    script;
  }{
-   flags = "-Oclassic -flambda2-reaper";
+   flags = "-Oclassic -flambda2-reaper -X reaper-oclassic=1";
    module = "rewrite_type_of_constants_classic.ml";
    ocamlopt.byte;
  }{

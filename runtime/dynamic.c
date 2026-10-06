@@ -88,7 +88,14 @@ CAMLexport void caml_dynamic_cache_scan_roots(dynamic_cache_t cache,
 static value dynamic_lookup(struct stack_info *stack, value dyn)
 {
   for(; stack; stack = Stack_parent(stack)) {
-    for(value node = stack->dynamic; Is_this(node);
+
+    // Naively, this would traverse the entire binding chain from [stack] to the
+    // root task at every iteration, which is quadratic. Instead, we eagerly
+    // advance to our Stack_parent when the lexical chain agrees with it.
+    struct stack_info *parent = Stack_parent(stack);
+    value shared = parent ? parent->dynamic : Val_null;
+
+    for(value node = stack->dynamic; Is_this(node) && node != shared;
         node = Dynamic_node_next(node)) {
       if(Dynamic_node_dyn(node) == dyn) {
         return Dynamic_node_val(node);
@@ -166,6 +173,67 @@ CAMLprim value caml_dynamic_pop(value dyn)
       entry->dyn = Val_null;
     }
   }
+
+  return Val_unit;
+}
+
+CAMLprim value caml_dynamic_freeze_scope(value unit)
+{
+  CAMLparam0();
+  CAMLlocal4(head, last, node, copy);
+
+  struct stack_info *stack = Caml_state->current_stack;
+  CAMLassert(stack);
+
+  // Copy bindings from plain fibers on the path to the enclosing task
+  head = Val_null;
+  last = Val_null;
+
+  while(!stack->is_task && Stack_parent(stack) != NULL) {
+
+    for(node = stack->dynamic; Is_this(node);
+        node = Dynamic_node_next(node)) {
+
+      // CR-someday mslater: once the gc supports cross-local-stack pointers,
+      // this could be allocated on the current fiber's local stack.
+      copy = caml_alloc_small(Dynamic_node_wosize, 0);
+      Dynamic_node_dyn(copy) = Dynamic_node_dyn(node);
+      Dynamic_node_val(copy) = Dynamic_node_val(node);
+      Dynamic_node_next(copy) = Val_null;
+
+      if(Is_null(last)) {
+        head = copy;
+      } else {
+        caml_modify(&Dynamic_node_next(last), copy);
+      }
+      last = copy;
+    }
+
+    stack = Stack_parent(stack);
+  }
+
+  // If we reached a task, link it in by reference
+  if(Is_this(last)) {
+    caml_modify(&Dynamic_node_next(last), stack->dynamic);
+  } else {
+    head = stack->dynamic;
+  }
+
+  CAMLreturn(head);
+}
+
+CAMLprim value caml_dynamic_use_scope(value scope)
+{
+  CAMLnoalloc;
+
+  struct stack_info *stack = Caml_state->current_stack;
+  CAMLassert(stack);
+  CAMLassert(Is_null(stack->dynamic));
+
+  stack->is_task = true;
+  stack->dynamic = scope;
+
+  caml_dynamic_cache_flush(Caml_state->dynamic_bindings);
 
   return Val_unit;
 }

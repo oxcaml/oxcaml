@@ -462,7 +462,7 @@ CAMLprim value caml_sys_executable_name(value unit)
   return caml_copy_string_of_os(caml_params->exe_name);
 }
 
-void caml_sys_init(const char_os * exe_name, char_os **argv)
+void caml_sys_init(const char_os * exe_name, char_os const * const * argv)
 {
 #ifdef _WIN32
   /* Initialises the caml_win32_* globals on Windows with the version of
@@ -474,7 +474,7 @@ void caml_sys_init(const char_os * exe_name, char_os **argv)
 #endif
   caml_init_exe_name(exe_name);
   main_argv = caml_alloc_array((void *)caml_copy_string_of_os,
-                               (char const **) argv);
+                               (char const * const *) argv);
   caml_register_generational_global_root(&main_argv);
 }
 
@@ -684,11 +684,6 @@ CAMLprim value caml_sys_const_ostype_cygwin(value unit)
 CAMLprim value caml_sys_const_backend_type(value unit)
 {
   return Val_int(1); /* Bytecode backed */
-}
-
-CAMLprim value caml_sys_const_runtime5(value unit)
-{
-  return Val_true;
 }
 
 CAMLprim value caml_sys_const_arch_amd64(value unit)

@@ -995,7 +995,7 @@ let emit_literals_list literals align emit_literal =
       D.switch_to_section_raw
         ~names:[".rodata.cst" ^ Int.to_string align]
         ~flags:(Some "aM")
-        ~args:["@progbits"; Int.to_string align]
+        ~args:["%progbits"; Int.to_string align]
         ~is_delayed:false;
     (* CR sspies: We set the internal section ref to Text here, because section
        ref does not support named text sections yet. Fix this when cleaning up
@@ -1929,7 +1929,7 @@ let emit_instr env i =
         A.ins4 CSEL res_x (H.reg_x i.arg.(1)) (H.reg_x i.arg.(2)) (O.cond EQ))
   | Lreloadretaddr -> ()
   | Lreturn -> A.ins0 RET
-  | Llabel { label = lbl; _ } ->
+  | Llabel_for_jump_target lbl | Llabel_for_dwarf lbl ->
     let lbl = label_to_asm_label ~section:Text lbl in
     D.define_label lbl
   | Lbranch lbl -> emit_branch lbl
@@ -2030,9 +2030,10 @@ let compute_instruction_sizes env code =
     match instr.Linear.desc with
     | Lend -> ()
     | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr | Lreturn
-    | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _ | Llabel _ | Lbranch _
-    | Lcondbranch _ | Lcondbranch3 _ | Lswitch _ | Ladjust_stack_offset _
-    | Lpushtrap _ | Lraise _ | Lstackcheck _ ->
+    | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _ | Llabel_for_jump_target _
+    | Llabel_for_dwarf _ | Lbranch _ | Lcondbranch _ | Lcondbranch3 _
+    | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
+    | Lstackcheck _ ->
       let m = measure_emit_instr env instr in
       let size : Branch_relaxation_intf.instruction_size =
         { size = m.count; max_displacement = m.min_max_displacement }

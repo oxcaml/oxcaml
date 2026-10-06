@@ -24,8 +24,7 @@ let code loopify(done) size(22) newer_version_of(iter_0)
                 let Pfield = %block_load.[`1`] (param_1) in
                 cont `self` (Pfield)))
 in
-let $camlProtect_refs__iter_1 = closure iter_0_1 @iter &toplevel.alloc_region
-in
+let $camlProtect_refs__iter_1 = closure iter_0_1 @iter &toplevel in
 let code loopify(never) size(7) newer_version_of(`fn[protect_refs.ml:28,24--50]_2`)
       `fn[protect_refs.ml:28,24--50]_2_1` (param : [ 0 of val * val ])
         my_closure &my_alloc_region my_depth
@@ -38,7 +37,7 @@ let code loopify(never) size(7) newer_version_of(`fn[protect_refs.ml:28,24--50]_
 in
 let $`camlProtect_refs__fn[protect_refs.ml:28,24--50]_3` =
   closure `fn[protect_refs.ml:28,24--50]_2_1`
-    @`fn[protect_refs.ml:28,24--50]` &toplevel.alloc_region
+    @`fn[protect_refs.ml:28,24--50]` &toplevel
 in
 let code loopify(never) size(11) newer_version_of(`fn[protect_refs.ml:29,2--43]_3`)
       `fn[protect_refs.ml:29,2--43]_3_1`
@@ -56,12 +55,12 @@ let code loopify(never) size(11) newer_version_of(`fn[protect_refs.ml:29,2--43]_
 in
 let $`camlProtect_refs__fn[protect_refs.ml:29,2--43]_4` =
   closure `fn[protect_refs.ml:29,2--43]_3_1` @`fn[protect_refs.ml:29,2--43]`
-    &toplevel.alloc_region
+    &toplevel
 in
 let umode = %block.mut.[`0`].`toplevel` (0) in
 let umode_1 = umode in
 let $camlProtect_refs__set_mode_pattern_5 =
-  closure set_mode_pattern_4_1 @set_mode_pattern &toplevel.alloc_region
+  closure set_mode_pattern_4_1 @set_mode_pattern &toplevel
 and code inline(never) loopify(never) size(4) newer_version_of(set_mode_pattern_4)
       set_mode_pattern_4_1 (f : val)
         my_closure &my_alloc_region my_depth
@@ -85,9 +84,9 @@ in
  in
  let $`camlProtect_refs__fn[protect_refs.ml:41,26--40]_8` =
    closure `fn[protect_refs.ml:41,26--40]_5_1`
-     @`fn[protect_refs.ml:41,26--40]` &toplevel.alloc_region
+     @`fn[protect_refs.ml:41,26--40]` &toplevel
  in
- apply direct(set_mode_pattern_4_1 &toplevel.alloc_region)
+ apply direct(set_mode_pattern_4_1 &toplevel)
    ($camlProtect_refs__set_mode_pattern_5 : _ -> imm tagged)
      ($`camlProtect_refs__fn[protect_refs.ml:41,26--40]_8`)
      -> k1 * error

@@ -107,7 +107,8 @@ module Map (T : Container_types.S_plus_iterator) : sig
 
       - Calling [accept] will set the [handler] reference to the current value
         of the iterator. *)
-  val create : 'a T.Map.t Channel.receiver -> 'a Channel.sender -> T.t t
+  val create :
+    'a T.Map.t Channel.or_null_receiver -> 'a Channel.or_null_sender -> T.t t
 end
 
 module Join (Iterator : Iterator) : sig

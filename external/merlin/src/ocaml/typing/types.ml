@@ -110,7 +110,7 @@ type atomic =
 type mutability =
   | Immutable
   | Mutable of
-      { mode : Mode.Value.Comonadic.lr
+      { mode : Mode.With_regionality.Comonadic.lr
       ; atomic : atomic
       }
 
@@ -125,9 +125,9 @@ let is_atomic = function
 
 (** Takes [m0] which is the parameter of [let mutable], returns the
     mode of new values in future writes. *)
-let mutable_mode m0 : _ Mode.Value.t =
+let mutable_mode m0 : _ Mode.With_regionality.t =
   { comonadic = m0
-  ; monadic = Mode.Value.Monadic.(min |> allow_left |> allow_right)
+  ; monadic = Mode.With_regionality.Monadic.(min |> allow_left |> allow_right)
   }
 
 (* Type expressions for the core language *)
@@ -186,7 +186,7 @@ and arg_label =
   | Position of string
 
 and arrow_desc =
-  arg_label * Mode.Alloc.lr * Mode.Alloc.lr
+  arg_label * Mode.With_locality.lr * Mode.With_locality.lr
 
 and package =
     { pack_path : Path.t;
@@ -330,7 +330,7 @@ module Vars = Misc.Stdlib.String.Map
 
 type value_kind =
     Val_reg of Jkind_types.Sort.t       (* Regular value *)
-  | Val_mut of Mode.Value.Comonadic.lr * Jkind_types.Sort.t
+  | Val_mut of Mode.With_regionality.Comonadic.lr * Jkind_types.Sort.t
                                         (* Mutable value *)
   | Val_prim of Primitive.description   (* Primitive *)
   | Val_ivar of mutable_flag * string   (* Instance variable (mutable ?) *)
@@ -562,6 +562,7 @@ and cstr_layout =
 and constructor_representation =
   | Constructor_uniform_value
   | Constructor_mixed of mixed_product_shape
+  | Constructor_immediate_all_void
   | Constructor_undetermined
   | Constructor_variable of (Jkind_types.Sort.t * type_expr) array
 
@@ -723,7 +724,7 @@ module type Wrapped = sig
   type module_type =
     Mty_ident of Path.t
   | Mty_signature of signature
-  | Mty_functor of functor_parameter * module_type * Mode.Alloc.lr
+  | Mty_functor of functor_parameter * module_type * Mode.With_locality.lr
   | Mty_alias of Path.t
   | Mty_strengthen of module_type * Path.t * Aliasability.t
       (* See comments about the aliasability of strengthening in mtype.ml *)
@@ -731,11 +732,11 @@ module type Wrapped = sig
 
   and functor_parameter =
   | Unit
-  | Named of Ident.t option * module_type * Mode.Alloc.lr
+  | Named of Ident.t option * module_type * Mode.With_locality.lr
 
   and signature = signature_item list wrapped
 
-  and persistent_signature = signature * Mode.Value.l
+  and persistent_signature = signature * Mode.With_regionality.l
 
   and signature_item =
     Sig_value of Ident.t * value_description * visibility
@@ -965,6 +966,7 @@ let equal_constructor_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
   | Constructor_uniform_value, Constructor_uniform_value -> true
   | Constructor_mixed mx1, Constructor_mixed mx2 ->
       equal_mixed_product_shape_up_to_scannable_axes mx1 mx2
+  | Constructor_immediate_all_void, Constructor_immediate_all_void -> true
   | Constructor_undetermined, Constructor_undetermined -> true
   (* [Constructor_variable] only appears in the typedtree, never in a decl. *)
   | Constructor_variable _, _ | _, Constructor_variable _ ->
@@ -972,7 +974,7 @@ let equal_constructor_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
         "equal_constructor_representation_up_to_scannable_axes: variable \
          representation"
   | (Constructor_mixed _ | Constructor_uniform_value
-    | Constructor_undetermined), _
+    | Constructor_immediate_all_void | Constructor_undetermined), _
     -> false
 
 let equal_variant_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
@@ -1000,11 +1002,8 @@ let equal_record_representation_up_to_scannable_axes r1 r2 = match r1, r2 with
   | Record_unboxed, Record_unboxed ->
       true
   | Record_inlined (tag1, cr1, vr1), Record_inlined (tag2, cr2, vr2) ->
-      (* Equality of tag and variant representation imply equality of
-         constructor representation. *)
-      ignore (cr1 : constructor_representation);
-      ignore (cr2 : constructor_representation);
       equal_tag tag1 tag2 &&
+        equal_constructor_representation_up_to_scannable_axes cr1 cr2 &&
         equal_variant_representation_up_to_scannable_axes vr1 vr2
   | Record_boxed, Record_boxed ->
       true
@@ -1042,7 +1041,17 @@ let equal_record_unboxed_product_representation_up_to_scannable_axes r1 r2 =
          variable representation"
   | (Record_unboxed_product | Record_unboxed_product_undetermined), _ -> false
 
-(* The scannable axes in the resulting  are always [max] *)
+let cstr_layout_is_constant (layout : cstr_layout) =
+  match layout with
+  | Cstr_layout_known { shape = Constructor_immediate_all_void; _ } -> true
+  | Cstr_layout_known
+      { shape = Constructor_uniform_value | Constructor_mixed _
+              | Constructor_undetermined | Constructor_variable _;
+        sorts } ->
+    Array.length sorts = 0
+  | Cstr_layout_undetermined -> false
+
+(* The scannable axes in the resulting [mixed_block_element] are always [max] *)
 let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
   match sort with
   (* CR layouts-scannable: since sorts do not store scannable axis information,
@@ -1853,11 +1862,17 @@ let undo_compress (changes, _old) =
 
 let class_mode =
   let hint : _ Mode.Hint.const = Legacy Class in
-  Mode.Value.(of_const ~hint_monadic:hint ~hint_comonadic:hint Const.legacy)
+  Mode.With_regionality.(of_const
+    ~hint_monadic:hint
+    ~hint_comonadic:hint
+    Const.legacy)
 
 let toplevel_mode =
   let hint : _ Mode.Hint.const = Legacy Toplevel in
-  Mode.Value.(of_const ~hint_monadic:hint ~hint_comonadic:hint Const.legacy)
+  Mode.With_regionality.(of_const
+    ~hint_monadic:hint
+    ~hint_comonadic:hint
+    Const.legacy)
 
 (* Merlin specific *)
 let linked_variables () = !linked_variables

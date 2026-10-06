@@ -161,10 +161,10 @@ type t17b : (value & value) non_pointer
 type t15 : any non_pointer
 type t16 : value non_pointer
 type t17 : value & value non_pointer
-Line 4, characters 12-39:
+Line 4, characters 28-39:
 4 | type t17b : (value & value) non_pointer
-                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer" have no effect on the kind "value & value".
+                                ^^^^^^^^^^^
+Warning 184 [ignored-kind-modifier]: The kind modifier "non_pointer" has no effect on the kind "value & value".
 
 type t17b : value & value
 |}]
@@ -172,7 +172,7 @@ type t17b : value & value
 type ('a : value mod external_ stateless many unyielding non_float) t18 =
   ('a : value mod immutable global)
 [%%expect{|
-type ('a : value mod everything non_float) t18 = 'a
+type ('a : (value mod everything) non_float) t18 = 'a
 |}]
 
 type t = #(int * float#)
@@ -944,23 +944,28 @@ val f : ('a : value_maybe_null). 'a iarray -> 'a iarray = <fun>
 let z, punned = 4, 5
 let x_must_be_even _ = assert false
 exception Odd
+type 'a t = T of 'a
 
 let x = (~x:1, ~y:2)
 let x = ((~x:1, ~y:2) [@test.attr])
 let _ = ( ~x: 5, 2, ~z, ~(punned:int))
 let (x : (x:int * y:int)) = (~x:1, ~y:2)
 let (x : ((x:int * y:int) [@test.attr])) = (~x:1, ~y:2)
+let ~x:(T x), T y = ~x:(T 5), T 10
 
 [%%expect{|
 val z : int = 4
 val punned : int = 5
 val x_must_be_even : 'a -> 'b = <fun>
 exception Odd
+type 'a t = T of 'a
 val x : x:int * y:int = (~x:1, ~y:2)
 val x : x:int * y:int = (~x:1, ~y:2)
 - : x:int * int * z:int * punned:int = (~x:5, 2, ~z:4, ~punned:5)
 val x : x:int * y:int @@ stateless = (~x:1, ~y:2)
 val x : x:int * y:int @@ stateless = (~x:1, ~y:2)
+val x : int = 5
+val y : int = 10
 |}]
 
 let (~x:x0, ~s, ~(y:int), ..) : (x:int * s:string * y:int * string) =
@@ -1829,4 +1834,37 @@ module type S = sig
 end
 [%%expect{|
 module type S = sig val poly_ f : 'a -> 'b end
+|}]
+
+(***************************************)
+(* Attributes on constrained function parameters *)
+
+let f ((x : int) [@test.attr]) = x
+[%%expect{|
+val f : int -> int = <fun>
+|}]
+
+let f ~l:((x : int) [@test.attr]) = x
+[%%expect{|
+val f : l:int -> int = <fun>
+|}]
+
+let f ?l:((x : int option) [@test.attr]) () = x
+[%%expect{|
+val f : ?l:int -> unit -> int option = <fun>
+|}]
+
+let f ?l:((x : int) [@test.attr] = 0) () = x
+[%%expect{|
+val f : ?l:int -> unit -> int = <fun>
+|}]
+
+let f ((x : int) [@test.attr] @ local) = x
+[%%expect{|
+val f : int @ local -> int = <fun>
+|}]
+
+let f ~l:((x : int) [@test.attr] @ local) = x
+[%%expect{|
+val f : l:int @ local -> int = <fun>
 |}]

@@ -223,6 +223,7 @@ type t =
     debug_ranges_table : Debug_ranges_table.t;
     address_table : Address_table.t;
     location_list_table : Location_list_table.t;
+    range_list_table : Range_list_table.t;
     function_abstract_instances : (Proto_die.t * Asm_symbol.t) Asm_symbol.Tbl.t;
     mutable function_ranges : function_range list;
     get_file_num : string -> int;
@@ -235,7 +236,8 @@ type t =
 
 let create ~compilation_unit_header_label ~compilation_unit_proto_die
     ~code_layout ~imm_or_ptr_enums debug_loc_table debug_ranges_table
-    address_table location_list_table ~get_file_num ~sourcefile =
+    address_table location_list_table range_list_table ~get_file_num ~sourcefile
+    =
   { compilation_unit_header_label;
     compilation_unit_proto_die;
     code_layout;
@@ -243,6 +245,7 @@ let create ~compilation_unit_header_label ~compilation_unit_proto_die
     debug_ranges_table;
     address_table;
     location_list_table;
+    range_list_table;
     function_abstract_instances = Asm_symbol.Tbl.create 42;
     function_ranges = [];
     get_file_num;
@@ -265,6 +268,8 @@ let debug_ranges_table t = t.debug_ranges_table
 let address_table t = t.address_table
 
 let location_list_table t = t.location_list_table
+
+let range_list_table t = t.range_list_table
 
 let function_abstract_instances t = t.function_abstract_instances
 

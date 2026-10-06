@@ -64,22 +64,21 @@ type exists = E : ('a : value non_float). 'a -> exists [@@unboxed]
 |}]
 
 
-(* Non-value layouts. *)
+(* Non-value layouts *)
 
-type 'a void_not_external : void with string
+type 'a void_with_bound : void with string
 
-type packed_void_not_external =
-    P : 'a void_not_external -> packed_void_not_external [@@unboxed]
+(* CR separability: like CR above, this type should warn, but the
+   incompatibility-with-upstream warning doesn't account for the fact that
+   externality crossing information is not available upstream
+
+   ([void] crosses because non-value layouts cross externality.) *)
+type packed_void_with_bound =
+    P : 'a void_with_bound -> packed_void_with_bound [@@unboxed]
 [%%expect{|
-type 'a void_not_external : void
-Lines 3-4, characters 0-68:
-3 | type packed_void_not_external =
-4 |     P : 'a void_not_external -> packed_void_not_external [@@unboxed]
-Warning 187 [incompatible-with-upstream]: This type relies on OxCaml's extended separability checking
-  and would not be accepted by upstream OCaml.
-
-type packed_void_not_external =
-    P : 'a void_not_external -> packed_void_not_external [@@unboxed]
+type 'a void_with_bound : void
+type packed_void_with_bound =
+    P : 'a void_with_bound -> packed_void_with_bound [@@unboxed]
 |}]
 
 type exists_word = W : ('a : word) . 'a -> exists_word [@@unboxed]

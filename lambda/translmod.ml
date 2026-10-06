@@ -42,6 +42,7 @@ type error =
   Circular_dependency of (Ident.t * unsafe_info) list
 | Conflicting_inline_attributes
 | Instantiating_packed of Compilation_unit.t
+| Coercion_returns_template
 
 exception Error of Location.t * error
 
@@ -144,14 +145,17 @@ let rec apply_coercion loc strict restr arg =
         [{name = param; debug_uid = param_duid; layout = Lambda.layout_module;
           attributes = Lambda.default_param_attribute; mode = alloc_heap}]
         [carg] yielding cc_res
+  | Tcoerce_kindtemplate tc ->
+      apply_kindtemplate_coercion loc tc arg
   | Tcoerce_primitive { pc_desc; pc_env; pc_type; pc_poly_mode; pc_poly_sort;
-                        pc_yielding; pc_zero_alloc_check } ->
+                        pc_yielding; pc_kindtemplate; pc_zero_alloc_check } ->
       Translprim.transl_primitive loc pc_desc pc_env pc_type
         ~poly_mode:pc_poly_mode
         ~poly_sort:pc_poly_sort
         ~yielding:pc_yielding
         ~zero_alloc_check:pc_zero_alloc_check
         None
+      |> apply_kindtemplate_coercion loc pc_kindtemplate
   | Tcoerce_alias (env, path, cc) ->
       let lam = transl_module_path loc env path in
       name_lambda strict arg Lambda.layout_module
@@ -205,7 +209,7 @@ and apply_coercion_result loc strict funct params args yielding cc_res =
                       ap_yielding=
                         Translmode.transl_yielding_mode_l yielding;
                       ap_tailcall=Default_tailcall;
-                      ap_inlined=Default_inlined;
+                      ap_inlined=forward_inlined_attribute ();
                       ap_specialised=Default_specialise;
                       ap_probe=None;
                     })))
@@ -231,6 +235,29 @@ and wrap_id_pos_list loc id_pos_list get_field get_layout lam =
   in
   if s == Ident.Map.empty then lam else Lambda.rename s lam
 
+and apply_kindtemplate_coercion loc { tc_params; tc_args } body =
+  (* Currently only functions (which are [value]s) may be kind-templated. *)
+  let kindtemplate_layout = layout_value_field in
+  let instantiate kinst_func =
+    match tc_args with
+    | [] -> kinst_func
+    | tc_args ->
+      Lkindinstantiate {
+        kinst_func;
+        kinst_args =
+          List.map (Typeopt.layout_of_sort (to_location loc)) tc_args;
+        kinst_result_layout = kindtemplate_layout;
+        kinst_mode = maybe_alloc_stack;
+        kinst_loc = loc;
+      }
+  in
+  let body =
+    match tc_params with
+    | [] -> instantiate body
+    | _ :: _ ->
+      raise (Error (to_location loc, Coercion_returns_template));
+  in
+  body
 
 (* Compose two coercions
    apply_coercion c1 (apply_coercion c2 e) behaves like
@@ -279,8 +306,24 @@ let rec compose_coercions c1 c2 =
                       Mode.Yielding.join [y1; y2])
   | (c1, Tcoerce_alias (env, path, c2)) ->
       Tcoerce_alias (env, path, compose_coercions c1 c2)
+  | (Tcoerce_kindtemplate tc, Tcoerce_kindtemplate tc') -> begin
+      match compose_kindtemplate_coercions tc tc' with
+      | { tc_params = []; tc_args = [] } -> Tcoerce_none
+      | tc -> Tcoerce_kindtemplate tc
+      end
+  | (Tcoerce_kindtemplate tc,
+     Tcoerce_primitive ({ pc_kindtemplate = tc' } as pc )) ->
+      Tcoerce_primitive
+        { pc with pc_kindtemplate = compose_kindtemplate_coercions tc tc' }
   | (_, _) ->
       fatal_error "Translmod.compose_coercions"
+
+and compose_kindtemplate_coercions
+    { tc_params = tc_params_out; tc_args = tc_args_out }
+    { tc_params = tc_params_in; tc_args = tc_args_in } =
+  let in_to_out = List.combine tc_params_in tc_args_out in
+  { tc_params = tc_params_out;
+    tc_args = List.map (Jkind.Sort.Const.subst in_to_out) tc_args_in }
 
 let dump_coercions = Option.is_some (Sys.getenv_opt "DUMP_COERCIONS")
 
@@ -556,40 +599,51 @@ let merge_inline_attributes attr1 attr2 loc =
   | None -> raise (Error (to_location loc, Conflicting_inline_attributes))
 
 let merge_functors ~scopes mexp coercion root_path =
-  let rec merge ~scopes mexp coercion path acc inline_attribute =
-    let finished = acc, mexp, path, coercion, inline_attribute in
+  let rec merge ~scopes mexp coercion path acc inline_attribute staticity =
+    let finished = acc, mexp, path, coercion, inline_attribute, staticity in
     match mexp.mod_desc with
-    | Tmod_functor (param, body, _) ->
-      let inline_attribute' =
-        Translattribute.get_inline_attribute mexp.mod_attributes
-      in
-      let arg_coercion, res_coercion =
-        match coercion with
-        | Tcoerce_none -> Tcoerce_none, Tcoerce_none
-        | Tcoerce_functor (arg_coercion, res_coercion, _) ->
-          arg_coercion, res_coercion
-        | _ -> fatal_error "Translmod.merge_functors: bad coercion"
-      in
-      let loc = of_location ~scopes mexp.mod_loc in
-      let path, param =
-        match param with
-        | Unit -> None, Ident.create_local "*"
-        | Named (None, _, _, _) ->
-          let id = Ident.create_local "_" in
-          functor_path path id, id
-        | Named (Some id, _, _, _) -> functor_path path id, id
-      in
-      let inline_attribute =
-        merge_inline_attributes inline_attribute inline_attribute' loc
-      in
-      merge ~scopes body res_coercion path ((param, loc, arg_coercion) :: acc)
-        inline_attribute
+    | Tmod_functor (param, body, new_staticity) ->
+      let new_staticity = Translmode.transl_staticity_mode_r new_staticity in
+      begin match acc, staticity, new_staticity with
+      | _ :: _, Dynamic, Static | _ :: _, Static, Dynamic ->
+        (* Only care about the old staticity if length acc > 0, otherwise it's
+          just the inital value we passed in. *)
+        finished
+      | _ -> begin
+        let staticity = new_staticity in
+        let inline_attribute' =
+          Translattribute.get_inline_attribute mexp.mod_attributes
+        in
+        let arg_coercion, res_coercion =
+          match coercion with
+          | Tcoerce_none -> Tcoerce_none, Tcoerce_none
+          | Tcoerce_functor (arg_coercion, res_coercion, _) ->
+            arg_coercion, res_coercion
+          | _ -> fatal_error "Translmod.merge_functors: bad coercion"
+        in
+        let loc = of_location ~scopes mexp.mod_loc in
+        let path, param =
+          match param with
+          | Unit -> None, Ident.create_local "*"
+          | Named (None, _, _, _) ->
+            let id = Ident.create_local "_" in
+            functor_path path id, id
+          | Named (Some id, _, _, _) -> functor_path path id, id
+        in
+        let inline_attribute =
+          merge_inline_attributes inline_attribute inline_attribute' loc
+        in
+        merge ~scopes body res_coercion path ((param, loc, arg_coercion) :: acc)
+          inline_attribute staticity
+        end
+      end
     | _ -> finished
   in
-  merge ~scopes mexp coercion root_path [] Default_inline
+  merge ~scopes mexp coercion root_path [] Default_inline Dynamic
 
 let rec compile_functor ~scopes mexp coercion root_path loc =
-  let functor_params_rev, body, body_path, res_coercion, inline_attribute =
+  let functor_params_rev, body, body_path, res_coercion, inline_attribute,
+      staticity =
     merge_functors ~scopes mexp coercion root_path
   in
   assert (List.length functor_params_rev >= 1);  (* cf. [transl_module] *)
@@ -615,31 +669,41 @@ let rec compile_functor ~scopes mexp coercion root_path loc =
       ([], transl_module ~scopes res_coercion body_path body)
       functor_params_rev
   in
-  lfunction
-    ~kind:(Curried {nlocal=0})
-    ~params
-    ~return:Lambda.layout_module
-    ~attr:{
-      inline = inline_attribute;
-      specialise = Default_specialise;
-      local = Default_local;
-      poll = Default_poll;
-      loop = Never_loop;
-      regalloc = Default_regalloc;
-      regalloc_param = Default_regalloc_params;
-      cold = false;
-      is_a_functor = true;
-      is_opaque = false;
-      zero_alloc = Default_zero_alloc;
-      stub = false;
-      tmc_candidate = false;
-      may_fuse_arity = true;
-      unbox_return = None;
-    }
-    ~loc
-    ~mode:alloc_heap
-    ~ret_mode:not_alloc_stack
-    ~body
+  let lfun =
+    lfunction'
+      ~kind:(Curried {nlocal=0})
+      ~params
+      ~return:Lambda.layout_module
+      ~attr:{
+        inline = inline_attribute;
+        specialise = Default_specialise;
+        local = Default_local;
+        poll = Default_poll;
+        loop = Never_loop;
+        regalloc = Default_regalloc;
+        regalloc_param = Default_regalloc_params;
+        cold = false;
+        is_a_functor = true;
+        is_opaque = false;
+        zero_alloc = Default_zero_alloc;
+        stub = false;
+        tmc_candidate = false;
+        may_fuse_arity = true;
+        unbox_return = None;
+      }
+      ~loc
+      ~mode:alloc_heap
+      ~ret_mode:not_alloc_stack
+      ~body
+  in
+  match staticity with
+  | Static ->
+    let tmpl_func, tmpl_env =
+      Lambda.extract_free_var_env lfun
+        ~layout_of_ident:(Typeopt.layout_of_ident mexp.mod_env)
+    in
+    Ltemplate { tmpl_func; tmpl_env }
+  | Dynamic -> Lfunction lfun
 
 (* Compile a module expression *)
 
@@ -655,36 +719,44 @@ and transl_module ~scopes cc rootpath mexp =
   | Tmod_functor _ ->
       oo_wrap mexp.mod_env true (fun () ->
         compile_functor ~scopes mexp cc rootpath loc) ()
-  | Tmod_apply(funct, arg, ccarg, yielding, _) ->
+  | Tmod_apply(funct, arg, ccarg, yielding, staticity) ->
       let translated_arg = transl_module ~scopes ccarg None arg in
-      transl_apply ~scopes ~loc ~cc mexp.mod_env funct ~yielding translated_arg
+      let staticity = Translmode.transl_staticity_mode_r staticity in
+      transl_apply ~scopes ~loc ~cc mexp.mod_env funct ~yielding ~staticity
+        translated_arg
   | Tmod_apply_unit (funct, yielding) ->
-      transl_apply ~scopes ~loc ~cc mexp.mod_env funct ~yielding lambda_unit
+      transl_apply ~scopes ~loc ~cc mexp.mod_env funct ~yielding
+        ~staticity:Dynamic lambda_unit
   | Tmod_constraint(arg, _, _, ccarg) ->
       transl_module ~scopes (compose_coercions cc ccarg) rootpath arg
   | Tmod_unpack(arg, _) ->
       apply_coercion loc Strict cc
         (Translcore.transl_exp ~scopes Lambda.layout_module arg)
 
-and transl_apply ~scopes ~loc ~cc mod_env funct ~yielding translated_arg =
+and transl_apply ~scopes ~loc ~cc mod_env funct ~yielding ~staticity
+    translated_arg  =
   let inlined_attribute =
     Translattribute.get_inlined_attribute_on_module funct
   in
-  let ap_yielding = Translmode.transl_yielding_mode_l yielding in
-  oo_wrap mod_env true
-    (apply_coercion loc Strict cc)
-    (Lapply{
-       ap_loc=loc;
-       ap_func=transl_module ~scopes Tcoerce_none None funct;
-       ap_args=[translated_arg];
-       ap_result_layout = Lambda.layout_module;
-       ap_region_close=Rc_normal;
-       ap_mode=not_alloc_stack;
-       ap_yielding;
-       ap_tailcall=Default_tailcall;
-       ap_inlined=inlined_attribute;
-       ap_specialised=Default_specialise;
-       ap_probe=None;})
+  let ap =
+    { ap_loc=loc;
+      ap_func=transl_module ~scopes Tcoerce_none None funct;
+      ap_args=[translated_arg];
+      ap_result_layout = Lambda.layout_module;
+      ap_region_close=Rc_normal;
+      ap_mode=not_alloc_stack;
+      ap_yielding=Translmode.transl_yielding_mode_l yielding;
+      ap_tailcall=Default_tailcall;
+      ap_inlined=inlined_attribute;
+      ap_specialised=Default_specialise;
+      ap_probe=None; }
+  in
+  let apply =
+    match staticity with
+    | Static -> Linstantiate ap
+    | Dynamic -> Lapply ap
+  in
+  oo_wrap mod_env true (apply_coercion loc Strict cc) apply
 
 and transl_struct ~scopes loc fields cc rootpath
       {str_final_env; str_items; _} =
@@ -734,17 +806,12 @@ and transl_structure ~scopes loc
                       ~loc:(to_location loc) output_repr,
                   List.map
                     (fun (pos, cc) ->
-                      match cc with
-                      | Tcoerce_primitive p ->
-                          Translprim.transl_primitive
-                            (of_location ~scopes p.pc_loc)
-                            p.pc_desc p.pc_env p.pc_type
-                            ~poly_mode:p.pc_poly_mode
-                            ~poly_sort:p.pc_poly_sort
-                            ~yielding:p.pc_yielding
-                            ~zero_alloc_check:p.pc_zero_alloc_check
-                            None
-                      | _ -> apply_coercion loc Strict cc (get_field pos))
+                      let loc =
+                        match cc with
+                        | Tcoerce_primitive p -> of_location ~scopes p.pc_loc
+                        | _ -> loc
+                      in
+                      apply_coercion loc Strict cc (get_field pos))
                     pos_cc_list, loc)
             and id_pos_list =
               List.filter (fun (id,_,_) -> not (Ident.Set.mem id ids))
@@ -928,7 +995,8 @@ and transl_structure ~scopes loc
           let let_kind, modl =
             match incl.incl_kind with
             | Tincl_structure ->
-                pure_module modl, transl_module ~scopes Tcoerce_none None modl
+                pure_module modl, transl_module ~scopes Tcoerce_none
+                  rootpath modl
             | Tincl_functor { input_coercion; input_repr; yielding } ->
                 Strict, transl_include_functor ~generative:false modl
                           input_coercion scopes loc ~input_repr ~yielding
@@ -978,7 +1046,8 @@ and transl_structure ~scopes loc
                 rebind_idents 0 fields ids_with_sorts
               in
               Llet(pure, Lambda.layout_module, mid, mid_duid,
-                   transl_module ~scopes Tcoerce_none None od.open_expr, body),
+                   transl_module ~scopes Tcoerce_none rootpath od.open_expr,
+                   body),
               repr
           end
       | Tstr_modtype _
@@ -1145,6 +1214,7 @@ let module_block_size component_names coercion =
   | Tcoerce_functor _
   | Tcoerce_primitive _
   | Tcoerce_alias _
+  | Tcoerce_kindtemplate _
   | Tcoerce_invalid -> assert false
 
 let transl_implementation compilation_unit impl ~loc =
@@ -1531,17 +1601,26 @@ let cu_of_impl (gm : Global_module.t) : Compilation_unit.t =
         "cu_of_impl: %a has no implementation (parameter module)"
         Global_module.print gm
 
-(* [gm] must have been compiled with [-as-argument-for]. *)
+(* [gm] must have been compiled with [-as-argument-for].
+
+   CR-someday zqian: the fatal error below is reachable with stale
+   [.cmo]/[.cmx] artifacts, because they are read without consistency
+   checks; such checks should be added. *)
 let project_arg_block ~find_impl_by_name ~chain ~(gm : Global_module.t)
       main_block =
-  let _fmt, arg_descr = find_impl_by_name ~chain (cu_of_impl gm) in
-  let arg_block_idx, main_repr =
+  let fmt, arg_descr = find_impl_by_name ~chain (cu_of_impl gm) in
+  let arg_block_idx =
     match (arg_descr : Lambda.arg_descr option) with
-    | Some { arg_block_idx; main_repr; _ } -> arg_block_idx, main_repr
+    | Some { arg_block_idx; _ } -> arg_block_idx
     | None ->
         Misc.fatal_errorf_doc
           "project_arg_block: %a was not compiled with -as-argument-for"
           Global_module.print gm
+  in
+  let main_repr =
+    match (fmt : main_module_block_format) with
+    | Mb_struct { mb_repr } -> mb_repr
+    | Mb_instantiating_functor { mb_returned_repr; _ } -> mb_returned_repr
   in
   Lprim (mod_field arg_block_idx main_repr, [main_block], Loc_unknown)
 
@@ -1814,16 +1893,26 @@ let transl_functorization compilation_unit
     transl_functorization_make ~params ~modules ~find_impl_by_name
   in
   let intf_func = transl_functorization_intf ~params in
+  let fields = [intf_func; make_func] in
   let code =
     apply_coercion Loc_unknown Strict coercion
       (Lprim
          ( Pmakeblock (0, Immutable, All_value, alloc_heap),
-           [intf_func; make_func],
+           fields,
            Loc_unknown ))
   in
-  let main_module_block_format =
-    Mb_struct { mb_repr = Module_value_only { field_count = 2 } }
+  (* CR-someday zqian: rewrite [module_block_size] to do this *)
+  let mb_repr =
+    match (coercion : Typedtree.module_coercion) with
+    | Tcoerce_none -> Module_value_only { field_count = List.length fields }
+    | Tcoerce_structure { output_repr; _ } ->
+        transl_module_representation output_repr
+    | Tcoerce_functor _ | Tcoerce_primitive _ | Tcoerce_alias _
+    | Tcoerce_kindtemplate _ | Tcoerce_invalid ->
+        Misc.fatal_error
+          "transl_functorization: unexpected compilation-unit coercion"
   in
+  let main_module_block_format = Mb_struct { mb_repr } in
   { compilation_unit;
     main_module_block_format;
     arg_block_idx = None;
@@ -1881,6 +1970,10 @@ let report_error loc = function
         "Cannot instantiate using the packed module %a@ \
          as either the instantiated module or an argument"
         Compilation_unit.print_as_inline_code comp_unit
+  | Coercion_returns_template ->
+      Location.errorf ~loc
+        "Coercing this module constructs a new layout-polymorphic value,@ \
+        which is not supported yet."
 
 let () =
   Location.register_error_of_exn

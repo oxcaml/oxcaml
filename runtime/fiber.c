@@ -354,6 +354,7 @@ alloc_size_class_stack_noexc(mlsize_t wosize, int cache_bucket, value hval,
   stack->local_top = NULL;
   stack->local_limit = 0;
   stack->dynamic = Val_null;
+  stack->is_task = false;
 #ifdef DEBUG
   stack->magic = 42;
 #endif
@@ -994,6 +995,7 @@ int caml_try_realloc_stack(asize_t required_space)
   new_stack->local_top = old_stack->local_top;
   new_stack->local_limit = old_stack->local_limit;
   new_stack->dynamic = old_stack->dynamic;
+  new_stack->is_task = old_stack->is_task;
 
   // Detach locals stack and dynamic bindings from old_stack
   old_stack->local_arenas = NULL;
@@ -1001,6 +1003,7 @@ int caml_try_realloc_stack(asize_t required_space)
   old_stack->local_top = NULL;
   old_stack->local_limit = 0;
   old_stack->dynamic = Val_null;
+  old_stack->is_task = false;
 
 #ifdef NATIVE_CODE
   /* There's no need to do another pass rewriting from
@@ -1363,22 +1366,6 @@ static const value * cache_named_exception(const value * _Atomic * cache,
   return exn;
 }
 
-static const value * cache_named_effect(const value * _Atomic * cache,
-                                        const char * name)
-{
-  const value * exn;
-  exn = atomic_load_acquire(cache);
-  if (exn == NULL) {
-    exn = caml_named_value(name);
-    if (exn == NULL) {
-      fprintf(stderr, "Fatal error: effect %s\n", name);
-      exit(2);
-    }
-    atomic_store_release(cache, exn);
-  }
-  return exn;
-}
-
 CAMLexport void caml_raise_continuation_already_resumed(void)
 {
   const value * exn =
@@ -1406,12 +1393,30 @@ CAMLexport void caml_raise_unhandled_effect (value effect)
 
 static const value * _Atomic caml_preemption_effect = NULL;
 
+/* Pre-cache the Stdlib.Effect.t value for preemption, storing it in a global
+   value */
+static void caml_cache_preemption_effect(void) {
+  if (atomic_load_acquire(&caml_preemption_effect) != NULL) {
+    /* Already cached; nothing to do. */
+    return;
+  }
+  const value *eff = caml_named_value("Effect.Preemption");
+  if (eff == NULL) {
+    fprintf(stderr, "Fatal error: effect Effect.Preemption not found\n");
+    exit(2);
+  }
+  atomic_store_release(&caml_preemption_effect, eff);
+}
+
+/* Look up the Stdlib.Effect.t value for a preemption effect. Must be called
+   after [caml_cache_preemption_effect] */
 CAMLexport value caml_get_preemption_effect(void) {
   CAMLnoalloc;
-  const value *eff =
-    cache_named_effect(&caml_preemption_effect, "Effect.Preemption");
+  const value *eff = atomic_load_acquire(&caml_preemption_effect);
+  CAMLassert(eff);
   return *eff;
 }
+
 
 /* Call the tick handler for each running fiber *in reverse order*, stopping as
    soon as one preempts
@@ -1446,6 +1451,15 @@ caml_result caml_tick_fiber_res(struct stack_info *stack) {
 
     switch (Long_val(res.data)) {
     case TICK_RESULT_PREEMPT:
+      /* Pre-cache the "preemption" effect, which will be looked up (with
+         `caml_get_preemption_effect`) when preemption actually occurs, after
+         the continuation is allocated.
+
+         We need to pre-cache here because [caml_named_value] may release the
+         runtime lock if it needs to block, and we can't do that while
+         preempting (since another systhread might run and trigger a GC).
+      */
+      caml_cache_preemption_effect();
       return Result_value(Val_true);
     case TICK_RESULT_CONTINUE:
       break;

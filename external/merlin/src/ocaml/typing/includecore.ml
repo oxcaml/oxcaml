@@ -38,28 +38,21 @@ type primitive_mismatch =
   | Argument_repr of int
   | Layout_poly_attr
 
-type layout_poly_coercion =
-  | Extra_lhs of { extra: int }
-  | Extra_rhs of { extra: int }
-  | Instantiate_lhs_to_rhs of { index_lhs: int; index_rhs: int }
-  | Instantiate_lhs of { index_lhs: int; arg: Jkind_types.Sort.t option }
-
 type value_mismatch =
   | Primitive_mismatch of primitive_mismatch
   | Not_a_primitive
   | Type of Errortrace.moregen_error
   | Zero_alloc of Zero_alloc.error
   | Modality of Mode.Modality.error
-  | Mode of Mode.Value.error
-  | Layout_poly_coercion of layout_poly_coercion
+  | Mode of Mode.With_regionality.error
 
 exception Dont_match of value_mismatch
 
 type mmodes =
   | All
   | Specific :
-      ((Mode.allowed * 'r) Mode.Value.t * Typedtree.held_locks option) *
-      ('l * Mode.allowed) Mode.Value.t ->
+      ((allowed * 'r) With_regionality.t * Typedtree.held_locks option) *
+      ('l * allowed) With_regionality.t ->
       mmodes
 
 let child_close_over_coercion_opt id c =
@@ -86,30 +79,44 @@ let child_modes_with_modalities id ~modalities:(moda0, moda1) = function
     let c = child_close_over_coercion_opt id c in
     begin match Mode.Modality.to_const_opt moda1 with
     | None ->
-      (* [wrap_constraint_with_shape] invokes inclusion check with
-          identical modes and inferred modalities, which we workaround *)
+      (* Inferred modalities on the expected side arise only with both sides
+          physically equal: [wrap_constraint_with_shape] invokes the inclusion
+          check with identical modes, and expanding the same module alias on
+          both sides (see [try_modtypes]) can reach here with different modes.
+          Since the modalities coincide, children's modes are related whenever
+          the parents' are; if the parents' are not, defer to the per-item
+          checks, which take modalities and mode crossing into account. *)
       assert (moda0 == moda1);
-      Mode.Value.submode_exn m0 m1;
-      (* For children, we only check modality inclusion *)
-      Ok All
+      begin match Mode.With_regionality.submode m0 m1 with
+      | Ok () -> Ok All
+      | Error _ -> Ok (Specific ((m0, c), m1))
+      end
     | Some moda1 ->
       let m0 = Mode.Modality.apply_left moda0 m0 in
       let m1 = Mode.Modality.Const.apply_right moda1 m1 in
       Ok (Specific ((m0, c), m1))
     end
 
-let check_modes env ?(crossing = Crossing.max) ~item ?typ = function
+let check_modes env ~crossing ~static ~item ?typ = function
   | All -> Ok ()
   | Specific ((m0, c), m1) ->
       let m0 =
         match c with
-        | None -> m0 |> Mode.Value.disallow_right
+        | None -> m0 |> Mode.With_regionality.disallow_right
         | Some (locks, lid, loc) ->
             let m0 = Crossing.apply_left crossing m0 in
             Env.walk_locks ~env ~loc lid ~item typ (m0, locks)
       in
       let m1 = Crossing.apply_right crossing m1 in
-      Mode.Value.submode m0 m1
+      let m1 =
+        if static then
+          Mode.With_regionality.meet [
+            m1;
+            Mode.Staticity.of_const ~hint:Lpoly_inst Static
+            |> Mode.With_regionality.max_with_monadic Staticity]
+        else m1
+      in
+      Mode.With_regionality.submode m0 m1
 
 let native_repr_args nra1 nra2 =
   let rec loop i nra1 nra2 =
@@ -176,40 +183,35 @@ let value_descriptions_consistency _env vd1 vd2 =
   | (_, _) -> Tcoerce_none
 
 let moregeneral_lpoly ~self_check env pat_lpoly subj_lpoly ty1 ty2 =
-  let pat_refs =
+  let tc_args =
     Ctype.moregeneral ~self_check env true pat_lpoly subj_lpoly ty1 ty2
   in
-  (* Map from RHS sort poly var to its 1-indexed position *)
-  let subj_index = List.mapi (fun i v -> (v, i + 1)) subj_lpoly in
-  let subj_rest =
-    List.fold_left
-      (fun (i, subj_rest) r ->
-        let i = i + 1 in
-        let v, subj_rest = match subj_rest with
-          | v :: rest -> v, rest
-          | [] ->
-            let extra = List.length pat_refs - i + 1 in
-            raise (Dont_match (Layout_poly_coercion (Extra_lhs { extra })))
-        in
-        (match r with
-        | Some (Jkind_types.Sort.Var v') when v' == v -> ()
-        | Some (Jkind_types.Sort.Var v') ->
-          let j = List.assq v' subj_index in
-          raise (Dont_match (Layout_poly_coercion
-            (Instantiate_lhs_to_rhs { index_lhs = i; index_rhs = j })))
-        | _ ->
-          raise (Dont_match (Layout_poly_coercion
-            (Instantiate_lhs { index_lhs = i; arg = r }))));
-        (i, subj_rest))
-      (0, subj_lpoly)
-      pat_refs
-    |> snd
-  in
-  match subj_rest with
-  | [] -> ()
-  | _ ->
-    raise (Dont_match (Layout_poly_coercion
-      (Extra_rhs { extra = List.length subj_rest })))
+  (* We can set uninstantiated variables (given by [None]) to anything,
+     including the variable at the same position.
+     This way, equivalent schemes return an identity coercion. *)
+  if List.length subj_lpoly = List.length tc_args &&
+     List.for_all2
+        (fun v v' ->
+          match v, v' with
+          | v, Some (Jkind.Sort.Const.Genvar v')
+            when Jkind.Sort.Const.(equal (genvar v) (genvar v')) -> true
+          | _, None -> true
+          | _, Some _ -> false)
+        subj_lpoly tc_args
+  then None
+  else
+    (* Set uninstantiated variables to [void] *)
+    let tc_args =
+      List.map
+        (Option.value ~default:Jkind.Sort.Const.void)
+        tc_args
+    in
+    Some { tc_params = subj_lpoly; tc_args }
+
+let kindtemplate_coercion_instantiates { tc_args; tc_params = _ } =
+  match tc_args with
+  | _ :: _ -> true
+  | [] -> false
 
 let value_descriptions_zero_alloc
     (vd1 : Types.value_description)
@@ -242,10 +244,11 @@ let uid_is_from_current_unit uid =
       (Compilation_unit.full_path_as_string (Unit_info.modname current_unit))
   | None, _ | _, None -> false
 
-let value_descriptions ~loc env name
-    ~mmodes ~self_check
+(* [static] is [true] if the [module_coercion] requires a [static] argument *)
+let value_descriptions_without_modes ~loc env name ~self_check
     (vd1 : Types.value_description)
-    (vd2 : Types.value_description) =
+    (vd2 : Types.value_description)
+    : module_coercion * static:bool =
   Builtin_attributes.check_alerts_inclusion
     ~def:vd1.val_loc
     ~use:vd2.val_loc
@@ -253,17 +256,6 @@ let value_descriptions ~loc env name
     vd1.val_attributes vd2.val_attributes
     name;
   let prim_coercion_zero_alloc_check = value_descriptions_zero_alloc vd1 vd2 in
-  let crossing = Ctype.crossing_of_ty env vd2.val_type in
-  let modalities = vd1.val_modalities, vd2.val_modalities in
-  let modes =
-    match child_modes_with_modalities name ~modalities mmodes with
-    | Ok modes -> modes
-    | Error e -> raise (Dont_match (Modality e))
-  in
-  begin match check_modes env ~crossing ~item:Value ~typ:vd1.val_type modes with
-  | Ok () -> ()
-  | Error e -> raise (Dont_match (Mode e))
-  end;
   let val_lpoly1 = Lpoly.get_exn vd1.val_lpoly in
   let val_lpoly2 = Lpoly.get_exn vd2.val_lpoly in
   match vd1.val_kind with
@@ -286,25 +278,35 @@ let value_descriptions ~loc env name
              Option.iter (Mode.Locality.equate_exn loc) mode_l2;
              Option.iter (Mode.Forkable.equate_exn fork) mode_f2;
              Option.iter (Mode.Yielding.equate_exn yield) mode_y2;
-             try
-               moregeneral_lpoly ~self_check env
-                 val_lpoly1 val_lpoly2 ty1 ty2
-             with Ctype.Moregen err ->
-               raise (Dont_match (Type err))
+             match moregeneral_lpoly ~self_check env
+                 val_lpoly1 val_lpoly2 ty1 ty2 with
+             | None -> ()
+             | Some _ ->
+              Misc.fatal_errorf
+                "Primitives cannot be layout-polymorphic,@ \
+                but a kind-template coercion is necessary@ \
+                between primitives at %a@ and %a."
+                Location.print_loc_in_lowercase vd1.val_loc
+                Location.print_loc_in_lowercase vd2.val_loc
+             | exception Ctype.Moregen err -> raise (Dont_match (Type err))
            ) yielding
           ) forkable
          ) locality;
          match primitive_descriptions p1 p2 with
-         | None -> Tcoerce_none
+         | None -> Tcoerce_none, ~static:false
          | Some err -> raise (Dont_match (Primitive_mismatch err))
        end
      | _ ->
         let ty1, mode_l1, _, sort1 =
           Ctype.instance_prim env p1 vd1.val_type
         in
-        (try moregeneral_lpoly ~self_check env
-               val_lpoly1 val_lpoly2 ty1 vd2.val_type
-         with Ctype.Moregen err -> raise (Dont_match (Type err)));
+        let tc =
+          try
+            moregeneral_lpoly ~self_check env
+              val_lpoly1 val_lpoly2 ty1 vd2.val_type
+            |> Option.value ~default:{ tc_params = []; tc_args = [] }
+          with Ctype.Moregen err -> raise (Dont_match (Type err))
+        in
         let pc_loc =
           (* Prefer a declaration from the current unit.  A foreign primitive
              or signature location may not resolve against this unit's source
@@ -323,20 +325,51 @@ let value_descriptions ~loc env name
              Ctype.prim_params_yielding env vd2.Types.val_type
                ~arity:p1.prim_arity;
            pc_zero_alloc_check = prim_coercion_zero_alloc_check;
+           pc_kindtemplate = tc;
            pc_env = env;
            pc_loc;
-          } in
-        Tcoerce_primitive pc
+          }
+        in
+        Tcoerce_primitive pc,
+        ~static:(kindtemplate_coercion_instantiates tc)
      end
   | _ ->
      match moregeneral_lpoly ~self_check env
              val_lpoly1 val_lpoly2 vd1.val_type vd2.val_type with
      | exception Ctype.Moregen err -> raise (Dont_match (Type err))
-     | () -> begin
+     | tc -> begin
        match vd2.val_kind with
          | Val_prim _ -> raise (Dont_match Not_a_primitive)
-         | _ -> Tcoerce_none
+         | _ ->
+          match tc with
+          | Some tc ->
+            Tcoerce_kindtemplate tc,
+            ~static:(kindtemplate_coercion_instantiates tc)
+          | None -> Tcoerce_none, ~static:false
      end
+
+let value_descriptions ~loc env name ~mmodes ~self_check vd1 vd2 =
+  let cc, ~static =
+    value_descriptions_without_modes ~loc env name ~self_check vd1 vd2
+  in
+  let () =
+    let crossing = Ctype.crossing_of_ty env vd2.val_type in
+    let modalities = vd1.val_modalities, vd2.val_modalities in
+    let modes =
+      match child_modes_with_modalities name ~modalities mmodes with
+      | Ok modes -> modes
+      | Error e -> raise (Dont_match (Modality e))
+    in
+    match
+      check_modes env ~crossing ~static ~item:Value ~typ:vd1.val_type modes
+    with
+    | Ok () -> ()
+    | Error e -> raise (Dont_match (Mode e))
+  in
+  cc
+
+let check_modes env ?(crossing = Crossing.max) ~item ?typ =
+  check_modes env ~crossing ~static:false ~item ?typ
 
 (* Inclusion between manifest types (particularly for private row types) *)
 
@@ -417,6 +450,8 @@ type constructor_mismatch =
   | Explicit_return_type of position
   | Modality of int * Modality.equate_error
   | Fixed_representation of position
+  | Immediate_representation of position
+  | Constructor_representation_shape_mismatch
 
 type extension_constructor_mismatch =
   | Constructor_privacy
@@ -482,7 +517,9 @@ let report_modality_sub_error first second ppf e =
     (print_modality "not") left
 
 let report_mode_sub_error ~pp got expected ppf e =
-  let ({ left; right } : _ Mode.simple_error) = Mode.Value.print_error pp e in
+  let ({ left; right } : _ Mode.simple_error) =
+    Mode.With_regionality.print_error pp e
+  in
   let open Format_doc in
   let open_box = dprintf "@[<hov 2>" in
   let reopen_box = dprintf "@]@ %t" open_box in
@@ -551,33 +588,6 @@ let report_value_mismatch ~pp first second env ppf err =
       let got = first ^ " is" in
       let expected = second ^ " is" in
       report_mode_sub_error ~pp got expected ppf e
-  | Layout_poly_coercion (Extra_lhs { extra }) ->
-      pr "%s has %d more layout parameter%s that %s not used,@ \
-          which is not supported yet."
-        first extra
-        (if extra = 1 then "" else "s")
-        (if extra = 1 then "is" else "are")
-  | Layout_poly_coercion (Extra_rhs { extra }) ->
-      pr "%s has %d more layout parameter%s that %s not used,@ \
-          which is not supported yet."
-        second extra
-        (if extra = 1 then "" else "s")
-        (if extra = 1 then "is" else "are")
-  | Layout_poly_coercion (Instantiate_lhs_to_rhs { index_lhs; index_rhs }) ->
-      pr "The layout parameter at position %d in %s@ \
-          corresponds to the parameter at position %d in %s,@ \
-          which is not supported yet."
-        index_lhs first index_rhs second
-  | Layout_poly_coercion (Instantiate_lhs { index_lhs; arg }) ->
-      let format_got ppf = match arg with
-        | None -> Fmt.fprintf ppf "an unconstrained layout variable"
-        | Some s ->
-          Fmt.fprintf ppf "layout %a"
-            (Style.as_inline_code Jkind_types.Sort.format) s
-      in
-      pr "The layout parameter at position %d in %s@ \
-          is instantiated with %t,@ \
-          which is not supported yet." index_lhs first format_got
 
 let report_type_inequality env ppf err =
   let msg = Fmt.Doc.msg in
@@ -718,6 +728,14 @@ let report_constructor_mismatch first second decl env ppf err =
           but has layout any in %s?@]"
         (choose ord first second)
         (choose_other ord first second)
+  | Immediate_representation ord ->
+      pr "%s is annotated with %a and %s isn't."
+        (String.capitalize_ascii (choose ord first second))
+        Style.inline_code "[@immediate_all_void_constructor]"
+        (choose_other ord first second)
+  | Constructor_representation_shape_mismatch ->
+      pr "@[<hv>Their internal representations differ:@;\
+          This is likely caused by a layout mismatch in a later definition.@]"
 
 let pp_variant_diff first second prefix decl env ppf (x : variant_change) =
   match x with
@@ -946,7 +964,7 @@ module Record_diffing = struct
             | Atomic, Nonatomic -> Some (Atomicity First)
             | Nonatomic, Atomic -> Some (Atomicity Second)
             | Atomic, Atomic | Nonatomic, Nonatomic ->
-                let open Mode.Value.Comonadic in
+                let open Mode.With_regionality.Comonadic in
                 equate_exn m1 legacy;
                 equate_exn m2 legacy;
                 None
@@ -1236,13 +1254,19 @@ module Variant_diffing = struct
     | None, None -> None
     | Some _, None -> Some (Fixed_representation First)
     | None, Some _ -> Some (Fixed_representation Second)
-    | Some _, Some _ ->
-        (* Currently the only way for the representations to be different but
-           the types the same is for the layout information to be different
-           between the two sides, which is only possible if the layout is
-           [any] on one side or the other. So if neither representation is
-           [None] then we must be okay. *)
-        None
+    | Some Constructor_immediate_all_void,
+      Some Constructor_immediate_all_void -> None
+    | Some Constructor_immediate_all_void, Some _ ->
+        Some (Immediate_representation First)
+    | Some _, Some Constructor_immediate_all_void ->
+        Some (Immediate_representation Second)
+    | Some shape1, Some shape2 ->
+        if equal_constructor_representation_up_to_scannable_axes shape1 shape2
+        then None
+        else
+          (* Analogous to where [find_mismatch_in_mixed_record_representations]
+             returns [Representation_shape_mismatch] *)
+          Some Constructor_representation_shape_mismatch
 
   let compare_constructors ~loc env params1 params2 res1 res2 args1 args2
         shape1 shape2 =

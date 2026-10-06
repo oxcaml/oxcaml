@@ -137,23 +137,38 @@ end = struct
        reconizable. *)
     Lambda.dummy_constant
 
+  let placeholder_pos constr =
+    let field = List.length constr.before in
+    (* Bytecode boxes products and preserves the source field order. *)
+    let pos =
+      match constr.shape with
+      | _ when not !Clflags.native_code -> field
+      | All_value -> field
+      | Shape shape ->
+        let shape =
+          Mixed_block_shape.of_mixed_block_elements shape
+            ~print_locality:(fun ppf () -> Format.pp_print_string ppf "()")
+        in
+        Mixed_block_shape.lookup_singleton_field shape field
+    in
+    Lconst (Const_base (Const_int pos))
+
   let with_placeholder constr (body : offset destination -> lambda) =
     let k_with_placeholder =
       apply { constr with flag = Mutable } tmc_placeholder in
-    let placeholder_pos = List.length constr.before in
-    let placeholder_pos_lam = Lconst (Const_base (Const_int placeholder_pos)) in
+    let placeholder_pos = placeholder_pos constr in
     let block_var = Ident.create_local "block" in
     let block_var_duid = Lambda.debug_uid_none in
     Llet (Strict, Lambda.layout_block, block_var, block_var_duid,
           k_with_placeholder,
           body {
             var = block_var;
-            offset = Offset placeholder_pos_lam ;
+            offset = Offset placeholder_pos;
             loc = constr.loc;
           })
 
   let delay_impure : block_id:int -> t -> (t -> lambda) -> lambda =
-    let bind_list ~block_id ~arg_offset lambdas k =
+    let bind_list ~shape ~block_id ~arg_offset lambdas k =
       let can_be_delayed =
         (* Note that the delayed subterms will be used
            exactly once in the linear-static subterm. So
@@ -170,20 +185,28 @@ end = struct
               let v = Ident.create_local
                   (Printf.sprintf "block%d_arg%d" block_id (arg_offset + i)) in
               let v_duid = Lambda.debug_uid_none in
-              (Some (v, v_duid, lam), Lvar v)
+              let layout =
+                match shape with
+                | All_value -> Lambda.layout_value_field
+                | Shape shape ->
+                  Lambda.layout_of_mixed_block_element shape.(arg_offset + i)
+              in
+              (Some (v, v_duid, layout, lam), Lvar v)
             end)
         |> List.split in
       let body = k args in
       List.fold_right (fun binding body ->
           match binding with
           | None -> body
-          | Some (v, v_duid, lam) ->
-            Llet(Strict, Lambda.layout_tmc_field, v, v_duid, lam, body)
+          | Some (v, v_duid, layout, lam) ->
+            Llet(Strict, layout, v, v_duid, lam, body)
         ) bindings body in
     fun ~block_id constr body ->
-    bind_list ~block_id ~arg_offset:0 constr.before @@ fun vbefore ->
+    bind_list ~shape:constr.shape ~block_id ~arg_offset:0 constr.before
+      @@ fun vbefore ->
     let arg_offset = List.length constr.before + 1 in
-    bind_list ~block_id ~arg_offset constr.after @@ fun vafter ->
+    bind_list ~shape:constr.shape ~block_id ~arg_offset constr.after
+      @@ fun vafter ->
     body { constr with before = vbefore; after = vafter }
 end
 
@@ -685,7 +708,8 @@ let rec choice ctx t =
     | Lexclave lam ->
         let+ lam = choice ctx ~tail lam in
         Lexclave lam
-    | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ ->
+    | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _
+    | Linstantiate _ ->
       fatal_error_invalid_constructor t
 
   and choice_apply ctx ~tail apply =
@@ -774,7 +798,21 @@ let rec choice ctx t =
       }
 
   and choice_makeblock ctx ~tail:_ (tag, flag, shape, mode) blockargs loc =
-    let choices = List.map (choice ctx ~tail:false) blockargs in
+    let choices =
+      (* We look at each position in the block to find candidates for the TMC
+         hole transformation. We only consider fields of layout Value. *)
+      let[@inline always] of_value arg = choice ctx ~tail:false arg in
+      let[@inline always] of_non_value arg = Choice.lambda (traverse ctx arg) in
+      match shape with
+      | All_value -> List.map of_value blockargs
+      | Shape shape ->
+        List.mapi
+          (fun index arg ->
+             match shape.(index) with
+             | Value _ -> of_value arg
+             | _ -> of_non_value arg)
+          blockargs
+    in
     match Choice.find_nonambiguous_tmc_call choices with
     | Choice.No_tmc_call args ->
         Choice.lambda @@ Lprim (Pmakeblock (tag, flag, shape, mode), args, loc)
@@ -865,8 +903,7 @@ let rec choice ctx t =
   and choice_prim ctx ~tail prim primargs loc =
     match prim with
     (* The important case is the construction case *)
-    | Pmakeblock (tag, flag, shape, mode)
-      when Lambda.is_uniform_block_shape shape ->
+    | Pmakeblock (tag, flag, shape, mode) ->
         choice_makeblock ctx ~tail (tag, flag, shape, mode) primargs loc
 
     (* Some primitives have arguments in tail-position *)
@@ -924,6 +961,11 @@ let rec choice ctx t =
     | Patomic_compare_set_idx _ | Patomic_fetch_add_idx
     | Patomic_add_idx | Patomic_sub_idx | Patomic_land_idx
     | Patomic_lor_idx | Patomic_lxor_idx
+    | Patomic_load_ptr _ | Patomic_set_ptr _
+    | Patomic_exchange_ptr _ | Patomic_compare_exchange_ptr _
+    | Patomic_compare_set_ptr _ | Patomic_fetch_add_ptr
+    | Patomic_add_ptr | Patomic_sub_ptr | Patomic_land_ptr
+    | Patomic_lor_ptr | Patomic_lxor_ptr
     | Pcpu_relax
     | Punbox_vector _ | Pbox_vector (_, _)
     | Punbox_mask | Pbox_mask _
@@ -935,12 +977,9 @@ let rec choice ctx t =
     (* we don't handle { foo with x = ...; y = recursive-call } *)
     | Pduprecord _
 
-    (* we don't handle all-float records or mixed-blocks. If we
-       did, we'd need to remove references to Lambda.layout_tmc_field
-    *)
+    (* All-float records have no value field to use as a destination. *)
     | Pmakefloatblock _
     | Pmakeufloatblock _
-    | Pmakeblock _
 
     (* nor unboxed products *)
     | Pmake_unboxed_product _ | Punboxed_product_field _

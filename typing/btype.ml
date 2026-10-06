@@ -108,7 +108,8 @@ end
 
 (**** Type level management ****)
 
-let generic_level = Mode.Alloc.generic_level
+let generic_level = Mode.With_locality.generic_level
+let subject_level = generic_level - 1
 let lowest_level = Ident.lowest_scope
 
 (**** leveled type pool ****)
@@ -451,7 +452,7 @@ type 'a type_iterators =
     it_type_kind: 'a type_iterators -> type_decl_kind -> unit;
     it_do_type_expr: 'a type_iterators -> 'a;
     it_type_expr: 'a type_iterators -> type_expr -> unit;
-    it_mode_expr: Mode.Alloc.lr -> unit;
+    it_mode_expr: Mode.With_locality.lr -> unit;
     it_modality: Mode.Modality.t -> unit;
     it_path: Path.t -> unit; }
 
@@ -591,23 +592,8 @@ let copy_row f fixed row keep more =
 
 let copy_commu c = if is_commu_ok c then commu_ok else commu_var ()
 
-let instance_jkind (t : jkind_lr) : jkind_lr =
-  let rec instance_layout (l : Jkind_types.Sort.t Jkind_types.Layout.t)
-      : Jkind_types.Sort.t Jkind_types.Layout.t =
-    match l with
-    | Any _ -> l
-    | Sort (s, sa) -> Sort (Jkind_types.Sort.instance s, sa)
-    | Product ts -> Product (List.map instance_layout ts)
-    | Addressable l -> Addressable (instance_layout l)
-  in
-  match t.jkind.base with
-  | Kconstr _ -> t
-  | Layout l ->
-    { t with jkind = { t.jkind with base = Layout (instance_layout l) } }
-
 let rec copy_type_desc ?(keep_names=false) f fm = function
     Tvar { name; jkind } ->
-     let jkind = instance_jkind jkind in
      if keep_names then Tvar { name; jkind } else Tvar { name=None; jkind }
   | Tarrow ((p, m1, m2), ty1, ty2, c)->
     Tarrow ((p, fm m1, fm m2), f ty1, f ty2, copy_commu c)
@@ -649,14 +635,16 @@ module For_copy : sig
 
   val mode_instantiate :
     copy_scope -> current_level:int ->
-    Mode.Alloc.lr -> Mode.Alloc.lr
+    Mode.With_locality.lr -> Mode.With_locality.lr
 
   val mode_copy_generic :
-    copy_scope -> Mode.Alloc.lr -> Mode.Alloc.lr
+    copy_scope -> Mode.With_locality.lr -> Mode.With_locality.lr
 
-  val mode_copy_for_saving : copy_scope -> Mode.Alloc.lr -> Mode.Alloc.lr
+  val mode_copy_for_saving :
+     copy_scope -> Mode.With_locality.lr -> Mode.With_locality.lr
 
-  val mode_copy_for_restoring : copy_scope -> Mode.Alloc.lr -> Mode.Alloc.lr
+  val mode_copy_for_restoring :
+     copy_scope -> Mode.With_locality.lr -> Mode.With_locality.lr
 
   val with_scope: (copy_scope -> 'a) -> 'a
 end = struct
@@ -673,19 +661,19 @@ end = struct
 
   let mode_instantiate copy_scope ~current_level m =
     let copy_scope = copy_scope.saved_mode_changes in
-    Mode.Alloc.instantiate ~copy_scope ~current_level m
+    Mode.With_locality.instantiate ~copy_scope ~current_level m
 
   let mode_copy_generic copy_scope m =
     let copy_scope = copy_scope.saved_mode_changes in
-    Mode.Alloc.copy_generic ~copy_scope m
+    Mode.With_locality.copy_generic ~copy_scope m
 
   let mode_copy_for_saving copy_scope m =
     let copy_scope = copy_scope.saved_mode_changes in
-    Mode.Alloc.copy_for_saving ~copy_scope m
+    Mode.With_locality.copy_for_saving ~copy_scope m
 
   let mode_copy_for_restoring copy_scope m =
     let copy_scope = copy_scope.saved_mode_changes in
-    Mode.Alloc.copy_for_restoring ~copy_scope m
+    Mode.With_locality.copy_for_restoring ~copy_scope m
 
   (* Restore type descriptions. *)
   let cleanup { saved_desc; _ } =
@@ -997,43 +985,6 @@ module Jkind0 = struct
 
     let[@inline] set_crossing crossing t = { t with crossing }
     let[@inline] set_externality externality t = { t with externality }
-
-    let[@inline] set_max_in_set t max_axes =
-      let open Jkind_axis.Axis_set in
-      let[@inline] modal ax =
-        if mem max_axes (Modal ax)
-        then (Crossing.Per_axis.max [@inlined hint]) ax
-        else modal ax t
-      in
-      (* a little optimization *)
-      if is_empty max_axes then t else
-      let regionality = modal areality in
-      let linearity = modal linearity in
-      let uniqueness = modal uniqueness in
-      let portability = modal portability in
-      let contention = modal contention in
-      let forkable = modal forkable in
-      let yielding = modal yielding in
-      let statefulness = modal statefulness in
-      let visibility = modal visibility in
-      let staticity = modal staticity in
-      let externality =
-        if mem max_axes (Nonmodal Externality)
-        then Externality.max
-        else t.externality
-      in
-      let monadic =
-        Crossing.Monadic.create ~uniqueness ~contention ~visibility ~staticity
-      in
-      let comonadic =
-        Crossing.Comonadic.create ~regionality ~linearity ~portability ~yielding
-          ~forkable ~statefulness
-      in
-      let crossing : Mode.Crossing.t = { monadic; comonadic } in
-      {
-        crossing;
-        externality;
-      }
 
     let[@inline] set_min_in_set t min_axes =
       let open Jkind_axis.Axis_set in
@@ -2238,8 +2189,6 @@ module Jkind0 = struct
 
     let get_const t = Jkind_desc.get_const t.jkind
 
-    let instance = instance_jkind
-
     let map_type_expr f t =
       if has_with_bounds t
       then { t with jkind = Jkind_desc.map_type_expr f t.jkind }
@@ -2258,42 +2207,21 @@ module Jkind0 = struct
       | Mutable { atomic = Nonatomic; _ } -> Builtin.mutable_data)
         ~why
 
-    let all_void_sort_option sort =
-      match sort with
-      | Some sort -> Jkind_types.Sort.Const.all_void sort
-      | None -> false
-
-    let all_void_labels_with_updates lbls_updated =
-      List.for_all (fun (_, _, sort) -> all_void_sort_option sort) lbls_updated
-
-    let all_void_labels lbls =
-      List.for_all
-        (fun (lbl : label_declaration) ->
-           all_void_sort_option lbl.ld_sort)
-        lbls
-
     let add_labels_as_with_bounds lbls jkind =
       List.fold_right
-        (fun ((lbl : label_declaration), ld_type, _sort) ->
-          add_with_bounds ~type_expr:ld_type ~modality:lbl.ld_modalities)
+        (fun { ld_type; ld_modalities; _ } ->
+          add_with_bounds ~type_expr:ld_type ~modality:ld_modalities)
         lbls jkind
 
-    let for_boxed_record_with_updates lbls =
-      if all_void_labels_with_updates lbls
-      then Builtin.immediate ~why:Empty_record
-      else
-        let base =
-          lbls
-          |> List.map (fun ((ld : label_declaration), _, _) -> ld.ld_mutable)
-          |> List.fold_left combine_mutability Immutable
-          |> jkind_of_mutability ~why:Boxed_record
-          |> mark_best
-        in
-        add_labels_as_with_bounds lbls base
-
     let for_boxed_record lbls =
-      for_boxed_record_with_updates
-        (List.map (fun lbl -> lbl, lbl.ld_type, lbl.ld_sort) lbls)
+      let base =
+        lbls
+        |> List.map (fun { ld_mutable; _ } -> ld_mutable)
+        |> List.fold_left combine_mutability Immutable
+        |> jkind_of_mutability ~why:Boxed_record
+        |> mark_best
+      in
+      add_labels_as_with_bounds lbls base
 
     let for_non_float ~(why : Jkind_intf.History.value_creation_reason) =
       let mod_bounds =
@@ -2428,68 +2356,72 @@ module Jkind0 = struct
   (* Shared type-level implementation of Steps B1-B4 from
      Note [With-bounds for GADTs]. *)
   let gadt_payload_subst
-      ~projected_params ~res_args ~payload_tys ~get_free_vars =
-    (* STEP B1 from Note [With-bounds for GADTs]: *)
-    let domain, range, seen =
-      List.fold_left2
-        (* CR ocaml-5.4: Use labeled tuples for the accumulator here *)
-          (fun ((domain, range, seen) as acc) res_arg projected_param ->
-          if TypeSet.mem res_arg seen
-          then
-            (* We've already seen this type parameter, so don't add it again.
-               See wrinkle BW1 from Note [With-bounds for GADTs]. *)
-            acc
-          else
-            match get_desc res_arg with
-            | Tvar { jkind; _ } ->
-              (* Only add types which are direct variables. Note that types
-                 which aren't variables might themselves /contain/ variables; if
-                 those variables don't show up on another parameter, they're
-                 treated as orphaned. See example K2 from Note [With-bounds for
-                 GADTs]. *)
-              let projected_param =
-                if Mod_bounds.is_max jkind.jkind.mod_bounds
-                then projected_param
-                else newgenty (Tmod (projected_param, jkind.jkind.mod_bounds))
-              in
-              res_arg :: domain, projected_param :: range,
-              TypeSet.add res_arg seen
-            | _ -> acc)
-        ([], [], TypeSet.empty)
-        res_args projected_params
-    in
-    (* STEP B2 from Note [With-bounds for GADTs]: *)
-    let orphaned_type_var_set = TypeSet.diff (get_free_vars payload_tys) seen in
-    let orphaned_type_var_list = TypeSet.elements orphaned_type_var_set in
-    (* STEP B3 from Note [With-bounds for GADTs]: *)
-    let mk_type_of_kind ty =
-      match get_desc ty with
-      (* use [newgenty] not [newty] here because we've already generalized the
-         declaration and want to keep things at [generic_level] *)
-      | Tvar { jkind; name = _ } -> newgenty (Tof_kind jkind)
-      | _ ->
-        Misc.fatal_error
-          "post-condition of [free_variable_set_of_list] violated"
-    in
-    let type_of_kind_list = List.map mk_type_of_kind orphaned_type_var_list in
-    (* STEP B4 from Note [With-bounds for GADTs]: *)
-    List.combine
-      (orphaned_type_var_list @ domain)
-      (type_of_kind_list @ range)
-
-  let for_boxed_variant ~loc ~decl_params ~type_apply ~get_free_vars cstrs =
-    let base =
-      let all_args_void =
-        List.for_all
-          (fun cstr ->
-            match cstr.cd_args with
-            | Cstr_tuple args ->
-              List.for_all
-                (fun arg -> all_void_sort_option arg.ca_sort) args
-            | Cstr_record lbls -> all_void_labels lbls)
-          cstrs
+      ~projected_params ~cstr_res ~payload_tys ~get_free_vars =
+    match cstr_res with
+    | None -> []
+    | Some res ->
+      let res_args =
+        match get_desc res with
+        | Tconstr (_, args, _) -> args
+        | _ -> Misc.fatal_error "gadt_payload_subst: expected Tconstr"
       in
-      if all_args_void
+      (* STEP B1 from Note [With-bounds for GADTs]: *)
+      let domain, range, seen =
+        List.fold_left2
+          (* CR ocaml-5.4: Use labeled tuples for the accumulator here *)
+          (fun ((domain, range, seen) as acc) res_arg projected_param ->
+            if TypeSet.mem res_arg seen
+            then
+              (* We've already seen this type parameter, so don't add it again.
+                 See wrinkle BW1 from Note [With-bounds for GADTs]. *)
+              acc
+            else
+              match get_desc res_arg with
+              | Tvar { jkind; _ } ->
+                (* Only add types which are direct variables. Note that types
+                   which aren't variables might themselves /contain/ variables;
+                   if those variables don't show up on another parameter,
+                   they're treated as orphaned. See example K2 from
+                   Note [With-bounds for GADTs]. *)
+                let projected_param =
+                  if Mod_bounds.is_max jkind.jkind.mod_bounds
+                  then projected_param
+                  else newgenty (Tmod (projected_param, jkind.jkind.mod_bounds))
+                in
+                res_arg :: domain, projected_param :: range,
+                TypeSet.add res_arg seen
+              | _ -> acc)
+          ([], [], TypeSet.empty)
+          res_args projected_params
+      in
+      (* STEP B2 from Note [With-bounds for GADTs]: *)
+      let orphaned_type_var_set =
+        TypeSet.diff (get_free_vars payload_tys) seen
+      in
+      let orphaned_type_var_list = TypeSet.elements orphaned_type_var_set in
+      (* STEP B3 from Note [With-bounds for GADTs]: *)
+      let mk_type_of_kind ty =
+        match get_desc ty with
+        (* use [newgenty] not [newty] here because we've already generalized the
+           declaration and want to keep things at [generic_level] *)
+        | Tvar { jkind; name = _ } -> newgenty (Tof_kind jkind)
+        | _ ->
+          Misc.fatal_error
+            "post-condition of [free_variable_set_of_list] violated"
+      in
+      let type_of_kind_list = List.map mk_type_of_kind orphaned_type_var_list in
+      (* STEP B4 from Note [With-bounds for GADTs]: *)
+      List.combine
+        (orphaned_type_var_list @ domain)
+        (type_of_kind_list @ range)
+
+  let for_boxed_variant ~loc ~decl_params ~type_apply ~get_free_vars
+      ~cstr_layouts cstrs =
+    let base =
+      let all_immediate =
+        Array.for_all cstr_layout_is_constant cstr_layouts
+      in
+      if all_immediate
       then (
         let has_args =
           List.exists
@@ -2528,36 +2460,17 @@ module Jkind0 = struct
             (fun (tys, ms) lbl -> lbl.ld_type :: tys, lbl.ld_modalities :: ms)
             ([], []) lbls
       in
+      let extra_substs =
+        gadt_payload_subst
+          ~projected_params:decl_params ~cstr_res:cstr.cd_res
+          ~payload_tys:cstr_arg_tys ~get_free_vars
+      in
       let cstr_arg_tys =
-        match cstr.cd_res with
-        | None -> cstr_arg_tys
-        | Some res ->
-          (* See Note [With-bounds for GADTs] for an overview. *)
-          let apply_subst domain range tys =
-            if Misc.Stdlib.List.is_empty domain
-            then tys
-            else List.map (fun ty -> type_apply domain ty range) tys
-          in
-          let res_args =
-            match get_desc res with
-            | Tconstr (_, args, _) -> args
-            | _ -> Misc.fatal_error "cd_res must be Tconstr"
-          in
-          let extra_substs =
-            gadt_payload_subst
-              ~projected_params:decl_params
-              ~res_args
-              ~payload_tys:cstr_arg_tys
-              ~get_free_vars
-          in
+        match extra_substs with
+        | [] -> cstr_arg_tys
+        | _ ->
           let domain, range = List.split extra_substs in
-          let cstr_arg_tys =
-            apply_subst
-              domain
-              range
-              cstr_arg_tys
-          in
-          cstr_arg_tys
+          List.map (fun ty -> type_apply domain ty range) cstr_arg_tys
       in
       List.fold_left2
         (fun jkind type_expr modality ->

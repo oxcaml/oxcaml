@@ -75,6 +75,7 @@ struct stack_info {
   /* The current dynamic binding node. Either [Val_null], or a block with three
      fields: dynamic key, bound value, and nullable parent node. */
   value dynamic;
+  bool is_task;
 };
 
 #ifdef STACK_GUARD_PAGES

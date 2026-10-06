@@ -80,7 +80,7 @@ jobs:
           install_url: https://releases.nixos.org/nix/nix-2.33.0/install
 
       - name: Set up cache (read-only)
-        uses: cachix/cachix-action@5f2d7c5294214f71b873db4b969586b980625e71 # v17
+        uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
         with:
           # Public caches are readable without credentials.
           name: oxcaml

@@ -357,6 +357,8 @@ let classify_expression : Typedtree.expression -> sd =
             Misc.fatal_error "letrec: primitive coercion on a module"
         | Tcoerce_alias _ ->
             Misc.fatal_error "letrec: alias coercion on a module"
+        | Tcoerce_kindtemplate _ ->
+            Misc.fatal_error "letrec: kind-instantiating coercion on a module"
         | Tcoerce_invalid ->
             Misc.fatal_error "letrec: invalid coercion on a module"
         end
@@ -787,7 +789,8 @@ let rec expression : Typedtree.expression -> term_judg =
            (match shape with
             | Constructor_uniform_value
             | Constructor_mixed _
-            | Constructor_variable _ ->
+            | Constructor_variable _
+            | Constructor_immediate_all_void ->
               Guard
             | Constructor_undetermined ->
                 Misc.fatal_error
@@ -818,6 +821,9 @@ let rec expression : Typedtree.expression -> term_judg =
               Guard
           | Record_dummy _ ->
             Misc.fatal_error "value_rec_check: unexpected dummy representation"
+          | Record_inlined (_, Constructor_immediate_all_void, _) ->
+            Misc.fatal_error
+              "value_rec_check: unexpected immediate representation"
           | Record_inlined (_, Constructor_undetermined, _)
           | Record_undetermined ->
             Misc.fatal_error
@@ -833,7 +839,7 @@ let rec expression : Typedtree.expression -> term_judg =
         in
         join [
           array field es;
-          option expression (Option.map Misc.fst3 eo) << Dereference
+          option expression (Option.map Misc.fst4 eo) << Dereference
         ]
     | Texp_record_unboxed_product { fields = es; extended_expression = eo;
                                     representation = rep } ->
@@ -1200,6 +1206,10 @@ and modexp : Typedtree.module_expr -> term_judg =
           (* These coercions perform a shallow copy of the input module,
              by creating a new module with fields obtained by accessing
              the same fields in the input module. *)
+           k Dereference
+        | Tcoerce_kindtemplate _ ->
+          (* This corresponds to kind template instantiation,
+             which uses its argument. *)
            k Dereference
         | Tcoerce_primitive _ ->
           (* This corresponds to 'external' declarations,

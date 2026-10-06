@@ -233,7 +233,7 @@ Line 3, characters 10-12:
 Error: This module type is not a signature
 |}]
 
-(* submodule of abstract type is not affected by modality *)
+(* submodule of abstract type is affected by the modality *)
 module type MT
 module type S = sig
   module M : MT
@@ -244,7 +244,7 @@ end
 [%%expect{|
 module type MT
 module type S = sig module M : MT end
-module type S' = sig module M : MT end
+module type S' = sig module M : MT @@ portable end
 |}]
 
 (* strenghtened module type *)

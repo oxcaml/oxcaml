@@ -23,9 +23,7 @@ let code loopify(never) size(34) newer_version_of(f_0)
       let Pmakeblock = %block.[`0`].my_alloc_region (x_1, 0) in
       cont k (Pmakeblock)
 in
-let $camlProduct_join_with_mixed_kinds__f_1 =
-  closure f_0_1 @f &toplevel.alloc_region
-in
+let $camlProduct_join_with_mixed_kinds__f_1 = closure f_0_1 @f &toplevel in
 let $camlProduct_join_with_mixed_kinds =
   Block 0 ($camlProduct_join_with_mixed_kinds__f_1)
 in

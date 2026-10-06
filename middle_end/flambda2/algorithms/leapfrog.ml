@@ -35,8 +35,8 @@ module Map (T : Container_types.S_plus_iterator) = struct
   type _ t =
     | Iterator :
         { iterator : 'v T.Map.Mutable_iterator.iterator;
-          map : 'v T.Map.t Channel.receiver;
-          handler : 'v Channel.sender
+          map : 'v T.Map.t Channel.or_null_receiver;
+          handler : 'v Channel.or_null_sender
         }
         -> T.t t
 
@@ -56,12 +56,17 @@ module Map (T : Container_types.S_plus_iterator) = struct
     T.Map.Mutable_iterator.seek i.iterator k
 
   let init (type a) (Iterator i : a t) : unit =
-    T.Map.Mutable_iterator.init i.iterator (Channel.recv i.map)
+    let map =
+      match Channel.recv_or_null i.map with
+      | Null -> T.Map.empty
+      | This map -> map
+    in
+    T.Map.Mutable_iterator.init i.iterator map
 
   let accept (type a) (Iterator i : a t) : unit =
     match T.Map.Mutable_iterator.current i.iterator with
     | None -> invalid_arg "accept: iterator is exhausted"
-    | Some (_, value) -> Channel.send i.handler value
+    | Some (_, value) -> Channel.send_or_null i.handler (Or_null.this value)
 
   let create cell handler =
     Iterator

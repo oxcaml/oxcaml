@@ -67,8 +67,8 @@
             let int_add = %int_barith.add (x, y) in
             cont k1 (int_add))
  in
- let foo = closure foo_0 @foo &toplevel.alloc_region in
- let f = closure f_1 @f &toplevel.alloc_region in
+ let foo = closure foo_0 @foo &toplevel in
+ let f = closure f_1 @f &toplevel in
  let Pmakeblock = %block.[`0`].`toplevel` (foo, f) in
  cont k (Pmakeblock))
   where k define_root_symbol (module_block) =

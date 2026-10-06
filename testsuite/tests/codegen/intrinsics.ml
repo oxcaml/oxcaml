@@ -715,6 +715,11 @@ module Bytes = struct
     @@ portable = "%caml_bytes_geti8u_indexed_by_int64#"
     [@@warning "-187"]
 
+  external unsafe_get_int8_u_indexed_by_int64 :
+    (bytes[@local_opt]) -> int64_u -> int8#
+    @@ portable = "%caml_bytes_geti8u#_indexed_by_int64#"
+    [@@warning "-187"]
+
   external unsafe_set_int8_indexed_by_int64 :
     (bytes[@local_opt]) -> int64_u -> int -> unit
     @@ portable = "%caml_bytes_set8u_indexed_by_int64#"

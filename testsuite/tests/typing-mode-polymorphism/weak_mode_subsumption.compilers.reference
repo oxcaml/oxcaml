@@ -14,6 +14,7 @@ Error: Signature mismatch:
        The type string -> int -> int is not compatible with the type
          string -> int -> int
        Type int -> int is not compatible with type int -> int
+       The return mode was expected to be static but is dynamic
        File "weak_mode_subsumption.ml", line 19, characters 6-7:
          Expected declaration
        File "weak_mode_subsumption.ml", line 27, characters 6-7:

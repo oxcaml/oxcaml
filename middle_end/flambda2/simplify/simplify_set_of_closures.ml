@@ -449,7 +449,9 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
         ~is_a_functor:(Code.is_a_functor code) ~recursive
     in
     Inlining_report.record_decision_at_function_definition ~absolute_history
-      ~code_metadata:(Code.code_metadata code) ~pass:After_simplify
+      ~code_metadata:
+        (Code_metadata.with_cost_metrics cost_metrics (Code.code_metadata code))
+      ~pass:After_simplify
       ~are_rebuilding_terms:(DA.are_rebuilding_terms dacc_after_body)
       decision;
     decision
@@ -899,8 +901,7 @@ let simplify_non_lifted_set_of_closures0 dacc bound_vars ~closure_bound_vars
       in
       Cost_metrics.
         { cost_metrics = Code_metadata.cost_metrics code_metadata;
-          params_arity =
-            Flambda_arity.num_params (Code_metadata.params_arity code_metadata)
+          function_slot_size = Code_metadata.function_slot_size code_metadata
         }
     in
     let machine_width = DE.machine_width (DA.denv dacc) in

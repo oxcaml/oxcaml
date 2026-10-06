@@ -149,7 +149,8 @@ let () =
       "sse41_test_ops";
       "sse42_string_ops";
       "f16c_ops";
-      "fma_ops" ]
+      "fma_ops";
+      "aes_ops" ]
   in
   List.iter make_ops_u ops;
   let tests =
@@ -193,6 +194,8 @@ let () =
       "f16c_ops_u", enabled_if_main_amd64_not_macos;
       "fma_ops", enabled_if_main_amd64_not_macos;
       "fma_ops_u", enabled_if_main_amd64_not_macos;
+      "aes_ops", enabled_if_main_amd64_not_macos;
+      "aes_ops_u", enabled_if_main_amd64_not_macos;
       "arrays", enabled_if_main;
       "arrays_u", enabled_if_main;
       "scalar_ops", enabled_if_main;

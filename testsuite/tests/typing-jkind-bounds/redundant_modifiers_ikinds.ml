@@ -1,5 +1,5 @@
 (* TEST
-    flags = "-extension mode_alpha";
+    flags = "-extension mode_alpha -extension layout_poly_alpha";
     expect;
 *)
 
@@ -276,7 +276,7 @@ type t : value mod everything
 
 type t : value mod everything non_float
 [%%expect{|
-type t : value mod everything non_float
+type t : (value mod everything) non_float
 |}]
 
 (**************************************************************************)

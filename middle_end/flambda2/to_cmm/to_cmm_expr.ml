@@ -318,9 +318,9 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         res,
         Ece.all )
     | Some { name; enabled_at_init } ->
+      assert (Flambda_arity.cardinal_unarized return_arity = 0);
       ( C.probe ~dbg ~name ~handler_code_linkage_name:code_sym.sym_name ~args
-          ~enabled_at_init
-        |> C.return_unit dbg,
+          ~enabled_at_init,
         free_vars,
         env,
         res,
@@ -778,7 +778,9 @@ and let_expr0 env res let_expr (bound_pattern : Bound_pattern.t)
     when (not (Flambda_features.stack_allocation_enabled ()))
          && Flambda_primitive.is_begin_or_end_region p ->
     expr env res body
-  | Singleton _, Prim (Nullary (Enter_inlined_apply { dbg }), _) ->
+  | ( Singleton _,
+      Prim (Nullary (Enter_inlined_apply { dbg; inlined_attribute = _ }), _) )
+    ->
     let env = Env.enter_inlined_apply env dbg in
     expr env res body
   | Singleton v, Prim ((Unary (End_region _, _) as p), dbg) ->

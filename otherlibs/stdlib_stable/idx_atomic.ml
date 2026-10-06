@@ -14,7 +14,7 @@
 
 [@@@ocaml.flambda_o3]
 
-type ('a : value_or_null, 'b : value_or_null) t : bits64 mod everything =
+type ('a : value_or_null, 'b : any) t : bits64 mod everything =
   ('a, 'b) idx_atomic
 
 external get :

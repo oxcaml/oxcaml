@@ -84,6 +84,9 @@ val staticity : t -> Mode.Staticity.const
 
 val externality : t -> Jkind_axis.Externality.t
 
+(** Lower a point on the lattice to the given externality bound *)
+val meet_externality : Jkind_axis.Externality.t -> t -> t
+
 val to_mode_crossing : t -> Mode.Crossing.t
 
 (** Canonical lattice constants used by ikinds. *)

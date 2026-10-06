@@ -87,22 +87,9 @@ module Sort : sig
 
   val set_change_log : (change -> unit) -> unit
 
-  type equate_result =
-    | Unequal
-    | Equal_mutated_first
-    | Equal_mutated_second
-    | Equal_mutated_both
-    | Equal_no_mutation
+  val equate : allow_mutation:bool -> t -> t -> bool
 
-  val equate_tracking_mutation : t -> t -> equate_result
-
-  type constrain_addressable_result =
-    | Addressable_mutated
-    | Addressable_no_mutation
-    | Not_known_addressable
-
-  val constrain_addressable :
-    allow_mutation:bool -> t -> constrain_addressable_result
+  val constrain_addressable : allow_mutation:bool -> t -> bool
 
   val strip_head_addressable : t -> t
 
@@ -113,6 +100,9 @@ module Sort : sig
   (** Determines if the sort is [Scannable] or an unfilled sort variable,
       possibly under [Addressable] wrappers *)
   val is_scannable_or_var : t -> bool
+
+  val implied_externality :
+    separability:Jkind_axis.Separability.t -> t -> Jkind_axis.Externality.t
 
   (** Decompose a sort into a list (of the given length) of fresh sort
       variables, equating the input sort with the product of the output sorts.
@@ -153,6 +143,10 @@ module Scannable_axes : sig
   val less_or_equal : t -> t -> Misc.Le_result.t
 
   val meet : t -> t -> t
+
+  (** [residual sa sa'] is the greatest [r] such that [meet sa r = meet sa sa'].
+  *)
+  val residual : t -> t -> t
 end
 
 module Layout : sig
@@ -175,6 +169,11 @@ module Layout : sig
     | Product of 'sort t list
     | Any of Scannable_axes.t
     | Addressable of 'sort t
+    | Box of 'sort t * Scannable_axes.t
+        (** The contents of a box imply some scannable axes (see
+            [Const.implied_box_axes]), so the scannable axes of a box are the
+            meet of those implied axes and the axes applied outside of the box
+            constructor. *)
 
   module Const : sig
     type t = private
@@ -183,16 +182,15 @@ module Layout : sig
       | Product of t list
       | Univar of Sort.univar
       | Genvar of Sort.var
-          (** A layout variable bound by a surrounding [val_lpoly]. It's a
-              "fake" constant that will be instantiated to real layout constant
-              by slambda. The [var] is used only for physical identity; its
-              contents are not consumed and its level must be
-              [Ident.highest_scope]. *)
       | Addressable of t
           (** See Note [Addressable kinds].
 
               Invariant: this constructor is never redundantly applied. I.e.,
               given [Addressable t], [not (is_surely_addressable t)]. *)
+      | Box of t * Scannable_axes.t
+          (** Invariant: axes on const boxes incorporate the axes implied by the
+              contents. I.e., given [Box (t, sa)],
+              [Scannable_axes.meet (implied_box_axes t) sa = sa]. *)
 
     val any : Scannable_axes.t -> t
 
@@ -212,13 +210,20 @@ module Layout : sig
 
     val get_sort : t -> Sort.Const.t option
 
-    val is_scannable_or_any : t -> bool
+    val implied_externality : t -> Jkind_axis.Externality.t
 
     val is_surely_addressable : t -> bool
 
     val addressable : t -> t
 
     val apply_operator : t -> Kind_operator.t -> t
+
+    (** The scannable axes implied by boxing data of layout [t]. *)
+    val implied_box_axes : t -> Scannable_axes.t
+
+    (** Given a layout [t] and scannable axes [sa], this function constructs the
+        layout [(t box) sa] while maintaining the invariant on [Box] above. *)
+    val box : t -> Scannable_axes.t -> t
 
     (** Returns [None] if the root of [t] has no meaningful scannable axes (e.g.
         [Base Float64], [Product], [Univar], [Genvar]). *)
