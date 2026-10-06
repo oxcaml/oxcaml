@@ -210,17 +210,15 @@ module Pattern_env : sig
       (* scope for local type declarations *)
       in_counterexample : bool;
       (* true iff checking counter examples *)
-      mutable env_locality_mode : Mode.Locality.r option;
-      (** [Some m] if the pattern is under [let poly_], where [m] is the
-         allocation mode of the captured environment *)
+      is_lpoly : bool;
+      (* true iff the pattern is under let poly_ *)
     }
   val make:
-    ?env_locality_mode:Mode.Locality.r
+    ?is_lpoly:bool
     -> Env.t -> equations_scope:int
     -> in_counterexample:bool -> t
   val copy: ?equations_scope:int -> t -> t
   val set_env: t -> Env.t -> unit
-  val set_env_locality_mode : t -> Mode.Locality.r option -> unit
 end
 
 type existential_treatment =
