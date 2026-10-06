@@ -76,7 +76,7 @@ let gen_rule ~ppf ~tgt_file ~base ~deps =
   let flags =
     "-nopervasives -directory stdlib -strict-sequence -g -absname \
      -extension runtime_metaprogramming -nostdlib -safe-string -strict-formats \
-     -no-alias-deps -w +a-4-9-40-41-42-44-45-48-66-67-70 -w -221"
+     -no-alias-deps -w +a-4-9-40-41-42-44-45-48-66-67-70 -w -221 -principal"
   in
   let flags =
     if annot then
@@ -106,7 +106,8 @@ let gen_rule ~ppf ~tgt_file ~base ~deps =
   | `Cmx ->
      let action =
        sprintf "(run %%{exe:../../boot_ocamlopt.exe} %s -cmi-file %s.cmi \
-                                                     -o %s.cmx -c %%{src})"
+                 %%{read-lines:../../ocamlopt_stdlib_flags.txt} \
+                 -o %s.cmx -c %%{src})"
          flags target target
      in
      rule ~ppf ~target ~exts:["o";"cmx"] ~src ~deps ~action

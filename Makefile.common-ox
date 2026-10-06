@@ -137,7 +137,7 @@ dune_config_targets = \
   $(ocamldir)/duneconf/ox-extra.inc \
   dune-project
 
-_build/_bootinstall: Makefile.config $(dune_config_targets)
+_build/_bootinstall: Makefile.config Makefile.common-ox $(dune_config_targets)
 	echo -n '$(NATDYNLINKOPTS)' > $(ocamldir)/natdynlinkops
 
 # flags.sexp
@@ -145,6 +145,7 @@ _build/_bootinstall: Makefile.config $(dune_config_targets)
 # See: https://github.com/ocaml/dune/issues/13225
 	echo '($(if $(filter true,$(FUNCTION_SECTIONS)),-function-sections,))' > ocamlopt_upstream_flags.sexp
 	echo '($(OXCAML_DWARF_FLAGS_FOR_COMPILER) $(ASSEMBLY_FLAG_FOR_COMPILER) $(if $(filter true,$(FUNCTION_SECTIONS)),-function-sections,))' > ocamlopt_oxcaml_flags.sexp
+	echo '$(OXCAML_DWARF_FLAGS_FOR_COMPILER) $(ASSEMBLY_FLAG_FOR_COMPILER) $(if $(filter true,$(FUNCTION_SECTIONS)),-function-sections,)' | xargs -n 1 echo > ocamlopt_stdlib_flags.txt
 	echo '( )' > boot_oc_cflags.sexp
 	echo '( $(OC_CFLAGS) )' > oc_cflags.sexp
 	echo '( $(subst -I $(ROOTDIR)/,-I $(CURDIR)/,$(OC_CPPFLAGS)) )' > oc_cppflags.sexp
