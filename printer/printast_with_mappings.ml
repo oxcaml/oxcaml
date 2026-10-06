@@ -544,6 +544,8 @@ and expression i ppf x =
   | Pexp_borrow e ->
       line i ppf "Pexp_borrow\n";
       expression i ppf e
+  | Pexp_break ->
+      line i ppf "Pexp_break"
   )
 
 and block_access i ppf = function

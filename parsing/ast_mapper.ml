@@ -669,6 +669,7 @@ module E = struct
     | Pexp_splice e -> splice ~loc ~attrs (sub.expr sub e)
     | Pexp_hole -> hole ~loc ~attrs ()
     | Pexp_borrow e -> borrow ~loc ~attrs (sub.expr sub e)
+    | Pexp_break -> break ~loc ~attrs ()
 
   let map_binding_op sub {pbop_op; pbop_pat; pbop_exp; pbop_loc} =
     let open Exp in
