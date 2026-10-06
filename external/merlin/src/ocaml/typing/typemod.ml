@@ -2098,13 +2098,7 @@ and transl_modtype_aux md_mode env smty =
         smty.pmty_attributes
   | Pmty_signature ssg ->
       Env.check_no_open_quotations loc env Env.Sig_qt;
-<<<<<<< Merlin:ageorges/parse-curry-mode-with-modality
-      let sg = transl_signature env [] ssg in
-||||||| Compiler:last-imported
-      let sg = transl_signature env ssg in
-=======
-      let sg = transl_signature ~md_mode env ssg in
->>>>>>> Compiler:HEAD
+      let sg = transl_signature ~md_mode env [] ssg in
       mkmty (Tmty_signature sg) (Mty_signature sg.sig_type) env loc
         smty.pmty_attributes
   | Pmty_functor(sarg_opt, sres, mres) ->
@@ -2243,7 +2237,6 @@ and add_implicit_jkinds env attrs =
   in
   List.fold_left register_default env attrs
 
-<<<<<<< Merlin:ageorges/parse-curry-mode-with-modality
 (* In the real compiler, there is no notion of incrementally checking a signature,
    as there is for structures when using the toplevel.  So this function doesn't
    take a ~toplevel argument like its cousin type_structure.  But in merlin,
@@ -2251,12 +2244,7 @@ and add_implicit_jkinds env attrs =
    so we need this to take the signature of the previously checked portion
    to support include functor. *)
 
-and transl_signature ?(keep_warnings = false) ?(interface_toplevel = false) env sig_acc
-||||||| Compiler:last-imported
-and transl_signature ?(interface_toplevel = false) env
-=======
-and transl_signature ?(interface_toplevel = false) ~md_mode env
->>>>>>> Compiler:HEAD
+and transl_signature ?(keep_warnings = false) ?(interface_toplevel = false) ~md_mode env sig_acc
       {psg_items; psg_modalities; psg_loc} =
   let names = Signature_names.create () in
 
@@ -4472,10 +4460,10 @@ let merlin_type_structure env sig_acc str =
   in
   str, sg, env
 let type_structure env = type_structure ~funct_body:false None env []
-let merlin_transl_signature ?interface_toplevel env sig_acc sg =
-  transl_signature ?interface_toplevel ~keep_warnings:true env sig_acc sg
-let transl_signature ?interface_toplevel env sg =
-  transl_signature ?interface_toplevel env [] sg
+let merlin_transl_signature ?interface_toplevel ~md_mode env sig_acc sg =
+  transl_signature ?interface_toplevel ~keep_warnings:true ~md_mode env sig_acc sg
+let transl_signature ?interface_toplevel ~md_mode env sg =
+  transl_signature ?interface_toplevel ~md_mode env [] sg
 
 (* Normalize types in a signature *)
 
@@ -5448,16 +5436,8 @@ let report_error ~loc _env = function
          Names must be unique in a given structure or signature.@]"
         (Sig_component_kind.to_string kind) Style.inline_code name
   | Non_generalizable { vars; expression } ->
-<<<<<<< Merlin:ageorges/parse-curry-mode-with-modality
       let manual_ref = [ 6; 1; 2 ] in
-      Out_type.prepare_for_printing vars;
-||||||| Compiler:last-imported
-      let[@manual.ref "ss:valuerestriction"] manual_ref = [ 6; 1; 2 ] in
-      Out_type.prepare_for_printing vars;
-=======
-      let[@manual.ref "ss:valuerestriction"] manual_ref = [ 6; 1; 2 ] in
       Out_type.prepare_for_printing ~base:Mode.With_locality.Const.legacy vars;
->>>>>>> Compiler:HEAD
       Out_type.add_type_to_preparation expression;
       Location.errorf ~loc
         "@[The type of this expression,@ %a,@ \
@@ -5467,16 +5447,8 @@ let report_error ~loc _env = function
            (Style.as_inline_code Out_type.prepared_type_scheme)) vars
         Misc.print_see_manual manual_ref
   | Non_generalizable_module { vars; mty; item } ->
-<<<<<<< Merlin:ageorges/parse-curry-mode-with-modality
       let manual_ref = [ 6; 1; 2 ] in
-      Out_type.prepare_for_printing vars;
-||||||| Compiler:last-imported
-      let[@manual.ref "ss:valuerestriction"] manual_ref = [ 6; 1; 2 ] in
-      Out_type.prepare_for_printing vars;
-=======
-      let[@manual.ref "ss:valuerestriction"] manual_ref = [ 6; 1; 2 ] in
       Out_type.prepare_for_printing ~base:Mode.With_locality.Const.legacy vars;
->>>>>>> Compiler:HEAD
       Out_type.add_type_to_preparation item.val_type;
       Location.errorf ~loc
         "@[The type of this module,@ %a,@ \

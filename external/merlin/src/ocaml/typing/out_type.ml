@@ -2537,7 +2537,7 @@ module Aliases = struct
     if List.memq px visited && aliasable ty then add_proxy px else
       let visited = px :: visited in
       match get_desc ty with
-      | Tvar _ -> Variable_names.reserve ty
+      | Tvar _ -> Variable_names.reserve ~base:With_locality.Const.legacy ty
       | Tarrow(_, ty1, ty2, _) ->
           mark_loops_rec visited ty1; mark_loops_rec visited ty2
       | Ttuple tyl | Tunboxed_tuple tyl ->
@@ -2595,7 +2595,7 @@ module Aliases = struct
       | Tpoly(ty, tyl) ->
           List.iter add tyl;
           mark_loops_rec visited ty
-      | Tunivar _ -> Variable_names.reserve ty
+      | Tunivar _ -> Variable_names.reserve ~base:With_locality.Const.legacy ty
 
   let mark_loops ty =
     mark_loops_rec [] ty
@@ -3608,7 +3608,7 @@ let print_annotated_qtvs_as_comment ppf qtvs =
         qtvs
 
 let type_scheme_for_merlin ~print_non_value_jkind_on_type_variables ppf ty =
-  prepare_for_printing [ty];
+  prepare_for_printing ~base:With_locality.Const.legacy [ty];
   prepared_type_scheme ppf ty;
   if print_non_value_jkind_on_type_variables
   then (

@@ -2477,17 +2477,9 @@ let report_error_doc env ppf =
               @[%a@]@]"
        pp_doc msg print_reason reason
   | Non_generalizable_class {id;  clty; nongen_vars } ->
-<<<<<<< Merlin:ageorges/parse-curry-mode-with-modality
       let manual_ref = [ 6; 1; 2] in
-      Out_type.prepare_for_printing nongen_vars;
-||||||| Compiler:last-imported
-      let[@manual.ref "ss:valuerestriction"] manual_ref = [ 6; 1; 2] in
-      Out_type.prepare_for_printing nongen_vars;
-=======
-      let[@manual.ref "ss:valuerestriction"] manual_ref = [ 6; 1; 2] in
       Out_type.prepare_for_printing ~base:Mode.With_locality.Const.legacy
         nongen_vars;
->>>>>>> Compiler:HEAD
       fprintf ppf
         "@[The type of this class,@ %a,@ \
          contains the non-generalizable type variable(s): %a.@ %a@]"
