@@ -58,6 +58,10 @@ open! Int_replace_polymorphic_compare
       every op and every block terminator, whether from the framework's default
       translation or from a reducer's replacement.
 
+    [visit_instruction] can also return [Move_to target], to have an [Op]
+    emitted (with its default translation) at the start of a block strictly
+    dominated by its own, rather than in place (e.g. to sink code).
+
     Default translation, applied when [visit_*] returns [Unchanged]:
     - Op args and block-param uses are mapped from the input to the output via
       [map_value]; block references via [map_block].
@@ -194,6 +198,7 @@ end
 type 'a reduction =
   | Unchanged
   | Reduce of (Context.Cursor.t -> 'a)
+  | Move_to of finished Block.t
 
 module type Reducer = sig
   type t
@@ -252,22 +257,22 @@ module Combine (A : Reducer) (B : Reducer) : Reducer = struct
   let visit_instruction (a, b) block ~instr_index =
     match A.visit_instruction a block ~instr_index with
     | Unchanged -> B.visit_instruction b block ~instr_index
-    | Reduce _ as r -> r
+    | (Reduce _ | Move_to _) as r -> r
 
   let visit_terminator (a, b) block =
     match A.visit_terminator a block with
     | Unchanged -> B.visit_terminator b block
-    | Reduce _ as r -> r
+    | (Reduce _ | Move_to _) as r -> r
 
   let emit_op (a, b) ~op ~dbg ~typ ~args =
     match A.emit_op a ~op ~dbg ~typ ~args with
     | Unchanged -> B.emit_op b ~op ~dbg ~typ ~args
-    | Reduce _ as r -> r
+    | (Reduce _ | Move_to _) as r -> r
 
   let finish_block (a, b) ~dbg t =
     match A.finish_block a ~dbg t with
     | Unchanged -> B.finish_block b ~dbg t
-    | Reduce _ as r -> r
+    | (Reduce _ | Move_to _) as r -> r
 end
 
 module Make_run (R : Reducer) = struct
@@ -332,6 +337,7 @@ module Make_run (R : Reducer) = struct
       match R.emit_op (Lazy.force reducer) ~op ~dbg ~typ ~args with
       | Unchanged -> Ssa.Cursor.emit_op out_graph c op dbg typ args
       | Reduce f -> f c
+      | Move_to _ -> Misc.fatal_error "Ssa_reducer: emit_op returned Move_to"
     and ctx : Context.t =
       { in_graph; out_graph; block_map; op_map; block_param_values; emit_op }
     and reducer : R.t Lazy.t = lazy (R.create ctx) in
@@ -347,6 +353,8 @@ module Make_run (R : Reducer) = struct
       | Reduce f ->
         let dbg, term = f c in
         finish_block c ~dbg term
+      | Move_to _ ->
+        Misc.fatal_error "Ssa_reducer: finish_block returned Move_to"
     in
     (* Default translation of one body instruction, returning the value(s) its
        results map to ([||] for a trap instruction). *)
@@ -366,13 +374,8 @@ module Make_run (R : Reducer) = struct
         Cursor.emit_pop_trap c ~handler:(Context.map_block ctx handler);
         [||]
     in
-    let visit_instruction (block : finished Block.t) ~instr_index c =
-      let instr = Array.get (Block.body block) instr_index in
-      let vs =
-        match R.visit_instruction reducer block ~instr_index with
-        | Reduce f -> f c
-        | Unchanged -> default_translate_instruction instr c
-      in
+    (* Record the value(s) an input instruction's results map to. *)
+    let record_results (instr : finished Instruction.t) vs =
       if Instruction.result_arity instr <> Array.length vs
       then
         Misc.fatal_errorf
@@ -385,6 +388,45 @@ module Make_run (R : Reducer) = struct
       | Op { id; _ } -> Instruction.Id.Tbl.replace op_map id vs
       | Push_trap _ | Pop_trap _ -> ()
     in
+    (* The instructions moved by [Move_to], per target block, most recently
+       visited first. *)
+    let moved_instructions = Block.Tbl.create 16 in
+    let move_instruction (block : finished Block.t)
+        (instr : finished Instruction.t) ~(target : finished Block.t) =
+      (match instr with
+      | Op _ -> ()
+      | Push_trap _ | Pop_trap _ ->
+        Misc.fatal_errorf "Ssa_reducer: cannot move trap instruction %a"
+          Instruction.print instr);
+      if Block.equal block target || not (Block.dominates block target)
+      then
+        Misc.fatal_errorf
+          "Ssa_reducer: cannot move %a from block %a to block %a, which the \
+           former does not strictly dominate"
+          Instruction.print instr Block.print_id block Block.print_id target;
+      let moved =
+        Option.value (Block.Tbl.find_opt moved_instructions target) ~default:[]
+      in
+      Block.Tbl.replace moved_instructions target (instr :: moved)
+    in
+    let emit_moved_instructions (block : finished Block.t) c =
+      match Block.Tbl.find_opt moved_instructions block with
+      | None -> ()
+      | Some moved ->
+        Block.Tbl.remove moved_instructions block;
+        List.iter
+          (fun instr ->
+            record_results instr (default_translate_instruction instr c))
+          (List.rev moved)
+    in
+    let visit_instruction (block : finished Block.t) ~instr_index c =
+      let instr = Array.get (Block.body block) instr_index in
+      match R.visit_instruction reducer block ~instr_index with
+      | Reduce f -> record_results instr (f c)
+      | Unchanged ->
+        record_results instr (default_translate_instruction instr c)
+      | Move_to target -> move_instruction block instr ~target
+    in
     let visit_terminator (block : finished Block.t) c =
       let dbg, terminator =
         match R.visit_terminator reducer block with
@@ -392,6 +434,8 @@ module Make_run (R : Reducer) = struct
         | Unchanged ->
           ( Block.terminator_dbg block,
             Context.map_terminator ctx (Block.terminator block) )
+        | Move_to _ ->
+          Misc.fatal_error "Ssa_reducer: visit_terminator returned Move_to"
       in
       finish_block c ~dbg terminator
     in
@@ -402,6 +446,7 @@ module Make_run (R : Reducer) = struct
         let out_block = Block.Tbl.find block_map block in
         let c = Cursor.start out_block in
         try
+          emit_moved_instructions block c;
           Array.iteri
             (fun instr_index _ -> visit_instruction block ~instr_index c)
             (Block.body block);
@@ -415,5 +460,9 @@ module Make_run (R : Reducer) = struct
             (Printexc.to_string exn) Ssa_print.print in_graph;
           Printexc.raise_with_backtrace exn bt)
       (Ssa.blocks in_graph);
+    if Block.Tbl.length moved_instructions > 0
+    then
+      Misc.fatal_error
+        "Ssa_reducer: instructions were moved to a block outside the graph";
     Ssa.finish_graph out_graph
 end
