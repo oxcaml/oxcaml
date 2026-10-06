@@ -74,7 +74,7 @@ Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 val g : t -> t -> bool = <fun>
 |}]
 
-(* oxcaml/oxcaml#XXXX, the second case was not reported as unused. The
+(* oxcaml/oxcaml#7450, the second case was not reported as unused. The
    corresponding miscompilation is tested in [basic/patmatch.ml]. *)
 type u = #{ a : int; b : int }
 

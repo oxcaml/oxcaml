@@ -1875,7 +1875,7 @@ module MPR7761 = struct
   end
 end
 
-(* oxcaml/oxcaml#XXXX, was giving wrong result 3 for [B] and [b = 0] *)
+(* oxcaml/oxcaml#7450, was giving wrong result 3 for [B] and [b = 0] *)
 module Unboxed_record_compat = struct
   type t = A | B
   type u = #{ a : int; b : int }
