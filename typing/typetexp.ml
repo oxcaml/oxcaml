@@ -814,13 +814,22 @@ end = struct
     let modes_to_equate = ref [] in
     LocalVarMap.iter Mode
       (fun name (mode, loc) ->
-        With_locality.update_level (get_global_level ()) mode;
+        let mode_global = With_locality.newvar (get_global_level ()) in
+        (match With_locality.equate mode_global mode with
+         | Ok () -> ()
+         | Error _ ->
+           raise (Error (loc, env, Unsatisfiable_mode_variable name)));
         match lookup_global_mode name with
         | mode' ->
-          modes_to_equate := (loc, name, mode, mode') :: !modes_to_equate
+          modes_to_equate :=
+            (loc, name, mode_global, mode') :: !modes_to_equate
         | exception Not_found ->
           match unbound_variable_policy with
-          | Open -> add_mode name mode
+          | Open ->
+            let mode_global' = With_locality.newvar (get_global_level ()) in
+            modes_to_equate :=
+              (loc, name, mode_global, mode_global') :: !modes_to_equate;
+            add_mode name mode_global'
           | Closed ->
             raise(Error(loc, env,
                         Unbound_variable (ModeVar,
