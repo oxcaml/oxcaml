@@ -22,7 +22,7 @@ type t =
   }
 
 let print_or_elide_debuginfo ppf dbg =
-  if Debuginfo.is_none dbg
+  if Flambda_features.dump_compact () || Debuginfo.is_none dbg
   then Format.pp_print_string ppf ""
   else (
     Format.pp_print_string ppf " ";
