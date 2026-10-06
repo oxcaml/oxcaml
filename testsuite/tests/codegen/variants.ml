@@ -123,10 +123,9 @@ even_variant:
   cmpq  $3, %rax
   je    .L0
   cmpq  $7, %rax
-  setge %al
+  setl  %al
   movzbq %al, %rax
   leaq  1(%rax,%rax), %rax
-  xorq  $2, %rax
   ret
 .L0:
   movl  $1, %eax
