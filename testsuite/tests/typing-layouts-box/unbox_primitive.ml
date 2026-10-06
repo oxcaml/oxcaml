@@ -153,8 +153,6 @@ let () = both_ways (fun { hide } ->
 [%%expect{|
 |}]
 
-(* CR box: add tests for mixed tuples after rebasing onto them *)
-(*
 (* Unboxed tuples mixing values and flat data, in various orders *)
 
 let () = both_ways (fun { hide } ->
@@ -192,7 +190,6 @@ let () = both_ways (fun { hide } ->
   assert (a = 1 && eq_i64 b #2L && eq_i64 c #3L && d = 4))
 [%%expect{|
 |}]
-*)
 
 (* Unboxed records. [t# box = t], so we can also unbox a directly constructed
    record. *)
@@ -254,12 +251,9 @@ let () = both_ways (fun { hide } ->
   let #{ w1; w2 = #(#{ ix; iy }, w2b); w3 } =
     unbox (hide (box #{ w1 = 1; w2 = #(#{ ix = #2L; iy = s }, #3l); w3 = s }))
   in
-  assert (w1 = 1 && eq_i64 ix #2L && iy == s && eq_i32 w2b #3l && w3 == s)
-  (* CR box: mixed tuple, enable after rebasing onto mixed tuples
-  ;
+  assert (w1 = 1 && eq_i64 ix #2L && iy == s && eq_i32 w2b #3l && w3 == s);
   let #(#{ ix; iy }, b) = unbox (hide (box #(#{ ix = #4L; iy = s }, #5.5))) in
-  assert (eq_i64 ix #4L && iy == s && eq_f64 b #5.5)
-  *))
+  assert (eq_i64 ix #4L && iy == s && eq_f64 b #5.5))
 [%%expect{|
 type inner_u = #{ ix : int64_u; iy : string; }
 type outer_u = #{ o1 : inner_u; o2 : float#; o3 : int; }
@@ -321,12 +315,8 @@ let () = both_ways (fun { hide } ->
   assert (eq_i64 a #1L && b == s);
   let #{ x = _; kept = _ } = unbox (hide (box #{ x = #(); kept = #() })) in
   let #{ x = _; kept = _ } = unbox (hide { x = #(); kept = #() }) in
-  ()
-  (* CR box: mixed tuple, enable after rebasing onto mixed tuples
-  ;
   let #(#(_, a), b, _) = unbox (hide (box #(#(#(), #1L), s, #()))) in
-  assert (eq_i64 a #1L && b == s)
-  *))
+  assert (eq_i64 a #1L && b == s))
 [%%expect{|
 type all_void = { x : unit#; kept : unit#; }
 type void_mixed = { v1 : #(unit# * int64_u); v2 : string; v3 : unit#; }
@@ -340,16 +330,13 @@ let () =
   assert (a = 42 && c == s);
   let local_ r = box #{ g = #1L; h = #2.5; k = s; l = 3; m = #4L } in
   let #{ g; h; k; l; m } = unbox r in
-  assert (eq_i64 g #1L && eq_f64 h #2.5 && k == s && l = 3 && eq_i64 m #4L)
-  (* CR box: mixed tuples, enable after rebasing onto mixed tuples
-  ;
+  assert (eq_i64 g #1L && eq_f64 h #2.5 && k == s && l = 3 && eq_i64 m #4L);
   let local_ b = box #(#1L, s) in
   let #(a, c) = unbox b in
   assert (eq_i64 a #1L && c == s);
   let local_ n = box #(s, #(#2L, #(3, #4.5s))) in
   let #(a, #(c, #(d, e))) = unbox n in
   assert (a == s && eq_i64 c #2L && d = 3 && eq_f32 e #4.5s)
-  *)
 [%%expect{|
 |}]
 

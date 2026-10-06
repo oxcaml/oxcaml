@@ -185,25 +185,19 @@ type p_many = { g : int64_u; h : float#; k : string; l : int; m : int64_u; }
 type p_nested = { n1 : #(int64_u * string); n2 : float#; }
 |}]
 
-(* CR zeisbach: add tests for mixed tuples after rebasing onto them *)
-
-(*
-external box_obj : ('a : any). 'a -> Obj.t = "%box" [@@layout_poly]
-
 let () =
-  check_shape (box_obj #(#42L, s)) { c = #42L; d = s };
-  check_shape (box_obj #(s, #42L)) { e = s; f = #42L };
-  check_shape (box_obj #(#1L, #2.5, s, 3, #4L))
+  check_shape (box #(#42L, s)) { c = #42L; d = s };
+  check_shape (box #(s, #42L)) { e = s; f = #42L };
+  check_shape (box #(#1L, #2.5, s, 3, #4L))
     { g = #1L; h = #2.5; k = s; l = 3; m = #4L };
-  check_shape (box_obj #(#(#42L, s), #2.5)) { n1 = #(#42L, s); n2 = #2.5 };
-  check_shape (box_obj #(#(#42L, s), #2.5)) { q1 = #42L; q2 = s; q3 = #2.5 };
-  let r : p_flat_first = Obj.obj (box_obj #(#42L, s)) in
+  check_shape (box #(#(#42L, s), #2.5)) { n1 = #(#42L, s); n2 = #2.5 };
+  let r : p_flat_first = Obj.magic (box #(#42L, s)) in
   assert (eq_i64 r.c #42L && r.d == s);
-  let r : p_many = Obj.obj (box_obj #(#1L, #2.5, s, 3, #4L)) in
+  let r : p_many = Obj.magic (box #(#1L, #2.5, s, 3, #4L)) in
   assert (eq_i64 r.g #1L && eq_f64 r.h #2.5 && r.k == s && r.l = 3
           && eq_i64 r.m #4L)
-*)
-
+[%%expect{|
+|}]
 
 type ur = { u1 : int64_u; u2 : string; u3 : int }
 
