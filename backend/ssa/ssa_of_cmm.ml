@@ -491,9 +491,9 @@ and emit_ifthenelse env c ~tail econd ifa eif elsea eelse : result =
   let else_block = new_block else_env ~params:[||] in
   emit_branch env c cond rarg ~true_block:then_block ~false_block:else_block;
   let then_c = Cursor.start then_block in
-  let r_then = emit env then_c eif ~tail in
+  let r_then = emit then_env then_c eif ~tail in
   let else_c = Cursor.start else_block in
-  let r_else = emit env else_c eelse ~tail in
+  let r_else = emit else_env else_c eelse ~tail in
   join env c [| r_then, then_c; r_else, else_c |]
 
 and emit_switch env c ~tail esel index ecases : result =
