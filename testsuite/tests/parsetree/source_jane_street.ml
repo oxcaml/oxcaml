@@ -2152,3 +2152,14 @@ let f a = let addr_imm_ x = a in x
 [%%expect{|
 val f : 'a addr_imm -> 'a = <fun>
 |}]
+
+(*****************)
+(* break_ *)
+
+let break =
+  for i = 0 to 10 do
+    if true then break_
+  done
+[%%expect{|
+val break : unit = ()
+|}]
