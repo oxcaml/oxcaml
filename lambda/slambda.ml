@@ -308,9 +308,9 @@ module Ctx : sig
   val instantiate :
     t ->
     loc:scoped_location ->
-    eval_apply:(Types.closure -> Types.value Or_missing.t array -> Types.halves) ->
+    eval_apply:(Types.closure -> Types.value Or_missing.t list -> Types.halves) ->
     Template_id.t ->
-    Types.value Or_missing.t array ->
+    Types.value Or_missing.t list ->
     Types.halves
 
   (** All of the template instantiations cached by [instantiate]. These are in
@@ -366,9 +366,7 @@ end = struct
         | None ->
           Misc.fatal_errorf_doc "Template not found: %a" Template_id.print id)
     in
-    let arg_names =
-      Array.map Mangling.symbol_arg_of_value args |> Array.to_list
-    in
+    let arg_names = List.map Mangling.symbol_arg_of_value args in
     let name =
       Fmt.asprintf "%a_%a" Template_id.print id
         (Fmt.pp_print_list
@@ -946,7 +944,7 @@ let rec eval_lam ?name ctx env old_lambda : halves =
          { c = inst_c; r = << inst_r func_r >> } *)
     let new_func = eval_lam ctx env old_func in
     let new_args =
-      Misc.Stdlib.Array.of_list_map
+      List.map
         (fun old_layout_arg ->
           Or_missing.Present (Vlayout (eval_layout env old_layout_arg)))
         old_args
@@ -986,8 +984,7 @@ let rec eval_lam ?name ctx env old_lambda : halves =
     let new_func = eval_lam ctx env old_func in
     let new_args_c, new_args_r = eval_args_reverse ctx env old_args in
     let instantiated =
-      instantiate ctx ~loc:old_apply.ap_loc new_func.slv_comptime
-        (Array.of_list new_args_c)
+      instantiate ctx ~loc:old_apply.ap_loc new_func.slv_comptime new_args_c
     in
     { slv_comptime = instantiated.slv_comptime;
       slv_runtime =
@@ -1433,7 +1430,7 @@ and instantiate ctx ~loc func args =
     ]}*)
 and eval_apply ctx { clo_template; clo_runtime_env; clo_env } args =
   let bind_params params =
-    try Misc.Stdlib.Array.fold_left2 Env.add clo_env params args
+    try List.fold_left2 Env.add clo_env params args
     with Invalid_argument _ ->
       Misc.fatal_error
         "Slambda eval doesn't support partial or over application of functors."
@@ -1504,14 +1501,12 @@ and eval_apply ctx { clo_template; clo_runtime_env; clo_env } args =
         ktmpl_env_mode;
         ktmpl_loc = _
       } ->
-    let env = bind_params (Array.of_list ktmpl_params) in
+    let env = bind_params ktmpl_params in
     let new_body = eval_dynamic ctx env old_func.body in
     dynamic (close_function env ~env_mode:ktmpl_env_mode old_func new_body)
   | Static { tmpl_func = old_func; tmpl_env = _ } ->
     let static_params =
-      Misc.Stdlib.Array.of_list_map
-        (fun { name; _ } -> Slambdaident.of_ident name)
-        old_func.params
+      List.map (fun { name; _ } -> Slambdaident.of_ident name) old_func.params
     in
     let env = bind_params static_params in
     let new_body = eval_lam ctx env old_func.body in
