@@ -335,6 +335,7 @@ type error =
   | Exception_pattern_disallowed
   | Mixed_value_and_exception_patterns_under_guard
   | Effect_pattern_below_toplevel
+  | Address_pattern_not_yet_supported
   | Invalid_continuation_pattern
   | Inlined_record_escape
   | Inlined_record_expected

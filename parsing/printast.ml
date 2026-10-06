@@ -323,6 +323,9 @@ and pattern i ppf x =
       line i ppf "Ppat_or\n";
       pattern i ppf p1;
       pattern i ppf p2;
+  | Ppat_addr (mut, p) ->
+      line i ppf "Ppat_addr %a\n" fmt_mutable_flag mut;
+      pattern i ppf p;
   | Ppat_lazy p ->
       line i ppf "Ppat_lazy\n";
       pattern i ppf p;
