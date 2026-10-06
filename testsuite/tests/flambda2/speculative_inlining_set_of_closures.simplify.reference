@@ -88,13 +88,33 @@ in
 let $camlSpeculative_inlining_set_of_closures__r1_3 =
   closure r1_3_1 @r1 &toplevel
 in
+let code loopify(never) size(36) newer_version_of(f_2_1)
+      f_2_3 (param : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let x = %project_value_slot.[f].[x] (my_closure) in
+  let y = %opaque (x) in
+  let int_mul = %int_barith.mul (y, 12) in
+  let int_mul_1 = %int_barith.mul (y, 10) in
+  let int_mul_2 = %int_barith.mul (y, 8) in
+  let int_mul_3 = %int_barith.mul (y, 6) in
+  let int_mul_4 = %int_barith.mul (y, 4) in
+  let int_mul_5 = %int_barith.mul (y, 2) in
+  let int_add = %int_barith.add (int_mul_5, int_mul_4) in
+  let int_add_1 = %int_barith.add (int_add, int_mul_3) in
+  let int_add_2 = %int_barith.add (int_add_1, int_mul_2) in
+  let int_add_3 = %int_barith.add (int_add_2, int_mul_1) in
+  let int_add_4 = %int_barith.add (int_add_3, int_mul) in
+  cont k (int_add_4)
+in
 let code loopify(never) size(48) newer_version_of(r2_4)
       r2_4_1 (param : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   let Popaque = %opaque (1) in
-  let f = closure f_2_1 @f &my_alloc_region with { x = Popaque } in
+  let f = closure f_2_3 @f &my_alloc_region with { x = Popaque } in
   apply direct(use_0_1 &my_alloc_region) inlining_state(depth(10))
     ($camlSpeculative_inlining_set_of_closures__use_1 : _ -> imm tagged)
       (f)

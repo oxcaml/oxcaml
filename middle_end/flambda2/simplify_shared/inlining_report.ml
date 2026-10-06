@@ -186,7 +186,6 @@ module Context = struct
             prim;
             branch;
             direct_call_of_indirect;
-            updated_direct_call;
             specialized_poly_compare;
             requested_inline
           } =
@@ -198,7 +197,6 @@ module Context = struct
           `String "Prim";
           `String "Branch";
           `String "Direct call of indirect";
-          `String "Updated direct call";
           `String "Specialized poly compare";
           `String "Requested inline" ];
         [ `Int call;
@@ -206,7 +204,6 @@ module Context = struct
           `Int prim;
           `Int branch;
           `Int direct_call_of_indirect;
-          `Int updated_direct_call;
           `Int specialized_poly_compare;
           `Int requested_inline ] ]
       |> Table.create
