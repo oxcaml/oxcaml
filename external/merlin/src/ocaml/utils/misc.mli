@@ -1259,37 +1259,6 @@ type alerts = string Stdlib.String.Map.t
 
 val remove_double_underscores : string -> string
 
-(** {1 {Sexp printing utilities} *)
-module Sexp : sig
-
-  type field
-  (** Fields (or atoms) of s-expressions *)
-
-  val d : string -> int -> field
-  val b : string -> bool -> field
-  val f : string -> float -> field
-  val s : string -> string -> field
-  val a : string -> 'a -> (Format.formatter -> 'a -> unit) -> field
-  (** Convenient functions for creating fields. These functions use the same
-      one-letter shorthands as found in printf/format strings:
-      - 'd' for integers
-      - 'b' for booleans
-      - 'f' for floating point numbers
-      - 's' for strings
-      - 'a' for a custom printing function *)
-
-  val o : string -> 'a option -> (Format.formatter -> 'a -> unit) -> field
-  (** Create an optional field: if the provided value is [None], then the field
-      will not be printed. *)
-
-  val fmt : ('a, Format.formatter, unit, field) format4 -> 'a
-  (* Create an atom with no field name, from a custom format string. *)
-
-  val print : Format.formatter -> field list -> unit
-  (** Print a list of fields/atoms as an s-expression. *)
-
-end
-
 (** {1 JSON utilities} *)
 module Json : sig
   (** Simple (and not very robust) JSON generation utilities.
@@ -1414,6 +1383,43 @@ module Colours : sig
     directive ->
     (Format.formatter -> 'a -> unit) ->
     (Format.formatter -> 'a -> unit)
+end
+
+(** {1 {Sexp printing utilities} *)
+module Sexp : sig
+
+  type field
+  (** Fields (or atoms) of s-expressions *)
+
+  val d : ?colour:Colours.directive -> string -> int -> field
+  val b : ?colour:Colours.directive -> string -> bool -> field
+  val f : ?colour:Colours.directive -> string -> float -> field
+  val s : ?colour:Colours.directive -> string -> string -> field
+  val a :
+    ?colour:Colours.directive ->
+    string -> 'a -> (Format.formatter -> 'a -> unit) -> field
+  (** Convenient functions for creating fields. These functions use the same
+      one-letter shorthands as found in printf/format strings:
+      - 'd' for integers
+      - 'b' for booleans
+      - 'f' for floating point numbers
+      - 's' for strings
+      - 'a' for a custom printing function *)
+
+  val o :
+    ?colour:Colours.directive ->
+    string -> 'a option -> (Format.formatter -> 'a -> unit) -> field
+  (** Create an optional field: if the provided value is [None], then the field
+      will not be printed. *)
+
+  val fmt :
+    ?colour:Colours.directive ->
+    ('a, Format.formatter, unit, field) format4 -> 'a
+  (* Create an atom with no field name, from a custom format string. *)
+
+  val print : Format.formatter -> field list -> unit
+  (** Print a list of fields/atoms as an s-expression. *)
+
 end
 
 (** Nullable values, unboxed via [@@or_null]. Not a full [Stdlib.Monad.S]: a
