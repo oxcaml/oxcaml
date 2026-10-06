@@ -191,10 +191,7 @@ let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
           ~base:block);
     match mut with
     | Immutable | Immutable_unique -> ()
-    | Mutable ->
-      default_bp (fun to_ ->
-          Acc.add_alias acc ~to_
-            ~from:(Code_id_or_name.name (Env.le_monde_exterieur denv))))
+    | Mutable -> default_bp (fun to_ -> Acc.add_any_source acc to_))
   | Unary (Is_int { variant_only = true }, arg) ->
     let name = Acc.simple_to_node acc ~denv arg in
     default_bp (fun to_ ->
@@ -254,10 +251,7 @@ let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
           ~init:()
       | (No_effects | Only_generative_effects _), _, _, _ -> ()
     in
-    default_bp (fun to_ ->
-        Acc.add_use_dep acc
-          ~from:(Code_id_or_name.name (Env.le_monde_exterieur denv))
-          ~to_);
+    default_bp (fun to_ -> Acc.add_any_source acc to_);
     default acc
 
 let traverse_set_of_closures denv acc ~(bound_pattern : Bound_pattern.t)
@@ -566,7 +560,6 @@ let rec traverse_let denv acc let_expr : rev_expr =
           ~code:(fun rev_group code_id code ->
             let code =
               traverse_code acc code_id code
-                ~le_monde_exterieur:(Env.le_monde_exterieur denv)
                 ~all_constants:(Env.all_constants denv)
                 ~function_slots_to_keep:(Env.function_slots_to_keep denv)
                 ~value_slots_to_keep:(Env.value_slots_to_keep denv)
@@ -696,8 +689,7 @@ and traverse_cont_handler : type a.
       k handler acc)
 
 and traverse_code (acc : acc) (code_id : Code_id.t) (code : Code.t)
-    ~le_monde_exterieur ~all_constants ~function_slots_to_keep
-    ~value_slots_to_keep : rev_code =
+    ~all_constants ~function_slots_to_keep ~value_slots_to_keep : rev_code =
   let params_and_body = Code.params_and_body code in
   Function_params_and_body.pattern_match params_and_body
     ~f:(fun
@@ -713,13 +705,11 @@ and traverse_code (acc : acc) (code_id : Code_id.t) (code : Code.t)
       ->
       traverse_function_params_and_body acc code_id code ~return_continuation
         ~exn_continuation params ~body ~my_closure ~my_alloc_mode ~my_depth
-        ~le_monde_exterieur ~all_constants ~function_slots_to_keep
-        ~value_slots_to_keep)
+        ~all_constants ~function_slots_to_keep ~value_slots_to_keep)
 
 and traverse_function_params_and_body acc code_id code ~return_continuation
-    ~exn_continuation params ~body ~my_closure ~my_alloc_mode
-    ~le_monde_exterieur ~all_constants ~function_slots_to_keep
-    ~value_slots_to_keep ~my_depth : rev_code =
+    ~exn_continuation params ~body ~my_closure ~my_alloc_mode ~all_constants
+    ~function_slots_to_keep ~value_slots_to_keep ~my_depth : rev_code =
   let code_metadata = Code.code_metadata code in
   let free_names_of_params_and_body = Code0.free_names code in
   (* Note: this significantly degrades the analysis on code being checked by the
@@ -767,8 +757,8 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
   in
   let denv =
     Env.create ~parent:Hole ~conts ~should_preserve_direct_calls
-      ~current_code_id:(Some code_id) ~le_monde_exterieur ~all_constants
-      ~function_slots_to_keep ~value_slots_to_keep
+      ~current_code_id:(Some code_id) ~all_constants ~function_slots_to_keep
+      ~value_slots_to_keep
   in
   if not is_opaque
   then (
@@ -832,7 +822,6 @@ type result =
     continuation_info : Acc.continuation_info Continuation.Map.t;
     code_deps : Traverse_acc.code_dep Code_id.Map.t;
     delayed_deps : Traverse_acc.delayed_deps;
-    le_monde_exterieur : Symbol.t;
     applications : Acc.Applications.t;
     all_sets_of_closures :
       (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list
@@ -844,7 +833,7 @@ let create_symbol_and_add_any_source acc name =
   Acc.add_any_source acc (Code_id_or_name.symbol sym);
   sym
 
-let run0 unit acc ~free_names ~all_constants ~le_monde_exterieur () =
+let run0 unit acc ~free_names ~all_constants () =
   let dummy_toplevel_return = Variable.create "dummy_toplevel_return" K.value in
   let dummy_toplevel_exn = Variable.create "dummy_toplevel_exn" K.value in
   Acc.add_any_usage acc (Code_id_or_name.var dummy_toplevel_return);
@@ -877,7 +866,6 @@ let run0 unit acc ~free_names ~all_constants ~le_monde_exterieur () =
   traverse
     (Env.create ~parent:Hole ~conts ~should_preserve_direct_calls
        ~current_code_id:None
-       ~le_monde_exterieur:(Name.symbol le_monde_exterieur)
        ~all_constants:(Name.symbol all_constants)
        ~function_slots_to_keep ~value_slots_to_keep)
     acc (Flambda_unit.body unit)
@@ -885,12 +873,9 @@ let run0 unit acc ~free_names ~all_constants ~le_monde_exterieur () =
 let run (unit : Flambda_unit.t) ~free_names =
   let acc = Acc.create () in
   let all_constants = create_symbol_and_add_any_source acc "all_constants" in
-  let le_monde_exterieur =
-    create_symbol_and_add_any_source acc "le_monde_extérieur"
-  in
   let holed =
     Profile.record_call ~accumulate:false "down"
-      (run0 unit acc ~free_names ~all_constants ~le_monde_exterieur)
+      (run0 unit acc ~free_names ~all_constants)
   in
   let deps = Acc.deps acc in
   let fixed_arity_continuations = Acc.fixed_arity_continuations acc in
@@ -904,7 +889,6 @@ let run (unit : Flambda_unit.t) ~free_names =
     continuation_info;
     code_deps;
     delayed_deps = Acc.delayed_deps acc;
-    le_monde_exterieur;
     applications = Acc.applications acc;
     all_sets_of_closures = Acc.get_all_sets_of_closures acc
   }

@@ -141,15 +141,6 @@ val add_argument_dep :
 val add_parameter_dep :
   t -> base:Code_id_or_name.t -> Cofield.t -> to_:Code_id_or_name.t -> unit
 
-(** Add a conditional propagation edge: if [if_used] is [any_usage] then add an
-    alias from [from] to [to_]. *)
-val add_propagate_dep :
-  t ->
-  if_used:Code_id_or_name.t ->
-  to_:Code_id_or_name.t ->
-  from:Code_id_or_name.t ->
-  unit
-
 (** Add a conditional alias edge: if [if_any_source] is marked as [any_source]
     then add an alias from [from] to [to_]. *)
 val add_alias_if_any_source_dep :
@@ -265,11 +256,7 @@ val delayed_deps : t -> delayed_deps
 
 (** Resolve all deferred dependencies into the graph. *)
 val resolve_delayed_deps :
-  Graph.graph ->
-  code_deps:code_dep Code_id.Map.t ->
-  le_monde_exterieur:Symbol.t ->
-  delayed_deps ->
-  unit
+  Graph.graph -> code_deps:code_dep Code_id.Map.t -> delayed_deps -> unit
 
 val sort_code_ids : t -> Code_id.t array
 
