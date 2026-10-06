@@ -1420,6 +1420,10 @@ val is_evaluated : lambda -> bool
 
 val free_variables: lambda -> Ident.Set.t
 
+val free_sort_vars: lambda -> Layout_ident.Set.t
+(** The sort variables in the layouts of a term, other than those bound by a
+    kind template within it. *)
+
 val transl_module_path: scoped_location -> Env.t -> Path.t -> lambda
 val transl_value_path: scoped_location -> Env.t -> Path.t -> lambda
 val transl_extension_path: scoped_location -> Env.t -> Path.t -> lambda

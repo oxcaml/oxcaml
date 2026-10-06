@@ -174,7 +174,11 @@ and Env : sig
 
   val find_value : t -> Ident.t -> Types.value Or_missing.t
 
-  val find_layout : t -> Ident.t -> layout
+  (** Keep only the given idents and sort variables, all of which must be bound.
+  *)
+  val restrict : t -> idents:Ident.Set.t -> sort_vars:Layout_ident.Set.t -> t
+
+  val idents_and_layouts : t -> (Ident.t * layout) list
 
   val find_sort_var : t -> Layout_ident.t -> layout
 end = struct
@@ -196,12 +200,32 @@ end = struct
     | Some (_, value) -> value
     | None -> Or_missing.Missing
 
-  let find_layout t id =
-    match Ident.Map.find_opt id t.idents with
-    | Some (layout, _) -> layout
-    | None ->
-      Misc.fatal_errorf "Slambda: no layout bound for variable %a" Ident.print
-        id
+  let restrict t ~idents ~sort_vars =
+    let idents =
+      Ident.Set.fold
+        (fun id restricted ->
+          match Ident.Map.find_opt id t.idents with
+          | Some entry -> Ident.Map.add id entry restricted
+          | None ->
+            Misc.fatal_errorf "Slambda: no layout bound for variable %a"
+              Ident.print id)
+        idents Ident.Map.empty
+    in
+    let sort_vars =
+      Layout_ident.Set.fold
+        (fun var restricted ->
+          match Layout_ident.Map.find_opt var t.sort_vars with
+          | Some layout -> Layout_ident.Map.add var layout restricted
+          | None ->
+            Misc.fatal_errorf "Slambda: no layout bound for sort variable %a"
+              Layout_ident.print var)
+        sort_vars Layout_ident.Map.empty
+    in
+    { idents; sort_vars }
+
+  let idents_and_layouts t =
+    Ident.Map.bindings t.idents
+    |> List.map (fun (id, (layout, _)) -> id, layout)
 
   let find_sort_var t var =
     match Layout_ident.Map.find_opt var t.sort_vars with
@@ -1364,7 +1388,8 @@ and eval_prim ?name ctx env old_lambda old_prim old_args loc =
 (** {[
     template p1 ... pn -> body ~>
         let fv1, ..., fvk = free variables of the template in
-        { c = closure (template, env);
+        { c = closure (template, env restricted to fv1 ... fvk and the
+                       template's free sort variables);
           r = << makeblock fv1 ... fvk >> }
     ]} *)
 and eval_template ?name ctx env template =
@@ -1384,11 +1409,17 @@ and eval_template ?name ctx env template =
     Misc.fatal_errorf
       "Slambda does not currently support functions with over %i arguments"
       (Lambda.max_arity () - 1);
-  let clo_runtime_env =
-    Lambda.free_variables (Lfunction func)
-    |> Ident.Set.to_list
-    |> List.map (fun id -> id, Env.find_layout env id)
+  let template_lam =
+    match template with
+    | Kind template -> Lkindtemplate template
+    | Static template -> Ltemplate template
   in
+  let clo_env =
+    Env.restrict env
+      ~idents:(Lambda.free_variables template_lam)
+      ~sort_vars:(Lambda.free_sort_vars template_lam)
+  in
+  let clo_runtime_env = Env.idents_and_layouts clo_env in
   let new_shape =
     Misc.Stdlib.Array.of_list_map
       (fun (_, new_layout) -> mixed_block_element_of_layout new_layout)
@@ -1397,7 +1428,7 @@ and eval_template ?name ctx env template =
   Typeopt.assert_mixed_product_support_for_lambda_shape
     (Debuginfo.Scoped_location.to_location func.loc)
     Block new_shape;
-  let closure = { clo_template = template; clo_runtime_env; clo_env = env } in
+  let closure = { clo_template = template; clo_runtime_env; clo_env } in
   let id =
     Template_store.add (Ctx.store ctx) ~cu:(Current_unit.get_cu ()) ~name
       closure

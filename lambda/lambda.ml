@@ -2067,6 +2067,245 @@ and free_variables_lfun {body; params} =
   Ident.Set.diff (free_variables body)
     (Ident.Set.of_list (List.map (fun p -> p.name) params))
 
+(* The sort variables that [Slambda] looks up when evaluating a term. *)
+
+let sort_vars_of_list f xs =
+  List.fold_left (fun set x -> Layout_ident.Set.union set (f x))
+    Layout_ident.Set.empty xs
+
+let rec sort_vars_of_mixed_block_element
+  : type a. a mixed_block_element -> Layout_ident.Set.t = function
+  | Splice_variable var -> Layout_ident.Set.singleton var
+  | Product elements -> sort_vars_of_mixed_block_shape elements
+  | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
+  | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
+      Layout_ident.Set.empty
+
+and sort_vars_of_mixed_block_shape
+  : type a. a mixed_block_element array -> Layout_ident.Set.t = fun shape ->
+  Array.fold_left
+    (fun set element ->
+       Layout_ident.Set.union set (sort_vars_of_mixed_block_element element))
+    Layout_ident.Set.empty shape
+
+let rec sort_vars_of_layout = function
+  | Psplicevar var -> Layout_ident.Set.singleton var
+  | Punboxed_product layouts -> sort_vars_of_list sort_vars_of_layout layouts
+  | Pvalue value_kind -> sort_vars_of_value_kind value_kind
+  | Ptop | Punboxed_float _ | Punboxed_or_untagged_integer _
+  | Punboxed_vector _ | Punboxed_mask | Pbottom ->
+      Layout_ident.Set.empty
+
+and sort_vars_of_value_kind { raw_kind; nullable = _ } =
+  match raw_kind with
+  | Pvariant { consts = _; non_consts } ->
+      sort_vars_of_list
+        (fun (_, shape) -> sort_vars_of_constructor_shape shape)
+        non_consts
+  | Pgenval | Pintval | Pboxedfloatval _ | Pboxedintval _ | Parrayval _
+  | Pboxedvectorval _ | Pboxedmaskval ->
+      Layout_ident.Set.empty
+
+and sort_vars_of_constructor_shape = function
+  | Constructor_shape_undetermined -> Layout_ident.Set.empty
+  | Constructor_shape_uniform value_kinds ->
+      sort_vars_of_list sort_vars_of_value_kind value_kinds
+  | Constructor_shape_mixed shape -> sort_vars_of_mixed_block_shape shape
+
+let rec sort_vars_of_structured_constant = function
+  | Const_mixed_block (_, shape, consts) ->
+      Layout_ident.Set.union
+        (sort_vars_of_mixed_block_shape shape)
+        (sort_vars_of_list sort_vars_of_structured_constant consts)
+  | Const_block (_, consts) ->
+      sort_vars_of_list sort_vars_of_structured_constant consts
+  | Const_base _ | Const_float_array _ | Const_immstring _
+  | Const_float_block _ | Const_null ->
+      Layout_ident.Set.empty
+
+let sort_vars_of_block_shape = function
+  | All_value -> Layout_ident.Set.empty
+  | Shape shape -> sort_vars_of_mixed_block_shape shape
+
+let sort_vars_of_record_representation = function
+  | Record_mixed shape | Record_inlined (_, Constructor_mixed shape, _) ->
+      sort_vars_of_mixed_block_shape shape
+  | Record_unboxed | Record_boxed | Record_float | Record_ufloat
+  | Record_inlined
+      (_, (Constructor_uniform_value | Constructor_immediate_all_void), _) ->
+      Layout_ident.Set.empty
+
+let sort_vars_of_primitive = function
+  | Pmakeblock (_, _, shape, _) -> sort_vars_of_block_shape shape
+  | Pduprecord (repr, _) -> sort_vars_of_record_representation repr
+  | Pmixedfield (_, shape, _) -> sort_vars_of_mixed_block_shape shape
+  | Psetmixedfield (_, shape, _)
+  | Patomic_load_mixed_field { index = _; shape }
+  | Patomic_set_mixed_field { index = _; shape; mode = _ }
+  | Pmake_idx_mixed_field (shape, _, _) ->
+      sort_vars_of_mixed_block_shape shape
+  | Pmake_idx_array (_, _, element, _) | Pidx_deepen (element, _) ->
+      sort_vars_of_mixed_block_element element
+  | Pmake_unboxed_product layouts | Punboxed_product_field (_, layouts) ->
+      sort_vars_of_list sort_vars_of_layout layouts
+  | Popaque layout
+  | Pobj_magic layout
+  | Pget_idx (layout, _)
+  | Pset_idx (layout, _)
+  | Pget_ptr (layout, _)
+  | Pset_ptr (layout, _)
+  | Pget_ext_ptr (layout, _)
+  | Pset_ext_ptr (layout, _)
+  | Patomic_load_idx { layout }
+  | Patomic_set_idx { layout; mode = _ }
+  | Patomic_exchange_idx { layout; mode = _ }
+  | Patomic_compare_exchange_idx { layout; mode = _ }
+  | Patomic_compare_set_idx { layout; mode = _ }
+  | Patomic_load_ptr { layout }
+  | Patomic_set_ptr { layout; mode = _ }
+  | Patomic_exchange_ptr { layout; mode = _ }
+  | Patomic_compare_exchange_ptr { layout; mode = _ }
+  | Patomic_compare_set_ptr { layout; mode = _ } ->
+      sort_vars_of_layout layout
+  | Pbytes_to_string | Pbytes_of_string | Pignore
+  | Pgetglobal _
+  | Pgetpredef _ | Pmakefloatblock _ | Pmakeufloatblock _ | Pmakelazyblock _
+  | Pfield _
+  | Pfield_computed _ | Psetfield _ | Psetfield_computed _ | Pfloatfield _
+  | Psetfloatfield _ | Psetufloatfield _ | Pufloatfield _
+  | Parray_element_size_in_bytes _ | Pmake_idx_field _ | Pwith_stack
+  | Pwith_stack_preemptible | Pperform | Pcontinue | Pdiscontinue
+  | Pdiscontinue_with_backtrace | Preperform | Pccall _ | Praise _ | Psequand
+  | Psequor | Pnot | Pphys_equal _ | Pscalar _ | Poffsetref _ | Pstringlength
+  | Pstringrefu | Pstringrefs | Pbyteslength | Pbytesrefu | Pbytessetu
+  | Pbytesrefs | Pbytessets | Pmakearray _ | Pmakearray_dynamic _ | Pduparray _
+  | Parrayblit _ | Parraylength _ | Parrayrefu _ | Parraysetu _ | Parrayrefs _
+  | Parraysets _ | Pisint _ | Pisnull | Pisout | Pbigarrayref _ | Pbigarrayset _
+  | Pbigarraydim _ | Pstring_load_i8 _ | Pstring_load_i16 _ | Pstring_load_16 _
+  | Pstring_load_32 _ | Pstring_load_f32 _ | Pstring_load_64 _
+  | Pstring_load_vec _ | Pbytes_load_i8 _ | Pbytes_load_i16 _ | Pbytes_load_16 _
+  | Pstring_load_mask _ | Pbytes_load_32 _ | Pbytes_load_f32 _
+  | Pbytes_load_64 _ | Pbytes_load_vec _ | Pbytes_load_mask _ | Pbytes_set_8 _
+  | Pbytes_set_16 _ | Pbytes_set_32 _ | Pbytes_set_f32 _ | Pbytes_set_64 _
+  | Pbytes_set_vec _ | Pbigstring_load_i8 _ | Pbytes_set_mask _
+  | Pbigstring_load_i16 _ | Pbigstring_load_16 _ | Pbigstring_load_32 _
+  | Pbigstring_load_f32 _ | Pbigstring_load_64 _ | Pbigstring_load_vec _
+  | Pbigstring_load_mask _ | Pbigstring_set_8 _ | Pbigstring_set_16 _
+  | Pbigstring_set_32 _ | Pbigstring_set_f32 _ | Pbigstring_set_64 _
+  | Pbigstring_set_vec _ | Pbigstring_set_mask _ | Pfloatarray_load_vec _
+  | Pint_array_load_vec _ | Punboxed_float_array_load_vec _
+  | Punboxed_float32_array_load_vec _ | Puntagged_int8_array_load_vec _
+  | Puntagged_int16_array_load_vec _ | Punboxed_int32_array_load_vec _
+  | Punboxed_int64_array_load_vec _ | Punboxed_nativeint_array_load_vec _
+  | Pfloatarray_set_vec _ | Pint_array_set_vec _
+  | Punboxed_float_array_set_vec _ | Punboxed_float32_array_set_vec _
+  | Puntagged_int8_array_set_vec _ | Puntagged_int16_array_set_vec _
+  | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
+  | Punboxed_nativeint_array_set_vec _ | Pctconst _ | Pint_as_pointer _
+  | Patomic_load_field _ | Patomic_set_field _ | Patomic_exchange_field _
+  | Patomic_compare_exchange_field _ | Patomic_compare_set_field _
+  | Patomic_fetch_add_field | Patomic_add_field | Patomic_sub_field
+  | Patomic_land_field | Patomic_lor_field | Patomic_lxor_field
+  | Patomic_fetch_add_idx | Patomic_add_idx | Patomic_sub_idx | Patomic_land_idx
+  | Patomic_lor_idx | Patomic_lxor_idx | Patomic_fetch_add_ptr | Patomic_add_ptr
+  | Patomic_sub_ptr | Patomic_land_ptr | Patomic_lor_ptr | Patomic_lxor_ptr
+  | Pprobe_is_enabled _ | Pobj_dup | Punbox_unit | Punbox_vector _
+  | Pbox_vector _ | Punbox_mask | Pbox_mask _ | Pjoin_vec256 | Psplit_vec256
+  | Preinterpret_boxed_vector_as_tuple _ | Preinterpret_tuple_as_boxed_vector _
+  | Preinterpret_unboxed_int64_as_tagged_int63
+  | Preinterpret_tagged_int63_as_unboxed_int64 | Parray_to_iarray
+  | Parray_of_iarray | Pget_header _ | Ppeek _ | Ppoke _ | Pdls_get | Ptls_get
+  | Pdomain_index | Ppoll | Pcpu_relax ->
+      Layout_ident.Set.empty
+
+let rec free_sort_vars = function
+  | Lvar _ | Lmutvar _ -> Layout_ident.Set.empty
+  | Lconst const -> sort_vars_of_structured_constant const
+  | Lapply{ap_func = fn; ap_args = args; ap_result_layout = layout}
+  | Linstantiate{ap_func = fn; ap_args = args; ap_result_layout = layout} ->
+      free_sort_vars_list (sort_vars_of_layout layout) (fn :: args)
+  | Lfunction lfun | Ltemplate lfun ->
+      free_sort_vars_lfun lfun
+  | Llet(_, layout, _id, _duid, arg, body)
+  | Lmutlet(layout, _id, _duid, arg, body) ->
+      free_sort_vars_list (sort_vars_of_layout layout) [arg; body]
+  | Lletrec(decl, body) ->
+      free_sort_vars_list (free_sort_vars body)
+        (List.map (fun { def } -> Lfunction def) decl)
+  | Lprim(p, args, _loc) ->
+      free_sort_vars_list (sort_vars_of_primitive p) args
+  | Lswitch(arg, sw, _, layout) ->
+      let set =
+        free_sort_vars_list
+          (free_sort_vars_list (sort_vars_of_layout layout)
+             (arg :: List.map snd sw.sw_consts))
+          (List.map snd sw.sw_blocks)
+      in
+      begin match sw.sw_failaction with
+      | None -> set
+      | Some failaction ->
+          Layout_ident.Set.union set (free_sort_vars failaction)
+      end
+  | Lstringswitch (arg, cases, default, _, layout) ->
+      let set =
+        free_sort_vars_list (sort_vars_of_layout layout)
+          (arg :: List.map snd cases)
+      in
+      begin match default with
+      | None -> set
+      | Some default -> Layout_ident.Set.union set (free_sort_vars default)
+      end
+  | Lstaticraise (_,args) ->
+      free_sort_vars_list Layout_ident.Set.empty args
+  | Lstaticcatch(body, (_, params), handler, _, layout) ->
+      let param_sort_vars =
+        sort_vars_of_list (fun (_, _, layout) -> sort_vars_of_layout layout)
+          params
+      in
+      free_sort_vars_list
+        (Layout_ident.Set.union param_sort_vars (sort_vars_of_layout layout))
+        [body; handler]
+  | Ltrywith(body, _param, _duid, handler, layout) ->
+      free_sort_vars_list (sort_vars_of_layout layout) [body; handler]
+  | Lifthenelse(e1, e2, e3, layout) ->
+      free_sort_vars_list (sort_vars_of_layout layout) [e1; e2; e3]
+  | Lsequence(e1, e2) ->
+      Layout_ident.Set.union (free_sort_vars e1) (free_sort_vars e2)
+  | Lwhile {wh_cond; wh_body} ->
+      Layout_ident.Set.union (free_sort_vars wh_cond) (free_sort_vars wh_body)
+  | Lfor {for_from; for_to; for_body} ->
+      free_sort_vars_list Layout_ident.Set.empty [for_from; for_to; for_body]
+  | Lassign(_id, e) ->
+      free_sort_vars e
+  | Lsend (_k, met, obj, args, _, _, _, layout, _) ->
+      free_sort_vars_list (sort_vars_of_layout layout) (met :: obj :: args)
+  | Levent (lam, _evt) ->
+      free_sort_vars lam
+  | Lifused (_v, e) ->
+      free_sort_vars e
+  | Lregion (e, layout) ->
+      Layout_ident.Set.union (free_sort_vars e) (sort_vars_of_layout layout)
+  | Lexclave e ->
+      free_sort_vars e
+  | Lkindtemplate {ktmpl_params; ktmpl_body} ->
+      Layout_ident.Set.diff (free_sort_vars_lfun ktmpl_body)
+        (Layout_ident.Set.of_list ktmpl_params)
+  | Lkindinstantiate {kinst_func = fn; kinst_args; kinst_result_layout} ->
+      Layout_ident.Set.union
+        (sort_vars_of_list sort_vars_of_layout
+           (kinst_result_layout :: kinst_args))
+        (free_sort_vars fn)
+
+and free_sort_vars_list set exprs =
+  List.fold_left
+    (fun set expr -> Layout_ident.Set.union (free_sort_vars expr) set)
+    set exprs
+
+and free_sort_vars_lfun {body; params; return} =
+  Layout_ident.Set.union (free_sort_vars body)
+    (sort_vars_of_list sort_vars_of_layout
+       (return :: List.map (fun p -> p.layout) params))
+
 (* Check if an action has a "when" guard *)
 let static_label_sequence = Static_label.make_sequence ()
 
