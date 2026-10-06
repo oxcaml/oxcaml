@@ -71,6 +71,7 @@ type t =
     single_use_allocations : Cost_metrics.t Variable.Map.t;
     single_use_continuations : single_use_continuation Continuation.Map.t;
     continuation_arities : [`Unarized] Flambda_arity.t Continuation.Map.t;
+    merged_handlers : (Flambda.Continuation_handler.t * t) list;
     cse : CSE.t;
     comparison_results : Comparison_result.t Variable.Map.t;
     are_rebuilding_terms : Are_rebuilding_terms.t;
@@ -120,7 +121,7 @@ let [@ocamlformat "disable"] print ppf { round; machine_width; typing_env;
                 at_unit_toplevel; unit_toplevel_exn_continuation;
                 variables_defined_at_toplevel; single_use_allocations = _;
                 single_use_continuations = _; continuation_arities = _;
-                cse; comparison_results;
+                merged_handlers = _; cse; comparison_results;
                 are_rebuilding_terms; closure_info;
                 unit_toplevel_return_continuation; unit_toplevel_alloc_region; all_code;
                 get_imported_code = _; inlining_history_tracker = _;
@@ -254,6 +255,7 @@ let create ~round ~machine_width ~(resolver : resolver)
       single_use_allocations = Variable.Map.empty;
       single_use_continuations = Continuation.Map.empty;
       continuation_arities = Continuation.Map.empty;
+      merged_handlers = [];
       cse = CSE.empty;
       comparison_results = Variable.Map.empty;
       are_rebuilding_terms = Are_rebuilding_terms.are_rebuilding;
@@ -336,6 +338,23 @@ let add_continuation_arity t cont arity =
 
 let continuation_arities t = t.continuation_arities
 
+(* A handler merged into an inlined body (see [Inlining_transforms.inline]) is
+   not inlined code: it is simplified with the inlining state, debuginfo and
+   history of the call site, remembered here (keyed by the handler itself). *)
+let add_merged_handler t handler ~call_site =
+  { t with merged_handlers = (handler, call_site) :: t.merged_handlers }
+
+let restore_state_for_merged_handler t handler =
+  match List.assq_opt handler t.merged_handlers with
+  | None -> None
+  | Some call_site ->
+    Some
+      { t with
+        inlined_debuginfo = call_site.inlined_debuginfo;
+        inlining_state = call_site.inlining_state;
+        inlining_history_tracker = call_site.inlining_history_tracker
+      }
+
 let is_defined_at_toplevel t var =
   Variable.Set.mem var t.variables_defined_at_toplevel
 
@@ -384,6 +403,7 @@ let enter_set_of_closures
       single_use_allocations = _;
       single_use_continuations = _;
       continuation_arities = _;
+      merged_handlers = _;
       cse = _;
       comparison_results = _;
       are_rebuilding_terms;
@@ -416,6 +436,7 @@ let enter_set_of_closures
     single_use_allocations = Variable.Map.empty;
     single_use_continuations = Continuation.Map.empty;
     continuation_arities = Continuation.Map.empty;
+    merged_handlers = [];
     cse = CSE.empty;
     comparison_results = Variable.Map.empty;
     are_rebuilding_terms;
@@ -966,6 +987,7 @@ let denv_for_lifted_continuation ~denv_for_join ~denv =
     single_use_allocations = denv_for_join.single_use_allocations;
     single_use_continuations = denv_for_join.single_use_continuations;
     continuation_arities = denv_for_join.continuation_arities;
+    merged_handlers = denv_for_join.merged_handlers;
     cse = denv_for_join.cse;
     comparison_results = denv_for_join.comparison_results;
     replay_history = denv_for_join.replay_history;

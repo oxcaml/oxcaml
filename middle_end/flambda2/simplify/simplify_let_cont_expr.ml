@@ -50,7 +50,10 @@ type one_original_handler =
 
 type simplify_let_cont_data =
   { body : Expr.t;
-    handlers : Original_handlers.t
+    handlers : Original_handlers.t;
+    merged_handler : Continuation_handler.t option
+        (* The handler, when it was merged into an inlined body; see
+           [DE.restore_state_for_merged_handler]. *)
   }
 
 type after_downwards_traversal_of_body_data =
@@ -1848,7 +1851,21 @@ let simplify_let_cont0 ~(simplify_expr : _ Simplify_common.expr_simplifier) dacc
     if
       Flambda_features.Inlining.speculative_inlining_merge_return_continuation
         ()
-    then add_continuation_arities denv_for_join data.handlers
+    then
+      let denv_for_join =
+        add_continuation_arities denv_for_join data.handlers
+      in
+      match data.merged_handler with
+      | None -> denv_for_join
+      | Some handler -> (
+        match DE.restore_state_for_merged_handler denv_for_join handler with
+        | None -> denv_for_join
+        | Some denv_for_join ->
+          if Inlining_stats.enabled ()
+          then
+            Inlining_stats_table.incr
+              "speculation.return_continuation_handler_simplified";
+          denv_for_join)
     else denv_for_join
   in
   let denv_for_body = DE.increment_continuation_scope denv_for_join in
@@ -1973,7 +1990,7 @@ let simplify_let_cont ~simplify_expr dacc let_cont ~down_to_up =
   (* This is the entry point to simplify a let cont expression. The only thing
      it does is to match all handlers to break the name abstraction, and then
      call [simplify_let_cont_stage1]. *)
-  let dacc, body, handlers =
+  let dacc, body, handlers, merged_handler =
     match (let_cont : Let_cont.t) with
     | Non_recursive { handler; can_be_lifted; num_free_occurrences; _ } ->
       let body, non_rec_handler =
@@ -1998,7 +2015,14 @@ let simplify_let_cont ~simplify_expr dacc let_cont ~down_to_up =
       let original_handlers =
         Original_handlers.create_non_recursive non_rec_handler
       in
-      dacc, body, original_handlers
+      let merged_handler =
+        if
+          Flambda_features.Inlining
+          .speculative_inlining_merge_return_continuation ()
+        then Some (Non_recursive_let_cont_handler.handler handler)
+        else None
+      in
+      dacc, body, original_handlers, merged_handler
     | Recursive handlers ->
       let lifted_params = Lifted_cont_params.empty in
       let body, invariant_params, continuation_handlers =
@@ -2008,9 +2032,11 @@ let simplify_let_cont ~simplify_expr dacc let_cont ~down_to_up =
         Original_handlers.create_recursive ~invariant_params ~lifted_params
           ~continuation_handlers ~can_be_lifted:true
       in
-      dacc, body, original_handlers
+      dacc, body, original_handlers, None
   in
-  simplify_let_cont0 ~simplify_expr dacc { body; handlers } ~down_to_up
+  simplify_let_cont0 ~simplify_expr dacc
+    { body; handlers; merged_handler }
+    ~down_to_up
 
 let simplify_as_recursive_let_cont ~simplify_expr dacc (body, handlers)
     ~down_to_up =
@@ -2032,7 +2058,8 @@ let simplify_as_recursive_let_cont ~simplify_expr dacc (body, handlers)
         Original_handlers.create_recursive
           ~invariant_params:Bound_parameters.empty
           ~lifted_params:Lifted_cont_params.empty ~continuation_handlers
-          ~can_be_lifted:true
+          ~can_be_lifted:true;
+      merged_handler = None
     }
   in
   simplify_let_cont0 ~simplify_expr dacc data ~down_to_up

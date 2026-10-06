@@ -335,3 +335,52 @@ the number of call sites inlined unchanged, and cost about three percent of
 compile time.  The measured estimate (with calls sure to be inlined counted
 as their callees) stays, with a comment in Call_site_inlining_decision
 recording the experiment.
+
+Parameter sweep on typing/ and a fix to the merge
+=================================================
+
+A sweep of the parameters around the two hints on env, ctype and typecore
+(2026 model; text bytes relative to plain 2026; compile times not reported
+as a whole-tree build ran concurrently):
+
+  config                              env     ctype   typecore
+  ----------------------------------  ------  ------  --------
+  both hints (cap 150)                +1.5%   +4.9%   +0.2%
+  both hints, cap 50                  +0.7%   +5.1%   +1.9%
+  both hints, cap 300                 +0.6%   +4.1%   -0.7%
+  both hints, no cap                  +0.6%   +2.5%   -1.8%
+  argument credit only                +0.1%   +1.9%   +0.4%
+  merge only                          +1.5%   +3.1%   +0.1%
+  both hints + nested speculation     -1.6%   +0.3%   -1.7%
+  both hints, alloc bonus 8           +1.3%   +5.0%   +1.0%
+  both hints, max ratio 0.7           -4.0%   -3.1%   -4.9%
+  max ratio 0.7 alone                 -7.7%   -4.9%   -6.2%
+
+The cap behaves non-monotonically, and the stats say why: in ctype the
+count of call sites refused for exceeding the maximum inlining depth goes
+from 0 (plain) to 79 (cap 150) to 377 (no cap).  The merged handler was
+simplified as part of the inlined body, so everything after a merged call
+sat one inlining level deeper, and with large handlers the rest of the
+function nested deeper at every call.  Fixed: the handler copied into an
+inlined body is now simplified with the inlining state, debuginfo and
+inlining history of the call site (Downwards_env.add_merged_handler,
+keyed by the handler value itself, and
+restore_state_for_merged_handler in Simplify_let_cont_expr).  Stats key:
+speculation.return_continuation_handler_simplified.
+
+With the fix:
+
+  config                              env     ctype   typecore
+  ----------------------------------  ------  ------  --------
+  both hints (cap 150)                +0.1%   +4.4%   +0.5%
+  both hints, no cap                  -0.3%   +3.7%   -0.3%
+  both hints + nested speculation     -3.0%   -0.0%   -1.6%
+
+The depth-limit refusals are back to the plain figures.  Nested
+speculation remains the setting that lets the merge pay off on these
+files: the calls inside a merged handler are only judged during the
+speculation when nested speculation is on.  The maximum ratio is the
+dominant size lever and is not specific to the hints.
+
+43 of the programs under testsuite/tests/basic* and rmain print the same
+output under 2026 and 2026 + both hints + nested speculation.

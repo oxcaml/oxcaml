@@ -82,6 +82,16 @@ val add_continuation_arity :
 
 val continuation_arities : t -> [`Unarized] Flambda_arity.t Continuation.Map.t
 
+(** Record that the handler, merged into an inlined body, is to be simplified
+    with the inlining state, debuginfo and history of [call_site] rather than
+    those of the inlined body. *)
+val add_merged_handler : t -> Flambda.Continuation_handler.t -> call_site:t -> t
+
+(** The environment with the state recorded by [add_merged_handler] for this
+    handler (the same value, physically), if any. *)
+val restore_state_for_merged_handler :
+  t -> Flambda.Continuation_handler.t -> t option
+
 val add_symbol_projection : t -> Variable.t -> Symbol_projection.t -> t
 
 val find_symbol_projection : t -> Variable.t -> Symbol_projection.t option
