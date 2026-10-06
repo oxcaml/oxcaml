@@ -170,22 +170,39 @@ and Env : sig
 
   val empty : t
 
-  val add : t -> Slambdaident.t -> Types.value Or_missing.t -> t
+  val add_ident : t -> Ident.t -> layout -> Types.value Or_missing.t -> t
+
+  val add_kind : t -> Slambdaident.t -> Types.value Or_missing.t -> t
 
   val find : t -> Slambdaident.t -> Types.value Or_missing.t
 end = struct
   module Map = Slambdaident.Map
 
-  type t = Types.value Map.t
+  type t =
+    { values : Types.value Map.t;
+      layouts : layout Ident.Map.t
+    }
 
-  let empty = Map.empty
+  let empty = { values = Map.empty; layouts = Ident.Map.empty }
 
-  let add t id v =
+  let add_ident t id layout v =
+    let slambda_id = Slambdaident.of_ident id in
     match (v : Types.value Or_missing.t) with
-    | Present v -> Map.add id v t
-    | Missing -> (* Possibly unnecessary but be safe anyway *) Map.remove id t
+    | Present v ->
+      { values = Map.add slambda_id v t.values;
+        layouts = Ident.Map.add id layout t.layouts
+      }
+    | Missing ->
+      { values = Map.remove slambda_id t.values;
+        layouts = Ident.Map.add id layout t.layouts
+      }
 
-  let find t id = Map.find_opt id t |> Or_missing.of_option
+  let add_kind { values; layouts } id v =
+    match (v : Types.value Or_missing.t) with
+    | Present v -> { values = Map.add id v values; layouts }
+    | Missing -> { values = Map.remove id values; layouts }
+
+  let find t id = Map.find_opt id t.values |> Or_missing.of_option
 end
 
 module Template_store = struct
@@ -672,11 +689,9 @@ let rec eval_lam ?name ctx env old_lambda : halves =
          let { c = body_c; r = body_r } = eval_lam {env with id=def_c} body in
          { c = body_c; r = << let id = def_r in body_r >> } *)
     let new_def = eval_lam ~name:id ctx env old_def in
-    let body_env =
-      Env.add env (Slambdaident.of_ident id) new_def.slv_comptime
-    in
-    let new_body = eval_lam ?name ctx body_env old_body in
     let new_layout = eval_layout env old_layout in
+    let body_env = Env.add_ident env id new_layout new_def.slv_comptime in
+    let new_body = eval_lam ?name ctx body_env old_body in
     { slv_comptime = new_body.slv_comptime;
       slv_runtime =
         (if
@@ -695,9 +710,10 @@ let rec eval_lam ?name ctx env old_lambda : halves =
     }
   | Lmutlet (old_layout, id, uid, old_def, old_body) ->
     (* Mutable variables have no static part. *)
-    let new_def = eval_dynamic ctx env old_def in
-    let new_body = eval_lam ?name ctx env old_body in
     let new_layout = eval_layout env old_layout in
+    let new_def = eval_dynamic ctx env old_def in
+    let body_env = Env.add_ident env id new_layout Missing in
+    let new_body = eval_lam ?name ctx body_env old_body in
     { slv_comptime = new_body.slv_comptime;
       slv_runtime =
         (if
@@ -708,18 +724,24 @@ let rec eval_lam ?name ctx env old_lambda : halves =
          else Lmutlet (new_layout, id, uid, new_def, new_body.slv_runtime))
     }
   | Lletrec (old_bindings, old_body) ->
-    (* Functions have no static part, so their identifiers need no binding in
-       the static environment. *)
+    (* Functions have no static part, so their identifiers are bound with no
+       static value. *)
+    let body_env =
+      List.fold_left
+        (fun env ({ id; _ } : rec_binding) ->
+          Env.add_ident env id layout_function Missing)
+        env old_bindings
+    in
     let new_bindings =
       Misc.Stdlib.List.map_sharing
         (fun ({ def = old_def; _ } as old_binding) ->
-          let new_def = eval_lfunction ctx env old_def in
+          let new_def = eval_lfunction ctx body_env old_def in
           if old_def == new_def
           then old_binding
           else { old_binding with def = new_def })
         old_bindings
     in
-    let new_body = eval_lam ?name ctx env old_body in
+    let new_body = eval_lam ?name ctx body_env old_body in
     { slv_comptime = new_body.slv_comptime;
       slv_runtime =
         (if new_bindings == old_bindings && new_body.slv_runtime == old_body
@@ -779,7 +801,6 @@ let rec eval_lam ?name ctx env old_lambda : halves =
   | Lstaticcatch
       (old_body, (label, old_params), old_handler, pop_region, old_layout) ->
     let new_body = eval_dynamic ctx env old_body in
-    let new_handler = eval_dynamic ctx env old_handler in
     let new_params =
       Misc.Stdlib.List.map_sharing
         (fun ((id, uid, old_layout) as old_param) ->
@@ -787,6 +808,12 @@ let rec eval_lam ?name ctx env old_lambda : halves =
           if new_layout == old_layout then old_param else id, uid, new_layout)
         old_params
     in
+    let handler_env =
+      List.fold_left
+        (fun env (id, _, layout) -> Env.add_ident env id layout Missing)
+        env new_params
+    in
+    let new_handler = eval_dynamic ctx handler_env old_handler in
     let new_layout = eval_layout env old_layout in
     dynamic
       (if
@@ -799,7 +826,8 @@ let rec eval_lam ?name ctx env old_lambda : halves =
   | Ltrywith (old_body, id, uid, old_handler, old_layout) ->
     (* Exceptions are runtime-only. *)
     let new_body = eval_dynamic ctx env old_body in
-    let new_handler = eval_dynamic ctx env old_handler in
+    let handler_env = Env.add_ident env id layout_exception Missing in
+    let new_handler = eval_dynamic ctx handler_env old_handler in
     let new_layout = eval_layout env old_layout in
     dynamic
       (if
@@ -840,12 +868,13 @@ let rec eval_lam ?name ctx env old_lambda : halves =
        then old_lambda
        else Lwhile { wh_cond = new_cond; wh_body = new_body })
   | Lfor
-      ({ for_from = old_from; for_to = old_to; for_body = old_body; _ } as
-       old_loop) ->
+      ({ for_id; for_from = old_from; for_to = old_to; for_body = old_body; _ }
+       as old_loop) ->
     (* Expand the body once; the loop variable is runtime-only. *)
     let new_from = eval_dynamic ctx env old_from in
     let new_to = eval_dynamic ctx env old_to in
-    let new_body = eval_dynamic ctx env old_body in
+    let body_env = Env.add_ident env for_id layout_int Missing in
+    let new_body = eval_dynamic ctx body_env old_body in
     dynamic
       (if new_from == old_from && new_to == old_to && new_body == old_body
        then old_lambda
@@ -1007,8 +1036,13 @@ and eval_lfunction ctx env
        ret_mode;
        yielding
      } as old_func) =
-  let new_body = eval_dynamic ctx env old_body in
   let new_params = Misc.Stdlib.List.map_sharing (eval_lparam env) old_params in
+  let body_env =
+    List.fold_left
+      (fun env { name; layout } -> Env.add_ident env name layout Missing)
+      env new_params
+  in
+  let new_body = eval_dynamic ctx body_env old_body in
   let new_return = eval_layout env old_return in
   if
     new_body == old_body && new_params == old_params && new_return == old_return
@@ -1363,8 +1397,8 @@ and eval_template ?name ctx env template old_captures mode loc =
   in
   let clo_env, args =
     List.fold_right
-      (fun (id, (new_def, _)) (env, args) ->
-        ( Env.add env (Slambdaident.of_ident id) new_def.slv_comptime,
+      (fun (id, (new_def, new_layout)) (env, args) ->
+        ( Env.add_ident env id new_layout new_def.slv_comptime,
           new_def.slv_runtime :: args ))
       new_captures (env, [])
   in
@@ -1430,7 +1464,7 @@ and instantiate ctx ~loc func args =
     ]}*)
 and eval_apply ctx { clo_template; clo_runtime_env; clo_env } args =
   let bind_params params =
-    try List.fold_left2 Env.add clo_env params args
+    try List.fold_left2 Env.add_kind clo_env params args
     with Invalid_argument _ ->
       Misc.fatal_error
         "Slambda eval doesn't support partial or over application of functors."
