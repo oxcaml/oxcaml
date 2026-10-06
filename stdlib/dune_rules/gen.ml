@@ -176,7 +176,7 @@ let write_stdlib_dune ppf =
   fprintf ppf "%s\n" {|
   (rule (target runtime-launch-info) (action (copy ../runtime.info %{target})))
   (alias
-    (name ocamllib)
+    (name stdlib)
     (deps
        libcamlrun.a libcamlrund.a libcamlrun_pic.a libcamlrun_shared.so
        libasmrun.a libasmrund.a libasmrun_pic.a libasmrun_shared.so
@@ -319,7 +319,6 @@ let write_runtime_dune ppf =
       ("libcamlrun" ^ variant_suff ~variant ^ ".a")
       (setting ("mkexe" ^ variant_suff ~variant) |> String.concat " ")
       (setting "bytecclibs" |> String.concat " "));
-  fprintf ppf "(alias (name ocamllib) (deps ocamlrun ocamlrund))\n";
 
   (* build_config.h *)
   fprintf ppf "%s\n" {|
@@ -334,7 +333,12 @@ let write_runtime_dune ppf =
      (run make -s -f Makefile.upstream
        V=1 SAK=runtime/sak_dune COMPUTE_DEPS=false runtime/build_config.h))
   ))
-|}
+|};
+
+  (* aliases *)
+  fprintf ppf "(alias (name runtime_all) (deps ocamlrun ocamlrund (glob_files *.{a,so})))\n";
+  fprintf ppf "(alias (name runtime) (deps libasmrun.a))\n";
+  fprintf ppf "(alias (name stdlib) (deps (alias runtime_all)))\n"
 
 let () =
   match Sys.argv.(2) with

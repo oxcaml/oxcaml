@@ -52,11 +52,10 @@ boot_targets = \
   $(boot_ocamlmklib) \
   $(boot_ocamldep) \
   $(boot_ocamlobjinfo) \
-  ocamltest/ocamltest.native \
-  @ocamllib
+  ocamltest/ocamltest.native
 
 boot-compiler: _build/_bootinstall
-	$(dune) build --always-show-command-line $(coverage_dune_flags) @merlin-support $(boot_targets)
+	$(dune) build --always-show-command-line $(coverage_dune_flags) @merlin-support $(boot_targets) @runtime_all @stdlib
 
 boot-runtest: boot-compiler
 	$(dune) build $(coverage_dune_flags) --force $(runtest_targets)
