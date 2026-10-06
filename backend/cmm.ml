@@ -695,16 +695,16 @@ and expression =
   | Cifthenelse of
       expression
       * Debuginfo.t
-      * Likelihood.t
+      * Branch_annotations.t
       * expression
       * Debuginfo.t
-      * Likelihood.t
+      * Branch_annotations.t
       * expression
       * Debuginfo.t
   | Cswitch of
       expression
       * int array
-      * (expression * Debuginfo.t * likelihood:Likelihood.t) array
+      * (expression * Debuginfo.t * Branch_annotations.t) array
       * Debuginfo.t
   | Ccatch of ccatch_flag * static_handler list * expression
   | Cexit of exit_label * expression list * trap_action list
@@ -793,7 +793,7 @@ let iter_shallow_tail f = function
     f e2;
     true
   | Cswitch (_e, _tbl, el, _dbg') ->
-    Array.iter (fun (e, _dbg, ~likelihood:_) -> f e) el;
+    Array.iter (fun (e, _dbg, _annots) -> f e) el;
     true
   | Ccatch (_flag, handlers, body) ->
     List.iter (fun { body = h; _ } -> f h) handlers;
@@ -831,10 +831,7 @@ let map_shallow_tail f = function
   | Csequence (e1, e2) -> Csequence (e1, f e2)
   | Cswitch (e, tbl, el, dbg') ->
     Cswitch
-      ( e,
-        tbl,
-        Array.map (fun (e, dbg, ~likelihood) -> f e, dbg, ~likelihood) el,
-        dbg' )
+      (e, tbl, Array.map (fun (e, dbg, annots) -> f e, dbg, annots) el, dbg')
   | Ccatch (flag, handlers, body) ->
     let map_h { label; params; body = handler; dbg; is_cold } =
       { label; params; body = f handler; dbg; is_cold }
@@ -897,7 +894,7 @@ let iter_shallow f = function
     f ifnot
   | Cswitch (e, _ia, ea, _dbg) ->
     f e;
-    Array.iter (fun (e, _, ~likelihood:_) -> f e) ea
+    Array.iter (fun (e, _, _) -> f e) ea
   | Ccatch (_f, hl, body) ->
     let iter_h { body = handler; _ } = f handler in
     List.iter iter_h hl;

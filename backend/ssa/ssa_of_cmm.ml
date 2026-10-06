@@ -476,14 +476,18 @@ and emit_expr_op env c op args dbg : result =
       Misc.fatal_errorf "Ssa_of_cmm: unexpected basic (%a)" Printcfg.basic_desc
         basic)
 
-and emit_ifthenelse env c ~tail econd ifp eif elsep eelse : result =
+and emit_ifthenelse env c ~tail econd ifa eif elsea eelse : result =
   let cond, earg = Sel.select_condition econd in
   let* rarg = emit env c earg ~tail:false in
   let then_env =
-    if Likelihood.is_cold ifp then { env with cold = true } else env
+    if Likelihood.is_cold (Branch_annotations.likelihood ifa)
+    then { env with cold = true }
+    else env
   in
   let else_env =
-    if Likelihood.is_cold elsep then { env with cold = true } else env
+    if Likelihood.is_cold (Branch_annotations.likelihood elsea)
+    then { env with cold = true }
+    else env
   in
   let then_block = new_block then_env ~params:[||] in
   let else_block = new_block else_env ~params:[||] in
@@ -498,9 +502,9 @@ and emit_switch env c ~tail esel index ecases : result =
   let* rsel = emit env c esel ~tail:false in
   let case_blocks =
     Array.map
-      (fun (_case_expr, _dbg, ~likelihood) ->
+      (fun (_case_expr, _dbg, annots) ->
         let env =
-          if Likelihood.is_cold likelihood
+          if Likelihood.is_cold (Branch_annotations.likelihood annots)
           then { env with cold = true }
           else env
         in
@@ -515,7 +519,7 @@ and emit_switch env c ~tail esel index ecases : result =
   finish_block env c ~dbg:Debuginfo.none (Switch { index; targets });
   let case_results =
     Array.mapi
-      (fun i (case_expr, _dbg, ~likelihood:_) ->
+      (fun i (case_expr, _dbg, _) ->
         let case_c = Cursor.start case_blocks.(i) in
         emit env case_c case_expr ~tail, case_c)
       ecases

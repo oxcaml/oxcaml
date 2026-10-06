@@ -1293,9 +1293,10 @@ let unary_primitive env res dbg f (_arg_simple : Simple.t option)
            (C.and_int arg (C.int 1 ~dbg) dbg)
            (C.eq arg (C.int 0 ~dbg) ~dbg)
            dbg)
-        ~dbg ~then_:(C.int 0 ~dbg) ~then_dbg:dbg ~then_p:Likelihood.default
+        ~dbg ~then_:(C.int 0 ~dbg) ~then_dbg:dbg
+        ~then_annots:Branch_annotations.default
         ~else_:(C.eq (C.get_tag arg dbg) (C.int Obj.double_tag ~dbg) ~dbg)
-        ~else_dbg:dbg ~else_p:Likelihood.default )
+        ~else_dbg:dbg ~else_annots:Branch_annotations.default )
   | Is_flat_float_array ->
     None, res, C.eq ~dbg (C.get_tag arg dbg) (C.floatarray_tag dbg)
   | End_region { ghost = false } | End_try_region { ghost = false } ->
@@ -1416,7 +1417,8 @@ let ternary_primitive _env dbg f (_x_simple : Simple.t option)
           C.ite ~dbg base_is_null
             ~then_:(C.store ~dbg memory_chunk Assignment ~addr:y ~new_value:z)
             ~else_:write_into_block ~then_dbg:dbg ~else_dbg:dbg
-            ~then_p:Likelihood.default ~else_p:Likelihood.default
+            ~then_annots:Branch_annotations.default
+            ~else_annots:Branch_annotations.default
       else
         let addr = C.add_int x y dbg in
         C.store ~dbg memory_chunk Assignment ~addr ~new_value:z

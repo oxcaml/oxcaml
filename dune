@@ -322,6 +322,7 @@
   outcometree
   allowance
   ;; lambda/
+  branch_annotations
   debuginfo
   lambda
   static_label
