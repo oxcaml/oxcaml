@@ -200,17 +200,15 @@ typedef uint64_t uintnat;
 #define STACK_GUARD_PAGES
 #endif
 
-/* A lower bound on the size of the stack guard page: the smallest page size
-   of any supported target. Functions whose frames are at least this large
-   could step over the guard page, so the compiler probes their frame area at
-   this stride. Zero when there is no guard page to defend (stack checks
-   enabled, or MAP_STACK stacks); the compiler then emits no probes. (This
-   deliberately does not test NATIVE_CODE, which is not defined when this
-   file is preprocessed for utils/domainstate.ml.) */
-#if !defined(STACK_CHECKS_ENABLED) && !defined(USE_MMAP_MAP_STACK)
-#define Stack_guard_size 4096
+/* A lower bound on the size of the stack guard page: the smallest
+   page size of any supported target. Functions whose frames are at
+   least this large probe for a stack guard page using this
+   stride. Zero when there is no guard page to defend (stack checks
+   enabled); the compiler then emits no probes. */
+#if !defined(STACK_CHECKS_ENABLED)
+#define Stack_guard_stride 4096
 #else
-#define Stack_guard_size 0
+#define Stack_guard_stride 0
 #endif
 
 /* Whether to offset Stack_high to preserve alignment. */

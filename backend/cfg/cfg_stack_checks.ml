@@ -85,11 +85,11 @@ let build_cfg_info : Cfg.t -> cfg_info =
         if Config.no_stack_checks
         then
           (* Only frames big enough to step over the stack's guard page need
-             probing; [stack_guard_size = 0] means there is no guard page to
+             probing; [stack_guard_stride = 0] means there is no guard page to
              defend, so nothing is inserted. *)
-          Domainstate.stack_guard_size > 0
+          Domainstate.stack_guard_stride > 0
           && preproc_stack_check_result.max_frame_size
-             >= Domainstate.stack_guard_size
+             >= Domainstate.stack_guard_stride
         else
           preproc_stack_check_result.contains_nontail_calls
           || preproc_stack_check_result.max_frame_size
