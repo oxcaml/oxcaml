@@ -1469,8 +1469,14 @@ let can_group discr pat =
   | Record_unboxed_product _, (Record_unboxed_product _ | Any)
   | Array _, Array _
   | Variant _, Variant _
-  | Addr _, Addr _
   | Lazy, Lazy ->
+      true
+  | Addr (mut1, _), Addr (mut2, _) ->
+      Types.is_mutable mut1 = Types.is_mutable mut2
+  (* [addr_ _] and [_] can be grouped together: This might cause [Pget_ptr] to
+     be executed even in the [_] branch. That's okay because addresses are
+     always safe to read. *)
+  | Addr _, Any ->
       true
   | ( _,
       ( Any
