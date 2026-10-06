@@ -292,26 +292,22 @@ let remove_intop_neutral_element (cell : Cfg.basic Cfg.instruction DLL.cell) =
     | _ -> None)
   | _ -> None
 
-let strength_reduce_mul_to_lea (cell : Cfg.basic Cfg.instruction DLL.cell) =
+let strength_reduce_mul (cell : Cfg.basic Cfg.instruction DLL.cell) =
   match U.get_cells cell 1 with
   | [cell] -> (
     let instr = DLL.value cell in
     match instr.desc with
     | Op (Intop_imm (Imul, mult))
       when Array.length instr.arg = 1 && Array.length instr.res = 1 -> (
-      match Arch.strength_reduce_mul_into_lea mult with
+      match Arch.strength_reduce_mul mult with
       | None -> None
       | Some specific ->
-        (* [lea (r, r, scale)] reads [r] twice; passing the operand register as
-           both base and index avoids re-evaluating it (it is already in a
-           register). *)
+        (* The operation reads the multiplicand twice (on amd64, as the base and
+           index of a [lea]), so pass the operand register as both arguments. *)
         let r = Array.unsafe_get instr.arg 0 in
-        let new_cell =
-          DLL.insert_and_return_before cell
-            { instr with desc = Cfg.Op (Specific specific); arg = [| r; r |] }
-        in
-        DLL.delete_curr cell;
-        Some (U.prev_at_most U.go_back_const new_cell))
+        DLL.set_value cell
+          { instr with desc = Cfg.Op (Specific specific); arg = [| r; r |] };
+        Some (U.prev_at_most U.go_back_const cell))
     | _ -> None)
   | _ -> None
 
@@ -325,4 +321,4 @@ let apply cell =
   |> if_none_do fold_intop_imm
   |> if_none_do fold_intop_imm_into_specific
   |> if_none_do remove_intop_neutral_element
-  |> if_none_do strength_reduce_mul_to_lea
+  |> if_none_do strength_reduce_mul

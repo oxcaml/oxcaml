@@ -153,10 +153,10 @@ let num_args_addressing = function
   | Iindexed _ -> 1
   | Ibased _ -> 0
 
+let strength_reduce_mul _mult = None
+
 (* No arm64-specific operation can currently absorb a constant addition to one
    of its source registers. *)
-let strength_reduce_mul_into_lea _mult = None
-
 let fold_delta_into_specific_operation _op ~arg_is_folded_reg:_ ~delta:_ = None
 
 let addressing_displacement_for_llvmize addr =
