@@ -1594,14 +1594,11 @@ let rec lam ppf = function
       fprintf ppf "@[<2>(region@ %a)@]" lam expr
   | Lexclave expr ->
       fprintf ppf "@[<2>(exclave@ %a)@]" lam expr
-  | Lkindtemplate {ktmpl_params; ktmpl_body; ktmpl_env; ktmpl_env_mode;
-                   ktmpl_loc = _} ->
+  | Lkindtemplate {ktmpl_params; ktmpl_body} ->
       let pr_params ppf params =
         List.iter (fun l -> fprintf ppf "%a@ " Slambdaident.print l) params
       in
-      fprintf ppf "@[<2>(ktemplate@ %a%a@ %a%a)@]"
-        locality_mode ktmpl_env_mode
-        template_env ktmpl_env
+      fprintf ppf "@[<2>(ktemplate@ %a%a)@]"
         pr_params ktmpl_params
         lfunction ktmpl_body
   | Lkindinstantiate {kinst_func; kinst_args; kinst_result_layout = _;
@@ -1610,11 +1607,9 @@ let rec lam ppf = function
         List.iter (fun l -> fprintf ppf "@ %a" layout l) largs in
       fprintf ppf "@[<2>(kinstantiate@ %a%a)@]"
         lam kinst_func lams kinst_args
-  | Ltemplate {tmpl_func = {kind; params; return; body; attr; ret_mode; mode};
-               tmpl_env} ->
-      fprintf ppf "@[<2>(template%s@ %a%a@ %a%a%a)@]"
-        (locality_kind mode) template_env tmpl_env
-        (function_params kind) params
+  | Ltemplate {kind; params; return; body; attr; ret_mode; mode} ->
+      fprintf ppf "@[<2>(template%s%a@ %a%a%a)@]"
+        (locality_kind mode) (function_params kind) params
         function_attribute attr return_kind (ret_mode, return) lam body
   | Linstantiate ap ->
       let lams ppf largs =
@@ -1664,19 +1659,6 @@ and lfunction ppf {kind; params; return; body; attr; ret_mode; mode} =
   fprintf ppf "@[<2>(function%s%a@ %a%a%a)@]"
     (locality_kind mode) (function_params kind) params
     function_attribute attr return_kind (ret_mode, return) lam body
-
-and template_env ppf env =
-  fprintf ppf "{@[";
-  Ident.Map.iter
-    (fun id (l, layout) ->
-      match l with
-      | Lvar id2 when Ident.same id id2 ->
-        fprintf ppf "@,%a%a;" Ident.print id layout_annotation layout
-      | _ ->
-        fprintf ppf "@,%a=%a%a;"
-          Ident.print id layout_annotation layout lam l)
-    env;
-  fprintf ppf "@]}"
 
 let structured_constant = struct_const
 

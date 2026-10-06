@@ -86,7 +86,7 @@ end
 module rec Types : sig
   type template =
     | Kind of lkindtemplate
-    | Static of ltemplate
+    | Static of lfunction
 
   type closure =
     { clo_template : template;
@@ -115,7 +115,7 @@ module rec Types : sig
 end = struct
   type template =
     | Kind of lkindtemplate
-    | Static of ltemplate
+    | Static of lfunction
 
   type closure =
     { clo_template : template;
@@ -175,6 +175,8 @@ and Env : sig
   val add_kind : t -> Slambdaident.t -> Types.value Or_missing.t -> t
 
   val find : t -> Slambdaident.t -> Types.value Or_missing.t
+
+  val find_layout : t -> Ident.t -> layout
 end = struct
   module Map = Slambdaident.Map
 
@@ -203,6 +205,13 @@ end = struct
     | Missing -> { values = Map.remove id values; layouts }
 
   let find t id = Map.find_opt id t.values |> Or_missing.of_option
+
+  let find_layout t id =
+    match Ident.Map.find_opt id t.layouts with
+    | Some layout -> layout
+    | None ->
+      Misc.fatal_errorf "Slambda: no layout bound for variable %a" Ident.print
+        id
 end
 
 module Template_store = struct
@@ -954,12 +963,8 @@ let rec eval_lam ?name ctx env old_lambda : halves =
       slv_runtime =
         (if new_body == old_body then old_lambda else Lexclave new_body)
     }
-  | Lkindtemplate template ->
-    eval_template ?name ctx env (Kind template) template.ktmpl_env
-      template.ktmpl_env_mode template.ktmpl_loc
-  | Ltemplate template ->
-    eval_template ?name ctx env (Static template) template.tmpl_env
-      template.tmpl_func.mode template.tmpl_func.loc
+  | Lkindtemplate template -> eval_template ?name ctx env (Kind template)
+  | Ltemplate template -> eval_template ?name ctx env (Static template)
   | Lkindinstantiate
       { kinst_func = old_func;
         kinst_args = old_args;
@@ -1363,18 +1368,16 @@ and eval_prim ?name ctx env old_lambda old_prim old_args loc =
     dynamic_prim old_prim
 
 (** {[
-    template p1 ... pn -> body, capturing id1=e1, ..., idm=em ~>
-        let { c = c1; r = r1 } = eval_lam env e1 in
-        ...
-        let { c = cm; r = rm } = eval_lam env em in
-        { c = closure (template, {env with id1=c1; ...; idm=cm});
-          r = << makeblock r1 ... rm >> }
+    template p1 ... pn -> body ~>
+        let fv1, ..., fvk = free variables of the template in
+        { c = closure (template, env);
+          r = << makeblock fv1 ... fvk >> }
     ]} *)
-and eval_template ?name ctx env template old_captures mode loc =
+and eval_template ?name ctx env template =
   let func =
     match template with
     | Kind { ktmpl_body; _ } -> ktmpl_body
-    | Static { tmpl_func; _ } -> tmpl_func
+    | Static tmpl_func -> tmpl_func
   in
   (match func.kind, template with
   | Curried _, _ -> ()
@@ -1387,45 +1390,30 @@ and eval_template ?name ctx env template old_captures mode loc =
     Misc.fatal_errorf
       "Slambda does not currently support functions with over %i arguments"
       (Lambda.max_arity () - 1);
-  let new_captures =
-    old_captures
-    |> Ident.Map.mapi (fun id (old_def, old_layout) ->
-        let new_def = eval_lam ~name:id ctx env old_def in
-        let new_layout = eval_layout env old_layout in
-        new_def, new_layout)
-    |> Ident.Map.bindings
-  in
-  let clo_env, args =
-    List.fold_right
-      (fun (id, (new_def, new_layout)) (env, args) ->
-        ( Env.add_ident env id new_layout new_def.slv_comptime,
-          new_def.slv_runtime :: args ))
-      new_captures (env, [])
+  let clo_runtime_env =
+    Lambda.free_variables (Lfunction func)
+    |> Ident.Set.to_list
+    |> List.map (fun id -> id, Env.find_layout env id)
   in
   let new_shape =
     Misc.Stdlib.Array.of_list_map
-      (fun (_, (_, new_layout)) -> mixed_block_element_of_layout new_layout)
-      new_captures
+      (fun (_, new_layout) -> mixed_block_element_of_layout new_layout)
+      clo_runtime_env
   in
   Typeopt.assert_mixed_product_support_for_lambda_shape
-    (Debuginfo.Scoped_location.to_location loc)
+    (Debuginfo.Scoped_location.to_location func.loc)
     Block new_shape;
-  let clo_runtime_env =
-    List.map (fun (id, (_, new_layout)) -> id, new_layout) new_captures
-  in
-  let template =
-    match template with
-    | Kind template -> Kind { template with ktmpl_env = Ident.Map.empty }
-    | Static template -> Static { template with tmpl_env = Ident.Map.empty }
-  in
-  let closure = { clo_template = template; clo_runtime_env; clo_env } in
+  let closure = { clo_template = template; clo_runtime_env; clo_env = env } in
   let id =
     Template_store.add (Ctx.store ctx) ~cu:(Current_unit.get_cu ()) ~name
       closure
   in
   { slv_comptime = Present (Vclosure id);
     slv_runtime =
-      Lprim (Pmakeblock (0, Immutable, Shape new_shape, mode), args, loc)
+      Lprim
+        ( Pmakeblock (0, Immutable, Shape new_shape, func.mode),
+          List.map (fun (id, _) -> Lvar id) clo_runtime_env,
+          func.loc )
   }
 
 and instantiate ctx ~loc func args =
@@ -1438,63 +1426,49 @@ and instantiate ctx ~loc func args =
     currently does not support partial- or over-application.
 
     {[
-    (kindtemplate {fv0, ..., fvn} k1 ... kn -> func p1 ... pm -> body)
-        arg1 ... argn
-    ~>
-      let { c = _; r = body_r} =
-        eval_lam { env with k1=arg1; ...; kn=argn } body
+    (kindtemplate k1 ... kn -> fun p1 ... pm -> body) arg1 ... argn ~>
+      let { c = _; r = body_r } =
+        eval_lam { clo_env with k1=arg1; ...; kn=argn } body
       in
       { c = Missing
-        r = << fun env p1 ... pm ->
-                 let fv0 = env.(0) in
+        r = << fun closure p1 ... pm ->
+                 let fv1 = closure.(0) in
                  ...
-                 let fvk = env.(k) in
+                 let fvk = closure.(k-1) in
                  body_r >> }
 
-    (template {fv0, ..., fvn} p1 ... pn -> body) arg1 ... argn) ~>
+    (template p1 ... pn -> body) arg1 ... argn ~>
       let { c = body_c; r = body_r } =
-        eval_lam { env with p1=arg1; ..; pn=argn } body
+        eval_lam { clo_env with p1=arg1; ...; pn=argn } body
       in
       { c = body_c;
-        r = << fun env p1 ... pn ->
-                 let fv0 = env.(0) in
+        r = << fun closure p1 ... pn ->
+                 let fv1 = closure.(0) in
                  ...
-                 let fvk = env.(k) in
-                 body_r >>}
-    ]}*)
+                 let fvk = closure.(k-1) in
+                 body_r >> }
+    ]}
+
+    where [fv1 ... fvk] are the variables captured by the closure, in the order
+    of [clo_runtime_env]. *)
 and eval_apply ctx { clo_template; clo_runtime_env; clo_env } args =
-  let bind_params params =
-    try List.fold_left2 Env.add_kind clo_env params args
-    with Invalid_argument _ ->
-      Misc.fatal_error
-        "Slambda eval doesn't support partial or over application of functors."
-  in
   let shape =
     Misc.Stdlib.Array.of_list_map
       (fun (_, layout) -> mixed_block_element_of_layout layout)
       clo_runtime_env
   in
-  let close_function env ~env_mode
-      { kind = old_kind;
-        params = old_params;
-        return = old_return;
-        body = _;
-        attr;
-        loc;
-        mode = _;
-        ret_mode;
-        yielding
-      } evaluated_body =
+  let close_function
+      { kind; params; return; body; attr; loc; mode; ret_mode; yielding } =
     let closure_id = Ident.create_local "closure" in
     let closure_param =
       { name = closure_id;
         debug_uid = debug_uid_none;
         layout = layout_template_env;
         attributes = default_param_attribute;
-        mode = env_mode
+        mode
       }
     in
-    let _, new_body =
+    let _, closed_body =
       List.fold_left
         (fun (i, body) (id, layout) ->
           ( i + 1,
@@ -1506,48 +1480,65 @@ and eval_apply ctx { clo_template; clo_runtime_env; clo_env } args =
                 Lprim
                   (Pmixedfield ([i], shape, Reads_agree), [Lvar closure_id], loc),
                 body ) ))
-        (0, evaluated_body) clo_runtime_env
+        (0, body) clo_runtime_env
     in
     let new_kind =
-      match old_kind, closure_param.mode with
+      match kind, closure_param.mode with
       | Curried { nlocal }, Alloc_local -> Curried { nlocal = nlocal + 1 }
-      | Curried _, Alloc_heap -> old_kind
+      | Curried _, Alloc_heap -> kind
       | Tupled, _ ->
         Misc.fatal_error "Tupled static functions are not currently supported"
     in
-    let new_params =
-      Misc.Stdlib.List.map_sharing (eval_lparam env) old_params
-    in
-    let new_return = eval_layout env old_return in
     (* All free variables are read from the environment parameter, so this
        function has no captures and can be statically allocated. *)
-    lfunction' ~kind:new_kind
-      ~params:(closure_param :: new_params)
-      ~return:new_return ~body:new_body ~attr ~loc ~mode:alloc_heap ~ret_mode
+    lfunction' ~kind:new_kind ~params:(closure_param :: params) ~return
+      ~body:closed_body ~attr ~loc ~mode:alloc_heap ~ret_mode
     |> lfunction_with_yielding yielding
     |> fun new_func -> Lfunction new_func
   in
   match clo_template with
-  | Kind
-      { ktmpl_params;
-        ktmpl_body = old_func;
-        ktmpl_env = _;
-        ktmpl_env_mode;
-        ktmpl_loc = _
-      } ->
-    let env = bind_params ktmpl_params in
-    let new_body = eval_dynamic ctx env old_func.body in
-    dynamic (close_function env ~env_mode:ktmpl_env_mode old_func new_body)
-  | Static { tmpl_func = old_func; tmpl_env = _ } ->
-    let static_params =
-      List.map (fun { name; _ } -> Slambdaident.of_ident name) old_func.params
+  | Kind { ktmpl_params; ktmpl_body = old_func } ->
+    let env =
+      try List.fold_left2 Env.add_kind clo_env ktmpl_params args
+      with Invalid_argument _ ->
+        Misc.fatal_error "Layout poly kind function should be fully applied."
     in
-    let env = bind_params static_params in
-    let new_body = eval_lam ctx env old_func.body in
-    { slv_comptime = new_body.slv_comptime;
-      slv_runtime =
-        close_function env ~env_mode:old_func.mode old_func new_body.slv_runtime
-    }
+    let new_func = eval_lfunction ctx env old_func in
+    dynamic (close_function new_func)
+  | Static
+      { kind;
+        params = old_params;
+        return = old_return;
+        body = old_body;
+        attr;
+        loc;
+        mode;
+        ret_mode;
+        yielding
+      } ->
+    let new_params =
+      Misc.Stdlib.List.map_sharing (eval_lparam clo_env) old_params
+    in
+    let new_return = eval_layout clo_env old_return in
+    let body_env =
+      try
+        List.fold_left2
+          (fun env { name; layout; _ } arg -> Env.add_ident env name layout arg)
+          clo_env new_params args
+      with Invalid_argument _ ->
+        Misc.fatal_error
+          "Slambda eval doesn't support partial or over application of \
+           functors."
+    in
+    let { slv_comptime = body_c; slv_runtime = new_body } =
+      eval_lam ctx body_env old_body
+    in
+    let new_func =
+      lfunction' ~kind ~params:new_params ~return:new_return ~body:new_body
+        ~attr ~loc ~mode ~ret_mode
+      |> lfunction_with_yielding yielding
+    in
+    { slv_comptime = body_c; slv_runtime = close_function new_func }
 
 (* Check that expansion left no unresolved layouts or templates. *)
 

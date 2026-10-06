@@ -4816,33 +4816,18 @@ let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
       (* This eliminates a useless variable (and stack slot in bytecode)
          for "let _ = ...". See #6865. *)
       Lsequence (param, body)
-  | Tpat_fun_layout { id; uid = duid; lpoly; env_locality_mode; _ }
+  | Tpat_fun_layout { id; uid = duid; lpoly; _ }
       when not (List.is_empty (Lpoly.get_exn lpoly)) ->
     assert (mutable_flag == Asttypes.Immutable);
     let kind_params =
       List.map Slambdaident.of_sort_var (Lpoly.get_exn lpoly)
     in
-    let env_locality_mode =
-      Translmode.transl_typed_locality_mode_r env_locality_mode
-    in
-    let param =
+    let ktmpl_body =
       match param with
       | Lfunction lfun -> lfun
       | _ -> Misc.fatal_error "let poly_ definitions must be functions"
     in
-    let ktmpl_body, ktmpl_env =
-      Lambda.extract_free_var_env param
-        ~layout_of_ident:(Typeopt.layout_of_ident pat.pat_env)
-    in
-    let f =
-      Lkindtemplate
-        { ktmpl_params = kind_params;
-          ktmpl_body;
-          ktmpl_env;
-          ktmpl_env_mode = env_locality_mode;
-          ktmpl_loc = Scoped_location.of_location ~scopes loc;
-        }
-    in
+    let f = Lkindtemplate { ktmpl_params = kind_params; ktmpl_body } in
     Llet (Strict, layout_block, id, duid, f, body)
   | Tpat_var { id; uid = duid; _ }
   | Tpat_alias { pattern = { pat_desc = Tpat_any }; id; uid = duid; _ }

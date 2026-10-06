@@ -275,7 +275,7 @@ let compute_static_size lam =
     | Lkindtemplate _ ->
       Misc.fatal_error "letrec: poly_ not supported"
     | Ltemplate tmpl ->
-      raise_error ~loc:tmpl.tmpl_func.loc Recursive_template
+      raise_error ~loc:tmpl.loc Recursive_template
     | Lkindinstantiate _ | Linstantiate  _ -> dynamic_size lam
   and compute_and_join_sizes env branches =
     List.fold_left (fun size branch ->
