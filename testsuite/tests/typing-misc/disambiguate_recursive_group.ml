@@ -23,7 +23,7 @@ let cycle x y =
 val unify : 'a -> 'a -> unit = <fun>
 type tx = Foo of ty
 and ty = Foo of tx
-val cycle : tx -> ty -> unit = <fun>
+val cycle : ty -> tx -> unit = <fun>
 |}, Principal{|
 val unify : 'a -> 'a -> unit = <fun>
 type tx = Foo of ty
@@ -34,7 +34,7 @@ Line 9, characters 11-14:
 Warning 18 [not-principal]: this type-based constructor disambiguation is not
   principal.
 
-val cycle : tx -> ty -> unit = <fun>
+val cycle : ty -> tx -> unit = <fun>
 |}]
 
 module C = struct
