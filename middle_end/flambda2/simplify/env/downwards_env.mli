@@ -56,6 +56,12 @@ val set_at_unit_toplevel_state : t -> bool -> t
 
 val is_defined_at_toplevel : t -> Variable.t -> bool
 
+(** Record that the variable, which occurs only once in the rest of the current
+    function body, is bound to an allocation of the given cost. *)
+val add_single_use_allocation : t -> Variable.t -> Cost_metrics.t -> t
+
+val single_use_allocation : t -> Variable.t -> Cost_metrics.t option
+
 val add_symbol_projection : t -> Variable.t -> Symbol_projection.t -> t
 
 val find_symbol_projection : t -> Variable.t -> Symbol_projection.t option

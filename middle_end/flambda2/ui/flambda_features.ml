@@ -329,6 +329,10 @@ module Inlining = struct
   let speculative_inlining_nested () =
     !Oxcaml_flags.Flambda2.Inlining.speculative_inlining_nested
 
+  let speculative_inlining_credit_caller_allocations () =
+    !Oxcaml_flags.Flambda2.Inlining
+     .speculative_inlining_credit_caller_allocations
+
   let speculative_inlining_uninlined_call_cost_factor () =
     !Oxcaml_flags.Flambda2.Inlining
      .speculative_inlining_uninlined_call_cost_factor

@@ -386,6 +386,51 @@ let charge_speculative_inlining_budget_for_let dacc simplify_named_result
     in
     DA.charge_speculative_inlining_budget dacc cost_metrics
 
+(* An allocation (a block or a closure) bound by this [Let] to a variable that
+   occurs only once in the body may be deleted if the call it flows into is
+   inlined; see [Call_site_inlining_decision.caller_allocation_credit]. *)
+let record_single_use_allocations dacc ~num_normal_occurrences_of_bound_vars
+    simplify_named_result =
+  List.fold_left
+    (fun dacc (binding : Expr_builder.binding_to_place) ->
+      match binding with
+      | Delete_binding _ -> dacc
+      | Keep_binding { let_bound; simplified_defining_expr; _ } -> (
+        match let_bound, simplified_defining_expr.named with
+        | Singleton bound_var, Prim (prim, _dbg) -> (
+          let var = Bound_var.var bound_var in
+          match
+            ( Variable.Map.find_opt var num_normal_occurrences_of_bound_vars,
+              Flambda_primitive.effects_and_coeffects prim )
+          with
+          | Some Num_occurrences.One, (Only_generative_effects _, _, _, _) ->
+            DA.map_denv dacc ~f:(fun denv ->
+                DE.add_single_use_allocation denv var
+                  (Simplified_named.cost_metrics simplified_defining_expr))
+          | ( ( None
+              | Some (Num_occurrences.Zero | Num_occurrences.More_than_one) ),
+              _ )
+          | _, ((No_effects | Arbitrary_effects), _, _, _) ->
+            dacc)
+        | Set_of_closures [bound_var], Set_of_closures _ -> (
+          let var = Bound_var.var bound_var in
+          match
+            Variable.Map.find_opt var num_normal_occurrences_of_bound_vars
+          with
+          | Some Num_occurrences.One ->
+            DA.map_denv dacc ~f:(fun denv ->
+                DE.add_single_use_allocation denv var
+                  (Simplified_named.cost_metrics simplified_defining_expr))
+          | None | Some (Num_occurrences.Zero | Num_occurrences.More_than_one)
+            ->
+            dacc)
+        | Singleton _, (Simple _ | Set_of_closures _ | Rec_info _)
+        | Set_of_closures _, (Simple _ | Prim _ | Set_of_closures _ | Rec_info _)
+        | Static _, _ ->
+          dacc))
+    dacc
+    (Simplify_named_result.bindings_to_place simplify_named_result)
+
 let record_new_defining_expression_binding_for_data_flow dacc ~rewrite_id
     data_flow (binding : Expr_builder.binding_to_place) : Flow.Acc.t =
   let generate_phantom_lets = DE.generate_phantom_lets (DA.denv dacc) in
@@ -416,7 +461,7 @@ let update_data_flow dacc closure_info ~lifted_constants_from_defining_expr
     ~f:(record_new_defining_expression_binding_for_data_flow dacc ~rewrite_id)
 
 let simplify_let0 ~simplify_expr ~simplify_function_body dacc let_expr
-    ~down_to_up bound_pattern ~body =
+    ~down_to_up bound_pattern ~num_normal_occurrences_of_bound_vars ~body =
   let module L = Flambda.Let in
   let original_dacc = dacc in
   (* Remember then clear the lifted constants memory in [DA] so we can easily
@@ -483,6 +528,15 @@ let simplify_let0 ~simplify_expr ~simplify_function_body dacc let_expr
             (update_data_flow dacc closure_info ~rewrite_id
                ~lifted_constants_from_defining_expr simplify_named_result)
       in
+      let dacc =
+        if
+          Flambda_features.Inlining
+          .speculative_inlining_credit_caller_allocations ()
+        then
+          record_single_use_allocations dacc
+            ~num_normal_occurrences_of_bound_vars simplify_named_result
+        else dacc
+      in
       let at_unit_toplevel = DE.at_unit_toplevel (DA.denv dacc) in
       (* Simplify the body of the let-expression and make the new [Let] bindings
          around the simplified body. [Simplify_named] will already have prepared
@@ -504,7 +558,7 @@ let simplify_let0 ~simplify_expr ~simplify_function_body dacc let_expr
 let simplify_let ~simplify_expr ~simplify_function_body dacc let_expr
     ~down_to_up =
   let module L = Flambda.Let in
-  L.pattern_match let_expr
+  L.pattern_match' let_expr
     ~f:
       (simplify_let0 ~simplify_expr ~simplify_function_body dacc let_expr
          ~down_to_up)

@@ -46,8 +46,50 @@ type speculative_inlining_result =
   | Aborted
   | Completed of
       { cost_metrics : Cost_metrics.t;
-        cost_metrics_of_lifted_constants : Cost_metrics.t
+        cost_metrics_of_lifted_constants : Cost_metrics.t;
+        free_names : Name_occurrences.t
       }
+
+(* Allocations of the caller that flow only into this call and that the inlined
+   body no longer refers to will be deleted along with it: credit them.
+   [free_names] are those of the speculatively simplified body. *)
+let caller_allocation_credit dacc ~apply ~inlining_args free_names =
+  if
+    not
+      (Flambda_features.Inlining.speculative_inlining_credit_caller_allocations
+         ())
+  then 0.
+  else
+    let denv = DA.denv dacc in
+    let removed =
+      List.fold_left
+        (fun removed arg ->
+          Simple.pattern_match arg
+            ~const:(fun _ -> removed)
+            ~name:(fun name ~coercion:_ ->
+              Name.pattern_match name
+                ~symbol:(fun _ -> removed)
+                ~var:(fun var ->
+                  match DE.single_use_allocation denv var with
+                  | None -> removed
+                  | Some allocation -> (
+                    match
+                      Name_occurrences.count_variable_normal_mode free_names var
+                    with
+                    | Zero ->
+                      Cost_metrics.( + ) removed
+                        (Cost_metrics.notify_removed
+                           ~operation:Removed_operations.alloc allocation)
+                    | One | More_than_one -> removed))))
+        Cost_metrics.zero (Apply.args apply)
+    in
+    let credit = Cost_metrics.credit ~args:inlining_args removed in
+    if Float.compare credit 0. > 0 && Inlining_stats.enabled ()
+    then (
+      Inlining_stats_table.incr "speculation.caller_allocation_credited";
+      Inlining_stats_table.add_float "speculation.caller_allocation_credit"
+        credit);
+    credit
 
 let speculative_inlining0 dacc ~apply ~function_type ~simplify_expr
     ~return_arity ~budget =
@@ -179,7 +221,8 @@ let speculative_inlining0 dacc ~apply ~function_type ~simplify_expr
       { cost_metrics =
           Cost_metrics.( + ) (UA.cost_metrics uacc)
             cost_metrics_of_lifted_constants;
-        cost_metrics_of_lifted_constants
+        cost_metrics_of_lifted_constants;
+        free_names = UA.name_occurrences uacc
       }
 
 let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
@@ -439,7 +482,14 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
             | Aborted ->
               Speculative_inlining_aborted
                 { budget; threshold_is_remaining_budget }
-            | Completed { cost_metrics; cost_metrics_of_lifted_constants } ->
+            | Completed
+                { cost_metrics; cost_metrics_of_lifted_constants; free_names }
+              ->
+              let call_site_credit =
+                call_site_credit
+                +. caller_allocation_credit dacc ~apply ~inlining_args
+                     free_names
+              in
               let original_size =
                 Code_metadata.cost_metrics code_metadata |> Cost_metrics.size
               in

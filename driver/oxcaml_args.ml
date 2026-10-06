@@ -1200,16 +1200,34 @@ let mk_flambda2_speculative_inlining_nested f =
       " Inside the outermost speculative inlining, speculate on calls to\n\
       \    speculatively-inlinable functions instead of leaving them as calls\n\
       \    (one level of nested speculation)%s (Flambda 2 only)"
-      (format_default Flambda2.Inlining.Default.speculative_inlining_nested)
-  )
+      (format_default Flambda2.Inlining.Default.speculative_inlining_nested) )
 
 let mk_no_flambda2_speculative_inlining_nested f =
   ( "-no-flambda2-speculative-inlining-nested",
     Arg.Unit f,
     Printf.sprintf
       " Do not perform nested speculative inlining%s (Flambda 2 only)"
+      (format_not_default Flambda2.Inlining.Default.speculative_inlining_nested)
+  )
+
+let mk_flambda2_speculative_inlining_credit_caller_allocations f =
+  ( "-flambda2-speculative-inlining-credit-caller-allocations",
+    Arg.Unit f,
+    Printf.sprintf
+      " When judging a speculative inlining, credit the allocations of the\n\
+      \    caller that flow only into the call and that the inlined body no\n\
+      \    longer uses%s (Flambda 2 only)"
+      (format_default
+         Flambda2.Inlining.Default
+         .speculative_inlining_credit_caller_allocations) )
+
+let mk_no_flambda2_speculative_inlining_credit_caller_allocations f =
+  ( "-no-flambda2-speculative-inlining-credit-caller-allocations",
+    Arg.Unit f,
+    Printf.sprintf " Do not credit the caller's allocations%s (Flambda 2 only)"
       (format_not_default
-         Flambda2.Inlining.Default.speculative_inlining_nested) )
+         Flambda2.Inlining.Default
+         .speculative_inlining_credit_caller_allocations) )
 
 let mk_flambda2_speculative_inlining_uninlined_call_cost_factor f =
   ( "-flambda2-speculative-inlining-uninlined-call-cost-factor",
@@ -1770,6 +1788,8 @@ module type Oxcaml_options = sig
   val no_flambda2_speculative_inlining_charge_uninlined_calls : unit -> unit
   val flambda2_speculative_inlining_nested : unit -> unit
   val no_flambda2_speculative_inlining_nested : unit -> unit
+  val flambda2_speculative_inlining_credit_caller_allocations : unit -> unit
+  val no_flambda2_speculative_inlining_credit_caller_allocations : unit -> unit
   val flambda2_speculative_inlining_uninlined_call_cost_factor : float -> unit
   val flambda2_speculative_inlining_budget : unit -> unit
   val no_flambda2_speculative_inlining_budget : unit -> unit
@@ -2039,6 +2059,10 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
         F.flambda2_speculative_inlining_nested;
       mk_no_flambda2_speculative_inlining_nested
         F.no_flambda2_speculative_inlining_nested;
+      mk_flambda2_speculative_inlining_credit_caller_allocations
+        F.flambda2_speculative_inlining_credit_caller_allocations;
+      mk_no_flambda2_speculative_inlining_credit_caller_allocations
+        F.no_flambda2_speculative_inlining_credit_caller_allocations;
       mk_flambda2_speculative_inlining_uninlined_call_cost_factor
         F.flambda2_speculative_inlining_uninlined_call_cost_factor;
       mk_flambda2_speculative_inlining_budget
@@ -2679,6 +2703,12 @@ module Oxcaml_options_impl = struct
   let no_flambda2_speculative_inlining_nested =
     clear' Flambda2.Inlining.speculative_inlining_nested
 
+  let flambda2_speculative_inlining_credit_caller_allocations =
+    set' Flambda2.Inlining.speculative_inlining_credit_caller_allocations
+
+  let no_flambda2_speculative_inlining_credit_caller_allocations =
+    clear' Flambda2.Inlining.speculative_inlining_credit_caller_allocations
+
   let flambda2_speculative_inlining_uninlined_call_cost_factor factor =
     Flambda2.Inlining.speculative_inlining_uninlined_call_cost_factor := factor
 
@@ -3228,6 +3258,8 @@ module Extra_params = struct
         set' Flambda2.Inlining.speculative_inlining_charge_uninlined_calls
     | "flambda2-speculative-inlining-nested" ->
         set' Flambda2.Inlining.speculative_inlining_nested
+    | "flambda2-speculative-inlining-credit-caller-allocations" ->
+        set' Flambda2.Inlining.speculative_inlining_credit_caller_allocations
     | "flambda2-speculative-inlining-budget" ->
         set' Flambda2.Inlining.speculative_inlining_budget
     | "flambda2-speculative-inlining-budget-size-ratio" ->

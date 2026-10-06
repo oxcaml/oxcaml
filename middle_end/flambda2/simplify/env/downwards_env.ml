@@ -63,6 +63,7 @@ type t =
     unit_toplevel_exn_continuation : Continuation.t;
     unit_toplevel_alloc_region : Variable.t;
     variables_defined_at_toplevel : Variable.Set.t;
+    single_use_allocations : Cost_metrics.t Variable.Map.t;
     cse : CSE.t;
     comparison_results : Comparison_result.t Variable.Map.t;
     are_rebuilding_terms : Are_rebuilding_terms.t;
@@ -110,7 +111,8 @@ let [@ocamlformat "disable"] print ppf { round; machine_width; typing_env;
                 disable_partial_application_stub_generation;
                 inlining_state; propagating_float_consts;
                 at_unit_toplevel; unit_toplevel_exn_continuation;
-                variables_defined_at_toplevel; cse; comparison_results;
+                variables_defined_at_toplevel; single_use_allocations = _;
+                cse; comparison_results;
                 are_rebuilding_terms; closure_info;
                 unit_toplevel_return_continuation; unit_toplevel_alloc_region; all_code;
                 get_imported_code = _; inlining_history_tracker = _;
@@ -241,6 +243,7 @@ let create ~round ~machine_width ~(resolver : resolver)
       unit_toplevel_exn_continuation;
       unit_toplevel_alloc_region = toplevel_my_alloc_region;
       variables_defined_at_toplevel = Variable.Set.empty;
+      single_use_allocations = Variable.Map.empty;
       cse = CSE.empty;
       comparison_results = Variable.Map.empty;
       are_rebuilding_terms = Are_rebuilding_terms.are_rebuilding;
@@ -303,6 +306,18 @@ let at_unit_toplevel t = t.at_unit_toplevel
 
 let set_at_unit_toplevel_state t at_unit_toplevel = { t with at_unit_toplevel }
 
+(* The allocations bound to variables that occur once in the rest of the current
+   function body: if such a variable is an argument of a call, inlining the call
+   may delete the allocation, see [Call_site_inlining_decision]. *)
+let add_single_use_allocation t var cost_metrics =
+  { t with
+    single_use_allocations =
+      Variable.Map.add var cost_metrics t.single_use_allocations
+  }
+
+let single_use_allocation t var =
+  Variable.Map.find_opt var t.single_use_allocations
+
 let is_defined_at_toplevel t var =
   Variable.Set.mem var t.variables_defined_at_toplevel
 
@@ -348,6 +363,7 @@ let enter_set_of_closures
       unit_toplevel_exn_continuation;
       unit_toplevel_alloc_region;
       variables_defined_at_toplevel;
+      single_use_allocations = _;
       cse = _;
       comparison_results = _;
       are_rebuilding_terms;
@@ -377,6 +393,7 @@ let enter_set_of_closures
     unit_toplevel_exn_continuation;
     unit_toplevel_alloc_region;
     variables_defined_at_toplevel;
+    single_use_allocations = Variable.Map.empty;
     cse = CSE.empty;
     comparison_results = Variable.Map.empty;
     are_rebuilding_terms;
@@ -859,6 +876,7 @@ let denv_for_lifted_continuation ~denv_for_join ~denv =
     typing_env = denv_for_join.typing_env;
     at_unit_toplevel = denv_for_join.at_unit_toplevel;
     variables_defined_at_toplevel = denv_for_join.variables_defined_at_toplevel;
+    single_use_allocations = denv_for_join.single_use_allocations;
     cse = denv_for_join.cse;
     comparison_results = denv_for_join.comparison_results;
     replay_history = denv_for_join.replay_history;

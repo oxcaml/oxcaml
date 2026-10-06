@@ -344,6 +344,7 @@ module Flambda2 : sig
       val speculative_inlining_track_lifted_constants : bool
       val speculative_inlining_charge_uninlined_calls : bool
       val speculative_inlining_nested : bool
+      val speculative_inlining_credit_caller_allocations : bool
       val speculative_inlining_uninlined_call_cost_factor : float
       val speculative_inlining_budget : bool
       val speculative_inlining_budget_size_ratio : float
@@ -392,6 +393,11 @@ module Flambda2 : sig
         speculatively-inlinable functions instead of leaving them as calls
         (one level of nested speculation). *)
     val speculative_inlining_nested : bool ref
+
+    (** When judging a speculative inlining, credit the allocations of the
+        caller that flow only into the call and that the inlined body no
+        longer refers to, since they will be deleted. *)
+    val speculative_inlining_credit_caller_allocations : bool ref
 
     val speculative_inlining_uninlined_call_cost_factor : float ref
 

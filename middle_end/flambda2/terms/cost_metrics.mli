@@ -72,4 +72,8 @@ val adjusted_size : t -> float
     under the threshold criterion, [adjusted_size] under the ratio one. *)
 val budget_charge : args:Inlining_arguments.t -> t -> float
 
+(** The credit, under the current criterion, for code of this cost removed
+    outside the inlined body. *)
+val credit : args:Inlining_arguments.t -> t -> float
+
 val equal : t -> t -> bool

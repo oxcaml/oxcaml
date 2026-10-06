@@ -126,6 +126,15 @@ let evaluate ~args (t : t) =
 let adjusted_size (t : t) =
   Float.of_int (Code_size.to_int t.size) -. Removed_operations.bonus t.removed
 
+(* The credit, under the current speculative inlining criterion, for code of the
+   given cost that an inlining removes elsewhere than in the inlined body (see
+   [Call_site_inlining_decision]). *)
+let credit ~args (t : t) =
+  let size = Float.of_int (Code_size.to_int t.size) in
+  match Flambda_features.Inlining.speculative_inlining_criterion () with
+  | Threshold -> size +. Removed_operations.evaluate ~args t.removed
+  | Ratio -> size +. Removed_operations.bonus t.removed
+
 let budget_charge ~args (t : t) =
   match Flambda_features.Inlining.speculative_inlining_criterion () with
   | Threshold -> evaluate ~args t
