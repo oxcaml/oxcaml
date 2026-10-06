@@ -34,7 +34,8 @@ module Doc = struct
 
 
   let typexp mode ppf ty =
-    !Oprint.out_type ppf (tree_of_typexp mode ty)
+    !Oprint.out_type ppf
+      (tree_of_typexp ~base:Mode.With_locality.Const.legacy mode ty)
 
   let modality ?(id = fun _ppf () -> ()) ax ppf modality =
     if Mode.Modality.Per_axis.is_id ax modality then
@@ -52,7 +53,7 @@ module Doc = struct
   let type_expr ppf ty =
     (* [type_expr] is used directly by error message printers,
        we mark eventual loops ourself to avoid any misuse and stack overflow *)
-    prepare_for_printing [ty];
+    prepare_for_printing ~base:Mode.With_locality.Const.legacy [ty];
     prepared_type_expr ppf ty
 
   let shared_type_scheme ppf ty =
@@ -60,7 +61,7 @@ module Doc = struct
     typexp Type_scheme ppf ty
 
   let type_scheme ppf ty =
-    prepare_for_printing [ty];
+    prepare_for_printing ~base:Mode.With_locality.Const.legacy [ty];
     prepared_type_scheme ppf ty
 
   let path ppf p =
@@ -101,7 +102,8 @@ module Doc = struct
     !Oprint.out_constr_args ppf (tree_of_constructor_arguments a)
 
   let label ppf l =
-    prepare_for_printing [l.Types.ld_type];
+    prepare_for_printing ~base:Mode.With_locality.Const.legacy
+      [l.Types.ld_type];
     !Oprint.out_label ppf (tree_of_label l)
 
   let extension_constructor id ppf ext =
@@ -196,8 +198,8 @@ let () = Jkind.set_printtyp_path Doc.path
 let () = Mode.print_longident := Doc.longident
 let () =
   Jkind.set_outcometrees_of_types (fun tys ->
-    prepare_for_printing tys;
-    List.map (tree_of_typexp Type) tys);
+    prepare_for_printing ~base:Mode.With_locality.Const.legacy tys;
+    List.map (tree_of_typexp ~base:Mode.With_locality.Const.legacy Type) tys);
   Jkind.set_outcometree_of_modalities tree_of_modalities;
   Jkind.set_print_type_expr Doc.type_expr
 

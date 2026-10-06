@@ -4731,11 +4731,11 @@ let check_for_hidden_arrow env loc ty =
 
 type transl_value_decl_modal =
   | Str_primitive
-  | Sig_value of Mode.With_regionality.l * Mode.Modality.Const.t
+  | Sig_value of Mode.With_regionality.Const.t * Mode.Modality.Const.t
 
 (* Translate a value declaration *)
 let transl_value_decl env loc ~modal ~why valdecl =
-  let mode, val_modalities, val_modal_info =
+  let mode, val_modalities, val_modal_info, curry_mode =
     match modal with
     | Str_primitive ->
         assert (not valdecl.pval_poly);
@@ -4747,10 +4747,10 @@ let transl_value_decl env loc ~modal ~why valdecl =
           |> Typemode.apply_mode_implications
           |> Mode.With_locality.Const.(
               Option.value ~default:{legacy with staticity = Static})
-          |> Mode.With_locality.of_const
-          |> Mode.with_locality_as_regionality
+          |> Mode.Const.with_locality_as_regionality
         in
-        mode, Mode.Modality.undefined, Valmi_str_primitive modes
+        mode, Mode.Modality.undefined, Valmi_str_primitive modes,
+        Mode.With_locality.Const.legacy
     | Sig_value (md_mode, sig_modalities) ->
         if valdecl.pval_poly then begin
           Language_extension.assert_enabled ~loc Layout_poly
@@ -4763,13 +4763,17 @@ let transl_value_decl env loc ~modal ~why valdecl =
         let modalities =
           Mode.Modality.of_const raw_modalities.moda_modalities
         in
-        md_mode, modalities, Valmi_sig_value raw_modalities
+        let curry_mode =
+          Mode.Modality.Const.apply_const raw_modalities.moda_modalities md_mode
+          |> Mode.Const.value_to_alloc_r2l
+        in
+        md_mode, modalities, Valmi_sig_value raw_modalities, curry_mode
   in
   let lpoly_flag =
     if valdecl.pval_poly then Typetexp.Lpoly else Typetexp.Lmono
   in
   let lpoly, cty =
-    Typetexp.transl_type_scheme env valdecl.pval_type lpoly_flag
+    Typetexp.transl_type_scheme env curry_mode valdecl.pval_type lpoly_flag
   in
   let sort =
     match Ctype.type_sort ~why ~fixed:false env cty.ctyp_type with
@@ -4884,7 +4888,8 @@ let transl_value_decl env loc ~modal ~why valdecl =
       }
   in
   let (id, newenv) =
-    Env.enter_value ~mode valdecl.pval_name.txt v env
+    Env.enter_value ~mode:(Mode.With_regionality.of_const mode)
+      valdecl.pval_name.txt v env
       ~check:(fun s -> Warnings.Unused_value_declaration s)
   in
   Ctype.check_and_update_generalized_ty_jkind ~name:id ~loc ty;
@@ -5356,7 +5361,8 @@ let explain_unbound_gen ppf tv tl typ kwd pr =
     let ti = List.find (fun ti -> Ctype.deep_occur tv (typ ti)) tl in
     let ty0 = (* Hack to force aliasing when needed *)
       Btype.newgenty (Tobject(tv, ref None)) in
-    Out_type.prepare_for_printing [typ ti; ty0];
+    Out_type.prepare_for_printing ~base:Mode.With_locality.Const.legacy
+      [typ ti; ty0];
     fprintf ppf
       ".@ @[<hov2>In %s@ %a@;<1 -2>the variable %a is unbound@]"
       kwd (Style.as_inline_code pr) ti
@@ -5595,7 +5601,8 @@ let variance_error ~loc ~v1 ~v2 =
          lacks the [env]. Therefore, we clear [Ident_names] manually.
          It'd be good to come up with a better solution. *)
       Out_type.Ident_names.reset ();
-      Out_type.prepare_for_printing [ variable ];
+      Out_type.prepare_for_printing ~base:Mode.With_locality.Const.legacy
+        [ variable ];
       let intro = variance_context context in
       Location.errorf ~loc "%a%t" pp_doc intro
         (variance_variable_error ~v1 ~v2 variable error)
@@ -5689,7 +5696,8 @@ let report_error ~loc = function
              jkind_loc)
   | Non_regular { definition; used_as; defined_as; reaching_path } ->
       let reaching_path = Reaching_path.simplify reaching_path in
-      Out_type.prepare_for_printing [used_as; defined_as];
+      let base = Mode.With_locality.Const.legacy in
+      Out_type.prepare_for_printing ~base [used_as; defined_as];
       Reaching_path.add_to_preparation reaching_path;
       Out_type.Ident_names.reset ();
       Location.errorf ~loc
@@ -5699,8 +5707,8 @@ let report_error ~loc = function
          All uses need to match the definition for the recursive type \
          to be regular.@]"
         Style.inline_code (Path.name definition)
-        quoted_out_type (Out_type.tree_of_typexp Type defined_as)
-        quoted_out_type (Out_type.tree_of_typexp Type used_as)
+        quoted_out_type (Out_type.tree_of_typexp ~base Type defined_as)
+        quoted_out_type (Out_type.tree_of_typexp ~base Type used_as)
         (fun pp ->
            let is_expansion = function Expands_to _ -> true | _ -> false in
            if List.exists is_expansion reaching_path then
