@@ -13,8 +13,8 @@ let code loopify(never) size(14) newer_version_of(g_1)
    apply direct(h_2_1 &my_alloc_region)
      ($camlCode_size__h_2 : _ -> [ 0 of val * val ]) (Pmakeblock) -> k2 * k1)
     where k2 (`*match*` : [ 0 of val * val ]) =
-      let Pfield = %block_load.[`0`] (`*match*`) in
-      cont k (Pfield)
+      let Pmixedfield = %block_load.[`0`] (`*match*`) in
+      cont k (Pmixedfield)
 in
 let code loopify(never) size(23) newer_version_of(f_0)
       f_0_1 (x) my_closure &my_alloc_region my_depth -> k * k1 : val =

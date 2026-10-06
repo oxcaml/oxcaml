@@ -89,95 +89,43 @@ end
 module M3_5 : sig val f : int32_u -> int32_u val y : int32_u end
 |}];;
 
-(*************************************)
-(* Test 4: No putting them in tuples *)
+(**********************************)
+(* Test 4: Putting them in tuples *)
 
 let f4_1 (x : t_bits32) = x, false;;
 [%%expect{|
-Line 1, characters 26-27:
-1 | let f4_1 (x : t_bits32) = x, false;;
-                              ^
-Error: The value "x" has type "t_bits32" but an expression was expected of type
-         "('a : value_or_null)"
-       The layout of t_bits32 is bits32
-         because of the definition of t_bits32 at line 1, characters 0-22.
-       But the layout of t_bits32 must be a value layout
-         because it's the type of a tuple element.
+val f4_1 : t_bits32 -> t_bits32 * bool = <fun>
 |}];;
 
 let f4_2 (x : 'a t_bits32_id) = x, false;;
 [%%expect{|
-Line 1, characters 32-33:
-1 | let f4_2 (x : 'a t_bits32_id) = x, false;;
-                                    ^
-Error: The value "x" has type "'a t_bits32_id" = "('a : bits32)"
-       but an expression was expected of type "('b : value_or_null)"
-       The layout of 'a t_bits32_id is bits32
-         because of the definition of t_bits32_id at line 2, characters 0-35.
-       But the layout of 'a t_bits32_id must be a value layout
-         because it's the type of a tuple element.
+val f4_2 : ('a : bits32). 'a t_bits32_id -> 'a t_bits32_id * bool = <fun>
 |}];;
 
 let f4_3 (x : int32_u) = x, false;;
 [%%expect{|
-Line 1, characters 25-26:
-1 | let f4_3 (x : int32_u) = x, false;;
-                             ^
-Error: The value "x" has type "int32_u" but an expression was expected of type
-         "('a : value_or_null)"
-       The layout of int32_u is bits32
-         because it is the primitive type int32_u.
-       But the layout of int32_u must be a value layout
-         because it's the type of a tuple element.
+val f4_3 : int32_u -> int32_u * bool = <fun>
 |}];;
 
 type t4_4 = t_bits32 * string;;
 [%%expect{|
-Line 1, characters 12-20:
-1 | type t4_4 = t_bits32 * string;;
-                ^^^^^^^^
-Error: Tuple element types must have layout value.
-       The layout of "t_bits32" is bits32
-         because of the definition of t_bits32 at line 1, characters 0-22.
-       But the layout of "t_bits32" must be a value layout
-         because it's the type of a tuple element.
+type t4_4 = t_bits32 * string
 |}];;
 
 type t4_5 = int * int32_u;;
 [%%expect{|
-Line 1, characters 18-25:
-1 | type t4_5 = int * int32_u;;
-                      ^^^^^^^
-Error: Tuple element types must have layout value.
-       The layout of "int32_u" is bits32
-         because it is the primitive type int32_u.
-       But the layout of "int32_u" must be a value layout
-         because it's the type of a tuple element.
+type t4_5 = int * int32_u
 |}];;
 
 type ('a : bits32) t4_6 = 'a * 'a
 [%%expect{|
-Line 1, characters 26-28:
-1 | type ('a : bits32) t4_6 = 'a * 'a
-                              ^^
-Error: Tuple element types must have layout value.
-       The layout of "'a" is bits32
-         because of the annotation on 'a in the declaration of the type t4_6.
-       But the layout of "'a" must be a value layout
-         because it's the type of a tuple element.
+type ('a : bits32) t4_6 = 'a * 'a
 |}];;
 
 (* check for layout propagation *)
 type ('a : bits32, 'b) t4_7 = ('a as 'b) -> ('b * 'b);;
 [%%expect{|
-Line 1, characters 45-47:
-1 | type ('a : bits32, 'b) t4_7 = ('a as 'b) -> ('b * 'b);;
-                                                 ^^
-Error: Tuple element types must have layout value.
-       The layout of "'a" is bits32
-         because of the annotation on 'a in the declaration of the type t4_7.
-       But the layout of "'a" must be a value layout
-         because it's the type of a tuple element.
+type ('a : bits32, 'b) t4_7 = 'a -> 'a * 'a constraint 'b = 'a
 |}]
 
 (*********************************************************)

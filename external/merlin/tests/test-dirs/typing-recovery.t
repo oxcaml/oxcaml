@@ -682,9 +682,11 @@ make sure we also handle that correctly in structures:
               Label: None
                 expression (test_ct.ml[3,20+24]..test_ct.ml[3,20+25])
                   Texp_constant Const_int 3
+              value
               Label: None
                 expression (test_ct.ml[3,20+27]..test_ct.ml[3,20+28])
                   Texp_constant Const_int 4
+              value
             ]
       ]
     structure_item (test_ct.ml[5,50+0]..test_ct.ml[5,50+27])
@@ -733,9 +735,11 @@ make sure we also handle that correctly in structures:
               Label: None
                 expression (test_ct.ml[5,50+23]..test_ct.ml[5,50+24])
                   Texp_constant Const_int 3
+              value
               Label: None
                 expression (test_ct.ml[5,50+26]..test_ct.ml[5,50+27])
                   Texp_constant Const_int 4
+              value
             ]
       ]
   ]
