@@ -193,9 +193,7 @@ let libraries = ["stdlib_upstream_compatible"; "stdlib_stable"]
 let array_primitives =
   let open Parsetree in
   let any =
-    { pjka_loc = Location.none;
-      pjka_desc = Pjk_abbreviation (lid "any")
-    }
+    { pjka_loc = Location.none; pjka_desc = Pjk_abbreviation (lid "any") }
   in
   let separable =
     { pjka_loc = Location.none;
@@ -221,8 +219,7 @@ let array_primitives =
   [ external_ "array_make" "%makearray_dynamic" [int; a] array;
     external_ "array_get" "%array_safe_get" [array; int] a;
     external_ "array_set" "%array_safe_set" [array; int; a] unit;
-    external_ "array_length" "%array_length" [array] int
-  ]
+    external_ "array_length" "%array_length" [array] int ]
 
 let record_declarations records =
   let declaration (record : Ty.record) =
@@ -234,7 +231,8 @@ let record_declarations records =
             then Mutable
             else Immutable
           in
-          Type.field ~mut (loc (Ty.field_name record field))
+          Type.field ~mut
+            (loc (Ty.field_name record field))
             (Ty.to_code field.ty))
         record.fields
     in
@@ -256,7 +254,9 @@ let rec print_value path ty expr =
       | [] -> print_number nty array
       | _ :: rest ->
         let index = path ^ "_index_" ^ string_of_int depth in
-        Exp.for_ (Pat.var (loc index)) (int 0)
+        Exp.for_
+          (Pat.var (loc index))
+          (int 0)
           (op "-" [apply (ident "array_length") [array]; int 1])
           Upto
           (print_elements (depth + 1) rest

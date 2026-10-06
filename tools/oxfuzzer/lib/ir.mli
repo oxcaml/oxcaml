@@ -88,8 +88,11 @@ module Ty : sig
     }
 
   val equal : t -> t -> bool
+
   val record_name : record -> string
+
   val field_name : record -> field -> string
+
   val to_code : t -> Parsetree.core_type
 end
 
@@ -177,7 +180,9 @@ module Expr : sig
     Parsetree.expression
 
   val to_code : t -> Parsetree.expression
+
   val place_to_code : place -> Parsetree.expression
+
   val assignment_to_code : place -> t -> Parsetree.expression
 end
 
@@ -205,10 +210,13 @@ module Statement : sig
         }
 
   val let_binding :
-    Binding.t -> Parsetree.expression -> Parsetree.expression ->
+    Binding.t ->
+    Parsetree.expression ->
+    Parsetree.expression ->
     Parsetree.expression
 
   val sequence : t -> t -> t
+
   val to_code : t -> Parsetree.expression
 end
 
