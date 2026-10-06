@@ -766,7 +766,8 @@ and flatten_for_printing t =
   Name_abstraction.pattern_match_for_printing
     (module Bound_pattern)
     t.let_abst ~apply_renaming_to_term:apply_renaming_let_expr_t0
-    ~f:(fun bound_pattern { body; _ } -> print bound_pattern ~body)
+    ~f:(fun bound_pattern { num_normal_occurrences_of_bound_vars = _; body } ->
+      print bound_pattern ~body)
 
 and print_closure_binding ppf (function_slot, sym) =
   Format.fprintf ppf "@[%a %t\u{21a4}%t@ %a@]" Symbol.print sym
@@ -869,7 +870,9 @@ and print_let_expr ppf ({ let_abst = _; defining_expr } as t) : unit =
       Name_abstraction.pattern_match_for_printing
         (module Bound_pattern)
         t.let_abst ~apply_renaming_to_term:apply_renaming_let_expr_t0
-        ~f:(fun bound_pattern { body; _ } -> print bound_pattern ~body)
+        ~f:(fun
+            bound_pattern { num_normal_occurrences_of_bound_vars = _; body } ->
+          print bound_pattern ~body)
     | Let_cont _ | Apply _ | Apply_cont _ | Switch _ | Invalid _ -> expr
   in
   let print (bound_pattern : Bound_pattern.t) ~body =
@@ -886,7 +889,8 @@ and print_let_expr ppf ({ let_abst = _; defining_expr } as t) : unit =
   Name_abstraction.pattern_match_for_printing
     (module Bound_pattern)
     t.let_abst ~apply_renaming_to_term:apply_renaming_let_expr_t0
-    ~f:(fun bound_pattern { body; _ } -> print bound_pattern ~body)
+    ~f:(fun bound_pattern { num_normal_occurrences_of_bound_vars = _; body } ->
+      print bound_pattern ~body)
 
 and print_named ppf (t : named) =
   let print_or_elide_debuginfo ppf dbg =
@@ -1224,7 +1228,7 @@ module Non_recursive_let_cont_handler = struct
       t2.continuation_and_body ~f:(fun continuation body1 body2 ->
         f continuation ~body1 ~body2)
 
-  let handler t = t.handler
+  let handler (t : t) = t.handler
 
   let apply_renaming = apply_renaming_non_recursive_let_cont_handler
 end

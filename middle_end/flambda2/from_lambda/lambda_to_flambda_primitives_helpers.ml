@@ -76,7 +76,7 @@ let maybe_create_unboxed_product expr_prims =
   | [expr_prim] -> expr_prim
   | _ -> Unboxed_product expr_prims
 
-let rec print_expr_primitive ppf expr_primitive =
+let rec print_expr_primitive ppf (expr_primitive : expr_primitive) =
   let module W = Flambda_primitive.Without_args in
   match expr_primitive with
   | Simple simple -> Simple.print ppf simple
