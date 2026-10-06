@@ -2019,8 +2019,8 @@ let close_switch acc env ~condition_dbg scrutinee (sw : IR.switch) :
       (* CR bclement: use likelihood information from annotations. *)
       Expr_with_acc.create_switch acc
         (Switch.if_then_else ~machine_width ~condition_dbg ~scrutinee
-           ~if_true:(Switch_expr.create_arm action)
-           ~if_false:(Switch_expr.create_arm default_action))
+           ~if_true:(Switch_arm.from_apply_cont action)
+           ~if_false:(Switch_arm.from_apply_cont default_action))
     in
     let acc, body =
       Let_with_acc.create acc
@@ -2070,7 +2070,7 @@ let close_switch acc env ~condition_dbg scrutinee (sw : IR.switch) :
                      compute logits *)
                   ( acc,
                     Target_ocaml_int.Map.add case
-                      (Switch_expr.create_arm arm)
+                      (Switch_arm.from_apply_cont arm)
                       arms ))
                 arms
                 (acc, Target_ocaml_int.Map.empty)

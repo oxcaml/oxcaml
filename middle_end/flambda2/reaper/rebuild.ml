@@ -2086,12 +2086,12 @@ and rebuild_expr (env : env) (res : rebuild_result)
       let arms =
         Target_ocaml_int.Map.filter_map
           (fun _ arm ->
-            match rewrite_apply_cont_expr env (Switch_expr.arm_action arm) with
+            match rewrite_apply_cont_expr env (Switch_arm.action arm) with
             | None -> None
             | Some action ->
               Some
-                (Switch_expr.create_arm_with_likelihood
-                   ~likelihood:(Switch_expr.arm_likelihood arm)
+                (Switch_arm.create
+                   ~annotations:(Switch_arm.annotations arm)
                    action))
           (Switch_expr.arms switch)
       in
