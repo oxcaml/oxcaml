@@ -20,13 +20,23 @@ val i : 'a @ [< 'm] -> 'a @ [> 'm] = <fun>
 
 (* Constant bounds are allowed in let binding annotations *)
 
+(* CR ageorges: The following two examples have bad principal types. When looking at their
+   underlying graphs, this is due to an ill-leveled mode graph, which can result in
+   bad zapping for printing.
+
+   The ill-leveled graph is due to to a bug in the typing of let: In principal mode, the
+   typing of let stores a type which has a generalized structure into the environment
+   The type is then instantiated, inference continues, and finally the copy is fully
+   generalized. However, this does not yield the same modes as generalizing the original
+   type in the environment, and leads to an ill-leveled exposed mode graph. *)
+
 let j : 'a @ [< 'm & portable] -> 'a @ [> 'm] = fun x -> x
 [%%expect{|
 val j : 'a @ [< 'm & portable] -> 'a @ [> 'm] = <fun>
 |}, Principal{|
 val j :
-  'a @ [< 'm & portable] ->
-  'a @ [> 'm | local once unforkable yielding stateful] = <fun>
+  'a @ [< 'm & global many portable forkable unyielding stateless] ->
+  'a @ [> 'm | nonportable stateful] = <fun>
 |}]
 
 (* Combined bounds are allowed in let binding annotations *)
@@ -34,6 +44,11 @@ val j :
 let k : 'a @ [< 'n > 'm] -> 'a @ [< 'm > 'n] = fun x -> x
 [%%expect{|
 val k : 'a @ [< 'n > 'm] -> 'a @ [< 'm > 'n] = <fun>
+|}, Principal{|
+val k :
+  'a @ [< global many uncontended forkable unyielding read_write > aliased nonportable stateful dynamic] ->
+  'a @ [< global many uncontended forkable unyielding read_write > aliased nonportable stateful dynamic] =
+  <fun>
 |}]
 
 (* Invalid: mode variables are only allowed on function types *)
