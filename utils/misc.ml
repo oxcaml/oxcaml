@@ -2256,7 +2256,7 @@ module Sexp = struct
   let fmt format = Format.kdprintf (fun f -> Fmt f) format
 
   let spacer ppf first =
-    if first then () else Format.pp_print_space ppf ()
+    if !first then first := false else Format.pp_print_space ppf ()
 
   let print_field ~first ppf field =
     match field with
@@ -2283,10 +2283,7 @@ module Sexp = struct
     let[@local] default () =
       let first = ref true in
       Format.fprintf ppf "@[<hov 1>(";
-      List.iter (fun field ->
-          print_field ~first:!first ppf field;
-          first := false
-        ) l;
+      List.iter (print_field ~first ppf) l;
       Format.fprintf ppf ")@]"
     in
     match l with
@@ -2295,7 +2292,7 @@ module Sexp = struct
         | (String _ | Bool _ | Int _ | Float _ | Print _) ->
           (* avoid double parenthesis when there is a single field
              (except for Fmt fields which don't have parentheses) *)
-           print_field ~first:true ppf field
+           print_field ~first:(ref true) ppf field
           | (Fmt _| Option _) ->
            default ()
         end
