@@ -2708,11 +2708,11 @@ let build_renaming_subst idmap =
 let rename idmap lam = (build_renaming_subst idmap).subst_lambda lam
 let rename_lfun idmap lfun = (build_renaming_subst idmap).subst_lfunction lfun
 
-let duplicate_function =
+let duplicate_function ?(rename = Ident.Map.empty) lfun =
   (build_substs
      (fun _ _ env -> env)
      ~freshen_bound_variables:true
-     Ident.Map.empty).subst_lfunction
+     (Ident.Map.map (fun id -> Lvar id) rename)).subst_lfunction lfun
 
 let map_lfunction f ({ kind; params; return; body = old_body; attr; loc;
                       mode; ret_mode; yielding } as lfunction) =
