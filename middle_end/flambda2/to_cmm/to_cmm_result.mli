@@ -63,6 +63,13 @@ val add_function : t -> Cmm.fundecl -> t
     of whether the module block symbol for the current unit has been defined. *)
 val check_for_module_symbol : t -> Symbol.t -> t
 
+(** Redirect every reference to the given symbol of the current unit to the
+    runtime's permanent atom of the given tag. Used for zero-sized statics. *)
+val redirect_symbol_to_atom : t -> Symbol.t -> tag:int -> t
+
+(** Whether the given symbol may be referenced from outside the unit. *)
+val symbol_is_exported : t -> Symbol.t -> bool
+
 (** Caching of symbols associated with [Invalid] messages. *)
 val add_invalid_message_symbol : t -> Symbol.t -> message:string -> t
 
