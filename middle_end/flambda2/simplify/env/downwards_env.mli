@@ -195,6 +195,9 @@ end
 
 val disable_inlining : t -> Disable_inlining.t
 
+(** Whether a speculative inlining is in progress. *)
+val in_speculative_inlining : t -> bool
+
 val disable_partial_application_stub_generation : t -> bool
 
 val enter_set_of_closures : t -> t

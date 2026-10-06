@@ -1430,6 +1430,12 @@ let mk_dcode_sizes f =
     " Write a CSV file of code size estimates for each function\n\
     \     alongside each compilation unit (Flambda 2 only)" )
 
+let mk_dinlining_stats f =
+  ( "-dinlining-stats",
+    Arg.Unit f,
+    " Print counts and sums describing the inlining decisions taken for\n\
+    \     each compilation unit, on standard output (Flambda 2 only)" )
+
 let mk_dfexpr_after f =
   let passes = [ "simplify"; "reaper" ] in
   ( "-dfexpr-after",
@@ -1793,6 +1799,7 @@ module type Oxcaml_options = sig
   val dfexpr_annot_after : string -> unit
   val flambda2_code_size_model : string -> unit
   val dcode_sizes : unit -> unit
+  val dinlining_stats : unit -> unit
   val dslot_offsets : unit -> unit
   val dfreshen : unit -> unit
   val dflow : unit -> unit
@@ -2077,6 +2084,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_dfexpr_annot_after F.dfexpr_annot_after;
       mk_flambda2_code_size_model F.flambda2_code_size_model;
       mk_dcode_sizes F.dcode_sizes;
+      mk_dinlining_stats F.dinlining_stats;
       mk_dslot_offsets F.dslot_offsets;
       mk_dfreshen F.dfreshen;
       mk_dflow F.dflow;
@@ -2752,6 +2760,7 @@ module Oxcaml_options_impl = struct
       | _ -> Misc.fatal_errorf "Unknown code size model %s" model
 
   let dcode_sizes () = Flambda2.Dump.code_sizes := true
+  let dinlining_stats () = Flambda2.Dump.inlining_stats := true
   let dslot_offsets = set' Flambda2.Dump.slot_offsets
   let dfreshen = set' Flambda2.Dump.freshen
   let dflow = set' Flambda2.Dump.flow
@@ -3130,6 +3139,9 @@ module Extra_params = struct
         true
     | "dcode-sizes" ->
         Flambda2.Dump.code_sizes := Compenv.check_bool ppf name v;
+        true
+    | "dinlining-stats" ->
+        Flambda2.Dump.inlining_stats := Compenv.check_bool ppf name v;
         true
     | "flambda2-expert-cont-lifting-budget" ->
         (match Compenv.check_int ppf name v with

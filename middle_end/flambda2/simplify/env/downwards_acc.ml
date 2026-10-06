@@ -162,6 +162,11 @@ let enter_speculative_region t ~budget =
     then Float.infinity
     else max_credit *. budget
   in
+  if Inlining_stats.enabled ()
+  then
+    Inlining_stats.record_budget_opened
+      ~in_region:(not (DE.in_speculative_inlining t.denv))
+      ~budget;
   with_speculative_inlining_budget t
     (Remaining { remaining = budget; pending_credit = 0.; creditable })
 
@@ -225,6 +230,23 @@ let charge_speculative_inlining_budget t cost_metrics =
               creditable
             }
     in
+    (if Inlining_stats.enabled ()
+     then
+       let credit_granted, credit_capped, credit_used =
+         if Float.compare charge 0. < 0
+         then
+           let credit = Float.min (-.charge) creditable in
+           credit, -.charge -. credit, 0.
+         else 0., 0., Float.min charge pending_credit
+       in
+       Inlining_stats.record_budget_charge
+         ~in_region:(not (DE.in_speculative_inlining t.denv))
+         ~charge:(Float.max charge 0.) ~credit_granted ~credit_capped
+         ~credit_used
+         ~exhausted:
+           (match speculative_inlining_budget with
+           | Exhausted -> true
+           | Not_in_speculative_region | Remaining _ -> false));
     { t with speculative_inlining_budget }
 
 let with_continuation_uses_env t ~cont_uses_env =

@@ -237,6 +237,7 @@ module Flambda2 : sig
     val simplify : bool ref
     val reaper : bool ref
     val code_sizes : bool ref
+    val inlining_stats : bool ref
   end
 
   (** In the result types of functors, keep the types of variables that are only

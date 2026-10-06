@@ -283,6 +283,11 @@ let get_continuation_scope t = TE.current_scope t.typing_env
 
 let disable_inlining t = t.disable_inlining
 
+let in_speculative_inlining t =
+  match t.disable_inlining with
+  | Disable_inlining (Speculative_inlining _) -> true
+  | Disable_inlining Stub | Do_not_disable_inlining -> false
+
 let disable_partial_application_stub_generation t =
   t.disable_partial_application_stub_generation
 

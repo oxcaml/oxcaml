@@ -558,6 +558,12 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
       ~code_metadata:(Code.code_metadata code) ~pass:After_simplify
       ~are_rebuilding_terms:(DA.are_rebuilding_terms dacc_after_body)
       decision;
+    if Inlining_stats.enabled ()
+    then
+      Inlining_stats.record_function_definition ~pass:Simplify
+        ~in_speculation:
+          (Downwards_env.in_speculative_inlining (DA.denv dacc_after_body))
+        ~code_metadata:(Code.code_metadata code) decision;
     decision
   in
   let is_a_functor = Code.is_a_functor code in

@@ -25,3 +25,39 @@ val dump :
   machine_width:Target_system.Machine_width.t ->
   Flambda_unit.t ->
   unit
+
+(** A traversal of Flambda terms that visits each construct once; code bound in
+    [Static_consts] is not entered (see [collect_code]). *)
+type visitor =
+  { named : Flambda.Named.t -> unit;
+    let_cont : Continuation.t -> Flambda.Continuation_handler.t -> unit;
+    apply : Apply_expr.t -> unit;
+    apply_cont : Apply_cont_expr.t -> unit;
+    switch : Switch_expr.t -> unit;
+    invalid : unit -> unit
+  }
+
+val iter_expr : visitor -> Flambda.Expr.t -> unit
+
+val iter_function_body :
+  Code.t ->
+  f:
+    (return_continuation:Continuation.t ->
+    exn_continuation:Continuation.t ->
+    Flambda.Expr.t ->
+    'a) ->
+  'a
+
+(** All pieces of code in the unit, including any bound inside function bodies.
+*)
+val collect_code : Flambda_unit.t -> Code.t Code_id.Map.t
+
+(** The size of a function body (or of the module initialiser) in the v1 and v2
+    models; see the comment in the implementation. *)
+val measure :
+  machine_width:Target_system.Machine_width.t ->
+  function_slot_size:(Code_id.t -> int) ->
+  return_continuation:Continuation.t ->
+  exn_continuation:Continuation.t ->
+  Flambda.Expr.t ->
+  int * Code_size_v2.t

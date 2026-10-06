@@ -130,6 +130,10 @@ val dump_fexpr_annot_after : unit -> string list
     each compilation unit (see [Code_size_report]). *)
 val dump_code_sizes : unit -> bool
 
+(** Whether to print counts and sums describing the inlining decisions of each
+    compilation unit (see [Inlining_stats]). *)
+val dump_inlining_stats : unit -> bool
+
 (** Which model is used to estimate the code size of Flambda terms. *)
 type code_size_model = Oxcaml_flags.Flambda2.code_size_model =
   | V1

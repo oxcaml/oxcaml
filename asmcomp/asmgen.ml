@@ -520,6 +520,52 @@ let compile_via_linear ~ppf_dump ~funcnames fd_cmm cfg_with_layout =
   | true -> fd)
   ++ Profile.record ~accumulate:true "emit_fundecl" emit_fundecl
 
+(* For [-dinlining-stats]: a structural hash of each function after
+   instruction selection, so that the number of functions of the unit that
+   are (probably) copies of one another can be reported. The hash ignores
+   labels, function names, constants and symbols (see [Cfg_quick_hash]), so
+   this is an estimate. Keyed by hash: number of functions, instructions. *)
+let cfg_hashes_for_inlining_stats : (int, int * int) Hashtbl.t =
+  Hashtbl.create 64
+
+let record_cfg_hash_for_inlining_stats cfg_with_layout =
+  let cfg = Cfg_with_layout.cfg cfg_with_layout in
+  let hash = ref 0 in
+  let instructions = ref 0 in
+  Cfg.iter_blocks_dfs cfg ~f:(fun _label block ->
+      hash := (!hash * 65599) + Cfg_quick_hash.basic_block block;
+      instructions := !instructions + Doubly_linked_list.length block.body + 1);
+  let count, total =
+    Option.value
+      (Hashtbl.find_opt cfg_hashes_for_inlining_stats !hash)
+      ~default:(0, 0)
+  in
+  Hashtbl.replace cfg_hashes_for_inlining_stats !hash
+    (count + 1, total + !instructions)
+
+let print_inlining_stats () =
+  let module Stats = Flambda2_ui.Inlining_stats_table in
+  Hashtbl.iter
+    (fun _hash (count, instructions) ->
+      Stats.incr "code.cfg.hash_groups";
+      Stats.add "code.cfg.functions" count;
+      Stats.add "code.cfg.instructions" instructions;
+      Stats.set_max "code.cfg.max_identical" count;
+      if count > 1
+      then (
+        Stats.incr "code.cfg.hash_groups_with_copies";
+        Stats.add "code.cfg.identical_functions" count;
+        Stats.add "code.cfg.extra_identical_functions" (count - 1);
+        (* All copies have the same number of instructions. *)
+        Stats.add "code.cfg.extra_identical_instructions"
+          (instructions / count * (count - 1))))
+    cfg_hashes_for_inlining_stats;
+  Hashtbl.reset cfg_hashes_for_inlining_stats;
+  let unit_name =
+    Compilation_unit.full_path_as_string (Current_unit.get_cu_exn ())
+  in
+  Stats.print_and_reset Format.std_formatter ~unit_name
+
 let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
   let module Cfg_selection = Cfg_selectgen.Make (Cfg_selection) in
   Reg.clear_relocatable_regs ();
@@ -530,6 +576,8 @@ let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
   ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After selection")
   ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)
   ++ Profile.record ~accumulate:true "cfg" (fun cfg_with_layout ->
+      if Flambda2_ui.Inlining_stats_table.enabled ()
+      then record_cfg_hash_for_inlining_stats cfg_with_layout;
       if !Clflags.llvm_backend
       then compile_via_llvm ~ppf_dump ~funcnames cfg_with_layout
       else compile_via_linear ~ppf_dump ~funcnames fd_cmm cfg_with_layout)
@@ -695,7 +743,8 @@ let end_gen_implementation unix ?toplevel ~ppf_dump ~sourcefile make_cmm =
             then None
             else Some (Cmm.global_symbol (Primitive.native_name prim)))
           !Translmod.primitive_declarations));
-  emit_end_assembly ~sourcefile ()
+  emit_end_assembly ~sourcefile ();
+  if Flambda2_ui.Inlining_stats_table.enabled () then print_inlining_stats ()
 
 type direct_to_cmm =
   ppf_dump:Format.formatter ->

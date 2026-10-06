@@ -362,6 +362,10 @@ module Inlining = struct
     | None | Some (Unknown _) ->
       Inlining_report.record_decision_at_call_site_for_unknown_function ~tracker
         ~apply ~pass:After_closure_conversion ();
+      if Inlining_stats.enabled ()
+      then
+        Inlining_stats.record_unknown_callee ~pass:Closure_conversion
+          ~in_speculation:false apply;
       Not_inlinable
     | Some (Value_symbol _)
     | Some (Value_const _)
@@ -382,6 +386,14 @@ module Inlining = struct
           ~remaining_speculative_inlining_budget:None
           ~callee:(Inlining_history.Absolute.empty compilation_unit)
           ~are_rebuilding_terms Definition_says_not_to_inline;
+        if Inlining_stats.enabled ()
+        then
+          Inlining_stats.record_call_site_decision ~pass:Closure_conversion
+            ~in_speculation:false
+            ~is_a_functor:(Code_metadata.is_a_functor metadata)
+            ~callee_size:
+              (Cost_metrics.size (Code_metadata.cost_metrics metadata))
+            ~apply Definition_says_not_to_inline;
         Not_inlinable)
       else
         (* These calculations are all in terms of non-unarized parameters. *)
@@ -420,6 +432,14 @@ module Inlining = struct
           ~remaining_speculative_inlining_budget:None
           ~callee:(Code.absolute_history code)
           ~are_rebuilding_terms decision;
+        if Inlining_stats.enabled ()
+        then
+          Inlining_stats.record_call_site_decision ~pass:Closure_conversion
+            ~in_speculation:false
+            ~is_a_functor:(Code_metadata.is_a_functor metadata)
+            ~callee_size:
+              (Cost_metrics.size (Code_metadata.cost_metrics metadata))
+            ~apply decision;
         res
 
   let make_inlined_body acc ~callee ~called_code_id ~region_inlined_into ~params
@@ -2584,6 +2604,12 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
         ~pass:After_closure_conversion
         ~are_rebuilding_terms:Are_rebuilding_terms.are_rebuilding
         inlining_decision;
+      if Inlining_stats.enabled ()
+      then
+        Inlining_stats.record_function_definition ~pass:Closure_conversion
+          ~in_speculation:false
+          ~code_metadata:(Code_or_metadata.code_metadata meta)
+          inlining_decision;
       if Function_decl_inlining_decision_type.must_be_inlined inlining_decision
       then code
       else meta)
@@ -3018,6 +3044,12 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
         ~pass:After_closure_conversion
         ~are_rebuilding_terms:Are_rebuilding_terms.are_rebuilding
         inlining_decision;
+      if Inlining_stats.enabled ()
+      then
+        Inlining_stats.record_function_definition ~pass:Closure_conversion
+          ~in_speculation:false
+          ~code_metadata:(Code_or_metadata.code_metadata meta)
+          inlining_decision;
       if Function_decl_inlining_decision_type.must_be_inlined inlining_decision
       then code
       else meta)

@@ -228,6 +228,7 @@ module type Oxcaml_options = sig
   val dfexpr_annot_after : string -> unit
   val flambda2_code_size_model : string -> unit
   val dcode_sizes : unit -> unit
+  val dinlining_stats : unit -> unit
   val dslot_offsets : unit -> unit
   val dfreshen : unit -> unit
   val dflow : unit -> unit

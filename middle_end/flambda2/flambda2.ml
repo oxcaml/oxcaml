@@ -243,6 +243,8 @@ let flambda_to_flambda0 : type m.
       Compiler_hooks.execute Reaped_flambda2 flambda;
       flambda, exported_offsets, reachable_names, cmx, all_code
   in
+  if Flambda_features.dump_inlining_stats ()
+  then Inlining_stats.record_final_unit ~machine_width flambda;
   (match cmx with
   | None ->
     () (* Either opaque was passed, or there is no need to export offsets *)

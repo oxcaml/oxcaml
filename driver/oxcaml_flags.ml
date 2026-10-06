@@ -315,6 +315,8 @@ module Flambda2 = struct
     let simplify = ref false
     let reaper = ref false
     let code_sizes = ref false (* -dcode-sizes *)
+
+    let inlining_stats = ref false (* -dinlining-stats *)
   end
 
   let functor_result_types_through_value_slots = ref false

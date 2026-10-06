@@ -49,8 +49,8 @@ type speculative_inlining_result =
         cost_metrics_of_lifted_constants : Cost_metrics.t
       }
 
-let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
-    ~budget =
+let speculative_inlining0 dacc ~apply ~function_type ~simplify_expr
+    ~return_arity ~budget =
   let dacc = DA.prepare_for_speculative_inlining dacc in
   let dacc =
     if Flambda_features.Inlining.speculative_inlining_budget ()
@@ -181,6 +181,19 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
             cost_metrics_of_lifted_constants;
         cost_metrics_of_lifted_constants
       }
+
+let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
+    ~budget =
+  if Inlining_stats.enabled ()
+  then
+    Inlining_stats.time_speculation
+      ~outermost:(not (DE.in_speculative_inlining (DA.denv dacc)))
+      (fun () ->
+        speculative_inlining0 dacc ~apply ~function_type ~simplify_expr
+          ~return_arity ~budget)
+  else
+    speculative_inlining0 dacc ~apply ~function_type ~simplify_expr
+      ~return_arity ~budget
 
 type argument_types_useful =
   | Coarse

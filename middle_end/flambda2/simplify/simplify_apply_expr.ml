@@ -290,6 +290,15 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
              then DA.remaining_speculative_inlining_budget dacc
              else None)
           ~apply decision;
+      if Inlining_stats.enabled ()
+      then
+        Inlining_stats.record_call_site_decision ~pass:Simplify
+          ~in_speculation:(DE.in_speculative_inlining (DA.denv dacc))
+          ~is_a_functor:(Code_metadata.is_a_functor callee's_code_metadata)
+          ~callee_size:
+            (Cost_metrics.size
+               (Code_metadata.cost_metrics callee's_code_metadata))
+          ~apply decision;
       match Call_site_inlining_decision_type.can_inline decision with
       | Do_not_inline { erase_attribute_if_ignored } ->
         Do_not_inline
@@ -978,6 +987,11 @@ let simplify_function_call_where_callee's_type_unavailable dacc apply
       ~pass:Inlining_report.Pass.Before_simplify
       ~tracker:(DE.inlining_history_tracker denv)
       ~apply ();
+  if Inlining_stats.enabled ()
+  then
+    Inlining_stats.record_unknown_callee ~pass:Simplify
+      ~in_speculation:(DE.in_speculative_inlining denv)
+      apply;
   let env_at_use = denv in
   let dacc, use_id =
     match Apply.continuation apply with
