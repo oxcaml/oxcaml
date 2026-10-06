@@ -290,8 +290,7 @@ let reg_tmp1_base = R.reg_x 16
 
 let reg_x_tmp1 = H.reg_x reg_tmp1
 
-(* Second scratch, used only by [emit_stack_probes]; like x16 it is a reserved
-   veneer temporary, never allocatable. *)
+(* Second scratch, used only by [emit_stack_probes] *)
 let reg_tmp2 = phys_reg Int X17
 
 let reg_x_tmp2 = H.reg_x reg_tmp2
@@ -1252,11 +1251,11 @@ let assembly_code_for_stack_check0 ~far ~max_frame_size_bytes =
   sc_label, sc_return
 
 (* When stack checks are disabled, probe the prospective stack frame at
-   [Domainstate.stack_guard_size]-byte strides so that a frame big enough to
+   [Domainstate.stack_guard_stride]-byte strides so that a frame big enough to
    step over the stack's guard page faults. Each probe loads (and discards) into
    x16, a reserved temporary. *)
 let emit_stack_probes ~max_frame_size_bytes =
-  let stride = Domainstate.stack_guard_size in
+  let stride = Domainstate.stack_guard_stride in
   assert (stride > 0 && max_frame_size_bytes >= stride);
   let full_pages = max_frame_size_bytes / stride in
   let probe_at offset =

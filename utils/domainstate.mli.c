@@ -16,9 +16,9 @@
 
 val stack_ctx_words : int
 
-(* Size in bytes of the guard page below each stack when stack checks are
-   disabled (zero otherwise); see runtime/caml/config.h. *)
-val stack_guard_size : int
+(* Minimum size in bytes of the guard page below each stack when stack checks
+   are disabled (zero otherwise); see runtime/caml/config.h. *)
+val stack_guard_stride : int
 
 type t =
 #define DOMAIN_STATE(type, name) | Domain_##name
