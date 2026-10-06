@@ -149,7 +149,7 @@ module List = struct
 
     let hash t = Hashtbl.hash (List.map hash t)
 
-    let [@ocamlformat "disable"] print ppf t =
+    let print ppf t =
       (Format.pp_print_list print ~pp_sep:Format.pp_print_space) ppf t
   end)
 
@@ -204,21 +204,23 @@ module With_debuginfo = struct
   include Container_types.Make (struct
     type nonrec t = t
 
-    let compare (s1, k1) (s2, k2) =
+    let compare (s1, dbg1) (s2, dbg2) =
       let c = compare s1 s2 in
-      if c <> 0 then c else Debuginfo.compare k1 k2
+      if c <> 0 then c else Debuginfo.compare dbg1 dbg2
 
     let equal t1 t2 = compare t1 t2 = 0
 
     let hash = Hashtbl.hash
 
-    let print ppf (s, k) =
-      if Debuginfo.is_none k
-      then print ppf s
+    let print ppf (simple, dbg) =
+      let open! Misc.Sexp in
+      if Debuginfo.is_none dbg
+      then Int_ids.Simple.print ppf simple
       else
-        Format.fprintf ppf "@[<hov 1>(%a@ %t%a%t)@]" print s
-          Flambda_colours.debuginfo Debuginfo.print_compact k
-          Flambda_colours.pop
+        print ppf
+          [ fmt "%a" Int_ids.Simple.print simple;
+            fmt ~colour:Flambda_colours.debuginfo "%a" Debuginfo.print_compact
+              dbg ]
   end)
 
   let create simple dbg = simple, dbg

@@ -339,15 +339,16 @@ type t =
 
 let print ppf
     { canonical_elements; aliases_of_canonical_names; aliases_of_consts } =
-  let print_element_and_coercion ppf (elt, coercion) =
-    Format.fprintf ppf "@[<hov 1>(%a@ @[<hov 1>%t(coercion@ %a)%t@])@]"
-      Simple.print elt
-      (if Coercion.is_id coercion
-       then Flambda_colours.elide
-       else Flambda_colours.none)
-      Coercion.print coercion Flambda_colours.pop
-  in
   let open! Misc.Sexp in
+  let print_element_and_coercion ppf (elt, coercion) =
+    print ppf
+      [ fmt "%a" Simple.print elt;
+        a "coercion" coercion Coercion.print
+          ~colour:
+            (if Coercion.is_id coercion
+             then Flambda_colours.elide
+             else Flambda_colours.none) ]
+  in
   print ppf
     [ a "canonical_elements" canonical_elements
         (Name.Map.print print_element_and_coercion);

@@ -311,14 +311,14 @@ module Symbol_data = struct
 
   let flags = symbol_flags
 
-  let [@ocamlformat "disable"] print ppf symbol =
+  let print ppf symbol =
     let compilation_unit = Symbol0.compilation_unit symbol in
     let linkage_name = Symbol0.linkage_name symbol in
     let open! Misc.Sexp in
-    print ppf [
-      a "compilation_unit" compilation_unit (Format_doc.compat Compilation_unit.print_debug);
-      a "linkage_name" linkage_name Linkage_name.print;
-    ]
+    print ppf
+      [ a "compilation_unit" compilation_unit
+          (Format_doc.compat Compilation_unit.print_debug);
+        a "linkage_name" linkage_name Linkage_name.print ]
 end
 
 module Code_id_data = struct
@@ -696,11 +696,9 @@ module Simple_data = struct
 
   let flags = simple_flags
 
-  let [@ocamlformat "disable"] print ppf { simple = _; coercion; } =
+  let print ppf { simple = _; coercion } =
     let open! Misc.Sexp in
-    print ppf [
-      a "coercion" coercion Coercion.print
-    ]
+    print ppf [a "coercion" coercion Coercion.print]
 
   let hash { simple; coercion } =
     Hashtbl.hash (Id.hash simple, Coercion.hash coercion)
@@ -786,17 +784,18 @@ module Simple = struct
     let hash = Id.hash
 
     let print ppf t =
-      let print ppf t =
+      let print_aux ppf t =
         pattern_match t
           ~name:(fun name ~coercion:_ -> Name.print ppf name)
           ~const:(fun cst -> Const.print ppf cst)
       in
       let coercion = coercion t in
       if Coercion.is_id coercion
-      then print ppf t
+      then print_aux ppf t
       else
-        Format.fprintf ppf "@[<hov 1>(coerce@ %a@ %a)@]" print t Coercion.print
-          coercion
+        let open! Misc.Sexp in
+        print ppf
+          [fmt "coerce"; fmt "%a" print_aux t; fmt "%a" Coercion.print coercion]
   end
 
   include T0
@@ -985,11 +984,10 @@ module Code_id_or_symbol = struct
     let hash = Id.hash
 
     let print ppf t =
+      let open! Misc.Sexp in
       pattern_match t
-        ~code_id:(fun code_id ->
-          Format.fprintf ppf "@[<hov 1>(code_id@ %a)@]" Code_id.print code_id)
-        ~symbol:(fun symbol ->
-          Format.fprintf ppf "@[<hov 1>(symbol@ %a)@]" Symbol.print symbol)
+        ~code_id:(fun code_id -> print ppf [a "code_id" code_id Code_id.print])
+        ~symbol:(fun symbol -> print ppf [a "symbol" symbol Symbol.print])
   end
 
   include T0
@@ -1043,13 +1041,11 @@ module Code_id_or_name = struct
     let hash = Id.hash
 
     let print ppf t =
+      let open! Misc.Sexp in
       pattern_match t
-        ~code_id:(fun code_id ->
-          Format.fprintf ppf "@[<hov 1>(code_id@ %a)@]" Code_id.print code_id)
-        ~symbol:(fun symbol ->
-          Format.fprintf ppf "@[<hov 1>(symbol@ %a)@]" Symbol.print symbol)
-        ~var:(fun var ->
-          Format.fprintf ppf "@[<hov 1>(var@ %a)@]" Variable.print var)
+        ~code_id:(fun code_id -> print ppf [a "code_id" code_id Code_id.print])
+        ~symbol:(fun symbol -> print ppf [a "symbol" symbol Symbol.print])
+        ~var:(fun var -> print ppf [a "var" var Variable.print])
   end
 
   include T0
