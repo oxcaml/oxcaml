@@ -3706,15 +3706,39 @@ let normalize_decl_jkinds env decls =
 let add_types_to_env ~shapes decls env =
   match shapes with
   | None ->
+<<<<<<< Merlin:aobrien/spooky-fold-right-in-constructor-label-disambiguation
     List.fold_right
       (fun (id, decl) env ->
         add_type ~long_path:false ~check:true id decl env)
       decls env
+||||||| Compiler:last-imported
+    List.fold_right
+      (fun (id, decl) env ->
+        add_type ~check:true id decl env)
+      decls env
+=======
+    List.fold_left
+      (fun env (id, decl) ->
+        add_type ~check:true id decl env)
+      env decls
+>>>>>>> Compiler:HEAD
   | Some shapes ->
+<<<<<<< Merlin:aobrien/spooky-fold-right-in-constructor-label-disambiguation
     List.fold_right2
     (fun (id, decl) shape env ->
       add_type ~long_path:false ~check:true ~shape id decl env)
     decls shapes env
+||||||| Compiler:last-imported
+    List.fold_right2
+    (fun (id, decl) shape env ->
+      add_type ~check:true ~shape id decl env)
+    decls shapes env
+=======
+    List.fold_left2
+    (fun env (id, decl) shape ->
+      add_type ~check:true ~shape id decl env)
+    env decls shapes
+>>>>>>> Compiler:HEAD
 
 (* Translate a set of type declarations, mutually recursive or not *)
 let transl_type_decl env rec_flag sdecl_list =
