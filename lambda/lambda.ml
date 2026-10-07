@@ -2706,7 +2706,6 @@ let build_renaming_subst idmap =
   build_substs update_env s
 
 let rename idmap lam = (build_renaming_subst idmap).subst_lambda lam
-let rename_lfun idmap lfun = (build_renaming_subst idmap).subst_lfunction lfun
 
 let duplicate_function ?(rename = Ident.Map.empty) lfun =
   (build_substs
