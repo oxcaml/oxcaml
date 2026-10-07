@@ -209,7 +209,8 @@ Line 1, characters 0-39:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation
          immutable_data,
-       because key is not mod forkable unyielding many stateless immutable.
+       because key is not mod forkable unyielding many stateless immutable
+                 noalloc_strict.
 |}]
 
 type bad : immutable_data = A of { x : key }
@@ -219,7 +220,8 @@ Line 1, characters 0-44:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation
          immutable_data,
-       because key is not mod forkable unyielding many stateless immutable.
+       because key is not mod forkable unyielding many stateless immutable
+                 noalloc_strict.
 |}]
 
 (* Refining a generic field to void preserves mutability. *)
