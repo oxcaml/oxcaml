@@ -157,6 +157,11 @@ module Stdlib = struct
       in
       loop []
 
+    let rec split3 = function
+      | [] -> ([], [], [])
+      | (x,y,z)::l ->
+        let (rx, ry, rz) = split3 l in (x::rx, y::ry, z::rz)
+
     let concat_map2 f l1 l2 =
       let rec aux f acc = function
         | [], [] -> rev acc

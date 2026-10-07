@@ -408,6 +408,11 @@ let rec fracture_lam lambda : slambda =
       let kind =
         match kind with
         | Tupled ->
+          (* We check for [all_components_are_values] in
+             [transl_tupled_function], but can still hit this case with other
+             polymorphism (e.g. in the return only). *)
+          (* CR layouts-mixed-tuplify: once we have mixed tupled functions, we
+             will hit this more. Regardless, it should be supported! *)
           Misc.fatal_errorf
             "Slambda does not currently support poly tupled functions"
         | Curried { nlocal } ->
@@ -778,7 +783,7 @@ and fracture_prim lambda prim args loc =
   | Preinterpret_tagged_int63_as_unboxed_int64 | Parray_to_iarray
   | Parray_of_iarray | Pget_header _ | Ppeek _ | Ppoke _ | Pdls_get | Ptls_get
   | Pdomain_index | Ppoll | Pcpu_relax | Pget_idx _ | Pset_idx _ | Pget_ptr _
-  | Pset_ptr _ | Pget_ext_ptr _ | Pset_ext_ptr _ ->
+  | Pset_ptr _ | Pget_ext_ptr _ | Pset_ext_ptr _ | Pbox _ | Punbox _ ->
     let fargs = fracture_dynamic_list args in
     SLhalves
       { sval_comptime = SLmissing;

@@ -153,8 +153,8 @@ module Layout = struct
       | Base b -> Static.of_base b sa
       | Product consts ->
         product (List.map (fun s -> of_sort_const s sa) consts)
-      | Univar uv -> univar uv
-      | Genvar v -> genvar v
+      | Univar uv -> univar uv sa
+      | Genvar v -> genvar v sa
       | Addressable s -> addressable (of_sort_const s sa)
 
     let rec equal_up_to_root_scannable_axes c1 c2 =
@@ -162,12 +162,12 @@ module Layout = struct
       | Base (b1, _), Base (b2, _) -> Sort.equal_base b1 b2
       | Any _, Any _ -> true
       | Product cs1, Product cs2 -> List.equal equal cs1 cs2
-      | Univar uv1, Univar uv2 ->
+      | Univar (uv1, _), Univar (uv2, _) ->
         (* [equal_up_to_root_scannable_axes] is only used to choose which
            abbreviation to use for printing, so physical equality suffices here.
            [Sort.equal_univar_univar] is not available from this module. *)
         uv1 == uv2
-      | Genvar v1, Genvar v2 -> v1 == v2
+      | Genvar (v1, _), Genvar (v2, _) -> v1 == v2
       | Addressable c1, Addressable c2 -> equal_up_to_root_scannable_axes c1 c2
       | Box (l1, _), Box (l2, _) -> equal l1 l2
       | ( ( Base _ | Any _ | Product _ | Univar _ | Genvar _ | Addressable _
@@ -231,9 +231,12 @@ module Layout = struct
             [ (if nested then "(" else "");
               String.concat " & " (List.map (to_string true) ts);
               (if nested then ")" else "") ]
-        | Univar { name = Some n } -> n
-        | Univar { name = None } -> "_"
-        | Genvar v -> Sort.to_string_genvar v
+        | Univar ({ name = n }, sa) ->
+          let name = match n with Some n -> n | None -> "_" in
+          String.concat " " (name :: Scannable_axes.to_string_list sa)
+        | Genvar (v, sa) ->
+          String.concat " "
+            (Sort.to_string_genvar v :: Scannable_axes.to_string_list sa)
         | Addressable t -> to_string true t ^ " addressable"
         | Box (t, sa) ->
           let axes =
@@ -3472,8 +3475,7 @@ module Format_history = struct
     | Statement -> fprintf ppf "it's the type of a statement"
     | Optional_arg_default ->
       fprintf ppf "it's the type of an optional argument default"
-    | Unboxed_tuple_element ->
-      fprintf ppf "it's the type of unboxed tuple element"
+    | Tuple_element -> fprintf ppf "it's the type of a tuple element"
     | Layout_poly_in_external ->
       fprintf ppf
         "it's the layout polymorphic type in an external declaration@ \
@@ -3592,7 +3594,6 @@ module Format_history = struct
       History.value_or_null_creation_reason -> _ = function
     | Primitive id ->
       fprintf ppf "it is the primitive value_or_null type %s" (Ident.name id)
-    | Tuple_element -> fprintf ppf "it's the type of a tuple element"
     | Separability_check ->
       fprintf ppf "the check that a type is definitely not `float`"
     | Polymorphic_variant_field ->
@@ -4704,7 +4705,7 @@ module Debug_printers = struct
     | Statement -> fprintf ppf "Statement"
     | Optional_arg_default -> fprintf ppf "Optional_arg_default"
     | Layout_poly_in_external -> fprintf ppf "Layout_poly_in_external"
-    | Unboxed_tuple_element -> fprintf ppf "Unboxed_tuple_element"
+    | Tuple_element -> fprintf ppf "Tuple_element"
     | Peek_or_poke -> fprintf ppf "Peek_or_poke"
     | Array_element -> fprintf ppf "Array_element"
     | Idx_element -> fprintf ppf "Idx_element"
@@ -4783,7 +4784,6 @@ module Debug_printers = struct
   let value_or_null_creation_reason ppf :
       History.value_or_null_creation_reason -> _ = function
     | Primitive id -> fprintf ppf "Primitive %s" (Ident.unique_name id)
-    | Tuple_element -> fprintf ppf "Tuple_element"
     | Separability_check -> fprintf ppf "Separability_check"
     | Polymorphic_variant_field -> fprintf ppf "Polymorphic_variant_field"
     | V1_safety_check -> fprintf ppf "V1_safety_check"

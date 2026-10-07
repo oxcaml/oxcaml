@@ -261,7 +261,7 @@ let[@tail_mod_cons] rec effects f = function
                                            value<
                                             (consts (0))
                                              (non_consts ([0: ?, *]))>]))>)
-             (apply f (field_imm 0 *match*))
+             (apply f (mixedfield 0  (?,?) *match*))
              (let
                (block =
                   (makemutable 0 (?,value<
@@ -270,7 +270,7 @@ let[@tail_mod_cons] rec effects f = function
                                                     value<
                                                      (consts (0))
                                                       (non_consts ([0: ?, *]))>]))>)
-                    (apply f (field_imm 1 *match*)) 24029))
+                    (apply f (mixedfield 1  (?,?) *match*)) 24029))
                (seq (apply effects_dps block 1 f (field_imm 1 param)) block))))
          0))
     effects_dps
@@ -285,8 +285,8 @@ let[@tail_mod_cons] rec effects f = function
         (if param
           (let
             (*match* =a? (field_imm 0 param)
-             block0_arg0 =? (apply f (field_imm 0 *match*))
-             block1_arg0 =? (apply f (field_imm 1 *match*))
+             block0_arg0 =? (apply f (mixedfield 0  (?,?) *match*))
+             block1_arg0 =? (apply f (mixedfield 1  (?,?) *match*))
              block =
                (makemutable 0 (?,value<
                                   (consts (0))

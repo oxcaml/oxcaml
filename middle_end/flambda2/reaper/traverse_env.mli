@@ -49,7 +49,6 @@ val create :
   conts:cont_kind Continuation.Map.t ->
   current_code_id:Code_id.t option ->
   should_preserve_direct_calls:should_preserve_direct_calls ->
-  le_monde_exterieur:Name.t ->
   all_constants:Name.t ->
   function_slots_to_keep:Function_slot.Set.t ->
   value_slots_to_keep:Value_slot.Set.t ->
@@ -72,10 +71,6 @@ val current_code_id : t -> Code_id.t option
     reaper. Set per function body based on the [reaper_preserve_direct_calls]
     flag and whether zero-alloc checking is active. *)
 val should_preserve_direct_calls : t -> should_preserve_direct_calls
-
-(** A distinguished [any_source] symbol representing the external world.
-    Dependencies on this node model side effects. *)
-val le_monde_exterieur : t -> Name.t
 
 (** A distinguished [any_source] symbol to which all compile-time constants are
     mapped. *)

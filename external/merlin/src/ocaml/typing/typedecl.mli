@@ -160,6 +160,7 @@ module Mixed_product_kind : sig
     | Cstr_record
     | Module
     | Block
+    | Tuple
 end
 
 val assert_mixed_product_support :

@@ -200,10 +200,9 @@ Each numeric type has its own library for working with it: `float_u`,
     * `#789n  (* : nativeint_u *)`
 
 * Unboxed numbers can be stored in local variables, passed to functions, returned from
-  functions, and have limited support in records (details below).
+  functions, and have limited support in records and tuples (details below).
 
 * Unboxed numbers may *not* appear...
-   * ... in a tuple (e.g. you cannot have `int32_u * int32_u`)
    * ... as a field of a constructor (e.g. you cannot have `| K of int64_u` or `| K of {
      x : nativeint_u }`)
    * ... as a field of a polymorphic variant constructor (e.g. you cannot have ``[ `K of
@@ -296,8 +295,8 @@ Records who store boxed floats flatly (all-float and float-and-float# records),
 versions.
 
 *Limitations and future plans*:
-* Unboxed products may only be stored in blocks via records (i.e. they are not
-  supported in tuples, polymorphic variants, etc.).
+* Unboxed products may only be stored in blocks via records and tuples (i.e.
+  they are not supported in polymorphic variants, etc.).
   We plan to lift this restriction in the near future.
 * Unboxed record fields may not be mutable.
   We plan to allow mutating unboxed records within boxed records
@@ -515,6 +514,7 @@ Unboxed types can usually be put in structures, though there are some restrictio
 These structures may contain unboxed types:
 
   * Records
+  * Tuples
   * Constructors
   * Modules
 
@@ -522,7 +522,6 @@ Unboxed numbers can't be put in these structures:
 
   * Exceptions
   * Extensible variant constructors
-  * Tuples
 
 There aren't fundamental issues with the structures that lack support. They will
 just take some work to implement.
