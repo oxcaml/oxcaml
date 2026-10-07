@@ -147,6 +147,48 @@ let[@tail_mod_cons] rec map_float_field (local_ r) (local_ x : float) t ~f =
   | [] -> []
   | hd :: tl -> f hd :: map_float_field r r.v tl ~f
 
+(* TMC, local closures (they capture a local value) calling themselves or each
+   other. The closures are allocated outside the region of the function being
+   called, so the region can be closed. Stack space constant. *)
+let map_local_closure t ~f =
+  let local_ offset = (Sys.opaque_identity 0, 0) in
+  let[@tail_mod_cons] rec go t =
+    let p = local_pair () in
+    ignore (Sys.opaque_identity (fst p));
+    match t with
+    | [] -> []
+    | hd :: tl -> f (hd + fst offset) :: go tl
+  in
+  go t [@nontail]
+
+let map_local_closure_mutual t ~f =
+  let local_ offset = (Sys.opaque_identity 0, 0) in
+  let[@tail_mod_cons] rec go t =
+    let p = local_pair () in
+    ignore (Sys.opaque_identity (fst p));
+    match t with
+    | [] -> []
+    | hd :: tl -> f (hd + fst offset) :: go' tl
+  and[@tail_mod_cons] go' t =
+    let p = local_pair () in
+    ignore (Sys.opaque_identity (fst p));
+    match t with
+    | [] -> []
+    | hd :: tl -> f (hd + snd offset) :: go tl
+  in
+  go t [@nontail]
+
+(* TMC, the callee [g] is a local closure allocated in the caller's region.
+   The region must not be closed when calling [g], or [g] (and the [p] it
+   captures) would be freed and overwritten by [_overwrite]. *)
+let[@tail_mod_cons] rec call_local_closure (n : int) =
+  let local_ p = (n, n) in
+  let[@tail_mod_cons] rec g n =
+    let local_ _overwrite = Sys.opaque_identity (100, n) in
+    if n = 0 then [] else fst p :: g (n - 1)
+  in
+  if n = 0 then 0 :: g 1 else 0 :: call_local_closure (n - 1)
+
 let depth () = Printexc.raw_backtrace_length (Printexc.get_callstack 10_000)
 
 (* Tail-recursive, so building the input does not itself grow the stack. *)
@@ -171,8 +213,6 @@ let report name map =
       let constant = List.for_all (fun d -> d = base) rest in
       Printf.printf "%-32s constant stack: %b\n" name constant
 
-
-
 let () =
   report "rev_map" (rev_map []);
   report "rev_map_with_local" (rev_map_with_local []);
@@ -188,19 +228,11 @@ let () =
     map_local_args (1, 2) ~count:0 ~seen:[] t ~f:(fun x -> f x));
   report "map_pass_local" (map_pass_local (0, 0));
   report "map_float_field" (map_float_field { v = 1. } 1.);
+  report "map_local_closure" map_local_closure;
+  report "map_local_closure_mutual" map_local_closure_mutual;
   let results = map_pass_local (0, 0) [1; 2; 3; 4] ~f:Fun.id in
   Printf.printf "map_pass_local results: %s\n"
+    (String.concat " " (List.map string_of_int results));
+  let results = call_local_closure 1 in
+  Printf.printf "call_local_closure results: %s\n"
     (String.concat " " (List.map string_of_int results))
-
-
-
-let[@tail_mod_cons] rec f (n : int) = 
-        let local_ p = (n, n) in 
-        let[@tail_mod_cons] rec g n = 
-                let local_ _overwrite = Sys.opaque_identity (100, n) in 
-                if n = 0 then [] else fst p :: g (n - 1)
-        in
-        if n = 0 then 0 :: g 1 else 0 :: f (n - 1)
-;;
-
-let () = assert (f 1 = [0; 0; 0]);;

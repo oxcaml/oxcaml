@@ -591,13 +591,17 @@ open Choice.Syntax
  * This would result in the recursive call being live with a dangling
  * reference.
  *
- *   It's safe to close the region if every argument to the recursive call is
- *   in one of the following categories:
+ *   It's safe to close the region if every argument to the call, and the calee 
+ *   itself is in one of the following categories:
+ *   - A closure bound by the same [let rec] as the function being transformed
+ *     (a recursive or mutually recursive function)
  *   - A parameter
  *   - A field projection of a parameter that doesn't allocate
  *   - An immediate
  *   - A value at the global mode
  *  Arguments for each:
+ *   - These closures are allocated before entering the function body, so they
+ *     must live longer than the inner region
  *   - Passing a parameter is safe inductively, the parameter must at one
  *     point have originated outside the function, and thus must have a
  *     lifetime bound longer than the function body
@@ -619,6 +623,7 @@ and specialized = {
   dps_id: Ident.t;
   direct_kind: function_kind;
   param_modes: locality_mode list;
+  closure_mode: locality_mode;
 }
 
 let rec is_non_pointer_layout : layout -> bool = function
@@ -677,7 +682,7 @@ let declare_binding ctx (var, def) =
   let param_modes =
     List.map (fun (param : lparam) -> param.mode) lfun.params
   in
-  let cand = { arity; dps_id; direct_kind; param_modes } in
+  let cand = { arity; dps_id; direct_kind; param_modes; closure_mode = lfun.mode } in
   { ctx with specialized = Ident.Map.add var cand ctx.specialized }
 
 let rec choice ctx t =
@@ -833,6 +838,9 @@ let rec choice ctx t =
           assert (Lambda.is_not_alloc_stack apply.ap_mode);
           let safe_to_close_region =
             region_depth = 1 &&
+            (* The callee's closure must not live in the region *)
+            (is_heap_mode specialized.closure_mode
+             || outlives_region ctx (Lvar f)) &&
             (* Arguments passed at mode global cannot point into the region *)
             List.for_all2 (fun mode arg ->
                 is_heap_mode mode || outlives_region ctx arg)
@@ -1189,7 +1197,8 @@ and traverse_letrec ctx bindings =
       ) ctx bindings
   in
   let bindings =
-    List.concat_map (traverse_letrec_binding ctx) bindings
+    let recursive_group = List.map (fun { id; _ } -> id) bindings in
+    List.concat_map (traverse_letrec_binding ctx ~recursive_group) bindings
   in
   ctx, bindings
 
@@ -1197,26 +1206,34 @@ and traverse_let_binding outer_ctx inner_ctx var var_duid def =
   match find_candidate def with
   | None -> [ var, var_duid, traverse outer_ctx def ]
   | Some lfun ->
-      let functions = make_dps_variant var var_duid inner_ctx outer_ctx lfun in
+      let functions =
+        make_dps_variant var var_duid inner_ctx outer_ctx
+          ~recursive_group:[] lfun
+      in
       List.map
         (fun (var, var_duid, lfun) -> var, var_duid, Lfunction lfun) functions
 
-and traverse_letrec_binding ctx { id; debug_uid; def } =
+and traverse_letrec_binding ctx ~recursive_group { id; debug_uid; def } =
   if def.attr.tmc_candidate
   then
-    let functions = make_dps_variant id debug_uid ctx ctx def in
+    let functions =
+      make_dps_variant id debug_uid ctx ctx ~recursive_group def
+    in
     List.map
       (fun (id, id_duid, def) -> { id; debug_uid = id_duid; def })
       functions
   else
     [ { id; debug_uid = debug_uid; def = traverse_lfunction ctx def } ]
 
-and make_dps_variant var var_duid inner_ctx outer_ctx (lfun : lfunction) =
+and make_dps_variant var var_duid inner_ctx outer_ctx ~recursive_group
+      (lfun : lfunction) =
   let special = Ident.Map.find var inner_ctx.specialized in
   let fun_choice =
+    (* Parameters and closures of the enclosing [let rec] are allocated before
+       the function is entered, so they outlive its region. *)
     let outlives_region =
       List.fold_left (fun set (param : lparam) -> Ident.Set.add param.name set)
-        Ident.Set.empty lfun.params
+        (Ident.Set.of_list recursive_group) lfun.params
     in
     choice { outer_ctx with outlives_region } ~tail:true lfun.body
   in

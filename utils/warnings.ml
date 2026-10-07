@@ -1510,14 +1510,15 @@ let message = function
   | Tmc_breaks_tailcall_region ->
       msg "This call@ is@ in@ tail-modulo-cons@ position@ in@ a@ TMC@ \
            function,@ but@ it@ is@ enclosed@ in@ a@ local-allocation@ \
-           region@ that@ cannot@ be@ closed@ as@ part@ of@ the@ call,@ so@ \
-           the@ call@ will@ not@ be@ transformed@ into@ a@ tail@ call@ and@ \
-           the@ function@ does@ not@ run@ in@ constant@ stack@ space.@ \
-           @[This@ happens@ when@ an@ argument@ passed@ at@ mode@ %a@ may@ \
-           point@ to@ a@ value@ allocated@ in@ the@ region.@ Parameters,@ \
+           region@ that@ cannot@ be@ closed@ prior@ to@ the@ call,@ \
+           preventing@ the@ function@ from@ running@ in@ constant@ stack@ \
+           space.@ \
+           @[This@ happens@ when@ either@ the@ callee@ or@ an@ argument@ is@ \
+           at@ the@ %a@ mode@ and@ may@ point@ to@ a@ value@ allocated@ in@ \
+           the@ surrounding@ region.@ Recursive@ calls,@ parameters,@ \
            non-allocating@ projections@ of@ parameters,@ immediates,@ and@ \
-           heap@ allocations@ are@ allowed.@]"
-        Style.inline_code "local"
+           values@ at@ the@ %a@ mode@ are@ allowed.@]"
+        Style.inline_code "local" Style.inline_code "global"
   | Generative_application_expects_unit ->
       msg "A generative functor@ \
            should be applied@ to@ %a;@ using@ %a@ is deprecated."

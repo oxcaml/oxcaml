@@ -202,6 +202,18 @@ module All_annotations_correctly_used = struct
         C (map' a, (map' [@tailcall]) b)
 end
 [%%expect {|
+Line 22, characters 19-39:
+22 |         C (map' a, (map' [@tailcall]) b)
+                        ^^^^^^^^^^^^^^^^^^^^
+Warning 222 [tmc-breaks-tailcall-region]: This call is in tail-modulo-cons
+  position in a TMC function, but it is enclosed in a local-allocation region
+  that cannot be closed prior to the call, preventing the function from
+  running in constant stack space.
+  This happens when either the callee or an argument is at the "local" mode and
+  may point to a value allocated in the surrounding region. Recursive calls,
+  parameters, non-allocating projections of parameters, immediates, and
+  values at the "global" mode are allowed.
+
 module All_annotations_correctly_used :
   sig
     type 'a t = N of 'a | Graft of int | Tau of 'a t | C of 'a t * 'a t
@@ -252,6 +264,18 @@ Warning 72 [tmc-breaks-tailcall]: This call is in tail-modulo-cons position
   Please either mark the called function with the "[@tail_mod_cons]" attribute,
   or mark this call with the "[@tailcall false]" attribute to make its
   non-tailness explicit.
+
+Line 27, characters 11-17:
+27 |         C (map' a,
+                ^^^^^^
+Warning 222 [tmc-breaks-tailcall-region]: This call is in tail-modulo-cons
+  position in a TMC function, but it is enclosed in a local-allocation region
+  that cannot be closed prior to the call, preventing the function from
+  running in constant stack space.
+  This happens when either the callee or an argument is at the "local" mode and
+  may point to a value allocated in the surrounding region. Recursive calls,
+  parameters, non-allocating projections of parameters, immediates, and
+  values at the "global" mode are allowed.
 
 Line 17, characters 17-67:
 17 |         else Tau ((graft[@tailcall]) (* this should also warn *) n)
