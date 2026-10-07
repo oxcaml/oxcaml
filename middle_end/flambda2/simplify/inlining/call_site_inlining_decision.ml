@@ -47,7 +47,11 @@ type speculative_inlining_result =
   | Completed of
       { cost_metrics : Cost_metrics.t;
         cost_metrics_of_lifted_constants : Cost_metrics.t;
-        free_names : Name_occurrences.t
+        free_names : Name_occurrences.t;
+        inlined_callees_size : int
+            (* The original sizes of the callees inlined into the speculated
+               body, which the ratio criterion may count as specialised code
+               too. *)
       }
 
 (* Allocations of the caller that flow only into this call and that the inlined
@@ -294,7 +298,8 @@ let speculative_inlining0 dacc ~apply ~function_type ~simplify_expr
           Cost_metrics.( + ) (UA.cost_metrics uacc)
             cost_metrics_of_lifted_constants;
         cost_metrics_of_lifted_constants;
-        free_names = UA.name_occurrences uacc
+        free_names = UA.name_occurrences uacc;
+        inlined_callees_size = DA.inlined_callees_size (UA.creation_dacc uacc)
       }
 
 let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
@@ -561,8 +566,11 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
               Speculative_inlining_aborted
                 { budget; threshold_is_remaining_budget }
             | Completed
-                { cost_metrics; cost_metrics_of_lifted_constants; free_names }
-              ->
+                { cost_metrics;
+                  cost_metrics_of_lifted_constants;
+                  free_names;
+                  inlined_callees_size
+                } ->
               let caller_allocation_credit =
                 caller_allocation_credit dacc ~apply ~inlining_args free_names
               in
@@ -572,7 +580,14 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
               let original_size =
                 Code_metadata.cost_metrics code_metadata |> Cost_metrics.size
               in
-              let decide ~call_site_credit :
+              let inlined_callees_size =
+                if
+                  Flambda_features.Inlining
+                  .speculative_inlining_ratio_includes_inlined_callees ()
+                then inlined_callees_size
+                else 0
+              in
+              let decide ~call_site_credit ~inlined_callees_size :
                   Call_site_inlining_decision_type.speculative_criterion * bool
                   =
                 match
@@ -598,7 +613,9 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
                     Cost_metrics.adjusted_size cost_metrics -. call_site_credit
                   in
                   let original =
-                    Float.of_int (Int.max 1 (Code_size.to_int original_size))
+                    Float.of_int
+                      (Int.max 1
+                         (Code_size.to_int original_size + inlined_callees_size))
                   in
                   let ratio = adjusted_size /. original in
                   let max_ratio =
@@ -607,7 +624,9 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
                   ( Ratio { adjusted_size; bonus; ratio; max_ratio },
                     Float.compare ratio max_ratio <= 0 )
               in
-              let criterion, inline = decide ~call_site_credit in
+              let criterion, inline =
+                decide ~call_site_credit ~inlined_callees_size
+              in
               if inline && Inlining_stats.enabled ()
               then (
                 (* Decisions that the credits of the new hints tipped. *)
@@ -617,13 +636,23 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
                     && not
                          (snd
                             (decide
-                               ~call_site_credit:(call_site_credit -. credit)))
+                               ~call_site_credit:(call_site_credit -. credit)
+                               ~inlined_callees_size))
                   then Inlining_stats_table.incr key
                 in
                 only_with caller_allocation_credit
                   "speculation.inlined_only_with_caller_allocation_credit";
                 only_with return_continuation_credit
-                  "speculation.inlined_only_with_return_continuation_credit");
+                  "speculation.inlined_only_with_return_continuation_credit";
+                if inlined_callees_size > 0
+                then (
+                  Inlining_stats_table.add "speculation.inlined_callees_size"
+                    inlined_callees_size;
+                  if
+                    not (snd (decide ~call_site_credit ~inlined_callees_size:0))
+                  then
+                    Inlining_stats_table.incr
+                      "speculation.inlined_only_with_inlined_callees_size"));
               if inline
               then
                 Speculatively_inline

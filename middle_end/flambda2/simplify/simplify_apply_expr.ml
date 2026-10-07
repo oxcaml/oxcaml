@@ -314,6 +314,17 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
           Inlining_transforms.inline dacc ~apply ~unroll_to ~was_inline_always
             function_type
         in
+        let dacc =
+          if
+            Flambda_features.Inlining
+            .speculative_inlining_ratio_includes_inlined_callees ()
+          then
+            DA.add_inlined_callee_size dacc
+              (Code_size.to_int
+                 (Cost_metrics.size
+                    (Code_metadata.cost_metrics callee's_code_metadata)))
+          else dacc
+        in
         let dacc, leaving_speculative_region =
           enter_inlined_body_for_speculative_inlining_budget dacc decision
         in

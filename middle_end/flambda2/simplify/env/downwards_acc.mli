@@ -141,6 +141,13 @@ val decrease_continuation_lifting_budget : t -> int -> t
 
 val prepare_for_speculative_inlining : t -> t
 
+(** Add to the sum of the original sizes of the callees inlined since the
+    current speculation started (reset by [prepare_for_speculative_inlining]),
+    for [-flambda2-speculative-inlining-ratio-includes-inlined-callees]. *)
+val add_inlined_callee_size : t -> int -> t
+
+val inlined_callees_size : t -> int
+
 (** Tracking of the speculative inlining budget (see
     [Flambda_features.Inlining.speculative_inlining_budget]). Inside a
     speculatively-inlined function body, or during a speculation, the cost of

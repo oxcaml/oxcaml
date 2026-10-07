@@ -347,6 +347,7 @@ module Flambda2 : sig
       val speculative_inlining_credit_caller_allocations : bool
       val speculative_inlining_merge_return_continuation : bool
       val speculative_inlining_merge_return_continuation_max_size : int
+      val speculative_inlining_ratio_includes_inlined_callees : bool
       val speculative_inlining_uninlined_call_cost_factor : float
       val speculative_inlining_budget : bool
       val speculative_inlining_budget_size_ratio : float
@@ -410,6 +411,11 @@ module Flambda2 : sig
     (** Handlers larger than this (as measured before simplification) are not
         merged. *)
     val speculative_inlining_merge_return_continuation_max_size : int ref
+
+    (** Under the ratio criterion, count the original sizes of the callees
+        inlined into the speculated body as part of the code being
+        specialised (the denominator of the ratio). *)
+    val speculative_inlining_ratio_includes_inlined_callees : bool ref
 
     val speculative_inlining_uninlined_call_cost_factor : float ref
 

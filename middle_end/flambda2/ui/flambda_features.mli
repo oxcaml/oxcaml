@@ -208,6 +208,8 @@ module Inlining : sig
 
   val speculative_inlining_merge_return_continuation_max_size : unit -> int
 
+  val speculative_inlining_ratio_includes_inlined_callees : unit -> bool
+
   val speculative_inlining_uninlined_call_cost_factor : unit -> float
 
   val speculative_inlining_budget : unit -> bool

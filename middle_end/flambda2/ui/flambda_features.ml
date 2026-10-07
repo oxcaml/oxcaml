@@ -341,6 +341,10 @@ module Inlining = struct
     !Oxcaml_flags.Flambda2.Inlining
      .speculative_inlining_merge_return_continuation_max_size
 
+  let speculative_inlining_ratio_includes_inlined_callees () =
+    !Oxcaml_flags.Flambda2.Inlining
+     .speculative_inlining_ratio_includes_inlined_callees
+
   let speculative_inlining_uninlined_call_cost_factor () =
     !Oxcaml_flags.Flambda2.Inlining
      .speculative_inlining_uninlined_call_cost_factor

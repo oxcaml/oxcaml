@@ -58,6 +58,7 @@ type t =
     speculative_inlining_budget : speculative_inlining_budget;
     merged_handler_budgets :
       (Flambda.Continuation_handler.t * speculative_inlining_budget) list;
+    inlined_callees_size : int;
     (* See [Flambda_features.Inlining.speculative_inlining_budget]. *)
     continuations_to_specialize : Continuation.Set.t;
     (* CR gbury: we could try and encode the set of continuations to specialize
@@ -76,6 +77,7 @@ let [@ocamlformat "disable"] print ppf
         code_ids_to_never_delete; code_ids_never_simplified; slot_offsets; debuginfo_rewrites;
         are_lifting_conts; lifted_continuations; continuation_lifting_budget;
         speculative_inlining_budget; merged_handler_budgets = _;
+        inlined_callees_size = _;
         continuations_to_specialize; specialization_map; } =
   Format.fprintf ppf "@[<hov 1>(\
       @[<hov 1>(denv@ %a)@]@ \
@@ -135,6 +137,7 @@ let create denv slot_offsets continuation_uses_env =
     continuation_lifting_budget = Flambda_features.Expert.cont_lifting_budget ();
     speculative_inlining_budget = Not_in_speculative_region;
     merged_handler_budgets = [];
+    inlined_callees_size = 0;
     continuations_to_specialize = Continuation.Set.empty;
     specialization_map = Continuation.Map.empty
   }
@@ -460,8 +463,18 @@ let prepare_for_speculative_inlining dacc =
           (Speculative_inlining { depth }))
       dacc
   in
-  with_are_lifting_conts dacc
-    (Are_lifting_conts.no_lifting In_speculative_inlining)
+  let dacc =
+    with_are_lifting_conts dacc
+      (Are_lifting_conts.no_lifting In_speculative_inlining)
+  in
+  { dacc with inlined_callees_size = 0 }
+
+(* The original sizes of the callees inlined since the current speculation
+   started: see [Call_site_inlining_decision]. *)
+let add_inlined_callee_size t size =
+  { t with inlined_callees_size = t.inlined_callees_size + size }
+
+let inlined_callees_size t = t.inlined_callees_size
 
 let continuations_to_specialize t = t.continuations_to_specialize
 
