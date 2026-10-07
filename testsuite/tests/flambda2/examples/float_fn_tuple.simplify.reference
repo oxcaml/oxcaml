@@ -24,10 +24,10 @@ let code loopify(never) size(16) newer_version_of(f_1)
       (x)
       -> k2 * k1
     where k2 (`*match*` : [ 0 of float boxed * float boxed ]) =
-      let Pfield = %block_load.[`1`] (`*match*`) in
-      let Pfield_1 = %block_load.[`0`] (`*match*`) in
-      let prim = %unbox_num.`float` (Pfield) in
-      let prim_1 = %unbox_num.`float` (Pfield_1) in
+      let Pmixedfield = %block_load.[`1`] (`*match*`) in
+      let Pmixedfield_1 = %block_load.[`0`] (`*match*`) in
+      let prim = %unbox_num.`float` (Pmixedfield) in
+      let prim_1 = %unbox_num.`float` (Pmixedfield_1) in
       let prim_2 = %bfloat_arith.add (prim_1, prim) in
       let float_add = %box_num.`float`.my_alloc_region (prim_2) in
       cont k (float_add)

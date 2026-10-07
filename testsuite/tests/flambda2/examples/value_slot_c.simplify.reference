@@ -44,8 +44,8 @@ let code loopify(never) size(59) newer_version_of(f_2)
                      k1 pop(regular k1) ($camlValue_slot_c__Pmakeblock_7)
                    | 1 -> k2)
               where k2 =
-                let Pfield = %block_load.[`1`] (`*match*`) in
-                let prim = %phys_eq (Pfield, 3) in
+                let Pmixedfield = %block_load.[`1`] (`*match*`) in
+                let prim = %phys_eq (Pmixedfield, 3) in
                 switch prim
                   | 0 -> k1 pop(regular k1) ($camlValue_slot_c__Pmakeblock_9)
                   | 1 -> k (0)))

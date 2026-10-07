@@ -11,7 +11,7 @@ open Effect.Deep
 (* Test that raising from on_tick correctly causes an async exception *)
 
 let () =
-  Domain.Tick.with_ ~interval_usec:1_000 (fun _ ->
+  Domain.Tick.with_ ~interval_usec:1_000 (fun () ->
     let raised = Atomic.make false in
     Preemptible.try_with
       ~on_tick:(fun () ->
@@ -27,5 +27,7 @@ let () =
       ()
       { effc = (fun (type a) (eff : a Effect.t) ->
           failwith "Should not get effect")
-      })
+      };
+    ());
+  ()
 ;;

@@ -188,9 +188,6 @@ let add_argument_dep t ~from relation ~base =
 let add_parameter_dep t ~base relation ~to_ =
   Graph.add_parameter_dep t.deps ~base relation ~to_
 
-let add_propagate_dep t ~if_used ~to_ ~from =
-  Graph.add_propagate_dep t.deps ~if_used ~to_ ~from
-
 let add_alias_if_any_source_dep t ~if_any_source ~to_ ~from =
   Graph.add_alias_if_any_source_dep t.deps ~if_any_source ~to_ ~from
 
@@ -216,16 +213,17 @@ let add_cond_any_source t ~(denv : Env.t) v =
   match Env.current_code_id denv with
   | None -> add_any_source t v
   | Some code_id ->
-    add_propagate_dep t
+    Graph.add_any_source_if_used t.deps
       ~if_used:(Code_id_or_name.code_id code_id)
-      ~from:(Code_id_or_name.name (Env.le_monde_exterieur denv))
-      ~to_:v
+      v
 
 let cond_alias t ~(denv : Env.t) ~from ~to_ =
   match Env.current_code_id denv with
   | None -> add_alias t ~from ~to_
   | Some code_id ->
-    add_propagate_dep t ~if_used:(Code_id_or_name.code_id code_id) ~from ~to_
+    Graph.add_propagate_dep t.deps
+      ~if_used:(Code_id_or_name.code_id code_id)
+      ~from ~to_
 
 let fixed_arity_continuation t k =
   t.fixed_arity_conts <- Continuation.Set.add k t.fixed_arity_conts
@@ -568,7 +566,7 @@ let add_closure_dep graph ~code_deps
       ~from:(List.hd code_dep.unknown_arity_call_witnesses)
       Field.unknown_arity_call_witness ~base:closure
 
-let add_apply_dep graph ~code_deps ~le_monde_exterieur
+let add_apply_dep graph ~code_deps
     { function_containing_apply_expr = caller;
       apply_code_id = code_id;
       apply_closure = closure;
@@ -588,10 +586,9 @@ let add_apply_dep graph ~code_deps ~le_monde_exterieur
     (match caller with
     | None -> Graph.add_any_source graph call
     | Some caller ->
-      Graph.add_propagate_dep graph
+      Graph.add_any_source_if_used graph
         ~if_used:(Code_id_or_name.code_id caller)
-        ~to_:call
-        ~from:(Code_id_or_name.symbol le_monde_exterieur));
+        call);
     match closure with
     | None -> ()
     | Some closure -> (
@@ -602,9 +599,8 @@ let add_apply_dep graph ~code_deps ~le_monde_exterieur
           ~to_:(Code_id_or_name.code_id caller)
           ~from:closure))
 
-let resolve_delayed_deps graph ~code_deps ~le_monde_exterieur
-    { apply_deps; set_of_closures_deps } =
-  List.iter (add_apply_dep graph ~code_deps ~le_monde_exterieur) apply_deps;
+let resolve_delayed_deps graph ~code_deps { apply_deps; set_of_closures_deps } =
+  List.iter (add_apply_dep graph ~code_deps) apply_deps;
   List.iter (add_closure_dep graph ~code_deps) set_of_closures_deps
 
 let add_set_of_closures t set_of_closures =

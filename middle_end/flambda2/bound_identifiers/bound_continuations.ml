@@ -60,3 +60,6 @@ let renaming t1 ~guaranteed_fresh:t2 =
     Misc.fatal_errorf
       "Continuation lists are of differing lengths:@ %a@ and@ %a" print t1 print
       t2
+
+let import_and_rename t renaming =
+  List.fold_left_map Renaming.bind_continuation renaming t

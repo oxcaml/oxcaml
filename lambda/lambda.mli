@@ -510,6 +510,8 @@ type primitive =
      offset and behave as if the base were null. *)
   | Pget_ext_ptr of layout * Asttypes.mutable_flag
   | Pset_ext_ptr of layout * modify_mode
+  | Pbox of layout * locality_mode
+  | Punbox of layout
 
 (** This is the same as [Primitive.native_repr] but with [Repr_poly]
     compiled away. *)
@@ -1360,8 +1362,6 @@ val layout_tupled_vector : boxed_vector -> layout
 val layout_unboxed_mask : layout
 val layout_unboxed_vector : unboxed_vector -> layout
 val layout_unboxed_tupled_vector : unboxed_vector -> layout
-(* A layout that is Pgenval because it is the field of a tuple *)
-val layout_tuple_element : layout
 (* A layout that is Pgenval because it is the arg of a polymorphic variant *)
 val layout_variant_arg : layout
 (* A layout that is Pgenval because it is an optional argument *)

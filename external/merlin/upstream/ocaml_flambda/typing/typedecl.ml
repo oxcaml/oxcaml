@@ -55,6 +55,7 @@ module Mixed_product_kind = struct
     | Cstr_record
     | Module
     | Block
+    | Tuple
 
   let to_plural_string = function
     | Record -> "records"
@@ -62,6 +63,7 @@ module Mixed_product_kind = struct
     | Cstr_record -> "inline record arguments to constructors"
     | Module -> "modules"
     | Block -> "blocks"
+    | Tuple -> "tuples"
 end
 
 type mixed_product_violation =
@@ -2041,7 +2043,6 @@ module Element_repr = struct
      otherwise the element is classified as [None]. See the CR in
      [update_label_sorts]. *)
   let classify env ty jkind ~default_to_scannable =
-
     if is_float env ty
     then Some Float_element
     else
@@ -4317,17 +4318,10 @@ let native_repr_of_type ~loc env kind ty sort_or_poly ~is_return =
     then Location.prerr_warning loc Warnings.Untagged_external_small_int_return;
     let is_immediate = Ctype.is_always_gc_ignorable env ty in
     let is_non_nullable = Ctype.check_type_nullability env ty Non_null in
-    let rec sort_is_scannable : Jkind.Sort.Const.t -> bool = function
-      | Base Scannable -> true
-      | Base _ | Product _ -> false
-      | Addressable s -> sort_is_scannable s
-      | Univar _ -> Misc.fatal_error "typedecl: Univar in native repr"
-      | Genvar _ -> Misc.fatal_error "typedecl: Genvar in native repr"
-    in
     let is_scannable =
       match sort_or_poly with
       | Poly -> false
-      | Sort s -> sort_is_scannable s
+      | Sort s -> Jkind.Sort.Const.is_scannable s
     in
     if is_immediate && is_non_nullable && is_scannable
     then Some (Unboxed_or_untagged_integer Untagged_int)
@@ -4857,6 +4851,10 @@ let transl_value_decl env loc ~modal ~why valdecl =
           ~is_layout_poly
       in
       error_if_containing_unexpected_jkind env prim cty ty;
+      (match prim.prim_name with
+       | "%box" | "%unbox" ->
+         Language_extension.assert_enabled ~loc Layouts Language_extension.Alpha
+       | _ -> ());
       if prim.prim_arity = 0 &&
          (prim.prim_name = "" || prim.prim_name.[0] <> '%') then
         raise(Error(valdecl.pval_type.ptyp_loc, Null_arity_external));
