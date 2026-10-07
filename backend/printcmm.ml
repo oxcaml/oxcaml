@@ -178,6 +178,7 @@ let atomic_op = function
   | Exchange -> "exchange"
   | Compare_set -> "compare_set"
   | Compare_exchange -> "compare_exchange"
+  | Release_store -> "release_store"
 
 let phantom_defining_expr ppf defining_expr =
   match defining_expr with
@@ -261,8 +262,13 @@ let operation d = function
   | Capply { result_type = _ty; region = _; callees = _ } -> "app" ^ location d
   | Cextcall { func = lbl; _ } ->
     Printf.sprintf "extcall \"%s\"%s" lbl (location d)
-  | Cload { memory_chunk; mutability; is_atomic } -> (
-    let atomic = if is_atomic then "_atomic" else "" in
+  | Cload { memory_chunk; mutability; atomic } -> (
+    let atomic =
+      match atomic with
+      | None -> ""
+      | Some Seq_cst -> "_atomic"
+      | Some Acquire -> "_atomic_acquire"
+    in
     match mutability with
     | Asttypes.Immutable ->
       Printf.sprintf "load%s %s" atomic (chunk memory_chunk)

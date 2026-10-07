@@ -1451,7 +1451,7 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
     assert (arg_count = 0 && res_count = 1);
     let consts = List.map extract_const_int cfg_ops in
     create_const_vec consts
-  | Load { memory_chunk; addressing_mode; mutability; is_atomic } ->
+  | Load { memory_chunk; addressing_mode; mutability; atomic } ->
     if not (same_width memory_chunk)
     then None
     else
@@ -1462,7 +1462,7 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
           { memory_chunk = vec128_chunk ();
             addressing_mode;
             mutability;
-            is_atomic
+            atomic
           }
       in
       Some
@@ -1759,7 +1759,7 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
                 { memory_chunk = vec128_chunk ();
                   addressing_mode;
                   mutability = Mutable;
-                  is_atomic = false
+                  atomic = None
                 };
             arguments = address_args;
             results = new_reg

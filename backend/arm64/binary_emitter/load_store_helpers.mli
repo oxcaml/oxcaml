@@ -119,6 +119,8 @@ val encode_load_store_halfword :
 
 val encode_load_acquire : rd:[`GP of 'a] Reg.t -> rn:[`GP of 'b] Reg.t -> int32
 
+val encode_store_release : rd:[`GP of 'a] Reg.t -> rn:[`GP of 'b] Reg.t -> int32
+
 val encode_memory_barrier : op2:int -> Memory_barrier.t -> int32
 
 val encode_load_store_pair_gp :

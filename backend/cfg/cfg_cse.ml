@@ -316,16 +316,16 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
          loads must not survive it. *)
       Op_store true
     | Stackoffset _ -> Op_other
-    | Load { mutability; is_atomic; memory_chunk = _; addressing_mode = _ } ->
+    | Load { mutability; atomic; memory_chunk = _; addressing_mode = _ } -> (
       (* #12173: disable CSE for atomic loads. Moreover, an atomic load is an
          acquire: a load that follows it must not be satisfied by an equation
          over a load that precedes it, so atomic loads are also load
          barriers. *)
-      if is_atomic
-      then Op_store true
-      else
+      match atomic with
+      | Some (Seq_cst | Acquire) -> Op_store true
+      | None ->
         Op_load
-          (match mutability with Mutable -> Mutable | Immutable -> Immutable)
+          (match mutability with Mutable -> Mutable | Immutable -> Immutable))
     | Store (_, _, asg) -> Op_store asg
     | (Alloc _ | Poll) as op ->
       Misc.fatal_errorf "Cfg_cse.class_of_operation0: %a is handled specially"

@@ -340,12 +340,14 @@ end = struct
         let addr_args = Arch.num_args_addressing addr in
         let data_args =
           match op with
-          | Fetch_and_add | Add | Sub | Land | Lor | Lxor | Exchange -> 1
+          | Fetch_and_add | Add | Sub | Land | Lor | Lxor | Exchange
+          | Release_store ->
+            1
           | Compare_set | Compare_exchange -> 2
         in
         let expected_res =
           match op with
-          | Add | Sub | Land | Lor | Lxor -> [0]
+          | Add | Sub | Land | Lor | Lxor | Release_store -> [0]
           | Fetch_and_add | Exchange | Compare_set | Compare_exchange -> [1]
         in
         check ~expected_args:[addr_args + data_args] ~expected_res

@@ -843,6 +843,8 @@ let encode_instruction : type num operands.
     Simd_helpers.encode_simd_copy ~q:1 ~op:1 ~imm5 ~imm4 ~rn ~rd
   | LDAR, Pair (Reg ({ reg_name = GP _; _ } as rd), Mem (Reg rn)) ->
     Load_store_helpers.encode_load_acquire ~rd ~rn
+  | STLR, Pair (Reg ({ reg_name = GP _; _ } as rd), Mem (Reg rn)) ->
+    Load_store_helpers.encode_store_release ~rd ~rn
   | LDP _, Triple (Reg rt1, Reg rt2, Mem addressing) ->
     Load_store_helpers.encode_load_store_pair_gp ~instr_name:"LDP" ~l:1 ~rt1
       ~rt2 addressing

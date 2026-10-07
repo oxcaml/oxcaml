@@ -174,6 +174,11 @@ type atomic_op =
   | Exchange
   | Compare_set
   | Compare_exchange
+  | Release_store
+      (** A store with release semantics (in the sense of the C11 memory model):
+          it is ordered after every memory access that precedes it, so it can
+          publish data to a thread that reads the stored value with an acquire
+          load. *)
 
 val equal_atomic_op : atomic_op -> atomic_op -> bool
 
@@ -270,6 +275,14 @@ type bswap_bitwidth =
   | Sixteen
   | Thirtytwo
   | Sixtyfour
+
+(** Memory ordering of an atomic load, in the sense of the C11 memory model.
+    [Seq_cst] loads additionally follow the OCaml memory model's scheme for
+    atomics (see Note [MM] in runtime/memory.c); [Acquire] loads are plain
+    acquire loads. *)
+type atomic_load_memory_order =
+  | Seq_cst
+  | Acquire
 
 type initialization_or_assignment =
   | Initialization
@@ -449,7 +462,7 @@ type operation =
   | Cload of
       { memory_chunk : memory_chunk;
         mutability : Asttypes.mutable_flag;
-        is_atomic : bool
+        atomic : atomic_load_memory_order option
       }
   | Calloc of Alloc_mode.t * alloc_block_kind
   | Cstore of memory_chunk * initialization_or_assignment
@@ -707,6 +720,9 @@ val equal_float_width : float_width -> float_width -> bool
 val equal_float_comparison : float_comparison -> float_comparison -> bool
 
 val equal_memory_chunk : memory_chunk -> memory_chunk -> bool
+
+val equal_atomic_load_memory_order :
+  atomic_load_memory_order -> atomic_load_memory_order -> bool
 
 val equal_integer_comparison : integer_comparison -> integer_comparison -> bool
 

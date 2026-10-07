@@ -144,7 +144,7 @@ type t =
       { memory_chunk : Cmm.memory_chunk;
         addressing_mode : Arch.addressing_mode;
         mutability : mutable_flag;
-        is_atomic : bool
+        atomic : Cmm.atomic_load_memory_order option
       }
   | Store of Cmm.memory_chunk * Arch.addressing_mode * bool
   | Intop of integer_operation
