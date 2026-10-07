@@ -78,8 +78,7 @@ let assert_subset ~gm ~chain sub sup =
       |> String.concat ", "
     in
     let chain_to_string chain =
-      List.map (fun gm -> GM.Name.to_string (GM.to_name gm)) chain
-      |> String.concat ", required by "
+      List.map GM.to_string chain |> String.concat ", required by "
     in
     Misc.fatal_errorf
       "{%s} is not a subset of {%s} (while loading %s, required by %s)"
