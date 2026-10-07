@@ -559,7 +559,7 @@ and layout =
   | Punboxed_mask
   | Punboxed_product of layout list
   | Pbottom
-  | Psplicevar of Slambdaident.t
+  | Psplicevar of Layout_ident.t
 
 and block_shape =
   | All_value
@@ -581,7 +581,7 @@ and 'a mixed_block_element =
   | Word
   | Untagged_immediate
   | Product of 'a mixed_block_element array
-  | Splice_variable of Slambdaident.t
+  | Splice_variable of Layout_ident.t
 
 and mixed_block_shape = unit mixed_block_element array
 
@@ -741,7 +741,7 @@ let equal_raise_kind left right =
 let fatal_error_unevaluated_splice_var ident =
   Misc.fatal_errorf
     "Splice variable %a should have been evaluated"
-    Slambdaident.print ident
+    Layout_ident.print ident
 
 let generic_value =
   { raw_kind = Pgenval;
@@ -812,7 +812,7 @@ and equal_mixed_block_element :
   | Product es1, Product es2 ->
     Misc.Stdlib.Array.equal
       (equal_mixed_block_element eq_param ~equal_value_kind) es1 es2
-  | Splice_variable id1, Splice_variable id2 -> Slambdaident.equal id1 id2
+  | Splice_variable id1, Splice_variable id2 -> Layout_ident.equal id1 id2
   | (Value _ | Float_boxed _ | Float64 | Float32
      | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
      | Vec256 | Vec512 | Mask | Word | Untagged_immediate | Product _
@@ -927,7 +927,7 @@ and join_mixed_block_element (m1 : unit mixed_block_element)
   | Mask, Mask
   | Word, Word
   | Untagged_immediate, Untagged_immediate -> Some m1
-  | Splice_variable id1, Splice_variable id2 when Slambdaident.equal id1 id2 ->
+  | Splice_variable id1, Splice_variable id2 when Layout_ident.equal id1 id2 ->
       Some m1
   | ( ( Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16
       | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word
@@ -1009,7 +1009,7 @@ let rec join_layout x y =
     when Primitive.equal_unboxed_vector v1 v2 ->
       x
   | Punboxed_mask, Punboxed_mask -> x
-  | Psplicevar id1, Psplicevar id2 when Slambdaident.equal id1 id2 -> x
+  | Psplicevar id1, Psplicevar id2 when Layout_ident.equal id1 id2 -> x
   | ( ( Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _
       | Punboxed_vector _ | Punboxed_mask | Punboxed_product _ | Psplicevar _ ),
       _ ) ->
@@ -1301,7 +1301,7 @@ and lfunction =
   }
 
 and lkindtemplate =
-  { ktmpl_params: Slambdaident.t list;
+  { ktmpl_params: Layout_ident.t list;
     ktmpl_body: lfunction;
   }
 

@@ -38,8 +38,6 @@ module Or_missing = struct
   type 'a t =
     | Present of 'a
     | Missing
-
-  let of_option = function Some a -> Present a | None -> Missing
 end
 
 module Template_id = struct
@@ -172,46 +170,45 @@ and Env : sig
 
   val add_ident : t -> Ident.t -> layout -> Types.value Or_missing.t -> t
 
-  val add_kind : t -> Slambdaident.t -> Types.value Or_missing.t -> t
+  val add_sort_var : t -> Layout_ident.t -> layout -> t
 
-  val find : t -> Slambdaident.t -> Types.value Or_missing.t
+  val find_value : t -> Ident.t -> Types.value Or_missing.t
 
   val find_layout : t -> Ident.t -> layout
-end = struct
-  module Map = Slambdaident.Map
 
+  val find_sort_var : t -> Layout_ident.t -> layout
+end = struct
   type t =
-    { values : Types.value Map.t;
-      layouts : layout Ident.Map.t
+    { idents : (layout * Types.value Or_missing.t) Ident.Map.t;
+      sort_vars : layout Layout_ident.Map.t
     }
 
-  let empty = { values = Map.empty; layouts = Ident.Map.empty }
+  let empty = { idents = Ident.Map.empty; sort_vars = Layout_ident.Map.empty }
 
-  let add_ident t id layout v =
-    let slambda_id = Slambdaident.of_ident id in
-    match (v : Types.value Or_missing.t) with
-    | Present v ->
-      { values = Map.add slambda_id v t.values;
-        layouts = Ident.Map.add id layout t.layouts
-      }
-    | Missing ->
-      { values = Map.remove slambda_id t.values;
-        layouts = Ident.Map.add id layout t.layouts
-      }
+  let add_ident t id layout value =
+    { t with idents = Ident.Map.add id (layout, value) t.idents }
 
-  let add_kind { values; layouts } id v =
-    match (v : Types.value Or_missing.t) with
-    | Present v -> { values = Map.add id v values; layouts }
-    | Missing -> { values = Map.remove id values; layouts }
+  let add_sort_var t var layout =
+    { t with sort_vars = Layout_ident.Map.add var layout t.sort_vars }
 
-  let find t id = Map.find_opt id t.values |> Or_missing.of_option
+  let find_value t id =
+    match Ident.Map.find_opt id t.idents with
+    | Some (_, value) -> value
+    | None -> Or_missing.Missing
 
   let find_layout t id =
-    match Ident.Map.find_opt id t.layouts with
-    | Some layout -> layout
+    match Ident.Map.find_opt id t.idents with
+    | Some (layout, _) -> layout
     | None ->
       Misc.fatal_errorf "Slambda: no layout bound for variable %a" Ident.print
         id
+
+  let find_sort_var t var =
+    match Layout_ident.Map.find_opt var t.sort_vars with
+    | Some layout -> layout
+    | None ->
+      Misc.fatal_errorf "Slambda: no layout bound for sort variable %a"
+        Layout_ident.print var
 end
 
 module Template_store = struct
@@ -544,9 +541,8 @@ and eval_mixed_block_element :
     'a. Env.t -> 'a mixed_block_element -> 'a mixed_block_element =
  fun env old_element ->
   match old_element with
-  | Splice_variable id ->
-    Env.find env id |> expect_not_missing |> expect Tlayout
-    |> mixed_block_element_of_layout
+  | Splice_variable var ->
+    Env.find_sort_var env var |> mixed_block_element_of_layout
   | Product old_elements ->
     let new_elements =
       Misc.Stdlib.Array.map_sharing (eval_mixed_block_element env) old_elements
@@ -558,7 +554,7 @@ and eval_mixed_block_element :
 
 and eval_layout env old_layout =
   match old_layout with
-  | Psplicevar id -> Env.find env id |> expect_not_missing |> expect Tlayout
+  | Psplicevar var -> Env.find_sort_var env var
   | Punboxed_product old_layouts ->
     let new_layouts =
       Misc.Stdlib.List.map_sharing (eval_layout env) old_layouts
@@ -661,9 +657,7 @@ let eval_lparam env
 let rec eval_lam ?name ctx env old_lambda : halves =
   match old_lambda with
   | Lvar id ->
-    { slv_comptime = Env.find env (Slambdaident.of_ident id);
-      slv_runtime = old_lambda
-    }
+    { slv_comptime = Env.find_value env id; slv_runtime = old_lambda }
   | Lmutvar _ -> dynamic old_lambda
   | Lconst old_const ->
     let new_const = eval_structured_const env old_const in
@@ -1499,7 +1493,12 @@ and eval_apply ctx { clo_template; clo_runtime_env; clo_env } args =
   match clo_template with
   | Kind { ktmpl_params; ktmpl_body = old_func } ->
     let env =
-      try List.fold_left2 Env.add_kind clo_env ktmpl_params args
+      try
+        List.fold_left2
+          (fun env var arg ->
+            Env.add_sort_var env var
+              (arg |> expect_not_missing |> expect Tlayout))
+          clo_env ktmpl_params args
       with Invalid_argument _ ->
         Misc.fatal_error "Layout poly kind function should be fully applied."
     in

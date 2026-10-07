@@ -4820,7 +4820,7 @@ let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
       when not (List.is_empty (Lpoly.get_exn lpoly)) ->
     assert (mutable_flag == Asttypes.Immutable);
     let kind_params =
-      List.map Slambdaident.of_sort_var (Lpoly.get_exn lpoly)
+      List.map Layout_ident.of_sort_var (Lpoly.get_exn lpoly)
     in
     let ktmpl_body =
       match param with
