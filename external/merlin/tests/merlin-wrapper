@@ -22,7 +22,10 @@ if [ ! -d "$MERLIN_TEST_OCAMLLIB_PATH" ]; then
     exit 1
 fi
 
-export PATH="$MERLIN_TEST_OCAML_PATH/bin:$PATH"
+# Keep the binaries under test ahead of the test compiler's, which may ship
+# its own Merlin (the nix oxcaml package does).
+merlin_bin_dir=$(dirname "$(command -v ocamlmerlin)")
+export PATH="$merlin_bin_dir:$MERLIN_TEST_OCAML_PATH/bin:$PATH"
 
 ocamlmerlin "$@" -ocamllib-path "$MERLIN_TEST_OCAMLLIB_PATH" \
     | jq 'del(.timing)' \

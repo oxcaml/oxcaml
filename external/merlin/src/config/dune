@@ -1,8 +1,15 @@
+(executable
+ (name gen_config)
+ (modules gen_config))
+
+; Nix sets MERLIN_GIT_VERSION, as it doesn't run dune subst. gen_config is an
+; executable: the bytecode toplevel (%{ocaml}) only runs from the compiler's
+; configured prefix.
 (rule
  (targets merlin_config.ml)
- (deps gen_config.ml)
  (action (with-stdout-to %{targets}
-          (run %{ocaml} gen_config.ml %{ocaml_version}))))
+          (run %{exe:gen_config.exe} %{ocaml_version}
+           %{env:MERLIN_GIT_VERSION=}))))
 
 (library
  (name merlin_config)

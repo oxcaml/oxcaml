@@ -14,4 +14,7 @@ if [ ! -f "$MERLIN_TEST_OCAMLC_PATH" ]; then
     exit 1
 fi
 
-PATH="$MERLIN_TEST_OCAML_PATH/bin:$PATH" dune "$@"
+# Keep the ocaml-index under test ahead of the test compiler's, which may ship
+# its own (the nix oxcaml package does).
+merlin_bin_dir=$(dirname "$(command -v ocaml-index)")
+PATH="$merlin_bin_dir:$MERLIN_TEST_OCAML_PATH/bin:$PATH" dune "$@"

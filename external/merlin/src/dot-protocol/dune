@@ -1,4 +1,10 @@
 (library
  (name merlin_dot_protocol)
  (public_name merlin-lib.dot_protocol)
- (libraries merlin_utils csexp))
+ (libraries merlin_utils
+  ; The OxCaml compiler install (built by nix) ships csexp renamed to
+  ; merlin_csexp, so that it cannot clash with a user's own csexp. Other
+  ; builds of Merlin use upstream csexp.
+  (select csexp_compat.ml from
+   (merlin_csexp -> csexp_compat.merlin_csexp.ml)
+   (csexp -> csexp_compat.upstream.ml))))

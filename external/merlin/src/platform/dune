@@ -1,4 +1,7 @@
 (library
  (name os_ipc)
  (public_name merlin-lib.os_ipc)
+ ; ml_merlin_dont_inherit_stdio is compiled into merlin_utils's stubs
+ ; (platform_misc.c).
+ (libraries merlin_utils)
  (foreign_stubs (language c) (names os_ipc_stub)))

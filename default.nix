@@ -1,7 +1,7 @@
 {
   pkgs ? import <nixpkgs> { },
   src ? ./.,
-  # Short commit hash of src, recorded in the js_of_ocaml version.
+  # Short commit hash of src, recorded in the js_of_ocaml and Merlin versions.
   gitRev ? null,
   addressSanitizer ? false,
   dev ? false,
@@ -15,7 +15,10 @@
   oxcamlClang ? false,
   oxcamlLldb ? false,
   syntaxQuotations ? false,
+  # Build Merlin with the installed OxCaml and include it in the install.
   withMerlin ? true,
+  # Dependencies of make merlin-build and make merlin-test.
+  withMerlinDev ? true,
   withAstDependentLibs ? true,
   withJsoo ? true,
   # Test-only sources for make jsoo-test; not needed to build the compiler.
@@ -443,6 +446,31 @@ let
       '';
     };
 
+  # The shipped Merlin libraries expose csexp in their interface. Rename it to
+  # merlin_csexp, with the single module Merlin_csexp, so that it cannot clash
+  # with a separately installed csexp.
+  csexpSrc =
+    let
+      version = "1.5.2";
+    in
+    pkgs.applyPatches {
+      name = "merlin_csexp-${version}-source";
+      src = pkgs.fetchzip {
+        url = "https://github.com/ocaml-dune/csexp/releases/download/${version}/csexp-${version}.tbz";
+        hash = "sha256-xfw5a9gLCU5YP/7gUjpwTFLVj4sPXdPSn9qBHrbyyDk=";
+      };
+      postPatch = ''
+        ${keepReleaseOpamFiles}
+        substituteInPlace dune-project \
+          --replace-fail '(name csexp)' '(name merlin_csexp)'
+        mv csexp.opam merlin_csexp.opam
+        mv src/csexp.ml src/merlin_csexp.ml
+        mv src/csexp.mli src/merlin_csexp.mli
+        substituteInPlace src/dune \
+          --replace-fail '(public_name csexp)' '(public_name merlin_csexp)'
+      '';
+    };
+
   outChannelRedirectSrc =
     let
       version = "0.2";
@@ -488,7 +516,12 @@ let
     JSOO_SEDLEX_SRC = sedlexSrc;
     JSOO_CMDLINER_SRC = cmdlinerSrc;
     JSOO_MENHIR_SRC = menhirLibrariesSrc;
-    JSOO_YOJSON_SRC = yojsonSrc;
+    YOJSON_SRC = yojsonSrc;
+  };
+
+  merlinSources = {
+    CSEXP_SRC = csexpSrc;
+    YOJSON_SRC = yojsonSrc;
   };
 
   jsooTestSources = {
@@ -772,13 +805,13 @@ stdenv.mkDerivation {
   ]
   ++ (if pkgs.stdenv.isDarwin then [ pkgs.cctools ] else [ pkgs.libtool ]) # cctools provides Apple libtool on macOS
   ++ lib.optional oxcamlLldb pkgs.python312
-  ++ lib.optionals withMerlin merlinDev.devNativeBuildInputs
+  ++ lib.optionals withMerlinDev merlinDev.devNativeBuildInputs
   ++ lib.optionals withJsoo jsooTools;
 
   buildInputs = [
     pkgs.llvm # llvm-objcopy is used for debuginfo
   ]
-  ++ lib.optionals withMerlin merlinDev.devBuildInputs;
+  ++ lib.optionals withMerlinDev merlinDev.devBuildInputs;
 
   # Nothing here runs libtool, so stop stdenv's configurePhase from rewriting
   # sys_lib_search_path in the checked-in build-aux/ltmain.sh.
@@ -810,6 +843,15 @@ stdenv.mkDerivation {
     + lib.optionalString withJsoo ''
       make SHELL="$SHELL" jsoo-install-shipped OXCAML_INSTALL="$out" AST_DEPENDENT_LIBS_PREFIX="$out"
       ${wrapWasmOfOcaml}
+    ''
+    + lib.optionalString withMerlin ''
+      make SHELL="$SHELL" merlin-install-shipped OXCAML_INSTALL="$out" AST_DEPENDENT_LIBS_PREFIX="$out"
+    ''
+    # dune install puts the C stubs of the shipped js_of_ocaml and Merlin
+    # libraries in $out/lib/stublibs, which ocamlc (when linking bytecode) and
+    # ocamlrun only search if ld.conf lists it.
+    + lib.optionalString (withJsoo || withMerlin) ''
+      echo "$out/lib/stublibs" >> $out/lib/ocaml/ld.conf
     ''
     # Get rid of unused artifacts
     + ''
@@ -844,14 +886,19 @@ stdenv.mkDerivation {
           + "  make jsoo-test           - Run core JSOO compiler and JS/Wasm regressions\n"
         else
           "  (make jsoo-* targets need this shell built with withJsoo=true)\n";
-      merlinCommands =
-        if withMerlin then
-          "  make merlin-build        - Build Merlin\n"
+      merlinDevCommands =
+        if withMerlinDev then
+          "  make merlin-build        - Build Merlin with OCaml 5.4\n"
           + "  make merlin-test         - Run the Merlin tests\n"
           + "  make merlin-promote      - Promote Merlin test output\n"
         else
-          "  (make merlin-* targets need this shell built with withMerlin=true,\n"
-          + "   as the flake's devShell does)\n";
+          "  (make merlin-build/test/promote need this shell built with\n"
+          + "   withMerlinDev=true, as the flake's devShell does)\n";
+      merlinCommands =
+        if withMerlin then
+          "  make merlin-build-shipped - Build the shipped Merlin with OxCaml\n"
+        else
+          "  (make merlin-build-shipped needs this shell built with withMerlin=true)\n";
     in
     ''
       prefix="$(pwd)/_install"
@@ -869,7 +916,7 @@ stdenv.mkDerivation {
         make install             - Install
         make test                - Run all tests
         make test-one TEST=...   - Run a single test
-      ${astDependentLibsCommands}${jsooCommands}${merlinCommands}EOF
+      ${astDependentLibsCommands}${jsooCommands}${merlinDevCommands}${merlinCommands}EOF
     '';
 
   meta =
@@ -892,7 +939,9 @@ stdenv.mkDerivation {
 
   env =
     lib.optionalAttrs (withJsoo && gitRev != null) { JSOO_GIT_VERSION = "ox-${gitRev}"; }
+    // lib.optionalAttrs (withMerlin && gitRev != null) { MERLIN_GIT_VERSION = "ox-${gitRev}"; }
     // lib.optionalAttrs needsPpxlibSources ppxlibSources
     // lib.optionalAttrs withJsoo jsooSources
+    // lib.optionalAttrs withMerlin merlinSources
     // lib.optionalAttrs (withJsoo && withJsooTestSources) jsooTestSources;
 }

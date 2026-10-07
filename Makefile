@@ -234,7 +234,7 @@ merlin-test:
 merlin-promote:
 	$(MAKE) -C external/merlin test-promote
 
-# AST-dependent libraries: ppxlib, js_of_ocaml and their dependencies
+# AST-dependent libraries: ppxlib, js_of_ocaml, Merlin and their dependencies
 #
 # Built with external/ast-dependent-libs as the dune root, against the
 # installed compiler in $(OXCAML_INSTALL) (found through PATH and OCAMLLIB).
@@ -324,9 +324,10 @@ $(ast_dependent_libs_deps)/gen: src_var = SEDLEX_GEN_SRC
 $(ast_dependent_libs_deps)/sedlex: src_var = JSOO_SEDLEX_SRC
 $(ast_dependent_libs_deps)/cmdliner: src_var = JSOO_CMDLINER_SRC
 $(ast_dependent_libs_deps)/menhir: src_var = JSOO_MENHIR_SRC
-$(ast_dependent_libs_deps)/yojson: src_var = JSOO_YOJSON_SRC
+$(ast_dependent_libs_deps)/yojson: src_var = YOJSON_SRC
 $(ast_dependent_libs_deps)/out-channel-redirect: src_var = JSOO_OUT_CHANNEL_REDIRECT_SRC
 $(ast_dependent_libs_deps)/qcheck: src_var = JSOO_QCHECK_SRC
+$(ast_dependent_libs_deps)/csexp: src_var = CSEXP_SRC
 
 PPXLIB_DEPS = \
   $(ast_dependent_libs_deps)/ppx_derivers \
@@ -344,8 +345,16 @@ JSOO_TEST_DEPS = \
   $(ast_dependent_libs_deps)/out-channel-redirect \
   $(ast_dependent_libs_deps)/qcheck
 
-.PHONY: $(PPXLIB_DEPS) $(JSOO_DEPS) $(JSOO_TEST_DEPS)
-$(PPXLIB_DEPS) $(JSOO_DEPS) $(JSOO_TEST_DEPS):
+MERLIN_DEPS = \
+  $(ast_dependent_libs_deps)/csexp \
+  $(ast_dependent_libs_deps)/yojson
+
+# $(sort) drops the duplicate deps/yojson, which js_of_ocaml and Merlin share.
+AST_DEPENDENT_LIBS_DEPS = \
+  $(sort $(PPXLIB_DEPS) $(JSOO_DEPS) $(JSOO_TEST_DEPS) $(MERLIN_DEPS))
+
+.PHONY: $(AST_DEPENDENT_LIBS_DEPS)
+$(AST_DEPENDENT_LIBS_DEPS):
 	@if [ -z "$($(src_var))" ]; then \
 	  echo "error: $(src_var) is not set; the sources of $(@F) are provided" \
 	       "by the nix development shell (see default.nix)" >&2; \
@@ -384,19 +393,19 @@ ppxlib-install: ppxlib-build
 jsoo-install: jsoo-build
 	$(call ast_dependent_libs_install,$(JSOO_PACKAGES))
 
-# What the compiler package ships: the js_of_ocaml and wasm_of_ocaml
-# executables, and the libraries needed to write and preprocess js_of_ocaml
-# code. The compiler library and its dependencies (yojson, sedlex, ...) stay
-# out.
-SHIPPED_BIN_PACKAGES = js_of_ocaml-compiler wasm_of_ocaml-compiler
-SHIPPED_LIB_PACKAGES = $(PPXLIB_PACKAGES) js_of_ocaml-runtime js_of_ocaml \
-  js_of_ocaml-ppx
+# What the compiler package ships of js_of_ocaml: the js_of_ocaml and
+# wasm_of_ocaml executables, and the libraries needed to write and preprocess
+# js_of_ocaml code. The compiler library and its dependencies (yojson, sedlex,
+# ...) stay out.
+JSOO_SHIPPED_BIN_PACKAGES = js_of_ocaml-compiler wasm_of_ocaml-compiler
+JSOO_SHIPPED_LIB_PACKAGES = $(PPXLIB_PACKAGES) js_of_ocaml-runtime \
+  js_of_ocaml js_of_ocaml-ppx
 SHIPPED_LIB_SECTIONS = lib,lib_root,libexec,libexec_root,stublibs
 
 .PHONY: jsoo-install-shipped
 jsoo-install-shipped: jsoo-build
-	$(call ast_dependent_libs_install,--sections=bin $(SHIPPED_BIN_PACKAGES))
-	$(call ast_dependent_libs_install,--sections=$(SHIPPED_LIB_SECTIONS) $(SHIPPED_LIB_PACKAGES))
+	$(call ast_dependent_libs_install,--sections=bin $(JSOO_SHIPPED_BIN_PACKAGES))
+	$(call ast_dependent_libs_install,--sections=$(SHIPPED_LIB_SECTIONS) $(JSOO_SHIPPED_LIB_PACKAGES))
 
 .PHONY: jsoo-test
 jsoo-test: ast-dependent-libs-compiler \
@@ -404,6 +413,23 @@ jsoo-test: ast-dependent-libs-compiler \
 	PROJECT_ROOT="$(CURDIR)/_build/jsoo-test/default/js_of_ocaml" \
 	WASM_OF_OCAML=true \
 	  $(ast_dependent_libs_dune) $(ws_jsoo_test) @jsoo-test
+
+# Unlike merlin-build, which uses OCaml 5.4, this builds the Merlin that the
+# compiler package ships, with the installed OxCaml.
+.PHONY: merlin-build-shipped
+merlin-build-shipped: ast-dependent-libs-compiler duneconf/ast-dependent-libs.ws \
+  $(MERLIN_DEPS)
+	$(ast_dependent_libs_dune) $(ws_ast_dependent_libs) @merlin-libs
+
+# The Merlin executables, and merlin-lib together with the renamed csexp that
+# its interface exposes. yojson is only linked into the executables.
+MERLIN_SHIPPED_BIN_PACKAGES = merlin dot-merlin-reader ocaml-index
+MERLIN_SHIPPED_LIB_PACKAGES = merlin_csexp merlin-lib
+
+.PHONY: merlin-install-shipped
+merlin-install-shipped: merlin-build-shipped
+	$(call ast_dependent_libs_install,--sections=bin $(MERLIN_SHIPPED_BIN_PACKAGES))
+	$(call ast_dependent_libs_install,--sections=$(SHIPPED_LIB_SECTIONS) $(MERLIN_SHIPPED_LIB_PACKAGES))
 
 .PHONY: fmt
 fmt: $(dune_config_targets)

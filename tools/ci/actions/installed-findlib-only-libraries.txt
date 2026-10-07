@@ -1,3 +1,4 @@
 # Findlib umbrella packages; Dune lists only their child libraries.
+merlin-lib
 ocaml-compiler-libs
 ppxlib_ast

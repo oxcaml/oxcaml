@@ -4,15 +4,16 @@
 ; created by make from nix-provided sources.
 
 ; js_of_ocaml stays unvendored: recursive aliases skip vendored directories.
-(vendored_dirs deps ocaml-compiler-libs ppxlib ppxlib_jane)
+(vendored_dirs deps merlin ocaml-compiler-libs ppxlib ppxlib_jane)
 
 ; A separate project, built against the installed compiler package (see
 ; mkJsooSmokeTest in default.nix).
 (data_only_dirs smoke)
 
 ; Each alias depends on the .install files of its packages, which builds
-; everything they install. Keep in sync with PPXLIB_PACKAGES and
-; JSOO_PACKAGES in the top-level Makefile.
+; everything they install. Keep in sync with PPXLIB_PACKAGES, JSOO_PACKAGES,
+; MERLIN_SHIPPED_BIN_PACKAGES and MERLIN_SHIPPED_LIB_PACKAGES in the top-level
+; Makefile.
 
 (alias
  (name ppxlib-libs)
@@ -61,3 +62,12 @@
   (alias_rec js_of_ocaml/compiler/tests-oxcaml/runtest-wasm)
   (alias_rec js_of_ocaml/lib/tests/runtest-js)
   (alias_rec js_of_ocaml/lib/tests/runtest-wasm)))
+
+(alias
+ (name merlin-libs)
+ (deps
+  deps/csexp/merlin_csexp.install
+  merlin/merlin-lib.install
+  merlin/merlin.install
+  merlin/dot-merlin-reader.install
+  merlin/ocaml-index.install))

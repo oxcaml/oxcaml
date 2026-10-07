@@ -31,7 +31,6 @@
       {
         packages = {
           inherit oxcaml;
-          inherit (merlinPackages) merlin-lib dot-merlin-reader merlin;
           oxcaml-fp = oxcaml.override { framePointers = true; };
           oxcaml-asan = oxcaml.override { addressSanitizer = true; };
           ppxlib = oxcaml.mkPpxlibLibs oxcaml;
@@ -52,8 +51,11 @@
             jsoo-test
             jsoo-smoke-test
             installed-libraries
-            merlin
             ;
+          # Merlin built with the boot OCaml, running its test suite against
+          # oxcaml. Not a package: the Merlin that ships in oxcaml is built
+          # with OxCaml.
+          inherit (merlinPackages) merlin;
         };
 
         formatter = pkgs.nixfmt-tree;
@@ -61,11 +63,11 @@
         # Use the compiler derivation itself as the dev shell so `nix develop`
         # exposes its full build environment (configureFlags, preConfigure,
         # OXCAML_LLDB/OXCAML_CLANG, ...) and the `configurePhase` advertised by
-        # the shellHook behaves exactly like the nix build. withMerlin only
+        # the shellHook behaves exactly like the nix build. withMerlinDev only
         # extends its inputs with what `make merlin-build` / `make merlin-test`
         # need.
         devShells.default = oxcaml.override {
-          withMerlin = true;
+          withMerlinDev = true;
           withJsooTestSources = true;
         };
       }

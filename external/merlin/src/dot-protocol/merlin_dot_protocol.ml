@@ -74,7 +74,7 @@ end
 type directive = Directive.Processed.t
 
 module Sexp = struct
-  type t = Csexp.t = Atom of string | List of t list
+  type t = Csexp_compat.t = Atom of string | List of t list
 
   let atoms_of_strings = List.map ~f:(fun s -> Atom s)
 
@@ -199,9 +199,9 @@ end) (Chan : sig
   type in_chan
   type out_chan
 
-  val read : in_chan -> (Csexp.t, string) result IO.t
+  val read : in_chan -> (Csexp_compat.t, string) result IO.t
 
-  val write : out_chan -> Csexp.t -> unit IO.t
+  val write : out_chan -> Csexp_compat.t -> unit IO.t
 end) =
 struct
   type 'a io = 'a IO.t
@@ -253,6 +253,6 @@ module Blocking =
     (struct
       type in_chan = in_channel
       type out_chan = out_channel
-      let read = Csexp.input
-      let write = Csexp.to_channel
+      let read = Csexp_compat.input
+      let write = Csexp_compat.to_channel
     end)

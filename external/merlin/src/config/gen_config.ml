@@ -6,10 +6,16 @@ let ocaml_version_val =
   | "4", "07", p -> Printf.sprintf "`OCaml_4_07_%d" p
   | maj, min, _ -> Printf.sprintf "`OCaml_%s_%s_0" maj min
 
+(* Builds that don't run dune subst can pass a version instead. *)
+let version =
+  match Sys.argv.(2) with
+  | "" -> "%%VERSION%%"
+  | version -> version
+
 let () =
   Printf.printf
     {|
-let version = "%%VERSION%%"
+let version = %S
 let ocamlversion :
   [ `OCaml_4_02_0 | `OCaml_4_02_1 | `OCaml_4_02_2 | `OCaml_4_02_3
   | `OCaml_4_03_0 | `OCaml_4_04_0 | `OCaml_4_05_0 | `OCaml_4_06_0
@@ -18,4 +24,4 @@ let ocamlversion :
   | `OCaml_4_14_0
   | `OCaml_4_14_1 | `OCaml_5_0_0  | `OCaml_5_1_0 | `OCaml_5_2_0 | `OCaml_5_4_0 ] = %s
 |}
-    ocaml_version_val
+    version ocaml_version_val

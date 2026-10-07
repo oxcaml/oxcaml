@@ -13,6 +13,20 @@ Here are the commands to know:
 
 Note that for any of the `make` commands, you must have already configured the workspace. See "Branching and configuring" in [`../../README.md`](http://README.md) for more information.
 
+# The Merlin in the compiler package
+
+The Nix `oxcaml` package ships a Merlin built with OxCaml itself: the `ocamlmerlin`, `ocamlmerlin-server`, `dot-merlin-reader` and `ocaml-index` executables and the `merlin-lib` libraries. `make merlin-build-shipped` builds it like js_of_ocaml (see [`../js_of_ocaml/HACKING.jst.md`](../js_of_ocaml/HACKING.jst.md)), with `external/ast-dependent-libs` as the dune root and csexp and yojson from Nix; `make merlin-install-shipped` installs it (into `_install` by default).
+
+So Merlin must also compile with OxCaml. The GitHub `merlin` check builds it with OCaml 5.4 and `merlin-emergency-skip` does not cover this: a change that breaks it fails the `oxcaml` Nix package. Check with `nix develop --command make merlin-build-shipped`; `withMerlin = false` in `default.nix` leaves Merlin out of the package.
+
+Downstream changes to keep when merging upstream Merlin:
+
+* The shipped csexp is renamed `merlin_csexp`, so that it cannot clash with a user's csexp. Merlin uses `Csexp_compat` (a `select` in `src/dot-protocol/dune`), never `Csexp`. In the shipped `merlin-lib`, `Merlin_dot_protocol.Make` therefore works on `Merlin_csexp.t`, so consumers that instantiate it with upstream csexp (such as ocaml-lsp-server) need adapting.
+* `src/ocaml-index/lib` is the public `merlin-lib.ocaml_index`.
+* `merlin-lib.os_ipc` depends on `merlin-lib.utils`, whose stubs it uses.
+* `src/config/dune` runs `gen_config` as an executable and passes it `MERLIN_GIT_VERSION`, which `default.nix` sets because Nix doesn't run `dune subst`. Losing the variable fails nothing: the shipped Merlin just stops reporting its version.
+* `src/runtime/float32.c`, `src/ocaml/parsing/msupport_parsing.ml` and the `enabled_if` on the menhirLib rule in `src/ocaml/preprocess/dune` are fixes for building with OxCaml.
+
 # Intended Workflows
 
 ## Authoring
