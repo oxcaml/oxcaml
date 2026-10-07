@@ -1050,6 +1050,24 @@ let cstr_layout_is_constant (layout : cstr_layout) =
     Array.length sorts = 0
   | Cstr_layout_undetermined -> false
 
+let mixed_block_element_of_base (base : Jkind_types.Sort.base) scannable_axes
+    : mixed_block_element =
+  match base with
+  | Scannable -> Scannable scannable_axes
+  | Bits8 -> Bits8
+  | Bits16 -> Bits16
+  | Bits32 -> Bits32
+  | Bits64 -> Bits64
+  | Float32 -> Float32
+  | Float64 -> Float64
+  | Untagged_immediate -> Untagged_immediate
+  | Vec128 -> Vec128
+  | Vec256 -> Vec256
+  | Vec512 -> Vec512
+  | Mask -> Mask
+  | Word -> Word
+  | Void -> Void
+
 (* The scannable axes in the resulting [mixed_block_element] are always [max] *)
 let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
   match sort with
@@ -1057,22 +1075,10 @@ let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
      we are forced to default to max. It would be good to store the scannable
      axis information, but doing so takes a sizable refactor. See the comment
      on [Sort] in [jkind_intf.ml] *)
-  | Base Scannable -> Scannable Jkind_types.Scannable_axes.max
-  | Base Bits8 -> Bits8
-  | Base Bits16 -> Bits16
-  | Base Bits32 -> Bits32
-  | Base Bits64 -> Bits64
-  | Base Float32 -> Float32
-  | Base Float64 -> Float64
-  | Base Untagged_immediate -> Untagged_immediate
-  | Base Vec128 -> Vec128
-  | Base Vec256 -> Vec256
-  | Base Vec512 -> Vec512
-  | Base Mask -> Mask
-  | Base Word -> Word
+  | Base base ->
+    mixed_block_element_of_base base Jkind_types.Scannable_axes.max
   | Product sorts ->
     Product (Array.map mixed_block_element_of_const_sort (Array.of_list sorts))
-  | Base Void -> Void
   | Addressable sort -> Addressable (mixed_block_element_of_const_sort sort)
   | Univar _ -> Misc.fatal_error "mixed_block_element_of_const_sort: Univar"
   | Genvar _ -> Misc.fatal_error "mixed_block_element_of_const_sort: Genvar"

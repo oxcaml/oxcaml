@@ -352,6 +352,7 @@
   translobj
   translprim
   translquote
+  translrepr
   ;; bytecomp/
   debug_event
   meta
