@@ -1679,3 +1679,8 @@ val static_cast
 
 val fatal_error_unevaluated_splice_var : Layout_ident.t -> 'a
 val fatal_error_invalid_constructor : lambda -> 'a
+
+type transl_ctx =
+  {
+    scopes: Debuginfo.Scoped_location.scopes
+  }
