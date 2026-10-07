@@ -21,7 +21,7 @@ Static data:
   Cross_module_static_relay//0[ Cross_module_static_relay/relay_id/0; ]
   (Cross_module_static_relay/relay_id/0
     (closure ⟨env⟩
-      (ktemplate heap{} layout_2
+      (ktemplate layout_2
         (function {nlocal = 0} x/318[$layout_2] : $layout_2
           (region
             (applytail

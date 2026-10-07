@@ -1275,7 +1275,7 @@ type lambda =
   | Lexclave of lambda
   | Lkindtemplate of lkindtemplate
   | Lkindinstantiate of lkindinstantiate
-  | Ltemplate of ltemplate
+  | Ltemplate of lfunction
   | Linstantiate of lambda_apply
 
 and rec_binding = {
@@ -1303,9 +1303,6 @@ and lfunction =
 and lkindtemplate =
   { ktmpl_params: Slambdaident.t list;
     ktmpl_body: lfunction;
-    ktmpl_env: (lambda * layout) Ident.Map.t;
-    ktmpl_env_mode: locality_mode;
-    ktmpl_loc: scoped_location;
   }
 
 and lkindinstantiate =
@@ -1314,11 +1311,6 @@ and lkindinstantiate =
     kinst_result_layout: layout;
     kinst_mode: return_mode;
     kinst_loc: scoped_location;
-  }
-
-and ltemplate =
-  { tmpl_func: lfunction;
-    tmpl_env: (lambda * layout) Ident.Map.t;
   }
 
 and lambda_while =
@@ -1375,8 +1367,8 @@ let rec try_to_find_location lam =
   match lam with
   | Lprim (_, _, loc)
   | Lfunction { loc; _ }
-  | Lkindtemplate { ktmpl_loc = loc; _ }
-  | Ltemplate { tmpl_func = { loc; _ }; _ }
+  | Lkindtemplate { ktmpl_body = { loc; _ }; _ }
+  | Ltemplate { loc; _ }
   | Lletrec ({ def = { loc; _ }; _ } :: _, _)
   | Lapply { ap_loc = loc; _ }
   | Lkindinstantiate { kinst_loc = loc; _ }
@@ -1963,7 +1955,7 @@ let shallow_iter ~tail ~non_tail:f = function
       f body
   | Lkindinstantiate {kinst_func} ->
       f kinst_func
-  | Ltemplate {tmpl_func = {body}} ->
+  | Ltemplate {body} ->
       f body
   | Linstantiate {ap_func = fn; ap_args = args} ->
       f fn; List.iter f args
@@ -1981,9 +1973,8 @@ let rec free_variables = function
   | Lconst _ -> Ident.Set.empty
   | Lapply{ap_func = fn; ap_args = args} ->
       free_variables_list (free_variables fn) args
-  | Lfunction{body; params} ->
-      Ident.Set.diff (free_variables body)
-        (Ident.Set.of_list (List.map (fun p -> p.name) params))
+  | Lfunction lfun ->
+      free_variables_lfun lfun
   | Llet(_, _k, id, _duid, arg, body)
   | Lmutlet(_k, id, _duid, arg, body) ->
       Ident.Set.union
@@ -2059,22 +2050,22 @@ let rec free_variables = function
       free_variables e
   | Lexclave e ->
       free_variables e
-  | Lkindtemplate {ktmpl_env} ->
-      Ident.Map.fold
-        (fun _ (lam, _) acc -> Ident.Set.union (free_variables lam) acc)
-        ktmpl_env Ident.Set.empty
+  | Lkindtemplate {ktmpl_body} ->
+      free_variables_lfun ktmpl_body
   | Lkindinstantiate {kinst_func = fn} ->
       free_variables fn
-  | Ltemplate {tmpl_env} ->
-      Ident.Map.fold
-        (fun _ (lam, _) acc -> Ident.Set.union (free_variables lam) acc)
-        tmpl_env Ident.Set.empty
+  | Ltemplate tmpl ->
+      free_variables_lfun tmpl
   | Linstantiate {ap_func = fn; ap_args = args} ->
       free_variables_list (free_variables fn) args
 
 and free_variables_list set exprs =
   List.fold_left (fun set expr -> Ident.Set.union (free_variables expr) set)
     set exprs
+
+and free_variables_lfun {body; params} =
+  Ident.Set.diff (free_variables body)
+    (Ident.Set.of_list (List.map (fun p -> p.name) params))
 
 (* Check if an action has a "when" guard *)
 let static_label_sequence = Static_label.make_sequence ()
@@ -2347,22 +2338,13 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
                                 ap_args = subst_list s l inst.ap_args }
     | Lfunction lf ->
         Lfunction (subst_lfun s l lf)
-    | Lkindtemplate ({ktmpl_env} as ktmpl) ->
+    | Lkindtemplate {ktmpl_params; ktmpl_body} ->
         Lkindtemplate
-          { ktmpl with
-            ktmpl_env =
-              Ident.Map.map
-                (fun (lam, layout) -> (subst s l lam, layout))
-                ktmpl_env;
+          { ktmpl_params;
+            ktmpl_body = subst_lfun s l ktmpl_body;
           }
-    | Ltemplate {tmpl_func; tmpl_env} ->
-        Ltemplate
-          { tmpl_func;
-            tmpl_env =
-              Ident.Map.map
-                (fun (lam, layout) -> (subst s l lam, layout))
-                tmpl_env;
-          }
+    | Ltemplate lf ->
+        Ltemplate (subst_lfun s l lf)
     | Llet(str, k, id, duid, arg, body) ->
         let id, duid, l' = bind id duid l in
         Llet(str, k, id, duid, subst s l arg, subst s l' body)
@@ -2501,38 +2483,6 @@ let map_lfunction f ({ kind; params; return; body = old_body; attr; loc;
   else { kind; params; return; body = new_body; attr; loc; mode; ret_mode;
          yielding }
 
-let extract_free_var_env ~layout_of_ident lfun =
-  let fresh_vars, env =
-      Ident.Set.fold
-    (fun ident (fresh_vars, env) ->
-       match layout_of_ident ident with
-       | None -> fresh_vars, env
-       | Some layout ->
-         let fresh_ident = Ident.rename ident in
-         Ident.Map.add ident fresh_ident fresh_vars,
-         Ident.Map.add fresh_ident (Lvar ident, layout) env)
-    (free_variables (Lfunction lfun))
-    (Ident.Map.empty, Ident.Map.empty)
-  in
-  let lfun =
-    if Ident.Map.is_empty fresh_vars
-    then lfun
-    else map_lfunction (rename fresh_vars) lfun
-  in
-  lfun, env
-
-let map_env f old_env =
-  let env_changed = ref false in
-  let new_env =
-    Ident.Map.map
-      (fun (old_lam, layout) ->
-        let new_lam = f old_lam in
-        env_changed := !env_changed || old_lam != new_lam;
-        (new_lam, layout))
-      old_env
-  in
-  if not !env_changed then old_env else new_env
-
 let shallow_map ~tail ~non_tail:f lam =
   match lam with
   | Lvar _
@@ -2596,31 +2546,20 @@ let shallow_map ~tail ~non_tail:f lam =
   | Lfunction old_lfun ->
       let new_lfun = map_lfunction f old_lfun in
       if old_lfun == new_lfun then lam else Lfunction new_lfun
-  | Lkindtemplate { ktmpl_params; ktmpl_body = old_body;
-                    ktmpl_env = old_env; ktmpl_env_mode;
-                    ktmpl_loc } ->
+  | Lkindtemplate { ktmpl_params; ktmpl_body = old_body } ->
       let new_body = map_lfunction f old_body in
-      let new_env = map_env f old_env in
-      if old_body == new_body && old_env == new_env
+      if old_body == new_body
       then lam
       else
         Lkindtemplate {
           ktmpl_params;
-          ktmpl_body = new_body;
-          ktmpl_env = new_env;
-          ktmpl_env_mode;
-          ktmpl_loc;
+          ktmpl_body = new_body
         }
-  | Ltemplate { tmpl_func = old_lfun; tmpl_env = old_env } ->
+  | Ltemplate old_lfun ->
       let new_lfun = map_lfunction f old_lfun in
-      let new_env = map_env f old_env in
-      if old_lfun == new_lfun && old_env == new_env
+      if old_lfun == new_lfun
       then lam
-      else
-        Ltemplate {
-          tmpl_func = new_lfun;
-          tmpl_env = new_env;
-        }
+      else Ltemplate new_lfun
   | Llet (str, layout, v, v_duid, old_e1, old_e2) ->
       let new_e1 = f old_e1 in
       let new_e2 = tail old_e2 in
@@ -3922,10 +3861,11 @@ let may_allocate_in_region lam =
   and loop = function
     | Lvar _ | Lmutvar _ | Lconst _ -> ()
 
-    | Lfunction {mode=Alloc_heap} | Lkindtemplate {ktmpl_env_mode=Alloc_heap}
-    | Ltemplate {tmpl_func = {mode=Alloc_heap}} -> ()
-    | Lfunction {mode=Alloc_local} | Lkindtemplate {ktmpl_env_mode=Alloc_local}
-    | Ltemplate {tmpl_func = {mode=Alloc_local}} -> raise Exit
+    | Lfunction {mode=Alloc_heap} | Lkindtemplate {ktmpl_body={mode=Alloc_heap}}
+    | Ltemplate {mode=Alloc_heap} -> ()
+    | Lfunction {mode=Alloc_local}
+    | Lkindtemplate {ktmpl_body={mode=Alloc_local}}
+    | Ltemplate {mode=Alloc_local} -> raise Exit
 
     | Lapply {ap_mode=Maybe_alloc_stack}
     | Lkindinstantiate {kinst_mode=Maybe_alloc_stack}
