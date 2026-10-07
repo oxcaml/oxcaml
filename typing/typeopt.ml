@@ -1238,8 +1238,6 @@ let assert_mixed_product_support_for_lambda_shape loc kind shape =
     Typedecl.assert_mixed_product_support loc kind
       ~value_prefix_len:(Mixed_product_bytes.value_prefix_len counts)
 
-let type_layout env ty = Jkind.get_layout env (Ctype.type_jkind env ty)
-
 let refine_mixed_block_element env loc ty mbe =
   try
     let (_num_nodes_visited, value_kind) =
