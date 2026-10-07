@@ -165,7 +165,7 @@ let print_cmi_infos name crcs kind params global_name_bindings =
     List.iter print_parameter_name_line params;
     begin
       match kind with
-      | Normal { cmi_arg_for = Some { Types.arg_param; _ }; _ } ->
+      | Normal { cmi_arg_signature = Some { Types.arg_param; _ }; _ } ->
         printf "Argument for parameter:\n";
         print_parameter_name_line arg_param
       | Normal _ | Parameter ->

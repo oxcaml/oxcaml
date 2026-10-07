@@ -45,7 +45,7 @@ type runtime_arg =
     Argument_block of {
       (* The compilation unit being passed as an argument *)
       ra_unit : Compilation_unit.t;
-      (* The offset of its argument block (see [Types.arg_for]) *)
+      (* The offset of its argument block (see [Types.arg_signature]) *)
       ra_field_idx : int;
       (* The representation of the main block, which is needed to
          index into it *)
@@ -54,6 +54,11 @@ type runtime_arg =
   | (* A module to pass in its entirety *)
     Main_module_block of Compilation_unit.t
   | Unit
+
+(** The representation of the main module block of a unit with signature
+    [swg] compiled with [-as-argument-for]. *)
+val main_repr_of_argument_unit:
+      Signature_with_global_bindings.t -> module_representation
 
 val transl_instance:
       Compilation_unit.t -> runtime_args:runtime_arg list

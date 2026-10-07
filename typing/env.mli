@@ -682,11 +682,7 @@ val save_signature_with_imports:
 
 (** See [Persistent_env.find_import]. *)
 val find_import:
-  chain:Global_module.t list ->
-  Compilation_unit.Name.t ->
-  Compilation_unit.t option
-  * Global_module.Parameter_name.t list
-  * Signature_with_global_bindings.t
+  chain:Global_module.t list -> Compilation_unit.Name.t -> Persistent_env.import
 
 (* Register a module as a parameter to this unit. *)
 val register_parameter: Global_module.Parameter_name.t -> unit
@@ -721,11 +717,11 @@ val register_import_as_opaque: Compilation_unit.Name.t -> unit
    -as-parameter *)
 val is_parameter_unit: Global_module.Name.t -> bool
 
-(* [implemented_parameter md] is the [Types.arg_for] recorded when [md] was
-   compiled with -as-argument-for *)
+(* [implemented_parameter md] is the [Types.arg_signature] recorded when [md]
+   was compiled with -as-argument-for *)
 val implemented_parameter:
   chain:Global_module.t list ->
-  Compilation_unit.Name.t -> Types.arg_for option
+  Compilation_unit.Name.t -> Types.arg_signature option
 
 (* [is_imported_parameter md] is true if [md] has been imported and is a
    parameter to this module *)

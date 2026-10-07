@@ -4606,20 +4606,11 @@ let check_argument_type_if_given env sourcefile ~actual_staticity actual_sig
              ai_coercion_from_primary = coercion;
            }
 
-let cmi_arg_for sg arg_param =
-  Option.map
-    (fun arg_param : Types.arg_for ->
-      (* The argument block is appended after the signature's runtime fields;
-         must agree with [Translmod.add_arg_block_to_module_block]. *)
-      let sig_repr =
-        List.map snd (Types.bound_value_identifiers_and_sorts sg)
-      in
-      { arg_param;
-        arg_block_idx = List.length sig_repr;
-        arg_main_repr =
-          Array.of_list
-            (sig_repr @ [Jkind_types.Sort.(of_const Const.for_module)]) })
-    arg_param
+let arg_signature sg ~param : Types.arg_signature =
+  (* The argument block is appended after the signature's runtime fields;
+     must agree with [Translmod.add_arg_block_to_module_block]. *)
+  { arg_param = param;
+    arg_block_idx = List.length (Types.bound_value_identifiers_and_sorts sg) }
 
 let type_implementation target modulename initial_env ast =
   let sourcefile = Unit_info.original_source_file target in
@@ -4724,7 +4715,8 @@ let type_implementation target modulename initial_env ast =
             error (Cannot_implement_parameter (cu_name, source_intf));
           let arg_type_from_cmi =
             Env.implemented_parameter ~chain:[] cu_name
-            |> Option.map (fun ({ arg_param; _ } : Types.arg_for) -> arg_param)
+            |> Option.map
+                 (fun ({ arg_param; _ } : Types.arg_signature) -> arg_param)
           in
           if not (Option.equal Global_module.Parameter_name.equal
                     arg_type arg_type_from_cmi) then
@@ -4816,7 +4808,10 @@ let type_implementation target modulename initial_env ast =
             let kind =
               Cmi_format.Normal
                 { cmi_impl = modulename;
-                  cmi_arg_for = cmi_arg_for simple_sg arg_type }
+                  cmi_arg_signature =
+                    Option.map
+                      (fun param -> arg_signature simple_sg ~param)
+                      arg_type }
             in
             let cmi =
               Profile.record_call "save_cmi" (fun () ->
@@ -4917,12 +4912,12 @@ let functorize_signature ~params ~modules : Types.signature =
         : Types.module_type =
     List.fold_right
       (fun (p_name, param_id) body ->
-        let impl, param_params, (swg : Signature_with_global_bindings.t) =
+        let { Persistent_env.imp_impl; imp_params; imp_raw_sign = swg; _ } =
           Env.find_import ~chain:[]
             (Compilation_unit.Name.of_parameter_name p_name)
         in
-        assert (Option.is_none impl);
-        assert (List.is_empty param_params);
+        assert (Option.is_none imp_impl);
+        assert (List.is_empty imp_params);
         assert (Array.length swg.bound_globals = 0);
         let sign, _ = swg.sign in
         let param_type = Mty_signature (Subst.Lazy.force_signature sign) in
@@ -4977,7 +4972,7 @@ let functorize_interface initial_env ~params ~module_sigs unit_info
   if not !Clflags.dont_write_files then begin
     let name = Compilation_unit.name modulename in
     let kind =
-      Cmi_format.Normal { cmi_impl = modulename; cmi_arg_for = None }
+      Cmi_format.Normal { cmi_impl = modulename; cmi_arg_signature = None }
     in
     let cmi =
       Env.save_signature ~alerts:Misc.Stdlib.String.Map.empty
@@ -5047,7 +5042,7 @@ let functorize_implementation initial_env ~params ~modules ~module_sigs
     | None ->
         let name = Compilation_unit.name modulename in
         let kind =
-          Cmi_format.Normal { cmi_impl = modulename; cmi_arg_for = None }
+          Cmi_format.Normal { cmi_impl = modulename; cmi_arg_signature = None }
         in
         let cmi =
           Env.save_signature_with_imports ~alerts:Misc.Stdlib.String.Map.empty
@@ -5165,12 +5160,14 @@ let package_units initial_env objfiles target_cmi modulename =
         (Env.imports()) in
     (* Write packaged signature *)
     if not !Clflags.dont_write_files then begin
-      let cmi_arg_for =
+      let cmi_arg_signature =
         (* Packs aren't supported as arguments *)
         None
       in
       let name = Compilation_unit.name modulename in
-      let kind = Cmi_format.Normal { cmi_impl = modulename; cmi_arg_for } in
+      let kind =
+        Cmi_format.Normal { cmi_impl = modulename; cmi_arg_signature }
+      in
       let cmi =
         Env.save_signature_with_imports ~alerts:Misc.Stdlib.String.Map.empty
           (sg, Staticity.Dynamic) name kind target_cmi

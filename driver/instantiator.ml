@@ -78,15 +78,16 @@ let instantiate
      arguments' [.cmo]/[.cmx] at all; only their [.cmi]s. *)
   let arg_info_of_cm_path cm_path =
     let unit_info = read_unit_info cm_path in
-    match
-      Env.implemented_parameter ~chain:[] (CU.name unit_info.ui_unit)
-    with
+    let { Persistent_env.imp_arg_signature; imp_raw_sign; _ } =
+      Env.find_import ~chain:[] (CU.name unit_info.ui_unit)
+    in
+    match imp_arg_signature with
     | None ->
       error (Not_compiled_as_argument
                { compilation_unit = unit_info.ui_unit;
                  filename = cm_path;
                  base_unit = base_unit_info.ui_unit; })
-    | Some { Types.arg_param; arg_block_idx; arg_main_repr } ->
+    | Some { Types.arg_param; arg_block_idx } ->
       begin
         match unit_info.ui_format with
         | Mb_struct _ -> ()
@@ -95,7 +96,7 @@ let instantiate
                    { compilation_unit = unit_info.ui_unit;
                      filename = cm_path; })
       end;
-      let main_repr = Lambda.transl_module_representation arg_main_repr in
+      let main_repr = Translmod.main_repr_of_argument_unit imp_raw_sign in
       arg_param, (unit_info.ui_unit, arg_block_idx, main_repr)
   in
   let arg_infos = List.map arg_info_of_cm_path args in

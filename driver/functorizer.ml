@@ -78,7 +78,8 @@ let assert_subset ~gm ~chain sub sup =
       |> String.concat ", "
     in
     let chain_to_string chain =
-      List.map GM.to_string chain |> String.concat ", required by "
+      List.map (fun gm -> GM.Name.to_string (GM.to_name gm)) chain
+      |> String.concat ", required by "
     in
     Misc.fatal_errorf
       "{%s} is not a subset of {%s} (while loading %s, required by %s)"
@@ -86,10 +87,15 @@ let assert_subset ~gm ~chain sub sup =
       (chain_to_string chain)
 
 let load_exact ~chain (gm : GM.t) : Signature_with_global_bindings.t =
-  let cu, cmi_params, swg =
+  let {
+    Persistent_env.imp_impl;
+    imp_params = cmi_params;
+    imp_raw_sign = swg;
+    _;
+  } =
     Env.find_import ~chain (CU.Name.of_head_of_global gm)
   in
-  assert (Option.is_some cu);
+  assert (Option.is_some imp_impl);
   let tracked_set =
     gm.GM.hidden_args @ gm.GM.visible_args
     |> List.map (fun (a : _ GM.Argument.t) -> a.param)
@@ -102,10 +108,15 @@ let load_exact ~chain (gm : GM.t) : Signature_with_global_bindings.t =
 
 let rec load_approx ~chain (gm : GM.t) : GM.t * Signature_with_global_bindings.t
     =
-  let cu, cmi_params, swg =
+  let {
+    Persistent_env.imp_impl;
+    imp_params = cmi_params;
+    imp_raw_sign = swg;
+    _;
+  } =
     Env.find_import ~chain (CU.Name.of_head_of_global gm)
   in
-  assert (Option.is_some cu);
+  assert (Option.is_some imp_impl);
   let param_set args =
     List.map (fun (a : _ GM.Argument.t) -> a.param) args
     |> GM.Parameter_name.Set.of_list
@@ -204,17 +215,17 @@ let analyze (src_names : CU.Name.Set.t) : result =
   CU.Name.Set.iter
     (fun cu_name ->
       match Env.find_import ~chain cu_name with
-      | None, _, _ ->
+      | { imp_impl = None; _ } ->
           Compenv.fatal
             (Printf.sprintf
                "Invalid -functorize input: '%s' is a parameter module"
                (CU.Name.to_string cu_name))
-      | Some _, [], _ ->
+      | { imp_impl = Some _; imp_params = []; _ } ->
           Compenv.fatal
             (Printf.sprintf
                "Invalid -functorize input: '%s' is not a parameterised module"
                (CU.Name.to_string cu_name))
-      | Some _, cmi_params, swg ->
+      | { imp_impl = Some _; imp_params = cmi_params; imp_raw_sign = swg; _ } ->
           let gm =
             GM.create_exn (CU.Name.to_string cu_name) [] ~hidden_args:cmi_params
           in
@@ -288,7 +299,8 @@ let implementation (input_module_names : CU.Name.Set.t) ~ext
           let required_by =
             List.map
               (fun gm ->
-                Printf.sprintf ", required by %s" (Global_module.to_string gm))
+                Printf.sprintf ", required by %s"
+                  (GM.Name.to_string (GM.to_name gm)))
               chain
             |> String.concat ""
           in
