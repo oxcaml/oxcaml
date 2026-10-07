@@ -424,3 +424,51 @@ against 0.92 without nesting).  A fairer denominator would add the sizes
 of the callees inlined during the speculation.
 
 Nothing here measures run time.
+
+Inlined callees in the ratio's denominator
+==========================================
+
+Flag: -flambda2-speculative-inlining-ratio-includes-inlined-callees (off
+by default).  The original sizes of the callees inlined into the
+speculated body since the speculation started (summed in the downwards
+accumulator, reset by prepare_for_speculative_inlining, counted at the
+real inlining in Simplify_apply_expr) are added to the callee's own
+original size in the ratio's denominator, as code the inlining
+specialises too.  Stats keys: speculation.inlined_callees_size and
+speculation.inlined_only_with_inlined_callees_size.
+
+typing/ (text bytes relative to plain 2026; "tipped" = accepted decisions
+that would fail with the callee's size alone):
+
+  config                       env            ctype          typecore
+  ---------------------------  -------------  -------------  -------------
+  denominator alone            0.0% (0)       +1.5% (19)     +0.4% (10)
+  nested                       -2.1%          -1.5%          -2.0%
+  nested + denominator         -1.3% (9)      +0.6% (33)     -1.3% (19)
+  hints + nested               -1.3%          +0.3%          -0.2%
+  hints + nested + denominator -1.0% (12)     +2.1% (49)     +0.9% (32)
+
+The denominator matters even without nesting, because the specialisation
+makes some calls inside the body inlinable that were not inlined in the
+callee's own code.  With nesting it gives back about half of the
+inlinings that nested speculation refuses (ctype: 411 accepted
+outermost speculations with nesting, 474 with the denominator, 461 plain).
+
+Whole compiler distribution, with the denominator (nine configurations):
+
+  configuration                 text      CPU     call sites inlined   tipped by the denominator
+  ----------------------------  --------  ------  -------------------  -------------------------
+  2026                          30.37 MB  1,543   140,225
+  + denominator                 +0.3%     -4.3%   +0.5%                364
+  + nested                      -5.5%     +4.5%   -7.5%
+  + nested + denominator        -0.7%     -0.4%   -1.0%                2,926
+  + hints + nested              -7.2%     +6.5%   -10.2%
+  + hints + nested + denominator -1.7%    +8.2%   -3.0%                5,881
+
+Nested speculation's size reduction was the asymmetry: with the callees
+inlined during the speculation counted in the denominator, nested
+speculation accepts 44,242 outermost speculations instead of 35,648
+(plain 45,387) and ends 0.7% smaller than plain at the same CPU time.
+The denominator alone is neutral in size and saves 4% of CPU time.
+PDFs regenerated: compiler-inlining-2026-hints.pdf (nine configurations)
+and compiler-inlining-2026-hints-stats.pdf.

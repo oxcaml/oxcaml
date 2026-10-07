@@ -98,7 +98,8 @@ MIN_BIN = 20  # bins with fewer decisions are not drawn
 # Chart chrome (light) and the categorical palette, one slot per configuration.
 SURFACE, INK, INK2, MUTED = '#fcfcfb', '#0b0b0b', '#52514e', '#898781'
 GRID, AXIS = '#e1e0d9', '#c3c2b7'
-PALETTE = ['#2a78d6', '#eb6834', '#1baf7a', '#8e4bd6', '#a0622d', '#d63c8a']
+PALETTE = ['#2a78d6', '#eb6834', '#1baf7a', '#8e4bd6', '#a0622d', '#d63c8a',
+           '#1f9bb5', '#b5a21f', '#5c5c5c']
 
 
 # --------------------------------------------------------------------------
