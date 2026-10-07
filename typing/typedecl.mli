@@ -132,7 +132,7 @@ val compute_block_shape :
     Env.t -> type_expr list ->
     [ `Not_mixed | `Mixed of mixed_product_shape | `Undetermined ]
 
-type native_repr_kind = Unboxed | Untagged | Unpacked
+type native_repr_kind = Unboxed | Untagged | Unpacked | Unsafe_unextended
 
 (* Records reason for a jkind representability requirement in errors. *)
 type jkind_sort_loc =
