@@ -448,7 +448,6 @@ let run
         | `Cmja filename ->
             read_jsir_file filename ~expected:`Cmja Parse_bytecode.from_cmja
       in
-      Gc.compact ();
       if times () then Format.eprintf "  parsing: %a@." Timer.print t1;
       (* CR-soon selee: [ocamlj] does not produce any debug-related information
          yet. This should be updated once the [.cmj] file format changes. *)
