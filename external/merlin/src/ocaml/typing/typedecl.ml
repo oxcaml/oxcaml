@@ -3707,15 +3707,15 @@ let normalize_decl_jkinds env decls =
 let add_types_to_env ~shapes decls env =
   match shapes with
   | None ->
-    List.fold_right
-      (fun (id, decl) env ->
+    List.fold_left
+      (fun env (id, decl) ->
         add_type ~long_path:false ~check:true id decl env)
-      decls env
+      env decls
   | Some shapes ->
-    List.fold_right2
-    (fun (id, decl) shape env ->
+    List.fold_left2
+    (fun env (id, decl) shape ->
       add_type ~long_path:false ~check:true ~shape id decl env)
-    decls shapes env
+    env decls shapes
 
 (* Translate a set of type declarations, mutually recursive or not *)
 let transl_type_decl env rec_flag sdecl_list =

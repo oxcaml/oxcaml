@@ -896,19 +896,21 @@ let add_definitions_of_params t ~params =
     t
     (Bound_parameters.to_list params)
 
-let add_to_code_age_relation t ~new_code_id ~old_code_id =
-  let code_age_relation =
-    match old_code_id with
-    | None -> t.code_age_relation
-    | Some old_code_id ->
-      Code_age_relation.add t.code_age_relation ~newer:new_code_id
-        ~older:old_code_id
-  in
+let code_age_relation (t : t) = t.code_age_relation
+
+let with_code_age_relation (t : t) code_age_relation =
   { t with code_age_relation }
 
-let code_age_relation t = t.code_age_relation
-
-let with_code_age_relation t code_age_relation = { t with code_age_relation }
+let add_to_code_age_relation t ~new_code_id ~old_code_id =
+  let code_age_relation =
+    let code_age_relation = code_age_relation t in
+    match old_code_id with
+    | None -> code_age_relation
+    | Some old_code_id ->
+      Code_age_relation.add code_age_relation ~newer:new_code_id
+        ~older:old_code_id
+  in
+  with_code_age_relation t code_age_relation
 
 let bump_current_level_scope t =
   { t with current_level = One_level.bump_scope t.current_level }
