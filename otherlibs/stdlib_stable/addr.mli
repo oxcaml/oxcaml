@@ -41,7 +41,7 @@ val of_idx_write_local
 
 external of_imm
   : ('a : any).
-  ('a Addr_imm.t[@local_opt]) @ read -> ('a t[@local_opt]) @ read
+  'a Addr_imm.t @ read -> 'a t @ read
   = "%identity"
 
 external get
