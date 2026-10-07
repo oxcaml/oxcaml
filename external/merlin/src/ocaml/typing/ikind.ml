@@ -614,8 +614,9 @@ module Solver = struct
       | _ -> provenance_and_child_ctx ctx ty
     in
     match desc with
-    | Types.Tvar { name = _name; jkind } | Types.Tunivar { name = _name; jkind }
-      ->
+    | Types.Tvar { name = _name; jkind }
+    | Types.Tivar { name = _name; jkind; ivar = _ }
+    | Types.Tunivar { name = _name; jkind } ->
       (* Keep a rigid param, but cap it by its annotated jkind. *)
       self_provenance (Ldd.meet (rigid ctx ty) (ckind_of_jkind child_ctx jkind))
     | Types.Tconstr (path, args, _abbrev_memo) ->

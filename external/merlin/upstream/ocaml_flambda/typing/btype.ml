@@ -181,6 +181,7 @@ let new_box_ty t = newty2 ~level:(get_level t) (Tbox t)
 (**** Check some types ****)
 
 let is_Tvar ty = match get_desc ty with Tvar _ -> true | _ -> false
+let is_Tivar ty = match get_desc ty with Tivar _ -> true | _ -> false
 let is_Tunivar ty = match get_desc ty with Tunivar _ -> true | _ -> false
 let is_Tconstr ty = match get_desc ty with Tconstr _ -> true | _ -> false
 let is_Tpoly ty = match get_desc ty with Tpoly _ -> true | _ -> false
@@ -348,7 +349,7 @@ let iter_row f row =
 
 let fold_type_expr f fm init ty =
   match get_desc ty with
-    Tvar _              -> init
+    Tvar _ | Tivar _    -> init
   | Tarrow ((_, m1, m2), ty1, ty2, _) ->
       let result = fm init m1 in
       let result = fm result m2 in
@@ -595,6 +596,9 @@ let copy_commu c = if is_commu_ok c then commu_ok else commu_var ()
 let rec copy_type_desc ?(keep_names=false) f fm = function
     Tvar { name; jkind } ->
      if keep_names then Tvar { name; jkind } else Tvar { name=None; jkind }
+  | Tivar _ ->
+    (* Copying (e.g. instantiation) of ivars is not implemented yet. *)
+    Misc.fatal_error "Btype.copy_type_desc: Tivar is not supported yet"
   | Tarrow ((p, m1, m2), ty1, ty2, c)->
     Tarrow ((p, fm m1, fm m2), f ty1, f ty2, copy_commu c)
   | Ttuple l            -> Ttuple (List.map (fun (label, t) -> label, f t) l)

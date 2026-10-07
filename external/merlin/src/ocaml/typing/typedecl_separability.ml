@@ -152,7 +152,7 @@ let rec immediate_subtypes : type_expr -> type_expr list = fun ty ->
   | Tquote ty | Tsplice ty | Tquote_eval ty | Tbox ty -> [ty]
   | Tmod _ -> Misc.fatal_error "immediate_subtypes: Tmod"
   | Tlink _ | Tsubst _ -> assert false (* impossible due to Ctype.repr *)
-  | Tvar _ | Tunivar _ -> []
+  | Tvar _ | Tivar _ | Tunivar _ -> []
   | Tof_kind _ -> []
   | Tpoly (pty, _) -> [pty]
   | Trepr (_, _) -> Misc.fatal_error "immediate_subtypes: Trepr"
@@ -418,7 +418,7 @@ let check_type
     (* "Indifferent" case, the empty context is sufficient. *)
     | (_                  , Ind    ) -> empty
     (* Variable case, add constraint. *)
-    | (Tvar { name }      , m      ) ->
+    | ((Tvar { name } | Tivar { name; _ }), m) ->
         TVarMap.singleton {text = name; id = get_id ty} m
     (* "Separable" case for constructors with known memory representation. *)
     | (Tarrow _           , Sep    )
