@@ -2225,6 +2225,22 @@ let mod_field ?(read_semantics=Reads_agree) pos = function
   | Module_mixed (_, shape_for_read) ->
     Pmixedfield([pos], shape_for_read, read_semantics)
 
+let rec transl_layout (layout : Jkind_types.Layout.Const.t)
+    : unit mixed_block_element =
+  match layout with
+  | Genvar (var, _axes) -> Splice_variable (Slambdaident.of_sort_var var)
+  | Product layouts ->
+      Product (Array.of_list (List.map transl_layout layouts))
+  | Addressable layout -> transl_layout layout
+  | Base (base, axes) ->
+      Types.mixed_block_element_of_base base axes
+      |> transl_mixed_product_element
+  | Box (_, axes) ->
+      Types.mixed_block_element_of_base Scannable axes
+      |> transl_mixed_product_element
+  | Any _ | Univar _ ->
+      fatal_error "Lambda.transl_layout: unrepresentable layout"
+
 let transl_module_representation repr =
   let sorts = Array.map Jkind.Sort.default_for_transl_and_get repr in
   if Array.for_all Jkind.Sort.Const.is_scannable sorts
