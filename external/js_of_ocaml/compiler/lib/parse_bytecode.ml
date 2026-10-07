@@ -3651,6 +3651,42 @@ let from_cma ?(includes = []) ?(include_cmis = false) ?(debug = false) lib ic =
   Code.invariant p.code;
   p
 
+type jsir_unit =
+  { name : string
+  ; program : Code.program
+  ; info : Unit_info.t
+  }
+
+let jsir_unit_of_cmj_body
+    { Code.program; last_var = _; imported_compilation_units; exported_compilation_unit }
+    =
+  { name = Code.Compilation_unit.full_path_as_string exported_compilation_unit
+  ; program
+  ; info =
+      Unit_info.of_compilation_units
+        ~exported:exported_compilation_unit
+        ~imported:imported_compilation_units
+  }
+
+let from_cmja ic =
+  let toc_pos = input_binary_int ic in
+  seek_in ic toc_pos;
+  let lib = (input_value ic : Ocaml_compiler.Cmj_format.library) in
+  let units, last_var =
+    List.fold_left
+      (Ocaml_compiler.Cmj_format.units lib)
+      ~init:([], 0)
+      ~f:(fun (units, last_var) unit ->
+        seek_in ic (Ocaml_compiler.Cmj_format.unit_pos unit);
+        let body = (Marshal.from_channel ic : Code.cmj_body) in
+        jsir_unit_of_cmj_body body :: units, max last_var body.Code.last_var)
+  in
+  (* The variables of the different units are not disjoint; they are compiled
+     one at a time, so it is enough for fresh variables to be larger than any
+     variable of any unit. *)
+  Code.Var.set_last last_var;
+  List.rev units
+
 let from_channel ic =
   let format =
     try

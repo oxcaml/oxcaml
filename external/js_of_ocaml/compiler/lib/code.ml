@@ -72,6 +72,8 @@ module Var : sig
 
   val reset : unit -> unit
 
+  val set_last : int -> unit
+
   module Set : Int_set.S with type elt = t
 
   module Map : Map.S with type key = t
@@ -219,6 +221,8 @@ end = struct
   let reset () =
     last_var := 0;
     Name.reset ()
+
+  let set_last n = last_var := n
 
   let print f x =
     Format.fprintf
@@ -524,6 +528,36 @@ type program =
   { start : Addr.t
   ; blocks : block Addr.Map.t
   ; free_pc : Addr.t
+  }
+
+module Compilation_unit = struct
+  type t = Compilation_unit.t
+
+  let full_path_as_string = Compilation_unit.full_path_as_string
+end
+[@@if oxcaml]
+
+(* [.cmj] files are only produced by OxCaml's [ocamlj]. On other compilers, this
+   is a placeholder with the same shape. *)
+module Compilation_unit = struct
+  type t = string
+
+  let full_path_as_string t = t
+end
+[@@if not oxcaml]
+
+type cmj_body =
+  { program : program
+  ; last_var : int
+        (** Highest variable index used in [program]. [Var] keeps this in mutable
+            state, so [ocamlj] must communicate it to [js_of_ocaml] to keep the
+            two in sync. *)
+  ; imported_compilation_units : Compilation_unit.t list
+        (** Compilation units whose symbols [program] fetches from the global
+            symbol table. Needed to fill in [Unit_info.t]. *)
+  ; exported_compilation_unit : Compilation_unit.t
+        (** The compilation unit [program] defines. Needed to fill in
+            [Unit_info.t]. *)
   }
 
 let noloc = No
