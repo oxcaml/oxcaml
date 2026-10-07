@@ -782,6 +782,17 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
         Misc.fatal_errorf "Invalid result layout %a for primitive %a"
           Printlambda.layout result_layout Printlambda.primitive prim
       | Psplicevar ident -> Lambda.fatal_error_unevaluated_splice_var ident);
+      let ccenv =
+        match[@ocaml.warning "-fragile-match"] prim, k with
+        | Pmakeblock (0, Immutable, _, _), Tail k
+          when Continuation.Sort.equal (Continuation.sort k) Define_root_symbol
+          ->
+          (* [id] is going to be bound to the module block, which is then passed
+             to the continuation defining the module symbol. Closure conversion
+             will instead bind the module symbol directly to the block. *)
+          CCenv.set_module_block_ident ccenv id
+        | _, (Tail _ | Non_tail _) -> ccenv
+      in
       cps acc env ccenv
         (L.Llet (Strict, result_layout, id, id_duid, lam, L.Lvar id))
         k k_exn)

@@ -13,7 +13,7 @@ immutable_load:
   testb $1, %al
   je    .L1
   subq  $8, %rsp
-  movq  camlStdlib__List__Pmakeblock2543_19@GOTPCREL(%rip), %rax
+  movq  camlStdlib__List__Pmakeblock2542_19@GOTPCREL(%rip), %rax
   call  caml_reraise_exn@PLT
 .L0:
 .L1:

@@ -1479,6 +1479,23 @@ let classify_fields_of_block env fields alloc_mode =
     then Computed_static fields
     else Constant fields
 
+(* Bind [id] to [symbol], defined as [static_const]. The definition is placed
+   right away rather than going through [register_const0], since [static_const]
+   may involve variables. *)
+let bind_block_like_symbol acc env id kind symbol static_const approx ~body =
+  let defining_expr =
+    Static_const_group.create
+      [Static_const_or_code.create_static_const static_const]
+    |> Named.create_static_consts
+  in
+  let env = Env.add_simple_to_substitute env id (Simple.symbol symbol) kind in
+  let acc = Acc.add_symbol_approximation acc symbol approx in
+  let acc, body = body acc env in
+  Let_with_acc.create acc
+    (Bound_pattern.static
+       (Bound_static.create [Bound_static.Pattern.block_like symbol]))
+    defining_expr ~body
+
 let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
     ~(body : Acc.t -> Env.t -> Expr_with_acc.t) : Expr_with_acc.t =
   let rec cont ids_with_kinds env acc (defining_exprs : Named.t list) =
@@ -1525,6 +1542,44 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
           Let_with_acc.create acc bound_pattern defining_expr ~body
         in
         match defining_expr with
+        | Prim
+            ( Variadic (Make_block (block_kind, Immutable, alloc_mode), fields),
+              dbg )
+          when Env.is_module_block_ident env id && Acc.at_unit_toplevel acc ->
+          (* This is the module block. Bind the module symbol directly to a
+             block with these fields, rather than allocating the block and
+             reading the fields back out of it in the handler of the
+             continuation that defines the module symbol (see
+             [wrap_final_module_block]). This is only possible if the symbol
+             binding will be at the toplevel of the compilation unit, since that
+             is the only place where symbols may be bound. *)
+          let tag, block_shape = P.Block_kind.to_shape block_kind in
+          let tag, block_shape =
+            match block_shape, Tag.Scannable.of_tag tag with
+            | Scannable block_shape, Some tag -> tag, block_shape
+            | (Scannable _ | Float_record), _ ->
+              Misc.fatal_errorf
+                "Binding of %a to %a (module block) has yielded a block which \
+                 is not scannable (tag %a, shape %a)"
+                Ident.print id Named.print defining_expr Tag.print tag
+                Flambda_kind.Block_shape.print block_shape
+          in
+          let static_const =
+            Static_const.block tag Immutable block_shape
+              (List.map
+                 (fun field -> Simple.With_debuginfo.create field dbg)
+                 fields)
+          in
+          let approx =
+            Value_approximation.Block_approximation
+              ( tag,
+                block_shape,
+                List.map (find_value_approximation body_env) fields
+                |> Array.of_list,
+                Alloc_mode.For_allocations.as_type alloc_mode )
+          in
+          bind_block_like_symbol acc body_env id kind (Env.module_symbol env)
+            static_const approx ~body
         | Prim
             ( Variadic (Make_block (block_kind, Immutable, alloc_mode), fields),
               dbg ) -> (
@@ -1632,25 +1687,9 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
               (* This is a inconstant statically-allocated value, so cannot go
                  through [register_const0]. The definition must be placed right
                  away. *)
-              let symbol = manufacture_symbol_of_variable var in
-              let static_consts =
-                [Static_const_or_code.create_static_const static_const]
-              in
-              let defining_expr =
-                Static_const_group.create static_consts
-                |> Named.create_static_consts
-              in
-              let body_env =
-                Env.add_simple_to_substitute body_env id (Simple.symbol symbol)
-                  kind
-              in
-              let acc = Acc.add_symbol_approximation acc symbol approx in
-              let acc, body = body acc body_env in
-              Let_with_acc.create acc
-                (Bound_pattern.static
-                   (Bound_static.create
-                      [Bound_static.Pattern.block_like symbol]))
-                defining_expr ~body
+              bind_block_like_symbol acc body_env id kind
+                (manufacture_symbol_of_variable var)
+                static_const approx ~body
             | Dynamic_block -> (* Handled in outer match *) assert false)
           | Dynamic_block ->
             let body_env =
@@ -1682,7 +1721,6 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
                && Env.at_toplevel env
                && Flambda_features.classic_mode () ->
           (* Special case to lift toplevel exception declarations *)
-          let symbol = manufacture_symbol_of_variable var in
           let transform_arg arg = Simple.With_debuginfo.create arg dbg in
           (* This is an inconstant statically-allocated value, so cannot go
              through [register_const0]. The definition must be placed right
@@ -1692,25 +1730,9 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
               Value_only
               [transform_arg exn_name; transform_arg exn_id]
           in
-          let static_consts =
-            [Static_const_or_code.create_static_const static_const]
-          in
-          let defining_expr =
-            Static_const_group.create static_consts
-            |> Named.create_static_consts
-          in
-          let body_env =
-            Env.add_simple_to_substitute body_env id (Simple.symbol symbol) kind
-          in
-          let acc =
-            Acc.add_symbol_approximation acc symbol
-              (Value_approximation.Unknown Flambda_kind.value)
-          in
-          let acc, body = body acc body_env in
-          Let_with_acc.create acc
-            (Bound_pattern.static
-               (Bound_static.create [Bound_static.Pattern.block_like symbol]))
-            defining_expr ~body
+          bind_block_like_symbol acc body_env id kind
+            (manufacture_symbol_of_variable var)
+            static_const (Value_approximation.Unknown Flambda_kind.value) ~body
         | Prim (Unary (Block_load { field; _ }, block), _) -> (
           match simplify_block_load acc body_env ~block ~field with
           | Unknown -> bind acc body_env
@@ -1947,6 +1969,17 @@ let close_exact_or_unknown_apply acc env
 let close_apply_cont acc env ~dbg cont trap_action args : Expr_with_acc.t =
   let acc, args = find_simples acc env args in
   let trap_action = close_trap_action_opt trap_action in
+  let cont =
+    match args with
+    | [arg]
+      when Continuation.Sort.equal (Continuation.sort cont) Define_root_symbol
+           && Simple.equal arg (Simple.symbol (Env.module_symbol env)) ->
+      (* The module symbol has already been bound, directly to the module block
+         (see [close_let]), so there is nothing for [cont] to do: return the
+         symbol from the whole compilation unit instead. *)
+      Env.return_continuation env
+    | [] | _ :: _ -> cont
+  in
   let args_approx = List.map (find_value_approximation env) args in
   let acc, apply_cont =
     Apply_cont_with_acc.create acc ?trap_action ~args_approx cont ~args ~dbg
@@ -4165,6 +4198,11 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
       | Value_approximation.Value_symbol s -> Simple.symbol s
       | _ -> simple_var
     in
+    let acc =
+      (* The module symbol may be rebuilt from a lifted block. *)
+      Acc.add_symbol_approximation acc module_symbol
+        (find_value_approximation_through_symbol acc env module_block_simple)
+    in
     let field_vars =
       List.init field_count (fun pos : final_module_block_field ->
           let pos_str = string_of_int pos in
@@ -4237,7 +4275,17 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
      in the incoming code. The handler for the continuation receives a tuple
      with fields indexed from zero to [module_block_size_in_words]. The handler
      extracts the fields; the variables bound to such fields are then used to
-     define the module block symbol. *)
+     define the module block symbol.
+
+     This is only needed when the module block is not built by a [Pmakeblock] in
+     tail position of the program (for example when a parameterised library is
+     instantiated by applying a functor), or when the place where it is built is
+     not at the toplevel of the compilation unit (for example when it is inside
+     the handler of a continuation for a toplevel pattern match that may fail),
+     where symbols may not be bound. Otherwise [close_let] binds the module
+     symbol directly to the block and [close_apply_cont] returns it from the
+     compilation unit, leaving this continuation unused, whereupon it is
+     deleted. *)
   let body acc =
     let acc, body = program acc env in
     bind_static_consts_and_code acc body
@@ -4250,28 +4298,22 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
     ~machine_width ~big_endian ~cmx_loader ~compilation_unit ~module_repr
     ~program ~prog_return_cont ~exn_continuation ~toplevel_my_alloc_region :
     mode close_program_result =
-  let env = Env.create ~big_endian in
   let module_symbol =
     Symbol.create_wrapped
       (Flambda2_import.Symbol.for_compilation_unit compilation_unit)
   in
   let return_cont = Continuation.create ~sort:Toplevel_return () in
+  let env =
+    Env.create ~big_endian ~module_symbol ~return_continuation:return_cont
+  in
   let env, toplevel_my_alloc_region =
     Env.add_var_like env toplevel_my_alloc_region Not_user_visible
       Flambda_kind.With_subkind.region
   in
-  let acc = Acc.create ~cmx_loader ~machine_width in
+  let acc = Acc.create ~cmx_loader ~machine_width ~exn_continuation in
   let acc, body =
     wrap_final_module_block acc env ~program ~prog_return_cont ~module_repr
       ~return_cont ~module_symbol
-  in
-  let module_block_approximation =
-    match Acc.continuation_known_arguments ~cont:prog_return_cont acc with
-    (* Module symbol may be rebuilt from a lifted block *)
-    | Some [Value_approximation.Value_symbol s] ->
-      Acc.find_symbol_approximation acc s
-    | Some [approx] -> approx
-    | _ -> Value_approximation.Unknown Flambda_kind.value
   in
   (* We must make sure there is always an outer [Let_symbol] binding so that
      lifted constants not in the scope of any other [Let_symbol] binding get put
@@ -4305,7 +4347,12 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
         defining_expr ~body
   in
   let symbols_approximations =
-    Symbol.Map.add module_symbol module_block_approximation
+    (* The module symbol is not bound if the program never returns (for example
+       if its initialiser always raises), but should still be present. *)
+    Symbol.Map.update module_symbol
+      (function
+        | None -> Some (Value_approximation.Unknown Flambda_kind.value)
+        | Some _ as approx -> approx)
       (Acc.symbol_approximations acc)
   in
   if Option.is_some (Acc.top_closure_info acc)
