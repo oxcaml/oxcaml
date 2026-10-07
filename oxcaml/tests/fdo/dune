@@ -1,0 +1,14 @@
+; Tests for the neFDO system with pseudo-instrumentation
+
+(executable
+ (name fdo_counters_test)
+ (modules fdo_counters_test)
+ (libraries ocamlcommon))
+
+; The operations on pseudo-instrumentation counters ([Fdo_counter]).
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (run ./fdo_counters_test.exe)))
