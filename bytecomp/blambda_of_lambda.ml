@@ -738,15 +738,26 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         | Punspecializedarray ->
           Misc.fatal_error "Blambda_of_lambda: Pduparray Punspecializedarray"))
     | Pmakeblock (tag, _mut, shape, _) -> (
-      match Lambda.mixed_block_of_block_shape shape with
-      | None -> pseudo_event (variadic (Makeblock { tag }))
-      | Some shape ->
-        (* There is no notion of a mixed block at runtime in bytecode.
-              Further, source-level unboxed types are represented as boxed in
-              bytecode, so no ceremony is needed to box values before inserting
-              them into the (normal, unmixed) block. *)
-        let total_len = Array.length shape in
-        pseudo_event (variadic (Make_faux_mixedblock { total_len; tag })))
+      (* There is no notion of a mixed block at runtime in bytecode, and
+         source-level unboxed types are represented as boxed in bytecode.
+         We (deeply) copy unboxed products before inserting them, so that
+         the resulting block does not alias the product it is built from
+         (which could be mutated through). *)
+      match shape with
+      | Shape mixed_shape ->
+        let fields =
+          List.map2
+            (fun elt arg -> copy_mixed_block_element elt (comp_expr arg))
+            (Array.to_list mixed_shape)
+            args
+        in
+        let primitive : Blambda.primitive =
+          if Lambda.is_uniform_block_shape shape
+          then Makeblock { tag }
+          else Make_faux_mixedblock { total_len = List.length fields; tag }
+        in
+        pseudo_event (Prim (primitive, fields))
+      | All_value -> pseudo_event (variadic (Makeblock { tag })))
     | Pmake_unboxed_product _ -> pseudo_event (variadic (Makeblock { tag = 0 }))
     | Pgetglobal (cu, _) -> nullary (Getglobal cu)
     | Pgetpredef id -> nullary (Getpredef id)
