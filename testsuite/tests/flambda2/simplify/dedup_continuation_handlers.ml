@@ -40,8 +40,8 @@ let code loopify(never) size(5) newer_version_of(set0_1)
   let Psetfield = %block_set.[`0`] (x, a) in
   cont k (0)
 in
-let $camlTOP3__set0_5 = closure set0_1_1 @set0 &toplevel in
-let $camlTOP3 = Block 0 ($camlTOP3__set0_5) in
+let $camlTOP3__set0_4 = closure set0_1_1 @set0 &toplevel in
+let $camlTOP3 = Block 0 ($camlTOP3__set0_4) in
 cont done ($camlTOP3)
 |}]
 ;;
@@ -71,9 +71,9 @@ let code loopify(never) size(2) newer_version_of(`fn[:8,2--97]_4`)
   let Pfield = %block_load.[`0`] (x) in
   cont k (Pfield)
 in
-let $`camlTOP5__fn[:8,2--97]_11` =
+let $`camlTOP5__fn[:8,2--97]_9` =
   closure `fn[:8,2--97]_4_1` @`fn[:8,2--97]` &toplevel
 in
-let $camlTOP5 = Block 0 ($`camlTOP5__fn[:8,2--97]_11`) in
+let $camlTOP5 = Block 0 ($`camlTOP5__fn[:8,2--97]_9`) in
 cont done ($camlTOP5)
 |}]
