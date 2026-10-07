@@ -4788,8 +4788,9 @@ module Report = struct
 
   let print_mutable_part ppf = function
     | Record_field s ->
-      Fmt.fprintf ppf "mutable field %a" Misc.Style.inline_code s
-    | Array_elements -> Fmt.fprintf ppf "array elements"
+      Fmt.fprintf ppf "its mutable field %a" Misc.Style.inline_code s
+    | Array_elements -> Fmt.fprintf ppf "its array elements"
+    | Address_contents -> Fmt.fprintf ppf "the value it points to"
 
   let print_always_dynamic = function
     | Application -> Fmt.dprintf "function applications"
@@ -4893,6 +4894,9 @@ module Report = struct
           | Array moda ->
             Fmt.dprintf "is an array that contains%a %t" maybe_modality moda
               print_pp
+          | Address moda ->
+            Fmt.dprintf "is an address that points to%a %t" maybe_modality moda
+              print_pp
           | Constructor (s, moda) ->
             Fmt.dprintf "contains (via constructor %a)%a %t"
               Misc.Style.inline_code s maybe_modality moda print_pp
@@ -4917,6 +4921,10 @@ module Report = struct
         container
     | Array moda ->
       Fmt.dprintf "is an element%a of the array at %a" maybe_modality moda
+        (Location.Doc.loc ~capitalize_first:false)
+        container
+    | Address moda ->
+      Fmt.dprintf "is the value%a at the address at %a" maybe_modality moda
         (Location.Doc.loc ~capitalize_first:false)
         container
     | Constructor (s, moda) ->
@@ -4970,10 +4978,9 @@ module Report = struct
       Fmt.pp_print_string ppf "it is the function in a tail call"
     | Tailcall_argument ->
       Fmt.pp_print_string ppf "it is an argument in a tail call"
-    | Mutable_read m ->
-      Fmt.fprintf ppf "its %a is being read" print_mutable_part m
+    | Mutable_read m -> Fmt.fprintf ppf "%a is being read" print_mutable_part m
     | Mutable_write m ->
-      Fmt.fprintf ppf "its %a is being written" print_mutable_part m
+      Fmt.fprintf ppf "%a is being written" print_mutable_part m
     | Lazy_forced -> (
       match pp_desc with
       | Lazy ->

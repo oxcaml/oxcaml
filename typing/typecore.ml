@@ -255,7 +255,6 @@ type error =
   | Exception_pattern_disallowed
   | Mixed_value_and_exception_patterns_under_guard
   | Effect_pattern_below_toplevel
-  | Address_pattern_not_yet_supported
   | Invalid_continuation_pattern
   | Inlined_record_escape
   | Inlined_record_expected
@@ -2134,7 +2133,7 @@ and build_as_type_aux (env : Env.t) p ~mode =
       end
   | Tpat_constant _ | Tpat_unboxed_unit | Tpat_unboxed_bool _
   | Tpat_any | Tpat_var _ | Tpat_fun_layout _
-  | Tpat_array _ | Tpat_lazy _ ->
+  | Tpat_array _ | Tpat_addr _ | Tpat_lazy _ ->
       p.pat_type, mode
 
 (* Returns [None] when the representation cannot be determined from the
@@ -2572,6 +2571,21 @@ let solve_Ppat_lazy loc env expected_ty =
   unify_pat_types_penv loc env (Predef.type_lazy_t nv)
     (generic_instance expected_ty);
   nv
+
+let solve_Ppat_addr loc env (mutability : mutable_flag) expected_ty =
+  let addr_type =
+    match mutability with
+    | Mutable -> Predef.type_addr
+    | Immutable -> Predef.type_addr_imm
+  in
+  let jkind, arg_sort =
+    Jkind.of_new_sort_var ~why:Address_contents
+      ~level:(Ctype.get_current_level ())
+  in
+  let ty_arg = newgenvar jkind in
+  unify_pat_types_penv loc env (addr_type ty_arg)
+    (generic_instance expected_ty);
+  ty_arg, arg_sort
 
 let solve_Ppat_constraint tps loc env mode sty expected_ty =
   let cty, ty, force =
@@ -4172,6 +4186,34 @@ and type_pat_aux
         pat_attributes = sp.ppat_attributes;
         pat_env = !!penv;
         pat_unique_barrier = Unique_barrier.not_computed () }
+  | Ppat_addr (mut, sp1) ->
+      let ty_arg, arg_sort = solve_Ppat_addr loc penv mut expected_ty in
+      let mutability =
+        match mut with
+        | Mutable -> Mutable {
+          mode = With_regionality.Comonadic.legacy;
+          atomic = Nonatomic
+        }
+        | Immutable -> Immutable
+      in
+      let modalities = Typemode.mutable_modalities mutability in
+      check_project_mutability ~loc ~env:!!penv Address_contents mutability
+        pat_mode.mode;
+      let is_contained_by : Mode.Hint.is_contained_by =
+        { containing = Address Modality; container = (loc, Pattern) }
+      in
+      let mode =
+        apply_left_is_contained_by is_contained_by ~modalities pat_mode.mode
+      in
+      let pat_mode = simple_pat_mode mode in
+      let p1 = type_pat ~pat_mode tps Value sp1 ty_arg arg_sort in
+      rvp {
+        pat_desc = Tpat_addr (mutability, arg_sort, p1);
+        pat_loc = loc; pat_extra=[];
+        pat_type = instance expected_ty;
+        pat_attributes = sp.ppat_attributes;
+        pat_env = !!penv;
+        pat_unique_barrier = Unique_barrier.not_computed () }
   | Ppat_constraint(sp_constrained, sty, ms) ->
       (* Pretend separate = true *)
       let type_modes = Typemode.transl_mode_with_locality ms in
@@ -4230,8 +4272,6 @@ and type_pat_aux
       }
   | Ppat_effect _ ->
       raise (Error (loc, !!penv, Effect_pattern_below_toplevel))
-  | Ppat_addr _ ->
-      raise (Error (loc, !!penv, Address_pattern_not_yet_supported))
   | Ppat_extension ext ->
       raise (Error_forward (Builtin_attributes.error_of_extension ext))
 
@@ -4758,6 +4798,17 @@ let rec check_counter_example_pat
       (* do not explode under lazy: PR#7421 *)
       check_rec ~info:(no_explosion info) tp1 nv
         (fun p1 -> mkp k (Tpat_lazy p1))
+  | Tpat_addr (mutability, original_arg_sort, tp1) ->
+      let mut : mutable_flag =
+        match mutability with
+        | Mutable _ -> Mutable
+        | Immutable -> Immutable
+      in
+      let ty_arg, arg_sort = solve_Ppat_addr loc penv mut expected_ty in
+      assert (
+        Jkind.Sort.equate ~allow_mutation:true original_arg_sort arg_sort);
+      check_rec tp1 ty_arg
+        (fun p1 -> mkp k (Tpat_addr (mutability, arg_sort, p1)))
 
 let check_counter_example_pat ~counter_example_args penv tp expected_ty =
   (* [check_counter_example_pat] doesn't use [type_pat_state] in an interesting
@@ -13767,11 +13818,6 @@ let report_error ~loc env =
   | Effect_pattern_below_toplevel ->
       Location.errorf ~loc
         "@[Effect patterns must be at the top level of a match case.@]"
-  | Address_pattern_not_yet_supported ->
-      Location.errorf ~loc
-        "@[Address patterns %a and %a are not supported yet.@]"
-        Style.inline_code "addr_"
-        Style.inline_code "addr_imm_"
   | Invalid_continuation_pattern ->
       Location.errorf ~loc
         "@[Invalid continuation pattern: only variables and _ are allowed .@]"

@@ -1055,6 +1055,7 @@ module Projection : sig
     | Construct_field of string * int
     | Variant_field of label
     | Array_index of int
+    | Address_load
     | Memory_address (* this is rendered as clubsuit in the ICFP'24 paper *)
 
   module Map : Map.S with type key = t
@@ -1072,6 +1073,7 @@ end = struct
       | Construct_field of string * int
       | Variant_field of label
       | Array_index of int
+      | Address_load
       | Memory_address
 
     let compare t1 t2 =
@@ -1084,38 +1086,45 @@ end = struct
         match String.compare l1 l2 with 0 -> Int.compare i j | i -> i)
       | Variant_field l1, Variant_field l2 -> String.compare l1 l2
       | Array_index i, Array_index j -> Int.compare i j
+      | Address_load, Address_load -> 0
       | Memory_address, Memory_address -> 0
       | ( Tuple_field _,
           ( Record_field _ | Record_unboxed_product_field _ | Construct_field _
-          | Variant_field _ | Array_index _ | Memory_address ) ) ->
+          | Variant_field _ | Array_index _ | Address_load | Memory_address ) )
+        ->
         -1
       | ( ( Record_field _ | Record_unboxed_product_field _ | Construct_field _
-          | Variant_field _ | Array_index _ | Memory_address ),
+          | Variant_field _ | Array_index _ | Address_load | Memory_address ),
           Tuple_field _ ) ->
         1
       | ( Record_field _,
           ( Record_unboxed_product_field _ | Construct_field _ | Variant_field _
-          | Array_index _ | Memory_address ) ) ->
+          | Array_index _ | Address_load | Memory_address ) ) ->
         -1
       | ( ( Record_unboxed_product_field _ | Construct_field _ | Variant_field _
-          | Array_index _ | Memory_address ),
+          | Array_index _ | Address_load | Memory_address ),
           Record_field _ ) ->
         1
       | ( Record_unboxed_product_field _,
-          (Construct_field _ | Variant_field _ | Array_index _ | Memory_address)
-        ) ->
+          ( Construct_field _ | Variant_field _ | Array_index _ | Address_load
+          | Memory_address ) ) ->
         -1
-      | ( (Construct_field _ | Variant_field _ | Array_index _ | Memory_address),
+      | ( ( Construct_field _ | Variant_field _ | Array_index _ | Address_load
+          | Memory_address ),
           Record_unboxed_product_field _ ) ->
         1
-      | Construct_field _, (Variant_field _ | Array_index _ | Memory_address) ->
+      | ( Construct_field _,
+          (Variant_field _ | Array_index _ | Address_load | Memory_address) ) ->
         -1
-      | (Variant_field _ | Array_index _ | Memory_address), Construct_field _ ->
+      | ( (Variant_field _ | Array_index _ | Address_load | Memory_address),
+          Construct_field _ ) ->
         1
-      | Variant_field _, (Array_index _ | Memory_address) -> -1
-      | (Array_index _ | Memory_address), Variant_field _ -> 1
-      | Array_index _, Memory_address -> -1
-      | Memory_address, Array_index _ -> 1
+      | Variant_field _, (Array_index _ | Address_load | Memory_address) -> -1
+      | (Array_index _ | Address_load | Memory_address), Variant_field _ -> 1
+      | Array_index _, (Address_load | Memory_address) -> -1
+      | (Address_load | Memory_address), Array_index _ -> 1
+      | Address_load, Memory_address -> -1
+      | Memory_address, Address_load -> 1
   end
 
   include T
@@ -1131,6 +1140,7 @@ end = struct
     | Construct_field (s, n) -> fprintf ppf "Construct_field(%s,%d)" s n
     | Variant_field l -> fprintf ppf "Variant_field(%s)" l
     | Array_index n -> fprintf ppf "Array_index(%d)" n
+    | Address_load -> fprintf ppf "Address_load"
     | Memory_address -> fprintf ppf "Memory_address"
 
   let print_map print_value ppf map =
@@ -1642,6 +1652,10 @@ module Paths : sig
       where [gf] is the appropriate modality for mutability [mut]. *)
   val array_index : Types.mutability -> int -> t -> t
 
+  (** [address_load mut t] is [modal_child gf Projection.Address_load t] where
+      [gf] is the appropriate modality for mutability [mut]. *)
+  val address_load : Types.mutability -> t -> t
+
   (** [memory_address t] is [child Projection.Memory_address t]. *)
   val memory_address : t -> t
 
@@ -1700,6 +1714,10 @@ end = struct
   let array_index mut i t =
     let modality = Typemode.mutable_modalities mut in
     modal_child modality (Projection.Array_index i) t
+
+  let address_load mut t =
+    let modality = Typemode.mutable_modalities mut in
+    modal_child modality Projection.Address_load t
 
   let memory_address t = child Projection.Memory_address t
 
@@ -2073,6 +2091,7 @@ and pattern_match_barrier pat paths : UF.t =
     (* Lazy patterns consume their memory anyway since
        forcing a lazy expression is like calling a nullary-function *)
     consume_memory_address Lazy
+  | Tpat_addr _ -> borrow_memory_address ()
   | Tpat_tuple _ -> borrow_memory_address ()
   | Tpat_unboxed_unit ->
     (* unboxed units are not allocations *)
@@ -2156,6 +2175,9 @@ and pattern_match_single pat paths : Ienv.Extension.t * UF.t =
       let uf_force = Paths.mark_aliased occ Lazy paths in
       let ext, uf_arg = pattern_match_single arg (Paths.fresh ()) in
       ext, UF.par uf_force uf_arg
+    | Tpat_addr (mut, _, arg) ->
+      let paths = Paths.address_load mut paths in
+      pattern_match_single arg paths
     | Tpat_tuple args ->
       List.mapi
         (fun i (_, arg) ->

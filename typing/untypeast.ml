@@ -432,6 +432,7 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
             map_loc sub lid, sub.pat sub pat) list, closed)
     | Tpat_array (am, _, list) ->
         Ppat_array (mutable_ am, List.map (sub.pat sub) list)
+    | Tpat_addr (mut, _, p) -> Ppat_addr (mutable_ mut, sub.pat sub p)
     | Tpat_lazy p -> Ppat_lazy (sub.pat sub p)
 
     | Tpat_exception p -> Ppat_exception (sub.pat sub p)

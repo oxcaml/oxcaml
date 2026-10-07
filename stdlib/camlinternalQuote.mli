@@ -359,6 +359,8 @@ module Pat : sig
 
   val or_ : t -> t -> t
 
+  val addr : t -> bool -> t
+
   val lazy_ : t -> t
 
   val any_module : t

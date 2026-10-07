@@ -281,7 +281,8 @@ end = struct
           | other_view -> continue orpat other_view
         )
       | ( `Constant _ | `Unboxed_unit | `Unboxed_bool _ | `Tuple _
-        | `Unboxed_tuple _ | `Construct _ | `Variant _ | `Array _ | `Lazy _ )
+        | `Unboxed_tuple _ | `Construct _ | `Variant _ | `Array _ | `Addr _
+        | `Lazy _ )
         as view -> stop p view
     in
     aux cl
@@ -336,6 +337,7 @@ end = struct
           `Record_unboxed_product (List.map (alpha_field env) fields, r,
                                    closed)
       | `Array (am, arg_sort, ps) -> `Array (am, arg_sort, List.map (alpha_pat env) ps)
+      | `Addr (mut, arg_sort, p) -> `Addr (mut, arg_sort, alpha_pat env p)
       | `Lazy p -> `Lazy (alpha_pat env p)
     in
     { p with pat_desc }
@@ -471,9 +473,9 @@ let matcher discr (p : Simple.pattern) rem =
   let open Patterns.Head in
   match (discr.pat_desc, ph.pat_desc) with
   | Any, _ -> rem
-  | ( ( Constant _ | Construct _ | Variant _ | Lazy | Array _ | Record _
-      | Record_unboxed_product _ | Unboxed_unit | Unboxed_bool _ | Tuple _
-      | Unboxed_tuple _ ), Any ) ->
+  | ( ( Constant _ | Construct _ | Variant _ | Addr _ | Lazy
+      | Array _ | Record _ | Record_unboxed_product _ | Unboxed_unit
+      | Unboxed_bool _ | Tuple _ | Unboxed_tuple _ ), Any ) ->
       omegas @ rem
   | Constant cst, Constant cst' -> yesif (const_compare cst cst' = 0)
   | Construct (cstr, _, _), Construct (cstr', _, _) ->
@@ -495,10 +497,11 @@ let matcher discr (p : Simple.pattern) rem =
   | Record_unboxed_product (l, _), Record_unboxed_product (l', _) ->
       (* we already expanded the record fully *)
       yesif (List.length l = List.length l')
+  | Addr (mut1, _), Addr (mut2, _) -> yesif (mut1 = mut2)
   | Lazy, Lazy -> yes ()
-  | ( Constant _ | Construct _ | Variant _ | Lazy | Array _ | Record _
-    | Record_unboxed_product _ | Unboxed_unit | Unboxed_bool _ | Tuple _
-    | Unboxed_tuple _), _ -> no ()
+  | ( Constant _ | Construct _ | Variant _ | Addr _ | Lazy
+    | Array _ | Record _ | Record_unboxed_product _ | Unboxed_unit
+    | Unboxed_bool _ | Tuple _ | Unboxed_tuple _), _ -> no ()
 
 let ncols = function
   | [] -> 0
@@ -1466,6 +1469,7 @@ let can_group discr pat =
   | Record_unboxed_product _, (Record_unboxed_product _ | Any)
   | Array _, Array _
   | Variant _, Variant _
+  | Addr _, Addr _
   | Lazy, Lazy ->
       true
   | ( _,
@@ -1480,7 +1484,8 @@ let can_group discr pat =
           | Const_unboxed_int32 _ | Const_unboxed_int64 _
           | Const_untagged_int _ | Const_unboxed_nativeint _ )
       | Construct _ | Unboxed_unit | Unboxed_bool _ | Tuple _ | Unboxed_tuple _
-      | Record _ | Record_unboxed_product _ | Array _ | Variant _ | Lazy ) ) ->
+      | Record _ | Record_unboxed_product _ | Array _ | Variant _ | Addr _
+      | Lazy ) ) ->
       false
 
 let is_or p =
@@ -4505,6 +4510,28 @@ and do_compile_matching ~scopes value_kind repr partial ctx pmh =
           compile_test
             (divide_array ~scopes kind)
             (combine_array value_kind ploc arg kind arg_partial)
+      | Addr _ ->
+          (* CR address-patterns: compile address patterns *)
+          let loc = ph.pat_loc in
+          let sloc = Scoped_location.of_location ~scopes loc in
+          let slot =
+            transl_extension_path sloc
+              (Lazy.force Env.initial) Predef.path_invalid_argument
+          in
+          let msg = "address patterns are not supported yet" in
+          let raise_invalid_argument =
+            Lprim
+              ( Praise Raise_regular,
+                [ Lprim
+                    ( Pmakeblock (0, Immutable, All_value, alloc_heap),
+                      [ slot;
+                        Lconst (Const_base (Const_string (msg, loc, None)))
+                      ],
+                      sloc )
+                ],
+                sloc )
+          in
+          (raise_invalid_argument, Jumps.empty Total)
       | Lazy ->
           compile_no_test
             (divide_lazy ~scopes ph)
@@ -4915,6 +4942,7 @@ let flatten_simple_pattern size (p : Simple.pattern) =
   | `Variant _
   | `Record _
   | `Record_unboxed_product _
+  | `Addr _
   | `Lazy _
   | `Construct _
   | `Constant _
