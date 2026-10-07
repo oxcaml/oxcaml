@@ -311,7 +311,10 @@ let with_additional_action =
           else Mode.With_locality.(mode |> to_const_exn |> of_const)
         in
         let prepare_modality modality =
-          Mode.Modality.(modality |> to_const_exn|> of_const)
+          (* The undefined modality (an absent module declaration carries no
+             modality) is accepted and kept unchanged. *)
+          if Mode.Modality.is_undefined modality then modality
+          else Mode.Modality.(modality |> to_const_exn|> of_const)
         in
         let bound_ident_stamp = ref 0 in
         let prepare_ident id =

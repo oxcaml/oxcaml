@@ -361,7 +361,7 @@ end
 [%%expect{|
 module Module :
   sig
-    module O = N.M
+    module O = N.M @@ stateless
     type t = N.t
     val unit : unit
     external e : unit -> unit = "%identity"

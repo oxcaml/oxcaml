@@ -114,6 +114,12 @@ val find_type: Path.t -> t -> type_declaration
 val find_type_descrs: Path.t -> t -> type_descriptions
 val find_module_lazy: Path.t -> t -> Subst.Lazy.module_declaration
 val find_module: Path.t -> t -> module_declaration
+
+val find_module_lazy_and_mode:
+  Path.t -> t -> Subst.Lazy.module_declaration * Mode.With_regionality.l
+(** The declaration and the recorded mode of the module at the given path,
+    without resolving module aliases. *)
+
 val find_modtype_lazy: Path.t -> t -> Subst.Lazy.modtype_declaration
 val find_modtype: Path.t -> t -> modtype_declaration
 val find_class: Path.t -> t -> class_declaration
@@ -538,7 +544,8 @@ val filter_non_loaded_persistent : (Ident.t -> bool) -> t -> t
 (* Insertion of all fields of a signature. *)
 
 val add_signature: signature -> t -> t
-val add_signature_lazy: Subst.Lazy.signature_item list -> t -> t
+val add_signature_lazy: ?mode:(Mode.allowed * 'r) Mode.With_regionality.t ->
+  Subst.Lazy.signature_item list -> t -> t
 
 (* Insertion of all fields of a signature, relative to the given path.
    Used to implement open. Returns None if the path refers to a functor,
@@ -786,7 +793,8 @@ val check_well_formed_module:
 val add_delayed_check_forward: ((unit -> unit) -> unit) ref
 (* Forward declaration to break mutual recursion with Mtype. *)
 val scrape_alias:
-    (t -> Subst.Lazy.module_type -> Subst.Lazy.module_type) ref
+    (t -> Subst.Lazy.module_type -> Mode.With_regionality.l ->
+     Subst.Lazy.module_type * Mode.With_regionality.l) ref
 (* Forward declaration to break mutual recursion with Ctype. *)
 val same_constr: (t -> type_expr -> type_expr -> bool) ref
 (* Forward declaration to break mutual recursion with Ctype. *)

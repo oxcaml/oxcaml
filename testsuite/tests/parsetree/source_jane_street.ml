@@ -713,7 +713,7 @@ module F : functor (M : S @ portable) -> sig end @@ stateless
   be an binary operator *)
 module M' = (M @ portable)
 [%%expect{|
-module M' = M @@ stateless
+module M' = M
 |}]
 
 module M' = (M : S @ portable)
@@ -772,7 +772,7 @@ module G :
 
 module (G' @ portable) = F
 [%%expect{|
-module G' = F @@ stateless
+module G' = F
 |}]
 
 module rec (F @ portable) () = struct end

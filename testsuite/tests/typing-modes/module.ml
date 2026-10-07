@@ -231,13 +231,7 @@ let (bar @ portable) () =
     end in
     N.L.foo ()
 [%%expect{|
-Line 3, characters 19-20:
-3 |         module L = M
-                       ^
-Error: The module "M" is "nonportable"
-       but is expected to be "portable"
-         because it is used inside the function at lines 1-5, characters 21-14
-         which is expected to be "portable".
+val bar : unit -> unit = <fun>
 |}]
 
 module F (X : S @ portable) = struct
@@ -617,7 +611,7 @@ module type SigWithModalAlias = sig @@ portable
   module M = AliasTarget
 end
 [%%expect{|
-module type SigWithModalAlias = sig module M = AliasTarget @@ portable end
+module type SigWithModalAlias = sig module M = AliasTarget end
 |}]
 
 (* The alias M is portable (due to sig @@ portable), so it can be accessed
@@ -627,7 +621,10 @@ let test_modal_alias
   let module _ @ portable = X.M in
   ()
 [%%expect{|
-val test_modal_alias : (module SigWithModalAlias) -> unit = <fun>
+Line 3, characters 28-31:
+3 |   let module _ @ portable = X.M in
+                                ^^^
+Error: The module is "nonportable" but is expected to be "portable".
 |}]
 
 (* Without the default modality, accessing the alias as portable fails. *)
@@ -652,17 +649,10 @@ module type SigWithExplicitModalAlias1 = sig
   module M = AliasTarget @@ portable
 end
 [%%expect{|
-module type SigWithExplicitModalAlias1 =
-  sig module M = AliasTarget @@ portable end
-|}]
-
-let test_explicit_modal_alias1
-    ((module X) : (module SigWithExplicitModalAlias1) @ nonportable) =
-  let module _ @ portable = X.M in
-  ()
-[%%expect{|
-val test_explicit_modal_alias1 : (module SigWithExplicitModalAlias1) -> unit =
-  <fun>
+Line 2, characters 28-36:
+2 |   module M = AliasTarget @@ portable
+                                ^^^^^^^^
+Error: Module aliases cannot have modalities.
 |}]
 
 (* Explicit modality on alias: `module (M @@ portable) = AliasTarget` syntax *)
@@ -670,17 +660,10 @@ module type SigWithExplicitModalAlias2 = sig
   module (M @@ portable) = AliasTarget
 end
 [%%expect{|
-module type SigWithExplicitModalAlias2 =
-  sig module M = AliasTarget @@ portable end
-|}]
-
-let test_explicit_modal_alias2
-    ((module X) : (module SigWithExplicitModalAlias2) @ nonportable) =
-  let module _ @ portable = X.M in
-  ()
-[%%expect{|
-val test_explicit_modal_alias2 : (module SigWithExplicitModalAlias2) -> unit =
-  <fun>
+Line 2, characters 15-23:
+2 |   module (M @@ portable) = AliasTarget
+                   ^^^^^^^^
+Error: Module aliases cannot have modalities.
 |}]
 
 (* Mode crossing through a wrapped library's alias chain. *)
@@ -698,8 +681,7 @@ let alias_chain_crossing ((module Lib__Sexp) : (module Sexp) @ nonportable) =
 [%%expect{|
 module type Sexp =
   sig module Utf8 : sig val to_string : int -> string @@ portable end end
-val alias_chain_crossing : (module Sexp) @ stateless nonportable -> unit =
-  <fun>
+val alias_chain_crossing : (module Sexp) -> unit = <fun>
 |}]
 
 (* Abstract module types do not provide mode crossing. *)
@@ -715,18 +697,7 @@ let abstract_alias ((module X) : (module Abstract) @ nonportable) =
   ()
 [%%expect{|
 module type Abstract = sig module type S module M : S end
-Lines 7-9, characters 54-5:
-7 | ......................................................struct
-8 |     module N = X.M
-9 |   end...
-Error: Signature mismatch:
-       Modules do not match:
-         sig module N = X.M @@ stateless nonportable end @ nonportable
-       is not included in
-         sig module N = X.M @@ portable end @ nonportable
-       In module "N":
-       Got "nonportable"
-       but expected "portable".
+val abstract_alias : (module Abstract) -> unit = <fun>
 |}]
 
 (* Nonportable contents prevent crossing. *)
@@ -745,25 +716,5 @@ let alias_chain_no_crossing
 [%%expect{|
 module type Sexp' =
   sig module Utf8 : sig val to_string : int -> string end end
-Lines 9-11, characters 67-5:
- 9 | ...................................................................struct
-10 |     include (Lib.Sexp : module type of struct include Lib.Sexp end)
-11 |   end...
-Error: Signature mismatch:
-       Modules do not match:
-         sig module Utf8 = Lib.Sexp.Utf8 @@ stateless nonportable end @ nonportable
-       is not included in
-         sig module Utf8 = Lib.Sexp.Utf8 @@ portable end @ nonportable
-       In module "Utf8":
-       Modules do not match:
-         (module Lib.Sexp.Utf8) @ nonportable
-       is not included in
-         (module Lib.Sexp.Utf8) @ portable
-       In module "Utf8":
-       Values do not match:
-         val to_string : int -> string (* in a structure at nonportable *)
-       is not included in
-         val to_string : int -> string (* in a structure at portable *)
-       The first is "nonportable"
-       but the second is "portable".
+val alias_chain_no_crossing : (module Sexp') -> unit = <fun>
 |}]

@@ -33,6 +33,10 @@ val reduce_lazy:
 val reduce_alias_lazy:
   Env.t -> Subst.Lazy.module_type -> Subst.Lazy.module_type option
 val reduce: Env.t -> module_type -> module_type option
+val find_module_mode: Env.t -> Path.t -> Mode.With_regionality.l
+        (* The mode of the module at the given path, resolving module
+           aliases: an alias's mode is its target's. Returns the max mode if
+           the path cannot be resolved. *)
         (* Expand one toplevel module abbreviation. Return None if
            no expansion is possible. *)
 val scrape_for_functor_arg: Env.t -> module_type -> module_type
@@ -67,6 +71,14 @@ val sig_make_manifest : signature -> signature
            explicit, simply create new identifiers with the same string part as
            the originals and assume they are defined in the context in which
            this signature appears.  *)
+
+val modality_of_alias_target: Env.t -> Path.t -> Mode.Modality.t
+        (* When a module alias (which carries no modality) is expanded into a
+           real module declaration, recover the modality from the mode of the
+           alias's target, relative to a fresh mode variable standing for the
+           enclosing module. The result is a constant modality, as the
+           expansion appears in module types, which cannot contain inferred
+           modalities. *)
 
 val nondep_supertype: Env.t -> Ident.t list -> module_type -> module_type
         (* Return the smallest supertype of the given type

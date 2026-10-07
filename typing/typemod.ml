@@ -90,6 +90,7 @@ type error =
   | Non_packable_local_modtype_subst of Path.t
   | With_cannot_remove_packed_modtype of Path.t * module_type
   | Cannot_alias of Path.t
+  | Modalities_on_alias
   | Strengthening_mismatch of Longident.t * Includemod.explanation
   | Cannot_pack_parameter
   | Compiling_as_parameterised_parameter
@@ -220,6 +221,9 @@ let rebase_modalities_sg ~loc ~loc_md ~md_mode ~mode sg =
         in
         let vd = {vd with val_modalities} in
         Sig_value (id, vd, vis)
+    | Sig_module (_, Mp_absent, md, _, _) as item ->
+        assert (Modality.is_undefined md.md_modalities);
+        item
     | Sig_module (id, pres, md, rec_, vis) ->
         let md_modalities =
           md.md_modalities
@@ -773,6 +777,9 @@ let rec remove_modality_and_zero_alloc_variables_sg env ~zap_modality sg =
         in
         let desc = {desc with val_modalities; val_zero_alloc} in
         Sig_value (id, desc, vis)
+    | Sig_module (_, Mp_absent, md, _, _) as item ->
+        assert (Mode.Modality.is_undefined md.md_modalities);
+        item
     | Sig_module (id, pres, md, re, vis) ->
         let md_type =
           remove_modality_and_zero_alloc_variables_mty env ~zap_modality
@@ -941,7 +948,7 @@ module Merge = struct
     | item, [s] -> patch item s env outer_sg ~ghosts
 
     (* Deep constraints *)
-    | Sig_module(id, _, md, rs, priv) as current_item, s :: namelist
+    | Sig_module(id, pres, md, rs, priv) as current_item, s :: namelist
       when Ident.name id = s ->
         let sig_env = Env.add_signature outer_sg env in
         let sg = extract_sig sig_env loc md.md_type in
@@ -964,7 +971,17 @@ module Merge = struct
               return_payload ~ghosts
                 ~replace_by:(Some current_item) path ~late_typedtree
           | _, _ ->
-              let new_md = {md with md_type = Mty_signature newsg} in
+              let md_modalities =
+                (* An absent member (an alias) carries no modality; it is
+                   materialized here, so recover one from its target. *)
+                match pres, md.md_type with
+                | Mp_absent, Mty_alias p ->
+                    Mtype.modality_of_alias_target sig_env p
+                | _, _ -> md.md_modalities
+              in
+              let new_md =
+                {md with md_type = Mty_signature newsg; md_modalities}
+              in
               let new_item = Sig_module(id, Mp_present, new_md, rs, priv) in
               return_payload ~ghosts ~replace_by:(Some new_item)
                 path ~paths ~late_typedtree
@@ -1163,7 +1180,11 @@ module Merge = struct
                 ~zap_modality:Mode.Modality.zap_to_id mty
             in
             assert (Modality.is_undefined md'.md_modalities);
-            let modalities = Modality.(Const.id |> of_const) in
+            let modalities =
+              match pres with
+              | Mp_absent -> Modality.undefined
+              | Mp_present -> Modality.(Const.id |> of_const)
+            in
             let md'' = { md' with md_type = mty; md_modalities = modalities} in
             let newmd =
               Mtype.strengthen_decl ~aliasable:false md'' path in
@@ -1409,6 +1430,9 @@ let rec apply_modalities_signature ~recursive env modalities sg =
       let val_modalities = concat_modalities vd.val_modalities in
       let vd = {vd with val_modalities = of_const val_modalities} in
       Sig_value (id, vd, vis)
+  | Sig_module (_, Mp_absent, md, _, _) as item ->
+      assert (is_undefined md.md_modalities);
+      item
   | Sig_module (id, pres, md, rec_, vis) when recursive ->
       let md_modalities = concat_modalities md.md_modalities in
       let md_type, md_modalities =
@@ -1557,10 +1581,13 @@ let rec approx_modtype env smty =
       let aliasable = (not (Env.is_functor_arg path env)) in
       Mty_strengthen (mty, path, Aliasability.aliasable aliasable)
 
-and approx_module_declaration env pmd =
+and approx_module_declaration ~pres pmd md_type =
   {
-    Types.md_type = approx_modtype env pmd.pmd_type;
-    md_modalities = Mode.Modality.(Const.id |> of_const);
+    Types.md_type;
+    md_modalities =
+      (match pres with
+       | Mp_absent -> Mode.Modality.undefined
+       | Mp_present -> Mode.Modality.(Const.id |> of_const));
     md_attributes = pmd.pmd_attributes;
     md_loc = pmd.pmd_loc;
     md_uid = Uid.internal_not_actually_unique;
@@ -1583,12 +1610,13 @@ and approx_sig_items env ssg=
           approx_sig_items env srem
       | Psig_module pmd ->
           let scope = Ctype.create_scope () in
-          let md = approx_module_declaration env pmd in
+          let md_type = approx_modtype env pmd.pmd_type in
           let pres =
-            match md.Types.md_type with
+            match md_type with
             | Mty_alias _ -> Mp_absent
             | _ -> Mp_present
           in
+          let md = approx_module_declaration ~pres pmd md_type in
           (* Assume the enclosing structure is legacy, for backward
               compatibility *)
           let id, newenv =
@@ -1621,7 +1649,8 @@ and approx_sig_items env ssg=
               (fun pmd ->
                  Option.map (fun name ->
                    Ident.create_scoped ~scope name,
-                   approx_module_declaration env pmd
+                   approx_module_declaration ~pres:Mp_present pmd
+                     (approx_modtype env pmd.pmd_type)
                  ) pmd.pmd_name.txt
               )
               sdecls
@@ -2388,13 +2417,6 @@ and transl_signature ?(interface_toplevel = false) env
           Builtin_attributes.warning_scope pmd.pmd_attributes
             (fun () -> transl_modtype env pmd.pmd_type)
         in
-        let mty_type, md_modalities =
-          apply_pmd_modalities
-            env
-            ~default_modalities:sig_modalities.moda_modalities
-            pmd.pmd_modalities tmty.mty_type
-        in
-        let tmty = {tmty with mty_type} in
         let pres =
           match tmty.mty_type with
           | Mty_alias p ->
@@ -2403,9 +2425,33 @@ and transl_signature ?(interface_toplevel = false) env
               Mp_absent
           | _ -> Mp_present
         in
+        let tmty, md_modalities, modalities =
+          match pres with
+          | Mp_present ->
+              let mty_type, md_modalities =
+                apply_pmd_modalities
+                  env
+                  ~default_modalities:sig_modalities.moda_modalities
+                  pmd.pmd_modalities tmty.mty_type
+              in
+              {tmty with mty_type}, md_modalities,
+              Modality.of_const md_modalities.moda_modalities
+          | Mp_absent ->
+              begin match pmd.pmd_modalities with
+              | [] -> ()
+              | _ :: _ as modalities ->
+                  let loc =
+                    Location.merge
+                      (List.map (fun (m : _ Location.loc) -> m.loc) modalities)
+                  in
+                  raise (Error (loc, env, Modalities_on_alias))
+              end;
+              tmty, { moda_modalities = Modality.Const.id; moda_desc = [] },
+              Modality.undefined
+        in
         let md = {
           md_type=tmty.mty_type;
-          md_modalities = Modality.of_const md_modalities.moda_modalities;
+          md_modalities = modalities;
           md_attributes=pmd.pmd_attributes;
           md_loc=pmd.pmd_loc;
           md_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
@@ -2448,7 +2494,7 @@ and transl_signature ?(interface_toplevel = false) env
             md
           else
             { md_type = Mty_alias path;
-              md_modalities = Mode.Modality.(Const.id |> of_const);
+              md_modalities = Mode.Modality.undefined;
               md_attributes = pms.pms_attributes;
               md_loc = pms.pms_loc;
               md_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
@@ -3384,6 +3430,15 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
             arg_shape
         | Some smty ->
             let mty = transl_modtype env smty in
+            let arg =
+              match arg.mod_type with
+              | Mty_alias p ->
+                  (* An opaque module alias carries no mode; the coercion
+                     needs its target's. *)
+                  let _, locks = arg.mod_mode in
+                  { arg with mod_mode = Mtype.find_module_mode env p, locks }
+              | _ -> arg
+            in
             wrap_constraint_with_shape ~self_check:false env true arg
               mty.mty_type mode.mode_modes arg_shape
               (Tmodtype_explicit (mty, mode))
@@ -3456,8 +3511,22 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
 
 and type_module_path_aux ~alias ~hold_locks ~strengthen env path
   (mode, locks) (lid : _ loc) smod =
+  let aliasable = not (Env.is_functor_arg path env) in
+  let opaque = alias && aliasable in
+  let mode, mty =
+    if opaque then begin
+      Env.add_required_global path env;
+      mode, Mty_alias path
+    end else
+      Mtype.find_module_mode env path,
+      Mtype.find_type_of_module ~strengthen ~aliasable env path
+  in
   let mod_mode =
     if hold_locks then mode, Some (locks, lid.txt, lid.loc)
+    else if opaque then
+      (* A module alias is opaque: it doesn't close over its target, so
+         there are no locks to walk. *)
+      mode, None
     else
       let vmode =
         Env.walk_locks ~env ~loc:lid.loc lid.txt ~item:Module None (mode, locks)
@@ -3470,31 +3539,23 @@ and type_module_path_aux ~alias ~hold_locks ~strengthen env path
              mod_env = env;
              mod_attributes = smod.pmod_attributes;
              mod_loc = smod.pmod_loc } in
-  let aliasable = not (Env.is_functor_arg path env) in
   let shape =
     Env.shape_of_path ~namespace:Shape.Sig_component_kind.Module env path
   in
-  let shape = if alias && aliasable then Shape.alias shape else shape in
+  let shape = if opaque then Shape.alias shape else shape in
   let md =
-    if alias && aliasable then
-      (Env.add_required_global path env; md)
-    else begin
-      let mty = Mtype.find_type_of_module
-          ~strengthen ~aliasable env path
-      in
-      match mty with
-      | Mty_alias p1 when not alias ->
-          let p1 = Env.normalize_module_path (Some smod.pmod_loc) env p1 in
-          let mty = Includemod.expand_module_alias
-              ~strengthen env p1 in
-          { md with
-            mod_desc =
-              Tmod_constraint (md, mty, Tmodtype_implicit,
-                               Tcoerce_alias (env, path, Tcoerce_none));
-            mod_type = mty }
-      | mty ->
-          { md with mod_type = mty }
-    end
+    match mty with
+    | Mty_alias p1 when not alias ->
+        let p1 = Env.normalize_module_path (Some smod.pmod_loc) env p1 in
+        let mty = Includemod.expand_module_alias
+            ~strengthen env p1 in
+        { md with
+          mod_desc =
+            Tmod_constraint (md, mty, Tmodtype_implicit,
+                             Tcoerce_alias (env, path, Tcoerce_none));
+          mod_type = mty }
+    | mty ->
+        { md with mod_type = mty }
   in
   md, shape
 
@@ -4037,9 +4098,12 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
               ~scope ~shape:md_shape name pres md ~mode env
             in
             Signature_names.check_module names pmb_loc id;
-            let pp : Mode.Hint.pinpoint = (modl.mod_loc, Module) in
             let md_modalities =
-              infer_modalities pp ~loc_md (Module, id) ~md_mode ~mode
+              match pres with
+              | Mp_absent -> Modality.undefined
+              | Mp_present ->
+                  let pp : Mode.Hint.pinpoint = (modl.mod_loc, Module) in
+                  infer_modalities pp ~loc_md (Module, id) ~md_mode ~mode
             in
             Some id, e,
             [Sig_module(id, pres,
@@ -5370,6 +5434,8 @@ let report_error ~loc _env = function
       Location.errorf ~loc
         "Functor arguments, such as %a, cannot be aliased"
         (Style.as_inline_code path) p
+  | Modalities_on_alias ->
+      Location.errorf ~loc "Module aliases cannot have modalities."
   | Cannot_scrape_package_type p ->
       Location.errorf ~loc
         "The type of this packed module refers to %a, which is missing"

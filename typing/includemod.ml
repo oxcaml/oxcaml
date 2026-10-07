@@ -925,7 +925,14 @@ and signatures ~core ~direction ~loc env subst ~modes sig1 sig2 mod_shape =
   let sig1 = force_signature_once sig1 in
   let sig2 = force_signature_once sig2 in
   let new_env =
-    Env.add_signature_lazy sig1 (Env.in_signature true env) in
+    (* Add [sig1]'s items at the mode of the module being checked, so that
+       resolving a module alias's target (see [Mtype.find_module_mode]) in this
+       environment gives its real mode. *)
+    let env = Env.in_signature true env in
+    match modes with
+    | All -> Env.add_signature_lazy sig1 env
+    | Specific ((m0, _), _) -> Env.add_signature_lazy ~mode:m0 sig1 env
+  in
   (* Keep ids for module aliases *)
   let (id_pos_list,_) =
     List.fold_left
@@ -1036,7 +1043,7 @@ and signature_components :
               in
               let item =
                 module_declarations ~core ~direction ~loc env subst id1
-                  mty1 mty2 ~mmodes orig_shape
+                  ~pres1 ~pres2 mty1 mty2 ~mmodes orig_shape
               in
               let item, shape_map =
                 match item with
@@ -1153,8 +1160,8 @@ and signature_components :
        in
        Sign_diff.merge first rest
 
-and module_declarations ~core ~direction ~loc env subst id1 ~mmodes md1 md2
-      orig_shape =
+and module_declarations ~core ~direction ~loc env subst id1 ~pres1 ~pres2
+      ~mmodes md1 md2 orig_shape =
   let open Subst.Lazy in
   Builtin_attributes.check_alerts_inclusion
     ~def:md1.md_loc
@@ -1165,11 +1172,45 @@ and module_declarations ~core ~direction ~loc env subst id1 ~mmodes md1 md2
   let p1 = Path.Pident id1 in
   if Directionality.mark_as_used direction then
     Env.mark_module_used md1.md_uid;
-  let modalities = md1.md_modalities, md2.md_modalities in
   let id = Ident.name id1 in
   let* modes =
-    Includecore.child_modes_with_modalities id ~modalities mmodes
-    |> map_error (fun e -> Error.(Core (Modalities e)))
+    match pres1, pres2 with
+    | _, Mp_absent ->
+        (* An absent module declaration (an alias) is not a real member of
+           the enclosing structure: it carries no modality and there is no
+           mode relationship between it and the enclosing module. Inclusion
+           into an alias is governed by path equality; no modes to check. *)
+        Ok All
+    | Mp_absent, Mp_present -> begin
+        (* [md1] is an alias but [md2] is a real member: the alias gets
+           expanded, and its real mode is its target's, unrelated to the
+           enclosing structure (no modality, no close-over coercion). [md2]'s
+           modality applies as usual. *)
+        let target = match md1.md_type with
+          | Mty_alias p -> p
+          | _ -> p1
+        in
+        match mmodes with
+        | All -> Ok All
+        | Specific (_, m1) ->
+            let m0 = Mtype.find_module_mode env target in
+            match Mode.Modality.to_const_opt md2.md_modalities with
+            | Some moda1 ->
+                let m1 = Mode.Modality.Const.apply_right moda1 m1 in
+                Ok (Specific ((m0, None), m1))
+            | None ->
+                (* [md2] has an inferred modality: this only arises when
+                   checking a signature against itself (see the corresponding
+                   comment in [Includecore.child_modes_with_modalities]). The
+                   mode-free check suffices. *)
+                Ok All
+      end
+    | Mp_present, Mp_present ->
+        (* Both are real members with modalities; in particular an aliasable
+           strengthening of a real member keeps its modality. *)
+        let modalities = md1.md_modalities, md2.md_modalities in
+        Includecore.child_modes_with_modalities id ~modalities mmodes
+        |> map_error (fun e -> Error.(Core (Modalities e)))
   in
   strengthened_modtypes ~core ~direction ~loc ~aliasable:true env subst ~modes
     md1.md_type p1 md2.md_type orig_shape

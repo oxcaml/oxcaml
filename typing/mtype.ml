@@ -185,6 +185,11 @@ let strengthen_decl ~aliasable md p =
   let md = strengthen_lazy_decl ~aliasable (Subst.Lazy.of_module_decl md) p in
   Subst.Lazy.force_module_decl md
 
+(* Expand a module alias with declaration [md] to its target's type. *)
+let expand_alias_lazy path (md : Subst.Lazy.module_declaration) =
+  let normal_path = Env.normalize_instance_names_in_module_path path in
+  strengthen_lazy ~aliasable:true md.md_type normal_path
+
 (* Perform one reduction on a module type, returning None is it couldn't be
   reduced. Possible reductions are unfolding type abbreviations, pushing
   strengthening inwards and, if aliases is true, resolving module aliases. *)
@@ -199,10 +204,7 @@ let rec reduce_lazy ~aliases env mty =
       end
   | Mty_alias path when aliases ->
         begin try
-          let mty = (Env.find_module_lazy path env).md_type in
-          let normal_path = Env.normalize_instance_names_in_module_path path in
-          let mty = strengthen_lazy ~aliasable:true mty normal_path in
-          Some mty
+          Some (expand_alias_lazy path (Env.find_module_lazy path env))
         with Not_found ->
           (*Location.prerr_warning Location.none
             (Warnings.No_cmi_file (Path.name path));*)
@@ -228,6 +230,28 @@ let rec scrape_lazy ~aliases env mty =
 let reduce_alias_lazy env mty = reduce_lazy ~aliases:true env mty
 
 let reduce_lazy env mty = reduce_lazy ~aliases:false env mty
+
+(* Like [scrape_lazy ~aliases:true], also tracking the mode of the module:
+   resolving an alias replaces [mode] with the mode of its target. *)
+let rec scrape_alias_with_mode_lazy env mty mode =
+  match (mty : Subst.Lazy.module_type) with
+  | Mty_alias path -> begin
+      match
+        let md, mode = Env.find_module_lazy_and_mode path env in
+        expand_alias_lazy path md, mode
+      with
+      | exception Not_found -> mty, mode
+      | mty, mode -> scrape_alias_with_mode_lazy env mty mode
+    end
+  | _ ->
+      match reduce_lazy env mty with
+      | Some mty -> scrape_alias_with_mode_lazy env mty mode
+      | None -> mty, mode
+
+let find_module_mode env path =
+  snd
+    (scrape_alias_with_mode_lazy env (Mty_alias path)
+       Mode.With_regionality.(max |> disallow_right))
 
 let reduce env mty =
   Subst.Lazy.of_modtype mty
@@ -405,13 +429,15 @@ let rec make_aliases_absent ~aliased pres mty =
   | Mty_signature sg ->
       let make_item = function
         | Sig_module(id, pres, md, rs, priv) ->
-          let pres, md = if aliased
-            then Mp_absent, md
+          let pres, md =
+            if aliased
+            then Mp_absent, { md with md_modalities = Mode.Modality.undefined }
             else
-              let pres, md_type =
-                make_aliases_absent ~aliased:false pres md.md_type
-              in
-              pres, { md with md_type }
+              match make_aliases_absent ~aliased:false pres md.md_type with
+              | Mp_absent, md_type ->
+                  Mp_absent,
+                  { md with md_type; md_modalities = Mode.Modality.undefined }
+              | Mp_present, md_type -> Mp_present, { md with md_type }
           in
           Sig_module(id, pres, md, rs, priv)
         | Sig_value _ | Sig_type _ | Sig_typext _ | Sig_modtype _
@@ -463,7 +489,7 @@ let scrape env mty =
 
 let () =
   Out_type.expand_module_type := expand ;
-  Env.scrape_alias := scrape_alias_lazy
+  Env.scrape_alias := scrape_alias_with_mode_lazy
 
 let find_type_of_module ~strengthen ~aliasable env path =
   if strengthen then
@@ -472,6 +498,17 @@ let find_type_of_module ~strengthen ~aliasable env path =
     Subst.Lazy.force_modtype mty
   else
     (Env.find_module path env).md_type
+
+(* When a module alias (which carries no modality) is expanded into a real
+   module declaration, recover the modality from the mode of the alias's
+   target, relative to a fresh mode variable standing for the enclosing
+   module. The result is zapped to a constant modality, as the expansion
+   appears in module types, which cannot contain inferred modalities. *)
+let modality_of_alias_target env path =
+  let mode = find_module_mode env path in
+  let mode, _ = Mode.With_regionality.newvar_above (Ctype.get_current_level ()) mode in
+  let md_mode, _ = Mode.With_regionality.newvar_above (Ctype.get_current_level ()) mode in
+  Mode.Modality.(infer ~md_mode ~mode |> zap_to_floor |> of_const)
 
 (* In nondep_supertype, env is only used for the type it assigns to id.
    Hence there is no need to keep env up-to-date by adding the bindings
@@ -550,9 +587,17 @@ and nondep_sig_item env va ids = function
       Sig_type(id, Ctype.nondep_type_decl env ids (va = Co) d, rs, vis)
   | Sig_typext(id, ext, es, vis) ->
       Sig_typext(id, Ctype.nondep_extension_constructor env ids ext, es, vis)
-  | Sig_module(id, pres, md, rs, vis) ->
-      let pres, mty = nondep_mty_with_presence env va ids pres md.md_type in
-      Sig_module(id, pres, {md with md_type = mty}, rs, vis)
+  | Sig_module(id, pres0, md, rs, vis) ->
+      let pres, mty = nondep_mty_with_presence env va ids pres0 md.md_type in
+      let md_modalities =
+        (* An absent member (an alias) carries no modality; if it is
+           materialized into a present one, recover a modality from its
+           target. *)
+        match pres0, pres, md.md_type with
+        | Mp_absent, Mp_present, Mty_alias p -> modality_of_alias_target env p
+        | _, _, _ -> md.md_modalities
+      in
+      Sig_module(id, pres, {md with md_type = mty; md_modalities}, rs, vis)
   | Sig_modtype(id, d, vis) ->
       Sig_modtype(id, nondep_modtype_decl env ids d, vis)
   | Sig_class(id, d, rs, vis) ->
@@ -848,7 +893,7 @@ let rec remove_aliases_mty env args pres mty =
   let res =
     match args.scrape env mty with
       Mty_signature sg ->
-        Mp_present, Mty_signature (remove_aliases_sig env args' sg)
+        Mp_present, Mty_signature (remove_aliases_sig env args' Ident.empty sg)
     | Mty_alias _ ->
         let mty' = scrape_alias env mty in
         if mty' = mty then begin
@@ -871,24 +916,40 @@ let rec remove_aliases_mty env args pres mty =
     pres, mty
   end
 
-and remove_aliases_sig env args sg =
+and remove_aliases_sig env args siblings sg =
   match sg with
     [] -> []
-  | Sig_module(id, pres, md, rs, priv) :: rem  ->
+  | Sig_module(id, pres0, md, rs, priv) :: rem  ->
       let pres, mty =
         match md.md_type with
           Mty_alias p when args.exclude (Alias id) p ->
-            pres, md.md_type
+            pres0, md.md_type
         | mty ->
-            remove_aliases_mty env args pres mty
+            remove_aliases_mty env args pres0 mty
       in
-      Sig_module(id, pres, {md with md_type = mty} , rs, priv) ::
-      remove_aliases_sig (Env.add_module id pres mty env) args rem
+      let md_modalities =
+        match pres0, pres, md.md_type with
+        | Mp_absent, Mp_present, Mty_alias p ->
+            begin match p with
+            | Pident tid ->
+                (* A sibling in this signature has no mode in [env]. *)
+                (try Ident.find_same tid siblings
+                 with Not_found -> modality_of_alias_target env p)
+            | _ -> modality_of_alias_target env p
+            end
+        | _, _, _ -> md.md_modalities
+      in
+      let siblings =
+        if Mode.Modality.is_undefined md_modalities then siblings
+        else Ident.add id md_modalities siblings
+      in
+      Sig_module(id, pres, {md with md_type = mty; md_modalities}, rs, priv) ::
+      remove_aliases_sig (Env.add_module id pres mty env) args siblings rem
   | Sig_modtype(id, mtd, priv) :: rem ->
       Sig_modtype(id, mtd, priv) ::
-      remove_aliases_sig (Env.add_modtype id mtd env) args rem
+      remove_aliases_sig (Env.add_modtype id mtd env) args siblings rem
   | it :: rem ->
-      it :: remove_aliases_sig env args rem
+      it :: remove_aliases_sig env args siblings rem
 
 let scrape_for_functor_arg env mty =
   let exclude _id p =

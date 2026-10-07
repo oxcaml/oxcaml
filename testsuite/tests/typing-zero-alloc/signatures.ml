@@ -1374,7 +1374,7 @@ end
 module M_outer : sig module M_inner : sig type t val f : unit -> unit end end
 module type M_outer_strong = sig module M_inner = M_outer.M_inner end
 module type M_outer_subst =
-  sig module M_inner : sig val f : unit -> unit end end
+  sig module M_inner : sig val f : unit -> unit end @@ stateless end
 module M : M_outer_subst
 |}]
 
@@ -1413,7 +1413,7 @@ module M_outer :
   end
 module type S_outer_strong = sig module M_inner = M_outer.M_inner end
 module type S_outer_subst =
-  sig module M_inner : sig val f : unit -> unit end end
+  sig module M_inner : sig val f : unit -> unit end @@ stateless end
 module M : S_outer_subst
 |}]
 
@@ -1452,7 +1452,7 @@ module M_outer :
   end
 module type S_outer_strong = sig module M_inner = M_outer.M_inner end
 module type S_outer_subst =
-  sig module M_inner : sig val f : unit -> unit end end
+  sig module M_inner : sig val f : unit -> unit end @@ stateless end
 module M : S_outer_subst
 |}]
 
