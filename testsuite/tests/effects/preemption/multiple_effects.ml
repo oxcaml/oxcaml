@@ -13,8 +13,8 @@ type _ Effect.t += Dec : int -> int Effect.t
 let () =
   let preempted = ref false in
 
-  let result = Domain.Tick.with_ ~interval_usec:100_000 (fun _ ->
-    Preemptible.try_with
+  let result = Domain.Tick.with_ ~interval_usec:100_000 (fun () ->
+    let result = Preemptible.try_with
       ~on_tick:(fun () -> Preempt)
       (fun () ->
          let start_at = Sys.time () in
@@ -39,7 +39,11 @@ let () =
             continue k (n + 1))
           | Dec n -> Some (fun (k : (a, _) continuation) ->
             continue k (n - 50))
-          | _ -> None) })
+          | _ -> None) }
+    in
+    { Modes.Global.global =
+        { Modes.Aliased.aliased = { Modes.Many.many = result } } })
   in
+  let result = result.global.aliased.many in
 
   assert (result > 0);

@@ -31,14 +31,12 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
           continuation_info;
           code_deps;
           delayed_deps;
-          le_monde_exterieur;
           applications;
           all_sets_of_closures
         } =
     Traverse.run unit ~free_names
   in
-  Traverse_acc.resolve_delayed_deps deps ~code_deps ~le_monde_exterieur
-    delayed_deps;
+  Traverse_acc.resolve_delayed_deps deps ~code_deps delayed_deps;
   if Flambda_features.debug_reaper "print-raw" then Dot_printer.print_dep deps;
   let solved_dep, uses =
     Profile.record_call ~accumulate:true "solver" (fun () ->

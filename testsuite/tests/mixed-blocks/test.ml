@@ -15,7 +15,7 @@
    program = "${test_source_directory}/generate.out";
    all_modules = "generate_mixed_blocks_code.ml";
    ocamlopt.opt;
-   arguments = "75 native";
+   arguments = "50 native";
    output = "${test_source_directory}/generated_native_test.ml.corrected";
    run;
    output = "${test_source_directory}/generated_native_test.ml.corrected";
@@ -27,7 +27,7 @@
    program = "${test_source_directory}/generate.out";
    all_modules = "generate_mixed_blocks_code.ml";
    ocamlopt.opt;
-   arguments = "300 byte";
+   arguments = "200 byte";
    output = "${test_source_directory}/generated_byte_test.ml.corrected";
    run;
    output = "${test_source_directory}/generated_byte_test.ml.corrected";

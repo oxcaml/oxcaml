@@ -83,10 +83,13 @@ extern intnat * caml_frametable[];
    flags, sizes, and the pointers needed to locate its live offsets,
    allocation sizes, and debug words. [d] points at the descriptor body:
    the byte after its LEB128 delta (short), or the escape byte itself
-   (medium/long). */
-void caml_decode_frame_descr(frame_descr *d, struct frame_descr_decoded *out)
+   (medium/long).
+
+   Inline to optimise frametable registration, which only needs out->end. */
+Caml_inline void decode_frame_descr(frame_descr *d,
+                                    struct frame_descr_decoded *out)
 {
-  memset(out, 0, sizeof(*out));
+  *out = (struct frame_descr_decoded){ 0 };
   if (frame_is_short(d)) {
     const unsigned char *p = (const unsigned char *)d;
     unsigned char sf = *p++; /* size+flags byte */
@@ -146,6 +149,11 @@ void caml_decode_frame_descr(frame_descr *d, struct frame_descr_decoded *out)
   out->end = p;
 }
 
+void caml_decode_frame_descr(frame_descr *d, struct frame_descr_decoded *out)
+{
+  decode_frame_descr(d, out);
+}
+
 /* Iterate over the descriptors of one frametable, reconstructing the
    absolute return address of each descriptor by walking the delta chain.
    An escaped descriptor carries an absolute return address (retaddr_rel);
@@ -165,8 +173,8 @@ static void frametable_iter_start(frametable_iter *it, intnat *tbl)
 
 /* Yield the next descriptor body and its absolute return address. Must
    only be called while [it->remaining > 0]. */
-static frame_descr *frametable_iter_next(frametable_iter *it,
-                                         uintnat *retaddr_out)
+Caml_inline frame_descr *frametable_iter_next(frametable_iter *it,
+                                              uintnat *retaddr_out)
 {
   const unsigned char *p = it->next;
   frame_descr *d;
@@ -187,7 +195,7 @@ static frame_descr *frametable_iter_next(frametable_iter *it,
     d = (frame_descr *)p;
   }
   struct frame_descr_decoded dec;
-  caml_decode_frame_descr(d, &dec);
+  decode_frame_descr(d, &dec);
   it->next = dec.end;
   it->remaining--;
   *retaddr_out = it->retaddr;
@@ -216,22 +224,107 @@ static int capacity(caml_frame_descrs table) {
   return capacity;
 }
 
+/* The descriptors array is mmapped rather than malloced. This allows
+ * us to use MAP_POPULATE which is a significant performance
+ * improvement (avoiding many separate page faults as we then populate
+ * the array).
+ *
+ * Under ASan, caml_mem_map is malloc-backed and does not
+ * zero its memory, so we use the C heap instead. */
+
+#ifdef WITH_ADDRESS_SANITIZER
+
+static frame_descr_entry *alloc_descriptors(intnat capacity)
+{
+  frame_descr_entry *descriptors =
+    caml_stat_calloc_noexc(capacity, sizeof(frame_descr_entry));
+  if (descriptors == NULL) caml_raise_out_of_memory();
+  return descriptors;
+}
+
+static void free_descriptors(frame_descr_entry *descriptors,
+                             intnat capacity)
+{
+  (void)capacity;
+  caml_stat_free(descriptors);
+}
+
+#else
+
+static uintnat descriptors_mapping_size(intnat capacity)
+{
+  return caml_mem_round_up_mapping_size(
+    (uintnat)capacity * sizeof(frame_descr_entry));
+}
+
+static frame_descr_entry *alloc_descriptors(intnat capacity)
+{
+  frame_descr_entry *descriptors = caml_mem_map(
+    descriptors_mapping_size(capacity), CAML_MAP_POPULATE,
+    "frame descriptors");
+  if (descriptors == NULL) caml_raise_out_of_memory();
+  return descriptors;
+}
+
+static void free_descriptors(frame_descr_entry *descriptors,
+                             intnat capacity)
+{
+  caml_mem_unmap(descriptors, descriptors_mapping_size(capacity));
+}
+
+#endif
+
+Caml_inline void insert_entry(frame_descr_entry *descriptors, uintnat mask,
+                              uintnat retaddr, uintnat hash, frame_descr *fd)
+{
+  while (descriptors[hash].fd != NULL) {
+    hash = (hash+1) & mask;
+  }
+  descriptors[hash].retaddr = retaddr;
+  descriptors[hash].fd = fd;
+}
+
+/* Use prefetching to optimise filling the hash table. A descriptor's
+   slot is prefetched as soon as the descriptor is decoded, and the
+   insertion itself happens FILL_PREFETCH_DISTANCE descriptors later,
+   by which time the slot's cache line has usually arrived. */
+#define FILL_PREFETCH_DISTANCE 16
+
 static void fill_hashtable(
   caml_frame_descrs *table, caml_frametable_list *new_frametables)
 {
+  frame_descr_entry *descriptors = table->descriptors;
+  uintnat mask = table->mask;
+  struct pending_entry {
+    uintnat retaddr;
+    uintnat hash;
+    frame_descr *fd;
+  } pending[FILL_PREFETCH_DISTANCE];
+  uintnat n = 0; /* descriptors decoded so far */
   iter_list(new_frametables,cur) {
     frametable_iter it;
     frametable_iter_start(&it, (intnat *) cur->frametable);
     while (it.remaining > 0) {
       uintnat retaddr;
-      frame_descr *d = frametable_iter_next(&it, &retaddr);
-      uintnat h = Hash_retaddr(retaddr, table->mask);
-      while (table->descriptors[h].fd != NULL) {
-        h = (h+1) & table->mask;
-      }
-      table->descriptors[h].retaddr = retaddr;
-      table->descriptors[h].fd = d;
+      frame_descr *fd = frametable_iter_next(&it, &retaddr);
+      uintnat hash = Hash_retaddr(retaddr, mask);
+      caml_prefetchw(&descriptors[hash]);
+      struct pending_entry *slot = &pending[n % FILL_PREFETCH_DISTANCE];
+      if (n >= FILL_PREFETCH_DISTANCE)
+        insert_entry(descriptors, mask,
+                     slot->retaddr, slot->hash, slot->fd);
+      slot->retaddr = retaddr;
+      slot->fd = fd;
+      slot->hash = hash;
+      ++ n;
     }
+  }
+  /* Insert the descriptors still in flight. */
+  uintnat first = n > FILL_PREFETCH_DISTANCE ? n - FILL_PREFETCH_DISTANCE : 0;
+  for (uintnat i = first; i < n; i++) {
+    struct pending_entry *slot = &pending[i % FILL_PREFETCH_DISTANCE];
+    insert_entry(descriptors, mask,
+                 slot->retaddr, slot->hash, slot->fd);
   }
 }
 
@@ -1040,6 +1133,11 @@ static void add_frame_descriptors(
   /* Reallocate the caml_frame_descriptor table if it is too small */
   if(tblsize < (table->num_descr + increase) * 2) {
 
+    if (table->descriptors != NULL) {
+      free_descriptors(table->descriptors, tblsize);
+      table->descriptors = NULL;
+    }
+
     /* Merge both lists */
     tail->next = table->frametables;
     table->frametables = NULL;
@@ -1052,11 +1150,7 @@ static void add_frame_descriptors(
     table->num_descr = num_descr;
     table->mask = tblsize - 1;
 
-    if (table->descriptors != NULL) caml_stat_free(table->descriptors);
-    table->descriptors =
-      (frame_descr_entry *) caml_stat_calloc_noexc(tblsize,
-                                                   sizeof(frame_descr_entry));
-    if (table->descriptors == NULL) caml_raise_out_of_memory();
+    table->descriptors = alloc_descriptors(tblsize);
 
     fill_hashtable(table, new_frametables);
     if (caml_measure_frametables) {

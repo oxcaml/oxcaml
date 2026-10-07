@@ -30,12 +30,14 @@ Error: allocation of 24 bytes
 File "test_assume_error.ml", line 61, characters 6-30:
 Error: called function may allocate (indirect call)
 
-File "printf.ml", line 27, characters 2-63:
-Error: called function may allocate (direct call camlCamlinternalFormat__make_printf_HIDE_STAMP)
+File "printf.ml", line 37, characters 21-43:
+Error: called function may allocate (direct call camlStdlib__Printf__kfprintf_HIDE_STAMP)
 inlined from
-stdlib/printf.ml:34,21--43[Stdlib__Printf.fprintf][camlStdlib__Printf__fprintf_HIDE_STAMP]
-stdlib/printf.ml:38,17--35[Stdlib__Printf.printf][camlStdlib__Printf__printf_HIDE_STAMP]
+stdlib/printf.ml:41,17--35[Stdlib__Printf.printf][camlStdlib__Printf__printf_HIDE_STAMP]
 test_assume_error.ml:61,6--30[Test_assume_error.A2.foo]
+Hint: Build artifacts for the library containing the callee are not available.
+Try adding the library as an explicit dependency.
+
 
 File "test_assume_error.ml", line 63, characters 6-10:
 Error: allocation of 24 bytes

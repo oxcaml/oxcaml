@@ -394,7 +394,8 @@
          (uncurry =
             (function {nlocal = 0} f
               param[value<(consts ()) (non_consts ([0: ?, ?]))>]
-              (apply f (field_imm 0 param) (field_imm 1 param)))
+              (apply f (mixedfield 0  (?,?) param)
+                (mixedfield 1  (?,?) param)))
           map =
             (function {nlocal = 2} f
               l[value<
@@ -519,7 +520,8 @@
              (uncurry =
                 (function {nlocal = 0} f
                   param[value<(consts ()) (non_consts ([0: ?, ?]))>]
-                  (apply f (field_imm 0 param) (field_imm 1 param)))
+                  (apply f (mixedfield 0  (?,?) param)
+                    (mixedfield 1  (?,?) param)))
               map =
                 (function {nlocal = 2} f
                   l[value<
