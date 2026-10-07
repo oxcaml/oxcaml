@@ -71,6 +71,21 @@ let of_cmo (cmo : Ocaml_compiler.Cmo_format.t) =
   let force_link = Cmo_format.force_link cmo in
   { provides; requires; aliases = []; primitives = []; force_link; effects_without_cps }
 
+let of_compilation_units ~exported ~imported =
+  let compunit cu = Global_name.Compunit (Code.Compilation_unit.full_path_as_string cu) in
+  let provides = Global_name.Compunit_set.singleton (compunit exported) in
+  let requires = Global_name.Compunit_set.of_list (List.map imported ~f:compunit) in
+  let requires = Global_name.Compunit_set.diff requires provides in
+  (* CR-soon selee: [force_link] and [effects_without_cps] should be populated
+     properly, too. *)
+  { provides
+  ; requires
+  ; aliases = []
+  ; primitives = []
+  ; force_link = false
+  ; effects_without_cps = false
+  }
+
 let union t1 t2 =
   let provides = Global_name.Compunit_set.union t1.provides t2.provides in
   let requires = Global_name.Compunit_set.union t1.requires t2.requires in
