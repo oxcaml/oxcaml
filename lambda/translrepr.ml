@@ -40,15 +40,21 @@ let transl_instantiated_shape env loc sorts_and_types kind =
     if all_scannable
     then `Not_mixed
     else
+      (* Build each field's shape from its defaulted sort, then refine it
+         against the field's type. This costs a [value_kind] per scannable
+         leaf (plus decomposing unboxed products), rather than a [type_jkind]
+         per field as when going via the type's layout, but is at least as
+         precise: refinement reads separability off the jkind for type
+         variables, and also recurses into unboxed products. Using
+         [Typeopt.layout] instead would skip the product work, but would lose
+         immediacy for values inside products. *)
       let shape =
-        Array.map
-          (fun (_sort, ty) ->
-            match Typeopt.type_layout env ty with
-            | Some layout -> Lambda.transl_layout layout
-            | None ->
-              Misc.fatal_error
-                "Translrepr.transl_instantiated_shape: missing layout")
-          sorts_and_types
+        Array.map2
+          (fun sort (_sort, ty) ->
+            Typeopt.layout_of_sort loc sort
+            |> Lambda.mixed_block_element_of_layout
+            |> Typeopt.refine_mixed_block_element env loc ty)
+          consts sorts_and_types
       in
       (* Shapes containing splices are checked after static evaluation *)
       if not (Lambda.mixed_block_shape_has_splices shape)

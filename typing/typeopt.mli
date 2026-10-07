@@ -105,6 +105,3 @@ val classify_lazy_argument : Typedtree.expression ->
 val assert_mixed_product_support_for_lambda_shape :
   Location.t -> Typedecl.Mixed_product_kind.t
   -> 'a Lambda.mixed_block_element array -> unit
-
-(* The layout of a type, without defaulting sort variables *)
-val type_layout : Env.t -> Types.type_expr -> Jkind.Layout.Const.t option
