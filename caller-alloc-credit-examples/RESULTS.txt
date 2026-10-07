@@ -384,3 +384,43 @@ dominant size lever and is not specific to the hints.
 
 43 of the programs under testsuite/tests/basic* and rmain print the same
 output under 2026 and 2026 + both hints + nested speculation.
+
+Whole compiler distribution, six configurations
+================================================
+
+Built in a detached worktree at the branch head (each configuration from a
+clean build directory, as changing only the workspace's environment does
+not rebuild), harvested by tools/inlining_comparison_report.py.  The merge
+configurations include two fixes found by the measurements: merged
+handlers are simplified with the call site's inlining state (22a009d695)
+and budget state (6e1bb2dc7f).  PDFs: compiler-inlining-2026-hints.pdf
+(comparison report) and compiler-inlining-2026-hints-stats.pdf (stats).
+
+  configuration        text bytes          CPU s       call sites inlined   spec. refused   spec. aborted
+  -------------------  ------------------  ----------  -------------------  --------------  -------------
+  2026                 30,373,514          1,543       140,225              24,607          22,819
+  + argument credit    +0.8%               -1.5%       +0.5%                -1.5%           +1.0%
+  + merge              +2.6%               -1.7%       +2.0%                -27%            +10%
+  + both hints         +2.8%               -2.2%       +2.3%                -28%            +10%
+  + nested alone       -5.5%               +4.5%       -7.5%                +15%            -13%
+  + hints + nested     -7.2%               +6.5%       -10.2%               -10%            +15%
+
+Argument credit: 5,791 decisions credited, 556 tipped; the parser grows 9%
+(Menhir action helpers such as mkpat_attrs take a freshly built pair).
+
+Merge: 51,412 handlers merged, 1,097 pre-check refusals (8,395 before the
+budget fix), 23 depth-limit refusals (450 for plain, 16 after the depth
+fix).  It changes which callees pass more than how many: Table_by_int_id
+find, Hashtbl.key_index and Option.map enter the top of the inlined-code
+table.  Per-object swings are large in both directions (odoc_man -49%,
+odoc_html -37%, x86_binary_emitter +20%, mode +5%).  Before the budget
+fix, Misc.Colours.push inlined its cold fatal_errorf arm, grew from 116 to
+265 instructions and was then refused at all 83 of its own call sites.
+
+Nested speculation: the outermost decision sees the inlinings made inside
+the speculated body but the ratio still divides by the callee's own size,
+so it refuses more (refused bodies come out 1.12 times their original size
+against 0.92 without nesting).  A fairer denominator would add the sizes
+of the callees inlined during the speculation.
+
+Nothing here measures run time.
