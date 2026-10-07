@@ -24,9 +24,7 @@ let test_simple () =
   let t = { r = #{ i = 1; j = () } } in
   let r = t.r in
   set_idx t (.r.#i) 2;
-  (* r should still have i = 1, not 2 *)
   assert (r.#i = 1);
-  (* t.r should have i = 2 *)
   assert (t.r.#i = 2)
 
 (* Simple case with multiple fields in outer record *)
@@ -48,9 +46,7 @@ let test_nested () =
   let t = { outer = #{ inner = #{ a = 10; b = 20 }; c = 30 } } in
   let outer = t.outer in
   set_idx t (.outer.#inner.#a) 100;
-  (* outer should still have inner.a = 10 *)
   assert (outer.#inner.#a = 10);
-  (* t.outer should have inner.a = 100 *)
   assert (t.outer.#inner.#a = 100)
 
 (* Nested case with multiple fields in outer record *)
@@ -73,9 +69,7 @@ let test_deep () =
   let t = { l1 = #{ l2 = #{ l3 = #{ x = 1; y = 2 }; z = 3 }; w = 4 } } in
   let l1 = t.l1 in
   set_idx t (.l1.#l2.#l3.#x) 999;
-  (* l1 should still have l2.l3.x = 1 *)
   assert (l1.#l2.#l3.#x = 1);
-  (* t.l1 should have l2.l3.x = 999 *)
   assert (t.l1.#l2.#l3.#x = 999)
 
 (* Deeply nested case with multiple fields in outer record *)
@@ -99,9 +93,7 @@ let test_mixed () =
   let t = { mixed = #{ inner = #{ f = #3.14; i = 42 }; s = "hello" } } in
   let mixed = t.mixed in
   set_idx t (.mixed.#inner.#i) 100;
-  (* mixed should still have inner.i = 42 *)
   assert (mixed.#inner.#i = 42);
-  (* t.mixed should have inner.i = 100 *)
   assert (t.mixed.#inner.#i = 100)
 
 (* Mixed block with multiple fields in outer record *)
@@ -125,9 +117,7 @@ let test_set_simple () =
   let t = { r = #{ i = 0; j = () } } in
   t.r <- r;
   set_idx t (.r.#i) 2;
-  (* r should still have i = 1, not 2 *)
   assert (r.#i = 1);
-  (* t.r should have i = 2 *)
   assert (t.r.#i = 2)
 
 let test_set_simple_multi () =
@@ -143,9 +133,7 @@ let test_set_nested () =
   let t = { outer = #{ inner = #{ a = 0; b = 0 }; c = 0 } } in
   t.outer <- outer;
   set_idx t (.outer.#inner.#a) 100;
-  (* outer should still have inner.a = 10 *)
   assert (outer.#inner.#a = 10);
-  (* t.outer should have inner.a = 100 *)
   assert (t.outer.#inner.#a = 100)
 
 let test_set_nested_multi () =
@@ -161,9 +149,7 @@ let test_set_deep () =
   let t = { l1 = #{ l2 = #{ l3 = #{ x = 0; y = 0 }; z = 0 }; w = 0 } } in
   t.l1 <- l1;
   set_idx t (.l1.#l2.#l3.#x) 999;
-  (* l1 should still have l2.l3.x = 1 *)
   assert (l1.#l2.#l3.#x = 1);
-  (* t.l1 should have l2.l3.x = 999 *)
   assert (t.l1.#l2.#l3.#x = 999)
 
 let test_set_deep_multi () =
@@ -181,9 +167,7 @@ let test_set_mixed () =
   let t = { mixed = #{ inner = #{ f = #0.0; i = 0 }; s = "" } } in
   t.mixed <- mixed;
   set_idx t (.mixed.#inner.#i) 100;
-  (* mixed should still have inner.i = 42 *)
   assert (mixed.#inner.#i = 42);
-  (* t.mixed should have inner.i = 100 *)
   assert (t.mixed.#inner.#i = 100)
 
 let test_set_mixed_multi () =
