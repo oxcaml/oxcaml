@@ -171,6 +171,8 @@ let report name map =
       let constant = List.for_all (fun d -> d = base) rest in
       Printf.printf "%-32s constant stack: %b\n" name constant
 
+
+
 let () =
   report "rev_map" (rev_map []);
   report "rev_map_with_local" (rev_map_with_local []);
@@ -189,3 +191,16 @@ let () =
   let results = map_pass_local (0, 0) [1; 2; 3; 4] ~f:Fun.id in
   Printf.printf "map_pass_local results: %s\n"
     (String.concat " " (List.map string_of_int results))
+
+
+
+let[@tail_mod_cons] rec f (n : int) = 
+        let local_ p = (n, n) in 
+        let[@tail_mod_cons] rec g n = 
+                let local_ _overwrite = Sys.opaque_identity (100, n) in 
+                if n = 0 then [] else fst p :: g (n - 1)
+        in
+        if n = 0 then 0 :: g 1 else 0 :: f (n - 1)
+;;
+
+let () = assert (f 1 = [0; 0; 0]);;
