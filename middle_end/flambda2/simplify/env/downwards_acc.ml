@@ -56,6 +56,8 @@ type t =
     (* head of the list is the innermost continuation being lifted *)
     continuation_lifting_budget : int;
     speculative_inlining_budget : speculative_inlining_budget;
+    merged_handler_budgets :
+      (Flambda.Continuation_handler.t * speculative_inlining_budget) list;
     (* See [Flambda_features.Inlining.speculative_inlining_budget]. *)
     continuations_to_specialize : Continuation.Set.t;
     (* CR gbury: we could try and encode the set of continuations to specialize
@@ -73,8 +75,8 @@ let [@ocamlformat "disable"] print ppf
         lifted_constants; flow_acc; demoted_exn_handlers; code_ids_to_remember;
         code_ids_to_never_delete; code_ids_never_simplified; slot_offsets; debuginfo_rewrites;
         are_lifting_conts; lifted_continuations; continuation_lifting_budget;
-        speculative_inlining_budget; continuations_to_specialize;
-        specialization_map; } =
+        speculative_inlining_budget; merged_handler_budgets = _;
+        continuations_to_specialize; specialization_map; } =
   Format.fprintf ppf "@[<hov 1>(\
       @[<hov 1>(denv@ %a)@]@ \
       @[<hov 1>(continuation_uses_env@ %a)@]@ \
@@ -132,6 +134,7 @@ let create denv slot_offsets continuation_uses_env =
     lifted_continuations = [];
     continuation_lifting_budget = Flambda_features.Expert.cont_lifting_budget ();
     speculative_inlining_budget = Not_in_speculative_region;
+    merged_handler_budgets = [];
     continuations_to_specialize = Continuation.Set.empty;
     specialization_map = Continuation.Map.empty
   }
@@ -169,6 +172,18 @@ let enter_speculative_region t ~budget =
       ~budget;
   with_speculative_inlining_budget t
     (Remaining { remaining = budget; pending_credit = 0.; creditable })
+
+(* See [Downwards_env.add_merged_handler]: the handler merged into an inlined
+   body is not part of that body for the purposes of the budget either, so the
+   budget state of the call site is remembered too. *)
+let add_merged_handler_budget t handler =
+  { t with
+    merged_handler_budgets =
+      (handler, t.speculative_inlining_budget) :: t.merged_handler_budgets
+  }
+
+let merged_handler_budget t handler =
+  List.assq_opt handler t.merged_handler_budgets
 
 let remaining_speculative_inlining_budget t =
   match t.speculative_inlining_budget with

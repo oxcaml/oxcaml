@@ -166,6 +166,13 @@ val enter_speculative_region : t -> budget:float -> t
 (** [None] if not in a speculative region; [Some 0.] if exhausted. *)
 val remaining_speculative_inlining_budget : t -> float option
 
+(** Remember the current budget state for the given handler, about to be merged
+    into an inlined body (see [Downwards_env.add_merged_handler]). *)
+val add_merged_handler_budget : t -> Flambda.Continuation_handler.t -> t
+
+val merged_handler_budget :
+  t -> Flambda.Continuation_handler.t -> speculative_inlining_budget option
+
 val speculative_inlining_budget_exhausted : t -> bool
 
 (** Charge the (evaluated) cost metrics against the budget, if any. *)

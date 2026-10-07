@@ -178,19 +178,20 @@ let inline dacc ~apply ~unroll_to ~was_inline_always function_decl =
               ~apply_exn_continuation ~apply_return_continuation
               ~result_arity:(Code.result_arity code) ~make_inlined_body
         in
-        let denv, expr =
+        let dacc, denv, expr =
           (* With [-flambda2-speculative-inlining-merge-return-continuation]:
              when the return continuation is used only by this call, its handler
              is copied into the inlined body, where it is simplified with what
              is known about the values returned (the original handler, left
              without any use, is deleted). *)
           match apply_return_continuation with
-          | Never_returns -> denv, expr
+          | Never_returns -> dacc, denv, expr
           | Return cont -> (
             match DE.single_use_continuation (DA.denv dacc) cont with
-            | None -> denv, expr
+            | None -> dacc, denv, expr
             | Some (handler, _size) ->
-              ( DE.add_merged_handler denv handler ~call_site:(DA.denv dacc),
+              ( DA.add_merged_handler_budget dacc handler,
+                DE.add_merged_handler denv handler ~call_site:(DA.denv dacc),
                 Let_cont.create_non_recursive cont handler ~body:expr
                   ~free_names_of_body:Unknown ))
         in

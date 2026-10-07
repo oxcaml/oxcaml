@@ -59,7 +59,8 @@ type simplify_let_cont_data =
 type after_downwards_traversal_of_body_data =
   { denv_for_join : DE.t;
     prior_lifted_constants : LCS.t;
-    handlers : Original_handlers.t
+    handlers : Original_handlers.t;
+    merged_handler : Continuation_handler.t option
   }
 
 type expr_to_rebuild = (Rebuilt_expr.t * Upwards_acc.t) Simplify_common.rebuild
@@ -1751,6 +1752,25 @@ and after_downwards_traversal_of_body ~simplify_expr ~down_to_up
   (* At this point, we have done the downwards traversal of the body, and we
      have two situations wrt to continuation lifting. *)
   let denv_for_join = data.denv_for_join in
+  let dacc =
+    (* A handler merged into an inlined body is simplified with the budget state
+       of the call site (see [DA.add_merged_handler_budget]), except within a
+       speculation, whose pool must see all of the code it produces. *)
+    match data.merged_handler with
+    | None -> dacc
+    | Some handler -> (
+      if DE.in_speculative_inlining (DA.denv dacc)
+      then dacc
+      else
+        match DA.merged_handler_budget dacc handler with
+        | None -> dacc
+        | Some budget ->
+          if Inlining_stats.enabled ()
+          then
+            Inlining_stats_table.incr
+              "speculation.return_continuation_handler_budget_restored";
+          DA.with_speculative_inlining_budget dacc budget)
+  in
   match DA.are_lifting_conts dacc with
   | Lifting_out_of { continuation = _ } ->
     if not (Original_handlers.can_be_lifted data.handlers)
@@ -1798,7 +1818,8 @@ and down_to_up_for_lifted_continuations ~simplify_expr ~denv_for_join
     let data : after_downwards_traversal_of_body_data =
       { denv_for_join = actual_denv;
         prior_lifted_constants = LCS.empty;
-        handlers
+        handlers;
+        merged_handler = None
       }
     in
     let down_to_up =
@@ -1980,7 +2001,11 @@ let simplify_let_cont0 ~(simplify_expr : _ Simplify_common.expr_simplifier) dacc
   in
   let body = data.body in
   let data : after_downwards_traversal_of_body_data =
-    { denv_for_join; prior_lifted_constants; handlers }
+    { denv_for_join;
+      prior_lifted_constants;
+      handlers;
+      merged_handler = data.merged_handler
+    }
   in
   simplify_expr dacc body
     ~down_to_up:
