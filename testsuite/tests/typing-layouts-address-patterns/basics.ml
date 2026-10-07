@@ -539,15 +539,11 @@ Error: This value is "yielding"
        However, the highlighted expression is expected to be "unyielding".
 |}]
 
-(* Once immutable addresses cannot be dereferenced *)
-let bad_once (a : (unit -> unit) addr_imm @ once) =
+let ok_once (a : 'a addr_imm @ once) =
   match a with
-  | addr_imm_ f -> f ()
+  | addr_imm_ x -> x
 [%%expect{|
-Line 3, characters 4-15:
-3 |   | addr_imm_ f -> f ()
-        ^^^^^^^^^^^
-Error: This value is "once" but is expected to be "many".
+val ok_once : 'a addr_imm @ once -> 'a @ once = <fun>
 |}]
 
 let ok_many (a : (unit -> unit) addr_imm @ many) =
@@ -557,17 +553,11 @@ let ok_many (a : (unit -> unit) addr_imm @ many) =
 val ok_many : (unit -> unit) addr_imm -> unit = <fun>
 |}]
 
-(* The value at an immutable address is always aliased *)
-let bad_unique (a : bytes addr_imm @ unique) =
+let ok_unique (a : bytes addr_imm @ unique) =
   match a with
   | addr_imm_ x -> use_unique x
 [%%expect{|
-Line 3, characters 30-31:
-3 |   | addr_imm_ x -> use_unique x
-                                  ^
-Error: This value is "aliased"
-         because it is the value (with some modality) at the address at line 3, characters 4-15.
-       However, the highlighted expression is expected to be "unique".
+val ok_unique : bytes addr_imm @ unique -> unit = <fun>
 |}]
 
 (* Dereferencing an immutable address does not otherwise restrict its mode *)
@@ -744,26 +734,306 @@ Error: This value is "read"
 (**************)
 (* Uniqueness *)
 
+(* Immutable addresses behave like immutable record fields with respect to
+   uniqueness. *)
+
+let use_aliased : 'a -> unit = fun _ -> ()
 let use_unique_addr : 'a addr @ unique -> unit = fun _ -> ()
+let use_unique_addr_imm : 'a addr_imm @ unique -> unit = fun _ -> ()
 [%%expect{|
+val use_aliased : 'a -> unit = <fun>
 val use_unique_addr : ('a : any). 'a addr @ unique -> unit = <fun>
+val use_unique_addr_imm : ('a : any). 'a addr_imm @ unique -> unit = <fun>
 |}]
 
-(* Matching on a mutable address uses the address as aliased *)
+(* Using the value at a unique immutable address uniquely *)
+let unique_use (a : bytes addr_imm @ unique) =
+  match a with
+  | addr_imm_ x -> use_unique x
+[%%expect{|
+val unique_use : bytes addr_imm @ unique -> unit = <fun>
+|}]
+
+(* ...twice *)
+let unique_use_twice (a : bytes addr_imm @ unique) =
+  match a with
+  | addr_imm_ x -> use_unique x; use_unique x
+[%%expect{|
+Line 3, characters 44-45:
+3 |   | addr_imm_ x -> use_unique x; use_unique x
+                                                ^
+Error: This value is used here, but it has already been used as unique at:
+Line 3, characters 30-31:
+3 |   | addr_imm_ x -> use_unique x; use_unique x
+                                  ^
+
+|}]
+
+(* ...in separate matches on the same address *)
+let unique_use_in_separate_matches (a : bytes addr_imm @ unique) =
+  (match a with addr_imm_ x -> use_unique x);
+  (match a with addr_imm_ y -> use_unique y)
+[%%expect{|
+Line 3, characters 42-43:
+3 |   (match a with addr_imm_ y -> use_unique y)
+                                              ^
+Error: This value is used here, but it has already been used as unique at:
+Line 2, characters 42-43:
+2 |   (match a with addr_imm_ x -> use_unique x);
+                                              ^
+
+|}]
+
+(* ...in separate branches *)
+let unique_use_in_branches c (a : bytes addr_imm @ unique) =
+  if c then (match a with addr_imm_ x -> use_unique x)
+  else (match a with addr_imm_ y -> use_unique y)
+[%%expect{|
+val unique_use_in_branches : bool -> bytes addr_imm @ unique -> unit = <fun>
+|}]
+
+(* Using the value at a unique immutable address as aliased *)
+let aliased_use (a : bytes addr_imm @ unique) =
+  (match a with addr_imm_ x -> use_aliased x; use_aliased x);
+  (match a with addr_imm_ y -> use_aliased y)
+[%%expect{|
+val aliased_use : bytes addr_imm @ unique -> unit = <fun>
+|}]
+
+(* Using distinct parts of the value at a unique immutable address uniquely *)
+let unique_use_of_parts (a : (bytes * bytes) addr_imm @ unique) =
+  match a with
+  | addr_imm_ (x, y) -> use_unique x; use_unique y
+[%%expect{|
+val unique_use_of_parts : (bytes * bytes) addr_imm @ unique -> unit = <fun>
+|}]
+
+(* ...and the same part twice *)
+let unique_use_of_part_twice (a : (bytes * bytes) addr_imm @ unique) =
+  (match a with addr_imm_ (x, _) -> use_unique x);
+  (match a with addr_imm_ (y, _) -> use_unique y)
+[%%expect{|
+Line 3, characters 47-48:
+3 |   (match a with addr_imm_ (y, _) -> use_unique y)
+                                                   ^
+Error: This value is used here, but it has already been used as unique at:
+Line 2, characters 47-48:
+2 |   (match a with addr_imm_ (x, _) -> use_unique x);
+                                                   ^
+
+|}]
+
+(* Using both the value at a unique immutable address and the address
+   uniquely *)
+let unique_use_then_addr (a : bytes addr_imm @ unique) =
+  (match a with addr_imm_ x -> use_unique x);
+  use_unique_addr_imm a
+[%%expect{|
+Line 3, characters 22-23:
+3 |   use_unique_addr_imm a
+                          ^
+Error: This value is used here,
+       but part of it has already been used as unique at:
+Line 2, characters 42-43:
+2 |   (match a with addr_imm_ x -> use_unique x);
+                                              ^
+
+|}]
+
+let unique_addr_then_use (a : bytes addr_imm @ unique) =
+  use_unique_addr_imm a;
+  (match a with addr_imm_ x -> use_unique x)
+[%%expect{|
+Line 3, characters 16-27:
+3 |   (match a with addr_imm_ x -> use_unique x)
+                    ^^^^^^^^^^^
+Error: This value is read from here,
+       but it has already been used as unique at:
+Line 2, characters 22-23:
+2 |   use_unique_addr_imm a;
+                          ^
+
+|}]
+
+let unique_use_and_as_alias (a : bytes addr_imm @ unique) =
+  match a with
+  | addr_imm_ x as a' -> use_unique x; use_unique_addr_imm a'
+[%%expect{|
+Line 3, characters 59-61:
+3 |   | addr_imm_ x as a' -> use_unique x; use_unique_addr_imm a'
+                                                               ^^
+Error: This value is used here,
+       but part of it has already been used as unique at:
+Line 3, characters 36-37:
+3 |   | addr_imm_ x as a' -> use_unique x; use_unique_addr_imm a'
+                                        ^
+
+|}]
+
+let unique_use_and_let_alias (a : bytes addr_imm @ unique) =
+  let a' = a in
+  (match a with addr_imm_ x -> use_unique x);
+  (match a' with addr_imm_ y -> use_unique y)
+[%%expect{|
+Line 4, characters 43-44:
+4 |   (match a' with addr_imm_ y -> use_unique y)
+                                               ^
+Error: This value is used here, but it has already been used as unique at:
+Line 3, characters 42-43:
+3 |   (match a with addr_imm_ x -> use_unique x);
+                                              ^
+
+|}]
+
+(* Using the value at nested unique immutable addresses uniquely *)
+let unique_use_nested (a : bytes addr_imm addr_imm @ unique) =
+  match a with
+  | addr_imm_ (addr_imm_ x) -> use_unique x
+[%%expect{|
+val unique_use_nested : bytes addr_imm addr_imm @ unique -> unit = <fun>
+|}]
+
+(* ...twice *)
+let unique_use_nested_twice (a : bytes addr_imm addr_imm @ unique) =
+  (match a with addr_imm_ (addr_imm_ x) -> use_unique x);
+  (match a with addr_imm_ (addr_imm_ y) -> use_unique y)
+[%%expect{|
+Line 3, characters 54-55:
+3 |   (match a with addr_imm_ (addr_imm_ y) -> use_unique y)
+                                                          ^
+Error: This value is used here, but it has already been used as unique at:
+Line 2, characters 54-55:
+2 |   (match a with addr_imm_ (addr_imm_ x) -> use_unique x);
+                                                          ^
+
+|}]
+
+(* An aliased immutable address gives an aliased value *)
+let unique_use_aliased (a : bytes addr_imm @ aliased) =
+  match a with
+  | addr_imm_ x -> use_unique x
+[%%expect{|
+Line 3, characters 30-31:
+3 |   | addr_imm_ x -> use_unique x
+                                  ^
+Error: This value is "aliased"
+         because it is the value at the address at line 3, characters 4-15
+         which is "aliased".
+       However, the highlighted expression is expected to be "unique".
+|}]
+
+(* The value at a mutable address is always aliased *)
+let unique_use_mut (a : bytes addr @ unique) =
+  match a with
+  | addr_ x -> use_unique x
+[%%expect{|
+Line 3, characters 26-27:
+3 |   | addr_ x -> use_unique x
+                              ^
+Error: This value is "aliased"
+         because it is the value (with some modality) at the address at line 3, characters 4-11.
+       However, the highlighted expression is expected to be "unique".
+|}]
+
+(* Using a unique mutable address uniquely after matching on it *)
 let unique_addr_after_match_mut (a : int addr @ unique) =
   match a with
   | addr_ 1 -> use_unique_addr a
   | _ -> ()
 [%%expect{|
-Line 3, characters 31-32:
-3 |   | addr_ 1 -> use_unique_addr a
-                                   ^
-Error: This value is used here as unique,
-       but it has already been used in an address pattern at:
-Line 3, characters 4-11:
-3 |   | addr_ 1 -> use_unique_addr a
-        ^^^^^^^
+val unique_addr_after_match_mut : int addr @ unique -> unit = <fun>
+|}]
 
+(*************)
+(* Linearity *)
+
+(* Immutable addresses behave like immutable record fields with respect to
+   linearity. *)
+
+let use_once_addr_imm : 'a addr_imm @ once -> unit = fun _ -> ()
+[%%expect{|
+val use_once_addr_imm : ('a : any). 'a addr_imm @ once -> unit = <fun>
+|}]
+
+(* Using the value at a once immutable address once *)
+let once_use (a : (unit -> unit) addr_imm @ once) =
+  match a with
+  | addr_imm_ f -> f ()
+[%%expect{|
+val once_use : (unit -> unit) addr_imm @ once -> unit = <fun>
+|}]
+
+(* ...twice *)
+let once_use_twice (a : (unit -> unit) addr_imm @ once) =
+  match a with
+  | addr_imm_ f -> f (); f ()
+[%%expect{|
+Line 3, characters 25-26:
+3 |   | addr_imm_ f -> f (); f ()
+                             ^
+Error: This value is used here,
+       but it is defined as once and has already been used at:
+Line 3, characters 19-20:
+3 |   | addr_imm_ f -> f (); f ()
+                       ^
+
+|}]
+
+(* ...in separate matches on the same address *)
+let once_use_in_separate_matches (a : (unit -> unit) addr_imm @ once) =
+  (match a with addr_imm_ f -> f ());
+  (match a with addr_imm_ g -> g ())
+[%%expect{|
+Line 3, characters 31-32:
+3 |   (match a with addr_imm_ g -> g ())
+                                   ^
+Error: This value is used here,
+       but it is defined as once and has already been used at:
+Line 2, characters 31-32:
+2 |   (match a with addr_imm_ f -> f ());
+                                   ^
+
+|}]
+
+(* ...in separate branches *)
+let once_use_in_branches c (a : (unit -> unit) addr_imm @ once) =
+  if c then (match a with addr_imm_ f -> f ())
+  else (match a with addr_imm_ g -> g ())
+[%%expect{|
+val once_use_in_branches : bool -> (unit -> unit) addr_imm @ once -> unit =
+  <fun>
+|}]
+
+(* Using both the value at a once immutable address and the address *)
+let once_use_then_addr (a : (unit -> unit) addr_imm @ once) =
+  (match a with addr_imm_ f -> f ());
+  use_once_addr_imm a
+[%%expect{|
+Line 3, characters 20-21:
+3 |   use_once_addr_imm a
+                        ^
+Error: This value is used here,
+       but part of it is defined as once and has already been used at:
+Line 2, characters 31-32:
+2 |   (match a with addr_imm_ f -> f ());
+                                   ^
+
+|}]
+
+(* The value at a many immutable address is many *)
+let many_use_twice (a : (unit -> unit) addr_imm @ many) =
+  match a with
+  | addr_imm_ f -> f (); f ()
+[%%expect{|
+val many_use_twice : (unit -> unit) addr_imm -> unit = <fun>
+|}]
+
+(* The value at a mutable address is always many *)
+let once_use_twice_mut (a : (unit -> unit) addr @ once) =
+  match a with
+  | addr_ f -> f (); f ()
+[%%expect{|
+val once_use_twice_mut : (unit -> unit) addr @ once -> unit = <fun>
 |}]
 
 (******************)

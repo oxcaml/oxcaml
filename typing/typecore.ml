@@ -4199,24 +4199,6 @@ and type_pat_aux
       let modalities = Typemode.mutable_modalities mutability in
       check_project_mutability ~loc ~env:!!penv Address_contents mutability
         pat_mode.mode;
-      (* CR address-patterns: immutable address dereferencing should pass
-         through uniqueness and affinity, too. These matches can be removed
-         then *)
-      begin match mut with
-      | Mutable -> ()
-      | Immutable ->
-          submode ~loc ~env:!!penv pat_mode.mode
-            (mode_default
-               With_regionality.(of_const { Const.max with linearity = Many }))
-      end;
-      let modalities =
-        match mut with
-        | Mutable -> modalities
-        | Immutable ->
-            Modality.Const.set (Monadic Uniqueness)
-              (Modality.Monadic.Atom.Join_const Uniqueness.Const.Aliased)
-              modalities
-      in
       let is_contained_by : Mode.Hint.is_contained_by =
         { containing = Address Modality; container = (loc, Pattern) }
       in
