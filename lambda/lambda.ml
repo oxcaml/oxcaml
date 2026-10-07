@@ -2070,7 +2070,8 @@ let rec sort_vars_of_mixed_block_element
   | Splice_variable var -> Layout_ident.Set.singleton var
   | Product elements -> sort_vars_of_mixed_block_shape elements
   | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
-  | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
+  | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate | Void
+    ->
       Layout_ident.Set.empty
 
 and sort_vars_of_mixed_block_shape
@@ -2085,7 +2086,7 @@ let rec sort_vars_of_layout = function
   | Punboxed_product layouts -> sort_vars_of_list sort_vars_of_layout layouts
   | Pvalue value_kind -> sort_vars_of_value_kind value_kind
   | Ptop | Punboxed_float _ | Punboxed_or_untagged_integer _
-  | Punboxed_vector _ | Punboxed_mask | Pbottom ->
+  | Punboxed_vector _ | Punboxed_mask | Pvoid | Pbottom ->
       Layout_ident.Set.empty
 
 and sort_vars_of_value_kind { raw_kind; nullable = _ } =
@@ -2153,11 +2154,8 @@ let sort_vars_of_primitive = function
   | Patomic_exchange_idx { layout; mode = _ }
   | Patomic_compare_exchange_idx { layout; mode = _ }
   | Patomic_compare_set_idx { layout; mode = _ }
-  | Patomic_load_ptr { layout }
-  | Patomic_set_ptr { layout; mode = _ }
-  | Patomic_exchange_ptr { layout; mode = _ }
-  | Patomic_compare_exchange_ptr { layout; mode = _ }
-  | Patomic_compare_set_ptr { layout; mode = _ } ->
+  | Pbox (layout, _)
+  | Punbox layout  ->
       sort_vars_of_layout layout
   | Pbytes_to_string | Pbytes_of_string | Pignore
   | Pgetglobal _
@@ -2199,11 +2197,10 @@ let sort_vars_of_primitive = function
   | Patomic_fetch_add_field | Patomic_add_field | Patomic_sub_field
   | Patomic_land_field | Patomic_lor_field | Patomic_lxor_field
   | Patomic_fetch_add_idx | Patomic_add_idx | Patomic_sub_idx | Patomic_land_idx
-  | Patomic_lor_idx | Patomic_lxor_idx | Patomic_fetch_add_ptr | Patomic_add_ptr
-  | Patomic_sub_ptr | Patomic_land_ptr | Patomic_lor_ptr | Patomic_lxor_ptr
-  | Pprobe_is_enabled _ | Pobj_dup | Punbox_unit | Punbox_vector _
-  | Pbox_vector _ | Punbox_mask | Pbox_mask _ | Pjoin_vec256 | Psplit_vec256
-  | Preinterpret_boxed_vector_as_tuple _ | Preinterpret_tuple_as_boxed_vector _
+  | Patomic_lor_idx | Patomic_lxor_idx | Pprobe_is_enabled _ | Pobj_dup
+  | Punbox_unit | Punbox_vector _ | Pbox_vector _ | Punbox_mask | Pbox_mask _
+  | Pjoin_vec256 | Psplit_vec256 | Preinterpret_boxed_vector_as_tuple _
+  | Preinterpret_tuple_as_boxed_vector _
   | Preinterpret_unboxed_int64_as_tagged_int63
   | Preinterpret_tagged_int63_as_unboxed_int64 | Parray_to_iarray
   | Parray_of_iarray | Pget_header _ | Ppeek _ | Ppoke _ | Pdls_get | Ptls_get
