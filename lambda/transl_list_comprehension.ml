@@ -167,14 +167,14 @@ type translated_iterator =
     desugars into a higher-order function which is applied to another function
     containing the body of the iteration; that body function can't be filled in
     until the rest of the translations have been done. *)
-let iterator ~transl_exp ~scopes = function
+let iterator ~transl_exp ~transl_ctx = function
   | Texp_comp_range
       { ident; ident_debug_uid; pattern = _; start; stop; direction } ->
     (* We have to let-bind [start] and [stop] so that they're evaluated in the
        correct (i.e., left-to-right) order *)
     let transl_bound var debug_uid bound =
       Let_binding.make (Immutable Strict) layout_int var debug_uid
-        (transl_exp ~scopes Lambda.layout_int bound)
+        (transl_exp ~transl_ctx Lambda.layout_int bound)
     in
     let start = transl_bound "start" Lambda.debug_uid_none start in
     let stop = transl_bound "stop" Lambda.debug_uid_none stop in
@@ -192,7 +192,7 @@ let iterator ~transl_exp ~scopes = function
     let iter_list =
       Let_binding.make (Immutable Strict) Lambda.layout_list "iter_list"
         Lambda.debug_uid_none
-        (transl_exp ~scopes Lambda.layout_list sequence)
+        (transl_exp ~transl_ctx Lambda.layout_list sequence)
     in
     (* Create a fresh variable to use as the function argument. The debug uid is
        [.debug_uid_none], because the variable is not visible to users. *)
@@ -207,7 +207,8 @@ let iterator ~transl_exp ~scopes = function
           Jkind.Sort.Const.for_list_element pattern.pat_type;
       add_bindings =
         (* CR layouts: to change when we allow non-values in sequences *)
-        Matching.for_let ~scopes ~arg_sort:Jkind.Sort.Const.for_list_element
+        Matching.for_let ~scopes:transl_ctx.scopes
+          ~arg_sort:Jkind.Sort.Const.for_list_element
           ~return_layout:layout_any_value pattern.pat_loc (Lvar element)
           Immutable pattern
     }
@@ -219,10 +220,11 @@ let iterator ~transl_exp ~scopes = function
     range iterators can just have an [Ident.t], for translation into for loops),
     so bindings are just like iterators with a possible annotation. As a result,
     this function is essentially the same as [iterator], which see. *)
-let binding ~transl_exp ~scopes { comp_cb_iterator; comp_cb_attributes = _ } =
+let binding ~transl_exp ~transl_ctx { comp_cb_iterator; comp_cb_attributes = _ }
+    =
   (* No attributes are meaningful here; see the definition of
      [comp_cb_attributes]. *)
-  iterator ~transl_exp ~scopes comp_cb_iterator
+  iterator ~transl_exp ~transl_ctx comp_cb_iterator
 
 (** Translate all the bindings of a single [for ... and ...] clause (the
     contents of a [Typedtree.Texp_comp_for]) into a pair of (1) a list of let
@@ -234,8 +236,8 @@ let binding ~transl_exp ~scopes { comp_cb_iterator; comp_cb_attributes = _ } =
     ([accumulator], which changes at every recursive step). It folds together
     all the [translated_iterator]s by connecting their [body_func]tions to each
     other, and bottoms out at the [inner_body]. *)
-let rec translate_bindings ~transl_exp ~scopes ~loc ~inner_body ~accumulator =
-  function
+let rec translate_bindings ~transl_exp ~transl_ctx ~loc ~inner_body ~accumulator
+    = function
   | cur_binding :: bindings ->
     let { builder;
           arg_lets;
@@ -244,12 +246,12 @@ let rec translate_bindings ~transl_exp ~scopes ~loc ~inner_body ~accumulator =
           element_kind;
           add_bindings
         } =
-      binding ~transl_exp ~scopes cur_binding
+      binding ~transl_exp ~transl_ctx cur_binding
     in
     let inner_acc = Ident.create_local "accumulator" in
     let inner_acc_duid = Lambda.debug_uid_none in
     let body_arg_lets, body =
-      translate_bindings ~transl_exp ~scopes ~loc ~inner_body
+      translate_bindings ~transl_exp ~transl_ctx ~loc ~inner_body
         ~accumulator:(Lvar inner_acc) bindings
     in
     let body_func =
@@ -291,34 +293,34 @@ let rec translate_bindings ~transl_exp ~scopes ~loc ~inner_body ~accumulator =
     most nested accumulator as a labeled argument which will produce the body of
     the iterations) and have a name for the accumulator of the current
     [rev_dlist] ([accumulator], which changes at every recursive step). *)
-let rec translate_clauses ~transl_exp ~scopes ~loc ~comprehension_body
+let rec translate_clauses ~transl_exp ~transl_ctx ~loc ~comprehension_body
     ~accumulator = function
   | clause :: clauses -> (
     let body ~accumulator =
-      translate_clauses ~transl_exp ~scopes ~loc ~comprehension_body
+      translate_clauses ~transl_exp ~transl_ctx ~loc ~comprehension_body
         ~accumulator clauses
     in
     match clause with
     | Texp_comp_for bindings ->
       let arg_lets, bindings =
-        translate_bindings ~transl_exp ~scopes ~loc ~inner_body:body
+        translate_bindings ~transl_exp ~transl_ctx ~loc ~inner_body:body
           ~accumulator bindings
       in
       Let_binding.let_all arg_lets bindings
     | Texp_comp_when cond ->
       Lifthenelse
-        ( transl_exp ~scopes Lambda.layout_bool cond,
+        ( transl_exp ~transl_ctx Lambda.layout_bool cond,
           body ~accumulator,
           accumulator,
           layout_any_value (* [list]s have the standard representation *) ))
   | [] -> comprehension_body ~accumulator
 
-let comprehension ~transl_exp ~scopes ~loc { comp_body; comp_clauses } =
+let comprehension ~transl_exp ~transl_ctx ~loc { comp_body; comp_clauses } =
   let rev_comprehension =
-    translate_clauses ~transl_exp ~scopes ~loc
+    translate_clauses ~transl_exp ~transl_ctx ~loc
       ~comprehension_body:(fun ~accumulator ->
         rev_list_snoc_local ~loc ~init:accumulator
-          ~last:(transl_exp ~scopes Lambda.layout_list_element comp_body))
+          ~last:(transl_exp ~transl_ctx Lambda.layout_list_element comp_body))
       ~accumulator:rev_list_nil comp_clauses
   in
   Lambda_utils.apply ~loc ~return_mode:not_alloc_stack
