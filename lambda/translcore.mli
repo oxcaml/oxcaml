@@ -19,13 +19,12 @@
 open Asttypes
 open Typedtree
 open Lambda
-open Debuginfo.Scoped_location
 
 val pure_module : module_expr -> let_kind
 
 (* Used for translating Alloc_heap values in classes and modules. *)
-val transl_exp: scopes:scopes -> Lambda.layout -> expression -> lambda
-val transl_apply: scopes:scopes
+val transl_exp: transl_ctx:transl_ctx -> Lambda.layout -> expression -> lambda
+val transl_apply: transl_ctx:transl_ctx
                   -> ?tailcall:tailcall_attribute
                   -> ?inlined:inlined_attribute
                   -> ?specialised:specialise_attribute
@@ -36,14 +35,14 @@ val transl_apply: scopes:scopes
                   -> lambda
                   -> (arg_label * apply_arg) list
                   -> scoped_location -> lambda
-val transl_let: scopes:scopes -> return_layout:layout -> ?in_structure:bool
+val transl_let: transl_ctx:transl_ctx -> return_layout:layout -> ?in_structure:bool
                   -> rec_flag -> value_binding list -> lambda -> lambda
 
-val transl_extension_constructor: scopes:scopes ->
+val transl_extension_constructor: transl_ctx:transl_ctx ->
   Env.t -> Longident.t option ->
   extension_constructor -> lambda
 
-val transl_scoped_exp : scopes:scopes -> Lambda.layout -> expression -> lambda
+val transl_scoped_exp : transl_ctx:transl_ctx -> Lambda.layout -> expression -> lambda
 
 type error =
     Free_super_var
@@ -65,8 +64,8 @@ val report_error_doc: error Format_doc.printer
 
 (* Forward declaration -- to be filled in by Translmod.transl_module *)
 val transl_module :
-      (scopes:scopes -> module_coercion -> Longident.t option ->
+      (transl_ctx:transl_ctx -> module_coercion -> Longident.t option ->
        module_expr -> lambda) ref
 val transl_object :
-      (scopes:scopes -> Ident.t -> string list ->
+      (transl_ctx:transl_ctx -> Ident.t -> string list ->
        class_expr -> lambda) ref
