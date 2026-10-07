@@ -1728,20 +1728,17 @@ let glb_array_set_type loc t1 t2 =
 
 let peek_or_poke_layout_from_type ~prim_name error_loc env ty
       : Lambda.peek_or_poke option =
-  match Jkind.get_layout env (Ctype.type_jkind env ty) with
-  | Some layout when Jkind.Layout.Const.has_genvar layout ->
-    (* CR layout poly: We can't pick a [Lambda.peek_or_poke] constructor here if
-       the argument is layout polymorphic. Other primitives have similar
-       dilemmas. We should consider moving primitive specialization after
-       slambda eval. *)
-    raise (Error (error_loc, Layout_poly_arguments_unsupported prim_name))
-  | Some _ | None ->
-  match Ctype.type_sort ~why:Peek_or_poke ~fixed:true env ty with
-  | Error _ -> None
-  | Ok sort ->
-    let sort = Jkind.Sort.default_to_scannable_and_get sort in
-    let layout = Typeopt.layout env error_loc sort ty in
-    match layout with
+  let jkind = Ctype.type_jkind env ty in
+  let layout =
+    match Jkind.get_layout_defaulting_to_scannable env jkind with
+    | Some layout -> layout
+    | None -> Misc.fatal_error "peek_or_poke_layout_from_type: expected layout"
+  in
+  match Jkind.Layout.Const.get_sort layout with
+  | None ->
+    Misc.fatal_error "peek_or_poke_layout_from_type: unrepresentable layout"
+  | Some sort ->
+    match Typeopt.layout env error_loc sort ty with
     | Punboxed_float Unboxed_float32 -> Some Ppp_unboxed_float32
     | Punboxed_float Unboxed_float64 -> Some Ppp_unboxed_float
     | Punboxed_or_untagged_integer Untagged_int8 -> Some Ppp_untagged_int8
@@ -1752,13 +1749,18 @@ let peek_or_poke_layout_from_type ~prim_name error_loc env ty
       Some Ppp_unboxed_nativeint
     | Punboxed_or_untagged_integer Untagged_int -> Some Ppp_untagged_immediate
     | Pvalue { raw_kind = Pintval ; _ } -> Some Ppp_tagged_immediate
+    | Psplicevar _ ->
+      (* CR layout poly: We can't pick a [Lambda.peek_or_poke] constructor here
+         if the argument is layout polymorphic; we'd have to wait until after
+         slambda evaluation. Other primitives have similar dilemmas. We should
+         consider moving all of primitive specialization after slambda eval. *)
+      raise (Error (error_loc, Layout_poly_arguments_unsupported prim_name))
     | Ptop
     | Pvalue _
     | Punboxed_vector _
     | Punboxed_mask
     | Punboxed_product _
-    | Pbottom
-    | Psplicevar _ ->
+    | Pbottom ->
       raise (Error (error_loc, Wrong_layout_for_peek_or_poke prim_name))
 
 let should_specialize_primitive p =
