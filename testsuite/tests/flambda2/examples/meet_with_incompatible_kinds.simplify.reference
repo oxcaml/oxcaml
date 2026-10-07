@@ -1,6 +1,20 @@
 let $camlMeet_with_incompatible_kinds__float_0 = 0x1.8p+1 in
 let code aux_0 deleted in
 let code f_1 deleted in
+let code loopify(never) size(10) newer_version_of(f_1)
+      f_1_1 (x : [ 0 of [ 0 of imm tagged * val ] |1 of float ^ 1 ])
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : [ 0 of float boxed * imm tagged ] =
+  let Pfield = %block_load.[`0`] (x) in
+  let n = %block_load.[`0`] (Pfield) in
+  let Pmakeblock =
+    %block.[`0`].my_alloc_region
+      ($camlMeet_with_incompatible_kinds__float_0, n)
+  in
+  cont k (Pmakeblock)
+in
+let $camlMeet_with_incompatible_kinds__f_2 = closure f_1_1 @f &toplevel in
 let code inline(always) loopify(never) size(20) newer_version_of(aux_0)
       aux_0_1 (x : [ 0 of [ 0 of imm tagged * val ] |1 of float ^ 1 ])
         my_closure &my_alloc_region my_depth
@@ -18,20 +32,6 @@ let code inline(always) loopify(never) size(20) newer_version_of(aux_0)
 in
 let $camlMeet_with_incompatible_kinds__aux_1 = closure aux_0_1 @aux &toplevel
 in
-let code loopify(never) size(10) newer_version_of(f_1)
-      f_1_1 (x : [ 0 of [ 0 of imm tagged * val ] |1 of float ^ 1 ])
-        my_closure &my_alloc_region my_depth
-        -> k * k1
-        : [ 0 of float boxed * imm tagged ] =
-  let Pfield = %block_load.[`0`] (x) in
-  let n = %block_load.[`0`] (Pfield) in
-  let Pmakeblock =
-    %block.[`0`].my_alloc_region
-      ($camlMeet_with_incompatible_kinds__float_0, n)
-  in
-  cont k (Pmakeblock)
-in
-let $camlMeet_with_incompatible_kinds__f_2 = closure f_1_1 @f &toplevel in
 let $camlMeet_with_incompatible_kinds =
   Block 0 ($camlMeet_with_incompatible_kinds__aux_1,
            $camlMeet_with_incompatible_kinds__f_2)

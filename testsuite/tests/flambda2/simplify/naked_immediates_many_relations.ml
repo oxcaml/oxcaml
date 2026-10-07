@@ -36,6 +36,7 @@ let r =
   let y = if Sys.opaque_identity true then A g else B f in
   (k[@inlined]) x y
 [%%expect_fexpr Simplify{|
+let $camlTOP3 = Block 0 (0) in
 let $camlTOP3__immstring_2 = "" in
 let $camlTOP3__const_block_3 = Block 0 ($camlTOP3__immstring_2, 27, 11) in
 let $camlTOP3__Pmakeblock_4 =
@@ -44,27 +45,24 @@ in
 (let Popaque = %opaque (1) in
  let untagged = %untag_imm (Popaque) in
  switch untagged
-   | 0 -> k1 (1i)
-   | 1 -> k1 (0i))
-  where k1 (tag : imm) =
+   | 0 -> k (1i)
+   | 1 -> k (0i))
+  where k (tag : imm) =
     ((let Popaque = %opaque (1) in
       let untagged = %untag_imm (Popaque) in
       switch untagged
-        | 0 -> k1 (1i)
-        | 1 -> k1 (0i))
-       where k1 (tag_1 : imm) =
+        | 0 -> k (1i)
+        | 1 -> k (0i))
+       where k (tag_1 : imm) =
          (switch tag
-            | 0 -> k1
-            | 1 -> k2
-            where k2 =
-              switch tag_1
-                | 0 -> error pop(regular error) ($camlTOP3__Pmakeblock_4)
-                | 1 -> k
+            | 0 -> k
+            | 1 -> k1
             where k1 =
               switch tag_1
-                | 0 -> k
+                | 0 -> error pop(regular error) ($camlTOP3__Pmakeblock_4)
+                | 1 -> done ($camlTOP3)
+            where k =
+              switch tag_1
+                | 0 -> done ($camlTOP3)
                 | 1 -> error pop(regular error) ($camlTOP3__Pmakeblock_4)))
-  where k =
-    let $camlTOP3 = Block 0 (0) in
-    cont done ($camlTOP3)
 |}]

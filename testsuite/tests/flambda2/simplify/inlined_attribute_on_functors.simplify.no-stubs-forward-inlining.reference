@@ -1,4 +1,13 @@
 let code Make_0 deleted in
+let code loopify(never) size(9) newer_version_of(Make_0)
+      Make_0_1 (X : val) my_closure &my_alloc_region my_depth -> k * k1 : val =
+  let x = %block_load.[`0`] (X) in
+  let Pmakeblock = %block.[`0`].my_alloc_region (0, x) in
+  cont k (Pmakeblock)
+in
+let $camlInlined_attribute_on_functors__Make_1 =
+  closure Make_0_1 @Make &toplevel
+in
 let code loopify(never) size(15) stub
       `fn[inlined_attribute_on_functors.ml:19,6--272]_1` (funarg : val)
         my_closure &my_alloc_region my_depth
@@ -14,16 +23,6 @@ let code loopify(never) size(15) stub
       let Pmakeblock = %block.[`0`].my_alloc_region (Pfield) in
       cont k (Pmakeblock)
 in
-let $camlInlined_attribute_on_functors__Pmakeblock_0 = Block 0 (0) in
-let code loopify(never) size(9) newer_version_of(Make_0)
-      Make_0_1 (X : val) my_closure &my_alloc_region my_depth -> k * k1 : val =
-  let x = %block_load.[`0`] (X) in
-  let Pmakeblock = %block.[`0`].my_alloc_region (0, x) in
-  cont k (Pmakeblock)
-in
-let $camlInlined_attribute_on_functors__Make_1 =
-  closure Make_0_1 @Make &toplevel
-in
 let $`camlInlined_attribute_on_functors__fn[inlined_attribute_on_functors.ml:19,6--272]_2` =
   closure `fn[inlined_attribute_on_functors.ml:19,6--272]_1`
     @`fn[inlined_attribute_on_functors.ml:19,6--272]` &toplevel
@@ -32,6 +31,7 @@ in
 let $camlInlined_attribute_on_functors__Pmakeblock_3 =
   Block 0 ($`camlInlined_attribute_on_functors__fn[inlined_attribute_on_functors.ml:19,6--272]_2`)
 in
+let $camlInlined_attribute_on_functors__Pmakeblock_0 = Block 0 (0) in
 apply direct(Make_0_1 &toplevel)
   ($camlInlined_attribute_on_functors__Make_1 : _ -> val)
     ($camlInlined_attribute_on_functors__Pmakeblock_0)

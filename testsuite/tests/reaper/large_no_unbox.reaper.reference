@@ -1,6 +1,4 @@
-let code small_1 deleted in
 let code large_2 deleted in
-let code f_0 deleted in
 let code inline(never) loopify(never) size(11) newer_version_of(large_2)
       large_2_1
         (param : [ 0 of imm tagged * imm tagged * imm tagged * imm tagged ])
@@ -17,6 +15,7 @@ let code inline(never) loopify(never) size(11) newer_version_of(large_2)
   cont k (int_add_2)
 in
 let $camlLarge_no_unbox__large_3 = closure large_2_1 @large &toplevel in
+let code small_1 deleted in
 let code inline(never) loopify(never) size(5) newer_version_of(small_1)
       small_1_1
         (Pmakeblock_into_param_field_0,
@@ -33,6 +32,7 @@ let code inline(never) loopify(never) size(5) newer_version_of(small_1)
   cont k (int_add_1)
 in
 let $camlLarge_no_unbox__small_2 = closure small_1_1 @small &toplevel in
+let code f_0 deleted in
 let code loopify(never) size(36) newer_version_of(f_0)
       f_0_1 (x : imm tagged)
         my_closure &my_alloc_region my_depth

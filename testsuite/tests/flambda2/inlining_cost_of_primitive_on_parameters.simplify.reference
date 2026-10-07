@@ -1,5 +1,4 @@
 let code f_0 deleted in
-let code g_1 deleted in
 let code loopify(never) size(8) newer_version_of(f_0)
       f_0_1 (x : val)
         my_closure &my_alloc_region my_depth
@@ -12,6 +11,7 @@ in
 let $camlInlining_cost_of_primitive_on_parameters__f_1 =
   closure f_0_1 @f &toplevel
 in
+let code g_1 deleted in
 let code loopify(never) size(4) newer_version_of(g_1)
       g_1_1 (x : val)
         my_closure &my_alloc_region my_depth

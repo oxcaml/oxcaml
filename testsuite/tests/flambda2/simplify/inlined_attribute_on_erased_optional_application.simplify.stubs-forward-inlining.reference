@@ -1,5 +1,24 @@
-let code default_0 deleted in
 let code f_inner_2 deleted in
+let code loopify(never) size(5) newer_version_of(f_inner_2)
+      f_inner_2_1 (x : imm tagged, y : imm tagged, z : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let int_add = %int_barith.add (x, y) in
+  let int_add_1 = %int_barith.add (int_add, z) in
+  cont k (int_add_1)
+in
+let $camlInlined_attribute_on_erased_optional_application__f_inner_2 =
+  closure f_inner_2_1 @f_inner &toplevel
+in
+let code default_0 deleted in
+let code loopify(never) size(1) newer_version_of(default_0)
+      default_0_1 (x) my_closure &my_alloc_region my_depth -> k * k1 =
+  cont k (x)
+in
+let $camlInlined_attribute_on_erased_optional_application__default_1 =
+  closure default_0_1 @`default` &toplevel
+in
 let code loopify(never) size(27) stub
       f_1
         (`*opt*x` : [ 0 | 0 of imm tagged ], y : imm tagged, z : imm tagged)
@@ -24,34 +43,6 @@ let code loopify(never) size(27) stub
           (x, y, z)
           -> k * k1
 in
-let code loopify(never) size(5) stub
-      partial_f_3 (param2 : imm tagged)
-        my_closure &my_alloc_region my_depth
-        -> k * k1
-        : imm tagged =
-  let f = %project_value_slot.[partial_f].[f] (my_closure) in
-  apply direct(f_1 &my_alloc_region) inlined(forward)
-    (f : _ -> imm tagged) (0, 0, param2) -> k * k1
-in
-let code loopify(never) size(1) newer_version_of(default_0)
-      default_0_1 (x) my_closure &my_alloc_region my_depth -> k * k1 =
-  cont k (x)
-in
-let $camlInlined_attribute_on_erased_optional_application__default_1 =
-  closure default_0_1 @`default` &toplevel
-in
-let code loopify(never) size(5) newer_version_of(f_inner_2)
-      f_inner_2_1 (x : imm tagged, y : imm tagged, z : imm tagged)
-        my_closure &my_alloc_region my_depth
-        -> k * k1
-        : imm tagged =
-  let int_add = %int_barith.add (x, y) in
-  let int_add_1 = %int_barith.add (int_add, z) in
-  cont k (int_add_1)
-in
-let $camlInlined_attribute_on_erased_optional_application__f_inner_2 =
-  closure f_inner_2_1 @f_inner &toplevel
-in
 let $camlInlined_attribute_on_erased_optional_application__f_3 =
   closure f_1 @f &toplevel
   with {
@@ -60,6 +51,15 @@ let $camlInlined_attribute_on_erased_optional_application__f_3 =
     f_inner =
       $camlInlined_attribute_on_erased_optional_application__f_inner_2
   }
+in
+let code loopify(never) size(5) stub
+      partial_f_3 (param2 : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let f = %project_value_slot.[partial_f].[f] (my_closure) in
+  apply direct(f_1 &my_alloc_region) inlined(forward)
+    (f : _ -> imm tagged) (0, 0, param2) -> k * k1
 in
 let $camlInlined_attribute_on_erased_optional_application__partial_f_4 =
   closure partial_f_3 @partial_f &toplevel

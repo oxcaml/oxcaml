@@ -1,7 +1,31 @@
 let code helper_0 deleted in
+let code loopify(never) size(3) newer_version_of(helper_0)
+      helper_0_1 (x : imm tagged, y : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let int_add = %int_barith.add (x, y) in
+  cont k (int_add)
+in
+let $camlInlined_attribute_on_unboxable_function__helper_1 =
+  closure helper_0_1 @helper &toplevel
+in
 let code f_2 deleted in
-let code loopify(never) size(15) stub
+let code loopify(never) size(5) newer_version_of(f_2)
       f_2_1 (x : imm tagged, y : imm tagged)
+        my_unboxed_closure &my_alloc_region my_depth
+        -> unboxed_return * k
+        : imm tagged * imm tagged =
+  apply direct(helper_0_1 &my_alloc_region)
+    ($camlInlined_attribute_on_unboxable_function__helper_1 : _ -> imm tagged
+     )
+      (x, y)
+      -> k1 * k
+    where k1 (apply_result : imm tagged) =
+      cont unboxed_return (x, apply_result)
+in
+let code loopify(never) size(15) stub
+      f_2_2 (x : imm tagged, y : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : [ 0 of imm tagged * imm tagged ] =
@@ -16,34 +40,10 @@ let code loopify(never) size(15) stub
       in
       cont k (boxed_return)
 in
-let code loopify(never) size(3) newer_version_of(helper_0)
-      helper_0_1 (x : imm tagged, y : imm tagged)
-        my_closure &my_alloc_region my_depth
-        -> k * k1
-        : imm tagged =
-  let int_add = %int_barith.add (x, y) in
-  cont k (int_add)
-in
-let $camlInlined_attribute_on_unboxable_function__helper_1 =
-  closure helper_0_1 @helper &toplevel
-in
-let code loopify(never) size(5) newer_version_of(f_2)
-      f_2_2 (x : imm tagged, y : imm tagged)
-        my_unboxed_closure &my_alloc_region my_depth
-        -> unboxed_return * k
-        : imm tagged * imm tagged =
-  apply direct(helper_0_1 &my_alloc_region)
-    ($camlInlined_attribute_on_unboxable_function__helper_1 : _ -> imm tagged
-     )
-      (x, y)
-      -> k1 * k
-    where k1 (apply_result : imm tagged) =
-      cont unboxed_return (x, apply_result)
-in
 let $camlInlined_attribute_on_unboxable_function__f_2 =
-  closure f_2_1 @f &toplevel
+  closure f_2_2 @f &toplevel
 and $camlInlined_attribute_on_unboxable_function__f_unboxed_3 =
-  closure f_2_2 @f_unboxed &toplevel
+  closure f_2_1 @f_unboxed &toplevel
 in
 apply direct(helper_0_1 &toplevel) inlining_state(depth(1))
   ($camlInlined_attribute_on_unboxable_function__helper_1 : _ -> imm tagged)

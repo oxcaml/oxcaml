@@ -1,7 +1,5 @@
 let code foo_0 deleted in
-let $camlBlock_closure_rec__foo_1 =
-  closure foo_0_1 @foo &toplevel
-and code rec loopify(never) size(8) newer_version_of(foo_0)
+let code rec loopify(never) size(8) newer_version_of(foo_0)
       foo_0_1 (x) my_closure &my_alloc_region my_depth -> k * k1 : val =
   let Pmakeblock =
     %block.[`0`].my_alloc_region
@@ -9,6 +7,8 @@ and code rec loopify(never) size(8) newer_version_of(foo_0)
        $camlBlock_closure_rec__foo_1 ~ depth my_depth -> succ my_depth)
   in
   cont k (Pmakeblock)
+and $camlBlock_closure_rec__foo_1 =
+  closure foo_0_1 @foo &toplevel
 in
 let $camlBlock_closure_rec = Block 0 ($camlBlock_closure_rec__foo_1) in
 cont done ($camlBlock_closure_rec)

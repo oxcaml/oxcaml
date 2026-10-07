@@ -1,6 +1,18 @@
 let code unbox_int_and_add_one_0 deleted in
 let code unbox_int_and_add_one_wrapper_1 deleted in
 let code box_int_then_call_unbox_int_and_add_one_wrapper_2 deleted in
+let code loopify(never) size(3) newer_version_of(box_int_then_call_unbox_int_and_add_one_wrapper_2)
+      box_int_then_call_unbox_int_and_add_one_wrapper_2_1 (x : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let int_add = %int_barith.add (x, 1) in
+  cont k (int_add)
+in
+let $camlArgument_types_useful__box_int_then_call_unbox_int_and_add_one_wrapper_3 =
+  closure box_int_then_call_unbox_int_and_add_one_wrapper_2_1
+    @box_int_then_call_unbox_int_and_add_one_wrapper &toplevel
+in
 let code loopify(never) size(4) newer_version_of(unbox_int_and_add_one_0)
       unbox_int_and_add_one_0_1 (param : [ 0 of imm tagged ])
         my_closure &my_alloc_region my_depth
@@ -26,18 +38,6 @@ in
 let $camlArgument_types_useful__unbox_int_and_add_one_wrapper_2 =
   closure unbox_int_and_add_one_wrapper_1_1 @unbox_int_and_add_one_wrapper
     &toplevel
-in
-let code loopify(never) size(3) newer_version_of(box_int_then_call_unbox_int_and_add_one_wrapper_2)
-      box_int_then_call_unbox_int_and_add_one_wrapper_2_1 (x : imm tagged)
-        my_closure &my_alloc_region my_depth
-        -> k * k1
-        : imm tagged =
-  let int_add = %int_barith.add (x, 1) in
-  cont k (int_add)
-in
-let $camlArgument_types_useful__box_int_then_call_unbox_int_and_add_one_wrapper_3 =
-  closure box_int_then_call_unbox_int_and_add_one_wrapper_2_1
-    @box_int_then_call_unbox_int_and_add_one_wrapper &toplevel
 in
 let $camlArgument_types_useful =
   Block 0 ($camlArgument_types_useful__unbox_int_and_add_one_1,

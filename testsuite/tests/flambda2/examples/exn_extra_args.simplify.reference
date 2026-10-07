@@ -1,6 +1,5 @@
 let $camlExn_extra_args__immstring_0 = "bar" in
 let code input_line_0 deleted in
-let code ld_conf_contents_1 deleted in
 let code inline(never) loopify(never) size(1) newer_version_of(input_line_0)
       input_line_0_1 (param : imm tagged)
         my_closure &my_alloc_region my_depth
@@ -11,6 +10,7 @@ in
 let $camlExn_extra_args__input_line_1 =
   closure input_line_0_1 @input_line &toplevel
 in
+let code ld_conf_contents_1 deleted in
 let code loopify(never) size(49) newer_version_of(ld_conf_contents_1)
       ld_conf_contents_1_1 (param : imm tagged)
         my_closure &my_alloc_region my_depth

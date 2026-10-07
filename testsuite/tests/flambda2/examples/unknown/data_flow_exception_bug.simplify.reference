@@ -8,7 +8,6 @@ let $camlData_flow_exception_bug__Pmakeblock_2 =
            $camlData_flow_exception_bug__const_block_1)
 in
 let code do_stuff_0 deleted in
-let code stuff_1 deleted in
 let code loopify(never) size(3) newer_version_of(do_stuff_0)
       do_stuff_0_1 (env) my_closure &my_alloc_region my_depth -> k * k1 =
   cont k1 pop(regular k1) ($camlData_flow_exception_bug__Pmakeblock_2)
@@ -16,6 +15,7 @@ in
 let $camlData_flow_exception_bug__do_stuff_3 =
   closure do_stuff_0_1 @do_stuff &toplevel
 in
+let code stuff_1 deleted in
 let code loopify(never) size(20) newer_version_of(stuff_1)
       stuff_1_1 (env)
         my_closure &my_alloc_region my_depth

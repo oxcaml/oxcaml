@@ -1,9 +1,4 @@
-let $camlData_flow_bug__string_4 = "index out of bounds" in
-let $camlData_flow_bug__block_5 =
-  Block 0 ($`*predef*`.caml_exn_Invalid_argument,
-           $camlData_flow_bug__string_4)
-in
-let $camlData_flow_bug__immstring_3 = "" in
+let $camlData_flow_bug = Block 0 () in
 let $camlData_flow_bug__const_block_0 = Block 0 (126, 0) in
 let $camlData_flow_bug__const_block_1 =
   Block 0 (63, $camlData_flow_bug__const_block_0)
@@ -11,80 +6,86 @@ in
 let $camlData_flow_bug__const_block_2 =
   Block 0 (33, $camlData_flow_bug__const_block_1)
 in
+let $camlData_flow_bug__immstring_3 = "" in
+let $camlData_flow_bug__string_4 = "index out of bounds" in
+let $camlData_flow_bug__block_5 =
+  Block 0 ($`*predef*`.caml_exn_Invalid_argument,
+           $camlData_flow_bug__string_4)
+in
 let Popaque = %opaque ($camlData_flow_bug__immstring_3) in
+let $camlData_flow_bug__Pmakeblock_8 = Block 0 (906850200, Popaque) in
 (let Popaque_1 = %opaque (1) in
  let untagged = %untag_imm (Popaque_1) in
- let $camlData_flow_bug__Pmakeblock_8 = Block 0 (906850200, Popaque) in
  switch untagged
    | 0 -> k (-453122489)
    | 1 -> k ($camlData_flow_bug__Pmakeblock_8))
   where k (fix : val) =
     ((let prim = %is_int (fix) in
       switch prim
-        | 0 -> k2
-        | 1 -> k1 (0i)
-        where k2 =
+        | 0 -> k1
+        | 1 -> k (0i)
+        where k1 =
           let Pfield = %block_load.[`0`] (fix) in
           let prim_1 = %int_comp.ne (Pfield, -784100624) in
           switch prim_1
-            | 0 -> k1 (1i)
-            | 1 -> k1 (0i))
-       where k1 (naked_immediate : imm) =
+            | 0 -> k (1i)
+            | 1 -> k (0i))
+       where k (naked_immediate : imm) =
          (switch naked_immediate
-            | 0 -> k1
-            | 1 -> k
-            where k1 =
+            | 0 -> k
+            | 1 -> done ($camlData_flow_bug)
+            where k =
               ((let prim = %is_int (fix) in
                 switch prim
-                  | 0 -> k2
-                  | 1 -> k1 (0i)
-                  where k2 =
+                  | 0 -> k1
+                  | 1 -> k (0i)
+                  where k1 =
                     let Pfield = %block_load.[`0`] (fix) in
                     let prim_1 = %int_comp.ne (Pfield, 237833689) in
                     switch prim_1
-                      | 0 -> k1 (1i)
-                      | 1 -> k1 (0i))
-                 where k1 (naked_immediate_1 : imm) =
+                      | 0 -> k (1i)
+                      | 1 -> k (0i))
+                 where k (naked_immediate_1 : imm) =
                    (switch naked_immediate_1
-                      | 0 -> k1
-                      | 1 -> k
-                      where k1 =
+                      | 0 -> k
+                      | 1 -> done ($camlData_flow_bug)
+                      where k =
                         ((let prim = %is_int (fix) in
                           switch prim
-                            | 0 -> k2
-                            | 1 -> k1 (0i)
-                            where k2 =
+                            | 0 -> k1
+                            | 1 -> k (0i)
+                            where k1 =
                               let variant = %block_load.[`0`] (fix) in
                               let prim_1 = %int_comp.ne (variant, 93260188)
                               in
                               (switch prim_1
-                                 | 0 -> k1 (1i)
-                                 | 1 -> k2
-                                 where k2 =
+                                 | 0 -> k (1i)
+                                 | 1 -> k1
+                                 where k1 =
                                    let prim_2 =
                                      %int_comp.ne (variant, 906850200)
                                    in
                                    switch prim_2
-                                     | 0 -> k1 (1i)
-                                     | 1 -> k1 (0i)))
-                           where k1 (naked_immediate_2 : imm) =
+                                     | 0 -> k (1i)
+                                     | 1 -> k (0i)))
+                           where k (naked_immediate_2 : imm) =
                              (switch naked_immediate_2
-                                | 0 -> k1
-                                | 1 -> k
-                                where k1 =
+                                | 0 -> k
+                                | 1 -> done ($camlData_flow_bug)
+                                where k =
                                   (apply ccall noalloc
                                      ($`*extern*`.caml_string_notequal
                                       : val * val -> val)
                                        (Popaque,
                                         $camlData_flow_bug__immstring_3)
-                                       -> k1 * error
-                                     where k1 (Pccall) =
+                                       -> k * error
+                                     where k (Pccall) =
                                        ((let untagged = %untag_imm (Pccall)
                                          in
                                          switch untagged
-                                           | 0 -> k
-                                           | 1 -> k1)
-                                          where k1 =
+                                           | 0 -> done ($camlData_flow_bug)
+                                           | 1 -> k)
+                                          where k =
                                             ((let prim =
                                                 %string_length (Popaque)
                                               in
@@ -97,9 +98,9 @@ let Popaque = %opaque ($camlData_flow_bug__immstring_3) in
                                                   (0n, prim_1)
                                               in
                                               switch prim_2
-                                                | 0 -> k1
-                                                | 1 -> k2)
-                                               where k2 =
+                                                | 0 -> k
+                                                | 1 -> k1)
+                                               where k1 =
                                                  let prim =
                                                    %string_load.[`8`]
                                                      (Popaque, 0n)
@@ -122,9 +123,11 @@ let Popaque = %opaque ($camlData_flow_bug__immstring_3) in
                                                         %is_int (param)
                                                       in
                                                       (switch prim_1
-                                                         | 0 -> k2
-                                                         | 1 -> k
-                                                         where k2 =
+                                                         | 0 -> k1
+                                                         | 1 ->
+                                                           done
+                                                             ($camlData_flow_bug)
+                                                         where k1 =
                                                            let Pfield =
                                                              %block_load.[`0`]
                                                                (param)
@@ -137,8 +140,8 @@ let Popaque = %opaque ($camlData_flow_bug__immstring_3) in
                                                                )
                                                                 (Pfield,
                                                                  Pstringrefs)
-                                                                -> k2 * error
-                                                              where k2
+                                                                -> k1 * error
+                                                              where k1
                                                                     (Pccall_1) =
                                                                 let prim_2 =
                                                                   %phys_eq
@@ -147,10 +150,12 @@ let Popaque = %opaque ($camlData_flow_bug__immstring_3) in
                                                                     0)
                                                                 in
                                                                 (switch prim_2
-                                                                   | 0 -> k2
-                                                                   | 1 -> k
+                                                                   | 0 -> k1
+                                                                   | 1 ->
+                                                                    done
+                                                                    ($camlData_flow_bug)
                                                                    where 
-                                                                    k2 =
+                                                                    k1 =
                                                                     let Pfield_1 =
                                                                     %block_load.[`1`]
                                                                     (param)
@@ -158,10 +163,7 @@ let Popaque = %opaque ($camlData_flow_bug__immstring_3) in
                                                                     cont 
                                                                     `self`
                                                                     (Pfield_1)))))
-                                               where k1 =
+                                               where k =
                                                  cont error
                                                         pop(regular error)
-                                                        ($camlData_flow_bug__block_5)))))))))
-       where k =
-         let $camlData_flow_bug = Block 0 () in
-         cont done ($camlData_flow_bug))
+                                                        ($camlData_flow_bug__block_5))))))))))

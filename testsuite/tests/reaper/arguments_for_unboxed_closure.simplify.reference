@@ -1,14 +1,12 @@
-let code g_1 deleted in
 let code id_2 deleted in
-let code unused_3 deleted in
-let code u_4 deleted in
-let code f_0 deleted in
 let code inline(never) loopify(never) size(1) newer_version_of(id_2)
       id_2_1 (z) my_closure &my_alloc_region my_depth -> k * k1 =
   cont k (z)
 in
 let $camlArguments_for_unboxed_closure__id_2 = closure id_2_1 @`id` &toplevel
 in
+let code g_1 deleted in
+let code u_4 deleted in
 let code inline(never) loopify(never) size(10) newer_version_of(u_4)
       u_4_1 (param : imm tagged)
         my_closure &my_alloc_region my_depth
@@ -25,6 +23,7 @@ let code inline(never) loopify(never) size(10) newer_version_of(u_4)
       let int_add = %int_barith.add (x, apply_result) in
       cont k (int_add)
 in
+let code unused_3 deleted in
 let code inline(never) loopify(never) size(1) newer_version_of(unused_3)
       unused_3_1 (param)
         my_closure &my_alloc_region my_depth
@@ -47,6 +46,7 @@ let code loopify(never) size(11) newer_version_of(g_1)
       let int_add = %int_barith.add (x, apply_result) in
       cont k (int_add)
 in
+let code f_0 deleted in
 let code loopify(never) size(52) newer_version_of(f_0)
       f_0_1 (x : imm tagged, y : imm tagged)
         my_closure &my_alloc_region my_depth

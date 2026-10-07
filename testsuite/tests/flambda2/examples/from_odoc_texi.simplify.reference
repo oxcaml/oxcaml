@@ -1,7 +1,11 @@
-let code `!_0` deleted in
 let code foo_1 deleted in
-let $camlFrom_odoc_texi__immstring_1 = "b" in
-let $camlFrom_odoc_texi__immstring_0 = "a" in
+let code inline(never) loopify(never) size(1) newer_version_of(foo_1)
+      foo_1_1 (x : val) my_closure &my_alloc_region my_depth -> k * k1 : val =
+  let Popaque = %opaque (x) in
+  cont k (Popaque)
+in
+let $camlFrom_odoc_texi__foo_3 = closure foo_1_1 @foo &toplevel in
+let code `!_0` deleted in
 let code loopify(never) size(2) newer_version_of(`!_0`)
       `!_0_1` (param : val)
         my_closure &my_alloc_region my_depth
@@ -11,13 +15,9 @@ let code loopify(never) size(2) newer_version_of(`!_0`)
   cont k (Pfield)
 in
 let $`camlFrom_odoc_texi__!_2` = closure `!_0_1` @`!` &toplevel in
+let $camlFrom_odoc_texi__immstring_0 = "a" in
+let $camlFrom_odoc_texi__immstring_1 = "b" in
 let esc_8bits = %block.mut.[`0`].`toplevel` (0) in
-let code inline(never) loopify(never) size(1) newer_version_of(foo_1)
-      foo_1_1 (x : val) my_closure &my_alloc_region my_depth -> k * k1 : val =
-  let Popaque = %opaque (x) in
-  cont k (Popaque)
-in
-let $camlFrom_odoc_texi__foo_3 = closure foo_1_1 @foo &toplevel in
 (let Pfield = %block_load.mut.[`0`] (esc_8bits) in
  (let untagged = %untag_imm (Pfield) in
   switch untagged

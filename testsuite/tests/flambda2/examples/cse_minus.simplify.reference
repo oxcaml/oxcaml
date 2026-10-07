@@ -1,13 +1,13 @@
-let $camlCse_minus__string_0 = "index out of bounds" in
-let $camlCse_minus__block_1 =
-  Block 0 ($`*predef*`.caml_exn_Invalid_argument, $camlCse_minus__string_0)
-in
 let $camlCse_minus__immstring_2 = "cse_minus.ml" in
 let $camlCse_minus__const_block_3 =
   Block 0 ($camlCse_minus__immstring_2, 24, 2)
 in
 let $camlCse_minus__Pmakeblock_4 =
   Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlCse_minus__const_block_3)
+in
+let $camlCse_minus__string_0 = "index out of bounds" in
+let $camlCse_minus__block_1 =
+  Block 0 ($`*predef*`.caml_exn_Invalid_argument, $camlCse_minus__string_0)
 in
 let code f_0 deleted in
 let code loopify(never) size(43) newer_version_of(f_0)

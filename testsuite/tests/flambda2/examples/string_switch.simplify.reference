@@ -1,7 +1,3 @@
-let $camlString_switch__immstring_0 = "Cow" in
-let $camlString_switch__immstring_1 = "Goat" in
-let $camlString_switch__immstring_2 = "Horse" in
-let $camlString_switch__immstring_3 = "Sheep" in
 let $camlString_switch__immstring_4 = "string_switch.ml" in
 let $camlString_switch__const_block_5 =
   Block 0 ($camlString_switch__immstring_4, 21, 9)
@@ -10,6 +6,10 @@ let $camlString_switch__Pmakeblock_6 =
   Block 0 ($`*predef*`.caml_exn_Assert_failure,
            $camlString_switch__const_block_5)
 in
+let $camlString_switch__immstring_3 = "Sheep" in
+let $camlString_switch__immstring_2 = "Horse" in
+let $camlString_switch__immstring_1 = "Goat" in
+let $camlString_switch__immstring_0 = "Cow" in
 let code of_string_0 deleted in
 let code loopify(never) size(60) newer_version_of(of_string_0)
       of_string_0_1 (str : val)

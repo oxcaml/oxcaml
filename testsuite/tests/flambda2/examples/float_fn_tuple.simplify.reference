@@ -1,5 +1,4 @@
 let code g_0 deleted in
-let code f_1 deleted in
 let code inline(never) loopify(never) size(23) newer_version_of(g_0)
       g_0_1 (x : float boxed)
         my_closure &my_alloc_region my_depth
@@ -14,6 +13,7 @@ let code inline(never) loopify(never) size(23) newer_version_of(g_0)
   cont k (Pmakeblock)
 in
 let $camlFloat_fn_tuple__g_2 = closure g_0_1 @g &toplevel in
+let code f_1 deleted in
 let code loopify(never) size(16) newer_version_of(f_1)
       f_1_1 (b, x : float boxed)
         my_closure &my_alloc_region my_depth

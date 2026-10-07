@@ -1,6 +1,4 @@
 let code g_1 deleted in
-let code h_2 deleted in
-let code f_0 deleted in
 let code loopify(never) size(12) newer_version_of(g_1)
       g_1_1 (b : imm tagged)
         my_closure &my_alloc_region my_depth
@@ -12,6 +10,7 @@ let code loopify(never) size(12) newer_version_of(g_1)
     | 0 -> k (42)
     | 1 -> k (x)
 in
+let code h_2 deleted in
 let code loopify(never) size(10) newer_version_of(h_2)
       h_2_1 (acc : imm tagged, x : imm tagged)
         my_closure &my_alloc_region my_depth
@@ -24,6 +23,7 @@ let code loopify(never) size(10) newer_version_of(h_2)
       let int_add_1 = %int_barith.add (int_add, apply_result) in
       cont k (int_add_1)
 in
+let code f_0 deleted in
 let code loopify(never) size(58) newer_version_of(f_0)
       f_0_1 (x : imm tagged, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
         my_closure &my_alloc_region my_depth

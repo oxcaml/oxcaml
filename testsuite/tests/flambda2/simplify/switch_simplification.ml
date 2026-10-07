@@ -37,13 +37,13 @@ let all_large_simplifications x = function
   | D -> #(3, x, 4, Some 0)
 [%%expect_fexpr Simplify{|
 let $camlTOP4__const_block_5 = Block 0 (0) in
-let code all_large_simplifications_1 deleted in
 let $camlTOP4__switch_block_7 =
   Value_array [|0;
   0;
   $camlTOP4__const_block_5;
   $camlTOP4__const_block_5|]
 in
+let code all_large_simplifications_1 deleted in
 let code loopify(never) size(4) newer_version_of(all_large_simplifications_1)
       all_large_simplifications_1_1 (x, param : imm tagged)
         my_closure &my_alloc_region my_depth
@@ -92,13 +92,13 @@ let shared_lookup_table = function
   | D -> #(3, Some 0, Some 0)
 [%%expect_fexpr Simplify{|
 let $camlTOP6__const_block_12 = Block 0 (0) in
-let code shared_lookup_table_3 deleted in
 let $camlTOP6__switch_block_14 =
   Value_array [|0;
   0;
   $camlTOP6__const_block_12;
   $camlTOP6__const_block_12|]
 in
+let code shared_lookup_table_3 deleted in
 let code loopify(never) size(2) newer_version_of(shared_lookup_table_3)
       shared_lookup_table_3_1 (param : imm tagged)
         my_closure &my_alloc_region my_depth
@@ -121,9 +121,9 @@ let multiple_lookup_tables = function
   | C -> #(0, 0)
   | D -> #(1, 0)
 [%%expect_fexpr Simplify{|
-let code multiple_lookup_tables_4 deleted in
 let $camlTOP7__switch_block_19 = Value_array [|1; 1; 0; 0|] in
 let $camlTOP7__switch_block_18 = Value_array [|0; 1; 0; 1|] in
+let code multiple_lookup_tables_4 deleted in
 let code loopify(never) size(3) newer_version_of(multiple_lookup_tables_4)
       multiple_lookup_tables_4_1 (param : imm tagged)
         my_closure &my_alloc_region my_depth
@@ -154,8 +154,8 @@ let offset_lookup_table i =
   | C -> 2
   | D -> 1
 [%%expect_fexpr Simplify{|
-let code offset_lookup_table_5 deleted in
 let $camlTOP8__switch_block_25 = Value_array [|0; 2; 1|] in
+let code offset_lookup_table_5 deleted in
 let code loopify(never) size(30) newer_version_of(offset_lookup_table_5)
       offset_lookup_table_5_1 (i : imm tagged)
         my_closure &my_alloc_region my_depth
@@ -220,8 +220,8 @@ let poison_prevents_boolean_not b =
   | Absent -> A
   | Box_A t -> t
 [%%expect_fexpr Simplify{|
-let code poison_prevents_boolean_not_6 deleted in
 let $camlTOP11__switch_block_32 = Int_array [|0; 0; 1|] in
+let code poison_prevents_boolean_not_6 deleted in
 let code loopify(never) size(14) newer_version_of(poison_prevents_boolean_not_6)
       poison_prevents_boolean_not_6_1 (b : imm tagged)
         my_closure &my_alloc_region my_depth

@@ -1,5 +1,4 @@
 let code f_0 deleted in
-let code baz_1 deleted in
 let code loopify(never) size(13) newer_version_of(f_0)
       f_0_1 (param : [ 0 | 0 of [ 0 of float boxed |1 of imm tagged ] ])
         my_closure &my_alloc_region my_depth
@@ -14,6 +13,7 @@ let code loopify(never) size(13) newer_version_of(f_0)
       cont k (Pfield)
 in
 let $camlUnboxing_gadt__f_1 = closure f_0_1 @f &toplevel in
+let code baz_1 deleted in
 let code loopify(never) size(23) newer_version_of(baz_1)
       baz_1_1
         (p : imm tagged,

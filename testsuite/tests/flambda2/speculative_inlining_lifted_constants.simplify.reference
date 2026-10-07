@@ -1,5 +1,4 @@
 let code f_0 deleted in
-let code v1_1 deleted in
 let code loopify(never) size(8) newer_version_of(f_0)
       f_0_1 (x)
         my_closure &my_alloc_region my_depth
@@ -11,6 +10,7 @@ in
 let $camlSpeculative_inlining_lifted_constants__f_1 =
   closure f_0_1 @f &toplevel
 in
+let code v1_1 deleted in
 let zero = %opaque (0) in
 apply direct(f_0_1 &toplevel)
   ($camlSpeculative_inlining_lifted_constants__f_1
@@ -19,9 +19,7 @@ apply direct(f_0_1 &toplevel)
     -> k * error
   where k (v0 : [ 0 of imm tagged * imm tagged ]) =
     let one = %opaque (1) in
-    let $camlSpeculative_inlining_lifted_constants__v1_3 =
-      closure v1_1_1 @v1 &toplevel
-    and code loopify(never) size(5) newer_version_of(v1_1)
+    let code loopify(never) size(5) newer_version_of(v1_1)
           v1_1_1 (param : imm tagged)
             my_closure &my_alloc_region my_depth
             -> k * k1
@@ -35,6 +33,8 @@ apply direct(f_0_1 &toplevel)
          : _ -> [ 0 of imm tagged * imm tagged ])
           (one_1)
           -> k * k1
+    and $camlSpeculative_inlining_lifted_constants__v1_3 =
+      closure v1_1_1 @v1 &toplevel
       with { one = one }
     in
     let $camlSpeculative_inlining_lifted_constants =

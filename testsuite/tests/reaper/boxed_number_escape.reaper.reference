@@ -1,9 +1,7 @@
-let code escape_0 deleted in
 let $camlBoxed_number_escape__int64_0 = 0L in
+let code escape_0 deleted in
 let r = %block.mut.[`0`].`toplevel` ($camlBoxed_number_escape__int64_0) in
-let $camlBoxed_number_escape__escape_1 =
-  closure escape_0_1 @escape &toplevel
-and code loopify(never) size(14) newer_version_of(escape_0)
+let code loopify(never) size(14) newer_version_of(escape_0)
       escape_0_1 (n : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
@@ -18,6 +16,8 @@ and code loopify(never) size(14) newer_version_of(escape_0)
   let prim_2 = %num_conv.[`int64`].[`imm`] (prim_1) in
   let int_of_int64 = %tag_imm (prim_2) in
   cont k (int_of_int64)
+and $camlBoxed_number_escape__escape_1 =
+  closure escape_0_1 @escape &toplevel
   with { r = r }
 in
 let $camlBoxed_number_escape =

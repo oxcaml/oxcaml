@@ -1,90 +1,4 @@
-let code pr2162_2_first_0 deleted in
-let code pr2162_2_1 deleted in
-let code pr2162_3_2 deleted in
 let code pr2162_3_as_int64_3 deleted in
-let code loopify(never) size(34) newer_version_of(pr2162_2_first_0)
-      pr2162_2_first_0_1 (z : imm tagged, x : imm tagged, y : float boxed)
-        my_closure &my_alloc_region my_depth
-        -> k * k1
-        : float boxed =
-  (let untagged = %untag_imm (z) in
-   switch untagged
-     | 0 -> k3
-     | 1 -> k4)
-    where k4 =
-      let prim = %unbox_num.`float` (y) in
-      let prim_1 = %bfloat_arith.mul (prim, 0x1.8p+1) in
-      let a = %int_barith.mul (x, 2) in
-      let naked_immediate = %untag_imm (a) in
-      cont k2 (prim_1, naked_immediate)
-    where k3 =
-      let prim = %unbox_num.`float` (y) in
-      let prim_1 = %bfloat_arith.add (prim, 0x0p+0) in
-      let naked_immediate = %untag_imm (x) in
-      cont k2 (prim_1, naked_immediate)
-    where k2 (unboxed_float : float, naked_immediate : imm) =
-      let prim = %num_conv.[`imm`].[`float`] (naked_immediate) in
-      let prim_1 = %bfloat_arith.sub (prim, unboxed_float) in
-      let float_sub = %box_num.`float`.my_alloc_region (prim_1) in
-      cont k (float_sub)
-in
-let $camlTests4__pr2162_2_first_6 =
-  closure pr2162_2_first_0_1 @pr2162_2_first &toplevel
-in
-let code loopify(never) size(34) newer_version_of(pr2162_2_1)
-      pr2162_2_1_1 (z : imm tagged, x : imm tagged, y : float boxed)
-        my_closure &my_alloc_region my_depth
-        -> k * k1
-        : float boxed =
-  (let untagged = %untag_imm (z) in
-   switch untagged
-     | 0 -> k3
-     | 1 -> k4)
-    where k4 =
-      let prim = %unbox_num.`float` (y) in
-      let prim_1 = %bfloat_arith.mul (prim, 0x1.8p+1) in
-      let a = %int_barith.mul (x, 2) in
-      let naked_immediate = %untag_imm (a) in
-      cont k2 (prim_1, naked_immediate)
-    where k3 =
-      let prim = %unbox_num.`float` (y) in
-      let prim_1 = %bfloat_arith.add (prim, 0x0p+0) in
-      let naked_immediate = %untag_imm (x) in
-      cont k2 (prim_1, naked_immediate)
-    where k2 (unboxed_float : float, naked_immediate : imm) =
-      let prim = %num_conv.[`imm`].[`float`] (naked_immediate) in
-      let prim_1 = %bfloat_arith.sub (prim, unboxed_float) in
-      let float_sub = %box_num.`float`.my_alloc_region (prim_1) in
-      cont k (float_sub)
-in
-let $camlTests4__pr2162_2_7 = closure pr2162_2_1_1 @pr2162_2 &toplevel in
-let code loopify(never) size(34) newer_version_of(pr2162_3_2)
-      pr2162_3_2_1 (z : imm tagged, x : imm tagged, y : float boxed)
-        my_closure &my_alloc_region my_depth
-        -> k * k1
-        : float boxed =
-  (let untagged = %untag_imm (z) in
-   switch untagged
-     | 0 -> k3
-     | 1 -> k4)
-    where k4 =
-      let prim = %unbox_num.`float` (y) in
-      let prim_1 = %bfloat_arith.mul (prim, 0x1.8p+1) in
-      let int_mul = %int_barith.mul (x, 2) in
-      let naked_immediate = %untag_imm (int_mul) in
-      cont k2 (prim_1, naked_immediate)
-    where k3 =
-      let prim = %unbox_num.`float` (y) in
-      let prim_1 = %bfloat_arith.add (prim, 0x0p+0) in
-      let naked_immediate = %untag_imm (x) in
-      cont k2 (prim_1, naked_immediate)
-    where k2 (unboxed_float : float, naked_immediate : imm) =
-      let prim = %num_conv.[`imm`].[`float`] (naked_immediate) in
-      let prim_1 = %bfloat_arith.sub (prim, unboxed_float) in
-      let float_sub = %box_num.`float`.my_alloc_region (prim_1) in
-      cont k (float_sub)
-in
-let $camlTests4__pr2162_3_8 = closure pr2162_3_2_1 @pr2162_3 &toplevel in
 let code loopify(never) size(49) newer_version_of(pr2162_3_as_int64_3)
       pr2162_3_as_int64_3_1
         (z : imm tagged, x : imm tagged, y : int64 boxed, y' : int32 boxed)
@@ -122,6 +36,92 @@ let code loopify(never) size(49) newer_version_of(pr2162_3_as_int64_3)
 in
 let $camlTests4__pr2162_3_as_int64_9 =
   closure pr2162_3_as_int64_3_1 @pr2162_3_as_int64 &toplevel
+in
+let code pr2162_3_2 deleted in
+let code loopify(never) size(34) newer_version_of(pr2162_3_2)
+      pr2162_3_2_1 (z : imm tagged, x : imm tagged, y : float boxed)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : float boxed =
+  (let untagged = %untag_imm (z) in
+   switch untagged
+     | 0 -> k3
+     | 1 -> k4)
+    where k4 =
+      let prim = %unbox_num.`float` (y) in
+      let prim_1 = %bfloat_arith.mul (prim, 0x1.8p+1) in
+      let int_mul = %int_barith.mul (x, 2) in
+      let naked_immediate = %untag_imm (int_mul) in
+      cont k2 (prim_1, naked_immediate)
+    where k3 =
+      let prim = %unbox_num.`float` (y) in
+      let prim_1 = %bfloat_arith.add (prim, 0x0p+0) in
+      let naked_immediate = %untag_imm (x) in
+      cont k2 (prim_1, naked_immediate)
+    where k2 (unboxed_float : float, naked_immediate : imm) =
+      let prim = %num_conv.[`imm`].[`float`] (naked_immediate) in
+      let prim_1 = %bfloat_arith.sub (prim, unboxed_float) in
+      let float_sub = %box_num.`float`.my_alloc_region (prim_1) in
+      cont k (float_sub)
+in
+let $camlTests4__pr2162_3_8 = closure pr2162_3_2_1 @pr2162_3 &toplevel in
+let code pr2162_2_1 deleted in
+let code loopify(never) size(34) newer_version_of(pr2162_2_1)
+      pr2162_2_1_1 (z : imm tagged, x : imm tagged, y : float boxed)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : float boxed =
+  (let untagged = %untag_imm (z) in
+   switch untagged
+     | 0 -> k3
+     | 1 -> k4)
+    where k4 =
+      let prim = %unbox_num.`float` (y) in
+      let prim_1 = %bfloat_arith.mul (prim, 0x1.8p+1) in
+      let a = %int_barith.mul (x, 2) in
+      let naked_immediate = %untag_imm (a) in
+      cont k2 (prim_1, naked_immediate)
+    where k3 =
+      let prim = %unbox_num.`float` (y) in
+      let prim_1 = %bfloat_arith.add (prim, 0x0p+0) in
+      let naked_immediate = %untag_imm (x) in
+      cont k2 (prim_1, naked_immediate)
+    where k2 (unboxed_float : float, naked_immediate : imm) =
+      let prim = %num_conv.[`imm`].[`float`] (naked_immediate) in
+      let prim_1 = %bfloat_arith.sub (prim, unboxed_float) in
+      let float_sub = %box_num.`float`.my_alloc_region (prim_1) in
+      cont k (float_sub)
+in
+let $camlTests4__pr2162_2_7 = closure pr2162_2_1_1 @pr2162_2 &toplevel in
+let code pr2162_2_first_0 deleted in
+let code loopify(never) size(34) newer_version_of(pr2162_2_first_0)
+      pr2162_2_first_0_1 (z : imm tagged, x : imm tagged, y : float boxed)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : float boxed =
+  (let untagged = %untag_imm (z) in
+   switch untagged
+     | 0 -> k3
+     | 1 -> k4)
+    where k4 =
+      let prim = %unbox_num.`float` (y) in
+      let prim_1 = %bfloat_arith.mul (prim, 0x1.8p+1) in
+      let a = %int_barith.mul (x, 2) in
+      let naked_immediate = %untag_imm (a) in
+      cont k2 (prim_1, naked_immediate)
+    where k3 =
+      let prim = %unbox_num.`float` (y) in
+      let prim_1 = %bfloat_arith.add (prim, 0x0p+0) in
+      let naked_immediate = %untag_imm (x) in
+      cont k2 (prim_1, naked_immediate)
+    where k2 (unboxed_float : float, naked_immediate : imm) =
+      let prim = %num_conv.[`imm`].[`float`] (naked_immediate) in
+      let prim_1 = %bfloat_arith.sub (prim, unboxed_float) in
+      let float_sub = %box_num.`float`.my_alloc_region (prim_1) in
+      cont k (float_sub)
+in
+let $camlTests4__pr2162_2_first_6 =
+  closure pr2162_2_first_0_1 @pr2162_2_first &toplevel
 in
 let $camlTests4 =
   Block 0 ($camlTests4__pr2162_2_first_6,

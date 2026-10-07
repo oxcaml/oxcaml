@@ -1,6 +1,4 @@
 let code h_2 deleted in
-let code g_1 deleted in
-let code f_0 deleted in
 let code inline(never) loopify(never) size(1) newer_version_of(h_2)
       h_2_1 (Pmakeblock_into_u_field_0)
         my_closure &my_alloc_region my_depth
@@ -8,6 +6,7 @@ let code inline(never) loopify(never) size(1) newer_version_of(h_2)
   cont k (Pmakeblock_into_u_field_0)
 in
 let $camlCode_size__h_2 = closure h_2_1 @h &toplevel in
+let code g_1 deleted in
 let code loopify(never) size(6) newer_version_of(g_1)
       g_1_1 (y) my_closure &my_alloc_region my_depth -> k * k1 =
   let x = %project_value_slot.[g].[unboxed_field_x] (my_closure) in
@@ -18,6 +17,7 @@ let code loopify(never) size(6) newer_version_of(g_1)
       let Pmixedfield = `Pmakeblock_into_*match*_field_0` in
       cont k (Pmixedfield)
 in
+let code f_0 deleted in
 let code loopify(never) size(15) newer_version_of(f_0)
       f_0_1 (x) my_closure &my_alloc_region my_depth -> k * k1 : val =
   let g = closure g_1_1 @g &my_alloc_region with { unboxed_field_x = x } in

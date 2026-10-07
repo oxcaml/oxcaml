@@ -1,10 +1,10 @@
 let code id_0 deleted in
-let code foo_1 deleted in
 let code inline(never) loopify(never) size(1) newer_version_of(id_0)
       id_0_1 (lam) my_closure &my_alloc_region my_depth -> k * k1 =
   cont k (lam)
 in
 let $camlCse_with_alias_to_param__id_1 = closure id_0_1 @`id` &toplevel in
+let code foo_1 deleted in
 let code loopify(never) size(42) newer_version_of(foo_1)
       foo_1_1 (v : val, opt : [ 0 | 0 of val ])
         my_closure &my_alloc_region my_depth

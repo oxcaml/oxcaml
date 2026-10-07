@@ -1,6 +1,4 @@
-let code `fn[tests8.ml:20,62--77]_2` deleted in
 let code `fn[tests8.ml:20,49--61]_3` deleted in
-let code map_foo_0 deleted and code `fn[tests8.ml:20,12--80]_1` deleted in
 let code loopify(never) size(1) newer_version_of(`fn[tests8.ml:20,49--61]_3`)
       `fn[tests8.ml:20,49--61]_3_1` (x : val)
         my_closure &my_alloc_region my_depth
@@ -11,6 +9,7 @@ in
 let $`camlTests8__fn[tests8.ml:20,49--61]_3` =
   closure `fn[tests8.ml:20,49--61]_3_1` @`fn[tests8.ml:20,49--61]` &toplevel
 in
+let code `fn[tests8.ml:20,62--77]_2` deleted in
 let code loopify(never) size(1) newer_version_of(`fn[tests8.ml:20,62--77]_2`)
       `fn[tests8.ml:20,62--77]_2_1` (param : imm tagged)
         my_closure &my_alloc_region my_depth
@@ -21,8 +20,19 @@ in
 let $`camlTests8__fn[tests8.ml:20,62--77]_2` =
   closure `fn[tests8.ml:20,62--77]_2_1` @`fn[tests8.ml:20,62--77]` &toplevel
 in
-let $camlTests8__map_foo_1 =
-  closure map_foo_0_1 @map_foo &toplevel
+let code map_foo_0 deleted and code `fn[tests8.ml:20,12--80]_1` deleted in
+let code loopify(never) size(4) newer_version_of(`fn[tests8.ml:20,12--80]_1`)
+      `fn[tests8.ml:20,12--80]_1_1` (param : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * val ] =
+  apply direct(map_foo_0_1 &my_alloc_region) inlined(never)
+    ($camlTests8__map_foo_1 ~ depth do_not_inline -> do_not_inline
+     : _ -> [ 0 | 0 of val * val ])
+      ($`camlTests8__fn[tests8.ml:20,49--61]_3`,
+       $`camlTests8__fn[tests8.ml:20,62--77]_2`,
+       0)
+      -> k * k1
 and code rec loopify(never) size(44) newer_version_of(map_foo_0)
       map_foo_0_1 (f : val, seq : val, param : imm tagged)
         my_closure &my_alloc_region my_depth
@@ -51,18 +61,8 @@ and code rec loopify(never) size(44) newer_version_of(map_foo_0)
                     (apply_result, `fn[tests8.ml:20,12--80]`)
                 in
                 cont k (Pmakeblock)))
-and code loopify(never) size(4) newer_version_of(`fn[tests8.ml:20,12--80]_1`)
-      `fn[tests8.ml:20,12--80]_1_1` (param : imm tagged)
-        my_closure &my_alloc_region my_depth
-        -> k * k1
-        : [ 0 | 0 of val * val ] =
-  apply direct(map_foo_0_1 &my_alloc_region) inlined(never)
-    ($camlTests8__map_foo_1 ~ depth do_not_inline -> do_not_inline
-     : _ -> [ 0 | 0 of val * val ])
-      ($`camlTests8__fn[tests8.ml:20,49--61]_3`,
-       $`camlTests8__fn[tests8.ml:20,62--77]_2`,
-       0)
-      -> k * k1
+and $camlTests8__map_foo_1 =
+  closure map_foo_0_1 @map_foo &toplevel
 in
 let $camlTests8 = Block 0 ($camlTests8__map_foo_1) in
 cont done ($camlTests8)

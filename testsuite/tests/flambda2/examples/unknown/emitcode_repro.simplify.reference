@@ -1,12 +1,4 @@
 let code out_0 deleted in
-let $camlEmitcode_repro__const_block_0 = Block 0 (1, 1) in
-let $camlEmitcode_repro__const_block_1 = Block 0 (1, 0) in
-let $camlEmitcode_repro__const_block_2 = Block 0 (0, 1) in
-let $camlEmitcode_repro__const_block_3 = Block 0 (0, 0) in
-let code emit_instr_1 deleted in
-let $camlEmitcode_repro__const_block_4 = Block 0 (2, 2) in
-let $camlEmitcode_repro__const_block_5 = Block 0 (2, 1) in
-let code emit_2 deleted in
 let code inline(never) loopify(never) size(1) newer_version_of(out_0)
       out_0_1 (_x)
         my_closure &my_alloc_region my_depth
@@ -16,6 +8,11 @@ let code inline(never) loopify(never) size(1) newer_version_of(out_0)
   cont k (Popaque)
 in
 let $camlEmitcode_repro__out_6 = closure out_0_1 @out &toplevel in
+let $camlEmitcode_repro__const_block_3 = Block 0 (0, 0) in
+let $camlEmitcode_repro__const_block_2 = Block 0 (0, 1) in
+let $camlEmitcode_repro__const_block_1 = Block 0 (1, 0) in
+let $camlEmitcode_repro__const_block_0 = Block 0 (1, 1) in
+let code emit_instr_1 deleted in
 let code loopify(never) size(50) newer_version_of(emit_instr_1)
       emit_instr_1_1 (param : [ 0 |1 | 0 of imm tagged |1 of imm tagged ])
         my_closure &my_alloc_region my_depth
@@ -59,6 +56,9 @@ in
 let $camlEmitcode_repro__emit_instr_7 =
   closure emit_instr_1_1 @emit_instr &toplevel
 in
+let $camlEmitcode_repro__const_block_5 = Block 0 (2, 1) in
+let $camlEmitcode_repro__const_block_4 = Block 0 (2, 2) in
+let code emit_2 deleted in
 let code loopify(done) size(115) newer_version_of(emit_2)
       emit_2_1 (param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
         my_closure &my_alloc_region my_depth

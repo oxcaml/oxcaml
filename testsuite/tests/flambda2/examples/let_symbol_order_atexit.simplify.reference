@@ -1,6 +1,4 @@
 let code id_0 deleted in
-let code do_at_exit_1 deleted in
-let code exit_3 deleted in
 let code loopify(never) size(1) newer_version_of(id_0)
       id_0_1 (param : imm tagged)
         my_closure &my_alloc_region my_depth
@@ -9,12 +7,12 @@ let code loopify(never) size(1) newer_version_of(id_0)
   cont k (0)
 in
 let $camlLet_symbol_order_atexit__id_1 = closure id_0_1 @`id` &toplevel in
+let code do_at_exit_1 deleted in
+let code exit_3 deleted in
 let exit_function =
   %block.mut.[`0`].`toplevel` ($camlLet_symbol_order_atexit__id_1)
 in
-let $camlLet_symbol_order_atexit__do_at_exit_2 =
-  closure do_at_exit_1_1 @do_at_exit &toplevel
-and code loopify(never) size(8) newer_version_of(do_at_exit_1)
+let code loopify(never) size(8) newer_version_of(do_at_exit_1)
       do_at_exit_1_1 (param : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
@@ -25,6 +23,8 @@ and code loopify(never) size(8) newer_version_of(do_at_exit_1)
   in
   let Pfield = %block_load.mut.[`0`] (exit_function_1) in
   apply &my_alloc_region Pfield (0) -> k * k1
+and $camlLet_symbol_order_atexit__do_at_exit_2 =
+  closure do_at_exit_1_1 @do_at_exit &toplevel
   with { exit_function = exit_function }
 in
 let code loopify(never) size(19) newer_version_of(exit_3)

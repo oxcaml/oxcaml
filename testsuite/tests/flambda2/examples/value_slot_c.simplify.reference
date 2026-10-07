@@ -1,17 +1,17 @@
 let $camlValue_slot_c__immstring_5 = "value_slot_c.ml" in
-let $camlValue_slot_c__const_block_6 =
-  Block 0 ($camlValue_slot_c__immstring_5, 24, 2)
-in
-let $camlValue_slot_c__Pmakeblock_7 =
-  Block 0 ($`*predef*`.caml_exn_Assert_failure,
-           $camlValue_slot_c__const_block_6)
-in
 let $camlValue_slot_c__const_block_8 =
   Block 0 ($camlValue_slot_c__immstring_5, 25, 2)
 in
 let $camlValue_slot_c__Pmakeblock_9 =
   Block 0 ($`*predef*`.caml_exn_Assert_failure,
            $camlValue_slot_c__const_block_8)
+in
+let $camlValue_slot_c__const_block_6 =
+  Block 0 ($camlValue_slot_c__immstring_5, 24, 2)
+in
+let $camlValue_slot_c__Pmakeblock_7 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure,
+           $camlValue_slot_c__const_block_6)
 in
 let code f_2 deleted in
 let code loopify(never) size(59) newer_version_of(f_2)

@@ -1,6 +1,6 @@
+let $camlGenlex2__immstring_0 = "Genlex2.Error" in
 let $camlGenlex2__immstring_1 = "" in
 let code foo_0 deleted in
-let $camlGenlex2__immstring_0 = "Genlex2.Error" in
 apply ccall noalloc
   ($`*extern*`.caml_fresh_oo_id : val -> val) (0) -> k * error
   where k (Pccall) =

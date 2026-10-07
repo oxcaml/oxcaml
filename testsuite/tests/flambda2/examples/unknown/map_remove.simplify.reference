@@ -1,9 +1,9 @@
-let code bal_0 deleted in
-let code min_binding_1 deleted in
 let $camlMap_remove__immstring_0 = "Map.remove_min_elt" in
-let code remove_min_binding_2 deleted in
-let code merge_3 deleted in
-let code remove_4 deleted in
+let $camlMap_remove__Pmakeblock_4 =
+  Block 0 ($`*predef*`.caml_exn_Invalid_argument,
+           $camlMap_remove__immstring_0)
+in
+let code bal_0 deleted in
 let code inline(never) loopify(never) size(9) newer_version_of(bal_0)
       bal_0_1
         (l :
@@ -24,45 +24,8 @@ let code inline(never) loopify(never) size(9) newer_version_of(bal_0)
   cont k (Pmakeblock)
 in
 let $camlMap_remove__bal_1 = closure bal_0_1 @bal &toplevel in
-let code loopify(done) size(26) newer_version_of(min_binding_1)
-      min_binding_1_1
-        (param :
-           [ 0
-           | 0 of [ 0 | 0 of val * imm tagged * val ] * imm tagged *
-               [ 0 | 0 of val * imm tagged * val ] ])
-        my_closure &my_alloc_region my_depth
-        -> k * k1
-        : imm tagged =
-  cont `self` (param)
-    where rec `self`
-                (param_1 :
-                   [ 0
-                   | 0 of [ 0 | 0 of val * imm tagged * val ] * imm tagged *
-                       [ 0 | 0 of val * imm tagged * val ] ]) =
-      let prim = %is_int (param_1) in
-      (switch prim
-         | 0 -> k2
-         | 1 -> k1 pop(reraise k1) ($`*predef*`.caml_exn_Not_found)
-         where k2 =
-           let l = %block_load.[`0`] (param_1) in
-           let prim_1 = %is_int (l) in
-           (switch prim_1
-              | 0 -> `self` (l)
-              | 1 -> k2
-              where k2 =
-                let Pfield = %block_load.[`1`] (param_1) in
-                cont k (Pfield)))
-in
-let $camlMap_remove__min_binding_2 =
-  closure min_binding_1_1 @min_binding &toplevel
-in
-let $camlMap_remove__Pmakeblock_4 =
-  Block 0 ($`*predef*`.caml_exn_Invalid_argument,
-           $camlMap_remove__immstring_0)
-in
-let $camlMap_remove__remove_min_binding_3 =
-  closure remove_min_binding_2_1 @remove_min_binding &toplevel
-and code rec loopify(never) size(35) newer_version_of(remove_min_binding_2)
+let code remove_min_binding_2 deleted in
+let code rec loopify(never) size(35) newer_version_of(remove_min_binding_2)
       remove_min_binding_2_1
         (param :
            [ 0
@@ -113,7 +76,43 @@ and code rec loopify(never) size(35) newer_version_of(remove_min_binding_2)
                    )
                     (apply_result, Pfield_1, Pfield)
                     -> k * k1))
+and $camlMap_remove__remove_min_binding_3 =
+  closure remove_min_binding_2_1 @remove_min_binding &toplevel
 in
+let code min_binding_1 deleted in
+let code loopify(done) size(26) newer_version_of(min_binding_1)
+      min_binding_1_1
+        (param :
+           [ 0
+           | 0 of [ 0 | 0 of val * imm tagged * val ] * imm tagged *
+               [ 0 | 0 of val * imm tagged * val ] ])
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont `self` (param)
+    where rec `self`
+                (param_1 :
+                   [ 0
+                   | 0 of [ 0 | 0 of val * imm tagged * val ] * imm tagged *
+                       [ 0 | 0 of val * imm tagged * val ] ]) =
+      let prim = %is_int (param_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k1 pop(reraise k1) ($`*predef*`.caml_exn_Not_found)
+         where k2 =
+           let l = %block_load.[`0`] (param_1) in
+           let prim_1 = %is_int (l) in
+           (switch prim_1
+              | 0 -> `self` (l)
+              | 1 -> k2
+              where k2 =
+                let Pfield = %block_load.[`1`] (param_1) in
+                cont k (Pfield)))
+in
+let $camlMap_remove__min_binding_2 =
+  closure min_binding_1_1 @min_binding &toplevel
+in
+let code merge_3 deleted in
 let code loopify(never) size(34) newer_version_of(merge_3)
       merge_3_1
         (t1 :
@@ -171,6 +170,7 @@ let code loopify(never) size(34) newer_version_of(merge_3)
                          -> k * k1)))
 in
 let $camlMap_remove__merge_5 = closure merge_3_1 @merge &toplevel in
+let code remove_4 deleted in
 let code loopify(never) size(30) newer_version_of(remove_4)
       remove_4_1
         (x : imm tagged,
