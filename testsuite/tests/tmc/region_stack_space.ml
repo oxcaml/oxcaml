@@ -189,6 +189,11 @@ let[@tail_mod_cons] rec call_local_closure (n : int) =
   in
   if n = 0 then 0 :: g 1 else 0 :: call_local_closure (n - 1)
 
+
+let[@tail_mod_cons] rec crashes_the_compiler n = 
+        let local_ p = (n, n) in 
+        try n :: crashes_the_compiler ( n - 1) with _ -> [ fst p ]
+
 let depth () = Printexc.raw_backtrace_length (Printexc.get_callstack 10_000)
 
 (* Tail-recursive, so building the input does not itself grow the stack. *)
