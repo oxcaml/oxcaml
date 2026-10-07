@@ -198,9 +198,13 @@ let eval (expr : 'a expr) =
   Warnings.check_fatal () (* TODO: more error handling? *);
   (* We ignore the comptime bit here because eval'd stuff is dynamic, we could
      consider packaging the comptime component up in the result if the quoted
-     mode is static, which would let us do something like: [{ val eval : <[ 'a @
-     static ]> expr -> <[ 'a ]> eval with_static_data val inject : (('a. 'a
-     with_static_data -> <[ 'a @ static ]> expr) -> 'b expr) -> 'b eval }] *)
+     mode is static, which would let us do something like: *)
+  (* [{
+      val eval : <[ 'a @ static ]> expr -> <[ 'a ]> eval with_static_data
+      val inject
+        :  (('a. 'a with_static_data -> <[ 'a @ static ]> expr) -> 'b expr)
+        -> 'b eval
+     }] *)
   let lambda =
     let _static_data, raw_lambda =
       Slambda.eval ~cu_static_data:Compilenv.get_static_data Fun.id

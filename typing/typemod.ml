@@ -4714,7 +4714,7 @@ let type_implementation target modulename initial_env ast =
           if Env.is_parameter_unit global_name then
             error (Cannot_implement_parameter (cu_name, source_intf));
           let arg_type_from_cmi =
-            Env.implemented_parameter ~chain:[] cu_name
+            (Env.find_import ~chain:[] cu_name).Persistent_env.imp_arg_signature
             |> Option.map
                  (fun ({ arg_param; _ } : Types.arg_signature) -> arg_param)
           in

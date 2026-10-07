@@ -717,12 +717,6 @@ val register_import_as_opaque: Compilation_unit.Name.t -> unit
    -as-parameter *)
 val is_parameter_unit: Global_module.Name.t -> bool
 
-(* [implemented_parameter md] is the [Types.arg_signature] recorded when [md]
-   was compiled with -as-argument-for *)
-val implemented_parameter:
-  chain:Global_module.t list ->
-  Compilation_unit.Name.t -> Types.arg_signature option
-
 (* [is_imported_parameter md] is true if [md] has been imported and is a
    parameter to this module *)
 val is_imported_parameter: Global_module.Name.t -> bool

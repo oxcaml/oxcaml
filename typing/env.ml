@@ -1282,9 +1282,6 @@ let find_import ~chain modname =
   try Persistent_env.find_import !persistent_env modname
   with Not_found -> error (Cmi_not_found { modname; chain })
 
-let implemented_parameter ~chain modname =
-  (find_import ~chain modname).imp_arg_signature
-
 let reset_declaration_caches () =
   Types.Uid.Tbl.clear !value_declarations;
   Types.Uid.Tbl.clear !type_declarations;
