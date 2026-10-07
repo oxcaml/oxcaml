@@ -103,7 +103,7 @@ type global_name_info = {
 type import = {
   imp_is_param : bool;
   imp_params : Global_module.Parameter_name.t list;
-  imp_arg_for : Types.arg_for option;
+  imp_arg_signature : Types.arg_signature option;
   imp_impl : CU.t option; (* None iff import is a parameter *)
   imp_raw_sign : Signature_with_global_bindings.t;
   imp_filename : string;
@@ -410,9 +410,10 @@ let acknowledge_import penv ~check modname pers_sig =
     | Normal _ -> false
     | Parameter -> true
   in
-  let arg_for, impl =
+  let arg_signature, impl =
     match kind with
-    | Normal { cmi_arg_for; cmi_impl } -> cmi_arg_for, Some cmi_impl
+    | Normal { cmi_arg_signature; cmi_impl } ->
+        cmi_arg_signature, Some cmi_impl
     | Parameter -> None, None
   in
   let uid =
@@ -430,7 +431,7 @@ let acknowledge_import penv ~check modname pers_sig =
   let import =
     { imp_is_param = is_param;
       imp_params = params;
-      imp_arg_for = arg_for;
+      imp_arg_signature = arg_signature;
       imp_impl = impl;
       imp_raw_sign = sign;
       imp_filename = filename;
@@ -666,7 +667,7 @@ and compute_global penv modname ~params ~check ~allow_excess_args =
                 ~allow_excess_args
             in
             let actual_type =
-              match pn.pn_import.imp_arg_for with
+              match pn.pn_import.imp_arg_signature with
               | None ->
                   error (Not_compiled_as_argument
                            { param = expected_type; value = arg_value;
@@ -1134,8 +1135,7 @@ let loaded_transitive_dependencies penv intfs =
   !names
 
 let find_import penv modname =
-  let import = find_import ~allow_hidden:true penv ~check:true modname in
-  import.imp_impl, import.imp_params, import.imp_arg_for, import.imp_raw_sign
+  find_import ~allow_hidden:true penv ~check:true modname
 
 let require_impl_for_quote {quoted_impls; _} name =
   quoted_impls := CU.Set.add name !quoted_impls

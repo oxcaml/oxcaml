@@ -62,11 +62,11 @@ val type_interface:
 val staticity_of_modalities:
   Typedtree.modalities -> Mode.Staticity.Const.t
 
-(* [cmi_arg_for sg arg_param] is the [Types.arg_for] to record in the cmi of a
-   unit with signature [sg] compiled with [-as-argument-for arg_param]. *)
-val cmi_arg_for:
-  Types.signature -> Global_module.Parameter_name.t option ->
-  Types.arg_for option
+(* [arg_signature sg ~param] describes a unit with signature [sg] compiled
+   with [-as-argument-for param]. *)
+val arg_signature:
+  Types.signature -> param:Global_module.Parameter_name.t ->
+  Types.arg_signature
 
 val check_nongen_signature:
         Env.t -> Types.signature -> unit

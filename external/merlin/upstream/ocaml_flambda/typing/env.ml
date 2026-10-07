@@ -1278,15 +1278,9 @@ let is_parameter_unit modname =
 let is_imported_parameter modname =
   Persistent_env.is_imported_parameter !persistent_env modname
 
-let find_import_with_arg_for ~chain modname =
+let find_import ~chain modname =
   try Persistent_env.find_import !persistent_env modname
   with Not_found -> error (Cmi_not_found { modname; chain })
-
-let implemented_parameter ~chain modname =
-  let _impl, _params, arg_for, _sign =
-    find_import_with_arg_for ~chain modname
-  in
-  arg_for
 
 let reset_declaration_caches () =
   Types.Uid.Tbl.clear !value_declarations;
@@ -3340,10 +3334,6 @@ let read_signature modname cmi =
   (* [mode] read from the cmi is always a constant *)
   Subst.Lazy.force_signature mty,
   (Mode.With_regionality.zap_to_floor_exn mode).staticity
-
-let find_import ~chain modname =
-  let impl, params, _arg_for, sign = find_import_with_arg_for ~chain modname in
-  impl, params, sign
 
 let register_parameter modname =
   Persistent_env.register_parameter !persistent_env modname
@@ -5611,7 +5601,8 @@ let report_error_doc = function
         List.iter
           (fun loader ->
             Format_doc.fprintf ppf ",@ referenced from %a"
-              (Style.as_inline_code Global_module.print) loader)
+              (Style.as_inline_code Global_module.Name.print)
+              (Global_module.to_name loader))
           chain
       in
       Location.errorf ~loc:Location.none

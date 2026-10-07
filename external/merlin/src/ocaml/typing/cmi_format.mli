@@ -25,7 +25,7 @@ type kind =
       cmi_impl : Compilation_unit.t;
         (* If this module takes parameters, [cmi_impl] will be the functor that
            generates instances *)
-      cmi_arg_for : Types.arg_for option;
+      cmi_arg_signature : Types.arg_signature option;
     }
   | Parameter
 
