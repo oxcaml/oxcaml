@@ -158,6 +158,11 @@ and type_expr = transient_expr
 
 and type_desc =
   | Tvar of { name : string option; jkind : jkind_lr }
+  | Tivar of
+      { name : string option;
+        jkind : jkind_lr;
+        ivar : type_shape Ivar.t
+      }
   | Tarrow of arrow_desc * type_expr * type_expr * commutable
   | Ttuple of (string option * type_expr) list
   | Tunboxed_tuple of (string option * type_expr) list
@@ -187,6 +192,15 @@ and arg_label =
 
 and arrow_desc =
   arg_label * Mode.With_locality.lr * Mode.With_locality.lr
+
+and type_shape =
+  | Sarrow of arg_label
+  | Stuple of string option list
+  | Sunboxed_tuple of string option list
+  | Sconstr of Path.t
+  | Sobject
+  | Svariant
+  | Spackage of Path.t
 
 and package =
     { pack_path : Path.t;
@@ -875,6 +889,17 @@ let equal_tag t1 t2 =
   | Null, Null -> true
   | (Ordinary _ | Extension _ | Null), _ -> false
 
+let equal_type_shape s1 s2 =
+  let equal_labels = List.equal (Option.equal String.equal) in
+  match s1, s2 with
+  | Sarrow l1, Sarrow l2 -> l1 = l2
+  | Stuple ls1, Stuple ls2 | Sunboxed_tuple ls1, Sunboxed_tuple ls2 ->
+    equal_labels ls1 ls2
+  | Sconstr p1, Sconstr p2 | Spackage p1, Spackage p2 -> Path.same p1 p2
+  | Sobject, Sobject | Svariant, Svariant -> true
+  | ( Sarrow _ | Stuple _ | Sunboxed_tuple _ | Sconstr _ | Sobject | Svariant
+    | Spackage _ ), _ -> false
+
 let compare_tag t1 t2 =
   match (t1, t2) with
   | Ordinary {src_index=i1}, Ordinary {src_index=i2} ->
@@ -1207,6 +1232,8 @@ type change =
   | Cfun of (unit -> unit)
   | Csort : Jkind_types.Sort.change -> change
   | Czero_alloc : Zero_alloc.change -> change
+  | Cscheduler : Scheduler.Change.t -> change
+  | Civar : Ivar.Change.t -> change
 
 type changes =
     Change of change * changes ref
@@ -1225,7 +1252,9 @@ let log_change ch =
 let () =
   Mode.set_append_changes (fun changes -> log_change (Cmodes !changes));
   Jkind_types.Sort.set_change_log (fun change -> log_change (Csort change));
-  Zero_alloc.set_change_log (fun change -> log_change (Czero_alloc change))
+  Zero_alloc.set_change_log (fun change -> log_change (Czero_alloc change));
+  Scheduler.set_log (fun change -> log_change (Cscheduler change));
+  Ivar.set_log (fun change -> log_change (Civar change))
 
 (* constructor and accessors for [field_kind] *)
 
@@ -1348,6 +1377,8 @@ module Transient_expr = struct
     match ty.desc with
     | Tvar { name; _ } ->
       set_desc ty (Tvar { name; jkind = jkind' })
+    | Tivar { name; ivar; _ } ->
+      set_desc ty (Tivar { name; jkind = jkind'; ivar })
     | _ -> Misc.fatal_error "set_var_jkind called on non-var"
   let get_scope ty = ty.scope land scope_mask
   let get_marks ty = ty.scope lsr 27
@@ -1412,6 +1443,7 @@ let best_effort_compare_type_expr te1 te2 =
         match get_desc ty with
         (* Types which must be compared by id *)
         | Tvar _
+        | Tivar _
         | Tunivar _
         | Tobject (_, _)
         | Tfield (_, _, _, _)
@@ -1696,6 +1728,8 @@ let undo_change = function
   | Cfun f -> f ()
   | Csort change -> Jkind_types.Sort.undo_change change
   | Czero_alloc c -> Zero_alloc.undo_change c
+  | Cscheduler c -> Scheduler.Change.undo c
+  | Civar c -> Ivar.Change.undo c
 
 type snapshot = changes ref * int
 let last_snapshot = Local_store.s_ref 0
