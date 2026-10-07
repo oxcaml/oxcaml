@@ -37,6 +37,8 @@ let kind_of_string = function
   | "Caml2012T" -> "cmt"
   | "Caml1999M" -> "impl"
   | "Caml1999N" -> "intf"
+  | "Caml1999J" -> "cmj"
+  | "Caml1999K" -> "cmja"
   | _ -> raise Not_found
 
 let of_string s =
@@ -53,6 +55,8 @@ let kind (s, _) =
   | "exe" -> `Exe
   | "cmo" -> `Cmo
   | "cma" -> `Cma
+  | "cmj" -> `Cmj
+  | "cmja" -> `Cmja
   | other -> `Other other
 
 let to_string (k, v) = Printf.sprintf "%s%03d" k v
@@ -79,7 +83,13 @@ let current_cmo = "Caml1999O", v
 
 let current_cma = "Caml1999A", v
 
+let current_cmj = "Caml1999J", v
+
+let current_cmja = "Caml1999K", v
+
 let current = function
   | `Exe -> current_exe
   | `Cmo -> current_cmo
   | `Cma -> current_cma
+  | `Cmj -> current_cmj
+  | `Cmja -> current_cmja
