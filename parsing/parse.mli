@@ -108,3 +108,11 @@ val type_ident: Lexing.lexbuf -> Longident.t
    are rejected.
 
 *)
+
+val compilation_unit: Lexing.lexbuf -> Compilation_unit.t
+(**
+   This function parses a compilation unit name, using functor application
+   syntax for instance arguments. For instance, [A] and
+   [F(P)(A)(Q)(G(R)(B))] are valid, but [Pack.A], [F(A)] and [F(P.Q)(A)]
+   are rejected.
+*)
