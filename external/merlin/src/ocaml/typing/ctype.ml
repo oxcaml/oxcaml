@@ -173,7 +173,6 @@ let nongen_level = s_ref 0
 let global_level = s_ref 0
 let saved_level = s_ref []
 
-<<<<<<< Merlin:aobrien/omni-stage-1
 
 (* merlin specific *)
 type levels =
@@ -194,8 +193,6 @@ let set_levels l =
   saved_level := l.saved_level
 (* end merlin specific *)
 
-||||||| Compiler:last-imported
-=======
 (* Runs the handlers woken up by filling [Tivar]s during unification. *)
 let scheduler = s_ref_of_create Scheduler.create ()
 
@@ -218,7 +215,6 @@ let run_scheduler_and_default_ivars () =
   in
   loop ()
 
->>>>>>> Compiler:HEAD
 let get_current_level () = !current_level
 let init_def level = current_level := level; nongen_level := level
 let begin_def () =

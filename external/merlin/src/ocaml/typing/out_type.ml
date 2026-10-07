@@ -2527,22 +2527,12 @@ module Aliases = struct
 
   let aliasable ty =
     match get_desc ty with
-<<<<<<< Merlin:aobrien/omni-stage-1
-      Tvar _ | Tunivar _ | Tpoly _ | Trepr _ -> false
+      Tvar _ | Tivar _ | Tunivar _ | Tpoly _ | Trepr _ -> false
     | Tconstr (p, _, _) -> begin
         match best_type_path_resolution p with
         | Nth _ -> false
         | Subst _ | Id -> true
       end
-||||||| Compiler:last-imported
-      Tvar _ | Tunivar _ | Tpoly _ | Trepr _ -> false
-    | Tconstr (p, _, _) ->
-        not (is_nth (snd (best_type_path p)))
-=======
-      Tvar _ | Tivar _ | Tunivar _ | Tpoly _ | Trepr _ -> false
-    | Tconstr (p, _, _) ->
-        not (is_nth (snd (best_type_path p)))
->>>>>>> Compiler:HEAD
     | _ -> true
 
   let rec mark_loops_rec visited ty =
