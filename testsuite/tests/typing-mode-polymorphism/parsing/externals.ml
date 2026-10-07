@@ -175,6 +175,69 @@ Hint: This is a partial application
       Adding 1 more argument will make the value non-local
 |}];;
 
+module M_stateless = struct
+  external add : int32 @ [< 'm] -> int32 @ [< 'm] -> int32 @ [> 'm]
+    @@ stateless = "%int32_add"
+end
+[%%expect{|
+module M_stateless :
+  sig
+    external add : int32 @ [< 'n] -> int32 @ [< 'm] -> int32 @ [> 'm | 'n]
+      = "%int32_add"
+  end
+|}];;
+
+(fun x -> M_stateless.add x);;
+[%%expect{|
+- : int32 @ [< 'n mod contended immutable & global] ->
+    (int32 @ [< 'm & global] ->
+     int32 @ [> 'm | 'n mod many portable forkable unyielding stateless]) @ [> nonportable stateful dynamic]
+= <fun>
+|}];;
+
+module M_stateless_val : sig
+  val add : int32 @ [< 'm & global] -> int32 @ [< 'm & global] -> int32 @ [> 'm]
+    @@ stateless
+end = struct
+  external add : int32 @ [< 'm] -> int32 @ [< 'm] -> int32 @ [> 'm]
+    @@ stateless = "%int32_add"
+end
+[%%expect{|
+Lines 4-7, characters 6-3:
+4 | ......struct
+5 |   external add : int32 @ [< 'm] -> int32 @ [< 'm] -> int32 @ [> 'm]
+6 |     @@ stateless = "%int32_add"
+7 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           external add :
+             int32 @ [< 'n] -> int32 @ [< 'm] -> int32 @ [> 'm | 'n]
+             = "%int32_add"
+         end
+       is not included in
+         sig
+           val add :
+             int32 @ [< 'n & global] ->
+             int32 @ [< 'm & global] -> int32 @ [> 'm | 'n] @@ stateless
+         end
+       Values do not match:
+         external add :
+           int32 @ [< 'n] -> int32 @ [< 'm] -> int32 @ [> 'm | 'n]
+           = "%int32_add"
+       is not included in
+         val add :
+           int32 @ [< 'n & global] ->
+           int32 @ [< 'm & global] -> int32 @ [> 'm | 'n] @@ stateless
+       The type
+         "int32 @ [< 'n & global] ->
+         int32 @ [< 'm & global] -> int32 @ [> 'm | 'n]"
+       is not compatible with the type
+         "int32 @ [< 'q & past('o) & global] ->
+         (int32 @ [< 'p & global] -> int32 @ [> 'p | 'q]) @ [> past('o)]"
+       The return mode was expected to be "stateless" but is "stateful"
+|}];;
+
 (* We do not lose [@local_opt] *)
 
 external add_old :
