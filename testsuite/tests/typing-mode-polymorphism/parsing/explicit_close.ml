@@ -273,12 +273,10 @@ Error: Signature mismatch:
          val k :
            'a @ [< 'm & global unique] ->
            ('b @ 'n -> 'a @ [> 'm]) @ [> close('m) mod many]
-       The type
-         "'a @ [< 'm > past('o)] ->
-         ('b @ [> past('n)] -> 'a @ [> 'm]) @ [> close('m)]"
+       The type "'a @ [< 'm] -> ('b @ 'n -> 'a @ [> 'm]) @ [> close('m)]"
        is not compatible with the type
-         "'a @ [< 'p & past('o) & global unique] ->
-         ('b @ [< past('n)] -> 'a @ [> 'p]) @ [> close('p) mod many]"
+         "'a @ [< 'm & global unique] ->
+         ('b @ 'n -> 'a @ [> 'm]) @ [> close('m) mod many]"
        The return mode was expected to be "many" but is "once"
 |}]
 

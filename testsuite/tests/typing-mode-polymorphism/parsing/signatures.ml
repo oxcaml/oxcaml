@@ -66,7 +66,7 @@ Error: Signature mismatch:
        is not included in
          val const : 'a @ 'n -> unit @ 'm
        The type "'a @ [< 'm] -> 'a @ [> 'm]" is not compatible with the type
-         "'a @ 'o -> unit @ 'n"
+         "'a @ 'n -> unit @ 'm"
        Type "'a" is not compatible with type "unit"
 |}]
 
@@ -117,8 +117,8 @@ Error: Signature mismatch:
          val f : 'a @ [< 'm] -> 'a @ [> 'm]
        is not included in
          val f : 'a @ [> 'm] -> 'a @ [< 'm]
-       The type "'a @ [< 'm > past('n)] -> 'a @ [> 'm]"
-       is not compatible with the type "'a @ [< past('n) > 'o] -> 'a @ [< 'o]"
+       The type "'a @ [< 'm] -> 'a @ [> 'm]" is not compatible with the type
+         "'a @ [> 'm] -> 'a @ [< 'm]"
        The return mode was expected to be "global" but is "local"
 |}]
 
@@ -205,8 +205,8 @@ Error: Signature mismatch:
            'a @ [> 'm | aliased contended]
        The type "'a @ [< 'm & many uncontended] -> 'a @ [> 'm | aliased]"
        is not compatible with the type
-         "'a @ [< 'n & many portable > contended] ->
-         'a @ [> 'n | aliased contended]"
+         "'a @ [< 'm & many portable > contended] ->
+         'a @ [> 'm | aliased contended]"
        The argument mode was expected to be "uncontended" but is "contended"
 |}]
 

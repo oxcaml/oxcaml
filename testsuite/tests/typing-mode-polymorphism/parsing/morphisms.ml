@@ -70,9 +70,8 @@ Error: Signature mismatch:
          val f : 'a @ [< 'm] -> 'a @ [> 'm]
        is not included in
          val f : 'a @ [< past('m)] -> 'a @ [> past('m)]
-       The type "'a @ [< 'm > past('n)] -> 'a @ [> 'm]"
-       is not compatible with the type
-         "'a @ [< past('o) & past('n)] -> 'a @ [> past('o)]"
+       The type "'a @ [< 'm] -> 'a @ [> 'm]" is not compatible with the type
+         "'a @ [< past('m)] -> 'a @ [> past('m)]"
        The return mode was expected to be "unique" but is "aliased"
 |}]
 
@@ -103,9 +102,8 @@ Error: Signature mismatch:
          val f : 'a @ [< 'm] -> 'a @ [> 'm]
        is not included in
          val f : 'a @ [< 'm] -> 'a @ [> 'm mod portable]
-       The type "'a @ [< 'm > past('n)] -> 'a @ [> 'm]"
-       is not compatible with the type
-         "'a @ [< 'o & past('n)] -> 'a @ [> 'o mod portable]"
+       The type "'a @ [< 'm] -> 'a @ [> 'm]" is not compatible with the type
+         "'a @ [< 'm] -> 'a @ [> 'm mod portable]"
        The return mode was expected to be "portable" but is "nonportable"
 |}]
 
@@ -162,10 +160,8 @@ Error: Signature mismatch:
        is not included in
          val f :
            'a @ [< 'm mod aliased contended] -> 'a @ [> 'm mod many portable]
-       The type "'a @ [< 'm > past('n)] -> 'a @ [> 'm]"
-       is not compatible with the type
-         "'a @ [< 'o mod aliased contended & past('n)] ->
-         'a @ [> 'o mod many portable]"
+       The type "'a @ [< 'm] -> 'a @ [> 'm]" is not compatible with the type
+         "'a @ [< 'm mod aliased contended] -> 'a @ [> 'm mod many portable]"
        The return mode was expected to be "many" but is "once"
 |}]
 
@@ -191,9 +187,8 @@ Error: Signature mismatch:
          val f : 'a @ [< 'm] -> 'a @ [> 'm]
        is not included in
          val f : 'a @ [< 'm mod contended] -> 'a @ [> 'm]
-       The type "'a @ [< 'm > past('n)] -> 'a @ [> 'm]"
-       is not compatible with the type
-         "'a @ [< 'o mod contended & past('n)] -> 'a @ [> 'o]"
+       The type "'a @ [< 'm] -> 'a @ [> 'm]" is not compatible with the type
+         "'a @ [< 'm mod contended] -> 'a @ [> 'm]"
        The return mode was expected to be "uncontended" but is "contended"
 |}]
 
@@ -223,9 +218,8 @@ Error: Signature mismatch:
          val f : 'a @ [< 'm] -> 'a @ [> 'm]
        is not included in
          val f : 'a @ [< 'm mod contended] -> 'a @ [> 'm]
-       The type "'a @ [< 'm > past('n)] -> 'a @ [> 'm]"
-       is not compatible with the type
-         "'a @ [< 'o mod contended & past('n)] -> 'a @ [> 'o]"
+       The type "'a @ [< 'm] -> 'a @ [> 'm]" is not compatible with the type
+         "'a @ [< 'm mod contended] -> 'a @ [> 'm]"
        The return mode was expected to be "uncontended" but is "contended"
 |}]
 
@@ -268,11 +262,10 @@ Error: Signature mismatch:
            'a @ [< 'm] ->
            ('b @ 'n -> 'a @ [> 'm]) @ [> close('m) mod portable | local once]
        The type
-         "'a @ [< 'm > past('o)] ->
-         ('b @ [> past('n)] -> 'a @ [> 'm]) @ [> close('m) | local]"
+         "'a @ [< 'm] -> ('b @ 'n -> 'a @ [> 'm]) @ [> close('m) | local]"
        is not compatible with the type
-         "'a @ [< 'p & past('o)] ->
-         ('b @ [< past('n)] -> 'a @ [> 'p]) @ [> close('p) mod portable | local once]"
+         "'a @ [< 'm] ->
+         ('b @ 'n -> 'a @ [> 'm]) @ [> close('m) mod portable | local once]"
        The return mode was expected to be "portable" but is "nonportable"
 |}]
 
@@ -316,11 +309,10 @@ Error: Signature mismatch:
            'a @ [< 'm] ->
            ('b @ 'n -> 'a @ [> 'm]) @ [> close('m) mod many | local]
        The type
-         "'a @ [< 'm > past('o)] ->
-         ('b @ [> past('n)] -> 'a @ [> 'm]) @ [> close('m) | local]"
+         "'a @ [< 'm] -> ('b @ 'n -> 'a @ [> 'm]) @ [> close('m) | local]"
        is not compatible with the type
-         "'a @ [< 'p & past('o)] ->
-         ('b @ [< past('n)] -> 'a @ [> 'p]) @ [> close('p) mod many | local]"
+         "'a @ [< 'm] ->
+         ('b @ 'n -> 'a @ [> 'm]) @ [> close('m) mod many | local]"
        The return mode was expected to be "many" but is "once"
 |}]
 
@@ -371,8 +363,8 @@ Error: Signature mismatch:
          "'a @ [< 'm mod aliased dynamic & global many forkable unyielding] ->
          'a myref @ [> 'm | nonportable stateful]"
        is not compatible with the type
-         "'a @ [< 'n mod aliased dynamic & global many] ->
-         'a myref @ [> 'n | stateful]"
+         "'a @ [< 'm mod aliased dynamic & global many] ->
+         'a myref @ [> 'm | stateful]"
        The argument mode was expected to be "forkable" but is "unforkable"
 |}]
 
@@ -409,7 +401,7 @@ Error: Signature mismatch:
          "'a @ [< 'm mod aliased dynamic & global many forkable unyielding] ->
          'a myref @ [> 'm | nonportable stateful]"
        is not compatible with the type
-         "'a @ [< 'n & global many] -> 'a myref @ [> 'n | stateful]"
+         "'a @ [< 'm & global many] -> 'a myref @ [> 'm | stateful]"
        The argument mode was expected to be "forkable" but is "unforkable"
 |}]
 
