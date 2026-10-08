@@ -12,23 +12,21 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open struct
-  open Int64
+open Int64
 
-  let ( + ) = add
+let ( + ) = add
 
-  let ( - ) = sub
+let ( - ) = sub
 
-  let ( * ) = mul
+let ( * ) = mul
 
-  let ( land ) = logand
+let ( land ) = logand
 
-  let ( lor ) = logor
+let ( lor ) = logor
 
-  let ( lxor ) = logxor
+let ( lxor ) = logxor
 
-  let ( lsr ) = shift_right_logical
-end
+let ( lsr ) = shift_right_logical
 
 (* Taken from Base. Implementation adapted from:
    https://en.wikipedia.org/wiki/Hamming_weight#Efficient_implementation *)

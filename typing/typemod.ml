@@ -3783,13 +3783,19 @@ and type_open_decl_aux ?used_slot ?toplevel ~funct_body names env od =
     } in
     open_descr, Mode.With_regionality.(max |> disallow_right), [], newenv
   | _ ->
+    let anon_open =
+      Env.start_anonymous_open
+        ~used_slot:(Option.value used_slot ~default:(ref false))
+        ~loc ~toplevel:(Option.value toplevel ~default:false)
+        od.popen_override
+    in
     let md, mod_shape =
       type_module ~strengthen:true ~funct_body None env od.popen_expr
     in
     let mode = mode_without_locks_exn md.mod_mode in
     let scope = Ctype.create_scope () in
     let sg, newenv =
-      Env.enter_signature ~scope ~mod_shape
+      Env.enter_signature_anon_open anon_open ~scope ~mod_shape
         (extract_sig_open env md.mod_loc md.mod_type) ~mode env
     in
     let info, visibility =

@@ -265,7 +265,7 @@ module TycompTbl =
 
     and ('lock, 'a) layer =
       | Open of {
-        components: ('a list) NameMap.t;
+        components: 'a list NameMap.t;
         (** Components from the opened module. We keep a list of
             bindings for each name, as in comp_labels and
             comp_constrs. *)
@@ -285,6 +285,20 @@ module TycompTbl =
         (** List of locks from the definition of [root] to this [Open], in that
             order *)
       }
+      (** Open of an unnamed module, e.g. the output of a functor or of a
+          first-class module *)
+      | Open_anonymous of {
+        bindings: 'a Ident.tbl;
+        (** The bindings introduced by this open. *)
+
+        using: (string -> ('a * 'a) option -> unit) option;
+        (** A callback to be applied when a component is used from this
+            "open".  This is used to detect unused "opens".  The
+            arguments are used to detect shadowing. *)
+
+        next: ('lock, 'a) t;
+        (** The table before opening the module. *)
+      }
       | Lock of {
           lock : 'lock;
           next : ('lock, 'a) t;
@@ -295,6 +309,17 @@ module TycompTbl =
 
     let add id x tbl =
       {tbl with current = Ident.add id x tbl.current}
+
+    let add_open_anonymous slot wrap bindings next =
+      let using =
+        match slot with
+        | None -> None
+        | Some f -> Some (fun s x -> f s (wrap x))
+      in
+      {
+        current = Ident.empty;
+        layer = Open_anonymous {using; bindings; next};
+      }
 
     let add_open slot wrap root components locks next =
       let using =
@@ -320,6 +345,10 @@ module TycompTbl =
       with Not_found as exn ->
         begin match tbl.layer with
         | Open {next; _} -> find_same id next
+        | Open_anonymous {bindings; next; _} ->
+            begin try Ident.find_same id bindings
+            with Not_found -> find_same id next
+            end
         | Lock {next; _} -> find_same id next
         | Nothing -> raise exn
         end
@@ -345,6 +374,18 @@ module TycompTbl =
       | Nothing -> []
       | Lock {lock;next} ->
           find_all_and_locks ~mark name next (lock :: acc)
+      | Open_anonymous {using; next; bindings} ->
+          let rest = find_all_and_locks ~mark name next acc in
+          let using = if mark then using else None in
+          begin match Ident.find_all name bindings with
+          | exception Not_found -> rest
+          | opened ->
+              List.map
+                (fun (id, desc) -> Pident id, desc,
+                  (acc, mk_callback rest name desc using))
+                opened
+              @ rest
+          end
       | Open {using; next; components; locks; root} ->
           let rest = find_all_and_locks ~mark name next acc in
           let using = if mark then using else None in
@@ -369,6 +410,10 @@ module TycompTbl =
             (fun _name -> List.fold_right f)
             components
           |> fold_name f next
+      | Open_anonymous {using = _; next; bindings} ->
+        acc
+        |> Ident.fold_all (fun _id -> f) bindings
+        |> fold_name f next
       | Lock {next; _} -> fold_name f next acc
       | Nothing ->
           acc
@@ -377,6 +422,9 @@ module TycompTbl =
       let acc = Ident.fold_all (fun k _ accu -> k::accu) tbl.current acc in
       match tbl.layer with
       | Open o -> local_keys o.next acc
+      | Open_anonymous {bindings; next; _} ->
+          local_keys next
+            (Ident.fold_all (fun k _ accu -> k::accu) bindings acc)
       | Lock {next; _} -> local_keys next acc
       | Nothing -> acc
 
@@ -389,6 +437,19 @@ module TycompTbl =
            with Not_found -> true)
         keys2
 
+    (* [push_open_anonymous] and [seal_open_anonymous] bracket the addition of
+       the bindings of an anonymous open: bindings added in between land in
+       [current] and are then moved into the [Open_anonymous] layer. *)
+    let push_open_anonymous tbl =
+      add_open_anonymous None Fun.id Ident.empty tbl
+
+    let seal_open_anonymous slot wrap tbl =
+      match tbl.layer with
+      | Open_anonymous { next; bindings = _; using = _ } ->
+          add_open_anonymous slot wrap tbl.current next
+      | Open _ | Lock _ | Nothing ->
+          Misc.fatal_error
+            "Env.TycompTbl.seal_open_anonymous: missing Open_anonymous layer"
   end
 
 
@@ -439,6 +500,14 @@ module IdTbl =
               that order. *)
         }
 
+      | Open_anonymous of {
+        bindings: 'a Ident.tbl;
+
+        using : (string -> ('a * 'a) option -> unit) option;
+
+        next: ('lock, 'a, 'b) t;
+      }
+
       | Map of {
           f: ('a -> 'a);
           next: ('lock, 'a, 'b) t;
@@ -458,6 +527,17 @@ module IdTbl =
 
     let remove id tbl =
       {tbl with current = Ident.remove id tbl.current}
+
+    let add_open_anonymous slot wrap bindings next =
+      let using =
+        match slot with
+        | None -> None
+        | Some f -> Some (fun s x -> f s (wrap x))
+      in
+      {
+        current = Ident.empty;
+        layer = Open_anonymous {using; bindings; next};
+      }
 
     let add_open slot wrap root components locks next =
       let using =
@@ -493,6 +573,11 @@ module IdTbl =
       | Null ->
         begin match tbl.layer with
         | Open {next; _} -> find_same_without_locks id next
+        | Open_anonymous {bindings; next; _} ->
+            begin match Ident.find_same_or_null id bindings with
+            | This data -> data
+            | Null -> find_same_without_locks id next
+            end
         | Map {f; next} -> f (find_same_without_locks id next)
         | Lock {lock=_; next} -> find_same_without_locks id next
         | Nothing -> raise Not_found
@@ -508,6 +593,10 @@ module IdTbl =
       with Not_found as exn ->
         begin match tbl.layer with
         | Open {next; _} -> find_same_and_locks id next macc
+        | Open_anonymous {bindings; next; _} ->
+            begin try Ident.find_same id bindings, macc
+            with Not_found -> find_same_and_locks id next macc
+            end
         | Map {f; next} ->
           let desc, locks = find_same_and_locks id next macc in
           f desc, locks
@@ -523,6 +612,24 @@ module IdTbl =
         Ok (Pident id, macc, desc)
       with Not_found ->
         begin match tbl.layer with
+        | Open_anonymous {using; next; bindings} ->
+          begin try
+            let id, descr = Ident.find_name name bindings in
+            let descr = descr in
+            let res = Pident id, macc, descr in
+            if mark then begin match using with
+              | None -> ()
+              | Some f -> begin match
+                    (find_name_and_locks wrap
+                       ~mark:false name next macc : _ Result.t)
+                  with
+                  | Error _ -> f name None
+                  | Ok (_, _, descr') -> f name (Some (descr', descr))
+                end
+            end;
+            Ok res
+          with Not_found -> find_name_and_locks wrap ~mark name next macc
+        end
         | Open {using; root; next; components; locks} ->
             begin try
               let descr = wrap (NameMap.find name components) in
@@ -557,6 +664,7 @@ module IdTbl =
     let rec get_all_locks tbl macc =
       match tbl.layer with
       | Open {next; _}
+      | Open_anonymous {next; _}
       | Map {next; _} -> get_all_locks next macc
       | Lock {lock; next} -> get_all_locks next (lock :: macc)
       | Nothing -> macc
@@ -587,6 +695,13 @@ module IdTbl =
           with Not_found ->
             find_all wrap name next
           end
+      | Open_anonymous {using = _; next; bindings} ->
+        begin try
+          let id, desc = Ident.find_name name bindings in
+          (Pident id, desc) :: find_all wrap name next
+        with Not_found ->
+          find_all wrap name next
+        end
       | Map {f; next} ->
           List.map (fun (p, desc) -> (p, f desc))
             (find_all wrap name next)
@@ -602,10 +717,19 @@ module IdTbl =
         match tbl.layer with
         | Nothing -> Seq.Nil
         | Open { next; components; _ } ->
+          (* since components doesn't contain idents, they can't be found by
+             this function, but they might shadow other names, which we
+             represent with `None` in the sequence (no match, but shadows) *)
             if NameMap.mem name components then
               Seq.Cons(None, find_all_idents name next)
             else
               find_all_idents name next ()
+        | Open_anonymous { next; bindings; _ } ->
+          Seq.append
+            (Ident.find_all_seq name bindings
+             |> Seq.map (fun (id, _) -> Some id))
+            (find_all_idents name next)
+            ()
         | Map {next; _ } -> find_all_idents name next ()
         | Lock {lock=_;next} ->
             find_all_idents name next ()
@@ -625,6 +749,12 @@ module IdTbl =
             (fun name desc -> f name (Pdot (root, name), wrap desc))
             components
           |> fold_name wrap f next
+      | Open_anonymous { using = _; next; bindings } ->
+        acc
+        |> Ident.fold_name
+             (fun id d -> f (Ident.name id) (Pident id, d))
+             bindings
+        |> fold_name wrap f next
       | Nothing ->
           acc
       | Map {f=g; next} ->
@@ -638,9 +768,12 @@ module IdTbl =
     let rec local_keys tbl acc =
       let acc = Ident.fold_all (fun k _ accu -> k::accu) tbl.current acc in
       match tbl.layer with
-      | Open {next; _ } | Map {next; _} | Lock {next; _} -> local_keys next acc
+      | Open_anonymous {bindings; next; _} ->
+          local_keys next
+            (Ident.fold_all (fun k _ accu -> k::accu) bindings acc)
+      | Open {next; _ } | Map {next; _} | Lock {next; _} ->
+        local_keys next acc
       | Nothing -> acc
-
 
     let rec iter wrap f tbl =
       Ident.iter (fun id desc -> f id (Pident id, desc)) tbl.current;
@@ -652,6 +785,9 @@ module IdTbl =
               f (Ident.create_scoped ~scope:root_scope s)
                 (Pdot (root, s), wrap x))
             components;
+          iter wrap f next
+      | Open_anonymous {using = _; next; bindings} ->
+          Ident.iter (fun id desc -> f id (Pident id, desc)) bindings;
           iter wrap f next
       | Map {f=g; next} ->
           iter wrap (fun id (path, desc) -> f id (path, g desc)) next
@@ -667,7 +803,17 @@ module IdTbl =
            with Not_found -> true)
         keys2
 
+    (* See [TycompTbl.push_open_anonymous]. *)
+    let push_open_anonymous tbl =
+      add_open_anonymous None Fun.id Ident.empty tbl
 
+    let seal_open_anonymous slot wrap tbl =
+      match tbl.layer with
+      | Open_anonymous { next; bindings = _; using = _ } ->
+          add_open_anonymous slot wrap tbl.current next
+      | Open _ | Map _ | Lock _ | Nothing ->
+          Misc.fatal_error
+            "Env.IdTbl.seal_open_anonymous: missing Open_anonymous layer"
   end
 
 type type_descr_kind =
@@ -1041,6 +1187,58 @@ let check_shadowing env = function
   | `Value None | `Type None | `Module None | `Module_type None
   | `Class None | `Class_type None | `Component None | `Jkind None ->
       None
+
+(* Warnings for unused and shadowing opens *)
+
+let unused_open_warning ovf name =
+  match ovf with
+  | Asttypes.Fresh -> Warnings.Unused_open name
+  | Asttypes.Override -> Warnings.Unused_open_bang name
+
+let open_warnings_enabled ~loc ~toplevel unused =
+  not toplevel && not loc.Location.loc_ghost
+  && (Warnings.is_active unused
+      || Warnings.is_active (Warnings.Open_shadow_identifier ("", ""))
+      || Warnings.is_active
+           (Warnings.Open_shadow_label_constructor ("", "")))
+
+let register_unused_open_check ?(on_unused = ignore) ~used ~loc unused =
+  if Warnings.is_active unused then
+    !add_delayed_check_forward
+      (fun () ->
+         if not !used then begin
+           used := true;
+           on_unused ();
+           Location.prerr_warning loc unused
+         end)
+
+(* The callback invoked when a component is found through an open. *)
+let open_slot ~used ~loc ovf env =
+  let shadowed = ref [] in
+  fun s b ->
+    begin match check_shadowing env b with
+    | Some kind when
+        ovf = Asttypes.Fresh && not (List.mem (kind, s) !shadowed) ->
+        shadowed := (kind, s) :: !shadowed;
+        let w =
+          match kind with
+          | "label" | "constructor" ->
+              Warnings.Open_shadow_label_constructor (kind, s)
+          | _ -> Warnings.Open_shadow_identifier (kind, s)
+        in
+        Location.prerr_warning loc w
+    | _ -> ()
+    end;
+    used := true
+
+type anonymous_open =
+  { ao_used : bool ref;
+    ao_loc : Location.t;
+    ao_override : Asttypes.override_flag;
+    ao_warnings_enabled : bool;
+    ao_signature : signature ref;
+    (* The opened signature, set by [enter_signature_anon_open]. *)
+  }
 
 let empty = {
   values = IdTbl.empty; constrs = TycompTbl.empty;
@@ -3421,6 +3619,51 @@ let enter_signature_and_shape ~scope ~parent_shape mod_shape sg ?mode env =
   let shape, env = add_signature parent_shape mod_shape sg ?mode env in
   sg, shape, env
 
+let enter_signature_anon_open anon_open ?mod_shape ~scope sg ?mode env =
+  let slot =
+    if anon_open.ao_warnings_enabled then
+      Some
+        (open_slot ~used:anon_open.ao_used ~loc:anon_open.ao_loc
+           anon_open.ao_override env)
+    else None
+  in
+  let push_t = TycompTbl.push_open_anonymous
+  and push = IdTbl.push_open_anonymous in
+  let env =
+    { env with
+      values = push env.values;
+      constrs = push_t env.constrs;
+      labels = push_t env.labels;
+      unboxed_labels = push_t env.unboxed_labels;
+      types = push env.types;
+      modules = push env.modules;
+      modtypes = push env.modtypes;
+      classes = push env.classes;
+      cltypes = push env.cltypes;
+      jkinds = push env.jkinds;
+    }
+  in
+  let sg, _, env =
+    enter_signature_and_shape ~scope ~parent_shape:Shape.Map.empty
+      mod_shape sg ?mode env
+  in
+  anon_open.ao_signature := sg;
+  let seal_t wrap tbl = TycompTbl.seal_open_anonymous slot wrap tbl
+  and seal wrap tbl = IdTbl.seal_open_anonymous slot wrap tbl in
+  sg,
+  { env with
+    values = seal (fun x -> `Value x) env.values;
+    constrs = seal_t (fun x -> `Constructor x) env.constrs;
+    labels = seal_t (fun x -> `Label x) env.labels;
+    unboxed_labels = seal_t (fun x -> `Unboxed_label x) env.unboxed_labels;
+    types = seal (fun x -> `Type x) env.types;
+    modules = seal (fun x -> `Module x) env.modules;
+    modtypes = seal (fun x -> `Module_type x) env.modtypes;
+    classes = seal (fun x -> `Class x) env.classes;
+    cltypes = seal (fun x -> `Class_type x) env.cltypes;
+    jkinds = seal (fun x -> `Jkind x) env.jkinds;
+  }
+
 let enter_signature ?mod_shape ~scope sg ?mode env =
   let sg, _, env =
     enter_signature_and_shape ~scope ~parent_shape:Shape.Map.empty
@@ -3664,6 +3907,56 @@ let mark_jkind_used uid =
   match stamped_find jkind_declarations uid with
   | mark -> mark ()
   | exception Not_found -> ()
+
+(* Mark everything defined by [sg] as used, including the contents of
+   submodules with explicit signatures. *)
+let rec mark_signature_used sg =
+  List.iter
+    (function
+      | Sig_value (_, vd, _) -> mark_value_used vd.val_uid
+      | Sig_type (_, td, _, _) ->
+          mark_type_used td.type_uid;
+          begin match td.type_kind with
+          | Type_variant (cstrs, _, _) ->
+              List.iter
+                (fun cd -> mark_constructor_used Exported cd.cd_uid)
+                cstrs
+          | Type_record (lbls, _, _)
+          | Type_record_unboxed_product (lbls, _, _) ->
+              List.iter (fun ld -> mark_label_used Exported ld.ld_uid) lbls
+          | Type_abstract _ | Type_open -> ()
+          end
+      | Sig_typext (_, ext, _, _) -> mark_extension_used Exported ext.ext_uid
+      | Sig_module (_, _, md, _, _) ->
+          mark_module_used md.md_uid;
+          begin match md.md_type with
+          | Mty_signature sg -> mark_signature_used sg
+          | Mty_ident _ | Mty_functor _ | Mty_alias _ | Mty_strengthen _
+          | Mty_for_hole -> ()
+          end
+      | Sig_modtype (_, mtd, _) -> mark_modtype_used mtd.mtd_uid
+      | Sig_class (_, cd, _, _) -> mark_class_used cd.cty_uid
+      | Sig_class_type (_, ctd, _, _) -> mark_cltype_used ctd.clty_uid
+      | Sig_jkind (_, jkd, _) -> mark_jkind_used jkd.jkind_uid)
+    sg
+
+(* Item-level unused checks for the opened module are registered while it is
+   typed, so this must be called before typing it: delayed checks run in
+   registration order, and an unused open marks its items as used so that only
+   the unused-open warning is reported. *)
+let start_anonymous_open ~used_slot ~loc ~toplevel ovf =
+  let unused = unused_open_warning ovf "<anonymous module>" in
+  let warnings_enabled = open_warnings_enabled ~loc ~toplevel unused in
+  let signature = ref [] in
+  if warnings_enabled then
+    register_unused_open_check ~used:used_slot ~loc unused
+      ~on_unused:(fun () -> mark_signature_used !signature);
+  { ao_used = used_slot;
+    ao_loc = loc;
+    ao_override = ovf;
+    ao_warnings_enabled = warnings_enabled;
+    ao_signature = signature;
+  }
 
 let set_value_used_callback vd callback =
   stamped_uid_add value_declarations vd.Subst.Lazy.val_uid callback
@@ -4612,47 +4905,10 @@ let open_signature
     ~loc ~toplevel
     ovf lid env =
   let lid_s = Format.asprintf "%a" Pprintast.longident lid.txt in
-  let unused =
-    match ovf with
-    | Asttypes.Fresh -> Warnings.Unused_open lid_s
-    | Asttypes.Override -> Warnings.Unused_open_bang lid_s
-  in
-  let warn_unused =
-    Warnings.is_active unused
-  and warn_shadow_id =
-    Warnings.is_active (Warnings.Open_shadow_identifier ("", ""))
-  and warn_shadow_lc =
-    Warnings.is_active (Warnings.Open_shadow_label_constructor ("",""))
-  in
-  if not toplevel && not loc.Location.loc_ghost
-     && (warn_unused || warn_shadow_id || warn_shadow_lc)
-  then begin
-    let used = used_slot in
-    if warn_unused then
-      !add_delayed_check_forward
-        (fun () ->
-           if not !used then begin
-             used := true;
-             Location.prerr_warning loc unused
-           end
-        );
-    let shadowed = ref [] in
-    let slot s b =
-      begin match check_shadowing env b with
-      | Some kind when
-          ovf = Asttypes.Fresh && not (List.mem (kind, s) !shadowed) ->
-          shadowed := (kind, s) :: !shadowed;
-          let w =
-            match kind with
-            | "label" | "constructor" ->
-                Warnings.Open_shadow_label_constructor (kind, s)
-            | _ -> Warnings.Open_shadow_identifier (kind, s)
-          in
-          Location.prerr_warning loc w
-      | _ -> ()
-      end;
-      used := true
-    in
+  let unused = unused_open_warning ovf lid_s in
+  if open_warnings_enabled ~loc ~toplevel unused then begin
+    register_unused_open_check ~used:used_slot ~loc unused;
+    let slot = open_slot ~used:used_slot ~loc ovf env in
     open_signature ~errors:true (Some slot) lid env
   end
   else open_signature ~errors:true None lid env
