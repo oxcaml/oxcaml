@@ -428,7 +428,8 @@ let list_tests dir =
 let find_tests dir =
   if Sys.is_directory dir then
     List.concat_map
-      (fun test_dir -> List.map (Filename.concat test_dir) (list_tests test_dir))
+      (fun test_dir ->
+         List.map (Filename.concat test_dir) (list_tests test_dir))
       (find_test_dirs dir)
   else []
 
