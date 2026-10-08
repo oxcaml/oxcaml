@@ -242,6 +242,7 @@ let prepare_code ~env ~res ~code_id code =
         ~return_continuation:_
         ~exn_continuation:_
         bound_params
+        ~specialised_params:_
         ~body:_
         ~my_closure:_
         ~is_my_closure_used:_
@@ -287,6 +288,7 @@ let code ~env ~res ~translate_body ~code_id code =
         ~return_continuation
         ~exn_continuation
         bound_params
+        ~specialised_params:_
         ~body
         ~my_closure
         ~is_my_closure_used:_

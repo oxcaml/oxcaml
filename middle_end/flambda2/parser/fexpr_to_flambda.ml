@@ -764,6 +764,7 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
             Flambda.Function_params_and_body.create ~return_continuation
               ~exn_continuation
               (Bound_parameters.create params)
+              ~specialised_params:Parameter_id.Map.empty
               ~body ~my_closure ~my_alloc_mode ~my_depth
               ~free_names_of_body:Unknown
           in

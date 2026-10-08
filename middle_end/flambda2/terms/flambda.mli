@@ -518,6 +518,7 @@ module Function_params_and_body : sig
     return_continuation:Continuation.t ->
     exn_continuation:Continuation.t ->
     Bound_parameters.t ->
+    specialised_params:Variable.t Parameter_id.Map.t ->
     body:expr ->
     free_names_of_body:Name_occurrences.t Or_unknown.t ->
     my_closure:Variable.t ->
@@ -540,6 +541,7 @@ module Function_params_and_body : sig
         (** To where we must jump if application of the function raises an
             exception. *) ->
       Bound_parameters.t ->
+      specialised_params:Variable.t Parameter_id.Map.t ->
       body:expr ->
       my_closure:Variable.t ->
       is_my_closure_used:bool Or_unknown.t ->

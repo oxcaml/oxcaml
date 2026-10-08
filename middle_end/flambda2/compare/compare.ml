@@ -392,6 +392,7 @@ and subst_params_and_body env params_and_body =
         ~return_continuation
         ~exn_continuation
         params
+        ~specialised_params
         ~body
         ~my_closure
         ~is_my_closure_used:_
@@ -401,7 +402,7 @@ and subst_params_and_body env params_and_body =
       ->
       let body = subst_expr env body in
       Function_params_and_body.create ~return_continuation ~exn_continuation
-        params ~body ~my_closure ~my_alloc_mode ~free_names_of_body ~my_depth)
+        params ~specialised_params ~body ~my_closure ~my_alloc_mode ~free_names_of_body ~my_depth)
 
 and subst_let_cont env (let_cont_expr : Let_cont_expr.t) =
   match let_cont_expr with
@@ -1253,7 +1254,8 @@ and codes env (code1 : Code.t) (code2 : Code.t) =
         exprs env body1 body2
         |> Comparison.map ~f:(fun body1' ->
             Function_params_and_body.create ~return_continuation
-              ~exn_continuation params ~body:body1' ~my_closure ~my_alloc_mode
+              ~exn_continuation params ~specialised_params:Parameter_id.Map.empty
+              ~body:body1' ~my_closure ~my_alloc_mode
               ~my_depth ~free_names_of_body:Unknown))
   in
   pairs ~f1:bodies

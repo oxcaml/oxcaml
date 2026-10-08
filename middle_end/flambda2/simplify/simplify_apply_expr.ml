@@ -702,7 +702,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
           (* Note that [exn_continuation] has no extra args -- see above. *)
           Function_params_and_body.create ~return_continuation
             ~exn_continuation:(Exn_continuation.exn_handler exn_continuation)
-            remaining_params ~body ~my_closure ~my_alloc_mode ~my_depth
+            remaining_params ~specialised_params:Parameter_id.Map.empty ~body ~my_closure ~my_alloc_mode ~my_depth
             ~free_names_of_body:Unknown
         in
         let name =

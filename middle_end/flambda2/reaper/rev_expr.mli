@@ -63,6 +63,7 @@ and rev_params_and_body =
   { return_continuation : Continuation.t;
     exn_continuation : Continuation.t;
     params : Bound_parameters.t;
+    specialised_params : Variable.t Parameter_id.Map.t;
     body : rev_expr;
     my_closure : Variable.t;
     my_alloc_mode : Alloc_mode.For_applications.t;

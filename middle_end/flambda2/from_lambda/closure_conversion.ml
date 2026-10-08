@@ -517,6 +517,7 @@ module Inlining = struct
           ~return_continuation
           ~exn_continuation
           params
+          ~specialised_params:_
           ~body
           ~my_closure
           ~is_my_closure_used:_
@@ -2613,7 +2614,7 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
   in
   let wrapper_params_and_body =
     Function_params_and_body.create ~return_continuation ~exn_continuation
-      params ~body ~free_names_of_body:(Known free_names_of_body) ~my_closure
+      params ~specialised_params:Parameter_id.Map.empty ~body ~free_names_of_body:(Known free_names_of_body) ~my_closure
       ~my_alloc_mode ~my_depth
   in
   let free_names_of_params_and_body =
@@ -2997,7 +2998,7 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
   let params_and_body =
     Function_params_and_body.create ~return_continuation
       ~exn_continuation:(Exn_continuation.exn_handler exn_continuation)
-      main_code_unarized_params ~body ~my_closure ~my_alloc_mode ~my_depth
+      main_code_unarized_params ~specialised_params:Parameter_id.Map.empty ~body ~my_closure ~my_alloc_mode ~my_depth
       ~free_names_of_body:(Known free_names_of_body)
   in
   let result_mode = Function_decl.result_mode decl in

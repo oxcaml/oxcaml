@@ -127,7 +127,8 @@ and continuation_handlers = continuation_handler Continuation.Lmap.t
 
 and function_params_and_body_base =
   { expr : expr;
-    free_names : Name_occurrences.t Or_unknown.t
+    free_names : Name_occurrences.t Or_unknown.t;
+    specialised_params : Variable.t Parameter_id.Map.t;
   }
 
 and function_params_and_body =
@@ -314,13 +315,15 @@ and apply_renaming_continuations_handlers_t0 t renaming =
          k, handler)
        (Continuation.Lmap.bindings t)
 
-and apply_renaming_function_params_and_body_base { expr; free_names } renaming =
+and apply_renaming_function_params_and_body_base { expr; free_names; specialised_params } renaming =
   let expr = apply_renaming expr renaming in
   let free_names =
     Or_unknown.map free_names ~f:(fun free_names ->
         Name_occurrences.apply_renaming free_names renaming)
   in
-  { expr; free_names }
+  let specialised_params =
+    Parameter_id.Map.map (Renaming.apply_variable renaming) specialised_params in
+  { expr; free_names; specialised_params }
 
 and apply_renaming_function_params_and_body ({ abst; is_my_closure_used } as t)
     renaming =
@@ -450,8 +453,11 @@ and ids_for_export_recursive_let_cont_handlers t =
     (module Bound_continuations)
     t ~ids_for_export_of_term:ids_for_export_recursive_let_cont_handlers_t0
 
-and ids_for_export_function_params_and_body_base { expr; free_names = _ } =
-  ids_for_export expr
+and ids_for_export_function_params_and_body_base { expr; free_names = _; specialised_params } =
+  Parameter_id.Map.fold (fun _id var ids ->
+      Ids_for_export.add_variable ids var)
+    specialised_params
+    (ids_for_export expr)
 
 and ids_for_export_function_params_and_body { abst; is_my_closure_used = _ } =
   Name_abstraction.ids_for_export
@@ -641,7 +647,7 @@ and print_function_params_and_body ppf t =
   Name_abstraction.pattern_match_for_printing
     (module BFF)
     t.abst ~apply_renaming_to_term:apply_renaming_function_params_and_body_base
-    ~f:(fun bff { expr; free_names } ->
+    ~f:(fun bff { expr; free_names; specialised_params = _ } ->
       print
         ~return_continuation:(BFF.return_continuation bff)
         ~exn_continuation:(BFF.exn_continuation bff) (BFF.params bff) ~body:expr
@@ -1048,14 +1054,14 @@ module Function_params_and_body = struct
 
   type t = function_params_and_body
 
-  let create ~return_continuation ~exn_continuation params ~body
+  let create ~return_continuation ~exn_continuation params ~specialised_params ~body
       ~free_names_of_body ~my_closure ~my_alloc_mode ~my_depth =
     Bound_parameters.check_no_duplicates params;
     let is_my_closure_used =
       Or_unknown.map free_names_of_body ~f:(fun free_names_of_body ->
           Name_occurrences.mem_var free_names_of_body my_closure)
     in
-    let base : Base.t = { expr = body; free_names = free_names_of_body } in
+    let base : Base.t = { expr = body; free_names = free_names_of_body; specialised_params } in
     let bound_for_function =
       Bound_for_function.create ~return_continuation ~exn_continuation ~params
         ~my_closure ~my_alloc_mode ~my_depth
@@ -1068,10 +1074,10 @@ module Function_params_and_body = struct
   let pattern_match t ~f =
     let module BFF = Bound_for_function in
     let open A in
-    let<> bff, { expr; free_names } = t.abst in
+    let<> bff, { expr; free_names; specialised_params } = t.abst in
     f
       ~return_continuation:(BFF.return_continuation bff)
-      ~exn_continuation:(BFF.exn_continuation bff) (BFF.params bff) ~body:expr
+      ~exn_continuation:(BFF.exn_continuation bff) (BFF.params bff) ~specialised_params ~body:expr
       ~my_closure:(BFF.my_closure bff) ~is_my_closure_used:t.is_my_closure_used
       ~my_alloc_mode:(BFF.my_alloc_mode bff) ~my_depth:(BFF.my_depth bff)
       ~free_names_of_body:free_names
@@ -1080,8 +1086,8 @@ module Function_params_and_body = struct
     A.pattern_match_pair t1.abst t2.abst
       ~f:(fun
           bound_for_function
-          { expr = body1; free_names = _ }
-          { expr = body2; free_names = _ }
+          { expr = body1; free_names = _; specialised_params = _ }
+          { expr = body2; free_names = _; specialised_params = _ }
         ->
         f
           ~return_continuation:

@@ -152,6 +152,7 @@ let inline dacc ~apply ~unroll_to ~was_inline_always function_decl =
           ~return_continuation
           ~exn_continuation
           params
+          ~specialised_params:_
           ~body
           ~my_closure
           ~is_my_closure_used:_

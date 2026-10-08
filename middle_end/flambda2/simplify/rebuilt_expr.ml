@@ -68,10 +68,10 @@ let create_apply_cont apply_cont = Expr.create_apply_cont apply_cont
 module Function_params_and_body = struct
   type t = Function_params_and_body.t
 
-  let create ~return_continuation ~exn_continuation params ~body
+  let create ~return_continuation ~exn_continuation params ~specialised_params ~body
       ~free_names_of_body ~my_closure ~my_alloc_mode ~my_depth =
     Function_params_and_body.create ~return_continuation ~exn_continuation
-      params ~body ~free_names_of_body:(Known free_names_of_body) ~my_closure
+      params ~specialised_params ~body ~free_names_of_body:(Known free_names_of_body) ~my_closure
       ~my_alloc_mode ~my_depth
 
   let to_function_params_and_body t are_rebuilding =

@@ -584,6 +584,7 @@ let params_and_body env res code_id p ~result_arity ~fun_dbg
         ~return_continuation
         ~exn_continuation
         params
+        ~specialised_params:_
         ~body
         ~my_closure
         ~is_my_closure_used

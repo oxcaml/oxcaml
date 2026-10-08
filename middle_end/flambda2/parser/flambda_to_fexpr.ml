@@ -458,6 +458,7 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
               ~return_continuation
               ~exn_continuation
               params
+              ~specialised_params:_
               ~body
               ~my_closure
               ~is_my_closure_used:_
@@ -830,6 +831,7 @@ module Iter = struct
               ~return_continuation:_
               ~exn_continuation:_
               _
+              ~specialised_params:_
               ~body
               ~my_closure:_
               ~is_my_closure_used:_

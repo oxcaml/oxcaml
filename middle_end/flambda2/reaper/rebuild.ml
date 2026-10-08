@@ -271,6 +271,7 @@ let function_params_and_body_free_names fpb =
         ~return_continuation
         ~exn_continuation
         params
+        ~specialised_params:_
         ~body:_
         ~my_closure
         ~is_my_closure_used:_
@@ -2166,6 +2167,7 @@ and rebuild_function_params_and_body (env : env) res code_metadata
   let { Rev_expr.return_continuation;
         exn_continuation;
         params;
+        specialised_params;
         body;
         my_closure;
         my_alloc_mode;
@@ -2298,7 +2300,7 @@ and rebuild_function_params_and_body (env : env) res code_metadata
     (* Format.eprintf "REBUILD %a FREE %a@." Code_id.print code_id
        Name_occurrences.print body.free_names; *)
     ( Function_params_and_body.create ~return_continuation ~exn_continuation
-        params ~body:body.expr ~free_names_of_body:(Known body.free_names)
+        params ~specialised_params ~body:body.expr ~free_names_of_body:(Known body.free_names)
         ~my_closure ~my_alloc_mode ~my_depth,
       code_metadata,
       res )
@@ -2409,6 +2411,7 @@ and rebuild_function_params_and_body (env : env) res code_metadata
        env.cont_params_to_keep)); *)
     ( Function_params_and_body.create ~return_continuation ~exn_continuation
         (Bound_parameters.create (List.flatten params))
+        ~specialised_params
         ~body:body.expr ~free_names_of_body:(Known body.free_names) ~my_closure
         ~my_alloc_mode ~my_depth,
       code_metadata,

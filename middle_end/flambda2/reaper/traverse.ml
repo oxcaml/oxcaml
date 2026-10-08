@@ -706,6 +706,7 @@ and traverse_code (acc : acc) (code_id : Code_id.t) (code : Code.t)
         ~return_continuation
         ~exn_continuation
         params
+        ~specialised_params
         ~body
         ~my_closure
         ~is_my_closure_used:_
@@ -714,11 +715,11 @@ and traverse_code (acc : acc) (code_id : Code_id.t) (code : Code.t)
         ~free_names_of_body:_
       ->
       traverse_function_params_and_body acc code_id code ~return_continuation
-        ~exn_continuation params ~body ~my_closure ~my_alloc_mode ~my_depth
+        ~exn_continuation params ~specialised_params ~body ~my_closure ~my_alloc_mode ~my_depth
         ~le_monde_exterieur ~all_constants)
 
 and traverse_function_params_and_body acc code_id code ~return_continuation
-    ~exn_continuation params ~body ~my_closure ~my_alloc_mode
+    ~exn_continuation params ~specialised_params ~body ~my_closure ~my_alloc_mode
     ~le_monde_exterieur ~all_constants ~my_depth : rev_code =
   let code_metadata = Code.code_metadata code in
   let free_names_of_params_and_body = Code0.free_names code in
@@ -805,6 +806,7 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
     { return_continuation;
       exn_continuation;
       params;
+      specialised_params;
       body;
       my_closure;
       my_alloc_mode;
