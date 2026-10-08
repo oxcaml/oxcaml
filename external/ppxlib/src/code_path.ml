@@ -10,9 +10,14 @@ type t = {
   in_expr : bool;
 }
 
+let remove_all_extensions basename =
+  match String.split_on_char ~sep:'.' basename with
+  | [] -> assert false (* split_on_char never returns the empty list *)
+  | name :: _ -> name
+
 let top_level ~file_path =
   let main_module_name =
-    file_path |> Stdlib.Filename.basename |> Stdlib.Filename.remove_extension
+    file_path |> Stdlib.Filename.basename |> remove_all_extensions
     |> String.capitalize_ascii
   in
   {
@@ -64,9 +69,4 @@ let enter_value ~loc value_name t =
     }
 
 let to_string_path t = String.concat ~sep:"." (t.file_path :: submodule_path t)
-let with_string_path f ~loc ~path = f ~loc ~path:(to_string_path path);;
-
-let module M = struct
-  let a = "lol"
-end in
-M.a
+let with_string_path f ~loc ~path = f ~loc ~path:(to_string_path path)

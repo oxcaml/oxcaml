@@ -1,0 +1,15 @@
+(executable
+ (name raising_driver)
+ (modules raising_driver)
+ (libraries ppxlib))
+
+(executable
+ (name identity_driver)
+ (modules identity_driver)
+ (libraries ppxlib))
+
+(cram
+ (package ppxlib)
+ (enabled_if
+  (>= %{ocaml_version} "4.08.0"))
+ (deps raising_driver.exe identity_driver.exe))

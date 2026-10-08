@@ -60,58 +60,182 @@ val convert_longident : string -> string * longident = <fun>
 |}]
 
 let _ = convert_longident "x"
-[%%expect{|
+[%%expect_in <= 5.3 {|
 - : string * longident = ("x", Ppxlib.Longident.Lident "x")
+|}]
+[%%expect_in >= 5.4 {|
+- : string * longident = ("x", Longident.Lident "x")
 |}]
 
 let _ = convert_longident "(+)"
-[%%expect{|
+[%%expect_in <= 5.3 {|
 - : string * longident = ("( + )", Ppxlib.Longident.Lident "+")
+|}]
+[%%expect_in >= 5.4 {|
+- : string * longident = ("( + )", Longident.Lident "+")
 |}]
 
 let _ = convert_longident "( + )"
-[%%expect{|
+[%%expect_in <= 5.3 {|
 - : string * longident = ("( + )", Ppxlib.Longident.Lident "+")
+|}]
+[%%expect_in >= 5.4 {|
+- : string * longident = ("( + )", Longident.Lident "+")
 |}]
 
 let _ = convert_longident "Base.x"
-[%%expect{|
+[%%expect_in <= 5.3 {|
 - : string * longident =
 ("Base.x", Ppxlib.Longident.Ldot (Ppxlib.Longident.Lident "Base", "x"))
 |}]
+[%%expect_in >= 5.4 {|
+- : string * longident =
+("Base.x", Longident.Ldot (Longident.Lident "Base", "x"))
+|}]
 
 let _ = convert_longident "Base.(+)"
-[%%expect{|
+[%%expect_in <= 5.3 {|
 - : string * longident =
 ("Base.( + )", Ppxlib.Longident.Ldot (Ppxlib.Longident.Lident "Base", "+"))
+|}]
+[%%expect_in >= 5.4 {|
+- : string * longident =
+("Base.( + )", Longident.Ldot (Longident.Lident "Base", "+"))
 |}]
 
 let _ = convert_longident "Base.( + )"
-[%%expect{|
+[%%expect_in <= 5.3 {|
 - : string * longident =
 ("Base.( + )", Ppxlib.Longident.Ldot (Ppxlib.Longident.Lident "Base", "+"))
 |}]
+[%%expect_in >= 5.4 {|
+- : string * longident =
+("Base.( + )", Longident.Ldot (Longident.Lident "Base", "+"))
+|}]
 
 let _ = convert_longident "Base.( land )"
-[%%expect{|
+[%%expect_in <= 5.3 {|
 - : string * longident =
 ("Base.( land )",
  Ppxlib.Longident.Ldot (Ppxlib.Longident.Lident "Base", "land"))
 |}]
+[%%expect_in >= 5.4 {|
+- : string * longident =
+("Base.( land )", Longident.Ldot (Longident.Lident "Base", "land"))
+|}]
 
 let _ = convert_longident "A(B)"
-[%%expect{|
-Exception: Invalid_argument "Ppxlib.Longident.parse: \"A(B)\"".
+[%%expect_in <= 5.3 {|
+Exception:
+Invalid_argument "Ppxlib.Longident.parse(application in path): \"A(B)\"".
+|}]
+[%%expect_in >= 5.4 {|
+Exception:
+Invalid_argument "Ppxlib.Longident.parse(application in path): \"A(B)\"".
 |}]
 
 let _ = convert_longident "A.B(C)"
-[%%expect{|
-Exception: Invalid_argument "Ppxlib.Longident.parse: \"A.B(C)\"".
+[%%expect_in <= 5.3 {|
+Exception:
+Invalid_argument "Ppxlib.Longident.parse(application in path): \"A.B(C)\"".
+|}]
+[%%expect_in >= 5.4 {|
+Exception:
+Invalid_argument "Ppxlib.Longident.parse(application in path): \"A.B(C)\"".
 |}]
 
 let _ = convert_longident ")"
+[%%expect_in <= 5.3 {|
+Exception:
+Invalid_argument "Ppxlib.Longident.parse(unbalanced parenthesis): \")\"".
+|}]
+[%%expect_in >= 5.4 {|
+Exception:
+Invalid_argument "Ppxlib.Longident.parse(unbalanced parenthesis): \")\"".
+|}]
+
+let _ = convert_longident "("
 [%%expect{|
-Exception: Invalid_argument "Ppxlib.Longident.parse: \")\"".
+Exception:
+Invalid_argument "Ppxlib.Longident.parse(unbalanced parenthesis): \"(\"".
+|}]
+
+let _ = convert_longident "A.(()"
+[%%expect{|
+Exception:
+Invalid_argument "Ppxlib.Longident.parse(unbalanced parenthesis): \"A.(()\"".
+|}]
+
+let _ = convert_longident "A.())()"
+[%%expect{|
+Exception:
+Invalid_argument
+ "Ppxlib.Longident.parse(right parenthesis misplaced): \"A.())()\"".
+|}]
+
+let _ = convert_longident "+."
+[%%expect_in <= 5.3 {|
+- : string * longident = ("( +. )", Ppxlib.Longident.Lident "+.")
+|}]
+[%%expect_in >= 5.4 {|
+- : string * longident = ("( +. )", Longident.Lident "+.")
+|}]
+
+let _ = convert_longident "(+.)"
+[%%expect_in <= 5.3 {|
+- : string * longident = ("( +. )", Ppxlib.Longident.Lident "+.")
+|}]
+[%%expect_in >= 5.4 {|
+- : string * longident = ("( +. )", Longident.Lident "+.")
+|}]
+
+let _ = convert_longident "Foo.(+.)"
+[%%expect_in <= 5.3 {|
+- : string * longident =
+("Foo.( +. )", Ppxlib.Longident.Ldot (Ppxlib.Longident.Lident "Foo", "+."))
+|}]
+[%%expect_in >= 5.4 {|
+- : string * longident =
+("Foo.( +. )", Longident.Ldot (Longident.Lident "Foo", "+."))
+|}]
+
+let _ = convert_longident "Foo.( *. )"
+[%%expect_in <= 5.3 {|
+- : string * longident =
+("Foo.( *. )", Ppxlib.Longident.Ldot (Ppxlib.Longident.Lident "Foo", "*."))
+|}]
+[%%expect_in >= 5.4 {|
+- : string * longident =
+("Foo.( *. )", Longident.Ldot (Longident.Lident "Foo", "*."))
+|}]
+
+(* Indexing operators  *)
+let _ = convert_longident "(.!())"
+[%%expect_in <= 5.3 {|
+- : string * longident = ("( .!() )", Ppxlib.Longident.Lident ".!()")
+|}]
+[%%expect_in >= 5.4 {|
+- : string * longident = ("( .!() )", Longident.Lident ".!()")
+|}]
+
+let _ = convert_longident "(.%(;..)<-)"
+[%%expect_in <= 5.3 {|
+- : string * longident =
+("( .%(;..)<- )", Ppxlib.Longident.Lident ".%(;..)<-")
+|}]
+[%%expect_in >= 5.4 {|
+- : string * longident = ("( .%(;..)<- )", Longident.Lident ".%(;..)<-")
+|}]
+
+let _ = convert_longident "Vec.(.%(;..)<-)"
+[%%expect_in <= 5.3 {|
+- : string * longident =
+("Vec.( .%(;..)<- )",
+ Ppxlib.Longident.Ldot (Ppxlib.Longident.Lident "Vec", ".%(;..)<-"))
+|}]
+[%%expect_in >= 5.4 {|
+- : string * longident =
+("Vec.( .%(;..)<- )", Longident.Ldot (Longident.Lident "Vec", ".%(;..)<-"))
 |}]
 
 let _ = Ppxlib.Code_path.(file_path @@ top_level ~file_path:"dir/main.ml")

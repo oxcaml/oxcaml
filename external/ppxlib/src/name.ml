@@ -292,14 +292,15 @@ module Registrar = struct
             Some
               (Format.asprintf
                  "@[Hint:@ `%s'@ is@ available@ for@ %a%t.@]@\n\
-                  Did you put it at the wrong level?" name pp_text c
-                 current_context)
+                  Did you put it at the wrong level?"
+                 name pp_text c current_context)
         | last :: rev_others ->
             let others = List.rev rev_others in
             Some
               (Format.asprintf
                  "@[Hint:@ `%s'@ is@ available@ for@ %a@ and@ %a%t.@]@\n\
-                  Did you put it at the wrong level?" name
+                  Did you put it at the wrong level?"
+                 name
                  (Format.pp_print_list pp_text ~pp_sep:(fun ppf () ->
                       Format.fprintf ppf ",@ "))
                  others pp_text last current_context))
