@@ -75,8 +75,8 @@ val eval_compile_time : t -> bool
     [host_engine], [target_engine], or the runtime shorthands).
 
     [oxcaml] reflects the compiler the preprocessor was built with, unless the
-    [oxcaml] cookie is set (e.g. [-cookie oxcaml=false] on the ppx driver
-    command line). *)
+    [oxcaml] cookie is set. This is present so that files from JSOO can be used
+    to bootstrap the OxCaml compiler. *)
 
 val reify : loc:Location.t -> t -> expression
 (** Reify the predicate into an OCaml expression of type [bool] that evaluates it
