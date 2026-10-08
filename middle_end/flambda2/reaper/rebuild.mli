@@ -29,23 +29,18 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-type result = private
-  { body : Flambda.Expr.t;
-    all_code : Code.t Code_id.Map.t;
-    code_ids_to_remember : Code_id.Set.t
+type 'f result = private
+  { unit : Flambda_unit.t;
+    exported_code : Exported_code.t;
+    slot_offsets : Slot_offsets.result;
+    final_typing_env : ('f, typing_env option) Traverse.With_types.t
   }
 
 val rebuild :
   machine_width:Target_system.Machine_width.t ->
-  ordered_code_ids:Code_id.t array ->
-  continuation_info:Traverse_acc.continuation_info Continuation.Map.t ->
-  fixed_arity_continuations:Continuation.Set.t ->
-  final_typing_env:Typing_env.t option ->
-  rewrite_kind_with_subkind:
-    (Name.t -> Flambda_kind.With_subkind.t -> Flambda_kind.With_subkind.t) ->
-  code_changes:Unboxing_analysis.code_changes ->
-  Analysis.result ->
-  (Code_id.t -> Code_metadata.t) ->
-  Rev_expr.t ->
-  Rev_expr.rev_code Code_id.Map.t ->
-  result
+  cmx_loader:Flambda_cmx.loader ->
+  all_code:Exported_code.t ->
+  unit:Flambda_unit.t ->
+  skeleton:Traverse.Skeleton.t ->
+  solution:'f Analysis.solution ->
+  'f result
