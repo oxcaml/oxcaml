@@ -241,11 +241,7 @@ module Marshalable_program : sig
 
   val to_program : t -> program
 end
-[@@ocaml.doc
-  " A [program] in a form that can be marshaled: [Addr.Map.t] values cannot be,\n\
-  \    since the trie identifies empty slots by physical equality with a \
-   sentinel\n\
-  \    that does not survive marshaling. "]
+[@@ocaml.doc " A [program] in a form that can be marshaled. "]
 
 type cmj_body =
   { program : Marshalable_program.t;
