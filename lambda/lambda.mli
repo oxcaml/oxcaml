@@ -1467,6 +1467,10 @@ val mixed_product_shape_for_read :
   -> mixed_block_shape
   -> 'a mixed_block_element array
 
+(* Translate a representable layout, turning generalized sorts into splices.
+   Rejects [Any] and [Univar]. *)
+val transl_layout : Jkind_types.Layout.Const.t -> unit mixed_block_element
+
 val transl_module_representation :
   Types.module_representation -> module_representation
 

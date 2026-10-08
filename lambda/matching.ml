@@ -2120,7 +2120,7 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
     match head.pat_desc with
     | Patterns.Head.Construct (cstr, shape, arg_sorts) ->
       let shape =
-        Typeopt.transl_constructor_representation head.pat_env
+        Translrepr.transl_constructor_representation head.pat_env
           head.pat_loc shape
       in
       let arg_sorts =
@@ -2570,7 +2570,7 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
         assert false
   in
   let lbl_repres, ~variable_sorts =
-    Typeopt.transl_record_representation_and_sorts head.pat_env
+    Translrepr.transl_record_representation_and_sorts head.pat_env
       head.pat_loc repres
   in
   let rec make_args pos =
@@ -2580,8 +2580,8 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
       let lbl = all_labels.(pos) in
       let ptr, _ = Typeopt.maybe_pointer_type head.pat_env lbl.lbl_arg in
       let lbl_sort =
-        Typeopt.label_sort_for_representation lbl lbl_repres ~record_sort:sort
-          ~variable_sorts
+        Translrepr.label_sort_for_representation lbl lbl_repres
+          ~record_sort:sort ~variable_sorts
       in
       let lbl_layout = Typeopt.layout_of_sort lbl.lbl_loc lbl_sort in
       let sem =
