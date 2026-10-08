@@ -283,6 +283,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     aux args args_arity
   in
   let return_ty = C.extended_machtype_of_return_arity return_arity in
+  let returns = Apply.returns apply in
   match Apply.call_kind apply with
   | Function { function_call = Direct code_id } -> (
     let code_metadata = Env.get_code_metadata env code_id in
@@ -310,7 +311,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     in
     match Apply.probe apply with
     | None ->
-      ( C.direct_call ~dbg
+      ( C.direct_call ~dbg ~returns
           (C.Extended_machtype.to_machtype return_ty)
           pos code_sym args,
         free_vars,
@@ -335,7 +336,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
           "Application expression did not provide callee for indirect call:@ %a"
           Apply.print apply
     in
-    ( C.indirect_call ~dbg return_ty pos
+    ( C.indirect_call ~dbg ~returns return_ty pos
         (C.alloc_mode_for_applications_to_cmx (Apply_expr.return_mode apply))
         callee args_ty (split_args ()),
       free_vars,
@@ -369,7 +370,8 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         "To_cmm expects indirect_known_arity calls to be full applications in \
          order to translate them"
     else
-      ( C.indirect_full_call ~dbg return_ty pos callee ~callees args_ty args,
+      ( C.indirect_full_call ~dbg ~returns return_ty pos callee ~callees args_ty
+          args,
         free_vars,
         env,
         res,
@@ -401,7 +403,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
       C.alloc_mode_for_applications_to_cmx (Apply_expr.return_mode apply)
     in
     ( C.send kind callee obj (split_args ()) args_ty return_ty (pos, alloc_mode)
-        dbg,
+        ~returns dbg,
       free_vars,
       env,
       res,
@@ -415,7 +417,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
       let { env; res; expr = { cmm = eff; free_vars; effs = _ } } =
         simple env res eff
       in
-      C.perform ~dbg eff, free_vars, env, res, Ece.all
+      C.perform ~dbg ~returns eff, free_vars, env, res, Ece.all
     | Reperform { eff; cont; last_fiber } ->
       let { env; res; expr = { cmm = eff; free_vars = fv0; effs = _ } } =
         simple env res eff
@@ -427,7 +429,11 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         simple env res last_fiber
       in
       let free_vars = BV.Set.union (BV.Set.union fv0 fv1) fv2 in
-      C.reperform ~dbg ~eff ~cont ~last_fiber, free_vars, env, res, Ece.all
+      ( C.reperform ~dbg ~returns ~eff ~cont ~last_fiber,
+        free_vars,
+        env,
+        res,
+        Ece.all )
     | With_stack { valuec; exnc; effc; f; arg } ->
       let { env; res; expr = { cmm = valuec; free_vars = fv0; effs = _ } } =
         simple env res valuec
@@ -449,7 +455,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
           (BV.Set.union fv0 (BV.Set.union fv1 fv2))
           (BV.Set.union fv3 fv4)
       in
-      ( C.with_stack ~dbg ~valuec ~exnc ~effc ~f ~arg,
+      ( C.with_stack ~dbg ~returns ~valuec ~exnc ~effc ~f ~arg,
         free_vars,
         env,
         res,
@@ -479,7 +485,8 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
           (BV.Set.union fv0 (BV.Set.union fv1 fv2))
           (BV.Set.union fv3 (BV.Set.union fv4 fv5))
       in
-      ( C.with_stack_preemptible ~dbg ~valuec ~exnc ~effc ~handle_tick ~f ~arg,
+      ( C.with_stack_preemptible ~dbg ~returns ~valuec ~exnc ~effc ~handle_tick
+          ~f ~arg,
         free_vars,
         env,
         res,
@@ -492,7 +499,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         simple env res value
       in
       let free_vars = BV.Set.union fv0 fv1 in
-      C.continue ~dbg ~cont ~value, free_vars, env, res, Ece.all
+      C.continue ~dbg ~returns ~cont ~value, free_vars, env, res, Ece.all
     | Discontinue { cont; exn } ->
       let { env; res; expr = { cmm = cont; free_vars = fv0; effs = _ } } =
         simple env res cont
@@ -501,7 +508,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         simple env res exn
       in
       let free_vars = BV.Set.union fv0 fv1 in
-      C.discontinue ~dbg ~cont ~exn, free_vars, env, res, Ece.all
+      C.discontinue ~dbg ~returns ~cont ~exn, free_vars, env, res, Ece.all
     | Discontinue_with_backtrace { cont; exn; bt } ->
       let { env; res; expr = { cmm = cont; free_vars = fv0; effs = _ } } =
         simple env res cont
@@ -513,7 +520,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         simple env res bt
       in
       let free_vars = BV.Set.union (BV.Set.union fv0 fv1) fv2 in
-      ( C.discontinue_with_backtrace ~dbg ~cont ~exn ~bt,
+      ( C.discontinue_with_backtrace ~dbg ~returns ~cont ~exn ~bt,
         free_vars,
         env,
         res,
