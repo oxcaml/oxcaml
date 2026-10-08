@@ -390,7 +390,7 @@ let is_test filename =
   end
 
 let ignored s =
-  s = "" || s.[0] = '_' || s.[0] = '.'
+  s = "" || s.[0] = '_' || s.[0] = '.' || Filename.check_suffix s ".reference"
 
 let sort_strings = List.sort String.compare
 
@@ -425,6 +425,13 @@ let list_tests dir =
   end;
   sort_strings !res
 
+let find_tests dir =
+  if Sys.is_directory dir then
+    List.concat_map
+      (fun test_dir -> List.map (Filename.concat test_dir) (list_tests test_dir))
+      (find_test_dirs dir)
+  else []
+
 let () =
   Actions.init ();
   Builtin_actions.init ();
@@ -447,9 +454,11 @@ let () =
     | res -> List.iter print_endline res
   in
   let find_test_dirs dir = List.iter print_endline (find_test_dirs dir) in
+  let find_tests dir = List.iter print_endline (find_tests dir) in
   let doit f x = work_done := true; f x in
   List.iter (doit find_test_dirs) Options.find_test_dirs;
   List.iter (doit list_tests) Options.list_tests;
+  List.iter (doit find_tests) Options.find_tests;
   let do_file =
     if Options.translate then
       Translate.file ~style:Options.style ~compact:Options.compact

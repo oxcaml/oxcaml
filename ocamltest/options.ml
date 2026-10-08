@@ -59,6 +59,8 @@ let find_test_dirs = ref []
 
 let list_tests = ref []
 
+let find_tests = ref []
+
 let show_timings = ref false
 
 let run_ocamlrunparam = ref ""
@@ -90,6 +92,8 @@ let commandline_options =
    " Find directories that contain tests (recursive).");
   ("-list-tests", Arg.String (add_to_list list_tests),
    " List tests in given directory.");
+  ("-find-tests", Arg.String (add_to_list find_tests),
+   " Find tests in given directory (recursive).");
   ("-keep-test-dir-on-success", Arg.Set keep_test_dir_on_success,
    " Keep the test directory (with the generated test artefacts) on success.");
   ("-run-ocamlrunparam", Arg.Set_string run_ocamlrunparam,
@@ -118,6 +122,7 @@ let promote = !promote
 let default_timeout = !default_timeout
 let find_test_dirs = !find_test_dirs
 let list_tests = !list_tests
+let find_tests = !find_tests
 let keep_test_dir_on_success = !keep_test_dir_on_success
 let show_timings = !show_timings
 let run_ocamlrunparam = !run_ocamlrunparam
