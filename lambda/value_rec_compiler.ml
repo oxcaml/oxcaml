@@ -456,6 +456,18 @@ let compute_static_size lam =
         | None -> dynamic_size lam
         end
 
+    | Popaque _ when
+        (match args with [Lprim(Pduprecord _, _, _)] -> true | _ -> false) ->
+        (* CR pchambart: Currently Pduprecord is only generated with
+           an opaque to avoid unsafe information propagation in
+           flambda. This should go away when Pduprecord is replaced by
+           a primitive doing the update at the same time. *)
+        begin match args with
+          | [Lprim (Pduprecord _ as p, args, loc)] ->
+               size_of_primitive env loc p args
+          | _ -> assert false
+        end
+
     | Pbytes_to_string
     | Pbytes_of_string
     | Pgetglobal _
