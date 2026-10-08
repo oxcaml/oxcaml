@@ -46,6 +46,14 @@
 /external/merlin/src/sherlodoc/type_parser.ml linguist-generated
 /external/merlin/src/sherlodoc/type_parser.mli linguist-generated
 
+# These files are automatically updated by the
+# external/merlin/scripts/import-ocaml-source.sh script, and the Merlin CI
+# check verifies that they're consistent, so there's no need to review them.
+/external/merlin/upstream/ocaml_flambda/**/*.ml linguist-generated
+/external/merlin/upstream/ocaml_flambda/**/*.mli linguist-generated
+/external/merlin/upstream/ocaml_flambda/**/*.mll linguist-generated
+/external/merlin/upstream/ocaml_flambda/**/*.mly linguist-generated
+
 # 'union' merge driver just unions textual content in case of conflict
 #   http://krlmlr.github.io/using-gitattributes-to-avoid-merge-conflicts/
 /.mailmap                merge=union
