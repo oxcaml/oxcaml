@@ -164,7 +164,8 @@ and pattern_desc :
   | Tpat_constant c -> Spat_constant (constant c)
   | Tpat_unboxed_unit -> Spat_unboxed_unit
   | Tpat_unboxed_bool b -> Spat_unboxed_bool b
-  | Tpat_tuple ps -> Spat_tuple (List.map (fun (l, p) -> (l, pattern p)) ps)
+  | Tpat_tuple ps ->
+      Spat_tuple (List.map (fun (l, p, _) -> (l, pattern p)) ps)
   | Tpat_unboxed_tuple ps ->
       Spat_unboxed_tuple
         (List.map (fun (l, p, s) -> (l, pattern p, sort s)) ps)
@@ -290,7 +291,7 @@ and expression_desc bound loc desc =
   | Texp_unboxed_bool b -> Sexp_unboxed_bool b
   | Texp_tuple (es, mode) ->
       Sexp_tuple
-        (List.map (fun (l, e) -> (l, expression bound e)) es,
+        (List.map (fun (l, e, _) -> (l, expression bound e)) es,
          locality_r mode)
   | Texp_unboxed_tuple es ->
       Sexp_unboxed_tuple

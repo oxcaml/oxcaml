@@ -71,6 +71,10 @@ let rec jkind_annotation (jkind : Outcometree.out_jkind)
   | Ojkind_product jkinds -> mk (Pjk_product (List.map jkind_annotation jkinds))
   | Ojkind_var _ -> unsupported "Ojkind_var"
   | Ojkind_addressable _ -> unsupported "Ojkind_addressable"
+  | Ojkind_box (jkind, axes) ->
+      mk
+        (Pjk_operator
+           (jkind_annotation jkind, List.map mknoloc ("box" :: axes)))
 
 and jkind_const (const : Outcometree.out_jkind_const)
     : Parsetree.jkind_annotation_desc =
