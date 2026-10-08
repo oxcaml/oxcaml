@@ -120,18 +120,14 @@ let typecheck_intf info ast =
   Warnings.check_fatal ();
   alerts, tsg
 
-let emit_signature info alerts tsg =
+let emit_signature info alerts tsg ~arg_signature =
   let sg =
     let kind : Cmi_format.kind =
       if !Clflags.as_parameter then
         Parameter
-      else begin
-        let cmi_arg_for =
-          !Clflags.as_argument_for
-          |> Option.map Global_module.Parameter_name.of_string
-        in
-        Normal { cmi_impl = info.module_name; cmi_arg_for }
-      end
+      else
+        Normal
+          { cmi_impl = info.module_name; cmi_arg_signature = arg_signature }
     in
     let staticity =
       Typemod.staticity_of_modalities tsg.Typedtree.sig_modalities
@@ -151,7 +147,14 @@ let interface ~hook_parse_tree ~hook_typed_tree info =
     let alerts, tsg = typecheck_intf info ast in
     hook_typed_tree tsg;
     if not !Clflags.print_types then begin
-      emit_signature info alerts tsg
+      let arg_signature =
+        match !Clflags.as_argument_for with
+        | None -> None
+        | Some param ->
+          let param = Global_module.Parameter_name.of_string param in
+          Some (Typemod.arg_signature tsg.Typedtree.sig_type ~param)
+      in
+      emit_signature info alerts tsg ~arg_signature
     end
   end
 

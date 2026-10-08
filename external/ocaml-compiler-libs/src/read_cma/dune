@@ -6,10 +6,12 @@
  (preprocess no_preprocessing))
 
 (rule
- (targets compunit_name.ml)
- (deps compunit_name_upstream.ml compunit_name_oxcaml.ml)
+ (enabled_if %{ocaml-config:ox})
  (action
-  (with-stdout-to
-   %{targets}
-   (system
-    "case '%{ocaml_version}' in *+ox*) cat compunit_name_oxcaml.ml ;; *) cat compunit_name_upstream.ml ;; esac"))))
+  (write-file compunit_name.ml "let of_cu_name cu_name = Compilation_unit.name_as_string cu_name")))
+
+(rule
+ (enabled_if
+  (not %{ocaml-config:ox}))
+ (action
+  (write-file compunit_name.ml "let of_cu_name (Cmo_format.Compunit name) = name")))

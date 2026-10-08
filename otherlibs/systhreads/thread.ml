@@ -52,9 +52,16 @@ exception Exit
    Should match [#define Thread_timeout_usec], in st_stubs.c *)
 let interval_usec = 50_000
 
+(* The request starts before [thread_new] and ends on the new thread, so it
+   cannot use [Domain.Tick.with_]. These primitives call the private runtime
+   callbacks; both calls run on the same domain. *)
+external acquire_tick : interval_usec:int -> int @@ portable
+  = "caml_thread_acquire_tick"
+external release_tick : int -> unit @@ portable = "caml_thread_release_tick"
+
 let create (fn @ once) arg =
   let tls_keys = Domain.TLS.Private.get_initial_keys () in
-  let tick = Domain.Tick.acquire ~interval_usec in
+  let tick = acquire_tick ~interval_usec in
   match
     thread_new
       (fun () ->
@@ -62,15 +69,15 @@ let create (fn @ once) arg =
         Domain.TLS.Private.set_initial_keys tls_keys;
         try
           fn arg;
-          Domain.Tick.release tick;
+          release_tick tick;
           ignore (Sys.opaque_identity (check_memprof_cb ()))
         with
         | Exit ->
-          Domain.Tick.release tick;
+          release_tick tick;
           ignore (Sys.opaque_identity (check_memprof_cb ()))
         | exn ->
           let raw_backtrace = Printexc.get_raw_backtrace () in
-          Domain.Tick.release tick;
+          release_tick tick;
           flush stdout; flush stderr;
           try
             (Atomic.get uncaught_exception_handler).portable exn
@@ -91,7 +98,7 @@ let create (fn @ once) arg =
   | exception exn ->
     (* If [thread_new] itself raises (e.g. [pthread_create] fails) the thread
        body never runs, so release the tick we acquired above. *)
-    Domain.Tick.release tick;
+    release_tick tick;
     raise exn
 
 module Portable = struct

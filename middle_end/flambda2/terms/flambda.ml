@@ -21,42 +21,7 @@ module Switch = Switch_expr
 
 let fprintf = Format.fprintf
 
-(* This signature ensures absolutely that the insides of an expression cannot be
-   accessed before any necessary delayed renaming has been applied. *)
-module With_delayed_renaming : sig
-  type 'descr t
-
-  val create : 'descr -> 'descr t
-
-  val apply_renaming : 'descr t -> Renaming.t -> 'descr t
-
-  val descr :
-    'descr t -> apply_renaming_descr:('descr -> Renaming.t -> 'descr) -> 'descr
-end = struct
-  type 'descr t =
-    { mutable descr : 'descr;
-      mutable delayed_renaming : Renaming.t
-    }
-
-  let create descr = { descr; delayed_renaming = Renaming.empty }
-
-  let apply_renaming t renaming =
-    let delayed_renaming =
-      Renaming.compose ~second:renaming ~first:t.delayed_renaming
-    in
-    { t with delayed_renaming }
-
-  let[@inline always] descr t ~apply_renaming_descr =
-    if Renaming.is_identity t.delayed_renaming
-    then t.descr
-    else
-      let descr = apply_renaming_descr t.descr t.delayed_renaming in
-      t.descr <- descr;
-      t.delayed_renaming <- Renaming.empty;
-      descr
-end
-
-type expr = expr_descr With_delayed_renaming.t
+type expr = expr_descr
 
 and expr_descr =
   | Let of let_expr
@@ -142,11 +107,9 @@ and static_const_or_code =
 
 and static_const_group = static_const_or_code list
 
-let rec descr expr =
-  With_delayed_renaming.descr expr
-    ~apply_renaming_descr:apply_renaming_expr_descr
+let rec descr expr = expr
 
-and apply_renaming = With_delayed_renaming.apply_renaming
+and apply_renaming t renaming = apply_renaming_expr_descr t renaming
 
 and apply_renaming_expr_descr t renaming =
   match t with
@@ -208,9 +171,7 @@ and apply_renaming_let_expr_t0
 
 and apply_renaming_let_expr ({ let_abst; defining_expr } as t) renaming =
   let let_abst' =
-    Name_abstraction.apply_renaming
-      (module Bound_pattern)
-      let_abst renaming ~apply_renaming_to_term:apply_renaming_let_expr_t0
+    Name_abstraction.apply_renaming (module Bound_pattern) let_abst renaming
   in
   let defining_expr' = apply_renaming_named defining_expr renaming in
   if let_abst == let_abst' && defining_expr == defining_expr'
@@ -244,7 +205,7 @@ and apply_renaming_non_recursive_let_cont_handler
   let continuation_and_body' =
     Name_abstraction.apply_renaming
       (module Bound_continuation)
-      continuation_and_body renaming ~apply_renaming_to_term:apply_renaming
+      continuation_and_body renaming
   in
   let handler' = apply_renaming_continuation_handler handler renaming in
   { handler = handler'; continuation_and_body = continuation_and_body' }
@@ -255,10 +216,7 @@ and apply_renaming_recursive_let_cont_handlers_t0 { handlers; body } renaming =
   { handlers = handlers'; body = body' }
 
 and apply_renaming_recursive_let_cont_handlers t renaming =
-  Name_abstraction.apply_renaming
-    (module Bound_continuations)
-    t renaming
-    ~apply_renaming_to_term:apply_renaming_recursive_let_cont_handlers_t0
+  Name_abstraction.apply_renaming (module Bound_continuations) t renaming
 
 and apply_renaming_continuation_handler_t0
     ({ handler; num_normal_occurrences_of_params } as t) renaming =
@@ -283,16 +241,13 @@ and apply_renaming_continuation_handler
     Name_abstraction.apply_renaming
       (module Bound_parameters)
       cont_handler_abst renaming
-      ~apply_renaming_to_term:apply_renaming_continuation_handler_t0
   in
   if cont_handler_abst == cont_handler_abst'
   then t
   else { cont_handler_abst = cont_handler_abst'; is_exn_handler; is_cold }
 
 and apply_renaming_continuation_handlers t renaming =
-  Name_abstraction.apply_renaming
-    (module Bound_parameters)
-    t renaming ~apply_renaming_to_term:apply_renaming_continuations_handlers_t0
+  Name_abstraction.apply_renaming (module Bound_parameters) t renaming
 
 and apply_renaming_continuations_handlers_t0 t renaming =
   Continuation.Lmap.of_list
@@ -314,10 +269,7 @@ and apply_renaming_function_params_and_body_base { expr; free_names } renaming =
 and apply_renaming_function_params_and_body ({ abst; is_my_closure_used } as t)
     renaming =
   let abst' =
-    Name_abstraction.apply_renaming
-      (module Bound_for_function)
-      abst renaming
-      ~apply_renaming_to_term:apply_renaming_function_params_and_body_base
+    Name_abstraction.apply_renaming (module Bound_for_function) abst renaming
   in
   if abst == abst' then t else { abst = abst'; is_my_closure_used }
 
@@ -355,11 +307,13 @@ and ids_for_export_continuation_handler
     (module Bound_parameters)
     cont_handler_abst
     ~ids_for_export_of_term:ids_for_export_continuation_handler_t0
+    ~apply_renaming_to_term:apply_renaming_continuation_handler_t0
 
 and ids_for_export_continuation_handlers t =
   Name_abstraction.ids_for_export
     (module Bound_parameters)
     t ~ids_for_export_of_term:ids_for_export_continuation_handlers_t0
+    ~apply_renaming_to_term:apply_renaming_continuations_handlers_t0
 
 and ids_for_export_continuation_handlers_t0 t =
   Continuation.Lmap.fold
@@ -389,6 +343,7 @@ and ids_for_export_let_expr { let_abst; defining_expr } =
     Name_abstraction.ids_for_export
       (module Bound_pattern)
       let_abst ~ids_for_export_of_term:ids_for_export_let_expr_t0
+      ~apply_renaming_to_term:apply_renaming_let_expr_t0
   in
   Ids_for_export.union defining_expr_ids let_abst_ids
 
@@ -421,6 +376,7 @@ and ids_for_export_non_recursive_let_cont_handler
     Name_abstraction.ids_for_export
       (module Bound_continuation)
       continuation_and_body ~ids_for_export_of_term:ids_for_export
+      ~apply_renaming_to_term:apply_renaming
   in
   Ids_for_export.union handler_ids continuation_and_body_ids
 
@@ -433,6 +389,7 @@ and ids_for_export_recursive_let_cont_handlers t =
   Name_abstraction.ids_for_export
     (module Bound_continuations)
     t ~ids_for_export_of_term:ids_for_export_recursive_let_cont_handlers_t0
+    ~apply_renaming_to_term:apply_renaming_recursive_let_cont_handlers_t0
 
 and ids_for_export_function_params_and_body_base { expr; free_names = _ } =
   ids_for_export expr
@@ -441,6 +398,7 @@ and ids_for_export_function_params_and_body { abst; is_my_closure_used = _ } =
   Name_abstraction.ids_for_export
     (module Bound_for_function)
     abst ~ids_for_export_of_term:ids_for_export_function_params_and_body_base
+    ~apply_renaming_to_term:apply_renaming_function_params_and_body_base
 
 and ids_for_export_static_const_or_code t =
   match t with
@@ -853,40 +811,59 @@ and print_let_expr ppf ({ let_abst = _; defining_expr } as t) : unit =
       | Simple _ | Prim _ | Set_of_closures _ | Static_consts _ ->
         Flambda_colours.variable
   in
+  let print_num_occurrences bound_pattern ppf num_occurrences =
+    match (bound_pattern : Bound_pattern.t) with
+    | Static _ | Set_of_closures _ -> ()
+    | Singleton bound_var ->
+      fprintf ppf "%t #%a%t" Flambda_colours.elide Num_occurrences.print
+        (try Variable.Map.find (Bound_var.var bound_var) num_occurrences
+         with Not_found -> Num_occurrences.Zero)
+        Flambda_colours.pop
+  in
   let rec let_body (expr : expr) =
     match descr expr with
     | Let ({ let_abst = _; defining_expr } as t) ->
-      let print (bound_pattern : Bound_pattern.t) ~body =
+      let print (bound_pattern : Bound_pattern.t) ~body
+          ~num_normal_occurrences_of_bound_vars =
         match bound_pattern with
         | Singleton _ | Set_of_closures _ ->
-          fprintf ppf "@ @[<hov 1>%t%a%t%t =%t@ %a@]"
+          fprintf ppf "@ @[<hov 1>%t%a%t%t%a =%t@ %a@]"
             (let_bound_var_colour bound_pattern defining_expr)
             Bound_pattern.print bound_pattern Flambda_colours.pop
-            Flambda_colours.elide Flambda_colours.pop print_named defining_expr;
+            Flambda_colours.elide
+            (print_num_occurrences bound_pattern)
+            num_normal_occurrences_of_bound_vars Flambda_colours.pop print_named
+            defining_expr;
           let_body body
         | Static _ -> expr
       in
       Name_abstraction.pattern_match_for_printing
         (module Bound_pattern)
         t.let_abst ~apply_renaming_to_term:apply_renaming_let_expr_t0
-        ~f:(fun bound_pattern { body; _ } -> print bound_pattern ~body)
+        ~f:(fun bound_pattern { body; num_normal_occurrences_of_bound_vars } ->
+          print bound_pattern ~body ~num_normal_occurrences_of_bound_vars)
     | Let_cont _ | Apply _ | Apply_cont _ | Switch _ | Invalid _ -> expr
   in
-  let print (bound_pattern : Bound_pattern.t) ~body =
+  let print (bound_pattern : Bound_pattern.t) ~body
+      ~num_normal_occurrences_of_bound_vars =
     match bound_pattern with
     | Static _ -> print_let_static ppf t
     | Singleton _ | Set_of_closures _ ->
-      fprintf ppf "@[<v 0>@[<v 0>@[<hov 1>%t%a%t%t =%t@ %a@]"
+      fprintf ppf "@[<v 0>@[<v 0>@[<hov 1>%t%a%t%t%a =%t@ %a@]"
         (let_bound_var_colour bound_pattern defining_expr)
         Bound_pattern.print bound_pattern Flambda_colours.pop
-        Flambda_colours.elide Flambda_colours.pop print_named defining_expr;
+        Flambda_colours.elide
+        (print_num_occurrences bound_pattern)
+        num_normal_occurrences_of_bound_vars Flambda_colours.pop print_named
+        defining_expr;
       let expr = let_body body in
       fprintf ppf "@]@ %a@]" print expr
   in
   Name_abstraction.pattern_match_for_printing
     (module Bound_pattern)
     t.let_abst ~apply_renaming_to_term:apply_renaming_let_expr_t0
-    ~f:(fun bound_pattern { body; _ } -> print bound_pattern ~body)
+    ~f:(fun bound_pattern { body; num_normal_occurrences_of_bound_vars } ->
+      print bound_pattern ~body ~num_normal_occurrences_of_bound_vars)
 
 and print_named ppf (t : named) =
   let print_or_elide_debuginfo ppf dbg =
@@ -1616,7 +1593,7 @@ module Expr = struct
 
   type descr = expr_descr
 
-  let create = With_delayed_renaming.create
+  let create expr = expr
 
   let descr = descr
 

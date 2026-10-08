@@ -15,6 +15,7 @@ js_of_ocaml-runtime
 js_of_ocaml.deriving
 ocaml-compiler-libs.bytecomp
 ocaml-compiler-libs.common
+ocaml-compiler-libs.frontend
 ocaml-compiler-libs.optcomp
 ocaml-compiler-libs.shadow
 ocaml-compiler-libs.toplevel

@@ -1902,6 +1902,116 @@ let mixed_field_index_and_kind ~machine_width ~prim_name index shape =
   check_non_negative_imm imm prim_name;
   imm, field_kind
 
+let mixed_block_shape_of_layout ~prim_name (layout : L.layout) :
+    L.mixed_block_shape =
+  match layout with
+  | Punboxed_product layouts ->
+    Array.of_list (List.map L.mixed_block_element_of_layout layouts)
+  (* CR box: the current state of the world is a little sad. We either box small
+     numbers as tagged immediates and break representation invariants for
+     singleton unboxed records, or box them as tag-0 blocks and break numeric
+     layout invariants / optimizations. We pick the latter, but we need
+     addressability to properly handle these cases.
+
+     We can't use [Box_number], since it is immutable and can be optimized as
+     such, but [Punboxed_vector] here really could correspond to a singleton
+     unboxed record whose boxed version is mutable. This can unsoundly expose
+     the immutable optimizations. *)
+  | Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _
+  | Punboxed_vector _ | Punboxed_mask ->
+    [| L.mixed_block_element_of_layout layout |]
+  | Ptop -> Misc.fatal_errorf "convert_lprim: %s: Ptop layout" prim_name
+  | Pbottom -> Misc.fatal_errorf "convert_lprim: %s: Pbottom layout" prim_name
+  | Psplicevar ident -> Lambda.fatal_error_unevaluated_splice_var ident
+
+let convert_block_creation ~machine_width ~prim_name tag (shape : L.block_shape)
+    mutability mode (args : H.simple_or_prim list) : H.expr_primitive list =
+  match L.mixed_block_of_block_shape shape with
+  | None ->
+    let shape =
+      convert_block_shape ~machine_width shape ~num_fields:(List.length args)
+    in
+    [Variadic (Make_block (Values (tag, shape), mutability, mode), args)]
+  | Some shape ->
+    (* Mixed block *)
+    let shape =
+      Mixed_block_shape.of_mixed_block_elements
+        ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
+        shape
+    in
+    let flattened_reordered_shape =
+      Mixed_block_shape.flattened_reordered_shape shape
+    in
+    if List.length args <> Array.length flattened_reordered_shape
+    then
+      Misc.fatal_errorf
+        "%s (mixed): number of arguments (%d) is not consistent with shape \
+         length (%d)"
+        prim_name (List.length args)
+        (Array.length flattened_reordered_shape);
+    let args =
+      let new_indexes_to_old_indexes =
+        Mixed_block_shape.new_indexes_to_old_indexes shape
+      in
+      let args = Array.of_list args in
+      Array.init (Array.length args) (fun new_index ->
+          args.(new_indexes_to_old_indexes.(new_index)))
+      |> Array.to_list
+    in
+    let args =
+      List.mapi
+        (fun new_index arg ->
+          match flattened_reordered_shape.(new_index) with
+          | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
+          | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
+            arg
+          | Float_boxed _ -> unbox_float arg)
+        args
+    in
+    let kind_shape =
+      match K.Scannable_block_shape.from_mixed_block_shape shape with
+      | Mixed_record kind_shape -> kind_shape
+      | Value_only ->
+        Misc.fatal_errorf
+          "%s: mixed_block_of_block_shape returned Some but \
+           from_mixed_block_shape returned Value_only"
+          prim_name
+    in
+    [Variadic (Make_block (Mixed (tag, kind_shape), mutability, mode), args)]
+
+let convert_block_unboxing ~machine_width tag (shape : L.mixed_block_shape) mut
+    (arg : H.simple_or_prim) : H.expr_primitive list =
+  let num_elements = Array.length shape in
+  let shape =
+    Mixed_block_shape.of_mixed_block_elements
+      ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
+      shape
+  in
+  let flattened_reordered_shape =
+    Mixed_block_shape.flattened_reordered_shape shape
+  in
+  let kind_shape = K.Scannable_block_shape.from_mixed_block_shape shape in
+  let tag = Or_unknown.Known tag in
+  let size =
+    Or_unknown.Known
+      (Target_ocaml_int.of_int machine_width
+         (Array.length flattened_reordered_shape))
+  in
+  let all_indices =
+    List.init num_elements (fun i ->
+        Mixed_block_shape.lookup_path_producing_new_indexes shape [i])
+    |> List.concat
+  in
+  List.map
+    (fun index : H.expr_primitive ->
+      let field = Target_ocaml_int.of_int machine_width index in
+      let kind =
+        H.block_access_kind_of_mixed_field_element ~kind_shape ~tag ~size
+          flattened_reordered_shape.(index)
+      in
+      Unary (Block_load { kind; mut; field }, arg))
+    all_indices
+
 (* Primitive conversion *)
 let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     (prim : L.primitive) (args : Simple.t list list) (dbg : Debuginfo.t)
@@ -1916,7 +2026,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
   | Pphys_equal eq, [[arg1]; [arg2]] ->
     let eq : P.equality_comparison = match eq with Eq -> Eq | Noteq -> Neq in
     [tag_int (Binary (Phys_equal eq, arg1, arg2))]
-  | Pmakeblock (tag, mutability, shape, mode), _ -> (
+  | Pmakeblock (tag, mutability, shape, mode), _ ->
     let args = List.flatten args in
     let mode =
       Alloc_mode.For_allocations.from_lambda mode ~current_alloc_region
@@ -1931,57 +2041,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       then Mutability.Immutable
       else Mutability.from_lambda mutability
     in
-    match L.mixed_block_of_block_shape shape with
-    | None ->
-      let shape =
-        convert_block_shape ~machine_width shape ~num_fields:(List.length args)
-      in
-      [Variadic (Make_block (Values (tag, shape), mutability, mode), args)]
-    | Some shape ->
-      (* Mixed block *)
-      let shape =
-        Mixed_block_shape.of_mixed_block_elements
-          ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
-          shape
-      in
-      let args =
-        let new_indexes_to_old_indexes =
-          Mixed_block_shape.new_indexes_to_old_indexes shape
-        in
-        let args = Array.of_list args in
-        Array.init (Array.length args) (fun new_index ->
-            args.(new_indexes_to_old_indexes.(new_index)))
-        |> Array.to_list
-      in
-      let flattened_reordered_shape =
-        Mixed_block_shape.flattened_reordered_shape shape
-      in
-      if List.length args <> Array.length flattened_reordered_shape
-      then
-        Misc.fatal_errorf
-          "Pmakeblock (mixed): number of arguments (%d) is not consistent with \
-           shape length (%d)"
-          (List.length args)
-          (Array.length flattened_reordered_shape);
-      let args =
-        List.mapi
-          (fun new_index arg ->
-            match flattened_reordered_shape.(new_index) with
-            | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-            | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
-              arg
-            | Float_boxed _ -> unbox_float arg)
-          args
-      in
-      let kind_shape =
-        match K.Scannable_block_shape.from_mixed_block_shape shape with
-        | Mixed_record kind_shape -> kind_shape
-        | Value_only ->
-          Misc.fatal_error
-            "Pmakeblock: mixed_block_of_block_shape returned Some but \
-             from_mixed_block_shape returned Value_only"
-      in
-      [Variadic (Make_block (Mixed (tag, kind_shape), mutability, mode), args)])
+    convert_block_creation ~machine_width ~prim_name:"Pmakeblock" tag shape
+      mutability mode args
   | Pmakelazyblock lazy_tag, [[arg]] ->
     [Unary (Make_lazy { lazy_tag; alloc_region = current_alloc_region }, arg)]
   | Pmake_unboxed_product layouts, _ ->
@@ -3650,6 +3711,31 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     let null_base = H.Simple (Simple.const Reg_width_const.const_null) in
     convert_pset_indirect ~machine_width ~dbg prim Into_block_or_off_heap layout
       mode ~ptr:null_base ~idx ~new_values
+  | Pbox (layout, mode), [args] ->
+    let mode =
+      Alloc_mode.For_allocations.from_lambda mode ~current_alloc_region
+        ~current_region
+    in
+    let shape : L.block_shape =
+      Shape (mixed_block_shape_of_layout ~prim_name:"Pbox" layout)
+    in
+    (* A boxed all-void product must be [Immutable] for the middle-end *)
+    (* CR box: we default to [Mutable], but we should consider storing
+       mutability information in the primitive and refining it from the type to
+       get better code generation. For now, we don't, and instead choose to be
+       entirely layout directed. *)
+    let mutability =
+      if List.is_empty args then Mutability.Immutable else Mutability.Mutable
+    in
+    convert_block_creation ~machine_width ~prim_name:"Pbox" Tag.Scannable.zero
+      shape mutability mode args
+  | Punbox layout, [[arg]] ->
+    let shape = mixed_block_shape_of_layout ~prim_name:"Punbox" layout in
+    (* CR box: always [Mutable], see [Pbox] above. In this case, we may actually
+       want to store a list of mutabilities to determine which fields should be
+       read (im)mutably. *)
+    let mut = Mutability.Mutable in
+    convert_block_unboxing ~machine_width Tag.Scannable.zero shape mut arg
   | (Praise _ | Pccall _), _ ->
     Misc.fatal_errorf
       "Closure_conversion.convert_primitive: Primitive %a (%a) shouldn't be \
@@ -3676,7 +3762,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Preinterpret_tuple_as_boxed_vector _ | Parray_element_size_in_bytes _
       | Pmake_idx_array _ | Pidx_deepen _ | Ppeek _ | Pmakelazyblock _
       | Pscalar (Unary _)
-      | Pget_ptr _ | Pget_ext_ptr _ | Patomic_load_ptr _ ),
+      | Pget_ptr _ | Pget_ext_ptr _ | Patomic_load_ptr _ | Pbox _ | Punbox _ ),
       ([] | _ :: _ :: _ | [([] | _ :: _ :: _)]) ) ->
     Misc.fatal_errorf
       "Closure_conversion.convert_primitive: Wrong arity for unary primitive \

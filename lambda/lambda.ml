@@ -517,6 +517,8 @@ type primitive =
   | Pset_ptr of layout * modify_mode
   | Pget_ext_ptr of layout * Asttypes.mutable_flag
   | Pset_ext_ptr of layout * modify_mode
+  | Pbox of layout * locality_mode
+  | Punbox of layout
 
 and extern_repr =
   | Same_as_ocaml_repr of Jkind.Sort.Const.t
@@ -1508,13 +1510,8 @@ let main_module_representation = function
 type program =
   { compilation_unit : Compilation_unit.t;
     main_module_block_format : main_module_block_format;
-    arg_block_idx : int option;
     required_globals : Compilation_unit.Set.t;
     code : lambda }
-
-type arg_descr =
-  { arg_param: Global_module.Parameter_name.t;
-    arg_block_idx: int; }
 
 let const_int n = Const_base (Const_int n)
 
@@ -1681,7 +1678,6 @@ let layout_list =
             Constructor_shape_uniform
               [generic_value;
                { generic_value with nullable = Non_nullable}]] })
-let layout_tuple_element = nullable_value Pgenval
 let layout_value_field = nullable_value Pgenval
 let layout_optional_arg = nullable_value Pgenval
 let layout_variant_arg = nullable_value Pgenval
@@ -2225,29 +2221,17 @@ let mod_field ?(read_semantics=Reads_agree) pos = function
     Pmixedfield([pos], shape_for_read, read_semantics)
 
 let transl_module_representation repr =
-  (* The shape here is potentially an underapproximation, since the scannable
-     axes in [shape] will all be [max]. This should not matter, though, since it
-     is not possible to reassign / directly mutate a [val] in a module. *)
-  let shape =
-    Array.map
-      (fun sort ->
-         sort
-         |> Jkind.Sort.default_for_transl_and_get
-         |> Types.mixed_block_element_of_const_sort)
-      repr
-  in
-  let rec is_value (elt : Types.mixed_block_element) =
-    match elt with
-    | Scannable _ -> true
-    | Addressable elt -> is_value elt
-    | Float_boxed | Float64 | Float32 | Bits8 | Bits16 | Untagged_immediate
-    | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word
-    | Product _ | Void -> false
-  in
-  if Array.for_all is_value shape
-  then Module_value_only { field_count = Array.length shape }
+  let sorts = Array.map Jkind.Sort.default_for_transl_and_get repr in
+  if Array.for_all Jkind.Sort.Const.is_scannable sorts
+  then Module_value_only { field_count = Array.length sorts }
   else
-    let shape = transl_mixed_product_shape shape in
+    (* The shape here is potentially an underapproximation, since the scannable
+       axes in [shape] will all be [max]. This should not matter, though, since
+       it is not possible to reassign / directly mutate a [val] in a module. *)
+    let shape =
+      transl_mixed_product_shape
+        (Array.map Types.mixed_block_element_of_const_sort sorts)
+    in
     Module_mixed
       ( shape,
         mixed_product_shape_for_read
@@ -2856,6 +2840,8 @@ let find_exact_application kind ~arity args =
           if arity <> List.length const_args
           then None
           else Some (List.map (fun cst -> Lconst cst) const_args)
+      (* CR layouts-mixed-tuplify: this should support [Const_mixed_block] once
+         there is proper support for mixed tupled functions *)
       | _ -> None
       end
 
@@ -3098,6 +3084,7 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Punbox_mask -> None
   | Pbox_mask m -> Some m
   | Punbox_unit -> None
+  | Pbox (_, m) -> Some m
   | Pjoin_vec256 | Psplit_vec256 ->
     (* Aborts in bytecode, unboxed in native code *)
     None
@@ -3159,7 +3146,8 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pmake_idx_mixed_field _
   | Pmake_idx_array _
   | Pidx_deepen _
-  | Preinterpret_tagged_int63_as_unboxed_int64 ->
+  | Preinterpret_tagged_int63_as_unboxed_int64
+  | Punbox _ ->
     if !Clflags.native_code then None
     else
       (* We don't provide a locally-allocating version of this primitive
@@ -3362,7 +3350,7 @@ let primitive_can_raise prim =
   | Pget_idx _ | Pset_idx _
   | Pget_ptr _ | Pset_ptr _
   | Pget_ext_ptr _ | Pset_ext_ptr _
-  | Ppeek _ | Ppoke _ ->
+  | Ppeek _ | Ppoke _ | Pbox _ | Punbox _ ->
     false
 
 let constant_layout: constant -> layout = function
@@ -3564,7 +3552,8 @@ let rec mixed_block_element_of_layout (layout : layout) :
   match layout with
   | Punboxed_product layouts ->
     Product (List.map mixed_block_element_of_layout layouts |> Array.of_list)
-  | Ptop | Pbottom -> Misc.fatal_error "Pidxdeepen"
+  | Ptop | Pbottom ->
+    Misc.fatal_error "cannot convert top/bottom layout to mixed block element"
   | Pvalue value_kind -> Value value_kind
   | Punboxed_float Unboxed_float64 -> Float64
   | Punboxed_float Unboxed_float32 -> Float32
@@ -3904,6 +3893,14 @@ let primitive_result_layout (p : primitive) =
   | Pset_ptr _ -> layout_unit
   | Pget_ext_ptr (layout, _) -> layout
   | Pset_ext_ptr _ -> layout_unit
+  | Pbox (_layout, _) ->
+    (* CR box: Once we box some things as tagged immediates, we should compute
+       a more precise layout here. For instance, a [bits8 box] could get
+       [layout_int]. If we add mutability tracking (depending on when
+       specialization happens), we could compute more precise layouts too,
+       like that of a tuple. *)
+    layout_block
+  | Punbox layout -> layout
 
 let array_ref_kind mode = function
   | Pgenarray -> Pgenarray_ref mode

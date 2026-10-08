@@ -177,3 +177,9 @@ let export conts =
 
 let import importer t =
   Table.add !grand_table_of_continuations (Table.import importer t)
+
+let import_and_rename importer t =
+  let { Data.name; sort; name_stamp = _; compilation_unit = _ } =
+    Table.import importer t
+  in
+  create ~sort ~name ()

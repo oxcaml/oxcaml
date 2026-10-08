@@ -510,6 +510,8 @@ type primitive =
      offset and behave as if the base were null. *)
   | Pget_ext_ptr of layout * Asttypes.mutable_flag
   | Pset_ext_ptr of layout * modify_mode
+  | Pbox of layout * locality_mode
+  | Punbox of layout
 
 (** This is the same as [Primitive.native_repr] but with [Repr_poly]
     compiled away. *)
@@ -1271,15 +1273,6 @@ val main_module_representation :
 type program =
   { compilation_unit : Compilation_unit.t;
     main_module_block_format : main_module_block_format;
-    arg_block_idx : int option;         (* Index of argument block (see
-                                           [arg_descr]). If
-                                           [main_module_block_format] is
-                                           [Mb_struct], this is an index into
-                                           the main module block of the
-                                           compilation unit. For
-                                           [Mb_instantiating_functor], this is
-                                           an index into the module returned by
-                                           the instantiating functor. *)
     required_globals : Compilation_unit.Set.t;
                                         (* Modules whose initializer side effects
                                            must occur before [code]. *)
@@ -1297,27 +1290,6 @@ type program =
      Initialize_symbol(module_name, 0,
        [getfield 0; ...; getfield (main_module_block_size mbf - 1)])
 *)
-
-(* Info for a compilation unit that implements a parameter (that is, was
-   compiled with [-as-argument-for]). Note that if the CU is itself
-   parameterised, this information (in particular [arg_block_idx]) describes
-   instances rather than the base CU gs. *)
-type arg_descr =
-  { arg_param: Global_module.Parameter_name.t;
-                                        (* The parameter implemented (the [P] in
-                                           [-as-argument-for P]) *)
-    arg_block_idx: int;                 (* The index within the main module
-                                           block of the _argument block_. If
-                                           this compilation unit is used as an
-                                           argument when instantiating,
-                                           [-instantiate] will pass the argument
-                                           block to the instantiating functor
-                                           (see [main_module_block_format]). The
-                                           argument block's signature is exactly
-                                           that of the parameter, which is in
-                                           general a supertype of this
-                                           compilation unit's signature. *)
-  }
 
 (* Sharing key *)
 val make_key: lambda -> lambda option
@@ -1360,8 +1332,6 @@ val layout_tupled_vector : boxed_vector -> layout
 val layout_unboxed_mask : layout
 val layout_unboxed_vector : unboxed_vector -> layout
 val layout_unboxed_tupled_vector : unboxed_vector -> layout
-(* A layout that is Pgenval because it is the field of a tuple *)
-val layout_tuple_element : layout
 (* A layout that is Pgenval because it is the arg of a polymorphic variant *)
 val layout_variant_arg : layout
 (* A layout that is Pgenval because it is an optional argument *)

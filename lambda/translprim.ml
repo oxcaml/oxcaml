@@ -224,6 +224,8 @@ let extern_repr_of_native_repr:
   | Unboxed_or_untagged_integer i, _ -> Unboxed_or_untagged_integer i
   | Unboxed_vector i, _ -> Unboxed_vector i
   | Unboxed_mask, _ -> Unboxed_mask
+  | Unextended_bits8, _ -> Same_as_ocaml_repr Jkind.Sort.Const.bits8
+  | Unextended_bits16, _ -> Same_as_ocaml_repr Jkind.Sort.Const.bits16
   | Unpacked_product sort, _ ->
     (* The product sort is unarized into separate C arguments by
        [unarize_extern_repr] in [closure_conversion.ml]. *)
@@ -1336,6 +1338,11 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
       Primitive(Pset_ext_ptr (layout, get_first_arg_mode ()), 2)
     | "%peek" -> Peek None
     | "%poke" -> Poke None
+    | "%box" ->
+      let layout = List.nth (get_arg_layouts ()) 0 in
+      Primitive(Pbox (layout, mode), 1)
+    | "%unbox" ->
+      Primitive(Punbox layout, 1)
     | s when String.length s > 0 && s.[0] = '%' ->
       (match String.Map.find_opt s indexing_primitives with
        | Some prim -> prim ~mode
@@ -2742,8 +2749,12 @@ let lambda_primitive_needs_event_after = function
   | Pwith_stack | Pwith_stack_preemptible
   | Pperform | Preperform
   | Pcontinue | Pdiscontinue | Pdiscontinue_with_backtrace
-  | Ppoll | Pobj_dup | Pget_header _ -> true
-  (* [Preinterpret_tagged_int63_as_unboxed_int64] has to allocate in
+  | Ppoll | Pobj_dup | Pget_header _
+  | Pbox _ -> true
+  (* In general, [Punbox] may allocate in bytecode, since unboxed structures
+     are actually represented as boxed values. *)
+  | Punbox _ -> true
+  (* [Preinterpret_tagged_int63_as_unboxed_int64] similarly has to allocate in
      bytecode, because int64_u is actually represented as a boxed value. *)
   | Preinterpret_tagged_int63_as_unboxed_int64 -> true
 

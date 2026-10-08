@@ -25,20 +25,17 @@ type t =
     conts : cont_kind Continuation.Map.t;
     current_code_id : Code_id.t option;
     should_preserve_direct_calls : should_preserve_direct_calls;
-    le_monde_exterieur : Name.t;
     all_constants : Name.t;
     function_slots_to_keep : Function_slot.Set.t;
     value_slots_to_keep : Value_slot.Set.t
   }
 
 let create ~parent ~conts ~current_code_id ~should_preserve_direct_calls
-    ~le_monde_exterieur ~all_constants ~function_slots_to_keep
-    ~value_slots_to_keep =
+    ~all_constants ~function_slots_to_keep ~value_slots_to_keep =
   { parent;
     conts;
     current_code_id;
     should_preserve_direct_calls;
-    le_monde_exterieur;
     all_constants;
     function_slots_to_keep;
     value_slots_to_keep
@@ -49,8 +46,6 @@ let parent t = t.parent
 let current_code_id t = t.current_code_id
 
 let should_preserve_direct_calls t = t.should_preserve_direct_calls
-
-let le_monde_exterieur t = t.le_monde_exterieur
 
 let all_constants t = t.all_constants
 

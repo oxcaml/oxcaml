@@ -485,6 +485,8 @@ module Datalog_schedule = struct
   let any_source_rules =
     [ (let$ [x] = ["x"] in
        [zero_alloc_source x] ==> any_source x);
+      (let$ [if_used; x] = ["if_used"; "x"] in
+       [any_usage if_used; any_source_if_used ~if_used x] ==> any_source x);
       (let$ [from; to_] = ["from"; "to_"] in
        [rev_alias ~from ~to_; any_source from] ==> any_source to_);
       (let$ [base; relation; to_] = ["base"; "relation"; "to_"] in
