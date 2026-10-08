@@ -407,6 +407,7 @@ module Let_cont_expr : sig
     expr
 
   val create_non_recursive' :
+    ?can_be_lifted:bool ->
     cont:Continuation.t ->
     Continuation_handler.t ->
     body:expr ->

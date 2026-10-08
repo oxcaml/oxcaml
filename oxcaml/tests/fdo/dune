@@ -1,0 +1,681 @@
+; Round-trip tests for the source-position FDO profile format
+; ([Source_position_profile] in ocamlcommon).
+
+(executable
+ (name source_position_profile_test)
+ (modules source_position_profile_test)
+ (libraries ocamlcommon))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (run ./source_position_profile_test.exe)))
+
+; The operations on pseudo-instrumentation counters ([Fdo_counter]).
+
+(executable
+ (name fdo_counters_test)
+ (modules fdo_counters_test)
+ (libraries ocamlcommon))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (run ./fdo_counters_test.exe)))
+
+(executable
+ (name gen_profile)
+ (modules gen_profile)
+ (libraries ocamlcommon))
+
+(executable
+ (name fdo_decode_test)
+ (modules fdo_decode_test)
+ (libraries fdo_decode_lib))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (run ./fdo_decode_test.exe)))
+
+; Deterministic test of -fdo-profile cold-block sinking: build a profile
+; that marks one branch of hot_cold.ml hot, compile with it, and check the
+; resulting block layouts.
+
+(executable
+ (name filter_fdo_dump)
+ (modules filter_fdo_dump))
+
+(rule
+ (targets hot_cold.fdo)
+ (deps hot_cold_profile.txt gen_profile.exe)
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (run ./gen_profile.exe hot_cold_profile.txt hot_cold.fdo)))
+
+(rule
+ (targets hot_cold.output.corrected)
+ (deps hot_cold.ml hot_cold.fdo filter_fdo_dump.exe)
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (progn
+   (with-outputs-to
+    hot_cold.output.raw
+    (run
+     %{bin:ocamlopt.opt}
+     -c
+     -g
+     -fdo-profile
+     hot_cold.fdo
+     -dcfg
+     -dfdo
+     -color
+     never
+     hot_cold.ml))
+   (with-outputs-to
+    hot_cold.output.corrected
+    (run ./filter_fdo_dump.exe hot_cold.output.raw)))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "main"))
+ (deps hot_cold.output hot_cold.output.corrected)
+ (action
+  (diff hot_cold.output hot_cold.output.corrected)))
+
+; Stability of function ids: the entry counters of anonymous.ml and of
+; anonymous_more.ml (the same module with extra anonymous functions inserted,
+; compiled under the same module name via -o) must agree except for the
+; inserted functions.
+
+(executable
+ (name entry_counters)
+ (modules entry_counters))
+
+(rule
+ (targets empty.fdo)
+ (deps empty_profile.txt gen_profile.exe)
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (run ./gen_profile.exe empty_profile.txt empty.fdo)))
+
+(rule
+ (targets anonymous.output.corrected)
+ (deps anonymous.ml anonymous_more.ml empty.fdo entry_counters.exe)
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (progn
+   (with-outputs-to
+    anonymous.dump
+    (run
+     %{bin:ocamlopt.opt}
+     -c
+     -g
+     -fdo-profile
+     empty.fdo
+     -dfdo
+     -color
+     never
+     anonymous.ml))
+   (with-outputs-to
+    anonymous_more.dump
+    (run
+     %{bin:ocamlopt.opt}
+     -c
+     -g
+     -fdo-profile
+     empty.fdo
+     -dfdo
+     -color
+     never
+     -o
+     anonymous.more.cmx
+     anonymous_more.ml))
+   (with-stdout-to
+    anonymous.output.corrected
+    (run ./entry_counters.exe anonymous.dump anonymous_more.dump)))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "main"))
+ (deps anonymous.output anonymous.output.corrected)
+ (action
+  (diff anonymous.output anonymous.output.corrected)))
+
+; End-to-end test through the runtime's single-stepping LBR emulator (see
+; runtime/singlestep_profiler.c, x86-64 Linux only): compile specialize.ml
+; with counters, run it collecting a complete trace of its hot part, decode the
+; trace into a profile and check it (specialize.profile), recompile with it,
+; and check the block frequencies and layouts (specialize.output).
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (target specialize.exe)
+ ; The emulator is linked from the installed runtime, which dune does not
+ ; track.
+ (deps specialize.ml %{project_root}/runtime/singlestep_profiler.c)
+ (action
+  (run
+   %{bin:ocamlopt.opt}
+   -O3
+   -fdo-counters
+   -fdo-names
+   -ccopt
+   -no-pie
+   specialize.ml
+   -o
+   specialize.exe)))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (targets specialize.lbr specialize.run)
+ (deps specialize.exe)
+ (action
+  (with-outputs-to
+   specialize.run
+   (run ./specialize.exe specialize.lbr))))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (target specialize.fdo)
+ (deps specialize.lbr specialize.exe)
+ (action
+  (run
+   %{bin:oxcaml-fdo-decode}
+   -perf-script-output
+   specialize.lbr
+   -binary
+   specialize.exe
+   -o
+   specialize.fdo)))
+
+; The decoded profile itself: its trie of counters and counts, named after
+; the executable's -fdo-names metadata.
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (target specialize.profile.corrected)
+ (deps specialize.fdo specialize.exe)
+ (action
+  (with-outputs-to
+   specialize.profile.corrected
+   (run %{bin:oxcaml-fdo-decode} -dump specialize.fdo -binary specialize.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (deps specialize.profile specialize.profile.corrected)
+ (action
+  (diff specialize.profile specialize.profile.corrected)))
+
+; Depends on specialize.exe so that the two compilations of specialize.ml,
+; which both write specialize.cm*, are sequenced.
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (target specialize.output.corrected)
+ (deps specialize.ml specialize.fdo specialize.exe filter_fdo_dump.exe)
+ (action
+  (progn
+   (with-outputs-to
+    specialize.dump
+    (run
+     %{bin:ocamlopt.opt}
+     -O3
+     -fdo-profile
+     specialize.fdo
+     -dcfg
+     -dfdo
+     -color
+     never
+     -c
+     specialize.ml))
+   (with-outputs-to
+    specialize.output.corrected
+    (run ./filter_fdo_dump.exe specialize.dump)))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (deps specialize.output specialize.output.corrected)
+ (action
+  (diff specialize.output specialize.output.corrected)))
+
+; Function reordering: the pass-1 compilation also hands the linker a call graph
+; profile (see backend/fdo_call_graph.ml), which lld lays the functions out by.
+; Link with lld, with its default ordering algorithm (cdsort) as in real
+; builds, and check the order of the functions in the executable by address
+; (lld's --print-symbol-order only works with hfsort). The edges themselves
+; are in specialize.output, from -dfdo. Needs lld: set OXCAML_LLD to enable.
+; Depends on specialize.output.corrected to be sequenced after the other
+; compilations of specialize.ml.
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")
+   (<> %{env:OXCAML_LLD=} "")))
+ (targets specialize_lld.exe specialize.order.corrected)
+ (deps specialize.ml specialize.fdo specialize.output.corrected)
+ (action
+  (progn
+   (run
+    %{bin:ocamlopt.opt}
+    -O3
+    -fdo-profile
+    specialize.fdo
+    -ccopt
+    -no-pie
+    -ccopt
+    -fuse-ld=lld
+    specialize.ml
+    -o
+    specialize_lld.exe)
+   (with-outputs-to
+    specialize.order.corrected
+    (system
+     "nm -n --defined-only specialize_lld.exe | grep ' [tT] camlSpecialize' | cut -d' ' -f3")))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")
+   (<> %{env:OXCAML_LLD=} "")))
+ (deps specialize.order specialize.order.corrected)
+ (action
+  (diff specialize.order specialize.order.corrected)))
+
+; The metadata follows ordinary debug splitting and compression. Keep using
+; the executable for address translation, and read names/data from the sidecar.
+
+(rule
+ (targets
+  specialize.exe.debug
+  specialize_stripped.exe
+  specialize_split.fdo
+  specialize_split.profile)
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (deps
+  specialize.exe
+  specialize.lbr
+  specialize.fdo
+  specialize.profile.corrected)
+ (action
+  (progn
+   (run
+    %{bin:objcopy}
+    --only-keep-debug
+    --compress-debug-sections=zlib
+    specialize.exe
+    specialize.exe.debug)
+   (run
+    %{bin:objcopy}
+    --strip-debug
+    --add-gnu-debuglink=specialize.exe.debug
+    specialize.exe
+    specialize_stripped.exe)
+   (run
+    %{bin:oxcaml-fdo-decode}
+    -perf-script-output
+    specialize.lbr
+    -binary
+    specialize_stripped.exe
+    -debug-file
+    specialize.exe.debug
+    -o
+    specialize_split.fdo)
+   (run cmp specialize.fdo specialize_split.fdo)
+   (with-outputs-to
+    specialize_split.profile
+    (run
+     %{bin:oxcaml-fdo-decode}
+     -dump
+     specialize_split.fdo
+     -debug-file
+     specialize.exe.debug))
+   (run cmp specialize.profile.corrected specialize_split.profile)
+   (ignore-outputs
+    (with-accepted-exit-codes
+     1
+     (run
+      %{bin:oxcaml-fdo-decode}
+      -perf-script-output
+      specialize.lbr
+      -binary
+      specialize_stripped.exe
+      -o
+      missing_metadata.fdo))))))
+
+; End-to-end test of a switch compiled to a jump table, through the same
+; pipeline as specialize.ml: the edges of the indirect jump are profiled.
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (target jump_table.exe)
+ ; The emulator is linked from the installed runtime, which dune does not
+ ; track.
+ (deps jump_table.ml %{project_root}/runtime/singlestep_profiler.c)
+ (action
+  (run
+   %{bin:ocamlopt.opt}
+   -O3
+   -fdo-counters
+   -fdo-names
+   -ccopt
+   -no-pie
+   jump_table.ml
+   -o
+   jump_table.exe)))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (targets jump_table.lbr jump_table.run)
+ (deps jump_table.exe)
+ (action
+  (with-outputs-to
+   jump_table.run
+   (run ./jump_table.exe jump_table.lbr))))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (target jump_table.fdo)
+ (deps jump_table.lbr jump_table.exe)
+ (action
+  (run
+   %{bin:oxcaml-fdo-decode}
+   -perf-script-output
+   jump_table.lbr
+   -binary
+   jump_table.exe
+   -o
+   jump_table.fdo)))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (target jump_table.profile.corrected)
+ (deps jump_table.fdo jump_table.exe)
+ (action
+  (with-outputs-to
+   jump_table.profile.corrected
+   (run %{bin:oxcaml-fdo-decode} -dump jump_table.fdo -binary jump_table.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (deps jump_table.profile jump_table.profile.corrected)
+ (action
+  (diff jump_table.profile jump_table.profile.corrected)))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (target jump_table.output.corrected)
+ (deps jump_table.ml jump_table.fdo jump_table.exe filter_fdo_dump.exe)
+ (action
+  (progn
+   (with-outputs-to
+    jump_table.dump
+    (run
+     %{bin:ocamlopt.opt}
+     -O3
+     -fdo-profile
+     jump_table.fdo
+     -dcfg
+     -dfdo
+     -color
+     never
+     -c
+     jump_table.ml))
+   (with-outputs-to
+    jump_table.output.corrected
+    (run ./filter_fdo_dump.exe jump_table.dump)))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (deps jump_table.output jump_table.output.corrected)
+ (action
+  (diff jump_table.output jump_table.output.corrected)))
+
+; The executables' FDO metadata as the decoder reads it back: the round trip
+; of what the compiler emits.
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (target specialize.metadata.corrected)
+ (deps specialize.exe)
+ (action
+  (with-outputs-to
+   specialize.metadata.corrected
+   (run %{bin:oxcaml-fdo-decode} -dump-metadata -binary specialize.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (deps specialize.metadata specialize.metadata.corrected)
+ (action
+  (diff specialize.metadata specialize.metadata.corrected)))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (target jump_table.metadata.corrected)
+ (deps jump_table.exe)
+ (action
+  (with-outputs-to
+   jump_table.metadata.corrected
+   (run %{bin:oxcaml-fdo-decode} -dump-metadata -binary jump_table.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (deps jump_table.metadata jump_table.metadata.corrected)
+ (action
+  (diff jump_table.metadata jump_table.metadata.corrected)))
+
+; The decoder's decisions for each sample of a trace of decode_trace.ml.
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (target decode_trace.exe)
+ ; The emulator is linked from the installed runtime, which dune does not
+ ; track.
+ (deps decode_trace.ml %{project_root}/runtime/singlestep_profiler.c)
+ (action
+  (run
+   %{bin:ocamlopt.opt}
+   -O3
+   -fdo-counters
+   -fdo-names
+   -ccopt
+   -no-pie
+   decode_trace.ml
+   -o
+   decode_trace.exe)))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (targets decode_trace.lbr decode_trace.run)
+ (deps decode_trace.exe)
+ (action
+  (with-outputs-to
+   decode_trace.run
+   (run ./decode_trace.exe decode_trace.lbr))))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (target decode_trace.trace.corrected)
+ (deps decode_trace.lbr decode_trace.exe)
+ (action
+  (with-outputs-to
+   decode_trace.trace.corrected
+   (run
+    %{bin:oxcaml-fdo-decode}
+    -dump-trace
+    -perf-script-output
+    decode_trace.lbr
+    -binary
+    decode_trace.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (deps decode_trace.trace decode_trace.trace.corrected)
+ (action
+  (diff decode_trace.trace decode_trace.trace.corrected)))
+
+; The counters of switches folded away by Simplify, as emitted in the
+; metadata.
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (target folded_switch.exe)
+ (deps folded_switch.ml)
+ (action
+  (run
+   %{bin:ocamlopt.opt}
+   -O3
+   -fdo-counters
+   -fdo-names
+   -ccopt
+   -no-pie
+   folded_switch.ml
+   -o
+   folded_switch.exe)))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (target folded_switch.metadata.corrected)
+ (deps folded_switch.exe)
+ (action
+  (with-outputs-to
+   folded_switch.metadata.corrected
+   (run %{bin:oxcaml-fdo-decode} -dump-metadata -binary folded_switch.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{system} "linux")))
+ (deps folded_switch.metadata folded_switch.metadata.corrected)
+ (action
+  (diff folded_switch.metadata folded_switch.metadata.corrected)))
+

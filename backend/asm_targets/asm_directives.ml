@@ -240,7 +240,9 @@ module Directive = struct
     | Label of Asm_label.t
     | Symbol of Asm_symbol.t
 
-  type reloc_type = R_X86_64_PLT32
+  type reloc_type =
+    | R_X86_64_PLT32
+    | R_X86_64_NONE
 
   type comment = string
 
@@ -309,6 +311,8 @@ module Directive = struct
         }
     | Delta_uleb128 of { delta : Constant.t }
   (* A constant (typically a label difference) emitted as ULEB128 *)
+
+  let new_label label = New_label (Label label, Code)
 
   let bprintf = Printf.bprintf
 
@@ -390,7 +394,9 @@ module Directive = struct
       bprintf buf "\t.ascii\t\"%s\""
         (string_of_substring_literal ~start:!i ~length:(l - !i) s)
 
-  let reloc_type_to_string = function R_X86_64_PLT32 -> "R_X86_64_PLT32"
+  let reloc_type_to_string = function
+    | R_X86_64_PLT32 -> "R_X86_64_PLT32"
+    | R_X86_64_NONE -> "R_X86_64_NONE"
 
   let print_gas buf t =
     let gas_comment_opt comment_opt =
@@ -1412,3 +1418,7 @@ let reloc_x86_64_plt32 ~offset_from_this ~target_symbol ~addend =
          target_symbol;
          addend
        })
+
+let reloc_x86_64_none ~target_symbol =
+  emit
+    (Reloc { offset = This; name = R_X86_64_NONE; target_symbol; addend = 0L })

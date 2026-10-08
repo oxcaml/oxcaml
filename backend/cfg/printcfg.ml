@@ -93,26 +93,32 @@ let terminator_body_with_args ?(print_reg = Printreg.reg) ?(args = [||])
   | Never -> fprintf ppf "deadend"
   | Always l -> fprintf ppf "goto %a" Label.format l
   | Parity_test { ifso; ifnot } ->
-    fprintf ppf "if even%s goto %a%selse goto %a" first_arg Label.format ifso
-      sep Label.format ifnot
+    fprintf ppf "if even%s goto %a%selse goto %a" first_arg Label.format
+      ifso.target sep Label.format ifnot.target
   | Truth_test { ifso; ifnot } ->
-    fprintf ppf "if true%s goto %a%selse goto %a" first_arg Label.format ifso
-      sep Label.format ifnot
+    fprintf ppf "if true%s goto %a%selse goto %a" first_arg Label.format
+      ifso.target sep Label.format ifnot.target
   | Float_test { width = _; lt; eq; gt; uo } ->
-    fprintf ppf "if%s <%s goto %a%s" first_arg second_arg Label.format lt sep;
-    fprintf ppf "if%s =%s goto %a%s" first_arg second_arg Label.format eq sep;
-    fprintf ppf "if%s >%s goto %a%s" first_arg second_arg Label.format gt sep;
-    fprintf ppf "else goto %a" Label.format uo
+    fprintf ppf "if%s <%s goto %a%s" first_arg second_arg Label.format lt.target
+      sep;
+    fprintf ppf "if%s =%s goto %a%s" first_arg second_arg Label.format eq.target
+      sep;
+    fprintf ppf "if%s >%s goto %a%s" first_arg second_arg Label.format gt.target
+      sep;
+    fprintf ppf "else goto %a" Label.format uo.target
   | Int_test { lt; eq; gt; is_signed; imm } ->
     let cmp =
       Printf.sprintf " %s%s"
         (match is_signed with Signed -> "s" | Unsigned -> "u")
         (match imm with None -> second_arg | Some i -> " " ^ Int.to_string i)
     in
-    fprintf ppf "if%s <%s goto %a%s" first_arg cmp Label.format lt sep;
-    fprintf ppf "if%s =%s goto %a%s" first_arg cmp Label.format eq sep;
-    fprintf ppf "if%s >%s goto %a" first_arg cmp Label.format gt
-  | Switch labels ->
+    fprintf ppf "if%s <%s goto %a%s" first_arg cmp Label.format lt.target sep;
+    fprintf ppf "if%s =%s goto %a%s" first_arg cmp Label.format eq.target sep;
+    fprintf ppf "if%s >%s goto %a" first_arg cmp Label.format gt.target
+  | Switch successors ->
+    let labels =
+      Array.map ~f:(fun (s : Cfg.successor) -> s.target) successors
+    in
     fprintf ppf "switch%s%s" first_arg sep;
     let label_count = Array.length labels in
     if label_count >= 1
@@ -133,20 +139,25 @@ let terminator_body_with_args ?(print_reg = Printreg.reg) ?(args = [||])
              { sym_name =
                  Printf.sprintf "self(%s)" (Label.to_string destination);
                sym_global = Local
-             }
+             };
+           callsite_counter = None
          })
   | Tailcall_func call ->
     (* CR ncourant: here and below, maybe the callees should be printed when
        they are known *)
     dump_linear_call_op ppf
       (match call with
-      | Indirect _callees -> Linear.Ltailcall_ind
-      | Direct func -> Linear.Ltailcall_imm { func })
+      | Indirect { callees = _; callsite_counter } ->
+        Linear.Ltailcall_ind { callsite_counter }
+      | Direct { sym = func; callsite_counter } ->
+        Linear.Ltailcall_imm { func; callsite_counter })
   | Call { op = call; label_after } ->
     dump_linear_call_op ppf
       (match call with
-      | Indirect _callees -> Linear.Lcall_ind
-      | Direct func -> Linear.Lcall_imm { func });
+      | Indirect { callees = _; callsite_counter } ->
+        Linear.Lcall_ind { callsite_counter }
+      | Direct { sym = func; callsite_counter } ->
+        Linear.Lcall_imm { func; callsite_counter });
     Format.fprintf ppf "%s\n           goto %a" sep Label.format label_after
   | Prim { op = prim; label_after } ->
     dump_linear_call_op ppf

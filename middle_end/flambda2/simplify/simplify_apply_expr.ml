@@ -44,7 +44,15 @@ let record_free_names_of_apply_as_used0 apply ~use_id ~exn_cont_use_id data_flow
     ~exn_cont:(exn_cont_use_id, exn_cont)
     ~result_cont ~result_arity:(Apply.return_arity apply) data_flow
 
+(* For applications that are not inlined out. *)
 let record_free_names_of_apply_as_used dacc ~use_id ~exn_cont_use_id apply =
+  (* The current region continues into the return continuation's handler (see
+     [Region_counters]). *)
+  let denv = DA.denv dacc in
+  (match Apply.continuation apply, DE.fdo_region denv with
+  | Return k, Some region when DE.tracking_region_counters denv ->
+    Region_counters.add_continuation_into (DE.region_counters denv) region k
+  | (Return _ | Never_returns), (Some _ | None) -> ());
   DA.map_flow_acc dacc
     ~f:(record_free_names_of_apply_as_used0 ~use_id ~exn_cont_use_id apply)
 
@@ -96,8 +104,14 @@ let loopify_decision_for_call dacc apply =
         else Loopify_state.do_not_loopify)
 
 let simplify_self_tail_call dacc apply self_cont ~down_to_up =
+  (* The call becomes a jump, which runs as often: its counter is preserved in
+     the current region (see [Region_counters]). *)
+  DE.preserve_counters (DA.denv dacc)
+    (List.map
+       (DE.add_inlined_fdo_counter (DA.denv dacc))
+       (Option.to_list (Apply.callsite_counter apply)));
   Simplify_apply_cont_expr.simplify_apply_cont dacc
-    (Apply_cont_expr.create self_cont ~args:(Apply.args apply)
+    (Apply_cont_expr.create ~fdo_counters:[] self_cont ~args:(Apply.args apply)
        ~dbg:(Apply.dbg apply))
     ~down_to_up
 
@@ -654,7 +668,9 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
             Apply.create ~callee ~continuation:(Return return_continuation)
               exn_continuation ~args ~args_arity:param_arity
               ~return_arity:result_arity ~call_kind ~return_mode:my_alloc_mode
-              dbg ~inlined
+              dbg (* The wrapper's call is the eventual call of this site. *)
+              ~callsite_counter:(Apply.callsite_counter apply)
+              ~inlined
               ~inlining_state:(Apply.inlining_state apply)
               ~position:Normal ~probe:None
               ~relative_history:Inlining_history.Relative.empty
@@ -743,7 +759,8 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
               ~cold:false ~is_a_functor:false ~is_opaque:false ~recursive
               ~cost_metrics:cost_metrics_of_body
               ~inlining_arguments:(DE.inlining_arguments (DA.denv dacc))
-              ~dbg ~is_tupled:false
+              ~dbg ~fdo_entry_counters:[] ~function_body_hash:None
+              ~is_tupled:false
               ~is_my_closure_used:
                 (Function_params_and_body.is_my_closure_used params_and_body)
               ~inlining_decision:Stub ~absolute_history ~relative_history
@@ -774,7 +791,9 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
           code )
       in
       let apply_cont =
-        Apply_cont.create apply_continuation ~args:[Simple.var wrapper_var] ~dbg
+        Apply_cont.create ~fdo_counters:[] apply_continuation
+          ~args:[Simple.var wrapper_var]
+          ~dbg
       in
       let expr =
         let wrapper_var =
@@ -1312,6 +1331,10 @@ let simplify_apply_shared dacc apply : _ simplify_apply_shared_result =
         ~call_kind:(Apply.call_kind apply)
         ~return_mode:(Apply.return_mode apply)
         (DE.add_inlined_debuginfo (DA.denv dacc) (Apply.dbg apply))
+        ~callsite_counter:
+          (Option.map
+             (DE.add_inlined_fdo_counter (DA.denv dacc))
+             (Apply.callsite_counter apply))
         ~inlined ~inlining_state ~probe:(Apply.probe apply)
         ~position:(Apply.position apply)
         ~relative_history:

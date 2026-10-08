@@ -1,0 +1,95 @@
+function
+  both normal "Folded_switch.side":0
+function
+  both normal "Folded_switch.choose":0
+  taken normal "Folded_switch.choose":0:475b0a05:0:then
+  fallthrough normal "Folded_switch.choose":0:475b0a05:0:else
+  taken tailcall "Folded_switch.choose":0:475b0a05:1:call
+function
+  both normal "Folded_switch.classify":0
+  taken normal "Folded_switch.classify":0:f0260189:0:else
+  fallthrough normal "Folded_switch.classify":0:f0260189:0:then
+  taken tailcall "Folded_switch.classify":0:f0260189:3:call
+  taken normal "Folded_switch.classify":0:f0260189:1:case(1)
+  taken normal "Folded_switch.classify":0:f0260189:1:case(2)
+  fallthrough normal "Folded_switch.classify":0:f0260189:1:case(0)
+  taken tailcall "Folded_switch.classify":0:f0260189:2:call
+function
+  both normal "Folded_switch.choose":0 < "Folded_switch.kept":0:818121b1:0:call
+  both normal "Folded_switch.kept":0
+  taken normal "Folded_switch.choose":0:475b0a05:0:then < "Folded_switch.kept":0:818121b1:0:call
+  fallthrough normal "Folded_switch.choose":0:475b0a05:0:else < "Folded_switch.kept":0:818121b1:0:call
+  taken tailcall "Folded_switch.choose":0:475b0a05:1:call < "Folded_switch.kept":0:818121b1:0:call
+function
+  both normal "Folded_switch.folded":0
+  both normal "Folded_switch.choose":0:475b0a05:0:then < "Folded_switch.folded":0:ca0f5e3a:0:call
+  both normal "Folded_switch.choose":0 < "Folded_switch.folded":0:ca0f5e3a:0:call
+  taken tailcall "Folded_switch.choose":0:475b0a05:1:call < "Folded_switch.folded":0:ca0f5e3a:0:call
+function
+  both normal "Folded_switch.classify":0 < "Folded_switch.kept_match":0:24c613fd:0:call
+  both normal "Folded_switch.kept_match":0
+  taken normal "Folded_switch.classify":0:f0260189:0:else < "Folded_switch.kept_match":0:24c613fd:0:call
+  fallthrough normal "Folded_switch.classify":0:f0260189:0:then < "Folded_switch.kept_match":0:24c613fd:0:call
+  taken tailcall "Folded_switch.classify":0:f0260189:3:call < "Folded_switch.kept_match":0:24c613fd:0:call
+  taken normal "Folded_switch.classify":0:f0260189:1:case(1) < "Folded_switch.kept_match":0:24c613fd:0:call
+  taken normal "Folded_switch.classify":0:f0260189:1:case(2) < "Folded_switch.kept_match":0:24c613fd:0:call
+  fallthrough normal "Folded_switch.classify":0:f0260189:1:case(0) < "Folded_switch.kept_match":0:24c613fd:0:call
+  taken tailcall "Folded_switch.classify":0:f0260189:2:call < "Folded_switch.kept_match":0:24c613fd:0:call
+function
+  both normal "Folded_switch.classify":0:f0260189:1:case(1) < "Folded_switch.folded_match":0:4bbcbf78:0:call
+  both normal "Folded_switch.classify":0 < "Folded_switch.folded_match":0:4bbcbf78:0:call
+  both normal "Folded_switch.classify":0:f0260189:0:else < "Folded_switch.folded_match":0:4bbcbf78:0:call
+  both normal "Folded_switch.folded_match":0
+  taken tailcall "Folded_switch.classify":0:f0260189:2:call < "Folded_switch.folded_match":0:4bbcbf78:0:call
+function
+  both normal "Folded_switch.count_down":0
+  taken normal "Folded_switch.count_down":0:c24b1bb7:1:call
+  taken normal "Folded_switch.count_down":0:c24b1bb7:0:else
+  fallthrough normal "Folded_switch.count_down":0:c24b1bb7:0:then
+function
+  both normal "Folded_switch.code":0:58709793:0:case(0)
+  both normal "Folded_switch.code":0
+  both normal "Folded_switch.code":0:58709793:0:case(3)
+  both normal "Folded_switch.code":0:58709793:0:case(1)
+  both normal "Folded_switch.code":0:58709793:0:case(2)
+function
+  both normal "Folded_switch.guarded":0
+  taken normal "Folded_switch.guarded":0:335b23fc:1:case(0)
+  taken normal "Folded_switch.guarded":0:335b23fc:0:then
+  taken normal "Folded_switch.guarded":0:335b23fc:1:case(2)
+  taken normal "Folded_switch.guarded":0:335b23fc:1:case(1)
+  taken normal "Folded_switch.guarded":0:335b23fc:1:case(3)
+  fallthrough normal "Folded_switch.guarded":0:335b23fc:0:else
+function
+  both normal "Folded_switch.sum_codes":0
+  taken normal "Folded_switch.sum_codes":0:ab1c0b19:0:else
+  fallthrough normal "Folded_switch.sum_codes":0:ab1c0b19:0:then
+  taken normal "Folded_switch.sum_codes":0:ab1c0b19:1:else
+  fallthrough normal "Folded_switch.sum_codes":0:ab1c0b19:2:case(3)
+  fallthrough normal "Folded_switch.sum_codes":0:ab1c0b19:1:then
+  fallthrough normal "Folded_switch.sum_codes":0:ab1c0b19:2:case(0)
+  fallthrough normal "Folded_switch.sum_codes":0:ab1c0b19:2:case(1)
+  fallthrough normal "Folded_switch.sum_codes":0:ab1c0b19:2:case(2)
+  taken normal "Folded_switch.sum_codes":0:ab1c0b19:3:then
+  fallthrough normal "Folded_switch.sum_codes":0:ab1c0b19:3:else
+function
+  taken call "Folded_switch":0:4685d237:0:call
+  taken call "Folded_switch":0:4685d237:1:call
+  taken call "Folded_switch":0:4685d237:2:call
+  taken call "Folded_switch":0:4685d237:3:call
+  taken call "Folded_switch":0:4685d237:4:call
+  taken call "Folded_switch":0:4685d237:5:call
+  taken call "Folded_switch":0:4685d237:6:call
+  taken call "Folded_switch":0:4685d237:7:call
+bodies:
+  "Folded_switch.choose":0: 475b0a05
+  "Folded_switch.classify":0: f0260189
+  "Folded_switch.code":0: 58709793
+  "Folded_switch.count_down":0: c24b1bb7
+  "Folded_switch.folded":0: ca0f5e3a
+  "Folded_switch.folded_match":0: 4bbcbf78
+  "Folded_switch.guarded":0: 335b23fc
+  "Folded_switch.kept":0: 818121b1
+  "Folded_switch.kept_match":0: 24c613fd
+  "Folded_switch.side":0: 0167095e
+  "Folded_switch.sum_codes":0: ab1c0b19

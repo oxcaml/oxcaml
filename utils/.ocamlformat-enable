@@ -22,3 +22,7 @@ structured_mangling.ml
 structured_mangling.mli
 opt_fuel.ml
 opt_fuel.mli
+fdo_counter.ml
+fdo_counter.mli
+fdo_prehash.ml
+fdo_prehash.mli

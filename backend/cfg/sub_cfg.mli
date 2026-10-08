@@ -124,6 +124,10 @@ val update_exit_terminator :
 
 val start_label : t -> Label.t
 
+(** The label of the block that instructions and the terminator are being added
+    to. *)
+val exit_label : t -> Label.t
+
 val mark_as_trap_handler : t -> unit
 
 val dump : t -> unit

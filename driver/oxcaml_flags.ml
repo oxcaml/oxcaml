@@ -15,6 +15,7 @@
 (**************************************************************************)
 let dump_cfg = ref false                (* -dcfg *)
 let dump_ssa = ref false                (* -dssa *)
+let dump_fdo = ref false                (* -dfdo *)
 let cfg_invariants = ref false          (* -dcfg-invariants *)
 let regalloc = ref Clflags.Register_allocator.Cfg (* -regalloc *)
 let default_regalloc_linscan_threshold = 100_000
@@ -189,6 +190,45 @@ let keep_llvmir = ref false (* -keep-llvmir *)
 let llvm_path = ref None (* -llvm-path *)
 
 let llvm_flags = ref "" (* -llvm-flags *)
+
+let fdo_profile_path = ref None (* -fdo-profile *)
+
+let set_fdo_profile_path path =
+  if not Config.function_sections
+  then
+    raise
+      (Arg.Bad
+         "OCaml has been configured without support for -function-sections \
+          which is required for -fdo-profile");
+  (* As [-function-sections] does (see [Main_args]). *)
+  Compenv.first_ccopts := "-ffunction-sections" :: !Compenv.first_ccopts;
+  Clflags.function_sections := true;
+  fdo_profile_path := Some path
+
+(* The profile is loaded once, on first use, from [fdo_profile_path] (which is
+   set during argument parsing, before this is forced). Held here so that any
+   compiler phase can consult it. Loading raises if the profile is malformed,
+   surfacing broken feedback-directed optimization loudly. *)
+let fdo_profile_lazy =
+  lazy
+    (Option.map (fun filename -> Source_position_profile.load ~filename)
+       !fdo_profile_path)
+
+let fdo_profile () = Lazy.force fdo_profile_lazy
+
+let fdo_counters = ref false (* -fdo-counters *)
+
+(* Pseudo-instrumentation counters name the edges of branching constructs.
+   They are needed both to produce a profile with edge counts (the
+   "fdo_metadata" section attributes decoded branch counts to them) and to
+   consume one (the profile's counts are matched back against them), so they
+   are created when either side is requested. *)
+let fdo_counters_enabled () =
+  !fdo_counters || Option.is_some !fdo_profile_path
+
+let fdo_names = ref false (* -fdo-names *)
+
+let fdo_profile_check = ref true (* -no-fdo-profile-check *)
 
 module Flambda2 = struct
   let debug = ref false (* -flambda2-debug *)

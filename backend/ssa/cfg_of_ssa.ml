@@ -161,26 +161,35 @@ let fuse_comparison (cond : value) ~true_label ~false_label :
     (Cfg.terminator * value array) option =
   match[@warning "-fragile-match"] cond with
   | Res ({ op = Intop_imm (Icomp Cne, 0); args; _ }, 0) ->
-    Some (Cfg.Truth_test { ifso = true_label; ifnot = false_label }, args)
+    Some
+      ( Cfg.Truth_test
+          { ifso = Cfg.successor true_label; ifnot = Cfg.successor false_label },
+        args )
   | Res ({ op = Intop (Icomp cmp); args; _ }, 0) ->
     Some
-      ( Select_utils.terminator_of_test (Iinttest cmp) ~label_true:true_label
-          ~label_false:false_label,
+      ( Select_utils.terminator_of_test (Iinttest cmp)
+          ~ifso:(Cfg.successor true_label)
+          ~ifnot:(Cfg.successor false_label),
         args )
   | Res ({ op = Intop_imm (Icomp cmp, n); args; _ }, 0) ->
     Some
       ( Select_utils.terminator_of_test
           (Iinttest_imm (cmp, n))
-          ~label_true:true_label ~label_false:false_label,
+          ~ifso:(Cfg.successor true_label)
+          ~ifnot:(Cfg.successor false_label),
         args )
   | Res ({ op = Floatop (w, Icompf cmp); args; _ }, 0) ->
     Some
       ( Select_utils.terminator_of_test
           (Ifloattest (w, cmp))
-          ~label_true:true_label ~label_false:false_label,
+          ~ifso:(Cfg.successor true_label)
+          ~ifnot:(Cfg.successor false_label),
         args )
   | Res ({ op = Intop_imm (Iand, 1); args; _ }, 0) ->
-    Some (Cfg.Parity_test { ifso = false_label; ifnot = true_label }, args)
+    Some
+      ( Cfg.Parity_test
+          { ifso = Cfg.successor false_label; ifnot = Cfg.successor true_label },
+        args )
   | _ -> None
 
 let truncate arr n = if Array.length arr > n then Array.sub arr 0 n else arr
@@ -450,19 +459,25 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
           make_instr term (Array.map (get_reg env) args) [||] dbg
         | None ->
           make_instr
-            (Cfg.Truth_test { ifso = true_label; ifnot = false_label })
+            (Cfg.Truth_test
+               { ifso = Cfg.successor true_label;
+                 ifnot = Cfg.successor false_label
+               })
             [| get_reg env index |]
             [||] dbg
       else
         let index_reg = get_reg env index in
-        let labels = Array.map (label_of env) targets in
+        let labels =
+          Array.map (fun target -> Cfg.successor (label_of env target)) targets
+        in
         make_instr (Cfg.Switch labels) [| index_reg |] [||] dbg
     | Call { op; args; continuation = Return; nontail; may_raise = _ } ->
       assert (not nontail);
       let call_op : Cfg.func_call_operation =
         match op with
-        | Direct sym -> Direct sym
-        | Indirect candidates -> Indirect candidates
+        | Direct sym -> Direct { sym; callsite_counter = None }
+        | Indirect candidates ->
+          Indirect { callees = candidates; callsite_counter = None }
         | External _ | Probe _ ->
           Misc.fatal_error
             "Cfg_of_ssa: external functions cannot be tail called"
@@ -519,8 +534,9 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
           loc_res dbg
       in
       match op with
-      | Direct sym -> ocaml_call (Direct sym)
-      | Indirect candidates -> ocaml_call (Indirect candidates)
+      | Direct sym -> ocaml_call (Direct { sym; callsite_counter = None })
+      | Indirect candidates ->
+        ocaml_call (Indirect { callees = candidates; callsite_counter = None })
       | External ({ ty_args; _ } as ext) ->
         let loc_arg, stack_ofs, stack_align =
           move_to_extcall_arg_locs body ty_args virt_args dbg
@@ -731,9 +747,11 @@ let convert ~future_funcnames (ssa_graph : finished Ssa.graph) :
     Cfg.create ~fun_name:function_info.sym_name ~fun_args:fun_arg_locs
       ~fun_codegen_options:
         (Cfg.of_cmm_codegen_option function_info.codegen_options)
-      ~fun_dbg:function_info.dbg ~fun_contains_calls:true
-      ~fun_num_stack_slots:(Stack_class.Tbl.make 0) ~fun_poll:function_info.poll
-      ~next_instruction_id:Sub_cfg.instr_id
+      ~fun_dbg:function_info.dbg
+      ~fun_fdo_entry_counters:function_info.fdo_entry_counters
+      ~fun_function_body_hash:function_info.function_body_hash
+      ~fun_contains_calls:true ~fun_num_stack_slots:(Stack_class.Tbl.make 0)
+      ~fun_poll:function_info.poll ~next_instruction_id:Sub_cfg.instr_id
       ~fun_ret_type:function_info.ret_type
         (* CR ttebbi: [Ssa_of_cmm] drops [Cphantom_let], so there are no phantom
            lets to attach; DWARF for phantom variables is lost in the SSA
