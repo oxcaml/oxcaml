@@ -72,7 +72,7 @@ let of_cmo (cmo : Ocaml_compiler.Cmo_format.t) =
   { provides; requires; aliases = []; primitives = []; force_link; effects_without_cps }
 
 let of_compilation_units ~exported ~imported =
-  let compunit cu = Global_name.Compunit (Code.Compilation_unit.full_path_as_string cu) in
+  let compunit cu = Global_name.Compunit cu in
   let provides = Global_name.Compunit_set.singleton (compunit exported) in
   let requires = Global_name.Compunit_set.of_list (List.map imported ~f:compunit) in
   let requires = Global_name.Compunit_set.diff requires provides in

@@ -56,7 +56,9 @@ let create_let_prim ~env ~res fvar prim =
 (** Apply the function pointed to by the variable in [f] with [args], bind the
     return value to a variable, and return the variable and the result. *)
 let apply_fn ~res ~f ~args ~exact =
-  let apply : Jsir.expr = Apply { f; args; exact } in
+  (* CR-soon selee: carry the unyielding information from Flambda 2 through to
+     JSIR rather than always using the sound default. *)
+  let apply : Jsir.expr = Apply { f; args; exact; yielding = May_yield } in
   let var = Jsir.Var.fresh () in
   let res = To_jsir_result.add_instr_exn res (Let (var, apply)) in
   var, res
@@ -203,7 +205,7 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
         (fun res var ->
           let null = Jsir.Var.fresh () in
           let res =
-            To_jsir_result.add_instr_exn res (Let (null, Constant Null))
+            To_jsir_result.add_instr_exn res (Let (null, Constant Null_))
           in
           To_jsir_result.add_instr_exn res
             (Let (var, Block (0, [| null |], NotArray, Maybe_mutable))))
@@ -411,7 +413,7 @@ and apply_expr ~env ~res e =
           let bt, res = To_jsir_shared.simple ~env ~res bt in
           "%discontinue_with_backtrace", [Pv cont; Pv exn; Pv bt], res
       in
-      let prim : Jsir.expr = Prim (Extern prim_name, args) in
+      let prim : Jsir.expr = Prim (Extern (prim_name, None), args) in
       let var = Jsir.Var.fresh () in
       let res = To_jsir_result.add_instr_exn res (Let (var, prim)) in
       var, res
@@ -519,7 +521,7 @@ and apply_cont0 ~env ~res apply_cont =
           (Jsir.Let
              ( var,
                Prim
-                 ( Extern "caml_register_global",
+                 ( Extern ("caml_register_global", None),
                    [ Pc (Int (Targetint.of_int_exn 0));
                      Pv module_symbol;
                      Pc
@@ -537,7 +539,7 @@ and apply_cont0 ~env ~res apply_cont =
           (* We have to return something - we will ignore this at the
              application site. *)
           let arg = Jsir.Var.fresh () in
-          arg, To_jsir_result.add_instr_exn res (Let (arg, Constant Null))
+          arg, To_jsir_result.add_instr_exn res (Let (arg, Constant Null_))
         | _ :: _ as args ->
           (* We box these back into a regular tuple - we will unbox this at the
              application site. *)
@@ -661,12 +663,15 @@ and invalid ~env ~res msg =
       (Let
          ( Jsir.Var.fresh (),
            Prim
-             ( Extern "caml_invalid_expr",
+             ( Extern ("caml_invalid_expr", None),
                [Pc (NativeString (Jsir.Native_string.of_string msg))] ) ))
   in
   env, To_jsir_result.end_block_with_last_exn res Stop
 
 let unit ~offsets:_ ~all_code:_ ~reachable_names:_ flambda_unit =
+  (* As [Config.set_target `JavaScript] does in js_of_ocaml. *)
+  Targetint.set_num_bits 32;
+  Targetnativeint.set_num_bits 32;
   let env =
     To_jsir_env.create
       ~module_symbol:(Flambda_unit.module_symbol flambda_unit)
