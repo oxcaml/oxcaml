@@ -121,8 +121,26 @@ module Env : sig
 
   type t
 
-  (** Create an environment marked as being at toplevel. *)
-  val create : big_endian:bool -> t
+  (** Create an environment marked as being at toplevel. [module_symbol] is the
+      symbol to be bound to the module block and [return_continuation] is the
+      return continuation of the whole compilation unit, to which
+      [module_symbol] is passed once it has been bound. *)
+  val create :
+    big_endian:bool ->
+    module_symbol:Symbol.t ->
+    return_continuation:Continuation.t ->
+    t
+
+  val module_symbol : t -> Symbol.t
+
+  val return_continuation : t -> Continuation.t
+
+  (** Record that the given identifier is about to be bound to the module block,
+      so that [Closure_conversion.close_let] binds that block directly to
+      [module_symbol]. *)
+  val set_module_block_ident : t -> Ident.t -> t
+
+  val is_module_block_ident : t -> Ident.t -> bool
 
   val set_not_at_toplevel : t -> t
 
@@ -234,7 +252,19 @@ module Acc : sig
   val create :
     cmx_loader:Flambda_cmx.loader ->
     machine_width:Target_system.Machine_width.t ->
+    exn_continuation:Continuation.t ->
     t
+
+  val toplevel_exn_continuation : t -> Continuation.t
+
+  (** Whether the term currently being built is at the toplevel of the
+      compilation unit, i.e. whether symbols may be bound there (the computation
+      mirrors that in [Simplify]). This is maintained by [Let_cont_with_acc] and
+      does not take function bodies into account (see [Env.at_toplevel] for
+      those). *)
+  val at_unit_toplevel : t -> bool
+
+  val set_at_unit_toplevel : t -> bool -> t
 
   val declared_symbols : t -> (Symbol.t * Static_const.t) list
 

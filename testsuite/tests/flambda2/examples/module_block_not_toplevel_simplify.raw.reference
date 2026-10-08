@@ -1,0 +1,51 @@
+(let code inline(never) size(3)
+       f_0 (x : imm tagged)
+         my_closure &my_alloc_region my_depth
+         -> k1 * k2
+         : imm tagged =
+   let next_depth = rec_info (succ my_depth) in
+   let int_add = %int_barith.add (x, 1) in
+   cont k1 (int_add)
+ in
+ let $camlModule_block_not_toplevel_simplify__immstring_0 =
+   "module_block_not_toplevel_simplify.ml"
+ in
+ let $camlModule_block_not_toplevel_simplify__const_block_1 =
+   Block 0 ($camlModule_block_not_toplevel_simplify__immstring_0, 22, 4)
+ in
+ let $camlModule_block_not_toplevel_simplify__Pmakeblock_2 =
+   Block 0 ($`*predef*`.caml_exn_Match_failure,
+            $camlModule_block_not_toplevel_simplify__const_block_1)
+ in
+ let f = closure f_0 @f &toplevel in
+ (let Popaque = %opaque (41) in
+  apply direct(f_0 &toplevel) (f : _ -> imm tagged) (Popaque) -> k1 * error)
+   where k1 (y : imm tagged) =
+     let Pmakeblock = %block.[`0`].`toplevel` (y) in
+     let `*match*` = %opaque (Pmakeblock) in
+     ((let prim = %is_int (`*match*`) in
+       let Pisint = %tag_imm (prim) in
+       (let untagged = %untag_imm (Pisint) in
+        switch untagged
+          | 0 -> k3
+          | 1 -> k4)
+         where k4 =
+           cont k1
+         where k3 =
+           cont k2)
+        where k2 =
+          let Pfield = %block_load.[`0`] (`*match*`) in
+          let Pmakeblock_1 = %block.[`0`].`toplevel` (f, y, Pfield) in
+          cont k (Pmakeblock_1)
+        where k1 =
+          cont error
+                 pop(regular error)
+                 ($camlModule_block_not_toplevel_simplify__Pmakeblock_2)))
+  where k define_root_symbol (module_block) =
+    let field_0 = %block_load.tag[`0`].`size`[`3`].[`0`] (module_block) in
+    let field_1 = %block_load.tag[`0`].`size`[`3`].[`1`] (module_block) in
+    let field_2 = %block_load.tag[`0`].`size`[`3`].[`2`] (module_block) in
+    let $camlModule_block_not_toplevel_simplify =
+      Block 0 (field_0, field_1, field_2)
+    in
+    cont done ($camlModule_block_not_toplevel_simplify)

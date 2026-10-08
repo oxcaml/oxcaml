@@ -167,7 +167,10 @@ module Env = struct
       big_endian : bool;
       path_to_root : Debuginfo.Scoped_location.t;
       inlining_history_tracker : Inlining_history.Tracker.t;
-      at_toplevel : bool
+      at_toplevel : bool;
+      module_symbol : Symbol.t;
+      return_continuation : Continuation.t;
+      module_block_ident : Ident.t option
     }
 
   let current_unit t = t.current_unit
@@ -176,7 +179,7 @@ module Env = struct
 
   let current_depth t = t.current_depth
 
-  let create ~big_endian =
+  let create ~big_endian ~module_symbol ~return_continuation =
     let current_unit = Current_unit.get_cu_exn () in
     { variables = Ident.Map.empty;
       globals = Numeric_types.Int.Map.empty;
@@ -187,8 +190,22 @@ module Env = struct
       big_endian;
       path_to_root = Debuginfo.Scoped_location.Loc_unknown;
       inlining_history_tracker = Inlining_history.Tracker.empty current_unit;
-      at_toplevel = true
+      at_toplevel = true;
+      module_symbol;
+      return_continuation;
+      module_block_ident = None
     }
+
+  let module_symbol t = t.module_symbol
+
+  let return_continuation t = t.return_continuation
+
+  let set_module_block_ident t id = { t with module_block_ident = Some id }
+
+  let is_module_block_ident t id =
+    match t.module_block_ident with
+    | None -> false
+    | Some module_block_ident -> Ident.same id module_block_ident
 
   let set_not_at_toplevel t = { t with at_toplevel = false }
 
@@ -204,7 +221,10 @@ module Env = struct
         big_endian;
         path_to_root;
         inlining_history_tracker;
-        at_toplevel
+        at_toplevel;
+        module_symbol;
+        return_continuation;
+        module_block_ident = _
       } =
     let simples_to_substitute =
       Ident.Map.filter
@@ -220,7 +240,10 @@ module Env = struct
       big_endian;
       path_to_root;
       inlining_history_tracker;
-      at_toplevel
+      at_toplevel;
+      module_symbol;
+      return_continuation;
+      module_block_ident = None
     }
 
   let with_depth t depth_var = { t with current_depth = Some depth_var }
@@ -375,6 +398,8 @@ module Acc = struct
       continuation_applications : continuation_application Continuation.Map.t;
       cost_metrics : Cost_metrics.t;
       seen_a_function : bool;
+      toplevel_exn_continuation : Continuation.t;
+      at_unit_toplevel : bool;
       slot_offsets : Slot_offsets.t;
       code_slot_offsets : Slot_offsets.t Code_id.Map.t;
       closure_infos : closure_info list
@@ -450,7 +475,7 @@ module Acc = struct
         externals := Symbol.Map.add symbol approx !externals;
         approx
 
-  let create ~cmx_loader ~machine_width =
+  let create ~cmx_loader ~machine_width ~exn_continuation =
     { machine_width;
       declared_symbols = [];
       lifted_sets_of_closures = [];
@@ -468,10 +493,18 @@ module Acc = struct
       seen_a_function = false;
       slot_offsets = Slot_offsets.empty;
       code_slot_offsets = Code_id.Map.empty;
-      closure_infos = []
+      closure_infos = [];
+      toplevel_exn_continuation = exn_continuation;
+      at_unit_toplevel = true
     }
 
   let declared_symbols t = t.declared_symbols
+
+  let toplevel_exn_continuation t = t.toplevel_exn_continuation
+
+  let at_unit_toplevel t = t.at_unit_toplevel
+
+  let set_at_unit_toplevel t at_unit_toplevel = { t with at_unit_toplevel }
 
   let lifted_sets_of_closures t = t.lifted_sets_of_closures
 
@@ -663,9 +696,8 @@ module Acc = struct
     { t with
       free_names =
         Name_occurrences.remove_continuation t.free_names ~continuation
-        (* We don't remove the continuation from [t.continuation_applications]
-           here because we need this information of the module block to escape
-           its scope to build the .cmx in [Closure_conversion.close_program]. *)
+        (* [t.continuation_applications] is left alone: the information in it is
+           only consulted when building continuation handlers. *)
     }
 
   let remove_code_id_from_free_names code_id t =
@@ -1195,6 +1227,8 @@ module Let_cont_with_acc = struct
     acc, expr
 
   let build_recursive acc ~invariant_params ~handlers ~body =
+    let at_unit_toplevel = Acc.at_unit_toplevel acc in
+    let acc = Acc.set_at_unit_toplevel acc false in
     let handlers_free_names, cost_metrics_of_handlers, acc, handlers =
       Continuation.Map.fold
         (fun cont (handler, params, is_exn_handler, is_cold)
@@ -1212,6 +1246,7 @@ module Let_cont_with_acc = struct
         handlers
         (Name_occurrences.empty, Cost_metrics.zero, acc, Continuation.Lmap.empty)
     in
+    let acc = Acc.set_at_unit_toplevel acc at_unit_toplevel in
     let body_free_names, acc, body = Acc.eval_branch_free_names acc ~f:body in
     let acc =
       Acc.with_free_names
@@ -1230,12 +1265,26 @@ module Let_cont_with_acc = struct
       Acc.eval_branch_free_names acc ~f:body
     in
     let body_acc = acc in
+    let at_unit_toplevel = Acc.at_unit_toplevel acc in
+    let handler_at_unit_toplevel =
+      (* This must agree with the corresponding computation in
+         [Simplify_let_cont_expr]: the handler remains at the toplevel of the
+         compilation unit if the body can only leave via [cont] or the toplevel
+         exception continuation. *)
+      at_unit_toplevel && (not is_exn_handler)
+      && Continuation.Set.subset
+           (Name_occurrences.continuations_including_in_trap_actions
+              free_names_of_body)
+           (Continuation.Set.of_list [cont; Acc.toplevel_exn_continuation acc])
+    in
+    let acc = Acc.set_at_unit_toplevel acc handler_at_unit_toplevel in
     let cost_metrics_of_handler, handler_free_names, acc, handler =
       Acc.measure_cost_metrics acc ~f:(fun acc ->
           let acc, handler = handler acc in
           Continuation_handler_with_acc.create acc handler_params ~handler
             ~is_exn_handler ~is_cold)
     in
+    let acc = Acc.set_at_unit_toplevel acc at_unit_toplevel in
     match Name_occurrences.count_continuation free_names_of_body cont with
     | Zero when not (Continuation_handler.is_exn_handler handler) ->
       Acc.with_free_names free_names_of_body body_acc, body
