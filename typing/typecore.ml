@@ -8545,7 +8545,10 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_letexception(cd, sbody) ->
-      let (cd, newenv, _shape) = Typedecl.transl_exception env cd in
+      let (cd, newenv, _shape) =
+        Typetexp.TyVarEnv.with_local_scope (fun () ->
+          Typedecl.transl_exception env cd)
+      in
       let body =
         type_expect newenv expected_mode sbody ty_expected_explained
       in
