@@ -16,8 +16,7 @@
 
 set -euo pipefail
 
-repo_root=$(git rev-parse --show-toplevel) || exit 1
-cd "$repo_root" || exit 1
+cd "$(dirname "$0")/.." || exit 1
 
 driver=${1:?usage: jsoo-imports.sh DRIVER [--check]}
 check=0
