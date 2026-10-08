@@ -72,11 +72,11 @@ val eval_compile_time : t -> bool
 (** Evaluate the predicate now, at preprocessing time. Resolves [ocaml_version],
     [ast_version], [arch_sixtyfour], [oxcaml] and [os_type]. Raises {!Invalid} on
     constructs that are not meaningful at compile time (e.g. [backend],
-    [host_engine], [target_engine], or the runtime shorthands). *)
+    [host_engine], [target_engine], or the runtime shorthands).
 
-val set_oxcaml : bool -> unit
-(** Override the value of [oxcaml] in {!eval_compile_time}, which otherwise
-    reflects the compiler the preprocessor was built with. *)
+    [oxcaml] reflects the compiler the preprocessor was built with, unless the
+    [oxcaml] cookie is set (e.g. [-cookie oxcaml=false] on the ppx driver
+    command line). *)
 
 val reify : loc:Location.t -> t -> expression
 (** Reify the predicate into an OCaml expression of type [bool] that evaluates it

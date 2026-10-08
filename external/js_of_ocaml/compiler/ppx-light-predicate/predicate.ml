@@ -162,13 +162,13 @@ let rec parse (e : expression) : t =
 
 (* -- Compile-time evaluation ----------------------------------------------- *)
 
-let oxcaml_override = ref None
-
-let set_oxcaml b = oxcaml_override := Some b
-
+(* The [oxcaml] cookie (e.g. [-cookie oxcaml=false] on the driver command
+   line) overrides the compiler the preprocessor was built with. *)
 let oxcaml () =
-  match !oxcaml_override with
-  | Some b -> b
+  match Astlib.Ast_metadata.get_cookie "oxcaml" with
+  | Some e ->
+      let e = Selected_ast.of_ocaml Expression e in
+      Ast_pattern.(parse (ebool __)) e.pexp_loc e (fun b -> b)
   | None -> (
       match Version.extra with
       | Some (Plus, "ox") -> true
