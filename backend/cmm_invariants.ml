@@ -248,8 +248,7 @@ type expected_arg_types =
       (** At least the listed arguments, checked slotwise, followed by any
           number of arguments checked against the second constraint. *)
 
-(* The machtypes an operation expects for its arguments, in the style of
-   [Select_utils.oper_result_type]. *)
+(* The machtypes an operation expects for its arguments *)
 let oper_arg_types : Cmm.operation -> expected_arg_types = function
   | Capply _ ->
     Args_then_any_number_of
@@ -363,9 +362,6 @@ let oper_arg_types : Cmm.operation -> expected_arg_types = function
   | Ctuple_field (_, fields_ty) ->
     Args [Exactly (Array.concat (Array.to_list fields_ty))]
 
-(* [Never_returns] is for diverging expressions, which do not constrain their
-   context, in the same way as [Select_utils.Or_never_returns] in the
-   selectors. *)
 type inferred_machtype =
   | Machtype of Cmm.machtype
   | Never_returns
@@ -389,12 +385,11 @@ let check_machtype ~dbg ~(what : unit -> string) ~(expected : Cmm.machtype)
       Array.length expected = Array.length actual
       && Array.for_all2
            (fun expected_comp actual_comp ->
-             (* The compiler types statically-known tagged immediates as [Int]
-                while generic loads and calls produce them as [Val], so [Val]
-                flows into [Int] positions routinely. *)
-             (Cmm.equal_machtype_component expected_comp Int
+              (* [Int] and [Val] are treated as compatible. See the doc comment
+                 for [check_machtypes]. *)
+              (Cmm.equal_machtype_component expected_comp Int
                && Cmm.equal_machtype_component actual_comp Val)
-             || Cmm.ge_component_bool expected_comp actual_comp)
+              || Cmm.ge_component_bool expected_comp actual_comp)
            expected actual
     in
     if not compatible
@@ -421,7 +416,7 @@ let join_inferred_machtypes ~dbg ty1 ty2 : inferred_machtype =
       | Some lub -> Machtype lub
       | None ->
         Misc.fatal_errorf
-          "Cmm machtype check failed%s: join of uncomparable machtype %a and \
+          "Cmm machtype check failed%s: join of incomparable machtype %a and \
            machtype %a"
           (dbg_suffix dbg) Printcmm.machtype ty1 Printcmm.machtype ty2
 

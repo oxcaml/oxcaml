@@ -85,7 +85,7 @@ val typ_int128 : machtype
 val lub_component :
   machtype_component -> machtype_component -> machtype_component
 
-(** Version of [lub_component] that returns [None] for uncomparable components.
+(** Version of [lub_component] that returns [None] for incomparable components.
 *)
 val lub_component_opt :
   machtype_component -> machtype_component -> machtype_component option
@@ -94,7 +94,7 @@ val lub_component_opt :
     or equal to the second under the relation used by [lub_component]. *)
 val ge_component : machtype_component -> machtype_component -> bool
 
-(** Version of [ge_component] that doesn't raise for uncomparable components. *)
+(** Version of [ge_component] that doesn't raise for incomparable components. *)
 val ge_component_bool : machtype_component -> machtype_component -> bool
 
 (** A variant of [machtype] used to describe arguments to external C functions
