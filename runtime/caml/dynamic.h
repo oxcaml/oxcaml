@@ -60,15 +60,12 @@ typedef struct dynamic_binding_s {
   value val;
 } dynamic_binding_s, *dynamic_binding_t;
 
-/* If you change DYNAMIC_CACHE_BITS, you must also update the assembly-language
-   stubs such as amd64.S.
-
-   TODO: single source of truth for things like this. */
+/* If you change this, update FLUSH_DYNAMIC_CACHE in the asm stubs */
 #define DYNAMIC_CACHE_BITS 3
 #define DYNAMIC_CACHE_SIZE (1 << DYNAMIC_CACHE_BITS)
 
 /* Per-thread cache of the most recently queried dynamic bindings.
-   Layout must match Dynamic_ definitions in amd64.S.
+   Layout reaches the assembly-language stubs via gen_asm_offsets.c.
 
    TODO: Stephen Dolan's wild plan to use vector instructions to do a fully-
    associative LRU cache. */
