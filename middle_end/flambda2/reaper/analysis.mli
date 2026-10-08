@@ -67,5 +67,4 @@ val rewrite_kind_with_subkind :
   Flambda_kind.With_subkind.t ->
   Flambda_kind.With_subkind.t
 
-val final_typing_env :
-  'f solution -> ('f, typing_env option) Traverse.With_types.t
+val final_typing_env : 'f solution -> ('f, typing_env) Traverse.With_types.t

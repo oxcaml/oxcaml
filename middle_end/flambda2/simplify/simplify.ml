@@ -18,7 +18,7 @@ open! Simplify_import
 
 type simplify_result =
   { free_names : Name_occurrences.t;
-    final_typing_env : Typing_env.t option;
+    final_typing_env : Typing_env.t;
     all_code : Exported_code.t;
     slot_offsets : Slot_offsets.t;
     unit : Flambda_unit.t
@@ -63,8 +63,15 @@ let run ~cmx_loader ~machine_width ~round ~code_slot_offsets unit =
       UA.print uacc;
   let final_typing_env =
     let cont_uses_env = DA.continuation_uses_env (UA.creation_dacc uacc) in
-    Continuation_uses_env.get_typing_env_no_more_than_one_use cont_uses_env
-      return_continuation
+    match
+      Continuation_uses_env.get_typing_env_no_more_than_one_use cont_uses_env
+        return_continuation
+    with
+    | Some final_typing_env -> final_typing_env
+    | None ->
+      TE.add_symbol_definition
+        (TE.create ~machine_width ~resolver)
+        module_symbol
   in
   let all_code =
     Exported_code.merge (UA.all_code uacc)
