@@ -253,9 +253,7 @@ type program =
   ; free_pc : Addr.t
   }
 
-(** A [program] in a form that can be marshaled: [Addr.Map.t] values cannot be,
-    since the trie identifies empty slots by physical equality with a sentinel
-    that does not survive marshaling. *)
+(** A [program] in a form that can be marshaled. *)
 module Marshalable_program : sig
   type t
 
