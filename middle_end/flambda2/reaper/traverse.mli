@@ -30,6 +30,7 @@ module Problem : sig
       delayed_deps : Traverse_acc.delayed_deps;
       applications : Traverse_acc.Applications.t;
       free_names : Name_occurrences.t;
+      toplevel_return : Code_id_or_name.t;
       all_sets_of_closures :
         ( 'f,
           (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list )

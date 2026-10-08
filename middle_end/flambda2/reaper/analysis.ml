@@ -103,7 +103,8 @@ let rewrite_kind_with_subkind (type f)
     Types_rewriter.rewrite_kind_with_subkind types_rewrite_context
   | Without_types -> fun _ -> Types_rewriter.erase_subkind
 
-let solve (type f) (problem : f Traverse.Problem.t) ~analysis_scope =
+let solve (type f) (problem : f Traverse.Problem.t)
+    ~(analysis_scope : Analysis_scope.t) =
   let { Traverse.Problem.deps;
         delayed_deps;
         code_deps;
@@ -111,10 +112,14 @@ let solve (type f) (problem : f Traverse.Problem.t) ~analysis_scope =
         all_sets_of_closures;
         final_typing_env;
         module_symbol;
-        free_names
+        free_names;
+        toplevel_return
       } =
     problem
   in
+  (match analysis_scope with
+  | Current_unit -> Global_flow_graph.add_any_usage deps toplevel_return
+  | Lto_participants _ -> ());
   Traverse_acc.resolve_delayed_deps deps ~analysis_scope ~code_deps delayed_deps;
   let unboxing = fixpoint deps ~analysis_scope in
   let db = unboxing.db in
