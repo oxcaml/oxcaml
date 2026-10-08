@@ -105,7 +105,7 @@ let slots_to_be_built_for_set_of_closures ~(uses : Unboxing_analysis.result)
           ~function_slots:set.function_slots,
         value_slots_to_be_built ~db ~unboxed_value_slots set )
 
-let compute ~free_names
+let compute ~free_names ~analysis_scope
     ({ db; unboxed_fields; changed_representation; _ } as uses :
       Unboxing_analysis.result) =
   (* The query gives us the name of every closure, but we want one entry per set
@@ -191,4 +191,6 @@ let compute ~free_names
           built_value_slots
     }
   in
-  Slot_offsets.finalize_offsets ~used_slots slot_offsets
+  Slot_offsets.finalize_offsets slot_offsets
+    ~is_local_compilation_unit:(Analysis_scope.contains_unit analysis_scope)
+    ~used_slots

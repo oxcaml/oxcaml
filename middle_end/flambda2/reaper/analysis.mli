@@ -16,7 +16,8 @@
 (** What the rebuild needs to know about the solved analysis. *)
 type 'f solution
 
-val solve : 'f Traverse.Problem.t -> 'f solution
+val solve :
+  'f Traverse.Problem.t -> analysis_scope:Analysis_scope.t -> 'f solution
 
 val get_unboxed_fields :
   'f solution -> Code_id_or_name.t -> Unboxing_analysis.unboxed option
