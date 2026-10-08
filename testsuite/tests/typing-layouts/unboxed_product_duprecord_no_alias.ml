@@ -117,7 +117,6 @@ let test_mutate_copy () =
   let t1 = make () in
   let t2 = { t1 with f000 = 42 } in
   set_idx t2 (.r.#i) 100;
-  (* t1.r should still have i = 1 *)
   assert (t1.r.#i = 1);
   assert (t2.r.#i = 100)
 
@@ -125,7 +124,6 @@ let test_mutate_original () =
   let t1 = make () in
   let t2 = { t1 with f000 = 42 } in
   set_idx t1 (.r.#j) 200;
-  (* t2.r should still have j = 2 *)
   assert (t2.r.#j = 2);
   assert (t1.r.#j = 200)
 
