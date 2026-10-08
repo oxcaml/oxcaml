@@ -61,9 +61,9 @@ module CtxStore(A:CtxStored) = struct
     let store mustshare ctx act = match A.make_key ctx act with
       | Some (key, weight) ->
           begin try
-            let (shared,total,i) = AMap.find key st.map in
+            let (_shared,total,i) = AMap.find key st.map in
             let total = Branch_annotations.add weight total in
-            st.map <- AMap.add key (shared,total,i) st.map ;
+            st.map <- AMap.add key (true,total,i) st.map ;
             i
           with Not_found ->
             let i = add mustshare act in
