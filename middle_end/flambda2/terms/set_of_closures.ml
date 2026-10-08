@@ -21,10 +21,7 @@ type t =
 
 let sexp_fields { function_decls; value_slots } =
   let open! Misc.Sexp in
-  [ fmt "%a"
-      (Misc.Colours.wrap Flambda_colours.prim_constructive
-         Format.pp_print_string)
-      "set_of_closures";
+  [ fmt ~colour:Flambda_colours.prim_constructive "set_of_closures";
     a "function_decls" function_decls Function_declarations.print;
     a "value_slots" value_slots (Value_slot.Map.print Simple.print) ]
 
