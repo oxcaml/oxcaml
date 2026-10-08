@@ -378,7 +378,7 @@ let name_domain t =
     (Name.set_of_symbol_set (defined_symbols t))
 
 let initial_symbol_type =
-  MTC.unknown K.value, Binding_time.With_name_mode.symbols
+  TG.any_non_null_value, Binding_time.With_name_mode.symbols
 
 let variable_is_from_missing_cmx_file t name =
   if Name.is_symbol name

@@ -25,9 +25,11 @@
 #include "minor_gc.h"
 #endif /* CAML_INTERNALS */
 #include "domain.h"
+#include "domain_state.h"
 #include "misc.h"
 #include "mlvalues.h"
 #include "signals.h"
+#include "tsan.h"
 
 #ifdef __cplusplus
 extern "C" {

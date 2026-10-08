@@ -19,7 +19,6 @@
 
 #include "caml/fail.h"
 #include "caml/mlvalues.h"
-#include "caml/fiber.h"
 
 struct lexer_buffer {
   value refill_buff;
