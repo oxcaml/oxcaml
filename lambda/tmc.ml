@@ -226,6 +226,10 @@ module Dps : sig
   type 'a t
 
   val make : lambda dps -> lambda t
+
+  (** [non_tail d] places [d] out of tail position, whatever the position of
+      its context. *)
+  val non_tail : 'a t -> 'a t
   val run : lambda t -> lambda dps
   val delay_constructor : Constr.t -> lambda t -> lambda t
 
@@ -378,6 +382,11 @@ end = struct
   let make (dps : 'a dps) : 'a t =
     reify_delay dps
 
+  let non_tail d = {
+    d with code = (fun ~delayed ~tail:_ ~dst ->
+      d.code ~delayed ~tail:false ~dst);
+  }
+
   let delay_constructor constr d =
     let d = ensures_affine d in {
       code = (fun ~delayed ~tail ~dst ->
@@ -479,6 +488,17 @@ module Choice = struct
 
   let dps (c : lambda t) ~tail ~dst =
     Dps.run c.dps ~tail ~dst
+
+  let non_tail c = {
+    c with
+    dps = Dps.non_tail c.dps;
+    (* The calls are not tailcalls, so whether their region can be closed is
+       irrelevant. *)
+    tmc_calls =
+      List.map (fun call -> { call with has_unclosable_region = false })
+        c.tmc_calls;
+  }
+  (** Place the destination-passing-style code out of tail position. *)
 
   let pair ((c1, c2) : 'a t * 'b t) : ('a * 'b) t = {
     dps = Dps.pair c1.dps c2.dps;
@@ -760,7 +780,7 @@ let rec choice ctx t =
         (* in [try l1 with id -> l2], the term [l1] is
            not in tail-call position (after it returns
            we need to remove the exception handler) *)
-        let+ l1 = choice ctx ~tail:false ~region_depth l1
+        let+ l1 = Choice.non_tail (choice ctx ~tail:false ~region_depth l1)
         and+ l2 = choice ctx ~tail ~region_depth l2 in
         Ltrywith (l1, id, id_duid, l2, kind)
     | Lstaticcatch (l1, ids, l2, r, kind) ->
