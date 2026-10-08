@@ -5,46 +5,57 @@
 
 open Stdlib_stable
 
-type r = { f : string }
-let use_unyielding : 'a @ unyielding -> unit = fun _ -> ()
+type t
+type t_global : value mod global
+let use_unyielding : t @ unyielding read -> unit = fun _ -> ()
+let use_forkable : t @ forkable read -> unit = fun _ -> ()
 [%%expect{|
-type r = { f : string; }
-val use_unyielding : 'a -> unit = <fun>
+type t
+type t_global : value mod global
+val use_unyielding : t @ read -> unit = <fun>
+val use_forkable : t @ read -> unit = <fun>
 |}]
 
-let via_pat (r : r @ local) : string =
-  match Addr.of_imm (Addr_imm.of_idx_local r (.f)) with
+let via_pat (a : t Addr_imm.t @ local) : t @ read =
+  match Addr.of_imm a with
   | addr_ x -> x
 [%%expect{|
-Line 2, characters 20-50:
-2 |   match Addr.of_imm (Addr_imm.of_idx_local r (.f)) with
-                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This value is "local" but is expected to be "global".
+Line 2, characters 20-21:
+2 |   match Addr.of_imm a with
+                        ^
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
-let via_pat_yielding (r : r @ local) =
-  match Addr.of_imm (Addr_imm.of_idx_local r (.f)) with
+let via_pat_yielding (a : t Addr_imm.t @ yielding) =
+  match Addr.of_imm a with
   | addr_ x -> use_unyielding x
 [%%expect{|
-Line 2, characters 20-50:
-2 |   match Addr.of_imm (Addr_imm.of_idx_local r (.f)) with
-                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This value is "local" but is expected to be "global".
+Line 2, characters 20-21:
+2 |   match Addr.of_imm a with
+                        ^
+Error: This value is "yielding" but is expected to be "unyielding".
 |}]
 
-type g = { g : unit -> unit }
-let use_forkable : 'a @ forkable -> unit = fun _ -> ()
-[%%expect{|
-type g = { g : unit -> unit; }
-val use_forkable : 'a -> unit = <fun>
-|}]
-
-let via_pat_unforkable (r : g @ local) =
-  match Addr.of_imm (Addr_imm.of_idx_local r (.g)) with
+let via_pat_unforkable (a : t Addr_imm.t @ unforkable) =
+  match Addr.of_imm a with
   | addr_ x -> use_forkable x
 [%%expect{|
-Line 2, characters 20-50:
-2 |   match Addr.of_imm (Addr_imm.of_idx_local r (.g)) with
-                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This value is "local" but is expected to be "global".
+Line 2, characters 20-21:
+2 |   match Addr.of_imm a with
+                        ^
+Error: This value is "unforkable" but is expected to be "forkable".
+|}]
+
+let of_imm_local_needs_mod_global (a : t Addr_imm.t @ local) =
+  Addr.of_imm_local a
+[%%expect{|
+Line 2, characters 20-21:
+2 |   Addr.of_imm_local a
+                        ^
+Error: The value "a" has type "t Stdlib_stable.Addr_imm.t" = "t addr_imm"
+       but an expression was expected of type
+         "'a Stdlib_stable__.Addr_imm.t" = "'a addr_imm"
+       The kind of t is value
+         because of the definition of t at line 3, characters 0-6.
+       But the kind of t must be a subkind of any mod global.
 |}]

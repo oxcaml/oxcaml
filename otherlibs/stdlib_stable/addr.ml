@@ -53,6 +53,10 @@ external of_imm
   : ('a : any).
   'a Addr_imm.t @ read -> 'a t @ read
   = "%identity"
+external of_imm_local
+  : ('a : any mod global).
+  'a Addr_imm.t @ local read -> 'a t @ local read
+  = "%identity"
 
 external get
   : ('a : any).

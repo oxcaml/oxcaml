@@ -87,5 +87,5 @@ let () =
   print_i64_ln r.m_pair.#a;
   let r = stack_ { i_str = "efgh"; i_pair = #{ a = #7L; b = #6L } } in
   let addr = Addr_imm.of_idx_read_local r (.i_pair.#b) in
-  print_i64_ln (Addr_imm.get_read addr);
+  print_i64_ln (Addr.get_read (Addr.of_imm_local addr));
   print_newline ()
