@@ -99,3 +99,19 @@ Line 4, characters 14-56:
                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: called function may allocate (direct tailcall caml_apply3)
 |}]
+
+module Local_but_allocates_on_the_heap : sig
+  val stack_allowed : int -> (int -> int) @ local [@@zero_alloc partial]
+  val heap_required : int -> int (* implicitly [@ global] *)
+end = struct
+  let stack_allowed x y = x + y
+  let heap_required = stack_allowed 42
+end
+[%%expect{|
+Line 5, characters 20-31:
+5 |   let stack_allowed x y = x + y
+                        ^^^^^^^^^^^
+Error: Annotation check for zero_alloc failed on function TOP14.Local_but_allocates_on_the_heap.stack_allowed (camlTOP14__stack_allowed_9_20_code).
+       Partial applications of this function may allocate a closure on the heap.
+       Hint: try marking the partial function "local", as in "'a -> ('b -> ... -> 'z) @ local".
+|}]
