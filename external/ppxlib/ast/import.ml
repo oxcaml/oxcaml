@@ -6,7 +6,7 @@
 
 (*$ open Ast_cinaps_helpers $*)
 
-module Js = Versions.OCaml_500
+module Js = Versions.OCaml_502
 module Ocaml = Versions.OCaml_current
 
 module Select_ast (Ocaml : Versions.OCaml_version) = struct

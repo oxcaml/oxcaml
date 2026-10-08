@@ -3,13 +3,25 @@ open! Import
 module Format = Stdlib.Format
 module Filename = Stdlib.Filename
 
-(* TODO: make the "deriving." depend on the matching attribute name. *)
+let allow_deriving_end = ref true
+
+(* TODO: make the "deriving." or other prefix depend on the matching attribute name. *)
 let end_marker_sig =
-  Attribute.Floating.declare "deriving.end" Signature_item
+  Attribute.Floating.declare "ppxlib.inline.end" Signature_item
     Ast_pattern.(pstr nil)
     ()
 
 let end_marker_str =
+  Attribute.Floating.declare "ppxlib.inline.end" Structure_item
+    Ast_pattern.(pstr nil)
+    ()
+
+let deprecated_end_marker_sig =
+  Attribute.Floating.declare "deriving.end" Signature_item
+    Ast_pattern.(pstr nil)
+    ()
+
+let deprecated_end_marker_str =
   Attribute.Floating.declare "deriving.end" Structure_item
     Ast_pattern.(pstr nil)
     ()
@@ -20,9 +32,11 @@ end
 
 module Make (M : sig
   type t
+  type compiler_t
 
   val get_loc : t -> Location.t
   val end_marker : (t, unit) Attribute.Floating.t
+  val deprecated_end_marker : (t, unit) Attribute.Floating.t
 
   module Transform (T : T1) : sig
     val apply :
@@ -33,8 +47,9 @@ module Make (M : sig
   end
 
   val parse : Lexing.lexbuf -> t list
-  val pp : Format.formatter -> t -> unit
   val to_sexp : t -> Sexp.t
+  val to_compiler : t -> compiler_t
+  val pp_compiler : Format.formatter -> compiler_t -> unit
 end) =
 struct
   let extract_prefix ~pos l =
@@ -49,10 +64,27 @@ struct
               [] )
       | x :: l -> (
           match Attribute.Floating.convert_res [ M.end_marker ] x with
-          | Ok None -> loop (x :: acc) l
           | Ok (Some ()) -> Ok (List.rev acc, (M.get_loc x).loc_start)
           | Error e -> Error e
-          | exception Failure _ -> loop (x :: acc) l)
+          | (exception Failure _) | Ok None -> (
+              match
+                Attribute.Floating.convert_res [ M.deprecated_end_marker ] x
+              with
+              | Ok (Some ()) ->
+                  if !allow_deriving_end then
+                    Ok (List.rev acc, (M.get_loc x).loc_start)
+                  else
+                    Error
+                      ( Location.Error.createf ~loc:(M.get_loc x)
+                          "ppxlib: [@@@@@@%s] is deprecated, please use \
+                           [@@@@@@%s]. If you need the deprecated attribute \
+                           temporarily, pass [-allow-deriving-end] to the ppx \
+                           driver)."
+                          (Attribute.Floating.name M.deprecated_end_marker)
+                          (Attribute.Floating.name M.end_marker),
+                        [] )
+              | Error e -> Error e
+              | (exception Failure _) | Ok None -> loop (x :: acc) l))
     in
     loop [] l
 
@@ -112,6 +144,21 @@ struct
   let parse_string s =
     match M.parse (Lexing.from_string s) with [ x ] -> x | _ -> assert false
 
+  (* To round trip our AST we convert it to the compiler's version, print it as
+     source using the compiler pretty-printers, parse it back using the
+     compiler's parser and migrate it back to our version.
+
+     Skipping the first migration can lead to errors because some subtleties may
+     be lost by older parsers. For instance in OCaml 5.02 [fun x y -> z] and
+     [fun x -> fun y -> z] have different representation but in OCaml 5.01 they
+     both parse to the same AST. Running the migration to the compiler AST first
+     anotates the AST using attributes allowing the final migration to preserve
+     such differences. *)
+  let round_trip ast =
+    let compiler_ast = M.to_compiler ast in
+    remove_loc
+      (parse_string (Format.asprintf "%a@." M.pp_compiler compiler_ast))
+
   let rec match_loop ~end_pos ~mismatch_handler ~expected ~source =
     match (expected, source) with
     | [], [] -> ()
@@ -130,9 +177,7 @@ struct
         let x = remove_loc x in
         let y = remove_loc y in
         if Poly.( <> ) x y then (
-          let round_trip =
-            remove_loc (parse_string (Format.asprintf "%a@." M.pp x))
-          in
+          let round_trip = round_trip x in
           if Poly.( <> ) x round_trip then
             Location.raise_errorf ~loc
               "ppxlib: the corrected code doesn't round-trip.\n\
@@ -151,33 +196,39 @@ end
 (*$*)
 module Str = Make (struct
   type t = structure_item
+  type compiler_t = Ppxlib_ast.Compiler_version.Ast.Parsetree.structure_item
 
   let get_loc x = x.pstr_loc
   let end_marker = end_marker_str
+  let deprecated_end_marker = deprecated_end_marker_str
 
   module Transform (T : T1) = struct
     let apply o = o#structure_item
   end
 
   let parse = Parse.implementation
-  let pp = Pprintast.structure_item
   let to_sexp = Ast_traverse.sexp_of#structure_item
+  let to_compiler = Ppxlib_ast.Selected_ast.To_ocaml.copy_structure_item
+  let pp_compiler = Astlib.Compiler_pprintast.structure_item
 end)
 
 (*$ str_to_sig _last_text_block *)
 module Sig = Make (struct
   type t = signature_item
+  type compiler_t = Ppxlib_ast.Compiler_version.Ast.Parsetree.signature_item
 
   let get_loc x = x.psig_loc
   let end_marker = end_marker_sig
+  let deprecated_end_marker = deprecated_end_marker_sig
 
   module Transform (T : T1) = struct
     let apply o = o#signature_item
   end
 
   let parse = Parse.interface
-  let pp = Pprintast.signature_item
   let to_sexp = Ast_traverse.sexp_of#signature_item
+  let to_compiler = Ppxlib_ast.Selected_ast.To_ocaml.copy_signature_item
+  let pp_compiler = Astlib.Compiler_pprintast.signature_item
 end)
 
 (*$*)

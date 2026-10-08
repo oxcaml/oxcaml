@@ -8,7 +8,7 @@ type t = location = {
 }
 
 let in_file name =
-  let loc = { pos_fname = name; pos_lnum = 1; pos_bol = 0; pos_cnum = -1 } in
+  let loc = { pos_fname = name; pos_lnum = 0; pos_bol = 0; pos_cnum = -1 } in
   { loc_start = loc; loc_end = loc; loc_ghost = true }
 
 let set_filename loc fn =
@@ -17,6 +17,7 @@ let set_filename loc fn =
   { loc with loc_start; loc_end }
 
 let none = in_file "_none_"
+let is_none v = Poly.( = ) v none
 
 let init lexbuf fname =
   let open Lexing in

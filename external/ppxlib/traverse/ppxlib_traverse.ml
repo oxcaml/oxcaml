@@ -54,31 +54,27 @@ module Backends = struct
       method tuple ~loc es = pexp_tuple ~loc es
     end
 
-  class type what =
-    object
-      method name : string
-      inherit reconstructors
+  class type what = object
+    method name : string
+    inherit reconstructors
 
-      method class_params :
-        loc:Location.t -> (core_type * (variance * injectivity)) list
+    method class_params :
+      loc:Location.t -> (core_type * (variance * injectivity)) list
 
-      method virtual_methods : loc:Location.t -> class_field list
+    method virtual_methods : loc:Location.t -> class_field list
+    method apply : loc:Location.t -> expression -> expression list -> expression
+    method abstract : loc:Location.t -> pattern -> expression -> expression
 
-      method apply :
-        loc:Location.t -> expression -> expression list -> expression
+    (* Basic combinator type *)
+    method typ : loc:Location.t -> core_type -> core_type
+    method any : loc:Location.t -> expression
 
-      method abstract : loc:Location.t -> pattern -> expression -> expression
-
-      (* Basic combinator type *)
-      method typ : loc:Location.t -> core_type -> core_type
-      method any : loc:Location.t -> expression
-
-      method combine :
-        loc:Location.t ->
-        (string loc * expression) list ->
-        reconstruct:expression ->
-        expression
-    end
+    method combine :
+      loc:Location.t ->
+      (string loc * expression) list ->
+      reconstruct:expression ->
+      expression
+  end
 
   let mapper : what =
     object

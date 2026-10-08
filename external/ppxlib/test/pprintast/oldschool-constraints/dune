@@ -1,0 +1,9 @@
+(executables
+ (names pprint_pvb_constraint pprint_ppat_constraint)
+ (libraries ppxlib astlib)
+ (preprocess
+  (pps ppxlib.metaquot)))
+
+(cram
+ (package ppxlib)
+ (deps pprint_pvb_constraint.exe pprint_ppat_constraint.exe))

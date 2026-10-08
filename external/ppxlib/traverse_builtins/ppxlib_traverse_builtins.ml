@@ -115,20 +115,19 @@ class ['ctx] map_with_context =
     method bool : ('ctx, bool) T.map_with_context = any
     method char : ('ctx, char) T.map_with_context = any
 
-    method option
-        : 'a.
-          ('ctx, 'a) T.map_with_context -> ('ctx, 'a option) T.map_with_context
-        =
+    method option :
+        'a.
+        ('ctx, 'a) T.map_with_context -> ('ctx, 'a option) T.map_with_context =
       fun f ctx x -> match x with None -> None | Some x -> Some (f ctx x)
 
-    method list
-        : 'a.
-          ('ctx, 'a) T.map_with_context -> ('ctx, 'a list) T.map_with_context =
+    method list :
+        'a. ('ctx, 'a) T.map_with_context -> ('ctx, 'a list) T.map_with_context
+        =
       fun f ctx l -> List.map (f ctx) l
 
-    method array
-        : 'a.
-          ('ctx, 'a) T.map_with_context -> ('ctx, 'a array) T.map_with_context =
+    method array :
+        'a. ('ctx, 'a) T.map_with_context -> ('ctx, 'a array) T.map_with_context
+        =
       fun f ctx a -> Array.map (f ctx) a
   end
 
@@ -184,10 +183,10 @@ class virtual ['ctx, 'res] lift_map_with_context =
     method virtual constr : 'ctx -> string -> 'res list -> 'res
     method virtual tuple : 'ctx -> 'res list -> 'res
 
-    method option
-        : 'a.
-          ('ctx, 'a, 'res) T.lift_map_with_context ->
-          ('ctx, 'a option, 'res) T.lift_map_with_context =
+    method option :
+        'a.
+        ('ctx, 'a, 'res) T.lift_map_with_context ->
+        ('ctx, 'a option, 'res) T.lift_map_with_context =
       fun f ctx x ->
         match x with
         | None -> (None, self#constr ctx "None" [])
@@ -195,10 +194,10 @@ class virtual ['ctx, 'res] lift_map_with_context =
             let x, res = f ctx x in
             (Some x, self#constr ctx "Some" [ res ])
 
-    method list
-        : 'a.
-          ('ctx, 'a, 'res) T.lift_map_with_context ->
-          ('ctx, 'a list, 'res) T.lift_map_with_context =
+    method list :
+        'a.
+        ('ctx, 'a, 'res) T.lift_map_with_context ->
+        ('ctx, 'a list, 'res) T.lift_map_with_context =
       fun f ctx l ->
         match l with
         | [] -> ([], self#constr ctx "[]" [])
@@ -208,55 +207,53 @@ class virtual ['ctx, 'res] lift_map_with_context =
             (x :: l, self#constr ctx "::" [ res_head; res_tail ])
   end
 
-class type ['res] std_lifters =
-  object
-    method other : 'a. ('a, 'res) T.lift
-    method int : (int, 'res) T.lift
-    method string : (string, 'res) T.lift
-    method bool : (bool, 'res) T.lift
-    method char : (char, 'res) T.lift
-    method array : 'a. ('a, 'res) T.lift -> ('a array, 'res) T.lift
-    method record : (string * 'res) list -> 'res
-    method constr : string -> 'res list -> 'res
-    method tuple : 'res list -> 'res
-    method float : (float, 'res) T.lift
-    method int32 : (int32, 'res) T.lift
-    method int64 : (int64, 'res) T.lift
-    method nativeint : (nativeint, 'res) T.lift
-    method unit : (unit, 'res) T.lift
-    method option : 'a. ('a, 'res) T.lift -> ('a option, 'res) T.lift
-    method list : 'a. ('a, 'res) T.lift -> ('a list, 'res) T.lift
-  end
+class type ['res] std_lifters = object
+  method other : 'a. ('a, 'res) T.lift
+  method int : (int, 'res) T.lift
+  method string : (string, 'res) T.lift
+  method bool : (bool, 'res) T.lift
+  method char : (char, 'res) T.lift
+  method array : 'a. ('a, 'res) T.lift -> ('a array, 'res) T.lift
+  method record : (string * 'res) list -> 'res
+  method constr : string -> 'res list -> 'res
+  method tuple : 'res list -> 'res
+  method float : (float, 'res) T.lift
+  method int32 : (int32, 'res) T.lift
+  method int64 : (int64, 'res) T.lift
+  method nativeint : (nativeint, 'res) T.lift
+  method unit : (unit, 'res) T.lift
+  method option : 'a. ('a, 'res) T.lift -> ('a option, 'res) T.lift
+  method list : 'a. ('a, 'res) T.lift -> ('a list, 'res) T.lift
+end
 
-class type ['ctx, 'res] std_lift_mappers_with_context =
-  object
-    method other : 'a. 'ctx -> 'a -> 'res
-    method int : ('ctx, int, 'res) T.lift_map_with_context
-    method string : ('ctx, string, 'res) T.lift_map_with_context
-    method bool : ('ctx, bool, 'res) T.lift_map_with_context
-    method char : ('ctx, char, 'res) T.lift_map_with_context
+class type ['ctx, 'res] std_lift_mappers_with_context = object
+  method other : 'a. 'ctx -> 'a -> 'res
+  method int : ('ctx, int, 'res) T.lift_map_with_context
+  method string : ('ctx, string, 'res) T.lift_map_with_context
+  method bool : ('ctx, bool, 'res) T.lift_map_with_context
+  method char : ('ctx, char, 'res) T.lift_map_with_context
 
-    method array :
-      'a.
-      ('ctx, 'a, 'res) T.lift_map_with_context ->
-      ('ctx, 'a array, 'res) T.lift_map_with_context
+  method array :
+    'a.
+    ('ctx, 'a, 'res) T.lift_map_with_context ->
+    ('ctx, 'a array, 'res) T.lift_map_with_context
 
-    method record : 'ctx -> (string * 'res) list -> 'res
-    method constr : 'ctx -> string -> 'res list -> 'res
-    method tuple : 'ctx -> 'res list -> 'res
-    method float : ('ctx, float, 'res) T.lift_map_with_context
-    method int32 : ('ctx, int32, 'res) T.lift_map_with_context
-    method int64 : ('ctx, int64, 'res) T.lift_map_with_context
-    method nativeint : ('ctx, nativeint, 'res) T.lift_map_with_context
-    method unit : ('ctx, unit, 'res) T.lift_map_with_context
+  method record : 'ctx -> (string * 'res) list -> 'res
+  method constr : 'ctx -> string -> 'res list -> 'res
+  method tuple : 'ctx -> 'res list -> 'res
+  method float : ('ctx, float, 'res) T.lift_map_with_context
+  method int32 : ('ctx, int32, 'res) T.lift_map_with_context
+  method int64 : ('ctx, int64, 'res) T.lift_map_with_context
+  method nativeint : ('ctx, nativeint, 'res) T.lift_map_with_context
+  method unit : ('ctx, unit, 'res) T.lift_map_with_context
 
-    method option :
-      'a.
-      ('ctx, 'a, 'res) T.lift_map_with_context ->
-      ('ctx, 'a option, 'res) T.lift_map_with_context
+  method option :
+    'a.
+    ('ctx, 'a, 'res) T.lift_map_with_context ->
+    ('ctx, 'a option, 'res) T.lift_map_with_context
 
-    method list :
-      'a.
-      ('ctx, 'a, 'res) T.lift_map_with_context ->
-      ('ctx, 'a list, 'res) T.lift_map_with_context
-  end
+  method list :
+    'a.
+    ('ctx, 'a, 'res) T.lift_map_with_context ->
+    ('ctx, 'a list, 'res) T.lift_map_with_context
+end

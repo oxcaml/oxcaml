@@ -27,7 +27,6 @@
 
          Actually run all lib-unix tests [4.08]
 *)
-
 module Asttypes = struct
 
   type constant (*IF_CURRENT = Asttypes.constant *) =

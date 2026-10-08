@@ -4,5 +4,6 @@
   (pps ppx_foo_deriver)))
 
 (alias
+ (package ppxlib)
  (name runtest)
  (deps ppx_deriving_example.cma))

@@ -63,10 +63,29 @@ let allow_unused_code_warnings = ref Options.default_allow_unused_code_warnings
 
 let () =
   Driver.add_arg "-unused-code-warnings"
-    (Bool (( := ) allow_unused_code_warnings))
-    ~doc:"_ Allow ppx derivers to enable unused code warnings"
+    (Options.Forcable_bool.arg allow_unused_code_warnings)
+    ~doc:" Allow ppx derivers to enable unused code warnings (default: false)"
 
-let allow_unused_code_warnings () = !allow_unused_code_warnings
+let allow_unused_code_warnings ~ppx_allows_unused_code_warnings =
+  match !allow_unused_code_warnings with
+  | Force -> true
+  | False -> false
+  | True -> ppx_allows_unused_code_warnings
+
+let allow_unused_type_warnings = ref Options.default_allow_unused_type_warnings
+
+let () =
+  Driver.add_arg "-unused-type-warnings"
+    (Options.Forcable_bool.arg allow_unused_type_warnings)
+    ~doc:
+      " Allow unused type warnings for types with [@@deriving ...] (default: \
+       false)"
+
+let allow_unused_type_warnings ~ppx_allows_unused_code_warnings =
+  match !allow_unused_type_warnings with
+  | Force -> true
+  | False -> false
+  | True -> ppx_allows_unused_code_warnings
 
 module Args = struct
   include (
@@ -109,8 +128,8 @@ module Args = struct
       | I_nil : ('m, 'm) instance
       | I_cons : ('m1, 'a -> 'm2) instance * 'a -> ('m1, 'm2) instance
 
-    let rec create :
-        type a b. (a, b) t -> (string * expression) list -> (a, b) instance =
+    let rec create : type a b.
+        (a, b) t -> (string * expression) list -> (a, b) instance =
      fun spec args ->
       match spec with
       | Nil -> I_nil
@@ -252,55 +271,65 @@ module Deriver = struct
       name : string;
       str_type_decl :
         (structure, rec_flag * type_declaration list) Generator.t option;
+      str_class_type_decl :
+        (structure, class_type_declaration list) Generator.t option;
       str_type_ext : (structure, type_extension) Generator.t option;
       str_exception : (structure, type_exception) Generator.t option;
       str_module_type_decl :
         (structure, module_type_declaration) Generator.t option;
+      str_module_binding : (structure, module_binding) Generator.t option;
       sig_type_decl :
         (signature, rec_flag * type_declaration list) Generator.t option;
+      sig_class_type_decl :
+        (signature, class_type_declaration list) Generator.t option;
       sig_type_ext : (signature, type_extension) Generator.t option;
       sig_exception : (signature, type_exception) Generator.t option;
       sig_module_type_decl :
         (signature, module_type_declaration) Generator.t option;
-      extension :
-        (loc:Location.t -> path:string -> core_type -> expression) option;
+      sig_module_decl : (signature, module_declaration) Generator.t option;
     }
   end
 
   module Alias = struct
     type t = {
       str_type_decl : string list;
+      str_class_type_decl : string list;
       str_type_ext : string list;
       str_exception : string list;
       str_module_type_decl : string list;
+      str_module_binding : string list;
       sig_type_decl : string list;
+      sig_class_type_decl : string list;
       sig_type_ext : string list;
       sig_exception : string list;
       sig_module_type_decl : string list;
+      sig_module_decl : string list;
     }
   end
 
   module Field = struct
-    type kind = Str | Sig
-
     type ('a, 'b) t = {
       name : string;
-      kind : kind;
       get : Actual_deriver.t -> ('a, 'b) Generator.t option;
       get_set : Alias.t -> string list;
     }
 
     let str_type_decl =
       {
-        kind = Str;
         name = "type";
         get = (fun t -> t.str_type_decl);
         get_set = (fun t -> t.str_type_decl);
       }
 
+    let str_class_type_decl =
+      {
+        name = "class type declaration";
+        get = (fun t -> t.str_class_type_decl);
+        get_set = (fun t -> t.str_class_type_decl);
+      }
+
     let str_type_ext =
       {
-        kind = Str;
         name = "type extension";
         get = (fun t -> t.str_type_ext);
         get_set = (fun t -> t.str_type_ext);
@@ -308,7 +337,6 @@ module Deriver = struct
 
     let str_exception =
       {
-        kind = Str;
         name = "exception";
         get = (fun t -> t.str_exception);
         get_set = (fun t -> t.str_exception);
@@ -316,23 +344,34 @@ module Deriver = struct
 
     let str_module_type_decl =
       {
-        kind = Str;
         name = "module type";
         get = (fun t -> t.str_module_type_decl);
         get_set = (fun t -> t.str_module_type_decl);
       }
 
+    let str_module_binding =
+      {
+        name = "module binding";
+        get = (fun t -> t.str_module_binding);
+        get_set = (fun t -> t.str_module_binding);
+      }
+
     let sig_type_decl =
       {
-        kind = Sig;
         name = "signature type";
         get = (fun t -> t.sig_type_decl);
         get_set = (fun t -> t.sig_type_decl);
       }
 
+    let sig_class_type_decl =
+      {
+        name = "signature class type";
+        get = (fun t -> t.sig_class_type_decl);
+        get_set = (fun t -> t.sig_class_type_decl);
+      }
+
     let sig_type_ext =
       {
-        kind = Sig;
         name = "signature type extension";
         get = (fun t -> t.sig_type_ext);
         get_set = (fun t -> t.sig_type_ext);
@@ -340,7 +379,6 @@ module Deriver = struct
 
     let sig_exception =
       {
-        kind = Sig;
         name = "signature exception";
         get = (fun t -> t.sig_exception);
         get_set = (fun t -> t.sig_exception);
@@ -348,10 +386,16 @@ module Deriver = struct
 
     let sig_module_type_decl =
       {
-        kind = Sig;
         name = "signature module type";
         get = (fun t -> t.sig_module_type_decl);
         get_set = (fun t -> t.sig_module_type_decl);
+      }
+
+    let sig_module_decl =
+      {
+        name = "signature module declaration";
+        get = (fun t -> t.sig_module_decl);
+        get_set = (fun t -> t.sig_module_decl);
       }
   end
 
@@ -474,21 +518,25 @@ module Deriver = struct
     in
     (result, derivers_and_args_errors @ dep_errors)
 
-  let add ?str_type_decl ?str_type_ext ?str_exception ?str_module_type_decl
-      ?sig_type_decl ?sig_type_ext ?sig_exception ?sig_module_type_decl
-      ?extension name =
+  let add ?str_type_decl ?str_class_type_decl ?str_type_ext ?str_exception
+      ?str_module_type_decl ?str_module_binding ?sig_type_decl
+      ?sig_class_type_decl ?sig_type_ext ?sig_exception ?sig_module_type_decl
+      ?sig_module_decl ?extension name =
     let actual_deriver : Actual_deriver.t =
       {
         name;
         str_type_decl;
+        str_class_type_decl;
         str_type_ext;
         str_exception;
         str_module_type_decl;
+        str_module_binding;
         sig_type_decl;
+        sig_class_type_decl;
         sig_type_ext;
         sig_exception;
         sig_module_type_decl;
-        extension;
+        sig_module_decl;
       }
     in
     Ppx_derivers.register name (T (Actual_deriver actual_deriver));
@@ -503,20 +551,25 @@ module Deriver = struct
           ~rules:[ Context_free.Rule.extension extension ]);
     name
 
-  let add_alias name ?str_type_decl ?str_type_ext ?str_exception
-      ?str_module_type_decl ?sig_type_decl ?sig_type_ext ?sig_exception
-      ?sig_module_type_decl set =
+  let add_alias name ?str_type_decl ?str_class_type_decl ?str_type_ext
+      ?str_exception ?str_module_type_decl ?str_module_binding ?sig_type_decl
+      ?sig_class_type_decl ?sig_type_ext ?sig_exception ?sig_module_type_decl
+      ?sig_module_decl set =
     let alias : Alias.t =
       let get = function None -> set | Some set -> set in
       {
         str_type_decl = get str_type_decl;
+        str_class_type_decl = get str_class_type_decl;
         str_type_ext = get str_type_ext;
         str_exception = get str_exception;
         str_module_type_decl = get str_module_type_decl;
+        str_module_binding = get str_module_binding;
         sig_type_decl = get sig_type_decl;
+        sig_class_type_decl = get sig_class_type_decl;
         sig_type_ext = get sig_type_ext;
         sig_exception = get sig_exception;
         sig_module_type_decl = get sig_module_type_decl;
+        sig_module_decl = get sig_module_decl;
       }
     in
     Ppx_derivers.register name (T (Alias alias));
@@ -631,7 +684,8 @@ let wrap_str ~loc ~hide st =
 let wrap_str ~loc ~hide ~unused_code_warnings st =
   let loc = { loc with loc_ghost = true } in
   let unused_code_warnings =
-    unused_code_warnings && allow_unused_code_warnings ()
+    allow_unused_code_warnings
+      ~ppx_allows_unused_code_warnings:unused_code_warnings
   in
   let warnings, st =
     if keep_w32_impl () || unused_code_warnings then ([], st)
@@ -671,7 +725,8 @@ let wrap_sig ~loc ~hide st =
 let wrap_sig ~loc ~hide ~unused_code_warnings sg =
   let loc = { loc with loc_ghost = true } in
   let unused_code_warnings =
-    unused_code_warnings && allow_unused_code_warnings ()
+    allow_unused_code_warnings
+      ~ppx_allows_unused_code_warnings:unused_code_warnings
   in
   let warnings =
     if keep_w32_intf () || unused_code_warnings then [] else [ 32 ]
@@ -700,8 +755,16 @@ let wrap_sig ~loc ~hide list =
    | Main expansion                                                  |
    +-----------------------------------------------------------------+ *)
 
-let types_used_by_deriving (tds : type_declaration list) : structure_item list =
-  if keep_w32_impl () then []
+let types_used_by_deriving (tds : type_declaration list)
+    ~unused_code_warnings:ppx_allows_unused_code_warnings : structure_item list
+    =
+  let unused_code_warnings =
+    allow_unused_code_warnings ~ppx_allows_unused_code_warnings
+  in
+  let unused_type_warnings =
+    allow_unused_type_warnings ~ppx_allows_unused_code_warnings
+  in
+  if keep_w32_impl () || unused_code_warnings || unused_type_warnings then []
   else
     List.map tds ~f:(fun td ->
         let typ = Common.core_type_of_type_declaration td in
@@ -737,10 +800,18 @@ let expand_str_type_decls ~ctxt rec_flag tds values =
         Ast_builder.Default.pstr_extension ~loc:Location.none err [])
       l_err
   in
+  let unused_code_warnings =
+    List.for_all generators ~f:(fun (_, generators, _) ->
+        List.for_all generators ~f:(fun (Generator.T t) ->
+            t.unused_code_warnings))
+  in
   (* TODO: instead of disabling the unused warning for types themselves, we
      should add a tag [@@unused]. *)
   let generated =
-    { items = types_used_by_deriving tds @ l_err; unused_code_warnings = false }
+    {
+      items = types_used_by_deriving tds ~unused_code_warnings @ l_err;
+      unused_code_warnings = false;
+    }
     :: Generator.apply_all ~ctxt (rec_flag, tds) generators
          Ast_builder.Default.pstr_extension
     |> merge_derived
@@ -790,9 +861,51 @@ let expand_str_module_type_decl ~ctxt mtd generators =
     ~hide:(not @@ Expansion_context.Deriver.inline ctxt)
     generated
 
+let expand_str_module_binding ~ctxt mtd generators =
+  let generators, l_err =
+    Deriver.resolve_all Deriver.Field.str_module_binding generators
+  in
+  let l_err =
+    List.map
+      ~f:(fun err ->
+        Ast_builder.Default.pstr_extension ~loc:Location.none err [])
+      l_err
+  in
+  let generated =
+    { items = l_err; unused_code_warnings = false }
+    :: Generator.apply_all ~ctxt mtd generators
+         Ast_builder.Default.pstr_extension
+    |> merge_derived
+  in
+  wrap_str
+    ~loc:(Expansion_context.Deriver.derived_item_loc ctxt)
+    ~hide:(not @@ Expansion_context.Deriver.inline ctxt)
+    generated
+
 let expand_sig_module_type_decl ~ctxt mtd generators =
   let generators, l_err =
     Deriver.resolve_all Deriver.Field.sig_module_type_decl generators
+  in
+  let l_err =
+    List.map
+      ~f:(fun err ->
+        Ast_builder.Default.psig_extension ~loc:Location.none err [])
+      l_err
+  in
+  let generated =
+    { items = l_err; unused_code_warnings = false }
+    :: Generator.apply_all ~ctxt mtd generators
+         Ast_builder.Default.psig_extension
+    |> merge_derived
+  in
+  wrap_sig
+    ~loc:(Expansion_context.Deriver.derived_item_loc ctxt)
+    ~hide:(not @@ Expansion_context.Deriver.inline ctxt)
+    generated
+
+let expand_sig_module_decl ~ctxt mtd generators =
+  let generators, l_err =
+    Deriver.resolve_all Deriver.Field.sig_module_decl generators
   in
   let l_err =
     List.map
@@ -895,6 +1008,70 @@ let expand_sig_type_ext ~ctxt te generators =
     ~hide:(not @@ Expansion_context.Deriver.inline ctxt)
     generated
 
+let expand_str_class_type_decls ~ctxt _rec_flag cds values =
+  let generators, l_err =
+    merge_generators Deriver.Field.str_class_type_decl values
+  in
+  let l_err =
+    List.map
+      ~f:(fun err ->
+        Ast_builder.Default.pstr_extension ~loc:Location.none err [])
+      l_err
+  in
+  let generated =
+    { items = l_err; unused_code_warnings = false }
+    :: Generator.apply_all ~ctxt cds generators
+         Ast_builder.Default.pstr_extension
+    |> merge_derived
+  in
+  wrap_str
+    ~loc:(Expansion_context.Deriver.derived_item_loc ctxt)
+    ~hide:(not @@ Expansion_context.Deriver.inline ctxt)
+    generated
+
+let expand_sig_class_decls ~ctxt _rec_flag cds values =
+  let generators, l_err =
+    merge_generators Deriver.Field.sig_class_type_decl values
+  in
+  let l_err =
+    List.map
+      ~f:(fun err ->
+        Ast_builder.Default.psig_extension ~loc:Location.none err [])
+      l_err
+  in
+  let generated =
+    { items = l_err; unused_code_warnings = false }
+    :: Generator.apply_all ~ctxt cds generators
+         Ast_builder.Default.psig_extension
+    |> merge_derived
+  in
+  wrap_sig
+    ~loc:(Expansion_context.Deriver.derived_item_loc ctxt)
+    ~hide:(not @@ Expansion_context.Deriver.inline ctxt)
+    generated
+
+let ppxlib_prefix = "ppxlib."
+
+let rules_str ~typ ~expand_str ~rule_str ~rule_str_expect =
+  let deriving_attr = mk_deriving_attr ~suffix:"" ~prefix:ppxlib_prefix typ in
+  let deriving_attr_expect =
+    mk_deriving_attr ~suffix:"_inline" ~prefix:ppxlib_prefix typ
+  in
+  [
+    rule_str deriving_attr expand_str;
+    rule_str_expect deriving_attr_expect expand_str;
+  ]
+
+let rules_sig ~typ ~expand_sig ~rule_sig ~rule_sig_expect =
+  let deriving_attr = mk_deriving_attr ~suffix:"" ~prefix:ppxlib_prefix typ in
+  let deriving_attr_expect =
+    mk_deriving_attr ~suffix:"_inline" ~prefix:ppxlib_prefix typ
+  in
+  [
+    rule_sig deriving_attr expand_sig;
+    rule_sig_expect deriving_attr_expect expand_sig;
+  ]
+
 let rules ~typ ~expand_sig ~expand_str ~rule_str ~rule_sig ~rule_str_expect
     ~rule_sig_expect =
   let prefix = "ppxlib." in
@@ -939,9 +1116,35 @@ let rules_module_type_decl =
     ~rule_str_expect:Context_free.Rule.attr_str_module_type_decl_expect
     ~rule_sig_expect:Context_free.Rule.attr_sig_module_type_decl_expect
 
+let rules_module_binding =
+  rules_str ~typ:Module_binding ~expand_str:expand_str_module_binding
+    ~rule_str:Context_free.Rule.attr_str_module_binding
+    ~rule_str_expect:Context_free.Rule.attr_str_module_binding_expect
+
+let rules_module_decl =
+  rules_sig ~typ:Module_declaration ~expand_sig:expand_sig_module_decl
+    ~rule_sig:Context_free.Rule.attr_sig_module_declaration
+    ~rule_sig_expect:Context_free.Rule.attr_sig_module_declaration_expect
+
+let rules_class_type_decl =
+  rules ~typ:Class_type_decl ~expand_str:expand_str_class_type_decls
+    ~expand_sig:expand_sig_class_decls
+    ~rule_str:Context_free.Rule.attr_str_class_type_decl
+    ~rule_sig:Context_free.Rule.attr_sig_class_type_decl
+    ~rule_str_expect:Context_free.Rule.attr_str_class_type_decl_expect
+    ~rule_sig_expect:Context_free.Rule.attr_sig_class_type_decl_expect
+
 let () =
   let rules =
-    [ rules_type_decl; rules_type_ext; rules_exception; rules_module_type_decl ]
+    [
+      rules_type_decl;
+      rules_type_ext;
+      rules_module_binding;
+      rules_module_decl;
+      rules_exception;
+      rules_module_type_decl;
+      rules_class_type_decl;
+    ]
     |> List.concat
   in
   Driver.register_transformation "deriving" ~aliases:[ "type_conv" ] ~rules

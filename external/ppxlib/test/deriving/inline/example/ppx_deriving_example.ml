@@ -13,4 +13,4 @@ include struct
     [%foo]
 end [@@ocaml.doc "@inline"]
 
-[@@@deriving.end]
+[@@@inline.end]

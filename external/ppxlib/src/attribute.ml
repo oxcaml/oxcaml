@@ -23,6 +23,7 @@ module Context = struct
     | Class_infos : _ class_infos t
     | Class_expr : class_expr t
     | Class_field : class_field t
+    | Class_type_decl : class_type_declaration t
     | Module_type : module_type t
     | Module_declaration : module_declaration t
     | Module_type_declaration : module_type_declaration t
@@ -54,6 +55,7 @@ module Context = struct
   let class_infos = Class_infos
   let class_expr = Class_expr
   let class_field = Class_field
+  let class_type_decl = Class_type_decl
   let module_type = Module_type
   let module_declaration = Module_declaration
   let module_type_declaration = Module_type_declaration
@@ -101,6 +103,7 @@ module Context = struct
     | Class_infos -> x.pci_attributes
     | Class_expr -> x.pcl_attributes
     | Class_field -> x.pcf_attributes
+    | Class_type_decl -> x.pci_attributes
     | Module_type -> x.pmty_attributes
     | Module_declaration -> x.pmd_attributes
     | Module_type_declaration -> x.pmtd_attributes
@@ -135,6 +138,7 @@ module Context = struct
     | Class_infos -> { x with pci_attributes = attrs }
     | Class_expr -> { x with pcl_attributes = attrs }
     | Class_field -> { x with pcf_attributes = attrs }
+    | Class_type_decl -> { x with pci_attributes = attrs }
     | Module_type -> { x with pmty_attributes = attrs }
     | Module_declaration -> { x with pmd_attributes = attrs }
     | Module_type_declaration -> { x with pmtd_attributes = attrs }
@@ -176,6 +180,7 @@ module Context = struct
     | Class_infos -> "class declaration"
     | Class_expr -> "class expression"
     | Class_field -> "class field"
+    | Class_type_decl -> "class type declaration"
     | Module_type -> "module type"
     | Module_declaration -> "module declaration"
     | Module_type_declaration -> "module type declaration"
@@ -427,8 +432,7 @@ let pattern_res t p =
 let pattern t p =
   pattern_res t p |> Ast_pattern.to_func
   |> (fun f a b c d ->
-       f a b c d
-       |> Result.handle_error ~f:(fun (err, _) -> Location.Error.raise err))
+  f a b c d |> Result.handle_error ~f:(fun (err, _) -> Location.Error.raise err))
   |> Ast_pattern.of_func
 
 module Floating = struct
@@ -442,13 +446,31 @@ module Floating = struct
 
   let name t = Name.Pattern.name t.name
 
-  let declare name context pattern k =
+  let declare_with_all_args name context pattern k =
     Name.Registrar.register ~kind:`Attribute registrar (Floating context) name;
     {
       name = Name.Pattern.make name;
       context;
-      payload = Payload_parser (pattern, fun ~attr_loc:_ ~name_loc:_ -> k);
+      payload = Payload_parser (pattern, k);
     }
+
+  let declare name context pattern k =
+    declare_with_all_args name context pattern (fun ~attr_loc:_ ~name_loc:_ ->
+        k)
+
+  let declare_with_name_loc name context pattern k =
+    declare_with_all_args name context pattern (fun ~attr_loc:_ ~name_loc ->
+        k ~name_loc)
+
+  let declare_with_attr_loc name context pattern k =
+    declare_with_all_args name context pattern (fun ~attr_loc ~name_loc:_ ->
+        k ~attr_loc)
+
+  let convert_attr_res t attr =
+    let open Result in
+    if Name.Pattern.matches t.name attr.attr_name.txt then
+      convert t.payload attr >>| fun value -> Some value
+    else Ok None
 
   let convert_res ts x =
     let open Result in
@@ -510,8 +532,7 @@ let collect_unused_attributes_errors =
             let errors =
               List.map attrs
                 ~f:(fun
-                     ({ attr_name = name; attr_payload = payload; _ } as attr)
-                   ->
+                    ({ attr_name = name; attr_payload = payload; _ } as attr) ->
                   let collected_errors =
                     self#payload payload []
                     @ collect_attribute_errors registrar (On_item context) name
@@ -695,8 +716,8 @@ let check_unused =
         | [] -> node
         | _ ->
             List.iter attrs
-              ~f:(fun ({ attr_name = name; attr_payload = payload; _ } as attr)
-                 ->
+              ~f:(fun
+                  ({ attr_name = name; attr_payload = payload; _ } as attr) ->
                 self#payload payload;
                 check_attribute registrar (On_item context) name;
                 (* If we allow the attribute to pass through, mark it as seen *)
@@ -814,7 +835,7 @@ let collect =
         =
       let loc = Common.loc_of_attribute attr in
       super#payload payload;
-      Attribute_table.add not_seen name loc
+      Attribute_table.replace not_seen name loc
   end
 
 let collect_unseen_errors () =

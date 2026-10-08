@@ -44,20 +44,41 @@ caught, so no AST is produced.
 
   $ echo "let x = 1+1. " > impl.ml
   $ echo "let _ = [%gen_raise_located_error]" >> impl.ml
+  $ echo "let _ = [%gen_raise_located_error2]" >> impl.ml
   $ export OCAML_ERROR_STYLE=short
+
+ when the -embed-errors flag is not passed  
   $ ./extender.exe impl.ml
   File "impl.ml", line 2, characters 8-34:
   Error: A raised located error
   [1]
 
+
+ when the -embed-errors flag is  passed
+  $ ./extender.exe -embed-errors impl.ml
+  let x = 1 + 1.
+  let _ = [%ocaml.error "A raised located error"]
+  let _ = [%ocaml.error "A second raised located error"]
+
  In the case of derivers
 
   $ echo "type a = int" > impl.ml
   $ echo "type b = int [@@deriving deriver_located_error]" >> impl.ml
+  $ echo "type c = int [@@deriving deriver_located_error2]" >> impl.ml
+
+ when the -embed-errors flag is not passed  
   $ ./deriver.exe impl.ml
   File "impl.ml", line 2, characters 0-47:
   Error: A raised located error
   [1]
+
+ when the -embed-errors flag is  passed
+  $ ./deriver.exe -embed-errors impl.ml
+  type a = int
+  type b = int[@@deriving deriver_located_error]
+  [%%ocaml.error "A raised located error"]
+  type c = int[@@deriving deriver_located_error2]
+  [%%ocaml.error "A second raised located error"]
 
  In the case of whole file transformations:
 
@@ -74,20 +95,41 @@ and the whole AST is prepended with an error extension node.
 
   $ echo "let x = 1+1. " > impl.ml
   $ echo "let _ = [%gen_raise_located_error]" >> impl.ml
+  $ echo "let _ = [%gen_raise_located_error2]" >> impl.ml
+
+when the -embed-errors flag is not passed
+  $ ./extender.exe impl.ml
+  File "impl.ml", line 2, characters 8-34:
+  Error: A raised located error
+  [1]
+
+ when the -embed-errors flag is  passed 
   $ ./extender.exe -embed-errors impl.ml
-  [%%ocaml.error "A raised located error"]
   let x = 1 + 1.
-  let _ = [%gen_raise_located_error ]
+  let _ = [%ocaml.error "A raised located error"]
+  let _ = [%ocaml.error "A second raised located error"]
 
  In the case of derivers
 
   $ echo "let x = 1+1. " > impl.ml
-  $ echo "type a = int" > impl.ml
+  $ echo "type a = int" >> impl.ml
   $ echo "type b = int [@@deriving deriver_located_error]" >> impl.ml
+  $ echo "type b = int [@@deriving deriver_located_error2]" >> impl.ml
+ 
+ when the -embed-errors flag is not passed 
+  $ ./deriver.exe impl.ml
+  File "impl.ml", line 3, characters 0-47:
+  Error: A raised located error
+  [1]
+
+ when the -embed-errors flag is passed 
   $ ./deriver.exe -embed-errors impl.ml
-  [%%ocaml.error "A raised located error"]
+  let x = 1 + 1.
   type a = int
   type b = int[@@deriving deriver_located_error]
+  [%%ocaml.error "A raised located error"]
+  type b = int[@@deriving deriver_located_error2]
+  [%%ocaml.error "A second raised located error"]
 
  In the case of whole file transformations:
 
@@ -112,15 +154,79 @@ and the whole AST is prepended with an error extension node.
 
   $ echo "type a = int" > impl.ml
   $ echo "type b = int [@@deriving deriver_raised_exception]" >> impl.ml
+  $ echo "type b = int [@@deriving deriver_raised_exception2]" >> impl.ml
   $ ./deriver.exe -embed-errors impl.ml
   Fatal error: exception Failure("A raised exception")
   [2]
 
+ In the case of Constant types
+
+  $ echo "let x = 2g + 3g" > impl.ml
+  $ echo "let x = 2g + 3g" >> impl.ml
+
+ When embed-errors is not passed 
+  $ ./constant_type.exe impl.ml
+  File "impl.ml", line 1, characters 8-10:
+  Error: A raised located error in the constant rewriting transformation.
+  [1]
+
+ When embed-errors is not passed
+  $ ./constant_type.exe -embed-errors impl.ml
+  let x =
+    ([%ocaml.error
+       "A raised located error in the constant rewriting transformation."])
+      +
+      ([%ocaml.error
+         "A raised located error in the constant rewriting transformation."])
+  let x =
+    ([%ocaml.error
+       "A raised located error in the constant rewriting transformation."])
+      +
+      ([%ocaml.error
+         "A raised located error in the constant rewriting transformation."])
+
+ In the case of Special functions
+
+  $ echo "let x1 = n_args" > impl.ml
+  $ echo "let x2 = n_args2" >> impl.ml
+ When embed-errors is not passed 
+  $ ./special_functions.exe impl.ml
+  File "impl.ml", line 1, characters 9-15:
+  Error: error special function
+  [1]
+
+ When embed-errors is not passed
+  $ ./special_functions.exe -embed-errors impl.ml
+  let x1 = [%ocaml.error "error special function"]
+  let x2 = [%ocaml.error "second error special function"]
+
  In the case of whole file transformations:
 
+  $ echo "let _ = [%gen_raise_exc] + [%gen_raise_exc]" > impl.ml
   $ ./whole_file_exception.exe impl.ml
   Fatal error: exception Failure("An exception in a whole file transform")
   [2]
   $ ./whole_file_exception.exe -embed-errors impl.ml
   Fatal error: exception Failure("An exception in a whole file transform")
   [2]
+
+
+4. Reporting Multiple Exceptions
+
+When the `-embed-error` flag is not set, exceptions stop the rewriting process. Therefore, only the first exception is reported to the user
+  $ ./whole_file_multiple_errors.exe impl.ml
+  File "impl.ml", line 1, characters 0-43:
+  Error: Raising a located exception during the first instrumentation phase
+  [1]
+
+When the `-embed-error` flag is set, located exceptions thrown during the rewriting process are caught, and collected. The "throwing transformations" are ignored. After all transformations have been applied, the collected errors are appended at the beginning of the AST.
+  $ echo 'let () = print_endline "Hello, World!" ' > impl.ml
+  $ ./whole_file_multiple_errors.exe -embed-errors impl.ml
+  [%%ocaml.error
+    "Raising a located exception during the first instrumentation phase"]
+  [%%ocaml.error
+    "Raising a located exception during the Global transformation phase"]
+  [%%ocaml.error
+    "Raising a located exception during the Last instrumentation phase"]
+  let () = print_endline "Hello, World!"
+
