@@ -154,7 +154,7 @@ val get_type_param_name: Parsetree.core_type -> string option
 exception Already_bound
 
 type value_loc =
-    Poly_variant | Object_field | Optional_arg
+    Poly_variant | Object_field
 
 type sort_loc =
     Fun_arg | Fun_ret
