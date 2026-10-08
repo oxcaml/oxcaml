@@ -313,19 +313,17 @@ let oper_arg_types : Cmm.operation -> expected_arg_types = function
         Exactly (Cmm.machtype_of_memory_chunk memory_chunk)
     in
     Args [Exactly Cmm.typ_addr; payload_machtype]
-  | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _ | Cand | Cor | Cxor
-  | Clsl | Clsr | Casr | Ccmpi _ ->
-    (* Under [ge_component], [typ_addr] accepts any word in a general-purpose
-       register ([Int], [Val] or [Addr]): classic machtypes cannot distinguish
-       tagged values from untagged words, and word operations are applied to
-       both (e.g. physical equality on values, untagging a scrutinee). *)
+  | Caddi | Csubi | Cand | Cor | Cxor | Ccmpi _ ->
     Args [Exactly Cmm.typ_addr; Exactly Cmm.typ_addr]
-  | Cclz | Cctz | Cpopcnt | Cbswap _ -> Args [Exactly Cmm.typ_addr]
+  | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _ | Cmuli64 _ ->
+    Args [Exactly Cmm.typ_int; Exactly Cmm.typ_int]
+  | Clsl | Clsr | Casr ->
+    Args [Exactly Cmm.typ_addr; Exactly Cmm.typ_int]
+  | Cclz | Cctz | Cpopcnt | Cbswap _ -> Args [Exactly Cmm.typ_int]
   | Caddi128 | Csubi128 ->
     Args
       [ Exactly Cmm.typ_int; Exactly Cmm.typ_int;
         Exactly Cmm.typ_int; Exactly Cmm.typ_int ]
-  | Cmuli64 _ -> Args [Exactly Cmm.typ_int; Exactly Cmm.typ_int]
   | Ccsel ty -> Args [Exactly Cmm.typ_int; Exactly ty; Exactly ty]
   | Cprefetch _ -> Args [Exactly Cmm.typ_addr]
   | Catomic
