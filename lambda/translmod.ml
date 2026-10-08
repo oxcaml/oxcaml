@@ -1128,6 +1128,8 @@ let add_arg_block_to_module_representation = function
         Array.append shape_for_read
           [| mixed_block_element_with_locality_mode_for_module |] )
 
+(* The argument block is appended after the primary block's fields; must agree
+   with [Typemod.arg_signature] and [main_repr_of_argument_unit]. *)
 let add_arg_block_to_module_block ~loc primary_block_lam primary_repr restr =
   let primary_block_id = Ident.create_local "*primary-block*" in
   let primary_block_id_duid = Lambda.debug_uid_none in
@@ -1141,7 +1143,6 @@ let add_arg_block_to_module_block ~loc primary_block_lam primary_repr restr =
   in
   let size = module_representation_field_count primary_repr in
   let all_fields = List.init size get_field @ [Lvar arg_block_id] in
-  let arg_block_field = size in
   let new_repr = add_arg_block_to_module_representation primary_repr in
   Llet(Strict, layout_module, primary_block_id,
        primary_block_id_duid, primary_block_lam,
@@ -1150,8 +1151,7 @@ let add_arg_block_to_module_block ~loc primary_block_lam primary_repr restr =
             Lprim(block_of_module_representation ~loc new_repr,
                   all_fields,
                   Loc_unknown))),
-  new_repr,
-  Some arg_block_field
+  new_repr
 
 let add_runtime_parameters lam params =
   let params =
@@ -1186,7 +1186,7 @@ let transl_implementation_module ~loc ~scopes module_id (str, cc, cc2) =
     transl_struct ~scopes (of_location ~scopes loc) [] cc path str
   in
   match cc2 with
-  | None -> lam, repr, None
+  | None -> lam, repr
   | Some cc2 ->
     add_arg_block_to_module_block ~loc lam repr cc2
 
@@ -1216,13 +1216,9 @@ let transl_implementation compilation_unit impl ~loc =
   primitive_declarations := [];
   Translprim.clear_used_primitives ();
   let scopes = enter_compilation_unit ~scopes:empty_scopes compilation_unit in
-  let body, (repr, arg_block_idx) =
+  let body, repr =
     Translobj.transl_label_init (fun () ->
-      let body, repr, arg_block_idx =
-        transl_implementation_module ~loc ~scopes compilation_unit
-          impl
-      in
-      body, (repr, arg_block_idx))
+      transl_implementation_module ~loc ~scopes compilation_unit impl)
   in
   let body, main_module_block_format =
     match has_parameters () with
@@ -1259,7 +1255,6 @@ let transl_implementation compilation_unit impl ~loc =
   in
   { compilation_unit;
     main_module_block_format;
-    arg_block_idx;
     required_globals = required_globals ~flambda:true body;
     code = body }
 
@@ -1531,7 +1526,6 @@ let transl_runtime_arg arg =
 
 let transl_instance_impl
       compilation_unit ~runtime_args ~main_module_block_repr
-      ~arg_block_idx
     : Lambda.program =
   let base_compilation_unit, _args =
     Compilation_unit.split_instance_exn compilation_unit
@@ -1572,56 +1566,68 @@ let transl_instance_impl
     code;
     main_module_block_format;
     required_globals;
-    arg_block_idx;
   }
 
-let transl_instance instance_unit ~runtime_args ~main_module_block_repr
-      ~arg_block_idx =
+let transl_instance instance_unit ~runtime_args ~main_module_block_repr =
   assert (Compilation_unit.is_instance instance_unit);
   if (runtime_args = []) then
     Misc.fatal_error "Trying to instantiate but passing no arguments";
   transl_instance_impl instance_unit ~runtime_args
-    ~main_module_block_repr ~arg_block_idx
+    ~main_module_block_repr
 
-let cu_of_impl (gm : Global_module.t) : Compilation_unit.t =
-  let impl, _params, _sig =
-    Env.find_import ~chain:[]
-      (Compilation_unit.Name.of_head_of_global_name (Global_module.to_name gm))
+let main_repr_of_argument_unit (swg : Signature_with_global_bindings.t) =
+  let sign, _ = swg.sign in
+  Subst.Lazy.force_signature_once sign
+  |> List.filter_map Subst.Lazy.sort_of_signature_item
+  |> Array.of_list
+  |> transl_module_representation
+  |> add_arg_block_to_module_representation
+
+let cu_of_impl ~chain (gm : Global_module.t) : Compilation_unit.t =
+  let { Persistent_env.imp_impl; _ } =
+    Env.find_import ~chain (Compilation_unit.Name.of_head_of_global gm)
   in
-  match impl with
+  match imp_impl with
   | Some cu -> cu
   | None ->
       Misc.fatal_errorf_doc
         "cu_of_impl: %a has no implementation (parameter module)"
         Global_module.print gm
 
-(* [gm] must have been compiled with [-as-argument-for].
+(* [gm] must have been compiled with [-as-argument-for param].
 
-   CR-someday zqian: the fatal error below is reachable with stale
+   CR-someday zqian: the fatal errors below are reachable with stale
    [.cmo]/[.cmx] artifacts, because they are read without consistency
    checks; such checks should be added. *)
-let project_arg_block ~find_impl_by_name ~chain ~(gm : Global_module.t)
-      main_block =
-  let fmt, arg_descr = find_impl_by_name ~chain (cu_of_impl gm) in
-  let arg_block_idx =
-    match (arg_descr : Lambda.arg_descr option) with
-    | Some { arg_block_idx; _ } -> arg_block_idx
-    | None ->
+let project_arg_block ~chain ~(param : Global_module.t)
+      ~(gm : Global_module.t) main_block =
+  let { Persistent_env.imp_arg_signature; imp_raw_sign; _ } =
+    Env.find_import ~chain (Compilation_unit.Name.of_head_of_global gm)
+  in
+  match imp_arg_signature with
+  | Some { arg_block_idx; arg_param } ->
+      if not
+           (Global_module.Name.equal (Global_module.to_name param)
+              (Global_module.Name.of_parameter_name arg_param))
+      then
         Misc.fatal_errorf_doc
-          "project_arg_block: %a was not compiled with -as-argument-for"
+          "project_arg_block: %a was compiled with -as-argument-for %a, \
+           not %a"
           Global_module.print gm
-  in
-  let main_repr =
-    match (fmt : main_module_block_format) with
-    | Mb_struct { mb_repr } -> mb_repr
-    | Mb_instantiating_functor { mb_returned_repr; _ } -> mb_returned_repr
-  in
-  Lprim (mod_field arg_block_idx main_repr, [main_block], Loc_unknown)
+          Global_module.Parameter_name.print arg_param
+          Global_module.print param;
+      let main_repr = main_repr_of_argument_unit imp_raw_sign in
+      Lprim (mod_field arg_block_idx main_repr, [main_block], Loc_unknown)
+  | None ->
+      Misc.fatal_errorf_doc
+        "project_arg_block: %a was not compiled with -as-argument-for"
+        Global_module.print gm
 
 (** All three of [transl_maybe_local_instance], [transl_local_instance],
     and [bind_local_instance] take [gm], [module_map], and [rev_bindings]:
     - [gm] is a global module name that we need lambda code for.
-    - [module_map] maps from incomplete global module names to local idents.
+    - [module_map] maps from incomplete global module names to local idents
+      and the compilation units implementing them.
     - [rev_bindings] binds each of the local idents to a local instantiation
       of the incomplete global module.
 
@@ -1647,7 +1653,7 @@ let rec transl_maybe_local_instance ~(gm : Global_module.t) ~chain
 and transl_local_instance ~(gm : Global_module.t) ~chain
     ~find_impl_by_name ~param_map ~module_map ~rev_bindings =
   match Global_module.Map.find_opt gm module_map with
-  | Some id -> (Lvar id, module_map, rev_bindings)
+  | Some (id, _cu) -> (Lvar id, module_map, rev_bindings)
   | None ->
       bind_local_instance ~gm ~chain ~find_impl_by_name ~param_map ~module_map
         ~rev_bindings
@@ -1657,11 +1663,11 @@ and transl_local_instance ~(gm : Global_module.t) ~chain
     at the top level or nested). *)
 and bind_local_instance ~(gm : Global_module.t) ~chain
     ~find_impl_by_name ~param_map ~module_map ~rev_bindings =
-  let cu = cu_of_impl gm in
-  let ui_format, _arg_descr = find_impl_by_name ~chain cu in
+  let cu = cu_of_impl ~chain gm in
+  let ui_format = find_impl_by_name ~chain cu in
   let chain = gm :: chain in
   let new_id = Ident.create_local (Global_module.to_string gm) in
-  let module_map = Global_module.Map.add gm new_id module_map in
+  let module_map = Global_module.Map.add gm (new_id, cu) module_map in
   let runtime_params =
     match ui_format with
     | Mb_struct _ ->
@@ -1714,8 +1720,8 @@ and bind_local_instance ~(gm : Global_module.t) ~chain
                  ~find_impl_by_name ~param_map ~module_map ~rev_bindings
              in
              let arg_block =
-               project_arg_block ~find_impl_by_name ~chain
-                 ~gm:arg_value main_block
+               project_arg_block ~chain ~param:global ~gm:arg_value
+                 main_block
              in
              ((module_map, rev_bindings), arg_block)
          | None ->
@@ -1830,7 +1836,7 @@ let transl_functorization_make ~params ~modules ~find_impl_by_name
   in
   let required_globals =
     Global_module.Map.fold
-      (fun gm _id set -> Compilation_unit.Set.add (cu_of_impl gm) set)
+      (fun _gm (_id, cu) set -> Compilation_unit.Set.add cu set)
       module_map Compilation_unit.Set.empty
   in
   let unit_ident = Ident.create_local "*unit*" in
@@ -1909,7 +1915,6 @@ let transl_functorization compilation_unit
   let main_module_block_format = Mb_struct { mb_repr } in
   { compilation_unit;
     main_module_block_format;
-    arg_block_idx = None;
     required_globals;
     code
   }

@@ -27,15 +27,15 @@ let print_int8u s f = print_int8 s (to_int8 f)
 
 (* Various combinations of arguments int8, int8 [@unboxed], and
    int8# *)
-external lognot_UtoU : int8# -> int8# =
+external lognot_UtoU : (int8#[@unsafe_unextended]) -> int8# =
   "lognot_bytecode" "lognot_UtoU"
 external lognot_BtoU : int8 -> int8# =
   "lognot_bytecode" "lognot_BtoU"
-external lognot_UtoB : int8# -> int8 =
+external lognot_UtoB : (int8#[@unsafe_unextended]) -> int8 =
   "lognot_bytecode" "lognot_UtoB"
 external lognot_BUtoU : (int8[@unboxed]) -> int8# =
   "lognot_bytecode" "lognot_UtoU"
-external lognot_UtoBU : int8# -> (int8[@unboxed]) =
+external lognot_UtoBU : (int8#[@unsafe_unextended]) -> (int8[@unboxed]) =
   "lognot_bytecode" "lognot_UtoU"
 
 let () =
@@ -60,8 +60,8 @@ let () =
 
 (* If there are more than 5 args, you get an array in bytecode *)
 external sum_7 :
-  int8# -> int8 -> int8# -> int8 ->
-  int8# -> int8 -> int8# -> int8# =
+  (int8#[@unsafe_unextended]) -> int8 -> (int8#[@unsafe_unextended]) -> int8 ->
+  (int8#[@unsafe_unextended]) -> int8 -> (int8#[@unsafe_unextended]) -> int8# =
   "sum_7_bytecode" "sum_7_UBUBUBUtoU"
 
 let _ =

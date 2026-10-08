@@ -1241,7 +1241,7 @@ let assert_mixed_product_support_for_lambda_shape loc kind shape =
 let rec transl_layout (layout : Jkind_types.Layout.Const.t)
     : unit Lambda.mixed_block_element =
   match layout with
-  | Genvar var -> Splice_variable (Slambdaident.of_sort_var var)
+  | Genvar (var, _axes) -> Splice_variable (Slambdaident.of_sort_var var)
   | Product layouts ->
       Product (Array.of_list (List.map transl_layout layouts))
   | Addressable layout -> transl_layout layout
