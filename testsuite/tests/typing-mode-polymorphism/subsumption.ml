@@ -285,8 +285,8 @@ Error: Signature mismatch:
          val f : 'a @ [< 'm > local] -> 'a @ [> 'm | local]
        is not included in
          val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless
-       The type "'a @ [< 'm > past('n) | local] -> 'a @ [> 'm | local]"
-       is not compatible with the type "'a @ [< 'o & past('n)] -> 'a @ [> 'o]"
+       The type "'a @ [< 'm > local] -> 'a @ [> 'm | local]"
+       is not compatible with the type "'a @ [< 'm] -> 'a @ [> 'm]"
        The return mode was expected to be "global" but is "local"
 |}]
 
@@ -308,7 +308,7 @@ Error: Signature mismatch:
        is not included in
          val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless
        The type "'a @ [< 'm & unique] -> 'a @ [> 'm]"
-       is not compatible with the type "'a @ [< 'n] -> 'a @ [> 'n]"
+       is not compatible with the type "'a @ [< 'm] -> 'a @ [> 'm]"
        The argument mode was expected to be "unique" but is "aliased"
 |}]
 
@@ -330,7 +330,7 @@ Error: Signature mismatch:
        is not included in
          val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless
        The type "'a @ [< 'm & global] -> 'a @ [> 'm]"
-       is not compatible with the type "'a @ [< 'n] -> 'a @ [> 'n]"
+       is not compatible with the type "'a @ [< 'm] -> 'a @ [> 'm]"
        The argument mode was expected to be "global"
        because it crosses with something but is "local"
 |}]
@@ -353,7 +353,7 @@ Error: Signature mismatch:
        is not included in
          val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless
        The type "'a @ [< 'm & portable] -> 'a @ [> 'm]"
-       is not compatible with the type "'a @ [< 'n] -> 'a @ [> 'n]"
+       is not compatible with the type "'a @ [< 'm] -> 'a @ [> 'm]"
        The argument mode was expected to be "portable" but is "nonportable"
 |}]
 
@@ -398,10 +398,9 @@ Error: Signature mismatch:
          val f : 'a @ [> local] -> 'b @ [< 'm] -> 'b @ [> 'm]
        is not included in
          val f : 'a @ [< global] -> 'b @ [< 'm] -> 'b @ [> 'm] @@ stateless
-       The type
-         "'a @ [> past('o) | local] -> 'b @ [< 'm > past('n)] -> 'b @ [> 'm]"
+       The type "'a @ [> local] -> 'b @ [< 'm] -> 'b @ [> 'm]"
        is not compatible with the type
-         "'a @ [< past('o) & global] -> 'b @ [< 'p & past('n)] -> 'b @ [> 'p]"
+         "'a @ [< global] -> 'b @ [< 'm] -> 'b @ [> 'm]"
        The return mode was expected to be "global" but is "local"
 |}]
 

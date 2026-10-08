@@ -39,6 +39,13 @@ module Style = Misc.Style
 
 type 'a diff = 'a Out_type.diff = Same of 'a | Diff of 'a * 'a
 
+let trees_of_diff (type variety) (trace_format : variety trace_format) f d =
+  match trace_format with
+  | Moregen ->
+      let side x = reserve_fresh_modes_of_expansion x; f x in
+      Errortrace.map_diff side d
+  | Unification | Equality -> Errortrace.map_diff f d
+
 let trees_of_trace mode =
   List.map (Errortrace.map_diff (trees_of_type_expansion mode))
 
@@ -466,11 +473,13 @@ let prepare_expansion_head empty_tr = function
       Some (Errortrace.map_diff (may_prepare_expansion empty_tr) d)
   | _ -> None
 
-let head_error_printer ~var_jkinds mode txt_got txt_but = function
+let head_error_printer trace_format ~var_jkinds mode txt_got txt_but =
+  function
   | None -> Format_doc.Doc.empty
   | Some d ->
       let d =
-        Errortrace.map_diff (trees_of_type_expansion' ~var_jkinds mode) d
+        trees_of_diff trace_format
+          (trees_of_type_expansion' ~var_jkinds mode) d
       in
       doc_printf "%a@;<1 2>%a@ %a@;<1 2>%a"
         pp_doc txt_got pp_type_expansion d.Errortrace.got
@@ -511,11 +520,14 @@ let error trace_format mode subst env tr txt1 ppf txt2 ty_expect_explanation =
       let tr = List.map (Errortrace.map_diff prepare_expansion) tr in
       let last = Option.map (Errortrace.map_diff prepare_expansion) last in
       let head_error =
-        head_error_printer ~var_jkinds:jkind_error mode txt1 txt2 head
+        head_error_printer trace_format ~var_jkinds:jkind_error mode txt1 txt2
+          head
       in
-      let tr = trees_of_trace mode tr in
-      let last =
-        Option.map (Errortrace.map_diff (trees_of_type_expansion mode)) last in
+      let trees_of_elt =
+        trees_of_diff trace_format (trees_of_type_expansion mode)
+      in
+      let tr = List.map trees_of_elt tr in
+      let last = Option.map trees_of_elt last in
       let mis = mismatch txt1 env full_trace in
       let tr = match mis, last with
         | None, Some elt -> tr @ [elt]
