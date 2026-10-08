@@ -1601,6 +1601,9 @@ module Metadata : sig
   (* CR-someday gyorsh: propagate assert of arbitrary expressions. *)
   val assume_value :
     Debuginfo.t -> can_raise:bool -> Witnesses.t -> Value.t option
+
+  val assume_value_unless_inferred :
+    Debuginfo.t -> Witnesses.t -> Value.t option
 end = struct
   (* CR gyorsh: The return type of [Assume_info.get_value] is
      [Assume_info.Value.t]. It is not the same as [Zero_alloc_checker.Value.t],
@@ -1624,6 +1627,11 @@ end = struct
       let v = transl w v in
       let v = if can_raise then v else { v with exn = V.bot } in
       Some v
+
+  let assume_value_unless_inferred dbg w =
+    if Zero_alloc_utils.Assume_info.is_inferred (Debuginfo.assume_zero_alloc dbg)
+    then None
+    else assume_value dbg ~can_raise:false w
 end
 
 module Report : sig
@@ -2338,7 +2346,7 @@ end = struct
     report t exn ~msg:"transform_specific exn" ~desc dbg;
     let effect_ =
       let w = create_witnesses t (Arch_specific s) dbg in
-      match Metadata.assume_value dbg ~can_raise:false w with
+      match Metadata.assume_value_unless_inferred dbg w with
       | Some v -> v
       | None ->
         (* Conservatively assume that operation can return normally. *)
@@ -2662,7 +2670,7 @@ end = struct
         | Alloc { mode = Heap; bytes; dbginfo } ->
           let w = create_witnesses t (Alloc { bytes; dbginfo }) dbg in
           let effect_ =
-            match Metadata.assume_value dbg ~can_raise:false w with
+            match Metadata.assume_value_unless_inferred dbg w with
             | Some effect_ -> effect_
             | None -> Value.{ nor = V.top w; exn = V.bot; div = V.bot }
           in
