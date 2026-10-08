@@ -285,8 +285,8 @@ module TycompTbl =
         (** List of locks from the definition of [root] to this [Open], in that
             order *)
       }
-      (** Open of an unnamed module, e.g. the output of a functor or of a first-class
-          module *)
+      (** Open of an unnamed module, e.g. the output of a functor or of a
+          first-class module *)
       | Open_anonymous of {
         bindings: 'a Ident.tbl;
         (** The bindings introduced by this open. *)
@@ -620,7 +620,8 @@ module IdTbl =
             if mark then begin match using with
               | None -> ()
               | Some f -> begin match
-                    (find_name_and_locks wrap ~mark:false name next macc : _ Result.t)
+                    (find_name_and_locks wrap
+                       ~mark:false name next macc : _ Result.t)
                   with
                   | Error _ -> f name None
                   | Ok (_, _, descr') -> f name (Some (descr', descr))
@@ -716,16 +717,17 @@ module IdTbl =
         match tbl.layer with
         | Nothing -> Seq.Nil
         | Open { next; components; _ } ->
-          (* since components doesn't contain idents, they can't be found by this
-             function, but they might shadow other names, which we represent
-             with `None` in the sequence (no match, but shadows) *)
+          (* since components doesn't contain idents, they can't be found by
+             this function, but they might shadow other names, which we
+             represent with `None` in the sequence (no match, but shadows) *)
             if NameMap.mem name components then
               Seq.Cons(None, find_all_idents name next)
             else
               find_all_idents name next ()
         | Open_anonymous { next; bindings; _ } ->
           Seq.append
-            (Ident.find_all_seq name bindings |> Seq.map (fun (id, _) -> Some id))
+            (Ident.find_all_seq name bindings
+             |> Seq.map (fun (id, _) -> Some id))
             (find_all_idents name next)
             ()
         | Map {next; _ } -> find_all_idents name next ()
@@ -749,7 +751,9 @@ module IdTbl =
           |> fold_name wrap f next
       | Open_anonymous { using = _; next; bindings } ->
         acc
-        |> Ident.fold_name (fun id d -> f (Ident.name id) (Pident id, d)) bindings
+        |> Ident.fold_name
+             (fun id d -> f (Ident.name id) (Pident id, d))
+             bindings
         |> fold_name wrap f next
       | Nothing ->
           acc
