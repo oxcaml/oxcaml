@@ -1432,6 +1432,9 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
                   arg, Jkind.Sort.scannable
                 else
                   Typecore.type_option_some val_env sarg ty ty0,
+                  (* Always [scannable] even for non-[value] optional arguments,
+                     since this is the sort of the [option], not what's inside.
+                  *)
                   Jkind.Sort.scannable
               )
             in

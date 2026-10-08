@@ -5053,6 +5053,12 @@ let for_optional_arg_default
   in
   let sloc = Scoped_location.of_location ~scopes loc in
   let field_access =
+    (* CR-someday lmaurer: This is just a special case of [make_field_access]
+       inside [get_expr_args_constr], but deduplicating it is nontrivial at the
+       moment. Even better, we could factor out *all* the places that project a
+       field and have to do this dance. Then here we'd bake in the
+       representation, which we could expose in [Predef] as a function of the
+       argument sort. *)
     match default_arg_layout with
     | Pvalue _ -> Pfield (0, Pointer, Reads_agree)
     | _ ->
