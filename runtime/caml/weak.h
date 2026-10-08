@@ -18,6 +18,8 @@
 #ifndef CAML_WEAK_H
 #define CAML_WEAK_H
 
+#include "config.h"
+#include "camlatomic.h"
 #include "mlvalues.h"
 
 #ifdef __cplusplus
