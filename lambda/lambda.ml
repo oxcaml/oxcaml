@@ -576,6 +576,7 @@ and layout =
   | Punboxed_vector of unboxed_vector
   | Punboxed_mask
   | Punboxed_product of layout list
+  | Pvoid
   | Pbottom
   | Psplicevar of Slambdaident.t
 
@@ -1017,6 +1018,7 @@ let rec join_layout x y =
   | Punboxed_product layouts1, Punboxed_product layouts2
     when List.length layouts1 = List.length layouts2 ->
       Punboxed_product (List.map2 join_layout layouts1 layouts2)
+  | Pvoid, Pvoid -> Pvoid
   | Punboxed_float f1, Punboxed_float f2
     when Primitive.equal_unboxed_float f1 f2 ->
       x
@@ -1028,7 +1030,7 @@ let rec join_layout x y =
       x
   | Punboxed_mask, Punboxed_mask -> x
   | Psplicevar id1, Psplicevar id2 when Slambdaident.equal id1 id2 -> x
-  | ( ( Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _
+  | ( ( Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _ | Pvoid
       | Punboxed_vector _ | Punboxed_mask | Punboxed_product _ | Psplicevar _ ),
       _ ) ->
       Misc.fatal_error "Lambda.join_layout: layouts of different sorts"

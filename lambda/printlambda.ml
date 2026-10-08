@@ -256,6 +256,7 @@ let rec layout ppf lay_ =
     fprintf ppf "@[<hov 1>#(%a)@]"
       (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ") layout)
       layouts
+  | Pvoid -> fprintf ppf "void"
   | Psplicevar id -> fprintf ppf "$%a" Slambdaident.print id
 
 let layout_annotation ppf lay_ =
@@ -303,6 +304,7 @@ let return_kind ppf (mode, kind) =
   | Punboxed_product _ -> fprintf ppf ": %a@ " layout kind
   | Ptop -> fprintf ppf ": top@ "
   | Pbottom -> fprintf ppf ": bottom@ "
+  | Pvoid -> fprintf ppf ": void@ "
   | Psplicevar id -> fprintf ppf ": $%a@ " Slambdaident.print id
 
 let locality_kind = function

@@ -88,6 +88,7 @@ module Component_for_creation = struct
     | Punboxed_mask -> Singleton KS.naked_mask
     | Punboxed_product layouts ->
       Unboxed_product (List.map (from_lambda ~machine_width) layouts)
+    | Pvoid -> Unboxed_product []
     | Ptop | Pbottom ->
       Misc.fatal_errorf
         "Cannot convert %a to Flambda_arity.Component_for_creation"

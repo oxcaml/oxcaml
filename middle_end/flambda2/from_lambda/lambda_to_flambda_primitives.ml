@@ -1910,6 +1910,7 @@ let mixed_block_shape_of_layout ~prim_name (layout : L.layout) :
   match layout with
   | Punboxed_product layouts ->
     Array.of_list (List.map L.mixed_block_element_of_layout layouts)
+  | Pvoid -> [||]
   (* CR box: the current state of the world is a little sad. We either box small
      numbers as tagged immediates and break representation invariants for
      singleton unboxed records, or box them as tag-0 blocks and break numeric

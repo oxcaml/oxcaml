@@ -644,8 +644,6 @@ and value_kind_non_null =
   | Pboxedvectorval of boxed_vector
   | Pboxedmaskval
 
-(* Because we check for and error on void in the translation to lambda, we don't
-   need a constructor for it here. *)
 and layout =
   | Ptop
   | Pvalue of value_kind
@@ -653,7 +651,9 @@ and layout =
   | Punboxed_or_untagged_integer of unboxed_or_untagged_integer
   | Punboxed_vector of unboxed_vector
   | Punboxed_mask
+  (* CR zeisbach: add invariant comment that length >= 2 here *)
   | Punboxed_product of layout list
+  | Pvoid
   | Pbottom
   | Psplicevar of Slambdaident.t
 

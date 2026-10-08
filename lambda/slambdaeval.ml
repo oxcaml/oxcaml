@@ -274,6 +274,7 @@ end = struct
       symbol_arg_of_unboxed_or_untagged_integer ui
     | Punboxed_vector uv -> symbol_arg_of_unboxed_vector uv
     | Punboxed_product layouts -> symbol_arg_of_unboxed_product layouts
+    | Pvoid -> "void"
     | Punboxed_mask -> "mask"
     | Ptop | Pbottom | Psplicevar _ ->
       Misc.fatal_error "Slambda_types.symbol_arg_of_layout: unexpected layout"
@@ -761,7 +762,7 @@ and eval_layout env layout =
     let new_value_kind = eval_value_kind env old_value_kind in
     if new_value_kind == old_value_kind then layout else Pvalue new_value_kind
   | Ptop | Punboxed_float _ | Punboxed_or_untagged_integer _ | Punboxed_vector _
-  | Punboxed_mask | Pbottom ->
+  | Punboxed_mask | Pvoid | Pbottom ->
     layout
 
 and eval_value_kind env ({ raw_kind = old_raw_kind; nullable } as value_kind) =
@@ -1071,7 +1072,7 @@ let assert_mixed_block_shape_contains_no_splices shape =
 let rec assert_layout_contains_no_splices : Lambda.layout -> unit = function
   | Psplicevar _ -> raise Found_a_splice
   | Ptop | Pbottom | Punboxed_float _ | Punboxed_or_untagged_integer _
-  | Punboxed_vector _ | Punboxed_mask ->
+  | Punboxed_vector _ | Punboxed_mask | Pvoid ->
     ()
   | Pvalue value_kind -> assert_value_kind_contains_no_splices value_kind
   | Punboxed_product layouts ->
