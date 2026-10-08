@@ -2649,7 +2649,7 @@ end = struct
           then
             Misc.fatal_errorf "Expected pure operation, got non-atomic load\n";
           next
-        | Reinterpret_cast (Int_of_value | Value_of_int)
+        | Reinterpret_cast (Int64_of_value | Value_of_int64)
         | Name_for_debugger _ | Stackoffset _ | Probe_is_enabled _ | Opaque
         | Begin_region | End_region | Intop_atomic _ | Store _ | Pause ->
           next
