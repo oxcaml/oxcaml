@@ -811,40 +811,59 @@ and print_let_expr ppf ({ let_abst = _; defining_expr } as t) : unit =
       | Simple _ | Prim _ | Set_of_closures _ | Static_consts _ ->
         Flambda_colours.variable
   in
+  let print_num_occurrences bound_pattern ppf num_occurrences =
+    match (bound_pattern : Bound_pattern.t) with
+    | Static _ | Set_of_closures _ -> ()
+    | Singleton bound_var ->
+      fprintf ppf "%t #%a%t" Flambda_colours.elide Num_occurrences.print
+        (try Variable.Map.find (Bound_var.var bound_var) num_occurrences
+         with Not_found -> Num_occurrences.Zero)
+        Flambda_colours.pop
+  in
   let rec let_body (expr : expr) =
     match descr expr with
     | Let ({ let_abst = _; defining_expr } as t) ->
-      let print (bound_pattern : Bound_pattern.t) ~body =
+      let print (bound_pattern : Bound_pattern.t) ~body
+          ~num_normal_occurrences_of_bound_vars =
         match bound_pattern with
         | Singleton _ | Set_of_closures _ ->
-          fprintf ppf "@ @[<hov 1>%t%a%t%t =%t@ %a@]"
+          fprintf ppf "@ @[<hov 1>%t%a%t%t%a =%t@ %a@]"
             (let_bound_var_colour bound_pattern defining_expr)
             Bound_pattern.print bound_pattern Flambda_colours.pop
-            Flambda_colours.elide Flambda_colours.pop print_named defining_expr;
+            Flambda_colours.elide
+            (print_num_occurrences bound_pattern)
+            num_normal_occurrences_of_bound_vars Flambda_colours.pop print_named
+            defining_expr;
           let_body body
         | Static _ -> expr
       in
       Name_abstraction.pattern_match_for_printing
         (module Bound_pattern)
         t.let_abst ~apply_renaming_to_term:apply_renaming_let_expr_t0
-        ~f:(fun bound_pattern { body; _ } -> print bound_pattern ~body)
+        ~f:(fun bound_pattern { body; num_normal_occurrences_of_bound_vars } ->
+          print bound_pattern ~body ~num_normal_occurrences_of_bound_vars)
     | Let_cont _ | Apply _ | Apply_cont _ | Switch _ | Invalid _ -> expr
   in
-  let print (bound_pattern : Bound_pattern.t) ~body =
+  let print (bound_pattern : Bound_pattern.t) ~body
+      ~num_normal_occurrences_of_bound_vars =
     match bound_pattern with
     | Static _ -> print_let_static ppf t
     | Singleton _ | Set_of_closures _ ->
-      fprintf ppf "@[<v 0>@[<v 0>@[<hov 1>%t%a%t%t =%t@ %a@]"
+      fprintf ppf "@[<v 0>@[<v 0>@[<hov 1>%t%a%t%t%a =%t@ %a@]"
         (let_bound_var_colour bound_pattern defining_expr)
         Bound_pattern.print bound_pattern Flambda_colours.pop
-        Flambda_colours.elide Flambda_colours.pop print_named defining_expr;
+        Flambda_colours.elide
+        (print_num_occurrences bound_pattern)
+        num_normal_occurrences_of_bound_vars Flambda_colours.pop print_named
+        defining_expr;
       let expr = let_body body in
       fprintf ppf "@]@ %a@]" print expr
   in
   Name_abstraction.pattern_match_for_printing
     (module Bound_pattern)
     t.let_abst ~apply_renaming_to_term:apply_renaming_let_expr_t0
-    ~f:(fun bound_pattern { body; _ } -> print bound_pattern ~body)
+    ~f:(fun bound_pattern { body; num_normal_occurrences_of_bound_vars } ->
+      print bound_pattern ~body ~num_normal_occurrences_of_bound_vars)
 
 and print_named ppf (t : named) =
   let print_or_elide_debuginfo ppf dbg =
