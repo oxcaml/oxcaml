@@ -118,12 +118,12 @@ class map_with_expansion_context_and_errors =
     method nativeint = return
     method unit = return
 
-    method array
-        : 'a.
-          (Expansion_context.Base.t -> 'a -> 'a * Location.Error.t list) ->
-          Expansion_context.Base.t ->
-          'a array ->
-          'a array * Location.Error.t list =
+    method array :
+        'a.
+        (Expansion_context.Base.t -> 'a -> 'a * Location.Error.t list) ->
+        Expansion_context.Base.t ->
+        'a array ->
+        'a array * Location.Error.t list =
       fun f ctx a ->
         let list, errors = self#list f ctx (Array.to_list a) in
         (Array.of_list list, errors)
@@ -241,7 +241,7 @@ class map_with_expansion_context_and_errors =
       with_value_description >>= fun ctxt -> super#value_description ctxt vd
 
     method! value_binding ctxt
-        ({ pvb_pat; pvb_expr; pvb_attributes; pvb_loc } as vb) =
+        ({ pvb_pat; pvb_expr; pvb_attributes; pvb_loc; pvb_constraint } as vb) =
       Attribute.get_res do_not_enter_value_binding vb |> of_result ~default:None
       >>= function
       | Some () -> super#value_binding ctxt vb
@@ -260,6 +260,13 @@ class map_with_expansion_context_and_errors =
             self#attributes in_binding_ctxt pvb_attributes
           in
           let pvb_loc, loc_errors = self#location ctxt pvb_loc in
+          let pvb_constraint, constraint_errors =
+            match pvb_constraint with
+            | Some c ->
+                let v, err = self#value_constraint ctxt c in
+                (Some v, err)
+            | None -> (None, [])
+          in
           let errors =
             self#record ctxt
               [
@@ -267,14 +274,16 @@ class map_with_expansion_context_and_errors =
                 ("pvb_expr", expr_errors);
                 ("pvb_attributes", attributes_errors);
                 ("pvb_loc", loc_errors);
+                ("pvb_constraint", constraint_errors);
               ]
           in
-          ({ pvb_pat; pvb_expr; pvb_attributes; pvb_loc }, errors)
+          ( { pvb_pat; pvb_expr; pvb_attributes; pvb_loc; pvb_constraint },
+            errors )
   end
 
 class sexp_of =
   object
-    inherit [Sexp.t] Ast.lift
+    inherit [Sexp.t] Ast.lift as super
     method int = sexp_of_int
     method string = sexp_of_string
     method bool = sexp_of_bool
@@ -290,14 +299,45 @@ class sexp_of =
     method other : 'a. 'a -> Sexp.t = fun _ -> Sexp.Atom "_"
 
     method record fields =
-      List
-        (List.map fields ~f:(fun (label, sexp) ->
-             Sexp.List [ Atom label; sexp ]))
+      match
+        List.filter fields ~f:(function
+          | _, Sexp.List [] -> false
+          | _, _ -> true)
+      with
+      | [ (label, sexp) ]
+        when String.equal label "txt" || String.is_suffix label ~suffix:"_desc"
+        ->
+          sexp
+      | fields ->
+          List
+            (List.map fields ~f:(fun (label, sexp) ->
+                 Sexp.List [ Atom label; sexp ]))
 
     method constr tag args =
       match args with [] -> Atom tag | _ -> List (Atom tag :: args)
 
     method tuple l = List l
+
+    method! location loc =
+      (* [Poly.equal] because [Location.compare] ignores [loc_ghost]. Users may need to
+         debug differences in [loc_ghost]. *)
+      if Poly.equal Location.none loc then List []
+      else
+        let string =
+          let fmt = Format.str_formatter in
+          Location.print fmt loc;
+          if loc.loc_ghost then Format.pp_print_string fmt "<ghost>";
+          Format.flush_str_formatter ()
+        in
+        Atom string
+
+    method! longident id =
+      let string = Longident.name id in
+      match Longident.parse string with
+      | round_trip ->
+          if Longident.compare id round_trip = 0 then Atom string
+          else super#longident id
+      | exception Invalid_argument _ -> super#longident id
   end
 
 let sexp_of = new sexp_of

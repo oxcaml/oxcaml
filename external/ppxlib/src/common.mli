@@ -31,31 +31,44 @@ val get_type_param_name_res :
     [tp] if it is a type parameter, as a result. *)
 
 val get_type_param_name : core_type * (variance * injectivity) -> string Loc.t
-(** See {!get_type_param_name_res}. Raises a located error in case of failure. *)
+(** See {!get_type_param_name_res}. Raises a located error in case of failure.
+*)
 
 (** [(new type_is_recursive rec_flag tds)#go ()] returns whether [rec_flag, tds]
     is really a recursive type. We disregard recursive occurrences appearing in
     arrow types. You can override the search for certain type expressions by
-    inheriting from this class. *)
-class type_is_recursive :
-  rec_flag
-  -> type_declaration list
-  -> object
-       inherit Ast_traverse0.iter
-       val type_names : string list
-       method return_true : unit -> unit
-       method go : unit -> rec_flag
-     end
+    inheriting from this class.
+
+    Note that this is an {b approximation} due to global and/or local openings
+    of modules.
+
+    {[
+      module M = struct
+        type t = Foo
+      end
+
+      type t = M.(t)
+    ]}
+
+    The outer [t] will return [Recursive] even though it is not. *)
+class type_is_recursive : rec_flag -> type_declaration list -> object
+  inherit Ast_traverse0.iter
+  val type_names : string list
+  method return_true : unit -> unit
+  method go : unit -> rec_flag
+end
 
 val really_recursive : rec_flag -> type_declaration list -> rec_flag
-(** [really_recursive rec_flag tds = (new type_is_recursive rec_flag tds)#go ()] *)
+(** [really_recursive rec_flag tds = (new type_is_recursive rec_flag tds)#go ()].
+    See the documentation for {! type_is_recursive}. *)
 
 val loc_of_payload : attribute -> Location.t
 val loc_of_attribute : attribute -> Location.t
 val loc_of_extension : extension -> Location.t
 
 val curry_applications : expression -> expression
-(** convert multi-arg function applications into a cascade of 1-arg applications *)
+(** convert multi-arg function applications into a cascade of 1-arg applications
+*)
 
 val attribute_of_warning : Location.t -> string -> attribute
 (** Encode a warning message into an 'ocaml.ppwarning' attribute which can be
@@ -88,6 +101,9 @@ val mk_named_sig :
 
     It will take care of giving fresh names to unnamed type parameters. *)
 
+val exn_to_loc_error : exn -> Location.Error.t
+(** Convert [exn] to a located error if possible or reraise it otherwise *)
+
 module With_errors : sig
   type 'a t = 'a * Location.Error.t list
 
@@ -100,3 +116,7 @@ module With_errors : sig
 
   val combine_errors : 'a t list -> 'a list t
 end
+
+val valid_string_constant_delimiter : string -> string
+(** [valid_string_constant_delimiter x] finds a delimiter [y] such that
+    [Pconst_string (x, loc, Some y)] is valid. *)
