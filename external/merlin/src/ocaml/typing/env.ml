@@ -3930,7 +3930,8 @@ let rec mark_signature_used sg =
           mark_module_used md.md_uid;
           begin match md.md_type with
           | Mty_signature sg -> mark_signature_used sg
-          | Mty_ident _ | Mty_functor _ | Mty_alias _ | Mty_strengthen _ -> ()
+          | Mty_ident _ | Mty_functor _ | Mty_alias _ | Mty_strengthen _
+          | Mty_for_hole -> ()
           end
       | Sig_modtype (_, mtd, _) -> mark_modtype_used mtd.mtd_uid
       | Sig_class (_, cd, _, _) -> mark_class_used cd.cty_uid
