@@ -1137,6 +1137,7 @@ type zero_alloc_attribute =
   | Check of { strict: bool;
                loc: Location.t;
                custom_error_msg: string option;
+               partial: bool;
              }
   | Assume of { strict: bool;
                 never_returns_normally: bool;

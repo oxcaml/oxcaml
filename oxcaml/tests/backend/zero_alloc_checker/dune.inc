@@ -948,6 +948,66 @@
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (targets test_partial.output.corrected)
+ (deps (:ml test_partial.ml) filter.sh)
+ (action
+   (with-outputs-to test_partial.output.corrected
+    (pipe-outputs
+    (with-accepted-exit-codes 0
+     (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
+          -zero-alloc-checker-details-extra
+          -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
+    (run "./filter.sh")
+   ))))
+
+(rule
+ (alias   runtest)
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (deps test_partial.output test_partial.output.corrected)
+ (action (diff test_partial.output test_partial.output.corrected)))
+
+(rule
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (targets test_partial_heap.output.corrected)
+ (deps (:ml test_partial_heap.ml) filter.sh)
+ (action
+   (with-outputs-to test_partial_heap.output.corrected
+    (pipe-outputs
+    (with-accepted-exit-codes 2
+     (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
+          -zero-alloc-checker-details-extra
+          -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
+    (run "./filter.sh")
+   ))))
+
+(rule
+ (alias   runtest)
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (deps test_partial_heap.output test_partial_heap.output.corrected)
+ (action (diff test_partial_heap.output test_partial_heap.output.corrected)))
+
+(rule
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (targets test_partial_external_heap.output.corrected)
+ (deps (:ml test_partial_external_heap.ml) filter.sh)
+ (action
+   (with-outputs-to test_partial_external_heap.output.corrected
+    (pipe-outputs
+    (with-accepted-exit-codes 2
+     (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
+          -zero-alloc-checker-details-extra
+          -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
+    (run "./filter.sh")
+   ))))
+
+(rule
+ (alias   runtest)
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (deps test_partial_external_heap.output test_partial_external_heap.output.corrected)
+ (action (diff test_partial_external_heap.output test_partial_external_heap.output.corrected)))
+
+(rule
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
  (targets test_signatures_first_class_modules.output.corrected)
  (deps (:ml test_signatures_first_class_modules.ml) filter.sh)
  (action

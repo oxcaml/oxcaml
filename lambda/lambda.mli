@@ -872,6 +872,7 @@ type zero_alloc_attribute =
                   This definition may not be applicable to new properties. *)
                loc: Location.t;
                custom_error_msg: string option;
+               partial: bool;
              }
   | Assume of { strict: bool;
                 never_returns_normally: bool;
