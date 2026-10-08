@@ -1,0 +1,12 @@
+mass: 4506000
+discontinue: 5050
+nested: 121
+callstack: true
+async_boundary: 20
+dynamic: 42
+locals: 42
+chain3: 777
+live_nest: 5000 ok
+reperform_gc_both: 888
+reperform_gc_outer: 888
+reperform_idle: 200010000
