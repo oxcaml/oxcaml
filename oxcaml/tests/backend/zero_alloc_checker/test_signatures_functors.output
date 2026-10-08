@@ -3,3 +3,9 @@ Error: Annotation check for zero_alloc strict failed on function Test_signatures
 
 File "test_signatures_functors.ml", line 18, characters 32-37:
 Error: called function may allocate on a path to exceptional return (indirect tailcall)
+
+File "test_signatures_functors.ml", line 35, characters 7-17:
+Error: Annotation check for zero_alloc failed on function Test_signatures_functors.F_partial.over (camlTest_signatures_functors__over_HIDE_STAMP).
+
+File "test_signatures_functors.ml", line 35, characters 30-38:
+Error: called function may allocate (direct tailcall caml_apply2)

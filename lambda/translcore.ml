@@ -420,13 +420,16 @@ let zero_alloc_of_application
       | Check_all | Check_opt_only -> true
     in
     begin match Zero_alloc.get val_zero_alloc with
-    | Check c when c.arity = num_args && (use_opt || not c.opt) ->
+    | Check { strict; opt; arity; partial; loc; custom_error_msg = _ }
+      when Zero_alloc.applicable_arity ~arity ~partial ~num_args
+           && (use_opt || not opt) ->
       let assume : Zero_alloc.assume =
-        { strict = c.strict;
+        { strict;
           never_returns_normally = false;
           never_raises = false;
-          arity = c.arity;
-          loc = c.loc }
+          arity;
+          partial;
+          loc }
       in
       Builtin_attributes.assume_zero_alloc ~inferred:true assume
     | Check _ | Default_zero_alloc | Ignore_assert_all | Assume _ ->

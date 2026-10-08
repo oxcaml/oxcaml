@@ -299,6 +299,7 @@ type zero_alloc_check =
        This definition may not be applicable to new properties. *)
     opt: bool;
     arity: int;
+    partial: bool;
     loc: Location.t;
     custom_error_msg : string option;
   }
@@ -312,6 +313,7 @@ type zero_alloc_assume =
        may raise exceptions that do not escape, i.e.,
        handled before the function returns. *)
     arity: int;
+    partial: bool;
     loc: Location.t;
   }
 

@@ -2,6 +2,7 @@ type check = Builtin_attributes.zero_alloc_check =
   { strict : bool;
     opt : bool;
     arity : int;
+    partial : bool;
     loc : Location.t;
     custom_error_msg : string option
   }
@@ -11,6 +12,7 @@ type assume = Builtin_attributes.zero_alloc_assume =
     never_returns_normally : bool;
     never_raises : bool;
     arity : int;
+    partial : bool;
     loc : Location.t
   }
 
@@ -61,5 +63,7 @@ val print_error : Format_doc.formatter -> error -> unit
    zero_alloc check t2. It returns [Ok ()] if so, and [Error e] if not.  If [t1]
    is a variable, it may be set to make the relation hold. *)
 val sub : t -> t -> (unit, error) Result.t
+
+val applicable_arity : arity:int -> partial:bool -> num_args:int -> bool
 
 val debug_printer : Format.formatter -> t -> unit

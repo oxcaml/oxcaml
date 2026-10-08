@@ -17,3 +17,20 @@ end
 module F_strict_bad (X : S_basic) = struct
   let[@zero_alloc strict] g x = X.f x
 end
+
+module type S_partial = sig
+  val id : 'a -> 'a [@@zero_alloc partial]
+
+  val add : int -> int -> int [@@zero_alloc partial]
+end
+
+module F_partial (X : S_partial) = struct
+  (* compiles: *)
+  let[@zero_alloc] partial x = X.add x
+
+  (* compiles: *)
+  let[@zero_alloc] full x y = X.add x y
+
+  (* fails to compile: *)
+  let[@zero_alloc] over h x = X.id h x
+end
