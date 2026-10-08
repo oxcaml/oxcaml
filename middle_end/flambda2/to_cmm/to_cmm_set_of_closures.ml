@@ -446,6 +446,68 @@ let transl_check_attrib : Zero_alloc_attribute.t -> Cmm.codegen_option list =
   | Check { strict; loc; custom_error_msg; partial = _ } ->
     [Check_zero_alloc { strict; loc; custom_error_msg }]
 
+let rec allocates_on_heap : Cmm.expression -> bool = function
+  | Cop (Calloc (Heap, _), _, _) -> true
+  | expr ->
+    let found = ref false in
+    Cmm.iter_shallow
+      (fun subexpr -> found := !found || allocates_on_heap subexpr)
+      expr;
+    !found
+[@@warning "-fragile-match"]
+
+let phrase_allocates_on_heap : Cmm.phrase -> bool = function
+  | Cfunction { fun_body; _ } -> allocates_on_heap fun_body
+  | Cdata _ -> false
+
+let can_be_partially_applied metadata =
+  (not (Code_metadata.is_tupled metadata)) &&
+  (Flambda_arity.num_params (Code_metadata.params_arity metadata) > 1)
+
+let flambda_builds_local_closures metadata =
+  Flambda_features.stack_allocation_enabled () &&
+  begin match Code_metadata.first_complex_local_param metadata with
+  (* `first_complex_local_param` asks "How many arguments can go on the heap?"
+     This is useful e.g. for `let f a (local_ b) c = ...`, where it's 1.
+     For e.g. `val f : int -> (int -> int) @ local`, it's zero, since
+     `(int -> int) @ local` captures the first argument and must be local. *)
+  | Index index -> index = 0
+  | Never_partially_applied -> true
+  end
+
+let curry_functions_build_local_closures env code_id =
+  let arity, _, _ = get_func_decl_params_arity env code_id in
+  not (List.exists phrase_allocates_on_heap (C.curry_function arity))
+
+let partial_applications_build_local_closures env code_id =
+  let metadata = Env.get_code_metadata env code_id in
+  ( (not (can_be_partially_applied metadata)) ||
+    ( flambda_builds_local_closures metadata &&
+      curry_functions_build_local_closures env code_id ) )
+
+let scoped_name fun_dbg =
+  fun_dbg |> Debuginfo.get_dbg |> Debuginfo.Dbg.to_list
+  |> List.map (fun (dbg : Debuginfo.item) ->
+      Debuginfo.Scoped_location.string_of_scopes ~include_zero_alloc:false
+        dbg.dinfo_scopes)
+  |> String.concat ","
+
+let check_zero_alloc_partial env code_id ~fun_dbg ~(fun_sym : Cmm.symbol)
+    (zero_alloc_attribute : Zero_alloc_attribute.t) =
+  match zero_alloc_attribute with
+  | Check { partial; loc; _ } when
+      partial &&
+      (not !Oxcaml_flags.disable_zero_alloc_checker) &&
+      not (partial_applications_build_local_closures env code_id) ->
+    Location.raise_errorf ~loc
+      "Annotation check for zero_alloc failed on function %s (%s).@ \
+       Partial applications of this function may allocate a closure on the \
+       heap.@ Hint: try marking the partial function type %a, as in %a."
+      (scoped_name fun_dbg) fun_sym.sym_name
+      Misc.Style.inline_code "local"
+      Misc.Style.inline_code "'a -> ('b -> ... -> 'z) @ local"
+  | Check _ | Assume _ | Default_zero_alloc -> ()
+
 (* Translation of regalloc attributes on functions. *)
 let transl_regalloc_attrib : Regalloc_attribute.t -> Cmm.codegen_option list =
   function
@@ -565,6 +627,7 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
   let fun_sym =
     R.symbol_of_code_id res code_id ~currently_in_inlined_body:false
   in
+  check_zero_alloc_partial env code_id ~fun_dbg ~fun_sym zero_alloc_attribute;
   let fun_poll =
     Env.get_code_metadata env code_id
     |> Code_metadata.poll_attribute |> Poll_attribute.to_lambda
