@@ -5629,7 +5629,8 @@ module Comonadic_gen (Obj : Obj) = struct
 
   let submode_exn ?pp m1 m2 = submode ?pp m1 m2 |> Result.get_ok
 
-  let equate ?pp a b = try_with_log (equate_from_submode (submode_log ?pp) a b)
+  let equate ?(pp = (Location.none, Unknown : Hint.pinpoint)) a b =
+    try_with_log (S.equate pp obj a b)
 
   let equate_err pp a b =
     match equate ~pp a b with
@@ -5838,7 +5839,8 @@ module Monadic_gen (Obj : Obj) = struct
 
   let submode_exn ?pp m1 m2 = submode ?pp m1 m2 |> Result.get_ok
 
-  let equate ?pp a b = try_with_log (equate_from_submode (submode_log ?pp) a b)
+  let equate ?(pp = (Location.none, Unknown : Hint.pinpoint)) a b =
+    try_with_log (S.equate pp obj b a)
 
   let equate_err pp a b =
     match equate ~pp a b with

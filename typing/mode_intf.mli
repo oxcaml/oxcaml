@@ -62,9 +62,7 @@ module type Const_product = sig
     Solver_intf.Lattices with type 'a obj := 'a axis and type 'a elt := 'a
 end
 
-type equate_step =
-  | Left_le_right
-  | Right_le_left
+type equate_step = Solver_intf.equate_step
 
 (* CR-soon zqian: remove [simple_error] such that all mode errors are printed
    with hints. *)

@@ -181,6 +181,10 @@ type 'd branch =
   constraint 'd = _ * _
 [@@ocaml.warning "-62"]
 
+type equate_step =
+  | Left_le_right
+  | Right_le_left
+
 module type Solver_mono = sig
   (* These first few types will be replaced with types from
      the Lattices_mono *)
@@ -308,6 +312,14 @@ module type Solver_mono = sig
     ('a, 'l * allowed) mode ->
     log:changes ref option ->
     (unit, 'a error_raw) result
+
+  val equate :
+    pinpoint ->
+    'a obj ->
+    ('a, allowed * allowed) mode ->
+    ('a, allowed * allowed) mode ->
+    log:changes ref option ->
+    (unit, equate_step * 'a error_raw) result
 
   (** Lowers a level of a variable. *)
   val update_level :
