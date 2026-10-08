@@ -1,5 +1,5 @@
 (* TEST
- readonly_files = "gen_types.sh types.ml";
+ readonly_files = "gen_types.sh";
  setup-ocamlc.byte-build-env;
 
  (* Generate a file that defines some large polymorphic variants. *)
