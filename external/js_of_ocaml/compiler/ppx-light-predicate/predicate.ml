@@ -162,6 +162,18 @@ let rec parse (e : expression) : t =
 
 (* -- Compile-time evaluation ----------------------------------------------- *)
 
+let oxcaml_override = ref None
+
+let set_oxcaml b = oxcaml_override := Some b
+
+let oxcaml () =
+  match !oxcaml_override with
+  | Some b -> b
+  | None -> (
+      match Version.extra with
+      | Some (Plus, "ox") -> true
+      | _ -> false)
+
 type value =
   | V_version of Version.t
   | V_bool of bool
@@ -182,11 +194,7 @@ let rec eval_value (t : t) : value =
   match t with
   | Ident (_, "ocaml_version") -> V_version Version.current
   | Ident (_, "ast_version") -> V_int Ppxlib.Selected_ast.version
-  | Ident (_, "oxcaml") ->
-      V_bool
-        (match Version.extra with
-        | Some (Plus, "ox") -> true
-        | _ -> false)
+  | Ident (_, "oxcaml") -> V_bool (oxcaml ())
   | Ident (_, "os_type") -> V_string Sys.os_type
   | Ident (_, "arch_sixtyfour") -> V_bool (Sys.word_size = 64)
   | Ident (_, "introspect") ->

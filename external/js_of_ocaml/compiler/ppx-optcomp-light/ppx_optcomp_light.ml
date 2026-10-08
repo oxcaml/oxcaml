@@ -210,6 +210,14 @@ let traverse =
   end
 
 let () =
+  Ppxlib.Driver.add_arg
+    "-optcomp-oxcaml"
+    (Arg.Bool Predicate.set_oxcaml)
+    ~doc:
+      "BOOL Value of the [oxcaml] predicate (default: whether the preprocessor \
+       was built with OxCaml)"
+
+let () =
   Ppxlib.Driver.register_transformation
     ~instrument:
       (Ppxlib.Driver.Instrument.make

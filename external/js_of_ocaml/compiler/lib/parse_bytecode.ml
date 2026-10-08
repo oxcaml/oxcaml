@@ -3660,8 +3660,8 @@ type jsir_unit =
 let jsir_unit_of_cmj_body
     { Code.program; last_var = _; imported_compilation_units; exported_compilation_unit }
     =
-  { name = Code.Compilation_unit.full_path_as_string exported_compilation_unit
-  ; program
+  { name = exported_compilation_unit
+  ; program = Code.Marshalable_program.to_program program
   ; info =
       Unit_info.of_compilation_units
         ~exported:exported_compilation_unit

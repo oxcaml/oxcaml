@@ -74,6 +74,10 @@ val eval_compile_time : t -> bool
     constructs that are not meaningful at compile time (e.g. [backend],
     [host_engine], [target_engine], or the runtime shorthands). *)
 
+val set_oxcaml : bool -> unit
+(** Override the value of [oxcaml] in {!eval_compile_time}, which otherwise
+    reflects the compiler the preprocessor was built with. *)
+
 val reify : loc:Location.t -> t -> expression
 (** Reify the predicate into an OCaml expression of type [bool] that evaluates it
     at runtime against [Ppx_expect_light_runtime.Axes]. Supports [ocaml_version],

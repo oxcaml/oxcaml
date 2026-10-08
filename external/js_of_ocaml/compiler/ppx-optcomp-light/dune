@@ -1,4 +1,12 @@
 (library
  (name ppx_optcomp_light)
+ (modules ppx_optcomp_light)
  (libraries compiler-libs.common ppxlib ppx_light_predicate)
  (kind ppx_rewriter))
+
+(executable
+ (name ppx_optcomp_light_standalone)
+ (modules ppx_optcomp_light_standalone)
+ (libraries ppxlib ppx_optcomp_light)
+ (link_flags
+  (-linkall)))

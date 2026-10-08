@@ -28,3 +28,7 @@
 
 module Jsir = Code
 module Parse_info = Parse_info
+
+(* js_of_ocaml's target integers, not the compiler's [Targetint]. *)
+module Targetint = Targetint
+module Targetnativeint = Targetnativeint

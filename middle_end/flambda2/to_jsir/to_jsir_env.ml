@@ -113,7 +113,7 @@ let register_symbol' ~res symbol var =
       (Let
          ( Jsir.Var.fresh (),
            Prim
-             ( Extern "caml_register_symbol",
+             ( Extern ("caml_register_symbol", None),
                [ Pc (NativeString compilation_unit_name);
                  Pc (NativeString symbol_name);
                  Pv var ] ) ))
@@ -146,7 +146,9 @@ let get_symbol_from_global_data ~symbol_name ~res =
   let symbol_name = Jsir.Native_string.of_string symbol_name in
   let var = Jsir.Var.fresh () in
   let expr : Jsir.expr =
-    Prim (Extern "caml_js_get", [Pv global_data; Pc (NativeString symbol_name)])
+    Prim
+      ( Extern ("caml_js_get", None),
+        [Pv global_data; Pc (NativeString symbol_name)] )
   in
   var, To_jsir_result.add_instr_exn res (Let (var, expr))
 
@@ -185,7 +187,7 @@ let get_external_symbol ~res symbol =
       let var = Jsir.Var.fresh () in
       let expr : Jsir.expr =
         Prim
-          ( Extern "caml_get_symbol",
+          ( Extern ("caml_get_symbol", None),
             [ Pc (NativeString compilation_unit_name);
               Pc (NativeString symbol_name) ] )
       in

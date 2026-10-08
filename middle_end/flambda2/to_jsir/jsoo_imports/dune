@@ -1,12 +1,4 @@
-(include_subdirs no)
+; The jsoo_imports library is defined in stock/ and oxcaml/: see README.txt.
+; import.ml here is copied into both.
 
-(library
- (name jsoo_imports)
- (wrapped true)
- (instrumentation (backend bisect_ppx))
- (flags
-  (:standard))
- (ocamlopt_flags
-  (:standard -O3))
- (libraries
-  ocamlfrontend))
+(include_subdirs no)

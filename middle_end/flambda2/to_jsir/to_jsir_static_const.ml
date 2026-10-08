@@ -231,7 +231,8 @@ let block_like ~env ~res symbol (const : Static_const.t) =
        important enough to warrant a new JSOO primitive taking in a tag, but
        maybe it's still worth fixing in the future just for uniformity. *)
     bind_expr_to_symbol ~env ~res symbol
-      (Prim (Extern "caml_array_make", [Pc (Int Targetint.zero); Pc Null]))
+      (Prim
+         (Extern ("caml_array_make", None), [Pc (Int Targetint.zero); Pc Null_]))
   | Immutable_string value ->
     bind_expr_to_symbol ~env ~res symbol (Constant (String value))
 

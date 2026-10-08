@@ -73,6 +73,9 @@ module Var : sig
   (** Set the index of the last allocated variable; subsequent calls to
       [fresh] return higher indices. *)
 
+  val last : unit -> t
+  (** The last allocated variable. *)
+
   module Set : Int_set.S with type elt = t
 
   module Map : Map.S with type key = t
@@ -250,32 +253,29 @@ type program =
   ; free_pc : Addr.t
   }
 
-module Compilation_unit : sig
-  type t = Compilation_unit.t
-
-  val full_path_as_string : t -> string
-end
-[@@if oxcaml]
-
-module Compilation_unit : sig
+(** A [program] in a form that can be marshaled: [Addr.Map.t] values cannot be,
+    since the trie identifies empty slots by physical equality with a sentinel
+    that does not survive marshaling. *)
+module Marshalable_program : sig
   type t
 
-  val full_path_as_string : t -> string
+  val of_program : program -> t
+
+  val to_program : t -> program
 end
-[@@if not oxcaml]
 
 type cmj_body =
-  { program : program
+  { program : Marshalable_program.t
   ; last_var : int
         (** Highest variable index used in [program]. [Var] keeps this in mutable
             state, so [ocamlj] must communicate it to [js_of_ocaml] to keep the
             two in sync. *)
-  ; imported_compilation_units : Compilation_unit.t list
-        (** Compilation units whose symbols [program] fetches from the global
-            symbol table. Needed to fill in [Unit_info.t]. *)
-  ; exported_compilation_unit : Compilation_unit.t
-        (** The compilation unit [program] defines. Needed to fill in
-            [Unit_info.t]. *)
+  ; imported_compilation_units : string list
+        (** Full paths of the compilation units whose symbols [program] fetches
+            from the global symbol table. Needed to fill in [Unit_info.t]. *)
+  ; exported_compilation_unit : string
+        (** Full path of the compilation unit [program] defines. Needed to fill
+            in [Unit_info.t]. *)
   }
 (** Contents of a [.cmj] file produced by OxCaml's [ocamlj] (after the magic
     number), marshaled. *)

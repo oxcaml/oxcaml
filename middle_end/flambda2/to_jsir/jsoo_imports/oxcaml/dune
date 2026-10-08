@@ -1,0 +1,19 @@
+; Variant for builds with an OxCaml compiler ([oxcaml] = true in
+; js_of_ocaml's [@@if] attributes), i.e. every context but the bootstrap
+; one, which uses stock/.
+
+(copy_files ../import.ml)
+
+(library
+ (name jsoo_imports)
+ (wrapped true)
+ (enabled_if
+  (<> %{context_name} default))
+ (instrumentation
+  (backend bisect_ppx))
+ ; js_of_ocaml builds with -w -7-37; the other warnings are style ones that
+ ; the compiler's dune env enables.
+ (flags
+  (:standard -w -4-7-18-37-44))
+ (ocamlopt_flags
+  (:standard -O3)))

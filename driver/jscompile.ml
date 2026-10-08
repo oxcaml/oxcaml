@@ -73,11 +73,13 @@ let emit_jsir i
          can read this number and update its own state accordingly. *)
       let cmj_body : Jsoo_imports.Code.cmj_body =
         {
-          program;
+          program = Jsoo_imports.Code.Marshalable_program.of_program program;
           last_var = Jsoo_imports.Code.Var.idx (Jsoo_imports.Code.Var.last ());
           imported_compilation_units =
-            Compilation_unit.Set.elements imported_compilation_units;
-          exported_compilation_unit = i.module_name;
+            Compilation_unit.Set.elements imported_compilation_units
+            |> List.map Compilation_unit.full_path_as_string;
+          exported_compilation_unit =
+            Compilation_unit.full_path_as_string i.module_name;
         }
       in
       output_value oc cmj_body)
