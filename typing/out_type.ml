@@ -3924,9 +3924,11 @@ let rec annotate_first_occurrence kinds (ty : out_type) =
 
 let tree_of_law_params params =
   let tys = List.map snd params in
-  prepare_for_printing tys;
+  let base = With_locality.Const.legacy in
+  prepare_for_printing ~base tys;
   let params =
-    List.map (fun (x, ty) -> (Ident.name x, tree_of_typexp Type_scheme ty))
+    List.map
+      (fun (x, ty) -> (Ident.name x, tree_of_typexp ~base Type_scheme ty))
       params
   in
   let kinds =
@@ -3945,9 +3947,11 @@ let tree_of_law_params params =
    variable and its full kind, nullability included *)
 let tree_of_law_quantification params =
   let tys = List.map snd params in
-  prepare_for_printing tys;
+  let base = With_locality.Const.legacy in
+  prepare_for_printing ~base tys;
   let params =
-    List.map (fun (x, ty) -> (Ident.name x, tree_of_typexp Type_scheme ty))
+    List.map
+      (fun (x, ty) -> (Ident.name x, tree_of_typexp ~base Type_scheme ty))
       params
   in
   let vars =
