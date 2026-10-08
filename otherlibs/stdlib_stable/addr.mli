@@ -39,9 +39,16 @@ val of_idx_write_local
   'a @ local write -> ('a, 'b) idx_mut -> 'b t @ local write
 [@@zero_alloc]
 
+(* no [@local_opt]: A local version of this function would be unsound. Modes
+   are deep on [addr_imm], but [addr] applies the mutable field modalities,
+   specifically [@@ global]. For local [addr_imm] use [of_imm_local] instead. *)
 external of_imm
   : ('a : any).
-  ('a Addr_imm.t[@local_opt]) @ read -> ('a t[@local_opt]) @ read
+  'a Addr_imm.t @ read -> 'a t @ read
+  = "%identity"
+external of_imm_local
+  : ('a : any mod global).
+  'a Addr_imm.t @ local read -> 'a t @ local read
   = "%identity"
 
 external get
