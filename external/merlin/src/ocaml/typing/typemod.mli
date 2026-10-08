@@ -54,7 +54,8 @@ val type_interface:
   sourcefile:string -> Compilation_unit.t -> Env.t ->
   Parsetree.signature -> Typedtree.signature
 val transl_signature:
-  ?interface_toplevel:bool -> Env.t -> Parsetree.signature -> Typedtree.signature
+  ?interface_toplevel:bool -> md_mode:Mode.With_regionality.Const.t ->
+  Env.t -> Parsetree.signature -> Typedtree.signature
 
 (* If the [.mli] file has any file-level staticity modality (whether
    [@@ static] or [@@ dynamic]), the module is [Static]; otherwise [Dynamic].
@@ -227,4 +228,5 @@ val merlin_type_structure:
   Typedtree.structure * Types.signature * (* Signature_names.t * *) Env.t
 
 val merlin_transl_signature:
-  ?interface_toplevel:bool -> Env.t -> Types.signature -> Parsetree.signature -> Typedtree.signature
+  ?interface_toplevel:bool -> md_mode:Mode.With_regionality.Const.t ->
+  Env.t -> Types.signature -> Parsetree.signature -> Typedtree.signature
