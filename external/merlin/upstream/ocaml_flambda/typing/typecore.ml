@@ -1557,6 +1557,13 @@ let disambiguate_array_literal ~loc env expected_ty =
   else
     { ty_elt = None; mut = Mutable }
 
+let disambiguate_unit ~loc env expected_ty =
+  if is_unboxed_unit_type env expected_ty then begin
+    check_disambiguation_principality ~loc ~name:"unit#" expected_ty;
+    instance Predef.type_unboxed_unit, ~unboxed:true
+  end else
+    instance Predef.type_unit, ~unboxed:false
+
 (* Typing of patterns *)
 
 (* Simplified patterns for effect continuations *)
@@ -8181,11 +8188,23 @@ and type_expect_
       in
       begin match sifnot with
         None ->
-          let ifso =
-            type_expect env expected_mode sifso
-              (mk_expected ~explanation:If_no_else_branch Predef.type_unit) in
+          let ifso, ~unboxed =
+            type_if_no_else_branch ~loc ~ty_expected env expected_mode sifso
+          in
+          let ifnot =
+            if unboxed
+            then
+              Some
+                { exp_desc = Texp_unboxed_unit;
+                  exp_loc = Location.none; exp_extra = [];
+                  exp_type = instance Predef.type_unboxed_unit;
+                  exp_attributes = [];
+                  exp_env = env }
+            else
+              None
+          in
           rue {
-            exp_desc = Texp_ifthenelse(cond, ifso, None);
+            exp_desc = Texp_ifthenelse(cond, ifso, ifnot);
             exp_loc = loc; exp_extra = [];
             exp_type = ifso.exp_type;
             exp_attributes = sexp.pexp_attributes;
@@ -11325,12 +11344,8 @@ and type_statement ?explanation ?(position=RNontail) env sexp =
         subexp.exp_loc
         Warnings.Nonreturning_statement;
     if !Clflags.strict_sequence then begin
-      let disambiguated_unit_ty =
-        if is_unboxed_unit_type env ty then begin
-          check_disambiguation_principality ~loc:exp.exp_loc ~name:"unit#" ty;
-          instance Predef.type_unboxed_unit
-        end else
-          instance Predef.type_unit
+      let disambiguated_unit_ty, ~unboxed:_ =
+        disambiguate_unit ~loc:exp.exp_loc env ty
       in
       begin
         try unify_var env expected_ty disambiguated_unit_ty
@@ -11347,6 +11362,36 @@ and type_statement ?explanation ?(position=RNontail) env sexp =
             Expr_type_clash(err, None, Some sexp))));
     end
   end
+
+and type_if_no_else_branch ~loc ~ty_expected env expected_mode sexp =
+  let principal_expected_unit =
+    let ty = expand_head env ty_expected in
+    is_principal ty && is_unboxed_unit_type env ty
+  in
+  let exp =
+    with_local_level_generalize_structure_if_principal
+      ~before_generalize:generalize_structure_exp
+      (fun () ->
+         let ty_expected =
+           match sexp.pexp_desc with
+           | Pexp_unboxed_unit -> Predef.type_unboxed_unit
+           | _ when is_Tvar ty_expected || is_inferred sexp ->
+               newvar (Jkind.Builtin.any ~why:Dummy_jkind)
+           | _ -> ty_expected
+         in
+         type_expect env expected_mode sexp
+           (mk_expected ~explanation:If_no_else_branch ty_expected))
+  in
+  with_explanation (Some If_no_else_branch) (fun () ->
+    unify_exp ~sexp env { exp with exp_type = instance exp.exp_type }
+      (instance ty_expected);
+    let ty =
+      if principal_expected_unit then Predef.type_unboxed_unit
+      else expand_head env exp.exp_type
+    in
+    let disambiguated_unit_ty, ~unboxed = disambiguate_unit ~loc env ty in
+    unify_exp ~sexp env exp disambiguated_unit_ty;
+    exp, ~unboxed)
 
 (* Most of the arguments are the same as [type_cases].
 
