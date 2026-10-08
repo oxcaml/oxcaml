@@ -38,7 +38,7 @@ let common_prefix l =
 
 let map_keyword = function
   | ( "open" | "private" | "downto" | "to" | "mutable" | "rec" | "nonrec"
-    | "virtual" | "type" | "mod" | "begin" | "end" ) as s ->
+    | "virtual" | "type" | "mod" | "begin" | "end" | "constraint" ) as s ->
       s ^ "_"
   | s -> s
 
@@ -120,6 +120,7 @@ module M = struct
   let patt fmt = parse Parse.pattern fmt
   let ctyp fmt = parse Parse.core_type fmt
   let str fmt = parse Parse.implementation fmt
+  let sign fmt = parse Parse.interface fmt
 
   let stri fmt =
     Format.kasprintf
@@ -127,6 +128,14 @@ module M = struct
         match Parse.implementation (Lexing.from_string s) with
         | [ x ] -> x
         | _ -> assert false)
+      fmt
+
+  let sigi fmt =
+    Format.kasprintf
+      (fun s ->
+        match Parse.interface (Lexing.from_string s) with
+        | [ x ] -> x
+        | _ -> failwith ("Failed to parse: " ^ s))
       fmt
 end
 

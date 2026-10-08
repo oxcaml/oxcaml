@@ -10,12 +10,6 @@ let () =
   in
   write "ast-version"
     (match ocaml_version with
-    | 4, 02 -> "402"
-    | 4, 03 -> "403"
-    | 4, 04 -> "404"
-    | 4, 05 -> "405"
-    | 4, 06 -> "406"
-    | 4, 07 -> "407"
     | 4, 08 -> "408"
     | 4, 09 -> "409"
     | 4, 10 -> "410"
@@ -27,6 +21,11 @@ let () =
         "414"
         (* Ast_500 aliases Ast_414, since the AST hasn't changed between those two *)
     | 5, 1 -> "501"
+    | 5, 2 -> "502"
+    | 5, 3 -> "503"
+    | 5, 4 -> "504"
+    | 5, 5 -> "505"
+    | 5, 6 -> "506"
     | _ ->
         Printf.eprintf "Unknown OCaml version %s\n" ocaml_version_str;
         exit 1)

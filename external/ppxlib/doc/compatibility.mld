@@ -1,0 +1,138 @@
+{%html: <div style="display: flex; justify-content:space-between"><div>%}{{!page-"driver"}< The Driver}{%html: </div><div>%}{{!"writing-ppxs"}Writing PPXs >}{%html: </div></div>%}
+
+{1:compat_mult_ver Compatibility With Multiple OCaml Versions}
+
+One of the important issues with working with the
+{{!Ppxlib.Parsetree}[Parsetree]} is that the API is not stable. For instance, in
+the {{:https://ocaml.org/releases/4.13.0}OCaml 4.13 release}, the following
+{{:https://github.com/ocaml/ocaml/pull/9584/files#diff-ebecf307cba2d756cc28f0ec614dfc57d3adc6946eb4faa9825eb25a92b2596d}two}
+{{:https://github.com/ocaml/ocaml/pull/10133/files#diff-ebecf307cba2d756cc28f0ec614dfc57d3adc6946eb4faa9825eb25a92b2596d}changes}
+were made to the {{!Ppxlib.Parsetree}[Parsetree]} type. Although they are small changes, they may
+break any PPX that is written to directly manipulate the (evolving) type.
+
+This instability causes a maintenance issue. PPX authors wish to maintain
+a single version of their PPX, not one per OCaml version, and ideally not have
+to update their code when seemingly irrelevant changes to the OCaml Parsetree happen.
+
+[ppxlib] helps to solve both issues. PPX authors only have to support
+ppxlib's version of the {{!Ppxlib.Parsetree}[Parsetree]}. The
+{{!page-driver.driver}driver} will take care of converting from OCaml's
+Parsetree to ppxlib's, applying all PPX transformations and then converting
+back to the compiler's Parsetree. This means PPX code will always only deal
+with the {{!Ppxlib.Parsetree}[Parsetree]} types as defined in ppxlib, regardless
+of the version of the compiler being used.
+
+Note that [ppxlib]'s {{!Ppxlib.Parsetree}[Parsetree]} is just a frozen version of
+the compiler's that we only update once in a while, instead of every minor
+compiler release, to limit breakage and maintenance burden.
+Such [ppxlib]'s AST bumps only happen on ppxlib major releases from
+[ppxlib.0.36.0] onward.
+
+Even when [ppxlib] does update its AST representation to a more recent one,
+less breakage is caused thanks to:
++ its stable APIs to {{!page-"generating-code"}generate} and
+  {{!page-"matching-code"}destruct} AST nodes
++ the reduced API surface between a PPX and the [Parsetree] types provided
+  by {{!page-"writing-ppxs".context_free}context-free transformations}
+
+{2:future_compilers Supporting latests language features}
+
+Since [ppxlib]'s AST remains frozen for a while, there are times at which it has
+to co-exist with newer compilers.
+
+Those newer compilers have different Parsetrees with new representations of
+existing AST nodes or even entirely new features that cannot be represented
+with older [Parsetree] types such as the ones [ppxlib] uses.
+
+To circumvent this limitation while still providing a certain amount of
+stability, [ppxlib] "encodes" those newer nodes into extension points with the
+[ppxlib.migration] namespace. When working with a newer compiler, the AST is
+migrated down to [ppxlib]'s version, encoding all unsupported nodes. Once the AST
+has been transformed, it is migrated back up to its original version and the
+nodes are automatically decoded back into their proper representation by the
+[ppxlib] {{!page-driver.driver}driver}.
+
+This approach allows not only to compile and preprocess old code with new
+compilers but also to use new language features alongside ppx-es.
+
+The only limitation is that using those features inside parts of the source code
+that are interpreted by a ppx can cause a failure as the ppx might try to
+interpret an encoded node and won't know what to do with it. We cannot reasonably
+expect an old ppx to properly handle a language feature it doesn't even know
+existed anyway.
+
+We do provide ways for ppx-es to build and destruct such encoded nodes so that
+a ppx author can easily update and add support for new features when it makes
+sense. {{!page-"generating-code".ast_builder}[Ast_builder]} functions can be
+used to generate AST nodes, eventually encoding them so they are properly
+migrated upward.
+Be aware that generating code this way will make it compatible only with
+compilers that support said feature.
+Conversely {{!page-"matching-code".ast_pattern}[Ast_pattern]} provides an
+interface for destructing any nodes, including ones that don't have a proper
+representation in [ppxlib]'s {{!Ppxlib.Parsetree}[Parsetree]}.
+
+{3 Example: labeled tuples}
+
+Let's take labeled tuples as an example to illustrate this.
+
+At the time of writing, [ppxlib]'s AST is frozen at 5.2. Labeled tuples have been
+introduced in 5.4, meaning a ppx-author won't be able to consume or produce a
+labeled tuple expression using the regular [Parsetree] types since the 5.2
+version of the `Pexp_tuple` variant won't allow it, see for yourself:
+
+In 5.2's AST:
+{[
+  | Pexp_tuple of expression list
+]}
+
+In 5.4's AST:
+{[
+  | Pexp_tuple of (string option * expression) list
+]}
+
+If I want to generate a labeled tuple expression I can simply use
+{!Ppxlib.Ast_builder.Default.pexp_labeled_tuple}:
+
+{[
+val pexp_labeled_tuple :
+  ((string option * expression) list -> expression) with_loc
+]}
+
+Not much more to say here.
+
+Now imagine my ppx has the following code to expand expressions it receives
+as a payload:
+{[
+let expand_expression expr =
+  let loc = expr.pexp_loc in
+  match expr with
+  | { pexp_desc = Pexp_tuple elist; _ } -> expand_tuple ~loc elist
+  | _ -> unsupported_payload_error ~loc ()
+]}
+
+Now let's say I want to allow users to pass labeled tuples as well, I can
+support that thanks to {!Ppxlib.Ast_pattern.pexp_labeled_tuple}:
+
+{[
+val pexp_labeled_tuple :
+  ((string option * expression) list, 'a, 'b) t -> (expression, 'a, 'b) t
+]}
+
+I simply need to update my code like this:
+{[
+let expand_expression expr =
+  let loc = expr.pexp_loc in
+  match expr with
+  | { pexp_desc = Pexp_tuple elist; _ } -> expand_tuple ~loc elist
+  | _ ->
+     let labeled =
+       Ast_pattern.(parse_res (pexp_labeled_tuple __)) pexp_loc expr
+         (fun x -> x)
+     in
+     (match labeled with
+      | Ok l_and_elist -> expand_labeled_tuple ~loc l_and_elist
+      | Error _ -> unsupported_payload_error ~loc ())
+]}
+
+{%html: <div style="display: flex; justify-content:space-between"><div>%}{{!page-"driver"}< The Driver}{%html: </div><div>%}{{!"writing-ppxs"}Writing PPXs >}{%html: </div></div>%}

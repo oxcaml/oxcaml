@@ -18,10 +18,14 @@ val in_file : string -> t
 (** Return an empty ghost range located in a given file. *)
 
 val set_filename : t -> string -> t
-(** Set the [pos_fname] both in [loc_start] and [loc_end]. Leave the rest as is. *)
+(** Set the [pos_fname] both in [loc_start] and [loc_end]. Leave the rest as is.
+*)
 
 val none : t
 (** An arbitrary value of type [t]; describes an empty ghost range. *)
+
+val is_none : t -> bool
+(** Checks whether a given location is equal to [none] *)
 
 val init : Lexing.lexbuf -> string -> unit
 (** Set the file name and line number of the [lexbuf] to be the start of the
@@ -55,7 +59,7 @@ module Error : sig
   (** For a detailed explanation on error reporting, refer to the
       {{!"good-practices".handling_errors} relevant} part of the tutorial.*)
 
-  type t
+  type t = Astlib.Location.Error.t
 
   val make : loc:location -> string -> sub:(location * string) list -> t
 
@@ -81,10 +85,15 @@ module Error : sig
       [Location.raise_errorf]. *)
 
   val update_loc : t -> location -> t
-  (** Update where the error is located. The old location will be overwritten. *)
+  (** Update where the error is located. The old location will be overwritten.
+  *)
 
   val get_location : t -> location
   (** Find out where the error is located. *)
+
+  val of_extension : extension -> t option
+  (** Convert an extension point to an error. Extension points must have the
+      exact form as created by [to_extension]. *)
 end
 with type location := t
 
