@@ -502,7 +502,7 @@ let check_zero_alloc_partial env code_id ~fun_dbg ~(fun_sym : Cmm.symbol)
     Location.raise_errorf ~loc
       "Annotation check for zero_alloc failed on function %s (%s).@ \
        Partial applications of this function may allocate a closure on the \
-       heap.@ Hint: try marking the partial function type %a, as in %a."
+       heap.@ Hint: try marking the partial function %a, as in %a."
       (scoped_name fun_dbg) fun_sym.sym_name
       Misc.Style.inline_code "local"
       Misc.Style.inline_code "'a -> ('b -> ... -> 'z) @ local"
