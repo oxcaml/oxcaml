@@ -49,6 +49,11 @@ type native_repr =
   | Unpacked_product of Jkind_types.Sort.Const.t
   | Unextended_bits8
   | Unextended_bits16
+  | Raw_pointer
+  (** A fat-pointer argument: an unboxed pair of a [value] base and a
+      [bits64] byte offset, passed to C as a single raw pointer
+      (base + offset).  Written [[@ox_ptr]].  Only allowed on arguments
+      of [@@noalloc] externals. *)
 (* CR mshinwell/ccasinghino: should we actually use
    "any_locality_mode Scalar.Integral.Width.t" here rather than defining an
    additional unboxed_or_untagged_integer type? *)
@@ -161,6 +166,7 @@ type wrong_repr_error =
   | Unpacked_product_return
   | Unextended_return
   | Small_int_arg
+  | Raw_pointer_return
   | Repr_mismatch
 
 type error =
@@ -171,6 +177,7 @@ type error =
   | No_native_primitive_with_non_value
   | Inconsistent_attributes_for_effects
   | Inconsistent_noalloc_attributes_for_effects
+  | Raw_pointer_requires_noalloc
   | Invalid_representation_polymorphic_attribute
   | Invalid_native_repr_for_primitive of
       { prim_name : string; errors : wrong_repr_error list }

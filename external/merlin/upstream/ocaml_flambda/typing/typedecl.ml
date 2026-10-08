@@ -25,7 +25,8 @@ open Typetexp
 
 module String = Misc.Stdlib.String
 
-type native_repr_kind = Unboxed | Untagged | Unpacked | Unsafe_unextended
+type native_repr_kind =
+  Unboxed | Untagged | Unpacked | Unsafe_unextended | Ox_ptr
 
 type jkind_sort_loc =
   | Cstr_tuple of { unboxed : bool }
@@ -4281,18 +4282,22 @@ let get_native_repr_attribute attrs ~global_repr =
     Attr_helper.get_no_payload_attribute "untagged" attrs,
     Attr_helper.get_no_payload_attribute "unpacked" attrs,
     Attr_helper.get_no_payload_attribute "unsafe_unextended" attrs,
+    Attr_helper.get_no_payload_attribute "ox_ptr" attrs,
     global_repr
   with
-  | None, None, None, None, None -> Native_repr_attr_absent
-  | None, None, None, None, Some repr -> Native_repr_attr_present repr
-  | Some _, None, None, None, None -> Native_repr_attr_present Unboxed
-  | None, Some _, None, None, None -> Native_repr_attr_present Untagged
-  | None, None, Some _, None, None -> Native_repr_attr_present Unpacked
-  | None, None, None, Some _, None -> Native_repr_attr_present Unsafe_unextended
-  | Some { Location.loc }, _, _, _, _
-  | _, Some { Location.loc }, _, _, _
-  | _, _, Some { Location.loc }, _, _
-  | _, _, _, Some { Location.loc }, _ ->
+  | None, None, None, None, None, None -> Native_repr_attr_absent
+  | None, None, None, None, None, Some repr -> Native_repr_attr_present repr
+  | Some _, None, None, None, None, None -> Native_repr_attr_present Unboxed
+  | None, Some _, None, None, None, None -> Native_repr_attr_present Untagged
+  | None, None, Some _, None, None, None -> Native_repr_attr_present Unpacked
+  | None, None, None, Some _, None, None ->
+    Native_repr_attr_present Unsafe_unextended
+  | None, None, None, None, Some _, None -> Native_repr_attr_present Ox_ptr
+  | Some { Location.loc }, _, _, _, _, _
+  | _, Some { Location.loc }, _, _, _, _
+  | _, _, Some { Location.loc }, _, _, _
+  | _, _, _, Some { Location.loc }, _, _
+  | _, _, _, _, Some { Location.loc }, _ ->
     raise (Error (loc, Multiple_native_repr_attributes))
 
 let is_upstream_compatible_non_value_unbox env ty =
@@ -4423,6 +4428,23 @@ let type_sort_external ~is_layout_poly ~why env loc typ =
       if is_layout_poly then External_with_layout_poly else External
     in
     raise(Error (loc, Jkind_sort {env; kloc; typ; err}))
+
+let rec strip_addressable_sort (s : Jkind_types.Sort.Const.t) =
+  match s with
+  | Addressable s -> strip_addressable_sort s
+  | (Base _ | Product _ | Univar _ | Genvar _) as s -> s
+
+(* A fat pointer: an unboxed pair of a [value] base and a [bits64] byte
+   offset. *)
+let sort_is_fat_pointer (sort : Jkind_types.Sort.Const.t) =
+  match strip_addressable_sort sort with
+  | Product [a; b] ->
+    (match strip_addressable_sort a, strip_addressable_sort b with
+     | Base Scannable, Base Bits64 -> true
+     | _, _ -> false)
+  | Base _ | Product _ | Univar _ | Genvar _
+  (* [strip_addressable_sort] never returns [Addressable _] *)
+  | Addressable _ -> false
 
 let make_native_repr
       env core_type ty ~global_repr ~is_layout_poly ~why ~is_return =
@@ -4556,6 +4578,13 @@ let make_native_repr
       (Error (core_type.ptyp_loc, Cannot_unbox_or_untag_type Unsafe_unextended))
   | Native_repr_attr_present Unsafe_unextended, Sort (Univar _ | Genvar _) ->
     Misc.fatal_error "typedecl: Univar/Genvar in concrete type"
+  | Native_repr_attr_present Ox_ptr, Sort (Univar _ | Genvar _) ->
+    Misc.fatal_error "typedecl: Univar/Genvar in concrete type"
+  | Native_repr_attr_present Ox_ptr, Sort sort
+    when (not is_return) && sort_is_fat_pointer sort ->
+    Raw_pointer
+  | Native_repr_attr_present Ox_ptr, (Sort _ | Poly) ->
+    raise (Error (core_type.ptyp_loc, Cannot_unbox_or_untag_type Ox_ptr))
 
 let prim_const_mode m =
   match Mode.Locality.Guts.check_const m with
@@ -5815,11 +5844,12 @@ let report_error ~loc = function
   | Val_in_structure ->
       Location.errorf ~loc "Value declarations are only allowed in signatures"
   | Multiple_native_repr_attributes ->
-      Location.errorf ~loc "Too many %a/%a/%a/%a attributes"
+      Location.errorf ~loc "Too many %a/%a/%a/%a/%a attributes"
         Style.inline_code "[@@unboxed]"
         Style.inline_code "[@@untagged]"
         Style.inline_code "[@@unpacked]"
         Style.inline_code "[@@unsafe_unextended]"
+        Style.inline_code "[@@ox_ptr]"
   | Cannot_unbox_or_untag_type Unboxed ->
       Location.errorf ~loc
         "Don't know how to unbox this type.@ \
@@ -5845,6 +5875,12 @@ let report_error ~loc = function
       Location.errorf ~loc
         "@[Only types with layout bits8 or bits16 can be marked %a.@]"
         Style.inline_code "unsafe_unextended"
+  | Cannot_unbox_or_untag_type Ox_ptr ->
+      Location.errorf ~loc
+        "The %a attribute may only be used on external arguments@ \
+         whose layout is %a (a fat pointer)."
+        Style.inline_code "[@ox_ptr]"
+        Style.inline_code "value_or_null & bits64"
   | Deep_unbox_or_untag_attribute kind ->
       Location.errorf ~loc
         "The attribute %a should be attached to@ \
@@ -5855,7 +5891,8 @@ let report_error ~loc = function
          | Unboxed -> "@unboxed"
          | Untagged -> "@untagged"
          | Unpacked -> "@unpacked"
-         | Unsafe_unextended -> "@unsafe_unextended")
+         | Unsafe_unextended -> "@unsafe_unextended"
+         | Ox_ptr -> "@ox_ptr")
   | Jkind_mismatch_of_path (env, dpath, v) ->
     (* the type is always printed just above, so print out just the head of the
        path instead of something like [t/3] *)
