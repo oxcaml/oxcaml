@@ -120,6 +120,7 @@ type 'a create_type =
   absolute_history:Inlining_history.Absolute.t ->
   relative_history:Inlining_history.Relative.t ->
   loopify:Loopify_attribute.t ->
+  param_uses:Param_use.params_uses ->
   'a
 
 val createk : (t -> 'a) -> 'a create_type

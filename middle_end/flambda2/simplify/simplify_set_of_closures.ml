@@ -514,6 +514,11 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
     | Default_loopify_and_tailrec -> Already_loopified
     | Default_loopify_and_not_tailrec -> Never_loopify
   in
+  let params_arity = Code.params_arity code in
+  let param_uses : Param_use.params_uses =
+    let all_uses = UA.param_uses uacc_after_upwards_traversal in
+    Param_use.convert params_arity all_uses
+  in
   let code_const, new_code =
     (* CR vlaviron: Ideally the debuginfo should be associated to the set of
        closures, not the code, but at the moment To_cmm looks at the debuginfo
@@ -523,7 +528,7 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
     Rebuilt_static_const.create_code
       (DA.are_rebuilding_terms dacc_after_body)
       code_id ~params_and_body ~free_names_of_params_and_body:free_names_of_code
-      ~newer_version_of ~params_arity:(Code.params_arity code)
+      ~newer_version_of ~params_arity
       ~param_modes:(Code.param_modes code)
       ~first_complex_local_param:(Code.first_complex_local_param code)
       ~result_arity ~result_types ~result_mode:(Code.result_mode code)
@@ -535,7 +540,7 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
       ~cold:(Code.cold code) ~is_a_functor ~is_opaque ~recursive ~cost_metrics
       ~inlining_arguments ~dbg ~is_tupled:(Code.is_tupled code)
       ~is_my_closure_used ~inlining_decision ~absolute_history ~relative_history
-      ~loopify
+      ~loopify ~param_uses
   in
   let code =
     let are_rebuilding = DA.are_rebuilding_terms dacc_after_body in

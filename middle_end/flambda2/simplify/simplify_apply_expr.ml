@@ -748,6 +748,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
                 (Function_params_and_body.is_my_closure_used params_and_body)
               ~inlining_decision:Stub ~absolute_history ~relative_history
               ~loopify:Never_loopify
+              ~param_uses:Param_use.empty_params_uses
           in
           Static_const_or_code.create_code code
         in

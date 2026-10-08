@@ -69,7 +69,7 @@ let[@ocamlformat "disable"] print_source ppf = function
   | My_closure -> Format.fprintf ppf "My_closure"
 
 let[@ocamlformat "disable"] rec print_projection source ppf = function
-  | Identity -> print_source ppf source
+  | Identity -> source ppf
   | Get_tag p -> Format.fprintf ppf "(Get_tag %a)" (print_projection source) p
   | Untag p -> Format.fprintf ppf "(Untag %a)" (print_projection source) p
   | Is_int p -> Format.fprintf ppf "(Is_int %a)" (print_projection source) p
@@ -77,4 +77,7 @@ let[@ocamlformat "disable"] rec print_projection source ppf = function
     Format.fprintf ppf "(Block_load %a %a)"
       Target_ocaml_int.print field (print_projection source) projection
 
-let print ppf t = print_projection t.source ppf t.projection
+let print ppf t = print_projection (fun ppf -> print_source ppf t.source) ppf t.projection
+
+let print_projection ppf projection =
+  print_projection (fun ppf -> Format.fprintf ppf "Identity") ppf projection

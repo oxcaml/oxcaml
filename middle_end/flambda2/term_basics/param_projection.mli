@@ -23,6 +23,8 @@ type t =
     projection : projection
   }
 
+val compare_projection : projection -> projection -> int
+
 val param : int -> t
 
 val my_closure : t
@@ -38,5 +40,7 @@ val block_load : Target_ocaml_int.t -> t -> t
 val equal : t -> t -> bool
 
 val compare : t -> t -> int
+
+val print_projection : Format.formatter -> projection -> unit
 
 val print : Format.formatter -> t -> unit

@@ -44,7 +44,8 @@ type t =
     inlining_decision : Function_decl_inlining_decision_type.t;
     absolute_history : Inlining_history.Absolute.t;
     relative_history : Inlining_history.Relative.t;
-    loopify : Loopify_attribute.t
+    loopify : Loopify_attribute.t;
+    param_uses : Param_use.params_uses;
   }
 
 type code_metadata = t
@@ -165,6 +166,7 @@ type 'a create_type =
   absolute_history:Inlining_history.Absolute.t ->
   relative_history:Inlining_history.Relative.t ->
   loopify:Loopify_attribute.t ->
+  param_uses:Param_use.params_uses ->
   'a
 
 let createk k code_id ~newer_version_of ~params_arity ~param_modes
@@ -173,7 +175,7 @@ let createk k code_id ~newer_version_of ~params_arity ~param_modes
     ~regalloc_attribute ~regalloc_param_attribute ~cold ~is_a_functor ~is_opaque
     ~recursive ~cost_metrics ~inlining_arguments ~dbg ~is_tupled
     ~is_my_closure_used ~inlining_decision ~absolute_history ~relative_history
-    ~loopify =
+    ~loopify ~param_uses =
   (match stub, inline with
   | true, (Available_inline | Never_inline | Default_inline)
   | ( false,
@@ -227,7 +229,8 @@ let createk k code_id ~newer_version_of ~params_arity ~param_modes
       inlining_decision;
       absolute_history;
       relative_history;
-      loopify
+      loopify;
+      param_uses
     }
 
 let create = createk (fun t -> t)
@@ -280,7 +283,7 @@ let [@ocamlformat "disable"] print ppf
          result_types; result_mode;
          recursive; cost_metrics; inlining_arguments;
          dbg; is_tupled; is_my_closure_used; inlining_decision;
-         absolute_history; relative_history; loopify } =
+         absolute_history; relative_history; loopify; param_uses } =
   let module C = Flambda_colours in
   Format.fprintf ppf "@[<hov 1>(\
       @[<hov 1>%t(newer_version_of@ %a)%t@]@ \
@@ -307,7 +310,8 @@ let [@ocamlformat "disable"] print ppf
       @[<hov 1>(is_my_closure_used@ %b)@]@ \
       %a\
       @[<hov 1>(inlining_decision@ %a)@]@ \
-      @[<hov 1>(loopify@ %a)@]\
+      @[<hov 1>(loopify@ %a)@]@ \
+      @[<hov 1>(param_uses@ %a)@]\
       )@]"
     (if Option.is_none newer_version_of then Flambda_colours.elide
     else Flambda_colours.none)
@@ -403,6 +407,7 @@ let [@ocamlformat "disable"] print ppf
     print_inlining_paths (relative_history, absolute_history)
     Function_decl_inlining_decision_type.print inlining_decision
     Loopify_attribute.print loopify
+    Param_use.print_params_uses param_uses
 
 let free_names
     { code_id = _;
@@ -431,7 +436,8 @@ let free_names
       inlining_decision = _;
       absolute_history = _;
       relative_history = _;
-      loopify = _
+      loopify = _;
+      param_uses = _
     } =
   (* [code_id] is only in [t.code_metadata] for the use of [compare]; it doesn't
      count as a free name. *)
@@ -476,7 +482,8 @@ let apply_renaming
        inlining_decision = _;
        absolute_history = _;
        relative_history = _;
-       loopify = _
+       loopify = _;
+       param_uses = _
      } as t) renaming =
   (* inlined and modified version of Option.map to preserve sharing *)
   let newer_version_of' =
@@ -533,7 +540,8 @@ let ids_for_export
       inlining_decision = _;
       absolute_history = _;
       relative_history = _;
-      loopify = _
+      loopify = _;
+      param_uses = _
     } =
   let ids =
     let newer_version_of_ids =
@@ -575,7 +583,8 @@ let approx_equal
       inlining_decision = inlining_decision1;
       absolute_history = absolute_history1;
       relative_history = relative_history1;
-      loopify = loopify1
+      loopify = loopify1;
+      param_uses = param_uses1
     }
     { code_id = code_id2;
       newer_version_of = newer_version_of2;
@@ -603,7 +612,8 @@ let approx_equal
       inlining_decision = inlining_decision2;
       absolute_history = absolute_history2;
       relative_history = relative_history2;
-      loopify = loopify2
+      loopify = loopify2;
+      param_uses = param_uses2
     } =
   Code_id.equal code_id1 code_id2
   && (Option.equal Code_id.equal) newer_version_of1 newer_version_of2
@@ -634,6 +644,7 @@ let approx_equal
   && Inlining_history.Absolute.compare absolute_history1 absolute_history2 = 0
   && Inlining_history.Relative.compare relative_history1 relative_history2 = 0
   && Loopify_attribute.equal loopify1 loopify2
+  && Param_use.approx_equal_params_uses param_uses1 param_uses2
 
 let map_result_types ({ result_types; _ } as t) ~f =
   let result_types' =
