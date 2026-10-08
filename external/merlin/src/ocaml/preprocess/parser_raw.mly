@@ -976,6 +976,8 @@ let instance_of_module_expr : module_expr -> module_instance =
 
 let pmod_instance mexpr = Pmod_instance (instance_of_module_expr mexpr)
 
+(* Merlin: [Compilation_unit] is not available to the parser.
+
 (* Compilation unit names use the syntax of module instances. Pack prefixes are
    not supported. *)
 let compilation_unit_of_module_expr mexpr =
@@ -989,6 +991,7 @@ let compilation_unit_of_module_expr mexpr =
          pmod_instance_args)
   in
   of_instance (instance_of_module_expr mexpr)
+*)
 
 let mk_directive_arg ~loc k =
   { pdira_desc = k;
@@ -1390,8 +1393,10 @@ The precedences must be listed from low to high.
 %type <Longident.t> parse_mod_longident
 %start parse_any_longident
 %type <Longident.t> parse_any_longident
+/* Merlin: [Compilation_unit] is not available to the parser.
 %start parse_compilation_unit
 %type <Compilation_unit.t> parse_compilation_unit
+*/
 /* END AVOID */
 
 %%
@@ -1798,10 +1803,12 @@ parse_any_longident:
     { $1 }
 ;
 
+/* Merlin: [Compilation_unit] is not available to the parser.
 parse_compilation_unit:
   module_expr EOF
     { compilation_unit_of_module_expr $1 }
 ;
+*/
 /* END AVOID */
 
 (* -------------------------------------------------------------------------- *)
