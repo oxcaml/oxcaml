@@ -158,7 +158,6 @@ module Flambda2 : sig
   module Default : sig
     val classic_mode : bool
     val join_points : bool
-    val unbox_along_intra_function_control_flow : bool
     val backend_cse_at_toplevel : bool
     val cse_depth : int
     val join_depth : int
@@ -182,7 +181,6 @@ module Flambda2 : sig
   type flags = {
     classic_mode : bool;
     join_points : bool;
-    unbox_along_intra_function_control_flow : bool;
     backend_cse_at_toplevel : bool;
     cse_depth : int;
     join_depth : int;
@@ -206,7 +204,6 @@ module Flambda2 : sig
 
   val classic_mode : bool or_default ref
   val join_points : bool or_default ref
-  val unbox_along_intra_function_control_flow : bool or_default ref
   val backend_cse_at_toplevel : bool or_default ref
   val cse_depth : int or_default ref
   val join_depth : int or_default ref
