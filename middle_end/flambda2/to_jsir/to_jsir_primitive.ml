@@ -306,10 +306,12 @@ let unary_exn ~env ~res (f : Flambda_primitive.unary_primitive) x =
     check_my_closure ~env x;
     Some (To_jsir_env.get_value_slot_exn env value_slot), env, res
   | Is_boxed_float ->
-    (* Floats and integers are both numbers in JavaScript, so they cannot be
-       told apart. As in js_of_ocaml's bytecode pipeline for the JavaScript
-       target, where [caml_array_of_uniform_array] is a no-op, generic arrays
-       are never flat float arrays. *)
+    (* This only arises from [Pmakearray Pgenarray], to decide whether an array
+       literal of unknown element type is a flat float array or an
+       ordinary one. A boxed float is a plain number in JavaScript, so
+       they can't be distinguished, but the JSOO runtime already puts
+       floats in ordinary arrays ([caml_array_make], so we return [false]
+       according to this convention. *)
     let var = Jsir.Var.fresh () in
     let expr : Jsir.expr = Constant (Int Targetint.zero) in
     Some var, env, To_jsir_result.add_instr_exn res (Let (var, expr))
