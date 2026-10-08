@@ -600,6 +600,22 @@ val enter_cltype:
 val enter_jkind:
   scope:int -> string -> jkind_declaration -> t -> Ident.t * t
 
+(* State for warnings about an open of a module expression that is not a
+   path, e.g. [open struct ... end] or [open F ()]. *)
+type anonymous_open
+
+(* Must be called before typing the opened module expression. If the open is
+   unused, only the unused-open warning is reported, rather than unused
+   warnings for each item of the module. *)
+val start_anonymous_open:
+  used_slot:bool ref -> loc:Location.t -> toplevel:bool ->
+  Asttypes.override_flag -> anonymous_open
+
+(* Like [enter_signature], but the items are added as an anonymous open, which
+   reports unused-open and shadowing warnings. *)
+val enter_signature_anon_open: anonymous_open -> ?mod_shape:Shape.t ->
+  scope:int -> signature ->
+  ?mode:(Mode.allowed * 'r) Mode.With_regionality.t -> t -> signature * t
 (* Same as [add_signature] but refreshes (new stamp) and rescopes bound idents
    in the process. *)
 val enter_signature: ?mod_shape:Shape.t -> scope:int -> signature ->
