@@ -486,3 +486,7 @@ let dominator_tree_for_entry_point t =
 let iter_breadth_dominator_forest t ~f =
   List.iter t.dominator_forest ~f:(fun dominator_tree ->
       iter_breadth_dominator_tree dominator_tree ~f)
+
+module For_testing = struct
+  let doms t = t.doms
+end
