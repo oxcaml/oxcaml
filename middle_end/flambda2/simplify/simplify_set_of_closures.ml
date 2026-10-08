@@ -540,12 +540,22 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
     let removed_ops = Cost_metrics.removed cost_metrics in
     Removed_operations.(equal zero removed_ops)
   in
-  if is_newer_version && (not should_resimplify) && zero_improvements
+  if
+    is_newer_version && (not should_resimplify)
+    && C.single_set_of_size_one context
+    && zero_improvements
   then
     (* If there are no improvements to the specialisation, we keep the old
        version.
 
        We can't do that if the function was never specialised at least once. *)
+    (* If there is any potential use of the new code id (here the variable [code_id])
+       it must be defined. Keeping the old version would prevent that.
+       Those uses could exist in functions from the same set of closures being
+       simplified with the same context. So this is valid only whene there are no such functions.
+    *)
+    (* CR pchambart: we should lift that restriction to single set of size one,
+       maybe by creating let aliases of symbols, that are currently not possible *)
     { code_id = old_code_id;
       code = None;
       outer_dacc = original_outer_dacc;
@@ -779,6 +789,7 @@ let simplify_and_lift_set_of_closures dacc ~closure_bound_vars_inverse
         [set_of_closures, Alloc_mode.For_allocations.as_type alloc_mode]
       ~closure_bound_names_all_sets:[closure_bound_names]
       ~value_slot_types_all_sets:[value_slot_types]
+      ~single_set_of_size_one:(Function_slot.Lmap.is_singleton closure_symbols)
   in
   let closure_bound_names_inside =
     C.closure_bound_names_inside_functions_exactly_one_set context
@@ -854,12 +865,18 @@ let simplify_non_lifted_set_of_closures0 dacc bound_vars ~closure_bound_vars
   let closure_bound_names =
     Function_slot.Map.map Bound_name.create_var closure_bound_vars
   in
+  let function_declarations_in_order =
+    Function_declarations.funs_in_order
+      (Set_of_closures.function_decls set_of_closures)
+  in
   let context =
     C.create ~dacc_prior_to_sets:dacc ~simplify_function_body
       ~all_sets_of_closures:
         [set_of_closures, Alloc_mode.For_allocations.as_type alloc_mode]
       ~closure_bound_names_all_sets:[closure_bound_names]
       ~value_slot_types_all_sets:[value_slot_types]
+      ~single_set_of_size_one:
+        (Function_slot.Lmap.is_singleton function_declarations_in_order)
   in
   let closure_bound_names_inside =
     C.closure_bound_names_inside_functions_exactly_one_set context
@@ -906,8 +923,7 @@ let simplify_non_lifted_set_of_closures0 dacc bound_vars ~closure_bound_vars
                       Code_metadata.function_slot_size code_metadata;
                     dbg = Code_metadata.dbg code_metadata
                   })
-            (Function_declarations.funs_in_order
-               (Set_of_closures.function_decls set_of_closures))
+            function_declarations_in_order
         in
         Set_of_closures.create ~value_slots
           (Function_declarations.create function_decls)
@@ -1147,10 +1163,15 @@ let simplify_lifted_sets_of_closures dacc ~all_sets_of_closures_and_symbols
       all_sets_of_closures
   in
   let value_slot_types_all_sets = List.map snd value_slots_and_types_all_sets in
+  let single_set_of_size_one =
+    match all_sets_of_closures_and_symbols with
+    | [(functions, _)] -> Function_slot.Lmap.is_singleton functions
+    | _ -> false
+  in
   let context =
     C.create ~dacc_prior_to_sets:dacc ~simplify_function_body
       ~all_sets_of_closures ~closure_bound_names_all_sets
-      ~value_slot_types_all_sets
+      ~value_slot_types_all_sets ~single_set_of_size_one
   in
   let closure_bound_names_inside_functions_all_sets =
     C.closure_bound_names_inside_functions_all_sets context

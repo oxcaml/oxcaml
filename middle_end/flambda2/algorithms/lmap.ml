@@ -43,6 +43,8 @@ module type S = sig
 
   val find_opt : key -> 'a t -> 'a option
 
+  val is_singleton : 'a t -> bool
+
   val get_singleton : 'a t -> (key * 'a) option
 
   val get_singleton_exn : 'a t -> key * 'a
@@ -124,6 +126,8 @@ module Make (T : Thing) : S with type key = T.t = struct
     List.find_map (fun (k', v) -> if T.equal k k' then Some v else None) m
 
   let find k m = match find_opt k m with Some v -> v | None -> raise Not_found
+
+  let is_singleton = function [_] -> true | _ -> false
 
   let get_singleton = function [(k, v)] -> Some (k, v) | _ -> None
 

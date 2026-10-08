@@ -87,6 +87,8 @@ module type S = sig
 
   val find_opt : key -> 'a t -> 'a option
 
+  val is_singleton : 'a t -> bool
+
   val get_singleton : 'a t -> (key * 'a) option
 
   val get_singleton_exn : 'a t -> key * 'a
