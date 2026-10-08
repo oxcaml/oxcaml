@@ -118,7 +118,7 @@ and let_expr_normal ~env ~res e ~(bound_pattern : Bound_pattern.t)
     ~num_normal_occurrences_of_bound_vars:_ ~body =
   let env, res =
     match bound_pattern, Let.defining_expr e with
-    | Singleton v, Simple s ->
+    | Singleton v, (Simple s | Unboxed_closure { closure = s; first_unarized_parameters = _}) ->
       let fvar = Bound_var.var v in
       create_let_simple ~env ~res fvar s
     | Singleton v, Prim (p, dbg) ->
@@ -180,8 +180,8 @@ and let_expr_normal ~env ~res e ~(bound_pattern : Bound_pattern.t)
       env, res
     | Singleton _, Rec_info _ -> env, res
     | Singleton _, (Set_of_closures _ | Static_consts _)
-    | Set_of_closures _, (Simple _ | Prim _ | Static_consts _ | Rec_info _)
-    | Static _, (Simple _ | Prim _ | Set_of_closures _ | Rec_info _) ->
+    | Set_of_closures _, (Simple _ | Prim _ | Static_consts _ | Unboxed_closure _ | Rec_info _)
+    | Static _, (Simple _ | Prim _ | Set_of_closures _ | Unboxed_closure _ | Rec_info _) ->
       Misc.fatal_errorf "Mismatch between pattern and defining expression:@ %a"
         Let.print e
   in

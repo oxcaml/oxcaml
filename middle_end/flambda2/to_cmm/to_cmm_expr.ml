@@ -763,7 +763,7 @@ and let_prim env res ~num_normal_occurrences_of_bound_vars v p dbg body =
 and let_expr0 env res let_expr (bound_pattern : Bound_pattern.t)
     ~num_normal_occurrences_of_bound_vars ~body =
   match[@warning "-4"] bound_pattern, Let.defining_expr let_expr with
-  | Singleton v, Simple s ->
+  | Singleton v, (Simple s | Unboxed_closure { closure = s; first_unarized_parameters = _ }) ->
     (* CR mshinwell: Try to get a proper [dbg] here (although the majority of
        these bindings should have been substituted out). *)
     (* CR gbury: once we get proper debuginfo here, remember to apply
@@ -826,8 +826,8 @@ and let_expr0 env res let_expr (bound_pattern : Bound_pattern.t)
       cmm, free_vars, symbol_inits, res)
   | Singleton _, Rec_info _ -> expr env res body
   | Singleton _, (Set_of_closures _ | Static_consts _)
-  | Set_of_closures _, (Simple _ | Prim _ | Static_consts _ | Rec_info _)
-  | Static _, (Simple _ | Prim _ | Set_of_closures _ | Rec_info _) ->
+  | Set_of_closures _, (Simple _ | Prim _ | Static_consts _ | Unboxed_closure _ | Rec_info _)
+  | Static _, (Simple _ | Prim _ | Set_of_closures _ | Unboxed_closure _ | Rec_info _) ->
     Misc.fatal_errorf "Mismatch between pattern and defining expression:@ %a"
       Let.print let_expr
 

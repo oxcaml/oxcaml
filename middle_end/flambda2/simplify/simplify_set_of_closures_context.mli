@@ -29,6 +29,7 @@ val create :
   all_sets_of_closures:(Set_of_closures.t * Alloc_mode.For_types.t) list ->
   closure_bound_names_all_sets:Bound_name.t Function_slot.Map.t list ->
   value_slot_types_all_sets:T.t Value_slot.Map.t list ->
+  specialized_parameters:Simple.t list ->
   t
 
 val create_for_static_stub :
@@ -54,6 +55,8 @@ val closure_bound_names_inside_functions_exactly_one_set :
 val simplify_function_body : t -> Simplify_common.simplify_function_body
 
 val previously_free_depth_variables : t -> Variable.Set.t
+
+val specialized_parameters : t -> Simple.t list
 
 val function_decl_type :
   ?new_code_id:Code_id.t ->
