@@ -29,7 +29,7 @@ let create_lifted_constant (dacc, lifted_constants)
        projections when lifting -- and [static_const] has already been
        lifted. *)
     let lifted_constant =
-      LC.create_block_like symbol static_const (DA.denv dacc)
+      LC.create_block_like symbol static_const (DA.typing_env dacc)
         ~symbol_projections:Variable.Map.empty typ
     in
     let dacc =
@@ -53,7 +53,7 @@ let create_lifted_constant (dacc, lifted_constants)
         closure_symbols
     in
     let lifted_constant =
-      LC.create_set_of_closures (DA.denv dacc)
+      LC.create_set_of_closures (DA.typing_env dacc)
         ~closure_symbols_with_types
           (* Same comment as above re. [symbol_projections]. *)
         ~symbol_projections:Variable.Map.empty static_const

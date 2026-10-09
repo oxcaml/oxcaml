@@ -786,7 +786,7 @@ let simplify_and_lift_set_of_closures dacc ~closure_bound_vars_inverse
     |> Code_or_metadata.code_metadata
   in
   let set_of_closures_lifted_constant =
-    LC.create_set_of_closures denv ~closure_symbols_with_types
+    LC.create_set_of_closures (DE.typing_env denv) ~closure_symbols_with_types
       ~symbol_projections
       (Rebuilt_static_const.create_set_of_closures
          (DE.are_rebuilding_terms denv)

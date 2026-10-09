@@ -101,7 +101,7 @@ let add_to_denv ?maybe_already_defined denv lifted =
     fold lifted ~init:typing_env ~f:(fun typing_env lifted_constant ->
         let types_of_symbols = LC.types_of_symbols lifted_constant in
         Symbol.Map.fold
-          (fun sym (denv_at_definition, typ) typing_env ->
+          (fun sym (typing_env_at_definition, typ) typing_env ->
             if maybe_already_defined && DE.mem_symbol initial_denv sym
             then typing_env
             else
@@ -111,8 +111,7 @@ let add_to_denv ?maybe_already_defined denv lifted =
                    previous to this point. *)
                 (* CR pchambart: Maybe some of these make_suitable calls could
                    be combined into one *)
-                T.make_suitable_for_environment
-                  (DE.typing_env denv_at_definition)
+                T.make_suitable_for_environment typing_env_at_definition
                   (Everything_not_in typing_env)
                   [sym, typ]
               in
