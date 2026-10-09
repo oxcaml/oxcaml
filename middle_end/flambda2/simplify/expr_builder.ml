@@ -473,7 +473,10 @@ let create_switch uacc ~condition_dbg ~scrutinee ~arms =
         UA.add_free_names uacc (Apply_cont.free_names action)
         |> UA.notify_added ~code_size:(Code_size.apply_cont action)
       in
-      RE.create_apply_cont action, uacc
+      let is_cold =
+        UE.is_cold_continuation (UA.uenv uacc) (Apply_cont.continuation action)
+      in
+      RE.create_apply_cont ~is_cold action, uacc
     in
     match Target_ocaml_int.Map.get_singleton arms with
     | Some (_discriminant, action) -> change_to_apply_cont action
@@ -495,7 +498,14 @@ let create_switch uacc ~condition_dbg ~scrutinee ~arms =
           UA.add_free_names uacc (Switch.free_names switch)
           |> UA.notify_added ~code_size:(Code_size.switch switch)
         in
-        RE.create_switch (UA.are_rebuilding_terms uacc) switch, uacc)
+        let is_cold =
+          Target_ocaml_int.Map.for_all
+            (fun _ apply_cont ->
+              UE.is_cold_continuation (UA.uenv uacc)
+                (Apply_cont.continuation apply_cont))
+            arms
+        in
+        RE.create_switch (UA.are_rebuilding_terms uacc) ~is_cold switch, uacc)
 
 type new_let_cont =
   { cont : Continuation.t;
@@ -695,17 +705,24 @@ let rewrite_fixed_arity_continuation0 uacc cont_or_apply_cont ~use_id arity :
       match rewrite_apply_cont0 uacc rewrite use_id ~ctx apply_cont with
       | Invalid { message } -> Invalid { message }
       | Apply_cont apply_cont ->
+        let is_cold =
+          UE.is_cold_continuation uenv (Apply_cont.continuation apply_cont)
+        in
         let cost_metrics =
           Cost_metrics.from_size (Code_size.apply_cont apply_cont)
         in
         new_wrapper params
-          (RE.create_apply_cont apply_cont)
+          (RE.create_apply_cont ~is_cold apply_cont)
           ~free_names:(Apply_cont.free_names apply_cont)
           ~cost_metrics
       | Expr build_expr ->
         let expr, cost_metrics, free_names =
           build_expr ~apply_cont_to_expr:(fun apply_cont ->
-              ( RE.create_apply_cont apply_cont,
+              let is_cold =
+                UE.is_cold_continuation uenv
+                  (Apply_cont.continuation apply_cont)
+              in
+              ( RE.create_apply_cont ~is_cold apply_cont,
                 Cost_metrics.from_size (Code_size.apply_cont apply_cont),
                 Apply_cont.free_names apply_cont ))
         in
@@ -718,7 +735,11 @@ let rewrite_fixed_arity_continuation0 uacc cont_or_apply_cont ~use_id arity :
       | Expr build_expr ->
         let expr, cost_metrics, free_names =
           build_expr ~apply_cont_to_expr:(fun apply_cont ->
-              ( RE.create_apply_cont apply_cont,
+              let is_cold =
+                UE.is_cold_continuation uenv
+                  (Apply_cont.continuation apply_cont)
+              in
+              ( RE.create_apply_cont ~is_cold apply_cont,
                 Cost_metrics.from_size (Code_size.apply_cont apply_cont),
                 Apply_cont.free_names apply_cont ))
         in
@@ -756,13 +777,13 @@ let rewrite_fixed_arity_continuation uacc cont ~use_id arity ~around =
     let body, uacc = around uacc new_let_cont.cont in
     bind_let_cont body uacc new_let_cont
 
-let rewrite_fixed_arity_apply uacc ~use_id arity apply =
+let rewrite_fixed_arity_apply uacc ~use_id ~is_cold arity apply =
   let make_apply apply =
     let uacc =
       UA.add_free_names uacc (Apply.free_names apply)
       |> UA.notify_added ~code_size:(Code_size.apply apply)
     in
-    uacc, RE.create_apply (UA.are_rebuilding_terms uacc) apply
+    uacc, RE.create_apply ~is_cold (UA.are_rebuilding_terms uacc) apply
   in
   match use_id, Apply.continuation apply with
   | _, Never_returns -> make_apply apply
