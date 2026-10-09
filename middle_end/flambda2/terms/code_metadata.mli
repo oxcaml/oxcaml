@@ -84,6 +84,8 @@ module type Code_metadata_accessors_result_type = sig
 
   val loopify : 'a t -> Loopify_attribute.t
 
+  val specialisable_arguments : 'a t -> Parameter_id.t option list
+
   val function_slot_size : 'a t -> int
 end
 
@@ -120,6 +122,7 @@ type 'a create_type =
   absolute_history:Inlining_history.Absolute.t ->
   relative_history:Inlining_history.Relative.t ->
   loopify:Loopify_attribute.t ->
+  specialisable_arguments:Parameter_id.t option list ->
   'a
 
 val createk : (t -> 'a) -> 'a create_type

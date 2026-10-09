@@ -2655,7 +2655,7 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
       ~cost_metrics
       ~inlining_arguments:(Inlining_arguments.create ~round:0)
       ~dbg ~is_tupled ~is_my_closure_used:true ~inlining_decision
-      ~absolute_history ~relative_history ~loopify:Never_loopify
+      ~absolute_history ~relative_history ~loopify:Never_loopify ~specialisable_arguments:[]
   in
   let main_approx =
     let code = Code_or_metadata.create main_code in
@@ -3003,7 +3003,7 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
   in
   let free_names_of_body = Acc.free_names acc in
   let closure_info, acc = Acc.pop_closure_info acc in
-  let specialised_params, _specialisable_args =
+  let specialised_params, specialisable_arguments =
     List.fold_left_map (fun spec_params (param, invariance) ->
         match (invariance : Acc.invariance) with
         | Invariant ->
@@ -3100,6 +3100,7 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
       ~is_my_closure_used:
         (Function_params_and_body.is_my_closure_used params_and_body)
       ~inlining_decision ~absolute_history ~relative_history ~loopify
+      ~specialisable_arguments
   in
   let function_code_ids = (function_slot, code_id) :: function_code_ids in
   let code, by_function_slot, function_code_ids, acc =
@@ -3252,6 +3253,9 @@ let close_functions acc external_env ~current_alloc_region ~current_region
           | Curried _ -> false
           | Tupled -> true
         in
+        let specialisable_arguments =
+          (* dummy value *) []
+        in
         let metadata =
           Code_metadata.create code_id ~params_arity
             ~first_complex_local_param:
@@ -3270,7 +3274,7 @@ let close_functions acc external_env ~current_alloc_region ~current_region
             ~inlining_decision:Recursive
             ~absolute_history:(Inlining_history.Absolute.empty compilation_unit)
             ~relative_history:Inlining_history.Relative.empty
-            ~loopify:Never_loopify
+            ~loopify:Never_loopify ~specialisable_arguments
         in
         let code = Code_or_metadata.create_metadata_only metadata in
         let approx =

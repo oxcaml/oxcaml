@@ -821,6 +821,7 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
             ~absolute_history:
               (Inlining_history.Absolute.empty (Current_unit.get_cu_exn ()))
             ~relative_history:Inlining_history.Relative.empty ~loopify
+            ~specialisable_arguments:[]
         in
         acc, Flambda.Static_const_or_code.create_code code
     in
