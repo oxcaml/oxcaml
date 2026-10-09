@@ -251,6 +251,15 @@ let copy_unboxed_product shape ~path expr =
     (Lambda.project_from_mixed_block_shape shape ~path)
     expr
 
+(** [block_primitive shape ~tag ~total_len] is the primitive that allocates a
+    block of shape [shape] with [total_len] fields: a regular block if all of
+    its fields are values, and a faux mixed block otherwise. *)
+let block_primitive (shape : Lambda.block_shape) ~tag ~total_len :
+    Blambda.primitive =
+  if Lambda.is_uniform_block_shape shape
+  then Makeblock { tag }
+  else Make_faux_mixedblock { total_len; tag }
+
 (** [element_of_array_kind k] returns the [mixed_block_element] describing one
     element of an array of [array_kind] [k]. *)
 let element_of_array_kind (k : Lambda.array_kind) :
@@ -751,12 +760,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
             (Array.to_list mixed_shape)
             args
         in
-        let primitive : Blambda.primitive =
-          if Lambda.is_uniform_block_shape shape
-          then Makeblock { tag }
-          else Make_faux_mixedblock { total_len = List.length fields; tag }
-        in
-        pseudo_event (Prim (primitive, fields))
+        let total_len = List.length fields in
+        pseudo_event (Prim (block_primitive shape ~tag ~total_len, fields))
       | All_value -> pseudo_event (variadic (Makeblock { tag })))
     | Pmake_unboxed_product _ -> pseudo_event (variadic (Makeblock { tag = 0 }))
     | Pgetglobal (cu, _) -> nullary (Getglobal cu)
@@ -1257,13 +1262,9 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
           Array.of_list (List.map Lambda.mixed_block_element_of_layout layouts)
         in
         let make_block fields =
-          let prim : Blambda.primitive =
-            match Lambda.mixed_block_of_block_shape (Shape shape) with
-            | None -> Makeblock { tag = 0 }
-            | Some shape ->
-              Make_faux_mixedblock { total_len = Array.length shape; tag = 0 }
-          in
-          pseudo_event (Prim (prim, fields))
+          let total_len = Array.length shape in
+          pseudo_event
+            (Prim (block_primitive (Shape shape) ~tag:0 ~total_len, fields))
         in
         copy_product_fields shape arg ~make_block
       | Punboxed_vector _ | Punboxed_mask -> simd_is_not_supported ()
