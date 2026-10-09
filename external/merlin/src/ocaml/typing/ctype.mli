@@ -766,9 +766,12 @@ val mk_jkind_context_always_principal : Env.t -> Jkind.jkind_context
    Even if [allow_mutation] is false, the sort of [ty] may still be
    constrained: any sort variables in [ty]'s jkind may be unified with the
    returned sort. So the returned sort may be updated by later constraints,
-   and constraining it (e.g. defaulting it) will also update [ty]'s jkind. *)
-(* CR-someday aobrien: [~allow_mutation:false] should not affect [ty]'s
-   jkind at all. *)
+   and constraining it (e.g. defaulting it) will also update [ty]'s jkind.
+
+   [allow_mutation] is typically false after type checking. Updating weak
+   sort variables at that point is fine, but unifying generic sort variables
+   is a bug. This function does not currently prevent that; we may want to
+   enforce it in future. *)
 val type_sort :
   why:Jkind.History.concrete_creation_reason ->
   allow_mutation:bool ->
@@ -778,9 +781,8 @@ val type_sort :
    it to be an arbitrary sort variable, if needed).
 
    As with [type_sort], the sort of [ty] may be constrained even if
-   [allow_mutation] is false. *)
-(* CR-someday aobrien: [~allow_mutation:false] should not affect [ty]'s
-   jkind at all. *)
+   [allow_mutation] is false, including generic sort variables (see
+   [type_sort]). *)
 val type_jkind_and_sort :
   why:Jkind.History.concrete_creation_reason ->
   allow_mutation:bool ->
