@@ -120,12 +120,11 @@ module With_extra_variables = struct
       equations free_names
 
   let apply_renaming { existential_vars; equations } renaming =
+    (* Make sure to preserve order here! *)
     let existential_vars =
-      Variable.Lmap.fold
-        (fun var kind result ->
-          let var' = Renaming.apply_variable renaming var in
-          Variable.Lmap.add var' kind result)
-        existential_vars Variable.Lmap.empty
+      Variable.Lmap.map_keys
+        (fun var -> Renaming.apply_variable renaming var)
+        existential_vars
     in
     let equations =
       Name.Map.fold

@@ -53,6 +53,8 @@ module type S = sig
 
   val map_sharing : ('a -> 'a) -> 'a t -> 'a t
 
+  val map_keys : (key -> key) -> 'a t -> 'a t
+
   val filter_map : (key -> 'a -> 'b option) -> 'a t -> 'b t
 
   val to_seq : 'a t -> (key * 'a) Seq.t
@@ -132,6 +134,8 @@ module Make (T : Thing) : S with type key = T.t = struct
   let map f m = List.map (fun (k, v) -> k, f v) m
 
   let mapi f m = List.map (fun (k, v) -> k, f k v) m
+
+  let map_keys f m = List.map (fun (k, v) -> f k, v) m
 
   let map_sharing f m =
     Misc.Stdlib.List.map_sharing
