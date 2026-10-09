@@ -120,10 +120,26 @@ let test_deepening_twice () =
   assert (v.o.#a.#y = 2);
   assert (v.o.#b = 3)
 
+(* A record whose only field is an unboxed product stores the product's fields
+   directly in its block, so an index to the whole product has an empty path:
+   writing through it must overwrite every field of the block. *)
+type single = { mutable sp : pt# }
+
+let test_singleton_product () =
+  let r = { sp = #{ x = 1; y = 2 } } in
+  let sp : (single, pt#) idx_mut = (.sp) in
+  let #{ x; y } = idx_get r sp in
+  assert (x = 1 && y = 2);
+  idx_set r sp #{ x = 3; y = 4 };
+  assert (r.sp.#x = 3 && r.sp.#y = 4);
+  idx_set r (.idx_mut(sp).#y) 40;
+  assert (r.sp.#x = 3 && r.sp.#y = 40)
+
 let () =
   test_boxed_record ();
   test_mixed_record ();
   test_nested_record ();
   test_deepening ();
   test_deepening_twice ();
+  test_singleton_product ();
   print_endline "OK"
