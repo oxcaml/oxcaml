@@ -365,6 +365,8 @@ let of_string str =
   in
   create for_pack_prefix name
 
+let of_intf_assume_no_prefix_no_args intf = create Prefix.empty intf
+
 let of_complete_global_exn glob =
   if not (Global_module.is_complete glob)
   then

@@ -30,8 +30,6 @@ type error =
   | Illegal_renaming of CU.Name.t * CU.Name.t * filepath
   | Inconsistent_import of CU.Name.t * filepath * filepath
   | Need_recursive_types of CU.Name.t
-  | Inconsistent_package_declaration_between_imports of
-      filepath * CU.t * CU.t
   | Direct_reference_from_wrong_package of
       CU.t * filepath * CU.Prefix.t
   | Illegal_import_of_parameter of Global_module.Name.t * filepath
@@ -279,16 +277,10 @@ let check_consistency penv imp =
       unit_name = name;
       inconsistent_source = source;
       original_source = auth;
-      inconsistent_data = source_kind;
-      original_data = auth_kind;
+      inconsistent_data = _;
+      original_data = _;
     } ->
-    match source_kind, auth_kind with
-    | Normal source_unit, Normal auth_unit
-      when not (CU.equal source_unit auth_unit) ->
-        error (Inconsistent_package_declaration_between_imports(
-            imp.imp_filename, auth_unit, source_unit))
-    | (Normal _ | Parameter), _ ->
-      error (Inconsistent_import(name, auth, source))
+    error (Inconsistent_import(name, auth, source))
 
 let is_registered_parameter_import {param_imports; _} name =
   Global_module.Name.mem_parameter_set name !param_imports
@@ -995,9 +987,6 @@ let check_pers_struct ~allow_hidden penv f1 f2 ~loc name =
             Format_doc.doc_printf
               "%a uses recursive types"
               CU.Name.print_as_inline_code name
-        | Inconsistent_package_declaration_between_imports _ ->
-            (* Can't be raised by [find_pers_struct ~check:false] *)
-            assert false
         | Direct_reference_from_wrong_package (unit, _filename, prefix) ->
             Format_doc.doc_printf "%a is inaccessible from %a"
               CU.print_as_inline_code unit
@@ -1104,8 +1093,7 @@ let imports {imported_units; crc_units; _} =
     Consistbl.extract (CU.Name.Set.elements !imported_units)
       crc_units
   in
-  List.map (fun (cu_name, spec) -> Import_info.Intf.create cu_name spec)
-    imports
+  List.map (fun (intf, spec) -> Import_info.Intf.create intf spec) imports
 
 let require_intf_for_quote {quoted_intfs; _} name =
   quoted_intfs := CU.Name.Set.add name !quoted_intfs
@@ -1122,7 +1110,8 @@ let loaded_transitive_dependencies penv intfs =
       then (
         names := CU.Name.Set.add name !names;
         Array.iter
-          (fun import_info -> add_loaded_deps (Import_info.name import_info))
+          (fun import_info ->
+            add_loaded_deps (Import_info.Intf.name import_info))
           imp_crcs)
   in
   Compilation_unit.Name.Set.iter add_loaded_deps intfs;
@@ -1235,7 +1224,7 @@ let save_cmi penv psig =
          also return its crc *)
       let data : Import_info.Intf.Nonalias.Kind.t =
         match kind with
-        | Normal { cmi_impl } -> Normal cmi_impl
+        | Normal _ -> Normal
         | Parameter -> Parameter
       in
       save_import penv crc modname data filename
@@ -1263,12 +1252,6 @@ let report_error_doc ppf =
          The compilation flag %a is required@]"
         CU.Name.print_as_inline_code import
         Style.inline_code "-rectypes"
-  | Inconsistent_package_declaration_between_imports (filename, unit1, unit2) ->
-      fprintf ppf
-        "@[<hov>The file %s@ is imported both as %a@ and as %a.@]"
-        filename
-        CU.print_as_inline_code unit1
-        CU.print_as_inline_code unit2
   | Direct_reference_from_wrong_package(unit, filename, prefix) ->
       fprintf ppf
         "@[<hov>Invalid reference to %a (in file %s) from %a.@ %s]"

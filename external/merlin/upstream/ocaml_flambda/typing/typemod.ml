@@ -5184,11 +5184,11 @@ let package_units initial_env objfiles target_cmi modulename =
     cc
   end else begin
     (* Determine imports *)
-    let unit_names = List.map fst units in
+    let unit_intfs = List.map fst units in
     let imports =
       List.filter (fun import ->
-          let name = Import_info.name import in
-          not (List.mem name unit_names))
+          let name = Import_info.Intf.name import in
+          not (List.exists (Compilation_unit.Name.equal name) unit_intfs))
         (Env.imports()) in
     (* Write packaged signature *)
     if not !Clflags.dont_write_files then begin
