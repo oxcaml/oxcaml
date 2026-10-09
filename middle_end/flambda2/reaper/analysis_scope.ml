@@ -36,3 +36,13 @@ let contains_unit t unit =
 
 let contains_code_id t code_id =
   contains_unit t (Code_id.get_compilation_unit code_id)
+
+let is_local_field t field =
+  Flambda_features.reaper_local_fields ()
+  &&
+  match Field.view field with
+  | Value_slot vs -> contains_unit t (Value_slot.get_compilation_unit vs)
+  | Function_slot fs -> contains_unit t (Function_slot.get_compilation_unit fs)
+  | Block _ | Call_witness _ | Return_of_call _ | Code_id_of_call_witness
+  | Is_int | Get_tag | Boxed_number _ ->
+    false
