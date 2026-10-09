@@ -809,7 +809,11 @@ let equal_float_test
 let equal_func_call_operation left right =
   match left, right with
   | Indirect left_callees, Indirect right_callees ->
-    Option.equal (List.equal Cmm.equal_symbol) left_callees right_callees
+    let equal_callee left right =
+      match left, right with
+      | Cmm.Symbol left, Cmm.Symbol right -> Cmm.equal_symbol left right
+    in
+    Option.equal (List.equal equal_callee) left_callees right_callees
   | Direct left_sym, Direct right_sym -> Cmm.equal_symbol left_sym right_sym
   | (Indirect _ | Direct _), _ -> false
 

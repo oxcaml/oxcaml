@@ -320,6 +320,9 @@ let equal_symbol { sym_name = left_sym_name; sym_global = left_sym_global }
   String.equal left_sym_name right_sym_name
   && equal_is_global left_sym_global right_sym_global
 
+type callee = Symbol of symbol
+(* | Argument of int *)
+
 type phantom_defining_expr =
   | Cphantom_const_int of Targetint.t
   | Cphantom_const_symbol of symbol
@@ -556,7 +559,7 @@ type operation =
   | Capply of
       { result_type : machtype;
         region : Lambda.region_close;
-        callees : symbol list option
+        callees : callee list option
       }
   | Cextcall of
       { func : string;
