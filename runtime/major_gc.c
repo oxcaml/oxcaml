@@ -25,7 +25,6 @@
 #include "caml/codefrag.h"
 #include "caml/domain.h"
 #include "caml/runtime_events.h"
-#include "caml/fail.h"
 #include "caml/fiber.h"
 #include "caml/finalise.h"
 #include "caml/globroots.h"
@@ -39,7 +38,6 @@
 #include "caml/shared_heap.h"
 #include "caml/startup_aux.h"
 #include "caml/weak.h"
-#include "caml/custom.h"
 #include "caml/minor_gc.h"
 
 /* This variable is only written with the world stopped, so it need not be

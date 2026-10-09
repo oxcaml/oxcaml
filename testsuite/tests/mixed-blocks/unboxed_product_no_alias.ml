@@ -7,10 +7,11 @@
  }
 *)
 
-(* Test that reading or writing an unboxed product from/to a mutable field does
-   not alias the original. This is a regression test for a bytecode bug where
-   unboxed products (represented as boxed blocks in bytecode) were not
-   deep-copied when read or written, causing mutations via set_idx to be visible
+(* Test that reading or writing an unboxed product from/to a mutable field, or
+   creating a record containing one, does not alias the original. This is a
+   regression test for a bytecode bug where unboxed products (represented as
+   boxed blocks in bytecode) were not deep-copied when read, written, or stored
+   in a newly allocated record, causing mutations via set_idx to be visible
    through previously-read values or to affect the source of a write. *)
 
 external set_idx : 'a -> ('a, 'b) idx_mut -> 'b -> unit = "%set_idx"
@@ -23,9 +24,7 @@ let test_simple () =
   let t = { r = #{ i = 1; j = () } } in
   let r = t.r in
   set_idx t (.r.#i) 2;
-  (* r should still have i = 1, not 2 *)
   assert (r.#i = 1);
-  (* t.r should have i = 2 *)
   assert (t.r.#i = 2)
 
 (* Simple case with multiple fields in outer record *)
@@ -47,9 +46,7 @@ let test_nested () =
   let t = { outer = #{ inner = #{ a = 10; b = 20 }; c = 30 } } in
   let outer = t.outer in
   set_idx t (.outer.#inner.#a) 100;
-  (* outer should still have inner.a = 10 *)
   assert (outer.#inner.#a = 10);
-  (* t.outer should have inner.a = 100 *)
   assert (t.outer.#inner.#a = 100)
 
 (* Nested case with multiple fields in outer record *)
@@ -72,9 +69,7 @@ let test_deep () =
   let t = { l1 = #{ l2 = #{ l3 = #{ x = 1; y = 2 }; z = 3 }; w = 4 } } in
   let l1 = t.l1 in
   set_idx t (.l1.#l2.#l3.#x) 999;
-  (* l1 should still have l2.l3.x = 1 *)
   assert (l1.#l2.#l3.#x = 1);
-  (* t.l1 should have l2.l3.x = 999 *)
   assert (t.l1.#l2.#l3.#x = 999)
 
 (* Deeply nested case with multiple fields in outer record *)
@@ -98,9 +93,7 @@ let test_mixed () =
   let t = { mixed = #{ inner = #{ f = #3.14; i = 42 }; s = "hello" } } in
   let mixed = t.mixed in
   set_idx t (.mixed.#inner.#i) 100;
-  (* mixed should still have inner.i = 42 *)
   assert (mixed.#inner.#i = 42);
-  (* t.mixed should have inner.i = 100 *)
   assert (t.mixed.#inner.#i = 100)
 
 (* Mixed block with multiple fields in outer record *)
@@ -124,9 +117,7 @@ let test_set_simple () =
   let t = { r = #{ i = 0; j = () } } in
   t.r <- r;
   set_idx t (.r.#i) 2;
-  (* r should still have i = 1, not 2 *)
   assert (r.#i = 1);
-  (* t.r should have i = 2 *)
   assert (t.r.#i = 2)
 
 let test_set_simple_multi () =
@@ -142,9 +133,7 @@ let test_set_nested () =
   let t = { outer = #{ inner = #{ a = 0; b = 0 }; c = 0 } } in
   t.outer <- outer;
   set_idx t (.outer.#inner.#a) 100;
-  (* outer should still have inner.a = 10 *)
   assert (outer.#inner.#a = 10);
-  (* t.outer should have inner.a = 100 *)
   assert (t.outer.#inner.#a = 100)
 
 let test_set_nested_multi () =
@@ -160,9 +149,7 @@ let test_set_deep () =
   let t = { l1 = #{ l2 = #{ l3 = #{ x = 0; y = 0 }; z = 0 }; w = 0 } } in
   t.l1 <- l1;
   set_idx t (.l1.#l2.#l3.#x) 999;
-  (* l1 should still have l2.l3.x = 1 *)
   assert (l1.#l2.#l3.#x = 1);
-  (* t.l1 should have l2.l3.x = 999 *)
   assert (t.l1.#l2.#l3.#x = 999)
 
 let test_set_deep_multi () =
@@ -180,9 +167,7 @@ let test_set_mixed () =
   let t = { mixed = #{ inner = #{ f = #0.0; i = 0 }; s = "" } } in
   t.mixed <- mixed;
   set_idx t (.mixed.#inner.#i) 100;
-  (* mixed should still have inner.i = 42 *)
   assert (mixed.#inner.#i = 42);
-  (* t.mixed should have inner.i = 100 *)
   assert (t.mixed.#inner.#i = 100)
 
 let test_set_mixed_multi () =
@@ -192,6 +177,85 @@ let test_set_mixed_multi () =
   set_idx t (.mixed.#inner.#i) 100;
   assert (mixed.#inner.#i = 42);
   assert (t.mixed.#inner.#i = 100)
+
+(* ===== Tests for creation aliasing ===== *)
+(* Test that creating a record with an unboxed product field does not alias
+   the source value. *)
+
+let test_create_simple () =
+  let r = #{ i = 1; j = () } in
+  let t = { r } in
+  set_idx t (.r.#i) 2;
+  assert (r.#i = 1);
+  assert (t.r.#i = 2)
+
+let test_create_simple_multi () =
+  let r = #{ i = 1; j = () } in
+  let t = { prefix = (); r } in
+  set_idx t (.r.#i) 2;
+  assert (r.#i = 1);
+  assert (t.r.#i = 2)
+
+let test_create_nested () =
+  let outer = #{ inner = #{ a = 10; b = 20 }; c = 30 } in
+  let t = { outer } in
+  set_idx t (.outer.#inner.#a) 100;
+  assert (outer.#inner.#a = 10);
+  assert (t.outer.#inner.#a = 100)
+
+let test_create_nested_multi () =
+  let outer = #{ inner = #{ a = 10; b = 20 }; c = 30 } in
+  let t = { prefix = (); outer } in
+  set_idx t (.outer.#inner.#a) 100;
+  assert (outer.#inner.#a = 10);
+  assert (t.outer.#inner.#a = 100)
+
+(* Only the inner product is a variable; the outer one is built in place *)
+let test_create_nested_inner () =
+  let inner = #{ a = 10; b = 20 } in
+  let t = { outer = #{ inner; c = 30 } } in
+  set_idx t (.outer.#inner.#a) 100;
+  assert (inner.#a = 10);
+  assert (t.outer.#inner.#a = 100)
+
+let test_create_deep () =
+  let l1 = #{ l2 = #{ l3 = #{ x = 1; y = 2 }; z = 3 }; w = 4 } in
+  let t = { l1 } in
+  set_idx t (.l1.#l2.#l3.#x) 999;
+  assert (l1.#l2.#l3.#x = 1);
+  assert (t.l1.#l2.#l3.#x = 999)
+
+let test_create_deep_multi () =
+  let l1 = #{ l2 = #{ l3 = #{ x = 1; y = 2 }; z = 3 }; w = 4 } in
+  let t = { prefix = (); l1 } in
+  set_idx t (.l1.#l2.#l3.#x) 999;
+  assert (l1.#l2.#l3.#x = 1);
+  assert (t.l1.#l2.#l3.#x = 999)
+
+let test_create_mixed () =
+  let mixed = #{ inner = #{ f = #3.14; i = 42 }; s = "hello" } in
+  let t = { mixed } in
+  set_idx t (.mixed.#inner.#i) 100;
+  assert (mixed.#inner.#i = 42);
+  assert (t.mixed.#inner.#i = 100)
+
+let test_create_mixed_multi () =
+  let mixed = #{ inner = #{ f = #3.14; i = 42 }; s = "hello" } in
+  let t = { prefix = (); mixed } in
+  set_idx t (.mixed.#inner.#i) 100;
+  assert (mixed.#inner.#i = 42);
+  assert (t.mixed.#inner.#i = 100)
+
+(* A functional update on a small record allocates a new record, so the
+   updated field is written at creation. *)
+let test_create_small_functional_update () =
+  let r = #{ i = 1; j = () } in
+  let t0 = { prefix = (); r = #{ i = 0; j = () } } in
+  let t = { t0 with r } in
+  set_idx t (.r.#i) 2;
+  assert (r.#i = 1);
+  assert (t.r.#i = 2);
+  assert (t0.r.#i = 0)
 
 let () =
   (* Read aliasing tests *)
@@ -212,4 +276,15 @@ let () =
   test_set_deep_multi ();
   test_set_mixed ();
   test_set_mixed_multi ();
+  (* Creation aliasing tests *)
+  test_create_simple ();
+  test_create_simple_multi ();
+  test_create_nested ();
+  test_create_nested_multi ();
+  test_create_nested_inner ();
+  test_create_deep ();
+  test_create_deep_multi ();
+  test_create_mixed ();
+  test_create_mixed_multi ();
+  test_create_small_functional_update ();
   print_endline "All tests passed"

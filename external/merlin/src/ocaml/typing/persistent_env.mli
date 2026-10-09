@@ -59,6 +59,20 @@ type error =
 
 exception Error of error
 
+(* Data relating directly to a .cmi - does not depend on arguments *)
+type import = private {
+  imp_is_param : bool;
+  imp_params : Global_module.Parameter_name.t list;
+  imp_arg_signature : Types.arg_signature option;
+  imp_impl : Compilation_unit.t option; (* None iff import is a parameter *)
+  imp_raw_sign : Signature_with_global_bindings.t;
+  imp_filename : string;
+  imp_uid : Shape.Uid.t;
+  imp_visibility: Load_path.visibility;
+  imp_crcs : Import_info.Intf.t array;
+  imp_flags : Cmi_format.pers_flags list;
+}
+
 val report_error: error Format_doc.format_printer
 val report_error_doc: error Format_doc.printer
 
@@ -128,11 +142,7 @@ val read_cmi_file :
     of that CU.  Does NOT register it as a persistent module, which
     would impose typing constraints between it and the current
     persistent module, such as the "parameter subset rule". *)
-val find_import :
-  'a t -> Compilation_unit.Name.t ->
-  Compilation_unit.t option
-  * Global_module.Parameter_name.t list
-  * Signature_with_global_bindings.t
+val find_import : 'a t -> Compilation_unit.Name.t -> import
 val find : allow_hidden:bool -> 'a t -> 'a sig_reader
   -> (Global_module.Name.t -> 'a -> Short_paths.Desc.Module.components Lazy.t)
   -> Global_module.Name.t -> allow_excess_args:bool -> 'a
@@ -164,11 +174,6 @@ val is_imported_opaque : 'a t -> Compilation_unit.Name.t -> bool
 (* [register_import_as_opaque penv md] registers [md] in [penv] as an
    opaque module *)
 val register_import_as_opaque : 'a t -> Compilation_unit.Name.t -> unit
-
-(* [implemented_parameter penv md] returns the argument to [-as-argument-for]
-   that [md] was compiled with. *)
-val implemented_parameter : 'a t
-  -> Global_module.Name.t -> Global_module.Parameter_name.t option
 
 val global_of_global_name : 'a t
   -> check:bool

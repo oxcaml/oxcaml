@@ -106,78 +106,79 @@ type t =
            that we have not explored yet. *)
   }
 
-let [@ocamlformat "disable"] print ppf { round; machine_width; typing_env;
-                inlined_debuginfo; disable_inlining;
-                disable_partial_application_stub_generation;
-                inlined_attribute_to_forward;
-                inlining_state; propagating_float_consts;
-                at_unit_toplevel; unit_toplevel_exn_continuation;
-                variables_defined_at_toplevel; cse; comparison_results;
-                are_rebuilding_terms; closure_info;
-                unit_toplevel_return_continuation; unit_toplevel_alloc_region; all_code;
-                get_imported_code = _; inlining_history_tracker = _;
-                loopify_state; replay_history; specialization_cost; defined_variables_by_scope;
-                lifted = _; cost_of_lifting_continuations_out_of_current_one;
-                has_seen_a_non_liftable_continuation; join_analysis;
-              } =
-  Format.fprintf ppf "@[<hov 1>(\
-      @[<hov 1>(round@ %d)@]@ \
-      @[<hov 1>(machine_width@ %a)@]@ \
-      @[<hov 1>(typing_env@ %a)@]@ \
-      @[<hov 1>(inlined_debuginfo@ %a)@]@ \
-      @[<hov 1>(disable_inlining@ %a)@]@ \
-      @[<hov 1>(disable_partial_application_stub_generation@ %b)@]@ \
-      %a\
-      @[<hov 1>(inlining_state@ %a)@]@ \
-      @[<hov 1>(propagating_float_consts@ %b)@]@ \
-      @[<hov 1>(at_unit_toplevel@ %b)@]@ \
-      @[<hov 1>(unit_toplevel_return_continuation@ %a)@]@ \
-      @[<hov 1>(unit_toplevel_exn_continuation@ %a)@]@ \
-      @[<hov 1>(unit_toplevel_alloc_region@ %a)@]@ \
-      @[<hov 1>(variables_defined_at_toplevel@ %a)@]@ \
-      @[<hov 1>(cse@ @[<hov 1>%a@])@]@ \
-      @[<hov 1>(comparison_results@ @[<hov 1>%a@])@]@ \
-      @[<hov 1>(are_rebuilding_terms@ %a)@]@ \
-      @[<hov 1>(closure_info@ %a)@]@ \
-      @[<hov 1>(all_code@ %a)@]@ \
-      @[<hov 1>(loopify_state@ %a)@]@ \
-      @[<hov 1>(binding_histories@ %a)@]@ \
-      @[<hov 1>(specialization_cost@ %a)@]@ \
-      @[<hov 1>(join_analysis@ %a)@]@ \
-      @[<hov 1>(defined_variables_by_scope@ %a)@]@ \
-      @[<hov 1>(cost_of_lifting_continuation_out_of_current_one %d)@]@ \
-      @[<hov 1>(has_seen_a_non_liftable_continuation %b)@]\
-      )@]"
-    round
-    Target_system.Machine_width.print machine_width
-    TE.print typing_env
-    Inlined_debuginfo.print inlined_debuginfo
-    Disable_inlining.print disable_inlining
-    disable_partial_application_stub_generation
-    (Format.pp_print_option (fun ppf (attribute, ~forwarded_from) ->
-      Format.fprintf ppf "@[<hov 1>(inlined_attribute_to_forward@ %a@ %a)@]@ "
-        Inlined_attribute.print attribute Inlined_debuginfo.print forwarded_from))
-    inlined_attribute_to_forward
-    Inlining_state.print inlining_state
-    propagating_float_consts
-    at_unit_toplevel
-    Continuation.print unit_toplevel_return_continuation
-    Continuation.print unit_toplevel_exn_continuation
-    Variable.print unit_toplevel_alloc_region
-    Variable.Set.print variables_defined_at_toplevel
-    CSE.print cse
-    (Variable.Map.print Comparison_result.print) comparison_results
-    Are_rebuilding_terms.print are_rebuilding_terms
-    Closure_info.print closure_info
-    (Code_id.Map.print Code.print) all_code
-    Loopify_state.print loopify_state
-    Replay_history.print replay_history
-    Specialization_cost.print specialization_cost
-    (Format.pp_print_option Join_analysis.print
-      ~none:(fun ppf () -> Format.fprintf ppf "()")) join_analysis
-    (Format.pp_print_list ~pp_sep:Format.pp_print_space Lifted_cont_params.print) defined_variables_by_scope
-    cost_of_lifting_continuations_out_of_current_one
-    has_seen_a_non_liftable_continuation
+let print ppf
+    { round;
+      machine_width;
+      typing_env;
+      inlined_debuginfo;
+      disable_inlining;
+      disable_partial_application_stub_generation;
+      inlined_attribute_to_forward;
+      inlining_state;
+      propagating_float_consts;
+      at_unit_toplevel;
+      unit_toplevel_exn_continuation;
+      variables_defined_at_toplevel;
+      cse;
+      comparison_results;
+      are_rebuilding_terms;
+      closure_info;
+      unit_toplevel_return_continuation;
+      unit_toplevel_alloc_region;
+      all_code;
+      get_imported_code = _;
+      inlining_history_tracker = _;
+      loopify_state;
+      replay_history;
+      specialization_cost;
+      defined_variables_by_scope;
+      lifted = _;
+      cost_of_lifting_continuations_out_of_current_one;
+      has_seen_a_non_liftable_continuation;
+      join_analysis
+    } =
+  let open! Misc.Sexp in
+  print ppf
+    [ d "round" round;
+      a "machine_width" machine_width Target_system.Machine_width.print;
+      a "typing_env" typing_env TE.print;
+      a "inlined_debuginfo" inlined_debuginfo Inlined_debuginfo.print;
+      a "disable_inlining" disable_inlining Disable_inlining.print;
+      b "disable_partial_application_stub_generation"
+        disable_partial_application_stub_generation;
+      o "inlined_attribute_to_forward" inlined_attribute_to_forward
+        (fun ppf (attribute, ~forwarded_from) ->
+          Format.fprintf ppf "%a@ %a" Inlined_attribute.print attribute
+            Inlined_debuginfo.print forwarded_from);
+      a "inlining_state" inlining_state Inlining_state.print;
+      b "propagating_float_consts" propagating_float_consts;
+      b "at_unit_toplevel" at_unit_toplevel;
+      a "unit_toplevel_return_continuation" unit_toplevel_return_continuation
+        Continuation.print;
+      a "unit_toplevel_exn_continuation" unit_toplevel_exn_continuation
+        Continuation.print;
+      a "unit_toplevel_alloc_region" unit_toplevel_alloc_region Variable.print;
+      a "variables_defined_at_toplevel" variables_defined_at_toplevel
+        Variable.Set.print;
+      a "cse" cse CSE.print;
+      a "comparison_results" comparison_results
+        (Variable.Map.print Comparison_result.print);
+      a "are_rebuilding_terms" are_rebuilding_terms Are_rebuilding_terms.print;
+      a "closure_info" closure_info Closure_info.print;
+      a "all_code" all_code (Code_id.Map.print Code.print);
+      a "loopify_state" loopify_state Loopify_state.print;
+      a "replay_history" replay_history Replay_history.print;
+      a "specialization_cost" specialization_cost Specialization_cost.print;
+      a "join_analysis" join_analysis
+        (Format.pp_print_option Join_analysis.print ~none:(fun ppf () ->
+             Format.fprintf ppf "()"));
+      a "defined_variables_by_scope" defined_variables_by_scope
+        (Format.pp_print_list ~pp_sep:Format.pp_print_space
+           Lifted_cont_params.print);
+      d "cost_of_lifting_continuations_out_of_current_one"
+        cost_of_lifting_continuations_out_of_current_one;
+      b "has_seen_a_non_liftable_continuation"
+        has_seen_a_non_liftable_continuation ]
 
 let define_continuations ~can_be_lifted t conts =
   let replay_history =

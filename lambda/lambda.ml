@@ -464,22 +464,6 @@ type primitive =
   | Patomic_land_idx
   | Patomic_lor_idx
   | Patomic_lxor_idx
-  | Patomic_load_ptr of
-    { layout : layout }
-  | Patomic_set_ptr of
-    { layout : layout; mode : modify_mode }
-  | Patomic_exchange_ptr of
-    { layout : layout; mode : modify_mode }
-  | Patomic_compare_exchange_ptr of
-    { layout : layout; mode : modify_mode }
-  | Patomic_compare_set_ptr of
-    { layout : layout; mode : modify_mode }
-  | Patomic_fetch_add_ptr
-  | Patomic_add_ptr
-  | Patomic_sub_ptr
-  | Patomic_land_ptr
-  | Patomic_lor_ptr
-  | Patomic_lxor_ptr
   (* Inhibition of optimisation *)
   | Popaque of layout
   (* Statically-defined probes *)
@@ -1510,13 +1494,8 @@ let main_module_representation = function
 type program =
   { compilation_unit : Compilation_unit.t;
     main_module_block_format : main_module_block_format;
-    arg_block_idx : int option;
     required_globals : Compilation_unit.Set.t;
     code : lambda }
-
-type arg_descr =
-  { arg_param: Global_module.Parameter_name.t;
-    arg_block_idx: int; }
 
 let const_int n = Const_base (Const_int n)
 
@@ -1684,7 +1663,6 @@ let layout_list =
               [generic_value;
                { generic_value with nullable = Non_nullable}]] })
 let layout_value_field = nullable_value Pgenval
-let layout_optional_arg = nullable_value Pgenval
 let layout_variant_arg = nullable_value Pgenval
 let layout_extensible_variant_constructor = non_null_value Pgenval
 let layout_exception = layout_extensible_variant_constructor
@@ -3124,17 +3102,6 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Patomic_land_idx
   | Patomic_lor_idx
   | Patomic_lxor_idx
-  | Patomic_load_ptr _
-  | Patomic_set_ptr _
-  | Patomic_exchange_ptr _
-  | Patomic_compare_exchange_ptr _
-  | Patomic_compare_set_ptr _
-  | Patomic_fetch_add_ptr
-  | Patomic_add_ptr
-  | Patomic_sub_ptr
-  | Patomic_land_ptr
-  | Patomic_lor_ptr
-  | Patomic_lxor_ptr
   | Pdls_get
   | Ptls_get
   | Pdomain_index
@@ -3335,11 +3302,8 @@ let primitive_can_raise prim =
   | Patomic_load_idx _ | Patomic_set_idx _
   | Patomic_exchange_idx _ | Patomic_compare_exchange_idx _
   | Patomic_compare_set_idx _ | Patomic_fetch_add_idx | Patomic_add_idx
-  | Patomic_sub_idx | Patomic_land_idx | Patomic_lor_idx | Patomic_lxor_idx
-  | Patomic_load_ptr _ | Patomic_set_ptr _ | Patomic_exchange_ptr _
-  | Patomic_compare_exchange_ptr _ | Patomic_compare_set_ptr _
-  | Patomic_fetch_add_ptr | Patomic_add_ptr | Patomic_sub_ptr | Patomic_land_ptr
-  | Patomic_lor_ptr | Patomic_lxor_ptr -> false
+  | Patomic_sub_idx | Patomic_land_idx | Patomic_lor_idx | Patomic_lxor_idx ->
+    false
   | Pwith_stack | Pwith_stack_preemptible
   | Pperform | Pcontinue | Pdiscontinue
   | Pdiscontinue_with_backtrace
@@ -3850,12 +3814,6 @@ let primitive_result_layout (p : primitive) =
   | Patomic_compare_exchange_idx { layout; _ } -> layout
   | Patomic_compare_set_idx _
   | Patomic_fetch_add_idx -> layout_int
-  | Patomic_load_ptr { layout } -> layout
-  | Patomic_set_ptr _ -> layout_unit
-  | Patomic_exchange_ptr { layout; _ } -> layout
-  | Patomic_compare_exchange_ptr { layout; _ } -> layout
-  | Patomic_compare_set_ptr _
-  | Patomic_fetch_add_ptr -> layout_int
   | Pdls_get | Ptls_get -> layout_any_value
   | Pdomain_index -> layout_unboxed_int Untagged_int
   | Patomic_add_field
@@ -3868,11 +3826,6 @@ let primitive_result_layout (p : primitive) =
   | Patomic_land_idx
   | Patomic_lor_idx
   | Patomic_lxor_idx
-  | Patomic_add_ptr
-  | Patomic_sub_ptr
-  | Patomic_land_ptr
-  | Patomic_lor_ptr
-  | Patomic_lxor_ptr
   | Ppoll -> layout_unit
   | Pcpu_relax -> layout_unit
   | Preinterpret_tagged_int63_as_unboxed_int64 -> layout_unboxed_int64

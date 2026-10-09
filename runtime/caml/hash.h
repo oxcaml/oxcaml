@@ -18,7 +18,10 @@
 #ifndef CAML_HASH_H
 #define CAML_HASH_H
 
+#include "config.h"
+#include "misc.h"
 #include "mlvalues.h"
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {

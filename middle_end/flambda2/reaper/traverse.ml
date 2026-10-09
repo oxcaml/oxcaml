@@ -813,19 +813,42 @@ and traverse (denv : denv) (acc : acc) (expr : Expr.t) : rev_expr =
   | Switch switch -> traverse_switch denv acc switch
   | Invalid { message } -> traverse_invalid denv acc ~message
 
-type result =
-  { toplevel_expr : Rev_expr.t;
-    code : Rev_expr.rev_code Code_id.Map.t;
-    ordered_code_ids : Code_id.t array;
-    deps : Global_flow_graph.graph;
-    fixed_arity_continuations : Continuation.Set.t;
-    continuation_info : Acc.continuation_info Continuation.Map.t;
-    code_deps : Traverse_acc.code_dep Code_id.Map.t;
-    delayed_deps : Traverse_acc.delayed_deps;
-    applications : Acc.Applications.t;
-    all_sets_of_closures :
-      (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list
-  }
+module With_types = struct
+  type ('f, 'a) t =
+    | With_types : 'a -> ([`With_types], 'a) t
+    | Without_types : ([`Without_types], 'a) t
+
+  let map (type f) f : (f, _) t -> (f, _) t = function
+    | With_types x -> With_types (f x)
+    | Without_types -> Without_types
+end
+
+module Problem = struct
+  type 'f t =
+    { deps : Global_flow_graph.graph;
+      code_deps : Traverse_acc.code_dep Code_id.Map.t;
+      delayed_deps : Traverse_acc.delayed_deps;
+      applications : Acc.Applications.t;
+      free_names : Name_occurrences.t;
+      toplevel_return : Code_id_or_name.t;
+      all_sets_of_closures :
+        ( 'f,
+          (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list )
+        With_types.t;
+      final_typing_env : ('f, typing_env option) With_types.t;
+      module_symbol : ('f, Symbol.t) With_types.t
+    }
+end
+
+module Skeleton = struct
+  type t =
+    { toplevel_expr : Rev_expr.t;
+      code : Rev_expr.rev_code Code_id.Map.t;
+      ordered_code_ids : Code_id.t array;
+      fixed_arity_continuations : Continuation.Set.t;
+      continuation_info : Acc.continuation_info Continuation.Map.t
+    }
+end
 
 let create_symbol_and_add_any_source acc name =
   let cu = Current_unit.get_cu_exn () in
@@ -836,7 +859,6 @@ let create_symbol_and_add_any_source acc name =
 let run0 unit acc ~free_names ~all_constants () =
   let dummy_toplevel_return = Variable.create "dummy_toplevel_return" K.value in
   let dummy_toplevel_exn = Variable.create "dummy_toplevel_exn" K.value in
-  Acc.add_any_usage acc (Code_id_or_name.var dummy_toplevel_return);
   Acc.add_any_usage acc (Code_id_or_name.var dummy_toplevel_exn);
   let return_continuation = Flambda_unit.return_continuation unit in
   let exn_continuation = Flambda_unit.exn_continuation unit in
@@ -863,32 +885,45 @@ let run0 unit acc ~free_names ~all_constants () =
   let value_slots_to_keep =
     Name_occurrences.value_slots_in_normal_projections free_names
   in
-  traverse
-    (Env.create ~parent:Hole ~conts ~should_preserve_direct_calls
-       ~current_code_id:None
-       ~all_constants:(Name.symbol all_constants)
-       ~function_slots_to_keep ~value_slots_to_keep)
-    acc (Flambda_unit.body unit)
+  ( Code_id_or_name.var dummy_toplevel_return,
+    traverse
+      (Env.create ~parent:Hole ~conts ~should_preserve_direct_calls
+         ~current_code_id:None
+         ~all_constants:(Name.symbol all_constants)
+         ~function_slots_to_keep ~value_slots_to_keep)
+      acc (Flambda_unit.body unit) )
 
-let run (unit : Flambda_unit.t) ~free_names =
+let run (unit : Flambda_unit.t) ~final_typing_env ~free_names =
   let acc = Acc.create () in
   let all_constants = create_symbol_and_add_any_source acc "all_constants" in
-  let holed =
+  let toplevel_return, holed =
     Profile.record_call ~accumulate:false "down"
       (run0 unit acc ~free_names ~all_constants)
   in
-  let deps = Acc.deps acc in
-  let fixed_arity_continuations = Acc.fixed_arity_continuations acc in
-  let continuation_info = Acc.get_continuation_info acc in
-  let code_deps = Acc.code_deps acc in
-  { toplevel_expr = holed;
-    code = Acc.get_all_code acc;
-    ordered_code_ids = Acc.sort_code_ids acc;
-    deps;
-    fixed_arity_continuations;
-    continuation_info;
-    code_deps;
-    delayed_deps = Acc.delayed_deps acc;
-    applications = Acc.applications acc;
-    all_sets_of_closures = Acc.get_all_sets_of_closures acc
-  }
+  let problem =
+    { Problem.deps = Acc.deps acc;
+      code_deps = Acc.code_deps acc;
+      delayed_deps = Acc.delayed_deps acc;
+      applications = Acc.applications acc;
+      free_names;
+      toplevel_return;
+      all_sets_of_closures =
+        With_types.map
+          (fun _ -> Acc.get_all_sets_of_closures acc)
+          final_typing_env;
+      final_typing_env;
+      module_symbol =
+        With_types.map
+          (fun _ -> Flambda_unit.module_symbol unit)
+          final_typing_env
+    }
+  in
+  let skeleton =
+    { Skeleton.toplevel_expr = holed;
+      code = Acc.get_all_code acc;
+      ordered_code_ids = Acc.sort_code_ids acc;
+      fixed_arity_continuations = Acc.fixed_arity_continuations acc;
+      continuation_info = Acc.get_continuation_info acc
+    }
+  in
+  problem, skeleton

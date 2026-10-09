@@ -1433,17 +1433,15 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
                   arg, Jkind.Sort.scannable
                 else
                   Typecore.type_option_some val_env sarg ty ty0,
-                  (* CR layouts v5: Change the sort when options can hold
-                     non-values. *)
+                  (* Always [scannable] even for non-[value] optional arguments,
+                     since this is the sort of the [option], not what's inside.
+                  *)
                   Jkind.Sort.scannable
               )
             in
             let eliminate_optional_arg () =
               Arg (Typecore.type_option_none val_env ty0 Location.none,
-                   (* CR layouts v5: Change the sort when options can hold
-                      non-values. *)
-                   Jkind.Sort.scannable
-                  )
+                   Jkind.Sort.scannable)
             in
             let eliminate_position_arg () =
               let arg = Typecore.src_pos (Location.ghostify scl.pcl_loc) [] val_env in
@@ -2329,7 +2327,11 @@ let quoted_type ppf t = Style.as_inline_code Printtyp.type_expr ppf t
 
 let report_error_doc env ppf =
   let pp_args ppf args =
-    let args = List.map (Out_type.tree_of_typexp Type) args in
+    let args =
+      List.map
+        (Out_type.tree_of_typexp ~base:Mode.With_locality.Const.legacy Type)
+        args
+    in
     Style.as_inline_code !Oprint.out_type_args ppf args
   in
   function
@@ -2381,12 +2383,13 @@ let report_error_doc env ppf =
       (Style.as_inline_code Printtyp.longident) cl
   | Abbrev_type_clash (abbrev, actual, expected) ->
       (* XXX Afficher une trace ? | Print a trace? *)
-      Out_type.prepare_for_printing [abbrev; actual; expected];
+      let base = Mode.With_locality.Const.legacy in
+      Out_type.prepare_for_printing ~base [abbrev; actual; expected];
       fprintf ppf "@[The abbreviation@ %a@ expands to type@ %a@ \
        but is used with type@ %a@]"
-        out_type (Out_type.tree_of_typexp Type abbrev)
-        out_type (Out_type.tree_of_typexp Type actual)
-        out_type (Out_type.tree_of_typexp Type expected)
+        out_type (Out_type.tree_of_typexp ~base Type abbrev)
+        out_type (Out_type.tree_of_typexp ~base Type actual)
+        out_type (Out_type.tree_of_typexp ~base Type expected)
   | Constructor_type_mismatch (c, err) ->
       let msg = Format_doc.doc_printf in
       Errortrace_report.unification ppf env err
@@ -2424,7 +2427,8 @@ let report_error_doc env ppf =
         (msg  "The type parameter")
         (msg "does not meet its constraint: it should be")
   | Bad_parameters (id, params, cstrs) ->
-      Out_type.prepare_for_printing (params @ cstrs);
+      Out_type.prepare_for_printing ~base:Mode.With_locality.Const.legacy
+        (params @ cstrs);
       fprintf ppf
         "@[The abbreviation %a@ is used with parameter(s)@ %a@ \
            which are incompatible with constraint(s)@ %a@]"
@@ -2433,7 +2437,8 @@ let report_error_doc env ppf =
         pp_args cstrs
   | Bad_class_type_parameters (id, params, cstrs) ->
       let pp_hash ppf id = fprintf ppf "#%a" Printtyp.ident id in
-      Out_type.prepare_for_printing (params @ cstrs);
+      Out_type.prepare_for_printing ~base:Mode.With_locality.Const.legacy
+        (params @ cstrs);
       fprintf ppf
         "@[The class type %a@ is used with parameter(s)@ %a,@ \
            whereas the class type definition@ constrains@ \
@@ -2458,8 +2463,12 @@ let report_error_doc env ppf =
         fprintf ppf
           "The method %a@ has type@;<1 2>%a@ where@ %a@ is unbound"
           Style.inline_code meth
-          out_type (Out_type.tree_of_typexp Type meth_ty)
-          out_type (Out_type.tree_of_typexp Type ty0)
+          out_type
+            (Out_type.tree_of_typexp ~base:Mode.With_locality.Const.legacy
+               Type meth_ty)
+          out_type
+            (Out_type.tree_of_typexp ~base:Mode.With_locality.Const.legacy
+               Type ty0)
       in
       fprintf ppf
         "@[<v>@[Some type variables are unbound in this type:@;<1 2>%a@]@ \
@@ -2467,7 +2476,8 @@ let report_error_doc env ppf =
        pp_doc msg print_reason reason
   | Non_generalizable_class {id;  clty; nongen_vars } ->
       let manual_ref = [ 6; 1; 2] in
-      Out_type.prepare_for_printing nongen_vars;
+      Out_type.prepare_for_printing ~base:Mode.With_locality.Const.legacy
+        nongen_vars;
       fprintf ppf
         "@[The type of this class,@ %a,@ \
          contains the non-generalizable type variable(s): %a.@ %a@]"

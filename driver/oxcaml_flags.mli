@@ -60,6 +60,8 @@ val cfg_value_propagation : bool ref
 val cfg_value_propagation_float : bool ref
 val cfg_value_propagation_flow : bool ref
 
+val cfg_copy_propagation : bool ref
+
 val reorder_blocks_random : int option ref
 val module_entry_functions_section : bool ref
 

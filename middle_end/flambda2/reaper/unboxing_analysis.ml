@@ -309,6 +309,13 @@ let calling_convention_changes_rules =
            ~from:codeid ]
        ==> cannot_change_calling_convention codeid) ]
 
+(* The analysis scope of the rules below. It is set before running them rather
+   than passed as a parameter, so that the schedules are not rebuilt on each
+   run. *)
+let current_analysis_scope = ref Analysis_scope.Current_unit
+
+let is_local field = Analysis_scope.is_local_field !current_analysis_scope field
+
 let unboxing_rules =
   saturate_in_order
     [ (* If any usage is possible, do not change the representation. Note that
@@ -319,7 +326,7 @@ let unboxing_rules =
          x); *)
       (let$ [x; field; y] = ["x"; "field"; "y"] in
        [ any_usage x;
-         unless1 Field.is_local field;
+         unless1 is_local field;
          when1 Field.is_real_field field;
          constructor ~base:x field ~from:y ]
        ==> cannot_change_representation0 x);
@@ -329,7 +336,7 @@ let unboxing_rules =
          the source at each point. *)
       (let$ [x; field; y; z] = ["x"; "field"; "y"; "z"] in
        [ any_usage x;
-         when1 Field.is_local field;
+         when1 is_local field;
          reading_field field z;
          constructor ~base:x field ~from:y ]
        ==> cannot_change_representation0 x);
@@ -341,7 +348,7 @@ let unboxing_rules =
        in
        [ rev_accessor ~base:usage field ~to_:v;
          has_usage v;
-         when1 Field.is_local field;
+         when1 is_local field;
          sources usage source1;
          has_source source1;
          sources usage source2;
@@ -655,12 +662,15 @@ let cannot_change_calling_convention_query =
   let^? [x], [] = ["x"], [] in
   [cannot_change_calling_convention x]
 
-let cannot_change_calling_convention uses v =
+let cannot_change_calling_convention ~analysis_scope uses v =
   (not (Flambda_features.reaper_change_calling_conventions ()))
-  || (not (Current_unit.is_current (Code_id.get_compilation_unit v)))
+  || (not
+        (Analysis_scope.contains_unit analysis_scope
+           (Code_id.get_compilation_unit v)))
   || cannot_change_calling_convention_query [Code_id_or_name.code_id v] uses.db
 
-let perform_analysis0 db ~stats =
+let perform_analysis0 db ~stats ~analysis_scope =
+  current_analysis_scope := analysis_scope;
   let db =
     Profile.record_call ~accumulate:true "compute_unboxing_decisions" (fun () ->
         (* We need to do this after [field_of_constructor_is_used] is computed,
@@ -742,9 +752,14 @@ let perform_analysis0 db ~stats =
                 PTA.get_direct_usages db
                   (Code_id_or_name.Map.singleton to_patch ())
               in
+              let compilation_unit =
+                Code_id_or_name.compilation_unit to_patch
+              in
               let fields =
                 mk_unboxed_fields ~has_to_be_unboxed
-                  ~mk:(fun kind name -> Variable.create name kind)
+                  ~mk:(fun kind name ->
+                    Variable.create_in_compilation_unit ~compilation_unit name
+                      kind)
                   db code_or_name
                   (PTA.get_fields db
                      (PTA.add_usages_through_function_slots
@@ -803,10 +818,12 @@ let perform_analysis0 db ~stats =
                 in
                 add_to_s (Block_representation (repr, !r + 1)) code_id_or_name
               | Set_of_closures l ->
+                let compilation_unit =
+                  Code_id_or_name.compilation_unit code_id_or_name
+                in
                 let mk kind name =
-                  Value_slot.create
-                    (Current_unit.get_cu_exn ())
-                    ~name ~is_always_immediate:false kind
+                  Value_slot.create compilation_unit ~name
+                    ~is_always_immediate:false kind
                 in
                 let fields =
                   PTA.get_fields_usage_of_constructors db
@@ -822,8 +839,7 @@ let perform_analysis0 db ~stats =
                   List.fold_left
                     (fun acc (fs, _) ->
                       Function_slot.Map.add fs
-                        (Function_slot.create
-                           (Current_unit.get_cu_exn ())
+                        (Function_slot.create compilation_unit
                            ~name:(Function_slot.name fs)
                              (* CR-someday ncourant: The reaper currently never
                                 changes the function slot size of changed arity
@@ -850,7 +866,7 @@ let perform_analysis0 db ~stats =
   in
   { db; unboxed_fields = unboxed; changed_representation }
 
-let perform_analysis db ~stats =
+let perform_analysis db ~stats ~analysis_scope =
   let db =
     if Flambda_features.reaper_change_calling_conventions ()
     then
@@ -864,7 +880,7 @@ let perform_analysis db ~stats =
   if
     Flambda_features.reaper_unbox ()
     && Flambda_features.reaper_change_calling_conventions ()
-  then perform_analysis0 db ~stats
+  then perform_analysis0 db ~stats ~analysis_scope
   else
     { db;
       unboxed_fields = Code_id_or_name.Map.empty;
@@ -933,8 +949,8 @@ let get_arity_and_modes params_decisions =
            arity)),
     modes )
 
-let compute_code_changes uses ~rewrite_kind_with_subkind ~rewrite_result_types
-    ~code_deps =
+let compute_code_changes uses ~analysis_scope ~rewrite_kind_with_subkind
+    ~rewrite_result_types ~code_deps =
   let get_unboxed_fields cn =
     Code_id_or_name.Map.find_opt cn uses.unboxed_fields
   in
@@ -972,7 +988,7 @@ let compute_code_changes uses ~rewrite_kind_with_subkind ~rewrite_result_types
         else Code_metadata.with_is_my_closure_used false code_metadata
       in
       let calling_convention_change, code_metadata =
-        if cannot_change_calling_convention uses code_id
+        if cannot_change_calling_convention ~analysis_scope uses code_id
         then
           (* We still need to rewrite the kinds and subkinds of parameters and
              returns, as they could be poisoned. *)
@@ -1127,30 +1143,30 @@ let compute_code_changes uses ~rewrite_kind_with_subkind ~rewrite_result_types
       { calling_convention_change; code_metadata })
     code_deps
 
-let get_calling_convention_change t code_id =
+let get_calling_convention_change t ~analysis_scope code_id =
   match Code_id.Map.find_opt code_id t with
   | None ->
-    if Current_unit.is_current (Code_id.get_compilation_unit code_id)
+    if Analysis_scope.contains_code_id analysis_scope code_id
     then
       Misc.fatal_errorf
-        "[get_calling_convention_change]: code_id %a is in current unit but \
+        "[get_calling_convention_change]: code_id %a is in analysis scope but \
          missing in code changes"
         Code_id.print code_id
     else Not_changing_calling_convention
   | Some code_change -> code_change.calling_convention_change
 
-let is_changing_calling_convention t code_id =
-  match get_calling_convention_change t code_id with
+let is_changing_calling_convention t ~analysis_scope code_id =
+  match get_calling_convention_change t ~analysis_scope code_id with
   | Not_changing_calling_convention -> false
   | Changing_calling_convention _ -> true
 
-let find_code_metadata t code_id =
+let find_code_metadata t ~analysis_scope code_id =
   match Code_id.Map.find_opt code_id t with
   | None ->
-    if Current_unit.is_current (Code_id.get_compilation_unit code_id)
+    if Analysis_scope.contains_code_id analysis_scope code_id
     then
       Misc.fatal_errorf
-        "[find_code_metadata]: code_id %a is in current unit but missing in \
+        "[find_code_metadata]: code_id %a is in analysis scope but missing in \
          code changes"
         Code_id.print code_id
     else None
