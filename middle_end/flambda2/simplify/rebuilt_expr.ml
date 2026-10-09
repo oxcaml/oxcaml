@@ -188,6 +188,14 @@ let create_let are_rebuilding bound_vars defining_expr ~body
   if ART.do_not_rebuild_terms are_rebuilding
   then term_not_rebuilt ~is_cold:(is_cold body) ~cost_metrics ~free_names
   else
+    let defining_expr =
+      match defining_expr with
+      | Or_null.Null ->
+        Misc.fatal_error
+          "No defining expr was provided for RE.create_let, but we are \
+           rebuilding terms."
+      | Or_null.This defining_expr -> defining_expr
+    in
     let contents_hash =
       match contents_hash body with
       | Null -> None
@@ -464,7 +472,8 @@ let bind_no_simplification are_rebuilding ~bindings ~body =
     ~f:(fun expr (var, size_of_defining_expr, defining_expr) ->
       create_let are_rebuilding
         (Bound_pattern.singleton var)
-        defining_expr ~body:expr
+        (Or_null.this defining_expr)
+        ~body:expr
         ~free_names_of_defining_expr:(Named.free_names defining_expr)
         ~cost_metrics_of_defining_expr:
           (Cost_metrics.from_size size_of_defining_expr))
