@@ -243,3 +243,26 @@ let[@zero_alloc conditional strict] rec roundabout b =
 [%%expect{|
 CR wsturgeon: this has to fail
 |}]
+
+(* Callback arguments are themselves conditional: *)
+let[@zero_alloc conditional] arguments_are_conditional
+    (f : (unit -> unit) -> unit) g =
+  f g
+[%%expect{|
+CR wsturgeon: this has to pass
+|}]
+let[@zero_alloc] no_op () =
+  arguments_are_conditional (fun f -> f ()) ignore
+[%%expect{|
+CR wsturgeon: this has to pass
+|}]
+let[@zero_alloc] alloc () =
+  arguments_are_conditional (fun f -> f ()) allocate
+[%%expect{|
+CR wsturgeon: this has to fail
+|}]
+let[@zero_alloc] alloc () =
+  arguments_are_conditional (fun f -> (allocate (); f ())) ignore
+[%%expect{|
+CR wsturgeon: this has to fail
+|}]
