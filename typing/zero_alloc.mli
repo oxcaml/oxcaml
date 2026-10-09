@@ -1,5 +1,6 @@
 type check = Builtin_attributes.zero_alloc_check =
-  { strict : bool;
+  { conditional : bool;
+    strict : bool;
     opt : bool;
     arity : int;
     loc : Location.t;
@@ -7,7 +8,8 @@ type check = Builtin_attributes.zero_alloc_check =
   }
 
 type assume = Builtin_attributes.zero_alloc_assume =
-  { strict : bool;
+  { conditional : bool;
+    strict : bool;
     never_returns_normally : bool;
     never_raises : bool;
     arity : int;

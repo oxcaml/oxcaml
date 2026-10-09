@@ -2,7 +2,8 @@ module ZA = Zero_alloc_utils
 
 (* Support for zero_alloc *)
 type check = Builtin_attributes.zero_alloc_check =
-  { strict : bool;
+  { conditional : bool;
+    strict : bool;
     opt : bool;
     arity : int;
     loc : Location.t;
@@ -10,7 +11,8 @@ type check = Builtin_attributes.zero_alloc_check =
   }
 
 type assume = Builtin_attributes.zero_alloc_assume =
-  { strict : bool;
+  { conditional : bool;
+    strict : bool;
     never_returns_normally : bool;
     never_raises : bool;
     arity : int;
@@ -24,7 +26,8 @@ type const = Builtin_attributes.zero_alloc_attribute =
   | Assume of assume
 
 type desc =
-  { strict : bool;
+  { conditional : bool;
+    strict : bool;
     opt : bool;
     custom_error_msg : string option
   }
@@ -90,8 +93,8 @@ let get (t : t) =
   | Var { loc; arity; desc } -> (
     match desc with
     | None -> Default_zero_alloc
-    | Some { strict; opt; custom_error_msg } ->
-      Check { loc; arity; strict; opt; custom_error_msg })
+    | Some { conditional; strict; opt; custom_error_msg } ->
+      Check { conditional; loc; arity; strict; opt; custom_error_msg })
 
 type error =
   | Less_general of { missing_entirely : bool }
@@ -185,16 +188,19 @@ let sub_var_const_exn v c =
   | _, (Default_zero_alloc | Ignore_assert_all | Assume _) -> assert false
   | { arity = arity1; _ }, Check { arity = arity2; _ } when arity1 <> arity2 ->
     raise (Error (Arity_mismatch (arity1, arity2)))
-  | { desc = None; _ }, Check { strict; opt; custom_error_msg } ->
+  | { desc = None; _ }, Check { conditional; strict; opt; custom_error_msg } ->
     !log_change (None, v);
-    v.desc <- Some { strict; opt; custom_error_msg }
+    v.desc <- Some { conditional; strict; opt; custom_error_msg }
   | ( { desc =
-          Some { strict = strict1; opt = opt1; custom_error_msg = msg1 } as desc;
+          Some { conditional = conditional1; strict = strict1; opt = opt1;
+                 custom_error_msg = msg1 } as desc;
         _
       },
-      Check { strict = strict2; opt = opt2; custom_error_msg = msg2 } ) ->
+      Check { conditional = conditional2; strict = strict2; opt = opt2;
+              custom_error_msg = msg2 } ) ->
     let strict = strict1 || strict2 in
     let opt = opt1 && opt2 in
+    let conditional = conditional1 && conditional2 in
     let custom_error_msg, msg_changed =
       match msg1, msg2 with
       | None, None -> msg1, false
@@ -205,10 +211,13 @@ let sub_var_const_exn v c =
         let msg = if b then msg1 else Some (String.concat "\n" [m1; m2]) in
         msg, not b
     in
-    if strict <> strict1 || opt <> opt1 || msg_changed
-    then begin
+    let anything_changed =
+      conditional1 <> conditional2 || strict <> strict1 || opt <> opt1
+      || msg_changed
+    in
+    if anything_changed then begin
       !log_change (desc, v);
-      v.desc <- Some { strict; opt; custom_error_msg }
+      v.desc <- Some { conditional; strict; opt; custom_error_msg }
     end
 
 let sub_exn za1 za2 =

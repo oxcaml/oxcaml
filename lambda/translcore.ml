@@ -422,7 +422,8 @@ let zero_alloc_of_application
     begin match Zero_alloc.get val_zero_alloc with
     | Check c when c.arity = num_args && (use_opt || not c.opt) ->
       let assume : Zero_alloc.assume =
-        { strict = c.strict;
+        { conditional = c.conditional;
+          strict = c.strict;
           never_returns_normally = false;
           never_raises = false;
           arity = c.arity;
