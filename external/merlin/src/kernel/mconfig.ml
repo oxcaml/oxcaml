@@ -550,6 +550,12 @@ let ocaml_ignored_flags =
     "-no-flambda2-result-types";
     "-flambda2-result-types-all-functions";
     "-flambda2-result-types-functors-only";
+    "-flambda2-result-types-functors-and-static-closures";
+    "-flambda2-result-types-functors-and-closures";
+    "-flambda2-functor-result-types-through-value-slots";
+    "-no-flambda2-functor-result-types-through-value-slots";
+    "-flambda2-function-result-types-through-value-slots";
+    "-no-flambda2-function-result-types-through-value-slots";
     "-flambda2-speculative-inlining-only-if-arguments-useful";
     "-flambda2-speculative-inlining-track-lifted-constants";
     "-flambda2-unbox-along-intra-function-control-flow";
