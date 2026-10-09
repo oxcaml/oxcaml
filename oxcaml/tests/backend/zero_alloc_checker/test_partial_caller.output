@@ -1,5 +1,5 @@
 File "test_partial_caller.ml", line 4, characters 5-15:
 Error: Annotation check for zero_alloc failed on function Test_partial_caller.g (camlTest_partial_caller__g_HIDE_STAMP).
 
-File "test_partial_caller.ml", line 9, characters 2-29:
+File "test_partial_caller.ml", line 12, characters 2-29:
 Error: allocation of 32 bytes for closure
