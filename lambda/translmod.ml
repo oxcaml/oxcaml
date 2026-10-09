@@ -1585,7 +1585,7 @@ let main_repr_of_argument_unit (swg : Signature_with_global_bindings.t) =
 
 let cu_of_impl ~chain (gm : Global_module.t) : Compilation_unit.t =
   let { Persistent_env.imp_impl; _ } =
-    Env.find_import ~chain (Compilation_unit.Name.of_head_of_global gm)
+    Env.find_import ~chain gm.Global_module.head
   in
   match imp_impl with
   | Some cu -> cu
@@ -1602,7 +1602,7 @@ let cu_of_impl ~chain (gm : Global_module.t) : Compilation_unit.t =
 let project_arg_block ~chain ~(param : Global_module.t)
       ~(gm : Global_module.t) main_block =
   let { Persistent_env.imp_arg_signature; imp_raw_sign; _ } =
-    Env.find_import ~chain (Compilation_unit.Name.of_head_of_global gm)
+    Env.find_import ~chain gm.Global_module.head
   in
   match imp_arg_signature with
   | Some { arg_block_idx; arg_param } ->

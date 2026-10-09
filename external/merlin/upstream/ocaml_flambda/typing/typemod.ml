@@ -535,7 +535,9 @@ let rec instance_name ~loc env syntax =
            value = instance_name ~loc env value })
       args
   in
-  match Global_module.Name.create head args with
+  match
+    Global_module.Name.create (Compilation_unit.Name.of_string head) args
+  with
   | Ok name -> name
   | Error (Duplicate { name; value1 = _; value2 = _ }) ->
     raise (Error (loc, env, Duplicate_parameter_name name))
@@ -4586,15 +4588,9 @@ let check_argument_type_if_given env sourcefile ~actual_staticity actual_sig
   match arg_module_opt with
   | None -> None
   | Some arg_param ->
-      (* CR-soon zqian: this conversion will not be needed once
-         [Global_module.Parameter_name.t] is an alias of
-         [Compilation_unit.Name.t]. *)
-      let arg_import =
-        Compilation_unit.Name.of_parameter_name arg_param
-      in
       (* CR lmaurer: This "look for known name in path" code is duplicated
          all over the place. *)
-      let basename = arg_import |> Compilation_unit.Name.to_string in
+      let basename = arg_param |> Compilation_unit.Name.to_string in
       let arg_filename =
         try
           Load_path.find_normalized (basename ^ ".cmi")
@@ -4609,7 +4605,7 @@ let check_argument_type_if_given env sourcefile ~actual_staticity actual_sig
         Unit_info.Artifact.from_filename ~for_pack_prefix arg_filename
       in
       let arg_module = Global_module.Name.of_parameter_name arg_param in
-      let arg_sig, arg_staticity = Env.read_signature arg_import arg_cmi in
+      let arg_sig, arg_staticity = Env.read_signature arg_param arg_cmi in
       if not (Env.is_parameter_unit arg_module) then
         raise (Error (Location.none, env,
                       Argument_for_non_parameter (arg_module, arg_filename)));
@@ -4937,8 +4933,7 @@ let functorize_signature ~params ~modules : Types.signature =
     List.fold_right
       (fun (p_name, param_id) body ->
         let { Persistent_env.imp_impl; imp_params; imp_raw_sign = swg; _ } =
-          Env.find_import ~chain:[]
-            (Compilation_unit.Name.of_parameter_name p_name)
+          Env.find_import ~chain:[] p_name
         in
         assert (Option.is_none imp_impl);
         assert (List.is_empty imp_params);
