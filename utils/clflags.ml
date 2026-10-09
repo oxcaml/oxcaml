@@ -243,7 +243,64 @@ let set_profile_granularity v =
   | None -> raise (Invalid_argument (Format.sprintf "profile granularity: %s" v))
 
 let native_code = ref false             (* set to true under ocamlopt *)
-let jsir = ref false                    (* set to true under ocamlj *)
+let jsir = ref false                    (* set to true under
+                                           ocamlopt -target js_of_ocaml *)
+
+module Target = struct
+  type t = Native | Js_of_ocaml
+
+  let all = [ "native", Native; "js_of_ocaml", Js_of_ocaml ]
+
+  let names = List.map fst all
+
+  let of_string name = List.assoc_opt name all
+
+  let to_string = function
+    | Native -> "native"
+    | Js_of_ocaml -> "js_of_ocaml"
+end
+
+let target = ref Target.Native
+
+let set_target (t : Target.t) =
+  target := t;
+  match t with
+  | Native ->
+    native_code := true;
+    jsir := false
+  | Js_of_ocaml ->
+    (* [native_code] stays false so that Lambda is generated as for bytecode,
+       which is what the translation to the js_of_ocaml IR expects. Flambda 2
+       is still used (see [is_flambda2]). *)
+    native_code := false;
+    jsir := true
+
+module Jsoo_phase = struct
+  type t = All | Compile | Archive | Runtime | Link
+
+  let all = [All; Compile; Archive; Runtime; Link]
+
+  let flag = function
+    | All -> "-jsoo-opt"
+    | Compile -> "-jsoo-opt-compile"
+    | Archive -> "-jsoo-opt-archive"
+    | Runtime -> "-jsoo-opt-runtime"
+    | Link -> "-jsoo-opt-link"
+end
+
+let all_jsoo_opts = ref ([] : string list)          (* -jsoo-opt *)
+let all_jsoo_opts_compile = ref ([] : string list)  (* -jsoo-opt-compile *)
+let all_jsoo_opts_archive = ref ([] : string list)  (* -jsoo-opt-archive *)
+let all_jsoo_opts_runtime = ref ([] : string list)  (* -jsoo-opt-runtime *)
+let all_jsoo_opts_link = ref ([] : string list)     (* -jsoo-opt-link *)
+
+let jsoo_opts (phase : Jsoo_phase.t) =
+  match phase with
+  | All -> all_jsoo_opts
+  | Compile -> all_jsoo_opts_compile
+  | Archive -> all_jsoo_opts_archive
+  | Runtime -> all_jsoo_opts_runtime
+  | Link -> all_jsoo_opts_link
 
 let force_slash = ref false             (* for ocamldep *)
 let clambda_checks = ref false          (* -clambda-checks *)

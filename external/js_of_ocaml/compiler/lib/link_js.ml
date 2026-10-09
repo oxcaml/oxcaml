@@ -254,7 +254,7 @@ let link
           match build_info with
           | Some bi -> (
               match Build_info.kind bi with
-              | `Cmo | `Cmj | `Cmja -> true
+              | `Cmo | `Cmj -> true
               | `Cma | `Exe | `Runtime | `Unknown -> false)
           | None -> false
         in
@@ -321,7 +321,7 @@ let link
         | Some bi -> (
             match Build_info.kind bi with
             | `Runtime -> Some bi
-            | `Cma | `Exe | `Cmo | `Cmj | `Cmja | `Unknown -> None)
+            | `Cma | `Exe | `Cmo | `Cmj | `Unknown -> None)
         | None -> None
       in
       let sm_for_file = ref None in

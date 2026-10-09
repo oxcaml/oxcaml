@@ -480,7 +480,8 @@ function caml_ba_get_generic(ba, i) {
 }
 
 // Flambda 2 computes the offset of bigarray accesses itself, so code produced
-// by OxCaml's ocamlj uses these raw accessors that take the computed offset.
+// by OxCaml's js_of_ocaml backend uses these raw accessors that take the
+// computed offset.
 
 //Provides: caml_ba_get_raw_unsafe
 //If: oxcaml

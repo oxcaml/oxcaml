@@ -181,6 +181,12 @@ let get_external_symbol ~res symbol =
       in
       get_symbol_from_global_data ~symbol_name:compilation_unit_name ~res
     | false ->
+      (* The unit defining the symbol must be linked (and initialised) before
+         this one, so record it as an import too. *)
+      let res =
+        To_jsir_result.import_compilation_unit res
+          (Symbol.compilation_unit symbol)
+      in
       let compilation_unit_name, symbol_name =
         symbol_to_native_strings symbol
       in

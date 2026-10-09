@@ -20,7 +20,7 @@ let usage = "Usage: ocamlopt <options> <files>\nOptions are:"
 module Options = Oxcaml_args.Make_optcomp_options
         (Oxcaml_args.Default.Optmain)
 
-let main unix argv ppf ~flambda2 =
+let main unix argv ppf ~flambda2:(module Flambda2 : Optcomp_intf.Flambda2) =
   native_code := true;
   let columns =
     match Sys.getenv "COLUMNS" with
@@ -83,7 +83,13 @@ let main unix argv ppf ~flambda2 =
         Compenv.fatal "The -uses-metaprogramming flag is only supported \
                        with the runtime metaprogramming extension";
     let (module Compiler : Optcompile.S) =
-      Optcompile.native unix ~flambda2
+      match !Clflags.target with
+      | Native -> Optcompile.native unix ~flambda2:Flambda2.lambda_to_cmm
+      | Js_of_ocaml ->
+        if !output_c_object then
+          Compenv.fatal
+            "-output-obj is not supported when targeting js_of_ocaml";
+        Jscomp.make ~lambda_to_jsir:Flambda2.lambda_to_jsir
     in
     begin try
       Compenv.process_deferred_actions

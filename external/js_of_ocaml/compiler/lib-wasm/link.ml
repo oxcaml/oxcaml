@@ -941,7 +941,7 @@ let link ~output_file ~linkall ~enable_source_maps ~embedded_files ~files =
       ~f:(fun (file, (build_info, units)) (requires, files_to_link) ->
         let cmo_or_cmj_file =
           match Build_info.kind build_info with
-          | `Cmo | `Cmj | `Cmja -> true
+          | `Cmo | `Cmj -> true
           | `Cma | `Exe | `Runtime | `Unknown -> false
         in
         if
@@ -970,7 +970,7 @@ let link ~output_file ~linkall ~enable_source_maps ~embedded_files ~files =
       ~f:(fun (_file, (build_info, units)) acc ->
         let cmo_or_cmj_file =
           match Build_info.kind build_info with
-          | `Cmo | `Cmj | `Cmja -> true
+          | `Cmo | `Cmj -> true
           | `Cma | `Exe | `Runtime | `Unknown -> false
         in
         List.fold_right
@@ -1131,7 +1131,7 @@ let make_library ~linkall ~output_file ~enable_source_maps ~files =
     List.map files ~f:(fun file ->
         let build_info, unit_data = Zip.with_open_in file read_info in
         (match Build_info.kind build_info with
-        | `Cmo | `Cmj | `Cmja -> ()
+        | `Cmo | `Cmj -> ()
         | `Runtime | `Cma | `Exe | `Unknown ->
             failwith (Printf.sprintf "File '%s' is not a .wasmo file." file));
         file, build_info, unit_data)

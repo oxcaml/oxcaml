@@ -26,10 +26,48 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-type compilation_unit_descr =
-  { cu_name: Compilation_unit.t;
-    cu_pos: int;
-    cu_codesize: int }
+(** The js_of_ocaml backend of ocamlopt, selected with [-target js_of_ocaml].
 
-type library =
-  { lib_units: compilation_unit_descr list }
+    It translates Flambda 2 to the js_of_ocaml IR and runs the [js_of_ocaml]
+    executable (found in [Config.bindir], or in the PATH, unless the
+    [OXCAML_JS_OF_OCAML] environment variable names it) to produce JavaScript:
+
+    - compiling [foo.ml] produces [foo.cmjx] (the counterpart of [.cmx]) and
+      [foo.cmjo] (the counterpart of [.o], containing JavaScript), via the
+      intermediate [foo.cmj] (the counterpart of [.s], kept with [-S]);
+
+    - [-a] produces a [.cmjxa] and a [.cmja] (the counterparts of [.cmxa] and
+      [.a]);
+
+    - linking produces a JavaScript file, [a.out.js] by default.
+
+    [.js] files given on the command line are JavaScript stubs, in the role of C
+    objects.
+
+    [-jsoo-opt] passes options to every [js_of_ocaml] invocation, and
+    [-jsoo-opt-compile], [-jsoo-opt-archive], [-jsoo-opt-runtime] and
+    [-jsoo-opt-link] to one of them (see {!Clflags.Jsoo_phase}). *)
+
+type error =
+  | Js_of_ocaml_not_found of string
+  | Js_of_ocaml_error of
+      { subcommand : string;
+        exit_code : int;
+        input_left_in : string option
+      }
+  | Unsupported of string
+
+exception Error of error
+
+val report_error : error Format_doc.format_printer
+
+val report_error_doc : error Format_doc.printer
+
+val make :
+  lambda_to_jsir:
+    (ppf_dump:Format.formatter ->
+    prefixname:string ->
+    keep_symbol_tables:bool ->
+    Lambda.program ->
+    Optcomp_intf.jsir_program) ->
+  (module Optcompile.S)

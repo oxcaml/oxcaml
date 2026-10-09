@@ -3,6 +3,30 @@
 The `to_jsir` pass is responsible for translating the Flambda 2 IR to `js_of_ocaml`'s IR ([JSIR](../../../external/js_of_ocaml/compiler/lib/code.mli), compiled into
 the compiler by [jsoo_imports/dune](jsoo_imports/dune)). This translation enables OCaml code compiled with Flambda 2 optimisations to be executed in JavaScript environments via `js_of_ocaml`, instead of compiling through bytecode. The entry point is [`To_jsir.unit`](to_jsir.mli).
 
+## Usage
+
+The pass is the code generator of `ocamlopt -target js_of_ocaml` (see [`Jscomp`](../../../optcomp/jscomp.mli)), which works like regular `ocamlopt`:
+
+```
+ocamlopt -target js_of_ocaml -c foo.ml                           # foo.cmi foo.cmjx foo.cmjo
+ocamlopt -target js_of_ocaml -a -o lib.cmjxa foo.cmjx stubs.js   # lib.cmjxa lib.cmja
+ocamlopt -target js_of_ocaml -o prog.js lib.cmjxa main.cmjx      # or a.out.js without -o
+```
+
+| Native | js_of_ocaml | Contents |
+|--------|-------------|----------|
+| `.cmx` / `.cmxa` | `.cmjx` / `.cmjxa` | Flambda 2 export information |
+| `.o` / `.a` | `.cmjo` / `.cmja` | JavaScript, produced by `js_of_ocaml compile` / `js_of_ocaml link -a` |
+| `.s` | `.cmj` | The JSIR of a unit, marshaled; deleted unless `-S` is given |
+| C stubs | `.js` stubs | Recorded in `.cmjxa` files and passed to `js_of_ocaml build-runtime` when linking |
+
+The compiler runs the `js_of_ocaml` executable found in its `bin` directory, or in the `PATH`, unless the `OXCAML_JS_OF_OCAML` environment variable is populated.
+We can print JSIR with `-djsir`, `-g` makes `js_of_ocaml` keep debug information, and `-verbose` shows the `js_of_ocaml` commands.
+It is disallowed to pass in C sources and objects, `-ccopt`/`-cclib`, `-shared` and `-output-obj`.
+
+Options passed in through `-jsoo-opt` are passed through to all `js_of_ocaml` commands. The flags `-jsoo-opt-compile`, `-jsoo-opt-archive`, `-jsoo-opt-runtime` and `-jsoo-opt-link` pass in arguments to one of them only: `js_of_ocaml compile` (for `-c`), `js_of_ocaml link -a` (for `-a` and `-pack`), `js_of_ocaml build-runtime` (the runtime and the `.js` stubs of an executable) and the `js_of_ocaml link` of an executable, respectively. `OCAMLPARAM` accepts them as `jsoo-opt=`, `jsoo-opt-compile=`, etc.
+
+
 ## Number representations
 | Flambda kind       | JSIR representation                                                                                                                                                                                                |
 |--------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|

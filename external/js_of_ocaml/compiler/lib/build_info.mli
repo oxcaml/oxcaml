@@ -65,7 +65,6 @@ type kind =
   | `Cmo
   | `Cma
   | `Cmj
-  | `Cmja
   | `Unknown
   ]
 

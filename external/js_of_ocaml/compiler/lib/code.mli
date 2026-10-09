@@ -266,7 +266,7 @@ type cmj_body =
   { program : Marshalable_program.t
   ; last_var : int
         (** Highest variable index used in [program]. [Var] keeps this in mutable
-            state, so [ocamlj] must communicate it to [js_of_ocaml] to keep the
+            state, so OxCaml must communicate it to [js_of_ocaml] to keep the
             two in sync. *)
   ; imported_compilation_units : string list
         (** Full paths of the compilation units whose symbols [program] fetches
@@ -275,8 +275,8 @@ type cmj_body =
         (** Full path of the compilation unit [program] defines. Needed to fill
             in [Unit_info.t]. *)
   }
-(** Contents of a [.cmj] file produced by OxCaml's [ocamlj] (after the magic
-    number), marshaled. *)
+(** Contents of a [.cmj] file produced by OxCaml's [ocamlopt -target
+    js_of_ocaml] (after the magic number), marshaled. *)
 
 module Print : sig
   type xinstr =
