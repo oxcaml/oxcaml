@@ -1199,7 +1199,9 @@ let unary_primitive env res dbg f (_arg_simple : Simple.t option)
          ~effects:No_effects ~coeffects:Has_coeffects ~ty_args:[] "caml_obj_dup"
          Cmm.typ_val [arg])
         .extcall )
-  | Is_int _ -> None, res, C.and_int arg (C.int ~dbg 1) dbg
+  | Is_int _ ->
+    let arg = C.value_as_int64 ~dbg arg in
+    None, res, C.and_int arg (C.int ~dbg 1) dbg
   | Is_null -> None, res, C.eq ~dbg arg (C.nativeint ~dbg 0n)
   | Get_tag -> None, res, C.get_tag arg dbg
   | Array_length (Array_kind array_kind) ->
