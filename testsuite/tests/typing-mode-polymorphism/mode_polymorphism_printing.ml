@@ -606,13 +606,4 @@ Error: This expression has type "'a -> 'b"
        but an expression was expected of type "'b"
        The type variable "'b" occurs inside "'a -> 'b"
 Hint: This function application is partial, maybe some arguments are missing.
-|}, Principal{|
-val k : 'a @ [< 'm & global] -> 'b @ 'n -> 'a @ [> 'm] = <fun>
-Line 2, characters 16-19:
-2 | let foo x = [x; k x]
-                    ^^^
-Error: This expression has type "'a -> 'b @ 'm"
-       but an expression was expected of type "'b"
-       The type variable "'b" occurs inside "'a -> 'b @ 'm"
-Hint: This function application is partial, maybe some arguments are missing.
 |}]
