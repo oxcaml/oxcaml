@@ -337,8 +337,8 @@
       (call $caml_bytes_set32u (local.get $a) (local.get $i)
          (i32.reinterpret_f32 (local.get $v))))
 
-   ;; Primitives used by the js_of_ocaml compiler itself
-   ;; (compiler/lib/stdlib.ml), which represents 32-bit floats as 32-bit
+   ;; Primitives used by the js_of_ocaml compiler
+   ;; which represents 32-bit floats as 32-bit
    ;; integer bit patterns.
 
    (func (export "jsoo_float32_of_float") (param $d (ref eq)) (result (ref eq))
