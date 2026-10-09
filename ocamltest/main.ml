@@ -431,6 +431,7 @@ let find_tests dir =
       (fun test_dir ->
          List.map (Filename.concat test_dir) (list_tests test_dir))
       (find_test_dirs dir)
+  else if is_test dir then [dir]
   else []
 
 let () =
