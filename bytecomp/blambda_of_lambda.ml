@@ -251,6 +251,42 @@ let copy_unboxed_product shape ~path expr =
     (Lambda.project_from_mixed_block_shape shape ~path)
     expr
 
+(** [flatten_path_if_singleton shape path] strips the leading field index off of
+    a path whenever the shape is a singleton at the top level, as such
+    singletons are flattened in their representation. *)
+let flatten_path_if_singleton (shape : _ Lambda.mixed_block_element array) path
+    =
+  match shape, path with
+  | [| Product _ |], 0 :: path -> path
+  | [| Product _ |], _ ->
+    Misc.fatal_error "flatten_path_if_singleton: invalid path into a singleton"
+  | _, _ -> path
+
+(** [overwrite_singleton_product shape ~block value] generates Blambda code that
+    overwrites each field of [block], whose shape [shape] is a singleton product
+    (and is thus flattened), with a fresh deep copy of the corresponding field
+    of the unboxed product [value]. *)
+let overwrite_singleton_product (shape : _ Lambda.mixed_block_element array)
+    ~block value =
+  match shape with
+  | [| Product elements |] ->
+    let block_id = Ident.create_local "block" in
+    copy_product_fields elements value ~make_block:(fun fields ->
+        let set_fields =
+          List.mapi
+            (fun i field -> Blambda.Prim (Setfield i, [Var block_id; field]))
+            fields
+        in
+        Let
+          { id = block_id;
+            arg = block;
+            body =
+              List.fold_right
+                (fun set rest -> Blambda.Sequence (set, rest))
+                set_fields unit
+          })
+  | _ -> Misc.fatal_error "overwrite_singleton_product: not a singleton product"
+
 (** [block_primitive shape ~tag ~total_len] is the primitive that allocates a
     block of shape [shape] with [total_len] fields: a regular block if all of
     its fields are values, and a faux mixed block otherwise. *)
@@ -751,9 +787,21 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
          source-level unboxed types are represented as boxed in bytecode.
          We (deeply) copy unboxed products before inserting them, so that
          the resulting block does not alias the product it is built from
-         (which could be mutated through). *)
-      match shape with
-      | Shape mixed_shape ->
+         (which could be mutated through).
+
+         We make an exception for blocks whose only field is an unboxed product,
+         like [{ p : #(int * int) }], to maintain the invariant that values with
+         the same layout be represented the same. We flatten one level of
+         product and represent such a type just like [{ x : int; y : int }],
+         which notably also has layout [(value & value) box]. *)
+      match shape, args with
+      | Shape [| Product elements |], [arg] ->
+        let total_len = Array.length elements in
+        pseudo_event
+          (copy_product_fields elements (comp_expr arg)
+             ~make_block:(fun fields ->
+               Prim (block_primitive shape ~tag ~total_len, fields)))
+      | Shape mixed_shape, _ ->
         let fields =
           List.map2
             (fun elt arg -> copy_mixed_block_element elt (comp_expr arg))
@@ -762,7 +810,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         in
         let total_len = List.length fields in
         pseudo_event (Prim (block_primitive shape ~tag ~total_len, fields))
-      | All_value -> pseudo_event (variadic (Makeblock { tag })))
+      | All_value, _ -> pseudo_event (variadic (Makeblock { tag })))
     | Pmake_unboxed_product _ -> pseudo_event (variadic (Makeblock { tag = 0 }))
     | Pgetglobal (cu, _) -> nullary (Getglobal cu)
     | Pgetpredef id -> nullary (Getpredef id)
@@ -811,9 +859,11 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | _ -> wrong_arity ~expected:2)
     | Pmake_idx_field pos ->
       Const (Const_block (0, [Const_base (Const_int pos)]))
-    | Pmake_idx_mixed_field (_, pos, path) ->
+    | Pmake_idx_mixed_field (shape, pos, path) ->
       let path_consts =
-        List.map (fun x -> Const_base (Const_int x)) (pos :: path)
+        List.map
+          (fun x -> Const_base (Const_int x))
+          (flatten_path_if_singleton shape (pos :: path))
       in
       Const (Const_block (0, path_consts))
     | Pmake_idx_array (_, ik, _, path) -> (
@@ -865,33 +915,36 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Psetfloatfield (n, _) | Psetufloatfield (n, _) -> binary (Setfloatfield n)
     | Pmixedfield ([], _, _) | Psetmixedfield ([], _, _) -> assert false
     | Pmixedfield (path, shape, _sem) ->
-      (* Non-value mixed fields are always boxed in bytecode; they aren't
-         stored flat like they are in native code. *)
+      (* Non-value mixed fields are always boxed in bytecode, except that the
+         fields of a singleton product are stored directly in the block. *)
+      let block =
+        match args with
+        | [block] -> comp_expr block
+        | [] | _ :: _ :: _ -> wrong_arity ~expected:1
+      in
       let read_expr =
         List.fold_left
-          (fun expr idx -> Prim (Getfield idx, [expr]))
-          (unary (Getfield (List.hd path)))
-          (List.tl path)
+          (fun expr idx -> Blambda.Prim (Getfield idx, [expr]))
+          block
+          (flatten_path_if_singleton shape path)
       in
       copy_unboxed_product shape ~path read_expr
-    | Psetmixedfield (path, shape, _init) ->
+    | Psetmixedfield (path, shape, _init) -> (
       let block, value =
         match args with
         | [block; value] -> comp_expr block, comp_expr value
         | _ -> wrong_arity ~expected:2
       in
-      let value_expr = copy_unboxed_product shape ~path value in
-      let parent_path, last_idx =
-        match List.rev path with
-        | last :: rest -> List.rev rest, last
-        | [] -> assert false
-      in
-      let target_block =
-        List.fold_left
-          (fun expr idx -> Prim (Getfield idx, [expr]))
-          block parent_path
-      in
-      Prim (Setfield last_idx, [target_block; value_expr])
+      match List.rev (flatten_path_if_singleton shape path) with
+      | last_idx :: rev_parent_path ->
+        let value_expr = copy_unboxed_product shape ~path value in
+        let target_block =
+          List.fold_left
+            (fun expr idx -> Blambda.Prim (Getfield idx, [expr]))
+            block (List.rev rev_parent_path)
+        in
+        Prim (Setfield last_idx, [target_block; value_expr])
+      | [] -> overwrite_singleton_product shape ~block value)
     | Pduprecord _ -> unary (Ccall "caml_obj_dup")
     | Pccall p -> n_ary (Ccall p.prim_name) ~arity:p.prim_arity
     | Pperform -> context_switch Perform ~arity:1

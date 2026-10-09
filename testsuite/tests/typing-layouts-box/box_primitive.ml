@@ -247,7 +247,6 @@ let () =
 type one_values = { p : #(int * string); }
 type wrapped = #{ wt : #(int * string); }
 type one_wrapped = { pw : wrapped; }
-Exception: Assert_failure ("", 12, 2).
 |}]
 
 (* All-void records *)
