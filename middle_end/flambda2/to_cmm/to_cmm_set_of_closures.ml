@@ -446,15 +446,14 @@ let transl_check_attrib : Zero_alloc_attribute.t -> Cmm.codegen_option list =
   | Check { strict; loc; custom_error_msg; partial = _ } ->
     [Check_zero_alloc { strict; loc; custom_error_msg }]
 
-let rec allocates_on_heap : Cmm.expression -> bool = function
-  | Cop (Calloc (Heap, _), _, _) -> true
-  | expr ->
-    let found = ref false in
-    Cmm.iter_shallow
-      (fun subexpr -> found := !found || allocates_on_heap subexpr)
-      expr;
-    !found
-[@@warning "-fragile-match"]
+let allocates_on_heap (expr : Cmm.expression) : bool =
+  let exception Allocates_on_heap in
+  let rec traverse : Cmm.expression -> unit = function
+    | Cop (Calloc (Heap, _), _, _) -> raise Allocates_on_heap
+    | _ -> Cmm.iter_shallow traverse expr
+    [@@warning "-fragile-match"]
+  in
+  try (traverse expr; true) with Allocates_on_heap -> false
 
 let phrase_allocates_on_heap : Cmm.phrase -> bool = function
   | Cfunction { fun_body; _ } -> allocates_on_heap fun_body
