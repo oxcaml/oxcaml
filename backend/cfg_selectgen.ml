@@ -111,7 +111,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
             coeffects = Has_coeffects
           }
       | Capply _ | Calloc _ | Cstore _ | Craise _ | Catomic _ | Cprobe _
-      | Cprobe_is_enabled _ | Copaque | Cpoll | Cpause ->
+      | Cprobe_is_enabled _ | Copaque _ | Cpoll | Cpause ->
         false
       | Cprefetch _ | Cbeginregion | Cendregion ->
         false
@@ -171,7 +171,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
               coeffects = ce
             } ->
           EC.create (SU.select_effects e) (SU.select_coeffects ce)
-        | Capply _ | Cprobe _ | Copaque | Cpoll | Cpause -> EC.arbitrary
+        | Capply _ | Cprobe _ | Copaque _ | Cpoll | Cpause -> EC.arbitrary
         | Calloc (Heap, _) -> EC.none
         | Calloc (Local, _) -> EC.coeffect_only Arbitrary
         | Cstore _ -> EC.effect_only Arbitrary
@@ -500,10 +500,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         args )
     | Cprobe_is_enabled { name; enabled_at_init } ->
       SU.basic_op (Probe_is_enabled { name; enabled_at_init }), []
+    | Copaque _ -> SU.basic_op Opaque, args
     | Cbeginregion -> SU.basic_op Begin_region, []
     | Cendregion -> SU.basic_op End_region, args
-    | Cpackf32 | Copaque | Cbswap _ | Cprefetch _ | Craise _
-    | Ctuple_field (_, _) ->
+    | Cpackf32 | Cbswap _ | Cprefetch _ | Craise _ | Ctuple_field (_, _) ->
       Misc.fatal_error "Selection.select_oper"
 
   let rec select_operation (op : Cmm.operation) (args : Cmm.expression list)
@@ -885,13 +885,6 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | Never_returns -> Never_returns
       | Ok (simple_list, ext_env) -> emit_tuple ext_env sub_cfg simple_list)
     | Cop (Craise k, args, dbg) -> emit_expr_raise env sub_cfg k args dbg
-    | Cop (Copaque, args, dbg) -> (
-      match emit_parts_list env sub_cfg args with
-      | Never_returns -> Never_returns
-      | Ok (simple_args, env) ->
-        let* rs = emit_tuple env sub_cfg simple_args in
-        let rd = Reg.createv_with_typs rs in
-        Ok (insert_op_debug env sub_cfg (SU.make_opaque ()) dbg rs rd))
     | Cop (Ctuple_field (field, fields_layout), [arg], _dbg) -> (
       match emit_expr env sub_cfg arg ~bound_name:None with
       | Never_returns -> Never_returns
@@ -913,9 +906,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
            | Ccsel _ | Cclz | Cctz | Cpopcnt | Cprefetch _ | Catomic _ | Ccmpi _
            | Caddv | Cadda | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _
            | Cdivf _ | Cpackf32 | Creinterpret_cast _ | Cstatic_cast _ | Ccmpf _
-           | Cprobe _ | Cprobe_is_enabled _ | Cbeginregion | Cendregion
-           | Ctuple_field _ | Cdls_get | Ctls_get | Cdomain_index | Cpoll
-           | Cpause ) as op),
+           | Cprobe _ | Cprobe_is_enabled _ | Copaque _ | Cbeginregion
+           | Cendregion | Ctuple_field _ | Cdls_get | Ctls_get | Cdomain_index
+           | Cpoll | Cpause ) as op),
           args,
           dbg ) ->
       emit_expr_op env sub_cfg bound_name op args dbg
@@ -976,7 +969,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           | Cctz | Cpopcnt | Cprefetch _ | Catomic _ | Ccmpi _ | Caddv | Cadda
           | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32
           | Creinterpret_cast _ | Cstatic_cast _ | Ccmpf _ | Craise _ | Cprobe _
-          | Cprobe_is_enabled _ | Copaque | Cbeginregion | Cendregion
+          | Cprobe_is_enabled _ | Copaque _ | Cbeginregion | Cendregion
           | Ctuple_field _ | Cdls_get | Ctls_get | Cdomain_index | Cpoll
           | Cpause ),
           _,

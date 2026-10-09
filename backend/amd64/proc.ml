@@ -755,7 +755,7 @@ let operation_supported = function
   | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32
   | Ccmpf _
   | Craise _
-  | Cprobe _ | Cprobe_is_enabled _ | Copaque | Cbeginregion | Cendregion
+  | Cprobe _ | Cprobe_is_enabled _ | Copaque _ | Cbeginregion | Cendregion
   | Ctuple_field _
   | Cdls_get
   | Ctls_get
