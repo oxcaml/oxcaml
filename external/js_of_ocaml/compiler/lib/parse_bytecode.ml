@@ -3673,14 +3673,6 @@ let from_cmj ic =
         ~imported:imported_compilation_units
   }
 
-let from_cmja ic =
-  let toc_pos = input_binary_int ic in
-  seek_in ic toc_pos;
-  let lib = (input_value ic : Ocaml_compiler.Cmj_format.library) in
-  List.map (Ocaml_compiler.Cmj_format.units lib) ~f:(fun unit ->
-      seek_in ic (Ocaml_compiler.Cmj_format.unit_pos unit);
-      from_cmj ic)
-
 let from_channel ic =
   let format =
     try

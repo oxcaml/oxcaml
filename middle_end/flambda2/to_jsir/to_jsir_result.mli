@@ -82,10 +82,10 @@ val invalid_switch_block : t -> t * Jsir.Addr.t
 val get_public_method :
   t -> obj:Jsir.Var.t -> field:Jsir.Var.t -> t * Jsir.Var.t
 
-(** Register the fact that we import the (toplevel module of the) given
-    compilation unit from the JSOO global data table. This is used to inform
-    Js_of_ocaml that it needs to add this compilation unit to the global data
-    table. *)
+(** Register the fact that we import the given compilation unit: either its
+    toplevel module from the JSOO global data table, or one of its symbols from
+    the symbol table. This is used to inform Js_of_ocaml that the compilation
+    unit must be linked, before this one. *)
 val import_compilation_unit : t -> Compilation_unit.t -> t
 (* CR selee: Eventually we should do something similar for symbols too, so that
    we don't put unused symbols in the symbol table. *)

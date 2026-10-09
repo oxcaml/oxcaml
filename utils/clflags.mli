@@ -201,7 +201,49 @@ val dump_linear : bool ref
 val debug_ocaml : bool ref
 val keep_startup_file : bool ref
 val native_code : bool ref
+
+(** Set when compiling for the js_of_ocaml target, i.e. under
+    [ocamlopt -target js_of_ocaml]. See [set_target]. *)
 val jsir : bool ref
+
+module Target : sig
+  type t = Native | Js_of_ocaml
+
+  val names : string list
+  val of_string : string -> t option
+  val to_string : t -> string
+end
+
+(** The backend selected with [-target] (ocamlopt only). *)
+val target : Target.t ref
+
+(** Select the backend, updating [native_code] and [jsir] accordingly. *)
+val set_target : Target.t -> unit
+
+(** The js_of_ocaml invocations of [ocamlopt -target js_of_ocaml] that options
+    can be passed through to, with [-jsoo-opt-<phase>] (and [-jsoo-opt] for all
+    of them):
+    - [Compile]: [js_of_ocaml compile], producing a unit's [.cmjo];
+    - [Archive]: [js_of_ocaml link -a], producing a [.cmja] ([-a] and [-pack]);
+    - [Runtime]: [js_of_ocaml build-runtime], when linking an executable;
+    - [Link]: [js_of_ocaml link], when linking an executable. *)
+module Jsoo_phase : sig
+  type t = All | Compile | Archive | Runtime | Link
+
+  val all : t list
+
+  (** The command-line flag, e.g. [-jsoo-opt-compile]. *)
+  val flag : t -> string
+end
+
+val all_jsoo_opts : string list ref
+val all_jsoo_opts_compile : string list ref
+val all_jsoo_opts_archive : string list ref
+val all_jsoo_opts_runtime : string list ref
+val all_jsoo_opts_link : string list ref
+
+(** The options given for a phase, most recent first. *)
+val jsoo_opts : Jsoo_phase.t -> string list ref
 val default_inline_threshold : float
 val inline_threshold : Float_arg_helper.parsed ref
 val inlining_report : bool ref

@@ -35,6 +35,9 @@ val last_objfiles : string list ref
 val first_objfiles : string list ref
 
 val stop_early : bool ref
+
+(* Record a [-jsoo-opt*] option from the command line. *)
+val add_first_jsoo_opt : Clflags.Jsoo_phase.t -> string -> unit
 val has_linker_inputs : bool ref
 
 type filename = string

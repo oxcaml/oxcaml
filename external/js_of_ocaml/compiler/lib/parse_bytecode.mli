@@ -77,8 +77,8 @@ type jsir_unit =
   }
 
 val from_cmj : in_channel -> jsir_unit
-
-val from_cmja : in_channel -> jsir_unit list
+(** Read the unit of a [.cmj] file produced by OxCaml's [ocamlopt -target
+    js_of_ocaml]. The channel must be positioned just after the magic number. *)
 
 val from_channel :
      in_channel

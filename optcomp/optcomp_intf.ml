@@ -32,6 +32,33 @@ open Compilenv
 
 type emit = Compile_common.info -> unit
 
+(** A compilation unit translated to the js_of_ocaml IR. *)
+type jsir_program =
+  { program : Jsoo_imports.Code.program;
+    imported_compilation_units : Compilation_unit.Set.t
+        (** The compilation units whose toplevel module blocks [program] reads
+            from js_of_ocaml's global symbol table. *)
+  }
+
+(** The entry points of Flambda 2 that the backends need. (Flambda 2 depends on
+    this library, so they are passed in by the compiler's main function.) *)
+module type Flambda2 = sig
+  val lambda_to_cmm :
+    ppf_dump:Format.formatter ->
+    prefixname:string ->
+    machine_width:Target_system.Machine_width.t ->
+    keep_symbol_tables:bool ->
+    Lambda.program ->
+    Cmm.phrase list
+
+  val lambda_to_jsir :
+    ppf_dump:Format.formatter ->
+    prefixname:string ->
+    keep_symbol_tables:bool ->
+    Lambda.program ->
+    jsir_program
+end
+
 module type File_extensions = sig
   (** File extensions include exactly one dot, so they can be added with regular
       string append, and removed by Filename.strip_extension *)
