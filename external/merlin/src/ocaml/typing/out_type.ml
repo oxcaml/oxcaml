@@ -2540,7 +2540,7 @@ module Aliases = struct
     if List.memq px visited && aliasable ty then add_proxy px else
       let visited = px :: visited in
       match get_desc ty with
-      | Tvar _ -> Variable_names.reserve ty
+      | Tvar _ | Tivar _ -> Variable_names.reserve ty
       | Tarrow(_, ty1, ty2, _) ->
           mark_loops_rec visited ty1; mark_loops_rec visited ty2
       | Ttuple tyl | Tunboxed_tuple tyl ->
