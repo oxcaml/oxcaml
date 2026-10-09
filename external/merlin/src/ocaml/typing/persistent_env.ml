@@ -318,8 +318,8 @@ let register_pers_for_short_paths penv modname ps components =
     |> Array.to_list
     |> List.map
          (fun import ->
-            let name = Import_info.name import in
-            let crc = Import_info.crc import in
+            let name = Import_info.Intf.name import in
+            let crc = Import_info.Intf.crc import in
             name, crc)
   in
   let depends, alias_depends =
