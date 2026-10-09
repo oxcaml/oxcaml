@@ -73,33 +73,13 @@ module Persistent_signature = struct
       visibility : Load_path.visibility }
 
   let load = ref (fun ~allow_hidden ~unit_name ->
-<<<<<<< Merlin:attach-cmi-path
-    let unit_name = CU.Name.to_string unit_name in
-    match Load_path.find_normalized_with_visibility (unit_name ^ ".cmi") with
-    | filename, visibility when allow_hidden ->
-      let cmi = Cmi_cache.read filename in
-      Some { filename; cmi; visibility}
-    | filename, (Visible _ as visibility) ->
-      let cmi = Cmi_cache.read filename in
-      Some { filename; cmi; visibility}
-    | _, Hidden
-    | exception Not_found -> None)
-||||||| Compiler:last-imported
-    let unit_name = CU.Name.to_string unit_name in
-    match Load_path.find_normalized_with_visibility (unit_name ^ ".cmi") with
-    | filename, visibility when allow_hidden ->
-      Some { filename; cmi = read_cmi_lazy filename; visibility}
-    | filename, (Visible _ as visibility) ->
-      Some { filename; cmi = read_cmi_lazy filename; visibility}
-    | _, Hidden
-    | exception Not_found -> None)
-=======
     match CUI.Found.cmi_path unit_name with
     | Some filename when allow_hidden && Sys.file_exists filename ->
       (* Loaded through the attached path without consulting the load path at
          all. The result is marked [Hidden] so that a later direct reference
          checks visibility against the load path (see [check_visibility]). *)
-      Some { filename; cmi = read_cmi_lazy filename; visibility = Hidden }
+      let cmi = Cmi_cache.read filename in
+      Some { filename; cmi; visibility = Hidden }
     | Some _ | None ->
       let unit_name = CUI.to_string (CUI.Found.intf unit_name) in
       match
@@ -107,12 +87,13 @@ module Persistent_signature = struct
           (unit_name ^ ".cmi")
       with
       | filename, visibility when allow_hidden ->
-        Some { filename; cmi = read_cmi_lazy filename; visibility}
+        let cmi = Cmi_cache.read filename in
+        Some { filename; cmi; visibility}
       | filename, (Visible _ as visibility) ->
-        Some { filename; cmi = read_cmi_lazy filename; visibility}
+        let cmi = Cmi_cache.read filename in
+        Some { filename; cmi; visibility}
       | _, Hidden
       | exception Not_found -> None)
->>>>>>> Compiler:HEAD
 end
 
 type can_load_cmis =
@@ -247,18 +228,10 @@ let clear penv =
 
 let clear_missing {imports; _} =
   let missing_entries =
-<<<<<<< Merlin:attach-cmi-path
-    Hashtbl.fold
+    CUI.Tbl.fold
       (fun name r acc -> match r with
        | Missing _ -> name :: acc
        | Found _ -> acc)
-||||||| Compiler:last-imported
-    Hashtbl.fold
-      (fun name r acc -> if r = Missing then name :: acc else acc)
-=======
-    CUI.Tbl.fold
-      (fun name r acc -> if r = Missing then name :: acc else acc)
->>>>>>> Compiler:HEAD
       imports []
   in
   List.iter (CUI.Tbl.remove imports) missing_entries
@@ -521,18 +494,6 @@ let check_visibility ~allow_hidden ~intf imp =
 
 let find_import ~allow_hidden penv ~check modname =
   let {imports; _} = penv in
-<<<<<<< Merlin:attach-cmi-path
-  if CU.Name.equal modname CU.Name.predef_exn then raise Not_found;
-  match Hashtbl.find imports modname with
-  | Found imp -> check_visibility ~allow_hidden imp; imp
-  | Missing { hidden_were_allowed = true } -> raise Not_found
-  | Missing { hidden_were_allowed = false }
-||||||| Compiler:last-imported
-  if CU.Name.equal modname CU.Name.predef_exn then raise Not_found;
-  match Hashtbl.find imports modname with
-  | Found imp -> check_visibility ~allow_hidden imp; imp
-  | Missing -> raise Not_found
-=======
   let intf = CUI.Found.intf modname in
   if CUI.equal intf CUI.predef_exn then raise Not_found;
   match CUI.Tbl.find imports intf with
@@ -540,8 +501,8 @@ let find_import ~allow_hidden penv ~check modname =
       check_visibility ~allow_hidden ~intf imp;
       if check then complete_consistency_check penv imp;
       imp
-  | Missing -> raise Not_found
->>>>>>> Compiler:HEAD
+  | Missing { hidden_were_allowed = true } -> raise Not_found
+  | Missing { hidden_were_allowed = false }
   | exception Not_found ->
       match can_load_cmis penv with
       | Cannot_load_cmis _ -> raise Not_found
@@ -550,14 +511,8 @@ let find_import ~allow_hidden penv ~check modname =
             match !Persistent_signature.load ~allow_hidden ~unit_name:modname with
             | Some psig -> psig
             | None ->
-<<<<<<< Merlin:attach-cmi-path
-                Hashtbl.replace imports modname
+                CUI.Tbl.replace imports intf
                   (Missing { hidden_were_allowed = allow_hidden });
-||||||| Compiler:last-imported
-                if allow_hidden then Hashtbl.add imports modname Missing;
-=======
-                if allow_hidden then CUI.Tbl.add imports intf Missing;
->>>>>>> Compiler:HEAD
                 raise Not_found
           in
           add_import penv intf;
@@ -569,7 +524,7 @@ let find_import ~allow_hidden penv ~check modname =
 let load_import_unrecorded penv intf =
   match CUI.Tbl.find penv.imports intf with
   | Found imp -> Some imp
-  | Missing -> None
+  | Missing _ -> None
   | exception Not_found ->
       match can_load_cmis penv with
       | Cannot_load_cmis _ -> None
@@ -580,7 +535,7 @@ let load_import_unrecorded penv intf =
           with
           | None -> None
           | Some psig -> Some (acknowledge_import penv ~check:false intf psig)
-          | exception (Error _ | Cmi_format.Error _ | Sys_error _) ->
+          | exception (Error _ | Magic_numbers.Cmi.Error _ | Sys_error _) ->
               (* [Sys_error]: the cmi is not a declared dependency of this
                  compilation, so a concurrent build tool may remove it between
                  the load-path lookup and the read. *)
@@ -1208,14 +1163,8 @@ let acknowledge_new_pers_struct penv modname pers_name val_of_pers_sig short_pat
       ps_canonical = true;
     }
   in
-<<<<<<< Merlin:attach-cmi-path
-  Hashtbl.add persistent_structures modname ps;
-  register_pers_for_short_paths penv modname ps (short_path_comps modname pm);
-||||||| Compiler:last-imported
-  Hashtbl.add persistent_structures modname ps;
-=======
   Global_module.Name.Tbl.add persistent_structures modname ps;
->>>>>>> Compiler:HEAD
+  register_pers_for_short_paths penv modname ps (short_path_comps modname pm);
   begin match binding with
   | Runtime_parameter id -> Ident.Tbl.add locals_bound_to_runtime_parameters id ()
   | Constant _ -> ()
@@ -1275,71 +1224,32 @@ let describe_prefix ppf prefix =
   else
     Format_doc.fprintf ppf "package %a" CU.Prefix.print prefix
 
-<<<<<<< Merlin:attach-cmi-path
-(* Emits a warning if there is no valid cmi for name *)
-let check_pers_struct ~allow_hidden penv f1 f2 ~loc name =
-  let name_as_string = CU.Name.to_string name.Global_module.Name.head in
-  try
-    ignore (find_pers_struct ~allow_hidden penv f1 f2 ~check:false name
-              ~allow_excess_args:true)
-||||||| Compiler:last-imported
-(* Emits a warning if there is no valid cmi for name *)
-let check_pers_struct ~allow_hidden penv f ~loc name =
-  let name_as_string = CU.Name.to_string name.Global_module.Name.head in
-  try
-    ignore (find_pers_struct ~allow_hidden penv f ~check:false name
-              ~allow_excess_args:true)
-=======
 (* Checks that there is a valid cmi for [name]; if so, returns [name] with the
    path of the loaded cmi attached to its head. Otherwise registers a delayed
    warning 49 (delayed so that, as with warnings about unused bindings, it is
    not emitted when compilation fails with a real error). *)
-let check_pers_struct ~allow_hidden penv f ~loc (name : Global_module.Name.t) =
+let check_pers_struct ~allow_hidden penv f1 f2 ~loc
+      (name : Global_module.Name.t) =
   let name_as_string = CUI.to_string (CUI.Found.intf name.head) in
   let delay_warning warn =
     !add_delayed_check_forward (fun () -> Location.prerr_warning loc warn)
   in
   match
-    find_pers_struct ~allow_hidden penv f ~check:false name
+    find_pers_struct ~allow_hidden penv f1 f2 ~check:false name
       ~allow_excess_args:true
->>>>>>> Compiler:HEAD
   with
-<<<<<<< Merlin:attach-cmi-path
-  | Not_found ->
-      let warn = Warnings.No_cmi_file(name_as_string, None) in
-        Location.prerr_warning loc warn
-  | Magic_numbers.Cmi.Error err ->
-||||||| Compiler:last-imported
-  | Not_found ->
-      let warn = Warnings.No_cmi_file(name_as_string, None) in
-        Location.prerr_warning loc warn
-  | Cmi_format.Error err ->
-=======
   | ps ->
       Global_module.Name.with_head_cmi_path name
         ps.ps_name_info.pn_import.imp_filename
   | exception Not_found ->
       delay_warning (Warnings.No_cmi_file(name_as_string, None));
       name
-  | exception Cmi_format.Error err ->
->>>>>>> Compiler:HEAD
+  | exception Magic_numbers.Cmi.Error err ->
       let msg = Format.asprintf "%a"
-<<<<<<< Merlin:attach-cmi-path
           Magic_numbers.Cmi.report_error err in
-      let warn = Warnings.No_cmi_file(name_as_string, Some msg) in
-        Location.prerr_warning loc warn
-  | Error err ->
-||||||| Compiler:last-imported
-          Cmi_format.report_error err in
-      let warn = Warnings.No_cmi_file(name_as_string, Some msg) in
-        Location.prerr_warning loc warn
-  | Error err ->
-=======
-          Cmi_format.report_error err in
       delay_warning (Warnings.No_cmi_file(name_as_string, Some msg));
       name
   | exception Error err ->
->>>>>>> Compiler:HEAD
       let msg =
         match err with
         | Illegal_renaming(name, ps_name, filename) ->
@@ -1445,25 +1355,13 @@ let check ~allow_hidden penv f1 f2 ~loc name =
          later *)
       approximate_global_by_name penv name
     in
-<<<<<<< Merlin:attach-cmi-path
-    if (Warnings.is_active (Warnings.No_cmi_file("", None))) then
-      !add_delayed_check_forward
-        (fun () -> check_pers_struct ~allow_hidden penv f1 f2 ~loc name)
-  end
-||||||| Compiler:last-imported
-    if (Warnings.is_active (Warnings.No_cmi_file("", None))) then
-      !add_delayed_check_forward
-        (fun () -> check_pers_struct ~allow_hidden penv f ~loc name)
-  end
-=======
     ()
   end;
   (* With warning 49 disabled, the alias is neither checked nor is its cmi
      searched for, so the output does not depend on which cmis happen to
      exist. *)
   if not (Warnings.is_active (Warnings.No_cmi_file ("", None))) then name
-  else check_pers_struct ~allow_hidden penv f ~loc name
->>>>>>> Compiler:HEAD
+  else check_pers_struct ~allow_hidden penv f1 f2 ~loc name
 
 let crc_of_unit penv name =
   match Consistbl.find penv.crc_units name with
@@ -1772,10 +1670,12 @@ let with_cmis penv f x =
           (fun () -> f x))
 
 let forall ~found ~missing t =
-  Std.Hashtbl.forall t.imports (fun name -> function
-      | Missing _ -> missing name
-      | Found import ->
-        found name import.imp_filename name
-    )
+  CUI.Tbl.fold
+    (fun name entry acc ->
+      acc
+      && (match entry with
+          | Missing _ -> missing name
+          | Found import -> found name import.imp_filename name))
+    t.imports true
 
 let report_error = Format_doc.compat report_error_doc
