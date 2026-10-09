@@ -915,7 +915,7 @@ let simplify_non_lifted_set_of_closures0 dacc bound_vars ~closure_bound_vars
            ~f:(Specialization_cost.add_set_of_closures set_of_closures))
   in
   Simplify_named_result.create dacc
-    (Expr_builder.Keep_binding
+    (Keep_binding
        { let_bound = bound_vars;
          simplified_defining_expr = defining_expr;
          original_defining_expr =

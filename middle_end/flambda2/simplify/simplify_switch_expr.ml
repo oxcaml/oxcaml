@@ -365,7 +365,7 @@ let ( let$ ) expr k uacc ~dacc_before_switch ~local_cse =
       let duid = Flambda_debug_uid.none in
       let machine_width = UE.machine_width (UA.uenv uacc) in
       let binding =
-        EB.Keep_binding
+        Simplified_named.Keep_binding
           { let_bound = BPt.singleton (BV.create var duid NM.normal);
             simplified_defining_expr =
               Simplified_named.create ~machine_width named;

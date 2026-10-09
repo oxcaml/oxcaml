@@ -34,14 +34,6 @@ val create_let_binding :
   cost_metrics_of_defining_expr:Cost_metrics.t ->
   Rebuilt_expr.t * Upwards_acc.t
 
-type binding_to_place =
-  | Keep_binding of
-      { let_bound : Bound_pattern.t;
-        simplified_defining_expr : Simplified_named.t;
-        original_defining_expr : Named.t option
-      }
-  | Delete_binding of { original_defining_expr : Named.t option }
-
 (** Create [Let] binding(s) around a given body. (The type of this function
     prevents it from being used to create "let symbol" bindings; use the other
     functions in this module instead.) Bindings will be elided if they are
@@ -51,7 +43,7 @@ type binding_to_place =
     names of the [body]. *)
 val make_new_let_bindings :
   Upwards_acc.t ->
-  bindings_outermost_first:binding_to_place list ->
+  bindings_outermost_first:Simplified_named.binding_to_place list ->
   body:Rebuilt_expr.t ->
   Rebuilt_expr.t * Upwards_acc.t
 
