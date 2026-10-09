@@ -2627,11 +2627,12 @@ end = struct
         | Const_mask _ | Floatop _
         | Intop_imm
             ( ( Iadd | Isub | Imul | Imulh _ | Idiv _ | Imod _ | Iand | Ior
-              | Ixor | Ilsl | Ilsr | Iasr | Ipopcnt | Iclz | Ictz | Icomp _ ),
+              | Ixor | Ilsl | Ilsr | Iasr | Ipopcnt | Inot | Iclz | Ictz
+              | Icomp _ ),
               _ )
         | Intop
             ( Iadd | Isub | Imul | Imulh _ | Idiv _ | Imod _ | Iand | Ior | Ixor
-            | Ilsl | Ilsr | Iasr | Ipopcnt | Iclz | Ictz | Icomp _ )
+            | Ilsl | Ilsr | Iasr | Ipopcnt | Inot | Iclz | Ictz | Icomp _ )
         | Int128op (Iadd128 | Isub128 | Imul64 _)
         | Reinterpret_cast
             ( Float32_of_float | Float_of_float32 | Float_of_int64
