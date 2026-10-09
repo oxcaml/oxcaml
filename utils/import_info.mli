@@ -33,11 +33,11 @@ module CU := Compilation_unit
     avoided in new code, in preference to [Intf.t] or [Impl.t]. *)
 type t
 
-val create : CU.Name.t -> crc_with_unit:(CU.t * string) option -> t
-
 val create_normal : CU.t -> crc:string option -> t
 
-val name : t -> CU.Name.t
+(** The name of the import, as a bare string: depending on the import this may
+    be an interface or an implementation name. *)
+val name : t -> string
 
 (** This function will cause a fatal error if a [CU.t] was not provided when the
     supplied value of type [t] was created. *)
@@ -45,19 +45,19 @@ val cu : t -> CU.t
 
 val crc : t -> string option
 
-val has_name : t -> name:CU.Name.t -> bool
+val has_name : t -> name:string -> bool
 
 val dummy : t
 
 val print : Format_doc.formatter -> t -> unit
 
 (** The preferred API to use for interface imports. An interface import might be
-    a parameter, in which case it has a CRC but no [CU.t] (since a [CU.t] is for
-    an implementation). *)
+    a parameter, in which case it is distinguished from the interface of an
+    ordinary unit by its kind. *)
 module Intf : sig
   type nonrec t = t
 
-  val create_normal : CU.Name.t -> CU.t -> crc:Digest.t -> t
+  val create_normal : CU.Name.t -> crc:Digest.t -> t
 
   val create_alias : CU.Name.t -> t
 
@@ -66,7 +66,7 @@ module Intf : sig
   module Nonalias : sig
     module Kind : sig
       type t =
-        | Normal of CU.t
+        | Normal
         | Parameter
     end
 
@@ -76,8 +76,8 @@ module Intf : sig
     type t = Kind.t * Digest.t
   end
 
-  (** [create name nonalias] is [create_normal name cu crc] if [nonalias] is
-      [Some (Normal cu, crc)], [create_parameter name crc] if [nonalias] is
+  (** [create name nonalias] is [create_normal name crc] if [nonalias] is
+      [Some (Normal, crc)], [create_parameter name crc] if [nonalias] is
       [Some (Parameter, crc)], and [create_alias] if [nonalias] is [None].
       Useful when [nonalias] is coming out of [Consistbl]. *)
   val create : CU.Name.t -> Nonalias.t option -> t

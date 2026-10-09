@@ -64,7 +64,8 @@ val lib_ccobjs : t -> filepath list
 val make_globals_map :
   t ->
   unit_link_info list ->
-  (CU.t * Digest.t option * Digest.t option * Symbol.t list) list
+  (CU.Name.t * Digest.t option * CU.t option * Digest.t option * Symbol.t list)
+  list
 
 val add_ccobjs : t -> filepath -> Cmx_format.library_infos -> unit
 

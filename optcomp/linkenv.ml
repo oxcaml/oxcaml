@@ -110,7 +110,7 @@ let check_cmi_consistency t file_name cmis =
   try
     Array.iter
       (fun import ->
-        let name = Import_info.name import in
+        let name = Import_info.Intf.name import in
         let info = Import_info.Intf.info import in
         CU.Name.Tbl.replace t.interfaces name ();
         match info with
@@ -210,33 +210,28 @@ let extract_missing_globals t =
     t.missing_globals;
   !mg
 
-let assume_no_prefix modname =
-  (* We're the linker, so we assume that everything's already been packed, so no
-     module needs its prefix considered. *)
-  CU.create CU.Prefix.empty modname
-
 let make_globals_map t units_list =
   (* The order in which entries appear in the globals map does not matter (see
      the natdynlink code). *)
-  let find_crc name =
-    Cmi_consistbl.find t.crc_interfaces name
-    |> Option.map (fun (_unit, crc) -> crc)
+  let find_crc intf =
+    Cmi_consistbl.find t.crc_interfaces intf
+    |> Option.map (fun (_kind, crc) -> crc)
   in
   let interfaces = CU.Name.Tbl.copy t.interfaces in
   let defined =
     List.map
       (fun unit ->
-        let name = CU.name unit.name in
-        let intf_crc = find_crc name in
-        CU.Name.Tbl.remove interfaces name;
+        let intf = CU.name unit.name in
+        let intf_crc = find_crc intf in
+        CU.Name.Tbl.remove interfaces intf;
         let syms = List.map Symbol.for_compilation_unit unit.defines in
-        unit.name, intf_crc, Some unit.crc, syms)
+        intf, intf_crc, Some unit.name, Some unit.crc, syms)
       units_list
   in
   CU.Name.Tbl.fold
-    (fun name () globals_map ->
-      let intf_crc = find_crc name in
-      (assume_no_prefix name, intf_crc, None, []) :: globals_map)
+    (fun intf () globals_map ->
+      let intf_crc = find_crc intf in
+      (intf, intf_crc, None, None, []) :: globals_map)
     interfaces defined
 
 let lib_ccobjs t = t.lib_ccobjs

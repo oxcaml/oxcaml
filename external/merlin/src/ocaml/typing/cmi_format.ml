@@ -244,8 +244,8 @@ let output_cmi filename oc cmi =
   let crc = Digest.file filename in
   let my_info =
     match cmi.cmi_kind with
-    | Normal { cmi_impl } ->
-      Import_info.Intf.create_normal cmi.cmi_name cmi_impl ~crc
+    | Normal _ ->
+      Import_info.Intf.create_normal cmi.cmi_name ~crc
     | Parameter ->
       Import_info.Intf.create_parameter cmi.cmi_name ~crc
   in

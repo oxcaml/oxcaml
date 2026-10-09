@@ -120,6 +120,10 @@ val of_complete_global_exn : Global_module.t -> t
     take their names from hidden files.) *)
 val of_string : string -> t
 
+(** Create a compilation unit implementing the given interface, assuming it was
+    compiled with neither a "-for-pack" prefix nor instance arguments. *)
+val of_intf_assume_no_prefix_no_args : Compilation_unit_intf.t -> t
+
 (** Create a global [Ident.t] representing this compilation unit. Only intended
     for use in bytecode; most uses of [Ident.t]s that are known to be global
     should simply use [t] instead. *)

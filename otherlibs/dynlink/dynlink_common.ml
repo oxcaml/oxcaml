@@ -29,6 +29,7 @@ end
 module Make (P : Dynlink_platform_intf.S) = struct
   module DT = Dynlink_types
   module UH = P.Unit_header
+  module CUI = Dynlink_compilerlibs.Compilation_unit_intf
 
   type interface_dep =
     | Name  (* the only use of the interface can be via a module alias *)
@@ -38,7 +39,7 @@ module Make (P : Dynlink_platform_intf.S) = struct
 
   module State = struct
     type t = {
-      ifaces : (interface_dep * DT.filename) String.Map.t;
+      ifaces : (interface_dep * DT.filename) CUI.Map.t;
       (* Interfaces that have been depended upon. *)
       implems : implem String.Map.t;
       (* Implementations that exist in the main program or have been
@@ -58,7 +59,7 @@ module Make (P : Dynlink_platform_intf.S) = struct
     }
 
     let empty = {
-      ifaces = String.Map.empty;
+      ifaces = CUI.Map.empty;
       implems = String.Map.empty;
       defined_symbols = String.Set.empty;
       allowed_units = String.Set.empty;
@@ -116,20 +117,20 @@ module Make (P : Dynlink_platform_intf.S) = struct
     let exe = Sys.executable_name in
     let ifaces, implems, defined_symbols =
       P.fold_initial_units
-        ~init:(String.Map.empty, String.Map.empty, String.Set.empty)
+        ~init:(CUI.Map.empty, String.Map.empty, String.Set.empty)
         ~f:(fun (ifaces, implems, defined_symbols)
-                ~compunit ~interface ~implementation
+                ~intf ~impl ~interface ~implementation
                 ~defined_symbols:defined_symbols_this_unit ->
           let ifaces =
             match interface with
-            | None -> String.Map.add compunit (Name, exe) ifaces
-            | Some crc -> String.Map.add compunit (Contents crc, exe) ifaces
+            | None -> CUI.Map.add intf (Name, exe) ifaces
+            | Some crc -> CUI.Map.add intf (Contents crc, exe) ifaces
           in
           let implems =
-            match implementation with
-            | None -> implems
-            | Some (crc, state) ->
-              String.Map.add compunit (crc, exe, state) implems
+            match impl, implementation with
+            | None, _ | _, None -> implems
+            | Some impl, Some (crc, state) ->
+              String.Map.add impl (crc, exe, state) implems
           in
           let defined_symbols_this_unit =
             String.Set.of_list defined_symbols_this_unit
@@ -169,19 +170,20 @@ module Make (P : Dynlink_platform_intf.S) = struct
 
   let check_interface_imports filename ui ifaces =
     List.fold_left (fun ifaces (name, crc) ->
-        match String.Map.find name ifaces with
+        match CUI.Map.find name ifaces with
         | exception Not_found -> begin
             match crc with
-            | None -> String.Map.add name (Name, filename) ifaces
-            | Some crc -> String.Map.add name (Contents crc, filename) ifaces
+            | None -> CUI.Map.add name (Name, filename) ifaces
+            | Some crc -> CUI.Map.add name (Contents crc, filename) ifaces
           end
         | old_crc, _old_src ->
           match old_crc, crc with
           | (Name | Contents _), None -> ifaces
           | Name, Some crc ->
-            String.Map.add name (Contents crc, filename) ifaces
+            CUI.Map.add name (Contents crc, filename) ifaces
           | Contents old_crc, Some crc ->
-            if old_crc <> crc then raise (DT.Error (Inconsistent_import name))
+            if old_crc <> crc
+            then raise (DT.Error (Inconsistent_import (CUI.to_string name)))
             else ifaces)
       ifaces
       (UH.interface_imports ui)
@@ -221,7 +223,7 @@ module Make (P : Dynlink_platform_intf.S) = struct
     if String.Map.mem name implems then begin
       raise (DT.Error (Module_already_loaded name))
     end;
-    if priv && String.Map.mem name ifaces then begin
+    if priv && CUI.Map.mem (CUI.of_string name) ifaces then begin
       raise (DT.Error (Private_library_cannot_implement_interface name))
     end;
     String.Map.add name (UH.crc ui, filename, DT.Not_initialized) implems

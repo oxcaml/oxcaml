@@ -65,10 +65,10 @@ end) : S = struct
            Compilenv.ensure_sharing_between_cmi_and_cmx_imports cmis cmxs in *)
         let cmis = Array.of_list cmis in
         let cmxs = Array.of_list cmxs in
-        let cmi_index = Compilation_unit.Name.Tbl.create 42 in
+        let cmi_index = Misc.Stdlib.String.Tbl.create 42 in
         Array.iteri
           (fun i import ->
-            Compilation_unit.Name.Tbl.add cmi_index (Import_info.name import) i)
+            Misc.Stdlib.String.Tbl.add cmi_index (Import_info.name import) i)
           cmis;
         let cmx_index = Compilation_unit.Tbl.create 42 in
         Array.iteri
@@ -113,8 +113,8 @@ end) : S = struct
           b
         in
         let units =
-          List.map
-            (fun (unit, crc) ->
+          List.map2
+            (fun file_name (unit, crc) ->
               ignore
                 (Generic_fns.Tbl.add ~imports:Generic_fns.Partition.Set.empty
                    genfns unit.ui_generic_fns);
@@ -124,8 +124,7 @@ end) : S = struct
                 li_force_link = unit.ui_force_link || !Clflags.link_everything;
                 li_imports_cmi =
                   mk_bitmap cmis cmi_index unit.ui_imports_cmi
-                    ~find:Compilation_unit.Name.Tbl.find
-                    ~get_name:Import_info.name;
+                    ~find:Misc.Stdlib.String.Tbl.find ~get_name:Import_info.name;
                 li_imports_cmx =
                   mk_bitmap cmxs cmx_index unit.ui_imports_cmx
                     ~find:Compilation_unit.Tbl.find ~get_name:Import_info.cu;
@@ -137,7 +136,7 @@ end) : S = struct
                     ~find:Compilation_unit.Tbl.find ~get_name:Fun.id;
                 li_external_symbols = Array.of_list unit.ui_external_symbols
               })
-            descr_list
+            file_list descr_list
         in
         let infos =
           { lib_units = units;
