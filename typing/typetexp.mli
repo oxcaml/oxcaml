@@ -18,6 +18,8 @@
 open Types
 open Mode
 
+type variable_universe = TypeVar | ModeVar
+
 type jkind_initialization_choice = Sort | Any
 
 type valdecl_lpoly_flag = Lpoly | Lmono
@@ -164,8 +166,8 @@ type cannot_quantify_reason
 type jkind_info
 type unbound_variable_reason
 type error =
-  | Unbound_type_variable of
-    string * string list * unbound_variable_reason option
+  | Unbound_variable of
+    variable_universe * string * string list * unbound_variable_reason option
   | No_type_wildcards of unbound_variable_reason option
   | Undefined_type_constructor of Path.t
   | Type_arity_mismatch of Longident.t * int * int
@@ -204,6 +206,8 @@ type error =
     { name : string; explicit_jkind : jkind_lr; implicit_jkind : jkind_lr }
   | Lpoly_unsupported
   | Val_poly_and_layout
+  | Unsatisfiable_mode_bound
+  | Unsatisfiable_mode_variable of string
 
 exception Error of Location.t * Env.t * error
 

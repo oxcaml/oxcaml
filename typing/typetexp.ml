@@ -27,6 +27,8 @@ open Ctype
 
 exception Already_bound
 
+type variable_universe = TypeVar | ModeVar
+
 type unbound_variable_policy =
   | Open (* common case *)
   | Closed (* no wildcards or unqunatified variables allowed *)
@@ -71,8 +73,8 @@ type jkind_info =
   }
 
 type error =
-  | Unbound_type_variable of
-    string * string list * unbound_variable_reason option
+  | Unbound_variable of
+    variable_universe * string * string list * unbound_variable_reason option
   | No_type_wildcards of unbound_variable_reason option
   | Undefined_type_constructor of Path.t
   | Type_arity_mismatch of Longident.t * int * int
@@ -111,6 +113,8 @@ type error =
     { name : string; explicit_jkind : jkind_lr; implicit_jkind : jkind_lr }
   | Lpoly_unsupported
   | Val_poly_and_layout
+  | Unsatisfiable_mode_bound
+  | Unsatisfiable_mode_variable of string
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
@@ -227,13 +231,16 @@ module TyVarEnv : sig
        postcondition: the returned type_exprs are all Tunivar *)
 
   val reset_locals : ?univars:poly_univars -> unit -> unit
-    (* clear out the local type variable env't; call this when starting
+    (* clear out the local variable env't; call this when starting
        a new e.g. type signature. Optionally pass some univars that
        are in scope. *)
 
   val lookup_local :
     row_context:type_expr option ref list -> string -> type_expr * Env.stage
     (* look up a local type variable; throws Not_found if it isn't in scope *)
+
+  val lookup_local_mode : string -> With_locality.lr
+    (* look up a local mode variable; throws Not_found if it isn't in scope *)
 
   val lookup_global_jkind : string -> jkind_lr
     (* look up a global type variable, returning the jkind it was originally
@@ -261,6 +268,9 @@ module TyVarEnv : sig
        imprecise annotations on it can be detected in [check_poly_univars].
        Does nothing if the name does not refer to an in-scope univar. *)
 
+  val remember_used_mode : string -> With_locality.lr -> Location.t -> unit
+    (* Remember that a given name is bound to a given mode variable. *)
+
   val globalize_used_variables : policy -> Env.t -> unit -> unit
   (* after finishing with a type signature, used variables are unified to the
      corresponding global type variables if they exist. Otherwise, in function
@@ -274,20 +284,74 @@ module TyVarEnv : sig
       function performs both the deferred unifications and the rigid-variable
       jkind checks. *)
 end = struct
-  (** Map indexed by type variable names. *)
-  module TyVarMap = Misc.Stdlib.String.Map
+  (** Map indexed by type or mode variable names. *)
+  module VarMap (M : sig
+    type ty
+    type mo
+  end) : sig
+    type 'a universe =
+      | Type : M.ty universe
+      | Mode : M.mo universe
+
+    type t
+
+    val empty : t
+    val mem : 'a universe -> string -> t -> bool
+    val find : 'a universe -> string -> t -> 'a
+    val add : 'a universe -> string -> 'a -> t -> t
+    val iter : 'a universe -> (string -> 'a -> unit) -> t -> unit
+    val fold : 'a universe -> (string -> 'a -> 'b -> 'b) -> t -> 'b -> 'b
+  end = struct
+    type 'a universe =
+      | Type : M.ty universe
+      | Mode : M.mo universe
+
+    module Map = Misc.Stdlib.String.Map
+
+    type t = { ty: M.ty Map.t; mo: M.mo Map.t }
+
+    let empty = { ty = Map.empty; mo = Map.empty }
+
+    let mem (type u) (u : u universe) key t =
+      match u with
+      | Type -> Map.mem key t.ty
+      | Mode -> Map.mem key t.mo
+
+    let find (type u) (u : u universe) key t : u =
+      match u with
+      | Type -> Map.find key t.ty
+      | Mode -> Map.find key t.mo
+
+    let add (type u) (u : u universe) key (value : u) t =
+      match u with
+      | Type -> { t with ty = Map.add key value t.ty }
+      | Mode -> { t with mo = Map.add key value t.mo }
+
+    let iter (type u) (u : u universe) (f : string -> u -> unit) t =
+      match u with
+      | Type -> Map.iter f t.ty
+      | Mode -> Map.iter f t.mo
+
+    let fold (type u) (u : u universe) (f : string -> u -> _ -> _) t acc =
+      match u with
+      | Type -> Map.fold f t.ty acc
+      | Mode -> Map.fold f t.mo acc
+  end
 
   let not_generic v = get_level v <> Btype.generic_level
+
+  module GlobalVarMap = VarMap (struct
+    type ty = type_expr * bool ref * jkind_lr * Env.stage
+    type mo = With_locality.lr
+  end)
 
   (* These are the "global" type variables: they were in scope before
      we started processing the current type. See Note [Global type variables].
   *)
-  let type_variables =
-    ref (TyVarMap.empty :
-           (type_expr * bool ref * jkind_lr * Env.stage) TyVarMap.t)
+  let variables = ref GlobalVarMap.empty
 
   (* These are variables that have been used in the currently-being-checked
-     type, possibly including the variables in [type_variables].
+     type, possibly including the variables in [variables].
   *)
   type used_info = {
     ty : type_expr;
@@ -304,8 +368,12 @@ end = struct
     annotated_jkind : jkind_lr option;
   }
 
-  let used_variables =
-    ref (TyVarMap.empty : used_info TyVarMap.t)
+  module LocalVarMap = VarMap (struct
+    type ty = used_info
+    type mo = With_locality.lr * Location.t
+  end)
+
+  let used_variables = ref LocalVarMap.empty
 
   (* Anonymous type variables with a jkind annotation ([(_ : kind)]) that
      have been used in the currently-being-checked type. Tracked separately
@@ -325,23 +393,26 @@ end = struct
 
   let reset () =
     reset_global_level ();
-    type_variables := TyVarMap.empty;
+    variables := GlobalVarMap.empty;
     warned_imprecise_locs := LocSet.empty
 
   let is_in_scope name =
-    TyVarMap.mem name !type_variables
+    GlobalVarMap.mem Type name !variables
 
   let add ?(unused = ref false) name v jkind stage =
     assert (not_generic v);
-    type_variables :=
-      TyVarMap.add name (v, unused, jkind, stage) !type_variables
+    variables := GlobalVarMap.add Type name (v, unused, jkind, stage) !variables
+
+  let add_mode name mode =
+    assert (not (With_locality.check_generic mode));
+    variables := GlobalVarMap.add Mode name mode !variables
 
   let narrow () =
-    (increase_global_level (), !type_variables)
+    (increase_global_level (), !variables)
 
   let widen (gl, tv) =
     restore_global_level gl;
-    type_variables := tv
+    variables := tv
 
   let with_local_scope f =
    let context = narrow () in
@@ -351,18 +422,23 @@ end = struct
 
   (* throws Not_found if the variable is not in scope *)
   let lookup_global name =
-    let (type_expr, unused, _, stage) = TyVarMap.find name !type_variables in
+    let (type_expr, unused, _, stage) =
+      GlobalVarMap.find Type name !variables
+    in
     unused := false;
     (type_expr, stage)
 
   let lookup_global_jkind name =
-    thd4 (TyVarMap.find name !type_variables)
+    thd4 (GlobalVarMap.find Type name !variables)
 
-  let get_in_scope_names () =
+  let lookup_global_mode name =
+    GlobalVarMap.find Mode name !variables
+
+  let get_in_scope_names u =
     let add_name name _ l =
       if name = "_" then l else Pprintast.tyvar_of_name name :: l
     in
-    TyVarMap.fold add_name !type_variables []
+    GlobalVarMap.fold u add_name !variables []
 
   (*****)
   (* These are variables we expect to become univars (they were introduced with
@@ -563,7 +639,7 @@ end = struct
   let reset_locals ?univars:(uvs=[]) () =
     assert_univars uvs;
     univars := uvs;
-    used_variables := TyVarMap.empty;
+    used_variables := LocalVarMap.empty;
     used_anonymous_variables := []
 
   let associate row_context p =
@@ -577,12 +653,15 @@ end = struct
       associate row_context p;
       p.univar, s
     with Not_found ->
-      let info = TyVarMap.find name !used_variables in
+      let info = LocalVarMap.find Type name !used_variables in
       info.unused := false;
       instance info.ty, info.stage
       (* This call to instance might be redundant; all variables
          inserted into [used_variables] are non-generic, but some
          might get generalized. *)
+
+  let lookup_local_mode name =
+    LocalVarMap.find Mode name !used_variables |> fst
 
   let remember_univar_use name annotated_jkind loc =
     match find_poly_univars name !univars with
@@ -593,7 +672,7 @@ end = struct
   let remember_used ?check ~rigid ~annotated_jkind name v loc stage =
     assert (not_generic v);
     let rigid, annotated_jkind =
-      match TyVarMap.find name !used_variables with
+      match LocalVarMap.find Type name !used_variables with
       | info -> info.rigid, info.annotated_jkind
       | exception Not_found -> rigid, annotated_jkind
     in
@@ -611,13 +690,15 @@ end = struct
       | _ -> ref false
     in
     let info = { ty = v; unused; loc; rigid; stage; annotated_jkind } in
-    used_variables := TyVarMap.add name info !used_variables
+    used_variables := LocalVarMap.add Type name info !used_variables
 
   let remember_used_anonymous v annotated_jkind loc =
     assert (not_generic v);
     used_anonymous_variables :=
       (v, annotated_jkind, loc) :: !used_anonymous_variables
 
+  let remember_used_mode name mode loc =
+    used_variables := LocalVarMap.add Mode name (mode, loc) !used_variables
 
   type flavor = Unification | Universal
   type policy = {
@@ -676,13 +757,13 @@ end = struct
 
   let globalize_used_variables
       { flavor; unbound_variable_policy; _ } env =
-    let r = ref [] in
+    let types_to_unify = ref [] in
     List.iter
       (fun (ty, annotated_jkind, loc) ->
         check_imprecise_annotation env loc "_" ty annotated_jkind)
       !used_anonymous_variables;
     used_anonymous_variables := [];
-    TyVarMap.iter
+    LocalVarMap.iter Type
       (fun name { ty; unused; rigid; loc; stage = s; annotated_jkind } ->
         Option.iter
           (check_imprecise_annotation env loc
@@ -708,33 +789,75 @@ end = struct
                                        {name = Pprintast.tyvar_of_name name;
                                         intro_stage = stage;
                                         usage_stage = s})));
-              r := (loc, v, type_expr) :: !r;
+              types_to_unify := (loc, v, type_expr) :: !types_to_unify;
               unused := false
             | exception Not_found ->
             match unbound_variable_policy, Btype.is_Tvar ty with
             | Open, _ | (Closed | Closed_for_upstream_compatibility), false ->
               let jkind = Jkind.Builtin.any ~why:Dummy_jkind in
               let v2 = new_global_var jkind in
-              r := (loc, v, v2) :: !r;
+              types_to_unify := (loc, v, v2) :: !types_to_unify;
               add ~unused name v2 jkind s;
             | Closed, true ->
               raise(Error(loc, env,
-                          Unbound_type_variable (Pprintast.tyvar_of_name name,
-                                                 get_in_scope_names (),
-                                                 None)))
+                          Unbound_variable (TypeVar,
+                                            Pprintast.tyvar_of_name name,
+                                            get_in_scope_names Type,
+                                            None)))
             | Closed_for_upstream_compatibility, true ->
               raise(Error(loc, env,
-                          Unbound_type_variable (Pprintast.tyvar_of_name name,
-                                                 get_in_scope_names (),
-                                                 Some Upstream_compatibility))))
+                          Unbound_variable (TypeVar,
+                                            Pprintast.tyvar_of_name name,
+                                            get_in_scope_names Type,
+                                            Some Upstream_compatibility))))
       !used_variables;
-    used_variables := TyVarMap.empty;
-    fun () ->
+    let modes_to_equate = ref [] in
+    LocalVarMap.iter Mode
+      (fun name (mode, loc) ->
+        let mode_global = With_locality.newvar (get_global_level ()) in
+        (match With_locality.equate mode_global mode with
+         | Ok () -> ()
+         | Error _ ->
+           raise (Error (loc, env, Unsatisfiable_mode_variable name)));
+        match lookup_global_mode name with
+        | mode' ->
+          modes_to_equate :=
+            (loc, name, mode_global, mode') :: !modes_to_equate
+        | exception Not_found ->
+          match unbound_variable_policy with
+          | Open ->
+            let mode_global' = With_locality.newvar (get_global_level ()) in
+            modes_to_equate :=
+              (loc, name, mode_global, mode_global') :: !modes_to_equate;
+            add_mode name mode_global'
+          | Closed ->
+            raise(Error(loc, env,
+                        Unbound_variable (ModeVar,
+                                          Pprintast.tyvar_of_name name,
+                                          get_in_scope_names Mode,
+                                          None)))
+          | Closed_for_upstream_compatibility ->
+            raise(Error(loc, env,
+                        Unbound_variable (ModeVar,
+                                          Pprintast.tyvar_of_name name,
+                                          get_in_scope_names Mode,
+                                          Some Upstream_compatibility))))
+      !used_variables;
+    used_variables := LocalVarMap.empty;
+    fun () -> begin
       List.iter
         (function (loc, t1, t2) ->
           try unify env t1 t2 with Unify err ->
             raise (Error(loc, env, Type_mismatch err)))
-        !r
+        !types_to_unify;
+      List.iter
+        (function (loc, name, mode, mode') ->
+          match With_locality.equate mode mode' with
+          | Ok () -> ()
+          | Error _ ->
+            raise (Error (loc, env, Unsatisfiable_mode_variable name)))
+        !modes_to_equate
+      end
   end
 
 (* Support for first-class modules. *)
@@ -875,35 +998,120 @@ let get_type_param_name styp =
   | Ptyp_var (name, _) -> Some name
   | _ -> Misc.fatal_error "non-type-variable in get_type_param_name"
 
+type sig_var =
+  { mode : With_locality.lr;
+    upper_const : With_locality.Const.t
+  }
+
 type sig_mode =
   | Sig_const of With_locality.Const.t
+  | Sig_var of sig_var
+
+let transl_modepoly_var { txt; loc } =
+  try TyVarEnv.lookup_local_mode txt
+  with Not_found ->
+    let v = With_locality.newvar (Ctype.get_current_level ()) in
+    TyVarEnv.remember_used_mode txt v loc;
+    v
+
+let transl_modepoly_morph_r (elem : Typemode.modepoly_elem) : With_locality.r =
+  With_locality.disallow_left (transl_modepoly_var elem.elem_var)
+
+let transl_modepoly_morph_l (elem : Typemode.modepoly_elem) : With_locality.l =
+  With_locality.disallow_right (transl_modepoly_var elem.elem_var)
+
+let transl_modepoly_annot env (annot : Typemode.modepoly_annot) : sig_var =
+  let m = With_locality.newvar (get_current_level ()) in
+  match annot with
+  | Typemode.Pmode_var ({txt; loc} as var) ->
+      let v = transl_modepoly_var var in
+      (match With_locality.equate m v with
+      | Ok () -> ()
+      | Error _ -> raise (Error (loc, env, Unsatisfiable_mode_variable txt)));
+      { mode = m; upper_const = With_locality.Const.max }
+  | Typemode.Pmode_bounds { txt = { upper; lower }; loc } ->
+      let upper_const =
+        With_locality.Const.Option.value upper.bound_const.mode_modes
+          ~default:With_locality.Const.max
+      in
+      let upper_elems = List.map transl_modepoly_morph_r upper.bound_vars in
+      (match
+         With_locality.submode m
+           (With_locality.meet
+              (With_locality.of_const upper_const :: upper_elems))
+       with
+      | Ok () -> ()
+      | Error _ -> raise (Error (loc, env, Unsatisfiable_mode_bound)));
+      let lower_const =
+        With_locality.Const.Option.value lower.bound_const.mode_modes
+          ~default:With_locality.Const.min
+      in
+      let lower_elems = List.map transl_modepoly_morph_l lower.bound_vars in
+      (match
+         With_locality.submode
+           (With_locality.join
+              (With_locality.of_const lower_const :: lower_elems))
+           m
+       with
+      | Ok () -> ()
+      | Error _ -> raise (Error (loc, env, Unsatisfiable_mode_bound)));
+      { mode = m; upper_const }
 
 let alloc_of_sig_mode = function
   | Sig_const c -> With_locality.of_const c
+  | Sig_var { mode; _ } -> mode
+
+let curry_acc_of_sig_mode : sig_mode -> Curry_mode.t = function
+  | Sig_const c -> Const c
+  | Sig_var { mode; upper_const } ->
+    Variable
+      { comonadic = With_locality.Comonadic.disallow_right mode.comonadic;
+        areality = upper_const.areality }
 
 let sig_mode_legacy = Sig_const With_locality.Const.legacy
 
 let curry_sig_mode acc_mode arg_mode =
-  match acc_mode, arg_mode with
-  | Sig_const acc, Sig_const arg -> Sig_const (curry_mode_const acc arg)
-
-let transl_arrow_mode pmodes : sig_mode Typemode.modes =
-  let { Typemode.mode_modes; mode_desc } =
-    Typemode.transl_mode_with_locality pmodes
+  let acc_mode =
+    match arg_mode with
+    | Sig_const arg -> Curry_mode.add_const_arg acc_mode arg
+    | Sig_var { mode; upper_const } ->
+      Curry_mode.add_arg acc_mode mode ~upper_areality:upper_const.areality
   in
-  { mode_modes = Sig_const mode_modes; mode_desc }
+  match acc_mode with
+  | Const curry -> acc_mode, Sig_const curry
+  | Variable { comonadic; areality } ->
+    let curry = With_locality.newvar (get_current_level ()) in
+    With_locality.Comonadic.submode_exn comonadic curry.comonadic;
+    Curry_mode.Variable
+      { comonadic = With_locality.Comonadic.disallow_right curry.comonadic;
+        areality },
+    Sig_var { mode = curry; upper_const = With_locality.Const.max }
 
-let rec extract_params styp =
+let transl_arrow_mode env pmodes : sig_mode Typemode.modes =
+  if Typemode.has_mode_variables pmodes
+  then
+    { mode_modes =
+        Sig_var
+          (transl_modepoly_annot env (Typemode.transl_modepoly_annot pmodes));
+      mode_desc = []
+    }
+  else
+    let { Typemode.mode_modes; mode_desc } =
+      Typemode.transl_mode_with_locality pmodes
+    in
+    { mode_modes = Sig_const mode_modes; mode_desc }
+
+let rec extract_params env styp =
   match styp.ptyp_desc with
   | Ptyp_arrow (l, a, r, ma, mr) ->
-      let arg_mode = transl_arrow_mode ma in
+      let arg_mode = transl_arrow_mode env ma in
       (match r.ptyp_desc with
       | Ptyp_arrow _
         when not (Builtin_attributes.has_curry r.ptyp_attributes) ->
-          let params, ret, ret_mode = extract_params r in
+          let params, ret, ret_mode = extract_params env r in
           (l, arg_mode, a) :: params, ret, ret_mode
       | _ ->
-          let ret_mode = transl_arrow_mode mr in
+          let ret_mode = transl_arrow_mode env mr in
           [l, arg_mode, a], r, ret_mode)
   | _ -> assert false
 
@@ -1006,7 +1214,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       in
       ctyp desc typ
   | Ptyp_arrow _ ->
-      let args, ret, ret_mode = extract_params styp in
+      let args, ret, ret_mode = extract_params env styp in
       let rec loop acc_mode args =
         match args with
         | (l, arg_mode, arg) :: rest ->
@@ -1018,12 +1226,14 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
             else
               transl_type env ~policy ~row_context arg_mode.mode_modes arg
           in
-          let acc_mode = curry_sig_mode acc_mode arg_mode.mode_modes in
-          let ret_mode =
+          let acc_mode, ret_mode =
             match rest with
-            | [] -> ret_mode
+            | [] -> acc_mode, ret_mode
             | _ :: _ ->
-              { mode_modes = acc_mode; mode_desc = [] }
+              let acc_mode, curry =
+                curry_sig_mode acc_mode arg_mode.mode_modes
+              in
+              acc_mode, { mode_modes = curry; mode_desc = [] }
           in
           let ret_cty = loop acc_mode rest in
           let arg_ty = arg_cty.ctyp_type in
@@ -1065,7 +1275,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
           ctyp (Ttyp_arrow (l, arg_cty, arg_modes, ret_cty, ret_modes)) ty
         | [] -> transl_type env ~policy ~row_context ret_mode.mode_modes ret
       in
-      loop mode args
+      loop (curry_acc_of_sig_mode mode) args
   | Ptyp_tuple stl ->
     let ctys, tys = transl_type_aux_tuple env ~loc ~policy ~row_context stl in
     ctyp (Ttyp_tuple ctys) (newty (Ttuple tys))
@@ -1706,7 +1916,8 @@ let transl_type env policy mode styp =
 let transl_simple_type_impl env ~new_var_jkind ?univars ~policy mode styp =
   TyVarEnv.reset_locals ?univars ();
   let policy = TyVarEnv.make_policy policy new_var_jkind in
-  let typ = transl_type env policy mode styp in
+  let typ = transl_type env policy mode styp
+  in
   TyVarEnv.globalize_used_variables policy env ();
   make_fixed_univars typ.ctyp_type;
   typ
@@ -1722,7 +1933,8 @@ let transl_simple_type_univars env styp =
     TyVarEnv.collect_univars begin fun () ->
       with_local_level_generalize begin fun () ->
         let policy = TyVarEnv.univars_policy in
-        let typ = transl_type env policy sig_mode_legacy styp in
+        let typ = transl_type env policy sig_mode_legacy styp
+        in
         TyVarEnv.globalize_used_variables policy env ();
         typ
       end
@@ -1737,7 +1949,8 @@ let transl_simple_type_delayed env mode styp =
   let typ, force =
     with_local_level_generalize begin fun () ->
       let policy = TyVarEnv.make_policy Open Any in
-      let typ = transl_type env policy (Sig_const mode) styp in
+      let typ = transl_type env policy (Sig_const mode) styp
+      in
       make_fixed_univars typ.ctyp_type;
       (* This brings the used variables to the global level, but doesn't link
          them to their other occurrences just yet. This will be done when
@@ -1908,9 +2121,10 @@ let report_unbound_variable_reason = function
   | None -> []
 
 let report_error_doc loc env = function
-  | Unbound_type_variable (name, in_scope_names, reason) ->
+  | Unbound_variable (universe, name, in_scope_names, reason) ->
     Location.aligned_error_hint ~loc
-      "@{<ralign>The type variable @}%a is unbound in this type declaration."
+      "@{<ralign>The %s variable @}%a is unbound in this type declaration."
+        (match universe with TypeVar -> "type" | ModeVar -> "mode")
         Style.inline_code name
         (Misc.did_you_mean (Misc.spellcheck in_scope_names name))
         ~sub:(report_unbound_variable_reason reason)
@@ -2122,6 +2336,12 @@ let report_error_doc loc env = function
          value descriptions introduced using %a.@]"
         Style.inline_code "layout_"
         Style.inline_code "val poly_"
+  | Unsatisfiable_mode_bound ->
+      Location.errorf ~loc "This mode bound cannot be satisfied."
+  | Unsatisfiable_mode_variable name ->
+      Location.errorf ~loc
+        "The mode constraints on %a cannot be satisfied."
+        Style.inline_code ("'" ^ name)
 
 let () =
   Location.register_error_of_exn
