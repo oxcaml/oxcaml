@@ -22,7 +22,8 @@ type ('a, 'b, 'c) t = ('a, 'b, 'c) Ast_pattern0.t
 
 val parse :
   ('a, 'b, 'c) t -> Location.t -> ?on_error:(unit -> 'c) -> 'a -> 'b -> 'c
-(** Matches a value against a pattern. Raise a located error in case of failure. *)
+(** Matches a value against a pattern. Raise a located error in case of failure.
+*)
 
 val parse_res :
   ('a, 'b, 'c) t ->
@@ -209,3 +210,47 @@ type context
 
 val of_func : (context -> Location.t -> 'a -> 'b -> 'c) -> ('a, 'b, 'c) t
 val to_func : ('a, 'b, 'c) t -> context -> Location.t -> 'a -> 'b -> 'c
+
+val fail : Location.t -> string -> _
+(** Call from [of_func]'s argument when the pattern does not match. The string
+    should describe the expected shape of the AST where the match failed. *)
+
+(** {2:future-asts Compat functions for future AST nodes}
+
+    The functions in this section provide a safe interface to match over AST
+    nodes that cannot be represented with Ppxlib's own AST but are available
+    with more recent versions of the compiler. *)
+
+val ppat_effect :
+  (pattern, 'a, 'b) t -> (pattern, 'b, 'c) t -> (pattern, 'a, 'c) t
+(** Match over an encoded OCaml 5.3 effect pattern. *)
+
+val ptyp_labeled_tuple :
+  ((string option * core_type) list, 'a, 'b) t -> (core_type, 'a, 'b) t
+(** Match over an encoded OCaml 5.4 labeled tuple type.
+
+    It will fail on a regular tuple type and as a consequence, if it matches, at
+    least one type in the tuple is guaranteed to be labeled. *)
+
+val pexp_labeled_tuple :
+  ((string option * expression) list, 'a, 'b) t -> (expression, 'a, 'b) t
+(** Match over an encoded OCaml 5.4 labeled tuple expression.
+
+    It will fail on a regular tuple expression and as a consequence, if it
+    matches, at least one expression in the tuple is guaranteed to be labeled.
+*)
+
+val ppat_labeled_tuple :
+  ((string option * pattern) list * closed_flag, 'a, 'b) t ->
+  (pattern, 'a, 'b) t
+(** Match over an encoded OCaml 5.4 labeled tuple pattern.
+
+    It will fail on a regular tuple expression and as a consequence, if it
+    matches, either at least one pattern in the tuple is guaranteed to be
+    labeled or the flag to be [Open]. *)
+
+val pexp_hole : (expression, 'a, 'a) t
+(** Match over an encoded OCaml 5.6 expression hole. *)
+
+val pmod_hole : (module_expr, 'a, 'a) t
+(** Match over an encoded OCaml 5.6 module expression hole. *)

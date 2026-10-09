@@ -19,6 +19,8 @@ module Rule : sig
   (** Rewrite an extension point *)
 
   val special_function : string -> (expression -> expression option) -> t
+
+  val special_function' : Longident.t -> (expression -> expression option) -> t
   (** [special_function id expand] is a rule to rewrite a function call at
       parsing time. [id] is the identifier to match on and [expand] is used to
       expand the full function application (it gets the Pexp_apply node). If the
@@ -26,7 +28,9 @@ module Rule : sig
       the identifier (Pexp_ident node) so you should handle both cases.
 
       If [id] is an operator identifier and contains dots, it should be
-      parenthesized (e.g. ["(+.+)"]).
+      parenthesized (e.g. ["(+.+)"]). Another option is to use the
+      [special_function'] variant which takes directly a {!Longident.t}
+      argument.
 
       [expand] must decide whether the expression it receive can be rewritten or
       not. Especially ppxlib makes the assumption that [expand] is idempotent.
@@ -47,7 +51,50 @@ module Rule : sig
 
   (** The rest of this API is for rewriting rules that apply when a certain
       attribute is present. The API is not complete and is currently only enough
-      to implement deriving. *)
+      to implement deriving and ppx_template. *)
+
+  val attr_replace :
+    string ->
+    'a Extension.Context.t ->
+    ('a, 'b) Attribute.t ->
+    (ctxt:Expansion_context.Base.t -> 'a -> 'b -> 'a) ->
+    t
+  (** Rewrite an item when the attribute is present.
+
+      These should be used sparingly and only for driving minor modifications to
+      a syntax node, if you want to do larger rewrites you should prefer to use
+      {!extension}. This is to keep the syntax clear for users of PPXes;
+      attributes should be thought of as adding code or information to an item,
+      and extensions rewriting code to something new. *)
+
+  (** An advanced module if you want to replace an item with multiple attributes
+      simultaneously. *)
+  module Attr_multiple_replace : sig
+    module Attribute_list : sig
+      type ('a, _) t =
+        | [] : ('a, unit) t
+        | ( :: ) : ('a, 'b) Attribute.t * ('a, 'c) t -> ('a, 'b * 'c) t
+    end
+
+    module Parsed_payload_list : sig
+      type _ t = [] : unit t | ( :: ) : 'a option * 'b t -> ('a * 'b) t
+    end
+
+    val attr_multiple_replace :
+      string ->
+      'a Extension.Context.t ->
+      ('a, 'list) Attribute_list.t ->
+      (ctxt:Expansion_context.Base.t -> 'a -> 'list Parsed_payload_list.t -> 'a) ->
+      t
+    (** Rewrite an item when any of the provided list of attributes are present.
+        It has the same caveats as {!attr_replace}.
+
+        This function uses GADT lists to provide type safety for the payloads
+        provided: when you call it with [[ attr1; attr2 ]] the replacement
+        function will provide you with a {!Parsed_payload_list.t} containing
+        [[ attr1_payload option; attr2_payload option ]]. These are options
+        because not all the attributes are necessarily present on the item.*)
+  end
 
   type ('a, 'b, 'c) attr_group_inline =
     ('b, 'c) Attribute.t ->
@@ -101,6 +148,17 @@ module Rule : sig
   val attr_sig_module_type_decl_expect :
     (signature_item, module_type_declaration, _) attr_inline
 
+  val attr_str_module_binding : (structure_item, module_binding, _) attr_inline
+
+  val attr_sig_module_declaration :
+    (signature_item, module_declaration, _) attr_inline
+
+  val attr_str_module_binding_expect :
+    (structure_item, module_binding, _) attr_inline
+
+  val attr_sig_module_declaration_expect :
+    (signature_item, module_declaration, _) attr_inline
+
   val attr_str_type_ext : (structure_item, type_extension, _) attr_inline
   val attr_sig_type_ext : (signature_item, type_extension, _) attr_inline
   val attr_str_type_ext_expect : (structure_item, type_extension, _) attr_inline
@@ -113,6 +171,29 @@ module Rule : sig
 
   val attr_sig_exception_expect :
     (signature_item, type_exception, _) attr_inline
+
+  val attr_str_class_type_decl :
+    (structure_item, class_type_declaration, _) attr_group_inline
+
+  val attr_sig_class_type_decl :
+    (signature_item, class_type_declaration, _) attr_group_inline
+
+  val attr_str_class_type_decl_expect :
+    (structure_item, class_type_declaration, _) attr_group_inline
+
+  val attr_sig_class_type_decl_expect :
+    (signature_item, class_type_declaration, _) attr_group_inline
+
+  type ('item, 'parsed_payload) attr_floating_inline =
+    ('item, 'parsed_payload) Attribute.Floating.t ->
+    (ctxt:Expansion_context.Deriver.t -> 'parsed_payload -> 'item list) ->
+    t
+
+  val attr_str_floating_expect_and_expand :
+    (structure_item, _) attr_floating_inline
+
+  val attr_sig_floating_expect_and_expand :
+    (signature_item, _) attr_floating_inline
 end
 
 (**/**)
@@ -146,10 +227,11 @@ end
    parser should be fixed. *)
 class map_top_down :
   ?expect_mismatch_handler:
-    Expect_mismatch_handler.t (* default: Expect_mismatch_handler.nop *)
-  -> ?generated_code_hook:
-       Generated_code_hook.t (* default: Generated_code_hook.nop *)
-  -> Rule.t list
-  -> object
-       inherit Ast_traverse.map_with_expansion_context_and_errors
-     end
+    Expect_mismatch_handler.t (* default: Expect_mismatch_handler.nop *) ->
+  ?generated_code_hook:
+    Generated_code_hook.t (* default: Generated_code_hook.nop *) ->
+  ?embed_errors:bool ->
+  Rule.t list ->
+object
+  inherit Ast_traverse.map_with_expansion_context_and_errors
+end

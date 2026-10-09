@@ -39,3 +39,8 @@ val match_signature :
   signature ->
   unit
 (** Same for signatures *)
+
+val allow_deriving_end : bool ref
+(** The legacy attribute [@@@deriving.end] is disabled by default, and
+    superseded by [@@@ppxlib.inline.end]. It can be enabled by setting
+    [allow_deriving_end := true]. See [-allow-deriving-end] in [Driver]. *)

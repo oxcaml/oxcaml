@@ -1,5 +1,221 @@
 unreleased
+----------
+
+- Fix a bug in `Ast_builder.Default.pexp_apply` where it would duplicate
+  attributes and mess up the locations. (#643. @Skepfyr)
+
+- Add support for OCaml 5.6 primitive aliases (#642, @NathanReb)
+
+- Remove reduntant module type copy from migrate_504_503, preventing
+  exponential blowup with many "with" constraints. (#644, @smuenzel)
+
+- Add support for OCaml 5.6 holes (#651, @patricoferris, @NathanReb)
+
+- Fix the 5.4/5.3 migration of attributes on package types (#650, @dra27, @patricoferris, @NathanReb)
+
+0.38.0
+------
+
+- Add support for OCaml 5.5 (#622, @patricoferris, @NathanReb)
+
+- Add support for OCaml 5.4 bivariant type parameters, they can now be used
+  alongside ppx-es. (#629, @NathanReb)
+
+- Add `Attribute.Floating.declare_with_attr_loc` and `.declare_with_name_loc`,
+  by analogy to the same functions at top level of `Attribute`. (#631, @ceastlund)
+
+- Migrate `Ptyp_open` nodes using an extension point (#625, @patricoferris)
+
+- Add Ast_builder and Ast_pattern utilities to manipulate encoded
+  effect patterns (#624, @NathanReb)
+
+- Fix a bug where ppat_effects would be encoded/decoded instead of copied by
+  the 5.4 <-> 5.3 migrations (#624, @NathanReb)
+
+- Fix infinite loop when duplicate attributes are present, raising
+  an error instead (#613, @ceastlund, @patricoferris)
+- Ignore extensions inside attributes for the unused extension check
+  (#616, @Skepfyr)
+- Fix a bug that inserted `Location.none` into `Longident`s when using OCaml
+  5.4 and above (#619, @patricoferris)
+
+- Add support for OCaml 5.4 labeled tuples, they can now be used alongside
+  ppx-es. Also adds Ast_builder and Ast_pattern utilities to manipulate them.
+  (#607, @NathanReb)
+
+0.37.0
+------
+
+### 5.4 Support
+
+- Add initial OCaml 5.4 support (#570, @patricoferris, @NathanReb)
+
+### Other Changes
+
+- Add `Longident.to/of_compiler` to astlib to simplify maintenance
+  of ppx-es that interacts with other parts of the compiler-libs such
+  as the type checker. (#603, @NathanReb)
+
+- Fix a bug where some infix operators such as `mod` would be printed as
+  raw identifiers by our `Pprintast`. (#601, @NathanReb)
+
+- Fix 5.2 -> 5.3 migration of constants. Those used to always have a `none`
+  location which can lead to unhelpful error messages.
+  (#569, @NathanReb)
+
+- Add a new context-free rule type that replaces AST nodes that have the registered
+  attributes attached to them. (#574, @Skepfyr)
+
+- Allow users to derive code from module bindings and module declarations
+  (#576, @patricoferris)
+
+- Expose `Ppxlib.Location.Error.t = Astlib.Location.Error.t` (#593, @ceastlund)
+
+- Add `@@@ppxlib.inline.end`, deprecate `@@@deriving.end`. (#594, @ceastlund)
+
+- Clean the AST of any ppxlib migration attributes whenever printing using
+  Pretty_print mode and the use_compiler_pp flag. (#598, @patricoferris)
+
+- Add custom printer support to `pp_ast` functions via the `?printer` config
+  parameter. (#526, @pedrobslisboa)
+
+0.36.2
+------
+
+- Make Ast_builder's default `value_binding` constructor generate the proper
+  `pvb_constraint` from the pattern and expression arguments.
+  (#589, @NathanReb)
+- Fix pprintast to output correct syntax from `Ppat_constraint (pat, Ptyp_poly ...)`
+  nodes until they are completely dropped. (#588, @NathanReb)
+
+0.36.1 (2025-07-10)
 -------------------
+
+- Fix ppxlib driver's AST to source printer. Our copy of pprintast was not
+  properly updated which resulted in incorrect printing of value bindings'
+  constraints (#585, @NathanReb)
+
+0.36.0 (2025-03-03)
+-------------------
+
+- Change `Location.none` to match the compiler's `Location.none` as of OCaml
+  4.08. This fixes a bug in `loc_of_attribute` (#540, @ncik-roberts, @patricoferris)
+
+- Bump ppxlib's AST to 5.2.0 (#514, @patricoferris)
+
+- Add the `[@@@expand_inline]` transformation and support for floating attribute context
+  free transformations. (#560, @jaymody)
+
+- Add a `-raise-embedded-errors` flag to the driver. Setting this flag raises the first
+  `ocaml.error` embedded in the final AST.
+
+- Export `Ast_pattern.fail`. (#563, @ceastlund)
+
+- Make `Ast_traverse.sexp_of` more concise, and add a test. (#561, @ceastlund)
+
+0.35.0 (2025-02-03)
+-------------------
+
+- Allow use of effect syntax in preprocessed files without causing migration
+  failures. (#552, @hhugo, @NathanReb)
+
+- Remove support for compilers older than 4.08 (#556, @NathanReb)
+
+- Add a `--use-compiler-pp` flag to the standalone driver. This flag
+ can be set when the driver outputs source code to make it use the compiler's
+ `Pprintast` instead of ppxlib's.
+ (#555, @NathanReb)
+
+0.34.0 (2025-01-06)
+-------------------
+
+### 5.3 support
+
+- Add initial OCaml 5.3 support (#487, @NathanReb, @hhugo, @nojb)
+
+- Initialise OCaml 5.3's lexer with the `keywords` setting from `OCAMLPARAM` or
+  the new `-keywords` driver's CLI option to allow the standalone ppx driver to
+  process old packages using `effect` as an identifier
+  (#535, @dra27, @NathanReb)
+
+### Other changes
+
+- Add `Pprintast.binding`, `longident` and `payload` (#542, @mattiasdrp)
+
+- Fix `deriving_inline` round-trip check so that it works with 5.01 <-> 5.02
+  migrations (#519, @NathanReb)
+
+- Add ppxlib's AST pretty-printing utilities in `Ppxlib.Pp_ast` and
+  a `ppxlib-pp-ast` executable in a new separate `ppxlib-tools` package
+  (#517, #525, #537, @NathanReb)
+
+- Change `-dparsetree` from a sexp output to a pretty printed AST, closer
+  to what the compiler's `-dparsetree` is.
+  (#530, @NathanReb)
+
+- Add Parsetree documentation comments to `Ast_builder` functions (#518, @patricoferris)
+
+- Support class type declarations in derivers with the new, optional arguments
+  `{str,sig}_class_type_decl` in `Deriving.add` (#538, @patricoferris)
+
+0.33.0 (2024-07-22)
+-------------------
+
+- Fix a bug where `Code_path.main_module_name` would not properly remove
+  extensions from the filename and therefore return an invalid module name.
+  (#512, @NathanReb)
+
+- Add `-unused-type-warnings` flag to the driver to allow users to disable
+  only the generation of warning 34 silencing structure items when using
+  `[@@deriving ...]` on type declarations. (#511, @mbarbin, @NathanReb)
+
+- Make `-unused-code-warnings` flag to the driver also controls the generation
+  of warning 34 silencing structure items when using `[@@deriving ...]` on type
+  declarations. (#510, @mbarbin, @NathanReb)
+
+- Driver: Add `-unused-code-warnings=force` command-line flag argument. (#490, @mbarbin)
+
+- new functions `Ast_builder.{e,p}list_tail` that take an extra tail
+  expression/pattern argument parameter compared to `Ast_builder.{e,p}list`, so
+  they can build ASTs like `a :: b :: c` instead of only `[ a; b ]`.
+  (#498, #502, @v-gb, @NathanReb)
+
+- Fix `Longident.parse` so it also handles indexing operators such as
+  `.!()`, `.%(;..)<-`, or `Vec.(.%())` (#494, @octachron)
+
+- Add a `special_function'` variant which directly takes a `Longident.t`
+  argument to avoid the issue that `Longident.t` cover distinct syntaxic classes
+  which cannot be easily parsed by a common parser (#496, @octachron).
+
+- Keep location ranges consistent when migrating `Pexp_function` nodes from 5.2+
+  to older versions (#504, @jchavarri)
+
+- Fix `-locations-check` behaviour so it is no longer required to pass `-check`
+  as well to enable location checks. (#506, @NathanReb)
+
+
+0.32.1 (2024-04-23)
+-------------------
+
+- Add support for OCaml 5.2
+
+- Insert errors from caught located exceptions in place of the code that
+  should have been generated by context-free rules. (#472, @NathanReb)
+
+0.32.0 (2024-02-05)
+-------------------
+
+- Add an optional `embed_errors` argument to `Context_free.map_top_down` that
+  controls how to deal with exceptions thrown by context-free rules.
+  (#468, @NathanReb)
+
+- Fix `Longident.parse` so it properly handles unparenthesized dotted operators
+  such as `+.` or `*.`. (#111, @rgrinberg, @NathanReb)
+
+- raising an exception does no longer cancel the whole context free phase(#453, @burnleydev1)
+
+- Sort embedded errors that are appended to the AST by location so the compiler
+  reports the one closer to the beginning of the file first. (#463, @NathanReb)
 
 - Update `Attribute.get` to ignore `loc_ghost`. (#460, @ceastlund)
 
@@ -8,6 +224,16 @@ unreleased
 - Update changelog to use ISO 8061 date format: YYYY-MM-DD. (#445, @ceastlund)
 
 - Replace `Caml` with `Stdlib`. (#427, @ceastlund)
+
+- When a transformation raises, the last valid AST is used as input to the upcoming
+  transformations. All such errors are collected and appended as
+  extension nodes to the final AST (#447, @burnleydev1)
+
+- Fix a small mistake in the man pages: Embededding errors is done by default with
+  `-as-pp`, not with `-dump-ast` (#464, @pitag-ha)
+
+- Set appropriate binary mode when writing to `stdout` especially for Windows
+  compatibility. (#466, @jonahbeckford)
 
 0.31.0 (2023-09-21)
 -------------------

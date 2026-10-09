@@ -9,12 +9,12 @@ open! Import
 (** {2 Annotations merlin understand} *)
 
 val hide_attribute : attribute
-(** Adding this [\[@merlin.hide\]] attribute on a piece of AST "hides" it from
+(** Adding this [[@merlin.hide]] attribute on a piece of AST "hides" it from
     merlin: it tells merlin not to consider that branch if another piece of AST
     with the same location exist. *)
 
 val focus_attribute : attribute
-(** Adding this [\[@merlin.focus\]] attribute on a piece of AST tells merlin to
+(** Adding this [[@merlin.focus]] attribute on a piece of AST tells merlin to
     prefer it to any other piece of AST when several have the same location. *)
 
 (** {2 Helpers}

@@ -1,0 +1,16 @@
+(rule
+ (package ppxlib)
+ (alias runtest)
+ ; #install_printer is not working on older compilers for some reason
+ ; This is fine as this does not need to be tested on older compilers anyway
+ (enabled_if
+  (>= %{ocaml_version} 5.1))
+ (deps
+  (:test test.ml)
+  (package ppxlib))
+ (action
+  (chdir
+   %{project_root}
+   (progn
+    (run expect-test %{test})
+    (diff? %{test} %{test}.corrected)))))

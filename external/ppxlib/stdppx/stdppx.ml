@@ -275,6 +275,12 @@ module List = struct
 
   (* reorders arguments to improve type inference *)
   let iter list ~f = iter list ~f
+
+  let rec equal ~eq l1 l2 =
+    match (l1, l2) with
+    | [], [] -> true
+    | [], _ :: _ | _ :: _, [] -> false
+    | a1 :: l1, a2 :: l2 -> eq a1 a2 && equal ~eq l1 l2
 end
 
 module Option = struct
@@ -288,7 +294,7 @@ end
 module Result = struct
   let bind t ~f = match t with Ok a -> f a | Error e -> Error e
   let map t ~f = match t with Ok a -> Ok (f a) | Error e -> Error e
-  let map_error t ~f = match t with Ok a -> Ok (f a) | Error e -> Error e
+  let map_error t ~f = match t with Ok a -> Ok a | Error e -> Error (f e)
   let ( >>= ) t f = bind t ~f
   let ( >>| ) t f = map t ~f
   let handle_error t ~f = match t with Ok a -> a | Error e -> f e
@@ -385,6 +391,25 @@ module String = struct
   let lowercase_ascii = Stdlib.String.lowercase_ascii
   let uncapitalize_ascii = Stdlib.String.uncapitalize_ascii
   let split_on_char t ~sep = Stdlib.String.split_on_char sep t
+
+  let is_substring t ~substring =
+    let len_t = String.length t in
+    let len_sub = String.length substring in
+    if len_sub = 0 then true
+    else if len_sub > len_t then false
+    else
+      let rec matches_at pos sub_pos =
+        if sub_pos = len_sub then true
+        else if Char.equal (get t pos) (get substring sub_pos) then
+          matches_at (pos + 1) (sub_pos + 1)
+        else false
+      in
+      let rec is_substring_at pos =
+        if pos + len_sub > len_t then false
+        else if matches_at pos 0 then true
+        else is_substring_at (pos + 1)
+      in
+      is_substring_at 0
 
   include (Poly : Comparisons with type t := string)
 

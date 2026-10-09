@@ -7,7 +7,7 @@ rule rewrite is_current ocaml_version = parse
       print_string chunk;
       rewrite is_current ocaml_version lexbuf
     }
-  |          "(*IF_AT_LEAST " ([^'*' ' ']* as v) " " ([^'*']* as s) "*)"
+  |          "(*IF_AT_LEAST " ([^'*' ' ']* as v) " " (([^'*'] | '*' [^')'])* as s) "*)"
     { let chunk = if (v <= ocaml_version)
         then "              " ^ String.make (String.length v + 1) ' ' ^ s ^          "  "
         else Lexing.lexeme lexbuf
@@ -15,7 +15,7 @@ rule rewrite is_current ocaml_version = parse
       print_string chunk;
       rewrite is_current ocaml_version lexbuf
     }
-  |          "(*IF_NOT_AT_LEAST " ([^'*' ' ']* as v) " " ([^'*']* as s) "*)"
+  |          "(*IF_NOT_AT_LEAST " ([^'*' ' ']* as v) " " (([^'*'] | '*' [^')'])* as s) "*)"
     { let chunk = if not (v <= ocaml_version)
         then "                  " ^ String.make (String.length v + 1) ' ' ^ s ^          "  "
         else Lexing.lexeme lexbuf
@@ -28,5 +28,4 @@ rule rewrite is_current ocaml_version = parse
       rewrite is_current ocaml_version lexbuf
     }
   | eof { () }
-
 

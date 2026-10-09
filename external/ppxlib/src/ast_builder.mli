@@ -35,6 +35,14 @@ module Default : sig
       (label loc list * pattern) option ->
       pattern
 
+    val value_binding :
+      ?constraint_:value_constraint ->
+      loc:location ->
+      pat:pattern ->
+      expr:expression ->
+      unit ->
+      value_binding
+
     val constructor_declaration :
       loc:location ->
       name:label loc ->
@@ -47,6 +55,13 @@ module Default : sig
 
   val ppat_construct :
     loc:location -> longident loc -> pattern option -> pattern
+
+  val coalesce_arity : expression -> expression
+  (** If an expression [e] is a function of arity [n] with a body that is
+      another function with arity [m], then [coalesce_arity e] will produce a
+      function of arity [n + m]. This will not run recursively, so an expression
+      [fun x -> fun y -> fun z -> x + y + z] will become
+      [fun x y -> fun z -> x + y + z]. *)
 
   val constructor_declaration :
     loc:location ->
@@ -77,6 +92,13 @@ module type S = sig
     val ppat_construct :
       longident loc -> (label loc list * pattern) option -> pattern
 
+    val value_binding :
+      ?constraint_:value_constraint ->
+      pat:pattern ->
+      expr:expression ->
+      unit ->
+      value_binding
+
     val constructor_declaration :
       name:label loc ->
       vars:label loc list ->
@@ -87,6 +109,7 @@ module type S = sig
   end
 
   val ppat_construct : longident loc -> pattern option -> pattern
+  val value_binding : pat:pattern -> expr:expression -> value_binding
 
   val constructor_declaration :
     name:label loc ->
@@ -97,6 +120,7 @@ end
 
 (** Build Ast helpers with the location argument factorized. *)
 module Make (Loc : Loc) : S
+[@@ocaml.warning "-67"]
 
 val make : Location.t -> (module S)
 (** Functional version of [Make]. *)
