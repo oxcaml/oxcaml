@@ -14,6 +14,11 @@ end
 
 (* compiles: *)
 module Three : sig
+  (* Note that `'a -> ('b -> 'c -> ...) @ local` implicitly forces
+     `'c -> ...` to be `@ local`, since modes are deep, and furthermore the
+     reason modes are deep in this case is that later closures still have to
+     hold on to earlier closed-over data, and that earlier [local] data might
+     reference data on the stack that can be freed arbitrarily soon. *)
   val f : int -> (int -> int -> int) @ local [@@zero_alloc partial]
 end = struct
   let f x y z = x + y + z
