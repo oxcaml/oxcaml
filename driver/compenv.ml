@@ -66,8 +66,6 @@ let first_include_dirs = ref []
 let last_include_dirs = ref []
 let first_ccopts = ref []
 let last_ccopts = ref []
-(* [-jsoo-opt*] options, kept like [-ccopt] ones: those from the command line
-   and from the first part of OCAMLPARAM in [first], the others in [last]. *)
 let jsoo_opts =
   List.map (fun phase -> phase, (ref [], ref []))
     Clflags.Jsoo_phase.all

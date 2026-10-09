@@ -4,7 +4,7 @@
  * -------------------------------------------------------------------------- *
  *                               MIT License                                  *
  *                                                                            *
- * Copyright (c) 2025 Jane Street Group LLC                                   *
+ * Copyright (c) 2026 Jane Street Group LLC                                   *
  * opensource-contacts@janestreet.com                                         *
  *                                                                            *
  * Permission is hereby granted, free of charge, to any person obtaining a    *
@@ -90,7 +90,7 @@ let debuginfo_args () = if !Clflags.debug then ["--debuginfo"] else []
 
 (* Stubs are stored in [.cmjxa] files as they were given on the command line
    when the library was created, so a bare file name may refer to a file
-   installed next to the library: look it up in the load path first. *)
+   installed next to the library. *)
 let find_stub name =
   match Load_path.find name with
   | path -> path
@@ -99,9 +99,6 @@ let find_stub name =
     then name
     else raise (Linkenv.Error (Linkenv.File_not_found name))
 
-(* Not [Misc.protect_output_to_file]: the [.cmj] file is left behind for
-   inspection when js_of_ocaml fails, so it must not be removed with the outputs
-   of a failed compilation. *)
 let write_cmj ~filename ~compilation_unit
     ({ program; imported_compilation_units } : Optcomp_intf.jsir_program) =
   let oc = open_out_bin filename in
@@ -197,8 +194,6 @@ let make
       let objfiles =
         List.map (fun ({ path; _ } : Linkenv.objfile_to_link) -> path) objfiles
       in
-      (* The runtime plays the role of the startup file: it is built for each
-         executable, with its stubs, and kept with [-dstartup]. *)
       let runtime = output_name ^ ".runtime.js" in
       Misc.try_finally
         ~always:(fun () ->
@@ -221,8 +216,6 @@ let make
 
     let set_load_path_for_eval () = ()
   end) : Optcompile.S)
-
-(* Error report *)
 
 let report_error_doc ppf = function
   | Js_of_ocaml_not_found program ->
