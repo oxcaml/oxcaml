@@ -250,7 +250,8 @@ parallel-%:
 	 || (echo "Your 'parallel' tool seems incompatible with GNU parallel.";\
 	     echo "This target requires GNU parallel.";\
 	     exit 1)
-	@$(ocamltest) $(addprefix -find-tests ,$(sort $(wildcard tests/$**))) \
+	@$(ocamltest) $(or $(addprefix -find-tests ,$(sort $(wildcard tests/$**))),\
+	    $(error No test directory matches 'tests/$**')) \
 	 | parallel --gnu --no-notice --keep-order $(J_ARGUMENT) \
 	     "$(MAKE) --no-print-directory exec-test-file TEST={} 2>&1" \
 	 | tee $(TESTLOG)
