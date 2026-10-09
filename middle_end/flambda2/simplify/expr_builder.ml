@@ -147,8 +147,6 @@ let create_coerced_singleton_let uacc var defining_expr
       generate_outer_binding (Bound_var.name_mode var)
 
 let make_new_let_bindings uacc ~bindings_outermost_first ~body =
-  (* The name occurrences component of [uacc] is expected to be in the state
-     described in the comment at the top of [Simplify_let.rebuild_let]. *)
   let notify_removed expr ~original_defining_expr =
     match (original_defining_expr : Named.t option) with
     | Some (Prim (prim, _dbg)) ->
@@ -171,9 +169,18 @@ let make_new_let_bindings uacc ~bindings_outermost_first ~body =
           simplified_defining_expr
         in
         let defining_expr = Simplified_named.to_named defining_expr in
-        assert (
-          Name_occurrences.equal free_names_of_defining_expr
-            (Named.free_names defining_expr));
+        if
+          Flambda_features.check_invariants ()
+          && not
+               (Name_occurrences.equal free_names_of_defining_expr
+                  (Named.free_names defining_expr))
+        then
+          Misc.fatal_errorf
+            "Mismatch between free_names_of_defining_expr and actual free \
+             names of defining_expr:@ %a@ =@ %a"
+            Name_occurrences.print free_names_of_defining_expr
+            Name_occurrences.print
+            (Named.free_names defining_expr);
         let expr, uacc =
           match (let_bound : Bound_pattern.t) with
           | Singleton _ | Set_of_closures _ ->
@@ -188,6 +195,13 @@ let make_new_let_bindings uacc ~bindings_outermost_first ~body =
               Bound_pattern.print let_bound Named.print defining_expr
         in
         expr, uacc)
+
+(* It does not matter what we use as a defining expr when not rebuilding terms:
+   it will not be inspected. *)
+let dummy_defining_expr =
+  Named.dummy_value
+    ~machine_width:Target_system.Machine_width.Thirty_two_no_gc_tag_bit
+    Flambda_kind.value
 
 let create_raw_let_symbol uacc bound_static static_consts ~body =
   let bindable = Bound_pattern.static bound_static in
@@ -206,15 +220,7 @@ let create_raw_let_symbol uacc bound_static static_consts ~body =
   in
   let uacc, defining_expr =
     if Are_rebuilding_terms.do_not_rebuild_terms (UA.are_rebuilding_terms uacc)
-    then
-      (* It does not matter what we use as a defining expr: it will not be
-         inspected. *)
-      let defining_expr =
-        Named.dummy_value
-          ~machine_width:(UE.machine_width (UA.uenv uacc))
-          Flambda_kind.value
-      in
-      uacc, defining_expr
+    then uacc, dummy_defining_expr
     else
       let defining_expr = Rebuilt_static_const.Group.to_named static_consts in
       ( add_set_of_closures_offsets ~is_phantom:false defining_expr uacc,

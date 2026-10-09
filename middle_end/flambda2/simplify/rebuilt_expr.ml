@@ -374,9 +374,9 @@ let create_non_recursive_let_cont' are_rebuilding cont handler ~body
     |> create ~cost_metrics ~free_names
 
 let create_recursive_let_cont are_rebuilding ~invariant_params handlers ~body =
-  let (cost_metrics_of_handlers, free_names), handlers =
-    Continuation.Lmap.fold_left_map
-      (fun (cost_metrics, free_names) _ handler ->
+  let cost_metrics_of_handlers, free_names =
+    Continuation.Lmap.fold
+      (fun _ handler (cost_metrics, free_names) ->
         let cost_metrics =
           Cost_metrics.( + ) cost_metrics
             (Continuation_handler.cost_metrics_of_handler handler)
@@ -393,10 +393,9 @@ let create_recursive_let_cont are_rebuilding ~invariant_params handlers ~body =
           Name_occurrences.union free_names
             (Name_occurrences.increase_counts free_names_of_handler)
         in
-        ( (cost_metrics, free_names),
-          Continuation_handler.to_continuation_handler handler ))
-      (Cost_metrics.zero, free_names body)
+        cost_metrics, free_names)
       handlers
+      (Cost_metrics.zero, free_names body)
   in
   let free_names =
     Continuation.Lmap.fold
@@ -411,6 +410,10 @@ let create_recursive_let_cont are_rebuilding ~invariant_params handlers ~body =
   if ART.do_not_rebuild_terms are_rebuilding
   then term_not_rebuilt ~cost_metrics ~free_names
   else
+    let handlers =
+      Continuation.Lmap.map Continuation_handler.to_continuation_handler
+        handlers
+    in
     Let_cont.create_recursive ~invariant_params handlers ~body:(to_expr0 body)
     |> create ~cost_metrics ~free_names
 
