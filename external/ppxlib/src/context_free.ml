@@ -381,7 +381,7 @@ let handle_attr_replace_once context attrs item base_ctxt : 'a option t =
           | [] -> return (false, Rule.Attr_replace.Parsed_payload_list.[])
           | x :: xs ->
               (if Attribute.Context.equal context (Attribute.context x) then
-                 return @@ Attribute.get x item
+                 Attribute.get_res x item |> of_result ~default:None
                else return None)
               >>= fun p ->
               get_attr_payloads xs >>| fun (any_attrs, ps) ->
@@ -392,64 +392,82 @@ let handle_attr_replace_once context attrs item base_ctxt : 'a option t =
         if any_attrs then
           Some
             ( (payloads, errors) >>= fun payloads ->
-              return
-              @@ Attribute.remove_seen context
-                   (Rule.Attr_replace.Attribute_list.to_packed_list a.attributes)
-                   item
-              >>| fun item -> a.expand ~ctxt:base_ctxt item payloads )
-        else None)
+              Attribute.remove_seen_res context
+                (Rule.Attr_replace.Attribute_list.to_packed_list a.attributes)
+                item
+              |> of_result ~default:item
+              >>| fun item -> Some (a.expand ~ctxt:base_ctxt item payloads) )
+        else match errors with _ :: _ -> Some (None, errors) | [] -> None)
   in
   match result with
-  | Some (item, errors) -> (Some item, errors)
+  | Some (option, errors) -> (option, errors)
   | None -> (None, [])
 
-let rec handle_attr_replace_str attrs item base_ctxt =
-  (match item.pstr_desc with
-    | Pstr_extension _ ->
-        handle_attr_replace_once AC.Pstr_extension attrs item base_ctxt
-    | Pstr_eval _ -> handle_attr_replace_once AC.Pstr_eval attrs item base_ctxt
-    | _ -> return None)
-  >>= function
-  | Some item -> handle_attr_replace_str attrs item base_ctxt
-  | None -> return item
+(* Applies [once] until it returns [None], and tells whether it applied at
+   all. Stops as soon as an application reports errors: the offending
+   attributes may still be on the item, so applying again could loop. *)
+let handle_attr_replace_fix once item =
+  let rec loop ~replaced item =
+    match once item with
+    | Some item, [] -> loop ~replaced:true item
+    | Some item, errors -> ((true, item), errors)
+    | None, errors -> ((replaced, item), errors)
+  in
+  loop ~replaced:false item
 
-let rec handle_attr_replace_sig attrs item base_ctxt =
-  (match item.psig_desc with
-    | Psig_extension _ ->
-        handle_attr_replace_once AC.Psig_extension attrs item base_ctxt
-    | _ -> return None)
-  >>= function
-  | Some item -> handle_attr_replace_sig attrs item base_ctxt
-  | None -> return item
+let handle_attr_replace_str attrs item base_ctxt =
+  handle_attr_replace_fix
+    (fun item ->
+      match item.pstr_desc with
+      | Pstr_extension _ ->
+          handle_attr_replace_once AC.Pstr_extension attrs item base_ctxt
+      | Pstr_eval _ ->
+          handle_attr_replace_once AC.Pstr_eval attrs item base_ctxt
+      | _ -> return None)
+    item
+  >>| snd
+
+let handle_attr_replace_sig attrs item base_ctxt =
+  handle_attr_replace_fix
+    (fun item ->
+      match item.psig_desc with
+      | Psig_extension _ ->
+          handle_attr_replace_once AC.Psig_extension attrs item base_ctxt
+      | _ -> return None)
+    item
+  >>| snd
 
 let rec map_node_rec attr_context attr_rules ext_context ts super_call loc
+    base_ctxt x ~embed_errors =
+  handle_attr_replace_fix
+    (fun x -> handle_attr_replace_once attr_context attr_rules x base_ctxt)
+    x
+  >>= fun (_, x) ->
+  map_extension_rec attr_context attr_rules ext_context ts super_call loc
+    base_ctxt x ~embed_errors
+
+and map_extension_rec attr_context attr_rules ext_context ts super_call loc
     base_ctxt x ~embed_errors =
   let ctxt =
     Expansion_context.Extension.make ~extension_point_loc:loc ~base:base_ctxt ()
   in
-  handle_attr_replace_once attr_context attr_rules x base_ctxt >>= function
-  | Some x ->
-      map_node_rec attr_context attr_rules ext_context ts super_call loc
-        base_ctxt x ~embed_errors
-  | None -> (
-      match EC.get_extension ext_context x with
+  match EC.get_extension ext_context x with
+  | None -> super_call base_ctxt x
+  | Some (ext, attrs) -> (
+      (try
+         E.For_context.convert_res ts ~ctxt ext
+         |> With_errors.of_result ~default:None
+       with exn when embed_errors ->
+         With_errors.return (Some (exn_to_error_extension ext_context x exn)))
+      >>= fun converted ->
+      match converted with
       | None -> super_call base_ctxt x
-      | Some (ext, attrs) -> (
-          (try
-             E.For_context.convert_res ts ~ctxt ext
-             |> With_errors.of_result ~default:None
-           with exn when embed_errors ->
-             With_errors.return
-               (Some (exn_to_error_extension ext_context x exn)))
-          >>= fun converted ->
-          match converted with
-          | None -> super_call base_ctxt x
-          | Some x ->
-              EC.merge_attributes_res ext_context x attrs
-              |> With_errors.of_result ~default:x
-              >>= fun x ->
-              map_node_rec attr_context attr_rules ext_context ts super_call loc
-                base_ctxt x ~embed_errors))
+      | Some x ->
+          EC.merge_attributes_res ext_context x attrs
+          |> With_errors.of_result ~default:x
+          >>= fun x ->
+          map_node_rec attr_context attr_rules ext_context ts super_call loc
+            base_ctxt x ~embed_errors)
 
 let map_context : type a. a EC.t -> a AC.t = function
   | EC.Class_expr -> AC.Class_expr
@@ -473,11 +491,14 @@ let map_node attr_rules ext_context ts super_call loc base_ctxt x ~hook
   let ctxt =
     Expansion_context.Extension.make ~extension_point_loc:loc ~base:base_ctxt ()
   in
-  handle_attr_replace_once attr_context attr_rules x base_ctxt >>= function
-  | Some x ->
-      map_node_rec attr_context attr_rules ext_context ts super_call loc
+  handle_attr_replace_fix
+    (fun x -> handle_attr_replace_once attr_context attr_rules x base_ctxt)
+    x
+  >>= function
+  | true, x ->
+      map_extension_rec attr_context attr_rules ext_context ts super_call loc
         base_ctxt x ~embed_errors
-  | None -> (
+  | false, x -> (
       match EC.get_extension ext_context x with
       | None -> super_call base_ctxt x
       | Some (ext, attrs) -> (
@@ -506,49 +527,47 @@ let rec map_nodes attr_rules ext_context ts super_call get_loc base_ctxt l ~hook
   match l with
   | [] -> return []
   | x :: l -> (
-      handle_attr_replace_once attr_context attr_rules x base_ctxt >>= function
-      | Some x ->
-          map_nodes attr_rules ext_context ts super_call get_loc base_ctxt
-            (x :: l) ~hook ~embed_errors ~in_generated_code
-      | None -> (
-          match EC.get_extension ext_context x with
-          | None ->
-              (* These two lets force the evaluation order, so that errors are reported in
+      handle_attr_replace_fix
+        (fun x -> handle_attr_replace_once attr_context attr_rules x base_ctxt)
+        x
+      >>= fun (_, x) ->
+      match EC.get_extension ext_context x with
+      | None ->
+          (* These two lets force the evaluation order, so that errors are reported in
              the same order as they appear in the source file. *)
+          super_call base_ctxt x >>= fun x ->
+          map_nodes attr_rules ext_context ts super_call get_loc base_ctxt l
+            ~hook ~embed_errors ~in_generated_code
+          >>| fun l -> x :: l
+      | Some (ext, attrs) -> (
+          let extension_point_loc = get_loc x in
+          let ctxt =
+            Expansion_context.Extension.make ~extension_point_loc
+              ~base:base_ctxt ()
+          in
+          (try
+             E.For_context.convert_inline_res ts ~ctxt ext
+             |> With_errors.of_result ~default:None
+           with exn when embed_errors ->
+             With_errors.return
+               (Some [ exn_to_error_extension ext_context x exn ]))
+          >>= function
+          | None ->
               super_call base_ctxt x >>= fun x ->
               map_nodes attr_rules ext_context ts super_call get_loc base_ctxt l
                 ~hook ~embed_errors ~in_generated_code
               >>| fun l -> x :: l
-          | Some (ext, attrs) -> (
-              let extension_point_loc = get_loc x in
-              let ctxt =
-                Expansion_context.Extension.make ~extension_point_loc
-                  ~base:base_ctxt ()
-              in
-              (try
-                 E.For_context.convert_inline_res ts ~ctxt ext
-                 |> With_errors.of_result ~default:None
-               with exn when embed_errors ->
-                 With_errors.return
-                   (Some [ exn_to_error_extension ext_context x exn ]))
-              >>= function
-              | None ->
-                  super_call base_ctxt x >>= fun x ->
-                  map_nodes attr_rules ext_context ts super_call get_loc
-                    base_ctxt l ~hook ~embed_errors ~in_generated_code
-                  >>| fun l -> x :: l
-              | Some converted ->
-                  ((), attributes_errors attrs) >>= fun () ->
-                  map_nodes attr_rules ext_context ts super_call get_loc
-                    base_ctxt converted ~hook ~embed_errors
-                    ~in_generated_code:true
-                  >>= fun generated_code ->
-                  if not in_generated_code then
-                    Generated_code_hook.replace hook ext_context
-                      extension_point_loc (Many generated_code);
-                  map_nodes attr_rules ext_context ts super_call get_loc
-                    base_ctxt l ~hook ~embed_errors ~in_generated_code
-                  >>| fun code -> generated_code @ code)))
+          | Some converted ->
+              ((), attributes_errors attrs) >>= fun () ->
+              map_nodes attr_rules ext_context ts super_call get_loc base_ctxt
+                converted ~hook ~embed_errors ~in_generated_code:true
+              >>= fun generated_code ->
+              if not in_generated_code then
+                Generated_code_hook.replace hook ext_context extension_point_loc
+                  (Many generated_code);
+              map_nodes attr_rules ext_context ts super_call get_loc base_ctxt l
+                ~hook ~embed_errors ~in_generated_code
+              >>| fun code -> generated_code @ code))
 
 let map_nodes = map_nodes ~in_generated_code:false
 
@@ -915,14 +934,12 @@ class map_top_down ?(expect_mismatch_handler = Expect_mismatch_handler.nop)
       let { pexp_desc = _; pexp_loc; pexp_attributes; pexp_loc_stack } = e in
       let func =
         with_context base_ctxt func >>= fun (base_ctxt, func) ->
-        let rec handle_attr_replace_fix replaced item =
-          handle_attr_replace_once AC.expression attr_replace_expression item
-            base_ctxt
-          >>= function
-          | Some item -> handle_attr_replace_fix true item
-          | None -> return (replaced, item)
-        in
-        handle_attr_replace_fix false func >>= fun (replaced, func) ->
+        handle_attr_replace_fix
+          (fun item ->
+            handle_attr_replace_once AC.expression attr_replace_expression item
+              base_ctxt)
+          func
+        >>= fun (replaced, func) ->
         match replaced with
         (* If the attribute replacement changed the func then we should traverse it after
            all. This might cause some weirdness if the attribute replacement doesn't
