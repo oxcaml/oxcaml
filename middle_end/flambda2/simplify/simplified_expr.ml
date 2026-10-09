@@ -34,11 +34,16 @@ module TE = T.Typing_env
 module LCS = Lifted_constant_state
 
 type t =
-  { simplified_lets : simplified_defining_expr list;
-    simplified_let_conts : simplified_let_cont_handlers list;
+  { simplified_lets_and_let_conts : simplified_lets_and_let_conts;
     simplified_terminator : simplified_terminator;
     removed_operations : Removed_operations.t
   }
+
+and simplified_lets_and_let_conts =
+  | Simplified_terminator
+  | Simplified_let of simplified_defining_expr * simplified_lets_and_let_conts
+  | Simplified_let_cont of
+      simplified_let_cont_handlers * simplified_lets_and_let_conts
 
 and simplified_defining_expr =
   { bindings_to_place : Simplified_named.binding_to_place list;
@@ -134,25 +139,26 @@ let simplified_let ~bindings_to_place ~removed_operations
     ~lifted_constants_from_defining_expr ~at_unit_toplevel ~closure_info
     ~rewrite_id t =
   { t with
-    simplified_lets =
-      { bindings_to_place;
-        removed_operations;
-        lifted_constants_from_defining_expr;
-        at_unit_toplevel;
-        closure_info;
-        rewrite_id
-      }
-      :: t.simplified_lets
+    simplified_lets_and_let_conts =
+      Simplified_let
+        ( { bindings_to_place;
+            removed_operations;
+            lifted_constants_from_defining_expr;
+            at_unit_toplevel;
+            closure_info;
+            rewrite_id
+          },
+          t.simplified_lets_and_let_conts )
   }
 
 let simplified_let_cont simplified_handlers t =
   { t with
-    simplified_let_conts = simplified_handlers :: t.simplified_let_conts
+    simplified_lets_and_let_conts =
+      Simplified_let_cont (simplified_handlers, t.simplified_lets_and_let_conts)
   }
 
 let simplified_terminator simplified_terminator =
-  { simplified_lets = [];
-    simplified_let_conts = [];
+  { simplified_lets_and_let_conts = Simplified_terminator;
     simplified_terminator;
     removed_operations = Removed_operations.zero
   }
@@ -200,8 +206,4 @@ let simplified_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
        })
 
 let simplified_invalid invalid =
-  { simplified_lets = [];
-    simplified_let_conts = [];
-    simplified_terminator = Simplified_invalid invalid;
-    removed_operations = Removed_operations.zero
-  }
+  simplified_terminator (Simplified_invalid invalid)
