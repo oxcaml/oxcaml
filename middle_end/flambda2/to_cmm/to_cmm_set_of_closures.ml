@@ -446,15 +446,15 @@ let transl_check_attrib : Zero_alloc_attribute.t -> Cmm.codegen_option list =
   | Check { strict; loc; custom_error_msg; partial = _ } ->
     [Check_zero_alloc { strict; loc; custom_error_msg }]
 
-(* Answers "Is it even possible to partially apply this thing?"
-   Returns `false` for single-argument functions, including "tupled" arguments
+(* Answers "Is it even possible to partially apply this thing?" *)
+(* Returns `false` for single-argument functions, including "tupled" arguments
    (e.g. `fun (x, y, z) -> ...`), which the compiler represents separately. *)
 let can_be_partially_applied metadata =
   (not (Code_metadata.is_tupled metadata))
   && Flambda_arity.num_params (Code_metadata.params_arity metadata) > 1
 
-(* Ask Flambda2 whether *all* partial closures will be local.
-   This requires two conditions: (1.) stack allocation must be enabled; and
+(* Ask Flambda2 whether *all* partial closures will be local. *)
+(* This requires two conditions: (1.) stack allocation must be enabled; and
    (2.) Flambda's `first_complex_local_param` (explained below) is zero. *)
 let flambda_builds_local_closures metadata =
   Flambda_features.stack_allocation_enabled ()
