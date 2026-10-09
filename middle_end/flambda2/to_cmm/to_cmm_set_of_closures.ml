@@ -461,16 +461,16 @@ let phrase_allocates_on_heap : Cmm.phrase -> bool = function
   | Cdata _ -> false
 
 let can_be_partially_applied metadata =
-  (not (Code_metadata.is_tupled metadata)) &&
-  (Flambda_arity.num_params (Code_metadata.params_arity metadata) > 1)
+  (not (Code_metadata.is_tupled metadata))
+  && Flambda_arity.num_params (Code_metadata.params_arity metadata) > 1
 
 let flambda_builds_local_closures metadata =
-  Flambda_features.stack_allocation_enabled () &&
-  begin match Code_metadata.first_complex_local_param metadata with
+  Flambda_features.stack_allocation_enabled ()
+  && begin match Code_metadata.first_complex_local_param metadata with
   (* `first_complex_local_param` asks "How many arguments can go on the heap?"
-     This is useful e.g. for `let f a (local_ b) c = ...`, where it's 1.
-     For e.g. `val f : int -> (int -> int) @ local`, it's zero, since
-     `(int -> int) @ local` captures the first argument and must be local. *)
+     This is useful e.g. for `let f a (local_ b) c = ...`, where it's 1. For
+     e.g. `val f : int -> (int -> int) @ local`, it's zero, since `(int -> int)
+     @ local` captures the first argument and must be local. *)
   | Index index -> index = 0
   | Never_partially_applied -> true
   end
@@ -481,9 +481,9 @@ let curry_functions_build_local_closures env code_id =
 
 let partial_applications_build_local_closures env code_id =
   let metadata = Env.get_code_metadata env code_id in
-  ( (not (can_be_partially_applied metadata)) ||
-    ( flambda_builds_local_closures metadata &&
-      curry_functions_build_local_closures env code_id ) )
+  (not (can_be_partially_applied metadata))
+  || flambda_builds_local_closures metadata
+     && curry_functions_build_local_closures env code_id
 
 let scoped_name fun_dbg =
   fun_dbg |> Debuginfo.get_dbg |> Debuginfo.Dbg.to_list
@@ -495,16 +495,15 @@ let scoped_name fun_dbg =
 let check_zero_alloc_partial env code_id ~fun_dbg ~(fun_sym : Cmm.symbol)
     (zero_alloc_attribute : Zero_alloc_attribute.t) =
   match zero_alloc_attribute with
-  | Check { partial; loc; _ } when
-      partial &&
-      (not !Oxcaml_flags.disable_zero_alloc_checker) &&
-      not (partial_applications_build_local_closures env code_id) ->
+  | Check { partial; loc; _ }
+    when partial
+         && (not !Oxcaml_flags.disable_zero_alloc_checker)
+         && not (partial_applications_build_local_closures env code_id) ->
     Location.raise_errorf ~loc
-      "Annotation check for zero_alloc failed on function %s (%s).@ \
-       Partial applications of this function may allocate a closure on the \
-       heap.@ Hint: try marking the partial function %a, as in %a."
-      (scoped_name fun_dbg) fun_sym.sym_name
-      Misc.Style.inline_code "local"
+      "Annotation check for zero_alloc failed on function %s (%s).@ Partial \
+       applications of this function may allocate a closure on the heap.@ \
+       Hint: try marking the partial function %a, as in %a."
+      (scoped_name fun_dbg) fun_sym.sym_name Misc.Style.inline_code "local"
       Misc.Style.inline_code "'a -> ('b -> ... -> 'z) @ local"
   | Check _ | Assume _ | Default_zero_alloc -> ()
 

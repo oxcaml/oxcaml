@@ -1602,8 +1602,8 @@ module Metadata : sig
   val assume_value :
     Debuginfo.t -> can_raise:bool -> Witnesses.t -> Value.t option
 
-  (* Redundantly ignore assumptions in which we haven't lost any information,
-     so we can check the soundness of the `zero_alloc` system itself. *)
+  (* Redundantly ignore assumptions in which we haven't lost any information, so
+     we can check the soundness of the `zero_alloc` system itself. *)
   val assume_value_unless_inferred :
     Debuginfo.t -> Witnesses.t -> Value.t option
 end = struct
@@ -1631,7 +1631,8 @@ end = struct
       Some v
 
   let assume_value_unless_inferred dbg w =
-    if Zero_alloc_utils.Assume_info.is_inferred (Debuginfo.assume_zero_alloc dbg)
+    if
+      Zero_alloc_utils.Assume_info.is_inferred (Debuginfo.assume_zero_alloc dbg)
     then None
     else assume_value dbg ~can_raise:false w
 end
