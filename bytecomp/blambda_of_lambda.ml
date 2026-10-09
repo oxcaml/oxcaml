@@ -1476,7 +1476,12 @@ and comp_unary_scalar_intrinsic op x =
       | Taggable ((Int16 | Int) as bswap16) ->
         sign_extend bswap16 (ccall "caml_bswap16")
       | Boxable boxed ->
-        ccall "caml_%s_bswap" (Scalar.Integral.Boxable.Width.to_string boxed)))
+        ccall "caml_%s_bswap" (Scalar.Integral.Boxable.Width.to_string boxed))
+    | Not ->
+      comp_binary_scalar_intrinsic
+        (Scalar.Operation.Binary.Integral (size, Xor))
+        x
+        (Const (const_int size (-1))))
   | Floating (size, ((Abs | Neg) as op)) -> (
     match Scalar.Floating.width size with
     | (Float32 Any_locality_mode | Float64 Any_locality_mode) as size ->

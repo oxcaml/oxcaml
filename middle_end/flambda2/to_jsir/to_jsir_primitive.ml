@@ -206,6 +206,16 @@ let unary_exn ~env ~res (f : Flambda_primitive.unary_primitive) x =
   | Opaque_identity { middle_end_only = false; kind : Flambda_kind.t = _ } ->
     (* CR selee: treating these as the identity for now *)
     identity ~env ~res x
+  | Int_arith (kind, Not) ->
+    let extern_name = with_int_prefix_exn ~kind "xor" ~percent_for_imms:true in
+    let x, res = prim_arg ~env ~res x in
+    let minus_one =
+      Reg_width_const.of_int_of_kind Thirty_two_no_gc_tag_bit
+        (Flambda_kind.Standard_int.to_kind kind)
+        (-1)
+      |> To_jsir_shared.reg_width_const
+    in
+    use_prim ~env ~res (Extern extern_name) [x; Pc minus_one]
   | Int_arith (kind, Swap_byte_endianness) -> (
     match kind with
     | Naked_int8 -> identity ~env ~res x

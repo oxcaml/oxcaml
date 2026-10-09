@@ -398,7 +398,9 @@ type nullary_primitive =
     encoding a 16-bit quantity (described in the least significant 16 bits of
     the immediate after untagging) and exchanges the two halves of the 16-bit
     quantity. The higher-order bits are zeroed. *)
-type unary_int_arith_op = Swap_byte_endianness
+type unary_int_arith_op =
+  | Swap_byte_endianness
+  | Not
 (* CR mshinwell/jvanburen: we should consider splitting this swapping primitive
    into two, based on the semantics *)
 

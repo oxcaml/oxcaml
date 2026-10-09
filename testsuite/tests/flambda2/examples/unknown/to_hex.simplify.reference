@@ -101,12 +101,12 @@ apply ccall
                cont k (int_neg)
          in
          let $camlTo_hex__abs_11 = closure abs_4_1 @abs &toplevel in
-         let code loopify(never) size(3) newer_version_of(lnot_5)
+         let code loopify(never) size(2) newer_version_of(lnot_5)
                lnot_5_1 (x : imm tagged)
                  my_closure &my_alloc_region my_depth
                  -> k * k1
                  : imm tagged =
-           let int_xor = %int_barith.xor (x, -1) in
+           let int_xor = %int_uarith.not (x) in
            cont k (int_xor)
          in
          let $camlTo_hex__lnot_12 = closure lnot_5_1 @lnot &toplevel in

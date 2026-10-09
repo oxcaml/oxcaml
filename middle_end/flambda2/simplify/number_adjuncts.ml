@@ -127,6 +127,8 @@ module type Int_number_kind = sig
 
     val xor : t -> t -> t
 
+    val not_ : t -> t
+
     val unsigned_div : t -> t -> t option
 
     val unsigned_mod : t -> t -> t option
@@ -201,6 +203,8 @@ module For_tagged_immediates : Int_number_kind = struct
     let one machine_width = Target_ocaml_int.one machine_width
 
     let minus_one machine_width = Target_ocaml_int.minus_one machine_width
+
+    let not_ t = xor t (minus_one (machine_width t))
 
     (* Shift functions inherit correct signature from Target_ocaml_int *)
 
@@ -294,6 +298,8 @@ module For_naked_immediates : Int_number_kind = struct
     let one machine_width = Target_ocaml_int.one machine_width
 
     let minus_one machine_width = Target_ocaml_int.minus_one machine_width
+
+    let not_ t = xor t (minus_one (machine_width t))
 
     let strictly_negative t = t < Target_ocaml_int.zero (machine_width t)
 
@@ -551,6 +557,8 @@ module For_int8s : Int_number_kind = struct
 
     let and_ = logand
 
+    let not_ x = of_int (Int.lognot (to_int x))
+
     let checked_div ~f t1 t2 =
       if equal t2 (of_int 0) then None else Some (f t1 t2)
 
@@ -675,6 +683,8 @@ module For_int16s : Int_number_kind = struct
 
     let and_ = logand
 
+    let not_ x = of_int (Int.lognot (to_int x))
+
     let checked_div ~f t1 t2 =
       if equal t2 Int16.zero then None else Some (f t1 t2)
 
@@ -772,6 +782,8 @@ module For_int32s : Boxable_int_number_kind = struct
 
     let and_ = logand
 
+    let not_ = lognot
+
     let checked_div ~f t1 t2 =
       if equal t2 (of_int 0) then None else Some (f t1 t2)
 
@@ -861,6 +873,8 @@ module For_int64s : Boxable_int_number_kind = struct
 
     let and_ = logand
 
+    let not_ = lognot
+
     let checked_div ~f t1 t2 =
       if equal t2 Int64.zero then None else Some (f t1 t2)
 
@@ -945,6 +959,8 @@ module For_nativeints : Boxable_int_number_kind = struct
     let or_ = logor
 
     let and_ = logand
+
+    let not_ = lognot
 
     let checked_div ~f t1 t2 =
       if equal t2 (zero_like t1) then None else Some (f t1 t2)
