@@ -381,7 +381,7 @@ let deep_copy () =
       TypeHash.add table ty ty';
       let desc =
         match get_desc ty with
-        | Tvar _ | Tnil | Tunivar _ | Tof_kind _ as desc -> desc
+        | Tvar _ | Tivar _ | Tnil | Tunivar _ | Tof_kind _ as desc -> desc
         | Tvariant _ as desc -> (* fixme *) desc
         | Tarrow (l,t1,t2,c) -> Tarrow (l, copy t1, copy t2, c)
         | Ttuple tl -> Ttuple (List.map (fun (l, t) -> l, copy t) tl)

@@ -169,6 +169,18 @@ let explain_fixed_row_case = function
 let pp_path ppf p =
   Style.as_inline_code Printtyp.Doc.path ppf p
 
+let pp_type_shape ppf : Types.type_shape -> unit = function
+  | Sarrow Nolabel -> fprintf ppf "an unlabeled function type"
+  | Sarrow l ->
+      fprintf ppf "a function type labeled %a"
+        Style.inline_code (Printtyp.string_of_label l)
+  | Stuple _ -> fprintf ppf "a tuple type"
+  | Sunboxed_tuple _ -> fprintf ppf "an unboxed tuple type"
+  | Sconstr p -> pp_path ppf p
+  | Sobject -> fprintf ppf "an object type"
+  | Svariant -> fprintf ppf "a polymorphic variant type"
+  | Spackage p -> fprintf ppf "a first-class module of type %a" pp_path p
+
 let explain_fixed_row pos expl = match expl with
   | Types.Fixed_private ->
     doc_printf "The %a variant type is private" Errortrace.print_pos pos
@@ -415,6 +427,9 @@ let explanation (type variety) intro prev env
     Some (doc_printf "@ because their kinds are different.\
                       @ @[<v>%t@;%t@]"
             (fmt_history "the first" k1) (fmt_history "the second" k2))
+  | Errortrace.Shape_mismatch { got; expected } ->
+    Some (doc_printf "@,@[The type was defaulted to@ %a,@ but is@ %a@]"
+            pp_type_shape expected pp_type_shape got)
   | Errortrace.Mode_mismatch _ -> None
 
 let mismatch intro env trace =

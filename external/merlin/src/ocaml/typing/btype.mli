@@ -99,6 +99,7 @@ val new_box_ty: type_expr -> type_expr
 (**** Types ****)
 
 val is_Tvar: type_expr -> bool
+val is_Tivar : type_expr -> bool
 val is_Tunivar: type_expr -> bool
 val is_Tconstr: type_expr -> bool
 val is_Tpoly: type_expr -> bool

@@ -36,10 +36,14 @@ let rec module_type =
 and core_type type_expr =
   let open Ast_helper in
   match Types.get_desc type_expr with
-  | Tvar { name = None; jkind = _ } | Tunivar { name = None; jkind = _ } ->
+  | Tvar { name = None; jkind = _ }
+  | Tivar { name = None; ivar = _; jkind = _ }
+  | Tunivar { name = None; jkind = _ } ->
     (* CR modes: do something better here with the jkind *)
     Typ.any None
-  | Tvar { name = Some s; jkind = _ } | Tunivar { name = Some s; jkind = _ } ->
+  | Tvar { name = Some s; jkind = _ }
+  | Tivar { name = Some s; ivar = _; jkind = _ }
+  | Tunivar { name = Some s; jkind = _ } ->
     (* CR modes: do something better here with the jkind *)
     Typ.var s None
   | Tarrow
