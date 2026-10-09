@@ -27,7 +27,9 @@ module type S = sig
     val name : t -> string
     val crc : t -> Digest.t option
 
-    val interface_imports : t -> (string * Digest.t option) list
+    val interface_imports
+       : t
+      -> (Dynlink_compilerlibs.Compilation_unit_intf.t * Digest.t option) list
     val implementation_imports : t -> (string * Digest.t option) list
 
     val defined_symbols : t -> string list
@@ -45,7 +47,8 @@ module type S = sig
   val fold_initial_units
      : init:'a
     -> f:('a
-      -> compunit:string
+      -> intf:Dynlink_compilerlibs.Compilation_unit_intf.t
+      -> impl:string option
       -> interface:Digest.t option
       -> implementation:(Digest.t option * Dynlink_types.implem_state) option
       -> defined_symbols:string list

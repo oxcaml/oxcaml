@@ -66,7 +66,7 @@ let print_with_crc ~print_name name crco =
   in
     printf "\t%s\t%a\n" crc print_name name
 
-let print_name_crc = print_with_crc ~print_name:Compilation_unit.Name.output
+let print_name_crc = print_with_crc ~print_name:(fun oc s -> output_string oc s)
 
 let print_cu_crc = print_with_crc ~print_name:print_cu_without_prefix
 
