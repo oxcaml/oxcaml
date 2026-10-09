@@ -336,10 +336,17 @@ val try_expand_safe_opt: Env.t -> type_expr -> type_expr
 val expand_head_once: Env.t -> type_expr -> type_expr
 val expand_head: Env.t -> type_expr -> type_expr
 
-(** [upon_shape env ty ~run ~default] enqueues [run shape] on {!scheduler}
+(** [upon_shape env ty ~run ~default] adds [run shape] to {!scheduler}
     once [ty]'s head has a shape, or [run (default ())] if it is defaulted
-    first. A [Tvar] head becomes a [Tivar]. [run] runs at the levels current
-    when [upon_shape] was called.
+    first. [run] runs at the levels current when [upon_shape] was called.
+    Depending on the scheduling policy (see {!Scheduler}), [run] may run
+    before [upon_shape] returns.
+
+    If [-extension omnidirectionality] is enabled, a [Tvar] head becomes a
+    [Tivar], and [run] waits for it to be filled or defaulted. Otherwise, a
+    [Tvar] head is defaulted immediately.
+
+    [ty] must not be generic: [run] (and [upon_shape] itself) may mutate it.
 
     Safety: [run shape] must give [ty]'s head shape [shape] (e.g. by
     unification), which fails if a different shape is already there.
