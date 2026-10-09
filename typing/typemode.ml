@@ -48,8 +48,14 @@ type error =
   | Forbidden_modality : 'a annot_type * forbidden_modality_kind -> error
   | Duplicated_axis : 'a annot_type * 'a -> error
   | Unrecognized_modifier : 'a annot_type * string -> error
+  | Mode_variable_not_allowed : error
 
 exception Error of Location.t * error
+
+let mode_variable_error ~loc =
+  Language_extension.assert_enabled ~loc Mode_polymorphism
+    Language_extension.Alpha;
+  raise (Error (loc, Mode_variable_not_allowed))
 
 module Mode_axis_pair = struct
   type t = Mode.With_locality.atom
@@ -244,15 +250,23 @@ let apply_mode_implications (annots : With_locality.Const.Option.t) =
   in
   { annots with forkable; yielding; contention; portability }
 
+let mode_const_of_modes annots =
+  List.map
+    (fun { txt; loc } ->
+      match (txt : Parsetree.mode) with
+      | Mode txt -> { txt; loc }
+      | Mode_var _ | Mode_bounds _ -> mode_variable_error ~loc)
+    annots
+
 let transl_mode_annots annots =
   let annots =
     List.map
-      (fun { txt = Parsetree.Mode txt; loc } ->
+      (fun { txt; loc } ->
         Language_extension.assert_enabled ~loc Mode Language_extension.Stable;
         try { txt = Mode_axis_pair.of_string ~loc txt; loc }
         with Not_found ->
           raise (Error (loc, Unrecognized_modifier (Mode, txt))))
-      annots
+      (mode_const_of_modes annots)
   in
   let step modes_so_far { txt = (Atom (ax, mode) : Mode_axis_pair.t); loc } =
     if Option.is_some (With_locality.Const.Option.proj ax modes_so_far)
@@ -647,7 +661,7 @@ let transl_mod_bounds ?(warn = true) annots =
   in
   let nonmodal, base_modality, modal_atoms =
     List.fold_left
-      (fun (nonmodal, base, atoms, seen_ev) { txt = Parsetree.Mode txt; loc } ->
+      (fun (nonmodal, base, atoms, seen_ev) { txt; loc } ->
         match Modality_axis_pair.of_string ~loc txt with
         | Atom (_, _) as atom ->
           if (seen_ev && not (is_staticity atom)) || has_modal_axis atom atoms
@@ -670,7 +684,7 @@ let transl_mod_bounds ?(warn = true) annots =
           in
           nonmodal, base, atoms, seen_ev)
       (Nonmodal_bounds.empty, Modality.Const.id, [], false)
-      annots
+      (mode_const_of_modes annots)
     |> fun (nm, base, atoms, _) ->
     (* axes listed in the order of implication. *)
     nm, base, sort_dedup_modalities_with_locs (List.rev atoms)
@@ -794,6 +808,8 @@ let report_error ppf =
       annot_type Misc.Style.inline_code "global" Misc.Style.inline_code "unique"
   | Unrecognized_modifier (annot_type, modifier) ->
     fprintf ppf "Unrecognized %a %s." print_annot_type annot_type modifier
+  | Mode_variable_not_allowed ->
+    fprintf ppf "Mode variables and mode bounds are not yet supported."
 
 let () =
   Location.register_error_of_exn (function
