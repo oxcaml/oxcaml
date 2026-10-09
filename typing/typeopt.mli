@@ -137,3 +137,23 @@ val label_sort_for_representation:
   -> record_sort:Jkind.Sort.Const.t
   -> variable_sorts:Jkind.Sort.Const.t array option
   -> Jkind.Sort.Const.t
+
+val transl_module_representation :
+  Types.module_representation -> Lambda.module_representation
+
+val transl_module_path :
+  Lambda.scoped_location -> Env.t -> Path.t -> Lambda.lambda
+val transl_value_path :
+  Lambda.scoped_location -> Env.t -> Path.t -> Lambda.lambda
+val transl_extension_path :
+  Lambda.scoped_location -> Env.t -> Path.t -> Lambda.lambda
+val transl_class_path :
+  Lambda.scoped_location -> Env.t -> Path.t -> Lambda.lambda
+
+val transl_prim: string -> string -> Lambda.lambda
+(** Translate a value from a persistent module. For instance:
+
+    {[
+      transl_prim "CamlinternalLazy" "force"
+    ]}
+*)

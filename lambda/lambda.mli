@@ -1402,26 +1402,11 @@ val shallow_iter:
     from.
 *)
 
-val transl_prim: string -> string -> lambda
-(** Translate a value from a persistent module. For instance:
-
-    {[
-      transl_prim "CamlinternalLazy" "force"
-    ]}
-*)
-
 val is_evaluated : lambda -> bool
 (** [is_evaluated lam] returns [true] if [lam] is either a constant, a variable
     or a function abstract. *)
 
 val free_variables: lambda -> Ident.Set.t
-
-val transl_module_path: scoped_location -> Env.t -> Path.t -> lambda
-val transl_value_path: scoped_location -> Env.t -> Path.t -> lambda
-val transl_extension_path: scoped_location -> Env.t -> Path.t -> lambda
-val transl_class_path: scoped_location -> Env.t -> Path.t -> lambda
-
-val transl_address : scoped_location -> Persistent_env.address -> lambda
 
 val value_kind_of_pointerness : immediate_or_pointer -> value_kind_non_null
 
@@ -1450,9 +1435,6 @@ val mixed_product_shape_for_read :
   get_value_kind:(int -> value_kind) -> get_mode:(int -> 'a)
   -> mixed_block_shape
   -> 'a mixed_block_element array
-
-val transl_module_representation :
-  Types.module_representation -> module_representation
 
 val make_sequence: ('a -> lambda) -> 'a list -> lambda
 

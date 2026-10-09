@@ -192,7 +192,7 @@ let rec eval_address = function
           "Opttoploop.eval_address: Can't return a non-value"
       end
   | Env.Adot(a, module_repr, pos) ->
-      let module_repr = Lambda.transl_module_representation module_repr in
+      let module_repr = Typeopt.transl_module_representation module_repr in
       begin match mod_field (eval_address a) module_repr pos with
       | Some field -> field
       | None ->

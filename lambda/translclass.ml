@@ -197,6 +197,8 @@ type error = Tags of label * label
 
 exception Error of Location.t * error
 
+let oo_prim = Typeopt.transl_prim "CamlinternalOO"
+
 (* Layouts for types defined in camlinternalOO.ml *)
 let layout_label = layout_any_value
 let layout_label_array = layout_any_value
@@ -400,7 +402,7 @@ let rec build_object_init ~scopes cl_table obj params inh_init obj_init cl =
                    Loc_unknown)]
       in
       let loc = of_location ~scopes cl.cl_loc in
-      let path_lam = transl_class_path loc cl.cl_env path in
+      let path_lam = Typeopt.transl_class_path loc cl.cl_env path in
       (* Note: we don't need to bind [params] here, as they are
          only used in structures. Outside structures (in class lets or
          applications) we use the regular identifiers. *)
@@ -813,7 +815,7 @@ let rec transl_class_rebind ~scopes obj_init cl vf =
         with Not_found -> raise Exit
       end;
       let cl_loc = of_location ~scopes cl.cl_loc in
-      let path_lam = transl_class_path cl_loc cl.cl_env path in
+      let path_lam = Typeopt.transl_class_path cl_loc cl.cl_env path in
       (path, path_lam, obj_init)
   | Tcl_fun (_, pat, _, cl, partial) ->
       let path, path_lam, obj_init =

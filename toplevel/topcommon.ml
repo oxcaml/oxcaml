@@ -129,7 +129,7 @@ module MakeEvalPrinter (E: EVAL_BASE) = struct
     | Env.Aunit (cu, _) -> E.eval_compilation_unit cu
     | Env.Alocal id -> E.eval_ident id
     | Env.Adot(p, module_repr, pos) ->
-      let module_repr = Lambda.transl_module_representation module_repr in
+      let module_repr = Typeopt.transl_module_representation module_repr in
       begin match mod_field (eval_address p) module_repr pos with
       | Some field -> field
       | None ->
