@@ -122,43 +122,69 @@ let[@zero_alloc] allocate_then_raise () = (allocate (); raise After_allocating)
 CR wsturgeon: this has to pass
 |}]
 
-let[@zero_alloc conditional] catch_nonstrict f =
-  try f () with After_allocating -> ()
+(* Arguments are non-`strict` by default: *)
+let[@zero_alloc conditional] catch_nonstrict f = try f () with _ -> ()
 [%%expect{|
-CR wsturgeon: genuinely not sure here
-|}]
-let[@zero_alloc] alloc_nonstrict () = catch_nonstrict allocate_then_raise
-[%%expect{|
-CR wsturgeon: this has to fail, assuming the above passed, else delete
+CR wsturgeon: this has to fail
 |}]
 
-let[@zero_alloc conditional strict] catch_strict f =
-  try f () with After_allocating -> ()
+(* Note that asking for `conditional strict` does not assume that *arguments*
+   are `strict`: *)
+let[@zero_alloc conditional strict] catch_strict f = try f () with _ -> ()
+[%%expect{|
+CR wsturgeon: this has to fail
+|}]
+
+(* Arguments are assumed non-strict by default, but they can be made strict: *)
+let catch_nonstrict_with_strict_assumption
+    (f [@zero_alloc conditional assume strict]) =
+  try f () with _ -> ()
+[@@zero_alloc conditional]
 [%%expect{|
 CR wsturgeon: this has to pass
 |}]
-let[@zero_alloc] alloc_strict () = catch_strict allocate_then_raise
+let[@zero_alloc] catch_ignore () = catch_nonstrict_with_strict_assumption ignore
+[%%expect{|
+CR wsturgeon: this has to pass
+|}]
+let[@zero_alloc] catch_after_allocating () =
+  catch_nonstrict_with_strict_assumption allocate_then_raise
 [%%expect{|
 CR wsturgeon: this has to fail
+|}]
+
+(* On a function instead of an argument, `conditional assume` does what it says:
+   "at call sites, if all arguments won't allocate, this won't allocate." *)
+let[@inline never][@zero_alloc conditional assume] secret () = allocate ()
+let[@zero_alloc] danger () = secret ()
+[%%expect{|
+CR wsturgeon: this has to pass
+|}]
+
+(* Deceptively trivial-looking functions (e.g. if `'a` is a function): *)
+let[@zero_alloc conditional] apply f x = f x
+let[@zero_alloc conditional] id x = x
+[%%expect{|
+val apply : ('a -> 'b) -> 'a -> 'b [@@zero_alloc conditional] = <fun>
+val id : 'a -> 'a [@@zero_alloc conditional] = <fun>
 |}]
 
 (* Try to use inlining (via `apply`) to break soundness: *)
-let[@inline always] [@zero_alloc conditional] apply f x = f x
-[%%expect{|
-val apply : ('a -> 'b) -> 'a -> 'b [@@zero_alloc conditional] = <fun>
-|}]
+module Inlining = struct
+  let[@inline always] [@zero_alloc conditional] apply f x = f x
 
-let[@zero_alloc conditional] inlining_cant_expose_assumptions () =
-  (* Note that `apply` assumes its `f` argument is non-allocating, but
-     we have to be careful about scoping that, since in this invocation,
-     `f` is `allocate`, and `apply` is `inline always`, so its inlined body is
-     `(allocate [@zero_alloc assume]) ()`, which would be accepted(!). *)
-  apply allocate ()
+  let[@zero_alloc conditional] inlining_cant_expose_assumptions () =
+    (* Note that `apply` assumes its `f` argument is non-allocating, but
+      we have to be careful about scoping that, since in this invocation,
+      `f` is `allocate`, and `apply` is `inline always`, so its inlined body is
+      `(allocate [@zero_alloc assume]) ()`, which would be accepted(!). *)
+    apply allocate ()
+end
 [%%expect{|
 CR wsturgeon: this has to fail
 |}]
 
-let[@inline always] [@zero_alloc conditional] apply2 f x y = f x y
+let[@zero_alloc conditional] apply2 f x y = f x y
 [%%expect{|
 val apply2 : ('a -> 'b -> 'c) -> 'a -> 'b -> 'c [@@zero_alloc conditional] = <fun>
 |}]
@@ -189,6 +215,31 @@ CR wsturgeon: this has to pass
 |}]
 
 let[@zero_alloc] allocating_callback_argument x = apply identity (ref x)
+[%%expect{|
+CR wsturgeon: this has to fail
+|}]
+
+(* Without inlining, arguments themselves can require conditional logic: *)
+let[@inline never][@zero_alloc conditional] forward2 f x y = f x y
+let[@zero_alloc] higher_order () = forward2 apply ignore ()
+let[@zero_alloc] higher_order () = forward2 apply allocate ()
+[%%expect{|
+val forward2 : ('a -> 'b -> 'c) -> 'a -> 'b -> 'c [@@zero_alloc conditional] = <fun>
+val higher_order : unit -> unit [@@zero_alloc] = <fun>
+CR wsturgeon: the latter has to fail
+|}]
+
+let[@inline never][@zero_alloc conditional strict] forward
+    (f [@zero_alloc conditional assume strict]) x =
+  f x
+let[@zero_alloc conditional strict] rec insane () = forward insane ()
+[%%expect{|
+CR wsturgeon: this has to pass
+|}]
+
+let[@zero_alloc conditional strict] rec roundabout b =
+  if b then allocate () else
+  forward roundabout true
 [%%expect{|
 CR wsturgeon: this has to fail
 |}]
