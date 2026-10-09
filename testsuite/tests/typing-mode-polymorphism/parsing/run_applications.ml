@@ -78,6 +78,22 @@ let () = assert (apply_partial 21 = 42)
 
 let () = assert (apply_partial 4 = 8)
 
+module type Close_fst = sig
+  val fst : 'a @ [< 'm] -> ('b @ 'n -> 'a @ [> 'm]) @ [> close('m) | local once]
+end
+
+module M_close_fst : Close_fst = struct
+  let fst a _ = a
+end
+
+let () = assert (M_close_fst.fst 1 2 = 1)
+
+let close_fst_partial () =
+  let (p @ local) = M_close_fst.fst 7 in
+  assert (p 8 = 7)
+
+let () = close_fst_partial ()
+
 module type Labelled = sig
   val labelled : a:'a @ [< 'm & global] -> b:'b @ 'n -> 'a @ [> 'm]
 end
