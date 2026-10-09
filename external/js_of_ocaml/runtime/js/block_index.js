@@ -81,6 +81,14 @@ function caml_set_idx_bytecode(base, idx, v) {
   switch (idx[0]) {
     case 0: {
       var depth = idx.length - 1;
+      // An empty index refers to an unboxed product that has been flattened
+      // into a singleton block: overwrite each of its fields, keeping its tag.
+      if (depth === 0) {
+        for (var j = 1; j < v.length; j++) {
+          base[j] = v[j];
+        }
+        return 0;
+      }
       var dst = base;
       for (var i = 1; i < depth; i++) {
         dst = dst[idx[i] + 1];

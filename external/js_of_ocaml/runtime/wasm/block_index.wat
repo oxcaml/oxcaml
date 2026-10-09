@@ -175,6 +175,8 @@
    ;; caml_set_idx_bytecode : base -> idx -> value -> unit
    ;; idx is a block (tag 0) of integer field positions.
    ;; Traverses to the parent block, then sets the final field.
+   ;; Special case: if idx is empty, base is a singleton block into which an
+   ;; unboxed product has been flattened, so overwrite all of its fields.
    ;; Special case: if base is a float array (all-float record), unbox the value.
    ;; The tag of a string-like (tag-3, tag-4) index tells us how to index
    ;; into [base]. Writing through a tag-2 (string) index is invalid: strings
@@ -211,6 +213,17 @@
             (call $caml_invalid_argument
                (array.new_data $string $invalid_set_idx
                   (i32.const 0) (i32.const 61)))))
+      ;; Empty index: [base] is a singleton block into which an unboxed
+      ;; product has been flattened. Overwrite each of its fields, but not its
+      ;; tag, with the corresponding field of [v].
+      (if (i32.eqz (local.get $depth))
+         (then
+            (array.copy $block $block
+               (ref.cast (ref $block) (local.get $base)) (i32.const 1)
+               (ref.cast (ref $block) (local.get $v)) (i32.const 1)
+               (i32.sub (array.len (ref.cast (ref $block) (local.get $v)))
+                  (i32.const 1)))
+            (return (ref.i31 (i32.const 0)))))
       ;; Float array case: base is $float_array, depth must be 1
       (drop (block $not_float_array (result (ref eq))
          (local.set $fa

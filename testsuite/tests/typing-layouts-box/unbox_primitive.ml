@@ -237,6 +237,30 @@ let () = both_ways (fun { hide } ->
 [%%expect{|
 |}]
 
+(* Singleton products. A record whose only field is an unboxed product, even
+   when wrapped in a singleton unboxed record, is laid out like the product (see
+   [box_primitive.ml]). So all of these blocks must unbox to the product. *)
+
+type one_values = { p : #(int * string) }
+type wrapped = #{ wt : #(int * string) }
+type one_wrapped = { pw : wrapped }
+
+let () = both_ways (fun { hide } ->
+  let check_values block =
+    let #{ p = #(i, s') } = unbox (hide (Obj.magic block : one_values)) in
+    assert (i = 42 && s' == s)
+  in
+  check_values { p = #(42, s) };
+  check_values { pw = #{ wt = #(42, s) } };
+  check_values (box #(42, s));
+  check_values (box #{ p = #(42, s) } : one_values);
+  check_values (box #{ pw = #{ wt = #(42, s) } } : one_wrapped))
+[%%expect{|
+type one_values = { p : #(int * string); }
+type wrapped = #{ wt : #(int * string); }
+type one_wrapped = { pw : wrapped; }
+|}]
+
 (* Unboxed records nested inside unboxed records and tuples *)
 
 type inner_u = #{ ix : int64_u; iy : string }
@@ -305,6 +329,7 @@ type two = { t1 : #(int * int64_u); t2 : #(int64_u * int); }
 (* Void components contribute no fields to the box and no data to the unboxed
    result. *)
 
+   type one_void = { v : unit# }
 type all_void = { x : unit#; kept : unit# }
 type void_mixed = { v1 : #(unit# * int64_u); v2 : string; v3 : unit# }
 
@@ -315,9 +340,12 @@ let () = both_ways (fun { hide } ->
   assert (eq_i64 a #1L && b == s);
   let #{ x = _; kept = _ } = unbox (hide (box #{ x = #(); kept = #() })) in
   let #{ x = _; kept = _ } = unbox (hide { x = #(); kept = #() }) in
+  let #{ v = _ } = unbox (hide (box #{ v = #() })) in
+  let #{ v = _ } = unbox (hide { v = #() }) in
   let #(#(_, a), b, _) = unbox (hide (box #(#(#(), #1L), s, #()))) in
   assert (eq_i64 a #1L && b == s))
 [%%expect{|
+type one_void = { v : unit#; }
 type all_void = { x : unit#; kept : unit#; }
 type void_mixed = { v1 : #(unit# * int64_u); v2 : string; v3 : unit#; }
 |}]

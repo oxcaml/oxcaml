@@ -191,6 +191,13 @@ let find_size_of_alloc_prim prim args =
     | _ -> None
   else None
 
+(* In bytecode, a block whose only field is an unboxed product stores the
+   fields of that product directly. *)
+let bytecode_block_size (shape : _ mixed_block_element array) =
+  match shape with
+  | [| Product elements |] -> Array.length elements
+  | _ -> Array.length shape
+
 let compute_mixed_block_size shape =
   if !Clflags.native_code then
     let bytes = Mixed_product_bytes.count (Product shape) in
@@ -198,7 +205,7 @@ let compute_mixed_block_size shape =
     let size = Mixed_product_bytes.size_in_words bytes in
     { size; value_prefix_len }
   else
-    let size = Array.length shape in
+    let size = bytecode_block_size shape in
     { size; value_prefix_len = size }
 
 let compute_static_size lam =
@@ -298,7 +305,7 @@ let compute_static_size lam =
     if !Clflags.native_code then
       Mixed_product_bytes.value_prefix_len
         (Mixed_product_bytes.count (Product shape))
-    else Array.length shape
+    else bytecode_block_size shape
   and uniform_block_size ~tag size =
     if size = 0 then Empty_block { tag } else Regular_block size
   and size_of_primitive env loc p args =

@@ -1141,6 +1141,14 @@ CAMLprim value caml_set_idx_bytecode(value base, value idx, value v)
     CAMLreturn (Val_unit);
   }
 #endif
+  // writing into an unboxed product that has been flattened into a singleton
+  if (depth == 0) {
+    CAMLassert (Wosize_val(base) == Wosize_val(v));
+    for (mlsize_t i = 0; i < Wosize_val(v); i++) {
+      caml_modify(&Field(base, i), Field(v, i));
+    }
+    CAMLreturn (Val_unit);
+  }
   volatile value* dst = &base;
   for (mlsize_t i = 0; i < depth; i++) {
     intnat pos = Long_val(Field(idx, i));
