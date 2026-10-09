@@ -84,7 +84,7 @@ val rewrite_double_underscore_paths: Env.t -> Path.t -> Path.t
     between multiple types in the input list will be given the same name when
     printed with {!prepared_type_expr}. *)
 val prepare_for_printing:
-  base:Mode.With_locality.Const.t -> type_expr list -> unit
+  base:Ctype.Curry_mode.t -> type_expr list -> unit
 
 (** [add_type_to_preparation ty] extend a previous type expression preparation
     to the type expression [ty]
@@ -95,7 +95,7 @@ val add_type_to_preparation: type_expr -> unit
     polymorphic type variables. *)
 type type_or_scheme = Type | Type_scheme
 val tree_of_typexp:
-  base:Mode.With_locality.Const.t -> type_or_scheme -> type_expr -> out_type
+  base:Ctype.Curry_mode.t -> type_or_scheme -> type_expr -> out_type
 (** [tree_of_typexp] generate the [outcometree] for a prepared type
     expression.*)
 
@@ -284,7 +284,7 @@ module Variable_names: sig
   val add_subst: (type_expr * type_expr) list -> unit
 
   (** [reserve ~base ty] registers the variable names appearing in [ty] *)
-  val reserve: base:Mode.With_locality.Const.t -> type_expr -> unit
+  val reserve: base:Ctype.Curry_mode.t -> type_expr -> unit
 end
 
 (** Register internal typechecker names ([$0],[$a]) appearing in the

@@ -1102,13 +1102,11 @@ let alloc_of_sig_mode = function
   | Sig_var { mode; _ } -> mode
 
 let curry_acc_of_sig_mode : sig_mode -> Curry_mode.t = function
-  | Sig_const c -> Const c
+  | Sig_const c -> Curry_mode.const c
   | Sig_var { mode; upper_const } ->
     Variable
       { comonadic = With_locality.Comonadic.disallow_right mode.comonadic;
-        areality = upper_const.areality }
-
-let sig_mode_legacy = Sig_const With_locality.Const.legacy
+        areality = Some upper_const.areality }
 
 let curry_sig_mode acc_mode arg_mode =
   let acc_mode =
@@ -1118,7 +1116,7 @@ let curry_sig_mode acc_mode arg_mode =
       Curry_mode.add_arg acc_mode mode ~upper_areality:upper_const.areality
   in
   match acc_mode with
-  | Const curry -> acc_mode, Sig_const curry
+  | Const { mode = curry; _ } -> acc_mode, Sig_const curry
   | Variable { comonadic; areality } ->
     let curry = With_locality.newvar (get_current_level ()) in
     With_locality.Comonadic.submode_exn comonadic curry.comonadic;
@@ -1264,7 +1262,8 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
             if Btype.is_position l then
               ctyp Ttyp_call_pos (newconstr Predef.path_lexing_position [])
             else
-              transl_type env ~policy ~row_context arg_mode.mode_modes arg
+              transl_type env ~policy ~row_context
+                (curry_acc_of_sig_mode arg_mode.mode_modes) arg
           in
           let acc_mode, ret_mode =
             match rest with
@@ -1313,9 +1312,11 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
             { mode_modes = ret_alloc; mode_desc = ret_mode.mode_desc }
           in
           ctyp (Ttyp_arrow (l, arg_cty, arg_modes, ret_cty, ret_modes)) ty
-        | [] -> transl_type env ~policy ~row_context ret_mode.mode_modes ret
+        | [] ->
+          transl_type env ~policy ~row_context
+            (curry_acc_of_sig_mode ret_mode.mode_modes) ret
       in
-      loop (curry_acc_of_sig_mode mode) args
+      loop mode args
   | Ptyp_tuple stl ->
     let ctys, tys = transl_type_aux_tuple env ~loc ~policy ~row_context stl in
     ctyp (Ttyp_tuple ctys) (newty (Ttuple tys))
@@ -1336,7 +1337,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
                     Type_arity_mismatch(lid.txt, decl.type_arity,
                                         List.length stl)));
       let args =
-        List.map (transl_type env ~policy ~row_context sig_mode_legacy) stl
+        List.map (transl_type env ~policy ~row_context Curry_mode.legacy) stl
       in
       let params = instance_list decl.type_params in
       let unify_param =
@@ -1398,7 +1399,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
                     Type_arity_mismatch(lid.txt, decl.type_arity,
                                         List.length stl)));
       let args =
-        List.map (transl_type env ~policy ~row_context sig_mode_legacy) stl
+        List.map (transl_type env ~policy ~row_context Curry_mode.legacy) stl
       in
       let body = Option.get decl.type_manifest in
       let (params, body) = instance_parameterized_type decl.type_params body in
@@ -1460,7 +1461,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
               Builtin_attributes.warning_scope rf_attributes
                 (fun () ->
                    List.map
-                     (transl_type env ~policy ~row_context sig_mode_legacy)
+                     (transl_type env ~policy ~row_context Curry_mode.legacy)
                      stl)
             in
             List.iter (fun {ctyp_type; ctyp_loc} ->
@@ -1491,7 +1492,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
               Ttag (l,c,tl)
         | Rinherit sty ->
             let cty =
-              transl_type env ~policy ~row_context sig_mode_legacy sty
+              transl_type env ~policy ~row_context Curry_mode.legacy sty
             in
             let ty = cty.ctyp_type in
             let nm =
@@ -1808,7 +1809,7 @@ and transl_type_aux_tuple env ~loc ~policy ~row_context stl =
   let ctys =
     List.map
       (fun (l, t) ->
-         l, transl_type env ~policy ~row_context sig_mode_legacy t)
+         l, transl_type env ~policy ~row_context Curry_mode.legacy t)
       stl
   in
   ctys, List.map (fun (label, ctyp) -> label, ctyp.ctyp_type) ctys
@@ -1834,7 +1835,7 @@ and transl_fields env ~policy ~row_context o fields =
     | Otag (s, ty1) -> begin
         let ty1 =
           Builtin_attributes.warning_scope of_attributes
-            (fun () -> transl_type env ~policy ~row_context sig_mode_legacy
+            (fun () -> transl_type env ~policy ~row_context Curry_mode.legacy
                 (Ast_helper.Typ.force_poly ty1))
         in
         begin
@@ -1853,7 +1854,7 @@ and transl_fields env ~policy ~row_context o fields =
         field
       end
     | Oinherit sty -> begin
-        let cty = transl_type env ~policy ~row_context sig_mode_legacy sty in
+        let cty = transl_type env ~policy ~row_context Curry_mode.legacy sty in
         let nm =
           match get_desc cty.ctyp_type with
             Tconstr(p, _, _) -> Some p
@@ -1912,7 +1913,7 @@ and transl_package env ~policy ~row_context ptyp =
   let ptys =
     List.map
       (fun (s, pty) ->
-         s, transl_type env ~policy ~row_context sig_mode_legacy pty)
+         s, transl_type env ~policy ~row_context Curry_mode.legacy pty)
       l
   in
   let mty =
@@ -1964,8 +1965,8 @@ let transl_simple_type_impl env ~new_var_jkind ?univars ~policy mode styp =
 
 let transl_simple_type env ~new_var_jkind ?univars ~closed mode styp =
   let policy = if closed then Closed else Open in
-  transl_simple_type_impl env ~new_var_jkind ?univars ~policy (Sig_const mode)
-    styp
+  transl_simple_type_impl env ~new_var_jkind ?univars ~policy
+    (Curry_mode.const mode) styp
 
 let transl_simple_type_univars env styp =
   TyVarEnv.reset_locals ();
@@ -1973,7 +1974,7 @@ let transl_simple_type_univars env styp =
     TyVarEnv.collect_univars begin fun () ->
       with_local_level_generalize begin fun () ->
         let policy = TyVarEnv.univars_policy in
-        let typ = transl_type env policy sig_mode_legacy styp
+        let typ = transl_type env policy Curry_mode.legacy styp
         in
         TyVarEnv.globalize_used_variables policy env ();
         typ
@@ -1989,7 +1990,7 @@ let transl_simple_type_delayed env mode styp =
   let typ, force =
     with_local_level_generalize begin fun () ->
       let policy = TyVarEnv.make_policy Open Any in
-      let typ = transl_type env policy (Sig_const mode) styp
+      let typ = transl_type env policy (Curry_mode.const mode) styp
       in
       make_fixed_univars typ.ctyp_type;
       (* This brings the used variables to the global level, but doesn't link
@@ -2007,7 +2008,7 @@ let transl_type_scheme_mono env mode styp =
   let typ =
     with_local_level_generalize begin fun () ->
       TyVarEnv.reset ();
-      transl_simple_type ~new_var_jkind:Sort env ~closed:false mode styp
+      transl_simple_type_impl ~new_var_jkind:Sort env ~policy:Open mode styp
     end
     ~before_generalize:generalize_ctyp
   in
@@ -2029,11 +2030,10 @@ let transl_type_scheme_poly env mode attrs loc vars inner_type =
       let typ =
         if Language_extension.erasable_extensions_only () then
           transl_simple_type_impl ~new_var_jkind:Sort env ~univars
-            ~policy:Closed_for_upstream_compatibility (Sig_const mode)
-            inner_type
+            ~policy:Closed_for_upstream_compatibility mode inner_type
         else
           transl_simple_type_impl ~new_var_jkind:Sort env ~univars
-            ~policy:Open (Sig_const mode) inner_type
+            ~policy:Open mode inner_type
       in
       (typed_vars, univars, typ)
     end
@@ -2219,7 +2219,7 @@ let report_error_doc loc env = function
         ]
   | Constructor_mismatch (ty, ty') ->
       wrap_printing_env ~error:true env (fun ()  ->
-        let base = Mode.With_locality.Const.legacy in
+        let base = Curry_mode.legacy in
         Out_type.prepare_for_printing ~base [ty; ty'];
         Location.errorf ~loc
           "This variant type contains a constructor %a@ \

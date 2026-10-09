@@ -153,7 +153,7 @@ let execute_phrase print_outcome ppf phr =
                         let outv = outval_of_value newenv v
                                      (Types.Lpoly.determined []) exp.exp_type in
                         let ty =
-                          let base = Mode.With_locality.Const.legacy in
+                          let base = Ctype.Curry_mode.legacy in
                           Out_type.prepare_for_printing ~base
                             [exp.exp_type];
                           Out_type.tree_of_typexp ~base Type_scheme

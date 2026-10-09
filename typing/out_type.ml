@@ -1024,14 +1024,14 @@ let curry_mode_of_occurrence :
     Curry_mode.t =
   fun ~arg m ->
     match With_locality.zap_to_legacy ~arg m with
-    | Some c -> Const c
+    | Some c -> Curry_mode.const c
     | None ->
       if mode_polymorphism_printing_enabled ()
       then
         Variable
           { comonadic = With_locality.Comonadic.disallow_right m.comonadic;
-            areality = (With_locality.Guts.get_ceil m).areality }
-      else Const (With_locality.zap_to_legacy_force ~arg m)
+            areality = Some (With_locality.Guts.get_ceil m).areality }
+      else Curry_mode.const (With_locality.zap_to_legacy_force ~arg m)
 
 (** Whether the return mode [m] of an arrow is the curry mode implied by
     [acc_mode]. Mutating when [m] must be zapped: [m] is equated with the
@@ -1047,13 +1047,13 @@ let equate_with_curry_bounds : With_locality.lr -> Curry_mode.t -> bool =
   fun m acc_mode ->
     if not (mode_polymorphism_printing_enabled ()) then
       match acc_mode with
-      | Const c -> Result.is_ok (With_locality.equate
+      | Const { mode = c; _ } -> Result.is_ok (With_locality.equate
            m
            (With_locality.of_const c))
       | Variable _ -> fatal_error "Out_type.equate_with_curry_bounds"
     else
       match acc_mode, With_locality.check_generic m with
-      | Const c, false ->
+      | Const { mode = c; _ }, false ->
         Result.is_ok (With_locality.equate m (With_locality.of_const c))
       | Variable _, true ->
         let floor = With_locality.Guts.get_floor m in
@@ -1138,7 +1138,7 @@ module Variable_names : sig
   val check_name_of_type : non_gen:bool -> transient_expr -> unit
 
 
-  val reserve: base:With_locality.Const.t -> type_expr -> unit
+  val reserve: base:Curry_mode.t -> type_expr -> unit
 
   val remove_names : transient_expr list -> unit
 
@@ -1417,7 +1417,7 @@ end = struct
         zap_non_generic_modes acc_mode ty
       | _ ->
         printer_iter_type_expr
-          (zap_non_generic_modes (Const With_locality.Const.legacy))
+          (zap_non_generic_modes Curry_mode.legacy)
           (Fun.const ()) ty
     end
 
@@ -1432,9 +1432,6 @@ end = struct
         | _ -> curry_mode_of_occurrence ~arg:false mret
       in
       zap_non_generic_modes acc_mode ty
-
-  let zap_non_generic_modes base ty =
-    zap_non_generic_modes (Const base) ty
 
   let eq_pair :
       visible_pair
@@ -2516,7 +2513,7 @@ let prepare_type_with_base base ty =
   Variable_names.reserve ~base ty;
   Aliases.mark_loops ty
 
-let prepare_type ty = prepare_type_with_base With_locality.Const.legacy ty
+let prepare_type ty = prepare_type_with_base Curry_mode.legacy ty
 
 
 let reset_except_conflicts () =
@@ -2649,7 +2646,7 @@ let tree_of_modes : With_locality.lr -> Curry_mode.t -> string list =
     | Variable _ ->
       [ (Fmt.asprintf "%s"
             (Variable_names.name_of_mode modes))]
-    | Const c -> tree_of_modes_const c
+    | Const { mode; _ } -> tree_of_modes_const mode
 
 (** The modal context on a type when printing it. This is to reproduce the mode
     currying logic in [typetexp.ml], so that parsing and printing roundtrip. *)
@@ -2894,7 +2891,7 @@ let rec tree_of_modal_typexp mode modal ty =
     let tree =
       Otyp_alias
         {non_gen;
-         aliased = pr_typ (Curry_mode.Const With_locality.Const.legacy);
+         aliased = pr_typ Curry_mode.legacy;
          alias}
     in
     not_arrow tree end
@@ -2910,7 +2907,7 @@ and tree_of_acc_typexp mode acc_mode ty =
   tree_of_modal_typexp mode (Other acc_mode) ty
 
 and tree_of_typexp mode mode_with_locality ty =
-  tree_of_acc_typexp mode (Curry_mode.Const mode_with_locality) ty
+  tree_of_acc_typexp mode (Curry_mode.const mode_with_locality) ty
 
 and tree_of_qtv v jkind =
     (* CR layouts: We ignore nullability here to avoid needlessly printing
@@ -3060,7 +3057,7 @@ and tree_of_package mode {pack_path; pack_cstrs} =
 
 let tree_of_typexp ~base mode ty =
   (* [tree_of_typexp] mutates state, which we need to backtrack. *)
-  wrap_mutation (fun () -> tree_of_typexp mode base ty)
+  wrap_mutation (fun () -> tree_of_acc_typexp mode base ty)
 
 let tree_of_typexp ~base mode ty =
   (* CR metaprogramming jbachurski: Remove this [Env.enter_future] hack once
@@ -3075,7 +3072,7 @@ let tree_of_typexp ~base mode ty =
     tree_of_typexp ~base mode ty
 
 let typexp mode ppf ty =
-  !Oprint.out_type ppf (tree_of_typexp ~base:With_locality.Const.legacy mode ty)
+  !Oprint.out_type ppf (tree_of_typexp ~base:Curry_mode.legacy mode ty)
 
 let prepared_type_expr ppf ty = typexp Type ppf ty
 
@@ -3089,8 +3086,8 @@ let type_expr_with_reserved_names ppf ty =
 let prepared_type_scheme ppf ty = typexp Type_scheme ppf ty
 
 let tree_of_type_scheme ty =
-  prepare_for_printing ~base:With_locality.Const.legacy [ty];
-  tree_of_typexp ~base:With_locality.Const.legacy Type_scheme ty
+  prepare_for_printing ~base:Curry_mode.legacy [ty];
+  tree_of_typexp ~base:Curry_mode.legacy Type_scheme ty
 
 (* Print one type declaration *)
 
@@ -3099,7 +3096,7 @@ let tree_of_constraints params =
     (fun ty list ->
        let ty' = unalias ty in
        if proxy ty != proxy ty' then
-         let base = With_locality.Const.legacy in
+         let base = Curry_mode.legacy in
          let tr = tree_of_typexp ~base Type_scheme ty in
          (tr, tree_of_typexp ~base Type_scheme ty') :: list
        else list)
@@ -3171,7 +3168,7 @@ let tree_of_label l =
   {
     olab_name = Ident.name l.ld_id;
     olab_mut = mut;
-    olab_type = tree_of_typexp ~base:With_locality.Const.legacy Type l.ld_type;
+    olab_type = tree_of_typexp ~base:Curry_mode.legacy Type l.ld_type;
     olab_modalities = ld_modalities;
   }
 
@@ -3183,7 +3180,7 @@ let extension_constructor_args_and_ret_type_subtree args ret_type =
   match ret_type with
   | None -> (tree_of_constructor_arguments args, None)
   | Some res ->
-      let out_ret = tree_of_typexp ~base:With_locality.Const.legacy Type res in
+      let out_ret = tree_of_typexp ~base:Curry_mode.legacy Type res in
       let out_args = tree_of_constructor_arguments args in
       let qtvs =
         (res :: tys_of_constr_args args)
@@ -3320,7 +3317,7 @@ let tree_of_type_decl id decl =
     let mk_param ty variance =
       let jkind = param_jkind ty in
       type_param variance jkind
-        (tree_of_typexp ~base:With_locality.Const.legacy Type ty)
+        (tree_of_typexp ~base:Curry_mode.legacy Type ty)
     in
     (Ident.name id,
      List.map2 mk_param params vari)
@@ -3330,7 +3327,7 @@ let tree_of_type_decl id decl =
     | None -> ty1
     | Some ty ->
         Otyp_manifest
-          (tree_of_typexp ~base:With_locality.Const.legacy Type ty, ty1)
+          (tree_of_typexp ~base:Curry_mode.legacy Type ty, ty1)
   in
   let (name, args) = type_defined decl in
   let constraints = tree_of_constraints params in
@@ -3340,7 +3337,7 @@ let tree_of_type_decl id decl =
         begin match ty_manifest with
         | None -> (Otyp_abstract, Public, false, None, false)
         | Some ty ->
-            tree_of_typexp ~base:With_locality.Const.legacy Type ty,
+            tree_of_typexp ~base:Curry_mode.legacy Type ty,
             decl.type_private, false, None, false
         end
     | Type_variant (cstrs, rep, umc) ->
@@ -3521,7 +3518,7 @@ let prepared_tree_of_extension_constructor
          List.map
            (fun ty ->
               type_param
-                (tree_of_typexp ~base:With_locality.Const.legacy Type ty))
+                (tree_of_typexp ~base:Curry_mode.legacy Type ty))
            ty_params
       )
   in
@@ -3602,6 +3599,12 @@ let tree_of_value_description id decl =
     Mode.Modality.Const.apply_const moda Mode.With_regionality.Const.legacy
     |> Mode.Const.value_to_alloc_r2l
   in
+  let base =
+    match decl.val_kind with
+    | Val_prim _ -> Curry_mode.primitive base
+    | Val_reg _ | Val_mut _ | Val_ivar _ | Val_self _ | Val_anc _ ->
+      Curry_mode.const base
+  in
   let () = prepare_for_printing ~base [decl.val_type] in
   let ty = tree_of_typexp ~base Type_scheme decl.val_type in
   (* Important: process the fvs *after* the type; tree_of_type_scheme
@@ -3680,7 +3683,7 @@ let prepare_method _lab (priv, _virt, ty) =
 
 let tree_of_method mode (lab, priv, virt, ty) =
   let (ty, tyl) = method_type priv ty in
-  let tty = tree_of_typexp ~base:With_locality.Const.legacy mode ty in
+  let tty = tree_of_typexp ~base:Curry_mode.legacy mode ty in
   let tyl = List.map Transient_expr.repr tyl in
   let qtvs = tree_of_univars tyl in
   let qtvs = zap_qtvs_if_boring qtvs in
@@ -3743,7 +3746,7 @@ let rec tree_of_class_type mode params =
           (fun csil (l, m, v, t) ->
             Ocsg_value
               (l, m = Asttypes.Mutable, v = Virtual,
-               tree_of_typexp ~base:With_locality.Const.legacy mode t)
+               tree_of_typexp ~base:Curry_mode.legacy mode t)
             :: csil)
           csil all_vars
       in
@@ -3768,9 +3771,9 @@ let rec tree_of_class_type mode params =
        if is_optional l then
          match get_desc (Ctype.expand_head !printing_env ty) with
          | Tconstr(path, [ty], _) when Path.same path Predef.path_option ->
-             tree_of_typexp ~base:With_locality.Const.legacy mode ty
+             tree_of_typexp ~base:Curry_mode.legacy mode ty
          | _ -> Otyp_stuff "<hidden>"
-       else tree_of_typexp ~base:With_locality.Const.legacy mode ty in
+       else tree_of_typexp ~base:Curry_mode.legacy mode ty in
       Octy_arrow (lab, tr, tree_of_class_type mode params cty)
 
 
@@ -3780,7 +3783,7 @@ let tree_of_class_param param variance =
   (* CR layouts: fix next line when adding support for jkind
      annotations on class type parameters *)
   let ot_jkind = param_jkind param in
-  match tree_of_typexp ~base:With_locality.Const.legacy Type_scheme param with
+  match tree_of_typexp ~base:Curry_mode.legacy Type_scheme param with
     Otyp_var (ot_non_gen, ot_name) ->
       {ot_non_gen; ot_name; ot_variance; ot_jkind}
   | _ -> {ot_non_gen=false; ot_name="?"; ot_variance; ot_jkind}
@@ -4191,7 +4194,7 @@ type 'a diff = Same of 'a | Diff of 'a * 'a
 let trees_of_type_expansion'
       ~var_jkinds mode Errortrace.{ty = t; expanded = t'} =
   let tree_of_typexp' ty =
-    let out = tree_of_typexp ~base:With_locality.Const.legacy mode ty in
+    let out = tree_of_typexp ~base:Curry_mode.legacy mode ty in
     if var_jkinds then
       match get_desc ty with
       | Tvar { jkind; _ } | Tunivar { jkind; _ } ->
@@ -4249,9 +4252,9 @@ let hide_variant_name t =
 
 let prepare_expansion Errortrace.{ty; expanded} =
   let expanded = hide_variant_name expanded in
-  Variable_names.reserve ~base:With_locality.Const.legacy ty;
+  Variable_names.reserve ~base:Curry_mode.legacy ty;
   if not (same_path ty expanded) then
-    Variable_names.reserve ~base:With_locality.Const.legacy expanded;
+    Variable_names.reserve ~base:Curry_mode.legacy expanded;
   Errortrace.{ty; expanded}
 
 (* Adapt functions to exposed interface *)

@@ -5335,7 +5335,7 @@ let report_error ~loc _env = function
         (Sig_component_kind.to_string kind) Style.inline_code name
   | Non_generalizable { vars; expression } ->
       let[@manual.ref "ss:valuerestriction"] manual_ref = [ 6; 1; 2 ] in
-      Out_type.prepare_for_printing ~base:Mode.With_locality.Const.legacy vars;
+      Out_type.prepare_for_printing ~base:Ctype.Curry_mode.legacy vars;
       Out_type.add_type_to_preparation expression;
       Location.errorf ~loc
         "@[The type of this expression,@ %a,@ \
@@ -5346,7 +5346,7 @@ let report_error ~loc _env = function
         Misc.print_see_manual manual_ref
   | Non_generalizable_module { vars; mty; item } ->
       let[@manual.ref "ss:valuerestriction"] manual_ref = [ 6; 1; 2 ] in
-      Out_type.prepare_for_printing ~base:Mode.With_locality.Const.legacy vars;
+      Out_type.prepare_for_printing ~base:Ctype.Curry_mode.legacy vars;
       Out_type.add_type_to_preparation item.val_type;
       Location.errorf ~loc
         "@[The type of this module,@ %a,@ \

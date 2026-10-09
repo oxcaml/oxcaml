@@ -134,7 +134,7 @@ val transl_simple_type_delayed
            Returns the type, an instance of the corresponding type_expr, and a
            function that binds the type variable. *)
 val transl_type_scheme:
-        Env.t -> With_locality.Const.t -> Parsetree.core_type ->
+        Env.t -> Ctype.Curry_mode.t -> Parsetree.core_type ->
         valdecl_lpoly_flag ->
         Jkind_types.Sort.var list * Typedtree.core_type
 val transl_type_param:
