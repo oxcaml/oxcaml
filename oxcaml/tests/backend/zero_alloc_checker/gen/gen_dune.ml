@@ -230,6 +230,8 @@ let () =
   print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
     ~extra_sources:[] ~exit_code:2 "test_partial_external_heap";
   print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
+    ~extra_sources:[] ~exit_code:2 "test_partial_unboxable";
+  print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
     ~extra_sources:["test_partial_caller_lib.mli"; "test_partial_caller_lib.ml"]
     ~exit_code:2 "test_partial_caller";
   print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]

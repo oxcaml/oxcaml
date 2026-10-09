@@ -1008,6 +1008,26 @@
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (targets test_partial_unboxable.output.corrected)
+ (deps (:ml test_partial_unboxable.ml) filter.sh)
+ (action
+   (with-outputs-to test_partial_unboxable.output.corrected
+    (pipe-outputs
+    (with-accepted-exit-codes 2
+     (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
+          -zero-alloc-checker-details-extra
+          -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
+    (run "./filter.sh")
+   ))))
+
+(rule
+ (alias   runtest)
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (deps test_partial_unboxable.output test_partial_unboxable.output.corrected)
+ (action (diff test_partial_unboxable.output test_partial_unboxable.output.corrected)))
+
+(rule
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
  (targets test_partial_caller.output.corrected)
  (deps (:ml test_partial_caller_lib.mli test_partial_caller_lib.ml test_partial_caller.ml) filter.sh)
  (action
