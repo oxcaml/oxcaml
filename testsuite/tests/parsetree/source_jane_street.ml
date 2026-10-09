@@ -532,10 +532,10 @@ module type S_for_mode_polymorphism = sig
 end
 
 [%%expect{|
-Line 2, characters 22-24:
-2 |   val variable : 'a @ 'm -> 'a @ 'm
-                          ^^
-Error: Mode variables and mode bounds are not yet supported.
+Line 6, characters 21-25:
+6 |   val past : 'a @ [< past('m)] -> 'a @ [> past('m)]
+                         ^^^^
+Error: The mode morphism "past" is not yet supported.
 |}]
 
 module type Mixed_mode_annotations = sig
@@ -543,10 +543,10 @@ module type Mixed_mode_annotations = sig
 end
 
 [%%expect{|
-Line 2, characters 29-31:
+Line 2, characters 15-23:
 2 |   val f : 'a @ portable many 'm contended 'n [< 'o] -> unit
-                                 ^^
-Error: Mode variables and mode bounds are not yet supported.
+                   ^^^^^^^^
+Error: Constant modes and mode variables cannot be mixed in a mode annotation.
 |}]
 
 (* kitchen sink, with new @ syntax *)

@@ -111,6 +111,8 @@ type error =
     { name : string; explicit_jkind : jkind_lr; implicit_jkind : jkind_lr }
   | Lpoly_unsupported
   | Val_poly_and_layout
+  | Unsatisfiable_mode_bound
+  | Unsatisfiable_mode_variable of string
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
@@ -875,35 +877,139 @@ let get_type_param_name styp =
   | Ptyp_var (name, _) -> Some name
   | _ -> Misc.fatal_error "non-type-variable in get_type_param_name"
 
+module Mode_var_env : sig
+  val lookup : string -> With_locality.lr
+
+  val with_mode_var_scope : (unit -> 'a) -> 'a
+end = struct
+  module StringMap = Map.Make(String)
+
+  type env = With_locality.lr StringMap.t ref
+
+  let table : env = ref StringMap.empty
+
+  let reset () = table := StringMap.empty
+
+  let lookup name =
+    match StringMap.find_opt name !table with
+    | Some v -> v
+    | None ->
+        let v = With_locality.newvar (get_current_level ()) in
+        table := StringMap.add name v !table;
+        v
+
+  let with_mode_var_scope f =
+    reset ();
+    Misc.try_finally f ~always:(fun () -> reset ())
+end
+
+type sig_var =
+  { mode : With_locality.lr;
+    upper_const : With_locality.Const.t
+  }
+
 type sig_mode =
   | Sig_const of With_locality.Const.t
+  | Sig_var of sig_var
+
+let transl_modepoly_morph_r (elem : Typemode.modepoly_elem) : With_locality.r =
+  With_locality.disallow_left (Mode_var_env.lookup elem.elem_var.txt)
+
+let transl_modepoly_morph_l (elem : Typemode.modepoly_elem) : With_locality.l =
+  With_locality.disallow_right (Mode_var_env.lookup elem.elem_var.txt)
+
+let transl_modepoly_annot env (annot : Typemode.modepoly_annot) : sig_var =
+  let m = With_locality.newvar (get_current_level ()) in
+  match annot with
+  | Typemode.Pmode_var { txt = name; loc } ->
+      let v = Mode_var_env.lookup name in
+      (match With_locality.equate m v with
+      | Ok () -> ()
+      | Error _ -> raise (Error (loc, env, Unsatisfiable_mode_variable name)));
+      { mode = m; upper_const = With_locality.Const.max }
+  | Typemode.Pmode_bounds { txt = { upper; lower }; loc } ->
+      let upper_const =
+        With_locality.Const.Option.value upper.bound_const.mode_modes
+          ~default:With_locality.Const.max
+      in
+      let upper_elems = List.map transl_modepoly_morph_r upper.bound_vars in
+      (match
+         With_locality.submode m
+           (With_locality.meet
+              (With_locality.of_const upper_const :: upper_elems))
+       with
+      | Ok () -> ()
+      | Error _ -> raise (Error (loc, env, Unsatisfiable_mode_bound)));
+      let lower_const =
+        With_locality.Const.Option.value lower.bound_const.mode_modes
+          ~default:With_locality.Const.min
+      in
+      let lower_elems = List.map transl_modepoly_morph_l lower.bound_vars in
+      (match
+         With_locality.submode
+           (With_locality.join
+              (With_locality.of_const lower_const :: lower_elems))
+           m
+       with
+      | Ok () -> ()
+      | Error _ -> raise (Error (loc, env, Unsatisfiable_mode_bound)));
+      { mode = m; upper_const }
 
 let alloc_of_sig_mode = function
   | Sig_const c -> With_locality.of_const c
+  | Sig_var { mode; _ } -> mode
+
+let curry_acc_of_sig_mode : sig_mode -> Curry_mode.t = function
+  | Sig_const c -> Const c
+  | Sig_var { mode; upper_const } ->
+    Variable
+      { comonadic = With_locality.Comonadic.disallow_right mode.comonadic;
+        areality = upper_const.areality }
 
 let sig_mode_legacy = Sig_const With_locality.Const.legacy
 
 let curry_sig_mode acc_mode arg_mode =
-  match acc_mode, arg_mode with
-  | Sig_const acc, Sig_const arg -> Sig_const (curry_mode_const acc arg)
-
-let transl_arrow_mode pmodes : sig_mode Typemode.modes =
-  let { Typemode.mode_modes; mode_desc } =
-    Typemode.transl_mode_with_locality pmodes
+  let acc_mode =
+    match arg_mode with
+    | Sig_const arg -> Curry_mode.add_const_arg acc_mode arg
+    | Sig_var { mode; upper_const } ->
+      Curry_mode.add_arg acc_mode mode ~upper_areality:upper_const.areality
   in
-  { mode_modes = Sig_const mode_modes; mode_desc }
+  match acc_mode with
+  | Const curry -> acc_mode, Sig_const curry
+  | Variable { comonadic; areality } ->
+    let curry = With_locality.newvar (get_current_level ()) in
+    With_locality.Comonadic.submode_exn comonadic curry.comonadic;
+    Curry_mode.Variable
+      { comonadic = With_locality.Comonadic.disallow_right curry.comonadic;
+        areality },
+    Sig_var { mode = curry; upper_const = With_locality.Const.max }
 
-let rec extract_params styp =
+let transl_arrow_mode env pmodes : sig_mode Typemode.modes =
+  if Typemode.has_mode_variables pmodes
+  then
+    { mode_modes =
+        Sig_var
+          (transl_modepoly_annot env (Typemode.transl_modepoly_annot pmodes));
+      mode_desc = []
+    }
+  else
+    let { Typemode.mode_modes; mode_desc } =
+      Typemode.transl_mode_with_locality pmodes
+    in
+    { mode_modes = Sig_const mode_modes; mode_desc }
+
+let rec extract_params env styp =
   match styp.ptyp_desc with
   | Ptyp_arrow (l, a, r, ma, mr) ->
-      let arg_mode = transl_arrow_mode ma in
+      let arg_mode = transl_arrow_mode env ma in
       (match r.ptyp_desc with
       | Ptyp_arrow _
         when not (Builtin_attributes.has_curry r.ptyp_attributes) ->
-          let params, ret, ret_mode = extract_params r in
+          let params, ret, ret_mode = extract_params env r in
           (l, arg_mode, a) :: params, ret, ret_mode
       | _ ->
-          let ret_mode = transl_arrow_mode mr in
+          let ret_mode = transl_arrow_mode env mr in
           [l, arg_mode, a], r, ret_mode)
   | _ -> assert false
 
@@ -1006,7 +1112,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       in
       ctyp desc typ
   | Ptyp_arrow _ ->
-      let args, ret, ret_mode = extract_params styp in
+      let args, ret, ret_mode = extract_params env styp in
       let rec loop acc_mode args =
         match args with
         | (l, arg_mode, arg) :: rest ->
@@ -1018,12 +1124,14 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
             else
               transl_type env ~policy ~row_context arg_mode.mode_modes arg
           in
-          let acc_mode = curry_sig_mode acc_mode arg_mode.mode_modes in
-          let ret_mode =
+          let acc_mode, ret_mode =
             match rest with
-            | [] -> ret_mode
+            | [] -> acc_mode, ret_mode
             | _ :: _ ->
-              { mode_modes = acc_mode; mode_desc = [] }
+              let acc_mode, curry =
+                curry_sig_mode acc_mode arg_mode.mode_modes
+              in
+              acc_mode, { mode_modes = curry; mode_desc = [] }
           in
           let ret_cty = loop acc_mode rest in
           let arg_ty = arg_cty.ctyp_type in
@@ -1065,7 +1173,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
           ctyp (Ttyp_arrow (l, arg_cty, arg_modes, ret_cty, ret_modes)) ty
         | [] -> transl_type env ~policy ~row_context ret_mode.mode_modes ret
       in
-      loop mode args
+      loop (curry_acc_of_sig_mode mode) args
   | Ptyp_tuple stl ->
     let ctys, tys = transl_type_aux_tuple env ~loc ~policy ~row_context stl in
     ctyp (Ttyp_tuple ctys) (newty (Ttuple tys))
@@ -1706,7 +1814,10 @@ let transl_type env policy mode styp =
 let transl_simple_type_impl env ~new_var_jkind ?univars ~policy mode styp =
   TyVarEnv.reset_locals ?univars ();
   let policy = TyVarEnv.make_policy policy new_var_jkind in
-  let typ = transl_type env policy mode styp in
+  let typ =
+    Mode_var_env.with_mode_var_scope (fun () ->
+        transl_type env policy mode styp)
+  in
   TyVarEnv.globalize_used_variables policy env ();
   make_fixed_univars typ.ctyp_type;
   typ
@@ -1722,7 +1833,10 @@ let transl_simple_type_univars env styp =
     TyVarEnv.collect_univars begin fun () ->
       with_local_level_generalize begin fun () ->
         let policy = TyVarEnv.univars_policy in
-        let typ = transl_type env policy sig_mode_legacy styp in
+        let typ =
+          Mode_var_env.with_mode_var_scope (fun () ->
+              transl_type env policy sig_mode_legacy styp)
+        in
         TyVarEnv.globalize_used_variables policy env ();
         typ
       end
@@ -1737,7 +1851,10 @@ let transl_simple_type_delayed env mode styp =
   let typ, force =
     with_local_level_generalize begin fun () ->
       let policy = TyVarEnv.make_policy Open Any in
-      let typ = transl_type env policy (Sig_const mode) styp in
+      let typ =
+        Mode_var_env.with_mode_var_scope (fun () ->
+            transl_type env policy (Sig_const mode) styp)
+      in
       make_fixed_univars typ.ctyp_type;
       (* This brings the used variables to the global level, but doesn't link
          them to their other occurrences just yet. This will be done when
@@ -2122,6 +2239,12 @@ let report_error_doc loc env = function
          value descriptions introduced using %a.@]"
         Style.inline_code "layout_"
         Style.inline_code "val poly_"
+  | Unsatisfiable_mode_bound ->
+      Location.errorf ~loc "This mode bound cannot be satisfied."
+  | Unsatisfiable_mode_variable name ->
+      Location.errorf ~loc
+        "The mode constraints on %a cannot be satisfied."
+        Style.inline_code ("'" ^ name)
 
 let () =
   Location.register_error_of_exn
