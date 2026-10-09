@@ -80,6 +80,8 @@ val new_indexes_to_old_indexes : 'a t -> int array
 
 val new_block_length : 'a t -> int
 
+val num_fields : 'a t -> int
+
 val new_index_to_old_path : 'a t -> int -> int list
 
 module Field_for_printing : sig

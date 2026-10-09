@@ -259,7 +259,6 @@ let () = both_ways (fun { hide } ->
 type one_values = { p : #(int * string); }
 type wrapped = #{ wt : #(int * string); }
 type one_wrapped = { pw : wrapped; }
-Exception: Assert_failure ("", 8, 4).
 |}]
 
 (* Unboxed records nested inside unboxed records and tuples *)

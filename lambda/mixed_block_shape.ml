@@ -144,6 +144,8 @@ let new_index_to_old_path t new_index =
 
 let new_block_length t = Array.length t.flattened_reordered_shape
 
+let num_fields t = Array.length t.forest
+
 module Field_for_printing = struct
   type 'a t =
     | Void
