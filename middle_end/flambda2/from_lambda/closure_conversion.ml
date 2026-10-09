@@ -2714,8 +2714,31 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
     | Recursive, ([] | _ :: _ :: _) -> false
     | Non_recursive, _ -> false
   in
+  let closure_env = Env.clear_local_bindings external_env in
+  let closure_env =
+    List.fold_right
+      (fun (p : Function_decl.param) env ->
+        let env, _var = Env.add_var_like env p.name User_visible p.kind in
+        env)
+      unarized_params closure_env
+  in
+  let unarized_params =
+    List.map
+      (fun (p : Function_decl.param) ->
+        let var = fst (Env.find_var closure_env p.name) in
+        BP.create var p.kind p.debug_uid)
+      unarized_params
+    |> Bound_parameters.create
+  in
+  let invariant_params =
+    if is_single_recursive_function
+    then
+      Bound_parameters.vars unarized_params
+    else []
+  in
   let acc =
     Acc.push_closure_info acc ~return_continuation ~exn_continuation ~my_closure
+      ~invariant_params
       ~is_purely_tailrec:is_single_recursive_function ~code_id
   in
   let my_alloc_region = Function_decl.my_alloc_region decl in
@@ -2766,7 +2789,6 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
       "Variables found in closure when trying to lift %a in \
        [Closure_conversion]."
       Ident.print our_let_rec_ident;
-  let closure_env = Env.clear_local_bindings external_env in
   (* Add the variables for function projections *)
   let closure_vars_to_bind, closure_env =
     if has_lifted_closure
@@ -2815,13 +2837,6 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
           (find_value_approximation_through_symbol acc env simple))
       vars_for_idents closure_env
   in
-  let closure_env =
-    List.fold_right
-      (fun (p : Function_decl.param) env ->
-        let env, _var = Env.add_var_like env p.name User_visible p.kind in
-        env)
-      unarized_params closure_env
-  in
   let closure_env, alloc_region =
     Env.add_var_like closure_env my_alloc_region Not_user_visible
       K.With_subkind.region
@@ -2869,14 +2884,6 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
   (* CR-someday pchambart: eta-expansion wrappers for primitives are not marked
      as stubs but certainly should be. *)
   let stub = Function_decl.stub decl in
-  let unarized_params =
-    List.map
-      (fun (p : Function_decl.param) ->
-        let var = fst (Env.find_var closure_env p.name) in
-        BP.create var p.kind p.debug_uid)
-      unarized_params
-    |> Bound_parameters.create
-  in
   let acc = Acc.with_seen_a_function acc false in
   let compute_body acc =
     let acc, body =
@@ -2995,10 +3002,25 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
     else Inline_attribute.from_lambda (Function_decl.inline decl)
   in
   let free_names_of_body = Acc.free_names acc in
+  let closure_info, acc = Acc.pop_closure_info acc in
+  let specialised_params, _specialisable_args =
+    List.fold_left_map (fun spec_params (param, invariance) ->
+        match (invariance : Acc.invariance) with
+        | Invariant ->
+          let param_id =
+            Parameter_id.create (Current_unit.get_cu_exn ())
+              ~name:(Variable.canonical_name param)
+              ~is_always_immediate:false
+              (Variable.kind param)
+          in
+          Parameter_id.Map.add param_id param spec_params, Some param_id
+        | Unused | Varies -> spec_params, None)
+      Parameter_id.Map.empty closure_info.invariant_params
+  in
   let params_and_body =
     Function_params_and_body.create ~return_continuation
       ~exn_continuation:(Exn_continuation.exn_handler exn_continuation)
-      main_code_unarized_params ~specialised_params:Parameter_id.Map.empty ~body ~my_closure ~my_alloc_mode ~my_depth
+      main_code_unarized_params ~specialised_params ~body ~my_closure ~my_alloc_mode ~my_depth
       ~free_names_of_body:(Known free_names_of_body)
   in
   let result_mode = Function_decl.result_mode decl in
@@ -3022,7 +3044,6 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
     |> Acc.remove_continuation_from_free_names
          (Exn_continuation.exn_handler exn_continuation)
   in
-  let closure_info, acc = Acc.pop_closure_info acc in
   let is_tupled =
     match Function_decl.kind decl with Curried _ -> false | Tupled -> true
   in

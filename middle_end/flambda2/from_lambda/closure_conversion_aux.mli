@@ -220,11 +220,17 @@ end
 
 (** Used to pipe some data through closure conversion *)
 module Acc : sig
+  type invariance =
+    | Unused
+    | Invariant
+    | Varies
+
   type closure_info = private
     { code_id : Code_id.t;
       return_continuation : Continuation.t;
       exn_continuation : Exn_continuation.t;
       my_closure : Variable.t;
+      invariant_params : (Variable.t * invariance) list;
       is_purely_tailrec : bool;
       slot_offsets_at_definition : Slot_offsets.t
     }
@@ -318,6 +324,7 @@ module Acc : sig
     return_continuation:Continuation.t ->
     exn_continuation:Exn_continuation.t ->
     my_closure:Variable.t ->
+    invariant_params:Variable.t list ->
     is_purely_tailrec:bool ->
     code_id:Code_id.t ->
     t

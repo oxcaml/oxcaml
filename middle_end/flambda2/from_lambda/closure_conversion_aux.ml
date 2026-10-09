@@ -348,11 +348,17 @@ module Acc = struct
     | Trackable_arguments of Env.value_approximation list
     | Untrackable
 
+  type invariance =
+    | Unused
+    | Invariant
+    | Varies
+
   type closure_info =
     { code_id : Code_id.t;
       return_continuation : Continuation.t;
       exn_continuation : Exn_continuation.t;
       my_closure : Variable.t;
+      invariant_params : (Variable.t * invariance) list;
       is_purely_tailrec : bool;
       slot_offsets_at_definition : Slot_offsets.t
           (* note: this last field is not a property of the current closure, but
@@ -716,7 +722,10 @@ module Acc = struct
     | closure_info :: _ -> Some closure_info
 
   let push_closure_info t ~return_continuation ~exn_continuation ~my_closure
-      ~is_purely_tailrec ~code_id =
+      ~invariant_params ~is_purely_tailrec ~code_id =
+    let invariant_params =
+      List.map (fun var -> var, Unused) invariant_params
+    in
     { t with
       slot_offsets = Slot_offsets.empty;
       closure_infos =
@@ -724,6 +733,7 @@ module Acc = struct
           return_continuation;
           exn_continuation;
           my_closure;
+          invariant_params;
           is_purely_tailrec;
           slot_offsets_at_definition = t.slot_offsets
         }
@@ -755,6 +765,51 @@ module Acc = struct
         code_slot_offsets;
         slot_offsets = closure_info.slot_offsets_at_definition
       } )
+
+  let rec update_invariant_params ~invariant_params ~args =
+    match invariant_params, args with
+    | [], _args ->
+      (* In the case of over-application, only the arguments
+         corresponding to actual parameters are relevant *)
+      [] 
+    | invariant_params, [] ->
+      (* In the case of partial application, all remaining arguments are considered varying *)
+      List.map (fun (param, _) -> (param, Varies)) invariant_params
+    | (param, invariance) :: invariant_params, arg :: args ->
+      let invariant_params = update_invariant_params ~invariant_params ~args in
+      let invariance =
+        match invariance with
+        | Varies -> Varies
+        | Invariant | Unused ->
+          if Simple.equal arg (Simple.var param) then
+            Invariant
+          else
+            Varies
+      in
+      (param, invariance) :: invariant_params
+
+  let update_invariant_params_from_application acc ~code_id ~args =
+    let closure_infos =
+      let rec update_stack = function
+        | [] -> []
+        | (closure_info :: closure_infos as stack) ->
+          let new_closure_infos = update_stack closure_infos in
+          if Code_id.equal code_id closure_info.code_id
+          then
+            let invariant_params =
+              update_invariant_params ~invariant_params:closure_info.invariant_params
+                ~args
+            in
+            { closure_info with invariant_params } :: new_closure_infos
+          else
+            if closure_infos == new_closure_infos
+            then stack
+            else closure_info :: new_closure_infos
+      in
+      update_stack acc.closure_infos
+    in
+    if closure_infos == acc.closure_infos then acc else
+      { acc with closure_infos }
 end
 
 module Function_decls = struct
@@ -1032,6 +1087,16 @@ module Expr_with_acc = struct
     let acc =
       Acc.add_free_names_and_check_my_closure_use
         (Apply_expr.free_names_except_callee apply)
+        acc
+    in
+    let acc =
+      match Apply.call_kind apply with
+      | Function { function_call = Direct code_id } ->
+        Acc.update_invariant_params_from_application acc ~code_id ~args:(Apply.args apply)
+      | Function { function_call = Indirect_known_arity _ | Indirect_unknown_arity }
+      | Method _
+      | C_call _
+      | Effect _ ->
         acc
     in
     let acc =
