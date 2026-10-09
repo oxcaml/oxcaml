@@ -369,8 +369,6 @@ module Float32 = struct
     = "jsoo_float32_to_float_boxed" "jsoo_float32_to_float"
   [@@unboxed] [@@noalloc]
 
-  (* The payload of a boxed float32, i.e. a custom block with identifier
-     ["_f32"]. *)
   external of_boxed : Obj.t -> t = "jsoo_float32_of_boxed"
 
   (* In javascript/wasm, we define float32 parsing as rounding the 64-bit result.
