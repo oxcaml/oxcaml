@@ -290,7 +290,7 @@ let oper_result_type = function
   | Craise _ -> typ_void
   | Cprobe _ -> typ_void
   | Cprobe_is_enabled _ -> typ_int
-  | Copaque -> typ_val
+  | Copaque ty -> ty
   | Cpoll | Cpause -> typ_void
   | Cbeginregion ->
     (* This must not be typ_val; the begin-region operation returns a naked
@@ -761,8 +761,6 @@ let make_const_vec256 x = Operation.Const_vec256 x
 let make_const_vec512 x = Operation.Const_vec512 x
 
 let make_const_symbol x = Operation.Const_symbol x
-
-let make_opaque () = Operation.Opaque
 
 let insert_debug (env : environment) sub_cfg basic dbg arg res =
   let phantom_available_before = phantom_vars_from_env env in
