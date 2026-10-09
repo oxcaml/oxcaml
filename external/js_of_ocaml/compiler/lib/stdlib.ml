@@ -103,55 +103,10 @@ module List = struct
     | [] -> acc
     | x :: xs -> rev_append_map ~f xs (f x :: acc)
 
-  let slow_map l ~f = rev (rev_map ~f l) [@@if ocaml_version < (4, 14, 0)]
-
-  let max_non_tailcall =
-    match Sys.backend_type with
-    | Sys.Native | Sys.Bytecode -> 1_000
-    | Sys.Other _ -> 50
-
-  let rec count_map ~f l ctr =
-    match l with
-    | [] -> []
-    | [ x1 ] ->
-        let f1 = f x1 in
-        [ f1 ]
-    | [ x1; x2 ] ->
-        let f1 = f x1 in
-        let f2 = f x2 in
-        [ f1; f2 ]
-    | [ x1; x2; x3 ] ->
-        let f1 = f x1 in
-        let f2 = f x2 in
-        let f3 = f x3 in
-        [ f1; f2; f3 ]
-    | [ x1; x2; x3; x4 ] ->
-        let f1 = f x1 in
-        let f2 = f x2 in
-        let f3 = f x3 in
-        let f4 = f x4 in
-        [ f1; f2; f3; f4 ]
-    | x1 :: x2 :: x3 :: x4 :: x5 :: tl ->
-        let f1 = f x1 in
-        let f2 = f x2 in
-        let f3 = f x3 in
-        let f4 = f x4 in
-        let f5 = f x5 in
-        f1
-        :: f2
-        :: f3
-        :: f4
-        :: f5
-        :: (if ctr > max_non_tailcall then slow_map ~f tl else count_map ~f tl (ctr + 1))
-  [@@if ocaml_version < (4, 14, 0)]
-
-  let map l ~f = count_map ~f l 0 [@@if ocaml_version < (4, 14, 0)]
-
   let[@tail_mod_cons] rec map l ~f =
     match l with
     | [] -> []
     | x :: tl -> f x :: (map [@tailcall]) tl ~f
-  [@@if ocaml_version >= (4, 14, 0)]
 
   (* Like [map], but returns the list itself (physically) when the
      function returns all the elements unchanged (physically). This
@@ -193,37 +148,6 @@ module List = struct
     | [] -> None
     | [ x ] -> Some x
     | _ :: xs -> last xs
-
-  let is_empty = function
-    | [] -> true
-    | _ -> false
-  [@@if ocaml_version < (5, 1, 0)]
-
-  let tail_append l1 l2 = rev_append (rev l1) l2 [@@if ocaml_version < (5, 1, 0)]
-
-  let rec count_append l1 l2 count =
-    match l2 with
-    | [] -> l1
-    | _ -> (
-        match l1 with
-        | [] -> l2
-        | [ x1 ] -> x1 :: l2
-        | [ x1; x2 ] -> x1 :: x2 :: l2
-        | [ x1; x2; x3 ] -> x1 :: x2 :: x3 :: l2
-        | [ x1; x2; x3; x4 ] -> x1 :: x2 :: x3 :: x4 :: l2
-        | x1 :: x2 :: x3 :: x4 :: x5 :: tl ->
-            x1
-            :: x2
-            :: x3
-            :: x4
-            :: x5
-            ::
-            (if count > max_non_tailcall
-             then tail_append tl l2
-             else count_append tl l2 (count + 1)))
-  [@@if ocaml_version < (5, 1, 0)]
-
-  let append l1 l2 = count_append l1 l2 0 [@@if ocaml_version < (5, 1, 0)]
 
   let group l ~f =
     let rec loop (l : 'a list) (this_group : 'a list) (acc : 'a list list) : 'a list list
@@ -270,7 +194,6 @@ module List = struct
 end
 
 let ( @ ) = List.append
-
 
 let warn_overflow name ~to_dec ~to_hex i ~truncated_hex ~truncated_dec =
   Warning.warn
@@ -429,28 +352,31 @@ module Float = struct
 end
 
 module Float32 = struct
-  type t
+  (* IEEE 754 single-precision bit patterns, as in Flambda 2's
+     [Flambda2_floats.Float32]. Conversions are done in C stubs
+     (float32_stubs.c), so no compiler support for float32 is needed. *)
+  type t = int32
 
-  let of_float _ = assert false
+  let of_bits x = x
 
-  let to_float _ = assert false
+  let to_bits x = x
 
-  let of_string _ = assert false
-end
-[@@if not oxcaml]
+  external of_float : float -> t
+    = "jsoo_float32_of_float_boxed" "jsoo_float32_of_float"
+  [@@unboxed] [@@noalloc]
 
-module Float32 = struct
-  type t = float32
+  external to_float : t -> float
+    = "jsoo_float32_to_float_boxed" "jsoo_float32_to_float"
+  [@@unboxed] [@@noalloc]
 
-  external of_float : float -> t = "%float32offloat"
-
-  external to_float : t -> float = "%floatoffloat32"
+  (* The payload of a boxed float32, i.e. a custom block with identifier
+     ["_f32"]. *)
+  external of_boxed : Obj.t -> t = "jsoo_float32_of_boxed"
 
   (* In javascript/wasm, we define float32 parsing as rounding the 64-bit result.
      This is not equivalent to native code, which parses to 32 bits directly. *)
   let of_string s = float_of_string s |> of_float
 end
-[@@if oxcaml]
 
 module Bool = struct
   include Bool
@@ -589,8 +515,6 @@ module Bytes = BytesLabels
 
 module String = struct
   include StringLabels
-
-  let hash (a : string) = Hashtbl.hash a [@@if ocaml_version < (5, 0, 0)]
 
   module Hashtbl = Hashtbl.Make (struct
     include String
@@ -1254,119 +1178,10 @@ end
 module In_channel = struct
   let stdlib_input_line = input_line
 
-  (* Read up to [len] bytes into [buf], starting at [ofs]. Return total bytes
-     read. *)
-  let read_upto ic buf ofs len =
-    let rec loop ofs len =
-      if len = 0
-      then ofs
-      else
-        let r = input ic buf ofs len in
-        if r = 0 then ofs else loop (ofs + r) (len - r)
-    in
-    loop ofs len - ofs
-
-  (* Best effort attempt to return a buffer with >= (ofs + n) bytes of storage,
-     and such that it coincides with [buf] at indices < [ofs].
-
-     The returned buffer is equal to [buf] itself if it already has sufficient
-     free space.
-
-     The returned buffer may have *fewer* than [ofs + n] bytes of storage if this
-     number is > [Sys.max_string_length]. However the returned buffer will
-     *always* have > [ofs] bytes of storage. In the limiting case when [ofs = len
-     = Sys.max_string_length] (so that it is not possible to resize the buffer at
-     all), an exception is raised. *)
-
-  let ensure buf ofs n =
-    let len = Bytes.length buf in
-    if len >= ofs + n
-    then buf
-    else
-      let new_len = ref len in
-      while !new_len < ofs + n do
-        new_len := (2 * !new_len) + 1
-      done;
-      let new_len = !new_len in
-      let new_len =
-        if new_len <= Sys.max_string_length
-        then new_len
-        else if ofs < Sys.max_string_length
-        then Sys.max_string_length
-        else
-          failwith
-            "In_channel.input_all: channel content is larger than maximum string length"
-      in
-      let new_buf = Bytes.create new_len in
-      Bytes.blit ~src:buf ~src_pos:0 ~dst:new_buf ~dst_pos:0 ~len:ofs;
-      new_buf
-
-  let input_all ic =
-    let chunk_size = 65536 in
-    (* IO_BUFFER_SIZE *)
-    let initial_size = try in_channel_length ic - pos_in ic with Sys_error _ -> -1 in
-    let initial_size = if initial_size < 0 then chunk_size else initial_size in
-    let initial_size =
-      if initial_size <= Sys.max_string_length
-      then initial_size
-      else Sys.max_string_length
-    in
-    let buf = Bytes.create initial_size in
-    let nread = read_upto ic buf 0 initial_size in
-    if nread < initial_size
-    then (* EOF reached, buffer partially filled *)
-      Bytes.sub_string buf ~pos:0 ~len:nread
-    else
-      (* nread = initial_size, maybe EOF reached *)
-      match input_char ic with
-      | exception End_of_file ->
-          (* EOF reached, buffer is completely filled *)
-          Bytes.unsafe_to_string buf
-      | c ->
-          (* EOF not reached *)
-          let rec loop buf ofs =
-            let buf = ensure buf ofs chunk_size in
-            let rem = Bytes.length buf - ofs in
-            (* [rem] can be < [chunk_size] if buffer size close to
-               [Sys.max_string_length] *)
-            let r = read_upto ic buf ofs rem in
-            if r < rem
-            then (* EOF reached *)
-              Bytes.sub_string buf ~pos:0 ~len:(ofs + r)
-            else (* r = rem *)
-              loop buf (ofs + rem)
-          in
-          let buf = ensure buf nread (chunk_size + 1) in
-          Bytes.set buf nread c;
-          loop buf (nread + 1)
-
-  let input_lines ic =
-    let rec aux acc =
-      match input_line ic with
-      | line -> aux (line :: acc)
-      | exception End_of_file -> acc
-    in
-    List.rev (aux [])
-
-  let input_line_exn = stdlib_input_line
-end
-[@@if ocaml_version < (4, 14, 0)]
-
-module In_channel = struct
-  let stdlib_input_line = input_line
-
   include In_channel
 
-  (* [In_channel.input_lines] only exists in the stdlib since 5.1. *)
-  let[@tail_mod_cons] rec input_lines ic =
-    match stdlib_input_line ic with
-    | line -> line :: input_lines ic
-    | exception End_of_file -> []
-  [@@if ocaml_version < (5, 1, 0)]
-
   let input_line_exn = stdlib_input_line
 end
-[@@if ocaml_version >= (4, 14, 0)]
 
 module Seq = struct
   include Seq
@@ -1447,6 +1262,4 @@ module Lexing = struct
   (* use [char1 + 1] and [char2 + 1] if *not* using Caml mode *)
 end
 
-let with_async_exns = Sys.with_async_exns [@@if oxcaml]
-
-let with_async_exns f = f () [@@if not oxcaml]
+let with_async_exns = Ocaml_or_oxcaml.with_async_exns

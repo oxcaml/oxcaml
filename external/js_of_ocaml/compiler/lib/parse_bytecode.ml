@@ -599,7 +599,7 @@ end = struct
 
   let ident_native = ident_of_custom (Obj.repr 0n)
 
-  let ident_f32 = ident_of_custom (Obj.repr 0.s) [@@if oxcaml]
+  let ident_f32 = Some "_f32"
 
   external is_null : Obj.t -> bool = "%is_null" [@@if oxcaml]
 
@@ -625,8 +625,8 @@ end = struct
       else if tag = Obj.custom_tag
       then
         match ident_of_custom x with
-        | ((Some name) [@if oxcaml]) when same_ident name ident_f32 ->
-            Float32 (Int64.bits_of_float ((Obj.magic x : float32) |> Float32.to_float))
+        | Some name when same_ident name ident_f32 ->
+            Float32 (Int64.bits_of_float (Float32.to_float (Float32.of_boxed x)))
         | Some name when same_ident name ident_32 ->
             let i : int32 = Obj.magic x in
             Int32 i
