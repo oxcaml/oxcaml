@@ -748,9 +748,15 @@ let recognize_mergeable_argument ~machine_width ~scrutinee required_names ~dbg
           | Naked_mask -> single_kind Naked_masks Naked_masks)
         | Region | Rec_info -> None))
 
-let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
-    ~shareable_constants ~typing_env_before_switch ~cse_before_switch uacc
-    ~after_rebuild =
+let rebuild_switch
+    { SE.arms;
+      condition_dbg;
+      scrutinee;
+      scrutinee_ty;
+      shareable_constants;
+      typing_env_before_switch;
+      cse_before_switch
+    } uacc ~after_rebuild =
   let machine_width = TE.machine_width typing_env_before_switch in
   let new_let_conts, arms, mergeable_arms =
     TI.Map.fold (rebuild_arm uacc) arms ([], TI.Map.empty, No_arms)
@@ -1035,12 +1041,10 @@ let simplify_switch dacc switch ~down_to_up =
     let denv_at_use = DE.with_typing_env (DA.denv dacc) env_at_use in
     let dacc = DA.with_denv dacc denv_at_use in
     Simplify_apply_cont_expr.simplify_apply_cont dacc apply_cont
-      ~down_to_up:(fun dacc ~rebuild ->
-        down_to_up dacc ~rebuild:(fun uacc ~after_rebuild ->
-            let uacc =
-              UA.notify_removed ~operation:Removed_operations.branch uacc
-            in
-            rebuild uacc ~after_rebuild))
+      ~down_to_up:(fun dacc simplified_expr ->
+        down_to_up dacc
+          (SE.notify_removed ~operation:Removed_operations.branch
+             simplified_expr))
   | None ->
     let arms, dacc = TI.Map.fold simplify_arm arms (TI.Map.empty, dacc) in
     let dacc =
@@ -1070,6 +1074,5 @@ let simplify_switch dacc switch ~down_to_up =
     let typing_env_before_switch = DA.typing_env dacc_before_switch in
     let cse_before_switch = DE.cse (DA.denv dacc_before_switch) in
     down_to_up dacc
-      ~rebuild:
-        (rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
-           ~shareable_constants ~typing_env_before_switch ~cse_before_switch)
+      (SE.simplified_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
+         ~shareable_constants ~typing_env_before_switch ~cse_before_switch)

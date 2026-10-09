@@ -18,4 +18,7 @@ open! Flambda
 
 val simplify_apply :
   simplify_expr:Expr.t Simplify_common.expr_simplifier ->
+  rebuild_expr:Simplified_expr.t Simplify_common.rebuild ->
   Apply.t Simplify_common.expr_simplifier
+
+val rebuild_apply : Simplified_expr.simplified_apply Simplify_common.rebuild
