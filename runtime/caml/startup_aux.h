@@ -19,6 +19,7 @@
 #ifdef CAML_INTERNALS
 
 #include "config.h"
+#include "misc.h"
 
 extern void caml_init_locale(void);
 extern void caml_free_locale(void);

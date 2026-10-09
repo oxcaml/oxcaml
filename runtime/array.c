@@ -23,8 +23,6 @@
 #include "caml/misc.h"
 #include "caml/mlvalues.h"
 #include "caml/signals.h"
-#include "caml/runtime_events.h"
-#include "caml/custom.h"
 
 static const mlsize_t mlsize_t_max = CAML_UINTNAT_MAX;
 
@@ -1323,16 +1321,78 @@ CAMLprim value caml_atomic_lxor_ptr_bytecode(value ptr, value incr)
   return caml_atomic_lxor_idx_bytecode(Field(ptr, 0), Field(ptr, 1), incr);
 }
 
-CAMLprim value caml_get_ext_ptr_bytecode(value idx)
+static value unimplemented_ext_ptr(void)
 {
   caml_failwith("External ptr primitives are unimplemented on bytecode");
   return Val_unit;
 }
 
+CAMLprim value caml_get_ext_ptr_bytecode(value idx)
+{
+  return unimplemented_ext_ptr();
+}
+
 CAMLprim value caml_set_ext_ptr_bytecode(value idx, value v)
 {
-  caml_failwith("External ptr primitives are unimplemented on bytecode");
-  return Val_unit;
+  return unimplemented_ext_ptr();
+}
+
+CAMLprim value caml_atomic_load_ext_ptr_bytecode(value idx)
+{
+  return unimplemented_ext_ptr();
+}
+
+CAMLprim value caml_atomic_set_ext_ptr_bytecode(value idx, value v)
+{
+  return unimplemented_ext_ptr();
+}
+
+CAMLprim value caml_atomic_exchange_ext_ptr_bytecode(value idx, value v)
+{
+  return unimplemented_ext_ptr();
+}
+
+CAMLprim value caml_atomic_compare_exchange_ext_ptr_bytecode(value idx,
+                                                             value oldv,
+                                                             value newv)
+{
+  return unimplemented_ext_ptr();
+}
+
+CAMLprim value caml_atomic_cas_ext_ptr_bytecode(value idx, value oldv,
+                                                value newv)
+{
+  return unimplemented_ext_ptr();
+}
+
+CAMLprim value caml_atomic_fetch_add_ext_ptr_bytecode(value idx, value incr)
+{
+  return unimplemented_ext_ptr();
+}
+
+CAMLprim value caml_atomic_add_ext_ptr_bytecode(value idx, value incr)
+{
+  return unimplemented_ext_ptr();
+}
+
+CAMLprim value caml_atomic_sub_ext_ptr_bytecode(value idx, value incr)
+{
+  return unimplemented_ext_ptr();
+}
+
+CAMLprim value caml_atomic_land_ext_ptr_bytecode(value idx, value incr)
+{
+  return unimplemented_ext_ptr();
+}
+
+CAMLprim value caml_atomic_lor_ext_ptr_bytecode(value idx, value incr)
+{
+  return unimplemented_ext_ptr();
+}
+
+CAMLprim value caml_atomic_lxor_ext_ptr_bytecode(value idx, value incr)
+{
+  return unimplemented_ext_ptr();
 }
 
 /* Concatenates idx_prefix and idx_suffix */

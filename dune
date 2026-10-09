@@ -663,6 +663,7 @@
   cfg_available_regs
   cfg_colours
   cfg_compare
+  cfg_copy_propagation
   cfg_edge
   cfg_intf
   cfg_quick_hash

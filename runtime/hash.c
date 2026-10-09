@@ -22,7 +22,6 @@
 
 #include "caml/mlvalues.h"
 #include "caml/custom.h"
-#include "caml/memory.h"
 #include "caml/hash.h"
 #include "caml/fail.h"
 
