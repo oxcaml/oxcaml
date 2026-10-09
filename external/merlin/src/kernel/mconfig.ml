@@ -761,6 +761,8 @@ let ocaml_ignored_flags =
     "-dcfg";
     "-dcfg-invariants";
     "-dcmm-invariants";
+    "-dcmm-check-machtypes";
+    "-dcmm-no-check-machtypes";
     "-ddebug-avail-sets";
     "-ddebug-available-regs";
     "-dfexpr";
