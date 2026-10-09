@@ -76,8 +76,9 @@ let create_let uacc (bound_vars : Bound_pattern.t) (defining_expr : Named.t)
   in
   ( RE.create_let
       (UA.are_rebuilding_terms uacc)
-      bound_vars defining_expr ~body ~free_names_of_defining_expr
-      ~cost_metrics_of_defining_expr,
+      bound_vars
+      (Or_null.this defining_expr)
+      ~body ~free_names_of_defining_expr ~cost_metrics_of_defining_expr,
     uacc )
 
 let create_let_binding uacc bound_vars defining_expr
@@ -196,13 +197,6 @@ let make_new_let_bindings uacc ~bindings_outermost_first ~body =
         in
         expr, uacc)
 
-(* It does not matter what we use as a defining expr when not rebuilding terms:
-   it will not be inspected. *)
-let dummy_defining_expr =
-  Named.dummy_value
-    ~machine_width:Target_system.Machine_width.Thirty_two_no_gc_tag_bit
-    Flambda_kind.value
-
 let create_raw_let_symbol uacc bound_static static_consts ~body =
   let bindable = Bound_pattern.static bound_static in
   let free_names_of_static_consts =
@@ -220,11 +214,11 @@ let create_raw_let_symbol uacc bound_static static_consts ~body =
   in
   let uacc, defining_expr =
     if Are_rebuilding_terms.do_not_rebuild_terms (UA.are_rebuilding_terms uacc)
-    then uacc, dummy_defining_expr
+    then uacc, Or_null.null
     else
       let defining_expr = Rebuilt_static_const.Group.to_named static_consts in
       ( add_set_of_closures_offsets ~is_phantom:false defining_expr uacc,
-        defining_expr )
+        Or_null.this defining_expr )
   in
   ( RE.create_let
       (UA.are_rebuilding_terms uacc)
