@@ -164,13 +164,14 @@ val is_parameter_import : 'a t -> Global_module.Name.t -> bool
    [penv] (it may have failed) *)
 val looked_up : 'a t -> Global_module.Name.t -> bool
 
-(* [is_imported_opaque penv md] checks if [md] has been imported
-   in [penv] as an opaque module *)
-val is_imported_opaque : 'a t -> Compilation_unit.Name.t -> bool
+(* [is_opaque_impl penv cu] checks if the interface implemented by
+   [cu] (as recorded in its cmi) has been imported in [penv] as an opaque
+   module *)
+val is_opaque_impl : 'a t -> Compilation_unit.t -> bool
 
-(* [register_import_as_opaque penv md] registers [md] in [penv] as an
-   opaque module *)
-val register_import_as_opaque : 'a t -> Compilation_unit.Name.t -> unit
+(* [register_impl_as_opaque penv cu] registers the interface implemented by
+   [cu] in [penv] as an opaque module *)
+val register_impl_as_opaque : 'a t -> Compilation_unit.t -> unit
 
 val global_of_global_name : 'a t
   -> check:bool
