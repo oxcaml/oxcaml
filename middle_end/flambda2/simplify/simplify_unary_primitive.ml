@@ -281,10 +281,14 @@ let simplify_string_length dacc ~original_term ~arg:_ ~arg_ty:str_ty ~result_var
       let machine_width = DE.machine_width (DA.denv dacc) in
       let lengths =
         String_info.Set.fold
-          (fun str lengths ->
-            Target_ocaml_int.Set.add
-              (Target_ocaml_int.of_int machine_width (String.length str))
-              lengths)
+          (fun (str_info : String_info.t) lengths ->
+            let length =
+              match str_info with
+              | Immutable str ->
+                Target_ocaml_int.of_int machine_width (String.length str)
+              | Mutable { length } -> length
+            in
+            Target_ocaml_int.Set.add length lengths)
           str_infos Target_ocaml_int.Set.empty
       in
       let ty = T.these_naked_immediates lengths in
@@ -841,9 +845,14 @@ let simplify_obj_dup ~alloc_region dbg dacc ~original_term ~arg ~arg_ty
            dbg)
         ~try_reify:true dacc)
   | Unknown -> (
+    let is_immutable (str_info : String_info.t) =
+      match str_info with Immutable _ -> true | Mutable _ -> false
+    in
     match T.prove_strings typing_env arg_ty with
-    | Proved _ -> elide_primitive ()
-    | Unknown -> SPR.create_unknown dacc ~result_var K.value ~original_term)
+    | Proved str_infos when String_info.Set.for_all is_immutable str_infos ->
+      elide_primitive ()
+    | Proved _ | Unknown ->
+      SPR.create_unknown dacc ~result_var K.value ~original_term)
 
 let simplify_get_header ~original_prim dacc ~original_term ~arg:_ ~arg_ty:_
     ~result_var =

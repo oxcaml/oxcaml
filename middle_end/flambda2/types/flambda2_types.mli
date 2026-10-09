@@ -615,6 +615,10 @@ val variant :
 
 val this_immutable_string : string -> t
 
+(** The type of a string or bytes of the given length allocated at runtime,
+    whose contents are unknown (see [String_info.Mutable]). *)
+val mutable_string : length:Target_ocaml_int.t -> t
+
 val exactly_this_closure :
   Function_slot.t ->
   all_function_slots_in_set:Function_type.t Or_unknown.t Function_slot.Map.t ->
