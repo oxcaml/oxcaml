@@ -611,9 +611,10 @@ let mk_flambda2_result_types_functors_and_static_closures f =
     Arg.Unit f,
     Printf.sprintf
       " Infer result types for functors, and for functions\n\
-      \     returning closures whose environments only refer to the\n\
-      \     functions' parameters (so that such closures would be statically\n\
-      \     allocated at a call site with known arguments)%s (Flambda 2 only)"
+      \     returning closures whose environments only refer to values\n\
+      \     available at the functions' entry (so that such closures would\n\
+      \     be statically allocated at a call site with known arguments)%s\n\
+      \     (Flambda 2 only)"
       (format_default
          (match Flambda2.Default.function_result_types with
          | Functors_and_static_closures -> true

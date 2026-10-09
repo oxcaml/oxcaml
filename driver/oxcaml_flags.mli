@@ -126,8 +126,10 @@ type function_result_types =
   | Functors_only
   | Functors_and_static_closures
       (** Functors, plus functions returning closures whose environments only
-          refer to the functions' parameters (or constants), i.e. closures that
-          would be statically allocated at a call site with known arguments. *)
+          refer to values available at the functions' entry (their parameters,
+          the variables they capture, symbols and constants), i.e. closures
+          that would be statically allocated at a call site with known
+          arguments. *)
   | Functors_and_closures
       (** Functors, plus all functions returning closures. *)
   | All_functions
