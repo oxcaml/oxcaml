@@ -358,27 +358,10 @@ $(PPXLIB_DEPS) $(JSOO_DEPS) $(JSOO_TEST_DEPS):
 ppxlib-build: ast-dependent-libs-compiler duneconf/ast-dependent-libs.ws $(PPXLIB_DEPS)
 	$(ast_dependent_libs_dune) $(ws_ast_dependent_libs) @ppxlib-libs
 
-# The js_of_ocaml IR modules linked into the compiler
-# (middle_end/flambda2/to_jsir/jsoo_imports) are generated from
-# external/js_of_ocaml by running its ppx, so that an edit to those modules
-# reaches the compiler on the next jsoo-build.
-jsoo_imports_driver = \
-  js_of_ocaml/compiler/ppx-optcomp-light/ppx_optcomp_light_standalone.exe
-jsoo_imports = bash scripts/jsoo-imports.sh \
-  $(ast_dependent_libs_root)/_build/default/$(jsoo_imports_driver)
-
 .PHONY: jsoo-build
 jsoo-build: ast-dependent-libs-compiler duneconf/ast-dependent-libs.ws \
   $(PPXLIB_DEPS) $(JSOO_DEPS)
-	$(ast_dependent_libs_dune) $(ws_ast_dependent_libs) @jsoo-libs \
-	  $(jsoo_imports_driver)
-	$(jsoo_imports)
-
-.PHONY: jsoo-imports jsoo-imports-check
-jsoo-imports jsoo-imports-check: ast-dependent-libs-compiler \
-  duneconf/ast-dependent-libs.ws $(PPXLIB_DEPS) $(JSOO_DEPS)
-	$(ast_dependent_libs_dune) $(ws_ast_dependent_libs) $(jsoo_imports_driver)
-	$(jsoo_imports) $(if $(filter jsoo-imports-check,$@),--check)
+	$(ast_dependent_libs_dune) $(ws_ast_dependent_libs) @jsoo-libs
 
 # The packages built by the ppxlib-libs and jsoo-libs aliases.
 PPXLIB_PACKAGES = ocaml-compiler-libs ppx_derivers sexp_type stdlib-shims \

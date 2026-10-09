@@ -1,4 +1,30 @@
-; The jsoo_imports library is defined in stock/ and oxcaml/: see README.txt.
-; import.ml here is copied into both.
+; The js_of_ocaml IR (Code) and its dependencies, compiled straight from the
+; js_of_ocaml subtree, external/js_of_ocaml/compiler/lib. (That directory is
+; data-only in this build, so copy_files is how its sources get here.) These
+; modules are kept free of js_of_ocaml's ppx_optcomp_light; what differs
+; between OxCaml and stock OCaml is in Ocaml_or_oxcaml, which has one source
+; file per compiler. Nothing here uses those definitions, so the stock OCaml
+; one is used in every context, including the bootstrap one, which has a
+; stock compiler.
 
-(include_subdirs no)
+(copy_files#
+ %{project_root}/external/js_of_ocaml/compiler/lib/{code,debug,int_set,int_trie,optimization_hint,parse_info,reserved,sizable_int,stdlib,targetint,targetnativeint,timer,warning}.{ml,mli})
+
+(rule
+ (target ocaml_or_oxcaml.ml)
+ (action
+  (copy
+   %{project_root}/external/js_of_ocaml/compiler/lib/ocaml_or_oxcaml.ocaml.ml
+   %{target})))
+
+(library
+ (name jsoo_imports)
+ (wrapped true)
+ (instrumentation
+  (backend bisect_ppx))
+ ; js_of_ocaml builds with -w -7-37; the other warnings are style ones that
+ ; the compiler's dune env enables.
+ (flags
+  (:standard -w -4-7-18-37-44))
+ (ocamlopt_flags
+  (:standard -O3)))
