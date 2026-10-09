@@ -668,7 +668,7 @@ let to_run () =
   (************************************)
   let r = { a54 = #{ a53 = #0.; b53 = 1. } } in
   mark_test_run 43;
-  let test = Int.equal (Obj.size (Obj.repr r)) 1 in
+  let test = Int.equal (Obj.size (Obj.repr r)) 2 in
   if not test then failwithf "test 43 failed";
 
   ()
@@ -681,7 +681,7 @@ let to_run () =
   (*************************************)
   let r = { a55 = #{ a30 = #0.; b30 = #1. } } in
   mark_test_run 44;
-  let test = Int.equal (Obj.size (Obj.repr r)) 1 in
+  let test = Int.equal (Obj.size (Obj.repr r)) 2 in
   if not test then failwithf "test 44 failed";
 
   ()
@@ -720,7 +720,7 @@ let to_run () =
   (*************************************)
   let r = { a59 = #{ a58 = "0"; b58 = (unbox_unit ()) } } in
   mark_test_run 47;
-  let test = Int.equal (Obj.size (Obj.repr r)) 1 in
+  let test = Int.equal (Obj.size (Obj.repr r)) 2 in
   if not test then failwithf "test 47 failed";
 
   ()

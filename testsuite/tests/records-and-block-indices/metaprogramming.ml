@@ -398,7 +398,18 @@ module Type_structure = struct
     match t with
     | Record (ts, Boxed) ->
       if bytecode
-      then List.length ts
+      then
+        (* A block whose only field is an unboxed product stores the fields of
+           that product directly. *)
+        match ts with
+        | [t] -> (
+          match layout t with
+          | Product layouts -> List.length layouts
+          | Void | Value _ | Float64 | Float32 | Bits64 | Bits32 | Vec128 | Word
+            ->
+            1
+        )
+        | _ -> List.length ts
       else
         List.fold_left ts ~init:0 ~f:(fun acc t ->
             acc + layout_size_in_block (layout t)

@@ -251,6 +251,16 @@ type one_wrapped = { pw : wrapped; }
 
 (* All-void records *)
 
+type one_void = { u : unit# }
+
+let () =
+  let boxed : one_void = box #{ u = #() } in
+  check_shape boxed { u = #() };
+  assert (Obj.size (Obj.repr boxed) = if native () then 0 else 1)
+[%%expect{|
+type one_void = { u : unit#; }
+|}]
+
 type all_void = { x : unit#; kept : unit# }
 
 let () =
