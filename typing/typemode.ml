@@ -48,8 +48,14 @@ type error =
   | Forbidden_modality : 'a annot_type * forbidden_modality_kind -> error
   | Duplicated_axis : 'a annot_type * 'a -> error
   | Unrecognized_modifier : 'a annot_type * string -> error
+  | Mode_variable_not_allowed : error
 
 exception Error of Location.t * error
+
+let mode_variable_error ~loc =
+  Language_extension.assert_enabled ~loc Mode_polymorphism
+    Language_extension.Alpha;
+  raise (Error (loc, Mode_variable_not_allowed))
 
 module Mode_axis_pair = struct
   type t = Mode.With_locality.atom
@@ -245,7 +251,12 @@ let apply_mode_implications (annots : With_locality.Const.Option.t) =
   { annots with forkable; yielding; contention; portability }
 
 let mode_consts annots =
-  List.map (fun { txt = Parsetree.Mode txt; loc } -> { txt; loc }) annots
+  List.map
+    (fun { txt; loc } ->
+      match (txt : Parsetree.mode) with
+      | Mode txt -> { txt; loc }
+      | Mode_var _ | Mode_bounds _ -> mode_variable_error ~loc)
+    annots
 
 let transl_mode_atoms atoms =
   let annots =
@@ -802,6 +813,9 @@ let report_error ppf =
       annot_type Misc.Style.inline_code "global" Misc.Style.inline_code "unique"
   | Unrecognized_modifier (annot_type, modifier) ->
     fprintf ppf "Unrecognized %a %s." print_annot_type annot_type modifier
+  | Mode_variable_not_allowed ->
+    fprintf ppf
+      "Mode variables and mode bounds are not yet supported."
 
 let () =
   Location.register_error_of_exn (function
