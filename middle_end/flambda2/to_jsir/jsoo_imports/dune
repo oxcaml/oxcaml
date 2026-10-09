@@ -1,11 +1,13 @@
 ; The js_of_ocaml IR (Code) and its dependencies, compiled straight from the
 ; js_of_ocaml subtree, external/js_of_ocaml/compiler/lib. (That directory is
 ; data-only in this build, so copy_files is how its sources get here.) These
-; modules are kept free of js_of_ocaml's ppx_optcomp_light; what differs
-; between OxCaml and stock OCaml is in Ocaml_or_oxcaml, which has one source
-; file per compiler. Nothing here uses those definitions, so the stock OCaml
-; one is used in every context, including the bootstrap one, which has a
-; stock compiler.
+; modules are built without js_of_ocaml's ppx_optcomp_light, so their
+; [@@if ocaml_version ...] attributes are not evaluated: both arms of such a
+; pair are compiled, and the later one (the current OCaml) shadows the other,
+; hence -w -32. What differs between OxCaml and stock OCaml is in
+; Ocaml_or_oxcaml, which has one source file per compiler. Nothing here uses
+; those definitions, so the stock OCaml one is used in every context,
+; including the bootstrap one, which has a stock compiler.
 
 (copy_files#
  %{project_root}/external/js_of_ocaml/compiler/lib/{code,debug,int_set,int_trie,optimization_hint,parse_info,reserved,sizable_int,stdlib,targetint,targetnativeint,timer,warning}.{ml,mli})
@@ -22,9 +24,9 @@
  (wrapped true)
  (instrumentation
   (backend bisect_ppx))
- ; js_of_ocaml builds with -w -7-37; the other warnings are style ones that
- ; the compiler's dune env enables.
+ ; js_of_ocaml builds with -w -7-37; -32 is explained above; the other
+ ; warnings are style ones that the compiler's dune env enables.
  (flags
-  (:standard -w -4-7-18-37-44))
+  (:standard -w -4-7-18-32-37-44))
  (ocamlopt_flags
   (:standard -O3)))
