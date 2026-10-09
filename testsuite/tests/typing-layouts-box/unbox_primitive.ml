@@ -237,6 +237,31 @@ let () = both_ways (fun { hide } ->
 [%%expect{|
 |}]
 
+(* Singleton products. A record whose only field is an unboxed product, even
+   when wrapped in a singleton unboxed record, is laid out like the product (see
+   [box_primitive.ml]). So all of these blocks must unbox to the product. *)
+
+type one_values = { p : #(int * string) }
+type wrapped = #{ wt : #(int * string) }
+type one_wrapped = { pw : wrapped }
+
+let () = both_ways (fun { hide } ->
+  let check_values block =
+    let #{ p = #(i, s') } = unbox (hide (Obj.magic block : one_values)) in
+    assert (i = 42 && s' == s)
+  in
+  check_values { p = #(42, s) };
+  check_values { pw = #{ wt = #(42, s) } };
+  check_values (box #(42, s));
+  check_values (box #{ p = #(42, s) } : one_values);
+  check_values (box #{ pw = #{ wt = #(42, s) } } : one_wrapped))
+[%%expect{|
+type one_values = { p : #(int * string); }
+type wrapped = #{ wt : #(int * string); }
+type one_wrapped = { pw : wrapped; }
+Exception: Assert_failure ("", 8, 4).
+|}]
+
 (* Unboxed records nested inside unboxed records and tuples *)
 
 type inner_u = #{ ix : int64_u; iy : string }
