@@ -122,6 +122,7 @@ module Allowlisted = struct
         "ocaml.toplevel_printer" (*Interpreted by the toplevel/utop*);
         "toplevel_printer" (*Interpreted by the toplevel/utop*);
         "ocaml.unsafe_allow_any_mode_crossing";
+        "ocaml.unsafe_unextended";
         "ocaml.or_null";
         "ocaml.or_null_reexport";
         "ocaml.atomic";
