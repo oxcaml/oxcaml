@@ -1,0 +1,45 @@
+# Module names of the libraries shipped only as private dependencies (see
+# joinConsumingProject in default.nix). No installed top-level compilation unit
+# (a .cmi without "__") outside lib/ocaml may have one of these names: it would
+# clash with a user's own copy. A trailing * matches any suffix.
+# cmdliner
+Cmdliner
+Cmdliner_*
+# gen
+Gen
+GenClone
+GenLabels
+GenLabels_intf
+GenM
+GenMList
+GenM_intf
+GenShims_
+Gen_intf
+# menhirLib, menhirSdk
+MenhirLib
+MenhirSdk
+# ppx_derivers
+Ppx_derivers
+# sedlex, sedlex.utils, sedlex.ppx
+Cset
+Iso
+Ppx_sedlex
+Sedlex
+Sedlex_cset
+Sedlex_ppx
+Sedlex_utils
+Sedlexing
+Unicode
+Utf8
+Xml
+# stdlib-shims
+Stdlib_shims
+# yojson
+Basic
+Codec
+Common
+Lexer_utils
+Raw
+Safe
+T
+Yojson
