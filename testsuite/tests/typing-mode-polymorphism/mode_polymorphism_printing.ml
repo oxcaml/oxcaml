@@ -603,10 +603,4 @@ Line 2, characters 12-17:
 2 | let foo x = (k x).contents
                 ^^^^^
 Error: This expression has type "'a -> 'b" which is not a record type.
-|}, Principal{|
-val k : 'a @ [< 'm & global] -> 'b @ 'n -> 'a @ [> 'm] = <fun>
-Line 2, characters 12-17:
-2 | let foo x = (k x).contents
-                ^^^^^
-Error: This expression has type "'a -> 'b @ 'm" which is not a record type.
 |}]
