@@ -695,7 +695,7 @@ let
     extraNativeBuildInputs = jsooTools;
   };
 
-  # Builds and runs a small js_of_ocaml program using only what a compiler
+  # Builds and runs small js_of_ocaml programs using only what a compiler
   # package built withJsoo ships.
   mkJsooSmokeTest =
     oxcaml:
