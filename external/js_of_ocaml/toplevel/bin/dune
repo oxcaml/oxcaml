@@ -4,5 +4,10 @@
  (package js_of_ocaml-toplevel)
  (libraries
   js_of_ocaml-compiler
-  js_of_ocaml-compiler.findlib-support
-  js_of_ocaml-compiler.runtime-files))
+  js_of_ocaml-compiler.runtime-files
+  (select
+   jsoo_findlib.ml
+   from
+   ;; Without findlib, only .cmi/.cma arguments are supported.
+   (js_of_ocaml-compiler.findlib-support -> jsoo_findlib.findlib.ml)
+   (-> jsoo_findlib.stub.ml))))
