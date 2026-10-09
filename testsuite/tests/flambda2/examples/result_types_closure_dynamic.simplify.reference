@@ -2,73 +2,70 @@ let code `fn[result_types_closure_dynamic.ml:18,2--46]_1` deleted in
 let code make_counter_0 deleted in
 let code f_2 deleted in
 let code inline(always) loopify(never) size(7) newer_version_of(`fn[result_types_closure_dynamic.ml:18,2--46]_1`)
-      `fn[result_types_closure_dynamic.ml:18,2--46]_1_1`
-        (param/130 : imm tagged)
-        my_closure/131 &my_alloc_region/132 my_depth/133
-        -> k/43 * k/44
+      `fn[result_types_closure_dynamic.ml:18,2--46]_1_1` (param : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
         : imm tagged =
-  let r/134 =
+  let r =
     %project_value_slot.[`fn[result_types_closure_dynamic.ml:18,2--46]`].[r]
-      (my_closure/131)
+      (my_closure)
   in
-  let prim/135 = %block_load.`imm`.tag[`0`].`size`[`1`].mut.[`0`] (r/134) in
-  let prim/136 = %int_barith.add (1, prim/135) in
-  let Poffsetref/137 =
-    %block_set.`imm`.tag[`0`].`size`[`1`].lassign.[`0`] (r/134, prim/136)
+  let prim = %block_load.`imm`.tag[`0`].`size`[`1`].mut.[`0`] (r) in
+  let prim_1 = %int_barith.add (1, prim) in
+  let Poffsetref =
+    %block_set.`imm`.tag[`0`].`size`[`1`].lassign.[`0`] (r, prim_1)
   in
-  let Pfield/138 = %block_load.mut.[`0`] (r/134) in
-  cont k/43 (Pfield/138)
+  let Pfield = %block_load.mut.[`0`] (r) in
+  cont k (Pfield)
 in
 let code inline(never) loopify(never) size(22) newer_version_of(make_counter_0)
-      make_counter_0_1 (n/139 : imm tagged)
-        my_closure/140 &my_alloc_region/141 my_depth/142
-        -> k/45 * k/46
+      make_counter_0_1 (n : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
         : val =
-  let r/143 = %block.mut.[`0`].my_alloc_region/141 (n/139) in
-  let `fn[result_types_closure_dynamic.ml:18,2--46]/144` =
+  let r = %block.mut.[`0`].my_alloc_region (n) in
+  let `fn[result_types_closure_dynamic.ml:18,2--46]` =
     closure `fn[result_types_closure_dynamic.ml:18,2--46]_1_1`
-      @`fn[result_types_closure_dynamic.ml:18,2--46]` &my_alloc_region/141
-  with { r = r/143 }
+      @`fn[result_types_closure_dynamic.ml:18,2--46]` &my_alloc_region
+  with { r = r }
   in
-  cont k/45 (`fn[result_types_closure_dynamic.ml:18,2--46]/144`)
+  cont k (`fn[result_types_closure_dynamic.ml:18,2--46]`)
 in
-let $camlResult_types_closure_dynamic__make_counter_0_1 =
+let $camlResult_types_closure_dynamic__make_counter_1 =
   closure make_counter_0_1 @make_counter &toplevel
 in
 let code loopify(never) size(18) newer_version_of(f_2)
-      f_2_1 (param/145 : imm tagged)
-        my_closure/146 &my_alloc_region/147 my_depth/148
-        -> k/47 * k/48
+      f_2_1 (param : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
         : imm tagged =
-  apply direct(make_counter_0_1 &my_alloc_region/147)
-    ($camlResult_types_closure_dynamic__make_counter_0_1 : _ -> val)
+  apply direct(make_counter_0_1 &my_alloc_region)
+    ($camlResult_types_closure_dynamic__make_counter_1 : _ -> val)
       (0)
-      -> k/49 * k/48
-    where k/49 (next/149 : val) =
-      let r/150 =
+      -> k2 * k1
+    where k2 (next : val) =
+      let r =
         %project_value_slot.[`fn[result_types_closure_dynamic.ml:18,2--46]`].[r]
-          (next/149)
+          (next)
       in
-      let prim/151 = %block_load.`imm`.tag[`0`].`size`[`1`].mut.[`0`] (r/150)
+      let prim = %block_load.`imm`.tag[`0`].`size`[`1`].mut.[`0`] (r) in
+      let prim_1 = %int_barith.add (1, prim) in
+      let Poffsetref =
+        %block_set.`imm`.tag[`0`].`size`[`1`].lassign.[`0`] (r, prim_1)
       in
-      let prim/152 = %int_barith.add (1, prim/151) in
-      let Poffsetref/153 =
-        %block_set.`imm`.tag[`0`].`size`[`1`].lassign.[`0`] (r/150, prim/152)
+      let Pfield = %block_load.mut.[`0`] (r) in
+      let prim_2 = %block_load.`imm`.tag[`0`].`size`[`1`].mut.[`0`] (r) in
+      let prim_3 = %int_barith.add (1, prim_2) in
+      let Poffsetref_1 =
+        %block_set.`imm`.tag[`0`].`size`[`1`].lassign.[`0`] (r, prim_3)
       in
-      let Pfield/154 = %block_load.mut.[`0`] (r/150) in
-      let prim/155 = %block_load.`imm`.tag[`0`].`size`[`1`].mut.[`0`] (r/150)
-      in
-      let prim/156 = %int_barith.add (1, prim/155) in
-      let Poffsetref/157 =
-        %block_set.`imm`.tag[`0`].`size`[`1`].lassign.[`0`] (r/150, prim/156)
-      in
-      let Pfield/158 = %block_load.mut.[`0`] (r/150) in
-      let int_add/159 = %int_barith.add (Pfield/158, Pfield/154) in
-      cont k/47 (int_add/159)
+      let Pfield_1 = %block_load.mut.[`0`] (r) in
+      let int_add = %int_barith.add (Pfield_1, Pfield) in
+      cont k (int_add)
 in
-let $camlResult_types_closure_dynamic__f_2_2 = closure f_2_1 @f &toplevel in
+let $camlResult_types_closure_dynamic__f_2 = closure f_2_1 @f &toplevel in
 let $camlResult_types_closure_dynamic =
-  Block 0 ($camlResult_types_closure_dynamic__make_counter_0_1,
-           $camlResult_types_closure_dynamic__f_2_2)
+  Block 0 ($camlResult_types_closure_dynamic__make_counter_1,
+           $camlResult_types_closure_dynamic__f_2)
 in
 cont done ($camlResult_types_closure_dynamic)
