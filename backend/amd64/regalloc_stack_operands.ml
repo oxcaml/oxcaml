@@ -230,8 +230,8 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
     may_use_stack_operand_for_result map instr ~num_args:1
   | Op
       (Static_cast
-         ( Float_of_int (Float32 | Float64)
-         | Int_of_float (Float32 | Float64)
+         ( Float_of_int64 (Float32 | Float64)
+         | Int64_of_float (Float32 | Float64)
          | Float_of_float32 | Float32_of_float )) ->
     may_use_stack_operand_for_only_argument map instr ~has_result:true
   | Op (Const_symbol _) ->
@@ -275,7 +275,7 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
         )
   | Op
       (Reinterpret_cast
-         (Int_of_value | Value_of_int | Mask_of_int64 | Int64_of_mask))
+         (Int64_of_value | Value_of_int64 | Mask_of_int64 | Int64_of_mask))
   | Op
       (Specific
          ( Isextend32 | Izextend32 | Ineg | Ilea _
