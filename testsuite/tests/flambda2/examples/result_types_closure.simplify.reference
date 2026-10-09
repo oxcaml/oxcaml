@@ -1,0 +1,46 @@
+let code `fn[result_types_closure.ml:18,34--64]_1` deleted in
+let code make_adder_0 deleted in
+let code f_2 deleted in
+let code inline(always) loopify(never) size(4) newer_version_of(`fn[result_types_closure.ml:18,34--64]_1`)
+      `fn[result_types_closure.ml:18,34--64]_1_1` (x : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let n =
+    %project_value_slot.[`fn[result_types_closure.ml:18,34--64]`].[n]
+      (my_closure)
+  in
+  let int_add = %int_barith.add (x, n) in
+  cont k (int_add)
+in
+let code inline(never) loopify(never) size(13) newer_version_of(make_adder_0)
+      make_adder_0_1 (n : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : val =
+  let `fn[result_types_closure.ml:18,34--64]` =
+    closure `fn[result_types_closure.ml:18,34--64]_1_1`
+      @`fn[result_types_closure.ml:18,34--64]` &my_alloc_region
+  with { n = n }
+  in
+  cont k (`fn[result_types_closure.ml:18,34--64]`)
+in
+let $camlResult_types_closure__make_adder_1 =
+  closure make_adder_0_1 @make_adder &toplevel
+in
+let code loopify(never) size(5) newer_version_of(f_2)
+      f_2_1 (param : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  apply direct(make_adder_0_1 &my_alloc_region)
+    ($camlResult_types_closure__make_adder_1 : _ -> val) (3) -> k2 * k1
+    where k2 (param_1 : val) =
+      cont k (7)
+in
+let $camlResult_types_closure__f_2 = closure f_2_1 @f &toplevel in
+let $camlResult_types_closure =
+  Block 0 ($camlResult_types_closure__make_adder_1,
+           $camlResult_types_closure__f_2)
+in
+cont done ($camlResult_types_closure)

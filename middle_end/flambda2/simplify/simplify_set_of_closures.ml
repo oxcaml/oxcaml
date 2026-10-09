@@ -306,18 +306,57 @@ let simplify_function_body context ~outer_dacc function_slot_opt
       my_closure Expr.print body DA.print dacc;
     Printexc.raise_with_backtrace Misc.Fatal_error bt
 
+(* For [Compute_if_returning_closures] (see [Flambda_features]): does [ty], the
+   type of one of the results of the function, describe a closure, or an
+   immutable block (e.g. a tuple or record, possibly nested) at least one field
+   of which is such a closure? If [only_if_statically_allocatable], the
+   environments of those closures and the other fields of those blocks must
+   additionally be values available at the function's entry, [env_at_fork]: its
+   parameters, the variables of enclosing functions that it captures, symbols
+   and constants (so that the whole result would be statically allocated at a
+   call site with known arguments), rather than values built in its body. *)
+let result_type_contains_closure typing_env ~env_at_fork
+    ~only_if_statically_allocatable ty =
+  (* Blocks are looked into at most two levels deep: enough for a tuple or
+     record of closures and for one nested in another (a record of records),
+     without walking arbitrary data. *)
+  let max_block_depth = 2 in
+  match T.prove_closure_like typing_env ~max_block_depth ty with
+  | Unknown -> false
+  | Proved { environment; environment_fully_known } ->
+    (not only_if_statically_allocatable)
+    || environment_fully_known
+       && Simple.Set.for_all
+            (fun simple ->
+              Simple.pattern_match simple
+                ~const:(fun _ -> true)
+                ~name:(fun name ~coercion:_ ->
+                  Name.pattern_match name
+                    ~symbol:(fun _ -> true)
+                    ~var:(fun _ ->
+                      TE.mem ~min_name_mode:Name_mode.in_types env_at_fork name)))
+            environment
+
 let compute_result_types ~is_a_functor ~is_opaque ~return_cont_uses
     ~dacc_after_body ~dacc_at_function_entry ~return_cont_params
     ~lifted_consts_this_function ~params : _ Or_unknown_or_bottom.t =
-  match
-    ( is_opaque,
-      Flambda_features.function_result_types ~is_a_functor,
-      return_cont_uses )
-  with
+  let function_result_types =
+    Flambda_features.function_result_types ~is_a_functor
+  in
+  (* Under [Compute_if_returning_closures], the result types are only kept if
+     every result is a closure (see [result_type_contains_closure]); this can
+     only be decided once they are known, i.e. after the join below. *)
+  let only_if_returning_closures =
+    match function_result_types with
+    | Compute_if_returning_closures { only_if_statically_allocatable } ->
+      Some only_if_statically_allocatable
+    | Do_not_compute | Compute -> None
+  in
+  match is_opaque, function_result_types, return_cont_uses with
   | true, _, _ -> Unknown
   | false, _, None -> Bottom
-  | false, false, Some _ -> Unknown
-  | false, true, Some uses ->
+  | false, Do_not_compute, Some _ -> Unknown
+  | false, (Compute | Compute_if_returning_closures _), Some uses ->
     let env_at_fork =
       (* We use [C.dacc_inside_functions] not [C.dacc_prior_to_sets] to ensure
          that the environment contains bindings for any symbols being defined by
@@ -352,13 +391,40 @@ let compute_result_types ~is_a_functor ~is_opaque ~return_cont_uses
           name, ty)
         (Bound_parameters.to_list bound_params_and_results)
     in
-    let env_extension =
-      (* This call is important for compilation time performance, to cut down
-         the size of the return types. *)
-      T.make_suitable_for_environment typing_env
-        (All_variables_except params_and_results) results_and_types
+    let compute =
+      match only_if_returning_closures with
+      | None -> true
+      | Some only_if_statically_allocatable ->
+        let env_at_fork = DE.typing_env env_at_fork in
+        List.for_all
+          (fun result ->
+            let kind = K.With_subkind.kind (BP.kind result) in
+            result_type_contains_closure typing_env ~env_at_fork
+              ~only_if_statically_allocatable
+              (TE.find typing_env (BP.name result) (Some kind)))
+          (Bound_parameters.to_list return_cont_params)
     in
-    Ok (Result_types.create ~params ~results:return_cont_params env_extension)
+    if not compute
+    then Unknown
+    else
+      let env_extension =
+        (* This call is important for compilation time performance, to cut down
+           the size of the return types. With
+           [-flambda2-{functor,function}-result-types-through-value-slots], we
+           keep the types of variables only reachable through the value slots of
+           the returned closures, instead of replacing them by Unknown. These
+           describe the environments of the returned functions; the case that
+           matters is a value (typically another closure, built in the body or
+           returned by a callee) that is captured by a returned closure but is
+           not otherwise reachable from the results, since aliases to parameters
+           or to variables that are kept anyway are already followed by
+           [make_suitable_for_environment]. *)
+        T.make_suitable_for_environment
+          ~keep_variables_through_value_slots:
+            (Flambda_features.result_types_through_value_slots ~is_a_functor)
+          typing_env (All_variables_except params_and_results) results_and_types
+      in
+      Ok (Result_types.create ~params ~results:return_cont_params env_extension)
 
 type rebuilt_code =
   | Rebuilding of Code.t

@@ -330,19 +330,27 @@ let compute_handler_env ?replay ?cut_after uses ~is_recursive ~env_at_fork
       compute_use_env_with_ids ?replay ~is_recursive ~params use
     in
     let use_tenv =
-      match
-        introduce_extra_params_in_use_env previous_extra_params_and_args use
-      with
-      | Some (use_env, _, _) -> use_env
-      | None ->
-        (* CR gbury: This case means that the EPA rewrite states the apply_cont
-           is actually invalid. This should not happen currently as lifted cont
-           epas do not generate invalid rewrites.
+      (* As in [introduce_extra_params_for_join] below: there may be no extra
+         params and args at all, for instance when computing the result types of
+         a function (see [Simplify_set_of_closures.compute_result_types]) whose
+         return continuation is a normal continuation, as happens for functions
+         with an unboxed calling convention. *)
+      if EPA.is_empty previous_extra_params_and_args
+      then DE.typing_env use_env
+      else
+        match
+          introduce_extra_params_in_use_env previous_extra_params_and_args use
+        with
+        | Some (use_tenv, _, _) -> use_tenv
+        | None ->
+          (* CR gbury: This case means that the EPA rewrite states the
+             apply_cont is actually invalid. This should not happen currently as
+             lifted cont epas do not generate invalid rewrites.
 
-           We could try and handle this case by replacing the continuation's
-           handler with an [Invalid] *)
-        Misc.fatal_errorf
-          "Apply_cont of a single-use inlinable continuation is Invalid."
+             We could try and handle this case by replacing the continuation's
+             handler with an [Invalid] *)
+          Misc.fatal_errorf
+            "Apply_cont of a single-use inlinable continuation is Invalid."
     in
     let use_env = DE.with_typing_env use_env use_tenv in
     (* There is only one use of the continuation and it is inlinable. No join

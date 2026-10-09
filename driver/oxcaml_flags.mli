@@ -121,7 +121,18 @@ val ssa_simplify : bool ref
 
 val ssa_validate : bool ref
 
-type function_result_types = Never | Functors_only | All_functions
+type function_result_types =
+  | Never
+  | Functors_only
+  | Functors_and_static_closures
+      (** Functors, plus functions returning closures whose environments only
+          refer to values available at the functions' entry (their parameters,
+          the variables they capture, symbols and constants), i.e. closures
+          that would be statically allocated at a call site with known
+          arguments. *)
+  | Functors_and_closures
+      (** Functors, plus all functions returning closures. *)
+  | All_functions
 type reaper_preserve_direct_calls = Never | Always | Zero_alloc | Auto
 type join_algorithm = Binary | N_way | Checked
 type opt_level = Oclassic | O2 | O3 | O4
@@ -239,6 +250,16 @@ module Flambda2 : sig
     val simplify : bool ref
     val reaper : bool ref
   end
+
+  (** In the result types of functors, keep the types of variables that are only
+      reachable through the value slots of the returned closures (instead of
+      replacing them by Unknown). *)
+  val functor_result_types_through_value_slots : bool ref
+
+  (** As [functor_result_types_through_value_slots], but for functions that are
+      not functors.  Only has an effect when result types are computed for such
+      functions (see [function_result_types]). *)
+  val function_result_types_through_value_slots : bool ref
 
   module Expert : sig
     module Default : sig

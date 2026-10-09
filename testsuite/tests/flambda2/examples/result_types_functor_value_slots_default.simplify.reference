@@ -1,0 +1,69 @@
+let code helper_1 deleted in
+let code f_2 deleted in
+let code F_0 deleted in
+let code h_3 deleted in
+let $camlResult_types_functor_value_slots_default__Pmakeblock_0 = Block 0 (1)
+in
+let code inline(always) loopify(never) size(10) newer_version_of(f_2)
+      f_2_1 (y : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let helper = %project_value_slot.[f].[helper] (my_closure) in
+  let X = %project_value_slot.[helper].[X] (helper) in
+  let Pfield = %block_load.[`0`] (X) in
+  let int_add = %int_barith.add (y, Pfield) in
+  let int_mul = %int_barith.mul (int_add, 2) in
+  cont k (int_mul)
+in
+let code inline(always) loopify(never) size(5) newer_version_of(helper_1)
+      helper_1_1 (x : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let X = %project_value_slot.[helper].[X] (my_closure) in
+  let Pfield = %block_load.[`0`] (X) in
+  let int_add = %int_barith.add (x, Pfield) in
+  cont k (int_add)
+in
+let code inline(never) loopify(never) size(38) newer_version_of(F_0)
+      F_0_1 (X : val) my_closure &my_alloc_region my_depth -> k * k1 : val =
+  let helper = closure helper_1_1 @helper &my_alloc_region with { X = X } in
+  let f = closure f_2_1 @f &my_alloc_region with { helper = helper } in
+  let Pmakeblock = %block.[`0`].my_alloc_region (f) in
+  cont k (Pmakeblock)
+in
+let $camlResult_types_functor_value_slots_default__F_1 =
+  closure F_0_1 @F &toplevel
+in
+apply direct(F_0_1 &toplevel)
+  ($camlResult_types_functor_value_slots_default__F_1 : _ -> val)
+    ($camlResult_types_functor_value_slots_default__Pmakeblock_0)
+    -> k * error
+  where k (M : val) =
+    let $camlResult_types_functor_value_slots_default__h_2 =
+      closure h_3_1 @h &toplevel
+    and code loopify(never) size(12) newer_version_of(h_3)
+          h_3_1 (param : imm tagged)
+            my_closure &my_alloc_region my_depth
+            -> k * k1
+            : imm tagged =
+      let M_1 =
+        %project_value_slot.[h].[M]
+          ($camlResult_types_functor_value_slots_default__h_2)
+      in
+      let Pfield = %block_load.[`0`] (M_1) in
+      let helper = %project_value_slot.[f].[helper] (Pfield) in
+      let X = %project_value_slot.[helper].[X] (helper) in
+      let Pfield_1 = %block_load.[`0`] (X) in
+      let int_add = %int_barith.add (3, Pfield_1) in
+      let int_mul = %int_barith.mul (int_add, 2) in
+      cont k (int_mul)
+      with { M = M }
+    in
+    let $camlResult_types_functor_value_slots_default =
+      Block 0 ($camlResult_types_functor_value_slots_default__F_1,
+               M,
+               $camlResult_types_functor_value_slots_default__h_2)
+    in
+    cont done ($camlResult_types_functor_value_slots_default)
