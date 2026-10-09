@@ -139,7 +139,7 @@ let simplify_comparison ~dbg ~dacc ~cont ~tagged_prim ~float_prim
   | Proved (Tagged_immediate | Boxed _), Unknown ->
     Unchanged { return_types = Unknown }
 
-let simplify_caml_array_make dacc ~len_ty ~init_value_ty : t =
+let simplify_caml_array_make dacc ~len_ty ~init_value_ty alloc_mode : t =
   let typing_env = DA.typing_env dacc in
   let element_kind : _ Or_unknown_or_bottom.t =
     (* We can't deduce subkind information, e.g. an array is all-immediates
@@ -164,7 +164,17 @@ let simplify_caml_array_make dacc ~len_ty ~init_value_ty : t =
      Also maybe we should allow static allocation of these arrays for reasonable
      sizes. *)
   let type_of_returned_array =
-    T.mutable_array ~element_kind ~length:len_ty Alloc_mode.For_types.heap
+    T.mutable_array ~element_kind ~length:len_ty alloc_mode
+  in
+  Unchanged { return_types = Known [type_of_returned_array] }
+
+(* The runtime functions that create uninitialized arrays of unboxed or untagged
+   elements (see [Lambda_to_lambda_transforms]) take the length of the array as
+   their only argument. Knowing the length allows bounds checks to be removed.
+   The element kind isn't needed for that, so it is left unknown. *)
+let simplify_uninitialized_array_creation ~len_ty alloc_mode : t =
+  let type_of_returned_array =
+    T.mutable_array ~element_kind:Unknown ~length:len_ty alloc_mode
   in
   Unchanged { return_types = Known [type_of_returned_array] }
 
@@ -212,6 +222,35 @@ let simplify_returning_extcall ~dbg ~cont ~exn_cont:_ dacc fun_name args
       ~boxed_int_prim:(fun kind -> Int_comp (kind, Yielding_bool (Gt Signed)))
   | "caml_array_make", [_; _], [len_ty; init_value_ty] ->
     simplify_caml_array_make dacc ~len_ty ~init_value_ty
+      Alloc_mode.For_types.heap
+  | "caml_array_make_local", [_; _], [len_ty; init_value_ty] ->
+    simplify_caml_array_make dacc ~len_ty ~init_value_ty
+      (Alloc_mode.For_types.local ())
+  | ( ( "caml_make_unboxed_float32_vect" | "caml_make_unboxed_float64_vect"
+      | "caml_make_untagged_int_vect" | "caml_make_untagged_int8_vect"
+      | "caml_make_untagged_int16_vect" | "caml_make_unboxed_int32_vect"
+      | "caml_make_unboxed_int64_vect" | "caml_make_unboxed_nativeint_vect"
+      | "caml_make_unboxed_vec128_vect" | "caml_make_unboxed_vec256_vect"
+      | "caml_make_unboxed_vec512_vect" | "caml_make_unboxed_mask_vect" ),
+      [_],
+      [len_ty] ) ->
+    simplify_uninitialized_array_creation ~len_ty Alloc_mode.For_types.heap
+  | ( ( "caml_make_local_unboxed_float32_vect"
+      | "caml_make_local_unboxed_float64_vect"
+      | "caml_make_local_untagged_int_vect"
+      | "caml_make_local_untagged_int8_vect"
+      | "caml_make_local_untagged_int16_vect"
+      | "caml_make_local_unboxed_int32_vect"
+      | "caml_make_local_unboxed_int64_vect"
+      | "caml_make_local_unboxed_nativeint_vect"
+      | "caml_make_local_unboxed_vec128_vect"
+      | "caml_make_local_unboxed_vec256_vect"
+      | "caml_make_local_unboxed_vec512_vect"
+      | "caml_make_local_unboxed_mask_vect" ),
+      [_],
+      [len_ty] ) ->
+    simplify_uninitialized_array_creation ~len_ty
+      (Alloc_mode.For_types.local ())
   | _ -> Unchanged { return_types = Unknown }
 
 (* Exported simplification function *)
