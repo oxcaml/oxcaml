@@ -453,7 +453,7 @@ let allocates_on_heap (expr : Cmm.expression) : bool =
     | _ -> Cmm.iter_shallow traverse expr
     [@@warning "-fragile-match"]
   in
-  try (traverse expr; true) with Allocates_on_heap -> false
+  try (traverse expr; false) with Allocates_on_heap -> true
 
 let phrase_allocates_on_heap : Cmm.phrase -> bool = function
   | Cfunction { fun_body; _ } -> allocates_on_heap fun_body
