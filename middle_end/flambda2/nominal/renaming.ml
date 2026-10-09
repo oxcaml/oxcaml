@@ -30,6 +30,7 @@ module Import_map : sig
     consts:Const.importer ->
     code_ids:Code_id.importer ->
     continuations:Continuation.importer ->
+    fields:Field.importer ->
     used_value_slots:Value_slot.Set.t ->
     original_compilation_unit:Compilation_unit.t ->
     t
@@ -47,6 +48,8 @@ module Import_map : sig
 
   val code_id : t -> Code_id.t -> Code_id.t
 
+  val field : t -> Field.t -> Field.t
+
   val continuation : t -> Continuation.t -> Continuation.t
 
   val fresh_continuation : t -> Continuation.t -> Continuation.t
@@ -60,6 +63,7 @@ end = struct
       consts : Const.importer;
       code_ids : Code_id.importer;
       continuations : Continuation.importer;
+      fields : Field.importer;
       used_value_slots : Value_slot.Set.t;
       (* CR vlaviron: [used_value_slots] is here because we need to rewrite the
          types to remove occurrences of unused value slots, as otherwise the
@@ -82,13 +86,14 @@ end = struct
     }
 
   let create ~symbols ~variables ~simples ~consts ~code_ids ~continuations
-      ~used_value_slots ~original_compilation_unit =
+      ~fields ~used_value_slots ~original_compilation_unit =
     { symbols;
       variables;
       simples;
       consts;
       code_ids;
       continuations;
+      fields;
       used_value_slots;
       original_compilation_unit
     }
@@ -102,6 +107,8 @@ end = struct
   let const t orig = Const.import t.consts orig
 
   let code_id t orig = Code_id.import t.code_ids orig
+
+  let field t orig = Field.import t.fields orig
 
   let continuation t orig = Continuation.import t.continuations orig
 
@@ -141,10 +148,10 @@ let empty =
   }
 
 let create_import_map ~symbols ~variables ~simples ~consts ~code_ids
-    ~continuations ~used_value_slots ~original_compilation_unit =
+    ~continuations ~fields ~used_value_slots ~original_compilation_unit =
   let import_map =
     Import_map.create ~symbols ~variables ~simples ~consts ~code_ids
-      ~continuations ~used_value_slots ~original_compilation_unit
+      ~continuations ~fields ~used_value_slots ~original_compilation_unit
   in
   (* It's tempting to set [import_map] to [None] if everything is empty, but
      this is incorrect: an import map of [None] is equivalent to having _all_
@@ -332,6 +339,11 @@ let apply_code_id t code_id =
   match t.import_map with
   | None -> code_id
   | Some import_map -> Import_map.code_id import_map code_id
+
+let apply_field t field =
+  match t.import_map with
+  | None -> field
+  | Some import_map -> Import_map.field import_map field
 
 let apply_const t cst =
   match t.import_map with

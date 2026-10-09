@@ -22,7 +22,8 @@ type t =
     simples : Simple.Set.t;
     consts : Reg_width_const.Set.t;
     code_ids : Code_id.Set.t;
-    continuations : Continuation.Set.t
+    continuations : Continuation.Set.t;
+    fields : Field.Set.t
   }
 
 let empty =
@@ -31,14 +32,15 @@ let empty =
     simples = Simple.Set.empty;
     consts = Reg_width_const.Set.empty;
     code_ids = Code_id.Set.empty;
-    continuations = Continuation.Set.empty
+    continuations = Continuation.Set.empty;
+    fields = Field.Set.empty
   }
 
 let create ?(symbols = Symbol.Set.empty) ?(variables = Variable.Set.empty)
     ?(simples = Simple.Set.empty) ?(consts = Reg_width_const.Set.empty)
-    ?(code_ids = Code_id.Set.empty) ?(continuations = Continuation.Set.empty) ()
-    =
-  { symbols; variables; simples; consts; code_ids; continuations }
+    ?(code_ids = Code_id.Set.empty) ?(continuations = Continuation.Set.empty)
+    ?(fields = Field.Set.empty) () =
+  { symbols; variables; simples; consts; code_ids; continuations; fields }
 
 let singleton_variable var = create ~variables:(Variable.Set.singleton var) ()
 
@@ -49,6 +51,8 @@ let singleton_continuation cont =
   create ~continuations:(Continuation.Set.singleton cont) ()
 
 let singleton_symbol symbol = create ~symbols:(Symbol.Set.singleton symbol) ()
+
+let singleton_field field = create ~fields:(Field.Set.singleton field) ()
 
 let add_const t const =
   { t with consts = Reg_width_const.Set.add const t.consts }
@@ -76,6 +80,8 @@ let add_code_id t code_id =
 let add_continuation t continuation =
   { t with continuations = Continuation.Set.add continuation t.continuations }
 
+let add_field t field = { t with fields = Field.Set.add field t.fields }
+
 let from_simple simple =
   let simples =
     if Coercion.is_id (Simple.coercion simple)
@@ -100,7 +106,8 @@ let union t1 t2 =
     simples = Simple.Set.union t1.simples t2.simples;
     consts = Reg_width_const.Set.union t1.consts t2.consts;
     code_ids = Code_id.Set.union t1.code_ids t2.code_ids;
-    continuations = Continuation.Set.union t1.continuations t2.continuations
+    continuations = Continuation.Set.union t1.continuations t2.continuations;
+    fields = Field.Set.union t1.fields t2.fields
   }
 
 let rec union_list ts =
