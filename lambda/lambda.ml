@@ -1687,7 +1687,7 @@ let split_vectors =
 
 let layout_unit = non_null_value Pintval
 let layout_bool = non_null_value (Pvariant { consts = [0; 1]; non_consts = []})
-let layout_unboxed_unit = Punboxed_product []
+let layout_unboxed_unit = Pvoid
 let layout_int = non_null_value Pintval
 let layout_int_or_null = nullable_value Pintval
 let layout_array kind = non_null_value (Parrayval kind)
@@ -2188,8 +2188,8 @@ let rec transl_mixed_product_element (element : Types.mixed_block_element)
   | Mask -> Mask
   | Word -> Word
   | Untagged_immediate -> Untagged_immediate
+  | Void -> Void
   | Product shape -> Product (transl_mixed_product_shape shape)
-  | Void -> Product [||]
   | Addressable elt ->
     (* CR box: Addressability should be preserved here once it affects boxed
        representations *)
@@ -3431,7 +3431,7 @@ let rec layout_of_const_sort (c : Jkind.Sort.Const.t) : layout =
   | Base Vec256 -> layout_unboxed_vector Unboxed_vec256
   | Base Vec512 -> layout_unboxed_vector Unboxed_vec512
   | Base Mask -> layout_unboxed_mask
-  | Base Void -> layout_unboxed_product []
+  | Base Void -> layout_unboxed_unit
   | Product sorts ->
     layout_unboxed_product (List.map layout_of_const_sort sorts)
   | Addressable sort ->
@@ -3568,7 +3568,7 @@ let rec layout_of_mixed_block_element element =
   | Vec256 -> layout_unboxed_vector Unboxed_vec256
   | Vec512 -> layout_unboxed_vector Unboxed_vec512
   | Mask -> layout_unboxed_mask
-  | Void -> Pvoid
+  | Void -> layout_unboxed_unit
   | Product shape ->
     Punboxed_product
       (Array.to_list (Array.map layout_of_mixed_block_element shape))

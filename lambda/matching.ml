@@ -2141,7 +2141,7 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
        boxed in bytecode). *)
     let rec lambda_void_of_el el =
       match el with
-      | Void -> Lprim (Punbox_unit, [lambda_unit], loc), Pvoid
+      | Void -> Lprim (Punbox_unit, [lambda_unit], loc), layout_unboxed_unit
       | Product shape ->
         let ll, layouts =
           Array.map lambda_void_of_el shape |> Array.to_list |> List.split
