@@ -29,6 +29,7 @@
     combined with the usual comparison and boolean operators (see
     {!Ppx_light_predicate.Predicate}). They can be placed
     on module (Pstr_module),
+    include (Pstr_include),
     toplevel bindings (Pstr_value, Pstr_primitive)
     toplevel extensions, e.g. [let%expect_test "..." = ... [@@if ...]]
     (Pstr_extension)
@@ -180,6 +181,8 @@ let traverse =
       match item.pstr_desc with
       | Pstr_module { pmb_attributes; pmb_loc; _ } ->
           if keep pmb_loc pmb_attributes then item else drop_str pmb_loc
+      | Pstr_include { pincl_attributes; pincl_loc; _ } ->
+          if keep pincl_loc pincl_attributes then item else drop_str pincl_loc
       | Pstr_primitive { pval_attributes; pval_loc; _ } ->
           if keep pval_loc pval_attributes then item else drop_str pval_loc
       | Pstr_value (r, l) -> (

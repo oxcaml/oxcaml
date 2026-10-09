@@ -16,10 +16,16 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *)
 
-type t
+module Float32 = struct
+  type t = float32
 
-val make : unit -> t
+  external of_float : float -> t = "%float32offloat"
 
-val get : t -> float
+  external to_float : t -> float = "%floatoffloat32"
 
-val print : Format.formatter -> t -> unit
+  (* In javascript/wasm, we define float32 parsing as rounding the 64-bit result.
+     This is not equivalent to native code, which parses to 32 bits directly. *)
+  let of_string s = float_of_string s |> of_float
+end
+
+let with_async_exns = Sys.with_async_exns

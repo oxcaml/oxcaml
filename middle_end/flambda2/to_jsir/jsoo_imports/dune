@@ -1,12 +1,23 @@
-(include_subdirs no)
+; The JSIR definition (in code.ml{i}) and its dependencies are imported from the
+; js_of_ocaml subtree (external/js_of_ocaml/compiler/lib).
+
+(copy_files#
+ %{project_root}/external/js_of_ocaml/compiler/lib/{code,debug,int_set,int_trie,optimization_hint,parse_info,reserved,sizable_int,stdlib,targetint,targetnativeint,timer,warning}.{ml,mli})
+
+(rule
+ (target ocaml_or_oxcaml.ml)
+ (action
+  (copy
+    ; nothing in to_jsir should use OxCaml-dependent functionality
+   %{project_root}/external/js_of_ocaml/compiler/lib/ocaml_or_oxcaml.ocaml.ml
+   %{target})))
 
 (library
  (name jsoo_imports)
  (wrapped true)
- (instrumentation (backend bisect_ppx))
+ (instrumentation
+  (backend bisect_ppx))
  (flags
-  (:standard))
+  (:standard -w -4-7-18-32-37-44))
  (ocamlopt_flags
-  (:standard -O3))
- (libraries
-  ocamlfrontend))
+  (:standard -O3)))

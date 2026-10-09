@@ -72,7 +72,11 @@ val eval_compile_time : t -> bool
 (** Evaluate the predicate now, at preprocessing time. Resolves [ocaml_version],
     [ast_version], [arch_sixtyfour], [oxcaml] and [os_type]. Raises {!Invalid} on
     constructs that are not meaningful at compile time (e.g. [backend],
-    [host_engine], [target_engine], or the runtime shorthands). *)
+    [host_engine], [target_engine], or the runtime shorthands).
+
+    [oxcaml] reflects the compiler the preprocessor was built with, unless the
+    [oxcaml] cookie is set. This is present so that files from JSOO can be used
+    to bootstrap the OxCaml compiler. *)
 
 val reify : loc:Location.t -> t -> expression
 (** Reify the predicate into an OCaml expression of type [bool] that evaluates it

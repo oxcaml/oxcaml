@@ -162,6 +162,18 @@ let rec parse (e : expression) : t =
 
 (* -- Compile-time evaluation ----------------------------------------------- *)
 
+(* The [oxcaml] cookie (e.g. [-cookie oxcaml=false] on the driver command
+   line) overrides the compiler the preprocessor was built with. *)
+let oxcaml () =
+  match Astlib.Ast_metadata.get_cookie "oxcaml" with
+  | Some e ->
+      let e = Selected_ast.of_ocaml Expression e in
+      Ast_pattern.(parse (ebool __)) e.pexp_loc e (fun b -> b)
+  | None -> (
+      match Version.extra with
+      | Some (Plus, "ox") -> true
+      | _ -> false)
+
 type value =
   | V_version of Version.t
   | V_bool of bool
@@ -182,11 +194,7 @@ let rec eval_value (t : t) : value =
   match t with
   | Ident (_, "ocaml_version") -> V_version Version.current
   | Ident (_, "ast_version") -> V_int Ppxlib.Selected_ast.version
-  | Ident (_, "oxcaml") ->
-      V_bool
-        (match Version.extra with
-        | Some (Plus, "ox") -> true
-        | _ -> false)
+  | Ident (_, "oxcaml") -> V_bool (oxcaml ())
   | Ident (_, "os_type") -> V_string Sys.os_type
   | Ident (_, "arch_sixtyfour") -> V_bool (Sys.word_size = 64)
   | Ident (_, "introspect") ->

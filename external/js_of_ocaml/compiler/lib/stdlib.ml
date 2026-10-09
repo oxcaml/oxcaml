@@ -428,29 +428,7 @@ module Float = struct
   external ( >= ) : t -> t -> bool = "%greaterequal"
 end
 
-module Float32 = struct
-  type t
-
-  let of_float _ = assert false
-
-  let to_float _ = assert false
-
-  let of_string _ = assert false
-end
-[@@if not oxcaml]
-
-module Float32 = struct
-  type t = float32
-
-  external of_float : float -> t = "%float32offloat"
-
-  external to_float : t -> float = "%floatoffloat32"
-
-  (* In javascript/wasm, we define float32 parsing as rounding the 64-bit result.
-     This is not equivalent to native code, which parses to 32 bits directly. *)
-  let of_string s = float_of_string s |> of_float
-end
-[@@if oxcaml]
+module Float32 = Ocaml_or_oxcaml.Float32
 
 module Bool = struct
   include Bool
@@ -1251,9 +1229,8 @@ module Fun = struct
         r
 end
 
-module In_channel = struct
-  let stdlib_input_line = input_line
-
+(* [In_channel] only exists in the stdlib since 4.14. *)
+module In_channel_pre_4_14 = struct
   (* Read up to [len] bytes into [buf], starting at [ofs]. Return total bytes
      read. *)
   let read_upto ic buf ofs len =
@@ -1347,26 +1324,24 @@ module In_channel = struct
       | exception End_of_file -> acc
     in
     List.rev (aux [])
-
-  let input_line_exn = stdlib_input_line
 end
 [@@if ocaml_version < (4, 14, 0)]
 
 module In_channel = struct
   let stdlib_input_line = input_line
 
-  include In_channel
+  include In_channel [@@if ocaml_version >= (4, 14, 0)]
+  include In_channel_pre_4_14 [@@if ocaml_version < (4, 14, 0)]
 
   (* [In_channel.input_lines] only exists in the stdlib since 5.1. *)
   let[@tail_mod_cons] rec input_lines ic =
     match stdlib_input_line ic with
     | line -> line :: input_lines ic
     | exception End_of_file -> []
-  [@@if ocaml_version < (5, 1, 0)]
+  [@@if ocaml_version >= (4, 14, 0) && ocaml_version < (5, 1, 0)]
 
   let input_line_exn = stdlib_input_line
 end
-[@@if ocaml_version >= (4, 14, 0)]
 
 module Seq = struct
   include Seq
@@ -1447,6 +1422,4 @@ module Lexing = struct
   (* use [char1 + 1] and [char2 + 1] if *not* using Caml mode *)
 end
 
-let with_async_exns = Sys.with_async_exns [@@if oxcaml]
-
-let with_async_exns f = f () [@@if not oxcaml]
+let with_async_exns = Ocaml_or_oxcaml.with_async_exns

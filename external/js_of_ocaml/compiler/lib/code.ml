@@ -74,6 +74,8 @@ module Var : sig
 
   val set_last : int -> unit
 
+  val last : unit -> t
+
   module Set : Int_set.S with type elt = t
 
   module Map : Map.S with type key = t
@@ -223,6 +225,8 @@ end = struct
     Name.reset ()
 
   let set_last n = last_var := n
+
+  let last () = !last_var
 
   let print f x =
     Format.fprintf
@@ -530,34 +534,36 @@ type program =
   ; free_pc : Addr.t
   }
 
-module Compilation_unit = struct
-  type t = Compilation_unit.t
+module Marshalable_program = struct
+  type t =
+    { start : Addr.t
+    ; blocks : (Addr.t * block) list
+    ; free_pc : Addr.t
+    }
 
-  let full_path_as_string = Compilation_unit.full_path_as_string
+  let of_program ({ start; blocks; free_pc } : program) : t =
+    { start; blocks = Addr.Map.bindings blocks; free_pc }
+
+  let to_program ({ start; blocks; free_pc } : t) : program =
+    let blocks =
+      List.fold_left blocks ~init:Addr.Map.empty ~f:(fun acc (pc, block) ->
+          Addr.Map.add pc block acc)
+    in
+    { start; blocks; free_pc }
 end
-[@@if oxcaml]
-
-(* [.cmj] files are only produced by OxCaml's [ocamlj]. On other compilers, this
-   is a placeholder with the same shape. *)
-module Compilation_unit = struct
-  type t = string
-
-  let full_path_as_string t = t
-end
-[@@if not oxcaml]
 
 type cmj_body =
-  { program : program
+  { program : Marshalable_program.t
   ; last_var : int
         (** Highest variable index used in [program]. [Var] keeps this in mutable
             state, so [ocamlj] must communicate it to [js_of_ocaml] to keep the
             two in sync. *)
-  ; imported_compilation_units : Compilation_unit.t list
-        (** Compilation units whose symbols [program] fetches from the global
-            symbol table. Needed to fill in [Unit_info.t]. *)
-  ; exported_compilation_unit : Compilation_unit.t
-        (** The compilation unit [program] defines. Needed to fill in
-            [Unit_info.t]. *)
+  ; imported_compilation_units : string list
+        (** Full paths of the compilation units whose symbols [program] fetches
+            from the global symbol table. Needed to fill in [Unit_info.t]. *)
+  ; exported_compilation_unit : string
+        (** Full path of the compilation unit [program] defines. Needed to fill
+            in [Unit_info.t]. *)
   }
 
 let noloc = No
