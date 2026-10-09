@@ -46,7 +46,7 @@ type unit_infos_builder =
     uib_file_sections : File_sections.Builder.t;
   }
 
-module Infos_table = Global_module.Name.Tbl
+module Infos_table = CU.Tbl
 
 let global_infos_table =
   (Infos_table.create 17 : unit_infos option Infos_table.t)
@@ -185,12 +185,11 @@ let get_unit comp_unit =
   then
     Misc.fatal_error
       "get_unit: unable to get unit_info for current unit";
-  let name = CU.to_global_name_without_prefix comp_unit in
   try
-    Infos_table.find global_infos_table name
+    Infos_table.find global_infos_table comp_unit
   with Not_found ->
     let (infos, crc) =
-      if Env.is_imported_opaque (CU.name comp_unit) then (None, None)
+      if Env.is_opaque_impl comp_unit then (None, None)
       else begin
         let missing_extension =
           match !Clflags.jsir with
@@ -210,7 +209,7 @@ let get_unit comp_unit =
           let warn =
             Warnings.No_cmx_file
               { missing_extension
-              ; module_name = Global_module.Name.to_string name }
+              ; module_name = CU.full_path_as_string comp_unit }
           in
           Location.prerr_warning Location.none warn;
           (None, None)
@@ -218,7 +217,7 @@ let get_unit comp_unit =
     in
     let import = Import_info.create_normal comp_unit ~crc in
     current_unit.uib_imports_cmx <- import :: current_unit.uib_imports_cmx;
-    Infos_table.add global_infos_table name infos;
+    Infos_table.add global_infos_table comp_unit infos;
     infos
 
 let get_unit_export_info comp_unit =
@@ -238,8 +237,7 @@ let get_global_export_info comp_unit =
 
 let cache_unit_info ui =
   cache_zero_alloc_info ui.ui_zero_alloc_info;
-  Infos_table.add global_infos_table
-    (ui.ui_unit |> CU.to_global_name_without_prefix) (Some ui)
+  Infos_table.add global_infos_table ui.ui_unit (Some ui)
 
 (* Exporting cross-module information *)
 
