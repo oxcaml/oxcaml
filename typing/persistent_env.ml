@@ -733,10 +733,9 @@ and find_pers_name ~allow_hidden penv ~check name ~allow_excess_args =
       let import = find_import ~allow_hidden penv ~check unit_name in
       acknowledge_pers_name penv check name import ~allow_excess_args
 
-let read_pers_name penv check name filename =
-  let unit_name = CU.Name.of_head_of_global_name name in
-  let import = read_import penv ~check unit_name filename in
-  acknowledge_pers_name penv check name import
+let read_pers_name penv check intf filename =
+  let import = read_import penv ~check intf filename in
+  acknowledge_pers_name penv check (CU.Name.to_global_name intf) import
 
 let normalize_global_name penv modname =
   let new_modname =
@@ -801,9 +800,9 @@ let make_binding penv (global : Global_module.t) (impl : CU.t option) : binding 
       match global.visible_args with
       | [] ->
           (* Make sure the names are consistent up to the pack prefix *)
-          assert (Global_module.Name.equal
-                    (unit_from_cmi |> CU.to_global_name_without_prefix)
-                    name);
+          assert (String.equal
+                    (CU.name_as_string unit_from_cmi)
+                    name.head);
           unit_from_cmi
       | _ ->
           (* Make sure the unit isn't supposed to be packed *)
@@ -891,9 +890,9 @@ let acknowledge_pers_struct penv modname pers_name val_of_pers_sig =
     Hashtbl.add persistent_structures modname { ps with ps_canonical = false };
   ps
 
-let read_pers_struct penv check modname cmi =
+let read_pers_struct penv check intf cmi =
   let pers_name =
-    read_pers_name penv check modname cmi ~allow_excess_args:false
+    read_pers_name penv check intf cmi ~allow_excess_args:false
   in
   pers_name.pn_sign
 
@@ -985,8 +984,8 @@ let check_pers_struct ~allow_hidden penv f ~loc name =
       let warn = Warnings.No_cmi_file(name_as_string, Some msg) in
         Location.prerr_warning loc warn
 
-let read penv modname a =
-  read_pers_struct penv true modname a
+let read penv intf a =
+  read_pers_struct penv true intf a
 
 let read_cmi_file penv filename =
   let cmi = read_cmi_lazy filename in

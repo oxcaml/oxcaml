@@ -124,7 +124,9 @@ type 'a sig_reader =
   -> flags:Cmi_format.pers_flags list
   -> 'a
 
-val read : 'a t -> Global_module.Name.t -> Unit_info.Artifact.t
+(* [read penv intf cmi] reads the file [cmi] as the interface [intf], binding
+   it to the global name with no arguments. *)
+val read : 'a t -> Compilation_unit.Name.t -> Unit_info.Artifact.t
   -> Subst.Lazy.persistent_signature
 
 (** [read_cmi_file] is a variant of [read] that takes the path of a cmi
