@@ -504,7 +504,7 @@ type operation =
       { name : string;
         enabled_at_init : bool option
       }
-  | Copaque (* Sys.opaque_identity *)
+  | Copaque of machtype (* Sys.opaque_identity *)
   | Cbeginregion
   | Cendregion
   | Ctuple_field of int * machtype array

@@ -471,7 +471,7 @@ val make_mixed_alloc :
   expression
 
 (** Sys.opaque_identity *)
-val opaque : expression -> Debuginfo.t -> expression
+val opaque : ty:machtype -> expression -> Debuginfo.t -> expression
 
 (** Generic application functions *)
 

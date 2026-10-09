@@ -3398,7 +3398,7 @@ let load_mask = load_chunk Word_mask
 
 let set_mask = set_chunk Word_mask
 
-let opaque e dbg = Cop (Copaque, [e], dbg)
+let opaque ~ty e dbg = Cop (Copaque ty, [e], dbg)
 
 (* Build an actual switch (ie jump table) *)
 
