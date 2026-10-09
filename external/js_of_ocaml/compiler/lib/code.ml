@@ -556,7 +556,7 @@ type cmj_body =
   { program : Marshalable_program.t
   ; last_var : int
         (** Highest variable index used in [program]. [Var] keeps this in mutable
-            state, so [ocamlj] must communicate it to [js_of_ocaml] to keep the
+            state, so OxCaml must communicate it to [js_of_ocaml] to keep the
             two in sync. *)
   ; imported_compilation_units : string list
         (** Full paths of the compilation units whose symbols [program] fetches

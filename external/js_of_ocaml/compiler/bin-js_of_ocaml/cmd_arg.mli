@@ -31,7 +31,6 @@ type t =
   ; input :
       [ `Bytecode_file of string
       | `Cmj of string
-      | `Cmja of string
       | `Bytecode_stdin
       | `None
       ]

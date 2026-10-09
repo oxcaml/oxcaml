@@ -78,10 +78,6 @@ type jsir_unit =
 
 val jsir_unit_of_cmj_body : Code.cmj_body -> jsir_unit
 
-val from_cmja : in_channel -> jsir_unit list
-(** Read the units of a [.cmja] archive produced by OxCaml's [ocamlj]. The
-    channel must be positioned just after the magic number. *)
-
 val from_channel :
      in_channel
   -> [ `Cmo of Ocaml_compiler.Cmo_format.t | `Cma of Cmo_format.library | `Exe ]

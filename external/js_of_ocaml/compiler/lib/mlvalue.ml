@@ -39,7 +39,8 @@ module Block = struct
     J.EArr (tag_elt :: args)
 
   (* CR-someday selee: We use optional chaining because issues can arise when
-     [Js.Unsafe.*] functions are used with code produced by OxCaml's ocamlj.
+     [Js.Unsafe.*] functions are used with code produced by OxCaml's
+     JSIR backend.
      When constructing an [any array], Flambda 2 first uses this primitive to
      check at runtime whether [any] is actually a boxed float, to determine
      whether it should create a float array or a normal array. Unfortunately

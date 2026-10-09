@@ -33,8 +33,9 @@ val of_cmo : Ocaml_compiler.Cmo_format.t -> t
 val of_primitives : aliases:(string * string) list -> string list -> t
 
 val of_compilation_units : exported:string -> imported:string list -> t
-(** Linking information of a unit compiled by OxCaml's [ocamlj], given the full
-    paths of the compilation units it defines and refers to. *)
+(** Linking information of a unit compiled by OxCaml's JSIR backend,
+    given the full paths of the compilation units it defines and
+    refers to. *)
 
 val union : t -> t -> t
 

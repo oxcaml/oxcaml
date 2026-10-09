@@ -232,7 +232,6 @@
   annot
   value_rec_types
   cmo_format
-  cmj_format
   outcometree
   debug_event
   solver_intf
@@ -365,7 +364,6 @@
   annot
   value_rec_types
   cmo_format
-  cmj_format
   outcometree
   debug_event))
 
@@ -412,24 +410,6 @@
   (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
  (libraries ocamlbytecomp ocamlfrontend)
  (modules main_native))
-
-(library
- (name ocamljcomp)
- (wrapped false)
- (flags
-  (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
- (ocamlopt_flags
-  (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
- (libraries ocamlfrontend flambda2)
- (modules jsmaindriver jscompile jslibrarian))
-
-(executable
- (name ocamlj)
- (modes native)
- (flags
-  (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
- (libraries ocamljcomp ocamlfrontend flambda2)
- (modules ocamlj))
 
 ; Disabled since there can be only one (data_only_dirs) declaration
 ;(data_only_dirs yacc)
@@ -493,12 +473,6 @@
  (files
   (main.bc as ocamlc.byte)
   (main_native.exe as ocamlc.opt))
- (section bin)
- (package ocaml))
-
-(install
- (files
-  (ocamlj.exe as ocamlj.opt))
  (section bin)
  (package ocaml))
 
@@ -756,6 +730,7 @@
   complex_shape
   dwarf_type
   ;; optcomp/
+  jscomp
   linkenv
   optcompile
   optlibrarian
@@ -778,6 +753,7 @@
   flambda2_identifiers
   flambda2_cmx
   flambda2_datalog
+  jsoo_imports
   compiler_owee
   gc_timings
   arm64_ast
@@ -910,8 +886,10 @@
    %{dep:middle_end/flambda2/parser/flambda2_parser.a}
    %{dep:external/owee/compiler_owee.a}
    %{dep:external/gc-timings/gc_timings.a}
+   %{dep:middle_end/flambda2/to_jsir/jsoo_imports/jsoo_imports.a}
    %{dep:ocamloptcomp.a}
    %{dep:middle_end/flambda2/to_cmm/flambda2_to_cmm.a}
+   %{dep:middle_end/flambda2/to_jsir/flambda2_to_jsir.a}
    %{dep:middle_end/flambda2/flambda2.a})))
 
 (rule
@@ -951,8 +929,10 @@
    %{dep:middle_end/flambda2/parser/flambda2_parser.cma}
    %{dep:external/owee/compiler_owee.cma}
    %{dep:external/gc-timings/gc_timings.cma}
+   %{dep:middle_end/flambda2/to_jsir/jsoo_imports/jsoo_imports.cma}
    %{dep:ocamloptcomp.cma}
    %{dep:middle_end/flambda2/to_cmm/flambda2_to_cmm.cma}
+   %{dep:middle_end/flambda2/to_jsir/flambda2_to_jsir.cma}
    %{dep:middle_end/flambda2/flambda2.cma})))
 
 (rule
@@ -992,8 +972,10 @@
    %{dep:middle_end/flambda2/parser/flambda2_parser.cmxa}
    %{dep:external/owee/compiler_owee.cmxa}
    %{dep:external/gc-timings/gc_timings.cmxa}
+   %{dep:middle_end/flambda2/to_jsir/jsoo_imports/jsoo_imports.cmxa}
    %{dep:ocamloptcomp.cmxa}
    %{dep:middle_end/flambda2/to_cmm/flambda2_to_cmm.cmxa}
+   %{dep:middle_end/flambda2/to_jsir/flambda2_to_jsir.cmxa}
    %{dep:middle_end/flambda2/flambda2.cmxa})))
 
 (install
@@ -1048,7 +1030,6 @@
   (glob_files .ocamlfrontend.objs/byte/*.{cmi,cmt,cmti})
   (glob_files .ocamlbytecomp.objs/byte/*.{cmi,cmt,cmti})
   (glob_files .ocamloptcomp.objs/byte/*.{cmi,cmt,cmti})
-  (glob_files .ocamljcomp.objs/byte/*.{cmi,cmt,cmti})
   (glob_files .oxcaml_common.objs/byte/*.{cmi,cmt,cmti})
   (alias_rec middle_end/check)
   (alias_rec backend/check)
@@ -1092,6 +1073,11 @@
   (glob_files middle_end/flambda2/.flambda2objs/byte/flambda2.{cmi,cmt})
   (glob_files
    middle_end/flambda2/to_cmm/.flambda2_to_cmm.objs/byte/flambda2_to_cmm{,__To_cmm}.{cmi,cmt})
+  ; ocamloptcomp's interface mentions the js_of_ocaml IR (Optcomp_intf).
+  (glob_files
+   middle_end/flambda2/to_jsir/jsoo_imports/.jsoo_imports.objs/byte/*.{cmi,cmo,cmt,cmti})
+  (glob_files
+   middle_end/flambda2/to_jsir/jsoo_imports/.jsoo_imports.objs/native/*.cmx)
   (glob_files
    .oxcaml_common.objs/byte/oxcaml_{args,flags}.{cmi,cmo,cmt,cmti})
   (glob_files .oxcaml_common.objs/native/oxcaml_{args,flags}.cmx)
