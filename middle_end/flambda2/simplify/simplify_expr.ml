@@ -16,6 +16,53 @@
 
 open! Simplify_import
 
+let rebuild_terminator (terminator : Simplified_expr.simplified_terminator) uacc
+    ~after_rebuild =
+  match terminator with
+  | Simplified_apply simplified_apply ->
+    Simplify_apply_expr.rebuild_apply simplified_apply uacc ~after_rebuild
+  | Simplified_apply_cont { apply_cont; args; rewrite_id } ->
+    Simplify_apply_cont_expr.rebuild_apply_cont apply_cont ~args ~rewrite_id
+      uacc ~after_rebuild
+  | Simplified_switch simplified_switch ->
+    Simplify_switch_expr.rebuild_switch simplified_switch uacc ~after_rebuild
+  | Simplified_invalid invalid -> EB.rebuild_invalid uacc invalid ~after_rebuild
+
+let rec rebuild_expr (expr : Simplified_expr.t) uacc ~after_rebuild =
+  let { Simplified_expr.simplified_lets;
+        simplified_let_conts;
+        simplified_terminator;
+        removed_operations
+      } =
+    expr
+  in
+  rebuild_lets simplified_terminator simplified_let_conts simplified_lets uacc
+    ~after_rebuild:(fun expr uacc ->
+      let uacc = UA.notify_removed ~operation:removed_operations uacc in
+      after_rebuild expr uacc)
+
+and rebuild_lets terminator let_conts simplified_lets uacc ~after_rebuild =
+  let rec rebuild_lets_loop simplified_lets uacc ~after_rebuild =
+    match simplified_lets with
+    | [] -> rebuild_let_conts terminator let_conts uacc ~after_rebuild
+    | simplified_let :: simplified_lets ->
+      rebuild_lets_loop simplified_lets uacc ~after_rebuild:(fun body uacc ->
+          Simplify_let_expr.rebuild_let (simplified_let, body) uacc
+            ~after_rebuild)
+  in
+  rebuild_lets_loop simplified_lets uacc ~after_rebuild
+
+and rebuild_let_conts terminator let_conts uacc ~after_rebuild =
+  let rec rebuild_let_conts_loop let_conts uacc ~after_rebuild =
+    match let_conts with
+    | [] -> rebuild_terminator terminator uacc ~after_rebuild
+    | let_cont :: let_conts ->
+      Simplify_let_cont_expr.rebuild_let_cont
+        ~rebuild_body:rebuild_let_conts_loop ~rebuild_expr (let_cont, let_conts)
+        uacc ~after_rebuild
+  in
+  rebuild_let_conts_loop let_conts uacc ~after_rebuild
+
 let simplify_toplevel_common dacc simplify ~params ~implicit_params
     ~return_continuation ~return_arity ~exn_continuation =
   (* The usage analysis needs a continuation whose handler holds the toplevel
@@ -35,62 +82,58 @@ let simplify_toplevel_common dacc simplify ~params ~implicit_params
     DA.record_continuation dacc exn_continuation
       (Flambda_arity.create [Singleton K.With_subkind.any_value])
   in
+  let expr, dacc = simplify dacc ~down_to_up:(fun dacc expr -> expr, dacc) in
   let expr, uacc =
-    simplify dacc ~down_to_up:(fun dacc ~rebuild ->
-        let dacc =
-          DA.map_flow_acc dacc
-            ~f:(Flow.Acc.exit_continuation dummy_toplevel_cont)
-        in
-        let data_flow = DA.flow_acc dacc in
-        let closure_info = DE.closure_info (DA.denv dacc) in
-        (* The code_age_relation and used value_slots are only correct at
-           toplevel, and they are only necessary to compute the live code ids,
-           which are only used when simplifying at the toplevel. So if we are in
-           a closure, we use empty/dummy values for the code_age_relation and
-           used_value_slots, and in return we do not use the reachable_code_id
-           part of the data_flow analysis. *)
-        let code_age_relation, used_value_slots, print_name =
-          match closure_info with
-          | Closure { code_id; _ } ->
-            Code_age_relation.empty, Or_unknown.Unknown, Code_id.name code_id
-          | In_a_set_of_closures_but_not_yet_in_a_specific_closure ->
-            assert false
-          | Not_in_a_closure ->
-            ( DA.code_age_relation dacc,
-              Or_unknown.Known (DA.used_value_slots dacc),
-              "toplevel" )
-        in
-        let flow_result =
-          Flow.Analysis.analyze data_flow ~print_name ~code_age_relation
-            ~used_value_slots
-            ~code_ids_to_never_delete:(DA.code_ids_to_never_delete dacc)
-            ~specialization_map:(DA.specialization_map dacc)
-            ~return_continuation ~exn_continuation
-            ~machine_width:(DE.machine_width (DA.denv dacc))
-        in
-        let uenv =
-          UE.add_function_return_or_exn_continuation
-            (UE.create
-               (DA.are_rebuilding_terms dacc)
-               ~machine_width:(DE.machine_width (DA.denv dacc)))
-            return_continuation return_arity
-        in
-        let uenv =
-          UE.add_function_return_or_exn_continuation uenv exn_continuation
-            (Flambda_arity.create_singletons [K.With_subkind.any_value])
-        in
-        let uacc =
-          UA.create ~flow_result ~compute_slot_offsets:true uenv dacc
-        in
-        let uacc =
-          if
-            Flow.Analysis.did_perform_mutable_unboxing flow_result
-            || Flow.Analysis.added_useful_alias_in_loop (DA.typing_env dacc)
-                 data_flow flow_result
-          then UA.set_resimplify uacc
-          else uacc
-        in
-        rebuild uacc ~after_rebuild:(fun expr uacc -> expr, uacc))
+    let dacc =
+      DA.map_flow_acc dacc ~f:(Flow.Acc.exit_continuation dummy_toplevel_cont)
+    in
+    let data_flow = DA.flow_acc dacc in
+    let closure_info = DE.closure_info (DA.denv dacc) in
+    (* The code_age_relation and used value_slots are only correct at toplevel,
+       and they are only necessary to compute the live code ids, which are only
+       used when simplifying at the toplevel. So if we are in a closure, we use
+       empty/dummy values for the code_age_relation and used_value_slots, and in
+       return we do not use the reachable_code_id part of the data_flow
+       analysis. *)
+    let code_age_relation, used_value_slots, print_name =
+      match closure_info with
+      | Closure { code_id; _ } ->
+        Code_age_relation.empty, Or_unknown.Unknown, Code_id.name code_id
+      | In_a_set_of_closures_but_not_yet_in_a_specific_closure -> assert false
+      | Not_in_a_closure ->
+        ( DA.code_age_relation dacc,
+          Or_unknown.Known (DA.used_value_slots dacc),
+          "toplevel" )
+    in
+    let flow_result =
+      Flow.Analysis.analyze data_flow ~print_name ~code_age_relation
+        ~used_value_slots
+        ~code_ids_to_never_delete:(DA.code_ids_to_never_delete dacc)
+        ~specialization_map:(DA.specialization_map dacc)
+        ~return_continuation ~exn_continuation
+        ~machine_width:(DE.machine_width (DA.denv dacc))
+    in
+    let uenv =
+      UE.add_function_return_or_exn_continuation
+        (UE.create
+           (DA.are_rebuilding_terms dacc)
+           ~machine_width:(DE.machine_width (DA.denv dacc)))
+        return_continuation return_arity
+    in
+    let uenv =
+      UE.add_function_return_or_exn_continuation uenv exn_continuation
+        (Flambda_arity.create_singletons [K.With_subkind.any_value])
+    in
+    let uacc = UA.create ~flow_result ~compute_slot_offsets:true uenv dacc in
+    let uacc =
+      if
+        Flow.Analysis.did_perform_mutable_unboxing flow_result
+        || Flow.Analysis.added_useful_alias_in_loop (DA.typing_env dacc)
+             data_flow flow_result
+      then UA.set_resimplify uacc
+      else uacc
+    in
+    rebuild_expr expr uacc ~after_rebuild:(fun expr uacc -> expr, uacc)
   in
   (* We don't check occurrences of variables or symbols here because the check
      required depends on whether we're dealing with a lambda or the whole
@@ -114,14 +157,16 @@ let simplify_toplevel_common dacc simplify ~params ~implicit_params
 (* CR-someday mshinwell: Need to simplify each [dbg] we come across. *)
 (* CR-someday mshinwell: Consider defunctionalising to remove the [k]. *)
 
-let rec simplify_expr dacc expr ~down_to_up =
+let rec simplify_expr dacc expr ~down_to_up :
+    Simplified_expr.t * Downwards_acc.t =
   match Expr.descr expr with
   | Let let_expr -> simplify_let dacc let_expr ~down_to_up
   | Let_cont let_cont ->
     Simplify_let_cont_expr.simplify_let_cont ~simplify_expr dacc let_cont
       ~down_to_up
   | Apply apply ->
-    Simplify_apply_expr.simplify_apply ~simplify_expr dacc apply ~down_to_up
+    Simplify_apply_expr.simplify_apply ~simplify_expr ~rebuild_expr dacc apply
+      ~down_to_up
   | Apply_cont apply_cont ->
     Simplify_apply_cont_expr.simplify_apply_cont dacc apply_cont ~down_to_up
   | Switch switch ->
@@ -129,8 +174,7 @@ let rec simplify_expr dacc expr ~down_to_up =
   | Invalid { message } ->
     (* CR mshinwell: Make sure that a program can be simplified to just
        [Invalid]. *)
-    down_to_up dacc ~rebuild:(fun uacc ~after_rebuild ->
-        EB.rebuild_invalid uacc (Message message) ~after_rebuild)
+    down_to_up dacc (Simplified_expr.simplified_invalid (Message message))
 
 and simplify_function_body dacc expr ~return_continuation ~return_arity
     ~exn_continuation ~(loopify_state : Loopify_state.t) ~params
