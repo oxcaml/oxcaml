@@ -105,3 +105,9 @@ let union t1 t2 =
 
 let rec union_list ts =
   match ts with [] -> empty | t :: ts -> union t (union_list ts)
+
+let without_variables_or_continuations t =
+  { t with
+    variables = Variable.Set.empty;
+    continuations = Continuation.Set.empty
+  }

@@ -19,7 +19,7 @@ type code_status =
       { sections : File_sections.t;
         index : File_sections.Idx.t;
         metadata : Code_metadata.t;
-        delayed_renaming : Renaming.t
+        import_map : Renaming.import_map
       }
 
 type t =
@@ -57,21 +57,30 @@ end
 let view t =
   match t with
   | Code_present { code_status = Loaded code } -> View.Code_present code
-  | Code_present ({ code_status = Not_loaded not_loaded } as c) ->
-    let params_and_body, free_names_of_params_and_body =
-      Obj.obj (File_sections.get not_loaded.sections not_loaded.index)
+  | Code_present
+      ({ code_status = Not_loaded { metadata; sections; index; import_map } } as
+       c) ->
+    let variables, continuations, params_and_body, free_names_of_params_and_body
+        =
+      Obj.obj (File_sections.get sections index)
+    in
+    let import_map =
+      Renaming.with_extra_imported_variables import_map variables
+    in
+    let import_map =
+      Renaming.with_extra_imported_continuations import_map continuations
     in
     let params_and_body =
       Flambda.Function_params_and_body.apply_renaming params_and_body
-        not_loaded.delayed_renaming
+        (Renaming.from_import_map import_map)
     in
     let free_names_of_params_and_body =
       Name_occurrences.apply_renaming free_names_of_params_and_body
-        not_loaded.delayed_renaming
+        (Renaming.from_import_map import_map)
     in
     let code =
       Code.create_with_metadata ~params_and_body ~free_names_of_params_and_body
-        ~code_metadata:not_loaded.metadata
+        ~code_metadata:metadata
     in
     c.code_status <- Loaded code;
     View.Code_present code
@@ -103,34 +112,53 @@ let code_status_metadata = function
 
 let create code = Code_present { code_status = Loaded code }
 
-let from_raw ~sections raw =
+let from_raw ~sections ~import_map raw =
+  let renaming = Renaming.from_import_map import_map in
   match raw.code_present with
-  | Absent -> Metadata_only raw.metadata
+  | Absent -> Metadata_only (Code_metadata.apply_renaming raw.metadata renaming)
   | Present { index } ->
     Code_present
       { code_status =
           Not_loaded
             { sections;
               index;
-              metadata = raw.metadata;
-              delayed_renaming = Renaming.empty
+              metadata = Code_metadata.apply_renaming raw.metadata renaming;
+              import_map
             }
       }
 
-let to_raw ~add_section t : raw =
+let to_raw ~add_section t : raw * Ids_for_export.t =
   match view t with
   | Code_present code ->
-    { metadata = Code.code_metadata code;
-      code_present =
-        Present
-          { index =
-              add_section
-                (Obj.repr
-                   ( Code.params_and_body code,
-                     Code.free_names_of_params_and_body code ))
-          }
-    }
-  | Metadata_only metadata -> { metadata; code_present = Absent }
+    let metadata = Code.code_metadata code in
+    let ids_for_export_code =
+      Ids_for_export.union
+        (Name_occurrences.ids_for_export
+           (Code.free_names_of_params_and_body code))
+        (Flambda.Function_params_and_body.ids_for_export
+           (Code.params_and_body code))
+    in
+    let ids_for_export =
+      Ids_for_export.union
+        (Code_metadata.ids_for_export metadata)
+        (Ids_for_export.without_variables_or_continuations ids_for_export_code)
+    in
+    ( { metadata;
+        code_present =
+          Present
+            { index =
+                add_section
+                  (Obj.repr
+                     ( Variable.export ids_for_export_code.variables,
+                       Continuation.export ids_for_export_code.continuations,
+                       Code.params_and_body code,
+                       Code.free_names_of_params_and_body code ))
+            }
+      },
+      ids_for_export )
+  | Metadata_only metadata ->
+    let ids_for_export = Code_metadata.ids_for_export metadata in
+    { metadata; code_present = Absent }, ids_for_export
 
 let create_metadata_only metadata = Metadata_only metadata
 
@@ -162,38 +190,6 @@ let free_names t =
   match view t with
   | Code_present code -> Code.free_names code
   | Metadata_only code_metadata -> Code_metadata.free_names code_metadata
-
-let apply_renaming t renaming =
-  match t with
-  | Metadata_only code_metadata ->
-    let code_metadata' = Code_metadata.apply_renaming code_metadata renaming in
-    if code_metadata == code_metadata' then t else Metadata_only code_metadata'
-  | Code_present { code_status = Loaded code } ->
-    let code' = Code.apply_renaming code renaming in
-    if code == code' then t else Code_present { code_status = Loaded code' }
-  | Code_present { code_status = Not_loaded not_loaded } ->
-    let metadata' = Code_metadata.apply_renaming not_loaded.metadata renaming in
-    let delayed_renaming' =
-      Renaming.compose ~second:renaming ~first:not_loaded.delayed_renaming
-    in
-    if
-      metadata' == not_loaded.metadata
-      && delayed_renaming' == not_loaded.delayed_renaming
-    then t
-    else
-      Code_present
-        { code_status =
-            Not_loaded
-              { not_loaded with
-                metadata = metadata';
-                delayed_renaming = delayed_renaming'
-              }
-        }
-
-let ids_for_export t =
-  match view t with
-  | Code_present code -> Code.ids_for_export code
-  | Metadata_only code_metadata -> Code_metadata.ids_for_export code_metadata
 
 let remember_only_metadata t =
   match t with
