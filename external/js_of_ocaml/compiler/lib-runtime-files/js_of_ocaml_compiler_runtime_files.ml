@@ -46,6 +46,7 @@ let runtime =
     ; mlBytes
     ; nat
     ; obj
+    ; ocamlj
     ; parsing
     ; promise
     ; stdlib

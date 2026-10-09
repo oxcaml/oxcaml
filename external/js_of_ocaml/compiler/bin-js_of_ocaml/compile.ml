@@ -139,7 +139,7 @@ let run
     ; source_map
     ; runtime_files = runtime_files_from_cmdline
     ; no_runtime
-    ; bytecode
+    ; input
     ; output_file
     ; params
     ; static_env
@@ -375,7 +375,7 @@ let run
       ~link:(`All_from runtime_files_from_cmdline)
       output_file
   in
-  (match bytecode with
+  (match input with
   | `None ->
       let primitives, aliases =
         let all = Linker.list_all_with_aliases () in
@@ -413,14 +413,116 @@ let run
             ~link:`All
             output_file
           |> sourcemap_of_info ~base:source_map_base)
-  | (`Stdin | `File _) as bytecode ->
+  | (`Cmj _ | `Cmja _) as input -> (
+      let t1 = Timer.make () in
+      (* Read a file produced by [ocamlj]: a magic number of the expected kind
+         followed by the contents read by [f]. *)
+      let read_jsir_file filename ~(expected : [ `Cmj | `Cmja ]) f =
+        let ic = open_in_bin filename in
+        Fun.protect
+          ~finally:(fun () -> close_in ic)
+          (fun () ->
+            let magic =
+              Magic_number.of_string (really_input_string ic Magic_number.size)
+            in
+            (match Magic_number.kind magic, expected with
+            | `Cmj, `Cmj | `Cmja, `Cmja -> ()
+            | (`Cmo | `Cma | `Cmj | `Cmja | `Exe | `Other _), (`Cmj | `Cmja) ->
+                raise Magic_number.(Bad_magic_number (to_string magic)));
+            let current =
+              Magic_number.current (expected :> [ `Cmo | `Cma | `Cmj | `Cmja | `Exe ])
+            in
+            if Config.Flag.check_magic () && not (Magic_number.equal magic current)
+            then raise Magic_number.(Bad_magic_version magic);
+            f ic)
+      in
+      let units =
+        match input with
+        | `Cmj filename ->
+            let body =
+              read_jsir_file filename ~expected:`Cmj (fun ic ->
+                  (Marshal.from_channel ic : Code.cmj_body))
+            in
+            Code.Var.set_last body.Code.last_var;
+            [ Parse_bytecode.jsir_unit_of_cmj_body body ]
+        | `Cmja filename ->
+            read_jsir_file filename ~expected:`Cmja Parse_bytecode.from_cmja
+      in
+      if times () then Format.eprintf "  parsing: %a@." Timer.print t1;
+      (* CR-soon selee: [ocamlj] does not produce any debug-related information
+         yet. This should be updated once the [.cmj] file format changes. *)
+      let one (unit : Parse_bytecode.jsir_unit) : Parse_bytecode.one =
+        { code = unit.program
+        ; cmis = StringSet.empty
+        ; debug = Parse_bytecode.Debug.default_summary
+        }
+      in
+      let output_unit
+          (unit : Parse_bytecode.jsir_unit)
+          ~standalone
+          ~shapes
+          ~source_map
+          ((_, fmt) as output_file) =
+        Pretty_print.string fmt "\n";
+        Pretty_print.string fmt (Unit_info.to_string unit.info);
+        output
+          (one unit)
+          ~check_sourcemap:false
+          ~standalone
+          ~shapes
+          ~source_map
+          ~link:`Needed
+          output_file
+      in
+      match input, keep_unit_names with
+      | `Cmja _, true ->
+          List.iter units ~f:(fun (unit : Parse_bytecode.jsir_unit) ->
+              let gen dir = Filename.concat dir (Printf.sprintf "%s.js" unit.name) in
+              let output_file =
+                match output_file with
+                | `Stdout, false -> gen "./"
+                | `Name x, false -> gen (Filename.dirname x)
+                | `Name x, true
+                  when String.length x > 0 && Char.equal x.[String.length x - 1] '/' ->
+                    gen x
+                | `Stdout, true | `Name _, true ->
+                    failwith "use [-o dirname/] or remove [--keep-unit-names]"
+              in
+              output_gen
+                ~write_shape:false
+                ~standalone:false
+                ~custom_header
+                ~build_info:(Build_info.create `Cmj)
+                ~source_map
+                (`Name output_file)
+                (fun ~standalone ~shapes ~source_map output_file ->
+                  output_unit unit ~standalone ~shapes ~source_map output_file
+                  |> sourcemap_of_info ~base:source_map_base))
+      | `Cmja _, false | `Cmj _, _ ->
+          let build_info =
+            match input with
+            | `Cmj _ -> Build_info.create `Cmj
+            | `Cmja _ -> Build_info.create `Cmja
+          in
+          output_gen
+            ~write_shape:false
+            ~standalone:false
+            ~custom_header
+            ~build_info
+            ~source_map
+            (fst output_file)
+            (fun ~standalone ~shapes ~source_map output_file ->
+              List.map units ~f:(fun unit ->
+                  output_unit unit ~standalone ~shapes ~source_map output_file)
+              |> sourcemap_of_infos ~base:source_map_base))
+  | (`Bytecode_stdin | `Bytecode_file _) as bytecode ->
       let kind, ic, close_ic, include_dirs =
         match bytecode with
-        | `Stdin ->
+        | `Bytecode_stdin ->
             let res = Parse_bytecode.from_channel stdin in
             Gc.compact ();
             res, stdin, (fun () -> ()), include_dirs
-        | `File fn ->
+        | `Bytecode_file fn ->
             let ch = open_in_bin fn in
             let res = Parse_bytecode.from_channel ch in
             Gc.compact ();
