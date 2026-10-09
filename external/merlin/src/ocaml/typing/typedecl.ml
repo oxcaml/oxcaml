@@ -4824,6 +4824,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
               Zero_alloc.create_const
                 (Check { strict = false;
                          arity = default_arity;
+                         partial = false;
                          custom_error_msg = None;
                          loc;
                          opt })
