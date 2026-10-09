@@ -446,23 +446,16 @@ let transl_check_attrib : Zero_alloc_attribute.t -> Cmm.codegen_option list =
   | Check { strict; loc; custom_error_msg; partial = _ } ->
     [Check_zero_alloc { strict; loc; custom_error_msg }]
 
-let allocates_on_heap (expr : Cmm.expression) : bool =
-  let exception Allocates_on_heap in
-  let rec traverse : Cmm.expression -> unit = function
-    | Cop (Calloc (Heap, _), _, _) -> raise Allocates_on_heap
-    | _ -> Cmm.iter_shallow traverse expr
-    [@@warning "-fragile-match"]
-  in
-  try (traverse expr; false) with Allocates_on_heap -> true
-
-let phrase_allocates_on_heap : Cmm.phrase -> bool = function
-  | Cfunction { fun_body; _ } -> allocates_on_heap fun_body
-  | Cdata _ -> false
-
+(* Answers "Is it even possible to partially apply this thing?"
+   Returns `false` for single-argument functions, including "tupled" arguments
+   (e.g. `fun (x, y, z) -> ...`), which the compiler represents separately. *)
 let can_be_partially_applied metadata =
   (not (Code_metadata.is_tupled metadata))
   && Flambda_arity.num_params (Code_metadata.params_arity metadata) > 1
 
+(* Ask Flambda2 whether *all* partial closures will be local.
+   This requires two conditions: (1.) stack allocation must be enabled; and
+   (2.) Flambda's `first_complex_local_param` (explained below) is zero. *)
 let flambda_builds_local_closures metadata =
   Flambda_features.stack_allocation_enabled ()
   && begin match Code_metadata.first_complex_local_param metadata with
@@ -474,16 +467,14 @@ let flambda_builds_local_closures metadata =
   | Never_partially_applied -> true
   end
 
-let curry_functions_build_local_closures env code_id =
-  let arity, _, _ = get_func_decl_params_arity env code_id in
-  not (List.exists phrase_allocates_on_heap (C.curry_function arity))
-
+(* Asks (1.) can we partially apply this at all, and (2.) if so, is Flambda2
+   required to place every such partial closure on the stack? *)
 let partial_applications_build_local_closures env code_id =
   let metadata = Env.get_code_metadata env code_id in
   (not (can_be_partially_applied metadata))
   || flambda_builds_local_closures metadata
-     && curry_functions_build_local_closures env code_id
 
+(* Get a function's name from its debug info. For diagnostics only. *)
 let scoped_name fun_dbg =
   fun_dbg |> Debuginfo.get_dbg |> Debuginfo.Dbg.to_list
   |> List.map (fun (dbg : Debuginfo.item) ->
@@ -491,12 +482,13 @@ let scoped_name fun_dbg =
         dbg.dinfo_scopes)
   |> String.concat ","
 
+(* If this function has a `zero_alloc ... partial ...` annotation, check it;
+   otherwise, do nothing. *)
 let check_zero_alloc_partial env code_id ~fun_dbg ~(fun_sym : Cmm.symbol)
     (zero_alloc_attribute : Zero_alloc_attribute.t) =
   match zero_alloc_attribute with
-  | Check { partial; loc; _ }
-    when partial
-         && (not !Oxcaml_flags.disable_zero_alloc_checker)
+  | Check { partial = true; loc; _ }
+    when (not !Oxcaml_flags.disable_zero_alloc_checker)
          && not (partial_applications_build_local_closures env code_id) ->
     Location.raise_errorf ~loc
       "Annotation check for zero_alloc failed on function %s (%s).@ Partial \
