@@ -55,3 +55,77 @@ let stackify_include_sig incl = mangle_include_sig incl ~f:stackify_longident
 let append_arbitrary_suffix_to_include_signature incl ~suffix =
   mangle_include_sig incl ~f:(mangle_longident ~suffix)
 ;;
+
+let type_declarations_contain_jkind_annotation td =
+  let fold =
+    object
+      inherit [bool] Ast_traverse.fold
+      method! jkind_annotation _ _ = true
+    end
+  in
+  fold#list fold#type_declaration td false
+;;
+
+let disable_imprecise_kind_annotation_attribute ~loc : attribute =
+  let payload_expression =
+    let pexp_desc =
+      Pexp_constant (Pconst_string ("-imprecise-kind-annotation", loc, None))
+    in
+    { pexp_desc; pexp_loc = loc; pexp_loc_stack = []; pexp_attributes = [] }
+  in
+  { attr_name = { txt = "warning"; loc }
+  ; attr_payload =
+      PStr [ { pstr_desc = Pstr_eval (payload_expression, []); pstr_loc = loc } ]
+  ; attr_loc = loc
+  }
+;;
+
+let suppress_imprecise_kind_annotation_warning_in_structure ~loc tds items =
+  match items with
+  | [] -> []
+  | _ :: _ ->
+    if type_declarations_contain_jkind_annotation tds
+    then (
+      let disable_warning =
+        { pstr_desc = Pstr_attribute (disable_imprecise_kind_annotation_attribute ~loc)
+        ; pstr_loc = loc
+        }
+      in
+      let module_expr =
+        { pmod_desc = Pmod_structure (disable_warning :: items)
+        ; pmod_loc = loc
+        ; pmod_attributes = []
+        }
+      in
+      [ { pstr_desc =
+            Pstr_include
+              (Ast_builder.Default.include_infos ~loc ~kind:Structure module_expr)
+        ; pstr_loc = loc
+        }
+      ])
+    else items
+;;
+
+let suppress_imprecise_kind_annotation_warning_in_signature ~loc tds items =
+  match items with
+  | [] -> []
+  | _ :: _ ->
+    if type_declarations_contain_jkind_annotation tds
+    then (
+      let disable_warning =
+        { psig_desc = Psig_attribute (disable_imprecise_kind_annotation_attribute ~loc)
+        ; psig_loc = loc
+        }
+      in
+      [ Ast_builder.Default.psig_include
+          ~loc
+          ~modalities:[]
+          (Ast_builder.Default.include_infos
+             ~loc
+             ~kind:Structure
+             (Ast_builder.Default.pmty_signature
+                ~loc
+                (Ast_builder.Default.signature ~loc (disable_warning :: items))))
+      ])
+    else items
+;;

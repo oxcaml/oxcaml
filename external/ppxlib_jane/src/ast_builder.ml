@@ -169,6 +169,8 @@ module Default = struct
       ~loc
   ;;
 
+  let pexp_function_cases ~loc cases = unary_function ~loc cases
+
   let fun_param ~loc arg_label pattern : function_param =
     { pparam_desc = Pparam_val (arg_label, None, pattern); pparam_loc = loc }
   ;;
@@ -493,8 +495,8 @@ struct
       ()
   ;;
 
-  let value_binding ~pat ~expr ~modes : value_binding =
-    value_binding ~loc ~pat ~expr ~modes
+  let value_binding ~pat ~expr ~constraint_ ~modes : value_binding =
+    value_binding ~loc ~pat ~expr ~constraint_ ~modes
   ;;
 
   let pcstr_tuple fields : constructor_arguments = pcstr_tuple ~loc fields
@@ -533,6 +535,7 @@ struct
   ;;
 
   let fun_param a b : function_param = fun_param ~loc a b
+  let pexp_function_cases a : expression = pexp_function_cases ~loc a
   let unary_function ?attrs a : expression = unary_function ~loc ?attrs a
 
   let add_fun_param ?attrs ?return_constraint a b c d : expression =
