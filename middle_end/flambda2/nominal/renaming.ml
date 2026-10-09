@@ -40,7 +40,11 @@ module Import_map : sig
 
   val fresh_variable : t -> Variable.t -> Variable.t
 
+  val variables : t -> Variable.importer
+
   val symbol : t -> Symbol.t -> Symbol.t
+
+  val symbols : t -> Symbol.importer
 
   val simple :
     t -> Simple.t -> import_var:(Variable.t -> Variable.t) -> Simple.t
@@ -95,7 +99,11 @@ end = struct
 
   let symbol t orig = Symbol.import t.symbols orig
 
+  let symbols t = t.symbols
+
   let variable t orig = Variable.import t.variables orig
+
+  let variables t = t.variables
 
   let fresh_variable t orig = Variable.import_and_rename t.variables orig
 
@@ -122,6 +130,12 @@ end = struct
       true
 end
 
+type import_map = Import_map.t
+
+let imported_variables = Import_map.variables
+
+let imported_symbols = Import_map.symbols
+
 type t =
   { continuations : Continuations.t;
     variables : Variables.t;
@@ -142,10 +156,10 @@ let empty =
 
 let create_import_map ~symbols ~variables ~simples ~consts ~code_ids
     ~continuations ~used_value_slots ~original_compilation_unit =
-  let import_map =
-    Import_map.create ~symbols ~variables ~simples ~consts ~code_ids
-      ~continuations ~used_value_slots ~original_compilation_unit
-  in
+  Import_map.create ~symbols ~variables ~simples ~consts ~code_ids
+    ~continuations ~used_value_slots ~original_compilation_unit
+
+let from_import_map import_map =
   (* It's tempting to set [import_map] to [None] if everything is empty, but
      this is incorrect: an import map of [None] is equivalent to having _all_
      value slots used, not none (see [value_slot_is_used]). *)
