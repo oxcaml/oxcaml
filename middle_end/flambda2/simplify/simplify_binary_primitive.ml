@@ -273,7 +273,12 @@ end
 [@@inline always]
 
 module Int_ops_for_binary_arith (I : A.Int_number_kind) : sig
-  include Binary_arith_like_sig with type op = P.binary_int_arith_op
+  include
+    Binary_arith_like_sig
+      with type op = P.binary_int_arith_op
+       and type Lhs.t = I.Num.t
+       and type Rhs.t = I.Num.t
+       and type Result.t = I.Num.t
 end = struct
   module Lhs = I.Num
   module Rhs = I.Num
@@ -457,7 +462,12 @@ module Binary_int_arith_nativeint =
   Binary_arith_like (Int_ops_for_binary_arith_nativeint)
 
 module Int_ops_for_binary_shift (I : A.Int_number_kind) : sig
-  include Binary_arith_like_sig with type op = P.int_shift_op
+  include
+    Binary_arith_like_sig
+      with type op = P.int_shift_op
+       and type Lhs.t = I.Num.t
+       and type Rhs.t = Target_ocaml_int.t
+       and type Result.t = I.Num.t
 end = struct
   module Lhs = I.Num
   module Rhs = Target_ocaml_int
@@ -588,6 +598,9 @@ module Int_ops_for_binary_comp (I : A.Int_number_kind) : sig
   include
     Binary_arith_like_sig
       with type op = P.signed_or_unsigned P.comparison_behaviour
+       and type Lhs.t = I.Num.t
+       and type Rhs.t = I.Num.t
+       and type Result.t = Target_ocaml_int.t
 end = struct
   module Lhs = I.Num
   module Rhs = I.Num
@@ -692,6 +705,101 @@ module Binary_int_comp_int32 = Binary_arith_like (Int_ops_for_binary_comp_int32)
 module Binary_int_comp_int64 = Binary_arith_like (Int_ops_for_binary_comp_int64)
 module Binary_int_comp_nativeint =
   Binary_arith_like (Int_ops_for_binary_comp_nativeint)
+
+(* Constant folding of integer binary primitives on known constants, for use
+   outside the simplifier (e.g. by [Closure_conversion] in classic mode, where
+   the simplifier does not run). This reuses the evaluation functions above so
+   that the semantics cannot diverge from those of the simplifier. *)
+module Fold_binary_int_prims (I : A.Int_number_kind) : sig
+  val arith :
+    machine_width:Target_system.Machine_width.t ->
+    P.binary_int_arith_op ->
+    Reg_width_const.t ->
+    Reg_width_const.t ->
+    Reg_width_const.t option
+
+  val shift :
+    machine_width:Target_system.Machine_width.t ->
+    P.int_shift_op ->
+    Reg_width_const.t ->
+    Reg_width_const.t ->
+    Reg_width_const.t option
+
+  val comp :
+    machine_width:Target_system.Machine_width.t ->
+    P.signed_or_unsigned P.comparison_behaviour ->
+    Reg_width_const.t ->
+    Reg_width_const.t ->
+    Reg_width_const.t option
+end = struct
+  module Arith = Int_ops_for_binary_arith (I)
+  module Shift = Int_ops_for_binary_shift (I)
+  module Comp = Int_ops_for_binary_comp (I)
+
+  let arith ~machine_width op c1 c2 =
+    Option.bind (I.Num.of_const c1) (fun n1 ->
+        Option.bind (I.Num.of_const c2) (fun n2 ->
+            Option.map I.Num.to_const (Arith.op ~machine_width op n1 n2)))
+
+  let shift ~machine_width op c1 c2 =
+    Option.bind (I.Num.of_const c1) (fun n1 ->
+        Option.bind (Reg_width_const.is_naked_immediate c2) (fun n2 ->
+            Option.map I.Num.to_const (Shift.op ~machine_width op n1 n2)))
+
+  let comp ~machine_width op c1 c2 =
+    Option.bind (I.Num.of_const c1) (fun n1 ->
+        Option.bind (I.Num.of_const c2) (fun n2 ->
+            Option.map Reg_width_const.naked_immediate
+              (Comp.op ~machine_width op n1 n2)))
+end
+
+module Fold_tagged_immediate = Fold_binary_int_prims (A.For_tagged_immediates)
+module Fold_naked_immediate = Fold_binary_int_prims (A.For_naked_immediates)
+module Fold_int8 = Fold_binary_int_prims (A.For_int8s)
+module Fold_int16 = Fold_binary_int_prims (A.For_int16s)
+module Fold_int32 = Fold_binary_int_prims (A.For_int32s)
+module Fold_int64 = Fold_binary_int_prims (A.For_int64s)
+module Fold_nativeint = Fold_binary_int_prims (A.For_nativeints)
+
+let fold_binary_int_primitive ~machine_width (prim : P.binary_primitive) c1 c2 =
+  match[@warning "-fragile-match"] prim with
+  | Int_arith (kind, op) ->
+    let arith =
+      match kind with
+      | Tagged_immediate -> Fold_tagged_immediate.arith
+      | Naked_immediate -> Fold_naked_immediate.arith
+      | Naked_int8 -> Fold_int8.arith
+      | Naked_int16 -> Fold_int16.arith
+      | Naked_int32 -> Fold_int32.arith
+      | Naked_int64 -> Fold_int64.arith
+      | Naked_nativeint -> Fold_nativeint.arith
+    in
+    arith ~machine_width op c1 c2
+  | Int_shift (kind, op) ->
+    let shift =
+      match kind with
+      | Tagged_immediate -> Fold_tagged_immediate.shift
+      | Naked_immediate -> Fold_naked_immediate.shift
+      | Naked_int8 -> Fold_int8.shift
+      | Naked_int16 -> Fold_int16.shift
+      | Naked_int32 -> Fold_int32.shift
+      | Naked_int64 -> Fold_int64.shift
+      | Naked_nativeint -> Fold_nativeint.shift
+    in
+    shift ~machine_width op c1 c2
+  | Int_comp (kind, op) ->
+    let comp =
+      match kind with
+      | Tagged_immediate -> Fold_tagged_immediate.comp
+      | Naked_immediate -> Fold_naked_immediate.comp
+      | Naked_int8 -> Fold_int8.comp
+      | Naked_int16 -> Fold_int16.comp
+      | Naked_int32 -> Fold_int32.comp
+      | Naked_int64 -> Fold_int64.comp
+      | Naked_nativeint -> Fold_nativeint.comp
+    in
+    comp ~machine_width op c1 c2
+  | _ -> None
 
 module Float_ops_for_binary_arith_gen (FP : sig
   module F : Numeric_types.Float_by_bit_pattern
