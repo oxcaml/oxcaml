@@ -1,0 +1,39 @@
+[@@@ocaml.warning "-27"]
+module Laws_gen_Capture_parameter = Capture_parameter
+module Laws_gen_Captured = Captured
+type 'a each = {
+  f_l: 'a }
+let names = { f_l = "f_l" }
+let map { f_l } ~f = { f_l = (f f_l) }
+let to_list { f_l } = [f_l]
+module Instantiate(Choice:CamlinternalLaw.Choice) =
+  struct
+    module Law = (CamlinternalLaw.Make)(Choice)
+    module type F_choices  =
+      sig
+        module Captured : sig  end
+        module X : sig law? l : Laws_gen_Captured.p end
+        type l_input =
+          | L_input: l_input 
+        val l : l_input Choice.t
+      end
+    module type Choices  = sig val f : (module F_choices) Choice.t end
+    let f_l ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.f),
+          (fun ((module M)  : (module F_choices)) ->
+             let module I = ((Laws_gen_Capture_parameter.F)(M.Captured))(M.X)
+               in
+               Law.Bind
+                 ((Law.Choose M.l),
+                   (fun input ->
+                      Law.Assertion
+                        {
+                          value = input;
+                          source = M.l;
+                          predicate =
+                            (fun ((M.L_input) : M.l_input) -> (true : bool));
+                          text = "true"
+                        }))))
+    let laws choices = { f_l = (f_l choices) }
+  end

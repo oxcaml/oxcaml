@@ -53,6 +53,14 @@ val add_module: Ident.t -> Path.t -> 'k subst -> 'k subst
 val add_modtype: Ident.t -> Path.t -> 'k subst -> 'k subst
 val add_jkind: Ident.t -> Path.t -> t -> t
 
+(* Paths to values occur only in the clauses of laws. To save the cost of
+   substituting them in programs without laws, [add_value] does nothing
+   until [enable_value_substitution] is called, which happens when a law
+   is typed or a compiled interface with laws is imported. *)
+val add_value: Ident.t -> Path.t -> 'k subst -> 'k subst
+val enable_value_substitution: unit -> unit
+val value_substitution_enabled: unit -> bool
+
 type additional_action_config =
    | Duplicate_variables
    (* [Duplicate_variables] makes it so that any substitution will duplicate
@@ -82,6 +90,7 @@ val change_locs: 'k subst -> Location.t -> 'k subst
 
 val module_path: t -> Path.t -> Path.t
 val type_path: t -> Path.t -> Path.t
+val value_path: t -> Path.t -> Path.t
 val modtype_path: t -> Path.t -> Path.t
 
 val type_expr: t -> type_expr -> type_expr
@@ -93,6 +102,7 @@ val extension_constructor:
 val class_declaration: t -> class_declaration -> class_declaration
 val cltype_declaration: t -> class_type_declaration -> class_type_declaration
 val jkind_declaration: t -> jkind_declaration -> jkind_declaration
+val law_description: t -> law_description -> law_description
 
 (**
    When applied to a signature item, a substitution not only modifies the types

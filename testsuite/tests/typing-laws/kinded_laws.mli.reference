@@ -1,0 +1,42 @@
+module Laws_gen_Kinded = Kinded
+module Laws_gen_Stdlib = Stdlib
+type 'a each =
+  {
+  kinded: 'a ;
+  kinded_unused: 'a ;
+  kinded_shared: 'a ;
+  nullable: 'a ;
+  plain: 'a }
+val names : string each
+val map : 'a each -> f:('a -> 'b) -> 'b each
+val to_list : 'a each -> 'a list
+type kinded_input =
+  | Kinded_input: ('a : immutable_data) . {
+  x: 'a } -> kinded_input 
+type kinded_unused_input =
+  | Kinded_unused_input: ('a : immutable_data) . {
+  x: 'a } -> kinded_unused_input 
+type kinded_shared_input =
+  | Kinded_shared_input: ('a : immutable_data) . {
+  x: 'a ;
+  y: 'a } -> kinded_shared_input 
+type nullable_input =
+  | Nullable_input: ('a : value_or_null) . {
+  x: 'a } -> nullable_input 
+type plain_input =
+  | Plain_input: ('a : value_or_null) . {
+  x: 'a } -> plain_input 
+module Instantiate :
+(Choice : CamlinternalLaw.Choice) ->
+  sig
+    module Law : sig type 'a t = 'a CamlinternalLaw.Make(Choice).t end
+    module type Choices  =
+      sig
+        val kinded : kinded_input Choice.t
+        val kinded_unused : kinded_unused_input Choice.t
+        val kinded_shared : kinded_shared_input Choice.t
+        val nullable : nullable_input Choice.t
+        val plain : plain_input Choice.t
+      end
+    val laws : (module Choices) -> unit Law.t each
+  end

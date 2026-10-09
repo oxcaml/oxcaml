@@ -71,6 +71,7 @@ val hash: t -> int
 val compare_extra: extra_ty -> extra_ty -> int
 val find_free_opt: Ident.t list -> t -> Ident.t option
 val exists_free: Ident.t list -> t -> bool
+val contains_apply: t -> bool
 val scope: t -> int
 val flatten : t -> [ `Contains_apply | `Ok of Ident.t * string list ]
 

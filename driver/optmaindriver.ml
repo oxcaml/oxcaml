@@ -90,6 +90,7 @@ let main unix argv ppf ~flambda2 =
         (ppf,
          Compiler.implementation,
          Compiler.interface,
+         Laws_gen.generate,
          Compiler.ext_flambda_obj,
          Compiler.ext_flambda_lib);
     with Arg.Bad msg ->

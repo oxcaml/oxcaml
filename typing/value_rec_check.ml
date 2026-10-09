@@ -1326,7 +1326,7 @@ and structure_item : Typedtree.structure_item -> bind_judg =
     | Tstr_include { incl_mod = mexp; incl_type = mty; _ } ->
       let included_ids = List.map Types.signature_item_id mty in
       Env.join (modexp mexp m) (Env.remove_list included_ids env)
-    | Tstr_jkind _ ->
+    | Tstr_jkind _ | Tstr_law _ ->
       env
 
 (* G |- module M = E : m -| G *)

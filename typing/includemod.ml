@@ -77,6 +77,8 @@ module Error = struct
     | Modalities of Mode.Modality.error
     | Jkind_declarations of
         (jkind_declaration, Includecore.jkind_mismatch) diff
+    | Law_descriptions of
+        (law_description, Includecore.law_mismatch) diff
 
   type core_module_type_symptom =
     | Not_an_alias
@@ -307,6 +309,17 @@ module Core_inclusion = struct
     | Some err ->
       Error Error.(Core(Jkind_declarations (diff decl1 decl2 err)))
 
+  (* Inclusion between laws *)
+
+  let law_descriptions ~loc env ~direction:_ subst id ~mmodes:_ decl1 decl2 =
+    let decl2 = Subst.law_description subst decl2 in
+    match
+      Includecore.law_descriptions ~loc env (Ident.name id) decl1 decl2
+    with
+    | None -> Ok Tcoerce_none
+    | Some err ->
+      Error Error.(Core(Law_descriptions (diff decl1 decl2 err)))
+
   (* Inclusion between class declarations *)
 
   let class_type_declarations ~loc env ~direction:_ subst _id ~mmodes:_ decl1
@@ -345,6 +358,7 @@ type field_kind =
   | Field_class
   | Field_classtype
   | Field_jkind
+  | Field_law
 
 
 
@@ -360,6 +374,7 @@ let kind_of_field_desc fd = match fd.kind with
   | Field_class -> "class"
   | Field_classtype -> "class type"
   | Field_jkind -> "kind"
+  | Field_law -> "law"
 
 let field_desc kind id = { kind; name = Ident.name id }
 
@@ -389,6 +404,7 @@ let item_ident_name =
   | Sig_class_type(id, d, _, _) ->
       (id, d.clty_loc, field_desc Field_classtype id)
   | Sig_jkind(id, d, _) -> (id, d.jkind_loc, field_desc Field_jkind id)
+  | Sig_law(id, d, _) -> (id, d.law_loc, field_desc Field_law id)
 
 let is_runtime_component =
   let open Subst.Lazy in
@@ -398,7 +414,8 @@ let is_runtime_component =
   | Sig_module(_,Mp_absent,_,_,_)
   | Sig_modtype(_,_,_)
   | Sig_class_type(_,_,_,_)
-  | Sig_jkind (_,_,_) -> false
+  | Sig_jkind (_,_,_)
+  | Sig_law (_,_,_) -> false
   | Sig_value(_,_,_)
   | Sig_typext(_,_,_,_)
   | Sig_module(_,Mp_present,_,_,_)
@@ -415,6 +432,7 @@ let item_visibility =
   | Sig_class (_, _, _, vis)
   | Sig_class_type (_, _, _, vis) -> vis
   | Sig_jkind (_, _, vis) -> vis
+  | Sig_law (_, _, vis) -> vis
 
 
 (* Print a coercion *)
@@ -507,7 +525,10 @@ let build_component_table pos_rep sg =
    identifying the names along the way.
    Return a coercion list indicating, for all run-time components
    of sig2, the position of the matching run-time components of sig1
-   and the coercion to be applied to it. *)
+   and the coercion to be applied to it.
+
+   Value and extension constructor paths, which only the clauses of laws
+   use, are substituted too. *)
 let pair_components subst sig1_comps sig2 =
   let open Subst.Lazy in
   let rec pair subst paired unpaired = function
@@ -537,8 +558,14 @@ let pair_components subst sig1_comps sig2 =
               Subst.add_modtype id2 (Path.Pident id1) subst
           | Sig_jkind _ ->
               Subst.add_jkind id2 (Path.Pident id1) subst
+          | Sig_value _ when Subst.value_substitution_enabled () ->
+              Subst.add_value id2 (Path.Pident id1) subst
+          | Sig_typext _ when Subst.value_substitution_enabled () ->
+              (* Extension constructors are substituted like types (see
+                 [Env.prefix_idents]). *)
+              Subst.add_type id2 (Path.Pident id1) subst
           | Sig_value _ | Sig_typext _
-          | Sig_class _ | Sig_class_type _ ->
+          | Sig_class _ | Sig_class_type _ | Sig_law _ ->
               subst
         in
         pair new_subst
@@ -628,6 +655,7 @@ type core_relation = {
   class_declarations: Types.class_declaration core_incl;
   class_type_declarations: Types.class_type_declaration core_incl;
   jkind_declarations: Types.jkind_declaration core_incl;
+  law_descriptions: Types.law_description core_incl;
 }
 
 (* Quickly compare module types without expanding them, succeeding only if mty1
@@ -643,7 +671,7 @@ let rec shallow_modtypes env subst mty1 mty2 =
       not (Env.is_functor_arg p2 env) && equal_module_paths env p1 subst p2
   | Mty_ident p1, Mty_ident p2 ->
       equal_modtype_paths env p1 subst p2
-  | Mty_strengthen (mty1,p1,a1), Mty_strengthen (mty2,p2,a2)
+  | Mty_strengthen (mty1,p1,a1,_), Mty_strengthen (mty2,p2,a2,_)
         when sub_aliasable a1 a2
               (* Destructive substitution can introduce this, similar to the
                  Mty_alias check *)
@@ -651,7 +679,7 @@ let rec shallow_modtypes env subst mty1 mty2 =
           && shallow_modtypes env subst mty1 mty2
           && shallow_module_paths env subst p1 mty2 p2 ->
       true
-  | Mty_strengthen (mty1,_,_), mty2 ->
+  | Mty_strengthen (mty1,_,_,_), mty2 ->
       (* S with M <= S *)
       shallow_modtypes env subst mty1 mty2
   | (Mty_alias _ | Mty_ident _ | Mty_signature _ | Mty_functor _), _  -> false
@@ -661,7 +689,7 @@ and shallow_module_paths env subst p1 mty2 p2 =
   (* This shortcut is a significant win in some cases. Note we don't apply it
      recursively as doing seems to be a net loss. *)
   match (Env.find_module_lazy p1 env).md_type with
-    | Mty_strengthen (mty1,p1,_) ->
+    | Mty_strengthen (mty1,p1,_,_) ->
         shallow_modtypes env subst mty1 mty2
           && equal_module_paths env p1 subst p2
     | Mty_alias _ | Mty_ident _ | Mty_signature _ | Mty_functor _
@@ -839,7 +867,7 @@ and try_modtypes ~core ~direction ~loc env subst ~modes
     | None ->
         (* Report error *)
         match mty1, mty2 with
-        | _, Mty_strengthen (_,p,Aliasable) when Env.is_functor_arg p env ->
+        | _, Mty_strengthen (_,p,Aliasable,_) when Env.is_functor_arg p env ->
             Error (Error.Invalid_module_alias p)
         | (Mty_ident _ | Mty_strengthen _), _ ->
             Error (Error.Mt_core Abstract_module_type)
@@ -906,13 +934,17 @@ and equate_one_functor_param subst env arg2' name1 name2  =
 
 and strengthened_modtypes ~core ~direction ~loc ~aliasable env
     subst mty1 path1 mty2 shape =
-  let mty1 = Mtype.strengthen_lazy ~aliasable mty1 path1 in
+  let mty1 =
+    Mtype.strengthen_lazy ~aliasable ~value_equations:Recorded mty1 path1
+  in
   modtypes ~core ~direction ~loc env subst mty1 mty2 shape
 
 and strengthened_module_decl ~loc ~aliasable ~core ~direction env
     subst ~mmodes  md1 path1 md2 shape =
   let md1 = Subst.Lazy.of_module_decl md1 in
-  let md1 = Mtype.strengthen_lazy_decl ~aliasable md1 path1 in
+  let md1 =
+    Mtype.strengthen_lazy_decl ~aliasable ~value_equations:Recorded md1 path1
+  in
   let mty2 = Subst.Lazy.of_modtype md2.md_type in
   let modes = mmodes in
   modtypes ~core ~direction ~loc env subst ~modes md1.md_type mty2 shape
@@ -1100,6 +1132,13 @@ and signature_components :
            let item = mark_error_as_unrecoverable item in
            let shape_map = Shape.Map.add_jkind_proj shape_map id1 orig_shape in
            id1, item, (jd1.jkind_uid, jd2.jkind_uid), shape_map, false
+        | Sig_law (id1, ld1, _), Sig_law (_id2, ld2, _) ->
+           let item =
+             core.law_descriptions ~loc env ~direction subst id1 ~mmodes ld1
+               ld2
+           in
+           let item = mark_error_as_unrecoverable item in
+           id1, item, (ld1.law_uid, ld2.law_uid), shape_map, false
         | _ ->
             assert false
       in
@@ -1264,6 +1303,7 @@ let make_core_inclusion ~self_check = Core_inclusion.{
   class_type_declarations;
   class_declarations;
   jkind_declarations;
+  law_descriptions;
 }
 
 let core_inclusion = make_core_inclusion ~self_check:false
@@ -1292,6 +1332,7 @@ let core_consistency =
     class_type_declarations=accept;
     extension_constructors=accept;
     jkind_declarations=accept;
+    law_descriptions=accept;
   }
 
 type explanation = Env.t * Error.all
@@ -1348,7 +1389,10 @@ let check_functor_application_in_path
       if errors then
         let prepare_arg (arg_path, arg_mty) =
           let aliasable = can_alias env arg_path in
-          let smd = Mtype.strengthen ~aliasable arg_mty arg_path in
+          let smd =
+            Mtype.strengthen ~aliasable ~value_equations:Recorded arg_mty
+              arg_path
+          in
           (* The current function is used for type checking F(M).t, which does
           not involve modes, so we fill in the strongest modes such that error
           messages would not mention modes. *)
@@ -1440,7 +1484,7 @@ module Functor_inclusion_diff = struct
   let rec keep_expansible_param = function
     | Mty_ident _ | Mty_alias _ as mty -> Some mty
     | Mty_signature _ | Mty_functor _ -> None
-    | Mty_strengthen (mty,_,_) -> keep_expansible_param mty
+    | Mty_strengthen (mty,_,_,_) -> keep_expansible_param mty
 
   let lookup_expansion { env ; res ; _ } = match res with
     | None -> None
@@ -1710,7 +1754,8 @@ let strengthened_module_decl ~loc ~aliasable env ~mark ~mmodes md1 path1 md2 =
 
 let expand_module_alias ~strengthen env path =
   try
-    Mtype.find_type_of_module ~strengthen ~aliasable:true env path
+    Mtype.find_type_of_module ~strengthen ~aliasable:true
+      ~value_equations:Recorded env path
   with Not_found ->
     raise (Error(env,In_Expansion(Error.Unbound_module_path path)))
 

@@ -40,28 +40,40 @@ let freshen ~scope mty =
   argument remains non-aliasable even if we later substitute a "real" module
   for it. This ensures that strengthening commutes with substitution and
   that it is irrelevant when exactly a strengthening node is expanded.  *)
-let rec reduce_strengthen_lazy ~aliasable mty p =
+(* Strengthening also records [val_alias] and [ext_alias] as it adds
+  manifests, if [value_equations] says so (see [Types.Value_equations]).
+  Like a manifest, an equation already recorded is kept. *)
+
+let rec reduce_strengthen_lazy ~aliasable ~value_equations mty p =
   let open Subst.Lazy in
   match mty with
     Mty_signature sg ->
-      Some (Mty_signature(strengthen_lazy_sig ~aliasable sg p))
+      Some (Mty_signature
+              (strengthen_lazy_sig ~aliasable ~value_equations sg p))
 
   | Mty_functor(Named (Some param, arg, marg), res, mres)
     when !Clflags.applicative_functors ->
       Some (Mty_functor(Named (Some param, arg, marg),
-        strengthen_lazy ~aliasable:false res (Papply(p, Pident param)), mres))
+        strengthen_lazy ~aliasable:false ~value_equations res
+          (Papply(p, Pident param)), mres))
   | Mty_functor(Named (None, arg, marg), res, mres)
     when !Clflags.applicative_functors ->
       let param = Ident.create_scoped ~scope:(Path.scope p) "Arg" in
       Some (Mty_functor(Named (Some param, arg, marg),
-        strengthen_lazy ~aliasable:false res (Papply(p, Pident param)), mres))
+        strengthen_lazy ~aliasable:false ~value_equations res
+          (Papply(p, Pident param)), mres))
 
-  | Mty_strengthen (mty,q,Not_aliasable) when aliasable ->
+  | Mty_strengthen (mty,q,Not_aliasable,inner_value_equations)
+    when aliasable ->
       (* Normally, we have S/M/N = S/M. However, if the inner strengthening is
         not aliasable and the outer is, we have to strengthen types in S with M
         and modules with N as per the semantics of strengthening.  *)
-      begin match reduce_strengthen_lazy ~aliasable:false mty q with
-      | Some mty -> reduce_strengthen_lazy ~aliasable:true mty p
+      begin match
+        reduce_strengthen_lazy ~aliasable:false
+          ~value_equations:inner_value_equations mty q
+      with
+      | Some mty ->
+          reduce_strengthen_lazy ~aliasable:true ~value_equations mty p
       | None -> None
       end
   | Mty_alias _ | Mty_functor _ | Mty_strengthen _ ->
@@ -72,21 +84,29 @@ let rec reduce_strengthen_lazy ~aliasable mty p =
 
 (* Strengthen a type by pushing strengthening inward and/or constructing
     appropriate Mty_strengthen nodes. *)
-and strengthen_lazy ~aliasable mty p =
-  match reduce_strengthen_lazy ~aliasable mty p with
+and strengthen_lazy ~aliasable ~value_equations mty p =
+  match reduce_strengthen_lazy ~aliasable ~value_equations mty p with
   | Some mty -> mty
   | None ->
-      Subst.Lazy.Mty_strengthen (mty, p, Aliasability.aliasable aliasable)
+      Subst.Lazy.Mty_strengthen
+        (mty, p, Aliasability.aliasable aliasable, value_equations)
 
-and strengthen_lazy_sig' ~aliasable sg p =
+and strengthen_lazy_sig' ~aliasable ~value_equations sg p =
   let open Subst.Lazy in
   match sg with
     [] -> []
-  | (Sig_value(_, _, _) as sigelt) :: rem ->
-      sigelt :: strengthen_lazy_sig' ~aliasable rem p
+  | (Sig_value(id, vd, vis) as sigelt) :: rem ->
+      let sigelt =
+        match (value_equations : Value_equations.t), vd.val_alias with
+        | Recorded, None ->
+            let vd = { vd with val_alias = Some (Pdot (p, Ident.name id)) } in
+            Sig_value (id, vd, vis)
+        | Recorded, Some _ | Not_recorded, _ -> sigelt
+      in
+      sigelt :: strengthen_lazy_sig' ~aliasable ~value_equations rem p
   | Sig_type(id, {type_kind=Type_abstract _}, _, _) :: rem
     when Btype.is_row_name (Ident.name id) ->
-      strengthen_lazy_sig' ~aliasable rem p
+      strengthen_lazy_sig' ~aliasable ~value_equations rem p
   | Sig_type(id, decl, rs, vis) :: rem ->
       let strengthen_decl path decl =
         match decl.type_manifest, decl.type_private, decl.type_kind with
@@ -127,15 +147,23 @@ and strengthen_lazy_sig' ~aliasable sg p =
           {decl with type_unboxed_version = new_unboxed_version}
       in
       Sig_type(id, newdecl, rs, vis) ::
-        strengthen_lazy_sig' ~aliasable rem p
-  | (Sig_typext _ as sigelt) :: rem ->
-      sigelt :: strengthen_lazy_sig' ~aliasable rem p
+        strengthen_lazy_sig' ~aliasable ~value_equations rem p
+  | (Sig_typext (id, ext, es, vis) as sigelt) :: rem ->
+      let sigelt =
+        match (value_equations : Value_equations.t), ext.ext_alias with
+        | Recorded, None ->
+            let ext = { ext with ext_alias = Some (Pdot (p, Ident.name id)) } in
+            Sig_typext (id, ext, es, vis)
+        | Recorded, Some _ | Not_recorded, _ -> sigelt
+      in
+      sigelt :: strengthen_lazy_sig' ~aliasable ~value_equations rem p
   | Sig_module(id, pres, md, rs, vis) :: rem ->
       let str =
-        strengthen_lazy_decl ~aliasable md (Pdot(p, Ident.name id))
+        strengthen_lazy_decl ~aliasable ~value_equations md
+          (Pdot(p, Ident.name id))
       in
       Sig_module(id, pres, str, rs, vis)
-      :: strengthen_lazy_sig' ~aliasable rem p
+      :: strengthen_lazy_sig' ~aliasable ~value_equations rem p
   | Sig_modtype(id, decl, vis) :: rem ->
       let newdecl =
         match decl.mtd_type with
@@ -147,11 +175,13 @@ and strengthen_lazy_sig' ~aliasable sg p =
             {decl with mtd_type = Some(Mty_ident(Pdot(p,Ident.name id)))}
       in
       Sig_modtype(id, newdecl, vis) ::
-      strengthen_lazy_sig' ~aliasable rem p
+      strengthen_lazy_sig' ~aliasable ~value_equations rem p
   | (Sig_class _ as sigelt) :: rem ->
-      sigelt :: strengthen_lazy_sig' ~aliasable rem p
+      sigelt :: strengthen_lazy_sig' ~aliasable ~value_equations rem p
   | (Sig_class_type _ as sigelt) :: rem ->
-      sigelt :: strengthen_lazy_sig' ~aliasable rem p
+      sigelt :: strengthen_lazy_sig' ~aliasable ~value_equations rem p
+  | (Sig_law _ as sigelt) :: rem ->
+      sigelt :: strengthen_lazy_sig' ~aliasable ~value_equations rem p
   | Sig_jkind(id, decl, vis) as sigelt :: rem ->
       let sigelt =
         match decl.jkind_manifest with
@@ -163,26 +193,32 @@ and strengthen_lazy_sig' ~aliasable sg p =
           let newdecl = { decl with jkind_manifest = manif } in
           Sig_jkind (id, newdecl, vis)
       in
-      sigelt :: strengthen_lazy_sig' ~aliasable rem p
+      sigelt :: strengthen_lazy_sig' ~aliasable ~value_equations rem p
 
-and strengthen_lazy_sig ~aliasable sg p =
+and strengthen_lazy_sig ~aliasable ~value_equations sg p =
   let sg = Subst.Lazy.force_signature_once sg in
-  let sg = strengthen_lazy_sig' ~aliasable sg p in
+  let sg = strengthen_lazy_sig' ~aliasable ~value_equations sg p in
   Subst.Lazy.of_value sg
 
-and strengthen_lazy_decl ~aliasable md p =
+and strengthen_lazy_decl ~aliasable ~value_equations md p =
   let open Subst.Lazy in
   match md.md_type with
   | Mty_alias _ -> md
   | _ when aliasable -> {md with md_type = Mty_alias p}
-  | mty -> {md with md_type = strengthen_lazy ~aliasable mty p}
+  | mty ->
+      {md with md_type = strengthen_lazy ~aliasable ~value_equations mty p}
 
-let strengthen ~aliasable mty p =
-  let mty = strengthen_lazy ~aliasable (Subst.Lazy.of_modtype mty) p in
+let strengthen ~aliasable ~value_equations mty p =
+  let mty =
+    strengthen_lazy ~aliasable ~value_equations (Subst.Lazy.of_modtype mty) p
+  in
   Subst.Lazy.force_modtype mty
 
-let strengthen_decl ~aliasable md p =
-  let md = strengthen_lazy_decl ~aliasable (Subst.Lazy.of_module_decl md) p in
+let strengthen_decl ~aliasable ~value_equations md p =
+  let md =
+    strengthen_lazy_decl ~aliasable ~value_equations
+      (Subst.Lazy.of_module_decl md) p
+  in
   Subst.Lazy.force_module_decl md
 
 (* Perform one reduction on a module type, returning None is it couldn't be
@@ -201,20 +237,26 @@ let rec reduce_lazy ~aliases env mty =
         begin try
           let mty = (Env.find_module_lazy path env).md_type in
           let normal_path = Env.normalize_instance_names_in_module_path path in
-          let mty = strengthen_lazy ~aliasable:true mty normal_path in
+          let mty =
+            strengthen_lazy ~aliasable:true ~value_equations:Recorded mty
+              normal_path
+          in
           Some mty
         with Not_found ->
           (*Location.prerr_warning Location.none
             (Warnings.No_cmi_file (Path.name path));*)
           None
         end
-  | Mty_strengthen (mty,p,a) ->
+  | Mty_strengthen (mty,p,a,value_equations) ->
       let aliasable = Aliasability.is_aliasable a in
-      begin match reduce_strengthen_lazy ~aliasable mty p with
+      begin match
+        reduce_strengthen_lazy ~aliasable ~value_equations mty p
+      with
       | Some mty -> Some mty
       | None ->
         begin match reduce_lazy ~aliases env mty with
-        | Some mty -> Some (strengthen_lazy ~aliasable mty p)
+        | Some mty ->
+            Some (strengthen_lazy ~aliasable ~value_equations mty p)
         | None -> None
         end
       end
@@ -279,7 +321,7 @@ let rec expand_paths_lazy paths env =
       in
       let res = expand_paths_lazy paths env res in
       Mty_functor (param,res,mres)
-  | Mty_strengthen (_,p,_) as mty when Path.Set.mem p paths ->
+  | Mty_strengthen (_,p,_,_) as mty when Path.Set.mem p paths ->
       (* If the path we're strengthening with is in paths then we need to
           unfold the node. *)
       begin match reduce_lazy env mty with
@@ -289,12 +331,12 @@ let rec expand_paths_lazy paths env =
             `with module M.N := X`, `paths` will only contain M but not M.N
             and M's type can't be abstract. *)
       end
-  | Mty_strengthen (mty,p,a) ->
+  | Mty_strengthen (mty,p,a,value_equations) ->
       (* If the path we're strengthening with isn't in paths then we can
           can just unfold the strengthened type but keep the Mty_strengthen
           node. *)
       let mty = expand_paths_lazy paths env mty in
-      Mty_strengthen (mty,p,a)
+      Mty_strengthen (mty,p,a,value_equations)
   | Mty_ident _ | Mty_alias _ as mty ->
       mty
 
@@ -320,7 +362,7 @@ and expand_paths_lazy_sig_items paths env sg =
           let env = Env.add_modtype_lazy ~update_summary:false id mtd env in
           env, Sig_modtype (id,mtd,vis)
       | Sig_value _ | Sig_type _ | Sig_typext _ | Sig_class _
-      | Sig_class_type _ | Sig_jkind _ as item ->
+      | Sig_class_type _ | Sig_jkind _ | Sig_law _ as item ->
           env, item
   in
   List.fold_left_map expand_item env sg |> snd
@@ -394,6 +436,8 @@ let rec sig_make_manifest sg =
         Sig_jkind (Ident.rename id, newdecl, vis)
     in
     sigelt :: sig_make_manifest rem
+  | (Sig_law _ as sigelt) :: rem ->
+    sigelt :: sig_make_manifest rem
 
 let rec make_aliases_absent ~aliased pres mty =
   (* aliased=true means that mty is subject to aliasable strengthening
@@ -415,7 +459,7 @@ let rec make_aliases_absent ~aliased pres mty =
           in
           Sig_module(id, pres, md, rs, priv)
         | Sig_value _ | Sig_type _ | Sig_typext _ | Sig_modtype _
-        | Sig_class _ | Sig_class_type _ | Sig_jkind _ as item ->
+        | Sig_class _ | Sig_class_type _ | Sig_jkind _ | Sig_law _ as item ->
           item
       in
       pres, Mty_signature(List.map make_item sg)
@@ -424,21 +468,57 @@ let rec make_aliases_absent ~aliased pres mty =
       pres, Mty_functor(arg, res, mres)
   | Mty_ident _ ->
       pres, mty
-  | Mty_strengthen (mty,p,a) ->
+  | Mty_strengthen (mty,p,a,value_equations) ->
       let aliased = aliased || Aliasability.is_aliasable a in
       let pres, res = make_aliases_absent ~aliased pres mty in
-      pres, Mty_strengthen (res,p,a)
+      pres, Mty_strengthen (res,p,a,value_equations)
+
+(* For the module types a user writes ([module type of], [with module]),
+  which are obligations and carry no equations. *)
+let rec remove_value_equations mty =
+  match mty with
+  | Mty_signature sg ->
+      Mty_signature (List.map remove_value_equations_item sg)
+  | Mty_functor (param, res, mres) ->
+      let param =
+        match param with
+        | Unit -> Unit
+        | Named (id, mty, marg) ->
+            Named (id, remove_value_equations mty, marg)
+      in
+      Mty_functor (param, remove_value_equations res, mres)
+  | Mty_strengthen (mty, p, a, (Recorded | Not_recorded)) ->
+      Mty_strengthen (remove_value_equations mty, p, a, Not_recorded)
+  | Mty_ident _ | Mty_alias _ -> mty
+
+and remove_value_equations_item = function
+  | Sig_value (id, ({ val_alias = Some _; _ } as vd), vis) ->
+      Sig_value (id, { vd with val_alias = None }, vis)
+  | Sig_typext (id, ({ ext_alias = Some _; _ } as ext), es, vis) ->
+      Sig_typext (id, { ext with ext_alias = None }, es, vis)
+  | Sig_module (id, pres, md, rs, vis) ->
+      let md = { md with md_type = remove_value_equations md.md_type } in
+      Sig_module (id, pres, md, rs, vis)
+  | Sig_modtype (id, ({ mtd_type = Some mty; _ } as mtd), vis) ->
+      let mtd = { mtd with mtd_type = Some (remove_value_equations mty) } in
+      Sig_modtype (id, mtd, vis)
+  | Sig_value _ | Sig_typext _ | Sig_modtype _ | Sig_type _ | Sig_class _
+  | Sig_class_type _ | Sig_jkind _ | Sig_law _ as item ->
+      item
 
 let scrape_for_type_of env pres mty =
   let rec loop env outer = function
     | Mty_alias path -> begin
         try
           let md = Env.find_module path env in
-          let mty = strengthen ~aliasable:false md.md_type path in
+          let mty =
+            strengthen ~aliasable:false ~value_equations:Not_recorded
+              md.md_type path
+          in
           loop env mty mty
         with Not_found -> outer
       end
-    | Mty_strengthen (inner,_,_) -> loop env outer inner
+    | Mty_strengthen (inner,_,_,_) -> loop env outer inner
     | Mty_ident _ | Mty_signature _ | Mty_functor _ -> outer
   in
   make_aliases_absent ~aliased:false pres (loop env mty mty)
@@ -465,10 +545,10 @@ let () =
   Out_type.expand_module_type := expand ;
   Env.scrape_alias := scrape_alias_lazy
 
-let find_type_of_module ~strengthen ~aliasable env path =
+let find_type_of_module ~strengthen ~aliasable ~value_equations env path =
   if strengthen then
     let md = Env.find_module_lazy path env in
-    let mty = strengthen_lazy ~aliasable md.md_type path in
+    let mty = strengthen_lazy ~aliasable ~value_equations md.md_type path in
     Subst.Lazy.force_modtype mty
   else
     (Env.find_module path env).md_type
@@ -526,7 +606,7 @@ let rec nondep_mty_with_presence env va ids pres mty =
                     nondep_mty res_env va ids res, mres)
       in
       pres, mty
-  | Mty_strengthen (mty,p,a) ->
+  | Mty_strengthen (mty,p,a,value_equations) ->
       (* If we end up strengthening an abstract type with a dependent module,
         just drop the strengthening. *)
       let pres,mty = nondep_mty_with_presence env va ids pres mty
@@ -534,7 +614,9 @@ let rec nondep_mty_with_presence env va ids pres mty =
       let mty =
         if Path.exists_free ids p
           then mty
-          else strengthen ~aliasable:(Aliasability.is_aliasable a) mty p
+          else
+            strengthen ~aliasable:(Aliasability.is_aliasable a)
+              ~value_equations mty p
       in
       pres,mty
 
@@ -543,8 +625,14 @@ and nondep_mty env va ids mty =
 
 and nondep_sig_item env va ids = function
   | Sig_value(id, d, vis) ->
+      let val_alias =
+        (* As the manifest of a type (see [Ctype.nondep_type_decl]) *)
+        Option.bind d.val_alias (fun p ->
+          if Path.exists_free ids p then None else Some p)
+      in
       Sig_value(id,
-                {d with val_type = Ctype.nondep_type env ids d.val_type},
+                {d with val_type = Ctype.nondep_type env ids d.val_type;
+                        val_alias},
                 vis)
   | Sig_type(id, d, rs, vis) ->
       Sig_type(id, Ctype.nondep_type_decl env ids (va = Co) d, rs, vis)
@@ -561,6 +649,8 @@ and nondep_sig_item env va ids = function
       Sig_class_type(id, Ctype.nondep_cltype_declaration env ids d, rs, vis)
   | Sig_jkind (id, d, vis) ->
       Sig_jkind (id, Ctype.nondep_jkind_declaration env ids d, vis)
+  | Sig_law (id, d, vis) ->
+      Sig_law (id, Ctype.nondep_law_description env ids d, vis)
 
 and nondep_sig env va ids sg =
   let scope = Ctype.create_scope () in
@@ -679,7 +769,8 @@ and type_and_jkind_paths_sig env p sg =
     ~types:(nested_types @ rem_types), ~jkinds:(nested_jkinds @ rem_jkinds)
   | Sig_modtype(id, decl, _) :: rem ->
     type_and_jkind_paths_sig (Env.add_modtype id decl env) p rem
-  | (Sig_value _ | Sig_typext _ | Sig_class _ | Sig_class_type _) :: rem ->
+  | (Sig_value _ | Sig_typext _ | Sig_class _ | Sig_class_type _
+    | Sig_law _) :: rem ->
     type_and_jkind_paths_sig env p rem
 
 let rec no_code_needed_mod env pres mty =
@@ -706,7 +797,8 @@ and no_code_needed_sig env sg =
       no_code_needed_mod env pres md.md_type &&
       no_code_needed_sig
         (Env.add_module_declaration ~check:false id pres md env) rem
-  | (Sig_type _ | Sig_modtype _ | Sig_class_type _ | Sig_jkind _) :: rem ->
+  | (Sig_type _ | Sig_modtype _ | Sig_class_type _ | Sig_jkind _
+    | Sig_law _) :: rem ->
       no_code_needed_sig env rem
   | (Sig_typext _ | Sig_class _) :: _ ->
       false
@@ -758,7 +850,8 @@ module Contains_type_or_jkind = struct
     | Sig_typext _
     | Sig_class _
     | Sig_class_type _
-    | Sig_jkind _ ->
+    | Sig_jkind _
+    | Sig_law _ ->
         ()
 
   let check env mty =
@@ -857,8 +950,9 @@ let rec remove_aliases_mty env args pres mty =
           args'.modified <- true;
           remove_aliases_mty env args' Mp_present mty'
         end
-    | Mty_strengthen (mty,p,Aliasable) when not (args.exclude Strengthening p) ->
-        let mty = strengthen ~aliasable:false mty p in
+    | Mty_strengthen (mty,p,Aliasable,value_equations)
+      when not (args.exclude Strengthening p) ->
+        let mty = strengthen ~aliasable:false ~value_equations mty p in
         args'.modified <- true;
         Mp_present, mty
     | mty ->
@@ -900,21 +994,24 @@ let scrape_for_functor_arg env mty =
   mty
 
 let scrape_for_type_of ~remove_aliases env mty =
-  if remove_aliases then begin
-    let excl = collect_arg_paths mty in
-    let exclude id _p = match id with
-      | Alias id -> Ident.Set.mem id excl
-      | Strengthening -> false
-    in
-    let scrape _ mty = mty in
-    let _, mty =
-      remove_aliases_mty env {modified=false; exclude; scrape} Mp_present mty
-    in
-    mty
-  end else begin
-    let _, mty = scrape_for_type_of env Mp_present mty in
-    mty
-  end
+  let mty =
+    if remove_aliases then begin
+      let excl = collect_arg_paths mty in
+      let exclude id _p = match id with
+        | Alias id -> Ident.Set.mem id excl
+        | Strengthening -> false
+      in
+      let scrape _ mty = mty in
+      let _, mty =
+        remove_aliases_mty env {modified=false; exclude; scrape} Mp_present mty
+      in
+      mty
+    end else begin
+      let _, mty = scrape_for_type_of env Mp_present mty in
+      mty
+    end
+  in
+  remove_value_equations mty
 
 (* Lower non-generalizable type variables *)
 

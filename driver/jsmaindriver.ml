@@ -52,7 +52,12 @@ let main argv ppf =
       Compenv.fatal "-plugin is only supported up to OCaml 4.08.0";
     try
       Compenv.process_deferred_actions
-        (ppf, Jscompile.implementation, Jscompile.interface, ".cmj", ".cmja")
+        ( ppf,
+          Jscompile.implementation,
+          Jscompile.interface,
+          Laws_gen.generate,
+          ".cmj",
+          ".cmja" )
     with Arg.Bad msg ->
       prerr_endline msg;
       Clflags.print_arguments program;

@@ -42,6 +42,7 @@ STDLIB_MODULE_BASENAMES = \
   obj \
   type \
   atomic \
+  camlinternalLaw \
   camlinternalLazy \
   dynamic \
   lazy \

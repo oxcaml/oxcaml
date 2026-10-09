@@ -1,0 +1,30 @@
+[@@@ocaml.warning "-27"]
+module Laws_gen_C = C
+module Laws_gen_Stdlib = Stdlib
+type 'a each = {
+  identity: 'a }
+let names = { identity = "identity" }
+let map { identity } ~f = { identity = (f identity) }
+let to_list { identity } = [identity]
+type identity_input =
+  | Identity_input: {
+  x: int } -> identity_input 
+module Instantiate(Choice:CamlinternalLaw.Choice) =
+  struct
+    module Law = (CamlinternalLaw.Make)(Choice)
+    module type Choices  = sig val identity : identity_input Choice.t end
+    let identity ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.identity),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.identity;
+                 predicate =
+                   (fun ((Identity_input { x }) : identity_input) ->
+                      (Laws_gen_Stdlib.(=) (Laws_gen_C.f x) x : bool));
+                 text = "(f x) = x"
+               }))
+    let laws choices = { identity = (identity choices) }
+  end

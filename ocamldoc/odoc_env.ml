@@ -76,6 +76,7 @@ let rec add_signature env root ?rel signat =
     | Types.Sig_class (ident, _, _, _) -> { env with env_classes = (rel_name ident, qualify ident) :: env.env_classes }
     | Types.Sig_class_type (ident, _, _, _) -> { env with env_class_types = (rel_name ident, qualify ident) :: env.env_class_types }
     | Types.Sig_jkind _ -> Misc.fatal_error "Unsupported: Sig_jkind"
+    | Types.Sig_law _ -> env
   in
   List.fold_left f env signat
 
@@ -212,8 +213,8 @@ let subst_module_type env t =
           Odoc_name.to_path (full_module_type_name env (Odoc_name.from_path p))
         in
         Mty_ident new_p
-    | Mty_strengthen (mt,p,a) ->
-        Mty_strengthen (iter mt,p,a)
+    | Mty_strengthen (mt,p,a,value_equations) ->
+        Mty_strengthen (iter mt,p,a,value_equations)
     | Mty_alias _
     | Mty_signature _ ->
         t

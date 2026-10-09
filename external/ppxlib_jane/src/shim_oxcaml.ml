@@ -380,6 +380,7 @@ module Signature_item_desc = struct
     | Psig_attribute of attribute
     | Psig_extension of extension * attributes
     | Psig_jkind of jkind_declaration
+    | Psig_law of law_declaration
 
   let of_parsetree x = x
   let to_parsetree x = x
@@ -404,6 +405,15 @@ type nonrec jkind_declaration = jkind_declaration =
   ; pjkind_manifest : jkind_annotation option
   ; pjkind_attributes : attributes
   ; pjkind_loc : Location.t
+  }
+
+type nonrec law_declaration = law_declaration =
+  { plaw_name : string loc
+  ; plaw_params : (string loc * core_type option) list
+  ; plaw_assumptions : expression list
+  ; plaw_conclusion : expression
+  ; plaw_attributes : attributes
+  ; plaw_loc : Location.t
   }
 
 module Type_declaration = struct
@@ -479,6 +489,7 @@ module Structure_item_desc = struct
     | Pstr_attribute of attribute
     | Pstr_extension of extension * attributes
     | Pstr_jkind of jkind_declaration
+    | Pstr_law of law_declaration
 
   let of_parsetree x = x
   let to_parsetree x = x

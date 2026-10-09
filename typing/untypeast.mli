@@ -46,6 +46,7 @@ type mapper = {
   jkind_declaration: mapper -> Typedtree.jkind_declaration -> jkind_declaration;
   label_declaration:
     mapper -> Typedtree.label_declaration -> label_declaration;
+  law_declaration: mapper -> Typedtree.law_declaration -> law_declaration;
   location: mapper -> Location.t -> Location.t;
   module_binding: mapper -> Typedtree.module_binding -> module_binding;
   module_declaration:

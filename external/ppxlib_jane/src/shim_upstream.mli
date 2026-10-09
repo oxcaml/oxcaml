@@ -157,6 +157,15 @@ and jkind_declaration =
   ; pjkind_loc : Location.t
   }
 
+type law_declaration =
+  { plaw_name : string loc
+  ; plaw_params : (string loc * core_type option) list
+  ; plaw_assumptions : expression list
+  ; plaw_conclusion : expression
+  ; plaw_attributes : attributes
+  ; plaw_loc : Location.t
+  }
+
 module Type_declaration : sig
   type t =
     { ptype_name : string loc
@@ -432,6 +441,7 @@ module Signature_item_desc : sig
     | Psig_attribute of attribute
     | Psig_extension of extension * attributes
     | Psig_jkind of jkind_declaration
+    | Psig_law of law_declaration
 
   val of_parsetree : signature_item_desc -> t
   val to_parsetree : t -> signature_item_desc
@@ -466,6 +476,7 @@ module Structure_item_desc : sig
     | Pstr_attribute of attribute
     | Pstr_extension of extension * attributes
     | Pstr_jkind of jkind_declaration
+    | Pstr_law of law_declaration
 
   val of_parsetree : structure_item_desc -> t
   val to_parsetree : t -> structure_item_desc

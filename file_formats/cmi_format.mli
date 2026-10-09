@@ -19,6 +19,7 @@ type pers_flags =
   | Rectypes
   | Alerts of alerts
   | Opaque
+  | Has_laws
 
 type kind =
   | Normal of {

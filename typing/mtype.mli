@@ -44,17 +44,29 @@ val freshen: scope:int -> module_type -> module_type
         (* Return an alpha-equivalent copy of the given module type
            where bound identifiers are fresh. *)
 val strengthen_lazy:
-        aliasable:bool -> Subst.Lazy.module_type -> Path.t -> Subst.Lazy.module_type
-val strengthen: aliasable:bool -> module_type -> Path.t -> module_type
+  aliasable:bool -> value_equations:Value_equations.t ->
+  Subst.Lazy.module_type -> Path.t -> Subst.Lazy.module_type
+val strengthen:
+  aliasable:bool -> value_equations:Value_equations.t ->
+  module_type -> Path.t -> module_type
         (* Strengthen abstract type components relative to the
-           given path. *)
+           given path. [value_equations] is whether the values and
+           extension constructors are recorded to be those of the path
+           (see [Types.Value_equations]). *)
 val strengthen_lazy_decl:
-  aliasable:bool -> Subst.Lazy.module_declaration -> Path.t -> Subst.Lazy.module_declaration
+  aliasable:bool -> value_equations:Value_equations.t ->
+  Subst.Lazy.module_declaration -> Path.t -> Subst.Lazy.module_declaration
 val strengthen_decl:
-  aliasable:bool -> module_declaration -> Path.t -> module_declaration
+  aliasable:bool -> value_equations:Value_equations.t ->
+  module_declaration -> Path.t -> module_declaration
+
+val remove_value_equations: module_type -> module_type
+        (* Remove the equations of values and extension constructors
+           (see [Types.val_alias]), for the module types a user writes. *)
 
 val find_type_of_module:
-  strengthen:bool -> aliasable:bool -> Env.t -> Path.t -> module_type
+  strengthen:bool -> aliasable:bool -> value_equations:Value_equations.t ->
+  Env.t -> Path.t -> module_type
         (* Get the type of a module, strengthening if necessary. *)
 
 val expand_to: Env.t -> signature -> Path.t list -> signature

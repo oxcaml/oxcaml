@@ -1,0 +1,31 @@
+[@@@ocaml.warning "-27"]
+module Laws_gen_Law_1 = Law
+module Laws_gen_Laws_gen_Law = Laws_gen_Law
+module Laws_gen_Stdlib = Stdlib
+type 'a each = {
+  distinct: 'a }
+let names = { distinct = "distinct" }
+let map { distinct } ~f = { distinct = (f distinct) }
+let to_list { distinct } = [distinct]
+type distinct_input =
+  | Distinct_input: distinct_input 
+module Instantiate(Choice:CamlinternalLaw.Choice) =
+  struct
+    module Law = (CamlinternalLaw.Make)(Choice)
+    module type Choices  = sig val distinct : distinct_input Choice.t end
+    let distinct ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.distinct),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.distinct;
+                 predicate =
+                   (fun ((Distinct_input) : distinct_input) ->
+                      (Laws_gen_Stdlib.(<>) Laws_gen_Law_1.x
+                         Laws_gen_Laws_gen_Law.x : bool));
+                 text = "Law.x <> Laws_gen_Law.x"
+               }))
+    let laws choices = { distinct = (distinct choices) }
+  end

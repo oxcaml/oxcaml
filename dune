@@ -252,6 +252,7 @@
   shape
   shape_reduce
   zero_alloc
+  spec
   types
   btype
   oprint
@@ -268,6 +269,8 @@
   jkind_intf
   signature_with_global_bindings
   typedtree
+  translspec
+  untypespec
   printtyped
   ctype
   printtyp
@@ -358,6 +361,8 @@
   ;; some of COMP
   main_args
   compmisc
+  parsetree_of_outcometree
+  laws_gen
   compile_common
   instantiator
   functorizer

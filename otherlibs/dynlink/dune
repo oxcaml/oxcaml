@@ -129,6 +129,7 @@
   scalar
   primitive
   zero_alloc
+  spec
   types
   oprint
   typemode
@@ -156,6 +157,7 @@
   errortrace
   ctype
   signature_group
+  untypespec
   out_type
   printtyp
   errortrace_report
@@ -344,6 +346,8 @@
 
 (copy_files ../../typing/zero_alloc.ml)
 
+(copy_files ../../typing/spec.ml)
+
 (copy_files ../../typing/types.ml)
 
 (copy_files ../../typing/errortrace.ml)
@@ -353,6 +357,8 @@
 (copy_files ../../typing/ctype.ml)
 
 (copy_files ../../typing/out_type.ml)
+
+(copy_files ../../typing/untypespec.ml)
 
 (copy_files ../../typing/printtyp.ml)
 
@@ -547,6 +553,8 @@
 
 (copy_files ../../typing/zero_alloc.mli)
 
+(copy_files ../../typing/spec.mli)
+
 (copy_files ../../typing/types.mli)
 
 (copy_files ../../typing/errortrace.mli)
@@ -558,6 +566,8 @@
 (copy_files ../../typing/signature_group.mli)
 
 (copy_files ../../typing/out_type.mli)
+
+(copy_files ../../typing/untypespec.mli)
 
 (copy_files ../../typing/printtyp.mli)
 
@@ -753,6 +763,7 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Unit_info.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Current_unit.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Shape.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Spec.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Types.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Attr_helper.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Scalar.cmo
@@ -780,6 +791,7 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Errortrace.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ctype.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Signature_group.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Untypespec.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Out_type.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Printtyp.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Errortrace_report.cmo
@@ -888,6 +900,7 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Unit_info.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Current_unit.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Shape.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Spec.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Types.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Attr_helper.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Scalar.cmx
@@ -915,6 +928,7 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Errortrace.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ctype.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Signature_group.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Untypespec.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Out_type.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Printtyp.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Errortrace_report.cmx

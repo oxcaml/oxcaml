@@ -1,0 +1,11 @@
+[@@@ocaml.warning "-27"]
+type 'a each = unit
+let names = ()
+let map () ~f:_ = ()
+let to_list () = []
+module Instantiate(Choice:CamlinternalLaw.Choice) =
+  struct
+    module Law = (CamlinternalLaw.Make)(Choice)
+    module type Choices  = sig  end
+    let laws (_ : (module Choices))  : unit Law.t each = ()
+  end

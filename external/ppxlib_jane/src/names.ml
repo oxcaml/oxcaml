@@ -142,6 +142,7 @@ module Language_feature_name = struct
     | Psig_attribute _ -> "module-level attribute (in a sig)"
     | Psig_extension _ -> "extension point as a signature item"
     | Psig_jkind _ -> "kind declaration"
+    | Psig_law _ -> "law declaration"
   ;;
 
   let of_structure_item_desc : Shim.Structure_item_desc.t -> string = function
@@ -159,6 +160,7 @@ module Language_feature_name = struct
     | Pstr_attribute _ -> "module-level attribute (in a struct)"
     | Pstr_extension _ -> "extension point as a structure item"
     | Pstr_jkind _ -> "kind definition"
+    | Pstr_law _ -> "law definition"
     | Pstr_eval _ -> "top-level expression"
     | Pstr_primitive _ -> "primitive 'external' binding"
   ;;
@@ -304,6 +306,7 @@ module Constructor_name = struct
     | Psig_attribute _ -> "Psig_attribute"
     | Psig_extension _ -> "Psig_extension"
     | Psig_jkind _ -> "Psig_jkind"
+    | Psig_law _ -> "Psig_law"
   ;;
 
   let of_structure_item_desc : Shim.Structure_item_desc.t -> string = function
@@ -321,6 +324,7 @@ module Constructor_name = struct
     | Pstr_attribute _ -> "Pstr_attribute"
     | Pstr_extension _ -> "Pstr_extension"
     | Pstr_jkind _ -> "Pstr_jkind"
+    | Pstr_law _ -> "Pstr_law"
     | Pstr_eval _ -> "Pstr_eval"
     | Pstr_primitive _ -> "Pstr_primitive"
   ;;
