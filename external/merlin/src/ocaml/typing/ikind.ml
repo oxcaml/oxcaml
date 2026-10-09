@@ -149,7 +149,8 @@ module Solver = struct
   let rec uid_is_reliable_identity = function
     | Types.Uid.Internal -> false
     | Types.Uid.Unboxed_version uid -> uid_is_reliable_identity uid
-    | Types.Uid.Compilation_unit _ | Types.Uid.Item _ | Types.Uid.Predef _ ->
+    | Types.Uid.Compilation_unit _ | Types.Uid.Compilation_unit_intf _
+    | Types.Uid.Item _ | Types.Uid.Predef _ ->
       true
 
   (* Hash tables avoiding polymorphic structural comparison on deep values.

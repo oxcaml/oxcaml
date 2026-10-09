@@ -1870,6 +1870,20 @@ let reset_probes () = probes := String.Set.empty
 let add_probe name = probes := String.Set.add name !probes
 let has_probe name = String.Set.mem name !probes
 
+(* The shape of the persistent unit named by the global ident [id]: a
+   compilation-unit leaf whose uid is the one carried by the unit's import
+   (its implementation for an ordinary unit, its interface for a parameter).
+   Nothing is loaded here: if the unit is not in the cache, the interface uid
+   is used. *)
+let persistent_unit_shape id =
+  let name = Ident.to_global_exn id in
+  let uid =
+    match Persistent_env.find_in_cache !persistent_env name with
+    | Some mda -> mda.mda_declaration.md_uid
+    | None -> Shape.Uid.of_compilation_unit_intf name.Global_module.Name.head
+  in
+  Shape.for_persistent_unit uid (Ident.name id)
+
 let find_shape env (ns : Shape.Sig_component_kind.t) id =
   match ns with
   | Type ->
@@ -1891,7 +1905,7 @@ let find_shape env (ns : Shape.Sig_component_kind.t) id =
   | Module ->
       begin match IdTbl.find_same_without_locks id env.modules with
       | Mod_local ({ mda_shape; _ }, _) -> mda_shape
-      | Mod_persistent -> Shape.for_persistent_unit (Ident.name id)
+      | Mod_persistent -> persistent_unit_shape id
       | Mod_unbound _ ->
           (* Only present temporarily while approximating the environment for
              recursive modules.
@@ -1900,7 +1914,7 @@ let find_shape env (ns : Shape.Sig_component_kind.t) id =
           assert false
       | exception Not_found
         when Ident.is_global id && not (Current_unit.Name.is_ident id) ->
-          Shape.for_persistent_unit (Ident.name id)
+          persistent_unit_shape id
       end
   | Module_type ->
       let modtype =  IdTbl.find_same_without_locks id env.modtypes in
