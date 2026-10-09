@@ -963,16 +963,8 @@ let describe_prefix ppf prefix =
     Format_doc.fprintf ppf "package %a" CU.Prefix.print prefix
 
 (* Emits a warning if there is no valid cmi for name *)
-<<<<<<< Merlin:introduce-cui
 let check_pers_struct ~allow_hidden penv f1 f2 ~loc name =
-  let name_as_string = CU.Name.to_string (CU.Name.of_head_of_global_name name) in
-||||||| Compiler:last-imported
-let check_pers_struct ~allow_hidden penv f ~loc name =
-  let name_as_string = CU.Name.to_string (CU.Name.of_head_of_global_name name) in
-=======
-let check_pers_struct ~allow_hidden penv f ~loc name =
   let name_as_string = CU.Name.to_string name.Global_module.Name.head in
->>>>>>> Compiler:HEAD
   try
     ignore (find_pers_struct ~allow_hidden penv f1 f2 ~check:false name
               ~allow_excess_args:true)
