@@ -105,7 +105,7 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
     DE.add_variable denv my_depth (T.unknown K.rec_info)
   in
   let denv =
-    LCS.add_to_denv ~maybe_already_defined:() denv
+    DE.add_lifted_constant_state ~maybe_already_defined:() denv
       (DA.get_lifted_constants outer_dacc)
     |> DE.enter_closure code_id ~return_continuation ~exn_continuation
          ~my_closure
