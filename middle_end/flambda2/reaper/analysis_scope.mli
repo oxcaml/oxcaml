@@ -33,3 +33,7 @@ type t =
 val contains_unit : t -> Compilation_unit.t -> bool
 
 val contains_code_id : t -> Code_id.t -> bool
+
+(* CR bclement: Should this be called [is_local_slot] instead, to make it clear
+   that this relates to function/value slots? *)
+val is_local_field : t -> Field.t -> bool

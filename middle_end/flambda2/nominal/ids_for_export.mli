@@ -21,7 +21,8 @@ type t = private
     simples : Simple.Set.t;
     consts : Reg_width_const.Set.t;
     code_ids : Code_id.Set.t;
-    continuations : Continuation.Set.t
+    continuations : Continuation.Set.t;
+    fields : Field.Set.t
   }
 
 val empty : t
@@ -33,6 +34,7 @@ val create :
   ?consts:Reg_width_const.Set.t ->
   ?code_ids:Code_id.Set.t ->
   ?continuations:Continuation.Set.t ->
+  ?fields:Field.Set.t ->
   unit ->
   t
 
@@ -43,6 +45,8 @@ val singleton_code_id : Code_id.t -> t
 val singleton_continuation : Continuation.t -> t
 
 val singleton_symbol : Symbol.t -> t
+
+val singleton_field : Field.t -> t
 
 val from_simple : Simple.t -> t
 
@@ -59,6 +63,8 @@ val add_simple : t -> Simple.t -> t
 val add_code_id : t -> Code_id.t -> t
 
 val add_continuation : t -> Continuation.t -> t
+
+val add_field : t -> Field.t -> t
 
 val union : t -> t -> t
 
