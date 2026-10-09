@@ -58,56 +58,21 @@ ocamlc.byte;
   ocamlc.byte;
 }
 
-(* Ordering of -I and -Ix determines which version of A is seen, just like
-   ordering of -I flags.  B was compiled against liba, so using liba_alt for A
-   causes inconsistent assumptions. *)
+(* B's transitive reference to A resolves through the cmi path attached in
+   b.cmi - the a.cmi b was compiled against - so mixing -I and -Ix versions of
+   liba in any order stays consistent. *)
 {
   split [
-  | (* Test: -Ix liba before -I liba_alt: liba wins, compiles fine. *)
-    flags = "-Ix liba -I liba_alt -I libb -nocwd";
-  | (* Test: -I liba before -Ix liba_alt: liba wins, compiles fine. *)
-    flags = "-I liba -Ix liba_alt -I libb -nocwd";
+  | flags = "-Ix liba -I liba_alt -I libb -nocwd";
+  | flags = "-I liba -Ix liba_alt -I libb -nocwd";
+  | flags = "-Ix liba_alt -I liba -I libb -nocwd";
+  | flags = "-I liba_alt -Ix liba -I libb -nocwd";
+  | flags = "-Ix liba -Ix liba_alt -I libb -nocwd";
+  | flags = "-Ix liba_alt -Ix liba -I libb -nocwd";
   ]
   module = "libc/c1.ml";
   setup-ocamlc.byte-build-env;
   ocamlc.byte;
-}
-{
-  not-windows;
-  split [
-  | (* Test: -Ix liba_alt before -I liba: liba_alt wins, inconsistent. *)
-    flags = "-Ix liba_alt -I liba -I libb -nocwd";
-  | (* Test: -I liba_alt before -Ix liba: liba_alt wins, inconsistent. *)
-    flags = "-I liba_alt -Ix liba -I libb -nocwd";
-  ]
-  module = "libc/c1.ml";
-  setup-ocamlc.byte-build-env;
-  ocamlc_byte_exit_status = "2";
-  ocamlc.byte;
-  compiler_reference =
-    "${test_source_directory}/wrong_include_order.ocamlc.reference";
-  check-ocamlc.byte-output;
-}
-
-(* Ordering among multiple -Ix flags *)
-{
-  (* -Ix liba before -Ix liba_alt: liba wins, compiles fine. *)
-  flags = "-Ix liba -Ix liba_alt -I libb -nocwd";
-  module = "libc/c1.ml";
-  setup-ocamlc.byte-build-env;
-  ocamlc.byte;
-}
-{
-  (* -Ix liba_alt before -Ix liba: liba_alt wins, inconsistent. *)
-  not-windows;
-  flags = "-Ix liba_alt -Ix liba -I libb -nocwd";
-  module = "libc/c1.ml";
-  setup-ocamlc.byte-build-env;
-  ocamlc_byte_exit_status = "2";
-  ocamlc.byte;
-  compiler_reference =
-    "${test_source_directory}/wrong_include_order.ocamlc.reference";
-  check-ocamlc.byte-output;
 }
 
 *)

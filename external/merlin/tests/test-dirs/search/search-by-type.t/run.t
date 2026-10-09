@@ -177,7 +177,7 @@
         },
         "name": "Hashtbl.add_seq",
         "type": "('a, 'b) Hashtbl.t -> ('a * 'b) Seq.t -> unit",
-        "cost": 46,
+        "cost": 52,
         "doc": null,
         "constructible": "Hashtbl.add_seq _ _"
       },
@@ -193,7 +193,7 @@
         },
         "name": "Hashtbl.replace_seq",
         "type": "('a, 'b) Hashtbl.t -> ('a * 'b) Seq.t -> unit",
-        "cost": 47,
+        "cost": 53,
         "doc": null,
         "constructible": "Hashtbl.replace_seq _ _"
       },
@@ -209,7 +209,7 @@
         },
         "name": "MoreLabels.Hashtbl.add_seq",
         "type": "('a, 'b) MoreLabels.Hashtbl.t -> ('a * 'b) Seq.t -> unit",
-        "cost": 48,
+        "cost": 54,
         "doc": null,
         "constructible": "MoreLabels.Hashtbl.add_seq _ _"
       },
@@ -225,7 +225,7 @@
         },
         "name": "MoreLabels.Hashtbl.replace_seq",
         "type": "('a, 'b) MoreLabels.Hashtbl.t -> ('a * 'b) Seq.t -> unit",
-        "cost": 49,
+        "cost": 55,
         "doc": null,
         "constructible": "MoreLabels.Hashtbl.replace_seq _ _"
       },
