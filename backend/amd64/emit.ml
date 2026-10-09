@@ -1856,29 +1856,57 @@ let check_simd_instr ?mode (simd : Simd.instr) imm instr =
       Array.length rr
   in
   assert (res_used = Array.length instr.res);
-  (* Gathers require that all args are distinct registers. *)
-  match[@warning "-4"] simd.id with
-  | Vpgatherdd_X_M32X_X | Vpgatherdd_Y_M32Y_Y | Vpgatherdq_X_M32X_X
-  | Vpgatherdq_Y_M32X_Y | Vpgatherqd_X_M64X_X | Vpgatherqd_X_M64Y_X
-  | Vpgatherqq_X_M64X_X | Vpgatherqq_Y_M64Y_Y ->
+  (* Gathers (VEX and EVEX) require that all args are distinct registers: the
+     destination, index, and mask must not overlap. *)
+  if
+    String.starts_with ~prefix:"vpgather" simd.mnemonic
+    || String.starts_with ~prefix:"vgather" simd.mnemonic
+  then
     let module Set = Reg.UsingLocEquality.Set in
     let set = Array.fold_right Set.add instr.arg Set.empty in
     assert (Set.cardinal set = Array.length instr.arg)
-  | _ -> ()
+
+(* The operand width can be narrower than the register's type, e.g. a 512-bit
+   vector whose low lane feeds an XMM operand, but never wider, which would read
+   or write lanes outside the value. *)
+let vec_arg_of_width ~bits (arg : X86_ast.arg) =
+  let reg_bits =
+    match arg with
+    | Regf (XMM _) -> 128
+    | Regf (YMM _) -> 256
+    | Regf (ZMM _) -> 512
+    | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _
+    | Regmask _ | Mem _ | Mem64_RIP _ ->
+      bits
+  in
+  if reg_bits < bits
+  then
+    Misc.fatal_errorf "%d-bit SIMD operand in a %d-bit register" bits reg_bits;
+  match bits with
+  | 128 -> arg_as_xmm arg
+  | 256 -> arg_as_ymm arg
+  | 512 -> arg_as_zmm arg
+  | _ -> Misc.fatal_errorf "Unexpected SIMD operand width %d" bits
 
 let to_arg_with_width loc instr i =
   match Simd.loc_register_width loc with
   | Some R8 -> arg8 instr i
   | Some R16 -> arg16 instr i
   | Some R32 -> arg32 instr i
-  | Some (R64 | R128 | R256 | R512) | None -> arg instr i
+  | Some R128 -> vec_arg_of_width ~bits:128 (arg instr i)
+  | Some R256 -> vec_arg_of_width ~bits:256 (arg instr i)
+  | Some R512 -> vec_arg_of_width ~bits:512 (arg instr i)
+  | Some R64 | None -> arg instr i
 
 let to_res_with_width loc instr i =
   match Simd.loc_register_width loc with
   | Some R8 -> res8 instr i
   | Some R16 -> res16 instr i
   | Some R32 -> res32 instr i
-  | Some (R64 | R128 | R256 | R512) | None -> res instr i
+  | Some R128 -> vec_arg_of_width ~bits:128 (res instr i)
+  | Some R256 -> vec_arg_of_width ~bits:256 (res instr i)
+  | Some R512 -> vec_arg_of_width ~bits:512 (res instr i)
+  | Some R64 | None -> res instr i
 
 let to_addr_width loc : X86_ast.data_type =
   match Simd.loc_memory_width loc with
@@ -2006,11 +2034,14 @@ let emit_simd ?mode (op : Simd.operation) instr =
       emit_simd_instr ?mode seq.instr imm instr;
       I.set cond (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0)
-    | Ptestz | Vptestz_X | Vptestz_Y ->
+    | Ptestz | Vptestz_X | Vptestz_Y | Kflag Zf ->
+      (* KORTEST/KTEST set ZF when the mask OR/AND is all-zero. *)
       emit_simd_instr ?mode seq.instr imm instr;
       I.set E (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0)
-    | Ptestc | Vptestc_X | Vptestc_Y ->
+    | Ptestc | Vptestc_X | Vptestc_Y | Kflag Cf ->
+      (* KORTEST sets CF when the OR is all-ones; KTEST when (~a & b) is
+         zero. *)
       emit_simd_instr ?mode seq.instr imm instr;
       I.set B (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0)

@@ -27,7 +27,9 @@ open! Int_replace_polymorphic_compare
 open Arch
 open Amd64_simd_instrs
 
-type error = Bad_immediate of string
+type error =
+  | Bad_immediate of string
+  | Bad_arity of string
 
 exception Error of error
 
@@ -1143,6 +1145,149 @@ let select_operation_fma ~dbg:_ op args =
     | "caml_fma_float32_neg_mul_sub" -> instr vfnmsub213ss_X_X_Xm32 args
     | _ -> None
 
+(* The AVX512 [caml_<intel-name>] builtins, selected by interpreting the
+   generated [Amd64_simd_intrins] table. Extension gating happens per
+   instruction: a disabled instruction selects [None], falling through to an
+   ordinary extcall (and a link error against the nonexistent C symbol), as with
+   the hand-written intrinsics. *)
+module Intrins = struct
+  module T = Amd64_simd_intrins
+
+  let bad_arity op =
+    (* A user-declared external with the wrong number of parameters. *)
+    let msg = "Wrong number of arguments for SIMD intrinsic " ^ op in
+    raise (Error (Bad_arity msg))
+
+  let invalid_immediate op = bad_immediate "Invalid immediate for %s" op
+
+  let bind : T.bind -> Amd64_simd_instrs.instr = function
+    | Instr simd -> simd
+    | Zeroing (simd, z) -> simd ~z
+
+  let imm op args : T.imm -> int option * Cmm.expression list = function
+    | No_imm -> None, args
+    | Imm max ->
+      let i, args = extract_constant args op ~max in
+      Some i, args
+    | Getmant (interval, sign) ->
+      let i0, args = extract_constant args op ~max:interval in
+      let i1, args = extract_constant args op ~max:sign in
+      Some ((i1 lsl 2) lor i0), args
+    | Fixed i -> Some i, args
+
+  (* Constants synthesized for the unmasked gathers and scatters: the AVX512
+     instructions always take a write mask, and gathers overwrite the
+     destination completely under an all-ones mask. *)
+  let operand args : T.operand -> Cmm.expression =
+    let dbg = Debuginfo.none in
+    function
+    | Value j -> args.(j)
+    | All_ones_mask -> Cmm_helpers.mask ~dbg (-1L)
+    | Zero_vec128 -> Cmm_helpers.vec128 ~dbg { word0 = 0L; word1 = 0L }
+    | Zero_vec256 ->
+      Cmm_helpers.vec256 ~dbg { word0 = 0L; word1 = 0L; word2 = 0L; word3 = 0L }
+    | Zero_vec512 ->
+      Cmm_helpers.vec512 ~dbg
+        { word0 = 0L;
+          word1 = 0L;
+          word2 = 0L;
+          word3 = 0L;
+          word4 = 0L;
+          word5 = 0L;
+          word6 = 0L;
+          word7 = 0L
+        }
+
+  (* The (non-constant) arguments in instruction operand order. *)
+  let operands op ~arity (ops : T.operand array) args =
+    let args = Array.of_list args in
+    if Array.length args <> arity then bad_arity op;
+    Array.fold_right (fun o operands -> operand args o :: operands) ops []
+
+  let rounding : int -> Amd64_simd_defs.evex_rounding option = function
+    | 8 -> Some Rnd_near
+    | 9 -> Some Rnd_down
+    | 10 -> Some Rnd_up
+    | 11 -> Some Rnd_zero
+    | _ -> None
+
+  (* _MM_FROUND_CUR_DIRECTION, selecting the non-rounding form. *)
+  let cur_direction = 4
+
+  let kflag : T.flag -> Simd.Kflag.t = function Zf -> Zf | Cf -> Cf
+
+  (* The instruction and the (ungated) selection. *)
+  let select_ungated op (spec : T.t) args =
+    match spec with
+    | Register { arity; imm = imm_spec; bind = b; args = ops } ->
+      let i, args = imm op args imm_spec in
+      let simd = bind b in
+      simd, instr simd ?i (operands op ~arity ops args)
+    | Embedded_rounding { arity; bind = b; cur; args = ops } -> (
+      let control, args = extract_constant args op ~max:255 in
+      let args = operands op ~arity ops args in
+      match rounding control, cur with
+      | Some rnd, (Some _ | None) ->
+        let simd =
+          match b with
+          | Rnd simd -> simd ~rnd
+          | Rnd_zeroing (simd, z) -> simd ~rnd ~z
+        in
+        simd, instr simd args
+      | None, Some cur when control = cur_direction ->
+        let simd = bind cur in
+        simd, instr simd args
+      | None, (Some _ | None) -> invalid_immediate op)
+    | Suppress_all_exceptions
+        { arity; imm = imm_spec; bind = b; cur; args = ops } -> (
+      let i, args = imm op args imm_spec in
+      let sae, args = extract_constant args op ~max:255 in
+      let args = operands op ~arity ops args in
+      (* _MM_FROUND_NO_EXC, alone or with _MM_FROUND_CUR_DIRECTION. *)
+      if sae = 8 || sae = 12
+      then
+        let simd =
+          match b with
+          | Sae simd -> simd ~sae:()
+          | Sae_zeroing (simd, z) -> simd ~sae:() ~z
+        in
+        simd, instr simd ?i args
+      else
+        match cur with
+        | Some cur when sae = cur_direction ->
+          let simd = bind cur in
+          simd, instr simd ?i args
+        | Some _ | None -> invalid_immediate op)
+    | Flag_reader { flag; instr = simd } ->
+      let args = operands op ~arity:2 [| Value 0; Value 1 |] args in
+      simd, seq (Seq.kflag (kflag flag) simd) args
+    | Load { arity; bind = b; args = ops } ->
+      let simd = bind b in
+      let args = operands op ~arity ops args in
+      simd, simd_load ~mode:Arch.identity_addressing simd args
+    | Store { arity; bind = b; args = ops } ->
+      let simd = bind b in
+      let args = operands op ~arity ops args in
+      simd, simd_store ~mode:Arch.identity_addressing simd args
+    | Gather { arity; instr = simd; args = ops } ->
+      let scale, args = extract_scale args op in
+      let args = operands op ~arity ops args in
+      simd, simd_load ~mode:(Iindexed2scaled (scale, 0)) simd args
+    | Scatter { arity; instr = simd; args = ops } ->
+      let scale, args = extract_scale args op in
+      let args = operands op ~arity ops args in
+      simd, simd_store ~mode:(Iindexed2scaled (scale, 0)) simd args
+
+  let select op spec args =
+    let simd, selected = select_ungated op spec args in
+    if Arch.Extension.enabled_instruction simd then selected else None
+end
+
+let select_operation_intrins ~dbg:_ op args =
+  match Amd64_simd_intrins.find op with
+  | None -> None
+  | Some spec -> Intrins.select op spec args
+
 let select_operation_cfg ~dbg op args =
   let or_else try_ opt =
     match opt with Some x -> Some x | None -> try_ ~dbg op args
@@ -1164,6 +1309,7 @@ let select_operation_cfg ~dbg op args =
   |> or_else select_operation_avx2
   |> or_else select_operation_f16c
   |> or_else select_operation_fma
+  |> or_else select_operation_intrins
 
 let rax = Proc.phys_reg Int (P RAX)
 
@@ -1227,7 +1373,8 @@ let pseudoregs_for_operation (simd : Simd.operation) arg res =
         { id =
             ( Sqrtss | Sqrtsd | Roundss | Roundsd | Pcompare_string _
             | Vpcompare_string _ | Ptestz | Ptestc | Ptestnzc | Vptestz_X
-            | Vptestc_X | Vptestnzc_X | Vptestz_Y | Vptestc_Y | Vptestnzc_Y );
+            | Vptestc_X | Vptestnzc_X | Vptestz_Y | Vptestc_Y | Vptestnzc_Y
+            | Kflag _ );
           instr
         } ->
       instr
@@ -1240,7 +1387,7 @@ let pseudoregs_for_mem_operation (op : Simd.Mem.operation) arg res =
 (* Error report *)
 
 let report_error ppf = function
-  | Bad_immediate msg -> Format_doc.pp_print_string ppf msg
+  | Bad_immediate msg | Bad_arity msg -> Format_doc.pp_print_string ppf msg
 
 let () =
   Location.register_error_of_exn (function
