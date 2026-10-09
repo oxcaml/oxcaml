@@ -96,6 +96,8 @@ val typ_mask : machtype
 
 val typ_int128 : machtype
 
+val encode_tagged_int : int -> nativeint
+
 (** Least upper bound of two [machtype_component]s. *)
 val lub_component :
   machtype_component -> machtype_component -> machtype_component
@@ -609,6 +611,7 @@ type static_handler =
 and expression =
   | Cconst_int of int * Debuginfo.t
   | Cconst_natint of nativeint * Debuginfo.t
+  | Cconst_tagged_int of int * Debuginfo.t
   | Cconst_float32 of float * Debuginfo.t
   | Cconst_float of float * Debuginfo.t
   | Cconst_vec128 of vec128_bits * Debuginfo.t

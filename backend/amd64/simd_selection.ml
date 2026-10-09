@@ -96,6 +96,7 @@ let extract_constant args name ~max =
   | Cmm.(
       ( Cconst_float _
       | Cconst_natint (_, _)
+      | Cconst_tagged_int _
       | Cconst_float32 (_, _)
       | Cconst_vec128 (_, _)
       | Cconst_vec256 (_, _)

@@ -361,6 +361,7 @@ let operation d = function
 let rec expr ppf = function
   | Cconst_int (n, _dbg) -> fprintf ppf "%i" n
   | Cconst_natint (n, _dbg) -> fprintf ppf "%s" (Nativeint.to_string n)
+  | Cconst_tagged_int (n, _dbg) -> fprintf ppf "%i:tagged" n
   | Cconst_vec128 ({ word0; word1 }, _dbg) ->
     fprintf ppf "%016Lx:%016Lx" word1 word0
   | Cconst_vec256 ({ word0; word1; word2; word3 }, _dbg) ->

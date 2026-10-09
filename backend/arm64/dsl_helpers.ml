@@ -93,8 +93,8 @@ let reg_index reg =
 let assert_vec128 ~fname reg =
   match reg.typ with
   | Vec128 -> ()
-  | Val | Tagged_int | Naked_int | Addr | Float | Float32 | Valx2
-  | Vec256 | Vec512 | Mask ->
+  | Val | Tagged_int | Naked_int | Addr | Float | Float32 | Valx2 | Vec256
+  | Vec512 | Mask ->
     Misc.fatal_errorf "%s: expected Vec128 register, got %a" fname Printreg.reg
       reg
 
@@ -121,8 +121,8 @@ let reg_v2s_of_float reg =
   let index = reg_index reg in
   match reg.typ with
   | Float -> Ast.DSL.reg_v2s index
-  | Val | Tagged_int | Naked_int | Addr | Float32 | Vec128 | Valx2
-  | Vec256 | Vec512 | Mask ->
+  | Val | Tagged_int | Naked_int | Addr | Float32 | Vec128 | Valx2 | Vec256
+  | Vec512 | Mask ->
     Misc.fatal_errorf "reg_v2s_of_float: expected Float register, got %a"
       Printreg.reg reg
 
@@ -292,8 +292,8 @@ let reg_d reg =
   let index = reg_index reg in
   match reg.typ with
   | Float -> Ast.DSL.reg_op (Ast.Reg.reg_d index)
-  | Val | Tagged_int | Naked_int | Addr | Float32 | Vec128 | Valx2
-  | Vec256 | Vec512 | Mask ->
+  | Val | Tagged_int | Naked_int | Addr | Float32 | Vec128 | Valx2 | Vec256
+  | Vec512 | Mask ->
     Misc.fatal_errorf "reg_d: expected Float register, got %a" Printreg.reg reg
 
 let reg_s reg =
@@ -311,8 +311,8 @@ let reg_s_of_float reg =
   let index = reg_index reg in
   match reg.typ with
   | Float -> Ast.DSL.reg_op (Ast.Reg.reg_s index)
-  | Val | Tagged_int | Naked_int | Addr | Float32 | Vec128 | Valx2
-  | Vec256 | Vec512 | Mask ->
+  | Val | Tagged_int | Naked_int | Addr | Float32 | Vec128 | Valx2 | Vec256
+  | Vec512 | Mask ->
     Misc.fatal_errorf "reg_s_of_float: expected Float register, got %a"
       Printreg.reg reg
 
@@ -322,8 +322,8 @@ let reg_d_of_vec128 reg =
   let index = reg_index reg in
   match reg.typ with
   | Vec128 -> Ast.DSL.reg_op (Ast.Reg.reg_d index)
-  | Val | Tagged_int | Naked_int | Addr | Float | Float32 | Valx2
-  | Vec256 | Vec512 | Mask ->
+  | Val | Tagged_int | Naked_int | Addr | Float | Float32 | Valx2 | Vec256
+  | Vec512 | Mask ->
     Misc.fatal_errorf "reg_d_of_vec128: expected Vec128 register, got %a"
       Printreg.reg reg
 
@@ -333,8 +333,8 @@ let reg_s_of_vec128 reg =
   let index = reg_index reg in
   match reg.typ with
   | Vec128 -> Ast.DSL.reg_op (Ast.Reg.reg_s index)
-  | Val | Tagged_int | Naked_int | Addr | Float | Float32 | Valx2
-  | Vec256 | Vec512 | Mask ->
+  | Val | Tagged_int | Naked_int | Addr | Float | Float32 | Valx2 | Vec256
+  | Vec512 | Mask ->
     Misc.fatal_errorf "reg_s_of_vec128: expected Vec128 register, got %a"
       Printreg.reg reg
 
@@ -342,16 +342,16 @@ let reg_q reg =
   let index = reg_index reg in
   match reg.typ with
   | Vec128 -> Ast.DSL.reg_op (Ast.Reg.reg_q index)
-  | Val | Tagged_int | Naked_int | Addr | Float | Float32 | Valx2
-  | Vec256 | Vec512 | Mask ->
+  | Val | Tagged_int | Naked_int | Addr | Float | Float32 | Valx2 | Vec256
+  | Vec512 | Mask ->
     Misc.fatal_errorf "reg_q: expected Vec128 register, got %a" Printreg.reg reg
 
 let reg_v2d_operand reg =
   let index = reg_index reg in
   match reg.typ with
   | Vec128 -> Ast.DSL.reg_op (Ast.Reg.reg_v2d index)
-  | Val | Tagged_int | Naked_int | Addr | Float | Float32 | Valx2
-  | Vec256 | Vec512 | Mask ->
+  | Val | Tagged_int | Naked_int | Addr | Float | Float32 | Valx2 | Vec256
+  | Vec512 | Mask ->
     Misc.fatal_errorf "reg_v2d_operand: expected Vec128 register, got %a"
       Printreg.reg reg
 
@@ -359,8 +359,8 @@ let reg_v16b_operand reg =
   let index = reg_index reg in
   match reg.typ with
   | Vec128 -> Ast.DSL.reg_op (Ast.Reg.reg_v16b index)
-  | Val | Tagged_int | Naked_int | Addr | Float | Float32 | Valx2
-  | Vec256 | Vec512 | Mask ->
+  | Val | Tagged_int | Naked_int | Addr | Float | Float32 | Valx2 | Vec256
+  | Vec512 | Mask ->
     Misc.fatal_errorf "reg_v16b_operand: expected Vec128 register, got %a"
       Printreg.reg reg
 
@@ -387,8 +387,8 @@ let reg_fp_operand_3 r1 r2 r3 =
       ( Ast.DSL.reg_op (Ast.Reg.reg_d index1),
         Ast.DSL.reg_op (Ast.Reg.reg_d index2),
         Ast.DSL.reg_op (Ast.Reg.reg_d index3) )
-  | ( ( Float32 | Float | Val | Tagged_int | Naked_int | Addr | Vec128
-      | Valx2 | Vec256 | Vec512 | Mask ),
+  | ( ( Float32 | Float | Val | Tagged_int | Naked_int | Addr | Vec128 | Valx2
+      | Vec256 | Vec512 | Mask ),
       _,
       _ ) ->
     Misc.fatal_errorf
@@ -428,8 +428,8 @@ let reg_fp_operand_4 r1 r2 r3 r4 : scalar_fp_regs_4 =
         Ast.DSL.reg_op (Ast.Reg.reg_d index2),
         Ast.DSL.reg_op (Ast.Reg.reg_d index3),
         Ast.DSL.reg_op (Ast.Reg.reg_d index4) )
-  | ( ( Float32 | Float | Val | Tagged_int | Naked_int | Addr | Vec128
-      | Valx2 | Vec256 | Vec512 | Mask ),
+  | ( ( Float32 | Float | Val | Tagged_int | Naked_int | Addr | Vec128 | Valx2
+      | Vec256 | Vec512 | Mask ),
       _,
       _,
       _ ) ->

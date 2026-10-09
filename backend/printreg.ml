@@ -95,7 +95,8 @@ let regsetaddr' ?(print_reg = reg) ppf s =
       | Val -> fprintf ppf "*"
       | Addr -> fprintf ppf "!"
       | Tagged_int | Naked_int | Float | Vec128 | Vec256 | Vec512 | Mask
-      | Float32 | Valx2 -> ())
+      | Float32 | Valx2 ->
+        ())
     s
 
 let regsetaddr ppf s = regsetaddr' ppf s

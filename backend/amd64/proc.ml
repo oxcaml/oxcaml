@@ -777,7 +777,8 @@ let operation_supported = function
     true
 
 let expression_supported = function
-  | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
+  | Cconst_int _ | Cconst_natint _ | Cconst_tagged_int _ | Cconst_float32 _
+  | Cconst_float _
   | Cconst_vec128 _ | Cconst_symbol _  | Cvar _ | Clet _ | Cphantom_let _
   | Cname_for_debugger _
   | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _ | Cswitch _ | Ccatch _

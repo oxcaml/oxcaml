@@ -208,8 +208,7 @@ let rec const ~dbg cst =
   match Reg_width_const.descr cst with
   | Naked_immediate i ->
     targetint ~dbg (Target_ocaml_int.to_targetint Sixty_four i)
-  | Tagged_immediate i ->
-    targetint ~dbg (tag_targetint (Target_ocaml_int.to_targetint Sixty_four i))
+  | Tagged_immediate i -> int_const dbg (Target_ocaml_int.to_int i)
   | Naked_float32 f ->
     float32 ~dbg (Numeric_types.Float32_by_bit_pattern.to_float f)
   | Naked_float f -> float ~dbg (Numeric_types.Float_by_bit_pattern.to_float f)

@@ -101,7 +101,8 @@ and instrument = function
   | Cexit (ex, args, traps) -> Cexit (ex, List.map instrument args, traps)
 
   (* these are base cases and have no logging *)
-  | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
+  | Cconst_int _ | Cconst_natint _ | Cconst_tagged_int _ | Cconst_float32 _
+  | Cconst_float _
   | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_mask _
   | Cconst_symbol _
   | Cvar _ | Cinvalid _ as c -> c

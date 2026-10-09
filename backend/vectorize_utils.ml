@@ -133,15 +133,16 @@ let vectorizable_machtypes (r1 : Reg.t) (r2 : Reg.t) =
   | ( (Vec128 | Vec256 | Vec512 | Valx2),
       ( Val | Tagged_int | Naked_int | Float | Float32 | Vec128 | Vec256
       | Vec512 | Valx2 ) )
-  | (Val | Tagged_int | Naked_int | Float | Float32),
-    (Vec128 | Vec256 | Vec512 | Valx2) ->
+  | ( (Val | Tagged_int | Naked_int | Float | Float32),
+      (Vec128 | Vec256 | Vec512 | Valx2) ) ->
     Misc.fatal_errorf "Unexpected vector machtype: %a %a" Printreg.reg r1
       Printreg.reg r2
   | Val, Val -> true
   | Val, (Tagged_int | Naked_int | Float | Float32)
-  | (Tagged_int | Naked_int | Float | Float32), Val -> false
-  | (Tagged_int | Naked_int | Float | Float32),
-    (Tagged_int | Naked_int | Float | Float32) ->
+  | (Tagged_int | Naked_int | Float | Float32), Val ->
+    false
+  | ( (Tagged_int | Naked_int | Float | Float32),
+      (Tagged_int | Naked_int | Float | Float32) ) ->
     (* It is safe to mix Float32, Float, and Int for the purpose of GC, because
        they are not scannable. It may not be possible to vectorize the
        operation. *)

@@ -76,7 +76,7 @@ let shift ~bits make_op arg count dbg =
     | Cconst_natint (n, _) ->
       Cconst_int
         (Nativeint.to_int (Nativeint.logand n (Nativeint.of_int mask)), dbg)
-    | Cconst_float32 _
+    | Cconst_tagged_int _ | Cconst_float32 _
     | Cconst_float (_, _)
     | Cconst_vec128 (_, _)
     | Cconst_vec256 (_, _)

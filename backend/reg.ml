@@ -399,8 +399,8 @@ let hash_loc = function
 let is_of_type_addr t =
   match t.typ with
   | Addr -> true
-  | Val | Tagged_int | Naked_int | Float | Vec128 | Vec256 | Vec512
-  | Mask | Float32 | Valx2 ->
+  | Val | Tagged_int | Naked_int | Float | Vec128 | Vec256 | Vec512 | Mask
+  | Float32 | Valx2 ->
     false
 
 module UsingLocEquality = struct

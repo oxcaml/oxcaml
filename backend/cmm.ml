@@ -87,6 +87,8 @@ let typ_mask = [| Mask |]
 
 let typ_int128 = [| Naked_int; Naked_int |]
 
+let encode_tagged_int n = Nativeint.(logor (shift_left (of_int n) 1) 1n)
+
 let string_of_machtype_component (comp : machtype_component) =
   match comp with
   | Val -> "Val"
@@ -142,10 +144,10 @@ let lub_component_result comp1 comp2 =
   | Mask, Mask -> Mask
   | Naked_int, (Tagged_int | Addr | Val)
   | (Tagged_int | Addr | Val), Naked_int
-  | (Tagged_int | Naked_int | Addr | Val),
-    (Float | Float32 | Vec128 | Vec256 | Vec512 | Mask)
-  | (Float | Float32 | Vec128 | Vec256 | Vec512 | Mask),
-    (Tagged_int | Naked_int | Addr | Val)
+  | ( (Tagged_int | Naked_int | Addr | Val),
+      (Float | Float32 | Vec128 | Vec256 | Vec512 | Mask) )
+  | ( (Float | Float32 | Vec128 | Vec256 | Vec512 | Mask),
+      (Tagged_int | Naked_int | Addr | Val) )
   | (Float | Float32 | Vec256 | Vec512 | Mask), (Vec128 | Vec256 | Vec512)
   | (Vec128 | Vec256 | Vec512), (Float | Float32 | Vec256 | Vec512 | Mask)
   | Mask, (Float | Float32)
@@ -189,10 +191,10 @@ let ge_component_result comp1 comp2 =
   | Mask, Mask -> true
   | Naked_int, (Tagged_int | Addr | Val)
   | (Tagged_int | Addr | Val), Naked_int
-  | (Tagged_int | Naked_int | Addr | Val),
-    (Float | Float32 | Vec128 | Vec256 | Vec512 | Mask)
-  | (Float | Float32 | Vec128 | Vec256 | Vec512 | Mask),
-    (Tagged_int | Naked_int | Addr | Val)
+  | ( (Tagged_int | Naked_int | Addr | Val),
+      (Float | Float32 | Vec128 | Vec256 | Vec512 | Mask) )
+  | ( (Float | Float32 | Vec128 | Vec256 | Vec512 | Mask),
+      (Tagged_int | Naked_int | Addr | Val) )
   | (Float | Float32 | Vec256 | Vec512 | Mask), (Vec128 | Vec256 | Vec512)
   | (Vec128 | Vec256 | Vec512), (Float | Float32 | Vec256 | Vec512 | Mask)
   | Mask, (Float | Float32)
@@ -775,6 +777,7 @@ type static_handler =
 and expression =
   | Cconst_int of int * Debuginfo.t
   | Cconst_natint of nativeint * Debuginfo.t
+  | Cconst_tagged_int of int * Debuginfo.t
   | Cconst_float32 of float * Debuginfo.t
   | Cconst_float of float * Debuginfo.t
   | Cconst_vec128 of vec128_bits * Debuginfo.t
@@ -892,9 +895,9 @@ let iter_shallow_tail f = function
     f body;
     true
   | Cexit _ | Cop (Craise _, _, _) | Cinvalid _ -> true
-  | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
-  | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_mask _
-  | Cconst_symbol _ | Cvar _ | Ctuple _
+  | Cconst_int _ | Cconst_natint _ | Cconst_tagged_int _ | Cconst_float32 _
+  | Cconst_float _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
+  | Cconst_mask _ | Cconst_symbol _ | Cvar _ | Ctuple _
   | Cop
       ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi _ | Cmodi _ | Caddi128
         | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr
@@ -927,9 +930,9 @@ let map_shallow_tail f = function
     in
     Ccatch (flag, List.map map_h handlers, f body)
   | (Cexit _ | Cop (Craise _, _, _) | Cinvalid _) as cmm -> cmm
-  | ( Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
-    | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_mask _
-    | Cconst_symbol _ | Cvar _ | Ctuple _
+  | ( Cconst_int _ | Cconst_natint _ | Cconst_tagged_int _ | Cconst_float32 _
+    | Cconst_float _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
+    | Cconst_mask _ | Cconst_symbol _ | Cvar _ | Ctuple _
     | Cop
         ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi _ | Cmodi _ | Caddi128
           | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr
@@ -949,9 +952,9 @@ let map_shallow_tail f = function
 
 let map_tail f =
   let rec loop = function
-    | ( Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
-      | Cconst_symbol _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
-      | Cconst_mask _ | Cvar _ | Ctuple _ | Cop _ ) as c ->
+    | ( Cconst_int _ | Cconst_natint _ | Cconst_tagged_int _ | Cconst_float32 _
+      | Cconst_float _ | Cconst_symbol _ | Cconst_vec128 _ | Cconst_vec256 _
+      | Cconst_vec512 _ | Cconst_mask _ | Cvar _ | Ctuple _ | Cop _ ) as c ->
       f c
     | ( Cexit _ | Cinvalid _
       | Clet (_, _, _)
@@ -988,9 +991,9 @@ let iter_shallow f = function
     List.iter iter_h hl;
     f body
   | Cexit (_n, el, _traps) -> List.iter f el
-  | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
-  | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_mask _
-  | Cconst_symbol _ | Cvar _ | Cinvalid _ ->
+  | Cconst_int _ | Cconst_natint _ | Cconst_tagged_int _ | Cconst_float32 _
+  | Cconst_float _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
+  | Cconst_mask _ | Cconst_symbol _ | Cvar _ | Cinvalid _ ->
     ()
 
 let contains_debug_only_constructs expr =
@@ -999,9 +1002,9 @@ let contains_debug_only_constructs expr =
     match expr with
     | Cphantom_let _ | Cname_for_debugger _ -> raise Found
     | Clet _ | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _ | Cswitch _
-    | Ccatch _ | Cexit _ | Cconst_int _ | Cconst_natint _ | Cconst_float32 _
-    | Cconst_float _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
-    | Cconst_mask _ | Cconst_symbol _ | Cvar _ | Cinvalid _ ->
+    | Ccatch _ | Cexit _ | Cconst_int _ | Cconst_natint _ | Cconst_tagged_int _
+    | Cconst_float32 _ | Cconst_float _ | Cconst_vec128 _ | Cconst_vec256 _
+    | Cconst_vec512 _ | Cconst_mask _ | Cconst_symbol _ | Cvar _ | Cinvalid _ ->
       iter_shallow check expr
   in
   try
@@ -1298,8 +1301,8 @@ let caml_flambda2_invalid = "caml_flambda2_invalid"
 let is_val (m : machtype_component) =
   match m with
   | Val -> true
-  | Addr | Tagged_int | Naked_int | Float | Vec128 | Vec256 | Vec512
-  | Mask | Float32 | Valx2 ->
+  | Addr | Tagged_int | Naked_int | Float | Vec128 | Vec256 | Vec512 | Mask
+  | Float32 | Valx2 ->
     false
 
 let is_int (m : machtype_component) =
@@ -1311,8 +1314,8 @@ let is_int (m : machtype_component) =
 let is_addr (m : machtype_component) =
   match m with
   | Addr -> true
-  | Val | Tagged_int | Naked_int | Float | Vec128 | Vec256 | Vec512
-  | Mask | Float32 | Valx2 ->
+  | Val | Tagged_int | Naked_int | Float | Vec128 | Vec256 | Vec512 | Mask
+  | Float32 | Valx2 ->
     false
 
 let is_exn_handler (flag : ccatch_flag) =

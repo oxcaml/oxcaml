@@ -129,7 +129,8 @@ end
 
 let rec check env (expr : Cmm.expression) =
   match expr with
-  | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
+  | Cconst_int _ | Cconst_natint _ | Cconst_tagged_int _ | Cconst_float32 _
+  | Cconst_float _
   | Cconst_symbol _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
   | Cconst_mask _ | Cvar _ | Cinvalid _ ->
     ()
@@ -446,6 +447,7 @@ let concat_inferred_machtypes tys : inferred_machtype =
 let rec infer_machtype env (expr : Cmm.expression) : inferred_machtype =
   match expr with
   | Cconst_int _ | Cconst_natint _ -> Machtype Cmm.typ_naked_int
+  | Cconst_tagged_int _ -> Machtype Cmm.typ_tagged_int
   | Cconst_symbol _ -> Machtype Cmm.typ_val
   | Cconst_float _ -> Machtype Cmm.typ_float
   | Cconst_float32 _ -> Machtype Cmm.typ_float32

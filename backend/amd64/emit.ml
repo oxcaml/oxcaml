@@ -619,8 +619,11 @@ let compute_live_offset live =
         Misc.fatal_errorf "bad GC root %a" Printreg.reg r
       | { typ = Val | Valx2; loc = Unknown; _ } as r ->
         Misc.fatal_errorf "Unknown location %a" Printreg.reg r
-      | { typ = Tagged_int | Naked_int | Float | Float32 | Vec128 | Vec256
-              | Vec512 | Mask; _ } ->
+      | { typ =
+            ( Tagged_int | Naked_int | Float | Float32 | Vec128 | Vec256
+            | Vec512 | Mask );
+          _
+        } ->
         ())
     live;
   !live_offset
@@ -1240,9 +1243,10 @@ let move (src : Reg.t) (dst : Reg.t) =
     if distinct then movsd (reg src) (reg dst)
   | Float32, (Reg _ | Stack _), Float32, (Reg _ | Stack _) ->
     if distinct then movss (reg src) (reg dst)
-  | (Tagged_int | Naked_int | Val | Addr), (Reg _ | Stack _),
-    (Tagged_int | Naked_int | Val | Addr), (Reg _ | Stack _)
-    ->
+  | ( (Tagged_int | Naked_int | Val | Addr),
+      (Reg _ | Stack _),
+      (Tagged_int | Naked_int | Val | Addr),
+      (Reg _ | Stack _) ) ->
     if distinct then I.mov (reg src) (reg dst)
   | _, Unknown, _, (Reg _ | Stack _ | Unknown)
   | _, (Reg _ | Stack _), _, Unknown ->
@@ -3202,8 +3206,9 @@ let emit_probe_handler_wrapper (p : Probe_emission.probe) =
         | Stack (Outgoing k) -> (
           match r.typ with
           | Val -> k :: acc
-          | Tagged_int | Naked_int | Float | Vec128 | Vec256 | Vec512
-          | Mask | Float32 -> acc
+          | Tagged_int | Naked_int | Float | Vec128 | Vec256 | Vec512 | Mask
+          | Float32 ->
+            acc
           | Valx2 -> k :: (k + Arch.size_addr) :: acc
           | Addr -> Misc.fatal_errorf "bad GC root %a" Printreg.reg r)
         | Stack (Incoming _ | Reg.Local _ | Domainstate _) | Reg _ | Unknown ->

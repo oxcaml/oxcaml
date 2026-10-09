@@ -275,6 +275,11 @@ and emit env c (exp : Cmm.expression) ~tail : result =
       Ok
         (emit_op env c (SU.make_const_int n) Debuginfo.none Cmm.typ_naked_int
            [||])
+    | Cconst_tagged_int (n, _dbg) ->
+      Ok
+        (emit_op env c
+           (SU.make_const_int (Cmm.encode_tagged_int n))
+           Debuginfo.none Cmm.typ_tagged_int [||])
     | Cconst_float32 (n, _dbg) ->
       Ok
         (emit_op env c
@@ -304,8 +309,8 @@ and emit env c (exp : Cmm.expression) ~tail : result =
            [||])
     | Cconst_symbol (n, _dbg) ->
       Ok
-        (emit_op env c (SU.make_const_symbol n) Debuginfo.none
-           Cmm.typ_naked_int [||])
+        (emit_op env c (SU.make_const_symbol n) Debuginfo.none Cmm.typ_naked_int
+           [||])
     | Cvar v -> Ok (env_find v env)
     | Ctuple [] -> Ok [||]
     | Ctuple exp_list ->

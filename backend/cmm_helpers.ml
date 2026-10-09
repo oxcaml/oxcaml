@@ -152,7 +152,9 @@ type arity =
 
 let bind name arg fn =
   match arg with
-  | Cvar _ | Cconst_int _ | Cconst_natint _ | Cconst_symbol _ -> fn arg
+  | Cvar _ | Cconst_int _ | Cconst_natint _ | Cconst_tagged_int _
+  | Cconst_symbol _ ->
+    fn arg
   | _ ->
     let id = V.create_local name in
     Clet (VP.create id, arg, fn (Cvar id))
@@ -460,24 +462,14 @@ let alloc_boxedintnat_header (mode : Cmm.Alloc_mode.t) dbg =
 
 (* Integers *)
 
-let max_repr_int = max_int asr 1
-
-let min_repr_int = min_int asr 1
-
-let int_const dbg n =
-  if n <= max_repr_int && n >= min_repr_int
-  then Cconst_int ((n lsl 1) + 1, dbg)
-  else
-    Cconst_natint
-      (Nativeint.add (Nativeint.shift_left (Nativeint.of_int n) 1) 1n, dbg)
+let int_const dbg n = Cconst_tagged_int (n, dbg)
 
 let natint_const_untagged dbg n =
   if n > Nativeint.of_int max_int || n < Nativeint.of_int min_int
   then Cconst_natint (n, dbg)
   else Cconst_int (Nativeint.to_int n, dbg)
 
-let cint_const n =
-  Cint (Nativeint.add (Nativeint.shift_left (Nativeint.of_int n) 1) 1n)
+let cint_const n = Cint (encode_tagged_int n)
 
 let add_no_overflow n x c dbg =
   let d = n + x in
@@ -511,16 +503,16 @@ let rec map_tail1 e ~f =
   | Cphantom_let (id, exp, body) -> Cphantom_let (id, exp, map_tail1 body ~f)
   | Cname_for_debugger (var, body) -> Cname_for_debugger (var, map_tail1 body ~f)
   | Csequence (e1, e2) -> Csequence (e1, map_tail1 e2 ~f)
-  | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
-  | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_mask _
-  | Cconst_symbol _ | Cvar _ | Ctuple _ | Cop _ | Cifthenelse _ | Cexit _
-  | Ccatch _ | Cswitch _ | Cinvalid _ ->
+  | Cconst_int _ | Cconst_natint _ | Cconst_tagged_int _ | Cconst_float32 _
+  | Cconst_float _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
+  | Cconst_mask _ | Cconst_symbol _ | Cvar _ | Ctuple _ | Cop _ | Cifthenelse _
+  | Cexit _ | Ccatch _ | Cswitch _ | Cinvalid _ ->
     f e
 
 let map_tail2 x y ~f = map_tail1 y ~f:(fun y -> map_tail1 x ~f:(fun x -> f x y))
 
 let[@inline] is_constant = function
-  | Cconst_int _ | Cconst_natint _ -> true
+  | Cconst_int _ | Cconst_natint _ | Cconst_tagged_int _ -> true
   | _ -> false
 
 let rec add_const c n dbg =
@@ -767,16 +759,20 @@ let ignore_low_bit_int =
 let[@inline] get_const = function
   | Cconst_int (i, _) -> Some (Nativeint.of_int i)
   | Cconst_natint (i, _) -> Some i
+  | Cconst_tagged_int (i, _) -> Some (encode_tagged_int i)
   | _ -> None
 
 let[@inline] const_exn = function
   | Cconst_int (i, _) -> Nativeint.of_int i
   | Cconst_natint (i, _) -> i
+  | Cconst_tagged_int (i, _) -> encode_tagged_int i
   | _ -> Misc.fatal_error "const_exn: not a constant"
 
 let replace x ~with_ =
   match x with
-  | Cconst_int _ | Cconst_natint _ | Cconst_symbol _ | Cvar _ | Ctuple [] ->
+  | Cconst_int _ | Cconst_natint _ | Cconst_tagged_int _ | Cconst_symbol _
+  | Cvar _
+  | Ctuple [] ->
     with_
   | inner -> Csequence (inner, with_)
 
@@ -1110,6 +1106,7 @@ let store ~dbg memory_chunk init ~addr ~new_value =
 let tag_int i dbg =
   match low_bits i ~bits:(arch_bits - 1) ~dbg with
   | Cconst_int (n, _) -> int_const dbg n
+  | Cconst_natint (n, _) -> int_const dbg (Nativeint.to_int n)
   | Cop (Casr, [e; Cconst_int (right, _)], dbg_op) when right > 0 ->
     or_const (asr_const e (right - 1) dbg_op) 1n dbg
   | Cop (Clsr, [e; Cconst_int (right, _)], dbg_op) when right > 0 ->
@@ -1118,6 +1115,7 @@ let tag_int i dbg =
 
 let untag_int i dbg =
   match i with
+  | Cconst_tagged_int (n, _) -> Cconst_int (n, dbg)
   | Cconst_int (n, _) -> Cconst_int (n asr 1, dbg)
   | Cop (Cor, [Cop (Casr, [c; Cconst_int (n, _)], _); Cconst_int (1, _)], _)
     when n > 0 && is_defined_shift (n + 1) ->
@@ -1127,10 +1125,17 @@ let untag_int i dbg =
     lsr_const c (n + 1) dbg
   | c -> asr_const c 1 dbg
 
-let unsigned_untag_int i dbg = lsr_const i 1 dbg
+let unsigned_untag_int i dbg =
+  match i with
+  | Cconst_tagged_int (n, _) ->
+    natint_const_untagged dbg
+      (Nativeint.shift_right_logical (encode_tagged_int n) 1)
+  | i -> lsr_const i 1 dbg
 
 let mk_not dbg cmm =
   match cmm with
+  | Cconst_tagged_int (0, _) -> Cconst_tagged_int (1, dbg)
+  | Cconst_tagged_int (1, _) -> Cconst_tagged_int (0, dbg)
   | Cop
       ( (Caddi | Cor),
         [Cop (Clsl, [c; Cconst_int (1, _)], _); Cconst_int (1, _)],
@@ -1150,8 +1155,6 @@ let mk_not dbg cmm =
         ( Cxor,
           [Cconst_int (3, dbg); Cop (Clsl, [c; Cconst_int (1, dbg)], dbg)],
           dbg ))
-  | Cconst_int (3, _) -> Cconst_int (1, dbg)
-  | Cconst_int (1, _) -> Cconst_int (3, dbg)
   | c ->
     (* 1 -> 3, 3 -> 1 *)
     Cop (Cxor, [Cconst_int (2, dbg); c], dbg)
@@ -1164,6 +1167,7 @@ let same_simple_value (e1 : expression) (e2 : expression) =
   | Cvar v1, Cvar v2 -> V.same v1 v2
   | Cconst_int (n1, _), Cconst_int (n2, _) -> Int.equal n1 n2
   | Cconst_natint (n1, _), Cconst_natint (n2, _) -> Nativeint.equal n1 n2
+  | Cconst_tagged_int (n1, _), Cconst_tagged_int (n2, _) -> Int.equal n1 n2
   | Cconst_symbol (s1, _), Cconst_symbol (s2, _) ->
     String.equal s1.sym_name s2.sym_name
   | _ -> false
@@ -1439,11 +1443,6 @@ let udivimm_parameters d =
 let raise_symbol dbg symb =
   Cop
     (Craise Lambda.Raise_regular, [Cconst_symbol (global_symbol symb, dbg)], dbg)
-
-let[@inline] get_const = function
-  | Cconst_int (i, _) -> Some (Nativeint.of_int i)
-  | Cconst_natint (i, _) -> Some i
-  | _ -> None
 
 (** Division or modulo on registers. The overflow case min_int / -1 can occur,
     in which case we force x / -1 = -x and x mod -1 = 0. (PR#5513). In typical
@@ -1860,8 +1859,8 @@ let complex_im c dbg =
 
 let return_unit dbg c =
   match c with
-  | Csequence (_, Cconst_int (1, _)) as c -> c
-  | c -> Csequence (c, Cconst_int (1, dbg))
+  | Csequence (_, Cconst_tagged_int (0, _)) as c -> c
+  | c -> Csequence (c, Cconst_tagged_int (0, dbg))
 
 let memory_chunk_width_in_bytes : memory_chunk -> int = function
   | Byte_unsigned | Byte_signed -> 1
@@ -2839,7 +2838,8 @@ let curry_function_sym_name function_kind arity result =
     ^ result_layout_suffix result
     ^ if nlocal > 0 then "L" ^ Int.to_string nlocal else ""
   | Lambda.Tupled ->
-    if List.exists
+    if
+      List.exists
         (function [| Val |] | [| Tagged_int |] -> false | _ -> true)
         arity
     then
@@ -4113,7 +4113,8 @@ let apply_function (arity, result, mode) =
  *)
 
 let tuplify_function arity return =
-  if List.exists
+  if
+    List.exists
       (function [| Val |] | [| Tagged_int |] -> false | _ -> true)
       arity
   then
@@ -4240,8 +4241,9 @@ let value_slot_given_machtype vs =
     List.partition
       (fun (_, c) ->
         match (c : machtype_component) with
-        | Tagged_int | Naked_int | Float | Float32 | Vec128 | Vec256
-        | Vec512 | Mask -> true
+        | Tagged_int | Naked_int | Float | Float32 | Vec128 | Vec256 | Vec512
+        | Mask ->
+          true
         | Val -> false
         | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
         | Addr -> assert false)
@@ -4861,7 +4863,7 @@ let entry_point namelist =
     Cfunction
       { fun_name;
         fun_args = [];
-        fun_body = Csequence (body, cconst_int 1);
+        fun_body = return_unit (dbg ()) body;
         fun_codegen_options = [Reduce_code_size; Use_linscan_regalloc];
         fun_dbg;
         fun_poll = Default_poll;
@@ -5078,7 +5080,7 @@ let emit_gc_roots_table ~symbols cont =
 
 let void = Ctuple []
 
-let unit ~dbg = Cconst_int (1, dbg)
+let unit ~dbg = Cconst_tagged_int (0, dbg)
 
 let var v = Cvar v
 
@@ -5108,11 +5110,11 @@ let letin v ~defining_expr ~body =
   match body with
   | Cvar v' when Backend_var.same (Backend_var.With_provenance.var v) v' ->
     defining_expr
-  | Cvar _ | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
-  | Cconst_symbol _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
-  | Cconst_mask _ | Clet _ | Cphantom_let _ | Cname_for_debugger _ | Ctuple _
-  | Cop _ | Csequence _ | Cifthenelse _ | Cswitch _ | Ccatch _ | Cexit _
-  | Cinvalid _ ->
+  | Cvar _ | Cconst_int _ | Cconst_natint _ | Cconst_tagged_int _
+  | Cconst_float32 _ | Cconst_float _ | Cconst_symbol _ | Cconst_vec128 _
+  | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_mask _ | Clet _ | Cphantom_let _
+  | Cname_for_debugger _ | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _
+  | Cswitch _ | Ccatch _ | Cexit _ | Cinvalid _ ->
     Clet (v, defining_expr, body)
 
 let sequence x y =
@@ -5460,9 +5462,9 @@ let cmm_arith_size (e : Cmm.expression) =
     | _ -> 0
   in
   match e with
-  | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
-  | Cconst_symbol _ | Cvar _ | Cconst_vec128 _ | Cconst_vec256 _
-  | Cconst_vec512 _ | Cconst_mask _ ->
+  | Cconst_int _ | Cconst_natint _ | Cconst_tagged_int _ | Cconst_float32 _
+  | Cconst_float _ | Cconst_symbol _ | Cvar _ | Cconst_vec128 _
+  | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_mask _ ->
     Some 0
   | Cop _ -> Some (cmm_arith_size0 e)
   | Clet _ | Cphantom_let _ | Cname_for_debugger _ | Ctuple _ | Csequence _

@@ -331,7 +331,7 @@ let size_machtype mty =
 
 let size_expr_with ~size_of_var exp =
   let rec size localenv = function
-    | Cconst_int _ | Cconst_natint _ -> Arch.size_int
+    | Cconst_int _ | Cconst_natint _ | Cconst_tagged_int _ -> Arch.size_int
     | Cconst_symbol _ -> Arch.size_addr
     | Cconst_float _ -> Arch.size_float
     | Cconst_float32 _ ->

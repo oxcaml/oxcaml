@@ -61,6 +61,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     match expr with
     | Cconst_int _ -> true
     | Cconst_natint _ -> true
+    | Cconst_tagged_int _ -> true
     | Cconst_float32 _ -> true
     | Cconst_float _ -> true
     | Cconst_symbol _ -> true
@@ -146,9 +147,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
   let rec effects_of0 (exp : Cmm.expression) =
     let module EC = SU.Effect_and_coeffect in
     match exp with
-    | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
-    | Cconst_symbol _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
-    | Cconst_mask _ | Cvar _ ->
+    | Cconst_int _ | Cconst_natint _ | Cconst_tagged_int _ | Cconst_float32 _
+    | Cconst_float _ | Cconst_symbol _ | Cconst_vec128 _ | Cconst_vec256 _
+    | Cconst_vec512 _ | Cconst_mask _ | Cvar _ ->
       EC.none
     | Ctuple el -> EC.join_list_map el effects_of
     | Clet (_id, arg, body) -> EC.join (effects_of arg) (effects_of body)
@@ -227,11 +228,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Cconst_natint (n, dbg)
       when Nativeint.equal (Nativeint.of_int (Nativeint.to_int n)) n ->
       Cconst_int (Nativeint.to_int n, dbg)
-    | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
-    | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_mask _
-    | Cconst_symbol _ | Cvar _ | Clet _ | Cphantom_let _ | Cname_for_debugger _
-    | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _ | Cswitch _ | Ccatch _
-    | Cexit _ | Cinvalid _ ->
+    | Cconst_int _ | Cconst_natint _ | Cconst_tagged_int _ | Cconst_float32 _
+    | Cconst_float _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
+    | Cconst_mask _ | Cconst_symbol _ | Cvar _ | Clet _ | Cphantom_let _
+    | Cname_for_debugger _ | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _
+    | Cswitch _ | Ccatch _ | Cexit _ | Cinvalid _ ->
       expr
 
   (* Instruction selection for conditionals *)
@@ -578,7 +579,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
 
   let unreachable_handler : (Operation.trap_stack * Cmm.expression) Lazy.t =
     lazy
-      (let dummy_constant : Cmm.expression = Cconst_int (1, Debuginfo.none) in
+      (let dummy_constant : Cmm.expression =
+         Cconst_tagged_int (0, Debuginfo.none)
+       in
        let segfault : Cmm.expression =
          Cop
            ( Cload
@@ -815,6 +818,12 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Cconst_natint (n, _dbg) ->
       let r = Reg.createv Cmm.typ_naked_int in
       Ok (insert_op env sub_cfg (SU.make_const_int n) [||] r)
+    | Cconst_tagged_int (n, _dbg) ->
+      let r = Reg.createv Cmm.typ_tagged_int in
+      Ok
+        (insert_op env sub_cfg
+           (SU.make_const_int (Cmm.encode_tagged_int n))
+           [||] r)
     | Cconst_float32 (n, _dbg) ->
       let r = Reg.createv Cmm.typ_float32 in
       Ok
@@ -977,9 +986,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           | Cpause ),
           _,
           _ )
-    | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
-    | Cconst_symbol _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
-    | Cconst_mask _ | Cvar _ | Ctuple _ | Cexit _ ->
+    | Cconst_int _ | Cconst_natint _ | Cconst_tagged_int _ | Cconst_float32 _
+    | Cconst_float _ | Cconst_symbol _ | Cconst_vec128 _ | Cconst_vec256 _
+    | Cconst_vec512 _ | Cconst_mask _ | Cvar _ | Ctuple _ | Cexit _ ->
       emit_return env sub_cfg exp (SU.pop_all_traps env)
 
   and emit_invalid env sub_cfg message symbol =
@@ -1378,8 +1387,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
                 "Cfg_selectgen.emit_expr_exit: unexpected machtype_component \
                  Addr in Ccatch register"
             | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
-            | Val | Tagged_int | Naked_int | Float | Vec128 | Vec256
-            | Vec512 | Mask | Float32 ->
+            | Val | Tagged_int | Naked_int | Float | Vec128 | Vec256 | Vec512
+            | Mask | Float32 ->
               ())
           src;
         SU.insert_moves env sub_cfg src tmp_regs;
