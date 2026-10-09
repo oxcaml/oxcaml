@@ -209,7 +209,6 @@ let machtype_of_vec512_scalar : Cmm.vec512_type -> Cmm.machtype = function
 let reinterpret_cast_arg_type : Cmm.reinterpret_cast -> Cmm.machtype = function
   | Int64_of_value -> Cmm.typ_val
   | Value_of_int64 -> Cmm.typ_int
-  | Tagged_int_of_value -> Cmm.typ_int
   | Float_of_float32 -> Cmm.typ_float32
   | Float32_of_float -> Cmm.typ_float
   | Float_of_int64 -> Cmm.typ_int
