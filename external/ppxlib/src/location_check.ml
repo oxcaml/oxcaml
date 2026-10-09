@@ -231,6 +231,13 @@ let enforce_invariants fname =
         { x.pbop_loc with loc_ghost = true }
         childrens_locs siblings_locs
 
+    method! jkind_annotation x siblings_locs =
+      let childrens_locs =
+        super#jkind_annotation x Non_intersecting_ranges.empty
+      in
+      do_check ~node_name:"jkind annotation" x.pjka_loc childrens_locs
+        siblings_locs
+
     method! value_description x siblings_locs =
       if should_ignore x.pval_loc x.pval_attributes then siblings_locs
       else
