@@ -599,7 +599,6 @@ and 'a mixed_block_element =
   | Mask
   | Word
   | Untagged_immediate
-  (* CR zeisbach: maybe add comment about invariant *)
   | Void
   | Product of 'a mixed_block_element array
   | Splice_variable of Slambdaident.t

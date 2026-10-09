@@ -226,7 +226,6 @@ let rec copy_mixed_block_element (elt : _ Lambda.mixed_block_element)
   | Product elements ->
     copy_product_fields elements expr ~make_block:(fun fields ->
         Prim (Makeblock { tag = 0 }, fields))
-  (* CR zeisbach: inspect this more thoroughly, since this changes repr! *)
   | Value _ | Void | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
   | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
     expr

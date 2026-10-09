@@ -651,9 +651,9 @@ and layout =
   | Punboxed_or_untagged_integer of unboxed_or_untagged_integer
   | Punboxed_vector of unboxed_vector
   | Punboxed_mask
-  (* CR zeisbach: add invariant comment that length >= 2 here *)
   | Pvoid
   | Punboxed_product of layout list
+    (** Invariant: the layout list has length >= 2 *)
   | Pbottom
   | Psplicevar of Slambdaident.t
 
@@ -681,6 +681,7 @@ and 'a mixed_block_element =
   | Untagged_immediate
   | Void
   | Product of 'a mixed_block_element array
+    (** Invariant: the mixed_block_element array has length >= 2 *)
   | Splice_variable of Slambdaident.t
 
 and mixed_block_shape = unit mixed_block_element array
