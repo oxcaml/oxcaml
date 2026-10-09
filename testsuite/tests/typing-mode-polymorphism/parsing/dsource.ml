@@ -57,10 +57,7 @@ module type Constants_after_mod  =
       'a @ [< 'm mod portable contended & global & many] ->
         'a @ [> 'm mod aliased dynamic | local | once]
   end;;
-Line 3, characters 19-27:
-3 |     'a @ [< 'm mod portable contended & global many] ->
-                       ^^^^^^^^
-Error: "mod" in mode bounds is not yet supported.
+module type Constants_after_mod = sig val f : 'a -> 'a @ local once end
 |}]
 
 module type Any_order = sig
@@ -119,8 +116,5 @@ module type Morphisms_and_mod  =
       'a @ [< 'm mod portable contended & past('n) mod global] ->
         'a @ [> close('m) mod many aliased | past('n) | local | once]
   end;;
-Line 3, characters 19-27:
-3 |     'a @ [< 'm mod portable contended & past('n) mod global] ->
-                       ^^^^^^^^
-Error: "mod" in mode bounds is not yet supported.
+module type Morphisms_and_mod = sig val f : 'a -> 'a @ local once end
 |}]
