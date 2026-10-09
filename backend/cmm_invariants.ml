@@ -221,6 +221,9 @@ let reinterpret_cast_arg_type : Cmm.reinterpret_cast -> Cmm.machtype = function
     machtype_of_vector_width width
 
 let static_cast_arg_type : Cmm.static_cast -> Cmm.machtype = function
+  | Int_conv _ -> Cmm.typ_int
+  | Tagged_int_of_int64 -> Cmm.typ_int
+  | Int64_of_tagged_int _ -> Cmm.typ_int
   | Float_of_int64 _ -> Cmm.typ_int
   | Int64_of_float width -> machtype_of_float_width width
   | Float_of_float32 -> Cmm.typ_float32
