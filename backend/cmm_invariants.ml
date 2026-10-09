@@ -352,7 +352,7 @@ let oper_arg_types : Cmm.operation -> expected_arg_types = function
        handler on the trap stack, whose machtypes are not known here. *)
     Args_then_any_number_of ([Exactly Cmm.typ_val], Any_machtype)
   | Cprobe _ -> Any_number_of Any_machtype
-  | Copaque -> Args [Any_machtype]
+  | Copaque ty -> Args [Exactly ty]
   | Cprobe_is_enabled _ | Cbeginregion | Cdls_get | Ctls_get | Cdomain_index
   | Cpoll | Cpause ->
     Args []
@@ -603,12 +603,6 @@ and typecheck_cop env (op : Cmm.operation) (args : Cmm.expression list) dbg
     | Cextcall { returns = false; _ }
     | Capply { returns = false; _ } ->
       Never_returns
-    | Copaque -> (
-      (* [Copaque] is the identity whatever the machtype of its argument;
-         [oper_result_type] approximates its result as [typ_val]. *)
-      match arg_tys with
-      | [ty] -> ty
-      | [] | _ :: _ :: _ -> arity_error "1")
     | Cextcall { returns = true; _ }
     | Capply { returns = true; _ }
     | Cload _ | Calloc _ | Cstore _ | Caddi | Csubi | Cmuli
@@ -617,8 +611,8 @@ and typecheck_cop env (op : Cmm.operation) (args : Cmm.expression list) dbg
     | Cpopcnt | Cprefetch _ | Catomic _ | Ccmpi _ | Caddv | Cadda | Cnegf _
     | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32
     | Creinterpret_cast _ | Cstatic_cast _ | Ccmpf _ | Cprobe _
-    | Cprobe_is_enabled _ | Cbeginregion | Cendregion | Ctuple_field _
-    | Cdls_get | Ctls_get | Cdomain_index | Cpoll | Cpause ->
+    | Cprobe_is_enabled _ | Copaque _ | Cbeginregion | Cendregion
+    | Ctuple_field _ | Cdls_get | Ctls_get | Cdomain_index | Cpoll | Cpause ->
       Machtype (Select_utils.oper_result_type op)
 
 let check_machtypes (fundecl : Cmm.fundecl) =
