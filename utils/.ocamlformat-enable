@@ -1,3 +1,5 @@
+action_trace.ml
+action_trace.mli
 compilation_unit.ml
 compilation_unit.mli
 doubly_linked_list.ml
@@ -6,6 +8,8 @@ hash_consed.ml
 hash_consed.mli
 import_info.ml
 import_info.mli
+json.ml
+json.mli
 language_extension_kernel.ml
 language_extension_kernel.mli
 zero_alloc_utils.ml
