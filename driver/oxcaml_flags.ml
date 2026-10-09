@@ -331,6 +331,12 @@ module Flambda2 = struct
     let reaper = ref false
   end
 
+  let functor_result_types_through_value_slots = ref false
+    (* -flambda2-functor-result-types-through-value-slots *)
+
+  let function_result_types_through_value_slots = ref false
+    (* -flambda2-function-result-types-through-value-slots *)
+
   module Expert = struct
     module Default = struct
       let fallback_inlining_heuristic = false

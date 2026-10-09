@@ -144,6 +144,10 @@ module type Oxcaml_options = sig
   val flambda2_result_types_functors_and_closures : unit -> unit
   val flambda2_result_types_all_functions : unit -> unit
   val no_flambda2_result_types : unit -> unit
+  val flambda2_functor_result_types_through_value_slots : unit -> unit
+  val no_flambda2_functor_result_types_through_value_slots : unit -> unit
+  val flambda2_function_result_types_through_value_slots : unit -> unit
+  val no_flambda2_function_result_types_through_value_slots : unit -> unit
   val flambda2_basic_meet : unit -> unit
   val flambda2_advanced_meet : unit -> unit
   val flambda2_join_algorithm : string -> unit

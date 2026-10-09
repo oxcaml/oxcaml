@@ -143,6 +143,11 @@ let function_result_types ~is_a_functor : function_result_types =
       Compute_if_returning_closures { only_if_statically_allocatable = false }
   | All_functions -> Compute
 
+let result_types_through_value_slots ~is_a_functor =
+  if is_a_functor
+  then !Oxcaml_flags.Flambda2.functor_result_types_through_value_slots
+  else !Oxcaml_flags.Flambda2.function_result_types_through_value_slots
+
 let debug () = !Clflags.debug
 
 let opaque () = !Clflags.opaque
