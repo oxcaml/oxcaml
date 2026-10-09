@@ -688,13 +688,17 @@ let expression sub exp =
     | Texp_variant (label, expo) ->
         Pexp_variant (label, Option.map (fun (e, _) -> sub.expr sub e) expo)
     | Texp_record { fields; extended_expression; _ } ->
-        let list = Array.fold_left (fun l -> function
-            | _, _, Kept _ -> l
-            | _, _, Overridden (lid, exp) -> (lid, sub.expr sub exp) :: l)
-            [] fields
+        let fields =
+          List.map
+            (fun { rf_lid; rf_exp; _ } -> rf_lid, sub.expr sub rf_exp)
+            fields
         in
-        Pexp_record (list, Option.map (fun (exp, _, _, _) -> sub.expr sub exp)
-                             extended_expression)
+        let extended_expression =
+          Option.map
+            (fun { er_record; _ } -> sub.expr sub er_record)
+            extended_expression
+        in
+        Pexp_record (fields, extended_expression)
     | Texp_record_unboxed_product { fields; extended_expression; _ } ->
         let list = Array.fold_left (fun l -> function
             | _, _, Kept _ -> l

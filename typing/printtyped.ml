@@ -150,9 +150,10 @@ let fmt_private_flag f x =
   | Private -> fprintf f "Private"
 
 let fmt_partiality f x =
-  match x with
-  | Total -> ()
-  | Partial -> fprintf f " (Partial)"
+  match Ivar.peek x with
+  | Some Total -> ()
+  | Some Partial -> fprintf f " (Partial)"
+  | None -> fprintf f " (<unknown partiality>)"
 
 let fmt_presence f x =
   match x with
@@ -186,6 +187,11 @@ let option i f ppf x =
   | Some x ->
       line i ppf "Some\n";
       f (i+1) ppf x
+
+let ivar i f ppf x =
+  match Ivar.peek x with
+  | None -> line i ppf "<empty>\n"
+  | Some x -> f i ppf x
 
 let longident i ppf li = line i ppf "%a\n" fmt_longident li
 let string i ppf s = line i ppf "\"%s\"\n" s
@@ -490,7 +496,7 @@ and type_inspection : type a. _ -> _ -> a type_inspection -> unit =
   fun i ppf -> function
   | Label_disambiguation amb ->
     line i ppf "Label_disambiguation\n";
-    label_ambiguity (i+1) ppf amb;
+    ivar (i+1) label_ambiguity ppf amb;
   | Polymorphic_parameter param ->
     line i ppf "Polymorphic_parameter\n";
     poly_param (i+1) ppf param;
@@ -683,6 +689,20 @@ and expression_locality_mode i ppf (expr, am) =
   locality_mode_r i ppf am;
   expression i ppf expr
 
+and extended_record_expression i ppf
+    { er_record;
+      er_kept;
+      er_sort = _;
+      er_representation = _;
+      er_unique_barrier = _
+    } =
+  expression i ppf er_record;
+  line i ppf "kept =\n";
+  ivar (i + 1)
+    (fun i ->
+      list i (fun i ppf { kf_label; _ } -> line i ppf "%s\n" kf_label.lbl_name))
+    ppf er_kept
+
 and expression i ppf x =
   line i ppf "expression %a\n" fmt_location x.exp_loc;
   attributes i ppf x.exp_attributes;
@@ -752,16 +772,20 @@ and expression i ppf x =
       line i ppf "Texp_variant \"%s\"\n" l;
       option i expression_locality_mode ppf eo;
   | Texp_record
-      { fields; representation; extended_expression; locality_mode = am } ->
+      { fields; representation; extended_expression;
+        locality_mode = am } ->
       line i ppf "Texp_record\n";
       let i = i+1 in
-      locality_mode_option i ppf am;
+      ivar i locality_mode_r ppf am;
       line i ppf "fields =\n";
-      array (i+1) record_field ppf fields;
+      list (i+1) (fun i ppf { rf_lid; rf_exp; _ } ->
+          line i ppf "%a\n" fmt_longident rf_lid;
+          expression (i+1) ppf rf_exp)
+        ppf fields;
       line i ppf "representation =\n";
-      record_representation (i+1) ppf representation;
+      ivar (i+1) record_representation ppf representation;
       line i ppf "extended_expression =\n";
-      option (i+1) expression ppf (Option.map Misc.fst4 extended_expression);
+      option (i+1) extended_record_expression ppf extended_expression
   | Texp_record_unboxed_product
         { fields; representation; extended_expression } ->
       line i ppf "Texp_record_unboxed_product\n";

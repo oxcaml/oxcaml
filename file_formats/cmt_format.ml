@@ -229,7 +229,7 @@ let iter_on_occurrences
           add_constructor_description exp_env lid constr_desc
       | Texp_field { lid; label = label_desc; _ }
       | Texp_setfield { lid; label = label_desc; _ } ->
-          add_label ~namespace:Label exp_env lid label_desc
+          add_label ~namespace:Label exp_env lid (Ivar.peek_exn label_desc)
       | Texp_unboxed_field { lid; label = label_desc; _ } ->
           add_label ~namespace:Unboxed_label exp_env lid label_desc
       | Texp_idx (ba, uas) ->
@@ -240,7 +240,12 @@ let iter_on_occurrences
       | Texp_new (path, lid, _, _) ->
           f ~namespace:Class exp_env path lid
       | Texp_record { fields; _ } ->
-        iter_field_exps ~namespace:Label exp_env fields
+        iter_field_exps ~namespace:Label exp_env
+          (Array.of_list
+             (List.map
+                (fun { rf_lid; rf_label; rf_sort; rf_exp } ->
+                   Ivar.peek_exn rf_label, rf_sort, Overridden (rf_lid, rf_exp))
+                fields))
       | Texp_record_unboxed_product { fields ; _ } ->
         iter_field_exps ~namespace:Unboxed_label exp_env fields
       | Texp_instvar  (_self_path, path, name) ->
@@ -301,7 +306,8 @@ let iter_on_occurrences
       | Tpat_construct (lid, constr_desc, _, _, _) ->
           add_constructor_description pat_env lid constr_desc
       | Tpat_record (fields, _, _) ->
-        iter_field_pats ~namespace:Label pat_env fields
+        iter_field_pats ~namespace:Label pat_env
+          (resolved_record_pattern_fields fields)
       | Tpat_record_unboxed_product (fields, _, _) ->
         iter_field_pats ~namespace:Unboxed_label pat_env fields
       | Tpat_any | Tpat_var _ | Tpat_alias _ | Tpat_constant _ | Tpat_tuple _

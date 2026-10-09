@@ -668,6 +668,18 @@ let rec typexp copy_scope s ty =
         For_copy.redirect_desc copy_scope ty (Tsubst (ty', None));
         ty'
       else ty
+  | Tivar { name; jkind = jk; ivar = _ } ->
+      begin match s.additional_action with
+      | Duplicate_variables ->
+          (* Duplicated types are only inspected (e.g. by exhaustiveness
+             checking), and never wait on the ivar, so it is dropped. *)
+          let ty' = newpersty (Tvar { name; jkind = jkind copy_scope s jk }) in
+          For_copy.redirect_desc copy_scope ty (Tsubst (ty', None));
+          ty'
+      | No_action -> ty
+      | Prepare_for_saving _ ->
+          Misc.fatal_error "Subst.typexp: saving an unsolved Tivar"
+      end
   | Tsubst (ty, _) ->
       ty
   | Tfield (m, k, _t1, _t2) when not should_duplicate_vars && m = dummy_method

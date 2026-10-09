@@ -382,7 +382,10 @@ module Compat
       tuple_compat labeled_ps labeled_qs
   | Tpat_lazy p, Tpat_lazy q -> compat p q
   | Tpat_record (l1,_,_),Tpat_record (l2,_,_) ->
-      let ps,qs = records_args l1 l2 in
+      let ps,qs =
+        records_args (resolved_record_pattern_fields l1)
+          (resolved_record_pattern_fields l2)
+      in
       compats ps qs
   | Tpat_array (am1, _, ps), Tpat_array (am2, _, qs) ->
       am1 = am2 &&
@@ -1009,7 +1012,11 @@ let pats_of_type env ty =
               mknoloc (Longident.Lident ld.lbl_name), ld, omega)
               labels
           in
-          [make_pat (Tpat_record (fields, fake_record_repr, Closed)) ty env]
+          [make_pat
+             (Tpat_record
+                (full_record_pattern_fields fields,
+                 Ivar.create_full fake_record_repr, Closed))
+             ty env]
       | Type_record_unboxed_product (labels, _,_) ->
           let fields =
             List.map (fun ld ->
@@ -1963,7 +1970,10 @@ let rec le_pat p q =
       le_tuple_pats labeled_ps labeled_qs
   | Tpat_lazy p, Tpat_lazy q -> le_pat p q
   | Tpat_record (l1,_,_), Tpat_record (l2,_,_) ->
-      let ps,qs = records_args l1 l2 in
+      let ps,qs =
+        records_args (resolved_record_pattern_fields l1)
+          (resolved_record_pattern_fields l2)
+      in
       le_pats ps qs
   | Tpat_array(am1, _, ps), Tpat_array(am2, _, qs) ->
       am1 = am2 && List.length ps = List.length qs && le_pats ps qs
@@ -2031,9 +2041,12 @@ let rec lub p q = match p.pat_desc,q.pat_desc with
 | Tpat_variant (l1,None,_row), Tpat_variant(l2,None,_)
               when l1 = l2 -> p
 | Tpat_record (l1,repr,closed),Tpat_record (l2,_,_) ->
-    let rs = record_lubs l1 l2 in
+    let rs =
+      record_lubs (resolved_record_pattern_fields l1)
+        (resolved_record_pattern_fields l2)
+    in
     (* CR-someday lmaurer: Take lubs of reprs? *)
-    make_pat (Tpat_record (rs, repr, closed))
+    make_pat (Tpat_record (full_record_pattern_fields rs, repr, closed))
       p.pat_type p.pat_env
 | Tpat_array (am1, arg_sort, ps), Tpat_array (am2, _, qs)
       when am1 = am2 && List.length ps = List.length qs ->
@@ -2388,7 +2401,8 @@ let inactive ~partial pat =
             loop p
         | Tpat_record (ldps,_,_) ->
             List.for_all
-              (fun (_, lbl, p) -> lbl.lbl_mut = Immutable && loop p)
+              (fun (_, lbl, p) ->
+                 (Ivar.peek_exn lbl).lbl_mut = Immutable && loop p)
               ldps
         | Tpat_record_unboxed_product (ldps,_,_) ->
             List.for_all

@@ -264,6 +264,9 @@ module Stdlib : sig
     val exists : ('a -> bool) -> 'a option -> bool
     (** [exists p o] is [p x] if [o] is [Some x], and [false] otherwise. *)
 
+    val for_all : ('a -> bool) -> 'a option -> bool
+    (** [for_all p o] is [p x] if [o] is [Some x], and [true] otherwise. *)
+
     (* short circuits if the first argument really is a [Some] *)
     val first_some : 'a option -> (unit -> 'a option) -> 'a option
 

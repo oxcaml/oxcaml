@@ -1370,6 +1370,15 @@ val compare_tag :  tag -> tag -> int
 val equal_record_representation_up_to_scannable_axes :
   record_representation -> record_representation -> bool
 
+(** Whether constructing a record with this representation allocates, i.e. the
+    record is not [@@unboxed]. *)
+val record_representation_allocates : record_representation -> bool
+
+(** [field_projection_boxes repres pos] is whether projecting the field at
+    [pos] out of a record with representation [repres] allocates a box (for
+    a float stored flat). *)
+val field_projection_boxes : record_representation -> int -> bool
+
 val equal_record_unboxed_product_representation_up_to_scannable_axes :
   record_unboxed_product_representation
   -> record_unboxed_product_representation

@@ -597,12 +597,22 @@ let expr sub x =
         Texp_variant (l, Option.map (fun (e, am) -> (sub.expr sub e, am)) expo)
     | Texp_record
         { fields; representation; extended_expression; locality_mode } ->
+        let fields =
+          List.map
+            (fun rf ->
+               { rf with rf_lid = map_loc_lid sub rf.rf_lid;
+                         rf_exp = sub.expr sub rf.rf_exp })
+            fields
+        in
         Texp_record {
-          fields = map_fields fields; representation;
+          fields;
+          representation;
           extended_expression =
             Option.map
-              (fun (exp, sort, repres, ubr) ->
-                 (sub.expr sub exp, sort, repres, ubr))
+              (fun extended_expression ->
+                { extended_expression with
+                  er_record = sub.expr sub extended_expression.er_record
+                })
               extended_expression;
           locality_mode
         }
@@ -614,11 +624,12 @@ let expr sub x =
             Option.map
               (fun (exp, sort) -> (sub.expr sub exp, sort)) extended_expression
         }
-    | Texp_field { record; record_sort; record_repres; lid; label; boxing;
-                   unique_barrier; } ->
+    | Texp_field { record; record_sort; record_repres; lid; label;
+                   locality_mode; unique_use; unique_barrier; } ->
         Texp_field { record = sub.expr sub record;
                      lid = map_loc_lid sub lid;
-                     record_sort; record_repres; label; boxing; unique_barrier;
+                     record_sort; record_repres; label; locality_mode;
+                     unique_use; unique_barrier;
                    }
     | Texp_unboxed_field { record; record_sort; record_repres;
                            lid; label; unique_use; } ->

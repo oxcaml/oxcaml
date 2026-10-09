@@ -108,22 +108,53 @@ let mkTexp_construct
     (name, desc, args) =
   Texp_construct (name, desc, repres, args, mode)
 
-type texp_record_identifier =
-  Types.record_representation * locality_mode_r option
+type texp_record_identifier = Types.record_representation * locality_mode_r
 
 type texp_record_field_identifier = Jkind.Sort.t
 
 type texp_record_extended_expression_identifier =
-  Jkind.Sort.t * Types.record_representation
+  Jkind.Sort.t * Types.record_representation Ivar.t
 
 let mkTexp_record ~id:(representation, locality_mode)
     (fields, extended_expression) =
+  let fields, kept =
+    List.partition_map
+      (fun (descr, sort, def) ->
+        match def with
+        | Overridden (lid, exp) ->
+          Left
+            { rf_lid = lid;
+              rf_label = Ivar.create_full descr;
+              rf_sort = sort;
+              rf_exp = exp
+            }
+        | Kept (ty, mut, unique_use) ->
+          Right
+            { kf_label = descr;
+              kf_sort = sort;
+              kf_type = ty;
+              kf_mut = mut;
+              kf_unique_use = unique_use
+            })
+      (Array.to_list fields)
+  in
   let extended_expression =
     Option.map
-      (fun (exp, (sort, repres), ubr) -> exp, sort, repres, ubr)
+      (fun (exp, (sort, repres), ubr) ->
+        { er_record = exp;
+          er_kept = Ivar.create_full kept;
+          er_sort = sort;
+          er_representation = repres;
+          er_unique_barrier = ubr
+        })
       extended_expression
   in
-  Texp_record { fields; representation; extended_expression; locality_mode }
+  Texp_record
+    { fields;
+      representation = Ivar.create_full representation;
+      extended_expression;
+      locality_mode = Ivar.create_full locality_mode
+    }
 
 type texp_function_param_identifier =
   { param_sort : Jkind.Sort.t;
@@ -220,7 +251,7 @@ let mkTexp_function ?(id = texp_function_defaults)
                   Tparam_optional_default (pattern, default, id.param_sort));
               fp_param = param;
               fp_param_debug_uid = Lambda.debug_uid_none;
-              fp_partial = partial;
+              fp_partial = Ivar.create_full partial;
               fp_sort = id.param_sort;
               fp_mode = { mode_modes = id.param_mode; mode_desc = [] };
               fp_curry = id.param_curry;
@@ -237,7 +268,7 @@ let mkTexp_function ?(id = texp_function_defaults)
             { fc_cases = cases;
               fc_param = param;
               fc_param_debug_uid = Lambda.debug_uid_none;
-              fc_partial = partial;
+              fc_partial = Ivar.create_full partial;
               fc_env = id.env;
               fc_ret_type = id.ret_type;
               fc_arg_mode = id.last_arg_mode;
@@ -261,7 +292,7 @@ let mkTexp_sequence ?id:(sort = Jkind.Sort.scannable) (e1, e2) =
 type texp_match_identifier = Jkind.sort
 
 let mkTexp_match ?id:(sort = Jkind.Sort.scannable) (e, cases, partial) =
-  Texp_match (e, sort, cases, [], partial)
+  Texp_match (e, sort, cases, [], Ivar.create_full partial)
 
 let mkTexp_assert e loc = Texp_assert (e, loc)
 
@@ -312,15 +343,35 @@ let view_texp (e : expression_desc) =
     Texp_apply (exp, args, (pos, mode, yielding, za))
   | Texp_construct (name, desc, repres, args, mode) ->
     Texp_construct (name, desc, args, (mode, repres))
-  | Texp_record { fields; representation; extended_expression; locality_mode }
-    ->
-    let extended_expression =
-      Option.map
-        (fun (exp, sort, repres, ubr) -> exp, (sort, repres), ubr)
-        extended_expression
+  | Texp_record
+      { fields; representation; extended_expression; locality_mode } ->
+    let extended_expression, kept =
+      match extended_expression with
+      | None -> None, []
+      | Some
+          { er_record; er_kept; er_sort; er_representation; er_unique_barrier }
+        ->
+        ( Some
+            ( er_record,
+              (er_sort, er_representation),
+              er_unique_barrier ),
+          Ivar.peek_exn er_kept )
+    in
+    let fields =
+      List.map
+        (fun { rf_lid; rf_label; rf_sort; rf_exp } ->
+          Ivar.peek_exn rf_label, rf_sort, Overridden (rf_lid, rf_exp))
+        fields
+      @ List.map
+          (fun { kf_label; kf_sort; kf_type; kf_mut; kf_unique_use } ->
+            kf_label, kf_sort, Kept (kf_type, kf_mut, kf_unique_use))
+          kept
     in
     Texp_record
-      { fields; extended_expression; id = representation, locality_mode }
+      { fields = Array.of_list fields;
+        extended_expression;
+        id = Ivar.peek_exn representation, Ivar.peek_exn locality_mode
+      }
   | Texp_tuple (args, mode) ->
     let labels_and_sorts, args =
       List.split (List.map (fun (label, arg, sort) -> (label, sort), arg) args)
@@ -339,7 +390,7 @@ let view_texp (e : expression_desc) =
           in
           { arg_label = untype_label param.fp_arg_label;
             param = param.fp_param;
-            partial = param.fp_partial;
+            partial = Ivar.peek_exn param.fp_partial;
             pattern;
             optional_default;
             param_identifier =
@@ -358,7 +409,7 @@ let view_texp (e : expression_desc) =
         Function_cases
           { cases = cases.fc_cases;
             param = cases.fc_param;
-            partial = cases.fc_partial;
+            partial = Ivar.peek_exn cases.fc_partial;
             function_cases_identifier =
               { last_arg_mode = cases.fc_arg_mode;
                 last_arg_sort = cases.fc_arg_sort;
@@ -375,7 +426,7 @@ let view_texp (e : expression_desc) =
       )
   | Texp_sequence (e1, sort, e2) -> Texp_sequence (e1, e2, sort)
   | Texp_match (e, sort, cases, _, partial) ->
-    Texp_match (e, cases, partial, sort)
+    Texp_match (e, cases, Ivar.peek_exn partial, sort)
   | _ -> O e
 
 let mkpattern_data ~pat_desc ~pat_loc ~pat_extra ~pat_type ~pat_env
@@ -447,7 +498,8 @@ let mkTpat_record ?id (args, closed) =
   let repres =
     match id with Some repres -> repres | None -> dummy_record_repres
   in
-  Tpat_record (args, repres, closed)
+  Tpat_record
+    (full_record_pattern_fields args, Ivar.create_full repres, closed)
 
 type tpat_record_unboxed_product_identifier =
   Types.record_unboxed_product_representation
@@ -518,7 +570,9 @@ let view_tpat (type a) (p : a pattern_desc) : a matched_pattern_desc =
     Tpat_tuple (pats, labels_and_sorts)
   | Tpat_construct (id, ctor, repres, args, ty) ->
     Tpat_construct (id, ctor, args, ty, repres)
-  | Tpat_record (args, repres, closed) -> Tpat_record (args, closed, repres)
+  | Tpat_record (args, repres, closed) ->
+    Tpat_record
+      (resolved_record_pattern_fields args, closed, Ivar.peek_exn repres)
   | Tpat_record_unboxed_product (args, repres, closed) ->
     Tpat_record_unboxed_product (args, closed, repres)
   | _ -> O p

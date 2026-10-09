@@ -1022,6 +1022,31 @@ let equal_variant_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
   | (Variant_unboxed | Variant_boxed _ | Variant_extensible | Variant_with_null), _ ->
       false
 
+let record_representation_allocates = function
+  | Record_unboxed
+  | Record_inlined (_, _, (Variant_unboxed | Variant_with_null)) -> false
+  | Record_boxed | Record_float | Record_ufloat | Record_mixed _
+  | Record_inlined (_, _, (Variant_boxed _ | Variant_extensible))
+  | Record_undetermined | Record_variable _ -> true
+  | Record_dummy _ ->
+    Misc.fatal_error "Types.record_representation_allocates: dummy"
+
+let field_projection_boxes repres pos =
+  match repres with
+  | Record_float -> true
+  | Record_mixed mixed ->
+    let rec is_float_boxed = function
+      | Float_boxed -> true
+      | Float64 | Float32 | Scannable _ | Bits8 | Bits16 | Bits32
+      | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word
+      | Untagged_immediate | Void | Product _ ->
+        false
+      | Addressable e -> is_float_boxed e
+    in
+    is_float_boxed mixed.(pos)
+  | Record_unboxed | Record_inlined _ | Record_boxed | Record_ufloat
+  | Record_dummy _ | Record_undetermined | Record_variable _ -> false
+
 let equal_record_representation_up_to_scannable_axes r1 r2 = match r1, r2 with
   | Record_unboxed, Record_unboxed ->
       true

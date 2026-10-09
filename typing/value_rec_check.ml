@@ -179,13 +179,15 @@ let classify_expression : Typedtree.expression -> sd =
     | Texp_construct _ ->
         Static
 
-    | Texp_record { representation = Record_unboxed;
-                    fields = [| _, _, Overridden (_,e) |] } ->
-        classify_expression env e
-    | Texp_record { representation = Record_ufloat; _ } ->
-        Dynamic
-    | Texp_record _ ->
-        Static
+    | Texp_record { representation; fields; _ } -> begin
+        match Ivar.peek_exn representation, fields with
+        | Record_unboxed, [ { rf_exp = e; _ } ] ->
+            classify_expression env e
+        | Record_ufloat, _ ->
+            Dynamic
+        | _ ->
+            Static
+      end
 
     | Texp_variant _
     | Texp_tuple _
@@ -811,7 +813,7 @@ let rec expression : Typedtree.expression -> term_judg =
     | Texp_record { fields = es; extended_expression = eo;
                     representation = rep } ->
         let field_mode =
-          match rep with
+          match Ivar.peek_exn rep with
           | Record_float -> Dereference
           | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> Return
           | Record_boxed | Record_ufloat | Record_mixed _ | Record_variable _
@@ -829,17 +831,14 @@ let rec expression : Typedtree.expression -> term_judg =
             Misc.fatal_error
               "value_rec_check: unexpected undetermined representation"
         in
-        let field (_, _, field_def) =
-          let env =
-            match field_def with
-            | Kept _ -> empty
-            | Overridden (_, e) -> expression e
-          in
-          env << field_mode
+        (* Kept fields are read from [eo], which is accounted for below. *)
+        let field { rf_exp; _ } = expression rf_exp << field_mode in
+        let extended_expression =
+          Option.map (fun { er_record; _ } -> er_record) eo
         in
         join [
-          array field es;
-          option expression (Option.map Misc.fst4 eo) << Dereference
+          join (List.map field es);
+          option expression extended_expression << Dereference
         ]
     | Texp_record_unboxed_product { fields = es; extended_expression = eo;
                                     representation = rep } ->

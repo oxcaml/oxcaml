@@ -10,9 +10,16 @@
 
 type 'a t
 
+(** An ivar of any content type. *)
+type packed = Packed : 'a t -> packed
+
 (** [create ~in_global_pool ()] returns an empty ivar, added to the
     {!Global_pool} iff [in_global_pool]. *)
 val create : in_global_pool:bool -> unit -> 'a t
+
+(** [create_full v] returns an ivar filled with [v]. It is not added to the
+    {!Global_pool}. *)
+val create_full : 'a -> 'a t
 
 (** [is_empty t] returns [true] if [t] is empty. *)
 val is_empty : 'a t -> bool
@@ -46,6 +53,16 @@ val upon :
   scheduler:Scheduler.t ->
   unit
 
+(** [upon_all t packeds ~scheduler] fills [t] once every ivar of [packeds] is
+    full. If they already are, [t] is filled now. *)
+val upon_all : unit t -> packed list -> scheduler:Scheduler.t -> unit
+
+(** [drop_all_handlers ()] detaches the handlers of every empty ivar, without
+    running or cancelling them. This is for when type checking is abandoned
+    (e.g. after an error), so that ivars no longer contain closures and can be
+    marshalled (e.g. into a [.cmt] file). *)
+val drop_all_handlers : unit -> unit
+
 (** [cancel_all t ~scheduler] detaches all handlers waiting on [t] and enqueues
     each [cancel]. Does nothing if [t] is full. *)
 val cancel_all : 'a t -> scheduler:Scheduler.t -> unit
@@ -56,13 +73,18 @@ val cancel_all : 'a t -> scheduler:Scheduler.t -> unit
     values. *)
 val merge : 'a t -> 'a t -> f:('a -> 'a -> 'a) -> scheduler:Scheduler.t -> unit
 
-(** An ivar of any content type. *)
-type packed = Packed : 'a t -> packed
 
 (** A pool of ivars that must be filled or cancelled, e.g. before the end of
     some scope. *)
 module Global_pool : sig
-  (** [take ()] empties the pool, returning the ivars that were in it. *)
+  (** [add t] adds [t] to the pool. *)
+  val add : packed -> unit
+
+  (** [exists_empty ()] is [true] iff an ivar in the pool is empty. *)
+  val exists_empty : unit -> bool
+
+  (** [take ()] empties the pool, returning the ivars that were in it, most
+      recently added first. *)
   val take : unit -> packed list
 end
 

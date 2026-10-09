@@ -156,15 +156,20 @@ type modalities = Typemode.modalities =
     moda_desc : Mode.Modality.atom Location.loc list
   }
 
-type texp_field_boxing =
-  | Boxing of locality_mode_r * unique_use
-  (** Projection requires boxing. [unique_use] describes the usage of the
-      unboxed field as argument to boxing. *)
-  | Non_boxing of unique_use
-  (** Projection does not require boxing. [unique_use] describes the usage of
-      the field as the result of direct projection. *)
-
 val aliased_many_use : unique_use
+
+(** [resolved_record_pattern_fields fields] are the [fields] of a [Tpat_record]
+    with their labels, which must have been disambiguated, sorted by label
+    position. *)
+val resolved_record_pattern_fields :
+  (Longident.t loc * Data_types.label_description Ivar.t * 'a) list ->
+  (Longident.t loc * Data_types.label_description * 'a) list
+
+(** [full_record_pattern_fields fields] are [fields] with already
+    disambiguated labels, as the fields of a [Tpat_record]. *)
+val full_record_pattern_fields :
+  (Longident.t loc * Data_types.label_description * 'a) list ->
+  (Longident.t loc * Data_types.label_description Ivar.t * 'a) list
 
 (** [label_ambiguity] specifies the result of type-driven label disambiguation.
     Disambiguation occurs when the same label (record field or variant case)
@@ -183,8 +188,10 @@ type label_ambiguity =
   | Unambiguous
 
 type _ type_inspection =
-  | Label_disambiguation : label_ambiguity -> [< `pat | `exp ] type_inspection
-  (** Label (e.g. record field or variant constructor) disambiguation *)
+  | Label_disambiguation :
+      label_ambiguity Ivar.t -> [< `pat | `exp ] type_inspection
+  (** Label (e.g. record field or variant constructor) disambiguation. The
+      ivar is filled once the label is disambiguated. *)
   | Polymorphic_parameter : 'a poly_param -> 'a type_inspection
   (** Polymorphic parameter uses (e.g. polymorphic object method) *)
   | Module_pack : Types.type_expr -> [< `pat | `exp ] type_inspection
@@ -353,10 +360,13 @@ and 'k pattern_desc =
             See {!Types.row_desc} for an explanation of the last parameter.
          *)
   | Tpat_record :
-      (Longident.t loc * Data_types.label_description * value general_pattern)
-        list *
-        Types.record_representation * closed_flag ->
-      value pattern_desc
+      (Longident.t loc
+      * Data_types.label_description Ivar.t
+      * value general_pattern)
+      list
+      * Types.record_representation Ivar.t
+      * closed_flag
+      -> value pattern_desc
         (** { l1=P1; ...; ln=Pn }     (flag = Closed)
             { l1=P1; ...; ln=Pn; _}   (flag = Open)
 
@@ -560,7 +570,7 @@ and expression_desc =
             assume] attribute that may appear on applications. *)
   | Texp_match of
       expression * Jkind.sort * computation case list * value case list *
-      partial
+      partial Ivar.t
         (** match E0 with
             | P1 -> E1
             | P2 | exception P3 -> E2
@@ -569,6 +579,10 @@ and expression_desc =
 
             [Texp_match (E0, sort_of_E0, [(P1, E1); (P2 | exception P3, E2);
                               (exception P4, E3)], [(P4, E4)], _)]
+
+            The partiality of the match is filled once the patterns are
+            fully typed, which may be delayed (e.g. by record patterns whose
+            labels are not yet disambiguated).
          *)
   | Texp_try of expression * value case list * value case list
         (** try E with
@@ -616,32 +630,36 @@ and expression_desc =
             or [None] if the variant has no argument,
             in which case it does not need allocation.
           *)
-  | Texp_record of {
-      fields :
-        ( Data_types.label_description * Jkind.sort * record_label_definition )
-          array;
-      representation : Types.record_representation;
-      extended_expression :
-        (expression * Jkind.sort * Types.record_representation
-         * Unique_barrier.t) option;
-      locality_mode : locality_mode_r option
-    }
+  | Texp_record of
+      { fields : record_field list;
+        representation : Types.record_representation Ivar.t;
+        extended_expression : extended_record_expression option;
+        locality_mode : locality_mode_r Ivar.t
+      }
         (** { l1=P1; ...; ln=Pn }           (extended_expression = None)
             { E0 with l1=P1; ...; ln=Pn }   (extended_expression = Some E0)
 
             Invariant: n > 0
 
+            [fields] are the fields [l1=P1; ...; ln=Pn] written in the
+            expression, which may be typed before their labels are known.
+            The ivars are filled once the labels are disambiguated,
+            which may be delayed until the type of the record is known.
+
             If the type is { l1: t1; l2: t2 }, the expression
             { E0 with t2=P2 } is represented as
             Texp_record
-              { fields = [| l1, Kept t1; l2 Override P2 |]; representation;
-                extended_expression = Some E0 }
+              { fields = [l2 = P2]; representation;
+                extended_expression = Some { er_record = E0; er_kept = [l1]} }
+
             [extended_expression] carries the representation of E0, which can
             differ from [representation] under a polymorphic update where the
             changed field's type changes its layout.
-            [locality_mode] is the locality mode of the record,
-            or [None] if it is [Record_unboxed],
-            in which case it does not need allocation.
+
+            [locality_mode] is the locality mode of the record. A record
+            that does not allocate (see
+            [Types.record_representation_allocates]) has a [global]
+            [locality_mode], which is otherwise unused.
           *)
   | Texp_record_unboxed_product of {
       fields : ( Data_types.unboxed_label_description * Jkind.sort *
@@ -671,16 +689,24 @@ and expression_desc =
   | Texp_field of {
       record : expression;
       record_sort : Jkind.sort;
-      record_repres : Types.record_representation;
+      record_repres : Types.record_representation Ivar.t;
       lid : Longident.t loc;
-      label : Data_types.label_description;
-      boxing : texp_field_boxing;
+      label : Data_types.label_description Ivar.t;
+      locality_mode : locality_mode_r Ivar.t;
+      unique_use : unique_use Ivar.t;
       unique_barrier : Unique_barrier.t;
     }
     (** - The [record_sort] is the sort of the whole record (which may be
           non-value if the record is @@unboxed).
-        - [texp_field_boxing] provides extra information depending on if the
-          projection requires boxing. *)
+        - [record_repres], [label], [locality_mode] and [unique_use] are
+          filled once [lid] is disambiguated, which may be delayed until the
+          type of [record] is known.
+        - Whether the projection boxes the field is given by
+          [Types.field_projection_boxes]. If it does, [locality_mode] is the
+          mode of the box and [unique_use] describes the usage of the unboxed
+          field as argument to boxing. Otherwise, [locality_mode] is [global]
+          and unused, and [unique_use] describes the usage of the field as the
+          result of direct projection. *)
   | Texp_unboxed_field of {
       record : expression;
       record_sort : Jkind.sort;
@@ -691,13 +717,16 @@ and expression_desc =
     }
   | Texp_setfield of {
       record : expression;
-      record_repres : Types.record_representation;
+      record_repres : Types.record_representation Ivar.t;
       modality : Mode.Locality.l;
       lid : Longident.t loc;
-      label : Data_types.label_description;
+      label : Data_types.label_description Ivar.t;
       newval : expression;
     }
-    (** [locality_mode] translates to the [modify_mode] of the record *)
+    (** [locality_mode] translates to the [modify_mode] of the record.
+        [record_repres] and [label] are filled once [lid] is disambiguated,
+        which may be delayed until the type of [record] is known. [newval]
+        may be typed before [lid] is disambiguated. *)
   | Texp_array of
       Types.mutability * Jkind.Sort.t * expression list * locality_mode_r
   | Texp_idx of block_access * unboxed_access list
@@ -748,7 +777,7 @@ and expression_desc =
       param_sort : Jkind.sort;
       body : value case;
       body_sort : Jkind.sort;
-      partial : partial;
+      partial : partial Ivar.t;
     }
   | Texp_unreachable
   | Texp_extension_constructor of Longident.t loc * Path.t
@@ -765,6 +794,14 @@ and expression_desc =
   | Texp_hole of unique_use (** _ *)
   | Texp_quote of expression
   | Texp_splice of expression
+
+and extended_record_expression =
+  { er_record : expression
+  ; er_sort : Jkind.sort
+  ; er_representation : Types.record_representation Ivar.t
+  ; er_kept : kept_field list Ivar.t
+  ; er_unique_barrier : Unique_barrier.t
+  }
 
 and meth =
     Tmeth_name of string
@@ -791,11 +828,12 @@ and function_param =
         parameter of the function.
     *)
     fp_param_debug_uid: Shape.Uid.t;
-    fp_partial: partial;
+    fp_partial: partial Ivar.t;
     (**
        [fp_partial] =
        [Partial] if the pattern match is partial
        [Total] otherwise.
+       It is filled once the pattern is fully typed (see [Texp_match]).
     *)
     fp_kind: function_param_kind;
     fp_sort: Jkind.sort;
@@ -843,7 +881,7 @@ and function_cases =
     fc_arg_mode: locality_mode_l;
     fc_arg_sort: Jkind.sort;
     fc_ret_type : Types.type_expr;
-    fc_partial: partial;
+    fc_partial: partial Ivar.t;
     fc_param: Ident.t;
     fc_param_debug_uid : Shape.Uid.t;
     fc_loc: Location.t;
@@ -911,6 +949,21 @@ and record_label_definition =
   | Kept of Types.type_expr * Types.mutability * unique_use
   | Overridden of Longident.t loc * expression
 
+and record_field =
+  { rf_lid : Longident.t loc;
+    rf_label : Data_types.label_description Ivar.t;
+    rf_sort : Jkind.sort;
+    rf_exp : expression;
+  }
+
+and kept_field =
+  { kf_label : Data_types.label_description;
+    kf_sort : Jkind.sort;
+    kf_type : Types.type_expr;
+    kf_mut : Types.mutability;
+    kf_unique_use : unique_use;
+  }
+
 and binding_op =
   {
     bop_op_path : Path.t;
@@ -960,7 +1013,7 @@ and class_expr_desc =
   | Tcl_structure of class_structure
   | Tcl_fun of
       arg_label * pattern * (Ident.t * expression) list
-      * class_expr * partial
+      * class_expr * partial Ivar.t
   | Tcl_apply of class_expr * (arg_label * apply_arg) list
   | Tcl_let of rec_flag * value_binding list *
                   (Ident.t * expression) list * class_expr

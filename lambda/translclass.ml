@@ -447,6 +447,7 @@ let rec build_object_init ~scopes cl_table obj params inh_init obj_init cl =
            params obj_init,
          has_init))
   | Tcl_fun (_, pat, vals, cl, partial) ->
+      let partial = Ivar.peek_exn partial in
       let (inh_init, obj_init) =
         (* [vals] maps all pattern variables to idents for use inside methods *)
         build_object_init ~scopes cl_table obj (vals @ params)
@@ -816,6 +817,7 @@ let rec transl_class_rebind ~scopes obj_init cl vf =
       let path_lam = transl_class_path cl_loc cl.cl_env path in
       (path, path_lam, obj_init)
   | Tcl_fun (_, pat, _, cl, partial) ->
+      let partial = Ivar.peek_exn partial in
       let path, path_lam, obj_init =
         transl_class_rebind ~scopes obj_init cl vf in
       let build params rem =

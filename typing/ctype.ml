@@ -179,22 +179,31 @@ let scheduler = s_ref_of_create Scheduler.create ()
 
 let scheduler () = !scheduler
 
-(* Runs the scheduler, then defaults any still-empty ivars, until none remain.
-   Defaulting calls each handler's [run] with its [default ()]; [run]'s
-   unification fills the ivar (see [upon_shape]). *)
+(* Runs the scheduler, then defaults the oldest still-empty ivar, until none
+   remain. Defaulting calls each handler's [run] with its [default ()]; [run]'s
+   unification fills the ivar (see [upon_shape]).
+
+   Ivars are defaulted one at a time, since defaulting one may fill others.
+   For example, in [fun r -> r.a.b], defaulting the type of [r] determines the
+   type of [r.a], which is needed to disambiguate [b]. *)
 let run_scheduler_and_default_ivars () =
   let rec loop () =
     Scheduler.run (scheduler ());
-    let defaulted = ref false in
-    List.iter (fun (Ivar.Packed ivar) ->
-        if Ivar.is_empty ivar then begin
-          defaulted := true;
-          Ivar.cancel_all ivar ~scheduler:(scheduler ())
-        end)
-      (Ivar.Global_pool.take ());
-    if !defaulted then loop ()
+    let empty =
+      List.filter (fun (Ivar.Packed ivar) -> Ivar.is_empty ivar)
+        (Ivar.Global_pool.take ())
+    in
+    match List.rev empty with
+    | [] -> ()
+    | Ivar.Packed oldest :: rest ->
+      (* Re-add oldest first, preserving the order of the pool. *)
+      List.iter Ivar.Global_pool.add rest;
+      Ivar.cancel_all oldest ~scheduler:(scheduler ());
+      loop ()
   in
   loop ()
+
+let has_pending_ivars () = Ivar.Global_pool.exists_empty ()
 
 let get_current_level () = !current_level
 let init_def level = current_level := level; nongen_level := level
@@ -5222,13 +5231,43 @@ let at_current_levels f =
     nongen_level := nongen;
     wrap_end_def (fun () -> f x)
 
+(* [at_current_warnings f] is [f], run with the warning state when
+   [at_current_warnings f] was called, e.g. inside a [[@warning]] scope. *)
+let at_current_warnings f =
+  let warnings = Warnings.backup () in
+  fun x ->
+    let saved = Warnings.backup () in
+    Warnings.restore warnings;
+    Misc.try_finally ~always:(fun () -> Warnings.restore saved)
+      (fun () -> f x)
+
+let suspend f = at_current_levels (at_current_warnings f)
+
+(* [upon ivar ~run] calls [run] with the contents of [ivar] once it is full,
+   at the levels and with the warning state current now (see [suspend]). If
+   [ivar] is already full, [run] is called now, as in [upon_shape]. [ivar] must
+   not be defaulted. *)
+let upon ivar ~run =
+  match Ivar.peek ivar with
+  | Some value -> run value
+  | None ->
+    Ivar.upon ivar ~run:(suspend run) ~scheduler:(scheduler ())
+      ~cancel:(fun () -> Misc.fatal_error "Ctype.upon: defaulted ivar")
+
+(* [upon_all ivars ~run] calls [run ()] once every ivar of [ivars] is full, as
+   for [upon]. *)
+let upon_all ivars ~run =
+  let all = Ivar.create ~in_global_pool:false () in
+  Ivar.upon_all all ivars ~scheduler:(scheduler ());
+  upon all ~run
+
 (* Registers [run] on [ivar]. If [ivar] is defaulted, calls [run (default ())]
    instead. A conflicting default fails in [run]'s unification. *)
 let ivar_upon ivar ~run ~default ~scheduler =
   Ivar.upon ivar ~run ~cancel:(fun () -> run (default ())) ~scheduler
 
 let upon_shape env ty ~run ~default =
-  let run = at_current_levels run in
+  let run = suspend run and default = at_current_warnings default in
   let scheduler = scheduler () in
   let ty = expand_head env ty in
   match get_desc ty with
@@ -5242,9 +5281,12 @@ let upon_shape env ty ~run ~default =
    | _ ->
      (* Fast path: [ty] is not a variable, so behaves as if its ivar
         were already filled, or defaulted if [ty] has no shape. *)
+     (* CR-someday aobrien: once the typechecker is fully omnidirectional,
+        we could delay arbitrarily. For now, we run the constraint immediately
+        to avoid breaking existing directional behaviour. *)
       match shape_of_expanded_head env ty with
-      | Some shape -> Scheduler.add scheduler (fun () -> run shape)
-      | None -> Scheduler.add scheduler (fun () -> run (default ()))
+      | Some shape -> run shape
+      | None -> run (default ())
 
 (* Unify a [Tivar] [t1'] with the non-variable type [t2], whose expanded head
    is [t2']: link [t1'] to [t2] as for a [Tvar], then fill its ivar with the

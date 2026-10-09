@@ -3129,7 +3129,7 @@ let extract_qtvs tyl =
 
 let param_jkind ty =
   match get_desc ty with
-  | Tvar { jkind; _ } | Tunivar { jkind; _ } ->
+  | Tvar { jkind; _ } | Tivar { jkind; _ } | Tunivar { jkind; _ } ->
      out_jkind_option_of_jkind ~ignore_null:false !printing_env jkind
   | _ -> None (* this is (C2.2) from Note [When to print jkind annotations] *)
 
@@ -4165,7 +4165,7 @@ let trees_of_type_expansion'
     let out = tree_of_typexp mode ty in
     if var_jkinds then
       match get_desc ty with
-      | Tvar { jkind; _ } | Tunivar { jkind; _ } ->
+      | Tvar { jkind; _ } | Tivar { jkind; _ } | Tunivar { jkind; _ } ->
           let okind = out_jkind_of_desc !printing_env (Jkind.get jkind) in
           Otyp_jkind_annot (out, okind)
       | _ ->

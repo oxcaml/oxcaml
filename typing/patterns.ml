@@ -131,7 +131,8 @@ module General = struct
     | Tpat_variant (cstr, arg, row_desc) ->
        `Variant (cstr, arg, row_desc)
     | Tpat_record (fields, repr, closed) ->
-       `Record (fields, repr, closed)
+       `Record
+         (resolved_record_pattern_fields fields, Ivar.peek_exn repr, closed)
     | Tpat_record_unboxed_product (fields, repr, closed) ->
        `Record_unboxed_product (fields, repr, closed)
     | Tpat_array (am, arg_sort, ps) -> `Array (am, arg_sort, ps)
@@ -161,7 +162,8 @@ module General = struct
     | `Variant (cstr, arg, row_desc) ->
        Tpat_variant (cstr, arg, row_desc)
     | `Record (fields, repr, closed) ->
-       Tpat_record (fields, repr, closed)
+       Tpat_record
+         (full_record_pattern_fields fields, Ivar.create_full repr, closed)
     | `Record_unboxed_product (fields, repr, closed) ->
        Tpat_record_unboxed_product (fields, repr, closed)
     | `Array (am, arg_sort, ps) -> Tpat_array (am, arg_sort, ps)
@@ -327,7 +329,8 @@ end = struct
               (lid_loc, lbl, omega)
             ) lbls
           in
-          Tpat_record (lst, repr, Closed)
+          Tpat_record
+            (full_record_pattern_fields lst, Ivar.create_full repr, Closed)
       | Record_unboxed_product (lbls, repr) ->
           let lst =
             List.map (fun lbl ->

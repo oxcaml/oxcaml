@@ -1321,9 +1321,9 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
       let l, spat = Typetexp.transl_label_from_pat l spat in
       if Typecore.has_poly_constraint spat then
         raise(Error(spat.ppat_loc, val_env, Polymorphic_class_parameter));
-      let (pat, pv, val_env', met_env) =
+      let (pat, pv, val_env', met_env, pending) =
         Ctype.with_local_level_generalize_structure_if_principal
-          ~before_generalize:begin fun (pat, _, _, _) ->
+          ~before_generalize:begin fun (pat, _, _, _, _) ->
             let gen {pat_type = ty} = Ctype.generalize_structure ty in
             iter_pattern gen pat
           end
@@ -1361,7 +1361,7 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
       in
       let partial =
         let dummy = Typecore.type_exp val_env (Ast_helper.Exp.unreachable ()) in
-        Typecore.check_partial val_env pat.pat_type pat.pat_loc
+        Typecore.check_partial ~pending val_env pat.pat_type pat.pat_loc
           [{c_lhs = pat; c_cont = None; c_guard = None; c_rhs = dummy}]
       in
       let val_env' =

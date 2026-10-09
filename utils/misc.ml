@@ -338,6 +338,10 @@ module Stdlib = struct
       | Some x -> p x
       | None -> false
 
+    let for_all p t = match t with
+      | Some x -> p x
+      | None -> true
+
     let first_some a b = match a with
       | Some _ -> a
       | None -> b ()

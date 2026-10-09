@@ -63,7 +63,7 @@ let cases_contain_gadt cases =
 let param_is_partial_gadt_match fp =
   match fp.fp_kind with
   | Tparam_pat pat -> (
-      match fp.fp_partial with
+      match Ivar.peek_exn fp.fp_partial with
       | Total -> false
       | Partial -> pat_contains_gadt pat)
   | Tparam_optional_default (pat, _, _) ->
@@ -434,6 +434,30 @@ let zero_alloc_of_application
     end
   | None, _ -> Zero_alloc_utils.Assume_info.none
 
+(* The fields of a record expression in label order, including those kept
+   from the extended expression. *)
+let record_label_definitions fields kept =
+  let size =
+    match fields, kept with
+    | { rf_label; _ } :: _, _ -> Array.length (Ivar.peek_exn rf_label).lbl_all
+    | [], { kf_label; _ } :: _ -> Array.length kf_label.lbl_all
+    | [], [] -> fatal_error "Translcore: record expression without labels"
+  in
+  let definitions = Array.make size None in
+  List.iter (fun { rf_lid; rf_label; rf_sort; rf_exp } ->
+      let lbl = Ivar.peek_exn rf_label in
+      definitions.(lbl.lbl_pos) <-
+        Some (lbl, rf_sort, Overridden (rf_lid, rf_exp)))
+    fields;
+  List.iter (fun { kf_label; kf_sort; kf_type; kf_mut; kf_unique_use } ->
+      definitions.(kf_label.lbl_pos) <-
+        Some (kf_label, kf_sort, Kept (kf_type, kf_mut, kf_unique_use)))
+    kept;
+  Array.map (function
+      | Some definition -> definition
+      | None -> fatal_error "Translcore: record expression missing a label")
+    definitions
+
 let rec transl_exp ~scopes layout e =
   transl_exp1 ~scopes ~in_new_scope:false layout e
 
@@ -565,10 +589,12 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
            (transl_exp ~scopes Lambda.layout_function funct)
            oargs (of_location ~scopes e.exp_loc))
   | Texp_match(arg, arg_sort, pat_expr_list, [], partial) ->
+      let partial = Ivar.peek_exn partial in
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
       transl_match ~scopes ~arg_sort ~return_layout:layout e arg pat_expr_list
         partial
   | Texp_match(arg, arg_sort, pat_expr_list, eff_pat_expr_list, partial) ->
+      let partial = Ivar.peek_exn partial in
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
   (* need to separate the values from exceptions for transl_handler *)
       let split_case (val_cases, exn_cases as acc)
@@ -825,24 +851,41 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                   [tagged_immediate tag; lam],
                   of_location ~scopes e.exp_loc)
       end
-  | Texp_record {fields; representation; extended_expression; locality_mode} ->
+  | Texp_record
+      { fields; representation; extended_expression; locality_mode } ->
+      let extended_expression, kept =
+        match extended_expression with
+        | None -> None, []
+        | Some
+            { er_record;
+              er_sort;
+              er_representation;
+              er_unique_barrier;
+              er_kept
+            }
+          ->
+          let er_representation =
+            Typeopt.transl_record_representation e.exp_env e.exp_loc
+              (Ivar.peek_exn er_representation)
+          in
+          ( Some (er_record, er_sort, er_representation, er_unique_barrier),
+            Ivar.peek_exn er_kept )
+      in
+      let fields = record_label_definitions fields kept in
+      let allocates =
+        Types.record_representation_allocates (Ivar.peek_exn representation)
+      in
       let representation =
         Typeopt.transl_record_representation e.exp_env e.exp_loc
-          representation
+          (Ivar.peek_exn representation)
       in
-      let extended_expression =
-        Option.map
-          (fun (init_expr, sort, repres, ubr) ->
-             let repres =
-               Typeopt.transl_record_representation e.exp_env e.exp_loc
-                 repres
-             in
-             (init_expr, sort, repres, ubr))
-          extended_expression
+      let locality_mode =
+        if allocates
+        then Some (transl_typed_locality_mode_r (Ivar.peek_exn locality_mode))
+        else None
       in
-      transl_record ~scopes e.exp_loc e.exp_env
-        (Option.map transl_typed_locality_mode_r locality_mode)
-        fields representation extended_expression
+      transl_record ~scopes e.exp_loc e.exp_env locality_mode fields representation
+        extended_expression
   | Texp_record_unboxed_product
         {fields; representation; extended_expression } ->
       transl_record_unboxed_product ~scopes e.exp_loc e.exp_env
@@ -884,11 +927,13 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                 transl_typed_locality_mode_r locality_mode),
              [arg; lbl], loc)
   | Texp_field { record = arg; record_sort = arg_sort;
-                 record_repres; lid = _; label = lbl; boxing = float;
-                 unique_barrier = ubr } ->
+                 record_repres; lid = _; label = lbl; locality_mode;
+                 unique_use = _; unique_barrier = ubr } ->
+      let lbl = Ivar.peek_exn lbl in
+      let locality_mode = Ivar.peek_exn locality_mode in
       let record_repres =
         Typeopt.transl_record_representation arg.exp_env e.exp_loc
-          record_repres
+          (Ivar.peek_exn record_repres)
       in
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
       let arg_layout = layout_exp arg_sort arg in
@@ -913,11 +958,6 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
             Some (Pfield (lbl.lbl_pos, immediate_or_pointer, sem), [targ])
         | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> None
         | Record_float ->
-          let locality_mode =
-            match float with
-            | Boxing (locality_mode, _) -> locality_mode
-            | Non_boxing _ -> assert false
-          in
           let mode = transl_typed_locality_mode_r locality_mode in
           Some (Pfloatfield (lbl.lbl_pos, sem, mode), [targ])
         | Record_ufloat ->
@@ -952,13 +992,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                   Lambda.{ raw_kind; nullable })
               ~get_mode:(fun i ->
                 if i <> lbl.lbl_pos then Lambda.alloc_heap
-                else
-                  match float with
-                    | Boxing (mode, _) -> transl_typed_locality_mode_r mode
-                    | Non_boxing _ ->
-                        Misc.fatal_error
-                          "expected typechecking to make [float] boxing mode\
-                          \ present for float field read")
+                else transl_typed_locality_mode_r locality_mode)
               shape
           in
           if Types.is_atomic lbl.lbl_mut then
@@ -1012,6 +1046,8 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
     end
   | Texp_setfield{ record = arg; record_repres;
                    modality = arg_mode; lid = _id; label = lbl; newval } ->
+      let record_repres = Ivar.peek_exn record_repres in
+      let lbl = Ivar.peek_exn lbl in
       (* CR layouts v2.5: When we allow `any` in record fields and check
          representability on construction, [sort_of_jkind] will be unsafe here.
          Probably we should add a sort to `Texp_setfield` in the typed tree,
@@ -1414,7 +1450,8 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       let body_sort = Jkind.Sort.default_for_transl_and_get body_sort in
       event_after ~scopes e
         (transl_letop ~scopes e.exp_loc e.exp_env let_ ands
-           param param_debug_uid param_sort body body_sort partial)
+           param param_debug_uid param_sort body body_sort
+           (Ivar.peek_exn partial))
   | Texp_unreachable ->
       raise (Error (e.exp_loc, Unreachable_reached))
   | Texp_open (od, e) ->
@@ -1964,14 +2001,15 @@ and transl_tupled_function
         { fc_cases = first_case :: rest_cases;
           fc_partial; fc_arg_mode; fc_arg_sort } ->
         let fc_arg_sort = Jkind.Sort.default_for_transl_and_get fc_arg_sort in
-        Some (first_case, rest_cases, fc_partial, fc_arg_mode, fc_arg_sort)
+        Some (first_case, rest_cases, Ivar.peek_exn fc_partial, fc_arg_mode,
+              fc_arg_sort)
     | [{ fp_kind = Tparam_pat pat; fp_partial; fp_mode; fp_sort }],
       Tfunction_body body ->
         let fp_sort = Jkind.Sort.default_for_transl_and_get fp_sort in
         let case =
           { c_lhs = pat; c_cont = None; c_guard = None; c_rhs = body }
         in
-        Some (case, [], fp_partial, fp_mode.mode_modes, fp_sort)
+        Some (case, [], Ivar.peek_exn fp_partial, fp_mode.mode_modes, fp_sort)
     | _ -> None
   in
   (* Cases can be eligible for flattening if they belong to the only param
@@ -2190,6 +2228,7 @@ and transl_curried_function ~scopes loc repr params body
         { fc_cases; fc_partial; fc_param; fc_param_debug_uid;
           fc_loc; fc_arg_sort; fc_arg_mode }
       ->
+        let fc_partial = Ivar.peek_exn fc_partial in
         let fc_arg_sort = Jkind.Sort.default_for_transl_and_get fc_arg_sort in
         let fc_arg_ty, _ = split_fun_ty fc_fun_ty in
         let arg_layout =
@@ -2237,6 +2276,7 @@ and transl_curried_function ~scopes loc repr params body
       (fun (fp, (follows_partial_gadt, fun_arg_ty)) (body, params) ->
         let { fp_param; fp_param_debug_uid; fp_kind; fp_mode; fp_sort;
               fp_partial; fp_loc } = fp in
+        let fp_partial = Ivar.peek_exn fp_partial in
         let arg_env, arg_type, attributes =
           match fp_kind with
           | Tparam_pat pat ->
@@ -3281,7 +3321,8 @@ and transl_letop ~scopes loc env let_ ands param param_debug_uid param_sort case
              ~fun_ty:None loc repr []
              (Tfunction_cases
                 { fc_cases = [case]; fc_param = param;
-                  fc_param_debug_uid = param_debug_uid; fc_partial = partial;
+                  fc_param_debug_uid = param_debug_uid;
+                  fc_partial = Ivar.create_full partial;
                   fc_loc = ghost_loc; fc_exp_extra = []; fc_attributes = [];
                   fc_arg_mode =
                     create_locality_mode_l

@@ -4817,6 +4817,9 @@ let type_implementation target modulename initial_env ast =
       end
     )
     ~exceptionally:(fun () ->
+        (* Suspended constraints may still be waiting on ivars in the
+           partial typed tree; their handlers cannot be marshalled. *)
+        Ivar.drop_all_handlers ();
         Profile.record_call "save_cmt" (fun () ->
           let annots =
             Cmt_format.Partial_implementation

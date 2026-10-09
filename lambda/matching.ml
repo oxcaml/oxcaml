@@ -238,8 +238,9 @@ end = struct
         else
           { p with pat_desc = Tpat_or (p1, p2, o) }
     | Tpat_record (lbls, r, closed) ->
-        let all_lbls = all_record_args lbls in
-        { p with pat_desc = Tpat_record (all_lbls, r, closed) }
+        let all_lbls = all_record_args (resolved_record_pattern_fields lbls) in
+        { p with pat_desc =
+                   Tpat_record (full_record_pattern_fields all_lbls, r, closed) }
     | Tpat_record_unboxed_product (lbls, r, closed) ->
         let all_lbls = all_record_args lbls in
         { p with pat_desc =
@@ -2549,7 +2550,9 @@ let get_pat_args_record num_fields p rem =
   match p with
   | { pat_desc = Tpat_any } -> record_matching_line num_fields [] @ rem
   | { pat_desc = Tpat_record (lbl_pat_list, _, _) } ->
-      record_matching_line num_fields lbl_pat_list @ rem
+      record_matching_line num_fields
+        (resolved_record_pattern_fields lbl_pat_list)
+      @ rem
   | _ -> assert false
 
 let get_pat_args_record_unboxed_product num_fields p rem =

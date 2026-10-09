@@ -2747,7 +2747,7 @@ and quote_pat_extra ~env ~scopes loc pat_lam extra =
   | Tpat_inspected_type (Label_disambiguation ambiguity) ->
     pat_lam
     |> maybe_constrain_pat_with_type loc
-         (type_constraint_of_ambiguity loc env ambiguity)
+         (type_constraint_of_ambiguity loc env (Ivar.peek_exn ambiguity))
   | Tpat_inspected_type (Polymorphic_parameter (Param ty)) ->
     Pat.constraint_ loc pat_lam
       (type_for_annotation ~env ~loc:(to_location loc) ty
@@ -2823,7 +2823,8 @@ and quote_value_pattern ~scopes p =
           (fun (lid, lbl_desc, pat) ->
             let lid_loc = Asttypes.(lid.loc) in
             let lbl =
-              quote_record_field (of_location ~scopes lid_loc) env lbl_desc
+              quote_record_field (of_location ~scopes lid_loc) env
+                (Ivar.peek_exn lbl_desc)
             in
             let pat = quote_value_pattern ~scopes pat in
             lbl, pat)
@@ -3389,7 +3390,7 @@ and quote_expression_extra ~env ~scopes _stage extra lambda =
   | Texp_inspected_type (Label_disambiguation ambiguity) ->
     lambda
     |> maybe_constrain_exp_desc_with_type loc
-         (type_constraint_of_ambiguity loc env ambiguity)
+         (type_constraint_of_ambiguity loc env (Ivar.peek_exn ambiguity))
   | Texp_inspected_type (Polymorphic_parameter poly_param) ->
     (* unused dummy for [core_type.ctyp_type] *)
     let cty =
@@ -3649,34 +3650,29 @@ and quote_expression_desc ~scopes ~transl stage e : Exp_desc.t =
       Exp_desc.variant loc variant argo
     | Texp_record { fields; extended_expression } ->
       let lbl_exps =
-        Array.map
-          (fun (lbl, _, def) ->
-            let lbl = quote_record_field loc env lbl in
-            let exp =
-              match def with
-              | Overridden (_, exp) ->
-                quote_expression ~scopes ~transl stage exp
-              | Kept _ ->
-                fatal_errorf
-                  "Translquote [at %a]: record update syntax not implemented"
-                  Location.print_loc (to_location loc)
-            in
-            lbl, exp)
+        List.map
+          (fun { rf_label; rf_exp; _ } ->
+            let lbl = quote_record_field loc env (Ivar.peek_exn rf_label) in
+            lbl, quote_expression ~scopes ~transl stage rf_exp)
           fields
       in
       let base =
         Option.map
-          (fun (e, _, _, _) -> quote_expression ~scopes ~transl stage e)
+          (fun e -> quote_expression ~scopes ~transl stage e.er_record)
           extended_expression
       in
-      Exp_desc.record loc (Array.to_list lbl_exps) base
+      Exp_desc.record loc lbl_exps base
     | Texp_field { record = rcd; lid; label = lbl; _ } ->
       let rcd = quote_expression ~scopes ~transl stage rcd in
-      let lbl = quote_record_field (of_location ~scopes lid.loc) env lbl in
+      let lbl =
+        quote_record_field (of_location ~scopes lid.loc) env (Ivar.peek_exn lbl)
+      in
       Exp_desc.field loc rcd lbl
     | Texp_setfield { record = rcd; lid; label = lbl; newval = exp; _ } ->
       let rcd = quote_expression ~scopes ~transl stage rcd in
-      let lbl = quote_record_field (of_location ~scopes lid.loc) env lbl in
+      let lbl =
+        quote_record_field (of_location ~scopes lid.loc) env (Ivar.peek_exn lbl)
+      in
       let exp = quote_expression ~scopes ~transl stage exp in
       Exp_desc.setfield loc rcd lbl exp
     | Texp_array (_, _, exps, _) ->

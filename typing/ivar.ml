@@ -81,11 +81,35 @@ let fill t value ~scheduler : _ Fill_result.t =
     List.iter (Callback.schedule_run ~value ~scheduler) callbacks;
     Ok
 
+(* Every ivar that has had a handler registered while empty, so that their
+   handlers can be dropped by [drop_all_handlers]. *)
+let waiting : packed list ref = Local_store.s_ref []
+
 let upon t ~run ~cancel ~scheduler =
   match cell t with
   | Full value -> Scheduler.add scheduler (fun () -> run value)
   | Empty callbacks ->
+    waiting := Packed t :: !waiting;
     set_cell t (Empty (Callback.create ~run ~cancel :: callbacks))
+
+let upon_all t packeds ~scheduler =
+  let rec loop packeds =
+    match packeds with
+    | [] -> ignore (fill t () ~scheduler : unit Fill_result.t)
+    | Packed t' :: packeds -> (
+      match cell t' with
+      | Full _ -> loop packeds
+      | Empty _ ->
+        upon t' ~run:(fun _ -> loop packeds) ~cancel:ignore ~scheduler)
+  in
+  loop packeds
+
+let drop_all_handlers () =
+  List.iter
+    (fun (Packed t) ->
+      match cell t with Empty _ -> set_cell t Cell.empty | Full _ -> ())
+    !waiting;
+  waiting := []
 
 let cancel_all t ~scheduler =
   match cell t with
@@ -102,9 +126,11 @@ let merge t1 t2 ~f ~scheduler =
     set_cell t1 cell)
 
 module Global_pool = struct
-  let add t =
+  let add packed =
     Log.log Global_pool_add;
-    global_pool := Packed t :: !global_pool
+    global_pool := packed :: !global_pool
+
+  let exists_empty () = List.exists (fun (Packed t) -> is_empty t) !global_pool
 
   let take () =
     let pool = !global_pool in
@@ -115,5 +141,7 @@ end
 
 let create ~in_global_pool () =
   let t = Union_find.create Cell.empty in
-  if in_global_pool then Global_pool.add t;
+  if in_global_pool then Global_pool.add (Packed t);
   t
+
+let create_full value = Union_find.create (Cell.Full value)

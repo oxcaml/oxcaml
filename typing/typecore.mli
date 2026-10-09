@@ -155,13 +155,17 @@ val type_class_arg_pattern:
         string -> Env.t -> Env.t -> arg_label -> Parsetree.pattern ->
         Typedtree.pattern *
         (Ident.t * Ident.t * type_expr) list *
-        Env.t * Env.t
+        Env.t * Env.t * Ivar.packed list
 val type_self_pattern:
         Env.t -> Parsetree.pattern ->
         Typedtree.pattern * pattern_variable list
+(* [check_partial ~pending env ty loc cases] is the partiality of [cases],
+   filled once the delayed patterns whose ivars are [pending] are fully
+   typed. *)
 val check_partial:
-        ?lev:int -> Env.t -> type_expr ->
-        Location.t -> Typedtree.value Typedtree.case list -> Typedtree.partial
+        ?lev:int -> pending:Ivar.packed list -> Env.t -> type_expr ->
+        Location.t -> Typedtree.value Typedtree.case list ->
+        Typedtree.partial Ivar.t
 val type_expect:
         Env.t ->
         ?mode:Mode.With_regionality.r ->

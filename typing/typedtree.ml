@@ -168,20 +168,27 @@ let return_mode_zap_to_floor_exn m = Mode.Locality.zap_to_floor_exn m
 let print_return_mode ppf m =
   Format_doc.compat (Mode.Locality.print ()) ppf m
 
-type texp_field_boxing =
-  | Boxing of locality_mode_r * unique_use
-  | Non_boxing of unique_use
-
 let aliased_many_use =
   ( Mode.Uniqueness.disallow_left Mode.Uniqueness.aliased,
     Mode.Linearity.disallow_right Mode.Linearity.many )
+
+let resolved_record_pattern_fields fields =
+  List.map (fun (lid, label, pat) -> lid, Ivar.peek_exn label, pat) fields
+  (* The fields of a delayed record pattern are in source order. *)
+  |> List.stable_sort (fun (_, (l1 : Data_types.label_description), _)
+                           (_, (l2 : Data_types.label_description), _) ->
+       Int.compare l1.lbl_pos l2.lbl_pos)
+
+let full_record_pattern_fields fields =
+  List.map (fun (lid, label, pat) -> lid, Ivar.create_full label, pat) fields
 
 type label_ambiguity =
   | Ambiguous of { path: Path.t; arity : int }
   | Unambiguous
 
 type _ type_inspection =
-  | Label_disambiguation : label_ambiguity -> [< `pat | `exp ] type_inspection
+  | Label_disambiguation :
+      label_ambiguity Ivar.t -> [< `pat | `exp ] type_inspection
   | Polymorphic_parameter : 'a poly_param -> 'a type_inspection
   | Module_pack : type_expr -> [< `pat | `exp ] type_inspection
 
@@ -257,8 +264,9 @@ and 'k pattern_desc =
       label * value general_pattern option * row_desc ref ->
       value pattern_desc
   | Tpat_record :
-      (Longident.t loc * label_description * value general_pattern) list *
-        Types.record_representation * closed_flag ->
+      (Longident.t loc * label_description Ivar.t * value general_pattern)
+        list *
+        Types.record_representation Ivar.t * closed_flag ->
       value pattern_desc
   | Tpat_record_unboxed_product :
       (Longident.t loc * unboxed_label_description *
@@ -333,7 +341,7 @@ and expression_desc =
         Mode.Locality.l * Mode.Yielding.l * Zero_alloc.assume option
   | Texp_match of
       expression * Jkind.sort * computation case list * value case list
-      * partial
+      * partial Ivar.t
   | Texp_try of expression * value case list * value case list
   | Texp_unboxed_unit
   | Texp_unboxed_bool of bool
@@ -346,14 +354,10 @@ and expression_desc =
       * locality_mode_r option
   | Texp_variant of label * (expression * locality_mode_r) option
   | Texp_record of {
-      fields :
-        ( Data_types.label_description * Jkind.sort * record_label_definition )
-          array;
-      representation : Types.record_representation;
-      extended_expression :
-        (expression * Jkind.sort * Types.record_representation
-         * Unique_barrier.t) option;
-      locality_mode : locality_mode_r option
+      fields : record_field list;
+      representation : Types.record_representation Ivar.t;
+      extended_expression : extended_record_expression option;
+      locality_mode : locality_mode_r Ivar.t
     }
   | Texp_record_unboxed_product of {
       fields :
@@ -373,10 +377,11 @@ and expression_desc =
   | Texp_field of {
       record : expression;
       record_sort : Jkind.sort;
-      record_repres : Types.record_representation;
+      record_repres : Types.record_representation Ivar.t;
       lid : Longident.t loc;
-      label : Data_types.label_description;
-      boxing : texp_field_boxing;
+      label : Data_types.label_description Ivar.t;
+      locality_mode : locality_mode_r Ivar.t;
+      unique_use : unique_use Ivar.t;
       unique_barrier : Unique_barrier.t;
     }
   | Texp_unboxed_field of {
@@ -389,10 +394,10 @@ and expression_desc =
     }
   | Texp_setfield of {
       record : expression;
-      record_repres : Types.record_representation;
+      record_repres : Types.record_representation Ivar.t;
       modality : Mode.Locality.l;
       lid : Longident.t loc;
-      label : Data_types.label_description;
+      label : Data_types.label_description Ivar.t;
       newval : expression;
     }
   | Texp_array of mutability * Jkind.Sort.t * expression list * locality_mode_r
@@ -440,7 +445,7 @@ and expression_desc =
       param_sort : Jkind.sort;
       body : value case;
       body_sort : Jkind.sort;
-      partial : partial;
+      partial : partial Ivar.t;
     }
   | Texp_unreachable
   | Texp_extension_constructor of Longident.t loc * Path.t
@@ -453,6 +458,14 @@ and expression_desc =
   | Texp_hole of unique_use
   | Texp_quote of expression
   | Texp_splice of expression
+
+and extended_record_expression =
+  { er_record : expression
+  ; er_sort : Jkind.sort
+  ; er_representation : Types.record_representation Ivar.t
+  ; er_kept : kept_field list Ivar.t
+  ; er_unique_barrier : Unique_barrier.t
+  }
 
 and ident_kind =
   | Id_value
@@ -519,7 +532,7 @@ and function_param =
     fp_arg_label: arg_label;
     fp_param: Ident.t;
     fp_param_debug_uid : Shape.Uid.t;
-    fp_partial: partial;
+    fp_partial: partial Ivar.t;
     fp_kind: function_param_kind;
     fp_sort: Jkind.sort;
     fp_mode: locality_mode_l modes;
@@ -543,7 +556,7 @@ and function_cases =
     fc_arg_mode: locality_mode_l;
     fc_arg_sort: Jkind.sort;
     fc_ret_type : Types.type_expr;
-    fc_partial: partial;
+    fc_partial: partial Ivar.t;
     fc_param: Ident.t;
     fc_param_debug_uid: Shape.Uid.t;
     fc_loc: Location.t;
@@ -554,6 +567,21 @@ and function_cases =
 and record_label_definition =
   | Kept of Types.type_expr * mutability * unique_use
   | Overridden of Longident.t loc * expression
+
+and record_field =
+  { rf_lid : Longident.t loc;
+    rf_label : Data_types.label_description Ivar.t;
+    rf_sort : Jkind.sort;
+    rf_exp : expression;
+  }
+
+and kept_field =
+  { kf_label : Data_types.label_description;
+    kf_sort : Jkind.sort;
+    kf_type : Types.type_expr;
+    kf_mut : mutability;
+    kf_unique_use : unique_use;
+  }
 
 and binding_op =
   {
@@ -601,7 +629,7 @@ and class_expr_desc =
   | Tcl_structure of class_structure
   | Tcl_fun of
       arg_label * pattern * (Ident.t * expression) list
-      * class_expr * partial
+      * class_expr * partial Ivar.t
   | Tcl_apply of class_expr * (arg_label * apply_arg) list
   | Tcl_let of rec_flag * value_binding list *
                   (Ident.t * expression) list * class_expr

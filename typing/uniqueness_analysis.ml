@@ -2129,6 +2129,7 @@ and pattern_match_single pat paths : Ienv.Extension.t * UF.t =
     | Tpat_record (pats, _, _) ->
       List.map
         (fun (_, l, pat) ->
+          let l = Ivar.peek_exn l in
           let paths = Paths.record_field l.lbl_modalities l.lbl_name paths in
           pattern_match_single pat paths)
         pats
@@ -2467,35 +2468,44 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
   | Texp_variant (_, Some (arg, _)) ->
     check_uniqueness_exp ~overwrite:None ienv arg
   | Texp_record { fields; extended_expression } ->
-    let value, uf_ext =
+    let uf_ext, uf_kept =
       match extended_expression with
-      | None -> Value.fresh, UF.unused
-      | Some (exp, _, _, unique_barrier) ->
-        let value, uf_exp = check_uniqueness_exp_as_value ienv exp in
-        Unique_barrier.enable unique_barrier;
+      | None -> UF.unused, []
+      | Some
+          { er_record;
+            er_kept;
+            er_sort = _;
+            er_representation = _;
+            er_unique_barrier
+          } ->
+        let value, uf_exp = check_uniqueness_exp_as_value ienv er_record in
+        Unique_barrier.enable er_unique_barrier;
         let uf_read =
-          Value.mark_implicit_borrow_memory_address (Read unique_barrier) value
+          Value.mark_implicit_borrow_memory_address (Read er_unique_barrier)
+            value
         in
-        value, UF.par uf_exp uf_read
+        let uf_kept =
+          List.map
+            (fun { kf_label = l; kf_unique_use; _ } ->
+              let value =
+                Value.implicit_record_field l.lbl_modalities l.lbl_name value
+                  kf_unique_use
+              in
+              Value.mark_maybe_unique value)
+            (Ivar.peek_exn er_kept)
+        in
+        UF.par uf_exp uf_read, uf_kept
     in
     let uf_fields =
-      Array.map
-        (fun field ->
-          match field with
-          | l, _, Kept (_, _, unique_use) ->
-            let value =
-              Value.implicit_record_field l.lbl_modalities l.lbl_name value
-                unique_use
-            in
-            Value.mark_maybe_unique value
-          | l, _, Overridden (_, e) ->
-            check_uniqueness_exp
-              ~overwrite:
-                (descend (Projection.Record_field l.lbl_name) overwrite)
-              ienv e)
+      List.map
+        (fun { rf_label; rf_exp; _ } ->
+          let l = Ivar.peek_exn rf_label in
+          check_uniqueness_exp
+            ~overwrite:(descend (Projection.Record_field l.lbl_name) overwrite)
+            ienv rf_exp)
         fields
     in
-    UF.par uf_ext (UF.pars (Array.to_list uf_fields))
+    UF.par uf_ext (UF.pars (uf_kept @ uf_fields))
   | Texp_record_unboxed_product { fields; extended_expression } ->
     let value, uf_ext =
       match extended_expression with
@@ -2714,7 +2724,14 @@ and check_uniqueness_exp_desc_as_value ~borrows ienv ~loc : _ -> Value.t * UF.t
       | Some value -> value
     in
     value, UF.unused
-  | Texp_field { record = e; label = l; boxing = float; unique_barrier; _ } -> (
+  | Texp_field
+      { record = e; record_repres; label = l; unique_use; unique_barrier; _ }
+    -> (
+    let l = Ivar.peek_exn l in
+    let unique_use = Ivar.peek_exn unique_use in
+    let boxes =
+      Types.field_projection_boxes (Ivar.peek_exn record_repres) l.lbl_pos
+    in
     let value, uf = check_uniqueness_exp_as_value ~borrows ienv e in
     match Value.paths value with
     | None ->
@@ -2731,10 +2748,9 @@ and check_uniqueness_exp_desc_as_value ~borrows ienv ~loc : _ -> Value.t * UF.t
       let uf_boxing, value =
         let occ = Occurrence.mk loc in
         let paths = Paths.record_field l.lbl_modalities l.lbl_name paths in
-        match float with
-        | Non_boxing unique_use ->
-          UF.unused, Value.existing paths unique_use occ
-        | Boxing (_, unique_use) ->
+        match boxes with
+        | false -> UF.unused, Value.existing paths unique_use occ
+        | true ->
           ( Paths.mark
               (Usage.maybe_unique unique_use occ)
               Learned_tags.empty Overwrites.empty paths,

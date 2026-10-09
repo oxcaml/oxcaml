@@ -389,6 +389,15 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
   let iter_unboxed_access sub = function
     | Uaccess_unboxed_field (lid, _, _) -> iter_loc sub lid
   in
+  let iter_extended_record_expression sub
+      { er_record;
+        er_kept = _;
+        er_sort = _;
+        er_representation = _;
+        er_unique_barrier = _
+      } =
+    sub.expr sub er_record
+  in
   match exp_desc with
   | Texp_ident { lid; _ } -> iter_loc_lid sub lid
   | Texp_apply_layout (exp, _) -> sub.expr sub exp
@@ -427,8 +436,11 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
   | Texp_variant (_, expo) ->
       Option.iter (fun (expr, _) -> sub.expr sub expr) expo
   | Texp_record { fields; extended_expression; _} ->
-      iter_fields fields;
-      Option.iter (fun (exp, _, _, _) -> sub.expr sub exp) extended_expression;
+      List.iter
+        (fun { rf_lid; rf_exp; _ } ->
+           iter_loc_lid sub rf_lid; sub.expr sub rf_exp)
+        fields;
+      Option.iter (iter_extended_record_expression sub) extended_expression;
   | Texp_record_unboxed_product { fields; extended_expression; _} ->
       iter_fields fields;
       Option.iter (fun (exp, _) -> sub.expr sub exp) extended_expression;
