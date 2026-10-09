@@ -1,0 +1,40 @@
+(executable
+ (name main)
+ (modes byte)
+ (link_flags (-linkall))
+ (libraries wasm_of_ocaml-compiler.dynlink js_of_ocaml-toplevel js_of_ocaml))
+
+(rule
+ (targets
+  main.js
+  (dir main.assets))
+ (action
+  (run
+   wasm_of_ocaml
+   --toplevel
+   --no-cmis
+   ; 63-bit ints in evaluated phrases, as natively.
+   --enable
+   portable-int
+   -w
+   no-missing-effects-backend
+   ; Memprof primitives of the bytecode compiler libraries, unused here.
+   -w
+   no-missing-primitive
+   %{dep:main.bc}
+   -o
+   main.js)))
+
+(rule
+ (alias runtest)
+ (deps
+  (glob_files main.assets/*))
+ (action
+  (progn
+   (with-stdout-to
+    main.actual
+    (setenv
+     TOPLEVEL_CMIS
+     %{ocaml_where}
+     (run node %{dep:main.js})))
+   (diff main.expected main.actual))))

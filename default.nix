@@ -278,19 +278,46 @@ let
   # testOcaml argument (it only feeds the merlin package's check phase).
   merlinDev = (mkMerlinPackages ocaml_5_4_0).merlin;
 
+  # The libraries below are only there as dependencies of the shipped ones.
+  # Users of the compiler package may have their own copies, at other versions,
+  # so these must not be visible: each one is a wrapped library with a unique
+  # name (oxcaml_private_<name>), which makes every compilation unit
+  # Oxcaml_private_<name>__<Module>. Without its dune-project, it joins the
+  # project that needs it (the Makefile links it into that project's
+  # oxcaml-private/ directory) and installs as a sub-library of one of its
+  # packages, e.g. js_of_ocaml-compiler.private.yojson. The shipped libraries
+  # see the old module names through -open Oxcaml_private_<name>.
+  joinConsumingProject = ''
+    rm -f dune-project *.opam
+  '';
+
   ppxDeriversSrc =
     let
       version = "1.2.1";
+      srcDune = pkgs.writeText "ppx_derivers-src-dune" ''
+        (library
+         (name oxcaml_private_ppx_derivers)
+         (public_name ppxlib.private.ppx_derivers))
+      '';
     in
-    pkgs.fetchFromGitHub {
+    pkgs.applyPatches {
       name = "ppx_derivers-${version}-source";
-      owner = "ocaml-ppx";
-      repo = "ppx_derivers";
-      tag = version;
-      hash = "sha256-9k4rbB1G4894F95XPMQsiVgwZKJ2XcaDUaEviArHG3s=";
+      src = pkgs.fetchFromGitHub {
+        owner = "ocaml-ppx";
+        repo = "ppx_derivers";
+        tag = version;
+        hash = "sha256-9k4rbB1G4894F95XPMQsiVgwZKJ2XcaDUaEviArHG3s=";
+      };
+      postPatch = ''
+        ${joinConsumingProject}
+        cp ${srcDune} src/dune
+      '';
     };
 
-  # sexp_type has no releases; pin a commit.
+  # sexp_type has no releases; pin a commit. Unlike the other dependencies, it
+  # is shipped as its own public package: its type is part of ppxlib's
+  # interface (Stdppx.Sexp.t), and must be the same as the one users' sexplib0
+  # builds on.
   sexpTypeSrc = pkgs.applyPatches {
     name = "sexp_type-6d16004-source";
     src = pkgs.fetchFromGitHub {
@@ -306,31 +333,6 @@ let
     '';
   };
 
-  stdlibShimsSrc =
-    let
-      version = "0.3.0";
-      # What the OCaml-syntax src/dune generates for OCaml >= 4.11. dune cannot
-      # evaluate that file through the deps/ symlink when the build directory
-      # is inside the dune root.
-      srcDune = pkgs.writeText "stdlib-shims-src-dune" ''
-        (library
-         (wrapped false)
-         (name stdlib_shims)
-         (modules)
-         (public_name stdlib-shims))
-      '';
-    in
-    pkgs.applyPatches {
-      name = "stdlib-shims-${version}-source";
-      src = pkgs.fetchzip {
-        url = "https://github.com/ocaml/stdlib-shims/releases/download/${version}/stdlib-shims-${version}.tbz";
-        hash = "sha256-uvnR7o0wicL7VfWpGefIgaAydnJ6/pLqaXmH9rgg8Xk=";
-      };
-      postPatch = ''
-        cp ${srcDune} src/dune
-      '';
-    };
-
   # "seq" is an empty compatibility package with no dune equivalent.
   dropSeqDependency = file: "substituteInPlace ${file} --replace-fail '(libraries seq)' ''";
 
@@ -340,9 +342,34 @@ let
       --replace-fail '(generate_opam_files true)' '(generate_opam_files false)'
   '';
 
+  # The ppx and sedlex.utils, which only the ppx uses, are only needed while
+  # building. The ppx refers to sedlex.utils as Sedlex_utils, so that name is
+  # kept.
   sedlexSrc =
     let
       version = "3.7";
+      libDune = pkgs.writeText "sedlex-lib-dune" ''
+        (library
+         (name oxcaml_private_sedlex)
+         (public_name js_of_ocaml-compiler.private.sedlex)
+         (libraries oxcaml_private_gen)
+         (flags :standard -w +A-4-9 -safe-string -open Oxcaml_private_gen))
+      '';
+      commonDune = pkgs.writeText "sedlex-common-dune" ''
+        (library
+         (name sedlex_utils))
+      '';
+      syntaxDune = pkgs.writeText "sedlex-syntax-dune" ''
+        (library
+         (name oxcaml_private_sedlex_ppx)
+         (kind ppx_rewriter)
+         (libraries ppxlib oxcaml_private_sedlex sedlex_utils)
+         (ppx_runtime_libraries oxcaml_private_sedlex)
+         (preprocess
+          (pps ppxlib.metaquot))
+         (flags
+          (:standard -w -9 -open Oxcaml_private_sedlex)))
+      '';
     in
     pkgs.applyPatches {
       name = "sedlex-${version}-source";
@@ -356,7 +383,13 @@ let
       # parameters), and use the shipped unicode.ml: its promote rule
       # downloads the Unicode data.
       patches = [ ./external/patches/sedlex-oxcaml-syntax.patch ];
-      postPatch = keepReleaseOpamFiles;
+      postPatch = ''
+        rm -r examples test src/generator
+        ${joinConsumingProject}
+        cp ${libDune} src/lib/dune
+        cp ${commonDune} src/common/dune
+        cp ${syntaxDune} src/syntax/dune
+      '';
     };
 
   genSrc =
@@ -371,23 +404,26 @@ let
         tag = "v${version}";
         hash = "sha256-ZytPPGhmt/uANaSgkgsUBOwyQ9ka5H4J+5CnJpEdrNk=";
       };
-      postPatch = dropSeqDependency "src/dune";
+      postPatch = ''
+        rm -r bench qtest
+        ${joinConsumingProject}
+        ${dropSeqDependency "src/dune"}
+        substituteInPlace src/dune \
+          --replace-fail '(name gen)' '(name oxcaml_private_gen)' \
+          --replace-fail '(public_name gen)' \
+            '(public_name js_of_ocaml-compiler.private.gen)' \
+          --replace-fail '(wrapped false)' ""
+      '';
     };
 
   # Cmdliner has no dune build; add one for the library.
   cmdlinerSrc =
     let
       version = "2.1.1";
-      duneProject = pkgs.writeText "cmdliner-dune-project" ''
-        (lang dune 3.0)
-        (name cmdliner)
-        (package (name cmdliner))
-      '';
       srcDune = pkgs.writeText "cmdliner-src-dune" ''
         (library
-         (name cmdliner)
-         (public_name cmdliner)
-         (wrapped false))
+         (name oxcaml_private_cmdliner)
+         (public_name js_of_ocaml-compiler.private.cmdliner))
       '';
     in
     pkgs.applyPatches {
@@ -397,25 +433,27 @@ let
         hash = "sha256-WJEtB7PI8wB+nbVavPso4m1poy1JJnhtGQ4JRXJT2F4=";
       };
       postPatch = ''
-        cp ${duneProject} dune-project
+        ${joinConsumingProject}
         cp ${srcDune} src/dune
       '';
     };
 
-  # Only menhirLib and menhirSdk are built from this tree; keeping the menhir
-  # executable's sources out stops dune from preferring it over the one from
-  # nixpkgs.
+  # Only menhirLib is built from this tree; keeping the menhir executable's
+  # sources out stops dune from preferring it over the one from nixpkgs.
+  # Without the dune-project, the version that lib/dune reads from it is
+  # spelled out.
   menhirLibrariesSrc = pkgs.applyPatches {
     name = "menhir-${menhirVersion}-libraries-source";
     src = menhirSrc;
     postPatch = ''
-      find . -mindepth 1 -maxdepth 1 \
-        ! -name dune ! -name dune-project ! -name LICENSE ! -name lib ! -name sdk \
+      find . -mindepth 1 -maxdepth 1 ! -name LICENSE ! -name lib \
         -exec rm -r {} +
-      # Attach the deprecation to [reductions], not the surrounding signature.
-      substituteInPlace sdk/cmly_api.ml \
-        --replace-fail '[@@@ocaml.deprecated "Please use [get_reductions]"]' \
-          '[@@ocaml.deprecated "Please use [get_reductions]"]'
+      substituteInPlace lib/dune \
+        --replace-fail '%{version:menhir}' '${menhirVersion}'
+      substituteInPlace lib/pack/dune \
+        --replace-fail '(name menhirLib)' '(name oxcaml_private_menhirlib)' \
+        --replace-fail '(public_name menhirLib)' \
+          '(public_name js_of_ocaml-compiler.private.menhirLib)'
     '';
   };
 
@@ -430,8 +468,13 @@ let
         hash = "sha256-V3USV8xhN1pQq5m0KmvUwgw7MujuCdWsv3lD+8PkECA=";
       };
       postPatch = ''
-        ${keepReleaseOpamFiles}
+        rm -r bench bin doc examples test test_json5 lib/json5
+        ${joinConsumingProject}
         ${dropSeqDependency "lib/dune"}
+        substituteInPlace lib/dune \
+          --replace-fail '(name yojson)' '(name oxcaml_private_yojson)' \
+          --replace-fail '(public_name yojson)' \
+            '(public_name js_of_ocaml-compiler.private.yojson)'
         # Eta-expand to avoid exposing Buffer.add_string's OxCaml modes.
         substituteInPlace lib/write.ml \
           --replace-fail 'let write_intlit = Buffer.add_string' \
@@ -476,11 +519,11 @@ let
       '';
     };
 
-  # Read by the external/ast-dependent-libs/deps/* rules of the Makefile.
+  # Read by the oxcaml-private/* and external/ast-dependent-libs/deps/* rules
+  # of the Makefile.
   ppxlibSources = {
     PPXLIB_PPX_DERIVERS_SRC = ppxDeriversSrc;
     PPXLIB_SEXP_TYPE_SRC = sexpTypeSrc;
-    PPXLIB_STDLIB_SHIMS_SRC = stdlibShimsSrc;
   };
 
   jsooSources = {
@@ -582,13 +625,20 @@ let
   # sandbox that is the writable copy of the sources, so a stale checked-in
   # file goes unnoticed. Compare the vendored sources with the pristine copy
   # after building, and fail if the build changed any. The projects are the
-  # ones linked into the external/ast-dependent-libs dune root.
+  # ones linked into the external/ast-dependent-libs dune root; the links to
+  # private dependencies that make adds to their oxcaml-private/ directories
+  # are expected.
   checkPromotedSources = ''
     stale=0
     for link in external/ast-dependent-libs/*; do
       [ -L "$link" ] || continue
       project=$(realpath --relative-to=. "$link")
-      diff -rq "$src/$project" "$project" || stale=1
+      diffs=$(diff -rq "$src/$project" "$project" \
+        | grep -v "^Only in $project/oxcaml-private: " || true)
+      if [ -n "$diffs" ]; then
+        echo "$diffs" >&2
+        stale=1
+      fi
     done
     if [ "$stale" -ne 0 ]; then
       echo "error: the build changed checked-in files under external/;" \
@@ -614,7 +664,7 @@ let
     extraNativeBuildInputs = jsooTools;
   };
 
-  # Builds and runs a small js_of_ocaml program using only what a compiler
+  # Builds and runs small js_of_ocaml programs using only what a compiler
   # package built withJsoo ships.
   mkJsooSmokeTest =
     oxcaml:

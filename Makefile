@@ -240,11 +240,17 @@ merlin-promote:
 # installed compiler in $(OXCAML_INSTALL) (found through PATH and OCAMLLIB).
 # That root only holds symlinks to the projects involved, which keeps the
 # compiler's own dune rules and $(OXCAML_INSTALL) out of the workspace.
-# Sources that are not checked in come from nix (see default.nix) and are
-# symlinked into external/ast-dependent-libs/deps/, which is gitignored.
+# Sources that are not checked in come from nix (see default.nix). The
+# libraries that are only there as dependencies are symlinked into the
+# oxcaml-private/ directory of the project that uses them, and are installed as
+# its private sub-libraries; sexp_type, which is shipped as its own package, and
+# test-only dependencies are symlinked into external/ast-dependent-libs/deps/.
+# Both are gitignored.
 
 ast_dependent_libs_root = external/ast-dependent-libs
 ast_dependent_libs_deps = $(ast_dependent_libs_root)/deps
+jsoo_private_deps = external/js_of_ocaml/oxcaml-private
+ppxlib_private_deps = external/ppxlib/oxcaml-private
 
 # The build directory is the default, $(ast_dependent_libs_root)/_build: with an
 # absolute --build-dir, dune install records absolute build-directory paths for
@@ -316,29 +322,26 @@ ppxlib-jane-build-boot:
 .PHONY: ast-dependent-libs-build-boot
 ast-dependent-libs-build-boot: ocaml-compiler-libs-build-boot ppxlib-jane-build-boot
 
-# Each deps/<name> names the variable holding its nix-provided source.
-$(ast_dependent_libs_deps)/ppx_derivers: src_var = PPXLIB_PPX_DERIVERS_SRC
+$(ppxlib_private_deps)/ppx_derivers: src_var = PPXLIB_PPX_DERIVERS_SRC
 $(ast_dependent_libs_deps)/sexp_type: src_var = PPXLIB_SEXP_TYPE_SRC
-$(ast_dependent_libs_deps)/stdlib-shims: src_var = PPXLIB_STDLIB_SHIMS_SRC
-$(ast_dependent_libs_deps)/gen: src_var = SEDLEX_GEN_SRC
-$(ast_dependent_libs_deps)/sedlex: src_var = JSOO_SEDLEX_SRC
-$(ast_dependent_libs_deps)/cmdliner: src_var = JSOO_CMDLINER_SRC
-$(ast_dependent_libs_deps)/menhir: src_var = JSOO_MENHIR_SRC
-$(ast_dependent_libs_deps)/yojson: src_var = JSOO_YOJSON_SRC
+$(jsoo_private_deps)/gen: src_var = SEDLEX_GEN_SRC
+$(jsoo_private_deps)/sedlex: src_var = JSOO_SEDLEX_SRC
+$(jsoo_private_deps)/cmdliner: src_var = JSOO_CMDLINER_SRC
+$(jsoo_private_deps)/menhir: src_var = JSOO_MENHIR_SRC
+$(jsoo_private_deps)/yojson: src_var = JSOO_YOJSON_SRC
 $(ast_dependent_libs_deps)/out-channel-redirect: src_var = JSOO_OUT_CHANNEL_REDIRECT_SRC
 $(ast_dependent_libs_deps)/qcheck: src_var = JSOO_QCHECK_SRC
 
 PPXLIB_DEPS = \
-  $(ast_dependent_libs_deps)/ppx_derivers \
-  $(ast_dependent_libs_deps)/sexp_type \
-  $(ast_dependent_libs_deps)/stdlib-shims
+  $(ppxlib_private_deps)/ppx_derivers \
+  $(ast_dependent_libs_deps)/sexp_type
 
 JSOO_DEPS = \
-  $(ast_dependent_libs_deps)/gen \
-  $(ast_dependent_libs_deps)/sedlex \
-  $(ast_dependent_libs_deps)/cmdliner \
-  $(ast_dependent_libs_deps)/menhir \
-  $(ast_dependent_libs_deps)/yojson
+  $(jsoo_private_deps)/gen \
+  $(jsoo_private_deps)/sedlex \
+  $(jsoo_private_deps)/cmdliner \
+  $(jsoo_private_deps)/menhir \
+  $(jsoo_private_deps)/yojson
 
 JSOO_TEST_DEPS = \
   $(ast_dependent_libs_deps)/out-channel-redirect \
@@ -363,12 +366,12 @@ jsoo-build: ast-dependent-libs-compiler duneconf/ast-dependent-libs.ws \
   $(PPXLIB_DEPS) $(JSOO_DEPS)
 	$(ast_dependent_libs_dune) $(ws_ast_dependent_libs) @jsoo-libs
 
-# The packages built by the ppxlib-libs and jsoo-libs aliases.
-PPXLIB_PACKAGES = ocaml-compiler-libs ppx_derivers sexp_type stdlib-shims \
-  ppxlib_ast ppxlib ppxlib_jane
-JSOO_PACKAGES = $(PPXLIB_PACKAGES) gen sedlex cmdliner menhirLib menhirSdk \
-  yojson js_of_ocaml-compiler wasm_of_ocaml-compiler js_of_ocaml-ppx \
-  js_of_ocaml-runtime js_of_ocaml
+# The packages built by the ppxlib-libs and jsoo-libs aliases. Their
+# dependencies are installed with them, as private sub-libraries.
+PPXLIB_PACKAGES = ocaml-compiler-libs sexp_type ppxlib_ast ppxlib ppxlib_jane
+JSOO_PACKAGES = $(PPXLIB_PACKAGES) js_of_ocaml-compiler \
+  wasm_of_ocaml-compiler js_of_ocaml-ppx js_of_ocaml-runtime js_of_ocaml \
+  js_of_ocaml-toplevel
 
 AST_DEPENDENT_LIBS_PREFIX ?= $(OXCAML_INSTALL)
 
@@ -384,18 +387,16 @@ ppxlib-install: ppxlib-build
 jsoo-install: jsoo-build
 	$(call ast_dependent_libs_install,$(JSOO_PACKAGES))
 
-# What the compiler package ships: the js_of_ocaml and wasm_of_ocaml
-# executables, and the libraries needed to write and preprocess js_of_ocaml
-# code. The compiler library and its dependencies (yojson, sedlex, ...) stay
-# out.
-SHIPPED_BIN_PACKAGES = js_of_ocaml-compiler wasm_of_ocaml-compiler
-SHIPPED_LIB_PACKAGES = $(PPXLIB_PACKAGES) js_of_ocaml-runtime js_of_ocaml \
-  js_of_ocaml-ppx
+# jsoo_mktop, which needs ocamlfind, is not shipped.
+SHIPPED_BIN_PACKAGES = js_of_ocaml-compiler wasm_of_ocaml-compiler \
+  js_of_ocaml-toplevel
+SHIPPED_LIB_PACKAGES = $(JSOO_PACKAGES)
 SHIPPED_LIB_SECTIONS = lib,lib_root,libexec,libexec_root,stublibs
 
 .PHONY: jsoo-install-shipped
 jsoo-install-shipped: jsoo-build
 	$(call ast_dependent_libs_install,--sections=bin $(SHIPPED_BIN_PACKAGES))
+	rm -f "$(AST_DEPENDENT_LIBS_PREFIX)/bin/jsoo_mktop"
 	$(call ast_dependent_libs_install,--sections=$(SHIPPED_LIB_SECTIONS) $(SHIPPED_LIB_PACKAGES))
 
 .PHONY: jsoo-test

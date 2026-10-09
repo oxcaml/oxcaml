@@ -1,0 +1,4 @@
+val x : int = 2
+42
+- : unit = ()
+- : int list = [1; 4; 9]

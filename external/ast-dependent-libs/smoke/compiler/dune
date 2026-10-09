@@ -1,0 +1,20 @@
+(executable
+ (name minify)
+ (libraries
+  js_of_ocaml-compiler
+  js_of_ocaml-compiler.cmdline
+  js_of_ocaml-compiler.runtime-files))
+
+(rule
+ (with-stdout-to
+  input.min.js
+  (run %{dep:minify.exe} %{dep:input.js})))
+
+(rule
+ (alias runtest)
+ (action
+  (progn
+   (with-stdout-to
+    output.actual
+    (run node %{dep:input.min.js}))
+   (diff output.expected output.actual))))
