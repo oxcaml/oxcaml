@@ -49,7 +49,7 @@ val notify_removed : operation:Removed_operations.t -> t -> t
 val create_let :
   Are_rebuilding_terms.t ->
   Bound_pattern.t ->
-  Named.t ->
+  Named.t Or_null.t (* must not be [Null] if we are rebuilding terms *) ->
   body:t ->
   free_names_of_defining_expr:Name_occurrences.t ->
   cost_metrics_of_defining_expr:Cost_metrics.t ->
