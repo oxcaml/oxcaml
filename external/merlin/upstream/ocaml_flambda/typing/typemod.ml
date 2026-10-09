@@ -4883,7 +4883,14 @@ let type_interface ~sourcefile modulename env ast =
     error Compiling_as_parameterised_parameter
   end;
   if !Clflags.binary_annotations_cms then begin
-    let uid = Shape.Uid.of_compilation_unit_id modulename in
+    (* Register under the uid the unit's import will carry: its interface for
+       a parameter, its implementation otherwise (see [Persistent_env]). *)
+    let uid =
+      if !Clflags.as_parameter
+      then
+        Shape.Uid.of_compilation_unit_intf (Compilation_unit.name modulename)
+      else Shape.Uid.of_compilation_unit_id modulename
+    in
     cms_register_toplevel_signature_attributes ~uid ~sourcefile ast
   end;
   let sg =
@@ -5038,7 +5045,12 @@ let functorize_implementation initial_env ~params ~modules ~module_sigs
                 Global_module.Name.to_string (Global_module.to_name gm)
               in
               let id = Ident.create_persistent name in
-              Shape.Map.add_module map id (Shape.for_persistent_unit name))
+              let uid =
+                (Env.find_import ~chain:[]
+                   (Global_module.to_name gm).Global_module.Name.head)
+                  .Persistent_env.imp_uid
+              in
+              Shape.Map.add_module map id (Shape.for_persistent_unit uid name))
             Shape.Map.empty modules
           |> Shape.str ~uid
         in
@@ -5129,10 +5141,11 @@ let package_units initial_env objfiles target_cmi modulename =
   (* Compute the shape of the package *)
   let pack_uid = Uid.of_compilation_unit_id modulename in
   let shape =
-    List.fold_left (fun map (name, _sg) ->
-      let name = Compilation_unit.Name.to_string name in
+    List.fold_left (fun map (intf, _sg) ->
+      let name = Compilation_unit.Name.to_string intf in
       let id = Ident.create_persistent name in
-      Shape.Map.add_module map id (Shape.for_persistent_unit name)
+      let uid = (Env.find_import ~chain:[] intf).Persistent_env.imp_uid in
+      Shape.Map.add_module map id (Shape.for_persistent_unit uid name)
     ) Shape.Map.empty units
     |> Shape.str ~uid:pack_uid
   in

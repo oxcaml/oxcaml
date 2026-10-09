@@ -59,7 +59,8 @@ type base_layout = Jkind_types.Sort.base
     stored to that effect in the [uid_to_decl] table of cmt files. *)
 module Uid : sig
   type t = private
-    | Compilation_unit of string
+    | Compilation_unit of Compilation_unit.t
+    | Compilation_unit_intf of Compilation_unit_intf.t
     | Item of { comp_unit: string; id: int; from: Unit_info.intf_or_impl }
     | Internal
     | Predef of string
@@ -69,7 +70,7 @@ module Uid : sig
 
   val mk : current_unit:(Unit_info.t option) -> t
   val of_compilation_unit_id : Compilation_unit.t -> t
-  val of_compilation_unit_name : Compilation_unit.Name.t -> t
+  val of_compilation_unit_intf : Compilation_unit_intf.t -> t
   val of_predef_id : Ident.t -> t
   val internal_not_actually_unique : t
   val unboxed_version : t -> t
@@ -420,8 +421,11 @@ val abs_list : t -> Ident.t list -> t
 
 val decompose_abs : t -> (var * t) option
 
+(** [for_persistent_unit uid name] is the shape of the persistent unit
+    [name], loaded on demand. [uid] is the uid carried by the unit's import:
+    its implementation for an ordinary unit, its interface for a parameter. *)
 (* CR lmaurer: Should really take a [Compilation_unit.t] *)
-val for_persistent_unit : string -> t
+val for_persistent_unit : Uid.t -> string -> t
 val leaf_for_unpack : t
 
 val poly_variant_constructors_map :
