@@ -532,10 +532,16 @@ module type S_for_mode_polymorphism = sig
 end
 
 [%%expect{|
-Line 6, characters 21-25:
-6 |   val past : 'a @ [< past('m)] -> 'a @ [> past('m)]
-                         ^^^^
-Error: The mode morphism "past" is not yet supported.
+module type S_for_mode_polymorphism =
+  sig
+    val variable : 'a -> 'a
+    val bounds : 'a -> 'a
+    val constants : 'a @ portable -> 'a @ local once
+    val combined : 'a @ portable -> 'a
+    val past : 'a -> 'a
+    val modified : 'a -> 'a
+    val close : 'a -> ('b -> 'a) @ local once
+  end
 |}]
 
 module type Mixed_mode_annotations = sig
