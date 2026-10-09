@@ -1486,7 +1486,9 @@ and simplify_single_recursive_handler ~simplify_expr cont_uses_env_so_far
     assert (not (DE.at_unit_toplevel denv_to_reset));
     DE.add_parameters_with_unknown_types ~extra:false denv_to_reset params
   in
-  let handler_env = LCS.add_to_denv handler_env consts_lifted_after_fork in
+  let handler_env =
+    DE.add_lifted_constant_state handler_env consts_lifted_after_fork
+  in
   let code_age_relation = TE.code_age_relation (DA.typing_env dacc) in
   let handler_env = DE.with_code_age_relation code_age_relation handler_env in
   let handler_env, unbox_decisions, dacc =
