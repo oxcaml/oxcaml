@@ -251,6 +251,10 @@ let archive_less_packages =
     "stdlib"; (* Linked implicitly. *)
     "threads.posix"; (* Alias for threads. *)
     "compiler-libs.toplevel"; (* Bytecode only. *)
+    (* Bytecode only, as they need compiler-libs.toplevel. *)
+    "js_of_ocaml-toplevel";
+    "js_of_ocaml-toplevel.common";
+    "js_of_ocaml-toplevel.worker";
   ]
 
 let check_bundled_libraries t =
