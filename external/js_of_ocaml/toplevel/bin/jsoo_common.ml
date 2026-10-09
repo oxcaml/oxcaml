@@ -77,11 +77,11 @@ let cmis_of_cma ~dir cma_path =
 
 let cmis_of_package pkg : string list =
   try
-    let dir = Findlib.package_directory pkg in
+    let dir = Jsoo_findlib.package_directory pkg in
     let fs : string list ref = ref [] in
     let add filename = fs := filename :: !fs in
     let archive =
-      try Findlib.package_property [ "byte" ] pkg "archive"
+      try Jsoo_findlib.package_property [ "byte" ] pkg "archive"
       with exc -> if String.equal pkg "stdlib" then "stdlib.cma" else raise exc
     in
     let l = String.split_on_char ~sep:' ' archive in
@@ -119,7 +119,7 @@ let cmis files =
           match String.split_on_char ~sep:':' s with
           | [ s ] -> read_cmi ~dir:"." s :: fs
           | [ pkg; s ] ->
-              let dir = Findlib.package_directory pkg in
+              let dir = Jsoo_findlib.package_directory pkg in
               read_cmi ~dir s :: fs
           | [] | _ :: _ :: _ :: _ -> assert false)
       | `Cma s -> cmis_of_cma ~dir:"." s @ fs)

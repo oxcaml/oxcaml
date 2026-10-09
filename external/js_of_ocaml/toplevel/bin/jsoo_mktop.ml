@@ -86,7 +86,7 @@ let _ =
     let args = scan_args [] args in
     List.iter (fun pkg -> execute [ "jsoo_mkcmis"; pkg ]) !pkgs;
     let toplevel_unit =
-      let dir = Findlib.package_directory "compiler-libs" in
+      let dir = Jsoo_findlib.package_directory "compiler-libs" in
       List.map
         (fun x -> Filename.concat dir x ^ ".cmi")
         [ "outcometree"; "topdirs"; "toploop" ]

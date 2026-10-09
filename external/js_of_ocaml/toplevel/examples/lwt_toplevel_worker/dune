@@ -32,6 +32,7 @@
   js_of_ocaml
   lwt
   js_of_ocaml-toplevel
+  js_of_ocaml-compiler.dynlink
   js_of_ocaml-toplevel.worker
   compiler-libs.toplevel)
  (link_flags
