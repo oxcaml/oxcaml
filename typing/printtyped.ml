@@ -326,6 +326,12 @@ let modes_with_locality_opt i ppf ms =
   in
   modes ~pr:print_modes_with_locality_opt i ppf ms
 
+let modes_with_locality_lr i ppf ms =
+  let print_with_locality_lr i ppf m =
+    line i ppf "%a\n" (Format_doc.compat (Mode.With_locality.print ())) m
+  in
+  modes ~pr:print_with_locality_lr i ppf ms
+
 let locality_modes_var i ppf ms =
   let print_locality_modes_var i ppf m =
     line i ppf "%a\n" print_locality_mode_l m
@@ -390,9 +396,9 @@ let rec core_type i ppf x =
       line i ppf "Ttyp_arrow\n";
       arg_label i ppf l;
       core_type i ppf ct1;
-      modes_with_locality i ppf m1;
+      modes_with_locality_lr i ppf m1;
       core_type i ppf ct2;
-      modes_with_locality i ppf m2;
+      modes_with_locality_lr i ppf m2;
   | Ttyp_tuple l ->
       line i ppf "Ttyp_tuple\n";
       list i labeled_core_type ppf l;

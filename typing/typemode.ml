@@ -244,15 +244,18 @@ let apply_mode_implications (annots : With_locality.Const.Option.t) =
   in
   { annots with forkable; yielding; contention; portability }
 
-let transl_mode_annots annots =
+let mode_consts annots =
+  List.map (fun { txt = Parsetree.Mode txt; loc } -> { txt; loc }) annots
+
+let transl_mode_atoms atoms =
   let annots =
     List.map
-      (fun { txt = Parsetree.Mode txt; loc } ->
+      (fun { txt; loc } ->
         Language_extension.assert_enabled ~loc Mode Language_extension.Stable;
         try { txt = Mode_axis_pair.of_string ~loc txt; loc }
         with Not_found ->
           raise (Error (loc, Unrecognized_modifier (Mode, txt))))
-      annots
+      atoms
   in
   let step modes_so_far { txt = (Atom (ax, mode) : Mode_axis_pair.t); loc } =
     if Option.is_some (With_locality.Const.Option.proj ax modes_so_far)
@@ -261,6 +264,13 @@ let transl_mode_annots annots =
   in
   let modes = List.fold_left step With_locality.Const.Option.none annots in
   { mode_modes = modes; mode_desc = annots }
+
+let transl_mode_annots annots = transl_mode_atoms (mode_consts annots)
+
+let untransl_const_mode s ~loc : string Location.loc = { txt = s; loc }
+
+let const_mode_strings (atoms : Parsetree.mode_const) =
+  List.map (fun { Location.txt = s; _ } -> s) atoms
 
 let untransl_mode modes =
   let untransl_annot =
@@ -644,7 +654,7 @@ let transl_mod_bounds ?(warn = true) annots =
   in
   let nonmodal, base_modality, modal_atoms =
     List.fold_left
-      (fun (nonmodal, base, atoms, seen_ev) { txt = Parsetree.Mode txt; loc } ->
+      (fun (nonmodal, base, atoms, seen_ev) { txt; loc } ->
         match Modality_axis_pair.of_string ~loc txt with
         | Atom (_, _) as atom ->
           if (seen_ev && not (is_staticity atom)) || has_modal_axis atom atoms
@@ -667,7 +677,7 @@ let transl_mod_bounds ?(warn = true) annots =
           in
           nonmodal, base, atoms, seen_ev)
       (Nonmodal_bounds.empty, Modality.Const.id, [], false)
-      annots
+      (mode_consts annots)
     |> fun (nm, base, atoms, _) ->
     (* axes listed in the order of implication. *)
     nm, base, sort_dedup_modalities_with_locs (List.rev atoms)
@@ -724,7 +734,7 @@ let close_implied_mod_bounds (bounds : Jkind.Mod_bounds.t) : Jkind.Mod_bounds.t
   Jkind.Mod_bounds.set_crossing crossing bounds
 
 let untransl_mod_bounds ?(verbose = false) (bounds : Jkind.Mod_bounds.t) :
-    Parsetree.modes =
+    Parsetree.mode_const =
   let crossing = Jkind.Mod_bounds.crossing bounds in
   let modality = Crossing.to_modality crossing in
   let least_modalities =
@@ -734,7 +744,7 @@ let untransl_mod_bounds ?(verbose = false) (bounds : Jkind.Mod_bounds.t) :
     List.map
       (fun (Atom (ax, m) : Modality.atom) ->
         let s = Format_doc.asprintf "%a" (Modality.Per_axis.print ax) m in
-        { Location.txt = Parsetree.Mode s; loc = Location.none })
+        untransl_const_mode s ~loc:Location.none)
       least_modalities
   in
   (* These mod-bounds are top ones, which are redundant to print. But we
@@ -757,7 +767,7 @@ let untransl_mod_bounds ?(verbose = false) (bounds : Jkind.Mod_bounds.t) :
               (Modality.Per_axis.print ax)
               (Modality.Const.proj ax modality)
           in
-          Some { Location.txt = Parsetree.Mode s; loc = Location.none })
+          Some (untransl_const_mode s ~loc:Location.none))
       With_regionality.Axis.all
   in
   let nonmodal_annots, top_nonmodal_annots =
@@ -765,8 +775,7 @@ let untransl_mod_bounds ?(verbose = false) (bounds : Jkind.Mod_bounds.t) :
     let mk_annot top print value =
       let only_when_verbose = value = top in
       let s = Format_doc.asprintf "%a" print value in
-      ( { Location.txt = Parsetree.Mode s; loc = Location.none },
-        only_when_verbose )
+      untransl_const_mode s ~loc:Location.none, only_when_verbose
     in
     [mk_annot Externality.max Externality.print (externality bounds)]
     |> List.partition_map (fun (annot, only_when_verbose) ->

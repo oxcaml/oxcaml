@@ -5475,8 +5475,7 @@ module Reaching_path = struct
              (String.concat " " strs))
     in
     let mod_strings =
-      Typemode.untransl_mod_bounds mod_bounds
-      |> List.map (fun { Location.txt = Parsetree.Mode s; _ } -> s)
+      Typemode.untransl_mod_bounds mod_bounds |> Typemode.const_mode_strings
     in
     match mod_strings with
     | [] -> pp_base ppf base
