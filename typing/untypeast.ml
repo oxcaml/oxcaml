@@ -223,8 +223,8 @@ let structure_item sub item =
 let modalities_of_val_modal_info = function
   | Valmi_sig_value modalities -> Typemode.untransl_modalities modalities
   | Valmi_str_primitive modes ->
-      let modality_of_mode { txt = Mode mode; loc } =
-        { txt = Modality mode; loc }
+      let modality_of_mode { txt; loc } =
+        { txt = Modality (Printast.string_of_mode txt); loc }
       in
       List.map modality_of_mode (Typemode.untransl_mode modes)
 
