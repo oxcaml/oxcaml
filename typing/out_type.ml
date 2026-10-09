@@ -1127,7 +1127,9 @@ let erase_implied_axes (modes : Mode.With_locality.Const.t) :
     yielding;
     statefulness = Some modes.statefulness;
     visibility = Some modes.visibility;
-    staticity = Some modes.staticity
+    staticity = Some modes.staticity;
+    borrowability = Some modes.borrowability;
+    borrowedness = Some modes.borrowedness
   }
 
 module Variable_names : sig
