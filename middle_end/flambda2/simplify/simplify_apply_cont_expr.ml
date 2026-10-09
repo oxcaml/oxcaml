@@ -41,7 +41,7 @@ let inline_linearly_used_continuation uacc ~params:params' ~handler
       handler;
   let bindings_outermost_first =
     ListLabels.map2 params args
-      ~f:(fun param arg : Expr_builder.binding_to_place ->
+      ~f:(fun param arg : Simplified_named.binding_to_place ->
         let param_var, param_uid = BP.var_and_uid param in
         let named = Named.create_simple arg in
         (* Get rid of useless [let x = x] bindings from dataflow. *)

@@ -87,7 +87,7 @@ let simplify_named0 dacc (bound_pattern : Bound_pattern.t) (named : Named.t)
     in
     ok
       (Simplify_named_result.create dacc
-         (Expr_builder.Keep_binding
+         (Keep_binding
             { let_bound = bound_pattern;
               simplified_defining_expr = defining_expr;
               original_defining_expr = Some named
@@ -115,7 +115,7 @@ let simplify_named0 dacc (bound_pattern : Bound_pattern.t) (named : Named.t)
       in
       ok
         (Simplify_named_result.create dacc
-           (Expr_builder.Keep_binding
+           (Keep_binding
               { let_bound = bound_pattern;
                 simplified_defining_expr =
                   Simplified_named.create ~machine_width defining_expr;
@@ -151,7 +151,7 @@ let simplify_named0 dacc (bound_pattern : Bound_pattern.t) (named : Named.t)
           then
             ok
               (Simplify_named_result.create dacc
-                 (Expr_builder.Keep_binding
+                 (Keep_binding
                     { let_bound = bound_pattern;
                       simplified_defining_expr = simplified_named;
                       original_defining_expr = Some named
@@ -176,7 +176,7 @@ let simplify_named0 dacc (bound_pattern : Bound_pattern.t) (named : Named.t)
             let result =
               Or_invalid.map defining_expr ~f:(fun defining_expr ->
                   Simplify_named_result.create dacc
-                    (Expr_builder.Keep_binding
+                    (Keep_binding
                        { let_bound = bound_pattern;
                          simplified_defining_expr = defining_expr;
                          original_defining_expr = Some named
@@ -243,7 +243,7 @@ let simplify_named0 dacc (bound_pattern : Bound_pattern.t) (named : Named.t)
     in
     ok
       (Simplify_named_result.create dacc
-         (Expr_builder.Keep_binding
+         (Keep_binding
             { let_bound = bound_pattern;
               simplified_defining_expr = defining_expr;
               original_defining_expr = Some named
@@ -274,7 +274,7 @@ let removed_operations ~min_name_mode ~(original : Named.t) dacc
     | Prim (original_prim, _) ->
       if
         List.exists
-          (fun (binding : Expr_builder.binding_to_place) ->
+          (fun (binding : Simplified_named.binding_to_place) ->
             match binding with
             | Keep_binding
                 { simplified_defining_expr =

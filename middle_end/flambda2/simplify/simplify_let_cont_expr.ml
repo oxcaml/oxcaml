@@ -644,7 +644,7 @@ let add_phantom_params_bindings uacc handler new_phantom_params =
         let simplified_defining_expr =
           Simplified_named.create ~machine_width named
         in
-        Expr_builder.Keep_binding
+        Simplified_named.Keep_binding
           { let_bound;
             simplified_defining_expr;
             original_defining_expr = Some named
