@@ -225,9 +225,9 @@ let add_import {imported_units; _} s =
   imported_units := CU.Name.Set.add s !imported_units
 
 let rec add_imports_in_name penv (g : Global_module.Name.t) =
-  add_import penv (g |> CU.Name.of_head_of_global_name);
+  add_import penv g.head;
   let add_in_arg ({ param; value } : Global_module.Name.argument) =
-    add_import penv (param |> CU.Name.of_parameter_name);
+    add_import penv param;
     add_imports_in_name penv value
   in
   List.iter add_in_arg g.args
@@ -250,8 +250,7 @@ let find_in_cache penv name =
   find_info_in_cache penv name |> Option.map (fun ps -> ps.ps_val)
 
 let register_parameter ({param_imports; _} as penv) modname =
-  let import = CU.Name.of_parameter_name modname in
-  begin match find_import_info_in_cache penv import with
+  begin match find_import_info_in_cache penv modname with
   | None ->
       (* Not loaded yet; if it's wrong, we'll get an error at load time *)
       ()
@@ -295,8 +294,7 @@ let is_registered_parameter_import {param_imports; _} name =
   Global_module.Name.mem_parameter_set name !param_imports
 
 let is_parameter_import t modname =
-  let import = CU.Name.of_head_of_global_name modname in
-  match find_import_info_in_cache t import with
+  match find_import_info_in_cache t modname.Global_module.Name.head with
   | Some { imp_is_param; _ } -> imp_is_param
   | None -> is_registered_parameter_import t modname
 
@@ -548,7 +546,7 @@ let current_unit_is_aux name ~allow_args =
       match CU.to_global_name current with
       | Some { head; args } ->
           (args = [] || allow_args)
-          && CU.Name.equal name (head |> CU.Name.of_string)
+          && CU.Name.equal name head
       | None -> false
 
 let current_unit_is name =
@@ -651,7 +649,7 @@ and compute_global penv modname ~params ~check ~allow_excess_args =
             if not allow_excess_args then
               raise
                 (Error (Imported_module_has_no_such_parameter {
-                          imported = CU.Name.of_head_of_global_name modname;
+                          imported = modname.Global_module.Name.head;
                           valid_parameters = params;
                           parameter = param;
                           value = value |> Global_module.to_name;
@@ -780,13 +778,14 @@ and find_pers_name ~allow_hidden penv ~check name ~allow_excess_args =
   match Hashtbl.find persistent_names name with
   | pn -> pn
   | exception Not_found ->
-      let unit_name = CU.Name.of_head_of_global_name name in
+      let unit_name = name.Global_module.Name.head in
       let import = find_import ~allow_hidden penv ~check unit_name in
       acknowledge_pers_name penv check name import ~allow_excess_args
 
 let read_pers_name penv check intf filename =
   let import = read_import penv ~check intf filename in
-  acknowledge_pers_name penv check (CU.Name.to_global_name intf) import
+  acknowledge_pers_name penv check (Global_module.Name.create_no_args intf)
+    import
 
 let normalize_global_name penv modname =
   let new_modname =
@@ -808,7 +807,7 @@ let need_local_ident penv (global : Global_module.t) =
      functor calls that instantiate open modules happen elsewhere (so that they
      can happen exactly once). *)
   let global_name = global |> Global_module.to_name in
-  let name = global_name |> CU.Name.of_head_of_global_name in
+  let name = global_name.Global_module.Name.head in
   if is_registered_parameter_import penv global_name
   then
     (* Already a parameter *)
@@ -851,9 +850,7 @@ let make_binding penv (global : Global_module.t) (impl : CU.t option) : binding 
       match global.visible_args with
       | [] ->
           (* Make sure the names are consistent up to the pack prefix *)
-          assert (String.equal
-                    (CU.name_as_string unit_from_cmi)
-                    name.head);
+          assert (CU.Name.equal (CU.name unit_from_cmi) name.head);
           unit_from_cmi
       | _ ->
           (* Make sure the unit isn't supposed to be packed *)
@@ -966,8 +963,16 @@ let describe_prefix ppf prefix =
     Format_doc.fprintf ppf "package %a" CU.Prefix.print prefix
 
 (* Emits a warning if there is no valid cmi for name *)
+<<<<<<< Merlin:introduce-cui
 let check_pers_struct ~allow_hidden penv f1 f2 ~loc name =
   let name_as_string = CU.Name.to_string (CU.Name.of_head_of_global_name name) in
+||||||| Compiler:last-imported
+let check_pers_struct ~allow_hidden penv f ~loc name =
+  let name_as_string = CU.Name.to_string (CU.Name.of_head_of_global_name name) in
+=======
+let check_pers_struct ~allow_hidden penv f ~loc name =
+  let name_as_string = CU.Name.to_string name.Global_module.Name.head in
+>>>>>>> Compiler:HEAD
   try
     ignore (find_pers_struct ~allow_hidden penv f1 f2 ~check:false name
               ~allow_excess_args:true)
@@ -1042,7 +1047,7 @@ let read penv intf a =
 let read_cmi_file penv filename =
   let cmi = read_cmi_lazy filename in
   let unit_name = cmi.cmi_name in
-  let modname = CU.Name.to_global_name unit_name in
+  let modname = Global_module.Name.create_no_args unit_name in
   add_import penv unit_name;
   (* Register as hidden so that direct user-code references to the module
      are still reported as unbound; only transitive lookups can reach it. *)
