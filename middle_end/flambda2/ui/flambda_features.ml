@@ -119,15 +119,29 @@ let simplify_stubs () =
 
 let flat_float_array () = Config.flat_float_array
 
-let function_result_types ~is_a_functor =
+type function_result_types =
+  | Do_not_compute
+  | Compute
+  | Compute_if_returning_closures of { only_if_statically_allocatable : bool }
+
+let function_result_types ~is_a_functor : function_result_types =
   let when_ =
     !Oxcaml_flags.Flambda2.function_result_types
     |> with_default ~f:(fun d -> d.function_result_types)
   in
   match when_ with
-  | Never -> false
-  | Functors_only -> is_a_functor
-  | All_functions -> true
+  | Never -> Do_not_compute
+  | Functors_only -> if is_a_functor then Compute else Do_not_compute
+  | Functors_and_static_closures ->
+    if is_a_functor
+    then Compute
+    else Compute_if_returning_closures { only_if_statically_allocatable = true }
+  | Functors_and_closures ->
+    if is_a_functor
+    then Compute
+    else
+      Compute_if_returning_closures { only_if_statically_allocatable = false }
+  | All_functions -> Compute
 
 let debug () = !Clflags.debug
 
