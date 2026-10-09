@@ -634,13 +634,10 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
                     Flambda_kind.With_subkind
                     .from_lambda_values_and_unboxed_numbers_only layout
                       ~machine_width:(Acc.machine_width acc) ) ] )
-            | Punboxed_product layouts ->
+            | Pvoid | Punboxed_product _ ->
               let arity_component =
-                Flambda_arity.Component_for_creation.Unboxed_product
-                  (List.map
-                     (Flambda_arity.Component_for_creation.from_lambda
-                        ~machine_width:(Acc.machine_width acc))
-                     layouts)
+                Flambda_arity.Component_for_creation.from_lambda layout
+                  ~machine_width:(Acc.machine_width acc)
               in
               let arity = Flambda_arity.create [arity_component] in
               let fields =
