@@ -154,39 +154,89 @@ module type Additional_helpers = sig
   val eta_reduce_if_possible_and_nonrec :
     expression -> rec_flag:rec_flag -> expression
 
+  (*---------------------------------------------------------------*)
+
+  (* override changed nodes to use [Ppxlib_jane] interface *)
+  val label_declaration :
+    (name:string loc ->
+    mutable_:mutable_flag ->
+    type_:core_type ->
+    label_declaration) with_loc
+
+  val value_description :
+    (name:string loc ->
+    type_:core_type ->
+    prim:string list ->
+    value_description) with_loc
+
+  val ptyp_arrow
+    : (arg_label -> core_type -> core_type -> core_type) with_loc
+  val ptyp_tuple : (core_type list -> core_type) with_loc
+
+  val pexp_let : (rec_flag -> value_binding list -> expression -> expression) with_loc
+  val pexp_constraint : (expression -> core_type -> expression) with_loc
+  val pexp_tuple : (expression list -> expression) with_loc
+
+  val ppat_constraint : (pattern -> core_type -> pattern) with_loc
+  val ppat_tuple : (pattern list -> pattern) with_loc
+  val ppat_array : (pattern list -> pattern) with_loc
+
+  val include_infos
+    : (?attrs:attributes -> 'a -> 'a include_infos) with_loc
+
+  val psig_include : (include_description -> signature_item) with_loc
+
+  val pmty_signature : (signature_item list -> module_type) with_loc
+
+  (* Use Ppxlib_jane in open source code, and [Latest] in non-open-sourced
+     code. *)
+  val signature : [ `Use_Ppxlib_jane ]
+
+  val ptyp_any : core_type with_loc
+  val ptyp_var : (string -> core_type) with_loc
+  val ptyp_alias : (core_type -> string loc -> core_type) with_loc
+  val ptyp_poly : (string loc list -> core_type -> core_type) with_loc
+  val pexp_newtype : (string loc -> expression -> expression) with_loc
+  val pexp_array : (expression list -> expression) with_loc
+
+  val type_declaration :
+    (name:string loc ->
+     params:(core_type * (variance * injectivity)) list ->
+     cstrs:(core_type * core_type * location) list ->
+     kind:type_kind ->
+     private_:private_flag ->
+     manifest:core_type option ->
+     type_declaration)
+      with_loc
+
+  val module_declaration :
+    (name:string option loc -> type_:module_type -> module_declaration) with_loc
+
+  val pmty_functor : (functor_parameter -> module_type -> module_type) with_loc
+
+  val pmod_constraint : (module_expr -> module_type -> module_expr) with_loc
+
+  (* ----------------------------------------------------- *)
+
   (** {2:future-asts Compat functions for future AST nodes}
 
-      The functions in this section provide a safe interface to generate AST
-      nodes that cannot be represented with Ppxlib's own AST but are available
-      with more recent versions of the compiler.
-
-      Note that producing such nodes will make the generated code incompatible
-      with compilers older than the feature you are trying to represent. Those
-      nodes also won't play nicely with the driver's default source output or if
-      printed as source using [Ppxlib.Pprintast]. You can use the
-      --use-compiler-pp flag of the driver to use your current compiler's AST to
-      source printers. *)
-
-  val ppat_effect : (pattern -> pattern -> pattern) with_loc
-  (** Returns an encoded effect pattern as introduced in OCaml 5.3 *)
+      Upstream ppxlib provides these functions to encode AST nodes that its own
+      AST cannot represent. The OxCaml AST represents them directly. *)
 
   val ptyp_labeled_tuple :
     ((string option * core_type) list -> core_type) with_loc
-  (** Returns an encoded labeled tuple type as introduced in OCaml 5.4. *)
+  (** Returns a labeled tuple type as introduced in OCaml 5.4. *)
 
   val pexp_labeled_tuple :
     ((string option * expression) list -> expression) with_loc
-  (** Returns an encoded labeled tuple expression as introduced in OCaml 5.4. *)
+  (** Returns a labeled tuple expression as introduced in OCaml 5.4. *)
 
   val ppat_labeled_tuple :
     ((string option * pattern) list -> closed_flag -> pattern) with_loc
-  (** Returns an encoded labeled tuple pattern as introduced in OCaml 5.4. *)
+  (** Returns a labeled tuple pattern as introduced in OCaml 5.4. *)
 
   val pexp_hole : (unit -> expression) with_loc
-  (** Returns an encoded expression hole as introduced in OCaml 5.6 *)
-
-  val pmod_hole : (unit -> module_expr) with_loc
-  (** Returns an encoded module expression hole as introduced in OCaml 5.6 *)
+  (** Returns an expression hole as introduced in OCaml 5.6 *)
 end
 
 module type Located = sig
@@ -206,5 +256,8 @@ type 'a with_location = loc:Location.t -> 'a
 module type S = sig
   module Located : Located with type 'a with_loc := 'a without_location
   include Ast_builder_generated.Intf_located
+
+  val pexp_apply : expression -> (arg_label * expression) list -> expression
+
   include Additional_helpers with type 'a with_loc := 'a without_location
 end

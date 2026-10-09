@@ -1,4 +1,4 @@
-val is_keyword : string -> bool
+val is_keyword : string -> bool @@ portable
 (** Check if a string is an OCaml keyword. *)
 
 val apply_keyword_edition : cli:string option -> unit -> unit
