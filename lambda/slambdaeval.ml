@@ -273,9 +273,9 @@ end = struct
     | Punboxed_or_untagged_integer ui ->
       symbol_arg_of_unboxed_or_untagged_integer ui
     | Punboxed_vector uv -> symbol_arg_of_unboxed_vector uv
-    | Punboxed_product layouts -> symbol_arg_of_unboxed_product layouts
-    | Pvoid -> "void"
     | Punboxed_mask -> "mask"
+    | Pvoid -> "void"
+    | Punboxed_product layouts -> symbol_arg_of_unboxed_product layouts
     | Ptop | Pbottom | Psplicevar _ ->
       Misc.fatal_error "Slambda_types.symbol_arg_of_layout: unexpected layout"
 

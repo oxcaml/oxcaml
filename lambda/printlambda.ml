@@ -252,11 +252,11 @@ let rec layout ppf lay_ =
     fprintf ppf "%s" (unboxed_integer_layout bi)
   | Punboxed_vector bv -> fprintf ppf "%s" (unboxed_vector_layout bv)
   | Punboxed_mask -> fprintf ppf "mask"
+  | Pvoid -> fprintf ppf "void"
   | Punboxed_product layouts ->
     fprintf ppf "@[<hov 1>#(%a)@]"
       (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ") layout)
       layouts
-  | Pvoid -> fprintf ppf "void"
   | Psplicevar id -> fprintf ppf "$%a" Slambdaident.print id
 
 let layout_annotation ppf lay_ =

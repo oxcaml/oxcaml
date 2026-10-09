@@ -575,8 +575,8 @@ and layout =
   | Punboxed_or_untagged_integer of unboxed_or_untagged_integer
   | Punboxed_vector of unboxed_vector
   | Punboxed_mask
-  | Punboxed_product of layout list
   | Pvoid
+  | Punboxed_product of layout list
   | Pbottom
   | Psplicevar of Slambdaident.t
 
@@ -599,6 +599,8 @@ and 'a mixed_block_element =
   | Mask
   | Word
   | Untagged_immediate
+  (* CR zeisbach: maybe add comment about invariant *)
+  | Pvoid
   | Product of 'a mixed_block_element array
   | Splice_variable of Slambdaident.t
 
@@ -1015,10 +1017,10 @@ let rec join_layout x y =
   | Pbottom, l | l, Pbottom -> l
   | Ptop, _ | _, Ptop -> Ptop
   | Pvalue kind1, Pvalue kind2 -> Pvalue (join_value_kind kind1 kind2)
+  | Pvoid, Pvoid -> Pvoid
   | Punboxed_product layouts1, Punboxed_product layouts2
     when List.length layouts1 = List.length layouts2 ->
       Punboxed_product (List.map2 join_layout layouts1 layouts2)
-  | Pvoid, Pvoid -> Pvoid
   | Punboxed_float f1, Punboxed_float f2
     when Primitive.equal_unboxed_float f1 f2 ->
       x

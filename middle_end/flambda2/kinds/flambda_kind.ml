@@ -1188,7 +1188,7 @@ module With_subkind = struct
     | Punboxed_vector Unboxed_vec256 -> naked_vec256
     | Punboxed_vector Unboxed_vec512 -> naked_vec512
     | Punboxed_mask -> naked_mask
-    | Punboxed_product _ | Pvoid | Ptop | Pbottom ->
+    | Pvoid | Punboxed_product _ | Ptop | Pbottom ->
       Misc.fatal_errorf
         "Flambda_kind.from_lambda_values_and_unboxed_numbers_only: cannot \
          convert %a"
