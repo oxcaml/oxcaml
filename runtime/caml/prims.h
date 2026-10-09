@@ -20,6 +20,9 @@
 
 #ifdef CAML_INTERNALS
 
+#include "mlvalues.h"
+#include "misc.h"
+
 typedef value (*c_primitive)(void);
 
 extern const c_primitive caml_builtin_cprim[];

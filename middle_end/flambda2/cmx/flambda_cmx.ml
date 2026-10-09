@@ -206,17 +206,18 @@ let prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
   let slots_used_in_typing_env =
     TE.Serializable.free_function_slots_and_value_slots final_typing_env
   in
+  let is_local = Current_unit.is_current in
   let exported_offsets =
     exported_offsets
-    |> Exported_offsets.reexport_function_slots
+    |> Exported_offsets.reexport_function_slots ~is_local
          (Name_occurrences.all_function_slots_at_normal_mode
             free_slots_of_all_code)
-    |> Exported_offsets.reexport_value_slots
+    |> Exported_offsets.reexport_value_slots ~is_local
          (Name_occurrences.all_value_slots_at_normal_mode free_slots_of_all_code)
-    |> Exported_offsets.reexport_function_slots
+    |> Exported_offsets.reexport_function_slots ~is_local
          (Name_occurrences.all_function_slots_at_normal_mode
             slots_used_in_typing_env)
-    |> Exported_offsets.reexport_value_slots
+    |> Exported_offsets.reexport_value_slots ~is_local
          (Name_occurrences.all_value_slots_at_normal_mode
             slots_used_in_typing_env)
   in

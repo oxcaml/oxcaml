@@ -2665,6 +2665,87 @@ module Colours = struct
     if debug_push_and_pop then output ppf "\u{2191}"
 
   let none ppf = push ppf
+
+  let wrap directive pp ppf x =
+    Format.fprintf ppf "%t%a%t" directive pp x pop
+end
+
+module Sexp = struct
+
+  type field =
+    | Bool : Colours.directive option * string * bool -> field
+    | Int : Colours.directive option * string * int -> field
+    | String : Colours.directive option * string * string -> field
+    | Float : Colours.directive option * string * float -> field
+    | Fmt : Colours.directive option * (Format.formatter -> unit) -> field
+    | Print :
+        Colours.directive option *
+        string * (Format.formatter -> 'a -> unit) * 'a -> field
+    | Option :
+        Colours.directive option *
+        string * (Format.formatter -> 'a -> unit) * 'a option -> field
+
+  let d ?colour s i = Int (colour, s, i)
+  let b ?colour s b = Bool (colour, s, b)
+  let f ?colour s f = Float (colour, s, f)
+  let s ?colour s1 s2 = String (colour, s1, s2)
+  let a ?colour s x pp = Print (colour, s, pp, x)
+  let o ?colour s x pp = Option (colour, s, pp, x)
+  let fmt ?colour format = Format.kdprintf (fun f -> Fmt (colour, f)) format
+
+  let spacer ppf first =
+    if !first then first := false else Format.pp_print_space ppf ()
+
+  let print_field ~first ppf field =
+    let fprintf colour ppf fmt =
+      match colour with
+      | None ->
+        Format.fprintf ppf "%a@[<hov 1>" spacer first;
+        Format.kfprintf (fun ppf -> Format.fprintf ppf "@]") ppf fmt
+      | Some colour ->
+        Format.fprintf ppf "%a@[<hov 1>%t" spacer first colour;
+        Format.kfprintf
+          (fun ppf -> Format.fprintf ppf "%t@]" Colours.pop) ppf fmt
+    in
+    match field with
+    | String (colour, name, s) ->
+      fprintf colour ppf "(%s@ %s)" name s
+    | Bool (colour, name, b) ->
+      fprintf colour ppf "(%s@ %b)" name b
+    | Int (colour, name, i) ->
+      fprintf colour ppf "(%s@ %d)" name i
+    | Float (colour, name, f) ->
+      fprintf colour ppf "(%s@ %f)" name f
+    | Fmt (colour, t) ->
+      fprintf colour ppf "%t" t
+    | Print (colour, name, pp, x) ->
+      fprintf colour ppf "(%s@ @[<hov>%a@])" name pp x
+    | Option (colour, name, pp, opt) -> (
+        match opt with
+        | None -> ()
+        | Some x ->
+          fprintf colour ppf "(%s@ %a)" name pp x
+      )
+
+  let print ppf (l : field list) =
+    let[@local] default () =
+      let first = ref true in
+      Format.fprintf ppf "@[<hov 1>(";
+      List.iter (print_field ~first ppf) l;
+      Format.fprintf ppf ")@]"
+    in
+    match l with
+    | [field] ->
+        begin match field with
+        | (String _ | Bool _ | Int _ | Float _ | Print _) ->
+          (* avoid double parenthesis when there is a single field
+             (except for Fmt fields which don't have parentheses) *)
+           print_field ~first:(ref true) ppf field
+          | (Fmt _| Option _) ->
+           default ()
+        end
+    | _ -> default ()
+
 end
 
 module Or_null = struct

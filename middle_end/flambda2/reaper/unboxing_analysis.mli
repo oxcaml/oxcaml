@@ -80,21 +80,33 @@ type calling_convention_change =
 type code_changes
 
 val get_calling_convention_change :
-  code_changes -> Code_id.t -> calling_convention_change
+  code_changes ->
+  analysis_scope:Analysis_scope.t ->
+  Code_id.t ->
+  calling_convention_change
 
-val is_changing_calling_convention : code_changes -> Code_id.t -> bool
+val is_changing_calling_convention :
+  code_changes -> analysis_scope:Analysis_scope.t -> Code_id.t -> bool
 
 (* Returns [None] for code ids of units that did not participate in the
    solve. *)
-val find_code_metadata : code_changes -> Code_id.t -> Code_metadata.t option
+val find_code_metadata :
+  code_changes ->
+  analysis_scope:Analysis_scope.t ->
+  Code_id.t ->
+  Code_metadata.t option
 
 val pp_result : Format.formatter -> result -> unit
 
 val perform_analysis :
-  Datalog.database -> stats:Datalog.Schedule.stats -> result
+  Datalog.database ->
+  stats:Datalog.Schedule.stats ->
+  analysis_scope:Analysis_scope.t ->
+  result
 
 val compute_code_changes :
   result ->
+  analysis_scope:Analysis_scope.t ->
   rewrite_kind_with_subkind:
     (Name.t -> Flambda_kind.With_subkind.t -> Flambda_kind.With_subkind.t) ->
   rewrite_result_types:

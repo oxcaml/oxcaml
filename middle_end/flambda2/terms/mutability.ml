@@ -19,12 +19,11 @@ type t =
   | Immutable
   | Immutable_unique
 
-let [@ocamlformat "disable"] print ppf t =
+let print ppf t =
   match t with
   | Mutable -> Format.pp_print_string ppf "Mutable"
   | Immutable -> Format.pp_print_string ppf "Immutable"
-  | Immutable_unique ->
-    Format.pp_print_string ppf "Immutable_unique"
+  | Immutable_unique -> Format.pp_print_string ppf "Immutable_unique"
 
 let compare t1 t2 =
   match t1, t2 with
