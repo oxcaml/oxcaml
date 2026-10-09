@@ -976,7 +976,7 @@ let filter_arity payload =
   in
   find_arity [] payload
 
-let filter_partial payload =
+let partition_partial payload =
   let is_partial = function
     | (Ident, "partial") -> true
     | _ -> false
@@ -1115,7 +1115,7 @@ let parse_zero_alloc_attribute ~in_signature ~on_application ~default_arity attr
                 signatures";
              default_arity, payload)
       in
-      let partial, payload = filter_partial payload in
+      let partial, payload = partition_partial payload in
       let _, payload = List.split payload in
       let parse p =
         let empty = empty arity partial custom_error_message in
