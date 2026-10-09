@@ -1,0 +1,65 @@
+let code helper_1 deleted in
+let code f_2 deleted in
+let code F_0 deleted in
+let code h_3 deleted in
+let $camlResult_types_functor_value_slots__Pmakeblock_0 = Block 0 (1) in
+let code inline(always) loopify(never) size(10) newer_version_of(f_2)
+      f_2_1 (y/147 : imm tagged)
+        my_closure/148 &my_alloc_region/149 my_depth/150
+        -> k/49 * k/50
+        : imm tagged =
+  let helper/151 = %project_value_slot.[f].[helper] (my_closure/148) in
+  let X/152 = %project_value_slot.[helper].[X] (helper/151) in
+  let Pfield/153 = %block_load.[`0`] (X/152) in
+  let int_add/154 = %int_barith.add (y/147, Pfield/153) in
+  let int_mul/155 = %int_barith.mul (int_add/154, 2) in
+  cont k/49 (int_mul/155)
+in
+let code inline(always) loopify(never) size(5) newer_version_of(helper_1)
+      helper_1_1 (x/156 : imm tagged)
+        my_closure/157 &my_alloc_region/158 my_depth/159
+        -> k/51 * k/52
+        : imm tagged =
+  let X/160 = %project_value_slot.[helper].[X] (my_closure/157) in
+  let Pfield/161 = %block_load.[`0`] (X/160) in
+  let int_add/162 = %int_barith.add (x/156, Pfield/161) in
+  cont k/51 (int_add/162)
+in
+let code inline(never) loopify(never) size(38) newer_version_of(F_0)
+      F_0_1 (X/163 : val)
+        my_closure/164 &my_alloc_region/165 my_depth/166
+        -> k/53 * k/54
+        : val =
+  let helper/167 = closure helper_1_1 @helper &my_alloc_region/165
+  with { X = X/163 }
+  in
+  let f/168 = closure f_2_1 @f &my_alloc_region/165
+  with { helper = helper/167 }
+  in
+  let Pmakeblock/169 = %block.[`0`].my_alloc_region/165 (f/168) in
+  cont k/53 (Pmakeblock/169)
+in
+let $camlResult_types_functor_value_slots__F_0_1 = closure F_0_1 @F &toplevel
+in
+apply direct(F_0_1 &toplevel)
+  ($camlResult_types_functor_value_slots__F_0_1 : _ -> val)
+    ($camlResult_types_functor_value_slots__Pmakeblock_0)
+    -> k/55 * error
+  where k/55 (M/170 : val) =
+    let code loopify(never) size(1) newer_version_of(h_3)
+          h_3_1 (param/171 : imm tagged)
+            my_closure/172 &my_alloc_region/173 my_depth/174
+            -> k/56 * k/57
+            : imm tagged =
+      cont k/56 (8)
+    in
+    let $camlResult_types_functor_value_slots__h_3_2 =
+      closure h_3_1 @h &toplevel
+      with { M = M/170 }
+    in
+    let $camlResult_types_functor_value_slots =
+      Block 0 ($camlResult_types_functor_value_slots__F_0_1,
+               M/170,
+               $camlResult_types_functor_value_slots__h_3_2)
+    in
+    cont done ($camlResult_types_functor_value_slots)

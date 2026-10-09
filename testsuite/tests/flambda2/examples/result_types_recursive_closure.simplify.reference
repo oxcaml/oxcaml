@@ -1,0 +1,87 @@
+let code count_0 deleted
+and code `fn[result_types_recursive_closure.ml:16,2--69]_1` deleted
+in
+let code f_2 deleted in
+let $camlResult_types_recursive_closure__count_0_1 =
+  closure count_0_1 @count &toplevel
+and code rec inline(never) loopify(never) size(38) newer_version_of(count_0)
+      count_0_1 (n/185 : imm tagged)
+        my_closure/186 &my_alloc_region/187 my_depth/188
+        -> k/74 * k/75
+        : val =
+  let `fn[result_types_recursive_closure.ml:16,2--69]/189` =
+    closure `fn[result_types_recursive_closure.ml:16,2--69]_1_1`
+      @`fn[result_types_recursive_closure.ml:16,2--69]` &my_alloc_region/187
+  with {
+    my_closure =
+      $camlResult_types_recursive_closure__count_0_1 ~ depth my_depth/188 -> succ my_depth/188;
+    n = n/185
+  }
+  in
+  cont k/74 (`fn[result_types_recursive_closure.ml:16,2--69]/189`)
+and code inline(always) loopify(never) size(28) newer_version_of(`fn[result_types_recursive_closure.ml:16,2--69]_1`)
+      `fn[result_types_recursive_closure.ml:16,2--69]_1_1`
+        (param/190 : imm tagged)
+        my_closure/191 &my_alloc_region/192 my_depth/193
+        -> k/76 * k/77
+        : imm tagged =
+  let n/194 =
+    %project_value_slot.[`fn[result_types_recursive_closure.ml:16,2--69]`].[n]
+      (my_closure/191)
+  in
+  let prim/195 = %phys_eq (n/194, 0) in
+  switch prim/195
+    | 0 -> k/78
+    | 1 -> k/76 (0)
+    where k/78 =
+      ((let int_sub/198 = %int_barith.sub (n/194, 1) in
+        apply direct(count_0_1 &my_alloc_region/192)
+          $camlResult_types_recursive_closure__count_0_1 ~ depth do_not_inline -> do_not_inline
+            (int_sub/198)
+            -> k/80 * k/77
+          where k/80 (func/199) =
+            apply &my_alloc_region/192 func/199 (0) -> k/79 * k/77)
+         where k/79 (apply_result/196 : imm tagged) =
+           let int_add/197 = %int_barith.add (1, apply_result/196) in
+           cont k/76 (int_add/197))
+in
+let code loopify(never) size(20) newer_version_of(f_2)
+      f_2_1 (param/200 : imm tagged)
+        my_closure/201 &my_alloc_region/202 my_depth/203
+        -> k/81 * k/82
+        : imm tagged =
+  apply direct(count_0_1 &my_alloc_region/202)
+    $camlResult_types_recursive_closure__count_0_1 (3) -> k/89 * k/82
+    where k/89 (param/207 : val) =
+      cont k/83
+    where k/83 =
+      (apply direct(count_0_1 &my_alloc_region/202) inlining_state(depth(1))
+         $camlResult_types_recursive_closure__count_0_1 ~ depth do_not_inline -> do_not_inline
+           (2)
+           -> k/88 * k/82
+         where k/88 (param/206 : val) =
+           cont k/84
+         where k/84 =
+           (apply direct(count_0_1 &my_alloc_region/202)
+                   inlining_state(depth(2))
+              $camlResult_types_recursive_closure__count_0_1 ~ depth do_not_inline -> do_not_inline
+                (1)
+                -> k/87 * k/82
+              where k/87 (param/205 : val) =
+                cont k/85
+              where k/85 =
+                (apply direct(count_0_1 &my_alloc_region/202)
+                        inlining_state(depth(3))
+                   $camlResult_types_recursive_closure__count_0_1 ~ depth do_not_inline -> do_not_inline
+                     (0)
+                     -> k/86 * k/82
+                   where k/86 (param/204 : val) =
+                     cont k/81 (3))))
+in
+let $camlResult_types_recursive_closure__f_2_2 = closure f_2_1 @f &toplevel
+in
+let $camlResult_types_recursive_closure =
+  Block 0 ($camlResult_types_recursive_closure__count_0_1,
+           $camlResult_types_recursive_closure__f_2_2)
+in
+cont done ($camlResult_types_recursive_closure)

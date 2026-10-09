@@ -1,0 +1,75 @@
+let code `fn[result_types_block_of_closures.ml:16,36--68]_1` deleted in
+let code `fn[result_types_block_of_closures.ml:16,2--34]_2` deleted in
+let code make_ops_0 deleted in
+let code g_3 deleted in
+let code inline(always) loopify(never) size(4) newer_version_of(`fn[result_types_block_of_closures.ml:16,2--34]_2`)
+      `fn[result_types_block_of_closures.ml:16,2--34]_2_1`
+        (x/146 : imm tagged)
+        my_closure/147 &my_alloc_region/148 my_depth/149
+        -> k/52 * k/53
+        : imm tagged =
+  let n/150 =
+    %project_value_slot.[`fn[result_types_block_of_closures.ml:16,2--34]`].[n]
+      (my_closure/147)
+  in
+  let int_add/151 = %int_barith.add (x/146, n/150) in
+  cont k/52 (int_add/151)
+in
+let code inline(always) loopify(never) size(6) newer_version_of(`fn[result_types_block_of_closures.ml:16,36--68]_1`)
+      `fn[result_types_block_of_closures.ml:16,36--68]_1_1`
+        (x/152 : imm tagged)
+        my_closure/153 &my_alloc_region/154 my_depth/155
+        -> k/54 * k/55
+        : imm tagged =
+  let n/156 =
+    %project_value_slot.[`fn[result_types_block_of_closures.ml:16,36--68]`].[n_1]
+      (my_closure/153)
+  in
+  let int_mul/157 = %int_barith.mul (x/152, n/156) in
+  cont k/54 (int_mul/157)
+in
+let code inline(never) loopify(never) size(34) newer_version_of(make_ops_0)
+      make_ops_0_1 (n/158 : imm tagged)
+        my_closure/159 &my_alloc_region/160 my_depth/161
+        -> k/56 * k/57
+        : [ 0 of val * val ] =
+  let `fn[result_types_block_of_closures.ml:16,36--68]/162` =
+    closure `fn[result_types_block_of_closures.ml:16,36--68]_1_1`
+      @`fn[result_types_block_of_closures.ml:16,36--68]` &my_alloc_region/160
+  with { n_1 = n/158 }
+  in
+  let `fn[result_types_block_of_closures.ml:16,2--34]/163` =
+    closure `fn[result_types_block_of_closures.ml:16,2--34]_2_1`
+      @`fn[result_types_block_of_closures.ml:16,2--34]` &my_alloc_region/160
+  with { n = n/158 }
+  in
+  let Pmakeblock/164 =
+    %block.[`0`].my_alloc_region/160
+      (`fn[result_types_block_of_closures.ml:16,2--34]/163`,
+       `fn[result_types_block_of_closures.ml:16,36--68]/162`)
+  in
+  cont k/56 (Pmakeblock/164)
+in
+let $camlResult_types_block_of_closures__make_ops_0_1 =
+  closure make_ops_0_1 @make_ops &toplevel
+in
+let code loopify(never) size(5) newer_version_of(g_3)
+      g_3_1 (param/165 : imm tagged)
+        my_closure/166 &my_alloc_region/167 my_depth/168
+        -> k/58 * k/59
+        : imm tagged =
+  apply direct(make_ops_0_1 &my_alloc_region/167)
+    ($camlResult_types_block_of_closures__make_ops_0_1
+     : _ -> [ 0 of val * val ])
+      (2)
+      -> k/60 * k/59
+    where k/60 (param/169 : [ 0 of val * val ]) =
+      cont k/58 (13)
+in
+let $camlResult_types_block_of_closures__g_3_2 = closure g_3_1 @g &toplevel
+in
+let $camlResult_types_block_of_closures =
+  Block 0 ($camlResult_types_block_of_closures__make_ops_0_1,
+           $camlResult_types_block_of_closures__g_3_2)
+in
+cont done ($camlResult_types_block_of_closures)

@@ -1,0 +1,48 @@
+let code `fn[result_types_closure_default.ml:14,34--64]_1` deleted in
+let code make_adder_0 deleted in
+let code f_2 deleted in
+let code inline(always) loopify(never) size(4) newer_version_of(`fn[result_types_closure_default.ml:14,34--64]_1`)
+      `fn[result_types_closure_default.ml:14,34--64]_1_1` (x/72 : imm tagged)
+        my_closure/73 &my_alloc_region/74 my_depth/75
+        -> k/35 * k/36
+        : imm tagged =
+  let n/76 =
+    %project_value_slot.[`fn[result_types_closure_default.ml:14,34--64]`].[n]
+      (my_closure/73)
+  in
+  let int_add/77 = %int_barith.add (x/72, n/76) in
+  cont k/35 (int_add/77)
+in
+let code inline(never) loopify(never) size(13) newer_version_of(make_adder_0)
+      make_adder_0_1 (n/78 : imm tagged)
+        my_closure/79 &my_alloc_region/80 my_depth/81
+        -> k/37 * k/38
+        : val =
+  let `fn[result_types_closure_default.ml:14,34--64]/82` =
+    closure `fn[result_types_closure_default.ml:14,34--64]_1_1`
+      @`fn[result_types_closure_default.ml:14,34--64]` &my_alloc_region/80
+  with { n = n/78 }
+  in
+  cont k/37 (`fn[result_types_closure_default.ml:14,34--64]/82`)
+in
+let $camlResult_types_closure_default__make_adder_0_1 =
+  closure make_adder_0_1 @make_adder &toplevel
+in
+let code loopify(never) size(10) newer_version_of(f_2)
+      f_2_1 (param/83 : imm tagged)
+        my_closure/84 &my_alloc_region/85 my_depth/86
+        -> k/39 * k/40
+        : imm tagged =
+  apply direct(make_adder_0_1 &my_alloc_region/85)
+    ($camlResult_types_closure_default__make_adder_0_1 : _ -> val)
+      (3)
+      -> k/41 * k/40
+    where k/41 (add3/87 : val) =
+      apply &my_alloc_region/85 add3/87 (4) -> k/39 * k/40
+in
+let $camlResult_types_closure_default__f_2_2 = closure f_2_1 @f &toplevel in
+let $camlResult_types_closure_default =
+  Block 0 ($camlResult_types_closure_default__make_adder_0_1,
+           $camlResult_types_closure_default__f_2_2)
+in
+cont done ($camlResult_types_closure_default)

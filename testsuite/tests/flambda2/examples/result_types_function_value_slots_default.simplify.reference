@@ -1,0 +1,76 @@
+let code helper_1 deleted in
+let code `fn[result_types_function_value_slots_default.ml:18,2--39]_2`
+     deleted
+in
+let code make_0 deleted in
+let code h_3 deleted in
+let code inline(always) loopify(never) size(9) newer_version_of(`fn[result_types_function_value_slots_default.ml:18,2--39]_2`)
+      `fn[result_types_function_value_slots_default.ml:18,2--39]_2_1`
+        (y/130 : imm tagged)
+        my_closure/131 &my_alloc_region/132 my_depth/133
+        -> k/49 * k/50
+        : imm tagged =
+  let helper/134 =
+    %project_value_slot.[`fn[result_types_function_value_slots_default.ml:18,2--39]`].[helper]
+      (my_closure/131)
+  in
+  let n/135 = %project_value_slot.[helper].[n] (helper/134) in
+  let int_add/136 = %int_barith.add (y/130, n/135) in
+  let int_mul/137 = %int_barith.mul (int_add/136, 2) in
+  cont k/49 (int_mul/137)
+in
+let code inline(always) loopify(never) size(4) newer_version_of(helper_1)
+      helper_1_1 (x/138 : imm tagged)
+        my_closure/139 &my_alloc_region/140 my_depth/141
+        -> k/51 * k/52
+        : imm tagged =
+  let n/142 = %project_value_slot.[helper].[n] (my_closure/139) in
+  let int_add/143 = %int_barith.add (x/138, n/142) in
+  cont k/51 (int_add/143)
+in
+let code inline(never) loopify(never) size(30) newer_version_of(make_0)
+      make_0_1 (n/144 : imm tagged)
+        my_closure/145 &my_alloc_region/146 my_depth/147
+        -> k/53 * k/54
+        : val =
+  let helper/148 = closure helper_1_1 @helper &my_alloc_region/146
+  with { n = n/144 }
+  in
+  let `fn[result_types_function_value_slots_default.ml:18,2--39]/149` =
+    closure `fn[result_types_function_value_slots_default.ml:18,2--39]_2_1`
+      @`fn[result_types_function_value_slots_default.ml:18,2--39]`
+      &my_alloc_region/146
+  with { helper = helper/148 }
+  in
+  cont k/53 (`fn[result_types_function_value_slots_default.ml:18,2--39]/149`)
+in
+let $camlResult_types_function_value_slots_default__make_0_1 =
+  closure make_0_1 @make &toplevel
+in
+let code loopify(never) size(13) newer_version_of(h_3)
+      h_3_1 (param/150 : imm tagged)
+        my_closure/151 &my_alloc_region/152 my_depth/153
+        -> k/55 * k/56
+        : imm tagged =
+  apply direct(make_0_1 &my_alloc_region/152)
+    ($camlResult_types_function_value_slots_default__make_0_1 : _ -> val)
+      (1)
+      -> k/57 * k/56
+    where k/57 (apply_result/154 : val) =
+      let helper/155 =
+        %project_value_slot.[`fn[result_types_function_value_slots_default.ml:18,2--39]`].[helper]
+          (apply_result/154)
+      in
+      let n/156 = %project_value_slot.[helper].[n] (helper/155) in
+      let int_add/157 = %int_barith.add (3, n/156) in
+      let int_mul/158 = %int_barith.mul (int_add/157, 2) in
+      cont k/55 (int_mul/158)
+in
+let $camlResult_types_function_value_slots_default__h_3_2 =
+  closure h_3_1 @h &toplevel
+in
+let $camlResult_types_function_value_slots_default =
+  Block 0 ($camlResult_types_function_value_slots_default__make_0_1,
+           $camlResult_types_function_value_slots_default__h_3_2)
+in
+cont done ($camlResult_types_function_value_slots_default)

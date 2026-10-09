@@ -1,0 +1,75 @@
+let code g_1 deleted in
+let code loopify(never) size(13) stub
+      g_1_1 (param/181 : imm tagged)
+        my_closure/182 &my_alloc_region/183 my_depth/184
+        -> k/72 * k/73
+        : float boxed =
+  (let g_unboxed/187 =
+     %project_function_slot.[g].[g_unboxed] (my_closure/182)
+   in
+   apply &my_alloc_region/183
+     (g_unboxed/187 : imm tagged -> float) (param/181) -> k/74 * k/73)
+    where k/74 (unboxed_return/185 : float) =
+      let boxed_return/186 =
+        %box_num.`float`.my_alloc_region/183 (unboxed_return/185)
+      in
+      cont k/72 (boxed_return/186)
+in
+let code h_3 deleted in
+let code loopify(never) size(13) stub
+      h_3_1 (x/188 : float boxed)
+        my_closure/189 &my_alloc_region/190 my_depth/191
+        -> k/75 * k/76
+        : float boxed =
+  (let h_unboxed/194 =
+     %project_function_slot.[h].[h_unboxed] (my_closure/189)
+   in
+   apply &my_alloc_region/190
+     (h_unboxed/194 : float boxed -> float) (x/188) -> k/77 * k/76)
+    where k/77 (unboxed_return/192 : float) =
+      let boxed_return/193 =
+        %box_num.`float`.my_alloc_region/190 (unboxed_return/192)
+      in
+      cont k/75 (boxed_return/193)
+in
+let code k_4 deleted in
+let code loopify(never) size(1) newer_version_of(g_1)
+      g_1_2 (param/195 : imm tagged)
+        my_unboxed_closure/196 &my_alloc_region/197 my_depth/198
+        -> unboxed_return/78 * k/79
+        : float =
+  cont unboxed_return/78 (0x1p+1)
+in
+let $camlResult_types_unboxable__g_1_2 =
+  closure g_1_1 @g &toplevel
+and $camlResult_types_unboxable__g_unboxed_0_3 =
+  closure g_1_2 @g_unboxed &toplevel
+in
+let code loopify(never) size(4) newer_version_of(h_3)
+      h_3_2 (x/199 : float boxed)
+        my_unboxed_closure/200 &my_alloc_region/201 my_depth/202
+        -> unboxed_return/80 * k/81
+        : float =
+  let prim/203 = %unbox_num.`float` (x/199) in
+  let prim/204 = %bfloat_arith.add (prim/203, 0x1p+0) in
+  cont unboxed_return/80 (prim/204)
+in
+let $camlResult_types_unboxable__h_3_4 =
+  closure h_3_1 @h &toplevel
+and $camlResult_types_unboxable__h_unboxed_2_5 =
+  closure h_3_2 @h_unboxed &toplevel
+in
+let code loopify(never) size(1) newer_version_of(k_4)
+      k_4_1 (param/205 : imm tagged)
+        my_closure/206 &my_alloc_region/207 my_depth/208
+        -> k/82 * k/83
+        : imm tagged =
+  cont k/82 (3)
+in
+let $camlResult_types_unboxable__k_4_6 = closure k_4_1 @k &toplevel in
+let $camlResult_types_unboxable =
+  Block 0 ($camlResult_types_unboxable__g_1_2,
+           $camlResult_types_unboxable__h_3_4,
+           $camlResult_types_unboxable__k_4_6)
+in
+cont done ($camlResult_types_unboxable)

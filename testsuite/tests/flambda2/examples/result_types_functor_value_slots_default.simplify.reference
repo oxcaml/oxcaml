@@ -1,0 +1,76 @@
+let code helper_1 deleted in
+let code f_2 deleted in
+let code F_0 deleted in
+let code h_3 deleted in
+let $camlResult_types_functor_value_slots_default__Pmakeblock_0 = Block 0 (1)
+in
+let code inline(always) loopify(never) size(10) newer_version_of(f_2)
+      f_2_1 (y/150 : imm tagged)
+        my_closure/151 &my_alloc_region/152 my_depth/153
+        -> k/49 * k/50
+        : imm tagged =
+  let helper/154 = %project_value_slot.[f].[helper] (my_closure/151) in
+  let X/155 = %project_value_slot.[helper].[X] (helper/154) in
+  let Pfield/156 = %block_load.[`0`] (X/155) in
+  let int_add/157 = %int_barith.add (y/150, Pfield/156) in
+  let int_mul/158 = %int_barith.mul (int_add/157, 2) in
+  cont k/49 (int_mul/158)
+in
+let code inline(always) loopify(never) size(5) newer_version_of(helper_1)
+      helper_1_1 (x/159 : imm tagged)
+        my_closure/160 &my_alloc_region/161 my_depth/162
+        -> k/51 * k/52
+        : imm tagged =
+  let X/163 = %project_value_slot.[helper].[X] (my_closure/160) in
+  let Pfield/164 = %block_load.[`0`] (X/163) in
+  let int_add/165 = %int_barith.add (x/159, Pfield/164) in
+  cont k/51 (int_add/165)
+in
+let code inline(never) loopify(never) size(38) newer_version_of(F_0)
+      F_0_1 (X/166 : val)
+        my_closure/167 &my_alloc_region/168 my_depth/169
+        -> k/53 * k/54
+        : val =
+  let helper/170 = closure helper_1_1 @helper &my_alloc_region/168
+  with { X = X/166 }
+  in
+  let f/171 = closure f_2_1 @f &my_alloc_region/168
+  with { helper = helper/170 }
+  in
+  let Pmakeblock/172 = %block.[`0`].my_alloc_region/168 (f/171) in
+  cont k/53 (Pmakeblock/172)
+in
+let $camlResult_types_functor_value_slots_default__F_0_1 =
+  closure F_0_1 @F &toplevel
+in
+apply direct(F_0_1 &toplevel)
+  ($camlResult_types_functor_value_slots_default__F_0_1 : _ -> val)
+    ($camlResult_types_functor_value_slots_default__Pmakeblock_0)
+    -> k/55 * error
+  where k/55 (M/173 : val) =
+    let $camlResult_types_functor_value_slots_default__h_3_2 =
+      closure h_3_1 @h &toplevel
+    and code loopify(never) size(12) newer_version_of(h_3)
+          h_3_1 (param/174 : imm tagged)
+            my_closure/175 &my_alloc_region/176 my_depth/177
+            -> k/56 * k/57
+            : imm tagged =
+      let M/178 =
+        %project_value_slot.[h].[M]
+          ($camlResult_types_functor_value_slots_default__h_3_2)
+      in
+      let Pfield/179 = %block_load.[`0`] (M/178) in
+      let helper/180 = %project_value_slot.[f].[helper] (Pfield/179) in
+      let X/181 = %project_value_slot.[helper].[X] (helper/180) in
+      let Pfield/182 = %block_load.[`0`] (X/181) in
+      let int_add/183 = %int_barith.add (3, Pfield/182) in
+      let int_mul/184 = %int_barith.mul (int_add/183, 2) in
+      cont k/56 (int_mul/184)
+      with { M = M/173 }
+    in
+    let $camlResult_types_functor_value_slots_default =
+      Block 0 ($camlResult_types_functor_value_slots_default__F_0_1,
+               M/173,
+               $camlResult_types_functor_value_slots_default__h_3_2)
+    in
+    cont done ($camlResult_types_functor_value_slots_default)
