@@ -74,27 +74,33 @@ let print = TG.Env_extension.print
 
 module With_extra_variables = struct
   type t =
-    { existential_vars : Flambda_kind.t Variable.Lmap.t;
+    { existential_vars : Variable.t list;
       equations : TG.t Name.Map.t
     }
 
   let print ppf { existential_vars; equations } =
     Format.fprintf ppf
       "@[<hov 1>(@[<hov 1>(variables@ @[<hov 1>%a@])@]@ @[<hov 1>%a@])@ @]"
-      (Variable.Lmap.print Flambda_kind.print)
+      (Format.pp_print_list ~pp_sep:Format.pp_print_space Variable.print)
       existential_vars TG.Env_extension.print
       (TG.Env_extension.create ~equations)
 
   let fold ~variable ~equation t acc =
-    let acc = Variable.Lmap.fold variable t.existential_vars acc in
+    let acc =
+      List.fold_left (fun acc var -> variable var acc) acc t.existential_vars
+    in
     Name.Map.fold equation t.equations acc
 
-  let empty =
-    { existential_vars = Variable.Lmap.empty; equations = Name.Map.empty }
+  let empty = { existential_vars = []; equations = Name.Map.empty }
 
   let add_definition t var kind =
-    let existential_vars = Variable.Lmap.add var kind t.existential_vars in
-    { existential_vars; equations = t.equations }
+    if
+      Flambda_features.check_light_invariants ()
+      && not (Flambda_kind.equal kind (Variable.kind var))
+    then
+      Misc.fatal_errorf "Incorrect kind for variable (expected %a): %a"
+        Flambda_kind.print (Variable.kind var) Flambda_kind.print kind;
+    { existential_vars = var :: t.existential_vars; equations = t.equations }
 
   let add_or_replace_equation t name ty =
     More_type_creators.check_equation name ty;
@@ -103,11 +109,7 @@ module With_extra_variables = struct
     }
 
   let free_names { existential_vars; equations } =
-    let variables =
-      Variable.Lmap.fold
-        (fun var _ acc -> Variable.Set.add var acc)
-        existential_vars Variable.Set.empty
-    in
+    let variables = Variable.Set.of_list existential_vars in
     let free_names =
       Name_occurrences.create_variables variables Name_mode.in_types
     in
@@ -122,7 +124,7 @@ module With_extra_variables = struct
   let apply_renaming { existential_vars; equations } renaming =
     (* Make sure to preserve order here! *)
     let existential_vars =
-      Variable.Lmap.map_keys
+      List.map
         (fun var -> Renaming.apply_variable renaming var)
         existential_vars
     in
@@ -137,11 +139,7 @@ module With_extra_variables = struct
     { existential_vars; equations }
 
   let ids_for_export { existential_vars; equations } =
-    let variables =
-      Variable.Lmap.fold
-        (fun var _ acc -> Variable.Set.add var acc)
-        existential_vars Variable.Set.empty
-    in
+    let variables = Variable.Set.of_list existential_vars in
     let ids = Ids_for_export.create ~variables () in
     Name.Map.fold
       (fun name ty ids ->
@@ -149,8 +147,7 @@ module With_extra_variables = struct
         Ids_for_export.union ids (TG.ids_for_export ty))
       equations ids
 
-  let existential_vars { existential_vars; _ } =
-    Variable.Lmap.keys existential_vars
+  let existential_vars { existential_vars; _ } = existential_vars
 
   let map_types ({ existential_vars; equations } as t) ~f =
     let equations' = Name.Map.map_sharing f equations in
