@@ -329,7 +329,7 @@ let ( let$ ) expr k uacc ~dacc_before_switch ~local_cse =
       let uacc =
         UA.add_lifted_constant uacc
           (LC.create_block_like symbol array_const
-             (DA.denv dacc_before_switch)
+             (DA.typing_env dacc_before_switch)
              block_type ~symbol_projections:Variable.Map.empty)
       in
       k (Simple.symbol symbol) uacc ~dacc_before_switch ~local_cse
