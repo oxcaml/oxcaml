@@ -997,7 +997,8 @@ let filter_assume_unless_opt payload =
 
 let zero_alloc_lookup_table =
   (* These are the possible payloads (sans arity) paired with a function that
-     returns the corresponding check_attribute, given the arity and the loc. *)
+     returns the corresponding check_attribute, given the arity, the partiality,
+     and the loc. *)
   [
     (["assume"],
      fun arity partial loc _ ->
