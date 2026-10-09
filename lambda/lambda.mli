@@ -1212,6 +1212,12 @@ and lambda_event_kind =
   | Lev_function
   | Lev_pseudo
 
+type transl_ctx =
+  {
+    scopes: Debuginfo.Scoped_location.scopes;
+    label_map : static_label Ident.Map.t
+  }
+
 (* A description of a parameter to be passed to the runtime representation of a
    parameterised module, namely a function (called the instantiating functor)
    that produces an instance when invoked. [-instantiate] reads these as
@@ -1749,8 +1755,3 @@ val static_cast
 
 val fatal_error_unevaluated_splice_var : Slambdaident.t -> 'a
 val fatal_error_invalid_constructor : lambda -> 'a
-
-type transl_ctx =
-  {
-    scopes: Debuginfo.Scoped_location.scopes
-  }

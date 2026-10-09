@@ -191,11 +191,13 @@ let simplify_exits lam =
       count ~try_depth l2;
       count ~try_depth l3
   | Lsequence(l1, l2) -> count ~try_depth l1; count ~try_depth l2
-  | Lwhile lw -> count ~try_depth lw.wh_cond; count ~try_depth lw.wh_body
+  | Lwhile lw ->
+      count ~try_depth lw.wh_cond;
+      count ~try_depth:(try_depth+1) lw.wh_body
   | Lfor lf ->
       count ~try_depth lf.for_from;
       count ~try_depth lf.for_to;
-      count ~try_depth lf.for_body
+      count ~try_depth:(try_depth+1) lf.for_body
   | Lassign(_v, l) -> count ~try_depth l
   | Lsend(_k, m, o, ll, _, _, _, _, _) ->
       List.iter (count ~try_depth) (m::o::ll)

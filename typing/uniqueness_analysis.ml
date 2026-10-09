@@ -2682,6 +2682,7 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
   | Texp_splice e ->
     let uf = check_uniqueness_exp ~overwrite:None ienv e in
     UF.antiquote uf
+  | Texp_break _ -> UF.unused
 
 and check_uniqueness_exp ~borrows ~overwrite (ienv : Ienv.t) exp : UF.t =
   let loc = exp.exp_loc in

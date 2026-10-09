@@ -3848,6 +3848,9 @@ and quote_expression_desc ~scopes ~transl stage e : Exp_desc.t =
     | Texp_idx _ ->
       fatal_errorf "Translquote [at %a]: Texp_idx" Location.print_loc
         (to_location loc)
+    | Texp_break _ ->
+      fatal_errorf "Translquote [at %a]: Texp_break" Location.print_loc
+        (to_location loc)
   in
   List.iter (update_env_without_extra ~loc) e.exp_extra;
   List.fold_right

@@ -435,6 +435,11 @@ let zero_alloc_of_application
     end
   | None, _ -> Zero_alloc_utils.Assume_info.none
 
+let add_loop_label ~transl_ctx ~loop_label =
+  let static_exception_id = next_raise_count () in
+  let label_map = Ident.Map.add loop_label static_exception_id transl_ctx.label_map in
+  static_exception_id, { transl_ctx with label_map }
+
 let rec transl_exp ~transl_ctx layout e =
   transl_exp1 ~transl_ctx ~in_new_scope:false layout e
 
@@ -1181,31 +1186,43 @@ and transl_exp0 ~in_new_scope ~transl_ctx (layout : Lambda.layout) e =
       let layout' = layout_exp sort' expr1 in
       Lsequence(transl_exp ~transl_ctx layout' expr1,
                 event_before ~scopes expr2 (transl_exp ~transl_ctx layout expr2))
-  | Texp_while {wh_body; wh_body_sort; wh_cond} ->
+  | Texp_while {wh_body; wh_body_sort; wh_cond; loop_label} ->
+      let static_exception_id, transl_ctx = add_loop_label ~transl_ctx ~loop_label in
       let wh_body_sort = Jkind.Sort.default_for_transl_and_get wh_body_sort in
       let cond = transl_exp ~transl_ctx Lambda.layout_bool wh_cond in
       let wh_body_layout = layout_exp wh_body_sort wh_body in
       let body = transl_exp ~transl_ctx wh_body_layout wh_body in
-      Lwhile {
-        wh_cond = maybe_region_layout layout_int cond;
-        wh_body = event_before ~scopes wh_body
-                    (maybe_region_layout layout_unit body);
-      }
-  | Texp_for {for_id; for_debug_uid; for_from; for_to; for_dir; for_body;
-              for_body_sort} ->
+      let loop =
+        Lwhile {
+          wh_cond = maybe_region_layout layout_int cond;
+          wh_body = event_before ~scopes wh_body
+                      (maybe_region_layout layout_unit body);
+        }
+      in
+      Lstaticcatch (loop,
+        (static_exception_id, []),
+        Lconst const_unit, Same_region, layout_unit)
+  | Texp_for {for_id; for_debug_uid; for_from; for_to; for_dir;
+              for_body; for_body_sort; loop_label} ->
       let for_body_sort = Jkind.Sort.default_for_transl_and_get for_body_sort in
       let for_body_layout = layout_exp for_body_sort for_body in
+      let static_exception_id, transl_ctx = add_loop_label ~transl_ctx ~loop_label in
       let body = transl_exp ~transl_ctx for_body_layout for_body in
-      Lfor {
-        for_id;
-        for_debug_uid;
-        for_loc = of_location ~scopes e.exp_loc;
-        for_from = transl_exp ~transl_ctx Lambda.layout_int for_from;
-        for_to = transl_exp ~transl_ctx Lambda.layout_int for_to;
-        for_dir;
-        for_body = event_before ~scopes for_body
-                     (maybe_region_layout layout_unit body);
-      }
+      let loop =
+        Lfor {
+          for_id;
+          for_debug_uid;
+          for_loc = of_location ~scopes e.exp_loc;
+          for_from = transl_exp ~transl_ctx Lambda.layout_int for_from;
+          for_to = transl_exp ~transl_ctx Lambda.layout_int for_to;
+          for_dir;
+          for_body = event_before ~scopes for_body
+                      (maybe_region_layout layout_unit body);
+        }
+      in
+      Lstaticcatch (loop,
+        (static_exception_id, []),
+        Lconst const_unit, Same_region, layout_unit)
   | Texp_send(expr, met, pos) ->
       let lam =
         let pos = transl_apply_position pos in
@@ -1301,13 +1318,15 @@ and transl_exp0 ~in_new_scope ~transl_ctx (layout : Lambda.layout) e =
              (Lvar cpy))
   | Texp_letmodule(None, loc, Mp_present, modl, body) ->
       let mod_scopes = enter_anonymous_module ~scopes ~loc:loc.loc in
-      let lam = !transl_module ~transl_ctx:{scopes = mod_scopes} Tcoerce_none None modl in
+      let lam = !transl_module ~transl_ctx:{transl_ctx with scopes = mod_scopes}
+                  Tcoerce_none None modl in
       Lsequence(Lprim(Pignore, [lam], of_location ~scopes loc.loc),
                 transl_exp ~transl_ctx layout body)
   | Texp_letmodule(Some id, _loc, Mp_present, modl, body) ->
       let defining_expr =
         let mod_scopes = enter_module_definition ~scopes id in
-        !transl_module ~transl_ctx:{scopes = mod_scopes} Tcoerce_none None modl
+        !transl_module ~transl_ctx:{transl_ctx with scopes = mod_scopes}
+          Tcoerce_none None modl
       in
       (* CR sspies: Add a debug uid to [Texp_letmodule] for the binder. *)
       Llet(Strict, Lambda.layout_module, id, Lambda.debug_uid_none,
@@ -1321,7 +1340,8 @@ and transl_exp0 ~in_new_scope ~transl_ctx (layout : Lambda.layout) e =
            transl_exp ~transl_ctx layout body)
   | Texp_pack modl ->
       let mod_scopes = enter_anonymous_module ~scopes ~loc:modl.mod_loc in
-      !transl_module ~transl_ctx:{scopes = mod_scopes} Tcoerce_none None modl
+      !transl_module ~transl_ctx:{transl_ctx with scopes = mod_scopes}
+        Tcoerce_none None modl
   | Texp_assert ({exp_desc=Texp_construct(_, {cstr_name="false"}, _, _, _)},
                  loc) ->
       assert_failed loc ~scopes e
@@ -1355,7 +1375,6 @@ and transl_exp0 ~in_new_scope ~transl_ctx (layout : Lambda.layout) e =
          (* other cases compile to a lazy block holding a function.  The
             typechecker enforces that e has jkind value.  *)
          let scopes = enter_lazy ~scopes in
-         let transl_ctx = { scopes } in
          let fn = lfunction ~kind:(Curried {nlocal=0})
                             ~params:[{ name = Ident.create_local "param";
                                        debug_uid = Lambda.debug_uid_none;
@@ -1601,6 +1620,9 @@ and transl_exp0 ~in_new_scope ~transl_ctx (layout : Lambda.layout) e =
         "transl_exp: unexpected initial-stage splice at %a"
         (Location.Doc.loc ~capitalize_first:false)
         e.exp_loc
+  | Texp_break loop_label ->
+    let static_exception_id = Ident.Map.find loop_label transl_ctx.label_map in
+    Lstaticraise (static_exception_id, [])
 
 and pure_module m =
   match m.mod_desc with
@@ -2366,7 +2388,7 @@ and transl_function
       update_assume_zero_alloc ~scopes ~assume_zero_alloc
     else enter_anonymous_function ~scopes ~assume_zero_alloc ~loc:e.exp_loc
   in
-  let transl_ctx = { scopes } in
+  let transl_ctx = { transl_ctx with scopes } in
   let sreturn_mode = transl_ret_mode sreturn_mode.mode_modes in
   let { params; body; return_sort; return_mode; region } =
     fuse_method_arity
@@ -2438,7 +2460,7 @@ and transl_bound_exp ~transl_ctx ~in_structure pat layout expr loc attrs =
          with zero_alloc info in [transl_function]. *)
       let scopes = transl_ctx.scopes in
       let new_scopes = enter_value_definition ~scopes ~assume_zero_alloc id in
-      transl_scoped_exp ~transl_ctx:{scopes = new_scopes} layout expr
+      transl_scoped_exp ~transl_ctx:{transl_ctx with scopes = new_scopes} layout expr
     | _ -> transl_exp ~transl_ctx layout expr
   in
   Translattribute.add_function_attributes lam loc attrs

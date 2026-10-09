@@ -264,6 +264,7 @@ type lookup_error =
   | Unbound_cltype of Longident.t
   | Unbound_jkind of Longident.t
   | Unbound_settable_variable of string
+  | Unbound_loop_label
   | Not_a_settable_variable of string
   | Masked_instance_variable of Longident.t
   | Masked_self_variable of Longident.t
@@ -288,6 +289,7 @@ type lookup_error =
   | No_unboxed_version of Longident.t * type_declaration * string option
   | Error_from_persistent_env of Persistent_env.error
   | Mutable_value_used_in_closure of Mode.Hint.pinpoint
+  | Break_used_in_closure of Mode.Hint.pinpoint
   | Incompatible_stage of Longident.t * Location.t * stage * Location.t * stage
   | Unbound_in_stage of
       none_in_quotations_context * Longident.t * Location.t * stage * stage
@@ -427,6 +429,11 @@ val find_modtype_index: Ident.t -> t -> int option
 val find_class_index:   Ident.t -> t -> int option
 val find_cltype_index:  Ident.t -> t -> int option
 
+(** Finds the label of the current loop, or
+    raises an error if none is found.
+*)
+val find_loop_label_exn: Location.t -> t -> Ident.t
+
 (* Check if a name is bound *)
 
 val bound_value: string -> t -> bool
@@ -462,6 +469,7 @@ val add_value:
     Types.value_description ->
     t ->
     t
+val add_loop_label: t -> Ident.t * t
 val add_type:
   check:bool -> ?shape:Shape.t -> Ident.t -> type_declaration -> t -> t
 val add_extension:

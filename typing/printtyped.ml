@@ -913,6 +913,8 @@ and expression i ppf x =
   | Texp_splice e ->
     line i ppf "Texp_splice";
     expression i ppf e
+  | Texp_break _ ->
+    line i ppf "Texp_break"
 
 and value_description i ppf x =
   line i ppf "value_description %a %a\n" fmt_ident x.val_id fmt_location

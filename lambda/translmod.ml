@@ -909,8 +909,8 @@ and transl_structure ~transl_ctx loc
             | None -> scopes
             | Some id -> enter_module_definition ~scopes id in
           let module_body =
-            transl_module ~transl_ctx:{ scopes = subscopes } Tcoerce_none
-              (Option.bind id (field_path rootpath)) mb.mb_expr
+            transl_module ~transl_ctx:{ transl_ctx with scopes = subscopes }
+              Tcoerce_none (Option.bind id (field_path rootpath)) mb.mb_expr
           in
           let module_body =
             Translattribute.add_inline_attribute module_body mb.mb_loc
@@ -948,8 +948,9 @@ and transl_structure ~transl_ctx loc
               match id with
               | None -> transl_module ~transl_ctx Tcoerce_none None modl
               | Some id ->
+                  let scopes = enter_module_definition ~scopes id in
                   transl_module
-                    ~transl_ctx:{ scopes = enter_module_definition ~scopes id }
+                    ~transl_ctx:{ transl_ctx with scopes }
                     Tcoerce_none (field_path rootpath id) modl
             ) bindings body
           in
@@ -1227,7 +1228,7 @@ let transl_implementation compilation_unit impl ~loc =
   primitive_declarations := [];
   Translprim.clear_used_primitives ();
   let scopes = enter_compilation_unit ~scopes:empty_scopes compilation_unit in
-  let transl_ctx = { scopes } in
+  let transl_ctx = { scopes; label_map = Ident.Map.empty } in
   let body, (repr, arg_block_idx) =
     Translobj.transl_label_init (fun () ->
       let body, repr, arg_block_idx =
@@ -1391,8 +1392,8 @@ let transl_toplevel_item ~transl_ctx item =
       (* we need to use the unique name for the module because of issues
          with "open" (PR#8133) *)
       set_toplevel_unique_name id;
-      let lam = transl_module
-                  ~transl_ctx:{ scopes = enter_module_definition ~scopes id }
+      let scopes = enter_module_definition ~scopes id in
+      let lam = transl_module ~transl_ctx:{ transl_ctx with scopes}
                   Tcoerce_none (Some(Lident (Ident.name id))) modl in
       toploop_setvalue id lam
   | Tstr_recmodule bindings ->
@@ -1403,8 +1404,9 @@ let transl_toplevel_item ~transl_ctx item =
            | None ->
              transl_module ~transl_ctx Tcoerce_none None modl
            | Some id ->
+             let scopes = enter_module_definition ~scopes id in
              transl_module
-               ~transl_ctx:{ scopes = enter_module_definition ~scopes id }
+               ~transl_ctx:{ transl_ctx with scopes }
                Tcoerce_none (Some (Lident (Ident.name id))) modl)
         bindings
         (make_sequence toploop_setvalue_id idents)
@@ -1488,11 +1490,11 @@ let transl_toplevel_item_and_close ~transl_ctx itm =
           in expr, ()))
 
 let transl_toplevel_definition str =
+  let transl_ctx = { scopes = empty_scopes; label_map = Ident.Map.empty } in
   reset_labels ();
   Translprim.clear_used_primitives ();
   make_sequence
-    (transl_toplevel_item_and_close ~transl_ctx:{ scopes = empty_scopes })
-    str.str_items
+    (transl_toplevel_item_and_close ~transl_ctx) str.str_items
 
 (* Compile the initialization code for a packed library *)
 

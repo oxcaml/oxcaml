@@ -665,7 +665,7 @@ let rec build_class_init ~transl_ctx cla cstr super inh_init cl_init msubst top 
                 (inh_init, cl_init, methods, values)
             | Tcf_method (name, _, Tcfk_concrete (_, exp)) ->
                 let scopes = enter_method_definition ~scopes name.txt in
-                let transl_ctx = { scopes } in
+                let transl_ctx = { transl_ctx with scopes } in
                 let met_code =
                   msubst true
                     (transl_scoped_exp ~transl_ctx Lambda.layout_method exp)
@@ -1118,7 +1118,7 @@ let transl_class ~transl_ctx ids cl_id pub_meths cl vflag =
 
   (* Prepare for heavy environment handling *)
   let scopes = enter_class_definition ~scopes cl_id in
-  let transl_ctx = { scopes } in
+  let transl_ctx = { transl_ctx with scopes } in
   let tables = Ident.create_local (Ident.name cl_id ^ "_tables") in
   let (top_env, req) = oo_add_class tables in
   let top = not req in

@@ -661,9 +661,9 @@ let expr sub x =
           sub.expr sub exp2
         )
     | Texp_while wh ->
-        Texp_while { wh_cond = sub.expr sub wh.wh_cond;
-                     wh_body = sub.expr sub wh.wh_body;
-                     wh_body_sort = wh.wh_body_sort
+        Texp_while { wh with wh_cond = sub.expr sub wh.wh_cond;
+                             wh_body = sub.expr sub wh.wh_body;
+                             wh_body_sort = wh.wh_body_sort
                    }
     | Texp_for tf ->
         Texp_for {tf with for_from = sub.expr sub tf.for_from;
@@ -756,6 +756,7 @@ let expr sub x =
         Texp_quote (sub.expr sub exp)
     | Texp_splice exp ->
         Texp_splice (sub.expr sub exp)
+    | Texp_break id -> Texp_break id
   in
   let exp_attributes = sub.attributes sub x.exp_attributes in
   {x with exp_loc; exp_extra; exp_desc; exp_env; exp_attributes}

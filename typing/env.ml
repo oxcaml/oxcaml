@@ -872,6 +872,7 @@ type lookup_error =
   | Unbound_cltype of Longident.t
   | Unbound_jkind of Longident.t
   | Unbound_settable_variable of string
+  | Unbound_loop_label
   | Not_a_settable_variable of string
   | Masked_instance_variable of Longident.t
   | Masked_self_variable of Longident.t
@@ -895,6 +896,7 @@ type lookup_error =
   | No_unboxed_version of Longident.t * type_declaration * string option
   | Error_from_persistent_env of Persistent_env.error
   | Mutable_value_used_in_closure of Mode.Hint.pinpoint
+  | Break_used_in_closure of Mode.Hint.pinpoint
   | Incompatible_stage of Longident.t * Location.t * stage * Location.t * stage
   | Unbound_in_stage of
       none_in_quotations_context * Longident.t * Location.t * stage * stage
@@ -3313,6 +3315,23 @@ let add_signature_lazy sg env =
   let _, env = add_signature_lazy Shape.Map.empty None sg env in
   env
 
+let loop_str = "*loop*"
+
+let add_loop_label env =
+  let id = Ident.create_local loop_str in
+  let desc =
+    { val_type = Predef.type_unit;
+      val_kind = Val_reg Jkind_types.Sort.scannable;
+      val_lpoly = Lpoly.determined [];
+      val_attributes = [];
+      val_zero_alloc = Zero_alloc.default;
+      val_modalities = Mode.Modality.undefined;
+      val_loc = Location.none;
+      val_uid = Uid.mk ~current_unit:(get_current_unit ())
+    }
+  in
+  (id, add_value ~mode:Mode.With_regionality.legacy id desc env)
+
 (* Add "unbound" bindings *)
 
 let enter_unbound_value name reason env =
@@ -3920,6 +3939,16 @@ let walk_locks_for_mutable_mode ~errors ~loc ~env locks m0 =
             (Mutable_value_used_in_closure pp)
       | Unboxed_lock -> mode
     ) mode locks
+
+let walk_locks_for_break ~loc ~env locks =
+  List.iter
+    (fun lock ->
+      match lock with
+      | Const_closure_lock (false, pp, _) | Closure_lock (pp, _) ->
+          lookup_error loc env (Break_used_in_closure pp)
+      | Const_closure_lock (true, _, _)
+      | Region_lock | Exclave_lock | Unboxed_lock -> ()
+    ) locks
 
 let lookup_ident_value ~errors ~use ~loc name env =
   match IdTbl.find_name_and_locks wrap_value ~mark:use name env.values with
@@ -4768,6 +4797,18 @@ let find_modtype_index id env = find_index_tbl id env.modtypes
 let find_class_index id env = find_index_tbl id env.classes
 let find_cltype_index id env = find_index_tbl id env.cltypes
 
+let find_loop_label_exn loc env =
+  let name = "*loop*" in
+  match IdTbl.find_name_and_locks wrap_value ~mark:false name env.values with
+  | Ok (path, locks, _) ->
+    let _, locks = partition_locks locks in
+    walk_locks_for_break ~loc ~env locks;
+    (match path with
+    | Path.Pident id -> id
+    | Path.Pdot _ | Path.Papply _ | Path.Pextra_ty _ ->
+      fatal_error "find_loop_label_exn: impossible path")
+  | Error _ -> lookup_error loc env Unbound_loop_label
+
 (* Ordinary lookup functions *)
 
 let walk_locks ~env ~loc lid ~item ty (mode, locks) =
@@ -5383,6 +5424,10 @@ let report_lookup_error_doc loc env = function
           "@{<ralign>Unbound instance variable or mutable variable @}%a"
           Style.inline_code s
           (spellcheck_name extract_settable_variables env s)
+  | Unbound_loop_label ->
+      Location.aligned_error_hint ~loc
+        "Cannot use break_ outside loop"
+        None
   | Not_a_settable_variable s ->
      Location.aligned_error_hint ~loc
         "@{<ralign>The value @}%a is not an instance variable or mutable \
@@ -5535,6 +5580,11 @@ let report_lookup_error_doc loc env = function
   | Mutable_value_used_in_closure ctx ->
       Location.errorf ~loc
         "Mutable variable cannot be used inside %t."
+        ((Mode.print_pinpoint ctx |> Option.get)
+          ~definite:false ~capitalize:false)
+  | Break_used_in_closure ctx ->
+      Location.errorf ~loc
+        "break_ cannot be used inside %t."
         ((Mode.print_pinpoint ctx |> Option.get)
           ~definite:false ~capitalize:false)
   | Incompatible_stage (lid, usage_loc, usage_stage, intro_loc, intro_stage) ->
