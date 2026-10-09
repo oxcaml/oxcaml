@@ -185,6 +185,7 @@ let rec mixed_block_element print_value_kind ppf el =
   | Mask -> fprintf ppf "mask"
   | Word -> fprintf ppf "word"
   | Untagged_immediate -> fprintf ppf "untagged_immediate"
+  | Void -> fprintf ppf "void"
   | Product shape ->
     fprintf ppf "product %a"
       (Format.pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ")
@@ -365,6 +366,7 @@ let rec mixed_block_element
   | Mask -> fprintf ppf "mask"
   | Word -> fprintf ppf "word"
   | Untagged_immediate -> fprintf ppf "untagged_immediate"
+  | Void -> fprintf ppf "void"
   | Product shape ->
     fprintf ppf "product %a" (mixed_block_shape (fun _ _ -> ())) shape
   | Splice_variable id -> fprintf ppf "$%a" Slambdaident.print id
