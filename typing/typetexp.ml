@@ -1014,11 +1014,51 @@ let transl_modepoly_var { txt; loc } =
     TyVarEnv.remember_used_mode txt v loc;
     v
 
-let transl_modepoly_morph_r (elem : Typemode.modepoly_elem) : With_locality.r =
-  With_locality.disallow_left (transl_modepoly_var elem.elem_var)
+let transl_modepoly_morph_r
+    (elem : (Allowance.disallowed * Allowance.allowed) Typemode.modepoly_elem)
+    : With_locality.r =
+  let v = transl_modepoly_var elem.elem_var in
+  let base =
+    match elem.elem_morph with
+    | None -> With_locality.disallow_left v
+    | Some Typemode.Past ->
+      { monadic = With_locality.Monadic.disallow_left With_locality.Monadic.max;
+        comonadic = With_locality.Comonadic.disallow_left v.comonadic
+      }
+  in
+  let { monadic; _ } =
+    elem.elem_mod
+    |> With_locality.Const.Option.value ~default:With_locality.Const.min
+    |> With_locality.Const.split in
+  let { comonadic; _ } =
+    elem.elem_mod
+    |> With_locality.Const.Option.value ~default:With_locality.Const.max
+    |> With_locality.Const.split in
+  With_locality.join_const monadic (With_locality.imply_const comonadic base)
 
-let transl_modepoly_morph_l (elem : Typemode.modepoly_elem) : With_locality.l =
-  With_locality.disallow_right (transl_modepoly_var elem.elem_var)
+let transl_modepoly_morph_l
+    (elem : (Allowance.allowed * Allowance.disallowed) Typemode.modepoly_elem)
+    : With_locality.l =
+  let v = transl_modepoly_var elem.elem_var in
+  let base : With_locality.l =
+    match elem.elem_morph with
+    | None -> With_locality.disallow_right v
+    | Some Typemode.Past ->
+      { monadic =
+          With_locality.Monadic.disallow_right With_locality.Monadic.min;
+        comonadic = With_locality.Comonadic.disallow_right v.comonadic
+      }
+    | Some Typemode.Close -> With_locality.close_over v
+  in
+  let { comonadic; _ } =
+    elem.elem_mod
+    |> With_locality.Const.Option.value ~default:With_locality.Const.max
+    |> With_locality.Const.split in
+  let { monadic; _ } =
+    elem.elem_mod
+    |> With_locality.Const.Option.value ~default:With_locality.Const.min
+    |> With_locality.Const.split in
+  With_locality.meet_const comonadic (With_locality.subtract_const monadic base)
 
 let transl_modepoly_annot env (annot : Typemode.modepoly_annot) : sig_var =
   let m = With_locality.newvar (get_current_level ()) in
