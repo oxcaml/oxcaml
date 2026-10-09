@@ -37,7 +37,7 @@ let keep_lifted_constant_only_if_used uacc acc lifted_constant =
   in
   if symbols_live || code_ids_live then LCS.add acc lifted_constant else acc
 
-let rebuild_let simplify_named_result removed_operations ~rewrite_id
+let rebuild_let bindings removed_operations ~rewrite_id
     ~lifted_constants_from_defining_expr ~at_unit_toplevel
     ~(closure_info : Closure_info.t) ~body uacc ~after_rebuild =
   let lifted_constants_from_defining_expr =
@@ -75,12 +75,9 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
   let put_bindings_around_body uacc ~body =
     let uacc = UA.notify_removed ~operation:removed_operations uacc in
     let bindings =
-      Simplify_named_result.bindings_to_place simplify_named_result
-    in
-    let bindings =
       List.map
-        (fun (binding : Expr_builder.binding_to_place) :
-             Expr_builder.binding_to_place ->
+        (fun (binding : Simplified_named.binding_to_place) :
+             Simplified_named.binding_to_place ->
           match binding with
           | Delete_binding _ -> binding
           | Keep_binding
@@ -131,7 +128,7 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
     in
     let bindings =
       List.map
-        (fun (binding_to_place : Expr_builder.binding_to_place) ->
+        (fun (binding_to_place : Simplified_named.binding_to_place) ->
           match binding_to_place with
           | Delete_binding _ -> binding_to_place
           | Keep_binding
@@ -222,7 +219,7 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
                   not (has_uses || (generate_phantom_lets && can_phantomise))
               in
               if will_delete_binding
-              then Expr_builder.Delete_binding { original_defining_expr }
+              then Simplified_named.Delete_binding { original_defining_expr }
               else
                 (* CR-someday mshinwell: When leaving behind phantom lets, maybe
                    we should turn the defining expressions into simpler ones by
@@ -240,7 +237,7 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
                 let bound_vars =
                   Bound_pattern.with_name_mode bound_vars name_mode
                 in
-                Expr_builder.Keep_binding
+                Simplified_named.Keep_binding
                   { binding with let_bound = bound_vars })
         bindings
     in
@@ -272,7 +269,7 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
                 in
                 match greatest_name_mode with
                 | Absent ->
-                  [ Expr_builder.Delete_binding
+                  [ Simplified_named.Delete_binding
                       { original_defining_expr = binding.original_defining_expr
                       } ]
                 | Present name_mode ->
@@ -281,7 +278,7 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
                     let let_bound =
                       Bound_pattern.with_name_mode binding.let_bound name_mode
                     in
-                    [Expr_builder.Keep_binding { binding with let_bound }]
+                    [Simplified_named.Keep_binding { binding with let_bound }]
                   else
                     Misc.fatal_errorf
                       "Binding for %a was supposed to be removed but occurs in \
@@ -294,7 +291,7 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
                   Simplified_named.create ~machine_width
                     (Named.create_prim prim dbg)
                 in
-                [ Expr_builder.Keep_binding
+                [ Simplified_named.Keep_binding
                     { binding with simplified_defining_expr } ]
               | Replace_by_binding { var; bound_to } ->
                 let bv = Bound_pattern.must_be_singleton binding.let_bound in
@@ -304,7 +301,7 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
                   Simplified_named.create ~machine_width
                     (Named.create_simple bound_to)
                 in
-                [ Expr_builder.Keep_binding
+                [ Simplified_named.Keep_binding
                     { binding with simplified_defining_expr } ]
             in
             uacc, new_bindings
@@ -343,7 +340,7 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
     after_rebuild body uacc
 
 let record_new_defining_expression_binding_for_data_flow dacc ~rewrite_id
-    data_flow (binding : Expr_builder.binding_to_place) : Flow.Acc.t =
+    data_flow (binding : Simplified_named.binding_to_place) : Flow.Acc.t =
   let generate_phantom_lets = DE.generate_phantom_lets (DA.denv dacc) in
   match binding with
   | Delete_binding _ -> data_flow
@@ -436,6 +433,9 @@ let simplify_let0 ~simplify_expr ~simplify_function_body dacc let_expr
                ~lifted_constants_from_defining_expr simplify_named_result)
       in
       let at_unit_toplevel = DE.at_unit_toplevel (DA.denv dacc) in
+      let bindings =
+        Simplify_named_result.bindings_to_place simplify_named_result
+      in
       (* Simplify the body of the let-expression and make the new [Let] bindings
          around the simplified body. [Simplify_named] will already have prepared
          [dacc] with the necessary bindings for the simplification of the
@@ -443,7 +443,7 @@ let simplify_let0 ~simplify_expr ~simplify_function_body dacc let_expr
       let down_to_up dacc ~rebuild:rebuild_body =
         let rebuild uacc ~after_rebuild =
           let after_rebuild body uacc =
-            rebuild_let simplify_named_result removed_operations
+            rebuild_let bindings removed_operations
               ~lifted_constants_from_defining_expr ~at_unit_toplevel
               ~closure_info ~body uacc ~after_rebuild ~rewrite_id
           in
