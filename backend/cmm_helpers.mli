@@ -941,6 +941,10 @@ val asr_int_caml_raw : dbg:Debuginfo.t -> expression -> expression -> expression
 
 (** Reinterpret cast functions *)
 
+val int64_as_value : dbg:Debuginfo.t -> expression -> expression
+
+val value_as_int64 : dbg:Debuginfo.t -> expression -> expression
+
 val int64_as_float : dbg:Debuginfo.t -> expression -> expression
 
 val float_as_int64 : dbg:Debuginfo.t -> expression -> expression

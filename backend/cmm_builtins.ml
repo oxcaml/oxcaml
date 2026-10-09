@@ -63,10 +63,6 @@ let if_operation_supported_bi bi op ~f =
 let if_expr_supported expr =
   match Proc.expression_supported expr with true -> Some expr | false -> None
 
-let int64_of_value arg dbg = Cop (Creinterpret_cast Int64_of_value, [arg], dbg)
-
-let value_of_int64 arg dbg = Cop (Creinterpret_cast Value_of_int64, [arg], dbg)
-
 let shift ~bits make_op arg count dbg =
   assert (size_int = 8);
   let mask = bits - 1 in
@@ -1008,9 +1004,9 @@ let transl_builtin name args dbg typ_res =
   | "caml_ext_pointer_as_native_pointer" ->
     Some (int_as_pointer (one_arg name args) dbg)
   | "caml_native_pointer_of_value" ->
-    Some (int64_of_value (one_arg name args) dbg)
+    Some (value_as_int64 ~dbg (one_arg name args))
   | "caml_native_pointer_to_value" ->
-    Some (value_of_int64 (one_arg name args) dbg)
+    Some (int64_as_value ~dbg (one_arg name args))
   | "caml_native_pointer_load_immediate"
   | "caml_native_pointer_load_unboxed_nativeint" ->
     Some (Cop (mk_load_mut Word_int, args, dbg))

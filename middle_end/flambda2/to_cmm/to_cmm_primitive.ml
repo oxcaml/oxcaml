@@ -1231,8 +1231,8 @@ let unary_primitive env res dbg f (_arg_simple : Simple.t option)
   | Reinterpret_64_bit_word reinterpret ->
     let cmm =
       match reinterpret with
-      | Tagged_int63_as_unboxed_int64 -> arg
-      | Unboxed_int64_as_tagged_int63 -> C.or_int (C.int 1 ~dbg) arg dbg
+      | Tagged_int63_as_unboxed_int64 -> C.value_as_int64 ~dbg arg
+      | Unboxed_int64_as_tagged_int63 -> C.int64_as_value ~dbg arg
       | Unboxed_int64_as_unboxed_float64 -> C.int64_as_float ~dbg arg
       | Unboxed_float64_as_unboxed_int64 -> C.float_as_int64 ~dbg arg
     in

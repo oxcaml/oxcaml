@@ -576,8 +576,6 @@ let add_const = check_equal_3 "add_const" add_const ~engine:add_const'
 
 let incr_int c dbg = add_const c 1 dbg
 
-let decr_int c dbg = add_const c (-1) dbg
-
 let rec add_int c1 c2 dbg =
   map_tail2 c1 c2 ~f:(fun c1 c2 ->
       match prefer_add c1, prefer_add c2 with
@@ -1103,61 +1101,31 @@ let store ~dbg memory_chunk init ~addr ~new_value =
   in
   Cop (Cstore (memory_chunk, init), [addr; new_value], dbg)
 
+let int64_as_value ~dbg arg = Cop (Creinterpret_cast Value_of_int64, [arg], dbg)
+
+let value_as_int64 ~dbg arg = Cop (Creinterpret_cast Int64_of_value, [arg], dbg)
+
 let tag_int i dbg =
   match low_bits i ~bits:(arch_bits - 1) ~dbg with
   | Cconst_int (n, _) -> int_const dbg n
   | Cconst_natint (n, _) -> int_const dbg (Nativeint.to_int n)
-  | Cop (Casr, [e; Cconst_int (right, _)], dbg_op) when right > 0 ->
-    or_const (asr_const e (right - 1) dbg_op) 1n dbg
-  | Cop (Clsr, [e; Cconst_int (right, _)], dbg_op) when right > 0 ->
-    or_const (lsr_const e (right - 1) dbg_op) 1n dbg
-  | c -> incr_int (lsl_const c 1 dbg) dbg
+  | i -> Cop (Cstatic_cast Tagged_int_of_int64, [i], dbg)
 
 let untag_int i dbg =
   match i with
   | Cconst_tagged_int (n, _) -> Cconst_int (n, dbg)
-  | Cconst_int (n, _) -> Cconst_int (n asr 1, dbg)
-  | Cop (Cor, [Cop (Casr, [c; Cconst_int (n, _)], _); Cconst_int (1, _)], _)
-    when n > 0 && is_defined_shift (n + 1) ->
-    asr_const c (n + 1) dbg
-  | Cop (Cor, [Cop (Clsr, [c; Cconst_int (n, _)], _); Cconst_int (1, _)], _)
-    when n > 0 && is_defined_shift (n + 1) ->
-    lsr_const c (n + 1) dbg
-  | c -> asr_const c 1 dbg
+  | i ->
+    Cop (Cstatic_cast (Int64_of_tagged_int { signedness = Signed }), [i], dbg)
 
 let unsigned_untag_int i dbg =
   match i with
   | Cconst_tagged_int (n, _) ->
     natint_const_untagged dbg
       (Nativeint.shift_right_logical (encode_tagged_int n) 1)
-  | i -> lsr_const i 1 dbg
+  | i ->
+    Cop (Cstatic_cast (Int64_of_tagged_int { signedness = Unsigned }), [i], dbg)
 
-let mk_not dbg cmm =
-  match cmm with
-  | Cconst_tagged_int (0, _) -> Cconst_tagged_int (1, dbg)
-  | Cconst_tagged_int (1, _) -> Cconst_tagged_int (0, dbg)
-  | Cop
-      ( (Caddi | Cor),
-        [Cop (Clsl, [c; Cconst_int (1, _)], _); Cconst_int (1, _)],
-        dbg' ) -> (
-    match c with
-    | Cop (Ccmpi cmp, [c1; c2], dbg'') ->
-      tag_int
-        (Cop (Ccmpi (negate_integer_comparison cmp), [c1; c2], dbg''))
-        dbg'
-    | Cop (Ccmpf (w, cmp), [c1; c2], dbg'') ->
-      tag_int
-        (Cop (Ccmpf (w, negate_float_comparison cmp), [c1; c2], dbg''))
-        dbg'
-    | _ ->
-      (* 0 -> 3, 1 -> 1 *)
-      Cop
-        ( Cxor,
-          [Cconst_int (3, dbg); Cop (Clsl, [c; Cconst_int (1, dbg)], dbg)],
-          dbg ))
-  | c ->
-    (* 1 -> 3, 3 -> 1 *)
-    Cop (Cxor, [Cconst_int (2, dbg); c], dbg)
+let mk_not dbg cmm = tag_int (xor_const (untag_int cmm dbg) 1n dbg) dbg
 
 (** Whether two expressions are known to denote the same machine word. Only
     variables and constants are recognised, so that evaluating one of the two
@@ -1681,16 +1649,7 @@ let unsigned_mod_int c1 c2 dbg =
 
 (* Bool *)
 
-let test_bool dbg cmm =
-  match cmm with
-  | Cop
-      ( (Caddi | Cor),
-        [Cop (Clsl, [c; Cconst_int (1, _)], _); Cconst_int (1, _)],
-        _ ) ->
-    c
-  | Cconst_int (n, dbg) ->
-    if n = 1 then Cconst_int (0, dbg) else Cconst_int (1, dbg)
-  | c -> Cop (Ccmpi Cne, [c; Cconst_int (1, dbg)], dbg)
+let test_bool dbg cmm = untag_int cmm dbg
 
 (* Float *)
 
@@ -1937,8 +1896,6 @@ let wordsize_shift = 9
 
 let numfloat_shift = 9 + log2_size_float - log2_size_addr
 
-let addr_array_length_shifted hdr dbg = lsr_const hdr wordsize_shift dbg
-
 (* Produces a pointer to the element of the array [ptr] on the position [ofs]
    with the given element [log2size] log2 element size.
 
@@ -1956,42 +1913,9 @@ let array_indexing ?typ log2size ptr ofs dbg =
     | Some Naked_int -> Caddi
     | _ -> assert false
   in
-  match ofs with
-  | Cconst_int (n, _) ->
-    let i = n asr 1 in
-    if i = 0
-    then ptr
-    else Cop (add, [ptr; Cconst_int (i lsl log2size, dbg)], dbg)
-  | Cop
-      ( (Caddi | Cor),
-        [Cop (Clsl, [c; Cconst_int (1, _)], _); Cconst_int (1, _)],
-        dbg' ) ->
-    (* [c] is not necessarily sign-extended to [arch_bits - 1] bits. When
-       [log2size > 0], the left shift discards the top bit, so [c] can be used
-       directly. When [log2size = 0], [c] must be sign-extended; [untag_int]
-       takes care of this (and omits the extension when it can prove it
-       unnecessary). *)
-    if log2size = 0
-    then Cop (add, [ptr; untag_int ofs dbg], dbg')
-    else Cop (add, [ptr; lsl_const c log2size dbg], dbg')
-  | Cop (Caddi, [c; Cconst_int (n, _)], dbg') when log2size = 0 ->
-    Cop
-      ( add,
-        [Cop (add, [ptr; untag_int c dbg], dbg); Cconst_int (n asr 1, dbg)],
-        dbg' )
-  | Cop (Caddi, [c; Cconst_int (n, _)], _) ->
-    Cop
-      ( add,
-        [ Cop (add, [ptr; lsl_const c (log2size - 1) dbg], dbg);
-          Cconst_int ((n - 1) lsl (log2size - 1), dbg) ],
-        dbg )
-  | _ when log2size = 0 -> Cop (add, [ptr; untag_int ofs dbg], dbg)
-  | _ ->
-    Cop
-      ( add,
-        [ Cop (add, [ptr; lsl_const ofs (log2size - 1) dbg], dbg);
-          Cconst_int (-1 lsl (log2size - 1), dbg) ],
-        dbg )
+  match untag_int ofs dbg with
+  | Cconst_int (0, _) -> ptr
+  | ofs -> Cop (add, [ptr; lsl_const ofs log2size dbg], dbg)
 
 (* CR Gbury: this conversion int -> nativeint is potentially unsafe when
    cross-compiling for 64-bit on a 32-bit host *)
@@ -3815,14 +3739,14 @@ let cache_public_method meths tag cache dbg =
        first label. *)
     Clet
       ( VP.create result,
-        Cop
-          ( Caddi,
-            [ lsl_const (Cvar result_label_index) log2_size_addr dbg;
-              cconst_int (1 - (3 * size_addr)) ],
-            dbg ),
+        tag_int
+          (lsl_const
+             (sub_int (Cvar result_label_index) (cconst_int 3) dbg)
+             (log2_size_addr - 1) dbg)
+          dbg,
         Csequence
           ( Cop (Cstore (Word_int, Assignment), [cache; Cvar result], dbg),
-            Cvar result ) )
+            value_as_int64 ~dbg (Cvar result) ) )
   in
   let loop_cont = Lambda.next_raise_count () in
   let li = V.create_local "*li*" in
@@ -4459,7 +4383,8 @@ let curry_function (kind, arity, return) =
 
 type unary_primitive = expression -> Debuginfo.t -> expression
 
-let int_as_pointer arg dbg = Cop (Caddi, [arg; Cconst_int (-1, dbg)], dbg)
+let int_as_pointer arg dbg =
+  int64_as_value ~dbg (lsl_const (untag_int arg dbg) 1 dbg)
 (* always a pointer outside the heap *)
 
 let raise_prim raise_kind ~extra_args arg dbg =
@@ -4467,11 +4392,9 @@ let raise_prim raise_kind ~extra_args arg dbg =
   then Cop (Craise raise_kind, arg :: extra_args, dbg)
   else Cop (Craise Lambda.Raise_notrace, arg :: extra_args, dbg)
 
-let negint arg dbg = Cop (Csubi, [Cconst_int (2, dbg); arg], dbg)
+let negint arg dbg = tag_int (neg_int (untag_int arg dbg) dbg) dbg
 
-let addr_array_length arg dbg =
-  let hdr = get_header_masked arg dbg in
-  Cop (Cor, [addr_array_length_shifted hdr dbg; Cconst_int (1, dbg)], dbg)
+let addr_array_length arg dbg = tag_int (get_size arg dbg) dbg
 
 (* CR-soon gyorsh: effects and coeffects for primitives are set conservatively
    to Arbitrary_effects and Has_coeffects, resp. Check if this can be improved
@@ -4554,27 +4477,14 @@ let setfield n ptr init arg1 arg2 dbg =
            dbg ))
   | Simple init -> return_unit dbg (set_field arg1 n arg2 init dbg)
 
-let add_int_caml arg1 arg2 dbg = decr_int (add_int arg1 arg2 dbg) dbg
+let add_int_caml arg1 arg2 dbg =
+  tag_int (add_int (untag_int arg1 dbg) (untag_int arg2 dbg) dbg) dbg
 
-let sub_int_caml arg1 arg2 dbg = incr_int (sub_int arg1 arg2 dbg) dbg
+let sub_int_caml arg1 arg2 dbg =
+  tag_int (sub_int (untag_int arg1 dbg) (untag_int arg2 dbg) dbg) dbg
 
 let mul_int_caml arg1 arg2 dbg =
-  (* decrementing the non-constant part helps when the multiplication is
-     followed by an addition; for example, using this trick compiles
-
-     (100 * a + 7)
-
-     into
-
-     (+ ( * a 100) -85)
-
-     rather than
-
-     (+ ( * 200 (>>s a 1)) 15) *)
-  match arg1, arg2 with
-  | (Cconst_int _ as c1), c2 ->
-    incr_int (mul_int (untag_int c1 dbg) (decr_int c2 dbg) dbg) dbg
-  | c1, c2 -> incr_int (mul_int (decr_int c1 dbg) (untag_int c2 dbg) dbg) dbg
+  tag_int (mul_int (untag_int arg1 dbg) (untag_int arg2 dbg) dbg) dbg
 
 let div_int_caml arg1 arg2 dbg =
   let dividend_cannot_be_min_int =
@@ -4618,16 +4528,14 @@ let unsigned_mod_int_caml arg1 arg2 dbg =
        dbg)
     dbg
 
-let and_int_caml arg1 arg2 dbg = and_int arg1 arg2 dbg
+let and_int_caml arg1 arg2 dbg =
+  tag_int (and_int (untag_int arg1 dbg) (untag_int arg2 dbg) dbg) dbg
 
-let or_int_caml arg1 arg2 dbg = or_int arg1 arg2 dbg
+let or_int_caml arg1 arg2 dbg =
+  tag_int (or_int (untag_int arg1 dbg) (untag_int arg2 dbg) dbg) dbg
 
 let xor_int_caml arg1 arg2 dbg =
-  Cop
-    ( Cor,
-      [ xor_int (ignore_low_bit_int arg1) (ignore_low_bit_int arg2) dbg;
-        Cconst_int (1, dbg) ],
-      dbg )
+  tag_int (xor_int (untag_int arg1 dbg) (untag_int arg2 dbg) dbg) dbg
 
 type ternary_primitive =
   expression -> expression -> expression -> Debuginfo.t -> expression
@@ -5170,11 +5078,13 @@ let float32_of_float = unary (Cstatic_cast Float32_of_float)
 let float_of_float32 = unary (Cstatic_cast Float_of_float32)
 
 let lsl_int_caml_raw ~dbg arg1 arg2 =
-  incr_int (lsl_int (decr_int arg1 dbg) arg2 dbg) dbg
+  tag_int (lsl_int (untag_int arg1 dbg) arg2 dbg) dbg
 
-let lsr_int_caml_raw ~dbg arg1 arg2 = or_const (lsr_int arg1 arg2 dbg) 1n dbg
+let lsr_int_caml_raw ~dbg arg1 arg2 =
+  tag_int (lsr_int (unsigned_untag_int arg1 dbg) arg2 dbg) dbg
 
-let asr_int_caml_raw ~dbg arg1 arg2 = or_const (asr_int arg1 arg2 dbg) 1n dbg
+let asr_int_caml_raw ~dbg arg1 arg2 =
+  tag_int (asr_int (untag_int arg1 dbg) arg2 dbg) dbg
 
 let eq ~dbg x y =
   match x, y with
@@ -6002,7 +5912,9 @@ let atomic_exchange ~dbg (imm_or_ptr : Lambda.immediate_or_pointer) ~mode block
   | Pointer -> atomic_exchange_extcall ~dbg ~mode block offset ~new_value
 
 let atomic_arith ~dbg ~op ~untag ~ext_name block offset i =
-  let i = if untag then decr_int i dbg else i in
+  let i =
+    if untag then lsl_const (untag_int i dbg) 1 dbg else value_as_int64 ~dbg i
+  in
   let op = Catomic { op; size = Word } in
   if Proc.operation_supported op
   then
