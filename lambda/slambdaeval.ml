@@ -746,7 +746,7 @@ and eval_mixed_block_element :
       Misc.Stdlib.Array.map_sharing (eval_mixed_block_element env) old_elements
     in
     if new_elements == old_elements then element else Product new_elements
-  | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
+  | Value _ | Void | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
   | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
     element
 
@@ -1060,7 +1060,7 @@ exception Found_a_splice
 let rec assert_mixed_block_element_contains_no_splices : type a.
     a Lambda.mixed_block_element -> unit = function
   | Splice_variable _ -> raise Found_a_splice
-  | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
+  | Value _ | Void | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
   | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
     ()
   | Product elements ->

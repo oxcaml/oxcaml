@@ -2134,14 +2134,14 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
   let sem = add_barrier_to_read ubr Reads_agree in
   let make_void_access binding_kind sort =
     (* Accesses to the void arguments of a constant constructor must create a
-       void (represented in lambda as an empty unboxed product) or product of
-       voids rather than access a block.
+       void or product of voids rather than access a block.
 
        This is necessary for bytecode, where [Pmixedfield]s that access void are
        not erased but translated into field access(es) (as unboxed products are
        boxed in bytecode). *)
     let rec lambda_void_of_el el =
       match el with
+      | Void -> Lprim (Punbox_unit, [lambda_unit], loc), Pvoid
       | Product shape ->
         let ll, layouts =
           Array.map lambda_void_of_el shape |> Array.to_list |> List.split

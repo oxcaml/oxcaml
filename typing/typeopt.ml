@@ -840,7 +840,7 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
     (* CR layouts v7.1: assess whether it is important for performance to
        support deep value_kinds here *)
     end
-  | Product [||] -> num_nodes_visited, field
+  | Void -> num_nodes_visited, field
   | Product fs ->
     let unknown () = Array.init (Array.length fs) (fun _ -> None) in
     let types =
@@ -867,7 +867,7 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
           | { type_kind =
                 Type_variant _ | Type_record _ | Type_abstract _ | Type_open;
               _ } ->
-            (* We don't need to handle  records/variants here,
+            (* We don't need to handle records/variants here,
                because [scrape_ty] looks though them. *)
             unknown ()
           end
