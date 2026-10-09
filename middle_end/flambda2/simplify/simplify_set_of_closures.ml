@@ -307,30 +307,87 @@ let simplify_function_body context ~outer_dacc function_slot_opt
     Printexc.raise_with_backtrace Misc.Fatal_error bt
 
 (* For [Compute_if_returning_closures] (see [Flambda_features]): does [ty], the
-   type of one of the results of the function, describe a single closure, and if
-   [only_if_statically_allocatable], one whose environment only refers to the
-   function's own parameters, symbols or constants? *)
-let result_type_is_closure typing_env ~params ~only_if_statically_allocatable ty
-    =
-  match T.prove_single_closures_entry typing_env ty with
-  | Unknown -> false
-  | Proved (_function_slot, _alloc_mode, closures_entry, _function_type) ->
-    (not only_if_statically_allocatable)
-    || Value_slot.Map.for_all
-         (fun _value_slot slot_ty ->
-           match
-             TE.get_alias_then_canonical_simple_exn typing_env
-               ~min_name_mode:Name_mode.in_types slot_ty
-           with
-           | exception Not_found -> false
-           | simple ->
-             Simple.pattern_match simple
-               ~const:(fun _ -> true)
-               ~name:(fun name ~coercion:_ ->
-                 Name.pattern_match name
-                   ~symbol:(fun _ -> true)
-                   ~var:(fun var -> Variable.Set.mem var params)))
-         (T.Closures_entry.value_slot_types closures_entry)
+   type of one of the results of the function, describe a single closure, or an
+   immutable block (e.g. a tuple or record, possibly nested) at least one field
+   of which is such a closure? If [only_if_statically_allocatable], the closures
+   must additionally have environments that only refer to the function's own
+   parameters, symbols or constants, and so must the other fields of blocks (so
+   that the whole result would be statically allocated at a call site with known
+   arguments). *)
+let result_type_contains_closure typing_env ~params
+    ~only_if_statically_allocatable ty =
+  let simple_is_static simple =
+    Simple.pattern_match simple
+      ~const:(fun _ -> true)
+      ~name:(fun name ~coercion:_ ->
+        Name.pattern_match name
+          ~symbol:(fun _ -> true)
+          ~var:(fun var -> Variable.Set.mem var params))
+  in
+  (* Blocks are looked into at most two levels deep: enough for a tuple or
+     record of closures and for one nested in another (a record of records),
+     without walking arbitrary data. *)
+  let max_block_depth = 2 in
+  let rec is_closure ~depth ty =
+    match T.prove_single_closures_entry typing_env ty with
+    | Proved (_function_slot, _alloc_mode, closures_entry, _function_type) ->
+      (not only_if_statically_allocatable)
+      || Value_slot.Map.for_all
+           (fun _value_slot slot_ty ->
+             match
+               TE.get_alias_then_canonical_simple_exn typing_env
+                 ~min_name_mode:Name_mode.in_types slot_ty
+             with
+             | exception Not_found -> false
+             | simple -> simple_is_static simple)
+           (T.Closures_entry.value_slot_types closures_entry)
+    | Unknown -> (
+      if depth >= max_block_depth
+      then false
+      else
+        match
+          T.prove_unique_fully_constructed_immutable_heap_block typing_env ty
+        with
+        | Unknown -> false
+        | Proved (_tag, shape, _size, fields) -> (
+          match (shape : K.Block_shape.t) with
+          | Scannable (Mixed_record _) | Float_record -> false
+          | Scannable Value_only ->
+            (* Every field must be acceptable and at least one must be a
+               closure. *)
+            let classify field =
+              let field =
+                match
+                  TE.get_canonical_simple_exn typing_env
+                    ~min_name_mode:Name_mode.in_types field
+                with
+                | exception Not_found -> field
+                | field -> field
+              in
+              Simple.pattern_match field
+                ~const:(fun _ -> `Other)
+                ~name:(fun name ~coercion:_ ->
+                  Name.pattern_match name
+                    ~symbol:(fun _ -> `Other)
+                    ~var:(fun var ->
+                      let field_ty = TE.find typing_env name (Some K.value) in
+                      if is_closure ~depth:(depth + 1) field_ty
+                      then `Closure
+                      else if
+                        (not only_if_statically_allocatable)
+                        || Variable.Set.mem var params
+                      then `Other
+                      else `Rejected))
+            in
+            let classes = List.map classify fields in
+            List.for_all
+              (function `Rejected -> false | `Closure | `Other -> true)
+              classes
+            && List.exists
+                 (function `Closure -> true | `Other | `Rejected -> false)
+                 classes))
+  in
+  is_closure ~depth:0 ty
 
 let compute_result_types ~is_a_functor ~is_opaque ~return_cont_uses
     ~dacc_after_body ~dacc_at_function_entry ~return_cont_params
@@ -339,8 +396,8 @@ let compute_result_types ~is_a_functor ~is_opaque ~return_cont_uses
     Flambda_features.function_result_types ~is_a_functor
   in
   (* Under [Compute_if_returning_closures], the result types are only kept if
-     every result is a closure (see [result_type_is_closure]); this can only be
-     decided once they are known, i.e. after the join below. *)
+     every result is a closure (see [result_type_contains_closure]); this can
+     only be decided once they are known, i.e. after the join below. *)
   let only_if_returning_closures =
     match function_result_types with
     | Compute_if_returning_closures { only_if_statically_allocatable } ->
@@ -394,7 +451,7 @@ let compute_result_types ~is_a_functor ~is_opaque ~return_cont_uses
         List.for_all
           (fun result ->
             let kind = K.With_subkind.kind (BP.kind result) in
-            result_type_is_closure typing_env ~params:params_set
+            result_type_contains_closure typing_env ~params:params_set
               ~only_if_statically_allocatable
               (TE.find typing_env (BP.name result) (Some kind)))
           (Bound_parameters.to_list return_cont_params)
