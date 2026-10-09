@@ -20,8 +20,6 @@ type t =
             (** To avoid re-opening name abstractions, we store the opened
                 parameters and handler here. *)
         handler : Rebuilt_expr.t
-            (** [free_names_of_handler] includes entries for any occurrences of
-                the [params] in the [handler]. *)
       }
   | Non_inlinable_zero_arity of
       { handler : Rebuilt_expr.t Or_unknown.t
