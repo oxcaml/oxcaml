@@ -1853,7 +1853,8 @@ let get_field_gen mut ptr n dbg =
   get_field_gen_given_memory_chunk Word_val mut ptr n dbg
 
 let get_field_codepointer mut ptr n dbg =
-  get_field_gen_given_memory_chunk Word_int mut ptr n dbg
+  int64_as_value ~dbg
+    (get_field_gen_given_memory_chunk Word_int mut ptr n dbg)
 
 let set_field ptr n newval init dbg =
   Cop (Cstore (Word_val, init), [field_address ptr n dbg; newval], dbg)
@@ -4717,7 +4718,7 @@ let entry_point namelist =
                 callees = None;
                 returns = true
               },
-            [Cop (mk_load_immut Word_int, [f], dbg ())],
+            [get_field_codepointer Asttypes.Immutable f 0 (dbg ())],
             dbg () ),
         incr_global_inited () )
   in
@@ -5246,8 +5247,7 @@ let indirect_full_call ~dbg ~returns ty pos f ~callees args_type args =
       | [] -> Misc.fatal_error "indirect_full_call: args_type was empty"
       | _ :: _ :: _ -> 2
     in
-    load ~dbg Word_int Asttypes.Mutable
-      ~addr:(field_address (Cvar v) offset dbg)
+    get_field_codepointer Asttypes.Mutable (Cvar v) offset dbg
   in
   letin v' ~defining_expr:f
     ~body:
