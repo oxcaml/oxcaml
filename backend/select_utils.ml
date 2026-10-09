@@ -216,15 +216,15 @@ let oper_result_type = function
   | Cstore (_c, _) -> typ_void
   | Cdls_get -> typ_val
   | Ctls_get -> typ_val
-  | Cdomain_index -> typ_int
+  | Cdomain_index -> typ_naked_int
   | Cprefetch _ -> typ_void
   | Catomic
       { op = Fetch_and_add | Compare_set | Exchange | Compare_exchange; _ } ->
-    typ_int
+    typ_naked_int
   | Catomic { op = Add | Sub | Land | Lor | Lxor; _ } -> typ_void
   | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _ | Cand | Cor | Cxor
   | Clsl | Clsr | Casr | Cclz | Cctz | Cpopcnt | Cbswap _ | Ccmpi _ | Ccmpf _ ->
-    typ_int
+    typ_naked_int
   | Caddi128 | Csubi128 | Cmuli64 _ -> typ_int128
   | Caddv -> typ_val
   | Cadda -> typ_addr
@@ -251,45 +251,45 @@ let oper_result_type = function
   | Creinterpret_cast (Float_of_int64 | Float_of_float32) -> typ_float
   | Creinterpret_cast (Float32_of_int32 | Float32_of_float) -> typ_float32
   | Creinterpret_cast (Int64_of_value | Int64_of_float | Int32_of_float32) ->
-    typ_int
+    typ_naked_int
   | Creinterpret_cast Mask_of_int64 -> typ_mask
-  | Creinterpret_cast Int64_of_mask -> typ_int
-  | Cstatic_cast (Int_conv _) -> typ_int
-  | Cstatic_cast Tagged_int_of_int64 -> typ_int
-  | Cstatic_cast (Int64_of_tagged_int _) -> typ_int
+  | Creinterpret_cast Int64_of_mask -> typ_naked_int
+  | Cstatic_cast (Int_conv _) -> typ_naked_int
+  | Cstatic_cast Tagged_int_of_int64 -> typ_tagged_int
+  | Cstatic_cast (Int64_of_tagged_int _) -> typ_naked_int
   | Cstatic_cast (Float_of_float32 | Float_of_int64 Float64) -> typ_float
   | Cstatic_cast (Float32_of_float | Float_of_int64 Float32) -> typ_float32
-  | Cstatic_cast (Int64_of_float (Float64 | Float32)) -> typ_int
+  | Cstatic_cast (Int64_of_float (Float64 | Float32)) -> typ_naked_int
   | Cstatic_cast (V128_of_scalar _) -> typ_vec128
   | Cstatic_cast (Scalar_of_v128 Float64x2) -> typ_float
   | Cstatic_cast (Scalar_of_v128 Float32x4) -> typ_float32
   | Cstatic_cast (Scalar_of_v128 Float16x8) ->
     Misc.fatal_error "float16x8: scalar type not supported"
   | Cstatic_cast (Scalar_of_v128 (Int8x16 | Int16x8 | Int32x4 | Int64x2)) ->
-    typ_int
+    typ_naked_int
   | Cstatic_cast (V256_of_scalar _) -> typ_vec256
   | Cstatic_cast (Scalar_of_v256 Float64x4) -> typ_float
   | Cstatic_cast (Scalar_of_v256 Float32x8) -> typ_float32
   | Cstatic_cast (Scalar_of_v256 Float16x16) ->
     Misc.fatal_error "float16x16: scalar type not supported"
   | Cstatic_cast (Scalar_of_v256 (Int8x32 | Int16x16 | Int32x8 | Int64x4)) ->
-    typ_int
+    typ_naked_int
   | Cstatic_cast (V512_of_scalar _) -> typ_vec512
   | Cstatic_cast (Scalar_of_v512 Float64x8) -> typ_float
   | Cstatic_cast (Scalar_of_v512 Float32x16) -> typ_float32
   | Cstatic_cast (Scalar_of_v512 Float16x32) ->
     Misc.fatal_error "float16x32: scalar type not supported"
   | Cstatic_cast (Scalar_of_v512 (Int8x64 | Int16x32 | Int32x16 | Int64x8)) ->
-    typ_int
+    typ_naked_int
   | Craise _ -> typ_void
   | Cprobe _ -> typ_void
-  | Cprobe_is_enabled _ -> typ_int
+  | Cprobe_is_enabled _ -> typ_naked_int
   | Copaque ty -> ty
   | Cpoll | Cpause -> typ_void
   | Cbeginregion ->
     (* This must not be typ_val; the begin-region operation returns a naked
        pointer into the local allocation stack. *)
-    typ_int
+    typ_naked_int
   | Cendregion -> typ_void
   | Ctuple_field (field, fields_ty) -> fields_ty.(field)
 
@@ -300,7 +300,7 @@ let oper_result_type = function
    dependencies, because it uses [Arch]. *)
 let size_component : machtype_component -> int = function
   | Val | Addr -> Arch.size_addr
-  | Int ->
+  | Tagged_int | Naked_int ->
     assert (Int.equal Arch.size_int Arch.size_addr);
     Arch.size_int
   | Float -> Arch.size_float
@@ -541,7 +541,7 @@ let chunk_of_machtype_component : Cmm.machtype_component -> Cmm.memory_chunk =
   | Vec256 -> Twofiftysix_unaligned
   | Vec512 -> Fivetwelve_unaligned
   | Mask -> Word_mask
-  | Val | Addr | Int -> Word_val
+  | Val | Addr | Tagged_int | Naked_int -> Word_val
   | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
 
 let float_test_of_float_comparison :
@@ -810,7 +810,8 @@ let insert_move_args env sub_cfg arg loc stacksize =
 
 let result_needs_mask_of_int64 (src : Reg.t) (dst : Reg.t) =
   (* The C ABI passes masks in GPRs. *)
-  equal_machtype_component dst.typ Mask && equal_machtype_component src.typ Int
+  equal_machtype_component dst.typ Mask
+  && equal_machtype_component src.typ Naked_int
 
 let insert_move_result env sub_cfg (src : Reg.t) (dst : Reg.t) =
   if result_needs_mask_of_int64 src dst

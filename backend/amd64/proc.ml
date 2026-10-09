@@ -79,7 +79,7 @@ let win64 = Arch.win64
 
 let types_are_compatible (left : Reg.t)  (right : Reg.t) =
   match left.typ, right.typ with
-  | (Int | Val | Addr), (Int | Val | Addr)
+  | (Tagged_int | Naked_int | Val | Addr), (Tagged_int | Naked_int | Val | Addr)
   | Float, Float
   | Float32, Float32
   | (Valx2 | Vec128), (Valx2 | Vec128) ->
@@ -90,7 +90,7 @@ let types_are_compatible (left : Reg.t)  (right : Reg.t) =
     true
   | Mask, Mask ->
     true
-  | (Int | Val | Addr | Float | Float32 |
+  | (Tagged_int | Naked_int | Val | Addr | Float | Float32 |
      Vec128 | Vec256 | Vec512 | Mask | Valx2), _ -> false
 
 (* Representation of hard registers by pseudo-registers *)
@@ -98,7 +98,7 @@ let types_are_compatible (left : Reg.t)  (right : Reg.t) =
 let hard_int_reg =
   Regs.phys_gpr_regs
   |> Array.map (fun phys_gpr_reg ->
-     Reg.create_at_location Int (Reg phys_gpr_reg))
+     Reg.create_at_location Naked_int (Reg phys_gpr_reg))
 
 let hard_float_reg =
   Regs.phys_simd_regs
@@ -141,7 +141,7 @@ let all_phys_regs = lazy ((* To be forced after flags are parsed. *)
 let phys_reg ty (phys_reg : Regs.Phys_reg.t) =
   let index_in_class = Regs.index_in_class phys_reg in
   match (ty : machtype_component) with
-  | Int | Addr | Val ->
+  | Tagged_int | Naked_int | Addr | Val ->
     (* CR yusumez: We need physical registers to have the appropriate machtype
        for the LLVM backend. However, this breaks an invariant the IRC register
        allocator relies on. It is safe to guard it with this flag since the LLVM
@@ -157,13 +157,13 @@ let phys_reg ty (phys_reg : Regs.Phys_reg.t) =
   | Vec512 -> hard_vec512_reg.(index_in_class)
   | Mask -> hard_mask_reg.(index_in_class)
 
-let rax = phys_reg Int (P RAX)
-let rdi = phys_reg Int (P RDI)
-let rdx = phys_reg Int (P RDX)
-let rcx = phys_reg Int (P RCX)
-let r10 = phys_reg Int (P R10)
-let r11 = phys_reg Int (P R11)
-let rbp = phys_reg Int (P RBP)
+let rax = phys_reg Naked_int (P RAX)
+let rdi = phys_reg Naked_int (P RDI)
+let rdx = phys_reg Naked_int (P RDX)
+let rcx = phys_reg Naked_int (P RCX)
+let r10 = phys_reg Naked_int (P R10)
+let r11 = phys_reg Naked_int (P R11)
+let rbp = phys_reg Naked_int (P RBP)
 
 (* CSE needs to know that all versions of xmm15 are destroyed. *)
 let destroy_xmm =
@@ -211,7 +211,7 @@ let calling_conventions
     let ty : machtype_component = arg.(i) in
     let registers, size, ty =
       match ty with
-      | Val | Int | Addr -> int_registers, size_int, ty
+      | Val | Tagged_int | Naked_int | Addr -> int_registers, size_int, ty
       | Float | Float32 -> float_registers, size_float, ty
       | Vec128 -> float_registers, size_vec128, ty
       | Vec256 -> float_registers, size_vec256, ty
@@ -222,7 +222,7 @@ let calling_conventions
         | None ->
           (* The C ABI passes masks in GPRs. The location is typed [Int] so
              that instruction selection inserts the mask<->GPR conversions. *)
-          int_registers, size_int, Int)
+          int_registers, size_int, Naked_int)
       | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
     in
     match !registers with
@@ -356,7 +356,8 @@ let win64_loc_external_arguments arg =
     let ty : machtype_component = arg.(i) in
     let arguments, size =
       match ty with
-      | Val | Int | Addr -> win64_int_external_arguments, size_int
+      | Val | Tagged_int | Naked_int | Addr ->
+        win64_int_external_arguments, size_int
       | Float | Float32 -> win64_float_external_arguments, size_float
       | Vec128 | Vec256 | Vec512 | Mask ->
         (* CR mslater: (SIMD) win64 calling convention requires pass by reference *)
@@ -401,7 +402,8 @@ let int_regs_destroyed_at_c_call =
 
 let destroyed_at_c_call_win64 = lazy ((* To be forced after flags are parsed. *)
   (* Win64: rbx, rbp, rsi, rdi, r12-r15, xmm6-xmm15 preserved *)
-  [ Array.map (fun p -> phys_reg Int (P p)) int_regs_destroyed_at_c_call_win64;
+  [ Array.map (fun p -> phys_reg Naked_int (P p))
+      int_regs_destroyed_at_c_call_win64;
     Array.sub hard_float_reg 0 6;
     Array.sub hard_float32_reg 0 6;
     Array.sub hard_vec128_reg 0 6 ]
@@ -412,7 +414,7 @@ let destroyed_at_c_call_win64 = lazy ((* To be forced after flags are parsed. *)
 
 let destroyed_at_c_call_unix = lazy ((* To be forced after flags are parsed. *)
   (* Unix: rbx, rbp, r12-r15 preserved *)
-  [ Array.map (fun p -> phys_reg Int (P p)) int_regs_destroyed_at_c_call;
+  [ Array.map (fun p -> phys_reg Naked_int (P p)) int_regs_destroyed_at_c_call;
     hard_float_reg;
     hard_float32_reg;
     hard_vec128_reg ]

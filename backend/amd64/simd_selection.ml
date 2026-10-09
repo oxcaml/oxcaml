@@ -1165,13 +1165,13 @@ let select_operation_cfg ~dbg op args =
   |> or_else select_operation_f16c
   |> or_else select_operation_fma
 
-let rax = Proc.phys_reg Int (P RAX)
+let rax = Proc.phys_reg Naked_int (P RAX)
 
-let rdi = Proc.phys_reg Int (P RDI)
+let rdi = Proc.phys_reg Naked_int (P RDI)
 
-let rcx = Proc.phys_reg Int (P RCX)
+let rcx = Proc.phys_reg Naked_int (P RCX)
 
-let rdx = Proc.phys_reg Int (P RDX)
+let rdx = Proc.phys_reg Naked_int (P RDX)
 
 let xmm0v = Proc.phys_reg Vec128 (P MM0)
 

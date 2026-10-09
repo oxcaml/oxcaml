@@ -33,7 +33,8 @@ val equal_int_width : int_width -> int_width -> bool
 type machtype_component = Cmx_format.machtype_component =
   | Val
   | Addr
-  | Int
+  | Tagged_int
+  | Naked_int
   | Float
   | Vec128
   | Vec256
@@ -45,9 +46,8 @@ type machtype_component = Cmx_format.machtype_component =
 (*=- [Val] denotes a valid OCaml value: either a pointer to the beginning
      of a heap block, an infix pointer if it is preceded by the correct
      infix header, or a 2n+1 encoded integer.
-   - [Int] is for integers (not necessarily 2n+1 encoded) and for
-     pointers outside the heap.
-   - [Addr] denotes pointers that are neither [Val] nor [Int], i.e.
+   - [Tagged_int] is for tagged integers and for pointers outside the heap.
+   - [Addr] denotes pointers that are neither [Val] nor [Tagged_int], i.e.
      pointers into the heap that point in the middle of a heap block.
      Such derived pointers are produced by e.g. array indexing.
    - [Float] is for unboxed floating-point numbers.
@@ -59,7 +59,7 @@ tracked by the GC:
    - Variables of type [Val] are GC roots.  If they are pointers, the
      GC will not deallocate the addressed heap block, and will update
      the local variable if the heap block moves.
-   - Variables of type [Int] and [Float] are ignored by the GC.
+   - Variables of type [Tagged_int] and [Float] are ignored by the GC.
      The GC does not change their values.
    - Variables of type [Addr] must never be live across an allocation
      point or function call.  They cannot be given as roots to the GC
@@ -78,7 +78,9 @@ val typ_val : machtype
 
 val typ_addr : machtype
 
-val typ_int : machtype
+val typ_tagged_int : machtype
+
+val typ_naked_int : machtype
 
 val typ_float : machtype
 

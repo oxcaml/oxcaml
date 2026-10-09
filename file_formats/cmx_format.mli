@@ -33,7 +33,8 @@ open Misc
 
 (* Declare machtype here to avoid depending on [Cmm]. *)
 type machtype_component =
-  Val | Addr | Int | Float | Vec128 | Vec256 | Vec512 | Mask | Float32 | Valx2
+    Val | Addr | Tagged_int | Naked_int | Float | Vec128 | Vec256 | Vec512
+  | Mask | Float32 | Valx2
 
 type machtype = machtype_component array
 

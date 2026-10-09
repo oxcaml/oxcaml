@@ -47,7 +47,8 @@ let string_of_int_width = function
 type machtype_component = Cmx_format.machtype_component =
   | Val
   | Addr
-  | Int
+  | Tagged_int
+  | Naked_int
   | Float
   | Vec128
   | Vec256
@@ -68,7 +69,9 @@ let typ_val = [| Val |]
 
 let typ_addr = [| Addr |]
 
-let typ_int = [| Int |]
+let typ_tagged_int = [| Tagged_int |]
+
+let typ_naked_int = [| Naked_int |]
 
 let typ_float = [| Float |]
 
@@ -82,13 +85,14 @@ let typ_vec512 = [| Vec512 |]
 
 let typ_mask = [| Mask |]
 
-let typ_int128 = [| Int; Int |]
+let typ_int128 = [| Naked_int; Naked_int |]
 
 let string_of_machtype_component (comp : machtype_component) =
   match comp with
   | Val -> "Val"
   | Addr -> "Addr"
-  | Int -> "Int"
+  | Tagged_int -> "Tagged_int"
+  | Naked_int -> "Naked_int"
   | Float -> "Float"
   | Vec128 -> "Vec128"
   | Vec256 -> "Vec256"
@@ -120,13 +124,14 @@ exception Incomparable_components
 
 let lub_component_result comp1 comp2 =
   match comp1, comp2 with
-  | Int, Int -> Int
-  | Int, Val -> Val
-  | Int, Addr -> Addr
-  | Val, Int -> Val
+  | Naked_int, Naked_int -> Naked_int
+  | Tagged_int, Tagged_int -> Tagged_int
+  | Tagged_int, Val -> Val
+  | Tagged_int, Addr -> Addr
+  | Val, Tagged_int -> Val
   | Val, Val -> Val
   | Val, Addr -> Addr
-  | Addr, Int -> Addr
+  | Addr, Tagged_int -> Addr
   | Addr, Addr -> Addr
   | Addr, Val -> Addr
   | Float, Float -> Float
@@ -135,8 +140,12 @@ let lub_component_result comp1 comp2 =
   | Vec256, Vec256 -> Vec256
   | Vec512, Vec512 -> Vec512
   | Mask, Mask -> Mask
-  | (Int | Addr | Val), (Float | Float32 | Vec128 | Vec256 | Vec512 | Mask)
-  | (Float | Float32 | Vec128 | Vec256 | Vec512 | Mask), (Int | Addr | Val)
+  | Naked_int, (Tagged_int | Addr | Val)
+  | (Tagged_int | Addr | Val), Naked_int
+  | (Tagged_int | Naked_int | Addr | Val),
+    (Float | Float32 | Vec128 | Vec256 | Vec512 | Mask)
+  | (Float | Float32 | Vec128 | Vec256 | Vec512 | Mask),
+    (Tagged_int | Naked_int | Addr | Val)
   | (Float | Float32 | Vec256 | Vec512 | Mask), (Vec128 | Vec256 | Vec512)
   | (Vec128 | Vec256 | Vec512), (Float | Float32 | Vec256 | Vec512 | Mask)
   | Mask, (Float | Float32)
@@ -162,13 +171,14 @@ let lub_component_opt comp1 comp2 =
 
 let ge_component_result comp1 comp2 =
   match comp1, comp2 with
-  | Int, Int -> true
-  | Int, Addr -> false
-  | Int, Val -> false
-  | Val, Int -> true
+  | Naked_int, Naked_int -> true
+  | Tagged_int, Tagged_int -> true
+  | Tagged_int, Addr -> false
+  | Tagged_int, Val -> false
+  | Val, Tagged_int -> true
   | Val, Val -> true
   | Val, Addr -> false
-  | Addr, Int -> true
+  | Addr, Tagged_int -> true
   | Addr, Addr -> true
   | Addr, Val -> true
   | Float, Float -> true
@@ -177,8 +187,12 @@ let ge_component_result comp1 comp2 =
   | Vec256, Vec256 -> true
   | Vec512, Vec512 -> true
   | Mask, Mask -> true
-  | (Int | Addr | Val), (Float | Float32 | Vec128 | Vec256 | Vec512 | Mask)
-  | (Float | Float32 | Vec128 | Vec256 | Vec512 | Mask), (Int | Addr | Val)
+  | Naked_int, (Tagged_int | Addr | Val)
+  | (Tagged_int | Addr | Val), Naked_int
+  | (Tagged_int | Naked_int | Addr | Val),
+    (Float | Float32 | Vec128 | Vec256 | Vec512 | Mask)
+  | (Float | Float32 | Vec128 | Vec256 | Vec512 | Mask),
+    (Tagged_int | Naked_int | Addr | Val)
   | (Float | Float32 | Vec256 | Vec512 | Mask), (Vec128 | Vec256 | Vec512)
   | (Vec128 | Vec256 | Vec512), (Float | Float32 | Vec256 | Vec512 | Mask)
   | Mask, (Float | Float32)
@@ -217,11 +231,11 @@ let machtype_of_exttype = function
   | XInt ->
     (* [XInt] only gets created from values, and LLVM needs to keep track of
        them properly. *)
-    if !Clflags.llvm_backend then typ_val else typ_int
-  | XInt8 -> typ_int
-  | XInt16 -> typ_int
-  | XInt32 -> typ_int
-  | XInt64 -> typ_int
+    if !Clflags.llvm_backend then typ_val else typ_naked_int
+  | XInt8 -> typ_naked_int
+  | XInt16 -> typ_naked_int
+  | XInt32 -> typ_naked_int
+  | XInt64 -> typ_naked_int
   | XMask -> typ_mask
   | XFloat -> typ_float
   | XFloat32 -> typ_float32
@@ -471,7 +485,7 @@ let size_of_memory_chunk : memory_chunk -> int = function
 let machtype_of_memory_chunk : memory_chunk -> machtype = function
   | Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
   | Thirtytwo_unsigned | Thirtytwo_signed | Word_int ->
-    typ_int
+    typ_naked_int
   | Word_val -> typ_val
   | Word_mask -> typ_mask
   | Single { reg = Float64 } | Double -> typ_float
@@ -998,24 +1012,25 @@ let contains_debug_only_constructs expr =
 let rank_machtype_component : machtype_component -> int = function
   | Val -> 0
   | Addr -> 1
-  | Int -> 2
-  | Float -> 3
-  | Vec128 -> 4
-  | Vec256 -> 5
-  | Vec512 -> 6
-  | Mask -> 7
-  | Float32 -> 8
-  | Valx2 -> 9
+  | Tagged_int -> 2
+  | Naked_int -> 3
+  | Float -> 4
+  | Vec128 -> 5
+  | Vec256 -> 6
+  | Vec512 -> 7
+  | Mask -> 8
+  | Float32 -> 9
+  | Valx2 -> 10
 
 let compare_machtype_component
-    (( Val | Addr | Int | Float | Vec128 | Vec256 | Vec512 | Mask | Float32
-     | Valx2 ) as left :
+    (( Val | Addr | Tagged_int | Naked_int | Float | Vec128 | Vec256 | Vec512
+     | Mask | Float32 | Valx2 ) as left :
       machtype_component) (right : machtype_component) =
   rank_machtype_component left - rank_machtype_component right
 
 let equal_machtype_component
-    (( Val | Addr | Int | Float | Vec128 | Vec256 | Vec512 | Mask | Float32
-     | Valx2 ) as left :
+    (( Val | Addr | Tagged_int | Naked_int | Float | Vec128 | Vec256 | Vec512
+     | Mask | Float32 | Valx2 ) as left :
       machtype_component) (right : machtype_component) =
   rank_machtype_component left = rank_machtype_component right
 
@@ -1283,19 +1298,21 @@ let caml_flambda2_invalid = "caml_flambda2_invalid"
 let is_val (m : machtype_component) =
   match m with
   | Val -> true
-  | Addr | Int | Float | Vec128 | Vec256 | Vec512 | Mask | Float32 | Valx2 ->
+  | Addr | Tagged_int | Naked_int | Float | Vec128 | Vec256 | Vec512
+  | Mask | Float32 | Valx2 ->
     false
 
 let is_int (m : machtype_component) =
   match m with
-  | Int -> true
+  | Tagged_int | Naked_int -> true
   | Addr | Val | Float | Vec128 | Vec256 | Vec512 | Mask | Float32 | Valx2 ->
     false
 
 let is_addr (m : machtype_component) =
   match m with
   | Addr -> true
-  | Val | Int | Float | Vec128 | Vec256 | Vec512 | Mask | Float32 | Valx2 ->
+  | Val | Tagged_int | Naked_int | Float | Vec128 | Vec256 | Vec512
+  | Mask | Float32 | Valx2 ->
     false
 
 let is_exn_handler (flag : ccatch_flag) =

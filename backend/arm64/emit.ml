@@ -275,15 +275,15 @@ let reg_b7 = O.reg_op (R.reg_b 7)
 
 (* Names for special regs *)
 
-let reg_domain_state_ptr = phys_reg Int X28
+let reg_domain_state_ptr = phys_reg Naked_int X28
 
-let reg_trap_ptr = phys_reg Int X26
+let reg_trap_ptr = phys_reg Naked_int X26
 
 let reg_x_trap_ptr = H.reg_x reg_trap_ptr
 
-let reg_alloc_ptr = phys_reg Int X27
+let reg_alloc_ptr = phys_reg Naked_int X27
 
-let reg_tmp1 = phys_reg Int X16
+let reg_tmp1 = phys_reg Naked_int X16
 
 (* AST register for reg_tmp1, used as memory base *)
 let reg_tmp1_base = R.reg_x 16
@@ -292,17 +292,17 @@ let reg_x_tmp1 = H.reg_x reg_tmp1
 
 let reg_x_alloc_ptr = H.reg_x reg_alloc_ptr
 
-let reg_x8 = phys_reg Int X8
+let reg_x8 = phys_reg Naked_int X8
 
 let reg_x_x8 = H.reg_x reg_x8
 
-let reg_stack_arg_begin = H.reg_x (phys_reg Int X20)
+let reg_stack_arg_begin = H.reg_x (phys_reg Naked_int X20)
 
-let reg_stack_arg_end = H.reg_x (phys_reg Int X21)
+let reg_stack_arg_end = H.reg_x (phys_reg Naked_int X21)
 
 (* Callee-saved register used to store the OCaml stack pointer around a noalloc
    external call. *)
-let reg_x_extcall_saved_sp = H.reg_x (phys_reg Int X19)
+let reg_x_extcall_saved_sp = H.reg_x (phys_reg Naked_int X19)
 
 (** Turn a Linear label into an assembly label. The section is checked against
     the section tracked by [D] when emitting label definitions. *)
@@ -742,7 +742,7 @@ let compute_live_offset env live =
         Misc.fatal_errorf "Unexpected Valx2 type of reg %a" Printreg.reg r
       | { typ = Val; loc = Unknown; _ } as r ->
         Misc.fatal_errorf "Unknown location %a" Printreg.reg r
-      | { typ = Int | Float | Float32 | Vec128; _ } -> ()
+      | { typ = Tagged_int | Naked_int | Float | Float32 | Vec128; _ } -> ()
       | { typ = Vec256 | Vec512 | Mask; _ } ->
         Misc.fatal_error "arm64: got 256/512 bit vector or mask")
     live;
@@ -1286,7 +1286,7 @@ let emit_load_literal dst lbl =
   match dst.typ with
   | Float -> A.ins2 LDR_simd_and_fp (H.reg_d dst) addr
   | Float32 -> A.ins2 LDR_simd_and_fp (H.reg_s dst) addr
-  | Val | Int | Addr -> A.ins2 LDR (H.reg_x dst) addr
+  | Val | Tagged_int | Naked_int | Addr -> A.ins2 LDR (H.reg_x dst) addr
   | Vec128 | Valx2 -> A.ins2 LDR_simd_and_fp (H.reg_q dst) addr
   | Vec256 | Vec512 | Mask ->
     Misc.fatal_errorf "emit_load_literal: unexpected vector or mask register %a"
@@ -1300,7 +1300,8 @@ let move_between_distinct_locs env (src : Reg.t) (dst : Reg.t) =
     A.ins_mov_vector (H.reg_v16b_operand dst) (H.reg_v16b_operand src)
   | (Vec256 | Vec512 | Mask), _, _, _ | _, _, (Vec256 | Vec512 | Mask), _ ->
     Misc.fatal_error "arm64: got 256/512 bit vector or mask"
-  | (Int | Val | Addr), Reg _, (Int | Val | Addr), Reg _ ->
+  | (Tagged_int | Naked_int | Val | Addr), Reg _,
+    (Tagged_int | Naked_int | Val | Addr), Reg _ ->
     A.ins_mov_reg (H.reg_x dst) (H.reg_x src)
   | Float, Reg _, Float, Stack _ ->
     emit_stack_str_simd_and_fp env (H.reg_d src) dst
@@ -1308,7 +1309,8 @@ let move_between_distinct_locs env (src : Reg.t) (dst : Reg.t) =
     emit_stack_str_simd_and_fp env (H.reg_s src) dst
   | (Vec128 | Valx2), Reg _, (Vec128 | Valx2), Stack _ ->
     emit_stack_str_simd_and_fp env (H.reg_q src) dst
-  | (Int | Val | Addr), Reg _, (Int | Val | Addr), Stack _ ->
+  | (Tagged_int | Naked_int | Val | Addr), Reg _,
+    (Tagged_int | Naked_int | Val | Addr), Stack _ ->
     emit_stack_str env (H.reg_x src) dst
   | Float, Stack _, Float, Reg _ ->
     emit_stack_ldr_simd_and_fp env (H.reg_d dst) src
@@ -1316,7 +1318,8 @@ let move_between_distinct_locs env (src : Reg.t) (dst : Reg.t) =
     emit_stack_ldr_simd_and_fp env (H.reg_s dst) src
   | (Vec128 | Valx2), Stack _, (Vec128 | Valx2), Reg _ ->
     emit_stack_ldr_simd_and_fp env (H.reg_q dst) src
-  | (Int | Val | Addr), Stack _, (Int | Val | Addr), Reg _ ->
+  | (Tagged_int | Naked_int | Val | Addr), Stack _,
+    (Tagged_int | Naked_int | Val | Addr), Reg _ ->
     emit_stack_ldr env (H.reg_x dst) src
   | _, Stack _, _, Stack _ ->
     Misc.fatal_errorf "Illegal move between stack slots (%a to %a)\n"
@@ -1326,7 +1329,7 @@ let move_between_distinct_locs env (src : Reg.t) (dst : Reg.t) =
     Misc.fatal_errorf
       "Illegal move with an unknown register location (%a to %a)\n" Printreg.reg
       src Printreg.reg dst
-  | ( (Float | Float32 | Vec128 | Int | Val | Addr | Valx2),
+  | ( (Float | Float32 | Vec128 | Tagged_int | Naked_int | Val | Addr | Valx2),
       (Reg _ | Stack _),
       _,
       _ ) ->

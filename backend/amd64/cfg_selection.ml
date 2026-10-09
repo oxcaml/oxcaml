@@ -98,11 +98,11 @@ let rec select_addr exp =
 
 exception Use_default_exn
 
-let rax = phys_reg Int (P RAX)
+let rax = phys_reg Naked_int (P RAX)
 
-let rcx = phys_reg Int (P RCX)
+let rcx = phys_reg Naked_int (P RCX)
 
-let rdx = phys_reg Int (P RDX)
+let rdx = phys_reg Naked_int (P RDX)
 
 let select_locality (l : Cmm.prefetch_temporal_locality_hint) :
     Arch.prefetch_temporal_locality_hint =
@@ -346,7 +346,7 @@ let insert_move_extcall_arg _exttype (src : Reg.t array) (dst : Reg.t array) :
   match src, dst with
   | [| s |], [| d |]
     when Cmm.equal_machtype_component s.typ Mask
-         && Cmm.equal_machtype_component d.typ Int ->
+         && Cmm.equal_machtype_component d.typ Naked_int ->
     (* The C ABI passes masks in GPRs. *)
     Rewritten (Op (Reinterpret_cast Cmm.Int64_of_mask), src, dst)
   | _ -> Use_default

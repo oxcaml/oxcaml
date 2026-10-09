@@ -45,14 +45,15 @@ open Arch
 
 let types_are_compatible left right =
   match left.typ, right.typ with
-  | (Int | Val | Addr), (Int | Val | Addr)
+  | (Tagged_int | Naked_int | Val | Addr), (Tagged_int | Naked_int | Val | Addr)
   | Float, Float -> true
   | Float32, Float32 -> true
   | Vec128, Vec128 -> true
   | Valx2,Valx2 -> true
   | (Vec256 | Vec512 | Mask), _ | _, (Vec256 | Vec512 | Mask) ->
     Misc.fatal_error "arm64: got 256/512 bit vector or mask"
-  | (Int | Val | Addr | Float | Float32 | Vec128 | Valx2), _ -> false
+  | (Tagged_int | Naked_int | Val | Addr | Float | Float32 | Vec128 | Valx2),
+    _ -> false
 
 (* Representation of hard registers by pseudo-registers *)
 
@@ -62,7 +63,7 @@ let hard_reg_gen typ =
   |> Array.map (fun phys_reg ->
      Reg.create_at_location typ (Reg phys_reg))
 
-let hard_int_reg = hard_reg_gen Int
+let hard_int_reg = hard_reg_gen Naked_int
 let hard_float_reg = hard_reg_gen Float
 
 let hard_vec128_reg = Array.map (Reg.create_alias ~typ:Vec128) hard_float_reg
@@ -78,7 +79,7 @@ let precolored_regs =
 let phys_reg typ phys_reg =
   let index_in_class = Regs.index_in_class phys_reg in
   match (typ : Cmm.machtype_component) with
-  | Int | Addr | Val ->
+  | Tagged_int | Naked_int | Addr | Val ->
     (* CR yusumez: We need physical registers to have the appropriate machtype
        for the LLVM backend. However, this breaks an invariant the IRC register
        allocator relies on. It is safe to guard it with this flag since the LLVM
@@ -93,7 +94,7 @@ let phys_reg typ phys_reg =
   | Vec256 | Vec512 | Mask ->
     Misc.fatal_error "arm64: got 256/512 bit vector or mask"
 
-let reg_x8 = phys_reg Int X8
+let reg_x8 = phys_reg Naked_int X8
 
 let stack_slot slot ty =
   Reg.create_at_location ty (Stack slot)
@@ -112,7 +113,7 @@ let calling_conventions
     let ty : Cmm.machtype_component = arg.(i) in
     let registers, size =
       match ty with
-      | Val | Int | Addr -> int_registers, size_int
+      | Val | Tagged_int | Naked_int | Addr -> int_registers, size_int
       | Float | Float32 -> float_registers, Arch.size_float
       | Vec128 -> float_registers, Arch.size_vec128
       | Vec256 | Vec512 | Mask ->
@@ -193,10 +194,10 @@ let external_calling_conventions
   List.iteri (fun i (ty_arg : Cmm.exttype) ->
     let (ty : Cmm.machtype_component), registers, divisor, size =
       match ty_arg with
-      | XInt | XInt64 | XMask -> Int, int_registers, 1, size_int
-      | XInt32 -> Int, int_registers, 2, size_int
-      | XInt16 -> Int, int_registers, 4, size_int
-      | XInt8 -> Int, int_registers, 8, size_int
+      | XInt | XInt64 | XMask -> Naked_int, int_registers, 1, size_int
+      | XInt32 -> Naked_int, int_registers, 2, size_int
+      | XInt16 -> Naked_int, int_registers, 4, size_int
+      | XInt8 -> Naked_int, int_registers, 8, size_int
       | XFloat -> Float, float_registers, 1, size_float
       | XFloat32 -> Float32, float_registers, 2, size_float
       | XVec128 -> Vec128, float_registers, 1, size_vec128
@@ -225,7 +226,7 @@ let loc_external_results res =
   let (loc, _) = calling_conventions [X0; X1] [D0; D1] not_supported 0 res in
   loc
 
-let loc_exn_bucket = phys_reg Int X0
+let loc_exn_bucket = phys_reg Naked_int X0
 
 let stack_ptr_dwarf_register_number = 31
 
@@ -258,7 +259,7 @@ let destroyed_at_c_noalloc_call =
     hard_vec128_reg
   in
   Array.concat [
-    Array.map (phys_reg Int) int_regs_destroyed_at_c_noalloc_call;
+    Array.map (phys_reg Naked_int) int_regs_destroyed_at_c_noalloc_call;
     Array.map (phys_reg Float) float_regs_destroyed_at_c_noalloc_call;
     Array.map (phys_reg Float32) float_regs_destroyed_at_c_noalloc_call;
     vec128_regs_destroyed_at_c_noalloc_call;

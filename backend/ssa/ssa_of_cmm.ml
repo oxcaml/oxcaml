@@ -116,7 +116,7 @@ let bind_let env c v args =
 
 let emit_branch env c (test : Operation.test) rarg ~true_block ~false_block =
   let make_cond op args =
-    (emit_op env c op Debuginfo.none Cmm.typ_int args).(0)
+    (emit_op env c op Debuginfo.none Cmm.typ_naked_int args).(0)
   in
   (* A boolean branch is a two-target switch: [targets.(0)] is the false edge,
      [targets.(1)] the true edge. The condition is always a 0/1 comparison. *)
@@ -182,7 +182,7 @@ and emit_stores env c dbg (args : Cmm.expression list) regs_addr =
     let tmp =
       (emit_op env c
          (SU.make_const_int (Nativeint.of_int !byte_offset))
-         dbg Cmm.typ_int [||]).(0)
+         dbg Cmm.typ_naked_int [||]).(0)
     in
     assert (!byte_offset > 0);
     let new_base =
@@ -270,9 +270,11 @@ and emit env c (exp : Cmm.expression) ~tail : result =
       Ok
         (emit_op env c
            (SU.make_const_int (Nativeint.of_int n))
-           Debuginfo.none Cmm.typ_int [||])
+           Debuginfo.none Cmm.typ_naked_int [||])
     | Cconst_natint (n, _dbg) ->
-      Ok (emit_op env c (SU.make_const_int n) Debuginfo.none Cmm.typ_int [||])
+      Ok
+        (emit_op env c (SU.make_const_int n) Debuginfo.none Cmm.typ_naked_int
+           [||])
     | Cconst_float32 (n, _dbg) ->
       Ok
         (emit_op env c
@@ -302,7 +304,8 @@ and emit env c (exp : Cmm.expression) ~tail : result =
            [||])
     | Cconst_symbol (n, _dbg) ->
       Ok
-        (emit_op env c (SU.make_const_symbol n) Debuginfo.none Cmm.typ_int [||])
+        (emit_op env c (SU.make_const_symbol n) Debuginfo.none
+           Cmm.typ_naked_int [||])
     | Cvar v -> Ok (env_find v env)
     | Ctuple [] -> Ok [||]
     | Ctuple exp_list ->
@@ -356,7 +359,7 @@ and emit_invalid env c message symbol =
   in
   if current_function_is_check_enabled
   then (
-    let cont_block = new_block env ~params:Cmm.typ_int in
+    let cont_block = new_block env ~params:Cmm.typ_naked_int in
     finish_block env c ~dbg:Debuginfo.none
       (Invalid { message; args = arg_instrs; continuation = Some cont_block });
     Cursor.move c ~new_pos:cont_block;

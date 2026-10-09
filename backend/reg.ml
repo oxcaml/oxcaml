@@ -82,7 +82,12 @@ let format_location fmt loc =
 type reg = t
 
 let dummy =
-  { name = Name.Anon; stamp = 0; typ = Int; preassigned = false; loc = Unknown }
+  { name = Name.Anon;
+    stamp = 0;
+    typ = Naked_int;
+    preassigned = false;
+    loc = Unknown
+  }
 
 let dummy_for_regalloc = { dummy with stamp = -1 }
 
@@ -394,7 +399,8 @@ let hash_loc = function
 let is_of_type_addr t =
   match t.typ with
   | Addr -> true
-  | Val | Int | Float | Vec128 | Vec256 | Vec512 | Mask | Float32 | Valx2 ->
+  | Val | Tagged_int | Naked_int | Float | Vec128 | Vec256 | Vec512
+  | Mask | Float32 | Valx2 ->
     false
 
 module UsingLocEquality = struct
