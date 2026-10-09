@@ -3300,7 +3300,7 @@ let instance_constructor_representation env constr ~types ~why
              match (List.nth constr.cstr_args i).ca_sort with
              | Some sort -> Ok (Jkind.Sort.of_const sort)
              | None ->
-                 type_sort env ty ~why ~fixed:false
+                 type_sort env ty ~why ~allow_mutation:true
                  |> Result.map_error
                       (fun err -> Unrepresentable_arg (loc, ty, err)))
           types
@@ -5077,7 +5077,7 @@ let collect_unknown_apply_args env funct ty_fun0 mode_fun rev_args sargs
           when labels_match ~param:l ~arg:lbl ->
             let sort_arg =
               match
-                type_sort ~why:Function_argument ~fixed:false env ty_arg
+                type_sort ~why:Function_argument ~allow_mutation:true env ty_arg
               with
               | Ok sort -> sort
               | Error err -> raise(Error(funct.exp_loc, env,
@@ -5202,7 +5202,7 @@ let collect_apply_args env funct ignore_labels ty_fun ty_fun0 mode_fun sargs
         | `Arrow (ty_arg, ty_ret, ty_arg0, ty_ret0) ->
             let sort_arg =
               match
-                type_sort ~why:Function_argument ~fixed:false env ty_arg
+                type_sort ~why:Function_argument ~allow_mutation:true env ty_arg
               with
               | Ok sort -> sort
               | Error err ->
@@ -5267,7 +5267,9 @@ let type_omitted_parameters_and_build_result_type expected_mode env loc ty_ret
              in
              let arrow_desc = (lbl, mode_arg, mode_ret_eta) in
              let sort_ret =
-               match type_sort ~why:Function_result ~fixed:false env ty_ret with
+               match
+                 type_sort ~why:Function_result ~allow_mutation:true env ty_ret
+               with
                | Ok sort -> sort
                | Error err ->
                  raise (Error (loc, env, Function_type_not_rep (ty_ret, err)))
@@ -6551,7 +6553,7 @@ let split_function_ty
   in
   let expected_pat_mode = simple_pat_mode arg_value_mode in
   let type_sort ~why ty =
-    match Ctype.type_sort ~why ~fixed:false env ty with
+    match Ctype.type_sort ~why ~allow_mutation:true env ty with
     | Ok sort -> sort
     | Error err -> raise (Error (loc_fun, env, Function_type_not_rep (ty, err)))
   in
@@ -6639,7 +6641,8 @@ end = struct
           in
           let ok =
             match
-              Ctype.type_sort ~why:sort_why ~fixed:true weak_env ccs_ty
+              Ctype.type_sort ~why:sort_why ~allow_mutation:false weak_env
+                ccs_ty
             with
             | Ok sort -> Jkind.Sort.equate ~allow_mutation:true sort ccs_sort
             | Error _ -> false
@@ -7098,7 +7101,7 @@ and type_expect_
             | Overridden (_, exp) -> exp.exp_loc, exp.exp_type
             | Kept (arg, _, _) -> sexp.pexp_loc, arg
           in
-          match Ctype.type_jkind_and_sort env arg ~why ~fixed:false with
+          match Ctype.type_jkind_and_sort env arg ~why ~allow_mutation:true with
           | Ok (jkind, sort) -> arg, jkind, sort
           | Error err ->
               raise (Error (loc, env, Field_value_not_rep(arg, err)))
@@ -7162,8 +7165,8 @@ and type_expect_
             let ubr = Unique_barrier.not_computed () in
             let sort =
               match
-                Ctype.type_sort ~why:Record_functional_update ~fixed:false env
-                  exp.exp_type
+                Ctype.type_sort ~why:Record_functional_update
+                  ~allow_mutation:true env exp.exp_type
               with
               | Ok sort -> sort
               | Error err ->
@@ -10689,7 +10692,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
            eta_mode)
         Regionality.regional;
       let type_sort ~why ty =
-        match type_sort ~why ~fixed:false env ty with
+        match type_sort ~why ~allow_mutation:true env ty with
         | Ok sort -> sort
         | Error err ->
           raise(Error(sarg.pexp_loc, env, Function_type_not_rep (ty, err)))
@@ -10892,7 +10895,7 @@ and type_application env app_loc expected_mode position_and_mode
           (fun () -> filter_arrow_mono env (instance funct.exp_type) Nolabel)
       in
       let type_sort ~why ty =
-        match Ctype.type_sort ~why ~fixed:false env ty with
+        match Ctype.type_sort ~why ~allow_mutation:true env ty with
         | Ok sort -> sort
         | Error err ->
           raise (Error (app_loc, env, Function_type_not_rep (ty, err)))
