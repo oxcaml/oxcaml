@@ -126,8 +126,9 @@ let convert_block_shape ~machine_width (shape : L.block_shape) ~num_fields =
        products of values into individual value fields. *)
     let rec collect_value_fields acc (elem : unit L.mixed_block_element) =
       match elem with
-      | L.Value vk ->
+      | Value vk ->
         K.With_subkind.from_lambda_value_kind ~machine_width vk :: acc
+      | Void -> acc
       | Product elts -> Array.fold_left collect_value_fields acc elts
       | Float_boxed ()
       | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256
@@ -1781,7 +1782,7 @@ let block_index_access_offsets_and_kinds ~machine_width layout idx =
       let add x y = H.Binary (Int_arith (Naked_int64, Add), Prim x, y) in
       let offset_from_offset : H.simple_or_prim =
         match mbe with
-        | Product _ ->
+        | Void | Product _ ->
           (* Products not produced by [L.mixed_block_element_leaves] *)
           Misc.fatal_errorf "Unexpected product in block index access: %a"
             Printlambda.layout layout
