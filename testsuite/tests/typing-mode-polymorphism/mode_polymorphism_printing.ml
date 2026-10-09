@@ -775,14 +775,4 @@ Error: This expression has type "'a -> 'b -> 'c"
        but an expression was expected of type "'b"
        The type variable "'b" occurs inside "'a -> 'b -> 'c"
 Hint: This function application is partial, maybe some arguments are missing.
-|}, Principal{|
-val k : 'a @ [< 'm & global] -> ('b @ 'n -> 'a @ [> 'm]) @ [> close('m)] =
-  <fun>
-Line 2, characters 14-19:
-2 | let foo x = x (k x)
-                  ^^^^^
-Error: This expression has type "'a -> ('b -> 'c) @ 'm"
-       but an expression was expected of type "'b"
-       The type variable "'b" occurs inside "'a -> ('b -> 'c) @ 'm"
-Hint: This function application is partial, maybe some arguments are missing.
 |}]
