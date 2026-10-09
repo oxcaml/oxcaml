@@ -16,10 +16,6 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *)
 
-(* The [Ocaml_or_oxcaml] module for a stock OCaml compiler. See
-   ocaml_or_oxcaml.oxcaml.ml for the OxCaml one, and the dune file for how
-   the build chooses between them. *)
-
 module Float32 = struct
   type t
 

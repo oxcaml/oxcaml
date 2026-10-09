@@ -15,11 +15,6 @@
 
 (ocamllex annot_lexer)
 
-; Definitions that differ between OxCaml and stock OCaml, as two source files
-; rather than [@@if oxcaml] in one, so that the modules of this library the
-; OxCaml compiler shares (middle_end/flambda2/to_jsir/jsoo_imports in the
-; OxCaml repository) build without ppx_optcomp_light.
-
 (rule
  (target ocaml_or_oxcaml.ml)
  (enabled_if %{oxcaml_supported})
