@@ -939,7 +939,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       emit_tail env sub_cfg body
     | Cname_for_debugger (_, body) -> emit_tail env sub_cfg body
     | Cop
-        ( (Capply { result_type = ty; region = Rc_normal; callees = _ } as op),
+        ( (Capply
+             { result_type = ty; region = Rc_normal; callees = _; returns = _ }
+           as op),
           args,
           dbg ) ->
       emit_tail_apply env sub_cfg ty op args dbg
@@ -961,7 +963,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         ( ( Capply
               { result_type = _;
                 region = Rc_nontail | Rc_close_at_apply;
-                callees = _
+                callees = _;
+                returns = _
               }
           | Cextcall _ | Cload _ | Calloc _ | Cstore _ | Caddi | Csubi | Cmuli
           | Cmulhi _ | Cdivi _ | Cmodi _ | Caddi128 | Csubi128 | Cmuli64 _
