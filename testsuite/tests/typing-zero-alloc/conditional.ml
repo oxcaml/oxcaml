@@ -119,7 +119,8 @@ CR wsturgeon: this has to fail
 exception After_allocating
 let[@zero_alloc] allocate_then_raise () = (allocate (); raise After_allocating)
 [%%expect{|
-CR wsturgeon: this has to pass
+exception After_allocating
+val allocate_then_raise : unit -> 'a [@@zero_alloc] = <fun>
 |}]
 
 (* Arguments are non-`strict` by default: *)
@@ -265,4 +266,11 @@ let[@zero_alloc] alloc () =
   arguments_are_conditional (fun f -> (allocate (); f ())) ignore
 [%%expect{|
 CR wsturgeon: this has to fail
+|}]
+
+(* Unannotated stdlib functions need to know their conditions: *)
+let[@zero_alloc] ignore_ints (ints : int list) =
+  (List.iter [@inlined never]) ignore ints
+[%%expect{|
+val ignore_ints : int list -> unit [@@zero_alloc] = <fun>
 |}]
