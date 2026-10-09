@@ -5,13 +5,22 @@
  (libraries
   ocaml-compiler-libs.common
   ocaml-compiler-libs.bytecomp
-  menhirLib
-  sedlex
-  yojson)
+  oxcaml_private_menhirlib
+  oxcaml_private_sedlex
+  oxcaml_private_yojson)
  (flags
-  (:standard -w -7-37 -safe-string))
+  (:standard
+   -w
+   -7-37
+   -safe-string
+   -open
+   Oxcaml_private_menhirlib
+   -open
+   Oxcaml_private_sedlex
+   -open
+   Oxcaml_private_yojson))
  (preprocess
-  (pps ppx_optcomp_light sedlex.ppx)))
+  (pps ppx_optcomp_light oxcaml_private_sedlex_ppx)))
 
 (ocamllex annot_lexer)
 

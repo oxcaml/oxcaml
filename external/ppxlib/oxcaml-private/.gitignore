@@ -1,0 +1,5 @@
+# Links to the nix-provided sources of private dependencies, made by the
+# top-level Makefile.
+/*
+!/.gitignore
+!/dune

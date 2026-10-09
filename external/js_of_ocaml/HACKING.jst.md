@@ -17,10 +17,23 @@ compilers, PPX and libraries, together with ppxlib and every other
 dependency, all compiled with OxCaml. Find the executables under
 `external/ast-dependent-libs/_build/default/js_of_ocaml/` and the installed
 layout under `external/ast-dependent-libs/_build/install/default/`. Dependencies that are not
-part of this repository (sedlex, cmdliner, menhirLib, yojson, ...) are
-provided by Nix and symlinked into `external/ast-dependent-libs/deps/`; Nix
-also supplies the Menhir, Node.js and Binaryen tools. `make ppxlib-build`
-builds only the ppxlib stack.
+part of this repository are provided by Nix; Nix also supplies the Menhir,
+Node.js and Binaryen tools. `make ppxlib-build` builds only the ppxlib stack.
+
+The libraries that are only there as dependencies (yojson, menhirLib, sedlex,
+gen, cmdliner here; ppx_derivers for ppxlib) are private: Make
+links them into `oxcaml-private/`, where they join this project, and each one
+is a wrapped library with a unique name (`oxcaml_private_yojson`, ...),
+installed as a sub-library such as `js_of_ocaml-compiler.private.yojson`. Its
+compilation units are `Oxcaml_private_yojson__*`, so they can't clash with a
+user's own copy. The libraries using them see the usual module names through
+`-open Oxcaml_private_yojson` (and so on) in their dune flags. default.nix
+rewrites the upstream dune files accordingly (see `joinConsumingProject`).
+The sedlex PPX and sedlex.utils are only needed while building, and are not
+installed. sexp_type is shared on purpose: its type appears in ppxlib's
+interface (`Stdppx.Sexp.t`), so it is shipped as its own `sexp_type` package.
+It and the test-only dependencies are symlinked into
+`external/ast-dependent-libs/deps/`.
 
 Make refreshes the local `_install`. Set `OXCAML_INSTALL` to use an existing
 installation without modifying it. Its `bin` and `lib/ocaml` select the
@@ -31,13 +44,14 @@ compiler, and an empty findlib configuration keeps host packages out.
 under `lib/` and executables under `bin/`. The Nix `jsoo` and `ppxlib`
 packages are built this way.
 
-The Nix `oxcaml` compiler package ships a subset, installed by
-`make jsoo-install-shipped`: the `js_of_ocaml`, `jsoo_minify` and
-`wasm_of_ocaml` executables, and the `js_of_ocaml`, `js_of_ocaml-runtime` and
-`js_of_ocaml-ppx` libraries with the ppxlib stack they need. The compiler
-library and its dependencies (yojson, sedlex, ...) are not shipped. The Nix
-`jsoo-smoke-test` check builds and runs `external/ast-dependent-libs/smoke`
-against that package.
+The Nix `oxcaml` compiler package ships most of it, installed by
+`make jsoo-install-shipped`: the `js_of_ocaml`, `jsoo_minify`,
+`wasm_of_ocaml`, `jsoo_mkcmis` and `jsoo_listunits` executables; the
+`js_of_ocaml`, `js_of_ocaml-runtime`, `js_of_ocaml-ppx`,
+`js_of_ocaml-compiler`, `wasm_of_ocaml-compiler` and `js_of_ocaml-toplevel`
+libraries with their private dependencies; and the ppxlib stack. `jsoo_mktop`
+is not shipped. The Nix `jsoo-smoke-test` check builds and runs
+`external/ast-dependent-libs/smoke` against that package.
 
 Downstream packaging changes:
 
@@ -54,6 +68,8 @@ Downstream packaging changes:
   wasm. Executables link their backend's dynlink library themselves:
   `js_of_ocaml-compiler.dynlink` for JavaScript,
   `wasm_of_ocaml-compiler.dynlink` for wasm.
+- The compiler libraries and executables use yojson, menhirLib, sedlex and
+  cmdliner through their private copies (see above).
 
 ## Test
 
