@@ -111,7 +111,8 @@ foo
 run {| let foo : ('a -> 'a) @ portable = fun x -> x in foo |}
 
 [%%expect{|
-let (foo : 'a -> 'a) = ((fun x -> x : 'a -> 'a) : @ portable) in foo
+let (foo : ('a -> 'a) @ portable) = ((fun x -> x : 'a -> 'a) : @ portable) in
+foo
 - : unit = ()
 |}];;
 
@@ -139,6 +140,19 @@ run {| let foo : 'a -> 'a = fun x -> x in foo |}
 
 [%%expect{|
 let (foo : 'a -> 'a) = (fun x -> x : 'a -> 'a) in foo
+- : unit = ()
+|}];;
+
+(***********************************)
+(* Untypeast/pprintast correctly handle modes on let bindings and functions. *)
+
+run {| fun y ->
+       let (x @ local) = Some y in match x with Some _ -> () | None -> () |};;
+
+[%%expect{|
+fun y ->
+  let (x @ local) = (Some y : @ local) in
+  match x with | Some _ -> () | None -> ()
 - : unit = ()
 |}];;
 
@@ -186,5 +200,30 @@ run_structure {|
 
 [%%expect{|
 module type S  = sig val x : int -> int @@ portable end
+- : unit = ()
+|}];;
+
+(***********************************)
+(* Untypeast/pprintast correctly print types and bindings. *)
+
+run_structure {| type 'a t = 'a constraint 'a = [< `A of & int ] |};;
+
+[%%expect{|
+type 'a t = 'a constraint 'a = [< `A of & int ]
+- : unit = ()
+|}];;
+
+run_structure {| type 'a t = int -> (int as 'a) |};;
+
+[%%expect{|
+type 'a t = int -> (int as 'a)
+- : unit = ()
+|}];;
+
+run_structure {|
+  let f () = let mutable g = fun x -> x in g <- (fun x -> x); g 1 |};;
+
+[%%expect{|
+let f () = let mutable g = fun x -> x in g <- (fun x -> x); g 1
 - : unit = ()
 |}]
