@@ -760,18 +760,18 @@ val mk_jkind_context :
 val mk_jkind_context_check_principal : Env.t -> Jkind.jkind_context
 val mk_jkind_context_always_principal : Env.t -> Jkind.jkind_context
 
-(* Find a type's sort (if fixed is false: constraining it to be an
+(* Find a type's sort (if allow_mutation is true: constraining it to be an
    arbitrary sort variable, if needed) *)
 val type_sort :
   why:Jkind.History.concrete_creation_reason ->
-  fixed:bool ->
+  allow_mutation:bool ->
   Env.t -> type_expr -> (Jkind.sort, Jkind.Violation.t) result
 
-(* Find a type's jkind and sort (if fixed is false: constraining it to be an
-   arbitrary sort variable, if needed) *)
+(* Find a type's jkind and sort (if allow_mutation is false: constraining
+   it to be an arbitrary sort variable, if needed) *)
 val type_jkind_and_sort :
   why:Jkind.History.concrete_creation_reason ->
-  fixed:bool ->
+  allow_mutation:bool ->
   Env.t -> type_expr -> (Types.jkind_lr * Jkind.sort, Jkind.Violation.t) result
 
 (* Jkind checking. [constrain_type_jkind] will update the jkind of type
