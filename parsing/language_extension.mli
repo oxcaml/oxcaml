@@ -13,6 +13,15 @@ module Maturity : sig
   val max : maturity -> maturity -> maturity
 end
 
+module Omnidirectionality : sig
+  module Scheduler_policy : sig
+    (** A setting for Omnidirectionality's scheduler *)
+    type t = Language_extension_kernel.scheduler_policy =
+      | Eager
+      | Delayed
+  end
+end
+
 (** The type of language extensions. An ['a t] is an extension that can either
     be off or be set to have any value in ['a], so a [unit t] can be either on
     or off, while a [maturity t] can have different maturity settings. *)
@@ -34,6 +43,7 @@ type 'a t = 'a Language_extension_kernel.t =
   | Let_mutable : unit t
   | Layout_poly : maturity t
   | Runtime_metaprogramming : unit t
+  | Omnidirectionality : Omnidirectionality.Scheduler_policy.t t
 
 (** Require that an extension is enabled for at least the provided level, or
     else throw an exception at the provided location saying otherwise. *)
