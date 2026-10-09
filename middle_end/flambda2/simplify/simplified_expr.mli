@@ -28,15 +28,17 @@
 
 open! Flambda.Import
 
-(** This is laid out in order: first the lets, then then let conts, then the
-    terminator, so that all let-bound variables are in scope of the let cont
-    handlers. *)
 type t = private
-  { simplified_lets : simplified_defining_expr list;
-    simplified_let_conts : simplified_let_cont_handlers list;
+  { simplified_lets_and_let_conts : simplified_lets_and_let_conts;
     simplified_terminator : simplified_terminator;
     removed_operations : Removed_operations.t
   }
+
+and simplified_lets_and_let_conts = private
+  | Simplified_terminator
+  | Simplified_let of simplified_defining_expr * simplified_lets_and_let_conts
+  | Simplified_let_cont of
+      simplified_let_cont_handlers * simplified_lets_and_let_conts
 
 and simplified_defining_expr =
   private

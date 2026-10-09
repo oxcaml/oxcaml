@@ -29,39 +29,34 @@ let rebuild_terminator (terminator : Simplified_expr.simplified_terminator) uacc
   | Simplified_invalid invalid -> EB.rebuild_invalid uacc invalid ~after_rebuild
 
 let rec rebuild_expr (expr : Simplified_expr.t) uacc ~after_rebuild =
-  let { Simplified_expr.simplified_lets;
-        simplified_let_conts;
+  let { Simplified_expr.simplified_lets_and_let_conts;
         simplified_terminator;
         removed_operations
       } =
     expr
   in
-  rebuild_lets simplified_terminator simplified_let_conts simplified_lets uacc
-    ~after_rebuild:(fun expr uacc ->
-      let uacc = UA.notify_removed ~operation:removed_operations uacc in
-      after_rebuild expr uacc)
-
-and rebuild_lets terminator let_conts simplified_lets uacc ~after_rebuild =
-  let rec rebuild_lets_loop simplified_lets uacc ~after_rebuild =
-    match simplified_lets with
-    | [] -> rebuild_let_conts terminator let_conts uacc ~after_rebuild
-    | simplified_let :: simplified_lets ->
-      rebuild_lets_loop simplified_lets uacc ~after_rebuild:(fun body uacc ->
+  let rec rebuild_lets_and_let_conts simplified_lets_and_let_conts uacc
+      ~after_rebuild =
+    match
+      (simplified_lets_and_let_conts : SE.simplified_lets_and_let_conts)
+    with
+    | Simplified_terminator ->
+      rebuild_terminator simplified_terminator uacc
+        ~after_rebuild:(fun expr uacc ->
+          let uacc = UA.notify_removed ~operation:removed_operations uacc in
+          after_rebuild expr uacc)
+    | Simplified_let (simplified_let, simplified_lets_and_let_conts) ->
+      rebuild_lets_and_let_conts simplified_lets_and_let_conts uacc
+        ~after_rebuild:(fun body uacc ->
           Simplify_let_expr.rebuild_let (simplified_let, body) uacc
             ~after_rebuild)
-  in
-  rebuild_lets_loop simplified_lets uacc ~after_rebuild
-
-and rebuild_let_conts terminator let_conts uacc ~after_rebuild =
-  let rec rebuild_let_conts_loop let_conts uacc ~after_rebuild =
-    match let_conts with
-    | [] -> rebuild_terminator terminator uacc ~after_rebuild
-    | let_cont :: let_conts ->
+    | Simplified_let_cont (let_cont, simplified_lets_and_let_conts) ->
       Simplify_let_cont_expr.rebuild_let_cont
-        ~rebuild_body:rebuild_let_conts_loop ~rebuild_expr (let_cont, let_conts)
+        ~rebuild_body:rebuild_lets_and_let_conts ~rebuild_expr
+        (let_cont, simplified_lets_and_let_conts)
         uacc ~after_rebuild
   in
-  rebuild_let_conts_loop let_conts uacc ~after_rebuild
+  rebuild_lets_and_let_conts simplified_lets_and_let_conts uacc ~after_rebuild
 
 let simplify_toplevel_common dacc simplify ~params ~implicit_params
     ~return_continuation ~return_arity ~exn_continuation =
