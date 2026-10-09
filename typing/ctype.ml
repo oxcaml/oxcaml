@@ -3407,7 +3407,7 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
        the call to [intersection_or_error]. And even if [ty] has unbound
        variables, [ty's_jkind] can't have any variables in it, so we're OK. *)
     | Tvar { jkind = ty's_jkind } when allow_mutation ->
-       (* Unfixed tyvars are special in at least two ways:
+       (* Mutable tyvars are special in at least two ways:
 
           1) Suppose we're processing [type 'a t = 'a list]. The ['a] on the
           left will be born with an [Unannotated_type_parameter] history and a
@@ -3424,7 +3424,7 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
           error message should complain about the lack of intersection, not the
           lack of subjkinding.
 
-          Because of these reasons, we pull out the unfixed tyvar case and treat
+          Because of these reasons, we pull out the mutable tyvar case and treat
           it first.
         *)
        let jkind_inter =
