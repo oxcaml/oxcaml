@@ -84,9 +84,11 @@ val imported_offsets : unit -> t
 val merge : t -> t -> t
 
 (** Ensure the offsets for the given function slots are in the given exported
-    offsets. *)
-val reexport_function_slots : Function_slot.Set.t -> t -> t
+    offsets. Only applies to function slots whose compilation units do not
+    satisfy [is_local]. *)
+val reexport_function_slots :
+  is_local:(Compilation_unit.t -> bool) -> Function_slot.Set.t -> t -> t
 
-(** Ensure the offsets for the given function slots are in the given exported
-    offsets. *)
-val reexport_value_slots : Value_slot.Set.t -> t -> t
+(** Same as [reexport_function_slots], for value slots. *)
+val reexport_value_slots :
+  is_local:(Compilation_unit.t -> bool) -> Value_slot.Set.t -> t -> t

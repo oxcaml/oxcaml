@@ -117,18 +117,22 @@ let finalize_offsets ~free_names slot_offsets =
 
 let run_reaper ~ppf ~prefixname ~machine_width ~cmx_loader ~all_code
     ~final_typing_env ~free_names flambda =
-  let ((flambda, _, _, _) as result) =
+  let { unit;
+        exported_code;
+        slot_offsets;
+        final_typing_env = With_types final_typing_env
+      } =
     Profile.record_call ~accumulate:true "reaper" (fun () ->
         Flambda2_reaper.Reaper.run ~machine_width ~cmx_loader ~all_code
-          ~final_typing_env ~free_names flambda)
+          ~final_typing_env:(With_types final_typing_env) ~free_names flambda)
   in
-  print_flambda "reaper" (Flambda_features.dump_reaper ()) ppf flambda;
+  print_flambda "reaper" (Flambda_features.dump_reaper ()) ppf unit;
   print_fexpr "reaper"
     (Flambda_features.dump_fexpr (This_pass "reaper"))
-    ppf flambda;
-  dump_fexpr_annot ~prefixname "reaper" flambda;
-  Compiler_hooks.execute Reaped_flambda2 flambda;
-  result
+    ppf unit;
+  dump_fexpr_annot ~prefixname "reaper" unit;
+  Compiler_hooks.execute Reaped_flambda2 unit;
+  unit, exported_code, slot_offsets, final_typing_env
 
 let compilation_unit_callbacks = ref []
 

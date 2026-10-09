@@ -255,18 +255,6 @@ let must_be_function_slot t =
     | Call_witness _ | Return_of_call _ | Code_id_of_call_witness ) as view ->
     Misc.fatal_errorf "[must_be_function_slot] got %a instead" print_view view
 
-let is_local f =
-  Flambda_features.reaper_local_fields ()
-  &&
-  match view f with
-  | Value_slot vs ->
-    Current_unit.is_current (Value_slot.get_compilation_unit vs)
-  | Function_slot fs ->
-    Current_unit.is_current (Function_slot.get_compilation_unit fs)
-  | Block _ | Call_witness _ | Return_of_call _ | Code_id_of_call_witness
-  | Is_int | Get_tag | Boxed_number _ ->
-    false
-
 let debug_nostamps = lazy (Flambda_features.debug_reaper "nostamps")
 
 let print_for_variable_name ppf x =
@@ -290,3 +278,10 @@ let print_for_variable_name ppf x =
         print_view view
 
 let equal (t1 : t) (t2 : t) = t1 = t2
+
+type importer = Table.serializable
+
+let export fields =
+  Table.export grand_table_of_fields ~iter:(fun f -> Set.iter f fields)
+
+let import importer t = create (Table.import importer t)
