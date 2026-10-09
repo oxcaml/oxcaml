@@ -39,9 +39,21 @@ library and its dependencies (yojson, sedlex, ...) are not shipped. The Nix
 `jsoo-smoke-test` check builds and runs `external/ast-dependent-libs/smoke`
 against that package.
 
-Downstream packaging change: `lib/runtime` is its own package,
-`js_of_ocaml-runtime`, instead of upstream's `js_of_ocaml-compiler.runtime`,
-so that the `js_of_ocaml` library installs without the compiler library.
+Downstream packaging changes:
+
+- `lib/runtime` is its own package, `js_of_ocaml-runtime`, instead of
+  upstream's `js_of_ocaml-compiler.runtime`, so that the `js_of_ocaml` library
+  installs without the compiler library.
+- `compiler/lib-cmdline` is public, as `js_of_ocaml-compiler.cmdline`.
+- `jsoo_mkcmis`, `jsoo_listunits` and `jsoo_mktop` build without findlib. They
+  then accept only `.cmi`/`.cma` arguments, not findlib package names.
+- The `js_of_ocaml-toplevel`, `.common` and `.worker` libraries are bytecode
+  only: they need `compiler-libs.toplevel`, which has no native archive.
+- `js_of_ocaml-toplevel` doesn't depend on `js_of_ocaml-compiler.dynlink`,
+  which registers a JavaScript bytecode compiler at startup and fails under
+  wasm. Executables link their backend's dynlink library themselves:
+  `js_of_ocaml-compiler.dynlink` for JavaScript,
+  `wasm_of_ocaml-compiler.dynlink` for wasm.
 
 ## Test
 
