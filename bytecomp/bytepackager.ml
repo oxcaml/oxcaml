@@ -52,6 +52,8 @@ type state = {
   relocs : (reloc_info * int) list; (** accumulated reloc info *)
   events : debug_event list;        (** accumulated debug events *)
   debug_dirs : String.Set.t;        (** accumulated debug_dirs *)
+  hints : (int * optimization_hint) list;
+                                    (** accumulated hints *)
   primitives : string list;         (** accumulated primitives *)
   offset : int;                     (** offset of the current unit *)
   subst : Subst.t;                  (** Substitution for debug event *)
@@ -63,6 +65,7 @@ let empty_state = {
   relocs = [];
   events = [];
   debug_dirs = String.Set.empty;
+  hints = [];
   primitives = [];
   offset = 0;
   mapping = CU.Name.Map.empty;
@@ -82,6 +85,8 @@ let rename_relocation base (rel, ofs) =
 let relocate_debug base subst ev =
   { ev with ev_pos = base + ev.ev_pos;
             ev_typsubst = Subst.compose ev.ev_typsubst subst }
+
+let relocate_hint base (pos, hint) = (base + pos, hint)
 
 (* Read the unit information from a .cmo file. *)
 
@@ -169,9 +174,25 @@ let process_append_bytecode oc state objfile compunit =
       end
       else state.events, state.debug_dirs
     in
+    let hints =
+      if compunit.cu_hint > 0 then begin
+        seek_in ic compunit.cu_hint;
+        let unit_hints =
+          (* CR ocaml 5 compressed-marshal:
+          (Compression.input_value ic : (int * optimization_hint) list)
+          *)
+          (Marshal.from_channel ic : (int * optimization_hint) list) in
+        rev_append_map
+          (relocate_hint state.offset)
+          unit_hints
+          state.hints
+      end
+      else
+        state.hints
+    in
     close_in ic;
     { state with
-      relocs; primitives; events; debug_dirs;
+      relocs; primitives; events; debug_dirs; hints;
       offset = state.offset + compunit.cu_codesize;
     }
   with x ->
@@ -221,15 +242,17 @@ let build_global_target ~ppf_dump oc ~packed_compilation_unit state members
   if !Clflags.dump_blambda then
     Format.fprintf ppf_dump "%a@." Printblambda.blambda blam;
   let instrs = Bytegen.compile_implementation packed_compilation_unit blam in
-  let size, pack_relocs, pack_events, pack_debug_dirs =
+  let size, pack_relocs, pack_events, pack_debug_dirs, pack_hints =
     Emitcode.to_packed_file oc instrs in
   let events = List.rev_append pack_events state.events in
+  let hints = List.rev_append pack_hints state.hints in
   let debug_dirs = String.Set.union pack_debug_dirs state.debug_dirs in
   let relocs =
     rev_append_map
       (fun (r, ofs) -> (r, state.offset + ofs))
       pack_relocs state.relocs in
-  { state with events; debug_dirs; relocs; offset = state.offset + size },
+  { state with
+    events; debug_dirs; hints; relocs; offset = state.offset + size },
   main_module_block_size
 
 (* Build the .cmo file obtained by packaging the given .cmo files. *)
@@ -284,12 +307,13 @@ let package_object_files ~ppf_dump files target coercion =
         members coercion
     in
     let pos_debug = pos_out oc in
-    (* CR mshinwell: Compression not supported in the OCaml 4 runtime
     if !Clflags.debug && state.events <> [] then begin
-      Compression.output_value oc (List.rev state.events);
-      Compression.output_value oc (String.Set.elements state.debug_dirs)
+      output_value oc (List.rev state.events);
+      output_value oc (String.Set.elements state.debug_dirs)
     end;
-    *)
+    let pos_hint = pos_out oc in
+    if state.hints <> [] then
+      output_value oc (List.rev state.hints);
     let force_link =
       List.exists (function
           | {pm_kind = PM_impl {cu_force_link}} -> cu_force_link
@@ -322,8 +346,10 @@ let package_object_files ~ppf_dump files target coercion =
         cu_primitives = List.rev state.primitives;
         cu_required_compunits = CU.Set.elements required_compunits;
         cu_force_link = force_link;
-        cu_debug = if pos_final > pos_debug then pos_debug else 0;
-        cu_debugsize = pos_final - pos_debug } in
+        cu_debug = if pos_hint > pos_debug then pos_debug else 0;
+        cu_debugsize = pos_hint - pos_debug;
+        cu_hint = if pos_final > pos_hint then pos_hint else 0;
+        cu_hintsize = pos_final - pos_hint } in
     Emitcode.marshal_to_channel_with_possibly_32bit_compat
       ~filename:targetfile ~kind:"bytecode unit"
       oc compunit;
