@@ -506,7 +506,7 @@ into environment
 
 is:
 
-  ((variables {})
+  ((variables )
    (equations
     ([0m[38;5;111;1mf/30N[0m :
       (Val!  (alloc_mode Heap)
@@ -560,7 +560,7 @@ into environment
 
 is:
 
-  ((variables {})
+  ((variables )
    (equations
     ([0m[38;5;111;1mf/30N[0m :
       (Val!  (alloc_mode Heap)

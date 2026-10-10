@@ -46,14 +46,14 @@ include Contains_names.S with type t := t
 
 module With_extra_variables : sig
   type t =
-    { existential_vars : Flambda_kind.t Variable.Map.t;
+    { existential_vars : Variable.t list;
       equations : Type_grammar.t Name.Map.t
     }
 
   val print : Format.formatter -> t -> unit
 
   val fold :
-    variable:(Variable.t -> Flambda_kind.t -> 'a -> 'a) ->
+    variable:(Variable.t -> 'a -> 'a) ->
     equation:(Name.t -> Type_grammar.t -> 'a -> 'a) ->
     t ->
     'a ->
@@ -65,7 +65,7 @@ module With_extra_variables : sig
 
   val add_or_replace_equation : t -> Name.t -> Type_grammar.t -> t
 
-  val existential_vars : t -> Variable.Set.t
+  val existential_vars : t -> Variable.t list
 
   val map_types : t -> f:(Type_grammar.t -> Type_grammar.t) -> t
 
