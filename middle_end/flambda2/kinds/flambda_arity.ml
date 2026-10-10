@@ -86,6 +86,7 @@ module Component_for_creation = struct
     | Punboxed_vector Unboxed_vec256 -> Singleton KS.naked_vec256
     | Punboxed_vector Unboxed_vec512 -> Singleton KS.naked_vec512
     | Punboxed_mask -> Singleton KS.naked_mask
+    | Pvoid -> Unboxed_product []
     | Punboxed_product layouts ->
       Unboxed_product (List.map (from_lambda ~machine_width) layouts)
     | Ptop | Pbottom ->

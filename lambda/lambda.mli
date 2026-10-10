@@ -616,8 +616,6 @@ and value_kind_non_null =
   | Pboxedvectorval of boxed_vector
   | Pboxedmaskval
 
-(* Because we check for and error on void in the translation to lambda, we don't
-   need a constructor for it here. *)
 and layout =
   | Ptop
   | Pvalue of value_kind
@@ -625,7 +623,9 @@ and layout =
   | Punboxed_or_untagged_integer of unboxed_or_untagged_integer
   | Punboxed_vector of unboxed_vector
   | Punboxed_mask
+  | Pvoid
   | Punboxed_product of layout list
+    (** Invariant: the layout list has length >= 2 *)
   | Pbottom
   | Psplicevar of Slambdaident.t
 
@@ -651,7 +651,9 @@ and 'a mixed_block_element =
   | Mask
   | Word
   | Untagged_immediate
+  | Void
   | Product of 'a mixed_block_element array
+    (** Invariant: the mixed_block_element array has length >= 2 *)
   | Splice_variable of Slambdaident.t
 
 and mixed_block_shape = unit mixed_block_element array

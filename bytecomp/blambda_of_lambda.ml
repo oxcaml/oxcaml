@@ -226,7 +226,7 @@ let rec copy_mixed_block_element (elt : _ Lambda.mixed_block_element)
   | Product elements ->
     copy_product_fields elements expr ~make_block:(fun fields ->
         Prim (Makeblock { tag = 0 }, fields))
-  | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
+  | Value _ | Void | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
   | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
     expr
   | Splice_variable var -> Lambda.fatal_error_unevaluated_splice_var var
@@ -1198,7 +1198,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | [] | [_] | _ :: _ :: _ -> wrong_arity ~expected:2)
     | Pbox (layout, _mode) -> (
       match layout with
-      | Pvalue _ -> pseudo_event (unary (Makeblock { tag = 0 }))
+      | Pvalue _ | Pvoid -> pseudo_event (unary (Makeblock { tag = 0 }))
       | Punboxed_float _ | Punboxed_or_untagged_integer _ ->
         (* CR box: This will have to be updated once addressability affects
            boxed representations *)
@@ -1231,7 +1231,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | Psplicevar ident -> Lambda.fatal_error_unevaluated_splice_var ident)
     | Punbox layout -> (
       match layout with
-      | Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _ ->
+      | Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _ | Pvoid ->
         unary (Getfield 0)
       | Punboxed_product layouts ->
         let arg =
