@@ -31,9 +31,15 @@ type unit_info = {
   ui_format : Lambda.main_module_block_format;
 }
 
+(** Each of [args] is either the path of an argument's [.cmo]/[.cmx] file (if
+    it ends with [expected_extension]) or the name of an argument's
+    compilation unit, which may be an instance such as [Arg(P)(P_arg)] (see
+    [Parse.compilation_unit]). *)
+(* CR-soon zqian: stop accepting file paths in [args]; only accept compilation
+   unit names. *)
 val instantiate
    : src:Misc.filepath
-  -> args:Misc.filepath list
+  -> args:string list
   -> Misc.filepath
   -> expected_extension:string
   -> read_unit_info:(Misc.filepath -> unit_info)
@@ -48,7 +54,6 @@ val instantiate
 type error =
   | Not_compiled_as_argument of {
       compilation_unit : CU.t;
-      filename : Misc.filepath;
       base_unit : CU.t;
     }
   | Incorrect_target_filename of {
@@ -72,10 +77,6 @@ type error =
       param : Global_module.Parameter_name.t;
       arg1 : CU.t;
       arg2 : CU.t;
-    }
-  | Argument_not_fully_instantiated of {
-      compilation_unit : CU.t;
-      filename : Misc.filepath;
     }
 
 
