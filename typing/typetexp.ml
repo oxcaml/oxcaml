@@ -405,8 +405,10 @@ end = struct
 
   let ttyp_poly_arg (poly_univars : poly_univars) = List.map
       (fun (name, pending_univar, _stage) ->
-        name,
-        Jkind.get_annotation pending_univar.jkind_info.original_jkind)
+        let { original_jkind; defaulted } = pending_univar.jkind_info in
+        (* A defaulted jkind was not written by the user, even though it may
+           have an annotation (e.g. [value]). *)
+        name, if defaulted then None else Jkind.get_annotation original_jkind)
       poly_univars
 
   let mk_pending_univar name jkind jkind_info =
@@ -989,7 +991,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       ctyp desc typ
   | Ptyp_arrow _ ->
       let args, ret, ret_mode = extract_params styp in
-      let rec loop acc_mode args =
+      let rec loop ~is_outermost acc_mode args =
         match args with
         | (l, arg_mode, arg) :: rest ->
           check_arg_type arg;
@@ -1006,7 +1008,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
             | _ :: _ ->
               { mode_modes = acc_mode; mode_desc = [] }
           in
-          let ret_cty = loop acc_mode rest in
+          let ret_cty = loop ~is_outermost:false acc_mode rest in
           let arg_ty = arg_cty.ctyp_type in
           let arg_ty =
             if Btype.is_Tpoly arg_ty then arg_ty else newmono arg_ty
@@ -1026,12 +1028,14 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
           let ty =
             newty (Tarrow(arrow_desc, arg_ty, ret_cty.ctyp_type, commu_ok))
           in
-          ctyp
-            (Ttyp_arrow (l, arg_cty, arg_mode, ret_cty, ret_mode))
-            ty
+          let cty =
+            ctyp (Ttyp_arrow (l, arg_cty, arg_mode, ret_cty, ret_mode)) ty
+          in
+          (* The attributes belong to the outermost arrow only *)
+          if is_outermost then cty else { cty with ctyp_attributes = [] }
         | [] -> transl_type env ~policy ~row_context ret_mode.mode_modes ret
       in
-      loop mode args
+      loop ~is_outermost:true mode args
   | Ptyp_tuple stl ->
     let ctys, tys = transl_type_aux_tuple env ~loc ~policy ~row_context stl in
     ctyp (Ttyp_tuple ctys) (newty (Ttuple tys))

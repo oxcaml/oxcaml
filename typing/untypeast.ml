@@ -101,22 +101,23 @@ let rec lident_of_path =
 
 let map_loc sub {loc; txt} = {loc = sub.location sub loc; txt}
 
-(** Extract the [n] patterns from the case of a letop *)
+(** Extract the patterns of the [let] and of the [n] [and]s from the case of a
+    letop, which [Typecore.type_expect] nests as [((p0, p1), ...), pn] *)
 let rec extract_letop_patterns n pat =
   if n = 0 then pat, []
   else begin
     match pat.pat_desc with
-    | Tpat_tuple([None, first, _; None, rest, _]) ->
+    | Tpat_tuple([None, rest, _; None, last, _]) ->
         (* Labels should always be None, from when [Texp_letop] are created in
            [Typecore.type_expect] *)
-        let next, others = extract_letop_patterns (n-1) rest in
-        first, next :: others
+        let first, others = extract_letop_patterns (n-1) rest in
+        first, others @ [last]
     | _ ->
       let rec anys n =
         if n = 0 then []
         else { pat with pat_desc = Tpat_any } :: anys (n-1)
       in
-      { pat with pat_desc = Tpat_any }, anys (n-1)
+      { pat with pat_desc = Tpat_any }, anys n
   end
 
 (** Mapping functions. *)
@@ -161,6 +162,15 @@ let var_jkind ~loc (var, jkind) =
   let add_loc x = mkloc x loc in
   add_loc var, jkind
 
+(* [Typedecl.transl_type_decl] adds a [t#row] declaration for each private row
+   type [t]; these cannot be written in source. *)
+let type_declarations sub list =
+  List.filter_map
+    (fun decl ->
+       if Btype.is_row_name decl.typ_name.txt then None
+       else Some (sub.type_declaration sub decl))
+    list
+
 let structure sub str =
   List.map (sub.structure_item sub) str.str_items
 
@@ -188,7 +198,7 @@ let structure_item sub item =
     | Tstr_primitive vd ->
         Pstr_primitive (sub.value_description sub vd)
     | Tstr_type (rec_flag, list) ->
-        Pstr_type (rec_flag, List.map (sub.type_declaration sub) list)
+        Pstr_type (rec_flag, type_declarations sub list)
     | Tstr_typext tyext ->
         Pstr_typext (sub.type_extension sub tyext)
     | Tstr_exception ext ->
@@ -232,11 +242,21 @@ let value_description sub v =
   let loc = sub.location sub v.val_loc in
   let attrs = sub.attributes sub v.val_attributes in
   let modalities = modalities_of_val_modal_info v.val_modal_info in
+  (* The layout variables of [val poly_] are inferred, and thus have no
+     location; they must not be printed back as an explicit [layout_]. *)
+  let poly, typ =
+    match v.val_desc.ctyp_desc with
+    | Ttyp_newlayout (vars, typ)
+      when List.for_all (fun var -> Location.is_none var.loc) vars ->
+      true, typ
+    | _ -> false, v.val_desc
+  in
   Val.mk ~loc ~attrs
     ~prim:v.val_prim
+    ~poly
     ~modalities
     (map_loc sub v.val_name)
-    (sub.typ sub v.val_desc)
+    (sub.typ sub typ)
 
 let module_binding sub mb =
   let loc = sub.location sub mb.mb_loc in
@@ -468,6 +488,22 @@ let exp_extra sub (extra, loc, attrs) sexp =
   in
   Exp.mk ~loc ~attrs desc
 
+let rec exp_extras sub extras sexp =
+  match extras with
+  | [] -> sexp
+  (* [(e : ty @ modes)] is typed as these two extras, but is not equivalent
+     to [((e : ty) : @ modes)]: the modes are used to interpret [ty]. *)
+  | (Texp_mode modes, mode_loc, [])
+    :: (Texp_constraint cty, loc, attrs) :: extras
+    when mode_loc = loc ->
+      let sexp = exp_extras sub extras sexp in
+      let loc = sub.location sub loc in
+      let attrs = sub.attributes sub attrs in
+      Exp.mk ~loc ~attrs
+        (Pexp_constraint
+           (sexp, Some (sub.typ sub cty), Typemode.untransl_mode modes))
+  | extra :: extras -> exp_extra sub extra (exp_extras sub extras sexp)
+
 let case : type k . mapper -> k case -> _ = fun sub {c_lhs; c_guard; c_rhs} ->
   {
    pc_lhs = sub.pat sub c_lhs;
@@ -475,21 +511,101 @@ let case : type k . mapper -> k case -> _ = fun sub {c_lhs; c_guard; c_rhs} ->
    pc_rhs = sub.expr sub c_rhs;
   }
 
+let effect_case sub c =
+  let uc = sub.case sub c in
+  let loc = uc.pc_lhs.ppat_loc in
+  let cont =
+    match c.c_cont with
+    | Some id -> Pat.var ~loc (mkloc (Ident.name id) loc)
+    | None -> Pat.any ~loc ()
+  in
+  let pat = Pat.mk ~loc (Ppat_effect (uc.pc_lhs, cont)) in
+  { uc with pc_lhs = pat }
+
+let same_modes (m1 : Parsetree.modes) (m2 : Parsetree.modes) =
+  List.equal (fun m1 m2 -> m1.txt = m2.txt) m1 m2
+
 let value_binding sub vb =
   let loc = sub.location sub vb.vb_loc in
   let attrs = sub.attributes sub vb.vb_attributes in
+  let poly =
+    match vb.vb_pat.pat_desc with
+    | Tpat_fun_layout _ -> true
+    | _ -> false
+  in
   let pat = sub.pat sub vb.vb_pat in
+  (* Modes of the binding, added by [Typecore.vb_pat_constraint] *)
+  let pat, outer_modes =
+    match pat.ppat_desc with
+    | Ppat_constraint (pat, None, modes) -> pat, modes
+    | _ -> pat, []
+  in
   let pat, value_constraint, modes =
     match pat.ppat_desc with
-    | Ppat_constraint (pat, Some ({ ptyp_desc = Ptyp_poly _; _ } as cty),
-                       modes) ->
+    | Ppat_constraint
+        (pat, Some ({ ptyp_desc = Ptyp_poly _ | Ptyp_repr _; _ } as cty),
+         modes) ->
+      let constr =
+        Pvc_constraint { locally_abstract_univars = []; typ = cty }
+      in
+      pat, Some constr, modes
+    | Ppat_constraint (pat, Some cty, (_ :: _ as modes)) ->
+      (* As built by [Typecore.vb_pat_constraint] for
+         [let x : ty @ modes = e] *)
       let constr =
         Pvc_constraint { locally_abstract_univars = []; typ = cty }
       in
       pat, Some constr, modes
     | _ -> pat, None, []
   in
-  Vb.mk ~loc ~attrs ?value_constraint ~modes pat (sub.expr sub vb.vb_expr)
+  let modes = outer_modes @ modes in
+  let expr = sub.expr sub vb.vb_expr in
+  (* [Typecore.vb_exp_constraint] also puts the modes and the (non-[Ptyp_poly])
+     type of the binding on the expression, where [repr_] annotations cannot
+     be written. *)
+  let expr =
+    match value_constraint, expr with
+    | _, { pexp_desc = Pexp_constraint (e, None, (_ :: _ as expr_modes));
+           pexp_attributes = [] }
+      when same_modes modes expr_modes -> e
+    | Some (Pvc_constraint { typ = { ptyp_desc = typ_desc; _ }; _ }),
+      { pexp_desc = Pexp_constraint (e, Some _, expr_modes);
+        pexp_attributes = [] }
+      when same_modes modes expr_modes
+        && (match typ_desc with Ptyp_poly _ -> false | _ -> true) -> e
+    | _ -> expr
+  in
+  (* In [let (f @ modes) x : ty = e], [modes] are also the mode annotations of
+     the function. Without return mode annotations, [Typecore] records them on
+     [e], next to the return type [ty]. *)
+  let rec function_modes expr =
+    match expr.pexp_desc with
+    | Pexp_newtype (name, jkind, e) when expr.pexp_attributes = [] ->
+      { expr with pexp_desc = Pexp_newtype (name, jkind, function_modes e) }
+    | Pexp_function
+        (params,
+         ({ ret_type_constraint = None; ret_mode_annotations = []; _ }
+          as constraint_),
+         Pfunction_body
+           { pexp_desc = Pexp_constraint (body, ret_type, body_modes);
+             pexp_attributes = []; _ })
+      when same_modes modes body_modes ->
+      let ret_type_constraint =
+        Option.map (fun ty -> Pconstraint ty) ret_type
+      in
+      { expr with
+        pexp_desc =
+          Pexp_function
+            (params, { constraint_ with ret_type_constraint },
+             Pfunction_body body) }
+    | _ -> expr
+  in
+  let expr =
+    match modes with
+    | [] -> expr
+    | _ :: _ -> function_modes expr
+  in
+  Vb.mk ~loc ~attrs ?value_constraint ~poly ~modes pat expr
 
 let block_access sub : block_access -> Parsetree.block_access = function
   | Baccess_field (lid, _, _) ->
@@ -537,7 +653,36 @@ let label : Types.arg_label -> Parsetree.arg_label = function
   | Optional l -> Optional l
   | Nolabel -> Nolabel
 
-let call_pos_extension = Location.mknoloc "call_pos_extension", PStr []
+let call_pos_extension = Location.mknoloc "call_pos", PStr []
+
+(* Re-insert the [(P : [%call_pos])] constraint that
+   [Typetexp.transl_label_from_pat] removed from the parameter pattern. *)
+let param_pat (arg_label : Types.arg_label) pat =
+  match arg_label with
+  | Position _ ->
+      let loc = pat.ppat_loc in
+      Pat.constraint_ ~loc pat (Some (Typ.extension ~loc call_pos_extension))
+        []
+  | Labelled _ | Optional _ | Nolabel -> pat
+
+let apply_args ~position_constraint sub args =
+  List.filter_map
+    (fun (arg_label, arg) ->
+       match arg with
+       | Omitted _ -> None
+       | Arg (exp, _) ->
+           let exp = sub.expr sub exp in
+           (* Like [param_pat], for [Typetexp.transl_label_from_expr] *)
+           let exp =
+             match (arg_label : Types.arg_label) with
+             | Position _ when position_constraint ->
+                 let loc = exp.pexp_loc in
+                 Exp.constraint_ ~loc exp
+                   (Some (Typ.extension ~loc call_pos_extension)) []
+             | Position _ | Labelled _ | Optional _ | Nolabel -> exp
+           in
+           Some (label arg_label, exp))
+    args
 
 let expression sub exp =
   let loc = sub.location sub exp.exp_loc in
@@ -547,6 +692,40 @@ let expression sub exp =
       Texp_ident { lid; _ } -> Pexp_ident (map_loc sub lid)
     | Texp_apply_layout (exp, _) -> (sub.expr sub exp).pexp_desc
     | Texp_constant cst -> Pexp_constant (constant cst)
+    | Texp_let
+        (Nonrecursive,
+         [{ vb_pat = { pat_desc = Tpat_var { id; _ }; _ }; vb_expr; vb_loc;
+            _ }],
+         { exp_desc =
+             Texp_function
+               { params = [];
+                 body =
+                   Tfunction_cases
+                     { fc_cases =
+                         [{ c_rhs =
+                              { exp_desc =
+                                  Texp_exclave
+                                    { exp_desc =
+                                        Texp_apply
+                                          ({ exp_desc =
+                                               Texp_ident
+                                                 { path = Pident id'; _ };
+                                             _ },
+                                           _, _, _, _, _);
+                                      _ };
+                                _ };
+                            _ }];
+                       _ };
+                 _ };
+           _ })
+      when Location.is_none vb_loc && Ident.same id id' ->
+        (* The eta-expansion built by [Typecore.type_argument] when omitting
+           optional arguments: [let arg = e in fun eta -> arg ?x:None eta].
+           Type-checking [e] again redoes it. The expansion is a copy of [e]
+           with a different [exp_desc], so [e]'s extras and attributes are
+           already on [exp]. *)
+        (sub.expr sub { vb_expr with exp_extra = []; exp_attributes = [] })
+          .pexp_desc
     | Texp_let (rec_flag, list, exp) ->
         Pexp_let (Immutable, rec_flag,
           List.map (sub.value_binding sub) list,
@@ -555,43 +734,51 @@ let expression sub exp =
         Pexp_let (Mutable, Nonrecursive,
           [sub.value_binding sub vb],
           sub.expr sub exp)
-    | Texp_function { params; body } ->
+    | Texp_function { params; body; ret_mode } ->
         let body, constraint_ =
           match body with
           | Tfunction_body body ->
               (* Unlike function cases, the [exp_extra] is placed on the body
-                 itself. *)
+                 itself. If there are return mode annotations, [Typecore] puts
+                 them there as the outermost extra, just outside the return
+                 type constraint. *)
+              let ret_mode_annotations = Typemode.untransl_mode ret_mode in
+              let body, ret_type_constraint =
+                match ret_mode_annotations, body.exp_extra with
+                | _ :: _,
+                  (Texp_mode _, _, _) :: (Texp_constraint ty, _, _) :: extra ->
+                  { body with exp_extra = extra },
+                  Some (Pconstraint (sub.typ sub ty))
+                | _ :: _, (Texp_mode _, _, _) :: extra ->
+                  { body with exp_extra = extra }, None
+                | _ -> body, None
+              in
               Pfunction_body (sub.expr sub body),
-              { mode_annotations = []; ret_type_constraint = None; ret_mode_annotations = []}
+              { mode_annotations = []; ret_type_constraint;
+                ret_mode_annotations }
           | Tfunction_cases
               { fc_cases = cases; fc_loc = loc; fc_exp_extra = exp_extra;
                 fc_attributes = attributes; _ }
             ->
               let cases = List.map (sub.case sub) cases in
-              let ret_type_constraints, ret_mode_annotations =
-                List.fold_right
-                  (fun extra (ret_type_constraints, ret_mode_annotations) ->
-                    let new_type_constraints, new_mode_annotations =
-                      match extra with
-                      | Texp_coerce (ty1, ty2) ->
-                        let ty1 = Option.map (sub.typ sub) ty1 in
-                        let ty2 = sub.typ sub ty2 in
-                        let coercion = Pcoerce (ty1, ty2) in
-                        [ coercion ], []
-                      | Texp_constraint ty ->
-                        [ Pconstraint (sub.typ sub ty) ], []
-                      | Texp_mode modes ->
-                        let modes = Typemode.untransl_mode modes in
-                        [], modes
-                      | Texp_poly _ | Texp_newtype _ | Texp_stack
-                      | Texp_inspected_type _ -> [], []
-                      | Texp_ghost_region | Texp_borrowed -> [], []
-                    in
-                    new_type_constraints @ ret_type_constraints,
-                    new_mode_annotations @ ret_mode_annotations)
+              let ret_type_constraints =
+                List.concat_map
+                  (fun extra ->
+                    match extra with
+                    | Texp_coerce (ty1, ty2) ->
+                      let ty1 = Option.map (sub.typ sub) ty1 in
+                      let ty2 = sub.typ sub ty2 in
+                      [ Pcoerce (ty1, ty2) ]
+                    | Texp_constraint ty -> [ Pconstraint (sub.typ sub ty) ]
+                    (* The [Texp_mode] is the one used to interpret the return
+                       type, which is not necessarily the return mode. *)
+                    | Texp_mode _ -> []
+                    | Texp_poly _ | Texp_newtype _ | Texp_stack
+                    | Texp_inspected_type _ -> []
+                    | Texp_ghost_region | Texp_borrowed -> [])
                   exp_extra
-                  ([], [])
               in
+              let ret_mode_annotations = Typemode.untransl_mode ret_mode in
               let ret_type_constraint =
                 match ret_type_constraints with
                 | [] -> None
@@ -616,7 +803,7 @@ let expression sub exp =
                  | Tparam_pat pat -> pat, None
                  | Tparam_optional_default (pat, expr, _) -> pat, Some expr
                in
-               let pat = sub.pat sub pat in
+               let pat = param_pat fp.fp_arg_label (sub.pat sub pat) in
                let default_arg = Option.map (sub.expr sub) default_arg in
                let newtypes =
                  List.map
@@ -635,37 +822,16 @@ let expression sub exp =
         in
         Pexp_function (params, constraint_, body)
     | Texp_apply (exp, list, _, _, _, _) ->
-        let list = List.map (fun (arg_label, arg) -> label arg_label, arg) list in
-        Pexp_apply (sub.expr sub exp,
-          List.fold_right (fun (label, arg) list ->
-              match arg with
-              | Omitted _ -> list
-              | Arg (exp, _) -> (label, sub.expr sub exp) :: list
-          ) list [])
+        Pexp_apply
+          (sub.expr sub exp, apply_args ~position_constraint:true sub list)
     | Texp_match (exp, _, cases, eff_cases, _) ->
       let merged_cases = List.map (sub.case sub) cases
-        @ List.map
-          (fun c ->
-            let uc = sub.case sub c in
-            let pat = { uc.pc_lhs
-                        (* XXX KC: The 2nd argument of Ppat_effect is wrong *)
-                        with ppat_desc = Ppat_effect (uc.pc_lhs, uc.pc_lhs) }
-            in
-            { uc with pc_lhs = pat })
-          eff_cases
+        @ List.map (effect_case sub) eff_cases
       in
       Pexp_match (sub.expr sub exp, merged_cases)
     | Texp_try (exp, exn_cases, eff_cases) ->
         let merged_cases = List.map (sub.case sub) exn_cases
-        @ List.map
-          (fun c ->
-            let uc = sub.case sub c in
-            let pat = { uc.pc_lhs
-                        (* XXX KC: The 2nd argument of Ppat_effect is wrong *)
-                        with ppat_desc = Ppat_effect (uc.pc_lhs, uc.pc_lhs) }
-            in
-            { uc with pc_lhs = pat })
-          eff_cases
+        @ List.map (effect_case sub) eff_cases
         in
         Pexp_try (sub.expr sub exp, merged_cases)
     | Texp_unboxed_unit -> Pexp_unboxed_unit
@@ -830,7 +996,7 @@ let expression sub exp =
         Pexp_apply ({
         pexp_desc =
           Pexp_extension
-            ({ txt = "ocaml.exclave"; loc}
+            ({ txt = "extension.exclave"; loc}
             , PStr []);
         pexp_loc = loc;
         pexp_loc_stack = [];
@@ -843,8 +1009,7 @@ let expression sub exp =
     | Texp_quote exp -> Pexp_quote (sub.expr sub exp)
     | Texp_splice exp -> Pexp_splice (sub.expr sub exp)
   in
-  List.fold_right (exp_extra sub) exp.exp_extra
-    (Exp.mk ~loc ~attrs desc)
+  exp_extras sub exp.exp_extra (Exp.mk ~loc ~attrs desc)
 
 let binding_op sub bop pat =
   let pbop_op = bop.bop_op_name in
@@ -879,9 +1044,9 @@ let signature_item sub item =
       Tsig_value v ->
         Psig_value (sub.value_description sub v)
     | Tsig_type (rec_flag, list) ->
-        Psig_type (rec_flag, List.map (sub.type_declaration sub) list)
+        Psig_type (rec_flag, type_declarations sub list)
     | Tsig_typesubst list ->
-        Psig_typesubst (List.map (sub.type_declaration sub) list)
+        Psig_typesubst (type_declarations sub list)
     | Tsig_typext tyext ->
         Psig_typext (sub.type_extension sub tyext)
     | Tsig_exception ext ->
@@ -916,6 +1081,7 @@ let module_declaration sub md =
   let loc = sub.location sub md.md_loc in
   let attrs = sub.attributes sub md.md_attributes in
   Md.mk ~loc ~attrs
+    ~modalities:(Typemode.untransl_modalities md.md_modalities)
     (map_loc sub md.md_name)
     (sub.module_type sub md.md_type)
 
@@ -1044,17 +1210,36 @@ let class_expr sub cexpr =
           List.map (sub.typ sub) tyl)
     | Tcl_structure clstr -> Pcl_structure (sub.class_structure sub clstr)
 
+    | Tcl_fun
+        (Optional _ as arg_label,
+         { pat_desc = Tpat_var { name = { txt; _ }; _ }; _ }, _pv,
+         { cl_desc =
+             Tcl_let
+               (Nonrecursive,
+                [{ vb_pat;
+                   vb_expr =
+                     { exp_desc =
+                         Texp_match (_, _, [_; { c_rhs = default; _ }], [], _);
+                       _ };
+                   _ }],
+                _, cl);
+           _ },
+         _)
+      when String.starts_with ~prefix:"*opt*" txt ->
+        (* [Typeclass] translates [?(p = default)] to [?*opt*x] and
+           [let p = match *opt*x with Some x -> x | None -> default] *)
+        Pcl_fun
+          (label arg_label, Some (sub.expr sub default), sub.pat sub vb_pat,
+           sub.class_expr sub cl)
     | Tcl_fun (arg_label, pat, _pv, cl, _partial) ->
-        Pcl_fun (label arg_label, None, sub.pat sub pat, sub.class_expr sub cl)
+        Pcl_fun (label arg_label, None, param_pat arg_label (sub.pat sub pat),
+                 sub.class_expr sub cl)
 
     | Tcl_apply (cl, args) ->
-        let args = List.map (fun (arg_label, expo) -> label arg_label, expo) args in
-        Pcl_apply (sub.class_expr sub cl,
-          List.fold_right (fun (label, expo) list ->
-              match expo with
-              | Omitted _ -> list
-              | Arg (exp, _) -> (label, sub.expr sub exp) :: list
-          ) args [])
+        (* [Typeclass] matches the arguments by label name *)
+        Pcl_apply
+          (sub.class_expr sub cl,
+           apply_args ~position_constraint:false sub args)
 
     | Tcl_let (rec_flat, bindings, _ivars, cl) ->
         Pcl_let (rec_flat,

@@ -96,30 +96,28 @@ fun x y z -> (function | w -> x y z w)
 run {| let foo : 'a. 'a -> 'a = fun x -> x in foo |}
 
 [%%expect{|
-let foo : ('a : value) . 'a -> 'a = fun x -> x in foo
+let foo : 'a . 'a -> 'a = fun x -> x in foo
 - : unit = ()
 |}];;
 
 run {| let foo : type a . a -> a = fun x -> x in foo |}
 
 [%%expect{|
-let foo : ('a : value) . 'a -> 'a = fun (type a) -> (fun x -> x : a -> a) in
-foo
+let foo : 'a . 'a -> 'a = fun (type a) -> (fun x -> x : a -> a) in foo
 - : unit = ()
 |}];;
 
 run {| let foo : ('a -> 'a) @ portable = fun x -> x in foo |}
 
 [%%expect{|
-let (foo : 'a -> 'a) = ((fun x -> x : 'a -> 'a) : @ portable) in foo
+let foo : ('a -> 'a) @ portable = fun x -> x in foo
 - : unit = ()
 |}];;
 
 run {| let foo : 'a . ('a -> 'a) @ portable = fun x -> x in foo |}
 
 [%%expect{|
-let foo : ('a : value) . ('a -> 'a) @ portable = (fun x -> x : @ portable) in
-foo
+let foo : 'a . ('a -> 'a) @ portable = fun x -> x in foo
 - : unit = ()
 |}];;
 
@@ -186,5 +184,136 @@ run_structure {|
 
 [%%expect{|
 module type S  = sig val x : int -> int @@ portable end
+- : unit = ()
+|}];;
+
+(***********************************)
+(* Untypeast/pprintast correctly handle modes on let bindings and functions. *)
+
+run {| fun y ->
+       let (x @ local) = Some y in match x with Some _ -> () | None -> () |};;
+
+[%%expect{|
+fun y -> let (x @ local) = Some y in match x with | Some _ -> () | None -> ()
+- : unit = ()
+|}];;
+
+run {| let (f @ local) x = x in f 1 |};;
+
+[%%expect{|
+let (f @ local) x = x in f 1
+- : unit = ()
+|}];;
+
+run {| let f x @ local = exclave_ Some x in f |};;
+
+[%%expect{|
+let f x  @ local= exclave_ Some x in f
+- : unit = ()
+|}];;
+
+run {| let (f @ local) x : int -> int -> int = fun _ _ -> x in f 1 2 3 |};;
+
+[%%expect{|
+let (f @ local) x  : int -> int -> int = fun _ _ -> x in f 1 2 3
+- : unit = ()
+|}];;
+
+run {| let f : (int -> int -> int) @ local = fun _ z -> z in f 1 2 |};;
+
+[%%expect{|
+let f : (int -> int -> int) @ local = fun _ z -> z in f 1 2
+- : unit = ()
+|}];;
+
+run {| let f (type a) (x : a) : a option @ local = exclave_ Some x in f |};;
+
+[%%expect{|
+let f (type a) (x : a)  : a option @ local = exclave_ Some x in f
+- : unit = ()
+|}];;
+
+run_structure {| type t = int -> (int -> int -> int) @ local |};;
+
+[%%expect{|
+type t = int -> (int -> int -> int) @ local
+- : unit = ()
+|}];;
+
+run_structure {| module type S = sig module M : sig end @@ portable end |};;
+
+[%%expect{|
+module type S  = sig module M : sig  end @@ portable end
+- : unit = ()
+|}];;
+
+run_structure {|
+  let f () = let mutable g = fun x -> x in g <- (fun x -> x); g 1 |};;
+
+[%%expect{|
+let f () = let mutable g = fun x -> x in g <- (fun x -> x); g 1
+- : unit = ()
+|}];;
+
+(***********************************)
+(* Untypeast/pprintast correctly handle constructs elaborated by the
+   type-checker. *)
+
+run_structure {|
+  let ( let+ ) x f = f x
+  let ( and+ ) x y = (x, y)
+  let res = let+ x = 1 and+ y = 2 and+ z = 3 in [x; y; z] |};;
+
+[%%expect{|
+let (let+) x f = f x
+let (and+) x y = (x, y)
+let res = let+ x = 1
+          and+ y = 2
+          and+ z = 3 in [x; y; z]
+- : unit = ()
+|}];;
+
+run_structure {| type t = private [> `A ] |};;
+
+[%%expect{|
+type t = private [> `A ]
+- : unit = ()
+|}];;
+
+run_structure {| class c ?(x = 1) () = object method x = x end |};;
+
+[%%expect{|
+class c ?(x= 1) () = object method x = x end
+- : unit = ()
+|}];;
+
+run_structure {|
+  let f ~(here : [%call_pos]) () = here
+  let g () = f () |};;
+
+[%%expect{|
+let f ~here:(here : [%call_pos ]) () = here
+let g () = f ~here:([%src_pos ] : [%call_pos ]) ()
+- : unit = ()
+|}];;
+
+run_structure {| let f (g : ?b:bool -> unit -> int) = (g : unit -> int) |};;
+
+[%%expect{|
+let f (g : ?b:bool -> unit -> int) = (g : unit -> int)
+- : unit = ()
+|}];;
+
+run_structure {| type 'a t = 'a constraint 'a = [< `A of & int ] |};;
+
+[%%expect{|
+type 'a t = 'a constraint 'a = [< `A of & int ]
+- : unit = ()
+|}];;
+
+run_structure {| type 'a t = int -> (int as 'a) |};;
+
+[%%expect{|
+type 'a t = int -> (int as 'a)
 - : unit = ()
 |}]
