@@ -56,8 +56,6 @@ val add_linearly_used_inlinable_continuation :
   Continuation.t ->
   params:Bound_parameters.t ->
   handler:Rebuilt_expr.t ->
-  free_names_of_handler:Name_occurrences.t ->
-  cost_metrics_of_handler:Cost_metrics.t ->
   t
 
 val add_function_return_or_exn_continuation :

@@ -110,12 +110,7 @@ let rebuild_arm uacc arm (action, use_id, arity, env_at_use)
             | None -> Some action
           in
           match cont_info_from_uenv with
-          | Linearly_used_and_inlinable
-              { handler;
-                free_names_of_handler = _;
-                params;
-                cost_metrics_of_handler = _
-              } ->
+          | Linearly_used_and_inlinable { handler; params } ->
             assert (Bound_parameters.is_empty params);
             check_handler ~handler ~action
           | Non_inlinable_zero_arity { handler = Known handler } ->
@@ -352,7 +347,6 @@ let ( let$ ) expr k uacc ~dacc_before_switch ~local_cse =
     | None ->
       let named = Named.create_prim prim dbg in
       let var = Variable.create name kind in
-      let uacc = UA.add_free_names uacc (NO.singleton_variable var NM.normal) in
       let local_cse =
         match P.Eligible_for_cse.create prim with
         | None -> local_cse
@@ -374,11 +368,7 @@ let ( let$ ) expr k uacc ~dacc_before_switch ~local_cse =
       in
       EB.make_new_let_bindings uacc ~bindings_outermost_first:[binding] ~body)
 
-let return ~added_code_size ~free_names expr uacc ~dacc_before_switch:_
-    ~local_cse:_ =
-  let uacc = UA.notify_added ~code_size:added_code_size uacc in
-  let uacc = UA.add_free_names uacc free_names in
-  expr, uacc
+let return expr uacc ~dacc_before_switch:_ ~local_cse:_ = expr, uacc
 
 let run uacc ~dacc_before_switch k =
   (* [local_cse] allows sharing between distinct arguments of the same switch.
@@ -769,8 +759,9 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
   let body, uacc =
     if num_arms < 1
     then
-      let uacc = UA.notify_removed ~operation:Removed_operations.branch uacc in
-      RE.create_invalid Zero_switch_arms, uacc
+      ( RE.notify_removed ~operation:Removed_operations.branch
+          (RE.create_invalid Zero_switch_arms),
+        uacc )
     else
       let dbg = Debuginfo.none in
       let[@inline] normal_case uacc =
@@ -794,9 +785,6 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
       in
       match switch_merged with
       | Some (dest, args) ->
-        let uacc =
-          UA.notify_removed ~operation:Removed_operations.branch uacc
-        in
         (* CR bclement: should use a single unboxed product lookup table *)
         let rec rebuild_merged_switch mergeable_args args_rev =
           match mergeable_args with
@@ -808,9 +796,8 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
                probably isn't that important for now. *)
             let apply_cont = Apply_cont.create dest ~args ~dbg in
             return
-              (RE.create_apply_cont apply_cont)
-              ~added_code_size:(Code_size.apply_cont apply_cont)
-              ~free_names:(Apply_cont.free_names apply_cont)
+              (RE.create_apply_cont apply_cont
+              |> RE.notify_removed ~operation:Removed_operations.branch)
           | special_arg :: special_args ->
             rebuild_mergeable_argument ~machine_width ~scrutinee special_arg
               (fun arg -> rebuild_merged_switch special_args (arg :: args_rev))
@@ -818,7 +805,7 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
         run uacc ~dacc_before_switch (rebuild_merged_switch args [])
       | None -> normal_case uacc
   in
-  let uacc, expr = EB.bind_let_conts uacc ~body new_let_conts in
+  let expr = EB.bind_let_conts uacc ~body new_let_conts in
   after_rebuild expr uacc
 
 let simplify_arm arm (action, env_at_use) (arms, dacc) =
@@ -1028,8 +1015,11 @@ let simplify_switch dacc switch ~down_to_up =
     Simplify_apply_cont_expr.simplify_apply_cont dacc apply_cont
       ~down_to_up:(fun dacc ~rebuild ->
         down_to_up dacc ~rebuild:(fun uacc ~after_rebuild ->
-            let uacc =
-              UA.notify_removed ~operation:Removed_operations.branch uacc
+            let after_rebuild expr uacc =
+              let expr =
+                RE.notify_removed ~operation:Removed_operations.branch expr
+              in
+              after_rebuild expr uacc
             in
             rebuild uacc ~after_rebuild))
   | None ->

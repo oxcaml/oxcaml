@@ -17,9 +17,7 @@
 type t =
   | Linearly_used_and_inlinable of
       { params : Bound_parameters.t;
-        handler : Rebuilt_expr.t;
-        free_names_of_handler : Name_occurrences.t;
-        cost_metrics_of_handler : Cost_metrics.t
+        handler : Rebuilt_expr.t
       }
   | Non_inlinable_zero_arity of { handler : Rebuilt_expr.t Or_unknown.t }
   | Non_inlinable_non_zero_arity of { arity : [`Unarized] Flambda_arity.t }
@@ -29,18 +27,13 @@ type t =
 
 let [@ocamlformat "disable"] print are_rebuilding_terms ppf t =
   match t with
-  | Linearly_used_and_inlinable { params; handler;
-      free_names_of_handler; cost_metrics_of_handler } ->
+  | Linearly_used_and_inlinable { params; handler } ->
     Format.fprintf ppf "@[<hov 1>(Linearly_used_and_inlinable@ \
         @[<hov 1>(params@ %a)@]@ \
         @[<hov 1>(handler@ %a)@]@ \
-        @[<hov 1>(free_names_of_handler@ %a)@]@ \
-        @[<hov 1>(cost_metrics_of_handler@ %a)@]\
         )@]"
       Bound_parameters.print params
       (Rebuilt_expr.print are_rebuilding_terms) handler
-      Name_occurrences.print free_names_of_handler
-      Cost_metrics.print cost_metrics_of_handler
   | Non_inlinable_zero_arity { handler } ->
     Format.fprintf ppf "@[<hov 1>(Non_inlinable_zero_arity@ \
         @[<hov 1>(handler@ %a)@]\
@@ -65,12 +58,7 @@ let [@ocamlformat "disable"] print are_rebuilding_terms ppf t =
 
 let arity t =
   match t with
-  | Linearly_used_and_inlinable
-      { params;
-        handler = _;
-        free_names_of_handler = _;
-        cost_metrics_of_handler = _
-      } ->
+  | Linearly_used_and_inlinable { params; handler = _ } ->
     Bound_parameters.arity params
   | Non_inlinable_zero_arity _ -> Flambda_arity.nullary
   | Non_inlinable_non_zero_arity { arity }
