@@ -198,7 +198,7 @@ type summary =
   | Env_type of summary * Ident.t * type_declaration
   | Env_extension of summary * Ident.t * extension_constructor
   | Env_module of summary * Ident.t * module_presence * module_declaration *
-      Mode.With_regionality.l * locks
+      visibility * Mode.With_regionality.l * locks
   | Env_modtype of summary * Ident.t * modtype_declaration
   | Env_class of summary * Ident.t * class_declaration
   | Env_cltype of summary * Ident.t * class_type_declaration
@@ -216,7 +216,7 @@ let map_summary f = function
   | Env_value (s, id, d, m) -> Env_value (f s, id, d, m)
   | Env_type (s, id, d) -> Env_type (f s, id, d)
   | Env_extension (s, id, d) -> Env_extension (f s, id, d)
-  | Env_module (s, id, p, d, m, l) -> Env_module (f s, id, p, d, m, l)
+  | Env_module (s, id, p, d, vis, m, l) -> Env_module (f s, id, p, d, vis, m, l)
   | Env_modtype (s, id, d) -> Env_modtype (f s, id, d)
   | Env_class (s, id, d) -> Env_class (f s, id, d)
   | Env_cltype (s, id, d) -> Env_cltype (f s, id, d)
@@ -777,6 +777,7 @@ and module_data =
     mda_components : module_components;
     mda_address : address_lazy;
     mda_mode : Mode.With_regionality.l;
+    mda_vis : visibility;
     mda_shape: Shape.t; }
 
 and module_alias_locks = locks
@@ -867,6 +868,7 @@ type lookup_error =
   | Unbound_constructor of Longident.t
   | Unbound_label of Longident.t * record_form_packed * label_usage
   | Unbound_module of Longident.t
+  | Unmentionable_module of Longident.t
   | Unbound_class of Longident.t
   | Unbound_modtype of Longident.t
   | Unbound_cltype of Longident.t
@@ -1232,6 +1234,7 @@ let read_sign_of_cmi (sign, mda_mode) name uid ~shape ~address:addr ~flags =
     mda_address;
     mda_mode;
     mda_shape;
+    mda_vis = Exported;
   }
 
 let persistent_env : module_data Persistent_env.t ref =
@@ -2472,7 +2475,7 @@ let rec components_of_module_maker
               { cda_description = descr; cda_address = Some addr; cda_shape }
             in
             c.comp_constrs <- add_to_tbl (Ident.name id) cda c.comp_constrs
-        | Sig_module(id, pres, md, _, _) ->
+        | Sig_module(id, pres, md, _, vis) ->
             let md, mode = Normalize_mode.md Normalize_exn md cm_mode in
             let md' =
               (* The prefixed items get the same scope as [cm_path], which is
@@ -2504,6 +2507,7 @@ let rec components_of_module_maker
                 mda_mode = mode;
                 mda_components = comps;
                 mda_address = addr;
+                mda_vis = vis;
                 mda_shape = shape; }
             in
             c.comp_modules <-
@@ -2513,7 +2517,7 @@ let rec components_of_module_maker
                populated env when forced. *)
             env :=
               store_module ~update_summary:false ~full_env:inner_full_env
-                ~check:None
+                ~check:None ~vis
                 id addr pres md mode shape locks_empty !env
         | Sig_modtype(id, decl, _) ->
             let final_decl =
@@ -2828,7 +2832,7 @@ and store_extension ~check ~rebind id addr ext shape env =
     constrs = TycompTbl.add id cda env.constrs;
     summary = Env_extension(env.summary, id, ext) }
 
-and store_module ?(update_summary=true) ~full_env ~check
+and store_module ?(update_summary=true) ~full_env ~vis ~check
                  id addr presence md mode shape alias_locks env =
   let open Subst.Lazy in
   let loc = md.md_loc in
@@ -2846,11 +2850,12 @@ and store_module ?(update_summary=true) ~full_env ~check
       mda_mode = mode;
       mda_components = comps;
       mda_address = addr;
+      mda_vis = vis;
       mda_shape = shape }
   in
   let summary =
     if not update_summary then env.summary
-    else Env_module (env.summary, id, presence, force_module_decl md, mode,
+    else Env_module (env.summary, id, presence, force_module_decl md, vis, mode,
       alias_locks)
   in
   { env with
@@ -2975,7 +2980,8 @@ and add_extension ~check ?shape ~rebind id ext env =
   store_extension ~check ~rebind id addr ext shape env
 
 and add_module_declaration_lazy
-      ~update_summary ?(arg=false) ?shape ?full_env ~check id presence md
+      ~update_summary ?(arg=false) ?(vis : visibility = Exported) ?shape
+      ?full_env ~check id presence md
       ?(mode = Mode.With_regionality.(allow_right max)) ?(locks = []) env =
   let check =
     if not check then
@@ -2992,8 +2998,8 @@ and add_module_declaration_lazy
   let shape = shape_or_leaf md.Subst.Lazy.md_uid shape in
   let mode = Mode.With_regionality.disallow_right mode in
   let env =
-    store_module ~update_summary ~full_env ~check id addr presence md mode shape
-      locks env
+    store_module ~update_summary ~full_env ~vis ~check id addr presence md
+      mode shape locks env
   in
   if arg then add_functor_arg id env else env
 
@@ -3001,9 +3007,10 @@ let add_jkind ~check ?shape id decl env =
   let shape = shape_or_leaf decl.jkind_uid shape in
   store_jkind ~check id decl shape env
 
-let add_module_declaration ?(arg=false) ?shape ~check id presence md
+let add_module_declaration ?(arg=false) ?(vis : visibility = Exported) ?shape
+  ~check id presence md
   ?mode ?locks env =
-  add_module_declaration_lazy ~update_summary:true ~arg ?shape ~check id
+  add_module_declaration_lazy ~update_summary:true ~arg ~vis ?shape ~check id
     presence (Subst.Lazy.of_module_decl md) ?mode ?locks env
 
 and add_modtype_lazy ~update_summary ?shape id info env =
@@ -3203,7 +3210,7 @@ module Add_signature(T : Types.Wrapped)(M : sig
     T.value_description ->
     t ->
     t
-  val add_module_declaration: ?arg:bool -> ?shape:Shape.t
+  val add_module_declaration: ?arg:bool -> vis:visibility -> ?shape:Shape.t
     -> full_env:t ref -> check:bool
     -> Ident.t -> module_presence -> T.module_declaration
     -> ?mode:(Mode.allowed * 'r) Mode.With_regionality.t -> ?locks:locks ->
@@ -3223,10 +3230,10 @@ end) = struct
     | Sig_typext(id, ext, _, _) ->
         let map, shape = proj_shape map mod_shape (Shape.Item.extension_constructor id) in
         map, add_extension ~check:false ?shape ~rebind:false id ext env
-    | Sig_module(id, presence, md, _, _) ->
+    | Sig_module(id, presence, md, _, vis) ->
         let map, shape = proj_shape map mod_shape (Shape.Item.module_ id) in
-        map, M.add_module_declaration ~check:false ?shape ~full_env id presence
-          md ~mode env
+        map, M.add_module_declaration ~check:false ~vis ?shape ~full_env id
+          presence md ~mode env
     | Sig_modtype(id, decl, _)  ->
         let map, shape = proj_shape map mod_shape (Shape.Item.module_type id) in
         map, M.add_modtype ?shape id decl env
@@ -3262,10 +3269,11 @@ let add_signature map mod_shape sg ?mode env =
   let module M = Add_signature(Types)(struct
     let add_value ?shape ~mode id vd =
       add_value_lazy ?shape ~mode id (Subst.Lazy.of_value_description vd)
-    let add_module_declaration ?arg ?shape ~full_env ~check id presence md
+    let add_module_declaration ?arg ~vis ?shape ~full_env ~check id presence md
       ?mode ?locks env =
-      add_module_declaration_lazy ~update_summary:true ?arg ?shape ~full_env
-        ~check id presence (Subst.Lazy.of_module_decl md) ?mode ?locks env
+      add_module_declaration_lazy ~update_summary:true ?arg ~vis ?shape
+        ~full_env ~check id presence (Subst.Lazy.of_module_decl md) ?mode ?locks
+        env
     let add_modtype = add_modtype
   end)
   in
@@ -3274,10 +3282,10 @@ let add_signature map mod_shape sg ?mode env =
 let add_signature_lazy =
   let module M = Add_signature(Subst.Lazy)(struct
     let add_value ?shape ~mode = add_value_lazy ?check:None ?shape ~mode
-    let add_module_declaration ?arg ?shape ~full_env ~check id pres md
+    let add_module_declaration ?arg ~vis ?shape ~full_env ~check id pres md
       ?mode ?locks env =
-      add_module_declaration_lazy ~update_summary:true ?arg ?shape ~full_env
-        ~check id pres md ?mode ?locks env
+      add_module_declaration_lazy ~update_summary:true ?arg ~vis ?shape
+        ~full_env ~check id pres md ?mode ?locks env
     let add_modtype = add_modtype_lazy ~update_summary:true
   end)
   in
@@ -3717,6 +3725,16 @@ let lookup_global_name_module_no_locks
           may_lookup_error errors loc env (Error_from_persistent_env err)
     end
 
+(* CR-someday zqian: only module lookups check mentionability; lookups of the
+   other kinds of items should check it as well. *)
+let visibility_is_mentionable (vis : visibility) =
+  match vis with
+  | Exported -> true
+  | Unmentionable -> false
+  | Hidden ->
+      (* [Hidden] is stripped by [Signature_names.simplify] before storage. *)
+      Misc.fatal_error "Env.visibility_is_mentionable: unexpected [Hidden]"
+
 let lookup_ident_module (type a) (load : a load) ~errors ~use ~loc s env =
   let path, locks, data =
     match find_name_module ~mark:use ~stage:env.stage s env.modules with
@@ -3730,6 +3748,8 @@ let lookup_ident_module (type a) (load : a load) ~errors ~use ~loc s env =
         may_lookup_error errors loc env (Unbound_module (Lident s))
   in
   match data with
+  | Mod_local (mda, _) when not (visibility_is_mentionable mda.mda_vis) ->
+      may_lookup_error errors loc env (Unmentionable_module (Lident s))
   | Mod_local (mda, alias_locks) -> begin
       use_module ~use ~loc path mda;
       let _, mode = Normalize_mode.mda Assert_normalized mda in
@@ -4184,6 +4204,8 @@ and lookup_dot_module ~errors ~use ~loc l s env =
     lookup_structure_components ~errors ~use l env
   in
   match NameMap.find s.txt comps.comp_modules with
+  | mda when not @@ visibility_is_mentionable mda.mda_vis ->
+      may_lookup_error errors loc env (Unmentionable_module (Ldot(l, s)))
   | mda ->
       let path = Pdot(p, s.txt) in
       use_module ~use ~loc path mda;
@@ -5285,6 +5307,10 @@ let report_lookup_error_doc loc env = function
                    quoted_longident lid
            ]
     end
+  | Unmentionable_module lid ->
+     Location.errorf ~loc
+       "The module %a cannot be referenced by name."
+       quoted_longident lid
   | Unbound_constructor lid ->
      Location.aligned_error_hint ~loc
        "@{<ralign>Unbound constructor @}%a"

@@ -153,10 +153,10 @@
 
       {[
         module Make (P : P) () = struct
-          module DEP__Q_impl = Q_impl (P)
-          module DEP__Foo_q = Foo_q (DEP__Q_impl)
+          module Q_impl = Q_impl (P)     (* unmentionable *)
+          module Foo_q = Foo_q (Q_impl)  (* unmentionable *)
           module Nested_arg = (* body of Nested_arg, with
-             [Foo_q_of_q_impl := DEP__Foo_q] *)
+             [Foo_q_of_q_impl := Foo_q] *)
         end
       ]} *)
 

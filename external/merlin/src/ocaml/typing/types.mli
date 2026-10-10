@@ -1152,6 +1152,9 @@ type class_type_declaration =
 
 type visibility =
   | Exported
+  | Unmentionable
+      (** like [Exported]: the item has a path which is its identity, but it
+          cannot be mentioned by name in user code. *)
   | Hidden
 
 type rec_status =

@@ -5069,9 +5069,9 @@ let functorize_signature ~params ~modules : Types.signature =
   in
   let body =
     List.map
-      (fun (id, sign) ->
+      (fun (id, visibility, sign) ->
         Sig_module
-          (id, Mp_present, make_md (Mty_signature sign), Trec_not, Exported))
+          (id, Mp_present, make_md (Mty_signature sign), Trec_not, visibility))
       modules
   in
   let intf_id = Ident.create_local "Intf" in
