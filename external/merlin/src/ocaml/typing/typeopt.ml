@@ -160,7 +160,7 @@ let type_representable_layout ~why env loc ty =
        will then yield one with the new, representable (defaulted) layout. *)
     (* We postpone calling [type_sort] until this branch to make the common case
        faster, even though it means that [type_jkind] must be called twice. *)
-    (match Ctype.type_sort ~why ~fixed:false env ty with
+    (match Ctype.type_sort ~why ~allow_mutation:true env ty with
     | Ok _sort ->
       let jkind = Ctype.type_jkind env ty in
       let layout =

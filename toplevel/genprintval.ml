@@ -740,7 +740,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                        | Some sort -> Some sort
                        | None ->
                            (match
-                              Ctype.type_sort env ty_arg ~fixed:true
+                              Ctype.type_sort env ty_arg ~allow_mutation:false
                                 ~why:Constructor_arg_projection
                             with
                             | Ok sort ->
