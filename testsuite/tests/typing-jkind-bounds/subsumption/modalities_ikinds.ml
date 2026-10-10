@@ -77,16 +77,7 @@ type 'a u : immutable_data with 'a @@ contended
 type 'a t : value mod portable = 'a u
 [%%expect {|
 type 'a u : immutable_data with 'a @@ contended
-Line 2, characters 0-37:
-2 | type 'a t : value mod portable = 'a u
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "'a u" is immutable_data with 'a @@ contended
-         because of the definition of u at line 1, characters 0-47.
-       But the kind of type "'a u" must be a subkind of value mod portable
-         because of the definition of t at line 2, characters 0-37.
-
-       The first mode-crosses less than the second along:
-         portability: mod portable with 'a ≰ mod portable
+type ('a : value mod portable) t = 'a u
 |}]
 
 module M : sig
