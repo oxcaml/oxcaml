@@ -151,6 +151,22 @@ module type Lattices_mono = sig
   val right_adjoint :
     'b obj -> ('a, 'b, allowed * 'r) morph -> ('b, 'a, right_only) morph
 
+  (** Pointwise join of two morphisms with the same source and target:
+      [apply (join_morph f g) a = join (apply f a) (apply g a)] *)
+  val join_morph :
+    'b obj ->
+    ('a, 'b, left_only) morph ->
+    ('a, 'b, left_only) morph ->
+    ('a, 'b, left_only) morph
+
+  (** Pointwise meet of two morphisms with the same source and target:
+      [apply (meet_morph f g) a = meet (apply f a) (apply g a)] *)
+  val meet_morph :
+    'b obj ->
+    ('a, 'b, right_only) morph ->
+    ('a, 'b, right_only) morph ->
+    ('a, 'b, right_only) morph
+
   include Allow_disallow with type ('a, 'b, 'd) sided = ('a, 'b, 'd) morph
 
   (** Apply morphism on constant *)
