@@ -340,7 +340,7 @@ let rec expr env e =
   | Apply app -> apply_expr env app
   | Apply_cont app_cont -> apply_cont_expr env app_cont
   | Switch switch -> switch_expr env switch
-  | Invalid { message } -> invalid_expr env ~message
+  | Invalid { message = _ } -> invalid_expr env ~message:"<invalid>"
 
 and let_expr env le =
   Flambda.Let_expr.pattern_match le ~f:(fun bound ~body : Fexpr.expr ->

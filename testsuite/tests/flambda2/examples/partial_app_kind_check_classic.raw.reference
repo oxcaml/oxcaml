@@ -10,7 +10,7 @@
          my_closure &my_alloc_region my_depth
          -> k1 * k2
          : int64 =
-   invalid "(Application_result_kind_mismatch_in_lambda\n (dbg partial_app_kind_check_classic.ml:16,2--14))"
+   invalid "<invalid>"
  in
  let $camlPartial_app_kind_check_classic__s0 = closure test_0 @test &toplevel
  in
