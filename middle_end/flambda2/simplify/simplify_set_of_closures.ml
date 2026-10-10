@@ -105,7 +105,7 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
     DE.add_variable denv my_depth (T.unknown K.rec_info)
   in
   let denv =
-    LCS.add_to_denv ~maybe_already_defined:() denv
+    DE.add_lifted_constant_state ~maybe_already_defined:() denv
       (DA.get_lifted_constants outer_dacc)
     |> DE.enter_closure code_id ~return_continuation ~exn_continuation
          ~my_closure
@@ -786,7 +786,7 @@ let simplify_and_lift_set_of_closures dacc ~closure_bound_vars_inverse
     |> Code_or_metadata.code_metadata
   in
   let set_of_closures_lifted_constant =
-    LC.create_set_of_closures denv ~closure_symbols_with_types
+    LC.create_set_of_closures (DE.typing_env denv) ~closure_symbols_with_types
       ~symbol_projections
       (Rebuilt_static_const.create_set_of_closures
          (DE.are_rebuilding_terms denv)
@@ -915,7 +915,7 @@ let simplify_non_lifted_set_of_closures0 dacc bound_vars ~closure_bound_vars
            ~f:(Specialization_cost.add_set_of_closures set_of_closures))
   in
   Simplify_named_result.create dacc
-    (Expr_builder.Keep_binding
+    (Keep_binding
        { let_bound = bound_vars;
          simplified_defining_expr = defining_expr;
          original_defining_expr =

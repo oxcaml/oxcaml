@@ -14,7 +14,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module DE = Downwards_env
 module LC = Lifted_constant
 
 type t
@@ -36,8 +35,6 @@ val union : t -> t -> t
 val fold : t -> init:'a -> f:('a -> LC.t -> 'a) -> 'a
 
 val all_defined_symbols : t -> Symbol.Set.t
-
-val add_to_denv : ?maybe_already_defined:unit -> DE.t -> t -> DE.t
 
 type sort_result = private { innermost_first : LC.t array }
 

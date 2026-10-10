@@ -14,10 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module DE = Downwards_env
 module LC = Lifted_constant
-module T = Flambda2_types
-module TE = T.Typing_env
 
 type t =
   | Empty
@@ -80,57 +77,6 @@ let[@inline] fold t ~init ~f =
 let all_defined_symbols t =
   fold t ~init:Symbol.Set.empty ~f:(fun symbols const ->
       LC.all_defined_symbols const |> Symbol.Set.union symbols)
-
-let add_to_denv ?maybe_already_defined denv lifted =
-  let initial_denv = denv in
-  let maybe_already_defined =
-    match maybe_already_defined with None -> false | Some () -> true
-  in
-  let denv =
-    fold lifted ~init:denv ~f:(fun denv lifted_constant ->
-        let types_of_symbols = LC.types_of_symbols lifted_constant in
-        Symbol.Map.fold
-          (fun sym (_denv, typ) denv ->
-            if maybe_already_defined && DE.mem_symbol denv sym
-            then denv
-            else DE.define_symbol denv sym (T.kind typ))
-          types_of_symbols denv)
-  in
-  let typing_env =
-    let typing_env = DE.typing_env denv in
-    fold lifted ~init:typing_env ~f:(fun typing_env lifted_constant ->
-        let types_of_symbols = LC.types_of_symbols lifted_constant in
-        Symbol.Map.fold
-          (fun sym (denv_at_definition, typ) typing_env ->
-            if maybe_already_defined && DE.mem_symbol initial_denv sym
-            then typing_env
-            else
-              let sym = Name.symbol sym in
-              let env_extension =
-                (* CR mshinwell: Maybe sometimes this could be done at a time
-                   previous to this point. *)
-                (* CR pchambart: Maybe some of these make_suitable calls could
-                   be combined into one *)
-                T.make_suitable_for_environment
-                  (DE.typing_env denv_at_definition)
-                  (Everything_not_in typing_env)
-                  [sym, typ]
-              in
-              TE.add_env_extension_with_extra_variables typing_env env_extension)
-          types_of_symbols typing_env)
-  in
-  fold lifted ~init:(DE.with_typing_env denv typing_env)
-    ~f:(fun denv lifted_constant ->
-      let pieces_of_code =
-        LC.defining_exprs lifted_constant
-        |> Rebuilt_static_const.Group.pieces_of_code_including_those_not_rebuilt
-      in
-      Code_id.Map.fold
-        (fun code_id code denv ->
-          if maybe_already_defined && DE.mem_code denv code_id
-          then denv
-          else DE.define_code denv ~code_id ~code)
-        pieces_of_code denv)
 
 module CIS = Code_id_or_symbol
 module SCC_lifted_constants = Strongly_connected_components.Make (CIS)

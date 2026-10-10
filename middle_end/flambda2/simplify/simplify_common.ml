@@ -16,18 +16,23 @@
 
 open Simplify_import
 
-type 'a after_rebuild = Rebuilt_expr.t -> Upwards_acc.t -> 'a
+type after_rebuild =
+  Rebuilt_expr.t -> Upwards_acc.t -> Rebuilt_expr.t * Upwards_acc.t
 
-type 'a rebuild = Upwards_acc.t -> after_rebuild:'a after_rebuild -> 'a
+type 'a rebuild =
+  'a ->
+  Upwards_acc.t ->
+  after_rebuild:after_rebuild ->
+  Rebuilt_expr.t * Upwards_acc.t
 
-type ('a, 'b) down_to_up = Downwards_acc.t -> rebuild:'a rebuild -> 'b
+type 'a down_to_up =
+  Downwards_acc.t -> 'a -> Simplified_expr.t * Downwards_acc.t
 
 type 'a expr_simplifier =
   Downwards_acc.t ->
   'a ->
-  down_to_up:
-    (Rebuilt_expr.t * Upwards_acc.t, Rebuilt_expr.t * Upwards_acc.t) down_to_up ->
-  Rebuilt_expr.t * Upwards_acc.t
+  down_to_up:Simplified_expr.t down_to_up ->
+  Simplified_expr.t * Downwards_acc.t
 
 type simplify_toplevel =
   Downwards_acc.t ->

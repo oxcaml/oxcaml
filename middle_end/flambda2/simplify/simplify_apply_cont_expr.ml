@@ -41,7 +41,7 @@ let inline_linearly_used_continuation uacc ~params:params' ~handler
       handler;
   let bindings_outermost_first =
     ListLabels.map2 params args
-      ~f:(fun param arg : Expr_builder.binding_to_place ->
+      ~f:(fun param arg : Simplified_named.binding_to_place ->
         let param_var, param_uid = BP.var_and_uid param in
         let named = Named.create_simple arg in
         (* Get rid of useless [let x = x] bindings from dataflow. *)
@@ -69,7 +69,7 @@ let inline_linearly_used_continuation uacc ~params:params' ~handler
   in
   expr, UA.cost_metrics uacc, UA.name_occurrences uacc
 
-let rebuild_apply_cont apply_cont ~args ~rewrite_id uacc ~after_rebuild =
+let rebuild_apply_cont ~args ~rewrite_id apply_cont uacc ~after_rebuild =
   let uenv = UA.uenv uacc in
   let cont, apply_cont =
     let cont = AC.continuation apply_cont in
@@ -177,4 +177,4 @@ let simplify_apply_cont dacc apply_cont ~down_to_up =
   let dbg = AC.debuginfo apply_cont in
   let dbg = DE.add_inlined_debuginfo (DA.denv dacc) dbg in
   let apply_cont = AC.with_debuginfo apply_cont ~dbg in
-  down_to_up dacc ~rebuild:(rebuild_apply_cont apply_cont ~args ~rewrite_id)
+  down_to_up dacc (SE.simplified_apply_cont apply_cont ~args ~rewrite_id)

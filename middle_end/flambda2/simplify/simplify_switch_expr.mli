@@ -15,3 +15,5 @@
 (**************************************************************************)
 
 val simplify_switch : Flambda.Switch.t Simplify_common.expr_simplifier
+
+val rebuild_switch : Simplified_expr.simplified_switch Simplify_common.rebuild

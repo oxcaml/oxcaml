@@ -25,14 +25,6 @@ module UE = Upwards_env
 module DA = Downwards_acc
 module VB = Bound_var
 
-type binding_to_place =
-  | Keep_binding of
-      { let_bound : Bound_pattern.t;
-        simplified_defining_expr : Simplified_named.t;
-        original_defining_expr : Named.t option
-      }
-  | Delete_binding of { original_defining_expr : Named.t option }
-
 let add_set_of_closures_offsets ~is_phantom named uacc =
   let add_offsets_from_set uacc set_of_closures =
     match UA.slot_offsets uacc with
@@ -182,7 +174,7 @@ let make_new_let_bindings uacc ~bindings_outermost_first ~body =
   in
   ListLabels.fold_left (List.rev bindings_outermost_first) ~init:(body, uacc)
     ~f:(fun (expr, uacc) binding ->
-      match (binding : binding_to_place) with
+      match (binding : Simplified_named.binding_to_place) with
       | Delete_binding { original_defining_expr } ->
         expr, notify_removed uacc ~original_defining_expr
       | Keep_binding

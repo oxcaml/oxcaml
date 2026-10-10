@@ -20,3 +20,7 @@ val simplify_let :
   simplify_expr:Expr.t Simplify_common.expr_simplifier ->
   simplify_function_body:Simplify_common.simplify_function_body ->
   Let.t Simplify_common.expr_simplifier
+
+val rebuild_let :
+  (Simplified_expr.simplified_defining_expr * Rebuilt_expr.t)
+  Simplify_common.rebuild
