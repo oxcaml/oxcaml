@@ -1494,7 +1494,7 @@ external ext_unpack_unboxed :
 Line 2, characters 31-38:
 2 |   (#(int * bool) [@unpacked] [@unboxed]) -> int = "foo" "bar"
                                    ^^^^^^^
-Error: Too many "[@@unboxed]"/"[@@untagged]"/"[@@unpacked]"/"[@@unsafe_unextended]" attributes
+Error: Too many "[@@unboxed]"/"[@@untagged]"/"[@@unpacked]"/"[@@unsafe_unextended]"/"[@@ox_ptr]" attributes
 |}]
 
 (***********************************)
