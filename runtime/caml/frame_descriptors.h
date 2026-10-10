@@ -276,6 +276,65 @@ Caml_inline bool frame_has_debug(frame_descr *d) {
   ((uintnat)(d) + Frame_retaddr_rel_ofs \
    + (uintnat)(intnat)caml_read_unaligned_int32((d) + Frame_retaddr_rel_ofs))
 
+/* The post-link frame-descriptor index.
+ *
+ * When ocamlopt links an ELF executable, its startup object reserves a
+ * read-only section [caml_frame_index], starting at the symbol
+ * [caml_frame_index_data], and once the executable is linked the
+ * compiler fills it with a lookup structure over every descriptor of
+ * every frametable in the [caml_frametables] section (see
+ * asmcomp/frame_index.ml; the layout constants below are mirrored in
+ * backend/frame_index_layout.ml). The runtime then needs no hash table
+ * for those descriptors: the index is file-backed, shared between
+ * processes, and only the pages a lookup touches become resident.
+ *
+ * Layout (little-endian, 64-byte aligned):
+ *
+ *   header, 64 bytes:
+ *      0  u64 magic             CAML_FRAME_INDEX_MAGIC; 0 means absent
+ *      8  u32 version           CAML_FRAME_INDEX_VERSION
+ *     12  u32 shift             log2 of the granule size in bytes
+ *     16  u64 text_lo           lowest covered return address, granule-aligned
+ *     24  u64 num_granules      G
+ *     32  u64 num_entries       N
+ *     40  u64 ft_lo             start of the caml_frametables section
+ *     48  u64 ft_hi             end of the caml_frametables section
+ *     56  u32 reserved_entries  R >= N, the section's capacity
+ *     60  u32 bucket_budget     B >= G
+ *   bucket table at 64: u32 bucket[G + 1], in a region of
+ *      round_up(4 * (B + 1), 64) bytes; bucket[g] is the index of the
+ *      first entry whose return address lies in granule g; bucket[G] = N
+ *   entries: struct { u32 pc_off; u32 descr_off; } entry[N], in a
+ *      region of round_up(8 * R, 64) bytes
+ *
+ * Entries are sorted by return address; entry i has return address
+ * text_lo + (g << shift) + entry[i].pc_off for its granule g, and its
+ * descriptor is at ft_lo + entry[i].descr_off. A lookup reads bucket[g]
+ * and bucket[g + 1] (one cache line) and scans the entries of that
+ * range; an entry's offset and descriptor share a cache line, so a
+ * lookup that misses the caches pays for two lines, not three. */
+
+#define CAML_FRAME_INDEX_MAGIC 0x0FEF4F5849445801ULL
+#define CAML_FRAME_INDEX_VERSION 1
+
+#define Frame_index_magic_ofs            0
+#define Frame_index_version_ofs          8
+#define Frame_index_shift_ofs           12
+#define Frame_index_text_lo_ofs         16
+#define Frame_index_num_granules_ofs    24
+#define Frame_index_num_entries_ofs     32
+#define Frame_index_ft_lo_ofs           40
+#define Frame_index_ft_hi_ofs           48
+#define Frame_index_reserved_entries_ofs 56
+#define Frame_index_bucket_budget_ofs   60
+#define Frame_index_header_size         64
+#define Frame_index_region_align        64
+
+/* Defined by the startup object of every executable produced by
+   ocamlopt. Weak, so that the runtime still links (and treats the index
+   as absent) when linked by other means. */
+extern unsigned char caml_frame_index_data[] CAMLweakdef;
+
 void caml_init_frame_descriptors(void);
 
 void caml_register_frametables(void **tables, int ntables);

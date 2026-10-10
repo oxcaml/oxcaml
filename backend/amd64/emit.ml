@@ -3248,10 +3248,10 @@ let end_assembly () =
   (* PR#6329 *)
   emit_global_label ~section:Data "data_end";
   D.int64 0L;
-  D.switch_to_section Read_only_data;
+  D.switch_to_section Frametables;
   D.align ~fill:Zero ~bytes:8;
   (* PR#7591 *)
-  emit_global_label ~section:Read_only_data "frametable";
+  emit_global_label ~section:Frametables "frametable";
   (* MASM can't assemble computed ULEB128 constants, so can't do short frame
      descriptors *)
   Emitaux.disable_short_descriptors := X86_proc.masm;
@@ -3259,7 +3259,7 @@ let end_assembly () =
      same-section label differences need no relocations. *)
   let debug_strings_section : Asm_targets.Asm_section.t =
     if Option.is_some !X86_proc.internal_assembler
-    then Read_only_data
+    then Frametables
     else Debuginfo_strings
   in
   (* CR sspies: Share the [emit_frames] code with the Arm backend. *)
@@ -3282,7 +3282,7 @@ let end_assembly () =
       efa_align = (fun n -> D.align ~fill:Zero ~bytes:n);
       efa_label_rel =
         (fun lbl ofs ->
-          let lbl = label_to_asm_label ~section:Read_only_data lbl in
+          let lbl = label_to_asm_label ~section:Frametables lbl in
           let ofs = Targetint.of_int32 ofs in
           D.between_this_and_label_offset_32bit_expr ~upper:lbl
             ~offset_upper:ofs);
@@ -3294,11 +3294,12 @@ let end_assembly () =
           D.delta_uleb128 ~upper ~lower);
       efa_def_label =
         (fun l ->
-          let lbl = label_to_asm_label ~section:Read_only_data l in
+          let lbl = label_to_asm_label ~section:Frametables l in
           D.define_label lbl)
     };
   let frametable_sym = S.create_global (Cmm_helpers.make_symbol "frametable") in
   D.size frametable_sym;
+  Emitaux.emit_frame_index_reservation ();
   D.data ();
   Probe_emission.emit_probe_notes ~add_def_symbol;
   emit_trap_notes ();

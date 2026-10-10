@@ -1,0 +1,4 @@
+Frame index: N entries, N-byte granules, N granules, largest bucket N, N bytes.
+Frame descriptor hash table: not allocated.
+check ok
+caml_frame_index PROGBITS A

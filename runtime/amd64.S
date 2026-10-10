@@ -1830,7 +1830,11 @@ G(caml_system__code_end):
 
 /* Frametable - GC roots for callback */
 /* Uses the same naming convention as ocamlopt generated modules. */
+#if defined(SYS_macosx) || defined(SYS_mingw64) || defined(SYS_cygwin)
         .data
+#else
+        .section caml_frametables,"a",@progbits
+#endif
         .globl  G(caml_system__frametable)
         .align  EIGHT_ALIGN
 G(caml_system__frametable):
