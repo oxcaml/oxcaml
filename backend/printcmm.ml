@@ -341,6 +341,11 @@ let operation d = function
   | Cpoll -> "poll"
   | Cpause -> "pause"
 
+let probability ~uniform ~total ppf likelihood =
+  match Likelihood.rescale ~total likelihood |> Likelihood.classify with
+  | Cold -> fprintf ppf "[cold]"
+  | Weight p -> if not uniform then fprintf ppf "[p = %f]" p
+
 let rec expr ppf = function
   | Cconst_int (n, _dbg) -> fprintf ppf "%i" n
   | Cconst_natint (n, _dbg) -> fprintf ppf "%s" (Nativeint.to_string n)
@@ -424,9 +429,22 @@ let rec expr ppf = function
         fprintf ppf ")@]")
   | Csequence (e1, e2) ->
     fprintf ppf "@[<2>(seq@ %a@ %a)@]" sequence e1 sequence e2
-  | Cifthenelse (e1, e2_dbg, e2, e3_dbg, e3, dbg) ->
+  | Cifthenelse (e1, e2_dbg, e2_a, e2, e3_dbg, e3_a, e3, dbg) ->
+    let e2_p = Branch_annotations.likelihood e2_a in
+    let e3_p = Branch_annotations.likelihood e3_a in
+    let uniform = Likelihood.is_uniform [e2_p; e3_p] in
+    let likely_or_unlikely =
+      let total = Likelihood.sum_list [e2_p; e3_p] in
+      match Likelihood.classify (Likelihood.rescale ~total e2_p) with
+      | Cold -> Format.dprintf "[unlikely]"
+      | Weight e2_p -> (
+        match Likelihood.classify (Likelihood.rescale ~total e3_p) with
+        | Cold -> Format.dprintf "[likely]"
+        | Weight _ ->
+          if uniform then Format.dprintf "" else Format.dprintf "[p = %f]" e2_p)
+    in
     with_location_mapping ~label:"Cifthenelse-e1" ~dbg ppf (fun () ->
-        fprintf ppf "@[<2>(if@ %a@ " expr e1;
+        fprintf ppf "@[<2>(if%t@ %a@ " likely_or_unlikely expr e1;
         with_location_mapping ~label:"Cifthenelse-e2" ~dbg:e2_dbg ppf (fun () ->
             fprintf ppf "%a@ " expr e2);
         with_location_mapping ~label:"Cifthenelse-e3" ~dbg:e3_dbg ppf (fun () ->
@@ -434,15 +452,29 @@ let rec expr ppf = function
         fprintf ppf ")@]")
   | Cswitch (e1, index, cases, dbg) ->
     with_location_mapping ~label:"Cswitch" ~dbg ppf (fun () ->
-        let print_case i ppf =
+        let likelihoods =
+          Array.fold_left
+            (fun likelihoods (_, _, annots) ->
+              Branch_annotations.likelihood annots :: likelihoods)
+            [] cases
+        in
+        let uniform = Likelihood.is_uniform likelihoods in
+        let total = Likelihood.sum_list likelihoods in
+        let print_case ~likelihood i ppf =
           for j = 0 to Array.length index - 1 do
-            if index.(j) = i then fprintf ppf "case %i:" j
+            if index.(j) = i
+            then
+              fprintf ppf "case %i%a:" j
+                (probability ~uniform ~total)
+                likelihood
           done
         in
         let print_cases ppf =
           for i = 0 to Array.length cases - 1 do
-            fprintf ppf "@ @[<2>%t@ %a@]" (print_case i) sequence
-              (fst cases.(i))
+            let case, _, annots = cases.(i) in
+            fprintf ppf "@ @[<2>%t@ %a@]"
+              (print_case ~likelihood:(Branch_annotations.likelihood annots) i)
+              sequence case
           done
         in
         fprintf ppf "@[<v 0>@[<2>(switch@ %a@ @]%t)@]" expr e1 print_cases)

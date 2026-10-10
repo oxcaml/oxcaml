@@ -317,7 +317,7 @@ let select_store' ~is_assign addr (exp : Cmm.expression) :
   | Cname_for_debugger _ | Ctuple _
   | Cop (_, _, _)
   | Csequence (_, _)
-  | Cifthenelse (_, _, _, _, _, _)
+  | Cifthenelse (_, _, _, _, _, _, _, _)
   | Cswitch (_, _, _, _)
   | Ccatch (_, _, _)
   | Cexit (_, _, _)

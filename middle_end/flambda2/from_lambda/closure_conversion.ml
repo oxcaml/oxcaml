@@ -2012,9 +2012,11 @@ let close_switch acc env ~condition_dbg scrutinee (sw : IR.switch) :
       let scrutinee = Simple.var comparison_result in
       let acc, action = action acc in
       let machine_width = Acc.machine_width acc in
+      (* CR bclement: use likelihood information from annotations. *)
       Expr_with_acc.create_switch acc
         (Switch.if_then_else ~machine_width ~condition_dbg ~scrutinee
-           ~if_true:action ~if_false:default_action)
+           ~if_true:(Switch_arm.from_apply_cont action)
+           ~if_false:(Switch_arm.from_apply_cont default_action))
     in
     let acc, body =
       Let_with_acc.create acc
@@ -2060,7 +2062,12 @@ let close_switch acc env ~condition_dbg scrutinee (sw : IR.switch) :
               Target_ocaml_int.Map.fold
                 (fun case action (acc, arms) ->
                   let acc, arm = action acc in
-                  acc, Target_ocaml_int.Map.add case arm arms)
+                  (* CR bclement: use likelihood annotations from lambda to
+                     compute logits *)
+                  ( acc,
+                    Target_ocaml_int.Map.add case
+                      (Switch_arm.from_apply_cont arm)
+                      arms ))
                 arms
                 (acc, Target_ocaml_int.Map.empty)
             in

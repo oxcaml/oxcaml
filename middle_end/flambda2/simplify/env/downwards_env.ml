@@ -109,8 +109,6 @@ type t =
            functions and continuations. *)
   }
 
-<<<<<<< conflict 1 of 1
-+++++++ qxtykpqn 69ba1e34 "Mark rebuilt expr of inlined [@cold] functions as cold" (rebase destination)
 let print ppf
     { round;
       machine_width;
@@ -140,7 +138,8 @@ let print ppf
       lifted = _;
       cost_of_lifting_continuations_out_of_current_one;
       has_seen_a_non_liftable_continuation;
-      join_analysis
+      join_analysis;
+      is_cold
     } =
   let open! Misc.Sexp in
   print ppf
@@ -183,7 +182,7 @@ let print ppf
       d "cost_of_lifting_continuations_out_of_current_one"
         cost_of_lifting_continuations_out_of_current_one;
       b "has_seen_a_non_liftable_continuation"
-        has_seen_a_non_liftable_continuation ;
+        has_seen_a_non_liftable_continuation;
       b "is_cold" is_cold ]
 
 let define_continuations ~can_be_lifted t conts =

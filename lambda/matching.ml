@@ -1320,9 +1320,14 @@ module StoreExp = Switch.Store (struct
 
   type key = lambda
 
+  let with_annotations t _ = t
+
   let compare_key = Stdlib.compare
 
-  let make_key = Lambda.make_key
+  let make_key t =
+    match Lambda.make_key t with
+    | None -> None
+    | Some e -> Some (e, Branch_annotations.default)
 end)
 
 let make_exit i = Lstaticraise (i, [])
@@ -3078,9 +3083,10 @@ module SArg = struct
         loc, kind ))
 
   let make_catch kind handler =
-    make_catch_delayed kind handler
+    let i,h = make_catch_delayed kind handler in
+    i,Branch_annotations.default,h
 
-  let make_exit i = make_exit i
+  let make_exit i _ = make_exit i
 end
 
 (* Action sharing for Lswitch argument *)
