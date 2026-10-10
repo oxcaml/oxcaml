@@ -11,7 +11,7 @@ Line 1, characters 5-15:
          ^^^^^^^^^^
 Error: Annotation check for zero_alloc failed on function TOP1.iter (camlTOP1__iter_0_1_code).
 File "list.ml", line 119, characters 12-15:
-Error: called function may allocate (indirect call) (:1,29--42)
+Error: called function may allocate (indirect call through argument #1) (:1,29--42)
 |}]
 
 (* However, `List.iter` doesn't *itself* allocate, so it's
