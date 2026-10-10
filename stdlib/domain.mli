@@ -174,9 +174,10 @@ module DLS : sig
         to [k], which cannot be restored later. *)
 end
 
-(** Thread-local storage. Like {!DLS}, but stores a distinct value for each
-    thread. Domains can contain multiple threads, so [TLS] should be preferred
-    in nearly all cases. *)
+(** Thread-local storage. Like {!Domain.DLS}, but stores a distinct value
+    for every preemptible fiber (see {!Domain.TLS} for the ownership rules).
+    Preemptable fibers are the fundamental unit of preemptive concurrency,
+    so [TLS] should be preferred in nearly all cases. *)
 module TLS : sig
 
     type 'a key : value mod portable contended
@@ -194,7 +195,7 @@ module TLS : sig
     [@@alert unsafe_multidomain "Use [Domain.Safe.TLS.set]."]
     (** Like {!DLS.set}, but sets the value for the current thread. *)
 
-    (** For use by the threading library. *)
+    (** For use by the threading library and [Effect]. *)
     module Private : sig @@ portable
         type keys
         val init : unit -> unit

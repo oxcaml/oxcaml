@@ -179,8 +179,13 @@ module Deep : sig
         the ability to receive "ticks" from the runtime, and can decide to
         preempt the current fiber on tick.
 
-        To set the tick interval, call [Domain.Tick.acquire] before running a
-        preemptible fiber. *)
+        To set the tick interval, call [Domain.Tick.with_] before running a
+        preemptible fiber.
+
+        A preemptible fiber owns its own TLS state (see {!Domain.TLS}): it
+        starts with fresh state, populated from the keys registered with
+        [split_from_parent]. [tickc] must not touch TLS, since it must be
+        signal-safe. *)
 
     type ('a,'b) handler =
         { retc: 'a -> 'b;
@@ -349,7 +354,10 @@ module Shallow : sig
         preempt the current fiber on tick.
 
         To set the tick interval, call [Domain.Tick.acquire] before running a
-        preemptible fiber. *)
+        preemptible fiber.
+
+        Like [Thread.create], creating a preemptable fiber splits the
+        active TLS state, and the child fiber gains is own TLS identity. *)
 
     type ('a,'b) continuation
     (** [('a,'b) continuation] is a delimited continuation of a preemptible

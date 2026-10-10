@@ -352,7 +352,8 @@ alloc_size_class_stack_noexc(mlsize_t wosize, int cache_bucket, value hval,
   stack->local_limit = 0;
   stack->dynamic = Val_null;
   stack->is_task = false;
-  stack->is_preemptible = preemptible;
+  /* Preemptible fibers own TLS state; see fiber.h. */
+  stack->tls_state = preemptible ? Atom(0) : Val_null;
 #ifdef DEBUG
   stack->magic = 42;
 #endif
@@ -697,6 +698,7 @@ void caml_scan_stack(
     f(fdata, Stack_handle_exception(stack), &Stack_handle_exception(stack));
     f(fdata, Stack_handle_effect(stack), &Stack_handle_effect(stack));
     f(fdata, Stack_handle_tick(stack), &Stack_handle_tick(stack));
+    f(fdata, stack->tls_state, &stack->tls_state);
 
     scan_local_allocations(f, fdata, locals, stack->local_sp);
 
@@ -844,6 +846,8 @@ void caml_scan_stack(
       f(fdata, Stack_handle_effect(stack), &Stack_handle_effect(stack));
     if (is_scannable(fflags, Stack_handle_tick(stack)))
       f(fdata, Stack_handle_tick(stack), &Stack_handle_tick(stack));
+    if (is_scannable(fflags, stack->tls_state))
+      f(fdata, stack->tls_state, &stack->tls_state);
 
     stack = Stack_parent(stack);
   }
@@ -857,6 +861,7 @@ CAMLexport void caml_do_local_roots (
   struct stack_info *current_stack,
   value * v_gc_regs,
   dynamic_cache_t dynamic_bindings,
+  value * tls_state,
   struct c_stack_link* c_stack)
 {
 #ifdef NATIVE_CODE
@@ -864,6 +869,8 @@ CAMLexport void caml_do_local_roots (
 #endif
 
   caml_dynamic_cache_scan_roots(dynamic_bindings, f, fflags, fdata);
+  if (tls_state != NULL) f(fdata, *tls_state, tls_state);
+
   for (struct caml__roots_block *lr = local_roots; lr != NULL; lr = lr->next) {
 #ifdef NATIVE_CODE
     /* c_stack marks the boundary between C stack segments. Distinct C stack
@@ -979,7 +986,7 @@ int caml_try_realloc_stack(asize_t required_space)
                                            Stack_handle_exception(old_stack),
                                            Stack_handle_effect(old_stack),
                                            Stack_handle_tick(old_stack),
-                                           old_stack->is_preemptible,
+                                           Stack_is_preemptible(old_stack),
                                            old_stack->id);
 
   if (!new_stack) return 0;
@@ -995,14 +1002,16 @@ int caml_try_realloc_stack(asize_t required_space)
   new_stack->local_limit = old_stack->local_limit;
   new_stack->dynamic = old_stack->dynamic;
   new_stack->is_task = old_stack->is_task;
+  new_stack->tls_state = old_stack->tls_state;
 
-  // Detach locals stack and dynamic bindings from old_stack
+  // Detach locals stack, dynamic bindings, and TLS state from old_stack
   old_stack->local_arenas = NULL;
   old_stack->local_sp = 0;
   old_stack->local_top = NULL;
   old_stack->local_limit = 0;
   old_stack->dynamic = Val_null;
   old_stack->is_task = false;
+  old_stack->tls_state = Val_null;
 
 #ifdef NATIVE_CODE
   /* There's no need to do another pass rewriting from
@@ -1072,9 +1081,10 @@ int caml_try_realloc_stack(asize_t required_space)
 struct stack_info* caml_alloc_main_stack (uintnat init_wsize)
 {
   const int64_t id = new_fiber_id();
-  struct stack_info* stk =
-    caml_alloc_stack_noexc(init_wsize, Val_unit, Val_unit, Val_unit, id);
-  return stk;
+  return alloc_size_class_stack_noexc(init_wsize,
+                                      stack_cache_bucket(init_wsize),
+                                      Val_unit, Val_unit, Val_unit,
+                                      /*htick=*/Val_null, true, id);
 }
 
 static void free_stack_memory(struct stack_info* stack)
@@ -1196,6 +1206,8 @@ void caml_free_stack (struct stack_info* stack)
   // Don't need to update local_sp since this is no longer the current stack.
   caml_free_local_arenas(stack->local_arenas);
 
+  stack->tls_state = Val_null;
+
   if (cache_bucket != -1) {
 #if defined(DEBUG) && defined(STACK_CHECKS_ENABLED)
     memset(Stack_base(stack), 0x42,
@@ -1220,6 +1232,21 @@ void caml_free_stack (struct stack_info* stack)
   } else {
     free_stack_memory(stack);
   }
+}
+
+struct stack_info* caml_tls_find_owner(struct stack_info* stack)
+{
+  while (stack->tls_state == Val_null) {
+    stack = Stack_parent(stack);
+    CAMLassert(stack != NULL);
+  }
+  return stack;
+}
+
+void caml_tls_update_cache(void)
+{
+  Caml_state->tls_state =
+    caml_tls_find_owner(Caml_state->current_stack)->tls_state;
 }
 
 void caml_free_gc_regs_buckets(value *gc_regs_buckets)
