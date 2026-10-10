@@ -835,7 +835,7 @@ module Problem = struct
         ( 'f,
           (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list )
         With_types.t;
-      final_typing_env : ('f, typing_env option) With_types.t;
+      final_typing_env : ('f, typing_env) With_types.t;
       module_symbol : ('f, Symbol.t) With_types.t
     }
 end

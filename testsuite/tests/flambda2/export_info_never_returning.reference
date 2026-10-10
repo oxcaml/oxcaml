@@ -1,0 +1,29 @@
+File export_info_never_returning.cmx
+Name: Export_info_never_returning
+CRC of implementation: 00000000000000000000000000000000
+Globals defined:
+	Export_info_never_returning
+Interfaces imported:
+	00000000000000000000000000000000	Stdlib
+	00000000000000000000000000000000	Export_info_never_returning
+	00000000000000000000000000000000	CamlinternalFormatBasics
+Implementations imported:
+	00000000000000000000000000000000	Stdlib
+Interfaces used in quotations:
+Implementations used in quotations:
+Flambda 2 export information:
+Original unit: Export_info_never_returning
+Typing env:
+((defined_symbols_without_equations
+  ([0m[38;5;98;1mExport_info_never_returning.camlExport_info_never_returning[0m))
+ (code_age_relation {}) (type_equations {}) ) Code: {}
+Offsets: {closures: {}
+          value_slots: {}}
+
+Currying functions:
+Apply functions:
+Send functions:
+Force link: no
+Static data: Export_info_never_returning//0[ ]
+Function summaries for static checks:
+		camlExport_info_never_returning__entry = 0x15

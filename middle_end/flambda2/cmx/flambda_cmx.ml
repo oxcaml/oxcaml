@@ -229,12 +229,9 @@ let prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
 
 let prepare_cmx_file_contents ~final_typing_env ~module_symbol ~used_value_slots
     ~exported_offsets ~sections all_code =
-  match final_typing_env with
-  | None ->
-    Name_occurrences.singleton_symbol module_symbol Name_mode.normal, None
-  | Some _ when Flambda_features.opaque () ->
-    Name_occurrences.singleton_symbol module_symbol Name_mode.normal, None
-  | Some final_typing_env ->
+  if Flambda_features.opaque ()
+  then Name_occurrences.singleton_symbol module_symbol Name_mode.normal, None
+  else
     let typing_env, canonicalise =
       TE.Pre_serializable.create final_typing_env ~used_value_slots
     in

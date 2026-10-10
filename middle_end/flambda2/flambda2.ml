@@ -183,7 +183,7 @@ let flambda_to_flambda0 : type m.
         in
         let flambda, all_code, slot_offsets, final_typing_env =
           run_reaper ~ppf ~prefixname ~machine_width ~cmx_loader ~all_code
-            ~final_typing_env:(Some final_typing_env) ~free_names raw_flambda
+            ~final_typing_env ~free_names raw_flambda
         in
         let prepare_cmx ~module_symbol ~used_value_slots ~exported_offsets
             all_code =
@@ -253,8 +253,7 @@ let flambda_to_flambda0 : type m.
     build_run_result flambda ~all_code slot_offsets ~prepare_cmx
   in
   (match cmx with
-  | None ->
-    () (* Either opaque was passed, or there is no need to export offsets *)
+  | None -> () (* Opaque compilation *)
   | Some cmx -> Compilenv.set_export_info cmx);
   { flambda; offsets = exported_offsets; reachable_names; all_code }
 

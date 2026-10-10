@@ -2349,7 +2349,7 @@ type 'f result =
   { unit : Flambda_unit.t;
     exported_code : Exported_code.t;
     slot_offsets : Slot_offsets.result;
-    final_typing_env : ('f, typing_env option) Traverse.With_types.t
+    final_typing_env : ('f, typing_env) Traverse.With_types.t
   }
 
 let rebuild (type f) ~machine_width ~cmx_loader ~all_code ~unit ~skeleton
