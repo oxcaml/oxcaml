@@ -36,6 +36,11 @@ caml_bigstring_blit_string_to_ba
 caml_bigstring_memcmp
 caml_hash_mix_bigstring
 
+From +float32.js:
+jsoo_float32_of_boxed
+jsoo_float32_of_float
+jsoo_float32_to_float
+
 From +fs.js:
 caml_ba_map_file
 caml_ba_map_file_bytecode

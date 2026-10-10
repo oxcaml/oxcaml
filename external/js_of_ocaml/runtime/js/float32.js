@@ -524,3 +524,24 @@ function caml_bytes_setf32(ba, i, v) {
 function caml_bytes_setf32u(ba, i, v) {
   return caml_bytes_set32u(ba, i, caml_float32_to_bits_bytecode(v));
 }
+
+// Primitives used by the js_of_ocaml compiler,
+// which represents 32-bit floats as 32-bit integer bit patterns.
+
+//Provides: jsoo_float32_of_float const
+//Requires: caml_int32_bits_of_float
+function jsoo_float32_of_float(x) {
+  return caml_int32_bits_of_float(x);
+}
+
+//Provides: jsoo_float32_to_float const
+//Requires: caml_int32_float_of_bits
+function jsoo_float32_to_float(x) {
+  return caml_int32_float_of_bits(x);
+}
+
+//Provides: jsoo_float32_of_boxed const
+//Requires: caml_int32_bits_of_float
+function jsoo_float32_of_boxed(x) {
+  return caml_int32_bits_of_float(x);
+}

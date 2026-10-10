@@ -38,6 +38,10 @@
       (func $caml_bytes_set32 (param (ref eq)) (param i32) (param i32) (result (ref eq))))
    (import "string" "caml_bytes_set32u"
       (func $caml_bytes_set32u (param (ref eq)) (param i32) (param i32) (result (ref eq))))
+   (import "int32" "caml_copy_int32"
+      (func $caml_copy_int32 (param i32) (result (ref eq))))
+   (import "int32" "Int32_val"
+      (func $Int32_val (param (ref eq)) (result i32)))
 
    (type $float (struct (field $f f64)))
 
@@ -332,4 +336,20 @@
       (param $a (ref eq)) (param $i i32) (param $v f32) (result (ref eq))
       (call $caml_bytes_set32u (local.get $a) (local.get $i)
          (i32.reinterpret_f32 (local.get $v))))
+
+   ;; Primitives used by the js_of_ocaml compiler
+   ;; which represents 32-bit floats as 32-bit
+   ;; integer bit patterns.
+
+   (func (export "jsoo_float32_of_float") (param $d (ref eq)) (result (ref eq))
+      (call $caml_copy_int32
+         (i32.reinterpret_f32 (f32.demote_f64 (call $unbox_float (local.get $d))))))
+
+   (func (export "jsoo_float32_to_float") (param $i (ref eq)) (result (ref eq))
+      (call $box_float
+         (f64.promote_f32 (f32.reinterpret_i32 (call $Int32_val (local.get $i))))))
+
+   (func (export "jsoo_float32_of_boxed") (param $v (ref eq)) (result (ref eq))
+      (call $caml_copy_int32
+         (i32.reinterpret_f32 (call $unbox_float32 (local.get $v)))))
 )
