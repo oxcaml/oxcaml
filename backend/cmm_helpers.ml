@@ -3638,7 +3638,7 @@ let split_arity_for_apply arity args =
     let args1, args2 = Misc.Stdlib.List.split_at max_arity args in
     (a1, args1), Some (a2, args2)
 
-let call_caml_apply extended_ty extended_args_type mut clos args pos mode dbg =
+let call_caml_apply ~callees extended_ty extended_args_type mut clos args pos mode dbg =
   (* Treat tagged int arguments and results as [typ_val], to avoid generating
      excessive numbers of caml_apply functions. *)
   let ty = Extended_machtype.to_machtype extended_ty in
@@ -3662,7 +3662,7 @@ let call_caml_apply extended_ty extended_args_type mut clos args pos mode dbg =
     bind_list "arg" args (fun args ->
         bind "fun" clos (fun clos ->
             Cifthenelse
-              ( Cop
+              ( Cop (* CR wsturgeon: propagate `callers` to the branch below *)
                   ( Ccmpi Ceq,
                     [ Cop
                         ( Casr,
@@ -3673,7 +3673,7 @@ let call_caml_apply extended_ty extended_args_type mut clos args pos mode dbg =
                     dbg ),
                 dbg,
                 Cop
-                  ( Capply { result_type = ty; region = pos; callees = None },
+                  ( Capply { result_type = ty; region = pos; callees },
                     (get_field_codepointer mut clos 2 dbg :: args) @ [clos],
                     dbg ),
                 dbg,
@@ -3697,7 +3697,7 @@ let maybe_reset_current_region ~dbg ~body_tail ~body_nontail old_region =
            Csequence (Cop (Cendregion, [old_region], dbg ()), Cvar res) )),
       dbg () )
 
-let apply_or_call_caml_apply result arity mut clos args pos mode dbg =
+let apply_or_call_caml_apply ~callees result arity mut clos args pos mode dbg =
   match arity with
   | [_] ->
     bind "fun" clos (fun clos ->
@@ -3705,33 +3705,35 @@ let apply_or_call_caml_apply result arity mut clos args pos mode dbg =
           ( Capply
               { result_type = Extended_machtype.to_machtype result;
                 region = pos;
-                callees = None
+                callees
               },
             (get_field_codepointer mut clos 0 dbg :: args) @ [clos],
             dbg ))
-  | _ -> call_caml_apply result arity mut clos args pos mode dbg
+  | _ -> call_caml_apply ~callees result arity mut clos args pos mode dbg
 
-let rec might_split_call_caml_apply ?old_region result arity mut clos args pos
-    mode dbg =
+let rec might_split_call_caml_apply ?old_region ~callees result arity
+    mut clos args pos mode dbg =
   match split_arity_for_apply arity args with
   | (arity, args), None -> (
     match old_region with
-    | None -> apply_or_call_caml_apply result arity mut clos args pos mode dbg
+    | None ->
+      apply_or_call_caml_apply ~callees result arity mut clos args pos mode dbg
     | Some old_region ->
       maybe_reset_current_region ~dbg:placeholder_dbg
         ~body_tail:
-          (apply_or_call_caml_apply result arity mut clos args pos mode dbg)
+          (apply_or_call_caml_apply ~callees result arity mut clos args pos mode
+             dbg)
         ~body_nontail:
-          (apply_or_call_caml_apply result arity mut clos args Rc_normal
-             Cmx_format.Maybe_alloc_stack dbg)
+          (apply_or_call_caml_apply ~callees result arity mut clos args
+             Rc_normal Cmx_format.Maybe_alloc_stack dbg)
         old_region)
   | (arity, args), Some (arity', args') -> (
     let body old_region =
       bind "result"
-        (call_caml_apply [| Val |] arity mut clos args Rc_normal
+        (call_caml_apply ~callees [| Val |] arity mut clos args Rc_normal
            Cmx_format.Maybe_alloc_stack dbg) (fun clos ->
-          might_split_call_caml_apply ?old_region result arity' mut clos args'
-            pos mode dbg)
+          might_split_call_caml_apply ~callees ?old_region result arity' mut
+            clos args' pos mode dbg)
     in
     (* When splitting [caml_applyM] into [caml_applyN] and [caml_applyK] it is
        possible for [caml_applyN] to allocate on the local stack. If we are not
@@ -3751,7 +3753,8 @@ let rec might_split_call_caml_apply ?old_region result arity mut clos args pos
     | _ -> body old_region)
 
 let generic_apply mut clos args args_type result (pos, mode) dbg =
-  might_split_call_caml_apply result args_type mut clos args pos mode dbg
+  might_split_call_caml_apply ~callees:None result args_type mut clos args pos
+    mode dbg
 
 let send kind met obj args args_type result akind dbg =
   let call_met obj args args_type clos =
@@ -5269,8 +5272,8 @@ let direct_call ~dbg ty pos f_code_sym args =
       Cconst_symbol (f_code_sym, dbg) :: args,
       dbg )
 
-let indirect_call ~dbg ty pos alloc_mode f args_type args =
-  might_split_call_caml_apply ty args_type Asttypes.Mutable f args pos
+let indirect_call ~dbg ~callees ty pos alloc_mode f args_type args =
+  might_split_call_caml_apply ~callees ty args_type Asttypes.Mutable f args pos
     alloc_mode dbg
 
 let indirect_full_call ~dbg ty pos f ~callees args_type args =

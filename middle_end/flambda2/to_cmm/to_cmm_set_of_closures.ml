@@ -468,6 +468,16 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
     ~zero_alloc_attribute ~return_continuation ~exn_continuation params ~body
     ~my_closure ~(is_my_closure_used : _ Or_unknown.t) ~my_alloc_mode
     ~(translate_expr : translate_expr) =
+  (* Init the env and create a jump id for the return continuation in case a
+     trap action is attached to one of its calls *)
+  let return_continuation_arity =
+    List.map To_cmm_shared.machtype_of_kind
+      (Flambda_arity.unarized_components result_arity)
+  in
+  let env =
+    Env.enter_function_body env ~params ~return_continuation
+      ~return_continuation_arity ~exn_continuation
+  in
   let params =
     let is_my_closure_used =
       match is_my_closure_used with
@@ -484,16 +494,6 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
       in
       Bound_parameters.append params
         (Bound_parameters.create [my_closure_param])
-  in
-  (* Init the env and create a jump id for the return continuation in case a
-     trap action is attached to one of its calls *)
-  let return_continuation_arity =
-    List.map To_cmm_shared.machtype_of_kind
-      (Flambda_arity.unarized_components result_arity)
-  in
-  let env =
-    Env.enter_function_body env ~return_continuation ~return_continuation_arity
-      ~exn_continuation
   in
   (* [my_region] can be referenced in [Begin_region] primitives so must be in
      the environment; however it should never end up in actual generated code,

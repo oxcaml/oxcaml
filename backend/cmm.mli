@@ -219,8 +219,9 @@ type symbol =
 
 val equal_symbol : symbol -> symbol -> bool
 
-type callee = Symbol of symbol
-(* | Argument of int *)
+type callee =
+  | Symbol of symbol
+  | Argument of int
 
 type phantom_defining_expr =
   (* CR-soon mshinwell: Convert this to [Targetint.OCaml.t] (or whatever the

@@ -1091,6 +1091,7 @@ val direct_call :
 (** Same as {!direct_call} but for an indirect call. *)
 val indirect_call :
   dbg:Debuginfo.t ->
+  callees:callee list option ->
   Extended_machtype.t ->
   Lambda.region_close ->
   Cmx_format.return_mode ->

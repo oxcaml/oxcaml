@@ -812,6 +812,8 @@ let equal_func_call_operation left right =
     let equal_callee left right =
       match left, right with
       | Cmm.Symbol left, Cmm.Symbol right -> Cmm.equal_symbol left right
+      | Cmm.Argument left, Cmm.Argument right -> Int.equal left right
+      | Cmm.Symbol _, Cmm.Argument _ | Cmm.Argument _, Cmm.Symbol _ -> false
     in
     Option.equal (List.equal equal_callee) left_callees right_callees
   | Direct left_sym, Direct right_sym -> Cmm.equal_symbol left_sym right_sym

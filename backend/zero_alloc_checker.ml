@@ -38,8 +38,8 @@ module Witness = struct
         { bytes : int;
           dbginfo : Cmm.alloc_dbginfo
         }
-    | Indirect_call of { callee : string option }
-    | Indirect_tailcall of { callee : string option }
+    | Indirect_call of { callee : Cmm.callee option }
+    | Indirect_tailcall of { callee : Cmm.callee option }
     | Direct_call of { callee : string }
     | Direct_tailcall of { callee : string }
     | Extcall of { callee : string }
@@ -95,10 +95,14 @@ module Witness = struct
     | Alloc { bytes; dbginfo = _ } -> fprintf ppf "allocation of %d bytes" bytes
     | Indirect_call { callee = None } -> fprintf ppf "indirect call"
     | Indirect_tailcall { callee = None } -> fprintf ppf "indirect tailcall"
-    | Indirect_call { callee = Some callee } ->
-      fprintf ppf "indirect call (possibly calling %s)" callee
-    | Indirect_tailcall { callee = Some callee } ->
-      fprintf ppf "indirect tailcall (possibly calling %s)" callee
+    | Indirect_call { callee = Some (Cmm.Symbol { sym_name; _ }) } ->
+      fprintf ppf "indirect call (possibly calling %s)" sym_name
+    | Indirect_tailcall { callee = Some (Cmm.Symbol { sym_name; _ }) } ->
+      fprintf ppf "indirect tailcall (possibly calling %s)" sym_name
+    | Indirect_call { callee = Some (Cmm.Argument index) } ->
+      fprintf ppf "indirect call through argument #%d" (index + 1)
+    | Indirect_tailcall { callee = Some (Cmm.Argument index) } ->
+      fprintf ppf "indirect tailcall through argument #%d" (index + 1)
     | Direct_call { callee } -> fprintf ppf "direct call %s" callee
     | Direct_tailcall { callee : string } ->
       fprintf ppf "direct tailcall %s" callee
@@ -2598,19 +2602,22 @@ end = struct
         let effect_ =
           List.fold_left
             (fun all_effects callee ->
-              match callee with
-              | Cmm.Symbol { sym_name = callee; _ } ->
-                let k = wkind callee in
-                let v = find_callee t callee ~desc dbg k in
-                let w = create_witnesses t k dbg in
-                let effect_ =
-                  match Metadata.assume_value dbg ~can_raise:true w with
-                  | Some v' ->
-                    assert (Value.is_resolved v');
-                    if Value.is_resolved v then Value.meet v v' else v'
-                  | None -> v
-                in
-                Value.join effect_ all_effects)
+              let k = wkind callee in
+              let w = create_witnesses t k dbg in
+              let v =
+                match callee with
+                | Cmm.Symbol { sym_name; _ } ->
+                  find_callee t sym_name ~desc dbg k
+                | Cmm.Argument _ -> Value.top w
+              in
+              let effect_ =
+                match Metadata.assume_value dbg ~can_raise:true w with
+                | Some v' ->
+                  assert (Value.is_resolved v');
+                  if Value.is_resolved v then Value.meet v v' else v'
+                | None -> v
+              in
+              Value.join effect_ all_effects)
             Value.bot callees
         in
         transform t ~next ~exn ~effect_ desc dbg

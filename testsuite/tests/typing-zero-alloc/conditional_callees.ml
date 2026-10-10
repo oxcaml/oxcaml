@@ -25,9 +25,9 @@ end = struct
           | _ -> ()))
 
   let take () =
-    let reversed = !calls in
+    let result = List.rev !calls in
     calls := [];
-    reversed
+    result
 end
 [%%expect{|
 module Callees : sig val take : unit -> Cmm.callee list option list end
@@ -77,7 +77,7 @@ let[@inline never] shadowed_argument f g x =
 Callees.take ();;
 [%%expect{|
 val shadowed_argument : ('a -> 'b) -> ('b -> 'c) -> 'a -> 'c = <fun>
-- : Cmm.callee list option list = [Some [Argument 1]; Some [Argument 0]]
+- : Cmm.callee list option list = [Some [Argument 0]; Some [Argument 1]]
 |}]
 
 let[@inline never] selected_argument f g b x =
@@ -94,7 +94,7 @@ let[@inline never] callback_result make x =
 Callees.take ();;
 [%%expect{|
 val callback_result : ('a -> 'a -> 'b) -> 'a -> 'b = <fun>
-- : Cmm.callee list option list = [None; Some [Argument 0]]
+- : Cmm.callee list option list = [Some [Argument 0]; None]
 |}]
 
 let[@inline never] callback_in_ref cell x = !cell x;;
@@ -150,4 +150,11 @@ Callees.take ();;
 [%%expect{|
 val inlined_non_argument : ('a -> 'b) ref -> 'a -> 'b = <fun>
 - : Cmm.callee list option list = [None]
+|}]
+
+let[@inline never] tupled_argument (x, f) = f x;;
+Callees.take ();;
+[%%expect{|
+val tupled_argument : 'a * ('a -> 'b) -> 'b = <fun>
+- : Cmm.callee list option list = [Some [Argument 1]]
 |}]

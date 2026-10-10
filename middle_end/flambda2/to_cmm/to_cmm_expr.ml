@@ -229,6 +229,13 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
 
 let translate_apply0 ~dbg_with_inlined:dbg env res apply =
   let callee_simple = Apply.callee apply in
+  let argument_callees =
+    match callee_simple with
+    | None -> None
+    | Some callee ->
+      Env.function_parameter_index env callee
+      |> Option.map (fun index -> [Cmm.Argument index])
+  in
   let args = Apply.args apply in
   (* CR mshinwell: When we fix the problem that [prim_effects] and
      [prim_coeffects] are ignored for C calls, we need to take into account the
@@ -335,7 +342,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
           "Application expression did not provide callee for indirect call:@ %a"
           Apply.print apply
     in
-    ( C.indirect_call ~dbg return_ty pos
+    ( C.indirect_call ~dbg ~callees:argument_callees return_ty pos
         (C.alloc_mode_for_applications_to_cmx (Apply_expr.return_mode apply))
         callee args_ty (split_args ()),
       free_vars,
@@ -354,7 +361,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     in
     let callees =
       match callees with
-      | Unknown -> None
+      | Unknown -> argument_callees
       | Known code_id_set ->
         Some
           (List.map
