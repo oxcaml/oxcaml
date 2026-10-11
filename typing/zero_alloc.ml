@@ -5,6 +5,7 @@ type check = Builtin_attributes.zero_alloc_check =
   { strict : bool;
     opt : bool;
     arity : int;
+    partial : bool;
     loc : Location.t;
     custom_error_msg : string option
   }
@@ -14,6 +15,7 @@ type assume = Builtin_attributes.zero_alloc_assume =
     never_returns_normally : bool;
     never_raises : bool;
     arity : int;
+    partial : bool;
     loc : Location.t
   }
 
@@ -26,7 +28,8 @@ type const = Builtin_attributes.zero_alloc_attribute =
 type desc =
   { strict : bool;
     opt : bool;
-    custom_error_msg : string option
+    custom_error_msg : string option;
+    partial : bool
   }
 
 type var =
@@ -61,9 +64,10 @@ let debug_printer ppf t =
     let print_desc ppf desc =
       match desc with
       | None -> Format.fprintf ppf "None"
-      | Some { strict; opt; custom_error_msg } ->
-        Format.fprintf ppf "{ strict = %b; opt = %b; custom_error_message = %a}"
-          strict opt pp_custom custom_error_msg
+      | Some { strict; opt; custom_error_msg; partial } ->
+        Format.fprintf ppf
+          "{ strict = %b; opt = %b; custom_error_message = %a; partial = %b}"
+          strict opt pp_custom custom_error_msg partial
     in
     Format.fprintf ppf "Var { arity = %d; desc = %a }" v.arity print_desc v.desc
 
@@ -90,12 +94,13 @@ let get (t : t) =
   | Var { loc; arity; desc } -> (
     match desc with
     | None -> Default_zero_alloc
-    | Some { strict; opt; custom_error_msg } ->
-      Check { loc; arity; strict; opt; custom_error_msg })
+    | Some { strict; opt; custom_error_msg; partial } ->
+      Check { loc; arity; partial; strict; opt; custom_error_msg })
 
 type error =
   | Less_general of { missing_entirely : bool }
   | Arity_mismatch of int * int
+  | Missing_partial
 
 exception Error of error
 
@@ -112,6 +117,22 @@ let print_error ppf error =
        the syntactic arity of@ the implementation must match the function type \
        in the interface.@ Here the former is %d and the latter is %d."
       n1 n2
+  | Missing_partial ->
+    pr
+      "zero_alloc partial mismatch:@ The latter requires \"partial\" but the \
+       former does not provide it."
+
+let applicable_arity ~arity ~partial ~num_args =
+  if partial then num_args <= arity else num_args = arity
+
+let check_arity_exn ~actual:(actual_arity, actual_partial)
+    ~required:(required_arity, required_partial) =
+  if required_partial && not actual_partial then raise (Error Missing_partial);
+  if
+    not
+      (applicable_arity ~arity:actual_arity ~partial:actual_partial
+         ~num_args:required_arity)
+  then raise (Error (Arity_mismatch (actual_arity, required_arity)))
 
 let sub_const_const_exn za1 za2 =
   (* The core of the check here is that we translate both attributes into the
@@ -164,14 +185,12 @@ let sub_const_const_exn za1 za2 =
   end;
   (* arity check *)
   let get_arity = function
-    | Check { arity; _ } | Assume { arity; _ } -> Some arity
+    | Check { arity; partial; _ } | Assume { arity; partial; _ } ->
+      Some (arity, partial)
     | Default_zero_alloc | Ignore_assert_all -> None
   in
   match get_arity za1, get_arity za2 with
-  | Some arity1, Some arity2 ->
-    (* Check *)
-    if not (arity1 = arity2)
-    then raise (Error (Arity_mismatch (arity1, arity2)))
+  | Some actual, Some required -> check_arity_exn ~actual ~required
   | Some _, None -> () (* Forgetting zero_alloc info is fine *)
   | None, Some _ ->
     (* Fabricating it is not, but earlier cases should have ruled this out *)
@@ -181,20 +200,34 @@ let sub_const_const_exn za1 za2 =
 let sub_var_const_exn v c =
   (* This can only fail due to an arity mismatch. We have a linear order and can
      always constrain the var lower to make the sub succeed. *)
+  begin match c with
+  | Check { arity; partial; _ } ->
+    check_arity_exn ~actual:(v.arity, partial) ~required:(arity, partial)
+  | Default_zero_alloc | Ignore_assert_all | Assume _ -> ()
+  end;
   match v, c with
   | _, (Default_zero_alloc | Ignore_assert_all | Assume _) -> assert false
-  | { arity = arity1; _ }, Check { arity = arity2; _ } when arity1 <> arity2 ->
-    raise (Error (Arity_mismatch (arity1, arity2)))
-  | { desc = None; _ }, Check { strict; opt; custom_error_msg } ->
+  | { desc = None; _ }, Check { strict; opt; custom_error_msg; partial } ->
     !log_change (None, v);
-    v.desc <- Some { strict; opt; custom_error_msg }
+    v.desc <- Some { strict; opt; custom_error_msg; partial }
   | ( { desc =
-          Some { strict = strict1; opt = opt1; custom_error_msg = msg1 } as desc;
+          Some
+            { strict = strict1;
+              opt = opt1;
+              custom_error_msg = msg1;
+              partial = partial1
+            } as desc;
         _
       },
-      Check { strict = strict2; opt = opt2; custom_error_msg = msg2 } ) ->
+      Check
+        { strict = strict2;
+          opt = opt2;
+          custom_error_msg = msg2;
+          partial = partial2
+        } ) ->
     let strict = strict1 || strict2 in
     let opt = opt1 && opt2 in
+    let partial = partial1 || partial2 in
     let custom_error_msg, msg_changed =
       match msg1, msg2 with
       | None, None -> msg1, false
@@ -205,10 +238,10 @@ let sub_var_const_exn v c =
         let msg = if b then msg1 else Some (String.concat "\n" [m1; m2]) in
         msg, not b
     in
-    if strict <> strict1 || opt <> opt1 || msg_changed
+    if strict <> strict1 || opt <> opt1 || partial <> partial1 || msg_changed
     then begin
       !log_change (desc, v);
-      v.desc <- Some { strict; opt; custom_error_msg }
+      v.desc <- Some { strict; opt; custom_error_msg; partial }
     end
 
 let sub_exn za1 za2 =

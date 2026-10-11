@@ -1,0 +1,4 @@
+File "test_partial_external_heap.ml", line 3, characters 31-41:
+Error: Annotation check for zero_alloc failed on function Test_partial_external_heap.External.(partial) (camlTest_partial_external_heap__fn[test_partial_external_heap.ml:5,2--75]_HIDE_STAMP).
+       Partial applications of this function may allocate a closure on the heap.
+       Hint: try marking the partial function local, as in 'a -> ('b -> ... -> 'z) @ local.

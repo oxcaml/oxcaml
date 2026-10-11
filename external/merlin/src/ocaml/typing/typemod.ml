@@ -4005,11 +4005,11 @@ and type_structure ?(toplevel = None) ?(keep_warnings = false) ~funct_body
                 let open Builtin_attributes in
                 match[@warning "+9"] Zero_alloc.get zero_alloc with
                 | Default_zero_alloc | Check _ -> zero_alloc
-                | Assume { strict; arity; loc;
+                | Assume { strict; arity; partial; loc;
                            never_returns_normally = _;
                            never_raises = _} ->
                   Zero_alloc.create_const
-                    (Check { strict; arity; loc; opt = false;
+                    (Check { strict; arity; partial; loc; opt = false;
                              custom_error_msg = None; })
                 | Ignore_assert_all -> Zero_alloc.default
               in
