@@ -1891,6 +1891,8 @@ end = struct
       construct_comonadic_morphs pair1.comonadic pair0.comonadic
     in
     if List.is_empty mon_morphs
+       && not (descr_compare_dec With_locality.obj_comonadic
+                 pair0.comonadic pair1.comonadic)
        && not (check_closing_over_candidate pair0 pair1)
     then
       List.map (fun com_morph ->
