@@ -700,6 +700,8 @@ let ocaml_ignored_flags =
     "-no-use-ssa";
     "-ssa-simplify";
     "-no-ssa-simplify";
+    "-ssa-sink";
+    "-no-ssa-sink";
     "-ssa-validate";
     "-no-ssa-validate";
     "-dssa";

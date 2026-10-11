@@ -152,6 +152,8 @@ let use_ssa = ref false                      (* -use-ssa *)
 
 let ssa_simplify = ref true                 (* -ssa-simplify *)
 
+let ssa_sink = ref true                     (* -ssa-sink *)
+
 let ssa_validate = ref true                 (* -ssa-validate *)
 
 type function_result_types = Never | Functors_only | All_functions

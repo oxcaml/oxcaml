@@ -730,6 +730,7 @@
   ssa_post_dominators
   ssa_reducer
   ssa_simplify
+  ssa_sink
   ssa_tail_call
   ssa_of_cmm
   cfg_of_ssa

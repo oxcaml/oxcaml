@@ -274,24 +274,21 @@ let unnecessary_moves (a : int) (b : int) (c : int) (d : int) f =
 unnecessary_moves:
   movq  %rbx, %rcx
   movq  %rdx, %rbx
-  leaq  -1(%rax,%rcx), %rdx
   cmpq  %rcx, %rax
-  jge   .L0
-  ret
-.L0:
+  jl    .L1
+  leaq  -1(%rax,%rcx), %rax
   cmpq  %rsi, %rdi
-  jge   .L2
+  jge   .L1
   subq  $8, %rsp
-  movq  %rdx, (%rsp)
+  movq  %rax, (%rsp)
   movq  (%rbx), %rdi
   movq  %rcx, %rax
   call  *%rdi
-.L1:
+.L0:
   movq  (%rsp), %rax
   addq  $8, %rsp
   ret
-.L2:
-  movq  %rdx, %rax
+.L1:
   ret
 |}]
 
