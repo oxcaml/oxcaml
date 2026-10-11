@@ -102,10 +102,13 @@ val sub_or_error :
   (unit, Jkind.Violation.t) result
 
 (** Requirements on the type variables of [ty], whose kind is [sub], that
-    together establish [sub <= super]. *)
+    together establish [sub <= super]. Requirements already satisfied by the
+    variables' kinds are omitted. Unless [allow_mutation], the variables may not
+    be refined, so any remaining requirement is an error. *)
 val type_var_requirements :
   type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
   context:Jkind.jkind_context ->
+  allow_mutation:bool ->
   Env.t ->
   Types.type_expr ->
   (Allowance.allowed * 'r1) Types.jkind ->

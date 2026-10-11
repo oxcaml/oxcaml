@@ -586,12 +586,14 @@ Error: This value is "aliased" but is expected to be "unique".
 (***********************************************************************)
 type ('a : immutable_data) t = Flat | Nested of 'a t t
 (* CR layouts v2.8: fix this. Internal ticket 6480 *)
-(* This fails due to the ('a : immutable_data) constraint *)
+(* This fails in principal mode due to the ('a : immutable_data) constraint *)
 [%%expect {|
-Line 1, characters 0-54:
+type ('a : immutable_data) t = Flat | Nested of 'a t t
+|}, Principal{|
+Line 1, characters 48-54:
 1 | type ('a : immutable_data) t = Flat | Nested of 'a t t
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Layout mismatch in checking consistency of mutually recursive groups.
+                                                    ^^^^^^
+Error: Layout mismatch in final type declaration consistency check.
        This is most often caused by the fact that type inference is not
        clever enough to propagate layouts through variables in different
        declarations. It is also not clever enough to produce a good error
@@ -924,6 +926,24 @@ val masked_function : (int -> int, int) masked -> unit = <fun>
 Line 1, characters 53-68:
 1 | let masked_function (x : (int -> int, int) masked) = portable_record x
                                                          ^^^^^^^^^^^^^^^
+Error: Unbound value "portable_record"
+|}]
+
+let masked_plain (x : (int, int -> int) masked) = portable_record x
+[%%expect{|
+Line 1, characters 66-67:
+1 | let masked_plain (x : (int, int -> int) masked) = portable_record x
+                                                                      ^
+Error: The value "x" has type "(int, int -> int) masked"
+       but an expression was expected of type "(int, 'a) masked"
+       The kind of int -> int is value non_float mod aliased immutable
+         because it's a function type.
+       But the kind of int -> int must be a subkind of value mod portable
+         because of the definition of portable_record at line 1, characters 20-65.
+|}, Principal{|
+Line 1, characters 50-65:
+1 | let masked_plain (x : (int, int -> int) masked) = portable_record x
+                                                      ^^^^^^^^^^^^^^^
 Error: Unbound value "portable_record"
 |}]
 
@@ -1319,6 +1339,31 @@ Error: The value "x" has type "'a poly_unboxed"
        But the kind of 'a poly_unboxed must be a subkind of
            value mod portable
          because of the definition of id_portable at line 1, characters 4-15.
+|}]
+
+type 'a unboxed = { v : 'a } [@@unboxed]
+type 'a unboxed_list : immutable_data = 'a unboxed list
+let portable_unboxed x = require_portability [{ v = x }]
+[%%expect{|
+type 'a unboxed = { v : 'a; } [@@unboxed]
+type ('a : value mod forkable unyielding many stateless immutable)
+     unboxed_list =
+    'a unboxed list
+val portable_unboxed : ('a : value mod portable). 'a -> unit = <fun>
+|}, Principal{|
+type 'a unboxed = { v : 'a; } [@@unboxed]
+type ('a : value mod forkable unyielding many stateless immutable)
+     unboxed_list =
+    'a unboxed list
+Line 3, characters 45-56:
+3 | let portable_unboxed x = require_portability [{ v = x }]
+                                                 ^^^^^^^^^^^
+Error: This constructor has type "'a list"
+       but an expression was expected of type "('b : value mod portable)"
+       The kind of 'a list is immutable_data with 'a
+         because it's a boxed variant type.
+       But the kind of 'a list must be a subkind of value mod portable
+         because of the definition of require_portability at line 1, characters 4-23.
 |}]
 
 (* Declaration parameters are not refined after their uses are checked. *)

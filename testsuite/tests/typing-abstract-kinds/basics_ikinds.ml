@@ -1475,6 +1475,13 @@ Error: This type "(int -> int) with_k1" should be an instance of type "('a : k1)
          because of the definition of require_k1 at line 5, characters 0-25.
 |}]
 
+type ('a : k1) t : immutable_data with 'a
+type ('a : k1) u : immutable_data = 'a t
+[%%expect{|
+type ('a : k1) t : immutable_data with 'a
+type ('a : k1 mod forkable unyielding many stateless immutable) u = 'a t
+|}]
+
 (***************************************)
 (* Test: Lack of short paths for kinds *)
 

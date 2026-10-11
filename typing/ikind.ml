@@ -1929,7 +1929,7 @@ let sub_or_error ?origin:_origin
       (* Delegate to Jkind for detailed error reporting. *)
       Jkind.sub_or_error ~type_equal ~context env t1 t2
 
-let type_var_requirements ~type_equal ~context env ty
+let type_var_requirements ~type_equal ~context ~allow_mutation env ty
     (sub : (Allowance.allowed * 'r1) Types.jkind)
     (super : ('l2 * Allowance.allowed) Types.jkind) =
   let check () =
@@ -1955,14 +1955,18 @@ let type_var_requirements ~type_equal ~context env ty
       let base, coeffs =
         Ldd.decompose_into_linear_terms ~universe:rigid_vars sub_poly
       in
-      match Ldd.leq_with_reason base super_poly with
-      | [] ->
-        Ok
-          (List.map2
-             (fun ty coeff ->
-               let bound = Ldd.round_down (Ldd.imply coeff super_poly) in
-               ty, Jkind.Mod_bounds.of_axis_lattice bound)
-             tvars coeffs)
+      let requirements =
+        List.filter_map
+          (fun (ty, coeff) ->
+            let bound = Ldd.round_down (Ldd.imply coeff super_poly) in
+            if Axis_lattice.equal bound Axis_lattice.top
+            then None
+            else Some (ty, Jkind.Mod_bounds.of_axis_lattice bound))
+          (List.combine tvars coeffs)
+      in
+      match Ldd.leq_with_reason base super_poly, requirements with
+      | [], [] -> Ok []
+      | [], _ :: _ when allow_mutation -> Ok requirements
       | _ ->
         (* The estimate may retain information hidden by principality checks
            in [Solver.kind]. Use it for reporting errors. *)

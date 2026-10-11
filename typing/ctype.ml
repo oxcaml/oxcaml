@@ -3667,12 +3667,8 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
               error ()
           in
           let requirements =
-            if not allow_mutation then
-              Error (Jkind.Violation.of_ ~context env
-                (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
-            else
-              Ikind.type_var_requirements ~type_equal ~context env ty
-                ty's_jkind jkind
+            Ikind.type_var_requirements ~type_equal ~context ~allow_mutation
+              env ty ty's_jkind jkind
           in
           match requirements, get_desc ty with
           | Ok requirements, _ ->

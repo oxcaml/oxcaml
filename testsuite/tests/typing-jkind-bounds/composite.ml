@@ -982,6 +982,14 @@ Line 1, characters 53-68:
 Error: Unbound value "portable_record"
 |}]
 
+let masked_plain (x : (int, int -> int) masked) = portable_record x
+[%%expect{|
+Line 1, characters 50-65:
+1 | let masked_plain (x : (int, int -> int) masked) = portable_record x
+                                                      ^^^^^^^^^^^^^^^
+Error: Unbound value "portable_record"
+|}]
+
 type 'a shared = { ignored : 'a @@ portable; required : 'a }
 let portable_shared (x : 'a shared) = require_portability x
 [%%expect{|
@@ -1294,6 +1302,21 @@ Error: The value "x" has type "'a poly_unboxed"
        But the kind of 'a poly_unboxed must be a subkind of
            value mod portable
          because of the definition of id_portable at line 1, characters 4-15.
+|}]
+
+type 'a unboxed = { v : 'a } [@@unboxed]
+type 'a unboxed_list : immutable_data = 'a unboxed list
+let portable_unboxed x = require_portability [{ v = x }]
+[%%expect{|
+type 'a unboxed = { v : 'a; } [@@unboxed]
+Line 2, characters 0-55:
+2 | type 'a unboxed_list : immutable_data = 'a unboxed list
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "'a unboxed list" is immutable_data with 'a unboxed
+         because it's a boxed variant type.
+       But the kind of type "'a unboxed list" must be a subkind of
+           immutable_data
+         because of the definition of unboxed_list at line 2, characters 0-55.
 |}]
 
 (* Declaration parameters are not refined after their uses are checked. *)
