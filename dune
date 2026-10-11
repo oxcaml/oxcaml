@@ -726,6 +726,7 @@
   ;; backend/ssa/
   ssa
   ssa_print
+  ssa_post_dominators
   ssa_reducer
   ssa_simplify
   ssa_tail_call
