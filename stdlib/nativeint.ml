@@ -32,6 +32,11 @@ external logxor: (nativeint[@local_opt]) -> (nativeint[@local_opt]) -> (nativein
 external shift_left: (nativeint[@local_opt]) -> int -> (nativeint[@local_opt]) @@ portable = "%nativeint_lsl"
 external shift_right: (nativeint[@local_opt]) -> int -> (nativeint[@local_opt]) @@ portable = "%nativeint_asr"
 external shift_right_logical: (nativeint[@local_opt]) -> int -> (nativeint[@local_opt]) @@ portable = "%nativeint_lsr"
+external rotate_left: (nativeint[@local_opt]) -> int -> (nativeint[@local_opt])
+  @@ portable = "%nativeint_rotl"
+external rotate_right:
+  (nativeint[@local_opt]) -> int -> (nativeint[@local_opt])
+  @@ portable = "%nativeint_rotr"
 external of_int: int -> (nativeint[@local_opt]) @@ portable = "%nativeint_of_int"
 external to_int: (nativeint[@local_opt]) -> int @@ portable = "%nativeint_to_int"
 external of_float : float -> nativeint @@ portable

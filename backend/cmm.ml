@@ -352,6 +352,14 @@ type bswap_bitwidth =
   | Thirtytwo
   | Sixtyfour
 
+type rotate_direction =
+  | Rotate_left
+  | Rotate_right
+
+type rotate_bitwidth =
+  | Rotate32
+  | Rotate64
+
 type initialization_or_assignment =
   | Initialization
   | Assignment
@@ -591,6 +599,10 @@ type operation =
   | Clsr
   | Casr
   | Cbswap of { bitwidth : bswap_bitwidth }
+  | Crotate of
+      { direction : rotate_direction;
+        bitwidth : rotate_bitwidth
+      }
   | Ccsel of machtype
   | Cclz
   | Cctz
@@ -804,9 +816,9 @@ let iter_shallow_tail f = function
         | Cendregion | Cdls_get | Ctls_get | Cdomain_index | Cpoll | Cpause
         | Capply _ | Cextcall _ | Cload _
         | Cstore (_, _)
-        | Cmulhi _ | Cbswap _ | Ccsel _ | Cclz | Cctz | Cprefetch _ | Catomic _
-        | Ccmpi _ | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _
-        | Creinterpret_cast _ | Cstatic_cast _
+        | Cmulhi _ | Cbswap _ | Crotate _ | Ccsel _ | Cclz | Cctz | Cprefetch _
+        | Catomic _ | Ccmpi _ | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _
+        | Cdivf _ | Creinterpret_cast _ | Cstatic_cast _
         | Ccmpf (_, _)
         | Cprobe _ | Cprobe_is_enabled _
         | Ctuple_field (_, _) ),
@@ -839,9 +851,9 @@ let map_shallow_tail f = function
           | Cendregion | Cdls_get | Ctls_get | Cdomain_index | Cpoll | Cpause
           | Capply _ | Cextcall _ | Cload _
           | Cstore (_, _)
-          | Cmulhi _ | Cbswap _ | Ccsel _ | Cclz | Cctz | Cprefetch _
-          | Catomic _ | Ccmpi _ | Cnegf _ | Cabsf _ | Caddf _ | Csubf _
-          | Cmulf _ | Cdivf _ | Creinterpret_cast _ | Cstatic_cast _
+          | Cmulhi _ | Cbswap _ | Crotate _ | Ccsel _ | Cclz | Cctz
+          | Cprefetch _ | Catomic _ | Ccmpi _ | Cnegf _ | Cabsf _ | Caddf _
+          | Csubf _ | Cmulf _ | Cdivf _ | Creinterpret_cast _ | Cstatic_cast _
           | Ccmpf (_, _)
           | Cprobe _ | Cprobe_is_enabled _
           | Ctuple_field (_, _) ),

@@ -38,7 +38,7 @@
     Operations:
     - Unary: Negation, successor/predecessor, byte swap, static cast
     - Binary: Arithmetic (add, sub, mul, div), bitwise (and, or, xor), shift
-      (lsl, asr, lsr), comparisons (integer and float)
+      (lsl, asr, lsr) and rotation (rotl, rotr), comparisons (integer and float)
 
     The locality parameter tracks where boxed values are allocated.
 
@@ -357,6 +357,8 @@ module Operation : sig
         | Lsl
         | Asr
         | Lsr
+        | Rol
+        | Ror
 
       val to_string : t -> string
     end
