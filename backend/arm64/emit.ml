@@ -2065,6 +2065,7 @@ type relaxed_instruction =
         dbginfo : Cmm.alloc_dbginfo;
         res : Reg.t;
         mode : Cmm.Alloc_mode.t
+        zero_alloc_obligations : Typedtree.Zero_alloc_obligations.t
       }
   | Far_stackcheck of { max_frame_size_bytes : int }
   | Condbranch of
@@ -2081,13 +2082,23 @@ let emit_relaxed_instruction (relaxed : relaxed_instruction) =
       assembly_code_for_poll0 ~far:true ~return_label:None
     in
     ()
-  | Far_alloc { num_bytes; res; dbginfo = _; mode = Heap } ->
+  | Far_alloc {
+      num_bytes;
+      res;
+      dbginfo = _;
+      mode = Heap;
+      zero_alloc_obligations = _ } ->
     let _gc_lbl, _gc_return_lbl =
       assembly_code_for_fast_heap_allocation0 ~n:num_bytes ~far:true
         ~res_reg:(H.reg_x res)
     in
     ()
-  | Far_alloc { num_bytes; res; dbginfo = _; mode = Local } ->
+  | Far_alloc {
+      num_bytes;
+      res;
+      dbginfo = _;
+      mode = Local;
+      zero_alloc_obligations = _ } ->
     let _lr_lbl, _lr_return_lbl =
       assembly_code_for_local_allocation0 ~n:num_bytes ~far:true
         ~res_reg:(H.reg_x res)
@@ -2139,7 +2150,7 @@ let relax_branches env body =
 
     let relax_poll () = Far_poll
 
-    let relax_allocation ~num_bytes ~dbginfo ~res ~mode =
+    let relax_allocation ~num_bytes ~dbginfo ~res ~mode ~zero_alloc_obligations =
       Far_alloc { num_bytes; dbginfo; res; mode }
 
     let relax_stackcheck ~max_frame_size_bytes =

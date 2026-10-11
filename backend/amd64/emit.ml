@@ -2195,12 +2195,12 @@ let emit_instr ~first ~last ~fallthrough i =
       | Align_64 ->
         emit_call (Cmm.global_symbol "caml_c_call_stack_args_avx512"));
       record_frame i.live (Dbg_other i.dbg))
-    else if alloc
-    then (
+    else begin match alloc with
+    | May_use_gc _ -> (
       load_symbol_addr (Cmm.global_symbol func) rax;
       emit_call (Cmm.global_symbol "caml_c_call");
       record_frame i.live (Dbg_other i.dbg))
-    else
+    | Won't_use_gc -> (
       let switch_stacks = not Config.no_stack_checks in
       if switch_stacks
       then (
@@ -2215,7 +2215,8 @@ let emit_instr ~first ~last ~fallthrough i =
       if switch_stacks
       then (
         I.mov r13 rsp;
-        D.cfi_restore_state ())
+        D.cfi_restore_state ()))
+    end
   | Lop (Stackoffset n) -> emit_stack_offset n
   | Lop (Load { memory_chunk; addressing_mode; _ }) -> (
     let[@inline always] load ~dest data_type instruction =
@@ -2300,7 +2301,8 @@ let emit_instr ~first ~last ~fallthrough i =
     Address_sanitizer.emit_sanitize ~dependencies:[| src |] ~instr:i ~address
       Word_int memory_access;
     I.mov src address
-  | Lop (Alloc { bytes = n; dbginfo; mode = Heap }) ->
+  | Lop (Alloc { bytes = n; dbginfo; mode = Heap;
+                 zero_alloc_obligations = _already_checked }) ->
     assert (n <= (Config.max_young_wosize + 1) * Arch.size_addr);
     let gc_save_simd = must_save_simd_regs i.live in
     if !fastcode_flag
@@ -2335,7 +2337,8 @@ let emit_instr ~first ~last ~fallthrough i =
       let label = record_frame_label i.live (Dbg_alloc dbginfo) in
       D.define_label label;
       I.lea (mem64 NONE 8 (Scalar R15)) (res i 0))
-  | Lop (Alloc { bytes = n; dbginfo = _; mode = Local }) ->
+  | Lop (Alloc { bytes = n; dbginfo = _; mode = Local;
+                 zero_alloc_obligations = _already_checked }) ->
     let r = res i 0 in
     I.mov (domain_field Domainstate.Domain_local_sp) r;
     I.sub (int n) r;

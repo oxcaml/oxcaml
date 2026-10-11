@@ -172,8 +172,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
             } ->
           EC.create (SU.select_effects e) (SU.select_coeffects ce)
         | Capply _ | Cprobe _ | Copaque | Cpoll | Cpause -> EC.arbitrary
-        | Calloc (Heap, _) -> EC.none
-        | Calloc (Local, _) -> EC.coeffect_only Arbitrary
+        | Calloc (Heap, _, _) -> EC.none
+        | Calloc (Local, _, _) -> EC.coeffect_only Arbitrary
         | Cstore _ -> EC.effect_only Arbitrary
         | Cbeginregion | Cendregion -> EC.arbitrary
         | Cprefetch _ -> EC.arbitrary
@@ -375,7 +375,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         Terminator (Call { op = Direct func; label_after }), rem
       | _ -> Terminator (Call { op = Indirect callees; label_after }), args)
     | Cextcall
-        { func; alloc; ty; ty_args; returns; builtin; effects; coeffects = _ }
+        { func; alloc; ty; ty_args; returns; builtin; effects;
+          coeffects = _ }
       ->
       if builtin && not !Oxcaml_flags.disable_builtin_check
       then raise (Error (Builtin_not_recognized func, dbg));
@@ -426,13 +427,15 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Cdls_get -> SU.basic_op Dls_get, args
     | Ctls_get -> SU.basic_op Tls_get, args
     | Cdomain_index -> SU.basic_op Domain_index, args
-    | Calloc (mode, alloc_block_kind) ->
+    | Calloc (mode, alloc_block_kind, zero_alloc_obligations) ->
       let placeholder_for_alloc_block_kind : Cmm.alloc_dbginfo_item =
         { alloc_words = 0; alloc_block_kind; alloc_dbg = Debuginfo.none }
       in
-      ( SU.basic_op
-          (Alloc
-             { bytes = 0; dbginfo = [placeholder_for_alloc_block_kind]; mode }),
+      ( SU.basic_op (Alloc {
+          bytes = 0;
+          dbginfo = [placeholder_for_alloc_block_kind];
+          mode;
+          zero_alloc_obligations }),
         args )
     | Cpoll -> SU.basic_op Poll, args
     | Cpause -> SU.basic_op Pause, args
@@ -1137,7 +1140,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         in
         SU.set_traps_for_raise env;
         Never_returns
-      | Basic (Op (Alloc { bytes = _; mode; dbginfo = [placeholder] })) ->
+      | Basic (Op (Alloc { bytes = _; mode; dbginfo = [placeholder];
+                           zero_alloc_obligations })) ->
         let rd = Reg.createv Cmm.typ_val in
         let bytes = SU.size_expr env (Ctuple new_args) in
         let alloc_words = (bytes + Arch.size_addr - 1) / Arch.size_addr in
@@ -1145,7 +1149,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           Operation.Alloc
             { bytes = alloc_words * Arch.size_addr;
               dbginfo = [{ placeholder with alloc_words; alloc_dbg = dbg }];
-              mode
+              mode;
+              zero_alloc_obligations
             }
         in
         insert_debug env sub_cfg (Op op) dbg [||] rd;
@@ -1153,7 +1158,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         emit_stores env sub_cfg dbg new_args rd;
         SU.set_traps_for_raise env;
         Ok rd
-      | Basic (Op (Alloc { bytes = _; mode = _; dbginfo })) ->
+      | Basic (Op (Alloc { bytes = _; mode = _; dbginfo;
+                           zero_alloc_obligations = _ })) ->
         Misc.fatal_errorf
           "Selection Alloc: expected a single placehold in dbginfo, found %d"
           (List.length dbginfo)

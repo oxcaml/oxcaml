@@ -1515,8 +1515,51 @@ type t6 = float64x2
 (**************)
 (* zero_alloc *)
 
-(* CR gyorsh or ccasinghino: Add examples *)
-(* CR gyorsh or ccasinghino: Add documentation to GitHub *)
+let state = ref (ref 0)
+let allocate () = state := ref 42
+[%%expect{|
+val state : int ref ref = {contents = {contents = 0}}
+val allocate : unit -> unit = <fun>
+|}]
+
+let no_parens = zero_alloc_ allocate ()
+[%%expect{|
+(* CR wsturgeon for wsturgeon: this needs to fail *)
+|}]
+let right_assoc = zero_alloc_ (allocate ())
+[%%expect{|
+(* CR wsturgeon for wsturgeon: this needs to fail *)
+|}]
+let left_assoc = (zero_alloc_ allocate) ()
+[%%expect{|
+val left_assoc : unit = ()
+|}]
+
+let no_parens_seq = zero_alloc_ (); allocate ()
+[%%expect{|
+(* CR wsturgeon for wsturgeon: this needs to fail *)
+|}]
+let right_assoc_seq = zero_alloc_ ((); allocate ())
+[%%expect{|
+(* CR wsturgeon for wsturgeon: this needs to fail *)
+|}]
+let left_assoc_seq = (zero_alloc_ ()); allocate ()
+[%%expect{|
+val left_assoc_seq : unit = ()
+|}]
+
+let outside_closure = zero_alloc_ fun () -> allocate ()
+[%%expect{|
+val outside_closure : unit -> unit = <fun>
+|}]
+let inside_closure = fun () -> zero_alloc_ allocate ()
+[%%expect{|
+(* CR wsturgeon for wsturgeon: this needs to fail *)
+|}]
+let inside_sugared () = zero_alloc_ allocate ()
+[%%expect{|
+(* CR wsturgeon for wsturgeon: this needs to fail *)
+|}]
 
 (*****************)
 (* error_message *)

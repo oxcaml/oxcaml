@@ -1695,9 +1695,9 @@ let test_bool dbg cmm =
 
 (* Float *)
 
-let box_float32 dbg mode exp =
+let box_float32 dbg mode exp ~zero_alloc_obligations =
   Cop
-    ( Calloc (mode, Alloc_block_kind_float32),
+    ( Calloc (mode, Alloc_block_kind_float32, zero_alloc_obligations),
       [ alloc_boxedfloat32_header mode dbg;
         Cconst_symbol (global_symbol caml_float32_ops, dbg);
         exp ],
@@ -1724,8 +1724,9 @@ let unbox_float32 dbg =
           [Cop (Cadda, [cmm; Cconst_int (size_addr, dbg)], dbg)],
           dbg ))
 
-let box_float dbg m c =
-  Cop (Calloc (m, Alloc_block_kind_float), [alloc_float_header m dbg; c], dbg)
+let box_float dbg m c ~zero_alloc_obligations =
+  Cop (Calloc (m, Alloc_block_kind_float, zero_alloc_obligations),
+       [alloc_float_header m dbg; c], dbg)
 
 let unbox_float dbg =
   map_tail (function
@@ -1741,8 +1742,8 @@ let unbox_float dbg =
 
 (* Vectors *)
 
-let box_vector ~alloc_kind ~header dbg m c =
-  Cop (Calloc (m, alloc_kind), [header m dbg; c], dbg)
+let box_vector ~alloc_kind ~header dbg m c ~zero_alloc_obligations =
+  Cop (Calloc (m, alloc_kind, zero_alloc_obligations), [header m dbg; c], dbg)
 
 let unbox_vector ~header ~local_header ~chunk ~structured_constant_of_sym dbg =
   (* Boxed vectors are not aligned by the GC, so we use an unaligned load. *)
@@ -1815,7 +1816,7 @@ let float_of_float16 dbg c =
     ( Cextcall
         { func = "caml_double_of_float16";
           ty = typ_float;
-          alloc = false;
+          alloc = Won't_use_gc;
           builtin = false;
           returns = true;
           effects = No_effects;
@@ -1830,7 +1831,7 @@ let float16_of_float dbg c =
     ( Cextcall
         { func = "caml_float16_of_double";
           ty = typ_int;
-          alloc = false;
+          alloc = Won't_use_gc;
           builtin = false;
           returns = true;
           effects = No_effects;
@@ -1842,9 +1843,10 @@ let float16_of_float dbg c =
 
 (* Complex *)
 
-let box_complex dbg c_re c_im =
+let box_complex dbg c_re c_im ~zero_alloc_obligations =
   Cop
-    ( Calloc (Cmm.Alloc_mode.Heap, Alloc_block_kind_float_array),
+    ( Calloc (Cmm.Alloc_mode.Heap, Alloc_block_kind_float_array,
+              zero_alloc_obligations),
       [alloc_floatarray_header 2 dbg; c_re; c_im],
       dbg )
 
@@ -2097,7 +2099,7 @@ let caml_modify ~dbg addr newval =
     ( Cextcall
         { func = "caml_modify";
           ty = typ_void;
-          alloc = false;
+          alloc = Won't_use_gc;
           builtin = false;
           returns = true;
           effects = Arbitrary_effects;
@@ -2112,7 +2114,7 @@ let caml_modify_local ~dbg addr i newval =
     ( Cextcall
         { func = "caml_modify_local";
           ty = typ_void;
-          alloc = false;
+          alloc = Won't_use_gc;
           builtin = false;
           returns = true;
           effects = Arbitrary_effects;
@@ -2156,7 +2158,7 @@ let addr_array_initialize arr ofs newval dbg =
           effects = Arbitrary_effects;
           coeffects = Has_coeffects;
           ty = typ_void;
-          alloc = false;
+          alloc = Won't_use_gc;
           ty_args = []
         },
       [array_indexing log2_size_addr arr ofs dbg; newval],
@@ -2459,7 +2461,7 @@ let lookup_tag obj tag dbg =
               returns = true;
               effects = Arbitrary_effects;
               coeffects = Has_coeffects;
-              alloc = false;
+              alloc = Won't_use_gc;
               ty_args = []
             },
           [obj; tag],
@@ -2685,7 +2687,7 @@ let alloc_generic_set_fn block ofs newval memory_chunk dbg =
       (Printcmm.chunk memory_chunk)
 
 let make_alloc_generic ~block_kind ~mode ~alloc_block_kind dbg tag wordsize args
-    args_memory_chunks =
+    args_memory_chunks ~zero_alloc_obligations =
   (* allocs of size 0 must be statically allocated else the Gc will bug *)
   assert (List.compare_length_with args 0 > 0);
   if Cmm.Alloc_mode.is_local mode || wordsize <= Config.max_young_wosize
@@ -2695,7 +2697,8 @@ let make_alloc_generic ~block_kind ~mode ~alloc_block_kind dbg tag wordsize args
       | Local -> local_block_header ~block_kind tag wordsize
       | Heap -> block_header ~block_kind tag wordsize
     in
-    Cop (Calloc (mode, alloc_block_kind), Cconst_natint (hdr, dbg) :: args, dbg)
+    Cop (Calloc (mode, alloc_block_kind, zero_alloc_obligations),
+         Cconst_natint (hdr, dbg) :: args, dbg)
   else
     let id = V.create_local "*alloc*" in
     let rec fill_fields idx args memory_chunks =
@@ -2724,7 +2727,7 @@ let make_alloc_generic ~block_kind ~mode ~alloc_block_kind dbg tag wordsize args
           ( Cextcall
               { func = caml_alloc_func;
                 ty = typ_val;
-                alloc = true;
+                alloc = May_use_gc zero_alloc_obligations;
                 builtin = false;
                 returns = true;
                 effects = Arbitrary_effects;
@@ -2909,7 +2912,7 @@ let alloc_header_boxed_int (bi : Primitive.boxed_integer) mode dbg =
   | Boxed_int32 -> alloc_boxedint32_header mode dbg
   | Boxed_int64 -> alloc_boxedint64_header mode dbg
 
-let box_int_gen dbg (bi : Primitive.boxed_integer) mode arg =
+let box_int_gen dbg (bi : Primitive.boxed_integer) mode arg ~zero_alloc_obligations =
   let arg' =
     if bi = Primitive.Boxed_int32
     then
@@ -2917,7 +2920,7 @@ let box_int_gen dbg (bi : Primitive.boxed_integer) mode arg =
     else arg
   in
   Cop
-    ( Calloc (mode, Alloc_block_kind_boxed_int bi),
+    ( Calloc (mode, Alloc_block_kind_boxed_int bi, zero_alloc_obligations),
       [ alloc_header_boxed_int bi mode dbg;
         Cconst_symbol (operations_boxed_int bi, dbg);
         arg' ],
@@ -4327,6 +4330,9 @@ let intermediate_curry_functions ~nlocal ~arity result =
       in
       let has_nary = curry_clos_has_nary_application ~narity (num + 1) in
       let function_slot_size = if has_nary then 3 else 2 in
+      let zero_alloc_obligation =
+        Typedtree.Zero_alloc_obligations.generated_intermediate_curry_function
+      in
       Cfunction
         { fun_name = global_symbol name2;
           fun_args =
@@ -4334,7 +4340,7 @@ let intermediate_curry_functions ~nlocal ~arity result =
             @ [VP.create clos, typ_val];
           fun_body =
             Cop
-              ( Calloc (mode, Alloc_block_kind_closure),
+              ( Calloc (mode, Alloc_block_kind_closure, zero_alloc_obligation),
                 [ alloc_closure_header ~mode
                     (function_slot_size + machtype_stored_size arg_type + 1)
                     (dbg ());
@@ -4456,7 +4462,7 @@ let bbswap (bitwidth : Cmm.bswap_bitwidth) arg dbg =
             effects = No_effects;
             coeffects = No_coeffects;
             ty = typ_int;
-            alloc = false;
+            alloc = Won't_use_gc;
             ty_args = [tyarg]
           },
         [arg],
@@ -4497,7 +4503,7 @@ let setfield n ptr init arg1 arg2 dbg =
          ( Cextcall
              { func = "caml_initialize";
                ty = typ_void;
-               alloc = false;
+               alloc = Won't_use_gc;
                builtin = false;
                returns = true;
                effects = Arbitrary_effects;
@@ -6064,7 +6070,7 @@ let atomic_exchange_extcall ~dbg ~mode block offset ~new_value =
           coeffects = Has_coeffects;
           ty = typ_val;
           ty_args = [];
-          alloc = false
+          alloc = Won't_use_gc
         },
       [block; atomic_field_index_for_extcall offset dbg; new_value],
       dbg )
@@ -6096,7 +6102,7 @@ let atomic_arith ~dbg ~op ~untag ~ext_name block offset i =
             coeffects = Has_coeffects;
             ty = typ_int;
             ty_args = [];
-            alloc = false
+            alloc = Won't_use_gc
           },
         [block; atomic_field_index_for_extcall offset dbg; i],
         dbg )
@@ -6141,7 +6147,7 @@ let atomic_compare_and_set_extcall ~dbg ~mode block offset ~old_value ~new_value
           coeffects = Has_coeffects;
           ty = typ_int;
           ty_args = [];
-          alloc = false
+          alloc = Won't_use_gc
         },
       [block; atomic_field_index_for_extcall offset dbg; old_value; new_value],
       dbg )
@@ -6174,7 +6180,7 @@ let atomic_compare_exchange_extcall ~dbg ~mode block offset ~old_value
           coeffects = Has_coeffects;
           ty = typ_val;
           ty_args = [];
-          alloc = false
+          alloc = Won't_use_gc
         },
       [block; atomic_field_index_for_extcall offset dbg; old_value; new_value],
       dbg )

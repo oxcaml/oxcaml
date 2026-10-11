@@ -9036,6 +9036,14 @@ and type_expect_
       end;
       let exp_extra = (Texp_stack, loc, []) :: exp.exp_extra in
       {exp with exp_extra}
+  | Pexp_zero_alloc body ->
+    let exp =
+      type_expect ~recarg env expected_mode body ty_expected_explained
+    in
+    { exp with
+      exp_loc = loc;
+      exp_extra = (Texp_zero_alloc, Location.none, []) :: exp.exp_extra;
+      exp_attributes = sexp.pexp_attributes @ exp.exp_attributes; }
   | Pexp_comprehension comp ->
       Language_extension.assert_enabled ~loc Comprehensions ();
       type_comprehension_expr

@@ -38,7 +38,7 @@ module S = struct
 
   type external_call_operation =
     { func_symbol : string;
-      alloc : bool;
+      alloc : Cmm.May_use_gc.t;
       (* CR mshinwell: rename [alloc] -> [needs_caml_c_call] *)
       effects : Cmm.effects;
       ty_res : Cmm.machtype;

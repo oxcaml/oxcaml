@@ -564,6 +564,8 @@ and expression_desc =
   | Pexp_hole (** _ *)
   | Pexp_borrow of expression
     (** borrow_ exp *)
+  | Pexp_zero_alloc of expression
+    (** zero_alloc_ exp *)
 
 and case =
     {

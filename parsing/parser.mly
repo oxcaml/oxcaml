@@ -1146,6 +1146,7 @@ let maybe_pmod_constraint mode expr =
 %token WHEN                   "when"
 %token WHILE                  "while"
 %token WITH                   "with"
+%token ZERO_ALLOC             "zero_alloc_"
 %token <string * Location.t> COMMENT    "(* comment *)"
 %token <Docstrings.docstring> DOCSTRING "(** documentation *)"
 
@@ -2896,6 +2897,8 @@ fun_expr:
      { mkexp_constraint ~loc:$sloc ~exp ~cty:None ~modes:[mode] }
   | EXCLAVE seq_expr
      { mkexp_exclave ~loc:$sloc ~kwd_loc:($loc($1)) $2 }
+  | ZERO_ALLOC seq_expr
+     { mkexp ~loc:$sloc (Pexp_zero_alloc $2) }
 ;
 %inline expr:
   | or_function(fun_expr) { $1 }
