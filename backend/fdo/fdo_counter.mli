@@ -77,10 +77,10 @@ val inline : t -> at:t -> t
     inlining stack keeps its length. *)
 val specialize : t -> at:t -> t
 
-(** Compare counters structurally, not by hash. *)
+(** Compare counters structurally. *)
 val equal : t -> t -> bool
 
-(** Canonical, unambiguous spelling for metadata and dumps. *)
+(** Canonical string representation for metadata and dumps. *)
 val to_string : t -> string
 
 (** Hash the position and each inlining level, innermost first. *)
