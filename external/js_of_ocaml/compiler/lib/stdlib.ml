@@ -352,28 +352,29 @@ module Float = struct
 end
 
 module Float32 = struct
-  type t
+  (* IEEE 754 single-precision bit patterns, as in Flambda 2's
+     [Flambda2_floats.Float32]. Conversions are done in C stubs
+     (float32_stubs.c), so no compiler support for float32 is needed. *)
+  type t = int32
 
-  let of_float _ = assert false
+  let of_bits x = x
 
-  let to_float _ = assert false
+  let to_bits x = x
 
-  let of_string _ = assert false
-end
-[@@if not oxcaml]
+  external of_float : float -> t
+    = "jsoo_float32_of_float" "jsoo_float32_of_float_unboxed"
+  [@@unboxed] [@@noalloc]
 
-module Float32 = struct
-  type t = float32
+  external to_float : t -> float
+    = "jsoo_float32_to_float" "jsoo_float32_to_float_unboxed"
+  [@@unboxed] [@@noalloc]
 
-  external of_float : float -> t = "%float32offloat"
-
-  external to_float : t -> float = "%floatoffloat32"
+  external of_boxed : Obj.t -> t = "jsoo_float32_of_boxed"
 
   (* In javascript/wasm, we define float32 parsing as rounding the 64-bit result.
      This is not equivalent to native code, which parses to 32 bits directly. *)
   let of_string s = float_of_string s |> of_float
 end
-[@@if oxcaml]
 
 module Bool = struct
   include Bool
@@ -1259,6 +1260,4 @@ module Lexing = struct
   (* use [char1 + 1] and [char2 + 1] if *not* using Caml mode *)
 end
 
-let with_async_exns = Sys.with_async_exns [@@if oxcaml]
-
-let with_async_exns f = f () [@@if not oxcaml]
+let with_async_exns = Ocaml_or_oxcaml.with_async_exns
