@@ -125,6 +125,9 @@ let all_keywords =
 
 let keyword_table = Hashtbl.create 149
 
+let is_keyword name =
+  Hashtbl.mem keyword_table name
+
 let populate_keywords (version,keywords) =
   let greater (x:(int*int) option) (y:(int*int) option) =
     match x, y with
@@ -141,7 +144,8 @@ let populate_keywords (version,keywords) =
     match List.find (fun (n,_,_) -> n = name) all_keywords with
     | (_,tok,_) -> Hashtbl.replace tbl name (Some tok)
     | exception Not_found -> Hashtbl.replace tbl name None
-    ) keywords
+    ) keywords;
+  Keywords.is_keyword_hook := is_keyword
 
 
 (* To buffer string literals *)
@@ -476,9 +480,6 @@ let lax_delim raw_name =
   | Ok name ->
      if Utf8_lexeme.is_lowercase name then Some name
      else None
-
-let is_keyword name =
-  Hashtbl.mem keyword_table name
 
 let find_keyword lexbuf name =
   match Hashtbl.find keyword_table name with
