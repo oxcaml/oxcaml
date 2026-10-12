@@ -806,7 +806,8 @@ let ocaml_ignored_flags =
     "-no-flambda2-simplify-stubs";
     "-flambda2-simplify-stubs";
     "-stubs-forward-inlining";
-    "-no-stubs-forward-inlining"
+    "-no-stubs-forward-inlining";
+    "-djsir"
   ]
 
 let ocaml_ignored_parametrized_flags =
@@ -919,7 +920,13 @@ let ocaml_ignored_parametrized_flags =
     "-reaper-preserve-direct-calls";
     "-save-ir-after";
     "-X";
-    "-dissector-max-linker-parallelism"
+    "-dissector-max-linker-parallelism";
+    "-target";
+    "-jsoo-opt";
+    "-jsoo-opt-compile";
+    "-jsoo-opt-archive";
+    "-jsoo-opt-runtime";
+    "-jsoo-opt-link"
   ]
 
 let ocaml_warnings_spec ~error =
