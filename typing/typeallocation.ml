@@ -42,7 +42,9 @@ let register_allocation_value_mode ~env ~loc
     with_regionality_to_locality_r2g ~allocation:({loc; txt = desc})
       (Mode.With_regionality.disallow_left mode)
   in
-  let mode = with_locality_as_regionality ~allocation:({loc; txt = desc}) mode in
+  let mode =
+    with_locality_as_regionality ~allocation:({loc; txt = desc}) mode
+  in
   locality_mode, mode
 
 (* Unlike most allocations, which can be the highest mode allowed by
@@ -58,9 +60,13 @@ let register_closure_allocation ~env (expected_mode : With_regionality.r) ~loc
       (with_regionality_to_locality_r2g ~allocation expected_mode)
   in
   let locality = With_locality.proj_comonadic Areality closure_mode in
-  let locality_mode : Locality.lr = Locality.newvar_below 0 locality |> fst in
+  let locality_mode : Locality.lr =
+    Locality.newvar_below 0 locality |> fst
+  in
   let closed_over_mode =
-    with_locality_as_regionality ~allocation (With_locality.disallow_left closure_mode)
+    with_locality_as_regionality
+      ~allocation
+      (With_locality.disallow_left closure_mode)
   in
   register_allocation_mode ~env ~loc locality_mode;
   locality_mode, closure_mode, closed_over_mode
@@ -106,13 +112,22 @@ let relax_alloc (desc : Types.value_description) ~is_applied mode =
   else
     match desc.val_kind with
     | Types.Val_prim _ ->
-      With_regionality.meet_const_with Allocation Allocation.Const.Noalloc_strict mode
+      With_regionality.meet_const_with
+        Allocation
+        Allocation.Const.Noalloc_strict
+        mode
     | _ ->
       begin match Type_zero_alloc.val_zero_alloc desc.val_zero_alloc with
       | Type_zero_alloc.Zero_alloc { strict = true; _ } ->
-        With_regionality.meet_const_with Allocation Allocation.Const.Noalloc_strict mode
+        With_regionality.meet_const_with
+          Allocation
+          Allocation.Const.Noalloc_strict
+          mode
       | Type_zero_alloc.Zero_alloc { strict = false; _ } ->
-        With_regionality.meet_const_with Allocation Allocation.Const.Noalloc mode
+        With_regionality.meet_const_with
+          Allocation
+          Allocation.Const.Noalloc
+          mode
       | Type_zero_alloc.Default -> mode
       end
 

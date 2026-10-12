@@ -7561,7 +7561,9 @@ and type_expect_
       in
       let mode_ret = With_locality.disallow_right mode_ret in
       let ap_mode = create_allocation_mode_l mode_ret in
-      let mode_ret = cross_left env ty_ret (with_locality_as_regionality mode_ret) in
+      let mode_ret =
+        cross_left env ty_ret (with_locality_as_regionality mode_ret)
+      in
       Typeallocation.register_zero_alloc_application_allocation ~env
         ~pos:pm.apply_position funct args mode_ret;
       let zero_alloc =
@@ -8353,8 +8355,10 @@ and type_expect_
          but we register it anyway so every allocation site is covered. *)
       Typeallocation.register_allocation_mode ~env ~loc
         (Locality.disallow_left Locality.legacy);
-      With_regionality.submode_exn ~pp:(cl.loc, Ident {category = Class; lid = cl.txt})
-        cl_mode With_regionality.legacy;
+      With_regionality.submode_exn
+        ~pp:(cl.loc, Ident {category = Class; lid = cl.txt})
+        cl_mode
+        With_regionality.legacy;
       let pm = position_and_mode env expected_mode sexp in
       begin match cl_decl.cty_new with
           None ->
@@ -12315,11 +12319,21 @@ and type_andops env sarg sands expected_sort expected_ty =
   in
   let_arg, sort_let_arg, List.rev rev_ands
 
-and type_expect_mode ~loc ~env ~(modes : With_locality.Const.Option.t) expected_mode =
-    let min = With_locality.Const.Option.value ~default:With_locality.Const.min modes |> Const.with_locality_as_regionality in
-    let max = With_locality.Const.Option.value ~default:With_locality.Const.max modes |> Const.with_locality_as_regionality in
-    submode ~loc ~env ~reason:Other (With_regionality.of_const min) expected_mode;
-    let expected_mode = mode_coerce (With_regionality.of_const max) expected_mode in
+and type_expect_mode ~loc ~env ~(modes : With_locality.Const.Option.t)
+      expected_mode =
+    let min =
+      With_locality.Const.Option.value ~default:With_locality.Const.min modes
+      |> Const.with_locality_as_regionality
+    in
+    let max =
+      With_locality.Const.Option.value ~default:With_locality.Const.max modes
+      |> Const.with_locality_as_regionality
+    in
+    submode ~loc ~env ~reason:Other (With_regionality.of_const min)
+      expected_mode;
+    let expected_mode =
+      mode_coerce (With_regionality.of_const max) expected_mode
+    in
     match modes.areality with
     | Some Local -> mode_strictly_local expected_mode
     | _ -> expected_mode
