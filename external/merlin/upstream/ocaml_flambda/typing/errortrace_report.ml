@@ -381,7 +381,7 @@ let explanation (type variety) intro prev env
     add_type_to_preparation x;
     add_type_to_preparation y;
     begin match Types.get_desc x with
-    | Tvar _ | Tunivar _  ->
+    | Tvar _ | Tivar _ | Tunivar _  ->
         Some(
           doc_printf "@,@[<hov>The type variable %a occurs inside@ %a@]"
             (Style.as_inline_code prepared_type_expr) x

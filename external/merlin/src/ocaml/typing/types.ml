@@ -1750,17 +1750,20 @@ let link_type ty ty' =
   (* Name is a user-supplied name for this unification variable (obtained
    * through a type annotation for instance). *)
   match desc, ty'.desc with
-    Tvar { name }, Tvar { name = name'; jkind = jkind' } ->
-      begin match name, name' with
-      | Some _, None ->
+    (Tvar { name } | Tivar { name; _ }),
+    ((Tvar { name = name'; _ } | Tivar { name = name'; _ }) as desc') ->
+      let set_name () =
         log_type ty';
-        Transient_expr.set_desc ty' (Tvar { name; jkind = jkind' })
+        Transient_expr.set_desc ty'
+          (match desc' with
+           | Tvar r -> Tvar { r with name }
+           | Tivar r -> Tivar { r with name }
+           | _ -> assert false)
+      in
+      begin match name, name' with
+      | Some _, None -> set_name ()
       | None, Some _ -> ()
-      | Some _, Some _ ->
-        if ty.level < ty'.level then begin
-          log_type ty';
-          Transient_expr.set_desc ty' (Tvar { name; jkind = jkind' })
-        end
+      | Some _, Some _ -> if ty.level < ty'.level then set_name ()
       | None, None   -> ()
       end
   | _ -> ()
