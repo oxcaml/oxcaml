@@ -148,6 +148,11 @@ val operation_is_pure : specific_operation -> bool
 
 val operation_allocates : specific_operation -> bool
 
+(** Whether the operation initializes one machine word with an immediate at
+    [addressing]. Its arguments are exactly the address operands. *)
+val is_immediate_initializing_store :
+  specific_operation -> addressing:addressing_mode -> bool
+
 (* Specific operations that can raise *)
 
 val isomorphic_specific_operation : specific_operation -> specific_operation -> bool

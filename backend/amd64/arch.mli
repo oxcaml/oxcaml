@@ -185,6 +185,11 @@ val operation_is_pure : specific_operation -> bool
 
 val operation_allocates : specific_operation -> bool
 
+(** Whether the operation initializes one machine word with an immediate at
+    [addressing]. Its arguments are exactly the address operands. *)
+val is_immediate_initializing_store :
+  specific_operation -> addressing:addressing_mode -> bool
+
 val float_cond_and_need_swap
   :  Scalar.Float_comparison.t -> X86_ast.float_condition * bool
 

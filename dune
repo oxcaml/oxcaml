@@ -725,6 +725,7 @@
   cfg_format
   ;; backend/ssa/
   ssa
+  ssa_allocation
   ssa_print
   ssa_loops
   ssa_post_dominators
