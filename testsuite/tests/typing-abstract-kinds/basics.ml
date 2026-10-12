@@ -1895,11 +1895,12 @@ let () = A_refine.c := (None : int id option)
 let () = B_refine.c := (None : bool id option)
 [%%expect{|
 val cell_refine : '_weak3 id option ref = {contents = None}
-module G_refine :
-  functor (X : sig kind_ ka end) -> sig val c : '_weak3 id option ref end
-module K_refine : sig kind_ ka = value end
-module A_refine : sig val c : '_weak4 id option ref end
-module B_refine : sig val c : '_weak5 id option ref end
+Line 6, characters 26-55:
+6 |   let () = cell_refine := (None : (_ : X.ka) id option)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "'a id option"
+       but an expression was expected of type "'weak3 id option"
+       The abstract kind "X.ka" would escape its scope
 |}]
 
 let f_refine (x : (_ : any) id option ref) =
@@ -1908,7 +1909,12 @@ let f_refine (x : (_ : any) id option ref) =
   end in
   ()
 [%%expect{|
-val f_refine : ('a : X.ka). 'a id option ref -> unit = <fun>
+Line 3, characters 18-47:
+3 |     let () = x := (None : (_ : X.ka) id option)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "'a id option"
+       but an expression was expected of type "'b id option"
+       The abstract kind "X.ka" would escape its scope
 |}]
 
 (*************************************************************************)
@@ -1939,8 +1945,8 @@ let (_ : bool id option) = M_manifest_local.get ()
 module M_manifest_local :
   sig
     kind_ k = value
-    val r : '_weak6 id option ref
-    val get : unit -> '_weak6 id option
+    val r : '_weak4 id option ref
+    val get : unit -> '_weak4 id option
   end
 - : bool id option = None
 |}]
@@ -1953,7 +1959,7 @@ end
 let () = M_abstract_local.r := (None : M_abstract_local.t id option)
 [%%expect{|
 module M_abstract_local :
-  sig kind_ k type t : k val r : '_weak7 id option ref end
+  sig kind_ k type t : k val r : '_weak5 id option ref end
 Line 6, characters 31-68:
 6 | let () = M_abstract_local.r := (None : M_abstract_local.t id option)
                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1979,16 +1985,16 @@ let (_ : bool id option) = M_include_functor.get ()
 [%%expect{|
 module G_local :
   functor (X : sig kind_ ka end) ->
-    sig val c : '_weak8 id option ref val get : unit -> '_weak8 id option end
+    sig val c : '_weak6 id option ref val get : unit -> '_weak6 id option end
 module K_local : sig kind_ ka = value end
 module A_local :
-  sig val c : '_weak9 id option ref val get : unit -> '_weak10 id option end
+  sig val c : '_weak7 id option ref val get : unit -> '_weak8 id option end
 - : bool id option = None
 module M_include_functor :
   sig
     kind_ ka = value
-    val c : '_weak11 id option ref
-    val get : unit -> '_weak12 id option
+    val c : '_weak9 id option ref
+    val get : unit -> '_weak10 id option
   end
 - : bool id option = None
 |}]
@@ -2022,7 +2028,7 @@ let (_ : bool id option) = A_anon.get ()
 [%%expect{|
 module K_anon : sig kind_ ka = value end
 module A_anon :
-  sig val c : '_weak13 id option ref val get : unit -> '_weak14 id option end
+  sig val c : '_weak11 id option ref val get : unit -> '_weak12 id option end
 - : bool id option = None
 |}]
 

@@ -3863,7 +3863,14 @@ let unification_jkind_check uenv ty jkind =
      is used in [estimate_type_jkind], used in [constrain_type_jkind]. *)
   if not (in_subst_mode uenv) then
     match !lmode with
-    | Perform_checks -> constrain_type_jkind_exn (get_env uenv) Unify ty jkind
+    | Perform_checks ->
+        let env = get_env uenv in
+        constrain_type_jkind_exn env Unify ty jkind;
+        (* If [ty] is a variable, its kind may have been refined with kind
+           constructors that are not in scope at its level. *)
+        begin try update_jkind_level env (get_level ty) ty
+        with Escape e -> raise_for Unify (Escape e)
+        end
     | Delay_checks r -> r := (ty,jkind) :: !r
 
 let check_and_update_generalized_ty_jkind ?name ~loc ty =
