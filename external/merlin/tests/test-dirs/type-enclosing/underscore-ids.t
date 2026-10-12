@@ -435,8 +435,9 @@ We try several places in the identifier to check the result stability
             value_mode id(modevar#9<0>[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,id(modevar#a<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
           expression (under.ml[2,13+6]..under.ml[5,70+17]) ghost
             Texp_function
-            alloc_mode id(modevar#b[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);id(modevar#c[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
-            id(modevar#13[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);id(modevar#14[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,dynamic])
+            alloc_mode global
+            yielding_mode unyielding
+            return_mode proj_Locality(modevar#16<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful])
             []
             [
               Nolabel
@@ -449,7 +450,7 @@ We try several places in the identifier to check the result stability
                 []
             ]
             Tfunction_cases (under.ml[2,13+18]..under.ml[5,70+17])
-              alloc_mode id(modevar#15[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);id(modevar#16[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+              locality_mode proj_Locality(modevar#18<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful])
               value
               extra (under.ml[2,13+18]..under.ml[5,70+17])
                 Texp_constraint
