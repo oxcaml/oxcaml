@@ -37,10 +37,19 @@ val combine : t -> t -> t
 (** Embed an integer component. *)
 val of_int : int -> t
 
+(** Embed a 64-bit integer component. *)
+val of_int64 : int64 -> t
+
 (** Hash a string using a fixed digest algorithm. *)
 val of_string : string -> t
 
-(** Hash a tree node from its tag and its components, in order. *)
+(** Hash a list from its length and its elements, in order. *)
+val of_list : t list -> t
+
+(** Hash an option, distinguishing [None] from [Some]. *)
+val of_option : t option -> t
+
+(** Hash a labelled tree node from its tag and its components, in order. *)
 val node : tag:int -> t list -> t
 
 (** Mix and truncate to the 32-bit on-disk representation. *)

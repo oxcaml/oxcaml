@@ -29,6 +29,8 @@
 (* Keep 64 bits while composing identities; truncate only for serialization. *)
 type t = int64
 
+let of_int64 n = n
+
 let of_int = Int64.of_int
 
 (* BLAKE2 has a fixed specification, unlike [String.hash]. Read the first 8 of
@@ -51,6 +53,10 @@ let combine a b =
   mix (Int64.add (Int64.mul a p) b)
 
 let node ~tag components = List.fold_left combine (of_int tag) components
+
+let of_list xs = node ~tag:(List.length xs) xs
+
+let of_option = function None -> of_int 0 | Some x -> combine (of_int 1) x
 
 (* The low 32 bits after mixing. *)
 let to_int32 x = Int64.to_int32 (mix x)

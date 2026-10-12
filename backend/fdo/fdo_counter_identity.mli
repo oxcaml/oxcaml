@@ -85,6 +85,9 @@ module Function_body_hash : sig
 
   (** Compare body fingerprints for equality. *)
   val equal : t -> t -> bool
+
+  (** The spelling used in metadata and dumps, as in interior positions. *)
+  val to_string : t -> string
 end
 
 (** A function or a module binding: its original definition, or a copy of it
