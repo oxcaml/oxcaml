@@ -203,10 +203,6 @@ _install: compiler
 	done
 	mkdir _install/lib/stublibs
 	cp _build/main/parser.cmly _install/lib/ocaml/compiler-libs/
-	find _build/main/ \( -name "flambda2*.cmi" \
-          -or -name "flambda2*.cmsi" -or -name "flambda2*.cms" \
-          -or -name "flambda2*.cmti" -or -name "flambda2*.cmt" \) \
-          -exec cp -f {} _install/lib/ocaml/compiler-libs \;
 
 
 # Copy _install to the final install directory (no-op if they are the same)
