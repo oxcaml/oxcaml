@@ -43,7 +43,7 @@ val of_int64 : int64 -> t
 (** Hash a string using a fixed digest algorithm. *)
 val of_string : string -> t
 
-(** Hash a list from its length and its elements, in order. *)
+(** Hash a list from its length and its elements in order. *)
 val of_list : t list -> t
 
 (** Hash an option, distinguishing [None] from [Some]. *)
