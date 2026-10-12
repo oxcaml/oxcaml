@@ -465,6 +465,7 @@ static struct gc_tweak gc_tweaks[] = {
   { "enable_segv_handler", &caml_enable_segv_handler, 0 },
   { "cache_stacks_per_class", &caml_cache_stacks_per_class, 0 },
   { "max_guarded_stacks", &caml_max_guarded_stacks, 0 },
+  { "no_idle_stacks", &caml_no_idle_stacks, 0 },
   { "tick_use_usleep", &caml_tick_use_usleep, 0 },
   { "measure_frametables", &caml_measure_frametables, 0 },
 };
