@@ -6803,9 +6803,9 @@ let split_function_ty
         let arg_kind = Jkind.Builtin.any ~why:Inside_of_Tarrow in
         let ret_kind = Jkind.Builtin.any ~why:Inside_of_Tarrow in
         { ty_arg = newty (Tpoly (newvar2 level arg_kind, []))
-        ; arg_mode = With_locality.newvar (get_current_level ())
+        ; arg_mode = With_locality.newvar level
         ; ty_ret = newvar2 level ret_kind
-        ; ret_mode = With_locality.newvar (get_current_level ())
+        ; ret_mode = With_locality.newvar level
         }
     end
   in
