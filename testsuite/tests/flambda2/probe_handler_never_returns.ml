@@ -3,13 +3,19 @@
  arch_amd64;
  flambda2;
  {
+   native;
+ }{
+   flags = "-O3";
+   native;
+ }{
    flags = "-Oclassic";
    native;
  }{
    flags = "-dcfg-invariants";
-   setup-ocamlopt.opt-build-env;
-   ocamlopt_opt_exit_status = "2";
-   ocamlopt.opt;
+   native;
+ }{
+   flags = "-O3 -dcfg-invariants";
+   native;
  }
 *)
 

@@ -957,15 +957,22 @@ let simplify_direct_function_call ~simplify_expr dacc apply
     ~coming_from_indirect ~result_arity ~result_types ~recursive
     ~must_be_detupled ~closure_alloc_mode_from_type function_decl ~down_to_up
     ~call ~inlined_forwarded_from =
-  (match Apply.probe apply, Apply.inlined apply with
-  | None, _ | Some _, Never_inlined -> ()
-  | ( Some _,
-      ( Hint_inlined | Forward_inlined | Unroll _ | Default_inlined
-      | Always_inlined _ ) ) ->
-    Misc.fatal_errorf
-      "[Apply] terms with a [probe] (i.e. that call a tracing probe) must \
-       always be marked as [Never_inline]:@ %a"
-      Apply.print apply);
+  let result_types : _ Or_unknown_or_bottom.t =
+    match Apply.probe apply, Apply.inlined apply with
+    | None, _ -> result_types
+    | Some _, Never_inlined ->
+      (* The handler of a disabled probe is not called, so nothing can be
+         deduced from its result types (in particular, the probe may return even
+         if the handler never does). *)
+      Unknown
+    | ( Some _,
+        ( Hint_inlined | Forward_inlined | Unroll _ | Default_inlined
+        | Always_inlined _ ) ) ->
+      Misc.fatal_errorf
+        "[Apply] terms with a [probe] (i.e. that call a tracing probe) must \
+         always be marked as [Never_inline]:@ %a"
+        Apply.print apply
+  in
   let callee's_code_ids : _ Or_bottom.t =
     match (callee's_code_ids_from_call_kind : _ Or_unknown.t) with
     | Unknown -> Ok (Code_id.Set.singleton callee's_code_id_from_type)
