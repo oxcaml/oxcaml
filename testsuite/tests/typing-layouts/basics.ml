@@ -1253,27 +1253,12 @@ val x13f : t_float64 option -> t_float64 = <fun>
 (* list *)
 type t13f = t_float64 list;;
 [%%expect{|
-Line 1, characters 12-21:
-1 | type t13f = t_float64 list;;
-                ^^^^^^^^^
-Error: This type "t_float64" should be an instance of type "('a : value_or_null)"
-       The layout of t_float64 is float64
-         because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a value layout
-         because the type argument of list has layout value_or_null.
+type t13f = t_float64 list
 |}];;
 
 let x13 (v : t_float64) = [v];;
 [%%expect{|
-Line 1, characters 27-28:
-1 | let x13 (v : t_float64) = [v];;
-                               ^
-Error: The value "v" has type "t_float64" but an expression was expected of type
-         "('a : value_or_null)"
-       The layout of t_float64 is float64
-         because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a value layout
-         because the type argument of list has layout value_or_null.
+val x13 : t_float64 -> t_float64 list = <fun>
 |}];;
 
 let x13 v =
@@ -1281,15 +1266,7 @@ let x13 v =
   | [v] -> f_id v
   | _ -> assert false
 [%%expect{|
-Line 3, characters 16-17:
-3 |   | [v] -> f_id v
-                    ^
-Error: The value "v" has type "('a : value_or_null)"
-       but an expression was expected of type "t_float64"
-       The layout of t_float64 is float64
-         because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a value layout
-         because the type argument of list has layout value_or_null.
+val x13 : t_float64 list -> t_float64 = <fun>
 |}];;
 
 (* array *)
@@ -1323,17 +1300,21 @@ and foo14 = string
 
 (* CR layouts v5: Bring back void version from basics_alpha. *)
 
-type t14 = foo14 list
+(* Needed for testing because [list] now takes an [any] parameter *)
+type ('a : value_or_null) value_list = 'a list
+
+type t14 = foo14 value_list
 and foo14 = t_float64;;
 [%%expect{|
-Line 2, characters 0-21:
-2 | and foo14 = t_float64;;
+type ('a : value_or_null) value_list = 'a list
+Line 4, characters 0-21:
+4 | and foo14 = t_float64;;
     ^^^^^^^^^^^^^^^^^^^^^
 Error:
        The layout of foo14 is float64
          because of the definition of t_float64 at line 4, characters 0-24.
        But the layout of foo14 must be a value layout
-         because the type argument of list has layout value_or_null.
+         because of the definition of value_list at line 1, characters 0-46.
 |}];;
 
 (****************************************************)

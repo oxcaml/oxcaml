@@ -183,6 +183,13 @@ T_BACKQUOTE
 %start <(Lexing.position * (Javascript.statement * Javascript.location)) list > script
 %start <Javascript.expression> standalone_expression
 
+(* CR-someday lmaurer: This is a workaround for a bug that oxcaml/oxcaml#7452
+   fixes. Delete these three declarations (and inline [caseClauses] back into
+   [caseBlock]) if that has landed. *)
+%type <case_clause> caseClause
+%type <case_clause list> caseClauses
+%type <(([`String | `Ident] * Stdlib.Utf8_string.t * lexing_position) * ([`String | `Ident] * Stdlib.Utf8_string.t * lexing_position)) list> exportClause
+
 %%
 
 (*************************************************************************)
@@ -1123,8 +1130,11 @@ switchStatement:
     }
 
 caseBlock:
-  | "{" cases=caseClause* "}" { cases, None, [] }
-  | "{" before=caseClause* default=defaultClause after=caseClause* "}" { before, Some default, after }
+  | "{" cases=caseClauses "}" { cases, None, [] }
+  | "{" before=caseClauses default=defaultClause after=caseClauses "}" { before, Some default, after }
+
+(* Only needed for its %type declaration; see comment there. *)
+caseClauses: cases=caseClause* { cases }
 
 caseClause:
   | T_CASE e=expression(in_allowed) ":" s=statementList { e,s }

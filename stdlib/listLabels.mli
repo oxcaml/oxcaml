@@ -44,7 +44,7 @@ open! Stdlib
    {!StdLabels} module.
  *)
 
-type ('a : value_or_null) t = 'a list = [] | (::) of 'a * 'a list (**)
+type ('a : any) t = 'a list = [] | (::) of 'a * 'a list (**)
 (** An alias for the type of lists. *)
 
 val length : ('a : value_or_null). 'a list -> int
@@ -65,7 +65,7 @@ val compare_length_with : ('a : value_or_null). 'a list -> len:int -> int
    @since 4.05
  *)
 
-val is_empty : ('a : value_or_null). 'a list -> bool
+val is_empty : ('a : any). 'a list -> bool
 (** [is_empty l] is true if and only if [l] has no elements. It is equivalent to
     [compare_length_with l 0 = 0].
     @since 5.1
