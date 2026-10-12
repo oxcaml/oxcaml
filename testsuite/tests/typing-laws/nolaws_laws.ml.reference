@@ -1,6 +1,7 @@
 [@@@ocaml.warning "-27"]
 type 'a each = unit
 let names = ()
+let locations = ()
 let map () ~f:_ = ()
 let to_list () = []
 module Instantiate(Choice:CamlinternalLaw.Choice) =

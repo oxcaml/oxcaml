@@ -67,8 +67,8 @@ end
 
 let check choices =
   List.iter2
-    (fun name law -> Minicheck.check ~name law)
-    (to_list names)
+    (fun (name, location) law -> Minicheck.check ~name ~location law)
+    (List.combine (to_list names) (to_list locations))
     (to_list (L.laws choices))
 
 let () = check (module Choices)
@@ -87,5 +87,5 @@ module Bad_choices = struct
 end
 
 let () =
-  Minicheck.check ~name:"init_length"
+  Minicheck.check ~name:"init_length" ~location:locations.init_length
     (L.laws (module Bad_choices)).init_length

@@ -11,9 +11,9 @@ let choice ?(show = fun _ -> "_") cases = { Choice.cases; show }
 
 exception Failed of string
 
-(* The clause as written: the range of the interface at [location] (which
-   is in the directory the test runs in). *)
-let clause { CamlinternalLaw.file; start_line; start_col; end_line; end_col } =
+(* The range of the interface at [location] (which is in the directory the
+   test runs in), as written, indented under the message. *)
+let excerpt { CamlinternalLaw.file; start_line; start_col; end_line; end_col } =
   let lines = In_channel.with_open_text file In_channel.input_lines in
   let line n = List.nth lines (n - 1) in
   if start_line = end_line then
@@ -25,9 +25,9 @@ let clause { CamlinternalLaw.file; start_line; start_col; end_line; end_col } =
     let middle =
       List.init (end_line - start_line - 1) (fun i -> line (start_line + 1 + i))
     in
-    String.concat "\n" ((first :: middle) @ [last])
+    String.concat "\n  " ((first :: middle) @ [last])
 
-let check ~name law =
+let check ~name ~location law =
   let passed = ref 0 and discarded = ref 0 in
   let rec run : type a. a Law.t -> (a -> unit) -> unit =
    fun law k ->
@@ -41,15 +41,15 @@ let check ~name law =
         let fail what =
           raise
             (Failed
-               (Printf.sprintf "%s%s\n  counterexample: %s" (clause location)
-                  what (source.show value)))
+               (Printf.sprintf "%s\n  %s\n  counterexample: %s" what
+                  (excerpt location) (source.show value)))
         in
         (match predicate value with
          | true -> incr passed; k ()
-         | false -> fail ""
-         | exception e -> fail (" raised " ^ Printexc.to_string e))
+         | false -> fail "FAILED"
+         | exception e -> fail ("FAILED, raised " ^ Printexc.to_string e))
   in
+  Printf.printf "%s\n  %s\n" name (excerpt location);
   match run law ignore with
-  | () ->
-      Printf.printf "%-24s passed %d, discarded %d\n" name !passed !discarded
-  | exception Failed msg -> Printf.printf "%-24s FAILED: %s\n" name msg
+  | () -> Printf.printf "  passed %d, discarded %d\n" !passed !discarded
+  | exception Failed msg -> Printf.printf "  %s\n" msg

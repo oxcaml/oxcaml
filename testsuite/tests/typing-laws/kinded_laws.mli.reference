@@ -8,6 +8,7 @@ type 'a each =
   nullable: 'a ;
   plain: 'a }
 val names : string each
+val locations : CamlinternalLaw.location each
 val map : 'a each -> f:('a -> 'b) -> 'b each
 val to_list : 'a each -> 'a list
 type kinded_input =

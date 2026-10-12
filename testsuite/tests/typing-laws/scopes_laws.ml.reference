@@ -36,6 +36,129 @@ let names =
     twice_g_idem = "twice_g_idem";
     outer_inner_mk_ok = "outer_inner_mk_ok"
   }
+let locations =
+  {
+    n_double_add =
+      {
+        CamlinternalLaw.file = "scopes.mli";
+        start_line = 11;
+        start_col = 2;
+        end_line = 11;
+        end_col = 46
+      };
+    n_inner_double_twice =
+      {
+        CamlinternalLaw.file = "scopes.mli";
+        start_line = 13;
+        start_col = 4;
+        end_line = 13;
+        end_col = 59
+      };
+    included_double_add =
+      {
+        CamlinternalLaw.file = "scopes.mli";
+        start_line = 21;
+        start_col = 2;
+        end_line = 21;
+        end_col = 46
+      };
+    included_inner_double_twice =
+      {
+        CamlinternalLaw.file = "scopes.mli";
+        start_line = 23;
+        start_col = 4;
+        end_line = 23;
+        end_col = 59
+      };
+    map_find_elem =
+      {
+        CamlinternalLaw.file = "scopes.mli";
+        start_line = 34;
+        start_col = 2;
+        end_line = 35;
+        end_col = 49
+      };
+    map_set_elem =
+      {
+        CamlinternalLaw.file = "scopes.mli";
+        start_line = 36;
+        start_col = 2;
+        end_line = 37;
+        end_col = 33
+      };
+    map_empty_find_empty =
+      {
+        CamlinternalLaw.file = "scopes.mli";
+        start_line = 39;
+        start_col = 4;
+        end_line = 39;
+        end_col = 63
+      };
+    lex_refl =
+      {
+        CamlinternalLaw.file = "scopes.mli";
+        start_line = 46;
+        start_col = 2;
+        end_line = 46;
+        end_col = 45
+      };
+    order_max_max_comm =
+      {
+        CamlinternalLaw.file = "scopes.mli";
+        start_line = 53;
+        start_col = 4;
+        end_line = 53;
+        end_col = 73
+      };
+    order_max_pair_pair_refl =
+      {
+        CamlinternalLaw.file = "scopes.mli";
+        start_line = 55;
+        start_col = 6;
+        end_line = 56;
+        end_col = 48
+      };
+    idem_idem =
+      {
+        CamlinternalLaw.file = "other.mli";
+        start_line = 4;
+        start_col = 2;
+        end_line = 4;
+        end_col = 37
+      };
+    p_h_pos =
+      {
+        CamlinternalLaw.file = "scopes.mli";
+        start_line = 73;
+        start_col = 4;
+        end_line = 73;
+        end_col = 35
+      };
+    q_idem =
+      {
+        CamlinternalLaw.file = "scopes.mli";
+        start_line = 80;
+        start_col = 2;
+        end_line = 80;
+        end_col = 35
+      };
+    twice_g_idem =
+      {
+        CamlinternalLaw.file = "scopes.mli";
+        start_line = 94;
+        start_col = 2;
+        end_line = 94;
+        end_col = 39
+      };
+    outer_inner_mk_ok =
+      {
+        CamlinternalLaw.file = "scopes.mli";
+        start_line = 102;
+        start_col = 4;
+        end_line = 102;
+        end_col = 38
+      }
+  }
 let map
   { n_double_add; n_inner_double_twice; included_double_add;
     included_inner_double_twice; map_find_elem; map_set_elem;

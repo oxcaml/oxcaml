@@ -18,6 +18,7 @@ type 'a each =
   twice_g_idem: 'a ;
   outer_inner_mk_ok: 'a }
 val names : string each
+val locations : CamlinternalLaw.location each
 val map : 'a each -> f:('a -> 'b) -> 'b each
 val to_list : 'a each -> 'a list
 type n_double_add_input =

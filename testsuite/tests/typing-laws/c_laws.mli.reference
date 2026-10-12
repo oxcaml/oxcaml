@@ -3,6 +3,7 @@ module Laws_gen_Stdlib = Stdlib
 type 'a each = {
   identity: 'a }
 val names : string each
+val locations : CamlinternalLaw.location each
 val map : 'a each -> f:('a -> 'b) -> 'b each
 val to_list : 'a each -> 'a list
 type identity_input =

@@ -5,6 +5,17 @@ module Laws_gen_Stdlib = Stdlib
 type 'a each = {
   distinct: 'a }
 let names = { distinct = "distinct" }
+let locations =
+  {
+    distinct =
+      {
+        CamlinternalLaw.file = "capture.mli";
+        start_line = 3;
+        start_col = 0;
+        end_line = 3;
+        end_col = 39
+      }
+  }
 let map { distinct } ~f = { distinct = (f distinct) }
 let to_list { distinct } = [distinct]
 type distinct_input =

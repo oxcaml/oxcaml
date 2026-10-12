@@ -449,6 +449,19 @@ let unit_exp = Exp.construct (lid "()") None
 
 let string s = Exp.constant (Const.string s)
 
+(* [{ CamlinternalLaw.file = "..."; start_line = ...; ... }]: where a law
+   or a clause is written, for the backend's messages. *)
+let location (loc : Location.t) =
+  let int n = Exp.constant (Const.int n) in
+  let column (pos : Lexing.position) = pos.pos_cnum - pos.pos_bol in
+  Exp.record
+    [ (ldot "CamlinternalLaw" "file", string loc.loc_start.pos_fname);
+      (lid "start_line", int loc.loc_start.pos_lnum);
+      (lid "start_col", int (column loc.loc_start));
+      (lid "end_line", int loc.loc_end.pos_lnum);
+      (lid "end_col", int (column loc.loc_end)) ]
+    None
+
 let tconstr name args = Typ.constr (lid name) args
 
 let arrow label a b = Typ.arrow label a b [] []
@@ -547,6 +560,7 @@ let each_values laws =
   match laws with
   | [] ->
       [ binding "names" unit_exp;
+        binding "locations" unit_exp;
         value "map"
           [param unit_pat; labelled_param (Labelled "f") (Pat.any ())]
           unit_exp;
@@ -561,6 +575,12 @@ let each_values laws =
       [ binding "names"
           (Exp.record
              (List.map (fun law -> (field law, string law.l_field)) laws)
+             None);
+        binding "locations"
+          (Exp.record
+             (List.map
+                (fun law -> (field law, location law.l_values.law_loc))
+                laws)
              None);
         value "map" [param fields; labelled_param (Labelled "f") (pvar f)]
           (Exp.record
@@ -577,6 +597,8 @@ let each_declarations =
   let a = Typ.var "a" None and b = Typ.var "b" None in
   let each ty = tconstr "each" [ty] in
   [ val_ "names" (each (tconstr "string" []));
+    val_ "locations"
+      (each (Typ.constr (ldot "CamlinternalLaw" "location") []));
     val_ "map"
       (arrow Nolabel (each a)
          (arrow (Labelled "f") (arrow Nolabel a b) (each b)));
@@ -648,19 +670,6 @@ let module_types names items =
   @ [ Mtd.mk
         ~typ:(Mty.signature (Sg.mk (List.map (choice_declaration names) items)))
         (mknoloc "Choices") ]
-
-(* [{ CamlinternalLaw.file = "..."; start_line = ...; ... }]: where the
-   clause is written, for the backend's messages. *)
-let location (loc : Location.t) =
-  let int n = Exp.constant (Const.int n) in
-  let column (pos : Lexing.position) = pos.pos_cnum - pos.pos_bol in
-  Exp.record
-    [ (ldot "CamlinternalLaw" "file", string loc.loc_start.pos_fname);
-      (lid "start_line", int loc.loc_start.pos_lnum);
-      (lid "start_col", int (column loc.loc_start));
-      (lid "end_line", int loc.loc_end.pos_lnum);
-      (lid "end_col", int (column loc.loc_end)) ]
-    None
 
 type law_names =
   { choices : string;

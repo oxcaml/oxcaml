@@ -4,6 +4,17 @@ module Laws_gen_Captured = Captured
 type 'a each = {
   f_l: 'a }
 let names = { f_l = "f_l" }
+let locations =
+  {
+    f_l =
+      {
+        CamlinternalLaw.file = "capture_parameter.mli";
+        start_line = 5;
+        start_col = 2;
+        end_line = 5;
+        end_col = 15
+      }
+  }
 let map { f_l } ~f = { f_l = (f f_l) }
 let to_list { f_l } = [f_l]
 module Instantiate(Choice:CamlinternalLaw.Choice) =

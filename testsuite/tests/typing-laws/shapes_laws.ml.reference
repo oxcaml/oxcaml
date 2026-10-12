@@ -37,6 +37,129 @@ let names =
     \#type = "type";
     inferred = "inferred"
   }
+let locations =
+  {
+    area_nonneg =
+      {
+        CamlinternalLaw.file = "shapes.mli";
+        start_line = 21;
+        start_col = 0;
+        end_line = 21;
+        end_col = 39
+      };
+    rect =
+      {
+        CamlinternalLaw.file = "shapes.mli";
+        start_line = 22;
+        start_col = 0;
+        end_line = 23;
+        end_col = 57
+      };
+    origin_x =
+      {
+        CamlinternalLaw.file = "shapes.mli";
+        start_line = 24;
+        start_col = 0;
+        end_line = 24;
+        end_col = 58
+      };
+    bad =
+      {
+        CamlinternalLaw.file = "shapes.mli";
+        start_line = 25;
+        start_col = 0;
+        end_line = 25;
+        end_col = 71
+      };
+    poly =
+      {
+        CamlinternalLaw.file = "shapes.mli";
+        start_line = 26;
+        start_col = 0;
+        end_line = 27;
+        end_col = 46
+      };
+    variant =
+      {
+        CamlinternalLaw.file = "shapes.mli";
+        start_line = 28;
+        start_col = 0;
+        end_line = 29;
+        end_col = 43
+      };
+    disamb =
+      {
+        CamlinternalLaw.file = "shapes.mli";
+        start_line = 30;
+        start_col = 0;
+        end_line = 30;
+        end_col = 58
+      };
+    optional =
+      {
+        CamlinternalLaw.file = "shapes.mli";
+        start_line = 31;
+        start_col = 0;
+        end_line = 32;
+        end_col = 62
+      };
+    modes =
+      {
+        CamlinternalLaw.file = "shapes.mli";
+        start_line = 33;
+        start_col = 0;
+        end_line = 33;
+        end_col = 54
+      };
+    fmt =
+      {
+        CamlinternalLaw.file = "shapes.mli";
+        start_line = 34;
+        start_col = 0;
+        end_line = 34;
+        end_col = 60
+      };
+    fake_format =
+      {
+        CamlinternalLaw.file = "shapes.mli";
+        start_line = 35;
+        start_col = 0;
+        end_line = 35;
+        end_col = 61
+      };
+    optional_none =
+      {
+        CamlinternalLaw.file = "shapes.mli";
+        start_line = 36;
+        start_col = 0;
+        end_line = 37;
+        end_col = 64
+      };
+    unboxed =
+      {
+        CamlinternalLaw.file = "shapes.mli";
+        start_line = 38;
+        start_col = 0;
+        end_line = 38;
+        end_col = 55
+      };
+    \#type =
+      {
+        CamlinternalLaw.file = "shapes.mli";
+        start_line = 39;
+        start_col = 0;
+        end_line = 39;
+        end_col = 50
+      };
+    inferred =
+      {
+        CamlinternalLaw.file = "shapes.mli";
+        start_line = 40;
+        start_col = 0;
+        end_line = 40;
+        end_col = 33
+      }
+  }
 let map
   { area_nonneg; rect; origin_x; bad; poly; variant; disamb; optional; 
     modes; fmt; fake_format; optional_none; unboxed; \#type; inferred }

@@ -16,6 +16,49 @@ let names =
     nullable = "nullable";
     plain = "plain"
   }
+let locations =
+  {
+    kinded =
+      {
+        CamlinternalLaw.file = "kinded.mli";
+        start_line = 3;
+        start_col = 0;
+        end_line = 3;
+        end_col = 45
+      };
+    kinded_unused =
+      {
+        CamlinternalLaw.file = "kinded.mli";
+        start_line = 4;
+        start_col = 0;
+        end_line = 4;
+        end_col = 53
+      };
+    kinded_shared =
+      {
+        CamlinternalLaw.file = "kinded.mli";
+        start_line = 5;
+        start_col = 0;
+        end_line = 5;
+        end_col = 68
+      };
+    nullable =
+      {
+        CamlinternalLaw.file = "kinded.mli";
+        start_line = 6;
+        start_col = 0;
+        end_line = 6;
+        end_col = 47
+      };
+    plain =
+      {
+        CamlinternalLaw.file = "kinded.mli";
+        start_line = 7;
+        start_col = 0;
+        end_line = 7;
+        end_col = 26
+      }
+  }
 let map { kinded; kinded_unused; kinded_shared; nullable; plain } ~f =
   {
     kinded = (f kinded);

@@ -4,6 +4,17 @@ module Laws_gen_Stdlib = Stdlib
 type 'a each = {
   identity: 'a }
 let names = { identity = "identity" }
+let locations =
+  {
+    identity =
+      {
+        CamlinternalLaw.file = "c.mli";
+        start_line = 4;
+        start_col = 0;
+        end_line = 4;
+        end_col = 33
+      }
+  }
 let map { identity } ~f = { identity = (f identity) }
 let to_list { identity } = [identity]
 type identity_input =

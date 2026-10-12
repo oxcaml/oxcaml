@@ -34,6 +34,10 @@ module type Choice = sig
   type 'a t
 end
 
+(** A range of the interface declaring the laws, as the compiler was given
+    the file. Lines count from 1 and columns from 0; the end is exclusive.
+    [Assumption] and [Assertion] locate their clause; the [locations] of a
+    generated file locate each law, from [law?] to its end. *)
 type location =
   { file : string;
     start_line : int;
