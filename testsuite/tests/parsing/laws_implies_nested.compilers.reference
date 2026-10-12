@@ -1,0 +1,8 @@
+File "laws_implies_nested.ml", line 11, characters 39-43:
+11 | law? nested (a : bool) (b : bool) : (a ===> b)
+                                            ^^^^
+Error: Syntax error: ) expected
+File "laws_implies_nested.ml", line 11, characters 36-37:
+11 | law? nested (a : bool) (b : bool) : (a ===> b)
+                                         ^
+  This ( might be unmatched

@@ -103,6 +103,8 @@ type error =
       old_source_file : Misc.filepath;
     }
   | Duplicate_parameter_name of Global_module.Parameter_name.t
+  | Law_parameter_not_representable of type_expr * Jkind.Violation.t
+  | Law_duplicate_parameter of string
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
@@ -648,6 +650,31 @@ let check_usage_after_substitution env ~loc ~lid paths sg =
   | [_] -> ()
   | _ -> do_check_after_substitution env ~loc ~lid paths sg
 
+(* The first law of a signature, including those of its submodules and
+   module types, that satisfies [f] *)
+let rec find_law f (sg : Types.signature) = List.find_map (find_law_item f) sg
+
+and find_law_item f (item : Types.signature_item) =
+  match item with
+  | Sig_law (id, ld, _) -> if f ld then Some (id, ld) else None
+  | Sig_module (_, _, md, _, _) -> find_law_modtype f md.md_type
+  | Sig_modtype (_, { mtd_type = Some mty; _ }, _) -> find_law_modtype f mty
+  | Sig_modtype (_, { mtd_type = None; _ }, _)
+  | Sig_value _ | Sig_type _ | Sig_typext _ | Sig_class _
+  | Sig_class_type _ | Sig_jkind _ ->
+      None
+
+and find_law_modtype f = function
+  | Mty_signature sg -> find_law f sg
+  | Mty_functor (Named (_, arg, _), res, _) ->
+      begin match find_law_modtype f arg with
+      | Some _ as law -> law
+      | None -> find_law_modtype f res
+      end
+  | Mty_functor (Unit, res, _) -> find_law_modtype f res
+  | Mty_strengthen (mty, _, _, _) -> find_law_modtype f mty
+  | Mty_ident _ | Mty_alias _ -> None
+
 (* After substitution one also needs to re-check the well-foundedness
    of type declarations in recursive modules *)
 let rec extract_next_modules = function
@@ -810,12 +837,12 @@ and remove_modality_and_zero_alloc_variables_mty env ~zap_modality mty =
       remove_modality_and_zero_alloc_variables_mty env ~zap_modality mty
     in
     Mty_functor (param, mty, mm)
-  | Mty_strengthen (mty, path, alias) ->
+  | Mty_strengthen (mty, path, alias, value_equations) ->
       let mty =
         remove_modality_and_zero_alloc_variables_mty env
           ~zap_modality:Mode.Modality.to_const_exn mty
       in
-      Mty_strengthen (mty, path, alias)
+      Mty_strengthen (mty, path, alias, value_equations)
 
 
 module Merge = struct
@@ -1166,7 +1193,9 @@ module Merge = struct
             let modalities = Modality.(Const.id |> of_const) in
             let md'' = { md' with md_type = mty; md_modalities = modalities} in
             let newmd =
-              Mtype.strengthen_decl ~aliasable:false md'' path in
+              Mtype.strengthen_decl ~aliasable:false
+                ~value_equations:Not_recorded md'' path
+            in
             (* Inclusion check with the original signature *)
             let _ = if (not approx) then
                ignore (Includemod.modtypes ~mark:true ~loc sig_env
@@ -1426,11 +1455,11 @@ and apply_modalities_module_type env modalities = function
       | None -> Mty_ident p, modalities
       | Some mty -> apply_modalities_module_type env modalities mty
       end
-  | Mty_strengthen (mty, p, alias) ->
+  | Mty_strengthen (mty, p, alias, value_equations) ->
       let mty', modalities' =
         apply_modalities_module_type env modalities mty
       in
-      Mty_strengthen (mty', p, alias), modalities'
+      Mty_strengthen (mty', p, alias, value_equations), modalities'
   | Mty_signature sg ->
       let sg = apply_modalities_signature ~recursive:true env modalities sg in
       Mty_signature sg, Mode.Modality.Const.id
@@ -1554,7 +1583,7 @@ let rec approx_modtype env smty =
           ~loc:mod_id.loc mod_id.txt env
       in
       let aliasable = (not (Env.is_functor_arg path env)) in
-      Mty_strengthen (mty, path, Aliasability.aliasable aliasable)
+      Mty_strengthen (mty, path, Aliasability.aliasable aliasable, Not_recorded)
 
 and approx_module_declaration env pmd =
   {
@@ -1778,6 +1807,7 @@ module Signature_names : sig
   val check_class     : ?info:info -> t -> Location.t -> Ident.t -> unit
   val check_class_type: ?info:info -> t -> Location.t -> Ident.t -> unit
   val check_jkind     : ?info:info -> t -> Location.t -> Ident.t -> unit
+  val check_law       : ?info:info -> t -> Location.t -> Ident.t -> unit
 
   val check_sig_item:
     ?info:info -> t -> Location.t -> Signature_group.rec_group -> unit
@@ -1826,6 +1856,7 @@ end = struct
     classes: names_infos;
     class_types: names_infos;
     jkinds: names_infos;
+    laws: names_infos;
   }
 
   let new_names () = {
@@ -1837,6 +1868,7 @@ end = struct
     classes = Hashtbl.create 16;
     class_types = Hashtbl.create 16;
     jkinds = Hashtbl.create 16;
+    laws = Hashtbl.create 16;
   }
 
   type t = {
@@ -1863,6 +1895,7 @@ end = struct
     | Class -> names.classes
     | Class_type -> names.class_types
     | Jkind -> names.jkinds
+    | Law -> names.laws
 
   let check_unsafe_subst loc env: _ result -> _ = function
     | Ok x -> x
@@ -1918,6 +1951,8 @@ end = struct
     check Sig_component_kind.Class_type t loc id info
   let check_jkind ?(info=`Exported) t loc id =
     check Sig_component_kind.Jkind t loc id info
+  let check_law ?(info=`Exported) t loc id =
+    check Sig_component_kind.Law t loc id info
 
   let classify =
     let open Sig_component_kind in
@@ -1930,6 +1965,7 @@ end = struct
     | Sig_class (id, _, _, _) -> Class, id
     | Sig_class_type (id, _, _, _) -> Class_type, id
     | Sig_jkind (id, _, _) -> Jkind, id
+    | Sig_law (id, _, _) -> Law, id
 
   let check_item ?info names loc kind id ids =
     let info =
@@ -1960,6 +1996,17 @@ end = struct
      If some reference cannot be removed, then we error out with
      [Cannot_hide_id].
   *)
+  (* The law of [item], possibly in a submodule or module type, that refers
+     to [id], for error messages. *)
+  let law_referring_to env id item =
+    let refers_to ld =
+      match Ctype.nondep_law_description env [id] ld with
+      | _ -> false
+      | exception Ctype.Nondep_cannot_erase _ -> true
+    in
+    Option.map (fun (law, (ld : Types.law_description)) -> (law, ld.law_loc))
+      (find_law_item refers_to item)
+
   let simplify env t sg =
     let to_remove = t.to_be_removed in
     let ids_to_remove =
@@ -1969,6 +2016,14 @@ end = struct
         else
           lst
       ) to_remove.hide []
+    in
+    (* Laws may additionally refer to values and extension constructors. *)
+    let ids_to_remove_from_laws =
+      Ident.Map.fold (fun id (kind,  _, _) lst ->
+        match (kind : Sig_component_kind.t) with
+        | Value | Extension_constructor -> id :: lst
+        | _ -> lst
+      ) to_remove.hide ids_to_remove
     in
     let simplify_item (component: Types.signature_item) =
       let user_kind, user_id, user_loc =
@@ -1982,6 +2037,7 @@ end = struct
         | Sig_class (id, c, _, _) -> Class, id, c.cty_loc
         | Sig_class_type (id, ct, _, _) -> Class_type, id, ct.clty_loc
         | Sig_jkind (id, jkd, _) -> Jkind, id, jkd.jkind_loc
+        | Sig_law (id, ld, _) -> Law, id, ld.law_loc
       in
       if Ident.Map.mem user_id to_remove.hide then
         None
@@ -1993,6 +2049,16 @@ end = struct
             check_unsafe_subst user_loc env @@
             Subst.Unsafe.signature_item Keep to_remove.subst component
         in
+        let ids_to_remove =
+          match component with
+          | Sig_law _ -> ids_to_remove_from_laws
+          | (Sig_module _ | Sig_modtype _)
+            when ids_to_remove_from_laws != ids_to_remove
+                 && Subst.value_substitution_enabled ()
+                 && Btype.signature_has_laws [component] ->
+              ids_to_remove_from_laws
+          | _ -> ids_to_remove
+        in
         let component =
           match ids_to_remove with
           | [] -> component
@@ -2001,6 +2067,19 @@ end = struct
             | Ctype.Nondep_cannot_erase removed_item_id ->
               let (removed_item_kind, removed_item_loc, reason) =
                 Ident.Map.find removed_item_id to_remove.hide
+              in
+              let user_kind, user_id, user_loc =
+                match removed_item_kind, component with
+                | (Value | Extension_constructor),
+                  (Sig_module _ | Sig_modtype _) ->
+                    begin match
+                      law_referring_to env removed_item_id component
+                    with
+                    | Some (law_id, law_loc) ->
+                        Sig_component_kind.Law, law_id, law_loc
+                    | None -> user_kind, user_id, user_loc
+                    end
+                | _ -> user_kind, user_id, user_loc
               in
               let err_loc, hiding_error =
                 match reason with
@@ -2067,6 +2146,118 @@ let mksig desc env loc =
   sg
 
 (* let signature sg = List.map (fun item -> item.sig_type) sg *)
+
+(* The type variables of a law are shared between its parameters and its
+   clauses, and generalized at the end. *)
+
+let transl_law env (ld : Parsetree.law_declaration)
+    : Typedtree.law_declaration =
+  Language_extension.assert_enabled ~loc:ld.plaw_loc Laws ();
+  Subst.enable_value_substitution ();
+  List.fold_left
+    (fun seen (name, _) ->
+       if List.mem name.txt seen then
+         raise (Error (name.loc, env, Law_duplicate_parameter name.txt));
+       name.txt :: seen)
+    [] ld.plaw_params
+  |> ignore;
+  let law_params, law_assumptions, law_conclusion =
+    Ctype.with_local_level_generalize ~before_generalize:ignore
+      begin fun () ->
+        Typetexp.TyVarEnv.reset ();
+        let params =
+          List.map
+            (fun (lp_name, sty) ->
+               let lp_type =
+                 Option.map
+                   (Typetexp.transl_simple_type env ~new_var_jkind:Any
+                      ~closed:false With_locality.Const.legacy)
+                   sty
+               in
+               let ty, sort =
+                 match lp_type with
+                 | Some cty ->
+                     let ty = cty.ctyp_type in
+                     begin match
+                       Ctype.type_sort ~why:Function_argument ~fixed:false env
+                         ty
+                     with
+                     | Ok sort -> ty, sort
+                     | Error violation ->
+                         raise (Error (cty.ctyp_loc, env,
+                                       Law_parameter_not_representable
+                                         (ty, violation)))
+                     end
+                 | None ->
+                     let jkind, sort =
+                       Jkind.of_new_sort_var ~why:Function_argument
+                         ~level:(Ctype.get_current_level ())
+                     in
+                     Ctype.newvar jkind, sort
+               in
+               { lp_id = Ident.create_local lp_name.txt; lp_name; lp_type },
+               ty, sort)
+            ld.plaw_params
+        in
+        let env =
+          List.fold_left
+            (fun env ({ lp_id; lp_name; lp_type = _ }, ty, sort) ->
+               let desc =
+                 { val_type = ty;
+                   val_kind = Val_reg sort;
+                   val_lpoly = Lpoly.determined [];
+                   val_modalities = Modality.undefined;
+                   val_attributes = [];
+                   val_zero_alloc = Zero_alloc.default;
+                   val_loc = lp_name.loc;
+                   val_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
+                   val_alias = None }
+               in
+               let check s =
+                 Warnings.Unused_var_strict { name = s; mutated = false }
+               in
+               Env.add_value ~check ~mode:With_regionality.legacy
+                 lp_id desc env)
+            env params
+        in
+        let clause sexp =
+          Typecore.type_expect env sexp (Typecore.mk_expected Predef.type_bool)
+        in
+        let law_assumptions = List.map clause ld.plaw_assumptions in
+        let law_conclusion = clause ld.plaw_conclusion in
+        List.map (fun (p, ty, _) -> (p, ty)) params,
+        law_assumptions, law_conclusion
+      end
+  in
+  let bound =
+    List.fold_left
+      (fun bound (p, _) -> Ident.Set.add p.lp_id bound)
+      Ident.Set.empty law_params
+  in
+  let spec = Translspec.expression ~bound in
+  let law_law =
+    { law_params = List.map (fun (p, ty) -> (p.lp_id, ty)) law_params;
+      law_assumptions = List.map spec law_assumptions;
+      law_conclusion = spec law_conclusion;
+      law_attributes = ld.plaw_attributes;
+      law_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
+      law_loc = ld.plaw_loc }
+  in
+  (* Mode and sort variables are zapped as in the other items of a
+     signature (see [remove_mode_and_jkind_variables]). *)
+  With_locality.with_zap_scope (fun ~zap_scope ->
+    let remove ty = Ctype.remove_mode_and_jkind_variables ~zap_scope ty in
+    List.iter (fun (_, ty) -> remove ty) law_law.law_params;
+    List.iter (Spec.iter_types remove) law_law.law_assumptions;
+    Spec.iter_types remove law_law.law_conclusion);
+  { law_id = Ident.create_local ld.plaw_name.txt;
+    law_name = ld.plaw_name;
+    law_law;
+    law_params = List.map fst law_params;
+    law_assumptions;
+    law_conclusion;
+    law_attributes = ld.plaw_attributes;
+    law_loc = ld.plaw_loc }
 
 let rec transl_modtype ?(md_mode = With_regionality.Const.legacy) env smty =
   Builtin_attributes.warning_scope smty.pmty_attributes
@@ -2161,7 +2352,8 @@ and transl_modtype_aux md_mode env smty =
         mkmty
           (Tmty_strengthen (tmty, path, mod_id))
           (Mty_strengthen
-            (tmty.mty_type, path, Aliasability.aliasable aliasable))
+             (tmty.mty_type, path, Aliasability.aliasable aliasable,
+              Not_recorded))
           env
           loc
           []
@@ -2604,6 +2796,11 @@ and transl_signature ?(interface_toplevel = false) ~md_mode env
         Signature_names.check_jkind names decl.jkind_loc decl.jkind_id;
         let item = Sig_jkind(id, decl.jkind_jkind, Exported) in
         mksig (Tsig_jkind decl) env loc, [item], newenv
+    | Psig_law sld ->
+        let decl = transl_law env sld in
+        Signature_names.check_law names decl.law_loc decl.law_id;
+        let item = Sig_law (decl.law_id, decl.law_law, Exported) in
+        mksig (Tsig_law decl) env loc, [item], env
   in
   let rec transl_sig env sig_items sig_type = function
     | [] -> List.rev sig_items, List.rev sig_type, env
@@ -2838,7 +3035,7 @@ let rec nongen_modtype env f g = function
             Env.add_module ~arg:true id Mp_present param ~mode env
       in
       nongen_modtype env f g body
-  | Mty_strengthen (mty,_ ,_) -> nongen_modtype env f g mty
+  | Mty_strengthen (mty,_ ,_,_) -> nongen_modtype env f g mty
 
 (** Recursively iterate a signature, and:
 - call [f] on all value description types, which potentailly contain
@@ -2971,7 +3168,8 @@ let check_recmodule_inclusion env bindings =
     match id with
     | None -> mty
     | Some id ->
-        Mtype.strengthen ~aliasable:false mty (Subst.module_path s (Pident id))
+        Mtype.strengthen ~aliasable:false ~value_equations:Recorded mty
+          (Subst.module_path s (Pident id))
   in
 
   let rec check_incl first_time n env s =
@@ -3129,7 +3327,7 @@ and package_constraints env loc mty constrs =
     | mty ->
       let rec ident = function
           Mty_ident p -> p
-        | Mty_strengthen (mty,_,_) -> ident mty
+        | Mty_strengthen (mty,_,_,_) -> ident mty
         | Mty_functor _ | Mty_alias _ | Mty_signature _ -> assert false
       in
       raise(Error(loc, env, Cannot_scrape_package_type (ident mty)))
@@ -3494,8 +3692,9 @@ and type_module_path_aux ~alias ~hold_locks ~strengthen env path
     if alias && aliasable then
       (Env.add_required_global path env; md)
     else begin
-      let mty = Mtype.find_type_of_module
-          ~strengthen ~aliasable env path
+      let mty =
+        Mtype.find_type_of_module ~strengthen ~aliasable
+          ~value_equations:Recorded env path
       in
       match mty with
       | Mty_alias p1 when not alias ->
@@ -3810,6 +4009,7 @@ and type_open_decl_aux ?used_slot ?toplevel ~funct_body names env od =
         | Sig_class_type(id, ctd, rs, _) ->
             Sig_class_type(id, ctd, rs, visibility)
         | Sig_jkind(id, jkd, _) -> Sig_jkind(id, jkd, visibility)
+        | Sig_law(id, ld, _) -> Sig_law(id, ld, visibility)
       ) sg
     in
     let open_descr = {
@@ -4276,6 +4476,11 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
         in
         let item = Sig_jkind(id, decl.jkind_jkind, Exported) in
         Tstr_jkind decl, [item], shape_map, env
+    | Pstr_law sld ->
+        let decl = transl_law env sld in
+        Signature_names.check_law names decl.law_loc decl.law_id;
+        let item = Sig_law (decl.law_id, decl.law_law, Exported) in
+        Tstr_law decl, [item], shape_map, env
   in
   let toplevel_sig = Option.value toplevel ~default:[] in
   let rec type_struct env shape_map sstr str_acc sig_acc
@@ -4353,7 +4558,7 @@ let rec normalize_modtype = function
   | Mty_alias _ -> ()
   | Mty_signature sg -> normalize_signature sg
   | Mty_functor(_param, body, _) -> normalize_modtype body
-  | Mty_strengthen (mty,_,_) -> normalize_modtype mty
+  | Mty_strengthen (mty,_,_,_) -> normalize_modtype mty
 
 and normalize_signature sg = List.iter normalize_signature_item sg
 
@@ -5220,10 +5425,10 @@ let invalid_part_of_user_kind : Sig_component_kind.t -> string  = function
   | Type -> "kind"
   | Jkind -> "definition"
   | ( Value | Constructor | Label | Unboxed_label | Module | Module_type
-    | Extension_constructor | Class | Class_type ) ->
+    | Extension_constructor | Class | Class_type | Law ) ->
     "type"
 
-let report_error ~loc _env = function
+let report_error ~loc env = function
     Cannot_apply mty ->
       Location.errorf ~loc
         "@[This module is not a functor; it has type@ %a@]"
@@ -5421,6 +5626,38 @@ let report_error ~loc _env = function
      in
      { report with main = { report.main with txt} }
   | Cannot_hide_id Illegal_shadowing
+      { shadowed_item_kind; shadowed_item_id; shadowed_item_loc = _;
+        shadower_id = _; user_id; user_kind = Law; user_loc } ->
+      let shadowed_item_kind =
+        Sig_component_kind.to_string shadowed_item_kind
+      in
+      let user_msg =
+        Location.msg ~loc:user_loc
+          "@[The law %a refers to the %s %a.@]"
+          Style.inline_code (Ident.name user_id)
+          shadowed_item_kind
+          Style.inline_code (Ident.name shadowed_item_id)
+      in
+      Location.errorf ~loc ~sub:[user_msg]
+        "Illegal shadowing of the %s %a used by a law."
+        shadowed_item_kind
+        Style.inline_code (Ident.name shadowed_item_id)
+  | Cannot_hide_id Appears_in_signature
+      { opened_item_kind; opened_item_id; user_id; user_kind = Law;
+        user_loc } ->
+      let opened_item_kind = Sig_component_kind.to_string opened_item_kind in
+      let user_msg =
+        Location.msg ~loc:user_loc
+          "@[The law %a refers to the %s %a.@]"
+          Style.inline_code (Ident.name user_id)
+          opened_item_kind
+          Style.inline_code (Ident.name opened_item_id)
+      in
+      Location.errorf ~loc ~sub:[user_msg]
+        "The %s %a introduced by this open is used by a law."
+        opened_item_kind
+        Style.inline_code (Ident.name opened_item_id)
+  | Cannot_hide_id Illegal_shadowing
       { shadowed_item_kind; shadowed_item_id; shadowed_item_loc;
         shadower_id; user_id; user_kind; user_loc } ->
       let shadowed =
@@ -5533,6 +5770,16 @@ let report_error ~loc _env = function
       Location.errorf ~loc
         "This instance has multiple arguments with the name %a."
         (Style.as_inline_code Global_module.Parameter_name.print) name
+  | Law_parameter_not_representable (ty, violation) ->
+      Location.errorf ~loc
+        "@[The parameters of a law must be representable.@]@ %a"
+        (Jkind.Violation.report_with_offender
+           ~offender:(fun ppf -> Printtyp.Doc.type_expr ppf ty)
+           env) violation
+  | Law_duplicate_parameter name ->
+      Location.errorf ~loc
+        "The law parameter %a is bound several times."
+        Style.inline_code name
 
 let report_error env ~loc err =
   Printtyp.wrap_printing_env ~error:true env

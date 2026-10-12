@@ -46,56 +46,60 @@
 < type nonrec jkind_declaration = jkind_declaration =
 ---
 > and jkind_declaration =
-161c161
+160c160
+< type nonrec law_declaration = law_declaration =
+---
+> type law_declaration =
+170c170
 <   type t = type_declaration =
 ---
 >   type t =
-179c179
+188c188
 <   type t = constant =
 ---
 >   type t =
-194c194
+203c203
 <   type nonrec function_param_desc = function_param_desc =
 ---
 >   type function_param_desc =
-198c198
+207c207
 <   type nonrec function_param = function_param =
 ---
 >   type function_param =
-208c208
+217c217
 <     type t = function_constraint =
 ---
 >     type t =
-234c234
+243c243
 < type nonrec access_flag = access_flag =
 ---
 > type nonrec access_flag =
-239c239
+248c248
 < type nonrec block_access = block_access =
 ---
 > type block_access =
-243c243
+252c252
 < type nonrec unboxed_access = unboxed_access = Uaccess_unboxed_field of Astlib.Longident.t loc
 ---
 > type unboxed_access = Uaccess_unboxed_field of Astlib.Longident.t loc
-246c246
+255c255
 <   type t = core_type_desc =
 ---
 >   type t =
-271c271
+280c280
 <   type t = core_type =
 ---
 >   type t =
-283c283
+292c292
 <   type t = pattern_desc =
 ---
 >   type t =
-294c294,295
+303c303,304
 <         Astlib.Longident.t loc * ((string loc * jkind_annotation option) list * pattern) option
 ---
 >         Astlib.Longident.t loc
 >         * ((string loc * jkind_annotation option) list * pattern) option
-313c314,319
+322c323,328
 <   type t = expression_desc =
 ---
 >   (* TODO: Fully support comprehensions upstream. *)
@@ -104,42 +108,42 @@
 >     | Pcomp_array_comprehension of unit
 > 
 >   type t =
-373c379
+382c388
 <   type t = type_kind =
 ---
 >   type t =
-399c405
+408c414
 <   type 'a t = 'a include_infos =
 ---
 >   type 'a t =
-411c417
+420c426
 <   type t = signature_item_desc =
 ---
 >   type t =
-435c441
+445c451
 <   type t = signature =
 ---
 >   type t =
-446c452
+456c462
 <   type t = structure_item_desc =
 ---
 >   type t =
-469c475
+480c486
 <   type t = functor_parameter =
 ---
 >   type t =
-478c484
+489c495
 <   type t = module_type_desc =
 ---
 >   type t =
-493c499,502
+504c510,513
 <   type t = module_expr_desc =
 ---
 >   (* TODO: Fully support module instances upstream. *)
 >   type module_instance = private Module_instance
 > 
 >   type t =
-509,514c518,643
+520,525c529,654
 <   class virtual map : Ppxlib_ast.Ast.map
 <   class virtual iter : Ppxlib_ast.Ast.iter
 <   class virtual ['acc] fold : ['acc] Ppxlib_ast.Ast.fold
@@ -273,7 +277,7 @@
 >     inherit ['ctx] Ppxlib_ast.Ast.map_with_context
 >     inherit ['ctx] Jane_street_extensions0_ctx(Ts.Map_with_context).t
 >   end
-516,517c645,653
+527,528c656,664
 <   class virtual ['ctx, 'res] lift_map_with_context :
 <     ['ctx, 'res] Ppxlib_ast.Ast.lift_map_with_context
 ---

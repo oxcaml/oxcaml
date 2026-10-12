@@ -82,6 +82,8 @@ val process_deferred_actions :
   (* compile implementation *)
   (source_file:string -> output_prefix:string -> unit) *
   (* compile interface *)
+  (Clflags.laws_file -> cmi:string -> output:string option -> unit) *
+  (* generate the laws file of a compiled interface *)
   string * (* ocaml module extension *)
   string -> (* ocaml library extension *)
   unit

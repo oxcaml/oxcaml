@@ -46,6 +46,7 @@ type mapper = {
   include_description: mapper -> T.include_description -> include_description;
   jkind_declaration: mapper -> T.jkind_declaration -> jkind_declaration;
   label_declaration: mapper -> T.label_declaration -> label_declaration;
+  law_declaration: mapper -> T.law_declaration -> law_declaration;
   location: mapper -> Location.t -> Location.t;
   module_binding: mapper -> T.module_binding -> module_binding;
   module_declaration: mapper -> T.module_declaration -> module_declaration;
@@ -217,6 +218,8 @@ let structure_item sub item =
         Pstr_attribute x
     | Tstr_jkind x ->
         Pstr_jkind (sub.jkind_declaration sub x)
+    | Tstr_law x ->
+        Pstr_law (sub.law_declaration sub x)
   in
   Str.mk ~loc desc
 
@@ -342,6 +345,18 @@ let jkind_declaration _sub decl =
     pjkind_manifest = decl.jkind_annotation;
     pjkind_attributes = decl.jkind_attributes;
     pjkind_loc = decl.jkind_jkind.jkind_loc }
+
+let law_declaration sub (decl : T.law_declaration) =
+  { plaw_name = map_loc sub decl.law_name;
+    plaw_params =
+      List.map
+        (fun (p : T.law_param) ->
+           (map_loc sub p.lp_name, Option.map (sub.typ sub) p.lp_type))
+        decl.law_params;
+    plaw_assumptions = List.map (sub.expr sub) decl.law_assumptions;
+    plaw_conclusion = sub.expr sub decl.law_conclusion;
+    plaw_attributes = sub.attributes sub decl.law_attributes;
+    plaw_loc = sub.location sub decl.law_loc }
 
 let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
   let loc = sub.location sub pat.pat_loc in
@@ -909,6 +924,8 @@ let signature_item sub item =
         Psig_attribute x
     | Tsig_jkind x ->
         Psig_jkind (sub.jkind_declaration sub x)
+    | Tsig_law x ->
+        Psig_law (sub.law_declaration sub x)
   in
   Sig.mk ~loc desc
 
@@ -1283,6 +1300,7 @@ let default_mapper =
     row_field = row_field ;
     object_field = object_field ;
     jkind_declaration = jkind_declaration;
+    law_declaration = law_declaration;
   }
 
 let untype_structure ?(mapper : mapper = default_mapper) structure =

@@ -128,6 +128,7 @@ module Sig_component_kind : sig
     | Class
     | Class_type
     | Jkind
+    | Law
 
   val to_string : t -> string
 end
@@ -206,6 +207,8 @@ type error =
       old_source_file: Misc.filepath;
     }
   | Duplicate_parameter_name of Global_module.Parameter_name.t
+  | Law_parameter_not_representable of type_expr * Jkind.Violation.t
+  | Law_duplicate_parameter of string
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error

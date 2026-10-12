@@ -52,6 +52,10 @@ val with_labels: bool -> (unit -> 'a) -> 'a
 
 val ident_name: Shape.Sig_component_kind.t option -> Ident.t -> out_name
 val tree_of_path: Path.t -> out_ident
+
+(** The path as printed by [tree_of_path], as a long identifier. *)
+val lident_of_path: Path.t -> Longident.t
+
 val namespaced_tree_of_path: Shape.Sig_component_kind.t -> Path.t -> out_ident
 val tree_of_type_path: Path.t -> out_ident
 (** Specialized functions for printing types with [short-paths] *)
@@ -178,6 +182,19 @@ val tree_of_cltype_declaration:
 
 val tree_of_jkind_declaration:
     Ident.t -> jkind_declaration -> out_sig_item
+val tree_of_law_description:
+    Ident.t -> law_description -> out_sig_item
+
+(** The types of the parameters of a law, which share their type variables,
+    with the kinds of the variables annotated at their first occurrence. *)
+val tree_of_law_params:
+    (Ident.t * type_expr) list -> (string * out_type) list
+
+(** The types of the parameters of a law, and its type variables with their
+    kinds, nullability included. *)
+val tree_of_law_quantification:
+    (Ident.t * type_expr) list ->
+    (string * out_jkind) list * (string * out_type) list
 
 (** {1 Module types }*)
 

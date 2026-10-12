@@ -153,6 +153,9 @@ val use_runtime : string ref
 val plugin : bool ref
 val principal : bool ref
 val print_variance : bool ref
+
+type laws_file = Laws_implementation | Laws_interface
+val generate_laws : laws_file option ref
 val real_paths : bool ref
 val recursive_types : bool ref
 val strict_sequence : bool ref

@@ -43,6 +43,7 @@ type mapper =
       mapper -> Parsetree.jkind_annotation -> Parsetree.jkind_annotation;
     jkind_declaration:
       mapper -> jkind_declaration -> jkind_declaration;
+    law_declaration: mapper -> law_declaration -> law_declaration;
     location: mapper -> Location.t -> Location.t;
     modalities: mapper -> modalities -> modalities;
     (* CR-someday lstevenson: If we ever want to inspect the [mode_modes] field,
@@ -214,6 +215,7 @@ let structure_item sub {str_loc; str_desc; str_env} =
     | Tstr_open od -> Tstr_open (sub.open_declaration sub od)
     | Tstr_attribute attr -> Tstr_attribute (sub.attribute sub attr)
     | Tstr_jkind d -> Tstr_jkind (sub.jkind_declaration sub d)
+    | Tstr_law d -> Tstr_law (sub.law_declaration sub d)
   in
   {str_desc; str_env; str_loc}
 
@@ -330,6 +332,24 @@ let[@warning "+9"] jkind_declaration sub
   let jkind_loc = sub.location sub jkind_loc in
   {jkind_id; jkind_name; jkind_jkind; jkind_annotation; jkind_attributes;
    jkind_loc}
+
+let[@warning "+9"] law_declaration sub
+     {law_id; law_name; law_law; law_params; law_assumptions; law_conclusion;
+      law_attributes; law_loc} =
+  let law_name = map_loc sub law_name in
+  let law_params =
+    List.map
+      (fun {lp_id; lp_name; lp_type} ->
+         {lp_id; lp_name = map_loc sub lp_name;
+          lp_type = Option.map (sub.typ sub) lp_type})
+      law_params
+  in
+  let law_assumptions = List.map (sub.expr sub) law_assumptions in
+  let law_conclusion = sub.expr sub law_conclusion in
+  let law_attributes = sub.attributes sub law_attributes in
+  let law_loc = sub.location sub law_loc in
+  {law_id; law_name; law_law; law_params; law_assumptions; law_conclusion;
+   law_attributes; law_loc}
 
 let pat_extra sub = function
   | Tpat_unpack as d -> d
@@ -824,6 +844,7 @@ let signature_item sub x =
     | Tsig_open od -> Tsig_open (sub.open_description sub od)
     | Tsig_attribute attr -> Tsig_attribute (sub.attribute sub attr)
     | Tsig_jkind jd -> Tsig_jkind (sub.jkind_declaration sub jd)
+    | Tsig_law ld -> Tsig_law (sub.law_declaration sub ld)
   in
   {sig_loc; sig_desc; sig_env}
 
@@ -1212,6 +1233,7 @@ let default =
     extension_constructor;
     jkind_annotation;
     jkind_declaration;
+    law_declaration;
     location;
     modalities;
     modes;

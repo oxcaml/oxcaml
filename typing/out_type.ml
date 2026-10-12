@@ -148,6 +148,7 @@ let human_unique n id = Printf.sprintf "%s/%d" (Ident.name id) n
     | Class
     | Class_type
     | Jkind
+    | Law
 
 
 module Namespace = struct
@@ -161,9 +162,10 @@ module Namespace = struct
     | Extension_constructor | Value | Constructor | Label -> 5
     | Unboxed_label -> 6
     | Jkind -> 7
+    | Law -> 8
      (* we do not handle those component *)
 
-  let size = 1 + id Jkind
+  let size = 1 + id Law
 
 
   let pp ppf x =
@@ -182,7 +184,7 @@ module Namespace = struct
     | Some Class_type -> to_lookup Env.find_cltype_by_name
     | Some Jkind -> to_lookup Env.find_jkind_by_name
     | None
-    | Some(Value|Extension_constructor|Constructor|Label|Unboxed_label) ->
+    | Some(Value|Extension_constructor|Constructor|Label|Unboxed_label|Law) ->
          fun _ -> raise Not_found
 
   let location namespace id =
@@ -196,7 +198,8 @@ module Namespace = struct
         | Some Class -> (in_printing_env @@ Env.find_class path).cty_loc
         | Some Class_type -> (in_printing_env @@ Env.find_cltype path).clty_loc
         | Some Jkind -> (in_printing_env @@ Env.find_jkind path).jkind_loc
-        | Some (Extension_constructor|Value|Constructor|Label|Unboxed_label)
+        | Some (Extension_constructor|Value|Constructor|Label|Unboxed_label
+               |Law)
         | None ->
             Location.none
       ) with Not_found -> None
@@ -3827,6 +3830,147 @@ let tree_of_cltype_declaration id cl rs =
      tree_of_class_type Type_scheme params cl.clty_type,
      tree_of_rec rs)
 
+(* Paths of the clauses of laws, shortened like the paths of types *)
+let rec longident_of_out_ident : out_ident -> Longident.t = function
+  | Oide_ident n -> Lident n.printed_name
+  | Oide_dot (p, s) ->
+      Ldot (Location.mknoloc (longident_of_out_ident p), Location.mknoloc s)
+  | Oide_apply (p1, p2) ->
+      Lapply
+        (Location.mknoloc (longident_of_out_ident p1),
+         Location.mknoloc (longident_of_out_ident p2))
+  | Oide_hash p -> longident_of_out_ident p
+
+let lident_of_path p = longident_of_out_ident (tree_of_path None p)
+
+(* Constructors and records are annotated with their types, so that the
+   printed clauses type again in the same way. *)
+let tree_of_law_clause clause =
+  let clause =
+    Untypespec.expression ~lident_of_path
+      ~annotate:(Untypespec.head_type_annotation ~lident_of_path)
+      clause
+  in
+  Format_doc.doc_printf "%a"
+    (Format_doc.deprecated Pprintast.law_clause) clause
+
+(* The kind of a type variable with one worth printing (see [val f : ('a :
+   k). ...]) is annotated at its first occurrence in the parameters, which
+   share their variables: [(x : ('a : k))]. *)
+let rec annotate_first_occurrence kinds (ty : out_type) =
+  let annotate = annotate_first_occurrence in
+  let labelled kinds (label, ty) =
+    let kinds, ty = annotate kinds ty in
+    kinds, (label, ty)
+  in
+  match ty with
+  | Otyp_var (_, name) ->
+      begin match List.assoc_opt name kinds with
+      | Some kind -> List.remove_assoc name kinds, Otyp_jkind_annot (ty, kind)
+      | None -> kinds, ty
+      end
+  | Otyp_constr (p, args) ->
+      let kinds, args = List.fold_left_map annotate kinds args in
+      kinds, Otyp_constr (p, args)
+  | Otyp_arrow (label, modes, arg, ret) ->
+      let kinds, arg = annotate kinds arg in
+      let kinds, ret = annotate kinds ret in
+      kinds, Otyp_arrow (label, modes, arg, ret)
+  | Otyp_ret (modes, ty) ->
+      let kinds, ty = annotate kinds ty in
+      kinds, Otyp_ret (modes, ty)
+  | Otyp_tuple tys ->
+      let kinds, tys = List.fold_left_map labelled kinds tys in
+      kinds, Otyp_tuple tys
+  | Otyp_unboxed_tuple tys ->
+      let kinds, tys = List.fold_left_map labelled kinds tys in
+      kinds, Otyp_unboxed_tuple tys
+  | Otyp_alias { non_gen; aliased; alias } ->
+      let kinds, aliased = annotate kinds aliased in
+      kinds, Otyp_alias { non_gen; aliased; alias }
+  | Otyp_poly (vars, ty) ->
+      let kinds, ty = annotate kinds ty in
+      kinds, Otyp_poly (vars, ty)
+  | Otyp_variant (Ovar_fields fields, closed, tags) ->
+      let field kinds (tag, empty, tys) =
+        let kinds, tys = List.fold_left_map annotate kinds tys in
+        kinds, (tag, empty, tys)
+      in
+      let kinds, fields = List.fold_left_map field kinds fields in
+      kinds, Otyp_variant (Ovar_fields fields, closed, tags)
+  | Otyp_variant (Ovar_typ ty, closed, tags) ->
+      let kinds, ty = annotate kinds ty in
+      kinds, Otyp_variant (Ovar_typ ty, closed, tags)
+  | Otyp_object { fields; open_row } ->
+      let kinds, fields = List.fold_left_map labelled kinds fields in
+      kinds, Otyp_object { fields; open_row }
+  | Otyp_class (p, args) ->
+      let kinds, args = List.fold_left_map annotate kinds args in
+      kinds, Otyp_class (p, args)
+  | Otyp_module { opack_path; opack_cstrs } ->
+      let kinds, opack_cstrs = List.fold_left_map labelled kinds opack_cstrs in
+      kinds, Otyp_module { opack_path; opack_cstrs }
+  | Otyp_mod (ty, modalities) ->
+      let kinds, ty = annotate kinds ty in
+      kinds, Otyp_mod (ty, modalities)
+  | Otyp_attribute (ty, attr) ->
+      let kinds, ty = annotate kinds ty in
+      kinds, Otyp_attribute (ty, attr)
+  | Otyp_abstract | Otyp_open | Otyp_manifest _ | Otyp_record _
+  | Otyp_record_unboxed_product _ | Otyp_stuff _ | Otyp_sum _ | Otyp_quote _
+  | Otyp_splice _ | Otyp_repr _ | Otyp_newlayout _ | Otyp_jkind_annot _
+  | Otyp_of_kind _ ->
+      kinds, ty
+
+let tree_of_law_params params =
+  let tys = List.map snd params in
+  let base = With_locality.Const.legacy in
+  prepare_for_printing ~base tys;
+  let params =
+    List.map
+      (fun (x, ty) -> (Ident.name x, tree_of_typexp ~base Type_scheme ty))
+      params
+  in
+  let kinds =
+    List.filter_map
+      (fun (name, kind) -> Option.map (fun kind -> (name, kind)) kind)
+      (zap_qtvs_if_boring (tree_of_qtvs (extract_qtvs tys)))
+  in
+  snd
+    (List.fold_left_map
+       (fun kinds (x, ty) ->
+          let kinds, ty = annotate_first_occurrence kinds ty in
+          kinds, (x, ty))
+       kinds params)
+
+(* For the generated code of the laws file: the parameters with every type
+   variable and its full kind, nullability included *)
+let tree_of_law_quantification params =
+  let tys = List.map snd params in
+  let base = With_locality.Const.legacy in
+  prepare_for_printing ~base tys;
+  let params =
+    List.map
+      (fun (x, ty) -> (Ident.name x, tree_of_typexp ~base Type_scheme ty))
+      params
+  in
+  let vars =
+    List.map
+      (fun (v, jkind) ->
+         (Variable_names.name_of_type Variable_names.new_name v,
+          out_jkind_of_jkind !printing_env jkind))
+      (extract_qtvs tys)
+  in
+  vars, params
+
+let tree_of_law_description id decl =
+  let olaw_params = tree_of_law_params decl.law_params in
+  Osig_law
+    { olaw_name = Ident.name id;
+      olaw_params;
+      olaw_assumptions = List.map tree_of_law_clause decl.law_assumptions;
+      olaw_conclusion = tree_of_law_clause decl.law_conclusion }
+
 let tree_of_jkind_declaration id decl =
   let ojkind =
     { ojkind_name = Ident.name id
@@ -3894,6 +4038,7 @@ let dummy =
 let ident_sigitem = function
   | Types.Sig_type(ident,_,_,_) ->  {hide=true;ident}
   | Types.Sig_jkind (ident,_,_)
+  | Types.Sig_law (ident,_,_)
   | Types.Sig_class(ident,_,_,_)
   | Types.Sig_class_type (ident,_,_,_)
   | Types.Sig_module(ident,_, _,_,_)
@@ -4002,7 +4147,7 @@ let rec tree_of_modtype ?abbrev = function
       Omty_alias (tree_of_path (Some Module) p)
   | Mty_strengthen _ as mty ->
       begin match !expand_module_type !printing_env mty with
-      | Mty_strengthen (mty,p,a) ->
+      | Mty_strengthen (mty,p,a,_) ->
           let unaliasable =
             not (Aliasability.is_aliasable a)
             && not (Env.is_functor_arg p !printing_env)
@@ -4124,6 +4269,8 @@ and tree_of_sigitem ?abbrev = function
       tree_of_cltype_declaration id decl rs
   | Sig_jkind(id, decl, _) ->
       tree_of_jkind_declaration id decl
+  | Sig_law(id, decl, _) ->
+      tree_of_law_description id decl
 
 and tree_of_modtype_declaration ?abbrev id decl =
   let mty =

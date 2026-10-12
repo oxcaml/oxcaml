@@ -113,6 +113,7 @@ module Typedtree_search =
       | Typedtree.Tstr_include _ -> ()
       | Typedtree.Tstr_eval _ -> ()
       | Typedtree.Tstr_attribute _ -> ()
+      | Typedtree.Tstr_law _ -> ()
       | Typedtree.Tstr_jkind _ -> Misc.fatal_error "Tstr_jkind"
 
     let tables typedtree =
@@ -1026,7 +1027,8 @@ module Analyser =
           (* don't care *)
           (0, env, [])
       | Parsetree.Pstr_attribute _
-      | Parsetree.Pstr_extension _ ->
+      | Parsetree.Pstr_extension _
+      | Parsetree.Pstr_law _ ->
           (0, env, [])
       | Parsetree.Pstr_value (rec_flag, pat_exp_list) ->
           (* of rec_flag * (pattern * expression) list *)
