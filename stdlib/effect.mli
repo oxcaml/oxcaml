@@ -22,6 +22,8 @@
     "The Effect interface may change in incompatible ways in the future."
 ]
 
+open! Stdlib
+
 type 'a t = 'a eff = ..
 (** The type of effects. *)
 
@@ -194,9 +196,10 @@ module Deep : sig
     (** [('a,'b) handler] is a handler record with four fields -- [retc]
         is the value handler, [exnc] handles exceptions, [effc] handles the
         effects performed by the computation enclosed by the handler, and
-        [tickc] handles ticks, deciding whether to preempt. [tickc] should be
-        signal-safe. If [tickc] returns [Preempt], a [Preemption] effect is
-        performed. *)
+        [tickc] handles ticks, deciding whether to preempt. If [tickc] is
+        [Null], preemptions are ignored. Otherwise, if [tickc] returns
+        [Preempt], a [Preemption] effect is performed. [tickc] should be
+        signal-safe. *)
 
     val match_with : ('c -> 'a) -> 'c -> ('a,'b) handler -> 'b
     (** [match_with f x h] runs the computation [f x] in the handler [h].
@@ -207,9 +210,10 @@ module Deep : sig
       ?on_tick:(unit -> tick_outcome) -> ('b -> 'a) -> 'b ->
       'a effect_handler -> 'a
       (** [try_with ?on_tick f x h] runs the computation [f x] under the handler
-          [h], calling [on_tick] whenever a tick occurs. [on_tick] should
-          be signal-safe. If it returns [Preempt], a [Preemption] effect is
-          performed.
+          [h], calling [on_tick] whenever a tick occurs. If [on_tick] is
+          not provided, preemptions are ignored. Otherwise, if [on_tick] returns
+          [Preempt], a [Preemption] effect is performed. [on_tick] should be
+          signal-safe.
 
         @raise Out_of_fibers if unable to allocate a fiber. *)
 
@@ -377,9 +381,10 @@ module Shallow : sig
     (** [('a,'b) handler] is a handler record with four fields -- [retc]
         is the value handler, [exnc] handles exceptions, [effc] handles the
         effects performed by the computation enclosed by the handler, and
-        [tickc] handles ticks, deciding whether to preempt. [tickc] should be
-        signal-safe. If [tickc] returns [Preempt], a [Preemption] effect is
-        performed. *)
+        [tickc] handles ticks, deciding whether to preempt. If [tickc] is
+        [Null], preemptions are ignored. Otherwise, if [tickc] returns
+        [Preempt], a [Preemption] effect is performed. [tickc] should be
+        signal-safe. *)
 
     val continue_with : ('c,'a) continuation -> 'c -> ('a,'b) handler -> 'b
     (** [continue_with k v h] resumes the continuation [k] with value [v] within

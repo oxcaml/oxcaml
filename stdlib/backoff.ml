@@ -21,6 +21,8 @@
 (*                                                                          *)
 (****************************************************************************)
 
+open! Stdlib
+
 type t = int
 
 let single_mask = Bool.to_int (Domain.recommended_domain_count () = 1) - 1
