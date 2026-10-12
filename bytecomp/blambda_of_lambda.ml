@@ -297,6 +297,24 @@ let overwrite_singleton_product shape ~block value =
   | None ->
     Misc.fatal_error "overwrite_singleton_product: not a singleton product"
 
+(** [duplicate_mixed_block shape expr] generates Blambda code that duplicates
+    the block [expr] deeply by first using [caml_obj_dup], then deeply copying
+    each contained mixed block. *)
+let duplicate_mixed_block (shape : _ Lambda.mixed_block_element array) expr =
+  let dup_id = Ident.create_local "dup" in
+  let copy_field i elt =
+    copy_if_product elt (Prim (Getfield i, [Var dup_id]))
+    |> Option.map (fun field -> Prim (Setfield i, [Var dup_id; field]))
+  in
+  let copies =
+    List.filter_map Fun.id (List.mapi copy_field (Array.to_list shape))
+  in
+  Let
+    { id = dup_id;
+      arg = Prim (Ccall "caml_obj_dup", [expr]);
+      body = seqs copies (Var dup_id)
+    }
+
 (** [block_primitive shape ~tag ~total_len] is the primitive that allocates a
     block of shape [shape] with [total_len] fields: a regular block if all of
     its fields are values, and a faux mixed block otherwise. *)
@@ -945,7 +963,20 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         in
         Prim (Setfield last_idx, [target_block; value_expr])
       | [] -> overwrite_singleton_product shape ~block value)
-    | Pduprecord _ -> unary (Ccall "caml_obj_dup")
+    | Pduprecord (repres, _) -> (
+      match repres with
+      | Record_mixed shape ->
+        let arg =
+          match args with
+          | [arg] -> comp_expr arg
+          | _ -> wrong_arity ~expected:1
+        in
+        duplicate_mixed_block shape arg
+      | Record_inlined _
+      (* Aliased products in inline records can't be observed, as block indices
+         into inline records are disallowed. *)
+      | Record_boxed | Record_float | Record_ufloat | Record_unboxed ->
+        unary (Ccall "caml_obj_dup"))
     | Pccall p -> n_ary (Ccall p.prim_name) ~arity:p.prim_arity
     | Pperform -> context_switch Perform ~arity:1
     | Poffsetref n -> unary (Offsetref n)
