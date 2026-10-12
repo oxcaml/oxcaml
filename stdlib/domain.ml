@@ -596,9 +596,12 @@ module Safe = struct
     let access k f = exclave_
       if get accessing then failwith "TLS.access re-entered";
       set accessing true;
-      let res = f (get k) in
-      set accessing false;
-      res
+      match f (get k) with
+      | res -> set accessing false; res
+      | exception exn ->
+        let bt = Printexc.get_raw_backtrace () in
+        set accessing false;
+        Printexc.raise_with_backtrace exn bt
   end
 
   let spawn f =
