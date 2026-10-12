@@ -471,15 +471,13 @@ let equal_modtype_paths env p1 subst p2 =
        (Env.normalize_modtype_path env
           (Subst.modtype_path subst p2))
 
-let simplify_structure_coercion input_repr output_repr pos_cc_list id_pos_list =
-  let rec is_identity_coercion pos = function
+let is_identity_coercion pos_cc_list =
+  let rec loop pos = function
   | [] ->
       true
   | (n, c) :: rem ->
-      n = pos && c = Tcoerce_none && is_identity_coercion (pos + 1) rem in
-  if is_identity_coercion 0 pos_cc_list
-  then Tcoerce_none
-  else Tcoerce_structure { input_repr; output_repr; pos_cc_list; id_pos_list }
+      n = pos && c = Tcoerce_none && loop (pos + 1) rem in
+  loop 0 pos_cc_list
 
 (* Build a table of the components of sig1, along with their positions.
    The table is indexed by kind and name of component *)
@@ -959,18 +957,19 @@ and signatures ~core ~direction ~loc env subst ~modes sig1 sig2 mod_shape =
           then mod_shape
           else Shape.str ?uid:mod_shape.Shape.uid d.shape_map
         in
-        let input_repr =
-          List.filter_map Subst.Lazy.sort_of_signature_item sig1
-          |> Array.of_list
-        in
-        let output_repr =
-          List.filter_map Subst.Lazy.sort_of_signature_item sig2
-          |> Array.of_list
-        in
         let coercion =
-          if runtime_len1 = runtime_len2 then (* see PR#5098 *)
-            simplify_structure_coercion input_repr output_repr cc id_pos_list
+          (* see PR#5098 *)
+          if runtime_len1 = runtime_len2 && is_identity_coercion cc then
+            Tcoerce_none
           else
+            let input_repr =
+              List.filter_map Subst.Lazy.sort_of_signature_item sig1
+              |> Array.of_list
+            in
+            let output_repr =
+              List.filter_map Subst.Lazy.sort_of_signature_item sig2
+              |> Array.of_list
+            in
             Tcoerce_structure
               { input_repr; output_repr; pos_cc_list = cc; id_pos_list }
         in
