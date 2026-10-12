@@ -285,7 +285,9 @@ type error =
       func_ty : type_expr;
       res_ty : type_expr;
       previous_arg_loc : Location.t;
-      extra_arg_loc : Location.t;
+      extra_arg_label : arg_label;
+      extra_arg : Parsetree.expression;
+      following_args : Parsetree.expression list;
     }
   | Apply_wrong_label of arg_label * type_expr * bool
   | Label_multiply_defined of string
