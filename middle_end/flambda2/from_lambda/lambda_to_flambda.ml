@@ -1391,8 +1391,19 @@ and cps_function_bindings env (bindings : Lambda.rec_binding list) =
 
 and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
     ?precomputed_free_idents
-    ({ kind; params; return; body; attr; loc; mode; ret_mode; yielding = _ } :
+    ({ kind; params; return; body; attr; loc; mode; ret_mode; yielding = _ } as
+     func :
       L.lfunction) : Function_decl.t =
+  let fdo_fingerprint =
+    if !Oxcaml_flags.fdo_counters
+    then
+      Some
+        (Fdo_fingerprint.of_function
+           ~fresh_discriminator:(Env.fresh_fdo_function_occurrence env)
+           ~enclosing_path:(Env.fdo_function_path env)
+           func)
+    else None
+  in
   let contains_no_escaping_local_allocs =
     match ret_mode with Not_alloc_stack -> true | Maybe_alloc_stack -> false
   in
@@ -1579,6 +1590,11 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
       ~machine_width:(Env.machine_width env) ~return_continuation:body_cont
       ~exn_continuation:body_exn_cont ~my_region:my_region_stack_elt
       ~my_alloc_region
+      ~fdo_function_path:
+        (match fdo_fingerprint with
+        | Some fingerprint -> Fdo_fingerprint.path fingerprint
+        | None -> Env.fdo_function_path env)
+      ~fdo_function_occurrences:(Env.fdo_function_occurrences env)
   in
   let exn_continuation : IR.exn_continuation =
     { exn_handler = body_exn_cont; extra_args = [] }
@@ -1662,7 +1678,7 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
     ~function_slot ~kind ~params ~params_arity ~removed_params ~return
     ~calling_convention ~return_continuation:body_cont ~exn_continuation
     ~my_region ~my_ghost_region ~my_alloc_region ~body ~attr ~loc
-    ~free_idents_of_body recursive ~closure_alloc_mode:mode
+    ~fdo_fingerprint ~free_idents_of_body recursive ~closure_alloc_mode:mode
     ~first_complex_local_param ~result_mode:ret_mode
 
 and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
@@ -1884,6 +1900,8 @@ let lambda_to_flambda ~mode ~machine_width ~big_endian ~cmx_loader
     Env.create ~current_unit:compilation_unit ~machine_width
       ~return_continuation ~exn_continuation ~my_region:None
       ~my_alloc_region:toplevel_my_alloc_region
+      ~fdo_function_path:(Compilation_unit.full_path_as_string compilation_unit)
+      ~fdo_function_occurrences:(Misc.Stdlib.String.Tbl.create 64)
   in
   let program acc ccenv =
     cps_tail acc env ccenv lam return_continuation exn_continuation

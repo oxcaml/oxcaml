@@ -1,11 +1,11 @@
 ; Tests for the FDO system with pseudo-instrumentation
 
+; The operations on pseudo-instrumentation counters ([Fdo_counter]).
+
 (executable
  (name fdo_counters)
  (modules fdo_counters)
  (libraries ocamlcommon))
-
-; The operations on pseudo-instrumentation counters ([Fdo_counter]).
 
 (rule
  (enabled_if
@@ -22,3 +22,53 @@
  (deps fdo_counters.output fdo_counters.output.corrected)
  (action
   (diff fdo_counters.output fdo_counters.output.corrected)))
+
+; Stability of function identities ([Fdo_fingerprint]): the entry counters of
+; anonymous.ml and of anonymous_more.ml (the same module with extra anonymous
+; functions inserted, compiled under the same module name via -o) must agree
+; except for the inserted functions.
+
+(executable
+ (name fdo_entries)
+ (modules fdo_entries))
+
+(rule
+ (targets anonymous.output.corrected)
+ (deps anonymous.ml anonymous_more.ml fdo_entries.exe)
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (progn
+   (with-outputs-to
+    anonymous.dump
+    (run
+     %{bin:ocamlopt.opt}
+     -c
+     -fdo-counters
+     -drawflambda
+     -color
+     never
+     anonymous.ml))
+   (with-outputs-to
+    anonymous_more.dump
+    (run
+     %{bin:ocamlopt.opt}
+     -c
+     -fdo-counters
+     -drawflambda
+     -color
+     never
+     -o
+     anonymous.more.cmx
+     anonymous_more.ml))
+   (with-stdout-to
+    anonymous.output.corrected
+    (run ./fdo_entries.exe anonymous.dump anonymous_more.dump)))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "main"))
+ (deps anonymous.output anonymous.output.corrected)
+ (action
+  (diff anonymous.output anonymous.output.corrected)))
