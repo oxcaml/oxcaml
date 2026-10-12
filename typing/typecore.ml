@@ -9453,7 +9453,7 @@ and type_expect_
         Typetexp.Error.log_or_raise loc env
           (Unsupported_extension Overwriting);
       if not (can_be_overwritten exp2.pexp_desc) then
-        Error.log_or_raise exp2.pexp_loc env Overwrite_of_invalid_term;
+        Error.log_and_raise exp2.pexp_loc env Overwrite_of_invalid_term;
       let cell_mode, _ =
         (* The overwritten cell has to be unique
            and should have the areality expected here: *)

@@ -4404,7 +4404,8 @@ and type_structure ?(toplevel = None) ~funct_body
     (* See comment on [type_structure] above *)
     sig_acc
   in
-  let rec type_struct env shape_map sstr str_acc sig_acc sig_acc_include_functor =
+  let rec type_struct env shape_map sstr str_acc sig_acc
+      sig_acc_include_functor =
     match sstr with
     | [] ->
         (List.rev str_acc, List.rev sig_acc, shape_map, env)
@@ -5058,7 +5059,7 @@ let type_interface target modulename env ast =
       | exn_list -> collect_recovery_errors target exn_list
     else
     *)
-    transl_signature env ast
+    transl_signature ~interface_toplevel:true env ast
   in
   let arg_type =
     !Clflags.as_argument_for
