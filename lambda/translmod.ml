@@ -954,7 +954,8 @@ and transl_structure ~scopes loc
           Value_rec_compiler.compile_letrec class_bindings body, repr
       | Tstr_include incl ->
           let ids_with_sorts =
-            bound_value_identifiers_and_sorts incl.incl_type
+            List.combine (bound_value_identifiers incl.incl_type)
+              (Array.to_list incl.incl_repr)
           in
           let modl = incl.incl_mod in
           let mid = Ident.create_local "include" in
@@ -1010,7 +1011,8 @@ and transl_structure ~scopes loc
               transl_structure ~scopes loc fields cc rootpath final_env rem
           | _ ->
               let ids_with_sorts =
-                bound_value_identifiers_and_sorts od.open_bound_items
+                List.combine (bound_value_identifiers od.open_bound_items)
+                  (Array.to_list od.open_items_repr)
               in
               let mid = Ident.create_local "open" in
               let mid_duid = Lambda.debug_uid_none in
