@@ -104,13 +104,12 @@ module Event = struct
   let instant_fields ~args ~counters ~name ~time_in_nanoseconds () =
     ["ts", nanos_to_micros_as_json time_in_nanoseconds]
     |> add_common_fields ~name ~counters ~args
-    |> add_counters ~counters |> add_args ~args
 
   let span_fields ~args ~counters ~name ~start_in_nanoseconds
       ~finish_in_nanoseconds () =
     [ "ts", nanos_to_micros_as_json start_in_nanoseconds;
       ( "dur",
-        nanos_to_micros_as_json (start_in_nanoseconds - finish_in_nanoseconds) )
+        nanos_to_micros_as_json (finish_in_nanoseconds - start_in_nanoseconds) )
     ]
     |> add_common_fields ~name ~counters ~args
 end
