@@ -59,7 +59,7 @@ let[@tail_mod_cons] rec map_local_param (bound : (int * int) @ local) t ~f =
 
 (* TMC, regions + the recursive call _uses_ the data we create on each local stack frame.
  * This fundementally can't be constant stack space.
- * Ideally, the type system would reject this? 
+ * Ideally, the type system would reject this? But here we'll have the TMC pass reject this.
  *)
 let[@tail_mod_cons] rec map_using_local t ~f = 
   let f' = stack_ (fun x -> (f x) + 1) in 
@@ -194,6 +194,37 @@ let[@tail_mod_cons] rec crashes_the_compiler n =
         let local_ p = (n, n) in 
         try n :: crashes_the_compiler ( n - 1) with _ -> [ fst p ]
 
+(* TMC call under [Sys.opaque_identity]: the argument of [opaque] is not in
+   tail position, so the call must not close the region. 
+   We don't get a warning for this one, because map_opaque is not even syntactically in tail-mod-cons position *)
+let[@tail_mod_cons] rec map_opaque t ~f =
+  let local_ p = (Sys.opaque_identity 0, 0) in
+  use_local p;
+  match t with
+  | [] -> []
+  | hd :: tl -> f hd :: Sys.opaque_identity (map_opaque tl ~f)
+
+(* A method call in tail position is a tail call in the direct version, but
+   the dps version writes its result to the destination, so the call must not
+   close the region. *)
+let[@tail_mod_cons] rec send_in_tail (o : < m : int list >) n =
+  let local_ p = (Sys.opaque_identity n, n) in
+  use_local p;
+  if n = 0 then o#m else n :: send_in_tail o (n - 1)
+
+(* As above, for a call on the right of [&&] or [||]. *)
+type _ ty = Bool_and : bool ty | Bool_or : bool ty | List : int list ty
+
+let[@inline never] big n = n > 3
+
+let[@tail_mod_cons] rec seq_in_tail : type a. a ty -> int -> a = fun ty n ->
+  let local_ p = (Sys.opaque_identity n, n) in
+  use_local p;
+  match ty with
+  | Bool_and -> n > 0 && big n
+  | Bool_or -> n < 0 || big n
+  | List -> if n = 0 then [] else n :: seq_in_tail List (n - 1)
+
 let depth () = Printexc.raw_backtrace_length (Printexc.get_callstack 10_000)
 
 (* Tail-recursive, so building the input does not itself grow the stack. *)
@@ -218,26 +249,49 @@ let report name map =
       let constant = List.for_all (fun d -> d = base) rest in
       Printf.printf "%-32s constant stack: %b\n" name constant
 
+let seperator = String.make 80 '='
+
 let () =
+  print_endline seperator;
+  print_endline "Functions that should be constant stack space:";
+  print_endline seperator;
   report "rev_map" (rev_map []);
   report "rev_map_with_local" (rev_map_with_local []);
   report "map_plain" map_plain;
   report "map_exclave" map_exclave;
   report "map_local" map_local;
   report "map_local_param" (map_local_param (1, 2));
-  report "map_using_local" map_using_local;
+  report "map_local_closure" map_local_closure;
+  report "map_local_closure_mutual" map_local_closure_mutual;
   report "map_nested_regions" map_nested_regions;
   report "map_nested_regions_shared" map_nested_regions_shared;
   report "map_via_helper" map_via_helper;
   report "map_local_args" (fun t ~f ->
     map_local_args (1, 2) ~count:0 ~seen:[] t ~f:(fun x -> f x));
+
+  print_endline seperator;
+  print_endline "Functions that should *not* be constant stack space";
+  print_endline seperator;
+  report "map_using_local" map_using_local;
   report "map_pass_local" (map_pass_local (0, 0));
   report "map_float_field" (map_float_field { v = 1. } 1.);
-  report "map_local_closure" map_local_closure;
-  report "map_local_closure_mutual" map_local_closure_mutual;
+  report "map_opaque" map_opaque;
+  print_endline seperator;
+
+
   let results = map_pass_local (0, 0) [1; 2; 3; 4] ~f:Fun.id in
   Printf.printf "map_pass_local results: %s\n"
     (String.concat " " (List.map string_of_int results));
+  let results = map_opaque [1; 2; 3; 4] ~f:Fun.id in
+  Printf.printf "map_opaque results: %s\n"
+    (String.concat " " (List.map string_of_int results));
+  let results = send_in_tail (object method m = [0] end) 3 in
+  Printf.printf "send_in_tail results: %s\n"
+    (String.concat " " (List.map string_of_int results));
+  let results = seq_in_tail List 3 in
+  Printf.printf "seq_in_tail results: %s %b %b\n"
+    (String.concat " " (List.map string_of_int results))
+    (seq_in_tail Bool_and 5) (seq_in_tail Bool_or 2);
   let results = call_local_closure 1 in
   Printf.printf "call_local_closure results: %s\n"
     (String.concat " " (List.map string_of_int results))
