@@ -224,20 +224,24 @@ let rec copy_mixed_block_element (elt : _ Lambda.mixed_block_element)
     (expr : Blambda.blambda) : Blambda.blambda =
   match elt with
   | Product elements ->
-    (* Bind expr to a variable so it's only evaluated once *)
-    let id = Ident.create_local "copy_src" in
-    let copied_fields =
-      Array.to_list
-        (Array.mapi
-           (fun i field_elt ->
-             copy_mixed_block_element field_elt (Prim (Getfield i, [Var id])))
-           elements)
-    in
-    Let { id; arg = expr; body = Prim (Makeblock { tag = 0 }, copied_fields) }
+    copy_product_fields elements expr ~make_block:(fun fields ->
+        Prim (Makeblock { tag = 0 }, fields))
   | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
   | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
     expr
   | Splice_variable var -> Lambda.fatal_error_unevaluated_splice_var var
+
+and copy_product_fields elements expr ~make_block =
+  (* Bind expr to a variable so it's only evaluated once *)
+  let id = Ident.create_local "copy_src" in
+  let copied_fields =
+    Array.to_list
+      (Array.mapi
+         (fun i field_elt ->
+           copy_mixed_block_element field_elt (Prim (Getfield i, [Var id])))
+         elements)
+  in
+  Let { id; arg = expr; body = make_block copied_fields }
 
 (** [copy_unboxed_product shape ~path expr] generates Blambda code that creates
     a fresh deep copy of [expr] if the field at [path] in [shape] is an unboxed
@@ -734,15 +738,26 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         | Punspecializedarray ->
           Misc.fatal_error "Blambda_of_lambda: Pduparray Punspecializedarray"))
     | Pmakeblock (tag, _mut, shape, _) -> (
-      match Lambda.mixed_block_of_block_shape shape with
-      | None -> pseudo_event (variadic (Makeblock { tag }))
-      | Some shape ->
-        (* There is no notion of a mixed block at runtime in bytecode.
-              Further, source-level unboxed types are represented as boxed in
-              bytecode, so no ceremony is needed to box values before inserting
-              them into the (normal, unmixed) block. *)
-        let total_len = Array.length shape in
-        pseudo_event (variadic (Make_faux_mixedblock { total_len; tag })))
+      (* There is no notion of a mixed block at runtime in bytecode, and
+         source-level unboxed types are represented as boxed in bytecode.
+         We (deeply) copy unboxed products before inserting them, so that
+         the resulting block does not alias the product it is built from
+         (which could be mutated through). *)
+      match shape with
+      | Shape mixed_shape ->
+        let fields =
+          List.map2
+            (fun elt arg -> copy_mixed_block_element elt (comp_expr arg))
+            (Array.to_list mixed_shape)
+            args
+        in
+        let primitive : Blambda.primitive =
+          if Lambda.is_uniform_block_shape shape
+          then Makeblock { tag }
+          else Make_faux_mixedblock { total_len = List.length fields; tag }
+        in
+        pseudo_event (Prim (primitive, fields))
+      | All_value -> pseudo_event (variadic (Makeblock { tag })))
     | Pmake_unboxed_product _ -> pseudo_event (variadic (Makeblock { tag = 0 }))
     | Pgetglobal (cu, _) -> nullary (Getglobal cu)
     | Pgetpredef id -> nullary (Getpredef id)
@@ -1011,12 +1026,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Patomic_set_idx { layout = Punboxed_product _; _ }
     | Patomic_exchange_idx { layout = Punboxed_product _; _ }
     | Patomic_compare_exchange_idx { layout = Punboxed_product _; _ }
-    | Patomic_compare_set_idx { layout = Punboxed_product _; _ }
-    | Patomic_load_ptr { layout = Punboxed_product _ }
-    | Patomic_set_ptr { layout = Punboxed_product _; _ }
-    | Patomic_exchange_ptr { layout = Punboxed_product _; _ }
-    | Patomic_compare_exchange_ptr { layout = Punboxed_product _; _ }
-    | Patomic_compare_set_ptr { layout = Punboxed_product _; _ } ->
+    | Patomic_compare_set_idx { layout = Punboxed_product _; _ } ->
       Misc.fatal_errorf
         "Blambda_of_lambda: primitive %a may not be used with unboxed products"
         Printlambda.primitive primitive
@@ -1035,21 +1045,6 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Patomic_land_idx -> ternary (Ccall "caml_atomic_land_idx_bytecode")
     | Patomic_lor_idx -> ternary (Ccall "caml_atomic_lor_idx_bytecode")
     | Patomic_lxor_idx -> ternary (Ccall "caml_atomic_lxor_idx_bytecode")
-    | Patomic_load_ptr _ -> unary (Ccall "caml_atomic_load_ptr_bytecode")
-    | Patomic_set_ptr _ -> binary (Ccall "caml_atomic_set_ptr_bytecode")
-    | Patomic_exchange_ptr _ ->
-      binary (Ccall "caml_atomic_exchange_ptr_bytecode")
-    | Patomic_compare_exchange_ptr _ ->
-      ternary (Ccall "caml_atomic_compare_exchange_ptr_bytecode")
-    | Patomic_compare_set_ptr _ ->
-      ternary (Ccall "caml_atomic_cas_ptr_bytecode")
-    | Patomic_fetch_add_ptr ->
-      binary (Ccall "caml_atomic_fetch_add_ptr_bytecode")
-    | Patomic_add_ptr -> binary (Ccall "caml_atomic_add_ptr_bytecode")
-    | Patomic_sub_ptr -> binary (Ccall "caml_atomic_sub_ptr_bytecode")
-    | Patomic_land_ptr -> binary (Ccall "caml_atomic_land_ptr_bytecode")
-    | Patomic_lor_ptr -> binary (Ccall "caml_atomic_lor_ptr_bytecode")
-    | Patomic_lxor_ptr -> binary (Ccall "caml_atomic_lxor_ptr_bytecode")
     | Pdls_get -> unary (Ccall "caml_domain_dls_get")
     | Ptls_get -> unary (Ccall "caml_domain_tls_get")
     | Pdomain_index -> unary (Ccall "caml_ml_domain_index")
@@ -1200,7 +1195,62 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       match args with
       | [x; y] ->
         comp_binary_scalar_intrinsic binary (comp_expr x) (comp_expr y)
-      | [] | [_] | _ :: _ :: _ -> wrong_arity ~expected:2))
+      | [] | [_] | _ :: _ :: _ -> wrong_arity ~expected:2)
+    | Pbox (layout, _mode) -> (
+      match layout with
+      | Pvalue _ -> pseudo_event (unary (Makeblock { tag = 0 }))
+      | Punboxed_float _ | Punboxed_or_untagged_integer _ ->
+        (* CR box: This will have to be updated once addressability affects
+           boxed representations *)
+        pseudo_event (unary (Make_faux_mixedblock { total_len = 1; tag = 0 }))
+      | Punboxed_product layouts ->
+        let arg =
+          match args with
+          | [arg] -> comp_expr arg
+          | _ -> wrong_arity ~expected:1
+        in
+        (* The unboxed product is already a block with one field per
+           component, but it must not be shared with the record, or a later
+           mutation of the record would be visible through the unboxed value. *)
+        let shape =
+          Array.of_list (List.map Lambda.mixed_block_element_of_layout layouts)
+        in
+        let make_block fields =
+          let prim : Blambda.primitive =
+            match Lambda.mixed_block_of_block_shape (Shape shape) with
+            | None -> Makeblock { tag = 0 }
+            | Some shape ->
+              Make_faux_mixedblock { total_len = Array.length shape; tag = 0 }
+          in
+          pseudo_event (Prim (prim, fields))
+        in
+        copy_product_fields shape arg ~make_block
+      | Punboxed_vector _ | Punboxed_mask -> simd_is_not_supported ()
+      | Ptop -> Misc.fatal_error "Blambda_of_lambda: Pbox: Ptop layout"
+      | Pbottom -> Misc.fatal_error "Blambda_of_lambda: Pbox: Pbottom layout"
+      | Psplicevar ident -> Lambda.fatal_error_unevaluated_splice_var ident)
+    | Punbox layout -> (
+      match layout with
+      | Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _ ->
+        unary (Getfield 0)
+      | Punboxed_product layouts ->
+        let arg =
+          match args with
+          | [arg] -> comp_expr arg
+          | _ -> wrong_arity ~expected:1
+        in
+        let shape =
+          Array.of_list (List.map Lambda.mixed_block_element_of_layout layouts)
+        in
+        copy_product_fields shape arg ~make_block:(fun fields ->
+            (* "Unboxed" products are actually boxed and represented like this
+               on bytecode; we match accordingly and deeply copy to avoid
+               aliasing bugs. *)
+            pseudo_event (Prim (Makeblock { tag = 0 }, fields)))
+      | Punboxed_vector _ | Punboxed_mask -> simd_is_not_supported ()
+      | Ptop -> Misc.fatal_error "Blambda_of_lambda: Punbox: Ptop layout"
+      | Pbottom -> Misc.fatal_error "Blambda_of_lambda: Punbox: Pbottom layout"
+      | Psplicevar ident -> Lambda.fatal_error_unevaluated_splice_var ident))
 
 and comp_binary_scalar_intrinsic : type a.
     a Scalar.Operation.Binary.t -> blambda -> blambda -> blambda =

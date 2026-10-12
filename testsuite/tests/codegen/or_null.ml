@@ -7,6 +7,7 @@
  flags += " -regalloc-param AFFINITY:on -regalloc irc";
  flags += " -cfg-merge-blocks";
  only-default-codegen;
+ flags += " -g -gdwarf-inlined-frames";
  expect.opt;
 *)
 

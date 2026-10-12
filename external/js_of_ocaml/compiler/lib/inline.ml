@@ -616,7 +616,7 @@ let rewrite_inlined_function p rem branch x params cont args =
 let rec inline_recursively ~context ~info p params (pc, _) args =
   let relevant_args = relevant_arguments ~context info args in
   if Var.Map.is_empty relevant_args
-  then p
+  then p, Var.Set.empty
   else
     let subst =
       List.fold_left2
@@ -630,11 +630,11 @@ let rec inline_recursively ~context ~info p params (pc, _) args =
     in
     Code.traverse
       { fold = Code.fold_children }
-      (fun pc p ->
+      (fun pc (p, inlined) ->
         let block = Addr.Map.find pc p.blocks in
-        let body, (branch, p) =
+        let body, (branch, p), inlined =
           List.fold_right
-            ~f:(fun i (rem, state) ->
+            ~f:(fun i (rem, state, inlined) ->
               match i with
               | Let (x, Apply { f; args; _ }) when Var.Map.mem f subst ->
                   (* The [exact] field might not be accurate since it
@@ -645,21 +645,23 @@ let rec inline_recursively ~context ~info p params (pc, _) args =
                      We have also checked that it made sense to inline
                      this call. In particular, this function is
                      applied only once. *)
-                  let f = Var.Map.find f subst in
-                  (* Force duplication: the actual argument [f] is
-                     still referenced in the block arguments that
-                     pass it to the formal parameter. Without
-                     duplication, the closure's params would conflict
-                     with the intermediate block's params. *)
-                  inline_function ~context ~force_duplicate:true i x f args rem state
-              | _ -> i :: rem, state)
-            ~init:([], (block.branch, p))
+                  let f' = Var.Map.find f subst in
+                  let body, state =
+                    inline_function ~context ~force_duplicate:true i x f' args rem state
+                  in
+                  let inlined =
+                    (* The body is empty when the call is inlined *)
+                    if List.is_empty body then Var.Set.add f inlined else inlined
+                  in
+                  body, state, inlined
+              | _ -> i :: rem, state, inlined)
+            ~init:([], (block.branch, p), inlined)
             block.body
         in
-        { p with blocks = Addr.Map.add pc { block with body; branch } p.blocks })
+        { p with blocks = Addr.Map.add pc { block with body; branch } p.blocks }, inlined)
       pc
       p.blocks
-      p
+      (p, Var.Set.empty)
 
 and inline_function ~context ~force_duplicate i x f args rem state =
   let info = Var.Map.find f context.env in
@@ -685,7 +687,14 @@ and inline_function ~context ~force_duplicate i x f args rem state =
         p, params, cont
       else p, params, cont
     in
-    let p = inline_recursively ~context ~info p params cont args in
+    let p, inlined = inline_recursively ~context ~info p params cont args in
+    (* Drop the parameters whose only use was inlined, so that the
+       functions passed to them are no longer referenced *)
+    let params, args =
+      List.split
+        (List.filter (List.combine params args) ~f:(fun (param, _) ->
+             not (Var.Set.mem param inlined)))
+    in
     rewrite_inlined_function p rem branch x params cont args)
   else i :: rem, state
 

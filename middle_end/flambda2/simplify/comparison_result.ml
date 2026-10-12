@@ -62,20 +62,25 @@ let [@ocamlformat "disable"] print ppf
     prefix Flambda_kind.Standard_int.print_lowercase kind result
 
 let convert_result_compared_to_tagged_zero
-    ({ lhs; rhs; kind; signed; tagged_or_untagged } as t) (op : _ P.comparison)
-    : P.t =
+    ({ lhs; rhs; kind; signed; tagged_or_untagged } as t)
+    (op : P.signed_or_unsigned P.comparison) : P.t option =
   (match tagged_or_untagged with
   | Tagged -> ()
   | Untagged ->
     Misc.fatal_errorf "Comparing untagged result with tagged zero: %a" print t);
-  let new_op : _ P.comparison =
-    match op with
-    | Eq -> Eq
-    | Neq -> Neq
-    | Lt _ -> Lt signed
-    | Gt _ -> Gt signed
-    | Le _ -> Le signed
-    | Ge _ -> Ge signed
+  let[@local] make_result new_op : P.t option =
+    let prim : P.binary_primitive = Int_comp (kind, Yielding_bool new_op) in
+    Some (Binary (prim, lhs, rhs))
   in
-  let prim : P.binary_primitive = Int_comp (kind, Yielding_bool new_op) in
-  Binary (prim, lhs, rhs)
+  (* Only signed comparisons should be transformed. *)
+  match op with
+  | Eq -> make_result Eq
+  | Neq -> make_result Neq
+  | Lt Signed -> make_result (Lt signed)
+  | Gt Signed -> make_result (Gt signed)
+  | Le Signed -> make_result (Le signed)
+  | Ge Signed -> make_result (Ge signed)
+  | Lt Unsigned -> None
+  | Gt Unsigned -> make_result Neq (* compare x y >u 0 <=> x <> y *)
+  | Le Unsigned -> make_result Eq (* compare x y <=u 0 <=> x = y *)
+  | Ge Unsigned -> None

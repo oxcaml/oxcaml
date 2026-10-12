@@ -8,6 +8,7 @@
  only-default-codegen;
  flags = " -O3 -I ocamlopt.opt";
  flags += " -experimental-optimizations";
+ flags += " -g -gdwarf-inlined-frames";
  expect.opt;
 *)
 
@@ -128,6 +129,15 @@ bit_xor:
   ret
 |}]
 
+let bit_not x = Int16_u.bit_xor x (-#1S)
+[%%expect_asm X86_64{|
+bit_not:
+  salq  $48, %rax
+  sarq  $48, %rax
+  xorq  $-1, %rax
+  ret
+|}]
+
 (* CR-someday jrayman: Both gcc and clang recommend [rolw $8, %ax]
    over [xchg] *)
 let bswap x = Int16_u.bswap x
@@ -179,11 +189,11 @@ div:
   sarq  $48, %rax
   ret
 .L0:
+  subq  $8, %rsp
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L1:
 |}]
 
 let rem x y = Int16_u.rem x y
@@ -199,11 +209,11 @@ rem:
   sarq  $48, %rax
   ret
 .L0:
+  subq  $8, %rsp
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L1:
 |}]
 
 let unsafe_div x y = Int16_u.unsafe_div x y
@@ -585,8 +595,8 @@ let to_int8 x = Int16_u.to_int8 x
 [%%expect_asm X86_64{|
 to_int8:
   salq  $56, %rax
-  sarq  $56, %rax
-  leaq  1(%rax,%rax), %rax
+  sarq  $55, %rax
+  orq   $1, %rax
   ret
 |}]
 

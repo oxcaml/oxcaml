@@ -1084,7 +1084,10 @@ and expression ctxt f x =
     | Pexp_apply
       ({ pexp_desc = Pexp_extension({txt = "extension.exclave"}, PStr []) },
        [Nolabel, sbody]) ->
-        pp f "@[<2>exclave_ %a@]" (expression ctxt) sbody
+        if ctxt.semi then
+          paren true (expression reset_ctxt) f x
+        else
+          pp f "@[<2>exclave_ %a@]" (expression ctxt) sbody
     | Pexp_apply (e, l) ->
         begin if not (sugar_expr ctxt f x) then
             match view_fixity_of_exp e with

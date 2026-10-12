@@ -9,6 +9,7 @@
  flags = " -O3 -I ocamlopt.opt";
  flags += " -experimental-optimizations";
  flags += " -no-flambda2-simplify-stubs";
+ flags += " -g -gdwarf-inlined-frames";
  expect.opt;
 *)
 
@@ -92,22 +93,22 @@ let loop_with_non_dominating_load x l =
   loop 100 0
 [%%expect_asm X86_64{|
 loop_with_non_dominating_load:
+  subq  $8, %rsp
   movl  $1, %eax
   movl  $201, %edi
 .L0:
   testb $1, %bl
-  je    .L1
+  je    .L2
   movq  camlStdlib__List__Pmakeblock2543_19@GOTPCREL(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  call  caml_reraise_exn@PLT
 .L1:
+.L2:
   movq  (%rbx), %rsi
   leaq  -1(%rax,%rsi), %rax
   addq  $-2, %rdi
   cmpq  $1, %rdi
   jg    .L0
+  addq  $8, %rsp
   ret
 |}]
 

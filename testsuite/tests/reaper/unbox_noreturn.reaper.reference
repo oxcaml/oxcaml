@@ -24,16 +24,16 @@ let code inline(never) loopify(never) size(32) newer_version_of(body_1)
      | 0 -> k3
      | 1 -> k4)
     where k4 =
-      let Pmakeblock_into_Pmakeblock_field_0 = x in
       let Pmakeblock_into_Pmakeblock_field_is_int = 0i in
+      let Pmakeblock_into_Pmakeblock_field_0 = x in
       cont k2
-             (Pmakeblock_into_Pmakeblock_field_is_int,
-              Pmakeblock_into_Pmakeblock_field_0)
+             (Pmakeblock_into_Pmakeblock_field_0,
+              Pmakeblock_into_Pmakeblock_field_is_int)
     where k3 =
       apply &my_alloc_region return (0) -> never * k1
     where k2
-            (`Pmakeblock_into_*match*_field_is_int` : imm,
-             `Pmakeblock_into_*match*_field_0`) =
+            (`Pmakeblock_into_*match*_field_0`,
+             `Pmakeblock_into_*match*_field_is_int` : imm) =
       let prim = `Pmakeblock_into_*match*_field_is_int` in
       (switch prim
          | 0 -> k2

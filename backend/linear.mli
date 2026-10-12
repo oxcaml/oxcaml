@@ -96,7 +96,9 @@ and instruction_desc =
   | Lcall_op of call_operation
   | Lreloadretaddr
   | Lreturn
-  | Llabel of label
+  | Llabel_for_jump_target of label
+  | Llabel_for_dwarf of label
+      (** Only delimits DWARF ranges, never a jump target. *)
   | Lbranch of label
   | Lcondbranch of Operation.test * label
   | Lcondbranch3 of label option * label option * label option

@@ -2,6 +2,7 @@
  flags += " -O3 -extension layouts_beta";
  only-default-codegen;
  flat-float-array;
+ flags += " -g -gdwarf-inlined-frames";
  expect.opt;
 *)
 

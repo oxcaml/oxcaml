@@ -67,7 +67,7 @@ jobs:
             # persist-credentials to false once that issue is resolved.
 
       - name: Run Claude Review
-        uses: anthropics/claude-code-action@6b082c41935b4c8a3b8b0ef85ba4ba4d9eeb8975 # v1.0.189
+        uses: anthropics/claude-code-action@8251c103ac8c1d761882c86aba1412c7f583c844 # v1.0.213
         with:
           # Workload Identity Federation identifiers, not credentials (see the
           # WIF section in .github/claude-code-security.md).

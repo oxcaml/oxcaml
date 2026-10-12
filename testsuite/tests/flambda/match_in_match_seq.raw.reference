@@ -34,8 +34,8 @@ let $camlMatch_in_match_seq__first_const_0 = Block 0 () in
    let aux = closure aux_1 @aux &my_alloc_region
    with { f = f; next = next }
    in
-   let Pfield = %block_load.[`0`] (`*match*`) in
-   apply direct(aux_1 &my_alloc_region) aux (acc, Pfield) -> k1 * k2
+   let Pmixedfield = %block_load.[`0`] (`*match*`) in
+   apply direct(aux_1 &my_alloc_region) aux (acc, Pmixedfield) -> k1 * k2
  in
  let code size(39)
        `fn[match_in_match_seq.ml:35,14--125]_3` (s : val)
@@ -84,10 +84,10 @@ let $camlMatch_in_match_seq__first_const_0 = Block 0 () in
        @`fn[match_in_match_seq.ml:35,14--125]` &my_alloc_region
    with { f_1 = f; next_1 = next }
    in
-   let Pfield = %block_load.[`0`] (`*match*`) in
+   let Pmixedfield = %block_load.[`0`] (`*match*`) in
    let Pmakeblock =
      %block.[`0`].my_alloc_region
-       (Pfield, `fn[match_in_match_seq.ml:35,14--125]`)
+       (Pmixedfield, `fn[match_in_match_seq.ml:35,14--125]`)
    in
    let Pmakeblock_1 = %block.[`0`].my_alloc_region (Pmakeblock) in
    cont k1 (Pmakeblock_1)
@@ -144,8 +144,8 @@ let $camlMatch_in_match_seq__first_const_0 = Block 0 () in
    let aux = closure aux_5 @aux_1 &my_alloc_region
    with { f_2 = f; next_2 = next }
    in
-   let Pfield = %block_load.[`0`] (`*match*`) in
-   let Pmakeblock = %block.[`0`].my_alloc_region (Pfield, aux) in
+   let Pmixedfield = %block_load.[`0`] (`*match*`) in
+   let Pmakeblock = %block.[`0`].my_alloc_region (Pmixedfield, aux) in
    let Pmakeblock_1 = %block.[`0`].my_alloc_region (Pmakeblock) in
    cont k1 (Pmakeblock_1)
  in

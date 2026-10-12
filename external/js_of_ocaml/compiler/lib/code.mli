@@ -30,9 +30,8 @@ module Addr : sig
 
   val pred : t -> t
 
-  module Set : Set.S with type elt = t
-
-  module Map : Map.S with type key = t
+  module Set = Int_set
+  module Map = Int_trie
 
   module Hashtbl : Hashtbl.S with type key = t
 end
@@ -70,7 +69,7 @@ module Var : sig
 
   val reset : unit -> unit
 
-  module Set : Set.S with type elt = t
+  module Set : Int_set.S with type elt = t
 
   module Map : Map.S with type key = t
 

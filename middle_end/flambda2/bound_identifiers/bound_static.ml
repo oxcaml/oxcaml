@@ -26,15 +26,15 @@ module Pattern = struct
 
   let block_like symbol = Block_like symbol
 
-  let [@ocamlformat "disable"] print ppf t =
+  let print ppf t =
+    let open! Misc.Sexp in
     match t with
-    | Code code_id ->
-      Format.fprintf ppf "@[<hov 1>(Code@ %a)@]" Code_id.print code_id
+    | Code code_id -> print ppf [a "Code" code_id Code_id.print]
     | Set_of_closures closure_symbols ->
-      Format.fprintf ppf "@[<hov 1>(Set_of_closures@ %a)@]"
-        (Function_slot.Lmap.print Symbol.print) closure_symbols
-    | Block_like symbol ->
-      Format.fprintf ppf "@[<hov 1>(Block_like@ %a)@]" Symbol.print symbol
+      print ppf
+        [ a "Set_of_closures" closure_symbols
+            (Function_slot.Lmap.print Symbol.print) ]
+    | Block_like symbol -> print ppf [a "Block_like" symbol Symbol.print]
 
   let apply_renaming t renaming =
     match t with

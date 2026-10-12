@@ -708,6 +708,24 @@ module Array1 : sig
     = "caml_ba_layout"
   (** Return the layout of the given Bigarray. *)
 
+  external is_stack
+    : ('a : any) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) @ immutable -> bool @@ stateless
+    = "caml_ba_is_stack" [@@noalloc] [@@no_effects]
+  (** Whether the given Bigarray custom block is stack-allocated, independently
+      of its backing storage. Always [false] when stack allocation is disabled,
+      including in bytecode. *)
+
+  external unsafe_smart_globalize
+    : ('a : any) ('b : any) ('c : any).
+      ('a, 'b, 'c) t @ local -> ('a, 'b, 'c) t
+    = "caml_ba_unsafe_smart_globalize"
+  (** If the custom block is stack-allocated, copy it to the heap without
+      copying its backing storage. Otherwise, return it unchanged.
+
+      The result shares the same data. This function does not extend the
+      lifetime of non-owned backing storage. *)
+
   external change_layout
     : ('a : any) ('b : any) ('c : any).
       (('a, 'b, 'c) t[@local_opt]) -> 'd layout -> (('a, 'b, 'd) t[@local_opt])

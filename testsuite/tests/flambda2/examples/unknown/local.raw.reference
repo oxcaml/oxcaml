@@ -187,24 +187,24 @@
           where k3
                   (`*match*` :
                      [ 0 of [ 0 | 0 of val * val ] * [ 0 | 0 of val * val ] ]) =
-            ((let Pfield = %block_load.[`1`] (`*match*`) in
+            ((let Pmixedfield = %block_load.[`1`] (`*match*`) in
               apply
                      direct(spans_5
                      &my_alloc_region &my_region &my_ghost_region)
                 (my_closure ~ depth my_depth -> next_depth
                  : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
-                  (break_here, Pfield)
+                  (break_here, Pmixedfield)
                   -> k3 * k2)
                where k3
                        (apply_result :
                           [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
-                 ((let Pfield = %block_load.[`0`] (`*match*`) in
+                 ((let Pmixedfield = %block_load.[`0`] (`*match*`) in
                    apply
                           direct(rev_app_4
                           &my_alloc_region &my_region &my_ghost_region)
                      (rev_app
                       : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
-                       (Pfield, 0)
+                       (Pmixedfield, 0)
                        -> k3 * k2)
                     where k3
                             (apply_result_1 :

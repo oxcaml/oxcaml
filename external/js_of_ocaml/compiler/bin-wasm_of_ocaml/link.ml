@@ -22,6 +22,7 @@ open Cmdliner
 
 type t =
   { common : Jsoo_cmdline.Arg.t
+  ; manifests : string list
   ; files : string list
   ; output_file : string
   ; linkall : bool
@@ -34,6 +35,14 @@ let options () =
   let output_file =
     let doc = "Set output file name to [$(docv)]." in
     Arg.(required & opt (some string) None & info [ "o" ] ~docv:"FILE" ~doc)
+  in
+  let manifests =
+    let doc =
+      "Manifest file, relative to \\$MANIFEST_FILES_ROOT, mapping bare file names to \
+       their locations, in the format read by the OCaml compiler's -I-manifest. Bare file \
+       names given on the command line are looked up in these manifests."
+    in
+    Arg.(value & opt_all string [] & info [ "I-manifest" ] ~docv:"FILE" ~doc)
   in
   let no_sourcemap =
     let doc = "Disable sourcemap output." in
@@ -68,9 +77,11 @@ let options () =
     in
     Arg.(value & flag & info [ "dynlink"; "toplevel" ] ~doc)
   in
-  let build_t common no_sourcemap sourcemap output_file files linkall dynlink mklib =
+  let build_t common no_sourcemap sourcemap output_file manifests files linkall dynlink mklib
+      =
     let enable_source_maps = (not no_sourcemap) && sourcemap in
-    `Ok { common; output_file; files; linkall; dynlink; mklib; enable_source_maps }
+    `Ok
+      { common; output_file; manifests; files; linkall; dynlink; mklib; enable_source_maps }
   in
   let t =
     Term.(
@@ -79,6 +90,7 @@ let options () =
       $ no_sourcemap
       $ sourcemap
       $ output_file
+      $ manifests
       $ files
       $ linkall
       $ dynlink
@@ -89,6 +101,7 @@ let options () =
 let f
     { common
     ; output_file
+    ; manifests
     ; files
     ; linkall
     ; dynlink =
@@ -100,6 +113,7 @@ let f
     } =
   Js_of_ocaml_compiler.Config.set_target `Wasm;
   Jsoo_cmdline.Arg.eval common;
+  Js_of_ocaml_compiler.Dune_manifests_reader.set manifests;
   Link.link ~output_file ~linkall ~mklib ~enable_source_maps ~embedded_files:[] ~files
 
 let info =
