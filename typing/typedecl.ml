@@ -4590,8 +4590,8 @@ let make_native_repr
     (Poly | Sort (Product _ | Addressable _ | Base (Scannable | Void | Bits32 |
       Bits64 | Word | Untagged_immediate | Float32 | Float64 | Vec128 | Vec256 |
       Vec512 | Mask))) ->
-    raise
-      (Error (core_type.ptyp_loc, Cannot_unbox_or_untag_type Unsafe_unextended))
+    Error.log_and_raise core_type.ptyp_loc
+      (Cannot_unbox_or_untag_type Unsafe_unextended)
   | Native_repr_attr_present Unsafe_unextended, Sort (Univar _ | Genvar _) ->
     Misc.fatal_error "typedecl: Univar/Genvar in concrete type"
 

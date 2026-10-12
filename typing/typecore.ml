@@ -10097,9 +10097,8 @@ and type_function
             with
             | Ok () -> ()
             | Error err ->
-              raise
-                (Error (pat.ppat_loc, env,
-                        Optional_arg_default_not_rep (ty_default_arg, err)))
+              Error.log_or_raise pat.ppat_loc env
+                (Optional_arg_default_not_rep (ty_default_arg, err))
             end;
             (* Issue#12668: Retain type-directed disambiguation of
                ?x:(y : Variant.t = Constr)
@@ -10843,7 +10842,7 @@ and type_option_some env expected_mode sarg ty ty0 =
     with
     | Ok (repres, sorts) -> repres, sorts
     | Error (Unrepresentable_arg (loc, ty, err)) ->
-      raise (Error (loc, env, Function_type_not_rep (ty, err)))
+      Error.log_and_raise loc env (Function_type_not_rep (ty, err))
   in
   mkexp (Texp_construct(mknoloc lid , csome, repres, List.combine sorts [arg],
                         Some (Typedtree.create_locality_mode_r locality_mode)))
