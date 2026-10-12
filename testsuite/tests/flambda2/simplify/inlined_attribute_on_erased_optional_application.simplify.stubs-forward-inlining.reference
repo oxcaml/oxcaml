@@ -41,7 +41,7 @@ let $camlInlined_attribute_on_erased_optional_application__default_1 =
   closure default_0_1 @`default` &toplevel
 in
 let code loopify(never) size(5) newer_version_of(f_inner_2)
-      f_inner_2_1 (x, y : imm tagged, z : imm tagged)
+      f_inner_2_1 (x : imm tagged, y : imm tagged, z : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =

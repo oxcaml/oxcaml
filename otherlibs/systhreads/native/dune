@@ -4,7 +4,7 @@
  (name C-only)
  (deps libthreadsnat_stubs.a))
 
-(copy_files# ../../../runtime/sync_posix.h)
+(rule (target sync_posix.h) (action (copy %{dep:../../../runtime/sync_posix.h} %{target})))
 
 (library
  (name threadsnat)

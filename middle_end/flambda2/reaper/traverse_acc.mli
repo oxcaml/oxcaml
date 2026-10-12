@@ -167,7 +167,7 @@ val add_code_id_my_closure : t -> Code_id.t -> Variable.t -> unit
 
 (** Convert a [Simple.t] to a dependency graph node. Constants map to the
     [all_constants] node; variables map to themselves; symbols from other
-    compilation units are marked [any_source]. *)
+    compilation units are recorded in the [delayed_deps]. *)
 val simple_to_node : t -> denv:Traverse_env.t -> Simple.t -> Code_id_or_name.t
 
 (** Mark a [Simple.t] as used, conditional on the current function (if any)
@@ -251,12 +251,18 @@ val add_set_of_closures_dep :
 val deps : t -> Graph.graph
 
 (** Return the dependencies recorded by [add_apply] and
-    [add_set_of_closures_dep]. *)
+    [add_set_of_closures_dep], and the symbols from other compilation units
+    recorded by [simple_to_node]. *)
 val delayed_deps : t -> delayed_deps
 
-(** Resolve all deferred dependencies into the graph. *)
+(** Resolve all deferred dependencies into the graph. Imported symbols from
+    compilation units outside [analysis_scope] are marked [any_source]. *)
 val resolve_delayed_deps :
-  Graph.graph -> code_deps:code_dep Code_id.Map.t -> delayed_deps -> unit
+  Graph.graph ->
+  analysis_scope:Analysis_scope.t ->
+  code_deps:code_dep Code_id.Map.t ->
+  delayed_deps ->
+  unit
 
 val sort_code_ids : t -> Code_id.t array
 

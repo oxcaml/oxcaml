@@ -263,20 +263,15 @@ module Variable_data = struct
 
   let flags = var_flags
 
-  let [@ocamlformat "disable"] print ppf { compilation_unit; name; name_stamp;
-                                           kind; user_visible; } =
-    Format.fprintf ppf "@[<hov 1>(\
-        @[<hov 1>(compilation_unit@ %a)@]@ \
-        @[<hov 1>(name@ %s)@]@ \
-        @[<hov 1>(name_stamp@ %d)@]@ \
-        @[<hov 1>(kind@ %a)@]@ \
-        @[<hov 1>(user_visible@ %b)@]\
-        )@]"
-      (Format_doc.compat Compilation_unit.print_debug) compilation_unit
-      name
-      name_stamp
-      Flambda_kind.print kind
-      user_visible
+  let print ppf { compilation_unit; name; name_stamp; kind; user_visible } =
+    let open! Misc.Sexp in
+    print ppf
+      [ a "compilation_unit" compilation_unit
+          (Format_doc.compat Compilation_unit.print_debug);
+        s "name" name;
+        d "name_stamp" name_stamp;
+        a "kind" kind Flambda_kind.print;
+        b "user_visible" user_visible ]
 
   let hash
       { compilation_unit; name = _; name_stamp; kind = _; user_visible = _ } =
@@ -316,15 +311,14 @@ module Symbol_data = struct
 
   let flags = symbol_flags
 
-  let [@ocamlformat "disable"] print ppf symbol =
+  let print ppf symbol =
     let compilation_unit = Symbol0.compilation_unit symbol in
     let linkage_name = Symbol0.linkage_name symbol in
-    Format.fprintf ppf "@[<hov 1>(\
-        @[<hov 1>(compilation_unit@ %a)@]@ \
-        @[<hov 1>(linkage_name@ %a)@]\
-        )@]"
-      (Format_doc.compat Compilation_unit.print_debug) compilation_unit
-      Linkage_name.print linkage_name
+    let open! Misc.Sexp in
+    print ppf
+      [ a "compilation_unit" compilation_unit
+          (Format_doc.compat Compilation_unit.print_debug);
+        a "linkage_name" linkage_name Linkage_name.print ]
 end
 
 module Code_id_data = struct
@@ -337,15 +331,13 @@ module Code_id_data = struct
 
   let flags = code_id_flags
 
-  let [@ocamlformat "disable"] print ppf { compilation_unit; name; debug_info = _; linkage_name; } =
-    Format.fprintf ppf "@[<hov 1>(\
-        @[<hov 1>(compilation_unit@ %a)@]@ \
-        @[<hov 1>(name@ %s)@]@ \
-        @[<hov 1>(linkage_name@ %a)@]@ \
-        )@]"
-      (Format_doc.compat Compilation_unit.print_debug) compilation_unit
-      name
-      Linkage_name.print linkage_name
+  let print ppf { compilation_unit; name; debug_info = _; linkage_name } =
+    let open! Misc.Sexp in
+    print ppf
+      [ a "compilation_unit" compilation_unit
+          (Format_doc.compat Compilation_unit.print_debug);
+        s "name" name;
+        a "linkage_name" linkage_name Linkage_name.print ]
 
   let hash { compilation_unit = _; name = _; debug_info = _; linkage_name } =
     (* Linkage names are unique across a whole project, so there's no need to
@@ -447,7 +439,7 @@ module Const = struct
 
     let hash = Id.hash
 
-    let [@ocamlformat "disable"] print ppf t = Const_data.print ppf (descr t)
+    let print ppf t = Const_data.print ppf (descr t)
   end
 
   include T0
@@ -497,14 +489,14 @@ module Variable = struct
 
   let previous_name_stamp = ref (-1)
 
-  let create ?user_visible name kind =
+  let create_in_compilation_unit ~compilation_unit ?user_visible name kind =
     let name_stamp =
       (* CR mshinwell: check for overflow on 32 bit *)
       incr previous_name_stamp;
       !previous_name_stamp
     in
     let data : Variable_data.t =
-      { compilation_unit = Current_unit.get_cu_exn ();
+      { compilation_unit;
         name;
         name_stamp;
         kind;
@@ -512,6 +504,11 @@ module Variable = struct
       }
     in
     Table.add !grand_table_of_variables data
+
+  let create ?user_visible name kind =
+    create_in_compilation_unit
+      ~compilation_unit:(Current_unit.get_cu_exn ())
+      ?user_visible name kind
 
   module T0 = struct
     let compare = Id.compare
@@ -522,7 +519,7 @@ module Variable = struct
 
     let print ppf t =
       let cu = compilation_unit t in
-      if Compilation_unit.equal cu (Current_unit.get_cu_exn ())
+      if Current_unit.is_current cu
       then
         Format.fprintf ppf "%s/%d%s" (name t) (name_stamp t)
           (if user_visible t then "UV" else "N")
@@ -704,11 +701,9 @@ module Simple_data = struct
 
   let flags = simple_flags
 
-  let [@ocamlformat "disable"] print ppf { simple = _; coercion; } =
-    Format.fprintf ppf "@[<hov 1>\
-        @[<hov 1>(coercion@ %a)@]\
-        @]"
-      Coercion.print coercion
+  let print ppf { simple = _; coercion } =
+    let open! Misc.Sexp in
+    print ppf [a "coercion" coercion Coercion.print]
 
   let hash { simple; coercion } =
     Hashtbl.hash (Id.hash simple, Coercion.hash coercion)
@@ -794,17 +789,18 @@ module Simple = struct
     let hash = Id.hash
 
     let print ppf t =
-      let print ppf t =
+      let print_aux ppf t =
         pattern_match t
           ~name:(fun name ~coercion:_ -> Name.print ppf name)
           ~const:(fun cst -> Const.print ppf cst)
       in
       let coercion = coercion t in
       if Coercion.is_id coercion
-      then print ppf t
+      then print_aux ppf t
       else
-        Format.fprintf ppf "@[<hov 1>(coerce@ %a@ %a)@]" print t Coercion.print
-          coercion
+        let open! Misc.Sexp in
+        print ppf
+          [fmt "coerce"; fmt "%a" print_aux t; fmt "%a" Coercion.print coercion]
   end
 
   include T0
@@ -993,11 +989,10 @@ module Code_id_or_symbol = struct
     let hash = Id.hash
 
     let print ppf t =
+      let open! Misc.Sexp in
       pattern_match t
-        ~code_id:(fun code_id ->
-          Format.fprintf ppf "@[<hov 1>(code_id@ %a)@]" Code_id.print code_id)
-        ~symbol:(fun symbol ->
-          Format.fprintf ppf "@[<hov 1>(symbol@ %a)@]" Symbol.print symbol)
+        ~code_id:(fun code_id -> print ppf [a "code_id" code_id Code_id.print])
+        ~symbol:(fun symbol -> print ppf [a "symbol" symbol Symbol.print])
   end
 
   include T0
@@ -1051,13 +1046,11 @@ module Code_id_or_name = struct
     let hash = Id.hash
 
     let print ppf t =
+      let open! Misc.Sexp in
       pattern_match t
-        ~code_id:(fun code_id ->
-          Format.fprintf ppf "@[<hov 1>(code_id@ %a)@]" Code_id.print code_id)
-        ~symbol:(fun symbol ->
-          Format.fprintf ppf "@[<hov 1>(symbol@ %a)@]" Symbol.print symbol)
-        ~var:(fun var ->
-          Format.fprintf ppf "@[<hov 1>(var@ %a)@]" Variable.print var)
+        ~code_id:(fun code_id -> print ppf [a "code_id" code_id Code_id.print])
+        ~symbol:(fun symbol -> print ppf [a "symbol" symbol Symbol.print])
+        ~var:(fun var -> print ppf [a "var" var Variable.print])
   end
 
   include T0

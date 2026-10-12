@@ -738,15 +738,26 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         | Punspecializedarray ->
           Misc.fatal_error "Blambda_of_lambda: Pduparray Punspecializedarray"))
     | Pmakeblock (tag, _mut, shape, _) -> (
-      match Lambda.mixed_block_of_block_shape shape with
-      | None -> pseudo_event (variadic (Makeblock { tag }))
-      | Some shape ->
-        (* There is no notion of a mixed block at runtime in bytecode.
-              Further, source-level unboxed types are represented as boxed in
-              bytecode, so no ceremony is needed to box values before inserting
-              them into the (normal, unmixed) block. *)
-        let total_len = Array.length shape in
-        pseudo_event (variadic (Make_faux_mixedblock { total_len; tag })))
+      (* There is no notion of a mixed block at runtime in bytecode, and
+         source-level unboxed types are represented as boxed in bytecode.
+         We (deeply) copy unboxed products before inserting them, so that
+         the resulting block does not alias the product it is built from
+         (which could be mutated through). *)
+      match shape with
+      | Shape mixed_shape ->
+        let fields =
+          List.map2
+            (fun elt arg -> copy_mixed_block_element elt (comp_expr arg))
+            (Array.to_list mixed_shape)
+            args
+        in
+        let primitive : Blambda.primitive =
+          if Lambda.is_uniform_block_shape shape
+          then Makeblock { tag }
+          else Make_faux_mixedblock { total_len = List.length fields; tag }
+        in
+        pseudo_event (Prim (primitive, fields))
+      | All_value -> pseudo_event (variadic (Makeblock { tag })))
     | Pmake_unboxed_product _ -> pseudo_event (variadic (Makeblock { tag = 0 }))
     | Pgetglobal (cu, _) -> nullary (Getglobal cu)
     | Pgetpredef id -> nullary (Getpredef id)
@@ -1015,12 +1026,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Patomic_set_idx { layout = Punboxed_product _; _ }
     | Patomic_exchange_idx { layout = Punboxed_product _; _ }
     | Patomic_compare_exchange_idx { layout = Punboxed_product _; _ }
-    | Patomic_compare_set_idx { layout = Punboxed_product _; _ }
-    | Patomic_load_ptr { layout = Punboxed_product _ }
-    | Patomic_set_ptr { layout = Punboxed_product _; _ }
-    | Patomic_exchange_ptr { layout = Punboxed_product _; _ }
-    | Patomic_compare_exchange_ptr { layout = Punboxed_product _; _ }
-    | Patomic_compare_set_ptr { layout = Punboxed_product _; _ } ->
+    | Patomic_compare_set_idx { layout = Punboxed_product _; _ } ->
       Misc.fatal_errorf
         "Blambda_of_lambda: primitive %a may not be used with unboxed products"
         Printlambda.primitive primitive
@@ -1039,21 +1045,6 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Patomic_land_idx -> ternary (Ccall "caml_atomic_land_idx_bytecode")
     | Patomic_lor_idx -> ternary (Ccall "caml_atomic_lor_idx_bytecode")
     | Patomic_lxor_idx -> ternary (Ccall "caml_atomic_lxor_idx_bytecode")
-    | Patomic_load_ptr _ -> unary (Ccall "caml_atomic_load_ptr_bytecode")
-    | Patomic_set_ptr _ -> binary (Ccall "caml_atomic_set_ptr_bytecode")
-    | Patomic_exchange_ptr _ ->
-      binary (Ccall "caml_atomic_exchange_ptr_bytecode")
-    | Patomic_compare_exchange_ptr _ ->
-      ternary (Ccall "caml_atomic_compare_exchange_ptr_bytecode")
-    | Patomic_compare_set_ptr _ ->
-      ternary (Ccall "caml_atomic_cas_ptr_bytecode")
-    | Patomic_fetch_add_ptr ->
-      binary (Ccall "caml_atomic_fetch_add_ptr_bytecode")
-    | Patomic_add_ptr -> binary (Ccall "caml_atomic_add_ptr_bytecode")
-    | Patomic_sub_ptr -> binary (Ccall "caml_atomic_sub_ptr_bytecode")
-    | Patomic_land_ptr -> binary (Ccall "caml_atomic_land_ptr_bytecode")
-    | Patomic_lor_ptr -> binary (Ccall "caml_atomic_lor_ptr_bytecode")
-    | Patomic_lxor_ptr -> binary (Ccall "caml_atomic_lxor_ptr_bytecode")
     | Pdls_get -> unary (Ccall "caml_domain_dls_get")
     | Ptls_get -> unary (Ccall "caml_domain_tls_get")
     | Pdomain_index -> unary (Ccall "caml_ml_domain_index")

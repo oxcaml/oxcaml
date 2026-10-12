@@ -1433,17 +1433,15 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
                   arg, Jkind.Sort.scannable
                 else
                   Typecore.type_option_some val_env sarg ty ty0,
-                  (* CR layouts v5: Change the sort when options can hold
-                     non-values. *)
+                  (* Always [scannable] even for non-[value] optional arguments,
+                     since this is the sort of the [option], not what's inside.
+                  *)
                   Jkind.Sort.scannable
               )
             in
             let eliminate_optional_arg () =
               Arg (Typecore.type_option_none val_env ty0 Location.none,
-                   (* CR layouts v5: Change the sort when options can hold
-                      non-values. *)
-                   Jkind.Sort.scannable
-                  )
+                   Jkind.Sort.scannable)
             in
             let eliminate_position_arg () =
               let arg = Typecore.src_pos (Location.ghostify scl.pcl_loc) [] val_env in

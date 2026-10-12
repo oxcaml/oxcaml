@@ -146,6 +146,7 @@
                           Label_disambiguation
                             Unambiguous
                       Texp_construct \"()\"
+                      Constructor_uniform_value
                       []
                   <case>
                     pattern (test.ml[5,58+4]..test.ml[5,58+5])

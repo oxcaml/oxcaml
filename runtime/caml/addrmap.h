@@ -15,6 +15,8 @@
 #ifndef CAML_ADDRMAP_H
 #define CAML_ADDRMAP_H
 
+#include "config.h"
+#include "misc.h"
 #include "mlvalues.h"
 
 #ifdef __cplusplus
@@ -24,7 +26,7 @@ extern "C" {
 /* An addrmap is a value -> value hashmap, where
    the values are blocks */
 
-struct addrmap_entry { value key, value; };
+struct addrmap_entry { value key; value val; };
 struct addrmap {
   struct addrmap_entry* entries;
   uintnat size;
@@ -84,14 +86,14 @@ Caml_inline value caml_addrmap_iter_value(struct addrmap* t,
                                           addrmap_iterator i)
 {
   CAMLassert(caml_addrmap_iter_ok(t, i));
-  return t->entries[i].value;
+  return t->entries[i].val;
 }
 
 Caml_inline value* caml_addrmap_iter_val_pos(struct addrmap* t,
                                              addrmap_iterator i)
 {
   CAMLassert(caml_addrmap_iter_ok(t, i));
-  return &t->entries[i].value;
+  return &t->entries[i].val;
 }
 
 Caml_inline addrmap_iterator caml_addrmap_iterator(struct addrmap* t)

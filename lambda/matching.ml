@@ -5044,14 +5044,6 @@ let for_optional_arg_default
     ~scopes loc pat ~param ~default_arg ~default_arg_sort ~return_layout body
   : lambda
   =
-  begin match default_arg_sort with
-  | Jkind.Sort.Const.Base Scannable -> ()
-  | _ ->
-    (* Currently this is enforced by the typechecker but we intend to
-       lift this restriction soon. *)
-    Misc.fatal_error
-      "Matching.for_optional_arg_default: optional argument must be a value"
-  end;
   (* CR layouts v1.5: It's sad to compute [default_arg_layout] here as we
      immediately go and do it again in [for_let]. We should rework [for_let]
      so it can take a precomputed layout.
@@ -5060,6 +5052,19 @@ let for_optional_arg_default
     Typeopt.layout pat.pat_env pat.pat_loc default_arg_sort pat.pat_type
   in
   let sloc = Scoped_location.of_location ~scopes loc in
+  let field_access =
+    (* CR-someday lmaurer: This is just a special case of [make_field_access]
+       inside [get_expr_args_constr], but deduplicating it is nontrivial at the
+       moment. Even better, we could factor out *all* the places that project a
+       field and have to do this dance. Then here we'd bake in the
+       representation, which we could expose in [Predef] as a function of the
+       argument sort. *)
+    match default_arg_layout with
+    | Pvalue _ -> Pfield (0, Pointer, Reads_agree)
+    | _ ->
+      let shape = [| mixed_block_element_of_layout default_arg_layout |] in
+      Pmixedfield ([ 0 ], shape, Reads_agree)
+  in
   let supplied_or_default =
     transl_match_on_option
       default_arg_layout
@@ -5074,11 +5079,7 @@ let for_optional_arg_default
               makes it impossible to overwrite and safe to use [Reads_agree]
               here. It would be slightly safer to use [Reads_vary] here, but
               that could degrade performance of programs not using uniqueness *)
-           (* Assumes that the argument type has layout [value_or_null]; see
-              the [default_arg_sort] check above. *)
-           (Pfield (0, Pointer, Reads_agree),
-            [ Lvar param ],
-            sloc))
+           (field_access, [ Lvar param ], sloc))
   in
   for_let ~scopes ~arg_sort:default_arg_sort ~return_layout
     loc supplied_or_default Immutable pat body
