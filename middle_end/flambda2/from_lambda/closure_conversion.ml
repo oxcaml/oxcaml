@@ -2994,22 +2994,21 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
       contains_subfunctions
       && Flambda_features.Expert.fallback_inlining_heuristic ()
     then Never_inline
-    else if
-      Flambda_features.classic_mode ()
-      && !Clflags.jsir
-      && Name_occurrences.contains_function_or_value_slots free_names_of_body
-    then
-      (* In classic mode this is the only inlining decision that will ever be
-         made for this function, so it must take the JSIR restriction into
-         account. In simplify mode we don't do this, as at this point free
-         variables that will later be lifted to symbols (e.g. other top-level
-         functions of the same module) still appear as value slots, which makes
-         this check too conservative. Instead the decision is recomputed from
-         the simplified body on each round (see
-         [Function_decl_inlining_decision]) and in its call sites (see
-         [Call_site_inlining_decision]). *)
-      Never_inline
     else Inline_attribute.from_lambda (Function_decl.inline decl)
+  in
+  let jsir_forbids_inlining =
+    (* In classic mode the decision made below is the only inlining decision
+       that will ever be made for this function, so it must take the JSIR
+       restriction into account. In simplify mode we don't do this, as at this
+       point free variables that will later be lifted to symbols (e.g. other
+       top-level functions of the same module) still appear as value slots,
+       which makes this check too conservative. Instead the decision is
+       recomputed from the simplified body on each round (see
+       [Function_decl_inlining_decision]) and in its call sites (see
+       [Call_site_inlining_decision]). *)
+    Flambda_features.classic_mode ()
+    && !Clflags.jsir
+    && Name_occurrences.contains_function_or_value_slots free_names_of_body
   in
   let params_and_body =
     Function_params_and_body.create ~return_continuation
@@ -3044,7 +3043,10 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
   in
   let inlining_decision =
     if Flambda_features.classic_mode ()
-    then Inlining.definition_inlining_decision inline cost_metrics
+    then
+      if jsir_forbids_inlining
+      then Function_decl_inlining_decision_type.Jsir_inlining_disabled
+      else Inlining.definition_inlining_decision inline cost_metrics
     else if stub
     then Function_decl_inlining_decision_type.Stub
     else Function_decl_inlining_decision_type.Not_yet_decided

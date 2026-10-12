@@ -64,6 +64,8 @@ end) : sig
 
   val fold_with_mode : t -> init:'a -> f:('a -> N.t -> Name_mode.t -> 'a) -> 'a
 
+  val exists_at_normal_mode : t -> bool
+
   val for_all : t -> f:(N.t -> bool) -> bool
 
   val filter : t -> f:(N.t -> bool) -> t
@@ -298,6 +300,14 @@ end = struct
         | Some name_mode -> f acc name name_mode
         | None -> acc)
       t init
+
+  let exists_at_normal_mode t =
+    N.Map.exists
+      (fun _name for_one_name ->
+        match For_one_name.max_name_mode_opt for_one_name with
+        | Some name_mode -> Name_mode.is_normal name_mode
+        | None -> false)
+      t
 
   let downgrade_occurrences_at_strictly_greater_name_mode t
       (max_name_mode : Name_mode.t) =
@@ -837,8 +847,10 @@ let all_value_slots_at_normal_mode t =
       else acc)
 
 let contains_function_or_value_slots t =
-  (not (all_function_slots_at_normal_mode t |> Function_slot.Set.is_empty))
-  || not (all_value_slots_at_normal_mode t |> Value_slot.Set.is_empty)
+  For_function_slots.exists_at_normal_mode t.function_slots_in_projections
+  || For_function_slots.exists_at_normal_mode t.function_slots_in_declarations
+  || For_value_slots.exists_at_normal_mode t.value_slots_in_projections
+  || For_value_slots.exists_at_normal_mode t.value_slots_in_declarations
 
 let variables t = For_names.keys t.names |> Name.set_to_var_set
 

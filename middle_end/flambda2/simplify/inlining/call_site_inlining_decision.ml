@@ -460,7 +460,14 @@ let make_decision dacc ~simplify_expr ~rebuild_expr ~function_type ~apply
      [@unrolled] and stubs do not consult the decision made at the function
      definition. *)
   let jsir_forbids_inlining =
+    (* [Code.can_be_inlined_for_jsir] also tests [Clflags.jsir]; testing it here
+       first avoids the code lookup when not compiling to JSIR. *)
     !Clflags.jsir
+    && (match Apply.inlined apply with
+      | Never_inlined | Forward_inlined ->
+        (* Let [make_decision0] report the attribute as the reason. *)
+        false
+      | Default_inlined | Unroll _ | Always_inlined _ | Hint_inlined -> true)
     &&
     match DE.find_code_exn (DA.denv dacc) (FT.code_id function_type) with
     | exception Not_found -> false (* [make_decision0] will handle this *)
