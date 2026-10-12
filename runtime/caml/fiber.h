@@ -364,10 +364,6 @@ CAMLextern void caml_free_stack(struct stack_info* stk);
 /* Walk the parent chain of a running [stack] to find the nearest TLS. */
 struct stack_info* caml_tls_find_owner(struct stack_info* stack);
 
-/* Set [Caml_state->tls_state] to the nearest TLS. Must be called after
-   switching stacks. */
-CAMLextern void caml_tls_update_cache(void);
-
 /* gc_regs_buckets is allocated on-demand by [maybe_expand_stack]. */
 CAMLextern void caml_free_gc_regs_buckets(value *gc_regs_buckets);
 
