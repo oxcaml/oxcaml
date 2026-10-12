@@ -213,13 +213,8 @@ val reset : preserve_persistent_env:bool -> unit
 
 (* merlin *)
 
-(* merlin *)
-
 module Error : sig
     type exn += private In_context of Location.t * Env.t * error
-
-  val log_or_raise : Location.t -> Env.t -> error -> unit
-  val log_and_raise : Location.t -> Env.t -> error -> 'a
 end
 
 val normalize_signature : Types.signature -> unit

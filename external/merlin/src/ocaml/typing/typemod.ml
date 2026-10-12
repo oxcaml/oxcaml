@@ -2386,14 +2386,6 @@ and transl_signature ?(interface_toplevel = false) env sig_acc
         in
         mksig (Tsig_type (rec_flag, decls)) env loc, sig_items, newenv
     | Psig_typesubst sdecls ->
-        List.iter (fun td ->
-          if td.ptype_kind <> Ptype_abstract || td.ptype_manifest = None ||
-             td.ptype_private = Private
-          then
-            (* This error should be a parsing error,
-               once we have nice error messages there. *)
-            Error.log_and_raise td.ptype_loc env Invalid_type_subst_rhs
-        ) sdecls;
         let (decls, newenv, _shapes) =
           Typedecl.transl_type_decl env Nonrecursive sdecls
         in
