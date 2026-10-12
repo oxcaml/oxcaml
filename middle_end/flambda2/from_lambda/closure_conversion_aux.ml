@@ -124,6 +124,7 @@ end
 module Inlining = struct
   type inlinable_result =
     | Not_inlinable
+    | Jsir_inlining_disabled
     | Inlinable of Code.t
 
   let threshold () =

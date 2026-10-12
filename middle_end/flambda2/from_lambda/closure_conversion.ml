@@ -402,18 +402,26 @@ module Inlining = struct
         let code = Code_or_metadata.get_code code in
         let inlined_call = Apply_expr.inlined apply in
         let decision, res =
-          match inlined_call with
-          | Never_inlined ->
-            ( Call_site_inlining_decision_type.Never_inlined_attribute,
-              Not_inlinable )
-          | Always_inlined _ | Hint_inlined ->
-            Call_site_inlining_decision_type.Attribute_always, Inlinable code
-          | Default_inlined | Forward_inlined | Unroll _ ->
-            (* Closure ignores completely [@unrolled] attributes, so it seems
-               safe to do the same. *)
-            ( Call_site_inlining_decision_type.Definition_says_inline
-                { was_inline_always = false },
-              Inlinable code )
+          (* This check must happen first, as [@inlined] below does not consult
+             the decision made at the function definition, and stubs are always
+             inlinable but project from their own closure. *)
+          if not (Code.can_be_inlined_for_jsir code)
+          then
+            ( Call_site_inlining_decision_type.Jsir_inlining_disabled,
+              Jsir_inlining_disabled )
+          else
+            match inlined_call with
+            | Never_inlined ->
+              ( Call_site_inlining_decision_type.Never_inlined_attribute,
+                Not_inlinable )
+            | Always_inlined _ | Hint_inlined ->
+              Call_site_inlining_decision_type.Attribute_always, Inlinable code
+            | Default_inlined | Forward_inlined | Unroll _ ->
+              (* Closure ignores completely [@unrolled] attributes, so it seems
+                 safe to do the same. *)
+              ( Call_site_inlining_decision_type.Definition_says_inline
+                  { was_inline_always = false },
+                Inlinable code )
         in
         Inlining_report.record_decision_at_call_site_for_known_function ~tracker
           ~apply ~pass:After_closure_conversion ~unrolling_depth:None
@@ -1912,14 +1920,6 @@ let close_exact_or_unknown_apply acc env
     in
     if not (Flambda_features.classic_mode ())
     then Expr_with_acc.create_apply acc apply
-    else if !Clflags.jsir
-    then
-      let apply =
-        Apply.with_inlined_attribute apply
-          (Inlined_attribute.with_use_info (Apply.inlined apply)
-             Jsir_inlining_disabled)
-      in
-      Expr_with_acc.create_apply acc apply
     else
       match Inlining.inlinable env apply callee_approx with
       | Not_inlinable ->
@@ -1927,6 +1927,13 @@ let close_exact_or_unknown_apply acc env
           Apply.with_inlined_attribute apply
             (Inlined_attribute.with_use_info (Apply.inlined apply)
                Unused_because_function_unknown)
+        in
+        Expr_with_acc.create_apply acc apply
+      | Jsir_inlining_disabled ->
+        let apply =
+          Apply.with_inlined_attribute apply
+            (Inlined_attribute.with_use_info (Apply.inlined apply)
+               Jsir_inlining_disabled)
         in
         Expr_with_acc.create_apply acc apply
       | Inlinable func_desc ->
@@ -2993,9 +3000,20 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
       && Flambda_features.Expert.fallback_inlining_heuristic ()
     then Never_inline
     else if
-      !Clflags.jsir
+      Flambda_features.classic_mode ()
+      && !Clflags.jsir
       && Name_occurrences.contains_function_or_value_slots free_names_of_body
-    then Never_inline
+    then
+      (* In classic mode this is the only inlining decision that will ever be
+         made for this function, so it must take the JSIR restriction into
+         account. In simplify mode we don't do this, as at this point
+         free variables that will later be lifted to symbols (e.g. other
+         top-level functions of the same module) still appear as value slots,
+         which makes this check too conservative. Instead the decision is
+         recomputed from the simplified body on each round (see
+         [Function_decl_inlining_decision]) and in its call sites (see
+         [Call_site_inlining_decision]). *)
+      Never_inline
     else Inline_attribute.from_lambda (Function_decl.inline decl)
   in
   let params_and_body =

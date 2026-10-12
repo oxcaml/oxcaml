@@ -456,7 +456,20 @@ let make_decision0 dacc ~simplify_expr ~rebuild_expr ~function_type ~apply
 
 let make_decision dacc ~simplify_expr ~rebuild_expr ~function_type ~apply
     ~return_arity : Call_site_inlining_decision_type.t =
-  if !Clflags.jsir
+  (* This check must happen before [make_decision0], since [@inlined],
+     [@unrolled] and stubs do not consult the decision made at the function
+     definition. *)
+  let jsir_forbids_inlining =
+    !Clflags.jsir
+    &&
+    match DE.find_code_exn (DA.denv dacc) (FT.code_id function_type) with
+    | exception Not_found -> false (* [make_decision0] will handle this *)
+    | code_or_metadata -> (
+      match Code_or_metadata.view code_or_metadata with
+      | Metadata_only _ -> false
+      | Code_present code -> not (Code.can_be_inlined_for_jsir code))
+  in
+  if jsir_forbids_inlining
   then Jsir_inlining_disabled
   else
     make_decision0 dacc ~simplify_expr ~rebuild_expr ~function_type ~apply
