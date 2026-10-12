@@ -102,8 +102,7 @@ end
 
 module Inlining : sig
   type inlinable_result =
-    | Not_inlinable
-    | Jsir_inlining_disabled
+    | Not_inlinable of Inlined_attribute.Use_info.t
     | Inlinable of Code.t
 
   val threshold : unit -> int
