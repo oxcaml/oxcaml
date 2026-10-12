@@ -40,11 +40,11 @@ val s_table : ('a -> 'b) -> 'a -> 'b ref
 
 val s_ref_of_create : ('a -> 'b) -> 'a -> 'b ref
 (** [s_ref_of_create create x] is like {!s_ref}, but the ref holds [create x].
-    On each fresh store, the ref is re-initialized by calling [create x],
-    rather than by snapshotting the value.
+    The ref is re-initialized by calling [create x] each time a {!fresh} store
+    is created (and on each {!reset}), rather than snapshotting the value.
 
-    Historical note: this is {!s_table} renamed for clarity. Despite its name,
-    [s_table] is not specific to hash tables. *)
+    This is an alias of {!s_table} with a clearer name: [s_table] is not
+    specific to hash tables. *)
 
 (** {1 State management}
 

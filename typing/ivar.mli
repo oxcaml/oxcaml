@@ -1,12 +1,19 @@
 (** Write-once variables whose readers are suspended until the variable is
     filled.
 
-    Ivars can be merged, after which they behave as a single ivar. All mutations
-    are reported to the log installed by [set_log], so they can be undone with
-    [Change.undo]. Jobs enqueued on the scheduler are logged separately, via
-    [Scheduler.set_log].
+    Ivars can be merged, after which they behave as a single ivar. Handlers may
+    run in any order.
 
-    Handlers may run in any order. *)
+    {2 The global pool}
+
+    An ivar created with [~in_global_pool:true] is registered in the
+    {!Global_pool}, recording that it must eventually be filled or cancelled.
+    The pool does not decide when that is: the client does, by draining it with
+    {!Global_pool.take}.
+
+    There is a single, global pool. It does not distinguish ivars by when or
+    where they were created: {!Global_pool.take} returns every ivar registered
+    since the previous [take]. *)
 
 type 'a t
 
@@ -59,11 +66,16 @@ val merge : 'a t -> 'a t -> f:('a -> 'a -> 'a) -> scheduler:Scheduler.t -> unit
 (** An ivar of any content type. *)
 type packed = Packed : 'a t -> packed
 
-(** A pool of ivars that must be filled or cancelled, e.g. before the end of
-    some scope. *)
+(** The global pool of ivars that must be filled or cancelled, described at the
+    top of this module. *)
 module Global_pool : sig
-  (** [take ()] empties the pool, returning the ivars that were in it. *)
+  (** [take ()] empties the pool, returning the ivars that were in it. Like all
+      mutations, this is logged, so backtracking restores the pool. *)
   val take : unit -> packed list
 end
 
+(** All mutations are reported to the log installed by [set_log], so they can be
+    undone with [Change.undo]. Jobs enqueued on the scheduler are logged
+    separately, via [Scheduler.set_log]. *)
 include With_backtracking.S
+(** @inline *)

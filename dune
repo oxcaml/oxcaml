@@ -169,6 +169,7 @@
   structured_mangling
   symbol
   lazy_backtrack
+  with_backtracking_intf
   with_backtracking
   union_find
   diffing

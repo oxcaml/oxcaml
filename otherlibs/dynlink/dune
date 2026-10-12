@@ -74,6 +74,7 @@
  (ocamlopt_flags
   (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
  (modules
+  with_backtracking_intf
   with_backtracking
   union_find
   binutils
@@ -281,6 +282,8 @@
 (copy_files ../../utils/diffing.ml)
 
 (copy_files ../../utils/diffing_with_keys.ml)
+
+(copy_files ../../utils/with_backtracking_intf.ml)
 
 (copy_files ../../utils/with_backtracking.ml)
 
@@ -536,6 +539,8 @@
 (copy_files ../../typing/jkind_types.mli)
 
 (copy_files ../../typing/jkind_axis.mli)
+
+(copy_files ../../utils/with_backtracking.mli)
 
 (copy_files ../../utils/union_find.mli)
 
