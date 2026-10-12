@@ -26,7 +26,11 @@
     -warn-error
     +A
     -w
-    +a-4-9-40-41-42-44-45-48-66-67-70)))
+    +a-4-9-40-41-42-44-45-48-66-67-70))
+  ; Here rather than in the main context, so as not to apply to the
+  ; libraries of external/ast-dependent-libs, which are separate projects.
+  (ocamlopt_flags
+   (:standard -O3)))
  (dev
   (flags
    (:standard
@@ -112,6 +116,7 @@
 
 (library
  (name ocamlcommon)
+ (public_name compiler-libs.common)
  (wrapped false)
  (flags
   (:standard
@@ -213,6 +218,7 @@
 
 (library
  (name ocamlfrontend)
+ (public_name compiler-libs.frontend)
  (wrapped false)
  (flags
   (:standard
@@ -371,6 +377,7 @@
 
 (library
  (name ocamlbytecomp)
+ (public_name compiler-libs.bytecomp)
  (wrapped false)
  (flags
   (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
@@ -536,6 +543,7 @@
 
 (library
  (name ocamloptcomp)
+ (public_name compiler-libs.internal.ocamloptcomp)
  (wrapped false) ; for compatibility with existing code
  (modes byte native)
  ; We should change the code so this "-open" can be removed.
@@ -790,6 +798,7 @@
 
 (library
  (name oxcaml_common)
+ (public_name compiler-libs.internal.oxcaml_common)
  (wrapped false)
  (modes byte native)
  ; same flags as for ocamlfrontend library

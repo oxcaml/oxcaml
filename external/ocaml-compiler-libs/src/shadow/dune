@@ -9,7 +9,27 @@
 
 (rule
  (targets ocaml_shadow.ml)
+ (enabled_if
+  (<> %{context_name} main))
  (deps
   (:first_dep gen/gen.exe))
  (action
   (run %{first_dep} -dir %{ocaml_where}/compiler-libs -o %{targets})))
+
+; In the main context of the OxCaml compiler's own build, from the
+; compiler-libs directory of its installation.
+(rule
+ (targets ocaml_shadow.ml)
+ (enabled_if
+  (= %{context_name} main))
+ (deps
+  (:first_dep gen/gen.exe)
+  (glob_files
+   %{workspace_root}/../install/main/lib/ocaml/compiler-libs/*.{cmi,cma}))
+ (action
+  (run
+   %{first_dep}
+   -dir
+   %{workspace_root}/../install/main/lib/ocaml/compiler-libs
+   -o
+   %{targets})))

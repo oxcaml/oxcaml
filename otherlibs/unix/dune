@@ -16,6 +16,12 @@
 
 (library
  (name unix)
+ ; Public for the libraries of external/ast-dependent-libs (see
+ ; compilerlibs/dune), in the main context only: in the boot context, other
+ ; projects such as merlin get the unix library of the system compiler.
+ (public_name unix)
+ (enabled_if
+  (= %{context_name} main))
  (wrapped false)
  (modes byte native)
  (flags

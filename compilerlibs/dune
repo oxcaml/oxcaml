@@ -1,0 +1,23 @@
+; The vendored libraries in external/ast-dependent-libs are separate dune
+; projects, which only see public libraries: the compiler libraries have
+; public names in the compiler-libs package, as in the findlib packages of an
+; installed compiler (compiler-libs.common is ocamlcommon, and so on), or under
+; compiler-libs.internal for those that installed compilers merge into
+; ocamloptcomp.cma. Nothing installs the compiler-libs package.
+
+; Not re-exported: dune would add them to the requires of the installed
+; packages that use compiler-libs.optcomp.
+(library
+ (name compiler_libs_optcomp)
+ (public_name compiler-libs.optcomp)
+ (modules)
+ (libraries compiler-libs.frontend ocamloptcomp flambda2))
+
+; The merged archive under the name it is installed with, for
+; %{lib:compiler-libs.optcomp:ocamloptcomp.cma} (see
+; external/ocaml-compiler-libs).
+(install
+ (package compiler-libs)
+ (section lib)
+ (files
+  (../ocamloptcomp_with_flambda2.cma as optcomp/ocamloptcomp.cma)))

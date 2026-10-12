@@ -1,5 +1,6 @@
 (library
  (name gc_timings)
+ (public_name compiler-libs.internal.gc_timings)
  (foreign_stubs
   (language c)
   (names gc_timings_stubs)

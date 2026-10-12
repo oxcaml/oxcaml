@@ -2,6 +2,7 @@
 
 (library
  (name arm64_ast)
+ (public_name compiler-libs.internal.arm64_ast)
  (wrapped true)
  (ocamlopt_flags
   (:standard -w +4

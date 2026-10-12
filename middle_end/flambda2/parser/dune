@@ -94,6 +94,7 @@
 
 (library
  (name flambda2_parser)
+ (public_name compiler-libs.internal.flambda2_parser)
  (wrapped true)
  (instrumentation (backend bisect_ppx))
  (flags

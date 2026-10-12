@@ -2,6 +2,7 @@
 
 (library
  (name flambda2_ui)
+ (public_name compiler-libs.internal.flambda2_ui)
  (wrapped true)
  (instrumentation
   (backend bisect_ppx))

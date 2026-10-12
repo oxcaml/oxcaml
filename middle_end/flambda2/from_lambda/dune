@@ -2,6 +2,7 @@
 
 (library
  (name flambda2_from_lambda)
+ (public_name compiler-libs.internal.flambda2_from_lambda)
  (wrapped true)
  (instrumentation (backend bisect_ppx))
  (flags
