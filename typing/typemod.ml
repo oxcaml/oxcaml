@@ -4712,7 +4712,12 @@ let check_argument_type_if_given env sourcefile ~actual_staticity actual_sig
              ai_coercion_from_primary = coercion;
            }
 
-<<<<<<< HEAD
+let arg_signature sg ~param : Types.arg_signature =
+  (* The argument block is appended after the signature's runtime fields;
+     must agree with [Translmod.add_arg_block_to_module_block]. *)
+  { arg_param = param;
+    arg_block_idx = List.length (Types.bound_value_identifiers_and_sorts sg) }
+
 let collect_recovery_errors unit exn_list =
   let error_list =
     List.fold_right (fun exn set ->
@@ -4729,15 +4734,6 @@ let collect_recovery_errors unit exn_list =
     (Errors (Location.in_file
                (Unit_info.raw_source_file unit), error_list))
 
-||||||| ad79b35c2d
-=======
-let arg_signature sg ~param : Types.arg_signature =
-  (* The argument block is appended after the signature's runtime fields;
-     must agree with [Translmod.add_arg_block_to_module_block]. *)
-  { arg_param = param;
-    arg_block_idx = List.length (Types.bound_value_identifiers_and_sorts sg) }
-
->>>>>>> origin/main
 let type_implementation target modulename initial_env ast =
   let sourcefile = Unit_info.original_source_file target in
   let error e =
@@ -5009,28 +5005,23 @@ let type_interface target modulename env ast =
     let uid = Shape.Uid.of_compilation_unit_id modulename in
     cms_register_toplevel_signature_attributes ~uid ~sourcefile ast
   end;
-<<<<<<< HEAD
   let sg =
     if !Clflags.typing_recovery then
       let caught = ref [] in
       let result =
         Typing_recovery.catch_errors caught
-          (fun () -> transl_signature ~interface_toplevel:true env ast)
+          (fun () ->
+            transl_signature
+              ~md_mode:With_regionality.Const.legacy
+              ~interface_toplevel:true env ast)
       in match !caught with
       | [] -> result
       | exn_list -> collect_recovery_errors target exn_list
     else
-      transl_signature ~interface_toplevel:true env ast
+      transl_signature
+        ~md_mode:With_regionality.Const.legacy
+        ~interface_toplevel:true env ast
   in
-||||||| ad79b35c2d
-  let sg = transl_signature ~interface_toplevel:true env ast in
-=======
-  let sg =
-    transl_signature
-      ~md_mode:With_regionality.Const.legacy
-      ~interface_toplevel:true env ast
-  in
->>>>>>> origin/main
   let arg_type =
     !Clflags.as_argument_for
     |> Option.map Global_module.Parameter_name.of_string

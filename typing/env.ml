@@ -3353,18 +3353,6 @@ let read_signature modname cmi =
   Subst.Lazy.force_signature mty,
   (Mode.With_regionality.zap_to_floor_exn mode).staticity
 
-<<<<<<< HEAD
-let find_import ~chain modname =
-  try Persistent_env.find_import !persistent_env modname
-  with Not_found -> Error.log_and_raise (Cmi_not_found { modname; chain })
-
-||||||| ad79b35c2d
-let find_import ~chain modname =
-  try Persistent_env.find_import !persistent_env modname
-  with Not_found -> error (Cmi_not_found { modname; chain })
-
-=======
->>>>>>> origin/main
 let register_parameter modname =
   Persistent_env.register_parameter !persistent_env modname
 

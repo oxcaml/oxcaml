@@ -4318,27 +4318,6 @@ let get_native_repr_attribute attrs ~global_repr =
     Attr_helper.get_no_payload_attribute "unsafe_unextended" attrs,
     global_repr
   with
-<<<<<<< HEAD
-  | None, None, None, None -> Native_repr_attr_absent
-  | None, None, None, Some repr -> Native_repr_attr_present repr
-  | Some _, None, None, None -> Native_repr_attr_present Unboxed
-  | None, Some _, None, None -> Native_repr_attr_present Untagged
-  | None, None, Some _, None -> Native_repr_attr_present Unpacked
-  | Some { Location.loc }, _, _, _
-  | _, Some { Location.loc }, _, _
-  | _, _, Some { Location.loc }, _ ->
-    Error.log_and_raise loc Multiple_native_repr_attributes
-||||||| ad79b35c2d
-  | None, None, None, None -> Native_repr_attr_absent
-  | None, None, None, Some repr -> Native_repr_attr_present repr
-  | Some _, None, None, None -> Native_repr_attr_present Unboxed
-  | None, Some _, None, None -> Native_repr_attr_present Untagged
-  | None, None, Some _, None -> Native_repr_attr_present Unpacked
-  | Some { Location.loc }, _, _, _
-  | _, Some { Location.loc }, _, _
-  | _, _, Some { Location.loc }, _ ->
-    raise (Error (loc, Multiple_native_repr_attributes))
-=======
   | None, None, None, None, None -> Native_repr_attr_absent
   | None, None, None, None, Some repr -> Native_repr_attr_present repr
   | Some _, None, None, None, None -> Native_repr_attr_present Unboxed
@@ -4349,8 +4328,7 @@ let get_native_repr_attribute attrs ~global_repr =
   | _, Some { Location.loc }, _, _, _
   | _, _, Some { Location.loc }, _, _
   | _, _, _, Some { Location.loc }, _ ->
-    raise (Error (loc, Multiple_native_repr_attributes))
->>>>>>> origin/main
+    Error.log_and_raise loc Multiple_native_repr_attributes
 
 let is_upstream_compatible_non_value_unbox env ty =
   (* CR layouts v2.5: This needs to be updated when we support unboxed
