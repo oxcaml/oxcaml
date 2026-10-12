@@ -41,6 +41,19 @@ end
 CR wsturgeon for wsturgeon: this has to fail
 |}]
 
+module Matching_a_non_float_array_does_not_allocate : sig
+  val head_or_42 : int array -> int @@ noalloc
+end = struct
+  let head_or_42 = function
+    | [| f |] -> f
+    | _ -> 42
+end
+[%%expect{|
+module Matching_a_non_float_array_does_not_allocate :
+  sig val head_or_42 : int array -> int @@ noalloc end @@ stateless
+  noalloc_strict
+|}]
+
 module Unboxable_return_value : sig
   val forty_two : unit -> float @@ noalloc
 end = struct
@@ -67,7 +80,13 @@ end = struct
   let g = f ?u:None
 end
 [%%expect{|
-CR wsturgeon for wsturgeon: this has to fail
+Line 5, characters 38-41:
+5 |   let f ?(u = (let (state @ global) = ref None in state := Some 42)) () = ()
+                                          ^^^
+Error: The allocation is "local"
+         because it is allocated inside the function at line 5, characters 8-76,
+         which is "noalloc" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
 |}]
 
 module Recursion_is_fine : sig

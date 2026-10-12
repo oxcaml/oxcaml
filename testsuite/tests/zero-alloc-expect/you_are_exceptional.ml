@@ -25,11 +25,11 @@ end = struct
   let f ~exceptional = if exceptional then raise (Allocations_don't_count !r)
 end
 [%%expect{|
-Line 6, characters 25-51:
-6 |       let (e @ global) = Allocations_don't_count !r in
-                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 4, characters 49-77:
+4 |   let f ~exceptional = if exceptional then raise (Allocations_don't_count !r)
+                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The allocation is "local"
-         because it is allocated inside the function at lines 4-7, characters 8-13,
+         because it is allocated inside the function at line 4, characters 8-77,
          which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
