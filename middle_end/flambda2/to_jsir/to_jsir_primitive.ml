@@ -107,11 +107,8 @@ let smallint_bits (kind : Flambda_kind.Standard_int.t) =
 
 let int_const n : Jsir.prim_arg = Pc (Int (Targetint.of_int_exn n))
 
-(* JavaScript integers are 32 bits wide *)
-let js_int_bits = 32
-
 let sign_extend ~env ~res ~bits (x : Jsir.prim_arg) =
-  let shift = int_const (js_int_bits - bits) in
+  let shift = int_const (Targetint.num_bits () - bits) in
   let shifted, env, res =
     use_prim0 ~env ~res (Extern ("%int_lsl", None)) [x; shift]
   in
