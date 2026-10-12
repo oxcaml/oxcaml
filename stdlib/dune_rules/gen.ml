@@ -336,7 +336,9 @@ let write_runtime_dune ppf =
 |};
 
   (* aliases *)
-  fprintf ppf "(alias (name runtime_all) (deps ocamlrun ocamlrund (glob_files *.{a,so})))\n";
+  fprintf ppf "(alias
+    (name runtime_all)
+    (deps ocamlrun ocamlrund (glob_files *.{a,so})))\n";
   fprintf ppf "(alias (name runtime) (deps libasmrun.a))\n";
   fprintf ppf "(alias (name stdlib) (deps (alias runtime_all)))\n"
 
