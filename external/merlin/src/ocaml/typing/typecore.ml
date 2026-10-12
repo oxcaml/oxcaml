@@ -7071,7 +7071,8 @@ let create_typing_recovery_error_node loc env ty_expected ~attributes =
             desc =
               { Types.val_type = ty_expected;
                 val_kind =
-                  Val_reg (Var (Jkind.Sort.new_var ~level:(Ctype.get_current_level ())));
+                  Val_reg (Var (Jkind.Sort.new_var
+                                  ~level:(Ctype.get_current_level ())));
                 val_lpoly = Lpoly.determined [];
                 val_loc = loc;
                 val_attributes = [];
