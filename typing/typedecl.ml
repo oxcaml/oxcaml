@@ -566,7 +566,7 @@ let set_private_row env loc p decl =
 
 (* Makes sure a type is representable, returning its sort. *)
 let representable_sort ~why env loc kloc typ =
-  match Ctype.type_sort ~why ~fixed:false env typ with
+  match Ctype.type_sort ~why ~allow_mutation:true env typ with
   | Ok sort -> sort
   | Error err -> Error.log_and_raise loc (Jkind_sort {env; kloc; typ; err})
 
@@ -3955,8 +3955,11 @@ let transl_type_decl env rec_flag sdecl_list =
     | Typedecl_separability.Error (loc, err) ->
         Error.log_and_raise loc (Separability err)
   in
-  (* Check re-exportation, updating [type_jkind] from the manifest *)
+  (* Check re-exportation, updating [type_jkind] from the manifest. This can
+     refine parameters whose uses [check_constraints] has already checked, so
+     check them again. *)
   let decls = List.map2 (check_abbrev new_env) sdecl_list decls in
+  List.iter2 (check_constraints new_env) sdecl_list decls;
   let shapes = shape_declarations env decls in
   (* Compute the final environment with variance and immediacy *)
   let final_env = add_types_to_env ~shapes:(Some shapes) decls env in
@@ -4451,7 +4454,7 @@ let error_if_has_deep_native_repr_attributes core_type =
     [external f : ('a : any). 'a -> 'a = "%identity"]
    In such cases, we raise an expection. *)
 let type_sort_external ~is_layout_poly ~why env loc typ =
-  match Ctype.type_sort ~why ~fixed:true env typ with
+  match Ctype.type_sort ~why ~allow_mutation:false env typ with
   | Ok s -> Jkind.Sort.default_to_scannable_and_get s
   | Error err ->
     let kloc =
@@ -4818,7 +4821,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
     Typetexp.transl_type_scheme env curry_mode valdecl.pval_type lpoly_flag
   in
   let sort =
-    match Ctype.type_sort ~why ~fixed:false env cty.ctyp_type with
+    match Ctype.type_sort ~why ~allow_mutation:true env cty.ctyp_type with
     | Ok sort -> sort
     | Error err ->
         Error.log_and_raise cty.ctyp_loc

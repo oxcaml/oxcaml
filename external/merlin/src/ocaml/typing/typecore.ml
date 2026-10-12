@@ -3490,7 +3490,7 @@ let instance_constructor_representation env constr ~types ~why
              match (List.nth constr.cstr_args i).ca_sort with
              | Some sort -> Ok (Jkind.Sort.of_const sort)
              | None ->
-                 type_sort env ty ~why ~fixed:false
+                 type_sort env ty ~why ~allow_mutation:true
                  |> Result.map_error
                       (fun err -> Unrepresentable_arg (loc, ty, err)))
           types
@@ -5273,6 +5273,7 @@ let collect_unknown_apply_args env funct ty_fun0 mode_fun rev_args sargs
                 let ty_arg_mono, sort_arg =
                   new_rep_var ~why:Function_argument ()
                 in
+<<<<<<< HEAD
                 let ty_arg = newmono ty_arg_mono in
                 let ty_res =
                   newvar (Jkind.of_new_sort ~why:Function_result
@@ -5352,6 +5353,103 @@ let collect_unknown_apply_args env funct ty_fun0 mode_fun rev_args sargs
           Unknown_arg { sarg; ty_arg_mono; mode_fun; mode_arg; sort_arg }
         in
         loop ty_res mode_ret ((lbl, Arg arg) :: rev_args) rest
+||||||| bb7745d9e2
+                let loc = Location.merge ~ghost:false locs in
+                let some_args_ok = not (Misc.Stdlib.List.is_empty rev_args) in
+                raise(error(loc, env,
+                            Impossible_function_jkind
+                              { some_args_ok; ty_fun; jkind }))
+              end;
+              (sort_arg, mode_arg, ty_arg_mono, mode_ret, ty_res)
+        | Tarrow ((l, mode_arg, mode_ret), ty_arg, ty_res, _)
+          when labels_match ~param:l ~arg:lbl ->
+            let sort_arg =
+              match
+                type_sort ~why:Function_argument ~fixed:false env ty_arg
+              with
+              | Ok sort -> sort
+              | Error err -> raise(error(funct.exp_loc, env,
+                                         Function_type_not_rep (ty_arg,err)))
+            in
+            (sort_arg, mode_arg, tpoly_get_mono ty_arg, mode_ret, ty_res)
+        | td ->
+            let ty_fun = match td with Tarrow _ -> newty td | _ -> ty_fun in
+            let ty_res =
+              remaining_function_type_for_error ty_fun mode_fun rev_args
+            in
+            match get_desc ty_res with
+            | Tarrow _ ->
+                if !Clflags.classic || not (has_label lbl ty_fun) then
+                  Msupport.resume_raise
+                    (error(sarg.pexp_loc, env,
+                               Apply_wrong_label(lbl, ty_res, false)))
+                else
+                  Msupport.resume_raise
+                    (error(funct.exp_loc, env, Incoherent_label_order))
+            | _ ->
+                Msupport.resume_raise
+                  (error(funct.exp_loc, env, Apply_non_function {
+                    funct;
+                    func_ty = expand_head env funct.exp_type;
+                    res_ty = expand_head env ty_res;
+                    previous_arg_loc = previous_arg_loc rev_args ~funct;
+                    extra_arg_loc = sarg.pexp_loc; }))
+    with Msupport.Resume ->
+      let ty_arg, kind_arg = new_rep_var ~why:Function_argument () in
+      kind_arg, Mode.With_locality.newvar (get_current_level ()), ty_arg,
+      Mode.With_locality.newvar (get_current_level ()), ty_fun
+    in
+    let arg = Unknown_arg { sarg; ty_arg_mono; mode_fun; mode_arg; sort_arg } in
+    loop ty_res mode_ret ((lbl, Arg arg) :: rev_args) rest
+=======
+                let loc = Location.merge ~ghost:false locs in
+                let some_args_ok = not (Misc.Stdlib.List.is_empty rev_args) in
+                raise(error(loc, env,
+                            Impossible_function_jkind
+                              { some_args_ok; ty_fun; jkind }))
+              end;
+              (sort_arg, mode_arg, ty_arg_mono, mode_ret, ty_res)
+        | Tarrow ((l, mode_arg, mode_ret), ty_arg, ty_res, _)
+          when labels_match ~param:l ~arg:lbl ->
+            let sort_arg =
+              match
+                type_sort ~why:Function_argument ~allow_mutation:true env ty_arg
+              with
+              | Ok sort -> sort
+              | Error err -> raise(error(funct.exp_loc, env,
+                                         Function_type_not_rep (ty_arg,err)))
+            in
+            (sort_arg, mode_arg, tpoly_get_mono ty_arg, mode_ret, ty_res)
+        | td ->
+            let ty_fun = match td with Tarrow _ -> newty td | _ -> ty_fun in
+            let ty_res =
+              remaining_function_type_for_error ty_fun mode_fun rev_args
+            in
+            match get_desc ty_res with
+            | Tarrow _ ->
+                if !Clflags.classic || not (has_label lbl ty_fun) then
+                  Msupport.resume_raise
+                    (error(sarg.pexp_loc, env,
+                               Apply_wrong_label(lbl, ty_res, false)))
+                else
+                  Msupport.resume_raise
+                    (error(funct.exp_loc, env, Incoherent_label_order))
+            | _ ->
+                Msupport.resume_raise
+                  (error(funct.exp_loc, env, Apply_non_function {
+                    funct;
+                    func_ty = expand_head env funct.exp_type;
+                    res_ty = expand_head env ty_res;
+                    previous_arg_loc = previous_arg_loc rev_args ~funct;
+                    extra_arg_loc = sarg.pexp_loc; }))
+    with Msupport.Resume ->
+      let ty_arg, kind_arg = new_rep_var ~why:Function_argument () in
+      kind_arg, Mode.With_locality.newvar (get_current_level ()), ty_arg,
+      Mode.With_locality.newvar (get_current_level ()), ty_fun
+    in
+    let arg = Unknown_arg { sarg; ty_arg_mono; mode_fun; mode_arg; sort_arg } in
+    loop ty_res mode_ret ((lbl, Arg arg) :: rev_args) rest
+>>>>>>> origin/main
   in
   loop ty_fun0 mode_fun rev_args sargs
 
@@ -5443,7 +5541,7 @@ let collect_apply_args env funct ignore_labels ty_fun ty_fun0 mode_fun sargs
         | `Arrow (ty_arg, ty_ret, ty_arg0, ty_ret0) ->
             let sort_arg =
               match
-                type_sort ~why:Function_argument ~fixed:false env ty_arg
+                type_sort ~why:Function_argument ~allow_mutation:true env ty_arg
               with
               | Ok sort -> sort
               | Error err ->
@@ -5508,7 +5606,9 @@ let type_omitted_parameters_and_build_result_type expected_mode env loc ty_ret
              in
              let arrow_desc = (lbl, mode_arg, mode_ret_eta) in
              let sort_ret =
-               match type_sort ~why:Function_result ~fixed:false env ty_ret with
+               match
+                 type_sort ~why:Function_result ~allow_mutation:true env ty_ret
+               with
                | Ok sort -> sort
                | Error err ->
                    Error.log_and_raise loc env
@@ -6814,7 +6914,7 @@ let split_function_ty
   in
   let expected_pat_mode = simple_pat_mode arg_value_mode in
   let type_sort ~why ty =
-    match Ctype.type_sort ~why ~fixed:false env ty with
+    match Ctype.type_sort ~why ~allow_mutation:true env ty with
     | Ok sort -> sort
     | Error err ->
         Error.log_and_raise loc_fun env (Function_type_not_rep (ty, err))
@@ -6903,7 +7003,8 @@ end = struct
           in
           let ok =
             match
-              Ctype.type_sort ~why:sort_why ~fixed:true weak_env ccs_ty
+              Ctype.type_sort ~why:sort_why ~allow_mutation:false weak_env
+                ccs_ty
             with
             | Ok sort -> Jkind.Sort.equate ~allow_mutation:true sort ccs_sort
             | Error _ -> false
@@ -7402,7 +7503,7 @@ and type_expect_
             | Overridden (_, exp) -> exp.exp_loc, exp.exp_type
             | Kept (arg, _, _) -> sexp.pexp_loc, arg
           in
-          match Ctype.type_jkind_and_sort env arg ~why ~fixed:false with
+          match Ctype.type_jkind_and_sort env arg ~why ~allow_mutation:true with
           | Ok (jkind, sort) -> arg, jkind, sort
           | Error err ->
               Error.log_and_raise loc env (Field_value_not_rep(arg, err))
@@ -7465,8 +7566,8 @@ and type_expect_
             let ubr = Unique_barrier.not_computed () in
             let sort =
               match
-                Ctype.type_sort ~why:Record_functional_update ~fixed:false env
-                  exp.exp_type
+                Ctype.type_sort ~why:Record_functional_update
+                  ~allow_mutation:true env exp.exp_type
               with
               | Ok sort -> sort
               | Error err ->
@@ -11135,7 +11236,7 @@ and type_argument_ ?explanation ?recarg ~overwrite env
            eta_mode)
         Regionality.regional;
       let type_sort ~why ty =
-        match type_sort ~why ~fixed:false env ty with
+        match type_sort ~why ~allow_mutation:true env ty with
         | Ok sort -> sort
         | Error err ->
             Error.log_and_raise sarg.pexp_loc env
@@ -11357,7 +11458,7 @@ and type_application env app_loc expected_mode position_and_mode
           (fun () -> filter_arrow_mono env (instance funct.exp_type) Nolabel)
       in
       let type_sort ~why ty =
-        match Ctype.type_sort ~why ~fixed:false env ty with
+        match Ctype.type_sort ~why ~allow_mutation:true env ty with
         | Ok sort -> sort
         | Error err ->
           Error.log_and_raise app_loc env (Function_type_not_rep (ty, err))
