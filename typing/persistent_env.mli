@@ -57,7 +57,6 @@ type error =
       { instance : Global_module.Name.t; value : Global_module.Name.t; }
 
 
-
 type exn += private Error of error
 
 val report_error: error Format_doc.format_printer
