@@ -1,4 +1,5 @@
 (* TEST
+   ocamlrunparam += ",b=1";
    flags += "-alert -unsafe_multidomain";
    exit_status = "2";
    { native; }
