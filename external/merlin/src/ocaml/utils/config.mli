@@ -33,37 +33,9 @@ val ast_impl_magic_number: string
 val cmt_magic_number: string
         (* Magic number for compiled interface files *)
 val cms_magic_number: string
-<<<<<<< Merlin:selee/jsir-interface
         (* Magic number for compiled shapes files *)
 val index_magic_number: string
         (* Magic number for index files *)
-||||||| Compiler:last-imported
-(** Magic number for compiled shapes files *)
-
-val cmj_magic_number: string
-(** Magic number for Js_of_ocaml IR files *)
-
-val cmja_magic_number: string
-(** Magic number for Js_of_ocaml IR archive files *)
-
-val linear_magic_number: string
-(** Magic number for Linear internal representation files *)
-
-val cfg_magic_number: string
-(** Magic number for Cfg internal representation files *)
-=======
-(** Magic number for compiled shapes files *)
-
-val cmj_magic_number: string
-(** Magic number for Js_of_ocaml IR files (the intermediate files of
-    [ocamlopt -target js_of_ocaml]) *)
-
-val linear_magic_number: string
-(** Magic number for Linear internal representation files *)
-
-val cfg_magic_number: string
-(** Magic number for Cfg internal representation files *)
->>>>>>> Compiler:HEAD
 
 val max_tag: int
         (* Biggest tag that can be stored in the header of a regular block. *)
