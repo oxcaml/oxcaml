@@ -174,10 +174,9 @@ module DLS : sig
         to [k], which cannot be restored later. *)
 end
 
-(** Thread-local storage. Like {!Domain.DLS}, but stores a distinct value
-    for every preemptible fiber (see {!Domain.TLS} for the ownership rules).
-    Preemptable fibers are the fundamental unit of preemptive concurrency,
-    so [TLS] should be preferred in nearly all cases. *)
+(** Thread-local storage. Like {!Domain.DLS}, but stores a distinct value for
+    every preemptible fiber. Preemptable fibers are the fundamental unit of
+    preemptive concurrency, so [TLS] should be nearly always preferred. *)
 module TLS : sig
 
     type 'a key : value mod portable contended
