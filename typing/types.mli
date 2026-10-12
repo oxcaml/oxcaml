@@ -1297,9 +1297,18 @@ module type Wrapped = sig
     mtd_uid: Uid.t;
   }
 
-  (* Returns [None] for items that have no runtime representation (see
-     [Includemod.is_runtime_component]). *)
-  val sort_of_signature_item : signature_item -> Jkind_types.Sort.t option
+  type signature_item_sort =
+    | Fixed of Jkind_types.Sort.t
+    | Unknown of Ident.t * value_description
+    | Absent_at_runtime
+        (** See [Includemod.is_runtime_component]. *)
+
+  val sort_of_signature_item : signature_item -> signature_item_sort
+
+  (** Sorts of the runtime items of a signature. Items with [Unknown] sort
+      are fatal errors. *)
+  val expect_fixed_representation :
+    signature_item list -> Jkind_types.Sort.t array
 end
 
 module Make_wrapped(Wrap : Wrap) : Wrapped with type 'a wrapped = 'a Wrap.t

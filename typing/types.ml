@@ -770,8 +770,15 @@ module type Wrapped = sig
     mtd_uid: Uid.t;
   }
 
-  val sort_of_signature_item :
-    signature_item -> Jkind_types.Sort.t option
+  type signature_item_sort =
+    | Fixed of Jkind_types.Sort.t
+    | Unknown of Ident.t * value_description
+    | Absent_at_runtime
+
+  val sort_of_signature_item : signature_item -> signature_item_sort
+
+  val expect_fixed_representation :
+    signature_item list -> Jkind_types.Sort.t array
 end
 
 module Make_wrapped(Wrap : Wrap) = struct
@@ -780,29 +787,41 @@ module Make_wrapped(Wrap : Wrap) = struct
   include M
 
   let sort_of_signature_item = function
-    | Sig_value(_, decl, _) ->
+    | Sig_value(id, decl, _) ->
       begin match decl.val_kind with
-      | Val_reg Unrepresentable -> Misc.fatal_error "unrepresentable signature item"
-      | Val_reg (Representable sort) -> Some sort
+      | Val_reg Unrepresentable -> Unknown (id, decl)
+      | Val_reg (Representable sort) -> Fixed sort
       | Val_ivar _ ->
-        Some Jkind_types.Sort.(of_const Const.for_instance_var)
+        Fixed Jkind_types.Sort.(of_const Const.for_instance_var)
       | Val_self _ | Val_anc _ ->
-        Some Jkind_types.Sort.(of_const Const.for_object)
-      | Val_prim _ -> None (* Primitives are not stored in modules *)
+        Fixed Jkind_types.Sort.(of_const Const.for_object)
+      | Val_prim _ ->
+        Absent_at_runtime (* Primitives are not stored in modules *)
       | Val_mut _ ->
         Misc.fatal_error "Mutable variable found at the structure level"
       end
     | Sig_typext _ ->
-      Some Jkind_types.Sort.(of_const Const.for_type_extension)
+      Fixed Jkind_types.Sort.(of_const Const.for_type_extension)
     | Sig_module(_, pres, _, _, _) ->
       begin match pres with
       | Mp_present ->
-        Some Jkind_types.Sort.(of_const Const.for_module)
-      | Mp_absent -> None
+        Fixed Jkind_types.Sort.(of_const Const.for_module)
+      | Mp_absent -> Absent_at_runtime
       end
     | Sig_class _ ->
-        Some Jkind_types.Sort.(of_const Const.for_class)
-    | Sig_type _ | Sig_modtype _ | Sig_class_type _ | Sig_jkind _ -> None
+        Fixed Jkind_types.Sort.(of_const Const.for_class)
+    | Sig_type _ | Sig_modtype _ | Sig_class_type _ | Sig_jkind _ ->
+      Absent_at_runtime
+
+  let expect_fixed_representation items =
+    List.filter_map
+      (fun item ->
+         match sort_of_signature_item item with
+         | Fixed sort -> Some sort
+         | Absent_at_runtime -> None
+         | Unknown _ -> Misc.fatal_error "unrepresentable signature item")
+      items
+    |> Array.of_list
 end
 
 module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
@@ -1147,8 +1166,11 @@ let signature_item_id = function
 
 let signature_item_representation sg =
   match sort_of_signature_item sg with
-  | None -> None
-  | Some sort -> Some (signature_item_id sg, sort)
+  | Fixed sort -> Some (signature_item_id sg, sort)
+  | Absent_at_runtime -> None
+  | Unknown _ ->
+    Misc.fatal_error
+      "bound_value_identifiers_and_sorts: unrepresentable signature item"
 
 let bound_value_identifiers_and_sorts sigs =
   List.filter_map signature_item_representation sigs

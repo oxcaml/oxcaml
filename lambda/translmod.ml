@@ -1591,8 +1591,7 @@ let transl_instance instance_unit ~runtime_args ~main_module_block_repr =
 let main_repr_of_argument_unit (swg : Signature_with_global_bindings.t) =
   let sign, _ = swg.sign in
   Subst.Lazy.force_signature_once sign
-  |> List.filter_map Subst.Lazy.sort_of_signature_item
-  |> Array.of_list
+  |> Subst.Lazy.expect_fixed_representation
   |> transl_module_representation
   |> add_arg_block_to_module_representation
 

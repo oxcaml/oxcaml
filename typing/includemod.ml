@@ -962,14 +962,8 @@ and signatures ~core ~direction ~loc env subst ~modes sig1 sig2 mod_shape =
           if runtime_len1 = runtime_len2 && is_identity_coercion cc then
             Tcoerce_none
           else
-            let input_repr =
-              List.filter_map Subst.Lazy.sort_of_signature_item sig1
-              |> Array.of_list
-            in
-            let output_repr =
-              List.filter_map Subst.Lazy.sort_of_signature_item sig2
-              |> Array.of_list
-            in
+            let input_repr = Subst.Lazy.expect_fixed_representation sig1 in
+            let output_repr = Subst.Lazy.expect_fixed_representation sig2 in
             Tcoerce_structure
               { input_repr; output_repr; pos_cc_list = cc; id_pos_list }
         in

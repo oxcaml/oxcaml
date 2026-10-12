@@ -309,9 +309,7 @@ let extract_sig_functor_open funct_body env loc mty sig_acc md_mode
         with Includemod.Error msg ->
           Error.log_and_raise loc env (Not_included_functor msg)
       in
-      let input_repr =
-        List.filter_map sort_of_signature_item sg_param |> Array.of_list;
-      in
+      let input_repr = expect_fixed_representation sg_param in
       (* We must scrape the result type in an environment expanded with the
          parameter type (to avoid `Not_found` exceptions when it is referenced).
          Because we don't have an actual parameter, we create definitions for
@@ -2335,8 +2333,7 @@ and transl_signature ?(interface_toplevel = false) ~md_mode env
     let incl =
       { incl_mod = tmty;
         incl_type = sg;
-        incl_repr =
-          List.filter_map sort_of_signature_item sg |> Array.of_list;
+        incl_repr = expect_fixed_representation sg;
         incl_kind;
         incl_attributes = sincl.pincl_attributes;
         incl_loc = sincl.pincl_loc;
@@ -3897,8 +3894,7 @@ and type_open_decl_aux ?used_slot ?toplevel ~funct_body names env od =
     let open_descr = {
       open_expr = md;
       open_bound_items = sg;
-      open_items_repr =
-        List.filter_map sort_of_signature_item sg |> Array.of_list;
+      open_items_repr = expect_fixed_representation sg;
       open_override = od.popen_override;
       open_env = newenv;
       open_loc = loc;
@@ -3944,8 +3940,7 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
     let incl =
       { incl_mod = modl;
         incl_type = sg;
-        incl_repr =
-          List.filter_map sort_of_signature_item sg |> Array.of_list;
+        incl_repr = expect_fixed_representation sg;
         incl_kind;
         incl_attributes = sincl.pincl_attributes;
         incl_loc = sincl.pincl_loc;
