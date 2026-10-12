@@ -64,7 +64,14 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                  predicate =
                    (fun ((Kinded_input { x }) : kinded_input) ->
                       (Laws_gen_Kinded.f x : bool));
-                 text = "f x"
+                 location =
+                   {
+                     CamlinternalLaw.file = "kinded.mli";
+                     start_line = 3;
+                     start_col = 42;
+                     end_line = 3;
+                     end_col = 45
+                   }
                }))
     let kinded_unused ((module C)  : (module Choices))  : unit Law.t =
       Law.Bind
@@ -77,7 +84,14 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                  predicate =
                    (fun ((Kinded_unused_input { x }) : kinded_unused_input)
                       -> (true : bool));
-                 text = "true"
+                 location =
+                   {
+                     CamlinternalLaw.file = "kinded.mli";
+                     start_line = 4;
+                     start_col = 49;
+                     end_line = 4;
+                     end_col = 53
+                   }
                }))
     let kinded_shared ((module C)  : (module Choices))  : unit Law.t =
       Law.Bind
@@ -93,7 +107,14 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                       ->
                       (Laws_gen_Stdlib.(&&) (Laws_gen_Kinded.f x)
                          (Laws_gen_Kinded.f y) : bool));
-                 text = "(f x) && (f y)"
+                 location =
+                   {
+                     CamlinternalLaw.file = "kinded.mli";
+                     start_line = 5;
+                     start_col = 58;
+                     end_line = 5;
+                     end_col = 68
+                   }
                }))
     let nullable ((module C)  : (module Choices))  : unit Law.t =
       Law.Bind
@@ -106,7 +127,14 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                  predicate =
                    (fun ((Nullable_input { x }) : nullable_input) ->
                       (true : bool));
-                 text = "true"
+                 location =
+                   {
+                     CamlinternalLaw.file = "kinded.mli";
+                     start_line = 6;
+                     start_col = 43;
+                     end_line = 6;
+                     end_col = 47
+                   }
                }))
     let plain ((module C)  : (module Choices))  : unit Law.t =
       Law.Bind
@@ -118,7 +146,14 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                  source = C.plain;
                  predicate =
                    (fun ((Plain_input { x }) : plain_input) -> (true : bool));
-                 text = "true"
+                 location =
+                   {
+                     CamlinternalLaw.file = "kinded.mli";
+                     start_line = 7;
+                     start_col = 22;
+                     end_line = 7;
+                     end_col = 26
+                   }
                }))
     let laws choices =
       {

@@ -33,7 +33,14 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                           source = M.l;
                           predicate =
                             (fun ((M.L_input) : M.l_input) -> (true : bool));
-                          text = "true"
+                          location =
+                            {
+                              CamlinternalLaw.file = "capture_parameter.mli";
+                              start_line = 5;
+                              start_col = 11;
+                              end_line = 5;
+                              end_col = 15
+                            }
                         }))))
     let laws choices = { f_l = (f_l choices) }
   end

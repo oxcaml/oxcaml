@@ -208,7 +208,14 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                    (fun ((N_double_add_input { x }) : n_double_add_input) ->
                       (Laws_gen_Stdlib.(=) (Laws_gen_Scopes.N.double x)
                          (Laws_gen_Stdlib.(+) x x) : bool));
-                 text = "(double x) = (x + x)"
+                 location =
+                   {
+                     CamlinternalLaw.file = "scopes.mli";
+                     start_line = 11;
+                     start_col = 30;
+                     end_line = 11;
+                     end_col = 46
+                   }
                }))
     let n_inner_double_twice ((module C)  : (module Choices))  : unit Law.t =
       Law.Bind
@@ -227,7 +234,14 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                          (Laws_gen_Scopes.N.double
                             (Laws_gen_Scopes.N.double x))
                          (Laws_gen_Stdlib.( * ) 4 x) : bool));
-                 text = "(double (double x)) = (4 * x)"
+                 location =
+                   {
+                     CamlinternalLaw.file = "scopes.mli";
+                     start_line = 13;
+                     start_col = 34;
+                     end_line = 13;
+                     end_col = 59
+                   }
                }))
     let included_double_add ((module C)  : (module Choices))  : unit Law.t =
       Law.Bind
@@ -245,7 +259,14 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                       (Laws_gen_Stdlib.(=)
                          (Laws_gen_Scopes.Included.double x)
                          (Laws_gen_Stdlib.(+) x x) : bool));
-                 text = "(double x) = (x + x)"
+                 location =
+                   {
+                     CamlinternalLaw.file = "scopes.mli";
+                     start_line = 21;
+                     start_col = 30;
+                     end_line = 21;
+                     end_col = 46
+                   }
                }))
     let included_inner_double_twice ((module C)  : (module Choices))  :
       unit Law.t =
@@ -265,7 +286,14 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                          (Laws_gen_Scopes.Included.double
                             (Laws_gen_Scopes.Included.double x))
                          (Laws_gen_Stdlib.( * ) 4 x) : bool));
-                 text = "(double (double x)) = (4 * x)"
+                 location =
+                   {
+                     CamlinternalLaw.file = "scopes.mli";
+                     start_line = 23;
+                     start_col = 34;
+                     end_line = 23;
+                     end_col = 59
+                   }
                }))
     let map_find_elem ((module C)  : (module Choices))  : unit Law.t =
       Law.Bind
@@ -287,7 +315,14 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                                    ->
                                    (Laws_gen_Stdlib.not (I.elem m k) : 
                                    bool));
-                              text = "not (elem m k)"
+                              location =
+                                {
+                                  CamlinternalLaw.file = "scopes.mli";
+                                  start_line = 35;
+                                  start_col = 4;
+                                  end_line = 35;
+                                  end_col = 18
+                                }
                             }),
                           (fun () ->
                              Law.Assertion
@@ -301,7 +336,14 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                                       ->
                                       (Laws_gen_Stdlib.Option.is_none
                                          (I.find m k) : bool));
-                                 text = "Option.is_none (find m k)"
+                                 location =
+                                   {
+                                     CamlinternalLaw.file = "scopes.mli";
+                                     start_line = 35;
+                                     start_col = 24;
+                                     end_line = 35;
+                                     end_col = 49
+                                   }
                                }))))))
     let map_set_elem ((module C)  : (module Choices))  : unit Law.t =
       Law.Bind
@@ -321,7 +363,14 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                                   M.set_elem_input)
                                -> (I.elem (I.set m ~key:k ~data:v) k : 
                                bool));
-                          text = "elem (set m ~key:k ~data:v) k"
+                          location =
+                            {
+                              CamlinternalLaw.file = "scopes.mli";
+                              start_line = 37;
+                              start_col = 4;
+                              end_line = 37;
+                              end_col = 33
+                            }
                         }))))
     let map_empty_find_empty ((module C)  : (module Choices))  : unit Law.t =
       Law.Bind
@@ -342,7 +391,14 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                                ->
                                (Laws_gen_Stdlib.Option.is_none
                                   (I.find I.empty k) : bool));
-                          text = "Option.is_none (find empty k)"
+                          location =
+                            {
+                              CamlinternalLaw.file = "scopes.mli";
+                              start_line = 39;
+                              start_col = 34;
+                              end_line = 39;
+                              end_col = 63
+                            }
                         }))))
     let lex_refl ((module C)  : (module Choices))  : unit Law.t =
       Law.Bind
@@ -360,7 +416,14 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                             (fun ((M.Refl_input { p }) : M.refl_input) ->
                                (Laws_gen_Stdlib.(=) (I.compare p p) 0 : 
                                bool));
-                          text = "(compare p p) = 0"
+                          location =
+                            {
+                              CamlinternalLaw.file = "scopes.mli";
+                              start_line = 46;
+                              start_col = 30;
+                              end_line = 46;
+                              end_col = 45
+                            }
                         }))))
     let order_max_max_comm ((module C)  : (module Choices))  : unit Law.t =
       Law.Bind
@@ -382,7 +445,14 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                                (Laws_gen_Stdlib.(=)
                                   (M.X.compare (I.max a b) (I.max b a)) 0 : 
                                bool));
-                          text = "(X.compare (max a b) (max b a)) = 0"
+                          location =
+                            {
+                              CamlinternalLaw.file = "scopes.mli";
+                              start_line = 53;
+                              start_col = 40;
+                              end_line = 53;
+                              end_col = 73
+                            }
                         }))))
     let order_max_pair_pair_refl ((module C)  : (module Choices))  :
       unit Law.t =
@@ -410,8 +480,14 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                                            (Laws_gen_Stdlib.(=)
                                               (M.X.compare (I.max a a) a) 0)
                                            (M1.Y.equal b b) : bool));
-                                   text =
-                                     "((X.compare (max a a) a) = 0) && (Y.equal b b)"
+                                   location =
+                                     {
+                                       CamlinternalLaw.file = "scopes.mli";
+                                       start_line = 56;
+                                       start_col = 8;
+                                       end_line = 56;
+                                       end_col = 48
+                                     }
                                  }))))))
     let idem_idem ((module C)  : (module Choices))  : unit Law.t =
       Law.Bind
@@ -426,7 +502,14 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                       (Laws_gen_Stdlib.(=)
                          (Laws_gen_Scopes.Idem.f (Laws_gen_Scopes.Idem.f x))
                          (Laws_gen_Scopes.Idem.f x) : bool));
-                 text = "(f (f x)) = (f x)"
+                 location =
+                   {
+                     CamlinternalLaw.file = "other.mli";
+                     start_line = 4;
+                     start_col = 24;
+                     end_line = 4;
+                     end_col = 37
+                   }
                }))
     let p_h_pos ((module C)  : (module Choices))  : unit Law.t =
       Law.Bind
@@ -440,7 +523,14 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                    (fun ((P_h_pos_input { x }) : p_h_pos_input) ->
                       (Laws_gen_Stdlib.(>=) (Laws_gen_Scopes.P.h x) 0 : 
                       bool));
-                 text = "(h x) >= 0"
+                 location =
+                   {
+                     CamlinternalLaw.file = "scopes.mli";
+                     start_line = 73;
+                     start_col = 27;
+                     end_line = 73;
+                     end_col = 35
+                   }
                }))
     let q_idem ((module C)  : (module Choices))  : unit Law.t =
       Law.Bind
@@ -455,7 +545,14 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                       (Laws_gen_Stdlib.(=)
                          (Laws_gen_Scopes.Q.f (Laws_gen_Scopes.Q.f x))
                          (Laws_gen_Scopes.Q.f x) : bool));
-                 text = "(f (f x)) = (f x)"
+                 location =
+                   {
+                     CamlinternalLaw.file = "scopes.mli";
+                     start_line = 80;
+                     start_col = 22;
+                     end_line = 80;
+                     end_col = 35
+                   }
                }))
     let twice_g_idem ((module C)  : (module Choices))  : unit Law.t =
       Law.Bind
@@ -473,7 +570,14 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                             (fun ((M.G_idem_input { x }) : M.g_idem_input) ->
                                (Laws_gen_Stdlib.(=) (I.g (I.g x)) (I.g x) : 
                                bool));
-                          text = "(g (g x)) = (g x)"
+                          location =
+                            {
+                              CamlinternalLaw.file = "scopes.mli";
+                              start_line = 94;
+                              start_col = 26;
+                              end_line = 94;
+                              end_col = 39
+                            }
                         }))))
     let outer_inner_mk_ok ((module C)  : (module Choices))  : unit Law.t =
       Law.Bind
@@ -498,7 +602,14 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                                         ->
                                         (Laws_gen_Stdlib.(=) (I1.mk x)
                                            (I1.mk x) : bool));
-                                   text = "(mk x) = (mk x)"
+                                   location =
+                                     {
+                                       CamlinternalLaw.file = "scopes.mli";
+                                       start_line = 102;
+                                       start_col = 27;
+                                       end_line = 102;
+                                       end_col = 38
+                                     }
                                  }))))))
     let laws choices =
       {

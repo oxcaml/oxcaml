@@ -31,6 +31,14 @@ module type Choice = sig
   type 'a t
 end
 
+type location =
+  { file : string;
+    start_line : int;
+    start_col : int;
+    end_line : int;
+    end_col : int;
+  }
+
 module type S = sig
   type 'a choice
 
@@ -40,11 +48,11 @@ module type S = sig
     | Choose : 'a choice -> 'a t
     | Assumption :
         { value : 'x; source : 'x choice; predicate : 'x -> bool;
-          text : string }
+          location : location }
         -> unit t
     | Assertion :
         { value : 'x; source : 'x choice; predicate : 'x -> bool;
-          text : string }
+          location : location }
         -> unit t
 end
 
@@ -57,10 +65,10 @@ module Make (Choice : Choice) = struct
     | Choose : 'a choice -> 'a t
     | Assumption :
         { value : 'x; source : 'x choice; predicate : 'x -> bool;
-          text : string }
+          location : location }
         -> unit t
     | Assertion :
         { value : 'x; source : 'x choice; predicate : 'x -> bool;
-          text : string }
+          location : location }
         -> unit t
 end

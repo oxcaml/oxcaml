@@ -25,7 +25,14 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                    (fun ((Distinct_input) : distinct_input) ->
                       (Laws_gen_Stdlib.(<>) Laws_gen_Law_1.x
                          Laws_gen_Laws_gen_Law.x : bool));
-                 text = "Law.x <> Laws_gen_Law.x"
+                 location =
+                   {
+                     CamlinternalLaw.file = "capture.mli";
+                     start_line = 3;
+                     start_col = 16;
+                     end_line = 3;
+                     end_col = 39
+                   }
                }))
     let laws choices = { distinct = (distinct choices) }
   end

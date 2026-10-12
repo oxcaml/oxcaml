@@ -41,7 +41,6 @@ type law =
     l_local : string;  (* the name of the law within its scope *)
     l_display : string;  (* its path, for messages *)
     l_frames : frame list;  (* its scopes, outermost first *)
-    l_source : law_description;  (* as written, for the [text] fields *)
     l_types : (Ident.t * type_expr) list;  (* the parameters, in the type
                                               context *)
     l_values : law_description;  (* in the value context: the clauses *)
@@ -161,7 +160,6 @@ and walk_item ctx ~pty ~pvl = function
             l_local = qualify ctx.relative name;
             l_display = display;
             l_frames = List.rev ctx.frames;
-            l_source = ld;
             l_types =
               List.map (fun (x, ty) -> (x, Subst.type_expr ctx.types ty))
                 ld.law_params;
@@ -651,16 +649,18 @@ let module_types names items =
         ~typ:(Mty.signature (Sg.mk (List.map (choice_declaration names) items)))
         (mknoloc "Choices") ]
 
-let text clause =
-  let clause =
-    Untypespec.expression ~lident_of_path:Out_type.lident_of_path
-      ~annotate:(fun _ -> None) clause
-  in
-  Format.asprintf "%a"
-    (fun ppf e ->
-       Format.pp_set_margin ppf max_int;
-       Pprintast.expression ppf e)
-    clause
+(* [{ CamlinternalLaw.file = "..."; start_line = ...; ... }]: where the
+   clause is written, for the backend's messages. *)
+let location (loc : Location.t) =
+  let int n = Exp.constant (Const.int n) in
+  let column (pos : Lexing.position) = pos.pos_cnum - pos.pos_bol in
+  Exp.record
+    [ (ldot "CamlinternalLaw" "file", string loc.loc_start.pos_fname);
+      (lid "start_line", int loc.loc_start.pos_lnum);
+      (lid "start_col", int (column loc.loc_start));
+      (lid "end_line", int loc.loc_end.pos_lnum);
+      (lid "end_col", int (column loc.loc_end)) ]
+    None
 
 type law_names =
   { choices : string;
@@ -676,8 +676,8 @@ let qualified n name =
 let law_constructor name arg = Exp.construct (ldot "Law" name) (Some arg)
 
 (* [Law.Assertion { value = input; source = C.l; predicate = (fun (L_input
-   { x1; ...; xn } : l_input) -> (clause : bool)); text = "..." }] *)
-let clause_check ~check law n (clause, source) =
+   { x1; ...; xn } : l_input) -> (clause : bool)); location = {...} }] *)
+let clause_check ~check law n (clause : _ Spec.expression) =
   let fields =
     match law.l_values.law_params with
     | [] -> None
@@ -691,34 +691,32 @@ let clause_check ~check law n (clause, source) =
       (Some (Typ.constr (qualified n (input_type law)) []))
       []
   in
-  let clause =
+  let body =
     Untypespec.expression ~lident_of_path:Untypespec.lident_of_path ~annotate
       clause
   in
   let predicate =
-    fun_ [param input] (Exp.constraint_ clause (Some (tconstr "bool" [])) [])
+    fun_ [param input] (Exp.constraint_ body (Some (tconstr "bool" [])) [])
   in
   law_constructor check
     (Exp.record
        [ (lid "value", evar n.input);
          (lid "source", Exp.ident (ldot n.choices law.l_local));
          (lid "predicate", predicate);
-         (lid "text", string (text source)) ]
+         (lid "location", location clause.sexp_loc) ]
        None)
 
 (* [Law.Bind (Law.Assumption {...}, fun () -> ... Law.Assertion {...})] *)
 let clauses law n =
   let rec bind = function
-    | [] ->
-        clause_check ~check:"Assertion" law n
-          (law.l_values.law_conclusion, law.l_source.law_conclusion)
+    | [] -> clause_check ~check:"Assertion" law n law.l_values.law_conclusion
     | assumption :: rest ->
         law_constructor "Bind"
           (Exp.tuple
              [ (None, clause_check ~check:"Assumption" law n assumption);
                (None, fun_ [param unit_pat] (bind rest)) ])
   in
-  bind (List.combine law.l_values.law_assumptions law.l_source.law_assumptions)
+  bind law.l_values.law_assumptions
 
 (* [let l (module C : Choices) : unit Law.t = Law.Bind (Law.Choose C.f, fun
    (module M : F_choices) -> let module I = F (M.X) in ... Law.Bind
