@@ -147,6 +147,10 @@ let rec unsafe_blits dst pos sep seplen = function
     unsafe_blit sep 0 dst (pos + length hd) seplen;
     unsafe_blits dst (pos + length hd + seplen) sep seplen tl
 
+module Obj = struct
+  external magic_uncontended : ('a[@local_opt]) @ contended -> ('a[@local_opt]) @@ portable = "%identity"
+end
+
 let concat sep = function
     [] -> Obj.magic_uncontended empty
   | l -> let seplen = length sep in
@@ -443,6 +447,14 @@ let to_seqi s =
   in
   aux 0
 
+let rec seq_iter f (seq : _ Seq.t) =
+  match seq () with
+    | Nil -> ()
+    | Cons (x, next) ->
+        f x;
+        seq_iter f next
+
+
 let of_seq i =
   let n = ref 0 in
   let buf = ref (make 256 '\000') in
@@ -454,7 +466,7 @@ let of_seq i =
     blit !buf 0 new_buf 0 !n;
     buf := new_buf
   in
-  Seq.iter
+  seq_iter
     (fun c ->
        if !n = length !buf then resize();
        set !buf !n c;

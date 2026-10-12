@@ -16,7 +16,7 @@
 
 open! Stdlib
 
-[@@@ocaml.flambda_o3]
+[@@@ocaml.flambda_oclassic]
 
 [@@@ocaml.warning "+A-e"]
 

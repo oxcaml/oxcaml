@@ -65,6 +65,15 @@ let rec trans_closure ~dst ~src s =
      StrTbl.add dst s deps;
      deps
 
+let is_opaque = function
+  | "camlinternalFormatBasics"
+  | "camlinternalFormat"
+  | "seq"
+  | "printexc"
+  | "format"
+  | "digest" -> true
+  | _ -> false
+
 let gen_rule ~ppf ~tgt_file ~base ~deps =
   let ext, annot =
     match Filename.extension tgt_file with
@@ -93,6 +102,11 @@ let gen_rule ~ppf ~tgt_file ~base ~deps =
   let flags =
     if target = "stdlib"
     then flags ^ " -pp \"awk -f %{dep:../expand_module_aliases.awk}\""
+    else flags
+  in
+  let flags =
+    if is_opaque base
+    then flags ^ " -opaque"
     else flags
   in
   if ext <> `Cmo then copy_ml_files ~ppf (sprintf "../%s" src);
@@ -136,6 +150,13 @@ let write_stdlib_dune ppf =
         else s
       in
       let tgt_file = strip tgt_file and deps = List.map strip deps in
+      let deps =
+        deps |> List.map (fun s ->
+          let base = Filename.remove_extension s in
+          if Filename.extension s = ".cmx" && is_opaque base then
+            base ^ ".cmi"
+          else s)
+      in
       let basename = Filename.remove_extension tgt_file in
       let tgt_file =
         rename_file tgt_file and deps = List.map rename_file deps

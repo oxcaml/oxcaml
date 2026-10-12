@@ -437,40 +437,22 @@ module Tick = struct
       -> (inner -> 'r @ contended portable) @ local once portable
       -> 'r @ contended portable
 
-    (** These two functions return the new min interval *)
-    val add : inner -> int -> int
-    val remove : inner -> int -> int or_null
+    type entry = private
+      { my_interval: int;
+        (* The min of this and all pre-existing intervals *)
+        mutable min_interval: int;  }
+
+    val add : inner -> int -> entry
+
+    (** Returns the new min interval *)
+    val remove : inner -> entry @ contended -> int or_null
   end = struct
-    (* NOTE this is extremely un-optimized; we assume that ticks are acquired
-       and released relatively infrequently so the performance of registry
-       modification doesn't matter. *)
-
-    module Inner = struct
-      (* It would be better for this to be a decent min-heap, but there is not
-         one around that is convenient to use (and see above note about this
-         not being tight-loop). *)
-      include Map.MakePortable (Int)
-
-      external magic_empty_stateless
-        : ('a t[@local_opt])
-        -> ('a t[@local_opt]) @ stateless
-        @@ stateless
-        = "%identity"
-
-      external magic_empty_read_write
-        : ('a t[@local_opt]) @ immutable
-        -> ('a t[@local_opt])
-        @@ stateless
-        = "%identity"
-
-      let empty = magic_empty_stateless empty
-      let[@inline] empty () = magic_empty_read_write empty
-    end
+    type entry =
+      { my_interval: int;
+        mutable min_interval: int; }
 
     type t : sync_data =
-      { mutable inner : int Inner.t
-      (* A bag, mapping the interval to the number of requesters of ticks with
-         that interval *)
+      { mutable stack : entry list
       ; mutex : Mutex.t
       }
     [@@unsafe_allow_any_mode_crossing "All accesses protected by mutex"]
@@ -478,7 +460,7 @@ module Tick = struct
     type inner = t
 
     let create () =
-      { inner = Inner.empty ()
+      { stack = []
       ; mutex = Mutex.create ()
       }
 
@@ -487,30 +469,38 @@ module Tick = struct
          t.mutex
          (fun () -> { Modes.Portended.portended = f t })).portended
 
+    let update_min_interval e rest =
+      e.min_interval <-
+        match rest with
+        | [] -> e.my_interval
+        | s :: _ -> min e.my_interval s.min_interval
+
     (* Must be called from within [protect] *)
-    let add t tick =
-      let inner' =
-        Inner.update tick
-          (function
-            | None -> Some 1
-            | Some i -> Some (i + 1))
-          t.inner
-      in
-      t.inner <- inner';
-      Inner.min_binding inner' |> fst
+    let add t my_interval =
+      let entry = { my_interval; min_interval = 0 } in
+      update_min_interval entry t.stack;
+      t.stack <- entry :: t.stack;
+      entry
+
+    external same_entry : entry @ contended -> entry @ contended -> bool @@ portable = "%eq"
+
+    let rec remove entry = function
+      | [] -> []
+      | e :: es ->
+         if same_entry e entry then es
+         else begin
+           (* Removed out of stack order *)
+           let es = remove entry es in
+           update_min_interval e es;
+           e :: es
+         end
 
     (* Must be called from within [protect] *)
     let remove t tick =
-      let inner' =
-        Inner.update tick
-          (function
-            | None | Some 0 | Some 1 -> None
-            | Some i -> Some (i - 1))
-          t.inner
-      in
-      t.inner <- inner';
-      if Inner.is_empty inner' then Null
-      else This (Inner.min_binding inner' |> fst)
+      t.stack <- remove tick t.stack;
+      match t.stack with
+      | [] -> Null
+      | e :: _ -> This e.min_interval
   end
 
   (* One registry per recommended_domain_count.
@@ -540,17 +530,17 @@ module Tick = struct
     if interval_usec <= 0
     then invalid_arg "Tick.acquire: interval must be strictly positive";
     Registry.protect (local_registry ()) (fun registry ->
-      let interval = Registry.add registry interval_usec in
-      set_tick_interval_usec interval);
-    interval_usec
+      let entry = Registry.add registry interval_usec in
+      set_tick_interval_usec entry.min_interval;
+      entry)
 
-  let release interval_usec =
+  let release entry =
     Registry.protect (local_registry ()) (fun registry ->
       (* Note that the calls to [set_tick_interval_usec] can't raise here, as
          we're neither setting the requested interval to a value we haven't
          successfully set it to before, nor are we starting the tick
          thread. *)
-      match Registry.remove registry interval_usec with
+      match Registry.remove registry entry with
       | Null -> set_tick_interval_usec 0
       | This interval -> set_tick_interval_usec interval)
 

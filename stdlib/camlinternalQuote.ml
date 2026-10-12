@@ -28,6 +28,8 @@
 
 open! Stdlib
 
+[@@@ocaml.flambda_oclassic]
+
 (* CR metaprogramming aivaskovic: This file has not been code reviewed *)
 
 type 'a lam = 'a

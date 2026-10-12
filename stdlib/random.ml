@@ -98,6 +98,8 @@ module State = struct
      we serialize the array as a sequence of bytes, then hash the
      sequence with MD5 (Digest.bytes).  MD5 gives only 128 bits while
      we need 256 bits, so we hash twice with different suffixes. *)
+
+  external digest_bytes : bytes -> int -> int -> string @@ portable = "caml_md5_bytes"
   let reinit s seed =
     let n = Array.length seed in
     let b = Bytes.create (n * 8 + 1) in
@@ -105,9 +107,9 @@ module State = struct
       Bytes.set_int64_le b (i * 8) (Int64.of_int seed.(i))
     done;
     Bytes.set b (n * 8) '\x01';
-    let d1 = Digest.bytes b in
+    let d1 = digest_bytes b 0 (Bytes.length b) in
     Bytes.set b (n * 8) '\x02';
-    let d2 = Digest.bytes b in
+    let d2 = digest_bytes b 0 (Bytes.length b) in
     set s (String.get_int64_le d1 0)
           (String.get_int64_le d1 8)
           (String.get_int64_le d2 0)
