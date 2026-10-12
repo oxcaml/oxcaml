@@ -67,6 +67,8 @@ module Function_body_hash = struct
   let to_int32 t = t
 
   let equal = Int32.equal
+
+  let to_string t = Printf.sprintf "%08lx" t
 end
 
 (* The kinds of node hashed into an identity. Their numbers are part of the
