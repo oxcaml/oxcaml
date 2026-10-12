@@ -1357,8 +1357,16 @@ let rec lower_contravariant env var_level visited contra ty =
     match get_desc ty with
       Tvar _ ->
         if contra then begin
-          set_level ty var_level;
-          update_jkind_level_exn env var_level ty
+          (* Kinds bound since [var_level] were checked not to escape when
+             leaving their scope (by [update_level] or [Mtype.lower_nongen]),
+             so this can't fail. *)
+          begin match update_jkind_level env var_level ty with
+          | Ok () -> ()
+          | Error path ->
+              Misc.fatal_errorf_doc
+                "Ctype.lower_contravariant: kind %a escapes" Path.print path
+          end;
+          set_level ty var_level
         end
     | Tconstr (_, [], _) -> ()
     | Tconstr (path, tyl, _abbrev) ->
