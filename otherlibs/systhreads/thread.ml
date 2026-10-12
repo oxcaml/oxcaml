@@ -53,13 +53,13 @@ exception Exit
 let interval_usec = 50_000
 
 let create (fn @ once) arg =
-  let tls_keys = Domain.TLS.Private.get_initial_keys () in
+  let tls_keys = Domain.Safe.TLS.Private.get_initial_keys () in
   let tick = Domain.Tick.acquire ~interval_usec in
   match
     thread_new
       (fun () ->
-        Domain.TLS.Private.init ();
-        Domain.TLS.Private.set_initial_keys tls_keys;
+        Domain.Safe.TLS.Private.init ();
+        Domain.Safe.TLS.Private.set_initial_keys tls_keys;
         try
           fn arg;
           Domain.Tick.release tick;

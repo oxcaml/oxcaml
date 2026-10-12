@@ -182,10 +182,9 @@ module Deep : sig
         To set the tick interval, call [Domain.Tick.with_] before running a
         preemptible fiber.
 
-        A preemptible fiber owns its own TLS state (see {!Domain.TLS}): it
-        starts with fresh state, populated from the keys registered with
-        [split_from_parent]. [tickc] must not touch TLS, since it must be
-        signal-safe. *)
+        Like [Thread.create], creating a preemptable fiber splits the active
+        TLS state, and the child fiber gains is own TLS identity.
+        [tickc] must not touch TLS, since it must be signal-safe. *)
 
     type ('a,'b) handler =
         { retc: 'a -> 'b;
@@ -357,7 +356,8 @@ module Shallow : sig
         preemptible fiber.
 
         Like [Thread.create], creating a preemptable fiber splits the
-        active TLS state, and the child fiber gains is own TLS identity. *)
+        active TLS state, and the child fiber gains is own TLS identity.
+        [tickc] must not touch TLS, since it must be signal-safe. *)
 
     type ('a,'b) continuation
     (** [('a,'b) continuation] is a delimited continuation of a preemptible

@@ -614,27 +614,6 @@ module Safe = struct
   let at_exit = at_exit
 end
 
-module TLS = struct
-  module Private = TLS0.Private
-
-  type 'a key = 'a TLS0.key
-
-  let new_key ?split_from_parent f =
-    let split_from_parent =
-      match split_from_parent with
-      | None -> None
-      | Some split_from_parent ->
-        Some (Obj.magic_portable (fun x ->
-          Obj.magic_portable (fun () -> split_from_parent x)))
-    in
-    TLS0.new_key ?split_from_parent (Obj.magic_portable f)
-  ;;
-
-  let get = TLS0.get
-  let set = TLS0.set
-  let init = TLS0.Private.init
-end
-
 module DLS = struct
   type 'a key = 'a Safe.DLS.key
 
@@ -658,6 +637,6 @@ let spawn f = Safe.spawn (Obj.magic_portable f)
 let at_exit f = Safe.at_exit (Obj.magic_portable f)
 
 let () = DLS.init ()
-let () = TLS.init ()
+let () = Safe.TLS.Private.init ()
 
 let _ = Stdlib.do_domain_local_at_exit := do_at_exit

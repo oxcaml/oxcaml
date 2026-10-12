@@ -160,8 +160,8 @@ let[@inline never] discontinue_with_handler_with_backtrace
     e bt
 
 let[@inline] split_tls comp =
-  let keys = Domain.TLS.Private.get_initial_keys () in
-  fun arg -> Domain.TLS.Private.set_initial_keys keys; comp arg
+  let keys = Domain.Safe.TLS.Private.get_initial_keys () in
+  fun arg -> Domain.Safe.TLS.Private.set_initial_keys keys; comp arg
 
 module Deep = struct
 

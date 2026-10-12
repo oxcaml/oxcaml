@@ -232,7 +232,7 @@ module Safe : sig @@ portable
     (** Like {!DLS.set}, but safe to use in the presence of multiple domains. *)
   end
 
-  (** Thread-local storage. Like {!DLS}, but stores a distinct value for
+  (** Thread-local storage. Like {!Domain.DLS}, but stores a distinct value for
       every preemptible fiber. Preemptable fibers are the fundamental unit of
       preemptive concurrency, so [TLS] should be nearly always preferred. *)
   module TLS : sig
@@ -244,14 +244,7 @@ module Safe : sig @@ portable
       : ?split_from_parent:('a -> (unit -> 'a) @ portable once) @ portable
       -> (unit -> 'a) @ portable
       -> 'a key
-    (** Like {!TLS.new_key}, but safe to use in the presence of multiple
-        domains. *)
-
-    val get : ('a : value mod portable). 'a key -> 'a @ contended
-    (** Like {!TLS.get}, but safe to use in the presence of multiple domains. *)
-
-    val set : ('a : value mod contended). 'a key -> 'a @ portable -> unit
-    (** Like {!TLS.set}, but safe to use in the presence of multiple domains. *)
+    (** Like {!DLS.new_key}, but represents a distinct value in every thread. *)
 
     val access
       : ('b : value_or_null).
@@ -260,7 +253,7 @@ module Safe : sig @@ portable
          @ local once portable unyielding
       -> 'b @ contended local once portable unique
     (** [access k f] provides uncontended access to the value of [k] on this
-        thread for the duration of [f]. Raises if [f] re-enters [access]. *)
+        thread for the duration of [f]. Raises if [f] re-enters [access k]. *)
 
     (** For use by the threading library and [Effect]. *)
     module Private : sig @@ portable
