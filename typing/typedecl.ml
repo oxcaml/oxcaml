@@ -4900,10 +4900,8 @@ let transl_value_decl env loc ~modal ~why valdecl =
   in
   let sort =
     match Ctype.type_sort ~why ~allow_mutation:true env cty.ctyp_type with
-    | Ok sort -> sort
-    | Error err ->
-        Error.log_and_raise cty.ctyp_loc
-          (Non_representable_in_module (env, err, cty.ctyp_type))
+    | Ok sort -> Representable sort
+    | Error _ -> Unrepresentable
   in
   let ty = cty.ctyp_type in
   let v =

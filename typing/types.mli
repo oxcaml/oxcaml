@@ -755,8 +755,12 @@ module Vars  : Map.S with type key = string
 
 (* Value descriptions *)
 
+type sort_or_unrepresentable =
+  | Representable of Jkind_types.Sort.t
+  | Unrepresentable
+
 type value_kind =
-    Val_reg of Jkind_types.Sort.t       (* Regular value *)
+    Val_reg of sort_or_unrepresentable  (* Regular value *)
   | Val_mut of Mode.With_regionality.Comonadic.lr * Jkind_types.Sort.t
                                         (* Mutable variable *)
   | Val_prim of Primitive.description   (* Primitive *)

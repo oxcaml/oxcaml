@@ -329,8 +329,12 @@ module Vars = Misc.Stdlib.String.Map
 
 (* Value descriptions *)
 
+type sort_or_unrepresentable =
+  | Representable of Jkind_types.Sort.t
+  | Unrepresentable
+
 type value_kind =
-    Val_reg of Jkind_types.Sort.t       (* Regular value *)
+    Val_reg of sort_or_unrepresentable  (* Regular value *)
   | Val_mut of Mode.With_regionality.Comonadic.lr * Jkind_types.Sort.t
                                         (* Mutable value *)
   | Val_prim of Primitive.description   (* Primitive *)
@@ -778,7 +782,8 @@ module Make_wrapped(Wrap : Wrap) = struct
   let sort_of_signature_item = function
     | Sig_value(_, decl, _) ->
       begin match decl.val_kind with
-      | Val_reg sort -> Some sort
+      | Val_reg Unrepresentable -> Misc.fatal_error "unrepresentable signature item"
+      | Val_reg (Representable sort) -> Some sort
       | Val_ivar _ ->
         Some Jkind_types.Sort.(of_const Const.for_instance_var)
       | Val_self _ | Val_anc _ ->

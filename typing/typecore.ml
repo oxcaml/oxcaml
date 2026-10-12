@@ -1829,7 +1829,7 @@ let type_continuation_pat env expected_ty sp =
       let id = Ident.create_local name.txt in
       let desc =
         { val_type = expected_ty;
-          val_kind = Val_reg (Jkind.Sort.(of_const Const.for_continuation));
+          val_kind = Val_reg (Representable Jkind.Sort.(of_const Const.for_continuation));
           val_lpoly = Lpoly.determined [];
           Types.val_loc = loc; val_attributes = [];
           val_modalities = Modality.undefined;
@@ -2974,7 +2974,7 @@ let type_for_loop_index ~loc ~env ~param =
             let pv =
               { pv_id; pv_uid; pv_mode;
                 pv_value_kind =
-                  Val_reg Jkind.Sort.(of_const Const.for_loop_index);
+                  Val_reg (Representable Jkind.Sort.(of_const Const.for_loop_index));
                 pv_type; pv_loc;
                 pv_kind = if pv_as_var then As_var else Std_var;
                 pv_attributes;
@@ -2997,7 +2997,7 @@ let type_comprehension_for_range_iterator_index ~loc ~env ~param tps =
     ~var:(fun ~name ~pv_mode ~pv_type ~pv_loc ~pv_as_var ~pv_attributes ->
           enter_variable
             ~is_as_variable:pv_as_var
-            ~kind:(Val_reg Jkind.Sort.(of_const Const.for_loop_index))
+            ~kind:(Val_reg (Representable Jkind.Sort.(of_const Const.for_loop_index)))
             tps
             pv_loc
             name
@@ -3958,7 +3958,7 @@ and type_pat_aux
       in
       let var_mode, kind =
         match mutable_flag with
-        | Immutable -> mode, Val_reg sort
+        | Immutable -> mode, Val_reg (Representable sort)
         | Mutable ->
             let m0 =
               With_regionality.Comonadic.newvar
@@ -4022,7 +4022,7 @@ and type_pat_aux
           let sort = Jkind.Sort.(of_const Const.for_module) in
           let id, uid =
             enter_variable tps loc v pat_mode.mode t ~is_module:true
-              ~kind:(Val_reg sort) sp.ppat_attributes sort
+              ~kind:(Val_reg (Representable sort)) sp.ppat_attributes sort
           in
           rvp {
             pat_desc = Tpat_var { id; name = v; uid; sort;
@@ -4040,7 +4040,7 @@ and type_pat_aux
       let mode = cross_left !!penv expected_ty mode in
       let id, uid =
         enter_variable ~is_as_variable:true
-          ~kind:(Val_reg sort) tps name.loc name mode
+          ~kind:(Val_reg (Representable sort)) tps name.loc name mode
           ty_var sp.ppat_attributes sort
       in
       rvp { pat_desc = Tpat_alias { pattern = q; id; name; uid;
@@ -4592,7 +4592,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
          let val_env =
           Env.add_value ~mode:Mode.With_regionality.legacy pv_id
             { val_type = pv_type
-            ; val_kind = Val_reg pv_sort
+            ; val_kind = Val_reg (Representable pv_sort)
             ; val_lpoly = Lpoly.determined []
             ; val_attributes = pv_attributes
             ; val_zero_alloc = Zero_alloc.default
@@ -7220,8 +7220,10 @@ let create_typing_recovery_error_node loc env ty_expected ~attributes =
             desc =
               { Types.val_type = ty_expected;
                 val_kind =
-                  Val_reg (Var (Jkind.Sort.new_var
-                                  ~level:(Ctype.get_current_level ())));
+                  Val_reg
+                    (Representable
+                       (Var (Jkind.Sort.new_var
+                               ~level:(Ctype.get_current_level ()))));
                 val_lpoly = Lpoly.determined [];
                 val_loc = loc;
                 val_attributes = [];
@@ -11174,7 +11176,7 @@ and type_argument_ ?explanation ?recarg ~overwrite env
       let var_pair ~(mode : With_regionality.lr) name ty sort =
         let id = Ident.create_local name in
         let desc =
-          { val_type = ty; val_kind = Val_reg sort;
+          { val_type = ty; val_kind = Val_reg (Representable sort);
             val_lpoly = Lpoly.determined [];
             val_attributes = [];
             val_zero_alloc = Zero_alloc.default;
