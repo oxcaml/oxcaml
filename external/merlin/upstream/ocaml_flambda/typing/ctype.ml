@@ -2805,7 +2805,14 @@ let rec extract_concrete_typedecl env ty =
   | Tquote ty -> extract_concrete_typedecl (incr_stage env) ty
   | Tsplice ty -> extract_concrete_typedecl (decr_stage env) ty
   | Tquote_eval ty -> extract_concrete_typedecl (incr_stage env) ty
-  | Tbox ty -> extract_concrete_typedecl env ty
+  | Tbox inner ->
+      begin match try_expand_head try_expand_safe env ty with
+      | ty -> extract_concrete_typedecl env ty
+      | exception Cannot_expand ->
+          match extract_concrete_typedecl env inner with
+          | May_have_typedecl -> May_have_typedecl
+          | Typedecl _ | Has_no_typedecl -> Has_no_typedecl
+      end
   | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tobject _ | Tfield _ | Tnil
   | Tvariant _ | Tpackage _ | Tof_kind _ -> Has_no_typedecl
   | Tvar _ | Tunivar _ -> May_have_typedecl
