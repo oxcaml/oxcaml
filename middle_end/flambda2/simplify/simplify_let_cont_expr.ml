@@ -491,7 +491,9 @@ let rebuild_let_cont (data : rebuild_let_cont_data) ~after_rebuild body uacc =
           then
             ( handler.handler_expr,
               handler.name_occurrences_of_handler,
-              handler.cost_metrics_of_handler )
+              Cost_metrics.notify_removed
+                ~operation:(Cost_metrics.removed cost_metrics_of_body)
+                handler.cost_metrics_of_handler )
           else
             let name_occurrences =
               NO.union name_occurrences_body handler.name_occurrences_of_handler
