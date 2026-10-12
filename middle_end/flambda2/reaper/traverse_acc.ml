@@ -50,7 +50,8 @@ type closure_dep =
 
 type delayed_deps =
   { apply_deps : apply_dep list;
-    set_of_closures_deps : closure_dep list
+    set_of_closures_deps : closure_dep list;
+    imported_symbols : Symbol.Set.t
   }
 
 module Applications = struct
@@ -133,7 +134,11 @@ let record_apply_for_rebuild t apply =
 let create () =
   { code_deps = Code_id.Map.empty;
     code = Code_id.Map.empty;
-    delayed_deps = { apply_deps = []; set_of_closures_deps = [] };
+    delayed_deps =
+      { apply_deps = [];
+        set_of_closures_deps = [];
+        imported_symbols = Symbol.Set.empty
+      };
     applications = Applications.empty;
     deps = Graph.create ();
     fixed_arity_conts = Continuation.Set.empty;
@@ -152,7 +157,12 @@ let simple_to_node t ~all_constants simple =
     ~var:(fun v ~coercion:_ -> Code_id_or_name.var v)
     ~symbol:(fun s ~coercion:_ ->
       if not (Current_unit.is_current (Symbol.compilation_unit s))
-      then Graph.add_any_source t.deps (Code_id_or_name.symbol s);
+      then
+        t.delayed_deps
+          <- { t.delayed_deps with
+               imported_symbols =
+                 Symbol.Set.add s t.delayed_deps.imported_symbols
+             };
       Code_id_or_name.symbol s)
 
 let add_code_dep t code_id dep =
@@ -188,9 +198,6 @@ let add_argument_dep t ~from relation ~base =
 let add_parameter_dep t ~base relation ~to_ =
   Graph.add_parameter_dep t.deps ~base relation ~to_
 
-let add_propagate_dep t ~if_used ~to_ ~from =
-  Graph.add_propagate_dep t.deps ~if_used ~to_ ~from
-
 let add_alias_if_any_source_dep t ~if_any_source ~to_ ~from =
   Graph.add_alias_if_any_source_dep t.deps ~if_any_source ~to_ ~from
 
@@ -216,16 +223,17 @@ let add_cond_any_source t ~(denv : Env.t) v =
   match Env.current_code_id denv with
   | None -> add_any_source t v
   | Some code_id ->
-    add_propagate_dep t
+    Graph.add_any_source_if_used t.deps
       ~if_used:(Code_id_or_name.code_id code_id)
-      ~from:(Code_id_or_name.name (Env.le_monde_exterieur denv))
-      ~to_:v
+      v
 
 let cond_alias t ~(denv : Env.t) ~from ~to_ =
   match Env.current_code_id denv with
   | None -> add_alias t ~from ~to_
   | Some code_id ->
-    add_propagate_dep t ~if_used:(Code_id_or_name.code_id code_id) ~from ~to_
+    Graph.add_propagate_dep t.deps
+      ~if_used:(Code_id_or_name.code_id code_id)
+      ~from ~to_
 
 let fixed_arity_continuation t k =
   t.fixed_arity_conts <- Continuation.Set.add k t.fixed_arity_conts
@@ -530,7 +538,7 @@ let add_alias_for_caller graph ~caller ~from ~to_ =
       ~if_used:(Code_id_or_name.code_id code_id)
       ~from ~to_
 
-let add_closure_dep graph ~code_deps
+let add_closure_dep graph ~analysis_scope ~code_deps
     { let_bound_name_of_the_closure;
       closure_code_id = code_id;
       only_full_applications = _
@@ -540,13 +548,17 @@ let add_closure_dep graph ~code_deps
      in code that will be rewritten for unbox-fv-closures anyway. *)
   match Code_id.Map.find_opt code_id code_deps with
   | None ->
-    assert (not (Current_unit.is_current (Code_id.get_compilation_unit code_id)));
-    (* The code comes from another compilation unit, so we don't know what
-       happens once it is applied. As such, it must cause the whole block to
-       escape. *)
+    assert (
+      not
+        (Analysis_scope.contains_unit analysis_scope
+           (Code_id.get_compilation_unit code_id)));
+    (* The code comes from a compilation unit outside the analysis scope, so we
+       don't know what happens once it is applied. As such, it must cause the
+       whole block to escape. *)
     let witness =
       Code_id_or_name.var
-        (Variable.create
+        (Variable.create_in_compilation_unit
+           ~compilation_unit:(Code_id.get_compilation_unit code_id)
            (Format.asprintf "external_code_id_witness_%s" (Code_id.name code_id))
            K.value)
     in
@@ -568,7 +580,7 @@ let add_closure_dep graph ~code_deps
       ~from:(List.hd code_dep.unknown_arity_call_witnesses)
       Field.unknown_arity_call_witness ~base:closure
 
-let add_apply_dep graph ~code_deps ~le_monde_exterieur
+let add_apply_dep graph ~analysis_scope ~code_deps
     { function_containing_apply_expr = caller;
       apply_code_id = code_id;
       apply_closure = closure;
@@ -584,14 +596,16 @@ let add_apply_dep graph ~code_deps ~le_monde_exterieur
           ~to_:(Code_id_or_name.var code_dep.my_closure))
       closure
   | None -> (
-    assert (not (Current_unit.is_current (Code_id.get_compilation_unit code_id)));
+    assert (
+      not
+        (Analysis_scope.contains_unit analysis_scope
+           (Code_id.get_compilation_unit code_id)));
     (match caller with
     | None -> Graph.add_any_source graph call
     | Some caller ->
-      Graph.add_propagate_dep graph
+      Graph.add_any_source_if_used graph
         ~if_used:(Code_id_or_name.code_id caller)
-        ~to_:call
-        ~from:(Code_id_or_name.symbol le_monde_exterieur));
+        call);
     match closure with
     | None -> ()
     | Some closure -> (
@@ -602,10 +616,20 @@ let add_apply_dep graph ~code_deps ~le_monde_exterieur
           ~to_:(Code_id_or_name.code_id caller)
           ~from:closure))
 
-let resolve_delayed_deps graph ~code_deps ~le_monde_exterieur
-    { apply_deps; set_of_closures_deps } =
-  List.iter (add_apply_dep graph ~code_deps ~le_monde_exterieur) apply_deps;
-  List.iter (add_closure_dep graph ~code_deps) set_of_closures_deps
+let resolve_delayed_deps graph ~analysis_scope ~code_deps
+    { apply_deps; set_of_closures_deps; imported_symbols } =
+  List.iter (add_apply_dep graph ~analysis_scope ~code_deps) apply_deps;
+  List.iter
+    (add_closure_dep graph ~analysis_scope ~code_deps)
+    set_of_closures_deps;
+  Symbol.Set.iter
+    (fun symbol ->
+      if
+        not
+          (Analysis_scope.contains_unit analysis_scope
+             (Symbol.compilation_unit symbol))
+      then Graph.add_any_source graph (Code_id_or_name.symbol symbol))
+    imported_symbols
 
 let add_set_of_closures t set_of_closures =
   t.all_sets_of_closures <- set_of_closures :: t.all_sets_of_closures

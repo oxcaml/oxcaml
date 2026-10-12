@@ -600,9 +600,9 @@ let option_argument_jkind = Jkind.Builtin.any ~why:(
 (* The jkind of an optional argument, as opposed to
    [option_argument_jkind], the jkind of the argument to the [option]
    type. *)
-(* CR-soon lmaurer: Remove this when these are once again the same. *)
-let optional_argument_jkind =
-  Jkind.Builtin.value_or_null ~why:Optional_argument
+(* CR-soon lmaurer: Consider removing this or [option_argument_jkind] now that
+   they're the same. *)
+let optional_argument_jkind = option_argument_jkind
 
 let unrestricted tvar ca_sort =
   {

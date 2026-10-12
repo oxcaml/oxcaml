@@ -83,7 +83,9 @@ let twiddle_refs () =
   done;
   !r
 
-let with_tick f = Domain.Tick.with_ ~interval_usec:1_000 (fun _ -> f ())
+let with_tick (f : unit -> unit) =
+  Domain.Tick.with_ ~interval_usec:1_000 (fun () -> f (); ());
+  ()
 
 let multidomain () =
   let stop = Atomic.make false in

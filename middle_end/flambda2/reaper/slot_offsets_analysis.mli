@@ -30,5 +30,6 @@
     output by simplify. *)
 val compute :
   free_names:Name_occurrences.t ->
+  analysis_scope:Analysis_scope.t ->
   Unboxing_analysis.result ->
   Slot_offsets.result

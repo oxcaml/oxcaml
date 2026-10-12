@@ -133,11 +133,11 @@ module Sys = struct
         with Sys_error _ -> ()
 
   let rec make_directory dir =
-    if Sys.file_exists dir then ()
-    else let () = make_directory (Filename.dirname dir) in
-         if not (Sys.file_exists dir) then
-           Sys.mkdir dir 0o777
-         else ()
+    if not (Sys.file_exists dir) then begin
+      make_directory (Filename.dirname dir);
+      try Sys.mkdir dir 0o777
+      with Sys_error _ when Sys.file_exists dir -> ()
+    end
 
   let make_directory dir =
     try make_directory dir

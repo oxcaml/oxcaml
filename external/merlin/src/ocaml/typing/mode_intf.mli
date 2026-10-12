@@ -1100,6 +1100,8 @@ module type S = sig
     val with_locality_as_regionality :
       With_locality.Const.t -> With_regionality.Const.t
 
+    val value_to_alloc_r2l : With_regionality.Const.t -> With_locality.Const.t
+
     module Axis : sig
       val with_locality_as_regionality :
         With_locality.Axis.packed -> With_regionality.Axis.packed
@@ -1233,6 +1235,10 @@ module type S = sig
 
       (** [concat ~then t] returns the modality that is [then_] after [t]. *)
       val concat : then_:t -> t -> t
+
+      (** Apply a modality on a constant *)
+      val apply_const :
+        t -> With_regionality.Const.t -> With_regionality.Const.t
 
       (** [set a t] overwrites an axis of [t] to be [a]. *)
       val set : 'a Axis.t -> 'a -> t -> t

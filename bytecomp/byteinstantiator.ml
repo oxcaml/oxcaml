@@ -27,7 +27,6 @@
 let read_unit_info file : Instantiator.unit_info =
   let cmo = Cmo_io.read_cmo file in
   { ui_unit = cmo.cu_name;
-    ui_arg_descr = cmo.cu_arg_descr;
     ui_format = cmo.cu_format;
   }
 

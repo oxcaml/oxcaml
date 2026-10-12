@@ -612,18 +612,41 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
   | Texp_unboxed_bool b ->
       Lconst(Const_base(Const_untagged_int8(Bool.to_int b)))
   | Texp_tuple (el, locality_mode) ->
-      let ll, shape =
-        transl_value_list_with_shape ~scopes
-          (List.map (fun (_, a) -> (a, Jkind.Sort.Const.for_tuple_element)) el)
+      let ll, sorts, layouts =
+        transl_list_with_layout ~scopes
+          (List.map
+             (fun (_, e, s) -> e, Jkind.Sort.default_for_transl_and_get s) el)
+        |> Misc.Stdlib.List.split3
       in
-      begin try
-        Lconst(Const_block(0, List.map extract_constant ll))
-      with Not_constant ->
-        Lprim(Pmakeblock(0, Immutable,
-                         Lambda.block_shape_of_value_kinds (Some shape),
-                         transl_typed_locality_mode_r locality_mode),
-              ll,
-              (of_location ~scopes e.exp_loc))
+      let shape =
+        Array.of_list (List.map Lambda.mixed_block_element_of_layout layouts)
+      in
+      (* Shapes containing splices are checked after static evaluation *)
+      if not (Lambda.mixed_block_shape_has_splices shape) then
+        Typeopt.assert_mixed_product_support_for_lambda_shape e.exp_loc Tuple
+          shape;
+      let constant =
+        match List.map extract_constant ll with
+        | exception Not_constant -> None
+        | constants ->
+            if List.for_all Jkind.Sort.Const.is_scannable sorts then
+              (* Ensure that uniform tuple constants are optimized *)
+              Some (Const_block(0, constants))
+            else if !Clflags.native_code then
+              Some (Const_mixed_block(0, shape, constants))
+            else
+              (* CR layouts v5.9: Structured constants for mixed blocks should
+                 be supported in bytecode. See symtable.ml for the difficulty.
+              *)
+              None
+      in
+      begin match constant with
+      | Some constant -> Lconst constant
+      | None ->
+          Lprim(Pmakeblock(0, Immutable, Shape shape,
+                           transl_typed_locality_mode_r locality_mode),
+                ll,
+                (of_location ~scopes e.exp_loc))
       end
   | Texp_unboxed_tuple el ->
       let el =
@@ -1618,15 +1641,6 @@ and transl_list_with_layout ~scopes expr_list =
     transl_exp ~scopes layout exp, sort, layout)
     expr_list
 
-(* Will raise if a list element has a non-value layout. *)
-and transl_value_list_with_shape ~scopes expr_list =
-  let transl_with_shape (e, sort) =
-    let layout = layout_exp sort e in
-    let shape = Lambda.must_be_value layout in
-    transl_exp ~scopes layout e, shape
-  in
-  List.split (List.map transl_with_shape expr_list)
-
 and transl_guard ~scopes guard rhs_layout rhs =
   let layout = rhs_layout in
   let expr = event_before ~scopes rhs (transl_exp ~scopes rhs_layout rhs) in
@@ -1915,7 +1929,7 @@ and transl_apply ~scopes
     - [Curried]. It takes each argument individually.
 
    We first try treating the function as taking a flattened tupled argument (in
-   [trans_tupled_function]) and, if that doesn't work, we fall back to treating
+   [transl_tupled_function]) and, if that doesn't work, we fall back to treating
    the function as taking each argument individually (in
    [trans_curried_function]).
 *)
@@ -1964,6 +1978,17 @@ and transl_tupled_function
      (whose alloc mode must be global) and the function itself is global. It may
      actually be sound to tuplify locally-allocated functions, but we haven't
      thought it through. *)
+  (* CR layouts-mixed-tuplify: We also currently require every component of the
+     tuple pattern to have the value sort, since the backend does not currently
+     support optimizing mixed tupled functions. This should change, especially
+     to properly support layout poly tupled functions. *)
+  let all_components_are_values pl =
+    List.for_all
+      (fun (_, _, sort) ->
+         Jkind.Sort.Const.is_scannable
+           (Jkind.Sort.default_for_transl_and_get sort))
+      pl
+  in
   match eligible_cases with
   | Some
       (({ c_lhs = { pat_desc = Tpat_tuple pl } } as first_case),
@@ -1971,7 +1996,8 @@ and transl_tupled_function
     when is_alloc_heap mode
       && is_alloc_heap (transl_typed_locality_mode_l arg_mode)
       && !Clflags.native_code
-      && List.length pl <= (Lambda.max_arity ()) ->
+      && List.length pl <= (Lambda.max_arity ())
+      && all_components_are_values pl ->
       begin try
         let cases = first_case :: rest_cases in
         let size = List.length pl in
@@ -1988,8 +2014,9 @@ and transl_tupled_function
                 Pvariant { consts = [];
                            non_consts = [0, Constructor_shape_uniform kinds] }
             } ->
-              (* CR layouts v5: to change when we have non-value tuple
-                 elements. *)
+              (* CR layouts-mixed-tuplify: we should support the
+                 [Constructor_mixed] case, once the backend supports this
+                 optimization for non-values. *)
               Some kinds
           | _ -> None
         in
@@ -2004,6 +2031,9 @@ and transl_tupled_function
                tuple_value_kinds (layout_of_fun_arg_ty fun_arg_ty loc arg_sort)
              with
              | Some kinds -> kinds
+             (* CR layouts-mixed-tuplify: this should compute a layout (not
+                necessarily a value_kind) from the stored sorts, following
+                backend support. *)
              | None -> List.init size (fun _ -> Lambda.generic_value))
           else
             match
@@ -2018,22 +2048,23 @@ and transl_tupled_function
         in
         let kinds = List.map (fun vk -> Pvalue vk) value_kinds in
         let tparams =
-          List.map2 (fun kind (_, fld_pat) ->
+          List.map2 (fun layout (_, fld_pat, sort) ->
               let debug_uid =
                 Typecore.create_uid_for_pattern_kind Value_pattern_in_argument
               in
+              let sort = Jkind.Sort.default_for_transl_and_get sort in
               add_type_shapes_of_param ~env:first_case.c_lhs.pat_env
-                ~uid:debug_uid ~sort:Jkind.Sort.Const.for_tuple_element
-                ~type_expr:fld_pat.pat_type;
-              {
-                name = Ident.create_local "param";
-                debug_uid;
-                layout = kind;
-                attributes = Lambda.default_param_attribute;
-                mode = alloc_heap
-              }) kinds pl
+                ~uid:debug_uid ~sort ~type_expr:fld_pat.pat_type;
+              ({
+                 name = Ident.create_local "param";
+                 debug_uid;
+                 layout;
+                 attributes = Lambda.default_param_attribute;
+                 mode = alloc_heap
+               }, sort, layout)) kinds pl
         in
-        let params = List.map (fun p -> p.name) tparams in
+        let params = List.map (fun (p, s, l) -> (p.name, s, l)) tparams in
+        let lparams = List.map (fun (p, _, _) -> p) tparams in
         let body =
           Matching.for_tupled_function ~scopes ~return_layout loc params
             (transl_tupled_cases ~scopes return_layout pats_expr_list) partial
@@ -2041,7 +2072,7 @@ and transl_tupled_function
         let region = region || not (may_allocate_in_region body) in
         add_type_shapes_of_cases cases;
         Some
-          ((Tupled, tparams, return_layout, region, return_mode), body)
+          ((Tupled, lparams, return_layout, region, return_mode), body)
     with Matching.Cannot_flatten -> None
       end
   | _ -> None
@@ -3007,13 +3038,15 @@ and transl_match ~scopes ~arg_sort ~return_layout e arg pat_expr_list partial =
       assert (static_handlers = []);
       let mode = transl_typed_locality_mode_r locality_mode in
       let argl =
-        List.map (fun (_, a) -> (a, Jkind.Sort.Const.for_tuple_element)) argl
+        List.map (fun (_, a, s) ->
+          (a, Jkind.Sort.default_for_transl_and_get s)) argl
       in
       Matching.for_multiple_match ~scopes ~return_layout e.exp_loc
         (transl_list_with_layout ~scopes argl) mode val_cases partial
     | {exp_desc = Texp_tuple (argl, locality_mode)}, _ :: _ ->
         let argl =
-          List.map (fun (_, a) -> (a, Jkind.Sort.Const.for_tuple_element)) argl
+          List.map (fun (_, a, s) ->
+            (a, Jkind.Sort.default_for_transl_and_get s)) argl
         in
         let val_ids, lvars =
           List.map

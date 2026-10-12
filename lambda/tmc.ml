@@ -961,15 +961,14 @@ let rec choice ctx t =
     | Patomic_compare_set_idx _ | Patomic_fetch_add_idx
     | Patomic_add_idx | Patomic_sub_idx | Patomic_land_idx
     | Patomic_lor_idx | Patomic_lxor_idx
-    | Patomic_load_ptr _ | Patomic_set_ptr _
-    | Patomic_exchange_ptr _ | Patomic_compare_exchange_ptr _
-    | Patomic_compare_set_ptr _ | Patomic_fetch_add_ptr
-    | Patomic_add_ptr | Patomic_sub_ptr | Patomic_land_ptr
-    | Patomic_lor_ptr | Patomic_lxor_ptr
     | Pcpu_relax
     | Punbox_vector _ | Pbox_vector (_, _)
     | Punbox_mask | Pbox_mask _
     | Pjoin_vec256 | Psplit_vec256
+
+    (* we don't yet handle box, though we should be able to *)
+    (* CR box: support TMC for layouts boxed by allocating a block *)
+    | Pbox _
 
     (* we don't handle array indices as destinations yet *)
     | (Pmakearray _ | Pduparray _ | Pmakearray_dynamic _)
@@ -1046,7 +1045,8 @@ let rec choice ctx t =
     | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pidx_deepen _
     | Pmake_idx_array _
     | Pget_idx _ | Pset_idx _ | Pget_ptr _ | Pset_ptr _
-    | Pget_ext_ptr _ | Pset_ext_ptr _ ->
+    | Pget_ext_ptr _ | Pset_ext_ptr _
+    | Punbox _ ->
         let primargs = traverse_list ctx primargs in
         Choice.lambda (Lprim (prim, primargs, loc))
 

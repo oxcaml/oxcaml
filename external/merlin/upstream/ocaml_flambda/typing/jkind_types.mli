@@ -180,8 +180,8 @@ module Layout : sig
       | Any of Scannable_axes.t
       | Base of Sort.base * Scannable_axes.t
       | Product of t list
-      | Univar of Sort.univar
-      | Genvar of Sort.var
+      | Univar of Sort.univar * Scannable_axes.t
+      | Genvar of Sort.var * Scannable_axes.t
       | Addressable of t
           (** See Note [Addressable kinds].
 
@@ -196,9 +196,9 @@ module Layout : sig
 
     val product : t list -> t
 
-    val univar : Sort.univar -> t
+    val univar : Sort.univar -> Scannable_axes.t -> t
 
-    val genvar : Sort.var -> t
+    val genvar : Sort.var -> Scannable_axes.t -> t
 
     module Static : sig
       val of_base : Sort.base -> Scannable_axes.t -> t

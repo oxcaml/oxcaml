@@ -833,9 +833,9 @@ type t : value mod portable
 
 (* Addressability does not change the out-of-block product representation,
    so a made-addressable product can be unpacked into C stub arguments. *)
-type tup : (bits8 & bits16) addressable
+type tup : (bits32 & bits32) addressable
 [%%expect{|
-type tup : (bits8 & bits16) addressable
+type tup : (bits32 & bits32) addressable
 |}]
 
 external ext_unpack_addressable : (tup [@unpacked]) -> int = "foo" "bar"
