@@ -1343,11 +1343,11 @@ let check_pers_mod ~allow_hidden ~loc name =
 let crc_of_unit name =
   Persistent_env.crc_of_unit !persistent_env name
 
-let is_imported_opaque modname =
-  Persistent_env.is_imported_opaque !persistent_env modname
+let is_opaque_impl cu =
+  Persistent_env.is_opaque_impl !persistent_env cu
 
-let register_import_as_opaque modname =
-  Persistent_env.register_import_as_opaque !persistent_env modname
+let register_impl_as_opaque cu =
+  Persistent_env.register_impl_as_opaque !persistent_env cu
 
 let is_parameter_unit modname =
   Persistent_env.is_parameter_import !persistent_env modname

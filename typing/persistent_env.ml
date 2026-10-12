@@ -153,7 +153,7 @@ type 'a t = {
     (Global_module.Name.t, 'a pers_struct_info) Hashtbl.t;
   locals_bound_to_runtime_parameters : unit Ident.Tbl.t;
   imported_units: CU.Name.Set.t ref;
-  imported_opaque_units: CU.Name.Set.t ref;
+  imported_opaque_impls: CU.Set.t ref;
   quoted_intfs: CU.Name.Set.t ref;
   quoted_impls: CU.Set.t ref;
   param_imports : Param_set.t ref;
@@ -168,7 +168,7 @@ let empty () = {
   persistent_structures = Hashtbl.create 17;
   locals_bound_to_runtime_parameters = Ident.Tbl.create 17;
   imported_units = ref CU.Name.Set.empty;
-  imported_opaque_units = ref CU.Name.Set.empty;
+  imported_opaque_impls = ref CU.Set.empty;
   quoted_intfs = ref CU.Name.Set.empty;
   quoted_impls = ref CU.Set.empty;
   param_imports = ref Param_set.empty;
@@ -184,7 +184,7 @@ let clear penv =
     persistent_structures;
     locals_bound_to_runtime_parameters;
     imported_units;
-    imported_opaque_units;
+    imported_opaque_impls;
     quoted_intfs;
     quoted_impls;
     param_imports;
@@ -197,7 +197,7 @@ let clear penv =
   Hashtbl.clear persistent_structures;
   Ident.Tbl.clear locals_bound_to_runtime_parameters;
   imported_units := CU.Name.Set.empty;
-  imported_opaque_units := CU.Name.Set.empty;
+  imported_opaque_impls := CU.Set.empty;
   quoted_intfs := CU.Name.Set.empty;
   quoted_impls := CU.Set.empty;
   param_imports := Param_set.empty;
@@ -224,8 +224,8 @@ let rec add_imports_in_name penv (g : Global_module.Name.t) =
   in
   List.iter add_in_arg g.args
 
-let register_import_as_opaque {imported_opaque_units; _} s =
-  imported_opaque_units := CU.Name.Set.add s !imported_opaque_units
+let register_impl_as_opaque {imported_opaque_impls; _} cu =
+  imported_opaque_impls := CU.Set.add cu !imported_opaque_impls
 
 let find_import_info_in_cache {imports; _} import =
   match Hashtbl.find imports import with
@@ -314,14 +314,8 @@ let fold {persistent_structures; _} f x =
 
 (* Reading persistent structures from .cmi files *)
 
-let save_import penv crc modname impl flags filename =
+let save_import penv crc modname impl filename =
   let {crc_units; _} = penv in
-  List.iter
-    (function
-        | Rectypes -> ()
-        | Alerts _ -> ()
-        | Opaque -> register_import_as_opaque penv modname)
-    flags;
   Consistbl.check crc_units modname impl crc filename;
   add_import penv modname
 
@@ -344,7 +338,10 @@ let acknowledge_import penv ~check modname pers_sig =
             if not !Clflags.recursive_types then
               error (Need_recursive_types(modname))
         | Alerts _ -> ()
-        | Opaque -> register_import_as_opaque penv modname)
+        | Opaque ->
+            (match kind with
+             | Normal { cmi_impl; _ } -> register_impl_as_opaque penv cmi_impl
+             | Parameter -> ()))
     flags;
   begin match kind, Current_unit.get_cu () with
   | Normal { cmi_impl = imported_unit }, Some current_unit ->
@@ -736,10 +733,9 @@ and find_pers_name ~allow_hidden penv ~check name ~allow_excess_args =
       let import = find_import ~allow_hidden penv ~check unit_name in
       acknowledge_pers_name penv check name import ~allow_excess_args
 
-let read_pers_name penv check name filename =
-  let unit_name = CU.Name.of_head_of_global_name name in
-  let import = read_import penv ~check unit_name filename in
-  acknowledge_pers_name penv check name import
+let read_pers_name penv check intf filename =
+  let import = read_import penv ~check intf filename in
+  acknowledge_pers_name penv check (CU.Name.to_global_name intf) import
 
 let normalize_global_name penv modname =
   let new_modname =
@@ -804,9 +800,9 @@ let make_binding penv (global : Global_module.t) (impl : CU.t option) : binding 
       match global.visible_args with
       | [] ->
           (* Make sure the names are consistent up to the pack prefix *)
-          assert (Global_module.Name.equal
-                    (unit_from_cmi |> CU.to_global_name_without_prefix)
-                    name);
+          assert (String.equal
+                    (CU.name_as_string unit_from_cmi)
+                    name.head);
           unit_from_cmi
       | _ ->
           (* Make sure the unit isn't supposed to be packed *)
@@ -894,9 +890,9 @@ let acknowledge_pers_struct penv modname pers_name val_of_pers_sig =
     Hashtbl.add persistent_structures modname { ps with ps_canonical = false };
   ps
 
-let read_pers_struct penv check modname cmi =
+let read_pers_struct penv check intf cmi =
   let pers_name =
-    read_pers_name penv check modname cmi ~allow_excess_args:false
+    read_pers_name penv check intf cmi ~allow_excess_args:false
   in
   pers_name.pn_sign
 
@@ -988,8 +984,8 @@ let check_pers_struct ~allow_hidden penv f ~loc name =
       let warn = Warnings.No_cmi_file(name_as_string, Some msg) in
         Location.prerr_warning loc warn
 
-let read penv modname a =
-  read_pers_struct penv true modname a
+let read penv intf a =
+  read_pers_struct penv true intf a
 
 let read_cmi_file penv filename =
   let cmi = read_cmi_lazy filename in
@@ -1132,8 +1128,8 @@ let parameters {param_imports; _} =
 let looked_up {persistent_structures; _} modname =
   Hashtbl.mem persistent_structures modname
 
-let is_imported_opaque {imported_opaque_units; _} s =
-  CU.Name.Set.mem s !imported_opaque_units
+let is_opaque_impl {imported_opaque_impls; _} cu =
+  CU.Set.mem cu !imported_opaque_impls
 
 let make_cmi penv modname kind sign alerts =
   let flags =
@@ -1179,7 +1175,7 @@ let save_cmi penv psig =
       let {
         cmi_name = modname;
         cmi_kind = kind;
-        cmi_flags = flags;
+        _
       } = cmi in
       let crc =
         output_to_file_via_temporary (* see MPR#7472, MPR#4991 *)
@@ -1192,7 +1188,7 @@ let save_cmi penv psig =
         | Normal { cmi_impl } -> Normal cmi_impl
         | Parameter -> Parameter
       in
-      save_import penv crc modname data flags filename
+      save_import penv crc modname data filename
     )
     ~exceptionally:(fun () -> remove_file filename)
 

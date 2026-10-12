@@ -4586,6 +4586,9 @@ let check_argument_type_if_given env sourcefile ~actual_staticity actual_sig
   match arg_module_opt with
   | None -> None
   | Some arg_param ->
+      (* CR-soon zqian: this conversion will not be needed once
+         [Global_module.Parameter_name.t] is an alias of
+         [Compilation_unit.Name.t]. *)
       let arg_import =
         Compilation_unit.Name.of_parameter_name arg_param
       in
@@ -4606,7 +4609,7 @@ let check_argument_type_if_given env sourcefile ~actual_staticity actual_sig
         Unit_info.Artifact.from_filename ~for_pack_prefix arg_filename
       in
       let arg_module = Global_module.Name.of_parameter_name arg_param in
-      let arg_sig, arg_staticity = Env.read_signature arg_module arg_cmi in
+      let arg_sig, arg_staticity = Env.read_signature arg_import arg_cmi in
       if not (Env.is_parameter_unit arg_module) then
         raise (Error (Location.none, env,
                       Argument_for_non_parameter (arg_module, arg_filename)));
@@ -4722,16 +4725,16 @@ let type_implementation target modulename initial_env ast =
           let compiled_intf_file_name =
             Unit_info.Artifact.filename compiled_intf_file
           in
-          let global_name =
-            Compilation_unit.to_global_name_without_prefix modulename
-          in
           let dclsig, staticity =
-            Env.read_signature global_name compiled_intf_file
+            Env.read_signature cu_name compiled_intf_file
           in
-          if Env.is_parameter_unit global_name then
+          let { Persistent_env.imp_is_param; imp_arg_signature; _ } =
+            Env.find_import ~chain:[] cu_name
+          in
+          if imp_is_param then
             error (Cannot_implement_parameter (cu_name, source_intf));
           let arg_type_from_cmi =
-            (Env.find_import ~chain:[] cu_name).Persistent_env.imp_arg_signature
+            imp_arg_signature
             |> Option.map
                  (fun ({ arg_param; _ } : Types.arg_signature) -> arg_param)
           in
@@ -5047,8 +5050,9 @@ let functorize_implementation initial_env ~params ~modules ~module_sigs
         let cmi_artifact =
           Unit_info.Artifact.from_filename ~for_pack_prefix cmi_file
         in
-        let name = Compilation_unit.to_global_name_without_prefix modulename in
-        let dclsig, staticity = Env.read_signature name cmi_artifact in
+        let dclsig, staticity =
+          Env.read_signature (Compilation_unit.name modulename) cmi_artifact
+        in
         let cc, _shape =
           let modes =
             Includecore.Specific
@@ -5114,11 +5118,9 @@ let package_units initial_env objfiles target_cmi modulename =
          let for_pack_prefix = Compilation_unit.to_prefix modulename in
          let artifact = Unit_info.Artifact.from_filename ~for_pack_prefix f in
          let modname = Unit_info.Artifact.modname artifact in
-         let global_name =
-           Compilation_unit.to_global_name_without_prefix modname
-         in
          let sg, _ =
-           Env.read_signature global_name (Unit_info.companion_cmi artifact)
+           Env.read_signature (Compilation_unit.name modname)
+             (Unit_info.companion_cmi artifact)
          in
          if Unit_info.is_cmi artifact &&
             not(Mtype.no_code_needed_sig (Lazy.force Env.initial) sg)
@@ -5147,8 +5149,9 @@ let package_units initial_env objfiles target_cmi modulename =
       raise(Error(Location.in_file mli, Env.empty,
                   Interface_not_compiled mli))
     end;
-    let name = Compilation_unit.to_global_name_without_prefix modulename in
-    let dclsig, staticity = Env.read_signature name target_cmi in
+    let dclsig, staticity =
+      Env.read_signature (Compilation_unit.name modulename) target_cmi
+    in
     (* [-pack] is a corner case feature that doesn't support staticity, so the
        packed [.mli] should not carry a file-level [@@ static]/[@@ dynamic]. *)
     Staticity.submode_err (Location.in_file mli, Module)
