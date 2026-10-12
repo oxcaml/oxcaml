@@ -109,10 +109,10 @@ module rec Definition_id : sig
   (** The hash of the entry position of the function with this id. *)
   val hash : t -> Hash.t
 
-  (** Compare identities structurally, not by hash. *)
+  (** Structural equality. *)
   val equal : t -> t -> bool
 
-  (** Canonical, unambiguous spelling for metadata and dumps. *)
+  (** Canonical string representation for metadata and dumps. *)
   val to_string : t -> string
 end
 
@@ -140,7 +140,6 @@ and Position : sig
   (** [None] for function entries and named module instantiations. *)
   val function_body_hash : t -> Function_body_hash.t option
 
-  (** Whether this position denotes a function entry. *)
   val is_function_entry : t -> bool
 
   (** The tagged hash used in metadata and profiles. *)
@@ -149,7 +148,7 @@ and Position : sig
   (** Structural equality. *)
   val equal : t -> t -> bool
 
-  (** Canonical, unambiguous spelling for metadata and dumps. *)
+  (** Canonical string representation for metadata and dumps. *)
   val to_string : t -> string
 
   (** The position corresponding to [t] in a copy of its definition. [at] is the

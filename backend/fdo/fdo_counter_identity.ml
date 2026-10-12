@@ -75,52 +75,45 @@ end
    on-disk format: changing one changes every hash. *)
 module Tag = struct
   type t =
-    | Then
-    | Else
     | Callsite
-    | Switch_case
+    | Branch
     | Original
     | Specialized
     | Interior
     | Instantiation_site
 
   let to_int = function
-    | Then -> 0
-    | Else -> 1
-    | Callsite -> 2
-    | Switch_case -> 3
-    | Original -> 4
-    | Specialized -> 5
-    | Interior -> 6
-    | Instantiation_site -> 7
+    | Callsite -> 0
+    | Branch -> 1
+    | Original -> 2
+    | Specialized -> 3
+    | Interior -> 4
+    | Instantiation_site -> 5
 end
 
 let prehash_node tag components =
   Fdo_prehash.node ~tag:(Tag.to_int tag) components
 
 module Edge = struct
+  (* CR yusumez: The prototype also contains [Then] and [Else] as separate
+     variants, which can be represented as [Branch 0] and [Branch 1]. Keep this
+     in mind as the prototype is implemented. *)
   type t =
-    | Then
-    | Else
-    | Switch_case of int
+    | Branch of int
     | Callsite
 
   let prehash = function
-    | Then -> prehash_node Tag.Then []
-    | Else -> prehash_node Tag.Else []
+    | Branch n -> prehash_node Tag.Branch [Fdo_prehash.of_int n]
     | Callsite -> prehash_node Tag.Callsite []
-    | Switch_case n -> prehash_node Tag.Switch_case [Fdo_prehash.of_int n]
 
   let equal a b =
     match a, b with
-    | Then, Then | Else, Else | Callsite, Callsite -> true
-    | Switch_case a, Switch_case b -> Int.equal a b
-    | (Then | Else | Callsite | Switch_case _), _ -> false
+    | Callsite, Callsite -> true
+    | Branch a, Branch b -> Int.equal a b
+    | (Callsite | Branch _), _ -> false
 
   let to_string = function
-    | Then -> "then"
-    | Else -> "else"
-    | Switch_case n -> Printf.sprintf "case(%d)" n
+    | Branch n -> Printf.sprintf "branch(%d)" n
     | Callsite -> "call"
 end
 
@@ -282,8 +275,7 @@ module Position = struct
         (fun unspecialized specialization_site ->
           (match specialization_site with
           | Interior { edge = Callsite; _ } | Instantiation_site _ -> ()
-          | Function_entry _
-          | Interior { edge = Then | Else | Switch_case _; _ } ->
+          | Function_entry _ | Interior { edge = Branch _; _ } ->
             Misc.fatal_errorf "Fdo_counter.specialize: %s is not a call site"
               (position_to_string specialization_site));
           Definition_id.create_specialized ~unspecialized ~specialization_site)
