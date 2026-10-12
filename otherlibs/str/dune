@@ -14,6 +14,10 @@
 
 (library
  (name str)
+ ; Public in the main context only, like unix (see otherlibs/unix/dune).
+ (public_name str)
+ (enabled_if
+  (= %{context_name} main))
  (wrapped false)
  (modes byte native)
  (flags (

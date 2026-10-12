@@ -259,12 +259,6 @@ ppxlib_private_deps = external/ppxlib/oxcaml-private
 # library archives in the installed dune-package files.
 ws_ast_dependent_libs = --root=$(ast_dependent_libs_root) \
   --workspace=$(CURDIR)/duneconf/ast-dependent-libs.ws
-# js_of_ocaml's dune-workspace sets up its test aliases, but is only read by
-# default when js_of_ocaml is the dune root.
-ws_jsoo_test = --root=$(ast_dependent_libs_root) \
-  --workspace=$(CURDIR)/external/js_of_ocaml/dune-workspace \
-  --profile=with-effects \
-  --build-dir=$(CURDIR)/_build/jsoo-test
 
 define dune_ast_dependent_libs_context
 (lang dune 3.23)
@@ -412,12 +406,22 @@ jsoo-install-shipped: boot-compiler $(PPXLIB_DEPS) $(JSOO_DEPS)
 	$(dune) install $(ws_main) --prefix="$(AST_DEPENDENT_LIBS_PREFIX)" \
 	  --sections=$(SHIPPED_LIB_SECTIONS) $(SHIPPED_LIB_PACKAGES)
 
+# The tests run in the compiler build too, against the js_of_ocaml it ships
+# (the main context sets up what js_of_ocaml's dune-workspace does). The nix
+# oxcaml package runs them in its check phase. The programs the tests compile
+# with ocamlc, some of which use unix, are compiled with the local _install.
+# Their expected outputs assume that OCAMLRUNPARAM does not ask for backtraces.
+# Like `make test`, this installs the compiler: the bytecode executables of the
+# tests refer to the installed ocamlrun.
 .PHONY: jsoo-test
-jsoo-test: ast-dependent-libs-compiler \
-  $(PPXLIB_DEPS) $(JSOO_DEPS) $(JSOO_TEST_DEPS)
-	PROJECT_ROOT="$(CURDIR)/_build/jsoo-test/default/js_of_ocaml" \
+jsoo-test: install $(PPXLIB_DEPS) $(JSOO_DEPS) $(JSOO_TEST_DEPS)
+	PROJECT_ROOT="$(CURDIR)/_build/main/$(ast_dependent_libs_root)/js_of_ocaml" \
+	OCAMLC="env OCAMLLIB=$(CURDIR)/_install/lib/ocaml $(CURDIR)/_install/bin/ocamlc.opt" \
+	CAML_LD_LIBRARY_PATH="$(CURDIR)/_install/lib/ocaml/stublibs" \
 	WASM_OF_OCAML=true \
-	  $(ast_dependent_libs_dune) $(ws_jsoo_test) @jsoo-test
+	  env -u OCAMLRUNPARAM \
+	  $(dune) build $(ws_main) --promote-install-files=false \
+	  @@$(ast_dependent_libs_root)/jsoo-test
 
 .PHONY: fmt
 fmt: $(dune_config_targets)

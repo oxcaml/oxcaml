@@ -83,10 +83,14 @@ nix develop --command make jsoo-test
 ```
 
 This runs the core compiler/property tests, PPX harness tests, and library
-and runtime regressions for JS and Wasm, using the upstream CPS profile
-(the `@jsoo-test` alias in `external/ast-dependent-libs/dune`). Test builds live in
-`_build/jsoo-test`; test dependencies are also built from source with
-OxCaml. Failures are not automatically promoted.
+and runtime regressions for JS and Wasm (the `@jsoo-test` alias in
+`external/ast-dependent-libs/dune`), in the main context of the compiler
+build, against the js_of_ocaml it ships. The main context sets up what
+js_of_ocaml's `dune-workspace` and CPS profile do (see `Makefile.common-ox`);
+the programs the tests compile with `ocamlc` are compiled with the local
+`_install`. Test dependencies are also built from source with OxCaml.
+Failures are not automatically promoted. The Nix `oxcaml` package runs these
+tests in its check phase, so a failure fails the compiler package.
 
 Optional-package integrations, browsers, native Wasm effects and C/Wasm
 runtime regeneration are outside this target. Run compiler regressions
