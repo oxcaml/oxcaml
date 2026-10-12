@@ -255,12 +255,21 @@ let normalize_step t =
     in
     let failures = ref [] in
     let warning failure = failures := failure :: !failures in
+    (* Compiler flags that must be ignored here rather than via
+       [ocaml_ignored_parametrized_flags], because they clash with flags of
+       merlin commands (e.g. [jump -target]). [arguments_table] takes
+       precedence over command-local flags, so adding them there would shadow
+       the command's flag. *)
+    let config_only_ignored_flags =
+      [ ("-target", "", Marg.param_ignore) ]
+    in
     let t =
       List.fold_left
         ~f:(fun t { workdir; workval } ->
           fst
             (let_ref cwd (Some workdir)
-               (Marg.parse_all ~warning arguments_table [] workval t)))
+               (Marg.parse_all ~warning arguments_table
+                  config_only_ignored_flags workval t)))
         ~init:t flagss
     in
     { t with
@@ -921,7 +930,6 @@ let ocaml_ignored_parametrized_flags =
     "-save-ir-after";
     "-X";
     "-dissector-max-linker-parallelism";
-    "-target";
     "-jsoo-opt";
     "-jsoo-opt-compile";
     "-jsoo-opt-archive";
