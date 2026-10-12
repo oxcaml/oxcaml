@@ -35,9 +35,22 @@ val create :
   exn_continuation:Continuation.t ->
   my_region:Region_stack_element.t option ->
   my_alloc_region:Ident.t ->
+  fdo_function_path:string ->
+  fdo_function_occurrences:int Misc.Stdlib.String.Tbl.t ->
   t
 
 val current_unit : t -> Compilation_unit.t
+
+(** The scope path of the FDO identity (see [Fdo_fingerprint]) of the currently
+    translated function *)
+val fdo_function_path : t -> string
+
+(** The number of functions already given each path within the current unit.
+    Discriminators count functions with the same path independently of their
+    bodies, so an edit does not change a function's identity. *)
+val fdo_function_occurrences : t -> int Misc.Stdlib.String.Tbl.t
+
+val fresh_fdo_function_occurrence : t -> path:string -> int
 
 val machine_width : t -> Target_system.Machine_width.t
 
