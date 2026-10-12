@@ -338,6 +338,10 @@ struct stack_info* caml_alloc_stack_noexc(mlsize_t wosize, value hval,
    returns nonzero on success */
 CAMLextern int caml_try_realloc_stack (asize_t required_wsize);
 
+/* Flushes cached fiber state (currently dynamic bindings and TLS state).
+   Should be called after every fiber switch. */
+CAMLextern void caml_fiber_switched(void);
+
 /* Parameters settable with OCAMLRUNPARAM */
 extern uintnat caml_init_main_stack_wsz;   /* -Xmain_stack_size= */
 extern uintnat caml_init_thread_stack_wsz; /* -Xthread_stack_size= */

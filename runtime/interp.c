@@ -627,8 +627,7 @@ value caml_bytecode_interpreter(code_t prog, asize_t prog_size,
         domain_state->current_stack = parent_stack;
         sp = domain_state->current_stack->sp;
         caml_free_stack(old_stack);
-        caml_dynamic_cache_flush(domain_state->dynamic_bindings);
-        caml_tls_update_cache();
+        caml_fiber_switched();
 
         domain_state->trap_sp_off = Long_val(sp[0]);
         extra_args = Long_val(sp[1]);
@@ -1048,8 +1047,7 @@ value caml_bytecode_interpreter(code_t prog, asize_t prog_size,
           old_stack->sp = sp;
           domain_state->current_stack = parent_stack;
           sp = domain_state->current_stack->sp;
-          caml_dynamic_cache_flush(domain_state->dynamic_bindings);
-          caml_tls_update_cache();
+          caml_fiber_switched();
           caml_free_stack(old_stack);
 
           domain_state->trap_sp_off = Long_val(sp[0]);
@@ -1358,8 +1356,7 @@ do_resume: {
       domain_state->current_stack->sp = sp;
       domain_state->current_stack = stk;
       sp = domain_state->current_stack->sp;
-      caml_dynamic_cache_flush(domain_state->dynamic_bindings);
-      caml_tls_update_cache();
+      caml_fiber_switched();
 
       domain_state->trap_sp_off = Long_val(sp[0]);
       switch (resume_action) {
@@ -1512,8 +1509,7 @@ do_resume: {
 
       old_stack->sp = sp;
       domain_state->current_stack = parent_stack;
-      caml_dynamic_cache_flush(domain_state->dynamic_bindings);
-      caml_tls_update_cache();
+      caml_fiber_switched();
       sp = parent_stack->sp;
       Stack_parent(old_stack) = NULL;
       Field(cont, 0) = Val_ptr(old_stack);
@@ -1560,8 +1556,7 @@ do_resume: {
       self->sp = sp;
       domain_state->current_stack = parent;
       sp = parent->sp;
-      caml_dynamic_cache_flush(domain_state->dynamic_bindings);
-      caml_tls_update_cache();
+      caml_fiber_switched();
 
       CAMLassert(Stack_parent(cont_tail) == NULL);
       Stack_parent(self) = NULL;

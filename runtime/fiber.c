@@ -1253,6 +1253,12 @@ void caml_tls_update_cache(void)
     caml_tls_find_owner(Caml_state->current_stack)->tls_state;
 }
 
+void caml_fiber_switched(void)
+{
+  caml_dynamic_cache_flush(Caml_state->dynamic_bindings);
+  caml_tls_update_cache();
+}
+
 void caml_free_gc_regs_buckets(value *gc_regs_buckets)
 {
   while (gc_regs_buckets != NULL) {
