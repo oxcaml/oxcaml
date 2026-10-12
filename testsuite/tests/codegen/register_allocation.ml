@@ -8,6 +8,7 @@
  only-default-codegen;
  flags = " -O3 -I ocamlopt.opt";
  flags += " -experimental-optimizations";
+ flags += " -g -gdwarf-inlined-frames";
  expect.opt;
 *)
 
@@ -166,7 +167,7 @@ spill_unspill_loop_movement:
   movq  %rbx, %rax
   cmpq  $3, %rax
   jl    .L4
-  movq  %rdi, 32(%rsp)
+  movq  %rdi, 24(%rsp)
   movq  %rax, %rbx
   movq  %rax, (%rsp)
   sarq  $1, %rbx
@@ -184,19 +185,19 @@ spill_unspill_loop_movement:
   movq  16(%rsp), %rbx
   cmpq  $11, %rsi
   jle   .L3
-  movq  %rdx, 24(%rsp)
+  movq  %rdx, 32(%rsp)
   movq  %rdi, 8(%rsp)
   call  camlTOP9__f_11_23_code@PLT
 .L2:
   movq  (%rsp), %rax
   movq  8(%rsp), %rdi
-  movq  24(%rsp), %rdx
+  movq  32(%rsp), %rdx
   movq  16(%rsp), %rbx
 .L3:
   incq  %rdi
   cmpq  %rbx, %rdi
   jle   .L0
-  movq  32(%rsp), %rdi
+  movq  24(%rsp), %rdi
   jmp   .L5
 .L4:
   movl  $1, %edx
@@ -408,11 +409,11 @@ double_loop_no_definition_at_beginning.f:
   movl  $1, %eax
   ret
 .L0:
+  subq  $8, %rsp
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L1:
 |}]
 
 

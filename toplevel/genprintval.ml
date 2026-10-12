@@ -464,7 +464,16 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
           | Tarrow _ ->
               Oval_stuff "<fun>"
           | Ttuple(labeled_tys) ->
-              Oval_tuple (tree_of_labeled_val_list 0 depth obj labeled_tys)
+              let field_types () = List.map snd labeled_tys in
+              begin match outval_rep_of_field_types env field_types with
+              | None -> Oval_stuff "<abstr>"
+              | Some rep ->
+                  Oval_tuple
+                    (List.mapi
+                       (fun i (label, ty) ->
+                          label, tree_of_field rep obj i depth ty)
+                       labeled_tys)
+              end
           | Tunboxed_tuple(labeled_tys) ->
               Oval_unboxed_tuple
                 (tree_of_labeled_val_list 0 depth obj labeled_tys)
@@ -853,23 +862,23 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                else
                  O.field obj pos)
         | Outval_record_mixed shape ->
-            (* Only native code reorders a mixed block's fields; bytecode lays
-               them out uniformly. *)
-            if not !Clflags.native_code then nested (O.field obj pos)
-            else begin
-              match
-                Mixed_block_shape.Field_for_printing.of_shape shape ~index:pos
-              with
-              | Void -> Oval_stuff "<void>"
-              | Unboxed_product -> Oval_stuff "<abstr>"
-              | Singleton { element; offset_in_words } ->
-                  match element with
-                  | Value _ -> nested (O.field obj offset_in_words)
-                  | Float_boxed () | Float64 ->
-                      nested (O.repr (O.double_field obj offset_in_words))
-                  | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
-                  | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
-                      Oval_stuff "<abstr>"
+            begin match
+              Mixed_block_shape.Field_for_printing.of_shape shape ~index:pos
+            with
+            | Void -> Oval_stuff "<void>"
+            | Unboxed_product | Singleton _ when not !Clflags.native_code ->
+                (* Only native code reorders a mixed block's fields; bytecode
+                   lays them out uniformly. *)
+                nested (O.field obj pos)
+            | Unboxed_product -> Oval_stuff "<abstr>"
+            | Singleton { element; offset_in_words } ->
+                match element with
+                | Value _ -> nested (O.field obj offset_in_words)
+                | Float_boxed () | Float64 ->
+                    nested (O.repr (O.double_field obj offset_in_words))
+                | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
+                | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
+                    Oval_stuff "<abstr>"
             end
 
       (* CR lmaurer: *Pretty please* let's cut down on the duplication here. *)

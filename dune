@@ -658,6 +658,7 @@
   cfg_available_regs
   cfg_colours
   cfg_compare
+  cfg_copy_propagation
   cfg_edge
   cfg_intf
   cfg_quick_hash
@@ -669,14 +670,19 @@
   cfg_dataflow
   cfg_deadcode
   cfg_liveness
+  cfg_validation_facts
+  cfg_liveness_validate
   cfg_dominators
+  cfg_dominators_validate
   cfg_loop_infos
   cfg_to_linear_desc
   cfg_cse
   cfg_cse_target_intf
+  cfg_reachability_validate
   cfg_stack_checks
   cfg_polling
   cfg_simplify
+  cfg_z3
   cfg_prologue
   cfg_merge_blocks
   cfg_block_layout
@@ -771,6 +777,7 @@
   oxcaml_common
   flambda2_identifiers
   flambda2_cmx
+  flambda2_datalog
   compiler_owee
   gc_timings
   arm64_ast

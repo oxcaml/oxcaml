@@ -8,6 +8,7 @@
  only-default-codegen;
  flags = " -O3 -I ocamlopt.opt";
  flags += " -experimental-optimizations";
+ flags += " -g -gdwarf-inlined-frames";
  expect.opt;
 *)
 
@@ -266,6 +267,7 @@ int32_box_unbox_after_call:
   movq  %rbx, %rsi
   call  memcmp@PLT
   movslq %eax, %rax
+  movslq %eax, %rax
   addq  $8, %rsp
   ret
 |}]
@@ -411,13 +413,12 @@ let branch_or_tailcall x =
 [%%expect_asm X86_64{|
 branch_or_tailcall:
   cmpq  $5, %rax
-  jbe   .L0
+  jbe   .L1
+  subq  $8, %rsp
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  call  caml_reraise_exn@PLT
 .L0:
+.L1:
   movq  <hidden PC-relative offset>(%rip), %rbx
   movq  -4(%rbx,%rax,4), %rax
   ret
@@ -432,9 +433,8 @@ let shift_of_logand (a : int64_u) =
 ;;
 [%%expect_asm X86_64{|
 shift_of_logand:
-  movl  $1, %ebx
   movq  %rax, %rcx
-  andq  %rbx, %rcx
+  andl  $1, %ecx
   movl  $3, %eax
   shrq  %cl, %rax
   orq   $1, %rax

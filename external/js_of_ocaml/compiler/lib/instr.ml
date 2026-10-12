@@ -180,6 +180,7 @@ type t =
   | MAKE_FAUX_MIXEDBLOCK
   | WITH_STACK
   | WITH_STACK_PREEMPTIBLE
+  | NEXT_RESERVED_BITS
   | FIRST_UNIMPLEMENTED_OP
 
 let equal (a : t) b = Poly.equal a b
@@ -207,9 +208,7 @@ type desc =
   ; opcode : int
   }
 
-let if_oxcaml k = k [@@if oxcaml]
-
-let if_oxcaml _ = K_will_not_happen [@@if not oxcaml]
+let if_oxcaml k = if Config.oxcaml then k else K_will_not_happen
 
 let ops =
   let if_v500 =
@@ -377,7 +376,9 @@ let ops =
        , if_oxcaml (KStop 1)
        , "DISCONTINUE_WITH_BACKTRACETERM" )
      ; REPERFORMTERM, if_v500 (KStop 1), "REPERFORMTERM"
-     ; MAKE_FAUX_MIXEDBLOCK, if_oxcaml KBinary, "MAKE_FAUX_MIXEDBLOCK"
+     ; (if Config.introspect
+        then NEXT_RESERVED_BITS, KUnary, "NEXT_RESERVED_BITS"
+        else MAKE_FAUX_MIXEDBLOCK, if_oxcaml KBinary, "MAKE_FAUX_MIXEDBLOCK")
      ; WITH_STACK, if_oxcaml KNullaryCall, "WITH_STACK"
      ; WITH_STACK_PREEMPTIBLE, if_oxcaml KNullaryCall, "WITH_STACK_PREEMPTIBLE"
      ; FIRST_UNIMPLEMENTED_OP, K_will_not_happen, "FIRST_UNIMPLEMENTED_OP"

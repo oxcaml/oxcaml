@@ -1,6 +1,7 @@
 (* TEST
  flags += " -O3";
  only-stack-checks-codegen;
+ flags += " -g -gdwarf-inlined-frames";
  expect.opt;
 *)
 

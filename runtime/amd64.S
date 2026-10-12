@@ -1874,6 +1874,7 @@ G(caml_absf32_mask):
 
         NONEXECSTACK_NOTE
 
+#ifndef SYS_macosx
 /* Record effect machinery branch offsets for magic trace */
 .pushsection .note.ocaml_eff,"?",%note
 .balign 4
@@ -1897,3 +1898,4 @@ LBL(ocaml_eff_desc):
 LBL(ocaml_eff_desc_end):
         .balign 4
 .popsection
+#endif

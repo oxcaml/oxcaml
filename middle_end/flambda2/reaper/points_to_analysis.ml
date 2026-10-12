@@ -136,12 +136,12 @@
    # Local fields
 
    Fields that are value slots or function slots originating from the current
-   compilation unit are said to be *local*. Local fields are special, because we
+   analysis scope are said to be *local*. Local fields are special, because we
    know all the places they are used: any constructor or accessor to a local
-   field in a different compilation unit comes necessarily from inlining such a
-   use from the current compilation unit, or type-based changed from the types
-   exported by the current compilation unit. As such, we can perform a much more
-   precise analysis on them.
+   field in a compilation unit outside the scope comes necessarily from inlining
+   such a use from a unit of the scope, or type-based changed from the types
+   exported by a unit of the scope. As such, we can perform a much more precise
+   analysis on them.
 
    Thus, let us assume we have a block $a$, with a local field $f$ containing a
    value $u$, and a block $b$, from which we read a value $v$ from the field
@@ -262,8 +262,8 @@ module Relations = struct
     fun ~base relation ~from -> tbl % [base; relation; from]
 
   (* Local fields are value and function slots that originate from the current
-     compilation unit. As such, all sources and usages from these fields will
-     necessarily correspond to either code in the current compilation unit, or a
+     analysis scope. As such, all sources and usages from these fields will
+     necessarily correspond to either code in the current analysis scope, or a
      resimplified version of it.
 
      The consequence of this is that we can consider them not to have
@@ -280,15 +280,19 @@ module Relations = struct
 
   let nontop_sources x y = `Only_if ([~~(any_source x)], sources x y)
 
+  let has_usage_tbl = Datalog.create_relation ~name:"has_usage" Cols.[n]
+
   (* [has_usage x] means that [x] must continue to exist at runtime, that is,
      either it has [any_usage], or some field of [x] is itself [has_usage]. *)
-  let has_usage = rel1 "has_usage" Cols.[n]
+  let has_usage x = has_usage_tbl % [x]
+
+  let has_source_tbl = Datalog.create_relation ~name:"has_source" Cols.[n]
 
   (* [has_source x] means that [x] can have been created at runtime.
      Unfortunately due to limitations of the datalog engine, it means that
      either [x] is [any_source], or that at least one field of [x] (instead of
      all fields of [x], which would be the exact answer) is [has_source]. *)
-  let has_source = rel1 "has_source" Cols.[n]
+  let has_source x = has_source_tbl % [x]
 
   let field_of_constructor_is_used_tbl =
     Datalog.create_relation ~name:"field_of_constructor_is_used" Cols.[n; f]
@@ -335,6 +339,13 @@ open! Relations
    used. We also perform a reverse analysis that computes where each value can
    come from: either an arbitrary source (for use and values coming from outside
    the compilation unit), or a given constructor. *)
+
+(* The analysis scope of the rules below. It is set before running them rather
+   than passed as a parameter, so that the schedules are not rebuilt on each
+   run. *)
+let current_analysis_scope = ref Analysis_scope.Current_unit
+
+let is_local field = Analysis_scope.is_local_field !current_analysis_scope field
 
 module Datalog_schedule = struct
   (* Group rules by priority. Rules with (let$) are executed first, then the
@@ -394,7 +405,7 @@ module Datalog_schedule = struct
       (let$$ [base; base_use; relation; from; to_] =
          ["base"; "base_use"; "relation"; "from"; "to_"]
        in
-       [ when1 Field.is_local relation;
+       [ when1 is_local relation;
          constructor ~base relation ~from;
          usages base base_use;
          rev_accessor ~base:base_use relation ~to_ ]
@@ -416,7 +427,7 @@ module Datalog_schedule = struct
       (let$$ [base; base_source; relation; to_; from] =
          ["base"; "base_source"; "relation"; "to_"; "from"]
        in
-       [ when1 Field.is_local relation;
+       [ when1 is_local relation;
          rev_accessor ~base relation ~to_;
          sources base base_source;
          constructor ~base:base_source relation ~from ]
@@ -450,6 +461,16 @@ module Datalog_schedule = struct
       (let$$ [from; relation; base] = ["from"; "relation"; "base"] in
        [has_source from; rev_constructor ~from relation ~base]
        ==> has_source base);
+      (* Since a block is said to have a source if one of its fields has a
+         source, where the real condition (but harder to express in datalog)
+         should be that it has a source if all of its non-function-slot fields
+         have a source, we need to force [has_source] for sets of closures,
+         otherwise sets of closures with no value slots and only deleted
+         code_ids will miss their has_source. *)
+      (let$$ [from; relation; base] = ["from"; "relation"; "base"] in
+       [ rev_constructor ~from relation ~base;
+         when1 Field.is_function_slot relation ]
+       ==> has_source base);
       (let$$ [to_; relation; base] = ["to_"; "relation"; "base"] in
        [has_usage to_; rev_parameter ~to_ relation ~base] ==> has_source base)
     ]
@@ -462,7 +483,7 @@ module Datalog_schedule = struct
       (let$ [base; relation; from] = ["base"; "relation"; "from"] in
        [ any_usage base;
          constructor ~base relation ~from;
-         unless1 Field.is_local relation ]
+         unless1 is_local relation ]
        ==> any_usage from);
       (let$ [base; relation; from] = ["base"; "relation"; "from"] in
        [any_source base; rev_argument ~base relation ~from] ==> any_usage from)
@@ -471,6 +492,8 @@ module Datalog_schedule = struct
   let any_source_rules =
     [ (let$ [x] = ["x"] in
        [zero_alloc_source x] ==> any_source x);
+      (let$ [if_used; x] = ["if_used"; "x"] in
+       [any_usage if_used; any_source_if_used ~if_used x] ==> any_source x);
       (let$ [from; to_] = ["from"; "to_"] in
        [rev_alias ~from ~to_; any_source from] ==> any_source to_);
       (let$ [base; relation; to_] = ["base"; "relation"; "to_"] in
@@ -478,7 +501,7 @@ module Datalog_schedule = struct
       (let$ [base; relation; to_] = ["base"; "relation"; "to_"] in
        [ any_source base;
          rev_accessor ~base relation ~to_;
-         unless1 Field.is_local relation ]
+         unless1 is_local relation ]
        ==> any_source to_);
       (let$ [from; to_] = ["from"; "to_"] in
        [has_source from; rev_use ~from ~to_] ==> any_source to_) ]
@@ -505,12 +528,12 @@ module Datalog_schedule = struct
     [ (let$ [base; relation; from] = ["base"; "relation"; "from"] in
        [ any_usage base;
          constructor ~base relation ~from;
-         when1 Field.is_local relation ]
+         when1 is_local relation ]
        ==> escaping_field relation from);
       (let$ [base; relation; to_] = ["base"; "relation"; "to_"] in
        [ any_source base;
          rev_accessor ~base relation ~to_;
-         when1 Field.is_local relation ]
+         when1 is_local relation ]
        ==> reading_field relation to_) ]
 
   let zero_alloc_rules =
@@ -894,7 +917,7 @@ let post_processing_rules =
     [ (let$ [base; relation; from] = ["base"; "relation"; "from"] in
        [ constructor ~base relation ~from;
          any_usage base;
-         unless1 Field.is_local relation ]
+         unless1 is_local relation ]
        ==> and_
              [ field_of_constructor_is_used base relation;
                field_of_constructor_is_used_top base relation ]);
@@ -939,7 +962,7 @@ let post_processing_rules =
        in
        [ constructor ~base relation ~from;
          sources usage base;
-         when1 Field.is_local relation;
+         when1 is_local relation;
          any_usage base;
          rev_accessor ~base:usage relation ~to_:v;
          has_usage v ]
@@ -951,7 +974,7 @@ let post_processing_rules =
        in
        [ constructor ~base relation ~from;
          sources usage base;
-         when1 Field.is_local relation;
+         when1 is_local relation;
          any_usage base;
          rev_accessor ~base:usage relation ~to_:v;
          any_usage v ]
@@ -989,7 +1012,8 @@ let post_processing_rules =
 
 let has_source_query db x = has_source_query [x] db
 
-let perform_analysis db ~stats =
+let perform_analysis db ~stats ~analysis_scope =
+  current_analysis_scope := analysis_scope;
   let db =
     Profile.record_call ~accumulate:true "analysis" (fun () ->
         Datalog.Schedule.run ~stats datalog_schedule db)
@@ -1111,36 +1135,33 @@ let cofield_has_use :
      in
      One.to_bool out)
 
-let rec arguments_used_by_call db ep callee_sources grouped_args =
-  match grouped_args with
+let rec arguments_used_by_call db ep callee_sources num_args =
+  match num_args with
   | [] -> []
-  | first_arg_group :: grouped_args_rest -> (
+  | num_first_arg :: num_args_rest -> (
     match callee_sources with
-    | Any_source -> List.map (List.map (fun x -> x, Keep)) grouped_args
+    | Any_source -> List.map (fun n -> List.init n (fun _ -> Keep)) num_args
     | Sources callee_sources -> (
       let witness_sources =
         get_field_sources db callee_sources (Field.call_witness ep)
       in
       match witness_sources with
-      | Any_source -> List.map (List.map (fun x -> x, Keep)) grouped_args
+      | Any_source -> List.map (fun n -> List.init n (fun _ -> Keep)) num_args
       | Sources witness_sources ->
         let first_arg_group =
-          List.mapi
-            (fun i x ->
-              ( x,
-                if cofield_has_use db witness_sources (Cofield.param i)
-                then Keep
-                else Delete ))
-            first_arg_group
+          List.init num_first_arg (fun i ->
+              if cofield_has_use db witness_sources (Cofield.param i)
+              then Keep
+              else Delete)
         in
         let grouped_args_rest =
-          match grouped_args_rest with
+          match num_args_rest with
           | [] -> [] (* Avoid computing sources of result if no more args *)
           | _ :: _ ->
             arguments_used_by_call db ep
               (get_field_sources db witness_sources
                  (Field.normal_return_of_call 0))
-              grouped_args_rest
+              num_args_rest
         in
         first_arg_group :: grouped_args_rest))
 

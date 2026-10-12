@@ -37,7 +37,7 @@ type transl_value_decl_modal =
   (** A primitive in structure, in which case the modality syntax is treated as
     modes, and the returned value description will have empty modalities. *)
   (* CR zqian: avoid the above hack *)
-  | Sig_value of Mode.With_regionality.l * Mode.Modality.Const.t
+  | Sig_value of Mode.With_regionality.Const.t * Mode.Modality.Const.t
   (** A value description in a signature, in which case we require the mode of
       the structure that the value lives in, as well as the default modalities
       of the signature. *)
@@ -48,7 +48,7 @@ val transl_value_decl:
     Env.t -> modal:transl_value_decl_modal ->
     why:Jkind.History.concrete_creation_reason -> Location.t ->
     Parsetree.value_description ->
-    Typedtree.value_description * Mode.With_regionality.l * Env.t
+    Typedtree.value_description * Mode.With_regionality.Const.t * Env.t
 
 (* If the [fixed_row_path] optional argument is provided,
    the [Parsetree.type_declaration] argument should satisfy [is_fixed_type] *)
@@ -132,7 +132,7 @@ val compute_block_shape :
     Env.t -> type_expr list ->
     [ `Not_mixed | `Mixed of mixed_product_shape | `Undetermined ]
 
-type native_repr_kind = Unboxed | Untagged | Unpacked
+type native_repr_kind = Unboxed | Untagged | Unpacked | Unsafe_unextended
 
 (* Records reason for a jkind representability requirement in errors. *)
 type jkind_sort_loc =
@@ -160,6 +160,7 @@ module Mixed_product_kind : sig
     | Cstr_record
     | Module
     | Block
+    | Tuple
 end
 
 val assert_mixed_product_support :

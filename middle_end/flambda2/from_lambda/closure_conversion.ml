@@ -1320,16 +1320,12 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Patomic_load_idx _ | Patomic_set_idx _ | Patomic_exchange_idx _
       | Patomic_compare_exchange_idx _ | Patomic_compare_set_idx _
       | Patomic_fetch_add_idx | Patomic_add_idx | Patomic_sub_idx
-      | Patomic_land_idx | Patomic_lor_idx | Patomic_lxor_idx
-      | Patomic_load_ptr _ | Patomic_set_ptr _ | Patomic_exchange_ptr _
-      | Patomic_compare_exchange_ptr _ | Patomic_compare_set_ptr _
-      | Patomic_fetch_add_ptr | Patomic_add_ptr | Patomic_sub_ptr
-      | Patomic_land_ptr | Patomic_lor_ptr | Patomic_lxor_ptr | Pdls_get
+      | Patomic_land_idx | Patomic_lor_idx | Patomic_lxor_idx | Pdls_get
       | Ptls_get | Pdomain_index | Ppoll | Patomic_load_field _
       | Patomic_load_mixed_field _ | Patomic_set_field _
       | Patomic_set_mixed_field _ | Preinterpret_tagged_int63_as_unboxed_int64
       | Preinterpret_unboxed_int64_as_tagged_int63 | Ppeek _ | Ppoke _
-      | Pscalar _ | Pphys_equal _ | Pcpu_relax ->
+      | Pscalar _ | Pphys_equal _ | Pcpu_relax | Pbox _ | Punbox _ ->
         (* Inconsistent with outer match *)
         assert false
     in
@@ -3509,7 +3505,11 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
   let function_slot =
     Function_slot.create
       (Current_unit.get_cu_exn ())
-      ~name:(Ident.name wrapper_id) ~is_always_immediate:false K.value
+      ~name:(Ident.name wrapper_id)
+      ~size:
+        (Function_slot.size_from_arity
+           ~num_complex_params:(Flambda_arity.num_params missing_arity)
+           ~is_tupled:false)
   in
   let num_provided = Flambda_arity.num_params provided_arity in
   let missing_arity_and_param_modes =

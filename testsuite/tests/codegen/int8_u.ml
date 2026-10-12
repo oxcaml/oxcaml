@@ -8,6 +8,7 @@
  only-default-codegen;
  flags = " -O3 -I ocamlopt.opt";
  flags += " -experimental-optimizations";
+ flags += " -g -gdwarf-inlined-frames";
  expect.opt;
 *)
 
@@ -122,6 +123,15 @@ bit_xor:
   ret
 |}]
 
+let bit_not x = Int8_u.bit_xor x (-#1s)
+[%%expect_asm X86_64{|
+bit_not:
+  salq  $56, %rax
+  sarq  $56, %rax
+  xorq  $-1, %rax
+  ret
+|}]
+
 let bswap x = Int8_u.bswap x
 [%%expect_asm X86_64{|
 bswap:
@@ -167,11 +177,11 @@ div:
   sarq  $56, %rax
   ret
 .L0:
+  subq  $8, %rsp
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L1:
 |}]
 
 let rem x y = Int8_u.rem x y
@@ -187,11 +197,11 @@ rem:
   sarq  $56, %rax
   ret
 .L0:
+  subq  $8, %rsp
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L1:
 |}]
 
 let unsafe_div x y = Int8_u.unsafe_div x y

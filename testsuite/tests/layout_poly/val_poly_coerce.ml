@@ -708,7 +708,8 @@ module type M_ab = sig val poly_ f : 'a -> 'b end
 module type M_aa = sig val poly_ f : 'a -> 'a end
 module type M_aF = sig val poly_ f : ('b : float64). 'a -> 'b end
 module type M_FF = sig val f : ('a : float64). 'a -> 'a end
-module type M_aa' = sig val f : layout_ l l0. ('a : l). 'a -> 'a end
+module type M_aa' =
+  sig val f : layout_ l l0. ('a : l separable non_null). 'a -> 'a end
 |}];;
 
 let f x = (x : (module M_ab) :> (module M_ab))

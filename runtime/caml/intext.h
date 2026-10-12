@@ -23,6 +23,9 @@
 
 #ifdef CAML_INTERNALS
 #include "io.h"
+#include <stddef.h>
+#include <stdint.h>
+#include "config.h"
 
 /* Magic number */
 

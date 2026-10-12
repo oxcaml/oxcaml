@@ -235,17 +235,13 @@ val register_global :
 
 val get_global : Code.Var.t -> Wasm_ast.expression option t
 
-val global_is_constant : Code.Var.t -> bool t
-
 val register_data_segment : Code.Var.t -> string -> unit t
 
-val lookup_string_global : string -> Code.Var.t option t
-
-val register_string_global : string -> Code.Var.t -> unit t
+val intern_string : string -> (unit -> Code.Var.t t) -> Code.Var.t t
+(** [intern_string s gen] returns the global holding the string constant [s],
+    calling [gen] to create it the first time [s] is encountered. *)
 
 val register_init_code : unit t -> unit t
-
-val init_code : context -> unit t
 
 val register_fragment : string -> (unit -> Javascript.expression) -> unit t
 

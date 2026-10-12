@@ -152,7 +152,7 @@ Warning 74 [degraded-to-partial-match]: This pattern-matching is compiled as
      (function {nlocal = 0} r/0 : int
        (region
          (let
-           (*match*/5 =[value<(consts (0)) (non_consts ([0: ?]))>]
+           (*match*/5 =[value<(consts (0)) (non_consts ([0: *]))>]
               (makelocalblock 0 (*) r/0))
            (catch
              (if *match*/5
@@ -191,8 +191,13 @@ type _ t = Int : int -> int t | Bool : bool -> bool t
 (let
   (test/0 =
      (function {nlocal = 0}
-       param/0[value<(consts (0)) (non_consts ([0: ?]))>] : int
-       (if param/0 (field_imm 0 (field_imm 0 param/0)) 0)))
+       param/0[value<
+                (consts (0))
+                 (non_consts ([0:
+                               value<
+                                (consts ()) (non_consts ([1: value<int>]
+                                 [0: value<int>]))>]))>]
+       : int (if param/0 (field_imm 0 (field_imm 0 param/0)) 0)))
   (apply (field_imm 1 (global Toploop!)) "test" test/0))
 val test : int t option -> int = <fun>
 |}]
@@ -240,7 +245,11 @@ type _ t = Int : int -> int t | Bool : bool -> bool t
      (function {nlocal = 0} n/0? : int
        (region
          (let
-           (*match*/9 =[value<(consts (0)) (non_consts ([0: ?]))>]
+           (*match*/9 =[value<
+                         (consts (0))
+                          (non_consts ([0:
+                                        value<
+                                         (consts ()) (non_consts ([0: *, *]))>]))>]
               (makelocalblock 0 (value<
                                   (consts ())
                                    (non_consts ([0: *,
@@ -257,9 +266,9 @@ type _ t = Int : int -> int t | Bool : bool -> bool t
            (if *match*/9
              (let
                (*match*/10 =a? (field_imm 0 *match*/9)
-                *match*/11 =o? (field_mut 0 (field_imm 0 *match*/10)))
-               (if *match*/11 (field_imm 0 (field_imm 1 *match*/10))
-                 (%int_neg (field_imm 0 (field_imm 1 *match*/10)))))
+                *match*/11 =o? (field_mut 0 (mixedfield 0  (?,?) *match*/10)))
+               (if *match*/11 (field_imm 0 (mixedfield 1  (?,?) *match*/10))
+                 (%int_neg (field_imm 0 (mixedfield 1  (?,?) *match*/10)))))
              3)))))
   (apply (field_imm 1 (global Toploop!)) "test" test/2))
 val test : 'a -> int = <fun>
@@ -301,19 +310,19 @@ Warning 74 [degraded-to-partial-match]: This pattern-matching is compiled as
      (function {nlocal = 0} r/1 : int
        (region
          (let
-           (*match*/12 =[value<(consts (0)) (non_consts ([0: ?]))>]
+           (*match*/12 =[value<(consts (0)) (non_consts ([0: *]))>]
               (makelocalblock 0 (*) r/1))
            (catch
              (if *match*/12
                (let (*match*/13 =o? (field_mut 0 (field_imm 0 *match*/12)))
-                 (if (field_imm 1 *match*/13) (exit 21) 0))
+                 (if (mixedfield 1  (?,?) *match*/13) (exit 21) 0))
                (exit 21))
             with (21)
              (if (seq (setfield_ptr 0 r/1 [0: 0 0]) 0) 1
                (if *match*/12
                  (let
                    (*match*/14 =o? (field_mut 0 (field_imm 0 *match*/12))
-                    *match*/15 =a? (field_imm 1 *match*/14))
+                    *match*/15 =a? (mixedfield 1  (?,?) *match*/14))
                    (if *match*/15 (field_imm 0 *match*/15)
                      (raise
                        (makeblock 0 (getpredef Match_failure/0!!)
@@ -351,8 +360,9 @@ type _ t = Bool : bool t | Int : int t | Char : char t
        param/2[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>]
        : int
        (catch
-         (if (%int_greaterequal (field_imm 0 param/2) 2) (exit 24)
-           (if (%int_greaterequal (field_imm 1 param/2) 2) (exit 24) 0))
+         (if (%int_greaterequal (mixedfield 0  (?,?) param/2) 2) (exit 24)
+           (if (%int_greaterequal (mixedfield 1  (?,?) param/2) 2) (exit 24)
+             0))
         with (24) 0)))
   (apply (field_imm 1 (global Toploop!)) "test" test/3))
 val test : 'a t * 'a t -> unit = <fun>
@@ -385,11 +395,11 @@ type t = A | B | C of nothing
                                 (consts (1 0)) (non_consts ([0: value<int>]))>]))>]
        : int
        (catch
-         (if (field_imm 0 param/3)
-           (switch* (field_imm 1 param/3)
+         (if (mixedfield 0  (?,?) param/3)
+           (switch* (mixedfield 1  (?,?) param/3)
             case int 0: 3
             case int 1: (exit 27))
-           (switch* (field_imm 1 param/3)
+           (switch* (mixedfield 1  (?,?) param/3)
             case int 0: 4
             case int 1: (exit 27)))
         with (27) 5)))
@@ -532,14 +542,14 @@ let check_results r1 r2 =
             (apply r1/0 r2/0))
          (catch
            (catch
-             (let (r/2 =a? (field_imm 0 *match*/16))
+             (let (r/2 =a? (mixedfield 0  (?,?) *match*/16))
                (catch
                  (switch* r/2
                   case tag 0: (exit 50 r/2)
                   case tag 1:
                    (catch
                      (if (%int_greaterequal (field_imm 0 r/2) 66)
-                       (let (*match*/17 =a? (field_imm 1 *match*/16))
+                       (let (*match*/17 =a? (mixedfield 1  (?,?) *match*/16))
                          (switch* *match*/17
                           case tag 0: (exit 52)
                           case tag 1:
@@ -548,11 +558,11 @@ let check_results r1 r2 =
                                (if (%int_notequal *match*/18 66) (exit 53)
                                  r/2)
                                (exit 53)))))
-                       (switch* (field_imm 1 *match*/16)
+                       (switch* (mixedfield 1  (?,?) *match*/16)
                         case tag 0: (exit 52)
                         case tag 1: (exit 51 r/2)))
-                    with (53) (exit 51 (field_imm 1 *match*/16))))
-                with (52) (exit 50 (field_imm 1 *match*/16))))
+                    with (53) (exit 51 (mixedfield 1  (?,?) *match*/16))))
+                with (52) (exit 50 (mixedfield 1  (?,?) *match*/16))))
             with (50 r/3[value<(consts ()) (non_consts ([1: ?] [0: ?]))>])
              r/3)
           with (51 r/4[value<(consts ()) (non_consts ([1: ?] [0: ?]))>]) r/4))))
