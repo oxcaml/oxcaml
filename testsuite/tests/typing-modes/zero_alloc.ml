@@ -599,11 +599,13 @@ val alloc_polyvariant : int -> [> `Tag of int ] @ local = <fun>
   allocation, which is successfully detected. *)
 let (alloc_optional_arg @ noalloc_strict) ?a () = a
 [%%expect{|
-val alloc_optional_arg : ?a:'a -> (unit -> 'a option) @ local = <fun>
+val alloc_optional_arg : ('a : any). ?a:'a -> (unit -> 'a option) @ local =
+  <fun>
 |}]
 let (alloc_optional_arg @ noalloc) ?a () = a
 [%%expect{|
-val alloc_optional_arg : ?a:'a -> (unit -> 'a option) @ local = <fun>
+val alloc_optional_arg : ('a : any). ?a:'a -> (unit -> 'a option) @ local =
+  <fun>
 |}]
 
 let test_missing_arg () =
@@ -611,7 +613,7 @@ let test_missing_arg () =
   let (g @ noalloc_strict) () = f () in
   g ()
 [%%expect{|
-val test_missing_arg : unit -> 'a option = <fun>
+val test_missing_arg : ('a : any). unit -> 'a option = <fun>
 |}]
 
 let test_passing_arg () =
@@ -2100,7 +2102,8 @@ val g_region : int -> unit = <fun>
    [noalloc_strict]. *)
 let ( let* ) o f = match o with None -> None | Some x -> f x
 [%%expect{|
-val ( let* ) : 'a option -> ('a -> 'b option) -> 'b option = <fun>
+val ( let* ) : 'a ('b : any). 'a option -> ('a -> 'b option) -> 'b option =
+  <fun>
 |}]
 let (g_letop @ noalloc_strict) (x : int) =
   let* _ = Some 0 in

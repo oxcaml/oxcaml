@@ -149,7 +149,7 @@ module type Inclusion_narrowing =
     module F :
       functor (M : sig val poly_ g : 'a -> 'a end @ static) ->
         sig val g : layout_ l. ('a : l addressable). 'a -> 'a end
-      @@ stateless
+      @@ stateless noalloc_strict
   end
 |}]
 
@@ -233,7 +233,7 @@ module type Inclusion_incomplete_but_ok =
                val g : layout_ l. ('a : l addressable) ('b : l). 'a -> 'b
              end @ static)
         -> sig val g : ('a : bits8 addressable) ('b : bits8). 'a -> 'b end
-      @@ stateless
+      @@ stateless noalloc_strict
   end
 |}]
 
@@ -257,6 +257,6 @@ module type Inclusion_incomplete_but_swapped_ok =
         sig
           val g : ('a : bits8 addressable) ('b : bits8 addressable). 'a -> 'b
         end
-      @@ stateless
+      @@ stateless noalloc_strict
   end
 |}]

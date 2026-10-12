@@ -703,8 +703,8 @@ let alias_chain_crossing ((module Lib__Sexp) : (module Sexp) @ nonportable) =
 [%%expect{|
 module type Sexp =
   sig module Utf8 : sig val to_string : int -> string @@ portable end end
-val alias_chain_crossing : (module Sexp) @ stateless nonportable -> unit =
-  <fun>
+val alias_chain_crossing :
+  (module Sexp) @ stateless nonportable noalloc_strict -> unit = <fun>
 |}]
 
 (* Abstract module types do not provide mode crossing. *)
@@ -726,7 +726,7 @@ Lines 7-9, characters 54-5:
 9 |   end...
 Error: Signature mismatch:
        Modules do not match:
-         sig module N = X.M @@ stateless nonportable end @ nonportable
+         sig module N = X.M @@ stateless nonportable noalloc_strict end @ nonportable
        is not included in
          sig module N = X.M @@ portable end @ nonportable
        In module "N":
@@ -756,7 +756,10 @@ Lines 9-11, characters 67-5:
 11 |   end...
 Error: Signature mismatch:
        Modules do not match:
-         sig module Utf8 = Lib.Sexp.Utf8 @@ stateless nonportable end @ nonportable
+         sig
+           module Utf8 = Lib.Sexp.Utf8 @@ stateless nonportable
+             noalloc_strict
+         end @ nonportable
        is not included in
          sig module Utf8 = Lib.Sexp.Utf8 @@ portable end @ nonportable
        In module "Utf8":

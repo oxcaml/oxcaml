@@ -104,7 +104,7 @@ module M : sig type t : value box mod portable end
 |}]
 
 module M : sig
-  type t : bits64 box mod many forkable stateless unyielding
+  type t : bits64 box mod many forkable stateless unyielding noalloc_strict
 end = struct
   type t : (bits64 mod everything) box
 end
@@ -115,7 +115,7 @@ module M : sig type t : (bits64 mod everything) box end
 module M : sig
   type t : (bits64 mod everything) box
 end = struct
-  type t : bits64 box mod many forkable stateless unyielding
+  type t : bits64 box mod many forkable stateless unyielding noalloc_strict
 end
 [%%expect{|
 module M : sig type t : (bits64 mod everything) box end
