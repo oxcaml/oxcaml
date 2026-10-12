@@ -92,6 +92,10 @@ uintnat caml_cache_stacks_per_class = /* Xcache_stacks_per_class */
    design comment below); only meaningful with STACK_GUARD_PAGES. */
 uintnat caml_max_guarded_stacks = 1024; /* -Xmax_guarded_stacks */
 
+/* Set nonzero to disable stack idling (see the design comment below):
+   promoted continuations then keep their guarded stacks. */
+uintnat caml_no_idle_stacks = 0; /* -Xno_idle_stacks */
+
 uintnat caml_get_init_stack_wsize (int context)
 {
   uintnat init_stack_wsize = 0;
@@ -346,7 +350,9 @@ Caml_inline int stack_cache_bucket (mlsize_t wosize) {
    beyond it are parked on an "extra" cache whose use also requests a
    minor collection. These requests back off geometrically (see
    [minor_gc_request_hysteresis]) so that a large population of live
-   stacks does not force a collection per allocation. The global and
+   stacks does not force a collection per allocation. Idling (and the
+   GC requests that serve it) can be disabled with -Xno_idle_stacks=1:
+   every stack then stays guarded for life. The global and
    extra caches are shared by all
    domains, so they are multiple-consumer: lock-free popping would
    suffer from ABA, so they are protected by [stack_cache_global_lock]
@@ -447,6 +453,7 @@ static atomic_uintnat stack_gc_requested_at = 0;
    or duplicate a request, so relaxed loads suffice. */
 static void minor_gc_request_hysteresis(void)
 {
+  if (caml_no_idle_stacks) return; /* a collection would not idle stacks */
   uintnat count = atomic_load_relaxed(&stack_count);
   uintnat prev = atomic_load_relaxed(&stack_gc_requested_at);
   for (;;) {
@@ -1642,6 +1649,8 @@ struct stack_info* caml_cont_idle_stacks(value cont)
 
   CAMLassert(Is_block(cont) && Tag_val(cont) == Cont_tag);
   CAMLassert(stack != NULL);
+
+  if (caml_no_idle_stacks) return stack;
 
   while (stack != NULL) {
     struct stack_info* next = Stack_parent(stack);
