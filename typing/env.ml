@@ -3888,29 +3888,42 @@ let walk_locks_for_zero_alloc_return ~env ~loc mode =
     Returns the pinpoint and allocation mode of every enclosing closure.
     The list is ordered from the innermost closure to the outermost one,
     so that error messages blame the closure nearest to the allocation. *)
-(* CR shsong: currently it only considers noalloc_strict and alloc,
-    need to customize this to support noalloc later *)
 let walk_locks_for_allocation ~env pp =
-  let locks = IdTbl.get_all_locks env.values in
-  let _stage_locks, locks = partition_locks locks in
+  (* CR-someday wsturgeon for wsturgeon: avoid intermediate list here *)
+  let locks_and_stages = IdTbl.get_all_locks env.values in
   List.fold_left
-    (fun acc lock ->
-      match lock with
-      | Closure_lock (closure, comonadic) ->
-          let comonadic =
-            Mode.With_regionality.Comonadic.apply_hint
-              (Is_closed_by (Comonadic, {closure; closed = pp}))
-              comonadic
+    begin fun acc lock_or_stage ->
+      begin match lock_or_stage with
+      | Nonstage_lock lock ->
+        begin match lock with
+        | Closure_lock (closure, comonadic) ->
+          let allocation_mode =
+            comonadic
+            (* Record the reason for this constraint, for diagnostics: *)
+            |> Mode.With_regionality.Comonadic.apply_hint
+                 (Is_closed_by (Comonadic, {closure; closed = pp}))
+            (* Get the allocation mode of the closure's multi-mode variable: *)
+            |> Mode.With_regionality.Comonadic.proj Allocation
+            (* Create an un-generalizable variable (at level 0) that's at least
+               as non-allocating as the closure's existing constraints: *)
+            |> Mode.Allocation.newvar_below 0 |> fst
+            (* Ensure we can only use that new variable as an upper bound: *)
+            |> Mode.Allocation.disallow_left
           in
-          let kv =
-            (closure, Mode.With_regionality.Comonadic.proj Allocation comonadic)
-          in
-          kv :: acc
-      (* A [Const_closure_lock] is at a constant mode which is always [alloc]
-         on the allocation axis, so there is nothing to constrain. *)
-      | Region_lock | Const_closure_lock _ | Exclave_lock
-      | Unboxed_lock -> acc
-    ) [] locks
+          (closure, allocation_mode) :: acc
+        (* A [Const_closure_lock] is at a constant mode which is always [alloc]
+          on the allocation axis, so there is nothing to constrain. *)
+        | Const_closure_lock _
+        | Exclave_lock
+        | Region_lock
+        | Unboxed_lock
+          -> acc
+        end
+      | Stage_lock _ -> acc
+      end
+    end
+    []
+    locks_and_stages
 
 (** Takes [m0] which is the parameter of [let mutable x] at declaration site,
   and [locks] which is the locks between the declaration and the usage (either

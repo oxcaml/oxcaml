@@ -15,8 +15,20 @@ let allocations : t list ref = Local_store.s_ref []
 
 let reset_allocations () = allocations := []
 
-let register_mode_for_optimisation pp ?(closures=[]) locality_mode =
+(* Register a locality mode variable to be zapped as local as possible, as late
+   as possible. *)
+let register_mode_for_optimisation
+    (* A diagnostic hint pinpoint for the location of this allocation. *)
+    pp
+    (* All closures enclosing this allocation, innermost-first, along with their
+       allocation modes. *)
+    ?(closures=[])
+    (* A locality mode *variable* with constraints, to be zapped as local as
+       possible, as late as possible. *)
+    locality_mode =
+  (* Ensure that `locality_mode` may only be an *upper* bound. *)
   let locality_mode = Locality.disallow_left locality_mode in
+  (* Add to a delayed worklist to be zapped as late as possible. *)
   allocations := {locality_mode; closures; pp} :: !allocations
 
 let register_allocation_mode ~env ~loc locality_mode =

@@ -4,9 +4,16 @@ open Mode
 
 val reset_allocations : unit -> unit
 
+(* Register a locality mode variable to be zapped as local as possible, as late
+   as possible. *)
 val register_mode_for_optimisation :
+  (* A diagnostic hint pinpoint for the location of this allocation. *)
   Hint.pinpoint ->
+  (* All closures enclosing this allocation, innermost-first, along with their
+      allocation modes. *)
   ?closures:(Hint.pinpoint * Allocation.r) list ->
+  (* A locality mode *variable* with constraints, to be zapped as local as
+      possible, as late as possible. *)
   ('l * allowed) Locality.t ->
   unit
 
