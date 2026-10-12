@@ -612,7 +612,6 @@ end
 module Safe = struct
   (* Note the exposed signature of [get] and [set] add modes for safety. *)
   module DLS = DLS0
-
   module TLS = TLS0
 
   let spawn f =
