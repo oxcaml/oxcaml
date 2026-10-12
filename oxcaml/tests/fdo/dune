@@ -8,8 +8,17 @@
 ; The operations on pseudo-instrumentation counters ([Fdo_counter]).
 
 (rule
- (alias runtest)
  (enabled_if
   (= %{context_name} "main"))
  (action
-  (run ./fdo_counters_test.exe)))
+  (with-stdout-to
+   fdo_counters_test.output
+   (run ./fdo_counters_test.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "main"))
+ (deps fdo_counters_test.expected fdo_counters_test.output)
+ (action
+  (diff fdo_counters_test.expected fdo_counters_test.output)))

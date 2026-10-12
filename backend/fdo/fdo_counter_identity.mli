@@ -45,9 +45,7 @@
 (** An edge out of a branch, or a call site. *)
 module Edge : sig
   type t =
-    | Then
-    | Else
-    | Switch_case of int
+    | Branch of int
     | Callsite
 end
 

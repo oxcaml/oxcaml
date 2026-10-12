@@ -32,13 +32,11 @@
    into. *)
 module F = Fdo_counter
 
-let failures = ref 0
-
 let check name cond =
-  if not cond
-  then (
-    incr failures;
-    Printf.eprintf "FAILED: %s\n%!" name)
+  Printf.printf "%s: %s\n" name (if cond then "ok" else "FAILED")
+
+let print_hash name hash =
+  Printf.printf "%s: %08lx\n" name (F.Hash.to_int32 hash)
 
 let fn demangled_name =
   F.Definition_id.create_original ~demangled_name ~discriminator:0
@@ -80,8 +78,8 @@ let () =
   check "interior counters depend on the body"
     (not
        (F.equal
-          (counter (pos leaf_a body_a 7 Then) [])
-          (counter (pos leaf_a body_edited 7 Then) [])));
+          (counter (pos leaf_a body_a 7 (Branch 0)) [])
+          (counter (pos leaf_a body_edited 7 (Branch 0)) [])));
   let inner =
     counter
       (F.Position.create_instantiation_site
@@ -101,12 +99,12 @@ let () =
 (* Inlining appends the call site, innermost first; specialization renames the
    outermost function identity. *)
 let () =
-  let then_ = counter (edge_a Then) [] in
+  let then_ = counter (edge_a (Branch 0)) [] in
   let once = F.inline then_ ~at:(counter ctx_b []) in
   let twice = F.inline once ~at:(counter ctx_d []) in
-  check "inlining context" (F.equal once (counter (edge_a Then) [ctx_b]));
+  check "inlining context" (F.equal once (counter (edge_a (Branch 0)) [ctx_b]));
   check "nested inlining context"
-    (F.equal twice (counter (edge_a Then) [ctx_b; ctx_d]));
+    (F.equal twice (counter (edge_a (Branch 0)) [ctx_b; ctx_d]));
   check "call site itself has typed inlining context"
     (F.equal
        (F.inline (counter ctx_b []) ~at:(counter ctx_d []))
@@ -114,11 +112,12 @@ let () =
   check "specialization changes only outermost function identity"
     (F.equal
        (F.specialize once ~at:(counter ctx_d []))
-       (counter (edge_a Then) [pos (specialize (fn "B.g")) body_b 3 Callsite]));
+       (counter (edge_a (Branch 0))
+          [pos (specialize (fn "B.g")) body_b 3 Callsite]));
   check "specialization of a position without context"
     (F.equal
        (F.specialize then_ ~at:(counter ctx_d []))
-       (counter (pos (specialize leaf_a) body_a 7 Then) []));
+       (counter (pos (specialize leaf_a) body_a 7 (Branch 0)) []));
   let entry = counter (F.Position.create_function_entry leaf_a) [] in
   check "entry inlining preserves function identity"
     (F.equal
@@ -135,27 +134,23 @@ let () =
     [ counter (F.Position.create_function_entry leaf_c) [ctx_b];
       counter (F.Position.create_function_entry leaf_c) [ctx_d] ]
   in
-  let edge = [counter (edge_a Then) []] in
+  let edge = [counter (edge_a (Branch 0)) []] in
   let counters = F.add_all edge inlined_calls in
   check "inlined calls follow the edge's counters"
-    (List.equal F.equal counters (counter (edge_a Then) [] :: inlined_calls));
+    (List.equal F.equal counters
+       (counter (edge_a (Branch 0)) [] :: inlined_calls));
   check "inlined calls are deduplicated"
     (List.equal F.equal (F.add_all counters [List.hd inlined_calls]) counters)
 
 (* Hashes are part of the profile format, not just an equality shortcut. *)
 let () =
   let entry = F.Position.create_function_entry leaf_a in
-  let interior = edge_a Then in
+  let interior = edge_a (Branch 0) in
   let module_site = F.Position.create_instantiation_site (fn "Example.Inner") in
   let specialized = specialize leaf_a in
-  check "golden function hash"
-    (F.Hash.equal (F.Definition_id.hash leaf_a) (F.Hash.of_int32 0x819a56d5l));
-  check "golden position hash"
-    (F.Hash.equal (F.Position.hash interior) (F.Hash.of_int32 0xf29d67eel));
-  check "golden specialized function hash"
-    (F.Hash.equal
-       (F.Definition_id.hash specialized)
-       (F.Hash.of_int32 0x92925811l));
+  print_hash "function hash" (F.Definition_id.hash leaf_a);
+  print_hash "position hash" (F.Position.hash interior);
+  print_hash "specialized function hash" (F.Definition_id.hash specialized);
   check "entry hash agrees with function hash"
     (F.Hash.equal (F.Position.hash entry) (F.Definition_id.hash leaf_a));
   check "only entries carry the entry bit"
@@ -175,7 +170,7 @@ let () =
   check "specialization recomputes cached hashes"
     (List.equal F.Hash.equal
        (F.hash (F.specialize (counter interior []) ~at:(counter ctx_d [])))
-       (F.hash (counter (pos specialized body_a 7 Then) [])))
+       (F.hash (counter (pos specialized body_a 7 (Branch 0)) [])))
 
 (* Nested components must not collapse to the same polynomial. *)
 let () =
@@ -184,17 +179,10 @@ let () =
       check "switch case and later AST position have distinct hashes"
         (not
            (F.Hash.equal
-              (F.Position.hash (pos leaf_a body_a 7 (Switch_case case)))
+              (F.Position.hash (pos leaf_a body_a 7 (Branch case)))
               (F.Position.hash (pos leaf_a body_a 10 edge)))))
-    [0, F.Edge.Then; 1, F.Edge.Else; 2, F.Edge.Callsite];
-  let a = counter (edge_a Then) [] in
-  let b = counter (edge_a Else) [] in
+    [0, F.Edge.Branch 0; 1, F.Edge.Branch 1; 2, F.Edge.Callsite];
+  let a = counter (edge_a (Branch 0)) [] in
+  let b = counter (edge_a (Branch 1)) [] in
   check "incoming counters are deduplicated in first-occurrence order"
     (List.equal F.equal (F.add_all [a] [b; b; a]) [a; b])
-
-let () =
-  if !failures > 0
-  then (
-    Printf.eprintf "%d test(s) failed\n%!" !failures;
-    exit 1)
-  else print_endline "All tests passed"
