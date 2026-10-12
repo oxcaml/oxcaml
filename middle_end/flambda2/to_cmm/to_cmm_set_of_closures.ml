@@ -500,6 +500,7 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
   let env =
     Env.enter_function_body env ~return_continuation ~return_continuation_arity
       ~exn_continuation
+      ~result_type:(C.extended_machtype_of_return_arity result_arity)
   in
   (* [my_region] can be referenced in [Begin_region] primitives so must be in
      the environment; however it should never end up in actual generated code,

@@ -1,9 +1,7 @@
 (* TEST
  flambda2;
  flags += " -O3 -dcfg-invariants";
- setup-ocamlopt.opt-build-env;
- ocamlopt_opt_exit_status = "2";
- ocamlopt.opt;
+ native;
 *)
 
 (* A call that Simplify finds never returns, last in a [try] so that it is not

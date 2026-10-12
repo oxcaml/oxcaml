@@ -170,6 +170,8 @@ type t =
     exn_continuation : Continuation.t;
     (* The exception continuation of the current context (used to determine
        where to insert try-with blocks). *)
+    result_type : C.Extended_machtype.t;
+    (* The result type of the Cmm function being translated. *)
     conts : cont Continuation.Map.t;
     (* Information about whether each continuation in scope should have its
        handler inlined, or else reached via a jump. *)
@@ -281,12 +283,13 @@ let print ppf t =
 (* Creation *)
 
 let create offsets functions_info ~trans_prim ~return_continuation
-    ~return_continuation_arity ~exn_continuation =
+    ~return_continuation_arity ~exn_continuation ~result_type =
   let conts =
     Continuation.Map.singleton return_continuation
       (Return { param_types = return_continuation_arity })
   in
   { exn_continuation;
+    result_type;
     offsets;
     functions_info;
     trans_prim;
@@ -303,9 +306,10 @@ let create offsets functions_info ~trans_prim ~return_continuation
   }
 
 let enter_function_body env ~return_continuation ~return_continuation_arity
-    ~exn_continuation =
+    ~exn_continuation ~result_type =
   create env.offsets env.functions_info ~trans_prim:env.trans_prim
     ~return_continuation ~return_continuation_arity ~exn_continuation
+    ~result_type
 
 (* Debuginfo *)
 
@@ -327,6 +331,8 @@ let currently_in_inlined_body t =
 (* Continuations *)
 
 let exn_continuation env = env.exn_continuation
+
+let result_type env = env.result_type
 
 (* Code and closures *)
 
