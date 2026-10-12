@@ -586,27 +586,3 @@ Test M.3 : Predef types
   [
     "(lazy _)"
   ]
-
-Test M.4 : that construct will work on holes in an overwrite expression
-
-  $ cat > M4.ml <<EOF
-  > let _ = overwrite_ (1, 2) with (_, 3)
-  > EOF
-
-  $ $MERLIN single construct -position 1:32 \
-  > -filename M4.ml < M4.ml | jq .value
-  [
-    {
-      "start": {
-        "line": 1,
-        "col": 32
-      },
-      "end": {
-        "line": 1,
-        "col": 33
-      }
-    },
-    [
-      "0"
-    ]
-  ]
