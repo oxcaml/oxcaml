@@ -32,6 +32,8 @@ Options passed in through `-jsoo-opt` are passed through to all `js_of_ocaml` co
 |--------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `Tagged_immediate` | Untagged 32-bit integer (via `Number`)                                                                                                                                                                             |
 | `Naked_immediate`  | Untagged 32-bit integer (via `Number`)                                                                                                                                                                             |
+| `Naked_int8`       | Untagged 32-bit integer (via `Number`), always kept sign-extended to 8 bits, i.e. in the range [-128, 127]                                                                                                         |
+| `Naked_int16`      | Untagged 32-bit integer (via `Number`), always kept sign-extended to 16 bits, i.e. in the range [-32768, 32767]                                                                                                    |
 | `Naked_nativeint`  | Untagged 32-bit integer (via `Number`)                                                                                                                                                                             |
 | `Naked_int32`      | Untagged 32-bit integer (via `Number`)                                                                                                                                                                             |
 | `Naked_int64`      | Untagged 64-bit integer (via [`MlInt64`](https://github.com/oxcaml/js_of_ocaml/blob/master/runtime/js/int64.js) )                                                                                                  |
@@ -42,14 +44,16 @@ Hence `Tag_immediate` and `Untag_immediate` are identities in JSIR: all integers
 
 Beware - immediates are 32 bits in JavaScript, instead of 63 or 31!
 
+Smallints (`Naked_int8` and `Naked_int16`) follow the same convention as bytecode and Cmm, where they are stored sign-extended.
+This means that JavaScript stubs receive exactly the same values for `int8#`/`int16#` arguments as they do in bytecode.
+
 ## Known limitations
 
 ### Unsupported Flambda features
 The following are not yet supported in JSIR translation, and will raise an exception in the compiler when encountered:
 
-1. Smallints: `int8` and `int16`
-2. SIMD/vector types: `vec128`, `vec256` and `vec512`
-3. Block indices: `Read_offset` and `Write_offset`
+1. SIMD/vector types: `vec128`, `vec256` and `vec512`
+2. Block indices: `Read_offset` and `Write_offset`
 
 ### WASM
 The produced JSIR is not suitable for WASM compilation via `wasm_of_ocaml`, despite the two sharing the same IR.

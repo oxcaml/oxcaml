@@ -80,6 +80,8 @@ let rec reg_width_const const : Jsir.constant =
     target_ocaml_int_to_jsir_const targetint
   | Naked_float32 float32 -> float32_to_jsir_const float32
   | Naked_float float -> float_to_jsir_const float
+  | Naked_int8 int8 -> int8_to_jsir_const int8
+  | Naked_int16 int16 -> int16_to_jsir_const int16
   | Naked_int32 int32 -> int32_to_jsir_const int32
   | Naked_int64 int64 -> int64_to_jsir_const int64
   | Naked_nativeint nativeint -> nativeint_to_jsir_const nativeint
@@ -88,9 +90,8 @@ let rec reg_width_const const : Jsir.constant =
     reg_width_const
       (Reg_width_const.of_int_of_kind Thirty_two_no_gc_tag_bit kind
          (String.hash name))
-  | Naked_int8 _ | Naked_int16 _ | Naked_vec128 _ | Naked_vec256 _
-  | Naked_vec512 _ | Naked_mask _ ->
-    (* CR selee: smallints and SIMD *)
+  | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Naked_mask _ ->
+    (* CR selee: SIMD *)
     Misc.fatal_errorf "Unsupported constant %a" Int_ids.Const.print const
 
 let simple ~env ~res simple =
