@@ -226,18 +226,13 @@ module TLS : sig @@ portable
    -> 'a key
    (** Like {!DLS.new_key}, but represents a distinct value in every thread. *)
 
-   val get : ('a : value mod portable). 'a key -> 'a @ contended
-   (** Like {!DLS.get}, but reads the value for the current thread. *)
-
-   val set : ('a : value mod contended). 'a key -> 'a @ portable -> unit
-   (** Like {!DLS.set}, but sets the value for the current thread. *)
-
    val access
       : ('b : value_or_null).
       'a key
       -> ('a -> 'b @ contended local once portable unique)
          @ local once portable unyielding
       -> 'b @ contended local once portable unique
-   (** [access k f] provides uncontended access to the value of [k] on this
-       thread for the duration of [f]. Raises if [f] re-enters [access]. *)
+   (** [access k f] provides uncontended access to the current value of [k]
+       for the duration of [f]. Raises if [f] re-enters [access k] or creates
+       a thread or preemptable fiber. *)
 end

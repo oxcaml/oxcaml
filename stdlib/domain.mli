@@ -252,8 +252,9 @@ module Safe : sig @@ portable
       -> ('a -> 'b @ contended local once portable unique)
          @ local once portable unyielding
       -> 'b @ contended local once portable unique
-    (** [access k f] provides uncontended access to the value of [k] on this
-        thread for the duration of [f]. Raises if [f] re-enters [access k]. *)
+    (** [access k f] provides uncontended access to the current value of [k]
+        for the duration of [f]. Raises if [f] re-enters [access k] or creates
+        a thread or preemptable fiber. *)
 
     (** For use by the threading library and [Effect]. *)
     module Private : sig @@ portable

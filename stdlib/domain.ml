@@ -32,8 +32,12 @@ module Obj_opt : sig @@ portable
   val grow_array : t array -> int -> int -> t array
   val compare_and_set : t array -> int -> t -> t -> bool
 
+  (** A sentinel marking a slot whose value is borrowed by [TLS.access]. *)
+  val borrowed : unit -> t
+  val is_borrowed : t -> bool
+
   (** [unsafe_get obj] may only be called safely
-      if [is_some] is true.
+      if [is_some] is true and [is_borrowed] is false.
 
       [unsafe_get (some v)] is equivalent to
       [Obj.obj (Obj.repr v)]. *)
@@ -41,6 +45,7 @@ module Obj_opt : sig @@ portable
 end = struct
   type t = Obj.t
   let none = Obj.magic_portable (Obj.repr (ref 0))
+  let borrowed_ = Obj.magic_portable (Obj.repr (ref 1))
   let fresh () = Array.make 7 (Obj.magic_uncontended none)
   let[@inline] some v =
    (* [Sys.opaque_identity] ensures that flambda does not look at the type of
@@ -48,6 +53,8 @@ end = struct
     * We do not want OCaml's float array optimisation kicking in here. *)
     Obj.repr (Sys.opaque_identity v)
   let[@inline] is_some obj = (obj != Obj.magic_uncontended none)
+  let[@inline] borrowed () = Obj.magic_uncontended borrowed_
+  let[@inline] is_borrowed obj = (obj == Obj.magic_uncontended borrowed_)
   let[@inline] unsafe_get obj = Obj.obj obj
 
   let[@inline never] grow_array st idx size =
@@ -381,25 +388,40 @@ module TLS0 = struct
       new_st
     end
 
+  (* [@poll error] so that interrupts cannot grow the state.
+     [idx] must be in range. *)
+  let[@poll error] store idx obj =
+    Array.unsafe_set (get_tls_state ()) idx obj
+
   let[@inline] set (type a) (idx, _init) (x : a) =
     (* Assures [idx] is in range. *)
-    let st = maybe_grow idx in
-    Array.unsafe_set st idx (Obj_opt.some x)
+    ignore (maybe_grow idx);
+    store idx (Obj_opt.some x)
 
   let[@inline never] init_idx (type a) idx (init : _ -> a) =
     let v : a = init () in
-    let new_obj = Obj_opt.some v in
-    let st = get_tls_state () in
-    Array.unsafe_set st idx new_obj;
+    store idx (Obj_opt.some v);
     v
+
+  let[@inline never] already_accessing () =
+    failwith "Domain.Safe.TLS: key is already being accessed"
 
   let[@inline] get (type a) ((idx, init) : a key) : a =
     (* Assures [idx] is in range. *)
     let st = maybe_grow idx in
     let obj = Array.unsafe_get st idx in
-    if Obj_opt.is_some obj
-    then (Obj_opt.unsafe_get obj : a)
+    if Obj_opt.is_borrowed obj then already_accessing ()
+    else if Obj_opt.is_some obj then (Obj_opt.unsafe_get obj : a)
     else init_idx idx init.portable
+
+  (* While [f] runs, the slot holds [Obj_opt.borrowed] instead of the value, so
+     [get] (hence [access] and splitting) raises on that key. *)
+  let access ((idx, _) as k) f = exclave_
+    let v = get k in
+    store idx (Obj_opt.borrowed ());
+    match f v with
+    | res -> store idx (Obj_opt.some v); res
+    | exception exn -> store idx (Obj_opt.some v); raise exn
 
   type key_value : value mod portable contended =
       KV : 'a key * (unit -> 'a) @@ portable -> key_value
@@ -588,21 +610,7 @@ module Safe = struct
   (* Note the exposed signature of [get] and [set] add modes for safety. *)
   module DLS = DLS0
 
-  module TLS = struct
-    include TLS0
-
-    let accessing = new_key (fun () -> false)
-
-    let access k f = exclave_
-      if get accessing then failwith "TLS.access re-entered";
-      set accessing true;
-      match f (get k) with
-      | res -> set accessing false; res
-      | exception exn ->
-        let bt = Printexc.get_raw_backtrace () in
-        set accessing false;
-        Printexc.raise_with_backtrace exn bt
-  end
+  module TLS = TLS0
 
   let spawn f =
     let tls_keys = TLS.Private.get_initial_keys () in
