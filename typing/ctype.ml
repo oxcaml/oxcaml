@@ -1226,6 +1226,25 @@ let update_scope_for tr_exn scope ty =
     (without this constraint, the type system would actually be unsound.)
 *)
 
+(* Lower the levels of the sort variables in the kind of the variable [ty] to
+   [level], replacing kind constructors that are not in scope at [level] by
+   their expansions. *)
+let update_jkind_level env level ty =
+  let update jkind =
+    match Jkind.update_level env level jkind with
+    | Ok jkind -> jkind
+    | Error path -> raise_escape_exn (Constructor (Kind, path))
+  in
+  match get_desc ty with
+  | Tvar ({ jkind; _ } as tv) ->
+      let jkind' = update jkind in
+      if jkind' != jkind then set_type_desc ty (Tvar { tv with jkind = jkind' })
+  | Tunivar ({ jkind; _ } as tv) ->
+      let jkind' = update jkind in
+      if jkind' != jkind then
+        set_type_desc ty (Tunivar { tv with jkind = jkind' })
+  | _ -> ()
+
 let rec update_level env level expand ty =
   let ty_level = get_level ty in
   if ty_level > level then begin
@@ -1286,12 +1305,8 @@ let rec update_level env level expand ty =
     | Tfield(lab, _, ty1, _)
       when lab = dummy_method && level < get_scope ty1 ->
         raise_escape_exn Self
-    | Tvar { jkind }
-    | Tunivar { jkind } ->
-      begin match Jkind.update_level env level jkind with
-      | Ok () -> ()
-      | Error path -> raise_escape_exn (Constructor (Kind, path))
-      end;
+    | Tvar _ | Tunivar _ ->
+      update_jkind_level env level ty;
       set_level ()
     | _ ->
         set_level ();
@@ -1331,12 +1346,10 @@ let rec lower_contravariant env var_level visited contra ty =
     Hashtbl.add visited (get_id ty) contra;
     let lower_rec = lower_contravariant env var_level visited in
     match get_desc ty with
-      Tvar { jkind } ->
+      Tvar _ ->
         if contra then begin
           set_level ty var_level;
-          match Jkind.update_level env var_level jkind with
-          | Ok () -> ()
-          | Error path -> raise_escape_exn (Constructor (Kind, path))
+          update_jkind_level env var_level ty
         end
     | Tconstr (_, [], _) -> ()
     | Tconstr (path, tyl, _abbrev) ->

@@ -2897,15 +2897,24 @@ let generalize ~current_level t =
   | Kconstr _ -> ()
   | Layout l -> Layout.generalize ~current_level l
 
-let rec update_level_base env level = function
-  | Kconstr (path, _, _) as base when level < Path.scope path -> (
-    match Base.expand_once env base with
-    | Some base' -> Base.of_const base' |> update_level_base env level
-    | None -> Error path)
-  | Kconstr _ -> Ok ()
-  | Layout l -> Ok (Layout.update_level level l)
-
-let update_level env level t = update_level_base env level t.jkind.base
+let update_level env level t =
+  let rec update_desc ~expanded desc =
+    match desc.base with
+    | Kconstr (path, _, _) when level < Path.scope path -> (
+      match Base_and_axes.expand_base_once_const env desc with
+      | Expanded const ->
+        update_desc ~expanded:true (Base_and_axes.jkind_desc_of_const const)
+      | Not_expanded | Missing_cmi _ -> Error path)
+    | Kconstr _ -> Ok desc
+    | Layout l ->
+      Layout.update_level level l;
+      if expanded
+      then Ok (Base_and_axes.refresh_layout_implied_crossing_desc desc)
+      else Ok desc
+  in
+  match update_desc ~expanded:false t.jkind with
+  | Ok desc -> Ok (if desc == t.jkind then t else { t with jkind = desc })
+  | Error path -> Error path
 
 let get_level t =
   match t.jkind.base with
