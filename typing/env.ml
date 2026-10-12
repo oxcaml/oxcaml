@@ -3865,7 +3865,7 @@ let unboxed_type ~errors ~env ~loc ty_and_lid =
 let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
   List.fold_left
     (fun vmode lock ->
-      match lock with
+      try match lock with
       | Region_lock -> region_mode vmode
       | Const_closure_lock (_, closure_context, comonadic) ->
           const_closure_mode pp vmode closure_context comonadic
@@ -3876,6 +3876,9 @@ let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
       | Unboxed_lock ->
           unboxed_type ~errors ~env ~loc:(fst pp) ty_and_lid;
           vmode
+      with exn ->
+        Typing_recovery.log_or_raise exn;
+        vmode
     ) mode locks
 
 (** Registers a use of a construct that is at legacy comonadic modes,
