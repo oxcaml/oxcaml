@@ -362,7 +362,7 @@ module Inlining = struct
     | None | Some (Unknown _) ->
       Inlining_report.record_decision_at_call_site_for_unknown_function ~tracker
         ~apply ~pass:After_closure_conversion ();
-      Not_inlinable Unused_because_function_unknown
+      Not_inlinable { disabled_for_jsir = false }
     | Some (Value_symbol _)
     | Some (Value_const _)
     | Some (Block_approximation _) ->
@@ -382,7 +382,7 @@ module Inlining = struct
           ~callee:(Inlining_history.Absolute.empty compilation_unit)
           ~are_rebuilding_terms ~inlined_forwarded_from:None
           Definition_says_not_to_inline;
-        Not_inlinable Unused_because_function_unknown)
+        Not_inlinable { disabled_for_jsir = false })
       else
         (* These calculations are all in terms of non-unarized parameters. *)
         let params_length_from_code_metadata =
@@ -408,12 +408,12 @@ module Inlining = struct
           if not (Code.can_be_inlined_for_jsir code)
           then
             ( Call_site_inlining_decision_type.Jsir_inlining_disabled,
-              Not_inlinable Jsir_inlining_disabled )
+              Not_inlinable { disabled_for_jsir = true } )
           else
             match inlined_call with
             | Never_inlined ->
               ( Call_site_inlining_decision_type.Never_inlined_attribute,
-                Not_inlinable Unused_because_function_unknown )
+                Not_inlinable { disabled_for_jsir = false } )
             | Always_inlined _ | Hint_inlined ->
               Call_site_inlining_decision_type.Attribute_always, Inlinable code
             | Default_inlined | Forward_inlined | Unroll _ ->
@@ -1922,10 +1922,13 @@ let close_exact_or_unknown_apply acc env
     then Expr_with_acc.create_apply acc apply
     else
       match Inlining.inlinable env apply callee_approx with
-      | Not_inlinable use_info ->
+      | Not_inlinable { disabled_for_jsir } ->
         let apply =
           Apply.with_inlined_attribute apply
-            (Inlined_attribute.with_use_info (Apply.inlined apply) use_info)
+            (Inlined_attribute.with_use_info (Apply.inlined apply)
+               (if disabled_for_jsir
+                then Jsir_inlining_disabled
+                else Unused_because_function_unknown))
         in
         Expr_with_acc.create_apply acc apply
       | Inlinable func_desc ->
