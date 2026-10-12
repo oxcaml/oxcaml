@@ -377,7 +377,6 @@ let load_tlambda ppf ~compilation_unit ~required_globals tlam repr =
     { Lambda.
       code = lam;
       main_module_block_format = Mb_struct { mb_repr = repr };
-      arg_block_idx = None;
       compilation_unit;
       required_globals;
     }
@@ -658,6 +657,7 @@ let use_channel ppf ~wrap_in_module ic name filename =
   (* Skip initial #! line if any *)
   Lexer.skip_hash_bang lb;
   let success =
+    Lexer.protect_syntax_mode @@ fun () ->
     protect_refs [ R (Location.input_name, filename) ] (fun () ->
       try
         List.iter

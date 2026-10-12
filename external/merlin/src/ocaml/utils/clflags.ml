@@ -23,6 +23,7 @@ let typing_recovery     = ref true
 
 let nopervasives        = ref false
 let strict_formats      = ref true
+let syntax_quotations   = ref Config.syntax_quotations
 
 type open_arg =
   | Open of string

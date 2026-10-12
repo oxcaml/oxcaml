@@ -94,8 +94,15 @@ and variant_subkind consts non_consts : Fexpr.subkind =
   in
   let non_consts =
     non_consts |> Tag.Scannable.Map.bindings
-    |> List.map (fun (tag, (_shape, sk)) ->
-        Tag.Scannable.to_int tag, List.map kind_with_subkind sk)
+    |> List.map (fun (tag, shape_and_fields) ->
+        ( Tag.Scannable.to_int tag,
+          match
+            (shape_and_fields
+              : Flambda_kind.With_subkind.Non_null_value_subkind
+                .constructor_shape)
+          with
+          | Undetermined -> None
+          | Determined (_shape, sk) -> Some (List.map kind_with_subkind sk) ))
   in
   Variant { consts; non_consts }
 

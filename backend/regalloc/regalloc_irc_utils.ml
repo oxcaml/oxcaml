@@ -3,16 +3,16 @@
 open! Int_replace_polymorphic_compare
 open! Regalloc_utils
 
-let log_function = lazy (make_log_function ~label:"irc")
+let log_function = Param.make (fun () -> make_log_function ~label:"irc")
 
-let indent () = (Lazy.force log_function).indent ()
+let indent () = (Param.get log_function).indent ()
 
-let dedent () = (Lazy.force log_function).dedent ()
+let dedent () = (Param.get log_function).dedent ()
 
-let reset_indentation () = (Lazy.force log_function).reset_indentation ()
+let reset_indentation () = (Param.get log_function).reset_indentation ()
 
 let log : type a. ?no_eol:unit -> (a, Format.formatter, unit) format -> a =
- fun ?no_eol fmt -> (Lazy.force log_function).log ?no_eol fmt
+ fun ?no_eol fmt -> (Param.get log_function).log ?no_eol fmt
 
 let instr_prefix (instr : Cfg.basic Cfg.instruction) =
   InstructionId.to_string_padded instr.id
@@ -26,12 +26,12 @@ let log_body_and_terminator :
     liveness ->
     unit =
  fun body terminator liveness ->
-  make_log_body_and_terminator (Lazy.force log_function) ~instr_prefix
+  make_log_body_and_terminator (Param.get log_function) ~instr_prefix
     ~term_prefix body terminator liveness
 
 let log_cfg_with_infos : Cfg_with_infos.t -> unit =
  fun cfg_with_infos ->
-  make_log_cfg_with_infos (Lazy.force log_function) ~instr_prefix ~term_prefix
+  make_log_cfg_with_infos (Param.get log_function) ~instr_prefix ~term_prefix
     cfg_with_infos
 
 module RegWorkList = struct
@@ -186,16 +186,16 @@ module Spilling_heuristics = struct
       String.concat ", "
         (all |> List.map ~f:to_string |> List.map ~f:(Printf.sprintf "%S"))
     in
-    lazy
-      (match find_param_value "IRC_SPILLING_HEURISTICS" with
-      | None -> default
-      | Some id -> (
-        match String.lowercase_ascii id with
-        | "flat_uses" | "flat-uses" -> Flat_uses
-        | "hierarchical_uses" | "hierarchical-uses" -> Hierarchical_uses
-        | _ ->
-          fatal "unknown heuristics %S (possible values: %s)" id
-            (available_heuristics ())))
+    Param.make (fun () ->
+        match find_param_value "IRC_SPILLING_HEURISTICS" with
+        | None -> default
+        | Some id -> (
+          match String.lowercase_ascii id with
+          | "flat_uses" | "flat-uses" -> Flat_uses
+          | "hierarchical_uses" | "hierarchical-uses" -> Hierarchical_uses
+          | _ ->
+            fatal "unknown heuristics %S (possible values: %s)" id
+              (available_heuristics ())))
 end
 
 module Interf_threshold = struct
@@ -204,13 +204,13 @@ module Interf_threshold = struct
   let default = None
 
   let value =
-    lazy
-      (match find_param_value "IRC_INTERF_THRESHOLD" with
-      | None -> default
-      | Some threshold -> (
-        match int_of_string_opt threshold with
-        | None ->
-          fatal "invalid interference threshold %S (should be an integer)"
-            threshold
-        | Some value as threshold -> if value < 0 then None else threshold))
+    Param.make (fun () ->
+        match find_param_value "IRC_INTERF_THRESHOLD" with
+        | None -> default
+        | Some threshold -> (
+          match int_of_string_opt threshold with
+          | None ->
+            fatal "invalid interference threshold %S (should be an integer)"
+              threshold
+          | Some value as threshold -> if value < 0 then None else threshold))
 end

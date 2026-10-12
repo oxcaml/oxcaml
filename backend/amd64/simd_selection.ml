@@ -134,6 +134,21 @@ let check_float_rounding = function
   | 0x8 | 0x9 | 0xA | 0xB | 0xC -> ()
   | i -> bad_immediate "Invalid float rounding immediate: %d" i
 
+let select_operation_aes ~dbg:_ op args =
+  if not (Arch.Extension.enabled AES)
+  then None
+  else
+    match op with
+    | "caml_aes_dec" -> sse_or_avx aesdec vaesdec args
+    | "caml_aes_declast" -> sse_or_avx aesdeclast vaesdeclast args
+    | "caml_aes_enc" -> sse_or_avx aesenc vaesenc args
+    | "caml_aes_enclast" -> sse_or_avx aesenclast vaesenclast args
+    | "caml_aes_imc" -> sse_or_avx aesimc vaesimc args
+    | "caml_aes_keygenassist" ->
+      let i, args = extract_constant args ~max:255 op in
+      sse_or_avx aeskeygenassist vaeskeygenassist ~i args
+    | _ -> None
+
 let select_operation_clmul ~dbg:_ op args =
   if not (Arch.Extension.enabled CLMUL)
   then None
@@ -1133,6 +1148,7 @@ let select_operation_cfg ~dbg op args =
     match opt with Some x -> Some x | None -> try_ ~dbg op args
   in
   None
+  |> or_else select_operation_aes
   |> or_else select_operation_clmul
   |> or_else select_operation_popcnt
   |> or_else select_operation_lzcnt

@@ -604,7 +604,7 @@ module With_subkind = struct
       | Tagged_immediate
       | Variant of
           { consts : Target_ocaml_int.Set.t;
-            non_consts : (Block_shape.t * full_kind list) Tag.Scannable.Map.t
+            non_consts : constructor_shape Tag.Scannable.Map.t
           }
       | Float_block of { num_fields : int }
       | Float_array
@@ -625,6 +625,10 @@ module With_subkind = struct
       | Unboxed_product_array
     (* CR mshinwell: more information could be added to
        [Unboxed_product_array] *)
+
+    and constructor_shape =
+      | Undetermined
+      | Determined of Block_shape.t * full_kind list
 
     (* CR vlaviron: only [Value] kinds need [value_subkind] and [nullable]
        fields. We should switch this to a variant in the future to avoid
@@ -679,19 +683,27 @@ module With_subkind = struct
             let field_lists2 = Tag.Scannable.Map.data non_consts2 in
             assert (List.compare_lengths field_lists1 field_lists2 = 0);
             List.for_all2
-              (fun (shape1, fields1) (shape2, fields2) ->
-                if not (Block_shape.equal shape1 shape2)
-                then false
-                else if List.compare_lengths fields1 fields2 <> 0
-                then false
-                else
-                  List.for_all2
-                    (fun { kind = _; value_subkind = d; nullable = _ }
-                         { kind = _;
-                           value_subkind = when_used_at;
-                           nullable = _
-                         } -> compatible d ~when_used_at)
-                    fields1 fields2)
+              (fun fields1 fields2 ->
+                match fields1, fields2 with
+                | Undetermined, Undetermined -> true
+                | Determined _, Undetermined ->
+                  (* A determined shape can be used where no shape is
+                     required. *)
+                  true
+                | Undetermined, Determined _ -> false
+                | Determined (shape1, fields1), Determined (shape2, fields2) ->
+                  if not (Block_shape.equal shape1 shape2)
+                  then false
+                  else if List.compare_lengths fields1 fields2 <> 0
+                  then false
+                  else
+                    List.for_all2
+                      (fun { kind = _; value_subkind = d; nullable = _ }
+                           { kind = _;
+                             value_subkind = when_used_at;
+                             nullable = _
+                           } -> compatible d ~when_used_at)
+                      fields1 fields2)
               field_lists1 field_lists2
       | ( Float_block { num_fields = num_fields1 },
           Float_block { num_fields = num_fields2 } ) ->
@@ -787,11 +799,14 @@ module With_subkind = struct
           in
           Format.fprintf ppf "%t=Variant((consts (%a))@ (non_consts (%a)))%t"
             colour Target_ocaml_int.Set.print consts
-            (Tag.Scannable.Map.print (fun ppf (_shape, fields) ->
-                 Format.fprintf ppf "[%a]"
-                   (Format.pp_print_list ~pp_sep:Format.pp_print_space
-                      print_field)
-                   fields))
+            (Tag.Scannable.Map.print (fun ppf fields ->
+                 match fields with
+                 | Undetermined -> Format.pp_print_string ppf "?"
+                 | Determined (_shape, fields) ->
+                   Format.fprintf ppf "[%a]"
+                     (Format.pp_print_list ~pp_sep:Format.pp_print_space
+                        print_field)
+                     fields))
             non_consts Flambda_colours.pop
         | Float_block { num_fields } ->
           Format.fprintf ppf "%t=Float_block(%d)%t" colour num_fields
@@ -973,7 +988,8 @@ module With_subkind = struct
            { consts = Target_ocaml_int.Set.empty;
              non_consts =
                Tag.Scannable.Map.singleton tag
-                 (Block_shape.Scannable Value_only, fields)
+                 (Non_null_value_subkind.Determined
+                    (Block_shape.Scannable Value_only, fields))
            })
         Non_nullable
     | None -> Misc.fatal_errorf "Tag %a is not scannable" Tag.print tag
@@ -1037,16 +1053,16 @@ module With_subkind = struct
       | Pvariant { consts; non_consts } -> (
         match consts, non_consts with
         | [], [] -> Misc.fatal_error "[Pvariant] with no constructors at all"
-        | [], [(tag, shape)] when tag = Obj.double_array_tag ->
+        | [], [(tag, shape)] when tag = Obj.double_array_tag -> (
           (* If we have [Obj.double_array_tag] here, this is always an all-float
              block, not an array. *)
           (* CR vlaviron: change the Lambda type *)
-          let num_fields =
-            match shape with
-            | Constructor_shape_uniform fields -> List.length fields
-            | Constructor_shape_mixed _ -> assert false
-          in
-          Float_block { num_fields }
+          match shape with
+          | Constructor_shape_uniform fields ->
+            Float_block { num_fields = List.length fields }
+          | Constructor_shape_undetermined -> Anything
+          | Constructor_shape_mixed _ ->
+            Misc.fatal_error "Invalid constructor shape for a float record")
         | [], _ :: _ | _ :: _, [] | _ :: _, _ :: _ ->
           let consts =
             Target_ocaml_int.Set.of_list
@@ -1059,14 +1075,18 @@ module With_subkind = struct
               (fun non_consts (tag, shape) ->
                 match Tag.Scannable.create tag with
                 | Some tag ->
-                  let shape_and_fields : Block_shape.t * t list =
+                  let shape_and_fields :
+                      Non_null_value_subkind.constructor_shape =
                     (* CR mshinwell/vlaviron: In both of these cases it would be
                        nice to propagate immediacy information. *)
                     match (shape : Lambda.constructor_shape) with
+                    | Constructor_shape_undetermined -> Undetermined
                     | Constructor_shape_uniform fields ->
-                      ( Scannable Value_only,
-                        List.map (from_lambda_value_kind ~machine_width) fields
-                      )
+                      Determined
+                        ( Scannable Value_only,
+                          List.map
+                            (from_lambda_value_kind ~machine_width)
+                            fields )
                     | Constructor_shape_mixed mixed_block_shape ->
                       let mixed_block_shape =
                         Mixed_block_lambda_shape.of_mixed_block_elements
@@ -1108,7 +1128,7 @@ module With_subkind = struct
                           (Scannable_block_shape.from_mixed_block_shape
                              mixed_block_shape)
                       in
-                      block_shape, fields
+                      Determined (block_shape, fields)
                   in
                   Tag.Scannable.Map.add tag shape_and_fields non_consts
                 | None ->

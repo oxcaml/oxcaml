@@ -29,7 +29,7 @@
   (name ocamldep)
   (modes byte native)
   (modules ocamldep)
-  (libraries ocamlfrontend ocamlbytecomp))
+  (libraries ocamlcommon))
 
 (install
   (files
@@ -111,7 +111,7 @@
 (library
   (name debug_printers)
   (modes byte)
-  (libraries ocamlfrontend)
+  (libraries ocamlfrontend flambda2_kinds)
   (modules debug_printers))
 
 (rule

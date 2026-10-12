@@ -290,6 +290,7 @@ ocaml/primitives.new
 /parsing/camlinternalMenhirLib.ml
 /parsing/camlinternalMenhirLib.mli
 
+/runtime/api-testing
 /runtime/domain_state.inc
 /runtime/caml/m.h
 /runtime/caml/s.h
@@ -383,3 +384,6 @@ ocaml/primitives.new
 /yacc/.gdb_history
 
 /natdynlinkops
+
+# Symlinks to nix-provided sources, created by make.
+/external/ast-dependent-libs/deps/

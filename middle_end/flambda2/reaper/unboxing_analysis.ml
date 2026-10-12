@@ -84,7 +84,7 @@ module Unboxed_fields = struct
 
   let rec fold_with_kind (f : Flambda_kind.t -> 'a -> 'b -> 'b) (fields : 'a t)
       acc =
-    Field.Map.fold
+    Field.Map.ordered_fold
       (fun field elt acc ->
         match elt with
         | Not_unboxed elt -> f (Field.kind field) elt acc
@@ -119,7 +119,7 @@ module Unboxed_fields = struct
     | Unboxed fields1, Unboxed fields2 -> fold2_subset f fields1 fields2 acc
 
   and fold2_subset f fields1 fields2 acc =
-    Field.Map.fold
+    Field.Map.ordered_fold
       (fun field f1 acc ->
         match Field.Map.find field fields2 with
         | exception Not_found ->
@@ -131,7 +131,7 @@ module Unboxed_fields = struct
       fields1 acc
 
   let rec fold2_subset_with_kind f fields1 fields2 acc =
-    Field.Map.fold
+    Field.Map.ordered_fold
       (fun field f1 acc ->
         match Field.Map.find field fields2 with
         | exception Not_found ->
@@ -247,94 +247,9 @@ let to_change_representation x = to_change_representation_tbl % [x]
 let lambda_lifting =
   Oxcaml_args.Extra_options.bool __LOC__ "reaper-lambda-lifting"
 
-let datalog_rules =
+let calling_convention_changes_rules =
   saturate_in_order
-    [ (* If any usage is possible, do not change the representation. Note that
-         this rule will change in the future, when local value slots are
-         properly tracked: a closure will only local value slots that has
-         any_use will still be able to have its representation changed. *)
-      (* (let$ [x] = ["x"] in [any_usage x] ==> cannot_change_representation0
-         x); *)
-      (let$ [x; field; y] = ["x"; "field"; "y"] in
-       [ any_usage x;
-         unless1 Field.is_local field;
-         when1 Field.is_real_field field;
-         constructor ~base:x field ~from:y ]
-       ==> cannot_change_representation0 x);
-      (* If a block with a local field escapes, and that field is read again
-         from an [any_source] value, prevent changing the representation. This
-         ensures that for a block whose representation is changed, we can know
-         the source at each point. *)
-      (let$ [x; field; y; z] = ["x"; "field"; "y"; "z"] in
-       [ any_usage x;
-         when1 Field.is_local field;
-         reading_field field z;
-         constructor ~base:x field ~from:y ]
-       ==> cannot_change_representation0 x);
-      (* Likewise, if a block with a local field escapes, and that field is read
-         again from a value with several sources, prevent changing the
-         representation. *)
-      (let$ [usage; field; source1; source2; v] =
-         ["usage"; "field"; "source1"; "source2"; "v"]
-       in
-       [ rev_accessor ~base:usage field ~to_:v;
-         has_usage v;
-         when1 Field.is_local field;
-         sources usage source1;
-         has_source source1;
-         sources usage source2;
-         has_source source2;
-         distinct Cols.n source1 source2 ]
-       ==> cannot_change_representation0 source1);
-      (* If there exists an alias which has another source, and which uses any
-         real field of our allocation, we cannot change the representation. This
-         currently requires 4 rules due to the absence of disjunction in the
-         datalog engine. *)
-      (let$ [allocation_id; alias; alias_source; field; v] =
-         ["allocation_id"; "alias"; "alias_source"; "field"; "v"]
-       in
-       [ usages allocation_id alias;
-         sources alias alias_source;
-         has_source alias_source;
-         distinct Cols.n alias_source allocation_id;
-         when1 Field.is_real_field field;
-         rev_accessor ~base:alias field ~to_:v;
-         has_usage v ]
-       ==> cannot_change_representation0 allocation_id);
-      (let$ [allocation_id; alias; field; v] =
-         ["allocation_id"; "alias"; "field"; "v"]
-       in
-       [ usages allocation_id alias;
-         any_source alias;
-         when1 Field.is_real_field field;
-         rev_accessor ~base:alias field ~to_:v;
-         has_usage v ]
-       ==> cannot_change_representation0 allocation_id);
-      (* If the allocation has a source distinct from itself, its representation
-         cannot be changed (in fact, in that case, it shouldn't even be an
-         allocation). *)
-      (let$ [allocation_id; source] = ["allocation_id"; "source"] in
-       [ sources allocation_id source;
-         has_source source;
-         distinct Cols.n source allocation_id ]
-       ==> cannot_change_representation0 allocation_id);
-      (* Used but not its own source: either from any source, or it has no
-         source at all and it is dead code. In either case, do not unbox or
-         change the representation. *)
-      (let$ [allocation_id; usage] = ["allocation_id"; "usage"] in
-       [ usages allocation_id usage;
-         has_usage usage;
-         ~~(sources allocation_id allocation_id) ]
-       ==> cannot_change_representation0 allocation_id);
-      (let$ [allocation_id] = ["allocation_id"] in
-       [any_source allocation_id]
-       ==> cannot_change_representation0 allocation_id);
-      (let$ [call_witness; code_id] = ["call_witness"; "code_id"] in
-       [ constructor ~base:call_witness
-           !!Field.code_id_of_call_witness
-           ~from:code_id ]
-       ==> cannot_change_representation0 call_witness);
-      (let$ [x] = ["x"] in
+    [ (let$ [x] = ["x"] in
        [any_usage x] ==> cannot_change_witness_calling_convention x);
       (let$ [allocation_id; alias; alias_source; v] =
          ["allocation_id"; "alias"; "alias_source"; "v"]
@@ -392,7 +307,102 @@ let datalog_rules =
          constructor ~base:call_witness
            !!Field.code_id_of_call_witness
            ~from:codeid ]
-       ==> cannot_change_calling_convention codeid);
+       ==> cannot_change_calling_convention codeid) ]
+
+(* The analysis scope of the rules below. It is set before running them rather
+   than passed as a parameter, so that the schedules are not rebuilt on each
+   run. *)
+let current_analysis_scope = ref Analysis_scope.Current_unit
+
+let is_local field = Analysis_scope.is_local_field !current_analysis_scope field
+
+let unboxing_rules =
+  saturate_in_order
+    [ (* If any usage is possible, do not change the representation. Note that
+         this rule will change in the future, when local value slots are
+         properly tracked: a closure will only local value slots that has
+         any_use will still be able to have its representation changed. *)
+      (* (let$ [x] = ["x"] in [any_usage x] ==> cannot_change_representation0
+         x); *)
+      (let$ [x; field; y] = ["x"; "field"; "y"] in
+       [ any_usage x;
+         unless1 is_local field;
+         when1 Field.is_real_field field;
+         constructor ~base:x field ~from:y ]
+       ==> cannot_change_representation0 x);
+      (* If a block with a local field escapes, and that field is read again
+         from an [any_source] value, prevent changing the representation. This
+         ensures that for a block whose representation is changed, we can know
+         the source at each point. *)
+      (let$ [x; field; y; z] = ["x"; "field"; "y"; "z"] in
+       [ any_usage x;
+         when1 is_local field;
+         reading_field field z;
+         constructor ~base:x field ~from:y ]
+       ==> cannot_change_representation0 x);
+      (* Likewise, if a block with a local field escapes, and that field is read
+         again from a value with several sources, prevent changing the
+         representation. *)
+      (let$ [usage; field; source1; source2; v] =
+         ["usage"; "field"; "source1"; "source2"; "v"]
+       in
+       [ rev_accessor ~base:usage field ~to_:v;
+         has_usage v;
+         when1 is_local field;
+         sources usage source1;
+         has_source source1;
+         sources usage source2;
+         has_source source2;
+         distinct Cols.n source1 source2 ]
+       ==> cannot_change_representation0 source1);
+      (* If there exists an alias which has another source, and which uses any
+         real field of our allocation, we cannot change the representation. This
+         currently requires 4 rules due to the absence of disjunction in the
+         datalog engine. *)
+      (let$ [allocation_id; alias; alias_source; field; v] =
+         ["allocation_id"; "alias"; "alias_source"; "field"; "v"]
+       in
+       [ usages allocation_id alias;
+         sources alias alias_source;
+         has_source alias_source;
+         distinct Cols.n alias_source allocation_id;
+         when1 Field.is_real_field field;
+         rev_accessor ~base:alias field ~to_:v;
+         has_usage v ]
+       ==> cannot_change_representation0 allocation_id);
+      (let$ [allocation_id; alias; field; v] =
+         ["allocation_id"; "alias"; "field"; "v"]
+       in
+       [ usages allocation_id alias;
+         any_source alias;
+         when1 Field.is_real_field field;
+         rev_accessor ~base:alias field ~to_:v;
+         has_usage v ]
+       ==> cannot_change_representation0 allocation_id);
+      (* If the allocation has a source distinct from itself, its representation
+         cannot be changed (in fact, in that case, it shouldn't even be an
+         allocation). *)
+      (let$ [allocation_id; source] = ["allocation_id"; "source"] in
+       [ sources allocation_id source;
+         has_source source;
+         distinct Cols.n source allocation_id ]
+       ==> cannot_change_representation0 allocation_id);
+      (* Used but not its own source: either from any source, or it has no
+         source at all and it is dead code. In either case, do not unbox or
+         change the representation. *)
+      (let$ [allocation_id; usage] = ["allocation_id"; "usage"] in
+       [ usages allocation_id usage;
+         has_usage usage;
+         ~~(sources allocation_id allocation_id) ]
+       ==> cannot_change_representation0 allocation_id);
+      (let$ [allocation_id] = ["allocation_id"] in
+       [any_source allocation_id]
+       ==> cannot_change_representation0 allocation_id);
+      (let$ [call_witness; code_id] = ["call_witness"; "code_id"] in
+       [ constructor ~base:call_witness
+           !!Field.code_id_of_call_witness
+           ~from:code_id ]
+       ==> cannot_change_representation0 call_witness);
       (* If the representation of any closure in a set of closures cannot be
          changed, the representation of all the closures in the set cannot be
          changed. *)
@@ -652,12 +662,15 @@ let cannot_change_calling_convention_query =
   let^? [x], [] = ["x"], [] in
   [cannot_change_calling_convention x]
 
-let cannot_change_calling_convention uses v =
+let cannot_change_calling_convention ~analysis_scope uses v =
   (not (Flambda_features.reaper_change_calling_conventions ()))
-  || (not (Current_unit.is_current (Code_id.get_compilation_unit v)))
+  || (not
+        (Analysis_scope.contains_unit analysis_scope
+           (Code_id.get_compilation_unit v)))
   || cannot_change_calling_convention_query [Code_id_or_name.code_id v] uses.db
 
-let perform_analysis0 db ~stats =
+let perform_analysis0 db ~stats ~analysis_scope =
+  current_analysis_scope := analysis_scope;
   let db =
     Profile.record_call ~accumulate:true "compute_unboxing_decisions" (fun () ->
         (* We need to do this after [field_of_constructor_is_used] is computed,
@@ -686,7 +699,7 @@ let perform_analysis0 db ~stats =
         in
         List.fold_left
           (fun db rule -> Datalog.Schedule.run ~stats rule db)
-          db datalog_rules)
+          db unboxing_rules)
   in
   let name_of_node =
     if Flambda_features.debug_reaper "nostamps"
@@ -739,9 +752,14 @@ let perform_analysis0 db ~stats =
                 PTA.get_direct_usages db
                   (Code_id_or_name.Map.singleton to_patch ())
               in
+              let compilation_unit =
+                Code_id_or_name.compilation_unit to_patch
+              in
               let fields =
                 mk_unboxed_fields ~has_to_be_unboxed
-                  ~mk:(fun kind name -> Variable.create name kind)
+                  ~mk:(fun kind name ->
+                    Variable.create_in_compilation_unit ~compilation_unit name
+                      kind)
                   db code_or_name
                   (PTA.get_fields db
                      (PTA.add_usages_through_function_slots
@@ -800,10 +818,12 @@ let perform_analysis0 db ~stats =
                 in
                 add_to_s (Block_representation (repr, !r + 1)) code_id_or_name
               | Set_of_closures l ->
+                let compilation_unit =
+                  Code_id_or_name.compilation_unit code_id_or_name
+                in
                 let mk kind name =
-                  Value_slot.create
-                    (Current_unit.get_cu_exn ())
-                    ~name ~is_always_immediate:false kind
+                  Value_slot.create compilation_unit ~name
+                    ~is_always_immediate:false kind
                 in
                 let fields =
                   PTA.get_fields_usage_of_constructors db
@@ -819,10 +839,15 @@ let perform_analysis0 db ~stats =
                   List.fold_left
                     (fun acc (fs, _) ->
                       Function_slot.Map.add fs
-                        (Function_slot.create
-                           (Current_unit.get_cu_exn ())
+                        (Function_slot.create compilation_unit
                            ~name:(Function_slot.name fs)
-                           ~is_always_immediate:false Flambda_kind.value)
+                             (* CR-someday ncourant: The reaper currently never
+                                changes the function slot size of changed arity
+                                functions, as it preserves their number of
+                                complex parameters. It would be possible to
+                                change it, but only for functions that have a
+                                changed representation as well. *)
+                           ~size:(Function_slot.size fs))
                         acc)
                     Function_slot.Map.empty l
                 in
@@ -841,11 +866,21 @@ let perform_analysis0 db ~stats =
   in
   { db; unboxed_fields = unboxed; changed_representation }
 
-let perform_analysis db ~stats =
+let perform_analysis db ~stats ~analysis_scope =
+  let db =
+    if Flambda_features.reaper_change_calling_conventions ()
+    then
+      Profile.record_call ~accumulate:true "compute_calling_convention_changes"
+        (fun () ->
+          List.fold_left
+            (fun db rule -> Datalog.Schedule.run ~stats rule db)
+            db calling_convention_changes_rules)
+    else db
+  in
   if
     Flambda_features.reaper_unbox ()
     && Flambda_features.reaper_change_calling_conventions ()
-  then perform_analysis0 db ~stats
+  then perform_analysis0 db ~stats ~analysis_scope
   else
     { db;
       unboxed_fields = Code_id_or_name.Map.empty;
@@ -914,8 +949,8 @@ let get_arity_and_modes params_decisions =
            arity)),
     modes )
 
-let compute_code_changes uses ~rewrite_kind_with_subkind ~rewrite_result_types
-    ~code_deps =
+let compute_code_changes uses ~analysis_scope ~rewrite_kind_with_subkind
+    ~rewrite_result_types ~code_deps =
   let get_unboxed_fields cn =
     Code_id_or_name.Map.find_opt cn uses.unboxed_fields
   in
@@ -953,7 +988,7 @@ let compute_code_changes uses ~rewrite_kind_with_subkind ~rewrite_result_types
         else Code_metadata.with_is_my_closure_used false code_metadata
       in
       let calling_convention_change, code_metadata =
-        if cannot_change_calling_convention uses code_id
+        if cannot_change_calling_convention ~analysis_scope uses code_id
         then
           (* We still need to rewrite the kinds and subkinds of parameters and
              returns, as they could be poisoned. *)
@@ -962,6 +997,7 @@ let compute_code_changes uses ~rewrite_kind_with_subkind ~rewrite_result_types
               (fun var kind -> rewrite_kind_with_subkind (Name.var var) kind)
               vars kinds
           in
+          let original_arity = Code_metadata.params_arity code_metadata in
           let params_arity =
             Flambda_arity.create
               (List.map
@@ -969,14 +1005,15 @@ let compute_code_changes uses ~rewrite_kind_with_subkind ~rewrite_result_types
                    Flambda_arity.Component_for_creation.(
                      Unboxed_product
                        (List.map (fun kind -> Singleton kind) kinds)))
-                 (Flambda_arity.group_by_parameter code_dep.arity
+                 (Flambda_arity.group_by_parameter original_arity
                     (rewrite_kinds code_dep.params
-                       (Flambda_arity.unarize code_dep.arity))))
+                       (Flambda_arity.unarize original_arity))))
           in
           let result_arity =
             Flambda_arity.create_singletons
               (rewrite_kinds code_dep.return
-                 (Flambda_arity.unarized_components code_dep.result_arity))
+                 (Flambda_arity.unarized_components
+                    (Code_metadata.result_arity code_metadata)))
           in
           ( Not_changing_calling_convention,
             Code_metadata.with_params_arity params_arity
@@ -991,7 +1028,7 @@ let compute_code_changes uses ~rewrite_kind_with_subkind ~rewrite_result_types
                   if is_var_used param then Keep (param, kind) else Delete
                 | Some fields -> Unbox fields)
               code_dep.params
-              (Flambda_arity.unarize code_dep.arity)
+              (Flambda_arity.unarize (Code_metadata.params_arity code_metadata))
           in
           let my_closure_decision, code_metadata =
             match
@@ -1011,7 +1048,8 @@ let compute_code_changes uses ~rewrite_kind_with_subkind ~rewrite_result_types
                   if is_var_used v then Keep (v, kind) else Delete
                 | Some fields -> Unbox fields)
               code_dep.return
-              (Flambda_arity.unarized_components code_dep.result_arity)
+              (Flambda_arity.unarized_components
+                 (Code_metadata.result_arity code_metadata))
           in
           let result_arity =
             Flambda_arity.unarize_t (arity_of_decisions return_decisions)
@@ -1105,33 +1143,31 @@ let compute_code_changes uses ~rewrite_kind_with_subkind ~rewrite_result_types
       { calling_convention_change; code_metadata })
     code_deps
 
-let get_calling_convention_change t code_id =
+let get_calling_convention_change t ~analysis_scope code_id =
   match Code_id.Map.find_opt code_id t with
   | None ->
-    if Current_unit.is_current (Code_id.get_compilation_unit code_id)
+    if Analysis_scope.contains_code_id analysis_scope code_id
     then
       Misc.fatal_errorf
-        "[get_calling_convention_change]: code_id %a is in current unit but \
+        "[get_calling_convention_change]: code_id %a is in analysis scope but \
          missing in code changes"
         Code_id.print code_id
     else Not_changing_calling_convention
   | Some code_change -> code_change.calling_convention_change
 
-let is_changing_calling_convention t code_id =
-  match get_calling_convention_change t code_id with
+let is_changing_calling_convention t ~analysis_scope code_id =
+  match get_calling_convention_change t ~analysis_scope code_id with
   | Not_changing_calling_convention -> false
   | Changing_calling_convention _ -> true
 
-let get_code_metadata t code_id =
-  if not (Current_unit.is_current (Code_id.get_compilation_unit code_id))
-  then
-    Misc.fatal_errorf
-      "[get_code_metadata]: code_id %a is not from the current unit"
-      Code_id.print code_id;
+let find_code_metadata t ~analysis_scope code_id =
   match Code_id.Map.find_opt code_id t with
   | None ->
-    Misc.fatal_errorf
-      "[get_code_metadata]: code_id %a is in current unit but missing in code \
-       changes"
-      Code_id.print code_id
-  | Some code_change -> code_change.code_metadata
+    if Analysis_scope.contains_code_id analysis_scope code_id
+    then
+      Misc.fatal_errorf
+        "[find_code_metadata]: code_id %a is in analysis scope but missing in \
+         code changes"
+        Code_id.print code_id
+    else None
+  | Some code_change -> Some code_change.code_metadata

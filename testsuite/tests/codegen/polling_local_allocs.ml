@@ -3,6 +3,7 @@
  no-stack-checks;
  no-frame_pointers;
  no-address-sanitizer;
+ flags += " -g -gdwarf-inlined-frames";
  expect.opt;
 *)
 

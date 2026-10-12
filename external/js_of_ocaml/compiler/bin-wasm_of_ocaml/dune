@@ -9,6 +9,7 @@
   compiler-libs.common
   js_of_ocaml-compiler.runtime-files
   yojson
+  unix
   (select
    findlib_support.ml
    from
@@ -27,21 +28,33 @@
   gen/gen.exe
   ../../runtime/wasm/runtime.js
   ../../runtime/wasm/deps.json
+  ../../runtime/wasm/runtime-wasi.js
+  ../../runtime/wasm/deps-wasi.json
+  ../../runtime/wasm/libc.wasm
   (glob_files ../../runtime/wasm/*.wat)
-  (glob_files ../../runtime/wasm/runtime-*.wasm))
+  (glob_files ../../runtime/wasm/runtime-*.wasm)
+  (glob_files ../../runtime/wasm/*-impl.wasm))
  (action
   (with-stdout-to
    %{target}
    (run %{deps}))))
 
 (rule
- (targets wasm_of_ocaml.1)
+ (target
+  (dir cmdliner-support))
+ (deps wasm_of_ocaml.exe)
  (action
-  (with-stdout-to
-   %{targets}
-   (run %{bin:wasm_of_ocaml} --help=groff))))
+  (ignore-stdout
+   (run
+    cmdliner
+    install
+    tool-support
+    ./wasm_of_ocaml.exe:wasm_of_ocaml
+    cmdliner-support))))
 
-(install
- (section man)
- (package wasm_of_ocaml-compiler)
- (files wasm_of_ocaml.1))
+;; Restore once fixed in dune
+;; (install
+;;  (section share_root)
+;;  (package wasm_of_ocaml-compiler)
+;;  (dirs
+;;   (cmdliner-support/share as .)))

@@ -27,15 +27,9 @@
 #include "caml/fail.h"
 #include "caml/fiber.h"
 #include "caml/fix_code.h"
-#include "caml/interp.h"
-#include "caml/intext.h"
-#include "caml/major_gc.h"
 #include "caml/memory.h"
-#include "caml/minor_gc.h"
 #include "caml/misc.h"
 #include "caml/mlvalues.h"
-#include "caml/prims.h"
-#include "caml/startup_aux.h"
 #include "caml/instruct.h"
 
 #ifndef NATIVE_CODE

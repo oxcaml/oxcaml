@@ -416,7 +416,7 @@ end = struct
 
   let do_create cfg =
     Regalloc_invariants.precondition cfg;
-    if Lazy.force Regalloc_utils.validator_debug
+    if Regalloc_utils.Param.get Regalloc_utils.validator_debug
     then
       (* CR-someday: We don't save the file with [fun_name] in the filename
          because there is an appended stamp that is fragile and is annoying when
@@ -1423,7 +1423,7 @@ let verify_entrypoint (equations : Equation_set.t) (desc : Description.t)
 
 let test (desc : Description.t) (cfg : Cfg_with_layout.t) :
     (Cfg_with_layout.t, Error.t) Result.t =
-  if Lazy.force Regalloc_utils.validator_debug
+  if Regalloc_utils.Param.get Regalloc_utils.validator_debug
   then
     (* CR-someday: We don't save the file with [fun_name] in the filename
        because there is an appended stamp that is fragile and is annoying when
@@ -1451,7 +1451,7 @@ let test (desc : Description.t) (cfg : Cfg_with_layout.t) :
         "Unable to compute validation equation sets from CFG for function %s@."
         (Cfg_with_layout.cfg cfg).fun_name
   in
-  if Lazy.force Regalloc_utils.validator_debug
+  if Regalloc_utils.Param.get Regalloc_utils.validator_debug
   then
     (* CR-someday: We don't save the file with [fun_name] in the filename
        because there is an appended stamp that is fragile and is annoying when

@@ -45,7 +45,7 @@ type unbound_variable_reason = | Upstream_compatibility
 type jkind_initialization_choice = Sort | Any
 
 type value_loc =
-    Tuple | Poly_variant | Object_field
+    Poly_variant | Object_field
 
 type sort_loc =
     Fun_arg | Fun_ret
@@ -1083,12 +1083,11 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       in
       loop mode args
   | Ptyp_tuple stl ->
-    let desc, typ =
-      transl_type_aux_tuple env ~loc ~policy ~row_context stl
-    in
-    ctyp desc typ
+    let ctys, tys = transl_type_aux_tuple env ~loc ~policy ~row_context stl in
+    ctyp (Ttyp_tuple ctys) (newty (Ttuple tys))
   | Ptyp_unboxed_tuple stl ->
     Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
+<<<<<<< HEAD
     assert (List.length stl >= 2);
     Option.iter (fun l -> Error.log_and_raise loc env (Repeated_tuple_label l))
       (Misc.repeated_label stl);
@@ -1104,6 +1103,26 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
                (List.map (fun (label, ctyp) -> label, ctyp.ctyp_type) tl))
     in
     ctyp (Ttyp_unboxed_tuple tl) ctyp_type
+||||||| ad79b35c2d
+    assert (List.length stl >= 2);
+    Option.iter (fun l -> raise (Error (loc, env, Repeated_tuple_label l)))
+      (Misc.repeated_label stl);
+    let tl =
+      List.map
+        (fun (label, t) ->
+           label,
+           transl_type env ~policy ~row_context With_locality.Const.legacy t)
+        stl
+    in
+    let ctyp_type =
+      newty (Tunboxed_tuple
+               (List.map (fun (label, ctyp) -> label, ctyp.ctyp_type) tl))
+    in
+    ctyp (Ttyp_unboxed_tuple tl) ctyp_type
+=======
+    let ctys, tys = transl_type_aux_tuple env ~loc ~policy ~row_context stl in
+    ctyp (Ttyp_unboxed_tuple ctys) (newty (Tunboxed_tuple tys))
+>>>>>>> origin/main
   | Ptyp_constr(lid, stl) ->
       let (path, decl) = Env.lookup_type ~loc:lid.loc lid.txt env in
       let stl =
@@ -1611,6 +1630,7 @@ and transl_type_aux_tuple env ~loc ~policy ~row_context stl =
          l, transl_type env ~policy ~row_context With_locality.Const.legacy t)
       stl
   in
+<<<<<<< HEAD
   List.iter (fun (_, {ctyp_type; ctyp_loc}) ->
     (* CR layouts v5: remove value requirement *)
     match
@@ -1625,6 +1645,24 @@ and transl_type_aux_tuple env ~loc ~policy ~row_context stl =
     newty (Ttuple (List.map (fun (label, ctyp) -> label, ctyp.ctyp_type) ctys))
   in
   Ttyp_tuple ctys, ctyp_type
+||||||| ad79b35c2d
+  List.iter (fun (_, {ctyp_type; ctyp_loc}) ->
+    (* CR layouts v5: remove value requirement *)
+    match
+      constrain_type_jkind env ctyp_type (Jkind.Builtin.value_or_null ~why:Tuple_element)
+    with
+    | Ok _ -> ()
+    | Error e ->
+      raise (Error(ctyp_loc, env,
+                   Non_value {vloc = Tuple; err = e; typ = ctyp_type})))
+    ctys;
+  let ctyp_type =
+    newty (Ttuple (List.map (fun (label, ctyp) -> label, ctyp.ctyp_type) ctys))
+  in
+  Ttyp_tuple ctys, ctyp_type
+=======
+  ctys, List.map (fun (label, ctyp) -> label, ctyp.ctyp_type) ctys
+>>>>>>> origin/main
 
 and transl_fields env ~policy ~row_context o fields =
   let hfields = Hashtbl.create 17 in
@@ -1819,16 +1857,11 @@ let transl_simple_type_delayed env mode styp =
   in
   (typ, instance typ.ctyp_type, force)
 
-let transl_type_scheme_mono env styp =
+let transl_type_scheme_mono env mode styp =
   let typ =
     with_local_level_generalize begin fun () ->
       TyVarEnv.reset ();
-      transl_simple_type
-        ~new_var_jkind:Sort
-        env
-        ~closed:false
-        With_locality.Const.legacy
-        styp
+      transl_simple_type ~new_var_jkind:Sort env ~closed:false mode styp
     end
     ~before_generalize:generalize_ctyp
   in
@@ -1840,7 +1873,7 @@ let transl_type_scheme_mono env styp =
     remove_mode_and_jkind_variables ~zap_scope typ.ctyp_type);
   typ
 
-let transl_type_scheme_poly env attrs loc vars inner_type =
+let transl_type_scheme_poly env mode attrs loc vars inner_type =
   let typed_vars, univars, typ =
     with_local_level_generalize begin fun () ->
       TyVarEnv.reset ();
@@ -1850,11 +1883,10 @@ let transl_type_scheme_poly env attrs loc vars inner_type =
       let typ =
         if Language_extension.erasable_extensions_only () then
           transl_simple_type_impl ~new_var_jkind:Sort env ~univars
-            ~policy:Closed_for_upstream_compatibility With_locality.Const.legacy
-            inner_type
+            ~policy:Closed_for_upstream_compatibility mode inner_type
         else
           transl_simple_type_impl ~new_var_jkind:Sort env ~univars ~policy:Open
-            With_locality.Const.legacy inner_type
+            mode inner_type
       in
       (typed_vars, univars, typ)
     end
@@ -1869,18 +1901,18 @@ let transl_type_scheme_poly env attrs loc vars inner_type =
     ctyp_loc = loc;
     ctyp_attributes = attrs }
 
-let transl_type_scheme_lmono env styp =
+let transl_type_scheme_lmono env mode styp =
   match styp.ptyp_desc with
   | Ptyp_poly (vars, st) ->
-    transl_type_scheme_poly env styp.ptyp_attributes
+    transl_type_scheme_poly env mode styp.ptyp_attributes
       styp.ptyp_loc vars st
   | _ ->
-    transl_type_scheme_mono env styp
+    transl_type_scheme_mono env mode styp
 
-let transl_type_scheme_poly_val env styp =
+let transl_type_scheme_poly_val env mode styp =
   let cty, sort_vars =
     Jkind_types.Sort.generalize_with (fun () ->
-      transl_type_scheme_lmono env styp)
+      transl_type_scheme_lmono env mode styp)
   in
   if List.is_empty sort_vars then
     Location.prerr_warning cty.ctyp_loc Warnings.Useless_valpoly;
@@ -1890,7 +1922,7 @@ let transl_type_scheme_poly_val env styp =
   let ctyp = { cty with ctyp_desc = Ttyp_newlayout (vars_names_loc, cty) } in
   sort_vars, ctyp
 
-let transl_type_scheme_newlayout env attrs loc vars inner_type =
+let transl_type_scheme_newlayout env mode attrs loc vars inner_type =
   (* Use [with_local_level] just for scoping *)
   with_local_level begin fun () ->
     let env', ident_var_pairs =
@@ -1903,7 +1935,7 @@ let transl_type_scheme_newlayout env attrs loc vars inner_type =
         (env', (id, v) :: pairs))
       (env, []) vars
     in
-    let cty = transl_type_scheme_lmono env' inner_type in
+    let cty = transl_type_scheme_lmono env' mode inner_type in
     let ty = cty.ctyp_type in
     (* Replace references to the ident with a Var at generic_level *)
     let seen = Hashtbl.create 8 in
@@ -1951,7 +1983,7 @@ let transl_type_scheme_newlayout env attrs loc vars inner_type =
     ident_var_pairs |> List.map snd |> List.rev, ctyp
   end
 
-let transl_type_scheme env styp valdecl_flag =
+let transl_type_scheme env mode styp valdecl_flag =
   match styp.ptyp_desc, valdecl_flag with
   | Ptyp_newlayout _, Lpoly ->
     Language_extension.assert_enabled ~loc:styp.ptyp_loc Layout_poly
@@ -1960,10 +1992,10 @@ let transl_type_scheme env styp valdecl_flag =
   | Ptyp_newlayout (vars, st), Lmono ->
     Language_extension.assert_enabled ~loc:styp.ptyp_loc Layout_poly
       Language_extension.Alpha;
-    transl_type_scheme_newlayout env styp.ptyp_attributes
+    transl_type_scheme_newlayout env mode styp.ptyp_attributes
       styp.ptyp_loc vars st
-  | _, Lpoly -> transl_type_scheme_poly_val env styp
-  | _, Lmono -> [], transl_type_scheme_lmono env styp
+  | _, Lpoly -> transl_type_scheme_poly_val env mode styp
+  | _, Lmono -> [], transl_type_scheme_lmono env mode styp
 
 (* Error report *)
 
@@ -2039,12 +2071,13 @@ let report_error_doc loc env = function
         ]
   | Constructor_mismatch (ty, ty') ->
       wrap_printing_env ~error:true env (fun ()  ->
-        Out_type.prepare_for_printing [ty; ty'];
+        let base = Mode.With_locality.Const.legacy in
+        Out_type.prepare_for_printing ~base [ty; ty'];
         Location.errorf ~loc
           "This variant type contains a constructor %a@ \
            which should be@ %a"
-          pp_out_type (Out_type.tree_of_typexp Type ty)
-          pp_out_type (Out_type.tree_of_typexp Type ty')
+          pp_out_type (Out_type.tree_of_typexp ~base Type ty)
+          pp_out_type (Out_type.tree_of_typexp ~base Type ty')
         )
   | Not_a_variant ty ->
       Location.aligned_error_hint ~loc
@@ -2097,7 +2130,8 @@ let report_error_doc loc env = function
                   ("a" :: Jkind.Scannable_axes.to_string_list sa)
               | Layout (Sort (Univar _, _)) ->
                 Misc.fatal_error "univar"
-              | Layout (Sort (Base _, _) | Any _ | Product _ | Addressable _)
+              | Layout (Sort (Base _, _) | Any _ | Product _ | Addressable _
+                       | Box _)
               | Kconstr _ ->
                 fprintf ppf "kind %a" (Jkind.format env)
                   inferred_jkind)))
@@ -2141,7 +2175,6 @@ let report_error_doc loc env = function
   | Non_value {vloc; typ; err} ->
     let s =
       match vloc with
-      | Tuple -> "Tuple element"
       | Poly_variant -> "Polymorphic variant constructor argument"
       | Object_field -> "Object field"
     in

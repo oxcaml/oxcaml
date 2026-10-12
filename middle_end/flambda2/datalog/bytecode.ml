@@ -74,7 +74,9 @@ module Make (Iterator : Leapfrog.Iterator) = struct
    * 005:  exit
    *)
   type code =
-    | Exit
+    | Exit of unit
+      (* Make sure this is represented as a block, not an immediate, to avoid a
+         nested switch on %is_int / %get_tag *)
     | Goto : label -> code
     | Init :
         'k Or_null_sender.t * string * 'k Join_iterator.t * string list * label
@@ -131,7 +133,7 @@ module Make (Iterator : Leapfrog.Iterator) = struct
         -> code
 
   let labels = function
-    | Exit | Union _ | Call_with_bindings _ -> []
+    | Exit () | Union _ | Call_with_bindings _ -> []
     | Goto lab
     | Init (_, _, _, _, lab)
     | Advance (_, _, _, _, lab)
@@ -149,7 +151,7 @@ module Make (Iterator : Leapfrog.Iterator) = struct
   let print_label digits ppf (Label lab) = Format.fprintf ppf "%0*d" digits lab
 
   let print_code digits ppf = function
-    | Exit -> Format.fprintf ppf "exit"
+    | Exit () -> Format.fprintf ppf "exit"
     | Goto lab -> Format.fprintf ppf "goto@ %a" (print_label digits) lab
     | Init (_sender, name, _iterator, names, if_empty) ->
       Format.fprintf ppf "init@ %s,@ [@[%a]@],@ %a" name print_list names
@@ -378,7 +380,7 @@ module Make (Iterator : Leapfrog.Iterator) = struct
         List.for_all (fun (Label lab) -> 0 <= lab && lab < length) (labels code)
 
       let is_exit = function[@warning "-fragile-match"]
-        | Exit -> true
+        | Exit () -> true
         | _ -> false
 
       let create code =
@@ -410,7 +412,7 @@ module Make (Iterator : Leapfrog.Iterator) = struct
     text st;
     (* The last instruction is always an [Exit], which means we can use
        [unsafe_get] in [exec] after incrementing the program counter. *)
-    emit Exit st;
+    emit (Exit ()) st;
     let len = Dynarray.length delayed in
     let labels =
       Iarray.init (Dynarray.length labels) (fun i ->
@@ -456,7 +458,7 @@ module Make (Iterator : Leapfrog.Iterator) = struct
     let[@inline] goto (Label new_pc) = exec code new_pc in
     let[@inline] next () = goto (Label (pc + 1)) in
     match Iarray.unsafe_get code pc with
-    | Exit -> Explicit_exit
+    | Exit () -> Explicit_exit
     | Goto lab -> goto lab
     | Init (key_out, _name, iterator, _names, if_empty) -> (
       Join_iterator.init iterator;

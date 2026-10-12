@@ -54,10 +54,9 @@ module Info = struct
   let possibly_mutable t x = Code.Var.ISet.mem t.info_possibly_mutable x
 
   let update_def { info_defs; _ } x exp =
+    (* [Specialize_js] can introduce fresh variables *)
     let idx = Code.Var.idx x in
-    info_defs.(idx) <- Expr exp
-
-  let info_defs_length { info_defs; _ } = Array.length info_defs
+    if idx < Array.length info_defs then info_defs.(idx) <- Expr exp
 end
 
 let undefined = Phi Var.Set.empty
@@ -158,15 +157,18 @@ let propagate1 deps defs st x =
       | Constant _ | Apply _ | Prim _ | Special _ | Closure _ | Block _ ->
           Var.Set.singleton x
       | Field (y, n, _) ->
-          var_set_lift
-            (fun z ->
-              match defs.(Var.idx z) with
-              | Expr (Block (_, a, _, _)) when n < Array.length a ->
-                  let t = a.(n) in
-                  add_dep deps x t;
-                  Var.Tbl.get st t
-              | Phi _ | Param | Expr _ -> Var.Set.empty)
-            (Var.Tbl.get st y))
+          if Shape.State.mem x
+          then Var.Set.singleton x
+          else
+            var_set_lift
+              (fun z ->
+                match defs.(Var.idx z) with
+                | Expr (Block (_, a, _, _)) when n < Array.length a ->
+                    let t = a.(n) in
+                    add_dep deps x t;
+                    Var.Tbl.get st t
+                | Phi _ | Param | Expr _ -> Var.Set.empty)
+              (Var.Tbl.get st y))
 
 module G = Dgraph.Make_Imperative (Var) (Var.ISet) (Var.Tbl)
 
@@ -208,7 +210,8 @@ let rec block_escape st x =
             | Maybe_mutable -> Code.Var.ISet.add st.possibly_mutable y);
             Array.iter l ~f:(fun z -> block_escape st z)
         | Expr
-            (Prim (Extern ("caml_make_array" | "caml_array_of_uniform_array"), [ Pv y ]))
+            (Prim
+               (Extern (("caml_make_array" | "caml_array_of_uniform_array"), _), [ Pv y ]))
           -> block_escape st y
         | _ -> Code.Var.ISet.add st.possibly_mutable y))
     (Var.Tbl.get st.known_origins x)
@@ -218,9 +221,9 @@ let expr_escape st _x e =
   | Special _ | Constant _ | Closure _ | Block _ | Field _ -> ()
   | Apply { args; _ } -> List.iter args ~f:(fun x -> block_escape st x)
   | Prim (Array_get, [ Pv x; _ ]) -> block_escape st x
-  | Prim ((Vectlength | Array_get | Not | IsInt | Eq | Neq | Lt | Le | Ult), _) -> ()
-  | Prim (Extern ("caml_make_array" | "caml_array_of_uniform_array"), [ Pv _ ]) -> ()
-  | Prim (Extern name, l) ->
+  | Prim ((Vectlength _ | Array_get | Not | IsInt | Eq | Neq | Lt | Le | Ult), _) -> ()
+  | Prim (Extern (("caml_make_array" | "caml_array_of_uniform_array"), _), [ Pv _ ]) -> ()
+  | Prim (Extern (name, _), l) ->
       let ka =
         match Primitive.kind_args name with
         | Some l -> l
@@ -246,7 +249,7 @@ let expr_escape st _x e =
                     Array.iter a ~f:(fun x -> block_escape st x)
                 | Expr
                     (Prim
-                       ( Extern ("caml_make_array" | "caml_array_of_uniform_array")
+                       ( Extern (("caml_make_array" | "caml_array_of_uniform_array"), _)
                        , [ Pv y ] )) -> (
                     match st.defs.(Var.idx y) with
                     | Expr (Block (_, a, _, _)) ->
@@ -303,16 +306,17 @@ let propagate2 defs known_origins possibly_mutable st x =
       match e with
       | Constant _ | Closure _ | Apply _ | Prim _ | Block _ | Special _ -> false
       | Field (y, n, _) ->
-          Var.Tbl.get st y
-          || Var.Set.exists
-               (fun z ->
-                 match defs.(Var.idx z) with
-                 | Expr (Block (_, a, _, _)) ->
-                     n >= Array.length a
-                     || Var.ISet.mem possibly_mutable z
-                     || Var.Tbl.get st a.(n)
-                 | Phi _ | Param | Expr _ -> true)
-               (Var.Tbl.get known_origins y))
+          (not (Shape.State.mem x))
+          && (Var.Tbl.get st y
+             || Var.Set.exists
+                  (fun z ->
+                    match defs.(Var.idx z) with
+                    | Expr (Block (_, a, _, _)) ->
+                        n >= Array.length a
+                        || Var.ISet.mem possibly_mutable z
+                        || Var.Tbl.get st a.(n)
+                    | Phi _ | Param | Expr _ -> true)
+                  (Var.Tbl.get known_origins y)))
 
 module Domain2 = struct
   type t = bool
@@ -336,13 +340,14 @@ let get_approx
     top
     join
     x =
-  let s = Var.Tbl.get info_known_origins x in
-  if Var.Tbl.get info_maybe_unknown x
+  (* [Specialize_js] can introduce fresh variables *)
+  if Var.idx x >= Var.Tbl.length info_known_origins || Var.Tbl.get info_maybe_unknown x
   then top
   else
-    match Var.Set.cardinal s with
-    | 0 -> top
-    | 1 -> f (Var.Set.choose s)
+    let s = Var.Tbl.get info_known_origins x in
+    match Var.Set.to_list_bounded 1 s with
+    | Some [] -> top
+    | Some [ x ] -> f x
     | _ -> Var.Set.fold (fun x u -> join (f x) u) s (f (Var.Set.choose s))
 
 let the_def_of info x =
@@ -365,57 +370,46 @@ let the_def_of info x =
 let the_const_of ~eq info x =
   match x with
   | Pv x ->
-      (* TODO: Consider doing something to actually propagate constants
-         here. *)
-      (* If this variable was minted after we constructed the info table, conservatively
-         assume we know nothing. Transformations of array-access primitives in
-         [specialize_js.ml] mint variables in this way. *)
-      if Var.idx x >= Array.length info.Info.info_defs
-      then None
-      else
-        get_approx
-          info
-          (fun x ->
-            match info.info_defs.(Var.idx x) with
-            | Expr
-                (Constant
-                   (( Float _
-                    | Int _
-                    | Int32 _
-                    | Int64 _
-                    | NativeInt _
-                    | NativeString _
-                    | Float_array _ ) as c)) -> Some c
-            | Expr (Constant (String _ as c))
-              when not (Var.ISet.mem info.info_possibly_mutable x) -> Some c
-            | Expr (Constant c) when Config.Flag.safe_string () -> Some c
-            | _ -> None)
-          None
-          (fun u v ->
-            match u, v with
-            | Some i, Some j when eq i j -> u
-            | _ -> None)
-          x
+      get_approx
+        info
+        (fun x ->
+          match info.info_defs.(Var.idx x) with
+          | Expr
+              (Constant
+                 (( Float _
+                  | Int _
+                  | Int32 _
+                  | Int64 _
+                  | NativeInt _
+                  | NativeString _
+                  | Float_array _ ) as c)) -> Some c
+          | Expr (Constant (String _ as c))
+            when not (Var.ISet.mem info.info_possibly_mutable x) -> Some c
+          | Expr (Constant c) when Config.Flag.safe_string () -> Some c
+          | _ -> None)
+        None
+        (fun u v ->
+          match u, v with
+          | Some i, Some j when eq i j -> u
+          | _ -> None)
+        x
   | Pc c -> Some c
 
 let the_int info x =
   match x with
   | Pv x ->
-      if Var.idx x >= Array.length info.Info.info_defs
-      then None
-      else
-        get_approx
-          info
-          (fun x ->
-            match info.info_defs.(Var.idx x) with
-            | Expr (Constant (Int c)) -> Some c
-            | _ -> None)
-          None
-          (fun u v ->
-            match u, v with
-            | Some i, Some j when Targetint.equal i j -> u
-            | _ -> None)
-          x
+      get_approx
+        info
+        (fun x ->
+          match info.info_defs.(Var.idx x) with
+          | Expr (Constant (Int c)) -> Some c
+          | _ -> None)
+        None
+        (fun u v ->
+          match u, v with
+          | Some i, Some j when Targetint.equal i j -> u
+          | _ -> None)
+        x
   | Pc (Int c) -> Some c
   | Pc _ -> None
 
@@ -444,7 +438,8 @@ let the_native_string_of info x =
 let the_block_contents_of info x =
   match the_def_of info x with
   | Some (Block (_, a, _, _)) -> Some a
-  | Some (Prim (Extern ("caml_make_array" | "caml_array_of_uniform_array"), [ x ])) -> (
+  | Some (Prim (Extern (("caml_make_array" | "caml_array_of_uniform_array"), _), [ x ]))
+    -> (
       match the_def_of info x with
       | Some (Block (_, a, _, _)) -> Some a
       | _ -> None)
@@ -471,6 +466,214 @@ let direct_approx (info : Info.t) x =
         y
   | _ -> None
 
+type prop =
+  | PTop
+  | PBlock of
+      { fields_vars : Var.Set.t array
+      ; fields_shapes : Shape.Set.t array
+      }
+  | PFunction of
+      { arity : int
+      ; pure : bool
+      ; res_vars : Var.Set.t
+      ; res_shapes : Shape.Set.t
+      }
+
+let merge_prop p1 p2 =
+  match p1, p2 with
+  | PBlock b1, PBlock b2 ->
+      let len1 = Array.length b1.fields_vars in
+      let len2 = Array.length b2.fields_vars in
+      if len1 = len2
+      then
+        let fields_vars =
+          Array.init len1 ~f:(fun i ->
+              Var.Set.union b1.fields_vars.(i) b2.fields_vars.(i))
+        in
+        let fields_shapes =
+          Array.init len1 ~f:(fun i ->
+              Shape.Set.union b1.fields_shapes.(i) b2.fields_shapes.(i))
+        in
+        PBlock { fields_vars; fields_shapes }
+      else PTop
+  | PFunction f1, PFunction f2 when f1.arity = f2.arity ->
+      PFunction
+        { arity = f1.arity
+        ; pure = f1.pure && f2.pure
+        ; res_vars = Var.Set.union f1.res_vars f2.res_vars
+        ; res_shapes = Shape.Set.union f1.res_shapes f2.res_shapes
+        }
+  | _ -> PTop
+
+module VarSetShapeSetId = struct
+  type t = Var.Set.t * Shape.Set.t
+
+  let compare (v1, s1) (v2, s2) =
+    let c = Var.Set.compare v1 v2 in
+    if c <> 0 then c else Shape.Set.compare s1 s2
+end
+
+module VarSetShapeSetMap = Map.Make (VarSetShapeSetId)
+
+let shape_to_prop s =
+  match s.Shape.desc with
+  | Top -> PTop
+  | Block fields ->
+      let len = List.length fields in
+      PBlock
+        { fields_vars = Array.make len Var.Set.empty
+        ; fields_shapes = Array.of_list (List.map ~f:Shape.Set.singleton fields)
+        }
+  | Function { arity; pure; res } ->
+      PFunction
+        { arity; pure; res_vars = Var.Set.empty; res_shapes = Shape.Set.singleton res }
+
+let the_shape_of ~return_values ~pure ~blocks info =
+  let cache = Var.Hashtbl.create 17 in
+  let set_cache = ref VarSetShapeSetMap.empty in
+  let eval_var_cache = Var.Hashtbl.create 17 in
+  let rec compute_set vars shapes =
+    if Var.Set.compare_cardinal_with vars 1 = 0 && Shape.Set.is_empty shapes
+    then (
+      let x = Var.Set.choose vars in
+      match Var.Hashtbl.find_opt cache x with
+      | Some s -> s
+      | None ->
+          let s = compute_internal vars shapes in
+          Var.Hashtbl.replace cache x s;
+          s)
+    else compute_internal vars shapes
+  and compute_internal vars shapes =
+    let key = vars, shapes in
+    match VarSetShapeSetMap.find_opt key !set_cache with
+    | Some shape -> shape
+    | None ->
+        let shape_proxy = Shape.proxy () in
+        set_cache := VarSetShapeSetMap.add key shape_proxy !set_cache;
+        let unknown =
+          Var.Set.exists (fun x -> Var.Tbl.get info.Info.info_maybe_unknown x) vars
+        in
+        (if not unknown
+         then
+           let p_vars =
+             let expanded =
+               Var.Set.fold
+                 (fun x expanded ->
+                   Var.Set.union expanded (Var.Tbl.get info.Info.info_known_origins x))
+                 vars
+                 Var.Set.empty
+             in
+             if Var.Set.is_empty expanded
+             then None
+             else
+               let first = Var.Set.choose expanded in
+               let rest = Var.Set.remove first expanded in
+               Some
+                 (Var.Set.fold
+                    (fun x acc -> merge_prop acc (eval_var x))
+                    rest
+                    (eval_var first))
+           in
+           let p_shapes =
+             if Shape.Set.is_empty shapes
+             then None
+             else
+               let first = Shape.Set.choose shapes in
+               let rest = Shape.Set.remove first shapes in
+               Some
+                 (Shape.Set.fold
+                    (fun s acc -> merge_prop acc (shape_to_prop s))
+                    rest
+                    (shape_to_prop first))
+           in
+           let p_combined =
+             match p_vars, p_shapes with
+             | None, None -> PTop
+             | Some p, None | None, Some p -> p
+             | Some p1, Some p2 -> merge_prop p1 p2
+           in
+           shape_proxy.desc <- prop_to_desc p_combined);
+        shape_proxy
+  and prop_to_desc p : Shape.desc =
+    match p with
+    | PTop -> Shape.Top
+    | PBlock { fields_vars; fields_shapes } ->
+        Shape.Block
+          (List.init ~len:(Array.length fields_vars) ~f:(fun i ->
+               compute_set fields_vars.(i) fields_shapes.(i)))
+    | PFunction { arity; pure; res_vars; res_shapes } ->
+        Shape.Function { arity; pure; res = compute_set res_vars res_shapes }
+  and eval_var x =
+    match Var.Hashtbl.find_opt eval_var_cache x with
+    | Some p -> p
+    | None ->
+        let p = eval_var_uncached x in
+        Var.Hashtbl.replace eval_var_cache x p;
+        p
+  and eval_var_uncached x =
+    match Shape.State.get x with
+    | Some s -> shape_to_prop s
+    | None -> (
+        match info.Info.info_defs.(Var.idx x) with
+        | Expr (Block (_, a, _, Immutable)) ->
+            if not blocks
+            then PTop
+            else
+              PBlock
+                { fields_vars = Array.map ~f:Var.Set.singleton a
+                ; fields_shapes = Array.make (Array.length a) Shape.Set.empty
+                }
+        | Expr (Closure (l, _, _)) ->
+            let res_vars =
+              match Var.Map.find_opt x return_values with
+              | None -> Var.Set.empty
+              | Some set -> set
+            in
+            PFunction
+              { arity = List.length l
+              ; pure = Pure_fun.pure pure x
+              ; res_vars
+              ; res_shapes = Shape.Set.empty
+              }
+        | Expr (Special (Alias_prim name)) -> (
+            try
+              let arity = Primitive.arity name in
+              let pure = Primitive.is_pure name in
+              PFunction
+                { arity; pure; res_vars = Var.Set.empty; res_shapes = Shape.Set.empty }
+            with Not_found -> PTop)
+        | Expr (Apply { f; args; _ }) ->
+            let f_shape = compute_set (Var.Set.singleton f) Shape.Set.empty in
+            let rec loop n' shape =
+              match shape.Shape.desc with
+              | Function { arity = n; pure; res } ->
+                  if n = n'
+                  then shape_to_prop res
+                  else if n' < n
+                  then
+                    PFunction
+                      { arity = n - n'
+                      ; pure
+                      ; res_vars = Var.Set.empty
+                      ; res_shapes = Shape.Set.singleton res
+                      }
+                  else loop (n' - n) res
+              | Block _ | Top -> PTop
+            in
+            loop (List.length args) f_shape
+        | _ -> PTop)
+  in
+  let get x =
+    match Var.Hashtbl.find_opt cache x with
+    | Some s -> s
+    | None ->
+        let s = compute_internal (Var.Set.singleton x) Shape.Set.empty in
+        Var.Hashtbl.replace cache x s;
+        s
+  in
+  let set x s = Var.Hashtbl.replace cache x s in
+  get, set
+
 let build_subst (info : Info.t) vars =
   let nv = Var.count () in
   let subst = Array.init nv ~f:(fun i -> Var.of_idx i) in
@@ -481,7 +684,7 @@ let build_subst (info : Info.t) vars =
       (if not u
        then
          let s = Var.Tbl.get info.info_known_origins x in
-         if Var.Set.cardinal s = 1 then subst.(x_idx) <- Var.Set.choose s);
+         if Var.Set.compare_cardinal_with s 1 = 0 then subst.(x_idx) <- Var.Set.choose s);
       (if Var.equal subst.(x_idx) x
        then
          match direct_approx info x with

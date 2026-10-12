@@ -380,6 +380,9 @@ val merlin : bool
 val has_pclmul : bool
 (* Whether the compiler was configured on a machine with PCLMUL *)
 
+val has_aes : bool
+(* Whether the compiler was configured on a machine with AES *)
+
 val has_popcnt : bool
 (* Whether the compiler was configured on a machine with POPCNT *)
 

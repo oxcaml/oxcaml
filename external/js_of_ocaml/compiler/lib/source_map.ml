@@ -140,8 +140,12 @@ module Mappings = struct
                 done;
                 gen_col_r := 0;
                 gen_line_r := gen_line c)
-              else if i > 0
-              then Buffer.add_char buf ',';
+              else if prev >= 0
+              then
+                (* Only emit a separator if a segment was already emitted on
+                   this line: deduplication may skip the first mappings, and a
+                   leading empty segment is rejected by Binaryen. *)
+                Buffer.add_char buf ',';
               let l =
                 match c with
                 | Gen { gen_line = _; gen_col } ->

@@ -33,6 +33,7 @@ type graph =
     mutable alias_if_any_source : NNN.t;
     mutable any_usage : N.t;
     mutable any_source : N.t;
+    mutable any_source_if_used : NN.t;
     mutable zero_alloc_source : N.t;
     mutable code_id_my_closure : NN.t
   }
@@ -66,7 +67,8 @@ let print_iter_edges ~print_edge graph =
     graph.propagate;
   Code_id_or_name.Map.iter
     (fun _if_any_source m -> iter_nn "orange" m)
-    graph.alias_if_any_source
+    graph.alias_if_any_source;
+  iter_nn "pink" graph.any_source_if_used
 
 let alias = NN.create ~name:"alias"
 
@@ -88,6 +90,8 @@ let any_usage = N.create ~name:"any_usage"
 
 let any_source = N.create ~name:"any_source"
 
+let any_source_if_used = NN.create ~name:"any_source_if_used"
+
 let zero_alloc_source = N.create ~name:"zero_alloc_source"
 
 let code_id_my_closure = NN.create ~name:"code_id_my_closure"
@@ -103,6 +107,7 @@ let to_datalog graph =
   @@ Datalog.set_table alias_if_any_source graph.alias_if_any_source
   @@ Datalog.set_table any_usage graph.any_usage
   @@ Datalog.set_table any_source graph.any_source
+  @@ Datalog.set_table any_source_if_used graph.any_source_if_used
   @@ Datalog.set_table zero_alloc_source graph.zero_alloc_source
   @@ Datalog.set_table code_id_my_closure graph.code_id_my_closure
   @@ Datalog.empty
@@ -143,6 +148,9 @@ module Relations = struct
 
   let any_source var = Datalog.atom any_source [var]
 
+  let any_source_if_used ~if_used var =
+    Datalog.atom any_source_if_used [if_used; var]
+
   let zero_alloc_source var = Datalog.atom zero_alloc_source [var]
 
   let code_id_my_closure ~code_id ~my_closure =
@@ -160,6 +168,7 @@ let create () =
     alias_if_any_source = NNN.empty;
     any_usage = N.empty;
     any_source = N.empty;
+    any_source_if_used = NN.empty;
     zero_alloc_source = N.empty;
     code_id_my_closure = NN.empty
   }
@@ -204,6 +213,10 @@ let add_any_usage t (var : Code_id_or_name.t) =
 
 let add_any_source t (var : Code_id_or_name.t) =
   t.any_source <- N.add_or_replace [var] () t.any_source
+
+let add_any_source_if_used t ~if_used (var : Code_id_or_name.t) =
+  t.any_source_if_used
+    <- NN.add_or_replace [if_used; var] () t.any_source_if_used
 
 let add_zero_alloc_source t var =
   t.zero_alloc_source <- N.add_or_replace [var] () t.zero_alloc_source

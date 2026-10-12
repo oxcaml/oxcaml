@@ -46,7 +46,8 @@ val for_multiple_match:
 
 val for_tupled_function:
         scopes:scopes -> return_layout:layout -> Location.t ->
-        Ident.t list -> (pattern list * lambda) list -> partial ->
+        (Ident.t * Jkind.Sort.Const.t * layout) list ->
+        (pattern list * lambda) list -> partial ->
         lambda
 
 (** [for_optional_arg_default pat body ~default_arg ~param] is:

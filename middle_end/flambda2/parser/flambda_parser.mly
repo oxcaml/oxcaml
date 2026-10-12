@@ -505,7 +505,9 @@ nonconst_ctors_nonempty:
   | ctors = separated_nonempty_list(PIPE, nonconst_ctor) { ctors }
 ;
 nonconst_ctor:
-  | tag = tag; KWD_OF; kinds = kinds_with_subkinds_nonempty { tag, kinds }
+  | tag = tag; KWD_OF; kinds = kinds_with_subkinds_nonempty
+      { tag, Some kinds }
+  | tag = tag; KWD_OF; KWD_ANY { tag, None }
 ;
 return_arity:
   | { None }

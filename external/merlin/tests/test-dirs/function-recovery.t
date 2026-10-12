@@ -150,6 +150,7 @@
                       Label_disambiguation
                         Unambiguous
                   Texp_construct \"()\"
+                  Constructor_uniform_value
                   []
       ]
   ]

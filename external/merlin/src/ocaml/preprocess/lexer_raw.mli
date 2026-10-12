@@ -63,6 +63,11 @@ val make: ?preprocessor:preprocessor -> keywords -> state
 val skip_sharp_bang: state -> Lexing.lexbuf -> Parser_raw.token result
 val token: state -> Lexing.lexbuf -> Parser_raw.token result
 
+(* Forget any [#syntax] directive seen so far, so that lexing continues with
+   the configured default ([Clflags.syntax_quotations]). Merlin calls this
+   before lexing each buffer. *)
+val reset_syntax_mode : unit -> unit
+
 (* Comments are filtered out from the token rule and stored in a global
    variable. *)
 type comment = string * Location.t

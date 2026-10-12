@@ -1489,8 +1489,7 @@ let transl_modalities ?(default_modalities = Mode.Modality.Const.id)
       ~allow_redundant_staticity
       ~default:default_modalities ~maturity:Stable modalities
 
-let apply_pmd_modalities env ~default_modalities pmd_modalities mty =
-  let modalities = transl_modalities ~default_modalities pmd_modalities in
+let apply_pmd_modalities env modalities mty =
   (*
   Workaround for pmd_modalities
 
@@ -2113,15 +2112,15 @@ let mksig desc env loc =
 
 (* let signature sg = List.map (fun item -> item.sig_type) sg *)
 
-let rec transl_modtype env smty =
+let rec transl_modtype ?(md_mode = With_regionality.Const.legacy) env smty =
   Builtin_attributes.warning_scope smty.pmty_attributes
-    (fun () -> transl_modtype_aux env smty)
+    (fun () -> transl_modtype_aux md_mode env smty)
 
 and transl_modtype_functor_arg env sarg =
   let mty = transl_modtype env sarg in
   {mty with mty_type = Mtype.scrape_for_functor_arg env mty.mty_type}
 
-and transl_modtype_aux env smty =
+and transl_modtype_aux md_mode env smty =
   let loc = smty.pmty_loc in
   match smty.pmty_desc with
     Pmty_ident lid ->
@@ -2134,7 +2133,7 @@ and transl_modtype_aux env smty =
         smty.pmty_attributes
   | Pmty_signature ssg ->
       Env.check_no_open_quotations loc env Env.Sig_qt;
-      let sg = transl_signature env [] ssg in
+      let sg = transl_signature ~md_mode env [] ssg in
       mkmty (Tmty_signature sg) (Mty_signature sg.sig_type) env loc
         smty.pmty_attributes
   | Pmty_functor(sarg_opt, sres, mres) ->
@@ -2194,7 +2193,7 @@ and transl_modtype_aux env smty =
   | Pmty_strengthen (mty, mod_id) ->
       Language_extension.assert_enabled ~loc:smty.pmty_loc
         Module_strengthening ();
-      let tmty = transl_modtype_aux env mty in
+      let tmty = transl_modtype_aux md_mode env mty in
       let path, md, _ =
         Env.lookup_module ~use:false ~loc:mod_id.loc mod_id.txt env
       in
@@ -2280,15 +2279,16 @@ and add_implicit_jkinds env attrs =
    so we need this to take the signature of the previously checked portion
    to support include functor. *)
 
+<<<<<<< HEAD
 and transl_signature ?(keep_warnings = false) ?(interface_toplevel = false)
       env sig_acc
+||||||| ad79b35c2d
+and transl_signature ?(keep_warnings = false) ?(interface_toplevel = false) env sig_acc
+=======
+and transl_signature ?(keep_warnings = false) ?(interface_toplevel = false) ~md_mode env sig_acc
+>>>>>>> origin/main
       {psg_items; psg_modalities; psg_loc} =
   let names = Signature_names.create () in
-
-  (* We assume the structure (described by the signature) to be at legacy mode,
-  for backward compatibility *)
-  (* CR-soon zqian: make it a parameter instead *)
-  let md_mode = With_regionality.legacy in
 
   let sig_modalities =
     transl_modalities ~allow_redundant_staticity:interface_toplevel
@@ -2297,20 +2297,30 @@ and transl_signature ?(keep_warnings = false) ?(interface_toplevel = false)
 
   let transl_include ~loc env sig_acc sincl modalities =
     let smty = sincl.pincl_mod in
+    let modalities =
+      transl_modalities
+        ~default_modalities:sig_modalities.moda_modalities
+        modalities
+    in
     let tmty =
       Builtin_attributes.warning_scope sincl.pincl_attributes
-        (fun () -> transl_modtype env smty)
+        (fun () ->
+          transl_modtype
+            ~md_mode:(Mode.Modality.Const.apply_const
+              modalities.moda_modalities md_mode)
+            env smty)
     in
     let mty = tmty.mty_type in
     let scope = Ctype.create_scope () in
+    let md_mode = With_regionality.of_const md_mode in
     let incl_kind, sg =
       match sincl.pincl_kind with
       | Functor ->
         Language_extension.assert_enabled ~loc Include_functor ();
         let funct_mode = With_regionality.disallow_right With_regionality.max in
         let sg, mode, incl_kind =
-          extract_sig_functor_open false env smty.pmty_loc mty sig_acc md_mode
-            ~funct_mode
+          extract_sig_functor_open false env smty.pmty_loc mty sig_acc
+            md_mode ~funct_mode
         in
         let zap_modality =
           Ctype.zap_modalities_to_floor_if_modes_enabled_at Stable
@@ -2324,11 +2334,6 @@ and transl_signature ?(keep_warnings = false) ?(interface_toplevel = false)
         incl_kind, sg
       | Structure ->
         Tincl_structure, extract_sig env smty.pmty_loc mty
-    in
-    let modalities =
-      transl_modalities
-        ~default_modalities:sig_modalities.moda_modalities
-        modalities
     in
     let recursive =
       not @@ Builtin_attributes.has_attribute "no_recursive_modalities"
@@ -2364,8 +2369,7 @@ and transl_signature ?(keep_warnings = false) ?(interface_toplevel = false)
         let (tdesc, _, newenv) =
           Typedecl.transl_value_decl env loc sdesc
             ~modal:(Sig_value
-              (With_regionality.disallow_right md_mode,
-               sig_modalities.moda_modalities))
+              (md_mode, sig_modalities.moda_modalities))
             ~why:Signature_item
         in
         Signature_names.check_value names tdesc.val_loc tdesc.val_id;
@@ -2439,15 +2443,21 @@ and transl_signature ?(keep_warnings = false) ?(interface_toplevel = false)
         mksig (Tsig_exception ext) env loc, [tsg], newenv
     | Psig_module pmd ->
         let scope = Ctype.create_scope () in
+        let modalities =
+          transl_modalities
+            ~default_modalities:sig_modalities.moda_modalities
+            pmd.pmd_modalities
+        in
         let tmty =
           Builtin_attributes.warning_scope pmd.pmd_attributes
-            (fun () -> transl_modtype env pmd.pmd_type)
+            (fun () ->
+              transl_modtype
+                ~md_mode:(Mode.Modality.Const.apply_const
+                  modalities.moda_modalities md_mode)
+                env pmd.pmd_type)
         in
         let mty_type, md_modalities =
-          apply_pmd_modalities
-            env
-            ~default_modalities:sig_modalities.moda_modalities
-            pmd.pmd_modalities tmty.mty_type
+          apply_pmd_modalities env modalities tmty.mty_type
         in
         let tmty = {tmty with mty_type} in
         let pres =
@@ -2472,7 +2482,7 @@ and transl_signature ?(keep_warnings = false) ?(interface_toplevel = false)
           | Some name ->
             let id, newenv =
               Env.enter_module_declaration ~scope name pres md
-                ~mode:md_mode env
+                ~mode:(With_regionality.of_const md_mode) env
             in
             let newenv = Env.update_short_paths newenv in
             Signature_names.check_module names pmd.pmd_name.loc id;
@@ -2517,7 +2527,7 @@ and transl_signature ?(keep_warnings = false) ?(interface_toplevel = false)
         in
         let id, newenv =
           Env.enter_module_declaration ~scope pms.pms_name.txt pres md
-            ~mode:md_mode env
+            ~mode:(With_regionality.of_const md_mode) env
         in
         let info =
           `Substituted_away (Subst.add_module id path Subst.identity)
@@ -2539,6 +2549,7 @@ and transl_signature ?(keep_warnings = false) ?(interface_toplevel = false)
           transl_recmodule_modtypes
             env
             ~sig_modalities:sig_modalities.moda_modalities
+            ~md_mode
             sdecls in
         let decls =
           List.filter_map (fun (md, _, uid, _) ->
@@ -2714,7 +2725,7 @@ and transl_modtype_decl_aux env
   in
   newenv, mtd, decl
 
-and transl_recmodule_modtypes env ~sig_modalities sdecls =
+and transl_recmodule_modtypes env ~sig_modalities ~md_mode sdecls =
   let make_env curr =
     List.fold_left (fun env (id_shape, _, md, mode, _, _) ->
       let mode = Option.map (fun m -> m.mode_modes) mode in
@@ -2727,13 +2738,20 @@ and transl_recmodule_modtypes env ~sig_modalities sdecls =
   let transition env_c curr =
     List.map2
       (fun (pmd, _) (id_shape, id_loc, md, mmode, _, _) ->
+        let modalities =
+          transl_modalities ~default_modalities:sig_modalities
+            pmd.pmd_modalities
+        in
         let tmty =
           Builtin_attributes.warning_scope pmd.pmd_attributes
-            (fun () -> transl_modtype env_c pmd.pmd_type)
+            (fun () ->
+              transl_modtype
+                ~md_mode:(Mode.Modality.Const.apply_const
+                  modalities.moda_modalities md_mode)
+                env_c pmd.pmd_type)
         in
         let mty_type, md_modalities =
-          apply_pmd_modalities env ~default_modalities:sig_modalities
-            pmd.pmd_modalities tmty.mty_type
+          apply_pmd_modalities env modalities tmty.mty_type
         in
         let tmty = {tmty with mty_type} in
         let md =
@@ -2771,10 +2789,13 @@ and transl_recmodule_modtypes env ~sig_modalities sdecls =
     List.map2
       (fun id (pmd, smmode) ->
          let md_uid = Uid.mk ~current_unit:(Env.get_current_unit ()) in
+         let modalities =
+           transl_modalities ~default_modalities:sig_modalities
+             pmd.pmd_modalities
+         in
          let md_type, md_modalities =
           approx_modtype (approx_env pmd.pmd_name.txt) pmd.pmd_type
-          |> apply_pmd_modalities env ~default_modalities:sig_modalities
-              pmd.pmd_modalities
+          |> apply_pmd_modalities env modalities
          in
          let md_modalities = Modality.of_const md_modalities.moda_modalities in
          let md =
@@ -4073,7 +4094,8 @@ and type_structure ?(toplevel = None) ?(keep_warnings = false) ~funct_body
         assert (desc.val_val.val_modalities |> Modality.is_undefined);
         let pp : Mode.Hint.pinpoint = (desc.val_loc, Expression) in
         let val_modalities =
-          infer_modalities pp ~loc_md (Value, desc.val_id) ~md_mode ~mode
+          infer_modalities pp ~loc_md (Value, desc.val_id) ~md_mode
+            ~mode:(With_regionality.of_const mode)
         in
         let val_val = {desc.val_val with val_modalities} in
         let desc = {desc with val_val} in
@@ -4216,6 +4238,7 @@ and type_structure ?(toplevel = None) ?(keep_warnings = false) ~funct_body
         let (decls, newenv) =
           transl_recmodule_modtypes env
             ~sig_modalities:Mode.Modality.Const.id
+            ~md_mode:With_regionality.Const.legacy
             (List.map (fun (name, smty, smode, _smodl, attrs, loc) ->
                  ({pmd_name=name; pmd_type=smty;
                    pmd_attributes=attrs; pmd_loc=loc; pmd_modalities=[]}
@@ -4492,10 +4515,10 @@ let merlin_type_structure env sig_acc str =
   in
   str, sg, env
 let type_structure env = type_structure ~funct_body:false None env []
-let merlin_transl_signature ?interface_toplevel env sig_acc sg =
-  transl_signature ?interface_toplevel ~keep_warnings:true env sig_acc sg
-let transl_signature ?interface_toplevel env sg =
-  transl_signature ?interface_toplevel env [] sg
+let merlin_transl_signature ?interface_toplevel ~md_mode env sig_acc sg =
+  transl_signature ?interface_toplevel ~keep_warnings:true ~md_mode env sig_acc sg
+let transl_signature ?interface_toplevel ~md_mode env sg =
+  transl_signature ?interface_toplevel ~md_mode env [] sg
 
 (* Normalize types in a signature *)
 
@@ -4681,7 +4704,7 @@ let type_open_ ?used_slot ?toplevel ovf env loc lid =
 let () =
   Typecore.type_module := type_module_alias;
   Typetexp.transl_modtype_longident := transl_modtype_longident;
-  Typetexp.transl_modtype := transl_modtype;
+  Typetexp.transl_modtype := transl_modtype ?md_mode:None;
   Typecore.type_open := type_open_ ?toplevel:None;
   Typetexp.type_open := type_open_ ?toplevel:None;
   Typecore.type_open_decl := type_open_decl;
@@ -4777,6 +4800,7 @@ let check_argument_type_if_given env sourcefile ~actual_staticity actual_sig
              ai_coercion_from_primary = coercion;
            }
 
+<<<<<<< HEAD
 (* In Merlin catching errors is done at the Mtyper level
 let collect_recovery_errors unit exn_list =
   let error_list =
@@ -4795,6 +4819,15 @@ let collect_recovery_errors unit exn_list =
                (Unit_info.raw_source_file unit), error_list))
 *)
 
+||||||| ad79b35c2d
+=======
+let arg_signature sg ~param : Types.arg_signature =
+  (* The argument block is appended after the signature's runtime fields;
+     must agree with [Translmod.add_arg_block_to_module_block]. *)
+  { arg_param = param;
+    arg_block_idx = List.length (Types.bound_value_identifiers_and_sorts sg) }
+
+>>>>>>> origin/main
 let type_implementation target modulename initial_env ast =
   let sourcefile = Unit_info.original_source_file target in
   let error e =
@@ -4910,7 +4943,11 @@ let type_implementation target modulename initial_env ast =
           in
           if Env.is_parameter_unit global_name then
             error (Cannot_implement_parameter (cu_name, source_intf));
-          let arg_type_from_cmi = Env.implemented_parameter global_name in
+          let arg_type_from_cmi =
+            (Env.find_import ~chain:[] cu_name).Persistent_env.imp_arg_signature
+            |> Option.map
+                 (fun ({ arg_param; _ } : Types.arg_signature) -> arg_param)
+          in
           if not (Option.equal Global_module.Parameter_name.equal
                     arg_type arg_type_from_cmi) then
             error (Inconsistent_argument_types
@@ -4998,7 +5035,12 @@ let type_implementation target modulename initial_env ast =
           if not !Clflags.dont_write_files then begin
             let name = Compilation_unit.name modulename in
             let kind =
-              Cmi_format.Normal { cmi_impl = modulename; cmi_arg_for = arg_type }
+              Cmi_format.Normal
+                { cmi_impl = modulename;
+                  cmi_arg_signature =
+                    Option.map
+                      (fun param -> arg_signature simple_sg ~param)
+                      arg_type }
             in
             let cmi =
               Profile.record_call "save_cmi" (fun () ->
@@ -5057,6 +5099,7 @@ let type_interface target modulename env ast =
     let uid = Shape.Uid.of_compilation_unit_id modulename in
     cms_register_toplevel_signature_attributes ~uid ~sourcefile ast
   end;
+<<<<<<< HEAD
   let sg =
     (*
     if !Clflags.typing_recovery then
@@ -5071,6 +5114,15 @@ let type_interface target modulename env ast =
     *)
     transl_signature ~interface_toplevel:true env ast
   in
+||||||| ad79b35c2d
+  let sg = transl_signature ~interface_toplevel:true env ast in
+=======
+  let sg =
+    transl_signature
+      ~md_mode:With_regionality.Const.legacy
+      ~interface_toplevel:true env ast
+  in
+>>>>>>> origin/main
   let arg_type =
     !Clflags.as_argument_for
     |> Option.map Global_module.Parameter_name.of_string
@@ -5112,12 +5164,12 @@ let functorize_signature ~params ~modules : Types.signature =
         : Types.module_type =
     List.fold_right
       (fun (p_name, param_id) body ->
-        let impl, param_params, (swg : Signature_with_global_bindings.t) =
+        let { Persistent_env.imp_impl; imp_params; imp_raw_sign = swg; _ } =
           Env.find_import ~chain:[]
             (Compilation_unit.Name.of_parameter_name p_name)
         in
-        assert (Option.is_none impl);
-        assert (List.is_empty param_params);
+        assert (Option.is_none imp_impl);
+        assert (List.is_empty imp_params);
         assert (Array.length swg.bound_globals = 0);
         let sign, _ = swg.sign in
         let param_type = Mty_signature (Subst.Lazy.force_signature sign) in
@@ -5172,7 +5224,7 @@ let functorize_interface initial_env ~params ~module_sigs unit_info
   if not !Clflags.dont_write_files then begin
     let name = Compilation_unit.name modulename in
     let kind =
-      Cmi_format.Normal { cmi_impl = modulename; cmi_arg_for = None }
+      Cmi_format.Normal { cmi_impl = modulename; cmi_arg_signature = None }
     in
     let cmi =
       Env.save_signature ~alerts:Misc.Stdlib.String.Map.empty
@@ -5242,7 +5294,7 @@ let functorize_implementation initial_env ~params ~modules ~module_sigs
     | None ->
         let name = Compilation_unit.name modulename in
         let kind =
-          Cmi_format.Normal { cmi_impl = modulename; cmi_arg_for = None }
+          Cmi_format.Normal { cmi_impl = modulename; cmi_arg_signature = None }
         in
         let cmi =
           Env.save_signature_with_imports ~alerts:Misc.Stdlib.String.Map.empty
@@ -5359,12 +5411,14 @@ let package_units initial_env objfiles target_cmi modulename =
         (Env.imports()) in
     (* Write packaged signature *)
     if not !Clflags.dont_write_files then begin
-      let cmi_arg_for =
+      let cmi_arg_signature =
         (* Packs aren't supported as arguments *)
         None
       in
       let name = Compilation_unit.name modulename in
-      let kind = Cmi_format.Normal { cmi_impl = modulename; cmi_arg_for } in
+      let kind =
+        Cmi_format.Normal { cmi_impl = modulename; cmi_arg_signature }
+      in
       let cmi =
         Env.save_signature_with_imports ~alerts:Misc.Stdlib.String.Map.empty
           (sg, Staticity.Dynamic) name kind target_cmi
@@ -5511,7 +5565,7 @@ let report_error ~loc _env = function
         (Sig_component_kind.to_string kind) Style.inline_code name
   | Non_generalizable { vars; expression } ->
       let manual_ref = [ 6; 1; 2 ] in
-      Out_type.prepare_for_printing vars;
+      Out_type.prepare_for_printing ~base:Mode.With_locality.Const.legacy vars;
       Out_type.add_type_to_preparation expression;
       Location.errorf ~loc
         "@[The type of this expression,@ %a,@ \
@@ -5522,7 +5576,7 @@ let report_error ~loc _env = function
         Misc.print_see_manual manual_ref
   | Non_generalizable_module { vars; mty; item } ->
       let manual_ref = [ 6; 1; 2 ] in
-      Out_type.prepare_for_printing vars;
+      Out_type.prepare_for_printing ~base:Mode.With_locality.Const.legacy vars;
       Out_type.add_type_to_preparation item.val_type;
       Location.errorf ~loc
         "@[The type of this module,@ %a,@ \

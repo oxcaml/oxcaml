@@ -464,22 +464,6 @@ type primitive =
   | Patomic_land_idx
   | Patomic_lor_idx
   | Patomic_lxor_idx
-  | Patomic_load_ptr of
-    { layout : layout }
-  | Patomic_set_ptr of
-    { layout : layout; mode : modify_mode }
-  | Patomic_exchange_ptr of
-    { layout : layout; mode : modify_mode }
-  | Patomic_compare_exchange_ptr of
-    { layout : layout; mode : modify_mode }
-  | Patomic_compare_set_ptr of
-    { layout : layout; mode : modify_mode }
-  | Patomic_fetch_add_ptr
-  | Patomic_add_ptr
-  | Patomic_sub_ptr
-  | Patomic_land_ptr
-  | Patomic_lor_ptr
-  | Patomic_lxor_ptr
   (* Inhibition of optimisation *)
   | Popaque of layout
   (* Statically-defined probes *)
@@ -517,6 +501,8 @@ type primitive =
   | Pset_ptr of layout * modify_mode
   | Pget_ext_ptr of layout * Asttypes.mutable_flag
   | Pset_ext_ptr of layout * modify_mode
+  | Pbox of layout * locality_mode
+  | Punbox of layout
 
 and extern_repr =
   | Same_as_ocaml_repr of Jkind.Sort.Const.t
@@ -611,6 +597,7 @@ and variant_representation =
 and constructor_shape =
   | Constructor_shape_uniform of value_kind list
   | Constructor_shape_mixed of mixed_block_shape
+  | Constructor_shape_undetermined
 
 and array_kind =
     Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
@@ -828,7 +815,9 @@ and equal_constructor_shape x y =
       && List.for_all2 equal_value_kind fields1 fields2
   | Constructor_shape_mixed shape1, Constructor_shape_mixed shape2 ->
       equal_mixed_block_shape shape1 shape2
-  | (Constructor_shape_uniform _ | Constructor_shape_mixed _), _ -> false
+  | Constructor_shape_undetermined, Constructor_shape_undetermined -> true
+  | (Constructor_shape_uniform _ | Constructor_shape_mixed _
+    | Constructor_shape_undetermined), _ -> false
 
 let equal_mixed_block_shape_up_to_value_kinds shape1 shape2 =
   Misc.Stdlib.Array.equal
@@ -878,26 +867,26 @@ let rec join_value_kind_non_null x y =
   else
     match x, y with
     | Pvariant { consts = consts1; non_consts = non_consts1 },
-      Pvariant { consts = consts2; non_consts = non_consts2 } -> begin
-        match join_non_consts non_consts1 non_consts2 with
-        | Some non_consts ->
-            let consts = List.sort_uniq Int.compare (consts1 @ consts2) in
-            Pvariant { consts; non_consts }
-        | None -> Pgenval
-      end
+      Pvariant { consts = consts2; non_consts = non_consts2 } ->
+        let non_consts = join_non_consts non_consts1 non_consts2 in
+        let consts = List.sort_uniq Int.compare (consts1 @ consts2) in
+        Pvariant { consts; non_consts }
     | _, _ -> Pgenval
 
 and join_constructor_shape shape1 shape2 =
   match shape1, shape2 with
+  | Constructor_shape_undetermined, _ | _, Constructor_shape_undetermined ->
+      Constructor_shape_undetermined
   | Constructor_shape_uniform fields1, Constructor_shape_uniform fields2
     when List.length fields1 = List.length fields2 ->
-      Some
-        (Constructor_shape_uniform (List.map2 join_value_kind fields1 fields2))
-  | Constructor_shape_mixed shape1, Constructor_shape_mixed shape2 ->
-      Option.map
-        (fun shape -> Constructor_shape_mixed shape)
-        (join_mixed_block_shape shape1 shape2)
-  | (Constructor_shape_uniform _ | Constructor_shape_mixed _), _ -> None
+      Constructor_shape_uniform (List.map2 join_value_kind fields1 fields2)
+  | Constructor_shape_mixed shape1, Constructor_shape_mixed shape2 -> begin
+      match join_mixed_block_shape shape1 shape2 with
+      | Some shape -> Constructor_shape_mixed shape
+      | None -> Constructor_shape_undetermined
+    end
+  | (Constructor_shape_uniform _ | Constructor_shape_mixed _), _ ->
+      Constructor_shape_undetermined
 
 and join_mixed_block_shape shape1 shape2 =
   if Array.length shape1 <> Array.length shape2 then None
@@ -936,17 +925,15 @@ and join_non_consts non_consts1 non_consts2 =
   let sorted = List.sort (fun (tag1, _) (tag2, _) -> Int.compare tag1 tag2) in
   let rec merge l1 l2 =
     match l1, l2 with
-    | [], l | l, [] -> Some l
+    | [], l | l, [] -> l
     | (tag1, shape1) :: rest1, (tag2, shape2) :: rest2 ->
         if tag1 < tag2 then
-          Option.map (fun l -> (tag1, shape1) :: l) (merge rest1 l2)
+          (tag1, shape1) :: merge rest1 l2
         else if tag2 < tag1 then
-          Option.map (fun l -> (tag2, shape2) :: l) (merge l1 rest2)
+          (tag2, shape2) :: merge l1 rest2
         else
-          match join_constructor_shape shape1 shape2 with
-          | Some shape ->
-              Option.map (fun l -> (tag1, shape) :: l) (merge rest1 rest2)
-          | None -> None
+          let shape = join_constructor_shape shape1 shape2 in
+          (tag1, shape) :: merge rest1 rest2
   in
   merge (sorted non_consts1) (sorted non_consts2)
 
@@ -1507,13 +1494,8 @@ let main_module_representation = function
 type program =
   { compilation_unit : Compilation_unit.t;
     main_module_block_format : main_module_block_format;
-    arg_block_idx : int option;
     required_globals : Compilation_unit.Set.t;
     code : lambda }
-
-type arg_descr =
-  { arg_param: Global_module.Parameter_name.t;
-    arg_block_idx: int; }
 
 let const_int n = Const_base (Const_int n)
 
@@ -1680,10 +1662,7 @@ let layout_list =
             Constructor_shape_uniform
               [generic_value;
                { generic_value with nullable = Non_nullable}]] })
-let layout_tuple_element = nullable_value Pgenval
 let layout_value_field = nullable_value Pgenval
-let layout_tmc_field = nullable_value Pgenval
-let layout_optional_arg = nullable_value Pgenval
 let layout_variant_arg = nullable_value Pgenval
 let layout_extensible_variant_constructor = non_null_value Pgenval
 let layout_exception = layout_extensible_variant_constructor
@@ -2225,29 +2204,17 @@ let mod_field ?(read_semantics=Reads_agree) pos = function
     Pmixedfield([pos], shape_for_read, read_semantics)
 
 let transl_module_representation repr =
-  (* The shape here is potentially an underapproximation, since the scannable
-     axes in [shape] will all be [max]. This should not matter, though, since it
-     is not possible to reassign / directly mutate a [val] in a module. *)
-  let shape =
-    Array.map
-      (fun sort ->
-         sort
-         |> Jkind.Sort.default_for_transl_and_get
-         |> Types.mixed_block_element_of_const_sort)
-      repr
-  in
-  let rec is_value (elt : Types.mixed_block_element) =
-    match elt with
-    | Scannable _ -> true
-    | Addressable elt -> is_value elt
-    | Float_boxed | Float64 | Float32 | Bits8 | Bits16 | Untagged_immediate
-    | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word
-    | Product _ | Void -> false
-  in
-  if Array.for_all is_value shape
-  then Module_value_only { field_count = Array.length shape }
+  let sorts = Array.map Jkind.Sort.default_for_transl_and_get repr in
+  if Array.for_all Jkind.Sort.Const.is_scannable sorts
+  then Module_value_only { field_count = Array.length sorts }
   else
-    let shape = transl_mixed_product_shape shape in
+    (* The shape here is potentially an underapproximation, since the scannable
+       axes in [shape] will all be [max]. This should not matter, though, since
+       it is not possible to reassign / directly mutate a [val] in a module. *)
+    let shape =
+      transl_mixed_product_shape
+        (Array.map Types.mixed_block_element_of_const_sort sorts)
+    in
     Module_mixed
       ( shape,
         mixed_product_shape_for_read
@@ -2856,6 +2823,8 @@ let find_exact_application kind ~arity args =
           if arity <> List.length const_args
           then None
           else Some (List.map (fun cst -> Lconst cst) const_args)
+      (* CR layouts-mixed-tuplify: this should support [Const_mixed_block] once
+         there is proper support for mixed tupled functions *)
       | _ -> None
       end
 
@@ -3098,6 +3067,7 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Punbox_mask -> None
   | Pbox_mask m -> Some m
   | Punbox_unit -> None
+  | Pbox (_, m) -> Some m
   | Pjoin_vec256 | Psplit_vec256 ->
     (* Aborts in bytecode, unboxed in native code *)
     None
@@ -3132,17 +3102,6 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Patomic_land_idx
   | Patomic_lor_idx
   | Patomic_lxor_idx
-  | Patomic_load_ptr _
-  | Patomic_set_ptr _
-  | Patomic_exchange_ptr _
-  | Patomic_compare_exchange_ptr _
-  | Patomic_compare_set_ptr _
-  | Patomic_fetch_add_ptr
-  | Patomic_add_ptr
-  | Patomic_sub_ptr
-  | Patomic_land_ptr
-  | Patomic_lor_ptr
-  | Patomic_lxor_ptr
   | Pdls_get
   | Ptls_get
   | Pdomain_index
@@ -3159,7 +3118,8 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pmake_idx_mixed_field _
   | Pmake_idx_array _
   | Pidx_deepen _
-  | Preinterpret_tagged_int63_as_unboxed_int64 ->
+  | Preinterpret_tagged_int63_as_unboxed_int64
+  | Punbox _ ->
     if !Clflags.native_code then None
     else
       (* We don't provide a locally-allocating version of this primitive
@@ -3342,11 +3302,8 @@ let primitive_can_raise prim =
   | Patomic_load_idx _ | Patomic_set_idx _
   | Patomic_exchange_idx _ | Patomic_compare_exchange_idx _
   | Patomic_compare_set_idx _ | Patomic_fetch_add_idx | Patomic_add_idx
-  | Patomic_sub_idx | Patomic_land_idx | Patomic_lor_idx | Patomic_lxor_idx
-  | Patomic_load_ptr _ | Patomic_set_ptr _ | Patomic_exchange_ptr _
-  | Patomic_compare_exchange_ptr _ | Patomic_compare_set_ptr _
-  | Patomic_fetch_add_ptr | Patomic_add_ptr | Patomic_sub_ptr | Patomic_land_ptr
-  | Patomic_lor_ptr | Patomic_lxor_ptr -> false
+  | Patomic_sub_idx | Patomic_land_idx | Patomic_lor_idx | Patomic_lxor_idx ->
+    false
   | Pwith_stack | Pwith_stack_preemptible
   | Pperform | Pcontinue | Pdiscontinue
   | Pdiscontinue_with_backtrace
@@ -3362,7 +3319,7 @@ let primitive_can_raise prim =
   | Pget_idx _ | Pset_idx _
   | Pget_ptr _ | Pset_ptr _
   | Pget_ext_ptr _ | Pset_ext_ptr _
-  | Ppeek _ | Ppoke _ ->
+  | Ppeek _ | Ppoke _ | Pbox _ | Punbox _ ->
     false
 
 let constant_layout: constant -> layout = function
@@ -3415,8 +3372,7 @@ let rec layout_of_const_sort (c : Jkind.Sort.Const.t) : layout =
     layout_of_const_sort sort
   | Univar _ ->
     Misc.fatal_error "layout_of_const_sort: unexpected univar"
-  | Genvar _ ->
-    Misc.fatal_error "layout_of_const_sort: unexpected genvar"
+  | Genvar var -> Psplicevar (Slambdaident.of_sort_var var)
 
 let layout_of_extern_repr : extern_repr -> _ = function
   | Unboxed_vector v -> layout_boxed_vector v
@@ -3565,7 +3521,8 @@ let rec mixed_block_element_of_layout (layout : layout) :
   match layout with
   | Punboxed_product layouts ->
     Product (List.map mixed_block_element_of_layout layouts |> Array.of_list)
-  | Ptop | Pbottom -> Misc.fatal_error "Pidxdeepen"
+  | Ptop | Pbottom ->
+    Misc.fatal_error "cannot convert top/bottom layout to mixed block element"
   | Pvalue value_kind -> Value value_kind
   | Punboxed_float Unboxed_float64 -> Float64
   | Punboxed_float Unboxed_float32 -> Float32
@@ -3857,12 +3814,6 @@ let primitive_result_layout (p : primitive) =
   | Patomic_compare_exchange_idx { layout; _ } -> layout
   | Patomic_compare_set_idx _
   | Patomic_fetch_add_idx -> layout_int
-  | Patomic_load_ptr { layout } -> layout
-  | Patomic_set_ptr _ -> layout_unit
-  | Patomic_exchange_ptr { layout; _ } -> layout
-  | Patomic_compare_exchange_ptr { layout; _ } -> layout
-  | Patomic_compare_set_ptr _
-  | Patomic_fetch_add_ptr -> layout_int
   | Pdls_get | Ptls_get -> layout_any_value
   | Pdomain_index -> layout_unboxed_int Untagged_int
   | Patomic_add_field
@@ -3875,11 +3826,6 @@ let primitive_result_layout (p : primitive) =
   | Patomic_land_idx
   | Patomic_lor_idx
   | Patomic_lxor_idx
-  | Patomic_add_ptr
-  | Patomic_sub_ptr
-  | Patomic_land_ptr
-  | Patomic_lor_ptr
-  | Patomic_lxor_ptr
   | Ppoll -> layout_unit
   | Pcpu_relax -> layout_unit
   | Preinterpret_tagged_int63_as_unboxed_int64 -> layout_unboxed_int64
@@ -3905,6 +3851,14 @@ let primitive_result_layout (p : primitive) =
   | Pset_ptr _ -> layout_unit
   | Pget_ext_ptr (layout, _) -> layout
   | Pset_ext_ptr _ -> layout_unit
+  | Pbox (_layout, _) ->
+    (* CR box: Once we box some things as tagged immediates, we should compute
+       a more precise layout here. For instance, a [bits8 box] could get
+       [layout_int]. If we add mutability tracking (depending on when
+       specialization happens), we could compute more precise layouts too,
+       like that of a tuple. *)
+    layout_block
+  | Punbox layout -> layout
 
 let array_ref_kind mode = function
   | Pgenarray -> Pgenarray_ref mode

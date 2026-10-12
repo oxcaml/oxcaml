@@ -908,7 +908,7 @@ type error =
   | Unsupported_inside_quotation of Location.t * no_open_quotations_context
   | Cmi_not_found of
       { modname : Compilation_unit.Name.t;
-        chain : Compilation_unit.Name.t list;
+        chain : Global_module.t list;
       }
 
 module Error : sig
@@ -1295,8 +1295,9 @@ let is_parameter_unit modname =
 let is_imported_parameter modname =
   Persistent_env.is_imported_parameter !persistent_env modname
 
-let implemented_parameter modname =
-  Persistent_env.implemented_parameter !persistent_env modname
+let find_import ~chain modname =
+  try Persistent_env.find_import !persistent_env modname
+  with Not_found -> error (Cmi_not_found { modname; chain })
 
 let reset_declaration_caches () =
   Types.Uid.Tbl.clear !value_declarations;
@@ -3352,10 +3353,18 @@ let read_signature modname cmi =
   Subst.Lazy.force_signature mty,
   (Mode.With_regionality.zap_to_floor_exn mode).staticity
 
+<<<<<<< HEAD
 let find_import ~chain modname =
   try Persistent_env.find_import !persistent_env modname
   with Not_found -> Error.log_and_raise (Cmi_not_found { modname; chain })
 
+||||||| ad79b35c2d
+let find_import ~chain modname =
+  try Persistent_env.find_import !persistent_env modname
+  with Not_found -> error (Cmi_not_found { modname; chain })
+
+=======
+>>>>>>> origin/main
 let register_parameter modname =
   Persistent_env.register_parameter !persistent_env modname
 
@@ -5637,7 +5646,8 @@ let report_error_doc = function
         List.iter
           (fun loader ->
             Format_doc.fprintf ppf ",@ referenced from %a"
-              (Style.as_inline_code Compilation_unit.Name.print) loader)
+              (Style.as_inline_code Global_module.Name.print)
+              (Global_module.to_name loader))
           chain
       in
       Location.errorf ~loc:Location.none

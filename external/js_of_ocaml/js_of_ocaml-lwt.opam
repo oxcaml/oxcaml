@@ -8,22 +8,22 @@ authors: ["Ocsigen team <dev@ocsigen.org>"]
 license: [
   "GPL-2.0-or-later" "LGPL-2.1-or-later WITH OCaml-LGPL-linking-exception"
 ]
-homepage: "https://ocsigen.org/js_of_ocaml/latest/manual/overview"
-doc: "https://ocsigen.org/js_of_ocaml/latest/manual/overview"
+homepage: "https://ocsigen.org/js_of_ocaml/latest/js_of_ocaml/overview.html"
+doc: "https://ocsigen.org/js_of_ocaml/latest/js_of_ocaml/overview.html"
 bug-reports: "https://github.com/ocsigen/js_of_ocaml/issues"
 depends: [
-  "dune" {>= "3.17"}
+  "dune" {>= "3.20"}
   "ocaml" {>= "4.13"}
   "js_of_ocaml" {= version}
   "js_of_ocaml-ppx" {= version}
-  "lwt" {>= "2.4.4"}
+  "lwt" {>= "2.4.4" & != "5.9.2"}
   "num" {with-test}
-  "ppx_expect" {>= "v0.14.2" & with-test}
-  "ppxlib" {>= "0.22.0" & with-test}
   "re" {>= "1.9.0" & with-test}
   "odoc" {with-doc}
 ]
-depopts: ["graphics" "lwt_log"]
+depopts: ["graphics"]
+dev-repo: "git+https://github.com/ocsigen/js_of_ocaml.git"
+x-maintenance-intent: ["(latest)"]
 build: [
   [
     "dune"
@@ -33,8 +33,6 @@ build: [
     "-j"
     jobs
     "@install"
-    "@runtest" {with-test}
     "@doc" {with-doc}
   ]
 ]
-dev-repo: "git+https://github.com/ocsigen/js_of_ocaml.git"

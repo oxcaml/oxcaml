@@ -18,6 +18,7 @@ type ocaml =
     applicative_functors : bool;
     nopervasives : bool;
     strict_formats : bool;
+    syntax_quotations : bool;
     open_args : Clflags.open_arg list;
     ppx : string with_workdir list;
     pp : string with_workdir option;
@@ -55,6 +56,7 @@ let dump_ocaml x =
       ("applicative_functors", `Bool x.applicative_functors);
       ("nopervasives", `Bool x.nopervasives);
       ("strict_formats", `Bool x.strict_formats);
+      ("syntax_quotations", `Bool x.syntax_quotations);
       ( "open_args",
         Json.list
           (fun (arg : Clflags.open_arg) ->
@@ -530,7 +532,6 @@ let ocaml_ignored_flags =
     "-safe-matching";
     "-bin-annot-occurrences";
     (* flambda-backend specific *)
-    "-basic-block-sections";
     "-caml-apply-inline-fast-path";
     "-debug-ocaml";
     "-dgc-timings";
@@ -612,6 +613,8 @@ let ocaml_ignored_flags =
     "-fno-simd-regalloc";
     "-fclmul";
     "-fno-clmul";
+    "-faes";
+    "-fno-aes";
     "-fcssc";
     "-no-auto-include-otherlibs";
     "-fbmi2";
@@ -670,6 +673,12 @@ let ocaml_ignored_flags =
     "-no-llvm-backend";
     "-ddwarf-types";
     "-ocamlcfg";
+    "-cfg-eliminate-dead-code-validate";
+    "-no-cfg-eliminate-dead-code-validate";
+    "-cfg-dominators-validate";
+    "-no-cfg-dominators-validate";
+    "-cfg-liveness-validate";
+    "-no-cfg-liveness-validate";
     "-cfg-prologue-validate";
     "-no-cfg-prologue-validate";
     "-cfg-prologue-shrink-wrap";
@@ -686,6 +695,15 @@ let ocaml_ignored_flags =
     "-no-cfg-value-propagation-float";
     "-cfg-value-propagation-flow";
     "-no-cfg-value-propagation-flow";
+    "-cfg-copy-propagation";
+    "-no-cfg-copy-propagation";
+    "-use-ssa";
+    "-no-use-ssa";
+    "-ssa-simplify";
+    "-no-ssa-simplify";
+    "-ssa-validate";
+    "-no-ssa-validate";
+    "-dssa";
     "-gdwarf-pedantic";
     "-ddwarf-metrics";
     "-afl-instrument";
@@ -991,6 +1009,13 @@ let ocaml_flags =
     ( "-strict-formats",
       Marg.unit (fun ocaml -> { ocaml with strict_formats = true }),
       " Reject invalid formats accepted by legacy implementations" );
+    ( "-syntax-quotations",
+      Marg.unit (fun ocaml -> { ocaml with syntax_quotations = true }),
+      " Lex quotation syntax in files without a #syntax quotations directive" );
+    ( "-no-syntax-quotations",
+      Marg.unit (fun ocaml -> { ocaml with syntax_quotations = false }),
+      " Do not lex quotation syntax in files without a #syntax quotations \
+       directive" );
     ( "-open",
       Marg.param "module" (fun md ocaml ->
           { ocaml with open_args = Clflags.Open md :: ocaml.open_args }),
@@ -1102,6 +1127,7 @@ let initial =
         applicative_functors = true;
         nopervasives = false;
         strict_formats = false;
+        syntax_quotations = Config.syntax_quotations;
         open_args = [];
         ppx = [];
         pp = None;
