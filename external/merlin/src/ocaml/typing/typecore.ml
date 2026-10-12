@@ -8988,19 +8988,11 @@ and type_expect_
                 Location.prerr_warning loc
                   (not_principal "this module packing");
               pack
-<<<<<<< Merlin:aobrien/omni-stage-1
-          | Tvar _ ->
-              raise (error (loc, env, Cannot_infer_signature))
-||||||| Compiler:last-imported
-          | Tvar _ ->
-              raise (Error (loc, env, Cannot_infer_signature))
-=======
-          | Tvar _ -> raise (Error (loc, env, Cannot_infer_signature))
+          | Tvar _ -> raise (error (loc, env, Cannot_infer_signature))
           | Tivar _ ->
               (* CR-someday omni: fails like a [Tvar]. Smarter: suspend on the
                  ivar until it is filled with a package type. *)
-              raise (Error (loc, env, Cannot_infer_signature))
->>>>>>> Compiler:HEAD
+              raise (error (loc, env, Cannot_infer_signature))
           | _ ->
               raise (error (loc, env, Not_a_packed_module ty_expected))
           in
@@ -9872,16 +9864,8 @@ and type_ident env ?(recarg=Rejected) lid =
   | true, Required, _
   | false, Rejected, _ -> ()
   | true, Rejected, _
-<<<<<<< Merlin:aobrien/omni-stage-1
-  | false, Required, (Tvar _ | Tconstr _) ->
-      raise (error (lid.loc, env, Inlined_record_escape))
-||||||| Compiler:last-imported
-  | false, Required, (Tvar _ | Tconstr _) ->
-      raise (Error (lid.loc, env, Inlined_record_escape))
-=======
   | false, Required, (Tvar _ | Tivar _ | Tconstr _) ->
-      raise (Error (lid.loc, env, Inlined_record_escape))
->>>>>>> Compiler:HEAD
+      raise (error (lid.loc, env, Inlined_record_escape))
   | false, Required, _  -> () (* will fail later *)
   end;
   let layout_args, val_type, kind =
