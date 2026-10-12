@@ -2733,7 +2733,10 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
   let invariant_params =
     if is_single_recursive_function
     then
-      Bound_parameters.vars unarized_params
+      match Function_decl.specialise decl with
+      | Always_specialise ->
+          Bound_parameters.vars unarized_params
+      | Never_specialise | Default_specialise -> []
     else []
   in
   let acc =
