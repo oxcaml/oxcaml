@@ -4,6 +4,12 @@
  expect;
 *)
 
+(* This test uses plain atomic field accesses on purpose, so it disables
+   the warnings for them (obscured-atomic-read/write). *)
+let () = ignore (Warnings.parse_options false "-222-223")
+[%%expect{|
+|}]
+
 let run s =
   let pe = Parse.expression (Lexing.from_string s) in
   let te = Typecore.type_expression (Lazy.force Env.initial) pe in
