@@ -20,9 +20,11 @@ open Effect.Deep
 type _ Effect.t += Outer : unit Effect.t | Inner : unit Effect.t
 type _ Effect.t += Suspend : unit Effect.t | Unknown : unit Effect.t
 
-let k = Domain.TLS.new_key (fun () -> "init")
-let get () = Domain.TLS.get k
-let set v = Domain.TLS.set k v
+module TLS = Domain.Safe.TLS
+
+let k = TLS.new_key (fun () -> ref "init")
+let get () = (TLS.access k (fun r -> { Modes.Global.global = !r })).global
+let set (v : string) = TLS.access k (fun r -> r := v) [@nontail]
 
 let forward_all ~expect =
   { retc = Fun.id; exnc = raise;

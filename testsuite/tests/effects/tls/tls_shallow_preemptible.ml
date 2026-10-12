@@ -13,9 +13,17 @@ open Effect
 
 type _ Effect.t += Ping : unit Effect.t
 
+module TLS = Domain.Safe.TLS
+
+let get (type a : value mod many portable contended) (k : a ref TLS.key) : a =
+  (TLS.access k (fun r -> { Modes.Global.global = !r })).global
+let set (type a : value mod many portable contended) (k : a ref TLS.key) (v : a) =
+  TLS.access k (fun r -> r := v) [@nontail]
+
 let split_key =
-  Domain.TLS.new_key ~split_from_parent:(fun parent -> parent * 2)
-    (fun () -> -1)
+  TLS.new_key
+    ~split_from_parent:(fun parent -> let v = !parent * 2 in fun () -> ref v)
+    (fun () -> ref (-1))
 
 let sh_handler k2ref =
   { Shallow.Preemptible.retc = Fun.id; exnc = raise;
@@ -32,32 +40,32 @@ let sh_handler k2ref =
     tickc = This (fun () -> Continue) }
 
 let () =
-  Domain.TLS.set split_key 5;
+  set split_key 5;
   let k = Shallow.Preemptible.fiber (fun () ->
-      Printf.printf "first resume sees: %d\n" (Domain.TLS.get split_key);
-      Domain.TLS.set split_key 1000;
+      Printf.printf "first resume sees: %d\n" (get split_key);
+      set split_key 1000;
       perform Ping;
-      Printf.printf "second resume sees: %d\n" (Domain.TLS.get split_key))
+      Printf.printf "second resume sees: %d\n" (get split_key))
   in
   (* The fiber's state was split at creation: changing the creator's value
      before the first resumption must not affect it. *)
-  Domain.TLS.set split_key 6;
+  set split_key 6;
   let k2ref = ref None in
   Shallow.Preemptible.continue_with k () (sh_handler k2ref);
-  assert (Domain.TLS.get split_key = 6);
-  Domain.TLS.set split_key 7;
+  assert (get split_key = 6);
+  set split_key 7;
   (match !k2ref with
    | Some k2 -> Shallow.Preemptible.continue_with k2 () (sh_handler (ref None))
    | None -> assert false);
-  assert (Domain.TLS.get split_key = 7);
+  assert (get split_key = 7);
 
   (* A non-preemptible shallow fiber shares its resumer's state. *)
   let k = Shallow.fiber (fun () ->
-      assert (Domain.TLS.get split_key = 7);
-      Domain.TLS.set split_key 8)
+      assert (get split_key = 7);
+      set split_key 8)
   in
   Shallow.continue_with k ()
     { Shallow.retc = Fun.id; exnc = raise;
       effc = (fun (type c) (_ : c Effect.t) -> None) };
-  assert (Domain.TLS.get split_key = 8);
+  assert (get split_key = 8);
   print_endline "OK"

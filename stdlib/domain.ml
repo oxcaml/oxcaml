@@ -421,7 +421,10 @@ module TLS0 = struct
     store idx (Obj_opt.borrowed ());
     match f v with
     | res -> store idx (Obj_opt.some v); res
-    | exception exn -> store idx (Obj_opt.some v); raise exn
+    | exception exn ->
+      let bt = Printexc.get_raw_backtrace () in
+      store idx (Obj_opt.some v);
+      Printexc.raise_with_backtrace exn bt
 
   type key_value : value mod portable contended =
       KV : 'a key * (unit -> 'a) @@ portable -> key_value

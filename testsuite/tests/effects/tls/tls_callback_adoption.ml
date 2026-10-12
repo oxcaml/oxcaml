@@ -17,49 +17,56 @@ type _ Effect.t += Suspend : unit Effect.t
 
 external call_me_back : (unit -> unit) -> unit = "call_me_back"
 
-let k0 = Domain.TLS.new_key (fun () -> "init")
+module TLS = Domain.Safe.TLS
+
+let get (type a : value mod many portable contended) (k : a ref TLS.key) : a =
+  (TLS.access k (fun r -> { Modes.Global.global = !r })).global
+let set (type a : value mod many portable contended) (k : a ref TLS.key) (v : a) =
+  TLS.access k (fun r -> r := v) [@nontail]
+
+let k0 = TLS.new_key (fun () -> ref "init")
 (* Enough keys that setting the last ones forces the array to grow inside
    the callback. *)
-let more_keys = Array.init 100 (fun _ -> Domain.TLS.new_key (fun () -> -1))
+let more_keys = Array.init 100 (fun _ -> TLS.new_key (fun () -> ref (-1)))
 
 let () =
-  Domain.TLS.set k0 "outer";
+  set k0 "outer";
 
   (* Call back from C inside a non-owner fiber. *)
   match_with (fun () ->
       call_me_back (fun () ->
-          assert (Domain.TLS.get k0 = "outer");
-          Domain.TLS.set k0 "set-in-callback";
+          assert (get k0 = "outer");
+          set k0 "set-in-callback";
           (* Growing writes during the callback. *)
-          Array.iteri (fun i k -> Domain.TLS.set k i) more_keys;
+          Array.iteri (fun i k -> set k i) more_keys;
 
           (* A preemptible fiber created, suspended, resumed and completed
              inside the callback. *)
           let r =
             Preemptible.match_with (fun () ->
-                assert (Domain.TLS.get k0 = "init");
-                Domain.TLS.set k0 "fiber-in-callback";
+                assert (get k0 = "init");
+                set k0 "fiber-in-callback";
                 perform Suspend;
-                Domain.TLS.get k0)
+                get k0)
               ()
               { retc = Fun.id; exnc = raise;
                 effc = (fun (type a) (e : a Effect.t) ->
                   match e with
                   | Suspend -> Some (fun (k : (a, _) continuation) ->
-                      assert (Domain.TLS.get k0 = "set-in-callback");
+                      assert (get k0 = "set-in-callback");
                       continue k ())
                   | _ -> None);
                 tickc = This (fun () -> Continue) }
           in
           assert (r = "fiber-in-callback"));
       (* Back in the fiber: writes made during the callback are visible. *)
-      assert (Domain.TLS.get k0 = "set-in-callback");
-      Array.iteri (fun i k -> assert (Domain.TLS.get k = i)) more_keys)
+      assert (get k0 = "set-in-callback");
+      Array.iteri (fun i k -> assert (get k = i)) more_keys)
     ()
     { retc = Fun.id; exnc = raise;
       effc = (fun (type a) (_ : a Effect.t) -> None) };
 
   (* And at the thread level too. *)
-  assert (Domain.TLS.get k0 = "set-in-callback");
-  Array.iteri (fun i k -> assert (Domain.TLS.get k = i)) more_keys;
+  assert (get k0 = "set-in-callback");
+  Array.iteri (fun i k -> assert (get k = i)) more_keys;
   print_endline "OK"

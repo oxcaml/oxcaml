@@ -17,9 +17,11 @@
 open Effect
 open Effect.Deep
 
-let k = Domain.TLS.new_key (fun () -> "init")
-let get () = Domain.TLS.get k
-let set v = Domain.TLS.set k v
+module TLS = Domain.Safe.TLS
+
+let k = TLS.new_key (fun () -> ref "init")
+let get () = (TLS.access k (fun r -> { Modes.Global.global = !r })).global
+let set (v : string) = TLS.access k (fun r -> r := v) [@nontail]
 
 (* A fresh, young, heap-allocated value with checkable contents. *)
 let payload tag = String.concat "" [ "<"; tag; ">"; String.make 64 '.' ]

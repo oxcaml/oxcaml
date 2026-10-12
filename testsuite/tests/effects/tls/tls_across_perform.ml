@@ -14,27 +14,34 @@ open Effect.Deep
 
 type _ Effect.t += Suspend : unit Effect.t
 
-let k = Domain.TLS.new_key (fun () -> "init")
+module TLS = Domain.Safe.TLS
+
+let get (type a : value mod many portable contended) (k : a ref TLS.key) : a =
+  (TLS.access k (fun r -> { Modes.Global.global = !r })).global
+let set (type a : value mod many portable contended) (k : a ref TLS.key) (v : a) =
+  TLS.access k (fun r -> r := v) [@nontail]
+
+let k = TLS.new_key (fun () -> ref "init")
 
 let () =
-  Domain.TLS.set k "parent";
+  set k "parent";
   Preemptible.match_with (fun () ->
-      Domain.TLS.set k "fiber";
+      set k "fiber";
       perform Suspend;
-      Printf.printf "after resume: %s\n" (Domain.TLS.get k);
+      Printf.printf "after resume: %s\n" (get k);
       perform Suspend;
-      assert (Domain.TLS.get k = "fiber"))
+      assert (get k = "fiber"))
     ()
     { retc = Fun.id; exnc = raise;
       effc = (fun (type a) (e : a Effect.t) ->
         match e with
         | Suspend -> Some (fun (k' : (a, _) continuation) ->
-            Printf.printf "in handler: %s\n" (Domain.TLS.get k);
+            Printf.printf "in handler: %s\n" (get k);
             (* Writes in the handler go to the parent's state, not the
                suspended fiber's. *)
-            Domain.TLS.set k "handler";
+            set k "handler";
             continue k' ())
         | _ -> None);
       tickc = This (fun () -> Continue) };
-  assert (Domain.TLS.get k = "handler");
+  assert (get k = "handler");
   print_endline "OK"

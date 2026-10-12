@@ -12,52 +12,59 @@ open Effect.Deep
 
 type _ Effect.t += Ask : unit Effect.t
 
-let k1 = Domain.TLS.new_key (fun () -> "init")
-let k2 = Domain.TLS.new_key (fun () -> 0)
+module TLS = Domain.Safe.TLS
+
+let get (type a : value mod many portable contended) (k : a ref TLS.key) : a =
+  (TLS.access k (fun r -> { Modes.Global.global = !r })).global
+let set (type a : value mod many portable contended) (k : a ref TLS.key) (v : a) =
+  TLS.access k (fun r -> r := v) [@nontail]
+
+let k1 = TLS.new_key (fun () -> ref "init")
+let k2 = TLS.new_key (fun () -> ref 0)
 
 let () =
-  Domain.TLS.set k1 "outer";
-  Domain.TLS.set k2 1;
+  set k1 "outer";
+  set k2 1;
 
   (* Deep, non-preemptible: inherits and writes through. *)
   match_with (fun () ->
-      assert (Domain.TLS.get k1 = "outer");
-      assert (Domain.TLS.get k2 = 1);
-      Domain.TLS.set k1 "set-in-deep-fiber")
+      assert (get k1 = "outer");
+      assert (get k2 = 1);
+      set k1 "set-in-deep-fiber")
     ()
     { retc = Fun.id; exnc = raise;
       effc = (fun (type a) (_ : a Effect.t) -> None) };
-  assert (Domain.TLS.get k1 = "set-in-deep-fiber");
+  assert (get k1 = "set-in-deep-fiber");
 
   (* Nested non-preemptible fibers: all share the thread's state. *)
   match_with (fun () ->
       match_with (fun () ->
-          assert (Domain.TLS.get k1 = "set-in-deep-fiber");
-          Domain.TLS.set k2 2)
+          assert (get k1 = "set-in-deep-fiber");
+          set k2 2)
         ()
         { retc = Fun.id; exnc = raise;
           effc = (fun (type a) (_ : a Effect.t) -> None) };
-      assert (Domain.TLS.get k2 = 2))
+      assert (get k2 = 2))
     ()
     { retc = Fun.id; exnc = raise;
       effc = (fun (type a) (_ : a Effect.t) -> None) };
-  assert (Domain.TLS.get k2 = 2);
+  assert (get k2 = 2);
 
   (* The effect handler runs on the parent chain and shares the same state
      when neither fiber is preemptible. *)
   match_with (fun () ->
-      Domain.TLS.set k2 3;
+      set k2 3;
       perform Ask;
-      assert (Domain.TLS.get k2 = 4))
+      assert (get k2 = 4))
     ()
     { retc = Fun.id; exnc = raise;
       effc = (fun (type a) (e : a Effect.t) ->
         match e with
         | Ask -> Some (fun (k : (a, _) continuation) ->
-            assert (Domain.TLS.get k2 = 3);
-            Domain.TLS.set k2 4;
+            assert (get k2 = 3);
+            set k2 4;
             continue k ())
         | _ -> None) };
-  assert (Domain.TLS.get k2 = 4);
+  assert (get k2 = 4);
 
   print_endline "OK"
