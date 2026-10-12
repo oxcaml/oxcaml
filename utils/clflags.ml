@@ -257,6 +257,9 @@ let flambda_invariant_checks =
   let v = if Config.with_flambda_invariants then Light_checks else No_checks in
   ref v (* -flambda-(no-)invariants *)
 
+let continue_on_type_error = ref false  (* for oxpect tests *)
+let zap_mliless_modality_to_id = ref false (* for oxpect tests *)
+
 let dont_write_files = ref false        (* set to true under ocamldoc *)
 
 let insn_sched_default = true

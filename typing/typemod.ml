@@ -3824,7 +3824,8 @@ and type_open_decl_aux ?used_slot ?toplevel ~funct_body names env od =
     } in
     open_descr, mode, sg, newenv
 
-and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
+and type_structure
+  ?(toplevel = None) ?(continue_on_error = false) ~funct_body anchor env sstr =
   let names = Signature_names.create () in
   let loc_md = location_of_structure sstr in
   let _, md_mode = register_allocation loc_md in
@@ -4285,15 +4286,22 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
       (List.rev str_acc, List.rev sig_acc, shape_map, env)
     | pstr :: srem ->
         let previous_saved_types = Cmt_format.get_saved_types () in
-        let desc, sg, shape_map, new_env =
+        match
           type_str_item env shape_map pstr sig_acc_include_functor
-        in
-        let str = { str_desc = desc; str_loc = pstr.pstr_loc; str_env = env } in
-        Cmt_format.set_saved_types (Cmt_format.Partial_structure_item str
-                                    :: previous_saved_types);
-        type_struct new_env shape_map srem (str :: str_acc)
-          (List.rev_append sg sig_acc)
-          (List.rev_append sg sig_acc_include_functor)
+        with
+        | desc, sg, shape_map, new_env ->
+           let str =
+             { str_desc = desc; str_loc = pstr.pstr_loc; str_env = env }
+           in
+           Cmt_format.set_saved_types (Cmt_format.Partial_structure_item str
+                                       :: previous_saved_types);
+           type_struct new_env shape_map srem (str :: str_acc)
+             (List.rev_append sg sig_acc)
+             (List.rev_append sg sig_acc_include_functor)
+        | exception e when continue_on_error ->
+           Location.report_exception !Location.formatter_for_warnings e;
+           type_struct env shape_map srem str_acc sig_acc
+             sig_acc_include_functor
   in
   let previous_saved_types = Cmt_format.get_saved_types () in
   let run () =
@@ -4343,6 +4351,7 @@ let type_module =
   type_module ~strengthen:true ~funct_body:false None
 let type_module_maybe_hold_locks =
   type_module_maybe_hold_locks ~strengthen:true ~funct_body:false None
+let type_structure' = type_structure
 let type_structure =
   type_structure ~funct_body:false None
 
@@ -4656,7 +4665,9 @@ let type_implementation target modulename initial_env ast =
       if !Clflags.as_parameter then
         error Cannot_compile_implementation_as_parameter;
       let (str, sg, mode, names, shape, finalenv) =
-        Profile.record_call "infer" (fun () -> type_structure initial_env ast)
+        let continue_on_error = !Clflags.continue_on_type_error in
+        Profile.record_call "infer" (fun () ->
+          type_structure' ~continue_on_error ~funct_body:false None initial_env ast)
       in
       With_regionality.submode_err (Location.in_file sourcefile, Structure)
         mode (Persistent_env.mode_pers_mod Dynamic);
@@ -4800,7 +4811,9 @@ let type_implementation target modulename initial_env ast =
             (* Generating [cmi] without [mli]. This [cmi] could be on the RHS of
                inclusion check, so we zap to identity if mode extension is
                disabled. Otherwise, zapping to floor (strongest) is better. *)
-            Ctype.zap_modalities_to_floor_if_modes_enabled_at Stable
+            if !Clflags.zap_mliless_modality_to_id
+            then Mode.Modality.zap_to_id
+            else Ctype.zap_modalities_to_floor_if_modes_enabled_at Stable
           in
           let simple_sg =
             remove_modality_and_zero_alloc_variables_sg finalenv ~zap_modality

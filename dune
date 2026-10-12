@@ -1142,3 +1142,17 @@
   otherlibs/dynlink/dynlink.cmxa
   middle_end/flambda2/from_lambda/flambda2_from_lambda.cma
   middle_end/flambda2/from_lambda/flambda2_from_lambda.cmxa))
+
+(rule
+  (target oxpect_test.out)
+  (deps
+
+    (glob_files stdlib/build/*.{cmi,cmx})
+    (glob_files stdlib/build/{libasmrun,stdlib}.{a,cmxa})
+    (glob_files stdlib/build/std_exit.{o,cmx})
+  )
+  (action (with-stdout-to %{target} (setenv OCAMLLIB %{project_root}/stdlib/build (run %{dep:oxcaml/testsuite/tools/oxpect.exe} %{dep:oxpect_test.ml})))))
+
+(rule (alias oxpect)
+   (deps main_native.exe boot_ocamlopt.exe stdlib/build/libasmrun.a stdlib/build/stdlib.a oxcaml/testsuite/tools/oxpect.exe)
+   (action (diff oxpect_test.ml oxpect_test.out)))

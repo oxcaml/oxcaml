@@ -18,6 +18,13 @@
  (flags (:standard -linkall))
  (modules expectnat))
 
+(executable
+ (name oxpect)
+ (modes native)
+ (libraries ocamlcommon flambda2 flambda2_ui flambda2_to_cmm ocamloptcomp)
+ (ocamlopt_flags (:standard -I +unix unix.cmxa))
+ (modules oxpect))
+
 (ocamllex
  (modules lexcmm))
 
