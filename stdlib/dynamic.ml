@@ -12,6 +12,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open! Stdlib
 type 'a t : value mod everything with 'a @@ contended portable
 
 external make : unit -> 'a t @@ portable = "caml_dynamic_make"

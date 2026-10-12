@@ -12,6 +12,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open! Stdlib
+
 type 'a t = 'a eff = ..
 
 let[@inline] or_null_of_opt = function
