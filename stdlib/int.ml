@@ -31,20 +31,20 @@ external div : (int[@local_opt]) -> (int[@local_opt]) -> int @@ portable = "%div
 external rem : (int[@local_opt]) -> (int[@local_opt]) -> int @@ portable = "%modint"
 external succ : (int[@local_opt]) -> int @@ portable = "%succint"
 external pred : (int[@local_opt]) -> int @@ portable = "%predint"
-let abs x = if x >= 0 then x else -x
+let (abs @ noalloc_strict) x = if x >= 0 then x else -x
 let max_int = (-1) lsr 1
 let min_int = max_int + 1
 external logand : (int[@local_opt]) -> (int[@local_opt]) -> int @@ portable = "%andint"
 external logor : (int[@local_opt]) -> (int[@local_opt]) -> int @@ portable = "%orint"
 external logxor : (int[@local_opt]) -> (int[@local_opt]) -> int @@ portable = "%xorint"
-let lognot x = logxor x (-1)
+let (lognot @ noalloc_strict) x = logxor x (-1)
 external shift_left : (int[@local_opt]) -> (int[@local_opt]) -> int @@ portable = "%lslint"
 external shift_right : (int[@local_opt]) -> (int[@local_opt]) -> int @@ portable = "%asrint"
 external shift_right_logical : (int[@local_opt]) -> (int[@local_opt]) -> int @@ portable = "%lsrint"
 let equal : int -> int -> bool = ( = )
 let compare : int -> int -> int = Stdlib.compare
-let min x y : t = if x <= y then x else y
-let max x y : t = if x >= y then x else y
+let (min @ noalloc_strict) (x : t) y : t = if x <= y then x else y
+let (max @ noalloc_strict) (x : t) y : t = if x >= y then x else y
 external to_float : (int[@local_opt]) -> (float[@local_opt]) @@ portable = "%floatofint"
 external of_float : (float[@local_opt]) -> int @@ portable = "%intoffloat"
 
@@ -62,4 +62,4 @@ let to_string x = format_int "%d" x
 external seeded_hash_param :
   int -> int -> int -> int -> int @@ portable = "caml_hash_exn" [@@noalloc]
 let seeded_hash seed x = seeded_hash_param 10 100 seed x
-let hash x = seeded_hash_param 10 100 0 x
+let (hash @ noalloc_strict) x = seeded_hash_param 10 100 0 x

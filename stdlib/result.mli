@@ -36,7 +36,8 @@ val ok : ('a : value_or_null) ('e : value_or_null). 'a -> ('a, 'e) result
 val error : ('a : value_or_null) ('e : value_or_null). 'e -> ('a, 'e) result
 (** [error e] is [Error e]. *)
 
-val value : ('a : value_or_null) ('e : value_or_null). ('a, 'e) result -> default:'a -> 'a
+val value : ('a : value_or_null) ('e : value_or_null) . ('a, 'e) result ->
+  (default:'a -> 'a) @ local @@ noalloc_strict
 (** [value r ~default] is [v] if [r] is [Ok v] and [default] otherwise. *)
 
 val get_ok : ('a : value_or_null) ('e : value_or_null). ('a, 'e) result -> 'a

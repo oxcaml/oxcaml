@@ -55,12 +55,12 @@ let blit =
 
 let ensure_ge (x:int) y = if x >= y then x else invalid_arg "String.concat"
 
-let rec sum_lengths acc seplen = function
+let[@zero_alloc strict] rec sum_lengths acc seplen = function
   | [] -> acc
   | hd :: [] -> length hd + acc
   | hd :: tl -> sum_lengths (ensure_ge (length hd + seplen + acc) acc) seplen tl
 
-let rec unsafe_blits dst pos sep seplen = function
+let rec (unsafe_blits @ noalloc_strict) dst pos sep seplen = function
     [] -> dst
   | hd :: [] ->
     unsafe_blit hd 0 dst pos (length hd); dst
@@ -125,12 +125,12 @@ let escaped s =
   if b == b' then s else bts b'
 
 (* duplicated in bytes.ml *)
-let rec index_rec s lim i c =
+let[@zero_alloc strict] rec index_rec s lim i c =
   if i >= lim then raise Not_found else
   if unsafe_get s i = c then i else index_rec s lim (i + 1) c
 
 (* duplicated in bytes.ml *)
-let index s c = index_rec s (length s) 0 c
+let[@zero_alloc strict] index s c = index_rec s (length s) 0 c
 
 (* duplicated in bytes.ml *)
 let rec index_rec_opt s lim i c =
@@ -155,12 +155,12 @@ let index_from_opt s i c =
     index_rec_opt s l i c
 
 (* duplicated in bytes.ml *)
-let rec rindex_rec s i c =
+let[@zero_alloc strict] rec rindex_rec s i c =
   if i < 0 then raise Not_found else
   if unsafe_get s i = c then i else rindex_rec s (i - 1) c
 
 (* duplicated in bytes.ml *)
-let rindex s c = rindex_rec s (length s - 1) c
+let[@zero_alloc strict] rindex s c = rindex_rec s (length s - 1) c
 
 (* duplicated in bytes.ml *)
 let rindex_from s i c =
@@ -193,7 +193,7 @@ let contains_from s i c =
     try ignore (index_rec s l i c); true with Not_found -> false
 
 (* duplicated in bytes.ml *)
-let contains s c = contains_from s 0 c
+let[@zero_alloc strict] contains s c = contains_from s 0 c
 
 (* duplicated in bytes.ml *)
 let rcontains_from s i c =
@@ -212,7 +212,7 @@ let uncapitalize_ascii s =
   B.uncapitalize_ascii (bos s) |> bts
 
 (* duplicated in bytes.ml *)
-let starts_with ~prefix s =
+let[@zero_alloc strict] starts_with ~prefix s =
   let len_s = length s
   and len_pre = length prefix in
   let rec aux i =
@@ -222,7 +222,7 @@ let starts_with ~prefix s =
   in len_s >= len_pre && aux 0
 
 (* duplicated in bytes.ml *)
-let ends_with ~suffix s =
+let[@zero_alloc strict] ends_with ~suffix s =
   let len_s = length s
   and len_suf = length suffix in
   let diff = len_s - len_suf in
@@ -234,7 +234,7 @@ let ends_with ~suffix s =
 
 external seeded_hash :
   int -> (t[@local_opt]) -> int @@ portable = "caml_string_hash" [@@noalloc]
-let hash x = seeded_hash 0 x
+let (hash @ noalloc_strict) x = seeded_hash 0 x
 
 (* duplicated in bytes.ml *)
 let split_on_char sep s =
@@ -264,14 +264,14 @@ let of_seq g = B.of_seq g |> bts
 
 (* UTF decoders and validators *)
 
-let get_utf_8_uchar s i = B.get_utf_8_uchar (bos s) i
-let is_valid_utf_8 s = B.is_valid_utf_8 (bos s)
+let[@zero_alloc strict] get_utf_8_uchar s i = B.get_utf_8_uchar (bos s) i
+let[@zero_alloc strict] is_valid_utf_8 s = B.is_valid_utf_8 (bos s)
 
-let get_utf_16be_uchar s i = B.get_utf_16be_uchar (bos s) i
-let is_valid_utf_16be s = B.is_valid_utf_16be (bos s)
+let[@zero_alloc strict] get_utf_16be_uchar s i = B.get_utf_16be_uchar (bos s) i
+let[@zero_alloc strict] is_valid_utf_16be s = B.is_valid_utf_16be (bos s)
 
-let get_utf_16le_uchar s i = B.get_utf_16le_uchar (bos s) i
-let is_valid_utf_16le s = B.is_valid_utf_16le (bos s)
+let[@zero_alloc strict] get_utf_16le_uchar s i = B.get_utf_16le_uchar (bos s) i
+let[@zero_alloc strict] is_valid_utf_16le s = B.is_valid_utf_16le (bos s)
 
 (** {6 Binary encoding/decoding of integers} *)
 
@@ -280,12 +280,12 @@ external get_uint16_ne : string -> int -> int @@ portable = "%caml_string_get16"
 external get_int32_ne : string -> int -> int32 @@ portable = "%caml_string_get32"
 external get_int64_ne : string -> int -> int64 @@ portable = "%caml_string_get64"
 
-let get_int8 s i = B.get_int8 (bos s) i
-let get_uint16_le s i = B.get_uint16_le (bos s) i
-let get_uint16_be s i = B.get_uint16_be (bos s) i
-let get_int16_ne s i = B.get_int16_ne (bos s) i
-let get_int16_le s i = B.get_int16_le (bos s) i
-let get_int16_be s i = B.get_int16_be (bos s) i
+let[@zero_alloc strict] get_int8 s i = B.get_int8 (bos s) i
+let[@zero_alloc strict] get_uint16_le s i = B.get_uint16_le (bos s) i
+let[@zero_alloc strict] get_uint16_be s i = B.get_uint16_be (bos s) i
+let[@zero_alloc strict] get_int16_ne s i = B.get_int16_ne (bos s) i
+let[@zero_alloc strict] get_int16_le s i = B.get_int16_le (bos s) i
+let[@zero_alloc strict] get_int16_be s i = B.get_int16_be (bos s) i
 let get_int32_le s i = B.get_int32_le (bos s) i
 let get_int32_be s i = B.get_int32_be (bos s) i
 let get_int64_le s i = B.get_int64_le (bos s) i
@@ -293,7 +293,7 @@ let get_int64_be s i = B.get_int64_be (bos s) i
 
 (* Spellchecking *)
 
-let utf_8_uchar_length s =
+let[@zero_alloc strict] utf_8_uchar_length s =
   let slen = length s in
   let i = ref 0 and ulen = ref 0 in
   while (!i < slen) do
@@ -372,7 +372,7 @@ let edit_distance ?limit s0 s1 =
   let us0 = uchar_array_of_utf_8_string s0 in
   edit_distance' ?limit s0 us0 s1
 
-let default_max_dist s = match utf_8_uchar_length s with
+let[@zero_alloc strict] default_max_dist s = match utf_8_uchar_length s with
   | 0 | 1 | 2 -> 0
   | 3 | 4 -> 1
   | _ -> 2

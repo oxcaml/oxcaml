@@ -14,8 +14,8 @@
   >   let _ = foo in
   >   ()
   > EOF
-  Verbosity 0: @ portable stateless
-  Verbosity 1: @ global portable uncontended read_write stateless aliased many forkable unyielding dynamic
+  Verbosity 0: @ portable stateless noalloc_strict
+  Verbosity 1: @ global portable uncontended read_write stateless aliased many forkable unyielding dynamic noalloc_strict
 
   $ run 2:4 <<EOF
   > let foo = ref 0
@@ -23,5 +23,5 @@
   >   let _ = foo in
   >   ()
   > EOF
-  Verbosity 0: @ portable stateless unique static
-  Verbosity 1: @ global portable uncontended read_write stateless unique many forkable unyielding static
+  Verbosity 0: @ portable stateless unique static noalloc_strict
+  Verbosity 1: @ global portable uncontended read_write stateless unique many forkable unyielding static noalloc_strict

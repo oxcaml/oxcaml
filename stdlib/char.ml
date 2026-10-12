@@ -61,6 +61,15 @@ let uppercase_ascii = function
 
 type t = char
 
+(* CR shsong: [compare] and [equal] both pass the [@zero_alloc strict] back-end
+   check, but neither can be [noalloc_strict]: they are curried and
+   two-argument, so [noalloc_strict] forces the intermediate arrow [local], and
+   [Char] then no longer matches [Set.OrderedType] / [Map.OrderedType] /
+   [Hashtbl.HashedType].  A functor argument is a module, so that break cannot
+   be repaired by an inline eta expansion at the call site.  Relaxing those
+   three functor signatures to a [local]-returning arrow would accept both --
+   an ordinary global-returning [compare] is included in a [local]-returning
+   one -- but that is a change to the functor interfaces, not to [Char]. *)
 let compare c1 c2 = code c1 - code c2
 let equal (c1: t) (c2: t) = compare c1 c2 = 0
 
@@ -70,7 +79,7 @@ let equal (c1: t) (c2: t) = compare c1 c2 = 0
 external seeded_hash_param :
   int -> int -> int -> char -> int @@ portable = "caml_hash_exn" [@@noalloc]
 let seeded_hash seed x = seeded_hash_param 10 100 seed x
-let hash x = seeded_hash_param 10 100 0 x
+let (hash @ noalloc_strict) x = seeded_hash_param 10 100 0 x
 
 module Ascii = struct
 
