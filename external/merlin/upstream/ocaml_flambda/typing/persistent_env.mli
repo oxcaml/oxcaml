@@ -57,7 +57,6 @@ type error =
       { instance : Global_module.Name.t; value : Global_module.Name.t; }
 
 
-
 type exn += private Error of error
 
 (* Data relating directly to a .cmi - does not depend on arguments *)

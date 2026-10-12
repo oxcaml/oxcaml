@@ -4322,27 +4322,6 @@ let get_native_repr_attribute attrs ~global_repr =
     Attr_helper.get_no_payload_attribute "unsafe_unextended" attrs,
     global_repr
   with
-<<<<<<< HEAD
-  | None, None, None, None -> Native_repr_attr_absent
-  | None, None, None, Some repr -> Native_repr_attr_present repr
-  | Some _, None, None, None -> Native_repr_attr_present Unboxed
-  | None, Some _, None, None -> Native_repr_attr_present Untagged
-  | None, None, Some _, None -> Native_repr_attr_present Unpacked
-  | Some { Location.loc }, _, _, _
-  | _, Some { Location.loc }, _, _
-  | _, _, Some { Location.loc }, _ ->
-    Error.log_and_raise loc Multiple_native_repr_attributes
-||||||| ad79b35c2d
-  | None, None, None, None -> Native_repr_attr_absent
-  | None, None, None, Some repr -> Native_repr_attr_present repr
-  | Some _, None, None, None -> Native_repr_attr_present Unboxed
-  | None, Some _, None, None -> Native_repr_attr_present Untagged
-  | None, None, Some _, None -> Native_repr_attr_present Unpacked
-  | Some { Location.loc }, _, _, _
-  | _, Some { Location.loc }, _, _
-  | _, _, Some { Location.loc }, _ ->
-    raise (Error (loc, Multiple_native_repr_attributes))
-=======
   | None, None, None, None, None -> Native_repr_attr_absent
   | None, None, None, None, Some repr -> Native_repr_attr_present repr
   | Some _, None, None, None, None -> Native_repr_attr_present Unboxed
@@ -4353,8 +4332,7 @@ let get_native_repr_attribute attrs ~global_repr =
   | _, Some { Location.loc }, _, _, _
   | _, _, Some { Location.loc }, _, _
   | _, _, _, Some { Location.loc }, _ ->
-    raise (Error (loc, Multiple_native_repr_attributes))
->>>>>>> origin/main
+    Error.log_and_raise loc Multiple_native_repr_attributes
 
 let is_upstream_compatible_non_value_unbox env ty =
   (* CR layouts v2.5: This needs to be updated when we support unboxed
@@ -4616,8 +4594,8 @@ let make_native_repr
     (Poly | Sort (Product _ | Addressable _ | Base (Scannable | Void | Bits32 |
       Bits64 | Word | Untagged_immediate | Float32 | Float64 | Vec128 | Vec256 |
       Vec512 | Mask))) ->
-    raise
-      (Error (core_type.ptyp_loc, Cannot_unbox_or_untag_type Unsafe_unextended))
+    Error.log_and_raise core_type.ptyp_loc
+      (Cannot_unbox_or_untag_type Unsafe_unextended)
   | Native_repr_attr_present Unsafe_unextended, Sort (Univar _ | Genvar _) ->
     Misc.fatal_error "typedecl: Univar/Genvar in concrete type"
 

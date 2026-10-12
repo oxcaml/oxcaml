@@ -3730,87 +3730,7 @@ and type_pat_aux
           spl
     in
     let expected_tys =
-<<<<<<< HEAD
-      solve_Ppat_tuple ~pat_mode loc penv args expected_ty
-    in
-    let pl =
-      List.map2 (fun (lbl, t, pat_mode) (_, p) ->
-        lbl,
-        type_pat tps Value ~pat_mode p t
-          Jkind.Sort.(of_const Const.for_tuple_element))
-        expected_tys args
-    in
-    rvp {
-      pat_desc = Tpat_tuple pl;
-      pat_loc = loc; pat_extra=[];
-      pat_type = newty (Ttuple (List.map (fun (lbl, p) -> lbl, p.pat_type) pl));
-      pat_attributes = sp.ppat_attributes;
-      pat_env = !!penv;
-      pat_unique_barrier = Unique_barrier.not_computed () }
-  in
-  let type_unboxed_tuple_pat spl closed =
-    Language_extension.assert_enabled ~loc Layouts
-      Language_extension.Stable;
-    assert (closed = Open || List.length spl >= 2);
-    Option.iter
-      (fun l -> Error.log_or_raise loc !!penv (Repeated_tuple_pat_label l))
-      (Misc.repeated_label spl);
-    let args =
-      match get_desc (expand_head !!penv expected_ty) with
-      (* If it's a principally-known tuple pattern, try to reorder *)
-      | Tunboxed_tuple labeled_tl when is_principal expected_ty ->
-        reorder_pat loc penv spl closed labeled_tl expected_ty
-      (* If not, it's not allowed to be open (partial) *)
-      | _ ->
-          (match closed with
-           | Open ->
-               Error.log_or_raise loc !!penv Partial_tuple_pattern_bad_type
-           | Closed -> ());
-          spl
-    in
-    let expected_tys =
-      solve_Ppat_unboxed_tuple ~pat_mode loc penv args expected_ty
-||||||| ad79b35c2d
-      solve_Ppat_tuple ~pat_mode loc penv args expected_ty
-    in
-    let pl =
-      List.map2 (fun (lbl, t, pat_mode) (_, p) ->
-        lbl,
-        type_pat tps Value ~pat_mode p t
-          Jkind.Sort.(of_const Const.for_tuple_element))
-        expected_tys args
-    in
-    rvp {
-      pat_desc = Tpat_tuple pl;
-      pat_loc = loc; pat_extra=[];
-      pat_type = newty (Ttuple (List.map (fun (lbl, p) -> lbl, p.pat_type) pl));
-      pat_attributes = sp.ppat_attributes;
-      pat_env = !!penv;
-      pat_unique_barrier = Unique_barrier.not_computed () }
-  in
-  let type_unboxed_tuple_pat spl closed =
-    Language_extension.assert_enabled ~loc Layouts
-      Language_extension.Stable;
-    assert (closed = Open || List.length spl >= 2);
-    Option.iter
-      (fun l -> raise (Error (loc, !!penv, Repeated_tuple_pat_label l)))
-      (Misc.repeated_label spl);
-    let args =
-      match get_desc (expand_head !!penv expected_ty) with
-      (* If it's a principally-known tuple pattern, try to reorder *)
-      | Tunboxed_tuple labeled_tl when is_principal expected_ty ->
-        reorder_pat loc penv spl closed labeled_tl expected_ty
-      (* If not, it's not allowed to be open (partial) *)
-      | _ ->
-        match closed with
-        | Open -> raise (Error (loc, !!penv, Partial_tuple_pattern_bad_type))
-        | Closed -> spl
-    in
-    let expected_tys =
-      solve_Ppat_unboxed_tuple ~pat_mode loc penv args expected_ty
-=======
       solve_Ppat_tuple ~is_unboxed ~pat_mode loc penv args expected_ty
->>>>>>> origin/main
     in
     let pl =
       List.map2 (fun (lbl, t, pat_mode, sort) (_, p) ->
@@ -6814,9 +6734,9 @@ let split_function_ty
         let arg_kind = Jkind.Builtin.any ~why:Inside_of_Tarrow in
         let ret_kind = Jkind.Builtin.any ~why:Inside_of_Tarrow in
         { ty_arg = newty (Tpoly (newvar2 level arg_kind, []))
-        ; arg_mode = With_locality.newvar (get_current_level ())
+        ; arg_mode = With_locality.newvar level
         ; ty_ret = newvar2 level ret_kind
-        ; ret_mode = With_locality.newvar (get_current_level ())
+        ; ret_mode = With_locality.newvar level
         }
     end
   in
@@ -7124,6 +7044,35 @@ let pat_modes ~force_toplevel rec_mode_var ~is_lpoly (attrs, spat) =
   in
   attrs, pat_mode, env_locality_mode, exp_mode, spat
 
+let create_typing_recovery_error_node loc env ty_expected ~attributes =
+    { exp_desc =
+        Texp_ident
+          { path = Path.Pident (Ident.create_local "*type-error*");
+            lid = Location.mkloc (Longident.Lident "*type-error*") loc;
+            desc =
+              { Types.val_type = ty_expected;
+                val_kind =
+                  Val_reg (Var (Jkind.Sort.new_var ~level:(Ctype.get_current_level ())));
+                val_lpoly = Lpoly.determined [];
+                val_loc = loc;
+                val_attributes = [];
+                val_uid = Uid.internal_not_actually_unique;
+                val_zero_alloc = Zero_alloc.default;
+                val_modalities = Modality.of_const Modality.Const.id
+              };
+            kind = Id_value;
+            unique_use = (Uniqueness.newvar (get_current_level ()),
+                          Linearity.newvar (get_current_level ()));
+            mode = Mode.With_regionality.newvar (get_current_level ());
+            staticity = Staticity.newvar (get_current_level ())
+          };
+      exp_loc = loc;
+      exp_extra = [];
+      exp_type = ty_expected;
+      exp_env = env;
+      exp_attributes = attributes;
+    }
+
 let add_zero_alloc_attribute expr attributes =
   let open Builtin_attributes in
   let to_string : zero_alloc_attribute -> string = function
@@ -7193,37 +7142,9 @@ and type_expect ?recarg ?(overwrite=No_overwrite) env
                  && Typing_recovery.is_recoverable exn ->
         Typing_recovery.erroneous_type_register ty_expected_explained.ty;
         let loc = sexp.pexp_loc in
-        let exp =
-          Texp_ident {
-            path = Path.Pident (Ident.create_local "*type-error*");
-            lid = Location.mkloc (Longident.Lident "*type-error*") loc;
-            kind = Id_value;
-            unique_use = (Uniqueness.disallow_left Uniqueness.legacy,
-             Linearity.disallow_right Linearity.legacy);
-            staticity = proj_staticity Mode.With_regionality.legacy;
-            mode =
-              Mode.With_regionality.disallow_right Mode.With_regionality.legacy;
-            desc = Types.{
-                val_type = ty_expected_explained.ty;
-                val_kind =
-                  Val_reg (Var (Jkind.Sort.new_var
-                                  ~level:(Ctype.get_current_level ())));
-                val_loc = loc;
-                val_attributes = [];
-                val_modalities = Modality.of_const Modality.Const.id;
-                val_zero_alloc = Zero_alloc.default;
-                val_uid = Uid.internal_not_actually_unique;
-                val_lpoly = Lpoly.determined []
-              }
-          }
-        in
-        { exp_desc = exp;
-          exp_loc = loc;
-          exp_extra = [];
-          exp_type = ty_expected_explained.ty;
-          exp_env = env;
-          exp_attributes =
-            Typing_recovery_state.recovery_attributes sexp.pexp_attributes }
+        create_typing_recovery_error_node loc env ty_expected_explained.ty
+          ~attributes:(Typing_recovery_state.recovery_attributes
+                         sexp.pexp_attributes)
     )
 
 and type_expect_
@@ -9470,7 +9391,7 @@ and type_expect_
         Typetexp.Error.log_or_raise loc env
           (Unsupported_extension Overwriting);
       if not (can_be_overwritten exp2.pexp_desc) then
-        Error.log_or_raise exp2.pexp_loc env Overwrite_of_invalid_term;
+        Error.log_and_raise exp2.pexp_loc env Overwrite_of_invalid_term;
       let cell_mode, _ =
         (* The overwritten cell has to be unique
            and should have the areality expected here: *)
@@ -10176,9 +10097,8 @@ and type_function
             with
             | Ok () -> ()
             | Error err ->
-              raise
-                (Error (pat.ppat_loc, env,
-                        Optional_arg_default_not_rep (ty_default_arg, err)))
+              Error.log_or_raise pat.ppat_loc env
+                (Optional_arg_default_not_rep (ty_default_arg, err))
             end;
             (* Issue#12668: Retain type-directed disambiguation of
                ?x:(y : Variant.t = Constr)
@@ -10922,7 +10842,7 @@ and type_option_some env expected_mode sarg ty ty0 =
     with
     | Ok (repres, sorts) -> repres, sorts
     | Error (Unrepresentable_arg (loc, ty, err)) ->
-      raise (Error (loc, env, Function_type_not_rep (ty, err)))
+      Error.log_and_raise loc env (Function_type_not_rep (ty, err))
   in
   mkexp (Texp_construct(mknoloc lid , csome, repres, List.combine sorts [arg],
                         Some (Typedtree.create_locality_mode_r locality_mode)))
@@ -11261,39 +11181,10 @@ and type_argument ?explanation ?recarg ~overwrite env mode sarg
         with exn when Typing_recovery.is_recoverable exn ->
           Typing_recovery.erroneous_type_register ty_expected;
           let loc = sarg.pexp_loc in
-          let exp =
-            Texp_ident
-              { path = Path.Pident (Ident.create_local "*type-error*");
-                lid = Location.mkloc (Longident.Lident "*type-error*") loc;
-                desc = {
-                  val_type = ty_expected;
-                  val_kind =
-                    Val_reg (Var (Jkind.Sort.new_var
-                                    ~level:(Ctype.get_current_level ())));
-                  val_lpoly = Lpoly.determined [];
-                  val_loc = loc;
-                  val_attributes = [];
-                  val_uid = Uid.internal_not_actually_unique;
-                  val_zero_alloc = Zero_alloc.default;
-                  val_modalities = Modality.of_const Modality.Const.id
-                };
-                kind = Id_value;
-                unique_use = (Uniqueness.disallow_left Uniqueness.legacy,
-                              Linearity.disallow_right Linearity.legacy);
-                staticity = proj_staticity Mode.With_regionality.legacy;
-                mode =
-                  Mode.With_regionality.disallow_right
-                    Mode.With_regionality.legacy
-              }
-          in
-          { exp_desc = exp;
-            exp_loc = loc;
-            exp_extra = [];
-            exp_type = ty_expected;
-            exp_env = env;
-            exp_attributes =
-              Typing_recovery_state.recovery_attributes sarg.pexp_attributes
-          })
+          create_typing_recovery_error_node loc env ty_expected
+            ~attributes:(Typing_recovery_state.recovery_attributes
+                           sarg.pexp_attributes)
+      )
   else delayed ()
 
 (* See Note [Type-checking applications] for an overview *)
@@ -11597,118 +11488,8 @@ and type_tuple ~is_unboxed ~overwrite ~loc ~env ~(expected_mode : expected_mode)
       (fun (label, body) ((_, ty, sort), argument_mode) overwrite ->
         let argument_mode = mode_default argument_mode in
         let argument_mode = expect_mode_cross env ty argument_mode in
-<<<<<<< HEAD
-          (label, type_expect ~overwrite env argument_mode body (mk_expected ty)))
-      sexpl types_and_modes overwrites
-  in
-  re {
-    exp_desc =
-      Texp_tuple (expl, Typedtree.create_locality_mode_r locality_mode);
-    exp_loc = loc; exp_extra = [];
-    (* Keep sharing *)
-    exp_type = newty (Ttuple (List.map (fun (label, e) -> label, e.exp_type) expl));
-    exp_attributes = attributes;
-    exp_env = env }
-
-and type_unboxed_tuple ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
-      ~explanation ~attributes sexpl =
-  Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
-  let arity = List.length sexpl in
-  assert (arity >= 2);
-  Option.iter
-    (fun l -> Error.log_or_raise loc env (Repeated_tuple_exp_label l))
-    (Misc.repeated_label sexpl);
-  let argument_mode =
-    expected_mode.mode
-    |> apply_right_is_contained_by
-      {containing = Tuple; container = (loc, Expression)}
-  in
-  (* elements must be representable *)
-  let labels_types_and_sorts =
-    List.map (fun (label, _) ->
-      let jkind, sort =
-        Jkind.of_new_sort_var ~why:Unboxed_tuple_element
-          ~level:(Ctype.get_current_level ())
-      in
-      label, newgenvar jkind, sort)
-    sexpl
-  in
-  let labeled_subtypes =
-    List.map (fun (l, t, _) -> (l, t)) labels_types_and_sorts
-  in
-  let to_unify = newgenty (Tunboxed_tuple labeled_subtypes) in
-  with_explanation explanation (fun () ->
-    unify_exp_types loc env to_unify (generic_instance ty_expected));
-
-  let argument_modes =
-    match expected_mode.tuple_modes with
-    (* CR zqian: improve the modes of opened labeled tuple pattern. *)
-    | Some tuple_modes when List.compare_length_with tuple_modes arity = 0 ->
-        List.map (fun (mode, _) -> With_regionality.meet [mode; argument_mode])
-          tuple_modes
-    | Some tuple_modes ->
-        (* If the pattern and the expression have different tuple length, it
-          should be an type error. Here, we give the sound mode anyway. *)
-        let argument_mode =
-          With_regionality.meet (argument_mode :: List.map fst tuple_modes)
-||||||| ad79b35c2d
-          (label, type_expect ~overwrite env argument_mode body (mk_expected ty)))
-      sexpl types_and_modes overwrites
-  in
-  re {
-    exp_desc =
-      Texp_tuple (expl, Typedtree.create_locality_mode_r locality_mode);
-    exp_loc = loc; exp_extra = [];
-    (* Keep sharing *)
-    exp_type = newty (Ttuple (List.map (fun (label, e) -> label, e.exp_type) expl));
-    exp_attributes = attributes;
-    exp_env = env }
-
-and type_unboxed_tuple ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
-      ~explanation ~attributes sexpl =
-  Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
-  let arity = List.length sexpl in
-  assert (arity >= 2);
-  Option.iter
-    (fun l -> raise (Error (loc, env, Repeated_tuple_exp_label l)))
-    (Misc.repeated_label sexpl);
-  let argument_mode =
-    expected_mode.mode
-    |> apply_right_is_contained_by
-      {containing = Tuple; container = (loc, Expression)}
-  in
-  (* elements must be representable *)
-  let labels_types_and_sorts =
-    List.map (fun (label, _) ->
-      let jkind, sort =
-        Jkind.of_new_sort_var ~why:Unboxed_tuple_element
-          ~level:(Ctype.get_current_level ())
-      in
-      label, newgenvar jkind, sort)
-    sexpl
-  in
-  let labeled_subtypes =
-    List.map (fun (l, t, _) -> (l, t)) labels_types_and_sorts
-  in
-  let to_unify = newgenty (Tunboxed_tuple labeled_subtypes) in
-  with_explanation explanation (fun () ->
-    unify_exp_types loc env to_unify (generic_instance ty_expected));
-
-  let argument_modes =
-    match expected_mode.tuple_modes with
-    (* CR zqian: improve the modes of opened labeled tuple pattern. *)
-    | Some tuple_modes when List.compare_length_with tuple_modes arity = 0 ->
-        List.map (fun (mode, _) -> With_regionality.meet [mode; argument_mode])
-          tuple_modes
-    | Some tuple_modes ->
-        (* If the pattern and the expression have different tuple length, it
-          should be an type error. Here, we give the sound mode anyway. *)
-        let argument_mode =
-          With_regionality.meet (argument_mode :: List.map fst tuple_modes)
-=======
         let exp =
           type_expect ~overwrite env argument_mode body (mk_expected ty)
->>>>>>> origin/main
         in
         (label, exp, sort))
       sexpl types_sorts_and_modes overwrites
