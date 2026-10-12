@@ -981,7 +981,6 @@ let type_open :
   ref (fun ?used_slot:_ _ -> assert false)
 
 let rec transl_type env ~policy ?(aliased=false) ~row_context mode styp =
-<<<<<<< HEAD
   let delayed () =
     Builtin_attributes.warning_scope styp.ptyp_attributes
       (fun () -> transl_type_aux env ~policy ~aliased ~row_context mode styp)
@@ -1006,44 +1005,6 @@ let rec transl_type env ~policy ?(aliased=false) ~row_context mode styp =
               ctyp_attributes = [];
             })
   else delayed ()
-||||||| ad79b35c2d
-  Msupport.with_saved_types
-    ~warning_attribute:styp.ptyp_attributes ?save_part:None
-    (fun () ->
-       try
-         transl_type_aux env ~policy ~aliased ~row_context mode styp
-       with exn ->
-         let ty = new_global_var (Jkind.Builtin.value ~why:(Unknown "merlin")) in
-         Msupport.erroneous_type_register ty;
-         Msupport.raise_error exn;
-           { ctyp_desc = Ttyp_var (None, None);
-             ctyp_type = ty;
-             ctyp_env = env;
-             ctyp_loc = styp.ptyp_loc;
-             ctyp_attributes = [];
-           }
-    )
-=======
-  Msupport.with_saved_types
-    ~warning_attribute:styp.ptyp_attributes ?save_part:None
-    (fun () ->
-       try
-         transl_type_aux env ~policy ~aliased ~row_context mode styp
-       with exn ->
-         let ty =
-           new_global_var
-             (Jkind.of_new_sort ~why:Merlin ~level:(Ctype.get_current_level ()))
-         in
-         Msupport.erroneous_type_register ty;
-         Msupport.raise_error exn;
-           { ctyp_desc = Ttyp_var (None, None);
-             ctyp_type = ty;
-             ctyp_env = env;
-             ctyp_loc = styp.ptyp_loc;
-             ctyp_attributes = [];
-           }
-    )
->>>>>>> origin/main
 
 and transl_type_aux env ~row_context ~aliased ~policy mode styp =
   let loc = styp.ptyp_loc in

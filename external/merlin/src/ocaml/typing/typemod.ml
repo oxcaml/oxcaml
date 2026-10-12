@@ -2279,14 +2279,7 @@ and add_implicit_jkinds env attrs =
    so we need this to take the signature of the previously checked portion
    to support include functor. *)
 
-<<<<<<< HEAD
-and transl_signature ?(keep_warnings = false) ?(interface_toplevel = false)
-      env sig_acc
-||||||| ad79b35c2d
-and transl_signature ?(keep_warnings = false) ?(interface_toplevel = false) env sig_acc
-=======
 and transl_signature ?(keep_warnings = false) ?(interface_toplevel = false) ~md_mode env sig_acc
->>>>>>> origin/main
       {psg_items; psg_modalities; psg_loc} =
   let names = Signature_names.create () in
 
@@ -4800,19 +4793,13 @@ let check_argument_type_if_given env sourcefile ~actual_staticity actual_sig
              ai_coercion_from_primary = coercion;
            }
 
-<<<<<<<<<<<<<< Merlin:typing-recovery-from-ocaml-541
-<<<<<<< HEAD
-(* In Merlin catching errors is done at the Mtyper level
-|||||||||||||| Compiler:last-imported
-<<<<<<< HEAD
-==============
 let arg_signature sg ~param : Types.arg_signature =
   (* The argument block is appended after the signature's runtime fields;
      must agree with [Translmod.add_arg_block_to_module_block]. *)
   { arg_param = param;
     arg_block_idx = List.length (Types.bound_value_identifiers_and_sorts sg) }
 
->>>>>>>>>>>>>> Compiler:HEAD
+(* In Merlin catching errors is done at the Mtyper level
 let collect_recovery_errors unit exn_list =
   let error_list =
     List.fold_right (fun exn set ->
@@ -5115,32 +5102,10 @@ let type_interface target modulename env ast =
       | [] -> result
       | exn_list -> collect_recovery_errors target exn_list
     else
-<<<<<<<<<<<<<< Merlin:typing-recovery-from-ocaml-541
-    *)
-    transl_signature ~interface_toplevel:true env ast
-  in
-||||||| ad79b35c2d
-  let sg = transl_signature ~interface_toplevel:true env ast in
-=======
-  let sg =
-    transl_signature
-      ~md_mode:With_regionality.Const.legacy
-      ~interface_toplevel:true env ast
-|||||||||||||| Compiler:last-imported
-      transl_signature ~interface_toplevel:true env ast
-  in
-||||||| ad79b35c2d
-  let sg = transl_signature ~interface_toplevel:true env ast in
-=======
-  let sg =
-    transl_signature
-      ~md_mode:With_regionality.Const.legacy
-      ~interface_toplevel:true env ast
-==============
+      *)
       transl_signature
         ~md_mode:With_regionality.Const.legacy
         ~interface_toplevel:true env ast
->>>>>>>>>>>>>> Compiler:HEAD
   in
   let arg_type =
     !Clflags.as_argument_for
