@@ -404,9 +404,9 @@ module Inlining = struct
         let decision, res =
           (* Normally [close_one_function] should give [Jsir_inlining_disabled]
              for code using slots, so shouldn't be present here. However the
-             wrappers created by [make_unboxed_function_wrapper] inherit the main
-             function's decision while projecting from their own closure, so they
-             can reach this point with code present. *)
+             wrappers created by [make_unboxed_function_wrapper] inherit the
+             main function's decision while projecting from their own closure,
+             so they can reach this point with code present. *)
           if not (Code.can_be_inlined_for_jsir code)
           then
             ( Call_site_inlining_decision_type.Jsir_inlining_disabled,
