@@ -40,11 +40,13 @@ Error: Annotation check for zero_alloc strict failed on function Test_inference.
 File "test_inference.ml", line 70, characters 12-35:
 Error: called function may allocate on a path to exceptional return (indirect call)
 
-File "printf.ml", line 46, characters 2-31:
-Error: called function may allocate on a path to exceptional return (direct call camlCamlinternalFormat__make_printf_HIDE_STAMP)
+File "printf.ml", line 51, characters 18-43:
+Error: called function may allocate on a path to exceptional return (direct call camlStdlib__Printf__ksprintf_HIDE_STAMP)
 inlined from
-stdlib/printf.ml:48,18--43[Stdlib__Printf.sprintf][camlStdlib__Printf__sprintf_HIDE_STAMP]
 test_inference.ml:70,12--35[Test_inference.f_strict_fail]
+Hint: Build artifacts for the library containing the callee are not available.
+Try adding the library as an explicit dependency.
+
 
 File "test_inference.ml", line 71, characters 10-15:
 Error: allocation of 24 bytes on a path to exceptional return

@@ -17,8 +17,6 @@
 
 #include "caml/alloc.h"
 #include "caml/custom.h"
-#include "caml/finalise.h"
-#include "caml/gc.h"
 #include "caml/gc_ctrl.h"
 #include "caml/gc_stats.h"
 #include "caml/major_gc.h"
@@ -34,7 +32,6 @@
 #endif
 #include "caml/domain.h"
 #include "caml/fiber.h"
-#include "caml/globroots.h"
 #include "caml/signals.h"
 #include "caml/startup.h"
 #include "caml/fail.h"

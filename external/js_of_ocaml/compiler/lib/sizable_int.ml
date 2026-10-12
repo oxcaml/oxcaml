@@ -265,6 +265,7 @@ module Make (Arg : Arg) : S = struct
   let of_int_warning_on_overflow i =
     Stdlib.Int64.convert_warning_on_overflow
       "integer"
+      ~num_bits:(num_bits ())
       ~to_int64:(fun i -> wrap_modulo (Int64.of_int i))
       ~of_int64:Int64.to_int
       ~equal:Int.equal
@@ -275,6 +276,7 @@ module Make (Arg : Arg) : S = struct
   let of_int32_warning_on_overflow n =
     Stdlib.Int64.convert_warning_on_overflow
       "int32"
+      ~num_bits:(num_bits ())
       ~to_int64:(fun i -> wrap_modulo (Int64.of_int32 i))
       ~of_int64:Int64.to_int32
       ~equal:Int32.equal
@@ -285,6 +287,7 @@ module Make (Arg : Arg) : S = struct
   let of_int64_warning_on_overflow n =
     Stdlib.Int64.convert_warning_on_overflow
       "int64"
+      ~num_bits:(num_bits ())
       ~to_int64:(fun i -> wrap_modulo  i)
       ~of_int64:Fun.id
       ~equal:Int64.equal
@@ -296,6 +299,7 @@ module Make (Arg : Arg) : S = struct
   let of_nativeint_warning_on_overflow n =
     Stdlib.Int64.convert_warning_on_overflow
       "native integer"
+      ~num_bits:(num_bits ())
       ~to_int64:(fun i -> wrap_modulo (Int64.of_nativeint i))
       ~of_int64:Int64.to_nativeint
       ~equal:Nativeint.equal

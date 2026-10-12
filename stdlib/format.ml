@@ -1532,7 +1532,10 @@ let rec strput_acc ppf acc = match acc with
 
 *)
 
-let kfprintf k ppf (Format (fmt, _)) =
+(* The functions below are not inlined: each of them allocates a closure,
+   whose code would otherwise be copied at every call site for no benefit
+   beyond saving one call. *)
+let[@inline never] kfprintf k ppf (Format (fmt, _)) =
   make_printf
     (fun acc -> output_acc ppf acc; k ppf)
     End_of_acc fmt
@@ -1555,14 +1558,14 @@ let eprintf (Format (fmt, _)) =
     (fun acc -> output_acc (DLS.get err_formatter_key) acc)
     End_of_acc fmt
 
-let kdprintf k (Format (fmt, _)) =
+let[@inline never] kdprintf k (Format (fmt, _)) =
   make_printf
     (fun acc -> k (fun ppf -> output_acc ppf acc))
     End_of_acc fmt
 
 let dprintf fmt = kdprintf (fun i -> i) fmt
 
-let ksprintf k (Format (fmt, _)) =
+let[@inline never] ksprintf k (Format (fmt, _)) =
   let b = pp_make_buffer () in
   let ppf = formatter_of_buffer b in
   let k acc =
@@ -1573,7 +1576,7 @@ let ksprintf k (Format (fmt, _)) =
 
 let sprintf fmt = ksprintf id fmt
 
-let kasprintf k (Format (fmt, _)) =
+let[@inline never] kasprintf k (Format (fmt, _)) =
   let b = pp_make_buffer () in
   let ppf = formatter_of_buffer b in
   let k acc =

@@ -1299,7 +1299,7 @@ type ('a : bits32 mod aliased) t = ('a : any mod global)
 type ('a : value mod global) t = 'a
 type ('a : immediate) t = 'a
 type ('a : immediate) t = 'a
-type ('a : value mod everything non_float) t = 'a
+type ('a : (value mod everything) non_float) t = 'a
 type 'a t = 'a
 type 'a t = 'a
 type ('a : bits32 mod global) t = 'a
@@ -1540,6 +1540,33 @@ type 'a t = private 'a
 type 'a t : value mod global = private 'a
 [%%expect {|
 type ('a : value mod global) t = private 'a
+|}]
+
+(* Refining a parameter from the manifest must not skip checking its uses. *)
+type 'a t : value mod global = 'a
+and u = (int -> int) t
+[%%expect {|
+Line 2, characters 8-22:
+2 | and u = (int -> int) t
+            ^^^^^^^^^^^^^^
+Error: Layout mismatch in final type declaration consistency check.
+       This is most often caused by the fact that type inference is not
+       clever enough to propagate layouts through variables in different
+       declarations. It is also not clever enough to produce a good error
+       message, so we'll say this instead:
+         The kind of int -> int is value non_float mod aliased immutable
+           because it's a function type.
+         But the kind of int -> int must be a subkind of value mod global
+           because of the definition of t at line 1, characters 0-33.
+       A good next step is to add a layout annotation on a parameter to
+       the declaration where this error is reported.
+|}]
+
+type 'a t : value mod global = 'a u
+and 'a u = 'a
+[%%expect {|
+type ('a : value mod global) t = 'a u
+and 'a u = 'a
 |}]
 
 type 'a t : word = private 'a
@@ -1838,11 +1865,11 @@ Error: Signature mismatch:
        Modules do not match:
          sig type 'a t : value_or_null mod everything end
        is not included in
-         sig type 'a t : value_or_null mod everything separable end
+         sig type 'a t : (value_or_null mod everything) separable end
        Type declarations do not match:
          type 'a t : value_or_null mod everything
        is not included in
-         type 'a t : value_or_null mod everything separable
+         type 'a t : (value_or_null mod everything) separable
        The layout of the first is value_or_null
          because of the definition of t at line 4, characters 2-42.
        But the layout of the first must be a sublayout of value_maybe_null
@@ -2040,8 +2067,7 @@ Lines 5-7, characters 0-43:
 6 |   | Foo of int * (t * (bool -> string)) portable
 7 |   | Bar of string * (int ref * q) contended
 Error: The kind of type "r" is
-           value
-             non_float
+           value non_float
              mod portable contended
              with q @@ contended
              with t @@ portable
@@ -2072,8 +2098,7 @@ Lines 5-7, characters 0-43:
 6 |   | Foo of int * (t * (bool -> string)) portable
 7 |   | Bar of string * (int ref * q) contended
 Error: The kind of type "r" is
-           value
-             non_float
+           value non_float
              mod portable contended
              with q @@ contended
              with t @@ portable

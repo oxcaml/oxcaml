@@ -116,6 +116,10 @@ module type Sort = sig
         layout-poly any-fields *)
     val is_concrete : t -> bool
 
+    (** True if the sort is [scannable], possibly under [Addressable]. Products
+        (even of scannables), univars, and genvars are not scannable. *)
+    val is_scannable : t -> bool
+
     val is_surely_addressable : t -> bool
 
     val addressable : t -> t
@@ -164,8 +168,6 @@ module type Sort = sig
     val for_instance_var : t
 
     val for_lazy_body : t
-
-    val for_tuple_element : t
 
     val for_variant_arg : t
 
@@ -370,7 +372,7 @@ module History = struct
     | Statement
     | Optional_arg_default
     | Layout_poly_in_external
-    | Unboxed_tuple_element
+    | Tuple_element
     | Peek_or_poke
     | Array_element
     | Idx_element
@@ -418,7 +420,6 @@ module History = struct
      related to objects here. *)
   type value_or_null_creation_reason =
     | Primitive of Ident.t
-    | Tuple_element
     | Separability_check
     | Polymorphic_variant_field
     | V1_safety_check

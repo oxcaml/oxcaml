@@ -28,6 +28,14 @@ let double_translate () =
   | `Cps -> false
   | `Double_translation -> true
 
+(* We turn mutually recursive functions into CPS so that calls between
+   them are tail calls. This is not needed when targeting Wasm, which
+   has proper tail calls. *)
+let cps_for_tail_calls () =
+  match Config.target () with
+  | `JavaScript -> true
+  | `Wasm -> false
+
 open Code
 
 let add_var = Var.ISet.add
@@ -71,7 +79,8 @@ let block_deps ~info ~vars ~tail_deps ~deps ~blocks ~fun_name pc =
           | Top -> ()
           | Values { known; others } ->
               let known_tail_call =
-                (not others)
+                cps_for_tail_calls ()
+                && (not others)
                 && is_last
                 &&
                 match block.branch with
@@ -172,44 +181,86 @@ let is_unyielding_call ~info ~in_mutual_recursion x =
       | Closure _ | Prim _ | Block _ | Constant _ | Field _ | Special _ )
   | Phi _ -> false
 
-let cps_needed ~info ~in_mutual_recursion ~rev_deps st x =
+(* Whether [x] may run below an effect handler, that is, whether its
+   stack frame may be captured by a continuation. A function may run
+   below an effect handler if it escapes (fiber bodies and effect
+   handlers are passed to the [%with_stack] and [%resume] primitives,
+   so they escape), or if it is called from a call point that may
+   itself run below an effect handler, that is, a call point in a
+   function that may. Toplevel code never runs below an effect handler.
+
+   A function that never runs below an effect handler does not need a
+   CPS version. This is only used with double translation, where a
+   direct-style version of every function is available, so that a CPS
+   call point can always fall back to calling the direct-style version
+   of a callee that has no CPS version.
+
+   The dependencies are the same as for [cps_needed], but the
+   information flows in the opposite direction: from callers to
+   callees. So this is solved on the reversed graph, reading [deps]. *)
+let below_handler ~info ~deps st x =
+  let from_callers () =
+    fold_children deps (fun y acc -> acc || Var.Tbl.get st y) x false
+  in
+  match info.Global_flow.info_defs.(Var.idx x) with
+  | Expr (Closure _) -> Var.ISet.mem info.Global_flow.info_may_escape x || from_callers ()
+  | Expr (Apply _ | Prim _ | Block _ | Constant _ | Field _ | Special _) | Phi _ ->
+      from_callers ()
+
+let cps_needed ~info ~in_mutual_recursion ~rev_deps ~below st x =
+  (match below with
+    | None -> true
+    | Some below -> Var.Tbl.get below x)
+  &&
   (* Mutually recursive functions are turned into CPS for tail
-     optimization *)
-  Var.Set.mem x in_mutual_recursion
+     optimization (JavaScript only, see [cps_for_tail_calls]) *)
+  (Var.Set.mem x in_mutual_recursion
   ||
-  (
-    (not (is_unyielding_call ~info ~in_mutual_recursion x))
-    &&
-    let idx = Var.idx x in
-    fold_children rev_deps (fun y acc -> acc || Var.Tbl.get st y) x false
-    ||
-    match info.Global_flow.info_defs.(idx) with
-    | Expr (Apply { f; _ }) -> (
-        (* If we don't know all possible functions at a call point, it
-          must be in CPS *)
-        match Var.Tbl.get info.Global_flow.info_approximation f with
-        | Top -> true
-        | Values { others; _ } -> others)
-    | Expr (Closure _) ->
-        (not (double_translate ()))
-        &&
-        (* If a function escapes, it must be in CPS *)
-        Var.ISet.mem info.Global_flow.info_may_escape x
-    | Expr
-        (Prim
-          ( Extern
-              ( ( "%perform"
-                | "%reperform"
-                | "%continue"
-                | "%discontinue"
-                | "%discontinue_with_backtrace"
-                | "%with_stack"
-                | "%with_stack_preemptible" )
-              , _ )
-          , _ )) ->
-        (* Effects primitives are in CPS *)
-        true
-    | Expr (Prim _ | Block _ | Constant _ | Field _ | Special _) | Phi _ -> false)
+  (not (is_unyielding_call ~info ~in_mutual_recursion x))
+  &&
+  let idx = Var.idx x in
+  fold_children rev_deps (fun y acc -> acc || Var.Tbl.get st y) x false
+  ||
+  match info.Global_flow.info_defs.(idx) with
+  | Expr (Apply { f; args; exact; _ }) -> (
+      (* If we don't know all possible functions at a call point, it
+         must be in CPS *)
+      match Var.Tbl.get info.Global_flow.info_approximation f with
+      | Top -> true
+      | Values { known; others } ->
+          others
+          || (not exact)
+             &&
+             (* Likewise if a function may be applied to too many
+                   arguments: the closure it returns is then applied
+                   to the remaining arguments *)
+             let nargs = List.length args in
+             Var.Set.exists
+               (fun g ->
+                 match info.Global_flow.info_defs.(Var.idx g) with
+                 | Expr (Closure (params, _, _)) -> List.length params < nargs
+                 | _ -> true)
+               known)
+  | Expr (Closure _) ->
+      (not (double_translate ()))
+      &&
+      (* If a function escapes, it must be in CPS *)
+      Var.ISet.mem info.Global_flow.info_may_escape x
+  | Expr
+      (Prim
+         ( Extern
+             ( ( "%perform"
+               | "%reperform"
+               | "%continue"
+               | "%discontinue"
+               | "%discontinue_with_backtrace"
+               | "%with_stack"
+               | "%with_stack_preemptible" )
+             , _ )
+         , _ )) ->
+      (* Effects primitives are in CPS *)
+      true
+  | Expr (Prim _ | Block _ | Constant _ | Field _ | Special _) | Phi _ -> false)
 
 module SCC = Strongly_connected_components.Make (Var)
 
@@ -238,14 +289,23 @@ let f p info =
   program_deps ~info ~vars ~tail_deps ~deps p;
   if times () then Format.eprintf "      fun analysis (initialize): %a@." Timer.print t1;
   let t2 = Timer.make () in
-  let in_mutual_recursion = find_mutually_recursive_calls tail_deps in
+  let in_mutual_recursion =
+    if cps_for_tail_calls ()
+    then find_mutually_recursive_calls tail_deps
+    else Var.Set.empty
+  in
   if times () then Format.eprintf "      fun analysis (tail calls): %a@." Timer.print t2;
   let t3 = Timer.make () in
   let g =
     { G.domain = vars; iter_children = (fun f x -> Var.Set.iter f deps.(Var.idx x)) }
   in
   let rev_deps = G.invert () g in
-  let res = Solver.f () g (cps_needed ~info ~in_mutual_recursion ~rev_deps) in
+  let below =
+    if double_translate ()
+    then Some (Solver.f () rev_deps (below_handler ~info ~deps:g))
+    else None
+  in
+  let res = Solver.f () g (cps_needed ~info ~in_mutual_recursion ~rev_deps ~below) in
   if times () then Format.eprintf "      fun analysis (solve): %a@." Timer.print t3;
   let s = ref Var.Set.empty in
   Var.Tbl.iter (fun x v -> if v then s := Var.Set.add x !s) res;

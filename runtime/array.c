@@ -23,8 +23,6 @@
 #include "caml/misc.h"
 #include "caml/mlvalues.h"
 #include "caml/signals.h"
-#include "caml/runtime_events.h"
-#include "caml/custom.h"
 
 static const mlsize_t mlsize_t_max = CAML_UINTNAT_MAX;
 
@@ -1120,12 +1118,20 @@ CAMLprim value caml_get_idx_bytecode(value base, value idx)
   CAMLreturn (res);
 }
 
+static value unimplemented_ext_ptr(void)
+{
+  caml_failwith("External ptrs are unimplemented on bytecode");
+  return Val_unit;
+}
+
 Caml_inline void check_atomic_idx(value base, value idx)
 {
+  /* A null base means [idx] is a raw address (an external ptr), which cannot be
+    dereferenced on bytecode. */
+  if (Is_null(base)) unimplemented_ext_ptr();
   CAMLassert (Tag_val(idx) == 0);
   CAMLassert (Wosize_val(idx) == 1); /* Nested atomic accesses not supported */
   CAMLassert (Tag_val(base) != Double_array_tag);
-  (void)base;
   (void)idx;
 }
 
@@ -1238,101 +1244,25 @@ CAMLprim value caml_atomic_lxor_idx_bytecode(value base, value idx, value incr)
 CAMLprim value caml_get_ptr_bytecode(value ptr)
 {
   value base = Field(ptr, 0);
-  if (Is_null(base))
-    caml_failwith("External ptrs are unimplemented on bytecode");
+  if (Is_null(base)) unimplemented_ext_ptr();
   return caml_get_idx_bytecode(base, Field(ptr, 1));
 }
 
 CAMLprim value caml_set_ptr_bytecode(value ptr, value v)
 {
   value base = Field(ptr, 0);
-  if (Is_null(base))
-    caml_failwith("External ptrs are unimplemented on bytecode");
+  if (Is_null(base)) unimplemented_ext_ptr();
   return caml_set_idx_bytecode(base, Field(ptr, 1), v);
-}
-
-Caml_inline void check_atomic_ptr(value ptr)
-{
-  if (Is_null(Field(ptr, 0)))
-    caml_failwith("Atomic ptr primitives do not support external ptrs");
-}
-
-CAMLprim value caml_atomic_load_ptr_bytecode(value ptr)
-{
-  check_atomic_ptr(ptr);
-  return caml_atomic_load_idx_bytecode(Field(ptr, 0), Field(ptr, 1));
-}
-
-CAMLprim value caml_atomic_set_ptr_bytecode(value ptr, value v)
-{
-  check_atomic_ptr(ptr);
-  return caml_atomic_set_idx_bytecode(Field(ptr, 0), Field(ptr, 1), v);
-}
-
-CAMLprim value caml_atomic_exchange_ptr_bytecode(value ptr, value v)
-{
-  check_atomic_ptr(ptr);
-  return caml_atomic_exchange_idx_bytecode(Field(ptr, 0), Field(ptr, 1), v);
-}
-
-CAMLprim value caml_atomic_compare_exchange_ptr_bytecode(value ptr, value oldv, value newv)
-{
-  check_atomic_ptr(ptr);
-  return caml_atomic_compare_exchange_idx_bytecode(Field(ptr, 0), Field(ptr, 1), oldv, newv);
-}
-
-CAMLprim value caml_atomic_cas_ptr_bytecode(value ptr, value oldv, value newv)
-{
-  check_atomic_ptr(ptr);
-  return caml_atomic_cas_idx_bytecode(Field(ptr, 0), Field(ptr, 1), oldv, newv);
-}
-
-CAMLprim value caml_atomic_fetch_add_ptr_bytecode(value ptr, value incr)
-{
-  check_atomic_ptr(ptr);
-  return caml_atomic_fetch_add_idx_bytecode(Field(ptr, 0), Field(ptr, 1), incr);
-}
-
-CAMLprim value caml_atomic_add_ptr_bytecode(value ptr, value incr)
-{
-  check_atomic_ptr(ptr);
-  return caml_atomic_add_idx_bytecode(Field(ptr, 0), Field(ptr, 1), incr);
-}
-
-CAMLprim value caml_atomic_sub_ptr_bytecode(value ptr, value incr)
-{
-  check_atomic_ptr(ptr);
-  return caml_atomic_sub_idx_bytecode(Field(ptr, 0), Field(ptr, 1), incr);
-}
-
-CAMLprim value caml_atomic_land_ptr_bytecode(value ptr, value incr)
-{
-  check_atomic_ptr(ptr);
-  return caml_atomic_land_idx_bytecode(Field(ptr, 0), Field(ptr, 1), incr);
-}
-
-CAMLprim value caml_atomic_lor_ptr_bytecode(value ptr, value incr)
-{
-  check_atomic_ptr(ptr);
-  return caml_atomic_lor_idx_bytecode(Field(ptr, 0), Field(ptr, 1), incr);
-}
-
-CAMLprim value caml_atomic_lxor_ptr_bytecode(value ptr, value incr)
-{
-  check_atomic_ptr(ptr);
-  return caml_atomic_lxor_idx_bytecode(Field(ptr, 0), Field(ptr, 1), incr);
 }
 
 CAMLprim value caml_get_ext_ptr_bytecode(value idx)
 {
-  caml_failwith("External ptr primitives are unimplemented on bytecode");
-  return Val_unit;
+  return unimplemented_ext_ptr();
 }
 
 CAMLprim value caml_set_ext_ptr_bytecode(value idx, value v)
 {
-  caml_failwith("External ptr primitives are unimplemented on bytecode");
-  return Val_unit;
+  return unimplemented_ext_ptr();
 }
 
 /* Concatenates idx_prefix and idx_suffix */

@@ -153,8 +153,11 @@ let execute_phrase print_outcome ppf phr =
                         let outv = outval_of_value newenv v
                                      (Types.Lpoly.determined []) exp.exp_type in
                         let ty =
-                          Out_type.prepare_for_printing [exp.exp_type];
-                          Out_type.tree_of_typexp Type_scheme exp.exp_type
+                          let base = Mode.With_locality.Const.legacy in
+                          Out_type.prepare_for_printing ~base
+                            [exp.exp_type];
+                          Out_type.tree_of_typexp ~base Type_scheme
+                            exp.exp_type
                         in
                         Ophr_eval (outv, ty)
                       | None -> Ophr_signature (pr_item oldenv sg'))

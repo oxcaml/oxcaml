@@ -15,7 +15,6 @@
 
 #define CAML_INTERNALS
 
-#include <unistd.h>
 #define __USE_GNU
 #if !defined(__OpenBSD__)
 #define _GNU_SOURCE
@@ -25,15 +24,10 @@
 /* Signal handling, code specific to the native-code compiler */
 
 #include <signal.h>
-#include <errno.h>
-#include <stdio.h>
-#include "caml/codefrag.h"
 #include "caml/domain.h"
-#include "caml/fail.h"
 #include "caml/fiber.h"
 #include "caml/frame_descriptors.h"
 #include "caml/memory.h"
-#include "caml/osdeps.h"
 #include "caml/signals.h"
 #include "caml/stack.h"
 

@@ -186,6 +186,14 @@ var caml_call_gen_tuple = (function () {
   }
   function caml_call_gen_cps(f, args) {
     if (!f.cps) {
+      // [f] cannot perform an effect, so it is called in direct style.
+      // But if it is applied to too many arguments, the closure it
+      // returns may perform one: it is then applied in CPS.
+      var n = f.l >= 0 ? f.l : (f.l = f.length);
+      if (args.length - 1 > n) {
+        var g = f.apply(null, args.slice(0, n));
+        return caml_call_gen_cps(g, args.slice(n));
+      }
       var k = args.pop();
       return k(caml_call_gen_direct(f, args));
     }
@@ -306,7 +314,9 @@ function caml_register_global_by_index(v, idx) {
 //Requires: jsoo_toplevel_reloc
 function caml_register_global(v, name) {
   if (jsoo_toplevel_reloc) {
-    var n = caml_callback(jsoo_toplevel_reloc, [[0, caml_string_of_jsbytes(name)]]);
+    var n = caml_callback(jsoo_toplevel_reloc, [
+      [0, caml_string_of_jsbytes(name)],
+    ]);
     caml_global_data[n + 1] = v;
   } else if (caml_link_info.symbols) {
     if (!caml_link_info.symidx) {
@@ -331,7 +341,9 @@ function caml_register_global(v, name) {
 function caml_register_global_predef(v, name) {
   var key = "predef:" + name;
   if (jsoo_toplevel_reloc) {
-    var n = caml_callback(jsoo_toplevel_reloc, [[1, caml_string_of_jsbytes(name)]]);
+    var n = caml_callback(jsoo_toplevel_reloc, [
+      [1, caml_string_of_jsbytes(name)],
+    ]);
     caml_global_data[n + 1] = v;
   } else if (caml_link_info.symbols) {
     if (!caml_link_info.symidx) {

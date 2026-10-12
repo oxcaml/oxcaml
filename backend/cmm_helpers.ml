@@ -678,12 +678,27 @@ let rec max_signed_bit_length e =
     if n = 0 then max_signed_bit_length c else arch_bits - n
   | Cop ((Cand | Cor | Cxor), [x; y], _) ->
     Int.max (max_signed_bit_length x) (max_signed_bit_length y)
+  | Cop (Cload { memory_chunk; _ }, _, _) -> loaded_bit_length memory_chunk
   | _ -> arch_bits
+
+(* The number of significant bits of a value loaded from memory, per
+   [max_signed_bit_length]. *)
+and loaded_bit_length (memory_chunk : Cmm.memory_chunk) =
+  match memory_chunk with
+  | Byte_unsigned | Byte_signed -> 8
+  | Sixteen_unsigned | Sixteen_signed -> 16
+  | Thirtytwo_unsigned | Thirtytwo_signed -> 32
+  | Word_int | Word_mask | Word_val | Single _ | Double
+  | Onetwentyeight_unaligned | Onetwentyeight_aligned | Twofiftysix_unaligned
+  | Twofiftysix_aligned | Fivetwelve_unaligned | Fivetwelve_aligned ->
+    arch_bits
 
 let rec max_signed_bit_length' e =
   let open P.Default_variables in
   P.run_default
-    ~default:(fun _ -> arch_bits)
+    ~default:(function
+      | Cop (Cload { memory_chunk; _ }, _, _) -> loaded_bit_length memory_chunk
+      | _ -> arch_bits)
     (prefer_or e)
     [ (Binop (Comparison, Any c1, Any c2) => fun _env -> 1);
       ( Guarded
@@ -1095,6 +1110,10 @@ let store ~dbg memory_chunk init ~addr ~new_value =
 let tag_int i dbg =
   match low_bits i ~bits:(arch_bits - 1) ~dbg with
   | Cconst_int (n, _) -> int_const dbg n
+  | Cop (Casr, [e; Cconst_int (right, _)], dbg_op) when right > 0 ->
+    or_const (asr_const e (right - 1) dbg_op) 1n dbg
+  | Cop (Clsr, [e; Cconst_int (right, _)], dbg_op) when right > 0 ->
+    or_const (lsr_const e (right - 1) dbg_op) 1n dbg
   | c -> incr_int (lsl_const c 1 dbg) dbg
 
 let untag_int i dbg =
@@ -2182,6 +2201,11 @@ let rec sign_extend ~bits ~dbg e =
     map_tail
       (fun e ->
         match prefer_or e with
+        | (Cconst_int _ | Cconst_natint _) as e ->
+          natint_const_untagged dbg
+            (Nativeint.shift_right
+               (Nativeint.shift_left (const_exn e) unused_bits)
+               unused_bits)
         | Cop (Cand, [x; y], _) when is_constant y ->
           and_int (sign_extend ~bits x ~dbg) (sign_extend ~bits y ~dbg) dbg
         | Cop (Cor, [x; y], _) when is_constant y ->
@@ -4060,6 +4084,8 @@ let apply_function (arity, result, mode) =
 let tuplify_function arity return =
   if List.exists (function [| Val |] | [| Int |] -> false | _ -> true) arity
   then
+    (* CR layouts-mixed-tuplify: eventually, we should support mixed tuplified
+       functions *)
     Misc.fatal_error
       "tuplify_function is currently unsupported if arity contains non-values";
   let arity = List.length arity in
