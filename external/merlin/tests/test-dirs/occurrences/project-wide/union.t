@@ -28,16 +28,15 @@ At this point `ŧest` and `sig` are unrelated. We'll later force their unificati
 
 First compute the index for `test` and `sig`:
 
-  $ ocaml-index aggregate test.cmti test.cmt sig.cmti sig.cmt --root . --rewrite-root
-  $ mv project.ocaml-index test_sig.ocaml-index
+  $ ocaml-index aggregate test.cmti test.cmt sig.cmti sig.cmt -o test_sig.ocaml-index --root . --rewrite-root
 
 Then for `both`:
 
-  $ ocaml-index aggregate both.cmt --root . --rewrite-root
+  $ ocaml-index aggregate both.cmt -o both.ocaml-index --root . --rewrite-root
 
 Merge everything together, which reveals the relation between `test` and `sig` uids:
 
-  $ ocaml-index aggregate test_sig.ocaml-index project.ocaml-index
+  $ ocaml-index aggregate test_sig.ocaml-index both.ocaml-index
 
 All files should be listed on queries: (except `both.ml`)
 
@@ -52,3 +51,20 @@ All files should be listed on queries: (except `both.ml`)
   "$TESTCASE_ROOT/sig.ml"
   "$TESTCASE_ROOT/sig.mli"
   "$TESTCASE_ROOT/test.mli"
+
+An error is expected, a pointer references an index file, but it doesn't exist anymore:
+
+  $ mv test_sig.ocaml-index index-files
+  $ ocaml-index dump project.ocaml-index
+  Missing file "$TESTCASE_ROOT/test_sig.ocaml-index".
+  Hint: try to rebuild indexes with dune build @ocaml-index.
+  [1]
+  $ mv index-files test_sig.ocaml-index
+
+An error is expected, a pointer references an index file that is considered outdated because we rebuilt it:
+
+  $ ocaml-index aggregate test.cmti test.cmt sig.cmti sig.cmt --root . --rewrite-root -o test_sig.ocaml-index
+  $ ocaml-index dump project.ocaml-index
+  Index IDs doesn't match for "$TESTCASE_ROOT/test_sig.ocaml-index".
+  Hint: try to rebuild indexes with dune build @ocaml-index.
+  [1]

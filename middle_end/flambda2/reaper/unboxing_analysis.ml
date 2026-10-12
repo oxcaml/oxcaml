@@ -314,8 +314,7 @@ let calling_convention_changes_rules =
    run. *)
 let current_analysis_scope = ref Analysis_scope.Current_unit
 
-let is_local field =
-  Field.is_local field ~analysis_scope:!current_analysis_scope
+let is_local field = Analysis_scope.is_local_field !current_analysis_scope field
 
 let unboxing_rules =
   saturate_in_order
