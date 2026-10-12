@@ -720,6 +720,7 @@
   ; NOTE: Be sure to keep these arguments in dependency order!
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Runtimetags.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Int_replace_polymorphic_compare.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__With_backtracking_intf.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__With_backtracking.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Union_find.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Binutils.cmo
@@ -859,6 +860,7 @@
   ; NOTE: Be sure to keep these arguments in dependency order!
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Runtimetags.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Int_replace_polymorphic_compare.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__With_backtracking_intf.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__With_backtracking.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Union_find.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Binutils.cmx
