@@ -260,9 +260,7 @@ let normalize_step t =
        merlin commands (e.g. [jump -target]). [arguments_table] takes
        precedence over command-local flags, so adding them there would shadow
        the command's flag. *)
-    let config_only_ignored_flags =
-      [ ("-target", "", Marg.param_ignore) ]
-    in
+    let config_only_ignored_flags = [ ("-target", "", Marg.param_ignore) ] in
     let t =
       List.fold_left
         ~f:(fun t { workdir; workval } ->
