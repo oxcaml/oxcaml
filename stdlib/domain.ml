@@ -587,7 +587,19 @@ end
 module Safe = struct
   (* Note the exposed signature of [get] and [set] add modes for safety. *)
   module DLS = DLS0
-  module TLS = TLS0
+
+  module TLS = struct
+    include TLS0
+
+    let accessing = new_key (fun () -> false)
+
+    let access k f = exclave_
+      if get accessing then failwith "TLS.access re-entered";
+      set accessing true;
+      let res = f (get k) in
+      set accessing false;
+      res
+  end
 
   let spawn f =
     let tls_keys = TLS.Private.get_initial_keys () in

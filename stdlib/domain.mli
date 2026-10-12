@@ -281,6 +281,15 @@ module Safe : sig @@ portable
 
     val set : ('a : value mod contended). 'a key -> 'a @ portable -> unit
     (** Like {!TLS.set}, but safe to use in the presence of multiple domains. *)
+
+    val access
+      : ('b : value_or_null).
+      'a key
+      -> ('a -> 'b @ contended local once portable unique)
+         @ local once portable unyielding
+      -> 'b @ contended local once portable unique
+    (** [access k f] provides uncontended access to the value of [k] on this
+        thread for the duration of [f]. Raises if [f] re-enters [access]. *)
   end
 
   val spawn : (unit -> 'a) @ portable once -> 'a t
