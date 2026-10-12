@@ -152,6 +152,14 @@ When the callee is unknown, the generic application of `js_of_ocaml` and `wasm_o
 For example, given `let[@inline never] g (v : void) (w : void) = print_string "g"; 1` and `let[@inline never] partial2 (k : void -> void -> int) = let p = k (void ()) in print_string "a"; p (void ())`, `print_int (partial2 g)` prints `ga1` instead of `ag1` (and fails at runtime with the JavaScript target).
 Functions with at least one non-void parameter are unaffected.
 
+## Inlining
+Captured variables of a closure become JavaScript local variables, so a function body that reads from its closure
+cannot be moved into another function. As such, Flambda currently only inlines a function when compiling to JSIR if its body
+does not use its closure.
+
+For such functions, `[@inline]`, `[@inlined]`, `[@inlined hint]` and `[@unrolled n]` are ignored.
+`[@inline never]` and `[@inlined never]` work as usual.
+
 ## External stub behaviour
 For `external` declarations containing both bytecode and native names, the JSIR pass uses the **bytecode** name for most cases, and such JavaScript stubs are compatible with the existing `js_of_ocaml` stubs.
 However, when **unboxed products** are involved (as arguments or return type), we instead use the **native** name. In this case, we use a slightly different convention to that of both existing JS/bytecode stubs and native C stubs:
