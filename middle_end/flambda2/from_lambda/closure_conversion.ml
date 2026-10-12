@@ -3006,11 +3006,11 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
     then
       (* In classic mode this is the only inlining decision that will ever be
          made for this function, so it must take the JSIR restriction into
-         account. In simplify mode we don't do this, as at this point
-         free variables that will later be lifted to symbols (e.g. other
-         top-level functions of the same module) still appear as value slots,
-         which makes this check too conservative. Instead the decision is
-         recomputed from the simplified body on each round (see
+         account. In simplify mode we don't do this, as at this point free
+         variables that will later be lifted to symbols (e.g. other top-level
+         functions of the same module) still appear as value slots, which makes
+         this check too conservative. Instead the decision is recomputed from
+         the simplified body on each round (see
          [Function_decl_inlining_decision]) and in its call sites (see
          [Call_site_inlining_decision]). *)
       Never_inline
