@@ -13,10 +13,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-let msupport_raise_error =
-  ref (fun _ ->
-        failwith "Env.raise_error should be filled in with Typing_recovery.log_or_raise")
-
 (* Environment handling *)
 
 module StdlibMap = Map
@@ -4017,7 +4013,7 @@ let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
           unboxed_type ~errors ~env ~loc:(fst pp) ty_and_lid;
           vmode
       with exn ->
-        !msupport_raise_error exn;
+        Typing_recovery.log_or_raise exn;
         vmode
     ) mode locks
 
