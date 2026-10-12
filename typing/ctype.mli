@@ -336,6 +336,25 @@ val try_expand_safe_opt: Env.t -> type_expr -> type_expr
 val expand_head_once: Env.t -> type_expr -> type_expr
 val expand_head: Env.t -> type_expr -> type_expr
 
+(** [upon env ty ~run ~default] adds [run shape] to {!scheduler} once [ty]'s
+    head is determined, where [shape] is the shape of the head ([None] if it
+    has none), or [default ()] if it is defaulted first. Both run at the
+    levels current when [upon] was called, and may run before [upon]
+    returns, depending on the scheduling policy (see {!Scheduler}).
+
+    If [-extension omnidirectionality] is enabled, a [Tvar] head becomes a
+    [Tivar], which [run] or [default] waits for. If [default] leaves it a
+    [Tivar], it is turned back into a [Tvar]. Otherwise, a [Tvar] head is
+    defaulted immediately.
+
+    [ty] must not be generic. *)
+val upon :
+  Env.t ->
+  type_expr ->
+  run:(type_shape option -> unit) ->
+  default:(unit -> unit) ->
+  unit
+
 (** [upon_shape env ty ~run ~default] adds [run shape] to {!scheduler}
     once [ty]'s head has a shape, or [run (default ())] if it is defaulted
     first. [run] runs at the levels current when [upon_shape] was called.
@@ -909,6 +928,22 @@ val crossing_of_ty :
   ?modalities:Mode.Modality.Const.t ->
   Types.type_expr ->
   Mode.Crossing.t
+
+(** [upon_crossing env ?modalities ty ~known ~unknown] is
+    [known (crossing_of_ty env ?modalities ty)], unless
+    [-extension omnidirectionality] is enabled. Then, the crossing is computed
+    by {!Ikind.upon_crossing_of_type}, which waits for the type variables
+    that [ty]'s kind depends on (see {!upon}). While it waits,
+    [unknown ()] returns a placeholder result and a handler for the
+    crossing. With [-no-ikinds], only a variable at [ty]'s head is waited
+    on. *)
+val upon_crossing :
+  Env.t ->
+  ?modalities:Mode.Modality.Const.t ->
+  type_expr ->
+  known:(Mode.Crossing.t -> 'a) ->
+  unknown:(unit -> 'a * (Mode.Crossing.t -> unit)) ->
+  'a
 
 (** Cross a right mode according to a type wrapped in modalities. Non-principal
     types don't cross. *)

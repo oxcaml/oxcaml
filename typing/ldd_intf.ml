@@ -80,6 +80,9 @@ module type S = sig
 
   val map_rigid : (Name.t -> node) -> node -> node
 
+  (** [unsolved_vars n] are the unsolved variables that [n] depends on. *)
+  val unsolved_vars : node -> var list
+
   (** Pretty printers and checks. *)
   val pp : node -> string
 

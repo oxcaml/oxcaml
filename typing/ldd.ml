@@ -702,6 +702,23 @@ module Make (V : Ordered) = struct
   let map_rigid (f : V.t -> node) (node : node) : node =
     map_rigid_rec f (inline_solved_vars node)
 
+  let unsolved_vars (node : node) : var list =
+    let rec aux acc node =
+      if is_leaf node
+      then acc
+      else
+        let block = Unsafe.node_block node in
+        match block.v.state with
+        | Rigid _ ->
+          (* Rigid vars are below all non-rigids, so nothing under [node] is
+             unsolved. *)
+          acc
+        | Unsolved | Solved _ ->
+          let acc = if List.memq block.v acc then acc else block.v :: acc in
+          aux (aux acc block.lo) block.hi
+    in
+    aux [] (inline_solved_vars node)
+
   (* --------- structural debug printer --------- *)
   let pp_debug (node : node) : string =
     let pp_coeff = Axis_lattice.to_string in
