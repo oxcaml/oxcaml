@@ -9531,7 +9531,7 @@ and type_ident env ?(recarg=Rejected) ?(is_applied=false) lid =
        | (Prim_poly, _), Some mode ->
            Typeallocation.register_mode_for_optimisation
              (lid.loc, Ident {category = Value; lid = lid.txt})
-             mode
+             (Typeallocation.Known (Locality.disallow_left mode))
        | _ -> ()
        end;
        (* Non-arrow type primitives that trigger allocation when
