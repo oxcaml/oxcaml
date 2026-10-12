@@ -74,6 +74,10 @@ module type Code_metadata_accessors_result_type = sig
 
   val fdo_entry_annotation : 'a t -> Fdo_annotation.t
 
+  (** The hash of the function's body that its interior counters are numbered
+      within (see [Fdo_fingerprint]). *)
+  val function_body_hash : 'a t -> Fdo_counter.Body_hash.t option
+
   val is_tupled : 'a t -> bool
 
   val is_my_closure_used : 'a t -> bool
@@ -117,6 +121,7 @@ type 'a create_type =
   inlining_arguments:Inlining_arguments.t ->
   dbg:Debuginfo.t ->
   fdo_entry_annotation:Fdo_annotation.t ->
+  function_body_hash:Fdo_counter.Body_hash.t option ->
   is_tupled:bool ->
   is_my_closure_used:bool ->
   inlining_decision:Function_decl_inlining_decision_type.t ->
