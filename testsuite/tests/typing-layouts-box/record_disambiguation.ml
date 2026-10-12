@@ -15,72 +15,49 @@ type s = { a : int; b : string; }
 
 let x : r# box = { a = #1L; b = "x" }
 [%%expect{|
-Line 1, characters 17-37:
-1 | let x : r# box = { a = #1L; b = "x" }
-                     ^^^^^^^^^^^^^^^^^^^^
-Error: This boxed record expression should be unboxed instead,
-       the expected type is "r"
+val x : r = {a = <abstr>; b = "x"}
 |}]
 
 let x : r# box = { a = #1L; b = "x" }
 let r : r = x
 [%%expect{|
-Line 1, characters 17-37:
-1 | let x : r# box = { a = #1L; b = "x" }
-                     ^^^^^^^^^^^^^^^^^^^^
-Error: This boxed record expression should be unboxed instead,
-       the expected type is "r"
+val x : r = {a = <abstr>; b = "x"}
+val r : r = {a = <abstr>; b = "x"}
 |}]
 
 let f (x : r# box) =
   match x with
   | { a = _; b } -> b
 [%%expect{|
-Line 3, characters 4-16:
-3 |   | { a = _; b } -> b
-        ^^^^^^^^^^^^
-Error: This boxed record pattern should be unboxed instead,
-       the expected type is "r"
+val f : r -> string = <fun>
 |}]
 
 let f (x : r# box) = x.b
 [%%expect{|
-Line 1, characters 21-22:
-1 | let f (x : r# box) = x.b
-                         ^
-Error: This expression has type "r",
-       which is an unboxed record rather than a boxed one.
+val f : r -> string = <fun>
 |}]
 
 let f (x : r# box) = { x with b = "y" }
 [%%expect{|
-Line 1, characters 21-39:
-1 | let f (x : r# box) = { x with b = "y" }
-                         ^^^^^^^^^^^^^^^^^^
-Error: This expression has type "r",
-       which is an unboxed record rather than a boxed one.
+val f : r -> r = <fun>
 |}]
 
 type r_box = r# box
 let x : r_box = { a = #1L; b = "x" }
 [%%expect{|
 type r_box = r
-Line 2, characters 16-36:
-2 | let x : r_box = { a = #1L; b = "x" }
-                    ^^^^^^^^^^^^^^^^^^^^
-Error: This boxed record expression should be unboxed instead,
-       the expected type is "r_box"
+val x : r_box = {a = <abstr>; b = "x"}
 |}]
 
 (* Errors *)
 
 let x : r# box = #{ a = #1L; b = "x" }
 [%%expect{|
-Line 1, characters 20-21:
+Line 1, characters 17-38:
 1 | let x : r# box = #{ a = #1L; b = "x" }
-                        ^
-Error: The unboxed record field "a" belongs to the type "r#"
-       but is mixed here with fields of type "r# box" = "r"
+                     ^^^^^^^^^^^^^^^^^^^^^
+Error: This unboxed record expression should be boxed instead,
+       the expected type is "r"
 |}]
 
 type u = #{ c : int; d : string }
@@ -90,15 +67,14 @@ type u = #{ c : int; d : string; }
 Line 2, characters 16-34:
 2 | let x : u box = { c = 1; d = "x" }
                     ^^^^^^^^^^^^^^^^^^
-Error: This boxed record expression should be unboxed instead,
-       the expected type is "u box"
+Error: This expression should not be a record, the expected type is "u box"
 |}]
 
 let x : u box = #{ c = 1; d = "x" }
 [%%expect{|
-Line 1, characters 19-20:
+Line 1, characters 16-35:
 1 | let x : u box = #{ c = 1; d = "x" }
-                       ^
-Error: The unboxed record field "c" belongs to the type "u"
-       but is mixed here with fields of type "u box"
+                    ^^^^^^^^^^^^^^^^^^^
+Error: This expression should not be a unboxed record, the expected type is
+       "u box"
 |}]
