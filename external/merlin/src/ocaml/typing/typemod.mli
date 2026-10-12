@@ -218,3 +218,10 @@ module Error : sig
 end
 
 val normalize_signature : Types.signature -> unit
+
+val merlin_type_structure:
+  Env.t -> Types.signature -> Parsetree.structure ->
+  Typedtree.structure * Types.signature * (* Signature_names.t * *) Env.t
+
+val merlin_transl_signature:
+  ?interface_toplevel:bool -> Env.t -> Types.signature -> Parsetree.signature -> Typedtree.signature
