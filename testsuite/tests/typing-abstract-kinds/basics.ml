@@ -1928,8 +1928,13 @@ let x_letmodule =
   end in
   M.r
 [%%expect{|
-Uncaught exception: Ctype.Escape(_)
-
+Lines 2-5, characters 17-5:
+2 | .................struct
+3 |     kind_ k
+4 |     let r = ref (None : (_ : k) id option)
+5 |   end...
+Error: The type of this module contains the non-generalizable type variable
+       "'_weak4", whose kind "k" would escape its scope.
 |}]
 
 (* [k] has a manifest, so the variable can be given its expansion, and [r] and
@@ -1945,10 +1950,15 @@ let (_ : bool id option) = M_manifest_local.get ()
 module M_manifest_local :
   sig
     kind_ k = value
-    val r : '_weak4 id option ref
-    val get : unit -> '_weak4 id option
+    val r : '_weak5 id option ref
+    val get : unit -> '_weak5 id option
   end
-- : bool id option = None
+Line 7, characters 27-50:
+7 | let (_ : bool id option) = M_manifest_local.get ()
+                               ^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "int id option"
+       but an expression was expected of type "bool id option"
+       Type "int" is not compatible with type "bool"
 |}]
 
 module M_abstract_local = struct
@@ -1958,14 +1968,14 @@ module M_abstract_local = struct
 end
 let () = M_abstract_local.r := (None : M_abstract_local.t id option)
 [%%expect{|
-module M_abstract_local :
-  sig kind_ k type t : k val r : '_weak5 id option ref end
-Line 6, characters 31-68:
-6 | let () = M_abstract_local.r := (None : M_abstract_local.t id option)
-                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This expression has type "M_abstract_local.t id option"
-       but an expression was expected of type "'a id option"
-       The type constructor "M_abstract_local.t" would escape its scope
+Lines 1-5, characters 0-3:
+1 | module M_abstract_local = struct
+2 |   kind_ k
+3 |   type t : k
+4 |   let r = ref (None : (_ : k) id option)
+5 | end
+Error: The type of this module contains the non-generalizable type variable
+       "'_weak6", whose kind "k" would escape its scope.
 |}]
 
 module G_local (X : sig kind_ ka end) = struct
@@ -1983,20 +1993,13 @@ end
 let () = M_include_functor.c := (None : int id option)
 let (_ : bool id option) = M_include_functor.get ()
 [%%expect{|
-module G_local :
-  functor (X : sig kind_ ka end) ->
-    sig val c : '_weak6 id option ref val get : unit -> '_weak6 id option end
-module K_local : sig kind_ ka = value end
-module A_local :
-  sig val c : '_weak7 id option ref val get : unit -> '_weak8 id option end
-- : bool id option = None
-module M_include_functor :
-  sig
-    kind_ ka = value
-    val c : '_weak9 id option ref
-    val get : unit -> '_weak10 id option
-  end
-- : bool id option = None
+Lines 1-4, characters 0-3:
+1 | module G_local (X : sig kind_ ka end) = struct
+2 |   let c = ref (None : (_ : X.ka) id option)
+3 |   let get () = !c
+4 | end
+Error: The type of this module contains the non-generalizable type variable
+       "'_weak7", whose kind "X.ka" would escape its scope.
 |}]
 
 module type Empty = sig end
@@ -2007,7 +2010,13 @@ let p_package =
   end : Empty)
 [%%expect{|
 module type Empty = sig end
-val p_package : (module Empty) = <module>
+Lines 3-6, characters 10-5:
+3 | ..........struct
+4 |     kind_ k
+5 |     let r = ref (None : (_ : k) id option)
+6 |   end.........
+Error: The type of this module contains the non-generalizable type variable
+       "'_weak8", whose kind "k" would escape its scope.
 |}]
 
 (*********************************************************************)
@@ -2028,7 +2037,7 @@ let (_ : bool id option) = A_anon.get ()
 [%%expect{|
 module K_anon : sig kind_ ka = value end
 module A_anon :
-  sig val c : '_weak11 id option ref val get : unit -> '_weak12 id option end
+  sig val c : '_weak9 id option ref val get : unit -> '_weak10 id option end
 - : bool id option = None
 |}]
 

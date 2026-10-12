@@ -1230,20 +1230,29 @@ let update_scope_for tr_exn scope ty =
    [level], replacing kind constructors that are not in scope at [level] by
    their expansions. *)
 let update_jkind_level env level ty =
-  let update jkind =
-    match Jkind.update_level env level jkind with
-    | Ok jkind -> jkind
-    | Error path -> raise_escape_exn (Constructor (Kind, path))
-  in
   match get_desc ty with
   | Tvar ({ jkind; _ } as tv) ->
-      let jkind' = update jkind in
-      if jkind' != jkind then set_type_desc ty (Tvar { tv with jkind = jkind' })
+      begin match Jkind.update_level env level jkind with
+      | Ok jkind' ->
+          if jkind' != jkind then
+            set_type_desc ty (Tvar { tv with jkind = jkind' });
+          Ok ()
+      | Error path -> Error path
+      end
   | Tunivar ({ jkind; _ } as tv) ->
-      let jkind' = update jkind in
-      if jkind' != jkind then
-        set_type_desc ty (Tunivar { tv with jkind = jkind' })
-  | _ -> ()
+      begin match Jkind.update_level env level jkind with
+      | Ok jkind' ->
+          if jkind' != jkind then
+            set_type_desc ty (Tunivar { tv with jkind = jkind' });
+          Ok ()
+      | Error path -> Error path
+      end
+  | _ -> Ok ()
+
+let update_jkind_level_exn env level ty =
+  match update_jkind_level env level ty with
+  | Ok () -> ()
+  | Error path -> raise_escape_exn (Constructor (Kind, path))
 
 let rec update_level env level expand ty =
   let ty_level = get_level ty in
@@ -1306,7 +1315,7 @@ let rec update_level env level expand ty =
       when lab = dummy_method && level < get_scope ty1 ->
         raise_escape_exn Self
     | Tvar _ | Tunivar _ ->
-      update_jkind_level env level ty;
+      update_jkind_level_exn env level ty;
       set_level ()
     | _ ->
         set_level ();
@@ -1349,7 +1358,7 @@ let rec lower_contravariant env var_level visited contra ty =
       Tvar _ ->
         if contra then begin
           set_level ty var_level;
-          update_jkind_level env var_level ty
+          update_jkind_level_exn env var_level ty
         end
     | Tconstr (_, [], _) -> ()
     | Tconstr (path, tyl, _abbrev) ->
@@ -3868,7 +3877,7 @@ let unification_jkind_check uenv ty jkind =
         constrain_type_jkind_exn env Unify ty jkind;
         (* If [ty] is a variable, its kind may have been refined with kind
            constructors that are not in scope at its level. *)
-        begin try update_jkind_level env (get_level ty) ty
+        begin try update_jkind_level_exn env (get_level ty) ty
         with Escape e -> raise_for Unify (Escape e)
         end
     | Delay_checks r -> r := (ty,jkind) :: !r

@@ -918,22 +918,57 @@ let scrape_for_type_of ~remove_aliases env mty =
 
 (* Lower non-generalizable type variables *)
 
-let lower_nongen nglev mty =
+let lower_nongen env nglev mty =
   let open Btype in
-  with_type_mark begin fun mark ->
-    let super = type_iterators mark in
-    let it_do_type_expr it ty =
-      match get_desc ty with
-        Tvar _ ->
-          let level = get_level ty in
-          if level < generic_level && level > nglev then set_level ty nglev
-      | _ ->
-          super.it_do_type_expr it ty
-    in
-  let it_mode_expr m =
-    if not (Mode.With_locality.check_generic m) then
-      Mode.With_locality.update_level nglev m
+  let exception Kind_escape of type_expr * Path.t in
+  (* The environment in which the kinds of the variables being visited are
+     expanded. It is only built if a variable needs to be lowered. *)
+  let env = ref (Lazy.from_val env) in
+  let with_env extend f =
+    let outer = !env in
+    env := lazy (extend (Lazy.force outer));
+    Fun.protect ~finally:(fun () -> env := outer) f
   in
-  let it = {super with it_do_type_expr; it_mode_expr} in
-  it.it_module_type it mty
-  end
+  match
+    with_type_mark begin fun mark ->
+      let super = type_iterators mark in
+      let it_do_type_expr it ty =
+        match get_desc ty with
+          Tvar _ ->
+            let level = get_level ty in
+            if level < generic_level && level > nglev then begin
+              begin match
+                Ctype.update_jkind_level (Lazy.force !env) nglev ty
+              with
+              | Ok () -> ()
+              | Error path -> raise (Kind_escape (ty, path))
+              end;
+              set_level ty nglev
+            end
+        | _ ->
+            super.it_do_type_expr it ty
+      in
+      let it_mode_expr m =
+        if not (Mode.With_locality.check_generic m) then
+          Mode.With_locality.update_level nglev m
+      in
+      let it_signature it sg =
+        with_env (Env.add_signature sg) (fun () -> super.it_signature it sg)
+      in
+      let it_module_type it = function
+        | Mty_functor (Named (Some id, mty_arg, _) as param, mty_res, mm) ->
+            it.it_functor_param it param;
+            with_env (Env.add_module ~arg:true id Mp_present mty_arg)
+              (fun () -> it.it_module_type it mty_res);
+            it.it_mode_expr mm
+        | mty -> super.it_module_type it mty
+      in
+      let it =
+        {super with it_do_type_expr; it_mode_expr; it_signature;
+                    it_module_type}
+      in
+      it.it_module_type it mty
+    end
+  with
+  | () -> Ok ()
+  | exception Kind_escape (ty, path) -> Error (ty, path)

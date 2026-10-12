@@ -240,6 +240,7 @@ type error =
       ; explanation   : type_forcing_context option
       }
   | Scoping_let_module of string * type_expr
+  | Nongen_kind_escape of type_expr * Path.t
   | Not_a_polymorphic_variant_type of Longident.t
   | Incoherent_label_order
   | Less_general of string * Errortrace.unification_error
@@ -8560,7 +8561,12 @@ and type_expect_
           let modl, pres, id, new_env =
             Typetexp.TyVarEnv.with_local_scope begin fun () ->
               let modl, md_shape = !type_module env smodl in
-              Mtype.lower_nongen lv modl.mod_type;
+              begin match Mtype.lower_nongen env lv modl.mod_type with
+              | Ok () -> ()
+              | Error (ty, path) ->
+                  raise (Error (smodl.pmod_loc, env,
+                                Nongen_kind_escape (ty, path)))
+              end;
               let pres =
                 match modl.mod_type with
                 | Mty_alias _ -> Mp_absent
@@ -13666,6 +13672,13 @@ let report_error ~loc env =
         Style.inline_code "let module"
         (Style.as_inline_code Printtyp.type_expr) ty
         Style.inline_code id
+  | Nongen_kind_escape (ty, path) ->
+      Out_type.prepare_for_printing [ty];
+      Location.errorf ~loc
+        "@[The type of this module contains the non-generalizable type \
+         variable@ %a,@ whose kind %a would escape its scope.@]"
+        (Style.as_inline_code Out_type.prepared_type_scheme) ty
+        (Style.as_inline_code Printtyp.path) path
   | Private_type ty ->
       Location.errorf ~loc "Cannot create values of the private type %a"
         (Style.as_inline_code Printtyp.type_expr) ty

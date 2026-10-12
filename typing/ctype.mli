@@ -165,6 +165,12 @@ val lower_variables_only: Env.t -> int -> type_expr -> unit
         (* Lower all variables to the given level *)
 val enforce_current_level: Env.t -> type_expr -> unit
         (* Lower whole type to !current_level *)
+val update_jkind_level: Env.t -> int -> type_expr -> (unit, Path.t) result
+        (* [update_jkind_level env level ty] lowers the levels of the sort
+           variables in the kind of the type variable [ty] to [level], and
+           replaces kind constructors that are not in scope at [level] by
+           their expansions. Returns [Error path] if the kind [path] would
+           escape its scope. *)
 val generalize_structure: type_expr -> unit
         (* Generalize the structure of a type, lowering variables
            to !current_level *)

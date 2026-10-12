@@ -100,4 +100,8 @@ module Contains_type_or_jkind : sig
   val check : Env.t -> module_type -> t option
 end
 
-val lower_nongen: int -> module_type -> unit
+val lower_nongen:
+  Env.t -> int -> module_type -> (unit, type_expr * Path.t) result
+(* [lower_nongen env level mty] lowers the non-generalizable type variables in
+   [mty] to [level]. Returns [Error (ty, path)] if the kind [path] of the
+   variable [ty] would escape its scope. *)
