@@ -881,7 +881,7 @@ let comprehension ~transl_exp ~scopes ~loc ~(array_kind : Lambda.array_kind)
     ()
   | Punboxedfloatarray _ | Punboxedoruntaggedintarray _ | Punboxedvectorarray _
   | Punboxedmaskarray ->
-    if not !Clflags.native_code
+    if not (Clflags.is_native ())
     then
       Misc.fatal_errorf
         "Array comprehensions for kind %s are not allowed in bytecode"

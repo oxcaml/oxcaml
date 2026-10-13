@@ -102,7 +102,7 @@ let compile_file ?output ?(opt="") ?stable_name name =
          The dwarf_c_toolchain_flag is set in optmaindriver.ml and will be
          empty when compiling C files from bytecode tools like ocamlc. *)
       let compression_flag =
-        if !Clflags.native_code then !Clflags.dwarf_c_toolchain_flag else ""
+        if Clflags.is_native () then !Clflags.dwarf_c_toolchain_flag else ""
       in
       "-g" ^ compression_flag
     else
@@ -116,7 +116,7 @@ let compile_file ?output ?(opt="") ?stable_name name =
           | Some cc -> cc
           | None ->
               let (cflags, cppflags) =
-                  if !Clflags.native_code
+                  if Clflags.is_native ()
                   then (Config.native_cflags, Config.native_cppflags)
                   else (Config.bytecode_cflags, Config.bytecode_cppflags) in
               (String.concat " " [Config.c_compiler; cflags; cppflags]))

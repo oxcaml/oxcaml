@@ -192,7 +192,7 @@ let find_size_of_alloc_prim prim args =
   else None
 
 let compute_mixed_block_size shape =
-  if !Clflags.native_code then
+  if Clflags.is_native () then
     let bytes = Mixed_product_bytes.count (Product shape) in
     let value_prefix_len = Mixed_product_bytes.value_prefix_len bytes in
     let size = Mixed_product_bytes.size_in_words bytes in
@@ -295,7 +295,7 @@ let compute_static_size lam =
      number of value fields only. In bytecode, void fields are kept, so the
      block size includes all fields. *)
   and all_value_mixed_block_size shape =
-    if !Clflags.native_code then
+    if Clflags.is_native () then
       Mixed_product_bytes.value_prefix_len
         (Mixed_product_bytes.count (Product shape))
     else Array.length shape

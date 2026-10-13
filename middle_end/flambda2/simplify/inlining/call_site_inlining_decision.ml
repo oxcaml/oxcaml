@@ -456,7 +456,7 @@ let make_decision0 dacc ~simplify_expr ~rebuild_expr ~function_type ~apply
 
 let make_decision dacc ~simplify_expr ~rebuild_expr ~function_type ~apply
     ~return_arity : Call_site_inlining_decision_type.t =
-  if !Clflags.jsir
+  if Clflags.is_jsir ()
   then Jsir_inlining_disabled
   else
     make_decision0 dacc ~simplify_expr ~rebuild_expr ~function_type ~apply

@@ -243,8 +243,25 @@ let set_profile_granularity v =
   | Some granularity -> profile_granularity := granularity
   | None -> raise (Invalid_argument (Format.sprintf "profile granularity: %s" v))
 
-let native_code = ref false             (* set to true under ocamlopt *)
-let jsir = ref false                    (* set to true under ocamlj *)
+module Target = struct
+  type t =
+    | Bytecode
+    | Native
+    | Js_of_ocaml
+end
+
+(* Set to [Native] under ocamlopt and [Js_of_ocaml] under ocamlj *)
+let target = ref Target.Bytecode
+
+let[@inline] is_native () =
+  match !target with
+  | Native -> true
+  | Bytecode | Js_of_ocaml -> false
+
+let[@inline] is_jsir () =
+  match !target with
+  | Js_of_ocaml -> true
+  | Bytecode | Native -> false
 
 let force_slash = ref false             (* for ocamldep *)
 let clambda_checks = ref false          (* -clambda-checks *)
@@ -679,7 +696,7 @@ module Compiler_ir = struct
 end
 
 let is_flambda2 () =
-  Config.flambda2 && (!native_code || !jsir)
+  Config.flambda2 && (is_native () || is_jsir ())
 
 module Opt_flag_handler = struct
   type t = {
@@ -1021,8 +1038,8 @@ module Dump_option = struct
     let guard descr cond =
       if cond then pass
       else fail descr in
-    let check_bytecode = guard "bytecode" (not !native_code) in
-    let check_native = guard "native" !native_code in
+    let check_bytecode = guard "bytecode" (not (is_native ())) in
+    let check_native = guard "native" (is_native ()) in
     let check_middle_end = function
       | Flambda -> guard "flambda" Config.flambda
       | Closure -> guard "closure" (not Config.flambda)

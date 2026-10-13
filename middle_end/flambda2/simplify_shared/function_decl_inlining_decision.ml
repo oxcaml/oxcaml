@@ -74,7 +74,7 @@ let make_decision0 ~inlining_arguments:args ~inline ~stub ~cost_metrics:metrics
 
 let make_decision ~inlining_arguments ~inline ~stub ~cost_metrics ~is_a_functor
     ~recursive : Function_decl_inlining_decision_type.t =
-  if !Clflags.jsir
+  if Clflags.is_jsir ()
   then Jsir_inlining_disabled
   else
     make_decision0 ~inlining_arguments ~inline ~stub ~cost_metrics ~is_a_functor
