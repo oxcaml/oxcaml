@@ -45,8 +45,8 @@ let run ~cmx_loader ~machine_width ~round ~code_slot_offsets unit =
       ~return_arity:(Flambda_arity.create_singletons [K.With_subkind.any_value])
       ~exn_continuation
   in
+  let name_occurrences = RE.free_names body in
   let body = Rebuilt_expr.to_expr body (UA.are_rebuilding_terms uacc) in
-  let name_occurrences = UA.name_occurrences uacc in
   NO.fold_names name_occurrences ~init:() ~f:(fun () name ->
       Name.pattern_match name
         ~var:(fun var ->
@@ -70,7 +70,6 @@ let run ~cmx_loader ~machine_width ~round ~code_slot_offsets unit =
     Exported_code.merge (UA.all_code uacc)
       (Exported_code.mark_as_imported (get_imported_code ()))
   in
-  let name_occurrences = UA.name_occurrences uacc in
   let slot_offsets =
     match UA.slot_offsets uacc with
     | Unknown ->

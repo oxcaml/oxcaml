@@ -91,16 +91,11 @@ val create_switch :
 
 type new_let_cont =
   { cont : Continuation.t;
-    handler : Rebuilt_expr.Continuation_handler.t;
-    free_names_of_handler : Name_occurrences.t;
-    cost_metrics_of_handler : Cost_metrics.t
+    handler : Rebuilt_expr.Continuation_handler.t
   }
 
 val bind_let_conts :
-  Upwards_acc.t ->
-  body:Rebuilt_expr.t ->
-  new_let_cont list ->
-  Upwards_acc.t * Rebuilt_expr.t
+  Upwards_acc.t -> body:Rebuilt_expr.t -> new_let_cont list -> Rebuilt_expr.t
 
 val rebuild_invalid :
   Upwards_acc.t ->
@@ -115,9 +110,7 @@ type rewrite_apply_cont_result = private
   | Invalid of { message : string }
   | Apply_cont of Apply_cont.t
   | Expr of
-      (apply_cont_to_expr:
-         (Apply_cont.t -> Rebuilt_expr.t * Cost_metrics.t * Name_occurrences.t) ->
-      Rebuilt_expr.t * Cost_metrics.t * Name_occurrences.t)
+      (apply_cont_to_expr:(Apply_cont.t -> Rebuilt_expr.t) -> Rebuilt_expr.t)
 
 type rewrite_switch_arm_result = private
   | Invalid of { message : string }
@@ -146,7 +139,7 @@ val rewrite_fixed_arity_apply :
   use_id:Apply_cont_rewrite_id.t option ->
   [`Unarized] Flambda_arity.t ->
   Apply.t ->
-  Upwards_acc.t * Rebuilt_expr.t
+  Rebuilt_expr.t
 
 val rewrite_exn_continuation :
   Apply_cont_rewrite.t ->

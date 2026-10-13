@@ -16,8 +16,7 @@
 
 open! Simplify_import
 
-let inline_linearly_used_continuation uacc ~params:params' ~handler
-    ~free_names_of_handler ~cost_metrics_of_handler apply_cont =
+let inline_linearly_used_continuation uacc ~params:params' ~handler apply_cont =
   let params = Bound_parameters.to_list params' in
   (* CR-someday mshinwell: With -g, we can end up with continuations that are
      just a sequence of phantom lets then "goto". These would normally be
@@ -60,14 +59,10 @@ let inline_linearly_used_continuation uacc ~params:params' ~handler
               original_defining_expr = Some named
             })
   in
-  let expr, uacc =
-    let uacc =
-      UA.with_name_occurrences uacc ~name_occurrences:free_names_of_handler
-      |> UA.with_cost_metrics cost_metrics_of_handler
-    in
+  let expr, _uacc =
     EB.make_new_let_bindings uacc ~bindings_outermost_first ~body:handler
   in
-  expr, UA.cost_metrics uacc, UA.name_occurrences uacc
+  expr
 
 let rebuild_apply_cont apply_cont ~args ~rewrite_id uacc ~after_rebuild =
   let uenv = UA.uenv uacc in
@@ -98,17 +93,11 @@ let rebuild_apply_cont apply_cont ~args ~rewrite_id uacc ~after_rebuild =
       | None -> EB.no_rewrite_apply_cont (UA.uenv uacc) apply_cont
       | Some rewrite -> EB.rewrite_apply_cont uacc rewrite rewrite_id apply_cont
     in
-    let expr, cost_metrics, free_names =
+    let expr, uacc =
       match rewrite_use_result with
-      | Invalid { message } ->
-        ( RE.create_invalid (Message message),
-          Cost_metrics.zero,
-          Name_occurrences.empty )
-      | Apply_cont apply_cont -> apply_cont_to_expr apply_cont
-      | Expr build_expr -> build_expr ~apply_cont_to_expr
-    in
-    let uacc =
-      UA.add_free_names uacc free_names |> UA.add_cost_metrics cost_metrics
+      | Invalid { message } -> RE.create_invalid (Message message), uacc
+      | Apply_cont apply_cont -> apply_cont_to_expr apply_cont, uacc
+      | Expr build_expr -> build_expr ~apply_cont_to_expr, uacc
     in
     after_rebuild expr uacc
   in
@@ -122,8 +111,7 @@ let rebuild_apply_cont apply_cont ~args ~rewrite_id uacc ~after_rebuild =
        have already been inlined. *)
     let cont = AC.continuation apply_cont in
     match UE.find_continuation uenv cont with
-    | Linearly_used_and_inlinable
-        { params; handler; free_names_of_handler; cost_metrics_of_handler } ->
+    | Linearly_used_and_inlinable { params; handler } ->
       (* We must not fail to inline here, since we've already decided that the
          relevant [Let_cont] is no longer needed.
 
@@ -137,20 +125,15 @@ let rebuild_apply_cont apply_cont ~args ~rewrite_id uacc ~after_rebuild =
          (branches can be moved by the backend, their runtime depends on the
          branch predictor...). Underestimating the number of removed branches is
          fine. *)
-      inline_linearly_used_continuation uacc ~params ~handler
-        ~free_names_of_handler ~cost_metrics_of_handler apply_cont
+      inline_linearly_used_continuation uacc ~params ~handler apply_cont
     | Invalid { arity = _ } ->
       (* We allow this transformation even if there is a trap action, on the
          basis that there wouldn't be any opportunity to collect any backtrace,
          even if the [Apply_cont] were compiled as "raise". *)
-      ( RE.create_invalid (Apply_cont_of_unreachable_continuation cont),
-        Cost_metrics.zero,
-        Name_occurrences.empty )
+      RE.create_invalid (Apply_cont_of_unreachable_continuation cont)
     | Non_inlinable_zero_arity _ | Non_inlinable_non_zero_arity _
     | Toplevel_or_function_return_or_exn_continuation _ ->
-      ( RE.create_apply_cont apply_cont,
-        Cost_metrics.from_size (Code_size.apply_cont apply_cont),
-        Apply_cont.free_names apply_cont )
+      RE.create_apply_cont apply_cont
   in
   create_apply_cont ~apply_cont_to_expr
 

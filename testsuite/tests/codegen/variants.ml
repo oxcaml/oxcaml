@@ -110,7 +110,7 @@ last_two:
 |}]
 
 (* CR ttebbi: This could be done looking at a single bit, and should certainly
-    be branchfree. Also, this xor can be avoided by negating the bit extraction.
+    be branchfree.
 *)
 let even_variant (t : t) : bool =
   match t with
@@ -123,10 +123,9 @@ even_variant:
   cmpq  $3, %rax
   je    .L0
   cmpq  $7, %rax
-  setge %al
+  setl  %al
   movzbq %al, %rax
   leaq  1(%rax,%rax), %rax
-  xorq  $2, %rax
   ret
 .L0:
   movl  $1, %eax

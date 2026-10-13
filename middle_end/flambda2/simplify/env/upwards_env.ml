@@ -160,11 +160,8 @@ let add_continuation_shortcut t cont ~params ~shortcut_to ~args =
     in
     { t with continuation_shortcuts }
 
-let add_linearly_used_inlinable_continuation t cont ~params ~handler
-    ~free_names_of_handler ~cost_metrics_of_handler =
-  add_continuation0 t cont
-    (Linearly_used_and_inlinable
-       { handler; free_names_of_handler; params; cost_metrics_of_handler })
+let add_linearly_used_inlinable_continuation t cont ~params ~handler =
+  add_continuation0 t cont (Linearly_used_and_inlinable { handler; params })
 
 let add_function_return_or_exn_continuation t cont arity =
   add_continuation0 t cont
