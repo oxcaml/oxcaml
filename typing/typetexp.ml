@@ -405,8 +405,10 @@ end = struct
 
   let ttyp_poly_arg (poly_univars : poly_univars) = List.map
       (fun (name, pending_univar, _stage) ->
-        name,
-        Jkind.get_annotation pending_univar.jkind_info.original_jkind)
+        let { original_jkind; defaulted } = pending_univar.jkind_info in
+        (* A defaulted jkind was not written by the user, even though it may
+           have an annotation (e.g. [value]). *)
+        name, if defaulted then None else Jkind.get_annotation original_jkind)
       poly_univars
 
   let mk_pending_univar name jkind jkind_info =
