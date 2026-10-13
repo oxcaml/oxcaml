@@ -386,12 +386,10 @@ let simplify_direct_full_application ~simplify_expr ~rebuild_expr dacc apply
                       (BP.simple result_var))
                   result_arity results
               in
-              let dacc = DA.with_denv dacc denv in
-              let env_at_use = DA.denv dacc in
               let env_at_use =
                 if Code_metadata.cold callee's_code_metadata
-                then DE.mark_as_cold env_at_use
-                else env_at_use
+                then DE.mark_as_cold denv
+                else denv
               in
               let dacc, use_id =
                 DA.record_continuation_use dacc apply_return_continuation
