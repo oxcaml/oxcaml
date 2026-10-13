@@ -783,3 +783,15 @@ let foo () =
 [%%expect{|
 val foo : unit -> unit = <fun>
 |}]
+
+(* CR zqian: borrowing a field and then using the parent uniquely should be
+   rejected, since [y] still aliases [r.f]. *)
+type r = { f : string }
+let foo r =
+  let y = borrow_ r.f in
+  unique_use r;
+  local_aliased_use y
+[%%expect{|
+type r = { f : string; }
+val foo : r @ unique -> unit = <fun>
+|}]
