@@ -12,6 +12,10 @@ type maturity =
   | Beta
   | Alpha
 
+type scheduler_policy =
+  | Eager
+  | Delayed
+
 (** The type of language extensions. An ['a t] is an extension that can either
     be off or be set to have any value in ['a], so a [unit t] can be either on
     or off, while a [maturity t] can have different maturity settings. *)
@@ -33,6 +37,7 @@ type _ t =
   | Let_mutable : unit t
   | Layout_poly : maturity t
   | Runtime_metaprogramming : unit t
+  | Omnidirectionality : scheduler_policy t
 
-(** Print and parse language extensions; parsing is case-insensitive *)
+(** Print language extensions *)
 val to_string : _ t -> string
