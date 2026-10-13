@@ -291,7 +291,8 @@ val parse_optional_id_payload :
 
 (* Support for zero_alloc *)
 type zero_alloc_check =
-  { strict: bool;
+  { conditional: bool;
+    strict: bool;
     (* [strict=true] property holds on all paths.
        [strict=false] if the function returns normally,
        then the property holds (but property violations on
@@ -304,7 +305,8 @@ type zero_alloc_check =
   }
 
 type zero_alloc_assume =
-  { strict: bool;
+  { conditional: bool;
+    strict: bool;
     never_returns_normally: bool;
     never_raises: bool;
     (* [never_raises=true] the function never returns

@@ -420,9 +420,11 @@ let zero_alloc_of_application
       | Check_all | Check_opt_only -> true
     in
     begin match Zero_alloc.get val_zero_alloc with
-    | Check c when c.arity = num_args && (use_opt || not c.opt) ->
+    | Check c when not c.conditional && c.arity = num_args
+                   && (use_opt || not c.opt) ->
       let assume : Zero_alloc.assume =
-        { strict = c.strict;
+        { conditional = c.conditional;
+          strict = c.strict;
           never_returns_normally = false;
           never_raises = false;
           arity = c.arity;
@@ -2421,18 +2423,18 @@ and transl_function
        | Assert_default -> Default_zero_alloc
        | Assert_all ->
          if Builtin_attributes.is_zero_alloc_check_enabled ~opt:false
-         then Check { strict = false; loc = e.exp_loc; custom_error_msg = None; }
+         then Check { conditional = false; strict = false; loc = e.exp_loc; custom_error_msg = None; }
          else Default_zero_alloc
        | Assert_all_opt ->
          if Builtin_attributes.is_zero_alloc_check_enabled ~opt:true
-         then Check { strict = false; loc = e.exp_loc; custom_error_msg = None; }
+         then Check { conditional = false; strict = false; loc = e.exp_loc; custom_error_msg = None; }
          else Default_zero_alloc)
-    | Check { strict; opt; arity = _; loc; custom_error_msg; } ->
+    | Check { conditional; strict; opt; arity = _; loc; custom_error_msg; } ->
       if Builtin_attributes.is_zero_alloc_check_enabled ~opt
-      then Check { strict; loc; custom_error_msg }
+      then Check { conditional; strict; loc; custom_error_msg }
       else Default_zero_alloc
-    | Assume { strict; never_returns_normally; never_raises; loc; arity = _; } ->
-      Assume { strict; never_returns_normally; never_raises; loc }
+    | Assume { conditional; strict; never_returns_normally; never_raises; loc; arity = _; } ->
+      Assume { conditional; strict; never_returns_normally; never_raises; loc }
     | Ignore_assert_all -> Default_zero_alloc
   in
   let attr =

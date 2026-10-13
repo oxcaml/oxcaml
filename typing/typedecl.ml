@@ -4818,7 +4818,8 @@ let transl_value_decl env loc ~modal ~why valdecl =
           end else
             let create_const ~opt =
               Zero_alloc.create_const
-                (Check { strict = false;
+                (Check { conditional = false; (* CR-soon wsturgeon: [true]? *)
+                         strict = false;
                          arity = default_arity;
                          custom_error_msg = None;
                          loc;

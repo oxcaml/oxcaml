@@ -5,7 +5,7 @@
 module type WS = sig
   type t
 
-  val empty : t
+  val unknown : t
 
   val join : t -> t -> t
 
@@ -160,7 +160,7 @@ module Assume_info : sig
   module Witnesses : sig
     type t = unit
 
-    val empty : t
+    val unknown : t
 
     val join : t -> t -> t
 
