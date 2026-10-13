@@ -1336,6 +1336,10 @@ let mk_cached_generic_functions_path f =
 
 let mk_target f =
   ( "-target",
+    (* We leave out [-target native] even though we could support it, as
+       we are hoping to use this flag for cross-compilation triplets, and
+       we don't want anyone to rely on this behaviour before that is in
+       place. *)
     Arg.Symbol ([ "js_of_ocaml" ], fun _ -> f Clflags.Target.Js_of_ocaml),
     " Compile to JavaScript instead of native code" )
 
