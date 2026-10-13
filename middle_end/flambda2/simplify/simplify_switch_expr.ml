@@ -742,7 +742,7 @@ let recognize_mergeable_argument ~machine_width ~scrutinee required_names ~dbg
         | Region | Rec_info -> None))
 
 let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
-    ~dacc_before_switch uacc ~after_rebuild =
+    ~dacc_before_switch ~param_projection uacc ~after_rebuild =
   let new_let_conts, arms, mergeable_arms =
     TI.Map.fold (rebuild_arm uacc) arms ([], TI.Map.empty, No_arms)
   in
@@ -790,6 +790,11 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
             T.print scrutinee_ty
             (RE.print (UA.are_rebuilding_terms uacc))
             expr;
+        let uacc =
+          match param_projection with
+          | None -> uacc
+          | Some source -> UA.add_param_use ~source ~use:Switch_scrutinee uacc
+        in
         expr, uacc
       in
       match switch_merged with
@@ -1057,7 +1062,10 @@ let simplify_switch dacc switch ~down_to_up =
         dacc
       | _ -> dacc
     in
+    let param_projection =
+      TE.is_param_projection_of_simple (DA.typing_env dacc) scrutinee
+    in
     down_to_up dacc
       ~rebuild:
         (rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
-           ~dacc_before_switch)
+           ~dacc_before_switch ~param_projection)
