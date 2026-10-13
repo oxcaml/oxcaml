@@ -325,7 +325,9 @@ let () =
     let compiler = Environment.tool_path env mode "ocamlc" "ocamlopt" in
     let args = [
       "-I"; "+compiler-libs";
-      Harness.lib mode "ocamlcommon"; Harness.lib mode "ocamlbytecomp";
+      Harness.lib mode "ocamlcommon";
+      Harness.lib mode "ocamlfrontend";
+      Harness.lib mode "ocamlbytecomp";
       "-o"; test_program; "test_install_script.ml"
     ] in
     (* For bytecode-only installations, ocamlc will be ocamlc.byte and so need
