@@ -32,8 +32,8 @@ Options passed in through `-jsoo-opt` are passed through to all `js_of_ocaml` co
 |--------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `Tagged_immediate` | Untagged 32-bit integer (via `Number`)                                                                                                                                                                             |
 | `Naked_immediate`  | Untagged 32-bit integer (via `Number`)                                                                                                                                                                             |
-| `Naked_int8`       | Untagged 32-bit integer (via `Number`), always kept sign-extended to 8 bits                                                                                                        |
-| `Naked_int16`      | Untagged 32-bit integer (via `Number`), always kept sign-extended to 16 bits                                                                                                 |
+| `Naked_int8`       | Untagged 32-bit integer (via `Number`), always kept sign-extended to 8 bits                                                                                                                        |
+| `Naked_int16`      | Untagged 32-bit integer (via `Number`), always kept sign-extended to 16 bits                                                                                                                       |
 | `Naked_nativeint`  | Untagged 32-bit integer (via `Number`)                                                                                                                                                                             |
 | `Naked_int32`      | Untagged 32-bit integer (via `Number`)                                                                                                                                                                             |
 | `Naked_int64`      | Untagged 64-bit integer (via [`MlInt64`](https://github.com/oxcaml/js_of_ocaml/blob/master/runtime/js/int64.js) )                                                                                                  |
@@ -45,7 +45,7 @@ Hence `Tag_immediate` and `Untag_immediate` are identities in JSIR: all integers
 Beware - immediates are 32 bits in JavaScript, instead of 63 or 31!
 
 Smallints (`Naked_int8` and `Naked_int16`) follow the same convention as bytecode and Cmm, where they are stored sign-extended.
-This means that JavaScript stubs receive exactly the same values for `int8#`/`int16#` arguments as they do in bytecode.
+This means that JavaScript stubs receive exactly the same values for `int8#`/`int16#` arguments as they do in bytecode, and must likewise return sign-extended values.
 
 ## Known limitations
 

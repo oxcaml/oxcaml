@@ -47,8 +47,7 @@ let prim_args ~env ~res simples =
       arg :: args, res)
     simples ([], res)
 
-let with_int_prefix_exn ~(kind : Flambda_kind.Standard_int.t) ~percent_for_imms
-    op =
+let with_int_prefix ~(kind : Flambda_kind.Standard_int.t) ~percent_for_imms op =
   let prefix =
     match kind, percent_for_imms with
     | (Tagged_immediate | Naked_immediate | Naked_int8 | Naked_int16), true ->
@@ -112,18 +111,11 @@ let sign_extend ~env ~res ~bits (x : Jsir.prim_arg) =
   let shifted, env, res =
     use_prim0 ~env ~res (Extern ("%int_lsl", None)) [x; shift]
   in
-  use_prim0 ~env ~res (Extern ("%int_asr", None)) [Pv shifted; shift]
+  use_prim ~env ~res (Extern ("%int_asr", None)) [Pv shifted; shift]
 
 let zero_extend ~env ~res ~bits (x : Jsir.prim_arg) =
   let mask = int_const ((1 lsl bits) - 1) in
   use_prim0 ~env ~res (Extern ("%int_and", None)) [x; mask]
-
-let sign_extend_if_smallint ~env ~res ~kind var =
-  match smallint_bits kind with
-  | None -> Some var, env, res
-  | Some bits ->
-    let var, env, res = sign_extend ~env ~res ~bits (Pv var) in
-    Some var, env, res
 
 let nullary_exn ~env ~res (f : Flambda_primitive.nullary_primitive) =
   let use_prim' prim = use_prim ~env ~res prim [] in
@@ -255,7 +247,7 @@ let unary_exn ~env ~res (f : Flambda_primitive.unary_primitive) x =
       let var, env, res =
         use_prim0' ~env ~res (Extern ("caml_bswap16", None)) [x]
       in
-      sign_extend_if_smallint ~env ~res ~kind var
+      sign_extend ~env ~res ~bits:16 (Pv var)
     | Naked_immediate | Tagged_immediate ->
       use_prim' (Extern ("caml_bswap16", None))
     | Naked_int32 -> use_prim' (Extern ("caml_int32_bswap", None))
@@ -282,15 +274,13 @@ let unary_exn ~env ~res (f : Flambda_primitive.unary_primitive) x =
        needed) and then sign-extend. *)
     let narrow ~bits =
       let x, res = prim_arg ~env ~res x in
-      let var, env, res = sign_extend ~env ~res ~bits x in
-      Some var, env, res
+      sign_extend ~env ~res ~bits x
     in
     let narrow_via extern_name ~bits =
       let var, env, res =
         use_prim0' ~env ~res (Extern (extern_name, None)) [x]
       in
-      let var, env, res = sign_extend ~env ~res ~bits (Pv var) in
-      Some var, env, res
+      sign_extend ~env ~res ~bits (Pv var)
     in
     match src, dst with
     | ( Naked_int8,
@@ -484,17 +474,18 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
       | Xor -> "xor"
     in
     let prim : Jsir.prim =
-      Extern (with_int_prefix_exn ~kind op_name ~percent_for_imms:true, None)
+      Extern (with_int_prefix ~kind op_name ~percent_for_imms:true, None)
     in
     match smallint_bits kind, op with
-    | None, _ | Some _, (And | Or | Xor) ->
+    | None, _ | Some _, (And | Or | Xor | Mod Signed) ->
       (* Bitwise operations on sign-extended operands yield sign-extended
-         results *)
+         results, and a signed remainder is always smaller in magnitude than the
+         divisor, so it is in range too. *)
       use_prim' prim
-    | Some _, (Add | Sub | Mul | Div Signed | Mod Signed) ->
+    | Some bits, (Add | Sub | Mul | Div Signed) ->
       (* The result may be out of range, e.g. [-128 / -1] for [int8] *)
       let var, env, res = use_prim0' ~env ~res prim [x; y] in
-      sign_extend_if_smallint ~env ~res ~kind var
+      sign_extend ~env ~res ~bits (Pv var)
     | Some bits, (Div Unsigned | Mod Unsigned) ->
       (* Zero-extend the operands to get their unsigned values *)
       let x, res = prim_arg ~env ~res x in
@@ -502,7 +493,7 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
       let x, env, res = zero_extend ~env ~res ~bits x in
       let y, env, res = zero_extend ~env ~res ~bits y in
       let var, env, res = use_prim0 ~env ~res prim [Pv x; Pv y] in
-      sign_extend_if_smallint ~env ~res ~kind var)
+      sign_extend ~env ~res ~bits (Pv var))
   | Int_shift (kind, op) -> (
     let op_name =
       match kind, op with
@@ -518,20 +509,20 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
       | (Naked_int32 | Naked_int64 | Naked_nativeint), Asr -> "shift_right"
     in
     let prim : Jsir.prim =
-      Extern (with_int_prefix_exn ~kind op_name ~percent_for_imms:true, None)
+      Extern (with_int_prefix ~kind op_name ~percent_for_imms:true, None)
     in
     match smallint_bits kind, op with
     | None, _ | Some _, Asr -> use_prim' prim
-    | Some _, Lsl ->
+    | Some bits, Lsl ->
       let var, env, res = use_prim0' ~env ~res prim [x; y] in
-      sign_extend_if_smallint ~env ~res ~kind var
+      sign_extend ~env ~res ~bits (Pv var)
     | Some bits, Lsr ->
       (* Shift the unsigned value, then sign-extend (e.g. for a shift by 0) *)
       let x, res = prim_arg ~env ~res x in
       let y, res = prim_arg ~env ~res y in
       let x, env, res = zero_extend ~env ~res ~bits x in
       let var, env, res = use_prim0 ~env ~res prim [Pv x; y] in
-      sign_extend_if_smallint ~env ~res ~kind var)
+      sign_extend ~env ~res ~bits (Pv var))
   | Int_comp (kind, behaviour) -> (
     match behaviour with
     | Yielding_bool comparison -> (
@@ -583,26 +574,34 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
       | Ge Signed -> use_prim ~env ~res le [y; x]
       | Ge Unsigned -> unsigned_le y x)
     | Yielding_int_like_compare_functions signed_or_unsigned -> (
+      let compare : Jsir.prim =
+        Extern (with_int_prefix ~kind "compare" ~percent_for_imms:false, None)
+      in
       match signed_or_unsigned with
-      | Signed ->
-        let extern_name =
-          with_int_prefix_exn ~kind "compare" ~percent_for_imms:false
+      | Signed -> use_prim' compare
+      | Unsigned ->
+        (* Map the operands to values whose signed ordering is the unsigned
+           ordering of the originals. Smallints should be zero-extended, and the
+           sign bit of the other kinds should be flipped. *)
+        let flip_sign_bit (min_int : Jsir.constant) ~env ~res arg =
+          use_prim0 ~env ~res
+            (Extern (with_int_prefix ~kind "xor" ~percent_for_imms:true, None))
+            [arg; Pc min_int]
         in
-        use_prim' (Extern (extern_name, None))
-      | Unsigned -> (
-        match smallint_bits kind with
-        | Some bits ->
-          (* Compare the zero-extended (i.e. unsigned) values *)
-          let x, res = prim_arg ~env ~res x in
-          let y, res = prim_arg ~env ~res y in
-          let x, env, res = zero_extend ~env ~res ~bits x in
-          let y, env, res = zero_extend ~env ~res ~bits y in
-          use_prim ~env ~res (Extern ("caml_int_compare", None)) [Pv x; Pv y]
-        | None ->
-          (* Also unimplemented in Cmm. See [To_cmm_primitive]. *)
-          (* CR selee: can do this by subtracting [min_int] before doing the
-             compare *)
-          raise Primitive_not_supported)))
+        let to_signed_order =
+          match kind with
+          | Naked_int8 -> zero_extend ~bits:8
+          | Naked_int16 -> zero_extend ~bits:16
+          | Tagged_immediate | Naked_immediate ->
+            flip_sign_bit (Int (Targetint.min_int ()))
+          | Naked_int32 | Naked_nativeint -> flip_sign_bit (Int32 Int32.min_int)
+          | Naked_int64 -> flip_sign_bit (Int64 Int64.min_int)
+        in
+        let x, res = prim_arg ~env ~res x in
+        let y, res = prim_arg ~env ~res y in
+        let x, env, res = to_signed_order ~env ~res x in
+        let y, env, res = to_signed_order ~env ~res y in
+        use_prim ~env ~res compare [Pv x; Pv y]))
   | Float_arith (bitwidth, op) ->
     let op_name =
       match op with Add -> "add" | Sub -> "sub" | Mul -> "mul" | Div -> "div"
