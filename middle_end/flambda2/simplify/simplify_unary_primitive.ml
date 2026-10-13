@@ -973,16 +973,16 @@ let[@inline always] simplify_immutable_block_load0
 
 let simplify_immutable_block_load access_kind ~field ~min_name_mode dacc
     ~original_term ~dbg ~arg ~arg_ty ~result_var =
+  let kind = P.Block_access_kind.element_subkind_for_load access_kind in
   let dacc =
     DA.compose_param_projection dacc ~result_var arg
-      (Param_projection.block_load field)
+      (Param_projection.block_load field (KS.kind kind))
   in
   let result =
     simplify_immutable_block_load0 access_kind ~field ~min_name_mode dacc
       ~original_term dbg ~arg ~arg_ty ~result_var
   in
   SPR.map_dacc result (fun dacc ->
-      let kind = P.Block_access_kind.element_subkind_for_load access_kind in
       let block_shape : Flambda_kind.Block_shape.t =
         match (access_kind : P.Block_access_kind.t) with
         | Values _ -> Scannable Value_only

@@ -8,6 +8,7 @@ type projection =
   | Is_int of projection
   | Block_load of
       { field : Target_ocaml_int.t;
+        kind : Flambda_kind.t;
         projection : projection
       }
   | Identity
@@ -27,8 +28,8 @@ let untag p = { p with projection = Untag p.projection }
 
 let is_int p = { p with projection = Is_int p.projection }
 
-let block_load field p =
-  { p with projection = Block_load { field; projection = p.projection } }
+let block_load field kind p =
+  { p with projection = Block_load { field; kind; projection = p.projection } }
 
 let compare_source s1 s2 =
   match s1, s2 with
@@ -43,11 +44,14 @@ let rec compare_projection p1 p2 =
   | Get_tag p1, Get_tag p2 -> compare_projection p1 p2
   | Untag p1, Untag p2 -> compare_projection p1 p2
   | Is_int p1, Is_int p2 -> compare_projection p1 p2
-  | ( Block_load { field = f1; projection = p1 },
-      Block_load { field = f2; projection = p2 } ) -> (
+  | ( Block_load { field = f1; kind = k1; projection = p1 },
+      Block_load { field = f2; kind = k2; projection = p2 } ) -> (
     match Target_ocaml_int.compare f1 f2 with
-    | 0 -> compare_projection p1 p2
-    | c -> c)
+      | 0 -> begin match compare_projection p1 p2 with
+          | 0 -> Flambda_kind.compare k1 k2
+          | c -> c
+        end
+      | c -> c)
   | Identity, _ -> -1
   | _, Identity -> 1
   | Get_tag _, _ -> -1
@@ -73,7 +77,7 @@ let[@ocamlformat "disable"] rec print_projection source ppf = function
   | Get_tag p -> Format.fprintf ppf "(Get_tag %a)" (print_projection source) p
   | Untag p -> Format.fprintf ppf "(Untag %a)" (print_projection source) p
   | Is_int p -> Format.fprintf ppf "(Is_int %a)" (print_projection source) p
-  | Block_load { field; projection } ->
+  | Block_load { field; projection; kind = _ } ->
     Format.fprintf ppf "(Block_load %a %a)"
       Target_ocaml_int.print field (print_projection source) projection
 

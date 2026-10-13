@@ -14,6 +14,7 @@ type projection =
   | Is_int of projection
   | Block_load of
       { field : Target_ocaml_int.t;
+        kind : Flambda_kind.t;
         projection : projection
       }
   | Identity
@@ -35,7 +36,7 @@ val untag : t -> t
 
 val is_int : t -> t
 
-val block_load : Target_ocaml_int.t -> t -> t
+val block_load : Target_ocaml_int.t -> Flambda_kind.t -> t -> t
 
 val equal : t -> t -> bool
 
