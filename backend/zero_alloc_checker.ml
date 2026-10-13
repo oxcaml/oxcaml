@@ -123,7 +123,7 @@ let take_first_n t n ~to_seq ~of_seq ~cardinal =
   let len = cardinal t in
   if len <= n then t else t |> to_seq |> Seq.take n |> of_seq
 
-module Witnesses : sig
+module Witness_set : sig
   type t
 
   val empty : t
@@ -210,6 +210,85 @@ end = struct
     }
 end
 
+module Witnesses = struct
+  type t =
+    { witnesses : Witness_set.t;
+      every_allocation_comes_from_calling_an_argument : bool
+    }
+
+  let unknown =
+    { witnesses = Witness_set.empty; every_allocation_comes_from_calling_an_argument = false }
+
+  let of_summary ~every_allocation_comes_from_calling_an_argument =
+    { witnesses = Witness_set.empty; every_allocation_comes_from_calling_an_argument }
+
+  let witnesses t = t.witnesses
+
+  let every_allocation_comes_from_calling_an_argument t =
+    t.every_allocation_comes_from_calling_an_argument
+
+  let create ~keep_witnesses ?hint kind dbg =
+    let witnesses =
+      if keep_witnesses
+      then Witness_set.create ?hint kind dbg
+      else Witness_set.empty
+    in
+    let every_allocation_comes_from_calling_an_argument =
+      match kind with
+      | Witness.Indirect_call { callee = Some (Cmm.Argument _) }
+      | Witness.Indirect_tailcall { callee = Some (Cmm.Argument _) }
+        -> true
+      | Witness.Indirect_call { callee = (None | Some (Cmm.Symbol _)) }
+      | Witness.Indirect_tailcall { callee = (None | Some (Cmm.Symbol _)) }
+      | Witness.Alloc _
+      | Witness.Direct_call _
+      | Witness.Direct_tailcall _
+      | Witness.Extcall _
+      | Witness.Arch_specific _
+      | Witness.Probe _
+      | Witness.Widen
+        -> false
+    in
+    { witnesses; every_allocation_comes_from_calling_an_argument }
+
+  let widen = { unknown with witnesses = Witness_set.widen }
+
+  let is_empty t = Witness_set.is_empty t.witnesses
+
+  let size t = Witness_set.size t.witnesses
+
+  let cutoff t ~n = { t with witnesses = Witness_set.cutoff t.witnesses ~n }
+
+  let print ppf t = Witness_set.print ppf t.witnesses
+
+  let compare t1 t2 =
+    let c = Witness_set.compare t1.witnesses t2.witnesses in
+    if c <> 0
+    then c
+    else
+      Bool.compare t1.every_allocation_comes_from_calling_an_argument
+        t2.every_allocation_comes_from_calling_an_argument
+
+  let lessequal t1 t2 =
+    ((not t2.every_allocation_comes_from_calling_an_argument)
+    || t1.every_allocation_comes_from_calling_an_argument)
+    && Witness_set.lessequal t1.witnesses t2.witnesses
+
+  let join t1 t2 =
+    { witnesses = Witness_set.join t1.witnesses t2.witnesses;
+      every_allocation_comes_from_calling_an_argument =
+        t1.every_allocation_comes_from_calling_an_argument
+        && t2.every_allocation_comes_from_calling_an_argument
+    }
+
+  let meet t1 t2 =
+    { witnesses = Witness_set.meet t1.witnesses t2.witnesses;
+      every_allocation_comes_from_calling_an_argument =
+        t1.every_allocation_comes_from_calling_an_argument
+        || t2.every_allocation_comes_from_calling_an_argument
+    }
+end
+
 module Tag = struct
   type t =
     | N
@@ -282,9 +361,9 @@ module V : sig
 
   val replace_witnesses : Witnesses.t -> t -> t
 
-  val diff_witnesses : expected:t -> actual:t -> Witnesses.t
+  val diff_witnesses : expected:t -> actual:t -> Witness_set.t
 
-  val get_witnesses : t -> Witnesses.t
+  val get_witnesses : t -> Witness_set.t
 
   val print : witnesses:bool -> Format.formatter -> t -> unit
 
@@ -321,7 +400,12 @@ end = struct
   let pp_var ~witnesses ppf var w =
     Format.fprintf ppf "(%a%a)@," Var.print var (pp_w ~witnesses) w
 
-  let pp_top ~witnesses ppf w = Format.fprintf ppf "(top%a)" (pp_w ~witnesses) w
+  let pp_top ~witnesses ppf w =
+    Format.fprintf ppf "(top%s%a)"
+      (if Witnesses.every_allocation_comes_from_calling_an_argument w
+       then " arguments_only"
+       else "")
+      (pp_w ~witnesses) w
 
   (** Variables with witnesses *)
   module Vars : sig
@@ -350,8 +434,7 @@ end = struct
 
     val print : witnesses:bool -> Format.formatter -> t -> unit
 
-    val fold :
-      f:(Var.t -> Witnesses.t -> 'acc -> 'acc) -> init:'acc -> t -> 'acc
+    val fold : f:(Var.t -> Witnesses.t -> 'acc -> 'acc) -> init:'acc -> t -> 'acc
 
     val exists : (Var.t -> Witnesses.t -> bool) -> t -> bool
 
@@ -584,7 +667,7 @@ end = struct
         then
           if M.exists (fun _var tr -> Transform.has_witnesses tr) t
           then raise (Widen Witnesses.widen)
-          else raise (Widen Witnesses.empty)
+          else raise (Widen Witnesses.unknown)
         else t
       | Error n ->
         if M.cardinal t > n
@@ -802,8 +885,7 @@ end = struct
 
     val distribute_transform_over_join : t -> Transform.t -> unit -> t
 
-    val distribute_transform_var_over_join :
-      t -> Var.t -> Witnesses.t -> unit -> t
+    val distribute_transform_var_over_join : t -> Var.t -> Witnesses.t -> unit -> t
 
     val distribute_transform_top_over_join : t -> Witnesses.t -> unit -> t
 
@@ -860,26 +942,26 @@ end = struct
        [n], and [Arg.join] is used for fixpoint computation before applying the
        cutoff. *)
     let args_with_top w args =
-      if not (Args.has_witnesses args)
-      then
-        Misc.fatal_errorf "Join Top without witnesses in args:%a"
-          (Args.print ~witnesses:false)
-          args;
-      match !Oxcaml_flags.zero_alloc_checker_details_cutoff with
-      | Keep_all -> Args_with_top { w; args }
-      | No_details ->
-        Misc.fatal_errorf "unexpected: (Join (Top %a) %a) " Witnesses.print w
-          (Args.print ~witnesses:true)
-          args
-      | At_most n ->
-        (* Normal form after cutoff: args contains at least one element even
-           after cutoff because [n] is guaranteed to be positive. *)
-        let len = Witnesses.size w in
-        if len > n
-        then
-          Misc.fatal_errorf "expected at most %d witnesses, got %d: %a" n len
-            Witnesses.print w;
-        Args_with_top { w; args = Args.cutoff args n }
+      if
+        Witnesses.every_allocation_comes_from_calling_an_argument w
+        || not (Args.has_witnesses args)
+      then Args_with_top { w; args }
+      else
+        match !Oxcaml_flags.zero_alloc_checker_details_cutoff with
+        | Keep_all -> Args_with_top { w; args }
+        | No_details ->
+          Misc.fatal_errorf "unexpected: (Join (Top %a) %a) " Witnesses.print w
+            (Args.print ~witnesses:true)
+            args
+        | At_most n ->
+          (* Normal form after cutoff: args contains at least one element even
+             after cutoff because [n] is guaranteed to be positive. *)
+          let len = Witnesses.size w in
+          if len > n
+          then
+            Misc.fatal_errorf "expected at most %d witnesses, got %d: %a" n len
+              Witnesses.print w;
+          Args_with_top { w; args = Args.cutoff args n }
 
     let tr_with_safe tr = Args_with_safe Args.(add_tr empty tr)
 
@@ -908,8 +990,7 @@ end = struct
 
     let add_top t witnesses =
       match t with
-      | Args_with_top { w; args } ->
-        args_with_top (Witnesses.join w witnesses) args
+      | Args_with_top { w; args } -> args_with_top (Witnesses.join w witnesses) args
       | Args_with_safe args | Args args -> args_with_top witnesses args
 
     let add_var t var witnesses =
@@ -1119,8 +1200,8 @@ end = struct
 
   let get_witnesses t =
     match t with
-    | Top w -> w
-    | Bot | Safe -> Witnesses.empty
+    | Top w -> Witnesses.witnesses w
+    | Bot | Safe -> Witness_set.empty
     | Var _ | Transform _ | Join _ ->
       Misc.fatal_errorf "Zero_alloc_checker.get_witnesses: unresolved value %a"
         (print ~witnesses:false) t
@@ -1174,9 +1255,14 @@ end = struct
       Join (Join.var_with_safe var witnesses)
     | (Top w as top), Var { var; witnesses }
     | Var { var; witnesses }, (Top w as top) ->
-      if Witnesses.is_empty witnesses
-      then top
-      else Join (Join.var_with_top var ~var_witnesses:witnesses w)
+      (* If `Top w` is already "as bad as possible" (i.e. permits allocation and
+         does *not* do so solely through its arguments), then there's nothing
+         more to learn, so we might as well save some time and space. *)
+      if
+        Witnesses.every_allocation_comes_from_calling_an_argument w
+        || not (Witnesses.is_empty witnesses)
+      then Join (Join.var_with_top var ~var_witnesses:witnesses w)
+      else top
     | Var { var = var1; witnesses = w1 }, Var { var = var2; witnesses = w2 } ->
       if Var.equal var1 var2
       then Var { var = var1; witnesses = Witnesses.join w1 w2 }
@@ -1201,9 +1287,18 @@ end = struct
          allocations. We can put a bound on the number of witnesses recorded,
          but it would make the resulting error messages sensitive to iteration
          order. *)
-      if Transform.has_witnesses tr then Join (Join.tr_with_top tr w) else top
-    | (Top w as top), Join j | Join j, (Top w as top) ->
-      if Join.has_witnesses j then Join (Join.add_top j w) else top
+      if
+        Witnesses.every_allocation_comes_from_calling_an_argument w
+        || Transform.has_witnesses tr
+      then Join (Join.tr_with_top tr w)
+      else top
+    | (Top w as top), Join j
+    | Join j, (Top w as top) ->
+      if
+        Witnesses.every_allocation_comes_from_calling_an_argument w
+        || Join.has_witnesses j
+      then Join (Join.add_top j w)
+      else top
     | Safe, Join j | Join j, Safe -> Join (Join.add_safe j)
     | Var { var; witnesses }, Join j | Join j, Var { var; witnesses } ->
       Join (Join.add_var j var witnesses)
@@ -1263,10 +1358,14 @@ end = struct
     | Transform tr1, Transform tr2 -> Transform (Transform.flatten tr1 tr2)
     | Transform tr, Join j | Join j, Transform tr ->
       bounded_join (Join.distribute_transform_over_join j tr)
-    | (Top w as top), Join j | Join j, (Top w as top) ->
-      if Join.has_safe j && not (Join.has_witnesses j)
-      then top
-      else bounded_join (Join.distribute_transform_top_over_join j w)
+    | (Top w as top), Join j
+    | Join j, (Top w as top) ->
+      if
+        Witnesses.every_allocation_comes_from_calling_an_argument w
+        || not (Join.has_safe j)
+        || Join.has_witnesses j
+      then bounded_join (Join.distribute_transform_top_over_join j w)
+      else top
     | Var { var; witnesses }, Join j | Join j, Var { var; witnesses } ->
       bounded_join (Join.distribute_transform_var_over_join j var witnesses)
     | Join j1, Join j2 ->
@@ -1290,12 +1389,12 @@ end = struct
     (* If [actual] is Top and [expected] is not Top then return the [actual]
        witnesses. Otherwise, return empty. *)
     match actual, expected with
-    | Bot, Bot | Safe, Safe | Bot, Safe -> Witnesses.empty
+    | Bot, Bot | Safe, Safe | Bot, Safe -> Witness_set.empty
     | Bot, Top w | Safe, Top w | Top _, Top w ->
       assert (Witnesses.is_empty w);
-      Witnesses.empty
-    | Safe, Bot -> Witnesses.empty
-    | Top w, (Bot | Safe) -> w
+      Witness_set.empty
+    | Safe, Bot -> Witness_set.empty
+    | Top w, (Bot | Safe) -> Witnesses.witnesses w
     | (Var _ | Join _ | Transform _), _ | _, (Var _ | Join _ | Transform _) ->
       Misc.fatal_errorf
         "Zero_alloc_checker.diff_witnesses: unresolved value (actual %a, \
@@ -1380,9 +1479,9 @@ module Value : sig
 
   val get_unresolved_names : t -> String.Set.t
 
-  val get_witnesses : t -> Witnesses.components
+  val get_witnesses : t -> Witness_set.components
 
-  val diff_witnesses : expected:t -> actual:t -> Witnesses.components
+  val diff_witnesses : expected:t -> actual:t -> Witness_set.components
 
   val unresolved : string -> Witnesses.t -> t
 
@@ -1431,15 +1530,15 @@ end = struct
     }
 
   let diff_witnesses ~expected ~actual =
-    { Witnesses.nor = V.diff_witnesses ~expected:expected.nor ~actual:actual.nor;
-      Witnesses.exn = V.diff_witnesses ~expected:expected.exn ~actual:actual.exn;
-      Witnesses.div = V.diff_witnesses ~expected:expected.div ~actual:actual.div
+    { Witness_set.nor = V.diff_witnesses ~expected:expected.nor ~actual:actual.nor;
+      Witness_set.exn = V.diff_witnesses ~expected:expected.exn ~actual:actual.exn;
+      Witness_set.div = V.diff_witnesses ~expected:expected.div ~actual:actual.div
     }
 
   let get_witnesses t =
-    { Witnesses.nor = V.get_witnesses t.nor;
-      Witnesses.exn = V.get_witnesses t.exn;
-      Witnesses.div = V.get_witnesses t.div
+    { Witness_set.nor = V.get_witnesses t.nor;
+      Witness_set.exn = V.get_witnesses t.exn;
+      Witness_set.div = V.get_witnesses t.div
     }
 end
 
@@ -1463,7 +1562,7 @@ module Annotation : sig
 
   val valid : t -> Value.t -> bool
 
-  val diff_witnesses : t -> Value.t -> Witnesses.components
+  val diff_witnesses : t -> Value.t -> Witness_set.components
 
   val is_assume : t -> bool
 
@@ -1514,7 +1613,7 @@ end = struct
   let valid t v =
     (* Use Value.lessequal but ignore witnesses. *)
     let expected = expected_value t in
-    let actual = Value.replace_witnesses Witnesses.empty v in
+    let actual = Value.replace_witnesses Witnesses.unknown v in
     Value.lessequal actual expected
 
   let diff_witnesses t v =
@@ -1603,12 +1702,11 @@ end
 
 module Metadata : sig
   (* CR-someday gyorsh: propagate assert of arbitrary expressions. *)
-  val assume_value :
-    Debuginfo.t -> can_raise:bool -> Witnesses.t -> Value.t option
+  val assume_value : Debuginfo.t -> can_raise:bool -> Witnesses.t -> Value.t option
 end = struct
   (* CR gyorsh: The return type of [Assume_info.get_value] is
      [Assume_info.Value.t]. It is not the same as [Zero_alloc_checker.Value.t],
-     because [Witnesses] in [Zero_alloc_checker] depend on Debuginfo and cannot
+     because [Witness_set] in [Zero_alloc_checker] depend on Debuginfo and cannot
      be used in Assume_info due to cyclic dependencies. The witnesses in
      Assume_info are always empty and the translation is trivial. Is there a
      better way to avoid duplicating [Zero_alloc_utils]? *)
@@ -1635,7 +1733,7 @@ module Report : sig
     { a : Annotation.t;
       fun_name : string;
       fun_dbg : Debuginfo.t;
-      witnesses : Witnesses.components
+      witnesses : Witness_set.components
     }
 
   exception Fail of t list
@@ -1646,7 +1744,7 @@ end = struct
     { a : Annotation.t;
       fun_name : string;
       fun_dbg : Debuginfo.t;
-      witnesses : Witnesses.components
+      witnesses : Witness_set.components
     }
 
   exception Fail of t list
@@ -1826,9 +1924,9 @@ end = struct
       Location.error_of_printer ~loc ~sub pp ()
     in
     let print_witnesses ws : Location.error list =
-      let { Witnesses.nor; exn; div } = Witnesses.simplify ws in
+      let { Witness_set.nor; exn; div } = Witness_set.simplify ws in
       let f ws component =
-        ws |> Witnesses.elements |> List.map (print_witness ~component)
+        ws |> Witness_set.elements |> List.map (print_witness ~component)
       in
       List.concat [f div "diverge"; f nor ""; f exn "exceptional return"]
     in
@@ -2064,8 +2162,12 @@ end = struct
      encoded as None (i.e., not stored). *)
   let encode (v : V.t) =
     V.match_with v
-      ~top:(fun _ -> 0)
-      ~safe:1 ~bot:2
+      ~top:(fun witnesses ->
+        Zero_alloc_info.Top
+          { every_allocation_comes_from_calling_an_argument =
+              Witnesses.every_allocation_comes_from_calling_an_argument witnesses
+          })
+      ~safe:Zero_alloc_info.Safe ~bot:Zero_alloc_info.Bot
       ~unresolved:(fun () ->
         Misc.fatal_errorf
           "Zero_alloc_checker.encode: unexpected unresolved value %a"
@@ -2075,26 +2177,25 @@ end = struct
      that appear in a function's summary are only used for error messages about
      that function, not about its callers. Witnesses from the summary of a
      callee are ignored, and replaced by the name of the callee. *)
-  let decoded_witness = Witnesses.empty
+  let decode_component = function
+    | Zero_alloc_info.Top { every_allocation_comes_from_calling_an_argument } ->
+      V.top (Witnesses.of_summary ~every_allocation_comes_from_calling_an_argument)
+    | Zero_alloc_info.Safe -> V.safe
+    | Zero_alloc_info.Bot -> V.bot
 
-  let decode = function
-    | 0 -> V.top decoded_witness
-    | 1 -> V.safe
-    | 2 -> V.bot
-    | n -> Misc.fatal_errorf "Zero_alloc_checker cannot decode %d" n
+  let encode (v : Value.t) =
+    Zero_alloc_info.encode
+      { nor = encode v.nor; exn = encode v.exn; div = encode v.div }
 
-  let encode (v : Value.t) : Zero_alloc_info.value option =
-    let c = (encode v.div lsl 4) lor (encode v.exn lsl 2) lor encode v.nor in
-    if c = 0 then None else Some c
-
-  let decode : Zero_alloc_info.value option -> Value.t option = function
-    | None -> None
-    | Some d ->
-      if d = 0 then Misc.fatal_error "Zero_alloc_checker unexpected 0 encoding";
-      let nor = decode (d land 3) in
-      let exn = decode ((d lsr 2) land 3) in
-      let div = decode ((d lsr 4) land 3) in
-      Some { nor; exn; div }
+  let decode value =
+    Option.map
+      (fun value ->
+        let { Zero_alloc_info.nor; exn; div } = Zero_alloc_info.decode value in
+        { Value.nor = decode_component nor;
+          exn = decode_component exn;
+          div = decode_component div
+        })
+      value
 
   let set_value s (v : Value.t) =
     let info = Compilenv.current_zero_alloc_info () in
@@ -2219,9 +2320,7 @@ end = struct
     match !errors with [] -> () | errors -> raise (Report.Fail errors)
 
   let[@inline always] create_witnesses t ?hint kind dbg =
-    if t.keep_witnesses
-    then Witnesses.create ?hint kind dbg
-    else Witnesses.empty
+    Witnesses.create ~keep_witnesses:t.keep_witnesses ?hint kind dbg
 
   let is_caml_internal s =
     String.starts_with s ~prefix:"caml_apply"
@@ -2550,10 +2649,10 @@ end = struct
         report t res ~msg:"finished" ~desc:"fundecl" fun_dbg;
         if (not t.keep_witnesses) && Value.is_resolved res
         then (
-          let { Witnesses.nor; exn; div } = Value.get_witnesses res in
-          assert (Witnesses.is_empty nor);
-          assert (Witnesses.is_empty exn);
-          assert (Witnesses.is_empty div));
+          let { Witness_set.nor; exn; div } = Value.get_witnesses res in
+          assert (Witness_set.is_empty nor);
+          assert (Witness_set.is_empty exn);
+          assert (Witness_set.is_empty div));
         Unit_info.record unit_info fun_name res fun_dbg a;
         add_unresolved_dependencies fun_name unit_info unresolved_deps t.ppf;
         report_unit_info ppf unit_info ~msg:"after record"
@@ -2563,9 +2662,7 @@ end = struct
         then
           (* Do not analyze the body of the function, conservatively assume that
              the summary is top. *)
-          Unit_info.record unit_info fun_name
-            (Value.top Witnesses.empty)
-            fun_dbg a
+          Unit_info.record unit_info fun_name (Value.top Witnesses.unknown) fun_dbg a
         else really_check ()
       in
       match a with
@@ -2720,9 +2817,7 @@ end = struct
             ~desc:"indirect tailcall" dbg
         | Tailcall_func (Indirect None) ->
           (* Sound to ignore [next] and [exn] because the call never returns. *)
-          let w =
-            create_witnesses t (Indirect_tailcall { callee = None }) dbg
-          in
+          let w = create_witnesses t (Indirect_tailcall { callee = None }) dbg in
           transform_top t ~next:Value.normal_return ~exn:Value.exn_escape w
             "indirect tailcall" dbg
         | Call_no_return { alloc = false; _ } ->
@@ -2791,7 +2886,7 @@ end = struct
         res
       | Aborted _ -> Misc.fatal_errorf "Analyzing function %s" fd.fun_name ()
       | Max_iterations_reached ->
-        let res = Value.top Witnesses.empty in
+        let res = Value.top Witnesses.unknown in
         report t res
           ~msg:
             "Can't reach fixpoint in max iterations, conservatively return Top"
@@ -2860,12 +2955,12 @@ let record_unit_info ppf_dump =
   Analysis.record_unit unit_info unresolved_deps ppf_dump;
   Compilenv.cache_zero_alloc_info (Compilenv.current_zero_alloc_info ())
 
-type iter_witnesses = (string -> Witnesses.components -> unit) -> unit
+type iter_witnesses = (string -> Witness_set.components -> unit) -> unit
 
 let iter_witnesses f =
   Unit_info.iter unit_info ~f:(fun func_info ->
       f func_info.name
-        (Value.get_witnesses func_info.value |> Witnesses.simplify))
+        (Value.get_witnesses func_info.value |> Witness_set.simplify))
 
 let () = Location.register_error_of_exn Report.print
 

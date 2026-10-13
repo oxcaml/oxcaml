@@ -17,6 +17,46 @@ let merge src ~into:dst =
 
 type value = int
 
+type component =
+  | Top of { every_allocation_comes_from_calling_an_argument : bool }
+  | Safe
+  | Bot
+
+type components =
+  { nor : component;
+    exn : component;
+    div : component
+  }
+
+let encode_component index = function
+  | Top { every_allocation_comes_from_calling_an_argument } ->
+    if every_allocation_comes_from_calling_an_argument then 1 lsl (6 + index) else 0
+  | Safe -> 1 lsl (2 * index)
+  | Bot -> 2 lsl (2 * index)
+
+let encode { nor; exn; div } =
+  let value =
+    encode_component 0 nor lor encode_component 1 exn lor encode_component 2 div
+  in
+  if value = 0 then None else Some value
+
+let decode_component index value =
+  match (value lsr (2 * index)) land 3 with
+  | 0 ->
+    Top
+      { every_allocation_comes_from_calling_an_argument = value land (1 lsl (6 + index)) <> 0
+      }
+  | 1 -> Safe
+  | 2 -> Bot
+  | n -> Misc.fatal_errorf "Zero_alloc_info cannot decode component %d" n
+
+let decode value =
+  if value = 0 then Misc.fatal_error "Zero_alloc_info unexpected 0 encoding";
+  { nor = decode_component 0 value;
+    exn = decode_component 1 value;
+    div = decode_component 2 value
+  }
+
 let get_value (t : t) s = String.Map.find_opt s t.zero_alloc
 
 let set_value (t : t) s (v : value) =
@@ -37,7 +77,6 @@ module Raw = struct
 
   let print t =
     let print (name, v) = Printf.printf "\t\t%s = %#x\n" name v in
-    (* CR gyorsh: move encode/decode here somehow for noalloc *)
     Printf.printf "Function summaries for static checks:\n";
     List.iter print t
 

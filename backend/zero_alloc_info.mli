@@ -5,6 +5,21 @@
 
 type value = int
 
+type component =
+  | Top of { every_allocation_comes_from_calling_an_argument : bool }
+  | Safe
+  | Bot
+
+type components =
+  { nor : component;
+    exn : component;
+    div : component
+  }
+
+val encode : components -> value option
+
+val decode : value -> components
+
 type t
 
 val create : unit -> t

@@ -30,7 +30,7 @@
 module type WS = sig
   type t
 
-  val empty : t
+  val unknown : t
 
   val join : t -> t -> t
 
@@ -166,7 +166,7 @@ struct
   let relaxed w = { nor = V.safe; exn = V.top w; div = V.top w }
 
   let of_annotation ~strict ~never_returns_normally ~never_raises =
-    let res = if strict then safe else relaxed Witnesses.empty in
+    let res = if strict then safe else relaxed Witnesses.unknown in
     let res = if never_raises then { res with exn = V.bot } else res in
     if never_returns_normally then { res with nor = V.bot } else res
 
@@ -196,7 +196,7 @@ module Assume_info = struct
 
     let print _ _ = ()
 
-    let empty = ()
+    let unknown = ()
 
     let compare _ _ = 0
   end

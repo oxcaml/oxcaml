@@ -71,7 +71,7 @@ module Witness : sig
     }
 end
 
-module Witnesses : sig
+module Witness_set : sig
   type t
 
   val is_empty : t -> bool
@@ -94,7 +94,7 @@ end
     only for functions annotated with [@zero_alloc], set
     [Oxcaml_flags.zero_alloc_checker_details_cutoff] to a negative value before
     calls to [fundecl]. Used by compiler_hooks. *)
-type iter_witnesses = (string -> Witnesses.components -> unit) -> unit
+type iter_witnesses = (string -> Witness_set.components -> unit) -> unit
 
 val iter_witnesses : iter_witnesses
 
