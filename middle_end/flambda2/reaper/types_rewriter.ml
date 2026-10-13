@@ -848,396 +848,408 @@ module Rewriter = struct
       Rule.rewrite Pattern.any (Expr.unknown (Flambda2_types.kind flambda_type))
     | Single_source _ | Many_sources_any_usage | Many_sources_usages (Usages _)
       -> (
-      match
-        Flambda2_types.meet_single_closures_entry typing_env flambda_type
-      with
-      | Invalid ->
+      match Flambda2_types.kind flambda_type with
+      | Rec_info | Region | Naked_number _ ->
         (* Not a closure. For now, we can never change the representation of
-           this, so no rewrite is necessary. *)
+           these kinds, so no rewrite is necessary. *)
         Rule.identity
-      | Need_meet ->
-        (* Multiple closures are possible. We are never able to use this
-           information currently; convert to Unknown. Note that this case
-           includes the case where the type is unknown. *)
-        forget_type ()
-      | Known_result
-          (current_function_slot, alloc_mode, closures_entry, _function_type) ->
-        let value_slot_types =
-          Flambda2_types.Closures_entry.value_slot_types closures_entry
-        in
-        let function_slot_types =
-          Flambda2_types.Closures_entry.function_slot_types closures_entry
-        in
-        let code_id_of_function_slots =
-          Function_slot.Map.mapi
-            (fun function_slot _ ->
-              let function_type =
-                Closures_entry.find_function_type closures_entry function_slot
-              in
-              Or_unknown.map function_type ~f:Function_type.code_id)
-            function_slot_types
-        in
-        let is_local_value_slot vs _ =
-          Current_unit.is_current (Value_slot.get_compilation_unit vs)
-        in
-        let is_local_function_slot fs _ =
-          Current_unit.is_current (Function_slot.get_compilation_unit fs)
-        in
-        let has_local_fields =
-          Value_slot.Map.exists is_local_value_slot value_slot_types
-          || Function_slot.Map.exists is_local_function_slot function_slot_types
-        in
-        if has_local_fields
-        then
-          if
-            not
-              (Value_slot.Map.for_all is_local_value_slot value_slot_types
-              && Function_slot.Map.for_all is_local_function_slot
-                   function_slot_types)
-          then
-            Misc.fatal_errorf
-              "Some slots in this closure are local while other are not:@\n\
-               Value slots: %a@\n\
-               Function slots: %a@."
-              Value_slot.Set.print
-              (Value_slot.Map.keys value_slot_types)
-              Function_slot.Set.print
-              (Function_slot.Map.keys function_slot_types);
-        let must_be_local =
-          if
-            has_local_fields
-            || Function_slot.Map.exists
-                 (fun _ code_id ->
-                   match code_id with
-                   | Or_unknown.Unknown -> false
-                   | Or_unknown.Known code_id ->
-                     Current_unit.is_current
-                       (Code_id.get_compilation_unit code_id))
-                 code_id_of_function_slots
-          then Must_be_local
-          else Can_be_external
-        in
-        (* refine *)
-        let local_sets_of_closures, must_be_local =
-          refine_sets_of_closures context usages current_function_slot
-            code_id_of_function_slots ~must_be_local
-        in
-        let all_changed_representation =
-          List.map
-            (get_set_of_closures_changed_representation context)
-            local_sets_of_closures
-        in
-        if List.for_all Option.is_none all_changed_representation
-        then begin
-          (* No set of closures changed representation. We can keep the shape of
-             the type, but might need to delete some value slots. *)
-          let from_local_sets_of_closures =
-            List.filter_map
-              (fun set_of_closures ->
-                let set_of_closures =
-                  Function_slot.Map.map (fun (name, _) -> name) set_of_closures
+      | Value -> (
+        match
+          Flambda2_types.meet_single_closures_entry typing_env flambda_type
+        with
+        | Invalid ->
+          (* Not a closure. For now, we can never change the representation of
+             this, so no rewrite is necessary. *)
+          Rule.identity
+        | Need_meet ->
+          (* Multiple closures are possible. We are never able to use this
+             information currently; convert to Unknown. Note that this case
+             includes the case where the type is unknown. *)
+          forget_type ()
+        | Known_result
+            (current_function_slot, alloc_mode, closures_entry, _function_type)
+          ->
+          let value_slot_types =
+            Flambda2_types.Closures_entry.value_slot_types closures_entry
+          in
+          let function_slot_types =
+            Flambda2_types.Closures_entry.function_slot_types closures_entry
+          in
+          let code_id_of_function_slots =
+            Function_slot.Map.mapi
+              (fun function_slot _ ->
+                let function_type =
+                  Closures_entry.find_function_type closures_entry function_slot
                 in
-                match
-                  Value_slot.Map.filter_map
-                    (fun value_slot _ ->
-                      match
-                        follow_field_for_set_of_closures context set_of_closures
-                          value_slot
-                      with
-                      | No_source -> raise Exit
-                      | At_least_one_source_no_usages -> None
-                      | ( Single_source _ | Many_sources_any_usage
-                        | Many_sources_usages _ ) as t0 ->
-                        Some t0)
-                    value_slot_types
-                with
-                | exception Exit -> None
-                | value_slot_usages ->
-                  let function_slot_usages =
-                    Function_slot.Map.mapi
-                      (fun function_slot _ ->
-                        match
-                          Function_slot.Map.find_opt function_slot
-                            set_of_closures
-                        with
-                        | None ->
-                          Misc.fatal_errorf
-                            "Function slot %a not found in closure produced by \
-                             [refine_sets_of_closures]"
-                            Function_slot.print function_slot
-                        | Some source ->
-                          let code_id_must_be_erased =
-                            not
-                              (PTA.field_used context.db source
-                                 Field.known_arity_call_witness
-                              || PTA.field_used context.db source
-                                   Field.unknown_arity_call_witness)
-                          in
-                          Single_source source, code_id_must_be_erased)
-                      function_slot_types
-                  in
-                  Some (value_slot_usages, function_slot_usages))
+                Or_unknown.map function_type ~f:Function_type.code_id)
+              function_slot_types
+          in
+          let is_local_value_slot vs _ =
+            Current_unit.is_current (Value_slot.get_compilation_unit vs)
+          in
+          let is_local_function_slot fs _ =
+            Current_unit.is_current (Function_slot.get_compilation_unit fs)
+          in
+          let has_local_fields =
+            Value_slot.Map.exists is_local_value_slot value_slot_types
+            || Function_slot.Map.exists is_local_function_slot
+                 function_slot_types
+          in
+          if has_local_fields
+          then
+            if
+              not
+                (Value_slot.Map.for_all is_local_value_slot value_slot_types
+                && Function_slot.Map.for_all is_local_function_slot
+                     function_slot_types)
+            then
+              Misc.fatal_errorf
+                "Some slots in this closure are local while other are not:@\n\
+                 Value slots: %a@\n\
+                 Function slots: %a@."
+                Value_slot.Set.print
+                (Value_slot.Map.keys value_slot_types)
+                Function_slot.Set.print
+                (Function_slot.Map.keys function_slot_types);
+          let must_be_local =
+            if
+              has_local_fields
+              || Function_slot.Map.exists
+                   (fun _ code_id ->
+                     match code_id with
+                     | Or_unknown.Unknown -> false
+                     | Or_unknown.Known code_id ->
+                       Current_unit.is_current
+                         (Code_id.get_compilation_unit code_id))
+                   code_id_of_function_slots
+            then Must_be_local
+            else Can_be_external
+          in
+          (* refine *)
+          let local_sets_of_closures, must_be_local =
+            refine_sets_of_closures context usages current_function_slot
+              code_id_of_function_slots ~must_be_local
+          in
+          let all_changed_representation =
+            List.map
+              (get_set_of_closures_changed_representation context)
               local_sets_of_closures
           in
-          let from_external_sources =
-            match must_be_local with
-            | Must_be_local -> None
-            | Can_be_external -> (
-              (* There can be external sources, so no local slots, thus making
-                 the calls to [follow_field] correct. *)
-              assert (not has_local_fields);
-              let[@local] any_usage () =
-                let value_slots =
-                  Value_slot.Map.map
-                    (fun _ -> Many_sources_any_usage)
-                    value_slot_types
-                in
-                let function_slots =
-                  Function_slot.Map.map
-                    (fun _ -> Many_sources_any_usage, false)
-                    function_slot_types
-                in
-                Some (value_slots, function_slots)
-              in
-              match usages with
-              | No_source | At_least_one_source_no_usages -> assert false
-              | Single_source _ ->
-                Misc.fatal_errorf
-                  "While rewriting set of closures, usages was [Single_source] \
-                   but [can_have_external_sources] was true."
-              | Many_sources_any_usage -> any_usage ()
-              | Many_sources_usages usages -> (
-                match
-                  PTA
-                  .compute_usages_by_function_slots_not_following_known_arity_calls
-                    context.db usages current_function_slot
-                with
-                | Unknown -> any_usage ()
-                | Known by_function_slot ->
-                  let all_usages =
-                    Function_slot.Map.fold
-                      (fun _ (PTA.Usages x) (PTA.Usages y) ->
-                        PTA.Usages (Code_id_or_name.Map.union_left_biased x y))
-                      by_function_slot (PTA.Usages Code_id_or_name.Map.empty)
+          if List.for_all Option.is_none all_changed_representation
+          then begin
+            (* No set of closures changed representation. We can keep the shape
+               of the type, but might need to delete some value slots. *)
+            let from_local_sets_of_closures =
+              List.filter_map
+                (fun set_of_closures ->
+                  let set_of_closures =
+                    Function_slot.Map.map
+                      (fun (name, _) -> name)
+                      set_of_closures
                   in
-                  let value_slots =
-                    Value_slot.Map.mapi
+                  match
+                    Value_slot.Map.filter_map
                       (fun value_slot _ ->
-                        (* Even if there are no usages, the field cannot have
-                           been deleted, since it comes from an external
-                           compilation unit. *)
-                        follow_field context (Many_sources_usages all_usages)
-                          (Field.value_slot value_slot))
+                        match
+                          follow_field_for_set_of_closures context
+                            set_of_closures value_slot
+                        with
+                        | No_source -> raise Exit
+                        | At_least_one_source_no_usages -> None
+                        | ( Single_source _ | Many_sources_any_usage
+                          | Many_sources_usages _ ) as t0 ->
+                          Some t0)
+                      value_slot_types
+                  with
+                  | exception Exit -> None
+                  | value_slot_usages ->
+                    let function_slot_usages =
+                      Function_slot.Map.mapi
+                        (fun function_slot _ ->
+                          match
+                            Function_slot.Map.find_opt function_slot
+                              set_of_closures
+                          with
+                          | None ->
+                            Misc.fatal_errorf
+                              "Function slot %a not found in closure produced \
+                               by [refine_sets_of_closures]"
+                              Function_slot.print function_slot
+                          | Some source ->
+                            let code_id_must_be_erased =
+                              not
+                                (PTA.field_used context.db source
+                                   Field.known_arity_call_witness
+                                || PTA.field_used context.db source
+                                     Field.unknown_arity_call_witness)
+                            in
+                            Single_source source, code_id_must_be_erased)
+                        function_slot_types
+                    in
+                    Some (value_slot_usages, function_slot_usages))
+                local_sets_of_closures
+            in
+            let from_external_sources =
+              match must_be_local with
+              | Must_be_local -> None
+              | Can_be_external -> (
+                (* There can be external sources, so no local slots, thus making
+                   the calls to [follow_field] correct. *)
+                assert (not has_local_fields);
+                let[@local] any_usage () =
+                  let value_slots =
+                    Value_slot.Map.map
+                      (fun _ -> Many_sources_any_usage)
                       value_slot_types
                   in
                   let function_slots =
-                    Function_slot.Map.filter_map
-                      (fun function_slot _ ->
-                        match
-                          Function_slot.Map.find_opt function_slot
-                            by_function_slot
-                        with
-                        | None -> None
-                        | Some usages -> Some (Many_sources_usages usages, false))
+                    Function_slot.Map.map
+                      (fun _ -> Many_sources_any_usage, false)
                       function_slot_types
                   in
-                  Some (value_slots, function_slots)))
-          in
-          if
-            List.is_empty from_local_sets_of_closures
-            && Option.is_none from_external_sources
-          then
-            (* We should be able to use [Expr.bottom] here (a set of closures
-               that can't be local and also can't be external simply cannot
-               exist), but we don't because it would be too easy to be unsound
-               if there are symbols in the typing env that no longer have a
-               corresponding let symbol in the output of simplify -- see the
-               discussion for the [No_source] case in [rewrite]. *)
-            Rule.rewrite Pattern.any
-              (Expr.unknown (Flambda2_types.kind flambda_type))
-          else
-            let from_everything =
-              match from_external_sources with
-              | None -> from_local_sets_of_closures
-              | Some for_external_sources ->
-                for_external_sources :: from_local_sets_of_closures
+                  Some (value_slots, function_slots)
+                in
+                match usages with
+                | No_source | At_least_one_source_no_usages -> assert false
+                | Single_source _ ->
+                  Misc.fatal_errorf
+                    "While rewriting set of closures, usages was \
+                     [Single_source] but [can_have_external_sources] was true."
+                | Many_sources_any_usage -> any_usage ()
+                | Many_sources_usages usages -> (
+                  match
+                    PTA
+                    .compute_usages_by_function_slots_not_following_known_arity_calls
+                      context.db usages current_function_slot
+                  with
+                  | Unknown -> any_usage ()
+                  | Known by_function_slot ->
+                    let all_usages =
+                      Function_slot.Map.fold
+                        (fun _ (PTA.Usages x) (PTA.Usages y) ->
+                          PTA.Usages (Code_id_or_name.Map.union_left_biased x y))
+                        by_function_slot (PTA.Usages Code_id_or_name.Map.empty)
+                    in
+                    let value_slots =
+                      Value_slot.Map.mapi
+                        (fun value_slot _ ->
+                          (* Even if there are no usages, the field cannot have
+                             been deleted, since it comes from an external
+                             compilation unit. *)
+                          follow_field context (Many_sources_usages all_usages)
+                            (Field.value_slot value_slot))
+                        value_slot_types
+                    in
+                    let function_slots =
+                      Function_slot.Map.filter_map
+                        (fun function_slot _ ->
+                          match
+                            Function_slot.Map.find_opt function_slot
+                              by_function_slot
+                          with
+                          | None -> None
+                          | Some usages ->
+                            Some (Many_sources_usages usages, false))
+                        function_slot_types
+                    in
+                    Some (value_slots, function_slots)))
             in
-            let value_slots, function_slots =
-              List.fold_left
-                (fun (value_slots1, function_slots1)
-                     (value_slots2, function_slots2) ->
-                  let value_slots =
-                    Value_slot.Map.inter
-                      (fun _ t1 t2 -> join_metadata context t1 t2)
-                      value_slots1 value_slots2
-                  in
-                  let function_slots =
-                    Function_slot.Map.inter
-                      (fun _ (t1, code_id_must_be_erased1)
-                           (t2, code_id_must_be_erased2) ->
-                        ( join_metadata context t1 t2,
-                          code_id_must_be_erased1 || code_id_must_be_erased2 ))
-                      function_slots1 function_slots2
-                  in
-                  value_slots, function_slots)
-                (List.hd from_everything) (List.tl from_everything)
-            in
-            let all_patterns = ref [] in
-            let at_least_these_value_slots =
-              Value_slot.Map.filter_map
-                (fun value_slot metadata ->
-                  let v = Var.create () in
-                  all_patterns
-                    := Pattern.value_slot value_slot
-                         (Pattern.var v (context, metadata))
-                       :: !all_patterns;
-                  Some (Expr.var v))
-                value_slots
-            in
-            let at_least_these_closure_types =
-              Function_slot.Map.mapi
-                (fun function_slot (metadata, _) ->
-                  let v = Var.create () in
-                  all_patterns
-                    := Pattern.function_slot function_slot
-                         (Pattern.var v (context, metadata))
-                       :: !all_patterns;
-                  Expr.var v)
-                function_slots
-            in
-            let at_least_these_function_slots =
-              Function_slot.Map.mapi
-                (fun function_slot (_, code_id_must_be_erased) ->
-                  if code_id_must_be_erased
-                  then Or_unknown.Unknown
-                  else
+            if
+              List.is_empty from_local_sets_of_closures
+              && Option.is_none from_external_sources
+            then
+              (* We should be able to use [Expr.bottom] here (a set of closures
+                 that can't be local and also can't be external simply cannot
+                 exist), but we don't because it would be too easy to be unsound
+                 if there are symbols in the typing env that no longer have a
+                 corresponding let symbol in the output of simplify -- see the
+                 discussion for the [No_source] case in [rewrite]. *)
+              Rule.rewrite Pattern.any
+                (Expr.unknown (Flambda2_types.kind flambda_type))
+            else
+              let from_everything =
+                match from_external_sources with
+                | None -> from_local_sets_of_closures
+                | Some for_external_sources ->
+                  for_external_sources :: from_local_sets_of_closures
+              in
+              let value_slots, function_slots =
+                List.fold_left
+                  (fun (value_slots1, function_slots1)
+                       (value_slots2, function_slots2) ->
+                    let value_slots =
+                      Value_slot.Map.inter
+                        (fun _ t1 t2 -> join_metadata context t1 t2)
+                        value_slots1 value_slots2
+                    in
+                    let function_slots =
+                      Function_slot.Map.inter
+                        (fun _ (t1, code_id_must_be_erased1)
+                             (t2, code_id_must_be_erased2) ->
+                          ( join_metadata context t1 t2,
+                            code_id_must_be_erased1 || code_id_must_be_erased2 ))
+                        function_slots1 function_slots2
+                    in
+                    value_slots, function_slots)
+                  (List.hd from_everything) (List.tl from_everything)
+              in
+              let all_patterns = ref [] in
+              let at_least_these_value_slots =
+                Value_slot.Map.filter_map
+                  (fun value_slot metadata ->
                     let v = Var.create () in
                     all_patterns
-                      := Pattern.rec_info function_slot
-                           (Pattern.var v (context, Many_sources_any_usage))
+                      := Pattern.value_slot value_slot
+                           (Pattern.var v (context, metadata))
                          :: !all_patterns;
-                    let function_type =
-                      Flambda2_types.Closures_entry.find_function_type
-                        closures_entry function_slot
-                    in
-                    Or_unknown.map function_type ~f:(fun function_type ->
-                        Expr.Function_type.create
-                          (Function_type.code_id function_type)
-                          ~rec_info:(Expr.var v)))
-                function_slots
-            in
-            let expr =
-              Expr.at_least_this_closure current_function_slot
-                ~at_least_these_function_slots ~at_least_these_closure_types
-                ~at_least_these_value_slots alloc_mode
-            in
-            Rule.rewrite (Pattern.closure !all_patterns) expr
-        end
-        else if
-          List.compare_length_with local_sets_of_closures 1 > 0
-          ||
-          match must_be_local with
-          | Can_be_external -> true
-          | Must_be_local -> false
-        then
-          (* At least one set of closures changed representation, and there are
-             more than one sets of closures. They now have incompatible
-             representations, since we don't do multi-source representation
-             changes/unboxing for now. *)
-          forget_type ()
-        else
-          let set_of_closures = List.hd local_sets_of_closures in
-          let value_slots_reprs, function_slots_reprs =
-            Option.get (List.hd all_changed_representation)
-          in
-          let patterns = ref [] in
-          let all_function_slots_in_set =
-            Function_slot.Map.fold
-              (fun function_slot uses m ->
-                let new_function_slot =
-                  Function_slot.Map.find function_slot function_slots_reprs
-                in
-                let r =
-                  match uses with
-                  | Never_called -> Or_unknown.Unknown
-                  | Only_called_with_known_arity | Any_call ->
+                    Some (Expr.var v))
+                  value_slots
+              in
+              let at_least_these_closure_types =
+                Function_slot.Map.mapi
+                  (fun function_slot (metadata, _) ->
                     let v = Var.create () in
-                    patterns
-                      := Pattern.rec_info function_slot
-                           (Pattern.var v (context, Many_sources_any_usage))
-                         :: !patterns;
-                    let function_type =
-                      Flambda2_types.Closures_entry.find_function_type
-                        closures_entry function_slot
-                    in
-                    Or_unknown.map function_type ~f:(fun function_type ->
-                        Expr.Function_type.create
-                          (Function_type.code_id function_type)
-                          ~rec_info:(Expr.var v))
-                in
-                Function_slot.Map.add new_function_slot r m)
-              (usages_of_function_slots_for_set_of_closures db set_of_closures)
-              Function_slot.Map.empty
-          in
-          let all_closure_types_in_set =
-            Function_slot.Map.fold
-              (fun function_slot (closure, _code_id) m ->
-                let v = Var.create () in
-                patterns
-                  := Pattern.function_slot function_slot
-                       (Pattern.var v (context, Single_source closure))
-                     :: !patterns;
-                let new_function_slot =
-                  Function_slot.Map.find function_slot function_slots_reprs
-                in
-                Function_slot.Map.add new_function_slot (Expr.var v) m)
-              set_of_closures Function_slot.Map.empty
-          in
-          let patterns_for_function_slots = Some !patterns in
-          let fields =
-            PTA.get_fields_usage_of_constructors db
-              (Function_slot.Map.fold
-                 (fun _ (c, _) acc -> Code_id_or_name.Map.add c () acc)
-                 set_of_closures Code_id_or_name.Map.empty)
-          in
-          let closure_source, _code_id =
-            Function_slot.Map.find current_function_slot set_of_closures
-          in
-          let bound, pat =
-            patterns_for_unboxed_fields
-              ~machine_width:(Typing_env.machine_width typing_env)
-              ~patterns_for_function_slots db
-              ~var:(fun _ (field_source : PTA.single_field_source) field_use ->
-                let metadata =
-                  match field_source, field_use with
-                  | No_source, _ -> No_source
-                  | One source, _ -> Single_source source
-                  | Many, Unknown -> Many_sources_any_usage
-                  | Many, Known flow_to ->
-                    let usages = PTA.get_direct_usages context.db flow_to in
-                    Many_sources_usages usages
-                in
-                context, metadata)
-              fields value_slots_reprs closure_source
-          in
-          let all_value_slots_in_set =
-            Unboxed_fields.fold_with_kind
-              (fun _kind (var, value_slot) m ->
-                let e =
-                  match var with
-                  | None -> Expr.unknown (Value_slot.kind value_slot)
-                  | Some var -> Expr.var var
-                in
-                Value_slot.Map.add value_slot e m)
-              bound Value_slot.Map.empty
-          in
-          let new_function_slot =
-            Function_slot.Map.find current_function_slot function_slots_reprs
-          in
-          Rule.rewrite pat
-            (Expr.exactly_this_closure new_function_slot
-               ~all_function_slots_in_set ~all_closure_types_in_set
-               ~all_value_slots_in_set alloc_mode))
+                    all_patterns
+                      := Pattern.function_slot function_slot
+                           (Pattern.var v (context, metadata))
+                         :: !all_patterns;
+                    Expr.var v)
+                  function_slots
+              in
+              let at_least_these_function_slots =
+                Function_slot.Map.mapi
+                  (fun function_slot (_, code_id_must_be_erased) ->
+                    if code_id_must_be_erased
+                    then Or_unknown.Unknown
+                    else
+                      let v = Var.create () in
+                      all_patterns
+                        := Pattern.rec_info function_slot
+                             (Pattern.var v (context, Many_sources_any_usage))
+                           :: !all_patterns;
+                      let function_type =
+                        Flambda2_types.Closures_entry.find_function_type
+                          closures_entry function_slot
+                      in
+                      Or_unknown.map function_type ~f:(fun function_type ->
+                          Expr.Function_type.create
+                            (Function_type.code_id function_type)
+                            ~rec_info:(Expr.var v)))
+                  function_slots
+              in
+              let expr =
+                Expr.at_least_this_closure current_function_slot
+                  ~at_least_these_function_slots ~at_least_these_closure_types
+                  ~at_least_these_value_slots alloc_mode
+              in
+              Rule.rewrite (Pattern.closure !all_patterns) expr
+          end
+          else if
+            List.compare_length_with local_sets_of_closures 1 > 0
+            ||
+            match must_be_local with
+            | Can_be_external -> true
+            | Must_be_local -> false
+          then
+            (* At least one set of closures changed representation, and there
+               are more than one sets of closures. They now have incompatible
+               representations, since we don't do multi-source representation
+               changes/unboxing for now. *)
+            forget_type ()
+          else
+            let set_of_closures = List.hd local_sets_of_closures in
+            let value_slots_reprs, function_slots_reprs =
+              Option.get (List.hd all_changed_representation)
+            in
+            let patterns = ref [] in
+            let all_function_slots_in_set =
+              Function_slot.Map.fold
+                (fun function_slot uses m ->
+                  let new_function_slot =
+                    Function_slot.Map.find function_slot function_slots_reprs
+                  in
+                  let r =
+                    match uses with
+                    | Never_called -> Or_unknown.Unknown
+                    | Only_called_with_known_arity | Any_call ->
+                      let v = Var.create () in
+                      patterns
+                        := Pattern.rec_info function_slot
+                             (Pattern.var v (context, Many_sources_any_usage))
+                           :: !patterns;
+                      let function_type =
+                        Flambda2_types.Closures_entry.find_function_type
+                          closures_entry function_slot
+                      in
+                      Or_unknown.map function_type ~f:(fun function_type ->
+                          Expr.Function_type.create
+                            (Function_type.code_id function_type)
+                            ~rec_info:(Expr.var v))
+                  in
+                  Function_slot.Map.add new_function_slot r m)
+                (usages_of_function_slots_for_set_of_closures db set_of_closures)
+                Function_slot.Map.empty
+            in
+            let all_closure_types_in_set =
+              Function_slot.Map.fold
+                (fun function_slot (closure, _code_id) m ->
+                  let v = Var.create () in
+                  patterns
+                    := Pattern.function_slot function_slot
+                         (Pattern.var v (context, Single_source closure))
+                       :: !patterns;
+                  let new_function_slot =
+                    Function_slot.Map.find function_slot function_slots_reprs
+                  in
+                  Function_slot.Map.add new_function_slot (Expr.var v) m)
+                set_of_closures Function_slot.Map.empty
+            in
+            let patterns_for_function_slots = Some !patterns in
+            let fields =
+              PTA.get_fields_usage_of_constructors db
+                (Function_slot.Map.fold
+                   (fun _ (c, _) acc -> Code_id_or_name.Map.add c () acc)
+                   set_of_closures Code_id_or_name.Map.empty)
+            in
+            let closure_source, _code_id =
+              Function_slot.Map.find current_function_slot set_of_closures
+            in
+            let bound, pat =
+              patterns_for_unboxed_fields
+                ~machine_width:(Typing_env.machine_width typing_env)
+                ~patterns_for_function_slots db
+                ~var:(fun
+                    _ (field_source : PTA.single_field_source) field_use ->
+                  let metadata =
+                    match field_source, field_use with
+                    | No_source, _ -> No_source
+                    | One source, _ -> Single_source source
+                    | Many, Unknown -> Many_sources_any_usage
+                    | Many, Known flow_to ->
+                      let usages = PTA.get_direct_usages context.db flow_to in
+                      Many_sources_usages usages
+                  in
+                  context, metadata)
+                fields value_slots_reprs closure_source
+            in
+            let all_value_slots_in_set =
+              Unboxed_fields.fold_with_kind
+                (fun _kind (var, value_slot) m ->
+                  let e =
+                    match var with
+                    | None -> Expr.unknown (Value_slot.kind value_slot)
+                    | Some var -> Expr.var var
+                  in
+                  Value_slot.Map.add value_slot e m)
+                bound Value_slot.Map.empty
+            in
+            let new_function_slot =
+              Function_slot.Map.find current_function_slot function_slots_reprs
+            in
+            Rule.rewrite pat
+              (Expr.exactly_this_closure new_function_slot
+                 ~all_function_slots_in_set ~all_closure_types_in_set
+                 ~all_value_slots_in_set alloc_mode)))
 
   let block_slot ?tag:_ (context, t) index _typing_env flambda_type =
     let r =
