@@ -2675,10 +2675,7 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
       ~cold:false ~is_opaque:false ~recursive ~newer_version_of:None
       ~cost_metrics
       ~inlining_arguments:(Inlining_arguments.create ~round:0)
-      ~dbg
-        (* CR yusumez: the entry counter of [decl], once functions have FDO
-           ids. *)
-      ~fdo_entry_annotation:Fdo_annotation.empty ~is_tupled
+      ~dbg ~fdo_entry_annotation:Fdo_annotation.empty ~is_tupled
       ~is_my_closure_used:true ~inlining_decision ~absolute_history
       ~relative_history ~loopify:Never_loopify
   in
