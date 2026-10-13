@@ -1084,9 +1084,20 @@ Line 1, characters 28-64:
 1 | let non_exhaustive_nested = function addr_ (addr_imm_ true) -> 0
                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-  Here is an example of a case that is not matched: "addr_ addr_imm_ false"
+  Here is an example of a case that is not matched: "addr_ (addr_imm_ false)"
 
 val non_exhaustive_nested : bool addr_imm addr -> int = <fun>
+|}]
+
+let non_exhaustive_lazy = function addr_imm_ (lazy true) -> 0
+[%%expect{|
+Line 1, characters 26-61:
+1 | let non_exhaustive_lazy = function addr_imm_ (lazy true) -> 0
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 8 [partial-match]: this pattern-matching is not exhaustive.
+  Here is an example of a case that is not matched: "addr_imm_ (lazy false)"
+
+val non_exhaustive_lazy : bool lazy_t addr_imm -> int = <fun>
 |}]
 
 let unused = function addr_ _ -> 0 | addr_ true -> 1

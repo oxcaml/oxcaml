@@ -160,7 +160,9 @@ and pretty_cdr ppf v = match v.pat_desc with
 
 and pretty_arg ppf v = match v.pat_desc with
 | Tpat_construct (_,_,_,_::_,None)
-| Tpat_variant (_, Some _, _) -> fprintf ppf "(%a)" pretty_val v
+| Tpat_variant (_, Some _, _)
+| Tpat_lazy _
+| Tpat_addr _ -> fprintf ppf "(%a)" pretty_val v
 |  _ -> pretty_val ppf v
 
 and pretty_or : type k . _ -> k general_pattern -> _ = fun ppf v ->
