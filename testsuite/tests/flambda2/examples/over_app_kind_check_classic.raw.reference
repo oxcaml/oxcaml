@@ -7,7 +7,7 @@
          my_closure &my_alloc_region my_depth
          -> k1 * k2
          : imm tagged =
-   invalid "<invalid>"
+   invalid
  in
  let $camlOver_app_kind_check_classic__s0 = closure test_0 @test &toplevel in
  let $camlOver_app_kind_check_classic__s2 =

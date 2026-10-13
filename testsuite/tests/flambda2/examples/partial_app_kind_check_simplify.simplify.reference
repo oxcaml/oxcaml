@@ -4,7 +4,7 @@ let code loopify(never) size(0) newer_version_of(test_0)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : int64 =
-  invalid "<invalid>"
+  invalid
 in
 let $camlPartial_app_kind_check_simplify__test_1 =
   closure test_0_1 @test &toplevel

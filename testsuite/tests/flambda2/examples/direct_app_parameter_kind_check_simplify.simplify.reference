@@ -37,7 +37,7 @@ in
    | 0 -> k1
    | 1 -> k
    where k1 =
-     invalid "<invalid>")
+     invalid)
   where k =
     let $camlDirect_app_parameter_kind_check_simplify =
       Block 0 (0,
