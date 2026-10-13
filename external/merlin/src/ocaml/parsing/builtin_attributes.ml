@@ -1170,7 +1170,9 @@ let get_zero_alloc_attribute ~in_signature ~on_application ~default_arity l =
    | Some _, Ignore_assert_all -> ()
    | Some _, Assume _ -> ()
    | Some attr, Check { opt; _ } ->
-     if not in_signature && is_zero_alloc_check_enabled ~opt && !Clflags.native_code then
+     if not in_signature && is_zero_alloc_check_enabled ~opt
+        && Clflags.is_native ()
+     then
        (* The warning for unchecked functions will not trigger if the check is
           requested through the [@@@zero_alloc all] top-level annotation rather
           than through the function annotation [@zero_alloc]. *)
