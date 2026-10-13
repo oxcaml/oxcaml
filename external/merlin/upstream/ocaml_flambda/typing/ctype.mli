@@ -755,18 +755,32 @@ val mk_jkind_context :
 val mk_jkind_context_check_principal : Env.t -> Jkind.jkind_context
 val mk_jkind_context_always_principal : Env.t -> Jkind.jkind_context
 
-(* Find a type's sort (if fixed is false: constraining it to be an
-   arbitrary sort variable, if needed) *)
+(* Find a type's sort (if allow_mutation is true: constraining it to be an
+   arbitrary sort variable, if needed).
+
+   Even if [allow_mutation] is false, the sort of [ty] may still be
+   constrained: any sort variables in [ty]'s jkind may be unified with the
+   returned sort. So the returned sort may be updated by later constraints,
+   and constraining it (e.g. defaulting it) will also update [ty]'s jkind.
+
+   [allow_mutation] is typically false after type checking. Updating weak
+   sort variables at that point is fine, but unifying generic sort variables
+   is a bug. This function does not currently prevent that; we may want to
+   enforce it in future. *)
 val type_sort :
   why:Jkind.History.concrete_creation_reason ->
-  fixed:bool ->
+  allow_mutation:bool ->
   Env.t -> type_expr -> (Jkind.sort, Jkind.Violation.t) result
 
-(* Find a type's jkind and sort (if fixed is false: constraining it to be an
-   arbitrary sort variable, if needed) *)
+(* Find a type's jkind and sort (if allow_mutation is true: constraining
+   it to be an arbitrary sort variable, if needed).
+
+   As with [type_sort], the sort of [ty] may be constrained even if
+   [allow_mutation] is false, including generic sort variables (see
+   [type_sort]). *)
 val type_jkind_and_sort :
   why:Jkind.History.concrete_creation_reason ->
-  fixed:bool ->
+  allow_mutation:bool ->
   Env.t -> type_expr -> (Types.jkind_lr * Jkind.sort, Jkind.Violation.t) result
 
 (* Jkind checking. [constrain_type_jkind] will update the jkind of type

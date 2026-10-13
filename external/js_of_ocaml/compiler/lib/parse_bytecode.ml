@@ -626,7 +626,7 @@ end = struct
       then
         match ident_of_custom x with
         | ((Some name) [@if oxcaml]) when same_ident name ident_f32 ->
-            Float32 (Int64.bits_of_float ((Obj.magic x : float32) |> Float32.to_float))
+            Float32 (Int64.bits_of_float (Float32.to_float (Float32.of_boxed x)))
         | Some name when same_ident name ident_32 ->
             let i : int32 = Obj.magic x in
             Int32 i
