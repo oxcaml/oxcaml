@@ -443,8 +443,6 @@ let the_tag_of info x get equal =
   | Pc (Tuple (j, _, _)) -> get j
   | _ -> None
 
-(* [%direct_obj_tag_nullish] is emitted by OxCaml's ocamlj; it reads the tag
-   like [%direct_obj_tag] when its argument is a block. *)
 let is_direct_obj_tag = function
   | "%direct_obj_tag" | "%direct_obj_tag_nullish" -> true
   | _ -> false

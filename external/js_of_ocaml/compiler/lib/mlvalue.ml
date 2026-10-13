@@ -41,9 +41,8 @@ module Block = struct
   let tag e = J.EAccess (e, ANormal, zero)
 
   (* Like [tag], but evaluates to [undefined] instead of throwing when [e] is
-     not an object. Used by the OxCaml JSIR backend for type tests on values
-     that are not known to be OCaml blocks (e.g. [undefined] obtained via
-     [Js.Unsafe]). *)
+     not an object. Used by OxCaml for type tests on values that are not known
+     to be OCaml blocks *)
   let tag_nullish e = J.EAccess (e, ANullish, zero)
 
   let field e idx =

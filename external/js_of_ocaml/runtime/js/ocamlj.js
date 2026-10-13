@@ -50,7 +50,7 @@ function caml_get_symbol(compilation_unit, symbol) {
         compilation_unit +
         " has not been initialised yet (looking up " +
         symbol +
-        "); check the link order",
+        ")",
     );
   }
   if (!Object.prototype.hasOwnProperty.call(symbols, symbol)) {

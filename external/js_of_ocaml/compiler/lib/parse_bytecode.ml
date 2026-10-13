@@ -3661,8 +3661,8 @@ let from_cmj ic =
   let { Code.program; last_var; imported_compilation_units; exported_compilation_unit } =
     (Marshal.from_channel ic : Code.cmj_body)
   in
-  (* The variables of the units of a [.cmja] are not disjoint; they are compiled
-     one at a time, so it is enough for fresh variables to be larger than any
+  (* Each unit is compiled one at a time, so the variables might not be disjoint.
+     This means that it is enough for fresh variables to be larger than any
      variable of any unit. *)
   Code.Var.set_last last_var;
   { name = Code.Compilation_unit.full_path_as_string exported_compilation_unit

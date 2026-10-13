@@ -116,9 +116,8 @@ let get_tag ~env ~res x =
   let x, res = prim_arg ~env ~res x in
   use_prim0 ~env ~res (Extern "%direct_obj_tag") [x]
 
-(* [x] may be any value, including a JS value that is not an OCaml block (e.g.
-   [undefined] obtained via [Js.Unsafe]), so the tag is read with optional
-   chaining: it then evaluates to [undefined] and the comparison is false. *)
+(* [x] may be any value, including a JS value that is not an OCaml block, so the
+   tag is read with optional chaining. *)
 let check_tag ~env ~res x ~tag =
   let x, res = prim_arg ~env ~res x in
   let tag_var, env, res =
