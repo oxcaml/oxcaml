@@ -159,6 +159,9 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
   in
   Cost_metrics.( + ) (UA.cost_metrics uacc) cost_metrics_of_lifted_constants
 
+let speculative_inlining_bonus =
+  Oxcaml_args.Extra_options.bool __LOC__ "speculative-inlining-bonus"
+
 type argument_types_useful =
   | Coarse
   | Fine
@@ -310,8 +313,9 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
                 (* CR pchambart: assert false ? *)
                 false
           in
-          if not always_try_speculation &&
-             argument_not_useful_enought_to_speculate denv ~apply ~code_metadata then
+          if speculative_inlining_bonus ()
+             && (not always_try_speculation)
+             && argument_not_useful_enought_to_speculate denv ~apply ~code_metadata then
             Argument_not_useful_enough
           else
           let cost_metrics =
