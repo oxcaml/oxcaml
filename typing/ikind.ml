@@ -1932,45 +1932,52 @@ let sub_or_error ?origin:_origin
 let type_var_requirements ~type_equal ~context ~allow_mutation env ty
     (sub : (Allowance.allowed * 'r1) Types.jkind)
     (super : ('l2 * Allowance.allowed) Types.jkind) =
-  let check () =
-    match sub_or_intersect ~type_equal ~context env sub super with
-    | Sub -> Ok []
-    | Disjoint reasons | May_have_intersection reasons ->
+  match sub_or_intersect ~type_equal ~context env sub super with
+  | Sub -> Ok []
+  | Disjoint reasons | May_have_intersection reasons -> (
+    let error () =
       Error
         (Jkind.Violation.of_ ~context env
            (Not_a_subjkind (sub, super, Misc.Nonempty_list.to_list reasons)))
-  in
-  if not !Clflags.ikinds
-  then check ()
-  else
-    match Jkind.sub_layout_or_error ~context env sub super with
-    | Error _ as error -> error
-    | Ok () -> (
-      let ctx = create_ctx ~mode:Solver.Normal ~env:(Some env) in
-      let super_poly = Solver.normalize (Solver.ckind_of_jkind ctx super) in
-      let sub_poly, tvars = Solver.kind_with_type_vars ctx ty in
-      let rigid_vars =
-        List.map (fun ty -> Ldd.rigid (Ldd.Name.param (Types.get_id ty))) tvars
-      in
-      let base, coeffs =
-        Ldd.decompose_into_linear_terms ~universe:rigid_vars sub_poly
-      in
-      let requirements =
-        List.filter_map
-          (fun (ty, coeff) ->
-            let bound = Ldd.round_down (Ldd.imply coeff super_poly) in
-            if Axis_lattice.equal bound Axis_lattice.top
-            then None
-            else Some (ty, Jkind.Mod_bounds.of_axis_lattice bound))
-          (List.combine tvars coeffs)
-      in
-      match Ldd.leq_with_reason base super_poly, requirements with
-      | [], [] -> Ok []
-      | [], _ :: _ when allow_mutation -> Ok requirements
-      | _ ->
-        (* The estimate may retain information hidden by principality checks
-           in [Solver.kind]. Use it for reporting errors. *)
-        check ())
+    in
+    if not !Clflags.ikinds
+    then error ()
+    else
+      match Jkind.sub_layout_or_error ~context env sub super with
+      | Error _ as error -> error
+      | Ok () -> (
+        let ctx = create_ctx ~mode:Solver.Normal ~env:(Some env) in
+        let super_poly = Solver.normalize (Solver.ckind_of_jkind ctx super) in
+        let sub_poly, tvars = Solver.kind_with_type_vars ctx ty in
+        if not allow_mutation
+        then
+          match Ldd.leq_with_reason sub_poly super_poly with
+          | [] -> Ok []
+          | _ :: _ -> error ()
+        else
+          let rigid_vars =
+            List.map
+              (fun ty -> Ldd.rigid (Ldd.Name.param (Types.get_id ty)))
+              tvars
+          in
+          let base, coeffs =
+            Ldd.decompose_into_linear_terms ~universe:rigid_vars sub_poly
+          in
+          let requirements =
+            List.filter_map
+              (fun (ty, coeff) ->
+                let bound = Ldd.round_down (Ldd.imply coeff super_poly) in
+                if Axis_lattice.equal bound Axis_lattice.top
+                then None
+                else Some (ty, Jkind.Mod_bounds.of_axis_lattice bound))
+              (List.combine tvars coeffs)
+          in
+          match Ldd.leq_with_reason base super_poly with
+          | [] -> Ok requirements
+          | _ :: _ ->
+            (* The estimate may retain information hidden by principality
+               checks in [Solver.kind]. Use it for reporting errors. *)
+            error ()))
 
 (** Substitute constructor ikinds according to [lookup] without requiring Env.
 *)
