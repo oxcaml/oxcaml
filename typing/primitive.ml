@@ -45,6 +45,7 @@ type native_repr =
   | Unpacked_product of Jkind_types.Sort.Const.t
   | Unextended_bits8
   | Unextended_bits16
+  | Repr_never_returns
 
 type effects = No_effects | Only_generative_effects | Arbitrary_effects
 type coeffects = No_coeffects | Has_coeffects
@@ -103,7 +104,8 @@ type value_check = Bad_attribute | Bad_layout | Ok_value
 let check_ocaml_value = function
   | _, Same_as_ocaml_repr (Base Scannable) -> Ok_value
   | _, Same_as_ocaml_repr _
-  | _, Repr_poly -> Bad_layout
+  | _, Repr_poly
+  | _, Repr_never_returns -> Bad_layout
   | _, Unboxed_float _
   | _, Unboxed_vector _
   | _, Unboxed_mask
@@ -287,6 +289,7 @@ let print p osig_val_decl =
   let needs_unboxed_attribute = function
     | _, Same_as_ocaml_repr (Base Scannable)
     | _, Repr_poly
+    | _, Repr_never_returns
     | _, Unpacked_product _
     | _, Unboxed_or_untagged_integer (Untagged_int | Untagged_int8
                                     | Untagged_int16) -> false
@@ -321,7 +324,8 @@ let print p osig_val_decl =
     | _, Unpacked_product _
     | _, Unextended_bits8
     | _, Unextended_bits16
-    | _, Repr_poly -> false
+    | _, Repr_poly
+    | _, Repr_never_returns -> false
   in
   let all_unboxed = for_all needs_unboxed_attribute in
   let all_untagged = for_all is_untagged in
@@ -357,7 +361,8 @@ let print p osig_val_decl =
     @
     (match repr with
      | Same_as_ocaml_repr (Base Scannable)
-     | Repr_poly -> []
+     | Repr_poly
+     | Repr_never_returns -> []
      | Unboxed_float _
      | Unboxed_vector _
      | Unboxed_mask
@@ -445,6 +450,18 @@ let equal_unboxed_vector_size v1 v2 =
 
 let equal_native_repr nr1 nr2 =
   match nr1, nr2 with
+  | Repr_never_returns, Repr_never_returns -> true
+  | Repr_never_returns, (Repr_poly | Unboxed_float _
+                        | Unboxed_or_untagged_integer _ | Unboxed_vector _
+                        | Unboxed_mask | Same_as_ocaml_repr _
+                        | Unpacked_product _ | Unextended_bits8
+                        | Unextended_bits16)
+  | (Repr_poly | Unboxed_float _
+    | Unboxed_or_untagged_integer _ | Unboxed_vector _
+    | Unboxed_mask | Same_as_ocaml_repr _
+    | Unpacked_product _ | Unextended_bits8
+    | Unextended_bits16), Repr_never_returns
+    -> false
   | Repr_poly, Repr_poly -> true
   | Repr_poly, (Unboxed_float _ | Unboxed_or_untagged_integer _
                | Unboxed_vector _ | Unboxed_mask | Same_as_ocaml_repr _
@@ -521,6 +538,11 @@ let native_name_is_external p =
   let nat_name = native_name p in
   nat_name <> "" && nat_name.[0] <> '%'
 
+let prim_name_never_returns name =
+  match name with
+  | "%raise" | "%reraise" | "%raise_notrace" | "%raise_with_backtrace" -> true
+  | _ -> false
+
 module Repr_check = struct
 
   type result =
@@ -544,7 +566,7 @@ module Repr_check = struct
     | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _
     | Unboxed_mask -> true
     | Same_as_ocaml_repr _ | Repr_poly | Unpacked_product _ | Unextended_bits8 |
-      Unextended_bits16 -> false
+      Unextended_bits16 | Repr_never_returns -> false
 
   let rec sort_is_product : Jkind_types.Sort.Const.t -> bool = function
     | Product _ -> true
@@ -574,12 +596,12 @@ module Repr_check = struct
       else []
     | Unextended_bits8 | Unextended_bits16
     | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _
-    | Unboxed_mask | Repr_poly -> []
+    | Unboxed_mask | Repr_poly | Repr_never_returns -> []
 
   let rec c_stub_return_errors = function
     | Same_as_ocaml_repr (Base _)
     | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _
-    | Unboxed_mask | Repr_poly -> []
+    | Unboxed_mask | Repr_poly | Repr_never_returns -> []
     | Unpacked_product _ -> [Unpacked_product_return]
     | Unextended_bits8 | Unextended_bits16 -> [Unextended_return]
     | Same_as_ocaml_repr (Product [s1; s2]) ->
@@ -623,15 +645,18 @@ module Repr_check = struct
       (List.init (arity+1) (fun _ -> repr))
       prim
 
-  let no_non_value_repr prim =
+  let no_non_value_repr ~never_returns prim =
     let arity = List.length prim.prim_native_repr_args in
-    check
-      (List.init (arity+1)
-         (fun _ repr ->
-            if value_or_unboxed_or_untagged repr
-            then []
-            else [Expected_value_prim]))
-      prim
+    let value_check repr =
+      if value_or_unboxed_or_untagged repr
+      then []
+      else [Expected_value_prim]
+    in
+    let res_check = function
+      | Repr_never_returns when never_returns -> []
+      | repr -> value_check repr
+    in
+    check (List.init arity (fun _ -> value_check) @ [res_check]) prim
 
   let check_c_stub ~builtin prim =
     (* C externals are allowed to return a tuple, but may not take products as
@@ -1284,7 +1309,7 @@ let prim_has_valid_reprs ~loc prim =
                   (List.map (fun sort -> Same_as_ocaml_repr sort)
                      (I.sort intrinsic))
               | exception Not_found ->
-                if is_builtin_prim_name name then no_non_value_repr
+                if is_builtin_prim_name name then
                   (* These can probably support non-value reprs if the
                      need arises:
                      {|
@@ -1293,6 +1318,8 @@ let prim_has_valid_reprs ~loc prim =
                        | "%sendcache"
                      |}
                   *)
+                  no_non_value_repr
+                    ~never_returns:(prim_name_never_returns name)
                 else
                   check_c_stub ~builtin:prim.prim_c_builtin)
   in

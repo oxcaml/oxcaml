@@ -303,7 +303,7 @@ let assert_failed loc ~scopes exp =
 type fusable_function =
   { params : function_param list
   ; body : function_body
-  ; return_sort : Jkind.Sort.Const.t
+  ; return_sort : function_return_sort
   ; return_mode : return_mode
   ; region : bool
   }
@@ -346,9 +346,6 @@ let fuse_method_arity (parent : fusable_function) : fusable_function =
                 (Mode.Locality.disallow_right Mode.Locality.legacy) }
         }
       in
-      let return_sort =
-        Jkind.Sort.default_for_transl_and_get method_.ret_sort
-      in
       (* We keep the outer function's yielding mode and drop [method_]'s: object
          code can never close over a yielding value, so the inner method is
          always unyielding and contributes nothing to the join. *)
@@ -357,7 +354,7 @@ let fuse_method_arity (parent : fusable_function) : fusable_function =
       { params = self_param :: method_.params;
         body = method_.body;
         return_mode = transl_ret_mode method_.ret_mode.mode_modes;
-        return_sort;
+        return_sort = method_.ret_sort;
         region = true;
       }
   | _ -> parent
@@ -482,7 +479,6 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         (event_before ~scopes body (transl_exp ~scopes layout body))
   | Texp_function { params; body; ret_sort; ret_mode; locality_mode;
                     yielding; zero_alloc } ->
-      let ret_sort = Jkind.Sort.default_for_transl_and_get ret_sort in
       transl_function ~in_new_scope ~scopes e params body
         ~locality_mode ~ret_mode ~ret_sort ~region:true ~zero_alloc
         ~yielding:(transl_yielding_mode_l yielding)
@@ -1411,10 +1407,10 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
          }
   | Texp_letop{let_; ands; param; param_debug_uid; param_sort; body; body_sort;
                partial} ->
-      let body_sort = Jkind.Sort.default_for_transl_and_get body_sort in
       event_after ~scopes e
         (transl_letop ~scopes e.exp_loc e.exp_env let_ ands
-           param param_debug_uid param_sort body body_sort partial)
+           param param_debug_uid param_sort body
+           (Function_returns body_sort) partial)
   | Texp_unreachable ->
       raise (Error (e.exp_loc, Unreachable_reached))
   | Texp_open (od, e) ->
@@ -1937,12 +1933,16 @@ and transl_function_without_attributes
     ~scopes ~return_sort ~return_mode ~mode ~region ~fun_ty loc repr params
     body =
   let return_layout =
-    match body with
-    | Tfunction_body exp ->
-        layout_exp return_sort exp
-    | Tfunction_cases cases ->
-        layout cases.fc_env cases.fc_loc return_sort cases.fc_ret_type
-
+    let env, loc, ty =
+      match body with
+      | Tfunction_body exp -> exp.exp_env, exp.exp_loc, exp.exp_type
+      | Tfunction_cases cases ->
+          cases.fc_env, cases.fc_loc, cases.fc_ret_type
+    in
+    match (return_sort : function_return_sort) with
+    | Function_returns sort ->
+        layout env loc (Jkind.Sort.default_for_transl_and_get sort) ty
+    | Function_never_returns -> layout_bottom
   in
   match
     transl_tupled_function ~scopes loc params body
