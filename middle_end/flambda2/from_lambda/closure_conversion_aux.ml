@@ -791,7 +791,7 @@ module Function_decls = struct
         params : param list;
         removed_params : Ident.Set.t;
         params_arity : [`Complex] Flambda_arity.t;
-        return : [`Unarized] Flambda_arity.t;
+        return : [`Unarized | `Unknown] Flambda_arity.t;
         calling_convention : calling_convention;
         return_continuation : Continuation.t;
         exn_continuation : IR.exn_continuation;

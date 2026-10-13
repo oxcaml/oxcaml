@@ -510,8 +510,9 @@ nonconst_ctor:
   | tag = tag; KWD_OF; KWD_ANY { tag, None }
 ;
 return_arity:
-  | { None }
-  | COLON k = kinds_with_subkinds { Some k }
+  | { Code_returns None }
+  | COLON k = kinds_with_subkinds { Code_returns (Some k) }
+  | COLON KWD_ANY { Code_unknown_arity }
 ;
 
 /* expr is staged so that let and where play nicely together. In particular, in

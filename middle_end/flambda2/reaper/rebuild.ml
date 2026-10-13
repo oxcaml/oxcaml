@@ -1039,9 +1039,21 @@ let decide_whether_apply_needs_calling_convention_change env apply =
     | C_call _ | Method _ | Effect _ -> None, call_kind
   in
   match code_id_actually_called with
-  | None -> Unboxing_analysis.Not_changing_calling_convention, call_kind
-  | Some code_id ->
-    Analysis.get_calling_convention_change env.solution code_id, call_kind
+  | None ->
+    ( Unboxing_analysis.Not_changing_calling_convention,
+      call_kind,
+      `Callee_may_return )
+  | Some code_id -> (
+    ( Analysis.get_calling_convention_change env.solution code_id,
+      call_kind,
+      match Analysis.find_code_metadata env.solution code_id with
+      | None -> `Callee_may_return
+      | Some code_metadata -> (
+        match
+          Flambda_arity.known (Code_metadata.result_arity code_metadata)
+        with
+        | Some _ -> `Callee_may_return
+        | None -> `Callee_never_returns) ))
 
 let rebuild_apply env apply =
   let callee_is_dead =
@@ -1068,7 +1080,7 @@ let rebuild_apply env apply =
     (* CR ncourant: we never rewrite alloc_mode. This is currently ok because we
        never remove begin- or end-region primitives, but might be needed later
        if we chose to handle them. *)
-    let updating_calling_convention, call_kind =
+    let updating_calling_convention, call_kind, callee_returns =
       decide_whether_apply_needs_calling_convention_change env apply
     in
     let exn_continuation = Apply.exn_continuation apply in
@@ -1103,6 +1115,42 @@ let rebuild_apply env apply =
         selected_extra_args
       in
       Exn_continuation.create ~exn_handler ~extra_args
+    in
+    (* The return arity of the application as seen by the caller, and decisions
+       for a callee that returns at that arity. *)
+    let caller_side_return () =
+      let return_arity =
+        match Apply.continuation apply with
+        | Never_returns -> Apply.return_arity apply
+        | Return cont ->
+          let cont_decisions =
+            Continuation.Map.find cont env.cont_params_to_keep
+          in
+          Flambda_arity.create_singletons
+            (List.map2
+               (fun (decision : Unboxing_analysis.param_decision) kind ->
+                 match decision with
+                 | Keep (_, kind) ->
+                   (* The subkind has already been rewritten when computing
+                      [cont_params_to_keep] *)
+                   kind
+                 | Unbox _ ->
+                   (* This can happen if the function can never return. The
+                      return continuation should be deleted anyway by
+                      [make_apply_wrapper]; conservatively erase the subkind. *)
+                   Types_rewriter.erase_subkind kind
+                 | Delete -> Types_rewriter.erase_subkind kind)
+               cont_decisions
+               (Flambda_arity.unarized_components (Apply.return_arity apply)))
+      in
+      let func_decisions =
+        List.map
+          (fun kind ->
+            Unboxing_analysis.Keep
+              (Variable.create "function_return" (KS.kind kind), kind))
+          (Flambda_arity.unarized_components return_arity)
+      in
+      return_arity, func_decisions
     in
     match updating_calling_convention with
     | Not_changing_calling_convention -> (
@@ -1193,31 +1241,7 @@ let rebuild_apply env apply =
                (Flambda_arity.group_by_parameter (Apply.args_arity apply)
                   args_arity))
         in
-        let return_arity =
-          match Apply.continuation apply with
-          | Never_returns -> Apply.return_arity apply
-          | Return cont ->
-            let cont_decisions =
-              Continuation.Map.find cont env.cont_params_to_keep
-            in
-            Flambda_arity.create_singletons
-              (List.map2
-                 (fun (decision : Unboxing_analysis.param_decision) kind ->
-                   match decision with
-                   | Keep (_, kind) ->
-                     (* The subkind has already been rewritten when computing
-                        [cont_params_to_keep] *)
-                     kind
-                   | Unbox _ ->
-                     (* This can happen if the function can never return. The
-                        return continuation should be deleted anyway by
-                        [make_apply_wrapper]; conservatively erase the
-                        subkind. *)
-                     Types_rewriter.erase_subkind kind
-                   | Delete -> Types_rewriter.erase_subkind kind)
-                 cont_decisions
-                 (Flambda_arity.unarized_components (Apply.return_arity apply)))
-        in
+        let return_arity, func_decisions = caller_side_return () in
         let make_apply =
           Apply.create
           (* Note here that callee is rewritten with [rewrite_simple_opt], which
@@ -1231,13 +1255,6 @@ let rebuild_apply env apply =
             ~inlining_state:(Apply.inlining_state apply)
             ~probe:(Apply.probe apply) ~position:(Apply.position apply)
             ~relative_history:(Apply.relative_history apply)
-        in
-        let func_decisions =
-          List.map
-            (fun kind ->
-              Unboxing_analysis.Keep
-                (Variable.create "function_return" (KS.kind kind), kind))
-            (Flambda_arity.unarized_components return_arity)
         in
         make_apply_wrapper env make_apply (Apply.continuation apply)
           func_decisions)
@@ -1346,9 +1363,13 @@ let rebuild_apply env apply =
         in
         Flambda_arity.create (List.map components_for args)
       in
-      let return_arity =
-        Flambda_arity.unarize_t
-          (Unboxing_analysis.arity_of_decisions return_decisions)
+      let return_arity, return_decisions =
+        match callee_returns with
+        | `Callee_may_return ->
+          ( Flambda_arity.unarize_t
+              (Unboxing_analysis.arity_of_decisions return_decisions),
+            return_decisions )
+        | `Callee_never_returns -> caller_side_return ()
       in
       let args = List.map fst (List.flatten args) in
       let make_apply ~continuation =

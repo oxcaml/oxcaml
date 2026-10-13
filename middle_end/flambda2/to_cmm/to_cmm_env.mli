@@ -105,6 +105,7 @@ val create :
   return_continuation:Continuation.t ->
   return_continuation_arity:Cmm.machtype list ->
   exn_continuation:Continuation.t ->
+  result_type:Cmm_helpers.Extended_machtype.t ->
   t
 
 (** Given an existing environment providing the "global" information (such as
@@ -115,6 +116,7 @@ val enter_function_body :
   return_continuation:Continuation.t ->
   return_continuation_arity:Cmm.machtype list ->
   exn_continuation:Continuation.t ->
+  result_type:Cmm_helpers.Extended_machtype.t ->
   t
 
 (** {2 Debuginfo} *)
@@ -136,6 +138,9 @@ val currently_in_inlined_body : t -> bool
 
 (** Returns the exception continuation of the environment. *)
 val exn_continuation : t -> Continuation.t
+
+(** Returns the result type of the Cmm function being translated. *)
+val result_type : t -> Cmm_helpers.Extended_machtype.t
 
 (** {2 Code and closures} *)
 

@@ -227,6 +227,17 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
   in
   cmm, free_vars, env, res, Ece.all
 
+(* A call to an OCaml function that never returns ends up in return position of
+   the function, so it is given the function's result type, whatever its return
+   arity. *)
+let call_result_type env apply =
+  match Apply.continuation apply, Apply.call_kind apply, Apply.probe apply with
+  | Never_returns, (Function _ | Method _), None -> Env.result_type env
+  | Never_returns, (Function _ | Method _), Some _
+  | Never_returns, (C_call _ | Effect _), _
+  | Return _, _, _ ->
+    C.extended_machtype_of_return_arity (Apply.return_arity apply)
+
 let translate_apply0 ~dbg_with_inlined:dbg env res apply =
   let callee_simple = Apply.callee apply in
   let args = Apply.args apply in
@@ -283,6 +294,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     aux args args_arity
   in
   let return_ty = C.extended_machtype_of_return_arity return_arity in
+  let call_ty = call_result_type env apply in
   match Apply.call_kind apply with
   | Function { function_call = Direct code_id } -> (
     let code_metadata = Env.get_code_metadata env code_id in
@@ -311,7 +323,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     match Apply.probe apply with
     | None ->
       ( C.direct_call ~dbg
-          (C.Extended_machtype.to_machtype return_ty)
+          (C.Extended_machtype.to_machtype call_ty)
           pos code_sym args,
         free_vars,
         env,
@@ -335,7 +347,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
           "Application expression did not provide callee for indirect call:@ %a"
           Apply.print apply
     in
-    ( C.indirect_call ~dbg return_ty pos
+    ( C.indirect_call ~dbg call_ty pos
         (C.alloc_mode_for_applications_to_cmx (Apply_expr.return_mode apply))
         callee args_ty (split_args ()),
       free_vars,
@@ -369,7 +381,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         "To_cmm expects indirect_known_arity calls to be full applications in \
          order to translate them"
     else
-      ( C.indirect_full_call ~dbg return_ty pos callee ~callees args_ty args,
+      ( C.indirect_full_call ~dbg call_ty pos callee ~callees args_ty args,
         free_vars,
         env,
         res,
@@ -400,7 +412,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     let alloc_mode =
       C.alloc_mode_for_applications_to_cmx (Apply_expr.return_mode apply)
     in
-    ( C.send kind callee obj (split_args ()) args_ty return_ty (pos, alloc_mode)
+    ( C.send kind callee obj (split_args ()) args_ty call_ty (pos, alloc_mode)
         dbg,
       free_vars,
       env,
@@ -556,8 +568,7 @@ let translate_apply env res apply =
     let exn_var = Backend_var.create_local "*exn*" in
     let result_var = Backend_var.create_local "*res*" in
     let result_type =
-      Apply.return_arity apply |> C.extended_machtype_of_return_arity
-      |> C.Extended_machtype.to_machtype
+      call_result_type env apply |> C.Extended_machtype.to_machtype
     in
     let pop_handler_params =
       [Backend_var.With_provenance.create result_var, result_type]

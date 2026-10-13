@@ -42,17 +42,17 @@ val make_inlined_body :
   apply_renaming:('expr_with_acc -> Renaming.t -> 'expr_with_acc) ->
   'expr_with_acc
 
-val wrap_inlined_body_for_exn_extra_args :
+val wrap_inlined_body :
   'acc ->
-  extra_args:(Simple.t * Flambda_kind.With_subkind.t) list ->
   apply_exn_continuation:Exn_continuation.t ->
   apply_return_continuation:Flambda.Apply.Result_continuation.t ->
-  result_arity:[`Unarized] Flambda_arity.t ->
+  result_arity:[`Unarized | `Unknown] Flambda_arity.t ->
   make_inlined_body:
     ('acc ->
     apply_exn_continuation:Continuation.t ->
     apply_return_continuation:Flambda.Apply.Result_continuation.t ->
     'expr_with_acc) ->
+  invalid:('acc -> 'expr_with_acc) ->
   apply_cont_create:
     ('acc ->
     trap_action:Trap_action.t ->
