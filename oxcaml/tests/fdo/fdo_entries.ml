@@ -2,6 +2,8 @@
    compilations of the same module: print each dump's entries, then those in
    only one of them. *)
 
+(* CR yusumez: Replace this once we have FDO counters in Fexpr *)
+
 let entries file =
   let dump = In_channel.with_open_text file In_channel.input_all in
   (* The printer breaks lines freely: collapse whitespace. *)
