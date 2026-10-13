@@ -266,6 +266,13 @@ module type S  = sig module M : sig  end @@ portable end
 - : unit = ()
 |}];;
 
+run_structure {| type t = int -> (int -> int -> int) @ local |};;
+
+[%%expect{|
+type t = int -> (int -> int -> int) @ local
+- : unit = ()
+|}];;
+
 (***********************************)
 (* Untypeast/pprintast correctly handle constructs elaborated by the
    type-checker. *)
