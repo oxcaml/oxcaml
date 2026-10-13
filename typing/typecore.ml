@@ -3157,6 +3157,25 @@ let disambiguate_sort_lid_a_list
   in
   lbl_a_list, ambiguity
 
+let record_field_requires_float_boxing ~field_pos = function
+  | Record_float -> true
+  | Record_mixed mixed ->
+    let rec is_float_boxed : Types.mixed_block_element -> bool = function
+      | Float_boxed -> true
+      | Float64 | Float32 | Scannable _ | Bits8 | Bits16 | Bits32
+      | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word
+      | Untagged_immediate | Void | Product _ -> false
+      | Addressable e -> is_float_boxed e
+    in
+    is_float_boxed mixed.(field_pos)
+  | Record_unboxed
+  | Record_inlined _
+  | Record_boxed
+  | Record_ufloat
+  | Record_dummy _
+  | Record_undetermined
+  | Record_variable _ -> false
+
 let map_fold_cont f xs k =
   List.fold_right (fun x k ys -> f x (fun y -> k (y :: ys)))
     xs (fun ys -> k (List.rev ys)) []
@@ -3518,12 +3537,10 @@ and type_pat_aux
             record_ty record_form in
         begin match record_form with
         | Legacy ->
-          begin match rep with
-          | Record_float ->
+          if record_field_requires_float_boxing ~field_pos:label.lbl_pos rep
+          then
             Typeallocation.register_allocation_mode
               ~env:!!penv ~loc:sarg.ppat_loc Locality.global
-          | _ -> ()
-          end
         | Unboxed_product -> ()
         end;
         check_project_mutability ~loc ~env:!!penv
@@ -7825,24 +7842,10 @@ and type_expect_
           ~modalities:label.lbl_modalities mode
       in
       let boxing : texp_field_boxing =
-        let is_float_boxing =
-          match record_repres with
-          | Record_float -> true
-          | Record_mixed mixed -> begin
-            let rec is_float_boxed : Types.mixed_block_element -> bool =
-              function
-              | Float_boxed -> true
-              | Float64 | Float32 | Scannable _ | Bits8 | Bits16 | Bits32
-              | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word
-              | Untagged_immediate | Void | Product _ ->
-                false
-              | Addressable e -> is_float_boxed e
-            in
-            is_float_boxed mixed.(label.lbl_pos)
-            end
-          | _ -> false
-        in
-        match is_float_boxing with
+        match
+          record_field_requires_float_boxing ~field_pos:label.lbl_pos
+            record_repres
+        with
         | true ->
           let locality_mode, argument_mode =
             register_allocation ~env ~loc ~desc:Float_projection expected_mode

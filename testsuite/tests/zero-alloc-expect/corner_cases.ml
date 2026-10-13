@@ -41,7 +41,6 @@ Error: The allocation is "local"
          which is "noalloc" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
-|}]
 
 module Generic_arrays_might_be_float_arrays : sig
   val head_or_diverge : 'a array -> 'a @@ noalloc
@@ -174,10 +173,10 @@ CR wsturgeon for wsturgeon: this has to fail
 |}]
 
 module Mixed_block_float_access_needs_box : sig
-  type r = { u : float#; f : float; }
+  type r = { u : float#; f : float; } [@@flatten_floats]
   val f : r -> float @@ noalloc
 end = struct
-  type r = { u : float#; f : float; }
+  type r = { u : float#; f : float; } [@@flatten_floats]
   let f { f; _ } = f
 end
 [%%expect{|
