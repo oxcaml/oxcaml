@@ -574,14 +574,7 @@ let place_required_lifted_constants ~bound_names body uacc =
   match UA.pop_lifted_constants_for_placement ~bound_names uacc with
   | In_a_closure () -> body, uacc
   | At_toplevel (uacc, lifted_constants_to_place) ->
-    if false && debug ()
-    then Format.eprintf "--- start placing lifted constants ---@.";
-    let body, uacc =
-      place_lifted_constants_if_used ~uacc ~body lifted_constants_to_place
-    in
-    if false && debug ()
-    then Format.eprintf "--- end placing lifted constants ---@.";
-    body, uacc
+    place_lifted_constants_if_used ~uacc ~body lifted_constants_to_place
 
 let place_all_remaining_lifted_constants expr uacc =
   if false && debug ()
