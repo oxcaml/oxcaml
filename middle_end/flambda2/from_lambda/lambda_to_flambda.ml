@@ -1588,8 +1588,7 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
     Env.create ~current_unit:(Env.current_unit env)
       ~machine_width:(Env.machine_width env) ~return_continuation:body_cont
       ~exn_continuation:body_exn_cont ~my_region:my_region_stack_elt
-      ~my_alloc_region
-      ~fdo_naming_context:fdo_body_naming_context
+      ~my_alloc_region ~fdo_naming_context:fdo_body_naming_context
   in
   let exn_continuation : IR.exn_continuation =
     { exn_handler = body_exn_cont; extra_args = [] }
@@ -1897,8 +1896,8 @@ let lambda_to_flambda ~mode ~machine_width ~big_endian ~cmx_loader
       ~my_alloc_region:toplevel_my_alloc_region
       ~fdo_naming_context:
         (if !Oxcaml_flags.fdo_counters
-        then Some (Fdo_fingerprint.Naming_context.toplevel compilation_unit)
-        else None)
+         then Some (Fdo_fingerprint.Naming_context.toplevel compilation_unit)
+         else None)
   in
   let program acc ccenv =
     cps_tail acc env ccenv lam return_continuation exn_continuation
