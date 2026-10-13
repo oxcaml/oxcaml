@@ -27,9 +27,9 @@ let parse_flambda filename =
 module Options = Oxcaml_args.Make_optcomp_options (Oxcaml_args.Default.Optmain)
 
 let _ =
-  (* Setting [Clflags.native_code := true] is how we tell the option parsing
+  (* Calling [Clflags.set_target Native] is how we tell the option parsing
      machinery that we are going to use flambda2. *)
-  Clflags.native_code := true;
+  Clflags.set_target Clflags.Target.Native;
   let file_action = ref (fun () -> Misc.fatal_error "Missing a flambda file") in
   let defer_file file =
     let ext = Filename.extension file in

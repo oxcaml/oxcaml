@@ -21,7 +21,7 @@ module Options = Oxcaml_args.Make_optcomp_options
         (Oxcaml_args.Default.Optmain)
 
 let main unix argv ppf ~flambda2:(module Flambda2 : Optcomp_intf.Flambda2) =
-  native_code := true;
+  Clflags.set_target Clflags.Target.Native;
   let columns =
     match Sys.getenv "COLUMNS" with
     | exception Not_found -> None
@@ -68,7 +68,7 @@ let main unix argv ppf ~flambda2:(module Flambda2 : Optcomp_intf.Flambda2) =
        Target_system.is_macos () then
       Clflags.dwarf_fission := Clflags.Fission_dsymutil;
     (* Set up DWARF compression for C compiler invocations *)
-    if !Clflags.debug && !Clflags.native_code then
+    if !Clflags.debug && Clflags.target_is_native () then
       Clflags.dwarf_c_toolchain_flag :=
         Dwarf_flags.get_dwarf_c_toolchain_flag ();
     if !Oxcaml_flags.gc_timings then Gc_timings.start_collection ();
@@ -83,13 +83,13 @@ let main unix argv ppf ~flambda2:(module Flambda2 : Optcomp_intf.Flambda2) =
         Compenv.fatal "The -uses-metaprogramming flag is only supported \
                        with the runtime metaprogramming extension";
     let (module Compiler : Optcompile.S) =
-      match !Clflags.target with
-      | Native -> Optcompile.native unix ~flambda2:Flambda2.lambda_to_cmm
-      | Js_of_ocaml ->
+      if Clflags.target_is_jsir () then begin
         if !output_c_object then
           Compenv.fatal
             "-output-obj is not supported when targeting js_of_ocaml";
         Jscomp.make ~lambda_to_jsir:Flambda2.lambda_to_jsir
+      end
+      else Optcompile.native unix ~flambda2:Flambda2.lambda_to_cmm
     in
     begin try
       Compenv.process_deferred_actions
