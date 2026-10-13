@@ -26,7 +26,7 @@ endif
 ifeq ($(main_build_profile),dev)
 main_ocamlopt_optimization_flags :=
 else
-main_ocamlopt_optimization_flags := -O4
+main_ocamlopt_optimization_flags := -O3
 endif
 
 define dune_main_context
