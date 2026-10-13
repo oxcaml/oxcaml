@@ -210,46 +210,50 @@ end = struct
     }
 end
 
+module Allocation_sources = Zero_alloc_info.Allocation_sources
+module Call_outcomes = Zero_alloc_info.Call_outcomes
+
 module Witnesses = struct
   type t =
     { witnesses : Witness_set.t;
-      every_allocation_comes_from_calling_an_argument : bool
+      allocation_sources : Allocation_sources.t
     }
 
   let unknown =
-    { witnesses = Witness_set.empty; every_allocation_comes_from_calling_an_argument = false }
+    { witnesses = Witness_set.empty;
+      allocation_sources = Allocation_sources.unknown
+    }
 
-  let of_summary ~every_allocation_comes_from_calling_an_argument =
-    { witnesses = Witness_set.empty; every_allocation_comes_from_calling_an_argument }
+  let of_summary allocation_sources =
+    { witnesses = Witness_set.empty; allocation_sources }
 
   let witnesses t = t.witnesses
 
-  let every_allocation_comes_from_calling_an_argument t =
-    t.every_allocation_comes_from_calling_an_argument
+  let allocation_sources t = t.allocation_sources
 
-  let create ~keep_witnesses ?hint kind dbg =
+  let every_allocation_comes_from_calling_an_argument t =
+    not t.allocation_sources.anything_else_may_allocate
+
+  let create ~keep_witnesses ~outcomes ?hint kind dbg =
     let witnesses =
       if keep_witnesses
       then Witness_set.create ?hint kind dbg
       else Witness_set.empty
     in
-    let every_allocation_comes_from_calling_an_argument =
+    let allocation_sources =
       match kind with
-      | Witness.Indirect_call { callee = Some (Cmm.Argument _) }
-      | Witness.Indirect_tailcall { callee = Some (Cmm.Argument _) }
-        -> true
-      | Witness.Indirect_call { callee = (None | Some (Cmm.Symbol _)) }
-      | Witness.Indirect_tailcall { callee = (None | Some (Cmm.Symbol _)) }
-      | Witness.Alloc _
-      | Witness.Direct_call _
-      | Witness.Direct_tailcall _
-      | Witness.Extcall _
-      | Witness.Arch_specific _
-      | Witness.Probe _
-      | Witness.Widen
-        -> false
+      | Witness.Indirect_call { callee = Some (Cmm.Argument lowered_index) }
+      | Witness.Indirect_tailcall { callee = Some (Cmm.Argument lowered_index) }
+        ->
+        Allocation_sources.argument ~lowered_index ~outcomes
+      | Witness.Indirect_call { callee = None | Some (Cmm.Symbol _) }
+      | Witness.Indirect_tailcall { callee = None | Some (Cmm.Symbol _) }
+      | Witness.Alloc _ | Witness.Direct_call _ | Witness.Direct_tailcall _
+      | Witness.Extcall _ | Witness.Arch_specific _ | Witness.Probe _
+      | Witness.Widen ->
+        Allocation_sources.unknown
     in
-    { witnesses; every_allocation_comes_from_calling_an_argument }
+    { witnesses; allocation_sources }
 
   let widen = { unknown with witnesses = Witness_set.widen }
 
@@ -265,27 +269,22 @@ module Witnesses = struct
     let c = Witness_set.compare t1.witnesses t2.witnesses in
     if c <> 0
     then c
-    else
-      Bool.compare t1.every_allocation_comes_from_calling_an_argument
-        t2.every_allocation_comes_from_calling_an_argument
+    else Allocation_sources.compare t1.allocation_sources t2.allocation_sources
 
   let lessequal t1 t2 =
-    ((not t2.every_allocation_comes_from_calling_an_argument)
-    || t1.every_allocation_comes_from_calling_an_argument)
+    Allocation_sources.lessequal t1.allocation_sources t2.allocation_sources
     && Witness_set.lessequal t1.witnesses t2.witnesses
 
   let join t1 t2 =
     { witnesses = Witness_set.join t1.witnesses t2.witnesses;
-      every_allocation_comes_from_calling_an_argument =
-        t1.every_allocation_comes_from_calling_an_argument
-        && t2.every_allocation_comes_from_calling_an_argument
+      allocation_sources =
+        Allocation_sources.join t1.allocation_sources t2.allocation_sources
     }
 
   let meet t1 t2 =
     { witnesses = Witness_set.meet t1.witnesses t2.witnesses;
-      every_allocation_comes_from_calling_an_argument =
-        t1.every_allocation_comes_from_calling_an_argument
-        || t2.every_allocation_comes_from_calling_an_argument
+      allocation_sources =
+        Allocation_sources.meet t1.allocation_sources t2.allocation_sources
     }
 end
 
@@ -401,10 +400,8 @@ end = struct
     Format.fprintf ppf "(%a%a)@," Var.print var (pp_w ~witnesses) w
 
   let pp_top ~witnesses ppf w =
-    Format.fprintf ppf "(top%s%a)"
-      (if Witnesses.every_allocation_comes_from_calling_an_argument w
-       then " arguments_only"
-       else "")
+    Format.fprintf ppf "(top %a%a)" Allocation_sources.print
+      (Witnesses.allocation_sources w)
       (pp_w ~witnesses) w
 
   (** Variables with witnesses *)
@@ -1405,7 +1402,11 @@ end = struct
     match t1, t2 with
     | Bot, Bot -> Bot
     | Safe, Safe -> Safe
-    | Top w1, Top w2 -> Top (Witnesses.meet w1 w2)
+    | Top w1, Top w2 ->
+      let witnesses = Witnesses.meet w1 w2 in
+      if Allocation_sources.is_empty (Witnesses.allocation_sources witnesses)
+      then Safe
+      else Top witnesses
     | Safe, Bot | Bot, Safe -> Bot
     | Top _, Bot | Bot, Top _ -> Bot
     | Top _, Safe | Safe, Top _ -> Safe
@@ -1702,7 +1703,11 @@ end
 
 module Metadata : sig
   (* CR-someday gyorsh: propagate assert of arbitrary expressions. *)
-  val assume_value : Debuginfo.t -> can_raise:bool -> Witnesses.t -> Value.t option
+  val assume_value :
+    Debuginfo.t ->
+    can_raise:bool ->
+    (Call_outcomes.t -> Witnesses.t) ->
+    Value.t option
 end = struct
   (* CR gyorsh: The return type of [Assume_info.get_value] is
      [Assume_info.Value.t]. It is not the same as [Zero_alloc_checker.Value.t],
@@ -1713,8 +1718,13 @@ end = struct
   let transl w (v : Zero_alloc_utils.Assume_info.V.t) : V.t =
     match v with Top _ -> V.top w | Safe -> V.safe | Bot -> V.bot
 
-  let transl w (v : Zero_alloc_utils.Assume_info.Value.t) : Value.t =
-    { nor = transl w v.nor; exn = transl w v.exn; div = transl w v.div }
+  let transl witnesses_for_outcome (v : Zero_alloc_utils.Assume_info.Value.t) :
+      Value.t =
+    { nor = transl (witnesses_for_outcome Call_outcomes.normal_return) v.nor;
+      exn =
+        transl (witnesses_for_outcome Call_outcomes.exceptional_return) v.exn;
+      div = transl (witnesses_for_outcome Call_outcomes.diverging) v.div
+    }
 
   let assume_value dbg ~can_raise w =
     (* [loc] can be obtained by [Debuginfo.to_location dbg], For now just return
@@ -2163,10 +2173,7 @@ end = struct
   let encode (v : V.t) =
     V.match_with v
       ~top:(fun witnesses ->
-        Zero_alloc_info.Top
-          { every_allocation_comes_from_calling_an_argument =
-              Witnesses.every_allocation_comes_from_calling_an_argument witnesses
-          })
+        Zero_alloc_info.Top (Witnesses.allocation_sources witnesses))
       ~safe:Zero_alloc_info.Safe ~bot:Zero_alloc_info.Bot
       ~unresolved:(fun () ->
         Misc.fatal_errorf
@@ -2178,8 +2185,7 @@ end = struct
      that function, not about its callers. Witnesses from the summary of a
      callee are ignored, and replaced by the name of the callee. *)
   let decode_component = function
-    | Zero_alloc_info.Top { every_allocation_comes_from_calling_an_argument } ->
-      V.top (Witnesses.of_summary ~every_allocation_comes_from_calling_an_argument)
+    | Zero_alloc_info.Top sources -> V.top (Witnesses.of_summary sources)
     | Zero_alloc_info.Safe -> V.safe
     | Zero_alloc_info.Bot -> V.bot
 
@@ -2319,8 +2325,9 @@ end = struct
     Unit_info.iter unit_info ~f:record;
     match !errors with [] -> () | errors -> raise (Report.Fail errors)
 
-  let[@inline always] create_witnesses t ?hint kind dbg =
-    Witnesses.create ~keep_witnesses:t.keep_witnesses ?hint kind dbg
+  let[@inline always] create_witnesses ?(outcomes = Call_outcomes.all) t ?hint
+      kind dbg =
+    Witnesses.create ~keep_witnesses:t.keep_witnesses ~outcomes ?hint kind dbg
 
   let is_caml_internal s =
     String.starts_with s ~prefix:"caml_apply"
@@ -2414,7 +2421,7 @@ end = struct
 
   let transform_top t ~next ~exn w desc dbg =
     let effect_ =
-      match Metadata.assume_value dbg ~can_raise:true w with
+      match Metadata.assume_value dbg ~can_raise:true (fun _ -> w) with
       | Some v -> v
       | None -> Value.top w
     in
@@ -2426,7 +2433,7 @@ end = struct
     let v = find_callee t callee ~desc dbg k in
     let effect_ =
       let w = create_witnesses t k dbg in
-      match Metadata.assume_value dbg ~can_raise:true w with
+      match Metadata.assume_value dbg ~can_raise:true (fun _ -> w) with
       | Some v' ->
         assert (Value.is_resolved v');
         if Value.is_resolved v then Value.meet v v' else v'
@@ -2441,7 +2448,7 @@ end = struct
     report t exn ~msg:"transform_specific exn" ~desc dbg;
     let effect_ =
       let w = create_witnesses t (Arch_specific s) dbg in
-      match Metadata.assume_value dbg ~can_raise:false w with
+      match Metadata.assume_value dbg ~can_raise:false (fun _ -> w) with
       | Some v -> v
       | None ->
         (* Conservatively assume that operation can return normally. *)
@@ -2700,15 +2707,31 @@ end = struct
           List.fold_left
             (fun all_effects callee ->
               let k = wkind callee in
-              let w = create_witnesses t k dbg in
+              let witnesses_for_outcome outcomes =
+                create_witnesses ~outcomes t k dbg
+              in
               let v =
                 match callee with
                 | Cmm.Symbol { sym_name; _ } ->
                   find_callee t sym_name ~desc dbg k
-                | Cmm.Argument _ -> Value.top w
+                | Cmm.Argument _ ->
+                  Value.
+                    { nor =
+                        V.top
+                          (witnesses_for_outcome Call_outcomes.normal_return);
+                      exn =
+                        V.top
+                          (witnesses_for_outcome
+                             Call_outcomes.exceptional_return);
+                      div =
+                        V.top (witnesses_for_outcome Call_outcomes.diverging)
+                    }
               in
               let effect_ =
-                match Metadata.assume_value dbg ~can_raise:true w with
+                match
+                  Metadata.assume_value dbg ~can_raise:true
+                    witnesses_for_outcome
+                with
                 | Some v' ->
                   assert (Value.is_resolved v');
                   if Value.is_resolved v then Value.meet v v' else v'
@@ -2768,7 +2791,7 @@ end = struct
         | Alloc { mode = Heap; bytes; dbginfo } ->
           let w = create_witnesses t (Alloc { bytes; dbginfo }) dbg in
           let effect_ =
-            match Metadata.assume_value dbg ~can_raise:false w with
+            match Metadata.assume_value dbg ~can_raise:false (fun _ -> w) with
             | Some effect_ -> effect_
             | None -> Value.{ nor = V.top w; exn = V.bot; div = V.bot }
           in

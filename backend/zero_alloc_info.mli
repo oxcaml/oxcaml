@@ -1,12 +1,47 @@
-(** Function summaries computed by zero_alloc analysis and encoded as integers
-    for storing in .cmx files. *)
+(** Function summaries computed by zero_alloc analysis for storing in .cmx
+    files. *)
 
 [@@@ocaml.warning "+a-40-41-42"]
 
-type value = int
+module Call_outcomes : sig
+  type t = private int
+
+  val normal_return : t
+
+  val exceptional_return : t
+
+  val diverging : t
+
+  val all : t
+end
+
+module Allocation_sources : sig
+  type t = private
+    { arguments_that_may_allocate : Call_outcomes.t Numbers.Int.Map.t;
+      anything_else_may_allocate : bool
+    }
+
+  val unknown : t
+
+  val argument : lowered_index:int -> outcomes:Call_outcomes.t -> t
+
+  val is_empty : t -> bool
+
+  val compare : t -> t -> int
+
+  val lessequal : t -> t -> bool
+
+  val join : t -> t -> t
+
+  val meet : t -> t -> t
+
+  val print : Format.formatter -> t -> unit
+end
+
+type value
 
 type component =
-  | Top of { every_allocation_comes_from_calling_an_argument : bool }
+  | Top of Allocation_sources.t
   | Safe
   | Bot
 
