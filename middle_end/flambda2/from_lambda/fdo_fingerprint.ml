@@ -31,16 +31,16 @@ module L = Lambda
 (* CR yusumez: We need to check whether this is a good way to identify
    functions *)
 module Leading_tokens = struct
-  (* A compact spelling of a primitive.
-
-     CR yusumez: do we need to discriminate primitives further? *)
+  (* CR yusumez: As above. These are chosen mostly for stability across
+     edits. *)
   let primitive_token (prim : L.primitive) =
     match[@ocaml.warning "-4"] prim with
-    | Pccall { prim_name; _ } -> prim_name
+    | Pccall p -> p.prim_name
+    | Pgetglobal (cu, _) -> Compilation_unit.name_as_string cu
+    | Pgetpredef id -> Ident.name id
     | _ -> Printlambda.name_of_primitive prim
 
-  let leading_tokens ~params body =
-    let limit = 5 in
+  let leading_tokens ?(limit = 5) ~params body =
     let tokens = ref [] in
     let exception Enough in
     let mention token =
@@ -50,57 +50,44 @@ module Leading_tokens = struct
         if List.length !tokens >= limit then raise Enough)
     in
     let ident id = mention (Ident.name id) in
-    (* A value of another compilation unit, named by unit and offset. The match
-       is non-exhaustive since the shape is specific. *)
-    let global_field (lam : L.lambda) =
-      match[@ocaml.warning "-4"] lam with
-      | Lprim
-          ( Pfield (n, _ptr, _sem),
-            [Lprim (Pgetglobal (cu, _layout), [], _loc)],
-            _loc' ) ->
-        Some (Compilation_unit.name_as_string cu ^ "." ^ string_of_int n)
-      | _ -> None
-    in
     let rec term (lam : L.lambda) =
-      match global_field lam with
-      | Some token -> mention token
-      | None ->
-        (match lam with
-        | Lvar id -> ident id
-        | Lmutvar id -> ident id
-        | Llet (_let_kind, _layout, id, _debug_uid, _arg, _body) -> ident id
-        | Lmutlet (_layout, id, _debug_uid, _arg, _body) -> ident id
-        | Ltrywith (_body, id, _debug_uid, _handler, _layout) -> ident id
-        | Lassign (id, _arg) -> ident id
-        | Lifused (id, _arg) -> ident id
-        | Lfor { for_id; _ } -> ident for_id
-        | Lfunction { params; _ } ->
-          List.iter (fun (p : L.lparam) -> ident p.name) params
-        | Lletrec (bindings, _body) ->
-          List.iter (fun (b : L.rec_binding) -> ident b.id) bindings
-        | Lstaticcatch (_body, (_label, params), _handler, _pop_region, _layout)
-          ->
-          List.iter (fun (id, _debug_uid, _layout) -> ident id) params
-        | Lprim (prim, _args, _loc) -> mention (primitive_token prim)
-        | Lconst (Const_base (Const_int n)) -> mention (string_of_int n)
-        | Lconst
-            (Const_base
-               ( Const_char _ | Const_untagged_char _ | Const_string _
-               | Const_float _ | Const_float32 _ | Const_unboxed_float _
-               | Const_unboxed_float32 _ | Const_int8 _ | Const_int16 _
-               | Const_int32 _ | Const_int64 _ | Const_nativeint _
-               | Const_untagged_int _ | Const_untagged_int8 _
-               | Const_untagged_int16 _ | Const_unboxed_int32 _
-               | Const_unboxed_int64 _ | Const_unboxed_nativeint _ ))
-        | Lconst
-            ( Const_block _ | Const_mixed_block _ | Const_float_array _
-            | Const_immstring _ | Const_float_block _ | Const_null )
-        | Lapply _ | Lswitch _ | Lstringswitch _ | Lstaticraise _
-        | Lifthenelse _ | Lsequence _ | Lwhile _ | Lsend _ | Levent _
-        | Lregion _ | Lexclave _ | Lsplice _ | Lkindtemplate _
-        | Lkindinstantiate _ | Ltemplate _ | Linstantiate _ ->
-          ());
-        L.shallow_iter ~tail:term ~non_tail:term lam
+      (match lam with
+      | Lvar id -> ident id
+      | Lmutvar id -> ident id
+      | Llet (_let_kind, _layout, id, _debug_uid, _arg, _body) -> ident id
+      | Lmutlet (_layout, id, _debug_uid, _arg, _body) -> ident id
+      | Ltrywith (_body, id, _debug_uid, _handler, _layout) -> ident id
+      | Lassign (id, _arg) -> ident id
+      | Lifused (id, _arg) -> ident id
+      | Lfor { for_id; _ } -> ident for_id
+      | Lfunction { params; _ } ->
+        List.iter (fun (p : L.lparam) -> ident p.name) params
+      | Lletrec (bindings, _body) ->
+        List.iter (fun (b : L.rec_binding) -> ident b.id) bindings
+      | Lstaticcatch (_body, (_label, params), _handler, _pop_region, _layout)
+        ->
+        List.iter (fun (id, _debug_uid, _layout) -> ident id) params
+      | Lprim (prim, _args, _loc) -> mention (primitive_token prim)
+      | Lconst (Const_base (Const_int n)) -> mention (string_of_int n)
+      (* CR yusumez: Other types of constants? *)
+      | Lconst
+          (Const_base
+             ( Const_char _ | Const_untagged_char _ | Const_string _
+             | Const_float _ | Const_float32 _ | Const_unboxed_float _
+             | Const_unboxed_float32 _ | Const_int8 _ | Const_int16 _
+             | Const_int32 _ | Const_int64 _ | Const_nativeint _
+             | Const_untagged_int _ | Const_untagged_int8 _
+             | Const_untagged_int16 _ | Const_unboxed_int32 _
+             | Const_unboxed_int64 _ | Const_unboxed_nativeint _ ))
+      | Lconst
+          ( Const_block _ | Const_mixed_block _ | Const_float_array _
+          | Const_immstring _ | Const_float_block _ | Const_null )
+      | Lapply _ | Lswitch _ | Lstringswitch _ | Lstaticraise _ | Lifthenelse _
+      | Lsequence _ | Lwhile _ | Lsend _ | Levent _ | Lregion _ | Lexclave _
+      | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _
+      | Linstantiate _ ->
+        ());
+      L.iter_head_constructor term lam
     in
     (try
        List.iter ident params;
@@ -109,12 +96,32 @@ module Leading_tokens = struct
     List.rev !tokens
 end
 
-type t =
-  { definition_id : Fdo_counter.Definition_id.t;
-    path : string
-  }
+module Naming_context = struct
+  type t =
+    { enclosing_path : string;
+      occurrences : int Misc.Stdlib.String.Tbl.t
+          (** The number of functions already given each path in the unit,
+              shared by all of its contexts. *)
+    }
 
-let of_function ~fresh_discriminator ~enclosing_path (fn : L.lfunction) =
+  let toplevel compilation_unit =
+    { enclosing_path = Compilation_unit.full_path_as_string compilation_unit;
+      occurrences = Misc.Stdlib.String.Tbl.create 64
+    }
+
+  let fresh_discriminator t ~path =
+    let index =
+      Option.value
+        (Misc.Stdlib.String.Tbl.find_opt t.occurrences path)
+        ~default:0
+    in
+    Misc.Stdlib.String.Tbl.replace t.occurrences path (index + 1);
+    index
+end
+
+type t = { definition_id : Fdo_counter.Definition_id.t }
+
+let of_function (context : Naming_context.t) (fn : L.lfunction) =
   let { L.loc; params; body; _ } = fn in
   let params = List.map (fun (p : L.lparam) -> p.name) params in
   let path, anonymous =
@@ -139,7 +146,7 @@ let of_function ~fresh_discriminator ~enclosing_path (fn : L.lfunction) =
       ( Debuginfo.Scoped_location.string_of_scopes ~include_zero_alloc:false
           scopes,
         anonymous )
-    | Loc_unknown -> enclosing_path ^ ".(fun)", true
+    | Loc_unknown -> context.enclosing_path ^ ".(fun)", true
   in
   let path =
     if anonymous
@@ -148,16 +155,14 @@ let of_function ~fresh_discriminator ~enclosing_path (fn : L.lfunction) =
       ^ String.concat "," (Leading_tokens.leading_tokens ~params body)
     else path
   in
-  let discriminator = fresh_discriminator ~path in
-  { definition_id =
-      Fdo_counter.Definition_id.create_original ~demangled_name:path
-        ~discriminator;
-    path
-  }
+  let discriminator = Naming_context.fresh_discriminator context ~path in
+  ( { definition_id =
+        Fdo_counter.Definition_id.create_original ~demangled_name:path
+          ~discriminator
+    },
+    { context with enclosing_path = path } )
 
 let definition_id t = t.definition_id
-
-let path t = t.path
 
 let leading_tokens = Leading_tokens.leading_tokens
 
