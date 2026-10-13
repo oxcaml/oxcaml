@@ -575,7 +575,7 @@ let check_section_binding pat expr attrs lam =
     then err "[@@critical safe] must be applied to a syntactic function";
     if count_type_arity expr.exp_env pat.pat_type <> syntactic_arity
     then
-      err "a [@@critical safe] function must take all of its arguments \
+      err "A [@@critical safe] function must take all of its arguments \
            syntactically";
     let rec function_body lam =
       match lam with
