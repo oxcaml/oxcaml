@@ -2930,8 +2930,23 @@ let transl_primitive_application loc p env ty ~poly_mode ~stack ~poly_sort
    builds for each [prim].  Keep the two in step. *)
 let prim_may_allocate ~arity prim =
   let primitive_may_allocate prim =
-    try Option.is_some (Lambda.primitive_may_allocate prim) with
-    | _ -> true
+    let may_allocate =
+      try Option.is_some (Lambda.primitive_may_allocate prim) with
+      | _ -> true
+    in
+    match prim with
+    | Pccall p ->
+      begin match snd p.prim_native_repr_res with
+      | Unboxed_float _
+      | Unboxed_vector _
+      | Unboxed_mask
+      | Unboxed_or_untagged_integer
+          (Unboxed_int32 | Unboxed_int64 | Unboxed_nativeint) -> true
+      | Same_as_ocaml_repr _
+      | Unboxed_or_untagged_integer
+          (Untagged_int | Untagged_int8 | Untagged_int16) -> may_allocate
+      end
+    | _ -> may_allocate
   in
   match prim with
   | Primitive (prim, _) -> primitive_may_allocate prim
