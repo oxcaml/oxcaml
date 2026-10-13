@@ -1,0 +1,36 @@
+function_ids.dump:
+  "Function_ids.apply":0
+  "Function_ids.twice":0
+  "Function_ids.a.(fun)@x,int_add,1":0
+  "Function_ids.b.(fun)@y,int_mul,2":0
+  "Function_ids.inner.(fun)@x,int_sub,n":0
+  "Function_ids.inner.(fun)@x,int_sub,n":1
+  "Function_ids.inner.(fun)@y,int_add,n":0
+  "Function_ids.inner.(fun)@y,x,int_add,n,p":0
+  "Function_ids.inner":0
+  "Function_ids.shadowing.f":0
+  "Function_ids.shadowing.f":1
+  "Function_ids.shadowing.f":2
+  "Function_ids.shadowing":0
+  "Function_ids.shadowing":1
+function_ids_edited.dump:
+  "Function_ids.apply":0
+  "Function_ids.twice":0
+  "Function_ids.a0.(fun)@z":0
+  "Function_ids.a.(fun)@x,int_add,1":0
+  "Function_ids.b.(fun)@y,int_mul,2":0
+  "Function_ids.inner.(fun)@z,int_mul,n":0
+  "Function_ids.inner.(fun)@x,int_sub,n":0
+  "Function_ids.inner.(fun)@x,int_sub,n":1
+  "Function_ids.inner.(fun)@y,int_add,n":0
+  "Function_ids.inner.(fun)@y,x,int_add,n,p":0
+  "Function_ids.inner":0
+  "Function_ids.shadowing.f":0
+  "Function_ids.shadowing.f":1
+  "Function_ids.shadowing.f":2
+  "Function_ids.shadowing":0
+only in function_ids.dump:
+  "Function_ids.shadowing":1
+only in function_ids_edited.dump:
+  "Function_ids.a0.(fun)@z":0
+  "Function_ids.inner.(fun)@z,int_mul,n":0
