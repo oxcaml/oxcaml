@@ -3511,11 +3511,21 @@ and type_pat_aux
           let error = Wrong_expected_kind(wks, Pattern, expected_ty) in
           raise (Error (loc, !!penv, error))
       in
-      let type_label_pat rep (label_lid, (label : rep gen_label_description),
-                              sarg) =
+      let type_label_pat (rep : rep)
+          (label_lid, (label : rep gen_label_description), sarg) =
         let ty_arg =
           solve_Ppat_record_field loc penv label label_lid
             record_ty record_form in
+        begin match record_form with
+        | Legacy ->
+          begin match rep with
+          | Record_float ->
+            Typeallocation.register_allocation_mode
+              ~env:!!penv ~loc:sarg.ppat_loc Locality.global
+          | _ -> ()
+          end
+        | Unboxed_product -> ()
+        end;
         check_project_mutability ~loc ~env:!!penv
           (Record_field label.lbl_name)
           label.lbl_mut pat_mode.mode;

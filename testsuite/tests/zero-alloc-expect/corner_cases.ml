@@ -33,7 +33,14 @@ end = struct
     | { field1; _ } -> field1
 end
 [%%expect{|
-CR wsturgeon for wsturgeon: this has to fail
+Line 7, characters 8-14:
+7 |     | { field1; _ } -> field1
+            ^^^^^^
+Error: The allocation is "local"
+         because it is allocated inside the function at lines 6-7, characters 15-29,
+         which is "noalloc" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
+|}]
 |}]
 
 module Generic_arrays_might_be_float_arrays : sig
