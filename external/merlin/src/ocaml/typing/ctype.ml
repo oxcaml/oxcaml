@@ -3397,10 +3397,11 @@ let mk_jkind_context_always_principal env =
 
 (**** checking jkind relationships ****)
 
-(* The ~fixed argument controls what effects this may have on `ty`.  If false,
-   then we will update the jkind of type variables to make the check true, if
-   possible.  If true, we won't (but will still instantiate sort variables). *)
-let constrain_type_jkind ~fixed env ty jkind =
+(* The ~allow_mutation argument controls what effects this may have on `ty`. If
+   true, then we will update the jkind of type variables to make the check true,
+   if possible.  If false, we won't (but will still instantiate sort variables).
+ *)
+let constrain_type_jkind ~allow_mutation env ty jkind =
   (* The [expanded] argument says whether we've already tried [expand_head_opt].
 
      The "fuel" argument is used because we're duplicating the loop of
@@ -3437,8 +3438,8 @@ let constrain_type_jkind ~fixed env ty jkind =
     (* The [ty's_jkind] we get here is an **r** jkind, necessary for
        the call to [intersection_or_error]. And even if [ty] has unbound
        variables, [ty's_jkind] can't have any variables in it, so we're OK. *)
-    | Tvar { jkind = ty's_jkind } when not fixed ->
-       (* Unfixed tyvars are special in at least two ways:
+    | Tvar { jkind = ty's_jkind } when allow_mutation ->
+       (* Mutable tyvars are special in at least two ways:
 
           1) Suppose we're processing [type 'a t = 'a list]. The ['a] on the
           left will be born with an [Unannotated_type_parameter] history and a
@@ -3455,7 +3456,7 @@ let constrain_type_jkind ~fixed env ty jkind =
           error message should complain about the lack of intersection, not the
           lack of subjkinding.
 
-          Because of these reasons, we pull out the unfixed tyvar case and treat
+          Because of these reasons, we pull out the mutable tyvar case and treat
           it first.
         *)
        let jkind_inter =
@@ -3751,21 +3752,21 @@ let estimate_type_jkind = estimate_type_jkind ~ignore_mod_bounds:false
 
 let () = Jkind.set_estimate_type_jkind estimate_type_jkind
 
-let type_jkind_and_sort ~why ~fixed env ty =
+let type_jkind_and_sort ~why ~allow_mutation env ty =
   let jkind, sort = Jkind.of_new_sort_var ~level:!current_level ~why in
-  match constrain_type_jkind ~fixed env ty jkind with
+  match constrain_type_jkind ~allow_mutation env ty jkind with
   | Ok _ -> Ok (Jkind.allow_left jkind, sort)
   | Error _ as e -> e
 
-let type_sort ~why ~fixed env ty =
-  type_jkind_and_sort ~why ~fixed env ty
+let type_sort ~why ~allow_mutation env ty =
+  type_jkind_and_sort ~why ~allow_mutation env ty
   |> Result.map snd
 
 let check_type_jkind env ty jkind =
-  constrain_type_jkind ~fixed:true env ty jkind
+  constrain_type_jkind ~allow_mutation:false env ty jkind
 
 let constrain_type_jkind env ty jkind =
-  constrain_type_jkind ~fixed:false env ty jkind
+  constrain_type_jkind ~allow_mutation:true env ty jkind
 
 let () =
   Env.constrain_type_jkind := constrain_type_jkind

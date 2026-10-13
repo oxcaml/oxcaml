@@ -253,34 +253,37 @@ let initialize_array0 env loc ~length array_set_kind width ~init creation_expr =
     match width with
     | Sixty_four_or_more -> L.lambda_unit
     | Thirty_two_or_less { width; zero_init } ->
-      let elements_per_word =
-        match width with Eight -> 8 | Sixteen -> 4 | Thirty_two -> 2
-      in
-      let zero_init_last_field =
-        L.Lprim
-          ( Parraysetu (array_set_kind, Ptagged_int_index),
-            (* [Popaque] is used to conceal the out-of-bounds write. *)
-            [ Lprim (Popaque L.layout_unit, [Lvar array], loc);
-              Lvar length;
-              zero_init ],
-            loc )
-      in
-      let length_is_greater_than_zero_and_is_not_zero_mod_elements_per_word =
-        L.Lprim
-          ( Psequand,
-            [ L.icmp ~loc Cgt L.int (Lvar length) (L.tagged_immediate 0);
-              L.icmp ~loc Cne L.int
-                (L.and_ L.int (Lvar length)
-                   (L.tagged_immediate (elements_per_word - 1))
-                   ~loc)
-                (L.tagged_immediate 0) ],
-            loc )
-      in
-      L.Lifthenelse
-        ( length_is_greater_than_zero_and_is_not_zero_mod_elements_per_word,
-          zero_init_last_field,
-          L.lambda_unit,
-          L.layout_unit )
+      if !Clflags.jsir
+      then L.lambda_unit
+      else
+        let elements_per_word =
+          match width with Eight -> 8 | Sixteen -> 4 | Thirty_two -> 2
+        in
+        let zero_init_last_field =
+          L.Lprim
+            ( Parraysetu (array_set_kind, Ptagged_int_index),
+              (* [Popaque] is used to conceal the out-of-bounds write. *)
+              [ Lprim (Popaque L.layout_unit, [Lvar array], loc);
+                Lvar length;
+                zero_init ],
+              loc )
+        in
+        let length_is_greater_than_zero_and_is_not_zero_mod_elements_per_word =
+          L.Lprim
+            ( Psequand,
+              [ L.icmp ~loc Cgt L.int (Lvar length) (L.tagged_immediate 0);
+                L.icmp ~loc Cne L.int
+                  (L.and_ L.int (Lvar length)
+                     (L.tagged_immediate (elements_per_word - 1))
+                     ~loc)
+                  (L.tagged_immediate 0) ],
+              loc )
+        in
+        L.Lifthenelse
+          ( length_is_greater_than_zero_and_is_not_zero_mod_elements_per_word,
+            zero_init_last_field,
+            L.lambda_unit,
+            L.layout_unit )
   in
   let env, initialize =
     let index = Ident.create_local "index" in

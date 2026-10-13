@@ -13,6 +13,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open! Stdlib
+
 (* {2 The type ['a t]}
 
    A dynamic array is represented using a backing array [arr] and

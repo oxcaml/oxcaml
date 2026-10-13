@@ -1766,7 +1766,7 @@ let peek_or_poke_layout_from_type ~prim_name error_loc env ty
        slambda eval. *)
     raise (Error (error_loc, Layout_poly_arguments_unsupported prim_name))
   | Some _ | None ->
-  match Ctype.type_sort ~why:Peek_or_poke ~fixed:true env ty with
+  match Ctype.type_sort ~why:Peek_or_poke ~allow_mutation:false env ty with
   | Error _ -> None
   | Ok sort ->
     let sort = Jkind.Sort.default_to_scannable_and_get sort in
