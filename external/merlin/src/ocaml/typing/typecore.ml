@@ -11076,7 +11076,7 @@ and type_argument_ ?explanation ?recarg ~overwrite env (mode : expected_mode) sa
         | Tarrow ((l,_,_),_,ty_res',_) when l = Nolabel || !Clflags.classic ->
             List.rev args, ty_fun, no_labels ty_res'
         | Tvar _ | Tivar _ ->
-          (* CR-someday omni : [Tivar] could link to a [Tarrow] later.
+          (* CR-someday omni: [Tivar] could link to a [Tarrow] later.
              We default to the directional case here, treating [Tivar] as
              a [Tvar]. *)
           List.rev args, ty_fun, false

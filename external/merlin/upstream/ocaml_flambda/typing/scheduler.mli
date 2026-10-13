@@ -1,12 +1,5 @@
 (** A queue of pending jobs, used to run suspended computations for
-    omnidirectional type inference.
-
-    The scheduling policy is set by [-extension omnidirectionality]:
-    - [Delayed] ([-extension omnidirectionality_delayed]): jobs are queued and
-      only run by {!run}, in FIFO order.
-    - [Eager], or the extension disabled: jobs run immediately in {!add}, so
-      jobs added by a job run before that job's later siblings (depth-first,
-      rather than FIFO). *)
+    omnidirectional type inference. *)
 
 module Job : sig
   type t = unit -> unit
@@ -16,12 +9,11 @@ type t
 
 val create : unit -> t
 
-(** [add t job] enqueues [job] at the back of [t] under the [Delayed] policy.
-    Otherwise, it runs [job] immediately, before returning. *)
+(** [add t job] enqueues [job] at the back of [t]. *)
 val add : t -> Job.t -> unit
 
 (** [run t] runs jobs until [t] is empty, including any jobs enqueued by the
-    jobs themselves. Only [Delayed] enqueues jobs, so otherwise this is a no-op.
+    jobs themselves.
 
     [run t] may be called re-entrantly (e.g. from within a job). The inner call
     drains the shared queue, including jobs enqueued before the job that called

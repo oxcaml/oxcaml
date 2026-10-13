@@ -5178,9 +5178,77 @@ let unify1_var uenv t1 t2 =
   | exception Unify_trace _ when in_pattern_mode uenv ->
       false
 
-(* Called from unify3. [on_link] is called after [t1'] is linked to [t2]; it is
-   not called if a GADT equation is added instead. *)
-let unify3_var ?(on_link = ignore) uenv jkind1 t1' t2 t2' =
+(* The shape of [ty]'s head, which must be fully expanded in [env] and not a
+   type variable, or [None] if it has none.
+
+   Limitations: Polytypes ([Tpoly], [Tunivar], [Trepr]) and [Tmod] have no
+   shapes yet. *)
+let type_shape_of_expanded_head env ty : type_shape option =
+  match get_desc ty with
+  | Tarrow ((l, _, _), _, _, _) -> Some (Sarrow l)
+  | Ttuple ltys -> Some (Stuple (List.map fst ltys))
+  | Tunboxed_tuple ltys -> Some (Sunboxed_tuple (List.map fst ltys))
+  | Tconstr (p, _, _) ->
+      (* Locally abstract types ([type a], GADT existentials) have no shape:
+         once out of scope they are replaced by type variables (e.g. by
+         [type_newtype]). Other abstract types, such as [M.t], keep their
+         identity, so do have one. *)
+      let is_locally_abstract =
+        match Env.find_type p env with
+        | decl -> decl.type_is_newtype
+        | exception Not_found -> false
+      in
+      if is_locally_abstract then None else Some (Sconstr p)
+  | Tobject _ -> Some Sobject
+  | Tvariant _ -> Some Svariant
+  | Tpackage pack -> Some (Spackage pack.pack_path)
+  | Tunivar _ | Tpoly _ | Trepr _ -> None
+  (* Irreducible for now, but may reduce once an inner variable is solved. *)
+  | Tquote _ | Tsplice _ | Tquote_eval _ | Tbox _ -> None
+  (* Not the types of values. *)
+  | Tfield _ | Tnil | Tof_kind _ -> None
+  | Tmod _ -> None
+  | Tvar _ | Tivar _ ->
+      Misc.fatal_error "Ctype.type_shape_of_expanded_head: type variable"
+  | Tlink _ | Tsubst _ -> assert false
+
+(* Fill [ivar] with the shape of [ty]. If [ivar] is already full, the
+   shapes must be equal. *)
+let fill_ivar env ivar ty =
+  match type_shape_of_expanded_head env ty with
+  | None ->
+    (* No shape. [ivar] (and its handlers) are orphaned, and defaulted when
+       the global ivar pool is next drained. *)
+    ()
+  | Some shape -> (
+    match Ivar.fill ivar shape ~scheduler:(scheduler ()) with
+    | Ok -> ()
+    | Already_full expected ->
+      if not (equal_type_shape shape expected)
+      then
+        (* CR-someday aobrien: we could do a better job of attaching
+           provenance information for ivars e.g. where did we create
+           the ivar? did we infer the type from a default? if so, where?
+           But treating this like a unification trace for now is
+           sufficient. *)
+        raise_for Unify (Shape_mismatch { got = shape; expected }))
+
+(** What [unify3_var] does after linking [from_] to [to_]. *)
+module On_link = struct
+  type t =
+    | Noop
+    | Fill_ivar of type_shape Ivar.t
+        (** Fill the ivar with the shape of [to_expanded]. *)
+
+  let run t ~uenv ~from_jkind:_ ~from_:_ ~to_:_ ~to_expanded:t2' =
+    match t with
+    | Noop -> ()
+    | Fill_ivar ivar1 -> fill_ivar (get_env uenv) ivar1 t2'
+end
+
+(* Called from unify3. [on_link] is run after [t1'] is linked to [t2], but not
+   if a GADT equation is added instead. *)
+let unify3_var ~(on_link : On_link.t) uenv jkind1 t1' t2 t2' =
   occur_for Unify uenv t1' t2;
   (* There are two possible ways forward here. Either the variable [t1']
      will succeed in unifying with [t2], in which case we're done; or
@@ -5194,7 +5262,10 @@ let unify3_var ?(on_link = ignore) uenv jkind1 t1' t2 t2' =
     occur_univar_for Unify (get_env uenv) t2;
     unification_jkind_check uenv t2' (Jkind.disallow_left jkind1)
   with
-  | () -> link_type t1' t2; on_link ()
+  | () ->
+      link_type t1' t2;
+      On_link.run on_link ~uenv ~from_jkind:jkind1 ~from_:t1' ~to_:t2
+        ~to_expanded:t2'
   | exception Unify_trace _ when in_pattern_mode uenv ->
       backtrack snap;
       reify uenv t1';
@@ -5217,57 +5288,6 @@ let unify3_var ?(on_link = ignore) uenv jkind1 t1' t2 t2' =
         end;
         record_equation uenv t1' t2'
       end
-
-(* The shape of a type whose head has already been expanded, or [None] if it
-   cannot be determined.
-
-   Limitation: polytypes ([Tpoly], [Tunivar], [Trepr]) and mode-crossing
-   wrappers ([Tmod]) do not have shapes yet, so they return [None].
-
-   Safety: [ty]'s head must be fully expanded. *)
-let shape_of_expanded_head env ty : type_shape option =
-  match get_desc ty with
-  | Tarrow ((l, _, _), _, _, _) -> Some (Sarrow l)
-  | Ttuple ltys -> Some (Stuple (List.map fst ltys))
-  | Tunboxed_tuple ltys -> Some (Sunboxed_tuple (List.map fst ltys))
-  | Tconstr (p, _, _) ->
-      (* Rigid types ([type a.], GADT existentials) may gain equations, so
-         their head depends on the environment. *)
-      if is_instantiable env ~for_jkind_eqn:false p then None
-      else Some (Sconstr p)
-  | Tobject _ -> Some Sobject
-  | Tvariant _ -> Some Svariant
-  | Tpackage pack -> Some (Spackage pack.pack_path)
-  | Tunivar _ | Tpoly _ | Trepr _ -> None
-  (* Irreducible for now, but may reduce once an inner variable is solved. *)
-  | Tquote _ | Tsplice _ | Tquote_eval _ | Tbox _ -> None
-  (* Not the types of values. *)
-  | Tfield _ | Tnil | Tof_kind _ -> None
-  | Tmod _ -> None
-  | Tvar _ | Tivar _ ->
-      Misc.fatal_error "Ctype.shape_of_expanded_head: type variable"
-  | Tlink _ | Tsubst _ -> assert false
-
-(* Fill [ivar] with the shape of [ty]. If [ivar] is already full, the
-   shapes must be equal. *)
-let fill_ivar env ivar ty =
-  match shape_of_expanded_head env ty with
-  | None ->
-    (* No shape. [ivar] (and its handlers) are orphaned, and defaulted when
-       the global ivar pool is next drained. *)
-    ()
-  | Some shape -> (
-    match Ivar.fill ivar shape ~scheduler:(scheduler ()) with
-    | Ok -> ()
-    | Already_full expected ->
-      if not (equal_type_shape shape expected)
-      then
-        (* CR-someday aobrien: we could do a better job of attaching
-           provenance information for ivars e.g. where did we create
-           the ivar? did we infer the type from a default? if so, where?
-           But treating this like a unification trace for now is
-           sufficient. *)
-        raise_for Unify (Shape_mismatch { got = shape; expected }))
 
 (* [at_current_levels f] is [f], run with the current and non-generalizable
    levels set to their values when [at_current_levels f] was called.
@@ -5303,7 +5323,7 @@ let upon_shape env ty ~run ~default =
    | _ ->
      (* Fast path: [ty] is not a variable, so behaves as if its ivar
         were already filled, or defaulted if [ty] has no shape. *)
-      match shape_of_expanded_head env ty with
+      match type_shape_of_expanded_head env ty with
       | Some shape -> Scheduler.add scheduler (fun () -> run shape)
       | None -> Scheduler.add scheduler (fun () -> run (default ()))
 
@@ -5311,8 +5331,7 @@ let upon_shape env ty ~run ~default =
    is [t2']: link [t1'] to [t2] as for a [Tvar], then fill its ivar with the
    shape of [t2']. *)
 let unify3_ivar uenv jkind1 ivar1 t1' t2 t2' =
-  unify3_var uenv jkind1 t1' t2 t2' ~on_link:(fun () ->
-      fill_ivar (get_env uenv) ivar1 t2')
+  unify3_var uenv jkind1 t1' t2 t2' ~on_link:(On_link.Fill_ivar ivar1)
 
 (* Unify two [Tivar]s: intersect their jkinds, merge their ivars and link
    [t1'] to [t2']. *)
@@ -5462,9 +5481,9 @@ and unify3 uenv t1 t1' t2 t2' =
       unify_univar_for Unify (get_env uenv) t1' t2' k1 k2 !univar_pairs;
       link_type t1' t2'
   | (Tvar { jkind }, _) ->
-      unify3_var uenv jkind t1' t2 t2'
+      unify3_var uenv jkind t1' t2 t2' ~on_link:Noop
   | (_, Tvar { jkind }) ->
-      unify3_var uenv jkind t2' t1 t1'
+      unify3_var uenv jkind t2' t1 t1' ~on_link:Noop
   | (Tivar { jkind; ivar = ivar1; _ }, Tivar { ivar = ivar2; _ }) ->
       unify_ivars uenv jkind ivar1 t1' ivar2 t2'
   | (Tivar { jkind; ivar; _ }, _) ->
