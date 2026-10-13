@@ -115,7 +115,8 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~rebuild_expr
       | Never_returns -> uenv
       | Return return_continuation ->
         UE.add_function_return_or_exn_continuation ~is_cold:false uenv
-          return_continuation return_arity
+          return_continuation
+          (Flambda_arity.unarize_t return_arity)
     in
     let uacc = UA.create ~flow_result ~compute_slot_offsets:false uenv dacc in
     rebuild_expr expr uacc ~after_rebuild:(fun expr uacc -> expr, uacc)

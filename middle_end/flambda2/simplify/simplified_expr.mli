@@ -100,7 +100,7 @@ and simplified_apply = private
       { apply : Apply.t;
         use_id : Apply_cont_rewrite_id.t option;
         exn_cont_use_id : Apply_cont_rewrite_id.t;
-        result_arity : [`Unarized] Flambda_arity.t;
+        result_arity : [`Complex] Flambda_arity.t;
         coming_from_indirect : bool;
         callee's_code_metadata : Code_metadata.t
       }
@@ -165,7 +165,7 @@ val simplified_non_inlined_direct_full_application :
   Apply.t ->
   use_id:Apply_cont_rewrite_id.t option ->
   exn_cont_use_id:Apply_cont_rewrite_id.t ->
-  result_arity:[`Unarized] Flambda_arity.t ->
+  result_arity:[`Complex] Flambda_arity.t ->
   coming_from_indirect:bool ->
   callee's_code_metadata:Code_metadata.t ->
   t
