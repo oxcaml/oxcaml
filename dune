@@ -136,6 +136,7 @@
  (modules_without_implementation parsetree)
  (modules
   ;; UTILS
+  json
   arrayset
   config
   build_path_prefix_map
