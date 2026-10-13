@@ -1149,4 +1149,7 @@ module Rewriter : sig
       Var.t list ->
       Variable.t Var.Map.t * Typing_env_extension.With_extra_variables.t
   end
+
+  val fold_destructuring : f:(Var.t * 'a -> t -> 'b -> 'b) ->
+    'a pattern -> typing_env -> t -> 'b -> 'b
 end

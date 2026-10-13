@@ -184,3 +184,6 @@ end) : sig
     Var.t list ->
     Variable.t Var.Map.t * Typing_env_extension.With_extra_variables.t
 end
+
+val fold_destructuring : f:(Var.t * 'a -> Type_grammar.t -> 'b -> 'b) ->
+  'a pattern -> Typing_env.t -> Type_grammar.t -> 'b -> 'b
