@@ -123,7 +123,7 @@ let raw_backtrace_entries bt = to_array bt
 external get_raw_backtrace:
   unit -> raw_backtrace @@ portable = "caml_get_exception_raw_backtrace"
 
-external raise_with_backtrace: ('a : value_or_null).
+external raise_with_backtrace: ('a : any).
   exn -> raw_backtrace -> 'a @ portable unique @@ portable
   = "%raise_with_backtrace"
 
