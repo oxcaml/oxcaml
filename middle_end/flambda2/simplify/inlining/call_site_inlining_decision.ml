@@ -281,6 +281,10 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
               "Unexpected call site inlinine decision for speculative inlining";
           counters)
       (fun () : Call_site_inlining_decision_type.t ->
+        let _eval_params =
+          let uses = Code_metadata.param_uses code_metadata in
+          Eval_param_use.eval denv uses ~args:(Apply.args apply)
+        in
         if not (argument_types_useful dacc ~apply ~code_metadata)
         then Argument_types_not_useful
         else if not (code_present ())
