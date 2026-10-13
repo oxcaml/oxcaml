@@ -159,8 +159,14 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
   in
   Cost_metrics.( + ) (UA.cost_metrics uacc) cost_metrics_of_lifted_constants
 
-let speculative_inlining_bonus =
-  Oxcaml_args.Extra_options.bool __LOC__ "speculative-inlining-bonus"
+type limit_speculative_inlining =
+  | Minimal
+  | Half
+  | Default
+
+let speculative_inlining_limit =
+  Oxcaml_args.Extra_options.symbol __LOC__ "speculative-inlining-limit" Default
+    [ "minimal", Minimal; "half", Half; "default", Default]
 
 type argument_types_useful =
   | Coarse
@@ -304,17 +310,25 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
             | Speculatively_inlinable { size; large_function_size = threshold;
                                         small_function_size = base_size }
             | Speculatively_inlinable_functor { size; large_functor_size = threshold;
-                                                small_functor_size = base_size } ->
-                let open! Code_size in
-                let speculation_margin = threshold - base_size in
-                let over_size = size - base_size in
-                over_size + over_size <= speculation_margin
+                                                small_functor_size = base_size } -> begin
+                match speculative_inlining_limit () with
+                | Default -> true
+                | Minimal ->
+                    let open! Code_size in
+                    let over_size = size - base_size in
+                    over_size <= base_size
+                | Half ->
+                    let open! Code_size in
+                    let speculation_margin = threshold - base_size in
+                    let over_size = size - base_size in
+                    over_size + over_size <= speculation_margin
+              end
             | _ ->
-                (* CR pchambart: assert false ? *)
-                false
+                (* CR pchambart: assert false ?
+                   true is previous behaviour *)
+                true
           in
-          if speculative_inlining_bonus ()
-             && (not always_try_speculation)
+          if (not always_try_speculation)
              && argument_not_useful_enought_to_speculate denv ~apply ~code_metadata then
             Argument_not_useful_enough
           else
