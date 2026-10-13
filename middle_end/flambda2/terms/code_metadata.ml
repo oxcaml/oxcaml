@@ -281,10 +281,8 @@ let [@ocamlformat "disable"] print_inlining_paths ppf
       Inlining_history.Relative.print relative_history
       Inlining_history.Absolute.print absolute_history
 
-(* Only when there are counters, so that dumps without [-fdo-counters] do not
-   change. *)
 let [@ocamlformat "disable"] print_fdo_entry_annotation ppf annotation =
-  if not (Fdo_annotation.is_empty annotation) then
+  if !Oxcaml_flags.fdo_counters then
     Format.fprintf ppf "@[<hov 1>(fdo_entry_annotation@ %a)@]@ "
       Fdo_annotation.print annotation
 

@@ -91,14 +91,15 @@ let [@ocamlformat "disable"] print_inlining_paths ppf relative_history =
     Format.fprintf ppf "@[<hov 1>(relative_history@ %a)@]@ "
       Inlining_history.Relative.print relative_history
 
-(* Only when there is one, so that dumps without [-fdo-counters] do not
-   change. *)
-let [@ocamlformat "disable"] print_callsite_counter ppf callsite_counter =
-  match callsite_counter with
-  | None -> ()
-  | Some counter ->
-    Format.fprintf ppf "@[<hov 1>(callsite_counter@ %s)@]@ "
-      (Fdo_counter.to_string counter)
+let[@ocamlformat "disable"] print_callsite_counter ppf callsite_counter =
+  if !Oxcaml_flags.fdo_counters
+  then
+    let print_fdo_counter ppf counter =
+      Format.fprintf ppf "%s" (Fdo_counter.to_string counter)
+    in
+    Format.fprintf ppf "@[<hov 1>(callsite_counter@ %a)@]@ "
+      (Misc.Stdlib.Option.print print_fdo_counter)
+      callsite_counter
 
 let [@ocamlformat "disable"] print_normal ppf
     { callee; continuation; exn_continuation; args; args_arity;
