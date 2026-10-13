@@ -5313,23 +5313,29 @@ let upon_shape env ty ~run ~default =
   let scheduler = scheduler () in
   let ty = expand_head env ty in
   match get_desc ty with
-  | Tivar { ivar; _ } -> ivar_upon ivar ~run ~default ~scheduler
+  | Tvar _ when not (Language_extension.is_enabled Omnidirectionality) ->
+    Scheduler.add scheduler (fun () -> run (default ()))
   | Tvar { name; jkind } ->
-      if get_level ty = generic_level then
-        Misc.fatal_error "Ctype.upon_shape: generic type variable";
-      let ivar = Ivar.create ~in_global_pool:true () in
-      set_type_desc ty (Tivar { name; jkind; ivar });
-      ivar_upon ivar ~run ~default ~scheduler
-   | _ ->
-     (* Fast path: [ty] is not a variable, so behaves as if its ivar
-        were already filled, or defaulted if [ty] has no shape. *)
-      match type_shape_of_expanded_head env ty with
-      | Some shape -> Scheduler.add scheduler (fun () -> run shape)
-      | None -> Scheduler.add scheduler (fun () -> run (default ()))
+    if get_level ty = generic_level
+    then Misc.fatal_error "Ctype.upon_shape: generic type variable";
+    let ivar = Ivar.create ~in_global_pool:true () in
+    set_type_desc ty (Tivar { name; jkind; ivar });
+    ivar_upon ivar ~run ~default ~scheduler
+  | Tivar { ivar; _ } -> ivar_upon ivar ~run ~default ~scheduler
+  | _ -> (
+    (* Fast path: [ty] is not a variable, so behaves as if its ivar
+       were already filled, or defaulted if [ty] has no shape. *)
+    match type_shape_of_expanded_head env ty with
+    | Some shape -> Scheduler.add scheduler (fun () -> run shape)
+    | None -> Scheduler.add scheduler (fun () -> run (default ())))
 
 (* Unify a [Tivar] [t1'] with the non-variable type [t2], whose expanded head
    is [t2']: link [t1'] to [t2] as for a [Tvar], then fill its ivar with the
    shape of [t2']. *)
+(* CR-someday aobrien: Under the [Eager] scheduling policy, filling an ivar
+   runs its handlers immediately. Errors raised by a handler escape as
+   [Unify] (not [Unify_trace]), skipping the cleanup of the enclosing
+   unification (e.g. [reset_trace_gadt_instances], [undo_compress]). *)
 let unify3_ivar uenv jkind1 ivar1 t1' t2 t2' =
   unify3_var uenv jkind1 t1' t2 t2' ~on_link:(On_link.Fill_ivar ivar1)
 
