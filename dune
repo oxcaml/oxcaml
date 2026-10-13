@@ -1136,9 +1136,8 @@
   (glob_files
    (backend/debug/dwarf/dwarf_ocaml/.dwarf_ocaml.objs/native/*.cmx with_prefix compiler-libs))
   ; Only the interfaces of flambda2. Dune cannot glob across directories, so
-  ; every flambda2 sub-library has to be listed here by hand; a library added
-  ; under middle_end/flambda2/ without a line below is silently left out of
-  ; the installation.
+  ; every flambda2 sub-library has to be listed here by hand; a test in
+  ; middle_end/flambda2/dune fails if one is missing.
   (glob_files
    (middle_end/flambda2/.flambda2.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
   (glob_files
