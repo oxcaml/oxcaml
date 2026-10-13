@@ -147,6 +147,15 @@ let sub_const_const_exn za1 za2 =
       ZA.Assume_info.Value.of_annotation ~strict ~never_returns_normally
         ~never_raises
   in
+  let is_conditional = function
+    | Check { conditional; _ } | Assume { conditional; _ } -> conditional
+    | Default_zero_alloc | Ignore_assert_all -> false
+  in
+  begin match za2 with
+  | Check _ when is_conditional za1 && not (is_conditional za2) ->
+    raise (Error (Less_general { missing_entirely = false }))
+  | Check _ | Assume _ | Default_zero_alloc | Ignore_assert_all -> ()
+  end;
   let v1 = abstract_value za1 in
   let v2 = abstract_value za2 in
   if not (ZA.Assume_info.Value.lessequal v1 v2)

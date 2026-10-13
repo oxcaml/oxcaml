@@ -441,10 +441,10 @@ end)
 let transl_check_attrib : Zero_alloc_attribute.t -> Cmm.codegen_option list =
   function
   | Default_zero_alloc -> []
-  | Assume { strict; never_returns_normally; never_raises; loc } ->
-    [Assume_zero_alloc { strict; never_returns_normally; never_raises; loc }]
-  | Check { strict; loc; custom_error_msg } ->
-    [Check_zero_alloc { strict; loc; custom_error_msg }]
+  | Assume { conditional; strict; never_returns_normally; never_raises; loc } ->
+    [Assume_zero_alloc { conditional; strict; never_returns_normally; never_raises; loc }]
+  | Check { conditional; strict; loc; custom_error_msg } ->
+    [Check_zero_alloc { conditional; strict; loc; custom_error_msg }]
 
 (* Translation of regalloc attributes on functions. *)
 let transl_regalloc_attrib : Regalloc_attribute.t -> Cmm.codegen_option list =

@@ -1151,7 +1151,8 @@ let zero_alloc_attribute_only_assume_allowed za =
 let assume_zero_alloc ~inferred (assume : zero_alloc_assume)
     : Zero_alloc_utils.Assume_info.t =
   match assume with
-  | { strict; never_returns_normally; never_raises; } ->
+  | { conditional = true; _ } -> Zero_alloc_utils.Assume_info.none
+  | { conditional = false; strict; never_returns_normally; never_raises; _ } ->
     Zero_alloc_utils.Assume_info.create ~strict ~never_returns_normally ~never_raises ~inferred
 
 type tracing_probe =

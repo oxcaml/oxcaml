@@ -864,7 +864,8 @@ type poll_attribute =
 
 type zero_alloc_attribute =
   | Default_zero_alloc
-  | Check of { strict: bool;
+  | Check of { conditional: bool;
+               strict: bool;
                (* [strict=true] property holds on all paths.
                   [strict=false] if the function returns normally,
                   then the property holds (but property violations on
@@ -873,7 +874,8 @@ type zero_alloc_attribute =
                loc: Location.t;
                custom_error_msg: string option;
              }
-  | Assume of { strict: bool;
+  | Assume of { conditional: bool;
+                strict: bool;
                 never_returns_normally: bool;
                 never_raises: bool;
                 loc: Location.t;

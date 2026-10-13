@@ -27,6 +27,9 @@ module Allocation_sources : sig
 
   val is_empty : t -> bool
 
+  val only_allocates_on_argument_outcomes :
+    t -> outcomes:Call_outcomes.t -> bool
+
   val compare : t -> t -> int
 
   val lessequal : t -> t -> bool

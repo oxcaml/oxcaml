@@ -1569,6 +1569,8 @@ module Annotation : sig
 
   val is_strict : t -> bool
 
+  val is_conditional : t -> bool
+
   val is_check_enabled : t option -> bool
 end = struct
   (****************************************************************************
@@ -1588,7 +1590,8 @@ end = struct
    *****************************************************************************)
 
   type t =
-    { strict : bool;  (** strict or relaxed? *)
+    { conditional : bool;
+      strict : bool;  (** strict or relaxed? *)
       assume : bool;
       never_returns_normally : bool;
       never_raises : bool;
@@ -1602,37 +1605,59 @@ end = struct
   let get_custom_error_msg t = t.custom_error_msg
 
   let expected_value
-      { strict;
+      { conditional;
+        strict;
         never_returns_normally;
         never_raises;
-        assume = _;
+        assume;
         loc = _;
         custom_error_msg = _
       } =
-    Value.of_annotation ~strict ~never_returns_normally ~never_raises
+    if conditional && assume then Value.top Witnesses.unknown
+    else Value.of_annotation ~strict ~never_returns_normally ~never_raises
+
+  let actual_value t (v : Value.t) =
+    if not t.conditional then v
+    else
+      let component value =
+        V.match_with value ~bot:V.bot ~safe:V.safe
+          ~top:(fun witnesses ->
+            if Allocation_sources.only_allocates_on_argument_outcomes
+                 (Witnesses.allocation_sources witnesses)
+                 ~outcomes:Call_outcomes.normal_return
+            then V.safe
+            else V.top witnesses)
+          ~unresolved:(fun () -> value)
+      in
+      Value.{ nor = component v.nor;
+              exn = component v.exn;
+              div = component v.div }
 
   let valid t v =
     (* Use Value.lessequal but ignore witnesses. *)
     let expected = expected_value t in
-    let actual = Value.replace_witnesses Witnesses.unknown v in
+    let actual = Value.replace_witnesses Witnesses.unknown (actual_value t v) in
     Value.lessequal actual expected
 
   let diff_witnesses t v =
     let expected = expected_value t in
-    Value.diff_witnesses ~actual:v ~expected
+    Value.diff_witnesses ~actual:(actual_value t v) ~expected
 
   let is_assume t = t.assume
 
   let is_strict t = t.strict
+
+  let is_conditional t = t.conditional
 
   let find codegen_options fun_name dbg =
     let a =
       List.filter_map
         (fun (c : Cmm.codegen_option) ->
           match c with
-          | Check_zero_alloc { strict; loc; custom_error_msg } ->
+          | Check_zero_alloc { conditional; strict; loc; custom_error_msg } ->
             Some
-              { strict;
+              { conditional;
+                strict;
                 assume = false;
                 never_returns_normally = false;
                 never_raises = false;
@@ -1640,9 +1665,10 @@ end = struct
                 custom_error_msg
               }
           | Assume_zero_alloc
-              { strict; never_returns_normally; never_raises; loc } ->
+              { conditional; strict; never_returns_normally; never_raises; loc } ->
             Some
-              { strict;
+              { conditional;
+                strict;
                 assume = true;
                 never_returns_normally;
                 never_raises;
@@ -1666,9 +1692,10 @@ end = struct
       List.filter_map
         (fun (c : Cfg.codegen_option) ->
           match c with
-          | Check_zero_alloc { strict; loc; custom_error_msg } ->
+          | Check_zero_alloc { conditional; strict; loc; custom_error_msg } ->
             Some
-              { strict;
+              { conditional;
+                strict;
                 assume = false;
                 never_returns_normally = false;
                 never_raises = false;
@@ -1676,9 +1703,10 @@ end = struct
                 custom_error_msg
               }
           | Assume_zero_alloc
-              { strict; never_returns_normally; never_raises; loc } ->
+              { conditional; strict; never_returns_normally; never_raises; loc } ->
             Some
-              { strict;
+              { conditional;
+                strict;
                 assume = true;
                 never_returns_normally;
                 never_raises;
@@ -1807,7 +1835,8 @@ end = struct
         |> String.concat ","
       in
       Fmt.fprintf ppf
-        "Annotation check for zero_alloc%s failed on function %s (%s).%s"
+        "Annotation check for zero_alloc%s%s failed on function %s (%s).%s"
+        (if Annotation.is_conditional t.a then " conditional" else "")
         (if Annotation.is_strict t.a then " strict" else "")
         scoped_name t.fun_name
         (match Annotation.get_custom_error_msg t.a with

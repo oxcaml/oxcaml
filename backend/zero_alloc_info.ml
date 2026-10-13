@@ -36,6 +36,12 @@ module Allocation_sources = struct
     (not t.anything_else_may_allocate)
     && Numbers.Int.Map.is_empty t.arguments_that_may_allocate
 
+  let only_allocates_on_argument_outcomes t ~outcomes =
+    (not t.anything_else_may_allocate)
+    && Numbers.Int.Map.for_all
+         (fun _ required -> required land outcomes = required)
+         t.arguments_that_may_allocate
+
   let compare t1 t2 =
     let c =
       Bool.compare t1.anything_else_may_allocate t2.anything_else_may_allocate
