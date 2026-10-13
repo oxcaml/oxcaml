@@ -144,10 +144,10 @@
 
 (executable
  (name merge_archives)
- ; The self-contained bytecode build merges the .cma archives: it only needs
- ; the bytecode compiler libraries, which are ready long before the native
- ; ones.
- (modes native byte_complete)
+ ; Built as a self-contained bytecode executable: it only needs the bytecode
+ ; compiler libraries, which are ready long before the native ones. Nothing
+ ; uses a native build of this tool.
+ (modes byte_complete)
  (modules merge_archives)
  ; FIXME Fix warning 27
  (flags
