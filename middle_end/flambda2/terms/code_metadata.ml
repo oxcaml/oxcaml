@@ -113,6 +113,8 @@ module Code_metadata_accessors (X : Metadata_view_type) = struct
 
   let loopify t = (metadata t).loopify
 
+  let param_uses t = (metadata t).param_uses
+
   let function_slot_size t =
     let metadata = metadata t in
     let is_tupled = metadata.is_tupled in

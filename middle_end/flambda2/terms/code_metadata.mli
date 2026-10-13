@@ -84,6 +84,8 @@ module type Code_metadata_accessors_result_type = sig
 
   val loopify : 'a t -> Loopify_attribute.t
 
+  val param_uses : 'a t -> Param_use.params_uses
+
   val function_slot_size : 'a t -> int
 end
 
