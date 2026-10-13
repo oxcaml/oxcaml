@@ -21,7 +21,7 @@ module Options = Oxcaml_args.Make_optcomp_options
         (Oxcaml_args.Default.Optmain)
 
 let main unix argv ppf ~flambda2 =
-  Clflags.target := Clflags.Target.Native;
+  Clflags.set_target Clflags.Target.Native;
   let columns =
     match Sys.getenv "COLUMNS" with
     | exception Not_found -> None

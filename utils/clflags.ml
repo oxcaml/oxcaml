@@ -253,6 +253,8 @@ end
 (* Set to [Native] under ocamlopt and [Js_of_ocaml] under ocamlj *)
 let target = ref Target.Bytecode
 
+let set_target t = target := t
+
 let[@inline] is_native () =
   match !target with
   | Native -> true

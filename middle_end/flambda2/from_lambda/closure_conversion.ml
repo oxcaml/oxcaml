@@ -1011,9 +1011,9 @@ let close_c_call acc env ~loc ~let_bound_ids_with_kinds
        Lambda.external_call_description) as prim_desc) ~args exn_continuation
     dbg ~current_region ~current_ghost_region k =
   let prim_desc =
-    match !Clflags.target with
-    | Bytecode | Native -> prim_desc
-    | Js_of_ocaml ->
+    if not (Clflags.is_jsir ())
+    then prim_desc
+    else
       (* [close_c_call0] checks [prim_native_name] to see whether we should
          invoke the bytecode name or native name; for JavaScript compilation, we
          should use the bytecode name unless it involves unboxed products, for

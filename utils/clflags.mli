@@ -208,14 +208,14 @@ module Target : sig
     | Js_of_ocaml
 end
 
-(** The compilation target: [Native] under ocamlopt, [Js_of_ocaml] under
-    ocamlj, and [Bytecode] otherwise. *)
-val target : Target.t ref
+(** Set the compilation target. The default is [Bytecode]; ocamlopt sets
+    [Native] and ocamlj sets [Js_of_ocaml]. *)
+val set_target : Target.t -> unit
 
-(** [true] iff [!target = Native]. *)
+(** [true] iff the target is [Native]. *)
 val is_native : unit -> bool
 
-(** [true] iff [!target = Js_of_ocaml]. *)
+(** [true] iff the target is [Js_of_ocaml]. *)
 val is_jsir : unit -> bool
 val default_inline_threshold : float
 val inline_threshold : Float_arg_helper.parsed ref

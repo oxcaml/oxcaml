@@ -94,7 +94,7 @@ let () =
 
 let main () =
   let ppf = Format.err_formatter in
-  Clflags.target := Clflags.Target.Native;
+  Clflags.set_target Clflags.Target.Native;
   Clflags.Opt_flag_handler.set Oxcaml_flags.opt_flag_handler;
   let list = ref Options.list in
   begin
