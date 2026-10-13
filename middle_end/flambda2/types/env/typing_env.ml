@@ -1113,7 +1113,11 @@ let compute_joined_aliases base_env alias_candidates envs_at_uses =
     with_aliases base_env ~aliases:new_aliases
 
 let closure_env t =
-  increment_scope { t with min_binding_time = t.next_binding_time }
+  increment_scope
+    { t with
+      min_binding_time = t.next_binding_time;
+      name_info = Name.Map.empty
+    }
 
 let rec free_names_transitive_of_type_of_name t name ~result =
   let result = Name_occurrences.add_name result name Name_mode.in_types in
