@@ -18,7 +18,7 @@ jobs:
     # It matches the untrusted workflow's job name; exactly one of the two
     # workflows runs per event, so the check is reported exactly once.
     name: nix-matrix
-    runs-on: warp-ubuntu-latest-arm64-8x
+    runs-on: warp-ubuntu-latest-arm64-16x
     permissions:
       contents: read
     outputs:
