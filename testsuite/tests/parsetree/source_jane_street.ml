@@ -1902,7 +1902,7 @@ val f : int addr -> int = <fun>
 
 let f (addr_ x : string addr @ local) = x
 [%%expect{|
-val f : string addr @ local -> string = <fun>
+val f : string addr @ local -> string @ local = <fun>
 |}]
 
 let f a = let addr_ x = a in x

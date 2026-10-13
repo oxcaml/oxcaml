@@ -323,11 +323,25 @@ let[@warning "-18"] mutable_implied_modalities ~for_mutable_variable mut =
   then if for_mutable_variable then monadic else monadic @ comonadic
   else []
 
-let mutable_implied_modalities ~for_mutable_variable mut =
-  let l = mutable_implied_modalities ~for_mutable_variable mut in
+let modality_of_atoms l =
   List.fold_left
     (fun t (Modality.Atom (ax, a)) -> Modality.Const.set ax a t)
     Modality.Const.id l
+
+(* The contents of an address get the same modalities as a field of the
+   same mutability, except [global] to preserve compatibility with
+   upstream [Addr.of_imm]. *)
+(* CR address-patterns: The address modalities should be the same as the
+   mutable implied modalities when [@@ global] is no longer implied. *)
+let address_modalities mut =
+  mutable_implied_modalities ~for_mutable_variable:false (Types.is_mutable mut)
+  |> List.filter (function
+    | Modality.Atom (Comonadic Areality, _) -> false
+    | Modality.Atom _ -> true)
+  |> modality_of_atoms
+
+let mutable_implied_modalities ~for_mutable_variable mut =
+  modality_of_atoms (mutable_implied_modalities ~for_mutable_variable mut)
 
 let idx_expected_modalities ~(mut : bool) =
   (* There are two design constraints on what modalities we allow in an index

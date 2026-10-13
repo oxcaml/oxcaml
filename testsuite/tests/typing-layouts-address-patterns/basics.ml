@@ -649,12 +649,19 @@ let ok_read (a : int addr @ read) =
 val ok_read : int addr @ read -> unit = <fun>
 |}]
 
-(* The value at a mutable address is global, many, aliased and unyielding *)
-let ok_local (a : string addr @ local) =
+(* The value at a mutable address is many, aliased and unyielding, but not
+   global *)
+let bad_local (a : string addr @ local) =
   match a with
   | addr_ x -> use_global x
 [%%expect{|
-val ok_local : string addr @ local -> unit = <fun>
+Line 3, characters 26-27:
+3 |   | addr_ x -> use_global x
+                              ^
+Error: This value is "local" to the parent region
+         because it is the value at the address at line 3, characters 4-11
+         which is "local" to the parent region.
+       However, the highlighted expression is expected to be "global".
 |}]
 
 let ok_once (a : (unit -> unit) addr @ once) =

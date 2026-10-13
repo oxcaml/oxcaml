@@ -4196,7 +4196,7 @@ and type_pat_aux
         }
         | Immutable -> Immutable
       in
-      let modalities = Typemode.mutable_modalities mutability in
+      let modalities = Typemode.address_modalities mutability in
       check_project_mutability ~loc ~env:!!penv Address_contents mutability
         pat_mode.mode;
       let is_contained_by : Mode.Hint.is_contained_by =
