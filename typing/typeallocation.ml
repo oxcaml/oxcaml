@@ -2,15 +2,8 @@
 
 open Mode
 
-type allocation =
-  (* A locality mode *variable* with constraints, to be zapped as local as
-      possible, as late as possible. *)
-  | Known of Locality.r
-  (* Pattern-matching an array that might be a float array. *)
-  | Maybe_float_array of Typedtree.pattern
-
 type t =
-  { allocation : allocation;
+  { locality_mode : Locality.r;
     closures : (Hint.pinpoint * Allocation.r) list;
     (** Closures enclosing the allocation, from the innermost
         to the outermost one. *)
@@ -29,15 +22,15 @@ let register_mode_for_optimisation
     (* All closures enclosing this allocation, innermost-first, along with their
        allocation modes. *)
     ?(closures=[])
-    allocation =
+    locality_mode =
+  let locality_mode = Locality.disallow_left locality_mode in
   (* Add to a delayed worklist to be zapped as late as possible. *)
-  allocations := {allocation; closures; pp} :: !allocations
+  allocations := {locality_mode; closures; pp} :: !allocations
 
 let register_allocation_mode ~env ~loc locality_mode =
   let pp : Hint.pinpoint = (loc, Allocation) in
   let closures = Env.walk_locks_for_allocation ~env pp in
-  register_mode_for_optimisation pp ~closures
-    (Known (Locality.disallow_left locality_mode))
+  register_mode_for_optimisation pp ~closures locality_mode
 
 let register_allocation_value_mode ~env ~loc
     ?(desc  = (Unknown : Hint.allocation_desc)) mode =
@@ -172,14 +165,10 @@ let rec iter_rev ~f = function
 let constrain_closures () =
   let heap, pending =
     List.partition
-      ( fun { allocation; _ } ->
-          begin match allocation with
-          | Known locality_mode ->
-            begin match Locality.Guts.get_ceil locality_mode with
-            | Global -> true
-            | Local -> false
-            end
-          | Maybe_float_array _ -> false
+      ( fun { locality_mode; _ } ->
+          begin match Locality.Guts.get_ceil locality_mode with
+          | Global -> true
+          | Local -> false
           end )
       !allocations
   in
@@ -193,14 +182,10 @@ let constrain_closures () =
 let constrain_allocations () =
   let local, pending =
     List.partition_map
-      ( fun ({ allocation; closures; pp } as entry) ->
-          begin match allocation with
-          | Known locality_mode ->
-            begin match enclosing_noalloc_closure closures with
-            | Some closure -> Left (locality_mode, pp, closure)
-            | None -> Right entry
-            end
-          | Maybe_float_array _ -> Right entry
+      ( fun ({ locality_mode; closures; pp } as entry) ->
+          begin match enclosing_noalloc_closure closures with
+          | Some closure -> Left (locality_mode, pp, closure)
+          | None -> Right entry
           end )
       !allocations
   in
@@ -226,39 +211,12 @@ let optimise_allocations () =
   - Add it back when middle-end can really utilize this information. *)
   (* Allocations are visited in registration (i.e. source) order, so that the
      first offending allocation is the one reported. *)
-  let known, maybe_float_array =
-    List.partition_map
-      ( fun { allocation; closures; pp } ->
-          begin match allocation with
-          | Known locality_mode -> Left (locality_mode, closures, pp)
-          | Maybe_float_array pattern -> Right (pattern, closures, pp)
-          end )
-      !allocations
-  in
+  let pending = !allocations in
   reset_allocations ();
   iter_rev
-    ~f:(fun (locality_mode, closures, pp) ->
+    ~f:(fun { locality_mode; closures; pp } ->
           begin match Locality.zap_to_ceil_exn locality_mode with
           | Global -> constrain_enclosing_closures pp closures
           | Local -> ()
           end)
-    known;
-  iter_rev
-    ~f:(fun (pattern, closures, pp) ->
-          begin match Typeopt.array_pattern_kind pattern with
-          | Lambda.Pfloatarray
-          | Lambda.Pgenarray
-            -> constrain_enclosing_closures pp closures
-          | Lambda.Paddrarray
-          | Lambda.Pgcignorableaddrarray
-          | Lambda.Pintarray
-          | Lambda.Punboxedmaskarray
-          | Lambda.Punspecializedarray
-          | Lambda.Punboxedfloatarray _
-          | Lambda.Punboxedoruntaggedintarray _
-          | Lambda.Punboxedvectorarray _
-          | Lambda.Pgcscannableproductarray _
-          | Lambda.Pgcignorableproductarray _
-            -> ()
-          end)
-    maybe_float_array
+    pending

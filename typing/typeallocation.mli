@@ -2,13 +2,6 @@
 
 open Mode
 
-type allocation =
-  (* A locality mode *variable* with constraints, to be zapped as local as
-      possible, as late as possible. *)
-  | Known of Locality.r
-  (* Pattern-matching an array that might be a float array. *)
-  | Maybe_float_array of Typedtree.pattern
-
 val reset_allocations : unit -> unit
 
 (* Register a locality mode variable to be zapped as local as possible, as late
@@ -19,7 +12,7 @@ val register_mode_for_optimisation :
   (* All closures enclosing this allocation, innermost-first, along with their
       allocation modes. *)
   ?closures:(Hint.pinpoint * Allocation.r) list ->
-  allocation ->
+  ('l * allowed) Locality.t ->
   unit
 
 val register_allocation_mode :

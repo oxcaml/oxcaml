@@ -18,10 +18,10 @@ end
 Line 5, characters 6-13:
 5 |     | [| f |] -> f
           ^^^^^^^
-Error: The allocation is "alloc" because it is allocated on the heap.
-       However, the allocation highlighted is expected to be "noalloc"
-         because it is used inside the function at lines 4-6, characters 19-15
-         which is expected to be "noalloc".
+Error: The allocation is "local"
+         because it is allocated inside the function at lines 4-6, characters 19-15,
+         which is "noalloc" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
 |}]
 
 module Matching_a_float_record_allocates : sig
@@ -47,12 +47,14 @@ end
 Line 5, characters 6-13:
 5 |     | [| a |] -> a
           ^^^^^^^
-Error: The allocation is "alloc" because it is allocated on the heap.
-       However, the allocation highlighted is expected to be "noalloc"
-         because it is used inside the function at lines 4-6, characters 24-32
-         which is expected to be "noalloc".
+Error: The allocation is "local"
+         because it is allocated inside the function at lines 4-6, characters 24-32,
+         which is "noalloc" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
 |}]
 
+(* CR-someday wsturgeon for wsturgeon: remove the float array optimization *)
+(*
 module Matching_a_non_float_array_does_not_allocate : sig
   val head_or_42 : int array -> int @@ noalloc
 end = struct
@@ -60,11 +62,7 @@ end = struct
     | [| i |] -> i
     | _ -> 42
 end
-[%%expect{|
-module Matching_a_non_float_array_does_not_allocate :
-  sig val head_or_42 : int array -> int @@ noalloc end @@ stateless
-  noalloc_strict
-|}]
+*)
 
 module Module_type_of_float_array_match = struct
   module M = struct
@@ -76,7 +74,24 @@ module Module_type_of_float_array_match = struct
   module N : S = M
 end
 [%%expect{|
-CR wsturgeon for wsturgeon: this has to pass
+module Module_type_of_float_array_match :
+  sig
+    module M :
+      sig
+        val head_or_42 :
+          float array @ [< 'm & read] ->
+          float @ [> 'm mod global many forkable unyielding | aliased dynamic]
+          @@ stateless
+      end
+    module type S =
+      sig
+        val head_or_42 :
+          float array @ [< 'm & read] ->
+          float @ [> 'm mod global many forkable unyielding | aliased dynamic]
+          @@ stateless
+      end
+    module N : S @@ stateless
+  end
 |}]
 
 module Unboxable_return_value : sig
