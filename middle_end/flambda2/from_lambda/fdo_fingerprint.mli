@@ -29,37 +29,38 @@
 (** The FDO identity of a function, computed from its Lambda definition (see
     [Fdo_counter_identity]).
 
-    The definition id names the function by its scope path and an occurrence
-    number among the functions with that path, so it survives edits of the body.
-    An anonymous function (or a wrapper, or a lazy body) has no name to be
-    stable under, and an occurrence among its scope's anonymous functions would
-    change whenever one is added before it, so its first few tokens (parameters,
-    identifiers, primitives, constants) are part of its name instead:
+    The [definition_id] names the function by its scope path and a
+    discriminator.
+
+    Functions with no (stable) names (like anonymous functions, wrappers, or
+    lazy bodies) instead use the enclosing path and the first few tokens
+    (parameters, identifiers, primitives, and constants). For example, like:
     ["Foo.(fun)@x,acc,+"]. *)
+
+(** What naming a function depends on besides its own definition. Used in
+    [Lambda_to_flambda_env] while translating from Lambda. Contains the path of
+    the enclosing function and the discriminators already handed out in the
+    compilation unit. *)
+module Naming_context : sig
+  type t
+
+  (** The context of a compilation unit's toplevel code. *)
+  val toplevel : Compilation_unit.t -> t
+end
 
 type t
 
-(** [fresh_discriminator ~path] counts the functions already named [path];
-    [enclosing_path] names the enclosing function, for functions without scopes.
-*)
-val of_function :
-  fresh_discriminator:(path:string -> int) ->
-  enclosing_path:string ->
-  Lambda.lfunction ->
-  t
+(** The identity of a function defined in the given context, and the context of
+    the functions defined in its body. *)
+val of_function : Naming_context.t -> Lambda.lfunction -> t * Naming_context.t
 
 val definition_id : t -> Fdo_counter.Definition_id.t
 
 (** The counters of the function's entry edge: its entry counter. *)
 val entry_annotation : t -> Fdo_annotation.t
 
-(** The scope path the definition id is derived from, used as [enclosing_path]
-    for the functions defined in the body. *)
-val path : t -> string
-
-(** The first (up to five) distinct tokens of a function: its parameters, then,
-    in translation order, the identifiers its body binds or mentions, the values
-    of other compilation units it uses (unit name and offset), its primitives
-    (with their tag or offset: "Pfield0", "Pmakeblock1", "int_add", "caml_hash")
-    and its integer constants. Exposed for testing. *)
-val leading_tokens : params:Ident.t list -> Lambda.lambda -> string list
+(** The first [limit] (5 by default) distinct tokens of a function. Only
+    parameter and body identifiers, primitives, and constants are considered, in
+    translation order. *)
+val leading_tokens :
+  ?limit:int -> params:Ident.t list -> Lambda.lambda -> string list
