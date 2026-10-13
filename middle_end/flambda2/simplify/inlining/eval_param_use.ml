@@ -46,6 +46,17 @@ let eval_use denv (ty : T.t) (use : Param_use.use) : Removed_operations.t =
         then Removed_operations.direct_call_of_indirect
         else Removed_operations.zero)
     end
+  | Switch_scrutinee ->
+    begin match T.meet_naked_immediates typing_env ty with
+    | Need_meet -> Removed_operations.zero
+    | Invalid ->
+      (* Dead branch: we know something, but it's not obvious what we know *)
+      Removed_operations.zero
+    | Known_result cases -> (
+      match Target_ocaml_int.Set.get_singleton cases with
+      | Some _ -> Removed_operations.branch
+      | None -> Removed_operations.zero)
+    end
 
 let eval_one_use denv ty (use : Param_use.one_param_use) =
   let typing_env = DE.typing_env denv in

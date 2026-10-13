@@ -2,6 +2,7 @@
 type use =
   | Apply_function of [`Complex] Flambda_arity.t
   (** Used as a function in an indirect function call with the given arity *)
+  | Switch_scrutinee
 
 type t = {
   source : Param_projection.t;

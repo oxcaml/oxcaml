@@ -1,4 +1,6 @@
-type use = Apply_function of [`Complex] Flambda_arity.t
+type use =
+  | Apply_function of [`Complex] Flambda_arity.t
+  | Switch_scrutinee
 
 type t =
   { source : Param_projection.t;
@@ -23,6 +25,7 @@ let add ~source ~use uses = { source; use } :: uses
 let print_use ppf = function
   | Apply_function arity ->
     Format.fprintf ppf "Apply_function(%a)" Flambda_arity.print arity
+  | Switch_scrutinee -> Format.fprintf ppf "Switch_scrutinee"
 
 let [@ocamlformat "disable"] print ppf { source; use } =
   Format.fprintf ppf "@[<hov 1>(\
@@ -55,6 +58,9 @@ let approx_equal_use u1 u2 =
   match u1, u2 with
   | Apply_function a1, Apply_function a2 ->
     Flambda_arity.equal_ignoring_subkinds a1 a2
+  | Switch_scrutinee, Switch_scrutinee -> true
+  | Apply_function _, Switch_scrutinee | Switch_scrutinee, Apply_function _ ->
+    false
 
 let approx_equal_one_param_uses { projection = projection1; use = use1 }
     { projection = projection2; use = use2 } =
