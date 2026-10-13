@@ -250,7 +250,6 @@ module Target = struct
     | Js_of_ocaml
 end
 
-(* Set to [Native] under ocamlopt and [Js_of_ocaml] under ocamlj *)
 let target = ref Target.Bytecode
 
 let set_target t = target := t
