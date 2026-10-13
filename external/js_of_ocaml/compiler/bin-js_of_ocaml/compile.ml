@@ -415,8 +415,8 @@ let run
           |> sourcemap_of_info ~base:source_map_base)
   | (`Cmj _ | `Cmja _) as input -> (
       let t1 = Timer.make () in
-      (* Read a file produced by [ocamlj]: a magic number of the expected kind
-         followed by the contents read by [f]. *)
+      (* Read a file produced by the OxCaml JSIR backend: a magic number of the
+         expected kind followed by the contents read by [f]. *)
       let read_jsir_file filename ~(expected : [ `Cmj | `Cmja ]) f =
         let ic = open_in_bin filename in
         Fun.protect
@@ -449,8 +449,9 @@ let run
             read_jsir_file filename ~expected:`Cmja Parse_bytecode.from_cmja
       in
       if times () then Format.eprintf "  parsing: %a@." Timer.print t1;
-      (* CR-soon selee: [ocamlj] does not produce any debug-related information
-         yet. This should be updated once the [.cmj] file format changes. *)
+      (* CR-soon selee: the OxCaml JSIR backend does not produce any
+         debug-related information yet. This should be updated once the [.cmj]
+         file format changes. *)
       let one (unit : Parse_bytecode.jsir_unit) : Parse_bytecode.one =
         { code = unit.program
         ; cmis = StringSet.empty

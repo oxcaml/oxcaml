@@ -34,7 +34,7 @@ val of_primitives : aliases:(string * string) list -> string list -> t
 
 val of_compilation_units :
   exported:Code.Compilation_unit.t -> imported:Code.Compilation_unit.t list -> t
-(** Linking information of a unit compiled by OxCaml's [ocamlj]. *)
+(** Linking information of a unit compiled by the OxCaml JSIR backend. *)
 
 val union : t -> t -> t
 
