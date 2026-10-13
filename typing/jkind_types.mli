@@ -78,6 +78,8 @@ module Sort : sig
 
   and var
 
+  exception Lower_rigid
+
   include
     Jkind_intf.Sort
       with type t := t

@@ -500,12 +500,8 @@ Error: Signature mismatch:
        is not included in
          val poly_ id : 'a -> 'a
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
-       The kind of 'a is 's8 separable non_null
-         because of the definition of id at line 2, characters 2-25.
-       But the kind of 'a must be representable
-         because it's the layout polymorphic type in an external declaration
-         ([@layout_poly] forces all variables of layout 'any' to be
-         representable at call sites).
+       The type "'b" is layout polymorphic,
+       but "'a" is not layout polymorphic.
 |}];;
 
 (* eta-expanding coercion *)
@@ -529,12 +525,8 @@ Error: Signature mismatch:
        is not included in
          val id : layout_ l l0. ('a : l). 'a -> 'a
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
-       The kind of 'a is 's9
-         because of the definition of id at line 2, characters 2-42.
-       But the kind of 'a must be representable
-         because it's the layout polymorphic type in an external declaration
-         ([@layout_poly] forces all variables of layout 'any' to be
-         representable at call sites).
+       The type "'b" is layout polymorphic,
+       but "'a" is not layout polymorphic.
 |}];;
 module M0 : sig
   val id : layout_ y x. ('a : x). 'a -> 'a
@@ -556,12 +548,8 @@ Error: Signature mismatch:
        is not included in
          val id : layout_ l l0. ('a : l0). 'a -> 'a
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
-       The kind of 'a is 's10
-         because of the definition of id at line 2, characters 2-42.
-       But the kind of 'a must be representable
-         because it's the layout polymorphic type in an external declaration
-         ([@layout_poly] forces all variables of layout 'any' to be
-         representable at call sites).
+       The type "'b" is layout polymorphic,
+       but "'a" is not layout polymorphic.
 |}];;
 
 (* instantiating and eta-expanding coercion *)
@@ -611,12 +599,8 @@ Error: Signature mismatch:
        is not included in
          val poly_ id : 'a -> 'a
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
-       The kind of 'a is 's11
-         because of the definition of id at line 2, characters 2-40.
-       But the kind of 'a must be representable
-         because it's the layout polymorphic type in an external declaration
-         ([@layout_poly] forces all variables of layout 'any' to be
-         representable at call sites).
+       The type "'b" is layout polymorphic,
+       but "'a" is not layout polymorphic.
 |}];;
 
 (* chaining non-polymorphic primitive and eta-expanding coercions *)
@@ -657,12 +641,8 @@ Error: Signature mismatch:
        is not included in
          val id : layout_ l l0. ('a : l0). 'a -> 'a
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
-       The kind of 'a is 's12
-         because of the definition of id at line 2, characters 2-42.
-       But the kind of 'a must be representable
-         because it's the layout polymorphic type in an external declaration
-         ([@layout_poly] forces all variables of layout 'any' to be
-         representable at call sites).
+       The type "'b" is layout polymorphic,
+       but "'a" is not layout polymorphic.
 |}];;
 
 module M1 = ((Id : sig
@@ -687,12 +667,8 @@ Error: Signature mismatch:
        is not included in
          val id : layout_ l l0. ('a : l). 'a -> 'a
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
-       The kind of 'a is 's13
-         because of the definition of id at line 2, characters 2-42.
-       But the kind of 'a must be representable
-         because it's the layout polymorphic type in an external declaration
-         ([@layout_poly] forces all variables of layout 'any' to be
-         representable at call sites).
+       The type "'b" is layout polymorphic,
+       but "'a" is not layout polymorphic.
 |}];;
 
 
