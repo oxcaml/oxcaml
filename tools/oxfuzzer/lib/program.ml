@@ -13,13 +13,21 @@ module Ty = Ir.Ty
 type t =
   { swarm : Config.Swarm.t;
     record_types : Ty.record list;
+    variant_types : Ty.variant list;
     functions : Function.t list;
     toplevel_decls : (Binding.t * Expr.t) list;
     toplevel_statement : Statement.t
   }
 
-let create ~swarm ~record_types ~functions ~toplevel_decls ~toplevel_statement =
-  { swarm; record_types; functions; toplevel_decls; toplevel_statement }
+let create ~swarm ~record_types ~variant_types ~functions ~toplevel_decls
+    ~toplevel_statement =
+  { swarm;
+    record_types;
+    variant_types;
+    functions;
+    toplevel_decls;
+    toplevel_statement
+  }
 
 let is_floating_point_to_integral ~from ~to_ =
   NumberTy.is_floating_point from && not (NumberTy.is_floating_point to_)
@@ -245,6 +253,26 @@ let record_declarations records =
   in
   List.map declaration records
 
+let variant_declarations variants =
+  List.map
+    (fun (variant : Ty.variant) ->
+      let constructors =
+        List.map
+          (fun (constructor : Ty.constructor) ->
+            let args =
+              List.map
+                (fun ty -> Type.constructor_arg (Ty.to_code ty))
+                constructor.args
+            in
+            Type.constructor ~args:(Parsetree.Pcstr_tuple args)
+              (loc (Ty.constructor_name variant constructor)))
+          variant.constructors
+      in
+      Str.type_ Nonrecursive
+        [ Type.mk ~kind:(Parsetree.Ptype_variant constructors)
+            (loc (Ty.variant_name variant)) ])
+    variants
+
 let rec print_value path ty expr =
   match ty with
   | Ty.Number nty -> print_number nty expr
@@ -271,6 +299,40 @@ let rec print_value path ty expr =
         let path = path ^ "_field_" ^ string_of_int field.index in
         Exp.sequence (print_value path field.ty value) acc)
       record.fields unit_
+  | Ty.Variant variant ->
+    let cases =
+      List.map
+        (fun (constructor : Ty.constructor) ->
+          let args =
+            List.mapi
+              (fun index ty ->
+                let name =
+                  Format.sprintf "%s_case_%d_arg_%d" path
+                    constructor.constructor_index index
+                in
+                Name.of_string name, ty)
+              constructor.args
+          in
+          let body =
+            List.fold_right
+              (fun (name, ty) body ->
+                let name = Name.to_string name in
+                Exp.sequence (print_value name ty (ident name)) body)
+              args unit_
+          in
+          let tag =
+            apply
+              (qualified_ident "Printf" "printf")
+              [ Exp.constant
+                  (Const.string (Ty.constructor_name variant constructor ^ " "))
+              ]
+          in
+          Exp.case
+            (Ty.constructor_pattern variant constructor (List.map fst args))
+            (Exp.sequence tag body))
+        variant.constructors
+    in
+    Exp.match_ expr cases
   | Ty.Bool ->
     apply
       (qualified_ident "Printf" "printf")
@@ -279,6 +341,7 @@ let rec print_value path ty expr =
 let to_code
     { swarm;
       record_types;
+      variant_types;
       functions;
       toplevel_decls = decls;
       toplevel_statement = statement
@@ -325,6 +388,7 @@ let to_code
   let structure =
     opens
     @ record_declarations record_types
+    @ variant_declarations variant_types
     @ array_primitives @ conversions number_types @ float_helpers
     @ List.map Function.to_code functions
     @ [main; run]
