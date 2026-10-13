@@ -389,7 +389,7 @@ external f10_6_1 : (int8#[@unboxed][@unsafe_unextended]) -> unit
 Line 1, characters 27-34:
 1 | external f10_6_1 : (int8#[@unboxed][@unsafe_unextended]) -> unit
                                ^^^^^^^
-Error: Too many "[@@unboxed]"/"[@@untagged]"/"[@@unpacked]"/"[@@unsafe_unextended]" attributes
+Error: Too many "[@@unboxed]"/"[@@untagged]"/"[@@unpacked]"/"[@@unsafe_unextended]"/"[@@ox_ptr]" attributes
 |}];;
 
 external f10_6_2 : (#(int8# * int)[@unpacked]) -> bool -> string  = "foo" "bar";;
