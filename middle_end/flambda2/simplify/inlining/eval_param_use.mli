@@ -1,5 +1,7 @@
 type expected_benefit = { removed_operations : Removed_operations.t }
 
+val no_expected_benefit : expected_benefit -> bool
+
 val eval :
   Downwards_env.t ->
   Param_use.params_uses ->

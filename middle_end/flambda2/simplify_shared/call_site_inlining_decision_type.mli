@@ -23,6 +23,7 @@ type t =
   | In_a_stub
   | Doing_speculative_inlining
   | Argument_types_not_useful
+  | Argument_not_useful_enough
   | Unrolling_depth_exceeded
   | Max_inlining_depth_exceeded
   | Recursion_depth_exceeded

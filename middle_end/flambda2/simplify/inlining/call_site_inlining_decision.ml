@@ -210,6 +210,13 @@ let argument_types_useful dacc ~apply ~code_metadata =
         (Flambda_arity.unarize arity)
         (Apply.args apply)
 
+let argument_not_useful_enought_to_speculate denv ~apply ~code_metadata =
+  let uses = Code_metadata.param_uses code_metadata in
+  let expected_benefit =
+    Eval_param_use.eval denv uses ~args:(Apply.args apply)
+  in
+  Eval_param_use.no_expected_benefit expected_benefit
+
 let inlining_does_decrease_code_size ~code_metadata cost_metrics =
   let[@ocamlformat "break-infix=fit-or-vertical"] original_code_size =
     code_metadata |> Code_metadata.cost_metrics |> Cost_metrics.size
@@ -257,6 +264,8 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
         match decision with
         | Argument_types_not_useful ->
           Profile.Counters.incr "argument_types_not_useful" counters
+        | Argument_not_useful_enough ->
+          Profile.Counters.incr "argument_not_useful_enough" counters
         | Speculatively_inline { cost_metrics; _ } ->
           let counters =
             Profile.Counters.incr "speculatively_inline" counters
@@ -281,15 +290,30 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
               "Unexpected call site inlinine decision for speculative inlining";
           counters)
       (fun () : Call_site_inlining_decision_type.t ->
-        let _eval_params =
-          let uses = Code_metadata.param_uses code_metadata in
-          Eval_param_use.eval denv uses ~args:(Apply.args apply)
-        in
         if not (argument_types_useful dacc ~apply ~code_metadata)
         then Argument_types_not_useful
         else if not (code_present ())
         then Missing_code
         else
+          let always_try_speculation =
+            (* The code size is small enough compared to speculation threshold *)
+            match[@ocaml.warning "-fragile-match"] Code_metadata.inlining_decision code_metadata with
+            | Speculatively_inlinable { size; large_function_size = threshold;
+                                        small_function_size = base_size }
+            | Speculatively_inlinable_functor { size; large_functor_size = threshold;
+                                                small_functor_size = base_size } ->
+                let open! Code_size in
+                let speculation_margin = threshold - base_size in
+                let over_size = size - base_size in
+                over_size + over_size <= speculation_margin
+            | _ ->
+                (* CR pchambart: assert false ? *)
+                false
+          in
+          if not always_try_speculation &&
+             argument_not_useful_enought_to_speculate denv ~apply ~code_metadata then
+            Argument_not_useful_enough
+          else
           let cost_metrics =
             speculative_inlining ~apply dacc ~simplify_expr ~return_arity
               ~function_type

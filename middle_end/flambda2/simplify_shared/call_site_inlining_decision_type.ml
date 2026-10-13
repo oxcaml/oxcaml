@@ -30,6 +30,7 @@ type t =
   | In_a_stub
   | Doing_speculative_inlining
   | Argument_types_not_useful
+  | Argument_not_useful_enough
   | Unrolling_depth_exceeded
   | Max_inlining_depth_exceeded
   | Recursion_depth_exceeded
@@ -64,6 +65,8 @@ let [@ocamlformat "disable"] rec print ppf t =
     Format.fprintf ppf "Doing_speculative_inlining"
   | Argument_types_not_useful ->
     Format.fprintf ppf "Argument_types_not_useful"
+  | Argument_not_useful_enough ->
+    Format.fprintf ppf "Argument_types_not_useful_enough"
   | Unrolling_depth_exceeded ->
     Format.fprintf ppf "Unrolling_depth_exceeded"
   | Max_inlining_depth_exceeded ->
@@ -135,6 +138,9 @@ let rec can_inline (t : t) : can_inline =
   | Argument_types_not_useful ->
     (* If there's an [@inlined] attribute on this, something's gone wrong *)
     Do_not_inline { erase_attribute_if_ignored = false }
+  | Argument_not_useful_enough ->
+    (* If there's an [@inlined] attribute on this, something's gone wrong *)
+    Do_not_inline { erase_attribute_if_ignored = false }
   | Never_inlined_attribute ->
     (* If there's an [@inlined] attribute on this, something's gone wrong *)
     Do_not_inline { erase_attribute_if_ignored = false }
@@ -183,6 +189,10 @@ let rec report_reason fmt t =
   | Argument_types_not_useful ->
     Format.fprintf fmt
       "there@ was@ no@ useful@ information@ about@ the@ arguments"
+  | Argument_not_useful_enough ->
+    Format.fprintf fmt
+      "there@ were@ useful@ information@ about@ the@ arguments,@ but@ not@ \
+       enough@ to@ warant@ speculation"
   | Unrolling_depth_exceeded ->
     Format.fprintf fmt "the@ maximum@ unrolling@ depth@ has@ been@ exceeded"
   | Max_inlining_depth_exceeded ->

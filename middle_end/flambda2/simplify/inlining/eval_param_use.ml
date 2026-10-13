@@ -5,6 +5,9 @@ module TR = Flambda2_types.Rewriter
 
 type expected_benefit = { removed_operations : Removed_operations.t }
 
+let no_expected_benefit { removed_operations } =
+  Removed_operations.equal removed_operations Removed_operations.zero
+
 let rec make_pattern (projection : Param_projection.projection) acc =
   match projection with
   | Identity -> acc
