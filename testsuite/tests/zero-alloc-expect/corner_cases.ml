@@ -15,7 +15,13 @@ end = struct
     | _ -> 42.0
 end
 [%%expect{|
-CR wsturgeon for wsturgeon: this has to fail
+Line 5, characters 6-13:
+5 |     | [| f |] -> f
+          ^^^^^^^
+Error: The allocation is "alloc" because it is allocated on the heap.
+       However, the allocation highlighted is expected to be "noalloc"
+         because it is used inside the function at lines 4-6, characters 19-15
+         which is expected to be "noalloc".
 |}]
 
 module Matching_a_float_record_allocates : sig
@@ -38,20 +44,39 @@ end = struct
     | _ -> while true do () done
 end
 [%%expect{|
-CR wsturgeon for wsturgeon: this has to fail
+Line 5, characters 6-13:
+5 |     | [| a |] -> a
+          ^^^^^^^
+Error: The allocation is "alloc" because it is allocated on the heap.
+       However, the allocation highlighted is expected to be "noalloc"
+         because it is used inside the function at lines 4-6, characters 24-32
+         which is expected to be "noalloc".
 |}]
 
 module Matching_a_non_float_array_does_not_allocate : sig
   val head_or_42 : int array -> int @@ noalloc
 end = struct
   let head_or_42 = function
-    | [| f |] -> f
+    | [| i |] -> i
     | _ -> 42
 end
 [%%expect{|
 module Matching_a_non_float_array_does_not_allocate :
   sig val head_or_42 : int array -> int @@ noalloc end @@ stateless
   noalloc_strict
+|}]
+
+module Module_type_of_float_array_match = struct
+  module M = struct
+    let head_or_42 = function
+      | [| f |] -> f
+      | _ -> 42.
+  end
+  module type S = module type of M
+  module N : S = M
+end
+[%%expect{|
+CR wsturgeon for wsturgeon: this has to pass
 |}]
 
 module Unboxable_return_value : sig

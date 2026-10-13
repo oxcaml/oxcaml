@@ -3971,13 +3971,23 @@ and type_pat_aux
         List.map
           (fun p -> type_pat ~pat_mode tps Value p ty_elt arg_sort) spl
       in
-      rvp {
+      let pattern = {
         pat_desc = Tpat_array (mutability, arg_sort, pl);
         pat_loc = loc; pat_extra=[];
         pat_type = instance expected_ty;
         pat_attributes = sp.ppat_attributes;
         pat_env = !!penv;
         pat_unique_barrier = Unique_barrier.not_computed () }
+      in
+      (* If the pattern does bind a variable, that variable might be a float,
+         and OCaml has to box floats coming out of a flattened float array. *)
+      begin
+        let pp : Mode.Hint.pinpoint = loc, Allocation in
+        let closures = Env.walk_locks_for_allocation ~env:!!penv pp in
+        Typeallocation.register_mode_for_optimisation pp ~closures
+          (Typeallocation.Maybe_float_array pattern)
+      end;
+      rvp pattern
   | Ppat_or(sp1, sp2) ->
       (* Reset pattern forces for just [tps2] because later we append [tps1] and
          [tps2]'s pattern forces, and we don't want to duplicate [tps]'s pattern
