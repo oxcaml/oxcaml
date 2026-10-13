@@ -470,36 +470,47 @@ let run
           ~link:`Needed
           output_file
       in
+      let build_info =
+        match input with
+        | `Cmj _ -> Build_info.create `Cmj
+        | `Cmja _ -> Build_info.create `Cmja
+      in
       match input, keep_unit_names with
       | `Cmja _, true ->
+          let output_file_in_dir name =
+            match output_file with
+            | `Stdout, false -> Filename.concat "./" name
+            | `Name x, false -> Filename.concat (Filename.dirname x) name
+            | `Name x, true
+              when String.length x > 0 && Char.equal x.[String.length x - 1] '/' ->
+                Filename.concat x name
+            | `Stdout, true | `Name _, true ->
+                failwith "use [-o dirname/] or remove [--keep-unit-names]"
+          in
+          if include_runtime
+          then
+            output_gen
+              ~write_shape:false
+              ~standalone:false
+              ~custom_header
+              ~build_info:(Build_info.create `Runtime)
+              ~source_map
+              (`Name (output_file_in_dir "runtime.js"))
+              (fun ~standalone ~shapes ~source_map output ->
+                output_partial_runtime ~standalone ~shapes ~source_map output
+                |> sourcemap_of_info ~base:source_map_base);
           List.iter units ~f:(fun (unit : Parse_bytecode.jsir_unit) ->
-              let gen dir = Filename.concat dir (Printf.sprintf "%s.js" unit.name) in
-              let output_file =
-                match output_file with
-                | `Stdout, false -> gen "./"
-                | `Name x, false -> gen (Filename.dirname x)
-                | `Name x, true
-                  when String.length x > 0 && Char.equal x.[String.length x - 1] '/' ->
-                    gen x
-                | `Stdout, true | `Name _, true ->
-                    failwith "use [-o dirname/] or remove [--keep-unit-names]"
-              in
               output_gen
                 ~write_shape:false
                 ~standalone:false
                 ~custom_header
-                ~build_info:(Build_info.create `Cmj)
+                ~build_info
                 ~source_map
-                (`Name output_file)
+                (`Name (output_file_in_dir (unit.name ^ ".js")))
                 (fun ~standalone ~shapes ~source_map output_file ->
                   output_unit unit ~standalone ~shapes ~source_map output_file
                   |> sourcemap_of_info ~base:source_map_base))
       | `Cmja _, false | `Cmj _, _ ->
-          let build_info =
-            match input with
-            | `Cmj _ -> Build_info.create `Cmj
-            | `Cmja _ -> Build_info.create `Cmja
-          in
           output_gen
             ~write_shape:false
             ~standalone:false
@@ -508,9 +519,17 @@ let run
             ~source_map
             (fst output_file)
             (fun ~standalone ~shapes ~source_map output_file ->
-              List.map units ~f:(fun unit ->
-                  output_unit unit ~standalone ~shapes ~source_map output_file)
-              |> sourcemap_of_infos ~base:source_map_base))
+              let runtime =
+                if include_runtime
+                then
+                  [ output_partial_runtime ~standalone ~shapes ~source_map output_file ]
+                else []
+              in
+              let units =
+                List.map units ~f:(fun unit ->
+                    output_unit unit ~standalone ~shapes ~source_map output_file)
+              in
+              sourcemap_of_infos ~base:source_map_base (runtime @ units)))
   | (`Bytecode_stdin | `Bytecode_file _) as bytecode ->
       let kind, ic, close_ic, include_dirs =
         match bytecode with
