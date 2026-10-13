@@ -120,7 +120,7 @@ external ceil : float -> float @@ portable = "caml_ceil_float" "ceil"
 external floor : float -> float @@ portable = "caml_floor_float" "floor"
 [@@unboxed] [@@noalloc]
 
-let (is_integer @ noalloc_strict) x = x = trunc x && is_finite x
+let is_integer x = x = trunc x && is_finite x
 
 external next_after : float -> float -> float @@ portable
   = "caml_nextafter_float" "caml_nextafter" [@@unboxed] [@@noalloc]
