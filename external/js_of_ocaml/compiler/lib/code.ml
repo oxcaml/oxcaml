@@ -537,8 +537,8 @@ module Compilation_unit = struct
 end
 [@@if oxcaml]
 
-(* [.cmj] files are only produced by OxCaml's [ocamlj]. On other compilers, this
-   is a placeholder with the same shape. *)
+(* [.cmj] files are only produced by the OxCaml JSIR backend. On other
+   compilers, this is a placeholder with the same shape. *)
 module Compilation_unit = struct
   type t = string
 
@@ -550,8 +550,8 @@ type cmj_body =
   { program : program
   ; last_var : int
         (** Highest variable index used in [program]. [Var] keeps this in mutable
-            state, so [ocamlj] must communicate it to [js_of_ocaml] to keep the
-            two in sync. *)
+            state, so the OxCaml JSIR backend must communicate it to
+            [js_of_ocaml] to keep the two in sync. *)
   ; imported_compilation_units : Compilation_unit.t list
         (** Compilation units whose symbols [program] fetches from the global
             symbol table. Needed to fill in [Unit_info.t]. *)

@@ -1,4 +1,4 @@
-// Runtime support for code produced by OxCaml's ocamlj compiler, which
+// Runtime support for code produced by the OxCaml JSIR backend, which
 // translates Flambda 2 terms to the js_of_ocaml IR instead of going through
 // bytecode.
 

@@ -268,8 +268,8 @@ type cmj_body =
   { program : program
   ; last_var : int
         (** Highest variable index used in [program]. [Var] keeps this in mutable
-            state, so [ocamlj] must communicate it to [js_of_ocaml] to keep the
-            two in sync. *)
+            state, so the OxCaml JSIR backend must communicate it to
+            [js_of_ocaml] to keep the two in sync. *)
   ; imported_compilation_units : Compilation_unit.t list
         (** Compilation units whose symbols [program] fetches from the global
             symbol table. Needed to fill in [Unit_info.t]. *)
@@ -277,8 +277,8 @@ type cmj_body =
         (** The compilation unit [program] defines. Needed to fill in
             [Unit_info.t]. *)
   }
-(** Contents of a [.cmj] file produced by OxCaml's [ocamlj] (after the magic
-    number), marshaled. *)
+(** Contents of a [.cmj] file produced by the OxCaml JSIR backend (after the
+    magic number), marshaled. *)
 
 module Print : sig
   type xinstr =

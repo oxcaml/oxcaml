@@ -428,8 +428,8 @@ module Cmo_format = struct
 end
 [@@if oxcaml]
 
-(* [.cmja] archives are only produced by OxCaml's [ocamlj]. On other compilers,
-   these are placeholders with the same shape. *)
+(* [.cmja] archives are only produced by the OxCaml JSIR backend. On other
+   compilers, these are placeholders with the same shape. *)
 module Cmj_format = struct
   type compilation_unit_descr =
     { cu_name : string
