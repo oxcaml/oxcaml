@@ -1336,14 +1336,8 @@ let mk_cached_generic_functions_path f =
 
 let mk_target f =
   ( "-target",
-    Arg.Symbol
-      ( Clflags.Target.names,
-        fun name ->
-          match Clflags.Target.of_string name with
-          | Some target -> f target
-          | None -> raise (Arg.Bad ("Unknown target " ^ name)) ),
-    Printf.sprintf " Select the compilation target (default: %s)"
-      (Clflags.Target.to_string !Clflags.target) )
+    Arg.Symbol ([ "js_of_ocaml" ], fun _ -> f Clflags.Target.Js_of_ocaml),
+    " Compile to JavaScript instead of native code" )
 
 let mk_jsoo_opt f =
   let doc (phase : Clflags.Jsoo_phase.t) =
@@ -2915,19 +2909,18 @@ module Extra_params = struct
         Oxcaml_flags.cached_generic_functions_path := v;
         true
     | "target" -> (
-        match Clflags.Target.of_string v with
-        | Some target ->
+        match v with
+        | "js_of_ocaml" ->
             (match position with
-            | Compenv.Before_args -> Clflags.set_target target
+            | Compenv.Before_args -> Clflags.set_target Js_of_ocaml
             | Compenv.Before_compile _ | Compenv.Before_link ->
                 (* The backend has been chosen by then. *)
                 Compenv.fatal
                   "OCAMLPARAM: target must be given before the _ separator");
             true
-        | None ->
+        | _ ->
             Printf.ksprintf Compenv.fatal
-              "OCAMLPARAM: unknown target %S (possible values: %s)" v
-              (String.concat ", " Clflags.Target.names))
+              "OCAMLPARAM: unknown target %S (possible values: js_of_ocaml)" v)
     | "reaper" -> set Flambda2.enable_reaper
     | "reaper-preserve-direct-calls" ->
         (match String.lowercase_ascii v with
@@ -3033,10 +3026,7 @@ module Default = struct
     include Oxcaml_options_impl
     include Debugging_options_impl
 
-    let target (target : Clflags.Target.t) =
-      match target with
-      | Native -> ()
-      | Js_of_ocaml ->
-          Compenv.fatal "-target js_of_ocaml is not supported by ocamlnat"
+    let target (_ : Clflags.Target.t) =
+      Compenv.fatal "-target is not supported by ocamlnat"
   end
 end

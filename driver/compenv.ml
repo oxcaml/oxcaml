@@ -48,10 +48,7 @@ let extract_output = function
   | None ->
       fatal "Please specify the name of the output file, using option -o"
 
-let is_js_target () =
-  match !Clflags.target with
-  | Js_of_ocaml -> true
-  | Native -> false
+let is_js_target = Clflags.target_is_jsir
 
 let fatal_unsupported_for_js what =
   fatal (Printf.sprintf "%s is not supported when targeting js_of_ocaml" what)
@@ -201,7 +198,7 @@ let check_relative_path ~on_error name s =
 
 let decode_compiler_pass ppf v ~name ~filter =
   let module P = Clflags.Compiler_pass in
-  let passes = P.available_pass_names ~filter ~native:!native_code in
+  let passes = P.available_pass_names ~filter ~native:(target_is_native ()) in
   begin match List.find_opt (String.equal v) passes with
   | None ->
     Printf.ksprintf (print_error ppf)
@@ -278,7 +275,7 @@ let read_one_param ppf position name v =
   let set name options s =  setter ppf (fun b -> b) name options s in
   let clear name options s = setter ppf (fun b -> not b) name options s in
   let save_ir ~filter ~setter =
-    if !native_code then begin
+    if target_is_native () then begin
       match decode_compiler_pass ppf v ~name ~filter with
       | None -> ()
       | Some pass -> setter pass true
@@ -471,7 +468,7 @@ let read_one_param ppf position name v =
       set "remove-unused-arguments" [ remove_unused_arguments ] v
 
   | "inlining-report" ->
-      if !native_code then
+      if target_is_native () then
         set "inlining-report" [ inlining_report ] v
 
   | "flambda-verbose" ->
@@ -561,7 +558,7 @@ let read_one_param ppf position name v =
 
 
   | "cmo" | "cma" ->
-    if not !native_code then
+    if not (target_is_native ()) then
     begin
       match position with
       | Before_link | Before_compile _ ->
@@ -571,7 +568,7 @@ let read_one_param ppf position name v =
     end
 
   | "cmx" | "cmxa" ->
-    if !native_code then
+    if target_is_native () then
     begin
       match position with
       | Before_link | Before_compile _ ->
@@ -581,7 +578,7 @@ let read_one_param ppf position name v =
     end
 
   | "pic" ->
-    if !native_code then
+    if target_is_native () then
       set "pic" [ pic_code ] v
 
   | "can-discard" ->
@@ -854,7 +851,8 @@ let process_action
         has_linker_inputs := true;
         ccobjs := name :: !ccobjs
       end
-      else if not !native_code && Filename.check_suffix name Config.ext_dll then
+      else if not (target_is_native ())
+           && Filename.check_suffix name Config.ext_dll then
         dllibs := name :: !dllibs
       else
         match Compiler_pass.of_input_filename name with
