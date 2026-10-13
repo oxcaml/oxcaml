@@ -38,17 +38,13 @@ module Block = struct
     let tag_elt = J.Element (J.ENum (J.Num.of_targetint (Targetint.of_int_exn tag))) in
     J.EArr (tag_elt :: args)
 
-  (* CR-someday selee: We use optional chaining because issues can arise when
-     [Js.Unsafe.*] functions are used with code produced by the OxCaml JSIR
-     backend. When constructing an [any array], Flambda 2 first uses this
-     primitive to check at runtime whether [any] is actually a boxed float, to
-     determine whether it should create a float array or a normal array.
-     Unfortunately [any] can be [undefined] (in JS), so accessing field 0 raises
-     an error.
+  let tag e = J.EAccess (e, ANormal, zero)
 
-     A more principled fix would probably be to refactor [Js.Unsafe], but this
-     is a much larger change. *)
-  let tag e = J.EAccess (e, ANullish, zero)
+  (* Like [tag], but evaluates to [undefined] instead of throwing when [e] is
+     not an object. Used by the OxCaml JSIR backend for type tests on values
+     that are not known to be OCaml blocks (e.g. [undefined] obtained via
+     [Js.Unsafe]). *)
+  let tag_nullish e = J.EAccess (e, ANullish, zero)
 
   let field e idx =
     let adjusted = J.ENum (J.Num.of_targetint (Targetint.of_int_exn (idx + 1))) in

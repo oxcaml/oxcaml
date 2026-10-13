@@ -443,6 +443,12 @@ let the_tag_of info x get equal =
   | Pc (Tuple (j, _, _)) -> get j
   | _ -> None
 
+(* [%direct_obj_tag_nullish] is emitted by OxCaml's ocamlj; it reads the tag
+   like [%direct_obj_tag] when its argument is a block. *)
+let is_direct_obj_tag = function
+  | "%direct_obj_tag" | "%direct_obj_tag_nullish" -> true
+  | _ -> false
+
 let the_cont_of info x (a : cont array) =
   (* The value of [x] might be meaningless when we're inside a dead code.
      The proper fix would be to remove the deadcode entirely.
@@ -453,7 +459,7 @@ let the_cont_of info x (a : cont array) =
     info
     (fun x ->
       match Flow.Info.def info x with
-      | Some (Prim (Extern ("%direct_obj_tag", _), [ b ])) ->
+      | Some (Prim (Extern (prim, _), [ b ])) when is_direct_obj_tag prim ->
           the_tag_of info b get cont_equal
       | Some (Constant (Int j)) -> get (Targetint.to_int_exn j)
       | None | Some _ -> None)
@@ -476,7 +482,7 @@ let rec int_predicate deep info pred x (i : Targetint.t) =
       info
       (fun x ->
         match Flow.Info.def info x with
-        | Some (Prim (Extern ("%direct_obj_tag", _), [ b ])) ->
+        | Some (Prim (Extern (prim, _), [ b ])) when is_direct_obj_tag prim ->
             the_tag_of info b (fun j -> Some (pred (Targetint.of_int_exn j) i)) Bool.equal
         | Some (Prim (Extern ("%int_sub", _), [ Pv a; Pc (Int b) ])) ->
             int_predicate (deep + 1) info (fun x y -> pred (Targetint.sub x b) y) a i
@@ -657,7 +663,7 @@ let eval_instr update_count inline_constant ~target info i =
           incr update_count;
           [ Let (x, c) ]
       | None -> [ i ])
-  | Let (x, Prim (Extern ("%direct_obj_tag", _), [ y ])) -> (
+  | Let (x, Prim (Extern (prim, _), [ y ])) when is_direct_obj_tag prim -> (
       match the_tag_of info y (fun x -> Some x) ( = ) with
       | Some tag ->
           let c = Constant (Int (Targetint.of_int_exn tag)) in
