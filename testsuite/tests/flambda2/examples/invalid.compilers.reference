@@ -55,15 +55,18 @@
    (+ (<< (==f (load_mut float64 t2/1) 0.) 1) 1)) )
 
 (function{invalid.ml:31,8-30} camlInvalid__foo_2_5_code (param/1: int) : int
- (let
-   (Pmakearray/0 (alloc{invalid.ml:31,17-25} 1278 1.)
-    param/2
-      (app{invalid.ml:31,13-30;invalid.ml:28,2-13}
-        G:"camlInvalid__check_0_3_code" Pmakearray/0
-        L:"camlInvalid__empty_array_2" int))
-   (invalid
-     "(Defining_expr_of_let (bound_pattern prim/109N)\n (defining_expr\n  (((Array_load Naked_floats Naked_floats Mutable) t2/105UV 0)\n   invalid.ml:29,2--23)))"
-     L:"camlInvalid__invalid_9")) )
+ (let Pmakearray/0 (alloc{invalid.ml:31,17-25} 1278 1.)
+   (catch
+     (let
+       param/2
+         (app{invalid.ml:31,13-30;invalid.ml:28,2-13}
+           G:"camlInvalid__check_0_3_code" Pmakearray/0
+           L:"camlInvalid__empty_array_2" int)
+       (exit 8))
+   with(8)(cold)
+     (invalid
+       "(Defining_expr_of_let (bound_pattern prim/109N)\n (defining_expr\n  (((Array_load Naked_floats Naked_floats Mutable) t2/105UV 0)\n   invalid.ml:29,2--23)))"
+       L:"camlInvalid__invalid_9"))) )
 
 (function no_cse reduce_code_size linscan camlInvalid__entry () : val
  (catch (exit 7 G:"camlInvalid") with(7 *ret*/0: val) 1) )
