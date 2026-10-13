@@ -189,6 +189,21 @@ let gen_scalar_or_array_type (st : State.t) =
   then Ty.Array (nty, gen_array_dimensions st)
   else Ty.Number nty
 
+let gen_type_with_unboxed_tuples (st : State.t) ~leaf =
+  let rec gen depth =
+    if
+      st.swarm.unboxed_tuples
+      && depth < Config.max_unboxed_tuple_depth
+      && with_probability st ~probability:Config.unboxed_tuple_probability
+    then
+      Ty.Unboxed_tuple
+        (List.init
+           (random_int_in_range st ~min:2 ~max:Config.max_unboxed_tuple_arity)
+           (fun _ -> gen (depth + 1)))
+    else leaf ()
+  in
+  gen 0
+
 let gen_record_types (st : State.t) =
   let representations =
     List.filter
@@ -211,12 +226,13 @@ let gen_record_types (st : State.t) =
           (fun index ->
             { Ty.index;
               ty =
-                (if
-                   (not (List.is_empty records))
-                   && with_probability st
-                        ~probability:Config.nested_record_probability
-                 then Ty.Record (random_element st records)
-                 else gen_scalar_or_array_type st);
+                gen_type_with_unboxed_tuples st ~leaf:(fun () ->
+                    if
+                      (not (List.is_empty records))
+                      && with_probability st
+                           ~probability:Config.nested_record_probability
+                    then Ty.Record (random_element st records)
+                    else gen_scalar_or_array_type st);
               is_mutable =
                 st.swarm.mutable_record_fields
                 && with_probability st
@@ -234,7 +250,7 @@ let gen_record_types (st : State.t) =
   in
   gen 0 []
 
-let gen_non_variant_type (st : State.t) =
+let gen_record_or_scalar_type (st : State.t) =
   if
     (not (List.is_empty st.record_types))
     && with_probability st ~probability:Config.record_probability
@@ -244,7 +260,9 @@ let gen_non_variant_type (st : State.t) =
 let gen_constructor_type (st : State.t) constructor_index =
   let args =
     List.init (random_int_in_range st ~min:0 ~max:Config.max_constructor_args)
-      (fun _ -> gen_non_variant_type st)
+      (fun _ ->
+        gen_type_with_unboxed_tuples st ~leaf:(fun () ->
+            gen_record_or_scalar_type st))
   in
   { Ty.constructor_index; args }
 
@@ -302,15 +320,16 @@ let gen_sum_type (st : State.t) =
 
 (* CR-soon hwasilewski: Add boolean variable generation. *)
 let gen_type (st : State.t) =
-  if
-    st.swarm.or_null
-    && with_probability st ~probability:Config.or_null_probability
-  then Ty.Or_null (gen_or_null_payload_type st)
-  else if
-    (not (List.is_empty st.variant_types))
-    && with_probability st ~probability:Config.variant_probability
-  then Ty.Variant (random_element st st.variant_types)
-  else gen_non_variant_type st
+  gen_type_with_unboxed_tuples st ~leaf:(fun () ->
+      if
+        st.swarm.or_null
+        && with_probability st ~probability:Config.or_null_probability
+      then Ty.Or_null (gen_or_null_payload_type st)
+      else if
+        (not (List.is_empty st.variant_types))
+        && with_probability st ~probability:Config.variant_probability
+      then Ty.Variant (random_element st st.variant_types)
+      else gen_record_or_scalar_type st)
 
 let can_convert (st : State.t) from to_ =
   match from, to_ with
@@ -382,6 +401,16 @@ let places (st : State.t) (env : Env.t) ~for_write =
               fun () ->
                 Place.Element (make (), gen_array_indices st env dimensions) )
           ]
+      | Ty.Unboxed_tuple components ->
+        List.mapi
+          (fun index ty ->
+            collect ty false (fun () ->
+                let tuple = make () in
+                let name = State.fresh st in
+                Place.Unboxed_tuple_component
+                  { tuple; arity = List.length components; index; name }))
+          components
+        |> List.concat
       | Ty.Number _ | Ty.Bool | Ty.Variant _ | Ty.Or_null _ -> []
     in
     here @ children
@@ -701,6 +730,22 @@ and gen_value (st : State.t) env ty =
       (Gen.weighted st.random_state
          [ 3, gen_existing st env ty;
            2, Gen.create (fun () -> gen_array st env nty dimensions);
+           1, gen_fun_call st env ty;
+           1, gen_match st env ty ])
+  | Ty.Unboxed_tuple components ->
+    let construct =
+      Gen.create (fun () ->
+          Expr.Unboxed_tuple
+            (List.map
+               (fun ty ->
+                 let name = State.fresh st in
+                 name, gen_value st env ty)
+               components))
+    in
+    Gen.run_exn
+      (Gen.weighted st.random_state
+         [ 3, gen_existing st env ty;
+           2, construct;
            1, gen_fun_call st env ty;
            1, gen_match st env ty ])
   | Ty.Record record ->

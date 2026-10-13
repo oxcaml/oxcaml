@@ -157,6 +157,7 @@ module Ty = struct
   type t =
     | Number of NumberTy.t
     | Array of NumberTy.t * int list
+    | Unboxed_tuple of t list
     | Record of record
     | Variant of variant
     | Or_null of t
@@ -189,11 +190,15 @@ module Ty = struct
     | Number l, Number r -> NumberTy.equal l r
     | Array (l, ls), Array (r, rs) ->
       NumberTy.equal l r && List.equal Int.equal ls rs
+    | Unboxed_tuple l, Unboxed_tuple r -> List.equal equal l r
     | Record l, Record r -> l.id = r.id && Bool.equal l.unboxed r.unboxed
     | Variant l, Variant r -> Int.equal l.variant_id r.variant_id
     | Or_null l, Or_null r -> equal l r
     | Bool, Bool -> true
-    | (Number _ | Array _ | Record _ | Variant _ | Or_null _ | Bool), _ -> false
+    | ( ( Number _ | Array _ | Unboxed_tuple _ | Record _ | Variant _
+        | Or_null _ | Bool ),
+        _ ) ->
+      false
 
   let variant_name variant = Format.sprintf "variant_%d" variant.variant_id
 
@@ -213,6 +218,8 @@ module Ty = struct
       List.fold_left
         (fun ty _ -> Typ.constr (lid "array") [ty])
         (NumberTy.to_code nty) dimensions
+    | Unboxed_tuple components ->
+      Typ.unboxed_tuple (List.map (fun ty -> None, to_code ty) components)
     | Record record -> Typ.constr (lid (record_name record)) []
     | Variant variant -> Typ.constr (lid (variant_name variant)) []
     | Or_null ty -> Typ.constr (lid "or_null") [to_code ty]
@@ -299,7 +306,7 @@ module Bin_op = struct
     match ty with
     | Number nty ->
       if NumberTy.is_floating_point nty then num_binops else integral_binops
-    | Bool | Array _ | Record _ | Variant _ | Or_null _ ->
+    | Bool | Array _ | Unboxed_tuple _ | Record _ | Variant _ | Or_null _ ->
       Misc.fatal_errorf "Bin_op.ops_for_ty: expected a numeric type"
 
   let to_code ty binop ~lhs ~rhs =
@@ -307,7 +314,8 @@ module Bin_op = struct
       match ty with
       | Ty.Number nty -> NumberTy.to_module nty
       | Ty.Bool -> "Bool"
-      | Ty.Array _ | Ty.Record _ | Ty.Variant _ | Ty.Or_null _ ->
+      | Ty.Array _ | Ty.Unboxed_tuple _ | Ty.Record _ | Ty.Variant _
+      | Ty.Or_null _ ->
         Misc.fatal_errorf "Bin_op.to_code: unexpected aggregate"
     in
     let call name = apply (qualified_ident module_name name) [lhs; rhs] in
@@ -344,6 +352,7 @@ module Expr = struct
           init_name : Name.t;
           init : t
         }
+    | Unboxed_tuple of (Name.t * t) list
     | Record of Ty.record * t list
     | Record_update of Ty.record * t * Ty.field * t
     | Record_convert of
@@ -389,6 +398,12 @@ module Expr = struct
     | Variable of Name.t
     | Field of place * Ty.record * Ty.field
     | Element of place * t list
+    | Unboxed_tuple_component of
+        { tuple : place;
+          arity : int;
+          index : int;
+          name : Name.t
+        }
 
   let convert_num expr ~(from : NumberTy.t) ~(to_ : NumberTy.t) =
     if NumberTy.equal from to_
@@ -435,6 +450,19 @@ module Expr = struct
                 [int size; function_ [value_param (Pat.any ())] (make rest)]
           in
           make dimensions)
+    | Unboxed_tuple components ->
+      let body =
+        Exp.unboxed_tuple
+          (List.map
+             (fun (name, _) -> None, ident (Name.to_string name))
+             components)
+      in
+      (* CR-soon xclerc for xclerc: here to, we may want to not let-bind. *)
+      (* As with constructor payloads, sequence effectful components
+         explicitly. *)
+      List.fold_right
+        (fun (name, expr) body -> bind name (to_code expr) (fun _ -> body))
+        components body
     | Record (record, values) ->
       if List.length record.fields <> List.length values
       then Misc.fatal_errorf "Record: incorrect number of fields";
@@ -511,6 +539,17 @@ module Expr = struct
       List.fold_left
         (fun array index -> apply (ident "array_get") [array; to_code index])
         (place_to_code parent) indices
+    | Unboxed_tuple_component { tuple; arity; index; name } ->
+      let name = Name.to_string name in
+      let pattern =
+        Pat.unboxed_tuple
+          (List.init arity (fun i ->
+               None, if i = index then Pat.var (loc name) else Pat.any ()))
+          Closed
+      in
+      Exp.let_ Immutable Nonrecursive
+        [Vb.mk pattern (place_to_code tuple)]
+        (ident name)
 
   let assignment_to_code place value =
     match place with
@@ -532,6 +571,8 @@ module Expr = struct
           set (apply (ident "array_get") [array; to_code index]) rest
       in
       set (place_to_code parent) indices
+    | Unboxed_tuple_component _ ->
+      Misc.fatal_errorf "Assign: unboxed tuple components are immutable"
 end
 
 module Place = struct
@@ -539,6 +580,12 @@ module Place = struct
     | Variable of Name.t
     | Field of t * Ty.record * Ty.field
     | Element of t * Expr.t list
+    | Unboxed_tuple_component of
+        { tuple : t;
+          arity : int;
+          index : int;
+          name : Name.t
+        }
 
   let to_code = Expr.place_to_code
 end

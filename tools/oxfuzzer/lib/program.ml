@@ -290,6 +290,24 @@ let rec print_value path ty expr =
              (apply (ident "array_get") [array; ident index]))
     in
     print_elements 0 dimensions expr
+  | Ty.Unboxed_tuple components ->
+    let components =
+      List.mapi
+        (fun index ty -> Format.sprintf "%s_component_%d" path index, ty)
+        components
+    in
+    let pattern =
+      Pat.unboxed_tuple
+        (List.map (fun (name, _) -> None, Pat.var (loc name)) components)
+        Closed
+    in
+    let body =
+      List.fold_right
+        (fun (name, ty) body ->
+          Exp.sequence (print_value name ty (ident name)) body)
+        components unit_
+    in
+    Exp.let_ Immutable Nonrecursive [Vb.mk pattern expr] body
   | Ty.Record record ->
     List.fold_right
       (fun (field : Ty.field) acc ->

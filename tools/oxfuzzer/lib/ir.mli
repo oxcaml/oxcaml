@@ -72,6 +72,7 @@ module Ty : sig
   type t =
     | Number of NumberTy.t
     | Array of NumberTy.t * int list
+    | Unboxed_tuple of t list
     | Record of record
     | Variant of variant
     | Or_null of t
@@ -174,6 +175,7 @@ module Expr : sig
           init_name : Name.t;
           init : t
         }
+    | Unboxed_tuple of (Name.t * t) list
     | Record of Ty.record * t list
     | Record_update of Ty.record * t * Ty.field * t
     | Record_convert of
@@ -219,6 +221,12 @@ module Expr : sig
     | Variable of Name.t
     | Field of place * Ty.record * Ty.field
     | Element of place * t list
+    | Unboxed_tuple_component of
+        { tuple : place;
+          arity : int;
+          index : int;
+          name : Name.t
+        }
 
   val convert_num :
     Parsetree.expression ->
@@ -238,6 +246,12 @@ module Place : sig
     | Variable of Name.t
     | Field of t * Ty.record * Ty.field
     | Element of t * Expr.t list
+    | Unboxed_tuple_component of
+        { tuple : t;
+          arity : int;
+          index : int;
+          name : Name.t
+        }
 
   val to_code : t -> Parsetree.expression
 end
