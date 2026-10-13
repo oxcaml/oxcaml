@@ -468,11 +468,22 @@
 (rule
  (targets ocamlopt_flags.sexp)
  (enabled_if
-  (or
-   (= %{context_name} "main")
-   (= %{context_name} "runtime_stdlib")))
+   (= %{context_name} "main"))
  (action
   (copy %{project_root}/ocamlopt_oxcaml_flags.sexp %{targets})))
+
+; Write empty files in an unconfigured tree
+(rule
+ (target Makefile.config)
+ (mode fallback)
+ (action
+  (write-file %{target} "")))
+
+(rule
+ (target Makefile.build_config)
+ (mode fallback)
+ (action
+  (write-file %{target} "")))
 
 (install
  (files ocamlyacc)
@@ -520,14 +531,6 @@
   (ocamlbytecomp.cma as compiler-libs/ocamlbytecomp.cma)
   (ocamlfrontend.cma as compiler-libs/ocamlfrontend.cma)
   (ocamlcommon.cma as compiler-libs/ocamlcommon.cma))
- (section lib)
- (package ocaml))
-
-(install
- (files
-  Makefile.build_config
-  Makefile.config_if_required
-  Makefile.config)
  (section lib)
  (package ocaml))
 

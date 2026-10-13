@@ -10,10 +10,26 @@
   yojson)
  (flags
   (:standard -w -7-37 -safe-string))
+ (foreign_stubs
+  (language c)
+  (names float32_stubs))
  (preprocess
   (pps ppx_optcomp_light sedlex.ppx)))
 
 (ocamllex annot_lexer)
+
+(rule
+ (target ocaml_or_oxcaml.ml)
+ (enabled_if %{oxcaml_supported})
+ (action
+  (copy ocaml_or_oxcaml.oxcaml.ml %{target})))
+
+(rule
+ (target ocaml_or_oxcaml.ml)
+ (enabled_if
+  (not %{oxcaml_supported}))
+ (action
+  (copy ocaml_or_oxcaml.ocaml.ml %{target})))
 
 (menhir
  (modules js_parser)
