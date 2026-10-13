@@ -590,7 +590,8 @@ let free_variables_transitive ~free_names_of_type env free_vars_acc ty =
   in
   free_variables_transitive0 ty ~free_vars_acc
 
-let make_suitable_for_environment env (to_erase : to_erase) bind_to_and_types =
+let make_suitable_for_environment ~keep_variables_through_value_slots env
+    (to_erase : to_erase) bind_to_and_types =
   (match to_erase with
   | Everything_not_in suitable_for ->
     List.iter
@@ -658,8 +659,13 @@ let make_suitable_for_environment env (to_erase : to_erase) bind_to_and_types =
             if erase var
             then
               if
-                Name_occurrences.mem_var free_vars_except_through_value_slots
-                  var
+                (* With [keep_variables_through_value_slots], variables only
+                   reachable through value slots are treated like the others
+                   (expanded or bound existentially) instead of being
+                   removed. *)
+                keep_variables_through_value_slots
+                || Name_occurrences.mem_var free_vars_except_through_value_slots
+                     var
               then
                 match Name_occurrences.count_variable free_vars var with
                 | Zero ->

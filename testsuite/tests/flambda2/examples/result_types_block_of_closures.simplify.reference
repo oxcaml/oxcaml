@@ -1,0 +1,72 @@
+let code `fn[result_types_block_of_closures.ml:16,36--68]_1` deleted in
+let code `fn[result_types_block_of_closures.ml:16,2--34]_2` deleted in
+let code make_ops_0 deleted in
+let code g_3 deleted in
+let code inline(always) loopify(never) size(4) newer_version_of(`fn[result_types_block_of_closures.ml:16,2--34]_2`)
+      `fn[result_types_block_of_closures.ml:16,2--34]_2_1` (x : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let n =
+    %project_value_slot.[`fn[result_types_block_of_closures.ml:16,2--34]`].[n]
+      (my_closure)
+  in
+  let int_add = %int_barith.add (x, n) in
+  cont k (int_add)
+in
+let code inline(always) loopify(never) size(6) newer_version_of(`fn[result_types_block_of_closures.ml:16,36--68]_1`)
+      `fn[result_types_block_of_closures.ml:16,36--68]_1_1` (x : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let n =
+    %project_value_slot.[`fn[result_types_block_of_closures.ml:16,36--68]`].[n_1]
+      (my_closure)
+  in
+  let int_mul = %int_barith.mul (x, n) in
+  cont k (int_mul)
+in
+let code inline(never) loopify(never) size(34) newer_version_of(make_ops_0)
+      make_ops_0_1 (n : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : [ 0 of val * val ] =
+  let `fn[result_types_block_of_closures.ml:16,36--68]` =
+    closure `fn[result_types_block_of_closures.ml:16,36--68]_1_1`
+      @`fn[result_types_block_of_closures.ml:16,36--68]` &my_alloc_region
+  with { n_1 = n }
+  in
+  let `fn[result_types_block_of_closures.ml:16,2--34]` =
+    closure `fn[result_types_block_of_closures.ml:16,2--34]_2_1`
+      @`fn[result_types_block_of_closures.ml:16,2--34]` &my_alloc_region
+  with { n = n }
+  in
+  let Pmakeblock =
+    %block.[`0`].my_alloc_region
+      (`fn[result_types_block_of_closures.ml:16,2--34]`,
+       `fn[result_types_block_of_closures.ml:16,36--68]`)
+  in
+  cont k (Pmakeblock)
+in
+let $camlResult_types_block_of_closures__make_ops_1 =
+  closure make_ops_0_1 @make_ops &toplevel
+in
+let code loopify(never) size(5) newer_version_of(g_3)
+      g_3_1 (param : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  apply direct(make_ops_0_1 &my_alloc_region)
+    ($camlResult_types_block_of_closures__make_ops_1
+     : _ -> [ 0 of val * val ])
+      (2)
+      -> k2 * k1
+    where k2 (param_1 : [ 0 of val * val ]) =
+      cont k (13)
+in
+let $camlResult_types_block_of_closures__g_2 = closure g_3_1 @g &toplevel in
+let $camlResult_types_block_of_closures =
+  Block 0 ($camlResult_types_block_of_closures__make_ops_1,
+           $camlResult_types_block_of_closures__g_2)
+in
+cont done ($camlResult_types_block_of_closures)

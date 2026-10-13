@@ -1418,7 +1418,8 @@ struct
         sbs Variable.Set.empty
     in
     let teev =
-      Expand_head.make_suitable_for_environment final_env
+      Expand_head.make_suitable_for_environment
+        ~keep_variables_through_value_slots:false final_env
         (All_variables_except to_keep) (List.map subst bind_to)
     in
     sbs, teev

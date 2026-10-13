@@ -3386,7 +3386,24 @@ and project_head_of_kind_naked_mask ~to_project:_ ~expand:_ head = head
 
 and project_head_of_kind_rec_info ~to_project ~expand head =
   match (head : head_of_kind_rec_info) with
-  | Const _ | Succ _ | Unroll_to _ -> head
+  | Const _ -> head
+  | Succ t ->
+    (* Depth variables may occur under [Succ] and [Unroll_to] (e.g. the coercion
+       [depth ∞ -> succ my_depth] on the type of [my_closure] inside a recursive
+       function); they must be projected out too, otherwise they would escape
+       e.g. into function result types. *)
+    let t' = project_head_of_kind_rec_info ~to_project ~expand t in
+    if t == t'
+    then head
+    else if Rec_info_expr.equal t' Rec_info_expr.unknown
+    then (* [succ unknown] is [unknown] *) Rec_info_expr.unknown
+    else Rec_info_expr.succ t'
+  | Unroll_to (unroll_depth, t) ->
+    (* Unlike [succ], [unroll_to] is not the identity on [unknown]: the
+       unrolling request stands whatever the depth, so the result is not
+       normalised. *)
+    let t' = project_head_of_kind_rec_info ~to_project ~expand t in
+    if t == t' then head else Rec_info_expr.unroll_to unroll_depth t'
   | Var var -> (
     if not (Variable.Set.mem var to_project)
     then head

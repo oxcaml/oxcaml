@@ -365,6 +365,7 @@ type to_erase =
     the resulting type is to be valid; or a set of variables may be supplied
     which are the only ones allowed to occur in the resulting type. *)
 val make_suitable_for_environment :
+  keep_variables_through_value_slots:bool ->
   Typing_env.t ->
   to_erase ->
   (Name.t * flambda_type) list ->
@@ -843,6 +844,22 @@ val prove_single_closures_entry :
   * Closures_entry.t
   * Function_type.t)
   proof_of_property
+
+(** A closure, or an immutable heap block of values (looking at most
+    [max_block_depth] levels of blocks deep) at least one field of which is such
+    a closure. [environment] collects the canonical simples that the value slots
+    of those closures and the other fields of those blocks are known to be equal
+    to; [environment_fully_known] is false when some of them have none. *)
+type closure_like_environment = private
+  { environment : Simple.Set.t;
+    environment_fully_known : bool
+  }
+
+val prove_closure_like :
+  Typing_env.t ->
+  max_block_depth:int ->
+  t ->
+  closure_like_environment proof_of_property
 
 val meet_code_ids : Typing_env.t -> t -> Code_id.Set.t meet_shortcut
 

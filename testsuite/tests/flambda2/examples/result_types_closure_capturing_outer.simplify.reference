@@ -1,0 +1,98 @@
+let code `fn[result_types_closure_capturing_outer.ml:21,32--66]_2` deleted in
+let code `fn[result_types_closure_capturing_outer.ml:21,5--66]_1` deleted in
+let code f_0 deleted in
+let code h_3 deleted in
+let code inline(always) loopify(never) size(7) newer_version_of(`fn[result_types_closure_capturing_outer.ml:21,32--66]_2`)
+      `fn[result_types_closure_capturing_outer.ml:21,32--66]_2_1`
+        (z : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let x =
+    %project_value_slot.[`fn[result_types_closure_capturing_outer.ml:21,32--66]`].[x]
+      (my_closure)
+  in
+  let y =
+    %project_value_slot.[`fn[result_types_closure_capturing_outer.ml:21,32--66]`].[y]
+      (my_closure)
+  in
+  let int_add = %int_barith.add (x, y) in
+  let int_add_1 = %int_barith.add (int_add, z) in
+  cont k (int_add_1)
+in
+let code inline(never) loopify(never) size(25) newer_version_of(`fn[result_types_closure_capturing_outer.ml:21,5--66]_1`)
+      `fn[result_types_closure_capturing_outer.ml:21,5--66]_1_1`
+        (y : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : [ 0 of imm tagged * val ] =
+  let x =
+    %project_value_slot.[`fn[result_types_closure_capturing_outer.ml:21,5--66]`].[x_1]
+      (my_closure)
+  in
+  let `fn[result_types_closure_capturing_outer.ml:21,32--66]` =
+    closure `fn[result_types_closure_capturing_outer.ml:21,32--66]_2_1`
+      @`fn[result_types_closure_capturing_outer.ml:21,32--66]`
+      &my_alloc_region
+  with { x = x; y = y }
+  in
+  let Pmakeblock =
+    %block.[`0`].my_alloc_region
+      (1, `fn[result_types_closure_capturing_outer.ml:21,32--66]`)
+  in
+  cont k (Pmakeblock)
+in
+let code inline(never) loopify(never) size(41) newer_version_of(f_0)
+      f_0_1 (x : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : [ 0 of imm tagged * val ] =
+  let `fn[result_types_closure_capturing_outer.ml:21,5--66]` =
+    closure `fn[result_types_closure_capturing_outer.ml:21,5--66]_1_1`
+      @`fn[result_types_closure_capturing_outer.ml:21,5--66]`
+      &my_alloc_region
+  with { x_1 = x }
+  in
+  let Pmakeblock =
+    %block.[`0`].my_alloc_region
+      (0, `fn[result_types_closure_capturing_outer.ml:21,5--66]`)
+  in
+  cont k (Pmakeblock)
+in
+let $camlResult_types_closure_capturing_outer__f_1 =
+  closure f_0_1 @f &toplevel
+in
+let code loopify(never) size(16) newer_version_of(h_3)
+      h_3_1 (param : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  apply direct(f_0_1 &my_alloc_region)
+    ($camlResult_types_closure_capturing_outer__f_1
+     : _ -> [ 0 of imm tagged * val ])
+      (1)
+      -> k2 * k1
+    where k2 (`*match*` : [ 0 of imm tagged * val ]) =
+      ((let Pmixedfield = %block_load.[`1`] (`*match*`) in
+        apply
+               direct(`fn[result_types_closure_capturing_outer.ml:21,5--66]_1_1`
+               &my_alloc_region)
+          (Pmixedfield : _ -> [ 0 of imm tagged * val ]) (2) -> k2 * k1)
+         where k2 (`*match*_1` : [ 0 of imm tagged * val ]) =
+           let Pmixedfield = %block_load.[`1`] (`*match*_1`) in
+           let x =
+             %project_value_slot.[`fn[result_types_closure_capturing_outer.ml:21,32--66]`].[x]
+               (Pmixedfield)
+           in
+           let int_add = %int_barith.add (x, 2) in
+           let int_add_1 = %int_barith.add (int_add, 3) in
+           cont k (int_add_1))
+in
+let $camlResult_types_closure_capturing_outer__h_2 =
+  closure h_3_1 @h &toplevel
+in
+let $camlResult_types_closure_capturing_outer =
+  Block 0 ($camlResult_types_closure_capturing_outer__f_1,
+           $camlResult_types_closure_capturing_outer__h_2)
+in
+cont done ($camlResult_types_closure_capturing_outer)

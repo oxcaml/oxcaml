@@ -544,7 +544,8 @@ let test_make_suitable_with_removed_alias () =
   in
   let make_extension env =
     let teev =
-      T.make_suitable_for_environment env (Everything_not_in outer_env)
+      T.make_suitable_for_environment ~keep_variables_through_value_slots:false
+        env (Everything_not_in outer_env)
         [Name.var f, TE.find env (Name.var f) (Some K.value)]
     in
     Format.eprintf

@@ -864,6 +864,58 @@ let meet_single_closures_entry env t =
 let prove_single_closures_entry env t =
   gen_value_to_proof prove_single_closures_entry_generic_value env t
 
+type closure_like_environment =
+  { environment : Simple.Set.t;
+    environment_fully_known : bool
+  }
+
+let prove_closure_like env ~max_block_depth t :
+    closure_like_environment proof_of_property =
+  let add_simple_of_type ty acc =
+    match
+      TE.get_alias_then_canonical_simple_exn env
+        ~min_name_mode:Name_mode.in_types ty
+    with
+    | exception Not_found -> { acc with environment_fully_known = false }
+    | simple -> { acc with environment = Simple.Set.add simple acc.environment }
+  in
+  (* [Proved acc'] when [ty] is closure-like, [acc'] extending [acc] with its
+     environment. *)
+  let rec closure_like ~depth ty acc :
+      closure_like_environment proof_of_property =
+    match
+      gen_value_to_proof prove_single_closures_entry_generic_value env ty
+    with
+    | Proved (_function_slot, _alloc_mode, closures_entry, _function_type) ->
+      Proved
+        (Value_slot.Map.fold
+           (fun _value_slot slot_ty acc -> add_simple_of_type slot_ty acc)
+           (TG.Closures_entry.value_slot_types closures_entry)
+           acc)
+    | Unknown -> (
+      if depth >= max_block_depth
+      then Unknown
+      else
+        match gen_value_to_proof prove_unique_tag_and_size_value env ty with
+        | Unknown | Proved (_, _, _, _, (Heap_or_local | Local)) -> Unknown
+        | Proved (_tag, shape, _size, product, Heap) -> (
+          match (shape : K.Block_shape.t) with
+          | Scannable (Mixed_record _) | Float_record -> Unknown
+          | Scannable Value_only ->
+            let found_closure, acc =
+              List.fold_left
+                (fun (found_closure, acc) field_ty ->
+                  match closure_like ~depth:(depth + 1) field_ty acc with
+                  | Proved acc -> true, acc
+                  | Unknown -> found_closure, add_simple_of_type field_ty acc)
+                (false, acc)
+                (TG.Product.Int_indexed.components product)
+            in
+            if found_closure then Proved acc else Unknown))
+  in
+  closure_like ~depth:0 t
+    { environment = Simple.Set.empty; environment_fully_known = true }
+
 exception Unknown_code_id
 
 let prove_code_ids_generic_value _env
