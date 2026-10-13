@@ -158,7 +158,7 @@ let close_phrase lam =
    Returns [None] if the selected field is not a value, [Some field] otherwise.
    Copied from [Topcommon] *)
 let mod_field obj (module_repr : Lambda.module_representation) pos =
-  if not (Clflags.is_native ()) then
+  if not (Clflags.target_is_native ()) then
     Some (Obj.field obj pos)
   else
   match module_repr with

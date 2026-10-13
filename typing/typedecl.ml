@@ -4920,7 +4920,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
       if prim.prim_arity = 0 &&
          (prim.prim_name = "" || prim.prim_name.[0] <> '%') then
         Error.log_and_raise valdecl.pval_type.ptyp_loc  Null_arity_external;
-      if Clflags.is_native ()
+      if Clflags.target_is_native ()
       && prim.prim_arity > 5
       && prim.prim_native_name = ""
       && not (String.starts_with ~prefix:"%" prim.prim_name)

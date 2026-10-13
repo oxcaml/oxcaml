@@ -68,7 +68,7 @@ let main unix argv ppf ~flambda2 =
        Target_system.is_macos () then
       Clflags.dwarf_fission := Clflags.Fission_dsymutil;
     (* Set up DWARF compression for C compiler invocations *)
-    if !Clflags.debug && Clflags.is_native () then
+    if !Clflags.debug && Clflags.target_is_native () then
       Clflags.dwarf_c_toolchain_flag :=
         Dwarf_flags.get_dwarf_c_toolchain_flag ();
     if !Oxcaml_flags.gc_timings then Gc_timings.start_collection ();

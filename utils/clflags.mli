@@ -201,6 +201,7 @@ val dump_cse : bool ref
 val dump_linear : bool ref
 val debug_ocaml : bool ref
 val keep_startup_file : bool ref
+
 module Target : sig
   type t =
     | Bytecode
@@ -208,15 +209,9 @@ module Target : sig
     | Js_of_ocaml
 end
 
-(** Set the compilation target. The default is [Bytecode]; ocamlopt sets
-    [Native] and ocamlj sets [Js_of_ocaml]. *)
 val set_target : Target.t -> unit
-
-(** [true] iff the target is [Native]. *)
-val is_native : unit -> bool
-
-(** [true] iff the target is [Js_of_ocaml]. *)
-val is_jsir : unit -> bool
+val target_is_native : unit -> bool
+val target_is_jsir : unit -> bool
 val default_inline_threshold : float
 val inline_threshold : Float_arg_helper.parsed ref
 val inlining_report : bool ref

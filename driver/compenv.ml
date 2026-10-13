@@ -183,7 +183,7 @@ let check_relative_path ~on_error name s =
 
 let decode_compiler_pass ppf v ~name ~filter =
   let module P = Clflags.Compiler_pass in
-  let passes = P.available_pass_names ~filter ~native:(is_native ()) in
+  let passes = P.available_pass_names ~filter ~native:(target_is_native ()) in
   begin match List.find_opt (String.equal v) passes with
   | None ->
     Printf.ksprintf (print_error ppf)
@@ -260,7 +260,7 @@ let read_one_param ppf position name v =
   let set name options s =  setter ppf (fun b -> b) name options s in
   let clear name options s = setter ppf (fun b -> not b) name options s in
   let save_ir ~filter ~setter =
-    if is_native () then begin
+    if target_is_native () then begin
       match decode_compiler_pass ppf v ~name ~filter with
       | None -> ()
       | Some pass -> setter pass true
@@ -454,7 +454,7 @@ let read_one_param ppf position name v =
       set "remove-unused-arguments" [ remove_unused_arguments ] v
 
   | "inlining-report" ->
-      if is_native () then
+      if target_is_native () then
         set "inlining-report" [ inlining_report ] v
 
   | "flambda-verbose" ->
@@ -526,7 +526,7 @@ let read_one_param ppf position name v =
 
 
   | "cmo" | "cma" ->
-    if not (is_native ()) then
+    if not (target_is_native ()) then
     begin
       match position with
       | Before_link | Before_compile _ ->
@@ -536,7 +536,7 @@ let read_one_param ppf position name v =
     end
 
   | "cmx" | "cmxa" ->
-    if is_native () then
+    if target_is_native () then
     begin
       match position with
       | Before_link | Before_compile _ ->
@@ -546,7 +546,7 @@ let read_one_param ppf position name v =
     end
 
   | "pic" ->
-    if is_native () then
+    if target_is_native () then
       set "pic" [ pic_code ] v
 
   | "can-discard" ->
@@ -790,7 +790,7 @@ let process_action
         has_linker_inputs := true;
         ccobjs := name :: !ccobjs
       end
-      else if not (is_native ())
+      else if not (target_is_native ())
            && Filename.check_suffix name Config.ext_dll then
         dllibs := name :: !dllibs
       else

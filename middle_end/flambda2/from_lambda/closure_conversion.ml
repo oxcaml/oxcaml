@@ -1011,7 +1011,7 @@ let close_c_call acc env ~loc ~let_bound_ids_with_kinds
        Lambda.external_call_description) as prim_desc) ~args exn_continuation
     dbg ~current_region ~current_ghost_region k =
   let prim_desc =
-    if not (Clflags.is_jsir ())
+    if not (Clflags.target_is_jsir ())
     then prim_desc
     else
       (* [close_c_call0] checks [prim_native_name] to see whether we should
@@ -1912,7 +1912,7 @@ let close_exact_or_unknown_apply acc env
     in
     if Flambda_features.classic_mode ()
     then
-      if Clflags.is_jsir ()
+      if Clflags.target_is_jsir ()
       then
         let apply =
           Apply.with_inlined_attribute apply

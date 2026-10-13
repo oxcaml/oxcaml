@@ -142,7 +142,7 @@ end = struct
     (* Bytecode boxes products and preserves the source field order. *)
     let pos =
       match constr.shape with
-      | _ when not (Clflags.is_native ()) -> field
+      | _ when not (Clflags.target_is_native ()) -> field
       | All_value -> field
       | Shape shape ->
         let shape =

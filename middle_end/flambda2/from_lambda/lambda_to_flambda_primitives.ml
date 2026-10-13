@@ -3054,7 +3054,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
           block,
           new_ref_value ) ]
   | Pctconst const, _ -> (
-    if Clflags.is_jsir ()
+    if Clflags.target_is_jsir ()
     then
       Misc.fatal_errorf
         "Saw %a in JSIR mode, but it should've been simplified away in \
