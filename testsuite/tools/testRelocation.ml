@@ -281,8 +281,18 @@ let libdir_rules config file =
            objects) to the /workspace_root sentinel, so they no longer carry the
            real build directory. C debug information is not mapped (gcc ignores
            BUILD_PATH_PREFIX_MAP) and .cmt/.cmti record the build directory
-           directly, so those still do. *)
-        ext = ".cmt" || ext = ".cmti"
+           directly, so those still do. The standard library files are all
+           compiled both with -nostdlib (which removes one source of the path)
+           and using a manual Dune rule with a relative path, which removes the
+           other source. *)
+        let is_stdlib_file =
+          Filename.basename (Filename.dirname file) <> "compiler-libs"
+          && (String.starts_with ~prefix:"stdlib__" basename
+              || String.starts_with ~prefix:"camlinternal" basename
+              || Filename.remove_extension basename = "stdlib"
+              || Filename.remove_extension basename = "std_exit")
+        in
+        (ext = ".cmt" || ext = ".cmti") && not is_stdlib_file
         || has_c_debug_info && c_compiler_debug_paths_are_absolute
       else
         has_ocaml_debug_info
