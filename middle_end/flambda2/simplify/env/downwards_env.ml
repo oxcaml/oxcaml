@@ -20,6 +20,8 @@ module K = Flambda_kind
 module BP = Bound_parameter
 module T = Flambda2_types
 module TE = Flambda2_types.Typing_env
+module LCS = Lifted_constant_state
+module LC = Lifted_constant
 
 type resolver =
   Compilation_unit.t -> Flambda2_types.Typing_env.Serializable.t option
@@ -789,6 +791,56 @@ let enter_continuation_handler lifted_params t =
     has_seen_a_non_liftable_continuation = false;
     specialization_cost = Specialization_cost.can_specialize ()
   }
+
+let add_lifted_constant_state ?maybe_already_defined denv lifted =
+  let initial_denv = denv in
+  let maybe_already_defined =
+    match maybe_already_defined with None -> false | Some () -> true
+  in
+  let denv =
+    LCS.fold lifted ~init:denv ~f:(fun denv lifted_constant ->
+        let types_of_symbols = LC.types_of_symbols lifted_constant in
+        Symbol.Map.fold
+          (fun sym (_denv, typ) denv ->
+            if maybe_already_defined && mem_symbol denv sym
+            then denv
+            else define_symbol denv sym (T.kind typ))
+          types_of_symbols denv)
+  in
+  let typing_env =
+    let typing_env = typing_env denv in
+    LCS.fold lifted ~init:typing_env ~f:(fun typing_env lifted_constant ->
+        let types_of_symbols = LC.types_of_symbols lifted_constant in
+        Symbol.Map.fold
+          (fun sym (typing_env_at_definition, typ) typing_env ->
+            if maybe_already_defined && mem_symbol initial_denv sym
+            then typing_env
+            else
+              let sym = Name.symbol sym in
+              let env_extension =
+                (* CR mshinwell: Maybe sometimes this could be done at a time
+                   previous to this point. *)
+                (* CR pchambart: Maybe some of these make_suitable calls could
+                   be combined into one *)
+                T.make_suitable_for_environment typing_env_at_definition
+                  (Everything_not_in typing_env)
+                  [sym, typ]
+              in
+              TE.add_env_extension_with_extra_variables typing_env env_extension)
+          types_of_symbols typing_env)
+  in
+  LCS.fold lifted ~init:(with_typing_env denv typing_env)
+    ~f:(fun denv lifted_constant ->
+      let pieces_of_code =
+        LC.defining_exprs lifted_constant
+        |> Rebuilt_static_const.Group.pieces_of_code_including_those_not_rebuilt
+      in
+      Code_id.Map.fold
+        (fun code_id code denv ->
+          if maybe_already_defined && mem_code denv code_id
+          then denv
+          else define_code denv ~code_id ~code)
+        pieces_of_code denv)
 
 let variables_defined_in_current_continuation t =
   match t.defined_variables_by_scope with
