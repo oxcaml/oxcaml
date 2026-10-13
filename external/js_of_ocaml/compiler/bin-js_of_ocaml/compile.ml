@@ -439,12 +439,7 @@ let run
       let units =
         match input with
         | `Cmj filename ->
-            let body =
-              read_jsir_file filename ~expected:`Cmj (fun ic ->
-                  (Marshal.from_channel ic : Code.cmj_body))
-            in
-            Code.Var.set_last body.Code.last_var;
-            [ Parse_bytecode.jsir_unit_of_cmj_body body ]
+            [ read_jsir_file filename ~expected:`Cmj Parse_bytecode.from_cmj ]
         | `Cmja filename ->
             read_jsir_file filename ~expected:`Cmja Parse_bytecode.from_cmja
       in

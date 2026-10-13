@@ -70,8 +70,8 @@ module Var : sig
   val reset : unit -> unit
 
   val set_last : int -> unit
-  (** Set the index of the last allocated variable; subsequent calls to
-      [fresh] return higher indices. *)
+  (** [set_last n] ensures that subsequent calls to [fresh] return indices
+      greater than [n]. *)
 
   module Set : Int_set.S with type elt = t
 

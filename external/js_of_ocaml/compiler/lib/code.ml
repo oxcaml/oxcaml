@@ -222,7 +222,7 @@ end = struct
     last_var := 0;
     Name.reset ()
 
-  let set_last n = last_var := n
+  let set_last n = last_var := max !last_var n
 
   let print f x =
     Format.fprintf
