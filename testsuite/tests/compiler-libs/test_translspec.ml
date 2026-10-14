@@ -30,6 +30,12 @@ let env =
     let hd = function x :: _ -> x | [] -> raise (Failure "hd")
     let f ?(opt = 0) ~lbl x = opt + lbl + x
     module M = struct let v = 1 end
+    module type S = sig val v : int end
+    module F (X : S) = struct
+      type t = A
+      let v = X.v
+      exception Applied
+    end
   |} in
   let str = Parse.implementation (Lexing.from_string prelude) in
   let _, _, _, _, _, env = Typemod.type_structure (Lazy.force Env.initial) str
@@ -220,6 +226,20 @@ fun ~lbl ?(opt = 0) x -> lbl + opt + x  ==>  fun ~lbl ?(opt= 0) x -> (lbl + opt)
 fun ?opt x -> match opt with Some o -> o + x | None -> x  ==>  fun ?opt x -> match opt with | Some o -> o + x | None -> x
 function A -> true | B _ | C _ -> false  ==>  function | A -> true | B _ | C _ -> false
 fun (x : int) : int -> x  ==>  fun x -> x
+|}]
+
+(* Local opens of module paths are resolved away, and local modules bound
+   to module paths are substituted away. *)
+
+let () = List.iter run
+  ["let open M in v"; "M.(v)"; "match n with M.(_) -> true";
+   "let module L = M in L.v"; "let module L = F (M) in (L.A : L.t)"]
+[%%expect {|
+let open M in v  ==>  M.v
+M.(v)  ==>  M.v
+match n with M.(_) -> true  ==>  match n with | _ -> true
+let module L = M in L.v  ==>  M.v
+let module L = F (M) in (L.A : L.t)  ==>  A
 |}]
 
 (* Lazy values and extension constructors *)

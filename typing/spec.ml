@@ -648,10 +648,10 @@ let rec alpha_equal_exp sp vars e1 e2 =
   | ( Sexp_var _ | Sexp_global _ | Sexp_constant _ | Sexp_let _
     | Sexp_function _ | Sexp_apply _ | Sexp_match _ | Sexp_try _
     | Sexp_tuple _ | Sexp_unboxed_tuple _ | Sexp_unboxed_unit
-    | Sexp_unboxed_bool _ | Sexp_construct _ | Sexp_variant _
-    | Sexp_record _ | Sexp_field _ | Sexp_record_unboxed_product _
-    | Sexp_unboxed_field _ | Sexp_ifthenelse _ | Sexp_sequence _
-    | Sexp_assert _ | Sexp_lazy _ | Sexp_extension_constructor _ ), _ ->
+    | Sexp_unboxed_bool _ | Sexp_construct _ | Sexp_variant _ | Sexp_record _
+    | Sexp_field _ | Sexp_record_unboxed_product _ | Sexp_unboxed_field _
+    | Sexp_ifthenelse _ | Sexp_sequence _ | Sexp_assert _ | Sexp_lazy _
+    | Sexp_extension_constructor _ ), _ ->
       false
 
 and alpha_equal_fields sp vars fields1 fields2 =

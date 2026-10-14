@@ -44,6 +44,8 @@ type unsupported =
   | First_class_modules
   | Layout_polymorphism
   | Local_exceptions
+  | Local_modules
+  | Local_opens
   | Locally_abstract_types
   | Loops
   | Mutable_variables
@@ -59,7 +61,6 @@ type unsupported =
   | Source_positions
   | Stack_allocation
   | Values_through_applications
-  | Not_yet_supported of string
 
 type error =
   | Unsupported of unsupported
@@ -207,6 +208,17 @@ let check_extra loc extra =
   | Texp_borrowed -> unsupported loc Borrow
   | Texp_ghost_region -> unsupported loc Borrow
 
+let rec path_of_module (mexp : module_expr) =
+  match mexp.mod_desc with
+  | Tmod_ident (p, _) -> Some p
+  | Tmod_apply (f, arg, _, _, _) ->
+      Option.bind (path_of_module f) (fun f ->
+        Option.map (fun arg -> Path.Papply (f, arg)) (path_of_module arg))
+  | Tmod_constraint (mexp, _, Tmodtype_implicit, _) -> path_of_module mexp
+  | Tmod_structure _ | Tmod_functor _ | Tmod_apply_unit _ | Tmod_unpack _
+  | Tmod_constraint (_, _, Tmodtype_explicit _, _) ->
+      None
+
 let rec expression bound (e : Typedtree.expression) =
   List.iter (fun (extra, loc, _) -> check_extra loc extra) e.exp_extra;
   { sexp_desc = expression_desc bound e.exp_loc e.exp_desc;
@@ -336,7 +348,26 @@ and expression_desc bound loc desc =
   | Texp_override _ | Texp_object _ ->
       unsupported loc Objects
   | Texp_mutvar _ | Texp_setmutvar _ -> unsupported loc Mutable_variables
-  | Texp_letmodule _ -> unsupported loc (Not_yet_supported "local modules")
+  | Texp_letmodule (Some id, _, _, mexp, body) -> begin
+      (* [let module M = P in e], with [P] a module path, stands for [e]
+         with [M] replaced by [P]. *)
+      match path_of_module mexp with
+      | None -> unsupported loc Local_modules
+      | Some path ->
+          let s = Subst.add_module id path Subst.identity in
+          let body =
+            Spec.map ~ty:(Subst.type_expr s) ~value_path:(Subst.value_path s)
+              ~type_path:(Subst.type_path s) (expression bound body)
+          in
+          List.iter
+            (fun ((ns : Spec.namespace), p) ->
+               match ns with
+               | Value | Extension -> check_global loc p
+               | Type -> ())
+            (Spec.paths body);
+          body.sexp_desc
+    end
+  | Texp_letmodule (None, _, _, _, _) -> unsupported loc Local_modules
   | Texp_letexception _ -> unsupported loc Local_exceptions
   | Texp_assert (e, _) -> Sexp_assert (expression bound e)
   | Texp_lazy e -> Sexp_lazy (expression bound e)
@@ -345,7 +376,12 @@ and expression_desc bound loc desc =
   | Texp_unreachable -> unsupported loc Refutation_cases
   | Texp_extension_constructor (_, path) ->
       Sexp_extension_constructor (global loc path)
-  | Texp_open _ -> unsupported loc (Not_yet_supported "local opens")
+  | Texp_open (od, e) -> begin
+      match path_of_module od.open_expr with
+      | Some path when not (Path.contains_apply path) ->
+          (expression bound e).sexp_desc
+      | Some _ | None -> unsupported loc Local_opens
+    end
   | Texp_probe _ | Texp_probe_is_enabled _ -> unsupported loc Probes
   | Texp_exclave _ -> unsupported loc Exclave
   | Texp_src_pos -> unsupported loc Source_positions
@@ -441,6 +477,8 @@ let describe = function
   | First_class_modules -> "first-class modules"
   | Layout_polymorphism -> "layout-polymorphic bindings"
   | Local_exceptions -> "local exceptions"
+  | Local_modules -> "local modules that are not module paths"
+  | Local_opens -> "local opens that are not of module paths"
   | Locally_abstract_types -> "locally abstract types"
   | Loops -> "loops"
   | Mutable_variables -> "mutable variables"
@@ -456,7 +494,6 @@ let describe = function
   | Source_positions -> "source positions"
   | Stack_allocation -> "stack_"
   | Values_through_applications -> "values through functor applications"
-  | Not_yet_supported what -> what
 
 let report_error ppf = function
   | Unsupported what ->

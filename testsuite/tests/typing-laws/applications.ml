@@ -90,6 +90,16 @@ Line 3, characters 11-12:
 Error: Laws do not support values through functor applications.
 |}]
 
+(* So does substituting a local module bound to an application. *)
+
+law? local : (let module L = F (A) in L.x == L.x)
+[%%expect {|
+Line 1, characters 13-49:
+1 | law? local : (let module L = F (A) in L.x == L.x)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Laws do not support values through functor applications.
+|}]
+
 (* A module substitution of an application gives the laws that refer to
    the values of the module such paths. The toplevel checks the signature
    of each phrase against itself, as the compiler does an interface and

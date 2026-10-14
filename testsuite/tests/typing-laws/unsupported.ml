@@ -57,3 +57,14 @@ Line 2, characters 23-27:
                            ^^^^
 Error: Laws do not support source locations.
 |}]
+
+(* A local module bound to a structure (only module paths are accepted,
+   see printing.ml). *)
+
+law? local_structure : (let module M = struct let x = 0 end in M.x = 0)
+[%%expect {|
+Line 1, characters 23-71:
+1 | law? local_structure : (let module M = struct let x = 0 end in M.x = 0)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Laws do not support local modules that are not module paths.
+|}]
