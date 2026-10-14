@@ -459,6 +459,11 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
       in
       let is_tupled = Code.is_tupled code in
       let stub = Code.stub code in
+      let fdo_entry_annotation =
+        if !Oxcaml_flags.fdo_counters
+        then Some (Code.fdo_entry_annotation code)
+        else None
+      in
       let params_and_body =
         Flambda.Function_params_and_body.pattern_match
           (Code.params_and_body code)
@@ -533,7 +538,8 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
           code_size;
           is_tupled;
           stub;
-          result_mode
+          result_mode;
+          fdo_entry_annotation
         }
     | Code code_id, Deleted_code ->
       Deleted_code (code_id |> Env.find_code_id_exn env)
