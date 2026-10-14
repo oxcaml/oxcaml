@@ -309,3 +309,181 @@ value swap_mixed_bytecode(value p) {
   Field(res, 1) = b;
   CAMLreturn(res);
 }
+
+/* More than two components per register. */
+
+typedef struct { int16_t a; int16_t b; int16_t c; int16_t d; } args_i16x4;
+typedef struct { int8_t a; int8_t b; int16_t c; int32_t d; } args_i8_i8_i16_i32;
+
+_Static_assert(sizeof(args_i16x4) == 8, "four int16s should be 8 bytes");
+_Static_assert(sizeof(args_i8_i8_i16_i32) == 8,
+               "int8, int8, int16, int32 should be 8 bytes");
+
+int64_t sum_i16_quad_native(args_i16x4 p) {
+  return (int64_t) p.a + (int64_t) p.b + (int64_t) p.c + (int64_t) p.d;
+}
+
+value sum_i16_quad_bytecode(value p) {
+  CAMLparam1(p);
+  int64_t res = (int64_t) Int16_val(Field(p, 0))
+    + (int64_t) Int16_val(Field(p, 1)) + (int64_t) Int16_val(Field(p, 2))
+    + (int64_t) Int16_val(Field(p, 3));
+  CAMLreturn(caml_copy_int64(res));
+}
+
+int64_t sum_i8_i8_i16_i32_native(args_i8_i8_i16_i32 p) {
+  return (int64_t) p.a + (int64_t) p.b + (int64_t) p.c + (int64_t) p.d;
+}
+
+value sum_i8_i8_i16_i32_bytecode(value p) {
+  CAMLparam1(p);
+  int64_t res = (int64_t) Int8_val(Field(p, 0))
+    + (int64_t) Int8_val(Field(p, 1)) + (int64_t) Int16_val(Field(p, 2))
+    + (int64_t) Int32_val(Field(p, 3));
+  CAMLreturn(caml_copy_int64(res));
+}
+
+args_i16x4 ret_i16_quad_native(value unit) {
+  args_i16x4 res = { -1, 2, -3000, 4000 };
+  return res;
+}
+
+value ret_i16_quad_bytecode(value unit) {
+  value res = caml_alloc_small(4, 0);
+  Field(res, 0) = Val_int16(-1);
+  Field(res, 1) = Val_int16(2);
+  Field(res, 2) = Val_int16(-3000);
+  Field(res, 3) = Val_int16(4000);
+  return res;
+}
+
+args_i8_i8_i16_i32 ret_i8_i8_i16_i32_native(value unit) {
+  args_i8_i8_i16_i32 res = { -100, 50, -20000, 1000000 };
+  return res;
+}
+
+value ret_i8_i8_i16_i32_bytecode(value unit) {
+  CAMLparam1(unit);
+  CAMLlocal2(res, d);
+  d = caml_copy_int32(1000000);
+  res = caml_alloc_small(4, 0);
+  Field(res, 0) = Val_int8(-100);
+  Field(res, 1) = Val_int8(50);
+  Field(res, 2) = Val_int16(-20000);
+  Field(res, 3) = d;
+  CAMLreturn(res);
+}
+
+/* Floating-point components in less common positions. */
+
+typedef struct { float a; int64_t b; } args_f32_i64;
+typedef struct { float a; float b; float c; } args_f32x3;
+
+double sum_f32_i64_native(args_f32_i64 p) {
+  return (double) p.a + (double) p.b;
+}
+
+value sum_f32_i64_bytecode(value p) {
+  CAMLparam1(p);
+  double res = (double) Float32_val(Field(p, 0))
+    + (double) Int64_val(Field(p, 1));
+  CAMLreturn(caml_copy_double(res));
+}
+
+double sum_f32_triple_native(args_f32x3 p) {
+  return (double) p.a + (double) p.b + (double) p.c;
+}
+
+value sum_f32_triple_bytecode(value p) {
+  CAMLparam1(p);
+  double res = (double) Float32_val(Field(p, 0))
+    + (double) Float32_val(Field(p, 1)) + (double) Float32_val(Field(p, 2));
+  CAMLreturn(caml_copy_double(res));
+}
+
+args_f32x3 ret_f32_triple_native(value unit) {
+  args_f32x3 res = { 1.5f, -0.25f, 4.0f };
+  return res;
+}
+
+value ret_f32_triple_bytecode(value unit) {
+  CAMLparam1(unit);
+  CAMLlocal4(res, a, b, c);
+  a = caml_copy_float32(1.5f);
+  b = caml_copy_float32(-0.25f);
+  c = caml_copy_float32(4.0f);
+  res = caml_alloc_small(3, 0);
+  Field(res, 0) = a;
+  Field(res, 1) = b;
+  Field(res, 2) = c;
+  CAMLreturn(res);
+}
+
+/* Heap pointers as components. */
+
+typedef struct { value s; int64_t n; } args_string_i64;
+
+int64_t sum_string_i64_native(args_string_i64 p) {
+  return (int64_t) caml_string_length(p.s) + p.n;
+}
+
+value sum_string_i64_bytecode(value p) {
+  CAMLparam1(p);
+  int64_t res = (int64_t) caml_string_length(Field(p, 0))
+    + Int64_val(Field(p, 1));
+  CAMLreturn(caml_copy_int64(res));
+}
+
+args_string_i64 ret_string_i64_native(value n) {
+  args_string_i64 res;
+  res.s = caml_copy_string("hello");
+  res.n = 2 * Long_val(n);
+  return res;
+}
+
+value ret_string_i64_bytecode(value n) {
+  CAMLparam1(n);
+  CAMLlocal3(res, s, m);
+  s = caml_copy_string("hello");
+  m = caml_copy_int64(2 * Long_val(n));
+  res = caml_alloc_small(2, 0);
+  Field(res, 0) = s;
+  Field(res, 1) = m;
+  CAMLreturn(res);
+}
+
+/* Stack arguments. */
+
+int64_t sum_three_pairs_then_int_native(args_i64_i64 p, args_i64_i64 q,
+                                        args_i64_i64 r, value n) {
+  return p.a + p.b + q.a + q.b + r.a + r.b + Long_val(n);
+}
+
+value sum_three_pairs_then_int_bytecode(value p, value q, value r, value n) {
+  CAMLparam4(p, q, r, n);
+  int64_t res = Int64_val(Field(p, 0)) + Int64_val(Field(p, 1))
+    + Int64_val(Field(q, 0)) + Int64_val(Field(q, 1))
+    + Int64_val(Field(r, 0)) + Int64_val(Field(r, 1)) + Long_val(n);
+  CAMLreturn(caml_copy_int64(res));
+}
+
+/* A one-member struct of a float passed on the stack; on Apple arm64 this
+   takes a 4-byte slot, unlike the 8-byte slot of [args_i16] above. */
+
+typedef struct { float a; } args_f32;
+
+double stack_single_f32_native(double a0, double a1, double a2, double a3,
+                               double a4, double a5, double a6, double a7,
+                               args_f32 s, double y) {
+  return a0 + a1 + a2 + a3 + a4 + a5 + a6 + a7 + 10 * (double) s.a + 100 * y;
+}
+
+value stack_single_f32_bytecode(value *argv, int argn) {
+  CAMLparam0();
+  double sum = 0;
+  int i;
+  for (i = 0; i < 8; i++) sum += Double_val(argv[i]);
+  sum += 10 * (double) Float32_val(Field(argv[8], 0));
+  sum += 100 * Double_val(argv[9]);
+  CAMLreturn(caml_copy_double(sum));
+}

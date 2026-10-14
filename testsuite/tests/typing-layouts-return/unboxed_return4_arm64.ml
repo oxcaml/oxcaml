@@ -148,3 +148,43 @@ external sum_f64_quad : #(float# * float# * float# * float#) -> float#
 let () =
   Printf.eprintf "sum_f64_quad: %.4f\n%!"
     (box_float (sum_f64_quad #(#1.0, #2.0, #3.0, #4.0)))
+
+(* Nested products of float64s are still homogeneous aggregates (d0-d2). *)
+external sum_nested_f64 : #(#(float# * float#) * float#) -> float#
+  = "" "sum_nested_f64_native"
+
+let () =
+  Printf.eprintf "sum_nested_f64: %.4f\n%!"
+    (box_float (sum_nested_f64 #(#(#1.0, #2.0), #3.0)))
+
+external ret_nested_f64 : unit -> #(#(float# * float#) * float#)
+  = "" "ret_nested_f64_native"
+
+let () =
+  let #(#(a, b), c) = ret_nested_f64 () in
+  Printf.eprintf "ret_nested_f64: %.4f %.4f %.4f\n%!" (box_float a)
+    (box_float b) (box_float c)
+
+(* Four 128-bit vectors: a 64-byte homogeneous aggregate, the largest passed
+   in registers (v0-v3 as an argument, q0-q3 as a result). *)
+external ret_f32x4_quad :
+  unit -> #(float32x4# * float32x4# * float32x4# * float32x4#)
+  = "" "ret_f32x4_quad_native"
+
+let () =
+  let #(a, b, c, d) = ret_f32x4_quad () in
+  print_f32x4 "f32x4_quad.a" a;
+  print_f32x4 "f32x4_quad.b" b;
+  print_f32x4 "f32x4_quad.c" c;
+  print_f32x4 "f32x4_quad.d" d
+
+external sum_f32x4_quad :
+  #(float32x4# * float32x4# * float32x4# * float32x4#) -> float32x4#
+  = "" "sum_f32x4_quad_native"
+
+let () =
+  let a = make_f32x4 #1.0 #2.0 #3.0 #4.0 in
+  let b = make_f32x4 #10.0 #20.0 #30.0 #40.0 in
+  let c = make_f32x4 #100.0 #200.0 #300.0 #400.0 in
+  let d = make_f32x4 #1000.0 #2000.0 #3000.0 #4000.0 in
+  print_f32x4 "sum_f32x4_quad" (sum_f32x4_quad #(a, b, c, d))

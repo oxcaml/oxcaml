@@ -102,3 +102,33 @@ f64_quad_struct ret_f64_quad_native(value unit) {
 double sum_f64_quad_native(f64_quad_struct p) {
   return p.a + p.b + p.c + p.d;
 }
+
+typedef struct { double a; double b; } f64_pair_struct;
+typedef struct { f64_pair_struct p; double c; } f64_nested_struct;
+
+double sum_nested_f64_native(f64_nested_struct p) {
+  return p.p.a + p.p.b + p.c;
+}
+
+f64_nested_struct ret_nested_f64_native(value unit) {
+  f64_nested_struct res = { { 1.25, -2.5 }, 3.75 };
+  return res;
+}
+
+typedef struct {
+  float32x4_t a; float32x4_t b; float32x4_t c; float32x4_t d;
+} f32x4_quad_struct;
+
+f32x4_quad_struct ret_f32x4_quad_native(value unit) {
+  float a[4] = { 1.0f, 2.0f, 3.0f, 4.0f };
+  float b[4] = { 5.0f, 6.0f, 7.0f, 8.0f };
+  float c[4] = { 9.0f, 10.0f, 11.0f, 12.0f };
+  float d[4] = { 13.0f, 14.0f, 15.0f, 16.0f };
+  f32x4_quad_struct res =
+    { vld1q_f32(a), vld1q_f32(b), vld1q_f32(c), vld1q_f32(d) };
+  return res;
+}
+
+float32x4_t sum_f32x4_quad_native(f32x4_quad_struct p) {
+  return vaddq_f32(vaddq_f32(p.a, p.b), vaddq_f32(p.c, p.d));
+}

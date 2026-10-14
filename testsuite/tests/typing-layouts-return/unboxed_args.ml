@@ -8,6 +8,10 @@
    native;
  }
  {
+   flags = "-extension layouts_beta -flambda2-reaper -reaper-local-fields";
+   native;
+ }
+ {
    flags = "-extension layouts_beta";
    bytecode;
  }
@@ -24,8 +28,9 @@
    the ABIs. In bytecode, products are passed and returned as (possibly
    nested) tuples.
 
-   Every case in this file is passed and returned entirely in registers on
-   both x86-64 (System V) and arm64 (AAPCS64 and the Apple variant). *)
+   No case in this file involves a C struct that either x86-64 (System V) or
+   arm64 (AAPCS64 and the Apple variant) passes in memory. Single-component
+   products, which are passed like their member, may spill to the stack. *)
 
 open Stdlib_stable
 
@@ -38,11 +43,15 @@ external unbox_float32 : (float32[@local_opt]) -> float32_u = "%unbox_float32"
 external float_of_float32 : float32 -> float = "%floatoffloat32"
 external untag_int16 : int16 -> int16# = "%untag_int16"
 external tag_int16 : int16# -> int16 = "%tag_int16"
+external untag_int8 : int8 -> int8# = "%untag_int8"
+external tag_int8 : int8# -> int8 = "%tag_int8"
 
 let i32 x = unbox_int32 x
 let f32 x = unbox_float32 (Float32.of_float x)
 let i16 x = untag_int16 (Int16.of_int x)
 let i16' x = Int16.to_int (tag_int16 x)
+let i8 x = untag_int8 (Int8.of_int x)
+let i8' x = Int8.to_int (tag_int8 x)
 let f32' x = float_of_float32 (box_float32 x)
 
 (* Two int64s: two integer registers on both ABIs. *)
@@ -238,3 +247,121 @@ external swap_mixed : #(int32_u * float32_u) -> #(float32_u * int32_u)
 let () =
   let #(a, b) = swap_mixed #(i32 5l, f32 (-2.5)) in
   Printf.eprintf "swap_mixed: %.4f %ld\n%!" (f32' a) (box_int32 b)
+
+(* Four int16s in one register. *)
+external sum_i16_quad : #(int16# * int16# * int16# * int16#) -> int64_u
+  = "sum_i16_quad_bytecode" "sum_i16_quad_native"
+
+let () =
+  Printf.eprintf "sum_i16_quad: %Ld\n%!"
+    (box_int64 (sum_i16_quad #(i16 (-1), i16 2, i16 (-3000), i16 4000)))
+
+(* Components of three different widths in one register. *)
+external sum_i8_i8_i16_i32 : #(int8# * int8# * int16# * int32_u) -> int64_u
+  = "sum_i8_i8_i16_i32_bytecode" "sum_i8_i8_i16_i32_native"
+
+let () =
+  Printf.eprintf "sum_i8_i8_i16_i32: %Ld\n%!"
+    (box_int64
+       (sum_i8_i8_i16_i32 #(i8 (-100), i8 50, i16 (-20000), i32 1000000l)))
+
+(* float32 then int64: an SSE eightbyte of its own on x86-64; on arm64 the
+   lone float32 travels in an integer register. *)
+external sum_f32_i64 : #(float32_u * int64_u) -> float#
+  = "sum_f32_i64_bytecode" "sum_f32_i64_native"
+
+let () =
+  Printf.eprintf "sum_f32_i64: %.4f\n%!"
+    (box_float (sum_f32_i64 #(f32 2.5, #10L)))
+
+(* Three float32s: on x86-64, two packed in xmm0 and one alone in xmm1; on
+   arm64, a homogeneous aggregate in s0-s2. *)
+external sum_f32_triple : #(float32_u * float32_u * float32_u) -> float#
+  = "sum_f32_triple_bytecode" "sum_f32_triple_native"
+
+let () =
+  Printf.eprintf "sum_f32_triple: %.4f\n%!"
+    (box_float (sum_f32_triple #(f32 1.5, f32 (-0.25), f32 4.0)))
+
+(* A heap pointer as a product component. *)
+external sum_string_i64 : #(string * int64_u) -> int64_u
+  = "sum_string_i64_bytecode" "sum_string_i64_native"
+
+let () =
+  Printf.eprintf "sum_string_i64: %Ld\n%!"
+    (box_int64 (sum_string_i64 #("hello", #100L)))
+
+(* A trailing scalar after three pairs have used all six x86-64 integer
+   argument registers. *)
+external sum_three_pairs_then_int :
+  #(int64_u * int64_u) -> #(int64_u * int64_u) -> #(int64_u * int64_u) -> int
+  -> int64_u
+  = "sum_three_pairs_then_int_bytecode" "sum_three_pairs_then_int_native"
+
+let () =
+  Printf.eprintf "sum_three_pairs_then_int: %Ld\n%!"
+    (box_int64
+       (sum_three_pairs_then_int #(#1L, #2L) #(#3L, #4L) #(#5L, #6L) 100))
+
+(* A product with a single float32 component passed on the stack, after eight
+   float64s have used the floating-point argument registers. On Apple arm64
+   such a struct is a homogeneous aggregate and takes the 4-byte slot of its
+   member, unlike the 8-byte slot of [stack_single] above. *)
+external stack_single_f32 :
+  float# -> float# -> float# -> float# -> float# -> float# -> float# -> float#
+  -> #(float32_u * unit#) -> float# -> float#
+  = "stack_single_f32_bytecode" "stack_single_f32_native"
+
+let () =
+  Printf.eprintf "stack_single_f32: %.4f\n%!"
+    (box_float
+       (stack_single_f32 #1.0 #2.0 #3.0 #4.0 #5.0 #6.0 #7.0 #8.0
+          #(f32 0.5, #()) #0.25))
+
+(* [@@noalloc] with a product argument. *)
+external sum_i64_pair_noalloc : #(int64_u * int64_u) -> int64_u
+  = "sum_i64_pair_bytecode" "sum_i64_pair_native"
+  [@@noalloc]
+
+let () =
+  Printf.eprintf "sum_i64_pair_noalloc: %Ld\n%!"
+    (box_int64 (sum_i64_pair_noalloc #(#5L, #6L)))
+
+(* Returns with more than two components per register. *)
+external ret_i16_quad : unit -> #(int16# * int16# * int16# * int16#)
+  = "ret_i16_quad_bytecode" "ret_i16_quad_native"
+
+let () =
+  let #(a, b, c, d) = ret_i16_quad () in
+  Printf.eprintf "ret_i16_quad: %d %d %d %d\n%!" (i16' a) (i16' b) (i16' c)
+    (i16' d)
+
+external ret_i8_i8_i16_i32 : unit -> #(int8# * int8# * int16# * int32_u)
+  = "ret_i8_i8_i16_i32_bytecode" "ret_i8_i8_i16_i32_native"
+
+let () =
+  let #(a, b, c, d) = ret_i8_i8_i16_i32 () in
+  Printf.eprintf "ret_i8_i8_i16_i32: %d %d %d %ld\n%!" (i8' a) (i8' b) (i16' c)
+    (box_int32 d)
+
+(* See [sum_f32_triple]. *)
+external ret_f32_triple : unit -> #(float32_u * float32_u * float32_u)
+  = "ret_f32_triple_bytecode" "ret_f32_triple_native"
+
+let () =
+  let #(a, b, c) = ret_f32_triple () in
+  Printf.eprintf "ret_f32_triple: %.4f %.4f %.4f\n%!" (f32' a) (f32' b) (f32' c)
+
+(* A freshly allocated heap pointer returned in a product: it must be treated
+   as a GC root, so it is promoted and the minor heap is then overwritten
+   before it is used. *)
+external ret_string_i64 : int -> #(string * int64_u)
+  = "ret_string_i64_bytecode" "ret_string_i64_native"
+
+let () =
+  let #(s, n) = ret_string_i64 21 in
+  Gc.minor ();
+  for _ = 1 to 1_000_000 do
+    ignore (Sys.opaque_identity (String.make 5 'x'))
+  done;
+  Printf.eprintf "ret_string_i64: %s %Ld\n%!" s (box_int64 n)

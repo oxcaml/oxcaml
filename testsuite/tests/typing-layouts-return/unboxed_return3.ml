@@ -8,6 +8,10 @@
    native;
  }
  {
+   flags = "-extension layouts_beta -flambda2-reaper -reaper-local-fields";
+   native;
+ }
+ {
    flags = "-extension layouts_beta";
    bytecode;
  }

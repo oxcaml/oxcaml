@@ -18,3 +18,15 @@ ret_f32_quad: 0.5000 -1.5000 2.2500 -4.0000
 ret_nested: -77 88 9999
 ret_nested_padded: -77777 1234 -5678
 swap_mixed: -2.5000 5
+sum_i16_quad: 1001
+sum_i8_i8_i16_i32: 979950
+sum_f32_i64: 12.5000
+sum_f32_triple: 5.2500
+sum_string_i64: 105
+sum_three_pairs_then_int: 121
+stack_single_f32: 66.0000
+sum_i64_pair_noalloc: 11
+ret_i16_quad: -1 2 -3000 4000
+ret_i8_i8_i16_i32: -100 50 -20000 1000000
+ret_f32_triple: 1.5000 -0.2500 4.0000
+ret_string_i64: hello 42
