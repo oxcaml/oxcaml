@@ -272,7 +272,11 @@ let with_local_level_gen ~begin_def ~structure ?before_generalize f =
     iter_var s ~f:(fun v ->
       let t = of_var v in
       if get_level t >= subject_level then () else
-      update_level !current_level t;
+      begin match update_level !current_level t with
+      | Ok () -> ()
+      | Error Rigid ->
+        Misc.fatal_error "Ctype.with_local_level_gen: rigid sort variable"
+      end;
       add_to_sort_pool ~level:(get_level t) t)
   end sort_pool;
   result
@@ -1005,7 +1009,12 @@ let rec lower_all ty =
   if get_level ty > !current_level then begin
     set_level ty !current_level;
     begin match get_desc ty with
-    | Tvar { jkind } -> Jkind.update_level !current_level jkind
+    | Tvar { jkind } ->
+      begin match Jkind.update_level !current_level jkind with
+      | Ok () -> ()
+      | Error Rigid ->
+        Misc.fatal_error "Ctype.lower_all: rigid sort variable in generalize"
+      end
     | _ -> ()
     end;
     iter_type_expr lower_all (Mode.With_locality.update_level !current_level) ty
@@ -1071,7 +1080,12 @@ let rec generalize_structure ty =
     match get_desc ty with
     | Tvar { jkind } ->
       set_level ty current_level;
-      Jkind.update_level current_level jkind
+      begin match Jkind.update_level current_level jkind with
+      | Ok () -> ()
+      | Error Rigid ->
+        Misc.fatal_error "Ctype.generalize_structure: \
+          rigid sort variable in generalize_structure"
+      end
     | _ ->
       begin match get_desc ty with
         Tconstr (_, _, abbrev) ->
@@ -1292,7 +1306,11 @@ let rec update_level env level expand ty =
         raise_escape_exn Self
     | Tvar { jkind } ->
       set_level ();
-      Jkind.update_level level jkind
+      begin match Jkind.update_level level jkind with
+      | Ok () -> ()
+      | Error Rigid ->
+        Misc.fatal_error "Ctype.update_level: rigid sort variable"
+      end
     | _ ->
         set_level ();
         (* XXX what about abbreviations in Tconstr ? *)
@@ -1334,7 +1352,11 @@ let rec lower_contravariant env var_level visited contra ty =
       Tvar { jkind } ->
         if contra then begin
           set_level ty var_level;
-          Jkind.update_level var_level jkind
+          match Jkind.update_level var_level jkind with
+          | Ok () -> ()
+          | Error Rigid ->
+            Misc.fatal_error
+              "Ctype.lower_contravariant: rigid sort variable"
         end
     | Tconstr (_, [], _) -> ()
     | Tconstr (path, tyl, _abbrev) ->
@@ -3489,12 +3511,20 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
           Because of these reasons, we pull out the mutable tyvar case and treat
           it first.
         *)
-        Jkind.intersection_or_error ~type_equal ~context
-          ~reason:Tyvar_refinement_intersection env
-          ty's_jkind jkind
-        |> Result.map (fun jkind ->
-          Jkind.update_level (get_level ty) jkind;
-          set_var_jkind ty jkind)
+        let open Misc.Stdlib.Monad.Result.Syntax in
+        let* ty's_new_jkind =
+          Jkind.intersection_or_error ~type_equal ~context
+            ~reason:Tyvar_refinement_intersection env
+            ty's_jkind jkind
+        in
+        let+ () =
+          Jkind.update_level (get_level ty) ty's_new_jkind
+          |> Result.map_error (fun error ->
+            Jkind.Violation.of_ ~context env (
+              Not_a_subjkind (ty's_jkind, jkind,
+              [Layout_disagreement (Level error)])))
+        in
+        set_var_jkind ty ty's_new_jkind
 
     (* Handle the [Tpoly] case out here so [Tvar]s wrapped in [Tpoly]s can get
        the treatment above. *)
@@ -6445,12 +6475,17 @@ let moregen_occur env level ty =
   update_level_for Moregen env level ty
 
 let moregen_check_type_jkind_exn env subj pat jkind =
+  let failed_because_of_rigid_instatiation = function
+    | Jkind.Sub_failure_reason.Layout_disagreement (Level Rigid) -> true
+    | _ -> false
+  in
   match check_type_jkind env subj jkind with
   | Ok () -> ()
   (* We improve the error message for rigid variables, which occur in [subj].
      The check may fail if they are equated against something non-generic,
      like a weak variable or a concrete layout. *)
-  | Error { violation = Not_a_subjkind (_, _, [Layout_disagreement Rigid]) } ->
+  | Error { violation = Not_a_subjkind (_, _, reasons) }
+    when List.exists failed_because_of_rigid_instatiation reasons ->
     raise_for Moregen (Weaken_sort { pat; subj } )
   | Error err -> raise_for Moregen (Bad_jkind (subj, err))
 

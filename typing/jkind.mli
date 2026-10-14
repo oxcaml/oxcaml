@@ -49,6 +49,7 @@ module Sort : sig
        and type var = Jkind_types.Sort.var
        and type univar = Jkind_types.Sort.univar
        and type base = Jkind_types.Sort.base
+       and type level_error = Jkind_types.Sort.level_error
        and type error = Jkind_types.Sort.error
        and type Const.t = Jkind_types.Sort.Const.t
 
@@ -626,7 +627,7 @@ val default_to_scannable : 'd Types.jkind -> unit
     has an effect when called within {!Sort.generalize_with}. *)
 val generalize : current_level:int -> 'd Types.jkind -> unit
 
-val update_level : int -> 'd Types.jkind -> unit
+val update_level : int -> 'd Types.jkind -> (unit, Sort.level_error) result
 
 (** Returns the sort corresponding to the jkind. Call only on representable
     jkinds - raises on Any. *)

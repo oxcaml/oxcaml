@@ -70,9 +70,13 @@ module Sort = struct
 
   exception Lower_rigid
 
+  type level_error = Rigid
+
   type error =
     | Incompatible
-    | Rigid
+    | Level of level_error
+
+  let level_error = Result.map_error (fun e -> Level e)
 
   let is_genvar var =
     assert (Option.is_none var.contents);
@@ -522,12 +526,17 @@ module Sort = struct
       List.fold_left (fun acc t -> min acc (get_level t)) generic_level ts
     | Addressable t -> get_level t
 
-  let[@inline] set_var_level (v : var) (level : int) =
+  let[@inline] set_var_level (v : var) (level : int) :
+      (unit, level_error) result =
     if level < v.level
-    then (
-      if v.level = subject_level then raise Lower_rigid;
-      log (v, Clevel v.level);
-      v.level <- level)
+    then
+      if v.level = subject_level
+      then raise Lower_rigid
+      else (
+        log (v, Clevel v.level);
+        v.level <- level;
+        Ok ())
+    else Ok ()
 
   let rec iter_var ~f = function
     | Var { contents = Some t } -> iter_var ~f t
@@ -536,12 +545,17 @@ module Sort = struct
     | Product ts -> List.iter (iter_var ~f) ts
     | Addressable t -> iter_var ~f t
 
-  let update_level level =
-    iter_var ~f:(fun v ->
-        assert (v.contents = None);
-        let generic = v.level = generic_level in
-        set_var_level v level;
-        if generic then !add_to_pool ~level (Var v))
+  let rec update_level level = function
+    | Var { contents = Some t } -> update_level level t
+    | Var ({ contents = None } as v) ->
+      assert (v.contents = None);
+      let generic = v.level = generic_level in
+      let result = set_var_level v level in
+      if generic then !add_to_pool ~level (Var v);
+      result
+    | Base _ | Univar _ -> Ok ()
+    | Product ts -> Misc.Stdlib.List.iter_until_error ~f:(update_level level) ts
+    | Addressable t -> update_level level t
 
   let[@inline] set_var_contents (v : var) (contents : t option) =
     if v.contents != contents
@@ -550,13 +564,13 @@ module Sort = struct
       v.contents <- contents)
 
   let[@inline] equate_var (v : var) (t : t) =
+    let open Misc.Stdlib.Monad.Result.Syntax in
     assert (Option.is_none v.contents);
     if v.level = subject_level
-    then Error (match t with Var _ -> Rigid | _ -> Incompatible)
-    else (
-      update_level v.level t;
-      set_var_contents v (Some t);
-      Ok ())
+    then Error (match t with Var _ -> Level Rigid | _ -> Incompatible)
+    else
+      let+ () = update_level v.level t |> level_error in
+      set_var_contents v (Some t)
 
   module Static = struct
     (* Statically allocated values of various consts and sorts to save

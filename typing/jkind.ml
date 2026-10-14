@@ -151,9 +151,11 @@ module Layout = struct
     | Addressable of 'sort t
     | Box of 'sort t * Scannable_axes.t
 
+  type level_error = Sort.level_error = Rigid
+
   type error = Sort.error =
     | Incompatible
-    | Rigid
+    | Level of level_error
 
   module Const = struct
     include Jkind_types.Layout.Const
@@ -679,10 +681,11 @@ module Layout = struct
     | Addressable t -> generalize ~current_level t
     | Box (t, _) -> generalize ~current_level t
 
-  let rec update_level level : _ Layout.t -> unit = function
-    | Any _ -> ()
+  let rec update_level level : _ Layout.t -> (unit, level_error) result =
+    function
+    | Any _ -> Ok ()
     | Sort (s, _) -> Sort.update_level level s
-    | Product ts -> List.iter (update_level level) ts
+    | Product ts -> Misc.Stdlib.List.iter_until_error ~f:(update_level level) ts
     | Addressable t -> update_level level t
     | Box (t, _) -> update_level level t
 
@@ -3137,9 +3140,9 @@ let generalize ~current_level t =
   | Kconstr _ -> ()
   | Layout l -> Layout.generalize ~current_level l
 
-let update_level level t =
+let update_level level t : (unit, Sort.level_error) result =
   match t.jkind.base with
-  | Kconstr _ -> ()
+  | Kconstr _ -> Ok ()
   | Layout l -> Layout.update_level level l
 
 let get t = Jkind_desc.get t.jkind
