@@ -719,6 +719,7 @@ rule token = parse
         check_label_name ~raw_escape:(escape<>"") lexbuf name;
         OPTLABEL name
       }
+  | "law?" { LAWQUESTION }
   (* Lowercase identifiers are split into 3 cases, and the order matters
      (longest to shortest).
   *)
@@ -908,6 +909,7 @@ rule token = parse
     }
   | "<-" { LESSMINUS }
   | "="  { EQUAL }
+  | "===>" { IMPLIES }
   | "["  { LBRACKET }
   | "[|" { LBRACKETBAR }
   | "[:" { LBRACKETCOLON }

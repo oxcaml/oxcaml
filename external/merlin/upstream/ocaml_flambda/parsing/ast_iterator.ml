@@ -51,6 +51,7 @@ type iterator = {
   jkind_annotation: iterator -> jkind_annotation -> unit;
   jkind_declaration: iterator -> jkind_declaration -> unit;
   label_declaration: iterator -> label_declaration -> unit;
+  law_declaration: iterator -> law_declaration -> unit;
   location: iterator -> Location.t -> unit;
   module_binding: iterator -> module_binding -> unit;
   module_declaration: iterator -> module_declaration -> unit;
@@ -365,6 +366,7 @@ module MT = struct
         sub.extension sub x
     | Psig_attribute x -> sub.attribute sub x
     | Psig_jkind x -> sub.jkind_declaration sub x
+    | Psig_law x -> sub.law_declaration sub x
 end
 
 
@@ -417,6 +419,7 @@ module M = struct
         sub.attributes sub attrs; sub.extension sub x
     | Pstr_attribute x -> sub.attribute sub x
     | Pstr_jkind x -> sub.jkind_declaration sub x
+    | Pstr_law x -> sub.law_declaration sub x
 end
 
 module E = struct
@@ -909,6 +912,20 @@ let default_iterator =
          Option.iter (this.jkind_annotation this) pjkind_manifest;
          this.attributes this pjkind_attributes;
          this.location this pjkind_loc
+      );
+
+    law_declaration =
+      (fun this { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
+                  plaw_attributes; plaw_loc } ->
+         iter_loc this plaw_name;
+         List.iter
+           (fun (name, ty) ->
+              iter_loc this name; Option.iter (this.typ this) ty)
+           plaw_params;
+         List.iter (this.expr this) plaw_assumptions;
+         this.expr this plaw_conclusion;
+         this.attributes this plaw_attributes;
+         this.location this plaw_loc
       );
 
     directive_argument =
