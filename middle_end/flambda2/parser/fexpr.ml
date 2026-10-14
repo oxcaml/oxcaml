@@ -297,6 +297,8 @@ type loopify_attribute = Loopify_attribute.t =
   | Default_loopify_and_tailrec
   | Default_loopify_and_not_tailrec
 
+type fdo_annotation = Fdo_annotation.t
+
 type apply =
   { func : simple option;
     continuation : result_continuation;
@@ -414,7 +416,8 @@ and code =
     is_tupled : bool;
     stub : bool;
     loopify : loopify_attribute option;
-    result_mode : alloc_mode_for_return
+    result_mode : alloc_mode_for_return;
+    fdo_entry_annotation : fdo_annotation option
   }
 
 and code_size = int

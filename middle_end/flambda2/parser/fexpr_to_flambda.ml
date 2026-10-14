@@ -682,7 +682,8 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
             is_tupled;
             stub;
             loopify;
-            result_mode
+            result_mode;
+            fdo_entry_annotation
           } ->
         let code_id = find_code_id env id in
         let newer_version_of = Option.map (find_code_id env) newer_version_of in
@@ -820,7 +821,9 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
             ~inlining_arguments:(Inlining_arguments.create ~round:0)
             ~poll_attribute:Default ~regalloc_attribute:Default_regalloc
             ~regalloc_param_attribute:Default_regalloc_params ~cold:false
-            ~dbg:Debuginfo.none ~fdo_entry_annotation:Fdo_annotation.empty
+            ~dbg:Debuginfo.none
+            ~fdo_entry_annotation:
+              (Option.value fdo_entry_annotation ~default:Fdo_annotation.empty)
             ~is_tupled ~is_my_closure_used
             ~inlining_decision:Never_inline_attribute
             ~absolute_history:

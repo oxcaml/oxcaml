@@ -318,7 +318,9 @@ code:
       { id; newer_version_of; param_arity = None; ret_arity; recursive; inline;
         params_and_body = { params; closure_var; region_vars; depth_var;
                             ret_cont; exn_cont; body };
-        code_size; is_tupled; stub; loopify; result_mode; } }
+        code_size; is_tupled; stub; loopify; result_mode;
+        (* CR yusumez: parse FDO annotations *)
+        fdo_entry_annotation = None; } }
 ;
 
 code_header:
