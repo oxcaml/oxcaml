@@ -149,9 +149,7 @@ let check_tag ~env ~res x ~tag =
   let tag_var, env, res =
     use_prim0 ~env ~res (Extern ("%direct_obj_tag_nullish", None)) [x]
   in
-  let expr : Jsir.expr =
-    Prim (Eq, [Pv tag_var; Pc (Int (Targetint.of_int_exn tag))])
-  in
+  let expr : Jsir.expr = Prim (Eq, [Pv tag_var; int_const tag]) in
   let var = Jsir.Var.fresh () in
   Some var, env, To_jsir_result.add_instr_exn res (Let (var, expr))
 
@@ -231,7 +229,7 @@ let unary_exn ~env ~res (f : Flambda_primitive.unary_primitive) x =
     let x, res = prim_arg ~env ~res x in
     use_prim ~env ~res
       (Extern ("caml_ba_dim", None))
-      [x; Pc (Int (Targetint.of_int_exn (dimension - 1)))]
+      [x; int_const (dimension - 1)]
   | String_length _ -> use_prim' (Extern ("caml_ml_string_length", None))
   | Int_as_pointer _ -> use_prim' (Extern ("caml_int_as_pointer", None))
   | Opaque_identity { middle_end_only = true; kind = _ } -> identity ~env ~res x
