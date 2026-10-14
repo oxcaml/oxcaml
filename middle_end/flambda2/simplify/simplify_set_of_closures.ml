@@ -524,7 +524,6 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
       ~cold ~is_a_functor ~is_opaque ~recursive ~cost_metrics
       ~inlining_arguments ~dbg
       ~fdo_entry_annotation:(Code.fdo_entry_annotation code)
-      ~function_body_hash:(Code.function_body_hash code)
       ~is_tupled:(Code.is_tupled code) ~is_my_closure_used ~inlining_decision
       ~absolute_history ~relative_history ~loopify
   in

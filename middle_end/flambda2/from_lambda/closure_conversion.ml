@@ -2426,10 +2426,8 @@ let first_complex_local_param_of_function_decl decl =
    when it has an FDO identity. *)
 let fdo_entry decl =
   match Function_decl.fdo_fingerprint decl with
-  | Some fingerprint ->
-    ( Fdo_fingerprint.entry_annotation fingerprint,
-      Some (Fdo_fingerprint.body_hash fingerprint) )
-  | None -> Fdo_annotation.empty, None
+  | Some fingerprint -> Fdo_fingerprint.entry_annotation fingerprint
+  | None -> Fdo_annotation.With_body_hash.empty
 
 let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
     params_arity ~unarized_param_modes:param_modes return result_arity_main_code
@@ -2684,8 +2682,8 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
       ~cold:false ~is_opaque:false ~recursive ~newer_version_of:None
       ~cost_metrics
       ~inlining_arguments:(Inlining_arguments.create ~round:0)
-      ~dbg ~fdo_entry_annotation:Fdo_annotation.empty ~function_body_hash:None
-      ~is_tupled ~is_my_closure_used:true ~inlining_decision ~absolute_history
+      ~dbg ~fdo_entry_annotation:Fdo_annotation.With_body_hash.empty ~is_tupled
+      ~is_my_closure_used:true ~inlining_decision ~absolute_history
       ~relative_history ~loopify:Never_loopify
   in
   let main_approx =
@@ -2717,7 +2715,7 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
   let body = Function_decl.body decl in
   let loc = Function_decl.loc decl in
   let dbg = Debuginfo.from_location loc in
-  let fdo_entry_annotation, function_body_hash = fdo_entry decl in
+  let fdo_entry_annotation = fdo_entry decl in
   let unarized_params = Function_decl.params decl in
   let params_arity = Function_decl.params_arity decl in
   let unarized_param_modes =
@@ -3107,8 +3105,7 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
       ~is_opaque:(Function_decl.is_opaque decl)
       ~recursive ~newer_version_of:None ~cost_metrics
       ~inlining_arguments:(Inlining_arguments.create ~round:0)
-      ~dbg ~fdo_entry_annotation ~function_body_hash
-      ~is_tupled:main_code_is_tupled
+      ~dbg ~fdo_entry_annotation ~is_tupled:main_code_is_tupled
       ~is_my_closure_used:
         (Function_params_and_body.is_my_closure_used params_and_body)
       ~inlining_decision ~absolute_history ~relative_history ~loopify
@@ -3259,7 +3256,7 @@ let close_functions acc external_env ~current_alloc_region ~current_region
         in
         let cost_metrics = Cost_metrics.zero in
         let dbg = Debuginfo.from_location (Function_decl.loc decl) in
-        let fdo_entry_annotation, function_body_hash = fdo_entry decl in
+        let fdo_entry_annotation = fdo_entry decl in
         let is_tupled =
           match Function_decl.kind decl with
           | Curried _ -> false
@@ -3279,8 +3276,8 @@ let close_functions acc external_env ~current_alloc_region ~current_region
             ~recursive:(Function_decl.recursive decl)
             ~newer_version_of:None ~cost_metrics
             ~inlining_arguments:(Inlining_arguments.create ~round:0)
-            ~dbg ~fdo_entry_annotation ~function_body_hash ~is_tupled
-            ~is_my_closure_used:true ~inlining_decision:Recursive
+            ~dbg ~fdo_entry_annotation ~is_tupled ~is_my_closure_used:true
+            ~inlining_decision:Recursive
             ~absolute_history:(Inlining_history.Absolute.empty compilation_unit)
             ~relative_history:Inlining_history.Relative.empty
             ~loopify:Never_loopify

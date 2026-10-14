@@ -72,7 +72,7 @@ val function_ : t -> Fdo_counter.Function.t
 val body_hash : t -> Fdo_counter.Body_hash.t
 
 (** The counters of the function's entry edge. *)
-val entry_annotation : t -> Fdo_annotation.t
+val entry_annotation : t -> Fdo_annotation.With_body_hash.t
 
 (** The first [limit] (5 by default) distinct tokens of a function. Only
     parameter and body identifiers, primitives, and constants are considered, in
