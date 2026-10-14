@@ -77,7 +77,14 @@ let build : State.t -> Cfg_with_infos.t -> unit =
         then State.add_move_list state instr.res.(0) instr;
         State.add_work_list_moves state instr;
         let move_src =
-          if Reg.same instr.arg.(0) instr.res.(0)
+          (* Different GC representations can cease to be equal at a safepoint.
+             Keep their interference if both remain live after the move; a dying
+             source can still be coalesced with its destination. *)
+          if
+            Reg.same instr.arg.(0) instr.res.(0)
+            || not
+                 (Cmm.equal_machtype_component instr.arg.(0).typ
+                    instr.res.(0).typ)
           then Reg.dummy
           else instr.arg.(0)
         in
