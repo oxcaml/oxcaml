@@ -24,7 +24,7 @@ open Modes.Portable
 
 external cpu_relax : unit -> unit @@ portable = "%cpu_relax"
 
-module Obj_opt : sig @@ portable
+module Obj_slot : sig @@ portable
   type t
   val some : 'a -> t
   val is_some : t -> bool
@@ -113,7 +113,7 @@ type 'a t = {
 
 module DLS0 = struct
 
-  type dls_state = Obj_opt.t array
+  type dls_state = Obj_slot.t array
 
   external get_dls_state : unit -> dls_state @@ portable = "%dls_get"
 
@@ -125,7 +125,7 @@ module DLS0 = struct
     "caml_domain_dls_compare_and_set" [@@noalloc]
 
   let init () =
-    let st = Obj_opt.fresh () in
+    let st = Obj_slot.fresh () in
     set_dls_state st
 
   type 'a key = int * (unit -> 'a) Modes.Portable.t
@@ -162,7 +162,7 @@ module DLS0 = struct
     let sz = Array.length st in
     if idx < sz then st
     else begin
-      let new_st = Obj_opt.grow_array st idx sz in
+      let new_st = Obj_slot.grow_array st idx sz in
       (* We want a implementation that is safe with respect to
         single-domain multi-threading: retry if the DLS state has
         changed under our feet.
@@ -179,11 +179,11 @@ module DLS0 = struct
   let[@inline never] set (type a) (idx, _init) (x : a) =
     (* Assures [idx] is in range. *)
     let st = maybe_grow idx in
-    Array.unsafe_set st idx (Obj_opt.some x)
+    Array.unsafe_set st idx (Obj_slot.some x)
 
   let[@inline never] init_idx (type a) idx old_obj (init : _ -> a) =
     let v : a = init () in
-    let new_obj = Obj_opt.some v in
+    let new_obj = Obj_slot.some v in
     (* At this point, [st] or [st.(idx)] may have been changed
       by another thread on the same domain.
 
@@ -194,14 +194,14 @@ module DLS0 = struct
       letting other threads observe a 'revert' that forgets
       previous modifications. *)
     let st = get_dls_state () in
-    if Obj_opt.compare_and_set st idx old_obj new_obj
+    if Obj_slot.compare_and_set st idx old_obj new_obj
     then v
     else begin
       (* if st.(idx) changed, someone must have initialized
         the key in the meantime. *)
       let updated_obj = Array.unsafe_get st idx in
-      if Obj_opt.is_some updated_obj
-      then (Obj_opt.unsafe_get updated_obj : a)
+      if Obj_slot.is_some updated_obj
+      then (Obj_slot.unsafe_get updated_obj : a)
       else assert false
     end
 
@@ -210,8 +210,8 @@ module DLS0 = struct
     (* Assures [idx] is in range. *)
     let st = maybe_grow idx in
     let obj = Array.unsafe_get st idx in
-    if Obj_opt.is_some obj
-    then (Obj_opt.unsafe_get obj : a)
+    if Obj_slot.is_some obj
+    then (Obj_slot.unsafe_get obj : a)
     else init_idx idx obj init.portable
 
   type key_value : value mod portable contended =
@@ -340,7 +340,7 @@ let max_domain_count = Raw.get_max_domain_count ()
 
 module TLS0 = struct
 
-  type tls_state = Obj_opt.t array
+  type tls_state = Obj_slot.t array
 
   external get_tls_state
     : unit -> tls_state @@ portable = "%tls_get"
@@ -383,7 +383,7 @@ module TLS0 = struct
     let size = Array.length st in
     if idx < size then st
     else begin
-      let new_st = Obj_opt.grow_array st idx size in
+      let new_st = Obj_slot.grow_array st idx size in
       set_tls_state new_st;
       new_st
     end
@@ -396,11 +396,11 @@ module TLS0 = struct
   let[@inline] set (type a) (idx, _init) (x : a) =
     (* Assures [idx] is in range. *)
     ignore (maybe_grow idx);
-    store idx (Obj_opt.some x)
+    store idx (Obj_slot.some x)
 
   let[@inline never] init_idx (type a) idx (init : _ -> a) =
     let v : a = init () in
-    store idx (Obj_opt.some v);
+    store idx (Obj_slot.some v);
     v
 
   let[@inline never] already_accessing () =
@@ -410,20 +410,20 @@ module TLS0 = struct
     (* Assures [idx] is in range. *)
     let st = maybe_grow idx in
     let obj = Array.unsafe_get st idx in
-    if Obj_opt.is_borrowed obj then already_accessing ()
-    else if Obj_opt.is_some obj then (Obj_opt.unsafe_get obj : a)
+    if Obj_slot.is_borrowed obj then already_accessing ()
+    else if Obj_slot.is_some obj then (Obj_slot.unsafe_get obj : a)
     else init_idx idx init.portable
 
-  (* While [f] runs, the slot holds [Obj_opt.borrowed] instead of the value, so
+  (* While [f] runs, the slot holds [Obj_slot.borrowed] instead of the value, so
      [get] (hence [access] and splitting) raises on that key. *)
   let access ((idx, _) as k) f = exclave_
     let v = get k in
-    store idx (Obj_opt.borrowed ());
+    store idx (Obj_slot.borrowed ());
     match f v with
-    | res -> store idx (Obj_opt.some v); res
+    | res -> store idx (Obj_slot.some v); res
     | exception exn ->
       let bt = Printexc.get_raw_backtrace () in
-      store idx (Obj_opt.some v);
+      store idx (Obj_slot.some v);
       Printexc.raise_with_backtrace exn bt
 
   type key_value : value mod portable contended =
@@ -434,7 +434,7 @@ module TLS0 = struct
     type keys = key_value list
 
     let init () =
-      let st = Obj_opt.fresh () in
+      let st = Obj_slot.fresh () in
       set_tls_state st
 
     let get_initial_keys () : key_value list =
