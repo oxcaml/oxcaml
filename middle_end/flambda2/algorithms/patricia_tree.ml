@@ -1885,6 +1885,9 @@ end = struct
                {b Warning}: The value of [current_key] is arbitrary and must not
                be read if [current] is [Null]. *)
             mutable stack : 'a t array;
+            (* CR-someday xclerc: consider allocating the storage in [create]
+               and making the field immutable. This would remove the only
+               mutable pointer read in [pop_or_exhaust] and simplify [reset]. *)
             mutable stack_size : int
                 (* Stack of later subtrees to iterate on. Storage is allocated
                    on first initialization, with capacity [Sys.int_size], enough
@@ -1928,6 +1931,8 @@ end = struct
         [@@inline]
 
         let push t tree =
+          if t.stack_size >= Array.length t.stack
+          then Misc.fatal_error "Patricia iterator: stack overflow";
           Array.unsafe_set t.stack t.stack_size (of_tree tree);
           t.stack_size <- t.stack_size + 1
         [@@inline]
