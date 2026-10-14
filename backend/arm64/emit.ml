@@ -1739,6 +1739,7 @@ let emit_instr env i =
       A.ins2 RBIT (H.reg_x i.res.(0)) (H.reg_x i.arg.(0));
       A.ins2 CLZ (H.reg_x i.res.(0)) (H.reg_x i.res.(0)))
   | Lop (Intop Iclz) -> A.ins2 CLZ (H.reg_x i.res.(0)) (H.reg_x i.arg.(0))
+  | Lop (Intop Inot) -> A.ins_mvn (H.reg_x i.res.(0)) (H.reg_x i.arg.(0))
   | Lop (Intop Iand) ->
     let rd, rn, rm = H.reg_x i.res.(0), H.reg_x i.arg.(0), H.reg_x i.arg.(1) in
     A.ins4 AND_shifted_register rd rn rm O.optional_none
@@ -1784,7 +1785,8 @@ let emit_instr env i =
   | Lop (Intop_imm (Iasr, shift_in_bits)) ->
     A.ins_asr_immediate (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)) ~shift_in_bits
   | Lop
-      (Intop_imm ((Imul | Idiv _ | Iclz | Ictz | Ipopcnt | Imod _ | Imulh _), _))
+      (Intop_imm
+         ((Imul | Idiv _ | Inot | Iclz | Ictz | Ipopcnt | Imod _ | Imulh _), _))
     ->
     Misc.fatal_errorf "emit_instr: immediate operand not supported for %a"
       Printlinear.instr i

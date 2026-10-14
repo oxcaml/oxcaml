@@ -118,11 +118,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         (* avoid reordering *)
         (* The remaining operations are simple if their args are *)
       | Cload _ | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _
-      | Caddi128 | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr
-      | Ccmpi _ | Caddv | Cadda | Cnegf _ | Cclz | Cctz | Cpopcnt | Cbswap _
-      | Ccsel _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32
-      | Creinterpret_cast _ | Cstatic_cast _ | Ctuple_field _ | Ccmpf _
-      | Cdls_get | Ctls_get | Cdomain_index ->
+      | Caddi128 | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Cnot | Clsl | Clsr
+      | Casr | Ccmpi _ | Caddv | Cadda | Cnegf _ | Cclz | Cctz | Cpopcnt
+      | Cbswap _ | Ccsel _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _
+      | Cpackf32 | Creinterpret_cast _ | Cstatic_cast _ | Ctuple_field _
+      | Ccmpf _ | Cdls_get | Ctls_get | Cdomain_index ->
         List.for_all is_simple_expr args)
     | Cifthenelse _ | Cswitch _ | Ccatch _ | Cexit _ | Cinvalid _ -> false
 
@@ -186,7 +186,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         | Cdls_get | Ctls_get | Cdomain_index -> EC.coeffect_only Read_mutable
         | Cprobe_is_enabled _ -> EC.coeffect_only Arbitrary
         | Ctuple_field _ | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _
-        | Caddi128 | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Cbswap _
+        | Caddi128 | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Cnot | Cbswap _
         | Ccsel _ | Cclz | Cctz | Cpopcnt | Clsl | Clsr | Casr | Ccmpi _ | Caddv
         | Cadda | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _
         | Cpackf32 | Creinterpret_cast _ | Cstatic_cast _ | Ccmpf _ ->
@@ -211,7 +211,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       match op with
       | Ilsl | Ilsr | Iasr -> n >= 0 && n < Arch.size_int * 8
       | Iadd | Isub | Imul | Imulh _ | Idiv _ | Imod _ | Iand | Ior | Ixor
-      | Iclz | Ictz | Ipopcnt | Icomp _ ->
+      | Inot | Iclz | Ictz | Ipopcnt | Icomp _ ->
         false)
 
   let is_immediate_test cmp n =
@@ -448,6 +448,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Cand -> select_arith_comm Iand args
     | Cor -> select_arith_comm Ior args
     | Cxor -> select_arith_comm Ixor args
+    | Cnot -> SU.basic_op (Intop Inot), args
     | Clsl -> select_arith Ilsl args
     | Clsr -> select_arith Ilsr args
     | Casr -> select_arith Iasr args
@@ -909,13 +910,13 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Cop
         ( (( Capply _ | Cextcall _ | Cload _ | Calloc _ | Cstore _ | Caddi
            | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _ | Caddi128 | Csubi128
-           | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr | Cbswap _
-           | Ccsel _ | Cclz | Cctz | Cpopcnt | Cprefetch _ | Catomic _ | Ccmpi _
-           | Caddv | Cadda | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _
-           | Cdivf _ | Cpackf32 | Creinterpret_cast _ | Cstatic_cast _ | Ccmpf _
-           | Cprobe _ | Cprobe_is_enabled _ | Cbeginregion | Cendregion
-           | Ctuple_field _ | Cdls_get | Ctls_get | Cdomain_index | Cpoll
-           | Cpause ) as op),
+           | Cmuli64 _ | Cand | Cor | Cxor | Cnot | Clsl | Clsr | Casr
+           | Cbswap _ | Ccsel _ | Cclz | Cctz | Cpopcnt | Cprefetch _
+           | Catomic _ | Ccmpi _ | Caddv | Cadda | Cnegf _ | Cabsf _ | Caddf _
+           | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32 | Creinterpret_cast _
+           | Cstatic_cast _ | Ccmpf _ | Cprobe _ | Cprobe_is_enabled _
+           | Cbeginregion | Cendregion | Ctuple_field _ | Cdls_get | Ctls_get
+           | Cdomain_index | Cpoll | Cpause ) as op),
           args,
           dbg ) ->
       emit_expr_op env sub_cfg bound_name op args dbg
@@ -972,11 +973,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
               }
           | Cextcall _ | Cload _ | Calloc _ | Cstore _ | Caddi | Csubi | Cmuli
           | Cmulhi _ | Cdivi _ | Cmodi _ | Caddi128 | Csubi128 | Cmuli64 _
-          | Cand | Cor | Cxor | Clsl | Clsr | Casr | Cbswap _ | Ccsel _ | Cclz
-          | Cctz | Cpopcnt | Cprefetch _ | Catomic _ | Ccmpi _ | Caddv | Cadda
-          | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32
-          | Creinterpret_cast _ | Cstatic_cast _ | Ccmpf _ | Craise _ | Cprobe _
-          | Cprobe_is_enabled _ | Copaque | Cbeginregion | Cendregion
+          | Cand | Cor | Cxor | Cnot | Clsl | Clsr | Casr | Cbswap _ | Ccsel _
+          | Cclz | Cctz | Cpopcnt | Cprefetch _ | Catomic _ | Ccmpi _ | Caddv
+          | Cadda | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _
+          | Cpackf32 | Creinterpret_cast _ | Cstatic_cast _ | Ccmpf _ | Craise _
+          | Cprobe _ | Cprobe_is_enabled _ | Copaque | Cbeginregion | Cendregion
           | Ctuple_field _ | Cdls_get | Ctls_get | Cdomain_index | Cpoll
           | Cpause ),
           _,

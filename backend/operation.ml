@@ -58,6 +58,7 @@ type integer_operation =
   | Iand
   | Ior
   | Ixor
+  | Inot
   | Ilsl
   | Ilsr
   | Iasr
@@ -81,6 +82,7 @@ let string_of_integer_operation = function
   | Iand -> " & "
   | Ior -> " | "
   | Ixor -> " ^ "
+  | Inot -> "not "
   | Ilsl -> " << "
   | Ilsr -> " >>u "
   | Iasr -> " >>s "
@@ -95,7 +97,7 @@ let string_of_int128_operation = function
   | Imul64 { signed } -> " *" ^ if signed then " " else "u "
 
 let is_unary_integer_operation = function
-  | Iclz | Ictz | Ipopcnt -> true
+  | Inot | Iclz | Ictz | Ipopcnt -> true
   | Iadd | Isub | Imul | Imulh _ | Idiv _ | Imod _ | Iand | Ior | Ixor | Ilsl
   | Ilsr | Iasr | Icomp _ ->
     false
@@ -111,6 +113,7 @@ let equal_integer_operation left right =
   | Iand, Iand -> true
   | Ior, Ior -> true
   | Ixor, Ixor -> true
+  | Inot, Inot -> true
   | Ilsl, Ilsl -> true
   | Ilsr, Ilsr -> true
   | Iasr, Iasr -> true
@@ -118,6 +121,13 @@ let equal_integer_operation left right =
   | Ictz, Ictz -> true
   | Ipopcnt, Ipopcnt -> true
   | Icomp left, Icomp right -> equal_integer_comparison left right
+  | ( Inot,
+      ( Iadd | Isub | Imul | Imulh _ | Idiv _ | Imod _ | Iand | Ior | Ixor
+      | Ilsl | Ilsr | Iasr | Iclz | Ictz | Ipopcnt | Icomp _ ) )
+  | ( ( Iadd | Isub | Imul | Imulh _ | Idiv _ | Imod _ | Iand | Ior | Ixor
+      | Ilsl | Ilsr | Iasr | Iclz | Ictz | Ipopcnt | Icomp _ ),
+      Inot ) ->
+    false
   | ( Iadd,
       ( Isub | Imul | Imulh _ | Idiv _ | Imod _ | Iand | Ior | Ixor | Ilsl
       | Ilsr | Iasr | Iclz | Ictz | Ipopcnt | Icomp _ ) )
@@ -395,6 +405,7 @@ let intop (op : integer_operation) =
   | Iand -> " & "
   | Ior -> " | "
   | Ixor -> " ^ "
+  | Inot -> "not "
   | Ilsl -> " << "
   | Ilsr -> " >>u "
   | Iasr -> " >>s "

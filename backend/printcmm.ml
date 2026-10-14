@@ -287,6 +287,7 @@ let operation d = function
   | Cand -> "and"
   | Cor -> "or"
   | Cxor -> "xor"
+  | Cnot -> "not"
   | Clsl -> "<<"
   | Clsr -> ">>u"
   | Casr -> ">>s"

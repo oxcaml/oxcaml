@@ -328,8 +328,8 @@ and emit env c (exp : Cmm.expression) ~tail : result =
       Ok (Array.sub loc_exp size_before (Array.length fields_layout.(field)))
     | Cop
         ( (( Ctuple_field _ | Caddi | Csubi | Cmuli | Cdivi _ | Cmodi _
-           | Caddi128 | Csubi128 | Cand | Cor | Cxor | Clsl | Clsr | Casr | Cclz
-           | Cctz | Cpopcnt | Caddv | Cadda | Cpackf32 | Cbeginregion
+           | Caddi128 | Csubi128 | Cand | Cor | Cxor | Cnot | Clsl | Clsr | Casr
+           | Cclz | Cctz | Cpopcnt | Caddv | Cadda | Cpackf32 | Cbeginregion
            | Cendregion | Cdls_get | Ctls_get | Cdomain_index | Cpoll | Cpause
            | Capply _ | Cextcall _ | Cload _
            | Calloc (_, _)

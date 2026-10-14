@@ -86,6 +86,19 @@ logand_branch:
   ret
 |}]
 
+let lognot_branch x y f = if Int64_u.equal (Int64_u.lognot x) #0L then f ()
+[%%expect_asm X86_64{|
+lognot_branch:
+  movq  %rdi, %rbx
+  cmpq  $-1, %rax
+  jne   .L0
+  movl  $1, %eax
+  movq  (%rbx), %rdi
+  jmp   *%rdi
+.L0:
+  movl  $1, %eax
+  ret
+|}]
 
 (* CR ttebbi: We materialize comparison result bits despite
    only using them for a single branch. Also, the `_ -> 0`

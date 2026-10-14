@@ -193,7 +193,7 @@ bytes_safe_get_int32:
   sarq  $1, %rbx
   movq  %rdi, %rsi
   sarq  $63, %rsi
-  xorq  $-1, %rsi
+  notq  %rsi
   andq  %rdi, %rsi
   cmpq  %rsi, %rbx
   jae   .L0
