@@ -76,7 +76,7 @@ let of_compilation_units ~exported ~imported =
   let provides = Global_name.Compunit_set.singleton (compunit exported) in
   let requires = Global_name.Compunit_set.of_list (List.map imported ~f:compunit) in
   let requires = Global_name.Compunit_set.diff requires provides in
-  (* CR-soon selee: [force_link] and [effects_without_cps] should be populated
+  (* TODO: [force_link] and [effects_without_cps] should be populated
      properly, too. *)
   { provides
   ; requires
