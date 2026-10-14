@@ -5217,13 +5217,7 @@ let fill_ivar env ivar ty =
     | Ok -> ()
     | Already_full expected ->
       if not (equal_type_shape shape expected)
-      then
-        (* CR-someday aobrien: we could do a better job of attaching
-           provenance information for ivars e.g. where did we create
-           the ivar? did we infer the type from a default? if so, where?
-           But treating this like a unification trace for now is
-           sufficient. *)
-        raise_for Unify (Shape_mismatch { got = shape; expected }))
+      then raise_for Unify (Shape_mismatch { got = shape; expected }))
 
 (** What [unify3_var] does after linking [from_] to [to_]. *)
 module On_link = struct
