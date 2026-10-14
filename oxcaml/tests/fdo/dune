@@ -31,7 +31,8 @@
 
 (executable
  (name fdo_entries)
- (modules fdo_entries))
+ (modules fdo_entries)
+ (libraries ocamlcommon))
 
 (rule
  (targets function_ids.output.corrected)
@@ -40,31 +41,29 @@
   (= %{context_name} "main"))
  (action
   (progn
-   (with-outputs-to
-    function_ids.dump
-    (run
-     %{bin:ocamlopt.opt}
-     -c
-     -fdo-counters
-     -drawflambda
-     -color
-     never
-     function_ids.ml))
-   (with-outputs-to
-    function_ids_edited.dump
-    (run
-     %{bin:ocamlopt.opt}
-     -c
-     -fdo-counters
-     -drawflambda
-     -color
-     never
-     -o
-     function_ids.edited.cmx
-     function_ids_edited.ml))
+   (run
+    %{bin:ocamlopt.opt}
+    -c
+    -fdo-counters
+    -dfexpr-annot-after
+    raw
+    -color
+    never
+    function_ids.ml)
+   (run
+    %{bin:ocamlopt.opt}
+    -c
+    -fdo-counters
+    -dfexpr-annot-after
+    raw
+    -color
+    never
+    -o
+    function_ids.edited.cmx
+    function_ids_edited.ml)
    (with-stdout-to
     function_ids.output.corrected
-    (run ./fdo_entries.exe function_ids.dump function_ids_edited.dump)))))
+    (run ./fdo_entries.exe function_ids.raw.fl function_ids.edited.raw.fl)))))
 
 (rule
  (alias runtest)
