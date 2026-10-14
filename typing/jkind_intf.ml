@@ -56,7 +56,9 @@ module type Sort = sig
   (** A sort variable that can be unified during type-checking. *)
   type var
 
-  type error = Incompatible
+  type error =
+    | Incompatible
+    | Rigid
 
   module Const : sig
     (* Note [Addressable kinds]

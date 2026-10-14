@@ -70,7 +70,9 @@ module Sort = struct
 
   exception Lower_rigid
 
-  type error = Incompatible
+  type error =
+    | Incompatible
+    | Rigid
 
   let is_genvar var =
     assert (Option.is_none var.contents);
@@ -550,7 +552,7 @@ module Sort = struct
   let[@inline] equate_var (v : var) (t : t) =
     assert (Option.is_none v.contents);
     if v.level = subject_level
-    then match t with Var _ -> raise Lower_rigid | _ -> Error Incompatible
+    then Error (match t with Var _ -> Rigid | _ -> Incompatible)
     else (
       update_level v.level t;
       set_var_contents v (Some t);

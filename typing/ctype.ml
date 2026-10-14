@@ -3836,11 +3836,6 @@ let is_always_gc_ignorable env ty =
   check_type_externality env ty
     (Jkind_axis.Externality.upper_bound_if_is_always_gc_ignorable ())
 
-let check_type_jkind_exn env texn ty jkind =
-  match check_type_jkind env ty jkind with
-  | Ok _ -> ()
-  | Error err -> raise_for texn (Bad_jkind (ty,err))
-
 let constrain_type_jkind_exn env texn ty jkind =
   match constrain_type_jkind env ty jkind with
   | Ok _ -> ()
@@ -6449,6 +6444,16 @@ let moregen_occur env level ty =
   occur_univar_for Moregen env ty;
   update_level_for Moregen env level ty
 
+let moregen_check_type_jkind_exn env subj pat jkind =
+  match check_type_jkind env subj jkind with
+  | Ok () -> ()
+  (* We improve the error message for rigid variables, which occur in [subj].
+     The check may fail if they are equated against something non-generic,
+     like a weak variable or a concrete layout. *)
+  | Error { violation = Not_a_subjkind (_, _, [Layout_disagreement Rigid]) } ->
+    raise_for Moregen (Weaken_sort { pat; subj } )
+  | Error err -> raise_for Moregen (Bad_jkind (subj, err))
+
 type moregen_pairs =
   { invariant_pairs : TypePairs.t;
     covariant_pairs : TypePairs.t;
@@ -6662,7 +6667,8 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
         (* use [check], not [constrain], here because [constrain] would be like
         instantiating [t2], which we do not wish to do *)
         begin try
-          check_type_jkind_exn env Moregen t2 (Jkind.disallow_left jkind)
+          moregen_check_type_jkind_exn env t2 t1
+            (Jkind.disallow_left jkind)
         (* rigid variables only occur in the subject [t2].
            they are only equated to something non-generic, like a weak variable
            or a concrete layout *)
@@ -6688,7 +6694,8 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
               (* use [check], not [constrain], here because [constrain] would be like
               instantiating [t2], which we do not wish to do *)
               begin try
-                check_type_jkind_exn env Moregen t2 (Jkind.disallow_left jkind)
+                moregen_check_type_jkind_exn env t2 t1
+                  (Jkind.disallow_left jkind)
               with Jkind_types.Sort.Lower_rigid ->
                 raise_for Moregen (Weaken_sort { pat = t1; subj = t2 })
               end;
