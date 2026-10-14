@@ -11818,32 +11818,16 @@ and type_statement ?explanation ?(position=RNontail) env sexp =
   ~before_generalize: begin fun (exp, _sort) ->
     let subexp = final_subexpression exp in
     let ty = expand_head env exp.exp_type in
-<<<<<<< Merlin:aobrien/omni-stage-1
-    if is_Tvar ty
-    && not !has_errors
-    && get_level ty > get_current_level ()
-    && not (allow_polymorphic subexp) then
-      Location.prerr_warning
-        subexp.exp_loc
-        Warnings.Nonreturning_statement;
-||||||| Compiler:last-imported
-    if is_Tvar ty
-    && get_level ty > get_current_level ()
-    && not (allow_polymorphic subexp) then
-      Location.prerr_warning
-        subexp.exp_loc
-        Warnings.Nonreturning_statement;
-=======
     (match get_desc ty with
     | Tvar _
-      when get_level ty > get_current_level () && not (allow_polymorphic subexp)
-      ->
+      when (not !has_errors)
+           && get_level ty > get_current_level ()
+           && not (allow_polymorphic subexp) ->
       Location.prerr_warning subexp.exp_loc Warnings.Nonreturning_statement
     | Tvar _ | Tivar _ | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tconstr _
     | Tmod _ | Tobject _ | Tfield _ | Tquote _ | Tsplice _ | Tquote_eval _
     | Tnil | Tlink _ | Tsubst _ | Tvariant _ | Tunivar _ | Tpoly _
     | Trepr _ | Tpackage _ | Tof_kind _ | Tbox _ -> ());
->>>>>>> Compiler:HEAD
     if !Clflags.strict_sequence then begin
       let disambiguated_unit_ty =
         if is_unboxed_unit_type env ty then begin
