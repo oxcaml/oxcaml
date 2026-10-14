@@ -53,7 +53,7 @@ are represented as JavaScript arrays, and thus each (unarised) element always oc
 In particular, arrays are never packed, and so always occupy the same number of slots as its length.
 
 We treat every slot as being 8 bytes wide. This means that the indexing behaviour differs
-compared to native code: for example, accessing the second element of a packed int32# array will
+compared to native code: for example, accessing the second element of a packed `int32# array` will
 require offset 4 in native code, but offset 8 in JSIR.
 
 External pointers are unsupported as in bytecode, and will throw a runtime error.
