@@ -80,6 +80,7 @@ type token =
   | LBRACE
   | LAZY
   | LAYOUT
+  | LAWQUESTION
   | LABEL of (string)
   | KIND_OF
   | KIND
@@ -93,6 +94,7 @@ type token =
   | INFIXOP0 of (string)
   | INCLUDE
   | IN
+  | IMPLIES
   | IF
   | HASH_SUFFIX
   | HASH_INT of (string * char option)
@@ -286,6 +288,7 @@ module MenhirInterpreter : sig
     | T_LBRACE : unit terminal
     | T_LAZY : unit terminal
     | T_LAYOUT : unit terminal
+    | T_LAWQUESTION : unit terminal
     | T_LABEL : (string) terminal
     | T_KIND_OF : unit terminal
     | T_KIND : unit terminal
@@ -299,6 +302,7 @@ module MenhirInterpreter : sig
     | T_INFIXOP0 : (string) terminal
     | T_INCLUDE : unit terminal
     | T_IN : unit terminal
+    | T_IMPLIES : unit terminal
     | T_IF : unit terminal
     | T_HASH_SUFFIX : unit terminal
     | T_HASH_INT : (string * char option) terminal
@@ -551,6 +555,7 @@ module MenhirInterpreter : sig
     | N_list_signature_element_ : (Parsetree.signature_item list list) nonterminal
     | N_list_post_item_attribute_ : (Parsetree.attributes) nonterminal
     | N_list_mkrhs_LIDENT__ : (string Location.loc list) nonterminal
+    | N_list_law_param_ : ((string Location.loc * Parsetree.core_type option) list) nonterminal
     | N_list_generic_and_type_declaration_type_subst_kind__ : (Parsetree.type_declaration list) nonterminal
     | N_list_generic_and_type_declaration_type_kind__ : (Parsetree.type_declaration list) nonterminal
     | N_list_attribute_ : (Parsetree.attributes) nonterminal
@@ -568,6 +573,9 @@ module MenhirInterpreter : sig
   Parsetree.value_constraint option * Parsetree.modes) nonterminal
     | N_let_binding_body : (Parsetree.pattern * Parsetree.expression *
   Parsetree.value_constraint option * Parsetree.modes * bool * bool) nonterminal
+    | N_law_param : (string Location.loc * Parsetree.core_type option) nonterminal
+    | N_law_declaration : (Parsetree.law_declaration) nonterminal
+    | N_law_body : (Parsetree.expression list * Parsetree.expression) nonterminal
     | N_labeled_tuple_pattern_pattern_no_exn_ : (Parsetree.pattern_desc) nonterminal
     | N_labeled_tuple_pattern_pattern_ : (Parsetree.pattern_desc) nonterminal
     | N_labeled_tuple_pat_element_list_pattern_no_exn_ : ((string option * Parsetree.pattern) list) nonterminal
