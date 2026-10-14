@@ -333,6 +333,7 @@ and emit env c (exp : Cmm.expression) ~tail : result =
            | Cendregion | Cdls_get | Ctls_get | Cdomain_index | Cpoll | Cpause
            | Capply _ | Cextcall _ | Cload _
            | Calloc (_, _)
+           | Calloc_uninitialized _
            | Cstore (_, _)
            | Cmulhi _ | Cmuli64 _ | Cbswap _ | Ccsel _ | Cprefetch _ | Catomic _
            | Ccmpi _ | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _
@@ -419,9 +420,14 @@ and emit_expr_op env c op args dbg : result =
     Sel.select_operation op simple_args dbg ~label_after:Label.none
   in
   match new_op with
-  | Basic (Op (Alloc { bytes = _; mode; dbginfo = [placeholder] })) ->
+  | Basic (Op (Alloc { bytes; mode; dbginfo = [placeholder] })) ->
+    (* As in [Cfg_selectgen], the arguments initialize the block from its header
+       onwards, and any remaining bytes are left uninitialized. *)
     let bytes =
-      List.fold_left (fun acc arg -> acc + size_of_cmm_expr env arg) 0 new_args
+      Int.max bytes
+        (List.fold_left
+           (fun acc arg -> acc + size_of_cmm_expr env arg)
+           0 new_args)
     in
     let alloc_words = (bytes + Arch.size_addr - 1) / Arch.size_addr in
     let op =
