@@ -35,7 +35,8 @@ type 'f solution =
       ('f, Types_rewriter.rewrite_context) Traverse.With_types.t;
     final_typing_env : ('f, typing_env option) Traverse.With_types.t;
     local_allocations : unit Code_id_or_name.Map.t;
-    scopes_needing_region : unit Code_id_or_name.Map.t
+    scopes_needing_region : unit Code_id_or_name.Map.t;
+    local_returns : unit Code_id_or_name.Map.t
   }
 
 let fixpoint0 (graph : Global_flow_graph.graph) ~analysis_scope =
@@ -43,12 +44,14 @@ let fixpoint0 (graph : Global_flow_graph.graph) ~analysis_scope =
   let with_provenance = Flambda_features.debug_reaper "prov" in
   let stats = Datalog.Schedule.create_stats ~with_provenance datalog in
   let db = PTA.perform_analysis datalog ~stats ~analysis_scope in
-  let db =
-    if Escape_analysis.enabled ()
-    then Escape_analysis.perform_analysis db ~stats
-    else db
-  in
   let (unboxing : UA.result) = UA.perform_analysis db ~stats ~analysis_scope in
+  let unboxing =
+    if Escape_analysis.enabled ()
+    then
+      { unboxing with db = Escape_analysis.perform_analysis unboxing.db ~stats }
+    else unboxing
+  in
+  let db = unboxing.db in
   if with_provenance || Flambda_features.debug_reaper "stats"
   then Format.eprintf "%a@." Datalog.Schedule.print_stats stats;
   if Flambda_features.debug_reaper "db"
@@ -170,7 +173,8 @@ let solve (type f) (problem : f Traverse.Problem.t)
     Datalog.get_table Escape_analysis.local_allocation_tbl db
   in
   (* A region is only needed in scopes where a local allocation survives
-     rebuilding, that is, is not unboxed. *)
+     rebuilding, that is, is not unboxed, or where a function returning at mode
+     local is called. *)
   let scopes_needing_region =
     Code_id_or_name.Map.fold
       (fun alloc () acc ->
@@ -181,7 +185,8 @@ let solve (type f) (problem : f Traverse.Problem.t)
             (fun acc scope -> Code_id_or_name.Map.add scope () acc)
             acc
             (Escape_analysis.scopes_of_allocation db alloc))
-      local_allocations Code_id_or_name.Map.empty
+      local_allocations
+      (Datalog.get_table Escape_analysis.scope_with_local_call_result_tbl db)
   in
   { analysis_scope;
     has_usage = Datalog.get_table PTA.Relations.has_usage_tbl db;
@@ -198,7 +203,8 @@ let solve (type f) (problem : f Traverse.Problem.t)
     types_rewrite_context;
     final_typing_env;
     local_allocations;
-    scopes_needing_region
+    scopes_needing_region;
+    local_returns = Datalog.get_table Escape_analysis.local_return_tbl db
   }
 
 let is_local_allocation solution var =
@@ -206,6 +212,11 @@ let is_local_allocation solution var =
 
 let scope_needs_region solution scope =
   Code_id_or_name.Map.mem scope solution.scopes_needing_region
+
+let returns_local solution code_id =
+  Code_id_or_name.Map.mem
+    (Code_id_or_name.code_id code_id)
+    solution.local_returns
 
 let get_unboxed_fields solution cn =
   Code_id_or_name.Map.find_opt cn solution.unboxed_fields

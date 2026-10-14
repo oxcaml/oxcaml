@@ -60,6 +60,21 @@ module Relations : sig
 
   val escaping_field : Field.t term -> Code_id_or_name.t term -> _ atom
 
+  (** [cannot_change_calling_convention code_id] means that not all call sites
+      of the function are known direct calls. Computed by [Unboxing_analysis].
+  *)
+  val cannot_change_calling_convention : Code_id_or_name.t term -> _ atom
+
+  (** [to_unbox x] means that the allocation [x] is going to be unboxed.
+      Computed by [Unboxing_analysis]. *)
+  val to_unbox_tbl :
+    ( unit Code_id_or_name.Map.t,
+      Code_id_or_name.t -> Datalog.nil,
+      unit )
+    Datalog.table
+
+  val to_unbox : Code_id_or_name.t term -> _ atom
+
   val has_usage_tbl :
     ( unit Code_id_or_name.Map.t,
       Code_id_or_name.t -> Datalog.nil,

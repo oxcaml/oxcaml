@@ -176,6 +176,25 @@ val add_scope_exit : t -> scope:Code_id_or_name.t -> param:Variable.t -> unit
 (** Record that no allocation of the given region scope may be made local. *)
 val add_unsafe_scope : t -> Code_id_or_name.t -> unit
 
+(** Record that [result] stands for a return value of the function [scope]. *)
+val add_return_of : t -> scope:Code_id_or_name.t -> result:Variable.t -> unit
+
+(** Record that [result] receives a return value of the known-arity application
+    [call_widget], in region scope [scope]. *)
+val add_call_result :
+  t ->
+  result:Variable.t ->
+  scope:Code_id_or_name.t ->
+  call_widget:Code_id_or_name.t ->
+  unit
+
+(** As [add_call_result], for an application outside of any region scope. *)
+val add_unscoped_call_result : t -> Variable.t -> unit
+
+(** Record that [result] receives a return value of an unknown-arity
+    application. *)
+val add_indirect_call_result : t -> Variable.t -> unit
+
 (** Whether [continuation_info] has been recorded for the given continuation
     with [is_exn_handler] set. *)
 val is_exn_handler : t -> Continuation.t -> bool

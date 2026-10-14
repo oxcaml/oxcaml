@@ -74,11 +74,15 @@ type 'f env =
 
 and region =
   { region : Variable.t;
+    ghost_region : Variable.t;
     inner_conts : Continuation.Set.t;
     (* Continuations closing this region (and any enclosing region also left)
        before jumping to a given exit continuation. They are created on demand
        and bound at the start of the scope. *)
-    closers : (Continuation.t * RE.continuation_handler) Continuation.Map.t ref
+    closers : (Continuation.t * RE.continuation_handler) Continuation.Map.t ref;
+    (* [false] for the region of the caller of a function returning at mode
+       local ([my_region]), which the function must not close. *)
+    closable : bool
   }
 
 type rebuild_result =
@@ -1882,25 +1886,80 @@ let regions_exited_by env k =
     then []
     else
       List.filter
-        (fun { inner_conts; _ } -> not (Continuation.Set.mem k inner_conts))
+        (fun { inner_conts; closable; _ } ->
+          closable && not (Continuation.Set.mem k inner_conts))
         env.regions
 
 let end_regions env regions (body : RE.t) : RE.t =
+  let end_region ~ghost region body =
+    let end_region : P.t = Unary (End_region { ghost }, Simple.var region) in
+    RE.create_let
+      (Bound_pattern.singleton
+         (Bound_var.create
+            (Variable.create "region_end" K.value)
+            Flambda_debug_uid.none Name_mode.normal))
+      (Named.create_prim end_region Debuginfo.none)
+      ~size_of_defining_expr:
+        (Code_size.prim ~machine_width:env.machine_width end_region)
+      ~body
+  in
   List.fold_left
-    (fun body { region; _ } ->
-      let end_region : P.t =
-        Unary (End_region { ghost = false }, Simple.var region)
-      in
-      RE.create_let
-        (Bound_pattern.singleton
-           (Bound_var.create
-              (Variable.create "region_end" K.value)
-              Flambda_debug_uid.none Name_mode.normal))
-        (Named.create_prim end_region Debuginfo.none)
-        ~size_of_defining_expr:
-          (Code_size.prim ~machine_width:env.machine_width end_region)
-        ~body)
+    (fun body { region; ghost_region; _ } ->
+      end_region ~ghost:false region (end_region ~ghost:true ghost_region body))
     body regions
+
+let begin_regions env { region; ghost_region; _ } (body : RE.t) : RE.t =
+  let begin_region ~ghost region body =
+    let begin_region : P.t = Variadic (Begin_region { ghost }, []) in
+    RE.create_let
+      (Bound_pattern.singleton
+         (Bound_var.create region Flambda_debug_uid.none Name_mode.normal))
+      (Named.create_prim begin_region Debuginfo.none)
+      ~size_of_defining_expr:
+        (Code_size.prim ~machine_width:env.machine_width begin_region)
+      ~body
+  in
+  begin_region ~ghost:false region (begin_region ~ghost:true ghost_region body)
+
+(* Calls to functions made to return at mode local (see [Escape_analysis])
+   receive their result in the region of the innermost enclosing scope. *)
+let set_local_return_mode env apply =
+  let returns_local code_id = Analysis.returns_local env.solution code_id in
+  let callee_returns_local =
+    match Apply.call_kind apply with
+    | Function { function_call = Direct code_id; _ } -> (
+      returns_local code_id
+      ||
+      match Apply.callee apply with
+      | None -> false
+      | Some callee ->
+        Simple.pattern_match callee
+          ~const:(fun _ -> false)
+          ~name:(fun name ~coercion:_ ->
+            match
+              Analysis.code_id_actually_directly_called env.solution name
+            with
+            | Unknown -> false
+            | Known code_ids -> Code_id.Set.exists returns_local code_ids))
+    | Function
+        { function_call = Indirect_known_arity _ | Indirect_unknown_arity; _ }
+    | Method _ | C_call _ | Effect _ ->
+      false
+  in
+  if not callee_returns_local
+  then apply
+  else
+    match env.regions with
+    | [] ->
+      Misc.fatal_errorf "No region for the local result of application %a"
+        Apply.print apply
+    | { region; ghost_region; _ } :: _ ->
+      let alloc_region =
+        Alloc_mode.For_applications.alloc_region (Apply.return_mode apply)
+      in
+      Apply.with_return_mode apply
+        (Alloc_mode.For_applications.maybe_alloc_stack ~alloc_region ~region
+           ~ghost_region)
 
 (* A continuation that closes the regions left when jumping to [k], then jumps
    to [k]. Used where an [End_region] cannot simply be inserted before the jump:
@@ -1957,11 +2016,13 @@ let rebuild_region_scope env res ~scope ~rebuild_body =
   else
     let region =
       { region = Variable.create "region" K.region;
+        ghost_region = Variable.create "ghost_region" K.region;
         inner_conts =
           (match Code_id_or_name.Map.find_opt scope env.conts_per_scope with
           | Some conts -> conts
           | None -> Continuation.Set.empty);
-        closers = ref Continuation.Map.empty
+        closers = ref Continuation.Map.empty;
+        closable = true
       }
     in
     let body, res =
@@ -1973,16 +2034,7 @@ let rebuild_region_scope env res ~scope ~rebuild_body =
           RE.create_non_recursive_let_cont k_close handler ~body)
         !(region.closers) body
     in
-    let begin_region : P.t = Variadic (Begin_region { ghost = false }, []) in
-    ( RE.create_let
-        (Bound_pattern.singleton
-           (Bound_var.create region.region Flambda_debug_uid.none
-              Name_mode.normal))
-        (Named.create_prim begin_region Debuginfo.none)
-        ~size_of_defining_expr:
-          (Code_size.prim ~machine_width:env.machine_width begin_region)
-        ~body,
-      res )
+    begin_regions env region body, res
 
 let rebuild_let_expr_singleton env res bv ~(defining_expr : Named.t) ~hole :
     RE.t * rebuild_result =
@@ -2303,6 +2355,7 @@ and rebuild_expr env (res : rebuild_result) (rev_expr : Rev_expr.rev_expr) :
         let free_names = Switch_expr.free_names switch in
         RE.from_expr ~expr ~free_names ~code_size:(Code_size.switch switch)
     | Apply apply -> (
+      let apply = set_local_return_mode env apply in
       let expr = rebuild_apply env apply in
       match Apply.continuation apply with
       | Never_returns -> expr
@@ -2366,6 +2419,31 @@ and rebuild_function_params_and_body env res code_metadata
     }
   in
   let code_id = Code_metadata.code_id code_metadata in
+  (* A function returning at mode local allocates in its caller's region, which
+     it must not close (see [Escape_analysis]). *)
+  let my_alloc_mode, caller_region =
+    if not (Analysis.returns_local env.solution code_id)
+    then my_alloc_mode, None
+    else
+      match (my_alloc_mode : Alloc_mode.For_applications.t) with
+      | Maybe_alloc_stack _ ->
+        Misc.fatal_errorf
+          "Function %a already returns at mode local, but the escape analysis \
+           decided to make it do so"
+          Code_id.print code_id
+      | Not_alloc_stack { alloc_region } ->
+        let region = Variable.create "my_region" K.region in
+        let ghost_region = Variable.create "my_ghost_region" K.region in
+        ( Alloc_mode.For_applications.maybe_alloc_stack ~alloc_region ~region
+            ~ghost_region,
+          Some
+            { region;
+              ghost_region;
+              inner_conts = Continuation.Set.empty;
+              closers = ref Continuation.Map.empty;
+              closable = false
+            } )
+  in
   let updating_calling_convention =
     Analysis.get_calling_convention_change env.solution code_id
   in
@@ -2378,9 +2456,12 @@ and rebuild_function_params_and_body env res code_metadata
     in
     let all_vars = region_vars @ (my_closure :: Bound_parameters.vars params) in
     match List.filter (is_dead_var env) all_vars with
-    | [] ->
-      rebuild_region_scope env res ~scope:(Code_id_or_name.code_id code_id)
-        ~rebuild_body:(fun env res -> rebuild_expr env res body)
+    | [] -> (
+      match caller_region with
+      | Some region -> rebuild_expr { env with regions = [region] } res body
+      | None ->
+        rebuild_region_scope env res ~scope:(Code_id_or_name.code_id code_id)
+          ~rebuild_body:(fun env res -> rebuild_expr env res body))
     | _ :: _ as dead_vars ->
       let msg =
         Format.asprintf

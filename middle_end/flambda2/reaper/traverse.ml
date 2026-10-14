@@ -347,6 +347,16 @@ let must_have_callee apply =
     Misc.fatal_errorf "Callee is unexpectedly [None] in [Apply]:@ %a"
       Apply.print apply
 
+(* Record where the results of an application land, for the escape analysis (see
+   [Escape_analysis]). *)
+let record_call_results denv acc ~call_widget return_args =
+  match Env.region_scope denv with
+  | Some scope ->
+    List.iter
+      (fun result -> Acc.add_call_result acc ~result ~scope ~call_widget)
+      return_args
+  | None -> List.iter (Acc.add_unscoped_call_result acc) return_args
+
 let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
   match Apply.call_kind apply with
   | Function { function_call = Direct code_id; _ } -> (
@@ -355,6 +365,7 @@ let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
       Acc.make_known_arity_apply_widget acc ~denv apply ~returns:return_args
         ~exn:exn_arg
     in
+    record_call_results denv acc ~call_widget return_args;
     let callee = Apply.callee apply in
     let is_external =
       not (Current_unit.is_current (Code_id.get_compilation_unit code_id))
@@ -409,6 +420,7 @@ let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
       Acc.make_known_arity_apply_widget acc ~denv apply ~returns:return_args
         ~exn:exn_arg
     in
+    record_call_results denv acc ~call_widget return_args;
     let closure = Acc.simple_to_node acc ~denv (must_have_callee apply) in
     Acc.add_accessor_dep acc ~to_:call_widget Field.known_arity_call_witness
       ~base:closure
@@ -418,6 +430,7 @@ let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
         ~exn:exn_arg
     in
     let closure = Acc.simple_to_node acc ~denv (must_have_callee apply) in
+    List.iter (Acc.add_indirect_call_result acc) return_args;
     Acc.add_accessor_dep acc ~to_:call_widget Field.unknown_arity_call_witness
       ~base:closure
   | Method _ | C_call _ | Effect _ -> default_acc acc
@@ -556,10 +569,8 @@ let traverse_invalid denv _acc ~message =
 
 (* Record heap allocations that the escape analysis may turn into stack
    allocations (see [Escape_analysis]). Sets of closures are only candidates
-   when every function has exactly one complex parameter and is not tupled:
-   partial applications of a local closure through an unknown-arity call would
-   otherwise be allocated on the heap by the curry functions, since the code
-   metadata still says the closure is a heap one. *)
+   when the code of every function is known, since their code metadata is
+   adjusted when they become local (see [Unboxing_analysis]). *)
 let record_candidate_allocation denv acc ~(bound_pattern : Bound_pattern.t)
     (defining_expr : Named.t) =
   match Env.region_scope denv with
@@ -589,14 +600,8 @@ let record_candidate_allocation denv acc ~(bound_pattern : Bound_pattern.t)
              ->
             match decl with
             | Deleted _ -> false
-            | Code_id { code_id; only_full_applications = _ } -> (
-              match Acc.find_code_dep acc code_id with
-              | None -> false
-              | Some { code_metadata; _ } ->
-                (not (Code_metadata.is_tupled code_metadata))
-                && Flambda_arity.num_params
-                     (Code_metadata.params_arity code_metadata)
-                   = 1))
+            | Code_id { code_id; only_full_applications = _ } ->
+              Option.is_some (Acc.find_code_dep acc code_id))
           funs
       in
       if can_be_local then List.iter add bvs
@@ -855,7 +860,8 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
         exn_continuation, Env.Normal [exn] ]
   in
   let scope = Code_id_or_name.code_id code_id in
-  List.iter (fun param -> Acc.add_scope_exit acc ~scope ~param) (exn :: return);
+  Acc.add_scope_exit acc ~scope ~param:exn;
+  List.iter (fun result -> Acc.add_return_of acc ~scope ~result) return;
   let region_scope : Env.region_scope =
     if
       Escape_analysis.enabled ()

@@ -142,6 +142,8 @@ val with_param_modes : Alloc_mode.For_types.t list -> t -> t
 
 val with_first_complex_local_param : First_complex_local_param.t -> t -> t
 
+val with_result_mode : Lambda.return_mode -> t -> t
+
 val with_is_tupled : bool -> t -> t
 
 val with_result_types : Result_types.t Or_unknown_or_bottom.t -> t -> t

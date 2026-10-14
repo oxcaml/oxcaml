@@ -46,7 +46,23 @@
 
    Values that flow into a callee and come back through its result are tracked
    by the aliases created by the points-to analysis for calls, so no special
-   treatment is needed for calls. *)
+   treatment is needed for calls.
+
+   A value reaching the return of the function containing its allocation does
+   not necessarily escape: if all call sites of that function are known direct
+   calls (see [cannot_change_calling_convention]), the function may be made to
+   allocate its result in its caller's region, as [exclave_] does. The value
+   then has to obey the rules of the scope of each call site, which is expressed
+   by the [owner] relation. Functions for which this happens are recorded in
+   [local_return]: their calling convention is changed so that they return at
+   mode local (see [Unboxing_analysis.compute_code_changes] for the code
+   metadata, and [Rebuild] for the function bodies and call sites).
+
+   A partial application of a local closure (through an unknown-arity call)
+   yields a closure pointing at it, allocated on the heap by the curry functions
+   (as for the closures of the type checker); the nodes standing for such
+   partial applications in the call witness chains are considered to contain the
+   closure, so that they must not outlive its region either. *)
 
 [@@@ocaml.warning "-not-principal"]
 
@@ -64,6 +80,14 @@ let is_candidate = rel1 "escape_candidate" Cols.[n]
 
 let escapes = rel1 "escapes" Cols.[n]
 
+(* [owner a s]: the value allocated at [a] may be live in region scope [s]: [s]
+   is the scope of the allocation, or the scope of a call site receiving the
+   value as the result of a function returning at mode local. *)
+let owner = rel2 "escape_owner" Cols.[n; n]
+
+(* [is_closure_of a c]: the candidate [a] is a closure whose code is [c]. *)
+let is_closure_of = rel2 "escape_closure_of" Cols.[n; n]
+
 let local_allocation_tbl =
   Datalog.create_relation ~name:"local_allocation" Cols.[n]
 
@@ -74,39 +98,126 @@ let scope_with_local_allocation_tbl =
 
 let scope_with_local_allocation x = scope_with_local_allocation_tbl % [x]
 
+let local_return_tbl = Datalog.create_relation ~name:"local_return" Cols.[n]
+
+let local_return x = local_return_tbl % [x]
+
+let local_closure_code_tbl =
+  Datalog.create_relation ~name:"local_closure_code" Cols.[n]
+
+let local_closure_code x = local_closure_code_tbl % [x]
+
+let scope_with_local_call_result_tbl =
+  Datalog.create_relation ~name:"scope_with_local_call_result" Cols.[n]
+
+let scope_with_local_call_result x = scope_with_local_call_result_tbl % [x]
+
 let candidate_rules =
   saturate_in_order
     [ (let$ [a; s] = ["a"; "s"] in
-       [allocated_in ~alloc:a ~scope:s] ==> and_ [is_candidate a; flow a a]) ]
+       [allocated_in ~alloc:a ~scope:s]
+       ==> and_ [is_candidate a; flow a a; owner a s]);
+      (let$ [a; wit; c] = ["a"; "wit"; "c"] in
+       [ is_candidate a;
+         constructor ~base:a !!Field.known_arity_call_witness ~from:wit;
+         constructor ~base:wit !!Field.code_id_of_call_witness ~from:c ]
+       ==> is_closure_of a c) ]
+
+(* When calling conventions may not be changed, no function may be made to
+   return at mode local. *)
+let no_calling_convention_change_rules =
+  saturate_in_order
+    [ (let$ [s; r] = ["s"; "r"] in
+       [return_of ~scope:s ~result:r] ==> cannot_change_calling_convention s) ]
 
 let escape_rules =
   Schedule.fixpoint
     [ Schedule.saturate
         [ (let$ [a; x; y] = ["a"; "x"; "y"] in
            [flow a x; rev_alias ~from:x ~to_:y] ==> flow a y);
+          (let$ [a; c; q] = ["a"; "c"; "q"] in
+           [is_closure_of a c; partial_application_node ~node:q ~code_id:c]
+           ==> flow a q);
           (let$ [a; x] = ["a"; "x"] in
            [flow a x; any_usage x] ==> escapes a);
           (let$ [a; x; relation; base] = ["a"; "x"; "relation"; "base"] in
            [ flow a x;
              rev_constructor ~from:x relation ~base;
+             when1 Field.is_real_field relation;
              ~~(is_candidate base) ]
            ==> escapes a);
           (let$ [a; x; relation; base] = ["a"; "x"; "relation"; "base"] in
-           [flow a x; rev_constructor ~from:x relation ~base; escapes base]
+           [ flow a x;
+             rev_constructor ~from:x relation ~base;
+             when1 Field.is_real_field relation;
+             escapes base ]
            ==> escapes a);
           (let$ [a; s; x] = ["a"; "s"; "x"] in
-           [ allocated_in ~alloc:a ~scope:s;
-             flow a x;
-             scope_exit ~scope:s ~param:x ]
-           ==> escapes a);
+           [owner a s; flow a x; scope_exit ~scope:s ~param:x] ==> escapes a);
           (let$ [a; s] = ["a"; "s"] in
-           [allocated_in ~alloc:a ~scope:s; unsafe_scope s] ==> escapes a) ] ]
+           [owner a s; unsafe_scope s] ==> escapes a);
+          (* Returned from a function whose calling convention cannot be
+             changed. *)
+          (let$ [a; s; r] = ["a"; "s"; "r"] in
+           [ owner a s;
+             flow a r;
+             return_of ~scope:s ~result:r;
+             cannot_change_calling_convention s ]
+           ==> escapes a);
+          (* Returned to a call site that cannot host a local result. *)
+          (let$ [a; s; r; q] = ["a"; "s"; "r"; "q"] in
+           [ owner a s;
+             flow a r;
+             return_of ~scope:s ~result:r;
+             flow a q;
+             indirect_call_result q ]
+           ==> escapes a);
+          (let$ [a; s; r; q] = ["a"; "s"; "r"; "q"] in
+           [ owner a s;
+             flow a r;
+             return_of ~scope:s ~result:r;
+             flow a q;
+             unscoped_call_result q ]
+           ==> escapes a);
+          (* Returned to a call site in scope [s']: the value is then also owned
+             by [s']. *)
+          (let$ [a; s; r; q; s'; w; wit] =
+             ["a"; "s"; "r"; "q"; "s'"; "w"; "wit"]
+           in
+           [ owner a s;
+             flow a r;
+             return_of ~scope:s ~result:r;
+             ~~(cannot_change_calling_convention s);
+             flow a q;
+             call_result ~result:q ~scope:s' ~call_widget:w;
+             sources w wit;
+             constructor ~base:wit !!Field.code_id_of_call_witness ~from:s ]
+           ==> owner a s') ] ]
 
 let decision_rules =
   saturate_in_order
     [ (let$ [a; s] = ["a"; "s"] in
        [allocated_in ~alloc:a ~scope:s; ~~(escapes a)]
-       ==> and_ [local_allocation a; scope_with_local_allocation s]) ]
+       ==> and_ [local_allocation a; scope_with_local_allocation s]);
+      (* Unboxed allocations no longer exist, so need no local return. *)
+      (let$ [a; s; r] = ["a"; "s"; "r"] in
+       [ owner a s;
+         local_allocation a;
+         ~~(to_unbox a);
+         flow a r;
+         return_of ~scope:s ~result:r ]
+       ==> local_return s);
+      (let$ [x; wit; c] = ["x"; "wit"; "c"] in
+       [ local_allocation x;
+         constructor ~base:x !!Field.known_arity_call_witness ~from:wit;
+         constructor ~base:wit !!Field.code_id_of_call_witness ~from:c ]
+       ==> local_closure_code c);
+      (let$ [q; s'; w; wit; c] = ["q"; "s'"; "w"; "wit"; "c"] in
+       [ call_result ~result:q ~scope:s' ~call_widget:w;
+         sources w wit;
+         constructor ~base:wit !!Field.code_id_of_call_witness ~from:c;
+         local_return c ]
+       ==> scope_with_local_call_result s') ]
 
 let scopes_of_allocation =
   let scopes =
@@ -118,11 +229,26 @@ let scopes_of_allocation =
     Cursor.fold_with_parameters scopes [a] db ~init:[] ~f:(fun [s] acc ->
         s :: acc)
 
+let returns_local db code_id =
+  Code_id_or_name.Map.mem
+    (Code_id_or_name.code_id code_id)
+    (Datalog.get_table local_return_tbl db)
+
+let is_local_closure_code db code_id =
+  Code_id_or_name.Map.mem
+    (Code_id_or_name.code_id code_id)
+    (Datalog.get_table local_closure_code_tbl db)
+
 let perform_analysis db ~stats =
   Profile.record_call ~accumulate:true "escape_analysis" (fun () ->
       let run db rules =
         List.fold_left (fun db rule -> Schedule.run ~stats rule db) db rules
       in
       let db = run db candidate_rules in
+      let db =
+        if Flambda_features.reaper_change_calling_conventions ()
+        then db
+        else run db no_calling_convention_change_rules
+      in
       let db = Schedule.run ~stats escape_rules db in
       run db decision_rules)

@@ -109,6 +109,8 @@ val erase_callee : t -> t
 (** Change the return continuation of an application. *)
 val with_continuation : t -> Result_continuation.t -> t
 
+val with_return_mode : t -> Alloc_mode.For_applications.t -> t
+
 val with_continuations : t -> Result_continuation.t -> Exn_continuation.t -> t
 
 val with_exn_continuation : t -> Exn_continuation.t -> t

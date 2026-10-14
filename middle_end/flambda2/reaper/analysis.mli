@@ -41,6 +41,10 @@ val is_local_allocation : 'f solution -> Variable.t -> bool
     which will not be unboxed, so that a region must be introduced. *)
 val scope_needs_region : 'f solution -> Code_id_or_name.t -> bool
 
+(** Whether the function is to allocate its result in its caller's region (see
+    [Escape_analysis.returns_local]). *)
+val returns_local : 'f solution -> Code_id.t -> bool
+
 val field_used : 'f solution -> Code_id_or_name.t -> Field.t -> bool
 
 (* The call queries below expect the corresponding application to have been

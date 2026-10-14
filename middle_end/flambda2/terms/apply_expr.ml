@@ -410,6 +410,8 @@ let erase_callee t = { t with callee = None }
 
 let with_continuation t continuation = { t with continuation }
 
+let with_return_mode t return_mode = { t with return_mode }
+
 let with_continuations t continuation exn_continuation =
   { t with continuation; exn_continuation }
 

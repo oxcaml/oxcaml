@@ -226,6 +226,17 @@ let add_scope_exit t ~scope ~param = Graph.add_scope_exit t.deps ~scope ~param
 
 let add_unsafe_scope t scope = Graph.add_unsafe_scope t.deps scope
 
+let add_return_of t ~scope ~result = Graph.add_return_of t.deps ~scope ~result
+
+let add_call_result t ~result ~scope ~call_widget =
+  Graph.add_call_result t.deps ~result ~scope ~call_widget
+
+let add_unscoped_call_result t result =
+  Graph.add_unscoped_call_result t.deps result
+
+let add_indirect_call_result t result =
+  Graph.add_indirect_call_result t.deps result
+
 let is_exn_handler t cont =
   match Continuation.Map.find_opt cont t.continuation_info with
   | Some { is_exn_handler; _ } -> is_exn_handler
@@ -487,6 +498,7 @@ let create_unknown_arity_non_tupled_call_witnesses t code_id ~arity ~params
           ~base:witness;
         add_constructor_dep t ~from:next_witness
           Field.unknown_arity_call_witness ~base:v;
+        Graph.add_partial_application_node t.deps ~node:v ~code_id;
         add_deps rest)
   in
   let params = Flambda_arity.group_by_parameter arity params in

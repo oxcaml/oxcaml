@@ -251,6 +251,8 @@ let with_first_complex_local_param first_complex_local_param t =
 
 let with_is_tupled is_tupled t = { t with is_tupled }
 
+let with_result_mode result_mode t = { t with result_mode }
+
 let with_result_types result_types t = { t with result_types }
 
 let with_inlining_decision inlining_decision t = { t with inlining_decision }
