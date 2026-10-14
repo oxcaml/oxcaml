@@ -1,5 +1,4 @@
-(* anonymous.ml with an extra anonymous function inserted at the start of the
-   module and at the start of [inner]. *)
+(* function_ids.ml with some insertions. *)
 
 let[@inline never] apply f x = f x
 
