@@ -111,6 +111,27 @@ module Relations : sig
     code_id:Code_id_or_name.t term ->
     my_closure:Code_id_or_name.t term ->
     _ atom
+
+  (** [allocated_in ~alloc ~scope] means that [alloc] is a heap allocation
+      (block, boxed number or set of closures) that is a candidate for stack
+      allocation, performed in the region scope [scope]. A region scope is
+      either the body of a function (the scope node is its code id) or the
+      handlers of a recursive [Let_cont] (the scope node is a dummy variable);
+      see [Escape_analysis]. *)
+  val allocated_in :
+    alloc:Code_id_or_name.t term -> scope:Code_id_or_name.t term -> _ atom
+
+  (** [scope_exit ~scope ~param] means that a value flowing into [param] leaves
+      the region scope [scope]: [param] is a parameter of a continuation defined
+      outside of the scope (for a function, the variables standing for its
+      return and exception values). *)
+  val scope_exit :
+    scope:Code_id_or_name.t term -> param:Code_id_or_name.t term -> _ atom
+
+  (** [unsafe_scope scope] means that no allocation in the region scope [scope]
+      may be made local, because the region could not be closed on some path
+      leaving the scope (an exception caught outside of it). *)
+  val unsafe_scope : Code_id_or_name.t term -> _ atom
 end
 
 val add_alias : graph -> to_:Code_id_or_name.t -> from:Code_id_or_name.t -> unit
@@ -154,6 +175,14 @@ val add_any_source_if_used :
 val add_zero_alloc_source : graph -> Code_id_or_name.t -> unit
 
 val add_code_id_my_closure : graph -> Code_id.t -> Variable.t -> unit
+
+val add_allocated_in :
+  graph -> alloc:Code_id_or_name.t -> scope:Code_id_or_name.t -> unit
+
+val add_scope_exit :
+  graph -> scope:Code_id_or_name.t -> param:Variable.t -> unit
+
+val add_unsafe_scope : graph -> Code_id_or_name.t -> unit
 
 val create : unit -> graph
 

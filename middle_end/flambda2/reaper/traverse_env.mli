@@ -20,6 +20,27 @@
     parameters. *)
 type cont_kind = Normal of Variable.t list
 
+(** Where heap allocations may be turned into stack allocations (see
+    [Escape_analysis]):
+
+    - [No_region_scope]: nowhere in the current function, not even in recursive
+      continuation handlers. This is used when the analysis is disabled, and for
+      functions that may allocate their result in the caller's region (such
+      allocations must not happen while an inner region is open).
+
+    - [Toplevel]: not at the current point, but recursive continuation handlers
+      may open their own region scopes. Used for the toplevel of the unit.
+
+    - [Scope scope]: allocations at the current point are candidates, in the
+      region scope named by [scope]: the code id of the enclosing function, or a
+      dummy variable naming a recursive [Let_cont] whose handlers get a region
+      each (so that a function-level region does not grow with every iteration).
+*)
+type region_scope =
+  | No_region_scope
+  | Toplevel
+  | Scope of Code_id_or_name.t
+
 (** Controls whether the reaper preserves direct function calls when the code_id
     being called might otherwise be dead. The typical situation is a call to a
     code_id [f], which has two newer versions [f1] and [f2], and the closure
@@ -52,7 +73,31 @@ val create :
   all_constants:Name.t ->
   function_slots_to_keep:Function_slot.Set.t ->
   value_slots_to_keep:Value_slot.Set.t ->
+  region_scope:region_scope ->
+  return_continuation:Continuation.t ->
+  exn_continuation:Continuation.t ->
   t
+
+(** The region scope in which allocations at the current point are candidates
+    for stack allocation, if any. *)
+val region_scope : t -> Code_id_or_name.t option
+
+(** All region scopes enclosing the current point, innermost first. *)
+val enclosing_region_scopes : t -> Code_id_or_name.t list
+
+(** The return continuation of the enclosing function (or of the unit, at
+    toplevel): applications returning to it are tail calls. *)
+val return_continuation : t -> Continuation.t
+
+(** The exception continuation of the enclosing function (or of the unit). *)
+val exn_continuation : t -> Continuation.t
+
+(** Enter the handlers of a recursive [Let_cont] whose region scope is named by
+    [scope]. *)
+val enter_recursive_handler : t -> scope:Variable.t -> t
+
+(** The parameters of all continuations currently in scope. *)
+val all_continuation_params : t -> Variable.t list
 
 (** The reversed expression context above the current point in the traversal. *)
 val parent : t -> Rev_expr.rev_expr_holed

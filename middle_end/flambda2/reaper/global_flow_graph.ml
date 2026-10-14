@@ -35,7 +35,10 @@ type graph =
     mutable any_source : N.t;
     mutable any_source_if_used : NN.t;
     mutable zero_alloc_source : N.t;
-    mutable code_id_my_closure : NN.t
+    mutable code_id_my_closure : NN.t;
+    mutable allocated_in : NN.t;
+    mutable scope_exit : NN.t;
+    mutable unsafe_scope : N.t
   }
 
 let print_iter_edges ~print_edge graph =
@@ -96,6 +99,12 @@ let zero_alloc_source = N.create ~name:"zero_alloc_source"
 
 let code_id_my_closure = NN.create ~name:"code_id_my_closure"
 
+let allocated_in = NN.create ~name:"allocated_in"
+
+let scope_exit = NN.create ~name:"scope_exit"
+
+let unsafe_scope = N.create ~name:"unsafe_scope"
+
 let to_datalog graph =
   Datalog.set_table alias graph.alias
   @@ Datalog.set_table use graph.use
@@ -110,6 +119,9 @@ let to_datalog graph =
   @@ Datalog.set_table any_source_if_used graph.any_source_if_used
   @@ Datalog.set_table zero_alloc_source graph.zero_alloc_source
   @@ Datalog.set_table code_id_my_closure graph.code_id_my_closure
+  @@ Datalog.set_table allocated_in graph.allocated_in
+  @@ Datalog.set_table scope_exit graph.scope_exit
+  @@ Datalog.set_table unsafe_scope graph.unsafe_scope
   @@ Datalog.empty
 
 module Relations = struct
@@ -155,6 +167,12 @@ module Relations = struct
 
   let code_id_my_closure ~code_id ~my_closure =
     Datalog.atom code_id_my_closure [code_id; my_closure]
+
+  let allocated_in ~alloc ~scope = Datalog.atom allocated_in [alloc; scope]
+
+  let scope_exit ~scope ~param = Datalog.atom scope_exit [scope; param]
+
+  let unsafe_scope scope = Datalog.atom unsafe_scope [scope]
 end
 
 let create () =
@@ -170,7 +188,10 @@ let create () =
     any_source = N.empty;
     any_source_if_used = NN.empty;
     zero_alloc_source = N.empty;
-    code_id_my_closure = NN.empty
+    code_id_my_closure = NN.empty;
+    allocated_in = NN.empty;
+    scope_exit = NN.empty;
+    unsafe_scope = N.empty
   }
 
 let add_alias t ~to_ ~from = t.alias <- NN.add_or_replace [to_; from] () t.alias
@@ -226,3 +247,13 @@ let add_code_id_my_closure t code_id my_closure =
     <- NN.add_or_replace
          [Code_id_or_name.code_id code_id; Code_id_or_name.var my_closure]
          () t.code_id_my_closure
+
+let add_allocated_in t ~alloc ~scope =
+  t.allocated_in <- NN.add_or_replace [alloc; scope] () t.allocated_in
+
+let add_scope_exit t ~scope ~param =
+  t.scope_exit
+    <- NN.add_or_replace [scope; Code_id_or_name.var param] () t.scope_exit
+
+let add_unsafe_scope t scope =
+  t.unsafe_scope <- N.add_or_replace [scope] () t.unsafe_scope

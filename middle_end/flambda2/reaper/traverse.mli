@@ -48,7 +48,10 @@ module Skeleton : sig
       code : Rev_expr.rev_code Code_id.Map.t;
       ordered_code_ids : Code_id.t array;
       fixed_arity_continuations : Continuation.Set.t;
-      continuation_info : Traverse_acc.continuation_info Continuation.Map.t
+      continuation_info : Traverse_acc.continuation_info Continuation.Map.t;
+      scope_conts : Continuation.Set.t Code_id_or_name.Map.t
+          (** The continuations defined inside each region scope (see
+              [Escape_analysis]). *)
     }
 end
 
