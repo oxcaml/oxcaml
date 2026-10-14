@@ -377,7 +377,8 @@ module Compat
       const_compare c1 c2 = 0
   | Tpat_unboxed_unit, Tpat_unboxed_unit -> true
   | Tpat_unboxed_bool b1, Tpat_unboxed_bool b2 -> Bool.equal b1 b2
-  | Tpat_tuple labeled_ps, Tpat_tuple labeled_qs ->
+  | Tpat_tuple labeled_ps, Tpat_tuple labeled_qs
+  | Tpat_unboxed_tuple labeled_ps, Tpat_unboxed_tuple labeled_qs ->
       tuple_compat labeled_ps labeled_qs
   | Tpat_lazy p, Tpat_lazy q -> compat p q
   | Tpat_record (l1,_,_),Tpat_record (l2,_,_) ->
