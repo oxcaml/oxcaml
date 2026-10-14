@@ -152,6 +152,20 @@ module Stdlib : sig
     (** [mapi_result f l] is similar to [map_option f l] but returns the first
         error result if [f] returns one. *)
 
+    val fold_left_result
+      : ('ok -> 'a -> ('ok, 'error) result) ->
+        'ok ->
+        'a t ->
+        ('ok, 'error) result
+
+    val fold_left2_result
+      : unequal_lengths:'error ->
+        ('ok -> 'a -> 'b -> ('ok, 'error) result) ->
+        'ok ->
+        'a t ->
+        'b t ->
+        ('ok, 'error) result
+
     val map2_option : ('a -> 'b -> 'c option) -> 'a t -> 'b t -> 'c t option
 
     val map2_prefix : ('a -> 'b -> 'c) -> 'a t -> 'b t -> ('c t * 'b t)

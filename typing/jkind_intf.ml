@@ -56,6 +56,8 @@ module type Sort = sig
   (** A sort variable that can be unified during type-checking. *)
   type var
 
+  type error = Incompatible
+
   module Const : sig
     (* Note [Addressable kinds]
        ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -259,7 +261,7 @@ module type Sort = sig
 
   val of_var : var -> t
 
-  val equate : allow_mutation:bool -> t -> t -> bool
+  val equate : allow_mutation:bool -> t -> t -> (unit, error) result
 
   val format : Format_doc.formatter -> t -> unit
 

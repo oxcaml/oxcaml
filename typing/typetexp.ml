@@ -420,7 +420,7 @@ end = struct
     in
     begin match Env.find_implicit_jkind name env with
     | Some implicit_jkind
-      when not (Jkind.equate env original_jkind implicit_jkind) ->
+      when Jkind.equate env original_jkind implicit_jkind |> Result.is_error ->
         raise (Error (loc, env,
           Mismatched_jkind_annotation { name; explicit_jkind = original_jkind;
                                         implicit_jkind }))
@@ -477,8 +477,7 @@ end = struct
   let check_jkind env loc name v jkind_info =
     match get_desc v with
     | Tvar { jkind } | Tunivar { jkind } when
-        not (Jkind.equate env jkind
-               jkind_info.original_jkind) ->
+        Result.is_error (Jkind.equate env jkind jkind_info.original_jkind) ->
       let reason =
         Bad_univar_jkind { name; jkind_info; inferred_jkind = jkind }
       in
@@ -493,7 +492,7 @@ end = struct
          6461). Therefore, we track the locations instead of using
          [Jkind.History.has_warned]. *)
       when not (LocSet.mem loc !warned_imprecise_locs) ->
-      if not (Jkind.equate env jkind annotated_jkind) then begin
+      if Result.is_error (Jkind.equate env jkind annotated_jkind) then begin
         warned_imprecise_locs := LocSet.add loc !warned_imprecise_locs;
         let format_jkind jkind =
           Format_doc.asprintf "%a" !Oprint.out_jkind
@@ -808,7 +807,7 @@ let transl_type_param env path jkind_default styp =
           Jkind.of_annotation ~context:(Type_parameter (path, name)) env
             jkind_annot
         in
-        if not (Jkind.equate env jkind implicit_jkind) then
+        if Result.is_error (Jkind.equate env jkind implicit_jkind) then
           raise (Error (loc, env,
             Mismatched_jkind_annotation
               { name = var_name; explicit_jkind = jkind;
@@ -1453,8 +1452,7 @@ and transl_type_alias env ~row_context ~policy mode attrs styp_loc styp name_opt
     | Some jkind_annot, None -> jkind_of_annot jkind_annot, None
     | Some jkind_annot, Some implicit_jkind ->
       let jkind = jkind_of_annot jkind_annot in
-      if not (Jkind.equate env jkind
-                implicit_jkind) then
+      if Result.is_error (Jkind.equate env jkind implicit_jkind) then
         raise (Error (alias_loc, env,
             Mismatched_jkind_annotation { name = alias; explicit_jkind = jkind;
                                           implicit_jkind }));

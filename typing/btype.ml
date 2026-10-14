@@ -1948,7 +1948,7 @@ module Jkind0 = struct
     module Sub_failure_reason = struct
       type t =
         | Axis_disagreement of Jkind_axis.Axis.packed
-        | Layout_disagreement
+        | Layout_disagreement of Jkind_types.Sort.error
         | With_bounds_on_left
         | Constrain_ran_out_of_fuel
     end
