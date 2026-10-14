@@ -12,7 +12,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** Translation of external (C) calls to Cmm. *)
+(** Translation of external (C) calls to Cmm, including the implementation of
+    the calling conventions for unboxed products (which are passed and returned
+    as if they were values of C struct type). *)
 
 val translate_external_call :
   To_cmm_env.t ->
