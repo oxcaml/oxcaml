@@ -25,13 +25,10 @@ clz_tagged:
   ret
 |}]
 
-(* CR ttebbi: The constant call should be folded. *)
 let clz_tagged_const () = Builtins.int_clz 6
 [%%expect_asm X86_64{|
 clz_tagged_const:
-  movl  $13, %eax
-  lzcnt %rax, %rax
-  leaq  1(%rax,%rax), %rax
+  movl  $121, %eax
   ret
 |}]
 
@@ -45,13 +42,10 @@ clz64:
   ret
 |}]
 
-(* CR ttebbi: The constant call should be folded. *)
 let clz64_const () = Builtins.int64_clz (Int64.of_int 6)
 [%%expect_asm X86_64{|
 clz64_const:
-  movl  $6, %eax
-  lzcnt %rax, %rax
-  leaq  1(%rax,%rax), %rax
+  movl  $123, %eax
   ret
 |}]
 
@@ -68,14 +62,10 @@ clz32:
   ret
 |}]
 
-(* CR ttebbi: The constant call should be folded. *)
 let clz32_const () = Builtins.int32_clz (Int32.of_int 6)
 [%%expect_asm X86_64{|
 clz32_const:
-  movl  $6, %eax
-  movl  %eax, %eax
-  lzcnt %rax, %rax
-  leaq  -63(%rax,%rax), %rax
+  movl  $59, %eax
   ret
 |}]
 
@@ -90,13 +80,10 @@ clz_native:
   ret
 |}]
 
-(* CR ttebbi: The constant call should be folded. *)
 let clz_native_const () = Builtins.nativeint_clz (Nativeint.of_int 6)
 [%%expect_asm X86_64{|
 clz_native_const:
-  movl  $6, %eax
-  lzcnt %rax, %rax
-  leaq  1(%rax,%rax), %rax
+  movl  $123, %eax
   ret
 |}]
 
@@ -115,15 +102,10 @@ ctz_int:
   ret
 |}]
 
-(* CR ttebbi: The constant call should be folded. *)
 let ctz_int_const () = Builtins.int_ctz 6
 [%%expect_asm X86_64{|
 ctz_int_const:
-  movl  $1, %eax
-  salq  $63, %rax
-  orq   $6, %rax
-  tzcnt %rax, %rax
-  leaq  1(%rax,%rax), %rax
+  movl  $3, %eax
   ret
 |}]
 
@@ -137,13 +119,10 @@ ctz64:
   ret
 |}]
 
-(* CR ttebbi: The constant call should be folded. *)
 let ctz64_const () = Builtins.int64_ctz (Int64.of_int 6)
 [%%expect_asm X86_64{|
 ctz64_const:
-  movl  $6, %eax
-  tzcnt %rax, %rax
-  leaq  1(%rax,%rax), %rax
+  movl  $3, %eax
   ret
 |}]
 
@@ -160,14 +139,10 @@ ctz32:
   ret
 |}]
 
-(* CR ttebbi: The constant call should be folded. *)
 let ctz32_const () = Builtins.int32_ctz (Int32.of_int 6)
 [%%expect_asm X86_64{|
 ctz32_const:
-  movabsq $4294967296, %rax
-  orq   $6, %rax
-  tzcnt %rax, %rax
-  leaq  1(%rax,%rax), %rax
+  movl  $3, %eax
   ret
 |}]
 
@@ -182,13 +157,10 @@ ctz_native:
   ret
 |}]
 
-(* CR ttebbi: The constant call should be folded. *)
 let ctz_native_const () = Builtins.nativeint_ctz (Nativeint.of_int 6)
 [%%expect_asm X86_64{|
 ctz_native_const:
-  movl  $6, %eax
-  tzcnt %rax, %rax
-  leaq  1(%rax,%rax), %rax
+  movl  $3, %eax
   ret
 |}]
 
@@ -202,13 +174,10 @@ popcnt_tagged:
   ret
 |}]
 
-(* CR ttebbi: The constant call should be folded. *)
 let popcnt_tagged_const () = Builtins.int_popcnt 6
 [%%expect_asm X86_64{|
 popcnt_tagged_const:
-  movl  $13, %eax
-  popcnt %rax, %rax
-  leaq  -1(%rax,%rax), %rax
+  movl  $5, %eax
   ret
 |}]
 
@@ -222,13 +191,10 @@ popcnt64:
   ret
 |}]
 
-(* CR ttebbi: The constant call should be folded. *)
 let popcnt64_const () = Builtins.int64_popcnt (Int64.of_int 6)
 [%%expect_asm X86_64{|
 popcnt64_const:
-  movl  $6, %eax
-  popcnt %rax, %rax
-  leaq  1(%rax,%rax), %rax
+  movl  $5, %eax
   ret
 |}]
 
@@ -244,14 +210,10 @@ popcnt32:
   ret
 |}]
 
-(* CR ttebbi: The constant call should be folded. *)
 let popcnt32_const () = Builtins.int32_popcnt (Int32.of_int 6)
 [%%expect_asm X86_64{|
 popcnt32_const:
-  movl  $6, %eax
-  movl  %eax, %eax
-  popcnt %rax, %rax
-  leaq  1(%rax,%rax), %rax
+  movl  $5, %eax
   ret
 |}]
 
@@ -266,14 +228,11 @@ popcnt_native:
   ret
 |}]
 
-(* CR ttebbi: The constant call should be folded. *)
 let popcnt_native_const () =
   Builtins.nativeint_popcnt (Nativeint.of_int 6)
 [%%expect_asm X86_64{|
 popcnt_native_const:
-  movl  $6, %eax
-  popcnt %rax, %rax
-  leaq  1(%rax,%rax), %rax
+  movl  $5, %eax
   ret
 |}]
 
@@ -317,7 +276,6 @@ let int32_shl_const () =
 [%%expect_asm X86_64{|
 int32_shl_const:
   movl  $24, %eax
-  movslq %eax, %rax
   ret
 |}]
 
@@ -439,15 +397,11 @@ int32_shr:
   ret
 |}]
 
-(* CR ttebbi: The constant call should be folded. *)
 let int32_shr_const () =
   Builtins.int32_shr 6l 2l |> Int32_u.of_int32
 [%%expect_asm X86_64{|
 int32_shr_const:
-  movl  $6, %eax
-  movl  %eax, %eax
-  shrq  $2, %rax
-  movslq %eax, %rax
+  movl  $1, %eax
   ret
 |}]
 
@@ -485,15 +439,11 @@ mulhi_signed:
   ret
 |}]
 
-(* CR ttebbi: The constant call should be folded. *)
 let mulhi_signed_const () =
   Int64_u.of_int64 (Builtins.int64_mulhi_s 6L 2L)
 [%%expect_asm X86_64{|
 mulhi_signed_const:
-  movl  $2, %ebx
-  movl  $6, %eax
-  imulq %rbx
-  movq  %rdx, %rax
+  xorl  %eax, %eax
   ret
 |}]
 
@@ -508,15 +458,11 @@ mulhi_unsigned:
   ret
 |}]
 
-(* CR ttebbi: The constant call should be folded. *)
 let mulhi_unsigned_const () =
   Int64_u.of_int64 (Builtins.int64_mulhi_u 6L 2L)
 [%%expect_asm X86_64{|
 mulhi_unsigned_const:
-  movl  $2, %ebx
-  movl  $6, %eax
-  mulq  %rbx
-  movq  %rdx, %rax
+  xorl  %eax, %eax
   ret
 |}]
 
