@@ -1979,12 +1979,14 @@ let copy_sep ~copy_scope ~fixed ~partial ~bound_univars
          second pass. Otherwise, the same variable would have disjoint
          copies. *)
       TypeSet.is_empty univars
-      && (match desc with
-        | Tvar _ | Tivar _ -> true
-        | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tconstr _ | Tmod _
-        | Tobject _ | Tfield _ | Tquote _ | Tsplice _ | Tquote_eval _ | Tnil
-        | Tlink _ | Tsubst _ | Tvariant _ | Tunivar _ | Tpoly _ | Trepr _
-        | Tpackage _ | Tof_kind _ | Tbox _ -> may_share)
+      &&
+      match desc with
+      | Tvar _ | Tivar _ -> true
+      | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tconstr _ | Tmod _ | Tobject _
+      | Tfield _ | Tquote _ | Tsplice _ | Tquote_eval _ | Tnil | Tlink _
+      | Tsubst _ | Tvariant _ | Tunivar _ | Tpoly _ | Trepr _ | Tpackage _
+      | Tof_kind _ | Tbox _ ->
+        may_share
     in
     if can_share then
       if partial || get_level ty <> generic_level then ty else
