@@ -32,13 +32,14 @@ open! Stdlib
 type (+'a : any mod separable) t = 'a iarray
 (** An alias for the type of immutable arrays. *)
 
-external length : ('a : any mod separable). local_ 'a iarray -> int
+external length : ('a : any mod separable). local_ 'a iarray -> int @@ stateless
   = "%array_length"
 [@@layout_poly]
 (** Return the length (number of elements) of the given immutable array. *)
 
 external get :
   ('a : any mod separable). ('a iarray[@local_opt]) -> int -> ('a[@local_opt])
+  @@ stateless
   = "%array_safe_get"
 [@@layout_poly]
 (** [get a n] returns the element number [n] of immutable array [a].
@@ -346,5 +347,6 @@ val of_seq : ('a : value_or_null mod separable). 'a Seq.t -> 'a iarray
 
 external unsafe_get :
   ('a : any mod separable). ('a iarray[@local_opt]) -> int -> ('a[@local_opt])
+  @@ stateless
   = "%array_unsafe_get"
 [@@layout_poly]

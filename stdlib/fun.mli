@@ -26,7 +26,7 @@ open! Stdlib
 
 (** {1:combinators Combinators} *)
 
-external id : ('a : value_or_null) . 'a -> 'a = "%identity"
+external id : ('a : value_or_null) . 'a -> 'a @@ stateless = "%identity"
 (** [id] is the identity function. For any argument [x], [id x] is [x]. *)
 
 val const : ('a : value_or_null) ('b : value_or_null)

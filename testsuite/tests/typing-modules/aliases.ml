@@ -16,7 +16,7 @@ module C = Char
 module C' :
   sig
     type t = char
-    external code : char -> int @@ portable = "%identity"
+    external code : char -> int @@ stateless = "%identity"
     val chr : int -> char @@ portable
     val escaped : char -> string @@ portable
     val compare : t -> t -> int @@ portable
@@ -49,7 +49,7 @@ module C' :
     val uppercase_ascii : char -> char @@ portable
     val seeded_hash : int -> t -> int @@ portable
     val hash : t -> int @@ portable
-    external unsafe_chr : int -> char @@ portable = "%identity"
+    external unsafe_chr : int -> char @@ stateless = "%identity"
   end
 - : char = 'B'
 module C3 :
@@ -85,7 +85,7 @@ module F :
   functor (X : sig end) ->
     sig
       type t = char
-      external code : char -> int @@ portable = "%identity"
+      external code : char -> int @@ stateless = "%identity"
       val chr : int -> char @@ portable
       val escaped : char -> string @@ portable
       val compare : t -> t -> int @@ portable
@@ -95,12 +95,12 @@ module F :
       val uppercase_ascii : char -> char @@ portable
       val seeded_hash : int -> t -> int @@ portable
       val hash : t -> int @@ portable
-      external unsafe_chr : int -> char @@ portable = "%identity"
+      external unsafe_chr : int -> char @@ stateless = "%identity"
     end
 module C4 :
   sig
     type t = char
-    external code : char -> int @@ portable = "%identity"
+    external code : char -> int @@ stateless = "%identity"
     val chr : int -> char @@ portable
     val escaped : char -> string @@ portable
     val compare : t -> t -> int @@ portable
@@ -110,7 +110,7 @@ module C4 :
     val uppercase_ascii : char -> char @@ portable
     val seeded_hash : int -> t -> int @@ portable
     val hash : t -> int @@ portable
-    external unsafe_chr : int -> char @@ portable = "%identity"
+    external unsafe_chr : int -> char @@ stateless = "%identity"
   end
 - : char = 'B'
 |}];;
