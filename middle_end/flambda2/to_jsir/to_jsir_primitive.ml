@@ -749,8 +749,6 @@ let ternary_exn ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
     let res =
       To_jsir_result.add_instr_exn res (Array_set (base, index, new_value))
     in
-    (* Unlike [Block_set], Simplify does not know that the result is unit, so it
-       may be used (e.g. returned from a function). *)
     unit ~env ~res
 
 let quaternary_exn ~env ~res (f : Flambda_primitive.quaternary_primitive) w x y
