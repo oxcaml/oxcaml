@@ -3302,8 +3302,12 @@ let primitive_can_raise prim =
   | Patomic_load_idx _ | Patomic_set_idx _
   | Patomic_exchange_idx _ | Patomic_compare_exchange_idx _
   | Patomic_compare_set_idx _ | Patomic_fetch_add_idx | Patomic_add_idx
-  | Patomic_sub_idx | Patomic_land_idx | Patomic_lor_idx | Patomic_lxor_idx ->
-    false
+  | Patomic_sub_idx | Patomic_land_idx | Patomic_lor_idx | Patomic_lxor_idx
+  | Pget_ptr _ | Pset_ptr _
+  | Pget_ext_ptr _ | Pset_ext_ptr _ ->
+    (* These may have a null base (an external pointer), which JSIR
+       does not support. *)
+    Clflags.target_is_jsir ()
   | Pwith_stack | Pwith_stack_preemptible
   | Pperform | Pcontinue | Pdiscontinue
   | Pdiscontinue_with_backtrace
@@ -3317,8 +3321,6 @@ let primitive_can_raise prim =
   | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pmake_idx_array _
   | Pidx_deepen _
   | Pget_idx _ | Pset_idx _
-  | Pget_ptr _ | Pset_ptr _
-  | Pget_ext_ptr _ | Pset_ext_ptr _
   | Ppeek _ | Ppoke _ | Pbox _ | Punbox _ ->
     false
 
@@ -4022,9 +4024,13 @@ let count_initializers_array_kind (lambda_array_kind : array_kind) =
     Misc.fatal_error
       "Lambda.count_initializers_array_kind: Punspecializedarray"
 
-(* CR mshinwell: This function might need revisiting for JSIR and any
-   Flambda 2 -> WASM backend *)
 let array_element_size_in_bytes (array_kind : array_kind) =
+  if Clflags.target_is_jsir () then
+    (* JSIR arrays have one slot per unarised element, and block index
+       arithmetic counts every slot as 8 bytes. In particular, arrays of small
+       scalars are not packed. *)
+    8 * count_initializers_array_kind array_kind
+  else
   match array_kind with
   | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray ->
     8

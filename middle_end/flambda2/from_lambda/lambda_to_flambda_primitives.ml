@@ -1846,8 +1846,23 @@ let idx_atomic_offset_and_field_kind ~machine_width primitive dbg layout ~idx =
 let null_base : H.simple_or_prim =
   H.Simple (Simple.const Reg_width_const.const_null)
 
+let check_no_external_pointers_on_jsir ~dbg ~(ptr : H.simple_or_prim)
+    (primitive : H.expr_primitive) : H.expr_primitive =
+  if not (Clflags.target_is_jsir ())
+  then primitive
+  else
+    Checked
+      { validity_conditions = [Binary (Phys_equal Neq, ptr, null_base)];
+        primitive;
+        failure = External_pointer_unsupported;
+        dbg
+      }
+
+(* [may_be_ext_pointer] is true for the pointer primitives, whose base may be
+   null, and false for plain block index accesses. *)
 let convert_pget_indirect ~machine_width ~dbg primitive layout
-    (mut : Asttypes.mutable_flag) ~ptr ~idx : H.expr_primitive list =
+    (mut : Asttypes.mutable_flag) ~may_be_ext_pointer ~ptr ~idx :
+    H.expr_primitive list =
   needs_64_bit_target primitive dbg;
   let offsets, kinds =
     block_index_access_offsets_and_kinds ~machine_width layout idx
@@ -1857,10 +1872,13 @@ let convert_pget_indirect ~machine_width ~dbg primitive layout
       (fun kind offset -> H.Binary (Read_offset (kind, mut), ptr, Prim offset))
       kinds offsets
   in
-  [H.maybe_create_unboxed_product reads]
+  let read = H.maybe_create_unboxed_product reads in
+  if may_be_ext_pointer
+  then [check_no_external_pointers_on_jsir ~dbg ~ptr read]
+  else [read]
 
 let convert_pset_indirect ~machine_width ~dbg primitive write_offset_kind layout
-    mode ~ptr ~idx ~new_values : H.expr_primitive list =
+    mode ~may_be_ext_pointer ~ptr ~idx ~new_values : H.expr_primitive list =
   needs_64_bit_target primitive dbg;
   let mode = Alloc_mode.For_assignments.from_lambda mode in
   let offsets, kinds =
@@ -1876,7 +1894,10 @@ let convert_pset_indirect ~machine_width ~dbg primitive write_offset_kind layout
             new_value ))
       kinds offsets new_values
   in
-  [H.Sequence writes]
+  let write = H.Sequence writes in
+  if may_be_ext_pointer
+  then [check_no_external_pointers_on_jsir ~dbg ~ptr write]
+  else [write]
 
 let string_or_bytes_checks (size : Flambda_primitive.string_accessor_width)
     unsafe =
@@ -2089,10 +2110,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     (* This is implemented as a unary primitive, but from our point of view it's
        actually nullary. *)
     let num_bytes = L.array_element_size_in_bytes array_kind in
-    [ Simple
-        (Simple.const_int
-           (Target_ocaml_int.of_int Target_system.Machine_width.Sixty_four
-              num_bytes)) ]
+    [Simple (Simple.const_int (Target_ocaml_int.of_int machine_width num_bytes))]
   | Pmake_idx_field pos, [] ->
     needs_64_bit_target prim dbg;
     let idx_raw_value = Int64.mul (Int64.of_int pos) 8L in
@@ -3462,91 +3480,102 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     let offset, field_kind =
       idx_atomic_offset_and_field_kind ~machine_width prim dbg layout ~idx
     in
-    [Binary (Atomic_load (Byte_offset, field_kind), ptr, offset)]
+    [ check_no_external_pointers_on_jsir ~dbg ~ptr
+        (Binary (Atomic_load (Byte_offset, field_kind), ptr, offset)) ]
   | Patomic_set_idx { layout; mode }, [[ptr]; [idx]; [new_value]] ->
     let offset, field_kind =
       idx_atomic_offset_and_field_kind ~machine_width prim dbg layout ~idx
     in
-    [ Ternary
-        ( Atomic_set
-            ( Byte_offset,
-              field_kind,
-              Alloc_mode.For_assignments.from_lambda mode ),
-          ptr,
-          offset,
-          new_value ) ]
+    [ check_no_external_pointers_on_jsir ~dbg ~ptr
+        (Ternary
+           ( Atomic_set
+               ( Byte_offset,
+                 field_kind,
+                 Alloc_mode.For_assignments.from_lambda mode ),
+             ptr,
+             offset,
+             new_value )) ]
   | Patomic_exchange_idx { layout; mode }, [[ptr]; [idx]; [new_value]] ->
     let offset, field_kind =
       idx_atomic_offset_and_field_kind ~machine_width prim dbg layout ~idx
     in
-    [ Ternary
-        ( Atomic_exchange
-            ( Byte_offset,
-              field_kind,
-              Alloc_mode.For_assignments.from_lambda mode ),
-          ptr,
-          offset,
-          new_value ) ]
+    [ check_no_external_pointers_on_jsir ~dbg ~ptr
+        (Ternary
+           ( Atomic_exchange
+               ( Byte_offset,
+                 field_kind,
+                 Alloc_mode.For_assignments.from_lambda mode ),
+             ptr,
+             offset,
+             new_value )) ]
   | ( Patomic_compare_exchange_idx { layout; mode },
       [[ptr]; [idx]; [comparison_value]; [new_value]] ) ->
     let offset, field_kind =
       idx_atomic_offset_and_field_kind ~machine_width prim dbg layout ~idx
     in
-    [ Quaternary
-        ( Atomic_compare_exchange
-            { offset_units = Byte_offset;
-              atomic_kind = field_kind;
-              args_kind = field_kind;
-              mode = Alloc_mode.For_assignments.from_lambda mode
-            },
-          ptr,
-          offset,
-          comparison_value,
-          new_value ) ]
+    [ check_no_external_pointers_on_jsir ~dbg ~ptr
+        (Quaternary
+           ( Atomic_compare_exchange
+               { offset_units = Byte_offset;
+                 atomic_kind = field_kind;
+                 args_kind = field_kind;
+                 mode = Alloc_mode.For_assignments.from_lambda mode
+               },
+             ptr,
+             offset,
+             comparison_value,
+             new_value )) ]
   | ( Patomic_compare_set_idx { layout; mode },
       [[ptr]; [idx]; [old_value]; [new_value]] ) ->
     let offset, field_kind =
       idx_atomic_offset_and_field_kind ~machine_width prim dbg layout ~idx
     in
-    [ Quaternary
-        ( Atomic_compare_and_set
-            ( Byte_offset,
-              field_kind,
-              Alloc_mode.For_assignments.from_lambda mode ),
-          ptr,
-          offset,
-          old_value,
-          new_value ) ]
+    [ check_no_external_pointers_on_jsir ~dbg ~ptr
+        (Quaternary
+           ( Atomic_compare_and_set
+               ( Byte_offset,
+                 field_kind,
+                 Alloc_mode.For_assignments.from_lambda mode ),
+             ptr,
+             offset,
+             old_value,
+             new_value )) ]
   | Patomic_fetch_add_idx, [[ptr]; [idx]; [i]] ->
     let offset, _ =
       idx_atomic_offset_and_field_kind ~machine_width prim dbg L.layout_int ~idx
     in
-    [Ternary (Atomic_int_arith (Byte_offset, Fetch_add), ptr, offset, i)]
+    [ check_no_external_pointers_on_jsir ~dbg ~ptr
+        (Ternary (Atomic_int_arith (Byte_offset, Fetch_add), ptr, offset, i)) ]
   | Patomic_add_idx, [[ptr]; [idx]; [i]] ->
     let offset, _ =
       idx_atomic_offset_and_field_kind ~machine_width prim dbg L.layout_int ~idx
     in
-    [Ternary (Atomic_int_arith (Byte_offset, Add), ptr, offset, i)]
+    [ check_no_external_pointers_on_jsir ~dbg ~ptr
+        (Ternary (Atomic_int_arith (Byte_offset, Add), ptr, offset, i)) ]
   | Patomic_sub_idx, [[ptr]; [idx]; [i]] ->
     let offset, _ =
       idx_atomic_offset_and_field_kind ~machine_width prim dbg L.layout_int ~idx
     in
-    [Ternary (Atomic_int_arith (Byte_offset, Sub), ptr, offset, i)]
+    [ check_no_external_pointers_on_jsir ~dbg ~ptr
+        (Ternary (Atomic_int_arith (Byte_offset, Sub), ptr, offset, i)) ]
   | Patomic_land_idx, [[ptr]; [idx]; [i]] ->
     let offset, _ =
       idx_atomic_offset_and_field_kind ~machine_width prim dbg L.layout_int ~idx
     in
-    [Ternary (Atomic_int_arith (Byte_offset, And), ptr, offset, i)]
+    [ check_no_external_pointers_on_jsir ~dbg ~ptr
+        (Ternary (Atomic_int_arith (Byte_offset, And), ptr, offset, i)) ]
   | Patomic_lor_idx, [[ptr]; [idx]; [i]] ->
     let offset, _ =
       idx_atomic_offset_and_field_kind ~machine_width prim dbg L.layout_int ~idx
     in
-    [Ternary (Atomic_int_arith (Byte_offset, Or), ptr, offset, i)]
+    [ check_no_external_pointers_on_jsir ~dbg ~ptr
+        (Ternary (Atomic_int_arith (Byte_offset, Or), ptr, offset, i)) ]
   | Patomic_lxor_idx, [[ptr]; [idx]; [i]] ->
     let offset, _ =
       idx_atomic_offset_and_field_kind ~machine_width prim dbg L.layout_int ~idx
     in
-    [Ternary (Atomic_int_arith (Byte_offset, Xor), ptr, offset, i)]
+    [ check_no_external_pointers_on_jsir ~dbg ~ptr
+        (Ternary (Atomic_int_arith (Byte_offset, Xor), ptr, offset, i)) ]
   | Pcpu_relax, _ -> [Nullary Cpu_relax]
   | Pdls_get, _ -> [Nullary Dls_get]
   | Ptls_get, _ -> [Nullary Tls_get]
@@ -3576,31 +3605,33 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     let kind = standard_int_or_float_of_peek_or_poke layout in
     [Binary (Poke kind, ptr, new_value)]
   | Pget_idx (layout, mut), [[ptr]; [idx]] ->
-    convert_pget_indirect ~machine_width ~dbg prim layout mut ~ptr ~idx
+    convert_pget_indirect ~machine_width ~dbg prim layout mut
+      ~may_be_ext_pointer:false ~ptr ~idx
   | Pget_ptr (layout, mut), [[ptr; idx]] ->
-    convert_pget_indirect ~machine_width ~dbg prim layout mut ~ptr ~idx
+    convert_pget_indirect ~machine_width ~dbg prim layout mut
+      ~may_be_ext_pointer:true ~ptr ~idx
   | Pget_ptr _, [([] | [_] | _ :: _ :: _ :: _)] ->
     Misc.fatal_errorf
       "Closure_convertion.convert_primitive: Expected unboxed product of \
        length 2 as first arg to ptr primitive %a (%a)"
       Printlambda.primitive prim H.print_list_of_lists_of_simple_or_prim args
   | Pset_idx (layout, mode), [[ptr]; [idx]; new_values] ->
-    convert_pset_indirect ~machine_width ~dbg prim Into_block layout mode ~ptr
-      ~idx ~new_values
+    convert_pset_indirect ~machine_width ~dbg prim Into_block layout mode
+      ~may_be_ext_pointer:false ~ptr ~idx ~new_values
   | Pset_ptr (layout, mode), [[ptr; idx]; new_values] ->
     convert_pset_indirect ~machine_width ~dbg prim Into_block_or_off_heap layout
-      mode ~ptr ~idx ~new_values
+      mode ~may_be_ext_pointer:true ~ptr ~idx ~new_values
   | Pset_ptr _, [([] | [_] | _ :: _ :: _ :: _); _] ->
     Misc.fatal_errorf
       "Closure_convertion.convert_primitive: Expected unboxed product of \
        length 2 as first arg to ptr primitive %a (%a)"
       Printlambda.primitive prim H.print_list_of_lists_of_simple_or_prim args
   | Pget_ext_ptr (layout, mut), [[idx]] ->
-    convert_pget_indirect ~machine_width ~dbg prim layout mut ~ptr:null_base
-      ~idx
+    convert_pget_indirect ~machine_width ~dbg prim layout mut
+      ~may_be_ext_pointer:true ~ptr:null_base ~idx
   | Pset_ext_ptr (layout, mode), [[idx]; new_values] ->
     convert_pset_indirect ~machine_width ~dbg prim Into_block_or_off_heap layout
-      mode ~ptr:null_base ~idx ~new_values
+      mode ~may_be_ext_pointer:true ~ptr:null_base ~idx ~new_values
   | Pbox (layout, mode), [args] ->
     let mode =
       Alloc_mode.For_allocations.from_lambda mode ~current_alloc_region

@@ -25,6 +25,7 @@ type failure =
   | Division_by_zero
   | Index_out_of_bounds
   | Address_was_misaligned
+  | External_pointer_unsupported
 
 type expr_primitive =
   | Simple of Simple.t
@@ -148,25 +149,32 @@ let raise_exn_for_failure acc ~dbg exn_cont exn_bucket =
 let symbol_for_prim id =
   Flambda2_import.Symbol.for_predef_ident id |> Symbol.create_wrapped
 
-let register_invalid_argument ~register_const0 acc error_text =
-  let invalid_argument =
-    (* [Predef.invalid_argument] is not exposed; the following avoids a change
-       to the frontend. *)
-    let matches ident = String.equal (Ident.name ident) "Invalid_argument" in
-    let invalid_argument =
-      match List.find matches Predef.all_predef_exns with
-      | exception Not_found ->
-        Misc.fatal_error "Cannot find Invalid_argument exception in Predef"
-      | ident -> ident
-    in
-    symbol_for_prim invalid_argument
-  in
+(* [Predef.invalid_argument] and [Predef.failure] are not exposed; the following
+   avoids a change to the frontend. *)
+let symbol_for_predef_exn name =
+  let matches ident = String.equal (Ident.name ident) name in
+  match List.find matches Predef.all_predef_exns with
+  | exception Not_found ->
+    Misc.fatal_errorf "Cannot find %s exception in Predef" name
+  | ident -> symbol_for_prim ident
+
+let register_exn_with_string_arg ~register_const0 acc exn error_text =
   let dbg = Debuginfo.none in
   register_const0 acc
     (Static_const.block Tag.Scannable.zero Immutable Value_only
-       [ Simple.With_debuginfo.create (Simple.symbol invalid_argument) dbg;
+       [ Simple.With_debuginfo.create (Simple.symbol exn) dbg;
          Simple.With_debuginfo.create (Simple.symbol error_text) dbg ])
     "block"
+
+let register_invalid_argument ~register_const0 acc error_text =
+  register_exn_with_string_arg ~register_const0 acc
+    (symbol_for_predef_exn "Invalid_argument")
+    error_text
+
+let register_failure ~register_const0 acc error_text =
+  register_exn_with_string_arg ~register_const0 acc
+    (symbol_for_predef_exn "Failure")
+    error_text
 
 let expression_for_failure acc exn_cont ~register_const0 primitive dbg
     (failure : failure) =
@@ -204,6 +212,15 @@ let expression_for_failure acc exn_cont ~register_const0 primitive dbg
     let acc, exn_bucket =
       register_invalid_argument ~register_const0 acc error_text
     in
+    raise_exn_for_failure acc ~dbg exn_cont (Simple.symbol exn_bucket)
+  | External_pointer_unsupported ->
+    let acc, error_text =
+      register_const0 acc
+        (Static_const.immutable_string
+           "External pointers are not supported in JavaScript")
+        "string"
+    in
+    let acc, exn_bucket = register_failure ~register_const0 acc error_text in
     raise_exn_for_failure acc ~dbg exn_cont (Simple.symbol exn_bucket)
 
 let must_be_singleton args =
