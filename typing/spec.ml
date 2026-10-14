@@ -90,6 +90,10 @@ and 'ty expression_desc =
         sort : sort;
         label : label;
       }
+  | Sexp_ifthenelse of 'ty expression * 'ty expression * 'ty expression option
+  | Sexp_sequence of 'ty expression * sort * 'ty expression
+  | Sexp_assert of 'ty expression
+  | Sexp_lazy of 'ty expression
   | Sexp_extension_constructor of Path.t
 
 and 'ty argument =
@@ -156,6 +160,13 @@ and map_desc m = function
   | Sexp_unboxed_field { record; sort; label } ->
       Sexp_unboxed_field
         { record = map m record; sort; label = map_label m label }
+  | Sexp_ifthenelse (c, t, e) ->
+      Sexp_ifthenelse
+        (map m c, map m t, Option.map (map m) e)
+  | Sexp_sequence (e1, sort, e2) ->
+      Sexp_sequence (map m e1, sort, map m e2)
+  | Sexp_assert e -> Sexp_assert (map m e)
+  | Sexp_lazy e -> Sexp_lazy (map m e)
   | Sexp_extension_constructor p ->
       Sexp_extension_constructor (m.extension_path p)
 
@@ -316,13 +327,22 @@ let rec alpha_equal_exp sp vars e1 e2 =
   | Sexp_unboxed_field f1, Sexp_unboxed_field f2 ->
       same_label sp f1.label f2.label
       && alpha_equal_exp sp vars f1.record f2.record
+  | Sexp_ifthenelse (c1, t1, e1), Sexp_ifthenelse (c2, t2, e2) ->
+      alpha_equal_exp sp vars c1 c2
+      && alpha_equal_exp sp vars t1 t2
+      && Option.equal (alpha_equal_exp sp vars) e1 e2
+  | Sexp_sequence (a1, _, b1), Sexp_sequence (a2, _, b2) ->
+      alpha_equal_exp sp vars a1 a2 && alpha_equal_exp sp vars b1 b2
+  | Sexp_assert e1, Sexp_assert e2 -> alpha_equal_exp sp vars e1 e2
+  | Sexp_lazy e1, Sexp_lazy e2 -> alpha_equal_exp sp vars e1 e2
   | Sexp_extension_constructor p1, Sexp_extension_constructor p2 ->
       sp Extension p1 p2
   | ( Sexp_var _ | Sexp_global _ | Sexp_constant _ | Sexp_apply _
     | Sexp_tuple _ | Sexp_unboxed_tuple _ | Sexp_unboxed_unit
     | Sexp_unboxed_bool _ | Sexp_construct _ | Sexp_variant _
     | Sexp_record _ | Sexp_field _ | Sexp_record_unboxed_product _
-    | Sexp_unboxed_field _ | Sexp_extension_constructor _ ), _ ->
+    | Sexp_unboxed_field _ | Sexp_ifthenelse _ | Sexp_sequence _
+    | Sexp_assert _ | Sexp_lazy _ | Sexp_extension_constructor _ ), _ ->
       false
 
 and alpha_equal_fields sp vars fields1 fields2 =

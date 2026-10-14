@@ -17,6 +17,7 @@ let env =
     type ur = #{ u : int; w : bool }
     exception E of int
     external ( + ) : int -> int -> int = "%addint"
+    external ignore : 'a -> unit = "%ignore"
     let rec length = function [] -> 0 | _ :: l -> 1 + length l
     let f ?(opt = 0) ~lbl x = opt + lbl + x
     module M = struct let v = 1 end
@@ -172,10 +173,28 @@ n :: xs  ==>  n :: xs
 [n; n]  ==>  [n; n]
 |}]
 
+(* Control *)
+
+let () = List.iter run
+  ["if b then n else 0";
+   "if b then ()";
+   "ignore n; b";
+   "assert b";
+   "assert false"]
+[%%expect {|
+if b then n else 0  ==>  if b then n else 0
+if b then ()  ==>  if b then ()
+ignore n; b  ==>  ignore n; b
+assert b  ==>  assert b
+assert false  ==>  assert false
+|}]
+
 (* Lazy values and extension constructors *)
 
 let () = List.iter run
-  ["[%extension_constructor E]"]
+  ["lazy n";
+   "[%extension_constructor E]"]
 [%%expect {|
+lazy n  ==>  lazy n
 [%extension_constructor E]  ==>  [%ocaml.extension_constructor E]
 |}]

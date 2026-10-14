@@ -150,6 +150,13 @@ let rec expression env (e : _ Spec.expression) =
   | Sexp_unboxed_field { record; label = lbl; _ } ->
       Exp.unboxed_field ~loc (annotated_record env record)
         (label env ~loc lbl)
+  | Sexp_ifthenelse (c, t, e) ->
+      Exp.ifthenelse ~loc (expression env c) (expression env t)
+        (Option.map (expression env) e)
+  | Sexp_sequence (e1, _, e2) ->
+      Exp.sequence ~loc (expression env e1) (expression env e2)
+  | Sexp_assert e -> Exp.assert_ ~loc (expression env e)
+  | Sexp_lazy e -> Exp.lazy_ ~loc (expression env e)
   | Sexp_extension_constructor path ->
       let constructor =
         Exp.construct ~loc (mk ~loc (env.lident_of_path path)) None

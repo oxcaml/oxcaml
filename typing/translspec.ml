@@ -225,8 +225,12 @@ and expression_desc bound loc desc =
   | Texp_idx _ -> unsupported loc Block_indices
   | Texp_list_comprehension _ | Texp_array_comprehension _ ->
       unsupported loc Comprehensions
-  | Texp_ifthenelse _ -> unsupported loc (Not_yet_supported "conditionals")
-  | Texp_sequence _ -> unsupported loc (Not_yet_supported "sequences")
+  | Texp_ifthenelse (c, t, e) ->
+      Sexp_ifthenelse
+        (expression bound c, expression bound t,
+         Option.map (expression bound) e)
+  | Texp_sequence (e1, s, e2) ->
+      Sexp_sequence (expression bound e1, sort s, expression bound e2)
   | Texp_while _ | Texp_for _ -> unsupported loc Loops
   | Texp_send _ | Texp_new _ | Texp_instvar _ | Texp_setinstvar _
   | Texp_override _ | Texp_object _ ->
@@ -234,8 +238,8 @@ and expression_desc bound loc desc =
   | Texp_mutvar _ | Texp_setmutvar _ -> unsupported loc Mutable_variables
   | Texp_letmodule _ -> unsupported loc (Not_yet_supported "local modules")
   | Texp_letexception _ -> unsupported loc Local_exceptions
-  | Texp_assert _ -> unsupported loc (Not_yet_supported "assertions")
-  | Texp_lazy _ -> unsupported loc (Not_yet_supported "lazy values")
+  | Texp_assert (e, _) -> Sexp_assert (expression bound e)
+  | Texp_lazy e -> Sexp_lazy (expression bound e)
   | Texp_pack _ -> unsupported loc First_class_modules
   | Texp_letop _ -> unsupported loc Binding_operators
   | Texp_unreachable -> unsupported loc Refutation_cases

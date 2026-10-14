@@ -97,6 +97,10 @@ and 'ty expression_desc =
         sort : sort;
         label : label;
       }
+  | Sexp_ifthenelse of 'ty expression * 'ty expression * 'ty expression option
+  | Sexp_sequence of 'ty expression * sort * 'ty expression
+  | Sexp_assert of 'ty expression
+  | Sexp_lazy of 'ty expression
   | Sexp_extension_constructor of Path.t
 
 and 'ty argument =
