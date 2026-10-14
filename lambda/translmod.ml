@@ -1170,15 +1170,29 @@ let add_runtime_parameters lam params =
        function call and actually substitutes. *)
     Always_inline
   in
-  lfunction
-    ~params
-    ~kind:(Curried { nlocal = 0 })
-    ~return:layout_module
-    ~attr:{ default_function_attribute with is_a_functor = true; inline }
-    ~loc:Loc_unknown
-    ~body:lam
-    ~mode:alloc_heap
-    ~ret_mode:not_alloc_stack
+  let attr = { default_function_attribute with is_a_functor = true; inline } in
+  (* A unit can have more runtime parameters than [Lambda.max_arity], so split
+     them into a curried chain of functions. [transl_instance] still passes all
+     the arguments at once, as an over-application. *)
+  let chunks = Misc.Stdlib.List.chunks_of (Lambda.max_arity ()) params in
+  let lam, _return =
+    List.fold_right
+      (fun params (body, return) ->
+        let lam =
+          lfunction
+            ~params
+            ~kind:(Curried { nlocal = 0 })
+            ~return
+            ~attr
+            ~loc:Loc_unknown
+            ~body
+            ~mode:alloc_heap
+            ~ret_mode:not_alloc_stack
+        in
+        lam, layout_functor)
+      chunks (lam, layout_module)
+  in
+  lam
 
 let transl_implementation_module ~loc ~scopes module_id (str, cc, cc2) =
   let path = global_path module_id in
