@@ -20,11 +20,11 @@ open! Stdlib
 
 (* Module [Seq]: functional iterators *)
 
-type ('a : value_or_null) node =
+type ('a : any) node =
   | Nil
   | Cons of 'a * 'a t
 
-and ('a : value_or_null) t = unit -> 'a node
+and ('a : any) t = unit -> 'a node
 
 let empty () = Nil
 
@@ -103,7 +103,7 @@ let is_empty xs =
   match xs() with
   | Nil ->
       true
-  | Cons (_, _) ->
+  | _ ->
       false
 
 let uncons xs =
