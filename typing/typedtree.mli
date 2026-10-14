@@ -1578,6 +1578,81 @@ and jkind_declaration =
     jkind_loc: Location.t
    }
 
+(* Spectree expressions are a strict subset of the typedtree expressions,
+   constructed via [Translspec.spectree]. Since not all typedtree expressions
+   are valid spectree expressions, the AST below aims to be as minimal as
+   possible for the supported subset. This has the benefit that any consumers
+   of spectree do not have to deal with expressions that are not constructible.
+   The only exceptions (i.e., expressions that are in principle part of the AST
+   but rejected by [Translspec.spectree]) are:
+
+   - a path of a global containing a functor application
+   - certain primitives rejected by [Translspec.check_primitive]
+   - an application without arguments. *)
+
+and spec_expression =
+  { stexp_desc: spec_expression_desc;
+    stexp_loc: Location.t;
+    stexp_extra: (spec_extra * Location.t) list;
+    stexp_type: Types.type_expr;
+    stexp_env: Env.t;
+  }
+
+and spec_expression_desc =
+  | Stexp_var of
+      { id: Ident.t;
+        name_loc: Location.t;
+        sort: Jkind.sort;
+        ident: spec_ident;
+      }
+        (** A parameter of the law, with the location of its name. *)
+  | Stexp_global of
+      { path: Path.t;
+        lid: Longident.t loc;
+        sort: Jkind.sort;
+        ident: spec_ident;
+      }
+  | Stexp_primitive of
+      { path: Path.t;
+        lid: Longident.t loc;
+        prim: Primitive.description;
+        locality: Mode.Locality.l option;
+        sort: Jkind.sort option;
+        yielding: Mode.Yielding.l;
+        ident: spec_ident;
+      }
+        (** [locality], [sort] and [yielding] as in [Id_prim]. *)
+  | Stexp_constant of Spec.constant
+  | Stexp_apply of
+      { funct: spec_expression;
+        args: (Spec.arg_label * spec_expression * Jkind.sort) list;
+        ret_mode: return_mode;
+        yielding: Mode.Yielding.l;
+      }
+
+(* The fields of [Texp_ident] other than the path, the name and the kind *)
+and spec_ident =
+  { sid_unique_use: unique_use;
+    sid_staticity: Mode.Staticity.r;
+    sid_mode: Mode.With_regionality.l;
+    sid_desc: spec_value_description;
+  }
+
+(* [Types.value_description] without its kind *)
+and spec_value_description =
+  { sval_type: Types.type_expr;
+    sval_modalities: Mode.Modality.t;
+    sval_lpoly: Types.Lpoly.t;
+    sval_loc: Location.t;
+    sval_zero_alloc: Zero_alloc.t;
+    sval_attributes: attributes;
+    sval_uid: Shape.Uid.t;
+  }
+
+and spec_extra =
+  | Stexp_constraint of core_type
+  | Stexp_inspected_type of [ `exp ] type_inspection
+
 type argument_interface = {
   ai_signature: Types.signature;
   ai_coercion_from_primary: module_coercion;

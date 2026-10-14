@@ -1124,6 +1124,65 @@ and jkind_declaration =
     jkind_loc: Location.t
    }
 
+and spec_expression =
+  { stexp_desc: spec_expression_desc;
+    stexp_loc: Location.t;
+    stexp_extra: (spec_extra * Location.t) list;
+    stexp_type: Types.type_expr;
+    stexp_env: Env.t;
+  }
+
+and spec_expression_desc =
+  | Stexp_var of
+      { id: Ident.t;
+        name_loc: Location.t;
+        sort: Jkind.sort;
+        ident: spec_ident;
+      }
+  | Stexp_global of
+      { path: Path.t;
+        lid: Longident.t loc;
+        sort: Jkind.sort;
+        ident: spec_ident;
+      }
+  | Stexp_primitive of
+      { path: Path.t;
+        lid: Longident.t loc;
+        prim: Primitive.description;
+        locality: Mode.Locality.l option;
+        sort: Jkind.sort option;
+        yielding: Mode.Yielding.l;
+        ident: spec_ident;
+      }
+  | Stexp_constant of Spec.constant
+  | Stexp_apply of
+      { funct: spec_expression;
+        args: (Spec.arg_label * spec_expression * Jkind.sort) list;
+        ret_mode: return_mode;
+        yielding: Mode.Yielding.l;
+      }
+
+and spec_ident =
+  { sid_unique_use: unique_use;
+    sid_staticity: Mode.Staticity.r;
+    sid_mode: Mode.With_regionality.l;
+    sid_desc: spec_value_description;
+  }
+
+and spec_value_description =
+  { sval_type: Types.type_expr;
+    sval_modalities: Mode.Modality.t;
+    sval_lpoly: Types.Lpoly.t;
+    sval_loc: Location.t;
+    sval_zero_alloc: Zero_alloc.t;
+    sval_attributes: attributes;
+    sval_uid: Shape.Uid.t;
+  }
+
+and spec_extra =
+  | Stexp_constraint of core_type
+  | Stexp_inspected_type of [ `exp ] type_inspection
+
 type argument_interface = {
   ai_signature: Types.signature;
   ai_coercion_from_primary: module_coercion;

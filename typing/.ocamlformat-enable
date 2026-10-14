@@ -40,3 +40,7 @@ signature_with_global_bindings.mli
 zero_alloc.ml
 zero_alloc.mli
 ikinds/*
+spec.ml
+spec.mli
+translspec.ml
+translspec.mli
