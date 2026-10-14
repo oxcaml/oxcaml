@@ -174,6 +174,28 @@ let nongen_level = s_ref 0
 let global_level = s_ref 0
 let saved_level = s_ref []
 
+(* Runs the handlers woken up by filling [Tivar]s during unification. *)
+let scheduler = s_ref_of_create Scheduler.create ()
+
+let scheduler () = !scheduler
+
+(* Runs the scheduler, then defaults any still-empty ivars, until none remain.
+   Defaulting calls each handler's [run] with its [default ()]; [run]'s
+   unification fills the ivar (see [upon_shape]). *)
+let run_scheduler_and_default_ivars () =
+  let rec loop () =
+    Scheduler.run (scheduler ());
+    let defaulted = ref false in
+    List.iter (fun (Ivar.Packed ivar) ->
+        if Ivar.is_empty ivar then begin
+          defaulted := true;
+          Ivar.cancel_all ivar ~scheduler:(scheduler ())
+        end)
+      (Ivar.Global_pool.take ());
+    if !defaulted then loop ()
+  in
+  loop ()
+
 let get_current_level () = !current_level
 let init_def level = current_level := level; nongen_level := level
 let begin_def () =
@@ -209,7 +231,17 @@ let with_local_level_gen ~begin_def ~structure ?before_generalize f =
   let level = !current_level in
   let result, pool =
     with_new_pool ~level:!current_level begin fun () ->
-      let result = wrap_end_def f in
+      let result =
+        wrap_end_def (fun () ->
+            let result = f () in
+            (* Before exiting the current pool, we must run all
+               pending ivar handlers. If any ivars are pending
+               after running the scheduler, we default them and
+               loop *)
+            if not structure then
+            run_scheduler_and_default_ivars ();
+            result)
+      in
       Option.iter (fun g -> g result) before_generalize;
       result
     end
@@ -229,13 +261,16 @@ let with_local_level_gen ~begin_def ~structure ?before_generalize f =
     (* Already generic nodes are not tracked *)
     if ty.level = generic_level then () else
     match ty.desc with
-    | Tvar _ when structure ->
+    | Tvar _ | Tivar _ when structure ->
         (* In structure mode, we do do not generalize type variables,
            so we need to lower their level, and move them to an outer pool.
            The goal of this mode is to allow unsharing inner nodes
            without introducing polymorphism *)
         if ty.level >= level then Transient_expr.set_level ty !current_level;
         add_to_pool ~level:ty.level ty
+    | Tivar _ ->
+      (* [Tivar]s cannot exist after defaulting *)
+      fatal_error "Ctype.with_local_level_gen: unsupported Tivar"
     | Tlink _ -> ()
         (* If a node is no longer used as representative, no need
            to track it anymore *)
@@ -336,6 +371,11 @@ let new_scoped_ty scope desc = newty3 ~level:!current_level ~scope desc
 
 let newvar ?name jkind =
   newty2 ~level:!current_level (Tvar { name; jkind })
+
+let newivar ?name jkind =
+  let ivar = Ivar.create ~in_global_pool:true () in
+  newty2 ~level:!current_level (Tivar { name; jkind; ivar })
+
 let new_rep_var ?name ~why () =
   let jkind, sort = Jkind.of_new_sort_var ~why ~level:!current_level in
   newvar ?name jkind, sort
@@ -750,7 +790,7 @@ let remove_mode_and_jkind_variables ~zap_scope ty =
     if TypeSet.mem ty !visited then () else begin
       visited := TypeSet.add ty !visited;
       match get_desc ty with
-      | Tvar { jkind } -> Jkind.default_to_scannable jkind
+      | Tvar { jkind } | Tivar { jkind; _ } -> Jkind.default_to_scannable jkind
       | Tunivar { jkind } -> Jkind.default_to_scannable jkind
       | Tarrow ((_,marg,mret),targ,tret,_) ->
          if Language_extension.(is_at_least Mode_polymorphism Alpha) then begin
@@ -795,6 +835,11 @@ let[@inline] free_vars ~init ~add_one ?env mark tys =
     if not (try_mark_node mark ty) then acc
     else match get_desc ty, env with
       | Tvar { jkind; _ }, _ ->
+          add_one ty (Some jkind) kind acc
+      | Tivar { jkind; _ }, _ ->
+          (* CR-someday omni: a [Tivar] is free, like a [Tvar]. Callers that
+             branch on the result (e.g. via [closed_type_expr]) could instead
+             suspend on the ivar, and decide once its shape is known. *)
           add_one ty (Some jkind) kind acc
       | Tconstr (path, tl, _), Some env ->
           let acc =
@@ -1019,6 +1064,8 @@ let rec generalize stage_offset ty =
     | Tvar name ->
         update_variable_stage stage_offset ty name.name name.jkind;
         Jkind.generalize ~current_level name.jkind
+    | Tivar _ ->
+        fatal_error "Ctype.generalize: unsupported Tivar"
     (* Do not generalize cross-stage row-polymorphic types, as we cannot
        quote or splice row variables.
        Weak type variables that arise here are considered cross-stage,
@@ -1028,7 +1075,7 @@ let rec generalize stage_offset ty =
        particularly tricky.
        This problem is independent from beta-reducing evaluations on
        open row types. *)
-    | Tobject _ | Tvariant _ when stage_offset <> 0 && is_Tvar (proxy ty) ->
+    | Tobject _ | Tvariant _ when stage_offset <> 0 && is_row_Tvar (proxy ty) ->
         lower_all ty
     (* recur into abbrev for the speed *)
     | Tconstr (_, _, abbrev) ->
@@ -1052,18 +1099,23 @@ let rec generalize_structure ty =
   let level = get_level ty in
   let current_level = !current_level in
   if level <> generic_level then begin
-    if is_Tvar ty && level > current_level then
-      set_level ty current_level
-    else if level > current_level then begin
-      begin match get_desc ty with
-        Tconstr (_, _, abbrev) ->
-          abbrev := Mnil
-      | _ -> ()
-      end;
-      set_level ty generic_level;
-      let mgen m = Mode.With_locality.generalize_structure ~current_level m in
-      iter_type_expr generalize_structure mgen ty
-    end
+    match get_desc ty with
+    | Tvar _ | Tivar _ ->
+      if level > current_level then set_level ty current_level
+    | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tconstr _ | Tmod _
+    | Tobject _ | Tfield _ | Tquote _ | Tsplice _ | Tquote_eval _ | Tnil
+    | Tlink _ | Tsubst _ | Tvariant _ | Tunivar _ | Tpoly _ | Trepr _
+    | Tpackage _ | Tof_kind _ | Tbox _ ->
+      if level > current_level then begin
+        begin match get_desc ty with
+          Tconstr (_, _, abbrev) ->
+            abbrev := Mnil
+        | _ -> ()
+        end;
+        set_level ty generic_level;
+        let mgen m = Mode.With_locality.generalize_structure ~current_level m in
+        iter_type_expr generalize_structure mgen ty
+      end
   end
 
 let generalize_structure ty =
@@ -1085,6 +1137,7 @@ let rec copy_spine copy_scope ty =
   match get_desc ty with
   | Tsubst (ty, _) -> ty
   | Tvar _
+  | Tivar _
   | Tfield _
   | Tnil
   | Tvariant _
@@ -1313,6 +1366,12 @@ let rec lower_contravariant env var_level visited contra ty =
     let lower_rec = lower_contravariant env var_level visited in
     match get_desc ty with
       Tvar _ -> if contra then set_level ty var_level
+    | Tivar _ ->
+      (* CR-someday omni: lowered like a [Tvar]. In a covariant position,
+         a [Tivar] later linked to (say) an arrow should have that arrow's
+         contravariant parts lowered. Smarter: suspend on the ivar and
+         lower the structure it is filled with, according to its variance. *)
+      if contra then set_level ty var_level
     | Tconstr (_, [], _) -> ()
     | Tconstr (path, tyl, _abbrev) ->
        let variance, maybe_expand =
@@ -1753,7 +1812,6 @@ let instance_constructor existential_treatment cstr =
             Pattern_env.set_env penv new_env;
             let to_unify = newty (Tconstr (Path.Pident id,[],ref Mnil)) in
             let tv = copy copy_scope existential in
-            assert (is_Tvar tv);
             link_type tv to_unify;
             (tv, jkind)
     in
@@ -1883,6 +1941,9 @@ let copy_sep ~copy_scope ~fixed ~partial ~bound_univars
       (fun () -> Transient_expr.set_stub_desc t (Tlink (copy copy_scope ty))) ::
       !delayed_copies
   in
+  (* [may_share] is [false] when [ty] is a row tail: the [row_more] of a
+     [Tvariant] or the rest of a [Tfield] chain. A tail is copied
+     together with its row. *)
   let rec copy_rec ~bound_univars ~may_share (ty : type_expr) =
     let bound_univars =
       match get_desc ty with
@@ -1891,7 +1952,24 @@ let copy_sep ~copy_scope ~fixed ~partial ~bound_univars
     in
     let copy_rec = copy_rec ~bound_univars in
     let univars = TypeSet.inter (free ty) bound_univars in
-    if is_Tvar ty || may_share && TypeSet.is_empty univars then
+    let desc = get_desc ty in
+    let can_share =
+      (* Shared nodes are [copy]d in the second pass. Nodes are shared
+         if it mentions no bound univar. Type variables must always be
+         shared: [copy_scope] gives each variable a single copy in the
+         second pass. Otherwise, the same variable would have disjoint
+         copies. *)
+      TypeSet.is_empty univars
+      &&
+      match desc with
+      | Tvar _ | Tivar _ -> true
+      | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tconstr _ | Tmod _ | Tobject _
+      | Tfield _ | Tquote _ | Tsplice _ | Tquote_eval _ | Tnil | Tlink _
+      | Tsubst _ | Tvariant _ | Tunivar _ | Tpoly _ | Trepr _ | Tpackage _
+      | Tof_kind _ | Tbox _ ->
+        may_share
+    in
+    if can_share then
       if partial || get_level ty <> generic_level then ty else
       (* jkind not consulted during copy_sep, so Any is safe *)
       let t = newstub ~scope:(get_scope ty) (Jkind.Builtin.any ~why:Dummy_jkind) in
@@ -1908,7 +1986,7 @@ let copy_sep ~copy_scope ~fixed ~partial ~bound_univars
             let more = row_more row in
             (* We shall really check the level on the row variable *)
             let keep =
-              is_Tvar more && get_level more <> generic_level
+              is_row_Tvar more && get_level more <> generic_level
             in
             (* In that case we should keep the original, but we still
                call copy to correct the levels *)
@@ -1918,7 +1996,7 @@ let copy_sep ~copy_scope ~fixed ~partial ~bound_univars
                       jkind = Jkind.for_non_float ~why:Polymorphic_variant })
             else
             let more' = copy_rec ~may_share:false more in
-            let fixed' = fixed && (is_Tvar more || is_Tunivar more) in
+            let fixed' = fixed && (is_row_Tvar more || is_Tunivar more) in
             let row =
               copy_row (copy_rec ~may_share:true) fixed' row keep more' in
             Tvariant row
@@ -2604,7 +2682,7 @@ and try_reduce_quote_eval env t =
   in
   let try_reduce_poly env t = if is_Tpoly t then try_reduce_once env t else t in
   match get_desc t with
-  | Tvar _ | Tunivar _ -> raise Cannot_expand
+  | Tvar _ | Tivar _ | Tunivar _ -> raise Cannot_expand
   (* [<[t1 -> t2]> eval]  ==>  [<[t1]> eval -> <[t2]> eval] *)
   | Tarrow (a, t1, t2, c) ->
     (* Reduce the parameter type's [Tpoly] immediately *)
@@ -2808,7 +2886,7 @@ let rec extract_concrete_typedecl env ty =
   | Tbox ty -> extract_concrete_typedecl env ty
   | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tobject _ | Tfield _ | Tnil
   | Tvariant _ | Tpackage _ | Tof_kind _ -> Has_no_typedecl
-  | Tvar _ | Tunivar _ -> May_have_typedecl
+  | Tvar _ | Tivar _ | Tunivar _ -> May_have_typedecl
   | Tlink _ | Tsubst _ -> assert false
 
 (* Implementing function [expand_head_opt], the compiler's own version of
@@ -3024,9 +3102,9 @@ let contained_without_boxing env ty =
   | Tpoly (ty, _) -> [ty]
   | Tmod (ty, _) -> [ty]
   | Trepr (_, _) ->  Misc.fatal_error "Ctype.contained_without_boxing: repr"
-  | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil | Tlink _
-  | Tsubst _ | Tvariant _ | Tunivar _ | Tpackage _ | Tof_kind _ | Tbox _
-  | Tquote _ | Tsplice _ | Tquote_eval _ -> []
+  | Tvar _ | Tivar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil
+  | Tlink _ | Tsubst _ | Tvariant _ | Tunivar _ | Tpackage _ | Tof_kind _
+  | Tbox _ | Tquote _ | Tsplice _ | Tquote_eval _ -> []
 
 (* We use ty_prev to track the last type for which we found a definition,
    allowing us to return a type for which a definition was found even if
@@ -3195,7 +3273,7 @@ let rec compute_ty_modality_layout ~expand_components ~ignore_mod_bounds env
       prev_unwrapped_ty
 and estimate_type_jkind ~expand_components ~ignore_mod_bounds env ty =
   match get_desc ty with
-  | Tvar { jkind } -> Jkind.disallow_right jkind
+  | Tvar { jkind } | Tivar { jkind; _ } -> Jkind.disallow_right jkind
   | Tarrow _ -> Jkind.for_arrow
   | Ttuple elts -> Jkind.for_boxed_tuple elts
   | Tunboxed_tuple ltys ->
@@ -3405,7 +3483,8 @@ let constrain_type_jkind ~fixed env ty jkind =
     (* The [ty's_jkind] we get here is an **r** jkind, necessary for
        the call to [intersection_or_error]. And even if [ty] has unbound
        variables, [ty's_jkind] can't have any variables in it, so we're OK. *)
-    | Tvar { jkind = ty's_jkind } when not fixed ->
+    | Tvar { jkind = ty's_jkind } | Tivar { jkind = ty's_jkind; _ }
+      when not fixed ->
        (* Unfixed tyvars are special in at least two ways:
 
           1) Suppose we're processing [type 'a t = 'a list]. The ['a] on the
@@ -3832,6 +3911,9 @@ let check_and_update_generalized_ty_jkind ?name ~loc ty =
       | Tvar ({ jkind; _ } as r) ->
         let new_jkind = generalization_check level jkind in
         set_type_desc ty (Tvar {r with jkind = new_jkind})
+      | Tivar ({ jkind; _ } as r) ->
+        let new_jkind = generalization_check level jkind in
+        set_type_desc ty (Tivar {r with jkind = new_jkind})
       | Tunivar ({ jkind; _ } as r) ->
         let new_jkind = generalization_check level jkind in
         set_type_desc ty (Tunivar {r with jkind = new_jkind})
@@ -3861,7 +3943,7 @@ let full_expand ~may_forget_scope env ty =
     else expand_head env ty
   in
   match get_desc ty with
-    Tobject (fi, {contents = Some (_, v::_)}) when is_Tvar v ->
+    Tobject (fi, {contents = Some (_, v::_)}) when is_row_Tvar v ->
       newty2 ~level:(get_level ty) (Tobject (fi, ref None))
   | _ ->
       ty
@@ -3990,7 +4072,7 @@ let rec local_non_recursive_abbrev ~allow_rec strict visited env p ty =
           in
           List.iter2
             (fun tv ty ->
-              let strict = strict || not (is_Tvar tv) in
+              let strict = strict || not (is_param_Tvar tv) in
               local_non_recursive_abbrev ~allow_rec strict visited env p ty)
             params args
         end
@@ -4360,7 +4442,12 @@ let reify uenv t =
     if TypeSet.mem ty !visited then () else begin
       visited := TypeSet.add ty !visited;
       match get_desc ty with
-        Tvar { name; jkind } ->
+        Tvar { name; jkind }
+      | Tivar { name; jkind; ivar = _ } ->
+          (* CR-someday omni: reified like a [Tvar]. Linking bypasses
+             [fill_ivar], so the ivar's handlers are defaulted when
+             the pool is drained; [fill_ivar] would do the same, as
+             the rigid variable has no shape. *)
           let level = get_level ty in
           let path, t = create_fresh_constr level name jkind in
           link_type ty t;
@@ -4437,6 +4524,12 @@ let is_instantiable env ~for_jkind_eqn p =
 let rec is_flexible_ty ty =
   match get_desc ty with
   | Tvar _ -> true
+  | Tivar _ ->
+    (* CR-someday omni: flexible, like a [Tvar]. Callers use flexibility to
+       choose which side to unwrap quotes and splices from; if the ivar is
+       later filled, the other choice may have been the right one. Smarter:
+       suspend on the ivar until its shape is known. *)
+    true
   | Tquote ty' -> is_flexible_ty ty'
   | Tsplice ty' -> is_flexible_ty ty'
   | _ -> false
@@ -4525,8 +4618,9 @@ let rec mcomp type_pairs env t1 t2 =
   in
   if eq_type t1 t2 then () else
   match (get_desc t1, get_desc t2, t1, t2) with
-  | (Tvar { jkind }, _, _, other)
-  | (_, Tvar { jkind }, other, _) -> check_jkinds other jkind
+  | ((Tvar { jkind } | Tivar { jkind; _ }), _, _, other)
+  | (_, (Tvar { jkind } | Tivar { jkind; _ }), other, _) ->
+      check_jkinds other jkind
   | (Tconstr (p1, [], _), Tconstr (p2, [], _), _, _) when Path.same p1 p2 ->
       ()
   | _ ->
@@ -4562,8 +4656,9 @@ let rec mcomp type_pairs env t1 t2 =
         (* Flexible cases *)
         (* - If [flexible1], then [t1'] is now a [Tvar].
            - If [flexible2], then [t2'] is now a [Tvar]. *)
-        | (Tvar { jkind }, _, _, other)
-        | (_, Tvar { jkind }, other, _)  -> check_jkinds other jkind
+        | ((Tvar { jkind } | Tivar { jkind; _ }), _, _, other)
+        | (_, (Tvar { jkind } | Tivar { jkind; _ }), other, _) ->
+            check_jkinds other jkind
         (* Aliasable cases *)
         (* - If [aliasable1], then [is_aliasable t1'] and [t1'] is [Tconstr]. *)
         (* - If [aliasable2], then [is_aliasable t2'] and [t2'] is [Tconstr]. *)
@@ -5075,8 +5170,71 @@ let unify1_var uenv t1 t2 =
   | exception Unify_trace _ when in_pattern_mode uenv ->
       false
 
-(* Called from unify3 *)
-let unify3_var uenv jkind1 t1' t2 t2' =
+(* The shape of [ty]'s head, which must be fully expanded in [env] and not a
+   type variable, or [None] if it has none.
+
+   Limitations: Polytypes ([Tpoly], [Tunivar], [Trepr]) and [Tmod] have no
+   shapes yet. *)
+let type_shape_of_expanded_head env ty : type_shape option =
+  match get_desc ty with
+  | Tarrow ((l, _, _), _, _, _) -> Some (Sarrow l)
+  | Ttuple ltys -> Some (Stuple (List.map fst ltys))
+  | Tunboxed_tuple ltys -> Some (Sunboxed_tuple (List.map fst ltys))
+  | Tconstr (p, _, _) ->
+      (* Locally abstract types ([type a], GADT existentials) have no shape:
+         once out of scope they are replaced by type variables (e.g. by
+         [type_newtype]). Other abstract types, such as [M.t], keep their
+         identity, so do have one. *)
+      let is_locally_abstract =
+        match Env.find_type p env with
+        | decl -> decl.type_is_newtype
+        | exception Not_found -> false
+      in
+      if is_locally_abstract then None else Some (Sconstr p)
+  | Tobject _ -> Some Sobject
+  | Tvariant _ -> Some Svariant
+  | Tpackage pack -> Some (Spackage pack.pack_path)
+  | Tunivar _ | Tpoly _ | Trepr _ -> None
+  (* Irreducible for now, but may reduce once an inner variable is solved. *)
+  | Tquote _ | Tsplice _ | Tquote_eval _ | Tbox _ -> None
+  (* Not the types of values. *)
+  | Tfield _ | Tnil | Tof_kind _ -> None
+  | Tmod _ -> None
+  | Tvar _ | Tivar _ ->
+      Misc.fatal_error "Ctype.type_shape_of_expanded_head: type variable"
+  | Tlink _ | Tsubst _ -> assert false
+
+(* Fill [ivar] with the shape of [ty]. If [ivar] is already full, the
+   shapes must be equal. *)
+let fill_ivar env ivar ty =
+  match type_shape_of_expanded_head env ty with
+  | None ->
+    (* No shape. [ivar] (and its handlers) are orphaned, and defaulted when
+       the global ivar pool is next drained. *)
+    ()
+  | Some shape -> (
+    match Ivar.fill ivar shape ~scheduler:(scheduler ()) with
+    | Ok -> ()
+    | Already_full expected ->
+      if not (equal_type_shape shape expected)
+      then raise_for Unify (Shape_mismatch { got = shape; expected }))
+
+(** What [unify3_var] does after linking [from_] to [to_]. *)
+module On_link = struct
+  type t =
+    | Noop
+    | Fill_ivar of type_shape Ivar.t
+        (** Fill the ivar with the shape of [to_expanded]. *)
+
+  let run t ~uenv ~from_jkind:_ ~from_:_ ~to_:_ ~to_expanded:t2' =
+    match t with
+    | Noop -> ()
+    | Fill_ivar ivar1 -> fill_ivar (get_env uenv) ivar1 t2'
+end
+
+(* Called from unify3. [on_link] is run after [t1'] is linked to [t2], but not
+   if a GADT equation is added instead. *)
+let unify3_var ~(on_link : On_link.t) uenv jkind1 t1' t2 t2' =
   occur_for Unify uenv t1' t2;
   (* There are two possible ways forward here. Either the variable [t1']
      will succeed in unifying with [t2], in which case we're done; or
@@ -5090,7 +5248,10 @@ let unify3_var uenv jkind1 t1' t2 t2' =
     occur_univar_for Unify (get_env uenv) t2;
     unification_jkind_check uenv t2' (Jkind.disallow_left jkind1)
   with
-  | () -> link_type t1' t2
+  | () ->
+      link_type t1' t2;
+      On_link.run on_link ~uenv ~from_jkind:jkind1 ~from_:t1' ~to_:t2
+        ~to_expanded:t2'
   | exception Unify_trace _ when in_pattern_mode uenv ->
       backtrack snap;
       reify uenv t1';
@@ -5113,6 +5274,63 @@ let unify3_var uenv jkind1 t1' t2 t2' =
         end;
         record_equation uenv t1' t2'
       end
+
+(* [at_current_levels f] is [f], run with the current and non-generalizable
+   levels set to their values when [at_current_levels f] was called.
+
+   Handlers in [upon_shape] run whenever the scheduler does, so without
+   this the types they create would get the level of whichever region
+   the scheduler is currently running in. *)
+let at_current_levels f =
+  let level = !current_level and nongen = !nongen_level in
+  fun x ->
+    saved_level := (!current_level, !nongen_level) :: !saved_level;
+    current_level := level;
+    nongen_level := nongen;
+    wrap_end_def (fun () -> f x)
+
+(* Registers [run] on [ivar]. If [ivar] is defaulted, calls [run (default ())]
+   instead. A conflicting default fails in [run]'s unification. *)
+let ivar_upon ivar ~run ~default ~scheduler =
+  Ivar.upon ivar ~run ~cancel:(fun () -> run (default ())) ~scheduler
+
+let upon_shape env ty ~run ~default =
+  let run = at_current_levels run in
+  let scheduler = scheduler () in
+  let ty = expand_head env ty in
+  match get_desc ty with
+  | Tivar { ivar; _ } -> ivar_upon ivar ~run ~default ~scheduler
+  | Tvar { name; jkind } ->
+    if get_level ty = generic_level
+    then Misc.fatal_error "Ctype.upon_shape: generic type variable";
+    let ivar = Ivar.create ~in_global_pool:true () in
+    set_type_desc ty (Tivar { name; jkind; ivar });
+    ivar_upon ivar ~run ~default ~scheduler
+  | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tconstr _ | Tmod _ | Tobject _
+  | Tfield _ | Tquote _ | Tsplice _ | Tquote_eval _ | Tnil | Tlink _ | Tsubst _
+  | Tvariant _ | Tunivar _ | Tpoly _ | Trepr _ | Tpackage _ | Tof_kind _
+  | Tbox _ -> (
+    (* Fast path: [ty] is not a variable, so behaves as if its ivar
+        were already filled, or defaulted if [ty] has no shape. *)
+    match type_shape_of_expanded_head env ty with
+    | Some shape -> Scheduler.add scheduler (fun () -> run shape)
+    | None -> Scheduler.add scheduler (fun () -> run (default ())))
+
+(* Unify a [Tivar] [t1'] with the non-variable type [t2], whose expanded head
+   is [t2']: link [t1'] to [t2] as for a [Tvar], then fill its ivar with the
+   shape of [t2']. *)
+let unify3_ivar uenv jkind1 ivar1 t1' t2 t2' =
+  unify3_var uenv jkind1 t1' t2 t2' ~on_link:(On_link.Fill_ivar ivar1)
+
+(* Unify two [Tivar]s: intersect their jkinds, merge their ivars and link
+   [t1'] to [t2']. *)
+let unify_ivars uenv jkind1 ivar1 t1' ivar2 t2' =
+  unification_jkind_check uenv t2' (Jkind.disallow_left jkind1);
+  Ivar.merge ivar1 ivar2 ~scheduler:(scheduler ())
+    ~f:(fun got expected ->
+      if equal_type_shape got expected then expected
+      else raise_for Unify (Shape_mismatch { got; expected }));
+  link_type t1' t2'
 
 (*
    1. When unifying two non-abbreviated types, one type is made a link
@@ -5252,9 +5470,15 @@ and unify3 uenv t1 t1' t2 t2' =
       unify_univar_for Unify (get_env uenv) t1' t2' k1 k2 !univar_pairs;
       link_type t1' t2'
   | (Tvar { jkind }, _) ->
-      unify3_var uenv jkind t1' t2 t2'
+      unify3_var uenv jkind t1' t2 t2' ~on_link:Noop
   | (_, Tvar { jkind }) ->
-      unify3_var uenv jkind t2' t1 t1'
+      unify3_var uenv jkind t2' t1 t1' ~on_link:Noop
+  | (Tivar { jkind; ivar = ivar1; _ }, Tivar { ivar = ivar2; _ }) ->
+      unify_ivars uenv jkind ivar1 t1' ivar2 t2'
+  | (Tivar { jkind; ivar; _ }, _) ->
+      unify3_ivar uenv jkind ivar t1' t2 t2'
+  | (_, Tivar { jkind; ivar; _ }) ->
+      unify3_ivar uenv jkind ivar t2' t1 t1'
   | (Tquote t1, Tquote t2) ->
       unify_with_incr_stage uenv (fun uenv -> unify uenv t1 t2)
   | (Tsplice t1, Tsplice t2) ->
@@ -5635,7 +5859,7 @@ and unify_row uenv row1 row2 =
         (newgenty (Tvariant row));
     if has_fixed_explanation row then
       if eq_type more rm then () else
-      if is_Tvar rm then link_type rm more else unify uenv rm more
+      if is_row_Tvar rm then link_type rm more else unify uenv rm more
     else
       let ty =
         newgenty (Tvariant
@@ -5659,7 +5883,7 @@ and unify_row uenv row1 row2 =
       pairs;
     if static_row row1 then begin
       let rm = row_more row1 in
-      if is_Tvar rm then link_type rm (newty2 ~level:(get_level rm) Tnil)
+      if is_row_Tvar rm then link_type rm (newty2 ~level:(get_level rm) Tnil)
     end
   with exn ->
     Transient_expr.set_desc tm1 md1;
@@ -5933,20 +6157,37 @@ let filter_arrow env t l ~force_tpoly =
                      env
                      (Diff { got = t'; expected = t } :: trace))))
   in
+  let link_function_type t jkind =
+    let t', arrow = function_type (get_level t) in
+    (match constrain_type_jkind env t' (Jkind.disallow_left jkind) with
+    | Ok _ -> ()
+    | Error err ->
+      raise
+        (Filter_arrow_failed
+           (Unification_error
+              (expand_to_unification_error env [Bad_jkind (t', err)]))));
+    link_type t t';
+    t', arrow
+  in
   match get_desc t with
-    Tvar { jkind } ->
-      let t', arrow_desc = function_type (get_level t) in
-      begin match constrain_type_jkind env t' (Jkind.disallow_left jkind) with
-      | Ok _ -> ()
-      | Error err ->
-        raise (Filter_arrow_failed
-                 (Unification_error
-                    (expand_to_unification_error
-                       env
-                       [Bad_jkind (t',err)])))
-      end;
-      link_type t t';
-      arrow_desc
+  | Tvar { name = _; jkind } ->
+    let _ty_arrow, arrow = link_function_type t jkind in
+    arrow
+  | Tivar { name = _; jkind; ivar } ->
+    (* CR-someday omni: this commits [t] to an arrow labelled [l], fixing the
+       ivar's shape to [Sarrow l], as for a [Tvar]. [t] might later have been
+       unified with an arrow carrying a different label (e.g. an optional
+       argument that would have been omitted). Smarter: suspend on the ivar
+       and filter once its shape is known, falling back to this if it is
+       defaulted. *)
+    let ty_arrow, arrow = link_function_type t jkind in
+    (try fill_ivar env ivar ty_arrow with
+     | Unify_trace trace ->
+       (* [ivar] is already full with a shape differing from [ty_arrow]'s *)
+       raise
+         (Filter_arrow_failed
+            (Unification_error (expand_to_unification_error env trace))));
+    arrow
   | Tarrow((l', arg_mode, ret_mode), ty_arg, ty_ret, _) ->
       if l = l' || !Clflags.classic && l = Nolabel &&
         equivalent_with_nolabels l l'
@@ -6015,6 +6256,9 @@ let rec filter_method_field env name ty =
         ty1
       end else
         filter_method_field env name ty2
+  | Tivar _ ->
+      (* [Tivar] cannot represent a row. *)
+      fatal_error "Ctype.filter_method: unsupported Tivar"
   | _ ->
       raise (Filter_method_failed Not_a_method)
 
@@ -6038,19 +6282,36 @@ let filter_method env name ty =
                      env
                      (Diff { got = ty; expected = ty' } :: trace))))
   in
+  let link_object_type ty =
+    let level = get_level ty in
+    let scope = get_scope ty in
+    let ty', ty_meth = object_type ~level ~scope in
+    begin match
+      constrain_type_jkind env ty (Jkind.Builtin.value ~why:Object)
+    with
+    | Ok _ -> ()
+    | Error err -> raise (Filter_method_failed (Not_a_value err))
+    end;
+    link_type ty ty';
+    ty', ty_meth
+  in
   match get_desc ty with
   | Tvar _ ->
-      let level = get_level ty in
-      let scope = get_scope ty in
-      let ty', ty_meth = object_type ~level ~scope in
-      begin match
-        constrain_type_jkind env ty (Jkind.Builtin.value ~why:Object)
-      with
-      | Ok _ -> ()
-      | Error err -> raise (Filter_method_failed (Not_a_value err))
-      end;
-      link_type ty ty';
-      ty_meth
+    let _ty_object, ty_meth = link_object_type ty in
+    ty_meth
+  | Tivar { ivar; _ } ->
+    (* CR-someday omni: this commits [ty] to an open object type, as for a
+       [Tvar]. Smarter: suspend on the ivar, so that a later unification
+       (e.g. with a class type) determines the object type, and only create
+       the open object type if the ivar is defaulted. *)
+    let ty_object, ty_meth = link_object_type ty in
+    (try fill_ivar env ivar ty_object
+     with Unify_trace trace ->
+       (* [ivar] is already full with a shape differing from [ty_object]'s *)
+       raise
+         (Filter_method_failed
+            (Unification_error (expand_to_unification_error env trace))));
+    ty_meth
   | Tobject(f, _) ->
       filter_method_field env name f
   | _ ->
@@ -6350,8 +6611,13 @@ let moregen_occur env level ty =
     let rec occur ty =
       let lv = get_level ty in
       if lv <= level then () else
-      if is_Tvar ty && lv >= subject_level then raise Occur else
-      if try_mark_node mark ty then iter_type_expr occur (Fun.const ()) ty
+      match get_desc ty with
+      | Tvar _ when lv >= subject_level -> raise Occur
+      | Tvar _ | Tivar _ | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tconstr _
+      | Tmod _ | Tobject _ | Tfield _ | Tquote _ | Tsplice _ | Tquote_eval _
+      | Tnil | Tlink _ | Tsubst _ | Tvariant _ | Tunivar _ | Tpoly _
+      | Trepr _ | Tpackage _ | Tof_kind _ | Tbox _ ->
+        if try_mark_node mark ty then iter_type_expr occur (Fun.const ()) ty
     in
     try
       occur ty
@@ -6750,7 +7016,7 @@ and moregen_row inst_nongen variance type_pairs env row1 row2 =
            fixed = row2_fixed} = row_repr row2 in
   if eq_type rm1 rm2 then () else
   let may_inst =
-    is_Tvar rm1 && may_instantiate inst_nongen rm1 || get_desc rm1 = Tnil in
+    is_row_Tvar rm1 && may_instantiate inst_nongen rm1 || get_desc rm1 = Tnil in
   let r1, r2, pairs = merge_row_fields row1_fields row2_fields in
   let r1, r2 =
     if row2_closed then
@@ -6946,17 +7212,6 @@ let is_moregeneral env inst_nongen pat_sch subj_sch =
   | _ -> true
   | exception Moregen _ -> false
 
-let all_distinct_vars env vars =
-  let tys = ref TypeSet.empty in
-  List.for_all
-    (fun ty ->
-      let ty = expand_head env ty in
-      if TypeSet.mem ty !tys then false else begin
-       tys := TypeSet.add ty !tys;
-       is_Tvar ty
-     end)
-    vars
-
 type matches_result =
   | Unification_failure of Errortrace.unification_error
   | Jkind_mismatch of { original_jkind : jkind_lr; inferred_jkind : jkind_lr
@@ -6978,7 +7233,7 @@ let rec rigidify_rec mark vars ty =
         vars := TypeMap.add ty (name, jkind) !vars
     | Tvariant row ->
         let Row {more; name; closed} = row_repr row in
-        if is_Tvar more && not (has_fixed_explanation row) then begin
+        if is_row_Tvar more && not (has_fixed_explanation row) then begin
           let more' = newty2 ~level:(get_level more) (get_desc more) in
           let row' =
             create_row ~fixed:(Some Rigid) ~fields:[] ~more:more'
@@ -7726,7 +7981,7 @@ let build_submode_neg level m =
 let rec build_subtype env (visited : transient_expr list)
     (loops : (int * type_expr) list) posi level t =
   match get_desc t with
-    Tvar _ ->
+    Tvar _ | Tivar _ ->
       if posi then
         try
           let t' = List.assq (get_id t) loops in
@@ -7819,7 +8074,7 @@ let rec build_subtype env (visited : transient_expr list)
           let (ty1', c) =
             build_subtype env [Transient_expr.repr t']
               loops posi (pred_enlarge level') ty1 in
-          assert (is_Tvar t'');
+          assert (is_row_Tvar t'');
           let nm =
             if c > Equiv || deep_occur ty ty1' then None else Some(p,tl1) in
           set_type_desc t'' (Tobject (ty1', ref nm));
@@ -8012,6 +8267,17 @@ let rec subtype_rec env trace t1 t2 cstrs =
     match (get_desc t1, get_desc t2) with
       (Tvar _, _) | (_, Tvar _) ->
         (trace, t1, t2, !univar_pairs)::cstrs
+    | (Tivar _, _) | (_, Tivar _) ->
+        (* CR-someday omni: like a [Tvar], we give up on subtyping and require
+           [t1 = t2]. This is sound but incomplete: if the ivar is later filled
+           with (say) a wider object type, [t1 <: t2] may hold where [t1 = t2]
+           does not. Smarter: suspend on the ivar(s) and resume [subtype_rec]
+           on [(t1, t2)] once filled, falling back to [t1 = t2] if defaulted.
+           The other side's head cannot be pushed into the ivar, as subtyping
+           does not preserve heads (e.g. private abbreviations). This needs
+           the handler to emit its own constraints, and a per-call [subtypes]
+           table and [univar_pairs]. *)
+        (trace, t1, t2, !univar_pairs)::cstrs
     | (Tarrow((l1,a1,r1), t1, u1, _),
        Tarrow((l2,a2,r2), t2, u2, _))
       when compatible_labels ~in_pattern_mode:false l1 l2 ->
@@ -8080,7 +8346,7 @@ let rec subtype_rec env trace t1 t2 cstrs =
 (*  | (_, Tconstr(p2, _, _)) when generic_private_abbrev false env p2 ->
         subtype_rec env trace t1 (expand_abbrev_opt env t2) cstrs *)
     | (Tobject (f1, _), Tobject (f2, _))
-      when is_Tvar (object_row f1) && is_Tvar (object_row f2) ->
+      when is_row_Tvar (object_row f1) && is_row_Tvar (object_row f2) ->
         (* Same row variable implies same object. *)
         (trace, t1, t2, !univar_pairs)::cstrs
     | (Tobject (f1, _), Tobject (f2, _)) ->
@@ -8314,7 +8580,7 @@ let rec unalias_object ty =
 let unalias ty =
   let level = get_level ty in
   match get_desc ty with
-    Tvar _ | Tunivar _ ->
+    Tvar _ | Tivar _ | Tunivar _ ->
       ty
   | Tvariant row ->
       let Row {fields; more; name; fixed; closed} = row_repr row in
@@ -8341,7 +8607,7 @@ let add_nongen_vars_in_schema =
     else begin
       let visited = TypeSet.add ty visited in
       match get_desc ty with
-      | Tvar _ when get_level ty <> generic_level ->
+      | (Tvar _ | Tivar _) when get_level ty <> generic_level ->
           visited, TypeSet.add ty weak_set
       | Tconstr _ ->
           let (_, unexpanded_candidate) as unexpanded_candidate' =
@@ -8564,7 +8830,14 @@ let rec nondep_type_rec ?(expand_private=false) env ids ty =
   try TypeHash.find nondep_hash ty
   with Not_found ->
   match get_desc ty with
-  | (Tvar {name; jkind} | Tunivar {name; jkind}) as desc ->
+  | Tivar { jkind; _ } ->
+    (* Like other variables, [ty] is left in place, as a copy would duplicate
+       its ivar. If its jkind mentions [ids], we instead update the jkind to
+       its expansion, which is equivalent. *)
+    let jkind' = nondep_jkind_base env ids jkind in
+    if jkind' != jkind then set_var_jkind ty jkind';
+    ty
+  | ( Tvar {name; jkind} | Tunivar {name; jkind}) as desc ->
     let jkind' = nondep_jkind_base env ids jkind in
     if jkind' == jkind then ty
     else

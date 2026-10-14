@@ -104,7 +104,7 @@ let classify env ty : classification =
   then Int
   else
     match get_desc ty with
-    | Tvar _ | Tunivar _ -> Any
+    | Tvar _ | Tivar _ | Tunivar _ -> Any
     | Tmod _ ->
       Misc.fatal_error "Vicuna_traverse_typed_tree.classify: unexpected Tmod"
     | Tconstr (p, _args, _abbrev) -> (
@@ -259,7 +259,7 @@ let rec value_kind env (subst : value_shape Subst.t) ~visited ~depth ty :
     if Btype.tvariant_not_immediate row then Or (Imm, Block None) else Imm
   | Tarrow _ -> Closure
   | Tobject _ -> Obj
-  | Tvar _ | Tunivar _ -> (
+  | Tvar _ | Tivar _ | Tunivar _ -> (
     if cannot_proceed ()
     then Value
     else

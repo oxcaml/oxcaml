@@ -93,6 +93,14 @@ val newty: type_desc -> type_expr
 val new_scoped_ty: int -> type_desc -> type_expr
 val newvar: ?name:string -> jkind_lr -> type_expr
 
+(** [newivar ?name jkind] returns a fresh [Tivar] whose empty ivar is in the
+    global ivar pool. *)
+val newivar : ?name:string -> jkind_lr -> type_expr
+
+(** The scheduler on which filling a [Tivar] during unification
+    enqueues the ivar's handlers. Unification never runs it. *)
+val scheduler: unit -> Scheduler.t
+
 val new_rep_var
   : ?name:string
   -> why:Jkind.History.concrete_creation_reason
@@ -327,6 +335,22 @@ val try_expand_safe_opt: Env.t -> type_expr -> type_expr
 
 val expand_head_once: Env.t -> type_expr -> type_expr
 val expand_head: Env.t -> type_expr -> type_expr
+
+(** [upon_shape env ty ~run ~default] enqueues [run shape] on {!scheduler}
+    once [ty]'s head has a shape, or [run (default ())] if it is defaulted
+    first. A [Tvar] head becomes a [Tivar]. [run] runs at the levels current
+    when [upon_shape] was called.
+
+    Safety: [run shape] must give [ty]'s head shape [shape] (e.g. by
+    unification), which fails if a different shape is already there.
+    This is especially important for handling defaults. *)
+val upon_shape :
+  Env.t ->
+  type_expr ->
+  run:(type_shape -> unit) ->
+  default:(unit -> type_shape) ->
+  unit
+
 val expand_head_opt: Env.t -> type_expr -> type_expr
 (** The compiler's own version of [expand_head] necessary for type-based
     optimisations. *)
@@ -422,8 +446,6 @@ val deep_occur_list: type_expr -> type_expr list -> bool
         (* Check whether a type occurs structurally within any type from
            a list of types. *)
 val is_moregeneral: Env.t -> bool -> type_expr -> type_expr -> bool
-val all_distinct_vars: Env.t -> type_expr list -> bool
-        (* Check those types are all distinct type variables *)
 
 type matches_result =
   | Unification_failure of Errortrace.unification_error

@@ -68,6 +68,8 @@ let parameter_list_from_arrows typ =
     | Types.Tlink texp
     | Types.Tpoly (texp, _) | Types.Trepr (texp, _) -> iter texp
     | Types.Tmod _ -> Misc.fatal_error "Odoc_value: unexpected Tmod"
+    | Types.Tivar _ ->
+      Misc.fatal_error "Odoc_value.parameter_list_from_arrows: unexpected Tivar"
     | Types.Tvar _
     | Types.Ttuple _
     | Types.Tunboxed_tuple _

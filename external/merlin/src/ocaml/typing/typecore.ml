@@ -381,7 +381,7 @@ let deep_copy () =
       TypeHash.add table ty ty';
       let desc =
         match get_desc ty with
-        | Tvar _ | Tnil | Tunivar _ | Tof_kind _ as desc -> desc
+        | Tvar _ | Tivar _ | Tnil | Tunivar _ | Tof_kind _ as desc -> desc
         | Tvariant _ as desc -> (* fixme *) desc
         | Tarrow (l,t1,t2,c) -> Tarrow (l, copy t1, copy t2, c)
         | Ttuple tl -> Ttuple (List.map (fun (l, t) -> l, copy t) tl)
@@ -4936,8 +4936,13 @@ let rec list_labels_aux env visited ls ty_fun =
   else match get_desc ty with
     | Tarrow ((l,_,_), _, ty_res, _) ->
         list_labels_aux env (TypeSet.add ty visited) (l::ls) ty_res
-    | _ ->
-        List.rev ls, is_Tvar ty
+    | Tvar _ -> List.rev ls, true
+    | Tivar _ ->
+        (* CR-someday omni: like a [Tvar], the labels end here. The ivar may
+           later be filled with an arrow, adding further labels. Smarter:
+           suspend on the ivar, and list the labels once the spine is known. *)
+        List.rev ls, true
+    | _ -> List.rev ls, false
 
 let list_labels env ty =
   let snap = Btype.snapshot () in
@@ -5187,7 +5192,14 @@ let collect_unknown_apply_args env funct ty_fun0 mode_fun rev_args sargs
         try
           let ty_fun = expand_head env ty_fun in
           match get_desc ty_fun with
-          | Tvar { jkind; _ } ->
+          | Tvar { jkind; _ } | Tivar { jkind; _ } ->
+              (* CR-someday omni: for a [Tivar], [ty_fun] is unified with an
+                 arrow labelled [lbl] as for a [Tvar], fixing the ivar's shape.
+                 [ty_fun] might later have been unified with an arrow whose
+                 labels are in a different order, or that has optional
+                 arguments before [lbl]. Smarter: suspend typing the remaining
+                 arguments on the ivar, falling back to this if it is
+                 defaulted. *)
               let ty_arg_mono, sort_arg = new_rep_var ~why:Function_argument () in
               let ty_arg = newmono ty_arg_mono in
               let ty_res =
@@ -6082,7 +6094,7 @@ let check_univars env kind exp ty_expected vars =
                2) [polyfy] actually calls [expand_head] twice!  why?!
             *)
             match get_desc (expand_head env var) with
-            | Tvar { jkind = jkind2; } -> begin
+            | Tvar { jkind = jkind2; } | Tivar { jkind = jkind2; _ } -> begin
                 match check_type_jkind env uvar (Jkind.disallow_left jkind2) with
                 | Ok _ -> ()
                 | Error err ->
@@ -6117,6 +6129,10 @@ let check_statement exp =
                         || Path.same p Predef.path_unboxed_unit ->
     ()
   | Tvar _ -> ()
+  | Tivar _ ->
+    (* CR-someday omni: skipped, like a [Tvar]. Smarter: suspend on the ivar,
+       and check once it is known whether [exp] has type unit. *)
+    ()
   | _ ->
       let rec loop {exp_loc; exp_desc; exp_extra; _} =
         match exp_desc with
@@ -6213,7 +6229,7 @@ let check_partial_application ~statement exp =
   in
   let ty = get_desc (expand_head exp.exp_env exp.exp_type) in
   match ty with
-  | Tvar _ ->
+  | Tvar _ | Tivar _ ->
       (* The type of [exp] is not known. Delay the check until after
          typechecking in order to give a chance for the type to become known
          through unification. *)
@@ -6440,12 +6456,14 @@ let rec is_inferred sexp =
   | Pexp_ifthenelse (_, e1, Some e2) -> is_inferred e1 && is_inferred e2
   | _ -> false
 
-(* check if the type of %apply or %revapply matches the type expected by
-   the specialized typing rule for those primitives.
-*)
 type apply_prim =
   | Apply
   | Revapply
+
+
+(* check if the type of %apply or %revapply matches the type expected by
+   the specialized typing rule for those primitives.
+*)
 let check_apply_prim_type prim typ =
   match get_desc typ with
   | Tarrow ((Nolabel,_,_),a,b,_) when tpoly_is_mono a ->
@@ -6461,8 +6479,16 @@ let check_apply_prim_type prim typ =
           begin match get_desc f with
           | Tarrow((Nolabel,_,_),fl,fr,_) ->
               let fl = tpoly_get_mono fl in
-              is_Tvar fl && is_Tvar fr && is_Tvar x && is_Tvar res
-              && Types.eq_type fl x && Types.eq_type fr res
+              begin match get_desc fl, get_desc fr with
+              | Tvar _, Tvar _ -> Types.eq_type fl x && Types.eq_type fr res
+              | ( ( Tvar _ | Tivar _ | Tarrow _ | Ttuple _ | Tunboxed_tuple _
+                  | Tconstr _ | Tmod _ | Tobject _ | Tfield _ | Tquote _
+                  | Tsplice _ | Tquote_eval _ | Tnil | Tlink _ | Tsubst _
+                  | Tvariant _ | Tunivar _ | Tpoly _ | Trepr _ | Tpackage _
+                  | Tof_kind _ | Tbox _ ),
+                  _ ) ->
+                false
+              end
           | _ -> false
           end
       | _ -> false
@@ -7783,6 +7809,11 @@ and type_expect_
               (try Ctype.unify_var env (outer_level_var ()) ty_arg
                with Unify _ -> assert false);
               ret_tvar (TypeSet.add ty seen) ty_fun
+          | Tivar _
+          (* CR-someday omni: [Tivar] could be unified with a [Tarrow]
+             with a non-variable return. For now, we treat [Tivar] like
+             a [Tvar]. Smarter: suspend on the ivar, and recurse / return
+             based on the inferred shape. *)
           | Tvar _ ->
               let v = outer_level_var () in
               let rt = get_level ty > get_level v in
@@ -8617,7 +8648,11 @@ and type_expect_
               Texp_inspected_type (Polymorphic_parameter (
                 Method (met, Ctype.instance ~partial:true typ))),
               loc, [])
-        | Tvar _ ->
+        | Tvar _ | Tivar _ ->
+            (* CR-someday omni: like a [Tvar], the method is assumed to be
+               monomorphic. The ivar might later be linked to a polymorphic
+               method type. Smarter: suspend on the ivar, requires shapes
+               for [Tpoly]. *)
             let ty' = newvar (Jkind.Builtin.value ~why:Object_field) in
             unify env (instance typ) (newty(Tpoly(ty',[])));
             (* if not !Clflags.nolabels then
@@ -8914,7 +8949,11 @@ and type_expect_
             in
             check_univars env "method" exp ty_expected vars;
             { exp with exp_type = instance ty }
-        | Tvar _ ->
+        | Tvar _ | Tivar _ ->
+            (* CR-someday omni: like a [Tvar], [sbody] is typed as a
+               monomorphic method. The ivar might later be linked to a
+               polymorphic method type. Smarter: suspend on the ivar, which
+               needs shapes for [Tpoly]. *)
             let exp = type_exp env expected_mode sbody in
             let exp = {exp with exp_type = newmono exp.exp_type} in
             unify_exp ~sexp env exp ty;
@@ -8959,7 +8998,10 @@ and type_expect_
                 Location.prerr_warning loc
                   (not_principal "this module packing");
               pack
-          | Tvar _ ->
+          | Tvar _ -> raise (error (loc, env, Cannot_infer_signature))
+          | Tivar _ ->
+              (* CR-someday omni: fails like a [Tvar]. Smarter: suspend on the
+                 ivar until it is filled with a package type. *)
               raise (error (loc, env, Cannot_infer_signature))
           | _ ->
               raise (error (loc, env, Not_a_packed_module ty_expected))
@@ -9832,7 +9874,7 @@ and type_ident env ?(recarg=Rejected) lid =
   | true, Required, _
   | false, Rejected, _ -> ()
   | true, Rejected, _
-  | false, Required, (Tvar _ | Tconstr _) ->
+  | false, Required, (Tvar _ | Tivar _ | Tconstr _) ->
       raise (error (lid.loc, env, Inlined_record_escape))
   | false, Required, _  -> () (* will fail later *)
   end;
@@ -11043,7 +11085,11 @@ and type_argument_ ?explanation ?recarg ~overwrite env (mode : expected_mode) sa
             make_args ((l, Arg (arg, Jkind.Sort.scannable)) :: args) ty_fun
         | Tarrow ((l,_,_),_,ty_res',_) when l = Nolabel || !Clflags.classic ->
             List.rev args, ty_fun, no_labels ty_res'
-        | Tvar _ ->  List.rev args, ty_fun, false
+        | Tvar _ | Tivar _ ->
+          (* CR-someday omni: [Tivar] could link to a [Tarrow] later.
+             We default to the directional case here, treating [Tivar] as
+             a [Tvar]. *)
+          List.rev args, ty_fun, false
         |  _ -> [], texp.exp_type, false
       in
       (* If make_args ends in Tvar, then simple_res is false, no_labels *)
@@ -11772,13 +11818,16 @@ and type_statement ?explanation ?(position=RNontail) env sexp =
   ~before_generalize: begin fun (exp, _sort) ->
     let subexp = final_subexpression exp in
     let ty = expand_head env exp.exp_type in
-    if is_Tvar ty
-    && not !has_errors
-    && get_level ty > get_current_level ()
-    && not (allow_polymorphic subexp) then
-      Location.prerr_warning
-        subexp.exp_loc
-        Warnings.Nonreturning_statement;
+    (match get_desc ty with
+    | Tvar _
+      when (not !has_errors)
+           && get_level ty > get_current_level ()
+           && not (allow_polymorphic subexp) ->
+      Location.prerr_warning subexp.exp_loc Warnings.Nonreturning_statement
+    | Tvar _ | Tivar _ | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tconstr _
+    | Tmod _ | Tobject _ | Tfield _ | Tquote _ | Tsplice _ | Tquote_eval _
+    | Tnil | Tlink _ | Tsubst _ | Tvariant _ | Tunivar _ | Tpoly _
+    | Trepr _ | Tpackage _ | Tof_kind _ | Tbox _ -> ());
     if !Clflags.strict_sequence then begin
       let disambiguated_unit_ty =
         if is_unboxed_unit_type env ty then begin
