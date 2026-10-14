@@ -140,7 +140,9 @@ module Layout = struct
     | Any of Scannable_axes.t
     | Addressable of 'sort t
 
-  type error = Sort.error = Incompatible
+  type error = Sort.error =
+    | Incompatible
+    | Rigid
 
   module Const = struct
     include Jkind_types.Layout.Const
