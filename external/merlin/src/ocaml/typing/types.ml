@@ -1209,17 +1209,9 @@ type change =
   | Ccommu : [`var] commutable_gen -> change
   | Cuniv : type_expr option ref * type_expr option -> change
   | Cmodes : Mode.changes -> change
-<<<<<<< Merlin:aobrien/with-backtracking
   | Cfun of (unit -> unit)
-  | Csort : Jkind_types.Sort.change -> change
-  | Czero_alloc : Zero_alloc.change -> change
-||||||| Compiler:last-imported
-  | Csort : Jkind_types.Sort.change -> change
-  | Czero_alloc : Zero_alloc.change -> change
-=======
   | Csort : Jkind_types.Sort.Change.t -> change
   | Czero_alloc : Zero_alloc.Change.t -> change
->>>>>>> Compiler:HEAD
 
 type changes =
     Change of change * changes ref
@@ -1705,20 +1697,10 @@ let undo_change = function
   | Ckind  (FKvar r) -> r.field_kind <- FKprivate
   | Ccommu (Cvar r)  -> r.commu <- Cunknown
   | Cuniv  (r, v)    -> r := v
-<<<<<<< Merlin:aobrien/with-backtracking
   | Cmodes c -> Mode.undo_changes c
   | Cfun f -> f ()
-  | Csort change -> Jkind_types.Sort.undo_change change
-  | Czero_alloc c -> Zero_alloc.undo_change c
-||||||| Compiler:last-imported
-  | Cmodes c          -> Mode.undo_changes c
-  | Csort change -> Jkind_types.Sort.undo_change change
-  | Czero_alloc c -> Zero_alloc.undo_change c
-=======
-  | Cmodes c          -> Mode.undo_changes c
   | Csort change -> Jkind_types.Sort.Change.undo change
   | Czero_alloc c -> Zero_alloc.Change.undo c
->>>>>>> Compiler:HEAD
 
 type snapshot = changes ref * int
 let last_snapshot = Local_store.s_ref 0
