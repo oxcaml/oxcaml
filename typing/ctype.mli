@@ -446,8 +446,6 @@ val deep_occur_list: type_expr -> type_expr list -> bool
         (* Check whether a type occurs structurally within any type from
            a list of types. *)
 val is_moregeneral: Env.t -> bool -> type_expr -> type_expr -> bool
-val all_distinct_vars: Env.t -> type_expr list -> bool
-        (* Check those types are all distinct type variables *)
 
 type matches_result =
   | Unification_failure of Errortrace.unification_error

@@ -1075,7 +1075,7 @@ let rec generalize stage_offset ty =
        particularly tricky.
        This problem is independent from beta-reducing evaluations on
        open row types. *)
-    | Tobject _ | Tvariant _ when stage_offset <> 0 && is_Tvar (proxy ty) ->
+    | Tobject _ | Tvariant _ when stage_offset <> 0 && is_row_Tvar (proxy ty) ->
         lower_all ty
     (* recur into abbrev for the speed *)
     | Tconstr (_, _, abbrev) ->
@@ -1099,18 +1099,23 @@ let rec generalize_structure ty =
   let level = get_level ty in
   let current_level = !current_level in
   if level <> generic_level then begin
-    if (is_Tvar ty || is_Tivar ty) && level > current_level then
-      set_level ty current_level
-    else if level > current_level then begin
-      begin match get_desc ty with
-        Tconstr (_, _, abbrev) ->
-          abbrev := Mnil
-      | _ -> ()
-      end;
-      set_level ty generic_level;
-      let mgen m = Mode.With_locality.generalize_structure ~current_level m in
-      iter_type_expr generalize_structure mgen ty
-    end
+    match get_desc ty with
+    | Tvar _ | Tivar _ ->
+      if level > current_level then set_level ty current_level
+    | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tconstr _ | Tmod _
+    | Tobject _ | Tfield _ | Tquote _ | Tsplice _ | Tquote_eval _ | Tnil
+    | Tlink _ | Tsubst _ | Tvariant _ | Tunivar _ | Tpoly _ | Trepr _
+    | Tpackage _ | Tof_kind _ | Tbox _ ->
+      if level > current_level then begin
+        begin match get_desc ty with
+          Tconstr (_, _, abbrev) ->
+            abbrev := Mnil
+        | _ -> ()
+        end;
+        set_level ty generic_level;
+        let mgen m = Mode.With_locality.generalize_structure ~current_level m in
+        iter_type_expr generalize_structure mgen ty
+      end
   end
 
 let generalize_structure ty =
@@ -1807,7 +1812,6 @@ let instance_constructor existential_treatment cstr =
             Pattern_env.set_env penv new_env;
             let to_unify = newty (Tconstr (Path.Pident id,[],ref Mnil)) in
             let tv = copy copy_scope existential in
-            assert (is_Tvar tv);
             link_type tv to_unify;
             (tv, jkind)
     in
@@ -1937,6 +1941,9 @@ let copy_sep ~copy_scope ~fixed ~partial ~bound_univars
       (fun () -> Transient_expr.set_stub_desc t (Tlink (copy copy_scope ty))) ::
       !delayed_copies
   in
+  (* [may_share] is [false] when [ty] is a row tail: the [row_more] of a
+     [Tvariant] or the rest of a [Tfield] chain. A tail is copied
+     together with its row. *)
   let rec copy_rec ~bound_univars ~may_share (ty : type_expr) =
     let bound_univars =
       match get_desc ty with
@@ -1945,7 +1952,22 @@ let copy_sep ~copy_scope ~fixed ~partial ~bound_univars
     in
     let copy_rec = copy_rec ~bound_univars in
     let univars = TypeSet.inter (free ty) bound_univars in
-    if is_Tvar ty || is_Tivar ty || may_share && TypeSet.is_empty univars then
+    let desc = get_desc ty in
+    let can_share =
+      (* Shared nodes are [copy]d in the second pass. Nodes are shared
+         if it mentions no bound univar. Type variables must always be
+         shared: [copy_scope] gives each variable a single copy in the
+         second pass. Otherwise, the same variable would have disjoint
+         copies. *)
+      TypeSet.is_empty univars
+      && (match desc with
+        | Tvar _ | Tivar _ -> true
+        | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tconstr _ | Tmod _
+        | Tobject _ | Tfield _ | Tquote _ | Tsplice _ | Tquote_eval _ | Tnil
+        | Tlink _ | Tsubst _ | Tvariant _ | Tunivar _ | Tpoly _ | Trepr _
+        | Tpackage _ | Tof_kind _ | Tbox _ -> may_share)
+    in
+    if can_share then
       if partial || get_level ty <> generic_level then ty else
       (* jkind not consulted during copy_sep, so Any is safe *)
       let t = newstub ~scope:(get_scope ty) (Jkind.Builtin.any ~why:Dummy_jkind) in
@@ -1962,7 +1984,7 @@ let copy_sep ~copy_scope ~fixed ~partial ~bound_univars
             let more = row_more row in
             (* We shall really check the level on the row variable *)
             let keep =
-              is_Tvar more && get_level more <> generic_level
+              is_row_Tvar more && get_level more <> generic_level
             in
             (* In that case we should keep the original, but we still
                call copy to correct the levels *)
@@ -1972,7 +1994,7 @@ let copy_sep ~copy_scope ~fixed ~partial ~bound_univars
                       jkind = Jkind.for_non_float ~why:Polymorphic_variant })
             else
             let more' = copy_rec ~may_share:false more in
-            let fixed' = fixed && (is_Tvar more || is_Tunivar more) in
+            let fixed' = fixed && (is_row_Tvar more || is_Tunivar more) in
             let row =
               copy_row (copy_rec ~may_share:true) fixed' row keep more' in
             Tvariant row
@@ -3919,7 +3941,7 @@ let full_expand ~may_forget_scope env ty =
     else expand_head env ty
   in
   match get_desc ty with
-    Tobject (fi, {contents = Some (_, v::_)}) when is_Tvar v ->
+    Tobject (fi, {contents = Some (_, v::_)}) when is_row_Tvar v ->
       newty2 ~level:(get_level ty) (Tobject (fi, ref None))
   | _ ->
       ty
@@ -4048,7 +4070,7 @@ let rec local_non_recursive_abbrev ~allow_rec strict visited env p ty =
           in
           List.iter2
             (fun tv ty ->
-              let strict = strict || not (is_Tvar tv) in
+              let strict = strict || not (is_param_Tvar tv) in
               local_non_recursive_abbrev ~allow_rec strict visited env p ty)
             params args
         end
@@ -5838,7 +5860,7 @@ and unify_row uenv row1 row2 =
         (newgenty (Tvariant row));
     if has_fixed_explanation row then
       if eq_type more rm then () else
-      if is_Tvar rm then link_type rm more else unify uenv rm more
+      if is_row_Tvar rm then link_type rm more else unify uenv rm more
     else
       let ty =
         newgenty (Tvariant
@@ -5862,7 +5884,7 @@ and unify_row uenv row1 row2 =
       pairs;
     if static_row row1 then begin
       let rm = row_more row1 in
-      if is_Tvar rm then link_type rm (newty2 ~level:(get_level rm) Tnil)
+      if is_row_Tvar rm then link_type rm (newty2 ~level:(get_level rm) Tnil)
     end
   with exn ->
     Transient_expr.set_desc tm1 md1;
@@ -6590,8 +6612,13 @@ let moregen_occur env level ty =
     let rec occur ty =
       let lv = get_level ty in
       if lv <= level then () else
-      if is_Tvar ty && lv >= subject_level then raise Occur else
-      if try_mark_node mark ty then iter_type_expr occur (Fun.const ()) ty
+      match get_desc ty with
+      | Tvar _ when lv >= subject_level -> raise Occur
+      | Tvar _ | Tivar _ | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tconstr _
+      | Tmod _ | Tobject _ | Tfield _ | Tquote _ | Tsplice _ | Tquote_eval _
+      | Tnil | Tlink _ | Tsubst _ | Tvariant _ | Tunivar _ | Tpoly _
+      | Trepr _ | Tpackage _ | Tof_kind _ | Tbox _ ->
+        if try_mark_node mark ty then iter_type_expr occur (Fun.const ()) ty
     in
     try
       occur ty
@@ -6990,7 +7017,7 @@ and moregen_row inst_nongen variance type_pairs env row1 row2 =
            fixed = row2_fixed} = row_repr row2 in
   if eq_type rm1 rm2 then () else
   let may_inst =
-    is_Tvar rm1 && may_instantiate inst_nongen rm1 || get_desc rm1 = Tnil in
+    is_row_Tvar rm1 && may_instantiate inst_nongen rm1 || get_desc rm1 = Tnil in
   let r1, r2, pairs = merge_row_fields row1_fields row2_fields in
   let r1, r2 =
     if row2_closed then
@@ -7186,17 +7213,6 @@ let is_moregeneral env inst_nongen pat_sch subj_sch =
   | _ -> true
   | exception Moregen _ -> false
 
-let all_distinct_vars env vars =
-  let tys = ref TypeSet.empty in
-  List.for_all
-    (fun ty ->
-      let ty = expand_head env ty in
-      if TypeSet.mem ty !tys then false else begin
-       tys := TypeSet.add ty !tys;
-       is_Tvar ty
-     end)
-    vars
-
 type matches_result =
   | Unification_failure of Errortrace.unification_error
   | Jkind_mismatch of { original_jkind : jkind_lr; inferred_jkind : jkind_lr
@@ -7218,7 +7234,7 @@ let rec rigidify_rec mark vars ty =
         vars := TypeMap.add ty (name, jkind) !vars
     | Tvariant row ->
         let Row {more; name; closed} = row_repr row in
-        if is_Tvar more && not (has_fixed_explanation row) then begin
+        if is_row_Tvar more && not (has_fixed_explanation row) then begin
           let more' = newty2 ~level:(get_level more) (get_desc more) in
           let row' =
             create_row ~fixed:(Some Rigid) ~fields:[] ~more:more'
@@ -8059,7 +8075,7 @@ let rec build_subtype env (visited : transient_expr list)
           let (ty1', c) =
             build_subtype env [Transient_expr.repr t']
               loops posi (pred_enlarge level') ty1 in
-          assert (is_Tvar t'');
+          assert (is_row_Tvar t'');
           let nm =
             if c > Equiv || deep_occur ty ty1' then None else Some(p,tl1) in
           set_type_desc t'' (Tobject (ty1', ref nm));
@@ -8331,7 +8347,7 @@ let rec subtype_rec env trace t1 t2 cstrs =
 (*  | (_, Tconstr(p2, _, _)) when generic_private_abbrev false env p2 ->
         subtype_rec env trace t1 (expand_abbrev_opt env t2) cstrs *)
     | (Tobject (f1, _), Tobject (f2, _))
-      when is_Tvar (object_row f1) && is_Tvar (object_row f2) ->
+      when is_row_Tvar (object_row f1) && is_row_Tvar (object_row f2) ->
         (* Same row variable implies same object. *)
         (trace, t1, t2, !univar_pairs)::cstrs
     | (Tobject (f1, _), Tobject (f2, _)) ->
