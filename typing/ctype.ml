@@ -3578,7 +3578,7 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
                           "Axis_disagreement("
                           ^ Jkind_axis.Axis.name axis
                           ^ ")"
-                        | Layout_disagreement -> "Layout_disagreement"
+                        | Layout_disagreement _ -> "Layout_disagreement"
                         | With_bounds_on_left -> "With_bounds_on_left"
                         | Constrain_ran_out_of_fuel ->
                           "Constrain_ran_out_of_fuel")
@@ -4110,7 +4110,7 @@ let local_non_recursive_abbrev uenv p ty =
    They carry redundant information but are added to save two calls to
    [get_desc] which are usually performed already at the call site. *)
 let unify_univar env t1 t2 jkind1 jkind2 pairs =
-  if not (Jkind.equal env jkind1 jkind2) then
+  if Result.is_error (Jkind.equal env jkind1 jkind2) then
     raise Cannot_unify_universal_variables;
   let rec inner t1 t2 = function
     (cl1, cl2) :: rem ->
@@ -4960,7 +4960,7 @@ let add_jkind_equation ~reason uenv destination jkind1 =
                ticket 5112. *)
             match Jkind.try_allow_r jkind, Jkind.try_allow_r decl.type_jkind with
             | Some jkind, Some decl_jkind
-                when not (Jkind.equal env jkind decl_jkind) ->
+                when Result.is_error (Jkind.equal env jkind decl_jkind) ->
                let refined_decl =
                  { decl with type_jkind = Jkind.disallow_right jkind }
                in
@@ -7131,10 +7131,10 @@ let all_distinct_vars_with_original_jkinds env vars =
        if TypeSet.mem ty !tys then Unification_failure { name; ty } else begin
          tys := TypeSet.add ty !tys;
          match get_desc ty with
-         | Tvar { jkind = inferred_jkind } ->
-           if Jkind.equate env inferred_jkind original_jkind
-           then All_good
-           else Jkind_mismatch { original_jkind; inferred_jkind; ty }
+         | Tvar { jkind = inferred_jkind } -> (
+           match Jkind.equate env inferred_jkind original_jkind with
+           | Ok () -> All_good
+           | Error _ -> Jkind_mismatch { original_jkind; inferred_jkind; ty })
          | _ -> Unification_failure { name; ty }
        end
   in
@@ -7188,7 +7188,7 @@ let eqtype_subst env type_pairs subst t1 k1 t2 k2 ~do_jkind_check =
       !subst
   then ()
   else begin
-    if do_jkind_check && not (Jkind.equal env k1 k2)
+    if do_jkind_check && Result.is_error (Jkind.equal env k1 k2)
       then raise_for Equality (Unequal_var_jkinds (t1, k1, t2, k2));
     subst := (t1, t2) :: !subst;
     TypePairs.add type_pairs (t1, t2)
@@ -7218,7 +7218,7 @@ let rec eqtype rename type_pairs subst env ~do_jkind_check t1 t2 =
     | (Tconstr (p1, [], _), Tconstr (p2, [], _)) when Path.same p1 p2 ->
         ()
     | (Tof_kind k1, Tof_kind k2) ->
-      if not (Jkind.equal env k1 k2)
+      if Result.is_error (Jkind.equal env k1 k2)
       then raise_for Equality (Unequal_tof_kind_jkinds (k1, k2))
     | _ ->
         let t1' = expand_head_rigid env t1 in

@@ -49,6 +49,7 @@ module Sort : sig
        and type var = Jkind_types.Sort.var
        and type univar = Jkind_types.Sort.univar
        and type base = Jkind_types.Sort.base
+       and type error = Jkind_types.Sort.error
        and type Const.t = Jkind_types.Sort.Const.t
 
   val new_var : level:int -> var
@@ -68,7 +69,7 @@ type sort = Sort.t
 module Sub_failure_reason : sig
   type t = Jkind0.Violation.Sub_failure_reason.t =
     | Axis_disagreement of Jkind_axis.Axis.packed
-    | Layout_disagreement
+    | Layout_disagreement of Jkind_types.Sort.error
     | With_bounds_on_left
     | Constrain_ran_out_of_fuel
 end
@@ -299,7 +300,11 @@ module Const : sig
   (** Creates an abstract jkind, with max with-bounds, from the path. *)
   val of_path : Path.t -> (allowed * allowed) t
 
-  val equal : Env.t -> (allowed * allowed) t -> (allowed * allowed) t -> bool
+  val equal :
+    Env.t ->
+    (allowed * allowed) t ->
+    (allowed * allowed) t ->
+    (unit, Sort.error) result
 
   (* [use_abstract_jkinds] controls whether references to other kinds here count
      as uses of them for unused abstract kind warnings. *)
@@ -800,14 +805,16 @@ val format_history :
 (** This checks for equality, and sets any variables to make two jkinds equal,
     if possible. e.g. [equate] on a var and [value] will set the variable to be
     [value] *)
-val equate : Env.t -> Types.jkind_lr -> Types.jkind_lr -> bool
+val equate :
+  Env.t -> Types.jkind_lr -> Types.jkind_lr -> (unit, Sort.error) result
 
 (** This checks for equality, but has the invariant that it can only be called
     when there is no need for unification; e.g. [equal] on a var and [value]
     will crash.
 
     CR layouts (v1.5): At the moment, this is actually the same as [equate]! *)
-val equal : Env.t -> Types.jkind_lr -> Types.jkind_lr -> bool
+val equal :
+  Env.t -> Types.jkind_lr -> Types.jkind_lr -> (unit, Sort.error) result
 
 (** Checks whether two jkinds have a non-empty intersection. Might mutate sort
     variables. Works over any mix of l- and r-jkinds, because the only way not
