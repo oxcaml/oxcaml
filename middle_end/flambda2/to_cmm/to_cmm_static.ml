@@ -350,9 +350,68 @@ let immutable_unboxed_mask_array =
     ~update_kind:UK.naked_mask_fields ~tag:Tags.unboxed_mask_array_tag
     ~words_per_element:1
 
+(* [zero_sized_static_tag const] is [Some tag] iff translating [const] for a
+   [Block_like] binding would emit a block with zero fields, where [tag] is the
+   tag that block would carry. This must mirror the emission cases in
+   [static_const0] and the [immutable_unboxed_*_array] helpers above. Such
+   constants are not emitted when their symbols can be redirected to the
+   runtime's permanent atoms of the same tag (see [static_consts0]). *)
+let zero_sized_static_tag (static_const : SC.t) : int option =
+  match static_const with
+  | Block (tag, _, Value_only, []) -> Some (Tag.Scannable.to_int tag)
+  | Block (tag, _, Mixed_record shape, _) when MBS.size_in_words shape = 0 ->
+    Some (Tag.Scannable.to_int tag)
+  | Empty_array _ ->
+    (* Recall: empty arrays have tag zero, whatever their kind. *)
+    Some 0
+  | Immutable_value_array [] -> Some 0
+  | Immutable_float_block [] | Immutable_float_array [] ->
+    Some (Tag.to_int Tag.double_array_tag)
+  | Immutable_float32_array [] -> Some Tags.unboxed_float32_array_zero_tag
+  | Immutable_int_array [] -> Some Tags.untagged_int_array_tag
+  | Immutable_int8_array [] -> Some (Tags.untagged_int8_array_tag 0)
+  | Immutable_int16_array [] -> Some (Tags.untagged_int16_array_tag 0)
+  | Immutable_int32_array [] -> Some Tags.unboxed_int32_array_zero_tag
+  | Immutable_int64_array [] -> Some Tags.unboxed_int64_array_tag
+  | Immutable_nativeint_array [] -> Some Tags.unboxed_nativeint_array_tag
+  | Immutable_vec128_array [] -> Some Tags.unboxed_vec128_array_tag
+  | Immutable_vec256_array [] -> Some Tags.unboxed_vec256_array_tag
+  | Immutable_vec512_array [] -> Some Tags.unboxed_vec512_array_tag
+  | Immutable_mask_array [] -> Some Tags.unboxed_mask_array_tag
+  | Block (_, _, (Value_only | Mixed_record _), _)
+  | Immutable_value_array _ | Immutable_float_block _ | Immutable_float_array _
+  | Immutable_float32_array _ | Immutable_int_array _ | Immutable_int8_array _
+  | Immutable_int16_array _ | Immutable_int32_array _ | Immutable_int64_array _
+  | Immutable_nativeint_array _ | Immutable_vec128_array _
+  | Immutable_vec256_array _ | Immutable_vec512_array _ | Immutable_mask_array _
+  | Boxed_float _ | Boxed_float32 _ | Boxed_int32 _ | Boxed_int64 _
+  | Boxed_nativeint _ | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _
+  | Boxed_mask _ | Immutable_string _ | Set_of_closures _ ->
+    None
+
 let static_const0 env res ~updates (bound_static : Bound_static.Pattern.t)
     (static_const : Static_const.t) =
   match bound_static, static_const with
+  | Block_like s, _ when Option.is_some (zero_sized_static_tag static_const) ->
+    (* All references to this zero-sized static go to a runtime atom (see the
+       pre-pass in [static_consts0]). If the symbol may be referenced from other
+       units, still emit a definition so those references link; nothing in this
+       unit refers to it. *)
+    let res = R.check_for_module_symbol res s in
+    let res =
+      if not (R.symbol_is_exported res s)
+      then res
+      else
+        let tag = Option.get (zero_sized_static_tag static_const) in
+        (* Bypass [R.symbol], which would return the atom symbol. *)
+        let sym : Cmm.symbol =
+          { sym_name = Linkage_name.to_string (Symbol.linkage_name s);
+            sym_global = Global
+          }
+        in
+        R.set_data res (C.emit_block sym (C.black_block_header tag 0) [])
+    in
+    env, res, updates
   | Block_like s, Block (tag, mut, shape, fields) ->
     (match mut with
     | Immutable | Immutable_unique -> ()
@@ -730,6 +789,20 @@ let static_consts0 env r ~params_and_body bound_static static_consts =
     Misc.fatal_errorf
       "Mismatch between [Bound_static] and [Static_const]s:@ %a@ =@ %a"
       Bound_static.print bound_static Static_const_group.print static_consts;
+  let r =
+    (* Redirect references to zero-sized constants to the runtime's permanent
+       atoms before translating the group, so that references from other members
+       of this (possibly recursive) group already see the redirection (see
+       [To_cmm_result.redirect_symbol_to_atom]). *)
+    ListLabels.fold_left2 bound_static' static_consts' ~init:r
+      ~f:(fun r pat (const : Static_const_or_code.t) ->
+        match[@ocaml.warning "-4"] (pat : Bound_static.Pattern.t), const with
+        | Block_like s, Static_const static_const -> (
+          match zero_sized_static_tag static_const with
+          | Some tag -> R.redirect_symbol_to_atom r s ~tag
+          | None -> r)
+        | _, _ -> r)
+  in
   let r =
     ListLabels.fold_left static_consts' ~init:r ~f:(fun r static_const ->
         match Static_const_or_code.to_code static_const with
