@@ -42,6 +42,8 @@ type constant =
   | Const_unboxed_int64 of int64
   | Const_unboxed_nativeint of nativeint
 
+type partial = Partial | Total
+
 type sort = Jkind_types.Sort.Const.t
 
 type locality = Mode.Locality.Const.t
@@ -62,11 +64,19 @@ and 'ty expression_desc =
   | Sexp_var of Ident.t
   | Sexp_global of Path.t
   | Sexp_constant of constant
+  | Sexp_let of rec_flag * 'ty value_binding list * 'ty expression
   | Sexp_apply of
       { funct : 'ty expression;
         args : (arg_label * 'ty argument) list;
         ret_mode : locality;
       }
+  | Sexp_match of
+      { scrutinee : 'ty expression;
+        sort : sort;
+        cases : 'ty case list;
+        partial : partial;
+      }
+  | Sexp_try of 'ty expression * 'ty case list
   | Sexp_tuple of (string option * 'ty expression) list * locality
   | Sexp_unboxed_tuple of (string option * 'ty expression * sort) list
   | Sexp_unboxed_unit
@@ -111,6 +121,43 @@ and 'ty field_definition =
   | Kept of 'ty
   | Overridden of 'ty expression
 
+and 'ty value_binding =
+  { svb_pat : 'ty pattern;
+    svb_expr : 'ty expression;
+    svb_rec_kind : Value_rec_types.recursive_binding_kind;
+    svb_sort : sort;
+  }
+
+and 'ty case =
+  { sc_lhs : 'ty pattern;
+    sc_guard : 'ty expression option;
+    sc_rhs : 'ty expression;
+  }
+
+and 'ty pattern =
+  { spat_desc : 'ty pattern_desc;
+    spat_type : 'ty;
+    spat_loc : Location.t;
+  }
+
+and 'ty pattern_desc =
+  | Spat_any
+  | Spat_var of Ident.t * sort
+  | Spat_alias of 'ty pattern * Ident.t * sort
+  | Spat_constant of constant
+  | Spat_tuple of (string option * 'ty pattern) list
+  | Spat_unboxed_tuple of (string option * 'ty pattern * sort) list
+  | Spat_unboxed_unit
+  | Spat_unboxed_bool of bool
+  | Spat_construct of constructor * (sort * 'ty pattern) list
+  | Spat_variant of string * 'ty pattern option
+  | Spat_record of (label * 'ty pattern) list * closed_flag
+  | Spat_record_unboxed_product of (label * 'ty pattern) list * closed_flag
+  | Spat_or of 'ty pattern * 'ty pattern
+  | Spat_lazy of 'ty pattern
+  | Spat_exception of 'ty pattern
+      (** Only at the top of a [match] case. *)
+
 (** {1 Traversals} *)
 
 (** [map ~ty ~value_path ~type_path e] applies [ty] to every type of [e],
@@ -130,6 +177,9 @@ val map_paths :
   'a expression -> 'a expression
 
 val iter_types : ('a -> unit) -> 'a expression -> unit
+
+(** The local variables bound by a pattern. *)
+val pattern_variables : 'a pattern -> Ident.t list
 
 (** The namespaces of the global paths of an expression: values, the types
     of constructors and labels, and extension constructors. *)

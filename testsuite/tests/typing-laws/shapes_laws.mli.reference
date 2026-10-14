@@ -6,12 +6,15 @@ type 'a each =
   area_nonneg: 'a ;
   rect: 'a ;
   origin_x: 'a ;
+  bad: 'a ;
   poly: 'a ;
+  variant: 'a ;
   disamb: 'a ;
   optional: 'a ;
   modes: 'a ;
   fmt: 'a ;
   fake_format: 'a ;
+  optional_none: 'a ;
   unboxed: 'a ;
   \#type: 'a ;
   inferred: 'a }
@@ -29,11 +32,17 @@ type rect_input =
 type origin_x_input =
   | Origin_x_input: {
   p: Laws_gen_Shapes.point } -> origin_x_input 
+type bad_input =
+  | Bad_input: {
+  s: string } -> bad_input 
 type poly_input =
   | Poly_input: ('a : value_or_null) ('b : value_or_null) .
   {
   xs: 'a list ;
   f: 'a -> 'b } -> poly_input 
+type variant_input =
+  | Variant_input: {
+  v: [ `A  | `B of int ] } -> variant_input 
 type disamb_input =
   | Disamb_input: {
   c: Laws_gen_Shapes.t } -> disamb_input 
@@ -48,6 +57,8 @@ type fmt_input =
   n: int } -> fmt_input 
 type fake_format_input =
   | Fake_format_input: fake_format_input 
+type optional_none_input =
+  | Optional_none_input: optional_none_input 
 type unboxed_input =
   | Unboxed_input: {
   x: float# } -> unboxed_input 
@@ -67,12 +78,15 @@ module Instantiate :
         val area_nonneg : area_nonneg_input Choice.t
         val rect : rect_input Choice.t
         val origin_x : origin_x_input Choice.t
+        val bad : bad_input Choice.t
         val poly : poly_input Choice.t
+        val variant : variant_input Choice.t
         val disamb : disamb_input Choice.t
         val optional : optional_input Choice.t
         val modes : modes_input Choice.t
         val fmt : fmt_input Choice.t
         val fake_format : fake_format_input Choice.t
+        val optional_none : optional_none_input Choice.t
         val unboxed : unboxed_input Choice.t
         val \#type : type_input Choice.t
         val inferred : inferred_input Choice.t

@@ -150,6 +150,28 @@ module Renamed_parameters :
   sig val f : int -> int law? p (x : int) : (f x) = x end
 |}]
 
+(* The clauses are compared up to the renaming of the parameters and of
+   the variables bound within them. *)
+
+module Renamed : sig
+  type t = A | B of int
+  val f : t -> int
+  law? p (x : int) : (match B x with A -> 0 | B y -> y) = f (B x)
+end = struct
+  type t = A | B of int
+  let f = function A -> 0 | B n -> n
+  law? p (n : int) : (match B n with A -> 0 | B m -> m) = f (B n)
+end
+[%%expect {|
+module Renamed :
+  sig
+    type t = A | B of int
+    val f : t -> int
+    law? p (x : int) :
+      (match (B x : t) with | (A : t) -> 0 | (B y : t) -> y) = (f (B x : t))
+  end
+|}]
+
 (* Clauses that differ otherwise are a mismatch, even if equivalent. *)
 
 module Different_clauses : sig

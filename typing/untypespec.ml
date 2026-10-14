@@ -12,6 +12,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Asttypes
 open Spec
 open Ast_helper
 
@@ -98,10 +99,62 @@ let constructor env ~loc = function
 let label env ~loc ({ type_path; name } : Spec.label) =
   in_namespace_of env ~loc type_path name
 
+let ident ~loc id = mk ~loc (Ident.name id)
+
+let annotate_pat env ty (p : Parsetree.pattern) =
+  match env.annotate ty with
+  | None -> p
+  | Some cty -> Pat.constraint_ ~loc:p.ppat_loc p (Some cty) []
+
 let annotate_exp env ty (e : Parsetree.expression) =
   match env.annotate ty with
   | None -> e
   | Some cty -> Exp.constraint_ ~loc:e.pexp_loc e (Some cty) []
+
+let rec pattern env (p : _ Spec.pattern) =
+  let loc = p.spat_loc in
+  match p.spat_desc with
+  | Spat_any -> Pat.any ~loc ()
+  | Spat_var (id, _) -> Pat.var ~loc (ident ~loc id)
+  | Spat_alias (p, id, _) -> Pat.alias ~loc (pattern env p) (ident ~loc id)
+  | Spat_constant c -> Pat.constant ~loc (constant c)
+  | Spat_tuple ps ->
+      Pat.tuple ~loc (List.map (fun (l, p) -> (l, pattern env p)) ps) Closed
+  | Spat_unboxed_tuple ps ->
+      Pat.unboxed_tuple ~loc
+        (List.map (fun (l, p, _) -> (l, pattern env p)) ps)
+        Closed
+  | Spat_unboxed_unit -> Pat.unboxed_unit ~loc ()
+  | Spat_unboxed_bool b -> Pat.unboxed_bool ~loc b
+  | Spat_construct (cstr, args) ->
+      let args =
+        match args with
+        | [] -> None
+        | [ (_, p) ] -> Some ([], pattern env p)
+        | args ->
+            Some
+              ([],
+               Pat.tuple ~loc
+                 (List.map (fun (_, p) -> (None, pattern env p)) args)
+                 Closed)
+      in
+      annotate_pat env p.spat_type
+        (Pat.construct ~loc (constructor env ~loc cstr) args)
+  | Spat_variant (lbl, arg) ->
+      Pat.variant ~loc lbl (Option.map (pattern env) arg)
+  | Spat_record (fields, closed) ->
+      annotate_pat env p.spat_type
+        (Pat.record ~loc (pattern_fields env ~loc fields) closed)
+  | Spat_record_unboxed_product (fields, closed) ->
+      annotate_pat env p.spat_type
+        (Pat.record_unboxed_product ~loc (pattern_fields env ~loc fields)
+           closed)
+  | Spat_or (p1, p2) -> Pat.or_ ~loc (pattern env p1) (pattern env p2)
+  | Spat_lazy p -> Pat.lazy_ ~loc (pattern env p)
+  | Spat_exception p -> Pat.exception_ ~loc (pattern env p)
+
+and pattern_fields env ~loc fields =
+  List.map (fun (lbl, p) -> (label env ~loc lbl, pattern env p)) fields
 
 let rec expression env (e : _ Spec.expression) =
   let loc = e.sexp_loc in
@@ -109,6 +162,10 @@ let rec expression env (e : _ Spec.expression) =
   | Sexp_var id -> Exp.ident ~loc (mk ~loc (Longident.Lident (Ident.name id)))
   | Sexp_global path -> Exp.ident ~loc (mk ~loc (env.lident_of_path path))
   | Sexp_constant c -> Exp.constant ~loc (constant c)
+  | Sexp_let (rf, vbs, body) ->
+      Exp.let_ ~loc Immutable rf
+        (List.map (value_binding env) vbs)
+        (expression env body)
   | Sexp_apply { funct; args; _ } ->
       let argument (lbl, arg) =
         match arg with
@@ -116,6 +173,10 @@ let rec expression env (e : _ Spec.expression) =
         | Omitted -> None
       in
       Exp.apply ~loc (expression env funct) (List.filter_map argument args)
+  | Sexp_match { scrutinee; cases; _ } ->
+      Exp.match_ ~loc (expression env scrutinee) (List.map (case env) cases)
+  | Sexp_try (e, cases) ->
+      Exp.try_ ~loc (expression env e) (List.map (case env) cases)
   | Sexp_tuple (es, _) ->
       Exp.tuple ~loc (List.map (fun (l, e) -> (l, expression env e)) es)
   | Sexp_unboxed_tuple es ->
@@ -181,6 +242,15 @@ and annotated_record env record =
   | Sexp_record _ | Sexp_record_unboxed_product _ | Sexp_construct _ ->
       expression env record
   | _ -> annotate_exp env record.sexp_type (expression env record)
+
+and value_binding env vb =
+  Vb.mk ~loc:vb.svb_expr.sexp_loc (pattern env vb.svb_pat)
+    (expression env vb.svb_expr)
+
+and case env c =
+  Exp.case (pattern env c.sc_lhs)
+    ?guard:(Option.map (expression env) c.sc_guard)
+    (expression env c.sc_rhs)
 
 let expression ~lident_of_path ~annotate e =
   expression { lident_of_path; annotate } e

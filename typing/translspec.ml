@@ -38,7 +38,9 @@ type unsupported =
   | Borrow
   | Coercions
   | Comprehensions
+  | Effect_handlers
   | Exclave
+  | Existential_patterns
   | First_class_modules
   | Layout_polymorphism
   | Local_exceptions
@@ -98,6 +100,11 @@ let constant (c : Typedtree.constant) : Spec.constant =
   | Const_unboxed_int64 n -> Const_unboxed_int64 n
   | Const_unboxed_nativeint n -> Const_unboxed_nativeint n
 
+let partial (p : Typedtree.partial) : Spec.partial =
+  match p with
+  | Partial -> Partial
+  | Total -> Total
+
 (* Labels of arguments *)
 
 let arg_label loc (lbl : Types.arg_label) : Asttypes.arg_label =
@@ -126,7 +133,67 @@ let constructor loc (cstr : Data_types.constructor_description) =
 let label (lbl : _ Data_types.gen_label_description) =
   { type_path = Data_types.gen_lbl_res_type_path lbl; name = lbl.lbl_name }
 
+(* Patterns *)
+
+let rec pattern : type k. k general_pattern -> _ Spec.pattern = fun p ->
+  List.iter
+    (fun (extra, loc, _) ->
+       match extra with
+       | Tpat_constraint (Some { ctyp_desc = Ttyp_poly _; _ }, _) ->
+           unsupported loc Polymorphic_annotations
+       | Tpat_constraint _ | Tpat_type _ | Tpat_inspected_type _
+       | Tpat_open _ -> ()
+       | Tpat_unpack -> unsupported loc First_class_modules)
+    p.pat_extra;
+  { spat_desc = pattern_desc p.pat_loc p.pat_desc;
+    spat_type = p.pat_type;
+    spat_loc = p.pat_loc }
+
+and pattern_desc :
+  type k. Location.t -> k Typedtree.pattern_desc -> _ Spec.pattern_desc =
+  fun loc desc ->
+  match desc with
+  | Tpat_any -> Spat_any
+  | Tpat_var { id; sort = s; _ } -> Spat_var (id, sort s)
+  | Tpat_alias { pattern = p; id; sort = s; _ } ->
+      Spat_alias (pattern p, id, sort s)
+  | Tpat_fun_layout _ -> unsupported loc Layout_polymorphism
+  | Tpat_constant c -> Spat_constant (constant c)
+  | Tpat_unboxed_unit -> Spat_unboxed_unit
+  | Tpat_unboxed_bool b -> Spat_unboxed_bool b
+  | Tpat_tuple ps ->
+      Spat_tuple (List.map (fun (l, p, _) -> (l, pattern p)) ps)
+  | Tpat_unboxed_tuple ps ->
+      Spat_unboxed_tuple
+        (List.map (fun (l, p, s) -> (l, pattern p, sort s)) ps)
+  | Tpat_construct (_, cstr, _, args, constr) ->
+      if not (List.is_empty cstr.cstr_existentials) then
+        unsupported loc Existential_patterns;
+      (match constr with
+       | Some (_ :: _, _) -> unsupported loc Locally_abstract_types
+       | None | Some ([], _) -> ());
+      Spat_construct
+        (constructor loc cstr,
+         List.map (fun (s, p) -> (sort s, pattern p)) args)
+  | Tpat_variant (lbl, arg, _) -> Spat_variant (lbl, Option.map pattern arg)
+  | Tpat_record (fields, _, closed) ->
+      Spat_record
+        (List.map (fun (_, lbl, p) -> (label lbl, pattern p)) fields, closed)
+  | Tpat_record_unboxed_product (fields, _, closed) ->
+      Spat_record_unboxed_product
+        (List.map (fun (_, lbl, p) -> (label lbl, pattern p)) fields, closed)
+  | Tpat_array _ -> unsupported loc Arrays
+  | Tpat_lazy p -> Spat_lazy (pattern p)
+  | Tpat_value p -> (pattern (p :> value general_pattern)).spat_desc
+  | Tpat_exception p -> Spat_exception (pattern p)
+  | Tpat_or (p1, p2, _) -> Spat_or (pattern p1, pattern p2)
+
 (* Expressions. [bound] contains the local variables in scope. *)
+
+let bind bound ids = List.fold_left (fun s id -> Ident.Set.add id s) bound ids
+
+let bind_pattern bound (p : _ Spec.pattern) =
+  bind bound (Spec.pattern_variables p)
 
 let check_extra loc extra =
   match extra with
@@ -156,7 +223,22 @@ and expression_desc bound loc desc =
   | Texp_ident { path; _ } -> Sexp_global (global loc path)
   | Texp_apply_layout _ -> unsupported loc Layout_polymorphism
   | Texp_constant c -> Sexp_constant (constant c)
-  | Texp_let _ -> unsupported loc (Not_yet_supported "let-bindings")
+  | Texp_let (rf, vbs, body) ->
+      let pats = List.map (fun vb -> pattern vb.vb_pat) vbs in
+      let bound_body = List.fold_left bind_pattern bound pats in
+      let bound_rhs =
+        match rf with Recursive -> bound_body | Nonrecursive -> bound
+      in
+      let vbs =
+        List.map2
+          (fun vb svb_pat ->
+             { svb_pat;
+               svb_expr = expression bound_rhs vb.vb_expr;
+               svb_rec_kind = vb.vb_rec_kind;
+               svb_sort = sort vb.vb_sort })
+          vbs pats
+      in
+      Sexp_let (rf, vbs, expression bound_body body)
   | Texp_letmutable _ -> unsupported loc Mutable_variables
   | Texp_function _ -> unsupported loc (Not_yet_supported "functions")
   | Texp_apply (funct, args, _, ret_mode, _, _) ->
@@ -173,8 +255,16 @@ and expression_desc bound loc desc =
         { funct = expression bound funct;
           args;
           ret_mode = return_mode ret_mode }
-  | Texp_match _ -> unsupported loc (Not_yet_supported "pattern matching")
-  | Texp_try _ -> unsupported loc (Not_yet_supported "exception handlers")
+  | Texp_match (scrutinee, s, cases, effect_cases, p) ->
+      if not (List.is_empty effect_cases) then unsupported loc Effect_handlers;
+      Sexp_match
+        { scrutinee = expression bound scrutinee;
+          sort = sort s;
+          cases = List.map (case bound) cases;
+          partial = partial p }
+  | Texp_try (e, cases, effect_cases) ->
+      if not (List.is_empty effect_cases) then unsupported loc Effect_handlers;
+      Sexp_try (expression bound e, List.map (case bound) cases)
   | Texp_unboxed_unit -> Sexp_unboxed_unit
   | Texp_unboxed_bool b -> Sexp_unboxed_bool b
   | Texp_tuple (es, mode) ->
@@ -264,6 +354,17 @@ and record_fields :
        in
        (label lbl, sort s, def))
 
+and case : type k. _ -> k Typedtree.case -> _ Spec.case =
+  fun bound c ->
+  (match c.c_cont with
+   | None -> ()
+   | Some _ -> unsupported c.c_rhs.exp_loc Effect_handlers);
+  let sc_lhs = pattern c.c_lhs in
+  let bound = bind_pattern bound sc_lhs in
+  { sc_lhs;
+    sc_guard = Option.map (expression bound) c.c_guard;
+    sc_rhs = expression bound c.c_rhs }
+
 let expression ~bound e = expression bound e
 
 (* Errors *)
@@ -276,7 +377,9 @@ let describe = function
   | Borrow -> "borrow_"
   | Coercions -> "coercions"
   | Comprehensions -> "comprehensions"
+  | Effect_handlers -> "effect handlers"
   | Exclave -> "exclave_"
+  | Existential_patterns -> "constructors with existential types in patterns"
   | First_class_modules -> "first-class modules"
   | Layout_polymorphism -> "layout-polymorphic bindings"
   | Local_exceptions -> "local exceptions"

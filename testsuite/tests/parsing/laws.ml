@@ -28,10 +28,10 @@ law? unzip_zip (xs : int list) (ys : int list) :
   (length xs) = (length ys) ===>
   (let (xs', ys') = List.split (List.combine xs ys) in
    (xs' = xs) && (ys' = ys));;
-Lines 3-4, characters 2-22:
-3 | ..let xs', ys' = List.split (List.combine xs ys) in
-4 |   xs' = xs && ys' = ys
-Error: Laws do not support let-bindings.
+law? unzip_zip (xs : int list) (ys : int list) :
+  (length xs) = (length ys) ===>
+  (let (xs', ys') = List.split (List.combine xs ys) in
+   (xs' = xs) && (ys' = ys))
 |}]
 
 law? trivial : true

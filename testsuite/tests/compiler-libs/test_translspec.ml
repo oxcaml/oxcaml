@@ -7,7 +7,8 @@
 (* The fragment of the expression language that [Translspec] accepts, and
    how [Untypespec] prints it back. Each expression is typed in an
    environment with the declarations below, with the variables [n], [b],
-   [s], [xs], [r] and [g] bound as the parameters of a law would be. *)
+   [s], [xs], [r], [t] and [g] bound as the parameters of a law would be.
+   *)
 
 let env =
   let prelude = {|
@@ -16,9 +17,13 @@ let env =
     type ('a, 'b) pair = Pair of 'a * 'b
     type ur = #{ u : int; w : bool }
     exception E of int
+    exception Failure of string
     external ( + ) : int -> int -> int = "%addint"
+    external ( > ) : 'a -> 'a -> bool = "%greaterthan"
     external ignore : 'a -> unit = "%ignore"
+    external raise : exn -> 'a = "%raise"
     let rec length = function [] -> 0 | _ :: l -> 1 + length l
+    let hd = function x :: _ -> x | [] -> raise (Failure "hd")
     let f ?(opt = 0) ~lbl x = opt + lbl + x
     module M = struct let v = 1 end
   |} in
@@ -35,7 +40,7 @@ let run_in env source =
   let wrapped =
     Printf.sprintf
       "fun (n : int) (b : bool) (s : string) (xs : int list) (r : r) \
-       (g : int -> int) -> (%s)"
+       (t : t) (g : int -> int) -> (%s)"
       source
   in
   let exp = Parse.expression (Lexing.from_string wrapped) in
@@ -128,27 +133,15 @@ f ~lbl:1  ==>  f ~lbl:1
 (* Tuples, constructors, records, variants, lists *)
 
 let () = List.iter run
-  ["(n, b)";
-   "(~x:n, b)";
-   "#(n, b)";
-   "A";
-   "B n";
-   "C { x = n; y = b }";
-   "Pair (n, b)";
-   "Some n";
-   "None";
-   "E n";
-   "{ a = n; b = s }";
-   "r.a";
-   "{ r with a = n }";
-   "#{ u = n; w = b }";
-   "(#{ u = n; w = b }).#u";
+  ["(n, b)"; "(~x:n, b)"; "#(n, b)";
+   "A"; "B n"; "C { x = n; y = b }"; "Pair (n, b)"; "Some n"; "None"; "E n";
+   "{ a = n; b = s }"; "r.a"; "{ r with a = n }";
+   "match t with C c -> c.x | A | B _ -> 0";
+   "#{ u = n; w = b }"; "(#{ u = n; w = b }).#u";
    "#{ #{ u = n; w = b } with u = 0 }";
-   "`A";
-   "`B n";
-   "[]";
-   "n :: xs";
-   "[n; n]"]
+   "match #{ u = n; w = b } with #{ u; _ } -> u";
+   "`A"; "`B n";
+   "[]"; "n :: xs"; "[n; n]"]
 [%%expect {|
 (n, b)  ==>  (n, b)
 (~x:n, b)  ==>  (~x:n, b)
@@ -163,9 +156,11 @@ E n  ==>  E n
 { a = n; b = s }  ==>  { a = n; b = s }
 r.a  ==>  r.a
 { r with a = n }  ==>  { r with a = n }
+match t with C c -> c.x | A | B _ -> 0  ==>  match t with | C c -> c.x | A | B _ -> 0
 #{ u = n; w = b }  ==>  #{ u = n; w = b }
 (#{ u = n; w = b }).#u  ==>  #{ u = n; w = b }.#u
 #{ #{ u = n; w = b } with u = 0 }  ==>  #{ #{ u = n; w = b } with u = 0 }
+match #{ u = n; w = b } with #{ u; _ } -> u  ==>  match #{ u = n; w = b } with | #{ u;_} -> u
 `A  ==>  `A
 `B n  ==>  `B n
 []  ==>  []
@@ -176,25 +171,47 @@ n :: xs  ==>  n :: xs
 (* Control *)
 
 let () = List.iter run
-  ["if b then n else 0";
-   "if b then ()";
-   "ignore n; b";
-   "assert b";
-   "assert false"]
+  ["if b then n else 0"; "if b then ()";
+   "match t with A -> 0 | B n -> n | C { x; _ } -> x";
+   "match t with B n when n > 0 -> true | A | B _ -> false | C _ -> b";
+   "match hd xs with n -> n | exception Failure _ -> 0";
+   "match (n, b) with (0, true) | (1, false) -> true | _ -> false";
+   "match xs with (x :: _) as l -> x + length l | [] -> 0";
+   "match r with { a; b = \"\" } -> a | { a = 0; _ } -> 0 | _ -> 1";
+   "try hd xs with Failure _ -> 0 | E n -> n";
+   "ignore n; b"; "assert b"; "assert false"]
 [%%expect {|
 if b then n else 0  ==>  if b then n else 0
 if b then ()  ==>  if b then ()
+match t with A -> 0 | B n -> n | C { x; _ } -> x  ==>  match t with | A -> 0 | B n -> n | C { x;_} -> x
+match t with B n when n > 0 -> true | A | B _ -> false | C _ -> b  ==>  match t with | B n when n > 0 -> true | A | B _ -> false | C _ -> b
+match hd xs with n -> n | exception Failure _ -> 0  ==>  match hd xs with | n -> n | exception Failure _ -> 0
+match (n, b) with (0, true) | (1, false) -> true | _ -> false  ==>  match (n, b) with | (0, true) | (1, false) -> true | _ -> false
+match xs with (x :: _) as l -> x + length l | [] -> 0  ==>  match xs with | x::_ as l -> x + (length l) | [] -> 0
+match r with { a; b = "" } -> a | { a = 0; _ } -> 0 | _ -> 1  ==>  match r with | { a; b = "" } -> a | { a = 0;_} -> 0 | _ -> 1
+try hd xs with Failure _ -> 0 | E n -> n  ==>  try hd xs with | Failure _ -> 0 | E n -> n
 ignore n; b  ==>  ignore n; b
 assert b  ==>  assert b
 assert false  ==>  assert false
 |}]
 
+(* Bindings *)
+
+let () = List.iter run
+  ["let x = n in x";
+   "let x, y = (n, b) in if y then x else 0"]
+[%%expect {|
+let x = n in x  ==>  let x = n in x
+let x, y = (n, b) in if y then x else 0  ==>  let (x, y) = (n, b) in if y then x else 0
+|}]
+
 (* Lazy values and extension constructors *)
 
 let () = List.iter run
-  ["lazy n";
+  ["lazy n"; "match lazy n with lazy _ -> true";
    "[%extension_constructor E]"]
 [%%expect {|
 lazy n  ==>  lazy n
+match lazy n with lazy _ -> true  ==>  match lazy n with | (lazy _) -> true
 [%extension_constructor E]  ==>  [%ocaml.extension_constructor E]
 |}]

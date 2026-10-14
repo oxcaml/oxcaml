@@ -14,6 +14,18 @@ Line 1, characters 36-43:
 Error: Laws do not support arrays.
 |}]
 
+(* A constructor pattern binding existential types. *)
+
+type ex = Ex : 'a -> ex
+law? existential (e : ex) : (match e with Ex _ -> true)
+[%%expect {|
+type ex = Ex : 'a -> ex
+Line 2, characters 42-46:
+2 | law? existential (e : ex) : (match e with Ex _ -> true)
+                                              ^^^^
+Error: Laws do not support constructors with existential types in patterns.
+|}]
+
 (* [__LINE__] and the like, whose values depend on where they occur. *)
 
 law? source_line : __LINE__ = 1

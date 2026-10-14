@@ -36,8 +36,16 @@ module L = Instantiate (Minicheck.Choice)
 
 let ints = [ -3; 0; 1; 7 ]
 let lists = [ []; [ 1 ]; [ 2; -1 ]; [ 0; 4; 4 ] ]
+let show_ints xs = "[" ^ String.concat "; " (List.map string_of_int xs) ^ "]"
 
 module Choices = struct
+  let unzip_zip =
+    Minicheck.choice
+      ~show:(fun (Unzip_zip_input { xs; ys }) -> show_ints xs ^ ", " ^ show_ints ys)
+      (List.concat_map
+         (fun xs -> List.map (fun ys -> Unzip_zip_input { xs; ys }) lists)
+         lists)
+
   let init_length =
     Minicheck.choice
       ~show:(fun (Init_length_input { n; _ }) -> string_of_int n)

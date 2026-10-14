@@ -79,6 +79,17 @@ Error: This expression has type "int" but an expression was expected of type
          "bool"
 |}]
 
+(* Each clause is scoped on its own: a variable bound by a [let] in an
+   assumption is not in scope in the conclusion. *)
+
+law? scoping (n : int) : let m = n + 1 in m > n ===> m = n + 1
+[%%expect {|
+Line 1, characters 53-54:
+1 | law? scoping (n : int) : let m = n + 1 in m > n ===> m = n + 1
+                                                         ^
+Error: Unbound value "m"
+|}]
+
 (* A clause may only refer to the parameters and to the items in scope. *)
 
 law? unbound (xs : int list) : List.length ys = 0
