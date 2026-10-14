@@ -158,7 +158,7 @@ let compute_variance_type env ~check (required, loc) decl tyl =
   if check_injectivity then
     List.iter
       (fun ty ->
-        if Btype.is_Tvar ty || mem Inj (get_variance ty tvl) then () else
+        if Btype.is_param_Tvar ty || mem Inj (get_variance ty tvl) then () else
         let visited = ref TypeSet.empty in
         let rec check env ty =
           if TypeSet.mem ty !visited then () else begin
@@ -191,7 +191,7 @@ let compute_variance_type env ~check (required, loc) decl tyl =
         incr pos;
         let var = get_variance ty tvl in
         let (co,cn) = get_upper var and ij = mem Inj var in
-        if Btype.is_Tvar ty && (co && not c || cn && not n) || not ij && i
+        if Btype.is_param_Tvar ty && (co && not c || cn && not n) || not ij && i
         then raise (Error(loc, Bad_variance
                                 (Variance_not_satisfied !pos,
                                                         (co,cn,ij),
@@ -206,7 +206,7 @@ let compute_variance_type env ~check (required, loc) decl tyl =
     let tvl2 = ref TypeMap.empty in
     List.iter2
       (fun ty (p,n,_) ->
-        if Btype.is_Tvar ty then () else
+        if Btype.is_param_Tvar ty then () else
         let v =
           if p then if n then full else covariant else conjugate covariant in
         compute_variance env tvl2 v ty)
@@ -259,11 +259,11 @@ let compute_variance_type env ~check (required, loc) decl tyl =
       (* Use required variance where relevant *)
       let concr = not (Btype.type_kind_is_abstract decl) in
       let (p, n) =
-        if tr = Private || not (Btype.is_Tvar ty) then (p, n) (* set *)
+        if tr = Private || not (Btype.is_param_Tvar ty) then (p, n) (* set *)
         else (false, false) (* only check *)
       and i = concr in
       let v = union v (make p n i) in
-      if not concr || Btype.is_Tvar ty then v else
+      if not concr || Btype.is_param_Tvar ty then v else
       union v
         (if p then if n then full else covariant else conjugate covariant))
     params required

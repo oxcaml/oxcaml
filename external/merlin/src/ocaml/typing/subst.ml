@@ -753,7 +753,7 @@ let rec typexp copy_scope s ty =
                     typexp copy_scope s more
                 | Tunivar _ | Tvar _ ->
                     if should_duplicate_vars then newpersty mored
-                    else if dup && is_Tvar more then newgenty mored
+                    else if dup && is_row_Tvar more then newgenty mored
                     else more
                 | _ -> assert false
               in

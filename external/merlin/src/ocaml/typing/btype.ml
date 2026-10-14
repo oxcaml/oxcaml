@@ -180,8 +180,8 @@ let new_box_ty t = newty2 ~level:(get_level t) (Tbox t)
 
 (**** Check some types ****)
 
-let is_Tvar ty = match get_desc ty with Tvar _ -> true | _ -> false
-let is_Tivar ty = match get_desc ty with Tivar _ -> true | _ -> false
+let is_param_Tvar ty = match get_desc ty with Tvar _ -> true | _ -> false
+
 let is_Tunivar ty = match get_desc ty with Tunivar _ -> true | _ -> false
 let is_Tconstr ty = match get_desc ty with Tconstr _ -> true | _ -> false
 let is_Tpoly ty = match get_desc ty with Tpoly _ -> true | _ -> false
@@ -288,6 +288,8 @@ let row_of_type t =
 
 let has_constr_row t =
   not (is_Tconstr t) && is_Tconstr (row_of_type t)
+
+let is_row_Tvar ty = match get_desc ty with Tvar _ -> true | _ -> false
 
 let is_row_name s =
   let l = String.length s in

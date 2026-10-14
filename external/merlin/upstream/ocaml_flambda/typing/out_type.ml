@@ -878,7 +878,14 @@ type type_or_scheme = Type | Type_scheme
 
 let is_non_gen mode ty =
   match mode with
-  | Type_scheme -> (is_Tvar ty && get_level ty <> generic_level) || is_Tivar ty
+  | Type_scheme -> (
+    match get_desc ty with
+    | Tvar _ -> get_level ty <> generic_level
+    | Tivar _ -> true
+    | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tconstr _ | Tmod _
+    | Tobject _ | Tfield _ | Tquote _ | Tsplice _ | Tquote_eval _ | Tnil
+    | Tlink _ | Tsubst _ | Tvariant _ | Tunivar _ | Tpoly _ | Trepr _
+    | Tpackage _ | Tof_kind _ | Tbox _ -> false)
   | Type -> false
 
 let nameable_row row =
@@ -3281,8 +3288,7 @@ let tree_of_type_decl id decl =
     let vari =
       List.map2
         (fun ty v ->
-          let is_var = is_Tvar ty in
-          if !Clflags.print_variance || abstr || not is_var then
+          if !Clflags.print_variance || abstr || not (is_param_Tvar ty) then
             let inj =
               !Clflags.print_variance && Variance.mem Inj v ||
               type_kind_is_abstract decl && Variance.mem Inj v &&
@@ -3665,7 +3671,7 @@ let rec prepare_class_type params = function
   | Cty_constr (_p, tyl, cty) ->
       let row = Btype.self_type_row cty in
       if List.memq (proxy row) !Aliases.visited_objects
-      || not (List.for_all is_Tvar params)
+      || not (List.for_all is_param_Tvar params)
       || deep_occur_list row tyl
       then prepare_class_type params cty
       else List.iter prepare_type tyl
@@ -3685,7 +3691,7 @@ let rec tree_of_class_type mode params =
   | Cty_constr (p', tyl, cty) ->
       let row = Btype.self_type_row cty in
       if List.memq (proxy row) !Aliases.visited_objects
-      || not (List.for_all is_Tvar params)
+      || not (List.for_all is_param_Tvar params)
       then
         tree_of_class_type mode params cty
       else
@@ -3747,7 +3753,10 @@ let rec tree_of_class_type mode params =
 
 let tree_of_class_param param variance =
   let ot_variance =
-    if is_Tvar param then Asttypes.(NoVariance, NoInjectivity) else variance in
+    if is_param_Tvar param
+    then Asttypes.(NoVariance, NoInjectivity)
+    else variance
+  in
   (* CR layouts: fix next line when adding support for jkind
      annotations on class type parameters *)
   let ot_jkind = param_jkind param in

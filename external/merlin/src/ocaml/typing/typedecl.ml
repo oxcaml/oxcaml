@@ -540,7 +540,7 @@ let set_private_row env loc p decl =
         else more
     | Tobject (ty, _) ->
         let r = snd (Ctype.flatten_fields ty) in
-        if not (Btype.is_Tvar r) then
+        if not (Btype.is_row_Tvar r) then
           (* a syntactically open object was closed by a constraint *)
           raise (Error(loc, Invalid_private_row_declaration tm));
         r

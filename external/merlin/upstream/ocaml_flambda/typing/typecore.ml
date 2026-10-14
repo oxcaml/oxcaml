@@ -6296,12 +6296,14 @@ let rec is_inferred sexp =
   | Pexp_ifthenelse (_, e1, Some e2) -> is_inferred e1 && is_inferred e2
   | _ -> false
 
-(* check if the type of %apply or %revapply matches the type expected by
-   the specialized typing rule for those primitives.
-*)
 type apply_prim =
   | Apply
   | Revapply
+
+
+(* check if the type of %apply or %revapply matches the type expected by
+   the specialized typing rule for those primitives.
+*)
 let check_apply_prim_type prim typ =
   match get_desc typ with
   | Tarrow ((Nolabel,_,_),a,b,_) when tpoly_is_mono a ->
@@ -6317,8 +6319,16 @@ let check_apply_prim_type prim typ =
           begin match get_desc f with
           | Tarrow((Nolabel,_,_),fl,fr,_) ->
               let fl = tpoly_get_mono fl in
-              is_Tvar fl && is_Tvar fr && is_Tvar x && is_Tvar res
-              && Types.eq_type fl x && Types.eq_type fr res
+              begin match get_desc fl, get_desc fr with
+              | Tvar _, Tvar _ -> Types.eq_type fl x && Types.eq_type fr res
+              | ( ( Tvar _ | Tivar _ | Tarrow _ | Ttuple _ | Tunboxed_tuple _
+                  | Tconstr _ | Tmod _ | Tobject _ | Tfield _ | Tquote _
+                  | Tsplice _ | Tquote_eval _ | Tnil | Tlink _ | Tsubst _
+                  | Tvariant _ | Tunivar _ | Tpoly _ | Trepr _ | Tpackage _
+                  | Tof_kind _ | Tbox _ ),
+                  _ ) ->
+                false
+              end
           | _ -> false
           end
       | _ -> false
@@ -11354,12 +11364,15 @@ and type_statement ?explanation ?(position=RNontail) env sexp =
   ~before_generalize: begin fun (exp, _sort) ->
     let subexp = final_subexpression exp in
     let ty = expand_head env exp.exp_type in
-    if is_Tvar ty
-    && get_level ty > get_current_level ()
-    && not (allow_polymorphic subexp) then
-      Location.prerr_warning
-        subexp.exp_loc
-        Warnings.Nonreturning_statement;
+    (match get_desc ty with
+    | Tvar _
+      when get_level ty > get_current_level () && not (allow_polymorphic subexp)
+      ->
+      Location.prerr_warning subexp.exp_loc Warnings.Nonreturning_statement
+    | Tvar _ | Tivar _ | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tconstr _
+    | Tmod _ | Tobject _ | Tfield _ | Tquote _ | Tsplice _ | Tquote_eval _
+    | Tnil | Tlink _ | Tsubst _ | Tvariant _ | Tunivar _ | Tpoly _
+    | Trepr _ | Tpackage _ | Tof_kind _ | Tbox _ -> ());
     if !Clflags.strict_sequence then begin
       let disambiguated_unit_ty =
         if is_unboxed_unit_type env ty then begin

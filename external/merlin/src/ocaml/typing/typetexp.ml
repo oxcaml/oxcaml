@@ -710,22 +710,28 @@ end = struct
               r := (loc, v, type_expr) :: !r;
               unused := false
             | exception Not_found ->
-            match unbound_variable_policy, Btype.is_Tvar ty with
-            | Open, _ | (Closed | Closed_for_upstream_compatibility), false ->
-              let jkind = Jkind.Builtin.any ~why:Dummy_jkind in
-              let v2 = new_global_var jkind in
-              r := (loc, v, v2) :: !r;
-              add ~unused name v2 jkind s;
-            | Closed, true ->
+            match unbound_variable_policy, get_desc ty with
+            | Closed, Tvar _ ->
               raise(Error(loc, env,
                           Unbound_type_variable (Pprintast.tyvar_of_name name,
                                                  get_in_scope_names (),
                                                  None)))
-            | Closed_for_upstream_compatibility, true ->
+            | Closed_for_upstream_compatibility, Tvar _ ->
               raise(Error(loc, env,
                           Unbound_type_variable (Pprintast.tyvar_of_name name,
                                                  get_in_scope_names (),
-                                                 Some Upstream_compatibility))))
+                                                 Some Upstream_compatibility)))
+            | Open, _
+            | (Closed | Closed_for_upstream_compatibility),
+              ( Tivar _ | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tconstr _
+              | Tmod _ | Tobject _ | Tfield _ | Tquote _ | Tsplice _
+              | Tquote_eval _ | Tnil | Tlink _ | Tsubst _ | Tvariant _
+              | Tunivar _ | Tpoly _ | Trepr _ | Tpackage _ | Tof_kind _
+              | Tbox _ ) ->
+              let jkind = Jkind.Builtin.any ~why:Dummy_jkind in
+              let v2 = new_global_var jkind in
+              r := (loc, v, v2) :: !r;
+              add ~unused name v2 jkind s)
       !used_variables;
     used_variables := TyVarMap.empty;
     fun () ->
