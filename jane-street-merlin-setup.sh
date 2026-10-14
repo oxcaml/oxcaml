@@ -41,6 +41,7 @@ create_link ocamlmerlin ocamlmerlin
 create_link ocamllsp ocaml-lsp
 create_link ocamlmerlin-server ocamlmerlin-server
 create_link dot-merlin-reader dot-merlin-reader
+create_link dune dune
 
 # Step 3: Create the files .local-merlin-binaries and .local-ocaml-lib, which
 # editors use to get configuration information.
