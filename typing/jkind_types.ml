@@ -68,8 +68,6 @@ module Sort = struct
       id : int
     }
 
-  exception Lower_rigid
-
   type level_error = Rigid
 
   type error =
@@ -531,7 +529,7 @@ module Sort = struct
     if level < v.level
     then
       if v.level = subject_level
-      then raise Lower_rigid
+      then Error Rigid
       else (
         log (v, Clevel v.level);
         v.level <- level;
