@@ -103,9 +103,26 @@ let print_plan ppf { input_stages; output_atoms; num_existentials; _ } =
   in
   print_stages print_output ppf input_stages
 
+(* Represent occurrences of variables in table atoms.
+
+   An occurrence is binding and will participate in the join defining the
+   variable if:
+
+   - It is the first (outermost) occurrence of the variable in the atom, and
+
+   - There is no previous (outer) occurrences of a variable that must be bound
+   earlier ccording to the global variable ordering.
+
+   For instance, the first occurrence of [X] in [P(X, Y, X)] is always binding,
+   but the occurrence of [Y] is only binding if [Y] is after [X] in the global
+   variable ordering. *)
+type 'a arg =
+  | Bind of 'a variable
+  | Check of 'a term
+
 type index_layer =
   | Index_layer :
-      ('t, 'k, 'v) Column.id * 't variable * 'k term * 'v variable
+      ('t, 'k, 'v) Column.id * 't variable * 'k arg * 'v variable
       -> index_layer
 
 type table_layers =
@@ -127,21 +144,21 @@ type atom_layout =
   }
 
 let layout_table_atom : type t k v.
-    bindable_vars:_ ->
+    binding_times:_ ->
     (t, k, v) Column.hlist ->
     t variable ->
     k Term.hlist ->
     table_layers =
- fun ~bindable_vars columns table args ->
+ fun ~binding_times columns table args ->
   let columns, result =
     let rec loop : type t k.
-        bindable_vars:_ ->
+        min_binding_time:_ ->
         _ ->
         (t, k, v) Column.hlist ->
         t variable ->
         k Term.hlist ->
         _ * v variable =
-     fun ~bindable_vars rev_plan columns outer_var args ->
+     fun ~min_binding_time rev_plan columns outer_var args ->
       match columns, args with
       | [], [] -> Iarray.of_list (List.rev rev_plan), outer_var
       | column :: columns, arg :: args ->
@@ -151,17 +168,23 @@ let layout_table_atom : type t k v.
                (print_term (Column.print_key column))
                arg)
         in
-        let bindable_vars =
+        (* Only the first (outermost) position of a variable is binding and can
+           participate in a join defining that variable. *)
+        let arg, min_binding_time =
           match arg with
-          | Variable var ->
-            Variable.Id.Set.remove (Variable.uid var) bindable_vars
-          | Literal _ -> bindable_vars
+          | Variable var -> (
+            match Variable.Id.Map.find (Variable.uid var) binding_times with
+            | var_binding_time when var_binding_time >= min_binding_time ->
+              Bind var, var_binding_time + 1
+            | _ | (exception Not_found) ->
+              Check (Variable var), min_binding_time)
+          | Literal _ -> Check arg, min_binding_time
         in
-        loop ~bindable_vars
+        loop ~min_binding_time
           (Index_layer (column, outer_var, arg, inner_var) :: rev_plan)
           columns inner_var args
     in
-    loop ~bindable_vars [] columns table args
+    loop ~min_binding_time:0 [] columns table args
   in
   Table_layers { columns; table; result; bound_prefix = 0 }
 
@@ -173,7 +196,7 @@ let rec free_vars_term_hlist : type a. a Term.hlist -> Variable.Id.Set.t =
   | Variable v :: terms ->
     Variable.Id.Set.add (Variable.uid v) (free_vars_term_hlist terms)
 
-let layout_atom ~bindable_vars bound_tables atom =
+let layout_atom ~binding_times bound_tables atom =
   let (Atom (relation, terms)) = atom in
   let bound_tables, table_layers =
     match relation with
@@ -181,14 +204,16 @@ let layout_atom ~bindable_vars bound_tables atom =
       let var = Variable.create (Table.Id.name tid) in
       let seminaive_tables = Bound_table (tid, var) :: bound_tables in
       let table_layers =
-        layout_table_atom ~bindable_vars (Table.Id.columns tid) var terms
+        layout_table_atom ~binding_times (Table.Id.columns tid) var terms
       in
       seminaive_tables, Some table_layers
     | Unless _ | Distinct _ | Filter _ | Callback_with_bindings _ ->
       bound_tables, None
   in
   let free_vars =
-    Variable.Id.Set.inter bindable_vars (free_vars_term_hlist terms)
+    Variable.Id.Set.filter
+      (fun var -> Variable.Id.Map.mem var binding_times)
+      (free_vars_term_hlist terms)
   in
   bound_tables, { table_layers; atom; free_vars }
 
@@ -212,9 +237,15 @@ let add_stages_involving_no_free_vars stages atom_decomposition =
         let index_layer = Iarray.get columns bound_prefix in
         let (Index_layer (col, outer, arg, inner)) = index_layer in
         match arg with
-        | Variable var when Variable.Id.Set.mem (Variable.uid var) free_vars ->
+        | Bind var ->
+          if not (Variable.Id.Set.mem (Variable.uid var) free_vars)
+          then
+            Misc.fatal_errorf
+              "*BUG*: Planner found binding position for variable %a, but it \
+               was already bound."
+              Variable.print var;
           stop_iteration ()
-        | Variable _ | Literal _ ->
+        | Check ((Variable _ | Literal _) as arg) ->
           add_seek_stage stages arg [Column_iterator (col, outer, inner)];
           loop (bound_prefix + 1)
     in
@@ -232,8 +263,8 @@ let advance_prefix_and_extract_iterator_on_variable (type a) table_layers
       Iarray.get columns bound_prefix
     in
     match arg with
-    | Literal _ -> iterators
-    | Variable arg_var -> (
+    | Check _ -> iterators
+    | Bind arg_var -> (
       match Variable.provably_equal var arg_var with
       | None -> iterators
       | Some Equal ->
@@ -241,14 +272,16 @@ let advance_prefix_and_extract_iterator_on_variable (type a) table_layers
         Column_iterator (column, outer_var, inner_var) :: iterators))
 
 let plan_rule { variables = vars; head; body } =
-  let bindable_vars =
+  let _, binding_times =
     List.fold_left
-      (fun bindable_vars (Variable.Any var) ->
-        Variable.Id.Set.add (Variable.uid var) bindable_vars)
-      Variable.Id.Set.empty vars
+      (fun (next_binding_time, bindable_vars) (Variable.Any var) ->
+        ( next_binding_time + 1,
+          Variable.Id.Map.add (Variable.uid var) next_binding_time bindable_vars
+        ))
+      (0, Variable.Id.Map.empty) vars
   in
   let tables, body_layout =
-    Iarray.fold_left_map (layout_atom ~bindable_vars) [] body
+    Iarray.fold_left_map (layout_atom ~binding_times) [] body
   in
   let tables = Iarray.of_list (List.rev tables) in
   let var_to_atoms = Variable.Id.Tbl.create 0 in
