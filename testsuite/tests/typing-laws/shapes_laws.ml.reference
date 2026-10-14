@@ -5,6 +5,8 @@ module Laws_gen_Stdlib = Stdlib
 type 'a each =
   {
   area_nonneg: 'a ;
+  rect: 'a ;
+  origin_x: 'a ;
   poly: 'a ;
   disamb: 'a ;
   optional: 'a ;
@@ -17,6 +19,8 @@ type 'a each =
 let names =
   {
     area_nonneg = "area_nonneg";
+    rect = "rect";
+    origin_x = "origin_x";
     poly = "poly";
     disamb = "disamb";
     optional = "optional";
@@ -37,15 +41,15 @@ let locations =
         end_line = 21;
         end_col = 39
       };
-    poly =
+    rect =
       {
         CamlinternalLaw.file = "shapes.mli";
         start_line = 22;
         start_col = 0;
         end_line = 23;
-        end_col = 46
+        end_col = 57
       };
-    disamb =
+    origin_x =
       {
         CamlinternalLaw.file = "shapes.mli";
         start_line = 24;
@@ -53,69 +57,87 @@ let locations =
         end_line = 24;
         end_col = 58
       };
-    optional =
+    poly =
       {
         CamlinternalLaw.file = "shapes.mli";
         start_line = 25;
         start_col = 0;
         end_line = 26;
-        end_col = 62
+        end_col = 46
       };
-    modes =
+    disamb =
       {
         CamlinternalLaw.file = "shapes.mli";
         start_line = 27;
         start_col = 0;
         end_line = 27;
-        end_col = 54
+        end_col = 58
       };
-    fmt =
+    optional =
       {
         CamlinternalLaw.file = "shapes.mli";
         start_line = 28;
         start_col = 0;
-        end_line = 28;
-        end_col = 60
-      };
-    fake_format =
-      {
-        CamlinternalLaw.file = "shapes.mli";
-        start_line = 29;
-        start_col = 0;
         end_line = 29;
-        end_col = 61
+        end_col = 62
       };
-    unboxed =
+    modes =
       {
         CamlinternalLaw.file = "shapes.mli";
         start_line = 30;
         start_col = 0;
         end_line = 30;
-        end_col = 55
+        end_col = 54
       };
-    \#type =
+    fmt =
       {
         CamlinternalLaw.file = "shapes.mli";
         start_line = 31;
         start_col = 0;
         end_line = 31;
-        end_col = 50
+        end_col = 60
       };
-    inferred =
+    fake_format =
       {
         CamlinternalLaw.file = "shapes.mli";
         start_line = 32;
         start_col = 0;
         end_line = 32;
+        end_col = 61
+      };
+    unboxed =
+      {
+        CamlinternalLaw.file = "shapes.mli";
+        start_line = 33;
+        start_col = 0;
+        end_line = 33;
+        end_col = 55
+      };
+    \#type =
+      {
+        CamlinternalLaw.file = "shapes.mli";
+        start_line = 34;
+        start_col = 0;
+        end_line = 34;
+        end_col = 50
+      };
+    inferred =
+      {
+        CamlinternalLaw.file = "shapes.mli";
+        start_line = 35;
+        start_col = 0;
+        end_line = 35;
         end_col = 33
       }
   }
 let map
-  { area_nonneg; poly; disamb; optional; modes; fmt; fake_format; unboxed;
-    \#type; inferred }
+  { area_nonneg; rect; origin_x; poly; disamb; optional; modes; fmt;
+    fake_format; unboxed; \#type; inferred }
   ~f =
   {
     area_nonneg = (f area_nonneg);
+    rect = (f rect);
+    origin_x = (f origin_x);
     poly = (f poly);
     disamb = (f disamb);
     optional = (f optional);
@@ -127,10 +149,12 @@ let map
     inferred = (f inferred)
   }
 let to_list
-  { area_nonneg; poly; disamb; optional; modes; fmt; fake_format; unboxed;
-    \#type; inferred }
+  { area_nonneg; rect; origin_x; poly; disamb; optional; modes; fmt;
+    fake_format; unboxed; \#type; inferred }
   =
   [area_nonneg;
+  rect;
+  origin_x;
   poly;
   disamb;
   optional;
@@ -143,6 +167,13 @@ let to_list
 type area_nonneg_input =
   | Area_nonneg_input: {
   s: Laws_gen_Shapes.t } -> area_nonneg_input 
+type rect_input =
+  | Rect_input: {
+  w: float ;
+  h: float } -> rect_input 
+type origin_x_input =
+  | Origin_x_input: {
+  p: Laws_gen_Shapes.point } -> origin_x_input 
 type poly_input =
   | Poly_input: ('a : value_or_null) ('b : value_or_null) .
   {
@@ -178,6 +209,8 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
     module type Choices  =
       sig
         val area_nonneg : area_nonneg_input Choice.t
+        val rect : rect_input Choice.t
+        val origin_x : origin_x_input Choice.t
         val poly : poly_input Choice.t
         val disamb : disamb_input Choice.t
         val optional : optional_input Choice.t
@@ -209,6 +242,90 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                      end_col = 39
                    }
                }))
+    let rect ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.rect),
+          (fun input ->
+             Law.Bind
+               ((Law.Assumption
+                   {
+                     value = input;
+                     source = C.rect;
+                     predicate =
+                       (fun ((Rect_input { w; h }) : rect_input) ->
+                          (Laws_gen_Stdlib.(>=) w 0. : bool));
+                     location =
+                       {
+                         CamlinternalLaw.file = "shapes.mli";
+                         start_line = 23;
+                         start_col = 2;
+                         end_line = 23;
+                         end_col = 9
+                       }
+                   }),
+                 (fun () ->
+                    Law.Bind
+                      ((Law.Assumption
+                          {
+                            value = input;
+                            source = C.rect;
+                            predicate =
+                              (fun ((Rect_input { w; h }) : rect_input) ->
+                                 (Laws_gen_Stdlib.(>=) h 0. : bool));
+                            location =
+                              {
+                                CamlinternalLaw.file = "shapes.mli";
+                                start_line = 23;
+                                start_col = 15;
+                                end_line = 23;
+                                end_col = 22
+                              }
+                          }),
+                        (fun () ->
+                           Law.Assertion
+                             {
+                               value = input;
+                               source = C.rect;
+                               predicate =
+                                 (fun ((Rect_input { w; h }) : rect_input) ->
+                                    (Laws_gen_Stdlib.(=)
+                                       (Laws_gen_Shapes.area
+                                          (Laws_gen_Shapes.Rect { w; h } : 
+                                          Laws_gen_Shapes.t))
+                                       (Laws_gen_Stdlib.( *. ) w h) : 
+                                    bool));
+                               location =
+                                 {
+                                   CamlinternalLaw.file = "shapes.mli";
+                                   start_line = 23;
+                                   start_col = 28;
+                                   end_line = 23;
+                                   end_col = 57
+                                 }
+                             }))))))
+    let origin_x ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.origin_x),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.origin_x;
+                 predicate =
+                   (fun ((Origin_x_input { p }) : origin_x_input) ->
+                      (Laws_gen_Stdlib.(=)
+                         ({ p with Laws_gen_Shapes.x = 0. } : Laws_gen_Shapes.point).Laws_gen_Shapes.x
+                         (Laws_gen_Shapes.origin : Laws_gen_Shapes.point).Laws_gen_Shapes.x : 
+                      bool));
+                 location =
+                   {
+                     CamlinternalLaw.file = "shapes.mli";
+                     start_line = 24;
+                     start_col = 28;
+                     end_line = 24;
+                     end_col = 58
+                   }
+               }))
     let poly ((module C)  : (module Choices))  : unit Law.t =
       Law.Bind
         ((Law.Choose C.poly),
@@ -226,9 +343,9 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                  location =
                    {
                      CamlinternalLaw.file = "shapes.mli";
-                     start_line = 23;
+                     start_line = 26;
                      start_col = 2;
-                     end_line = 23;
+                     end_line = 26;
                      end_col = 46
                    }
                }))
@@ -252,9 +369,9 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                  location =
                    {
                      CamlinternalLaw.file = "shapes.mli";
-                     start_line = 24;
+                     start_line = 27;
                      start_col = 22;
-                     end_line = 24;
+                     end_line = 27;
                      end_col = 58
                    }
                }))
@@ -277,9 +394,9 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                  location =
                    {
                      CamlinternalLaw.file = "shapes.mli";
-                     start_line = 26;
+                     start_line = 29;
                      start_col = 2;
-                     end_line = 26;
+                     end_line = 29;
                      end_col = 62
                    }
                }))
@@ -298,9 +415,9 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                  location =
                    {
                      CamlinternalLaw.file = "shapes.mli";
-                     start_line = 27;
+                     start_line = 30;
                      start_col = 37;
-                     end_line = 27;
+                     end_line = 30;
                      end_col = 54
                    }
                }))
@@ -336,9 +453,9 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                  location =
                    {
                      CamlinternalLaw.file = "shapes.mli";
-                     start_line = 28;
+                     start_line = 31;
                      start_col = 21;
-                     end_line = 28;
+                     end_line = 31;
                      end_col = 60
                    }
                }))
@@ -359,9 +476,9 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                  location =
                    {
                      CamlinternalLaw.file = "shapes.mli";
-                     start_line = 29;
+                     start_line = 32;
                      start_col = 19;
-                     end_line = 29;
+                     end_line = 32;
                      end_col = 61
                    }
                }))
@@ -380,9 +497,9 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                  location =
                    {
                      CamlinternalLaw.file = "shapes.mli";
-                     start_line = 30;
+                     start_line = 33;
                      start_col = 28;
-                     end_line = 30;
+                     end_line = 33;
                      end_col = 55
                    }
                }))
@@ -400,9 +517,9 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                  location =
                    {
                      CamlinternalLaw.file = "shapes.mli";
-                     start_line = 31;
+                     start_line = 34;
                      start_col = 31;
-                     end_line = 31;
+                     end_line = 34;
                      end_col = 50
                    }
                }))
@@ -421,15 +538,17 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                  location =
                    {
                      CamlinternalLaw.file = "shapes.mli";
-                     start_line = 32;
+                     start_line = 35;
                      start_col = 20;
-                     end_line = 32;
+                     end_line = 35;
                      end_col = 33
                    }
                }))
     let laws choices =
       {
         area_nonneg = (area_nonneg choices);
+        rect = (rect choices);
+        origin_x = (origin_x choices);
         poly = (poly choices);
         disamb = (disamb choices);
         optional = (optional choices);

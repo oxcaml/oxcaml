@@ -50,6 +50,8 @@ type constructor =
   | Constructor of { type_path : Path.t; name : string }
   | Extension_constructor of Path.t
 
+type label = { type_path : Path.t; name : string }
+
 type 'ty expression =
   { sexp_desc : 'ty expression_desc;
     sexp_type : 'ty;
@@ -75,11 +77,35 @@ and 'ty expression_desc =
         locality : locality option;  (** [None] if no allocation is needed *)
       }
   | Sexp_variant of string * ('ty expression * locality) option
+  | Sexp_record of
+      { fields : (label * sort * 'ty field_definition) list;
+          (** all the fields of the record type, in declaration order *)
+        extended_expression : ('ty expression * sort) option;
+        locality : locality option;
+      }
+  | Sexp_field of
+      { record : 'ty expression;
+        sort : sort;  (** sort of the record *)
+        label : label;
+      }
+  | Sexp_record_unboxed_product of
+      { fields : (label * sort * 'ty field_definition) list;
+        extended_expression : ('ty expression * sort) option;
+      }
+  | Sexp_unboxed_field of
+      { record : 'ty expression;
+        sort : sort;
+        label : label;
+      }
   | Sexp_extension_constructor of Path.t
 
 and 'ty argument =
   | Arg of 'ty expression * sort
   | Omitted
+
+and 'ty field_definition =
+  | Kept of 'ty
+  | Overridden of 'ty expression
 
 (** {1 Traversals} *)
 

@@ -123,6 +123,9 @@ let constructor loc (cstr : Data_types.constructor_description) =
         { type_path = Data_types.cstr_res_type_path cstr;
           name = cstr.cstr_name }
 
+let label (lbl : _ Data_types.gen_label_description) =
+  { type_path = Data_types.gen_lbl_res_type_path lbl; name = lbl.lbl_name }
+
 (* Expressions. [bound] contains the local variables in scope. *)
 
 let check_extra loc extra =
@@ -191,11 +194,32 @@ and expression_desc bound loc desc =
         (lbl,
          Option.map (fun (e, mode) -> (expression bound e, locality_r mode))
            arg)
-  | Texp_record _ | Texp_record_unboxed_product _ ->
-      unsupported loc (Not_yet_supported "records")
+  | Texp_record { fields; extended_expression; locality_mode; _ } ->
+      Sexp_record
+        { fields = record_fields bound fields;
+          extended_expression =
+            Option.map
+              (fun (e, s, _, _) -> (expression bound e, sort s))
+              extended_expression;
+          locality = Option.map locality_r locality_mode }
+  | Texp_record_unboxed_product { fields; extended_expression; _ } ->
+      Sexp_record_unboxed_product
+        { fields = record_fields bound fields;
+          extended_expression =
+            Option.map
+              (fun (e, s) -> (expression bound e, sort s))
+              extended_expression }
   | Texp_atomic_loc _ -> unsupported loc Atomic_fields
-  | Texp_field _ | Texp_unboxed_field _ ->
-      unsupported loc (Not_yet_supported "field accesses")
+  | Texp_field { record; record_sort; label = lbl; _ } ->
+      Sexp_field
+        { record = expression bound record;
+          sort = sort record_sort;
+          label = label lbl }
+  | Texp_unboxed_field { record; record_sort; label = lbl; _ } ->
+      Sexp_unboxed_field
+        { record = expression bound record;
+          sort = sort record_sort;
+          label = label lbl }
   | Texp_setfield _ -> unsupported loc Mutation
   | Texp_array _ -> unsupported loc Arrays
   | Texp_idx _ -> unsupported loc Block_indices
@@ -223,6 +247,18 @@ and expression_desc bound loc desc =
   | Texp_src_pos -> unsupported loc Source_positions
   | Texp_overwrite _ | Texp_hole _ -> unsupported loc Overwrite
   | Texp_quote _ | Texp_splice _ -> unsupported loc Quotations
+
+and record_fields :
+  type r. _ -> (r Data_types.gen_label_description * _ * _) array -> _ =
+  fun bound fields ->
+  Array.to_list fields
+  |> List.map (fun (lbl, s, (def : record_label_definition)) ->
+       let def : _ Spec.field_definition =
+         match def with
+         | Kept (ty, _, _) -> Kept ty
+         | Overridden (_, e) -> Overridden (expression bound e)
+       in
+       (label lbl, sort s, def))
 
 let expression ~bound e = expression bound e
 

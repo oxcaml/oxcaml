@@ -95,6 +95,9 @@ let constructor env ~loc = function
   | Constructor { type_path; name } -> in_namespace_of env ~loc type_path name
   | Extension_constructor path -> mk ~loc (env.lident_of_path path)
 
+let label env ~loc ({ type_path; name } : Spec.label) =
+  in_namespace_of env ~loc type_path name
+
 let annotate_exp env ty (e : Parsetree.expression) =
   match env.annotate ty with
   | None -> e
@@ -134,6 +137,19 @@ let rec expression env (e : _ Spec.expression) =
         (Exp.construct ~loc (constructor env ~loc cstr) args)
   | Sexp_variant (lbl, arg) ->
       Exp.variant ~loc lbl (Option.map (fun (e, _) -> expression env e) arg)
+  | Sexp_record { fields; extended_expression; _ } ->
+      annotate_exp env e.sexp_type
+        (Exp.record ~loc (record_fields env ~loc fields)
+           (Option.map (fun (e, _) -> expression env e) extended_expression))
+  | Sexp_record_unboxed_product { fields; extended_expression } ->
+      annotate_exp env e.sexp_type
+        (Exp.record_unboxed_product ~loc (record_fields env ~loc fields)
+           (Option.map (fun (e, _) -> expression env e) extended_expression))
+  | Sexp_field { record; label = lbl; _ } ->
+      Exp.field ~loc (annotated_record env record) (label env ~loc lbl)
+  | Sexp_unboxed_field { record; label = lbl; _ } ->
+      Exp.unboxed_field ~loc (annotated_record env record)
+        (label env ~loc lbl)
   | Sexp_extension_constructor path ->
       let constructor =
         Exp.construct ~loc (mk ~loc (env.lident_of_path path)) None
@@ -141,6 +157,23 @@ let rec expression env (e : _ Spec.expression) =
       Exp.extension ~loc
         (mk ~loc "ocaml.extension_constructor",
          PStr [Str.eval ~loc constructor])
+
+(* The overridden fields, for [{ e with ... }] *)
+and record_fields env ~loc fields =
+  List.filter_map
+    (fun (lbl, _, def) ->
+       match def with
+       | Kept _ -> None
+       | Overridden e -> Some (label env ~loc lbl, expression env e))
+    fields
+
+(* The record of a field access, annotated with its type unless its
+   construction already is *)
+and annotated_record env record =
+  match record.sexp_desc with
+  | Sexp_record _ | Sexp_record_unboxed_product _ | Sexp_construct _ ->
+      expression env record
+  | _ -> annotate_exp env record.sexp_type (expression env record)
 
 let expression ~lident_of_path ~annotate e =
   expression { lident_of_path; annotate } e

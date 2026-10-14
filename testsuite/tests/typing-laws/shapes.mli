@@ -19,6 +19,9 @@ val apply : (local_ int -> int) -> int
 val of_unboxed : float# -> float
 
 law? area_nonneg (s : t) : area s >= 0.
+law? rect (w : float) (h : float) :
+  w >= 0. ===> h >= 0. ===> area (Rect { w; h }) = w *. h
+law? origin_x (p : point) : { p with x = 0. }.x = origin.x
 law? poly (xs : 'a list) (f : 'a -> 'b) :
   List.length (List.map f xs) = List.length xs
 law? disamb (c : t) : (Circle 1. : t) = c || Sub.U = Sub.U

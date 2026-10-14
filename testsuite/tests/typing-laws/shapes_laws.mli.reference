@@ -4,6 +4,8 @@ module Laws_gen_Stdlib = Stdlib
 type 'a each =
   {
   area_nonneg: 'a ;
+  rect: 'a ;
+  origin_x: 'a ;
   poly: 'a ;
   disamb: 'a ;
   optional: 'a ;
@@ -20,6 +22,13 @@ val to_list : 'a each -> 'a list
 type area_nonneg_input =
   | Area_nonneg_input: {
   s: Laws_gen_Shapes.t } -> area_nonneg_input 
+type rect_input =
+  | Rect_input: {
+  w: float ;
+  h: float } -> rect_input 
+type origin_x_input =
+  | Origin_x_input: {
+  p: Laws_gen_Shapes.point } -> origin_x_input 
 type poly_input =
   | Poly_input: ('a : value_or_null) ('b : value_or_null) .
   {
@@ -56,6 +65,8 @@ module Instantiate :
     module type Choices  =
       sig
         val area_nonneg : area_nonneg_input Choice.t
+        val rect : rect_input Choice.t
+        val origin_x : origin_x_input Choice.t
         val poly : poly_input Choice.t
         val disamb : disamb_input Choice.t
         val optional : optional_input Choice.t

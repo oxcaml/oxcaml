@@ -74,6 +74,22 @@ module type Disambiguated =
   end
 |}]
 
+(* So are records and field accesses, for their labels. *)
+
+module type Disambiguated_record = sig
+  type r = { x : int }
+  type r2 = { x : float }
+  law? record (r : r) : ({ x = 1 } : r) = r && (r : r).x = 1
+end
+[%%expect {|
+module type Disambiguated_record =
+  sig
+    type r = { x : int; }
+    type r2 = { x : float; }
+    law? record (r : r) : (({ x = 1 } : r) = r) && ((r : r).x = 1)
+  end
+|}]
+
 (* The [None] the type checker inserts for an omitted optional argument is
    printed like an explicit [?x:None]. *)
 

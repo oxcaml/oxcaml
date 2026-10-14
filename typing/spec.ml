@@ -43,6 +43,8 @@ type constructor =
   | Constructor of { type_path : Path.t; name : string }
   | Extension_constructor of Path.t
 
+type label = { type_path : Path.t; name : string }
+
 type 'ty expression =
   { sexp_desc : 'ty expression_desc;
     sexp_type : 'ty;
@@ -68,11 +70,35 @@ and 'ty expression_desc =
         locality : locality option;  (** [None] if no allocation is needed *)
       }
   | Sexp_variant of string * ('ty expression * locality) option
+  | Sexp_record of
+      { fields : (label * sort * 'ty field_definition) list;
+          (** all the fields of the record type, in declaration order *)
+        extended_expression : ('ty expression * sort) option;
+        locality : locality option;
+      }
+  | Sexp_field of
+      { record : 'ty expression;
+        sort : sort;  (** sort of the record *)
+        label : label;
+      }
+  | Sexp_record_unboxed_product of
+      { fields : (label * sort * 'ty field_definition) list;
+        extended_expression : ('ty expression * sort) option;
+      }
+  | Sexp_unboxed_field of
+      { record : 'ty expression;
+        sort : sort;
+        label : label;
+      }
   | Sexp_extension_constructor of Path.t
 
 and 'ty argument =
   | Arg of 'ty expression * sort
   | Omitted
+
+and 'ty field_definition =
+  | Kept of 'ty
+  | Overridden of 'ty expression
 
 
 (* Traversals *)
@@ -113,6 +139,23 @@ and map_desc m = function
           locality }
   | Sexp_variant (lbl, arg) ->
       Sexp_variant (lbl, Option.map (fun (e, loc) -> (map m e, loc)) arg)
+  | Sexp_record { fields; extended_expression; locality } ->
+      Sexp_record
+        { fields = List.map (map_field m) fields;
+          extended_expression =
+            Option.map (fun (e, sort) -> (map m e, sort)) extended_expression;
+          locality }
+  | Sexp_field { record; sort; label } ->
+      Sexp_field
+        { record = map m record; sort; label = map_label m label }
+  | Sexp_record_unboxed_product { fields; extended_expression } ->
+      Sexp_record_unboxed_product
+        { fields = List.map (map_field m) fields;
+          extended_expression =
+            Option.map (fun (e, sort) -> (map m e, sort)) extended_expression }
+  | Sexp_unboxed_field { record; sort; label } ->
+      Sexp_unboxed_field
+        { record = map m record; sort; label = map_label m label }
   | Sexp_extension_constructor p ->
       Sexp_extension_constructor (m.extension_path p)
 
@@ -120,10 +163,21 @@ and map_argument m = function
   | Arg (e, sort) -> Arg (map m e, sort)
   | Omitted -> Omitted
 
+and map_field m (lbl, sort, def) =
+  let def =
+    match def with
+    | Kept t -> Kept (m.ty t)
+    | Overridden e -> Overridden (map m e)
+  in
+  (map_label m lbl, sort, def)
+
 and map_constructor m = function
   | Constructor { type_path = p; name } ->
       Constructor { type_path = m.type_path p; name }
   | Extension_constructor p -> Extension_constructor (m.extension_path p)
+
+and map_label m { type_path = p; name } =
+  { type_path = m.type_path p; name }
 
 type namespace = Value | Type | Extension
 
@@ -195,6 +249,9 @@ let same_constructor sp c1 c2 =
   | Extension_constructor _, Constructor _ ->
       false
 
+let same_label sp (l1 : label) (l2 : label) =
+  sp Type l1.type_path l2.type_path && String.equal l1.name l2.name
+
 let same_arg_label (l1 : arg_label) (l2 : arg_label) =
   match l1, l2 with
   | Nolabel, Nolabel -> true
@@ -245,13 +302,44 @@ let rec alpha_equal_exp sp vars e1 e2 =
           | None, None -> true
           | Some (e1, _), Some (e2, _) -> alpha_equal_exp sp vars e1 e2
           | None, Some _ | Some _, None -> false)
+  | Sexp_record r1, Sexp_record r2 ->
+      alpha_equal_fields sp vars r1.fields r2.fields
+      && alpha_equal_extension sp vars
+           r1.extended_expression r2.extended_expression
+  | Sexp_record_unboxed_product r1, Sexp_record_unboxed_product r2 ->
+      alpha_equal_fields sp vars r1.fields r2.fields
+      && alpha_equal_extension sp vars
+           r1.extended_expression r2.extended_expression
+  | Sexp_field f1, Sexp_field f2 ->
+      same_label sp f1.label f2.label
+      && alpha_equal_exp sp vars f1.record f2.record
+  | Sexp_unboxed_field f1, Sexp_unboxed_field f2 ->
+      same_label sp f1.label f2.label
+      && alpha_equal_exp sp vars f1.record f2.record
   | Sexp_extension_constructor p1, Sexp_extension_constructor p2 ->
       sp Extension p1 p2
   | ( Sexp_var _ | Sexp_global _ | Sexp_constant _ | Sexp_apply _
     | Sexp_tuple _ | Sexp_unboxed_tuple _ | Sexp_unboxed_unit
     | Sexp_unboxed_bool _ | Sexp_construct _ | Sexp_variant _
-    | Sexp_extension_constructor _ ), _ ->
+    | Sexp_record _ | Sexp_field _ | Sexp_record_unboxed_product _
+    | Sexp_unboxed_field _ | Sexp_extension_constructor _ ), _ ->
       false
+
+and alpha_equal_fields sp vars fields1 fields2 =
+  for_all2
+    (fun (l1, _, d1) (l2, _, d2) ->
+       same_label sp l1 l2
+       && (match d1, d2 with
+           | Kept _, Kept _ -> true
+           | Overridden e1, Overridden e2 -> alpha_equal_exp sp vars e1 e2
+           | Kept _, Overridden _ | Overridden _, Kept _ -> false))
+    fields1 fields2
+
+and alpha_equal_extension sp vars ext1 ext2 =
+  match ext1, ext2 with
+  | None, None -> true
+  | Some (e1, _), Some (e2, _) -> alpha_equal_exp sp vars e1 e2
+  | None, Some _ | Some _, None -> false
 
 let alpha_equal ~same_path ~vars e1 e2 =
   alpha_equal_exp same_path vars e1 e2

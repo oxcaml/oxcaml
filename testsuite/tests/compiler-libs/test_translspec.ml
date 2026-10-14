@@ -7,12 +7,14 @@
 (* The fragment of the expression language that [Translspec] accepts, and
    how [Untypespec] prints it back. Each expression is typed in an
    environment with the declarations below, with the variables [n], [b],
-   [xs] and [g] bound as the parameters of a law would be. *)
+   [s], [xs], [r] and [g] bound as the parameters of a law would be. *)
 
 let env =
   let prelude = {|
     type t = A | B of int | C of { x : int; y : bool }
+    type r = { a : int; b : string }
     type ('a, 'b) pair = Pair of 'a * 'b
+    type ur = #{ u : int; w : bool }
     exception E of int
     external ( + ) : int -> int -> int = "%addint"
     let rec length = function [] -> 0 | _ :: l -> 1 + length l
@@ -31,7 +33,8 @@ val env : Env.t = <abstr>
 let run_in env source =
   let wrapped =
     Printf.sprintf
-      "fun (n : int) (b : bool) (xs : int list) (g : int -> int) -> (%s)"
+      "fun (n : int) (b : bool) (s : string) (xs : int list) (r : r) \
+       (g : int -> int) -> (%s)"
       source
   in
   let exp = Parse.expression (Lexing.from_string wrapped) in
@@ -129,10 +132,17 @@ let () = List.iter run
    "#(n, b)";
    "A";
    "B n";
+   "C { x = n; y = b }";
    "Pair (n, b)";
    "Some n";
    "None";
    "E n";
+   "{ a = n; b = s }";
+   "r.a";
+   "{ r with a = n }";
+   "#{ u = n; w = b }";
+   "(#{ u = n; w = b }).#u";
+   "#{ #{ u = n; w = b } with u = 0 }";
    "`A";
    "`B n";
    "[]";
@@ -144,10 +154,17 @@ let () = List.iter run
 #(n, b)  ==>  #(n, b)
 A  ==>  A
 B n  ==>  B n
+C { x = n; y = b }  ==>  C { x = n; y = b }
 Pair (n, b)  ==>  Pair (n, b)
 Some n  ==>  Some n
 None  ==>  None
 E n  ==>  E n
+{ a = n; b = s }  ==>  { a = n; b = s }
+r.a  ==>  r.a
+{ r with a = n }  ==>  { r with a = n }
+#{ u = n; w = b }  ==>  #{ u = n; w = b }
+(#{ u = n; w = b }).#u  ==>  #{ u = n; w = b }.#u
+#{ #{ u = n; w = b } with u = 0 }  ==>  #{ #{ u = n; w = b } with u = 0 }
 `A  ==>  `A
 `B n  ==>  `B n
 []  ==>  []
