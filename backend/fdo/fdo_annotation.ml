@@ -45,3 +45,28 @@ let print ppf t =
     (Format.pp_print_list ~pp_sep:Format.pp_print_space (fun ppf counter ->
          Format.pp_print_string ppf (Fdo_counter.to_string counter)))
     t
+
+module With_body_hash = struct
+  type annotation = t
+
+  type t =
+    { annotation : annotation;
+      body_hash : Fdo_counter.Function_body_hash.t option
+    }
+
+  let create ~annotation ~body_hash = { annotation; body_hash }
+
+  let annotation { annotation; _ } = annotation
+
+  let body_hash { body_hash; _ } = body_hash
+
+  let empty = { annotation = empty; body_hash = None }
+
+  let print ppf { annotation; body_hash } =
+    Format.fprintf ppf "@[<hov 1>(%a body_hash:%a)@]"
+      (Format.pp_print_list ~pp_sep:Format.pp_print_space (fun ppf counter ->
+           Format.pp_print_string ppf (Fdo_counter.to_string counter)))
+      annotation
+      (Format.pp_print_option Fdo_counter.Function_body_hash.print)
+      body_hash
+end

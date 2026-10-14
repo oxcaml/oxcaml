@@ -69,6 +69,8 @@ module Function_body_hash = struct
   let equal = Int32.equal
 
   let to_string t = Printf.sprintf "%08lx" t
+
+  let print ppf t = Format.fprintf ppf "%s" (to_string t)
 end
 
 (* The kinds of node hashed into an identity. Their numbers are part of the

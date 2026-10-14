@@ -48,3 +48,22 @@ val combine : t -> t -> t
 val equal : t -> t -> bool
 
 val print : Format.formatter -> t -> unit
+
+module With_body_hash : sig
+  type annotation = t
+
+  type t
+
+  val create :
+    annotation:annotation ->
+    body_hash:Fdo_counter.Function_body_hash.t option ->
+    t
+
+  val annotation : t -> annotation
+
+  val body_hash : t -> Fdo_counter.Function_body_hash.t option
+
+  val empty : t
+
+  val print : Format.formatter -> t -> unit
+end

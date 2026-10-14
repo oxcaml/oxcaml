@@ -39,8 +39,7 @@ type t =
     cost_metrics : Cost_metrics.t;
     inlining_arguments : Inlining_arguments.t;
     dbg : Debuginfo.t;
-    fdo_entry_annotation : Fdo_annotation.t;
-    function_body_hash : Fdo_counter.Function_body_hash.t option;
+    fdo_entry_annotation : Fdo_annotation.With_body_hash.t;
     is_tupled : bool;
     is_my_closure_used : bool;
     inlining_decision : Function_decl_inlining_decision_type.t;
@@ -104,8 +103,6 @@ module Code_metadata_accessors (X : Metadata_view_type) = struct
 
   let fdo_entry_annotation t = (metadata t).fdo_entry_annotation
 
-  let function_body_hash t = (metadata t).function_body_hash
-
   let is_tupled t = (metadata t).is_tupled
 
   let is_my_closure_used t = (metadata t).is_my_closure_used
@@ -165,8 +162,7 @@ type 'a create_type =
   cost_metrics:Cost_metrics.t ->
   inlining_arguments:Inlining_arguments.t ->
   dbg:Debuginfo.t ->
-  fdo_entry_annotation:Fdo_annotation.t ->
-  function_body_hash:Fdo_counter.Function_body_hash.t option ->
+  fdo_entry_annotation:Fdo_annotation.With_body_hash.t ->
   is_tupled:bool ->
   is_my_closure_used:bool ->
   inlining_decision:Function_decl_inlining_decision_type.t ->
@@ -180,8 +176,8 @@ let createk k code_id ~newer_version_of ~params_arity ~param_modes
     ~(inline : Inline_attribute.t) ~zero_alloc_attribute ~poll_attribute
     ~regalloc_attribute ~regalloc_param_attribute ~cold ~is_a_functor ~is_opaque
     ~recursive ~cost_metrics ~inlining_arguments ~dbg ~fdo_entry_annotation
-    ~function_body_hash ~is_tupled ~is_my_closure_used ~inlining_decision
-    ~absolute_history ~relative_history ~loopify =
+    ~is_tupled ~is_my_closure_used ~inlining_decision ~absolute_history
+    ~relative_history ~loopify =
   (match stub, inline with
   | true, (Available_inline | Never_inline | Default_inline)
   | ( false,
@@ -231,7 +227,6 @@ let createk k code_id ~newer_version_of ~params_arity ~param_modes
       inlining_arguments;
       dbg;
       fdo_entry_annotation;
-      function_body_hash;
       is_tupled;
       is_my_closure_used;
       inlining_decision;
@@ -286,15 +281,11 @@ let [@ocamlformat "disable"] print_inlining_paths ppf
       Inlining_history.Relative.print relative_history
       Inlining_history.Absolute.print absolute_history
 
-let [@ocamlformat "disable"] print_fdo_entry ppf (annotation, body_hash) =
-  if !Oxcaml_flags.fdo_counters then
+let [@ocamlformat "disable"] print_fdo_entry ppf fdo_entry_annotation =
+  if !Oxcaml_flags.fdo_counters
+  then
     Format.fprintf ppf "@[<hov 1>(fdo_entry_annotation@ %a)@]@ "
-      Fdo_annotation.print annotation;
-  match body_hash with
-  | None -> ()
-  | Some body_hash ->
-    Format.fprintf ppf "@[<hov 1>(function_body_hash@ %s)@]@ "
-      (Fdo_counter.Function_body_hash.to_string body_hash)
+      Fdo_annotation.With_body_hash.print fdo_entry_annotation
 
 let [@ocamlformat "disable"] print ppf
        { code_id = _; newer_version_of; stub; inline; zero_alloc_attribute; poll_attribute;
@@ -302,7 +293,7 @@ let [@ocamlformat "disable"] print ppf
          first_complex_local_param; result_arity;
          result_types; result_mode;
          recursive; cost_metrics; inlining_arguments;
-         dbg; fdo_entry_annotation; function_body_hash;
+         dbg; fdo_entry_annotation;
          is_tupled; is_my_closure_used; inlining_decision;
          absolute_history; relative_history; loopify } =
   let module C = Flambda_colours in
@@ -419,7 +410,7 @@ let [@ocamlformat "disable"] print ppf
     Flambda_colours.debuginfo
     Debuginfo.print_compact dbg
     Flambda_colours.pop
-    print_fdo_entry (fdo_entry_annotation, function_body_hash)
+    print_fdo_entry fdo_entry_annotation
     (if is_tupled
     then Flambda_colours.none
     else Flambda_colours.elide)
@@ -453,7 +444,6 @@ let free_names
       inlining_arguments = _;
       dbg = _;
       fdo_entry_annotation = _;
-      function_body_hash = _;
       is_tupled = _;
       is_my_closure_used = _;
       inlining_decision = _;
@@ -500,7 +490,6 @@ let apply_renaming
        inlining_arguments = _;
        dbg = _;
        fdo_entry_annotation = _;
-       function_body_hash = _;
        is_tupled = _;
        is_my_closure_used = _;
        inlining_decision = _;
@@ -559,7 +548,6 @@ let ids_for_export
       inlining_arguments = _;
       dbg = _;
       fdo_entry_annotation = _;
-      function_body_hash = _;
       is_tupled = _;
       is_my_closure_used = _;
       inlining_decision = _;
@@ -603,7 +591,6 @@ let approx_equal
       inlining_arguments = inlining_arguments1;
       dbg = dbg1;
       fdo_entry_annotation = _;
-      function_body_hash = _;
       is_tupled = is_tupled1;
       is_my_closure_used = is_my_closure_used1;
       inlining_decision = inlining_decision1;
@@ -633,7 +620,6 @@ let approx_equal
       inlining_arguments = inlining_arguments2;
       dbg = dbg2;
       fdo_entry_annotation = _;
-      function_body_hash = _;
       is_tupled = is_tupled2;
       is_my_closure_used = is_my_closure_used2;
       inlining_decision = inlining_decision2;

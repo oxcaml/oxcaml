@@ -86,6 +86,8 @@ module Function_body_hash : sig
 
   (** The spelling used in metadata and dumps, as in interior positions. *)
   val to_string : t -> string
+
+  val print : Format.formatter -> t -> unit
 end
 
 (** A function or a module binding: its original definition, or a copy of it

@@ -774,8 +774,11 @@ let leading_tokens = Leading_tokens.leading_tokens
 let hash_function = Body_hash.hash_function
 
 let entry_annotation t =
-  Fdo_annotation.of_list
-    [ { Fdo_counter.position =
-          Fdo_counter.Position.create_function_entry t.definition_id;
-        inlining_stack = []
-      } ]
+  let annotation =
+    Fdo_annotation.of_list
+      [ { Fdo_counter.position =
+            Fdo_counter.Position.create_function_entry t.definition_id;
+          inlining_stack = []
+        } ]
+  in
+  Fdo_annotation.With_body_hash.create ~annotation ~body_hash:(Some t.body_hash)
