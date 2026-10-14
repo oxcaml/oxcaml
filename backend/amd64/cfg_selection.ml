@@ -142,11 +142,22 @@ let pseudoregs_for_operation op arg res =
   (* Two-address binary operations: arg.(0) and res.(0) must be the same *)
   | Intop (Isub | Imul | Iand | Ior | Ixor) | Specific Ipackf32 ->
     [| res.(0); arg.(1) |], res
-  | Floatop ((Float32 | Float64), (Iaddf | Isubf | Imulf | Idivf))
-  | Specific (Ifloatarithmem (_, _, _)) ->
+  | Floatop ((Float32 | Float64), (Iaddf | Isubf | Imulf | Idivf)) ->
     if Proc.has_three_operand_float_ops ()
     then raise Use_default_exn
     else [| res.(0); arg.(1) |], res
+  | Specific (Ifloatarithmem (_, _, _)) ->
+    (* Two-address float arithmetic with a memory operand. [arg.(0)] must be
+       the same as [res.(0)], but all of the remaining arguments (the registers
+       used by the addressing mode -- there can be more than one, e.g. for
+       [Iindexed2scaled]) must be preserved. Returning only [arg.(1)] drops the
+       second addressing register and crashes the emitter. *)
+    if Proc.has_three_operand_float_ops ()
+    then raise Use_default_exn
+    else (
+      let arg = Array.copy arg in
+      arg.(0) <- res.(0);
+      arg, res)
   | Intop_atomic { op = Compare_set; size = _; addr = _ } ->
     (* first arg must be rax *)
     let arg = Array.copy arg in
