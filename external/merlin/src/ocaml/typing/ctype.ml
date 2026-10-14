@@ -5339,17 +5339,20 @@ let upon_shape env ty ~run ~default =
   match get_desc ty with
   | Tivar { ivar; _ } -> ivar_upon ivar ~run ~default ~scheduler
   | Tvar { name; jkind } ->
-      if get_level ty = generic_level then
-        Misc.fatal_error "Ctype.upon_shape: generic type variable";
-      let ivar = Ivar.create ~in_global_pool:true () in
-      set_type_desc ty (Tivar { name; jkind; ivar });
-      ivar_upon ivar ~run ~default ~scheduler
-   | _ ->
-     (* Fast path: [ty] is not a variable, so behaves as if its ivar
+    if get_level ty = generic_level
+    then Misc.fatal_error "Ctype.upon_shape: generic type variable";
+    let ivar = Ivar.create ~in_global_pool:true () in
+    set_type_desc ty (Tivar { name; jkind; ivar });
+    ivar_upon ivar ~run ~default ~scheduler
+  | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tconstr _ | Tmod _ | Tobject _
+  | Tfield _ | Tquote _ | Tsplice _ | Tquote_eval _ | Tnil | Tlink _ | Tsubst _
+  | Tvariant _ | Tunivar _ | Tpoly _ | Trepr _ | Tpackage _ | Tof_kind _
+  | Tbox _ -> (
+    (* Fast path: [ty] is not a variable, so behaves as if its ivar
         were already filled, or defaulted if [ty] has no shape. *)
-      match type_shape_of_expanded_head env ty with
-      | Some shape -> Scheduler.add scheduler (fun () -> run shape)
-      | None -> Scheduler.add scheduler (fun () -> run (default ()))
+    match type_shape_of_expanded_head env ty with
+    | Some shape -> Scheduler.add scheduler (fun () -> run shape)
+    | None -> Scheduler.add scheduler (fun () -> run (default ())))
 
 (* Unify a [Tivar] [t1'] with the non-variable type [t2], whose expanded head
    is [t2']: link [t1'] to [t2] as for a [Tvar], then fill its ivar with the
