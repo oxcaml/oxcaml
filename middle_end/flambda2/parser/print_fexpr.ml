@@ -850,11 +850,12 @@ and code_binding ppf
        is_tupled;
        stub;
        loopify;
-       result_mode
+       result_mode;
+       fdo_entry_annotation
      } :
       code) =
   Format.fprintf ppf
-    "@[<hv 2>%tcode%t@[<h>%t%a%a%a@ size(%a)%a%a%a%t@]@ @[<hv2>@[<hv 2>%a"
+    "@[<hv 2>%tcode%t@[<h>%t%a%a%a@ size(%a)%a%a%a%a%t@]@ @[<hv2>@[<hv 2>%a"
     Flambda_colours.static_keyword Flambda_colours.pop Flambda_colours.elide
     (recursive ~space:Before) rec_
     (inline_attribute_opt ~space:Before)
@@ -866,7 +867,10 @@ and code_binding ppf
     (fun ppf is_tupled -> if is_tupled then Format.fprintf ppf "@ tupled@ ")
     is_tupled
     (fun ppf stub -> if stub then Format.fprintf ppf "@ stub")
-    stub Flambda_colours.pop code_id id;
+    stub
+    (pp_option ~space:Before
+       (pp_like "fdo_entry_annotation%a" Fdo_annotation.print))
+    fdo_entry_annotation Flambda_colours.pop code_id id;
   let { params; closure_var; region_vars; depth_var; ret_cont; exn_cont; body }
       =
     params_and_body
