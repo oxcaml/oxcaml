@@ -1211,6 +1211,7 @@ let build_initial_env add_type add_extension add_jkind empty_env =
                             (Location.mknoloc "ocaml.warn_on_literal_pattern")
                             (Parsetree.PStr [])];
         ext_uid = Uid.of_predef_id id;
+        ext_alias = None;
       }
   in
   List.fold_left (fun env tconstr ->

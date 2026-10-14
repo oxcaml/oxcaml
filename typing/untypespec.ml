@@ -55,11 +55,50 @@ let constant : Spec.constant -> Parsetree.constant = function
   | Const_unboxed_nativeint i ->
     Const.mk (Pconst_unboxed_integer (Nativeint.to_string i, 'n'))
 
+let head_type_annotation ~lident_of_path ty : Parsetree.core_type option =
+  match Types.get_desc ty with
+  | Tconstr (Pident id, _, _) when Ident.is_predef id -> None
+  | Tconstr (Pextra_ty _, _, _) ->
+      (* The types of inline records cannot be written. *)
+      None
+  | Tconstr (p, args, _) ->
+      Some
+        (Typ.constr (mknoloc (lident_of_path p))
+           (List.map (fun _ -> Typ.any None) args))
+  | _ -> None
+
 type 'ty env =
   { lident_of_path : Path.t -> Longident.t;
+    annotate : 'ty -> Parsetree.core_type option;
   }
 
 let mk ~loc txt = Location.mkloc txt loc
+
+(* The long identifier of a constructor or label: the one of its type, with
+   the last component replaced by the name. The labels of inline records
+   cannot be qualified and are disambiguated by their constructor; nor can
+   the constructors and labels of a type through a functor application,
+   which the type annotation disambiguates (see [annotate]). *)
+let in_namespace_of env ~loc (type_path : Path.t) name =
+  let lid : Longident.t =
+    match type_path with
+    | Pextra_ty (_, Pcstr_ty _) -> Lident name
+    | _ when Path.contains_apply type_path -> Lident name
+    | _ ->
+        match env.lident_of_path type_path with
+        | Lident _ | Lapply _ -> Lident name
+        | Ldot (p, _) -> Ldot (p, mk ~loc name)
+  in
+  mk ~loc lid
+
+let constructor env ~loc = function
+  | Constructor { type_path; name } -> in_namespace_of env ~loc type_path name
+  | Extension_constructor path -> mk ~loc (env.lident_of_path path)
+
+let annotate_exp env ty (e : Parsetree.expression) =
+  match env.annotate ty with
+  | None -> e
+  | Some cty -> Exp.constraint_ ~loc:e.pexp_loc e (Some cty) []
 
 let rec expression env (e : _ Spec.expression) =
   let loc = e.sexp_loc in
@@ -74,5 +113,34 @@ let rec expression env (e : _ Spec.expression) =
         | Omitted -> None
       in
       Exp.apply ~loc (expression env funct) (List.filter_map argument args)
+  | Sexp_tuple (es, _) ->
+      Exp.tuple ~loc (List.map (fun (l, e) -> (l, expression env e)) es)
+  | Sexp_unboxed_tuple es ->
+      Exp.unboxed_tuple ~loc
+        (List.map (fun (l, e, _) -> (l, expression env e)) es)
+  | Sexp_unboxed_unit -> Exp.unboxed_unit ~loc ()
+  | Sexp_unboxed_bool b -> Exp.unboxed_bool ~loc b
+  | Sexp_construct { constructor = cstr; args; _ } ->
+      let args =
+        match args with
+        | [] -> None
+        | [ (e, _) ] -> Some (expression env e)
+        | args ->
+            Some
+              (Exp.tuple ~loc
+                 (List.map (fun (e, _) -> (None, expression env e)) args))
+      in
+      annotate_exp env e.sexp_type
+        (Exp.construct ~loc (constructor env ~loc cstr) args)
+  | Sexp_variant (lbl, arg) ->
+      Exp.variant ~loc lbl (Option.map (fun (e, _) -> expression env e) arg)
+  | Sexp_extension_constructor path ->
+      let constructor =
+        Exp.construct ~loc (mk ~loc (env.lident_of_path path)) None
+      in
+      Exp.extension ~loc
+        (mk ~loc "ocaml.extension_constructor",
+         PStr [Str.eval ~loc constructor])
 
-let expression ~lident_of_path e = expression { lident_of_path } e
+let expression ~lident_of_path ~annotate e =
+  expression { lident_of_path; annotate } e

@@ -29,6 +29,18 @@ module Alias = Outer
 module Through_alias : sig law? l (x : int) : (Outer.f x) = x end
 |}]
 
+(* So are the extension constructors [Alias.E] and [Outer.E]. *)
+
+module Through_alias_exception : sig
+  law? e (x : int) : Outer.E x = Outer.E x
+end = struct
+  law? e (x : int) : Alias.E x = Alias.E x
+end
+[%%expect {|
+module Through_alias_exception :
+  sig law? e (x : int) : (Outer.E x) = (Outer.E x) end
+|}]
+
 (* Paths are compared as the paths of types are, not through the
    declarations they lead to: the values of two modules with the same
    signature are different values. *)
@@ -227,6 +239,17 @@ module rec Rec : Idem
 and Rec_struct : Idem
 |}]
 
+(* And packing a module whose law mentions an exception. *)
+
+module type Exn = sig exception E law? raised : E = E end
+module X_exn = struct exception E law? raised : E = E end
+let exn = (module X_exn : Exn)
+[%%expect {|
+module type Exn = sig exception E law? raised : E = E end
+module X_exn : sig exception E law? raised : E = E end
+val exn : (module Exn) = <module>
+|}]
+
 (* Inside a functor, the parameter can be checked against its signature,
    packed and applied; and [with module M = X] identifies the submodule
    with [X]. *)
@@ -390,4 +413,38 @@ Error: Signature mismatch:
        is not included in
          law? l (x : int) : (Generated.f x) = x
        The clauses of the laws differ.
+|}]
+
+(* The types of constructors and the extension constructors of a clause
+   are identified through the module path as well. *)
+
+module P = struct
+  type t = A | B
+  exception E
+  module N = struct
+    law? l : A <> B && E = E
+  end
+end
+module type P_sig = sig
+  type t = A | B
+  exception E
+  module N : sig
+    law? l : A <> B && E = E
+  end
+end
+module P' : P_sig = P
+[%%expect {|
+module P :
+  sig
+    type t = A | B
+    exception E
+    module N : sig law? l : ((A : t) <> (B : t)) && (E = E) end
+  end
+module type P_sig =
+  sig
+    type t = A | B
+    exception E
+    module N : sig law? l : ((A : t) <> (B : t)) && (E = E) end
+  end
+module P' : P_sig
 |}]

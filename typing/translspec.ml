@@ -70,6 +70,8 @@ let unsupported loc what = raise (Error (loc, Unsupported what))
 
 let sort s = Jkind.Sort.default_for_transl_and_get s
 
+let locality_r m = locality_mode_r_zap_to_ceil m
+
 let return_mode m = return_mode_zap_to_floor_exn m
 
 (* Constants and partiality *)
@@ -112,6 +114,14 @@ let check_global loc (path : Path.t) =
   if Path.contains_apply path then unsupported loc Values_through_applications
 
 let global loc path = check_global loc path; path
+
+let constructor loc (cstr : Data_types.constructor_description) =
+  match cstr.cstr_tag with
+  | Extension path -> Extension_constructor (global loc path)
+  | Ordinary _ | Null ->
+      Constructor
+        { type_path = Data_types.cstr_res_type_path cstr;
+          name = cstr.cstr_name }
 
 (* Expressions. [bound] contains the local variables in scope. *)
 
@@ -162,9 +172,25 @@ and expression_desc bound loc desc =
           ret_mode = return_mode ret_mode }
   | Texp_match _ -> unsupported loc (Not_yet_supported "pattern matching")
   | Texp_try _ -> unsupported loc (Not_yet_supported "exception handlers")
-  | Texp_unboxed_unit | Texp_unboxed_bool _ | Texp_tuple _
-  | Texp_unboxed_tuple _ | Texp_construct _ | Texp_variant _ ->
-      unsupported loc (Not_yet_supported "tuples, constructors and variants")
+  | Texp_unboxed_unit -> Sexp_unboxed_unit
+  | Texp_unboxed_bool b -> Sexp_unboxed_bool b
+  | Texp_tuple (es, mode) ->
+      Sexp_tuple
+        (List.map (fun (l, e, _) -> (l, expression bound e)) es,
+         locality_r mode)
+  | Texp_unboxed_tuple es ->
+      Sexp_unboxed_tuple
+        (List.map (fun (l, e, s) -> (l, expression bound e, sort s)) es)
+  | Texp_construct (_, cstr, _, args, mode) ->
+      Sexp_construct
+        { constructor = constructor loc cstr;
+          args = List.map (fun (s, e) -> (expression bound e, sort s)) args;
+          locality = Option.map locality_r mode }
+  | Texp_variant (lbl, arg) ->
+      Sexp_variant
+        (lbl,
+         Option.map (fun (e, mode) -> (expression bound e, locality_r mode))
+           arg)
   | Texp_record _ | Texp_record_unboxed_product _ ->
       unsupported loc (Not_yet_supported "records")
   | Texp_atomic_loc _ -> unsupported loc Atomic_fields
@@ -189,8 +215,8 @@ and expression_desc bound loc desc =
   | Texp_pack _ -> unsupported loc First_class_modules
   | Texp_letop _ -> unsupported loc Binding_operators
   | Texp_unreachable -> unsupported loc Refutation_cases
-  | Texp_extension_constructor _ ->
-      unsupported loc (Not_yet_supported "extension constructors")
+  | Texp_extension_constructor (_, path) ->
+      Sexp_extension_constructor (global loc path)
   | Texp_open _ -> unsupported loc (Not_yet_supported "local opens")
   | Texp_probe _ | Texp_probe_is_enabled _ -> unsupported loc Probes
   | Texp_exclave _ -> unsupported loc Exclave

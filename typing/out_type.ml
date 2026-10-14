@@ -3843,8 +3843,14 @@ let rec longident_of_out_ident : out_ident -> Longident.t = function
 
 let lident_of_path p = longident_of_out_ident (tree_of_path None p)
 
+(* Constructors and records are annotated with their types, so that the
+   printed clauses type again in the same way. *)
 let tree_of_law_clause clause =
-  let clause = Untypespec.expression ~lident_of_path clause in
+  let clause =
+    Untypespec.expression ~lident_of_path
+      ~annotate:(Untypespec.head_type_annotation ~lident_of_path)
+      clause
+  in
   Format_doc.doc_printf "%a"
     (Format_doc.deprecated Pprintast.law_clause) clause
 

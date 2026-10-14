@@ -929,7 +929,9 @@ let jkind_declaration s decl =
 
 let law_description' copy_scope s decl =
   let ty = typexp copy_scope s decl.law_loc in
-  let spec e = Spec.map ~ty ~value_path:(value_path s) e in
+  let spec e =
+    Spec.map ~ty ~value_path:(value_path s) ~type_path:(type_path s) e
+  in
   { law_params =
       List.map (fun (x, ty_) -> (x, ty ty_)) decl.law_params;
     law_assumptions = List.map spec decl.law_assumptions;
@@ -1099,6 +1101,7 @@ let extension_constructor' copy_scope s ext =
       | No_action -> ext.ext_loc
     end;
     ext_uid = ext.ext_uid;
+    ext_alias = Option.map (type_path s) ext.ext_alias;
   }
 
 let extension_constructor s ext =

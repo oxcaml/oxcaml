@@ -34,6 +34,30 @@ Error: Signature mismatch:
        The clauses of the laws differ.
 |}]
 
+(* Nor are its exceptions those of [Fact]. *)
+
+module type Fact_exception = sig law? l : Fact.E = Fact.E end
+module Not_forged_exception : Fact_exception = struct
+  law? l : Fact.E = Forged.E
+end
+[%%expect {|
+module type Fact_exception = sig law? l : Fact.E = Fact.E end
+Lines 2-4, characters 47-3:
+2 | ...............................................struct
+3 |   law? l : Fact.E = Forged.E
+4 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig law? l : Fact.E = Forged.E end
+       is not included in
+         Fact_exception
+       Laws do not match:
+         law? l : Fact.E = Forged.E
+       is not included in
+         law? l : Fact.E = Fact.E
+       The clauses of the laws differ.
+|}]
+
 (* Nor is a module ascribed to [Fact_sig with Fact], the module type of
    [Fact] as a user writes it. *)
 
@@ -158,4 +182,15 @@ module Facts :
     law? applied : Fact.x = 0
     law? returned (y : int) : Fact.x = y
   end
+|}]
+
+(* The same for the exceptions of a structure including [Fact]. *)
+
+module Facts_exception : sig
+  law? included_exception : Fact.E = Fact.E
+end = struct
+  law? included_exception : Including.E = Fact.E
+end
+[%%expect {|
+module Facts_exception : sig law? included_exception : Fact.E = Fact.E end
 |}]

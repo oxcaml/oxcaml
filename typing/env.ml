@@ -761,7 +761,9 @@ and value_entry =
 and constructor_data =
   { cda_description : constructor_description;
     cda_address : address_lazy option;
-    cda_shape: Shape.t; }
+    cda_shape: Shape.t;
+    cda_alias : Path.t option;
+  }
 
 and label_data = label_description
 
@@ -1675,6 +1677,9 @@ let find_cltype path env =
 let find_value path env =
   find_value_full path env |> vda_description
 
+let find_extension_alias path env =
+  (find_extension_full path env).cda_alias
+
 let find_value_no_locks_exn id env =
   match IdTbl.find_same_and_locks id env.values with
   | Val_bound _, _ :: _ -> Misc.fatal_error "locks encountered"
@@ -2426,7 +2431,8 @@ let rec components_of_module_maker
                       let cda = {
                         cda_description = descr;
                         cda_address = None;
-                        cda_shape }
+                        cda_shape;
+                        cda_alias = None }
                       in
                       c.comp_constrs <-
                         add_to_tbl descr.cstr_name cda c.comp_constrs
@@ -2481,7 +2487,8 @@ let rec components_of_module_maker
               Shape.proj cm_shape (Shape.Item.extension_constructor id)
             in
             let cda =
-              { cda_description = descr; cda_address = Some addr; cda_shape }
+              { cda_description = descr; cda_address = Some addr; cda_shape;
+                cda_alias = ext'.ext_alias }
             in
             c.comp_constrs <- add_to_tbl (Ident.name id) cda c.comp_constrs
         | Sig_module(id, pres, md, _, _) ->
@@ -2671,7 +2678,9 @@ and store_constructor ~check type_decl type_id cstr_id cstr env =
   { env with
     constrs =
       TycompTbl.add cstr_id
-        { cda_description = cstr; cda_address = None; cda_shape } env.constrs;
+        { cda_description = cstr; cda_address = None; cda_shape;
+          cda_alias = None }
+        env.constrs;
   }
 
 and store_label
@@ -2811,7 +2820,8 @@ and store_extension ~check ~rebind id addr ext shape env =
   let cda =
     { cda_description = cstr;
       cda_address = Some addr;
-      cda_shape = shape }
+      cda_shape = shape;
+      cda_alias = ext.ext_alias }
   in
   Builtin_attributes.mark_alerts_used ext.ext_attributes;
   Builtin_attributes.mark_warn_on_literal_pattern_used cstr.cstr_attributes;

@@ -52,6 +52,30 @@ Error: Signature mismatch:
        The clauses of the laws differ.
 |}]
 
+(* Nor are [M.E] and [N.E] the same exception. *)
+
+module Different_exceptions : sig
+  law? e : M.E = N.E
+end = struct
+  law? e : M.E = M.E
+end
+[%%expect {|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   law? e : M.E = M.E
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig law? e : M.E = M.E end
+       is not included in
+         sig law? e : M.E = N.E end
+       Laws do not match:
+         law? e : M.E = M.E
+       is not included in
+         law? e : M.E = N.E
+       The clauses of the laws differ.
+|}]
+
 (* Opening an application in a signature gives its values paths through
    the application, which a law cannot refer to. *)
 
@@ -176,6 +200,32 @@ Error: Signature mismatch:
          law? p : F(A).x == F(A).x
        The law refers to "F(A).x" through a functor application, which names no
        particular instance.
+|}]
+
+(* A constraint that substitutes only types is fine. *)
+
+module type With_type = sig
+  module M : sig type t = A | B end
+  law? p (x : M.t) : x = M.A
+end
+module type Accepted = With_type with module M := F (A)
+[%%expect {|
+module type With_type =
+  sig
+    module M : sig type t = A | B end
+    law? p (x : M.t) : x = (M.A : M.t)
+  end
+module type Accepted = sig law? p (x : F(A).t) : x = (A : F(A).t) end
+|}]
+
+(* The printed law types again, the constructors being resolved by their
+   type annotations. *)
+
+module Printed : Accepted = struct
+  law? p (x : F(A).t) : x = (A : F(A).t)
+end
+[%%expect {|
+module Printed : Accepted
 |}]
 
 (* Applying a functor to an application gives the laws of the result such
@@ -349,6 +399,17 @@ module Same_instance :
   sig law? p : Id_bound.x == Id_bound'.x law? q : Id_bound.x == Bound.x end
 |}]
 
+(* The same for the exceptions. *)
+
+module Same_instance_exception : sig
+  law? e : Id_bound.E = Id_bound'.E
+end = struct
+  law? e : Bound.E = Bound.E
+end
+[%%expect {|
+module Same_instance_exception : sig law? e : Id_bound.E = Id_bound'.E end
+|}]
+
 module Id_applied = Id (F (A))
 module Id_applied' = Id (F (A))
 module Different_results : sig
@@ -372,6 +433,28 @@ Error: Signature mismatch:
          law? p : Id_applied.x == Id_applied.x
        is not included in
          law? p : Id_applied.x == Id_applied'.x
+       The clauses of the laws differ.
+|}]
+
+module Different_result_exceptions : sig
+  law? e : Id_applied.E = Id_applied'.E
+end = struct
+  law? e : Id_applied.E = Id_applied.E
+end
+[%%expect {|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   law? e : Id_applied.E = Id_applied.E
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig law? e : Id_applied.E = Id_applied.E end
+       is not included in
+         sig law? e : Id_applied.E = Id_applied'.E end
+       Laws do not match:
+         law? e : Id_applied.E = Id_applied.E
+       is not included in
+         law? e : Id_applied.E = Id_applied'.E
        The clauses of the laws differ.
 |}]
 

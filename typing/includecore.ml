@@ -1937,8 +1937,20 @@ let extension_constructors ~loc env ~mark id ext1 ext2 =
       | _, _ -> None
 
 (* Inclusion between laws. The global paths of the clauses are compared
-   like the paths of types: by identity once module aliases are normalized
-   and values expanded through their [val_alias]. *)
+   like the paths of types: by identity once module aliases are normalized,
+   type abbreviations expanded, and values and extension constructors
+   expanded through their [val_alias]/[ext_alias]. *)
+
+let normalize_type_path env p =
+  let p = Env.normalize_type_path None env p in
+  match Env.find_type p env with
+  | decl ->
+      let ty = Ctype.expand_head env (Ctype.newconstr p decl.type_params) in
+      begin match get_desc ty with
+      | Tconstr (p', _, _) -> Env.normalize_type_path None env p'
+      | _ -> p
+      end
+  | exception Not_found -> p
 
 (* [alias] is the alias recorded for the declaration at [p], if any.
    Expansion stops at paths that cannot be looked up, at cycles, and at
@@ -1956,10 +1968,15 @@ let normalize_value_path env p =
   let alias p = (Env.find_value p env).val_alias in
   normalize_alias_path alias env [] p
 
+let normalize_extension_path env p =
+  normalize_alias_path (fun p -> Env.find_extension_alias p env) env [] p
+
 let same_path env (ns : Spec.namespace) p1 p2 =
   let normalize =
     match ns with
     | Value -> normalize_value_path env
+    | Extension -> normalize_extension_path env
+    | Type -> normalize_type_path env
   in
   Path.same p1 p2 || Path.same (normalize p1) (normalize p2)
 
@@ -1971,8 +1988,9 @@ let law_applied_path decl1 decl2 =
   List.find_map
     (fun ((ns : Spec.namespace), path) ->
        match ns with
-       | Value when Path.contains_apply path -> Some (Law_applied_path path)
-       | Value -> None)
+       | (Value | Extension) when Path.contains_apply path ->
+           Some (Law_applied_path path)
+       | Value | Extension | Type -> None)
     (law_paths decl1 @ law_paths decl2)
 
 let law_descriptions ~loc env name

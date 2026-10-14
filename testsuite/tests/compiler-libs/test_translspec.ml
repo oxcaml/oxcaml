@@ -6,11 +6,14 @@
 
 (* The fragment of the expression language that [Translspec] accepts, and
    how [Untypespec] prints it back. Each expression is typed in an
-   environment with the declarations below, with the variables [n], [xs]
-   and [g] bound as the parameters of a law would be. *)
+   environment with the declarations below, with the variables [n], [b],
+   [xs] and [g] bound as the parameters of a law would be. *)
 
 let env =
   let prelude = {|
+    type t = A | B of int | C of { x : int; y : bool }
+    type ('a, 'b) pair = Pair of 'a * 'b
+    exception E of int
     external ( + ) : int -> int -> int = "%addint"
     let rec length = function [] -> 0 | _ :: l -> 1 + length l
     let f ?(opt = 0) ~lbl x = opt + lbl + x
@@ -28,7 +31,7 @@ val env : Env.t = <abstr>
 let run_in env source =
   let wrapped =
     Printf.sprintf
-      "fun (n : int) (xs : int list) (g : int -> int) -> (%s)"
+      "fun (n : int) (b : bool) (xs : int list) (g : int -> int) -> (%s)"
       source
   in
   let exp = Parse.expression (Lexing.from_string wrapped) in
@@ -45,7 +48,7 @@ let run_in env source =
           let printed =
             Format.asprintf "%a" Pprintast.expression
               (Untypespec.expression ~lident_of_path:Untypespec.lident_of_path
-                 spec)
+                 ~annotate:(fun _ -> None) spec)
           in
           if String.contains printed '\n'
           then Format.printf "%s  ==>@\n%s@." source printed
@@ -66,24 +69,8 @@ val run : string -> unit = <fun>
 (* Constants *)
 
 let () = List.iter run
-  ["1";
-   "'c'";
-   "\"s\"";
-   "{s|quoted|s}";
-   "1.5";
-   "1l";
-   "1L";
-   "1n";
-   "1s";
-   "1S";
-   "#1.5";
-   "#1.5s";
-   "#1l";
-   "#1L";
-   "#1n";
-   "#1m";
-   "#1s";
-   "#1S"]
+  ["1"; "'c'"; "\"s\""; "{s|quoted|s}"; "1.5"; "1l"; "1L"; "1n"; "1s"; "1S";
+   "#1.5"; "#1.5s"; "#1l"; "#1L"; "#1n"; "#1m"; "#1s"; "#1S"; "#()"; "#true"]
 [%%expect {|
 1  ==>  1
 'c'  ==>  'c'
@@ -103,20 +90,19 @@ let () = List.iter run
 #1m  ==>  #1m
 #1s  ==>  #1s
 #1S  ==>  #1S
+#()  ==>  #()
+#true  ==>  #true
 |}]
 
 (* Variables and globals *)
 
-let () = List.iter run
-  ["n";
-   "g n";
-   "M.v";
-   "length xs"]
+let () = List.iter run ["n"; "g n"; "M.v"; "length xs"; "f ~lbl:1 2"]
 [%%expect {|
 n  ==>  n
 g n  ==>  g n
 M.v  ==>  M.v
 length xs  ==>  length xs
+f ~lbl:1 2  ==>  f ?opt:None ~lbl:1 2
 |}]
 
 (* Applications. The [None] the type checker supplies for an omitted optional
@@ -124,7 +110,55 @@ length xs  ==>  length xs
    argument omitted by a partial application is not printed. *)
 
 let () = List.iter run
-  ["f ~lbl:1"]
+  ["f ~lbl:1 2"; "f ~opt:1 ~lbl:1 2"; "f ?opt:None ~lbl:1 2";
+   "f ?opt:(Some n) ~lbl:1 2"; "f ~lbl:1"; "(f ~lbl:1) 2"]
 [%%expect {|
+f ~lbl:1 2  ==>  f ?opt:None ~lbl:1 2
+f ~opt:1 ~lbl:1 2  ==>  f ?opt:(Some 1) ~lbl:1 2
+f ?opt:None ~lbl:1 2  ==>  f ?opt:None ~lbl:1 2
+f ?opt:(Some n) ~lbl:1 2  ==>  f ?opt:(Some n) ~lbl:1 2
 f ~lbl:1  ==>  f ~lbl:1
+(f ~lbl:1) 2  ==>  (f ~lbl:1) ?opt:None 2
+|}]
+
+(* Tuples, constructors, records, variants, lists *)
+
+let () = List.iter run
+  ["(n, b)";
+   "(~x:n, b)";
+   "#(n, b)";
+   "A";
+   "B n";
+   "Pair (n, b)";
+   "Some n";
+   "None";
+   "E n";
+   "`A";
+   "`B n";
+   "[]";
+   "n :: xs";
+   "[n; n]"]
+[%%expect {|
+(n, b)  ==>  (n, b)
+(~x:n, b)  ==>  (~x:n, b)
+#(n, b)  ==>  #(n, b)
+A  ==>  A
+B n  ==>  B n
+Pair (n, b)  ==>  Pair (n, b)
+Some n  ==>  Some n
+None  ==>  None
+E n  ==>  E n
+`A  ==>  `A
+`B n  ==>  `B n
+[]  ==>  []
+n :: xs  ==>  n :: xs
+[n; n]  ==>  [n; n]
+|}]
+
+(* Lazy values and extension constructors *)
+
+let () = List.iter run
+  ["[%extension_constructor E]"]
+[%%expect {|
+[%extension_constructor E]  ==>  [%ocaml.extension_constructor E]
 |}]

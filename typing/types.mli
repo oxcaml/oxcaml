@@ -1122,6 +1122,7 @@ type extension_constructor =
     ext_loc: Location.t;
     ext_attributes: Parsetree.attributes;
     ext_uid: Uid.t;
+    ext_alias: Path.t option;
   }
 
 and type_transparence =
@@ -1265,7 +1266,8 @@ module type Wrapped = sig
       (** [Some p.x] in the signature of a module strengthened with [p],
           as a type [t] gets the manifest [p.t] (see [Mtype.strengthen]).
           Only the clauses of laws use it (see
-          [Includecore.law_descriptions]). *)
+          [Includecore.law_descriptions]). [ext_alias] is the same for
+          extension constructors. *)
     }
 
   type module_type =

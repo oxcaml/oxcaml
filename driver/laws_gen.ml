@@ -117,13 +117,13 @@ let check_paths ctx display (ld : law_description) =
   List.iter
     (fun ((ns : Spec.namespace), path) ->
        match ns with
-       | Value when Path.contains_apply path ->
+       | (Value | Extension) when Path.contains_apply path ->
            error ~cmi:ctx.cmi
              "@[<hov>The@ law@ %a@ refers@ to@ %a@ through@ a@ functor@ \
               application,@ which@ names@ no@ particular@ instance.@]"
              Misc.Style.inline_code display
              Misc.Style.inline_code (Path.name path)
-       | Value -> ())
+       | Value | Extension | Type -> ())
     (List.concat_map Spec.paths (ld.law_conclusion :: ld.law_assumptions))
 
 (* The laws within a module type, for messages. *)
@@ -510,6 +510,11 @@ let module_type mty =
   Format.asprintf "%a@?" Printtyp.modtype mty
   |> Lexing.from_string |> Parse.module_type
 
+(* Type annotations for the generated clauses, so that constructors and
+   labels are resolved as in the source. *)
+let annotate =
+  Untypespec.head_type_annotation ~lident_of_path:Untypespec.lident_of_path
+
 let input_type law = law.l_local ^ "_input"
 
 let module_type_name frame = String.capitalize_ascii frame.f_local ^ "_choices"
@@ -696,7 +701,8 @@ let clause_check ~check law n (clause : _ Spec.expression) =
       []
   in
   let body =
-    Untypespec.expression ~lident_of_path:Untypespec.lident_of_path clause
+    Untypespec.expression ~lident_of_path:Untypespec.lident_of_path ~annotate
+      clause
   in
   let predicate =
     fun_ [param input] (Exp.constraint_ body (Some (tconstr "bool" [])) [])

@@ -288,3 +288,23 @@ Line 4, characters 4-30:
         ^^^^^^^^^^^^^^^^^^^^^^^^^^
   The law "l" refers to the value "f".
 |}]
+
+(* And for an extension constructor from [open struct], used by the law of
+   a submodule. *)
+
+module Hidden_in_submodule = struct
+  open struct exception E end
+  module Inner = struct
+    law? l : E = E
+  end
+end
+[%%expect {|
+Line 2, characters 2-29:
+2 |   open struct exception E end
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The extension constructor "E" introduced by this open is used by a law.
+Line 4, characters 4-18:
+4 |     law? l : E = E
+        ^^^^^^^^^^^^^^
+  The law "l" refers to the extension constructor "E".
+|}]

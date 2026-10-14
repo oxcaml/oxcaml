@@ -38,10 +38,7 @@ law? trivial : true
 [%%expect {|
 
 law? trivial : true;;
-Line 1, characters 15-19:
-1 | law? trivial : true
-                   ^^^^
-Error: Laws do not support tuples, constructors and variants.
+law? trivial : true
 |}]
 
 module type S = sig

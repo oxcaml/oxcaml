@@ -12,8 +12,10 @@
 
 module type L = sig
   law? value : Fact_a.x = 0
+  law? exception_ : Fact_a.E = Fact_a.E
 end
 
 module Through_b : L = struct
   law? value : Fact_b.x = 0
+  law? exception_ : Fact_b.E = Fact_a.E
 end

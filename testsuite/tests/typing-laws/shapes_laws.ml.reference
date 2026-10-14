@@ -1,11 +1,16 @@
 [@@@ocaml.warning "-27"]
+module Laws_gen_CamlinternalFormatBasics = CamlinternalFormatBasics
 module Laws_gen_Shapes = Shapes
 module Laws_gen_Stdlib = Stdlib
 type 'a each =
   {
   area_nonneg: 'a ;
   poly: 'a ;
+  disamb: 'a ;
+  optional: 'a ;
   modes: 'a ;
+  fmt: 'a ;
+  fake_format: 'a ;
   unboxed: 'a ;
   \#type: 'a ;
   inferred: 'a }
@@ -13,7 +18,11 @@ let names =
   {
     area_nonneg = "area_nonneg";
     poly = "poly";
+    disamb = "disamb";
+    optional = "optional";
     modes = "modes";
+    fmt = "fmt";
+    fake_format = "fake_format";
     unboxed = "unboxed";
     \#type = "type";
     inferred = "inferred"
@@ -36,50 +45,101 @@ let locations =
         end_line = 23;
         end_col = 46
       };
-    modes =
+    disamb =
       {
         CamlinternalLaw.file = "shapes.mli";
         start_line = 24;
         start_col = 0;
         end_line = 24;
-        end_col = 54
+        end_col = 58
       };
-    unboxed =
+    optional =
       {
         CamlinternalLaw.file = "shapes.mli";
         start_line = 25;
         start_col = 0;
-        end_line = 25;
-        end_col = 55
-      };
-    \#type =
-      {
-        CamlinternalLaw.file = "shapes.mli";
-        start_line = 26;
-        start_col = 0;
         end_line = 26;
-        end_col = 50
+        end_col = 62
       };
-    inferred =
+    modes =
       {
         CamlinternalLaw.file = "shapes.mli";
         start_line = 27;
         start_col = 0;
         end_line = 27;
+        end_col = 54
+      };
+    fmt =
+      {
+        CamlinternalLaw.file = "shapes.mli";
+        start_line = 28;
+        start_col = 0;
+        end_line = 28;
+        end_col = 60
+      };
+    fake_format =
+      {
+        CamlinternalLaw.file = "shapes.mli";
+        start_line = 29;
+        start_col = 0;
+        end_line = 29;
+        end_col = 61
+      };
+    unboxed =
+      {
+        CamlinternalLaw.file = "shapes.mli";
+        start_line = 30;
+        start_col = 0;
+        end_line = 30;
+        end_col = 55
+      };
+    \#type =
+      {
+        CamlinternalLaw.file = "shapes.mli";
+        start_line = 31;
+        start_col = 0;
+        end_line = 31;
+        end_col = 50
+      };
+    inferred =
+      {
+        CamlinternalLaw.file = "shapes.mli";
+        start_line = 32;
+        start_col = 0;
+        end_line = 32;
         end_col = 33
       }
   }
-let map { area_nonneg; poly; modes; unboxed; \#type; inferred } ~f =
+let map
+  { area_nonneg; poly; disamb; optional; modes; fmt; fake_format; unboxed;
+    \#type; inferred }
+  ~f =
   {
     area_nonneg = (f area_nonneg);
     poly = (f poly);
+    disamb = (f disamb);
+    optional = (f optional);
     modes = (f modes);
+    fmt = (f fmt);
+    fake_format = (f fake_format);
     unboxed = (f unboxed);
     \#type = (f \#type);
     inferred = (f inferred)
   }
-let to_list { area_nonneg; poly; modes; unboxed; \#type; inferred } =
-  [area_nonneg; poly; modes; unboxed; \#type; inferred]
+let to_list
+  { area_nonneg; poly; disamb; optional; modes; fmt; fake_format; unboxed;
+    \#type; inferred }
+  =
+  [area_nonneg;
+  poly;
+  disamb;
+  optional;
+  modes;
+  fmt;
+  fake_format;
+  unboxed;
+  \#type;
+  inferred]
 type area_nonneg_input =
   | Area_nonneg_input: {
   s: Laws_gen_Shapes.t } -> area_nonneg_input 
@@ -88,9 +148,20 @@ type poly_input =
   {
   xs: 'a list ;
   f: 'a -> 'b } -> poly_input 
+type disamb_input =
+  | Disamb_input: {
+  c: Laws_gen_Shapes.t } -> disamb_input 
+type optional_input =
+  | Optional_input: {
+  f: ?y:int -> x:int -> unit -> int } -> optional_input 
 type modes_input =
   | Modes_input: {
   g: int @ local -> int } -> modes_input 
+type fmt_input =
+  | Fmt_input: {
+  n: int } -> fmt_input 
+type fake_format_input =
+  | Fake_format_input: fake_format_input 
 type unboxed_input =
   | Unboxed_input: {
   x: float# } -> unboxed_input 
@@ -108,7 +179,11 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
       sig
         val area_nonneg : area_nonneg_input Choice.t
         val poly : poly_input Choice.t
+        val disamb : disamb_input Choice.t
+        val optional : optional_input Choice.t
         val modes : modes_input Choice.t
+        val fmt : fmt_input Choice.t
+        val fake_format : fake_format_input Choice.t
         val unboxed : unboxed_input Choice.t
         val \#type : type_input Choice.t
         val inferred : inferred_input Choice.t
@@ -157,6 +232,57 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                      end_col = 46
                    }
                }))
+    let disamb ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.disamb),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.disamb;
+                 predicate =
+                   (fun ((Disamb_input { c }) : disamb_input) ->
+                      (Laws_gen_Stdlib.(||)
+                         (Laws_gen_Stdlib.(=)
+                            (Laws_gen_Shapes.Circle 1. : Laws_gen_Shapes.t) c)
+                         (Laws_gen_Stdlib.(=)
+                            (Laws_gen_Shapes.Sub.U : Laws_gen_Shapes.Sub.u)
+                            (Laws_gen_Shapes.Sub.U : Laws_gen_Shapes.Sub.u)) : 
+                      bool));
+                 location =
+                   {
+                     CamlinternalLaw.file = "shapes.mli";
+                     start_line = 24;
+                     start_col = 22;
+                     end_line = 24;
+                     end_col = 58
+                   }
+               }))
+    let optional ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.optional),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.optional;
+                 predicate =
+                   (fun ((Optional_input { f }) : optional_input) ->
+                      (Laws_gen_Stdlib.(&&)
+                         (Laws_gen_Stdlib.(=) (f ?y:None ~x:1 ())
+                            (Laws_gen_Shapes.opt ?y:None ~x:1 ()))
+                         (Laws_gen_Stdlib.(=) (f ?y:(Some 2) ~x:1 ())
+                            (Laws_gen_Shapes.opt ?y:(Some 2) ~x:1 ())) : 
+                      bool));
+                 location =
+                   {
+                     CamlinternalLaw.file = "shapes.mli";
+                     start_line = 26;
+                     start_col = 2;
+                     end_line = 26;
+                     end_col = 62
+                   }
+               }))
     let modes ((module C)  : (module Choices))  : unit Law.t =
       Law.Bind
         ((Law.Choose C.modes),
@@ -172,10 +298,71 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                  location =
                    {
                      CamlinternalLaw.file = "shapes.mli";
-                     start_line = 24;
+                     start_line = 27;
                      start_col = 37;
-                     end_line = 24;
+                     end_line = 27;
                      end_col = 54
+                   }
+               }))
+    let fmt ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.fmt),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.fmt;
+                 predicate =
+                   (fun ((Fmt_input { n }) : fmt_input) ->
+                      (Laws_gen_Stdlib.(=)
+                         (Laws_gen_Stdlib.Printf.sprintf
+                            (Laws_gen_CamlinternalFormatBasics.Format
+                               ((Laws_gen_CamlinternalFormatBasics.Int
+                                   ((Laws_gen_CamlinternalFormatBasics.Int_d : 
+                                     Laws_gen_CamlinternalFormatBasics.int_conv),
+                                     (Laws_gen_CamlinternalFormatBasics.No_padding : 
+                                     (_, _)
+                                       Laws_gen_CamlinternalFormatBasics.padding),
+                                     (Laws_gen_CamlinternalFormatBasics.No_precision : 
+                                     (_, _)
+                                       Laws_gen_CamlinternalFormatBasics.precision),
+                                     (Laws_gen_CamlinternalFormatBasics.End_of_format : 
+                                     (_, _, _, _, _, _)
+                                       Laws_gen_CamlinternalFormatBasics.fmt)) : 
+                                 (_, _, _, _, _, _)
+                                   Laws_gen_CamlinternalFormatBasics.fmt),
+                                 "%d") : (_, _, _) Laws_gen_Stdlib.format) n)
+                         (Laws_gen_Stdlib.string_of_int n) : bool));
+                 location =
+                   {
+                     CamlinternalLaw.file = "shapes.mli";
+                     start_line = 28;
+                     start_col = 21;
+                     end_line = 28;
+                     end_col = 60
+                   }
+               }))
+    let fake_format ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.fake_format),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.fake_format;
+                 predicate =
+                   (fun ((Fake_format_input) : fake_format_input) ->
+                      (Laws_gen_Stdlib.(<>)
+                         (Laws_gen_Shapes.Format (1, "hello") : Laws_gen_Shapes.format6)
+                         (Laws_gen_Shapes.Format (2, "hello") : Laws_gen_Shapes.format6) : 
+                      bool));
+                 location =
+                   {
+                     CamlinternalLaw.file = "shapes.mli";
+                     start_line = 29;
+                     start_col = 19;
+                     end_line = 29;
+                     end_col = 61
                    }
                }))
     let unboxed ((module C)  : (module Choices))  : unit Law.t =
@@ -193,9 +380,9 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                  location =
                    {
                      CamlinternalLaw.file = "shapes.mli";
-                     start_line = 25;
+                     start_line = 30;
                      start_col = 28;
-                     end_line = 25;
+                     end_line = 30;
                      end_col = 55
                    }
                }))
@@ -213,9 +400,9 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                  location =
                    {
                      CamlinternalLaw.file = "shapes.mli";
-                     start_line = 26;
+                     start_line = 31;
                      start_col = 31;
-                     end_line = 26;
+                     end_line = 31;
                      end_col = 50
                    }
                }))
@@ -234,9 +421,9 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                  location =
                    {
                      CamlinternalLaw.file = "shapes.mli";
-                     start_line = 27;
+                     start_line = 32;
                      start_col = 20;
-                     end_line = 27;
+                     end_line = 32;
                      end_col = 33
                    }
                }))
@@ -244,7 +431,11 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
       {
         area_nonneg = (area_nonneg choices);
         poly = (poly choices);
+        disamb = (disamb choices);
+        optional = (optional choices);
         modes = (modes choices);
+        fmt = (fmt choices);
+        fake_format = (fake_format choices);
         unboxed = (unboxed choices);
         \#type = (\#type choices);
         inferred = (inferred choices)

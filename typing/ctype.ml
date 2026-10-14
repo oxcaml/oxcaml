@@ -8765,6 +8765,10 @@ let nondep_extension_constructor env ids ext =
         ext_attributes = ext.ext_attributes;
         ext_loc = ext.ext_loc;
         ext_uid = ext.ext_uid;
+        ext_alias =
+          (* As the manifest of a type (see [nondep_type_decl]) *)
+          Option.bind ext.ext_alias (fun p ->
+            if Path.exists_free ids p then None else Some p);
       }
   with Nondep_cannot_erase _ as exn ->
     clear_hash ();
@@ -8837,7 +8841,7 @@ let nondep_law_description env ids decl =
     | Some id -> raise (Nondep_cannot_erase id)
     | None -> p
   in
-  let spec = Spec.map ~ty ~value_path:path in
+  let spec = Spec.map ~ty ~value_path:path ~type_path:path in
   let decl =
     { decl with
       law_params = List.map (fun (x, ty_) -> (x, ty ty_)) decl.law_params;

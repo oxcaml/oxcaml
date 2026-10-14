@@ -2017,11 +2017,11 @@ end = struct
           lst
       ) to_remove.hide []
     in
-    (* Laws may additionally refer to values. *)
+    (* Laws may additionally refer to values and extension constructors. *)
     let ids_to_remove_from_laws =
       Ident.Map.fold (fun id (kind,  _, _) lst ->
         match (kind : Sig_component_kind.t) with
-        | Value -> id :: lst
+        | Value | Extension_constructor -> id :: lst
         | _ -> lst
       ) to_remove.hide ids_to_remove
     in
@@ -2070,7 +2070,8 @@ end = struct
               in
               let user_kind, user_id, user_loc =
                 match removed_item_kind, component with
-                | Value, (Sig_module _ | Sig_modtype _) ->
+                | (Value | Extension_constructor),
+                  (Sig_module _ | Sig_modtype _) ->
                     begin match
                       law_referring_to env removed_item_id component
                     with

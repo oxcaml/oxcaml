@@ -46,6 +46,10 @@ type sort = Jkind_types.Sort.Const.t
 
 type locality = Mode.Locality.Const.t
 
+type constructor =
+  | Constructor of { type_path : Path.t; name : string }
+  | Extension_constructor of Path.t
+
 type 'ty expression =
   { sexp_desc : 'ty expression_desc;
     sexp_type : 'ty;
@@ -61,6 +65,17 @@ and 'ty expression_desc =
         args : (arg_label * 'ty argument) list;
         ret_mode : locality;
       }
+  | Sexp_tuple of (string option * 'ty expression) list * locality
+  | Sexp_unboxed_tuple of (string option * 'ty expression * sort) list
+  | Sexp_unboxed_unit
+  | Sexp_unboxed_bool of bool
+  | Sexp_construct of
+      { constructor : constructor;
+        args : ('ty expression * sort) list;
+        locality : locality option;  (** [None] if no allocation is needed *)
+      }
+  | Sexp_variant of string * ('ty expression * locality) option
+  | Sexp_extension_constructor of Path.t
 
 and 'ty argument =
   | Arg of 'ty expression * sort
@@ -68,22 +83,27 @@ and 'ty argument =
 
 (** {1 Traversals} *)
 
-(** [map ~ty ~value_path e] applies [ty] to every type of [e] and
-    [value_path] to the paths of globals. *)
+(** [map ~ty ~value_path ~type_path e] applies [ty] to every type of [e],
+    [value_path] to the paths of globals and [type_path] to the paths of
+    constructors, extension constructors and labels. *)
 val map :
   ty:('a -> 'b) ->
   value_path:(Path.t -> Path.t) ->
+  type_path:(Path.t -> Path.t) ->
   'a expression -> 'b expression
 
 val map_types : ('a -> 'b) -> 'a expression -> 'b expression
 
 val map_paths :
-  value_path:(Path.t -> Path.t) -> 'a expression -> 'a expression
+  value_path:(Path.t -> Path.t) ->
+  type_path:(Path.t -> Path.t) ->
+  'a expression -> 'a expression
 
 val iter_types : ('a -> unit) -> 'a expression -> unit
 
-(** The namespaces of the global paths of an expression: values. *)
-type namespace = Value
+(** The namespaces of the global paths of an expression: values, the types
+    of constructors and labels, and extension constructors. *)
+type namespace = Value | Type | Extension
 
 (** The global paths of an expression with their namespaces, in traversal
     order. *)
