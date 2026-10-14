@@ -1,13 +1,27 @@
-type t =
-  [ `Null
-  | `False
-  | `True
-  | `String of string
-  | `Number of string
-  | `Object of (string * t) list
-  | `Array of t list ]
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*                  Liam Stevenson, Jane Street, New York                 *)
+(*                                                                        *)
+(*   Copyright 2026 Jane Street Group LLC                                 *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
 
-let int i = `Number (Int.to_string i)
+type t =
+  | Null
+  | False
+  | True
+  | String of string
+  | Number of string
+  | Object of (string * t) list
+  | Array of t list
+
+let int i = Number (Int.to_string i)
 
 let float f =
   if Float.is_finite f
@@ -16,13 +30,13 @@ let float f =
        [string_of_float] can produce "1." for whole numbers, which is not valid
        JSON. %.17g provides full double precision and produces valid JSON
        numbers. *)
-    `Number (Format.asprintf "%.17g" f)
+    Number (Format.asprintf "%.17g" f)
   else
     (* JSON can't represent nan or infinity, so use null like JavaScript's
        [JSON.stringify] does. *)
-    `Null
+    Null
 
-let option = function None -> `Null | Some t -> t
+let option = function None -> Null | Some t -> t
 
 module Print_mode = struct
   type t =
@@ -135,15 +149,15 @@ let print_container ~mode ~opening ~closing ~print_item ppf items =
 
 let rec print_value ppf ~mode (t : t) =
   match t with
-  | `Null -> Format.pp_print_string ppf "null"
-  | `False -> Format.pp_print_string ppf "false"
-  | `True -> Format.pp_print_string ppf "true"
-  | `String s -> print_quoted_string ppf s
-  | `Number n -> Format.pp_print_string ppf n
-  | `Array items ->
+  | Null -> Format.pp_print_string ppf "null"
+  | False -> Format.pp_print_string ppf "false"
+  | True -> Format.pp_print_string ppf "true"
+  | String s -> print_quoted_string ppf s
+  | Number n -> Format.pp_print_string ppf n
+  | Array items ->
     print_container ~mode ~opening:'[' ~closing:']'
       ~print_item:(print_value ~mode) ppf items
-  | `Object fields ->
+  | Object fields ->
     print_container ~mode ~opening:'{' ~closing:'}'
       ~print_item:(print_field ~mode) ppf fields
 

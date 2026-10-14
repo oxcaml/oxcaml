@@ -133,14 +133,15 @@ let dwarf_for_fundecl t fundecl ~fun_end_label ~ppf_dump =
       available_ranges_vars inlined_frame_ranges;
     { fun_end_label; fundecl }
 
-let format_variable_json (variable : DS.Diagnostics.variable_reduction) =
+let format_variable_json (variable : DS.Diagnostics.variable_reduction) : Json.t
+    =
   let layout =
     Format_doc.asprintf "%a" Jkind_types.Sort.Const.format variable.type_layout
   in
   let type_with_layout = Printf.sprintf "%s @ %s" variable.type_name layout in
-  let strings l = `Array (List.map (fun s -> `String s) l) in
-  `Object
-    [ "type", `String type_with_layout;
+  let strings l : Json.t = Array (List.map (fun s : Json.t -> String s) l) in
+  Object
+    [ "type", String type_with_layout;
       ( "shape_size_before_reduction_in_bytes",
         Json.int variable.shape_size_before_reduction_in_bytes );
       ( "shape_size_after_reduction_in_bytes",
@@ -163,10 +164,10 @@ let emit_stats_file t =
   in
   let { DS.Diagnostics.variables } = DS.diagnostics t.state in
   let optional_int flag = Json.option (Option.map Json.int !flag) in
-  let main_object =
-    `Object
+  let main_object : Json.t =
+    Object
       [ ( "compilation_parameters",
-          `Object
+          Object
             [ ( "type_to_shape_max_depth",
                 optional_int Clflags.type_to_shape_max_depth );
               ( "gdwarf_config_shape_reduce_depth",
@@ -185,7 +186,7 @@ let emit_stats_file t =
                   Clflags.gdwarf_config_max_evaluation_steps_per_variable );
               ( "gdwarf_config_shape_reduce_fuel",
                 optional_int Clflags.gdwarf_config_shape_reduce_fuel ) ] );
-        "variables", `Array (List.rev_map format_variable_json variables) ]
+        "variables", Array (List.rev_map format_variable_json variables) ]
   in
   let oc = open_out stats_filename in
   let ppf = Format.formatter_of_out_channel oc in
