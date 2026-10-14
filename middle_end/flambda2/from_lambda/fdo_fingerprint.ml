@@ -31,17 +31,29 @@ module H = Fdo_prehash
 
 module Body_hash = struct
   (* Two bodies should hash alike unless their differences are likely to change
-     code layout decisions. Any change to what the program computes may, so the
-     hash covers the control-flow constructs (in the order the body's counters
-     are numbered in), constants, primitives with the payloads that select what
-     they compute, the call sites with their callees and inlining attributes,
-     and the function attributes. It leaves out what varies between compilations
-     of the same code (source positions, identifier stamps, debug uids, static
-     handler numbers) and the layouts and modes of terms.
+     code layout decisions.
+
+     As such, the following are covered:
+
+     - control-flow constructs
+
+     - constants
+
+     - primitives (with selected payloads)
+
+     - call sites with their callees and inlining attributes
+
+     - function attributes
+
+     And the following are not:
+
+     - what varies between compilations of the same code (source positions,
+     identifier stamps, etc.)
+
+     - layouts and modes of terms.
 
      Every node is hashed from a tag of its own, its fields and its children, so
-     that distinct trees get distinct hashes. The tags are part of the hash
-     definition: renumbering them changes every body hash.
+     that distinct trees get distinct hashes.
 
      CR yusumez: The translation to Lambda and the names of the primitives
      change between compiler versions, so a body hash from one compiler version
@@ -483,9 +495,6 @@ module Body_hash = struct
       =
     ident name
 
-  (* Static handler numbers are fresh for every compilation and left out, so
-     which handler a [Lstaticraise] jumps to is not hashed. Debugger events,
-     regions and exclaves are transparent. *)
   let rec term (lam : L.lambda) =
     match lam with
     | Lvar id -> H.node ~tag:1 [ident id]
@@ -552,6 +561,8 @@ module Body_hash = struct
                (fun (key, case) -> H.combine (H.of_string key) (term case))
                cases);
           H.of_option (Option.map term default) ]
+    (* Static handler numbers are fresh for every compilation and left out, so
+       which handler a [Lstaticraise] jumps to is not hashed. *)
     | Lstaticraise (_label, args) ->
       H.node ~tag:12 [H.of_list (List.map term args)]
     | Lstaticcatch (body, (_label, params), handler, _pop_region, _layout) ->
@@ -598,6 +609,7 @@ module Body_hash = struct
           term obj;
           H.of_list (List.map term args) ]
     | Lifused (id, e) -> H.node ~tag:21 [ident id; term e]
+    (* Debugger events, regions and exclaves are transparent *)
     | Levent (e, _event) -> term e
     | Lregion (e, _layout) -> term e
     | Lexclave e -> term e
