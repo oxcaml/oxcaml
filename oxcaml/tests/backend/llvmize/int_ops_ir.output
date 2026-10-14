@@ -539,34 +539,30 @@ define  oxcamlcc { { i64, i64 }, { i64 } } @camlInt_ops__lnot__HIDE_STAMP(i64 %0
   %6 = alloca i64
   %7 = alloca ptr addrspace(1)
   %8 = alloca i64
-  %9 = alloca i64
   br label %L1
 L1:
   br label %L201
 L201:
-  %10 = load i64, ptr %4
-  store i64 %10, ptr %5
-  %11 = ptrtoint ptr @camlInt_ops_data to i64
-  store i64 %11, ptr %6
-  %12 = load i64, ptr %6
-  %13 = inttoptr i64 %12 to ptr
-  %14 = load ptr addrspace(1), ptr %13
-  store ptr addrspace(1) %14, ptr %7
-  %15 = load i64, ptr %7
-  %16 = xor i64 %15, -1
-  store i64 %16, ptr %8
-  %17 = load i64, ptr %8
-  %18 = or i64 %17, 1
-  store i64 %18, ptr %9
-  %19 = load i64, ptr %9
-  store i64 %19, ptr %4
-  %20 = load i64, ptr %4
-  %21 = load i64, ptr %ds
-  %22 = load i64, ptr %alloc
-  %23 = insertvalue { { i64, i64 }, { i64 } } poison, i64 %21, 0, 0
-  %24 = insertvalue { { i64, i64 }, { i64 } } %23, i64 %22, 0, 1
-  %25 = insertvalue { { i64, i64 }, { i64 } } %24, i64 %20, 1, 0
-  ret { { i64, i64 }, { i64 } } %25
+  %9 = load i64, ptr %4
+  store i64 %9, ptr %5
+  %10 = ptrtoint ptr @camlInt_ops_data to i64
+  store i64 %10, ptr %6
+  %11 = load i64, ptr %6
+  %12 = inttoptr i64 %11 to ptr
+  %13 = load ptr addrspace(1), ptr %12
+  store ptr addrspace(1) %13, ptr %7
+  %14 = load i64, ptr %7
+  %15 = xor i64 %14, -2
+  store i64 %15, ptr %8
+  %16 = load i64, ptr %8
+  store i64 %16, ptr %4
+  %17 = load i64, ptr %4
+  %18 = load i64, ptr %ds
+  %19 = load i64, ptr %alloc
+  %20 = insertvalue { { i64, i64 }, { i64 } } poison, i64 %18, 0, 0
+  %21 = insertvalue { { i64, i64 }, { i64 } } %20, i64 %19, 0, 1
+  %22 = insertvalue { { i64, i64 }, { i64 } } %21, i64 %17, 1, 0
+  ret { { i64, i64 }, { i64 } } %22
 }
 
 define  oxcamlcc { { i64, i64 }, { i64 } } @camlInt_ops__lsl__HIDE_STAMP(i64 %0, i64 %1, i64 %2) gc "oxcaml" {
@@ -588,8 +584,8 @@ define  oxcamlcc { { i64, i64 }, { i64 } } @camlInt_ops__lsl__HIDE_STAMP(i64 %0,
   %14 = alloca i64
   br label %L1
 L1:
-  br label %L207
-L207:
+  br label %L206
+L206:
   %15 = load i64, ptr %4
   store i64 %15, ptr %5
   %16 = ptrtoint ptr @camlInt_ops_data to i64
@@ -648,8 +644,8 @@ define  oxcamlcc { { i64, i64 }, { i64 } } @camlInt_ops__lsr__HIDE_STAMP(i64 %0,
   %13 = alloca i64
   br label %L1
 L1:
-  br label %L217
-L217:
+  br label %L216
+L216:
   %14 = load i64, ptr %4
   store i64 %14, ptr %5
   %15 = ptrtoint ptr @camlInt_ops_data to i64
@@ -705,8 +701,8 @@ define  oxcamlcc { { i64, i64 }, { i64 } } @camlInt_ops__asr__HIDE_STAMP(i64 %0,
   %13 = alloca i64
   br label %L1
 L1:
-  br label %L226
-L226:
+  br label %L225
+L225:
   %14 = load i64, ptr %4
   store i64 %14, ptr %5
   %15 = ptrtoint ptr @camlInt_ops_data to i64
@@ -757,8 +753,8 @@ define  oxcamlcc { { i64, i64 }, { i64 } } @camlInt_ops__add_imm_HIDE_STAMP(i64 
   %8 = alloca i64
   br label %L1
 L1:
-  br label %L235
-L235:
+  br label %L234
+L234:
   %9 = load i64, ptr %4
   store i64 %9, ptr %5
   %10 = ptrtoint ptr @camlInt_ops_data to i64
@@ -794,8 +790,8 @@ define  oxcamlcc { { i64, i64 }, { i64 } } @camlInt_ops__sub_imm_HIDE_STAMP(i64 
   %8 = alloca i64
   br label %L1
 L1:
-  br label %L240
-L240:
+  br label %L239
+L239:
   %9 = load i64, ptr %4
   store i64 %9, ptr %5
   %10 = ptrtoint ptr @camlInt_ops_data to i64
@@ -832,8 +828,8 @@ define  oxcamlcc { { i64, i64 }, { i64 } } @camlInt_ops__mul_imm_HIDE_STAMP(i64 
   %9 = alloca i64
   br label %L1
 L1:
-  br label %L245
-L245:
+  br label %L244
+L244:
   %10 = load i64, ptr %4
   store i64 %10, ptr %5
   %11 = ptrtoint ptr @camlInt_ops_data to i64
@@ -879,8 +875,8 @@ define  oxcamlcc { { i64, i64 }, { i64 } } @camlInt_ops__div_imm_HIDE_STAMP(i64 
   %15 = alloca i64
   br label %L1
 L1:
-  br label %L251
-L251:
+  br label %L250
+L250:
   %16 = load i64, ptr %4
   store i64 %16, ptr %5
   %17 = ptrtoint ptr @camlInt_ops_data to i64
@@ -945,8 +941,8 @@ define  oxcamlcc { { i64, i64 }, { i64 } } @camlInt_ops__mod_imm_HIDE_STAMP(i64 
   %16 = alloca i64
   br label %L1
 L1:
-  br label %L262
-L262:
+  br label %L261
+L261:
   %17 = load i64, ptr %4
   store i64 %17, ptr %5
   %18 = ptrtoint ptr @camlInt_ops_data to i64
@@ -1007,8 +1003,8 @@ define  oxcamlcc { { i64, i64 }, { i64 } } @camlInt_ops__land_imm_HIDE_STAMP(i64
   %8 = alloca i64
   br label %L1
 L1:
-  br label %L274
-L274:
+  br label %L273
+L273:
   %9 = load i64, ptr %4
   store i64 %9, ptr %5
   %10 = ptrtoint ptr @camlInt_ops_data to i64
@@ -1044,8 +1040,8 @@ define  oxcamlcc { { i64, i64 }, { i64 } } @camlInt_ops__lor_imm_HIDE_STAMP(i64 
   %8 = alloca i64
   br label %L1
 L1:
-  br label %L279
-L279:
+  br label %L278
+L278:
   %9 = load i64, ptr %4
   store i64 %9, ptr %5
   %10 = ptrtoint ptr @camlInt_ops_data to i64
@@ -1082,8 +1078,8 @@ define  oxcamlcc { { i64, i64 }, { i64 } } @camlInt_ops__lxor_imm_HIDE_STAMP(i64
   %9 = alloca i64
   br label %L1
 L1:
-  br label %L284
-L284:
+  br label %L283
+L283:
   %10 = load i64, ptr %4
   store i64 %10, ptr %5
   %11 = ptrtoint ptr @camlInt_ops_data to i64
@@ -1123,8 +1119,8 @@ define  oxcamlcc { { i64, i64 }, { i64 } } @camlInt_ops__lsl_imm_HIDE_STAMP(i64 
   %9 = alloca i64
   br label %L1
 L1:
-  br label %L290
-L290:
+  br label %L289
+L289:
   %10 = load i64, ptr %4
   store i64 %10, ptr %5
   %11 = ptrtoint ptr @camlInt_ops_data to i64
@@ -1164,8 +1160,8 @@ define  oxcamlcc { { i64, i64 }, { i64 } } @camlInt_ops__lsr_imm_HIDE_STAMP(i64 
   %9 = alloca i64
   br label %L1
 L1:
-  br label %L296
-L296:
+  br label %L295
+L295:
   %10 = load i64, ptr %4
   store i64 %10, ptr %5
   %11 = ptrtoint ptr @camlInt_ops_data to i64
@@ -1205,8 +1201,8 @@ define  oxcamlcc { { i64, i64 }, { i64 } } @camlInt_ops__asr_imm_HIDE_STAMP(i64 
   %9 = alloca i64
   br label %L1
 L1:
-  br label %L302
-L302:
+  br label %L301
+L301:
   %10 = load i64, ptr %4
   store i64 %10, ptr %5
   %11 = ptrtoint ptr @camlInt_ops_data to i64
@@ -1252,8 +1248,8 @@ define  oxcamlcc { { i64, i64 }, { i64 } } @camlInt_ops__popcnt_HIDE_STAMP(i64 %
   %15 = alloca i64
   br label %L1
 L1:
-  br label %L308
-L308:
+  br label %L307
+L307:
   %16 = load i64, ptr %4
   store i64 %16, ptr %5
   store i64 9223372036854775807, ptr %6
@@ -1315,8 +1311,8 @@ define  oxcamlcc { { i64, i64 }, { i64 } } @camlInt_ops__ctz_HIDE_STAMP(i64 %0, 
   %16 = alloca i64
   br label %L1
 L1:
-  br label %L318
-L318:
+  br label %L317
+L317:
   %17 = load i64, ptr %4
   store i64 %17, ptr %5
   store i64 1, ptr %6
@@ -1381,8 +1377,8 @@ define  oxcamlcc { { i64, i64 }, { i64 } } @camlInt_ops__clz_HIDE_STAMP(i64 %0, 
   %16 = alloca i64
   br label %L1
 L1:
-  br label %L329
-L329:
+  br label %L328
+L328:
   %17 = load i64, ptr %4
   store i64 %17, ptr %5
   store i64 9223372036854775807, ptr %6
@@ -1438,8 +1434,8 @@ define  oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlInt_ops__entry(i64 
   %7 = alloca i64
   br label %L1
 L1:
-  br label %L343
-L343:
+  br label %L342
+L342:
   %8 = ptrtoint ptr @camlInt_ops to i64
   store i64 %8, ptr %5
   %9 = load i64, ptr %5
