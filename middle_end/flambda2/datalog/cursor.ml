@@ -316,12 +316,9 @@ module From_plan = struct
         @@ build_stages env plan (index + 1)
 
   let create_from_plan_with_parameters ?(callback = ref ignore) ~original_rule
-      ({ tables;
-         parameters;
-         input_stages = _;
-         output_atoms = _;
-         num_existentials = _
-       } as plan) : (_, _) with_parameters =
+      parameters
+      ({ tables; input_stages = _; output_atoms = _; num_existentials = _ } as
+       plan) : (_, _) with_parameters =
     let env = Env.create () in
     let env, parameters =
       let rec bind_params : type p.
@@ -367,9 +364,9 @@ module With_parameters = struct
   let without_parameters { parameters = []; cursor } = cursor
 
   let create_from_rule ?callback params rule =
-    let plan = Planner.plan_rule params rule in
+    let plan = Planner.plan_rule rule in
     From_plan.create_from_plan_with_parameters ?callback ~original_rule:rule
-      plan
+      params plan
 
   let naive_fold { parameters; cursor } ps db f acc =
     Or_null_sender.send_hlist parameters ps;

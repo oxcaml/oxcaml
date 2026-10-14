@@ -41,14 +41,13 @@ type stage =
 type bound_table =
   | Bound_table : ('t, 'k, 'v) Table.Id.t * 't variable -> bound_table
 
-type ('p, 'v) plan =
+type plan =
   { tables : bound_table iarray;
-    parameters : 'p Variable.hlist;
     input_stages : stage iarray;
     num_existentials : int;
     output_atoms : atom iarray
   }
 
-val print_plan : Format.formatter -> ('p, 'v) plan -> unit
+val print_plan : Format.formatter -> plan -> unit
 
-val plan_rule : 'p Variable.hlist -> rule -> ('p, 'v) plan
+val plan_rule : rule -> plan

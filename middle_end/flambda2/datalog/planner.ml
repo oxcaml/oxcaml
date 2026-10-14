@@ -41,9 +41,8 @@ type stage =
 type bound_table =
   | Bound_table : ('t, 'k, 'v) Table.Id.t * 't variable -> bound_table
 
-type ('p, 'v) plan =
+type plan =
   { tables : bound_table iarray;
-    parameters : 'p Variable.hlist;
     input_stages : stage iarray;
     num_existentials : int;
     output_atoms : atom iarray
@@ -128,16 +127,21 @@ type atom_layout =
   }
 
 let layout_table_atom : type t k v.
-    (t, k, v) Column.hlist -> t variable -> k Term.hlist -> table_layers =
- fun columns table args ->
+    bindable_vars:_ ->
+    (t, k, v) Column.hlist ->
+    t variable ->
+    k Term.hlist ->
+    table_layers =
+ fun ~bindable_vars columns table args ->
   let columns, result =
     let rec loop : type t k.
+        bindable_vars:_ ->
         _ ->
         (t, k, v) Column.hlist ->
         t variable ->
         k Term.hlist ->
         _ * v variable =
-     fun rev_plan columns outer_var args ->
+     fun ~bindable_vars rev_plan columns outer_var args ->
       match columns, args with
       | [], [] -> Iarray.of_list (List.rev rev_plan), outer_var
       | column :: columns, arg :: args ->
@@ -147,11 +151,17 @@ let layout_table_atom : type t k v.
                (print_term (Column.print_key column))
                arg)
         in
-        loop
+        let bindable_vars =
+          match arg with
+          | Variable var ->
+            Variable.Id.Set.remove (Variable.uid var) bindable_vars
+          | Literal _ -> bindable_vars
+        in
+        loop ~bindable_vars
           (Index_layer (column, outer_var, arg, inner_var) :: rev_plan)
           columns inner_var args
     in
-    loop [] columns table args
+    loop ~bindable_vars [] columns table args
   in
   Table_layers { columns; table; result; bound_prefix = 0 }
 
@@ -163,19 +173,24 @@ let rec free_vars_term_hlist : type a. a Term.hlist -> Variable.Id.Set.t =
   | Variable v :: terms ->
     Variable.Id.Set.add (Variable.uid v) (free_vars_term_hlist terms)
 
-let layout_atom bound_tables atom =
+let layout_atom ~bindable_vars bound_tables atom =
   let (Atom (relation, terms)) = atom in
   let bound_tables, table_layers =
     match relation with
     | Table tid ->
       let var = Variable.create (Table.Id.name tid) in
       let seminaive_tables = Bound_table (tid, var) :: bound_tables in
-      let table_layers = layout_table_atom (Table.Id.columns tid) var terms in
+      let table_layers =
+        layout_table_atom ~bindable_vars (Table.Id.columns tid) var terms
+      in
       seminaive_tables, Some table_layers
     | Unless _ | Distinct _ | Filter _ | Callback_with_bindings _ ->
       bound_tables, None
   in
-  bound_tables, { table_layers; atom; free_vars = free_vars_term_hlist terms }
+  let free_vars =
+    Variable.Id.Set.inter bindable_vars (free_vars_term_hlist terms)
+  in
+  bound_tables, { table_layers; atom; free_vars }
 
 let add_join_stage stages var columns =
   Dynarray.add_last stages (Join_stage (var, columns))
@@ -225,8 +240,16 @@ let advance_prefix_and_extract_iterator_on_variable (type a) table_layers
         layers.bound_prefix <- bound_prefix + 1;
         Column_iterator (column, outer_var, inner_var) :: iterators))
 
-let plan_rule parameters { variables = vars; head; body } =
-  let tables, body_layout = Iarray.fold_left_map layout_atom [] body in
+let plan_rule { variables = vars; head; body } =
+  let bindable_vars =
+    List.fold_left
+      (fun bindable_vars (Variable.Any var) ->
+        Variable.Id.Set.add (Variable.uid var) bindable_vars)
+      Variable.Id.Set.empty vars
+  in
+  let tables, body_layout =
+    Iarray.fold_left_map (layout_atom ~bindable_vars) [] body
+  in
   let tables = Iarray.of_list (List.rev tables) in
   let var_to_atoms = Variable.Id.Tbl.create 0 in
   Iarray.iteri
@@ -240,7 +263,8 @@ let plan_rule parameters { variables = vars; head; body } =
         free_vars)
     body_layout;
   let stages = Dynarray.create () in
-  (* Constant stage: place any stage that does not involve variables. *)
+  (* Initial stage: place any stage that does not involve variables (only
+     constants and parameters). *)
   Iarray.iter
     (fun atom_layout -> add_stages_involving_no_free_vars stages atom_layout)
     body_layout;
@@ -253,17 +277,6 @@ let plan_rule parameters { variables = vars; head; body } =
         add_stages_involving_no_free_vars stages atom_layout)
       atom_ids
   in
-  (* Parameter stage: place any stage only involving parameters. *)
-  Variable.iter_hlist
-    (fun (Any param) ->
-      match Variable.Id.Tbl.find var_to_atoms (Variable.uid param) with
-      | exception Not_found ->
-        Misc.fatal_errorf "Parameter %a is either unused or bound twice"
-          Variable.print param
-      | atom_ids ->
-        Variable.Id.Tbl.remove var_to_atoms (Variable.uid param);
-        place_stages_involving_var param atom_ids)
-    parameters;
   (* Variable stage: this is where we start introducing join stages in a
      top-down way, following the provided ordering. *)
   List.iter
@@ -328,4 +341,4 @@ let plan_rule parameters { variables = vars; head; body } =
     in
     loop 0
   in
-  { tables; parameters; input_stages; output_atoms = head; num_existentials }
+  { tables; input_stages; output_atoms = head; num_existentials }
