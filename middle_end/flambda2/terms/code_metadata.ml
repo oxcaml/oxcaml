@@ -281,11 +281,11 @@ let [@ocamlformat "disable"] print_inlining_paths ppf
       Inlining_history.Relative.print relative_history
       Inlining_history.Absolute.print absolute_history
 
-let [@ocamlformat "disable"] print_fdo_entry ppf fdo_entry_annotation =
+let [@ocamlformat "disable"] print_fdo_entry_annotation ppf annotation =
   if !Oxcaml_flags.fdo_counters
   then
     Format.fprintf ppf "@[<hov 1>(fdo_entry_annotation@ %a)@]@ "
-      Fdo_annotation.With_body_hash.print fdo_entry_annotation
+      Fdo_annotation.With_body_hash.print annotation
 
 let [@ocamlformat "disable"] print ppf
        { code_id = _; newer_version_of; stub; inline; zero_alloc_attribute; poll_attribute;
@@ -410,7 +410,7 @@ let [@ocamlformat "disable"] print ppf
     Flambda_colours.debuginfo
     Debuginfo.print_compact dbg
     Flambda_colours.pop
-    print_fdo_entry fdo_entry_annotation
+    print_fdo_entry_annotation fdo_entry_annotation
     (if is_tupled
     then Flambda_colours.none
     else Flambda_colours.elide)
