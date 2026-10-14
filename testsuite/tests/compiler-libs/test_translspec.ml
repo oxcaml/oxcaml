@@ -19,7 +19,11 @@ let env =
     exception E of int
     exception Failure of string
     external ( + ) : int -> int -> int = "%addint"
+    external ( - ) : int -> int -> int = "%subint"
+    external ( = ) : 'a -> 'a -> bool = "%equal"
     external ( > ) : 'a -> 'a -> bool = "%greaterthan"
+    external ( && ) : bool -> bool -> bool = "%sequand"
+    external ( || ) : bool -> bool -> bool = "%sequor"
     external ignore : 'a -> unit = "%ignore"
     external raise : exn -> 'a = "%raise"
     let rec length = function [] -> 0 | _ :: l -> 1 + length l
@@ -198,11 +202,24 @@ assert false  ==>  assert false
 (* Bindings *)
 
 let () = List.iter run
-  ["let x = n in x";
-   "let x, y = (n, b) in if y then x else 0"]
+  ["let x = n in x"; "let x, y = (n, b) in if y then x else 0";
+   "let rec even k = k = 0 || odd (k - 1) and odd k = k > 0 && even (k - 1) \
+    in even n";
+   "fun x -> x + n"; "fun ~lbl ?(opt = 0) x -> lbl + opt + x";
+   "fun ?opt x -> match opt with Some o -> o + x | None -> x";
+   "function A -> true | B _ | C _ -> false";
+   "fun (x : int) : int -> x"]
 [%%expect {|
 let x = n in x  ==>  let x = n in x
 let x, y = (n, b) in if y then x else 0  ==>  let (x, y) = (n, b) in if y then x else 0
+let rec even k = k = 0 || odd (k - 1) and odd k = k > 0 && even (k - 1) in even n  ==>
+let rec even k = (k = 0) || (odd (k - 1))
+and odd k = (k > 0) && (even (k - 1)) in even n
+fun x -> x + n  ==>  fun x -> x + n
+fun ~lbl ?(opt = 0) x -> lbl + opt + x  ==>  fun ~lbl ?(opt= 0) x -> (lbl + opt) + x
+fun ?opt x -> match opt with Some o -> o + x | None -> x  ==>  fun ?opt x -> match opt with | Some o -> o + x | None -> x
+function A -> true | B _ | C _ -> false  ==>  function | A -> true | B _ | C _ -> false
+fun (x : int) : int -> x  ==>  fun x -> x
 |}]
 
 (* Lazy values and extension constructors *)

@@ -156,6 +156,10 @@ let rec pattern env (p : _ Spec.pattern) =
 and pattern_fields env ~loc fields =
   List.map (fun (lbl, p) -> (label env ~loc lbl, pattern env p)) fields
 
+let no_constraint : Parsetree.function_constraint =
+  { mode_annotations = []; ret_type_constraint = None;
+    ret_mode_annotations = [] }
+
 let rec expression env (e : _ Spec.expression) =
   let loc = e.sexp_loc in
   match e.sexp_desc with
@@ -166,6 +170,11 @@ let rec expression env (e : _ Spec.expression) =
       Exp.let_ ~loc Immutable rf
         (List.map (value_binding env) vbs)
         (expression env body)
+  | Sexp_function { params; body; _ } ->
+      Exp.function_ ~loc
+        (List.map (function_param env) params)
+        no_constraint
+        (function_body env body)
   | Sexp_apply { funct; args; _ } ->
       let argument (lbl, arg) =
         match arg with
@@ -246,6 +255,27 @@ and annotated_record env record =
 and value_binding env vb =
   Vb.mk ~loc:vb.svb_expr.sexp_loc (pattern env vb.svb_pat)
     (expression env vb.svb_expr)
+
+and function_param env fp : Parsetree.function_param =
+  let pat, default =
+    match fp.sfp_kind with
+    | Sparam_pat p -> pattern env p, None
+    | Sparam_optional_default (p, e, _) ->
+        pattern env p, Some (expression env e)
+  in
+  { pparam_desc = Pparam_val (fp.sfp_arg_label, default, pat);
+    pparam_loc = pat.ppat_loc }
+
+and function_body env : _ -> Parsetree.function_body = function
+  | Sfunction_body e -> Pfunction_body (expression env e)
+  | Sfunction_cases { cases; _ } ->
+      let cases = List.map (case env) cases in
+      let loc =
+        match cases with
+        | [] -> Location.none
+        | (c : Parsetree.case) :: _ -> c.pc_lhs.ppat_loc
+      in
+      Pfunction_cases (cases, loc, [])
 
 and case env c =
   Exp.case (pattern env c.sc_lhs)

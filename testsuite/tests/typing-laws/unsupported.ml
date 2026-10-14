@@ -14,6 +14,16 @@ Line 1, characters 36-43:
 Error: Laws do not support arrays.
 |}]
 
+(* A locally abstract type. *)
+
+law? newtype (x : int) : (fun (type a) (y : a) -> true) x
+[%%expect {|
+Line 1, characters 36-37:
+1 | law? newtype (x : int) : (fun (type a) (y : a) -> true) x
+                                        ^
+Error: Laws do not support locally abstract types.
+|}]
+
 (* A constructor pattern binding existential types. *)
 
 type ex = Ex : 'a -> ex

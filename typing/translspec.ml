@@ -74,6 +74,8 @@ let sort s = Jkind.Sort.default_for_transl_and_get s
 
 let locality_r m = locality_mode_r_zap_to_ceil m
 
+let locality_l m = locality_mode_l_zap_to_floor m
+
 let return_mode m = return_mode_zap_to_floor_exn m
 
 (* Constants and partiality *)
@@ -240,7 +242,15 @@ and expression_desc bound loc desc =
       in
       Sexp_let (rf, vbs, expression bound_body body)
   | Texp_letmutable _ -> unsupported loc Mutable_variables
-  | Texp_function _ -> unsupported loc (Not_yet_supported "functions")
+  | Texp_function { params; body; ret_mode; ret_sort; locality_mode; _ } ->
+      let bound, params = function_params bound params in
+      let body = function_body bound body in
+      Sexp_function
+        { params;
+          body;
+          ret_sort = sort ret_sort;
+          ret_mode = return_mode ret_mode.mode_modes;
+          locality = locality_r locality_mode }
   | Texp_apply (funct, args, _, ret_mode, _, _) ->
       let args =
         List.map
@@ -364,6 +374,54 @@ and case : type k. _ -> k Typedtree.case -> _ Spec.case =
   { sc_lhs;
     sc_guard = Option.map (expression bound) c.c_guard;
     sc_rhs = expression bound c.c_rhs }
+
+and function_params bound params =
+  let bound, rev_params =
+    List.fold_left
+      (fun (bound, acc) (fp : Typedtree.function_param) ->
+         if not (List.is_empty fp.fp_newtypes) then
+           unsupported fp.fp_loc Locally_abstract_types;
+         let sfp_arg_label = arg_label fp.fp_loc fp.fp_arg_label in
+         let bound = Ident.Set.add fp.fp_param bound in
+         let sfp_kind, bound =
+           match fp.fp_kind with
+           | Tparam_pat p ->
+               let p = pattern p in
+               Sparam_pat p, bind_pattern bound p
+           | Tparam_optional_default (p, default, s) ->
+               (* The default is evaluated in the scope of the preceding
+                  parameters. *)
+               let default = expression bound default in
+               let p = pattern p in
+               Sparam_optional_default (p, default, sort s),
+               bind_pattern bound p
+         in
+         let param =
+           { sfp_arg_label;
+             sfp_param = fp.fp_param;
+             sfp_kind;
+             sfp_sort = sort fp.fp_sort;
+             sfp_mode = locality_l fp.fp_mode.mode_modes;
+             sfp_partial = partial fp.fp_partial }
+         in
+         bound, param :: acc)
+      (bound, []) params
+  in
+  bound, List.rev rev_params
+
+and function_body bound body =
+  match body with
+  | Tfunction_body e -> Sfunction_body (expression bound e)
+  | Tfunction_cases fc ->
+      List.iter (check_extra fc.fc_loc) fc.fc_exp_extra;
+      let bound = Ident.Set.add fc.fc_param bound in
+      Sfunction_cases
+        { cases = List.map (case bound) fc.fc_cases;
+          param = fc.fc_param;
+          arg_sort = sort fc.fc_arg_sort;
+          arg_mode = locality_l fc.fc_arg_mode;
+          ret_type = fc.fc_ret_type;
+          partial = partial fc.fc_partial }
 
 let expression ~bound e = expression bound e
 

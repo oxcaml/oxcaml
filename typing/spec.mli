@@ -65,6 +65,13 @@ and 'ty expression_desc =
   | Sexp_global of Path.t
   | Sexp_constant of constant
   | Sexp_let of rec_flag * 'ty value_binding list * 'ty expression
+  | Sexp_function of
+      { params : 'ty function_param list;
+        body : 'ty function_body;
+        ret_sort : sort;
+        ret_mode : locality;
+        locality : locality;  (** allocation mode of the closure *)
+      }
   | Sexp_apply of
       { funct : 'ty expression;
         args : (arg_label * 'ty argument) list;
@@ -127,6 +134,30 @@ and 'ty value_binding =
     svb_rec_kind : Value_rec_types.recursive_binding_kind;
     svb_sort : sort;
   }
+
+and 'ty function_param =
+  { sfp_arg_label : arg_label;
+    sfp_param : Ident.t;
+    sfp_kind : 'ty function_param_kind;
+    sfp_sort : sort;
+    sfp_mode : locality;
+    sfp_partial : partial;
+  }
+
+and 'ty function_param_kind =
+  | Sparam_pat of 'ty pattern
+  | Sparam_optional_default of 'ty pattern * 'ty expression * sort
+
+and 'ty function_body =
+  | Sfunction_body of 'ty expression
+  | Sfunction_cases of
+      { cases : 'ty case list;
+        param : Ident.t;
+        arg_sort : sort;
+        arg_mode : locality;
+        ret_type : 'ty;
+        partial : partial;
+      }
 
 and 'ty case =
   { sc_lhs : 'ty pattern;

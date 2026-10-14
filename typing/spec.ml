@@ -58,6 +58,13 @@ and 'ty expression_desc =
   | Sexp_global of Path.t
   | Sexp_constant of constant
   | Sexp_let of rec_flag * 'ty value_binding list * 'ty expression
+  | Sexp_function of
+      { params : 'ty function_param list;
+        body : 'ty function_body;
+        ret_sort : sort;
+        ret_mode : locality;
+        locality : locality;  (** allocation mode of the closure *)
+      }
   | Sexp_apply of
       { funct : 'ty expression;
         args : (arg_label * 'ty argument) list;
@@ -121,6 +128,30 @@ and 'ty value_binding =
     svb_sort : sort;
   }
 
+and 'ty function_param =
+  { sfp_arg_label : arg_label;
+    sfp_param : Ident.t;
+    sfp_kind : 'ty function_param_kind;
+    sfp_sort : sort;
+    sfp_mode : locality;
+    sfp_partial : partial;
+  }
+
+and 'ty function_param_kind =
+  | Sparam_pat of 'ty pattern
+  | Sparam_optional_default of 'ty pattern * 'ty expression * sort
+
+and 'ty function_body =
+  | Sfunction_body of 'ty expression
+  | Sfunction_cases of
+      { cases : 'ty case list;
+        param : Ident.t;
+        arg_sort : sort;
+        arg_mode : locality;
+        ret_type : 'ty;
+        partial : partial;
+      }
+
 and 'ty case =
   { sc_lhs : 'ty pattern;
     sc_guard : 'ty expression option;
@@ -174,6 +205,11 @@ and map_desc m = function
   | Sexp_let (rf, vbs, body) ->
       Sexp_let (rf, List.map (map_value_binding m) vbs,
                 map m body)
+  | Sexp_function { params; body; ret_sort; ret_mode; locality } ->
+      Sexp_function
+        { params = List.map (map_function_param m) params;
+          body = map_function_body m body;
+          ret_sort; ret_mode; locality }
   | Sexp_apply { funct; args; ret_mode } ->
       Sexp_apply
         { funct = map m funct;
@@ -246,6 +282,24 @@ and map_value_binding m vb =
     svb_rec_kind = vb.svb_rec_kind;
     svb_sort = vb.svb_sort;
   }
+
+and map_function_param m fp =
+  { fp with
+    sfp_kind =
+      (match fp.sfp_kind with
+       | Sparam_pat p -> Sparam_pat (map_pattern m p)
+       | Sparam_optional_default (p, e, sort) ->
+           Sparam_optional_default
+             (map_pattern m p, map m e, sort)) }
+
+and map_function_body m = function
+  | Sfunction_body e -> Sfunction_body (map m e)
+  | Sfunction_cases { cases; param; arg_sort; arg_mode; ret_type; partial } ->
+      Sfunction_cases
+        { cases = List.map (map_case m) cases;
+          param; arg_sort; arg_mode;
+          ret_type = m.ty ret_type;
+          partial }
 
 and map_case m c =
   { sc_lhs = map_pattern m c.sc_lhs;
@@ -526,6 +580,9 @@ let rec alpha_equal_exp sp vars e1 e2 =
                 alpha_equal_exp sp vars_rhs vb1.svb_expr vb2.svb_expr)
              vbs1 vbs2
            && alpha_equal_exp sp vars_body body1 body2)
+  | Sexp_function f1, Sexp_function f2 ->
+      alpha_equal_params sp vars f1.params f2.params (fun vars ->
+        alpha_equal_body sp vars f1.body f2.body)
   | Sexp_apply a1, Sexp_apply a2 ->
       alpha_equal_exp sp vars a1.funct a2.funct
       && for_all2
@@ -589,12 +646,12 @@ let rec alpha_equal_exp sp vars e1 e2 =
   | Sexp_extension_constructor p1, Sexp_extension_constructor p2 ->
       sp Extension p1 p2
   | ( Sexp_var _ | Sexp_global _ | Sexp_constant _ | Sexp_let _
-    | Sexp_apply _ | Sexp_match _ | Sexp_try _ | Sexp_tuple _
-    | Sexp_unboxed_tuple _ | Sexp_unboxed_unit | Sexp_unboxed_bool _
-    | Sexp_construct _ | Sexp_variant _ | Sexp_record _ | Sexp_field _
-    | Sexp_record_unboxed_product _ | Sexp_unboxed_field _
-    | Sexp_ifthenelse _ | Sexp_sequence _ | Sexp_assert _ | Sexp_lazy _
-    | Sexp_extension_constructor _ ), _ ->
+    | Sexp_function _ | Sexp_apply _ | Sexp_match _ | Sexp_try _
+    | Sexp_tuple _ | Sexp_unboxed_tuple _ | Sexp_unboxed_unit
+    | Sexp_unboxed_bool _ | Sexp_construct _ | Sexp_variant _
+    | Sexp_record _ | Sexp_field _ | Sexp_record_unboxed_product _
+    | Sexp_unboxed_field _ | Sexp_ifthenelse _ | Sexp_sequence _
+    | Sexp_assert _ | Sexp_lazy _ | Sexp_extension_constructor _ ), _ ->
       false
 
 and alpha_equal_fields sp vars fields1 fields2 =
@@ -622,6 +679,41 @@ and alpha_equal_cases sp vars cases1 cases2 =
            Option.equal (alpha_equal_exp sp vars) c1.sc_guard c2.sc_guard
            && alpha_equal_exp sp vars c1.sc_rhs c2.sc_rhs)
     cases1 cases2
+
+and alpha_equal_params sp vars params1 params2 k =
+  match params1, params2 with
+  | [], [] -> k vars
+  | fp1 :: params1, fp2 :: params2 ->
+      same_arg_label fp1.sfp_arg_label fp2.sfp_arg_label
+      &&
+      let vars = (fp1.sfp_param, fp2.sfp_param) :: vars in
+      (match fp1.sfp_kind, fp2.sfp_kind with
+       | Sparam_pat p1, Sparam_pat p2 ->
+           (match alpha_equal_pattern sp vars p1 p2 with
+            | None -> false
+            | Some vars -> alpha_equal_params sp vars params1 params2 k)
+       | Sparam_optional_default (p1, d1, _),
+         Sparam_optional_default (p2, d2, _) ->
+           (* The default is evaluated in the scope of the preceding
+              parameters only. *)
+           alpha_equal_exp sp vars d1 d2
+           && (match alpha_equal_pattern sp vars p1 p2 with
+               | None -> false
+               | Some vars -> alpha_equal_params sp vars params1 params2 k)
+       | Sparam_pat _, Sparam_optional_default _
+       | Sparam_optional_default _, Sparam_pat _ ->
+           false)
+  | [], _ :: _ | _ :: _, [] -> false
+
+and alpha_equal_body sp vars body1 body2 =
+  match body1, body2 with
+  | Sfunction_body e1, Sfunction_body e2 -> alpha_equal_exp sp vars e1 e2
+  | Sfunction_cases c1, Sfunction_cases c2 ->
+      let vars = (c1.param, c2.param) :: vars in
+      alpha_equal_cases sp vars c1.cases c2.cases
+  | Sfunction_body _, Sfunction_cases _ | Sfunction_cases _, Sfunction_body _
+    ->
+      false
 
 let alpha_equal ~same_path ~vars e1 e2 =
   alpha_equal_exp same_path vars e1 e2

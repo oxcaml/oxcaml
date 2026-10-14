@@ -46,6 +46,11 @@ module Choices = struct
          (fun xs -> List.map (fun ys -> Unzip_zip_input { xs; ys }) lists)
          lists)
 
+  let zip_unzip =
+    Minicheck.choice
+      (List.map (fun xs -> Zip_unzip_input { zs = List.map (fun x -> x, -x) xs })
+         lists)
+
   let init_length =
     Minicheck.choice
       ~show:(fun (Init_length_input { n; _ }) -> string_of_int n)

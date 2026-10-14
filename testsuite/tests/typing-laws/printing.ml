@@ -24,6 +24,30 @@ module type Basic =
   end
 |}]
 
+(* Sequences and [let]s are parenthesized as well. *)
+
+module type Printed = sig
+  type t
+  val create : int -> t
+  val to_int : t -> int
+  law? roundtrip (x : t) (xs : t list) (f : 'a -> t) :
+    to_int (create 1) = 1 ===>
+    List.for_all (fun x -> to_int x >= 0) xs ===>
+    (match xs with [] -> true | x :: _ -> to_int x = to_int (f 1))
+end
+[%%expect {|
+module type Printed =
+  sig
+    type t
+    val create : int -> t
+    val to_int : t -> int
+    law? roundtrip (x : t) (xs : t list) (f : int -> t) :
+      (to_int (create 1)) = 1 ===>
+      List.for_all (fun x -> (to_int x) >= 0) xs ===>
+      (match xs with | [] -> true | x::_ -> (to_int x) = (to_int (f 1)))
+  end
+|}]
+
 (* The kind of a type variable shared by the parameters is printed at its
    first occurrence. *)
 
