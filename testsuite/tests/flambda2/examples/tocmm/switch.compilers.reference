@@ -1,0 +1,20 @@
+(data global "camlSwitch__gc_roots": int 0)
+(data int 1792 global "camlSwitch": addr G:"camlSwitch__dispatch_1")
+(data
+ int 3063
+ global "camlSwitch__dispatch_1":
+ addr G:"camlSwitch__dispatch_0_1_code"
+ int 108086391056891909)
+(function{switch.ml:14,28-129} camlSwitch__dispatch_0_1_code (n/0: int) : int
+ (if (<u 7 n/0) (extcall "ext_fn"{switch.ml:20,9-14} 1 int->val)
+   (let switcher/0 (>>s n/0 1)
+     (switch switcher/0 
+     case 0: (extcall "ext_fn"{switch.ml:16,9-16} 201 int->val)
+     case 1: (extcall "ext_fn"{switch.ml:17,9-16} 401 int->val)
+     case 2: (extcall "ext_fn"{switch.ml:18,9-16} 601 int->val)
+     case 3: (extcall "ext_fn"{switch.ml:19,9-16} 801 int->val)))) )
+
+(function no_cse reduce_code_size linscan camlSwitch__entry () : val
+ (catch (exit 6 G:"camlSwitch") with(6 *ret*/0: val) 1) )
+
+(data addr G:"ext_fn")

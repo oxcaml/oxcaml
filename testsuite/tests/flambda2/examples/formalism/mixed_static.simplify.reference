@@ -1,0 +1,6 @@
+let $camlMixed_static__immstring4 = "a" in
+let $camlMixed_static__const_mixed_block6 =
+  Block 0 ($camlMixed_static__immstring4, 0x1p+0, 2l)
+in
+let $camlMixed_static = Block 0 ($camlMixed_static__const_mixed_block6) in
+cont done ($camlMixed_static)

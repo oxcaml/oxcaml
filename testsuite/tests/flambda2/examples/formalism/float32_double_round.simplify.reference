@@ -1,0 +1,12 @@
+let code f_0 deleted in
+let $camlFloat32_double_round__float32_of_int22 = 0x1p+53s in
+let code loopify(never) size(1) newer_version_of(f_0)
+      f_0_1 (param : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : float32 boxed =
+  cont k ($camlFloat32_double_round__float32_of_int22)
+in
+let $camlFloat32_double_round__f_1 = closure f_0_1 @f in
+let $camlFloat32_double_round = Block 0 ($camlFloat32_double_round__f_1) in
+cont done ($camlFloat32_double_round)

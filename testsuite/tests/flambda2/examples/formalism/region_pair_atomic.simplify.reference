@@ -1,0 +1,97 @@
+let code use_0 deleted in
+let code f_1 deleted in
+let code g_2 deleted in
+let code inline(never) loopify(never) size(2) newer_version_of(use_0)
+      use_0_1 (t : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let Pfield = %block_load.mut.[`0`] (t) in
+  cont k (Pfield)
+in
+let $camlRegion_pair_atomic__use_3 = closure use_0_1 @use in
+let code inline(never) loopify(never) size(29) newer_version_of(f_1)
+      f_1_1 (b : imm tagged, x : imm tagged)
+        my_closure my_region my_ghost_region my_depth
+        -> k * k1
+        : val local =
+  (let untagged = %untag_imm (b) in
+   switch untagged
+     | 0 -> k2
+     | 1 -> k3)
+    where k3 =
+      let int_add = %int_barith.add (x, 1) in
+      let Pmakeblock = %block.mut.[`0`].`local`[my_region] (int_add) in
+      cont k (Pmakeblock)
+    where k2 =
+      let int_add = %int_barith.add (x, 2) in
+      let Pmakeblock = %block.mut.[`0`].`local`[my_region] (int_add) in
+      cont k (Pmakeblock)
+in
+let $camlRegion_pair_atomic__f_4 = closure f_1_1 @f in
+let code inline(never) loopify(never) size(42) newer_version_of(g_2)
+      g_2_1 (b : imm tagged, x : imm tagged)
+        my_closure my_region my_ghost_region my_depth
+        -> k * k1
+        : val local =
+  let `region` = %begin_region (my_region) in
+  let t = %block.mut.[`0`].`local`[`region`] (x) in
+  apply direct(use_0_1)
+    ($camlRegion_pair_atomic__use_3 : _ -> imm tagged) (t) -> k2 * k1
+    where k2 (y : imm tagged) =
+      ((let untagged = %untag_imm (b) in
+        switch untagged
+          | 0 -> k2
+          | 1 -> k3)
+         where k3 =
+           let `unit` = %end_region (`region`) in
+           let int_add = %int_barith.add (y, 1) in
+           let Pmakeblock = %block.mut.[`0`].`local`[my_region] (int_add) in
+           cont k (Pmakeblock)
+         where k2 =
+           let `unit` = %end_region (`region`) in
+           let int_add = %int_barith.add (y, 2) in
+           let Pmakeblock = %block.mut.[`0`].`local`[my_region] (int_add) in
+           cont k (Pmakeblock))
+in
+let $camlRegion_pair_atomic__g_5 = closure g_2_1 @g in
+let `region` = %begin_region () in
+let ghost_region = %begin_ghost_region () in
+(let Popaque = %opaque (5) in
+ let Popaque_1 = %opaque (1) in
+ apply direct(f_1_1 &`region` &ghost_region)
+   ($camlRegion_pair_atomic__f_4 : _ -> val)
+     (Popaque_1, Popaque)
+     -> k1 * error)
+  where k1 (apply_result : val) =
+    apply direct(use_0_1)
+      ($camlRegion_pair_atomic__use_3 : _ -> imm tagged)
+        (apply_result)
+        -> k * error
+  where k (region_return : imm tagged) =
+    let `unit` = %end_region (`region`) in
+    let unit_1 = %end_ghost_region (ghost_region) in
+    let region_1 = %begin_region () in
+    let ghost_region_1 = %begin_ghost_region () in
+    ((let Popaque = %opaque (5) in
+      let Popaque_1 = %opaque (1) in
+      apply direct(g_2_1 &region_1 &ghost_region_1)
+        ($camlRegion_pair_atomic__g_5 : _ -> val)
+          (Popaque_1, Popaque)
+          -> k1 * error)
+       where k1 (apply_result : val) =
+         apply direct(use_0_1)
+           ($camlRegion_pair_atomic__use_3 : _ -> imm tagged)
+             (apply_result)
+             -> k * error
+       where k (region_return_1 : imm tagged) =
+         let unit_2 = %end_region (region_1) in
+         let unit_3 = %end_ghost_region (ghost_region_1) in
+         let $camlRegion_pair_atomic =
+           Block 0 ($camlRegion_pair_atomic__use_3,
+                    $camlRegion_pair_atomic__f_4,
+                    $camlRegion_pair_atomic__g_5,
+                    region_return,
+                    region_return_1)
+         in
+         cont done ($camlRegion_pair_atomic))
