@@ -27,6 +27,9 @@ external prefetch_read_high_offset : 'a -> (int[@untagged]) -> unit
     "caml_prefetch_read_high_val_offset_untagged"
 [@@noalloc] [@@builtin]
 
+(* CR-someday xclerc: support prefetcchin on arm64 backend (`prfm`). *)
+let prefetch_enabled = Config.oxcaml && String.equal Config.architecture "amd64"
+
 (* A bit-packed pair of a bit [b] and prefix [p] matching the beginning
    (big-endian) of every key in a subtree, up to bit [b].
 
@@ -1935,7 +1938,7 @@ end = struct
 
         let set_current t l =
           let stack_size = t.stack_size in
-          (if stack_size > 0
+          (if prefetch_enabled && stack_size > 0
            then
              match descr t.stack.(stack_size - 1) with
              | Empty -> ()
