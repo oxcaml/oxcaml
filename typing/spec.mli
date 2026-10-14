@@ -23,6 +23,24 @@ open Asttypes
 (** Constants, as in [Typedtree]. *)
 type constant =
     Const_int of int
+  | Const_char of char
+  | Const_untagged_char of int
+  | Const_string of string * Location.t * string option
+  | Const_float of string
+  | Const_float32 of string
+  | Const_unboxed_float of string
+  | Const_unboxed_float32 of string
+  | Const_int8 of int
+  | Const_int16 of int
+  | Const_int32 of int32
+  | Const_int64 of int64
+  | Const_nativeint of nativeint
+  | Const_untagged_int of int
+  | Const_untagged_int8 of int
+  | Const_untagged_int16 of int
+  | Const_unboxed_int32 of int32
+  | Const_unboxed_int64 of int64
+  | Const_unboxed_nativeint of nativeint
 
 type sort = Jkind_types.Sort.Const.t
 

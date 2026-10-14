@@ -174,6 +174,31 @@ Error: Signature mismatch:
        The clauses of the laws differ.
 |}]
 
+(* Floating-point literals are compared by their representation: [0.] and
+   [-0.] differ, although they are equal as floats. *)
+
+module Zeros : sig
+  law? p : 1. /. 0. > 0.
+end = struct
+  law? p : 1. /. -0. > 0.
+end
+[%%expect {|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   law? p : 1. /. -0. > 0.
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig law? p : (1. /. (-0.)) > 0. end
+       is not included in
+         sig law? p : (1. /. 0.) > 0. end
+       Laws do not match:
+         law? p : (1. /. (-0.)) > 0.
+       is not included in
+         law? p : (1. /. 0.) > 0.
+       The clauses of the laws differ.
+|}]
+
 (* The assumptions are compared as well. *)
 
 module Different_assumptions : sig

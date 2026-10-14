@@ -1,7 +1,9 @@
 [@@@ocaml.warning "-27"]
 module Laws_gen_Shapes = Shapes
 module Laws_gen_Stdlib = Stdlib
-type 'a each = {
+type 'a each =
+  {
+  area_nonneg: 'a ;
   poly: 'a ;
   modes: 'a ;
   unboxed: 'a ;
@@ -9,6 +11,7 @@ type 'a each = {
   inferred: 'a }
 let names =
   {
+    area_nonneg = "area_nonneg";
     poly = "poly";
     modes = "modes";
     unboxed = "unboxed";
@@ -17,57 +20,69 @@ let names =
   }
 let locations =
   {
-    poly =
+    area_nonneg =
       {
         CamlinternalLaw.file = "shapes.mli";
         start_line = 21;
         start_col = 0;
-        end_line = 22;
+        end_line = 21;
+        end_col = 39
+      };
+    poly =
+      {
+        CamlinternalLaw.file = "shapes.mli";
+        start_line = 22;
+        start_col = 0;
+        end_line = 23;
         end_col = 46
       };
     modes =
       {
         CamlinternalLaw.file = "shapes.mli";
-        start_line = 23;
+        start_line = 24;
         start_col = 0;
-        end_line = 23;
+        end_line = 24;
         end_col = 54
       };
     unboxed =
       {
         CamlinternalLaw.file = "shapes.mli";
-        start_line = 24;
+        start_line = 25;
         start_col = 0;
-        end_line = 24;
+        end_line = 25;
         end_col = 55
       };
     \#type =
       {
         CamlinternalLaw.file = "shapes.mli";
-        start_line = 25;
+        start_line = 26;
         start_col = 0;
-        end_line = 25;
+        end_line = 26;
         end_col = 50
       };
     inferred =
       {
         CamlinternalLaw.file = "shapes.mli";
-        start_line = 26;
+        start_line = 27;
         start_col = 0;
-        end_line = 26;
+        end_line = 27;
         end_col = 33
       }
   }
-let map { poly; modes; unboxed; \#type; inferred } ~f =
+let map { area_nonneg; poly; modes; unboxed; \#type; inferred } ~f =
   {
+    area_nonneg = (f area_nonneg);
     poly = (f poly);
     modes = (f modes);
     unboxed = (f unboxed);
     \#type = (f \#type);
     inferred = (f inferred)
   }
-let to_list { poly; modes; unboxed; \#type; inferred } =
-  [poly; modes; unboxed; \#type; inferred]
+let to_list { area_nonneg; poly; modes; unboxed; \#type; inferred } =
+  [area_nonneg; poly; modes; unboxed; \#type; inferred]
+type area_nonneg_input =
+  | Area_nonneg_input: {
+  s: Laws_gen_Shapes.t } -> area_nonneg_input 
 type poly_input =
   | Poly_input: ('a : value_or_null) ('b : value_or_null) .
   {
@@ -91,12 +106,34 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
     module Law = (CamlinternalLaw.Make)(Choice)
     module type Choices  =
       sig
+        val area_nonneg : area_nonneg_input Choice.t
         val poly : poly_input Choice.t
         val modes : modes_input Choice.t
         val unboxed : unboxed_input Choice.t
         val \#type : type_input Choice.t
         val inferred : inferred_input Choice.t
       end
+    let area_nonneg ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.area_nonneg),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.area_nonneg;
+                 predicate =
+                   (fun ((Area_nonneg_input { s }) : area_nonneg_input) ->
+                      (Laws_gen_Stdlib.(>=) (Laws_gen_Shapes.area s) 0. : 
+                      bool));
+                 location =
+                   {
+                     CamlinternalLaw.file = "shapes.mli";
+                     start_line = 21;
+                     start_col = 27;
+                     end_line = 21;
+                     end_col = 39
+                   }
+               }))
     let poly ((module C)  : (module Choices))  : unit Law.t =
       Law.Bind
         ((Law.Choose C.poly),
@@ -114,9 +151,9 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                  location =
                    {
                      CamlinternalLaw.file = "shapes.mli";
-                     start_line = 22;
+                     start_line = 23;
                      start_col = 2;
-                     end_line = 22;
+                     end_line = 23;
                      end_col = 46
                    }
                }))
@@ -135,9 +172,9 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                  location =
                    {
                      CamlinternalLaw.file = "shapes.mli";
-                     start_line = 23;
+                     start_line = 24;
                      start_col = 37;
-                     end_line = 23;
+                     end_line = 24;
                      end_col = 54
                    }
                }))
@@ -156,9 +193,9 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                  location =
                    {
                      CamlinternalLaw.file = "shapes.mli";
-                     start_line = 24;
+                     start_line = 25;
                      start_col = 28;
-                     end_line = 24;
+                     end_line = 25;
                      end_col = 55
                    }
                }))
@@ -176,9 +213,9 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                  location =
                    {
                      CamlinternalLaw.file = "shapes.mli";
-                     start_line = 25;
+                     start_line = 26;
                      start_col = 31;
-                     end_line = 25;
+                     end_line = 26;
                      end_col = 50
                    }
                }))
@@ -197,14 +234,15 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                  location =
                    {
                      CamlinternalLaw.file = "shapes.mli";
-                     start_line = 26;
+                     start_line = 27;
                      start_col = 20;
-                     end_line = 26;
+                     end_line = 27;
                      end_col = 33
                    }
                }))
     let laws choices =
       {
+        area_nonneg = (area_nonneg choices);
         poly = (poly choices);
         modes = (modes choices);
         unboxed = (unboxed choices);

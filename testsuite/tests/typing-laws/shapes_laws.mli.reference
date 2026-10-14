@@ -1,6 +1,8 @@
 module Laws_gen_Shapes = Shapes
 module Laws_gen_Stdlib = Stdlib
-type 'a each = {
+type 'a each =
+  {
+  area_nonneg: 'a ;
   poly: 'a ;
   modes: 'a ;
   unboxed: 'a ;
@@ -10,6 +12,9 @@ val names : string each
 val locations : CamlinternalLaw.location each
 val map : 'a each -> f:('a -> 'b) -> 'b each
 val to_list : 'a each -> 'a list
+type area_nonneg_input =
+  | Area_nonneg_input: {
+  s: Laws_gen_Shapes.t } -> area_nonneg_input 
 type poly_input =
   | Poly_input: ('a : value_or_null) ('b : value_or_null) .
   {
@@ -34,6 +39,7 @@ module Instantiate :
     module Law : sig type 'a t = 'a CamlinternalLaw.Make(Choice).t end
     module type Choices  =
       sig
+        val area_nonneg : area_nonneg_input Choice.t
         val poly : poly_input Choice.t
         val modes : modes_input Choice.t
         val unboxed : unboxed_input Choice.t

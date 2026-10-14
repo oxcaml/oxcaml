@@ -18,6 +18,7 @@ val opt : ?y:int -> x:int -> unit -> int
 val apply : (local_ int -> int) -> int
 val of_unboxed : float# -> float
 
+law? area_nonneg (s : t) : area s >= 0.
 law? poly (xs : 'a list) (f : 'a -> 'b) :
   List.length (List.map f xs) = List.length xs
 law? modes (g : local_ int -> int) : apply g = apply g

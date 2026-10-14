@@ -74,10 +74,27 @@ let return_mode m = return_mode_zap_to_floor_exn m
 
 (* Constants and partiality *)
 
-let constant loc (c : Typedtree.constant) : Spec.constant =
+let constant (c : Typedtree.constant) : Spec.constant =
   match c with
   | Const_int n -> Const_int n
-  | _ -> unsupported loc (Not_yet_supported "constants other than integers")
+  | Const_char c -> Const_char c
+  | Const_untagged_char c -> Const_untagged_char c
+  | Const_string (s, loc, d) -> Const_string (s, loc, d)
+  | Const_float f -> Const_float f
+  | Const_float32 f -> Const_float32 f
+  | Const_unboxed_float f -> Const_unboxed_float f
+  | Const_unboxed_float32 f -> Const_unboxed_float32 f
+  | Const_int8 n -> Const_int8 n
+  | Const_int16 n -> Const_int16 n
+  | Const_int32 n -> Const_int32 n
+  | Const_int64 n -> Const_int64 n
+  | Const_nativeint n -> Const_nativeint n
+  | Const_untagged_int n -> Const_untagged_int n
+  | Const_untagged_int8 n -> Const_untagged_int8 n
+  | Const_untagged_int16 n -> Const_untagged_int16 n
+  | Const_unboxed_int32 n -> Const_unboxed_int32 n
+  | Const_unboxed_int64 n -> Const_unboxed_int64 n
+  | Const_unboxed_nativeint n -> Const_unboxed_nativeint n
 
 (* Labels of arguments *)
 
@@ -125,7 +142,7 @@ and expression_desc bound loc desc =
       unsupported loc Source_locations
   | Texp_ident { path; _ } -> Sexp_global (global loc path)
   | Texp_apply_layout _ -> unsupported loc Layout_polymorphism
-  | Texp_constant c -> Sexp_constant (constant loc c)
+  | Texp_constant c -> Sexp_constant (constant c)
   | Texp_let _ -> unsupported loc (Not_yet_supported "let-bindings")
   | Texp_letmutable _ -> unsupported loc Mutable_variables
   | Texp_function _ -> unsupported loc (Not_yet_supported "functions")

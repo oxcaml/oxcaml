@@ -16,6 +16,24 @@ open Asttypes
 
 type constant =
     Const_int of int
+  | Const_char of char
+  | Const_untagged_char of int
+  | Const_string of string * Location.t * string option
+  | Const_float of string
+  | Const_float32 of string
+  | Const_unboxed_float of string
+  | Const_unboxed_float32 of string
+  | Const_int8 of int
+  | Const_int16 of int
+  | Const_int32 of int32
+  | Const_int64 of int64
+  | Const_nativeint of nativeint
+  | Const_untagged_int of int
+  | Const_untagged_int8 of int
+  | Const_untagged_int16 of int
+  | Const_unboxed_int32 of int32
+  | Const_unboxed_int64 of int64
+  | Const_unboxed_nativeint of nativeint
 
 type sort = Jkind_types.Sort.Const.t
 
@@ -105,8 +123,23 @@ let same_var vars id1 id2 =
   | None -> false
 
 let same_constant (c1 : constant) (c2 : constant) =
+  (* By representation, which distinguishes [0.] from [-0.]. Literals
+     cannot denote NaNs. *)
+  let same_float f1 f2 =
+    match float_of_string f1, float_of_string f2 with
+    | x1, x2 -> Int64.equal (Int64.bits_of_float x1) (Int64.bits_of_float x2)
+    | exception Failure _ -> String.equal f1 f2
+  in
   match c1, c2 with
-  | Const_int n1, Const_int n2 -> Int.equal n1 n2
+  | Const_string (s1, _, _), Const_string (s2, _, _) ->
+      (* The quotation delimiters do not matter. *)
+      String.equal s1 s2
+  | Const_float f1, Const_float f2
+  | Const_float32 f1, Const_float32 f2
+  | Const_unboxed_float f1, Const_unboxed_float f2
+  | Const_unboxed_float32 f1, Const_unboxed_float32 f2 ->
+      same_float f1 f2
+  | _ -> c1 = c2
 
 let same_arg_label (l1 : arg_label) (l2 : arg_label) =
   match l1, l2 with

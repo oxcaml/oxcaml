@@ -66,9 +66,43 @@ val run : string -> unit = <fun>
 (* Constants *)
 
 let () = List.iter run
-  ["1"]
+  ["1";
+   "'c'";
+   "\"s\"";
+   "{s|quoted|s}";
+   "1.5";
+   "1l";
+   "1L";
+   "1n";
+   "1s";
+   "1S";
+   "#1.5";
+   "#1.5s";
+   "#1l";
+   "#1L";
+   "#1n";
+   "#1m";
+   "#1s";
+   "#1S"]
 [%%expect {|
 1  ==>  1
+'c'  ==>  'c'
+"s"  ==>  "s"
+{s|quoted|s}  ==>  {s|quoted|s}
+1.5  ==>  1.5
+1l  ==>  1l
+1L  ==>  1L
+1n  ==>  1n
+1s  ==>  1s
+1S  ==>  1S
+#1.5  ==>  #1.5
+#1.5s  ==>  #1.5s
+#1l  ==>  #1l
+#1L  ==>  #1L
+#1n  ==>  #1n
+#1m  ==>  #1m
+#1s  ==>  #1s
+#1S  ==>  #1S
 |}]
 
 (* Variables and globals *)

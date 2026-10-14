@@ -28,7 +28,32 @@ let rec lident_of_path =
   | Path.Pextra_ty (p, _) -> lident_of_path p
 
 let constant : Spec.constant -> Parsetree.constant = function
+  | Const_char c -> Const.char c
+  | Const_untagged_char c ->
+      Const.mk (Pconst_untagged_char (Char.chr (c land 0xff)))
+  | Const_string (s,loc,d) -> Const.string ?quotation_delimiter:d ~loc s
   | Const_int i -> Const.integer (Int.to_string i)
+  | Const_int8 i -> Const.integer ~suffix:'s' (Int.to_string i)
+  | Const_int16 i -> Const.integer ~suffix:'S' (Int.to_string i)
+  | Const_int32 i -> Const.integer ~suffix:'l' (Int32.to_string i)
+  | Const_int64 i -> Const.integer ~suffix:'L' (Int64.to_string i)
+  | Const_nativeint i -> Const.integer ~suffix:'n' (Nativeint.to_string i)
+  | Const_float f -> Const.float f
+  | Const_float32 f -> Const.float ~suffix:'s' f
+  | Const_unboxed_float f -> Const.mk (Pconst_unboxed_float (f, None))
+  | Const_unboxed_float32 f -> Const.mk (Pconst_unboxed_float (f, Some 's'))
+  | Const_untagged_int i ->
+    Const.mk (Pconst_unboxed_integer (Int.to_string i, 'm'))
+  | Const_untagged_int8 i ->
+    Const.mk (Pconst_unboxed_integer (Int.to_string i, 's'))
+  | Const_untagged_int16 i ->
+    Const.mk (Pconst_unboxed_integer (Int.to_string i, 'S'))
+  | Const_unboxed_int32 i ->
+    Const.mk (Pconst_unboxed_integer (Int32.to_string i, 'l'))
+  | Const_unboxed_int64 i ->
+    Const.mk (Pconst_unboxed_integer (Int64.to_string i, 'L'))
+  | Const_unboxed_nativeint i ->
+    Const.mk (Pconst_unboxed_integer (Nativeint.to_string i, 'n'))
 
 type 'ty env =
   { lident_of_path : Path.t -> Longident.t;
