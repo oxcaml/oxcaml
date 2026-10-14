@@ -166,6 +166,13 @@ let read_text_sections dir =
           then
             let name = "." ^ String.sub f 8 (String.length f - 12) in
             Some (name, read_file (Filename.concat dir f))
+          else if
+            String.starts_with ~prefix:"section_hash-" f
+            && String.ends_with ~suffix:".bin" f
+          then
+            let name_filename = Filename.chop_suffix f "bin" ^ "name" in
+            let name = read_file (Filename.concat dir name_filename) in
+            Some (name, read_file (Filename.concat dir f))
           else None)
     in
     match function_sections with
@@ -195,6 +202,14 @@ let read_text_relocations dir ~include_main_text =
           then
             let name_part = String.sub f 8 (String.length f - 15) in
             Some ("." ^ name_part, read_relocations dir name_part)
+          else if
+            String.starts_with ~prefix:"section_hash-" f
+            && String.ends_with ~suffix:".relocs" f
+          then
+            let name_filename = Filename.chop_suffix f "relocs" ^ "name" in
+            let name = read_file (Filename.concat dir name_filename) in
+            let name_part = String.sub f 8 (String.length f - 15) in
+            Some (name, read_relocations dir name_part)
           else None)
     in
     if include_main_text
