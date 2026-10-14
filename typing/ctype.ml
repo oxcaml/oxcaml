@@ -272,7 +272,7 @@ let with_local_level_gen ~begin_def ~structure ?before_generalize f =
     iter_var s ~f:(fun v ->
       let t = of_var v in
       if get_level t = generic_level then () else
-      update_level !current_level t;
+      update_level !current_level t |> Result.get_ok;
       add_to_sort_pool ~level:(get_level t) t)
   end sort_pool;
   result
@@ -1288,7 +1288,7 @@ let rec update_level env level expand ty =
         raise_escape_exn Self
     | Tvar { jkind } ->
       set_level ();
-      Jkind.update_level level jkind
+      Jkind.update_level level jkind |> Result.get_ok
     | _ ->
         set_level ();
         (* XXX what about abbreviations in Tconstr ? *)
@@ -1330,7 +1330,7 @@ let rec lower_contravariant env var_level visited contra ty =
       Tvar { jkind } ->
         if contra then begin
           set_level ty var_level;
-          Jkind.update_level var_level jkind
+          Jkind.update_level var_level jkind |> Result.get_ok
         end
     | Tconstr (_, [], _) -> ()
     | Tconstr (path, tyl, _abbrev) ->

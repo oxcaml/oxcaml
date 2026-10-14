@@ -342,7 +342,7 @@ module type Sort = sig
       within {!generalize_with}. *)
   val generalize : current_level:int -> t -> unit
 
-  val update_level : int -> t -> unit
+  val update_level : int -> t -> (unit, error) result
 
   val get_level : t -> int
 

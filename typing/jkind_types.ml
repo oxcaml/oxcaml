@@ -500,12 +500,16 @@ module Sort = struct
       List.fold_left (fun acc t -> min acc (get_level t)) generic_level ts
     | Addressable t -> get_level t
 
-  let[@inline] set_var_level (v : var) (level : int) =
+  let[@inline] set_var_level (v : var) (level : int) : (unit, error) result =
     if level < v.level
-    then (
-      if v.level = subject_level then raise Lower_rigid;
-      log_change (v, Clevel v.level);
-      v.level <- level)
+    then
+      if v.level = subject_level
+      then raise Lower_rigid
+      else (
+        log_change (v, Clevel v.level);
+        v.level <- level;
+        Ok ())
+    else Ok ()
 
   let rec iter_var ~f = function
     | Var { contents = Some t } -> iter_var ~f t
@@ -514,7 +518,12 @@ module Sort = struct
     | Product ts -> List.iter (iter_var ~f) ts
     | Addressable t -> iter_var ~f t
 
-  let update_level level = iter_var ~f:(fun v -> set_var_level v level)
+  let rec update_level level = function
+    | Var { contents = Some t } -> update_level level t
+    | Var ({ contents = None } as v) -> set_var_level v level
+    | Base _ | Univar _ -> Ok ()
+    | Product ts -> Misc.Stdlib.List.iter_until_error ~f:(update_level level) ts
+    | Addressable t -> update_level level t
 
   let[@inline] set_var_contents (v : var) (contents : t option) =
     if v.contents != contents
@@ -523,13 +532,13 @@ module Sort = struct
       v.contents <- contents)
 
   let[@inline] equate_var (v : var) (t : t) =
+    let open Misc.Stdlib.Monad.Result.Syntax in
     assert (Option.is_none v.contents);
     if v.level = subject_level
     then Error (match t with Var _ -> Rigid | _ -> Incompatible)
-    else (
-      update_level v.level t;
-      set_var_contents v (Some t);
-      Ok ())
+    else
+      let+ () = update_level v.level t in
+      set_var_contents v (Some t)
 
   module Static = struct
     (* Statically allocated values of various consts and sorts to save
