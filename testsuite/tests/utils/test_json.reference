@@ -61,14 +61,11 @@
     "empty_vs_null": ""
   }
 }
-//empty object:
+
 {}
-{}
-//small object:
-{"key":"value"}
+
 {"key": "value"}
-//large object:
-{"key":"value","key":"value","key":"value","key":"value","key":"value","key":"value","key":"value","key":"value","key":"value","key":"value"}
+
 {
   "key": "value",
   "key": "value",
@@ -81,14 +78,11 @@
   "key": "value",
   "key": "value"
 }
-//empty array:
+
 []
-[]
-//small array:
+
 ["value"]
-["value"]
-//large array:
-["value","value","value","value","value","value","value","value","value","value"]
+
 [
   "value",
   "value",
@@ -101,8 +95,7 @@
   "value",
   "value"
 ]
-//complex value:
-{"name":"complex","id":42,"ratio":0.25,"enabled":true,"deleted":false,"parent":null,"tags":["a","b"],"point":{"x":1,"y":-2},"empty_array":[],"empty_object":{},"matrix":[[1,2,3],[],[1.5,null,true]],"config":{"verbose":false,"level":3,"threshold":0.001,"output":"out/\"file\".json","fallback":null,"limits":{"min":-4611686018427387904,"max":4611686018427387903,"step":0.5},"plugins":[{"name":"lint","enabled":true},{"name":"format","enabled":false,"options":{"width":80,"indent":2}}]}}
+
 {
   "name": "complex",
   "id": 42,

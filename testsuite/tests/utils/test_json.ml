@@ -2,6 +2,7 @@
  include ocamlcommon;
 *)
 
+(* Test that various json values are serialized correctly. *)
 let () =
   (* Create string with all 256 possible byte values *)
   let all_bytes_string = String.init 256 (fun i -> Char.chr i) in
@@ -108,20 +109,34 @@ let () =
   Format.printf "%a@." (Json.print ~mode:Pretty) test_json
 
 
-(* Test pretty vs compact formatting *)
+(* Test pretty and compact formatting *)
 let () =
-  let test_json desc json =
-    print_endline ("//" ^ desc ^ ":");
-    Format.printf "%a@." (Json.print ~mode:Compact) json;
-    Format.printf "%a@." (Json.print ~mode:Pretty) json
+  let strip_whitespace str =
+    String.to_seq str
+    |> Seq.filter (fun c -> not (Char.Ascii.is_white c))
+    |> String.of_seq in
+  let test_json json =
+    print_newline ();
+    let pretty_json = Format.asprintf "%a" (Json.print ~mode:Pretty) json in
+    let compact_json = Format.asprintf "%a" (Json.print ~mode:Compact) json in
+    (* Assert that the compact formatting is the same as the pretty formatting,
+       but with no whitespace. *)
+    let expected_compact_json = strip_whitespace pretty_json in
+    if not (String.equal compact_json expected_compact_json)
+    then
+      (Printf.eprintf "expected: %s\n" expected_compact_json;
+      Printf.eprintf "actual: %s\n" compact_json;
+      failwith "Compact json representation differs from expected");
+    (* Print the pretty formatting *)
+    print_endline pretty_json
   in
-  test_json "empty object" (Object []);
-  test_json "small object" (Object [ "key", String "value" ]);
-  test_json "large object" (Object (List.init 10 (fun _ -> ("key", Json.String "value"))));
-  test_json "empty array" (Array []);
-  test_json "small array" (Array [ String "value" ]);
-  test_json "large array" (Array (List.init 10 (fun _ -> Json.String "value")));
-  test_json "complex value" (Object [
+  test_json (Object []);
+  test_json (Object [ "key", String "value" ]);
+  test_json (Object (List.init 10 (fun _ -> ("key", Json.String "value"))));
+  test_json (Array []);
+  test_json (Array [ String "value" ]);
+  test_json (Array (List.init 10 (fun _ -> Json.String "value")));
+  test_json (Object [
     "name", String "complex";
     "id", Json.int 42;
     "ratio", Json.float 0.25;
