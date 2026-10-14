@@ -825,8 +825,6 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
             ~fdo_entry_annotation:
               (Option.value fdo_entry_annotation
                  ~default:Fdo_annotation.With_body_hash.empty)
-              (* CR yusumez: change this once we have
-                 [Fdo_annotation.With_hash.t] *)
             ~is_tupled ~is_my_closure_used
             ~inlining_decision:Never_inline_attribute
             ~absolute_history:
