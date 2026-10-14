@@ -7,15 +7,17 @@
 (* The fragment of the expression language that [Translspec] accepts, and
    how [Untypespec] prints it back. Each expression is typed in an
    environment with the declarations below, with the variables [n], [b],
-   [s], [xs], [r], [t] and [g] bound as the parameters of a law would be.
-   *)
+   [s], [xs], [r], [t] and [g] bound as the parameters of a law would be. *)
 
 let env =
   let prelude = {|
     type t = A | B of int | C of { x : int; y : bool }
     type r = { a : int; b : string }
     type ('a, 'b) pair = Pair of 'a * 'b
+    type ex = Ex : 'a -> ex
+    type m = { mutable c : int }
     type ur = #{ u : int; w : bool }
+    type ('a, 'b) eq = Refl : ('a, 'a) eq
     exception E of int
     exception Failure of string
     external ( + ) : int -> int -> int = "%addint"
@@ -24,11 +26,16 @@ let env =
     external ( > ) : 'a -> 'a -> bool = "%greaterthan"
     external ( && ) : bool -> bool -> bool = "%sequand"
     external ( || ) : bool -> bool -> bool = "%sequor"
+    external not : bool -> bool = "%boolnot"
     external ignore : 'a -> unit = "%ignore"
     external raise : exn -> 'a = "%raise"
+    external line : int = "%loc_LINE"
+    external pos : string * int * int * int = "%loc_POS"
     let rec length = function [] -> 0 | _ :: l -> 1 + length l
     let hd = function x :: _ -> x | [] -> raise (Failure "hd")
+    let is_some = function Some _ -> true | None -> false
     let f ?(opt = 0) ~lbl x = opt + lbl + x
+    let ( let* ) x k = k x
     module M = struct let v = 1 end
     module type S = sig val v : int end
     module F (X : S) = struct
@@ -42,6 +49,7 @@ let env =
   in
   env
 ;;
+let () = Language_extension.enable Comprehensions ()
 [%%expect {|
 val env : Env.t = <abstr>
 |}]
@@ -49,8 +57,8 @@ val env : Env.t = <abstr>
 let run_in env source =
   let wrapped =
     Printf.sprintf
-      "fun (n : int) (b : bool) (s : string) (xs : int list) (r : r) \
-       (t : t) (g : int -> int) -> (%s)"
+      "fun (n : int) (b : bool) (s : string) (xs : int list) (r : r) (t : t) \
+       (g : int -> int) -> (%s)"
       source
   in
   let exp = Parse.expression (Lexing.from_string wrapped) in
@@ -251,4 +259,79 @@ let () = List.iter run
 lazy n  ==>  lazy n
 match lazy n with lazy _ -> true  ==>  match lazy n with | (lazy _) -> true
 [%extension_constructor E]  ==>  [%ocaml.extension_constructor E]
+|}]
+
+(* A signature open of a functor application gives the values paths
+   through the application, which laws do not support. *)
+
+let applied_env =
+  let sg = Parse.interface (Lexing.from_string "open F (M)") in
+  let sg =
+    Typemod.type_interface ~sourcefile:"applied.mli"
+      (Compilation_unit.of_string "Applied") env sg
+  in
+  sg.sig_final_env
+let () = List.iter (run_in applied_env)
+  ["v"; "raise Applied"; "[%extension_constructor Applied]"]
+[%%expect {|
+val applied_env : Env.t = <abstr>
+v  ==>  Error: Laws do not support values through functor applications.
+raise Applied  ==>  Error: Laws do not support values through functor applications.
+[%extension_constructor Applied]  ==>  Error: Laws do not support values through functor applications.
+|}]
+
+let () = run "let module L = F (M) in L.v"
+[%%expect {|
+let module L = F (M) in L.v  ==>  Error: Laws do not support values through functor applications.
+|}]
+
+(* Rejected constructs *)
+
+let () = List.iter run
+  ["fun (type a) (x : a) -> x"; "(n :> int)";
+   "let h ~(here : [%call_pos]) () = here in ignore (h ()); true";
+   "match Ex n with Ex _ -> true";
+   "let module L = struct let x = n end in L.x";
+   "let open struct let v = n end in v"; "let open F (M) in v";
+   "fun (e : (int, string) eq) -> match e with _ -> .";
+   "let f : 'a. 'a -> 'a = fun x -> x in f n";
+   "let rec f : 'a. int -> 'a list -> bool = fun k l -> k = 0 || f (k - 1) [l] \
+    in f n [b]";
+   "let exception F in true";
+   "let* x = n in x"; "let mutable x = n in x";
+   "[| n |]"; "match [| n |] with [| _ |] -> true | _ -> false";
+   "[ x for x in xs ]"; "[| x for x = 0 to n |]";
+   "{ c = n }.c <- n"; "while b do () done"; "for i = 0 to n do () done";
+   "object end"; "(module M : S)"; "let (module L : S) = (module M) in L.v";
+   "let _ = stack_ (n, b) in true"; "exclave_ true";
+   "line"; "pos"; "[%src_pos]"]
+[%%expect {|
+fun (type a) (x : a) -> x  ==>  Error: Laws do not support locally abstract types.
+(n :> int)  ==>  Error: Laws do not support coercions.
+let h ~(here : [%call_pos]) () = here in ignore (h ()); true  ==>  Error: Laws do not support source position arguments.
+match Ex n with Ex _ -> true  ==>  Error: Laws do not support constructors with existential types in patterns.
+let module L = struct let x = n end in L.x  ==>  Error: Laws do not support local modules that are not module paths.
+let open struct let v = n end in v  ==>  Error: Laws do not support local opens that are not of module paths.
+let open F (M) in v  ==>  Error: Laws do not support local opens that are not of module paths.
+fun (e : (int, string) eq) -> match e with _ -> .  ==>  Error: Laws do not support refutation cases.
+let f : 'a. 'a -> 'a = fun x -> x in f n  ==>  Error: Laws do not support polymorphic type annotations.
+let rec f : 'a. int -> 'a list -> bool = fun k l -> k = 0 || f (k - 1) [l] in f n [b]  ==>  Error: Laws do not support polymorphic type annotations.
+let exception F in true  ==>  Error: Laws do not support local exceptions.
+let* x = n in x  ==>  Error: Laws do not support binding operators.
+let mutable x = n in x  ==>  Error: Laws do not support mutable variables.
+[| n |]  ==>  Error: Laws do not support arrays.
+match [| n |] with [| _ |] -> true | _ -> false  ==>  Error: Laws do not support arrays.
+[ x for x in xs ]  ==>  Error: Laws do not support comprehensions.
+[| x for x = 0 to n |]  ==>  Error: Laws do not support comprehensions.
+{ c = n }.c <- n  ==>  Error: Laws do not support mutation.
+while b do () done  ==>  Error: Laws do not support loops.
+for i = 0 to n do () done  ==>  Error: Laws do not support loops.
+object end  ==>  Error: Laws do not support objects.
+(module M : S)  ==>  Error: Laws do not support first-class modules.
+let (module L : S) = (module M) in L.v  ==>  Error: Laws do not support first-class modules.
+let _ = stack_ (n, b) in true  ==>  Error: Laws do not support stack_.
+exclave_ true  ==>  Error: Laws do not support exclave_.
+line  ==>  Error: Laws do not support source locations.
+pos  ==>  Error: Laws do not support source locations.
+[%src_pos]  ==>  Error: Laws do not support source positions.
 |}]
