@@ -32,9 +32,14 @@ open! Flambda
 
 (** [rebuild] and [after_rebuild] form the compiler-level continuation. *)
 
-type 'a after_rebuild = Rebuilt_expr.t -> Upwards_acc.t -> 'a
+type after_rebuild =
+  Rebuilt_expr.t -> Upwards_acc.t -> Rebuilt_expr.t * Upwards_acc.t
 
-type 'a rebuild = Upwards_acc.t -> after_rebuild:'a after_rebuild -> 'a
+type 'a rebuild =
+  'a ->
+  Upwards_acc.t ->
+  after_rebuild:after_rebuild ->
+  Rebuilt_expr.t * Upwards_acc.t
 
 (** [down_to_up] is the term-level continuation.
 
@@ -43,7 +48,8 @@ type 'a rebuild = Upwards_acc.t -> after_rebuild:'a after_rebuild -> 'a
     that the downwards pass has reached the end of some subexpression, at which
     point another subexpression can be traversed downwards, or (after all such
     subexpressions have been traversed) the upwards pass may begin. *)
-type ('a, 'b) down_to_up = Downwards_acc.t -> rebuild:'a rebuild -> 'b
+type 'a down_to_up =
+  Downwards_acc.t -> 'a -> Simplified_expr.t * Downwards_acc.t
 
 (** The environments and accumulators for simplification are as follows:
 
@@ -69,9 +75,8 @@ type ('a, 'b) down_to_up = Downwards_acc.t -> rebuild:'a rebuild -> 'b
 type 'a expr_simplifier =
   Downwards_acc.t ->
   'a ->
-  down_to_up:
-    (Rebuilt_expr.t * Upwards_acc.t, Rebuilt_expr.t * Upwards_acc.t) down_to_up ->
-  Rebuilt_expr.t * Upwards_acc.t
+  down_to_up:Simplified_expr.t down_to_up ->
+  Simplified_expr.t * Downwards_acc.t
 
 type simplify_toplevel =
   Downwards_acc.t ->

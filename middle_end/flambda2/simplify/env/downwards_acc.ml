@@ -171,7 +171,9 @@ let add_to_lifted_constant_accumulator ?also_add_to_env t constants =
   in
   let lifted_constants = LCS.union t.lifted_constants constants in
   let denv =
-    if also_add_to_env then LCS.add_to_denv t.denv constants else t.denv
+    if also_add_to_env
+    then DE.add_lifted_constant_state t.denv constants
+    else t.denv
   in
   { t with lifted_constants; denv }
 
