@@ -1,50 +1,31 @@
-(* Compare the function entry counters in the -drawflambda dumps of two
-   compilations of the same module: print each dump's entries, then those in
-   only one of them. *)
+(* Compares the function entry annotations of two compilations of the same
+   module. Extracts the annoations via the raw fexpr dumps obtained via
+   `-drawfexpr`. Prints each dump's entries, then those in only one of them. *)
 
-(* CR yusumez: Replace this once we have FDO counters in Fexpr *)
+let prefix = "fdo_entry_annotation("
 
+(* Each entry is [prefix], a quoted name (with escapes), and the rest of the
+   counter up to the closing parenthesis.
+
+   CR yusumez: This is done to not dump the entire fexpr. I still find this a
+   bit sad. *)
 let entries file =
   let dump = In_channel.with_open_text file In_channel.input_all in
-  (* The printer breaks lines freely: collapse whitespace. *)
-  let dump =
-    String.split_on_char '\n' dump
-    |> List.concat_map (String.split_on_char ' ')
-    |> List.filter (fun s -> s <> "")
-    |> String.concat " "
-  in
-  let find_from prefix pos =
+  (* The index just after the string starting at the quote at [i]. *)
+  let eat_string i =
     let rec go i =
-      if i + String.length prefix > String.length dump
-      then None
-      else if String.sub dump i (String.length prefix) = prefix
-      then Some (i + String.length prefix)
-      else go (i + 1)
+      match dump.[i] with '\\' -> go (i + 2) | '"' -> i + 1 | _ -> go (i + 1)
     in
-    go pos
+    go (i + 1)
   in
-  (* The text up to the parenthesis closing the one before [pos]; names are
-     quoted strings and may contain parentheses. *)
-  let until_close pos =
-    let rec go i depth in_string =
-      match dump.[i] with
-      | '\\' when in_string -> go (i + 2) depth in_string
-      | '"' -> go (i + 1) depth (not in_string)
-      | _ when in_string -> go (i + 1) depth in_string
-      | '(' -> go (i + 1) (depth + 1) in_string
-      | ')' when depth = 0 -> i
-      | ')' -> go (i + 1) (depth - 1) in_string
-      | _ -> go (i + 1) depth in_string
-    in
-    let close = go pos 0 false in
-    String.sub dump pos (close - pos), close
-  in
-  let rec go pos acc =
-    match find_from "(fdo_entry_annotation (" pos with
-    | None -> List.rev acc
-    | Some pos ->
-      let counters, pos = until_close pos in
-      go pos (counters :: acc)
+  let rec go i acc =
+    match Misc.search_substring prefix dump i with
+    | i ->
+      let start = i + String.length prefix in
+      let string_end = eat_string start in
+      let close = String.index_from dump string_end ')' in
+      go (i + 1) (String.sub dump start (close - start) :: acc)
+    | exception Not_found -> List.rev acc
   in
   go 0 []
 

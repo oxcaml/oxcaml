@@ -1,4 +1,4 @@
-function_ids.dump:
+function_ids.raw.fl:
   "Function_ids.apply":0
   "Function_ids.twice":0
   "Function_ids.a.(fun)@x,int_add,1":0
@@ -13,7 +13,7 @@ function_ids.dump:
   "Function_ids.shadowing.f":2
   "Function_ids.shadowing":0
   "Function_ids.shadowing":1
-function_ids_edited.dump:
+function_ids.edited.raw.fl:
   "Function_ids.apply":0
   "Function_ids.twice":0
   "Function_ids.a0.(fun)@z":0
@@ -29,8 +29,8 @@ function_ids_edited.dump:
   "Function_ids.shadowing.f":1
   "Function_ids.shadowing.f":2
   "Function_ids.shadowing":0
-only in function_ids.dump:
+only in function_ids.raw.fl:
   "Function_ids.shadowing":1
-only in function_ids_edited.dump:
+only in function_ids.edited.raw.fl:
   "Function_ids.a0.(fun)@z":0
   "Function_ids.inner.(fun)@z,int_mul,n":0
