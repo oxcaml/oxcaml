@@ -178,7 +178,7 @@ let linearize_terminator (func : string)
             (Ltailcall_imm { func = { sym_name = func; sym_global = Local } })
         ],
         Some destination )
-    | Call_no_return
+    | Call_no_return_ext
         { func_symbol;
           alloc;
           ty_args;
@@ -212,6 +212,13 @@ let linearize_terminator (func : string)
               }))
     | Invalid { label_after = Some _; _ } ->
       Misc.fatal_error "Cannot linearize terminator: Invalid with a successor"
+    | Call_no_return_func op ->
+      let op : Linear.call_operation =
+        match op with
+        | Indirect _ -> Lcall_ind
+        | Direct func_symbol -> Lcall_imm { func = func_symbol }
+      in
+      single (L.Lcall_op op)
     | Call { op; label_after } ->
       let op : Linear.call_operation =
         match op with
@@ -417,7 +424,7 @@ let need_starting_label (block : Cfg.basic_block)
       | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
       | Call _ | Prim _ | Invalid _ ->
         false
-      | Return | Raise _ | Tailcall_func _ | Call_no_return _ ->
+      | Return | Raise _ | Tailcall_func _ | Call_no_return_ext _ | Call_no_return_func _ ->
         (* Unreachable for a consistent CFG: these terminators have no normal
            successors, and their exceptional successors are trap handlers,
            handled above. *)
