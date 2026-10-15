@@ -26,6 +26,7 @@ parsing/parse.mli merlin-exclude
 
 typing/cmt2annot.ml* merlin-exclude
 
+utils/action_trace.ml* merlin-exclude
 utils/arg_helper.ml* merlin-exclude
 utils/arrayset.ml* merlin-exclude
 utils/binutils.ml* merlin-exclude
