@@ -26,27 +26,6 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(* The js_of_ocaml backend of ocamlopt ([-target js_of_ocaml]).
-
-   Code generation stops at the js_of_ocaml IR (JSIR), produced from Flambda 2
-   by [Flambda2_to_jsir]. The JSIR of a compilation unit is written to a [.cmj]
-   file, from which the [js_of_ocaml] executable produces JavaScript, much like
-   the native backend writes assembly for the assembler to turn into an object
-   file. The [.cmj] file is an intermediate like the [.s] file: it is deleted
-   unless [-S] is given.
-
-   The correspondence with the native backend's files is:
-
-   - [.cmjx]: unit metadata, in the same format as [.cmx];
-
-   - [.cmjo]: the JavaScript for a unit, analogous to [.o];
-
-   - [.cmjxa] and [.cmja]: libraries, analogous to [.cmxa] and [.a];
-
-   - [.js] files given on the command line: JavaScript stubs, analogous to C
-   stubs. They are recorded in [.cmjxa] files and passed to [js_of_ocaml
-   build-runtime] when linking an executable. *)
-
 type error =
   | Js_of_ocaml_not_found of string
   | Js_of_ocaml_error of
@@ -67,7 +46,6 @@ let js_of_ocaml_program () =
     let in_bindir = Filename.concat Config.bindir "js_of_ocaml" in
     if Sys.file_exists in_bindir then in_bindir else "js_of_ocaml"
 
-(* [phase] selects the [-jsoo-opt-*] options to add to the [-jsoo-opt] ones. *)
 let run_js_of_ocaml ?input_left_in ~(phase : Clflags.Jsoo_phase.t) subcommand
     args =
   let args =
@@ -83,7 +61,6 @@ let run_js_of_ocaml ?input_left_in ~(phase : Clflags.Jsoo_phase.t) subcommand
   | exit_code ->
     raise (Error (Js_of_ocaml_error { subcommand; exit_code; input_left_in }))
   | exception Sys_error _ ->
-    (* [Ccomp.command] raises when the shell cannot run the program. *)
     raise (Error (Js_of_ocaml_not_found program))
 
 let debuginfo_args () = if !Clflags.debug then ["--debuginfo"] else []

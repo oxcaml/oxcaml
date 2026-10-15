@@ -48,15 +48,13 @@ let extract_output = function
   | None ->
       fatal "Please specify the name of the output file, using option -o"
 
-let is_js_target = Clflags.target_is_jsir
-
 let fatal_unsupported_for_js what =
   fatal (Printf.sprintf "%s is not supported when targeting js_of_ocaml" what)
 
 let default_output = function
   | Some s -> s
   | None ->
-      if is_js_target () then Config.default_executable_name ^ ".js"
+      if Clflags.target_is_jsir () then Config.default_executable_name ^ ".js"
       else Config.default_executable_name
 
 let first_include_dirs = ref []
@@ -762,9 +760,9 @@ let readenv ppf position =
   (match position with
    | Before_args -> ()
    | Before_compile _ | Before_link ->
-     if is_js_target () && !all_ccopts <> [] then
+     if Clflags.target_is_jsir () && !all_ccopts <> [] then
        fatal_unsupported_for_js "-ccopt";
-     if not (is_js_target ()) then
+     if not (Clflags.target_is_jsir ()) then
        List.iter (fun phase ->
            if !(Clflags.jsoo_opts phase) <> [] then
              fatal (Clflags.Jsoo_phase.flag phase
@@ -815,7 +813,7 @@ let process_action
       if !make_package then objfiles := (opref ^ ".cmi") :: !objfiles
   | ProcessCFile name ->
       readenv ppf (Before_compile name);
-      if is_js_target () then
+      if Clflags.target_is_jsir () then
         fatal_unsupported_for_js ("C source file " ^ name);
       Location.input_name := name;
       let obj_name = match !output_name with
@@ -826,7 +824,7 @@ let process_action
       then raise (Exit_with_status 2);
       ccobjs := obj_name :: !ccobjs
   | ProcessObjects names ->
-      if is_js_target () then fatal_unsupported_for_js "-cclib";
+      if Clflags.target_is_jsir () then fatal_unsupported_for_js "-cclib";
       ccobjs := names @ !ccobjs
   | ProcessDLLs names ->
       dllibs := names @ !dllibs
@@ -839,15 +837,14 @@ let process_action
         objfiles := name :: !objfiles
       else if Filename.check_suffix name ".cmi" && !make_package then
         objfiles := name :: !objfiles
-      else if is_js_target () && Filename.check_suffix name ".js" then begin
-        (* JavaScript stubs play the role of C objects: they are stored in
-           [.cmjxa] files and passed to the js_of_ocaml linker. *)
+      else if Clflags.target_is_jsir () && Filename.check_suffix name ".js"
+      then begin
         has_linker_inputs := true;
         ccobjs := name :: !ccobjs
       end
       else if Filename.check_suffix name Config.ext_obj
            || Filename.check_suffix name Config.ext_lib then begin
-        if is_js_target () then
+        if Clflags.target_is_jsir () then
           fatal_unsupported_for_js ("object file " ^ name);
         has_linker_inputs := true;
         ccobjs := name :: !ccobjs
