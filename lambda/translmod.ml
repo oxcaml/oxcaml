@@ -1837,7 +1837,7 @@ let transl_functorization_make ~params ~modules ~find_impl_by_name
   let required_globals =
     Global_module.Map.fold
       (fun _gm (_id, cu) set -> Compilation_unit.Set.add cu set)
-      module_map Compilation_unit.Set.empty
+      module_map (scan_used_globals body)
   in
   let unit_ident = Ident.create_local "*unit*" in
   let func_params =
