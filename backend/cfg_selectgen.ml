@@ -385,7 +385,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | [] | _ :: _ -> wrong_num_args 3
     in
     match[@ocaml.warning "+fragile-match"] op with
-    | Capply { callees; result_type; _ } -> (
+    | Capply { callees; result_type; region = _ } -> (
       let (func, args) : Cfg.func_call_operation * Cmm.expression list =
         match[@ocaml.warning "-fragile-match"] args with
         | Cconst_symbol (func, _dbg) :: rem -> Direct func, rem
@@ -1122,7 +1122,19 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         SU.set_traps_for_raise env;
         Ok rd
       | Terminator
-          (Prim { op = External ({ ty_args; ty_res; _ } as r); label_after }) ->
+          (Prim
+             { op =
+                 External
+                   ({ func_symbol = _;
+                      alloc = _;
+                      effects = _;
+                      ty_res;
+                      ty_args;
+                      stack_ofs = _;
+                      stack_align = _
+                    } as r);
+               label_after
+             }) ->
         let* loc_arg, stack_ofs, stack_align =
           emit_extcall_args env sub_cfg ty_args new_args dbg
         in
@@ -1147,7 +1159,16 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         SU.set_traps_for_raise env;
         Sub_cfg.add_never_block sub_cfg ~label:label_after;
         Ok rd
-      | Terminator (Call_no_return_ext ({ ty_args; _ } as r)) ->
+      | Terminator
+          (Call_no_return_ext
+             ({ func_symbol = _;
+                alloc = _;
+                effects = _;
+                ty_res = _;
+                ty_args;
+                stack_ofs = _;
+                stack_align = _
+              } as r)) ->
         let* loc_arg, stack_ofs, stack_align =
           emit_extcall_args env sub_cfg ty_args new_args dbg
         in
@@ -1502,7 +1523,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       let new_op, new_args = select_operation op simple_args dbg ~label_after in
       match new_op with
       | Terminator
-          (( Call { op = Indirect callees; _ }
+          (( Call { op = Indirect callees; label_after = _ }
            | Call_no_return_func (Indirect callees) ) as term) ->
         let** r1 = emit_tuple env sub_cfg new_args in
         let rd = Reg.createv result_type in
@@ -1530,8 +1551,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
             SU.insert_move_results env sub_cfg loc_res rd stack_ofs;
             insert_return env sub_cfg (Ok rd) (SU.pop_all_traps env))
       | Terminator
-          ((Call { op = Direct func; _ } | Call_no_return_func (Direct func)) as
-           term) ->
+          (( Call { op = Direct func; label_after = _ }
+           | Call_no_return_func (Direct func) ) as term) ->
         let** r1 = emit_tuple env sub_cfg new_args in
         let rd = Reg.createv result_type in
         let loc_arg, stack_ofs_args = Proc.loc_arguments (Reg.typv r1) in
