@@ -389,3 +389,62 @@ function caml_uniform_array_make(len, init) {
 function caml_uniform_array_make_local(len, init) {
   return caml_uniform_array_make(len, init);
 }
+
+//Provides: caml_makearray_dynamic_unboxed_product_size
+//Requires: caml_invalid_argument
+//Version: >= 5.2
+//If: oxcaml
+function caml_makearray_dynamic_unboxed_product_size(
+  num_components,
+  non_unarized_length,
+) {
+  var size = num_components * non_unarized_length;
+  if (size !== 0 && num_components < 1)
+    caml_invalid_argument(
+      "%makearray_dynamic: the only array that can be initialized with nothing is a zero-length array",
+    );
+  var max_size = (0x7fffffff / 4) | 0;
+  if (size < 0 || size >= max_size)
+    caml_invalid_argument("%makearray_dynamic: array size too large");
+  return size;
+}
+
+//Provides: caml_makearray_dynamic_non_scannable_unboxed_product mutator (const, const, const)
+//Requires: caml_makearray_dynamic_unboxed_product_size
+//Version: >= 5.2
+//If: oxcaml
+function caml_makearray_dynamic_non_scannable_unboxed_product(
+  num_components,
+  is_local,
+  non_unarized_length,
+) {
+  var size = caml_makearray_dynamic_unboxed_product_size(
+    num_components,
+    non_unarized_length,
+  );
+  var b = new Array(size + 1);
+  b[0] = 0;
+  for (var i = 1; i <= size; i++) b[i] = 0;
+  return b;
+}
+
+//Provides: caml_makearray_dynamic_scannable_unboxed_product mutator (mutable, const, const)
+//Requires: caml_makearray_dynamic_unboxed_product_size
+//Version: >= 5.2
+//If: oxcaml
+function caml_makearray_dynamic_scannable_unboxed_product(
+  init,
+  is_local,
+  non_unarized_length,
+) {
+  // [init] is a block holding the unarized components of one element.
+  var num_components = init.length - 1;
+  var size = caml_makearray_dynamic_unboxed_product_size(
+    num_components,
+    non_unarized_length,
+  );
+  var b = new Array(size + 1);
+  b[0] = 0;
+  for (var i = 0; i < size; i++) b[i + 1] = init[1 + (i % num_components)];
+  return b;
+}
