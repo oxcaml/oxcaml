@@ -62,10 +62,10 @@ module Make (Iterator : Leapfrog.Iterator) : sig
     ('k Or_null_receiver.t -> assembler) ->
     assembler
 
-  (** [break n] breaks out of the [n] innermost loops (created with [for_in]).
+  val exists : (accept:assembler -> assembler) -> assembler -> assembler
 
-      {b Note}: [break 0] is a no-op. *)
-  val break : int -> assembler
+  (** [nop] is a no-op and does nothing. *)
+  val nop : assembler
 
   (** [if_in key iterators body] executes body if [key] is in the intersection
       of the [iterators]. *)
