@@ -687,10 +687,9 @@ let parens ~if_scope_is scope ppf f =
   | (Outer | Where_body | Continuation_body), _ -> f scope ppf
 
 let rec expr scope ppf = function
-  | Invalid { message } ->
-    Format.fprintf ppf "@[%tinvalid%t \"%s\"@]" Flambda_colours.invalid_keyword
+  | Invalid ->
+    Format.fprintf ppf "%tinvalid%t" Flambda_colours.invalid_keyword
       Flambda_colours.pop
-      (message |> String.escaped)
   | Apply_cont ac ->
     Format.fprintf ppf "@[%tcont%t %a@]" Flambda_colours.expr_keyword
       Flambda_colours.pop apply_cont ac

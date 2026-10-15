@@ -93,6 +93,10 @@ let new_block env ~params =
 let handler_is_cold (handler : Cmm.static_handler) =
   handler.is_cold && !Oxcaml_flags.cfg_block_layout
 
+let branch_is_cold (branch : Branch_annotations.t) =
+  Likelihood.is_cold (Branch_annotations.likelihood branch)
+  && !Oxcaml_flags.cfg_block_layout
+
 let emit_name_for_debugger env c v args =
   match VP.provenance v with
   | None -> ()
@@ -259,8 +263,9 @@ and emit env c (exp : Cmm.expression) ~tail : result =
     | Csequence (e1, e2) ->
       let* _ = emit env c e1 ~tail:false in
       emit env c e2 ~tail
-    | Cifthenelse (econd, _ifso_dbg, eif, _ifnot_dbg, eelse, _dbg) ->
-      emit_ifthenelse env c ~tail econd eif eelse
+    | Cifthenelse
+        (econd, _ifso_dbg, ifso_p, eif, _ifnot_dbg, ifnot_p, eelse, _dbg) ->
+      emit_ifthenelse env c ~tail econd ifso_p eif ifnot_p eelse
     | Cswitch (esel, index, ecases, _dbg) ->
       emit_switch env c ~tail esel index ecases
     | Ccatch (_, [], e1) -> emit env c e1 ~tail
@@ -475,22 +480,32 @@ and emit_expr_op env c op args dbg : result =
       Misc.fatal_errorf "Ssa_of_cmm: unexpected basic (%a)" Printcfg.basic_desc
         basic)
 
-and emit_ifthenelse env c ~tail econd eif eelse : result =
+and emit_ifthenelse env c ~tail econd ifa eif elsea eelse : result =
   let cond, earg = Sel.select_condition econd in
   let* rarg = emit env c earg ~tail:false in
-  let then_block = new_block env ~params:[||] in
-  let else_block = new_block env ~params:[||] in
+  let then_env = if branch_is_cold ifa then { env with cold = true } else env in
+  let else_env =
+    if branch_is_cold elsea then { env with cold = true } else env
+  in
+  let then_block = new_block then_env ~params:[||] in
+  let else_block = new_block else_env ~params:[||] in
   emit_branch env c cond rarg ~true_block:then_block ~false_block:else_block;
   let then_c = Cursor.start then_block in
-  let r_then = emit env then_c eif ~tail in
+  let r_then = emit then_env then_c eif ~tail in
   let else_c = Cursor.start else_block in
-  let r_else = emit env else_c eelse ~tail in
+  let r_else = emit else_env else_c eelse ~tail in
   join env c [| r_then, then_c; r_else, else_c |]
 
 and emit_switch env c ~tail esel index ecases : result =
   let* rsel = emit env c esel ~tail:false in
   let case_blocks =
-    Array.map (fun (_case_expr, _dbg) -> new_block env ~params:[||]) ecases
+    Array.map
+      (fun (_case_expr, _dbg, annots) ->
+        let env =
+          if branch_is_cold annots then { env with cold = true } else env
+        in
+        new_block env ~params:[||])
+      ecases
   in
   let targets = Array.map (fun idx -> case_blocks.(idx)) index in
   let index =
@@ -500,7 +515,7 @@ and emit_switch env c ~tail esel index ecases : result =
   finish_block env c ~dbg:Debuginfo.none (Switch { index; targets });
   let case_results =
     Array.mapi
-      (fun i (case_expr, _dbg) ->
+      (fun i (case_expr, _dbg, _) ->
         let case_c = Cursor.start case_blocks.(i) in
         emit env case_c case_expr ~tail, case_c)
       ecases

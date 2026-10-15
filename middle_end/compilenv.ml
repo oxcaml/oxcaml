@@ -193,9 +193,7 @@ let get_unit comp_unit =
       if Env.is_imported_opaque (CU.name comp_unit) then (None, None)
       else begin
         let missing_extension =
-          match !Clflags.jsir with
-          | false -> "cmx"
-          | true -> "cmjx"
+          if Clflags.target_is_jsir () then "cmjx" else "cmx"
         in
         try
           let filename =
