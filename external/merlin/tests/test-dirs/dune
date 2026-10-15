@@ -5,7 +5,7 @@
   (<> %{os_type} Win32)))
 
 (cram
- (applies_to parameters)
+ (applies_to include-functor parameters)
  (locks server-tests/merlin_server))
 
 (cram

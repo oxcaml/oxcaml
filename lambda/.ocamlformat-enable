@@ -22,3 +22,5 @@ translmode.ml
 translmode.mli
 translquote.ml
 translquote.mli
+translrepr.ml
+translrepr.mli

@@ -19,6 +19,12 @@
 
 include module type of struct include Ident end
 
+(** Name equality.
+
+   (Unlike Ident, Backend_var.equal is equality of identifiers, rather
+   than equality of names) *)
+val equal_by_name : t -> t -> bool
+
 type backend_var = t
 
 val name_for_debugger : t -> string

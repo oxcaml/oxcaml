@@ -31,7 +31,8 @@ let rebuild_terminator (terminator : Simplified_expr.simplified_terminator) uacc
 let rec rebuild_expr (expr : Simplified_expr.t) uacc ~after_rebuild =
   let { Simplified_expr.simplified_lets_and_let_conts;
         simplified_terminator;
-        removed_operations
+        removed_operations;
+        is_cold
       } =
     expr
   in
@@ -44,6 +45,7 @@ let rec rebuild_expr (expr : Simplified_expr.t) uacc ~after_rebuild =
       rebuild_terminator simplified_terminator uacc
         ~after_rebuild:(fun expr uacc ->
           let uacc = UA.notify_removed ~operation:removed_operations uacc in
+          let expr = if is_cold then RE.mark_as_cold expr else expr in
           after_rebuild expr uacc)
     | Simplified_let (simplified_let, simplified_lets_and_let_conts) ->
       rebuild_lets_and_let_conts simplified_lets_and_let_conts uacc
@@ -72,7 +74,10 @@ let simplify_toplevel_common dacc simplify ~params ~implicit_params
          (Flow.Acc.init_toplevel ~dummy_toplevel_cont
             (Bound_parameters.append params implicit_params))
   in
-  let dacc = DA.record_continuation dacc return_continuation return_arity in
+  let dacc =
+    DA.record_continuation dacc return_continuation
+      (Flambda_arity.unarize_t return_arity)
+  in
   let dacc =
     DA.record_continuation dacc exn_continuation
       (Flambda_arity.create [Singleton K.With_subkind.any_value])
@@ -108,15 +113,28 @@ let simplify_toplevel_common dacc simplify ~params ~implicit_params
         ~return_continuation ~exn_continuation
         ~machine_width:(DE.machine_width (DA.denv dacc))
     in
+    (* Propagate upwards the coldness information on the return/exn continuation
+       that we collected downwards. *)
+    let continuation_is_cold cont =
+      match CUE.get_continuation_uses (DA.continuation_uses_env dacc) cont with
+      | None -> (* never returned *) false
+      | Some uses ->
+        Continuation_uses.get_uses uses
+        |> List.for_all (fun use ->
+            One_continuation_use.env_at_use use |> DE.is_cold)
+    in
     let uenv =
       UE.add_function_return_or_exn_continuation
+        ~is_cold:(continuation_is_cold return_continuation)
         (UE.create
            (DA.are_rebuilding_terms dacc)
            ~machine_width:(DE.machine_width (DA.denv dacc)))
-        return_continuation return_arity
+        return_continuation
+        (Flambda_arity.unarize_t return_arity)
     in
     let uenv =
       UE.add_function_return_or_exn_continuation uenv exn_continuation
+        ~is_cold:(continuation_is_cold exn_continuation)
         (Flambda_arity.create_singletons [K.With_subkind.any_value])
     in
     let uacc = UA.create ~flow_result ~compute_slot_offsets:true uenv dacc in
