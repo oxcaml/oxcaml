@@ -35,6 +35,12 @@ typedef struct {
   frame_descr *fd;
 } frame_descr_entry;
 
+/* One entry of the index (see frame_descriptors.h). */
+typedef struct {
+  uint32_t pc_off;
+  uint32_t descr_off;
+} frame_index_entry;
+
 struct caml_frame_descrs {
   int num_descr;
   int mask;
@@ -42,6 +48,24 @@ struct caml_frame_descrs {
   caml_frametable_list *frametables;
   caml_frametable_list *zombies;
   caml_plat_mutex mutex;
+  /* The post-link index of the executable's own frametables (see
+     frame_descriptors.h), decoded from its header at startup; [index]
+     is NULL when the executable carries none. Descriptors covered by
+     the index are never hashed, so [descriptors] stays NULL until a
+     frametable from elsewhere (natdynlink, a JIT) is registered. */
+  const unsigned char *index;
+  uintnat index_text_lo;
+  uintnat index_shift;
+  uintnat index_num_granules;
+  uintnat index_num_entries;
+  uintnat index_ft_lo;
+  uintnat index_ft_hi;
+  uintnat index_bytes;
+  const uint32_t *index_bucket;
+  const frame_index_entry *index_entries;
+  /* Xframe_index_check: hash every frametable as well, and check each
+     lookup against the hash table. */
+  bool index_check;
 };
 /* Let us call 'capacity' the length of the descriptors array.
 
@@ -377,6 +401,122 @@ static void clean_frame_descriptors(caml_frame_descrs *table)
   }
   table->num_descr -= decrease;
   table->zombies = NULL;
+}
+
+/* ---- The post-link index ---- */
+
+extern uintnat caml_frame_index_check;
+
+Caml_inline uint64_t read_u64(const unsigned char *p)
+{
+  uint64_t v;
+  memcpy(&v, p, sizeof(v));
+  return v;
+}
+
+Caml_inline uintnat round_up(uintnat n, uintnat align)
+{
+  return (n + align - 1) / align * align;
+}
+
+/* Decode the header of the executable's index, if it has one. */
+static void init_frame_index(caml_frame_descrs *fds)
+{
+  const unsigned char *hdr = caml_frame_index_data;
+  if (hdr == NULL) return;
+  if (read_u64(hdr + Frame_index_magic_ofs) != CAML_FRAME_INDEX_MAGIC)
+    return;
+  if (caml_read_unaligned_uint32(hdr + Frame_index_version_ofs)
+      != CAML_FRAME_INDEX_VERSION)
+    return;
+  uintnat reserved =
+    caml_read_unaligned_uint32(hdr + Frame_index_reserved_entries_ofs);
+  uintnat budget =
+    caml_read_unaligned_uint32(hdr + Frame_index_bucket_budget_ofs);
+  uintnat bucket_region =
+    round_up(sizeof(uint32_t) * (budget + 1), Frame_index_region_align);
+  uintnat entries_region =
+    round_up(sizeof(frame_index_entry) * reserved, Frame_index_region_align);
+  fds->index = hdr;
+  fds->index_shift = caml_read_unaligned_uint32(hdr + Frame_index_shift_ofs);
+  fds->index_text_lo = read_u64(hdr + Frame_index_text_lo_ofs);
+  fds->index_num_granules = read_u64(hdr + Frame_index_num_granules_ofs);
+  fds->index_num_entries = read_u64(hdr + Frame_index_num_entries_ofs);
+  fds->index_ft_lo = read_u64(hdr + Frame_index_ft_lo_ofs);
+  fds->index_ft_hi = read_u64(hdr + Frame_index_ft_hi_ofs);
+  fds->index_bytes = Frame_index_header_size + bucket_region + entries_region;
+  fds->index_bucket = (const uint32_t *)(hdr + Frame_index_header_size);
+  fds->index_entries = (const frame_index_entry *)
+    (hdr + Frame_index_header_size + bucket_region);
+}
+
+/* Whether the descriptors of [tbl] are covered by the index, so that
+   the table need not be hashed. */
+static bool frametable_is_indexed(const caml_frame_descrs *fds,
+                                  const void *tbl)
+{
+  return fds->index != NULL && !fds->index_check
+    && (uintnat)tbl >= fds->index_ft_lo && (uintnat)tbl < fds->index_ft_hi;
+}
+
+/* Find [off] among the sorted offsets of entries[lo..hi); returns [hi]
+   when absent. A branchy scalar scan: the exit is predicted well when
+   the same frames recur from one collection to the next, which lets
+   the descriptor load issue before the compares resolve. */
+Caml_inline uint32_t index_scan_bucket(const frame_index_entry *entries,
+                                       uint32_t lo, uint32_t hi, uint32_t off)
+{
+  for (uint32_t i = lo; i < hi; i++) {
+    if (entries[i].pc_off == off) return i;
+  }
+  return hi;
+}
+
+Caml_inline frame_descr *index_lookup(const caml_frame_descrs *fds,
+                                      uintnat pc)
+{
+  if (pc < fds->index_text_lo) return NULL;
+  uintnat rel = pc - fds->index_text_lo;
+  uintnat g = rel >> fds->index_shift;
+  if (g >= fds->index_num_granules) return NULL;
+  uint32_t lo = fds->index_bucket[g];
+  uint32_t hi = fds->index_bucket[g + 1];
+  uint32_t off = (uint32_t)(rel & (((uintnat)1 << fds->index_shift) - 1));
+  uint32_t i = index_scan_bucket(fds->index_entries, lo, hi, off);
+  if (i == hi) return NULL;
+  return (frame_descr *)(fds->index_ft_lo + fds->index_entries[i].descr_off);
+}
+
+static void report_index(const caml_frame_descrs *fds)
+{
+  if (fds->index == NULL) {
+    printf("Frame index: absent.\n");
+    return;
+  }
+  uint32_t largest = 0;
+  for (uintnat g = 0; g < fds->index_num_granules; g++) {
+    uint32_t n = fds->index_bucket[g + 1] - fds->index_bucket[g];
+    if (n > largest) largest = n;
+  }
+  printf("Frame index: %" ARCH_INTNAT_PRINTF_FORMAT "u entries, "
+         "%" ARCH_INTNAT_PRINTF_FORMAT "u-byte granules, "
+         "%" ARCH_INTNAT_PRINTF_FORMAT "u granules, "
+         "largest bucket %u, "
+         "%" ARCH_INTNAT_PRINTF_FORMAT "u bytes.\n",
+         fds->index_num_entries, (uintnat)1 << fds->index_shift,
+         fds->index_num_granules, largest, fds->index_bytes);
+}
+
+static void report_hashtable(const caml_frame_descrs *fds)
+{
+  if (fds->descriptors == NULL) {
+    printf("Frame descriptor hash table: not allocated.\n");
+  } else {
+    printf("Frame descriptor hash table: %d descriptors, capacity %d "
+           "(%zu bytes).\n",
+           fds->num_descr, fds->mask + 1,
+           (size_t)(fds->mask + 1) * sizeof(frame_descr_entry));
+  }
 }
 
 /* ---- Frametable measurement ---- */
@@ -1151,15 +1291,9 @@ static void add_frame_descriptors(
     table->descriptors = alloc_descriptors(tblsize);
 
     fill_hashtable(table, new_frametables);
-    if (caml_measure_frametables) {
-      report_frametables_stats(new_frametables);
-    }
   } else {
     table->num_descr += increase;
     fill_hashtable(table, new_frametables);
-    if (caml_measure_frametables) {
-      report_frametables_stats(new_frametables);
-    }
     tail->next = table->frametables;
   }
 
@@ -1167,8 +1301,11 @@ static void add_frame_descriptors(
 }
 
 /* protected by STW sections */
-static caml_frame_descrs current_frame_descrs =
-  { 0, -1, NULL, NULL, NULL, CAML_PLAT_MUTEX_INITIALIZER };
+static caml_frame_descrs current_frame_descrs = {
+  .num_descr = 0,
+  .mask = -1,
+  .mutex = CAML_PLAT_MUTEX_INITIALIZER,
+};
 
 static caml_frametable_list *cons(
   intnat *frametable, caml_frametable_list *tl)
@@ -1200,16 +1337,43 @@ static caml_frametable_list *copy_cons(
   return li;
 }
 
+static void free_list(caml_frametable_list *list)
+{
+  while (list != NULL) {
+    caml_frametable_list *next = list->next;
+    caml_stat_free(list);
+    list = next;
+  }
+}
+
 void caml_init_frame_descriptors(void)
 {
-  caml_frametable_list *frametables = NULL;
-  for (int i = 0; caml_frametable[i] != 0; i++)
-    frametables = cons(caml_frametable[i], frametables);
+  caml_frame_descrs *fds = &current_frame_descrs;
 
   /* `init_frame_descriptors` is called from `init_gc`, before
      any mutator can run. We can mutate [current_frame_descrs]
      at will. */
-  add_frame_descriptors(&current_frame_descrs, frametables);
+  fds->index_check = caml_frame_index_check != 0;
+  init_frame_index(fds);
+
+  /* Hash only the tables the index does not cover (normally none, so
+     no hash table is allocated). */
+  caml_frametable_list *frametables = NULL;
+  for (int i = 0; caml_frametable[i] != 0; i++) {
+    if (!frametable_is_indexed(fds, caml_frametable[i]))
+      frametables = cons(caml_frametable[i], frametables);
+  }
+  if (frametables != NULL) add_frame_descriptors(fds, frametables);
+
+  if (caml_measure_frametables) {
+    caml_frametable_list *all = NULL;
+    for (int i = 0; caml_frametable[i] != 0; i++)
+      all = cons(caml_frametable[i], all);
+    report_frametables_stats(all);
+    free_list(all);
+    report_index(fds);
+    report_hashtable(fds);
+  }
 }
 
 static void register_frametables_from_stw_single(
@@ -1217,6 +1381,10 @@ static void register_frametables_from_stw_single(
 {
   clean_frame_descriptors(&current_frame_descrs);
   add_frame_descriptors(&current_frame_descrs, new_frametables);
+  if (caml_measure_frametables) {
+    report_frametables_stats(new_frametables);
+    report_hashtable(&current_frame_descrs);
+  }
 }
 
 static void stw_register_frametables(
@@ -1232,8 +1400,14 @@ static void stw_register_frametables(
 
 void caml_register_frametables(void **table, int ntables) {
   caml_frametable_list *new_frametables = NULL;
-  for (int i = 0; i < ntables; i++)
-    new_frametables = cons(table[i], new_frametables);
+  for (int i = 0; i < ntables; i++) {
+    /* A table inside the executable's own frametables section (as
+       under -manual-module-init) is already covered by the index. The
+       index fields are only written before any mutator runs. */
+    if (!frametable_is_indexed(&current_frame_descrs, table[i]))
+      new_frametables = cons(table[i], new_frametables);
+  }
+  if (new_frametables == NULL) return;
 
   do {} while (!caml_try_run_on_all_domains(
                  &stw_register_frametables, new_frametables, 0));
@@ -1311,11 +1485,10 @@ caml_frame_descrs* caml_get_frame_descrs(void)
   return &current_frame_descrs;
 }
 
-frame_descr* caml_find_frame_descr(caml_frame_descrs *fds, uintnat pc)
+static frame_descr *hash_lookup(const caml_frame_descrs *fds, uintnat pc)
 {
-  uintnat h;
-
-  h = Hash_retaddr(pc, fds->mask);
+  if (fds->descriptors == NULL) return NULL;
+  uintnat h = Hash_retaddr(pc, fds->mask);
   while (1) {
     frame_descr_entry e = fds->descriptors[h];
     /* On stack overflow (via guard page/SEGV) the PC is not in frame tables */
@@ -1323,4 +1496,33 @@ frame_descr* caml_find_frame_descr(caml_frame_descrs *fds, uintnat pc)
     if (e.retaddr == pc) return e.fd;
     h = (h+1) & fds->mask;
   }
+}
+
+/* Xframe_index_check: every table is hashed, so the hash table is the
+   oracle. The index must agree with it on every descriptor inside the
+   executable's frametables section, and find nothing otherwise. */
+static frame_descr *checked_lookup(const caml_frame_descrs *fds, uintnat pc,
+                                   frame_descr *from_index)
+{
+  frame_descr *from_table = hash_lookup(fds, pc);
+  frame_descr *expected = NULL;
+  if (from_table != NULL
+      && (uintnat)from_table >= fds->index_ft_lo
+      && (uintnat)from_table < fds->index_ft_hi)
+    expected = from_table;
+  if (from_index != expected)
+    caml_fatal_error("frame index check failed at pc %p: "
+                     "index gives %p, hash table gives %p",
+                     (void *)pc, (void *)from_index, (void *)from_table);
+  return from_table;
+}
+
+frame_descr* caml_find_frame_descr(caml_frame_descrs *fds, uintnat pc)
+{
+  if (fds->index != NULL) {
+    frame_descr *d = index_lookup(fds, pc);
+    if (CAMLunlikely(fds->index_check)) return checked_lookup(fds, pc, d);
+    if (d != NULL) return d;
+  }
+  return hash_lookup(fds, pc);
 }

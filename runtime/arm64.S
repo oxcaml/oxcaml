@@ -139,6 +139,7 @@ G(\name):
 G(\name):
         .endm
 #define END_OBJECT(name)
+#define FRAMETABLE_OBJECT(name) OBJECT(name)
 
 #else
 
@@ -159,6 +160,12 @@ G(name):
 G(name):
 #define END_OBJECT(name) \
         SIZE_DIRECTIVE(G(name))
+#define FRAMETABLE_OBJECT(name) \
+        .section caml_frametables,"a",%progbits; \
+        .align  3; \
+        .globl  G(name); \
+        TYPE_DIRECTIVE(G(name),%object) \
+G(name):
 #endif
 
 /* Function prologue and epilogue */
@@ -1619,7 +1626,7 @@ G(caml_system__code_end):
 
 /* Frametable - GC roots for callback */
 /* Uses the same naming convention as ocamlopt generated modules. */
-OBJECT(CAMLSEP(system,frametable))
+FRAMETABLE_OBJECT(CAMLSEP(system,frametable))
         .quad   2                   /* two descriptors */
         /* Each descriptor is preceded by a "delta" byte. These return-to-C
            descriptors do not fit the "short" format, so each escapes: a 0

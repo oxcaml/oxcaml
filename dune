@@ -578,6 +578,7 @@
   binary_emitter_verify
   asmlink
   cm_bundle
+  frame_index
   linkenv
   optlink
   ;; asmcomp/dissector/
@@ -618,6 +619,7 @@
   emit
   emitaux
   fdo_info
+  frame_index_layout
   generic_fns
   instructionId
   linear

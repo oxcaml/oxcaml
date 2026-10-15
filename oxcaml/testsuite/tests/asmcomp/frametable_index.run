@@ -1,0 +1,19 @@
+#!/bin/sh
+
+exec > "${output}" 2>&1
+
+# How the runtime finds frame descriptors: through the index stored in the
+# executable, or through a hash table built at startup. The counts vary with
+# the program and the standard library, so they are elided.
+OCAMLRUNPARAM="Xmeasure_frametables=1" ${program} \
+  | grep -E '^Frame (index|descriptor hash table)' | sed -E 's/[0-9]+/N/g'
+
+# Xframe_index_check builds the hash table as well and checks every lookup
+# against it.
+OCAMLRUNPARAM="Xframe_index_check=1" ${program} && echo "check ok"
+
+# The index lives in a read-only, allocated section (flags "A" only). Without
+# the index, only its 64-byte header is present.
+readelf -S -W ${program} | sed -E 's/^ *\[ *[0-9]+\] *//' \
+  | awk '/^caml_frame_index / { print $1, $2, $7;
+                                if ($5 == "000040") print "header only" }'

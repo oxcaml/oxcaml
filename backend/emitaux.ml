@@ -76,6 +76,15 @@ let enter_code_section name =
    directive). Every descriptor then escapes to the normal format. *)
 let disable_short_descriptors = ref false
 
+let num_frame_descriptors = ref 0
+
+type frame_index_reservation =
+  { other_descriptors : int;
+    full : bool
+  }
+
+let frame_index_reservation : frame_index_reservation option ref = ref None
+
 let is_none_dbg d = Debuginfo.Dbg.is_none (Debuginfo.get_dbg d)
 
 let get_flags debuginfo =
@@ -158,7 +167,7 @@ let emit_frames ~debug_strings_section a =
   in
   let string_label_rel lbl ofs =
     D.between_this_and_label_offset_32bit_expr
-      ~upper:(string_label ~section:Asm_section.Read_only_data lbl)
+      ~upper:(string_label ~section:Asm_section.Frametables lbl)
       ~offset_upper:(Targetint.of_int32 ofs)
   in
   (* The emit functions below perform bounds checks for the corresponding ranges
@@ -545,7 +554,8 @@ let emit_frames ~debug_strings_section a =
      is emitted), so the prepended list is in decreasing order. Reverse it to
      emit the frame table in increasing return-address order. *)
   let descrs = List.rev !frame_descriptors in
-  a.efa_word (List.length descrs);
+  num_frame_descriptors := List.length descrs;
+  a.efa_word !num_frame_descriptors;
   (* Emit each descriptor preceded by retaddr delta. The first descriptor of the
      frametable, and any descriptor that does not fit the short format, escapes:
      a 0 delta byte followed by the existing normal/long descriptor (which
@@ -585,7 +595,7 @@ let emit_frames ~debug_strings_section a =
   D.switch_to_section debug_strings_section;
   Hashtbl.iter emit_merged_string filenames;
   Hashtbl.iter emit_merged_string defstrings;
-  D.switch_to_section Asm_section.Read_only_data;
+  D.switch_to_section Asm_section.Frametables;
   frame_descriptors := []
 
 (* Detection of functions that can be duplicated between a DLL and the main
@@ -889,6 +899,44 @@ let emit_stapsdt_base_section () =
     D.space ~bytes:1;
     D.size_const stapsdt_sym
       1L (* 1 byte; alternative would be . - _.stapsdt.base *))
+
+let emit_frame_index_reservation () =
+  let module D = Asm_targets.Asm_directives in
+  let module S = Asm_targets.Asm_symbol in
+  match !frame_index_reservation with
+  | None -> ()
+  | Some { other_descriptors; full } ->
+    frame_index_reservation := None;
+    let layout =
+      if full
+      then
+        Frame_index_layout.of_estimate
+          (other_descriptors + !num_frame_descriptors)
+      else Frame_index_layout.empty
+    in
+    let total_bytes = Frame_index_layout.total_bytes layout in
+    let sym = S.create_global Frame_index_layout.symbol_name in
+    D.switch_to_section Frame_index;
+    D.align ~fill:Zero ~bytes:Frame_index_layout.region_align;
+    D.global sym;
+    D.define_symbol_label ~section:Frame_index sym;
+    (* The header (see [Frame_index_layout]). A zero magic marks the index as
+       absent until [Frame_index.build] fills the section in after linking; the
+       two reservation fields are final. *)
+    let int32 n = D.int32 (Int32.of_int n) in
+    D.int64 0L (* magic *);
+    int32 Frame_index_layout.version;
+    int32 0 (* shift *);
+    D.int64 0L (* text_lo *);
+    D.int64 0L (* num_granules *);
+    D.int64 0L (* num_entries *);
+    D.int64 0L (* ft_lo *);
+    D.int64 0L (* ft_hi *);
+    int32 layout.reserved_entries;
+    int32 layout.bucket_budget;
+    D.space ~bytes:(total_bytes - Frame_index_layout.header_size);
+    D.type_symbol ~ty:Object sym;
+    D.size_const sym (Int64.of_int total_bytes)
 
 let emit_elf_note ~section ~owner ~typ ~emit_desc =
   let module D = Asm_targets.Asm_directives in
