@@ -168,6 +168,7 @@ and recursive_types = ref false         (* -rectypes *)
 and strict_sequence = ref false         (* -strict-sequence *)
 and strict_formats = ref true           (* -strict-formats *)
 and applicative_functors = ref true     (* -no-app-funct *)
+and typing_recovery = ref false         (* -typing-recovery *)
 and make_runtime = ref false            (* -make-runtime *)
 and c_compiler = ref (None: string option) (* -cc *)
 and no_auto_link = ref false            (* -noautolink *)
@@ -242,8 +243,26 @@ let set_profile_granularity v =
   | Some granularity -> profile_granularity := granularity
   | None -> raise (Invalid_argument (Format.sprintf "profile granularity: %s" v))
 
-let native_code = ref false             (* set to true under ocamlopt *)
-let jsir = ref false                    (* set to true under ocamlj *)
+module Target = struct
+  type t =
+    | Bytecode
+    | Native
+    | Js_of_ocaml
+end
+
+let target = ref Target.Bytecode
+
+let set_target t = target := t
+
+let[@inline] target_is_native () =
+  match !target with
+  | Native -> true
+  | Bytecode | Js_of_ocaml -> false
+
+let[@inline] target_is_jsir () =
+  match !target with
+  | Js_of_ocaml -> true
+  | Bytecode | Native -> false
 
 let force_slash = ref false             (* for ocamldep *)
 let clambda_checks = ref false          (* -clambda-checks *)
@@ -678,7 +697,7 @@ module Compiler_ir = struct
 end
 
 let is_flambda2 () =
-  Config.flambda2 && (!native_code || !jsir)
+  Config.flambda2 && (target_is_native () || target_is_jsir ())
 
 module Opt_flag_handler = struct
   type t = {
@@ -1020,8 +1039,8 @@ module Dump_option = struct
     let guard descr cond =
       if cond then pass
       else fail descr in
-    let check_bytecode = guard "bytecode" (not !native_code) in
-    let check_native = guard "native" !native_code in
+    let check_bytecode = guard "bytecode" (not (target_is_native ())) in
+    let check_native = guard "native" (target_is_native ()) in
     let check_middle_end = function
       | Flambda -> guard "flambda" Config.flambda
       | Closure -> guard "closure" (not Config.flambda)

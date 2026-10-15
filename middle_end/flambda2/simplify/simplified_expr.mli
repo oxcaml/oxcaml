@@ -31,7 +31,8 @@ open! Flambda.Import
 type t = private
   { simplified_lets_and_let_conts : simplified_lets_and_let_conts;
     simplified_terminator : simplified_terminator;
-    removed_operations : Removed_operations.t
+    removed_operations : Removed_operations.t;
+    is_cold : bool
   }
 
 and simplified_lets_and_let_conts = private
@@ -99,7 +100,7 @@ and simplified_apply = private
       { apply : Apply.t;
         use_id : Apply_cont_rewrite_id.t option;
         exn_cont_use_id : Apply_cont_rewrite_id.t;
-        result_arity : [`Unarized] Flambda_arity.t;
+        result_arity : [`Complex] Flambda_arity.t;
         coming_from_indirect : bool;
         callee's_code_metadata : Code_metadata.t
       }
@@ -119,6 +120,7 @@ and simplified_apply_cont = private
 and simplified_switch = private
   { arms :
       (Apply_cont_expr.t
+      * annotations:Branch_annotations.t
       * Apply_cont_rewrite_id.t
       * [`Unarized] Flambda_arity.t
       * Typing_env.t)
@@ -132,6 +134,8 @@ and simplified_switch = private
   }
 
 val notify_removed : operation:Removed_operations.t -> t -> t
+
+val mark_as_cold : t -> t
 
 val simplified_let :
   bindings_to_place:Simplified_named.binding_to_place list ->
@@ -161,7 +165,7 @@ val simplified_non_inlined_direct_full_application :
   Apply.t ->
   use_id:Apply_cont_rewrite_id.t option ->
   exn_cont_use_id:Apply_cont_rewrite_id.t ->
-  result_arity:[`Unarized] Flambda_arity.t ->
+  result_arity:[`Complex] Flambda_arity.t ->
   coming_from_indirect:bool ->
   callee's_code_metadata:Code_metadata.t ->
   t
@@ -172,6 +176,7 @@ val simplified_apply_cont :
 val simplified_switch :
   arms:
     (Apply_cont_expr.t
+    * annotations:Branch_annotations.t
     * Apply_cont_rewrite_id.t
     * [`Unarized] Flambda_arity.t
     * Typing_env.t)

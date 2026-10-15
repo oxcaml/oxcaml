@@ -866,7 +866,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
               Mixed_block_shape.Field_for_printing.of_shape shape ~index:pos
             with
             | Void -> Oval_stuff "<void>"
-            | Unboxed_product | Singleton _ when not !Clflags.native_code ->
+            | Unboxed_product | Singleton _
+              when not (Clflags.target_is_native ()) ->
                 (* Only native code reorders a mixed block's fields; bytecode
                    lays them out uniformly. *)
                 nested (O.field obj pos)
