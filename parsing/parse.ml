@@ -107,6 +107,7 @@ let constr_ident= wrap Parser.parse_constr_longident
 let extended_module_path = wrap Parser.parse_mod_ext_longident
 let simple_module_path = wrap Parser.parse_mod_longident
 let type_ident = wrap Parser.parse_mty_longident
+let compilation_unit = wrap Parser.parse_compilation_unit
 
 (* Error reporting for Syntaxerr *)
 (* The code has been moved here so that one can reuse Pprintast.tyvar *)
