@@ -185,7 +185,7 @@ module Deep : sig
         preemptible fiber.
 
         Like [Thread.create], creating a preemptable fiber splits the active
-        TLS state, and the child fiber gains is own TLS identity.
+        TLS state, and the child fiber gains its own TLS identity.
         [tickc] must not touch TLS, since it must be signal-safe. *)
 
     type ('a,'b) handler =
@@ -356,11 +356,11 @@ module Shallow : sig
         the ability to receive "ticks" from the runtime, and can decide to
         preempt the current fiber on tick.
 
-        To set the tick interval, call [Domain.Tick.acquire] before running a
+        To set the tick interval, call [Domain.Tick.with_] before running a
         preemptible fiber.
 
         Like [Thread.create], creating a preemptable fiber splits the
-        active TLS state, and the child fiber gains is own TLS identity.
+        active TLS state, and the child fiber gains its own TLS identity.
         [tickc] must not touch TLS, since it must be signal-safe. *)
 
     type ('a,'b) continuation
