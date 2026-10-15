@@ -415,7 +415,7 @@ function caml_makearray_dynamic_unboxed_product_size(
 //If: oxcaml
 function caml_makearray_dynamic_non_scannable_unboxed_product(
   num_components,
-  is_local,
+  _is_local,
   non_unarized_length,
 ) {
   var size = caml_makearray_dynamic_unboxed_product_size(
@@ -434,7 +434,7 @@ function caml_makearray_dynamic_non_scannable_unboxed_product(
 //If: oxcaml
 function caml_makearray_dynamic_scannable_unboxed_product(
   init,
-  is_local,
+  _is_local,
   non_unarized_length,
 ) {
   // [init] is a block holding the unarized components of one element.
