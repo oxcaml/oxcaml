@@ -458,7 +458,7 @@ let update_type temp_env env id loc =
               Ctype.unify_delaying_jkind_checks env new_ty ty, new_ty
             with Ctype.Unify err ->
               raise (Error(loc, Type_clash (env, err))))
-          ~before_generalize:(fun (_, new_ty) -> Ctype.generalize new_ty)
+          ~generalize:(fun (_, new_ty) -> Ctype.generalize new_ty)
       in
       delayed_jkind_checks
     | None -> Misc.fatal_error "Typedecl.update_type"
@@ -701,7 +701,7 @@ let make_constructor
       (* narrow and widen are now invoked through with_local_scope *)
       TyVarEnv.with_local_scope begin fun () ->
       let closed = svars <> [] in
-      let targs, tret_type, args, ret_type, _univars =
+      let targs, tret_type, args, ret_type, univars =
         Ctype.with_local_level_generalize_if closed begin fun () ->
           TyVarEnv.reset ();
           let univar_list =
@@ -742,15 +742,19 @@ let make_constructor
           end;
           (targs, tret_type, args, ret_type, univar_list)
         end
-        ~before_generalize: begin fun (_, _, args, ret_type, univars) ->
+        ~generalize:(fun (_, _, args, ret_type, _) ->
           Btype.iter_type_expr_cstr_args Ctype.generalize args;
-          Ctype.generalize ret_type;
-          let _vars = TyVarEnv.instance_poly_univars env loc univars in
-          let set_level t = Ctype.enforce_current_level env t in
-          Btype.iter_type_expr_cstr_args set_level args;
-          set_level ret_type;
-        end
+          Ctype.generalize ret_type)
       in
+      if closed
+      then (
+        (* Call [check_poly_univars] (via [instance_poly_univars]) to check
+           scope escapes. *)
+        ignore
+          (TyVarEnv.instance_poly_univars env loc univars : type_expr list);
+        let set_level t = Ctype.enforce_current_level env t in
+        Btype.iter_type_expr_cstr_args set_level args;
+        set_level ret_type);
       tvars, targs, Some tret_type, args, Some ret_type
       end
 
@@ -1030,7 +1034,7 @@ let transl_declaration env sdecl (id, uid) =
          also necessary because the variables here are at generic level, and so
          any containers of them should be, too! *)
       Ctype.with_local_level_generalize_structure
-        ~before_generalize:(fun cty ->
+        ~generalize:(fun cty ->
           Ctype.generalize_structure cty.ctyp_type)
         begin fun () ->
         Typetexp.transl_simple_type env ~new_var_jkind:Any
@@ -3747,7 +3751,7 @@ let transl_type_decl env rec_flag sdecl_list =
      the translated declarations in the resulting new environment. *)
   let tdecls, decls, temp_env, new_env =
     Ctype.with_local_level_generalize
-      ~before_generalize:(fun (_, decls, _, _) ->
+      ~generalize:(fun (_, decls, _, _) ->
         List.iter (fun (_, decl) -> generalize_decl decl) decls)
     begin fun () ->
       (* Enter types. *)
@@ -4173,7 +4177,7 @@ let transl_type_extension extend env loc styext =
       in
       (ttype_params, type_params, constructors)
     end
-    ~before_generalize: begin fun (_, type_params, constructors) ->
+    ~generalize: begin fun (_, type_params, constructors) ->
       (* Generalize types *)
       List.iter Ctype.generalize type_params;
       List.iter
@@ -4239,7 +4243,7 @@ let transl_exception env sext =
         TyVarEnv.reset();
         transl_extension_constructor ~scope env
           Predef.path_exn [] [] Asttypes.Public sext)
-      ~before_generalize: begin fun (ext, _shape) ->
+      ~generalize: begin fun (ext, _shape) ->
         Btype.iter_type_expr_cstr_args Ctype.generalize ext.ext_type.ext_args;
         Option.iter Ctype.generalize ext.ext_type.ext_ret_type;
       end
@@ -5147,7 +5151,7 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
     typ_jkind_annotation = Jkind.get_annotation type_jkind;
   }
   end
-  ~before_generalize:(fun ttyp -> generalize_decl ttyp.typ_type)
+  ~generalize:(fun ttyp -> generalize_decl ttyp.typ_type)
 
 (* A simplified version of [transl_with_constraint], for the case of packages.
    Package constraints are much simpler than normal with type constraints (e.g.,
@@ -5178,7 +5182,7 @@ let transl_package_constraint ~loc ty =
 
 let abstract_type_decl ~injective ~jkind ~params =
   let arity = List.length params in
-  Ctype.with_local_level_generalize ~before_generalize:generalize_decl
+  Ctype.with_local_level_generalize ~generalize:generalize_decl
     begin fun () ->
     let params = List.map Ctype.newvar params in
     { type_params = params;
