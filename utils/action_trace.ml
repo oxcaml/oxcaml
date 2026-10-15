@@ -73,8 +73,10 @@ end = struct
 end
 
 module Event = struct
-  (* Divide before converting to a string to preserve epoch microseconds. *)
-  let nanos_to_micros_as_json ns = Json.int (ns / 1_000)
+  let nanos_to_trace_event_json ns =
+    (* Dune's action trace format expects integer microseconds and doesn't allow
+       for more precision. *)
+    Json.int (ns / 1_000)
 
   let add_args ~args json =
     match args with
@@ -102,15 +104,15 @@ module Event = struct
     @ json
 
   let instant_fields ~args ~counters ~name ~time_in_nanoseconds () =
-    ["ts", nanos_to_micros_as_json time_in_nanoseconds]
+    ["ts", nanos_to_trace_event_json time_in_nanoseconds]
     |> add_common_fields ~name ~counters ~args
 
   let span_fields ~args ~counters ~name ~start_in_nanoseconds
       ~finish_in_nanoseconds () =
-    [ "ts", nanos_to_micros_as_json start_in_nanoseconds;
+    [ "ts", nanos_to_trace_event_json start_in_nanoseconds;
       ( "dur",
-        nanos_to_micros_as_json (finish_in_nanoseconds - start_in_nanoseconds) )
-    ]
+        nanos_to_trace_event_json (finish_in_nanoseconds - start_in_nanoseconds)
+      ) ]
     |> add_common_fields ~name ~counters ~args
 end
 
