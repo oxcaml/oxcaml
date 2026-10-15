@@ -60,8 +60,7 @@ let run_js_of_ocaml ?input_left_in ~(phase : Clflags.Jsoo_phase.t) subcommand
   | 0 -> ()
   | exit_code ->
     raise (Error (Js_of_ocaml_error { subcommand; exit_code; input_left_in }))
-  | exception Sys_error _ ->
-    raise (Error (Js_of_ocaml_not_found program))
+  | exception Sys_error _ -> raise (Error (Js_of_ocaml_not_found program))
 
 let debuginfo_args () = if !Clflags.debug then ["--debuginfo"] else []
 

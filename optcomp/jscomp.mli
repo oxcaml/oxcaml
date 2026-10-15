@@ -26,29 +26,27 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-
 (** The JSIR backend of ocamlopt ([-target js_of_ocaml]).
 
-   The JSIR of a compilation unit is written to a [.cmj] file, from which the
-   [js_of_ocaml] executable produces JavaScript. The [.cmj] file is intermediate,
-   and is deleted unless [-S] is given.
+    The JSIR of a compilation unit is written to a [.cmj] file, from which the
+    [js_of_ocaml] executable produces JavaScript. The [.cmj] file is
+    intermediate, and is deleted unless [-S] is given.
 
-   The correspondence with the native backend's files is:
+    The correspondence with the native backend's files is:
 
-   - [.cmjx]: unit metadata, in the same format as [.cmx];
+    - [.cmjx]: unit metadata, in the same format as [.cmx];
 
-   - [.cmjo]: the JavaScript for a unit, analogous to [.o];
+    - [.cmjo]: the JavaScript for a unit, analogous to [.o];
 
-   - [.cmjxa] and [.cmja]: libraries, analogous to [.cmxa] and [.a];
+    - [.cmjxa] and [.cmja]: libraries, analogous to [.cmxa] and [.a];
 
-   - [.js] files given on the command line: JavaScript stubs, analogous to C
-   stubs. They are recorded in [.cmjxa] files and passed to [js_of_ocaml
-    build-runtime] when linking an executable.
+    - [.js] files given on the command line: JavaScript stubs, analogous to C
+      stubs. They are recorded in [.cmjxa] files and passed to
+      [js_of_ocaml build-runtime] when linking an executable.
 
-   [-jsoo-opt] passes options to every [js_of_ocaml] invocation, and
-   [-jsoo-opt-compile], [-jsoo-opt-archive], [-jsoo-opt-runtime] and
-   [-jsoo-opt-link] to one of them (see {!Clflags.Jsoo_phase}).
-*)
+    [-jsoo-opt] passes options to every [js_of_ocaml] invocation, and
+    [-jsoo-opt-compile], [-jsoo-opt-archive], [-jsoo-opt-runtime] and
+    [-jsoo-opt-link] to one of them (see {!Clflags.Jsoo_phase}). *)
 
 type error =
   | Js_of_ocaml_not_found of string
