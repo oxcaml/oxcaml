@@ -53,15 +53,44 @@ let x =
 val x : int = 55
 |}]
 
-(* No disambiguation of unit/unit# in if statements *)
+(* Disambiguation of unit/unit# in if statements *)
 let incr_if b r =
   if b then incr r;
   !r
+let use_unit_u_if b x =
+  let #() = if b then x in
+  #()
+let synthesized_unit_u = if Sys.opaque_identity false then #()
 [%%expect{|
-Line 2, characters 12-18:
-2 |   if b then incr r;
-                ^^^^^^
-Error: This expression has type "unit#" but an expression was expected of type
+val incr_if : bool -> int ref -> int = <fun>
+val use_unit_u_if : bool -> unit# -> unit# = <fun>
+val synthesized_unit_u : unit# = <abstr>
+|}]
+
+(* Disambiguation of unit/unit# in if statements is upstream-incompatible since
+   [ty_expected = unit] no longer happens when typechecking [ifso] branches *)
+type _ t = Unit : unit t
+
+let f (type a) (t : a t) (x : a) =
+  if true then (match t with Unit -> x)
+[%%expect{|
+type _ t = Unit : unit t
+Line 4, characters 15-39:
+4 |   if true then (match t with Unit -> x)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This "match" expression has type "a"
+       but an expression was expected of type "unit"
+       because it is in the result of a conditional with no else branch
+|}]
+
+include struct [@@@warning "-redefining-unit"] type t = () end
+let x = if true then ()
+[%%expect{|
+type t = ()
+Line 2, characters 21-23:
+2 | let x = if true then ()
+                         ^^
+Error: The constructor "()" has type "t" but an expression was expected of type
          "unit"
        because it is in the result of a conditional with no else branch
 |}]
@@ -69,9 +98,11 @@ Error: This expression has type "unit#" but an expression was expected of type
 (* Principality *)
 let g #() = #()
 let f x = g x; x; 42
+let h b x = g x; if b then x
 [%%expect{|
 val g : unit# -> unit# = <fun>
 val f : unit# -> int = <fun>
+val h : bool -> unit# -> unit# = <fun>
 |}, Principal{|
 val g : unit# -> unit# = <fun>
 Line 2, characters 15-16:
@@ -81,6 +112,13 @@ Warning 18 [not-principal]: this type-based unit# disambiguation is not
   principal.
 
 val f : unit# -> int = <fun>
+Line 3, characters 17-28:
+3 | let h b x = g x; if b then x
+                     ^^^^^^^^^^^
+Warning 18 [not-principal]: this type-based unit# disambiguation is not
+  principal.
+
+val h : bool -> unit# -> unit# = <fun>
 |}]
 
 (* The previous example is analogous to: *)
@@ -111,6 +149,11 @@ Warning 18 [not-principal]: this type-based constructor disambiguation is not
 val f : t1 -> int = <fun>
 |}]
 
+let f b c = if b then #() else if c then #()
+[%%expect{|
+val f : bool -> bool -> unit# = <fun>
+|}]
+
 (* Can't disambiguate to arbitrary void type *)
 let x = non_unit_void (); 42
 [%%expect{|
@@ -120,6 +163,16 @@ Line 1, characters 8-24:
 Error: This expression has type "non_unit_void"
        but an expression was expected of type "unit"
        because it is in the left-hand side of a sequence
+|}]
+
+let x = if true then non_unit_void ()
+[%%expect{|
+Line 1, characters 21-37:
+1 | let x = if true then non_unit_void ()
+                         ^^^^^^^^^^^^^^^^
+Error: This expression has type "non_unit_void"
+       but an expression was expected of type "unit"
+       because it is in the result of a conditional with no else branch
 |}]
 
 let x = for i = 0 to 1 do non_unit_void () done; 42
