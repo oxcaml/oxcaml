@@ -46,7 +46,7 @@ external get : string -> string -> 'a = "caml_get_symbol"
 let lookup cu sym =
   match (get cu sym : int) with
   | n -> Printf.printf "%s.%s = %d\n" cu sym n
-  | exception Failure msg -> print_endline msg
+  | exception Invalid_argument msg -> print_endline msg
 
 let () =
   register "Foo" "x" 42;
@@ -57,8 +57,8 @@ let () =
   [%expect
     {|
     Foo.x = 42
-    Error: caml_get_symbol: compilation unit Foo does not define symbol y
-    Error: caml_get_symbol: compilation unit Bar has not been initialised yet (looking up x)
+    caml_get_symbol: compilation unit Foo does not define symbol y
+    caml_get_symbol: compilation unit Bar has not been initialised yet (looking up x)
     |}]
 
 (* Synthetic [.cmj] and [.cmja] files, laid out as [ocamlj] and [ocamlj -a]
