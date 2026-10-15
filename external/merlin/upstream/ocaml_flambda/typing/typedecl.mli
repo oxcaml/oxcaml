@@ -117,13 +117,6 @@ val instance_record_representation:
     (Types.label_declaration * Types.type_expr) list ->
     'rep
 
-module Element_repr : sig
-  type t
-
-  val classify_base : Jkind.Sort.base -> Jkind.Scannable_axes.t -> t
-  val to_shape_element : t -> Types.mixed_block_element
-end
-
 val mixed_block_element :
     Env.t -> type_expr -> _ jkind -> mixed_block_element option
 
@@ -261,6 +254,11 @@ type error =
   | Recursive_jkind_definition of Path.t * Env.t * reaching_kind_path
   | Bad_represent_as_float_array_attribute
 
-exception Error of Location.t * error
+module Error : sig
+    type exn += private In_context of Location.t * error
+
+  val log_or_raise : Location.t -> error -> unit
+  val log_and_raise : Location.t -> error -> 'a
+end
 
 val report_error: loc:Location.t -> error -> Location.report

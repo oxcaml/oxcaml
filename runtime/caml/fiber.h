@@ -84,6 +84,9 @@ struct stack_info {
      fields: dynamic key, bound value, and nullable parent node. */
   value dynamic;
   bool is_task;
+
+  /* Whether the fiber was allocated by [caml_alloc_stack_preemptible]. */
+  bool is_preemptible;
 };
 
 #ifdef STACK_GUARD_PAGES

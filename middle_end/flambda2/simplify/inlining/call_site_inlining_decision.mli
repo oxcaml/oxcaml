@@ -19,9 +19,10 @@ open! Flambda.Import
 val make_decision :
   Downwards_acc.t ->
   simplify_expr:Expr.t Simplify_common.expr_simplifier ->
+  rebuild_expr:Simplified_expr.t Simplify_common.rebuild ->
   function_type:Flambda2_types.Function_type.t ->
   apply:Apply.t ->
-  return_arity:[`Unarized] Flambda_arity.t ->
+  return_arity:[`Complex] Flambda_arity.t ->
   Call_site_inlining_decision_type.t
 
 val get_rec_info :

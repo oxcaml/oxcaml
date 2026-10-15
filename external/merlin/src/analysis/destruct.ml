@@ -82,7 +82,7 @@ let placeholder = Ast_helper.Exp.hole ()
 
 let omega_with_sort env (label, ty) =
   let sort : Jkind.Sort.t =
-    match Ctype.type_sort ~why:Tuple_element ~fixed:true env ty with
+    match Ctype.type_sort ~why:Tuple_element ~allow_mutation:false env ty with
     | Ok sort -> sort
     | Error _ -> Var (Jkind.Sort.new_genvar ())
   in
@@ -278,7 +278,7 @@ let collect_every_pattern_for_expression parent =
                   Typedtree.
                     { f =
                         (fun p ->
-                          List.memq Msupport.incorrect_attribute
+                          List.memq Typing_recovery_state.incorrect_attribute
                             ~set:p.pat_attributes)
                     }
                 in
