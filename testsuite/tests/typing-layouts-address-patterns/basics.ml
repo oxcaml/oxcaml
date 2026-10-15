@@ -383,6 +383,7 @@ let use_unique : 'a @ unique -> unit = fun _ -> ()
 let use_portable : 'a @ portable -> unit = fun _ -> ()
 let use_uncontended : 'a -> unit = fun _ -> ()
 let use_unyielding : 'a @ unyielding -> unit = fun _ -> ()
+let use_forkable : 'a @ forkable -> unit = fun _ -> ()
 [%%expect{|
 val use_global : 'a -> unit = <fun>
 val use_many : 'a -> unit = <fun>
@@ -390,6 +391,7 @@ val use_unique : 'a @ unique -> unit = <fun>
 val use_portable : 'a @ portable -> unit = <fun>
 val use_uncontended : 'a -> unit = <fun>
 val use_unyielding : 'a -> unit = <fun>
+val use_forkable : 'a -> unit = <fun>
 |}]
 
 (* The value at an immutable address has the mode of the address *)
@@ -649,8 +651,8 @@ let ok_read (a : int addr @ read) =
 val ok_read : int addr @ read -> unit = <fun>
 |}]
 
-(* The value at a mutable address is many, aliased and unyielding, but not
-   global *)
+(* The value at a mutable address is many and aliased, but not global,
+   unyielding or forkable *)
 let bad_local (a : string addr @ local) =
   match a with
   | addr_ x -> use_global x
@@ -683,11 +685,30 @@ Error: This value is "aliased"
        However, the highlighted expression is expected to be "unique".
 |}]
 
-let ok_yielding (a : (unit -> unit) addr @ yielding) =
+let bad_yielding (a : (unit -> unit) addr @ yielding) =
   match a with
   | addr_ f -> use_unyielding f
 [%%expect{|
-val ok_yielding : (unit -> unit) addr @ yielding -> unit = <fun>
+Line 3, characters 30-31:
+3 |   | addr_ f -> use_unyielding f
+                                  ^
+Error: This value is "yielding"
+         because it is the value at the address at line 3, characters 4-11
+         which is "yielding".
+       However, the highlighted expression is expected to be "unyielding".
+|}]
+
+let bad_unforkable (a : (unit -> unit) addr @ unforkable) =
+  match a with
+  | addr_ f -> use_forkable f
+[%%expect{|
+Line 3, characters 28-29:
+3 |   | addr_ f -> use_forkable f
+                                ^
+Error: This value is "unforkable"
+         because it is the value at the address at line 3, characters 4-11
+         which is "unforkable".
+       However, the highlighted expression is expected to be "forkable".
 |}]
 
 (* ...but otherwise has the mode of the address *)

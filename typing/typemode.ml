@@ -328,16 +328,29 @@ let modality_of_atoms l =
     (fun t (Modality.Atom (ax, a)) -> Modality.Const.set ax a t)
     Modality.Const.id l
 
-(* The contents of an address get the same modalities as a field of the
-   same mutability, except [global] to preserve compatibility with
-   upstream [Addr.of_imm]. *)
+(* The contents of an address get the same modalities as a field of the same
+   mutability, except on the axes implied by locality (see
+   [implied_modalities]). This is to preserve compatibility with:
+   {[
+     val of_imm_local : addr_imm @ local -> addr @ local
+   ]}
+*)
 (* CR address-patterns: The address modalities should be the same as the
    mutable implied modalities when [@@ global] is no longer implied. *)
 let address_modalities mut =
+  let local =
+    Modality.Atom
+      ( Comonadic Areality,
+        Modality.Comonadic.Atom.Meet_const Regionality.Const.Local )
+  in
+  let dropped = local :: implied_modalities local in
   mutable_implied_modalities ~for_mutable_variable:false (Types.is_mutable mut)
-  |> List.filter (function
-    | Modality.Atom (Comonadic Areality, _) -> false
-    | Modality.Atom _ -> true)
+  |> List.filter (fun (Modality.Atom (ax, _)) ->
+      not
+        (List.exists
+           (fun (Modality.Atom (ax', _)) ->
+             Modality.Axis.compare (P ax') (P ax) = 0)
+           dropped))
   |> modality_of_atoms
 
 let mutable_implied_modalities ~for_mutable_variable mut =
