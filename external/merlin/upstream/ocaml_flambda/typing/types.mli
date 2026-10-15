@@ -1363,6 +1363,9 @@ val equal_constructor_representation_up_to_scannable_axes :
     it is nullary, or its shape is [Constructor_immediate_all_void]. *)
 val cstr_layout_is_constant : cstr_layout -> bool
 
+val mixed_block_element_of_base :
+  Jkind_types.Sort.base -> Jkind_types.Scannable_axes.t -> mixed_block_element
+
 val mixed_block_element_of_const_sort :
   Jkind_types.Sort.Const.t -> mixed_block_element
 
