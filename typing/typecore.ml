@@ -12987,6 +12987,10 @@ let type_binding env mutable_flag rec_flag ?force_toplevel spat_sexp_list =
       At_toplevel
       env mutable_flag rec_flag spat_sexp_list Modules_rejected
   in
+  (* Suspended constraints that do not block generalization outlive it, so
+     must be defaulted here (before checking uniqueness, which reads the
+     modes they constrain). *)
+  Ctype.run_scheduler_and_default_all ();
   maybe_check_uniqueness_value_bindings pat_exp_list;
   (pat_exp_list, new_env)
 
@@ -13011,6 +13015,7 @@ let type_expression env jkind sexp =
         may_lower_contravariant env exp;
         generalize exp.exp_type)
   in
+  Ctype.run_scheduler_and_default_all ();
   let exp =
     match sexp.pexp_desc with
       Pexp_ident lid ->

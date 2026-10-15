@@ -74,6 +74,8 @@ val add_to_pool: level:int -> transient_expr -> unit
            be the level of the type node).
            Do nothing if [level = generic_level] or [level = lowest_level]. *)
 
+val iter_pool : level:int -> (transient_expr -> unit) -> unit
+
 val newty3: level:int -> scope:int -> type_desc -> type_expr
         (* Create a type with a fresh id *)
 val newty2: level:int -> type_desc -> type_expr

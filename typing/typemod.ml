@@ -4276,6 +4276,9 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
         let desc, sg, shape_map, new_env =
           type_str_item env shape_map pstr sig_acc_include_functor
         in
+        (* Default the suspended constraints that outlived the item (e.g.
+           in class definitions). *)
+        Ctype.run_scheduler_and_default_all ();
         let str = { str_desc = desc; str_loc = pstr.pstr_loc; str_env = env } in
         Cmt_format.set_saved_types (Cmt_format.Partial_structure_item str
                                     :: previous_saved_types);

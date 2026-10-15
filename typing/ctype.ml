@@ -179,22 +179,39 @@ let scheduler = s_ref_of_create Scheduler.create ()
 
 let scheduler () = !scheduler
 
-(* Runs the scheduler, then defaults any still-empty ivars, until none remain.
-   Defaulting calls each handler's [run] with its [default ()]; [run]'s
-   unification fills the ivar (see [upon_shape]). *)
-let run_scheduler_and_default_ivars () =
+let run_scheduler_loop ~(f : continue : (unit -> unit) -> unit) =
   let rec loop () =
     Scheduler.run (scheduler ());
-    let defaulted = ref false in
-    List.iter (fun (Ivar.Packed ivar) ->
-        if Ivar.is_empty ivar then begin
-          defaulted := true;
-          Ivar.cancel_all ivar ~scheduler:(scheduler ())
-        end)
-      (Ivar.Global_pool.take ());
-    if !defaulted then loop ()
+    let continue = ref false in
+    f ~continue:(fun () -> continue := true);
+    if !continue then loop ()
   in
   loop ()
+
+let default_all_ivars ~continue =
+  Ivar.Global_pool.take ()
+  |> List.iter (fun (Ivar.Packed ivar) ->
+    if Ivar.is_empty ivar then (
+      Ivar.cancel_all ivar ~scheduler:(scheduler ());
+      continue ()))
+
+let default_local_ivars ~continue =
+  let current_level = !current_level in
+  iter_pool ~level:current_level (fun ty ->
+      if ty.level = current_level
+      then
+        match get_desc (Transient_expr.type_expr ty) with
+        | Tivar { ivar; _ } ->
+          assert (Ivar.is_empty ivar);
+          Ivar.cancel_all ivar ~scheduler:(scheduler ());
+          continue ()
+        | _ -> ())
+
+let run_scheduler_and_default_local_ivars () =
+  run_scheduler_loop ~f:default_local_ivars
+
+let run_scheduler_and_default_all () =
+  run_scheduler_loop ~f:default_all_ivars
 
 let get_current_level () = !current_level
 let init_def level = current_level := level; nongen_level := level
@@ -234,12 +251,12 @@ let with_local_level_gen ~begin_def ~structure ?before_generalize f =
       let result =
         wrap_end_def (fun () ->
             let result = f () in
-            (* Before exiting the current pool, we must run all
-               pending ivar handlers. If any ivars are pending
-               after running the scheduler, we default them and
-               loop *)
+            (* CR-soon omni: refactor [before_generalize] to keep the
+               level lowering semantics (as in upstream) and
+               add a second callback for 'post-defaulting'
+               generalization. *)
             if not structure then
-            run_scheduler_and_default_ivars ();
+            run_scheduler_and_default_local_ivars ();
             result)
       in
       Option.iter (fun g -> g result) before_generalize;
@@ -268,8 +285,12 @@ let with_local_level_gen ~begin_def ~structure ?before_generalize f =
            without introducing polymorphism *)
         if ty.level >= level then Transient_expr.set_level ty !current_level;
         add_to_pool ~level:ty.level ty
+    | Tivar _ when ty.level < level ->
+      (* A [Tivar] whose level was lowered is not generalized, so is not
+         defaulted. Move it to an outer pool. *)
+      add_to_pool ~level:ty.level ty
     | Tivar _ ->
-      (* [Tivar]s cannot exist after defaulting *)
+      (* Generalizable [Tivar]s cannot exist after defaulting *)
       fatal_error "Ctype.with_local_level_gen: unsupported Tivar"
     | Tlink _ -> ()
         (* If a node is no longer used as representative, no need

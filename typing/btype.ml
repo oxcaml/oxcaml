@@ -158,6 +158,10 @@ let add_to_pool ~level ty =
   let pool = pool_of_level level !pool_stack in
   pool.pool <- ty :: pool.pool
 
+let iter_pool ~level f =
+  let pool = pool_of_level level !pool_stack in
+  List.iter f pool.pool
+
 (**** Some type creators ****)
 
 let newty3 ~level ~scope desc =

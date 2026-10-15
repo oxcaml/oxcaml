@@ -668,7 +668,22 @@ let rec typexp copy_scope s ty =
         For_copy.redirect_desc copy_scope ty (Tsubst (ty', None));
         ty'
       else ty
-  | Tivar _ -> Misc.fatal_error "Subst.typexp: Tivar is not supported yet"
+  | Tivar { name; jkind = jk; ivar = _ } ->
+      (* A [Tivar] is a non-generic variable whose suspended constraints are
+         still pending. It is shared, like a [Tvar], unless variables are
+         duplicated, in which case the copy is a plain [Tvar]: the
+         constraints stay with the original. *)
+      let jk' = jkind copy_scope s jk in
+      if should_duplicate_vars || get_id ty < 0 || jk != jk' then
+        let desc = Tvar { name; jkind = jk' } in
+        let ty' =
+          match s.additional_action with
+          | Duplicate_variables | Prepare_for_saving _ -> newpersty desc
+          | No_action -> newty2 ~level:(get_level ty) desc
+        in
+        For_copy.redirect_desc copy_scope ty (Tsubst (ty', None));
+        ty'
+      else ty
   | Tsubst (ty, _) ->
       ty
   | Tfield (m, k, _t1, _t2) when not should_duplicate_vars && m = dummy_method

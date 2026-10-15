@@ -101,6 +101,9 @@ val newivar : ?name:string -> jkind_lr -> type_expr
     enqueues the ivar's handlers. Unification never runs it. *)
 val scheduler: unit -> Scheduler.t
 
+(** Runs the scheduler and defaults the pending ivars. *)
+val run_scheduler_and_default_all : unit -> unit
+
 val new_rep_var
   : ?name:string
   -> why:Jkind.History.concrete_creation_reason
