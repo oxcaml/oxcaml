@@ -1,7 +1,6 @@
 (* TEST
  flambda2;
- flags = "-O3 -flambda2-match-in-match";
- unset OCAMLPARAM;
+ flags = "-O3 -flambda2-join-algorithm=n-way";
  native;
 *)
 
