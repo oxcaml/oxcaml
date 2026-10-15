@@ -65,13 +65,13 @@ static CAMLthread_local int64_t fiber_id_local = 0;
 #define MAX_STACK_CACHE_LIMIT  Max_domains_max
 
 /* Parameters settable with OCAMLRUNPARAM */
-uintnat caml_init_main_stack_wsz = 0;   /* -Xmain_stack_size= */
-uintnat caml_init_thread_stack_wsz = 0; /* -Xthread_stack_size= */
-uintnat caml_init_fiber_stack_wsz = 0;  /* -Xfiber_stack_size= */
+uintnat caml_init_main_stack_wsz = 0;   /* Xmain_stack_size= */
+uintnat caml_init_thread_stack_wsz = 0; /* Xthread_stack_size= */
+uintnat caml_init_fiber_stack_wsz = 0;  /* Xfiber_stack_size= */
 
 uintnat caml_nohugepage_stacks = 1;
 
-uintnat caml_cache_stacks_per_class = /* -Xcache_stacks_per_class */
+uintnat caml_cache_stacks_per_class = /* Xcache_stacks_per_class */
 #if defined(USE_MMAP_MAP_STACK) || defined(STACK_GUARD_PAGES)
   1
 #else
@@ -225,6 +225,9 @@ Caml_inline struct stack_info* alloc_for_stack (mlsize_t wosize, int64_t id)
   // mmap is always expected to return a page-aligned value.
   CAMLassert((uintnat)stack % page_size == 0);
 
+  /* The compiler probes large frames at [Stack_guard_stride]-byte strides; a
+     guard page at least that big can never be stepped over. */
+  CAMLassert(page_size >= Stack_guard_stride);
   if (mprotect(Protected_stack_page(stack), page_size, PROT_NONE)) {
     caml_mem_unmap(stack, len);
     return NULL;
