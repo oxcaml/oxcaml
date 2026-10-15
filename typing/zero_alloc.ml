@@ -72,13 +72,13 @@ let debug_printer ppf t =
     Format.fprintf ppf "Var { arity = %d; desc = %a }" v.arity print_desc v.desc
 
 (* For backtracking *)
-type change = desc option * var
+module Change = struct
+  type t = desc option * var
 
-let undo_change (d, v) = v.desc <- d
+  let undo (d, v) = v.desc <- d
+end
 
-let log_change = ref (fun _ -> ())
-
-let set_change_log f = log_change := f
+include With_backtracking.Make (Change)
 
 let create_const x = Const x
 
@@ -207,8 +207,10 @@ let sub_var_const_exn v c =
   end;
   match v, c with
   | _, (Default_zero_alloc | Ignore_assert_all | Assume _) -> assert false
+  | { arity = arity1; _ }, Check { arity = arity2; _ } when arity1 <> arity2 ->
+    raise (Error (Arity_mismatch (arity1, arity2)))
   | { desc = None; _ }, Check { strict; opt; custom_error_msg; partial } ->
-    !log_change (None, v);
+    log (None, v);
     v.desc <- Some { strict; opt; custom_error_msg; partial }
   | ( { desc =
           Some
@@ -240,7 +242,7 @@ let sub_var_const_exn v c =
     in
     if strict <> strict1 || opt <> opt1 || partial <> partial1 || msg_changed
     then begin
-      !log_change (desc, v);
+      log (desc, v);
       v.desc <- Some { strict; opt; custom_error_msg; partial }
     end
 

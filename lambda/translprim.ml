@@ -65,7 +65,7 @@ let unboxed_product_uninitialized_array_check loc array_kind =
 let event_before loc exp lam = match lam with
 | Lstaticraise (_,_) -> lam
 | _ ->
-  if !Clflags.debug && not !Clflags.native_code
+  if !Clflags.debug && not (Clflags.target_is_native ())
   then Levent(lam, {lev_loc = loc;
                     lev_kind = Lev_before;
                     lev_repr = None;
@@ -73,7 +73,7 @@ let event_before loc exp lam = match lam with
   else lam
 
 let event_after loc exp lam =
-  if !Clflags.debug && not !Clflags.native_code
+  if !Clflags.debug && not (Clflags.target_is_native ())
   then Levent(lam, {lev_loc = loc;
                     lev_kind = Lev_after exp.exp_type;
                     lev_repr = None;
@@ -2497,7 +2497,7 @@ let lambda_of_prim prim_name prim ~yielding loc args arg_exps =
             loc, layout, Unyielding)
   | Send_cache (apos, layout), [obj; meth; cache; pos] ->
       (* Cached mode only works in the native backend *)
-      if !Clflags.native_code then
+      if Clflags.target_is_native () then
         Lsend(Cached, meth, obj, [cache; pos], apos,
               not_alloc_stack, loc, layout,
               Unyielding)
@@ -2505,7 +2505,7 @@ let lambda_of_prim prim_name prim ~yielding loc args arg_exps =
         Lsend(Public, meth, obj, [], apos, not_alloc_stack,
               loc, layout, Unyielding)
   | Frame_pointers, [] ->
-     (of_bool (!Clflags.native_code && Config.with_frame_pointers))
+     (of_bool (Clflags.target_is_native () && Config.with_frame_pointers))
   | Identity, [arg] -> arg
   | Apply (pos, layout), [func; arg]
   | Revapply (pos, layout), [arg; func] ->

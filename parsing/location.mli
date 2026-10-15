@@ -416,6 +416,7 @@ val error_of_printer: ?loc:t -> ?sub:msg list -> ?footnote:delayed_msg ->
 
 val error_of_printer_file: (Format_doc.formatter -> 'a -> unit) -> 'a -> error
 
+val multiple_errors : ?loc:t -> error list -> error
 
 (** {1 Automatically reporting errors for raised exceptions} *)
 

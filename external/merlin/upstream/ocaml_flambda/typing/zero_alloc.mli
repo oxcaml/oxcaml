@@ -48,11 +48,7 @@ val create_var : Location.t -> int -> t
 val get : t -> const
 
 (* For types.ml's backtracking mechanism. *)
-type change
-
-val set_change_log : (change -> unit) -> unit
-
-val undo_change : change -> unit
+include With_backtracking.S
 
 (* These are the errors that may be raised by [sub_exn] below. *)
 type error
