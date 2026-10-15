@@ -165,9 +165,7 @@ let get_predef_exception ~res symbol =
     String.sub symbol_name (String.length caml_exn_)
       (String.length symbol_name - String.length caml_exn_)
   in
-  (* jsoo already registers these in global data, under keys that tell them
-     apart from compilation units (see [caml_register_global_predef] in the
-     runtime). *)
+  (* jsoo already registers these in global data *)
   get_symbol_from_global_data ~symbol_name:("predef:" ^ symbol_name) ~res
 
 let get_external_symbol ~res symbol =

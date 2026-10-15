@@ -304,6 +304,49 @@ function caml_floatarray_create(len) {
   return b;
 }
 
+// Bytecode stubs for [%makearray_dynamic_uninit] on arrays of unboxed or
+// untagged elements (see [caml_make_*_vect_bytecode] in runtime/array.c).
+// Unboxed and boxed numbers have the same representation here, so these are
+// ordinary arrays filled with the zero of the element kind, like the
+// corresponding C stubs. [float#] arrays are flat float arrays, as for
+// [caml_make_unboxed_float64_vect] in native code.
+
+//Provides: caml_make_unboxed_float64_vect_bytecode mutator (const)
+//Requires: caml_floatarray_create
+//Version: >= 5.2
+//If: oxcaml
+function caml_make_unboxed_float64_vect_bytecode(len) {
+  return caml_floatarray_create(len);
+}
+
+//Provides: caml_make_unboxed_float32_vect_bytecode mutator (const)
+//Requires: caml_array_make
+//Version: >= 5.2
+//If: oxcaml
+function caml_make_unboxed_float32_vect_bytecode(len) {
+  return caml_array_make(len, 0);
+}
+
+//Provides: caml_make_untagged_int_vect_bytecode mutator (const)
+//Requires: caml_array_make
+//Alias: caml_make_untagged_int8_vect_bytecode
+//Alias: caml_make_untagged_int16_vect_bytecode
+//Alias: caml_make_unboxed_int32_vect_bytecode
+//Alias: caml_make_unboxed_nativeint_vect_bytecode
+//Version: >= 5.2
+//If: oxcaml
+function caml_make_untagged_int_vect_bytecode(len) {
+  return caml_array_make(len, 0);
+}
+
+//Provides: caml_make_unboxed_int64_vect_bytecode mutator (const)
+//Requires: caml_array_make, caml_int64_create_lo_mi_hi
+//Version: >= 5.2
+//If: oxcaml
+function caml_make_unboxed_int64_vect_bytecode(len) {
+  return caml_array_make(len, caml_int64_create_lo_mi_hi(0, 0, 0));
+}
+
 //Provides: caml_floatarray_make mutator (const)
 //Requires: caml_array_bound_error
 //Version: >= 5.3
