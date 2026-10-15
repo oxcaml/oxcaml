@@ -564,9 +564,9 @@ inlined_expr:
 ;
 
 atomic_expr:
-  | KWD_HCF { Invalid { message = "halt-and-catch-fire" } }
-  | KWD_UNREACHABLE { Invalid { message =  "treat-as-unreachable" } }
-  | KWD_INVALID; message = STRING { Invalid { message } }
+  | KWD_HCF { Invalid }
+  | KWD_UNREACHABLE { Invalid }
+  | KWD_INVALID { Invalid }
   | KWD_CONT; ac = apply_cont_expr { Apply_cont ac }
   | KWD_APPLY e = apply_expr { Apply e }
   | LPAREN; e = expr; RPAREN { e }

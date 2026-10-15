@@ -16,6 +16,9 @@
 
 include Ident
 
+let equal_by_name = Ident.equal
+let equal = Ident.same
+
 type backend_var = t
 
 let name_for_debugger t =
