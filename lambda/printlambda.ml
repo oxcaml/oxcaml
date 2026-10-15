@@ -1261,12 +1261,14 @@ let name_of_primitive = function
 let zero_alloc_attribute ppf check =
   match check with
   | Default_zero_alloc -> ()
-  | Assume {strict; never_returns_normally; loc = _} ->
-    fprintf ppf "assume_zero_alloc%s%s@ "
+  | Assume {conditional; strict; never_returns_normally; loc = _} ->
+    fprintf ppf "assume_zero_alloc%s%s%s@ "
+      (if conditional then "_conditional" else "")
       (if strict then "_strict" else "")
       (if never_returns_normally then "_never_returns_normally" else "")
-  | Check {strict; loc = _; custom_error_msg; } ->
-    fprintf ppf "assert_zero_alloc%s%s@ "
+  | Check {conditional; strict; loc = _; custom_error_msg; } ->
+    fprintf ppf "assert_zero_alloc%s%s%s@ "
+      (if conditional then "_conditional" else "")
       (if strict then "_strict" else "")
       (match custom_error_msg with
        | None -> ""

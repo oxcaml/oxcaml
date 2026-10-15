@@ -13,12 +13,14 @@
 type t = Lambda.zero_alloc_attribute =
   | Default_zero_alloc
   | Check of
-      { strict : bool;
+      { conditional : bool;
+        strict : bool;
         loc : Location.t;
         custom_error_msg : string option
       }
   | Assume of
-      { strict : bool;
+      { conditional : bool;
+        strict : bool;
         never_returns_normally : bool;
         never_raises : bool;
         loc : Location.t

@@ -1569,6 +1569,8 @@ module Annotation : sig
 
   val is_strict : t -> bool
 
+  val is_conditional : t -> bool
+
   val is_check_enabled : t option -> bool
 end = struct
   (****************************************************************************
@@ -1588,7 +1590,8 @@ end = struct
    *****************************************************************************)
 
   type t =
-    { strict : bool;  (** strict or relaxed? *)
+    { conditional : bool;
+      strict : bool;  (** strict or relaxed? *)
       assume : bool;
       never_returns_normally : bool;
       never_raises : bool;
@@ -1601,8 +1604,11 @@ end = struct
 
   let get_custom_error_msg t = t.custom_error_msg
 
+  (* Translate an annotation (e.g. [[@zero_alloc]]) into an expectation
+     (e.g. [{ normal = Safe; exceptional = Top; diverging = Top }]). *)
   let expected_value
-      { strict;
+      { conditional = _;
+        strict;
         never_returns_normally;
         never_raises;
         assume = _;
@@ -1625,14 +1631,17 @@ end = struct
 
   let is_strict t = t.strict
 
+  let is_conditional t = t.conditional
+
   let find codegen_options fun_name dbg =
     let a =
       List.filter_map
         (fun (c : Cmm.codegen_option) ->
           match c with
-          | Check_zero_alloc { strict; loc; custom_error_msg } ->
+          | Check_zero_alloc { conditional; strict; loc; custom_error_msg } ->
             Some
-              { strict;
+              { conditional;
+                strict;
                 assume = false;
                 never_returns_normally = false;
                 never_raises = false;
@@ -1640,9 +1649,10 @@ end = struct
                 custom_error_msg
               }
           | Assume_zero_alloc
-              { strict; never_returns_normally; never_raises; loc } ->
+              { conditional; strict; never_returns_normally; never_raises; loc } ->
             Some
-              { strict;
+              { conditional;
+                strict;
                 assume = true;
                 never_returns_normally;
                 never_raises;
@@ -1666,9 +1676,10 @@ end = struct
       List.filter_map
         (fun (c : Cfg.codegen_option) ->
           match c with
-          | Check_zero_alloc { strict; loc; custom_error_msg } ->
+          | Check_zero_alloc { conditional; strict; loc; custom_error_msg } ->
             Some
-              { strict;
+              { conditional;
+                strict;
                 assume = false;
                 never_returns_normally = false;
                 never_raises = false;
@@ -1676,9 +1687,10 @@ end = struct
                 custom_error_msg
               }
           | Assume_zero_alloc
-              { strict; never_returns_normally; never_raises; loc } ->
+              { conditional; strict; never_returns_normally; never_raises; loc } ->
             Some
-              { strict;
+              { conditional;
+                strict;
                 assume = true;
                 never_returns_normally;
                 never_raises;
@@ -1807,7 +1819,8 @@ end = struct
         |> String.concat ","
       in
       Fmt.fprintf ppf
-        "Annotation check for zero_alloc%s failed on function %s (%s).%s"
+        "Annotation check for zero_alloc%s%s failed on function %s (%s).%s"
+        (if Annotation.is_conditional t.a then " conditional" else "")
         (if Annotation.is_strict t.a then " strict" else "")
         scoped_name t.fun_name
         (match Annotation.get_custom_error_msg t.a with

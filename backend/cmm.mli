@@ -603,13 +603,15 @@ type codegen_option =
   | Use_regalloc_param of string list
   | Cold
   | Assume_zero_alloc of
-      { strict : bool;
+      { conditional : bool;
+        strict : bool;
         never_returns_normally : bool;
         never_raises : bool;
         loc : Location.t
       }
   | Check_zero_alloc of
-      { strict : bool;
+      { conditional : bool;
+        strict : bool;
         loc : Location.t;
         custom_error_msg : string option
       }
