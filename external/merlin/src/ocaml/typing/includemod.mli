@@ -116,6 +116,7 @@ module Error: sig
     | Module_type_declaration of
         (Types.modtype_declaration, module_type_declaration_symptom) diff
     | Module_type of module_type_diff
+    | Visibility of Types.visibility core_diff
 
   and module_type_declaration_symptom =
     | Illegal_permutation of Typedtree.module_coercion
