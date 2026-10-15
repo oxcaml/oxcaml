@@ -53,6 +53,8 @@ type native_repr =
    "any_locality_mode Scalar.Integral.Width.t" here rather than defining an
    additional unboxed_or_untagged_integer type? *)
 
+type native_repr_or_elided = Native_repr of native_repr | Elided_void
+
 (* See [middle_end/semantics_of_primitives.mli] *)
 type effects = No_effects | Only_generative_effects | Arbitrary_effects
 type coeffects = No_coeffects | Has_coeffects
@@ -66,9 +68,11 @@ type mode =
    typechecking, all [Prim_poly] modes on a given primitive application
    will be instantiated either all to [Local] or all to [Global] *)
 
-type 'repr description_gen = private
+type ('arg_repr, 'ret_repr) description_gen = private
   { prim_name: string;         (* Name of primitive  or C function *)
-    prim_arity: int;           (* Number of arguments *)
+    prim_type_arity: int;      (* Arguments in the OCaml type. *)
+    prim_apply_arity: int;     (* Arguments after elision, before
+                                  unarization. *)
     prim_alloc: bool;          (* Does it allocates or raise? *)
     prim_c_builtin: bool;
     (* When [prim_c_builtin] is true, the native compiler is allowed to rewrite
@@ -79,19 +83,20 @@ type 'repr description_gen = private
     prim_effects: effects;
     prim_coeffects: coeffects;
     prim_native_name: string;  (* Name of C function for the nat. code gen. *)
-    prim_native_repr_args: (mode * 'repr) list;
-    prim_native_repr_res: mode * 'repr;
+    prim_native_repr_args: (mode * 'arg_repr) list;
+    prim_native_repr_res: mode * 'ret_repr;
     prim_is_layout_poly: bool }
 
-type description = native_repr description_gen
+type description = (native_repr_or_elided, native_repr) description_gen
 
-(* Invariant [List.length d.prim_native_repr_args = d.prim_arity] *)
+(* Invariant [List.length d.prim_native_repr_args = d.prim_type_arity]. *)
 
 (** [make_prim_repr_args n x] is the same as [List.init n (fun _ -> x)].
     Keeping this function here to be close to upstream. It's
     intended for use with [make]. *)
 val make_prim_repr_args : int -> 'a -> 'a list
 
+(** Construct a description with no elided arguments; both arities are equal. *)
 val make
   :  name:string
   -> alloc:bool
@@ -99,14 +104,14 @@ val make
   -> effects:effects
   -> coeffects:coeffects
   -> native_name:string
-  -> native_repr_args: (mode * 'repr) list
-  -> native_repr_res: mode * 'repr
+  -> native_repr_args: (mode * 'arg_repr) list
+  -> native_repr_res: mode * 'ret_repr
   -> is_layout_poly: bool
-  -> 'repr description_gen
+  -> ('arg_repr, 'ret_repr) description_gen
 
 val parse_declaration
   :  Parsetree.value_description
-  -> native_repr_args:(mode * native_repr) list
+  -> native_repr_args:(mode * native_repr_or_elided) list
   -> native_repr_res:(mode * native_repr)
   -> is_layout_poly:bool
   -> description
@@ -116,8 +121,8 @@ val print
   -> Outcometree.out_val_decl
   -> Outcometree.out_val_decl
 
-val native_name: 'a description_gen -> string
-val byte_name: 'a description_gen -> string
+val native_name: ('a, 'b) description_gen -> string
+val byte_name: ('a, 'b) description_gen -> string
 
 
 val unboxed_float : boxed_float -> unboxed_float
@@ -135,6 +140,8 @@ val equal_boxed_vector : boxed_vector -> boxed_vector -> bool
 val compare_boxed_float : boxed_float -> boxed_float -> int
 val compare_boxed_vector : boxed_vector -> boxed_vector -> int
 val equal_native_repr : native_repr -> native_repr -> bool
+val equal_native_repr_or_elided :
+  native_repr_or_elided -> native_repr_or_elided -> bool
 val equal_effects : effects -> effects -> bool
 val equal_coeffects : coeffects -> coeffects -> bool
 

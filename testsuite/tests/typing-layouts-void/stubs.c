@@ -99,3 +99,33 @@ value void_to_void_void_bytecode(value unit) {
   Field(res, 1) = Val_unit;
   CAMLreturn (res);
 }
+
+/* Stubs for [elide_void_runtime.ml]. Arguments are small ints and the
+   result concatenates them as decimal digits, so a void argument that is
+   passed (as unit, i.e. 0) or shifts the others changes the result. The
+   [argv] stub also records [argn]. */
+
+value elide_digits1(value a) {
+  return Val_long(Long_val(a));
+}
+
+value elide_digits2(value a, value b) {
+  return Val_long(Long_val(a) * 10 + Long_val(b));
+}
+
+value elide_digits3(value a, value b, value c) {
+  return Val_long((Long_val(a) * 10 + Long_val(b)) * 10 + Long_val(c));
+}
+
+value elide_digits6(value a, value b, value c, value d, value e, value f) {
+  long r = 0;
+  value args[6] = { a, b, c, d, e, f };
+  for (int i = 0; i < 6; i++) r = r * 10 + Long_val(args[i]);
+  return Val_long(60000000 + r);
+}
+
+value elide_digits_argv(value *argv, int argn) {
+  long r = 0;
+  for (int i = 0; i < argn; i++) r = r * 10 + Long_val(argv[i]);
+  return Val_long(argn * 10000000 + r);
+}

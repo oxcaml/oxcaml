@@ -728,7 +728,8 @@ let unarize_extern_repr ~machine_width alloc_mode
 
 let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
     (({ prim_name;
-        prim_arity;
+        prim_type_arity = _;
+        prim_apply_arity;
         prim_alloc;
         prim_c_builtin;
         prim_effects;
@@ -846,7 +847,7 @@ let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
     (* Some C primitives have implementations within Flambda itself. *)
     let[@inline] unboxed_int64_to_and_from_unboxed_float ~src_kind ~dst_kind ~op
         =
-      if prim_arity <> 1
+      if prim_apply_arity <> 1
       then Misc.fatal_errorf "Expected arity one for %s" prim_native_name
       else
         match prim_native_repr_args, prim_native_repr_res with
@@ -998,7 +999,8 @@ let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
 
 let close_c_call acc env ~loc ~let_bound_ids_with_kinds
     (({ prim_name;
-        prim_arity = _;
+        prim_type_arity = _;
+        prim_apply_arity = _;
         prim_alloc;
         prim_c_builtin;
         prim_effects;
