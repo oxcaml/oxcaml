@@ -48,9 +48,6 @@ let extract_output = function
   | None ->
       fatal "Please specify the name of the output file, using option -o"
 
-let fatal_unsupported_for_js what =
-  fatal (Printf.sprintf "%s is not supported when targeting js_of_ocaml" what)
-
 let warn_once =
   let seen = Hashtbl.create 7 in
   fun message ->
@@ -58,6 +55,9 @@ let warn_once =
       Hashtbl.add seen message ();
       if !Clflags.verbose then prerr_endline ("Warning: " ^ message)
     end
+
+let warn_jsir_ignore what =
+  warn_once ("ignoring " ^ what ^ " when targeting js_of_ocaml")
 
 let default_output = function
   | Some s -> s
@@ -766,8 +766,10 @@ let readenv ppf position =
   (match position with
    | Before_args -> ()
    | Before_compile _ | Before_link ->
-     if Clflags.target_is_jsir () && !all_ccopts <> [] then
-       fatal_unsupported_for_js "-ccopt";
+     if Clflags.target_is_jsir () && !all_ccopts <> [] then begin
+       warn_jsir_ignore "-ccopt";
+       all_ccopts := []
+     end;
      if not (Clflags.target_is_jsir ()) then
        List.iter (fun phase ->
            if !(Clflags.jsoo_opts phase) <> [] then
@@ -820,18 +822,22 @@ let process_action
   | ProcessCFile name ->
       readenv ppf (Before_compile name);
       if Clflags.target_is_jsir () then
-        fatal_unsupported_for_js ("C source file " ^ name);
-      Location.input_name := name;
-      let obj_name = match !output_name with
-        | None -> c_object_of_filename name
-        | Some n -> n
-      in
-      if Ccomp.compile_file ?output:!output_name name <> 0
-      then raise (Exit_with_status 2);
-      ccobjs := obj_name :: !ccobjs
+        warn_jsir_ignore ("C source file " ^ name)
+      else begin
+        Location.input_name := name;
+        let obj_name = match !output_name with
+          | None -> c_object_of_filename name
+          | Some n -> n
+        in
+        if Ccomp.compile_file ?output:!output_name name <> 0
+        then raise (Exit_with_status 2);
+        ccobjs := obj_name :: !ccobjs
+      end
   | ProcessObjects names ->
-      if Clflags.target_is_jsir () then fatal_unsupported_for_js "-cclib";
-      ccobjs := names @ !ccobjs
+      if Clflags.target_is_jsir () then
+        List.iter (fun name -> warn_jsir_ignore ("-cclib " ^ name)) names
+      else
+        ccobjs := names @ !ccobjs
   | ProcessDLLs names ->
       dllibs := names @ !dllibs
   | ProcessOtherFile name ->
@@ -851,9 +857,11 @@ let process_action
       else if Filename.check_suffix name Config.ext_obj
            || Filename.check_suffix name Config.ext_lib then begin
         if Clflags.target_is_jsir () then
-          fatal_unsupported_for_js ("object file " ^ name);
-        has_linker_inputs := true;
-        ccobjs := name :: !ccobjs
+          warn_jsir_ignore ("object file " ^ name)
+        else begin
+          has_linker_inputs := true;
+          ccobjs := name :: !ccobjs
+        end
       end
       else if not (target_is_native ())
            && Filename.check_suffix name Config.ext_dll then

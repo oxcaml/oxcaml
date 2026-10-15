@@ -23,7 +23,7 @@ ocamlopt -target js_of_ocaml -o prog.js lib.cmjxa main.cmjx      # or a.out.js w
 
 The compiler runs the `js_of_ocaml` executable found in its `bin` directory, or in the `PATH`, unless the `OXCAML_JS_OF_OCAML` environment variable is populated.
 We can print JSIR with `-djsir`, `-g` makes `js_of_ocaml` keep debug information, and `-verbose` shows the `js_of_ocaml` commands.
-It is disallowed to pass in C sources and objects, `-ccopt`/`-cclib`, `-shared`, `-output-obj` and `-pack`.
+C sources and objects and `-ccopt`/`-cclib` are ignored (with a warning under `-verbose`).
 
 Options passed in through `-jsoo-opt` are passed through to all `js_of_ocaml` commands. The flags `-jsoo-opt-compile`, `-jsoo-opt-archive`, `-jsoo-opt-runtime` and `-jsoo-opt-link` pass in arguments to one of them only: `js_of_ocaml compile` (for `-c`), `js_of_ocaml link -a` (for `-a`), `js_of_ocaml build-runtime` (the runtime and the `.js` stubs of an executable) and the `js_of_ocaml link` of an executable, respectively. `OCAMLPARAM` accepts them as `jsoo-opt=`, `jsoo-opt-compile=`, etc.
 
