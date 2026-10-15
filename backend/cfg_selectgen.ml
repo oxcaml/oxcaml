@@ -386,16 +386,14 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     in
     match[@ocaml.warning "+fragile-match"] op with
     | Capply { callees; result_type; _ } -> (
-        let (func, args) : Cfg.func_call_operation * Cmm.expression list =
-      match[@ocaml.warning "-fragile-match"] args with
-      | Cconst_symbol (func, _dbg) :: rem ->
-        Direct func, rem
-      | _ -> Indirect callees, args
-        in
-        match result_type with
-        | None -> Terminator ( Call_no_return_func func ), args
-        | Some _ -> Terminator ( Call { op = func; label_after }), args
-      )
+      let (func, args) : Cfg.func_call_operation * Cmm.expression list =
+        match[@ocaml.warning "-fragile-match"] args with
+        | Cconst_symbol (func, _dbg) :: rem -> Direct func, rem
+        | _ -> Indirect callees, args
+      in
+      match result_type with
+      | None -> Terminator (Call_no_return_func func), args
+      | Some _ -> Terminator (Call { op = func; label_after }), args)
     | Cextcall
         { func; alloc; ty; ty_args; returns; builtin; effects; coeffects = _ }
       ->
@@ -1496,15 +1494,18 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     insert_return env sub_cfg (emit_expr env sub_cfg exp ~bound_name:None) traps
 
   and emit_tail_apply env sub_cfg ty op args dbg =
+    let result_type = Option.value ty ~default:Cmm.typ_void in
     match emit_parts_list env sub_cfg args with
     | Never_returns -> ()
     | Ok (simple_args, env) -> (
       let label_after = Cmm.new_label () in
       let new_op, new_args = select_operation op simple_args dbg ~label_after in
       match new_op with
-      | Terminator (Call { op = Indirect callees; label_after } as term) ->
+      | Terminator
+          (( Call { op = Indirect callees; _ }
+           | Call_no_return_func (Indirect callees) ) as term) ->
         let** r1 = emit_tuple env sub_cfg new_args in
-        let rd = Reg.createv ty in
+        let rd = Reg.createv result_type in
         let rarg = Array.sub r1 1 (Array.length r1 - 1) in
         let loc_arg, stack_ofs_args = Proc.loc_arguments (Reg.typv rarg) in
         let loc_res, stack_ofs_res = Proc.loc_results_call (Reg.typv rd) in
@@ -1521,13 +1522,18 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           SU.insert_debug' env sub_cfg term dbg
             (Array.append [| r1.(0) |] loc_arg)
             loc_res;
-          Sub_cfg.add_never_block sub_cfg ~label:label_after;
           SU.set_traps_for_raise env;
-          SU.insert_move_results env sub_cfg loc_res rd stack_ofs;
-          insert_return env sub_cfg (Ok rd) (SU.pop_all_traps env))
-      | Terminator (Call { op = Direct func; label_after } as term) ->
+          match ty with
+          | None -> ()
+          | Some _ ->
+            Sub_cfg.add_never_block sub_cfg ~label:label_after;
+            SU.insert_move_results env sub_cfg loc_res rd stack_ofs;
+            insert_return env sub_cfg (Ok rd) (SU.pop_all_traps env))
+      | Terminator
+          ((Call { op = Direct func; _ } | Call_no_return_func (Direct func)) as
+           term) ->
         let** r1 = emit_tuple env sub_cfg new_args in
-        let rd = Reg.createv ty in
+        let rd = Reg.createv result_type in
         let loc_arg, stack_ofs_args = Proc.loc_arguments (Reg.typv r1) in
         let loc_res, stack_ofs_res = Proc.loc_results_call (Reg.typv rd) in
         let stack_ofs = Stdlib.Int.max stack_ofs_args stack_ofs_res in
@@ -1550,10 +1556,13 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         else (
           SU.insert_move_args env sub_cfg r1 loc_arg stack_ofs;
           SU.insert_debug' env sub_cfg term dbg loc_arg loc_res;
-          Sub_cfg.add_never_block sub_cfg ~label:label_after;
           SU.set_traps_for_raise env;
-          SU.insert_move_results env sub_cfg loc_res rd stack_ofs;
-          insert_return env sub_cfg (Ok rd) (SU.pop_all_traps env))
+          match ty with
+          | None -> ()
+          | Some _ ->
+            Sub_cfg.add_never_block sub_cfg ~label:label_after;
+            SU.insert_move_results env sub_cfg loc_res rd stack_ofs;
+            insert_return env sub_cfg (Ok rd) (SU.pop_all_traps env))
       | Basic _
       | Terminator
           ( Never | Always _ | Parity_test _ | Truth_test _ | Float_test _

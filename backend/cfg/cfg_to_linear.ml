@@ -424,7 +424,8 @@ let need_starting_label (block : Cfg.basic_block)
       | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
       | Call _ | Prim _ | Invalid _ ->
         false
-      | Return | Raise _ | Tailcall_func _ | Call_no_return_ext _ | Call_no_return_func _ ->
+      | Return | Raise _ | Tailcall_func _ | Call_no_return_ext _
+      | Call_no_return_func _ ->
         (* Unreachable for a consistent CFG: these terminators have no normal
            successors, and their exceptional successors are trap handlers,
            handled above. *)

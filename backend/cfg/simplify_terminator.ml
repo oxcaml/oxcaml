@@ -430,7 +430,8 @@ let evaluate_terminator (known_values : known_value Reg.UsingLocEquality.Tbl.t)
     Misc.fatal_error
       "Simplify_terminator.evaluate_terminator: unexpected Never terminator"
   | Always _ | Return | Raise _ | Tailcall_self _ | Tailcall_func _
-  | Call_no_return_ext _ | Call_no_return_func _ | Call _ | Prim _ | Invalid _ ->
+  | Call_no_return_ext _ | Call_no_return_func _ | Call _ | Prim _ | Invalid _
+    ->
     None
 
 let block_known_values (cfg : Cfg.t) (block : C.basic_block)
