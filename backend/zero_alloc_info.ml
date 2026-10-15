@@ -110,7 +110,7 @@ module Allocation_sources = struct
         paths
     in
     Format.fprintf ppf
-      "@[<hov 1>{arguments_that_may_allocate = {@[<hov>%a1]};@ anything_else_may_allocate = %b}@]"
+      "@[<hov 1>{arguments_that_may_allocate = {@[<hov>%a@]};@ anything_else_may_allocate = %b}@]"
       (Format.pp_print_list
          ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ ")
          print_paths)
