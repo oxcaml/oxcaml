@@ -656,9 +656,13 @@ let is_destruction_point ~(more_destruction_points : bool) (terminator : Cfg_int
     else
       if alloc || stack_ofs > 0 then true else false
   | Invalid _ -> more_destruction_points
-  | Call {op = Indirect _ | Direct _; _}
-  | Call_no_return_func _ ->
+  | Call {op = Indirect _ | Direct _; _} ->
     true
+  | Call_no_return_func _ ->
+    (* XXX/note: it is probably ok to return `true`, but returning `false` makes
+       it obvious that we will not spill before the call (unless there is an exception).
+       the only drawback is the sync with the set of destroyed registers *)
+    false
 
 (* Layout of the stack frame *)
 

@@ -384,9 +384,10 @@ let is_destruction_point ~(more_destruction_points : bool) (terminator : Cfg_int
   | Never ->
     Misc.fatal_error
       "Proc.is_destruction_point: unexpected Never terminator"
-  | Call {op = Indirect _ | Direct _; _}
-  | Call_no_return_func _ ->
+  | Call {op = Indirect _ | Direct _; _} ->
     true
+  | Call_no_return_func _ ->
+    false
   | Always _ | Parity_test _ | Truth_test _ | Float_test _
   | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
   | Tailcall_func _ | Prim {op = Probe _; _} ->
