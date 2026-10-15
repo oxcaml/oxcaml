@@ -147,8 +147,8 @@ let rec recursive x n =
 [%%expect{|
 val recursive :
   'a @ [< 'm & global] ->
-  int @ [< many read_write > dynamic] -> 'a @ [< global > 'm | dynamic] =
-  <fun>
+  int @ [< many read_write borrowable > dynamic] ->
+  'a @ [< global > 'm | dynamic] = <fun>
 |}]
 
 let foo (x @ portable) =
@@ -162,8 +162,8 @@ let recursive' = recursive
 [%%expect{|
 val recursive' :
   'a @ [< 'm & global] ->
-  int @ [< many read_write > dynamic] -> 'a @ [< global > 'm | dynamic] =
-  <fun>
+  int @ [< many read_write borrowable > dynamic] ->
+  'a @ [< global > 'm | dynamic] = <fun>
 |}]
 
 let foo (x @ nonportable) =
@@ -237,7 +237,8 @@ Error: This value is "nonportable" but is expected to be "portable".
 let use_and_return x = ignore x; x
 [%%expect{|
 val use_and_return :
-  'a @ [< 'm & global many read_write] -> 'a @ [> 'm | aliased] = <fun>
+  'a @ [< 'm & global many read_write borrowable] -> 'a @ [> 'm | aliased] =
+  <fun>
 |}]
 
 (* contended values cannot be use_and_returned due to uncontended bound *)

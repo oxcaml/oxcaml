@@ -6432,6 +6432,8 @@ let mode_crossing_structure_memaddr =
     ~yielding:true
     ~statefulness:true
     ~staticity:false
+    ~borrowability:true
+    ~borrowedness:false
 
 (** The mode crossing of a functor. *)
 let mode_crossing_functor =
@@ -6446,6 +6448,8 @@ let mode_crossing_functor =
     ~yielding:false
     ~statefulness:false
     ~staticity:false
+    ~borrowability:false
+    ~borrowedness:true
 
 (** The mode crossing of any module. *)
 let mode_crossing_module = Mode.Crossing.max
