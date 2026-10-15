@@ -2056,20 +2056,26 @@ let instance_label' copy_scope ~fixed lbl =
 let instance_label ~fixed lbl =
   For_copy.with_scope (fun copy_scope -> instance_label' copy_scope ~fixed lbl)
 
-let instance_labels ~fixed ~representative lbls =
-  (* Merlin-only: Merlin sometimes calls this function with an empty lbls (since lbl_all
-     is empty for dummy labels). In the compiler, this function assumes the array is
-     non-empty to get the result type. But in Merlin, we explicitly pass representative to
-     avoid an index-out-of-bounds exception. *)
+let instance_labels ~fixed ?representative lbls =
   For_copy.with_scope (fun copy_scope ->
     let vars_and_ty_args =
       Array.map
         (fun lbl -> instance_label_type' copy_scope ~fixed lbl.lbl_arg)
         lbls
     in
-    let ty_res = copy copy_scope representative.lbl_res in
+    let lbl =
+      (* Typing recovery calls this function with an empty lbls
+          (since lbl_all is empty for dummy labels). In the compiler,
+          this function assumes the array is non-empty to get the
+          result type. But in Typing Recovery, we explicitly pass
+          representative to avoid an index-out-of-bounds exception. *)
+      match representative with
+      | None -> lbls.(0)
+      | Some l -> l
+    in
+    let ty_res = copy copy_scope lbl.lbl_res in
     (vars_and_ty_args, ty_res)
-  )
+    )
 
 let instance_label_declarations ~fixed lds ~params =
   For_copy.with_scope (fun copy_scope ->
@@ -3698,8 +3704,19 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
                  We could still estimate the kind on the left better. *)
               error ()
           in
-          match get_desc ty with
-          | Tconstr _ ->
+          let requirements =
+            Ikind.type_var_requirements ~type_equal ~context ~allow_mutation
+              env ty ty's_jkind jkind
+          in
+          match requirements, get_desc ty with
+          | Ok requirements, _ ->
+            List.fold_left
+              (fun result (tvar, mod_bounds) ->
+                 Result.bind result (fun () ->
+                   loop ~fuel ~expanded:false env tvar ty's_jkind
+                     (Jkind.of_mod_bounds ~history:jkind.history mod_bounds)))
+              (Ok ()) requirements
+          | Error error, Tconstr _ ->
              if not expanded
              then
                let ty = expand_head_opt env ty in
@@ -3711,9 +3728,7 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
                           (Not_a_subjkind (ty's_jkind, jkind,
                                            sub_failure_reasons)))
                | Final_result ->
-                 Error
-                   (Jkind.Violation.of_ ~context env
-                      (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
+                 Error error
                | Stepped { ty; modality; or_null = None } ->
                  let jkind = Jkind.apply_modality_r modality jkind in
                  estimate_jkind_and_loop ~fuel:(fuel - 1) ~expanded:false env ty
@@ -3723,16 +3738,14 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
                | Stepped_record_unboxed_product unwrapped_tys ->
                  product ~fuel:(fuel - 1) unwrapped_tys
                end
-          | Tunboxed_tuple ltys ->
+          | Error _, Tunboxed_tuple ltys ->
             (* Note: here we "duplicate" the fuel, which may seem like cheating.
                Fuel counts expansions, and its purpose is to guard against
                infinitely expanding a recursive type. In a wide tuple, we many
                need to expand many types shallowly, and that's fine. *)
             product ~fuel (List.map (fun (_, ty) ->
               mk_unwrapped_type_expr ty) ltys)
-          | _ ->
-            Error (Jkind.Violation.of_ ~context env
-                (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
+          | Error error, _ -> Error error
   and estimate_jkind_and_loop ~fuel ~expanded env ty jkind : _ result =
     (* If [jkind]'s bound's are all max, then we immediately know that the
        mod-bounds already agree. But in such a case, we may still need to
