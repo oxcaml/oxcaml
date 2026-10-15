@@ -343,14 +343,16 @@ let address_modalities mut =
       ( Comonadic Areality,
         Modality.Comonadic.Atom.Meet_const Regionality.Const.Local )
   in
-  let dropped = local :: implied_modalities local in
+  let dropped_axes =
+    List.map
+      (fun (Modality.Atom (ax, _)) -> Modality.Axis.P ax)
+      (local :: implied_modalities local)
+  in
+  let should_drop (Modality.Atom (ax, _)) =
+    List.exists (fun p -> Modality.Axis.compare p (P ax) = 0) dropped_axes
+  in
   mutable_implied_modalities ~for_mutable_variable:false (Types.is_mutable mut)
-  |> List.filter (fun (Modality.Atom (ax, _)) ->
-      not
-        (List.exists
-           (fun (Modality.Atom (ax', _)) ->
-             Modality.Axis.compare (P ax') (P ax) = 0)
-           dropped))
+  |> List.filter (fun atom -> not (should_drop atom))
   |> modality_of_atoms
 
 let mutable_implied_modalities ~for_mutable_variable mut =
