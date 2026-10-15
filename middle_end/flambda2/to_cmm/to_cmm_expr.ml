@@ -73,15 +73,6 @@ let warn_if_unused_inlined_attribute apply ~dbg_with_inlined =
       (Debuginfo.to_location dbg_with_inlined)
       (Warnings.Inlining_impossible reason)
 
-let fail_if_probe apply =
-  match Apply.probe apply with
-  | None -> ()
-  | Some _ ->
-    Misc.fatal_errorf
-      "[Apply] terms with a [probe] (i.e. that call a tracing probe) must \
-       always be direct applications of an OCaml function:@ %a"
-      Apply.print apply
-
 let translate_apply0 ~dbg_with_inlined:dbg env res apply =
   let callee_simple = Apply.callee apply in
   let args = Apply.args apply in
@@ -181,7 +172,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         res,
         Ece.all ))
   | Function { function_call = Indirect_unknown_arity } ->
-    fail_if_probe apply;
+    C.fail_if_apply_with_probe apply;
     let callee =
       match callee with
       | Some callee -> callee
@@ -198,7 +189,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
       res,
       Ece.all )
   | Function { function_call = Indirect_known_arity callees } ->
-    fail_if_probe apply;
+    C.fail_if_apply_with_probe apply;
     let callee =
       match callee with
       | Some callee -> callee
@@ -234,7 +225,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
       ~callee_simple ~args ~return_arity ~return_ty dbg ~needs_caml_c_call
       ~is_c_builtin ~effects ~coeffects
   | Method { kind; obj } ->
-    fail_if_probe apply;
+    C.fail_if_apply_with_probe apply;
     let callee =
       match callee with
       | Some callee -> callee
