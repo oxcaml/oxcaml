@@ -20,5 +20,7 @@
 (* Common subexpression elimination by value numbering over basic blocks. *)
 
 module Cse_generic (_ : Cfg_cse_target_intf.S) : sig
+  val class_of_operation : Operation.t -> Cfg_cse_target_intf.op_class
+
   val cfg_with_layout : Cfg_with_layout.t -> Cfg_with_layout.t
 end

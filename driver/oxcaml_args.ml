@@ -456,6 +456,12 @@ let mk_ssa_simplify f =
 let mk_no_ssa_simplify f =
   ("-no-ssa-simplify", Arg.Unit f, " Disable the SSA simplification pass")
 
+let mk_ssa_sink f =
+  ("-ssa-sink", Arg.Unit f, " Run the SSA sinking pass (EXPERIMENTAL)")
+
+let mk_no_ssa_sink f =
+  ("-no-ssa-sink", Arg.Unit f, " Disable the SSA sinking pass")
+
 let mk_ssa_validate f =
   ( "-ssa-validate",
     Arg.Unit f,
@@ -1449,6 +1455,8 @@ module type Oxcaml_options = sig
   val no_use_ssa : unit -> unit
   val ssa_simplify : unit -> unit
   val no_ssa_simplify : unit -> unit
+  val ssa_sink : unit -> unit
+  val no_ssa_sink : unit -> unit
   val ssa_validate : unit -> unit
   val no_ssa_validate : unit -> unit
   val internal_assembler : unit -> unit
@@ -1665,6 +1673,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_no_use_ssa F.no_use_ssa;
       mk_ssa_simplify F.ssa_simplify;
       mk_no_ssa_simplify F.no_ssa_simplify;
+      mk_ssa_sink F.ssa_sink;
+      mk_no_ssa_sink F.no_ssa_sink;
       mk_ssa_validate F.ssa_validate;
       mk_no_ssa_validate F.no_ssa_validate;
       mk_internal_assembler F.internal_assembler;
@@ -2115,6 +2125,8 @@ module Oxcaml_options_impl = struct
   let no_use_ssa = clear' Oxcaml_flags.use_ssa
   let ssa_simplify = set' Oxcaml_flags.ssa_simplify
   let no_ssa_simplify = clear' Oxcaml_flags.ssa_simplify
+  let ssa_sink = set' Oxcaml_flags.ssa_sink
+  let no_ssa_sink = clear' Oxcaml_flags.ssa_sink
   let ssa_validate = set' Oxcaml_flags.ssa_validate
   let no_ssa_validate = clear' Oxcaml_flags.ssa_validate
   let internal_assembler = set' Oxcaml_flags.internal_assembler
@@ -2553,6 +2565,7 @@ module Extra_params = struct
     match name with
     | "use-ssa" -> set' Oxcaml_flags.use_ssa
     | "ssa-simplify" -> set' Oxcaml_flags.ssa_simplify
+    | "ssa-sink" -> set' Oxcaml_flags.ssa_sink
     | "ssa-validate" -> set' Oxcaml_flags.ssa_validate
     | "internal-assembler" -> set' Oxcaml_flags.internal_assembler
     | "verify-binary-emitter" -> set' Oxcaml_flags.verify_binary_emitter
