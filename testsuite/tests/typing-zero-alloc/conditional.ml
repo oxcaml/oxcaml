@@ -26,7 +26,8 @@ let[@zero_alloc conditional] rec iter ~f : 'a list -> unit = function
   | [] -> ()
   | head :: tail -> (let () = f head in iter ~f tail)
 [%%expect{|
-val iter : f:('a -> unit) -> 'a list -> unit [@@zero_alloc conditional] = <fun>
+val iter : f:('a -> unit) -> 'a list -> unit [@@zero_alloc conditional] =
+  <fun>
 |}]
 
 let[@zero_alloc conditional] rec iter_even ~f : 'a list -> unit = function
