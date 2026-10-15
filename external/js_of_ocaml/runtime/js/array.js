@@ -304,13 +304,6 @@ function caml_floatarray_create(len) {
   return b;
 }
 
-// Bytecode stubs for [%makearray_dynamic_uninit] on arrays of unboxed or
-// untagged elements (see [caml_make_*_vect_bytecode] in runtime/array.c).
-// Unboxed and boxed numbers have the same representation here, so these are
-// ordinary arrays filled with the zero of the element kind, like the
-// corresponding C stubs. [float#] arrays are flat float arrays, as for
-// [caml_make_unboxed_float64_vect] in native code.
-
 //Provides: caml_make_unboxed_float64_vect_bytecode mutator (const)
 //Requires: caml_floatarray_create
 //Version: >= 5.2
