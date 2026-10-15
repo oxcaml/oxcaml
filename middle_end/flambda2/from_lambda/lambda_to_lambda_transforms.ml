@@ -314,30 +314,7 @@ let initialize_array env loc ~length array_set_kind width ~init creation_expr =
   | Some init ->
     initialize_array0 env loc ~length array_set_kind width ~init creation_expr
 
-let makearray_dynamic_singleton name (mode : L.locality_mode) ~length ~init loc
-    =
-  let non_empty = String.length name > 0 in
-  let name =
-    if non_empty
-    then
-      Printf.sprintf "caml_make%s_%s_vect%s"
-        (match mode with
-        | Alloc_heap -> ""
-        | Alloc_local when !Clflags.jsir -> ""
-        | Alloc_local -> "_local")
-        name
-        (if !Clflags.jsir then "_bytecode" else "")
-    else if
-      (* For regular (boxed) arrays, use the new #13003 names. JSOO doesn't have
-         the new names yet, so we fall back to the old ones. It also doesn't
-         discriminate between local and heap allocations. *)
-      !Clflags.jsir
-    then "caml_make_vect"
-    else
-      match mode with
-      | Alloc_heap -> "caml_array_make"
-      | Alloc_local -> "caml_array_make_local"
-  in
+let makearray_dynamic_ccall ~name (mode : L.locality_mode) ~length ~init loc =
   let external_call_desc =
     Primitive.make ~name ~alloc:true (* the C stub may raise an exception *)
       ~c_builtin:false ~effects:Arbitrary_effects ~coeffects:Has_coeffects
@@ -361,11 +338,53 @@ let makearray_dynamic_singleton name (mode : L.locality_mode) ~length ~init loc
       ([L.Lvar length] @ match init with None -> [] | Some (_, init) -> [init]),
       loc )
 
+let makearray_dynamic_singleton name (mode : L.locality_mode) ~length ~init loc
+    =
+  let non_empty = String.length name > 0 in
+  let name =
+    if non_empty
+    then
+      Printf.sprintf "caml_make%s_%s_vect"
+        (match mode with Alloc_heap -> "" | Alloc_local -> "_local")
+        name
+    else if
+      (* For regular (boxed) arrays, use the new #13003 names. JSOO doesn't have
+         the new names yet, so we fall back to the old ones. It also doesn't
+         discriminate between local and heap allocations. *)
+      !Clflags.jsir
+    then "caml_make_vect"
+    else
+      match mode with
+      | Alloc_heap -> "caml_array_make"
+      | Alloc_local -> "caml_array_make_local"
+  in
+  makearray_dynamic_ccall ~name mode ~length ~init loc
+
+(* How an array of unboxed or untagged elements is created in JSIR, where the
+   runtime has no [caml_make_*_vect] stubs for such arrays and arrays cannot be
+   left uninitialized anyway. As in bytecode, we build the array with
+   [caml_make_vect] and a zero of the element kind, or [caml_floatarray_create]
+   for [float#] (such arrays carry [Double_array_tag]). *)
+type jsir_uninitialized_array =
+  | Flat_float_array
+  | Zero_filled of
+      { sort : S.t;
+        zero : L.lambda
+      }
+  | Unsupported_in_jsir
+
 let makearray_dynamic_singleton_uninitialized name (mode : L.locality_mode)
-    ~length loc =
-  makearray_dynamic_singleton name
-    (mode : L.locality_mode)
-    ~length ~init:None loc
+    ~length ~(jsir : jsir_uninitialized_array) loc =
+  match !Clflags.jsir, jsir with
+  | false, _ | true, Unsupported_in_jsir ->
+    makearray_dynamic_singleton name mode ~length ~init:None loc
+  | true, Flat_float_array ->
+    makearray_dynamic_ccall ~name:"caml_floatarray_create" mode ~length
+      ~init:None loc
+  | true, Zero_filled { sort; zero } ->
+    makearray_dynamic_singleton "" mode ~length
+      ~init:(Some (L.Same_as_ocaml_repr sort, zero))
+      loc
 
 let makearray_dynamic_unboxed_products_only_64_bit () =
   (* To keep things simple in the C stub as regards array length, we currently
@@ -558,72 +577,85 @@ let makearray_dynamic0 env (lambda_array_kind : L.array_kind)
            ~init:(Some (Same_as_ocaml_repr S.scannable, L.Lvar init))
            loc) )
   | Punboxedfloatarray Unboxed_float32 ->
-    makearray_dynamic_singleton_uninitialized "unboxed_float32" ~length mode loc
+    let zero = L.Lconst (Const_base (Const_unboxed_float32 "0")) in
+    makearray_dynamic_singleton_uninitialized "unboxed_float32" ~length mode
+      ~jsir:(Zero_filled { sort = S.float32; zero })
+      loc
     |> initialize_array env loc ~length (Punboxedfloatarray_set Unboxed_float32)
-         (Thirty_two_or_less
-            { width = Thirty_two;
-              zero_init = Lconst (Const_base (Const_unboxed_float32 "0"))
-            })
+         (Thirty_two_or_less { width = Thirty_two; zero_init = zero })
          ~init
   | Punboxedfloatarray Unboxed_float64 ->
-    makearray_dynamic_singleton_uninitialized "unboxed_float64" ~length mode loc
+    makearray_dynamic_singleton_uninitialized "unboxed_float64" ~length mode
+      ~jsir:Flat_float_array loc
     |> initialize_array env loc ~length (Punboxedfloatarray_set Unboxed_float64)
          Sixty_four_or_more ~init
   | Punboxedoruntaggedintarray Untagged_int ->
-    makearray_dynamic_singleton_uninitialized "untagged_int" ~length mode loc
+    let zero = L.Lconst (Const_base (Const_untagged_int 0)) in
+    makearray_dynamic_singleton_uninitialized "untagged_int" ~length mode
+      ~jsir:(Zero_filled { sort = S.untagged_immediate; zero })
+      loc
     |> initialize_array env loc ~length
          (Punboxedoruntaggedintarray_set Untagged_int) Sixty_four_or_more ~init
   | Punboxedoruntaggedintarray Untagged_int8 ->
-    makearray_dynamic_singleton_uninitialized "untagged_int8" ~length mode loc
+    let zero = L.Lconst (Const_base (Const_untagged_int8 0)) in
+    makearray_dynamic_singleton_uninitialized "untagged_int8" ~length mode
+      ~jsir:(Zero_filled { sort = S.bits8; zero })
+      loc
     |> initialize_array env loc ~length
          (Punboxedoruntaggedintarray_set Untagged_int8)
-         (Thirty_two_or_less
-            { width = Eight;
-              zero_init = Lconst (Const_base (Const_untagged_int8 0))
-            })
+         (Thirty_two_or_less { width = Eight; zero_init = zero })
          ~init
   | Punboxedoruntaggedintarray Untagged_int16 ->
-    makearray_dynamic_singleton_uninitialized "untagged_int16" ~length mode loc
+    let zero = L.Lconst (Const_base (Const_untagged_int16 0)) in
+    makearray_dynamic_singleton_uninitialized "untagged_int16" ~length mode
+      ~jsir:(Zero_filled { sort = S.bits16; zero })
+      loc
     |> initialize_array env loc ~length
          (Punboxedoruntaggedintarray_set Untagged_int16)
-         (Thirty_two_or_less
-            { width = Sixteen;
-              zero_init = Lconst (Const_base (Const_untagged_int16 0))
-            })
+         (Thirty_two_or_less { width = Sixteen; zero_init = zero })
          ~init
   | Punboxedoruntaggedintarray Unboxed_int32 ->
-    makearray_dynamic_singleton_uninitialized "unboxed_int32" ~length mode loc
+    let zero = L.Lconst (Const_base (Const_unboxed_int32 0l)) in
+    makearray_dynamic_singleton_uninitialized "unboxed_int32" ~length mode
+      ~jsir:(Zero_filled { sort = S.bits32; zero })
+      loc
     |> initialize_array env loc ~length
          (Punboxedoruntaggedintarray_set Unboxed_int32)
-         (Thirty_two_or_less
-            { width = Thirty_two;
-              zero_init = Lconst (Const_base (Const_unboxed_int32 0l))
-            })
+         (Thirty_two_or_less { width = Thirty_two; zero_init = zero })
          ~init
   | Punboxedoruntaggedintarray Unboxed_int64 ->
-    makearray_dynamic_singleton_uninitialized "unboxed_int64" ~length mode loc
+    let zero = L.Lconst (Const_base (Const_unboxed_int64 0L)) in
+    makearray_dynamic_singleton_uninitialized "unboxed_int64" ~length mode
+      ~jsir:(Zero_filled { sort = S.bits64; zero })
+      loc
     |> initialize_array env loc ~length
          (Punboxedoruntaggedintarray_set Unboxed_int64) Sixty_four_or_more ~init
   | Punboxedoruntaggedintarray Unboxed_nativeint ->
+    let zero = L.Lconst (Const_base (Const_unboxed_nativeint 0n)) in
     makearray_dynamic_singleton_uninitialized "unboxed_nativeint" ~length mode
+      ~jsir:(Zero_filled { sort = S.word; zero })
       loc
     |> initialize_array env loc ~length
          (Punboxedoruntaggedintarray_set Unboxed_nativeint) Sixty_four_or_more
          ~init
   | Punboxedvectorarray Unboxed_vec128 ->
-    makearray_dynamic_singleton_uninitialized "unboxed_vec128" ~length mode loc
+    makearray_dynamic_singleton_uninitialized "unboxed_vec128" ~length mode
+      ~jsir:Unsupported_in_jsir loc
     |> initialize_array env loc ~length (Punboxedvectorarray_set Unboxed_vec128)
          Sixty_four_or_more ~init
   | Punboxedvectorarray Unboxed_vec256 ->
-    makearray_dynamic_singleton_uninitialized "unboxed_vec256" ~length mode loc
+    makearray_dynamic_singleton_uninitialized "unboxed_vec256" ~length mode
+      ~jsir:Unsupported_in_jsir loc
     |> initialize_array env loc ~length (Punboxedvectorarray_set Unboxed_vec256)
          Sixty_four_or_more ~init
   | Punboxedvectorarray Unboxed_vec512 ->
-    makearray_dynamic_singleton_uninitialized "unboxed_vec512" ~length mode loc
+    makearray_dynamic_singleton_uninitialized "unboxed_vec512" ~length mode
+      ~jsir:Unsupported_in_jsir loc
     |> initialize_array env loc ~length (Punboxedvectorarray_set Unboxed_vec512)
          Sixty_four_or_more ~init
   | Punboxedmaskarray ->
-    makearray_dynamic_singleton_uninitialized "unboxed_mask" ~length mode loc
+    makearray_dynamic_singleton_uninitialized "unboxed_mask" ~length mode
+      ~jsir:Unsupported_in_jsir loc
     |> initialize_array env loc ~length Punboxedmaskarray_set Sixty_four_or_more
          ~init
   | Pgcscannableproductarray _ ->

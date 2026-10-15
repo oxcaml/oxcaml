@@ -522,8 +522,7 @@ and apply_cont0 ~env ~res apply_cont =
              ( var,
                Prim
                  ( Extern ("caml_register_global", None),
-                   [ Pc (Int (Targetint.of_int_exn 0));
-                     Pv module_symbol;
+                   [ Pv module_symbol;
                      Pc
                        (* CR selee: this assumes javascript, WASM needs just
                           String *)
