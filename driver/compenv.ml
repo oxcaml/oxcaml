@@ -51,9 +51,6 @@ let extract_output = function
 let fatal_unsupported_for_js what =
   fatal (Printf.sprintf "%s is not supported when targeting js_of_ocaml" what)
 
-(* Printed at most once per message, and only with [-verbose]: OCAMLPARAM is
-   shared by every tool of a build, so a setting meant for
-   [ocamlopt -target js_of_ocaml] should not make ocamlc or ocamldep noisy. *)
 let warn_once =
   let seen = Hashtbl.create 7 in
   fun message ->
