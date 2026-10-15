@@ -19,7 +19,7 @@
  (description
   "Js_of_ocaml is a compiler from OCaml bytecode to JavaScript. It makes it possible to run pure OCaml programs in JavaScript environment like browsers and Node.js")
  (depends
-  (ocaml (and (>= 4.13) (< 5.7)))
+  (ocaml (and (>= 5.4) (< 5.7)))
   (js_of_ocaml-runtime (= :version))
   (num :with-test)
   (out-channel-redirect :with-test)
@@ -46,7 +46,7 @@
  (description
   "Js_of_ocaml is a compiler from OCaml bytecode to JavaScript. It makes it possible to run pure OCaml programs in JavaScript environment like browsers and Node.js")
  (depends
-  (ocaml (>= 4.13))
+  (ocaml (>= 5.4))
   (js_of_ocaml (= :version))
   (js_of_ocaml-ppx (= :version))
   (lwt (and (>= 2.4.4) (<> 5.9.2)))
@@ -61,7 +61,7 @@
  (description
   "Js_of_ocaml is a compiler from OCaml bytecode to JavaScript. It makes it possible to run pure OCaml programs in JavaScript environment like browsers and Node.js")
  (depends
-  (ocaml (>= 4.13))
+  (ocaml (>= 5.4))
   (js_of_ocaml (= :version))
   (ppxlib (>= 0.33))
   (num :with-test)
@@ -75,7 +75,7 @@
  (description
   "Js_of_ocaml is a compiler from OCaml bytecode to JavaScript. It makes it possible to run pure OCaml programs in JavaScript environment like browsers and Node.js")
  (depends
-  (ocaml (>= 4.13))
+  (ocaml (>= 5.4))
   (js_of_ocaml (= :version))
   (ppxlib (>= 0.33))
   (num :with-test)
@@ -88,7 +88,7 @@
  (description
   "Js_of_ocaml is a compiler from OCaml bytecode to JavaScript. It makes it possible to run pure OCaml programs in JavaScript environment like browsers and Node.js")
  (depends
-  (ocaml (>= 4.13))
+  (ocaml (>= 5.4))
   (js_of_ocaml-compiler (= :version))
   (js_of_ocaml (= :version))
   (ocamlfind (>= 1.5.1))
@@ -106,7 +106,7 @@
  (description
   "Js_of_ocaml is a compiler from OCaml bytecode to JavaScript. It makes it possible to run pure OCaml programs in JavaScript environment like browsers and Node.js")
  (depends
-  (ocaml (>= 4.13))
+  (ocaml (>= 5.4))
   (js_of_ocaml (= :version))
   (js_of_ocaml-ppx (= :version))
   (react (>= 1.2.2))
@@ -122,7 +122,7 @@
  (description
   "The OCaml side of the Js_of_ocaml runtime, shared by the js_of_ocaml library and the compiler's dynlink support. Split out of js_of_ocaml-compiler so that it can be installed without the compiler library.")
  (depends
-  (ocaml (>= 4.13))))
+  (ocaml (>= 5.4))))
 
 (package
  (name js_of_ocaml)
@@ -130,7 +130,7 @@
  (description
   "Js_of_ocaml is a compiler from OCaml bytecode to JavaScript. It makes it possible to run pure OCaml programs in JavaScript environment like browsers and Node.js")
  (depends
-  (ocaml (>= 4.13))
+  (ocaml (>= 5.4))
   (js_of_ocaml-compiler (= :version))
   (js_of_ocaml-runtime (= :version))
   (num :with-test)
@@ -145,7 +145,7 @@
  (description
   "Wasm_of_ocaml is a compiler from OCaml bytecode to WebAssembly. It makes it possible to run pure OCaml programs in JavaScript environment like browsers and Node.js")
  (depends
-  (ocaml (>= 4.14))
+  (ocaml (>= 5.4))
   (js_of_ocaml (= :version))
   (num :with-test)
   (out-channel-redirect :with-test)

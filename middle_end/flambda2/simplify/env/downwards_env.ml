@@ -20,6 +20,8 @@ module K = Flambda_kind
 module BP = Bound_parameter
 module T = Flambda2_types
 module TE = Flambda2_types.Typing_env
+module LCS = Lifted_constant_state
+module LC = Lifted_constant
 
 type resolver =
   Compilation_unit.t -> Flambda2_types.Typing_env.Serializable.t option
@@ -97,13 +99,16 @@ type t =
         (* This cost is the number of parameters that would have to be created
            if we lifted all continuations that are defined in the current
            continuation's handler. *)
-    has_seen_a_non_liftable_continuation : bool
+    has_seen_a_non_liftable_continuation : bool;
         (* This flag is used to mark as non-liftable any continuation that is
            bound after a non-liftable continuation, since any continuation bound
            after a non-liftable continuation may refer to it.
 
            CR gbury: we may not need to do this if we had free_names on handlers
            that we have not explored yet. *)
+    is_cold : bool
+        (* This flag is used to mark cold contexts, i.e. the body of cold
+           functions and continuations. *)
   }
 
 let print ppf
@@ -135,7 +140,8 @@ let print ppf
       lifted = _;
       cost_of_lifting_continuations_out_of_current_one;
       has_seen_a_non_liftable_continuation;
-      join_analysis
+      join_analysis;
+      is_cold
     } =
   let open! Misc.Sexp in
   print ppf
@@ -178,7 +184,8 @@ let print ppf
       d "cost_of_lifting_continuations_out_of_current_one"
         cost_of_lifting_continuations_out_of_current_one;
       b "has_seen_a_non_liftable_continuation"
-        has_seen_a_non_liftable_continuation ]
+        has_seen_a_non_liftable_continuation;
+      b "is_cold" is_cold ]
 
 let define_continuations ~can_be_lifted t conts =
   let replay_history =
@@ -264,7 +271,8 @@ let create ~round ~machine_width ~(resolver : resolver)
     lifted = Variable.Set.empty;
     cost_of_lifting_continuations_out_of_current_one = 0;
     has_seen_a_non_liftable_continuation = false;
-    join_analysis = None
+    join_analysis = None;
+    is_cold = false
   }
 
 let all_code t = t.all_code
@@ -358,7 +366,8 @@ let enter_set_of_closures
       lifted = _;
       cost_of_lifting_continuations_out_of_current_one = _;
       has_seen_a_non_liftable_continuation = _;
-      join_analysis = _
+      join_analysis = _;
+      is_cold = _
     } =
   { machine_width;
     round;
@@ -388,7 +397,8 @@ let enter_set_of_closures
     defined_variables_by_scope = [Lifted_cont_params.empty];
     lifted = Variable.Set.empty;
     cost_of_lifting_continuations_out_of_current_one = 0;
-    has_seen_a_non_liftable_continuation = false
+    has_seen_a_non_liftable_continuation = false;
+    is_cold = false
   }
 
 let define_symbol t sym kind =
@@ -790,6 +800,56 @@ let enter_continuation_handler lifted_params t =
     specialization_cost = Specialization_cost.can_specialize ()
   }
 
+let add_lifted_constant_state ?maybe_already_defined denv lifted =
+  let initial_denv = denv in
+  let maybe_already_defined =
+    match maybe_already_defined with None -> false | Some () -> true
+  in
+  let denv =
+    LCS.fold lifted ~init:denv ~f:(fun denv lifted_constant ->
+        let types_of_symbols = LC.types_of_symbols lifted_constant in
+        Symbol.Map.fold
+          (fun sym (_denv, typ) denv ->
+            if maybe_already_defined && mem_symbol denv sym
+            then denv
+            else define_symbol denv sym (T.kind typ))
+          types_of_symbols denv)
+  in
+  let typing_env =
+    let typing_env = typing_env denv in
+    LCS.fold lifted ~init:typing_env ~f:(fun typing_env lifted_constant ->
+        let types_of_symbols = LC.types_of_symbols lifted_constant in
+        Symbol.Map.fold
+          (fun sym (typing_env_at_definition, typ) typing_env ->
+            if maybe_already_defined && mem_symbol initial_denv sym
+            then typing_env
+            else
+              let sym = Name.symbol sym in
+              let env_extension =
+                (* CR mshinwell: Maybe sometimes this could be done at a time
+                   previous to this point. *)
+                (* CR pchambart: Maybe some of these make_suitable calls could
+                   be combined into one *)
+                T.make_suitable_for_environment typing_env_at_definition
+                  (Everything_not_in typing_env)
+                  [sym, typ]
+              in
+              TE.add_env_extension_with_extra_variables typing_env env_extension)
+          types_of_symbols typing_env)
+  in
+  LCS.fold lifted ~init:(with_typing_env denv typing_env)
+    ~f:(fun denv lifted_constant ->
+      let pieces_of_code =
+        LC.defining_exprs lifted_constant
+        |> Rebuilt_static_const.Group.pieces_of_code_including_those_not_rebuilt
+      in
+      Code_id.Map.fold
+        (fun code_id code denv ->
+          if maybe_already_defined && mem_code denv code_id
+          then denv
+          else define_code denv ~code_id ~code)
+        pieces_of_code denv)
+
 let variables_defined_in_current_continuation t =
   match t.defined_variables_by_scope with
   | [] -> Misc.fatal_errorf "Empty stack of defined_variables_by_scope in denv"
@@ -814,6 +874,10 @@ let set_has_seen_a_non_liftable_continuation t =
   if t.has_seen_a_non_liftable_continuation
   then t
   else { t with has_seen_a_non_liftable_continuation = true }
+
+let is_cold t = t.is_cold
+
+let mark_as_cold t = if t.is_cold then t else { t with is_cold = true }
 
 let must_inline t = Replay_history.must_inline t.replay_history
 
@@ -866,6 +930,7 @@ let denv_for_lifted_continuation ~denv_for_join ~denv =
       denv_for_join.cost_of_lifting_continuations_out_of_current_one;
     has_seen_a_non_liftable_continuation =
       denv_for_join.has_seen_a_non_liftable_continuation;
+    is_cold = denv_for_join.is_cold;
     (* For the following fields, both denvs should have the same value of these
        fields *)
     round = denv.round;

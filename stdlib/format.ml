@@ -1086,8 +1086,8 @@ and str_formatter = formatter_of_buffer stdbuf
 (* CR-soon mslater: switch to TLS to remove thread unsafety *)
 module DLS = struct
   let new_key = Domain.Safe.DLS.new_key
-  let get = Obj.magic_portable Domain.DLS.get
-  let set = Obj.magic_portable Domain.DLS.set
+  let get = Obj.magic_portable (Domain.DLS.get[@alert "-unsafe_multidomain"])
+  let set = Obj.magic_portable (Domain.DLS.set[@alert "-unsafe_multidomain"])
 end
 
 let stdbuf_key = DLS.new_key pp_make_buffer

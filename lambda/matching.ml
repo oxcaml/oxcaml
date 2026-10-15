@@ -1320,9 +1320,14 @@ module StoreExp = Switch.Store (struct
 
   type key = lambda
 
+  let with_annotations t _ = t
+
   let compare_key = Stdlib.compare
 
-  let make_key = Lambda.make_key
+  let make_key t =
+    match Lambda.make_key t with
+    | None -> None
+    | Some e -> Some (e, Branch_annotations.default)
 end)
 
 let make_exit i = Lstaticraise (i, [])
@@ -2120,7 +2125,7 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
     match head.pat_desc with
     | Patterns.Head.Construct (cstr, shape, arg_sorts) ->
       let shape =
-        Typeopt.transl_constructor_representation head.pat_env
+        Translrepr.transl_constructor_representation head.pat_env
           head.pat_loc shape
       in
       let arg_sorts =
@@ -2454,7 +2459,7 @@ let inline_lazy_force arg pos loc =
         ap_specialised = Default_specialise;
         ap_probe=None;
       }
-  else if !Clflags.native_code && not (Clflags.is_flambda2 ()) then
+  else if Clflags.target_is_native () && not (Clflags.is_flambda2 ()) then
     (* CR vlaviron: Find a way for Flambda 2 to avoid both the call to
        caml_obj_tag and the switch on arbitrary tags *)
     (* Lswitch generates compact and efficient native code *)
@@ -2570,7 +2575,7 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
         assert false
   in
   let lbl_repres, ~variable_sorts =
-    Typeopt.transl_record_representation_and_sorts head.pat_env
+    Translrepr.transl_record_representation_and_sorts head.pat_env
       head.pat_loc repres
   in
   let rec make_args pos =
@@ -2580,8 +2585,8 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
       let lbl = all_labels.(pos) in
       let ptr, _ = Typeopt.maybe_pointer_type head.pat_env lbl.lbl_arg in
       let lbl_sort =
-        Typeopt.label_sort_for_representation lbl lbl_repres ~record_sort:sort
-          ~variable_sorts
+        Translrepr.label_sort_for_representation lbl lbl_repres
+          ~record_sort:sort ~variable_sorts
       in
       let lbl_layout = Typeopt.layout_of_sort lbl.lbl_loc lbl_sort in
       let sem =
@@ -3036,7 +3041,7 @@ module SArg = struct
   let make_isin loc h arg = Lprim (Pnot, [ make_isout loc h arg ], loc)
 
   let make_is_nonzero loc arg =
-    if !Clflags.native_code || Clflags.is_flambda2 ()
+    if Clflags.target_is_native () || Clflags.is_flambda2 ()
     then icmp Cne int arg (tagged_immediate 0) ~loc
     else arg
 
@@ -3078,9 +3083,10 @@ module SArg = struct
         loc, kind ))
 
   let make_catch kind handler =
-    make_catch_delayed kind handler
+    let i,h = make_catch_delayed kind handler in
+    i,Branch_annotations.default,h
 
-  let make_exit i = make_exit i
+  let make_exit i _ = make_exit i
 end
 
 (* Action sharing for Lswitch argument *)
@@ -3662,7 +3668,7 @@ let transl_match_on_option value_kind arg loc ~if_some ~if_none =
   (* Keeping the Pisint test would make the bytecode
       slightly worse, but it lets the native compiler generate
       better code -- see #10681. *)
-  if !Clflags.native_code || Clflags.is_flambda2 () then
+  if Clflags.target_is_native () || Clflags.is_flambda2 () then
     Lifthenelse(Lprim (Pisint { variant_only = true }, [ arg ], loc),
                 if_none, if_some, value_kind)
   else
