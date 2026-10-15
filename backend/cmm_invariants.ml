@@ -207,8 +207,8 @@ let machtype_of_vec512_scalar : Cmm.vec512_type -> Cmm.machtype = function
   | Int8x64 | Int16x32 | Int32x16 | Int64x8 -> Cmm.typ_int
 
 let reinterpret_cast_arg_type : Cmm.reinterpret_cast -> Cmm.machtype = function
-  | Int_of_value -> Cmm.typ_val
-  | Value_of_int -> Cmm.typ_int
+  | Int64_of_value -> Cmm.typ_val
+  | Value_of_int64 -> Cmm.typ_int
   | Float_of_float32 -> Cmm.typ_float32
   | Float32_of_float -> Cmm.typ_float
   | Float_of_int64 -> Cmm.typ_int
@@ -221,8 +221,8 @@ let reinterpret_cast_arg_type : Cmm.reinterpret_cast -> Cmm.machtype = function
     machtype_of_vector_width width
 
 let static_cast_arg_type : Cmm.static_cast -> Cmm.machtype = function
-  | Float_of_int _ -> Cmm.typ_int
-  | Int_of_float width -> machtype_of_float_width width
+  | Float_of_int64 _ -> Cmm.typ_int
+  | Int64_of_float width -> machtype_of_float_width width
   | Float_of_float32 -> Cmm.typ_float32
   | Float32_of_float -> Cmm.typ_float
   | V128_of_scalar ty -> machtype_of_vec128_scalar ty
