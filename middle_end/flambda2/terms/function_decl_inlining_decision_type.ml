@@ -133,7 +133,8 @@ let report_decision ppf t =
   | Recursive -> Format.fprintf ppf "this@ function@ is@ recursive"
   | Jsir_inlining_disabled ->
     Format.fprintf ppf
-      "function@ inlining@ is@ disabled@ for@ Js_of_ocaml@ translation"
+      "the@ function's@ body@ refers@ to@ closure@ slots,@ which@ cannot@ be@ \
+       moved@ into@ another@ function@ when@ compiling@ to@ Js_of_ocaml"
 
 type inlining_behaviour =
   | Cannot_be_inlined

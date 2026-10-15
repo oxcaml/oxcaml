@@ -10,7 +10,7 @@ The `to_jsir` pass is responsible for translating the Flambda 2 IR to `js_of_oca
 | `Naked_nativeint`  | Untagged 32-bit integer (via `Number`)                                                                                                                                                                             |
 | `Naked_int32`      | Untagged 32-bit integer (via `Number`)                                                                                                                                                                             |
 | `Naked_int64`      | Untagged 64-bit integer (via [`MlInt64`](https://github.com/oxcaml/js_of_ocaml/blob/master/runtime/js/int64.js) )                                                                                                  |
-| `Naked_float32`    | Untagged 64-bit float (via `Number`), where operations are performed in 64-bit precesion then [rounded down](https://github.com/oxcaml/js_of_ocaml/blob/master/runtime/js/float32.js) to the nearest 32-bit result |
+| `Naked_float32`    | Untagged 64-bit float (via `Number`), where operations are performed in 64-bit precision then [rounded down](https://github.com/oxcaml/js_of_ocaml/blob/master/runtime/js/float32.js) to the nearest 32-bit result |
 | `Naked_float`      | Untagged 64-bit float (via `Number`)                                                                                                                                                                               |
 
 Hence `Tag_immediate` and `Untag_immediate` are identities in JSIR: all integers are untagged. Similarly, `Box_number` and `Unbox_number` are also identities, since everything is represented as the `Number` type (with the exception of `Naked_int64`, which are just three `Number`s under the hood).
@@ -29,6 +29,20 @@ The following are not yet supported in JSIR translation, and will raise an excep
 ### WASM
 The produced JSIR is not suitable for WASM compilation via `wasm_of_ocaml`, despite the two sharing the same IR.
 In particular, there are places within the `to_jsir` code that assumes JavaScript - these are marked with comments.
+
+## Inlining
+Each function slot and value slot is translated to a single JavaScript variable, which is bound where the
+corresponding set of closures is created and read wherever the slot is projected. A function body that mentions
+slots, either because it projects from a closure (its own or any other one) or because it defines a set of
+closures, therefore cannot be copied into another function. As such, when compiling to JSIR, Flambda only inlines
+a function if its body contains no function or value slots at all (see `Code.can_be_inlined_for_jsir`).
+
+For functions that do mention slots, `[@inline]`, `[@inlined]`, `[@inlined hint]` and `[@unrolled n]` are ignored.
+`[@inline never]` and `[@inlined never]` work as usual.
+
+In classic mode the decision is made once, during closure conversion, and is therefore more conservative than in
+simplify mode: for example, a function that defines a constant local closure which is later lifted to a symbol is
+still never inlined.
 
 ## External stub behaviour
 For `external` declarations containing both bytecode and native names, the JSIR pass uses the **bytecode** name for most cases, and such JavaScript stubs are compatible with the existing `js_of_ocaml` stubs.
