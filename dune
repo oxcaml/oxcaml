@@ -136,6 +136,7 @@
  (modules_without_implementation parsetree)
  (modules
   ;; UTILS
+  json
   arrayset
   config
   build_path_prefix_map
@@ -169,6 +170,8 @@
   structured_mangling
   symbol
   lazy_backtrack
+  with_backtracking_intf
+  with_backtracking
   diffing
   diffing_with_keys
   linkdeps
@@ -179,6 +182,7 @@
   file_sections
   lru
   id_counter
+  likelihood
   ;; PARSING
   location
   longident
@@ -300,6 +304,8 @@
   typedecl
   typeopt
   value_rec_check
+  typing_recovery_state
+  typing_recovery
   typecore
   solver_intf
   solver
@@ -320,6 +326,7 @@
   outcometree
   allowance
   ;; lambda/
+  branch_annotations
   debuginfo
   lambda
   static_label
@@ -347,6 +354,7 @@
   translobj
   translprim
   translquote
+  translrepr
   ;; bytecomp/
   debug_event
   meta

@@ -1,0 +1,3 @@
+(cram
+ (applies_to warning-attribute-scope)
+ (locks ../server-tests/merlin_server))
