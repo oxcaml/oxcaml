@@ -740,9 +740,12 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
         try Env.find_type p env with Not_found -> raise Missing_cmi_fallback
       in
       if cannot_proceed () then
+        (* [decl.type_jkind] may be more general than [value_or_null] (e.g.
+           [('a : any) t = { field : 'a } [@@unboxed]]), so use the jkind of
+           the instantiated type instead. *)
         num_nodes_visited,
         add_nullability_from_ty env scty
-          (value_kind_of_scannable_jkind env decl.type_jkind)
+          (value_kind_of_scannable_jkind env (Ctype.type_jkind env scty))
       else
         let visited = Numbers.Int.Set.add (get_id ty) visited in
         (* Default of [Pgenval] is currently safe for the missing cmi fallback
@@ -777,7 +780,8 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
           fallback_if_missing_cmi
             ~default:(num_nodes_visited, nullable Pgenval)
             (fun () ->
-               value_kind env ~loc ~visited ~depth ~num_nodes_visited ld_type)
+               value_kind_unboxed_field env ~loc ~visited ~depth
+                 ~num_nodes_visited ~params:decl.type_params ~args ld_type)
         | Type_record_unboxed_product (([] | _::_::_),
                                        Record_unboxed_product,
                                        _) ->
@@ -811,6 +815,16 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
   | _ ->
     num_nodes_visited,
     add_nullability_from_ty env scty Pgenval
+
+(* The field type must be instantiated with the type arguments: the declared
+   field type may mention parameters whose declared layout is more general
+   than [value_or_null] (e.g. [any]). *)
+and value_kind_unboxed_field env ~loc ~visited ~depth ~num_nodes_visited
+      ~params ~args field_ty =
+  match Ctype.apply env params field_ty args with
+  | exception Ctype.Cannot_apply -> num_nodes_visited, nullable Pgenval
+  | field_ty ->
+    value_kind env ~loc ~visited ~depth ~num_nodes_visited field_ty
 
 and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
       (field : unit Lambda.mixed_block_element) ty
@@ -924,12 +938,14 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
     end
   | Variant_unboxed -> begin
       (* CR layouts v1.5: This should only be reachable in the case of a missing
-         cmi, according to the comment on scrape_ty.  Reevaluate whether it's
-         needed when we deal with missing cmis. *)
+         cmi, or when the contents are an [or_null], which [scrape_ty] doesn't
+         look through.  Reevaluate whether it's needed when we deal with
+         missing cmis. *)
       match cstrs with
       | [{cd_args=Cstr_tuple [{ca_type=ty}]}]
       | [{cd_args=Cstr_record [{ld_type=ty}]}] ->
-        value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
+        value_kind_unboxed_field env ~loc ~visited ~depth ~num_nodes_visited
+          ~params ~args ty
       | _ -> assert false
     end
   | Variant_boxed cstr_layouts ->
@@ -1134,11 +1150,13 @@ and value_kind_immutable_record env ~loc ~visited ~depth ~num_nodes_visited
         Types.Record_inlined (tag, shape, vrep))
   | (Record_unboxed | (Record_inlined (_, _, Variant_unboxed))) -> begin
       (* CR layouts v1.5: This should only be reachable in the case of a missing
-         cmi, according to the comment on scrape_ty.  Reevaluate whether it's
-         needed when we deal with missing cmis. *)
+         cmi, or when the contents are an [or_null], which [scrape_ty] doesn't
+         look through.  Reevaluate whether it's needed when we deal with
+         missing cmis. *)
       match labels with
       | [{ld_type}] ->
-        value_kind env ~loc ~visited ~depth ~num_nodes_visited ld_type
+        value_kind_unboxed_field env ~loc ~visited ~depth ~num_nodes_visited
+          ~params ~args ld_type
       | [] | _ :: _ :: _ -> assert false
     end
   | Record_dummy _ ->
