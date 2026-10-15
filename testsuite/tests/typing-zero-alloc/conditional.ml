@@ -18,7 +18,8 @@ Error: called function may allocate (indirect call through argument #1) (:1,29--
    *conditionally* `zero_alloc`: *)
 let[@zero_alloc conditional] iter ~f l = List.iter f l
 [%%expect{|
-val iter : f:('a -> unit) -> 'a list -> unit [@@zero_alloc conditional] = <fun>
+val iter : f:('a -> unit) -> 'a list -> unit [@@zero_alloc conditional] =
+  <fun>
 |}]
 
 let[@zero_alloc conditional] rec iter ~f : 'a list -> unit = function
