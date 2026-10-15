@@ -1,3 +1,17 @@
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*                  Liam Stevenson, Jane Street, New York                 *)
+(*                                                                        *)
+(*   Copyright 2026 Jane Street Group LLC                                 *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
+
 (** This module is adapted from
     https://github.com/ocaml/dune/blob/main/otherlibs/dune-action-trace/dune_action_trace.ml,
     but heavily modified to work with Jane Street's internal version of dune and
