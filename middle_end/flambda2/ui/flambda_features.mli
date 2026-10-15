@@ -30,8 +30,6 @@ val mode : unit -> any_mode
 
 val join_points : unit -> bool
 
-val unbox_along_intra_function_control_flow : unit -> bool
-
 val backend_cse_at_toplevel : unit -> bool
 
 val cse_depth : unit -> int

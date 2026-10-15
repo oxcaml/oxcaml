@@ -119,11 +119,6 @@ let value_slot_offset env value_slot =
   | exception Not_found -> None
   | res -> Some res
 
-let map_function_slot_offsets env f =
-  Function_slot.Map.mapi f env.function_slot_offsets
-
-let map_value_slot_offsets env f = Value_slot.Map.mapi f env.value_slot_offsets
-
 let current_offsets = ref empty
 
 let imported_offsets () = !current_offsets
