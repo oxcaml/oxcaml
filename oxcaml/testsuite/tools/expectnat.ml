@@ -50,6 +50,6 @@ let () =
     ~read_anonymous_arg
     ~extra_args:Options.list
     ~extra_init:(fun () ->
-      Clflags.set_target Clflags.Target.Native;
+      Clflags.native_code := true;
       Clflags.Opt_flag_handler.set Oxcaml_flags.opt_flag_handler)
     (module Toplevel)

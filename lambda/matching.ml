@@ -2454,7 +2454,7 @@ let inline_lazy_force arg pos loc =
         ap_specialised = Default_specialise;
         ap_probe=None;
       }
-  else if Clflags.target_is_native () && not (Clflags.is_flambda2 ()) then
+  else if !Clflags.native_code && not (Clflags.is_flambda2 ()) then
     (* CR vlaviron: Find a way for Flambda 2 to avoid both the call to
        caml_obj_tag and the switch on arbitrary tags *)
     (* Lswitch generates compact and efficient native code *)
@@ -3036,7 +3036,7 @@ module SArg = struct
   let make_isin loc h arg = Lprim (Pnot, [ make_isout loc h arg ], loc)
 
   let make_is_nonzero loc arg =
-    if Clflags.target_is_native () || Clflags.is_flambda2 ()
+    if !Clflags.native_code || Clflags.is_flambda2 ()
     then icmp Cne int arg (tagged_immediate 0) ~loc
     else arg
 
@@ -3662,7 +3662,7 @@ let transl_match_on_option value_kind arg loc ~if_some ~if_none =
   (* Keeping the Pisint test would make the bytecode
       slightly worse, but it lets the native compiler generate
       better code -- see #10681. *)
-  if Clflags.target_is_native () || Clflags.is_flambda2 () then
+  if !Clflags.native_code || Clflags.is_flambda2 () then
     Lifthenelse(Lprim (Pisint { variant_only = true }, [ arg ], loc),
                 if_none, if_some, value_kind)
   else

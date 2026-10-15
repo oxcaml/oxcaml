@@ -58,7 +58,7 @@ let rec is_path = function
 
 let meth obj lab =
   let tag = meth_tag lab in
-  if not (!cache_required && Clflags.target_is_native ()) then (tag, []) else
+  if not (!cache_required && !Clflags.native_code) then (tag, []) else
   if not (is_path obj) then next_cache tag else
   try
     let r = List.assoc obj !method_table in
@@ -134,7 +134,7 @@ let transl_label_init_flambda f =
   transl_label_init_general (fun () -> expr, repr)
 
 let transl_label_init f =
-  if Clflags.target_is_native () || Clflags.is_flambda2 () then
+  if !Clflags.native_code || Clflags.is_flambda2 () then
     transl_label_init_flambda f
   else
     transl_label_init_general f

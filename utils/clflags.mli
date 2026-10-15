@@ -200,17 +200,25 @@ val dump_cse : bool ref
 val dump_linear : bool ref
 val debug_ocaml : bool ref
 val keep_startup_file : bool ref
+val native_code : bool ref
+
+(** Set when compiling for the js_of_ocaml target, i.e. under
+    [ocamlopt -target js_of_ocaml]. See [set_target]. *)
+val jsir : bool ref
 
 module Target : sig
-  type t =
-    | Bytecode
-    | Native
-    | Js_of_ocaml
+  type t = Native | Js_of_ocaml
+
+  val names : string list
+  val of_string : string -> t option
+  val to_string : t -> string
 end
 
+(** The backend selected with [-target] (ocamlopt only). *)
+val target : Target.t ref
+
+(** Select the backend, updating [native_code] and [jsir] accordingly. *)
 val set_target : Target.t -> unit
-val target_is_native : unit -> bool
-val target_is_jsir : unit -> bool
 
 (** The js_of_ocaml invocations of [ocamlopt -target js_of_ocaml] that options
     can be passed through to, with [-jsoo-opt-<phase>] (and [-jsoo-opt] for all

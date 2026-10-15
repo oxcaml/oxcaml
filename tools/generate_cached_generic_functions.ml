@@ -74,7 +74,7 @@ let cached_generic_functions unix ~ppf_dump ~id output_name genfns =
 
 let main filename =
   let unix = (module Unix_for_owee : Compiler_owee.Unix_intf.S) in
-  Clflags.set_target Clflags.Target.Native;
+  Clflags.native_code := true;
   Clflags.use_linscan := true;
   Clflags.function_sections := Config.function_sections;
   Compmisc.init_path ();

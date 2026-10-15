@@ -482,7 +482,7 @@ let assemble_file infile outfile =
     0
   | None ->
     let dwarf_flag =
-      if Clflags.target_is_native () && !Clflags.debug then
+      if !Clflags.native_code && !Clflags.debug then
         Dwarf_flags.get_dwarf_as_toolchain_flag ()
       else
         ""

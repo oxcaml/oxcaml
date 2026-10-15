@@ -1,5 +1,5 @@
 let () =
-  Clflags.set_target Clflags.Target.Native;
+  Clflags.native_code := true;
   Opttoploop.set_paths ();
   Opttoploop.initialize_toplevel_env ();
   Jit.init_top ();

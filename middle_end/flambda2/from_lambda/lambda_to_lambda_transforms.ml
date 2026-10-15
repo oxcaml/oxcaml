@@ -253,7 +253,7 @@ let initialize_array0 env loc ~length array_set_kind width ~init creation_expr =
     match width with
     | Sixty_four_or_more -> L.lambda_unit
     | Thirty_two_or_less { width; zero_init } ->
-      if Clflags.target_is_jsir ()
+      if !Clflags.jsir
       then L.lambda_unit
       else
         let elements_per_word =
@@ -323,15 +323,15 @@ let makearray_dynamic_singleton name (mode : L.locality_mode) ~length ~init loc
       Printf.sprintf "caml_make%s_%s_vect%s"
         (match mode with
         | Alloc_heap -> ""
-        | Alloc_local when Clflags.target_is_jsir () -> ""
+        | Alloc_local when !Clflags.jsir -> ""
         | Alloc_local -> "_local")
         name
-        (if Clflags.target_is_jsir () then "_bytecode" else "")
+        (if !Clflags.jsir then "_bytecode" else "")
     else if
       (* For regular (boxed) arrays, use the new #13003 names. JSOO doesn't have
          the new names yet, so we fall back to the old ones. It also doesn't
          discriminate between local and heap allocations. *)
-      Clflags.target_is_jsir ()
+      !Clflags.jsir
     then "caml_make_vect"
     else
       match mode with
@@ -1112,7 +1112,7 @@ let transform_primitive0 env (prim : L.primitive) args loc =
           "Lambda_to_flambda.transform_primitive: Pbigarrayset with unknown \
            layout and elements should only have dimensions between 1 and 3 \
            (see translprim).")
-  | Pctconst const, _ when Clflags.target_is_jsir () ->
+  | Pctconst const, _ when !Clflags.jsir ->
     let name =
       match const with
       | Big_endian -> "big_endian"

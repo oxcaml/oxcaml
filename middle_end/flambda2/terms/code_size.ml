@@ -141,7 +141,7 @@ let arith_conversion_size ~machine_width src dst =
 
 let unbox_number ~machine_width kind =
   (* Box/unbox are identities in JSIR *)
-  if Clflags.target_is_jsir ()
+  if !Clflags.jsir
   then 0
   else
     match (kind : Flambda_kind.Boxable_number.t) with
@@ -155,7 +155,7 @@ let unbox_number ~machine_width kind =
 
 let box_number ~machine_width kind =
   (* Box/unbox are identities in JSIR *)
-  if Clflags.target_is_jsir ()
+  if !Clflags.jsir
   then 0
   else
     match (kind : Flambda_kind.Boxable_number.t) with
@@ -436,12 +436,12 @@ let unary_prim_size ~machine_width prim =
       (* Needs a move between register classes. *) 1)
   | Unbox_number k -> unbox_number ~machine_width k
   | Untag_immediate ->
-    if Clflags.target_is_jsir ()
+    if !Clflags.jsir
     then 0 (* Numbers are not tagged in JSIR *)
     else 1 (* 1 shift *)
   | Box_number (k, _alloc_mode) -> box_number ~machine_width k
   | Tag_immediate ->
-    if Clflags.target_is_jsir ()
+    if !Clflags.jsir
     then 0 (* Numbers are not tagged in JSIR *)
     else 2 (* 1 shift + add *)
   | Project_function_slot _ -> 1 (* caddv *)

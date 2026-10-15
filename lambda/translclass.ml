@@ -668,8 +668,7 @@ let rec build_class_init ~scopes cla cstr super inh_init cl_init msubst top cl =
                     (transl_scoped_exp ~scopes Lambda.layout_method exp)
                 in
                 let met_code =
-                  if Clflags.target_is_native () && List.length met_code = 1
-                  then
+                  if !Clflags.native_code && List.length met_code = 1 then
                     (* Force correct naming of method for profiles *)
                     let met = Ident.create_local ("method_" ^ name.txt) in
                     [Llet(Strict, layout_meth, met, Lambda.debug_uid_none,
@@ -1158,7 +1157,7 @@ let transl_class ~scopes ids cl_id pub_meths cl vflag =
           Lambda.subst no_env_update (subst env body 0 new_ids_meths) body in
         begin try
           (* Doesn't seem to improve size for bytecode *)
-          (* if not (Clflags.target_is_native ()) then raise Not_found; *)
+          (* if not !Clflags.native_code then raise Not_found; *)
           if not arr || !Clflags.debug then raise Not_found;
           builtin_meths [self.name] env env2 (lfunction return args body')
         with Not_found ->
@@ -1383,7 +1382,7 @@ let transl_class ~scopes ids cl_id pub_meths cl vflag =
                     [transl_meth_list pub_meths;
                      Lvar class_init; Lvar cached], layout_unit)) in
   let lcheck_cache =
-    if Clflags.target_is_native () && !Clflags.afl_instrument then
+    if !Clflags.native_code && !Clflags.afl_instrument then
       (* When afl-fuzz instrumentation is enabled, ignore the cache
          so that the program's behaviour does not change between runs *)
       lupdate_cache

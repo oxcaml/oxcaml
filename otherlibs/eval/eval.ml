@@ -124,7 +124,7 @@ let eval (expr : 'a expr) =
   (* TODO: reset all the things *)
   (* TODO: these flags should maybe be snapshotted and restored *)
   Clflags.no_cwd := true;
-  Clflags.set_target Clflags.Target.Native;
+  Clflags.native_code := true;
   Clflags.dont_write_files := true;
   Clflags.shared := true;
   Clflags.dlcode := false;

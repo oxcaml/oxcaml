@@ -425,12 +425,12 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
   (* CR mshinwell: Evaluate the impact of simply removing [Alias] from
      [Lambda], given what Flambda 2 does. *)
   let dwarf_wants_to_prevent_substitutions =
-    Clflags.target_is_native ()
+    !Clflags.native_code
     && !Clflags.debug
     && not restrict_to_upstream_dwarf
     && gdwarf_may_alter_codegen
   in
-  let optimize = Clflags.target_is_native () || not !Clflags.debug  in
+  let optimize = !Clflags.native_code || not !Clflags.debug  in
   let optimize_except_alias_bindings =
     (* The debug info degrades when we substitute let x = y in ... bindings. We
        disable their simplification when [dwarf_wants_to_prevent_substitutions].
@@ -1020,7 +1020,7 @@ let simplify_local_functions lam =
   let enabled = function
     (* Stubs are explicitly intended for the middle-end inliner, they should not
        be contified. *)
-    | {stub=true; _ } when Clflags.target_is_native ()
+    | {stub=true; _ } when !Clflags.native_code
       -> false
     | {local = Always_local; _}
     | {local = Default_local;
@@ -1193,8 +1193,7 @@ let simplify_local_functions lam =
 let simplify_lambda lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
   let lam =
     lam
-    |> (if Clflags.target_is_native () || Clflags.is_flambda2()
-           || not !Clflags.debug
+    |> (if !Clflags.native_code || Clflags.is_flambda2() || not !Clflags.debug
         then simplify_local_functions else Fun.id
        )
     |> simplify_exits

@@ -819,7 +819,7 @@ and transl_structure ~scopes loc
       (* This debugging event provides information regarding the structure
          items. It is ignored by the OCaml debugger but is used by
          Js_of_ocaml to preserve variable names. *)
-      (if !Clflags.debug && not (Clflags.target_is_native ()) then
+      (if !Clflags.debug && not !Clflags.native_code then
          Levent(body,
                 {lev_loc = loc;
                  lev_kind = Lev_pseudo;
@@ -1276,7 +1276,7 @@ let toplevel_name id =
   with Not_found -> Ident.name id
 
 let toploop_getvalue id =
-  if Clflags.target_is_native () then
+  if !Clflags.native_code then
     (* [toploop_getvalue] and [toploop_setvalue] are only used by bytecode, so
        we can hardcode the module representations passed to [mod_field] as
        [Module_value_only]. *)
@@ -1301,7 +1301,7 @@ let toploop_getvalue id =
   }
 
 let toploop_setvalue id lam =
-  if Clflags.target_is_native () then
+  if !Clflags.native_code then
     (* See comment under [toploop_getvalue] *)
     fatal_error "Translmod.toploop_setvalue: expected bytecode";
   Lapply{
