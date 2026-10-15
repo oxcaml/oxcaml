@@ -229,3 +229,46 @@ end;;
 [%%expect {|
 module T8 : sig end
 |}]
+
+module T9 : sig end = struct
+  module F () = struct
+    let x = 42
+  end
+
+  open F ()
+
+  let () =
+    let open struct
+      let x = 42
+      let y = 13
+    end in
+    let _z = x in
+    ()
+end;;
+
+[%%expect{|
+Lines 9-12, characters 8-7:
+ 9 | ........open struct
+10 |       let x = 42
+11 |       let y = 13
+12 |     end...
+Warning 44 [open-shadow-identifier]: this open statement shadows the
+  value identifier "x" (which is later used)
+
+Line 3, characters 8-9:
+3 |     let x = 42
+            ^
+Warning 32 [unused-value-declaration]: unused value "x".
+
+Line 6, characters 2-11:
+6 |   open F ()
+      ^^^^^^^^^
+Warning 33 [unused-open]: unused open "<anonymous module>".
+
+Line 11, characters 10-11:
+11 |       let y = 13
+               ^
+Warning 32 [unused-value-declaration]: unused value "y".
+
+module T9 : sig end
+|}]

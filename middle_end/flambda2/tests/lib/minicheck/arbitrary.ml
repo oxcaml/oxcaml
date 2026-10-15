@@ -161,15 +161,15 @@ end
 
 let tuple_impl impls =
   let generators impls =
-    let open Tuple.Map (Impl) (G.T) in
+    let open! Tuple.Map (Impl) (G.T) in
     map impls ~f:{ f = (fun impl -> impl.generator) }
   in
   let shrinkers impls =
-    let open Tuple.Map (Impl) (S.T) in
+    let open! Tuple.Map (Impl) (S.T) in
     map impls ~f:{ f = (fun impl -> impl.shrinker) }
   in
   let printers impls =
-    let open Tuple.Map (Impl) (P.T) in
+    let open! Tuple.Map (Impl) (P.T) in
     map impls ~f:{ f = (fun impl -> impl.printer) }
   in
   let generator = G.tuple (generators impls) in
