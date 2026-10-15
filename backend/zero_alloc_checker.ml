@@ -361,7 +361,7 @@ module V : sig
 
   val transform : t -> t -> t
 
-  val replace_witnesses : Witnesses.t -> t -> t
+  val apply_call : Witnesses.t -> t -> t
 
   val diff_witnesses :
     conditional:bool -> expected:t -> actual:t -> Witness_set.t
@@ -431,8 +431,6 @@ end = struct
 
     val has_witnesses : t -> bool
 
-    val replace_witnesses : t -> Witnesses.t -> t
-
     val print : witnesses:bool -> Format.formatter -> t -> unit
 
     val fold : f:(Var.t -> Witnesses.t -> 'acc -> 'acc) -> init:'acc -> t -> 'acc
@@ -477,8 +475,6 @@ end = struct
           | None -> Some witnesses | Some w -> Some (Witnesses.join w witnesses))
         t
 
-    let replace_witnesses t w = Var.Map.map (fun _ -> w) t
-
     let print ~witnesses ppf t =
       Var.Map.iter (fun var w -> pp_var ~witnesses ppf var w) t
 
@@ -510,8 +506,6 @@ end = struct
     val equal : t -> t -> bool
 
     val has_witnesses : t -> bool
-
-    val replace_witnesses : t -> Witnesses.t -> t
 
     val flatten : t -> t -> t
 
@@ -607,12 +601,6 @@ end = struct
       | Args_with_top { w; vars } ->
         Vars.has_witnesses vars || not (Witnesses.is_empty w)
       | Args vars -> Vars.has_witnesses vars
-
-    let replace_witnesses t w =
-      match t with
-      | Args vars -> Args (Vars.replace_witnesses vars w)
-      | Args_with_top { w = _; vars } ->
-        Args_with_top { w; vars = Vars.replace_witnesses vars w }
 
     let print ~witnesses ppf t =
       match t with
@@ -750,8 +738,6 @@ end = struct
 
     val has_witnesses : t -> bool
 
-    val replace_witnesses : t -> Witnesses.t -> t
-
     val cutoff : t -> int -> t
 
     val compare : t -> t -> int
@@ -843,11 +829,6 @@ end = struct
     let has_witnesses { vars; trs } =
       Vars.has_witnesses vars || Transforms.exists Transform.has_witnesses trs
 
-    let replace_witnesses { vars; trs } w =
-      { vars = Vars.replace_witnesses vars w;
-        trs = Transforms.map (fun tr -> Transform.replace_witnesses tr w) trs
-      }
-
     let cutoff { vars; trs } n =
       { vars = Vars.cutoff vars n; trs = Transforms.cutoff trs n }
 
@@ -901,8 +882,6 @@ end = struct
     val print : witnesses:bool -> Format.formatter -> t -> unit
 
     val has_witnesses : t -> bool
-
-    val replace_witnesses : t -> Witnesses.t -> t
 
     val compare : t -> t -> int
 
@@ -1109,14 +1088,6 @@ end = struct
       | Args_with_safe args | Args args -> Args.has_witnesses args
       | Args_with_top { w; args } ->
         (not (Witnesses.is_empty w)) || Args.has_witnesses args
-
-    let replace_witnesses t witnesses =
-      match t with
-      | Args_with_safe args ->
-        Args_with_safe (Args.replace_witnesses args witnesses)
-      | Args args -> Args (Args.replace_witnesses args witnesses)
-      | Args_with_top { w = _; args } ->
-        args_with_top witnesses (Args.replace_witnesses args witnesses)
 
     let compare t1 t2 =
       match t1, t2 with
@@ -1407,13 +1378,13 @@ end = struct
      while keeping the comments about implementation choices and/or imperatives
      (e.g. why/how witnesses are tracked) next to the code. *)
 
-  let replace_witnesses w t =
-    match t with
+  let apply_call w v =
+    match v with
     | Top _ -> Top w
-    | Bot | Safe -> t
-    | Join j -> Join (Join.replace_witnesses j w)
-    | Transform tr -> Transform (Transform.replace_witnesses tr w)
-    | Var { var; witnesses = _ } -> Var { var; witnesses = w }
+    | Bot | Safe -> v
+    | Var _ | Transform _ | Join _ ->
+      Misc.fatal_errorf "Zero_alloc_checker.apply_call: unresolved value %a"
+        (print ~witnesses:false) v
 
   let diff_witnesses ~conditional ~expected ~actual =
     if satisfies ~conditional ~actual ~expected
@@ -1454,7 +1425,7 @@ end = struct
     let get env var w =
       match env var with
       | None -> unresolved w var
-      | Some v -> replace_witnesses w v
+      | Some v -> apply_call w v
     in
     let contains_any env vars =
       Vars.exists (fun var _w -> Option.is_some (env var)) vars
@@ -1465,8 +1436,7 @@ end = struct
     let rec aux t =
       match t with
       | Bot | Safe | Top _ -> t
-      | Var { var; witnesses } -> (
-        match env var with None -> t | Some v -> replace_witnesses witnesses v)
+      | Var { var; witnesses } -> get env var witnesses
       | Transform tr ->
         let vars = Transform.get_vars tr in
         if not (contains_any env vars)
@@ -1512,7 +1482,7 @@ module Value : sig
 
   val transform : V.t -> t -> t
 
-  val replace_witnesses : Witnesses.t -> t -> t
+  val apply_call : Witnesses.t -> t -> t
 
   val get_unresolved_names : t -> String.Set.t
 
@@ -1561,10 +1531,10 @@ end = struct
       div = V.transform effect_ v.div
     }
 
-  let replace_witnesses w t =
-    { nor = V.replace_witnesses w t.nor;
-      exn = V.replace_witnesses w t.exn;
-      div = V.replace_witnesses w t.div
+  let apply_call w v =
+    { nor = V.apply_call w v.nor;
+      exn = V.apply_call w v.exn;
+      div = V.apply_call w v.div
     }
 
   let diff_witnesses ~conditional ~expected ~actual =
@@ -2401,7 +2371,7 @@ end = struct
          Summary of tailcall self won't be affected because it is not set to Top
          by [find_callee]. *)
       let w = create_witnesses t k dbg in
-      Value.replace_witnesses w v
+      Value.apply_call w v
     in
     let return_top hint reason =
       let w = create_witnesses t ~hint k dbg in
