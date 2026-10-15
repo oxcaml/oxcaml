@@ -364,15 +364,6 @@ alloc_size_class_stack_noexc(mlsize_t wosize, int cache_bucket, value hval,
 
 }
 
-/* allocate a stack with at least "wosize" usable words of stack */
-struct stack_info*
-caml_alloc_stack_noexc(mlsize_t wosize, value hval, value hexn, value heff, int64_t id)
-{
-  int cache_bucket = stack_cache_bucket (wosize);
-  return alloc_size_class_stack_noexc(wosize, cache_bucket, hval, hexn, heff,
-                                      /*htick=*/Val_null, false, id);
-}
-
 static int64_t new_fiber_id(void)
 {
   enum { Fiber_id_chunk = 1024 };

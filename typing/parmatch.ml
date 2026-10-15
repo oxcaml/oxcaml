@@ -384,11 +384,27 @@ module Compat
   | Tpat_record (l1,_,_),Tpat_record (l2,_,_) ->
       let ps,qs = records_args l1 l2 in
       compats ps qs
+  | ( Tpat_record_unboxed_product (l1, _, _),
+      Tpat_record_unboxed_product (l2, _, _) ) ->
+      let ps, qs = records_args l1 l2 in
+      compats ps qs
   | Tpat_array (am1, _, ps), Tpat_array (am2, _, qs) ->
       am1 = am2 &&
       List.length ps = List.length qs &&
       compats ps qs
-  | _,_  -> false
+  | Tpat_fun_layout _, _
+  | Tpat_constant _, _
+  | Tpat_unboxed_unit, _
+  | Tpat_unboxed_bool _, _
+  | Tpat_tuple _, _
+  | Tpat_unboxed_tuple _, _
+  | Tpat_construct (_, _, _, _, _), _
+  | Tpat_variant (_, _, _), _
+  | Tpat_record (_, _, _), _
+  | Tpat_record_unboxed_product (_, _, _), _
+  | Tpat_array (_, _, _), _
+  | Tpat_lazy _, _ ->
+      false
 
   and ocompat op oq = match op,oq with
   | None,None -> true

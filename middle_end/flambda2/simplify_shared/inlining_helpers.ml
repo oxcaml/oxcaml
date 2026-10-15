@@ -108,7 +108,7 @@ let wrap_inlined_body_for_exn_extra_args acc ~extra_args ~apply_exn_continuation
             in
             let wrapper_return_duid = Flambda_debug_uid.none in
             Bound_parameter.create wrapper_return k wrapper_return_duid)
-          (Flambda_arity.unarized_components result_arity)
+          (Flambda_arity.unarize result_arity)
       in
       let trap_action =
         Trap_action.Pop { exn_handler = wrapper; raise_kind = None }
