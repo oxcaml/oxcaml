@@ -179,22 +179,41 @@ let scheduler = s_ref_of_create Scheduler.create ()
 
 let scheduler () = !scheduler
 
-(* Runs the scheduler, then defaults any still-empty ivars, until none remain.
-   Defaulting calls each handler's [run] with its [default ()]; [run]'s
-   unification fills the ivar (see [upon_shape]). *)
-let run_scheduler_and_default_ivars () =
+(* Which pending ivars to default: those that block the generalization of the
+   region at the given level (see [Ivar.Global_pool.entry]), or, at top level,
+   those created at or above the given level. *)
+type defaulting =
+  | Blocking_generalization of int
+  | Created_at_or_above of int
+
+(* Runs the scheduler, then defaults the still-empty ivars selected by
+   [defaulting], until none remain to be defaulted. Defaulting calls each
+   handler's [cancel] (see [upon]). The other ivars are put back into the
+   pool, to be defaulted by an enclosing region or at top level. *)
+let run_scheduler_and_default_ivars defaulting =
   let rec loop () =
     Scheduler.run (scheduler ());
     let defaulted = ref false in
-    List.iter (fun (Ivar.Packed ivar) ->
+    List.iter (fun ({ ivar = Ivar.Packed ivar; blocks; created_at } as entry
+                    : Ivar.Global_pool.entry) ->
         if Ivar.is_empty ivar then begin
-          defaulted := true;
-          Ivar.cancel_all ivar ~scheduler:(scheduler ())
+          let default =
+            match defaulting with
+            | Blocking_generalization level -> blocks ~level
+            | Created_at_or_above level -> created_at >= level
+          in
+          if default then begin
+            defaulted := true;
+            Ivar.cancel_all ivar ~scheduler:(scheduler ())
+          end else Ivar.Global_pool.add entry
         end)
-      (Ivar.Global_pool.take ());
+      (List.rev (Ivar.Global_pool.take ()));
     if !defaulted then loop ()
   in
   loop ()
+
+let default_ivars_at_top_level () =
+  run_scheduler_and_default_ivars (Created_at_or_above !current_level)
 
 let get_current_level () = !current_level
 let init_def level = current_level := level; nongen_level := level
@@ -235,11 +254,11 @@ let with_local_level_gen ~begin_def ~structure ?before_generalize f =
         wrap_end_def (fun () ->
             let result = f () in
             (* Before exiting the current pool, we must run all
-               pending ivar handlers. If any ivars are pending
-               after running the scheduler, we default them and
-               loop *)
+               pending ivar handlers. If any ivars that block
+               generalization are pending after running the
+               scheduler, we default them and loop *)
             if not structure then
-            run_scheduler_and_default_ivars ();
+            run_scheduler_and_default_ivars (Blocking_generalization level);
             result)
       in
       Option.iter (fun g -> g result) before_generalize;
@@ -268,8 +287,12 @@ let with_local_level_gen ~begin_def ~structure ?before_generalize f =
            without introducing polymorphism *)
         if ty.level >= level then Transient_expr.set_level ty !current_level;
         add_to_pool ~level:ty.level ty
+    | Tivar _ when ty.level < level ->
+      (* A [Tivar] whose level was lowered is not generalized, so is not
+         defaulted. Move it to an outer pool. *)
+      add_to_pool ~level:ty.level ty
     | Tivar _ ->
-      (* [Tivar]s cannot exist after defaulting *)
+      (* Generalizable [Tivar]s cannot exist after defaulting *)
       fatal_error "Ctype.with_local_level_gen: unsupported Tivar"
     | Tlink _ -> ()
         (* If a node is no longer used as representative, no need
@@ -372,9 +395,21 @@ let new_scoped_ty scope desc = newty3 ~level:!current_level ~scope desc
 let newvar ?name jkind =
   newty2 ~level:!current_level (Tvar { name; jkind })
 
+(* A [Tivar]'s ivar blocks the generalization of a region iff the [Tivar]
+   (or what it has been unified with) would be generalized by it. *)
+let tivar_blocks ty ~level = get_level ty >= level
+
 let newivar ?name jkind =
-  let ivar = Ivar.create ~in_global_pool:true () in
-  newty2 ~level:!current_level (Tivar { name; jkind; ivar })
+  let ty = ref None in
+  let blocks ~level =
+    match !ty with Some ty -> tivar_blocks ty ~level | None -> true
+  in
+  let ivar =
+    Ivar.create ~in_global_pool:true ~blocks ~created_at:!current_level ()
+  in
+  let t = newty2 ~level:!current_level (Tivar { name; jkind; ivar }) in
+  ty := Some t;
+  t
 
 let new_rep_var ?name ~why () =
   let jkind, sort = Jkind.of_new_sort_var ~why ~level:!current_level in
@@ -5293,7 +5328,10 @@ let upon env ty ~run ~default =
   | Tvar { name; jkind } ->
     if get_level ty = generic_level
     then Misc.fatal_error "Ctype.upon: generic type variable";
-    let ivar = Ivar.create ~in_global_pool:true () in
+    let ivar =
+      Ivar.create ~in_global_pool:true ~blocks:(tivar_blocks ty)
+        ~created_at:!current_level ()
+    in
     set_type_desc ty (Tivar { name; jkind; ivar });
     wait ivar
   | Tivar { ivar; _ } -> wait ivar

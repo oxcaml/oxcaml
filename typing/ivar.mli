@@ -13,13 +13,22 @@
 
     There is a single, global pool. It does not distinguish ivars by when or
     where they were created: {!Global_pool.take} returns every ivar registered
-    since the previous [take]. *)
+    since the previous [take]. Each entry carries a guard, which the client uses
+    to decide whether the ivar must be cancelled now (see {!Global_pool.entry}).
+*)
 
 type 'a t
 
-(** [create ~in_global_pool ()] returns an empty ivar, added to the
-    {!Global_pool} iff [in_global_pool]. *)
-val create : in_global_pool:bool -> unit -> 'a t
+(** [create ~in_global_pool ?blocks ?created_at ()] returns an empty ivar, added
+    to the {!Global_pool} iff [in_global_pool], with guard [blocks] (by default,
+    [fun ~level:_ -> true]) and creation level [created_at] (by default, [0]).
+    See {!Global_pool.entry}. *)
+val create :
+  in_global_pool:bool ->
+  ?blocks:(level:int -> bool) ->
+  ?created_at:int ->
+  unit ->
+  'a t
 
 (** [is_empty t] returns [true] if [t] is empty. *)
 val is_empty : 'a t -> bool
@@ -69,9 +78,23 @@ type packed = Packed : 'a t -> packed
 (** The global pool of ivars that must be filled or cancelled, described at the
     top of this module. *)
 module Global_pool : sig
-  (** [take ()] empties the pool, returning the ivars that were in it. Like all
-      mutations, this is logged, so backtracking restores the pool. *)
-  val take : unit -> packed list
+  (** An ivar in the pool. [blocks ~level] is [true] if the ivar must be
+      cancelled before generalizing the region at [level], i.e. if a suspended
+      constraint waiting on it captures something that would be generalized.
+      [created_at] is the level at which the entry was created, used to decide
+      which ivars to default at top level. *)
+  type entry =
+    { ivar : packed;
+      blocks : level:int -> bool;
+      created_at : int
+    }
+
+  (** [take ()] empties the pool, returning the entries that were in it. Like
+      all mutations, this is logged, so backtracking restores the pool. *)
+  val take : unit -> entry list
+
+  (** [add entry] puts [entry] (e.g. taken by [take]) back into the pool. *)
+  val add : entry -> unit
 end
 
 (** All mutations are reported to the log installed by [set_log], so they can be

@@ -47,13 +47,19 @@ type 'a t = 'a Cell.t Union_find.t
 
 type packed = Packed : 'a t -> packed
 
-let global_pool : packed list ref = Local_store.s_ref []
+type entry =
+  { ivar : packed;
+    blocks : level:int -> bool;
+    created_at : int
+  }
+
+let global_pool : entry list ref = Local_store.s_ref []
 
 module Change = struct
   type t =
     | Union_find of Union_find.Change.t
     | Global_pool_add
-    | Global_pool_take of packed list
+    | Global_pool_take of entry list
 
   let undo = function
     | Union_find change -> Union_find.Change.undo change
@@ -116,9 +122,15 @@ let merge t1 t2 ~f ~scheduler =
     Cell.After_merge.run after ~scheduler)
 
 module Global_pool = struct
-  let add t =
+  type nonrec entry = entry =
+    { ivar : packed;
+      blocks : level:int -> bool;
+      created_at : int
+    }
+
+  let add entry =
     Log.log Global_pool_add;
-    global_pool := Packed t :: !global_pool
+    global_pool := entry :: !global_pool
 
   let take () =
     let pool = !global_pool in
@@ -127,7 +139,9 @@ module Global_pool = struct
     pool
 end
 
-let create ~in_global_pool () =
+let always_blocks ~level:_ = true
+
+let create ~in_global_pool ?(blocks = always_blocks) ?(created_at = 0) () =
   let t = Union_find.create Cell.empty in
-  if in_global_pool then Global_pool.add t;
+  if in_global_pool then Global_pool.add { ivar = Packed t; blocks; created_at };
   t
