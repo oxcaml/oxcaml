@@ -338,8 +338,7 @@ void caml_scan_stack(
 
 value caml_alloc_stack(value hval, value hexn, value heff);
 value caml_alloc_stack_preemptible(value hval, value hexn, value heff, value htick);
-struct stack_info* caml_alloc_stack_noexc(mlsize_t wosize, value hval,
-                                          value hexn, value heff, int64_t id);
+
 /* try to grow the stack until at least required_size words are available.
    returns nonzero on success */
 CAMLextern int caml_try_realloc_stack (asize_t required_wsize);
