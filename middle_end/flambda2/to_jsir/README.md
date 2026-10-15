@@ -49,8 +49,8 @@ This means that JavaScript stubs receive exactly the same values for `int8#`/`in
 
 ## Block indices
 JSIR blocks have the same flattened and reordered layout as native blocks. However, these blocks
-are represented as JavaScript arrays, and thus each (unarised) element always occupies one slot
-In particular, arrays are never packed, and so always occupy the same number of slots as its length.
+are represented as JavaScript arrays, and thus each (unarised) element always occupies one slot.
+In particular, arrays are never packed, and so always occupy the same number of slots as their length.
 
 We treat every slot as being 8 bytes wide. This means that the indexing behaviour differs
 compared to native code: for example, accessing the second element of a packed `int32# array` will
