@@ -337,10 +337,10 @@ struct stack_info* caml_alloc_stack_noexc(mlsize_t wosize, value hval,
 CAMLextern int caml_try_realloc_stack (asize_t required_wsize);
 
 /* Parameters settable with OCAMLRUNPARAM */
-extern uintnat caml_init_main_stack_wsz;   /* -Xmain_stack_size= */
-extern uintnat caml_init_thread_stack_wsz; /* -Xthread_stack_size= */
-extern uintnat caml_init_fiber_stack_wsz;  /* -Xfiber_stack_size= */
-extern uintnat caml_cache_stacks_per_class;/* -Xcache_stacks_per_class= */
+extern uintnat caml_init_main_stack_wsz;   /* Xmain_stack_size= */
+extern uintnat caml_init_thread_stack_wsz; /* Xthread_stack_size= */
+extern uintnat caml_init_fiber_stack_wsz;  /* Xfiber_stack_size= */
+extern uintnat caml_cache_stacks_per_class;/* Xcache_stacks_per_class= */
 
 #define STACK_SIZE_MAIN   0
 #define STACK_SIZE_THREAD 1

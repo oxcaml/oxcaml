@@ -65,13 +65,13 @@ static CAMLthread_local int64_t fiber_id_local = 0;
 #define MAX_STACK_CACHE_LIMIT  Max_domains_max
 
 /* Parameters settable with OCAMLRUNPARAM */
-uintnat caml_init_main_stack_wsz = 0;   /* -Xmain_stack_size= */
-uintnat caml_init_thread_stack_wsz = 0; /* -Xthread_stack_size= */
-uintnat caml_init_fiber_stack_wsz = 0;  /* -Xfiber_stack_size= */
+uintnat caml_init_main_stack_wsz = 0;   /* Xmain_stack_size= */
+uintnat caml_init_thread_stack_wsz = 0; /* Xthread_stack_size= */
+uintnat caml_init_fiber_stack_wsz = 0;  /* Xfiber_stack_size= */
 
 uintnat caml_nohugepage_stacks = 1;
 
-uintnat caml_cache_stacks_per_class = /* -Xcache_stacks_per_class */
+uintnat caml_cache_stacks_per_class = /* Xcache_stacks_per_class */
 #if defined(USE_MMAP_MAP_STACK) || defined(STACK_GUARD_PAGES)
   1
 #else
