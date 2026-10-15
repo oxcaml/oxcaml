@@ -251,7 +251,7 @@ let select_operation' ~generic_select_condition:_ (op : Cmm.operation)
   | Caddi128 | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Ccsel _
   | Cclz | Cctz | Cpopcnt | Cprefetch _ | Catomic _ | Ccmpi _ | Cabsf _
   | Cmulf _ | Cdivf _ | Creinterpret_cast _ | Cstatic_cast _ | Ccmpf _
-  | Craise _ | Cprobe _ | Cprobe_is_enabled _ | Copaque | Cbeginregion
+  | Craise _ | Cprobe _ | Cprobe_is_enabled _ | Copaque _ | Cbeginregion
   | Cendregion | Ctuple_field _ | Cdls_get | Ctls_get | Cdomain_index | Cpoll
   | Cpause ->
     Use_default
