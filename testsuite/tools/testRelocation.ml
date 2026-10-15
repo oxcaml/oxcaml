@@ -43,6 +43,7 @@ let effective_toolchain _config =
   in
   let assembler_embeds_build_path =
     Toolchain.assembler_embeds_build_path
+    && not (dune_maps_build_paths && Config.as_debug_prefix_map_flag <> "")
   in
   ~c_compiler_debug_paths_are_absolute, ~assembler_embeds_build_path
 
@@ -276,25 +277,27 @@ let libdir_rules config file =
          && (not Toolchain.linker_propagates_debug_information
              || Toolchain.linker_embeds_build_path) then
         Toolchain.linker_embeds_build_path
-      else if dune_maps_build_paths then
-        (* dune maps OCaml-compiled debug information (and ocamlopt's assembled
-           objects) to the /workspace_root sentinel, so they no longer carry the
-           real build directory. C debug information is not mapped (gcc ignores
-           BUILD_PATH_PREFIX_MAP) and .cmt/.cmti record the build directory
-           directly, so those still do. The standard library files are all
-           compiled both with -nostdlib (which removes one source of the path)
-           and using a manual Dune rule with a relative path, which removes the
-           other source. *)
-        let is_stdlib_file =
-          Filename.basename (Filename.dirname file) <> "compiler-libs"
-          && (String.starts_with ~prefix:"stdlib__" basename
-              || String.starts_with ~prefix:"camlinternal" basename
-              || Filename.remove_extension basename = "stdlib"
-              || Filename.remove_extension basename = "std_exit")
-        in
-        (ext = ".cmt" || ext = ".cmti") && not is_stdlib_file
-        || has_c_debug_info && c_compiler_debug_paths_are_absolute
       else
+        let has_ocaml_debug_info =
+          if dune_maps_build_paths then
+            (* dune maps OCaml-compiled debug information to the /workspace_root
+               sentinel, so it no longer carries the real build directory.
+               .cmt/.cmti record the build directory directly, so those still
+               do. The standard library files are all compiled both with
+               -nostdlib (which removes one source of the path) and using a
+               manual Dune rule with a relative path, which removes the other
+               source. *)
+            let is_stdlib_file =
+              Filename.basename (Filename.dirname file) <> "compiler-libs"
+              && (String.starts_with ~prefix:"stdlib__" basename
+                  || String.starts_with ~prefix:"camlinternal" basename
+                  || Filename.remove_extension basename = "stdlib"
+                  || Filename.remove_extension basename = "std_exit")
+            in
+            (ext = ".cmt" || ext = ".cmti") && not is_stdlib_file
+          else
+            has_ocaml_debug_info
+        in
         has_ocaml_debug_info
         || has_c_debug_info && c_compiler_debug_paths_are_absolute
         || contains_assembled_objects && assembler_embeds_build_path
