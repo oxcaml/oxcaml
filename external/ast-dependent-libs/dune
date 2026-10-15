@@ -6,13 +6,15 @@
 ; js_of_ocaml stays unvendored: recursive aliases skip vendored directories.
 (vendored_dirs deps ocaml-compiler-libs ppxlib ppxlib_jane)
 
-; A separate project, built against the installed compiler package (see
-; mkJsooSmokeTest in default.nix).
-(data_only_dirs smoke)
+; smoke is a separate project, built against the installed compiler package
+; (see mkJsooSmokeTest in default.nix). stdlib points at the compiler's
+; stdlib directory, for the few files of the stdlib-js build that the
+; installed compiler does not ship.
+(data_only_dirs smoke stdlib)
 
 ; Each alias depends on the .install files of its packages, which builds
-; everything they install. Keep in sync with PPXLIB_PACKAGES and
-; JSOO_PACKAGES in the top-level Makefile.
+; everything they install. Keep in sync with PPXLIB_PACKAGES, JSOO_PACKAGES
+; and stdlib_js_install in the top-level Makefile.
 
 (alias
  (name ppxlib-libs)
@@ -39,7 +41,8 @@
   js_of_ocaml/wasm_of_ocaml-compiler.install
   js_of_ocaml/js_of_ocaml-ppx.install
   js_of_ocaml/js_of_ocaml-runtime.install
-  js_of_ocaml/js_of_ocaml.install))
+  js_of_ocaml/js_of_ocaml.install
+  stdlib-js/stdlib-js.install))
 
 ; For js_of_ocaml's dune-workspace, which defines runtest-js and runtest-wasm.
 (alias

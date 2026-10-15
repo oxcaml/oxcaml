@@ -231,7 +231,9 @@ merlin-test:
 merlin-promote:
 	$(MAKE) -C external/merlin test-promote
 
-# AST-dependent libraries: ppxlib, js_of_ocaml and their dependencies
+# AST-dependent libraries: ppxlib, js_of_ocaml and their dependencies, and
+# the standard library compiled for ocamlopt -target js_of_ocaml (which runs
+# js_of_ocaml, so it can only be built once that is).
 #
 # Built with external/ast-dependent-libs as the dune root, against the
 # installed compiler in $(OXCAML_INSTALL) (found through PATH and OCAMLLIB).
@@ -367,6 +369,12 @@ JSOO_PACKAGES = $(PPXLIB_PACKAGES) gen sedlex cmdliner menhirLib menhirSdk \
   yojson js_of_ocaml-compiler wasm_of_ocaml-compiler js_of_ocaml-ppx \
   js_of_ocaml-runtime js_of_ocaml
 
+# The standard library for ocamlopt -target js_of_ocaml is installed into
+# lib/ocaml, next to the native one, where ocamlopt looks for it; that is its
+# only section, as its META and dune-package would describe no library.
+stdlib_js_install = \
+  $(call ast_dependent_libs_install,--sections=lib_root stdlib-js)
+
 AST_DEPENDENT_LIBS_PREFIX ?= $(OXCAML_INSTALL)
 
 ast_dependent_libs_install = \
@@ -380,11 +388,12 @@ ppxlib-install: ppxlib-build
 .PHONY: jsoo-install
 jsoo-install: jsoo-build
 	$(call ast_dependent_libs_install,$(JSOO_PACKAGES))
+	$(stdlib_js_install)
 
 # What the compiler package ships: the js_of_ocaml and wasm_of_ocaml
-# executables, and the libraries needed to write and preprocess js_of_ocaml
-# code. The compiler library and its dependencies (yojson, sedlex, ...) stay
-# out.
+# executables, the libraries needed to write and preprocess js_of_ocaml
+# code, and the standard library for ocamlopt -target js_of_ocaml. The
+# compiler library and its dependencies (yojson, sedlex, ...) stay out.
 SHIPPED_BIN_PACKAGES = js_of_ocaml-compiler wasm_of_ocaml-compiler
 SHIPPED_LIB_PACKAGES = $(PPXLIB_PACKAGES) js_of_ocaml-runtime js_of_ocaml \
   js_of_ocaml-ppx
@@ -394,6 +403,7 @@ SHIPPED_LIB_SECTIONS = lib,lib_root,libexec,libexec_root,stublibs
 jsoo-install-shipped: jsoo-build
 	$(call ast_dependent_libs_install,--sections=bin $(SHIPPED_BIN_PACKAGES))
 	$(call ast_dependent_libs_install,--sections=$(SHIPPED_LIB_SECTIONS) $(SHIPPED_LIB_PACKAGES))
+	$(stdlib_js_install)
 
 .PHONY: jsoo-test
 jsoo-test: ast-dependent-libs-compiler \
