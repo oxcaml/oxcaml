@@ -39,7 +39,7 @@
  readonly_files = "\
    pair_qr.mli pair_qr.ml pair_qr__.ml \
    partial_qr.mli partial_qr.ml partial_qr__.ml \
-   main_archive_deps.ml run_and_report.sh \
+   main_archive_deps.ml \
    test_archive_deps_native.reference \
  ";
 
@@ -274,14 +274,10 @@
  ";
  ocamlopt.byte;
 
- (* Run through a wrapper that reports a crash in the output. *)
-
- script = "sh ${test_source_directory}/run_and_report.sh \
-   ${test_build_directory}/test_archive_deps_native.exe";
  stdout = "test_archive_deps_native.output";
  stderr = "test_archive_deps_native.output";
  output = "test_archive_deps_native.output";
- script;
+ run;
 
  reference = "test_archive_deps_native.reference";
  check-program-output;
