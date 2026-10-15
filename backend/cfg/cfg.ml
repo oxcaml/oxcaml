@@ -173,7 +173,7 @@ let successor_labels_normal ti =
   | Tailcall_self { destination } -> Label.Set.singleton destination
   | Switch labels -> Array.to_seq labels |> Label.Set.of_seq
   | Return | Raise _ | Tailcall_func _ -> Label.Set.empty
-  | Call_no_return _ -> Label.Set.empty
+  | Call_no_return_func _ | Call_no_return_ext _ -> Label.Set.empty
   | Never -> Label.Set.empty
   | Always l -> Label.Set.singleton l
   | Parity_test { ifso; ifnot } | Truth_test { ifso; ifnot } ->
@@ -236,7 +236,7 @@ let replace_successor_labels t ~normal ~exn block ~f =
         Tailcall_self { destination = f destination }
       | Tailcall_func (Indirect _)
       | Tailcall_func (Direct _)
-      | Return | Raise _ | Call_no_return _
+      | Return | Raise _ | Call_no_return_ext _ | Call_no_return_func _
       | Invalid { label_after = None; _ } ->
         block.terminator.desc
       | Call { op; label_after } -> Call { op; label_after = f label_after }
@@ -356,7 +356,7 @@ let register_predecessors_for_all_blocks (t : t) =
 
 let can_raise_terminator (i : terminator) =
   match i with
-  | Call_no_return _ | Raise _ | Tailcall_func _ | Call _
+  | Call_no_return_ext _ | Call_no_return_func _ | Raise _ | Tailcall_func _ | Call _
   | Prim { op = Probe _; label_after = _ } ->
     true
   | Prim { op = External { alloc; effects; _ }; label_after = _ } -> (
@@ -379,7 +379,8 @@ let can_raise_terminator (i : terminator) =
    taking into account [effects] on extcalls *)
 let is_pure_terminator desc =
   match (desc : terminator) with
-  | Return | Raise _ | Call_no_return _ | Tailcall_func _ | Tailcall_self _
+  | Return | Raise _ | Call_no_return_ext _ | Call_no_return_func _
+  | Tailcall_func _ | Tailcall_self _
   | Call _ | Prim _ | Invalid _ ->
     false
   | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
@@ -392,15 +393,15 @@ let is_never_terminator desc =
   | Never -> true
   | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
   | Switch _ | Return | Raise _ | Tailcall_self _ | Tailcall_func _
-  | Call_no_return _ | Call _ | Prim _ | Invalid _ ->
+  | Call_no_return_ext _ | Call_no_return_func _ | Call _ | Prim _ | Invalid _ ->
     false
 
 let is_return_terminator desc =
   match (desc : terminator) with
   | Return -> true
   | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
-  | Switch _ | Raise _ | Tailcall_self _ | Tailcall_func _ | Call_no_return _
-  | Call _ | Prim _ | Invalid _ ->
+  | Switch _ | Raise _ | Tailcall_self _ | Tailcall_func _ | Call_no_return_ext _
+  | Call_no_return_func _ | Call _ | Prim _ | Invalid _ ->
     false
 
 let is_pure_basic : basic -> bool = function
@@ -613,7 +614,8 @@ let basic_block_contains_calls block =
         true)
     | Tailcall_self _ -> false
     | Tailcall_func _ -> false
-    | Call_no_return _ -> true
+    | Call_no_return_ext _ -> true
+    | Call_no_return_func _ -> true
     | Call _ -> true
     | Prim { op = External _; _ } | Invalid _ -> true
     | Prim { op = Probe _; _ } -> true)
@@ -671,7 +673,7 @@ let remove_trap_instructions t removed_trap_handlers =
     | Tailcall_self _ -> assert (Int.equal stack_offset 0)
     | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
     | Int_test _ | Switch _ | Return | Raise _ | Tailcall_func _
-    | Call_no_return _ | Call _ | Prim _ | Invalid _ ->
+    | Call_no_return_ext _ | Call_no_return_func _ | Call _ | Prim _ | Invalid _ ->
       ());
     update_instruction terminator ~stack_offset
   and update_block label ~stack_offset =
@@ -884,8 +886,10 @@ let equal_terminator left right =
     Label.equal left_dest right_dest
   | Tailcall_func left_op, Tailcall_func right_op ->
     equal_func_call_operation left_op right_op
-  | Call_no_return left_op, Call_no_return right_op ->
+  | Call_no_return_ext left_op, Call_no_return_ext right_op ->
     equal_external_call_operation left_op right_op
+  | Call_no_return_func left_op, Call_no_return_func right_op ->
+    equal_func_call_operation left_op right_op
   | Call left_call, Call right_call ->
     equal_with_label_after equal_func_call_operation left_call right_call
   | Prim left_prim, Prim right_prim ->
@@ -908,6 +912,6 @@ let equal_terminator left right =
     && Option.equal Label.equal left_lbl right_lbl
   | ( ( Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
       | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
-      | Tailcall_func _ | Call_no_return _ | Call _ | Prim _ | Invalid _ ),
+      | Tailcall_func _ | Call_no_return_ext _ | Call_no_return_func _ | Call _ | Prim _ | Invalid _ ),
       _ ) ->
     false

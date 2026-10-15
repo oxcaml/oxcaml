@@ -370,11 +370,17 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | [] | _ :: _ -> wrong_num_args 3
     in
     match[@ocaml.warning "+fragile-match"] op with
-    | Capply { callees; _ } -> (
+    | Capply { callees; result_type; _ } -> (
+        let (func, args) : Cfg.func_call_operation * Cmm.expression list =
       match[@ocaml.warning "-fragile-match"] args with
       | Cconst_symbol (func, _dbg) :: rem ->
-        Terminator (Call { op = Direct func; label_after }), rem
-      | _ -> Terminator (Call { op = Indirect callees; label_after }), args)
+        Direct func, rem
+      | _ -> Indirect callees, args
+        in
+        match result_type with
+        | None -> Terminator ( Call_no_return_func func ), args
+        | Some _ -> Terminator ( Call { op = func; label_after }), args
+      )
     | Cextcall
         { func; alloc; ty; ty_args; returns; builtin; effects; coeffects = _ }
       ->
@@ -392,7 +398,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       in
       if returns
       then Terminator (Prim { op = External external_call; label_after }), args
-      else Terminator (Call_no_return external_call), args
+      else Terminator (Call_no_return_ext external_call), args
     | Cload { memory_chunk; mutability; is_atomic } ->
       let arg = single_arg () in
       let addressing_mode, eloc = Target.select_addressing memory_chunk arg in
@@ -1128,17 +1134,40 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         SU.set_traps_for_raise env;
         Sub_cfg.add_never_block sub_cfg ~label:label_after;
         Ok rd
-      | Terminator (Call_no_return ({ ty_args; _ } as r)) ->
+      | Terminator (Call_no_return_ext ({ ty_args; _ } as r)) ->
         let* loc_arg, stack_ofs, stack_align =
           emit_extcall_args env sub_cfg ty_args new_args dbg
         in
         let rd = Reg.createv ty in
         let r = { r with stack_ofs; stack_align } in
-        let term : Cfg.terminator = Call_no_return r in
+        let term : Cfg.terminator = Call_no_return_ext r in
         let (_ : Reg.t array) =
           SU.insert_op_debug' env sub_cfg term dbg loc_arg
             (Proc.loc_external_results (Reg.typv rd))
         in
+        SU.set_traps_for_raise env;
+        Never_returns
+      | Terminator (Call_no_return_func (Direct _) as term) ->
+        let* r1 = emit_tuple env sub_cfg new_args in
+        let rd = Reg.createv ty in
+        let loc_arg, stack_ofs_args = Proc.loc_arguments (Reg.typv r1) in
+        let loc_res, stack_ofs_res = Proc.loc_results_call (Reg.typv rd) in
+        let stack_ofs = Stdlib.Int.max stack_ofs_args stack_ofs_res in
+        SU.insert_move_args env sub_cfg r1 loc_arg stack_ofs;
+        SU.insert_debug' env sub_cfg term dbg loc_arg loc_res;
+        SU.set_traps_for_raise env;
+        Never_returns
+      | Terminator (Call_no_return_func (Indirect _) as term) ->
+        let* r1 = emit_tuple env sub_cfg new_args in
+        let rarg = Array.sub r1 1 (Array.length r1 - 1) in
+        let rd = Reg.createv ty in
+        let loc_arg, stack_ofs_args = Proc.loc_arguments (Reg.typv rarg) in
+        let loc_res, stack_ofs_res = Proc.loc_results_call (Reg.typv rd) in
+        let stack_ofs = Stdlib.Int.max stack_ofs_args stack_ofs_res in
+        SU.insert_move_args env sub_cfg rarg loc_arg stack_ofs;
+        SU.insert_debug' env sub_cfg term dbg
+          (Array.append [| r1.(0) |] loc_arg)
+          loc_res;
         SU.set_traps_for_raise env;
         Never_returns
       | Basic (Op (Alloc { bytes = _; mode; dbginfo = [placeholder] })) ->
@@ -1514,7 +1543,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | Terminator
           ( Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
           | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
-          | Tailcall_func _ | Invalid _ | Call_no_return _ | Prim _ ) ->
+          | Tailcall_func _ | Invalid _ | Call_no_return_ext _ | Prim _ ) ->
         Misc.fatal_error "Cfg_selectgen.emit_tail")
 
   and emit_tail_ifthenelse env sub_cfg econd (_ifso_dbg : Debuginfo.t) ifso_a
