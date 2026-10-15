@@ -144,3 +144,94 @@ let either (v : float# inline) (w : float# inline) =
   (apply (field_imm 1 (global Toploop!)) "either" either))
 val either : float# inline -> float# inline -> int = <fun>
 |}]
+
+(* [scrape_ty] stops at an [or_null], so [value_kind] sees the [@@unboxed]
+   types around it. *)
+type ('a : any) unboxed_record = { field : 'a } [@@unboxed]
+type ('a : any) unboxed_variant = U of 'a [@@unboxed]
+type ('a : any) unboxed_inline = V of { f : 'a } [@@unboxed]
+type ('a : any) unboxed_gadt = G : ('b : any). 'b -> 'b unboxed_gadt [@@unboxed]
+[%%expect{|
+0
+type ('a : any) unboxed_record = { field : 'a; } [@@unboxed]
+0
+type ('a : any) unboxed_variant = U of 'a [@@unboxed]
+0
+type ('a : any) unboxed_inline = V of { f : 'a; } [@@unboxed]
+0
+type ('a : any) unboxed_gadt = G : ('b : any). 'b -> 'b unboxed_gadt [@@unboxed]
+|}]
+
+let unboxed_record_or_null (r : int or_null unboxed_record) = r
+[%%expect{|
+Line 1, characters 62-63:
+1 | let unboxed_record_or_null (r : int or_null unboxed_record) = r
+                                                                  ^
+Error: Non-value detected in [value_kind].
+       Please report this error to the Jane Street compilers team.
+       The layout of 'a is any
+         because of the definition of unboxed_record at line 1, characters 0-59.
+       But the layout of 'a must be a value layout
+         because it has to be value for the V1 safety check.
+|}]
+
+let unboxed_variant_or_null (v : int or_null unboxed_variant) = v
+[%%expect{|
+Line 1, characters 64-65:
+1 | let unboxed_variant_or_null (v : int or_null unboxed_variant) = v
+                                                                    ^
+Error: Non-value detected in [value_kind].
+       Please report this error to the Jane Street compilers team.
+       The layout of 'a is any
+         because of the definition of unboxed_variant at line 2, characters 0-53.
+       But the layout of 'a must be a value layout
+         because it has to be value for the V1 safety check.
+|}]
+
+let unboxed_inline_or_null (v : int or_null unboxed_inline) =
+  match v with V r -> r.f
+[%%expect{|
+Line 2, characters 8-9:
+2 |   match v with V r -> r.f
+            ^
+Error: Non-value detected in [value_kind].
+       Please report this error to the Jane Street compilers team.
+       The layout of 'a is any
+         because of the definition of unboxed_inline at line 3, characters 0-60.
+       But the layout of 'a must be a value layout
+         because it has to be value for the V1 safety check.
+|}]
+
+let unboxed_gadt_or_null (g : int or_null unboxed_gadt) = g
+[%%expect{|
+Line 1, characters 58-59:
+1 | let unboxed_gadt_or_null (g : int or_null unboxed_gadt) = g
+                                                              ^
+Error: Non-value detected in [value_kind].
+       Please report this error to the Jane Street compilers team.
+       The layout of 'b is any
+         because of the definition of unboxed_gadt at line 4, characters 0-80.
+       But the layout of 'b must be a value layout
+         because it has to be value for the V1 safety check.
+|}]
+
+let nested_unboxed_record_or_null
+    (r : int or_null unboxed_record unboxed_record) = r
+[%%expect{|
+Line 2, characters 54-55:
+2 |     (r : int or_null unboxed_record unboxed_record) = r
+                                                          ^
+Error: Non-value detected in [value_kind].
+       Please report this error to the Jane Street compilers team.
+       The layout of 'a is any
+         because of the definition of unboxed_record at line 1, characters 0-59.
+       But the layout of 'a must be a value layout
+         because it has to be value for the V1 safety check.
+|}]
+
+let unboxed_record_or_null_in_record (r : int or_null unboxed_record t t) = r
+[%%expect{|
+>> Fatal error: expected a layout of scannable
+Uncaught exception: Misc.Fatal_error
+
+|}]
