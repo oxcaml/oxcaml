@@ -2843,6 +2843,9 @@ let rec extract_concrete_typedecl env ty =
       | exception Cannot_expand ->
           match extract_concrete_typedecl env inner with
           | May_have_typedecl -> May_have_typedecl
+          (* If [inner] has a concrete typedecl, [inner box] can never
+             expand further: types with concrete kinds cannot be refined
+             by GADT equations (see [is_instantiable]). *)
           | Typedecl _ | Has_no_typedecl -> Has_no_typedecl
       end
   | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tobject _ | Tfield _ | Tnil
