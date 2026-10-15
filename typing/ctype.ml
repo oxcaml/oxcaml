@@ -272,7 +272,7 @@ let with_local_level_gen ~begin_def ~structure ?before_generalize f =
     iter_var s ~f:(fun v ->
       let t = of_var v in
       if get_level t = generic_level then () else
-      update_level !current_level t;
+      update_level !current_level t |> Result.get_ok;
       add_to_sort_pool ~level:(get_level t) t)
   end sort_pool;
   result
@@ -1288,7 +1288,7 @@ let rec update_level env level expand ty =
         raise_escape_exn Self
     | Tvar { jkind } ->
       set_level ();
-      Jkind.update_level level jkind
+      Jkind.update_level level jkind |> Result.get_ok
     | _ ->
         set_level ();
         (* XXX what about abbreviations in Tconstr ? *)
@@ -1330,7 +1330,7 @@ let rec lower_contravariant env var_level visited contra ty =
       Tvar { jkind } ->
         if contra then begin
           set_level ty var_level;
-          Jkind.update_level var_level jkind
+          Jkind.update_level var_level jkind |> Result.get_ok
         end
     | Tconstr (_, [], _) -> ()
     | Tconstr (path, tyl, _abbrev) ->
@@ -3521,7 +3521,7 @@ let constrain_type_jkind ~fixed env ty jkind =
                           "Axis_disagreement("
                           ^ Jkind_axis.Axis.name axis
                           ^ ")"
-                        | Layout_disagreement -> "Layout_disagreement"
+                        | Layout_disagreement _ -> "Layout_disagreement"
                         | With_bounds_on_left -> "With_bounds_on_left"
                         | Constrain_ran_out_of_fuel ->
                           "Constrain_ran_out_of_fuel")
@@ -3794,11 +3794,6 @@ let is_always_gc_ignorable env ty =
     (Jkind_axis.Externality.upper_bound_if_is_always_gc_ignorable ())
   || type_is_gc_ignorable_scannable env ty
 
-let check_type_jkind_exn env texn ty jkind =
-  match check_type_jkind env ty jkind with
-  | Ok _ -> ()
-  | Error err -> raise_for texn (Bad_jkind (ty,err))
-
 let constrain_type_jkind_exn env texn ty jkind =
   match constrain_type_jkind env ty jkind with
   | Ok _ -> ()
@@ -4068,7 +4063,7 @@ let local_non_recursive_abbrev uenv p ty =
    They carry redundant information but are added to save two calls to
    [get_desc] which are usually performed already at the call site. *)
 let unify_univar env t1 t2 jkind1 jkind2 pairs =
-  if not (Jkind.equal env jkind1 jkind2) then
+  if Result.is_error (Jkind.equal env jkind1 jkind2) then
     raise Cannot_unify_universal_variables;
   let rec inner t1 t2 = function
     (cl1, cl2) :: rem ->
@@ -4910,7 +4905,7 @@ let add_jkind_equation ~reason uenv destination jkind1 =
                ticket 5112. *)
             match Jkind.try_allow_r jkind, Jkind.try_allow_r decl.type_jkind with
             | Some jkind, Some decl_jkind
-                when not (Jkind.equal env jkind decl_jkind) ->
+                when Result.is_error (Jkind.equal env jkind decl_jkind) ->
                let refined_decl =
                  { decl with type_jkind = Jkind.disallow_right jkind }
                in
@@ -6390,6 +6385,16 @@ let moregen_occur env level ty =
   occur_univar_for Moregen env ty;
   update_level_for Moregen env level ty
 
+let moregen_check_type_jkind_exn env subj pat jkind =
+  match check_type_jkind env subj jkind with
+  | Ok () -> ()
+  (* We improve the error message for rigid variables, which occur in [subj].
+     The check may fail if they are equated against something non-generic,
+     like a weak variable or a concrete layout. *)
+  | Error { violation = Not_a_subjkind (_, _, [Layout_disagreement Rigid]) } ->
+    raise_for Moregen (Weaken_sort { pat; subj } )
+  | Error err -> raise_for Moregen (Bad_jkind (subj, err))
+
 type moregen_pairs =
   { invariant_pairs : TypePairs.t;
     covariant_pairs : TypePairs.t;
@@ -6602,14 +6607,8 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
         update_scope_for Moregen (get_scope t1) t2;
         (* use [check], not [constrain], here because [constrain] would be like
         instantiating [t2], which we do not wish to do *)
-        begin try
-          check_type_jkind_exn env Moregen t2 (Jkind.disallow_left jkind)
-        (* rigid variables only occur in the subject [t2].
-           they are only equated to something non-generic, like a weak variable
-           or a concrete layout *)
-        with Jkind_types.Sort.Lower_rigid ->
-          raise_for Moregen (Weaken_sort { pat = t1; subj = t2 })
-        end;
+        moregen_check_type_jkind_exn env t2 t1
+          (Jkind.disallow_left jkind);
         link_type t1 t2
     | (Tconstr (p1, [], _), Tconstr (p2, [], _)) when Path.same p1 p2 ->
         ()
@@ -6628,11 +6627,8 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
               update_scope_for Moregen (get_scope t1') t2;
               (* use [check], not [constrain], here because [constrain] would be like
               instantiating [t2], which we do not wish to do *)
-              begin try
-                check_type_jkind_exn env Moregen t2 (Jkind.disallow_left jkind)
-              with Jkind_types.Sort.Lower_rigid ->
-                raise_for Moregen (Weaken_sort { pat = t1; subj = t2 })
-              end;
+              moregen_check_type_jkind_exn env t2 t1
+                (Jkind.disallow_left jkind);
               link_type t1' t2
           | (Tarrow ((l1,a1,r1), t1, u1, _),
              Tarrow ((l2,a2,r2), t2, u2, _)) ->
@@ -7069,10 +7065,10 @@ let all_distinct_vars_with_original_jkinds env vars =
        if TypeSet.mem ty !tys then Unification_failure { name; ty } else begin
          tys := TypeSet.add ty !tys;
          match get_desc ty with
-         | Tvar { jkind = inferred_jkind } ->
-           if Jkind.equate env inferred_jkind original_jkind
-           then All_good
-           else Jkind_mismatch { original_jkind; inferred_jkind; ty }
+         | Tvar { jkind = inferred_jkind } -> (
+           match Jkind.equate env inferred_jkind original_jkind with
+           | Ok () -> All_good
+           | Error _ -> Jkind_mismatch { original_jkind; inferred_jkind; ty })
          | _ -> Unification_failure { name; ty }
        end
   in
@@ -7126,7 +7122,7 @@ let eqtype_subst env type_pairs subst t1 k1 t2 k2 ~do_jkind_check =
       !subst
   then ()
   else begin
-    if do_jkind_check && not (Jkind.equal env k1 k2)
+    if do_jkind_check && Result.is_error (Jkind.equal env k1 k2)
       then raise_for Equality (Unequal_var_jkinds (t1, k1, t2, k2));
     subst := (t1, t2) :: !subst;
     TypePairs.add type_pairs (t1, t2)
@@ -7156,7 +7152,7 @@ let rec eqtype rename type_pairs subst env ~do_jkind_check t1 t2 =
     | (Tconstr (p1, [], _), Tconstr (p2, [], _)) when Path.same p1 p2 ->
         ()
     | (Tof_kind k1, Tof_kind k2) ->
-      if not (Jkind.equal env k1 k2)
+      if Result.is_error (Jkind.equal env k1 k2)
       then raise_for Equality (Unequal_tof_kind_jkinds (k1, k2))
     | _ ->
         let t1' = expand_head_rigid env t1 in

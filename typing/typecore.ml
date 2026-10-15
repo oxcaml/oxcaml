@@ -4653,7 +4653,9 @@ let rec check_counter_example_pat
       List.iter2
         (fun (_, _, orig_sort) (_, _, _, sort) ->
            (* Sanity check *)
-           assert (Jkind.Sort.equate ~allow_mutation:true orig_sort sort))
+           assert (
+            Jkind.Sort.equate ~allow_mutation:true orig_sort sort
+            |> Result.is_ok))
         tpl expected_tys;
       let tpl_ann = List.combine tpl expected_tys in
       map_fold_cont
@@ -4705,7 +4707,8 @@ let rec check_counter_example_pat
         solve_Ppat_array loc penv mut expected_ty
       in
       assert (
-        Jkind.Sort.equate ~allow_mutation:true original_arg_sort arg_sort);
+        Jkind.Sort.equate ~allow_mutation:true original_arg_sort arg_sort
+        |> Result.is_ok);
       map_fold_cont (fun p -> check_rec p ty_elt) tpl
         (fun pl -> mkp k (Tpat_array (mutability, arg_sort, pl)))
   | Tpat_or(tp1, tp2, _) ->
@@ -6708,7 +6711,9 @@ end = struct
             match
               Ctype.type_sort ~why:sort_why ~fixed:true weak_env ccs_ty
             with
-            | Ok sort -> Jkind.Sort.equate ~allow_mutation:true sort ccs_sort
+            | Ok sort ->
+              Jkind.Sort.equate ~allow_mutation:true sort ccs_sort
+              |> Result.is_ok
             | Error _ -> false
           in
           if not ok then

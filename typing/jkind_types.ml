@@ -68,7 +68,9 @@ module Sort = struct
       id : int
     }
 
-  exception Lower_rigid
+  type error =
+    | Incompatible
+    | Rigid
 
   let is_genvar var =
     assert (Option.is_none var.contents);
@@ -496,12 +498,16 @@ module Sort = struct
       List.fold_left (fun acc t -> min acc (get_level t)) generic_level ts
     | Addressable t -> get_level t
 
-  let[@inline] set_var_level (v : var) (level : int) =
+  let[@inline] set_var_level (v : var) (level : int) : (unit, error) result =
     if level < v.level
-    then (
-      if v.level = subject_level then raise Lower_rigid;
-      log_change (v, Clevel v.level);
-      v.level <- level)
+    then
+      if v.level = subject_level
+      then Error Rigid
+      else (
+        log_change (v, Clevel v.level);
+        v.level <- level;
+        Ok ())
+    else Ok ()
 
   let rec iter_var ~f = function
     | Var { contents = Some t } -> iter_var ~f t
@@ -510,7 +516,12 @@ module Sort = struct
     | Product ts -> List.iter (iter_var ~f) ts
     | Addressable t -> iter_var ~f t
 
-  let update_level level = iter_var ~f:(fun v -> set_var_level v level)
+  let rec update_level level = function
+    | Var { contents = Some t } -> update_level level t
+    | Var ({ contents = None } as v) -> set_var_level v level
+    | Base _ | Univar _ -> Ok ()
+    | Product ts -> Misc.Stdlib.List.iter_until_error ~f:(update_level level) ts
+    | Addressable t -> update_level level t
 
   let[@inline] set_var_contents (v : var) (contents : t option) =
     if v.contents != contents
@@ -519,13 +530,13 @@ module Sort = struct
       v.contents <- contents)
 
   let[@inline] equate_var (v : var) (t : t) =
+    let open Misc.Stdlib.Monad.Result.Syntax in
     assert (Option.is_none v.contents);
     if v.level = subject_level
-    then match t with Var _ -> raise Lower_rigid | _ -> false
-    else (
-      update_level v.level t;
-      set_var_contents v (Some t);
-      true)
+    then Error (match t with Var _ -> Rigid | _ -> Incompatible)
+    else
+      let+ () = update_level v.level t in
+      set_var_contents v (Some t)
 
   module Static = struct
     (* Statically allocated values of various consts and sorts to save
@@ -837,18 +848,25 @@ module Sort = struct
   (***********************)
   (* equality *)
 
-  let rec constrain_addressable ~allow_mutation : t -> bool = function
-    | Addressable _ -> true
-    | Base b -> base_is_addressable b
-    | Product ts -> List.for_all (constrain_addressable ~allow_mutation) ts
-    | Univar _ -> false
+  let rec constrain_addressable ~allow_mutation : t -> (unit, error) result =
+    function
+    | Addressable _ -> Ok ()
+    | Base b -> if base_is_addressable b then Ok () else Error Incompatible
+    | Product ts ->
+      Misc.Stdlib.List.fold_left_result
+        (fun () t -> constrain_addressable ~allow_mutation t)
+        () ts
+    | Univar _ -> Error Incompatible
     | Var v -> (
       match v.contents with
       | Some s -> constrain_addressable ~allow_mutation s
-      | None when not allow_mutation -> false
+      | None when not allow_mutation -> Error Incompatible
       | None -> equate_var v (Addressable (Var (new_genvar ()))))
 
-  let is_surely_addressable = constrain_addressable ~allow_mutation:false
+  let is_surely_addressable t =
+    match constrain_addressable ~allow_mutation:false t with
+    | Ok () -> true
+    | Error _ -> false
 
   let rec strip_head_addressable : t -> t = function
     | Addressable s -> strip_head_addressable s
@@ -858,11 +876,12 @@ module Sort = struct
     | (Var _ | Base _ | Product _ | Univar _) as t -> t
 
   let rec equate ~allow_mutation s1 s2 =
+    let open Misc.Stdlib.Monad.Result.Syntax in
     match s1, s2 with
-    | Var v1, Var v2 when v1.id = v2.id -> true
+    | Var v1, Var v2 when v1.id = v2.id -> Ok ()
     | Var { contents = Some s1 }, _ -> equate ~allow_mutation s1 s2
     | _, Var { contents = Some s2 } -> equate ~allow_mutation s1 s2
-    | Var _, Var _ when not allow_mutation -> false
+    | Var _, Var _ when not allow_mutation -> Error Incompatible
     | Var ({ contents = None } as v1), Var ({ contents = None } as v2) ->
       if v1.level >= v2.level then equate_var v1 s2 else equate_var v2 s1
     | Var ({ contents = None } as v1), _ -> equate_var v1 s2
@@ -875,21 +894,25 @@ module Sort = struct
          Consider [s1 = 'var addressable] and [s2 = bits8 addressable].
          We could unify ['var = bits8] or ['var = bits8 addressable], but
          neither is more general. *)
-      constrain_addressable ~allow_mutation s1
-      && constrain_addressable ~allow_mutation s2
-      && equate ~allow_mutation
-           (strip_head_addressable s1)
-           (strip_head_addressable s2)
-    | Base b1, Base b2 -> equal_base b1 b2
-    | Product sorts1, Product sorts2 -> (
-      try List.for_all2 (equate ~allow_mutation) sorts1 sorts2
-      with Invalid_argument _ -> false)
-    | Univar uv1, Univar uv2 -> equal_univar_univar uv1 uv2
-    | _, (Base _ | Product _ | Univar _) -> false
+      let* () = constrain_addressable ~allow_mutation s1 in
+      let* () = constrain_addressable ~allow_mutation s2 in
+      equate ~allow_mutation
+        (strip_head_addressable s1)
+        (strip_head_addressable s2)
+    | Base b1, Base b2 -> if equal_base b1 b2 then Ok () else Error Incompatible
+    | Product sorts1, Product sorts2 ->
+      Misc.Stdlib.List.fold_left2_result ~unequal_lengths:Incompatible
+        (fun () s1 s2 -> equate ~allow_mutation s1 s2)
+        () sorts1 sorts2
+    | Univar uv1, Univar uv2 ->
+      if equal_univar_univar uv1 uv2 then Ok () else Error Incompatible
+    | _, (Base _ | Product _ | Univar _) -> Error Incompatible
 
   let decompose_into_product t n =
+    let open Misc.Stdlib.Monad.Result.Syntax in
     let ts = List.init n (fun _ -> of_var (new_genvar ())) in
-    if equate ~allow_mutation:true t (Product ts) then Some ts else None
+    let+ () = equate ~allow_mutation:true t (Product ts) in
+    ts
 
   (*** defaulting ***)
 
@@ -908,15 +931,16 @@ module Sort = struct
     in
     begin match v.contents with
     | Some s -> compress_to (default_to_scannable_and_get s)
-    | None ->
+    | None -> (
       if is_genvar v
       then Const.Genvar v
-      else if equate_var v Static.T.scannable
-      then compress_to Static.Const.scannable
       else
-        Misc.fatal_error
-          "Jkind_types.default_to_scannable_and_get: cannot default rigid \
-           variables"
+        match equate_var v Static.T.scannable with
+        | Ok () -> compress_to Static.Const.scannable
+        | Error _ ->
+          Misc.fatal_error
+            "Jkind_types.default_to_scannable_and_get: cannot default rigid \
+             variables")
     end
 
   let get_concrete_defaulting_to_scannable s =

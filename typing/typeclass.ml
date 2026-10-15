@@ -1556,8 +1556,8 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
              List.iter
                (fun (loc, mode, sort) ->
                   Typecore.escape ~loc ~env:val_env ~reason:Other mode;
-                  if not (Jkind.Sort.(equate ~allow_mutation:true
-                                        sort scannable))
+                  if Jkind.Sort.(equate ~allow_mutation:true sort scannable)
+                     |> Result.is_error
                   then
                     raise (Error(loc, met_env,
                                  Non_value_let_binding (Ident.name id, sort)))
