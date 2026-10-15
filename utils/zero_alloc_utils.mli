@@ -11,7 +11,7 @@ module type WS = sig
 
   val meet : t -> t -> t
 
-  val lessequal : t -> t -> bool
+  val lessequal : ignore_diagnostic_witnesses:bool -> t -> t -> bool
 
   val print : Format.formatter -> t -> unit
 
@@ -35,6 +35,8 @@ module type Component = sig
 
   (** Order of the abstract domain *)
   val lessequal : t -> t -> bool
+
+  val satisfies : conditional:bool -> actual:t -> expected:t -> bool
 
   val join : t -> t -> t
 
@@ -74,6 +76,8 @@ module Make_value
     }
 
   val lessequal : t -> t -> bool
+
+  val satisfies : conditional:bool -> actual:t -> expected:t -> bool
 
   val join : t -> t -> t
 
@@ -164,7 +168,7 @@ module Assume_info : sig
 
     val join : t -> t -> t
 
-    val lessequal : t -> t -> bool
+    val lessequal : ignore_diagnostic_witnesses:bool -> t -> t -> bool
 
     val meet : t -> t -> t
 

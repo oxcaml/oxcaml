@@ -149,7 +149,8 @@ let sub_const_const_exn za1 za2 =
   in
   let v1 = abstract_value za1 in
   let v2 = abstract_value za2 in
-  if not (ZA.Assume_info.Value.lessequal v1 v2)
+  if not
+      (ZA.Assume_info.Value.satisfies ~conditional:false ~actual:v1 ~expected:v2)
   then begin
     let missing_entirely =
       match za1 with

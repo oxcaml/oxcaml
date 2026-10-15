@@ -271,9 +271,10 @@ module Witnesses = struct
     then c
     else Allocation_sources.compare t1.allocation_sources t2.allocation_sources
 
-  let lessequal t1 t2 =
+  let lessequal ~ignore_diagnostic_witnesses t1 t2 =
     Allocation_sources.lessequal t1.allocation_sources t2.allocation_sources
-    && Witness_set.lessequal t1.witnesses t2.witnesses
+    && (ignore_diagnostic_witnesses
+       || Witness_set.lessequal t1.witnesses t2.witnesses)
 
   let join t1 t2 =
     { witnesses = Witness_set.join t1.witnesses t2.witnesses;
@@ -352,6 +353,8 @@ module V : sig
   (** order of the abstract domain *)
   val lessequal : t -> t -> bool
 
+  val satisfies : conditional:bool -> actual:t -> expected:t -> bool
+
   val join : t -> t -> t
 
   val meet : t -> t -> t
@@ -360,7 +363,8 @@ module V : sig
 
   val replace_witnesses : Witnesses.t -> t -> t
 
-  val diff_witnesses : expected:t -> actual:t -> Witness_set.t
+  val diff_witnesses :
+    conditional:bool -> expected:t -> actual:t -> Witness_set.t
 
   val get_witnesses : t -> Witness_set.t
 
@@ -1309,7 +1313,8 @@ end = struct
     match t1, t2 with
     | Bot, Bot -> true
     | Safe, Safe -> true
-    | Top w1, Top w2 -> Witnesses.lessequal w1 w2
+    | Top w1, Top w2 ->
+      Witnesses.lessequal ~ignore_diagnostic_witnesses:false w1 w2
     | Bot, Safe -> true
     | Bot, Top _ -> true
     | Safe, Top _ -> true
@@ -1320,6 +1325,34 @@ end = struct
     | (Safe | Top _ | Var _ | Transform _ | Join _), _ ->
       (* structural equality on the normal form *)
       equal (join t1 t2) t2
+
+  let satisfies ~conditional ~actual ~expected =
+    match actual, expected with
+    | Top actual, Top expected ->
+      Witnesses.lessequal ~ignore_diagnostic_witnesses:true actual expected
+    (* If we want something that conditionally never allocates,
+       but the function we're checking says it can sometimes allocate, ... *)
+    | Top witnesses, _ when conditional ->
+      (* ... we check the allocation sources of the function, ... *)
+      let sources = Witnesses.allocation_sources witnesses in
+      (* ... check that nothing other than arguments can allocate, ... *)
+      (not sources.anything_else_may_allocate)
+      (* ... and check that, for all arguments that might allocate, ... *)
+      && Numbers.Int.Map.for_all (fun _ (outcomes : Call_outcomes.t) ->
+        (* ... as long as we assume those arguments do not allocate in
+          normal-return paths, then (conditionally) we're fine. *)
+        (outcomes :> int) land (lnot (Call_outcomes.normal_return :> int)) = 0)
+        sources.arguments_that_may_allocate
+    | Top _, (Safe | Bot) -> false
+    | (Safe | Bot), _ -> lessequal actual expected
+    | (Var _ | Transform _ | Join _), _
+    | _, (Var _ | Transform _ | Join _)
+      ->
+      Misc.fatal_errorf
+        "Zero_alloc_checker.diff_witnesses: unresolved value (actual %a, \
+        expected %a)"
+        (print ~witnesses:false) actual
+        (print ~witnesses:false) expected
 
   (* Abstract transformer. Commutative and Associative.
 
@@ -1382,21 +1415,24 @@ end = struct
     | Transform tr -> Transform (Transform.replace_witnesses tr w)
     | Var { var; witnesses = _ } -> Var { var; witnesses = w }
 
-  let diff_witnesses ~expected ~actual =
-    (* If [actual] is Top and [expected] is not Top then return the [actual]
-       witnesses. Otherwise, return empty. *)
-    match actual, expected with
-    | Bot, Bot | Safe, Safe | Bot, Safe -> Witness_set.empty
-    | Bot, Top w | Safe, Top w | Top _, Top w ->
-      assert (Witnesses.is_empty w);
-      Witness_set.empty
-    | Safe, Bot -> Witness_set.empty
-    | Top w, (Bot | Safe) -> Witnesses.witnesses w
-    | (Var _ | Join _ | Transform _), _ | _, (Var _ | Join _ | Transform _) ->
-      Misc.fatal_errorf
-        "Zero_alloc_checker.diff_witnesses: unresolved value (actual %a, \
-         expected %a)"
-        (print ~witnesses:false) actual (print ~witnesses:false) expected
+  let diff_witnesses ~conditional ~expected ~actual =
+    if satisfies ~conditional ~actual ~expected
+    then Witness_set.empty
+    else
+      (* If [actual] is Top and [expected] is not Top then return the [actual]
+         witnesses. Otherwise, return empty. *)
+      match actual, expected with
+      | Bot, Bot | Safe, Safe | Bot, Safe -> Witness_set.empty
+      | Bot, Top w | Safe, Top w | Top _, Top w ->
+        assert (Witnesses.is_empty w);
+        Witness_set.empty
+      | Safe, Bot -> Witness_set.empty
+      | Top w, (Bot | Safe) -> Witnesses.witnesses w
+      | (Var _ | Join _ | Transform _), _ | _, (Var _ | Join _ | Transform _) ->
+        Misc.fatal_errorf
+          "Zero_alloc_checker.diff_witnesses: unresolved value (actual %a, \
+           expected %a)"
+          (print ~witnesses:false) actual (print ~witnesses:false) expected
 
   let meet t1 t2 =
     match t1, t2 with
@@ -1482,7 +1518,8 @@ module Value : sig
 
   val get_witnesses : t -> Witness_set.components
 
-  val diff_witnesses : expected:t -> actual:t -> Witness_set.components
+  val diff_witnesses :
+    conditional:bool -> expected:t -> actual:t -> Witness_set.components
 
   val unresolved : string -> Witnesses.t -> t
 
@@ -1530,10 +1567,13 @@ end = struct
       div = V.replace_witnesses w t.div
     }
 
-  let diff_witnesses ~expected ~actual =
-    { Witness_set.nor = V.diff_witnesses ~expected:expected.nor ~actual:actual.nor;
-      Witness_set.exn = V.diff_witnesses ~expected:expected.exn ~actual:actual.exn;
-      Witness_set.div = V.diff_witnesses ~expected:expected.div ~actual:actual.div
+  let diff_witnesses ~conditional ~expected ~actual =
+    { Witness_set.nor =
+        V.diff_witnesses ~conditional ~expected:expected.nor ~actual:actual.nor;
+      Witness_set.exn =
+        V.diff_witnesses ~conditional ~expected:expected.exn ~actual:actual.exn;
+      Witness_set.div =
+        V.diff_witnesses ~conditional ~expected:expected.div ~actual:actual.div
     }
 
   let get_witnesses t =
@@ -1561,7 +1601,7 @@ module Annotation : sig
       annotation, i.e., [value] is less or equal to [expected_value a] when
       ignoring witnesses. *)
 
-  val valid : t -> Value.t -> bool
+  val valid : expected:t -> actual:Value.t -> bool
 
   val diff_witnesses : t -> Value.t -> Witness_set.components
 
@@ -1617,15 +1657,13 @@ end = struct
       } =
     Value.of_annotation ~strict ~never_returns_normally ~never_raises
 
-  let valid t v =
-    (* Use Value.lessequal but ignore witnesses. *)
-    let expected = expected_value t in
-    let actual = Value.replace_witnesses Witnesses.unknown v in
-    Value.lessequal actual expected
+  let valid ~expected ~actual =
+    Value.satisfies ~conditional:expected.conditional ~actual
+      ~expected:(expected_value expected)
 
   let diff_witnesses t v =
     let expected = expected_value t in
-    Value.diff_witnesses ~actual:v ~expected
+    Value.diff_witnesses ~conditional:t.conditional ~actual:v ~expected
 
   let is_assume t = t.assume
 
@@ -2313,7 +2351,7 @@ end = struct
         if
           (not (Annotation.is_assume a))
           && enabled ()
-          && not (Annotation.valid a func_info.value)
+          && not (Annotation.valid ~expected:a ~actual:func_info.value)
         then
           (* CR-soon gyorsh: keeping track of all the witnesses until the end of
              the compilation unit will be expensive. For functions that do not
