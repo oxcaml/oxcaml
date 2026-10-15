@@ -407,7 +407,8 @@ let rec expr ppf = function
         fprintf ppf "@[<2>(%s" (operation dbg op);
         List.iter (fun e -> fprintf ppf "@ %a" expr e) el;
         (match[@warning "-4"] op with
-        | Capply { result_type = Some mty; _ } -> fprintf ppf "@ %a" machtype mty
+        | Capply { result_type = Some mty; _ } ->
+          fprintf ppf "@ %a" machtype mty
         | Capply { result_type = None; _ } -> fprintf ppf "@ ."
         | Cextcall
             { ty;
