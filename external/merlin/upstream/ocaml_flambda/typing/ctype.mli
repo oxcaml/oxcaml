@@ -717,15 +717,17 @@ val get_unboxed_type_representation :
   type_expr ->
   (unwrapped_type_expr, unwrapped_type_expr) result
     (* [get_unboxed_type_representation] attempts to fully expand the input
-       type_expr, descending through [@@unboxed] types.  May fail in the case of
-       circular types or very deeply nested unboxed types, in which case it
-       returns the most expanded version it was able to compute. *)
+       type_expr, descending through [@@unboxed] and [or_null] types. May fail
+       in the case of circular types or very deeply nested unboxed types, in
+       which case it returns the most expanded version it was able to compute.
+    *)
 
 val get_unboxed_type_approximation :
-  Env.t -> type_expr -> unwrapped_type_expr
+  expand_or_null:bool -> Env.t -> type_expr -> unwrapped_type_expr
     (* [get_unboxed_type_approximation] does the same thing as
        [get_unboxed_type_representation], but doesn't indicate whether the type
-       was fully expanded or not. *)
+       was fully expanded or not. With [~expand_or_null:false], it stops at an
+       [or_null] application. *)
 
 val contained_without_boxing : Env.t -> type_expr -> type_expr list
     (* Return all types that are directly contained without boxing
