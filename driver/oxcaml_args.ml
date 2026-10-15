@@ -1352,7 +1352,7 @@ let mk_jsoo_opt f =
          (js_of_ocaml compile)"
     | Archive ->
         "<opt>  Pass option <opt> to js_of_ocaml when creating an archive with \
-         -a or -pack (js_of_ocaml link -a)"
+         -a (js_of_ocaml link -a)"
     | Runtime ->
         "<opt>  Pass option <opt> to js_of_ocaml when building the runtime of \
          an executable (js_of_ocaml build-runtime)"

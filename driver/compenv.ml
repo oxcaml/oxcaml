@@ -51,11 +51,20 @@ let extract_output = function
 let fatal_unsupported_for_js what =
   fatal (Printf.sprintf "%s is not supported when targeting js_of_ocaml" what)
 
+(* Printed at most once per message, and only with [-verbose]: OCAMLPARAM is
+   shared by every tool of a build, so a setting meant for
+   [ocamlopt -target js_of_ocaml] should not make ocamlc or ocamldep noisy. *)
+let warn_once =
+  let seen = Hashtbl.create 7 in
+  fun message ->
+    if not (Hashtbl.mem seen message) then begin
+      Hashtbl.add seen message ();
+      if !Clflags.verbose then prerr_endline ("Warning: " ^ message)
+    end
+
 let default_output = function
   | Some s -> s
-  | None ->
-      if Clflags.target_is_jsir () then Config.default_executable_name ^ ".js"
-      else Config.default_executable_name
+  | None -> Config.default_executable_name
 
 let first_include_dirs = ref []
 let last_include_dirs = ref []
@@ -765,8 +774,8 @@ let readenv ppf position =
      if not (Clflags.target_is_jsir ()) then
        List.iter (fun phase ->
            if !(Clflags.jsoo_opts phase) <> [] then
-             fatal (Clflags.Jsoo_phase.flag phase
-                    ^ " is only supported when targeting js_of_ocaml"))
+             warn_once ("ignoring " ^ Clflags.Jsoo_phase.flag phase
+                        ^ ", which is only used when targeting js_of_ocaml"))
          Clflags.Jsoo_phase.all);
   all_ppx := !last_ppx @ !first_ppx
 

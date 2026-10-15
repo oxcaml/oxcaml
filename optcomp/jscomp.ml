@@ -75,8 +75,15 @@ let find_stub name =
     then name
     else raise (Linkenv.Error (Linkenv.File_not_found name))
 
-let write_cmj ~filename ~compilation_unit
+let write_cmj ~filename ~compilation_unit ~required_globals
     ({ program; imported_compilation_units } : Optcomp_intf.jsir_program) =
+  (* js_of_ocaml links a unit of a library only if some unit it links requires
+     it, so a module must be recorded here if its initialiser is to run, even
+     when nothing is read from it (e.g. because Flambda inlined every use).
+     [required_globals] is what [.cmo] files record for this purpose. *)
+  let imported_compilation_units =
+    Compilation_unit.Set.union imported_compilation_units required_globals
+  in
   let oc = open_out_bin filename in
   Misc.try_finally
     ~always:(fun () -> close_out oc)
@@ -93,7 +100,9 @@ let write_cmj ~filename ~compilation_unit
             Compilation_unit.Set.elements imported_compilation_units
             |> List.map Compilation_unit.full_path_as_string;
           exported_compilation_unit =
-            Compilation_unit.full_path_as_string compilation_unit
+            Compilation_unit.full_path_as_string compilation_unit;
+          (* As [ui_force_link] in the [.cmjx]. *)
+          force_link = !Clflags.link_everything
         }
       in
       output_value oc body)
@@ -124,6 +133,10 @@ let make
 
     let compile_implementation ~keep_symbol_tables ~sourcefile:_ ~prefixname
         ~ppf_dump (program : Lambda.program) =
+      (* As in [Asmgen]: the required modules must appear in the imports of
+         the [.cmjx], for the linker to know they must be linked. *)
+      Compilation_unit.Set.iter Compilenv.require_global
+        program.required_globals;
       let jsir =
         lambda_to_jsir ~ppf_dump ~prefixname ~keep_symbol_tables program
         |> Misc.print_if ppf_dump Clflags.dump_jsir
@@ -132,7 +145,8 @@ let make
       in
       let cmj = prefixname ^ ".cmj" in
       let cmjo = prefixname ^ ext_obj in
-      write_cmj ~filename:cmj ~compilation_unit:program.compilation_unit jsir;
+      write_cmj ~filename:cmj ~compilation_unit:program.compilation_unit
+        ~required_globals:program.required_globals jsir;
       let remove_cmj () =
         if not !Clflags.keep_asm_file then Misc.remove_file cmj
       in
@@ -145,11 +159,19 @@ let make
           remove_cmj ())
 
     let create_archive archive_name objfiles =
+      (* [-a -linkall] marks every unit of the library as force-linked (see
+         [Optlibrarian]); [--linkall] does the same for the js_of_ocaml
+         archive. *)
+      let linkall = if !Clflags.link_everything then ["--linkall"] else [] in
       run_js_of_ocaml "link" ~phase:Archive
-        (["-a"; "-o"; archive_name] @ objfiles)
+        (linkall @ ["-a"; "-o"; archive_name] @ objfiles)
 
-    let link_partial target objfiles =
-      run_js_of_ocaml "link" ~phase:Archive (["-a"; "-o"; target] @ objfiles)
+    (* CR selee: [-pack] would be [js_of_ocaml link -a] of the members and
+       the pack unit, but js_of_ocaml cannot yet link packed units: it reads
+       their names (e.g. [P.A]) back with [Compilation_unit.of_string], which
+       rejects qualified names (see [Ocaml_compiler.GlobalMap.of_global_name]
+       and [Ocaml_compiler.Import_info.make]). *)
+    let link_partial _target _objfiles = raise (Error (Unsupported "-pack"))
 
     let link _linkenv (objfiles : Linkenv.objfile_to_link list) output_name
         ~cached_genfns_imports:_ ~genfns:_ ~units_tolink:_ ~uses_eval:_

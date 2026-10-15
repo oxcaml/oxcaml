@@ -559,11 +559,16 @@ type cmj_body =
             state, so the OxCaml JSIR backend must communicate it to
             [js_of_ocaml] to keep the two in sync. *)
   ; imported_compilation_units : string list
-        (** Full paths of the compilation units whose symbols [program] fetches
-            from the global symbol table. Needed to fill in [Unit_info.t]. *)
+        (** Full paths of the compilation units that must be linked, and
+            initialised, before [program]: those whose symbols it fetches from
+            the global symbol table, and those the OCaml source refers to.
+            Needed to fill in [Unit_info.t]. *)
   ; exported_compilation_unit : string
         (** Full path of the compilation unit [program] defines. Needed to fill
             in [Unit_info.t]. *)
+  ; force_link : bool
+        (** Whether the unit was compiled with [-linkall], so must be linked
+            even if nothing requires it. Needed to fill in [Unit_info.t]. *)
   }
 
 let noloc = No

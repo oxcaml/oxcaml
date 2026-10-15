@@ -18,13 +18,14 @@ ocamlopt -target js_of_ocaml -o prog.js lib.cmjxa main.cmjx      # or a.out.js w
 | `.cmx` / `.cmxa` | `.cmjx` / `.cmjxa` | Flambda 2 export information |
 | `.o` / `.a` | `.cmjo` / `.cmja` | JavaScript, produced by `js_of_ocaml compile` / `js_of_ocaml link -a` |
 | `.s` | `.cmj` | The JSIR of a unit, marshaled; deleted unless `-S` is given |
+| startup file | `<exe>.runtime.js` | The output of `js_of_ocaml build-runtime`; deleted unless `-dstartup` is given |
 | C stubs | `.js` stubs | Recorded in `.cmjxa` files and passed to `js_of_ocaml build-runtime` when linking |
 
 The compiler runs the `js_of_ocaml` executable found in its `bin` directory, or in the `PATH`, unless the `OXCAML_JS_OF_OCAML` environment variable is populated.
 We can print JSIR with `-djsir`, `-g` makes `js_of_ocaml` keep debug information, and `-verbose` shows the `js_of_ocaml` commands.
-It is disallowed to pass in C sources and objects, `-ccopt`/`-cclib`, `-shared` and `-output-obj`.
+It is disallowed to pass in C sources and objects, `-ccopt`/`-cclib`, `-shared`, `-output-obj` and `-pack`.
 
-Options passed in through `-jsoo-opt` are passed through to all `js_of_ocaml` commands. The flags `-jsoo-opt-compile`, `-jsoo-opt-archive`, `-jsoo-opt-runtime` and `-jsoo-opt-link` pass in arguments to one of them only: `js_of_ocaml compile` (for `-c`), `js_of_ocaml link -a` (for `-a` and `-pack`), `js_of_ocaml build-runtime` (the runtime and the `.js` stubs of an executable) and the `js_of_ocaml link` of an executable, respectively. `OCAMLPARAM` accepts them as `jsoo-opt=`, `jsoo-opt-compile=`, etc.
+Options passed in through `-jsoo-opt` are passed through to all `js_of_ocaml` commands. The flags `-jsoo-opt-compile`, `-jsoo-opt-archive`, `-jsoo-opt-runtime` and `-jsoo-opt-link` pass in arguments to one of them only: `js_of_ocaml compile` (for `-c`), `js_of_ocaml link -a` (for `-a`), `js_of_ocaml build-runtime` (the runtime and the `.js` stubs of an executable) and the `js_of_ocaml link` of an executable, respectively. `OCAMLPARAM` accepts them as `jsoo-opt=`, `jsoo-opt-compile=`, etc.
 
 
 ## Number representations

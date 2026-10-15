@@ -36,8 +36,8 @@ type emit = Compile_common.info -> unit
 type jsir_program =
   { program : Jsoo_imports.Code.program;
     imported_compilation_units : Compilation_unit.Set.t
-        (** The compilation units whose toplevel module blocks [program] reads
-            from js_of_ocaml's global symbol table. *)
+        (** The compilation units whose toplevel module block or symbols
+            [program] reads from js_of_ocaml's symbol tables. *)
   }
 
 module type Flambda2 = sig
