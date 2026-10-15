@@ -291,7 +291,7 @@ module From_plan = struct
             let value = { value = value_receiver; name = value_name } in
             let table = Env.get_output env tid in
             let args = Env.must_be_bound_term_hlist env terms in
-            Executor.list [Executor.union repr columns table args value; body]
+            Executor.list [Executor.union columns table args value [] repr; body]
           | Callback_with_bindings (fn, name) ->
             let args = Env.must_be_bound_term_hlist env terms in
             Executor.list

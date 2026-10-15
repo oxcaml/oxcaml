@@ -122,14 +122,15 @@ module Make (Iterator : Leapfrog.Iterator) = struct
         * string list
         -> code
     | Union :
-        'v Table.result_repr
-        * ('t, 'k, 'v) Column.hlist
+        ('t, 'k, 's) Column.hlist
         * 't output_ref
         * string
         * 'k Or_null_receiver.hlist
         * string list
-        * 'v Or_null_receiver.t
+        * 's Or_null_receiver.t
         * string
+        * ('s, _, 'v) Column.hlist
+        * 'v Table.result_repr
         -> code
 
   let labels = function
@@ -173,7 +174,7 @@ module Make (Iterator : Leapfrog.Iterator) = struct
         (print_label digits) if_false
     | Call_with_bindings (_, name, _, _, names) ->
       Format.fprintf ppf "call@ %s,@ [@[%a]@]" name print_list names
-    | Union (_, _, _, name, _, names, _, value_name) ->
+    | Union (_, _, name, _, names, _, value_name, _, _) ->
       Format.fprintf ppf "union@ %s,@ @[{[@[%a]@] ->@;<1 2>%s}@]" name
         print_list names value_name
 
@@ -364,9 +365,19 @@ module Make (Iterator : Leapfrog.Iterator) = struct
   let call_with_bindings { value = fn; name } { values = args; names } st =
     emit (Call_with_bindings (fn, name, st.bindings, args, names)) st
 
-  let union repr columns { value = table; name } { values = args; names }
-      { value; name = value_name } =
-    emit (Union (repr, columns, table, name, args, names, value, value_name))
+  let union columns { value = table; name } { values = args; names }
+      { value; name = value_name } inner_columns repr =
+    emit
+      (Union
+         ( columns,
+           table,
+           name,
+           args,
+           names,
+           value,
+           value_name,
+           inner_columns,
+           repr ))
 
   (* Use a [private] type from an anonymous module to ensure that we only ever
      construct bytecode that satisfies the requirements of [exec] below (namely,
@@ -514,14 +525,15 @@ module Make (Iterator : Leapfrog.Iterator) = struct
     | Call_with_bindings (func, _name, bindings, args, _names) ->
       func bindings (read_hlist args);
       next ()
-    | Union (repr, columns, table, _, args, _, value, _) ->
+    | Union (columns, table, _, args, _, value, _, inner_cols, repr) ->
       let entry = read_singleton columns args value in
       (match table.contents with
       | Null -> table.contents <- Or_null.this entry
       | This contents ->
+        let union_value = Table.result_repr_union repr in
         let contents =
           Column.union_total_hlist columns
-            (Table.result_repr_union repr)
+            (fun s1 s2 -> Column.union_total_hlist inner_cols union_value s1 s2)
             contents entry
         in
         table.contents <- Or_null.this contents);
