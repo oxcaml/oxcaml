@@ -558,6 +558,8 @@ module Variable = struct
     let data = Table.import importer t in
     let user_visible = if data.user_visible then Some () else None in
     create ?user_visible data.name data.kind
+
+  let export_name_stamp_counter () = !previous_name_stamp
 end
 
 module Symbol = struct
@@ -959,6 +961,8 @@ module Code_id = struct
 
   let import importer t =
     Table.add !grand_table_of_code_ids (Table.import importer t)
+
+  let export_name_stamp_counter () = !previous_name_stamp
 end
 
 module Code_id_or_symbol = struct

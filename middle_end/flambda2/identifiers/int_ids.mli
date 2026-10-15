@@ -139,6 +139,8 @@ module Variable : sig
   val import : importer -> t -> t
 
   val import_and_rename : importer -> t -> t
+
+  val export_name_stamp_counter : unit -> int
 end
 
 module Symbol : sig
@@ -275,6 +277,8 @@ module Code_id : sig
   val export : Set.t -> importer
 
   val import : importer -> t -> t
+
+  val export_name_stamp_counter : unit -> int
 end
 
 module Code_id_or_symbol : sig
