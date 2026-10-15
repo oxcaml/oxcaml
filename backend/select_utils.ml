@@ -209,7 +209,8 @@ let select_mutable_flag : Asttypes.mutable_flag -> Operation.mutable_flag =
 (* Infer the type of the result of an operation *)
 
 let oper_result_type = function
-  | Capply { result_type = ty; _ } -> ty
+  | Capply { result_type = Some ty; _ } -> ty
+  | Capply { result_type = None; _ } -> typ_void
   | Cextcall { ty; ty_args = _; alloc = _; func = _; _ } -> ty
   | Cload { memory_chunk; _ } -> (
     match memory_chunk with
@@ -651,7 +652,7 @@ module Stack_offset_and_exn = struct
         InstructionId.format term.id
     | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
     | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
-    | Tailcall_func _ | Call_no_return _ | Invalid _ | Call _ | Prim _ ->
+    | Tailcall_func _ | Call_no_return_ext _ | Call_no_return_func _ | Invalid _ | Call _ | Prim _ ->
       stack_offset, traps
 
   let rec process_basic :

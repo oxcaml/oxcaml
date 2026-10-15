@@ -395,8 +395,10 @@ let terminator_structure_match ~map_label (old_term : Cfg.terminator)
     true
   | Tailcall_func old_op, Tailcall_func new_op ->
     Cfg.equal_func_call_operation old_op new_op
-  | Call_no_return old_op, Call_no_return new_op ->
+  | Call_no_return_ext old_op, Call_no_return_ext new_op ->
     Cfg.equal_external_call_operation old_op new_op
+  | Call_no_return_func old_op, Call_no_return_func new_op ->
+    Cfg.equal_func_call_operation old_op new_op
   | ( Call { op = old_op; label_after = old_label_after },
       Call { op = new_op; label_after = new_label_after } ) ->
     map_label old_label_after new_label_after;
@@ -431,7 +433,7 @@ let terminator_structure_match ~map_label (old_term : Cfg.terminator)
     && Cmm.equal_stack_align old_stack_align new_stack_align
   | ( ( Always _ | Parity_test _ | Truth_test _ | Int_test _ | Float_test _
       | Switch _ | Return | Raise _ | Tailcall_self _ | Tailcall_func _
-      | Call_no_return _ | Call _ | Prim _ | Invalid _ ),
+      | Call_no_return_ext _ | Call_no_return_func _ | Call _ | Prim _ | Invalid _ ),
       _ ) ->
     false
 
@@ -696,7 +698,7 @@ let process_block_backward ~ppf_m eqs ~(old_block : Cfg.basic_block)
   let new_terminator = new_block.terminator in
   let terminator_is_gc_point =
     match old_terminator.desc with
-    | Call _ | Call_no_return _ | Prim _ | Invalid _ -> true
+    | Call _ | Call_no_return_ext _ | Call_no_return_func _ | Prim _ | Invalid _ -> true
     | Never | Always _ | Parity_test _ | Truth_test _ | Int_test _
     | Float_test _ | Switch _ | Return | Raise _ | Tailcall_self _
     | Tailcall_func _ ->

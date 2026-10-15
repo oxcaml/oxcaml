@@ -614,7 +614,7 @@ let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
     if fp then [| rbp |] else [||]
   | Switch _ ->
     destroyed_rax_rdx
-  | Call_no_return { func_symbol = _; alloc; ty_res = _; ty_args = _;
+  | Call_no_return_ext { func_symbol = _; alloc; ty_res = _; ty_args = _;
                      stack_ofs; stack_align = _; effects = _; }
   | Prim {op = External { func_symbol = _; alloc; ty_res = _; ty_args = _;
                           stack_ofs; stack_align = _; effects = _; }; _} ->
@@ -627,7 +627,8 @@ let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
     if stack_ofs > 0
     then Lazy.force all_phys_regs
     else Lazy.force destroyed_at_c_call
-  | Call {op = Indirect _ | Direct _; _} -> Lazy.force all_phys_regs
+  | Call {op = Indirect _ | Direct _; _}
+  | Call_no_return_func _ -> Lazy.force all_phys_regs
 
 (* CR-soon xclerc for xclerc: consider having more destruction points.
    We current return `true` when `destroyed_at_terminator` returns
@@ -646,7 +647,7 @@ let is_destruction_point ~(more_destruction_points : bool) (terminator : Cfg_int
     false
   | Switch _ ->
     false
-  | Call_no_return { func_symbol = _; alloc; ty_res = _; ty_args = _;
+  | Call_no_return_ext { func_symbol = _; alloc; ty_res = _; ty_args = _;
                      stack_ofs; stack_align = _; effects = _; }
   | Prim {op = External { func_symbol = _; alloc; ty_res = _; ty_args = _;
                           stack_ofs; stack_align = _; effects = _; }; _} ->
@@ -655,7 +656,8 @@ let is_destruction_point ~(more_destruction_points : bool) (terminator : Cfg_int
     else
       if alloc || stack_ofs > 0 then true else false
   | Invalid _ -> more_destruction_points
-  | Call {op = Indirect _ | Direct _; _} ->
+  | Call {op = Indirect _ | Direct _; _}
+  | Call_no_return_func _ ->
     true
 
 (* Layout of the stack frame *)
