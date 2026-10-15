@@ -229,26 +229,33 @@ module Make (Iterator : Leapfrog.Iterator) = struct
 
      The [late] type below is used to represent as closures the instructions
      with unresolved labels emitted during the first iteration. The closure
-     takes as argument the resolved offsets for the labels. *)
+     takes as argument the resolved offsets for the labels.
 
-  type 'a late = Late of (label iarray -> 'a) [@@unboxed]
-
-  let run_late (Late f) len = f len
+     Unconditional jumps ([goto]) are explicitly represented in the [late] type
+     in order to simplify code when a jump is either followed immediately by its
+     label or by an instruction insn without label (which becomes
+     unreachable). *)
 
   type label_id = Label_id of int [@@unboxed]
 
-  (** [code] and [labels] are accumulated across the whole code; [bindings] and
-      [loops] are used to implement structured primitives and depend on the
-      context only. *)
+  type late =
+    | Late of (label iarray -> code)
+    | Late_goto of
+        { jump_target : label_id;
+          pending_labels : label_id list
+        }
+
+  (** [code] and [labels] are accumulated across the whole code; [bindings] are
+      used to implement structured primitives and depend on the context only. *)
   type state =
-    { code : code late Dynarray.t;
-      mutable labels : int Dynarray.t;
+    { code : late Dynarray.t;
+      pending_labels : label_id list ref;
+      labels : int Dynarray.t;
           (** Map from label ids to their resolved offset. -1 for unresolved
               labels. *)
-      bindings : bindings_ref;
+      bindings : bindings_ref
           (** Used to implement [Callback_with_bindings]; contains the variables
               in the current scope. *)
-      after_loops : label_id list  (** Used to implement [break]. *)
     }
 
   type assembler = state -> unit
@@ -265,23 +272,66 @@ module Make (Iterator : Leapfrog.Iterator) = struct
 
   let get_label offsets (Label_id label) = Iarray.get offsets label
 
+  let run_late late offsets =
+    match late with
+    | Late f -> f offsets
+    | Late_goto { jump_target; pending_labels = _ } ->
+      Goto (get_label offsets jump_target)
+
+  let flush_pending_labels pending_labels st =
+    List.iter
+      (fun (Label_id label) ->
+        Dynarray.set st.labels label (Dynarray.length st.code))
+      pending_labels
+
+  let assert_no_pending_labels st =
+    match !(st.pending_labels) with
+    | [] -> ()
+    | _ :: _ -> Misc.fatal_error "*BUG*: Unexpected pending labels"
+
   let here (Label_id label) st =
     if Dynarray.get st.labels label >= 0
     then Misc.fatal_error "here: label already defined";
-    Dynarray.set st.labels label (Dynarray.length st.code)
+    match Dynarray.find_last st.code with
+    | None | Some (Late _) ->
+      Dynarray.set st.labels label (Dynarray.length st.code)
+    | Some (Late_goto { jump_target = Label_id pending_jump; pending_labels })
+      when pending_jump = label ->
+      Dynarray.remove_last st.code;
+      flush_pending_labels pending_labels st;
+      Dynarray.set st.labels label (Dynarray.length st.code)
+    | Some
+        (Late_goto { jump_target = Label_id _ as jump_target; pending_labels })
+      ->
+      Dynarray.set st.code
+        (Dynarray.length st.code - 1)
+        (Late_goto
+           { jump_target; pending_labels = Label_id label :: pending_labels })
 
-  let emit insn st = Dynarray.add_last st.code (Late (fun _ -> insn))
+  let is_dead st =
+    (* If we have seen an unconditional jump and no labels since that jump,
+       nobody can reach us -- no need to emit anything. *)
+    match Dynarray.find_last st.code with
+    | Some (Late_goto _) -> List.is_empty !(st.pending_labels)
+    | None | Some (Late _) -> false
 
-  let emit_with_label label f st =
-    Dynarray.add_last st.code (Late (fun len -> f (get_label len label)))
+  let emit0 insn st =
+    if not (is_dead st)
+    then (
+      flush_pending_labels st;
+      Dynarray.add_last st.code (Late insn))
 
-  (* Note: [break 0] doesn't break out of any loops *)
-  let break n st =
-    if n > 0
-    then
-      match List.nth st.after_loops (n - 1) with
-      | lab -> emit_with_label lab (fun lab -> Goto lab) st
-      | exception Not_found -> Misc.fatal_error "cannot break"
+  let emit insn st = emit0 (fun _ -> insn) st
+
+  let emit_with_label label f st = emit0 (fun len -> f (get_label len label)) st
+
+  let goto lab st =
+    if not (is_dead st)
+    then (
+      flush_pending_labels st;
+      Dynarray.add_last st.code (Late_goto lab))
+
+  let nop _ = ()
 
   let with_binding repr receiver body st =
     let (Bindings_ref_innermost_first (reprs, receivers)) = st.bindings in
@@ -326,8 +376,9 @@ module Make (Iterator : Leapfrog.Iterator) = struct
 
   let list xs st = List.iter (fun x -> x st) xs
 
-  let with_loop lab body st =
-    body { st with after_loops = lab :: st.after_loops }
+  let exists cond body =
+    let* after = lab in
+    list [cond ~accept:(body ++ goto after); here after]
 
   let for_in repr iterators body =
     let iterator =
@@ -340,7 +391,7 @@ module Make (Iterator : Leapfrog.Iterator) = struct
         list
           [ init { repr with value = sender } iterator after_loop;
             here start_of_body;
-            with_loop after_loop (body receiver);
+            body receiver;
             advance { repr with value = sender } iterator start_of_body;
             here after_loop ])
 
@@ -414,7 +465,7 @@ module Make (Iterator : Leapfrog.Iterator) = struct
     let labels = Dynarray.create () in
     let st =
       { code = delayed;
-        after_loops = [];
+        pending_labels = ref [];
         bindings =
           Bindings_ref_innermost_first (Nil, { values = []; names = [] });
         labels
@@ -429,7 +480,7 @@ module Make (Iterator : Leapfrog.Iterator) = struct
       Iarray.init (Dynarray.length labels) (fun i ->
           let offset = Dynarray.get labels i in
           if not (0 <= offset && offset < len)
-          then Misc.fatal_error "out-of-range (unresolved) label";
+          then Misc.fatal_error "out-of-range (unresolved) label (at %d)";
           Label offset)
     in
     Dynarray.unsafe_to_iarray ~capacity:len (fun code ->

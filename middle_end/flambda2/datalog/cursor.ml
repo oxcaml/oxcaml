@@ -270,36 +270,23 @@ module From_plan = struct
       ( inner_env,
         { values = iterator :: values; names = outer_receiver.name :: names } )
 
-  let rec build_stages env plan index =
-    if index >= Iarray.length plan.input_stages
-    then
-      Iarray.fold_right
-        (fun head_atom body ->
-          match head_atom with
-          | Union (tid, columns, args, value, inner_columns, repr) ->
-            let table = Env.get_output env tid in
-            let value = Env.must_be_bound_term env value in
-            let args = Env.must_be_bound_term_hlist env args in
-            Executor.list
-              [Executor.union columns table args value inner_columns repr; body]
-          | Callback_with_bindings (fn, args) ->
-            let args = Env.must_be_bound_term_hlist env args in
-            Executor.list [Executor.call_with_bindings fn args; body])
-        plan.output_atoms
-        (Executor.break plan.num_existentials)
+  let rec build_stages env stages index k =
+    if index >= Iarray.length stages
+    then k env
     else
-      match Iarray.get plan.input_stages index with
+      match Iarray.get stages index with
       | Join_stage (var, columns) ->
         let env, iterators = join_iterators env columns in
         let (Column column) = column_for_join columns in
         Executor.for_in { value = column; name = Variable.name var } iterators
         @@ fun receiver ->
-        build_stages (Env.bind_var env var receiver) plan (index + 1)
+        build_stages (Env.bind_var env var receiver) stages (index + 1) k
       | Seek_stage (term, columns) ->
         let env, iterators = join_iterators env columns in
         let (Column column) = column_for_join columns in
         let receiver = Env.must_be_bound_term ~column env term in
-        Executor.if_in receiver iterators @@ build_stages env plan (index + 1)
+        Executor.if_in receiver iterators
+        @@ build_stages env stages (index + 1) k
       | Check_stage (Atom (relation, terms)) ->
         (match relation with
           | Table _ ->
@@ -317,11 +304,11 @@ module From_plan = struct
               (Env.must_be_bound_term_hlist env terms)
           | Callback_with_bindings _ ->
             Misc.fatal_error "Callback with bindings cannot be used in the body")
-        @@ build_stages env plan (index + 1)
+        @@ build_stages env stages (index + 1) k
 
   let create_from_plan_with_parameters ?(callback = ref ignore) ~original_rule
       parameters
-      ({ tables; input_stages = _; output_atoms = _; num_existentials = _ } as
+      ({ tables; input_stages = _; existential_stages = _; output_atoms = _ } as
        plan) : (_, _) with_parameters =
     let env = Env.create () in
     let env, parameters =
@@ -345,19 +332,47 @@ module From_plan = struct
           Env.bind_var env var receiver, binders)
         (env, []) tables
     in
-    let executor = Executor.assemble (build_stages env plan 0) in
+    Format.eprintf "@.@.";
+    Format.eprintf "%a@." print_rule original_rule;
+    Format.eprintf "%a@." Planner.print_plan plan;
+    let executor =
+      build_stages env plan.input_stages 0 (fun env ->
+          Executor.exists
+            (fun ~accept ->
+              build_stages env plan.existential_stages 0 (fun _env -> accept))
+            (Iarray.fold_right
+               (fun head_atom body ->
+                 match head_atom with
+                 | Union (tid, columns, args, value, inner_columns, repr) ->
+                   let table = Env.get_output env tid in
+                   let value = Env.must_be_bound_term env value in
+                   let args = Env.must_be_bound_term_hlist env args in
+                   Executor.list
+                     [ Executor.union columns table args value inner_columns repr;
+                       body ]
+                 | Callback_with_bindings (fn, args) ->
+                   let args = Env.must_be_bound_term_hlist env args in
+                   Executor.list [Executor.call_with_bindings fn args; body])
+               plan.output_atoms Executor.nop))
+      |> Executor.assemble
+    in
     let cursor_naive_binders = Env.get_naive_tables env in
     let cursor_outputs = Env.get_output_tables env in
-    { parameters;
-      cursor =
-        { cursor_binders;
-          cursor_naive_binders;
-          cursor_outputs;
-          executor;
-          callback;
-          original_rule
-        }
-    }
+    let o =
+      { parameters;
+        cursor =
+          { cursor_binders;
+            cursor_naive_binders;
+            cursor_outputs;
+            executor;
+            callback;
+            original_rule
+          }
+      }
+    in
+    Format.eprintf "%a@." print o.cursor;
+    Format.eprintf "@.@.";
+    o
 end
 
 module With_parameters = struct
