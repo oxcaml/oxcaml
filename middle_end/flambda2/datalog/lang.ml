@@ -103,6 +103,19 @@ module Term = struct
         loop ~first:false ppf terms
     in
     loop ~first:true ppf terms
+
+  let print_columns ~pp_sep columns ppf terms =
+    let rec loop : type t k v.
+        first:_ -> (t, k, v) Column.hlist -> _ -> k hlist -> unit =
+     fun ~first columns ppf terms ->
+      match columns, terms with
+      | [], [] -> ()
+      | column :: columns, term :: terms ->
+        if not first then pp_sep ppf ();
+        print_term (Column.print_key column) ppf term;
+        loop ~first:false columns ppf terms
+    in
+    loop ~first:true columns ppf terms
 end
 
 type ('k, 'v) relation =

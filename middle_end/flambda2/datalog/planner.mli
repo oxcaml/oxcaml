@@ -26,6 +26,7 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
+open Datalog_imports
 open Lang
 
 type 'k column_iterator =
@@ -41,11 +42,25 @@ type stage =
 type bound_table =
   | Bound_table : ('t, 'k, 'v) Table.Id.t * 't variable -> bound_table
 
+type head_atom =
+  | Union :
+      ('t, _, _) Table.Id.t
+      * ('t, 'k, 's) Column.hlist
+      * 'k Term.hlist
+      * 's term
+      * ('s, _, 'v) Column.hlist
+      * 'v Table.result_repr
+      -> head_atom
+  | Callback_with_bindings :
+      (Bytecode.bindings_ref -> 'k Constant.hlist -> unit) with_name
+      * 'k Term.hlist
+      -> head_atom
+
 type plan =
   { tables : bound_table iarray;
     input_stages : stage iarray;
     num_existentials : int;
-    output_atoms : atom iarray
+    output_atoms : head_atom iarray
   }
 
 val print_plan : Format.formatter -> plan -> unit

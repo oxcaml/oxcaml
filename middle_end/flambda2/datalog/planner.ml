@@ -26,6 +26,7 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
+open Datalog_imports
 open Lang
 
 type 'k column_iterator =
@@ -41,12 +42,44 @@ type stage =
 type bound_table =
   | Bound_table : ('t, 'k, 'v) Table.Id.t * 't variable -> bound_table
 
+type head_atom =
+  | Union :
+      ('t, _, _) Table.Id.t
+      * ('t, 'k, 's) Column.hlist
+      * 'k Term.hlist
+      * 's term
+      * ('s, _, 'v) Column.hlist
+      * 'v Table.result_repr
+      -> head_atom
+  | Callback_with_bindings :
+      (Bytecode.bindings_ref -> 'k Constant.hlist -> unit) with_name
+      * 'k Term.hlist
+      -> head_atom
+
 type plan =
   { tables : bound_table iarray;
     input_stages : stage iarray;
     num_existentials : int;
-    output_atoms : atom iarray
+    output_atoms : head_atom iarray
   }
+
+let print_head_atom ppf head_atom =
+  match head_atom with
+  | Union (tid, columns, args, value, _, _) ->
+    Format.fprintf ppf "@[<1>@[%a@](@,@[%a@])%a@]" Table.Id.print tid
+      (Term.print_columns
+         ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ ")
+         columns)
+      args
+      (fun ppf value ->
+        match value with
+        | Literal _ -> ()
+        | Variable var -> Format.fprintf ppf " <= %a" Variable.print var)
+      value
+  | Callback_with_bindings (fn, args) ->
+    Format.fprintf ppf "%s@[<1>(%a)@]" fn.name
+      (Term.print_hlist ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ "))
+      args
 
 let print_stage ppf stage =
   match stage with
@@ -97,7 +130,7 @@ let print_plan ppf { input_stages; output_atoms; num_existentials; _ } =
        restrictions. *)
     Format.pp_print_iter ~pp_sep:Format.pp_print_space
       (fun f arr -> Iarray.iter f arr)
-      print_atom ppf output_atoms;
+      print_head_atom ppf output_atoms;
     if num_existentials > 0
     then Format.fprintf ppf "@ break %d" num_existentials
   in
@@ -373,5 +406,19 @@ let plan_rule { variables = vars; head; body } =
         else loop (n + 1)
     in
     loop 0
+  in
+  let head =
+    Iarray.map
+      (fun (Atom (relation, args)) ->
+        match relation with
+        | Unless _ | Distinct _ | Filter _ ->
+          Misc.fatal_error "not supported in the head"
+        | Table tid ->
+          let repr = Table.Id.result_repr tid in
+          let columns = Table.Id.columns tid in
+          Union (tid, columns, args, lit (Table.Id.default_value tid), [], repr)
+        | Callback_with_bindings (fn, name) ->
+          Callback_with_bindings ({ value = fn; name }, args))
+      head
   in
   { tables; input_stages; output_atoms = head; num_existentials }

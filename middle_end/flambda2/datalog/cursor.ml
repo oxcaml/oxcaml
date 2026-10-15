@@ -274,28 +274,17 @@ module From_plan = struct
     if index >= Iarray.length plan.input_stages
     then
       Iarray.fold_right
-        (fun (Atom (relation, terms)) body ->
-          match relation with
-          | Unless _ | Distinct _ | Filter _ ->
-            Misc.fatal_error "not supported in the head"
-          | Table tid ->
-            let repr = Table.Id.result_repr tid in
-            let columns = Table.Id.columns tid in
-            let value = Table.Id.default_value tid in
-            let _, value_receiver =
-              Channel.create_or_null (Or_null.this value)
-            in
-            let value_name =
-              Format.asprintf "%a" (Table.result_repr_print repr) value
-            in
-            let value = { value = value_receiver; name = value_name } in
+        (fun head_atom body ->
+          match head_atom with
+          | Union (tid, columns, args, value, inner_columns, repr) ->
             let table = Env.get_output env tid in
-            let args = Env.must_be_bound_term_hlist env terms in
-            Executor.list [Executor.union columns table args value [] repr; body]
-          | Callback_with_bindings (fn, name) ->
-            let args = Env.must_be_bound_term_hlist env terms in
+            let value = Env.must_be_bound_term env value in
+            let args = Env.must_be_bound_term_hlist env args in
             Executor.list
-              [Executor.call_with_bindings { value = fn; name } args; body])
+              [Executor.union columns table args value inner_columns repr; body]
+          | Callback_with_bindings (fn, args) ->
+            let args = Env.must_be_bound_term_hlist env args in
+            Executor.list [Executor.call_with_bindings fn args; body])
         plan.output_atoms
         (Executor.break plan.num_existentials)
     else

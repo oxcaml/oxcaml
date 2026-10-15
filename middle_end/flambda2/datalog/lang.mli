@@ -52,6 +52,19 @@ module Term : sig
   type 'a t = 'a term
 
   include Heterogenous_list.S with type 'a t := 'a t
+
+  val print_hlist :
+    pp_sep:(Format.formatter -> unit -> unit) ->
+    Format.formatter ->
+    _ hlist ->
+    unit
+
+  val print_columns :
+    pp_sep:(Format.formatter -> unit -> unit) ->
+    (_, 'a, _) Column.hlist ->
+    Format.formatter ->
+    'a hlist ->
+    unit
 end
 
 type ('k, 'v) relation =
