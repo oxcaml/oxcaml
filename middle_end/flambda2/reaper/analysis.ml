@@ -15,12 +15,12 @@
 
 module PTA = Points_to_analysis
 module UA = Unboxing_analysis
+module Schemas = Datalog_helpers.Schemas
 
 (* We use unit maps instead of sets, because it allows reuse of the tables
    stored in the Datalog database without copying. *)
-type 'f solution =
-  { analysis_scope : Analysis_scope.t;
-    has_usage : unit Code_id_or_name.Map.t;
+type answers =
+  { has_usage : unit Code_id_or_name.Map.t;
     has_source : unit Code_id_or_name.Map.t;
     field_of_constructor_is_used : unit Field.Map.t Code_id_or_name.Map.t;
     directly_called : Code_id.Set.t Or_unknown.t Code_id_or_name.Map.t;
@@ -28,7 +28,12 @@ type 'f solution =
     unknown_masks : PTA.keep_or_delete list list Code_id_or_name.Map.t;
     unboxed_fields : UA.unboxed Code_id_or_name.Map.t;
     changed_representation :
-      (UA.changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t;
+      (UA.changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t
+  }
+
+type 'f solution =
+  { analysis_scope : Analysis_scope.t;
+    answers : answers;
     code_changes : Unboxing_analysis.code_changes;
     slot_offsets : Slot_offsets.result;
     types_rewrite_context :
@@ -103,24 +108,11 @@ let rewrite_kind_with_subkind (type f)
     Types_rewriter.rewrite_kind_with_subkind types_rewrite_context
   | Without_types -> fun _ -> Types_rewriter.erase_subkind
 
-let solve (type f) (problem : f Traverse.Problem.t)
-    ~(analysis_scope : Analysis_scope.t) =
-  let { Traverse.Problem.deps;
-        delayed_deps;
-        code_deps;
-        applications;
-        all_sets_of_closures;
-        final_typing_env;
-        module_symbol;
-        free_names;
-        toplevel_return
-      } =
-    problem
-  in
-  (match analysis_scope with
-  | Current_unit -> Global_flow_graph.add_any_usage deps toplevel_return
-  | Lto_participants _ -> ());
-  Traverse_acc.resolve_delayed_deps deps ~analysis_scope ~code_deps delayed_deps;
+(* [deps] must have its delayed dependencies resolved. *)
+let solve0 (type f) deps ~analysis_scope ~code_deps ~applications ~free_names
+    ~(all_sets_of_closures : (f, _) Traverse.With_types.t)
+    ~(final_typing_env : (f, typing_env) Traverse.With_types.t)
+    ~(module_symbol : (f, Symbol.t) Traverse.With_types.t) : f solution =
   let unboxing = fixpoint deps ~analysis_scope in
   let db = unboxing.db in
   let ~directly_called, ~known_masks, ~unknown_masks =
@@ -158,33 +150,94 @@ let solve (type f) (problem : f Traverse.Problem.t)
            final_typing_env)
   in
   { analysis_scope;
-    has_usage = Datalog.get_table PTA.Relations.has_usage_tbl db;
-    has_source = Datalog.get_table PTA.Relations.has_source_tbl db;
-    field_of_constructor_is_used =
-      Datalog.get_table PTA.Relations.field_of_constructor_is_used_tbl db;
-    directly_called;
-    known_masks;
-    unknown_masks;
-    unboxed_fields = unboxing.unboxed_fields;
-    changed_representation = unboxing.changed_representation;
+    answers =
+      { has_usage = Datalog.get_table PTA.Relations.has_usage_tbl db;
+        has_source = Datalog.get_table PTA.Relations.has_source_tbl db;
+        field_of_constructor_is_used =
+          Datalog.get_table PTA.Relations.field_of_constructor_is_used_tbl db;
+        directly_called;
+        known_masks;
+        unknown_masks;
+        unboxed_fields = unboxing.unboxed_fields;
+        changed_representation = unboxing.changed_representation
+      };
     code_changes;
     slot_offsets;
     types_rewrite_context;
     final_typing_env
   }
 
+let solve (problem : _ Traverse.Problem.t) ~(analysis_scope : Analysis_scope.t)
+    =
+  let { Traverse.Problem.deps;
+        delayed_deps;
+        code_deps;
+        applications;
+        all_sets_of_closures;
+        final_typing_env;
+        module_symbol;
+        free_names;
+        toplevel_return
+      } =
+    problem
+  in
+  (match analysis_scope with
+  | Current_unit -> Global_flow_graph.add_any_usage deps toplevel_return
+  | Lto_participants _ -> ());
+  Traverse_acc.resolve_delayed_deps deps ~analysis_scope ~code_deps delayed_deps;
+  solve0 deps ~analysis_scope ~code_deps ~applications ~free_names
+    ~all_sets_of_closures ~final_typing_env ~module_symbol
+
+let solve_whole_program (problems : [`Without_types] Traverse.Problem.t list)
+    ~analysis_scope =
+  let deps =
+    match problems with
+    | [] -> Global_flow_graph.create ()
+    | first :: rest ->
+      List.fold_left
+        (fun deps (problem : _ Traverse.Problem.t) ->
+          Global_flow_graph.union deps problem.deps)
+        first.deps rest
+  in
+  let code_deps =
+    List.fold_left
+      (fun code_deps (problem : _ Traverse.Problem.t) ->
+        Code_id.Map.disjoint_union code_deps problem.code_deps)
+      Code_id.Map.empty problems
+  in
+  let applications =
+    List.fold_left
+      (fun applications (problem : _ Traverse.Problem.t) ->
+        Traverse_acc.Applications.union applications problem.applications)
+      Traverse_acc.Applications.empty problems
+  in
+  let free_names =
+    List.fold_left
+      (fun free_names (problem : _ Traverse.Problem.t) ->
+        Name_occurrences.union free_names problem.free_names)
+      Name_occurrences.empty problems
+  in
+  List.iter
+    (fun (problem : _ Traverse.Problem.t) ->
+      Traverse_acc.resolve_delayed_deps deps ~analysis_scope ~code_deps
+        problem.delayed_deps)
+    problems;
+  solve0 deps ~analysis_scope ~code_deps ~applications ~free_names
+    ~all_sets_of_closures:Without_types ~final_typing_env:Without_types
+    ~module_symbol:Without_types
+
 let get_unboxed_fields solution cn =
-  Code_id_or_name.Map.find_opt cn solution.unboxed_fields
+  Code_id_or_name.Map.find_opt cn solution.answers.unboxed_fields
 
 let get_changed_representation solution cn =
   Option.map fst
-    (Code_id_or_name.Map.find_opt cn solution.changed_representation)
+    (Code_id_or_name.Map.find_opt cn solution.answers.changed_representation)
 
-let has_use solution v = Code_id_or_name.Map.mem v solution.has_usage
+let has_use solution v = Code_id_or_name.Map.mem v solution.answers.has_usage
 
 let field_used solution v f =
   match
-    Code_id_or_name.Map.find_opt v solution.field_of_constructor_is_used
+    Code_id_or_name.Map.find_opt v solution.answers.field_of_constructor_is_used
   with
   | None -> false
   | Some fields -> Field.Map.mem f fields
@@ -197,7 +250,7 @@ let find_answer map callee query =
       Code_id_or_name.print callee
 
 let code_id_actually_directly_called solution closure =
-  find_answer solution.directly_called
+  find_answer solution.answers.directly_called
     (Code_id_or_name.name closure)
     "direct-call targets"
 
@@ -211,11 +264,13 @@ let rec apply_mask callee query mask args =
       query Code_id_or_name.print callee
 
 let arguments_used_by_known_arity_call solution callee args =
-  let mask = find_answer solution.known_masks callee "known-arity" in
+  let mask = find_answer solution.answers.known_masks callee "known-arity" in
   apply_mask callee "known-arity" mask args
 
 let arguments_used_by_unknown_arity_call solution callee args =
-  let masks = find_answer solution.unknown_masks callee "unknown-arity" in
+  let masks =
+    find_answer solution.answers.unknown_masks callee "unknown-arity"
+  in
   let rec apply_groups masks args =
     match args, masks with
     | [], _ -> []
@@ -228,7 +283,8 @@ let arguments_used_by_unknown_arity_call solution callee args =
   in
   apply_groups masks args
 
-let has_source solution v = Code_id_or_name.Map.mem v solution.has_source
+let has_source solution v =
+  Code_id_or_name.Map.mem v solution.answers.has_source
 
 let get_calling_convention_change solution code_id =
   Unboxing_analysis.get_calling_convention_change solution.code_changes
@@ -273,3 +329,163 @@ let rewrite_kind_with_subkind solution =
   rewrite_kind_with_subkind solution.types_rewrite_context
 
 let final_typing_env solution = solution.final_typing_env
+
+module Rebuild_data = struct
+  type t =
+    { answers : answers;
+      code_changes : UA.code_changes;
+      slot_offsets : Exported_offsets.t
+    }
+
+  let of_solution ({ answers; code_changes; slot_offsets; _ } : _ solution) =
+    { answers;
+      code_changes;
+      slot_offsets = slot_offsets.Slot_offsets.exported_offsets
+    }
+
+  let empty_answers =
+    { has_usage = Code_id_or_name.Map.empty;
+      has_source = Code_id_or_name.Map.empty;
+      field_of_constructor_is_used = Code_id_or_name.Map.empty;
+      directly_called = Code_id_or_name.Map.empty;
+      known_masks = Code_id_or_name.Map.empty;
+      unknown_masks = Code_id_or_name.Map.empty;
+      unboxed_fields = Code_id_or_name.Map.empty;
+      changed_representation = Code_id_or_name.Map.empty
+    }
+
+  let empty =
+    { answers = empty_answers;
+      code_changes = UA.empty_code_changes;
+      slot_offsets = Exported_offsets.empty
+    }
+
+  let add_keys map ids =
+    Code_id_or_name.Map.fold
+      (fun id _ ids -> Ids_for_export.add_code_id_or_name ids id)
+      map ids
+
+  let ids_for_export { answers; code_changes; slot_offsets = _ } =
+    (* Slots are not hashconsed, so the offsets need no renaming. *)
+    let ids =
+      Ids_for_export.union_list
+        [ Schemas.N.ids_for_export answers.has_usage;
+          Schemas.N.ids_for_export answers.has_source;
+          Schemas.NF.ids_for_export answers.field_of_constructor_is_used ]
+    in
+    let ids = add_keys answers.known_masks ids in
+    let ids = add_keys answers.unknown_masks ids in
+    let ids =
+      Code_id_or_name.Map.fold
+        (fun callee targets ids ->
+          let ids = Ids_for_export.add_code_id_or_name ids callee in
+          match (targets : _ Or_unknown.t) with
+          | Unknown -> ids
+          | Known targets ->
+            Code_id.Set.fold
+              (fun code_id ids -> Ids_for_export.add_code_id ids code_id)
+              targets ids)
+        answers.directly_called ids
+    in
+    let ids = UA.unboxed_fields_ids_for_export answers.unboxed_fields ids in
+    let ids =
+      UA.changed_representation_ids_for_export answers.changed_representation
+        ids
+    in
+    UA.code_changes_ids_for_export code_changes ids
+
+  let rename_map map renaming ~f =
+    Code_id_or_name.Map.fold
+      (fun id value map ->
+        Code_id_or_name.Map.add
+          (Renaming.apply_code_id_or_name renaming id)
+          (f value) map)
+      map Code_id_or_name.Map.empty
+
+  let apply_renaming { answers; code_changes; slot_offsets } renaming =
+    let answers =
+      { has_usage = Schemas.N.apply_renaming answers.has_usage renaming;
+        has_source = Schemas.N.apply_renaming answers.has_source renaming;
+        field_of_constructor_is_used =
+          Schemas.NF.apply_renaming answers.field_of_constructor_is_used
+            renaming;
+        directly_called =
+          rename_map answers.directly_called renaming ~f:(fun targets ->
+              Or_unknown.map targets ~f:(fun targets ->
+                  Code_id.Set.fold
+                    (fun code_id targets ->
+                      Code_id.Set.add
+                        (Renaming.apply_code_id renaming code_id)
+                        targets)
+                    targets Code_id.Set.empty));
+        known_masks = rename_map answers.known_masks renaming ~f:Fun.id;
+        unknown_masks = rename_map answers.unknown_masks renaming ~f:Fun.id;
+        unboxed_fields =
+          UA.unboxed_fields_apply_renaming answers.unboxed_fields renaming;
+        changed_representation =
+          UA.changed_representation_apply_renaming
+            answers.changed_representation renaming
+      }
+    in
+    { answers;
+      code_changes = UA.code_changes_apply_renaming code_changes renaming;
+      slot_offsets
+    }
+
+  let partition_answers answers =
+    let distribute map ~get ~set partitions =
+      Code_id_or_name.Map.fold
+        (fun id value partitions ->
+          Compilation_unit.Map.update
+            (Code_id_or_name.compilation_unit id)
+            (fun part ->
+              let part = Option.value part ~default:empty_answers in
+              Some (set part (Code_id_or_name.Map.add id value (get part))))
+            partitions)
+        map partitions
+    in
+    Compilation_unit.Map.empty
+    |> distribute answers.has_usage
+         ~get:(fun part -> part.has_usage)
+         ~set:(fun part has_usage -> { part with has_usage })
+    |> distribute answers.has_source
+         ~get:(fun part -> part.has_source)
+         ~set:(fun part has_source -> { part with has_source })
+    |> distribute answers.field_of_constructor_is_used
+         ~get:(fun part -> part.field_of_constructor_is_used)
+         ~set:(fun part field_of_constructor_is_used ->
+           { part with field_of_constructor_is_used })
+    |> distribute answers.directly_called
+         ~get:(fun part -> part.directly_called)
+         ~set:(fun part directly_called -> { part with directly_called })
+    |> distribute answers.known_masks
+         ~get:(fun part -> part.known_masks)
+         ~set:(fun part known_masks -> { part with known_masks })
+    |> distribute answers.unknown_masks
+         ~get:(fun part -> part.unknown_masks)
+         ~set:(fun part unknown_masks -> { part with unknown_masks })
+    |> distribute answers.unboxed_fields
+         ~get:(fun part -> part.unboxed_fields)
+         ~set:(fun part unboxed_fields -> { part with unboxed_fields })
+    |> distribute answers.changed_representation
+         ~get:(fun part -> part.changed_representation)
+         ~set:(fun part changed_representation ->
+           { part with changed_representation })
+
+  let partition_by_compilation_unit { answers; code_changes; slot_offsets } =
+    let add_parts by_unit ~set parts =
+      Compilation_unit.Map.fold
+        (fun compilation_unit value parts ->
+          Compilation_unit.Map.update compilation_unit
+            (fun part -> Some (set (Option.value part ~default:empty) value))
+            parts)
+        by_unit parts
+    in
+    Compilation_unit.Map.empty
+    |> add_parts (partition_answers answers) ~set:(fun part answers ->
+        { part with answers })
+    |> add_parts (UA.partition_code_changes_by_compilation_unit code_changes)
+         ~set:(fun part code_changes -> { part with code_changes })
+    |> add_parts (Exported_offsets.partition_by_compilation_unit slot_offsets)
+         ~set:(fun part slot_offsets -> { part with slot_offsets })
+end

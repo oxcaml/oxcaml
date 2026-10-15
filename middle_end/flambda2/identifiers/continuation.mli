@@ -56,6 +56,8 @@ val import_and_rename : importer -> t -> t
 
 val export_stamp_counter : unit -> int
 
+val restore_stamp_counter : int -> unit
+
 val initialise : unit -> unit
 
 val reset : unit -> unit

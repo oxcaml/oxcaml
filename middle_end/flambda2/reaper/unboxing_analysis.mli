@@ -98,6 +98,32 @@ val find_code_metadata :
 
 val pp_result : Format.formatter -> result -> unit
 
+val empty_code_changes : code_changes
+
+val partition_code_changes_by_compilation_unit :
+  code_changes -> code_changes Compilation_unit.Map.t
+
+val code_changes_ids_for_export :
+  code_changes -> Ids_for_export.t -> Ids_for_export.t
+
+val code_changes_apply_renaming : code_changes -> Renaming.t -> code_changes
+
+val unboxed_fields_ids_for_export :
+  unboxed Code_id_or_name.Map.t -> Ids_for_export.t -> Ids_for_export.t
+
+val unboxed_fields_apply_renaming :
+  unboxed Code_id_or_name.Map.t -> Renaming.t -> unboxed Code_id_or_name.Map.t
+
+val changed_representation_ids_for_export :
+  (changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t ->
+  Ids_for_export.t ->
+  Ids_for_export.t
+
+val changed_representation_apply_renaming :
+  (changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t ->
+  Renaming.t ->
+  (changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t
+
 val perform_analysis :
   Datalog.database ->
   stats:Datalog.Schedule.stats ->
