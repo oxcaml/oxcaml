@@ -666,9 +666,48 @@ end = struct
         then Some (int 0)
         else Some (int 1))
 
-  let op_lhs_unknown ~machine_width:_ _op ~rhs:_ = Cannot_simplify
+  let min_value ~machine_width (signedness : P.signed_or_unsigned) =
+    match signedness with
+    | Signed -> Num.min_value machine_width
+    | Unsigned -> Num.zero machine_width
 
-  let op_rhs_unknown ~machine_width:_ _op ~lhs:_ = Cannot_simplify
+  let max_value ~machine_width (signedness : P.signed_or_unsigned) =
+    match signedness with
+    | Signed -> Num.max_value machine_width
+    | Unsigned -> Num.minus_one machine_width
+
+  let op_lhs_unknown ~machine_width (op : op) ~rhs =
+    let at_bound bound result =
+      if Num.equal rhs bound
+      then Exactly (Target_ocaml_int.bool machine_width result)
+      else Cannot_simplify
+    in
+    match op with
+    | Yielding_bool (Lt signedness) ->
+      at_bound (min_value ~machine_width signedness) false
+    | Yielding_bool (Ge signedness) ->
+      at_bound (min_value ~machine_width signedness) true
+    | Yielding_bool (Le signedness) ->
+      at_bound (max_value ~machine_width signedness) true
+    | Yielding_bool (Gt signedness) ->
+      at_bound (max_value ~machine_width signedness) false
+    | Yielding_bool (Eq | Neq) | Yielding_int_like_compare_functions _ ->
+      Cannot_simplify
+
+  let op_rhs_unknown ~machine_width (op : op) ~lhs =
+    match op with
+    | Yielding_bool cmp ->
+      let swapped_cmp : _ P.comparison =
+        match cmp with
+        | Eq -> Eq
+        | Neq -> Neq
+        | Lt s -> Gt s
+        | Gt s -> Lt s
+        | Le s -> Ge s
+        | Ge s -> Le s
+      in
+      op_lhs_unknown ~machine_width (Yielding_bool swapped_cmp) ~rhs:lhs
+    | Yielding_int_like_compare_functions _ -> Cannot_simplify
 end
 [@@inline always]
 
