@@ -652,7 +652,8 @@ module Stack_offset_and_exn = struct
         InstructionId.format term.id
     | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
     | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
-    | Tailcall_func _ | Call_no_return_ext _ | Call_no_return_func _ | Invalid _ | Call _ | Prim _ ->
+    | Tailcall_func _ | Call_no_return_ext _ | Call_no_return_func _ | Invalid _
+    | Call _ | Prim _ ->
       stack_offset, traps
 
   let rec process_basic :

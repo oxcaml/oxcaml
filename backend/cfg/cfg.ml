@@ -356,7 +356,8 @@ let register_predecessors_for_all_blocks (t : t) =
 
 let can_raise_terminator (i : terminator) =
   match i with
-  | Call_no_return_ext _ | Call_no_return_func _ | Raise _ | Tailcall_func _ | Call _
+  | Call_no_return_ext _ | Call_no_return_func _ | Raise _ | Tailcall_func _
+  | Call _
   | Prim { op = Probe _; label_after = _ } ->
     true
   | Prim { op = External { alloc; effects; _ }; label_after = _ } -> (
@@ -380,8 +381,7 @@ let can_raise_terminator (i : terminator) =
 let is_pure_terminator desc =
   match (desc : terminator) with
   | Return | Raise _ | Call_no_return_ext _ | Call_no_return_func _
-  | Tailcall_func _ | Tailcall_self _
-  | Call _ | Prim _ | Invalid _ ->
+  | Tailcall_func _ | Tailcall_self _ | Call _ | Prim _ | Invalid _ ->
     false
   | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
   | Switch _ ->
@@ -393,15 +393,17 @@ let is_never_terminator desc =
   | Never -> true
   | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
   | Switch _ | Return | Raise _ | Tailcall_self _ | Tailcall_func _
-  | Call_no_return_ext _ | Call_no_return_func _ | Call _ | Prim _ | Invalid _ ->
+  | Call_no_return_ext _ | Call_no_return_func _ | Call _ | Prim _ | Invalid _
+    ->
     false
 
 let is_return_terminator desc =
   match (desc : terminator) with
   | Return -> true
   | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
-  | Switch _ | Raise _ | Tailcall_self _ | Tailcall_func _ | Call_no_return_ext _
-  | Call_no_return_func _ | Call _ | Prim _ | Invalid _ ->
+  | Switch _ | Raise _ | Tailcall_self _ | Tailcall_func _
+  | Call_no_return_ext _ | Call_no_return_func _ | Call _ | Prim _ | Invalid _
+    ->
     false
 
 let is_pure_basic : basic -> bool = function
@@ -673,7 +675,8 @@ let remove_trap_instructions t removed_trap_handlers =
     | Tailcall_self _ -> assert (Int.equal stack_offset 0)
     | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
     | Int_test _ | Switch _ | Return | Raise _ | Tailcall_func _
-    | Call_no_return_ext _ | Call_no_return_func _ | Call _ | Prim _ | Invalid _ ->
+    | Call_no_return_ext _ | Call_no_return_func _ | Call _ | Prim _ | Invalid _
+      ->
       ());
     update_instruction terminator ~stack_offset
   and update_block label ~stack_offset =
@@ -912,6 +915,7 @@ let equal_terminator left right =
     && Option.equal Label.equal left_lbl right_lbl
   | ( ( Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
       | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
-      | Tailcall_func _ | Call_no_return_ext _ | Call_no_return_func _ | Call _ | Prim _ | Invalid _ ),
+      | Tailcall_func _ | Call_no_return_ext _ | Call_no_return_func _ | Call _
+      | Prim _ | Invalid _ ),
       _ ) ->
     false

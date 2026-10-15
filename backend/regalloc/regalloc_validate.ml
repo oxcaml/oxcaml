@@ -609,9 +609,10 @@ end = struct
     | Tailcall_self { destination = l1 }, Tailcall_self { destination = l2 } ->
       compare_label l1 l2
     | Tailcall_func call1, Tailcall_func call2
+    | Call_no_return_func call1, Call_no_return_func call2
       when Cfg.equal_func_call_operation call1 call2 ->
       ()
-    | Call_no_return call1, Call_no_return call2
+    | Call_no_return_ext call1, Call_no_return_ext call2
       when Cfg.equal_external_call_operation call1 call2 ->
       ()
     | ( Call { op = call1; label_after = l1 },

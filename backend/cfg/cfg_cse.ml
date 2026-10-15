@@ -461,8 +461,9 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
     | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
     | Switch _ ->
       set_unknown_regs numbering (Proc.destroyed_at_terminator terminator.desc)
-    | Return | Raise _ | Tailcall_self _ | Tailcall_func _ | Call_no_return_ext _
-    | Call_no_return_func _ | Call _ | Prim _ | Invalid _ ->
+    | Return | Raise _ | Tailcall_self _ | Tailcall_func _
+    | Call_no_return_ext _ | Call_no_return_func _ | Call _ | Prim _ | Invalid _
+      ->
       (* For function calls and probes, we should at least forget: - equations
          involving memory loads, since the callee can perform arbitrary memory
          stores; - equations involving arithmetic operations that can produce

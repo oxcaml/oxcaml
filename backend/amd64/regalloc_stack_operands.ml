@@ -308,7 +308,7 @@ let terminator (map : spilled_map) (term : Cfg.terminator Cfg.instruction) =
        the operands). *)
     May_still_have_spilled_registers
   | Always _ | Return | Raise _ | Switch _ | Tailcall_self _ | Tailcall_func _
-  | Call_no_return _ | Invalid _
+  | Call_no_return_ext _ | Call_no_return_func _ | Invalid _
   | Prim { op = External _; _ }
   | Call { op = Indirect _ | Direct _; _ } ->
     (* no rewrite *)

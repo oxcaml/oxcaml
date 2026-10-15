@@ -238,7 +238,8 @@ module Polls_before_prtc_transfer = struct
       then Ok Might_not_poll
       else Ok Always_polls
     | Return -> Ok Always_polls
-    | Call_no_return_ext _ | Call_no_return_func _ | Call _ | Prim _ | Invalid _ ->
+    | Call_no_return_ext _ | Call_no_return_func _ | Call _ | Prim _ | Invalid _
+      ->
       if Cfg.can_raise_terminator term.desc
       then Ok (Polls_before_prtc_domain.join dom exn)
       else Ok dom

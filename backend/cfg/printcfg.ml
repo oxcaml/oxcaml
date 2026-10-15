@@ -88,11 +88,13 @@ let terminator_body_with_args ?(print_reg = Printreg.reg) ?(args = [||])
   let dump_linear_call_op ppf op =
     Printlinear.call_operation ~print_reg ppf op args
   in
-  let print_func_call ppf (call : Cfg.func_call_operation) =
+  let print_func_call ~tailcall ppf (call : Cfg.func_call_operation) =
     dump_linear_call_op ppf
-      (match call with
-       | Indirect _callees -> Linear.Ltailcall_ind
-       | Direct func -> Linear.Ltailcall_imm { func })
+      (match tailcall, call with
+      | false, Indirect _callees -> Linear.Lcall_ind
+      | false, Direct func -> Linear.Lcall_imm { func }
+      | true, Indirect _callees -> Linear.Ltailcall_ind
+      | true, Direct func -> Linear.Ltailcall_imm { func })
   in
   let open Format in
   match terminator with
@@ -131,7 +133,7 @@ let terminator_body_with_args ?(print_reg = Printreg.reg) ?(args = [||])
   | Call_no_return_ext { func_symbol; _ } ->
     fprintf ppf "call_no_return %s%a" func_symbol print_args args
   | Call_no_return_func call ->
-    fprintf ppf "call_no_return %a%a" print_func_call call print_args args
+    fprintf ppf "%a (no return)" (print_func_call ~tailcall:false) call
   | Return -> fprintf ppf "return%a" print_args args
   | Raise _ -> fprintf ppf "raise%a" print_args args
   | Tailcall_self { destination } ->
@@ -146,9 +148,9 @@ let terminator_body_with_args ?(print_reg = Printreg.reg) ?(args = [||])
   | Tailcall_func call ->
     (* CR ncourant: here and below, maybe the callees should be printed when
        they are known *)
-    print_func_call ppf call
+    print_func_call ~tailcall:true ppf call
   | Call { op = call; label_after } ->
-    print_func_call ppf call;
+    print_func_call ~tailcall:false ppf call;
     Format.fprintf ppf "%s\n           goto %a" sep Label.format label_after
   | Prim { op = prim; label_after } ->
     dump_linear_call_op ppf
