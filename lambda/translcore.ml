@@ -391,8 +391,8 @@ let can_apply_primitive p pmode pos args =
   if List.exists (fun (_, arg) -> is_omitted arg) args then false
   else begin
     let nargs = List.length args in
-    if nargs = p.prim_arity then true
-    else if nargs < p.prim_arity then false
+    if nargs = p.prim_type_arity then true
+    else if nargs < p.prim_type_arity then false
     else if pos <> Typedtree.Tail then true
     else begin
       let return_mode =
@@ -502,7 +502,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         | ((_, arg_repr) :: prim_repr), ((_, Arg (x, _)) :: oargs) ->
           let arg_exps, extra_args = cut_args prim_repr oargs in
           let arg_sort =
-              Translprim.sort_of_native_repr arg_repr ~poly_sort:psort
+              Translprim.sort_of_native_repr_or_elided arg_repr ~poly_sort:psort
           in
           (x, arg_sort) :: arg_exps, extra_args
         | _, ((_, Omitted _) :: _) -> assert false
