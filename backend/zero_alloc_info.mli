@@ -70,6 +70,8 @@ val get_value : t -> string -> value option
 
 val set_value : t -> string -> value -> unit
 
+val iter : f:(string -> value -> unit) -> t -> unit
+
 module Raw : sig
   type t
 

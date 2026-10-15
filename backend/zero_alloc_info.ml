@@ -86,16 +86,34 @@ module Allocation_sources = struct
       }
 
   let print ppf t =
-    let print_call ppf (argument, outcomes) =
-      Format.fprintf ppf "#%d:%s%s%s" (argument + 1)
-        (if outcomes land Call_outcomes.normal_return <> 0 then "N" else "")
-        (if outcomes land Call_outcomes.exceptional_return <> 0 then "E" else "")
-        (if outcomes land Call_outcomes.diverging <> 0 then "D" else "")
+    let print_paths ppf (argument, outcomes) =
+      let paths = [] in
+      let paths =
+        if outcomes land Call_outcomes.diverging <> 0
+        then "diverging" :: paths
+        else paths
+      in
+      let paths =
+        if outcomes land Call_outcomes.exceptional_return <> 0
+        then "exceptional" :: paths
+        else paths
+      in
+      let paths =
+        if outcomes land Call_outcomes.normal_return <> 0
+        then "normal" :: paths
+        else paths
+      in
+      Format.fprintf ppf "argument #%d on %a paths" (argument + 1)
+        ( Format.pp_print_list
+            ~pp_sep:(fun ppf () -> Format.fprintf ppf "/")
+            Format.pp_print_string )
+        paths
     in
-    Format.fprintf ppf "{arguments=[%a]; anything_else=%b}"
+    Format.fprintf ppf
+      "@[<hov 1>{arguments_that_may_allocate = {@[<hov>%a1]};@ anything_else_may_allocate = %b}@]"
       (Format.pp_print_list
-         ~pp_sep:(fun ppf () -> Format.fprintf ppf "; ")
-         print_call)
+         ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ ")
+         print_paths)
       (Numbers.Int.Map.bindings t.arguments_that_may_allocate)
       t.anything_else_may_allocate
 end
@@ -199,6 +217,8 @@ let set_value (t : t) s (v : value) =
     Some new_
   in
   t.zero_alloc <- String.Map.update s (f v) t.zero_alloc
+
+let iter ~f t = String.Map.iter f t.zero_alloc
 
 module Raw = struct
   type entries = (string * value) list
