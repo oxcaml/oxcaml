@@ -579,9 +579,9 @@ module Safe = struct
   module TLS = TLS0
 
   let spawn f =
-    (* CR-soon vkarvonen: Optimize [get_initial_keys] followed by [set_initial_keys]
-       combination, e.g. use an unboxed array rather than a list and potentially avoid
-       the allocation if possible. *)
+    (* CR-soon vkarvonen: Optimize [get_initial_keys] followed by
+       [set_initial_keys] combination, e.g. use an unboxed array rather than
+       a list and potentially avoid the allocation if possible. *)
     let tls_keys = TLS.Private.get_initial_keys () in
     spawn (fun () ->
       TLS.Private.init ();
