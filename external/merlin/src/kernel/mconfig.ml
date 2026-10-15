@@ -226,6 +226,12 @@ let dump x =
 
 let arguments_table = Hashtbl.create 67
 
+(* Parametrized compiler flags that are ignored only when they come from the
+   configuration (.merlin, dune's [FLG], [-flags]), not from the command line.
+   They cannot go in [ocaml_ignored_parametrized_flags] because they clash with
+   flags of merlin commands (e.g. [jump -target]). *)
+let config_only_ignored_parametrized_flags = [ "-target" ]
+
 let stdlib =
   let env =
     try Some (Sys.getenv "OCAMLLIB")
@@ -255,19 +261,17 @@ let normalize_step t =
     in
     let failures = ref [] in
     let warning failure = failures := failure :: !failures in
-    (* Compiler flags that must be ignored here rather than via
-       [ocaml_ignored_parametrized_flags], because they clash with flags of
-       merlin commands (e.g. [jump -target]). [arguments_table] takes
-       precedence over command-local flags, so adding them there would shadow
-       the command's flag. *)
-    let config_only_ignored_flags = [ ("-target", "", Marg.param_ignore) ] in
+    let local_spec =
+      List.map
+        ~f:(fun name -> (name, "", Marg.param_ignore))
+        config_only_ignored_parametrized_flags
+    in
     let t =
       List.fold_left
         ~f:(fun t { workdir; workval } ->
           fst
             (let_ref cwd (Some workdir)
-               (Marg.parse_all ~warning arguments_table
-                  config_only_ignored_flags workval t)))
+               (Marg.parse_all ~warning arguments_table local_spec workval t)))
         ~init:t flagss
     in
     { t with
