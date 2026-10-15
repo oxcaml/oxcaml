@@ -36,7 +36,8 @@ module LCS = Lifted_constant_state
 type t =
   { simplified_lets_and_let_conts : simplified_lets_and_let_conts;
     simplified_terminator : simplified_terminator;
-    removed_operations : Removed_operations.t
+    removed_operations : Removed_operations.t;
+    is_cold : bool
   }
 
 and simplified_lets_and_let_conts =
@@ -98,7 +99,7 @@ and simplified_apply =
       { apply : Apply.t;
         use_id : Apply_cont_rewrite_id.t option;
         exn_cont_use_id : Apply_cont_rewrite_id.t;
-        result_arity : [`Unarized] Flambda_arity.t;
+        result_arity : [`Complex] Flambda_arity.t;
         coming_from_indirect : bool;
         callee's_code_metadata : Code_metadata.t
       }
@@ -118,6 +119,7 @@ and simplified_apply_cont =
 and simplified_switch =
   { arms :
       (Apply_cont_expr.t
+      * annotations:Branch_annotations.t
       * Apply_cont_rewrite_id.t
       * [`Unarized] Flambda_arity.t
       * TE.t)
@@ -134,6 +136,8 @@ let notify_removed ~operation t =
   { t with
     removed_operations = Removed_operations.( + ) operation t.removed_operations
   }
+
+let mark_as_cold t = if t.is_cold then t else { t with is_cold = true }
 
 let simplified_let ~bindings_to_place ~removed_operations
     ~lifted_constants_from_defining_expr ~at_unit_toplevel ~closure_info
@@ -160,7 +164,8 @@ let simplified_let_cont simplified_handlers t =
 let simplified_terminator simplified_terminator =
   { simplified_lets_and_let_conts = Simplified_terminator;
     simplified_terminator;
-    removed_operations = Removed_operations.zero
+    removed_operations = Removed_operations.zero;
+    is_cold = false
   }
 
 let simplified_apply simplified_apply =

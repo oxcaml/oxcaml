@@ -23,10 +23,8 @@
  skip 4
  byte 4)
 (function{array_kind.ml:34,6-59} camlArray_kind__f_0_1_code (a/1: val) : val
- (catch
-   (if (<u 1 (>>u (<< (load_mut int (+a a/1 -8)) 8) 17)) (load_mut val a/1)
-     (exit 5))
- with(5)(cold)
+ (if[likely] (<u 1 (>>u (<< (load_mut int (+a a/1 -8)) 8) 17))
+   (load_mut val a/1)
    (raise_notrace{array_kind.ml:35,14-19} L:"camlArray_kind__block_1")) )
 
 (function no_cse reduce_code_size linscan camlArray_kind__entry () : val
