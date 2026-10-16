@@ -2,7 +2,6 @@
    include stdlib_stable;
    include stdlib_upstream_compatible;
    ocamlopt_flags="-extension layouts_beta -extension small_numbers";
-   (* ocamlopt_flags+=" -dlambda"; *)
 *)
 
 let pr = print_endline

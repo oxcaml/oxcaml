@@ -805,6 +805,25 @@ let () =
       set r #(3, 4);
       ignore (Sys.opaque_identity r))
 
+(* Contents with no values at all need no barrier, whether or not the type is
+   known *)
+let () =
+  test ~expect_caml_modifies:0
+    (fun () ->
+      let r = ref #(#1L, #1.0) in
+      r := #(#2L, #2.0);
+      ignore (Sys.opaque_identity r))
+
+let () =
+  let[@inline never] set (type a : bits64 & float64) (r : a ref) (x : a) =
+    r := x
+  in
+  test ~expect_caml_modifies:0
+    (fun () ->
+      let r = ref #(#1L, #1.0) in
+      set r #(#2L, #2.0);
+      ignore (Sys.opaque_identity r))
+
 (* Unboxed GADT: the existential component's immediacy is only visible in the
    declared [immediate & immediate] field shape *)
 let () =
