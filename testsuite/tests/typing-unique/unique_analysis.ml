@@ -367,6 +367,15 @@ Line 2, characters 12-13:
 
 |}]
 
+(* A wildcard does not use the components of a tuple expression *)
+let tuple_wildcard a b =
+  match (a, b) with
+  | (true, b) -> unique_id b
+  | _ -> b
+[%%expect{|
+val tuple_wildcard : bool -> 'a @ unique -> 'a = <fun>
+|}]
+
 let unique_match_on a b =
   let (t @ unique) = (a, b) in t
 [%%expect{|
