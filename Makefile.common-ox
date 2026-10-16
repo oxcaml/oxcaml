@@ -45,6 +45,18 @@ define dune_main_context
   (env (_
     ; Not the toplevel of this build, which only runs once installed.
     (binaries (duneconf/ocaml as ocaml))
+    ; For the tests of js_of_ocaml (see jsoo-test in Makefile), as its
+    ; dune-workspace and with-effects profile set them up.
+    (js_of_ocaml
+     (compilation_mode separate)
+     (flags (:standard -w no-missing-effects-backend))
+     (link_flags (:standard -w no-missing-effects-backend))
+     (runtest_alias runtest-js))
+    (wasm_of_ocaml
+     (enabled_if %{env:WASM_OF_OCAML=false})
+     (compilation_mode separate)
+     (flags (:standard --effects cps))
+     (runtest_alias runtest-wasm))
     (bin_annot_cms true)
     (flags (:standard -directory compiler-distro -warn-error +A -alert -unsafe_multidomain -alert -unsafe_effects))
     ; We never want to build the compiler itself with AddressSanitizer enabled.
