@@ -416,34 +416,36 @@ module Fold_prims = struct
       with_unboxed_fields ~block ~dom ~env ~f:(fun ~block fields ->
           ignore block;
           (* ensure that only the canonical alias of block is in scope *)
+          let k =
+            Flambda_primitive.Block_access_kind.element_kind_for_load bak
+          in
           let rewrite =
             match Numeric_types.Int.Map.find field fields with
-            | bound_to ->
+            | bound_to when Flambda_kind.equal (Simple.kind bound_to) k ->
               Named_rewrite.prim_rewrite
                 (Named_rewrite.Prim_rewrite.replace_by_binding ~var ~bound_to)
-            | exception Not_found ->
-              let k =
-                Flambda_primitive.Block_access_kind.element_kind_for_load bak
-              in
-              Named_rewrite.prim_rewrite (Named_rewrite.Prim_rewrite.invalid k)
+            | _ | (exception Not_found) ->
+              Named_rewrite.prim_rewrite
+                (Named_rewrite.Prim_rewrite.invalid k)
           in
           { env with
             rewrites = Named_rewrite_id.Map.add rewrite_id rewrite env.rewrites
           })
-    | Block_set { bak; block; field; value } ->
+    | Block_set { bak = _; block; field; value } ->
       with_unboxed_fields ~block ~dom ~env ~f:(fun ~block fields ->
           if Flambda_features.dump_flow ()
           then Format.printf "Remove Block set %a@." Variable.print var;
           let rewrite, fields =
-            if Numeric_types.Int.Map.mem field fields
-            then
+            match Numeric_types.Int.Map.find field fields with
+            | previous_value
+              when Flambda_kind.equal
+                     (Simple.kind previous_value)
+                     (Simple.kind value) ->
               ( Named_rewrite.prim_rewrite Named_rewrite.Prim_rewrite.remove_prim,
                 Numeric_types.Int.Map.add field value fields )
-            else
-              let k =
-                Flambda_primitive.Block_access_kind.element_kind_for_load bak
-              in
-              ( Named_rewrite.prim_rewrite (Named_rewrite.Prim_rewrite.invalid k),
+            | _ | (exception Not_found) ->
+              ( Named_rewrite.prim_rewrite
+                  (Named_rewrite.Prim_rewrite.invalid Flambda_kind.value),
                 fields )
           in
           { bindings = Simple.Map.add block fields env.bindings;
