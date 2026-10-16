@@ -98,7 +98,7 @@ end) : S = struct
     Profile.record_call pack_name (fun () ->
         let objtemp =
           if !Clflags.keep_asm_file
-          then Unit_info.Artifact.prefix target ^ ".pack" ^ Config.ext_obj
+          then Unit_info.Artifact.prefix target ^ ".pack" ^ Backend.ext_obj
           else
             (* Put the full name of the module in the temporary file name to
                avoid collisions with MSVC's link /lib in case of successive
@@ -107,7 +107,7 @@ end) : S = struct
               Current_unit.symbol () |> Symbol.linkage_name
               |> Linkage_name.to_string
             in
-            Filename.temp_file name Config.ext_obj
+            Filename.temp_file name Backend.ext_obj
         in
         let components =
           List.map
@@ -147,7 +147,7 @@ end) : S = struct
           ~prefixname ~ppf_dump program;
         let objfiles =
           List.map
-            (fun m -> Filename.remove_extension m.pm_file ^ Config.ext_obj)
+            (fun m -> Filename.remove_extension m.pm_file ^ Backend.ext_obj)
             (List.filter (fun m -> m.pm_kind <> PM_intf) members)
         in
         Misc.try_finally
@@ -258,7 +258,10 @@ end) : S = struct
     let for_pack_prefix = CU.Prefix.from_clflags () in
     let cmx = Unit_info.Artifact.from_filename ~for_pack_prefix targetcmx in
     let cmi = Unit_info.companion_cmi cmx in
-    let obj = Unit_info.companion_obj cmx in
+    let obj =
+      Unit_info.Artifact.from_filename ~for_pack_prefix
+        (Unit_info.Artifact.prefix cmx ^ Backend.ext_obj)
+    in
     (* Set the name of the current "input" *)
     Location.input_name := targetcmx;
     (* Set the name of the current compunit *)

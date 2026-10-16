@@ -81,6 +81,7 @@ let cmj_body ~name ~imports body : Code.cmj_body =
   ; last_var
   ; imported_compilation_units = imports
   ; exported_compilation_unit = name
+  ; force_link = false
   }
 
 let write_cmj file (body : Code.cmj_body) =

@@ -3658,7 +3658,12 @@ type jsir_unit =
   }
 
 let from_cmj ic =
-  let { Code.program; last_var; imported_compilation_units; exported_compilation_unit } =
+  let { Code.program
+      ; last_var
+      ; imported_compilation_units
+      ; exported_compilation_unit
+      ; force_link
+      } =
     (Marshal.from_channel ic : Code.cmj_body)
   in
   (* Each unit is compiled one at a time, so the variables might not be disjoint.
@@ -3671,6 +3676,7 @@ let from_cmj ic =
       Unit_info.of_compilation_units
         ~exported:exported_compilation_unit
         ~imported:imported_compilation_units
+        ~force_link
   }
 
 let from_channel ic =
