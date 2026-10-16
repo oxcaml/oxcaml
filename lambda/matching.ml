@@ -637,11 +637,9 @@ end = struct
           | `Or (p1, p2, _) ->
               filter_rec ((left, p1, right) :: (left, p2, right) :: rem)
           | `Alias (p, _, _, _, _, _, _) -> filter_rec ((left, p, right) :: rem)
-          | `Var _ -> filter_rec ((left, Patterns.omega, right) :: rem)
+          | `Var _ | `Deref _ ->
+              filter_rec ((left, Patterns.omega, right) :: rem)
           | `Fun_layout (_, _, _, _, _, lpoly, _) -> fatal_var_lpoly lpoly
-          | `Deref _ ->
-              Misc.fatal_error
-                "Matching: dereference patterns are not supported yet"
           | #Simple.view as view -> (
               let p = { p with pat_desc = view } in
               match matcher head p right with
@@ -783,11 +781,8 @@ end = struct
           let p = General.view p in
           match p.pat_desc with
           | `Alias (p, _, _, _, _, _, _) -> filter_rec ((p, ps) :: rem)
-          | `Var _ -> filter_rec ((Patterns.omega, ps) :: rem)
+          | `Var _ | `Deref _ -> filter_rec ((Patterns.omega, ps) :: rem)
           | `Fun_layout (_, _, _, _, _, lpoly, _) -> fatal_var_lpoly lpoly
-          | `Deref _ ->
-              Misc.fatal_error
-                "Matching: dereference patterns are not supported yet"
           | `Or (p1, p2, _) -> filter_rec_or p1 p2 ps rem
           | #Simple.view as view -> (
               let p = { p with pat_desc = view } in

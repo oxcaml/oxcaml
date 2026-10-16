@@ -2686,6 +2686,14 @@ let solve_Ppat_addr loc env (mutability : mutable_flag) expected_ty =
     (generic_instance expected_ty);
   ty_arg, arg_sort
 
+let solve_Ppat_deref env (mutability : Types.mutability) expected_ty =
+  let addr_type =
+    if Types.is_mutable mutability
+    then Predef.type_addr (generic_instance expected_ty)
+    else Predef.type_addr_imm (generic_instance expected_ty)
+  in
+  addr_type, Jkind.sort_of_jkind env (Ctype.type_jkind env addr_type)
+
 let solve_Ppat_constraint tps loc env mode sty expected_ty =
   let cty, ty, force =
     with_local_level_generalize_structure
@@ -4911,10 +4919,10 @@ let rec check_counter_example_pat
         Jkind.Sort.equate ~allow_mutation:true original_arg_sort arg_sort);
       check_rec tp1 ty_arg
         (fun p1 -> mkp k (Tpat_addr (mutability, arg_sort, p1)))
-  | Tpat_deref _ ->
-      Misc.fatal_error
-        "Typecore.check_counter_example_pat: dereference patterns are not \
-         supported yet"
+  | Tpat_deref (mutability, ba, uas, tp1) ->
+      let ty_addr, _ = solve_Ppat_deref !!penv mutability expected_ty in
+      check_rec tp1 ty_addr
+        (fun p1 -> mkp k (Tpat_deref (mutability, ba, uas, p1)))
 
 let check_counter_example_pat ~counter_example_args penv tp expected_ty =
   (* [check_counter_example_pat] doesn't use [type_pat_state] in an interesting
