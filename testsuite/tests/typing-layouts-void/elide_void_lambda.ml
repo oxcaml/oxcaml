@@ -7,7 +7,8 @@
    observe by dumping short lambda snippets (the effect on behavior is sometimes
    subtle and internal to e.g. GC state).
 
-   Native-only since bytecode doesn't support [%peek]. *)
+   Native-only since bytecode doesn't support [%peek].
+*)
 
 type w : void
 external w : unit -> w = "%unbox_unit"
@@ -60,6 +61,7 @@ external set : (w [@elide_void]) -> local_ 'a ref -> 'a -> unit
    Here, this is the third non-elided argument ([local_ 'a array]) and not the
    third argument (a global elided [w]). *)
 external blit :
+  ('a : value non_float).
   'a array -> int -> (w [@elide_void]) -> local_ 'a array -> int -> int
   -> unit
   = "%arrayblit"
@@ -73,8 +75,9 @@ external set : (w [@elide_void]) -> 'a ref @ local -> 'a -> unit
   = "%setfield0"
 (makeblock 0)
 external blit :
-  'a array ->
-  int -> (w [@elide_void]) -> 'a array @ local -> int -> int -> unit
+  ('a : value non_float).
+    'a array ->
+    int -> (w [@elide_void]) -> 'a array @ local -> int -> int -> unit
   = "%arrayblit"
 (let
   (set_local =
@@ -84,13 +87,14 @@ external blit :
 val set_local : 'a ref @ local -> 'a -> unit = <fun>
 (let
   (blit_local =
-     (function {nlocal = 1} a[value<genarray>] b[L][value<genarray>] : int
+     (function {nlocal = 1} a[value<addrarray>] b[L][value<addrarray>] : int
        (let (let =[value<int>] 1 let =[value<int>] 0)
          (seq (unbox_unit 0)
            (let (let =[value<int>] 0)
-             (arrayblit[array -> gen(local)] a let b let let))))))
+             (arrayblit[array -> addr(local)] a let b let let))))))
   (makeblock 0 blit_local))
-val blit_local : 'a array -> 'a array @ local -> unit = <fun>
+val blit_local : ('a : value non_float). 'a array -> 'a array @ local -> unit =
+  <fun>
 |}]
 
 (* Specialize [%peek] based on the true result type ([int64_u]) and not the
