@@ -95,21 +95,21 @@ val retract : ('a : value_or_null). ('a, 'a) result -> 'a
 
     @since 5.4 *)
 
-val iter : ('a : value_or_null) ('e : value_or_null)
+val iter : ('a : value_or_null) ('e : any)
   . ('a -> unit) -> ('a, 'e) result -> unit
 (** [iter f r] is [f v] if [r] is [Ok v] and [()] otherwise. *)
 
-val iter_error : ('a : value_or_null) ('e : value_or_null)
+val iter_error : ('a : any) ('e : value_or_null)
   . ('e -> unit) -> ('a, 'e) result -> unit
 (** [iter_error f r] is [f e] if [r] is [Error e] and [()] otherwise. *)
 
 (** {1:preds Predicates and comparisons} *)
 
-val is_ok : ('a : value_or_null) ('e : value_or_null)
+val is_ok : ('a : value_or_null) ('e : any)
   . ('a, 'e) result -> bool
 (** [is_ok r] is [true] if and only if [r] is [Ok _]. *)
 
-val is_error : ('a : value_or_null) ('e : value_or_null)
+val is_error : ('a : any) ('e : value_or_null)
   . ('a, 'e) result -> bool
 (** [is_error r] is [true] if and only if [r] is [Error _]. *)
 

@@ -38,10 +38,10 @@ let product r0 r1 = match r0, r1 with
 let map_error f = function Error e -> Error (f e) | Ok _ as v -> v
 let fold ~ok ~error = function Ok v -> ok v | Error e -> error e
 let retract = function Ok v -> v | Error v -> v
-let iter f = function Ok v -> f v | Error _ -> ()
-let iter_error f = function Error e -> f e | Ok _ -> ()
-let is_ok = function Ok _ -> true | Error _ -> false
-let is_error = function Error _ -> true | Ok _ -> false
+let iter f = function Ok v -> f v | _ -> ()
+let iter_error f = function Error e -> f e | _ -> ()
+let is_ok = function Ok _ -> true | _ -> false
+let is_error = function Error _ -> true | _ -> false
 
 let equal ~ok ~error r0 r1 = match r0, r1 with
 | Ok v0, Ok v1 -> ok v0 v1

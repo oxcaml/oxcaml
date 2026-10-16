@@ -67,11 +67,11 @@ val right : ('a : value_or_null) ('b : value_or_null)
   . 'b -> ('a, 'b) t
 (** [right v] is [Right v]. *)
 
-val is_left : ('a : value_or_null) ('b : value_or_null)
+val is_left : ('a : value_or_null) ('b : any)
   . ('a, 'b) t -> bool
 (** [is_left (Left v)] is [true], [is_left (Right v)] is [false]. *)
 
-val is_right : ('a : value_or_null) ('b : value_or_null)
+val is_right : ('a : any) ('b : value_or_null)
   . ('a, 'b) t -> bool
 (** [is_right (Left v)] is [false], [is_right (Right v)] is [true]. *)
 

@@ -27,11 +27,11 @@ let right v = Right v
 
 let is_left = function
 | Left _ -> true
-| Right _ -> false
+| _ -> false
 
 let is_right = function
-| Left _ -> false
 | Right _ -> true
+| _ -> false
 
 let get_left = function
 | Left v -> v

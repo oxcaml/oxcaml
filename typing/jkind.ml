@@ -3625,7 +3625,7 @@ module Format_history = struct
         "it's the element type of an array that is iterated over in a \
          comprehension"
     | List_comprehension_element ->
-      fprintf ppf "it's the element type of list comprehension"
+      fprintf ppf "it's the element type of a list comprehension"
     | Idx_base ->
       fprintf ppf
         "it's the base type (the first type parameter) for a@ block index (idx \

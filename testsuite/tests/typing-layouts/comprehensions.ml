@@ -50,7 +50,7 @@ Error: This expression has type "Stdlib_upstream_compatible.Float_u.t" = "float#
        The layout of Stdlib_upstream_compatible.Float_u.t is float64.
        But the layout of Stdlib_upstream_compatible.Float_u.t must be
          a value layout
-         because it's the element type of list comprehension.
+         because it's the element type of a list comprehension.
 |}]
 
 let box_list x = [ Float_u.to_float a for a in x ]
