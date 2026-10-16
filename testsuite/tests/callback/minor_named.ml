@@ -1,5 +1,10 @@
 (* TEST
  modules = "minor_named_.c";
+ {
+   bytecode;
+ }{
+   native;
+ }
 *)
 
 (* Tests Callback.register and caml_named_value on a young object *)

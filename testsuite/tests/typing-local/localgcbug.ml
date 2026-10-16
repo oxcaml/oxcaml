@@ -1,5 +1,9 @@
 (* TEST
- native;
+ {
+   native;
+ }{
+   jsir;
+ }
 *)
 
 type n = Z | S of n

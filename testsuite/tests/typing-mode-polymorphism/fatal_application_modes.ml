@@ -1,6 +1,10 @@
 (* TEST
  flags += "-extension mode_polymorphism_alpha";
- native;
+ {
+   native;
+ }{
+   jsir;
+ }
 *)
 
 (* Regression test: under mode polymorphism, a return mode may be inferred as

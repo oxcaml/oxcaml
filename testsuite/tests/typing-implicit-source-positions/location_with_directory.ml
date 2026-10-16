@@ -1,6 +1,10 @@
 (* TEST
  flags = "-directory app/foo";
- native;
+ {
+   native;
+ }{
+   jsir;
+ }
 *)
 
 let f = fun ~(call_pos:[%call_pos]) () -> call_pos

@@ -1,6 +1,11 @@
 (* TEST
  flags = "-extension comprehensions";
  include stdlib_stable;
+ {
+   bytecode;
+ }{
+   native;
+ }
 *)
 
 module Iarray = Stdlib_stable.Iarray

@@ -1,5 +1,10 @@
 (* TEST
  modules = "intextaux.c";
+ {
+   bytecode;
+ }{
+   native;
+ }
 *)
 
 (* Test for output_value / input_value *)

@@ -192,8 +192,8 @@ expressed as follows:
 
 Lines starting with stars indicate which tests to run. If no test is
 specified, then the tests that are enabled by default are used, namely
-to compile and run the test program in both bytecode and native code
-(roughly speaking).
+to compile and run the test program in bytecode, native code and, when
+js_of_ocaml is installed, JavaScript (roughly speaking).
 
 Once your test has been annotated, run `ocamltest` on it and see whether
 it passes or fails. If it fails, see the log file to understand why and

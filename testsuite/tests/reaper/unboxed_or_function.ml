@@ -2,6 +2,7 @@
    flambda2;
    flags += "-flambda2-reaper";
    { native; }
+   { jsir; }
  *)
 
 external opaque : 'a -> 'a = "%opaque"

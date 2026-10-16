@@ -1,4 +1,10 @@
-(* TEST *)
+(* TEST
+ {
+   bytecode;
+ }{
+   native;
+ }
+*)
 
 let _ =
   (* In 4.13 this causes Obj.reachable_words to segfault

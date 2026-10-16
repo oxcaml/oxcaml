@@ -27,6 +27,15 @@ let native_action a =
   if Ocamltest_config.native_compiler then a
   else (Actions.update a no_native_compilers)
 
+let no_jsir_reason = "js_of_ocaml not available"
+
+let no_jsir _log env =
+  (Result.skip_with_reason no_jsir_reason, env)
+
+let jsir_action a =
+  if Ocamltest_config.native_compiler && Ocaml_files.jsir_available then a
+  else (Actions.update a no_jsir)
+
 let get_backend_value_from_env env bytecode_var native_var =
   Ocaml_backends.make_backend_function
     (Environments.safe_lookup bytecode_var env)
@@ -85,6 +94,15 @@ let default_ocaml_env = [|
   "OCAML_COLOR=auto";
   "OCAML_ERROR_STYLE=contextual"
 |]
+
+(* JSIR mode looks for js_of_ocaml in the configured bindir,
+   which need not be where the testsuite runs from. *)
+let compiler_env backend =
+  match (backend : Ocaml_backends.t) with
+  | Native | Bytecode -> default_ocaml_env
+  | Jsir ->
+    Array.append default_ocaml_env
+      [| "OXCAML_JS_OF_OCAML=" ^ Ocaml_files.js_of_ocaml |]
 
 type module_generator = {
   description : string;
@@ -262,6 +280,7 @@ let compile_program (compiler : Ocaml_compilers.compiler) log env =
         Ocaml_flags.runtime_flags env Compiler.target
                                   (has_c_file || bytecode_links_c_code);
         c_headers_flags;
+        Ocaml_flags.target_flags Compiler.target;
         Ocaml_flags.stdlib;
         directory_flags env;
         libraries;
@@ -276,7 +295,7 @@ let compile_program (compiler : Ocaml_compilers.compiler) log env =
       ] in
       let exit_status =
         Actions_helpers.run_cmd
-          ~environment:default_ocaml_env
+          ~environment:(compiler_env Compiler.target)
           ~stdin_variable: Ocaml_variables.compiler_stdin
           ~stdout_variable:Compiler.output_variable
           ~stderr_variable:Compiler.output_variable
@@ -309,6 +328,7 @@ let compile_module (compiler : Ocaml_compilers.compiler) module_ log env =
   let commandline =
   [
     Compiler.name;
+    Ocaml_flags.target_flags Compiler.target;
     Ocaml_flags.stdlib;
     c_headers_flags;
     directory_flags env;
@@ -321,7 +341,7 @@ let compile_module (compiler : Ocaml_compilers.compiler) module_ log env =
   ] in
   let exit_status =
     Actions_helpers.run_cmd
-      ~environment:default_ocaml_env
+      ~environment:(compiler_env Compiler.target)
       ~stdin_variable: Ocaml_variables.compiler_stdin
       ~stdout_variable:Compiler.output_variable
       ~stderr_variable:Compiler.output_variable
@@ -431,6 +451,22 @@ let setup_compiler_build_env (compiler : Ocaml_compilers.compiler) log env =
       | Some outputvar ->
         Environments.add_if_undefined outputvar prog_output_file env
     in
+    let env = match Compiler.target with
+      | Native | Bytecode -> env
+      | Jsir ->
+        (* A program may behave differently when compiled to JavaScript
+           (for instance, integers are 32 bits wide), in which case its
+           expected output goes in <test>.jsir-output.reference. *)
+        let reference =
+          Filename.make_path
+            [Actions_helpers.test_source_directory env;
+             Filename.chop_extension (Actions_helpers.testfile env)
+             ^ ".jsir-output.reference"]
+        in
+        if Sys.file_exists reference
+        then Environments.add Builtin_variables.reference reference env
+        else env
+    in
     (r, env)
   end else (r, env)
 
@@ -472,6 +508,12 @@ let setup_ocamlopt_opt_build_env =
       "setup-ocamlopt.opt-build-env"
       Ocaml_compilers.ocamlopt_opt)
 
+let setup_ocamlopt_jsir_build_env =
+  jsir_action
+    (mk_compiler_env_setup
+      "setup-ocamlopt.jsir-build-env"
+      Ocaml_compilers.ocamlopt_jsir)
+
 let setup_ocaml_build_env =
   mk_toplevel_env_setup
     "setup-ocaml-build-env"
@@ -498,10 +540,11 @@ let compile (compiler : Ocaml_compilers.compiler) log env =
         (module Compiler : Ocaml_tools.Tool) in
     let what = Printf.sprintf "Compiling using commandline %s" cmdline in
     Printf.fprintf log "%s\n%!" what;
-    let commandline = [Compiler.name; cmdline] in
+    let commandline =
+      [Compiler.name; Ocaml_flags.target_flags Compiler.target; cmdline] in
     let exit_status =
       Actions_helpers.run_cmd
-        ~environment:default_ocaml_env
+        ~environment:(compiler_env Compiler.target)
         ~stdin_variable: Ocaml_variables.compiler_stdin
         ~stdout_variable:Compiler.output_variable
         ~stderr_variable:Compiler.output_variable
@@ -548,6 +591,24 @@ let ocamlopt_opt =
       ~description:"Compile the program using ocamlopt.opt"
       ~does_something:true
       (compile Ocaml_compilers.ocamlopt_opt))
+
+let ocamlopt_jsir =
+  jsir_action
+    (Actions.make
+      ~name:"ocamlopt.jsir"
+      ~description:
+        "Compile the program to JavaScript using \
+         ocamlopt.opt -target js_of_ocaml"
+      ~does_something:true
+      (compile Ocaml_compilers.ocamlopt_jsir))
+
+let run_js =
+  jsir_action
+    (Actions.make
+      ~name:"run-js"
+      ~description:"Run the JavaScript program with node"
+      ~does_something:true
+      (Actions_helpers.run_program ~prefix:Ocaml_files.node))
 
 let env_with_lib_unix env =
   let libunixdir = Ocaml_directories.libunix in
@@ -889,6 +950,7 @@ let run_expect_once input_file principal log env ~backend =
     match (backend : Ocaml_backends.t) with
     | Bytecode -> Ocaml_commands.expect
     | Native -> Ocaml_commands.expectnat
+    | Jsir -> invalid_arg "run_expect_once: no JSIR toplevel"
   in
   let commandline =
   [
@@ -993,6 +1055,11 @@ let check_ocamlopt_opt_output =
   native_action
     (make_check_compiler_output
       "check-ocamlopt.opt-output" Ocaml_compilers.ocamlopt_opt)
+
+let check_ocamlopt_jsir_output =
+  jsir_action
+    (make_check_compiler_output
+      "check-ocamlopt.jsir-output" Ocaml_compilers.ocamlopt_jsir)
 
 let really_compare_programs backend comparison_tool log env =
   let program = Environments.safe_lookup Builtin_variables.program env in
@@ -1671,6 +1738,10 @@ let init () =
     setup_ocamlopt_opt_build_env;
     ocamlopt_opt;
     check_ocamlopt_opt_output;
+    setup_ocamlopt_jsir_build_env;
+    ocamlopt_jsir;
+    check_ocamlopt_jsir_output;
+    run_js;
     run_expect;
     run_expectnat;
     compare_bytecode_programs;

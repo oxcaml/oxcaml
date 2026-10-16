@@ -1,6 +1,7 @@
 (* TEST
  { bytecode; }
  { native; }
+ { jsir; }
 *)
 
 let check_tls () =

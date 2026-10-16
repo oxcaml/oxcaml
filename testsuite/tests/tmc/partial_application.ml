@@ -23,5 +23,7 @@ let () =
    bytecode;
  }{
    native;
+ }{
+   jsir;
  }
 *)
