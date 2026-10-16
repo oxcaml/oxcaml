@@ -269,6 +269,8 @@ let (r13i, r13f) =
   end in
   (R.i, R.f)
 [%%expect{|
+val r13i : int = 12
+val r13f : float = 12.
 |}]
 
 (* The same with a generative static functor: instantiate, then apply to unit. *)
@@ -283,6 +285,8 @@ let (r13gi, r13gf) =
   end in
   (R.i, R.f)
 [%%expect{|
+val r13gi : int = 13
+val r13gf : float = 13.
 |}]
 
 (* Captured values of several layouts at once. *)
