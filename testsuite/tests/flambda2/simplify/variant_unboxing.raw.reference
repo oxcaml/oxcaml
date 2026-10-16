@@ -84,13 +84,7 @@ let $camlVariant_unboxing__first_const_0 = Block 0 () in
           let Pmakeblock = %block.[`0`].`toplevel` (Pfield) in
           cont k1 (Pmakeblock)
         where k1 (Set : val) =
-          let Pmakeblock =
-            %block.[`0`].`toplevel` (Set0, Tree_operations, Set)
-          in
-          cont k (Pmakeblock)))
+          let $camlVariant_unboxing = Block 0 (Set0, Tree_operations, Set) in
+          cont k ($camlVariant_unboxing)))
   where k define_root_symbol (module_block) =
-    let field_0 = %block_load.tag[`0`].`size`[`3`].[`0`] (module_block) in
-    let field_1 = %block_load.tag[`0`].`size`[`3`].[`1`] (module_block) in
-    let field_2 = %block_load.tag[`0`].`size`[`3`].[`2`] (module_block) in
-    let $camlVariant_unboxing = Block 0 (field_0, field_1, field_2) in
     cont done ($camlVariant_unboxing)

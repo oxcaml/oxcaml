@@ -33,9 +33,7 @@ let $camlTests6__first_const_0 = Block 0 () in
       let unit_1 = %end_ghost_region (ghost_region) in
       cont k1 (region_return))
    where k1 (n : imm tagged) =
-     let Pmakeblock = %block.[`0`].`toplevel` (n) in
-     cont k (Pmakeblock))
+     let $camlTests6 = Block 0 (n) in
+     cont k ($camlTests6))
   where k define_root_symbol (module_block) =
-    let field_0 = %block_load.tag[`0`].`size`[`1`].[`0`] (module_block) in
-    let $camlTests6 = Block 0 (field_0) in
     cont done ($camlTests6)

@@ -1,11 +1,11 @@
-let $camlCode_id_join_b__const_block_10 = Block 0 (2, 0) in
+let $camlCode_id_join_b__const_block_9 = Block 0 (2, 0) in
+let $camlCode_id_join_b__const_block_10 =
+  Block 0 (1, $camlCode_id_join_b__const_block_9)
+in
 let $camlCode_id_join_b__const_block_11 =
-  Block 0 (1, $camlCode_id_join_b__const_block_10)
+  Block 0 (0, $camlCode_id_join_b__const_block_10)
 in
-let $camlCode_id_join_b__const_block_12 =
-  Block 0 (0, $camlCode_id_join_b__const_block_11)
-in
-cont `self` ($camlCode_id_join_b__const_block_12)
+cont `self` ($camlCode_id_join_b__const_block_11)
   where rec `self` (param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
     let prim = %is_int (param) in
     (switch prim

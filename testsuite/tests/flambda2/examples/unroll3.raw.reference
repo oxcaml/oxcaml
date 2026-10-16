@@ -51,14 +51,8 @@ let $camlUnroll3__first_const_0 = Block 0 () in
      (apply direct(odd_1 &toplevel) unroll(2)
         (odd : _ -> imm tagged) (4) -> k1 * error
         where k1 (four_is_odd : imm tagged) =
-          let Pmakeblock =
-            %block.[`0`].`toplevel` (even, odd, three_is_even, four_is_odd)
+          let $camlUnroll3 = Block 0 (even, odd, three_is_even, four_is_odd)
           in
-          cont k (Pmakeblock)))
+          cont k ($camlUnroll3)))
   where k define_root_symbol (module_block) =
-    let field_0 = %block_load.tag[`0`].`size`[`4`].[`0`] (module_block) in
-    let field_1 = %block_load.tag[`0`].`size`[`4`].[`1`] (module_block) in
-    let field_2 = %block_load.tag[`0`].`size`[`4`].[`2`] (module_block) in
-    let field_3 = %block_load.tag[`0`].`size`[`4`].[`3`] (module_block) in
-    let $camlUnroll3 = Block 0 (field_0, field_1, field_2, field_3) in
     cont done ($camlUnroll3)

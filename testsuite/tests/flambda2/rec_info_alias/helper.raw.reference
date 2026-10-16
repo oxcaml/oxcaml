@@ -1,3 +1,4 @@
+let $camlHelper__s1 = Block 0 () in
 (let code rec inline(always) size(8)
        f_1 (x) my_closure &my_alloc_region my_depth -> k1 * k2 : imm tagged =
    let next_depth = rec_info (succ my_depth) in
@@ -37,8 +38,7 @@
    cont k1 (g)
  in
  let $camlHelper__s0 = closure p_0 @p &toplevel in
- let $camlHelper__s1 = Block 0 ($camlHelper__s0) in
- cont k ($camlHelper__s1))
+ let $camlHelper = Block 0 ($camlHelper__s0) in
+ cont k ($camlHelper))
   where k define_root_symbol (module_block) =
-    let $camlHelper = Block 0 ($camlHelper__s0) in
     cont done ($camlHelper)

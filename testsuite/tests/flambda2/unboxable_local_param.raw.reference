@@ -68,10 +68,7 @@
  let g = closure g_3_1 @g &toplevel
  and generated_1 = closure g_3 @g_unboxed &toplevel
  in
- let Pmakeblock = %block.[`0`].`toplevel` (f, g) in
- cont k (Pmakeblock))
+ let $camlUnboxable_local_param = Block 0 (f, g) in
+ cont k ($camlUnboxable_local_param))
   where k define_root_symbol (module_block) =
-    let field_0 = %block_load.tag[`0`].`size`[`2`].[`0`] (module_block) in
-    let field_1 = %block_load.tag[`0`].`size`[`2`].[`1`] (module_block) in
-    let $camlUnboxable_local_param = Block 0 (field_0, field_1) in
     cont done ($camlUnboxable_local_param)

@@ -167,7 +167,9 @@ module Env = struct
       big_endian : bool;
       path_to_root : Debuginfo.Scoped_location.t;
       inlining_history_tracker : Inlining_history.Tracker.t;
-      at_toplevel : bool
+      at_toplevel : bool;
+      module_symbol : Symbol.t;
+      module_block_ident : Ident.t option
     }
 
   let current_unit t = t.current_unit
@@ -176,7 +178,7 @@ module Env = struct
 
   let current_depth t = t.current_depth
 
-  let create ~big_endian =
+  let create ~big_endian ~module_symbol =
     let current_unit = Current_unit.get_cu_exn () in
     { variables = Ident.Map.empty;
       globals = Numeric_types.Int.Map.empty;
@@ -187,8 +189,19 @@ module Env = struct
       big_endian;
       path_to_root = Debuginfo.Scoped_location.Loc_unknown;
       inlining_history_tracker = Inlining_history.Tracker.empty current_unit;
-      at_toplevel = true
+      at_toplevel = true;
+      module_symbol;
+      module_block_ident = None
     }
+
+  let module_symbol t = t.module_symbol
+
+  let set_module_block_ident t id = { t with module_block_ident = Some id }
+
+  let is_module_block_ident t id =
+    match t.module_block_ident with
+    | None -> false
+    | Some module_block_ident -> Ident.same id module_block_ident
 
   let set_not_at_toplevel t = { t with at_toplevel = false }
 
@@ -204,7 +217,9 @@ module Env = struct
         big_endian;
         path_to_root;
         inlining_history_tracker;
-        at_toplevel
+        at_toplevel;
+        module_symbol;
+        module_block_ident = _
       } =
     let simples_to_substitute =
       Ident.Map.filter
@@ -220,7 +235,9 @@ module Env = struct
       big_endian;
       path_to_root;
       inlining_history_tracker;
-      at_toplevel
+      at_toplevel;
+      module_symbol;
+      module_block_ident = None
     }
 
   let with_depth t depth_var = { t with current_depth = Some depth_var }
@@ -377,7 +394,8 @@ module Acc = struct
       seen_a_function : bool;
       slot_offsets : Slot_offsets.t;
       code_slot_offsets : Slot_offsets.t Code_id.Map.t;
-      closure_infos : closure_info list
+      closure_infos : closure_info list;
+      module_symbol_is_bound : bool
     }
 
   let cost_metrics t = t.cost_metrics
@@ -468,7 +486,8 @@ module Acc = struct
       seen_a_function = false;
       slot_offsets = Slot_offsets.empty;
       code_slot_offsets = Code_id.Map.empty;
-      closure_infos = []
+      closure_infos = [];
+      module_symbol_is_bound = false
     }
 
   let declared_symbols t = t.declared_symbols
@@ -755,6 +774,10 @@ module Acc = struct
         code_slot_offsets;
         slot_offsets = closure_info.slot_offsets_at_definition
       } )
+
+  let module_symbol_bound t = { t with module_symbol_is_bound = true }
+
+  let module_symbol_is_bound t = t.module_symbol_is_bound
 end
 
 module Function_decls = struct

@@ -1,0 +1,28 @@
+(let code inline(never) size(3)
+       f_0 (x : imm tagged)
+         my_closure &my_alloc_region my_depth
+         -> k1 * k2
+         : imm tagged =
+   let int_add = %int_barith.add (x, 1) in
+   cont k1 (int_add)
+ in
+ let $camlModule_block_toplevel_classic__s1 = "s" in
+ let $camlModule_block_toplevel_classic__s0 = closure f_0 @f &toplevel in
+ (let Popaque = %opaque (41) in
+  apply direct(f_0 &toplevel)  (Popaque) -> k1 * error)
+   where k1 (y : imm tagged) =
+     let $camlModule_block_toplevel_classic__s2 =
+       Block 0 (y, $camlModule_block_toplevel_classic__s1)
+     in
+     let `*match*` = %opaque ($camlModule_block_toplevel_classic__s2) in
+     let Pmixedfield = %block_load.[`1`] (`*match*`) in
+     let Pmixedfield_1 = %block_load.[`0`] (`*match*`) in
+     let $camlModule_block_toplevel_classic =
+       Block 0 ($camlModule_block_toplevel_classic__s0,
+                y,
+                Pmixedfield_1,
+                Pmixedfield)
+     in
+     cont k ($camlModule_block_toplevel_classic))
+  where k define_root_symbol (module_block) =
+    cont done ($camlModule_block_toplevel_classic)

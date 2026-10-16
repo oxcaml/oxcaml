@@ -189,15 +189,9 @@
  let pr2162_3_as_int64 =
    closure pr2162_3_as_int64_3 @pr2162_3_as_int64 &toplevel
  in
- let Pmakeblock =
-   %block.[`0`].`toplevel`
-     (pr2162_2_first, pr2162_2, pr2162_3, pr2162_3_as_int64)
+ let $camlTests4 =
+   Block 0 (pr2162_2_first, pr2162_2, pr2162_3, pr2162_3_as_int64)
  in
- cont k (Pmakeblock))
+ cont k ($camlTests4))
   where k define_root_symbol (module_block) =
-    let field_0 = %block_load.tag[`0`].`size`[`4`].[`0`] (module_block) in
-    let field_1 = %block_load.tag[`0`].`size`[`4`].[`1`] (module_block) in
-    let field_2 = %block_load.tag[`0`].`size`[`4`].[`2`] (module_block) in
-    let field_3 = %block_load.tag[`0`].`size`[`4`].[`3`] (module_block) in
-    let $camlTests4 = Block 0 (field_0, field_1, field_2, field_3) in
     cont done ($camlTests4)

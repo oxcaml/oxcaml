@@ -1,3 +1,4 @@
+let $camlDirect_app_parameter_kind_check_classic__s3 = Block 0 () in
 (let code size(25)
        send_0 (t : val, c : val)
          my_closure &my_alloc_region my_depth
@@ -33,19 +34,14 @@
          : imm tagged =
    cont k1 (0)
  in
- let $camlDirect_app_parameter_kind_check_classic__s0 =
-   closure send_0 @send &toplevel
+ let $camlDirect_app_parameter_kind_check_classic__s2 =
+   closure fn_2 @fn &toplevel
  in
  let $camlDirect_app_parameter_kind_check_classic__s1 =
    closure create_1 @create &toplevel
  in
- let $camlDirect_app_parameter_kind_check_classic__s3 =
-   Block 0 (0,
-            $camlDirect_app_parameter_kind_check_classic__s0,
-            $camlDirect_app_parameter_kind_check_classic__s1)
- in
- let $camlDirect_app_parameter_kind_check_classic__s2 =
-   closure fn_2 @fn &toplevel
+ let $camlDirect_app_parameter_kind_check_classic__s0 =
+   closure send_0 @send &toplevel
  in
  (let inlined_dbg = %inlined_apply () in
   let Pmakeblock = %block.mut.[`0`].`toplevel` (0) in
@@ -69,11 +65,11 @@
           let Pfield_1 = %block_load.[`0`] (`*match*_1`) in
           apply &toplevel c (Pfield_1, Pfield) -> k1 * error)
    where k1 (`*match*` : imm tagged) =
-     cont k ($camlDirect_app_parameter_kind_check_classic__s3))
+     let $camlDirect_app_parameter_kind_check_classic =
+       Block 0 (0,
+                $camlDirect_app_parameter_kind_check_classic__s0,
+                $camlDirect_app_parameter_kind_check_classic__s1)
+     in
+     cont k ($camlDirect_app_parameter_kind_check_classic))
   where k define_root_symbol (module_block) =
-    let $camlDirect_app_parameter_kind_check_classic =
-      Block 0 (0,
-               $camlDirect_app_parameter_kind_check_classic__s0,
-               $camlDirect_app_parameter_kind_check_classic__s1)
-    in
     cont done ($camlDirect_app_parameter_kind_check_classic)

@@ -48,12 +48,7 @@ let $camlUnroll5__first_const_0 = Block 0 () in
  let test1 = closure test1_1 @test1 &toplevel with { foo = foo } in
  let test2 = closure test2_2 @test2 &toplevel with { foo_1 = foo } in
  let test3 = closure test3_3 @test3 &toplevel with { foo_2 = foo } in
- let Pmakeblock = %block.[`0`].`toplevel` (foo, test1, test2, test3) in
- cont k (Pmakeblock))
+ let $camlUnroll5 = Block 0 (foo, test1, test2, test3) in
+ cont k ($camlUnroll5))
   where k define_root_symbol (module_block) =
-    let field_0 = %block_load.tag[`0`].`size`[`4`].[`0`] (module_block) in
-    let field_1 = %block_load.tag[`0`].`size`[`4`].[`1`] (module_block) in
-    let field_2 = %block_load.tag[`0`].`size`[`4`].[`2`] (module_block) in
-    let field_3 = %block_load.tag[`0`].`size`[`4`].[`3`] (module_block) in
-    let $camlUnroll5 = Block 0 (field_0, field_1, field_2, field_3) in
     cont done ($camlUnroll5)

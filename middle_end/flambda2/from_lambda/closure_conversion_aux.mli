@@ -121,8 +121,18 @@ module Env : sig
 
   type t
 
-  (** Create an environment marked as being at toplevel. *)
-  val create : big_endian:bool -> t
+  (** Create an environment marked as being at toplevel. [module_symbol] is the
+      symbol to be bound to the module block. *)
+  val create : big_endian:bool -> module_symbol:Symbol.t -> t
+
+  val module_symbol : t -> Symbol.t
+
+  (** Record that the given identifier is about to be bound to the module block,
+      so that [Closure_conversion.close_let] binds that block directly to
+      [module_symbol]. *)
+  val set_module_block_ident : t -> Ident.t -> t
+
+  val is_module_block_ident : t -> Ident.t -> bool
 
   val set_not_at_toplevel : t -> t
 
@@ -329,6 +339,10 @@ module Acc : sig
   val find_symbol_approximation : t -> Symbol.t -> Env.value_approximation
 
   val symbol_approximations : t -> Env.value_approximation Symbol.Map.t
+
+  val module_symbol_bound : t -> t
+
+  val module_symbol_is_bound : t -> bool
 end
 
 (** Used to represent information about a set of function declarations during

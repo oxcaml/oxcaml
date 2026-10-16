@@ -43,23 +43,13 @@
  let $camlTests7__empty_block_0 = Block 0 () in
  let f = closure f_0 @f &toplevel in
  let foo = closure foo_1 @foo &toplevel in
- let Pmakeblock =
-   %block.[`0`].`toplevel`
-     ($camlTests7__empty_block_0,
-      $camlTests7__immstring_1,
-      $camlTests7__immstring_2,
-      f,
-      foo)
+ let $camlTests7 =
+   Block 0 ($camlTests7__empty_block_0,
+            $camlTests7__immstring_1,
+            $camlTests7__immstring_2,
+            f,
+            foo)
  in
- cont k (Pmakeblock))
+ cont k ($camlTests7))
   where k define_root_symbol (module_block) =
-    let field_3 = %block_load.tag[`0`].`size`[`5`].[`3`] (module_block) in
-    let field_4 = %block_load.tag[`0`].`size`[`5`].[`4`] (module_block) in
-    let $camlTests7 =
-      Block 0 ($camlTests7__empty_block_0,
-               $camlTests7__immstring_1,
-               $camlTests7__immstring_2,
-               field_3,
-               field_4)
-    in
     cont done ($camlTests7)

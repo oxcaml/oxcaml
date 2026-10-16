@@ -97,9 +97,7 @@ let $camlTests11__first_const_0 = Block 0 () in
  in
  let bar = closure bar_0 @bar &toplevel in
  let map_foo = closure map_foo_4 @map_foo &toplevel with { bar = bar } in
- let Pmakeblock = %block.[`0`].`toplevel` (map_foo) in
- cont k (Pmakeblock))
+ let $camlTests11 = Block 0 (map_foo) in
+ cont k ($camlTests11))
   where k define_root_symbol (module_block) =
-    let field_0 = %block_load.tag[`0`].`size`[`1`].[`0`] (module_block) in
-    let $camlTests11 = Block 0 (field_0) in
     cont done ($camlTests11)

@@ -63,16 +63,8 @@ let $camlCross_function_cse_b__first_const_0 = Block 0 () in
  let g = closure g_2 @g &toplevel with { some_1 = some } in
  let f_classic = closure f_classic_3 @f_classic &toplevel in
  let g_classic = closure g_classic_4 @g_classic &toplevel in
- let Pmakeblock = %block.[`0`].`toplevel` (some, f, g, f_classic, g_classic)
+ let $camlCross_function_cse_b = Block 0 (some, f, g, f_classic, g_classic)
  in
- cont k (Pmakeblock))
+ cont k ($camlCross_function_cse_b))
   where k define_root_symbol (module_block) =
-    let field_0 = %block_load.tag[`0`].`size`[`5`].[`0`] (module_block) in
-    let field_1 = %block_load.tag[`0`].`size`[`5`].[`1`] (module_block) in
-    let field_2 = %block_load.tag[`0`].`size`[`5`].[`2`] (module_block) in
-    let field_3 = %block_load.tag[`0`].`size`[`5`].[`3`] (module_block) in
-    let field_4 = %block_load.tag[`0`].`size`[`5`].[`4`] (module_block) in
-    let $camlCross_function_cse_b =
-      Block 0 (field_0, field_1, field_2, field_3, field_4)
-    in
     cont done ($camlCross_function_cse_b)
