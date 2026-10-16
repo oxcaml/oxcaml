@@ -43,6 +43,16 @@ end = struct
   let read fd = really_input_string fd digest_size
 end
 
+module Outdated_store = struct
+  type t =
+    { filename : string; reason : [ `Missing_file | `Index_ids_do_not_match ] }
+
+  module Set = Set.Make (struct
+    type nonrec t = t
+    let compare = compare
+  end)
+end
+
 type store = { filename : string; id : File_digest.t; cache : cache }
 
 and cache = any_link Cache.t
@@ -154,9 +164,7 @@ let string_of_link : type a. a link -> string =
   | In_memory_reused _ -> "In_memory_reused"
   | Duplicate _ -> "Duplicate"
 
-exception
-  Outdated_store of
-    { filename : string; reason : [ `Missing_file | `Index_ids_do_not_match ] }
+exception Outdated_store of Outdated_store.t
 
 let lru_dbllist : cached Dbllist.t option ref = ref None
 let lru_size = ref 1_000_000
@@ -205,6 +213,9 @@ let int_of_binstring s =
 let last_open_store = ref None
 
 let force_open_store store =
+  (* Before opening a new store, make sure the old one is closed. *)
+  Option.iter (fun (_, fd) -> close_in fd) !last_open_store;
+  last_open_store := None;
   try
     let fd = open_in_bin store.filename in
     seek_in fd (String.length Config.index_magic_number);
@@ -212,10 +223,11 @@ let force_open_store store =
     if File_digest.equal required_id store.id then (
       last_open_store := Some (store, fd);
       fd)
-    else
+    else (
+      close_in fd;
       raise
         (Outdated_store
-           { filename = store.filename; reason = `Index_ids_do_not_match })
+           { filename = store.filename; reason = `Index_ids_do_not_match }))
   with Sys_error _ ->
     raise (Outdated_store { filename = store.filename; reason = `Missing_file })
 
@@ -224,10 +236,7 @@ let open_store store =
   | Some (store', fd)
     when File_digest.equal store.id store'.id
          && String.equal store.filename store'.filename -> fd
-  | Some (_, fd) ->
-    close_in fd;
-    force_open_store store
-  | None -> force_open_store store
+  | Some _ | None -> force_open_store store
 
 let resolve_filename store ~filename =
   if Filename.is_relative filename then
