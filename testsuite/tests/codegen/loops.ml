@@ -99,7 +99,7 @@ loop_with_non_dominating_load:
 .L0:
   testb $1, %bl
   je    .L2
-  movq  camlStdlib__List__Pmakeblock2542_19@GOTPCREL(%rip), %rax
+  movq  camlStdlib__List__Pmakeblock2473_19@GOTPCREL(%rip), %rax
   call  caml_reraise_exn@PLT
 .L1:
 .L2:

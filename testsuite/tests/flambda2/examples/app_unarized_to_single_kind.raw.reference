@@ -1,26 +1,28 @@
 let $camlApp_unarized_to_single_kind__first_const_0 = Block 0 () in
-let code size(1)
-      f_0 (x) my_closure &my_alloc_region my_depth -> k * k1 : imm tagged =
-  let next_depth = rec_info (succ my_depth) in
-  cont k (x)
-in
-let code size(6)
-      g_1 (f : val, x)
-        my_closure &my_alloc_region my_depth
-        -> k * k1
-        : imm tagged =
-  let next_depth = rec_info (succ my_depth) in
-  apply &my_alloc_region f (x) -> k * k1
-in
-let code size(6)
-      h_2 (x) my_closure &my_alloc_region my_depth -> k * k1 : imm tagged =
-  let next_depth = rec_info (succ my_depth) in
-  let f = %project_value_slot.[h].[f] (my_closure) in
-  let g = %project_value_slot.[h].[g] (my_closure) in
-  apply direct(g_1 &my_alloc_region) (g : _ -> imm tagged) (f, x) -> k * k1
-in
-let f = closure f_0 @f &toplevel in
-let g = closure g_1 @g &toplevel in
-let h = closure h_2 @h &toplevel with { f = f; g = g } in
-let $camlApp_unarized_to_single_kind = Block 0 (f, g, h) in
-cont done ($camlApp_unarized_to_single_kind)
+(let code size(1)
+       f_0 (x) my_closure &my_alloc_region my_depth -> k1 * k2 : imm tagged =
+   let next_depth = rec_info (succ my_depth) in
+   cont k1 (x)
+ in
+ let code size(6)
+       g_1 (f : val, x)
+         my_closure &my_alloc_region my_depth
+         -> k1 * k2
+         : imm tagged =
+   let next_depth = rec_info (succ my_depth) in
+   apply &my_alloc_region f (x) -> k1 * k2
+ in
+ let code size(6)
+       h_2 (x) my_closure &my_alloc_region my_depth -> k1 * k2 : imm tagged =
+   let next_depth = rec_info (succ my_depth) in
+   let f = %project_value_slot.[h].[f] (my_closure) in
+   let g = %project_value_slot.[h].[g] (my_closure) in
+   apply direct(g_1 &my_alloc_region) (g : _ -> imm tagged) (f, x) -> k1 * k2
+ in
+ let f = closure f_0 @f &toplevel in
+ let g = closure g_1 @g &toplevel in
+ let h = closure h_2 @h &toplevel with { f = f; g = g } in
+ let $camlApp_unarized_to_single_kind = Block 0 (f, g, h) in
+ cont k ($camlApp_unarized_to_single_kind))
+  where k define_root_symbol (module_block) =
+    cont done ($camlApp_unarized_to_single_kind)
