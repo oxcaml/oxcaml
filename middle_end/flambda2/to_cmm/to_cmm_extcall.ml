@@ -211,7 +211,7 @@ module Component = struct
       size : int;  (** in bytes; also the natural alignment *)
       offset : int
           (** in bytes, from the start of the outermost struct (after
-              [Layout.of_product]) or of the containing unit (after
+              [Layout.of_arity]) or of the containing unit (after
               [Unit.of_product]) *)
     }
 
@@ -314,56 +314,57 @@ module Layout = struct
       align : int
     }
 
-  let init_state = { rev_acc = []; size = 0; align = 1 }
-
-  (* Add [components] as the next members of the struct. All alignments are
-     powers of two, as [Misc.align] requires. *)
-  let rec members : type uc.
-      state -> uc Flambda_arity.Component_for_creation.t list -> state =
-   fun state components ->
-    match components with
-    | [] -> state
-    | Singleton kind :: components ->
-      let reg_class, size = Component.reg_class_and_size kind in
-      let offset = Misc.align state.size size in
-      let component : Component.t = { kind; reg_class; size; offset } in
-      members
-        { rev_acc = component :: state.rev_acc;
-          size = offset + size;
-          align = max state.align size
-        }
-        components
-    | Unboxed_product inner :: components ->
-      (* A nested struct is aligned to the largest alignment of its members and
-         its size is rounded up to that alignment. *)
-      let inner = members init_state inner in
-      let offset = Misc.align state.size inner.align in
-      let rev_acc =
-        List.map
-          (fun (component : Component.t) ->
-            { component with offset = component.offset + offset })
-          inner.rev_acc
-        @ state.rev_acc
-      in
-      members
-        { rev_acc;
-          size = offset + Misc.align inner.size inner.align;
-          align = max state.align inner.align
-        }
-        components
-
   type t =
     { components : Component.t list;
       size : int
     }
 
+  let init_state = { rev_acc = []; size = 0; align = 1 }
+
+  let singleton (state : state) kind =
+    let reg_class, size = Component.reg_class_and_size kind in
+    let offset = Misc.align state.size size in
+    let component : Component.t = { kind; reg_class; size; offset } in
+    { rev_acc = component :: state.rev_acc;
+      size = offset + size;
+      align = max state.align size
+    }
+
+  (* Add [inner], a laid-out member, after the members in [outer], treating it
+     as a nested struct: it is aligned to the largest alignment of its members
+     and its size is rounded up to that alignment. (A scalar member is a
+     one-member struct, whose layout is the same as the scalar's.) *)
+  let unboxed_product ~(outer : state) ~(inner : state) =
+    let offset = Misc.align outer.size inner.align in
+    let rev_acc =
+      List.map
+        (fun (component : Component.t) ->
+          { component with offset = component.offset + offset })
+        inner.rev_acc
+      @ outer.rev_acc
+    in
+    { rev_acc;
+      size = offset + Misc.align inner.size inner.align;
+      align = max outer.align inner.align
+    }
+
+  let of_state { rev_acc; size; align } =
+    { components = List.rev rev_acc; size = Misc.align size align }
+
   (* The flattened components of the struct corresponding to a product, with
      offsets from the start of the outermost struct, and that struct's total
      size. Void components correspond to no C struct members and contribute
      nothing. *)
-  let of_product components =
-    let { rev_acc; size; align } = members init_state components in
-    { components = List.rev rev_acc; size = Misc.align size align }
+  let of_arity arity =
+    Flambda_arity.fold ~init:init_state ~singleton ~unboxed_product
+      ~component:unboxed_product arity
+    |> of_state
+
+  (* Like [of_arity], but laying out each parameter as a struct of its own. *)
+  let of_param_arities arity =
+    Flambda_arity.fold_per_parameter ~init:init_state ~singleton
+      ~unboxed_product arity
+    |> List.map of_state
 end
 
 (* Returned small integer values need to be sign-extended because it's not clear
@@ -631,18 +632,29 @@ module Unit = struct
         K.With_subkind.print component.kind
 end
 
+(* Represents the head constructor of an [Flambda_arity.t] component. *)
+module Arity_component_head = struct
+  type t =
+    | Singleton of K.With_subkind.t
+    | Unboxed_product
+
+  let of_arity arity =
+    Flambda_arity.singleton_component_per_parameter arity
+    |> List.map (function
+      | Some kind -> Singleton kind
+      | None -> Unboxed_product)
+end
+
 (* Translation of the arguments of an external call. *)
 module Args = struct
-  type param = [`Complex] Flambda_arity.Component_for_creation.t
+  type param_head = Arity_component_head.t
 
   (* [Some exttypes] when no parameter is an unboxed product, in which case no
      laying-out is needed and the arguments pass through unchanged. *)
   let exttypes_if_all_scalar params =
     params
-    |> Misc.Stdlib.List.map_option (fun (param : param) ->
-        match param with
-        | Singleton kind -> Some kind
-        | Unboxed_product _ -> None)
+    |> Misc.Stdlib.List.map_option (fun (param : param_head) ->
+        match param with Singleton kind -> Some kind | Unboxed_product -> None)
     |> Option.map
          (List.map (fun kind -> C.exttype_of_kind (K.With_subkind.kind kind)))
 
@@ -650,10 +662,10 @@ module Args = struct
      all, so require no particular ABI support. *)
   let involves_unboxed_products params laid_out_params =
     List.exists2
-      (fun (param : param) ({ components; size = _ } : Layout.t) ->
+      (fun (param : param_head) ({ components; size = _ } : Layout.t) ->
         match param, components with
-        | Unboxed_product _, _ :: _ -> true
-        | (Unboxed_product _ | Singleton _), _ -> false)
+        | Unboxed_product, _ :: _ -> true
+        | (Unboxed_product | Singleton _), _ -> false)
       params laid_out_params
 
   (* A product with a single non-void component is passed exactly as if it were
@@ -661,7 +673,7 @@ module Args = struct
      a struct containing a single scalar member from the member itself. (Such
      products may therefore be passed on the stack, unlike larger ones.) The
      stack slot may however differ; see [Component.exttype_when_alone]. *)
-  let translate_single_component ~free_regs (param : param)
+  let translate_single_component ~free_regs (param : param_head)
       (component : Component.t) arg =
     let free_regs =
       Reg_count.take_one_if_available free_regs component.reg_class
@@ -669,7 +681,7 @@ module Args = struct
     let exttype =
       match param with
       | Singleton _ -> Component.exttype component
-      | Unboxed_product _ -> Component.exttype_when_alone component
+      | Unboxed_product -> Component.exttype_when_alone component
     in
     free_regs, (arg, exttype)
 
@@ -714,14 +726,14 @@ module Args = struct
      list of unarized Cmm arguments. Free registers are tracked across the
      argument list so that products the ABI would demote to memory can be
      rejected. *)
-  let translate apply ~dbg (params : param list) args =
-    match exttypes_if_all_scalar params with
+  let translate apply ~dbg args =
+    let arity = Apply.args_arity apply in
+    let param_heads = Arity_component_head.of_arity arity in
+    match exttypes_if_all_scalar param_heads with
     | Some exttypes -> args, exttypes
     | None ->
-      let laid_out_params =
-        List.map (fun param -> Layout.of_product [param]) params
-      in
-      if not (involves_unboxed_products params laid_out_params)
+      let laid_out_params = Layout.of_param_arities arity in
+      if not (involves_unboxed_products param_heads laid_out_params)
       then
         ( args,
           List.concat_map
@@ -732,9 +744,7 @@ module Args = struct
         let abi = Abi.for_unboxed_products apply in
         (* [args] has one argument per laid-out component: both are the non-void
            leaves, in order. *)
-        let args_per_param =
-          Flambda_arity.group_by_parameter (Flambda_arity.create params) args
-        in
+        let args_per_param = Flambda_arity.group_by_parameter arity args in
         let (_ : Reg_count.t), rev_args_with_types =
           List.fold_left2
             (fun (free_regs, rev_acc) (param, (layout : Layout.t)) param_args ->
@@ -758,7 +768,7 @@ module Args = struct
                    arity:@ %a"
                   Apply.print apply)
             (Abi.num_arg_regs abi, [])
-            (List.combine params laid_out_params)
+            (List.combine param_heads laid_out_params)
             args_per_param
         in
         List.split (List.rev rev_args_with_types)
@@ -774,16 +784,7 @@ module Return = struct
      x86-64, matching xmm0/xmm1). *)
   let units apply return_arity =
     let abi = Abi.for_unboxed_products apply in
-    (* Closure conversion produces a single component for product returns;
-       multiple top-level components (possible for terms built via the Flambda
-       parser) are treated as a flat product. *)
-    let component =
-      match Flambda_arity.components return_arity with
-      | [component] -> component
-      | components ->
-        Flambda_arity.Component_for_creation.Unboxed_product components
-    in
-    Unit.of_product apply abi ~what:Return_value (Layout.of_product [component])
+    Unit.of_product apply abi ~what:Return_value (Layout.of_arity return_arity)
 
   (* [Some units] for a product return occupying more than one register. A
      product occupying a single register is returned exactly as the
@@ -795,11 +796,11 @@ module Return = struct
     | [_] ->
       let return_is_product =
         List.exists
-          (fun (component : _ Flambda_arity.Component_for_creation.t) ->
+          (fun (component : Arity_component_head.t) ->
             match component with
-            | Unboxed_product _ -> true
+            | Unboxed_product -> true
             | Singleton _ -> false)
-          (Flambda_arity.components return_arity)
+          (Arity_component_head.of_arity return_arity)
       in
       if return_is_product then ignore (Abi.for_unboxed_products apply : Abi.t);
       None
@@ -873,11 +874,7 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
       let unit_tys = List.map Unit.machtype units in
       Array.concat unit_tys, Array.of_list unit_tys
   in
-  let args, ty_args =
-    Args.translate apply ~dbg
-      (Flambda_arity.components (Apply.args_arity apply))
-      args
-  in
+  let args, ty_args = Args.translate apply ~dbg args in
   let effects = To_cmm_effects.transl_c_call_effects effects in
   let coeffects = To_cmm_effects.transl_c_call_coeffects coeffects in
   let { extcall; builtin_sign_extends } : Cmm_builtins.t =

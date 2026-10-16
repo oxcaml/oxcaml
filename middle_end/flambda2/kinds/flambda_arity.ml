@@ -62,6 +62,10 @@ module Component = struct
   let component : [`Unarized] t -> KS.t =
    fun t -> match t with Singleton kind -> kind
 
+  let component_if_singleton : type uc. uc t -> KS.t option =
+   fun t ->
+    match t with Singleton kind -> Some kind | Unboxed_product _ -> None
+
   (* Returns [None] if there are too few kinds. Any kinds left over are
      returned. *)
   let rec with_unarized_kinds : type uc.
@@ -89,6 +93,22 @@ module Component = struct
         match with_unarized_kinds_list ts kinds with
         | None -> None
         | Some (ts, kinds) -> Some (t :: ts, kinds)))
+
+  let rec fold : type uc.
+      init:'acc ->
+      singleton:('acc -> KS.t -> 'acc) ->
+      unboxed_product:(outer:'acc -> inner:'acc -> 'acc) ->
+      uc t ->
+      'acc =
+   fun ~init ~singleton ~unboxed_product t ->
+    match t with
+    | Singleton kind -> singleton init kind
+    | Unboxed_product ts ->
+      List.fold_left
+        (fun outer t ->
+          let inner = fold ~init ~singleton ~unboxed_product t in
+          unboxed_product ~outer ~inner)
+        init ts
 end
 
 type 'uc t = 'uc Component.t list
@@ -127,8 +147,6 @@ let nullary = []
 
 let create t = t
 
-let components t = t
-
 let create_singletons t = List.map (fun kind -> Component.Singleton kind) t
 
 let print ppf t =
@@ -136,6 +154,19 @@ let print ppf t =
     (Format.pp_print_list Component.print ~pp_sep:(fun ppf () ->
          Format.fprintf ppf " @<1>\u{2a2f} "))
     t
+
+let fold ~init ~component ~singleton ~unboxed_product t =
+  List.fold_left
+    (fun outer c ->
+      let inner = Component.fold ~init ~singleton ~unboxed_product c in
+      component ~outer ~inner)
+    init t
+
+let fold_per_parameter ~init ~singleton ~unboxed_product t =
+  List.map (Component.fold ~init ~singleton ~unboxed_product) t
+
+let singleton_component_per_parameter t =
+  List.map Component.component_if_singleton t
 
 let equal_ignoring_subkinds : type uc1 uc2. uc1 t -> uc2 t -> bool =
  fun t1 t2 -> Misc.Stdlib.List.equal Component.equal_ignoring_subkinds t1 t2

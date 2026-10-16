@@ -50,10 +50,6 @@ end
     component may in turn have an arity describing an unboxed product. *)
 val create : 'uc Component_for_creation.t list -> 'uc t
 
-(** The components of an arity, one per parameter, including the structure of
-    any unboxed products (for [`Complex] arities). *)
-val components : 'uc t -> 'uc Component_for_creation.t list
-
 (** A shorthand for creation of arities where no parameter has an unboxed
     product layout. *)
 val create_singletons : Flambda_kind.With_subkind.t list -> [> ] t
@@ -77,6 +73,33 @@ val equal_exact : 'a t -> 'a t -> bool
     (Note that this function does not look inside unboxed products, not even
     ones with a single component.) *)
 val is_one_param_of_kind_value : _ t -> bool
+
+(** Fold over an arity, left to right, including inside unboxed products. Each
+    parameter, and each member of an unboxed product, is folded on its own
+    starting from [init]; the results are then combined by [component] (for
+    parameters) and [unboxed_product] (for members), where [outer] is the
+    accumulator so far and [inner] the result for the next one. *)
+val fold :
+  init:'a ->
+  component:(outer:'a -> inner:'a -> 'a) ->
+  singleton:('a -> Flambda_kind.With_subkind.t -> 'a) ->
+  unboxed_product:(outer:'a -> inner:'a -> 'a) ->
+  _ t ->
+  'a
+
+(** Like [fold], but folds each parameter separately, returning one result per
+    parameter. *)
+val fold_per_parameter :
+  init:'a ->
+  singleton:('a -> Flambda_kind.With_subkind.t -> 'a) ->
+  unboxed_product:(outer:'a -> inner:'a -> 'a) ->
+  _ t ->
+  'a list
+
+(** Returns [Some kind] for every singleton parameter component and [None] for
+    unboxed products. *)
+val singleton_component_per_parameter :
+  _ t -> Flambda_kind.With_subkind.t option list
 
 (** Convert, in a left-to-right depth-first order, an arity into a flattened
     list of kinds for all parameters. (For [`Unarized] arities this simply
