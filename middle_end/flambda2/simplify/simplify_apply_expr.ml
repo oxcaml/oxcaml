@@ -767,7 +767,8 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
               ~cold:false ~is_a_functor:false ~is_opaque:false ~recursive
               ~cost_metrics:cost_metrics_of_body
               ~inlining_arguments:(DE.inlining_arguments (DA.denv dacc))
-              ~dbg ~fdo_entry_annotation:Fdo_annotation.empty ~is_tupled:false
+              ~dbg ~fdo_entry_annotation:Fdo_annotation.With_body_hash.empty
+              ~is_tupled:false
               ~is_my_closure_used:
                 (Function_params_and_body.is_my_closure_used params_and_body)
               ~inlining_decision:Stub ~absolute_history ~relative_history

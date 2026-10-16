@@ -2409,12 +2409,12 @@ let compute_body_of_unboxed_function acc my_region my_alloc_region my_closure
 let first_complex_local_param_of_function_decl decl =
   First_complex_local_param.Index (Function_decl.first_complex_local_param decl)
 
-(* The entry counter of a function's code (see [Fdo_fingerprint]), when it has
-   an FDO identity. *)
+(* The entry counter and body hash of a function's code (see [Fdo_fingerprint]),
+   when it has an FDO identity. *)
 let fdo_entry decl =
   match Function_decl.fdo_fingerprint decl with
   | Some fingerprint -> Fdo_fingerprint.entry_annotation fingerprint
-  | None -> Fdo_annotation.empty
+  | None -> Fdo_annotation.With_body_hash.empty
 
 let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
     params_arity ~unarized_param_modes:param_modes return result_arity_main_code
@@ -2669,7 +2669,7 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
       ~cold:false ~is_opaque:false ~recursive ~newer_version_of:None
       ~cost_metrics
       ~inlining_arguments:(Inlining_arguments.create ~round:0)
-      ~dbg ~fdo_entry_annotation:Fdo_annotation.empty ~is_tupled
+      ~dbg ~fdo_entry_annotation:Fdo_annotation.With_body_hash.empty ~is_tupled
       ~is_my_closure_used:true ~inlining_decision ~absolute_history
       ~relative_history ~loopify:Never_loopify
   in
