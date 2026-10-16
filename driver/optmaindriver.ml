@@ -20,7 +20,7 @@ let usage = "Usage: ocamlopt <options> <files>\nOptions are:"
 module Options = Oxcaml_args.Make_optcomp_options
         (Oxcaml_args.Default.Optmain)
 
-let main unix argv ppf ~flambda2 =
+let main unix argv ppf ~flambda2:(module Flambda2 : Optcomp_intf.Flambda2) =
   Clflags.set_target Clflags.Target.Native;
   let columns =
     match Sys.getenv "COLUMNS" with
@@ -83,7 +83,15 @@ let main unix argv ppf ~flambda2 =
         Compenv.fatal "The -uses-metaprogramming flag is only supported \
                        with the runtime metaprogramming extension";
     let (module Compiler : Optcompile.S) =
-      Optcompile.native unix ~flambda2
+      if Clflags.target_is_jsir () then begin
+        if !output_c_object then
+          Compenv.fatal
+            "-output-obj is not supported when targeting js_of_ocaml";
+        if !make_package then
+          Compenv.fatal "-pack is not supported when targeting js_of_ocaml";
+        Jscomp.make ~lambda_to_jsir:Flambda2.lambda_to_jsir
+      end
+      else Optcompile.native unix ~flambda2:Flambda2.lambda_to_cmm
     in
     begin try
       Compenv.process_deferred_actions
@@ -187,7 +195,9 @@ let main unix argv ppf ~flambda2 =
                  Config.ext_obj Config.ext_dll
               )
         else
-          Compenv.default_output !output_name
+          match !output_name with
+          | Some name -> name
+          | None -> Compiler.default_executable_name
       in
       Compmisc.init_path ();
       Compmisc.with_ppf_dump ~file_prefix:target (fun ppf_dump ->
