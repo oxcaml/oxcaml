@@ -8,13 +8,18 @@
   ocaml-compiler-libs.shadow
   ppxlib_ast.astlib
   ppxlib_print_diff
-  ppx_derivers
+  oxcaml_private_ppx_derivers
   ppxlib_jane
   ppxlib_ast.traverse_builtins
   ppxlib_ast.stdppx
   sexp_type)
  (flags
-  (:standard -safe-string -open Ocaml_shadow))
+  (:standard
+   -safe-string
+   -open
+   Ocaml_shadow
+   -open
+   Oxcaml_private_ppx_derivers))
  (ppx.driver
   (main Ppxlib.Driver.standalone)
   (flags

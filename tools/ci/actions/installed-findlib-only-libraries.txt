@@ -1,3 +1,5 @@
 # Findlib umbrella packages; Dune lists only their child libraries.
+js_of_ocaml-compiler.private
 ocaml-compiler-libs
+ppxlib.private
 ppxlib_ast
