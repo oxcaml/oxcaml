@@ -1405,12 +1405,17 @@ end = struct
   let apply_call ~witnesses ~callee_summary ~known_arguments =
     match callee_summary with
     | Top callee_witnesses ->
-      begin match Witnesses.allocation_sources callee_witnesses with
-      | Allocation_other_than_calling_arguments -> Top witnesses
-      | No_allocation_other_than_calling_arguments _arguments_called ->
-        (* CR wsturgeon for wsturgeon: implement *)
-        Top witnesses
-      end
+      let caller_argument callee_argument =
+        match Cmm.Known_arguments.find known_arguments callee_argument with
+        | Some (Argument caller_argument) -> Some caller_argument
+        | Some (Symbol _) | None -> None
+      in
+      let allocation_sources =
+        Allocation_sources.rename_arguments
+          (Witnesses.allocation_sources callee_witnesses)
+          ~f:caller_argument
+      in
+      Top { witnesses with Witnesses.allocation_sources }
     | Bot | Safe -> callee_summary
     | Var _ | Transform _ | Join _ ->
       Misc.fatal_errorf "Zero_alloc_checker.apply_call: unresolved value %a"

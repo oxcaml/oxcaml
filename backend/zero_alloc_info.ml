@@ -57,6 +57,20 @@ module Allocation_sources = struct
 
   let lessequal t1 t2 = compare (join t1 t2) t2 = 0
 
+  let rename_arguments t ~f =
+    match t with
+    | Allocation_other_than_calling_arguments ->
+      Allocation_other_than_calling_arguments
+    | No_allocation_other_than_calling_arguments arguments_called ->
+      Numbers.Int.Map.fold
+        (fun callee_argument outcomes renamed ->
+          match f callee_argument with
+          | None -> Allocation_other_than_calling_arguments
+          | Some caller_argument ->
+            join renamed (argument ~lowered_index:caller_argument ~outcomes))
+        arguments_called
+        (No_allocation_other_than_calling_arguments Numbers.Int.Map.empty)
+
   let meet t1 t2 = match t1, t2 with
     | ( Allocation_other_than_calling_arguments,
         Allocation_other_than_calling_arguments ) ->

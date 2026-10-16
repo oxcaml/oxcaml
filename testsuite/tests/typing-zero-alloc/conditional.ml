@@ -32,10 +32,10 @@ val iter : f:('a -> unit) -> 'a list -> unit [@@zero_alloc conditional] =
 
 let[@zero_alloc conditional] rec iter_even ~f : 'a list -> unit = function
   | [] -> ()
-  | head :: tail -> (f head; iter_odd ~f tail)
+  | head :: tail -> (let () = f head in iter_odd ~f tail)
 and[@zero_alloc conditional] iter_odd ~f : 'a list -> unit = function
   | [] -> ()
-  | head :: tail -> (f head; iter_even ~f tail)
+  | head :: tail -> (let () = f head in iter_even ~f tail)
 [%%expect{|
 val iter_even : f:('a -> unit) -> 'a list -> unit [@@zero_alloc conditional] = <fun>
 val iter_odd : f:('a -> unit) -> 'a list -> unit [@@zero_alloc conditional] = <fun>

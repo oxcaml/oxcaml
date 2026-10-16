@@ -35,6 +35,8 @@ module Allocation_sources : sig
 
   val meet : t -> t -> t
 
+  val rename_arguments : t -> f:(int -> int option) -> t
+
   val print : Format.formatter -> t -> unit
 end
 
