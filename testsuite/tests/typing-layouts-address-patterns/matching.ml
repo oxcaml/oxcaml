@@ -238,3 +238,366 @@ let () =
   let addr_imm_ s = Addr_imm.of_idx_local r (.i_str) in
   print_endline s;
   print_newline ()
+
+(* Dereference patterns *)
+
+let print_pair_ln #{ a; b } =
+  Printf.printf "%Ld %Ld\n" (Int64_u.to_int64 a) (Int64_u.to_int64 b)
+
+(* Positions: record fields *)
+
+(* Unlike [t], [v] is not a mixed record *)
+type v = { mutable vx : int; vy : string }
+
+let () =
+  print_endline "deref record fields";
+  let v = { vx = 1; vy = "vy" } in
+  (match v with
+   | { vx = deref_ vx; vy = deref_ vy } ->
+     print_int_ln (Addr.get vx);
+     print_endline (Addr_imm.get vy);
+     Addr.set vx 2);
+  print_int_ln v.vx;
+  print_endline v.vy;
+  let r = make () in
+  (match r with
+   | { m_int = deref_ m_int; i_str = deref_ i_str; m_float = deref_ m_float;
+       i_pair = deref_ i_pair; m_addr = deref_ m_addr; _ } ->
+     print_int_ln (Addr.get m_int);
+     print_endline (Addr_imm.get i_str);
+     print_float_ln (Addr.get m_float);
+     print_pair_ln (Addr_imm.get i_pair);
+     print_int_ln (Addr.get (Addr.get m_addr));
+     Addr.set m_int 10;
+     Addr.set m_float #10.5;
+     Addr.set m_addr (Addr.of_idx (ref 70) (.contents)));
+  print_int_ln r.m_int;
+  print_endline r.i_str;
+  print_float_ln r.m_float;
+  print_pair_ln r.i_pair;
+  print_int_ln (Addr.get r.m_addr);
+  print_newline ()
+
+(* Positions: below unboxed records and tuples in record fields *)
+
+type ub = { ub : int } [@@unboxed]
+type s1 = #{ s : int }
+type inner = #{ ia : int; ib : float# }
+type outer = #{ oa : string; ob : inner }
+
+(* Unlike [u], [w] is not a mixed record *)
+type w = { mutable w_ub : ub; mutable w_s1 : s1 }
+
+type u =
+  { mutable m_ub : ub;
+    i_ub : ub;
+    mutable m_s1 : s1;
+    mutable m_ut : #(int * string);
+    i_ut : #(int * string);
+    mutable m_outer : outer;
+    i_outer : outer
+  }
+
+let make_u () =
+  { m_ub = { ub = 3 };
+    i_ub = { ub = 4 };
+    m_s1 = #{ s = 5 };
+    m_ut = #(6, "six");
+    i_ut = #(7, "seven");
+    m_outer = #{ oa = "eight"; ob = #{ ia = 9; ib = #10.5 } };
+    i_outer = #{ oa = "eleven"; ob = #{ ia = 12; ib = #13.5 } }
+  }
+
+let print_ut_ln #(i, s) = Printf.printf "%d %s\n" i s
+
+let print_outer_ln #{ oa; ob = #{ ia; ib } } =
+  Printf.printf "%s %d %.1f\n" oa ia (Float_u.to_float ib)
+
+let () =
+  print_endline "deref unboxed";
+  let w = { w_ub = { ub = 1 }; w_s1 = #{ s = 2 } } in
+  (match w with
+   | { w_ub = { ub = deref_ ub }; w_s1 = #{ s = deref_ s } } ->
+     print_int_ln (Addr.get ub);
+     print_int_ln (Addr.get s);
+     Addr.set ub 10;
+     Addr.set s 20);
+  print_int_ln w.w_ub.ub;
+  print_int_ln w.w_s1.#s;
+  let u = make_u () in
+  (match u with
+   | { m_ub = { ub = deref_ m_ub }; i_ub = { ub = deref_ i_ub };
+       m_s1 = #{ s = deref_ m_s1 };
+       m_ut = #(deref_ m_ut_i, deref_ m_ut_s);
+       i_ut = #(deref_ i_ut_i, deref_ i_ut_s);
+       m_outer =
+         #{ oa = deref_ m_oa; ob = #{ ia = deref_ m_ia; ib = deref_ m_ib } };
+       i_outer =
+         #{ oa = deref_ i_oa; ob = #{ ia = deref_ i_ia; ib = deref_ i_ib } }
+     } ->
+     print_int_ln (Addr.get m_ub);
+     print_int_ln (Addr_imm.get i_ub);
+     print_int_ln (Addr.get m_s1);
+     print_ut_ln #(Addr.get m_ut_i, Addr.get m_ut_s);
+     print_ut_ln #(Addr_imm.get i_ut_i, Addr_imm.get i_ut_s);
+     print_outer_ln
+       #{ oa = Addr.get m_oa;
+          ob = #{ ia = Addr.get m_ia; ib = Addr.get m_ib } };
+     print_outer_ln
+       #{ oa = Addr_imm.get i_oa;
+          ob = #{ ia = Addr_imm.get i_ia; ib = Addr_imm.get i_ib } };
+     Addr.set m_ub 30;
+     Addr.set m_s1 50;
+     Addr.set m_ut_i 60;
+     Addr.set m_ut_s "SIX";
+     Addr.set m_oa "EIGHT";
+     Addr.set m_ia 90;
+     Addr.set m_ib #100.5);
+  print_int_ln u.m_ub.ub;
+  print_int_ln u.i_ub.ub;
+  print_int_ln u.m_s1.#s;
+  print_ut_ln u.m_ut;
+  print_ut_ln u.i_ut;
+  print_outer_ln u.m_outer;
+  print_outer_ln u.i_outer;
+  print_newline ()
+
+(* Positions: tuple elements *)
+
+let () =
+  print_endline "deref tuples";
+  let t = (1, "one") in
+  (match t with
+   | (deref_ a, deref_ b) ->
+     print_int_ln (Addr_imm.get a);
+     print_endline (Addr_imm.get b));
+  let nested = ((2, "two"), 3) in
+  (match nested with
+   | ((deref_ a, deref_ b), deref_ c) ->
+     print_int_ln (Addr_imm.get a);
+     print_endline (Addr_imm.get b);
+     print_int_ln (Addr_imm.get c));
+  let local = stack_ (4, 5) in
+  (match local with
+   | (deref_ a, deref_ b) ->
+     print_int_ln (Addr_imm.get a);
+     print_int_ln (Addr_imm.get b));
+  print_newline ()
+
+(* Positions: below address patterns *)
+
+let () =
+  print_endline "deref below addr";
+  let r = make () in
+  (match Addr.of_idx r (.m_int) with
+   | addr_ (deref_ a) ->
+     print_int_ln (Addr.get a);
+     Addr.set a 10);
+  (match Addr_imm.of_idx r (.i_int) with
+   | addr_imm_ (deref_ a) -> print_int_ln (Addr_imm.get a));
+  (match Addr.of_idx r (.m_pair) with
+   | addr_ #{ a = deref_ a; b = deref_ b } ->
+     print_pair_ln #{ a = Addr.get a; b = Addr.get b };
+     Addr.set a #30L;
+     Addr.set b #20L);
+  (match Addr_imm.of_idx r (.i_pair) with
+   | addr_imm_ #{ a = deref_ a; b = deref_ b } ->
+     print_pair_ln #{ a = Addr_imm.get a; b = Addr_imm.get b });
+  (match Addr.of_idx r (.m_addr) with
+   | addr_ (addr_ (deref_ a)) ->
+     print_int_ln (Addr.get a);
+     Addr.set a 70);
+  print_int_ln r.m_int;
+  print_int_ln r.i_int;
+  print_pair_ln r.m_pair;
+  print_pair_ln r.i_pair;
+  print_int_ln (Addr.get r.m_addr);
+  let u = make_u () in
+  (match Addr.of_idx u (.m_ub) with
+   | addr_ { ub = deref_ a } ->
+     print_int_ln (Addr.get a);
+     Addr.set a 30);
+  (match Addr.of_idx u (.m_s1) with
+   | addr_ #{ s = deref_ a } ->
+     print_int_ln (Addr.get a);
+     Addr.set a 50);
+  (match Addr.of_idx u (.m_ut) with
+   | addr_ #(deref_ a, deref_ b) ->
+     print_ut_ln #(Addr.get a, Addr.get b);
+     Addr.set a 60;
+     Addr.set b "SIX");
+  (match Addr.of_idx u (.m_outer) with
+   | addr_ #{ oa = deref_ oa; ob = #{ ia = deref_ ia; ib = deref_ ib } } ->
+     print_outer_ln
+       #{ oa = Addr.get oa; ob = #{ ia = Addr.get ia; ib = Addr.get ib } };
+     Addr.set oa "EIGHT";
+     Addr.set ia 90;
+     Addr.set ib #100.5);
+  (match Addr_imm.of_idx u (.i_outer) with
+   | addr_imm_ #{ oa = deref_ oa; ob = #{ ia = deref_ ia; ib = deref_ ib } } ->
+     print_outer_ln
+       #{ oa = Addr_imm.get oa;
+          ob = #{ ia = Addr_imm.get ia; ib = Addr_imm.get ib } });
+  print_int_ln u.m_ub.ub;
+  print_int_ln u.m_s1.#s;
+  print_ut_ln u.m_ut;
+  print_outer_ln u.m_outer;
+  print_outer_ln u.i_outer;
+  print_newline ()
+
+(* Binding sites, each at [vx] *)
+
+let get_set (local_ a) x =
+  let before : int = Addr.get a in
+  Addr.set a x;
+  before
+
+let param { vx = deref_ a; _ } x = get_set a x
+
+let optional ?v:({ vx = deref_ a; _ } = { vx = 0; vy = "" }) x = get_set a x
+
+let ( let* ) v f = f v
+
+let binding_sites : (string * (v -> int -> int)) list =
+  [ ("match", fun v x -> match v with { vx = deref_ a; _ } -> get_set a x);
+    ("let", fun v x -> let { vx = deref_ a; _ } = v in get_set a x);
+    ("parameter", param);
+    ( "function",
+      fun v x -> (function { vx = deref_ a; _ } -> get_set a x) v );
+    ("optional argument default", fun v x -> optional ~v x);
+    ("let-operator", fun v x -> let* { vx = deref_ a; _ } = v in get_set a x);
+    ( "match with an exception case",
+      fun v x ->
+        match v with
+        | { vx = deref_ a; _ } -> get_set a x
+        | exception Exit -> 0 );
+    ( "guard",
+      fun v x ->
+        let before = ref 0 in
+        (match v with
+         | { vx = deref_ a; _ } when (before := get_set a x; false) -> ()
+         | _ -> ());
+        !before );
+    ( "or-pattern",
+      fun v x ->
+        match v with
+        | { vx = deref_ a; vy = "" } | { vx = deref_ a; _ } -> get_set a x );
+    ( "constructor argument",
+      fun v x ->
+        match Some v with
+        | Some { vx = deref_ a; _ } -> get_set a x
+        | None -> 0 );
+    ( "syntactic tuple element",
+      fun v x -> match v, 0 with { vx = deref_ a; _ }, _ -> get_set a x )
+  ]
+
+let () =
+  print_endline "deref binding sites";
+  List.iter
+    (fun (name, bind) ->
+      let v = { vx = 1; vy = "" } in
+      let before = bind v 2 in
+      Printf.printf "%s: %d -> %d\n" name before v.vx)
+    binding_sites;
+  let v = stack_ { vx = 1; vy = "" } in
+  (match v with
+   | { vx = deref_ a; _ } -> Printf.printf "local: %d -> " (get_set a 2));
+  print_int_ln v.vx;
+  print_newline ()
+
+(* Syntactic tuples are usually matched without allocating them. With
+   dereference patterns on their elements, they are allocated. *)
+
+let get2 (addr_imm_ a) (addr_imm_ b) = a ^ b
+
+let tupled (deref_ a, deref_ b) = get2 a b
+
+let syntactic_tuples : (string * (string -> string -> string)) list =
+  [ ("match", fun x y -> match x, y with deref_ a, deref_ b -> get2 a b);
+    ( "match with an exception case",
+      fun x y ->
+        match x, y with deref_ a, deref_ b -> get2 a b | exception Exit -> "" );
+    ( "match with several rows",
+      fun x y ->
+        match x, y with
+        | deref_ a, "" -> Addr_imm.get a
+        | deref_ a, deref_ b -> get2 a b );
+    ( "match with an alias",
+      fun x y ->
+        match x, y with (deref_ a, deref_ b) as t -> get2 a b ^ fst t ^ snd t );
+    ( "match on a nested tuple",
+      fun x y -> match (x, 0), y with (deref_ a, _), deref_ b -> get2 a b );
+    ("let", fun x y -> let (deref_ a, deref_ b) = (x, y) in get2 a b);
+    ( "let of a nested tuple",
+      fun x y ->
+        let ((deref_ a, _), deref_ b) = ((x, 0), y) in
+        get2 a b );
+    ( "let of a constant",
+      fun _ _ -> let (deref_ a, deref_ b) = ("x", "y") in get2 a b );
+    ("tupled function", fun x y -> tupled (x, y))
+  ]
+
+let () =
+  print_endline "deref syntactic tuples";
+  List.iter
+    (fun (name, f) -> Printf.printf "%s: %s\n" name (f "x" "y"))
+    syntactic_tuples;
+  print_newline ()
+
+(* Choosing between positions *)
+
+type two = { mutable p : int; mutable q : int; sel : bool }
+
+let pick = function
+  | { sel = true; p = deref_ a; _ } | { sel = false; q = deref_ a; _ } -> a
+
+let choose b x y =
+  match b, x, y with
+  | true, deref_ a, _ | false, _, deref_ a -> Addr_imm.get a
+
+(* The second alternative of the first case is kept in the default matrix of
+   the other cases. *)
+let default = function
+  | (1, (deref_ _a, _)) | (_, (deref_ _a, 1)) -> 1
+  | (2, (_, 2)) -> 2
+  | _ -> 3
+
+let () =
+  print_endline "deref choice";
+  let t = { p = 1; q = 2; sel = true } in
+  Addr.set (pick t) 3;
+  print_int_ln t.p;
+  print_int_ln t.q;
+  let t = { p = 1; q = 2; sel = false } in
+  Addr.set (pick t) 3;
+  print_int_ln t.p;
+  print_int_ln t.q;
+  print_endline (choose true "x" "y");
+  print_endline (choose false "x" "y");
+  print_int_ln (default (1, (0, 0)));
+  print_int_ln (default (0, (0, 1)));
+  print_int_ln (default (2, (0, 2)));
+  print_int_ln (default (3, (0, 0)));
+  print_newline ()
+
+(* Allocating syntactic tuples does not change evaluation order *)
+
+let say s = print_string s
+
+let () =
+  print_endline "deref evaluation order";
+  (match say "a", say "b" with _ -> ());
+  print_string " ";
+  (match say "a", say "b" with (deref_ a, _) -> Addr_imm.get a);
+  print_newline ();
+  (match say "a", say "b" with _ -> () | exception _ -> ());
+  print_string " ";
+  (match say "a", say "b" with
+   | (deref_ a, _) -> Addr_imm.get a
+   | exception _ -> ());
+  print_newline ();
+  (let (_, _) = (say "a", say "b") in ());
+  print_string " ";
+  (let (deref_ a, _) = (say "a", say "b") in Addr_imm.get a);
+  print_newline ();
+  print_newline ()
