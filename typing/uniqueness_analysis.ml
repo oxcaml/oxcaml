@@ -1055,7 +1055,6 @@ module Projection : sig
     | Construct_field of string * int
     | Variant_field of label
     | Array_index of int
-    | Address_load
     | Memory_address (* this is rendered as clubsuit in the ICFP'24 paper *)
     | Alloc
   (* a child of [Memory_address] that guarantees the block is still allocated *)
@@ -1075,7 +1074,6 @@ end = struct
       | Construct_field of string * int
       | Variant_field of label
       | Array_index of int
-      | Address_load
       | Memory_address
       | Alloc
 
@@ -1089,53 +1087,42 @@ end = struct
         match String.compare l1 l2 with 0 -> Int.compare i j | i -> i)
       | Variant_field l1, Variant_field l2 -> String.compare l1 l2
       | Array_index i, Array_index j -> Int.compare i j
-      | Address_load, Address_load -> 0
       | Memory_address, Memory_address -> 0
       | Alloc, Alloc -> 0
       | ( Tuple_field _,
           ( Record_field _ | Record_unboxed_product_field _ | Construct_field _
-          | Variant_field _ | Array_index _ | Address_load | Memory_address
-          | Alloc ) ) ->
+          | Variant_field _ | Array_index _ | Memory_address | Alloc ) ) ->
         -1
       | ( ( Record_field _ | Record_unboxed_product_field _ | Construct_field _
-          | Variant_field _ | Array_index _ | Address_load | Memory_address
-          | Alloc ),
+          | Variant_field _ | Array_index _ | Memory_address | Alloc ),
           Tuple_field _ ) ->
         1
       | ( Record_field _,
           ( Record_unboxed_product_field _ | Construct_field _ | Variant_field _
-          | Array_index _ | Address_load | Memory_address | Alloc ) ) ->
+          | Array_index _ | Memory_address | Alloc ) ) ->
         -1
       | ( ( Record_unboxed_product_field _ | Construct_field _ | Variant_field _
-          | Array_index _ | Address_load | Memory_address | Alloc ),
+          | Array_index _ | Memory_address | Alloc ),
           Record_field _ ) ->
         1
       | ( Record_unboxed_product_field _,
-          ( Construct_field _ | Variant_field _ | Array_index _ | Address_load
-          | Memory_address | Alloc ) ) ->
+          ( Construct_field _ | Variant_field _ | Array_index _ | Memory_address
+          | Alloc ) ) ->
         -1
-      | ( ( Construct_field _ | Variant_field _ | Array_index _ | Address_load
-          | Memory_address | Alloc ),
+      | ( ( Construct_field _ | Variant_field _ | Array_index _ | Memory_address
+          | Alloc ),
           Record_unboxed_product_field _ ) ->
         1
       | ( Construct_field _,
-          ( Variant_field _ | Array_index _ | Address_load | Memory_address
-          | Alloc ) ) ->
+          (Variant_field _ | Array_index _ | Memory_address | Alloc) ) ->
         -1
-      | ( ( Variant_field _ | Array_index _ | Address_load | Memory_address
-          | Alloc ),
+      | ( (Variant_field _ | Array_index _ | Memory_address | Alloc),
           Construct_field _ ) ->
         1
-      | Variant_field _, (Array_index _ | Address_load | Memory_address | Alloc)
-        ->
-        -1
-      | (Array_index _ | Address_load | Memory_address | Alloc), Variant_field _
-        ->
-        1
-      | Array_index _, (Address_load | Memory_address | Alloc) -> -1
-      | (Address_load | Memory_address | Alloc), Array_index _ -> 1
-      | Address_load, (Memory_address | Alloc) -> -1
-      | (Memory_address | Alloc), Address_load -> 1
+      | Variant_field _, (Array_index _ | Memory_address | Alloc) -> -1
+      | (Array_index _ | Memory_address | Alloc), Variant_field _ -> 1
+      | Array_index _, (Memory_address | Alloc) -> -1
+      | (Memory_address | Alloc), Array_index _ -> 1
       | Memory_address, Alloc -> -1
       | Alloc, Memory_address -> 1
   end
@@ -1153,7 +1140,6 @@ end = struct
     | Construct_field (s, n) -> fprintf ppf "Construct_field(%s,%d)" s n
     | Variant_field l -> fprintf ppf "Variant_field(%s)" l
     | Array_index n -> fprintf ppf "Array_index(%d)" n
-    | Address_load -> fprintf ppf "Address_load"
     | Memory_address -> fprintf ppf "Memory_address"
     | Alloc -> fprintf ppf "Alloc"
 
@@ -1673,8 +1659,8 @@ module Paths : sig
       where [gf] is the appropriate modality for mutability [mut]. *)
   val array_index : Types.mutability -> int -> t -> t
 
-  (** [address_load mut t] is [modal_child gf Projection.Address_load t] where
-      [gf] is the appropriate modality for mutability [mut]. *)
+  (** [address_load mut t] are the paths of the value loaded from an address
+      with paths [t] and mutability [mut]. *)
   val address_load : Types.mutability -> t -> t
 
   (** [memory_address t] is [child Projection.Memory_address t]. *)
@@ -1713,14 +1699,17 @@ end = struct
 
   let child proj t = List.map (UF.Path.child proj) t
 
-  let modal_child modalities proj t =
+  let tracked_under modalities =
     (* CR zqian: Instead of just ignoring such children, we should add modality
        to [Projection.t] and add corresponding logic in [UsageTree]. *)
     let uni = Modality.Const.proj (Monadic Uniqueness) modalities in
     let lin = Modality.Const.proj (Comonadic Linearity) modalities in
     match uni, lin with
-    | Join_const Aliased, Meet_const Many -> untracked
-    | _ -> child proj t
+    | Join_const Aliased, Meet_const Many -> false
+    | _ -> true
+
+  let modal_child modalities proj t =
+    if tracked_under modalities then child proj t else untracked
 
   let tuple_field i t = child (Projection.Tuple_field i) t
 
@@ -1740,7 +1729,7 @@ end = struct
 
   let address_load mut t =
     let modality = Typemode.address_modalities mut in
-    modal_child modality Projection.Address_load t
+    if tracked_under modality then t else untracked
 
   let memory_address t = child Projection.Memory_address t
 
