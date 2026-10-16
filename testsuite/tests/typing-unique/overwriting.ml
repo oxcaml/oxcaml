@@ -1282,3 +1282,25 @@ Alert Translcore: Overwrite not implemented.
 Uncaught exception: Misc.Fatal_error
 
 |}]
+
+(* An address owns the part of the memory it points into, so the block can't
+   be overwritten while it is in use. For a mutable field, this is not implied
+   by the address owning the value at the position, which is aliased. *)
+type deref_mut = { mutable dm : string }
+let consume_addr : ('a : any). 'a addr @ unique -> unit = fun _ -> ()
+let overwrite_after_consume_addr (r : deref_mut @ unique) =
+  match r with
+  | { dm = deref_ a } -> consume_addr a; overwrite_ r with { dm = "x" }
+[%%expect{|
+type deref_mut = { mutable dm : string; }
+val consume_addr : ('a : any). 'a addr @ unique -> unit = <fun>
+Line 5, characters 52-53:
+5 |   | { dm = deref_ a } -> consume_addr a; overwrite_ r with { dm = "x" }
+                                                        ^
+Error: This value is used here,
+       but part of it has already been used as unique at:
+Line 5, characters 38-39:
+5 |   | { dm = deref_ a } -> consume_addr a; overwrite_ r with { dm = "x" }
+                                          ^
+
+|}]

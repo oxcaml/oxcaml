@@ -1138,6 +1138,22 @@ Warning 11 [redundant-case]: this match case is unused.
 val unused_imm : bool addr_imm -> int = <fun>
 |}]
 
+let amb = function
+  | addr_ ((Some x, _) | (_, Some x)) when x > 0 -> x
+  | _ -> 0
+[%%expect{|
+Line 2, characters 4-37:
+2 |   | addr_ ((Some x, _) | (_, Some x)) when x > 0 -> x
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 57 [ambiguous-var-in-pattern-guard]: Ambiguous or-pattern variables under
+  guard; variable "x" appears in different places in different or-pattern
+  alternatives.
+  Only the first match will be used to evaluate the guard expression.
+  (see manual section 13.5.4)
+
+val amb : (int option * int option) addr -> int = <fun>
+|}]
+
 type _ gadt = Int : int gadt | Bool : bool gadt
 [%%expect{|
 type _ gadt = Int : int gadt | Bool : bool gadt
