@@ -419,12 +419,10 @@ end
 Exception: Match_failure ("", 2, 23).
 |}]
 
-(* Staticity interacts with functors in two ways:
-   - a functor's own staticity, equal to its parameter's (generative functors
-     are always dynamic).
-   - the staticity of an application's result, which is the join of the
-     functor's staticity and its declared return staticity - so the result is
-     static only if both are. *)
+(* Staticity interacts with functors as follows:
+   - non-template functors are dynamic.
+   - non-template functor applications are dynamic.
+   - instantiated template functors must be static. *)
 
 (* A static functor takes a static parameter. *)
 module (F @ static) (X : sig end @ static) = struct end
@@ -432,16 +430,14 @@ module (F @ static) (X : sig end @ static) = struct end
 module F : functor (X : sig end @ static) -> sig end
 |}]
 
-(* Static functor, dynamic (unannotated) parameter: a contradiction. The error
-   relates the functor and its parameter. *)
+(* Static functor, dynamic (unannotated) parameter: a contradiction. *)
 module (F @ static) (X : sig end) = struct end
 [%%expect{|
 Line 1, characters 20-46:
 1 | module (F @ static) (X : sig end) = struct end
                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The module is "dynamic"
-         because it shares the staticity of the functor parameter at line 1, characters 21-22
-         which is "dynamic".
+         because non-template functors are always dynamic.
        However, the module highlighted is expected to be "static".
 |}]
 
@@ -452,8 +448,7 @@ Line 1, characters 20-56:
 1 | module (F @ static) (X : sig end @ dynamic) = struct end
                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The module is "dynamic"
-         because it shares the staticity of the functor parameter at line 1, characters 21-22
-         which is "dynamic".
+         because non-template functors are always dynamic.
        However, the module highlighted is expected to be "static".
 |}]
 
@@ -480,19 +475,35 @@ module M = struct
   let _ @ static = Y.x
 end
 [%%expect{|
-module M :
-  sig
-    module F : functor () -> sig val x : int end @ static
-    module Y : sig val x : int end
-  end
+Line 4, characters 19-22:
+4 |   let _ @ static = Y.x
+                       ^^^
+Error: This value is "dynamic"
+         because generative functor applications are always dynamic.
+       However, the highlighted expression is expected to be "static".
 |}]
 
-(* A functor type declares its return's staticity independently of the
-   functor's own: a dynamic functor returning a static result... *)
+(* A non-template functor can only ever return [@ dynamic]. *)
 module F : functor (X : sig end) -> sig end @ static =
   functor (X : sig end) -> struct end
 [%%expect{|
-module F : functor (X : sig end) -> sig end @ static
+Line 1, characters 19-43:
+1 | module F : functor (X : sig end) -> sig end @ static =
+                       ^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The functor return is "dynamic"
+         because non-template functor applications are always dynamic.
+       However, the functor return highlighted is expected to be "static".
+|}]
+
+module F : functor (X : sig end) -> sig val x : int end @ static =
+  functor (X : sig end) -> struct let x = 42 end
+[%%expect{|
+Line 1, characters 19-55:
+1 | module F : functor (X : sig end) -> sig val x : int end @ static =
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The functor return is "dynamic"
+         because non-template functor applications are always dynamic.
+       However, the functor return highlighted is expected to be "static".
 |}]
 
 (* ...and a static functor returning a dynamic result. *)
@@ -527,8 +538,7 @@ module M :
   end
 |}]
 
-(* Dually, a dynamic functor returning at static; the application result is
-   still dynamic because the functor is. *)
+(* Dually, a dynamic functor cannot return at static. *)
 module M = struct
   module F (X : sig end) = struct end
   module (Y @ static) = F(struct end)
@@ -538,10 +548,7 @@ Line 3, characters 24-37:
 3 |   module (Y @ static) = F(struct end)
                             ^^^^^^^^^^^^^
 Error: The module is "dynamic"
-         because it is an application of the functor at line 3, characters 24-25
-         which is "dynamic"
-         because it shares the staticity of the functor parameter at line 2, characters 12-13
-         which is "dynamic".
+         because non-template functor applications are always dynamic.
        However, the module highlighted is expected to be "static".
 |}]
 
@@ -571,8 +578,7 @@ Line 2, characters 22-35:
                           ^^^^^^^^^^^^^
 Error: The functor is "dynamic"
        but is expected to be "static"
-         because it shares the staticity of a functor parameter
-         which is expected to be "static".
+         because it is a template functor instantiated here.
 |}]
 
 (* The same definition inside a structure works fine. *)
@@ -594,16 +600,16 @@ module F : functor (X : sig end @ static) -> sig end =
   functor (X : sig end) -> struct end
 module Y = F(struct end)
 [%%expect{|
-module F : functor (X : sig end @ static) -> sig end
-Line 3, characters 11-12:
-3 | module Y = F(struct end)
-               ^
-Error: The functor is "dynamic"
-         because it shares the staticity of the functor parameter at line 2, characters 11-12
-         which is "dynamic".
-       However, the functor highlighted is expected to be "static"
-         because it shares the staticity of a functor parameter
-         which is expected to be "static".
+Line 2, characters 10-37:
+2 |   functor (X : sig end) -> struct end
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Signature mismatch:
+       Modules do not match:
+         functor (X : sig end) -> sig end
+       is not included in
+         functor (X : sig end @ static) -> sig end
+       Their staticities disagree: one is a template functor
+       and the other is not.
 |}]
 
 (* [include functor] is an application, and is checked like one: the same
@@ -612,16 +618,32 @@ module F : functor (X : sig end @ static) -> sig end =
   functor (X : sig end) -> struct end
 module Y = struct include functor F end
 [%%expect{|
+Line 2, characters 10-37:
+2 |   functor (X : sig end) -> struct end
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Signature mismatch:
+       Modules do not match:
+         functor (X : sig end) -> sig end
+       is not included in
+         functor (X : sig end @ static) -> sig end
+       Their staticities disagree: one is a template functor
+       and the other is not.
 |}]
 
-(* The items bound by [include functor] inherit the functor's staticity, like
-   the result of an ordinary application. *)
+(* The items bound by [include functor] follow the same rules
+   as the result of a functor application. *)
 module M = struct
   module F (X : sig end) = struct let x = 1 end
   module Y = struct include functor F end
   let _ @ static = Y.x
 end
 [%%expect{|
+Line 4, characters 19-22:
+4 |   let _ @ static = Y.x
+                       ^^^
+Error: This value is "dynamic"
+         because non-template functor applications are always dynamic.
+       However, the highlighted expression is expected to be "static".
 |}]
 
 module M = struct
@@ -630,6 +652,40 @@ module M = struct
   let _ @ static = Y.x
 end
 [%%expect{|
+module M :
+  sig
+    module F : functor (X : sig end @ static) -> sig val x : int end @ static
+    module Y : sig val x : int end
+  end
+|}]
+
+(* [include functor] in signatures *)
+module M = struct
+  module type F = functor (_ : sig end) -> sig val x : int end
+  module type T = sig
+    module Y : sig include functor F end
+  end
+end
+[%%expect{|
+module M :
+  sig
+    module type F = sig end -> sig val x : int end
+    module type T = sig module Y : sig val x : int end end
+  end
+|}]
+
+module M = struct
+  module type F = functor (_ : sig end @ static) -> sig val x : int end
+  module type T = sig
+    module Y : sig include functor F end
+  end
+end
+[%%expect{|
+module M :
+  sig
+    module type F = sig end @ static -> sig val x : int end
+    module type T = sig module Y : sig val x : int end end
+  end
 |}]
 
 (* with an explicit [@@ dynamic] *)
@@ -640,13 +696,11 @@ module M = struct
   end
 end
 [%%expect{|
-Line 4, characters 46-47:
-4 |     module Y : sig @@ dynamic include functor F end
-                                                  ^
-Error: The functor is "dynamic"
-       but is expected to be "static"
-         because it shares the staticity of a functor parameter
-         which is expected to be "static".
+module M :
+  sig
+    module type F = sig end @ static -> sig val x : int end
+    module type T = sig module Y : sig val x : int @@ dynamic end end
+  end
 |}]
 
 (* with an explicit [@@ dynamic] on [include functor] *)
@@ -755,14 +809,13 @@ Error: Signature mismatch:
          sig module Make : Id -> Id end
        In module "Make":
        Modules do not match:
-         (Arg : Id @ static) -> ...
+         functor (Arg : Id @ static) ->
+           sig val poly_ id : 'a -> 'a end @ static
        is not included in
-         Id @ dynamic -> ...
-       Module types do not match:
-         Id @ static
-       does not include
-         Id @ dynamic
-       Got "dynamic" but expected "static".
+         Id -> Id
+       In module "Make":
+       Their staticities disagree: one is a template functor
+       and the other is not.
 |}]
 
 module F (M : sig
@@ -788,8 +841,8 @@ Error: Signature mismatch:
        is not included in
          Id @ static -> Id @ static
        In module "Make":
-       Got "dynamic"
-       but expected "static".
+       Their staticities disagree: one is a template functor
+       and the other is not.
 |}]
 
 (* inconsistent template functor types *)
@@ -799,9 +852,12 @@ end) : sig
   module Make : functor (_ : Id) -> Id
 end = M
 [%%expect{|
-module F :
-  functor (M : sig module Make : Id -> Id @ static end) ->
-    sig module Make : Id -> Id end
+Line 2, characters 24-38:
+2 |   module Make : functor (_ : Id) -> Id @ static
+                            ^^^^^^^^^^^^^^
+Error: The functor return is "dynamic"
+         because non-template functor applications are always dynamic.
+       However, the functor return highlighted is expected to be "static".
 |}]
 
 module F (M : sig
@@ -810,9 +866,25 @@ end) : sig
   module Make : functor (_ : Id @ static) -> Id
 end = M
 [%%expect{|
-module F :
-  functor (M : sig module Make : Id -> Id end) ->
-    sig module Make : Id @ static -> Id end
+Line 5, characters 6-7:
+5 | end = M
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           module Make :
+             functor (Arg : Id) -> sig val poly_ id : 'a -> 'a end
+         end
+       is not included in
+         sig module Make : Id @ static -> Id end
+       In module "Make":
+       Modules do not match:
+         functor (Arg : Id) -> sig val poly_ id : 'a -> 'a end
+       is not included in
+         Id @ static -> Id
+       In module "Make":
+       Their staticities disagree: one is a template functor
+       and the other is not.
 |}]
 
 (* persistent modules are currently dynamic. *)

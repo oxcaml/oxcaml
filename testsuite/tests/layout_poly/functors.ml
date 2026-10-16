@@ -208,7 +208,7 @@ let c1 =
   let module R = U (struct let poly_ id x = x end) in
   R.i
 [%%expect{|
->> Fatal error: slambda eval: unexpected missing value
+>> Fatal error: Includemod.try_modtypes: template functor coercion at line 6, characters 68-73
 Uncaught exception: Misc.Fatal_error
 
 |}]
@@ -285,14 +285,24 @@ Line 1, characters 21-22:
                          ^
 Error: The functor is "dynamic"
        but is expected to be "static"
-         because it shares the staticity of a functor parameter
-         which is expected to be "static".
+         because it is a template functor instantiated here.
 |}]
 
 (* [G] is a template functor, so all is fine. *)
 module G (H : IdF @ static) = H (struct let poly_ id x = x end)
 [%%expect{|
 module G : functor (H : IdF @ static) -> Id
+|}]
+
+(* same as before, but with an [include functor] application *)
+module G (H : IdF) = struct let poly_ id x = x include functor H end
+[%%expect{|
+Line 1, characters 47-64:
+1 | module G (H : IdF) = struct let poly_ id x = x include functor H end
+                                                   ^^^^^^^^^^^^^^^^^
+Error: The functor is "dynamic"
+       but is expected to be "static"
+         because it is a template functor instantiated here.
 |}]
 
 (* [include functor] of a static functor: the enclosing structure is the
@@ -308,6 +318,8 @@ let (r13i, r13f) =
   end in
   (R.i, R.f)
 [%%expect{|
+val r13i : int = 12
+val r13f : float = 12.
 |}]
 
 (* The same with a generative static functor: instantiate, then apply to unit. *)
@@ -322,10 +334,11 @@ let (r13gi, r13gf) =
   end in
   (R.i, R.f)
 [%%expect{|
+val r13gi : int = 13
+val r13gf : float = 13.
 |}]
 
 (* Generative non-template [include functor] should return [@ dynamic] *)
-(* CR jbachurski: fix *)
 let _ =
   let module F (M : sig end) () = struct
     let poly_ id x = x
@@ -335,13 +348,16 @@ let _ =
   end in
   M.id 1
 [%%expect{|
->> Fatal error: slambda eval: unexpected missing value
-Uncaught exception: Misc.Fatal_error
-
+Line 8, characters 2-6:
+8 |   M.id 1
+      ^^^^
+Error: The value "M.id" is "dynamic"
+         because generative functor applications are always dynamic.
+       However, the value "M.id" highlighted is expected to be "static"
+         because it is layout-polymorphic and being instantiated here.
 |}]
 
 (* Generative [include functor] should return [@ dynamic] *)
-(* CR jbachurski: fix *)
 let _ =
   let module F (M : sig end @ static) () = struct
     let poly_ id x = x
@@ -351,9 +367,13 @@ let _ =
   end in
   M.id 1
 [%%expect{|
->> Fatal error: slambda eval: unexpected missing value
-Uncaught exception: Misc.Fatal_error
-
+Line 8, characters 2-6:
+8 |   M.id 1
+      ^^^^
+Error: The value "M.id" is "dynamic"
+         because generative functor applications are always dynamic.
+       However, the value "M.id" highlighted is expected to be "static"
+         because it is layout-polymorphic and being instantiated here.
 |}]
 
 (* Abstraction of a template functor with a consistent functor type. *)
@@ -381,13 +401,25 @@ let _ =
   let module M = M.F (struct let poly_ id x = x end) in
   M.id 1
 [%%expect{|
-Line 8, characters 17-20:
-8 |   let module M = M.F (struct let poly_ id x = x end) in
-                     ^^^
-Error: The functor is "dynamic"
-       but is expected to be "static"
-         because it shares the staticity of a functor parameter
-         which is expected to be "static".
+Lines 4-6, characters 8-5:
+4 | ........struct
+5 |     module F (X : Id) = X
+6 |   end...
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           module F : functor (X : Id) -> sig val poly_ id : 'a -> 'a end
+         end
+       is not included in
+         sig module F : Id @ static -> Id end
+       In module "F":
+       Modules do not match:
+         functor (X : Id) -> sig val poly_ id : 'a -> 'a end
+       is not included in
+         Id @ static -> Id
+       In module "F":
+       Their staticities disagree: one is a template functor
+       and the other is not.
 |}]
 
 (* Abstraction of a template functor with an inconsistent functor type
@@ -419,7 +451,7 @@ let _ =
   let module M = M.F (struct end) in
   M.j
 [%%expect{|
->> Fatal error: slambda eval: unexpected missing value
+>> Fatal error: Includemod.try_modtypes: template functor coercion at lines 4-6, characters 8-5
 Uncaught exception: Misc.Fatal_error
 
 |}]
