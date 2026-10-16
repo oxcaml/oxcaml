@@ -79,7 +79,9 @@ val create :
   t
 
 (** The region scope in which allocations at the current point are candidates
-    for stack allocation, if any. *)
+    for stack allocation, if any. There is none while a region pre-existing in
+    the term (see [enter_foreign_region]) is open, since allocations would go to
+    that region instead. *)
 val region_scope : t -> Code_id_or_name.t option
 
 (** All region scopes enclosing the current point, innermost first. *)
@@ -95,6 +97,35 @@ val exn_continuation : t -> Continuation.t
 (** Enter the handlers of a recursive [Let_cont] whose region scope is named by
     [scope]. *)
 val enter_recursive_handler : t -> scope:Variable.t -> t
+
+(** Note that the given region, defined by a [Begin_region] or
+    [Begin_try_region] primitive pre-existing in the term (as inserted for
+    [local_] allocations or [try] bodies), is open at the current point. *)
+val enter_foreign_region : t -> Variable.t -> t
+
+(** Note that the given region has been closed by an [End_region] or
+    [End_try_region] primitive. *)
+val exit_foreign_region : t -> Variable.t -> t
+
+(** Note that the given try-region, defined by a [Begin_try_region] primitive,
+    is open at the current point. Unlike the regions above, try-regions are not
+    closed on the normal path, so allocations made while they are open belong to
+    the enclosing region and remain candidates. *)
+val enter_try_region : t -> Variable.t -> t
+
+(** Note that the given try-region has been closed by an [End_try_region]
+    primitive. *)
+val exit_try_region : t -> Variable.t -> t
+
+(** Enter the handler of a continuation with the given parameters. *)
+val enter_handler : t -> params:Variable.t list -> t
+
+(** The parameters of the enclosing continuation handlers that were defined
+    while the given try-region was open: closing that try-region frees
+    everything allocated since it was opened, so no such value may be among the
+    arguments passed to these handlers. *)
+val handler_params_freed_by_end_of_try_region :
+  t -> Variable.t -> Variable.t list
 
 (** The parameters of all continuations currently in scope. *)
 val all_continuation_params : t -> Variable.t list

@@ -686,6 +686,39 @@ let rec traverse_let denv acc let_expr : rev_expr =
     Let { bound_pattern; defining_expr = named; parent = Env.parent denv }
   in
   let denv = Env.with_parent denv let_acc in
+  (* Keep track of the regions pre-existing in the term (see
+     [Escape_analysis]). *)
+  let denv =
+    let with_region_var region f =
+      Simple.pattern_match' region
+        ~const:(fun _ -> denv)
+        ~symbol:(fun _ ~coercion:_ -> denv)
+        ~var:(fun region ~coercion:_ -> f region)
+    in
+    match[@ocaml.warning "-fragile-match"] defining_expr, bound_pattern with
+    | Prim (Variadic (Begin_region _, _), _), Singleton bv ->
+      Env.enter_foreign_region denv (Bound_var.var bv)
+    | Prim (Unary (End_region _, region), _), _ ->
+      with_region_var region (Env.exit_foreign_region denv)
+    | Prim (Variadic (Begin_try_region _, _), _), Singleton bv ->
+      (* Try-regions are only closed by the handlers of the corresponding [try],
+         so allocations in its body belong to the enclosing region (see
+         [Lambda_to_flambda]). *)
+      Env.enter_try_region denv (Bound_var.var bv)
+    | Prim (Unary (End_try_region _, region), _), _ ->
+      with_region_var region (fun region ->
+          (* Closing the try-region frees everything allocated since it was
+             opened, including any value passed to the handler closing it (the
+             exception, or mutable variables turned into extra parameters). *)
+          List.iter
+            (fun scope ->
+              List.iter
+                (fun param -> Acc.add_scope_exit acc ~scope ~param)
+                (Env.handler_params_freed_by_end_of_try_region denv region))
+            (Env.enclosing_region_scopes denv);
+          Env.exit_try_region denv region)
+    | _ -> denv
+  in
   traverse denv acc body
 
 and traverse_let_cont denv acc (let_cont : Let_cont.t) : rev_expr =
@@ -785,7 +818,13 @@ and traverse_let_cont_recursive denv acc ~invariant_params ~body handlers =
       (fun (cont_handler, bound_parameters, handler) ->
         let is_exn_handler = Continuation_handler.is_exn_handler cont_handler in
         let is_cold = Continuation_handler.is_cold cont_handler in
-        let expr = traverse (Env.with_parent handler_denv Hole) acc handler in
+        let handler_denv =
+          Env.enter_handler
+            (Env.with_parent handler_denv Hole)
+            ~params:
+              (invariant_params_vars @ Bound_parameters.vars bound_parameters)
+        in
+        let expr = traverse handler_denv acc handler in
         let handler = { bound_parameters; expr; is_exn_handler; is_cold } in
         handler)
       handlers
@@ -804,6 +843,9 @@ and traverse_cont_handler : type a.
   let is_cold = Continuation_handler.is_cold cont_handler in
   Continuation_handler.pattern_match cont_handler
     ~f:(fun bound_parameters ~handler ->
+      let denv =
+        Env.enter_handler denv ~params:(Bound_parameters.vars bound_parameters)
+      in
       let expr = traverse denv acc handler in
       let handler = { bound_parameters; expr; is_exn_handler; is_cold } in
       k handler acc)

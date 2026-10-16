@@ -24,7 +24,10 @@
    - a node with [any_usage] (unknown function, external call, mutation, ...);
 
    - a field of a block that is not itself a candidate (a heap or static block),
-   or a field of a candidate that escapes;
+   or a field of a candidate that escapes ([contained_in]); besides, a value
+   stored in a candidate block is live wherever that block is (see [owner]
+   below), since it can be retrieved from it (and is passed along with the block
+   if the latter is unboxed);
 
    - a parameter of a continuation defined outside the scope (see [scope_exit]):
    for a function, its return or exception values; for a recursive handler, this
@@ -37,12 +40,19 @@
    Besides, nothing is done to close regions on exceptional paths: as for the
    regions introduced by the type checker, the handler catching the exception is
    expected to restore the local stack pointer (handlers of try-with have a
-   region of their own for that purpose), or failing that, the next [End_region]
-   of an enclosing region does. This is however not enough for the region of a
-   loop iteration raising to a handler outside of the loop (whose try-region may
-   have been removed by Simplify as unused), since an enclosing loop could then
-   accumulate unclosed regions; such scopes are marked [unsafe_scope] and get no
-   local allocations (see [Traverse]).
+   try-region of their own for that purpose, which they close on entry: this
+   frees everything allocated in the body of the [try], so values passed to such
+   a handler are treated as leaving the scope, see [Traverse]), or failing that,
+   the next [End_region] of an enclosing region does. This is however not enough
+   for the region of a loop iteration raising to a handler outside of the loop,
+   since an enclosing loop could then accumulate unclosed regions; such scopes
+   are marked [unsafe_scope] and get no local allocations (see [Traverse]).
+
+   Finally, since an allocation always goes to the innermost region open at
+   runtime, no allocation is a candidate while a region pre-existing in the term
+   (as introduced by the type checker for [local_] allocations, and closed
+   before the enclosing function returns) is open: see
+   [Traverse_env.enter_foreign_region].
 
    Values that flow into a callee and come back through its result are tracked
    by the aliases created by the points-to analysis for calls, so no special
@@ -80,10 +90,29 @@ let is_candidate = rel1 "escape_candidate" Cols.[n]
 
 let escapes = rel1 "escapes" Cols.[n]
 
+(* [escapes_anywhere a]: the value escapes for a reason independent of the
+   region scopes (it may be used by unknown code, or stored in a heap block). *)
+let escapes_anywhere = rel1 "escapes_anywhere" Cols.[n]
+
 (* [owner a s]: the value allocated at [a] may be live in region scope [s]: [s]
-   is the scope of the allocation, or the scope of a call site receiving the
-   value as the result of a function returning at mode local. *)
+   is the scope of the allocation, the scope of a call site receiving the value
+   as the result of a function returning at mode local, or a scope owning a
+   candidate block containing the value. *)
 let owner = rel2 "escape_owner" Cols.[n; n]
+
+(* [contained_in a b]: the value allocated at [a] may be stored in a field of
+   the candidate block allocated at [b]. *)
+let contained_in = rel2 "escape_contained_in" Cols.[n; n]
+
+(* [returned a r]: the value allocated at [a], or a candidate block containing
+   it, may be the value of the function result [r]. *)
+let returned = rel2 "escape_returned" Cols.[n; n]
+
+(* Indexes of input tables in the order needed by the rules below. *)
+let is_function_result = rel1 "escape_is_function_result" Cols.[n]
+
+let partial_application_of_code =
+  rel2 "escape_partial_application_of_code" Cols.[n; n]
 
 (* [is_closure_of a c]: the candidate [a] is a closure whose code is [c]. *)
 let is_closure_of = rel2 "escape_closure_of" Cols.[n; n]
@@ -114,9 +143,13 @@ let scope_with_local_call_result x = scope_with_local_call_result_tbl % [x]
 
 let candidate_rules =
   saturate_in_order
-    [ (let$ [a; s] = ["a"; "s"] in
-       [allocated_in ~alloc:a ~scope:s]
-       ==> and_ [is_candidate a; flow a a; owner a s]);
+    [ (let$ [s; r] = ["s"; "r"] in
+       [return_of ~scope:s ~result:r] ==> is_function_result r);
+      (let$ [q; c] = ["q"; "c"] in
+       [partial_application_node ~node:q ~code_id:c]
+       ==> partial_application_of_code c q);
+      (let$ [a; s] = ["a"; "s"] in
+       [allocated_in ~alloc:a ~scope:s] ==> and_ [is_candidate a; flow a a]);
       (let$ [a; wit; c] = ["a"; "wit"; "c"] in
        [ is_candidate a;
          constructor ~base:a !!Field.known_arity_call_witness ~from:wit;
@@ -130,28 +163,53 @@ let no_calling_convention_change_rules =
     [ (let$ [s; r] = ["s"; "r"] in
        [return_of ~scope:s ~result:r] ==> cannot_change_calling_convention s) ]
 
-let escape_rules =
+(* First stratum: where the allocated values flow, and the reasons for escaping
+   that do not depend on region scopes. *)
+let flow_rules =
   Schedule.fixpoint
     [ Schedule.saturate
         [ (let$ [a; x; y] = ["a"; "x"; "y"] in
            [flow a x; rev_alias ~from:x ~to_:y] ==> flow a y);
           (let$ [a; c; q] = ["a"; "c"; "q"] in
-           [is_closure_of a c; partial_application_node ~node:q ~code_id:c]
-           ==> flow a q);
+           [is_closure_of a c; partial_application_of_code c q] ==> flow a q);
+          (let$ [a; x; relation; base] = ["a"; "x"; "relation"; "base"] in
+           [ flow a x;
+             rev_constructor ~from:x relation ~base;
+             when1 Field.is_real_field relation;
+             is_candidate base ]
+           ==> contained_in a base);
           (let$ [a; x] = ["a"; "x"] in
-           [flow a x; any_usage x] ==> escapes a);
+           [flow a x; any_usage x] ==> escapes_anywhere a);
           (let$ [a; x; relation; base] = ["a"; "x"; "relation"; "base"] in
            [ flow a x;
              rev_constructor ~from:x relation ~base;
              when1 Field.is_real_field relation;
              ~~(is_candidate base) ]
-           ==> escapes a);
-          (let$ [a; x; relation; base] = ["a"; "x"; "relation"; "base"] in
-           [ flow a x;
-             rev_constructor ~from:x relation ~base;
-             when1 Field.is_real_field relation;
-             escapes base ]
-           ==> escapes a);
+           ==> escapes_anywhere a);
+          (let$ [a; b] = ["a"; "b"] in
+           [contained_in a b; escapes_anywhere b] ==> escapes_anywhere a) ] ]
+
+(* Second stratum: the constraints of the region scopes, for the values that may
+   still be made local. Values that escape anywhere need no [owner] or
+   [returned] facts, which keeps these joins small. *)
+let scope_rules =
+  Schedule.fixpoint
+    [ Schedule.saturate
+        [ (let$ [a] = ["a"] in
+           [escapes_anywhere a] ==> escapes a);
+          (let$ [a; s] = ["a"; "s"] in
+           [allocated_in ~alloc:a ~scope:s; ~~(escapes_anywhere a)]
+           ==> owner a s);
+          (let$ [a; b; s] = ["a"; "b"; "s"] in
+           [contained_in a b; owner b s; ~~(escapes_anywhere a)] ==> owner a s);
+          (let$ [a; r] = ["a"; "r"] in
+           [flow a r; is_function_result r; ~~(escapes_anywhere a)]
+           ==> returned a r);
+          (let$ [a; b; r] = ["a"; "b"; "r"] in
+           [contained_in a b; returned b r; ~~(escapes_anywhere a)]
+           ==> returned a r);
+          (let$ [a; b] = ["a"; "b"] in
+           [contained_in a b; escapes b] ==> escapes a);
           (let$ [a; s; x] = ["a"; "s"; "x"] in
            [owner a s; flow a x; scope_exit ~scope:s ~param:x] ==> escapes a);
           (let$ [a; s] = ["a"; "s"] in
@@ -199,12 +257,13 @@ let decision_rules =
     [ (let$ [a; s] = ["a"; "s"] in
        [allocated_in ~alloc:a ~scope:s; ~~(escapes a)]
        ==> and_ [local_allocation a; scope_with_local_allocation s]);
-      (* Unboxed allocations no longer exist, so need no local return. *)
+      (* Unboxed allocations no longer exist, so need no local return (but the
+         local allocations they contain may). *)
       (let$ [a; s; r] = ["a"; "s"; "r"] in
        [ owner a s;
          local_allocation a;
          ~~(to_unbox a);
-         flow a r;
+         returned a r;
          return_of ~scope:s ~result:r ]
        ==> local_return s);
       (let$ [x; wit; c] = ["x"; "wit"; "c"] in
@@ -250,5 +309,6 @@ let perform_analysis db ~stats =
         then db
         else run db no_calling_convention_change_rules
       in
-      let db = Schedule.run ~stats escape_rules db in
+      let db = Schedule.run ~stats flow_rules db in
+      let db = Schedule.run ~stats scope_rules db in
       run db decision_rules)
