@@ -2027,6 +2027,9 @@ let rec pattern_match_tuple pat values =
         pattern_match_single pat paths)
       pats values
     |> conjuncts_pattern_match
+  | Tpat_any ->
+    (* The tuple is not used. *)
+    pattern_match_single pat (Paths.fresh ())
   | _ ->
     (* Mark all values in the tuple as used, because we are binding the tuple
        to a variable *)
