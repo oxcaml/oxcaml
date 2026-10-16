@@ -2,6 +2,12 @@
    expect;
 *)
 
+(* This test uses plain atomic field accesses on purpose, so it disables
+   the warnings for them (obscured-atomic-read/write). *)
+[@@@warning "-222-223"]
+[%%expect{|
+|}]
+
 type 'a atomic = { mutable contents : 'a [@atomic] }
 
 [%%expect{|

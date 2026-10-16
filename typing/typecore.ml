@@ -8165,6 +8165,8 @@ and type_expect_
         solve_Pexp_field ~label_usage:Env.Projection loc env sexp srecord Legacy
           lid
       in
+      if Types.is_atomic label.lbl_mut then
+        Location.prerr_warning loc Warnings.Obscured_atomic_read;
       check_project_mutability ~loc:record.exp_loc ~env
         (Record_field label.lbl_name) label.lbl_mut mode;
       let is_contained_by : Mode.Hint.is_contained_by =
@@ -8268,6 +8270,8 @@ and type_expect_
   | Pexp_setfield(srecord, lid, snewval) ->
       let (record, _, rmode, label, expected_type, ambiguity) =
         type_label_access Legacy env srecord Env.Mutation lid in
+      if Types.is_atomic label.lbl_mut then
+        Location.prerr_warning loc Warnings.Obscured_atomic_write;
       let ty_record =
         if expected_type = None
         then

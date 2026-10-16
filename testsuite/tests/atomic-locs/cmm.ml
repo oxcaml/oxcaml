@@ -12,6 +12,10 @@ let standard_atomic_get (r : 'a Atomic.t) v =
 
 (* atomic record fields *)
 
+(* This test uses plain atomic field accesses on purpose, so it disables
+   the warnings for them (obscured-atomic-read/write). *)
+[@@@warning "-222-223"]
+
 type 'a atomic = { filler : unit; mutable x : 'a [@atomic] }
 
 let get (r : 'a atomic) : 'a =
