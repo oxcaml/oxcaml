@@ -68,6 +68,9 @@ type attributes = attribute list
 type value = Value_pattern
 type computation = Computation_pattern
 
+type index = Index_access
+type deref = Deref_access
+
 type _ pattern_category =
 | Value : value pattern_category
 | Computation : computation pattern_category
@@ -381,6 +384,14 @@ and 'k pattern_desc =
       value pattern_desc
         (** addr_ P        (flag = Mutable)
             addr_imm_ P    (flag = Immutable) *)
+  | Tpat_deref :
+      Types.mutability * deref block_access * deref unboxed_access list
+      * value general_pattern ->
+      value pattern_desc
+        (** deref_ P
+
+            Invariants: the pattern is a variable or a wildcard, and the access
+            descriptors must correspond to the surrounding patterns. *)
   | Tpat_lazy : value general_pattern -> value pattern_desc
         (** lazy P *)
   (* computation patterns *)
@@ -703,7 +714,7 @@ and expression_desc =
     (** [locality_mode] translates to the [modify_mode] of the record *)
   | Texp_array of
       Types.mutability * Jkind.Sort.t * expression list * locality_mode_r
-  | Texp_idx of block_access * unboxed_access list
+  | Texp_idx of index block_access * index unboxed_access list
   | Texp_list_comprehension of comprehension
   (* CR layouts-scannable: The sort here is no longer used. Instead, a layout is
      computed, since it has scannable axes. This should either be removed
@@ -863,16 +874,32 @@ and ident_kind =
           primitive's parameters, for when the primitive is closed over rather
           than directly applied. *)
 
-and block_access =
-  | Baccess_field of
+(* The start of a path to a position in a block, as used by block indices and
+   dereference patterns. A path starts with a boxed value, an index (when
+   constructing a block index expression), or an address (when constructing a
+   dereference pattern). *)
+and 'k block_access =
+  | Baccess_field :
       Longident.t loc * Data_types.label_description
       * Types.record_representation
-  | Baccess_block of access_flag * expression
+      -> 'k block_access
+  | Baccess_block : access_flag * expression -> index block_access
+  | Baccess_tuple_element : int -> deref block_access
+  | Baccess_address : Jkind.sort -> deref block_access
+      (** The sort of the value at the address *)
 
-and unboxed_access =
-  | Uaccess_unboxed_field of
+(* Unboxed accesses that might follow a block access. Some are only supported by
+   deref patterns, not block indices. *)
+and 'k unboxed_access =
+  | Uaccess_unboxed_field :
       Longident.t loc * Data_types.unboxed_label_description
       * Types.record_unboxed_product_representation
+      -> 'k unboxed_access
+  | Uaccess_unboxed_tuple_element : int -> deref unboxed_access
+  | Uaccess_unboxed_record_field :
+      Longident.t loc * Data_types.label_description
+      * Types.record_representation
+      -> deref unboxed_access
 
 and comprehension =
   {
