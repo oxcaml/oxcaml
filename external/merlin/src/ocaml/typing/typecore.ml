@@ -9800,23 +9800,26 @@ and type_newtype
     let scope = create_scope () in
     let (id, new_env) = Env.enter_type ~scope name decl env in
 
-    let result, exp_type = type_body new_env in
+    let result, exp_type =
+      with_local_level_generalize_structure
+        ~before_generalize:(fun (_, exp_type) -> generalize_structure exp_type)
+        (fun () -> type_body new_env)
+    in
     (* Replace every instance of this type constructor in the resulting
        type. *)
-    let seen = Hashtbl.create 8 in
-    let rec replace t =
-      if Hashtbl.mem seen (get_id t) then ()
-      else begin
-        Hashtbl.add seen (get_id t) ();
-        match get_desc t with
-        | Tconstr (Path.Pident id', _, _) when id == id' -> link_type t ty
-        | _ -> Btype.iter_type_expr replace (Fun.const ()) t
-      end
-    in
-    let ety = Subst.type_expr Subst.identity exp_type in
-    replace ety;
+    let exp_type = instance exp_type in
+    let current = get_current_level () in
+    with_type_mark (fun mark ->
+        let rec replace ty' =
+          if try_mark_node mark ty' && get_level ty' = current
+          then
+            match get_desc ty' with
+            | Tconstr (Pident id', _, _) when id == id' -> link_type ty' ty
+            | _ -> iter_type_expr replace (Fun.const ()) ty'
+        in
+        replace exp_type);
     let uid = decl.type_uid in
-    (result, ety, id, uid)
+    (result, exp_type, id, uid)
   end
    ~before_generalize:(fun (_,ety,_,_) -> enforce_current_level env ety)
 
