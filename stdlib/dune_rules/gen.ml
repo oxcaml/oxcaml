@@ -65,14 +65,11 @@ let rec trans_closure ~dst ~src s =
      StrTbl.add dst s deps;
      deps
 
-(* Flags for compiling the modules of the stdlib, whichever the target. *)
 let stdlib_flags =
   "-nopervasives -directory stdlib -strict-sequence -g -absname \
    -extension runtime_metaprogramming -nostdlib -safe-string -strict-formats \
    -no-alias-deps -w +a-4-9-40-41-42-44-45-48-66-67-70 -w -221 -principal"
 
-(* stdlib.ml is preprocessed to expand its module aliases. [awk_dir] is the
-   location of stdlib/ relative to the directory of the rules. *)
 let pp_flags ~awk_dir ~target =
   if target = "stdlib"
   then sprintf " -pp \"awk -f %%{dep:%s/expand_module_aliases.awk}\"" awk_dir
@@ -128,10 +125,6 @@ let setting s =
   try StrTbl.find settings_table s
   with Not_found -> failwith ("Missing build_setting " ^ s)
 
-(* Parse the output of [ocamldep -one-line -as-map] on the stdlib sources
-   (see stdlib_module_deps.txt in dune) into a table from the compiled file
-   (with the stdlib__ prefix added) to the source basename and its immediate
-   dependencies. *)
 let module_deps_table filename =
   parse_table filename
   |> StrTbl.to_seq
@@ -149,7 +142,6 @@ let module_deps_table filename =
     tgt_file, (basename, StrSet.of_list deps))
   |> StrTbl.of_seq
 
-(* Iterate over the table above, with the transitive dependencies. *)
 let iter_module_deps table f =
   let trans_table = StrTbl.create 10 in
   table |> StrTbl.iter (fun tgt_file (base, _imm_deps) ->
@@ -186,7 +178,7 @@ let write_stdlib_dune ppf =
     ~action;
   copy_files ~ppf "../../runtime/lib{asm,caml}run*.{a,so}";
   copy_files ~ppf "../../Makefile.config";
-  copy_files ~ppf "../dune_rules/ld.conf"; 
+  copy_files ~ppf "../dune_rules/ld.conf";
   fprintf ppf "%s\n" {|
   (rule (target runtime-launch-info) (action (copy ../runtime.info %{target})))
   (alias
@@ -202,16 +194,6 @@ let write_stdlib_dune ppf =
        stdlib/META dynlink/dynlink.cmxa))
   |}
 
-(* The stdlib for [ocamlopt -target js_of_ocaml] is built in
-   external/ast-dependent-libs/stdlib-jsir (see the dune file there, which also
-   installs the result), where js_of_ocaml itself is built, by the installed
-   compiler, from the sources that it ships in its standard library directory
-   (which include the sys.ml that configure generated). The two generators
-   below are used there: [stdlib-jsir-sources] copies these sources into src/,
-   and [stdlib-jsir] generates, for build/, the counterparts of the native rules
-   above: same modules and flags, but compiled against the installed .cmi
-   files into .cmjx/.cmjo files (the counterparts of .cmx/.o), and archived
-   into stdlib.cmjxa/stdlib.cmja. *)
 let write_stdlib_jsir_sources_dune ppf =
   setting "stdlib_modules" @ ["std_exit"] |> List.iter (fun m ->
     ["ml"; "mli"] |> List.iter (fun ext ->
@@ -231,7 +213,6 @@ let write_stdlib_jsir_dune ppf =
   let installed file = sprintf "%%{ocaml_where}/%s" file in
   let table = module_deps_table Sys.argv.(3) in
   iter_module_deps table (fun ~tgt_file ~base ~deps ->
-    (* .cmi files are not rebuilt, and .cmo files are not needed. *)
     if Filename.extension tgt_file = ".cmx" then begin
       let target = get_target base in
       let src = sprintf "%s/%s.ml" src_dir base in
@@ -365,7 +346,7 @@ let write_runtime_dune ppf =
       \ (action (progn (run rm -f %%{target}) (run %s))))\n"
       target (String.concat " " objs) (String.concat " " cmd)
   in
-  
+
   [`Byte; `Native] |> List.iter (fun mode ->
     [`Normal; `Debug; `PIC] |> List.iter (fun variant ->
       sources ~variant ~mode |> List.iter (compile_object ~variant ~mode));
@@ -403,7 +384,7 @@ let write_runtime_dune ppf =
   fprintf ppf "%s\n" {|
 (rule
   (targets build_config.h)
-  (deps sak.c 
+  (deps sak.c
     (glob_files ../Makefile.*)
     (glob_files caml/*.h)
      ../.depend.menhir ../config.status ../stdlib/StdlibModules)

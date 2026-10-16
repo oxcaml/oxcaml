@@ -7,9 +7,7 @@
 (vendored_dirs deps ocaml-compiler-libs ppxlib ppxlib_jane)
 
 ; smoke is a separate project, built against the installed compiler package
-; (see mkJsooSmokeTest in default.nix). stdlib points at the compiler's
-; stdlib directory, for the few files of the stdlib-jsir build that the
-; installed compiler does not ship.
+; (see mkJsooSmokeTest in default.nix).
 (data_only_dirs smoke stdlib)
 
 ; Each alias depends on the .install files of its packages, which builds

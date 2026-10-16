@@ -1,6 +1,6 @@
 ; Uses only what the compiler package ships: the js_of_ocaml and
 ; wasm_of_ocaml executables, the js_of_ocaml library and its PPX, and the
-; standard library for ocamlopt -target js_of_ocaml.
+; standard library for JSIR.
 
 (executable
  (name main)

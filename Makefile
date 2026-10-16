@@ -369,9 +369,6 @@ JSOO_PACKAGES = $(PPXLIB_PACKAGES) gen sedlex cmdliner menhirLib menhirSdk \
   yojson js_of_ocaml-compiler wasm_of_ocaml-compiler js_of_ocaml-ppx \
   js_of_ocaml-runtime js_of_ocaml
 
-# The standard library for ocamlopt -target js_of_ocaml is installed into
-# lib/ocaml, next to the native one, where ocamlopt looks for it; that is its
-# only section, as its META and dune-package would describe no library.
 stdlib_jsir_install = \
   $(call ast_dependent_libs_install,--sections=lib_root stdlib-jsir)
 
@@ -392,8 +389,7 @@ jsoo-install: jsoo-build
 
 # What the compiler package ships: the js_of_ocaml and wasm_of_ocaml
 # executables, the libraries needed to write and preprocess js_of_ocaml
-# code, and the standard library for ocamlopt -target js_of_ocaml. The
-# compiler library and its dependencies (yojson, sedlex, ...) stay out.
+# code, and the standard library for JSIR.
 SHIPPED_BIN_PACKAGES = js_of_ocaml-compiler wasm_of_ocaml-compiler
 SHIPPED_LIB_PACKAGES = $(PPXLIB_PACKAGES) js_of_ocaml-runtime js_of_ocaml \
   js_of_ocaml-ppx
