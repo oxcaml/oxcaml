@@ -40,8 +40,26 @@ function caml_register_symbol(compilation_unit, symbol, value) {
 }
 
 //Provides: caml_get_symbol (const,const)
-//Requires: caml_symbols
+//Requires: caml_symbols, caml_invalid_argument
 //If: oxcaml
 function caml_get_symbol(compilation_unit, symbol) {
-  return caml_symbols[compilation_unit][symbol];
+  var symbols = caml_symbols[compilation_unit];
+  if (symbols === undefined) {
+    caml_invalid_argument(
+      "caml_get_symbol: compilation unit " +
+        compilation_unit +
+        " has not been initialised yet (looking up " +
+        symbol +
+        ")",
+    );
+  }
+  if (!Object.prototype.hasOwnProperty.call(symbols, symbol)) {
+    caml_invalid_argument(
+      "caml_get_symbol: compilation unit " +
+        compilation_unit +
+        " does not define symbol " +
+        symbol,
+    );
+  }
+  return symbols[symbol];
 }
