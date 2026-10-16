@@ -15,7 +15,7 @@
 
 (** Copy of Ast_helper from OCaml 4.14 with docstring related stuff removed *)
 
-open Astlib.Ast_502
+open Astlib.Ast_500
 open Asttypes
 open Parsetree
 
@@ -116,6 +116,9 @@ module Pat : sig
   val record :
     ?loc:loc -> ?attrs:attrs -> (lid * pattern) list -> closed_flag -> pattern
 
+  val record_unboxed_product :
+    ?loc:loc -> ?attrs:attrs -> (lid * pattern) list -> closed_flag -> pattern
+
   val array : ?loc:loc -> ?attrs:attrs -> pattern list -> pattern
   val or_ : ?loc:loc -> ?attrs:attrs -> pattern -> pattern -> pattern
   val constraint_ : ?loc:loc -> ?attrs:attrs -> pattern -> core_type -> pattern
@@ -150,9 +153,17 @@ module Exp : sig
     pattern ->
     expression ->
     expression
+  [@@alert
+    prefer_jane_syntax
+      "Use [Ppxlib_jane.Ast_builder] for constructing functions ASTs that are handed to \
+       the ocaml compiler, e.g. in ppxes"]
 
   val function_ :
     ?loc:loc -> ?attrs:attrs -> ?loc_location:loc -> case list -> expression
+  [@@alert
+     prefer_jane_syntax
+       "Use [Ppxlib_jane.Ast_builder] for constructing function ASTs that are handed to \
+        the ocaml compiler, e.g. in ppxes"]
 
   val apply :
     ?loc:loc ->
@@ -163,10 +174,15 @@ module Exp : sig
 
   val match_ : ?loc:loc -> ?attrs:attrs -> expression -> case list -> expression
   val try_ : ?loc:loc -> ?attrs:attrs -> expression -> case list -> expression
+
   val tuple : ?loc:loc -> ?attrs:attrs -> expression list -> expression
 
   val construct :
     ?loc:loc -> ?attrs:attrs -> lid -> expression option -> expression
+
+  val unboxed_unit : ?loc:loc -> ?attrs:attrs -> unit -> expression
+
+  val unboxed_bool : ?loc:loc -> ?attrs:attrs -> bool -> expression
 
   val variant :
     ?loc:loc -> ?attrs:attrs -> label -> expression option -> expression
@@ -178,7 +194,16 @@ module Exp : sig
     expression option ->
     expression
 
+  val record_unboxed_product :
+    ?loc:loc ->
+    ?attrs:attrs ->
+    (lid * expression) list ->
+    expression option ->
+    expression
+
   val field : ?loc:loc -> ?attrs:attrs -> expression -> lid -> expression
+
+  val unboxed_field : ?loc:loc -> ?attrs:attrs -> expression -> lid -> expression
 
   val setfield :
     ?loc:loc -> ?attrs:attrs -> expression -> lid -> expression -> expression
@@ -265,8 +290,16 @@ module Exp : sig
 
   val extension : ?loc:loc -> ?attrs:attrs -> extension -> expression
   val unreachable : ?loc:loc -> ?attrs:attrs -> unit -> expression
+  val stack : ?loc:loc -> ?attrs:attrs -> expression -> expression
+
   val case : pattern -> ?guard:expression -> expression -> case
   val binding_op : str -> pattern -> expression -> loc -> binding_op
+
+  val overwrite : ?loc:loc -> ?attrs:attrs -> expression -> expression -> expression
+  val quote : ?loc:loc -> ?attrs:attrs -> expression -> expression
+  val splice : ?loc:loc -> ?attrs:attrs -> expression -> expression
+  val hole : ?loc:loc -> ?attrs:attrs -> unit -> expression
+  val borrow : ?loc:loc -> ?attrs:attrs -> expression -> expression
 end
 
 (** Value declarations *)
@@ -352,10 +385,10 @@ module Mty : sig
   val attr : module_type -> attribute -> module_type
   val ident : ?loc:loc -> ?attrs:attrs -> lid -> module_type
   val alias : ?loc:loc -> ?attrs:attrs -> lid -> module_type
-  val signature : ?loc:loc -> ?attrs:attrs -> signature -> module_type
+  val signature : ?loc:loc -> ?attrs:attrs -> signature_item list -> module_type
 
   val functor_ :
-    ?loc:loc -> ?attrs:attrs -> functor_parameter -> module_type -> module_type
+    ?loc:loc -> ?attrs:attrs -> functor_parameter -> module_type -> modes -> module_type
 
   val with_ :
     ?loc:loc ->

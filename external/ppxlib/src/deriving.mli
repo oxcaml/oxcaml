@@ -110,12 +110,12 @@ val add :
   ?str_exception:(structure, type_exception) Generator.t ->
   ?str_module_type_decl:(structure, module_type_declaration) Generator.t ->
   ?str_module_binding:(structure, module_binding) Generator.t ->
-  ?sig_type_decl:(signature, rec_flag * type_declaration list) Generator.t ->
-  ?sig_class_type_decl:(signature, class_type_declaration list) Generator.t ->
-  ?sig_type_ext:(signature, type_extension) Generator.t ->
-  ?sig_exception:(signature, type_exception) Generator.t ->
-  ?sig_module_type_decl:(signature, module_type_declaration) Generator.t ->
-  ?sig_module_decl:(signature, module_declaration) Generator.t ->
+  ?sig_type_decl:(signature_item list, rec_flag * type_declaration list) Generator.t ->
+  ?sig_class_type_decl:(signature_item list, class_type_declaration list) Generator.t ->
+  ?sig_type_ext:(signature_item list, type_extension) Generator.t ->
+  ?sig_exception:(signature_item list, type_exception) Generator.t ->
+  ?sig_module_type_decl:(signature_item list, module_type_declaration) Generator.t ->
+  ?sig_module_decl:(signature_item list, module_declaration) Generator.t ->
   ?extension:(loc:Location.t -> path:string -> core_type -> expression) ->
   string ->
   t
