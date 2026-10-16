@@ -1057,6 +1057,8 @@ module Projection : sig
     | Array_index of int
     | Address_load
     | Memory_address (* this is rendered as clubsuit in the ICFP'24 paper *)
+    | Alloc
+  (* a child of [Memory_address] that guarantees the block is still allocated *)
 
   module Map : Map.S with type key = t
 
@@ -1075,6 +1077,7 @@ end = struct
       | Array_index of int
       | Address_load
       | Memory_address
+      | Alloc
 
     let compare t1 t2 =
       match t1, t2 with
@@ -1088,43 +1091,53 @@ end = struct
       | Array_index i, Array_index j -> Int.compare i j
       | Address_load, Address_load -> 0
       | Memory_address, Memory_address -> 0
+      | Alloc, Alloc -> 0
       | ( Tuple_field _,
           ( Record_field _ | Record_unboxed_product_field _ | Construct_field _
-          | Variant_field _ | Array_index _ | Address_load | Memory_address ) )
-        ->
+          | Variant_field _ | Array_index _ | Address_load | Memory_address
+          | Alloc ) ) ->
         -1
       | ( ( Record_field _ | Record_unboxed_product_field _ | Construct_field _
-          | Variant_field _ | Array_index _ | Address_load | Memory_address ),
+          | Variant_field _ | Array_index _ | Address_load | Memory_address
+          | Alloc ),
           Tuple_field _ ) ->
         1
       | ( Record_field _,
           ( Record_unboxed_product_field _ | Construct_field _ | Variant_field _
-          | Array_index _ | Address_load | Memory_address ) ) ->
+          | Array_index _ | Address_load | Memory_address | Alloc ) ) ->
         -1
       | ( ( Record_unboxed_product_field _ | Construct_field _ | Variant_field _
-          | Array_index _ | Address_load | Memory_address ),
+          | Array_index _ | Address_load | Memory_address | Alloc ),
           Record_field _ ) ->
         1
       | ( Record_unboxed_product_field _,
           ( Construct_field _ | Variant_field _ | Array_index _ | Address_load
-          | Memory_address ) ) ->
+          | Memory_address | Alloc ) ) ->
         -1
       | ( ( Construct_field _ | Variant_field _ | Array_index _ | Address_load
-          | Memory_address ),
+          | Memory_address | Alloc ),
           Record_unboxed_product_field _ ) ->
         1
       | ( Construct_field _,
-          (Variant_field _ | Array_index _ | Address_load | Memory_address) ) ->
+          ( Variant_field _ | Array_index _ | Address_load | Memory_address
+          | Alloc ) ) ->
         -1
-      | ( (Variant_field _ | Array_index _ | Address_load | Memory_address),
+      | ( ( Variant_field _ | Array_index _ | Address_load | Memory_address
+          | Alloc ),
           Construct_field _ ) ->
         1
-      | Variant_field _, (Array_index _ | Address_load | Memory_address) -> -1
-      | (Array_index _ | Address_load | Memory_address), Variant_field _ -> 1
-      | Array_index _, (Address_load | Memory_address) -> -1
-      | (Address_load | Memory_address), Array_index _ -> 1
-      | Address_load, Memory_address -> -1
-      | Memory_address, Address_load -> 1
+      | Variant_field _, (Array_index _ | Address_load | Memory_address | Alloc)
+        ->
+        -1
+      | (Array_index _ | Address_load | Memory_address | Alloc), Variant_field _
+        ->
+        1
+      | Array_index _, (Address_load | Memory_address | Alloc) -> -1
+      | (Address_load | Memory_address | Alloc), Array_index _ -> 1
+      | Address_load, (Memory_address | Alloc) -> -1
+      | (Memory_address | Alloc), Address_load -> 1
+      | Memory_address, Alloc -> -1
+      | Alloc, Memory_address -> 1
   end
 
   include T
@@ -1142,6 +1155,7 @@ end = struct
     | Array_index n -> fprintf ppf "Array_index(%d)" n
     | Address_load -> fprintf ppf "Address_load"
     | Memory_address -> fprintf ppf "Memory_address"
+    | Alloc -> fprintf ppf "Alloc"
 
   let print_map print_value ppf map =
     let module M = Print_utils.Map (Map) in
@@ -1659,14 +1673,20 @@ module Paths : sig
   (** [memory_address t] is [child Projection.Memory_address t]. *)
   val memory_address : t -> t
 
+  (** [field_memory_address proj t] is the part of the memory of [t] that stores
+      the field [proj]. *)
+  val field_memory_address : Projection.t -> t -> t
+
   val mark : Usage.t -> Learned_tags.t -> Overwrites.t -> t -> UF.t
 
   val fresh : unit -> t
 
   val choose : t -> t -> t
 
+  (** Marks [memory_address t] (or [field_memory_address field t]) as implicitly
+      borrowed *)
   val mark_implicit_borrow_memory_address :
-    Occurrence.t -> Maybe_aliased.access -> t -> UF.t
+    ?field:Projection.t -> Occurrence.t -> Maybe_aliased.access -> t -> UF.t
 
   val mark_aliased : Occurrence.t -> Aliased.reason -> t -> UF.t
 
@@ -1724,15 +1744,22 @@ end = struct
 
   let memory_address t = child Projection.Memory_address t
 
+  let field_memory_address proj t = child proj (memory_address t)
+
   let mark usage learned overwrites t =
     UF.chooses (List.map (UF.singleton usage learned overwrites) t)
 
   let fresh () = [UF.Path.fresh_root ()]
 
-  let mark_implicit_borrow_memory_address occ access paths =
+  let mark_implicit_borrow_memory_address ?field occ access paths =
+    let memory =
+      match field with
+      | None -> memory_address paths
+      | Some field -> field_memory_address field paths
+    in
     mark
       (Maybe_aliased (Maybe_aliased.singleton occ access))
-      Learned_tags.empty Overwrites.empty (memory_address paths)
+      Learned_tags.empty Overwrites.empty memory
 
   let mark_aliased occ reason paths =
     mark (Usage.aliased occ reason) Learned_tags.empty Overwrites.empty paths
@@ -1803,9 +1830,10 @@ module Value : sig
   (** Mark the value's memory address as aliased_or_unique *)
   val mark_consumed_memory_address : t -> UF.t
 
-  (** Mark the memory_address of the value as implicitly borrowed
-      (borrow_or_aliased). *)
-  val mark_implicit_borrow_memory_address : Maybe_aliased.access -> t -> UF.t
+  (** Mark the memory_address of the value (or only the part of it storing
+      [field]) as implicitly borrowed (borrow_or_aliased). *)
+  val mark_implicit_borrow_memory_address :
+    ?field:Projection.t -> Maybe_aliased.access -> t -> UF.t
 
   val mark_aliased : reason:boundary_reason -> t -> UF.t
 
@@ -1848,10 +1876,10 @@ end = struct
       let paths = Paths.record_unboxed_product_field gf s paths in
       Existing { paths; occ; unique_use }
 
-  let mark_implicit_borrow_memory_address access = function
+  let mark_implicit_borrow_memory_address ?field access = function
     | Fresh -> UF.unused
     | Existing { paths; occ; _ } ->
-      Paths.mark_implicit_borrow_memory_address occ access paths
+      Paths.mark_implicit_borrow_memory_address ?field occ access paths
 
   let mark_maybe_unique = function
     | Fresh -> UF.unused
@@ -2003,6 +2031,18 @@ let conjuncts_pattern_match l =
   let exts, ufs = List.split l in
   Ienv.Extension.conjuncts exts, UF.pars ufs
 
+(* The memory of a block is tracked per field: reading or writing a field only
+   borrows the part of the memory storing that field,
+   [Paths.field_memory_address (Record_field l) paths]. Operations on the block
+   as a whole (e.g. overwriting it or reading its tag) use the whole memory,
+   [Paths.memory_address paths], which is an ancestor of all fields' parts. *)
+let field_memory_projection (l : label_description) : Projection.t option =
+  match l.lbl_repres with
+  | Record_boxed | Record_float | Record_ufloat | Record_mixed _
+  | Record_undetermined | Record_variable _ ->
+    Some (Record_field l.lbl_name)
+  | Record_unboxed | Record_inlined _ | Record_dummy _ -> None
+
 let rec pattern_match_tuple pat values =
   match pat.pat_desc with
   | Tpat_or (pat0, pat1, _) ->
@@ -2062,9 +2102,23 @@ and pattern_match_barrier pat paths : UF.t =
     ignore (Unique_barrier.resolve pat.pat_unique_barrier);
     UF.unused
   in
-  let borrow_memory_address () =
-    Paths.mark_implicit_borrow_memory_address occ (Read pat.pat_unique_barrier)
-      paths
+  let borrow_memory_address ?field () =
+    Paths.mark_implicit_borrow_memory_address ?field occ
+      (Read pat.pat_unique_barrier) paths
+  in
+  (* Borrows the parts of the memory storing [fields], which are the fields
+     whose sub-patterns are not wildcards. The loads of other fields are
+     dropped (see [Matching.get_expr_args_record]). If no field is inspected,
+     we conservatively borrow the whole memory, as before memory was tracked
+     per field. *)
+  let borrow_fields_memory_address fields =
+    match fields with
+    | [] -> borrow_memory_address ()
+    | _ :: _ ->
+      UF.pars (List.map (fun field -> borrow_memory_address ~field ()) fields)
+  in
+  let is_wildcard (p : pattern) =
+    match p.pat_desc with Tpat_any -> true | _ -> false
   in
   let consume_memory_address reason =
     ignore (Unique_barrier.resolve pat.pat_unique_barrier);
@@ -2085,7 +2139,17 @@ and pattern_match_barrier pat paths : UF.t =
     consume_memory_address Constant
   | Tpat_construct _ -> borrow_memory_address ()
   | Tpat_variant _ -> borrow_memory_address ()
-  | Tpat_record _ -> borrow_memory_address ()
+  | Tpat_record (pats, _, _) ->
+    let fields =
+      List.map (fun (_, l, p) -> field_memory_projection l, p) pats
+    in
+    if List.for_all (fun (field, _) -> Option.is_some field) fields
+    then
+      borrow_fields_memory_address
+        (List.filter_map
+           (fun (field, p) -> if is_wildcard p then None else field)
+           fields)
+    else borrow_memory_address ()
   | Tpat_array _ ->
     (* This is necessary since we do not yet guarantee that
        the reads of arrays in the pattern-matching code
@@ -2098,7 +2162,13 @@ and pattern_match_barrier pat paths : UF.t =
        forcing a lazy expression is like calling a nullary-function *)
     consume_memory_address Lazy
   | Tpat_addr _ -> borrow_memory_address ()
-  | Tpat_tuple _ -> borrow_memory_address ()
+  | Tpat_tuple pats ->
+    borrow_fields_memory_address
+      (List.concat
+         (List.mapi
+            (fun i (_, p) ->
+              if is_wildcard p then [] else [Projection.Tuple_field i])
+            pats))
   | Tpat_unboxed_unit ->
     (* unboxed units are not allocations *)
     no_memory_access ()
@@ -2501,21 +2571,34 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
       | Some (exp, _, _, unique_barrier) ->
         let value, uf_exp = check_uniqueness_exp_as_value ienv exp in
         Unique_barrier.enable unique_barrier;
-        let uf_read =
-          Value.mark_implicit_borrow_memory_address (Read unique_barrier) value
+        (* The block must still be allocated, even if no field is kept: large
+           records are updated by copying the whole block. *)
+        let uf_alloc =
+          Value.mark_implicit_borrow_memory_address ~field:Projection.Alloc
+            (Read unique_barrier) value
         in
-        value, UF.par uf_exp uf_read
+        value, UF.par uf_exp uf_alloc
     in
     let uf_fields =
       Array.map
         (fun field ->
           match field with
           | l, _, Kept (_, _, unique_use) ->
-            let value =
+            (* Only the kept fields are read, borrowing the part of the memory
+               storing them. *)
+            let uf_read =
+              match extended_expression with
+              | None -> UF.unused
+              | Some (_, _, _, unique_barrier) ->
+                Value.mark_implicit_borrow_memory_address
+                  ?field:(field_memory_projection l)
+                  (Read unique_barrier) value
+            in
+            let field_value =
               Value.implicit_record_field l.lbl_modalities l.lbl_name value
                 unique_use
             in
-            Value.mark_maybe_unique value
+            UF.par uf_read (Value.mark_maybe_unique field_value)
           | l, _, Overridden (_, e) ->
             check_uniqueness_exp
               ~overwrite:
@@ -2551,7 +2634,7 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
   | Texp_unboxed_field _ as exp_desc ->
     let value, uf = check_uniqueness_exp_desc_as_value ienv ~loc exp_desc in
     UF.seq uf (Value.mark_maybe_unique value)
-  | Texp_setfield { record = rcd; newval = arg; _ } ->
+  | Texp_setfield { record = rcd; label; newval = arg; _ } ->
     (* Ideally, we should treat this as creating a new alias of [arg], and
        further usages of the field should be directed at the alias, instead of
        the old value. However, this would require some big changes to the
@@ -2572,10 +2655,16 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
        on [r.x] can be skipped. *)
     let value, uf_rcd = check_uniqueness_exp_as_value ienv rcd in
     let uf_arg = check_uniqueness_exp ~overwrite:None ienv arg in
-    let uf_write = Value.mark_implicit_borrow_memory_address Write value in
+    let uf_write =
+      Value.mark_implicit_borrow_memory_address
+        ?field:(field_memory_projection label)
+        Write value
+    in
     let uf_tag = Value.invalidate_tag value in
     UF.pars [uf_rcd; uf_arg; uf_write; uf_tag]
   | Texp_atomic_loc { record = rcd; _ } ->
+    (* An atomic location points to the whole block, so it uses all of its
+       memory *)
     let value, uf_rcd = check_uniqueness_exp_as_value ienv rcd in
     let uf = Value.mark_consumed_memory_address value in
     UF.seq uf_rcd uf
@@ -2750,11 +2839,14 @@ and check_uniqueness_exp_desc_as_value ~borrows ienv ~loc : _ -> Value.t * UF.t
       Unique_barrier.enable unique_barrier;
       Value.fresh, uf
     | Some paths ->
-      (* accessing the field meaning borrowing the parent record's mem
-         block. Note that the field itself is not borrowed or used *)
+      (* accessing the field meaning borrowing the part of the parent
+         record's mem block storing the field. Note that the field itself is
+         not borrowed or used *)
       Unique_barrier.enable unique_barrier;
       let uf_read =
-        Value.mark_implicit_borrow_memory_address (Read unique_barrier) value
+        Value.mark_implicit_borrow_memory_address
+          ?field:(field_memory_projection l)
+          (Read unique_barrier) value
       in
       let uf_boxing, value =
         let occ = Occurrence.mk loc in
@@ -3024,11 +3116,38 @@ let report_multi_use inner first_is_of_second =
         (* there comes first in source, so show occ (later) as main error *)
         there_occ, there_usage, occ, here_usage, "is also being", true
   in
+  (* Reads and writes of (parts of) the memory of a value are reported as
+     accesses to the value itself, so the relation between that memory and the
+     value is not mentioned. [descendant_is_there] says whether the usage
+     further down the tree is [there]. *)
+  let is_own_memory ~descendant_is_there (projs : Projection.t list) =
+    let descendant_is_access =
+      descendant_is_there
+      &&
+      match there with
+      | Usage.Maybe_aliased _ -> true
+      | Usage.Aliased t -> (
+        match Aliased.reason t with
+        | Lifted _ -> true
+        | Forced | Lazy | Array | Constant | Lifted_borrowed | In_borrowing ->
+          false)
+      | _ -> false
+    in
+    match projs with
+    | [Memory_address] -> true
+    | [(Record_field _ | Tuple_field _ | Alloc)]
+    | [(Record_field _ | Tuple_field _ | Alloc); Memory_address] ->
+      descendant_is_access
+    | _ -> false
+  in
   let first_is_of_second =
     match first_is_of_second with
-    | Self
-    | Ancestor [Projection.Memory_address]
-    | Descendant [Projection.Memory_address] ->
+    | Self -> "it"
+    | Descendant projs
+      when is_own_memory ~descendant_is_there:second_is_occ projs ->
+      "it"
+    | Ancestor projs
+      when is_own_memory ~descendant_is_there:(not second_is_occ) projs ->
       "it"
     | Descendant _ -> "part of it"
     | Ancestor _ -> "it is part of a value that"
