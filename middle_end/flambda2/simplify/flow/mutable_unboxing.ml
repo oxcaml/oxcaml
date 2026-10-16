@@ -425,8 +425,7 @@ module Fold_prims = struct
               Named_rewrite.prim_rewrite
                 (Named_rewrite.Prim_rewrite.replace_by_binding ~var ~bound_to)
             | _ | (exception Not_found) ->
-              Named_rewrite.prim_rewrite
-                (Named_rewrite.Prim_rewrite.invalid k)
+              Named_rewrite.prim_rewrite (Named_rewrite.Prim_rewrite.invalid k)
           in
           { env with
             rewrites = Named_rewrite_id.Map.add rewrite_id rewrite env.rewrites
