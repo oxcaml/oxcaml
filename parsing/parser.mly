@@ -1017,6 +1017,7 @@ let maybe_pmod_constraint mode expr =
 %token COLONRBRACKET          ":]"
 %token COMMA                  ","
 %token CONSTRAINT             "constraint"
+%token DEREF                  "deref_"
 %token DO                     "do"
 %token DOLLAR                 "$"
 %token DONE                   "done"
@@ -3750,6 +3751,8 @@ pattern_gen:
     ) { $1 }
   | addr_pattern_keyword ext_attributes simple_pattern
       { mkpat_attrs ~loc:$sloc (Ppat_addr ($1, $3)) $2}
+  | DEREF ext_attributes simple_pattern
+      { mkpat_attrs ~loc:$sloc (Ppat_deref $3) $2}
   | LAZY ext_attributes simple_pattern
       { mkpat_attrs ~loc:$sloc (Ppat_lazy $3) $2}
 ;
@@ -5465,6 +5468,7 @@ single_attr_id:
   | BORROW { "borrow_" }
   | CLASS { "class" }
   | CONSTRAINT { "constraint" }
+  | DEREF { "deref_" }
   | DO { "do" }
   | DONE { "done" }
   | DOWNTO { "downto" }

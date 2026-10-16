@@ -265,6 +265,7 @@ type error =
   | Exception_pattern_disallowed
   | Mixed_value_and_exception_patterns_under_guard
   | Effect_pattern_below_toplevel
+  | Deref_pattern_not_yet_supported
   | Invalid_continuation_pattern
   | Inlined_record_escape
   | Inlined_record_expected
@@ -3641,6 +3642,7 @@ let rec has_literal_pattern p =
   | Ppat_constraint (p, _, _)
   | Ppat_alias (p, _)
   | Ppat_addr (_, p)
+  | Ppat_deref p
   | Ppat_lazy p
   | Ppat_open (_, p) ->
      has_literal_pattern p
@@ -4492,6 +4494,8 @@ and type_pat_aux
       }
   | Ppat_effect _ ->
       Error.log_and_raise loc !!penv Effect_pattern_below_toplevel
+  | Ppat_deref _ ->
+      Error.log_and_raise loc !!penv Deref_pattern_not_yet_supported
   | Ppat_extension ext ->
       raise (Error_forward (Builtin_attributes.error_of_extension ext))
 
@@ -4651,8 +4655,8 @@ let rec pat_tuple_arity spat =
   | Ppat_constant _ | Ppat_unboxed_unit | Ppat_unboxed_bool _
   | Ppat_interval _ | Ppat_construct _ | Ppat_variant _
   | Ppat_record _ | Ppat_record_unboxed_product _ | Ppat_array _ | Ppat_type _
-  | Ppat_addr _ | Ppat_lazy _ | Ppat_unpack _ | Ppat_extension _
-  | Ppat_effect _ ->
+  | Ppat_addr _ | Ppat_deref _ | Ppat_lazy _ | Ppat_unpack _
+  | Ppat_extension _ | Ppat_effect _ ->
       Not_local_tuple
   | Ppat_or(sp1, sp2) ->
       combine_pat_tuple_arity (pat_tuple_arity sp1) (pat_tuple_arity sp2)
@@ -6500,7 +6504,7 @@ let shallow_iter_ppat f p =
   | Ppat_exception p | Ppat_alias (p,_)
   | Ppat_open (_,p)
   | Ppat_constraint (p,_,_)
-  | Ppat_addr (_, p) | Ppat_lazy p -> f p
+  | Ppat_addr (_, p) | Ppat_deref p | Ppat_lazy p -> f p
   | Ppat_record (args, _flag) | Ppat_record_unboxed_product (args, _flag) ->
     List.iter (fun (_,p) -> f p) args
 
@@ -14222,6 +14226,10 @@ let report_error ~loc env =
   | Effect_pattern_below_toplevel ->
       Location.errorf ~loc
         "@[Effect patterns must be at the top level of a match case.@]"
+  | Deref_pattern_not_yet_supported ->
+      Location.errorf ~loc
+        "@[Dereference patterns %a are not supported yet.@]"
+        Style.inline_code "deref_"
   | Invalid_continuation_pattern ->
       Location.errorf ~loc
         "@[Invalid continuation pattern: only variables and _ are allowed .@]"
