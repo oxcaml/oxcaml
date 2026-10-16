@@ -2718,12 +2718,16 @@ let make_alloc_generic ~block_kind ~mode ~alloc_block_kind dbg tag wordsize args
     let id = V.create_local "*alloc*" in
     let rec fill_fields idx args memory_chunks =
       match args, memory_chunks with
-      | [], [] -> Cvar id
+      | [], [] -> Ctuple []
       | e1 :: el, m1 :: ml ->
         let ofs = memory_chunk_size_in_words_for_mixed_block m1 in
-        Csequence
-          ( alloc_generic_set_fn (Cvar id) (int_const dbg idx) e1 m1 dbg,
-            fill_fields (idx + ofs) el ml )
+        (* We want fields to be intialized right-to-left, that is last fields
+           first, to match the behavior of selection/selectgen on [Calloc] *)
+        let field_set =
+          alloc_generic_set_fn (Cvar id) (int_const dbg idx) e1 m1 dbg
+        in
+        let other_fields_set = fill_fields (idx + ofs) el ml in
+        Csequence (other_fields_set, field_set)
       | _ ->
         Misc.fatal_errorf
           "To_cmm_helpers.make_alloc_generic: mismatched list sizes between \
@@ -2751,7 +2755,7 @@ let make_alloc_generic ~block_kind ~mode ~alloc_block_kind dbg tag wordsize args
               },
             List.map (fun arg -> Cconst_int (arg, dbg)) caml_alloc_args,
             dbg ),
-        fill_fields 0 args args_memory_chunks )
+        Csequence (fill_fields 0 args args_memory_chunks, Cvar id) )
 
 let make_alloc ~mode dbg ~tag args =
   make_alloc_generic ~block_kind:Regular_block ~mode dbg tag (List.length args)
