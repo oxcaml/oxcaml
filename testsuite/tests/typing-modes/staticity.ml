@@ -473,6 +473,20 @@ Error: The module is "dynamic" because generative functors are always dynamic.
        However, the module highlighted is expected to be "static".
 |}]
 
+(* ...and so are their applications. *)
+module M = struct
+  module F () = struct let x = 1 end
+  module Y = F ()
+  let _ @ static = Y.x
+end
+[%%expect{|
+Line 4, characters 19-22:
+4 |   let _ @ static = Y.x
+                       ^^^
+Error: This value is "dynamic" because generative functors are always dynamic.
+       However, the highlighted expression is expected to be "static".
+|}]
+
 (* A functor type declares its return's staticity independently of the
    functor's own: a dynamic functor returning a static result... *)
 module F : functor (X : sig end) -> sig end @ static =
@@ -573,6 +587,85 @@ Error: The functor is "dynamic"
          because it shares the staticity of the functor parameter at line 2, characters 11-12
          which is "dynamic".
        However, the functor highlighted is expected to be "static"
+         because it shares the staticity of a functor parameter
+         which is expected to be "static".
+|}]
+
+(* [include functor] is an application, and is checked like one: the same
+   functor cannot be included either. *)
+module F : functor (X : sig end @ static) -> sig end =
+  functor (X : sig end) -> struct end
+module Y = struct include functor F end
+[%%expect{|
+module F : functor (X : sig end @ static) -> sig end
+Line 3, characters 34-35:
+3 | module Y = struct include functor F end
+                                      ^
+Error: The functor is "dynamic"
+         because it shares the staticity of the functor parameter at line 2, characters 11-12
+         which is "dynamic".
+       However, the functor highlighted is expected to be "static"
+         because it shares the staticity of a functor parameter
+         which is expected to be "static".
+|}]
+
+(* The items bound by [include functor] inherit the functor's staticity, like
+   the result of an ordinary application. *)
+module M = struct
+  module F (X : sig end) = struct let x = 1 end
+  module Y = struct include functor F end
+  let _ @ static = Y.x
+end
+[%%expect{|
+Line 4, characters 19-22:
+4 |   let _ @ static = Y.x
+                       ^^^
+Error: This value is "dynamic"
+         because it shares the staticity of the functor parameter at line 2, characters 12-13
+         which is "dynamic".
+       However, the highlighted expression is expected to be "static".
+|}]
+
+module M = struct
+  module F (X : sig end @ static) = struct let x = 1 end
+  module Y = struct include functor F end
+  let _ @ static = Y.x
+end
+[%%expect{|
+module M :
+  sig
+    module F : functor (X : sig end @ static) -> sig val x : int end @ static
+    module Y : sig val x : int end
+  end
+|}]
+
+(* [include functor] in signatures *)
+module M = struct
+  module type F = functor (_ : sig end) -> sig val x : int end
+  module type T = sig
+    module Y : sig include functor F end
+  end
+end
+[%%expect{|
+module M :
+  sig
+    module type F = sig end -> sig val x : int end
+    module type T = sig module Y : sig val x : int end end
+  end
+|}]
+
+module M = struct
+  module type F = functor (_ : sig end @ static) -> sig val x : int end
+  module type T = sig
+    module Y : sig include functor F end
+  end
+end
+[%%expect{|
+Line 4, characters 35-36:
+4 |     module Y : sig include functor F end
+                                       ^
+Error: The functor is "dynamic"
+       but is expected to be "static"
          because it shares the staticity of a functor parameter
          which is expected to be "static".
 |}]
