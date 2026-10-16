@@ -210,7 +210,6 @@ let
           version = "dev";
           src = merlinSrc;
           duneVersion = "3";
-          propagatedBuildInputs = [ ocamlPackages.findlib ];
           buildInputs = [ merlin-lib ];
           checkInputs = [ ocamlPackages.alcotest ];
           doCheck = true;
@@ -234,6 +233,7 @@ let
           ];
           nativeCheckInputs = [
             dot-merlin-reader
+            ocamlPackages.findlib
             pkgs.python3
             pkgs.which
             testOcaml
