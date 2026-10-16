@@ -217,7 +217,7 @@ val target_is_jsir : unit -> bool
     can be passed through to, with [-jsoo-opt-<phase>] (and [-jsoo-opt] for all
     of them):
     - [Compile]: [js_of_ocaml compile], producing a unit's [.cmjo];
-    - [Archive]: [js_of_ocaml link -a], producing a [.cmja] ([-a] and [-pack]);
+    - [Archive]: [js_of_ocaml link -a], producing a [.cmja] ([-a]);
     - [Runtime]: [js_of_ocaml build-runtime], when linking an executable;
     - [Link]: [js_of_ocaml link], when linking an executable. *)
 module Jsoo_phase : sig
@@ -228,12 +228,6 @@ module Jsoo_phase : sig
   (** The command-line flag, e.g. [-jsoo-opt-compile]. *)
   val flag : t -> string
 end
-
-val all_jsoo_opts : string list ref
-val all_jsoo_opts_compile : string list ref
-val all_jsoo_opts_archive : string list ref
-val all_jsoo_opts_runtime : string list ref
-val all_jsoo_opts_link : string list ref
 
 (** The options given for a phase, most recent first. *)
 val jsoo_opts : Jsoo_phase.t -> string list ref

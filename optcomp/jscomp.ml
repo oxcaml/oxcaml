@@ -26,27 +26,6 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(* The js_of_ocaml backend of ocamlopt ([-target js_of_ocaml]).
-
-   Code generation stops at the js_of_ocaml IR (JSIR), produced from Flambda 2
-   by [Flambda2_to_jsir]. The JSIR of a compilation unit is written to a [.cmj]
-   file, from which the [js_of_ocaml] executable produces JavaScript, much like
-   the native backend writes assembly for the assembler to turn into an object
-   file. The [.cmj] file is an intermediate like the [.s] file: it is deleted
-   unless [-S] is given.
-
-   The correspondence with the native backend's files is:
-
-   - [.cmjx]: unit metadata, in the same format as [.cmx];
-
-   - [.cmjo]: the JavaScript for a unit, analogous to [.o];
-
-   - [.cmjxa] and [.cmja]: libraries, analogous to [.cmxa] and [.a];
-
-   - [.js] files given on the command line: JavaScript stubs, analogous to C
-   stubs. They are recorded in [.cmjxa] files and passed to [js_of_ocaml
-   build-runtime] when linking an executable. *)
-
 type error =
   | Js_of_ocaml_not_found of string
   | Js_of_ocaml_error of
@@ -67,7 +46,6 @@ let js_of_ocaml_program () =
     let in_bindir = Filename.concat Config.bindir "js_of_ocaml" in
     if Sys.file_exists in_bindir then in_bindir else "js_of_ocaml"
 
-(* [phase] selects the [-jsoo-opt-*] options to add to the [-jsoo-opt] ones. *)
 let run_js_of_ocaml ?input_left_in ~(phase : Clflags.Jsoo_phase.t) subcommand
     args =
   let args =
@@ -82,9 +60,7 @@ let run_js_of_ocaml ?input_left_in ~(phase : Clflags.Jsoo_phase.t) subcommand
   | 0 -> ()
   | exit_code ->
     raise (Error (Js_of_ocaml_error { subcommand; exit_code; input_left_in }))
-  | exception Sys_error _ ->
-    (* [Ccomp.command] raises when the shell cannot run the program. *)
-    raise (Error (Js_of_ocaml_not_found program))
+  | exception Sys_error _ -> raise (Error (Js_of_ocaml_not_found program))
 
 let debuginfo_args () = if !Clflags.debug then ["--debuginfo"] else []
 
@@ -99,8 +75,11 @@ let find_stub name =
     then name
     else raise (Linkenv.Error (Linkenv.File_not_found name))
 
-let write_cmj ~filename ~compilation_unit
+let write_cmj ~filename ~compilation_unit ~required_globals
     ({ program; imported_compilation_units } : Optcomp_intf.jsir_program) =
+  let imported_compilation_units =
+    Compilation_unit.Set.union imported_compilation_units required_globals
+  in
   let oc = open_out_bin filename in
   Misc.try_finally
     ~always:(fun () -> close_out oc)
@@ -117,7 +96,8 @@ let write_cmj ~filename ~compilation_unit
             Compilation_unit.Set.elements imported_compilation_units
             |> List.map Compilation_unit.full_path_as_string;
           exported_compilation_unit =
-            Compilation_unit.full_path_as_string compilation_unit
+            Compilation_unit.full_path_as_string compilation_unit;
+          force_link = !Clflags.link_everything
         }
       in
       output_value oc body)
@@ -148,6 +128,8 @@ let make
 
     let compile_implementation ~keep_symbol_tables ~sourcefile:_ ~prefixname
         ~ppf_dump (program : Lambda.program) =
+      Compilation_unit.Set.iter Compilenv.require_global
+        program.required_globals;
       let jsir =
         lambda_to_jsir ~ppf_dump ~prefixname ~keep_symbol_tables program
         |> Misc.print_if ppf_dump Clflags.dump_jsir
@@ -156,7 +138,8 @@ let make
       in
       let cmj = prefixname ^ ".cmj" in
       let cmjo = prefixname ^ ext_obj in
-      write_cmj ~filename:cmj ~compilation_unit:program.compilation_unit jsir;
+      write_cmj ~filename:cmj ~compilation_unit:program.compilation_unit
+        ~required_globals:program.required_globals jsir;
       let remove_cmj () =
         if not !Clflags.keep_asm_file then Misc.remove_file cmj
       in
@@ -169,11 +152,12 @@ let make
           remove_cmj ())
 
     let create_archive archive_name objfiles =
+      let linkall = if !Clflags.link_everything then ["--linkall"] else [] in
       run_js_of_ocaml "link" ~phase:Archive
-        (["-a"; "-o"; archive_name] @ objfiles)
+        (linkall @ ["-a"; "-o"; archive_name] @ objfiles)
 
-    let link_partial target objfiles =
-      run_js_of_ocaml "link" ~phase:Archive (["-a"; "-o"; target] @ objfiles)
+    (* JSOO cannot yet link packed units. *)
+    let link_partial _target _objfiles = raise (Error (Unsupported "-pack"))
 
     let link _linkenv (objfiles : Linkenv.objfile_to_link list) output_name
         ~cached_genfns_imports:_ ~genfns:_ ~units_tolink:_ ~uses_eval:_
