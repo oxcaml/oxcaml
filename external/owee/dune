@@ -1,5 +1,6 @@
 (library
  (name compiler_owee)
+ (public_name compiler-libs.internal.compiler_owee)
  (flags
   (:standard -w -27-69))
  (foreign_stubs

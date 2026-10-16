@@ -244,6 +244,10 @@ merlin-promote:
 # its private sub-libraries; sexp_type, which is shipped as its own package, and
 # test-only dependencies are symlinked into external/ast-dependent-libs/deps/.
 # Both are gitignored.
+#
+# They can also be built by the compiler build itself, against the compiler
+# being built: `make compiler WITH_JSOO=1` builds them along with it, in its
+# main context, and jsoo-install-shipped installs from that build.
 
 ast_dependent_libs_root = external/ast-dependent-libs
 ast_dependent_libs_deps = $(ast_dependent_libs_root)/deps
@@ -391,11 +395,22 @@ SHIPPED_BIN_PACKAGES = js_of_ocaml-compiler wasm_of_ocaml-compiler \
 SHIPPED_LIB_PACKAGES = $(JSOO_PACKAGES)
 SHIPPED_LIB_SECTIONS = lib,lib_root,libexec,libexec_root,stublibs
 
+ifeq ($(WITH_JSOO),1)
+compiler_jsoo_targets = @$(ast_dependent_libs_root)/jsoo-libs
+compiler: $(PPXLIB_DEPS) $(JSOO_DEPS)
+endif
+
+# From the compiler build (see above): the build is a no-op after
+# `make compiler WITH_JSOO=1`.
 .PHONY: jsoo-install-shipped
-jsoo-install-shipped: jsoo-build
-	$(call ast_dependent_libs_install,--sections=bin $(SHIPPED_BIN_PACKAGES))
+jsoo-install-shipped: boot-compiler $(PPXLIB_DEPS) $(JSOO_DEPS)
+	$(dune) build $(ws_main) --promote-install-files=false \
+	  @$(ast_dependent_libs_root)/jsoo-libs
+	$(dune) install $(ws_main) --prefix="$(AST_DEPENDENT_LIBS_PREFIX)" \
+	  --sections=bin $(SHIPPED_BIN_PACKAGES)
 	rm -f "$(AST_DEPENDENT_LIBS_PREFIX)/bin/jsoo_mktop"
-	$(call ast_dependent_libs_install,--sections=$(SHIPPED_LIB_SECTIONS) $(SHIPPED_LIB_PACKAGES))
+	$(dune) install $(ws_main) --prefix="$(AST_DEPENDENT_LIBS_PREFIX)" \
+	  --sections=$(SHIPPED_LIB_SECTIONS) $(SHIPPED_LIB_PACKAGES)
 
 .PHONY: jsoo-test
 jsoo-test: ast-dependent-libs-compiler \

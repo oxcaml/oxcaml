@@ -1,14 +1,18 @@
-; Dune root for the libraries that depend on the compiler's AST, built against
-; the installed compiler (see the top-level Makefile). The symlinks next to
-; this file point at sources vendored in external/; those under deps/ (test
-; dependencies) and under the projects' oxcaml-private/ directories (private
-; dependencies) are created by make from nix-provided sources.
+; The libraries that depend on the compiler's AST (see the top-level Makefile).
+; They are built in the compiler's own workspace, in its main context, and
+; against an installed compiler with this directory as the dune root. The
+; symlinks next to this file point at sources vendored in external/; those
+; under deps/ (test dependencies) and under the projects' oxcaml-private/
+; directories (private dependencies) are created by make from nix-provided
+; sources.
 
 ; js_of_ocaml stays unvendored: recursive aliases skip vendored directories.
+
 (vendored_dirs deps ocaml-compiler-libs ppxlib ppxlib_jane)
 
 ; A separate project, built against the installed compiler package (see
 ; mkJsooSmokeTest in default.nix).
+
 (data_only_dirs smoke)
 
 ; Each alias depends on the .install files of its packages, which builds
@@ -36,6 +40,7 @@
   js_of_ocaml/js_of_ocaml-toplevel.install))
 
 ; For js_of_ocaml's dune-workspace, which defines runtest-js and runtest-wasm.
+
 (alias
  (name jsoo-test)
  (deps

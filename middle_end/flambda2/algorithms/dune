@@ -2,6 +2,7 @@
 
 (library
  (name flambda2_algorithms)
+ (public_name compiler-libs.internal.flambda2_algorithms)
  (wrapped true)
  (instrumentation (backend bisect_ppx))
  (foreign_stubs

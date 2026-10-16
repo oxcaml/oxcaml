@@ -2,6 +2,7 @@
 
 (library
  (name flambda2_classic_mode_types)
+ (public_name compiler-libs.internal.flambda2_classic_mode_types)
  (wrapped true)
  (flags
   (:standard

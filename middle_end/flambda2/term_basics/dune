@@ -4,6 +4,7 @@
 
 (library
  (name flambda2_term_basics)
+ (public_name compiler-libs.internal.flambda2_term_basics)
  (wrapped true)
  (instrumentation
   (backend bisect_ppx))

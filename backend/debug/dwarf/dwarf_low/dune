@@ -2,6 +2,7 @@
 
 (library
   (name dwarf_low)
+ (public_name compiler-libs.internal.dwarf_low)
   (wrapped true)
   (flags (:standard -w -70))
   (ocamlopt_flags

@@ -2,6 +2,7 @@
 
 (library
  (name flambda2_identifiers)
+ (public_name compiler-libs.internal.flambda2_identifiers)
  (wrapped true)
  (instrumentation (backend bisect_ppx))
  (flags

@@ -7,6 +7,7 @@
 
 (library
  (name flambda2)
+ (public_name compiler-libs.internal.flambda2)
  (wrapped false)
  (instrumentation
   (backend bisect_ppx))

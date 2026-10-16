@@ -16,6 +16,7 @@
 
 (library
  (name ocamltoplevel)
+ (public_name compiler-libs.toplevel)
  (wrapped false)
  (modes byte)
  (libraries ocamlfrontend ocamlbytecomp)

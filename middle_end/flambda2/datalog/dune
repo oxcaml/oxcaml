@@ -2,6 +2,7 @@
 
 (library
  (name flambda2_datalog)
+ (public_name compiler-libs.internal.flambda2_datalog)
  (wrapped true)
  (instrumentation (backend bisect_ppx))
  (ocamlopt_flags

@@ -3,6 +3,10 @@
 (using directory-targets 0.1)
 (using oxcaml 0.1)
 (name js_of_ocaml)
+
+; Downstream: OxCaml's format check builds this project in its workspace (see
+; external/ast-dependent-libs/dune), and should not reformat upstream files.
+(formatting disabled)
 (generate_opam_files true)
 (executables_implicit_empty_intf true)
 
