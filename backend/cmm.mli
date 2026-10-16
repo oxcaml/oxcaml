@@ -383,6 +383,15 @@ module Alloc_mode : sig
   val is_heap : t -> bool
 end
 
+module May_use_gc : sig
+  type t =
+    | Won't_use_gc
+    | May_use_gc of Typedtree.Zero_alloc_obligations.t
+
+  val may_use_gc : t -> bool
+  val equal : t -> t -> bool
+end
+
 type alloc_block_kind =
   | Alloc_block_kind_other
   | Alloc_block_kind_closure
@@ -436,7 +445,7 @@ type operation =
       { func : string;
         ty : machtype;
         ty_args : exttype list;
-        alloc : bool;
+        alloc : May_use_gc.t;
         builtin : bool;
         returns : bool;
         effects : effects;
@@ -451,7 +460,7 @@ type operation =
         mutability : Asttypes.mutable_flag;
         is_atomic : bool
       }
-  | Calloc of Alloc_mode.t * alloc_block_kind
+  | Calloc of Alloc_mode.t * alloc_block_kind * Typedtree.Zero_alloc_obligations.t
   | Cstore of memory_chunk * initialization_or_assignment
   | Caddi
   | Csubi

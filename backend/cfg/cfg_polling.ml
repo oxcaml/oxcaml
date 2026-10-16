@@ -194,8 +194,11 @@ module Polls_before_prtc_transfer = struct
       if InstructionId.equal instr.id optimistic_prologue_poll_instr_id
       then Ok dom
       else Ok Always_polls
-    | Op (Alloc { mode = Heap; bytes = _; dbginfo = _ }) -> Ok Always_polls
-    | Op (Alloc { mode = Local; bytes = _; dbginfo = _ }) ->
+    | Op (Alloc { mode = Heap; bytes = _; dbginfo = _;
+                  zero_alloc_obligations = _ }) ->
+      Ok Always_polls
+    | Op (Alloc { mode = Local; bytes = _; dbginfo = _;
+                  zero_alloc_obligations = _ }) ->
       (* A local allocation does not call the GC, and is hence not a polling
          point. *)
       Ok dom
@@ -396,7 +399,7 @@ let add_calls_terminator :
   | Tailcall_self _ | Tailcall_func _ -> (Function_call, term.dbg) :: points
   | Call _ -> (Function_call, term.dbg) :: points
   | Call_no_return
-      { alloc = false;
+      { alloc = Won't_use_gc;
         func_symbol = _;
         ty_res = _;
         ty_args = _;
@@ -407,7 +410,7 @@ let add_calls_terminator :
   | Prim
       { op =
           External
-            { alloc = false;
+            { alloc = Won't_use_gc;
               func_symbol = _;
               ty_res = _;
               ty_args = _;
@@ -419,7 +422,7 @@ let add_calls_terminator :
       } ->
     points
   | Call_no_return
-      { alloc = true;
+      { alloc = May_use_gc _;
         func_symbol = _;
         ty_res = _;
         ty_args = _;
@@ -430,7 +433,7 @@ let add_calls_terminator :
   | Prim
       { op =
           External
-            { alloc = true;
+            { alloc = May_use_gc _;
               func_symbol = _;
               ty_res = _;
               ty_args = _;

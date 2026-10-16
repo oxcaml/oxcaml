@@ -44,9 +44,17 @@ let operation_body ?(print_reg = Printreg.reg) (op : Operation.t) arg ppf =
       (Array.sub arg 1 (Array.length arg - 1))
       reg arg.(0)
       (if is_assign then "(assign)" else "(init)")
-  | Alloc { bytes = n; mode = Cmm.Alloc_mode.Heap; dbginfo = _ } ->
+  | Alloc {
+      bytes = n;
+      mode = Cmm.Alloc_mode.Heap;
+      dbginfo = _;
+      zero_alloc_obligations = _ } ->
     fprintf ppf "alloc %i" n
-  | Alloc { bytes = n; mode = Cmm.Alloc_mode.Local; dbginfo = _ } ->
+  | Alloc {
+      bytes = n;
+      mode = Cmm.Alloc_mode.Local;
+      dbginfo = _;
+      zero_alloc_obligations = _ } ->
     fprintf ppf "alloc_local %i" n
   | Intop op ->
     if Operation.is_unary_integer_operation op

@@ -33,7 +33,7 @@ let call_operation ?(print_reg = Printreg.reg) ppf op arg =
     fprintf ppf "tailcall \"%s\" %a" func.sym_name regs arg
   | Lextcall { func; alloc; _ } ->
     fprintf ppf "extcall \"%s\" %a%s" func regs arg
-      (if alloc then "" else " (noalloc)")
+      (match alloc with May_use_gc _ -> "" | Won't_use_gc -> " (noalloc)")
   | Lprobe { name; handler_code_sym; enabled_at_init } ->
     fprintf ppf "probe \"%s\" %s%s %a"
       (if enabled_at_init then "enabled_at_init " else "")

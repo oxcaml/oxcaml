@@ -79,6 +79,8 @@ val iter_right_cell : 'a t -> f:('a cell -> unit) -> unit
 
 val iter2 : 'a t -> 'a t -> f:('a -> 'a -> unit) -> unit
 
+val iter_cell2 : 'a t -> 'b t -> f:('a cell -> 'b cell -> unit) -> unit
+
 val fold_left : 'a t -> f:('b -> 'a -> 'b) -> init:'b -> 'b
 
 val fold_right : 'a t -> f:('a -> 'b -> 'b) -> init:'b -> 'b

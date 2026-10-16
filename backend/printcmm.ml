@@ -268,8 +268,8 @@ let operation d = function
       Printf.sprintf "load%s %s" atomic (chunk memory_chunk)
     | Asttypes.Mutable ->
       Printf.sprintf "load_mut%s %s" atomic (chunk memory_chunk))
-  | Calloc (Alloc_mode.Heap, _) -> "alloc" ^ location d
-  | Calloc (Alloc_mode.Local, _) -> "alloc_local" ^ location d
+  | Calloc (Alloc_mode.Heap, _, _) -> "alloc" ^ location d
+  | Calloc (Alloc_mode.Local, _, _) -> "alloc_local" ^ location d
   | Cstore (c, init) ->
     let init =
       match init with Initialization -> "(init)" | Assignment -> ""

@@ -360,9 +360,9 @@ let can_raise_terminator (i : terminator) =
   | Prim { op = Probe _; label_after = _ } ->
     true
   | Prim { op = External { alloc; effects; _ }; label_after = _ } -> (
-    if not alloc
-    then false
-    else
+    match alloc with
+    | Won't_use_gc -> false
+    | May_use_gc _ ->
       (* Even if going via [caml_c_call], if there are no effects, the function
          cannot raise an exception. (Example: [caml_obj_dup].) *)
       match effects with
@@ -560,10 +560,10 @@ let is_alloc (instr : basic instruction) =
 
 let is_heap_alloc (instr : basic instruction) =
   match instr.desc with
-  | Op (Alloc { mode = Heap; bytes = _; dbginfo = _ }) -> true
+  | Op (Alloc { mode = Heap; bytes = _; dbginfo = _; zero_alloc_obligations = _ }) -> true
   | Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _ | Stack_check _
   | Op
-      ( Alloc { mode = Local; bytes = _; dbginfo = _ }
+      ( Alloc { mode = Local; bytes = _; dbginfo = _; zero_alloc_obligations = _ }
       | Poll | Move | Spill | Reload | Opaque | Begin_region | End_region
       | Dls_get | Tls_get | Domain_index | Pause | Const_int _ | Const_float32 _
       | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
@@ -831,7 +831,7 @@ let equal_external_call_operation
       stack_align = right_stack_align
     } =
   String.equal left_func_symbol right_func_symbol
-  && Bool.equal left_alloc right_alloc
+  && Cmm.May_use_gc.equal left_alloc right_alloc
   && Cmm.equal_effects left_effects right_effects
   && Cmm.equal_machtype left_ty_res right_ty_res
   && List.equal Cmm.equal_exttype left_ty_args right_ty_args

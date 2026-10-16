@@ -119,7 +119,9 @@ let instrument_initialiser c dbg =
                      returns = true;
                      effects = Arbitrary_effects;
                      coeffects = Has_coeffects;
-                     ty = typ_int; alloc = false; ty_args = []; },
+                     ty = typ_int;
+                     alloc = Won't_use_gc;
+                     ty_args = []; },
           [Cconst_int (0, dbg ())],
           dbg ()),
      with_afl_logging c (dbg ()))

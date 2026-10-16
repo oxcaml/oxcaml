@@ -469,6 +469,21 @@ module Alloc_mode = struct
   let is_heap = function Heap -> true | Local -> false
 end
 
+module May_use_gc = struct
+  type t =
+    | Won't_use_gc
+    | May_use_gc of Typedtree.Zero_alloc_obligations.t
+
+  let may_use_gc : t -> bool = function
+    | May_use_gc _ -> true
+    | Won't_use_gc -> false
+
+  let equal (lhs : t) (rhs : t) : bool =
+    match lhs, rhs with
+    | Won't_use_gc, Won't_use_gc | May_use_gc _, May_use_gc _ -> true
+    | Won't_use_gc, May_use_gc _ | May_use_gc _, Won't_use_gc -> false
+end
+
 type alloc_block_kind =
   | Alloc_block_kind_other
   | Alloc_block_kind_closure
@@ -562,7 +577,7 @@ type operation =
       { func : string;
         ty : machtype;
         ty_args : exttype list;
-        alloc : bool;
+        alloc : May_use_gc.t;
         builtin : bool;
         returns : bool;
         effects : effects;
@@ -573,7 +588,7 @@ type operation =
         mutability : Asttypes.mutable_flag;
         is_atomic : bool
       }
-  | Calloc of Alloc_mode.t * alloc_block_kind
+  | Calloc of Alloc_mode.t * alloc_block_kind * Typedtree.Zero_alloc_obligations.t
   | Cstore of memory_chunk * initialization_or_assignment
   | Caddi
   | Csubi

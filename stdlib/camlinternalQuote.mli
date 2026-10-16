@@ -560,6 +560,8 @@ and Exp_desc : sig
 
   val stack : Exp.t -> t
 
+  val zero_alloc : Exp.t -> t
+
   val borrow : Exp.t -> t
 
   val extension_constructor : Name.t -> t
