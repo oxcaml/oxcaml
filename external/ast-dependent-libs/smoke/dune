@@ -1,16 +1,25 @@
 ; Uses only what the compiler package ships: the js_of_ocaml and
-; wasm_of_ocaml executables, the js_of_ocaml library and its PPX.
+; wasm_of_ocaml executables, the js_of_ocaml library and its PPX, and the
+; standard library for JSIR.
 
 (executable
  (name main)
+ (modules main)
  (modes js wasm)
  (libraries js_of_ocaml)
  (preprocess
   (pps js_of_ocaml-ppx)))
 
 (rule
+ (target main_jsir.js)
+ (deps main_jsir.ml)
+ (action
+  (run %{ocamlopt} -target js_of_ocaml -o %{target} %{deps})))
+
+(rule
  (alias runtest)
  (action
   (progn
    (run node %{dep:main.bc.js})
-   (run node %{dep:main.bc.wasm.js}))))
+   (run node %{dep:main.bc.wasm.js})
+   (run node %{dep:main_jsir.js}))))
