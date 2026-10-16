@@ -28,6 +28,7 @@ let () =
   (* Pattern expressions *)
   | addr_%foo[@foo] x -> ()
   | addr_imm_%foo[@foo] x -> ()
+  | deref_%foo[@foo] x -> ()
   | lazy%foo[@foo] x -> ()
   | exception%foo[@foo] x -> ()
 

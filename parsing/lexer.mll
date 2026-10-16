@@ -59,6 +59,7 @@ let all_keywords =
     "borrow_", BORROW, oxcaml;
     "class", CLASS, v1_0;
     "constraint", CONSTRAINT, v1_0;
+    "deref_", DEREF, oxcaml;
     "do", DO, always;
     "done", DONE, always;
     "downto", DOWNTO, always;
