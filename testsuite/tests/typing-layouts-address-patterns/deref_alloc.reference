@@ -1,0 +1,8 @@
+tupled function, allocated tuple: ok
+tupled function, syntactic tuple: ok
+match on a syntactic tuple: ok
+match on a syntactic tuple, with an alias: ok
+match on a syntactic tuple, with several rows: ok
+match on a syntactic tuple, with an exception case: ok
+let-bound constant tuple: ok
+record: ok

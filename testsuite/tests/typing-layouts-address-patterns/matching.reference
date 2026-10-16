@@ -53,3 +53,60 @@ local
 4
 efgh
 
+deref records
+10
+efgh
+4.5
+9
+3
+2
+vy
+
+deref unboxed
+3
+4
+5
+five
+7
+
+deref tuples
+1
+one
+two
+3
+
+deref syntactic tuples
+abcd
+x
+x2
+yz
+pq
+qp
+
+deref below addr
+11
+2
+12
+thirteen
+
+deref choice
+3
+2
+5
+42
+
+deref local
+2
+3
+
+deref more positions
+x
+y
+2
+7
+8
+nested
+2.5
+1
+9
+

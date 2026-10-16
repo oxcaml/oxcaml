@@ -206,11 +206,11 @@ Error: Dereference patterns must bind a variable, as in "deref_ x".
 (* Compilation *)
 
 (* Running dereference patterns *)
-let run (deref_ _, _) = ()
+let run (deref_ a, _) = match a with addr_imm_ x -> x
 let _ = run (1, 2)
 [%%expect{|
-val run : 'a * 'b -> unit = <fun>
-- : unit = ()
+val run : 'a * 'b -> 'a = <fun>
+- : int = 1
 |}]
 
 (* Default matrices may contain dereference patterns, e.g. from alternatives of

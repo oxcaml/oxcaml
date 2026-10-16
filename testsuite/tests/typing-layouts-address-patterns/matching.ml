@@ -238,3 +238,192 @@ let () =
   let addr_imm_ s = Addr_imm.of_idx_local r (.i_str) in
   print_endline s;
   print_newline ()
+
+(* Dereference patterns *)
+
+type v = { mutable vx : int; vy : string }
+
+let () =
+  print_endline "deref records";
+  let r = make () in
+  (match r with
+   | { m_int = deref_ a; i_str = deref_ b; _ } ->
+     Addr.set a 10;
+     print_int_ln r.m_int;
+     print_endline (Addr_imm.get b));
+  (match r with
+   | { m_float = deref_ a; m_pair = #{ b = deref_ pb; _ }; _ } ->
+     Addr.set a #4.5;
+     Addr.set pb #9L;
+     print_float_ln r.m_float;
+     print_i64_ln r.m_pair.#b;
+     print_i64_ln r.m_pair.#a);
+  let v = { vx = 1; vy = "vy" } in
+  (match v with
+   | { vx = deref_ a; vy = deref_ b } ->
+     Addr.set a 2;
+     print_int_ln v.vx;
+     print_endline (Addr_imm.get b));
+  print_newline ()
+
+type ub = { ub : int } [@@unboxed]
+type s1 = #{ s : int }
+type ut = { ut : #(int * string); mutable mut_ut : #(string * int) }
+type wrap = { mutable wub : ub; mutable ws1 : s1 }
+
+let () =
+  print_endline "deref unboxed";
+  let w = { wub = { ub = 1 }; ws1 = #{ s = 2 } } in
+  (match w with
+   | { wub = { ub = deref_ a }; ws1 = #{ s = deref_ b } } ->
+     Addr.set a 3;
+     Addr.set b 4;
+     print_int_ln w.wub.ub;
+     print_int_ln w.ws1.#s);
+  let u = { ut = #(5, "five"); mut_ut = #("six", 6) } in
+  (match u with
+   | { ut = #(deref_ a, deref_ b); mut_ut = #(_, deref_ c) } ->
+     print_int_ln (Addr_imm.get a);
+     print_endline (Addr_imm.get b);
+     Addr.set c 7;
+     let #(_, c) = u.mut_ut in
+     print_int_ln c);
+  print_newline ()
+
+let () =
+  print_endline "deref tuples";
+  let t = (1, "one") in
+  (match t with
+   | (deref_ a, deref_ b) ->
+     print_int_ln (Addr_imm.get a);
+     print_endline (Addr_imm.get b));
+  let nested = ((2, "two"), 3) in
+  (match nested with
+   | ((_, deref_ a), deref_ b) ->
+     print_endline (Addr_imm.get a);
+     print_int_ln (Addr_imm.get b));
+  print_newline ()
+
+(* Syntactic tuples are not always allocated *)
+
+let tupled (deref_ a, b) = Addr_imm.get a ^ b
+
+let multiple x y =
+  match x, y with
+  | deref_ a, 0 -> Addr_imm.get a
+  | (deref_ a, deref_ b) as t ->
+    let (_, y') = t in
+    Addr_imm.get a ^ string_of_int (Addr_imm.get b + y')
+
+let let_tuple x y =
+  let (deref_ a, deref_ b) = (x, y) in
+  Addr_imm.get a ^ Addr_imm.get b
+
+let let_tuple_branch c x y =
+  let (deref_ a, b) = if c then (x, y) else (y, x) in
+  Addr_imm.get a ^ b
+
+let () =
+  print_endline "deref syntactic tuples";
+  print_endline (tupled ("ab", "cd"));
+  print_endline (multiple "x" 0);
+  print_endline (multiple "x" 1);
+  print_endline (let_tuple "y" "z");
+  print_endline (let_tuple_branch true "p" "q");
+  print_endline (let_tuple_branch false "p" "q");
+  print_newline ()
+
+(* Dereference patterns below address patterns *)
+
+let () =
+  print_endline "deref below addr";
+  let r = make () in
+  (match Addr.of_idx r (.m_pair) with
+   | addr_ #{ a = deref_ pa; b } ->
+     Addr.set pa #11L;
+     print_i64_ln r.m_pair.#a;
+     print_i64_ln b);
+  (match Addr.of_idx r (.m_int) with
+   | addr_ (deref_ a) ->
+     Addr.set a 12;
+     print_int_ln r.m_int);
+  let u = { ut = #(13, "thirteen"); mut_ut = #("fourteen", 14) } in
+  (match Addr_imm.of_idx u (.ut) with
+   | addr_imm_ #(_, deref_ b) -> print_endline (Addr_imm.get b));
+  print_newline ()
+
+(* Choosing between positions *)
+
+type two = { mutable p : int; mutable q : int; sel : bool }
+
+let pick = function
+  | { sel = true; p = deref_ a; _ } | { sel = false; q = deref_ a; _ } -> a
+
+let guarded r =
+  match r with
+  | { vx = deref_ a; _ } when (Addr.set a 42; false) -> 0
+  | _ -> r.vx
+
+let () =
+  print_endline "deref choice";
+  let t = { p = 1; q = 2; sel = true } in
+  Addr.set (pick t) 3;
+  Addr.set (pick { t with sel = false }) 4;
+  let t' = { t with sel = false } in
+  Addr.set (pick t') 5;
+  print_int_ln t.p;
+  print_int_ln t.q;
+  print_int_ln t'.q;
+  print_int_ln (guarded { vx = 0; vy = "" });
+  print_newline ()
+
+(* Local containers *)
+
+let () =
+  print_endline "deref local";
+  let r = stack_ { vx = 1; vy = "local" } in
+  (match r with
+   | { vx = deref_ a; _ } -> Addr.set a 2);
+  print_int_ln r.vx;
+  let x = stack_ (3, "three") in
+  (match x with
+   | (deref_ a, _) -> print_int_ln (Addr_imm.get a));
+  print_newline ()
+
+(* More positions *)
+
+type inner = #{ ia : int; ib : float# }
+type outer = #{ oa : string; ob : inner }
+type deep = { mutable mo : outer; mutable mub : ub }
+
+let choose b x y =
+  match b, x, y with
+  | true, deref_ a, _ | false, _, deref_ a -> Addr_imm.get a
+
+let nested_in_syntactic x y =
+  match (x, 1), y with
+  | ((deref_ a, _), _) -> Addr_imm.get a
+
+let () =
+  print_endline "deref more positions";
+  print_endline (choose true "x" "y");
+  print_endline (choose false "x" "y");
+  let v = { vx = 2; vy = "" } in
+  print_int_ln v.vx;
+  let { vx = deref_ a; _ } = v in
+  Addr.set a 7;
+  print_int_ln v.vx;
+  (fun { vx = deref_ a; _ } -> Addr.set a 8) v;
+  print_int_ln v.vx;
+  print_endline (nested_in_syntactic "nested" 0);
+  let d =
+    { mo = #{ oa = "oa"; ob = #{ ia = 1; ib = #1.5 } }; mub = { ub = 1 } }
+  in
+  (match Addr.of_idx d (.mo) with
+   | addr_ #{ ob = #{ ib = deref_ x; _ }; _ } -> Addr.set x #2.5);
+  print_float_ln d.mo.#ob.#ib;
+  print_int_ln d.mo.#ob.#ia;
+  (match Addr.of_idx d (.mub) with
+   | addr_ { ub = deref_ a } -> Addr.set a 9);
+  print_int_ln d.mub.ub;
+  print_newline ()
