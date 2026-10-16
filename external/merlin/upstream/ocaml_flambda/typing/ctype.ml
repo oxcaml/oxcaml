@@ -2910,7 +2910,7 @@ type unbox_result =
 
    (In most callers of this, there is no ongoing state of unwrapping, so we just
    use [mk_unwrapped_type_expr]). *)
-let unbox_once env ty =
+let unbox_once ~expand_or_null env ty =
   match get_desc ty.ty with
   | Tconstr (p, args, _) ->
     begin match Env.find_type p env with
@@ -2956,7 +2956,7 @@ let unbox_once env ty =
                                    or_null = None }) lbls)
         | Type_record_unboxed_product ([], _, _) ->
           Misc.fatal_error "Ctype.unboxed_once: fieldless record"
-        | Type_variant (cstrs, Variant_with_null, _) ->
+        | Type_variant (cstrs, Variant_with_null, _) when expand_or_null ->
           begin match Datarepr.find_variant_with_null_payload cstrs with
           | Some
               { payload_cstr = { cd_res; _ };
@@ -3022,7 +3022,9 @@ let contained_without_boxing env ty =
            | Cstr_record _ -> [])
         cstrs
     | _ | exception Not_found ->
-      begin match unbox_once env (mk_unwrapped_type_expr ty) with
+      begin match
+        unbox_once ~expand_or_null:true env (mk_unwrapped_type_expr ty)
+      with
       | Stepped { ty; modality = _; or_null = _ } -> [ty]
       | Stepped_record_unboxed_product tys ->
         List.map (fun { ty; _ } -> ty) tys
@@ -3041,7 +3043,8 @@ let contained_without_boxing env ty =
 (* We use ty_prev to track the last type for which we found a definition,
    allowing us to return a type for which a definition was found even if
    we eventually bottom out at a missing cmi file, or otherwise. *)
-let rec get_unboxed_type_representation ~modality ~or_null env ty_prev ty fuel =
+let rec get_unboxed_type_representation ~expand_or_null ~modality ~or_null env
+          ty_prev ty fuel =
   match get_desc ty with
   | Tmod (ty, _) ->
     (* Mode bounds do not affect the runtime representation, so [Tmod]
@@ -3050,19 +3053,21 @@ let rec get_unboxed_type_representation ~modality ~or_null env ty_prev ty fuel =
        it may not become [ty_prev] (the missing-cmi fallback, whose kind could
        then only be estimated as [any]), and representation-oriented consumers
        such as [Typeopt.classify] expect never to see one. *)
-    get_unboxed_type_representation ~modality ~or_null env ty_prev ty fuel
+    get_unboxed_type_representation ~expand_or_null ~modality ~or_null env
+      ty_prev ty fuel
   | _ ->
   if fuel < 0 then Error { ty; modality; or_null }
   else
     (* We use expand_head_opt version of expand_head to get access
        to the manifest type of private abbreviations. *)
     let ty = expand_head_opt env ty in
-    match unbox_once env { ty; modality; or_null } with
+    match unbox_once ~expand_or_null env { ty; modality; or_null } with
     | Stepped { ty = ty2; modality = modality2; or_null = or_null2 } ->
       let modality = Mode.Modality.Const.concat modality ~then_:modality2 in
       begin match or_null, or_null2 with
       | None, or_null | or_null, None ->
-        get_unboxed_type_representation ~modality ~or_null env ty ty2 (fuel - 1)
+        get_unboxed_type_representation ~expand_or_null ~modality ~or_null env
+          ty ty2 (fuel - 1)
       | Some _, Some _ ->
         (* Nested or-nulls are possible as a result of [Typecore.type_approx] *)
         Ok { ty = ty_prev; modality; or_null }
@@ -3071,14 +3076,17 @@ let rec get_unboxed_type_representation ~modality ~or_null env ty_prev ty fuel =
       Ok { ty; modality; or_null }
     | Missing _ -> Ok { ty = ty_prev; modality; or_null }
 
-let get_unboxed_type_representation env ty =
+let get_unboxed_type_representation ~expand_or_null env ty =
   (* Do not give too much fuel: PR#7424 *)
-  get_unboxed_type_representation ~modality:Mode.Modality.Const.id
-    ~or_null:None env ty ty 100
+  get_unboxed_type_representation ~expand_or_null
+    ~modality:Mode.Modality.Const.id ~or_null:None env ty ty 100
 
-let get_unboxed_type_approximation env ty =
-  match get_unboxed_type_representation env ty with
+let get_unboxed_type_approximation ~expand_or_null env ty =
+  match get_unboxed_type_representation ~expand_or_null env ty with
   | Ok ty | Error ty -> ty
+
+let get_unboxed_type_representation env ty =
+  get_unboxed_type_representation ~expand_or_null:true env ty
 
 
 (* forward declarations *)
@@ -3176,7 +3184,7 @@ let apply_jkind_wrapping_r ~env ~unwrapped_ty:{ ty = _; modality; or_null }
 let maybe_expand_component env ty ~expand_components =
   match expand_components with
   | false -> mk_unwrapped_type_expr ty
-  | true -> get_unboxed_type_approximation env ty
+  | true -> get_unboxed_type_approximation ~expand_or_null:true env ty
 
 let unify' = (* Forward declaration *)
   ref (fun _env _t1 _t2 -> assert false)
@@ -3336,7 +3344,9 @@ let rec estimate_type_jkind_unwrapped
       ~unwrapped_ty:prev_unwrapped_ty
 
 let type_jkind env ty =
-  let unwrapped_ty = get_unboxed_type_approximation env ty in
+  let unwrapped_ty =
+    get_unboxed_type_approximation ~expand_or_null:true env ty
+  in
   estimate_type_jkind_unwrapped (get_level ty) ~unwrapped_ty
     ~expand_components:true env
 
@@ -3694,7 +3704,10 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
                let ty = expand_head_opt env ty in
                estimate_jkind_and_loop ~fuel ~expanded:true env ty jkind
              else
-               begin match unbox_once env (mk_unwrapped_type_expr ty) with
+               begin match
+                 unbox_once ~expand_or_null:true env
+                   (mk_unwrapped_type_expr ty)
+               with
                | Missing path ->
                  Error (Jkind.Violation.of_ ~context ~missing_cmi:path env
                           (Not_a_subjkind (ty's_jkind, jkind,

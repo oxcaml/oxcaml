@@ -144,3 +144,89 @@ let either (v : float# inline) (w : float# inline) =
   (apply (field_imm 1 (global Toploop!)) "either" either))
 val either : float# inline -> float# inline -> int = <fun>
 |}]
+
+(* [scrape_ty] stops at an [or_null], so [value_kind] sees the [@@unboxed]
+   types around it. *)
+type ('a : any) unboxed_record = { field : 'a } [@@unboxed]
+type ('a : any) unboxed_variant = U of 'a [@@unboxed]
+type ('a : any) unboxed_inline = V of { f : 'a } [@@unboxed]
+type ('a : any) unboxed_gadt = G : ('b : any). 'b -> 'b unboxed_gadt [@@unboxed]
+[%%expect{|
+0
+type ('a : any) unboxed_record = { field : 'a; } [@@unboxed]
+0
+type ('a : any) unboxed_variant = U of 'a [@@unboxed]
+0
+type ('a : any) unboxed_inline = V of { f : 'a; } [@@unboxed]
+0
+type ('a : any) unboxed_gadt = G : ('b : any). 'b -> 'b unboxed_gadt [@@unboxed]
+|}]
+
+let unboxed_record_or_null (r : int or_null unboxed_record) = r
+[%%expect{|
+(let (unboxed_record_or_null = (function {nlocal = 0} r? r))
+  (apply (field_imm 1 (global Toploop!)) "unboxed_record_or_null"
+    unboxed_record_or_null))
+val unboxed_record_or_null :
+  int or_null unboxed_record -> int or_null unboxed_record = <fun>
+|}]
+
+let unboxed_variant_or_null (v : int or_null unboxed_variant) = v
+[%%expect{|
+(let (unboxed_variant_or_null = (function {nlocal = 0} v? v))
+  (apply (field_imm 1 (global Toploop!)) "unboxed_variant_or_null"
+    unboxed_variant_or_null))
+val unboxed_variant_or_null :
+  int or_null unboxed_variant -> int or_null unboxed_variant = <fun>
+|}]
+
+let unboxed_inline_or_null (v : int or_null unboxed_inline) =
+  match v with V r -> r.f
+[%%expect{|
+(let (unboxed_inline_or_null = (function {nlocal = 0} v? v))
+  (apply (field_imm 1 (global Toploop!)) "unboxed_inline_or_null"
+    unboxed_inline_or_null))
+val unboxed_inline_or_null : int or_null unboxed_inline -> int or_null =
+  <fun>
+|}]
+
+let unboxed_gadt_or_null (g : int or_null unboxed_gadt) = g
+[%%expect{|
+(let (unboxed_gadt_or_null = (function {nlocal = 0} g? g))
+  (apply (field_imm 1 (global Toploop!)) "unboxed_gadt_or_null"
+    unboxed_gadt_or_null))
+val unboxed_gadt_or_null :
+  int or_null unboxed_gadt -> int or_null unboxed_gadt = <fun>
+|}]
+
+let nested_unboxed_record_or_null
+    (r : int or_null unboxed_record unboxed_record) = r
+[%%expect{|
+(let (nested_unboxed_record_or_null = (function {nlocal = 0} r? r))
+  (apply (field_imm 1 (global Toploop!)) "nested_unboxed_record_or_null"
+    nested_unboxed_record_or_null))
+val nested_unboxed_record_or_null :
+  int or_null unboxed_record unboxed_record ->
+  int or_null unboxed_record unboxed_record = <fun>
+|}]
+
+let unboxed_record_or_null_in_record (r : int or_null unboxed_record t t) = r
+[%%expect{|
+(let
+  (unboxed_record_or_null_in_record =
+     (function {nlocal = 0}
+       r[value<
+          (consts ())
+           (non_consts ([0:
+                         value<(consts ()) (non_consts ([0: ?, value<int>]))>,
+                         value<int>]))>]
+       : (consts ())
+          (non_consts ([0:
+                        value<(consts ()) (non_consts ([0: ?, value<int>]))>,
+                        value<int>]))
+       r))
+  (apply (field_imm 1 (global Toploop!)) "unboxed_record_or_null_in_record"
+    unboxed_record_or_null_in_record))
+val unboxed_record_or_null_in_record :
+  int or_null unboxed_record t t -> int or_null unboxed_record t t = <fun>
+|}]

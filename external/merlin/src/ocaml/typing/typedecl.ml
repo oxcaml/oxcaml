@@ -506,7 +506,7 @@ let update_type temp_env env id loc =
    be possible.
 *)
 let is_float env ty =
-  match Ctype.get_unboxed_type_approximation env ty with
+  match Ctype.get_unboxed_type_approximation ~expand_or_null:true env ty with
   | { ty; or_null = None; modality = _ } -> begin
     match get_desc ty with
     | Tconstr(p, _, _) -> Path.same p Predef.path_float
@@ -4470,7 +4470,10 @@ let make_native_repr
       env core_type ty ~global_repr ~is_layout_poly ~why ~is_return =
   error_if_has_deep_native_repr_attributes core_type;
   let sort_or_poly =
-    match get_desc (Ctype.get_unboxed_type_approximation env ty).ty with
+    match
+      get_desc
+        (Ctype.get_unboxed_type_approximation ~expand_or_null:true env ty).ty
+    with
     (* This only captures tvars with layout [any] explicitly quantified within
        the declaration.
 

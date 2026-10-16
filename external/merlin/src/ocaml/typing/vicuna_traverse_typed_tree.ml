@@ -77,7 +77,8 @@ let scrape_ty env ty =
     match get_desc ty' with
     | Tconstr (p, _, _) -> (
       match find_unboxed_type (Env.find_type p env) with
-      | Some _ -> (Ctype.get_unboxed_type_approximation env ty').ty
+      | Some _ ->
+        (Ctype.get_unboxed_type_approximation ~expand_or_null:false env ty').ty
       | None -> ty'
       | exception Not_found -> ty (* missing cmi file *))
     | _ -> ty')
