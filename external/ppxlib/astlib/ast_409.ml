@@ -16,7 +16,6 @@
 (*   special exception on linking described in the file LICENSE.          *)
 (*                                                                        *)
 (**************************************************************************)
-
 module Asttypes = struct
 
   type constant (*IF_CURRENT = Asttypes.constant *) =

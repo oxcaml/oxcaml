@@ -24,12 +24,19 @@ let quote t (e : expression) =
        See https://github.com/ocaml-ppx/ppx_deriving/pull/252. *)
     | { pexp_desc = Pexp_ident _; _ } -> (e, Ast.evar name)
     | _ ->
-        let binding_expr =
-          Ast.pexp_fun Nolabel None
-            (let unit = Ast_builder.Default.Located.lident ~loc "()" in
-             Ast.ppat_construct unit None)
-            e
+        let p =
+          let unit = Ast_builder.Default.Located.lident ~loc "()" in
+          Ast.ppat_construct unit None
         in
+        let params =
+          [
+            {
+              pparam_desc = Pparam_val (Nolabel, None, p);
+              pparam_loc = Location.none;
+            };
+          ]
+        in
+        let binding_expr = Ast.pexp_function params None (Pfunction_body e) in
         let quoted_expr = Ast.eapply (Ast.evar name) [ Ast.eunit ] in
         (binding_expr, quoted_expr)
   in

@@ -46,6 +46,9 @@ with type location := t
 val set_input_name : string -> unit
 (** Set the name of the input source, e.g. the file name. *)
 
+val set_input_lexbuf : Lexing.lexbuf option -> unit
+(** Set the name of the input source, e.g. the file name. *)
+
 val none : t
 (** An arbitrary value of type [t]; describes an empty ghost range. *)
 
