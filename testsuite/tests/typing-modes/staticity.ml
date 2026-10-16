@@ -591,6 +591,32 @@ Error: The functor is "dynamic"
          which is expected to be "static".
 |}]
 
+(* [include functor] is an application, and is checked like one: the same
+   functor cannot be included either. *)
+module F : functor (X : sig end @ static) -> sig end =
+  functor (X : sig end) -> struct end
+module Y = struct include functor F end
+[%%expect{|
+|}]
+
+(* The items bound by [include functor] inherit the functor's staticity, like
+   the result of an ordinary application. *)
+module M = struct
+  module F (X : sig end) = struct let x = 1 end
+  module Y = struct include functor F end
+  let _ @ static = Y.x
+end
+[%%expect{|
+|}]
+
+module M = struct
+  module F (X : sig end @ static) = struct let x = 1 end
+  module Y = struct include functor F end
+  let _ @ static = Y.x
+end
+[%%expect{|
+|}]
+
 (* persistent modules are currently dynamic. *)
 (* CR-soon zqian: remove this restriction *)
 module (L @ static) = List
