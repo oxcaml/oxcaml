@@ -1216,3 +1216,123 @@ Warning 18 [not-principal]: this type-based constructor disambiguation is not
 
 val f_imm : bool -> t addr_imm -> int = <fun>
 |}]
+
+(* Mode crossing *)
+
+(* The error messages give the precise kinds. *)
+type 'a t : value_or_null & bits64 mod everything = 'a addr
+[%%expect{|
+Line 1, characters 0-59:
+1 | type 'a t : value_or_null & bits64 mod everything = 'a addr
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "'a addr" is
+           value_or_null
+             mod forkable unyielding many stateless
+             with 'a @@ many
+           & bits64
+               mod forkable unyielding many stateless
+               with 'a @@ many external_
+         because it is the primitive type addr.
+       But the kind of type "'a addr" must be a subkind of
+           value_or_null mod everything & bits64 mod everything
+         because of the definition of t at line 1, characters 0-59.
+
+       The first mode-crosses less than the second along:
+         locality: mod local ≰ mod global
+         uniqueness: mod unique ≰ mod aliased
+         contention: mod uncontended ≰ mod contended
+         portability: mod portable with 'a ≰ mod portable
+         forkable: mod forkable with 'a ≰ mod forkable
+         yielding: mod unyielding with 'a ≰ mod unyielding
+         statefulness: mod stateless with 'a ≰ mod stateless
+         visibility: mod read_write ≰ mod immutable
+         externality: mod internal ≰ mod external_
+|}]
+
+type 'a t : value_or_null & bits64 mod everything = 'a addr_imm
+[%%expect{|
+Line 1, characters 0-63:
+1 | type 'a t : value_or_null & bits64 mod everything = 'a addr_imm
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "'a addr_imm" is
+           value_or_null
+             mod forkable unyielding many stateless immutable
+             with 'a
+           & bits64
+               mod forkable unyielding many stateless immutable
+               with 'a @@ external_
+         because it is the primitive type addr_imm.
+       But the kind of type "'a addr_imm" must be a subkind of
+           value_or_null mod everything & bits64 mod everything
+         because of the definition of t at line 1, characters 0-63.
+|}]
+
+(* Upper and lower bounds using an abstract type *)
+type 'a addr_kind :
+  value_or_null & bits64 mod forkable unyielding many stateless with 'a @@ many
+type 'a addr_upper :
+  value_or_null & bits64 mod forkable unyielding many stateless with 'a @@ many
+  = 'a addr
+type 'a addr_lower : value_or_null & bits64 mod everything with 'a addr =
+  'a addr_kind
+[%%expect{|
+type 'a addr_kind
+  : value_or_null mod forkable unyielding many stateless with 'a @@ many
+    & bits64 mod forkable unyielding many stateless with 'a @@ many external_
+type 'a addr_upper = 'a addr
+type 'a addr_lower = 'a addr_kind
+|}]
+
+type 'a addr_imm_kind :
+  value_or_null & bits64 mod forkable unyielding many stateless immutable
+  with 'a
+type 'a addr_imm_upper :
+  value_or_null & bits64 mod forkable unyielding many stateless immutable
+  with 'a
+  = 'a addr_imm
+type 'a addr_imm_lower :
+  value_or_null & bits64 mod everything with 'a addr_imm = 'a addr_imm_kind
+[%%expect{|
+type 'a addr_imm_kind
+  : value_or_null mod forkable unyielding many stateless immutable with 'a
+    & bits64
+        mod forkable unyielding many stateless immutable
+        with 'a @@ external_
+type 'a addr_imm_upper = 'a addr_imm
+type 'a addr_imm_lower = 'a addr_imm_kind
+|}]
+
+(* Upper and lower bounds, phrased in terms of records *)
+type 'a mut = { mutable contents : 'a @@ local }
+type 'a imm = { contents : 'a }
+[%%expect{|
+type 'a mut = { mutable contents : 'a @@ local; }
+type 'a imm = { contents : 'a; }
+|}]
+
+type 'a addr_kind : value_or_null & bits64 mod everything with 'a mut
+type 'a addr_upper : value_or_null & bits64 mod everything with 'a mut = 'a addr
+type 'a addr_lower : value_or_null & bits64 mod everything with 'a addr =
+  'a addr_kind
+[%%expect{|
+type 'a addr_kind
+  : value_or_null mod forkable unyielding many stateless with 'a @@ many
+    & bits64 mod forkable unyielding many stateless with 'a @@ many external_
+type 'a addr_upper = 'a addr
+type 'a addr_lower = 'a addr_kind
+|}]
+
+type 'a addr_imm_kind : value_or_null & bits64 mod everything with 'a imm
+type 'a addr_imm_upper : value_or_null & bits64 mod everything with 'a imm
+  = 'a addr_imm
+type 'a addr_imm_lower :
+  value_or_null & bits64 mod everything with 'a addr_imm = 'a addr_imm_kind
+[%%expect{|
+type 'a addr_imm_kind
+  : value_or_null mod forkable unyielding many stateless immutable with 'a
+    & bits64
+        mod forkable unyielding many stateless immutable
+        with 'a @@ external_
+type 'a addr_imm_upper = 'a addr_imm
+type 'a addr_imm_lower = 'a addr_imm_kind
+|}]
