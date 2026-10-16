@@ -1634,6 +1634,9 @@ let check_block_reference_path
   in
   let boxed_modality : k block_access -> Modality.Const.t = function
     | Baccess_field (_, label, _) -> label.lbl_modalities
+    (* These bases have no modalities of their own to check: tuple elements
+       carry none, and an index or address already points to a position whose
+       modalities were checked when it was built. *)
     | Baccess_block _ | Baccess_tuple_element _ | Baccess_address _ ->
       expected_modality
   in
@@ -4184,8 +4187,8 @@ and type_pat_aux
                | Some s ->
                  Jkind.Sort.of_const s, None
              in
-             (* CR address-patterns: in principle, immutable addresses may point
-                into variants *)
+             (* CR address-patterns: in principle, immutable addresses may
+                point into constructor arguments *)
              type_pat ~pat_mode tps Value p arg.ca_type sort,
              jkind_to_check)
           sargs args
@@ -4227,6 +4230,8 @@ and type_pat_aux
             pat_env = !!penv;
             pat_unique_barrier = Unique_barrier.not_computed () }
   | Ppat_variant(tag, sarg) ->
+      (* CR address-patterns: in principle, immutable addresses may point
+         into variants *)
       assert (tag <> Parmatch.some_private_tag);
       let constant = (sarg = None) in
       let arg_type, row, pat_type =
@@ -4465,13 +4470,12 @@ and type_pat_aux
   | Ppat_deref sp1 ->
       (* CR address-patterns: [deref_] should be allowed while deepening an
          [addr_] at [write] and [immutable], too. Currently, this is only
-         acceptable if the ['a addr] is at least read. Similarly, [deref_] on
+         accepted if the ['a addr] is at least read. Similarly, [deref_] on
          a mutable field should be allowed in records at [write], [immutable]
          or [contended]. *)
-      (* CR address-patterns: print a more informative error if the inner
-         pattern is too complex once we have [as deref_ x] *)
-      (* CR address-patterns: support for [as deref_ x] to avoid the limitations of these
-         restrictions. *)
+      (* CR address-patterns: support [as deref_ x], which lifts the
+         restriction below; until then, print a more informative error when
+         the argument is a pattern that [as deref_ x] would accept. *)
       (match sp1.ppat_desc with
        | Ppat_any | Ppat_var _ -> ()
        | _ ->
@@ -4956,7 +4960,6 @@ let rec check_counter_example_pat
           let args = List.map2 (fun (s, _) a -> s, a) targs args in
           mkp k(Tpat_construct(cstr_lid, constr, repr, args, existential_ctyp)))
   | Tpat_variant(tag, targ, _) ->
-      (* CR address-patterns: allow deref_ in variants whenever that's sound *)
       let constant = (targ = None) in
       let arg_type, row, pat_type =
         solve_Ppat_variant loc penv tag constant expected_ty in
@@ -14287,19 +14290,21 @@ let report_error ~loc env =
     in
     let elements, what_elements_must_have =
       if Types.is_mutable mutability then
-        "mutable", "the default modalities of mutable fields"
+        "mutable", "the default mutable modalities"
       else "immutable", "the identity modality"
     in
     Location.errorf ~loc
-      "%s do not yet support non-default modalities.@ In \
-       particular,@ %s elements must have %s,@ but this is %a."
+      "%s do not yet support non-default modalities. In \
+       particular,@ %s elements must have %s, but this is %a."
       (block_reference_name reference) elements what_elements_must_have
       (print_modality_doc identity) actual
-  | Block_reference_polymorphic_field ((Block_index as reference), lid) ->
+  | Block_reference_polymorphic_field (Block_index, lid) ->
+    (* Block indices only reject polymorphic fields in mutable positions, so
+       they keep their own message. *)
     Location.errorf ~loc
-      "%s do not support polymorphic record fields@ (here %a)@ \
-       in mutable positions."
-      (block_reference_name reference) quoted_longident lid
+      "Mutable block indices to polymorphic record fields@ (here %a) are \
+       forbidden."
+      quoted_longident lid
   | Block_reference_polymorphic_field ((Deref_pattern as reference), lid) ->
     Location.errorf ~loc
       "%s do not support polymorphic record fields@ (here %a)."

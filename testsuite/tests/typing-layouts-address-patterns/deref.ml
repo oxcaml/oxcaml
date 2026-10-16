@@ -380,9 +380,8 @@ type global_field = { g : string @@ global; }
 Line 2, characters 23-31:
 2 | let global_field { g = deref_ a } = a
                            ^^^^^^^^
-Error: Dereference patterns do not yet support non-default modalities.
-       In particular, immutable elements must have the identity modality,
-       but this is aliased.
+Error: Dereference patterns do not yet support non-default modalities. In particular,
+       immutable elements must have the identity modality, but this is aliased.
 |}]
 
 (* ...including along unboxed paths *)
@@ -395,9 +394,8 @@ type contains_unboxed_global = { u : unboxed_global; }
 Line 3, characters 33-41:
 3 | let unboxed_global { u = #{ ug = deref_ a; _ } } = a
                                      ^^^^^^^^
-Error: Dereference patterns do not yet support non-default modalities.
-       In particular, immutable elements must have the identity modality,
-       but this is aliased.
+Error: Dereference patterns do not yet support non-default modalities. In particular,
+       immutable elements must have the identity modality, but this is aliased.
 |}]
 
 type unboxed_attr_global = { uag : string @@ global } [@@unboxed]
@@ -409,9 +407,8 @@ type contains_unboxed_attr_global = { ua : unboxed_attr_global; }
 Line 3, characters 39-47:
 3 | let unboxed_attr_global { ua = { uag = deref_ a } } = a
                                            ^^^^^^^^
-Error: Dereference patterns do not yet support non-default modalities.
-       In particular, immutable elements must have the identity modality,
-       but this is aliased.
+Error: Dereference patterns do not yet support non-default modalities. In particular,
+       immutable elements must have the identity modality, but this is aliased.
 |}]
 
 (* The modalities are composed along the path, so non-default modalities are
@@ -434,10 +431,8 @@ type contains_unboxed_contended_mut = { mutable umc : unboxed_contended; }
 Line 3, characters 42-50:
 3 | let unboxed_contended_mut { umc = #{ uc = deref_ a; _ } } = a
                                               ^^^^^^^^
-Error: Dereference patterns do not yet support non-default modalities.
-       In particular,
-       mutable elements must have the default modalities of mutable fields,
-       but this is contended.
+Error: Dereference patterns do not yet support non-default modalities. In particular,
+       mutable elements must have the default mutable modalities, but this is contended.
 |}]
 
 (*********)
