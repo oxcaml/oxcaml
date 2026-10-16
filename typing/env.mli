@@ -196,6 +196,10 @@ val has_probe: string -> bool
 
 val has_local_constraints: t -> bool
 
+val has_local_type_constraint : Path.t -> t -> bool
+
+val is_locally_abstract : Path.t -> t -> bool
+
 (* Mark definitions as used *)
 val mark_value_used: Uid.t -> unit
 val mark_module_used: Uid.t -> unit
