@@ -473,6 +473,20 @@ Error: The module is "dynamic" because generative functors are always dynamic.
        However, the module highlighted is expected to be "static".
 |}]
 
+(* ...and so are their applications. *)
+module M = struct
+  module F () = struct let x = 1 end
+  module Y = F ()
+  let _ @ static = Y.x
+end
+[%%expect{|
+module M :
+  sig
+    module F : functor () -> sig val x : int end @ static
+    module Y : sig val x : int end
+  end
+|}]
+
 (* A functor type declares its return's staticity independently of the
    functor's own: a dynamic functor returning a static result... *)
 module F : functor (X : sig end) -> sig end @ static =
@@ -531,6 +545,21 @@ Error: The module is "dynamic"
        However, the module highlighted is expected to be "static".
 |}]
 
+(* Template functor that captures a dynamic value. *)
+module (M @ static) = struct
+  let y = 2 + 2
+  module F (X : sig end @ static) = struct let () = ignore y end
+  module (Y @ static) = F(struct end)
+end
+[%%expect{|
+module M :
+  sig
+    val y : int @@ dynamic
+    module F : functor (X : sig end @ static) -> sig end @ static
+    module Y : sig end
+  end
+|}]
+
 (* At top level, the outer functor's return - the intermediate functor - is
    inferred but zapped to dynamic. *)
 module (F @ static) (A : sig end @ static) (B : sig end @ static) = struct end
@@ -575,6 +604,215 @@ Error: The functor is "dynamic"
        However, the functor highlighted is expected to be "static"
          because it shares the staticity of a functor parameter
          which is expected to be "static".
+|}]
+
+(* [include functor] is an application, and is checked like one: the same
+   functor cannot be included either. *)
+module F : functor (X : sig end @ static) -> sig end =
+  functor (X : sig end) -> struct end
+module Y = struct include functor F end
+[%%expect{|
+|}]
+
+(* The items bound by [include functor] inherit the functor's staticity, like
+   the result of an ordinary application. *)
+module M = struct
+  module F (X : sig end) = struct let x = 1 end
+  module Y = struct include functor F end
+  let _ @ static = Y.x
+end
+[%%expect{|
+|}]
+
+module M = struct
+  module F (X : sig end @ static) = struct let x = 1 end
+  module Y = struct include functor F end
+  let _ @ static = Y.x
+end
+[%%expect{|
+|}]
+
+(* with an explicit [@@ dynamic] *)
+module M = struct
+  module type F = functor (_ : sig end @ static) -> sig val x : int end
+  module type T = sig
+    module Y : sig @@ dynamic include functor F end
+  end
+end
+[%%expect{|
+Line 4, characters 46-47:
+4 |     module Y : sig @@ dynamic include functor F end
+                                                  ^
+Error: The functor is "dynamic"
+       but is expected to be "static"
+         because it shares the staticity of a functor parameter
+         which is expected to be "static".
+|}]
+
+(* with an explicit [@@ dynamic] on [include functor] *)
+module M = struct
+  module type F = functor (_ : sig end @ static) -> sig val x : int end
+  module type T = sig
+    module Y : sig val y : int include functor F @@ dynamic end
+  end
+end
+[%%expect{|
+module M :
+  sig
+    module type F = sig end @ static -> sig val x : int end
+    module type T =
+      sig module Y : sig val y : int val x : int @@ dynamic end end
+  end
+|}]
+
+(* non-empty argument to [include functor] *)
+(* CR jbachurski: fix -- [x] can be static here *)
+module M = struct
+  module type F =
+    functor (_ : sig val x : int end @ static) -> sig val x : int end
+  module type T = sig
+    module Y : sig val x : int include functor F end
+  end
+end
+[%%expect{|
+Line 5, characters 47-48:
+5 |     module Y : sig val x : int include functor F end
+                                                   ^
+Error: Signature mismatch in included functor's parameter:
+       Values do not match:
+         val x : int (* in a structure at dynamic *)
+       is not included in
+         val x : int (* in a structure at static *)
+       The first is "dynamic"
+       but the second is "static".
+|}]
+
+(* non-empty argument to [include functor] available with [@@ dynamic] *)
+module M = struct
+  module type F =
+    functor (_ : sig val x : int end @ static) -> sig val x : int end
+  module type T = sig
+    module Y : sig val x : int @@ dynamic include functor F end
+  end
+end
+[%%expect{|
+Line 5, characters 58-59:
+5 |     module Y : sig val x : int @@ dynamic include functor F end
+                                                              ^
+Error: Signature mismatch in included functor's parameter:
+       Values do not match:
+         val x : int @@ dynamic (* in a structure at dynamic *)
+       is not included in
+         val x : int (* in a structure at static *)
+       The first is "dynamic"
+       but the second is "static".
+|}]
+
+(* the entire module is under [@@ dynamic] *)
+module M = struct
+  module type F =
+    functor (_ : sig val x : int end @ static) -> sig val x : int end
+  module type T = sig
+    module Y : sig @@ dynamic val x : int include functor F end
+  end
+end
+[%%expect{|
+Line 5, characters 58-59:
+5 |     module Y : sig @@ dynamic val x : int include functor F end
+                                                              ^
+Error: Signature mismatch in included functor's parameter:
+       Values do not match:
+         val x : int @@ dynamic (* in a structure at dynamic *)
+       is not included in
+         val x : int (* in a structure at static *)
+       The first is "dynamic"
+       but the second is "static".
+|}]
+
+module type Id = sig val poly_ id : 'a -> 'a end
+[%%expect{|
+module type Id = sig val poly_ id : 'a -> 'a end
+|}]
+
+(* template and non-template functors cannot be coerced either way *)
+module F (M : sig
+  module Make : functor (_ : Id @ static) -> Id @ static
+end) : sig
+  module Make : functor (_ : Id) -> Id
+end = M
+[%%expect{|
+Line 5, characters 6-7:
+5 | end = M
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           module Make :
+             functor (Arg : Id @ static) ->
+               sig val poly_ id : 'a -> 'a end @ static
+         end
+       is not included in
+         sig module Make : Id -> Id end
+       In module "Make":
+       Modules do not match:
+         (Arg : Id @ static) -> ...
+       is not included in
+         Id @ dynamic -> ...
+       Module types do not match:
+         Id @ static
+       does not include
+         Id @ dynamic
+       Got "dynamic" but expected "static".
+|}]
+
+module F (M : sig
+  module Make : functor (_ : Id) -> Id
+end) : sig
+  module Make : functor (_ : Id @ static) -> Id @ static
+end = M
+[%%expect{|
+Line 5, characters 6-7:
+5 | end = M
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           module Make :
+             functor (Arg : Id) -> sig val poly_ id : 'a -> 'a end
+         end
+       is not included in
+         sig module Make : Id @ static -> Id @ static end
+       In module "Make":
+       Modules do not match:
+         functor (Arg : Id) -> sig val poly_ id : 'a -> 'a end
+       is not included in
+         Id @ static -> Id @ static
+       In module "Make":
+       Got "dynamic"
+       but expected "static".
+|}]
+
+(* inconsistent template functor types *)
+module F (M : sig
+  module Make : functor (_ : Id) -> Id @ static
+end) : sig
+  module Make : functor (_ : Id) -> Id
+end = M
+[%%expect{|
+module F :
+  functor (M : sig module Make : Id -> Id @ static end) ->
+    sig module Make : Id -> Id end
+|}]
+
+module F (M : sig
+  module Make : functor (_ : Id) -> Id
+end) : sig
+  module Make : functor (_ : Id @ static) -> Id
+end = M
+[%%expect{|
+module F :
+  functor (M : sig module Make : Id -> Id end) ->
+    sig module Make : Id @ static -> Id end
 |}]
 
 (* persistent modules are currently dynamic. *)

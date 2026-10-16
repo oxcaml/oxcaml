@@ -256,6 +256,153 @@ let r12 =
 val r12 : int = 11
 |}]
 
+(* Template functor [IdF] only available dynamically as an argument of [G]. *)
+module G (H : IdF) = H (struct let poly_ id x = x end)
+[%%expect{|
+Line 1, characters 21-22:
+1 | module G (H : IdF) = H (struct let poly_ id x = x end)
+                         ^
+Error: The functor is "dynamic"
+       but is expected to be "static"
+         because it shares the staticity of a functor parameter
+         which is expected to be "static".
+|}]
+
+(* [G] is a template functor, so all is fine. *)
+module G (H : IdF @ static) = H (struct let poly_ id x = x end)
+[%%expect{|
+module G : functor (H : IdF @ static) -> Id
+|}]
+
+(* [include functor] of a static functor: the enclosing structure is the
+   argument, and the application is a template instantiation. *)
+let (r13i, r13f) =
+  let module F (M : Id @ static) = struct
+    let i = M.id 12
+    let f = to_float (M.id #12.0)
+  end in
+  let module R = struct
+    let poly_ id x = x
+    include functor F
+  end in
+  (R.i, R.f)
+[%%expect{|
+|}]
+
+(* The same with a generative static functor: instantiate, then apply to unit. *)
+let (r13gi, r13gf) =
+  let module F (M : Id @ static) () = struct
+    let i = M.id 13
+    let f = to_float (M.id #13.0)
+  end in
+  let module R = struct
+    let poly_ id x = x
+    include functor F
+  end in
+  (R.i, R.f)
+[%%expect{|
+|}]
+
+(* Generative non-template [include functor] should return [@ dynamic] *)
+(* CR jbachurski: fix *)
+let _ =
+  let module F (M : sig end) () = struct
+    let poly_ id x = x
+  end in
+  let module M = struct
+    include functor F
+  end in
+  M.id 1
+[%%expect{|
+>> Fatal error: slambda eval: unexpected missing value
+Uncaught exception: Misc.Fatal_error
+
+|}]
+
+(* Generative [include functor] should return [@ dynamic] *)
+(* CR jbachurski: fix *)
+let _ =
+  let module F (M : sig end @ static) () = struct
+    let poly_ id x = x
+  end in
+  let module M = struct
+    include functor F
+  end in
+  M.id 1
+[%%expect{|
+>> Fatal error: slambda eval: unexpected missing value
+Uncaught exception: Misc.Fatal_error
+
+|}]
+
+(* Abstraction of a template functor with a consistent functor type. *)
+let _ =
+  let module M : sig
+    module F : functor (_ : Id @ static) -> Id @ static
+  end = struct
+    module F (X : Id @ static) = X
+  end in
+  let module M = M.F (struct let poly_ id x = x end) in
+  M.id 1
+[%%expect{|
+- : int = 1
+|}]
+
+(* Abstraction of a non-template functor with an inconsistent functor type
+   taking [@ static]. *)
+let _ =
+  let module M : sig
+    module F : functor (_ : Id @ static) -> Id
+  end = struct
+    module F (X : Id) = X
+  end in
+  (* [F] is [dynamic] because it's not defined as a template functor *)
+  let module M = M.F (struct let poly_ id x = x end) in
+  M.id 1
+[%%expect{|
+Line 8, characters 17-20:
+8 |   let module M = M.F (struct let poly_ id x = x end) in
+                     ^^^
+Error: The functor is "dynamic"
+       but is expected to be "static"
+         because it shares the staticity of a functor parameter
+         which is expected to be "static".
+|}]
+
+(* Abstraction of a template functor with an inconsistent functor type
+   returning [@ dynamic]. *)
+let _ =
+  let module M : sig
+    module F : functor (_ : Id @ static) -> Id
+  end = struct
+    module F (X : Id @ static) = X
+  end in
+  let module M = M.F (struct let poly_ id x = x end) in
+  M.id 1
+[%%expect{|
+Line 8, characters 2-6:
+8 |   M.id 1
+      ^^^^
+Error: The value "M.id" is "dynamic"
+       but is expected to be "static"
+         because it is layout-polymorphic and being instantiated here.
+|}]
+
+(* template functor coercion *)
+let _ =
+  let module M : sig
+    module F (X : sig end @ static) : sig val j : int end
+  end = struct
+    module F (X : sig end @ static) = struct let i = 1 let j = 2 end
+  end in
+  let module M = M.F (struct end) in
+  M.j
+[%%expect{|
+>> Fatal error: slambda eval: unexpected missing value
+Uncaught exception: Misc.Fatal_error
+
+|}]
+
 (* Captured values of several layouts at once. *)
 let (k1i, k1f, k1s, k1l) =
   let ci = 17 in
