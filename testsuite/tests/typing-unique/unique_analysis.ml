@@ -816,15 +816,7 @@ let foo () =
   let (_, _) = t in
   ()
 [%%expect{|
-Line 4, characters 6-12:
-4 |   let (_, _) = t in
-          ^^^^^^
-Error: This value is read from here,
-       but it has already been used as unique at:
-Line 3, characters 20-21:
-3 |   ignore (unique_id t);
-                        ^
-
+val foo : unit -> unit = <fun>
 |}]
 
 type 'a r = {mutable x : 'a [@atomic]; y : 'a}
@@ -970,4 +962,57 @@ Line 2, characters 23-24:
 2 |   let x = [%atomic.loc r.x] in
                            ^
 
+|}]
+
+type mem = { m1 : string; m2 : string }
+let consume : 'a @ unique -> unit = fun _ -> ()
+[%%expect{|
+type mem = { m1 : string; m2 : string; }
+val consume : 'a @ unique -> unit = <fun>
+|}]
+
+let memory_tuple_field (t : (string * string) @ unique) =
+  consume t;
+  match t with (a, _) -> a
+[%%expect{|
+Line 3, characters 15-21:
+3 |   match t with (a, _) -> a
+                   ^^^^^^
+Error: This value is read from here,
+       but it has already been used as unique at:
+Line 2, characters 10-11:
+2 |   consume t;
+              ^
+
+|}]
+
+let memory_alloc_after_atomic_loc (r : string r @ unique) =
+  let x = [%atomic.loc r.x] in
+  consume x;
+  { r with x = ""; y = "" } [@warning "-23"]
+[%%expect{|
+Line 4, characters 4-5:
+4 |   { r with x = ""; y = "" } [@warning "-23"]
+        ^
+Error: This value is read from here,
+       but it has already been used as unique at:
+Line 2, characters 23-24:
+2 |   let x = [%atomic.loc r.x] in
+                           ^
+
+|}]
+
+(* Patterns with only wildcards below don't read the value's memory *)
+let wildcard_fields (r : mem @ unique) =
+  consume r;
+  match r with { m1 = _; m2 = _ } -> ()
+[%%expect{|
+val wildcard_fields : mem @ unique -> unit = <fun>
+|}]
+
+let wildcard_tuple_elements (t : (string * string) @ unique) =
+  consume t;
+  match t with (_, _) -> ()
+[%%expect{|
+val wildcard_tuple_elements : string * string @ unique -> unit = <fun>
 |}]
