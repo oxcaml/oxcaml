@@ -69,6 +69,7 @@ module Simple = struct
         (Longident.t loc * unboxed_label_description * pattern) list
         * record_unboxed_product_representation * closed_flag
     | `Array of mutability * Jkind.sort * pattern list
+    | `Addr of mutability * Jkind.sort * pattern
     | `Lazy of pattern
   ]
 
@@ -136,6 +137,7 @@ module General = struct
        `Record_unboxed_product (fields, repr, closed)
     | Tpat_array (am, arg_sort, ps) -> `Array (am, arg_sort, ps)
     | Tpat_or (p, q, row_desc) -> `Or (p, q, row_desc)
+    | Tpat_addr (mut, arg_sort, p) -> `Addr (mut, arg_sort, p)
     | Tpat_lazy p -> `Lazy p
 
   let view p : pattern =
@@ -166,6 +168,7 @@ module General = struct
        Tpat_record_unboxed_product (fields, repr, closed)
     | `Array (am, arg_sort, ps) -> Tpat_array (am, arg_sort, ps)
     | `Or (p, q, row_desc) -> Tpat_or (p, q, row_desc)
+    | `Addr (mut, arg_sort, p) -> Tpat_addr (mut, arg_sort, p)
     | `Lazy p -> Tpat_lazy p
 
   let erase p : Typedtree.pattern =
@@ -200,6 +203,7 @@ module Head : sig
           cstr_row: row_desc ref;
           type_row : unit -> row_desc; }
     | Array of mutability * Jkind.sort * int
+    | Addr of mutability * Jkind.sort
     | Lazy
 
   type t = desc pattern_data
@@ -235,6 +239,7 @@ end = struct
           (* the row of the type may evolve if [close_variant] is called,
              hence the (unit -> ...) delay *)
     | Array of mutability * Jkind.sort * int
+    | Addr of mutability * Jkind.sort
     | Lazy
 
   type t = desc pattern_data
@@ -275,6 +280,8 @@ end = struct
           let lbls = List.map (fun (_,lbl,_) -> lbl) largs in
           let pats = List.map (fun (_,_,pat) -> pat) largs in
           Record_unboxed_product (lbls, repr), pats
+      | `Addr (mut, arg_sort, p) ->
+          Addr (mut, arg_sort), [p]
       | `Lazy p ->
           Lazy, [p]
     in
@@ -294,6 +301,7 @@ end = struct
       | Record (l, _) -> List.length l
       | Record_unboxed_product (l, _) -> List.length l
       | Variant { has_arg; _ } -> if has_arg then 1 else 0
+      | Addr _ -> 1
       | Lazy -> 1
 
   let to_omega_pattern t =
@@ -301,6 +309,7 @@ end = struct
       let mkloc x = Location.mkloc x t.pat_loc in
       match t.pat_desc with
       | Any -> Tpat_any
+      | Addr (mut, arg_sort) -> Tpat_addr (mut, arg_sort, omega)
       | Lazy -> Tpat_lazy omega
       | Constant c -> Tpat_constant c
       | Unboxed_unit -> Tpat_unboxed_unit

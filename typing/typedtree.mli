@@ -376,6 +376,11 @@ and 'k pattern_desc =
       value pattern_desc
         (** [| P1; ...; Pn |]    (flag = Mutable)
             [: P1; ...; Pn :]    (flag = Immutable) *)
+  | Tpat_addr :
+      Types.mutability * Jkind.sort * value general_pattern ->
+      value pattern_desc
+        (** addr_ P        (flag = Mutable)
+            addr_imm_ P    (flag = Immutable) *)
   | Tpat_lazy : value general_pattern -> value pattern_desc
         (** lazy P *)
   (* computation patterns *)

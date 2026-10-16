@@ -3240,6 +3240,9 @@ module Format_history = struct
       fprintf ppf
         "it's the element type (the second type parameter) for a@ block index \
          (idx_imm or idx_mut)"
+    | Address_contents ->
+      fprintf ppf
+        "it's the type of the value at an address@ in an address pattern"
     | Field_in_indexed_record ->
       fprintf ppf
         "it's the type of a field in a record type into which a@ block index \
@@ -4387,6 +4390,7 @@ module Debug_printers = struct
     | Peek_or_poke -> fprintf ppf "Peek_or_poke"
     | Array_element -> fprintf ppf "Array_element"
     | Idx_element -> fprintf ppf "Idx_element"
+    | Address_contents -> fprintf ppf "Address_contents"
     | Field_in_indexed_record -> fprintf ppf "Field_in_indexed_record"
     | Structure_item -> fprintf ppf "Structure_item"
     | Signature_item -> fprintf ppf "Signature_item"

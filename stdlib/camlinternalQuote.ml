@@ -1180,6 +1180,7 @@ module Ast = struct
     | PatArray of pattern list
     | PatOr of pattern * pattern
     | PatConstraint of pattern * core_type * modes
+    | PatAddr of pattern * bool
     | PatLazy of pattern
     | PatAnyModule
     | PatUnpack of Var.Module.t
@@ -1519,6 +1520,10 @@ module Ast = struct
       maybe_parens with_parens fmt (fun fmt () ->
           pp fmt "%a@ :@ %a%a" (print_pat env) pat (print_core_type env) ty
             print_mode_constraint modes)
+    | PatAddr (pat, mutable_) ->
+      pp fmt "%s@ (%a)"
+        (if mutable_ then "addr_" else "addr_imm_")
+        (print_pat env) pat
     | PatLazy pat -> pp fmt "lazy@ (%a)" (print_pat env) pat
     | PatAnyModule -> pp fmt "module _"
     | PatUnpack v -> pp fmt "(module@ %a)" (Var.Module.print env) v
@@ -2260,6 +2265,10 @@ module Pat = struct
   let or_ t1 t2 =
     let+ p1, p2 = join t1 t2 in
     Ast.PatOr (p1, p2)
+
+  let addr t mutable_ =
+    let+ p = t in
+    Ast.PatAddr (p, mutable_)
 
   let lazy_ t =
     let+ p = t in

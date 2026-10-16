@@ -547,6 +547,10 @@ and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
       line i ppf "Tpat_array %a\n" fmt_mutable_mode_flag am;
       line i ppf "%a\n" fmt_sort arg_sort;
       list i pattern ppf l;
+  | Tpat_addr (mut, arg_sort, p) ->
+      line i ppf "Tpat_addr %a\n" fmt_mutable_mode_flag mut;
+      line i ppf "%a\n" fmt_sort arg_sort;
+      pattern i ppf p;
   | Tpat_lazy p ->
       line i ppf "Tpat_lazy\n";
       pattern i ppf p;
