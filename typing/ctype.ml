@@ -5124,7 +5124,7 @@ let rigid_variants = ref false
 
 let unify1_var uenv t1 t2 =
   let jkind = match get_desc t1 with
-    | Tvar { jkind } -> jkind
+    | Tvar { jkind } | Tivar { jkind; _ } -> jkind
     | _ -> assert false
   in
   occur_for Unify uenv t1 t2;
@@ -5201,17 +5201,47 @@ let fill_ivar env ivar ty =
            sufficient. *)
         raise_for Unify (Shape_mismatch { got = shape; expected }))
 
+(* Like [expand_head_unif], but stops at a type constructor with a local (e.g.
+   GADT) equation: a [Tivar]'s ivar must not rely on an equation that may not
+   hold where its variable lives. *)
+let rec expand_head_without_equations env ty =
+  match get_desc ty with
+  | Tconstr (p, _, _) when find_expansion_scope env p <> Btype.lowest_level ->
+    ty
+  | _ -> (
+    match try_expand_once env ty with
+    | ty -> expand_head_without_equations env ty
+    | exception Cannot_expand -> ty
+    | exception Escape e -> raise_for Unify (Escape e))
+
+(* Like [unify1_var] for a [Tivar] [t1] with ivar [ivar], linking it to the
+   unexpanded [t2] and filling [ivar]. Returns [false], so that [unify2]
+   handles it, if [t2] expands to a variable. *)
+let unify1_ivar uenv t1 ivar t2 =
+  let env = get_env uenv in
+  let t2' = expand_head_without_equations env t2 in
+  match get_desc t2' with
+  | Tvar _ | Tivar _ -> false
+  | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tconstr _ | Tmod _ | Tobject _
+  | Tfield _ | Tquote _ | Tsplice _ | Tquote_eval _ | Tnil | Tvariant _
+  | Tunivar _ | Tpoly _ | Trepr _ | Tpackage _ | Tof_kind _ | Tbox _ ->
+    unify1_var uenv t1 t2 && (fill_ivar env ivar t2'; true)
+  | Tlink _ | Tsubst _ -> assert false
+
 (** What [unify3_var] does after linking [from_] to [to_]. *)
 module On_link = struct
   type t =
     | Noop
     | Fill_ivar of type_shape Ivar.t
-        (** Fill the ivar with the shape of [to_expanded]. *)
+        (** Fill the ivar with the shape of [to_], expanded without local
+            equations (see [expand_head_without_equations]). *)
 
-  let run t ~uenv ~from_jkind:_ ~from_:_ ~to_:_ ~to_expanded:t2' =
+  let run t ~uenv ~from_jkind:_ ~from_:_ ~to_:t2 ~to_expanded:_ =
     match t with
     | Noop -> ()
-    | Fill_ivar ivar1 -> fill_ivar (get_env uenv) ivar1 t2'
+    | Fill_ivar ivar1 ->
+      let env = get_env uenv in
+      fill_ivar env ivar1 (expand_head_without_equations env t2)
 end
 
 (* Called from unify3. [on_link] is run after [t1'] is linked to [t2], but not
@@ -5271,31 +5301,44 @@ let at_current_levels f =
     nongen_level := nongen;
     wrap_end_def (fun () -> f x)
 
-(* Registers [run] on [ivar]. If [ivar] is defaulted, calls [run (default ())]
-   instead. A conflicting default fails in [run]'s unification. *)
-let ivar_upon ivar ~run ~default ~scheduler =
-  Ivar.upon ivar ~run ~cancel:(fun () -> run (default ())) ~scheduler
-
-let upon_shape env ty ~run ~default =
+let upon env ty ~run ~default =
   let run = at_current_levels run in
+  let default = at_current_levels default in
   let scheduler = scheduler () in
   let ty = expand_head env ty in
+  let wait ivar =
+    let cancel () =
+      default ();
+      (* [default] did not determine [ty]'s head, which stays a variable. *)
+      match get_desc ty with
+      | Tivar { name; jkind; ivar = _ } ->
+        set_type_desc ty (Tvar { name; jkind })
+      | _ -> ()
+    in
+    Ivar.upon ivar ~run:(fun shape -> run (Some shape)) ~cancel ~scheduler
+  in
   match get_desc ty with
   | Tvar _ when not (Language_extension.is_enabled Omnidirectionality) ->
-    Scheduler.add scheduler (fun () -> run (default ()))
+    Scheduler.add scheduler default
   | Tvar { name; jkind } ->
     if get_level ty = generic_level
-    then Misc.fatal_error "Ctype.upon_shape: generic type variable";
+    then Misc.fatal_error "Ctype.upon: generic type variable";
     let ivar = Ivar.create ~in_global_pool:true () in
     set_type_desc ty (Tivar { name; jkind; ivar });
-    ivar_upon ivar ~run ~default ~scheduler
-  | Tivar { ivar; _ } -> ivar_upon ivar ~run ~default ~scheduler
-  | _ -> (
-    (* Fast path: [ty] is not a variable, so behaves as if its ivar
-       were already filled, or defaulted if [ty] has no shape. *)
-    match type_shape_of_expanded_head env ty with
-    | Some shape -> Scheduler.add scheduler (fun () -> run shape)
-    | None -> Scheduler.add scheduler (fun () -> run (default ())))
+    wait ivar
+  | Tivar { ivar; _ } -> wait ivar
+  | _ ->
+    (* Fast path: [ty] is not a variable, so behaves as if its ivar were
+       already filled. *)
+    let shape = type_shape_of_expanded_head env ty in
+    Scheduler.add scheduler (fun () -> run shape)
+
+let upon_shape env ty ~run ~default =
+  (* A conflicting default fails in [run]'s unification. *)
+  let default () = run (default ()) in
+  upon env ty ~default ~run:(function
+    | Some shape -> run shape
+    | None -> default ())
 
 (* Unify a [Tivar] [t1'] with the non-variable type [t2], whose expanded head
    is [t2']: link [t1'] to [t2] as for a [Tvar], then fill its ivar with the
@@ -5349,22 +5392,26 @@ let rec unify uenv t1 t2 =
   try
     type_changed := true;
     begin match (get_desc t1, get_desc t2) with
-      (Tconstr _, Tvar _) when deep_occur t2 t1 ->
+      (Tconstr _, (Tvar _ | Tivar _)) when deep_occur t2 t1 ->
         unify2 uenv t1 t2
-    | (Tvar _, Tconstr _) when deep_occur t1 t2 ->
+    | ((Tvar _ | Tivar _), Tconstr _) when deep_occur t1 t2 ->
         unify2 uenv t1 t2
-    | (Tquote _, Tvar _) when deep_occur t2 t1 ->
+    | (Tquote _, (Tvar _ | Tivar _)) when deep_occur t2 t1 ->
         unify2 uenv t1 t2
-    | (Tvar _, Tquote _) when deep_occur t1 t2 ->
+    | ((Tvar _ | Tivar _), Tquote _) when deep_occur t1 t2 ->
         unify2 uenv t1 t2
-    | (Tsplice _, Tvar _) when deep_occur t2 t1 ->
+    | (Tsplice _, (Tvar _ | Tivar _)) when deep_occur t2 t1 ->
         unify2 uenv t1 t2
-    | (Tvar _, Tsplice _) when deep_occur t1 t2 ->
+    | ((Tvar _ | Tivar _), Tsplice _) when deep_occur t1 t2 ->
         unify2 uenv t1 t2
     | (Tvar _, _) ->
         if unify1_var uenv t1 t2 then () else unify2 uenv t1 t2
     | (_, Tvar _) ->
         if unify1_var uenv t2 t1 then () else unify2 uenv t1 t2
+    | (Tivar { ivar; _ }, _) ->
+        if unify1_ivar uenv t1 ivar t2 then () else unify2 uenv t1 t2
+    | (_, Tivar { ivar; _ }) ->
+        if unify1_ivar uenv t2 ivar t1 then () else unify2 uenv t1 t2
     | (Tunivar { jkind = k1 }, Tunivar { jkind = k2 }) ->
         unify_univar_for Unify (get_env uenv) t1 t2 k1 k2 !univar_pairs;
         update_level_for Unify (get_env uenv) (get_level t1) t2;
@@ -6729,6 +6776,39 @@ let crossing_of_ty env ?modalities ty =
   match modalities with
   | None -> crossing
   | Some m -> Crossing.modality m crossing
+
+let () =
+  Defined_later.Fun.define_exn Ikind.upon_later upon;
+  Defined_later.Fun.define_exn Ikind.scheduler_later scheduler
+
+let upon_crossing env ?modalities ty ~cross ~later =
+  if not (Language_extension.is_enabled Omnidirectionality)
+  then cross (crossing_of_ty env ?modalities ty)
+  else
+    let later () =
+      let mode = With_regionality.newvar (get_current_level ()) in
+      later mode
+    in
+    if !Clflags.ikinds
+    then
+      Ikind.upon_crossing_of_type env ty
+        ~cross:(fun crossing ->
+          cross
+            (match modalities with
+            | None -> crossing
+            | Some m -> Crossing.modality m crossing))
+        ~later
+    else
+      (* Jkinds do not say which type variables they depend on, so we only wait
+        for the head. *)
+      let head = expand_head env ty in
+      match get_desc head with
+      | (Tvar _ | Tivar _) when get_level head <> generic_level ->
+        let result, ~run = later () in
+        let run () = run (cross (crossing_of_ty env ?modalities ty)) in
+        upon env head ~run:(fun _ -> run ()) ~default:run;
+        result
+      | _ -> cross (crossing_of_ty env ?modalities ty)
 
 let cross_left env ?modalities ty mode =
   let crossing = crossing_of_ty env ?modalities ty in

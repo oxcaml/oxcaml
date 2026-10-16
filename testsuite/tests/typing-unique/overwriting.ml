@@ -83,10 +83,7 @@ let gc_soundness_bug (r @ local unique) (local_ x) =
 Line 2, characters 31-32:
 2 |   exclave_ overwrite_ r with { x }
                                    ^
-Error: This value is "local"
-       but is expected to be "global"
-         because it is the field "x" of the record at line 2, characters 29-34
-         which is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let disallowed_by_locality (r @ local unique) (local_ x) =
@@ -107,10 +104,7 @@ let gc_soundness_bug (r @ unique) (local_ x) =
 Line 2, characters 31-32:
 2 |   exclave_ overwrite_ r with { x }
                                    ^
-Error: This value is "local"
-       but is expected to be "global"
-         because it is the field "x" of the record at line 2, characters 29-34
-         which is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let disallowed_by_locality (r @ unique) (local_ x) =
