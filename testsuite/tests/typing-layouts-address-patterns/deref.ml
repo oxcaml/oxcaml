@@ -214,12 +214,12 @@ Error: Dereference patterns must bind a variable or a wildcard,
 (***************)
 (* Compilation *)
 
-(* Compiling dereference patterns is not supported yet *)
+(* Running dereference patterns *)
 let run (deref_ _, _) = ()
 let _ = run (1, 2)
 [%%expect{|
 val run : 'a * 'b -> unit = <fun>
-Exception: Invalid_argument "dereference patterns are not supported yet".
+- : unit = ()
 |}]
 
 (* Default matrices may contain dereference patterns, e.g. from alternatives of

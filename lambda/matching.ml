@@ -179,29 +179,87 @@ let map_on_rows f = List.map (map_on_row f)
 
 module Non_empty_row = Patterns.Non_empty_row
 
-let raise_unsupported_pattern loc msg =
-  let sloc =
-    Scoped_location.of_location ~scopes:Scoped_location.empty_scopes loc
-  in
-  let slot =
-    transl_extension_path sloc
-      (Lazy.force Env.initial) Predef.path_invalid_argument
-  in
-  Lprim
-    ( Praise Raise_regular,
-      [ Lprim
-          ( Pmakeblock (0, Immutable, All_value, alloc_heap),
-            [ slot;
-              Lconst (Const_base (Const_string (msg, loc, None)))
-            ],
-            sloc )
-      ],
-      sloc )
-
 let fatal_var_lpoly lpoly =
   let n = List.length (Types.Lpoly.get_exn lpoly) in
   Misc.fatal_errorf
     "Matching: layout-poly patterns not yet supported (%d sort var(s))" n
+
+(* Dereference patterns
+
+   A dereference pattern [deref_ x] matches a value stored in a block and
+   binds [x] to the address of its position. The arguments of the pattern
+   matching that dereference patterns may match keep track of their position,
+   as a [deref_address]. (The access paths recorded in [Tpat_deref] are not
+   needed.) The argument of [deref_] is a variable or a wildcard, so it places
+   no constraint on the value: compiling a dereference pattern amounts to
+   binding the address in the action and matching the value against [_]. *)
+
+type deref_field =
+  | Value_field of int
+  | Mixed_field of mixed_block_shape * int
+
+type deref_address =
+  | In_block of
+      { block : lambda; field : deref_field; rev_unboxed_path : int list }
+      (** The position [field] of [block], then the unboxed fields
+          [List.rev rev_unboxed_path] *)
+  | In_address of
+      { addr : lambda; contents_layout : layout; rev_unboxed_path : int list }
+      (** The value at the address [addr], of layout [contents_layout], then
+          the unboxed fields [List.rev rev_unboxed_path] *)
+
+let deref_address_unboxed_field pos = function
+  | In_block a ->
+      In_block { a with rev_unboxed_path = pos :: a.rev_unboxed_path }
+  | In_address a ->
+      In_address { a with rev_unboxed_path = pos :: a.rev_unboxed_path }
+
+let address_layouts = [ layout_any_value; layout_block_idx ]
+
+let transl_deref_address deref_address =
+  let loc = Scoped_location.Loc_unknown in
+  let make_address base idx =
+    Lprim (Pmake_unboxed_product address_layouts, [ base; idx ], loc)
+  in
+  match deref_address with
+  | In_block { block; field = Value_field pos; rev_unboxed_path = [] } ->
+      make_address block (Lprim (Pmake_idx_field pos, [], loc))
+  | In_block { field = Value_field _; rev_unboxed_path = _ :: _ } ->
+      fatal_error "Matching.transl_deref_address: unboxed field of a value"
+  | In_block { block; field = Mixed_field (shape, pos); rev_unboxed_path } ->
+      let path = List.rev rev_unboxed_path in
+      make_address block
+        (Lprim (Pmake_idx_mixed_field (shape, pos, path), [], loc))
+  | In_address { addr; rev_unboxed_path = []; _ } -> addr
+  | In_address { addr; contents_layout; rev_unboxed_path } ->
+      let part i =
+        Lprim (Punboxed_product_field (i, address_layouts), [ addr ], loc)
+      in
+      let contents = mixed_block_element_of_layout contents_layout in
+      let path = List.rev rev_unboxed_path in
+      make_address (part 0)
+        (Lprim (Pidx_deepen (contents, path), [ part 1 ], loc))
+
+let bind_address (id, duid) deref_address action =
+  match deref_address with
+  | Some deref_address ->
+      bind_with_layout Alias (id, duid, Punboxed_product address_layouts)
+        (transl_deref_address deref_address) action
+  | None -> fatal_error "Matching: dereference pattern without an address"
+
+(* The variable a dereference pattern binds to the address of its position,
+   if its argument is not a wildcard. *)
+let deref_binder (q : pattern) =
+  match q.pat_desc with
+  | Tpat_any -> None
+  | Tpat_var { id; uid; _ } -> Some (id, uid)
+  | Tpat_fun_layout { lpoly; _ } -> fatal_var_lpoly lpoly
+  | _ -> fatal_error "Matching.deref_binder: argument is not a variable"
+
+(* The pattern a dereference pattern imposes on the value at its position:
+   none, since its argument only binds the address. *)
+let deref_value (deref : pattern) =
+  { deref with pat_desc = Tpat_any; pat_extra = [] }
 
 module General = struct
   include Patterns.General
@@ -214,6 +272,8 @@ module Half_simple : sig
   (** Half-simplified patterns are patterns where:
         - records are expanded so that they possess all fields
         - aliases are removed and replaced by bindings in actions.
+        - dereference patterns are replaced by wildcards, and the addresses
+          they bind become bindings in actions.
 
       Or-patterns are not removed, they are only "half-simplified":
         - aliases under or-patterns are kept
@@ -234,7 +294,9 @@ module Half_simple : sig
 
   type nonrec clause = pattern Non_empty_row.t clause
 
-  val of_clause : arg:lambda -> General.clause -> clause
+  val of_clause :
+    arg:lambda -> deref_address:deref_address option -> General.clause ->
+    clause
 end = struct
   include Patterns.Half_simple
 
@@ -266,7 +328,7 @@ end = struct
     | _ -> p
 
   (* Explode or-patterns and turn aliases into bindings in actions *)
-  let of_clause ~arg cl =
+  let of_clause ~arg ~deref_address cl =
     let rec aux (((p, patl), action) : General.clause) : clause =
       let continue p (view : General.view) : clause =
         aux (({ p with pat_desc = view }, patl), action)
@@ -299,21 +361,13 @@ end = struct
           | `Or _ as or_view -> stop orpat or_view
           | other_view -> continue orpat other_view
         )
-      | `Deref _ ->
-          (* CR address-patterns: compile dereference patterns. Elements of
-             syntactic tuples ([match (a, b)] in [do_for_multiple_match],
-             [let ... = (a, b)] in [assign_pat], tupled functions) are not
-             stored in a block. If a dereference pattern points into such a
-             tuple, bind the tuple once, outside the match, with an [Alias]
-             let to a fresh "*deref_target*", and build the addresses (and
-             the aliases of the tuple) from it. [Simplif] then drops the
-             binding if it is unused, moves it into its use if there is only
-             one, and allocates the tuple once before the match otherwise.
-             Never build the tuple more than once: values at addresses may be
-             large. *)
-          (({ p with pat_desc = `Any }, patl),
-           raise_unsupported_pattern p.pat_loc
-             "dereference patterns are not supported yet")
+      | `Deref (_, _, _, q) ->
+          let action =
+            match deref_binder q with
+            | None -> action
+            | Some binder -> bind_address binder deref_address action
+          in
+          aux ((General.view (deref_value (General.erase p)), patl), action)
       | ( `Constant _ | `Unboxed_unit | `Unboxed_bool _ | `Tuple _
         | `Unboxed_tuple _ | `Construct _ | `Variant _ | `Array _ | `Addr _
         | `Lazy _ )
@@ -334,6 +388,7 @@ module Simple : sig
   val explode_or_pat :
     arg:lambda ->
     arg_sort:Jkind.Sort.Const.t ->
+    deref_address:deref_address option ->
     Half_simple.pattern ->
     mk_action:(vars:Ident.t list -> lambda) ->
     patbound_action_vars:(Ident.t * Lambda.debug_uid) list ->
@@ -399,28 +454,39 @@ end = struct
      the bindings [let x1 = arg] are inlined on the fly), except when
      compiling in [do_for_multiple_match] where it is a tuple of
      variables.
+
+     Dereference patterns are split as in [Half_simple.of_clause], and the
+     variables bound to the address of [arg] are bound like [x1] above.
   *)
-  let explode_or_pat ~arg ~arg_sort (p : Half_simple.pattern)
+  let explode_or_pat ~arg ~arg_sort ~deref_address (p : Half_simple.pattern)
         ~mk_action ~patbound_action_vars
     : (pattern * lambda) list =
-    let rec explode p aliases rem =
-      let split_explode p aliases rem = explode (General.view p) aliases rem in
+    (* [aliases] are bound to [arg], [address_aliases] to the address of [arg]
+       (see [deref_address]) *)
+    let rec explode p aliases address_aliases rem =
+      let split_explode p aliases address_aliases rem =
+        explode (General.view p) aliases address_aliases rem
+      in
       match p.pat_desc with
       | `Or (p1, p2, _) ->
-          split_explode p1 aliases (split_explode p2 aliases rem)
-      | `Alias (p, id, _, _, _, _, _) -> split_explode p (id :: aliases) rem
+          split_explode p1 aliases address_aliases
+            (split_explode p2 aliases address_aliases rem)
+      | `Alias (p, id, _, _, _, _, _) ->
+          split_explode p (id :: aliases) address_aliases rem
       | `Var (id, str, uid, sort, mode) ->
           explode
             { p with pat_desc =
                 `Alias (Patterns.omega, id, str, uid, sort, mode, p.pat_type) }
-            aliases rem
+            aliases address_aliases rem
       | `Fun_layout (_, _, _, _, _, lpoly, _) -> fatal_var_lpoly lpoly
-      | `Deref _ ->
-          (* CR address-patterns: compile dereference patterns *)
-          ({ p with pat_desc = `Any },
-           raise_unsupported_pattern p.pat_loc
-             "dereference patterns are not supported yet")
-          :: rem
+      | `Deref (_, _, _, q) ->
+          let address_aliases =
+            match deref_binder q with
+            | None -> address_aliases
+            | Some (id, _) -> id :: address_aliases
+          in
+          split_explode (deref_value (General.erase p)) aliases
+            address_aliases rem
       | #view as view ->
           (* We are doing two things here:
              - we freshen the variables of the pattern, to
@@ -443,7 +509,14 @@ end = struct
                 let fresh_action = mk_action ~vars:(List.rev action_vars) in
                 (fresh_pat, fresh_action)
             | (pat_id, pat_duid) :: rem_vars ->
-              if not (List.mem pat_id aliases) then begin
+              if List.mem pat_id address_aliases then begin
+                let id = Ident.rename pat_id in
+                let action_vars = id :: action_vars in
+                let pat, action =
+                  fresh_clause arg_id action_vars renaming_env rem_vars
+                in
+                pat, bind_address (id, pat_duid) deref_address action
+              end else if not (List.mem pat_id aliases) then begin
                 let fresh_id = Ident.rename pat_id in
                 let action_vars = fresh_id :: action_vars in
                 let renaming_env = ((pat_id, fresh_id) :: renaming_env) in
@@ -466,7 +539,7 @@ end = struct
           in
           fresh_clause None [] [] patbound_action_vars :: rem
     in
-    explode (p : Half_simple.pattern :> General.pattern) [] []
+    explode (p : Half_simple.pattern :> General.pattern) [] [] []
 end
 
 let expand_record_simple : Simple.pattern -> Simple.pattern =
@@ -1194,6 +1267,8 @@ type 'a arg = {
       for the mutable read -- may observe a different value. *)
   sort : Jkind.Sort.Const.t;
   layout : layout;
+  deref_address : deref_address option;
+  (** The address of the argument, if dereference patterns may match it *)
 }
 
 type args = lambda arg list
@@ -1433,16 +1508,17 @@ let safe_before ((p, ps), act_p) l =
       || not (may_compats (General.erase p :: ps) (General.erase q :: qs)))
     l
 
-let half_simplify_nonempty ~arg
+let half_simplify_nonempty ~arg ~deref_address
       (cls : Typedtree.pattern Non_empty_row.t clause) : Half_simple.clause =
   cls
   |> map_on_row (Non_empty_row.map_first General.view)
-  |> Half_simple.of_clause ~arg
+  |> Half_simple.of_clause ~arg ~deref_address
 
-let half_simplify_clause ~arg (cls : Typedtree.pattern list clause) =
+let half_simplify_clause ~arg ~deref_address
+      (cls : Typedtree.pattern list clause) =
   cls
   |> map_on_row Non_empty_row.of_initial
-  |> half_simplify_nonempty ~arg
+  |> half_simplify_nonempty ~arg ~deref_address
 
 (* Once matchings are *fully* simplified, one can easily find
    their nature. *)
@@ -1813,7 +1889,8 @@ and precompile_var args cls def k =
                 (* we learned by pattern-matching on [args]
                    that [p::ps] has at least two arguments,
                    so [ps] must be non-empty *)
-                half_simplify_clause ~arg:(Lvar v) (ps, act))
+                half_simplify_clause ~arg:(Lvar v)
+                  ~deref_address:first.deref_address (ps, act))
               cls
           and var_def = Default_environment.pop_column def in
           let { me = first; matrix }, nexts =
@@ -1944,7 +2021,8 @@ and precompile_or (cls : Simple.clause list) ors args def k =
             let new_cases =
               let arg = arg_of_pure args.first.arg in
               let arg_sort = args.first.sort in
-              Simple.explode_or_pat ~arg ~arg_sort p
+              Simple.explode_or_pat ~arg ~arg_sort
+                ~deref_address:args.first.deref_address p
                 ~mk_action:mk_new_action
                 ~patbound_action_vars:
                  (List.map (fun (id, duid, _) -> id, duid) patbound_action_vars)
@@ -2207,7 +2285,8 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
           [| Types.mixed_block_element_of_const_sort sort |]
       in
       let e, layout = lambda_void_of_el shape.(0) in
-      { arg = e; binding_kind; mut = compose_mut mut Immutable; sort; layout; }
+      { arg = e; binding_kind; mut = compose_mut mut Immutable; sort; layout;
+        deref_address = None }
     | Constructor_uniform_value ->
       fatal_error "Matching.get_exr_args_constr: if constant, should have no \
                    args and then shouldn't produce accesses"
@@ -2242,11 +2321,12 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
         mut = compose_mut mut Immutable;
         sort;
         layout;
+        deref_address = None;
       }
   in
   let binding_kind = add_barrier_to_let_kind ubr Alias in
   if cstr.cstr_inlined <> None then
-    { arg; binding_kind; mut; sort; layout } :: rem
+    { arg; binding_kind; mut; sort; layout; deref_address = None } :: rem
   else
     match cstr.cstr_repr with
     | Variant_boxed _ ->
@@ -2263,7 +2343,7 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
           arg_sorts
         @ rem
       else
-        { arg; binding_kind; mut; sort; layout } :: rem
+        { arg; binding_kind; mut; sort; layout; deref_address = None } :: rem
         (* the unboxed variant constructor, or the [This] constructor
            for [Variant_with_null]. *)
     | Variant_extensible ->
@@ -2308,6 +2388,7 @@ let get_expr_args_variant_nonconst ~scopes head { arg; mut; _ } rem =
     mut = compose_mut mut Immutable;
     sort = Jkind.Sort.Const.for_variant_arg;
     layout = layout_variant_arg;
+    deref_address = None;
   } :: rem
 
 let divide_variant ~scopes row ctx { cases = cl; args; default = def } =
@@ -2520,6 +2601,7 @@ let get_expr_args_lazy ~scopes head { arg; mut; _ } rem =
        always returns the same value. *)
     sort = Jkind.Sort.Const.for_lazy_body;
     layout = layout_lazy_contents;
+    deref_address = None;
   } :: rem
 
 let divide_lazy ~scopes head ctx pm =
@@ -2562,6 +2644,10 @@ let get_expr_args_addr ~scopes head { arg; mut; _ } rem =
     mut = compose_mut mut mut_flag;
     sort;
     layout;
+    deref_address =
+      Some
+        (In_address
+           { addr = arg; contents_layout = layout; rev_unboxed_path = [] });
   } :: rem
 
 let divide_addr ~scopes head ctx pm =
@@ -2601,11 +2687,16 @@ let get_expr_args_tuple ~scopes head { arg; mut; _ } rem =
         mut = compose_mut mut Immutable;
         sort = Jkind.Sort.Const.for_tuple_element;
         layout = layout_tuple_element;
+        deref_address =
+          Some
+            (In_block
+               { block = arg; field = Value_field pos; rev_unboxed_path = [] });
       } :: make_args (pos + 1)
   in
   make_args 0
 
-let get_expr_args_unboxed_tuple ~scopes shape head { arg; mut; _ } rem =
+let get_expr_args_unboxed_tuple ~scopes shape head
+      { arg; mut; deref_address; _ } rem =
   let loc = head_loc ~scopes head in
   let shape =
     List.map (fun (_, sort) ->
@@ -2624,6 +2715,8 @@ let get_expr_args_unboxed_tuple ~scopes shape head { arg; mut; _ } rem =
       mut = compose_mut mut Immutable;
       sort;
       layout;
+      deref_address =
+        Option.map (deref_address_unboxed_field pos) deref_address;
     }) shape
   @ rem
 
@@ -2664,7 +2757,8 @@ let get_pat_args_record_unboxed_product num_fields p rem =
       record_matching_line num_fields lbl_pat_list @ rem
   | _ -> assert false
 
-let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
+let get_expr_args_record ~scopes head
+      { arg; mut; sort; layout; deref_address; _ } rem =
   let loc = head_loc ~scopes head in
   let all_labels, repres =
     let open Patterns.Head in
@@ -2739,6 +2833,18 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
         if Types.is_mutable lbl.lbl_mut then StrictOpt else Alias
       in
       let binding_kind = add_barrier_to_let_kind ubr binding_kind in
+      let deref_address =
+        let in_block field =
+          Some (In_block { block = arg; field; rev_unboxed_path = [] })
+        in
+        match lbl_repres with
+        | Record_boxed -> in_block (Value_field lbl.lbl_pos)
+        | Record_mixed shape -> in_block (Mixed_field (shape, lbl.lbl_pos))
+        | Record_unboxed -> deref_address
+        | Record_inlined _ | Record_float | Record_ufloat ->
+            (* Dereference patterns are not allowed here *)
+            None
+      in
       {
         arg = access;
         binding_kind;
@@ -2746,12 +2852,14 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
           (if Types.is_mutable lbl.lbl_mut then Mutable else Immutable);
         sort;
         layout;
+        deref_address;
       } :: make_args (pos + 1)
   in
   make_args 0
 
 (* CR lmaurer: This is a vastly not-okay amount of duplicated code. *)
-let get_expr_args_record_unboxed_product ~scopes head { arg; mut; _ } rem =
+let get_expr_args_record_unboxed_product ~scopes head
+      { arg; mut; deref_address; _ } rem =
   let loc = head_loc ~scopes head in
   let all_labels, lbl_repres =
     let open Patterns.Head in
@@ -2775,10 +2883,13 @@ let get_expr_args_record_unboxed_product ~scopes head { arg; mut; _ } rem =
       rem
     else
       let lbl = all_labels.(pos) in
-      let access = if Array.length all_labels = 1 then
-        arg (* erase singleton unboxed records before lambda *)
-      else
-        Lprim (Punboxed_product_field (pos, lbl_layouts), [ arg ], loc)
+      let access, deref_address =
+        if Array.length all_labels = 1 then
+          (* erase singleton unboxed records before lambda *)
+          arg, deref_address
+        else
+          Lprim (Punboxed_product_field (pos, lbl_layouts), [ arg ], loc),
+          Option.map (deref_address_unboxed_field pos) deref_address
       in
       let binding_kind, mut =
         if Types.is_mutable lbl.lbl_mut then
@@ -2798,7 +2909,8 @@ let get_expr_args_record_unboxed_product ~scopes head { arg; mut; _ } rem =
         binding_kind;
         mut;
         sort = lbl_sort;
-        layout
+        layout;
+        deref_address;
       } :: make_args (pos + 1)
   in
   make_args 0
@@ -2860,6 +2972,7 @@ let get_expr_args_array ~scopes kind head { arg; mut; _ } rem =
           compose_mut mut (if Types.is_mutable am then Mutable else Immutable);
         sort = arg_sort;
         layout = result_layout;
+        deref_address = None;
       } :: make_args (pos + 1)
   in
   make_args 0
@@ -4322,7 +4435,12 @@ and compile_match_nonempty ~scopes value_kind repr partial ctx
       let v, v_duid = arg_to_var arg m.cases in
       bind_match_arg binding_kind v v_duid arg layout (
         let args = { first = { first with arg = Var v }; rest } in
-        let cases = List.map (half_simplify_nonempty ~arg:(Lvar v)) m.cases in
+        let cases =
+          List.map
+            (half_simplify_nonempty ~arg:(Lvar v)
+               ~deref_address:first.deref_address)
+            m.cases
+        in
         let m = { m with args; cases } in
         let first_match, rem =
           split_and_precompile_half_simplified m in
@@ -4711,12 +4829,59 @@ let toplevel_handler ~scopes ~return_layout loc ~failer partial args cases
                       Same_region, return_layout)
   end
 
-let root_arg arg binding_kind sort layout =
+let root_arg ?deref_address arg binding_kind sort layout =
   (* The mutability information denotes the mutability of a *position*
      inside the value, which indicates whether looking inside the
      value of the scrutinee is a pure operation. At the root we are
      immutable. *)
-  { arg; binding_kind; mut = Immutable; sort; layout }
+  { arg; binding_kind; mut = Immutable; sort; layout; deref_address }
+
+(* Syntactic tuples ([match (a, b) with ...], [let ... = (a, b)] and the
+   arguments of tupled functions) are matched element-wise, without allocating
+   the tuple. Dereference patterns on their elements need the tuple in memory.
+   For [match], if there are any, [bind_deref_tuple] binds the tuple to a
+   variable [deref_tuple], with an [Alias] binding. [Simplif] moves the
+   allocation to its use if there is only one. *)
+
+(* Whether a pattern on an element of a tuple contains dereference patterns on
+   the element (rather than on elements of nested tuples) *)
+let rec derefs_tuple_element : type k. k general_pattern -> bool =
+ fun p ->
+  match p.pat_desc with
+  | Tpat_deref (_, Baccess_tuple_element _, _, _) -> true
+  | Tpat_tuple _ -> false
+  | _ ->
+      let found = ref false in
+      shallow_iter_pattern_desc
+        { f = (fun p -> if derefs_tuple_element p then found := true) }
+        p.pat_desc;
+      !found
+
+let rec has_tuple_element_deref (p : pattern) =
+  match p.pat_desc with
+  | Tpat_tuple ps -> List.exists (fun (_, p) -> derefs_tuple_element p) ps
+  | Tpat_alias { pattern; _ } -> has_tuple_element_deref pattern
+  | Tpat_or (p1, p2, _) ->
+      has_tuple_element_deref p1 || has_tuple_element_deref p2
+  | _ -> false
+
+let bind_deref_tuple ~needed tuple =
+  if needed then
+    let deref_tuple = Ident.create_local "*deref_tuple*" in
+    ( Some deref_tuple,
+      fun lam ->
+        Llet (Alias, layout_block, deref_tuple, debug_uid_none, tuple, lam) )
+  else None, Fun.id
+
+let deref_tuple_element deref_tuple pos =
+  Option.map
+    (fun deref_tuple ->
+      In_block
+        { block = Lvar deref_tuple;
+          field = Value_field pos;
+          rev_unboxed_path = []
+        })
+    deref_tuple
 
 let compile_matching ~scopes ~arg_sort ~arg_layout ~return_layout loc ~failer
       repr arg pat_act_list partial =
@@ -4870,6 +5035,10 @@ let rec map_return f = function
 let assign_pat ~scopes body_layout opt nraise catch_ids loc pat pat_sort lam =
   let rec collect pat_sort acc pat lam =
     match (pat.pat_desc, lam) with
+    | Tpat_tuple _, _ when has_tuple_element_deref pat ->
+        (* Dereference patterns need the tuple in memory, so we don't bind
+           its elements separately *)
+        collect_whole pat_sort acc pat lam
     | Tpat_tuple patl, Lprim (Pmakeblock _, lams, _) ->
         opt := true;
         List.fold_left2
@@ -4882,12 +5051,13 @@ let assign_pat ~scopes body_layout opt nraise catch_ids loc pat pat_sort lam =
           collect Jkind.Sort.Const.for_tuple_element acc pat (Lconst sc)
         in
         List.fold_left2 collect_const acc patl scl
-    | _ ->
-        (* pattern idents will be bound in staticcatch (let body), so we
-           refresh them here to guarantee binders uniqueness *)
-        let pat_ids = pat_bound_idents pat in
-        let fresh_ids = List.map (fun id -> (id, Ident.rename id)) pat_ids in
-        (fresh_ids, alpha_pat fresh_ids pat, lam, pat_sort) :: acc
+    | _ -> collect_whole pat_sort acc pat lam
+  and collect_whole pat_sort acc pat lam =
+    (* pattern idents will be bound in staticcatch (let body), so we
+       refresh them here to guarantee binders uniqueness *)
+    let pat_ids = pat_bound_idents pat in
+    let fresh_ids = List.map (fun id -> (id, Ident.rename id)) pat_ids in
+    (fresh_ids, alpha_pat fresh_ids pat, lam, pat_sort) :: acc
   in
   (* sublets were accumulated by 'collect' with the leftmost tuple
      pattern at the bottom of the list; to respect right-to-left
@@ -5000,6 +5170,10 @@ let for_tupled_function ~scopes ~return_layout loc paraml pats_act_list partial 
 
 let flatten_pattern size p =
   match p.pat_desc with
+  | Tpat_tuple _ when has_tuple_element_deref p ->
+      (* Calls to tupled functions with tuples that are already allocated would
+         allocate them again *)
+      raise Cannot_flatten
   | Tpat_tuple args -> List.map snd args
   | Tpat_any -> Patterns.omegas size
   | _ -> raise Cannot_flatten
@@ -5086,9 +5260,23 @@ let do_for_multiple_match ~scopes ~return_layout loc idl mode
      when we allow non-values in structures. *)
   let repr = None in
   let param_lambda = List.map (fun (id, _, _) -> Lvar id) idl in
-  let arg =
+  let tuple =
     let sloc = Scoped_location.of_location ~scopes loc in
     Lprim (Pmakeblock (0, Immutable, All_value, mode), param_lambda, sloc)
+  in
+  let deref_tuple, bind_deref_tuple =
+    let needed =
+      List.exists (fun (p, _) -> has_tuple_element_deref p) pat_act_list
+    in
+    bind_deref_tuple ~needed tuple
+  in
+  let arg =
+    match deref_tuple with
+    | Some deref_tuple ->
+        (* Aliases of the tuple refer to the same block as the dereference
+           patterns *)
+        Lvar deref_tuple
+    | None -> tuple
   in
   let input_args =
     { first = root_arg (Tuple arg) Strict
@@ -5099,16 +5287,21 @@ let do_for_multiple_match ~scopes ~return_layout loc idl mode
     let rows = map_on_rows (fun p -> (p, [])) pat_act_list in
     toplevel_handler ~scopes ~return_layout loc ~failer:Raise_match_failure
       partial input_args rows in
+  bind_deref_tuple @@
   handler (fun partial pm1 ->
     let pm1_half =
       { pm1 with
-        cases = List.map (half_simplify_nonempty ~arg) pm1.cases }
+        cases =
+          List.map (half_simplify_nonempty ~arg ~deref_address:None)
+            pm1.cases }
     in
     let next, nexts = split_and_precompile_half_simplified pm1_half in
     let size = List.length idl in
     let args =
-      List.map
-        (fun (id, sort, layout) -> root_arg (Lvar id) Alias sort layout)
+      List.mapi
+        (fun pos (id, sort, layout) ->
+          root_arg (Lvar id) Alias sort layout
+            ?deref_address:(deref_tuple_element deref_tuple pos))
         idl
     in
     let flat_next = flatten_precompiled size args next
