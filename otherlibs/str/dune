@@ -16,11 +16,7 @@
  (name str)
  (wrapped false)
  (modes byte native)
- (flags (
-   :standard
-   -strict-sequence -absname -w +67+70
-   -bin-annot -safe-string -strict-formats
- ))
+ (flags (:standard (:include flags.sexp) -bin-annot))
  (ocamlopt_flags (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
  (library_flags (:standard -linkall))
  (foreign_stubs (language c) (names strstubs)

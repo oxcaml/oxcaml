@@ -18,11 +18,8 @@
  (modes byte native)
  (flags
   (:standard
-   -strict-sequence
-   -absname
-   -bin-annot
-   -safe-string
-   -strict-formats))
+   (:include flags.sexp)
+   -bin-annot))
  (ocamlopt_flags
   (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
  (library_flags
