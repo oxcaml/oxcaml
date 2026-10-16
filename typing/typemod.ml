@@ -3684,6 +3684,11 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
         ~mty_res
         ~mode_res:(with_locality_as_regionality mm_res)
         ~mode_arg:None;
+      let staticity = With_locality.proj_monadic Staticity mm_res in
+      Staticity.submode_err (funct.mod_loc, Functor)
+        (Staticity.of_const ~hint:(Always_dynamic Generative_functor)
+            Dynamic)
+        staticity;
       { mod_desc = Tmod_apply_unit(funct, Mode.Yielding.newvar 0);
         mod_type = mty_res;
         mod_mode =

@@ -480,11 +480,11 @@ module M = struct
   let _ @ static = Y.x
 end
 [%%expect{|
-module M :
-  sig
-    module F : functor () -> sig val x : int end @ static
-    module Y : sig val x : int end
-  end
+Line 4, characters 19-22:
+4 |   let _ @ static = Y.x
+                       ^^^
+Error: This value is "dynamic" because generative functors are always dynamic.
+       However, the highlighted expression is expected to be "static".
 |}]
 
 (* A functor type declares its return's staticity independently of the
