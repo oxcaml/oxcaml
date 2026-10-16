@@ -172,6 +172,7 @@
   with_backtracking_intf
   with_backtracking
   union_find
+  defined_later
   diffing
   diffing_with_keys
   linkdeps

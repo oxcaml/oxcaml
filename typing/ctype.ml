@@ -5271,31 +5271,44 @@ let at_current_levels f =
     nongen_level := nongen;
     wrap_end_def (fun () -> f x)
 
-(* Registers [run] on [ivar]. If [ivar] is defaulted, calls [run (default ())]
-   instead. A conflicting default fails in [run]'s unification. *)
-let ivar_upon ivar ~run ~default ~scheduler =
-  Ivar.upon ivar ~run ~cancel:(fun () -> run (default ())) ~scheduler
-
-let upon_shape env ty ~run ~default =
+let upon env ty ~run ~default =
   let run = at_current_levels run in
+  let default = at_current_levels default in
   let scheduler = scheduler () in
   let ty = expand_head env ty in
+  let wait ivar =
+    let cancel () =
+      default ();
+      (* [default] did not determine [ty]'s head, which stays a variable. *)
+      match get_desc ty with
+      | Tivar { name; jkind; ivar = _ } ->
+        set_type_desc ty (Tvar { name; jkind })
+      | _ -> ()
+    in
+    Ivar.upon ivar ~run:(fun shape -> run (Some shape)) ~cancel ~scheduler
+  in
   match get_desc ty with
   | Tvar _ when not (Language_extension.is_enabled Omnidirectionality) ->
-    Scheduler.add scheduler (fun () -> run (default ()))
+    Scheduler.add scheduler default
   | Tvar { name; jkind } ->
     if get_level ty = generic_level
-    then Misc.fatal_error "Ctype.upon_shape: generic type variable";
+    then Misc.fatal_error "Ctype.upon: generic type variable";
     let ivar = Ivar.create ~in_global_pool:true () in
     set_type_desc ty (Tivar { name; jkind; ivar });
-    ivar_upon ivar ~run ~default ~scheduler
-  | Tivar { ivar; _ } -> ivar_upon ivar ~run ~default ~scheduler
-  | _ -> (
-    (* Fast path: [ty] is not a variable, so behaves as if its ivar
-       were already filled, or defaulted if [ty] has no shape. *)
-    match type_shape_of_expanded_head env ty with
-    | Some shape -> Scheduler.add scheduler (fun () -> run shape)
-    | None -> Scheduler.add scheduler (fun () -> run (default ())))
+    wait ivar
+  | Tivar { ivar; _ } -> wait ivar
+  | _ ->
+    (* Fast path: [ty] is not a variable, so behaves as if its ivar were
+       already filled. *)
+    let shape = type_shape_of_expanded_head env ty in
+    Scheduler.add scheduler (fun () -> run shape)
+
+let upon_shape env ty ~run ~default =
+  (* A conflicting default fails in [run]'s unification. *)
+  let default () = run (default ()) in
+  upon env ty ~default ~run:(function
+    | Some shape -> run shape
+    | None -> default ())
 
 (* Unify a [Tivar] [t1'] with the non-variable type [t2], whose expanded head
    is [t2']: link [t1'] to [t2] as for a [Tvar], then fill its ivar with the
@@ -6729,6 +6742,39 @@ let crossing_of_ty env ?modalities ty =
   match modalities with
   | None -> crossing
   | Some m -> Crossing.modality m crossing
+
+let () =
+  Defined_later.Fun.define_exn Ikind.upon_later upon;
+  Defined_later.Fun.define_exn Ikind.scheduler_later scheduler
+
+let upon_crossing env ?modalities ty ~cross ~later =
+  if not (Language_extension.is_enabled Omnidirectionality)
+  then cross (crossing_of_ty env ?modalities ty)
+  else
+    let later () =
+      let mode = With_regionality.newvar (get_current_level ()) in
+      later mode
+    in
+    if !Clflags.ikinds
+    then
+      Ikind.upon_crossing_of_type env ty
+        ~cross:(fun crossing ->
+          cross
+            (match modalities with
+            | None -> crossing
+            | Some m -> Crossing.modality m crossing))
+        ~later
+    else
+      (* Jkinds do not say which type variables they depend on, so we only wait
+        for the head. *)
+      let head = expand_head env ty in
+      match get_desc head with
+      | (Tvar _ | Tivar _) when get_level head <> generic_level ->
+        let result, ~run = later () in
+        let run () = run (cross (crossing_of_ty env ?modalities ty)) in
+        upon env head ~run:(fun _ -> run ()) ~default:run;
+        result
+      | _ -> cross (crossing_of_ty env ?modalities ty)
 
 let cross_left env ?modalities ty mode =
   let crossing = crossing_of_ty env ?modalities ty in
