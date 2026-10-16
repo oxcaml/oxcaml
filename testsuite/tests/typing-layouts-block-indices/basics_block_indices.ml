@@ -824,7 +824,7 @@ Line 1, characters 13-30:
 1 | let bad () = (.mut_not_global)
                  ^^^^^^^^^^^^^^^^^
 Error: Block indices do not yet support non-default modalities. In particular,
-       mutable elements must be global, but this is not.
+       mutable elements must be global, but this is local.
 |}]
 
 let bad () = (.mut_not_many)
@@ -833,7 +833,7 @@ Line 1, characters 13-28:
 1 | let bad () = (.mut_not_many)
                  ^^^^^^^^^^^^^^^
 Error: Block indices do not yet support non-default modalities. In particular,
-       mutable elements must be many, but this is not.
+       mutable elements must be many, but this is once.
 |}]
 
 let bad () = (.mut_not_unyielding)
@@ -842,7 +842,7 @@ Line 1, characters 13-34:
 1 | let bad () = (.mut_not_unyielding)
                  ^^^^^^^^^^^^^^^^^^^^^
 Error: Block indices do not yet support non-default modalities. In particular,
-       mutable elements must be unyielding, but this is not.
+       mutable elements must be unyielding, but this is yielding.
 |}]
 
 let bad () = (.mut.#contended)
@@ -1055,14 +1055,52 @@ Error: This expression has type "('a iarray, 'a) idx_imm"
 (*******************)
 (* Private records *)
 
-type t = private { i : int }
-let bad () = (.i)
+type t = private { i : int; mutable j : int }
+let ok () = (.i)
 [%%expect{|
-type t = private { i : int; }
-Line 2, characters 15-16:
-2 | let bad () = (.i)
+type t = private { i : int; mutable j : int; }
+val ok : unit -> (t, int) idx_imm = <fun>
+|}]
+
+let bad () = (.j)
+[%%expect{|
+Line 1, characters 15-16:
+1 | let bad () = (.j)
                    ^
-Error: Block indices do not support private records.
+Error: Block indices do not support private types in mutable positions.
+|}]
+
+(* Private unboxed records further down the path *)
+module Private_u : sig
+  type t = private #{ a : int; b : int }
+end = struct
+  type t = #{ a : int; b : int }
+end
+type has_private_u = { mutable pu : Private_u.t }
+let bad () = (.pu.#Private_u.a)
+[%%expect{|
+module Private_u : sig type t = private #{ a : int; b : int; } end
+type has_private_u = { mutable pu : Private_u.t; }
+Line 7, characters 19-30:
+7 | let bad () = (.pu.#Private_u.a)
+                       ^^^^^^^^^^^
+Error: Block indices do not support private types in mutable positions.
+|}]
+
+type has_private_u_imm = { ipu : Private_u.t }
+let ok () = (.ipu.#Private_u.a)
+[%%expect{|
+type has_private_u_imm = { ipu : Private_u.t; }
+val ok : unit -> (has_private_u_imm, int) idx_imm = <fun>
+|}]
+
+let bad () =
+  (.idx_mut(Idx_mut.unsafe_create_into_array 0).#Private_u.a)
+[%%expect{|
+Line 2, characters 49-60:
+2 |   (.idx_mut(Idx_mut.unsafe_create_into_array 0).#Private_u.a)
+                                                     ^^^^^^^^^^^
+Error: Block indices do not support private types in mutable positions.
 |}]
 
 (****************)
