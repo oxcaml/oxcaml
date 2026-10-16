@@ -740,6 +740,39 @@ and expression =
         symbol : symbol
       }
 
+module Known_arguments = struct
+  type t = callee option list
+
+  let of_argument ~parameters = function[@ocaml.warning "-fragile-match"]
+    | Cvar var ->
+      List.find_index
+        (fun (parameter, _machtype) ->
+          Backend_var.same (Backend_var.With_provenance.var parameter) var)
+        parameters
+      |> Option.map (fun index -> Argument index)
+    | _ -> None
+
+  let of_arguments ~parameters arguments =
+    List.map (of_argument ~parameters) arguments
+
+  let none length = List.init length (fun _ -> None)
+
+  let find t index = Option.join (List.nth_opt t index)
+
+  let equal = List.equal (Option.equal equal_callee)
+
+  let compare = List.compare (Option.compare compare_callee)
+
+  let print ppf t =
+    let print_argument ppf = function
+      | None -> Format.fprintf ppf "?"
+      | Some callee -> print_callee ppf callee
+    in
+    Format.pp_print_list
+      ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ ")
+      print_argument ppf t
+end
+
 type codegen_option =
   | Reduce_code_size
   | No_CSE

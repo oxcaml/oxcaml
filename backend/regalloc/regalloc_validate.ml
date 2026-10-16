@@ -608,7 +608,7 @@ end = struct
     | Raise rk1, Raise rk2 when Lambda.equal_raise_kind rk1 rk2 -> ()
     | ( Tailcall_self { destination = l1; known_arguments = args1 },
         Tailcall_self { destination = l2; known_arguments = args2 } )
-      when Array.equal (Option.equal Cmm.equal_callee) args1 args2 ->
+      when Cmm.Known_arguments.equal args1 args2 ->
       compare_label l1 l2
     | Tailcall_func call1, Tailcall_func call2
       when Cfg.equal_func_call_operation call1 call2 ->

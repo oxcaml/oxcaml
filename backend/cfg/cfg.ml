@@ -824,7 +824,7 @@ let equal_func_call_operation
     { desc = left_desc; known_arguments = left_args }
     { desc = right_desc; known_arguments = right_args } =
   equal_func_call_desc left_desc right_desc
-  && Array.equal (Option.equal Cmm.equal_callee) left_args right_args
+  && Cmm.Known_arguments.equal left_args right_args
 
 let equal_external_call_operation
     { func_symbol = left_func_symbol;
@@ -897,7 +897,7 @@ let equal_terminator left right =
       Tailcall_self
         { destination = right_dest; known_arguments = right_args } ) ->
     Label.equal left_dest right_dest
-    && Array.equal (Option.equal Cmm.equal_callee) left_args right_args
+    && Cmm.Known_arguments.equal left_args right_args
   | Tailcall_func left_op, Tailcall_func right_op ->
     equal_func_call_operation left_op right_op
   | Call_no_return left_op, Call_no_return right_op ->

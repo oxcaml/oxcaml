@@ -603,6 +603,25 @@ and expression =
         symbol : symbol
       }
 
+module Known_arguments : sig
+  type t
+
+  val of_arguments :
+    parameters:(Backend_var.With_provenance.t * machtype) list ->
+    expression list ->
+    t
+
+  val none : int -> t
+
+  val find : t -> int -> callee option
+
+  val equal : t -> t -> bool
+
+  val compare : t -> t -> int
+
+  val print : Format.formatter -> t -> unit
+end
+
 type codegen_option =
   | Reduce_code_size
   | No_CSE

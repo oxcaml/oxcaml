@@ -380,7 +380,7 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
       let loc_arg = Proc.loc_parameters (Reg.typv virt_args) in
       emit_moves body ~src:virt_args ~dst:loc_arg;
       (* CR-soon wsturgeon for wsturgeon: propagate known arguments in SSA *)
-      let known_arguments = Array.make (Array.length virt_args) None in
+      let known_arguments = Cmm.Known_arguments.none (Array.length virt_args) in
       make_instr
         ( Cfg.Tailcall_self
             { destination = label_of env start_block; known_arguments } )
@@ -478,7 +478,7 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
       assert (stack_ofs = 0);
       emit_moves body ~src:rarg ~dst:loc_arg;
       (* CR-soon wsturgeon for wsturgeon: propagate known arguments in SSA *)
-      let known_arguments = Array.make (Array.length rarg) None in
+      let known_arguments = Cmm.Known_arguments.none (Array.length rarg) in
       make_instr
         (Cfg.Tailcall_func { desc = call_desc; known_arguments })
         (call_arg_for_terminator call_desc virt_args loc_arg)
@@ -520,7 +520,7 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
         Block.Tbl.replace env.call_result_locs continuation loc_res;
         Block.Tbl.replace env.call_stack_ofs continuation stack_ofs;
         (* CR-soon wsturgeon for wsturgeon: propagate known arguments in SSA *)
-        let known_arguments = Array.make (Array.length rarg) None in
+        let known_arguments = Cmm.Known_arguments.none (Array.length rarg) in
         make_instr
           (Cfg.Call
              { op = { desc = call_desc; known_arguments };

@@ -308,14 +308,14 @@ module Var : sig
   val create :
     name:string ->
     tag:Tag.t ->
-    known_arguments:(Cmm.callee option array) ->
+    known_arguments:Cmm.Known_arguments.t ->
     t
 
   val name : t -> string
 
   val tag : t -> Tag.t
 
-  val known_arguments : t -> Cmm.callee option array
+  val known_arguments : t -> Cmm.Known_arguments.t
 
   val print : Format.formatter -> t -> unit
 
@@ -331,7 +331,7 @@ end = struct
     type t =
       { name : string;
         tag : Tag.t;
-        known_arguments : Cmm.callee option array;
+        known_arguments : Cmm.Known_arguments.t;
       }
 
     let compare
@@ -341,7 +341,7 @@ end = struct
       if c <> 0 then c else
       let c = Tag.compare tag1 tag2 in
       if c <> 0 then c else
-      Array.compare (Option.compare Cmm.compare_callee) args1 args2
+      Cmm.Known_arguments.compare args1 args2
   end
 
   include T
@@ -359,15 +359,8 @@ end = struct
   let create ~name ~tag ~known_arguments = { name; tag; known_arguments }
 
   let print ppf { name; tag; known_arguments } =
-    let print_known_argument ppf = function
-      | None -> Format.fprintf ppf "?"
-      | Some callee -> Cmm.print_callee ppf callee
-    in
     Format.fprintf ppf "%s.%s[args: %a]@ " name (Tag.print tag)
-      (Format.pp_print_seq
-         ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ ")
-         print_known_argument)
-      (Array.to_seq known_arguments)
+      Cmm.Known_arguments.print known_arguments
 end
 
 (** Abstract value for each component of the domain. *)
@@ -388,7 +381,7 @@ module V : sig
   val apply_call :
     witnesses:Witnesses.t ->
     callee_summary:t ->
-    known_arguments:(Cmm.callee option array) ->
+    known_arguments:Cmm.Known_arguments.t ->
     t
 
   val diff_witnesses :
@@ -1526,7 +1519,7 @@ module Value : sig
   val apply_call :
     witnesses:Witnesses.t ->
     callee_summary:t ->
-    known_arguments:(Cmm.callee option array) ->
+    known_arguments:Cmm.Known_arguments.t ->
     t
 
   val get_unresolved_names : t -> String.Set.t
@@ -1539,7 +1532,7 @@ module Value : sig
   val unresolved :
     string ->
     Witnesses.t ->
-    known_arguments:(Cmm.callee option array) ->
+    known_arguments:Cmm.Known_arguments.t ->
     t
 
   val is_resolved : t -> bool

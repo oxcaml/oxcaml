@@ -38,7 +38,7 @@ module S = struct
 
   type func_call_operation =
     { desc : func_call_desc;
-      known_arguments : Cmm.callee option array
+      known_arguments : Cmm.Known_arguments.t
     }
 
   type external_call_operation =
@@ -149,7 +149,7 @@ module S = struct
     | Raise of Lambda.raise_kind
     | Tailcall_self of
         { destination : Label.t;
-          known_arguments : Cmm.callee option array;
+          known_arguments : Cmm.Known_arguments.t;
         }
     | Tailcall_func of func_call_operation
     | Call_no_return of external_call_operation

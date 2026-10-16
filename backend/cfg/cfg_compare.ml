@@ -394,7 +394,7 @@ let terminator_structure_match ~map_label (old_term : Cfg.terminator)
       Tailcall_self
         { destination = new_destination; known_arguments = new_arguments } ) ->
     map_label old_destination new_destination;
-    Array.equal (Option.equal Cmm.equal_callee) old_arguments new_arguments
+    Cmm.Known_arguments.equal old_arguments new_arguments
   | Tailcall_func old_op, Tailcall_func new_op ->
     Cfg.equal_func_call_operation old_op new_op
   | Call_no_return old_op, Call_no_return new_op ->
