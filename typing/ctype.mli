@@ -336,6 +336,25 @@ val try_expand_safe_opt: Env.t -> type_expr -> type_expr
 val expand_head_once: Env.t -> type_expr -> type_expr
 val expand_head: Env.t -> type_expr -> type_expr
 
+(** [upon env ty ~run ~default] adds [run shape] to {!scheduler} once [ty]'s
+    head is determined, where [shape] is the shape of the head ([None] if it
+    has none), or [default ()] if it is defaulted first. Both run at the
+    levels current when [upon] was called, and may run before [upon]
+    returns, depending on the scheduling policy (see {!Scheduler}).
+
+    If [-extension omnidirectionality] is enabled, a [Tvar] head becomes a
+    [Tivar], which [run] or [default] waits for. If [default] leaves it a
+    [Tivar], it is turned back into a [Tvar]. Otherwise, a [Tvar] head is
+    defaulted immediately.
+
+    [ty] must not be generic. *)
+val upon :
+  Env.t ->
+  type_expr ->
+  run:(type_shape option -> unit) ->
+  default:(unit -> unit) ->
+  unit
+
 (** [upon_shape env ty ~run ~default] adds [run shape] to {!scheduler}
     once [ty]'s head has a shape, or [run (default ())] if it is defaulted
     first. [run] runs at the levels current when [upon_shape] was called.
@@ -907,6 +926,20 @@ val crossing_of_ty :
   ?modalities:Mode.Modality.Const.t ->
   Types.type_expr ->
   Mode.Crossing.t
+
+(** [upon_crossing env ?modalities ty ~cross ~later] is
+    [cross (crossing_of_ty env ?modalities ty)], unless
+    [-extension omnidirectionality] and [-ikinds] are enabled and the crossing
+    depends on unsolved type variables. Then it returns [r], where
+    [(r, ~run) = later m] for a fresh [m], and calls [run (cross c)] once the
+    crossing [c] is known. *)
+val upon_crossing :
+  Env.t ->
+  ?modalities:Mode.Modality.Const.t ->
+  type_expr ->
+  cross:(Mode.Crossing.t -> 'a) ->
+  later:(Mode.With_regionality.lr -> 'a * run:('a -> unit)) ->
+  'a
 
 (** Cross a right mode according to a type wrapped in modalities. Non-principal
     types don't cross. *)
