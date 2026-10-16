@@ -20,6 +20,12 @@ function caml_invalid_primitive() {
   );
 }
 
+//Provides: caml_invalid_expr
+//If: oxcaml
+function caml_invalid_expr(msg) {
+  throw "caml_invalid_expr: reached an Invalid Flambda2 expression: " + msg;
+}
+
 // Global symbol table, indexed by compilation unit then by symbol name.
 // Flambda 2 symbols that are exported from a compilation unit are registered
 // here when the unit is initialised, and looked up by the units that refer to

@@ -3665,8 +3665,8 @@ let from_cmj ic =
      This means that it is enough for fresh variables to be larger than any
      variable of any unit. *)
   Code.Var.set_last last_var;
-  { name = Code.Compilation_unit.full_path_as_string exported_compilation_unit
-  ; program
+  { name = exported_compilation_unit
+  ; program = Code.Marshalable_program.to_program program
   ; info =
       Unit_info.of_compilation_units
         ~exported:exported_compilation_unit

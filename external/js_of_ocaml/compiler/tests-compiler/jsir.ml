@@ -76,23 +76,16 @@ let native_string s = Code.Pc (Code.NativeString (Code.Native_string.of_string s
 
 let extern name args = Code.Prim (Code.Extern (name, None), args)
 
-(* TODO: we temporarily populate 31 unreachable blocks in addition to the one we want,
-   since an [Int_trie] with empty slots cannot be marshalled into [cmj]. *)
-let blocks block =
-  let empty = { Code.params = []; body = []; branch = Stop } in
-  List.fold_left
-    (List.init ~len:32 ~f:Fun.id)
-    ~init:Code.Addr.Map.empty
-    ~f:(fun blocks pc -> Code.Addr.Map.add pc (if pc = 0 then block else empty) blocks)
-
 let cmj_body ~name ~imports body : Code.cmj_body =
   let body = body ~fresh:Code.Var.fresh in
   let last_var = Code.Var.count () - 1 in
   let block = { Code.params = []; body; branch = Stop } in
-  { program = { start = 0; blocks = blocks block; free_pc = 32 }
+  { program =
+      Code.Marshalable_program.of_program
+        { start = 0; blocks = Code.Addr.Map.singleton 0 block; free_pc = 1 }
   ; last_var
-  ; imported_compilation_units = List.map imports ~f:compilation_unit
-  ; exported_compilation_unit = compilation_unit name
+  ; imported_compilation_units = imports
+  ; exported_compilation_unit = name
   }
 
 let write_cmj file (body : Code.cmj_body) =
@@ -110,7 +103,7 @@ let write_cmja file bodies =
     List.map bodies ~f:(fun (body : Code.cmj_body) ->
         let cu_pos = pos_out oc in
         output_value oc body;
-        { Cmj_format.cu_name = body.exported_compilation_unit
+        { Cmj_format.cu_name = compilation_unit body.exported_compilation_unit
         ; cu_pos
         ; cu_codesize = pos_out oc - cu_pos
         })
