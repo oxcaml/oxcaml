@@ -21,6 +21,8 @@ open Lambda
 type tmc_call_information = {
   loc: scoped_location;
   explicit: bool;
+  has_unclosable_region: bool;
+  dps_callee: Ident.t;
 }
 type subterm_information = {
   tmc_calls: tmc_call_information list;
@@ -65,8 +67,8 @@ let add_dst_params ({var; offset} : Ident.t destination) params =
   { name = var ; layout = Lambda.layout_block ;
     debug_uid= Lambda.debug_uid_none;
     (* The destination parameters are generated internally as part of the TMC
-       optimization. As such, they are not user visible, and we do not associate
-       them with a [debug_uid]. *)
+       optimization. As such, they are not user visible, and we do not
+       associate them with a [debug_uid]. *)
     attributes = Lambda.default_param_attribute ; mode = alloc_heap } ::
   { name = offset ; layout = Lambda.layout_int ;
     debug_uid= Lambda.debug_uid_none;
@@ -225,6 +227,11 @@ module Dps : sig
   type 'a t
 
   val make : lambda dps -> lambda t
+
+  (** [reset_dst d] resets the destination to a placeholder before running
+      [d], so that [d] may initialize a destination that was already
+      written. *)
+  val reset_dst : lambda t -> lambda t
   val run : lambda t -> lambda dps
   val delay_constructor : Constr.t -> lambda t -> lambda t
 
@@ -377,6 +384,18 @@ end = struct
   let make (dps : 'a dps) : 'a t =
     reify_delay dps
 
+  let reset_dst d = {
+    d with code = (fun ~delayed ~tail ~dst ->
+      (* Writes to the DPS destination with CAML_WRITE to ensure the GC sees
+       * that whatever used to be there was overwritten *)
+      let reset =
+        Lprim(Psetfield_computed(Pointer, Assignment modify_heap),
+              [Lvar dst.var; offset_code dst.offset; Lambda.dummy_constant],
+              dst.loc)
+      in
+      Lsequence (reset, d.code ~delayed ~tail ~dst));
+  }
+
   let delay_constructor constr d =
     let d = ensures_affine d in {
       code = (fun ~delayed ~tail ~dst ->
@@ -479,6 +498,8 @@ module Choice = struct
   let dps (c : lambda t) ~tail ~dst =
     Dps.run c.dps ~tail ~dst
 
+  let reset_dst c = { c with dps = Dps.reset_dst c.dps }
+
   let pair ((c1, c2) : 'a t * 'b t) : ('a * 'b) t = {
     dps = Dps.pair c1.dps c2.dps;
     direct = (fun () -> (c1.direct (), c2.direct ()));
@@ -579,14 +600,199 @@ end
 
 open Choice.Syntax
 
+(* Region closing:
+ *
+ * TMC needs to close a function's region when making a recursive call in
+ * order to preserve the constant stack-space usage.
+ * However, this is not always safe.
+ *
+ * We can't close the region when the lifetime of a value passed to the
+ * recursive call is bound to the current region.
+ * This would result in the recursive call being live with a dangling
+ * reference.
+ *
+ *   It's safe to close the region if every argument to the call, and the calee 
+ *   itself is in one of the following categories:
+ *   - A closure bound by the same [let rec] as the function being transformed
+ *     (a recursive or mutually recursive function)
+ *   - A parameter
+ *   - A field projection of a parameter that doesn't allocate
+ *   - An immediate
+ *   - A value at the global mode
+ *  Arguments for each:
+ *   - These closures are allocated before entering the function body, so they
+ *     must live longer than the inner region
+ *   - Passing a parameter is safe inductively, the parameter must at one
+ *     point have originated outside the function, and thus must have a
+ *     lifetime bound longer than the function body
+ *   - A field projection of a parameter is valid for the same reason, as long
+ *     as it's not a projection that allocates, as that allocation might live
+ *     in the current region
+ *   - Immediates are safe as they are not pointers, so there's no chance of a
+ *     dangling reference.
+ *   - Values at the global mode are safe as they cannot be stack allocated.
+ *     We can't have a dangling pointer to a heap object thanks to the GC
+ * *)
+
 type context = {
   specialized: specialized Ident.Map.t;
+  outlives_region: Ident.Set.t;
 }
 and specialized = {
   arity: int;
   dps_id: Ident.t;
   direct_kind: function_kind;
+  param_modes: locality_mode list;
+  closure_mode: locality_mode;
 }
+
+let rec is_non_pointer_layout : layout -> bool = function
+  | Pvalue { raw_kind = Pintval; _ }
+  | Punboxed_float _ | Punboxed_or_untagged_integer _ | Punboxed_vector _ ->
+      true
+  | Punboxed_product layouts -> List.for_all is_non_pointer_layout layouts
+  | Pvalue _ | Punboxed_mask | Ptop | Pbottom | Psplicevar _ -> false
+
+(* Is this expression guaranteed to outlive the current region? *)
+let rec outlives_region ctx lam =
+  match lam with
+  | Lvar id -> Ident.Set.mem id ctx.outlives_region
+  | Lconst _ -> true
+  | Lprim (Pfield _, [arg], _) -> outlives_region ctx arg
+  | Lprim ((Pmakeblock (_, _, _, mode)
+           | Pmakefloatblock (_, mode)
+           | Pmakeufloatblock (_, mode)
+           | Pmakearray (_, _, mode)), _, _) ->
+      is_heap_mode mode
+  | Lprim (Pscalar op, _, _) ->
+      begin match Scalar.ignore_locality (Scalar.Operation.info op).result with
+      | Value (Integral (Taggable _)) | Naked _ -> true
+      | Value (Integral (Boxable _) | Floating _) -> false
+      end
+  | _ -> false
+
+let add_outlives_region ctx ~layout var def =
+  if is_non_pointer_layout layout || outlives_region ctx def
+  then { ctx with outlives_region = Ident.Set.add var ctx.outlives_region }
+  else ctx
+
+(* Locations are compared physically, as distinct calls can have equal
+   locations. *)
+module Loc_tbl = Hashtbl.Make (struct
+  type t = scoped_location
+  let equal = ( == )
+  let hash = Hashtbl.hash
+end)
+
+(* The dps version moves terms out of tail position, for example under a
+   write to the destination or into the body of a [try]. Which calls are
+   tailcalls is therefore only known from the shape of the generated code:
+   - [Rc_close_at_apply] is only valid on a call in tail position of its
+     innermost region, and is removed elsewhere;
+   - calls to the dps functions [dps_ids] in tail position are expected to be
+     tailcalls, and their locations are added to [tail_dps_calls].
+
+   [regions] records, for each [Lregion] enclosing [lam] in the function body,
+   whether that region is itself in tail position of its parent region. *)
+
+(* Because DPS rewrites the code, it may move things out of tail position that were previously in tail position.
+ * This pass traverses the tree and ensures thing are correctly marked as in or out of tail position 
+ *
+ * [Rc_close_at_apply] is only valid on a call in a tail position at the innermost region.
+ *)
+let rec finalize_dps_calls
+    (* The dps functions whose tail calls should be marked as tailcalls. *)
+    ~(dps_ids : Ident.Set.t)
+    (* Receives the location of each tail call to a dps function. *)
+    ~(tail_dps_calls : unit Loc_tbl.t)
+    (* Whether [lam] is in tail position of its innermost region. *)
+    ~(tail : bool)
+    (* For each enclosing region, innermost first, whether it is in tail
+       position of its parent region. *)
+    ~(regions : bool list)
+    (* The term to finalize. *)
+    (lam : lambda)
+  : lambda =
+  let region_close (rc : region_close) =
+    match rc with
+    | Rc_close_at_apply when not tail -> Rc_normal
+    | Rc_close_at_apply | Rc_normal | Rc_nontail -> rc
+  in
+  (* The body of an exclave, or the handler of a [Popped_region] catch, runs
+     in the parent region. *)
+  let in_parent_region lam =
+    match regions with
+    | [] -> finalize_dps_calls ~dps_ids ~tail_dps_calls ~tail ~regions lam
+    | parent_tail :: regions ->
+        finalize_dps_calls ~dps_ids ~tail_dps_calls
+          ~tail:(tail && parent_tail) ~regions lam
+  in
+  match lam with
+  | Lapply ap ->
+      let ap_tailcall =
+        (* The application is a tail call iff we're in tail position and 
+         * the callee is is a dps function *)
+        match ap.ap_func with
+        | Lvar f when tail && Ident.Set.mem f dps_ids ->
+            Loc_tbl.replace tail_dps_calls ap.ap_loc ();
+            Tailcall_expectation true
+        | _ -> ap.ap_tailcall
+      in
+      Lapply { ap with
+               ap_func =
+                 finalize_dps_calls ~dps_ids ~tail_dps_calls ~tail:false
+                   ~regions ap.ap_func;
+               (* Arguments to functions are not in tail position *)
+               ap_args =
+                 List.map
+                   (finalize_dps_calls ~dps_ids ~tail_dps_calls
+                      ~tail:false ~regions)
+                   ap.ap_args;
+               ap_tailcall;
+               ap_region_close = region_close ap.ap_region_close }
+  | Lsend (k, lmet, lobj, largs, rc, mode, loc, layout, yielding) ->
+      let lmet =
+        finalize_dps_calls ~dps_ids ~tail_dps_calls ~tail:false ~regions
+          lmet
+      in
+      let lobj =
+        finalize_dps_calls ~dps_ids ~tail_dps_calls ~tail:false ~regions
+          lobj
+      in
+      let largs =
+        List.map
+          (finalize_dps_calls ~dps_ids ~tail_dps_calls ~tail:false ~regions)
+          largs
+      in
+      Lsend (k, lmet, lobj, largs, region_close rc, mode, loc, layout,
+             yielding)
+  | Lregion (body, layout) ->
+      let body =
+        finalize_dps_calls ~dps_ids ~tail_dps_calls ~tail:true
+          ~regions:(tail :: regions) body
+      in
+      Lregion (body, layout)
+  | Lexclave body ->
+      Lexclave (in_parent_region body)
+  | Lstaticcatch (body, ids, handler, Popped_region, layout) ->
+      let body =
+        finalize_dps_calls ~dps_ids ~tail_dps_calls ~tail ~regions body
+      in
+      Lstaticcatch (body, ids, in_parent_region handler, Popped_region,
+                    layout)
+  (* Function bodies have their own regions. *)
+  | Lfunction _ | Ltemplate _ | Lkindtemplate _ -> lam
+  | Lletrec (bindings, body) ->
+      let body =
+        finalize_dps_calls ~dps_ids ~tail_dps_calls ~tail ~regions body
+      in
+      Lletrec (bindings, body)
+  | _ ->
+      shallow_map
+        ~tail:(finalize_dps_calls ~dps_ids ~tail_dps_calls ~tail ~regions)
+        ~non_tail:
+          (finalize_dps_calls ~dps_ids ~tail_dps_calls ~tail:false ~regions)
+        lam
 
 let llets lk vk bindings body =
   List.fold_right (fun (var, var_duid, def) body ->
@@ -611,11 +817,16 @@ let declare_binding ctx (var, def) =
   let arity = List.length lfun.params in
   let dps_id = Ident.create_local (Ident.name var ^ "_dps") in
   let direct_kind = lfun.kind in
-  let cand = { arity; dps_id; direct_kind; } in
-  { specialized = Ident.Map.add var cand ctx.specialized }
+  let param_modes =
+    List.map (fun (param : lparam) -> param.mode) lfun.params
+  in
+  let cand =
+    { arity; dps_id; direct_kind; param_modes; closure_mode = lfun.mode }
+  in
+  { ctx with specialized = Ident.Map.add var cand ctx.specialized }
 
 let rec choice ctx t =
-  let rec choice ctx ~tail t =
+  let rec choice ctx ~tail ~region_depth t =
     match t with
     | (Lvar _ | Lmutvar _ | Lconst _ | Lfunction _ | Lsend _
       | Lassign _ | Lfor _ | Lwhile _) ->
@@ -626,35 +837,36 @@ let rec choice ctx t =
        of construction [Lprim(Pmakeblock(...), ...)] is handled by
        [choice_makeblock] *)
     | Lprim (prim, primargs, loc) ->
-        choice_prim ctx ~tail prim primargs loc
+        choice_prim ctx ~tail ~region_depth prim primargs loc
 
     (* [choice_apply] handles applications, in particular tail-calls which
        generate Set choices at the leaves *)
     | Lapply apply ->
-        choice_apply ctx ~tail apply
+        choice_apply ctx ~tail ~region_depth apply
     (* other cases use the [lift] helper that takes the sub-terms in tail
        position and the context around them, and generates a choice for
        the whole term from choices for the tail subterms. *)
     | Lsequence (l1, l2) ->
         let l1 = traverse ctx l1 in
-        let+ l2 = choice ctx ~tail l2 in
+        let+ l2 = choice ctx ~tail ~region_depth l2 in
         Lsequence (l1, l2)
     | Lifthenelse (l1, l2, l3, kind) ->
         let l1 = traverse ctx l1 in
-        let+ (l2, l3) = choice_pair ctx ~tail (l2, l3) in
+        let+ (l2, l3) = choice_pair ctx ~tail ~region_depth (l2, l3) in
         Lifthenelse (l1, l2, l3, kind)
     | Lmutlet (vk, var, var_duid, def, body) ->
         (* mutable bindings are not TMC-specialized *)
         let def = traverse ctx def in
-        let+ body = choice ctx ~tail body in
+        let+ body = choice ctx ~tail ~region_depth body in
         Lmutlet (vk, var, var_duid, def, body)
     | Llet (lk, vk, var, var_duid, def, body) ->
         let ctx, bindings = traverse_let ctx var var_duid def in
-        let+ body = choice ctx ~tail body in
+        let ctx = add_outlives_region ctx ~layout:vk var def in
+        let+ body = choice ctx ~tail ~region_depth body in
         llets lk vk bindings body
     | Lletrec (bindings, body) ->
         let ctx, bindings = traverse_letrec ctx bindings in
-        let+ body = choice ctx ~tail body in
+        let+ body = choice ctx ~tail ~region_depth body in
         Lletrec(bindings, body)
     | Lswitch (l1, sw, loc, kind) ->
         (* decompose *)
@@ -662,9 +874,10 @@ let rec choice ctx t =
         let blocks_lhs, blocks_rhs = List.split sw.sw_blocks in
         (* transform *)
         let l1 = traverse ctx l1 in
-        let+ consts_rhs = choice_list ctx ~tail consts_rhs
-        and+ blocks_rhs = choice_list ctx ~tail blocks_rhs
-        and+ sw_failaction = choice_option ctx ~tail sw.sw_failaction in
+        let+ consts_rhs = choice_list ctx ~tail ~region_depth consts_rhs
+        and+ blocks_rhs = choice_list ctx ~tail ~region_depth blocks_rhs
+        and+ sw_failaction =
+          choice_option ctx ~tail ~region_depth sw.sw_failaction in
         (* rebuild *)
         let sw_consts = List.combine consts_lhs consts_rhs in
         let sw_blocks = List.combine blocks_lhs blocks_rhs in
@@ -675,8 +888,8 @@ let rec choice ctx t =
         let cases_lhs, cases_rhs = List.split cases in
         (* transform *)
         let l1 = traverse ctx l1 in
-        let+ cases_rhs = choice_list ctx ~tail cases_rhs
-        and+ fail = choice_option ctx ~tail fail in
+        let+ cases_rhs = choice_list ctx ~tail ~region_depth cases_rhs
+        and+ fail = choice_option ctx ~tail ~region_depth fail in
         (* rebuild *)
         let cases = List.combine cases_lhs cases_rhs in
         Lstringswitch (l1, cases, fail, loc, kind)
@@ -687,32 +900,48 @@ let rec choice ctx t =
         (* in [try l1 with id -> l2], the term [l1] is
            not in tail-call position (after it returns
            we need to remove the exception handler) *)
-        let+ l1 = choice ctx ~tail:false l1
-        and+ l2 = choice ctx ~tail l2 in
+        let l1 = choice ctx ~tail:false ~region_depth l1 in
+        let l2 = choice ctx ~tail ~region_depth l2 in
+        (* A TMC call in [l1] writes the destination before it may raise,
+           so the handler must reset it before writing it again. *)
+        let l2 =
+          match l1.Choice.tmc_calls with
+          | [] -> l2
+          | _ :: _ -> Choice.reset_dst l2
+        in
+        let+ l1 = l1
+        and+ l2 = l2 in
         Ltrywith (l1, id, id_duid, l2, kind)
     | Lstaticcatch (l1, ids, l2, r, kind) ->
         (* In [static-catch l1 with ids -> l2],
            the term [l1] is in fact in tail-position *)
-        let+ l1 = choice ctx ~tail l1
-        and+ l2 = choice ctx ~tail l2 in
+        let handler_region_depth =
+          match r with
+          | Same_region -> region_depth
+          (* the innermost region is considered closed in the handler *)
+          | Popped_region -> region_depth - 1
+        in
+        let+ l1 = choice ctx ~tail ~region_depth l1
+        and+ l2 = choice ctx ~tail ~region_depth:handler_region_depth l2 in
         Lstaticcatch (l1, ids, l2, r, kind)
     | Levent (lam, lev) ->
-        let+ lam = choice ctx ~tail lam in
+        let+ lam = choice ctx ~tail ~region_depth lam in
         Levent (lam, lev)
     | Lifused (x, lam) ->
-        let+ lam = choice ctx ~tail lam in
+        let+ lam = choice ctx ~tail ~region_depth lam in
         Lifused (x, lam)
     | Lregion (lam, layout) ->
-        let+ lam = choice ctx ~tail lam in
+        (* this region has to be closed after [lam] returns *)
+        let+ lam = choice ctx ~tail ~region_depth:(region_depth + 1) lam in
         Lregion (lam, layout)
     | Lexclave lam ->
-        let+ lam = choice ctx ~tail lam in
+        let+ lam = choice ctx ~tail ~region_depth:(region_depth - 1) lam in
         Lexclave lam
     | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _
     | Linstantiate _ ->
       fatal_error_invalid_constructor t
 
-  and choice_apply ctx ~tail apply =
+  and choice_apply ctx ~tail ~region_depth apply =
     let exception No_tmc in
     try
       let explicit_tailcall_request =
@@ -748,7 +977,9 @@ let rec choice ctx t =
           let tailcall tail =
             (* If we are calling a tmc-specializable function in tail
                context, then both the direct-style and dps-style calls
-               must be tailcalls. *)
+               must be tailcalls. The dps-style call is only known to be in
+               tail position once the dps code is generated, see
+               [finalize_dps_calls]. *)
             if tail
             then Tailcall_expectation true
             else Default_tailcall
@@ -756,12 +987,39 @@ let rec choice ctx t =
           (* This application is in tail position of a region=true function
              (or Tmc_local_returning would have occurred), so it must be Heap *)
           assert (Lambda.is_not_alloc_stack apply.ap_mode);
+          let safe_to_close_region =
+            region_depth = 1 &&
+            (* The callee's closure must not live in the region *)
+            (is_heap_mode specialized.closure_mode
+             || outlives_region ctx (Lvar f)) &&
+            (* Arguments passed at mode global cannot point into the region *)
+            List.for_all2 (fun mode arg ->
+                is_heap_mode mode || outlives_region ctx arg)
+              specialized.param_modes args
+          in
+          (* We don't need to close the region if we aren't in one to begin
+             with *)
+          let should_close_region =
+            match apply.ap_region_close with
+            | Rc_normal | Rc_close_at_apply -> region_depth >= 1
+            | Rc_nontail -> false
+          in
+          let has_unclosable_region =
+            should_close_region && not safe_to_close_region
+          in
           {
             Choice.dps = Dps.make (fun ~tail ~dst ->
               Lapply { apply with
                        ap_func = Lvar specialized.dps_id;
                        ap_args = add_dst_args dst args;
-                       ap_tailcall = tailcall tail;
+                       (* Out of tail position, the dps call is made by the
+                          direct version, which satisfies [@tailcall]. *)
+                       ap_tailcall =
+                         if tail then apply.ap_tailcall else Default_tailcall;
+                       ap_region_close =
+                         if safe_to_close_region && should_close_region && tail
+                         then Rc_close_at_apply
+                         else apply.ap_region_close;
                      });
             direct = (fun () ->
               Lapply { apply with ap_tailcall = tailcall tail });
@@ -769,6 +1027,8 @@ let rec choice ctx t =
             tmc_calls = [{
               loc = apply.ap_loc;
               explicit = explicit_tailcall_request;
+              has_unclosable_region;
+              dps_callee = specialized.dps_id;
             }];
             benefits_from_dps = true;
           }
@@ -785,23 +1045,18 @@ let rec choice ctx t =
           | other -> other
         in
         { apply with ap_tailcall } in
-      (* The call will not be in tail position, so the close-on-apply flag must
-         not be set. *)
-      let ap_region_close =
-        match apply.ap_region_close with
-        | Rc_close_at_apply -> Rc_normal
-        | (Rc_normal | Rc_nontail) as reg_close -> reg_close
-      in
-      let apply = { apply with ap_region_close } in
       { (Choice.lambda (Lapply apply)) with
         direct = (fun () -> Lapply apply_no_bailout);
       }
 
-  and choice_makeblock ctx ~tail:_ (tag, flag, shape, mode) blockargs loc =
+  and choice_makeblock ctx ~tail:_ ~region_depth (tag, flag, shape, mode)
+        blockargs loc =
     let choices =
       (* We look at each position in the block to find candidates for the TMC
          hole transformation. We only consider fields of layout Value. *)
-      let[@inline always] of_value arg = choice ctx ~tail:false arg in
+      let[@inline always] of_value arg =
+        choice ctx ~tail:false ~region_depth arg
+      in
       let[@inline always] of_non_value arg = Choice.lambda (traverse ctx arg) in
       match shape with
       | All_value -> List.map of_value blockargs
@@ -900,18 +1155,19 @@ let rec choice ctx t =
             choice.explicit_tailcall_request;
         }
 
-  and choice_prim ctx ~tail prim primargs loc =
+  and choice_prim ctx ~tail ~region_depth prim primargs loc =
     match prim with
     (* The important case is the construction case *)
     | Pmakeblock (tag, flag, shape, mode) ->
-        choice_makeblock ctx ~tail (tag, flag, shape, mode) primargs loc
+        choice_makeblock ctx ~tail ~region_depth (tag, flag, shape, mode)
+          primargs loc
 
     (* Some primitives have arguments in tail-position *)
     | Popaque layout ->
         let l1 = match primargs with
           |  [l1] -> l1
           | _ -> invalid_arg "choice_prim" in
-        let+ l1 = choice ctx ~tail l1 in
+        let+ l1 = choice ctx ~tail:false ~region_depth l1 in
         Lprim (Popaque layout, [l1], loc)
 
     (* in common cases we just return *)
@@ -1050,14 +1306,15 @@ let rec choice ctx t =
         let primargs = traverse_list ctx primargs in
         Choice.lambda (Lprim (prim, primargs, loc))
 
-  and choice_list ctx ~tail terms =
-    Choice.list (List.map (choice ctx ~tail) terms)
-  and choice_pair ctx ~tail (t1, t2) =
-    Choice.pair (choice ctx ~tail t1, choice ctx ~tail t2)
-  and choice_option ctx ~tail t =
-    Choice.option (Option.map (choice ctx ~tail) t)
+  and choice_list ctx ~tail ~region_depth terms =
+    Choice.list (List.map (choice ctx ~tail ~region_depth) terms)
+  and choice_pair ctx ~tail ~region_depth (t1, t2) =
+    Choice.pair (choice ctx ~tail ~region_depth t1,
+                 choice ctx ~tail ~region_depth t2)
+  and choice_option ctx ~tail ~region_depth t =
+    Choice.option (Option.map (choice ctx ~tail ~region_depth) t)
 
-  in choice ctx t
+  in fun ~tail -> choice ctx ~tail ~region_depth:0 t
 
 and traverse ctx = function
   | Llet (lk, vk, var, var_duid, def, body) ->
@@ -1087,7 +1344,8 @@ and traverse_letrec ctx bindings =
       ) ctx bindings
   in
   let bindings =
-    List.concat_map (traverse_letrec_binding ctx) bindings
+    let recursive_group = List.map (fun { id; _ } -> id) bindings in
+    List.concat_map (traverse_letrec_binding ctx ~recursive_group) bindings
   in
   ctx, bindings
 
@@ -1095,23 +1353,37 @@ and traverse_let_binding outer_ctx inner_ctx var var_duid def =
   match find_candidate def with
   | None -> [ var, var_duid, traverse outer_ctx def ]
   | Some lfun ->
-      let functions = make_dps_variant var var_duid inner_ctx outer_ctx lfun in
+      let functions =
+        make_dps_variant var var_duid inner_ctx outer_ctx
+          ~recursive_group:[] lfun
+      in
       List.map
         (fun (var, var_duid, lfun) -> var, var_duid, Lfunction lfun) functions
 
-and traverse_letrec_binding ctx { id; debug_uid; def } =
+and traverse_letrec_binding ctx ~recursive_group { id; debug_uid; def } =
   if def.attr.tmc_candidate
   then
-    let functions = make_dps_variant id debug_uid ctx ctx def in
+    let functions =
+      make_dps_variant id debug_uid ctx ctx ~recursive_group def
+    in
     List.map
       (fun (id, id_duid, def) -> { id; debug_uid = id_duid; def })
       functions
   else
     [ { id; debug_uid = debug_uid; def = traverse_lfunction ctx def } ]
 
-and make_dps_variant var var_duid inner_ctx outer_ctx (lfun : lfunction) =
+and make_dps_variant var var_duid inner_ctx outer_ctx ~recursive_group
+      (lfun : lfunction) =
   let special = Ident.Map.find var inner_ctx.specialized in
-  let fun_choice = choice outer_ctx ~tail:true lfun.body in
+  let fun_choice =
+    (* Parameters and closures of the enclosing [let rec] are allocated before
+       the function is entered, so they outlive its region. *)
+    let outlives_region =
+      List.fold_left (fun set (param : lparam) -> Ident.Set.add param.name set)
+        (Ident.Set.of_list recursive_group) lfun.params
+    in
+    choice { outer_ctx with outlives_region } ~tail:true lfun.body
+  in
   if fun_choice.Choice.tmc_calls = [] then
     Location.prerr_warning
       (Debuginfo.Scoped_location.to_location lfun.loc)
@@ -1120,6 +1392,12 @@ and make_dps_variant var var_duid inner_ctx outer_ctx (lfun : lfunction) =
     let { kind; params; return; body = _; attr; loc; mode; ret_mode } = lfun in
     let body = Choice.direct fun_choice in
     lfunction' ~kind ~params ~return ~body ~attr ~loc ~mode ~ret_mode in
+  let dps_ids =
+    Ident.Set.of_list
+      (List.map (fun (info : tmc_call_information) -> info.dps_callee)
+         fun_choice.Choice.tmc_calls)
+  in
+  let tail_dps_calls = Loc_tbl.create 16 in
   let dps =
     let dst_param = {
       var = Ident.create_local "dst";
@@ -1143,12 +1421,21 @@ and make_dps_variant var var_duid inner_ctx outer_ctx (lfun : lfunction) =
       ~kind
       ~params
       ~return:lfun.return
-      ~body:(Choice.dps ~tail:true ~dst:dst fun_choice)
+      ~body:(finalize_dps_calls ~dps_ids ~tail:true ~regions:[]
+               ~tail_dps_calls
+               (Choice.dps ~tail:true ~dst:dst fun_choice))
       ~attr:lfun.attr
       ~loc:lfun.loc
       ~mode:lfun.mode
       ~ret_mode:lfun.ret_mode
   in
+  List.iter (fun (info : tmc_call_information) ->
+      if info.has_unclosable_region
+      && Loc_tbl.mem tail_dps_calls info.loc then
+        Location.prerr_warning
+          (Debuginfo.Scoped_location.to_location info.loc)
+          Warnings.Tmc_breaks_tailcall_region)
+    fun_choice.Choice.tmc_calls;
   let dps_var = special.dps_id in
   let dps_var_duid = Lambda.debug_uid_none in
   [var, var_duid, direct; dps_var, dps_var_duid, dps]
@@ -1157,7 +1444,9 @@ and traverse_list ctx terms =
   List.map (traverse ctx) terms
 
 let rewrite t =
-  let ctx = { specialized = Ident.Map.empty } in
+  let ctx =
+    { specialized = Ident.Map.empty; outlives_region = Ident.Set.empty }
+  in
   traverse ctx t
 
 module Style = Misc.Style

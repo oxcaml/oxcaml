@@ -8,3 +8,7 @@ let[@tail_mod_cons] rec test_1 = function
 
 let () =
   assert (test_1 ["1"; "2"; "foo"; "3"; "4"] = [1; 2; -1; 3; 4])
+
+let[@tail_mod_cons] rec crashes_the_compiler_old n = 
+        let (p @ global) = (n, n) in 
+        try n :: crashes_the_compiler_old ( n - 1) with _ -> [ fst p ]

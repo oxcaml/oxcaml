@@ -1,0 +1,8 @@
+try_body_local                   4 3 200
+try_body_inferred                3 2 1 0
+try_body_no_region               3 2 1
+map_try_body                     constant stack: false
+map_handler                      constant stack: true
+effect_value_case                30 20 10
+perform_in_tmc                   103 202 301
+perform_in_try                   100 200 -3

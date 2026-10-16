@@ -1,0 +1,11 @@
+File "region_handlers.ml", lines 66-73, characters 42-54:
+66 | ..........................................n =
+67 |   let local_ p = (Sys.opaque_identity n, n) in
+68 |   use_local p;
+69 |   if n = 0 then []
+70 |   else
+71 |     match Effect.perform Ask with
+72 |     | v -> v :: effect_value_case (n - 1)
+73 |     | effect Ask, k -> Effect.Deep.continue k (n * 10)
+Warning 71 [unused-tmc-attribute]: This function is marked @tail_mod_cons
+  but is never applied in TMC position.

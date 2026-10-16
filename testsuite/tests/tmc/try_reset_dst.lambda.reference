@@ -1,0 +1,92 @@
+(let
+  (fail =
+     (function {nlocal = 0} param[value<int>] never_inline : int
+       (raise_notrace (field_imm 2 (global Stdlib!)))))
+  (letrec
+    (f
+       (function {nlocal = 0} n[value<int>] tail_mod_cons
+         : (consts (0))
+            (non_consts ([0: ?, value<(consts (0)) (non_consts ([0: ?, *]))>]))
+         (try
+           (seq (if (%eq n 0) (apply fail 0) 0)
+             (let
+               (block =
+                  (makemutable 0 (value<int>,value<
+                                              (consts (0))
+                                               (non_consts ([0: ?,
+                                                             value<
+                                                              (consts (0))
+                                                               (non_consts (
+                                                               [0: ?, *]))>]))>)
+                    n 24029))
+               (seq (apply f_dps block 1 (%int_sub n 1)) block)))
+          with exn
+           (catch
+             (if (%eq exn (field_imm 2 (global Stdlib!)))
+               (if (%eq n 2)
+                 (makeblock 0 (value<int>,value<
+                                           (consts (0))
+                                            (non_consts ([0: ?,
+                                                          value<
+                                                           (consts (0))
+                                                            (non_consts (
+                                                            [0: ?, *]))>]))>)
+                   (%int_mul n 100) 0)
+                 (exit 2))
+               (exit 2))
+            with (2) (reraise exn))))
+      f_dps
+        (function {nlocal = 0} dst offset[value<int>] n[value<int>]
+          tail_mod_cons
+          : (consts (0))
+             (non_consts ([0: ?,
+                           value<(consts (0)) (non_consts ([0: ?, *]))>]))
+          (try
+            (seq (if (%eq n 0) (apply fail 0) 0)
+              (let
+                (block =
+                   (makemutable 0 (value<int>,value<
+                                               (consts (0))
+                                                (non_consts ([0: ?,
+                                                              value<
+                                                               (consts (0))
+                                                                (non_consts (
+                                                                [0: ?, *]))>]))>)
+                     n 24029))
+                (seq (setfield_ptr(heap-init)_computed dst offset block)
+                  (apply f_dps block 1 (%int_sub n 1)))))
+           with exn
+            (seq (setfield_ptr_computed dst offset 24029)
+              (catch
+                (if (%eq exn (field_imm 2 (global Stdlib!)))
+                  (if (%eq n 2)
+                    (setfield_ptr(heap-init)_computed dst offset
+                      (makeblock 0 (value<int>,value<
+                                                (consts (0))
+                                                 (non_consts ([0: ?,
+                                                               value<
+                                                                (consts (0))
+                                                                 (non_consts (
+                                                                 [0: ?, *]))>]))>)
+                        (%int_mul n 100) 0))
+                    (setfield_ptr(heap-init)_computed dst offset (exit 2)))
+                  (setfield_ptr(heap-init)_computed dst offset (exit 2)))
+               with (2)
+                (setfield_ptr(heap-init)_computed dst offset (reraise exn)))))))
+    (let
+      (*match* =[value<int>]
+         (let
+           (result =[value<
+                      (consts (0))
+                       (non_consts ([0: ?,
+                                     value<
+                                      (consts (0)) (non_consts ([0: ?, *]))>]))>]
+              (apply f 4)
+            as_str =
+              (apply (field_imm 6 (global Stdlib__String!)) " "
+                (apply (field_imm 20 (global Stdlib__List!))
+                  (field_imm 32 (global Stdlib!)) result)))
+           (seq (apply (field_imm 45 (global Stdlib!)) "Should be: 4 3 200")
+             (apply (field_imm 41 (global Stdlib!)) "f 4 = ")
+             (apply (field_imm 45 (global Stdlib!)) as_str))))
+      (makeblock 0 fail f))))
