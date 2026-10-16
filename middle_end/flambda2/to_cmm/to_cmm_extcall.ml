@@ -571,10 +571,11 @@ module Unit = struct
     match reg_class, components with
     | Float_regs, [component] -> C.machtype_of_kind component.kind
     | Float_regs, _ :: _ :: _ -> Cmm.typ_float
-    | Int_regs, [component] ->
-      if K.equal (K.With_subkind.kind component.kind) K.value
-      then Cmm.typ_val
-      else Cmm.typ_int
+    | Int_regs, [component] -> (
+      match component.reg_class with
+      | Int_regs -> C.machtype_of_kind component.kind (* val / int / mask *)
+      | Float_regs ->
+        Cmm.typ_int (* float bits in an integer register (arm64) *))
     | Int_regs, _ :: _ :: _ -> Cmm.typ_int
 
   (* Extract one component of a return value from the value of its unit.
