@@ -372,8 +372,8 @@ JSOO_PACKAGES = $(PPXLIB_PACKAGES) gen sedlex cmdliner menhirLib menhirSdk \
 # The standard library for ocamlopt -target js_of_ocaml is installed into
 # lib/ocaml, next to the native one, where ocamlopt looks for it; that is its
 # only section, as its META and dune-package would describe no library.
-stdlib_js_install = \
-  $(call ast_dependent_libs_install,--sections=lib_root stdlib-js)
+stdlib_jsir_install = \
+  $(call ast_dependent_libs_install,--sections=lib_root stdlib-jsir)
 
 AST_DEPENDENT_LIBS_PREFIX ?= $(OXCAML_INSTALL)
 
@@ -388,7 +388,7 @@ ppxlib-install: ppxlib-build
 .PHONY: jsoo-install
 jsoo-install: jsoo-build
 	$(call ast_dependent_libs_install,$(JSOO_PACKAGES))
-	$(stdlib_js_install)
+	$(stdlib_jsir_install)
 
 # What the compiler package ships: the js_of_ocaml and wasm_of_ocaml
 # executables, the libraries needed to write and preprocess js_of_ocaml
@@ -403,7 +403,7 @@ SHIPPED_LIB_SECTIONS = lib,lib_root,libexec,libexec_root,stublibs
 jsoo-install-shipped: jsoo-build
 	$(call ast_dependent_libs_install,--sections=bin $(SHIPPED_BIN_PACKAGES))
 	$(call ast_dependent_libs_install,--sections=$(SHIPPED_LIB_SECTIONS) $(SHIPPED_LIB_PACKAGES))
-	$(stdlib_js_install)
+	$(stdlib_jsir_install)
 
 .PHONY: jsoo-test
 jsoo-test: ast-dependent-libs-compiler \

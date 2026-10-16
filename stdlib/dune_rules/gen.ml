@@ -203,16 +203,16 @@ let write_stdlib_dune ppf =
   |}
 
 (* The stdlib for [ocamlopt -target js_of_ocaml] is built in
-   external/ast-dependent-libs/stdlib-js (see the dune file there, which also
+   external/ast-dependent-libs/stdlib-jsir (see the dune file there, which also
    installs the result), where js_of_ocaml itself is built, by the installed
    compiler, from the sources that it ships in its standard library directory
    (which include the sys.ml that configure generated). The two generators
-   below are used there: [stdlib-js-sources] copies these sources into src/,
-   and [stdlib-js] generates, for build/, the counterparts of the native rules
+   below are used there: [stdlib-jsir-sources] copies these sources into src/,
+   and [stdlib-jsir] generates, for build/, the counterparts of the native rules
    above: same modules and flags, but compiled against the installed .cmi
    files into .cmjx/.cmjo files (the counterparts of .cmx/.o), and archived
    into stdlib.cmjxa/stdlib.cmja. *)
-let write_stdlib_js_sources_dune ppf =
+let write_stdlib_jsir_sources_dune ppf =
   setting "stdlib_modules" @ ["std_exit"] |> List.iter (fun m ->
     ["ml"; "mli"] |> List.iter (fun ext ->
       let file = m ^ "." ^ ext in
@@ -220,7 +220,7 @@ let write_stdlib_js_sources_dune ppf =
         "(rule (target %s) (action (copy %%{ocaml_where}/%s %%{target})))\n"
         file file))
 
-let write_stdlib_js_dune ppf =
+let write_stdlib_jsir_dune ppf =
   let src_dir = "../src" and stdlib_dir = "../../stdlib" in
   let run_ocamlopt args =
     sprintf
@@ -424,8 +424,8 @@ let write_runtime_dune ppf =
 let () =
   match Sys.argv.(2) with
   | "stdlib" -> write_stdlib_dune stdout
-  | "stdlib-js-sources" -> write_stdlib_js_sources_dune stdout
-  | "stdlib-js" -> write_stdlib_js_dune stdout
+  | "stdlib-jsir-sources" -> write_stdlib_jsir_sources_dune stdout
+  | "stdlib-jsir" -> write_stdlib_jsir_dune stdout
   | "runtime" -> write_runtime_dune stdout
   | "primitives" -> write_primitives_dune stdout
   | s -> failwith ("Unknown target " ^ s)

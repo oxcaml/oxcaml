@@ -8,13 +8,13 @@
 
 ; smoke is a separate project, built against the installed compiler package
 ; (see mkJsooSmokeTest in default.nix). stdlib points at the compiler's
-; stdlib directory, for the few files of the stdlib-js build that the
+; stdlib directory, for the few files of the stdlib-jsir build that the
 ; installed compiler does not ship.
 (data_only_dirs smoke stdlib)
 
 ; Each alias depends on the .install files of its packages, which builds
 ; everything they install. Keep in sync with PPXLIB_PACKAGES, JSOO_PACKAGES
-; and stdlib_js_install in the top-level Makefile.
+; and stdlib_jsir_install in the top-level Makefile.
 
 (alias
  (name ppxlib-libs)
@@ -42,7 +42,7 @@
   js_of_ocaml/js_of_ocaml-ppx.install
   js_of_ocaml/js_of_ocaml-runtime.install
   js_of_ocaml/js_of_ocaml.install
-  stdlib-js/stdlib-js.install))
+  stdlib-jsir/stdlib-jsir.install))
 
 ; For js_of_ocaml's dune-workspace, which defines runtest-js and runtest-wasm.
 (alias
