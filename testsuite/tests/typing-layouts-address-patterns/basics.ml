@@ -1310,11 +1310,8 @@ type 'a mut = { mutable contents : 'a @@ local; }
 type 'a imm = { contents : 'a; }
 |}]
 
-type 'a addr_kind :
-  value_or_null & bits64 mod everything with (type : mutable_data) with 'a mut
-type 'a addr_upper :
-  value_or_null & bits64 mod everything with (type : mutable_data) with 'a mut
-  = 'a addr
+type 'a addr_kind : value_or_null & bits64 mod everything with 'a mut
+type 'a addr_upper : value_or_null & bits64 mod everything with 'a mut = 'a addr
 type 'a addr_lower : value_or_null & bits64 mod everything with 'a addr =
   'a addr_kind
 [%%expect{|
@@ -1325,12 +1322,8 @@ type 'a addr_upper = 'a addr
 type 'a addr_lower = 'a addr_kind
 |}]
 
-type 'a addr_imm_kind :
-  value_or_null & bits64 mod everything with (type : immutable_data)
-  with 'a imm
-type 'a addr_imm_upper :
-  value_or_null & bits64 mod everything with (type : immutable_data)
-  with 'a imm
+type 'a addr_imm_kind : value_or_null & bits64 mod everything with 'a imm
+type 'a addr_imm_upper : value_or_null & bits64 mod everything with 'a imm
   = 'a addr_imm
 type 'a addr_imm_lower :
   value_or_null & bits64 mod everything with 'a addr_imm = 'a addr_imm_kind
