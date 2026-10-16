@@ -16,6 +16,14 @@
 
 (** Simplification of primitives taking two arguments. *)
 
+(** Constant-fold an integer binary primitive. *)
+val fold_binary_int_primitive :
+  machine_width:Target_system.Machine_width.t ->
+  Flambda_primitive.binary_primitive ->
+  Reg_width_const.t ->
+  Reg_width_const.t ->
+  Reg_width_const.t option
+
 val simplify_binary_primitive :
   Downwards_acc.t ->
   Flambda_primitive.t ->
