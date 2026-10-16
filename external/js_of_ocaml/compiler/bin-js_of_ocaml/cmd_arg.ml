@@ -59,7 +59,13 @@ type t =
   ; no_runtime : bool
   ; include_runtime : bool
   ; output_file : [ `Name of string | `Stdout ] * bool
-  ; bytecode : [ `File of string | `Stdin | `None ]
+  ; input :
+      [ `Bytecode_file of string
+      | `Cmj of string
+      | `Cmja of string
+      | `Bytecode_stdin
+      | `None
+      ]
   ; params : (string * string) list
   ; static_env : (string * string) list
   ; wrap_with_fun : [ `Iife | `Named of string | `Anonymous ]
@@ -122,7 +128,8 @@ let options =
   in
   let input_file =
     let doc =
-      "Compile the bytecode program [$(docv)]. "
+      "Compile the bytecode program, Js_of_ocaml IR file (.cmj) or IR archive (.cmja) \
+       [$(docv)]. "
       ^ "Use '-' to read from the standard input instead."
     in
     Arg.(value & pos ~rev:true 0 (some filepath) None & info [] ~docv:"PROGRAM" ~doc)
@@ -331,10 +338,12 @@ let options =
     match build_config, input_file with
     | false, None -> `Error (true, "required argument PROGRAM is missing")
     | _ ->
-        let bytecode =
+        let input =
           match input_file with
-          | Some "-" -> `Stdin
-          | Some x -> `File x
+          | Some "-" -> `Bytecode_stdin
+          | Some x when Filename.check_suffix x ".cmj" -> `Cmj x
+          | Some x when Filename.check_suffix x ".cmja" -> `Cmja x
+          | Some x -> `Bytecode_file x
           | None -> `None
         in
         let output_file =
@@ -342,9 +351,10 @@ let options =
           | Some "-" -> `Stdout, true
           | Some s -> `Name s, true
           | None -> (
-              match bytecode with
-              | `File s -> `Name (chop_extension s ^ ".js"), false
-              | `Stdin | `None -> `Stdout, false)
+              match input with
+              | `Bytecode_file s | `Cmj s | `Cmja s ->
+                  `Name (chop_extension s ^ ".js"), false
+              | `Bytecode_stdin | `None -> `Stdout, false)
         in
         let source_map =
           if (not no_sourcemap) && (sourcemap || sourcemap_inline_in_js)
@@ -393,7 +403,7 @@ let options =
           ; fs_external
           ; no_cmis
           ; output_file
-          ; bytecode
+          ; input
           ; source_map
           ; keep_unit_names
           ; effects
@@ -658,7 +668,7 @@ let options_runtime_only =
       ; fs_external
       ; no_cmis
       ; output_file
-      ; bytecode = `None
+      ; input = `None
       ; source_map
       ; keep_unit_names = false
       ; effects

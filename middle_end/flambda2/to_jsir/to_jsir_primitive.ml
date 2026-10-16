@@ -111,12 +111,18 @@ let nullary_exn ~env ~res (f : Flambda_primitive.nullary_primitive) =
     no_op ~env ~res
   | Cpu_relax -> use_prim' (Extern "caml_ml_domain_cpu_relax")
 
+(* [x] must be a block. *)
 let get_tag ~env ~res x =
   let x, res = prim_arg ~env ~res x in
   use_prim0 ~env ~res (Extern "%direct_obj_tag") [x]
 
+(* [x] may be any value, including a JS value that is not an OCaml block, so the
+   tag is read with optional chaining. *)
 let check_tag ~env ~res x ~tag =
-  let tag_var, env, res = get_tag ~env ~res x in
+  let x, res = prim_arg ~env ~res x in
+  let tag_var, env, res =
+    use_prim0 ~env ~res (Extern "%direct_obj_tag_nullish") [x]
+  in
   let expr : Jsir.expr =
     Prim (Eq, [Pv tag_var; Pc (Int (Targetint.of_int tag))])
   in
