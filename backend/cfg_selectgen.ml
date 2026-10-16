@@ -348,7 +348,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
   (* Default instruction selection for operators *)
 
   let select_operation0 (op : Cmm.operation) (args : Cmm.expression list)
-      (dbg : Debuginfo.t) ~label_after :
+      (dbg : Debuginfo.t) ~label_after ~parameters :
       Cfg.basic_or_terminator * Cmm.expression list =
     let wrong_num_args n =
       Misc.fatal_errorf
@@ -370,6 +370,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     in
     match[@ocaml.warning "+fragile-match"] op with
     | Capply { callees; _ } -> (
+      let known_arguments =
+        Cmm.Known_arguments.of_arguments ~parameters (List.tl args)
+      in
       match[@ocaml.warning "-fragile-match"] args with
       | Cconst_symbol (func, _dbg) :: rem ->
         ( Terminator
@@ -516,7 +519,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       Misc.fatal_error "Selection.select_oper"
 
   let rec select_operation (op : Cmm.operation) (args : Cmm.expression list)
-      (dbg : Debuginfo.t) ~label_after :
+      (dbg : Debuginfo.t) ~label_after ~parameters :
       Cfg.basic_or_terminator * Cmm.expression list =
     match
       Target.select_operation ~generic_select_condition:select_condition op args
@@ -525,12 +528,12 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Rewritten (basic_or_terminator, args) -> basic_or_terminator, args
     | Select_operation_then_rewrite (op, args, dbg, rewriter) -> (
       let basic_or_terminator, args =
-        select_operation op args dbg ~label_after
+        select_operation op args dbg ~label_after ~parameters
       in
       match rewriter basic_or_terminator ~args with
       | Rewritten (basic_or_terminator, args) -> basic_or_terminator, args
       | Use_default -> basic_or_terminator, args)
-    | Use_default -> select_operation0 op args dbg ~label_after
+    | Use_default -> select_operation0 op args dbg ~label_after ~parameters
 
   let insert_return env sub_cfg (r : _ Or_never_returns.t)
       (traps : Cmm.trap_action list) =
@@ -1073,7 +1076,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       in
       let ty = SU.oper_result_type op in
       let label_after = Cmm.new_label () in
-      let new_op, new_args = select_operation op simple_args dbg ~label_after in
+      let new_op, new_args =
+        select_operation op simple_args dbg ~label_after
+          ~parameters:env.SU.parameters
+      in
       match new_op with
       | Terminator (Call { op = { desc = Indirect _; _ }; label_after } as term)
         ->
@@ -1449,7 +1455,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Never_returns -> ()
     | Ok (simple_args, env) -> (
       let label_after = Cmm.new_label () in
-      let new_op, new_args = select_operation op simple_args dbg ~label_after in
+      let new_op, new_args =
+        select_operation op simple_args dbg ~label_after
+          ~parameters:env.SU.parameters
+      in
       match new_op with
       | Terminator
           (Call { op = { desc = Indirect _; _ } as op; label_after } as term) ->
@@ -1724,7 +1733,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     let rarg = Array.concat rargs in
     let loc_arg = Proc.loc_parameters (Reg.typv rarg) in
     let tailrec_label = Cmm.new_label () in
-    let env = SU.env_create ~tailrec_label in
+    let env = SU.env_create ~tailrec_label ~parameters:f.Cmm.fun_args in
     let env =
       List.fold_right2
         (fun (id, _ty) r env -> SU.env_add id r env)

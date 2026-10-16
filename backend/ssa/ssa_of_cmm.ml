@@ -418,6 +418,7 @@ and emit_expr_op env c op args dbg : result =
   let ty = SU.oper_result_type op in
   let new_op, new_args =
     Sel.select_operation op simple_args dbg ~label_after:Label.none
+      ~parameters:(Ssa.function_info env.graph).parameters
   in
   match new_op with
   | Basic (Op (Alloc { bytes = _; mode; dbginfo = [placeholder] })) ->
