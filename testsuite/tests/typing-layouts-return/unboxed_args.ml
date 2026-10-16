@@ -306,17 +306,18 @@ let () =
 (* A product with a single float32 component passed on the stack, after eight
    float64s have used the floating-point argument registers. On Apple arm64
    such a struct is a homogeneous aggregate and takes the 4-byte slot of its
-   member, unlike the 8-byte slot of [stack_single] above. *)
+   member, unlike the 8-byte slot of [stack_single] above; the trailing
+   float32 is placed right after it, so a wrong slot size moves it. *)
 external stack_single_f32 :
   float# -> float# -> float# -> float# -> float# -> float# -> float# -> float#
-  -> #(float32_u * unit#) -> float# -> float#
+  -> #(float32_u * unit#) -> float32_u -> float#
   = "stack_single_f32_bytecode" "stack_single_f32_native"
 
 let () =
   Printf.eprintf "stack_single_f32: %.4f\n%!"
     (box_float
        (stack_single_f32 #1.0 #2.0 #3.0 #4.0 #5.0 #6.0 #7.0 #8.0
-          #(f32 0.5, #()) #0.25))
+          #(f32 0.5, #()) (f32 0.25)))
 
 (* [@@noalloc] with a product argument. *)
 external sum_i64_pair_noalloc : #(int64_u * int64_u) -> int64_u
@@ -365,3 +366,38 @@ let () =
     ignore (Sys.opaque_identity (String.make 5 'x'))
   done;
   Printf.eprintf "ret_string_i64: %s %Ld\n%!" s (box_int64 n)
+
+(* Seven ints use up the six x86-64 integer argument registers (the seventh
+   goes on the stack); the pair of floats still goes in registers. *)
+external seven_ints_f64_pair :
+  int -> int -> int -> int -> int -> int -> int -> #(float# * float#) -> float#
+  = "seven_ints_f64_pair_bytecode" "seven_ints_f64_pair_native"
+
+let () =
+  Printf.eprintf "seven_ints_f64_pair: %.4f\n%!"
+    (box_float (seven_ints_f64_pair 1 2 3 4 5 6 7 #(#0.5, #0.25)))
+
+(* A product with a single value component on the stack. *)
+external stack_single_value :
+  int64_u -> int64_u -> int64_u -> int64_u -> int64_u -> int64_u -> int64_u
+  -> int64_u -> #(int * unit#) -> int -> int64_u
+  = "stack_single_value_bytecode" "stack_single_value_native"
+
+let () =
+  Printf.eprintf "stack_single_value: %Ld\n%!"
+    (box_int64
+       (stack_single_value #1L #2L #3L #4L #5L #6L #7L #8L #(5, #()) 7))
+
+(* Products all of whose components are void: no C arguments or results. *)
+external all_void_arg : #(unit# * unit#) -> int64_u
+  = "all_void_arg_bytecode" "all_void_arg_native"
+
+let () =
+  Printf.eprintf "all_void_arg: %Ld\n%!" (box_int64 (all_void_arg #(#(), #())))
+
+external all_void_return : unit -> #(unit# * unit#)
+  = "all_void_return_bytecode" "all_void_return_native"
+
+let () =
+  let #(#(), #()) = all_void_return () in
+  Printf.eprintf "all_void_return: ok\n%!"

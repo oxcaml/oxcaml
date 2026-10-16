@@ -8,6 +8,10 @@
    native;
  }
  {
+   flags = "-bin-annot-cms -flambda2-reaper -reaper-local-fields";
+   native;
+ }
+ {
    bytecode;
  }
 *)

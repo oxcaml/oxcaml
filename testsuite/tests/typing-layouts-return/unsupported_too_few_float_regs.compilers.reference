@@ -1,0 +1,6 @@
+File "unsupported_too_few_float_regs.ml", line 19, characters 11-67:
+19 | let g () = f #1.0 #2.0 #3.0 #4.0 #5.0 #6.0 #7.0 #8.0 #(#9.0, #10.0)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The unboxed product argument of the external call to unsupported_too_few_float_regs_stub cannot be compiled:
+       the corresponding C struct (16 bytes) would be passed in memory, since too few argument registers remain for it.
+       Only unboxed products that C passes entirely in registers are currently supported.

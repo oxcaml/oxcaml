@@ -82,7 +82,7 @@ f32x4_pair_struct swap_f32x4_native(float32x4_t x, float32x4_t y) {
 typedef struct { float32x4_t a; float32x4_t b; } f32x4_arg_pair_struct;
 
 float32x4_t add_f32x4_pairwise_native(f32x4_arg_pair_struct p) {
-  return vaddq_f32(p.a, p.b);
+  return vaddq_f32(p.a, vaddq_f32(p.b, p.b));
 }
 
 typedef struct { double a; double b; double c; } f64_triple_struct;
@@ -100,14 +100,14 @@ f64_quad_struct ret_f64_quad_native(value unit) {
 }
 
 double sum_f64_quad_native(f64_quad_struct p) {
-  return p.a + p.b + p.c + p.d;
+  return p.a + 2 * p.b + 4 * p.c + 8 * p.d;
 }
 
 typedef struct { double a; double b; } f64_pair_struct;
 typedef struct { f64_pair_struct p; double c; } f64_nested_struct;
 
 double sum_nested_f64_native(f64_nested_struct p) {
-  return p.p.a + p.p.b + p.c;
+  return p.p.a + 2 * p.p.b + 4 * p.c;
 }
 
 f64_nested_struct ret_nested_f64_native(value unit) {
@@ -130,5 +130,7 @@ f32x4_quad_struct ret_f32x4_quad_native(value unit) {
 }
 
 float32x4_t sum_f32x4_quad_native(f32x4_quad_struct p) {
-  return vaddq_f32(vaddq_f32(p.a, p.b), vaddq_f32(p.c, p.d));
+  float32x4_t two = vdupq_n_f32(2.0f);
+  return vaddq_f32(p.a, vmulq_f32(two, vaddq_f32(p.b, vmulq_f32(two,
+           vaddq_f32(p.c, vmulq_f32(two, p.d))))));
 }

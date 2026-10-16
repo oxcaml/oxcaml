@@ -7,6 +7,10 @@
    flags = "-extension layouts_beta -extension simd_beta";
    native;
  }
+ {
+   flags = "-extension layouts_beta -extension simd_beta -flambda2-reaper -reaper-local-fields";
+   native;
+ }
 *)
 
 (* Test of unboxed products of 128-bit vectors returned from external calls.
