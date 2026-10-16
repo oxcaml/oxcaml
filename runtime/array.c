@@ -401,9 +401,25 @@ CAMLprim value caml_floatarray_make_local(value len, value init)
   return caml_floatarray_make_unboxed_local(Long_val(len), Double_val(init));
 }
 
+static inline void array_init(value res, mlsize_t size, value init)
+{
+  for (mlsize_t i = 0; i < size; i++) {
+    Field(res, i) = init;
+  }
+}
+
+static inline void array_ref_add(value res, mlsize_t size)
+{
+  struct caml_ref_table* major_ref = &Caml_state->minor_tables->major_ref;
+  for (mlsize_t i = 0; i < size; i++) {
+    Ref_table_add(major_ref, &Field(res, i));
+  }
+}
+
 static value uniform_array_make(value len, value init, bool local)
 {
   mlsize_t size = Long_val(len);
+  bool init_on_minor = false;
   CAMLparam1 (init);
   CAMLlocal1 (res);
   if (size == 0) {
@@ -412,24 +428,18 @@ static value uniform_array_make(value len, value init, bool local)
   else if (size > Max_array_wosize) caml_invalid_argument("Array.make");
   else if (local) { /* local array */
     res = caml_alloc_local(size, 0);
-    for (mlsize_t i = 0; i < size; i++) Field(res, i) = init;
   } else if (size <= Max_young_wosize) { /* array on minor heap */
     res = caml_alloc_small(size, 0);
-    for (mlsize_t i = 0; i < size; i++) Field(res, i) = init;
   } else { /* array on major heap */
-    bool init_on_minor = (Is_block(init) && Is_young(init) &&
-                          !caml_maybe_minor_gc_before_writes(size));
+    init_on_minor = (Is_block(init) && Is_young(init) &&
+                     !caml_maybe_minor_gc_before_writes(size));
     res = caml_alloc_shr(size, 0);
-    if (init_on_minor) {
-      /* init is still on the minor heap (we didn't just collect),
-       * so every entry needs a remembered set entry */
-      for (mlsize_t i = 0; i < size; i++) {
-        Ref_table_add(&Caml_state->minor_tables->major_ref, &Field(res, i));
-        Field(res, i) = init;
-      }
-    } else {
-      for (mlsize_t i = 0; i < size; i++) Field(res, i) = init;
-    }
+  }
+  array_init(res, size, init);
+  if (init_on_minor) {
+    /* init is still on the minor heap (we didn't just collect),
+     * so every entry needs a remembered set entry */
+    array_ref_add(res, size);
   }
   /* Give the GC a chance to run, and run memprof callbacks.
      This matches the semantics of allocations directly from OCaml code. */
@@ -533,6 +543,40 @@ CAMLprim value caml_makearray_dynamic_non_scannable_unboxed_product(
   CAMLreturn(res);
 }
 
+static inline void array_scannable_unboxed_product_init(
+  value res, mlsize_t size, value init, mlsize_t num_initializers)
+{
+  mlsize_t delta = 0;
+
+  while (delta < 16 && delta < size) {
+    for (mlsize_t i = 0; i < num_initializers; ++i) {
+      Field(res, i + delta) = Field(init, i);
+    }
+    delta += num_initializers;
+  }
+
+  // For this loop to perform well we need [delta] to be big enough.
+  // Otherwise out-of-order CPUs will likely have trouble executing
+  // loads within the loop speculatively as stores would invalidate
+  // speculatively executed loads.
+  for (mlsize_t i = delta; i < size; i++) {
+    Field(res, i) = Field(res, i - delta);
+  }
+}
+
+static inline void array_scannable_unboxed_product_ref_add(
+  value res, mlsize_t size)
+{
+  struct caml_ref_table* major_ref = &Caml_state->minor_tables->major_ref;
+
+  for (mlsize_t i = 0; i < size; i++) {
+    value v = Field(res, i);
+    if (Is_block(v) && Is_young(v)) {
+      Ref_table_add(major_ref, &Field(res, i));
+    }
+  }
+}
+
 CAMLprim value caml_makearray_dynamic_scannable_unboxed_product(
   value v_init, value v_is_local, value v_non_unarized_length)
 {
@@ -542,10 +586,8 @@ CAMLprim value caml_makearray_dynamic_scannable_unboxed_product(
   CAMLlocal1(res);
 
   mlsize_t num_initializers = Wosize_val(v_init);
-  int is_local = Bool_val(v_is_local);
+  bool is_local = Bool_val(v_is_local);
   mlsize_t non_unarized_length = Long_val(v_non_unarized_length);
-
-  mlsize_t size, i;
 
   // N.B. [v_init] may be on the local stack!
 
@@ -559,7 +601,8 @@ CAMLprim value caml_makearray_dynamic_scannable_unboxed_product(
 
   int tag = 0;
 
-  size = non_unarized_length * num_initializers;
+  mlsize_t size = non_unarized_length * num_initializers;
+  bool init_on_minor = false;
   if (size == 0) {
     res = Atom(0);
   } else if (num_initializers < 1) {
@@ -573,18 +616,13 @@ CAMLprim value caml_makearray_dynamic_scannable_unboxed_product(
       "%makearray_dynamic: array size too large (> Max_array_wosize)");
   } else if (is_local) { /* local array */
     res = caml_alloc_local(size, tag);
-    for (i = 0; i < size; i++) {
-      Field(res, i) = Field(v_init, i % num_initializers);
-    }
   } else if (size <= Max_young_wosize) { /* array on minor heap */
     res = caml_alloc_small(size, tag);
-    for (i = 0; i < size; i++) {
-      Field(res, i) = Field(v_init, i % num_initializers);
-    }
   } else { /* array on major heap */
     mlsize_t minor_fields = 0;
     for (mlsize_t i = 0; i < num_initializers; i++) {
-      if (Is_block(Field(v_init, i)) && Is_young(Field(v_init, i))) {
+      value v = Field(v_init, i);
+      if (Is_block(v) && Is_young(v)) {
         ++ minor_fields;
       }
     }
@@ -593,20 +631,18 @@ CAMLprim value caml_makearray_dynamic_scannable_unboxed_product(
 #ifdef DEBUG
     if (collected) {
       for (mlsize_t i = 0; i < num_initializers; i++) {
-        CAMLassert(!(Is_block(Field(v_init, i)) && Is_young(Field(v_init, i))));
+        value v = Field(v_init, i);
+        CAMLassert(!(Is_block(v) && Is_young(v)));
       }
     }
-#else
-    (void)collected;
 #endif
+    init_on_minor = minor_fields && !collected;
     res = caml_alloc_shr(size, tag);
-    for (i = 0; i < size; i++) {
-      value v = Field(v_init, i % num_initializers);
-      if (Is_block(v) && Is_young(v)) {
-        Ref_table_add(&Caml_state->minor_tables->major_ref, &Field(res, i));
-      }
-      Field(res, i) = v;
-    }
+  }
+
+  array_scannable_unboxed_product_init(res, size, v_init, num_initializers);
+  if (init_on_minor) {
+    array_scannable_unboxed_product_ref_add(res, size);
   }
 
   /* Give the GC a chance to run, and run memprof callbacks.
