@@ -1,4 +1,5 @@
 (* TEST
+ flags = "-extension omnidirectionality";
  expect;
 *)
 
@@ -15,16 +16,7 @@ val unify : 'a -> 'a -> unit = <fun>
 
 let f (local_ x) = (x, ignore (x + 1))
 [%%expect {|
-Line 1, characters 20-21:
-1 | let f (local_ x) = (x, ignore (x + 1))
-                        ^
-Error: This value is "local" to the parent region
-       but is expected to be "global"
-         because it is an element of the tuple at line 1, characters 19-38
-         which is expected to be "global" because it is an allocation
-         which is expected to be "local" to the parent region or "global"
-         because it is a function return value.
-         Hint: Use exclave_ to return a local value.
+val f : int @ local -> int * unit = <fun>
 |}]
 
 let f (local_ x) = (x, ignore (x ^ ""))
@@ -43,27 +35,18 @@ Error: This value is "local" to the parent region
 
 let f (x @ nonportable) = ((x : _ @ portable), ignore (x = Some 1))
 [%%expect{|
-Line 1, characters 28-29:
-1 | let f (x @ nonportable) = ((x : _ @ portable), ignore (x = Some 1))
-                                ^
-Error: This value is "nonportable" but is expected to be "portable".
+val f : int option -> int option * unit = <fun>
 |}]
 
 let f (x @ nonportable) =
   ((x : _ @ portable), unify3 x (Some None) (Some (Some 1)))
 [%%expect{|
-Line 2, characters 4-5:
-2 |   ((x : _ @ portable), unify3 x (Some None) (Some (Some 1)))
-        ^
-Error: This value is "nonportable" but is expected to be "portable".
+val f : int option option -> int option option * unit = <fun>
 |}]
 
 let f (x @ nonportable) y = ((x : _ @ portable), unify3 x y 1)
 [%%expect{|
-Line 1, characters 30-31:
-1 | let f (x @ nonportable) y = ((x : _ @ portable), unify3 x y 1)
-                                  ^
-Error: This value is "nonportable" but is expected to be "portable".
+val f : int -> int -> int * unit = <fun>
 |}]
 
 (* CR-soon omni: this test should change once defaulting is lazier *)
@@ -198,26 +181,12 @@ Error: This value is "nonportable" but is expected to be "portable".
 
 let alias (local_ x) = match x with (_ as y) -> (y, ignore (y + 1))
 [%%expect {|
-Line 1, characters 49-50:
-1 | let alias (local_ x) = match x with (_ as y) -> (y, ignore (y + 1))
-                                                     ^
-Error: This value is "local" to the parent region
-       but is expected to be "global"
-         because it is an element of the tuple at line 1, characters 48-67
-         which is expected to be "global" because it is an allocation
-         which is expected to be "local" to the parent region or "global"
-         because it is a function return value.
-         Hint: Use exclave_ to return a local value.
+val alias : int @ local -> int * unit = <fun>
 |}]
 
 let array (local_ x) = ([| x |], ignore (x + 1))
 [%%expect {|
-Line 1, characters 27-28:
-1 | let array (local_ x) = ([| x |], ignore (x + 1))
-                               ^
-Error: This value is "local" to the parent region
-       but is expected to be "global"
-         because it is an element (with some modality) of the array at line 1, characters 24-31.
+val array : int @ local -> int array * unit = <fun>
 |}]
 
 let return (local_ x) = exclave_ (fun y -> (y, ignore (y + 1))) x
@@ -229,18 +198,7 @@ type 'a box = { contents : 'a }
 let field (local_ r) = (r.contents, ignore (r.contents + 1))
 [%%expect {|
 type 'a box = { contents : 'a; }
-Line 2, characters 24-34:
-2 | let field (local_ r) = (r.contents, ignore (r.contents + 1))
-                            ^^^^^^^^^^
-Error: This value is "local" to the parent region
-         because it is the field "contents" of the record at line 2, characters 24-25
-         which is "local" to the parent region.
-       However, the highlighted expression is expected to be "global"
-         because it is an element of the tuple at line 2, characters 23-60
-         which is expected to be "global" because it is an allocation
-         which is expected to be "local" to the parent region or "global"
-         because it is a function return value.
-         Hint: Use exclave_ to return a local value.
+val field : int box @ local -> int * unit = <fun>
 |}]
 
 (* Pending variables copied by [Subst] *)
@@ -248,16 +206,7 @@ Error: This value is "local" to the parent region
 let exhaustive (local_ x) =
   ((match x with exception Not_found -> x | y -> y), ignore (x + 1))
 [%%expect {|
-Line 2, characters 40-41:
-2 |   ((match x with exception Not_found -> x | y -> y), ignore (x + 1))
-                                            ^
-Error: This value is "local" to the parent region
-       but is expected to be "global"
-         because it is an element of the tuple at line 2, characters 2-68
-         which is expected to be "global" because it is an allocation
-         which is expected to be "local" to the parent region or "global"
-         because it is a function return value.
-         Hint: Use exclave_ to return a local value.
+val exhaustive : int @ local -> int * unit = <fun>
 |}]
 
 type _ gadt = Int : int gadt | Bool : bool gadt
@@ -268,30 +217,12 @@ type _ gadt = Int : int gadt | Bool : bool gadt
 let gadt_branches (type a) (w : a gadt) (local_ x) =
   ((match w with Int -> x | Bool -> x), ignore (x + 1))
 [%%expect {|
-Line 2, characters 24-25:
-2 |   ((match w with Int -> x | Bool -> x), ignore (x + 1))
-                            ^
-Error: This value is "local" to the parent region
-       but is expected to be "global"
-         because it is an element of the tuple at line 2, characters 2-55
-         which is expected to be "global" because it is an allocation
-         which is expected to be "local" to the parent region or "global"
-         because it is a function return value.
-         Hint: Use exclave_ to return a local value.
+val gadt_branches : 'a gadt -> int @ local -> int * unit = <fun>
 |}]
 
 let newtype = fun (type a) (local_ x) -> (x, ignore (x + 1))
 [%%expect {|
-Line 1, characters 42-43:
-1 | let newtype = fun (type a) (local_ x) -> (x, ignore (x + 1))
-                                              ^
-Error: This value is "local" to the parent region
-       but is expected to be "global"
-         because it is an element of the tuple at line 1, characters 41-60
-         which is expected to be "global" because it is an allocation
-         which is expected to be "local" to the parent region or "global"
-         because it is a function return value.
-         Hint: Use exclave_ to return a local value.
+val newtype : int @ local -> int * unit = <fun>
 |}]
 
 (* Pending variables unified under a GADT equation *)
