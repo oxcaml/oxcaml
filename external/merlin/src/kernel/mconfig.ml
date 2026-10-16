@@ -671,6 +671,7 @@ let ocaml_ignored_flags =
     "-keep-llvmir";
     "-llvm-backend";
     "-no-llvm-backend";
+    "-fdo-counters";
     "-ddwarf-types";
     "-ocamlcfg";
     "-cfg-eliminate-dead-code-validate";

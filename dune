@@ -184,6 +184,7 @@
   fdo_prehash
   fdo_counter_identity
   fdo_counter
+  fdo_annotation
   file_sections
   lru
   id_counter
