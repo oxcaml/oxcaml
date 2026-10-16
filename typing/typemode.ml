@@ -303,11 +303,46 @@ let modality_of_atoms l =
     (fun t (Modality.Atom (ax, a)) -> Modality.Const.set ax a t)
     Modality.Const.id l
 
+(* The contents of an address get the same modalities as a field of the same
+   mutability, except on the axes implied by locality. This is to preserve
+   compatibility with:
+   {[
+     val of_imm_local : addr_imm @ local -> addr @ local
+   ]}
+
+   Ideally, we would drop exactly the axes that [[@local_opt]] varies together
+   with locality. These are hard-coded in [Ctype.prim_mode'] rather than
+   exposed as a list, so we approximate them by the comonadic modalities that
+   [local] implies (see [implied_modalities]), which mirror the modes implied by
+   [@ local].
+
+   Only comonadic atoms are dropped: dropping one only restricts the contents
+   further, which is always sound. *)
+(* CR address-patterns: The address modalities should be the same as the
+   mutable implied modalities when [@@ global] is no longer implied. *)
+let address_modalities mut =
+  let local =
+    Modality.Atom
+      ( Comonadic Areality,
+        Modality.Comonadic.Atom.Meet_const Regionality.Const.Local )
+  in
+  let dropped_axes =
+    List.filter_map
+      (fun (Modality.Atom (ax, _)) ->
+        match ax with
+        | Comonadic _ -> Some (Modality.Axis.P ax)
+        | Monadic _ -> None)
+      (local :: implied_modalities local)
+  in
+  let should_drop (Modality.Atom (ax, _)) =
+    List.exists (fun p -> Modality.Axis.compare p (P ax) = 0) dropped_axes
+  in
+  mutable_implied_modalities ~for_mutable_variable:false (Types.is_mutable mut)
+  |> List.filter (fun atom -> not (should_drop atom))
+  |> modality_of_atoms
+
 let mutable_implied_modalities ~for_mutable_variable mut =
-  let l = mutable_implied_modalities ~for_mutable_variable mut in
-  List.fold_left
-    (fun t (Modality.Atom (ax, a)) -> Modality.Const.set ax a t)
-    Modality.Const.id l
+  modality_of_atoms (mutable_implied_modalities ~for_mutable_variable mut)
 
 let block_path_expected_modalities mutability =
   (* There are two design constraints on what modalities we allow a block
