@@ -310,6 +310,12 @@ let equal_is_global g g' =
   | Local, Local | Global, Global -> true
   | Local, Global | Global, Local -> false
 
+let compare_is_global g g' =
+  match g, g' with
+  | Local, Local | Global, Global -> 0
+  | Local, Global -> -1
+  | Global, Local -> 1
+
 type symbol =
   { sym_name : string;
     sym_global : is_global
@@ -320,9 +326,31 @@ let equal_symbol { sym_name = left_sym_name; sym_global = left_sym_global }
   String.equal left_sym_name right_sym_name
   && equal_is_global left_sym_global right_sym_global
 
+let compare_symbol { sym_name = left_sym_name; sym_global = left_sym_global }
+    { sym_name = right_sym_name; sym_global = right_sym_global } =
+  let c = String.compare left_sym_name right_sym_name in
+  if c <> 0 then c else compare_is_global left_sym_global right_sym_global
+
 type callee =
   | Symbol of symbol
   | Argument of int
+
+let equal_callee c1 c2 =
+  match c1, c2 with
+  | Symbol s1, Symbol s2 -> equal_symbol s1 s2
+  | Argument s1, Argument s2 -> s1 = s2
+  | Symbol _, Argument _ | Argument _, Symbol _ -> false
+
+let compare_callee c1 c2 =
+  match c1, c2 with
+  | Symbol s1, Symbol s2 -> compare_symbol s1 s2
+  | Argument s1, Argument s2 -> compare s1 s2
+  | Symbol _, Argument _ -> -1
+  | Argument _, Symbol _ -> 1
+
+let print_callee ppf = function
+  | Symbol { sym_name; _ } -> Format.fprintf ppf "%s" sym_name
+  | Argument index -> Format.fprintf ppf "arg#%d" (index + 1)
 
 type phantom_defining_expr =
   | Cphantom_const_int of Targetint.t

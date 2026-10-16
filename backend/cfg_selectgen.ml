@@ -372,8 +372,17 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Capply { callees; _ } -> (
       match[@ocaml.warning "-fragile-match"] args with
       | Cconst_symbol (func, _dbg) :: rem ->
-        Terminator (Call { op = Direct func; label_after }), rem
-      | _ -> Terminator (Call { op = Indirect callees; label_after }), args)
+        ( Terminator
+            ( Call
+                { op = { desc = Direct func; known_arguments }; label_after }),
+          rem )
+      | _ ->
+        ( Terminator
+            ( Call
+                { op = { desc = Indirect callees; known_arguments };
+                  label_after
+               }),
+          args ))
     | Cextcall
         { func; alloc; ty; ty_args; returns; builtin; effects; coeffects = _ }
       ->
@@ -1066,7 +1075,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       let label_after = Cmm.new_label () in
       let new_op, new_args = select_operation op simple_args dbg ~label_after in
       match new_op with
-      | Terminator (Call { op = Indirect _; label_after } as term) ->
+      | Terminator (Call { op = { desc = Indirect _; _ }; label_after } as term)
+        ->
         let* r1 = emit_tuple env sub_cfg new_args in
         let rarg = Array.sub r1 1 (Array.length r1 - 1) in
         let rd = Reg.createv ty in
@@ -1085,7 +1095,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         SU.insert_move_results env sub_cfg loc_res rd stack_ofs;
         SU.set_traps_for_raise env;
         Ok rd
-      | Terminator (Call { op = Direct _; label_after } as term) ->
+      | Terminator (Call { op = { desc = Direct _; _ }; label_after } as term)
+        ->
         let* r1 = emit_tuple env sub_cfg new_args in
         let rd = Reg.createv ty in
         let loc_arg, stack_ofs_args = Proc.loc_arguments (Reg.typv r1) in
@@ -1440,7 +1451,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       let label_after = Cmm.new_label () in
       let new_op, new_args = select_operation op simple_args dbg ~label_after in
       match new_op with
-      | Terminator (Call { op = Indirect callees; label_after } as term) ->
+      | Terminator
+          (Call { op = { desc = Indirect _; _ } as op; label_after } as term) ->
         let** r1 = emit_tuple env sub_cfg new_args in
         let rd = Reg.createv ty in
         let rarg = Array.sub r1 1 (Array.length r1 - 1) in
@@ -1449,7 +1461,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         let stack_ofs = Stdlib.Int.max stack_ofs_args stack_ofs_res in
         if stack_ofs = 0 && SU.trap_stack_is_empty env
         then (
-          let call = Cfg.Tailcall_func (Indirect callees) in
+          let call = Cfg.Tailcall_func op in
           SU.insert_moves env sub_cfg rarg loc_arg;
           SU.insert_debug' env sub_cfg call dbg
             (Array.append [| r1.(0) |] loc_arg)
@@ -1463,7 +1475,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           SU.set_traps_for_raise env;
           SU.insert_move_results env sub_cfg loc_res rd stack_ofs;
           insert_return env sub_cfg (Ok rd) (SU.pop_all_traps env))
-      | Terminator (Call { op = Direct func; label_after } as term) ->
+      | Terminator
+          (Call
+             { op = { desc = Direct func; known_arguments } as op; label_after }
+           as term) ->
         let** r1 = emit_tuple env sub_cfg new_args in
         let rd = Reg.createv ty in
         let loc_arg, stack_ofs_args = Proc.loc_arguments (Reg.typv r1) in
@@ -1473,7 +1488,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           String.equal func.sym_name !SU.current_function_name
           && SU.trap_stack_is_empty env
         then (
-          let call = Cfg.Tailcall_self { destination = env.SU.tailrec_label } in
+          let call =
+            Cfg.Tailcall_self
+              { destination = env.SU.tailrec_label; known_arguments }
+          in
           let loc_arg' =
             assert (stack_ofs >= 0);
             if stack_ofs = 0 then loc_arg else Proc.loc_parameters (Reg.typv r1)
@@ -1482,7 +1500,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           SU.insert_debug' env sub_cfg call dbg loc_arg' [||])
         else if stack_ofs = 0 && SU.trap_stack_is_empty env
         then (
-          let call = Cfg.Tailcall_func (Direct func) in
+          let call = Cfg.Tailcall_func op in
           SU.insert_moves env sub_cfg r1 loc_arg;
           SU.insert_debug' env sub_cfg call dbg loc_arg [||])
         else (

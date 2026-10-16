@@ -305,11 +305,17 @@ end
 module Var : sig
   type t
 
-  val create : string -> Tag.t -> t
+  val create :
+    name:string ->
+    tag:Tag.t ->
+    known_arguments:(Cmm.callee option array) ->
+    t
 
   val name : t -> string
 
   val tag : t -> Tag.t
+
+  val known_arguments : t -> Cmm.callee option array
 
   val print : Format.formatter -> t -> unit
 
@@ -324,12 +330,18 @@ end = struct
   module T = struct
     type t =
       { name : string;
-        tag : Tag.t
+        tag : Tag.t;
+        known_arguments : Cmm.callee option array;
       }
 
-    let compare { tag = tag1; name = name1 } { tag = tag2; name = name2 } =
+    let compare
+        { tag = tag1; name = name1; known_arguments = args1 }
+        { tag = tag2; name = name2; known_arguments = args2 } =
       let c = String.compare name1 name2 in
-      if c = 0 then Tag.compare tag1 tag2 else c
+      if c <> 0 then c else
+      let c = Tag.compare tag1 tag2 in
+      if c <> 0 then c else
+      Array.compare (Option.compare Cmm.compare_callee) args1 args2
   end
 
   include T
@@ -342,10 +354,20 @@ end = struct
 
   let tag t = t.tag
 
-  let create name tag = { name; tag }
+  let known_arguments t = t.known_arguments
 
-  let print ppf { name; tag } =
-    Format.fprintf ppf "%s.%s@ " name (Tag.print tag)
+  let create ~name ~tag ~known_arguments = { name; tag; known_arguments }
+
+  let print ppf { name; tag; known_arguments } =
+    let print_known_argument ppf = function
+      | None -> Format.fprintf ppf "?"
+      | Some callee -> Cmm.print_callee ppf callee
+    in
+    Format.fprintf ppf "%s.%s[args: %a]@ " name (Tag.print tag)
+      (Format.pp_print_seq
+         ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ ")
+         print_known_argument)
+      (Array.to_seq known_arguments)
 end
 
 (** Abstract value for each component of the domain. *)
@@ -363,7 +385,11 @@ module V : sig
 
   val transform : t -> t -> t
 
-  val apply_call : witnesses:Witnesses.t -> callee_summary:t -> t
+  val apply_call :
+    witnesses:Witnesses.t ->
+    callee_summary:t ->
+    known_arguments:(Cmm.callee option array) ->
+    t
 
   val diff_witnesses :
     conditional:bool -> expected:t -> actual:t -> Witness_set.t
@@ -1383,7 +1409,7 @@ end = struct
      while keeping the comments about implementation choices and/or imperatives
      (e.g. why/how witnesses are tracked) next to the code. *)
 
-  let apply_call ~witnesses ~callee_summary =
+  let apply_call ~witnesses ~callee_summary ~known_arguments =
     match callee_summary with
     | Top callee_witnesses ->
       begin match Witnesses.allocation_sources callee_witnesses with
@@ -1436,7 +1462,9 @@ end = struct
     let get env var ~witnesses =
       match env var with
       | None -> unresolved witnesses var
-      | Some callee_summary -> apply_call ~witnesses ~callee_summary
+      | Some callee_summary ->
+        let known_arguments = Var.known_arguments var in
+        apply_call ~witnesses ~callee_summary ~known_arguments
     in
     let contains_any env vars =
       Vars.exists (fun var _w -> Option.is_some (env var)) vars
@@ -1495,7 +1523,11 @@ module Value : sig
 
   val transform : V.t -> t -> t
 
-  val apply_call : witnesses:Witnesses.t -> callee_summary:t -> t
+  val apply_call :
+    witnesses:Witnesses.t ->
+    callee_summary:t ->
+    known_arguments:(Cmm.callee option array) ->
+    t
 
   val get_unresolved_names : t -> String.Set.t
 
@@ -1504,7 +1536,11 @@ module Value : sig
   val diff_witnesses :
     conditional:bool -> expected:t -> actual:t -> Witness_set.components
 
-  val unresolved : string -> Witnesses.t -> t
+  val unresolved :
+    string ->
+    Witnesses.t ->
+    known_arguments:(Cmm.callee option array) ->
+    t
 
   val is_resolved : t -> bool
 
@@ -1514,10 +1550,10 @@ module Value : sig
 end = struct
   include T
 
-  let unresolved name w =
-    { nor = Var.create name Tag.N |> V.unresolved w;
-      exn = Var.create name Tag.E |> V.unresolved w;
-      div = Var.create name Tag.D |> V.unresolved w
+  let unresolved name w ~known_arguments =
+    { nor = Var.create ~name ~tag:Tag.N ~known_arguments |> V.unresolved w;
+      exn = Var.create ~name ~tag:Tag.E ~known_arguments |> V.unresolved w;
+      div = Var.create ~name ~tag:Tag.D ~known_arguments |> V.unresolved w
     }
 
   let is_resolved t =
@@ -1544,10 +1580,16 @@ end = struct
       div = V.transform effect_ v.div
     }
 
-  let apply_call ~witnesses ~callee_summary =
-    { nor = V.apply_call ~witnesses ~callee_summary:callee_summary.nor;
-      exn = V.apply_call ~witnesses ~callee_summary:callee_summary.exn;
-      div = V.apply_call ~witnesses ~callee_summary:callee_summary.div;
+  let apply_call ~witnesses ~callee_summary ~known_arguments =
+    { nor =
+        V.apply_call ~witnesses ~callee_summary:callee_summary.nor
+          ~known_arguments;
+      exn =
+        V.apply_call ~witnesses ~callee_summary:callee_summary.exn
+          ~known_arguments;
+      div =
+        V.apply_call ~witnesses ~callee_summary:callee_summary.div
+          ~known_arguments;
     }
 
   let diff_witnesses ~conditional ~expected ~actual =
@@ -2368,10 +2410,10 @@ end = struct
     || String.starts_with s ~prefix:"camlCamlinternal"
 
   (* [find_callee] returns the value associated with the callee. *)
-  let find_callee t callee ~desc dbg (k : Witness.kind) =
+  let find_callee t callee ~desc dbg (k : Witness.kind) ~known_arguments =
     let unresolved reason =
       let w = create_witnesses t k dbg in
-      let v = Value.unresolved callee w in
+      let v = Value.unresolved callee w ~known_arguments in
       let msg = Printf.sprintf "unresolved %s (%s)" callee reason in
       report t v ~msg ~desc dbg;
       v
@@ -2422,12 +2464,12 @@ end = struct
           else
             return_top Missing_summary
               "missing summary: callee compiled without checks"
-        | Some v -> resolved v)
+        | Some v -> resolved v ~known_arguments)
       | Some callee_info ->
         (* Callee defined earlier in the same compilation unit. May have
            unresolved dependencies. *)
         if Value.is_resolved callee_info.value
-        then resolved callee_info.value
+        then resolved callee_info.value ~known_arguments
         else unresolved "defined earlier with unresolved dependencies"
 
   let transform_return ~(effect_ : V.t) dst =
@@ -2461,10 +2503,11 @@ end = struct
     in
     transform t ~next ~exn ~effect_ desc dbg
 
-  let transform_call t ~next ~exn callee (k : Witness.kind) ~desc dbg =
+  let transform_call t ~next ~exn callee (k : Witness.kind) ~desc dbg
+      ~known_arguments =
     report t next ~msg:"transform_call next" ~desc dbg;
     report t exn ~msg:"transform_call exn" ~desc dbg;
-    let v = find_callee t callee ~desc dbg k in
+    let v = find_callee t callee ~desc dbg k ~known_arguments in
     let effect_ =
       let w = create_witnesses t k dbg in
       match Metadata.assume_value dbg ~can_raise:true (fun _ -> w) with
@@ -2734,7 +2777,8 @@ end = struct
 
       type error = unit
 
-      let transform_call_indirect t ~next ~exn callees wkind ~desc dbg =
+      let transform_call_indirect t ~next ~exn callees wkind ~desc dbg
+          ~known_arguments =
         report t next ~msg:"transform_call_indirect next" ~desc dbg;
         report t exn ~msg:"transform_call_indirect exn" ~desc dbg;
         let effect_ =
@@ -2747,7 +2791,7 @@ end = struct
               let v =
                 match callee with
                 | Cmm.Symbol { sym_name; _ } ->
-                  find_callee t sym_name ~desc dbg k
+                  find_callee t sym_name ~desc dbg k ~known_arguments
                 | Cmm.Argument _ ->
                   Value.
                     { nor =
@@ -2776,12 +2820,12 @@ end = struct
         in
         transform t ~next ~exn ~effect_ desc dbg
 
-      let transform_tailcall_imm t func dbg =
+      let transform_tailcall_imm t func dbg ~known_arguments =
         (* Sound to ignore [next] and [exn] because the call never returns. *)
         let k = Witness.Direct_tailcall { callee = func } in
         transform_call t ~next:Value.normal_return ~exn:Value.exn_escape func k
           ~desc:("direct tailcall to " ^ func)
-          dbg
+          dbg ~known_arguments
 
       let operation t ~next (op : Operation.t) dbg =
         match op with
@@ -2861,18 +2905,18 @@ end = struct
         | Switch _ ->
           assert (not (Cfg.can_raise_terminator i.desc));
           next
-        | Tailcall_self _ ->
+        | Tailcall_self { known_arguments; _ } ->
           (* CR gyorsh: show this be treated as a jump, without affecting the
              summary? *)
-          transform_tailcall_imm t t.current_fun_name dbg
-        | Tailcall_func (Direct { sym_name; _ }) ->
-          transform_tailcall_imm t sym_name dbg
-        | Tailcall_func (Indirect (Some callees)) ->
+          transform_tailcall_imm t t.current_fun_name dbg ~known_arguments
+        | Tailcall_func { desc = Direct { sym_name; _ }; known_arguments } ->
+          transform_tailcall_imm t sym_name dbg ~known_arguments
+        | Tailcall_func { desc = Indirect (Some callees); known_arguments } ->
           transform_call_indirect t ~next:Value.normal_return
             ~exn:Value.exn_escape callees
             (fun callee -> Witness.Indirect_tailcall { callee = Some callee })
-            ~desc:"indirect tailcall" dbg
-        | Tailcall_func (Indirect None) ->
+            ~desc:"indirect tailcall" dbg ~known_arguments
+        | Tailcall_func { desc = Indirect None; _ } ->
           (* Sound to ignore [next] and [exn] because the call never returns. *)
           let w = create_witnesses t (Indirect_tailcall { callee = None }) dbg in
           transform_top t ~next:Value.normal_return ~exn:Value.exn_escape w
@@ -2901,18 +2945,22 @@ end = struct
             Printf.sprintf "probe %s handler %s" name handler_code_sym
           in
           let k = Witness.Probe { name; handler_code_sym } in
-          transform_call t ~next ~exn handler_code_sym k ~desc dbg
-        | Call { op = Indirect None; _ } ->
+          transform_call t ~next ~exn handler_code_sym k ~desc dbg ~known_arguments
+        | Call { op = { desc = Indirect None; _ }; _ } ->
           let w = create_witnesses t (Indirect_call { callee = None }) dbg in
           transform_top t ~next ~exn w "indirect call" dbg
-        | Call { op = Indirect (Some callees); _ } ->
+        | Call { op = { desc = Indirect (Some callees); known_arguments }; _ }
+          ->
           transform_call_indirect t ~next ~exn callees
             (fun callee -> Witness.Indirect_call { callee = Some callee })
-            ~desc:"indirect call" dbg
-        | Call { op = Direct { sym_name = func; _ }; _ } ->
+            ~desc:"indirect call" dbg ~known_arguments
+        | Call
+            { op = { desc = Direct { sym_name = func; _ }; known_arguments };
+              _
+            } ->
           let k = Witness.Direct_call { callee = func } in
           transform_call t ~next ~exn func k ~desc:("direct call to " ^ func)
-            dbg
+            dbg ~known_arguments
         | Invalid _ -> next
 
       let terminator next ~exn (i : Cfg.terminator Cfg.instruction) t =

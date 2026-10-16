@@ -219,9 +219,17 @@ type symbol =
 
 val equal_symbol : symbol -> symbol -> bool
 
+val compare_symbol : symbol -> symbol -> int
+
 type callee =
   | Symbol of symbol
   | Argument of int
+
+val equal_callee : callee -> callee -> bool
+
+val compare_callee : callee -> callee -> int
+
+val print_callee : Format.formatter -> callee -> unit
 
 type phantom_defining_expr =
   (* CR-soon mshinwell: Convert this to [Targetint.OCaml.t] (or whatever the

@@ -389,10 +389,12 @@ let terminator_structure_match ~map_label (old_term : Cfg.terminator)
   | Return, Return -> true
   | Raise old_raise_kind, Raise new_raise_kind ->
     Lambda.equal_raise_kind old_raise_kind new_raise_kind
-  | ( Tailcall_self { destination = old_destination },
-      Tailcall_self { destination = new_destination } ) ->
+  | ( Tailcall_self
+        { destination = old_destination; known_arguments = old_arguments },
+      Tailcall_self
+        { destination = new_destination; known_arguments = new_arguments } ) ->
     map_label old_destination new_destination;
-    true
+    Array.equal (Option.equal Cmm.equal_callee) old_arguments new_arguments
   | Tailcall_func old_op, Tailcall_func new_op ->
     Cfg.equal_func_call_operation old_op new_op
   | Call_no_return old_op, Call_no_return new_op ->
