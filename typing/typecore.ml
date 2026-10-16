@@ -11381,7 +11381,8 @@ and type_application env app_loc expected_mode position_and_mode
                 ty_ret (List.rev untyped_args)
             in
             let snap = snapshot () in
-            (* Quotation inference can fail before its arguments are known. *)
+            (* We backtrack here on errors, so that we can proceed in cases
+               inference is order-dependent (like for [Tquote_eval]). *)
             begin try Ctype.unify env ty_res (instance ty_expected)
             with Unify _ | Tags _ -> backtrack snap
             end
