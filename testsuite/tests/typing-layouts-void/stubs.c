@@ -129,3 +129,48 @@ value elide_digits_argv(value *argv, int argn) {
   for (int i = 0; i < argn; i++) r = r * 10 + Long_val(argv[i]);
   return Val_long(argn * 10000000 + r);
 }
+
+/* Ordinary void arguments are passed as unit in bytecode. The native
+   bindings use the same stubs as their [@elide_void] counterparts. */
+
+value elide_first_normal(value unit, value a, value b) {
+  assert(unit == Val_unit);
+  return elide_digits2(a, b);
+}
+
+value elide_mid_normal(value a, value unit, value b) {
+  assert(unit == Val_unit);
+  return elide_digits2(a, b);
+}
+
+value elide_last_normal(value a, value b, value unit) {
+  assert(unit == Val_unit);
+  return elide_digits2(a, b);
+}
+
+value elide_mixed_normal(value unit1, value unit2, value a) {
+  assert(unit1 == Val_unit);
+  assert(unit2 == Val_unit);
+  return elide_digits1(a);
+}
+
+value elide_seven_last_normal(value *argv, int argn) {
+  assert(argn == 7);
+  assert(argv[6] == Val_unit);
+  return elide_digits6(argv[0], argv[1], argv[2], argv[3], argv[4], argv[5]);
+}
+
+value elide_six_source_normal(value *argv, int argn) {
+  assert(argn == 6);
+  assert(argv[1] == Val_unit);
+  assert(argv[3] == Val_unit);
+  assert(argv[5] == Val_unit);
+  return elide_digits3(argv[0], argv[2], argv[4]);
+}
+
+CAMLextern value caml_hypot_float(value, value);
+
+value elide_hypot_normal(value a, value unit, value b) {
+  assert(unit == Val_unit);
+  return caml_hypot_float(a, b);
+}
