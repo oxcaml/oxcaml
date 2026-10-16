@@ -363,7 +363,7 @@ module V : sig
 
   val transform : t -> t -> t
 
-  val apply_call : Witnesses.t -> t -> t
+  val apply_call : witnesses:Witnesses.t -> callee_summary:t -> t
 
   val diff_witnesses :
     conditional:bool -> expected:t -> actual:t -> Witness_set.t
@@ -1383,13 +1383,19 @@ end = struct
      while keeping the comments about implementation choices and/or imperatives
      (e.g. why/how witnesses are tracked) next to the code. *)
 
-  let apply_call w v =
-    match v with
-    | Top _ -> Top w
-    | Bot | Safe -> v
+  let apply_call ~witnesses ~callee_summary =
+    match callee_summary with
+    | Top callee_witnesses ->
+      begin match Witnesses.allocation_sources callee_witnesses with
+      | Allocation_other_than_calling_arguments -> Top witnesses
+      | No_allocation_other_than_calling_arguments _arguments_called ->
+        (* CR wsturgeon for wsturgeon: implement *)
+        Top witnesses
+      end
+    | Bot | Safe -> callee_summary
     | Var _ | Transform _ | Join _ ->
       Misc.fatal_errorf "Zero_alloc_checker.apply_call: unresolved value %a"
-        (print ~witnesses:false) v
+        (print ~witnesses:false) callee_summary
 
   let diff_witnesses ~conditional ~expected ~actual =
     if satisfies ~conditional ~actual ~expected
@@ -1427,10 +1433,10 @@ end = struct
         "Meet of unresolved is not implemented and shouldn't be needed."
 
   let apply t ~env =
-    let get env var w =
+    let get env var ~witnesses =
       match env var with
-      | None -> unresolved w var
-      | Some v -> apply_call w v
+      | None -> unresolved witnesses var
+      | Some callee_summary -> apply_call ~witnesses ~callee_summary
     in
     let contains_any env vars =
       Vars.exists (fun var _w -> Option.is_some (env var)) vars
@@ -1441,7 +1447,7 @@ end = struct
     let rec aux t =
       match t with
       | Bot | Safe | Top _ -> t
-      | Var { var; witnesses } -> get env var witnesses
+      | Var { var; witnesses } -> get env var ~witnesses
       | Transform tr ->
         let vars = Transform.get_vars tr in
         if not (contains_any env vars)
@@ -1451,7 +1457,7 @@ end = struct
             match Transform.get_top tr with None -> Safe | Some w -> Top w
           in
           Vars.fold
-            ~f:(fun var w acc -> transform (get env var w) acc)
+            ~f:(fun var witnesses acc -> transform (get env var ~witnesses) acc)
             ~init vars
       | Join j ->
         let vars, trs = Join.get j in
@@ -1469,7 +1475,9 @@ end = struct
             | Some w -> Top w
           in
           let acc =
-            Vars.fold ~f:(fun var w acc -> join (get env var w) acc) ~init vars
+            Vars.fold
+              ~f:(fun var witnesses acc -> join (get env var ~witnesses) acc)
+              ~init vars
           in
           Transforms.fold
             (fun tr acc ->
@@ -1487,7 +1495,7 @@ module Value : sig
 
   val transform : V.t -> t -> t
 
-  val apply_call : Witnesses.t -> t -> t
+  val apply_call : witnesses:Witnesses.t -> callee_summary:t -> t
 
   val get_unresolved_names : t -> String.Set.t
 
@@ -1536,10 +1544,10 @@ end = struct
       div = V.transform effect_ v.div
     }
 
-  let apply_call w v =
-    { nor = V.apply_call w v.nor;
-      exn = V.apply_call w v.exn;
-      div = V.apply_call w v.div
+  let apply_call ~witnesses ~callee_summary =
+    { nor = V.apply_call ~witnesses ~callee_summary:callee_summary.nor;
+      exn = V.apply_call ~witnesses ~callee_summary:callee_summary.exn;
+      div = V.apply_call ~witnesses ~callee_summary:callee_summary.div;
     }
 
   let diff_witnesses ~conditional ~expected ~actual =
@@ -2368,15 +2376,15 @@ end = struct
       report t v ~msg ~desc dbg;
       v
     in
-    let resolved v =
-      assert (Value.is_resolved v);
+    let resolved callee_summary =
+      assert (Value.is_resolved callee_summary);
       let msg = Printf.sprintf "resolved %s" callee in
-      report t v ~msg ~desc dbg;
+      report t callee_summary ~msg ~desc dbg;
       (* Abstract witnesses of a call to the single witness for the callee name.
          Summary of tailcall self won't be affected because it is not set to Top
          by [find_callee]. *)
-      let w = create_witnesses t k dbg in
-      Value.apply_call w v
+      let witnesses = create_witnesses t k dbg in
+      Value.apply_call ~witnesses ~callee_summary
     in
     let return_top hint reason =
       let w = create_witnesses t ~hint k dbg in
