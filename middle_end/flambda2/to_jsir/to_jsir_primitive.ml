@@ -125,8 +125,9 @@ let zero_extend ~env ~res ~bits (x : Jsir.prim_arg) =
    [Lambda.array_element_size_in_bytes]). JSIR blocks have one slot per field,
    so the field index is the byte offset divided by 8.
 
-   We can assume that the the base is always a block, as external pointers are
-   rejected in [Lambda_to_flambda_primitives] when targeting JSIR. *)
+   The base may be null, in which case the offset is a raw address (an external
+   pointer). As in bytecode, this is unsupported and raises [Failure] at
+   runtime; see [caml_check_idx_base] in the JS runtime. *)
 let field_index_of_byte_offset ~env ~res offset =
   let offset, res = prim_arg ~env ~res offset in
   let offset, env, res =
@@ -134,18 +135,23 @@ let field_index_of_byte_offset ~env ~res offset =
   in
   use_prim0 ~env ~res (Extern ("%int_lsr", None)) [Pv offset; int_const 3]
 
+let checked_block_index_base ~env ~res base =
+  let base, res = prim_arg ~env ~res base in
+  use_prim0 ~env ~res (Extern ("caml_check_idx_base", None)) [base]
+
 let atomic_field ~env ~res
     (offset_units : Flambda_primitive.atomic_offset_units) extern_name ~base
     ~offset rest =
-  let base, res = prim_arg ~env ~res base in
-  let (offset : Jsir.prim_arg), env, res =
+  let (base : Jsir.prim_arg), (offset : Jsir.prim_arg), env, res =
     match offset_units with
     | Field_index ->
+      let base, res = prim_arg ~env ~res base in
       let offset, res = prim_arg ~env ~res offset in
-      offset, env, res
+      base, offset, env, res
     | Byte_offset ->
+      let base, env, res = checked_block_index_base ~env ~res base in
       let index, env, res = field_index_of_byte_offset ~env ~res offset in
-      Pv index, env, res
+      Pv base, Pv index, env, res
   in
   let rest, res = prim_args ~env ~res rest in
   use_prim ~env ~res (Extern (extern_name, None)) (base :: offset :: rest)
@@ -669,9 +675,9 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
     (* Unsupported in bytecode *)
     raise Primitive_not_supported
   | Read_offset _ ->
-    let base, res = prim_arg ~env ~res x in
+    let base, env, res = checked_block_index_base ~env ~res x in
     let index, env, res = field_index_of_byte_offset ~env ~res y in
-    use_prim ~env ~res Array_get [base; Pv index]
+    use_prim ~env ~res Array_get [Pv base; Pv index]
 
 let ternary_exn ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
   let use_prim' prim = use_prim' ~env ~res prim [x; y; z] in
@@ -743,7 +749,7 @@ let ternary_exn ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
     atomic_field ~env ~res offset_units "caml_atomic_exchange_field" ~base:x
       ~offset:y [z]
   | Write_offset _ ->
-    let base, res = To_jsir_shared.simple ~env ~res x in
+    let base, env, res = checked_block_index_base ~env ~res x in
     let index, env, res = field_index_of_byte_offset ~env ~res y in
     let new_value, res = To_jsir_shared.simple ~env ~res z in
     let res =
