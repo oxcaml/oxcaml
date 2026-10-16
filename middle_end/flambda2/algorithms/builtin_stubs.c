@@ -45,3 +45,16 @@ CAMLweakdef intnat caml_int_clz_tagged_to_untagged(value i) {
 CAMLweakdef value caml_int_clz_tagged_to_tagged(value i) {
     return Val_int(caml_int_clz_tagged_to_untagged(i));
 }
+
+// These prefetch stubs are needed only for linking, the compiler will emit
+// proper prefetch instructions.
+CAMLweakdef value caml_prefetch_read_high_val_offset_untagged(value block, intnat offset) {
+    (void) block;
+    (void) offset;
+    return Val_unit;
+}
+CAMLweakdef value caml_flambda2_prefetch_read_high_offset(value block, value offset) {
+    (void) block;
+    (void) offset;
+    return Val_unit;
+}
