@@ -45,6 +45,9 @@ type 'offset destination = {
   var: Ident.t;
   offset: 'offset;
   loc : Debuginfo.Scoped_location.t;
+  maybe_written : bool;
+  (** Whether the placeholder may already have been overwritten, by the body
+      of a [try] that raised afterwards. *)
 }
 and offset = Offset of lambda
 (** In the OCaml value model, interior pointers are not allowed.  To
@@ -76,9 +79,26 @@ let add_dst_params ({var; offset} : Ident.t destination) params =
 let add_dst_args ({var; offset} : offset destination) args =
   Lvar var :: offset_code offset :: args
 
-let assign_to_dst {var; offset; loc} lam =
-  Lprim(Psetfield_computed(Pointer, Heap_initialization),
+let tmc_placeholder =
+  (* we choose a placeholder whose tagged representation will be
+     recognizable. *)
+  Lambda.dummy_constant
+
+let assign_to_dst {var; offset; loc; maybe_written} lam =
+  (* [caml_initialize] requires the field to hold an immediate, and does not
+     let the GC see the value it overwrites. *)
+  let init =
+    if maybe_written then Assignment modify_heap else Heap_initialization
+  in
+  Lprim(Psetfield_computed(Pointer, init),
         [Lvar var; offset_code offset; lam], loc)
+
+(* The dps function initializes its destination, so it must be passed one
+   holding the placeholder. *)
+let reset_dst dst lam =
+  if dst.maybe_written
+  then Lsequence (assign_to_dst dst tmc_placeholder, lam)
+  else lam
 
 module Constr : sig
   (** The type [Constr.t] represents a reified constructor with
@@ -132,11 +152,6 @@ end = struct
     Lprim (Pmakeblock (constr.tag, constr.flag, constr.shape, alloc_heap),
            block_args, constr.loc)
 
-  let tmc_placeholder =
-    (* we choose a placeholder whose tagged representation will be
-       reconizable. *)
-    Lambda.dummy_constant
-
   let placeholder_pos constr =
     let field = List.length constr.before in
     (* Bytecode boxes products and preserves the source field order. *)
@@ -165,6 +180,7 @@ end = struct
             var = block_var;
             offset = Offset placeholder_pos;
             loc = constr.loc;
+            maybe_written = false;
           })
 
   let delay_impure : block_id:int -> t -> (t -> lambda) -> lambda =
@@ -225,6 +241,14 @@ module Dps : sig
   type 'a t
 
   val make : lambda dps -> lambda t
+
+  (** [non_tail d] places [d] out of tail position, whatever the position of
+      its context. *)
+  val non_tail : 'a t -> 'a t
+
+  (** [maybe_written d] runs [d] with a destination that may already have
+      been written. *)
+  val maybe_written : lambda t -> lambda t
   val run : lambda t -> lambda dps
   val delay_constructor : Constr.t -> lambda t -> lambda t
 
@@ -377,6 +401,16 @@ end = struct
   let make (dps : 'a dps) : 'a t =
     reify_delay dps
 
+  let non_tail d = {
+    d with code = (fun ~delayed ~tail:_ ~dst ->
+      d.code ~delayed ~tail:false ~dst);
+  }
+
+  let maybe_written d = {
+    d with code = (fun ~delayed ~tail ~dst ->
+      d.code ~delayed ~tail ~dst:{ dst with maybe_written = true });
+  }
+
   let delay_constructor constr d =
     let d = ensures_affine d in {
       code = (fun ~delayed ~tail ~dst ->
@@ -478,6 +512,11 @@ module Choice = struct
 
   let dps (c : lambda t) ~tail ~dst =
     Dps.run c.dps ~tail ~dst
+
+  let maybe_written c = { c with dps = Dps.maybe_written c.dps }
+
+  let non_tail c = { c with dps = Dps.non_tail c.dps }
+  (** Place the destination-passing-style code out of tail position. *)
 
   let pair ((c1, c2) : 'a t * 'b t) : ('a * 'b) t = {
     dps = Dps.pair c1.dps c2.dps;
@@ -687,8 +726,17 @@ let rec choice ctx t =
         (* in [try l1 with id -> l2], the term [l1] is
            not in tail-call position (after it returns
            we need to remove the exception handler) *)
-        let+ l1 = choice ctx ~tail:false l1
-        and+ l2 = choice ctx ~tail l2 in
+        let l1 = choice ctx ~tail:false l1 in
+        let l2 = choice ctx ~tail l2 in
+        (* A TMC call in [l1] writes the destination before it may raise,
+           so the handler may write it again. *)
+        let l2 =
+          match l1.Choice.tmc_calls with
+          | [] -> l2
+          | _ :: _ -> Choice.maybe_written l2
+        in
+        let+ l1 = Choice.non_tail l1
+        and+ l2 = l2 in
         Ltrywith (l1, id, id_duid, l2, kind)
     | Lstaticcatch (l1, ids, l2, r, kind) ->
         (* In [static-catch l1 with ids -> l2],
@@ -758,6 +806,7 @@ let rec choice ctx t =
           assert (Lambda.is_not_alloc_stack apply.ap_mode);
           {
             Choice.dps = Dps.make (fun ~tail ~dst ->
+              reset_dst dst @@
               Lapply { apply with
                        ap_func = Lvar specialized.dps_id;
                        ap_args = add_dst_args dst args;
@@ -1125,6 +1174,7 @@ and make_dps_variant var var_duid inner_ctx outer_ctx (lfun : lfunction) =
       var = Ident.create_local "dst";
       offset = Ident.create_local "offset";
       loc = lfun.loc;
+      maybe_written = false;
     } in
     let dst = { dst_param with offset = Offset (Lvar dst_param.offset) } in
     let params = add_dst_params dst_param lfun.params in
