@@ -185,6 +185,7 @@ let rec mixed_block_element print_value_kind ppf el =
   | Mask -> fprintf ppf "mask"
   | Word -> fprintf ppf "word"
   | Untagged_immediate -> fprintf ppf "untagged_immediate"
+  | Void -> fprintf ppf "void"
   | Product shape ->
     fprintf ppf "product %a"
       (Format.pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ")
@@ -252,6 +253,7 @@ let rec layout ppf lay_ =
     fprintf ppf "%s" (unboxed_integer_layout bi)
   | Punboxed_vector bv -> fprintf ppf "%s" (unboxed_vector_layout bv)
   | Punboxed_mask -> fprintf ppf "mask"
+  | Pvoid -> fprintf ppf "void"
   | Punboxed_product layouts ->
     fprintf ppf "@[<hov 1>#(%a)@]"
       (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ") layout)
@@ -303,6 +305,7 @@ let return_kind ppf (mode, kind) =
   | Punboxed_product _ -> fprintf ppf ": %a@ " layout kind
   | Ptop -> fprintf ppf ": top@ "
   | Pbottom -> fprintf ppf ": bottom@ "
+  | Pvoid -> fprintf ppf ": void@ "
   | Psplicevar id -> fprintf ppf ": $%a@ " Slambdaident.print id
 
 let locality_kind = function
@@ -363,6 +366,7 @@ let rec mixed_block_element
   | Mask -> fprintf ppf "mask"
   | Word -> fprintf ppf "word"
   | Untagged_immediate -> fprintf ppf "untagged_immediate"
+  | Void -> fprintf ppf "void"
   | Product shape ->
     fprintf ppf "product %a" (mixed_block_shape (fun _ _ -> ())) shape
   | Splice_variable id -> fprintf ppf "$%a" Slambdaident.print id
