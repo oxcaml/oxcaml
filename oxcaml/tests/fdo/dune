@@ -1,0 +1,24 @@
+; Tests for the FDO system with pseudo-instrumentation
+
+(executable
+ (name fdo_counters)
+ (modules fdo_counters)
+ (libraries ocamlcommon))
+
+; The operations on pseudo-instrumentation counters ([Fdo_counter]).
+
+(rule
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (with-stdout-to
+   fdo_counters.output.corrected
+   (run ./fdo_counters.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "main"))
+ (deps fdo_counters.output fdo_counters.output.corrected)
+ (action
+  (diff fdo_counters.output fdo_counters.output.corrected)))
