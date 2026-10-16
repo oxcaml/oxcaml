@@ -48,7 +48,7 @@ external six_source :
   int -> (w [@elide_void]) -> int -> (w [@elide_void]) -> int = "elide_stub"
 |}]
 
-(* The legacy "float" form unboxes only retained arguments. *)
+(* Reject the legacy float form *)
 external hyp : (w [@elide_void]) -> float -> float -> float
   = "caml_hypot_float" "caml_hypot" "float"
 let f x = hyp (w ()) x 4.0
@@ -96,6 +96,8 @@ Line 1, characters 25-35:
 Error: Only external arguments of layout void can be marked "[@elide_void]".
 |}]
 
+(* We could try to be more permissive here, but it is not necessary for our
+   current purposes. *)
 external on_void_product : (#(w * w) [@elide_void]) -> int -> int
   = "elide_stub"
 [%%expect{|
