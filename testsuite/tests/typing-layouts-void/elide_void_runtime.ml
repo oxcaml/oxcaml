@@ -585,6 +585,142 @@ w
 Exit
 |}]
 
+(* Intrinsics *)
+
+(* The native C stub aborts if called: these calls must be lowered to the
+   intrinsic. Bytecode uses the boxed C stubs. The witness's effects must
+   survive the intrinsic's purity annotations. *)
+external select :
+  bool -> (int64 [@unboxed]) -> w -> (int64 [@unboxed]) -> (int64 [@unboxed])
+  = "elide_select_normal" "caml_csel_int64_unboxed"
+  [@@builtin] [@@noalloc] [@@no_effects] [@@no_coeffects]
+external select_elide :
+  bool -> (int64 [@unboxed]) -> (w [@elide_void]) -> (int64 [@unboxed])
+  -> (int64 [@unboxed])
+  = "elide_select" "caml_csel_int64_unboxed"
+  [@@builtin] [@@noalloc] [@@no_effects] [@@no_coeffects]
+[%%expect {|
+external select :
+  bool -> (int64 [@unboxed]) -> w -> (int64 [@unboxed]) -> (int64 [@unboxed])
+  = "elide_select_normal" "caml_csel_int64_unboxed" [@@no_coeffects]
+  [@@no_effects] [@@builtin] [@@noalloc]
+external select_elide :
+  bool ->
+  (int64 [@unboxed]) ->
+  (w [@elide_void]) -> (int64 [@unboxed]) -> (int64 [@unboxed])
+  = "elide_select" "caml_csel_int64_unboxed" [@@no_coeffects] [@@no_effects]
+  [@@builtin] [@@noalloc]
+|}]
+
+let () =
+  Format.printf "%Ld@."
+    (select (value "cond" false) (value "ifso" 17L) (noisy_w "w")
+       (value "ifnot" 42L))
+[%%expect {|
+ifnot
+w
+ifso
+cond
+42
+|}]
+
+let () =
+  Format.printf "%Ld@."
+    (select_elide (value "cond" false) (value "ifso" 17L) (noisy_w "w")
+       (value "ifnot" 42L))
+[%%expect {|
+ifnot
+w
+ifso
+cond
+42
+|}]
+
+let[@inline never] test_select f =
+  let f = Sys.opaque_identity f in
+  Format.printf "%Ld@."
+    (f (value "cond" true) (value "ifso" 17L) (noisy_w "w")
+       (value "ifnot" 42L))
+[%%expect {|
+val test_select : (bool -> int64 -> w -> int64 -> int64) -> unit = <fun>
+|}]
+
+let () = test_select select
+[%%expect {|
+ifnot
+w
+ifso
+cond
+17
+|}]
+
+let () = test_select select_elide
+[%%expect {|
+ifnot
+w
+ifso
+cond
+17
+|}]
+
+let[@inline never] test_select_partial () =
+  note "before witness";
+  let before =
+    Sys.opaque_identity (select (value "cond" true) (value "ifso" 17L))
+  in
+  Format.printf "%Ld@." (before (noisy_w "w") (value "ifnot" 42L));
+  note "after witness";
+  let after =
+    Sys.opaque_identity
+      (select (value "cond" false) (value "ifso" 17L) (noisy_w "w"))
+  in
+  Format.printf "%Ld@." (after (value "ifnot" 42L))
+let () = test_select_partial ()
+[%%expect {|
+val test_select_partial : unit -> unit = <fun>
+before witness
+ifso
+cond
+ifnot
+w
+17
+after witness
+w
+ifso
+cond
+ifnot
+42
+|}]
+
+let[@inline never] test_select_partial () =
+  note "before witness";
+  let before =
+    Sys.opaque_identity (select_elide (value "cond" true) (value "ifso" 17L))
+  in
+  Format.printf "%Ld@." (before (noisy_w "w") (value "ifnot" 42L));
+  note "after witness";
+  let after =
+    Sys.opaque_identity
+      (select_elide (value "cond" false) (value "ifso" 17L) (noisy_w "w"))
+  in
+  Format.printf "%Ld@." (after (value "ifnot" 42L))
+let () = test_select_partial ()
+[%%expect {|
+val test_select_partial : unit -> unit = <fun>
+before witness
+ifso
+cond
+ifnot
+w
+17
+after witness
+w
+ifso
+cond
+ifnot
+42
+|}]
+
 (* Primitives have fixed arities: unlike C stubs, they cannot accept ordinary
    void arguments. We test both direct and partial/eta-expanded calls below.
    Direct short-circuiting calls can skip the RHS; an eta-expanded function

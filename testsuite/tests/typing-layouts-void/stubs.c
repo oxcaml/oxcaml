@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include "caml/alloc.h"
 #include "caml/memory.h"
+#include "caml/misc.h"
 #include "caml/mlvalues.h"
 
 void void_to_void() {
@@ -173,4 +174,20 @@ CAMLextern value caml_hypot_float(value, value);
 value elide_hypot_normal(value a, value unit, value b) {
   assert(unit == Val_unit);
   return caml_hypot_float(a, b);
+}
+
+/* The native toplevel resolves this symbol when loading the declaration,
+   but every call must be lowered to the intrinsic. */
+int64_t caml_csel_int64_unboxed(value cond, int64_t ifso, int64_t ifnot) {
+  caml_fatal_error("caml_csel_int64_unboxed was not intrinsified");
+}
+
+/* Bytecode fallbacks for the conditional-select intrinsic. */
+value elide_select(value cond, value ifso, value ifnot) {
+  return Bool_val(cond) ? ifso : ifnot;
+}
+
+value elide_select_normal(value cond, value ifso, value unit, value ifnot) {
+  assert(unit == Val_unit);
+  return elide_select(cond, ifso, ifnot);
 }
