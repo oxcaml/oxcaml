@@ -2,6 +2,7 @@
    flambda2;
    flags += "-flambda2-reaper";
    { native; }
+   { jsir; }
  *)
 
 type r = { a : int; b : int; mutable c : int } 

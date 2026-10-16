@@ -210,6 +210,7 @@ let run_cmd
   n
 
 let run
+    ?(prefix = "")
     (log_message : string)
     (redirect_output : bool)
     (can_skip : bool)
@@ -227,7 +228,7 @@ let run
     let arguments = match args_variable with
       | None -> ""
       | Some variable -> Environments.safe_lookup variable env in
-    let commandline = [program; arguments] in
+    let commandline = [prefix; program; arguments] in
     let what = log_message ^ " " ^ program ^ " " ^
     begin if arguments="" then "without any argument"
     else "with arguments " ^ arguments
@@ -258,7 +259,7 @@ let run
 (* Any extra OCAMLRUNPARAM components given by -run-ocamlrunparam are appended
    here, for this action only, rather than in the initial environment:
    the compilers and other tools run without them. *)
-let run_program log env =
+let run_program ?prefix log env =
   let env =
     if Options.run_ocamlrunparam = "" then env
     else begin
@@ -271,6 +272,7 @@ let run_program log env =
     end
   in
   run
+    ?prefix
     "Running program"
     true
     false

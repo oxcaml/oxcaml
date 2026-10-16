@@ -24,6 +24,10 @@
 *.la
 *.cm[ioxats]
 *.cmx[as]
+*.cmj
+*.cmj[ox]
+*.cmjxa
+*.cmja
 *.cmti
 *.cmsi
 *.annot

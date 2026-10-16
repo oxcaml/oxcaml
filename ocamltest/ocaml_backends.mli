@@ -15,11 +15,13 @@
 
 (* Backends of the OCaml compiler and their properties *)
 
-type t = Native | Bytecode
+type t = Native | Bytecode | Jsir
 
 val is_bytecode : t -> bool
 
 val is_native : t -> bool
+
+val is_jsir : t -> bool
 
 val string_of_backend : t -> string
 

@@ -3,6 +3,8 @@
  {
    flags = "-extension layouts_beta";
    native;
+ }{
+   jsir;
  }
 *)
 

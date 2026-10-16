@@ -1,6 +1,7 @@
 (* TEST
  { bytecode; }
  { native; }
+ { jsir; }
 *)
 
 (* Test Mutex.try_lock *)
