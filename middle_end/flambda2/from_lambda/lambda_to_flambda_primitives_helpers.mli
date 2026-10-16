@@ -18,7 +18,6 @@ type failure =
   | Division_by_zero
   | Index_out_of_bounds
   | Address_was_misaligned
-  | External_pointer_unsupported
 
 type expr_primitive =
   | Simple of Simple.t

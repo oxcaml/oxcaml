@@ -57,7 +57,8 @@ We treat every slot as being 8 bytes wide. This means that the indexing behaviou
 compared to native code: for example, accessing the second element of a packed `int32# array` will
 require offset 4 in native code, but offset 8 in JSIR.
 
-External pointers are unsupported as in bytecode, and will throw a runtime error.
+External pointers (block index accesses with a null base) are unsupported as in bytecode.
+The JS runtime primitive `caml_check_idx_base` raises `Failure` when such an access is attempted.
 
 ## Known limitations
 
