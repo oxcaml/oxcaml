@@ -243,9 +243,9 @@ Error: The value "y" has type "('a : bits8)"
          representable at call sites).
 |}]
 
-(* okay if we constrain the kind earlier. Propagating the expected result
-   into the application sets the shared sort first, which hits the same
-   incompleteness. *)
+(* Constraining the kind through the expected result no longer works:
+   propagating it into the application sets the shared sort first, which
+   hits the same incompleteness. *)
 let bad (y : b8a) =
   let _ : (_ : bits8 addressable) = magic_to_addressable y in
   (y : b8a)
@@ -262,6 +262,14 @@ Error: The value "y" has type "b8a" but an expression was expected of type
          ([@layout_poly] forces all variables of layout 'any' to be
          representable at call sites).
 |}, Principal{|
+val bad : b8a -> b8a = <fun>
+|}]
+
+(* okay if we constrain the kind earlier *)
+let bad (y : b8a) =
+  let _ = (magic_to_addressable : (_ : bits8 addressable) -> _) y in
+  (y : b8a)
+[%%expect{|
 val bad : b8a -> b8a = <fun>
 |}]
 
