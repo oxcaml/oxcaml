@@ -319,7 +319,7 @@ let print p osig_val_decl =
     let native_repr_res_repr = snd p.prim_native_repr_res in
     f native_repr_res_repr
     && List.for_all
-         (* Global representation attributes do not apply to elided arguments. *)
+         (* Global representation attributes do not apply to elided arguments *)
          (function Elided_void -> true | Native_repr repr -> f repr)
          native_repr_args_reprs
   in
