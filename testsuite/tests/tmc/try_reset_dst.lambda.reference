@@ -1,0 +1,81 @@
+(let
+  (Fail = (makeblock_unique 248 "Try_reset_dst.Fail" (caml_fresh_oo_id 0))
+   fail =
+     (function {nlocal = 0} param[value<int>] never_inline : int
+       (raise_notrace Fail)))
+  (letrec
+    (f
+       (function {nlocal = 0} n[value<int>] tail_mod_cons
+         : (consts (0))
+            (non_consts ([0: ?, value<(consts (0)) (non_consts ([0: ?, *]))>]))
+         (try
+           (seq (if (%eq n 0) (apply fail 0) 0)
+             (let
+               (block =
+                  (makemutable 0 (value<int>,value<
+                                              (consts (0))
+                                               (non_consts ([0: ?,
+                                                             value<
+                                                              (consts (0))
+                                                               (non_consts (
+                                                               [0: ?, *]))>]))>)
+                    n 24029))
+               (seq (apply f_dps block 1 (%int_sub n 1)) block)))
+          with exn
+           (catch
+             (if (%eq exn Fail)
+               (if (%eq n 2)
+                 (makeblock 0 (value<int>,value<
+                                           (consts (0))
+                                            (non_consts ([0: ?,
+                                                          value<
+                                                           (consts (0))
+                                                            (non_consts (
+                                                            [0: ?, *]))>]))>)
+                   (%int_mul n 100) 0)
+                 (exit 2))
+               (exit 2))
+            with (2) (reraise exn))))
+      f_dps
+        (function {nlocal = 0} dst offset[value<int>] n[value<int>]
+          tail_mod_cons
+          : (consts (0))
+             (non_consts ([0: ?,
+                           value<(consts (0)) (non_consts ([0: ?, *]))>]))
+          (try
+            (seq (if (%eq n 0) (apply fail 0) 0)
+              (let
+                (block =
+                   (makemutable 0 (value<int>,value<
+                                               (consts (0))
+                                                (non_consts ([0: ?,
+                                                              value<
+                                                               (consts (0))
+                                                                (non_consts (
+                                                                [0: ?, *]))>]))>)
+                     n 24029))
+                (seq (setfield_ptr(heap-init)_computed dst offset block)
+                  (apply f_dps block 1 (%int_sub n 1)))))
+           with exn
+            (catch
+              (if (%eq exn Fail)
+                (if (%eq n 2)
+                  (setfield_ptr_computed dst offset
+                    (makeblock 0 (value<int>,value<
+                                              (consts (0))
+                                               (non_consts ([0: ?,
+                                                             value<
+                                                              (consts (0))
+                                                               (non_consts (
+                                                               [0: ?, *]))>]))>)
+                      (%int_mul n 100) 0))
+                  (setfield_ptr_computed dst offset (exit 2)))
+                (setfield_ptr_computed dst offset (exit 2)))
+             with (2) (setfield_ptr_computed dst offset (reraise exn))))))
+    (let
+      (*match* =[value<int>]
+         (if (caml_equal (apply f 4) [0: 4 [0: 3 [0: 200 0]]]) 0
+           (raise
+             (makeblock 0 (getpredef Assert_failure!!)
+               [0: "try_reset_dst.ml" 34 9]))))
+      (makeblock 0 Fail fail f))))
