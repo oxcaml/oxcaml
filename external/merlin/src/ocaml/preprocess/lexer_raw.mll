@@ -730,6 +730,7 @@ rule token state = parse
       { oPTLABEL (check_label_name lexbuf name) }
   | "?" (lowercase_latin1 identchar_latin1 * as name) ':'
       { warn_latin1 lexbuf; return (OPTLABEL name) }
+  | "law?" { return LAWQUESTION }
   (* Lowercase identifiers are split into 3 cases, and the order matters
      (longest to shortest).
   *)
@@ -918,6 +919,7 @@ rule token state = parse
     }
   | "<-" { return LESSMINUS }
   | "="  { return EQUAL }
+  | "===>" { return IMPLIES }
   | "["  { return LBRACKET }
   | "[|" { return LBRACKETBAR }
   | "[:" { return LBRACKETCOLON }

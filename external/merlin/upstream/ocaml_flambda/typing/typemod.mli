@@ -206,6 +206,7 @@ type error =
       old_source_file: Misc.filepath;
     }
   | Duplicate_parameter_name of Global_module.Parameter_name.t
+  | Laws_not_supported
 
 exception Error_forward of Location.error
 exception Errors of Location.t * Typing_recovery.Error_set.t
