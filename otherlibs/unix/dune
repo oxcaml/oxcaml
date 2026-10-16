@@ -20,14 +20,8 @@
  (modes byte native)
  (flags
   (:standard
-   -absname
-   -bin-annot
-   -g
-   -safe-string
-   -strict-sequence
-   -strict-formats
-   -nolabels ; for UnixLabels
-   ))
+   (:include flags.sexp)
+   -bin-annot))
  (ocamlopt_flags (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
  (library_flags (:standard -linkall))
  (modules unix unixLabels)

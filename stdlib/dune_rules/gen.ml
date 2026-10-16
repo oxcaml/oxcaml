@@ -65,10 +65,7 @@ let rec trans_closure ~dst ~src s =
      StrTbl.add dst s deps;
      deps
 
-let stdlib_flags =
-  "-nopervasives -directory stdlib -strict-sequence -g -absname \
-   -extension runtime_metaprogramming -nostdlib -safe-string -strict-formats \
-   -no-alias-deps -w +a-4-9-40-41-42-44-45-48-66-67-70 -w -221 -principal"
+let stdlib_flags = String.concat " " Stdlib_flags.flags
 
 let pp_flags ~awk_dir ~target =
   if target = "stdlib"
@@ -193,60 +190,6 @@ let write_stdlib_dune ppf =
        Makefile.config runtime-launch-info ld.conf
        stdlib/META dynlink/dynlink.cmxa))
   |}
-
-let write_stdlib_jsir_sources_dune ppf =
-  setting "stdlib_modules" @ ["std_exit"] |> List.iter (fun m ->
-    ["ml"; "mli"] |> List.iter (fun ext ->
-      let file = m ^ "." ^ ext in
-      fprintf ppf
-        "(rule (target %s) (action (copy %%{ocaml_where}/%s %%{target})))\n"
-        file file))
-
-let write_stdlib_jsir_dune ppf =
-  let src_dir = "../src" and stdlib_dir = "../../stdlib" in
-  let run_ocamlopt args =
-    sprintf
-      "(setenv OXCAML_JS_OF_OCAML %%{bin:js_of_ocaml} \
-       (run %%{ocamlopt} -target js_of_ocaml %s))"
-      args
-  in
-  let installed file = sprintf "%%{ocaml_where}/%s" file in
-  let table = module_deps_table Sys.argv.(3) in
-  iter_module_deps table (fun ~tgt_file ~base ~deps ->
-    if Filename.extension tgt_file = ".cmx" then begin
-      let target = get_target base in
-      let src = sprintf "%s/%s.ml" src_dir base in
-      let deps =
-        installed (target ^ ".cmi")
-        :: List.map (fun dep ->
-             match Filename.extension dep with
-             | ".cmx" -> Filename.remove_extension dep ^ ".cmjx"
-             | ".cmi" -> installed dep
-             | s -> failwith ("Unexpected extension " ^ s))
-             deps
-        |> StrSet.of_list |> StrSet.to_list
-      in
-      let action =
-        run_ocamlopt
-          (sprintf "%s%s -I %%{ocaml_where} -cmi-file %s -o %s.cmjx -c %%{src}"
-             stdlib_flags (pp_flags ~awk_dir:stdlib_dir ~target)
-             (installed (target ^ ".cmi")) target)
-      in
-      rule ~ppf ~target ~exts:["cmjx"; "cmjo"] ~src ~deps ~action
-    end);
-  let modnames = setting "stdlib_modules" in
-  let targets = List.map get_target modnames in
-  let action =
-    targets
-    |> List.map (fun t -> sprintf "%%{dep:%s.cmjx}" t)
-    |> String.concat " "
-    |> sprintf "-g -nostdlib -a -o stdlib.cmjxa %s"
-    |> run_ocamlopt
-  in
-  rule ~ppf ~target:"stdlib" ~exts:["cmjxa"; "cmja"]
-    ~src:(sprintf "%s/stdlib.ml" src_dir)
-    ~deps:(List.map (fun t -> t ^ ".cmjo") targets)
-    ~action
 
 (* Generate runtime.dune for the main build, which only needs 'primitives' *)
 let write_primitives_dune ppf =
@@ -405,8 +348,6 @@ let write_runtime_dune ppf =
 let () =
   match Sys.argv.(2) with
   | "stdlib" -> write_stdlib_dune stdout
-  | "stdlib-jsir-sources" -> write_stdlib_jsir_sources_dune stdout
-  | "stdlib-jsir" -> write_stdlib_jsir_dune stdout
   | "runtime" -> write_runtime_dune stdout
   | "primitives" -> write_primitives_dune stdout
   | s -> failwith ("Unknown target " ^ s)
