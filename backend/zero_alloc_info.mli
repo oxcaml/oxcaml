@@ -17,9 +17,9 @@ end
 
 module Allocation_sources : sig
   type t = private
-    { arguments_that_may_allocate : Call_outcomes.t Numbers.Int.Map.t;
-      anything_else_may_allocate : bool
-    }
+    | Allocation_other_than_calling_arguments
+    | No_allocation_other_than_calling_arguments of
+        Call_outcomes.t Numbers.Int.Map.t
 
   val unknown : t
 

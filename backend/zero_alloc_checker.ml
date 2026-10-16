@@ -231,8 +231,10 @@ module Witnesses = struct
 
   let allocation_sources t = t.allocation_sources
 
-  let every_allocation_comes_from_calling_an_argument t =
-    not t.allocation_sources.anything_else_may_allocate
+  let no_allocation_other_than_calling_arguments t : bool =
+    match t.allocation_sources with
+    | Allocation_other_than_calling_arguments -> false
+    | No_allocation_other_than_calling_arguments _ -> true
 
   let create ~keep_witnesses ~outcomes ?hint kind dbg =
     let witnesses =
@@ -923,7 +925,7 @@ end = struct
        cutoff. *)
     let args_with_top w args =
       if
-        Witnesses.every_allocation_comes_from_calling_an_argument w
+        Witnesses.no_allocation_other_than_calling_arguments w
         || not (Args.has_witnesses args)
       then Args_with_top { w; args }
       else
@@ -1231,7 +1233,7 @@ end = struct
          does *not* do so solely through its arguments), then there's nothing
          more to learn, so we might as well save some time and space. *)
       if
-        Witnesses.every_allocation_comes_from_calling_an_argument w
+        Witnesses.no_allocation_other_than_calling_arguments w
         || not (Witnesses.is_empty witnesses)
       then Join (Join.var_with_top var ~var_witnesses:witnesses w)
       else top
@@ -1260,14 +1262,14 @@ end = struct
          but it would make the resulting error messages sensitive to iteration
          order. *)
       if
-        Witnesses.every_allocation_comes_from_calling_an_argument w
+        Witnesses.no_allocation_other_than_calling_arguments w
         || Transform.has_witnesses tr
       then Join (Join.tr_with_top tr w)
       else top
     | (Top w as top), Join j
     | Join j, (Top w as top) ->
       if
-        Witnesses.every_allocation_comes_from_calling_an_argument w
+        Witnesses.no_allocation_other_than_calling_arguments w
         || Join.has_witnesses j
       then Join (Join.add_top j w)
       else top
@@ -1305,15 +1307,18 @@ end = struct
        but the function we're checking says it can sometimes allocate, ... *)
     | Top witnesses, _ when conditional ->
       (* ... we check the allocation sources of the function, ... *)
-      let sources = Witnesses.allocation_sources witnesses in
+      begin match Witnesses.allocation_sources witnesses with
       (* ... check that nothing other than arguments can allocate, ... *)
-      (not sources.anything_else_may_allocate)
-      (* ... and check that, for all arguments that might allocate, ... *)
-      && Numbers.Int.Map.for_all (fun _ (outcomes : Call_outcomes.t) ->
-        (* ... as long as we assume those arguments do not allocate in
-          normal-return paths, then (conditionally) we're fine. *)
-        (outcomes :> int) land (lnot (Call_outcomes.normal_return :> int)) = 0)
-        sources.arguments_that_may_allocate
+      | Allocation_other_than_calling_arguments -> false
+      | No_allocation_other_than_calling_arguments arguments_called ->
+        (* ... and check that, for all arguments that might allocate, ... *)
+        Numbers.Int.Map.for_all (fun _ (outcomes : Call_outcomes.t) ->
+          (* ... as long as we assume those arguments do not allocate in
+            normal-return paths, then (conditionally) we're fine. *)
+          (outcomes :> int) land (lnot (Call_outcomes.normal_return :> int))
+          = 0)
+          arguments_called
+      end
     | Top _, (Safe | Bot) -> false
     | (Safe | Bot), _ -> lessequal actual expected
     | (Var _ | Transform _ | Join _), _
@@ -1362,7 +1367,7 @@ end = struct
     | (Top w as top), Join j
     | Join j, (Top w as top) ->
       if
-        Witnesses.every_allocation_comes_from_calling_an_argument w
+        Witnesses.no_allocation_other_than_calling_arguments w
         || not (Join.has_safe j)
         || Join.has_witnesses j
       then bounded_join (Join.distribute_transform_top_over_join j w)

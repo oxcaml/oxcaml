@@ -17,73 +17,66 @@ end
 
 module Allocation_sources = struct
   type t =
-    { arguments_that_may_allocate : Call_outcomes.t Numbers.Int.Map.t;
-      anything_else_may_allocate : bool
-    }
+    | Allocation_other_than_calling_arguments
+    | No_allocation_other_than_calling_arguments of
+        Call_outcomes.t Numbers.Int.Map.t
 
-  let unknown =
-    { arguments_that_may_allocate = Numbers.Int.Map.empty;
-      anything_else_may_allocate = true
-    }
+  let unknown = Allocation_other_than_calling_arguments
 
   let argument ~lowered_index ~outcomes =
-    { arguments_that_may_allocate =
-        Numbers.Int.Map.singleton lowered_index outcomes;
-      anything_else_may_allocate = false
-    }
+    No_allocation_other_than_calling_arguments
+      (Numbers.Int.Map.singleton lowered_index outcomes)
 
-  let is_empty t =
-    (not t.anything_else_may_allocate)
-    && Numbers.Int.Map.is_empty t.arguments_that_may_allocate
+  let is_empty : t -> bool = function
+    | Allocation_other_than_calling_arguments -> false
+    | No_allocation_other_than_calling_arguments arguments_called ->
+      Numbers.Int.Map.is_empty arguments_called
 
-  let compare t1 t2 =
-    let c =
-      Bool.compare t1.anything_else_may_allocate t2.anything_else_may_allocate
-    in
-    if c <> 0
-    then c
-    else
-      Numbers.Int.Map.compare Int.compare t1.arguments_that_may_allocate
-        t2.arguments_that_may_allocate
+  let compare t1 t2 = match t1, t2 with
+    | ( Allocation_other_than_calling_arguments,
+        Allocation_other_than_calling_arguments ) ->
+      0
+    | ( No_allocation_other_than_calling_arguments a1,
+        No_allocation_other_than_calling_arguments a2 ) ->
+      Numbers.Int.Map.compare Int.compare a1 a2
+    | ( Allocation_other_than_calling_arguments,
+        No_allocation_other_than_calling_arguments _ ) ->
+      1
+    | ( No_allocation_other_than_calling_arguments _,
+        Allocation_other_than_calling_arguments ) ->
+      -1
 
-  let lessequal t1 t2 =
-    t2.anything_else_may_allocate
-    || (not t1.anything_else_may_allocate)
-       && Numbers.Int.Map.for_all
-            (fun argument outcomes ->
-              match
-                Numbers.Int.Map.find_opt argument t2.arguments_that_may_allocate
-              with
-              | None -> false
-              | Some other -> outcomes land other = outcomes)
-            t1.arguments_that_may_allocate
+  let join t1 t2 = match t1, t2 with
+    | Allocation_other_than_calling_arguments, _
+    | _, Allocation_other_than_calling_arguments
+      -> Allocation_other_than_calling_arguments
+    | ( No_allocation_other_than_calling_arguments a1,
+        No_allocation_other_than_calling_arguments a2 ) ->
+      No_allocation_other_than_calling_arguments
+        (Numbers.Int.Map.union (fun _ lhs rhs -> Some (lhs lor rhs)) a1 a2)
 
-  let join t1 t2 =
-    { arguments_that_may_allocate =
-        Numbers.Int.Map.union
-          (fun _ left right -> Some (left lor right))
-          t1.arguments_that_may_allocate t2.arguments_that_may_allocate;
-      anything_else_may_allocate =
-        t1.anything_else_may_allocate || t2.anything_else_may_allocate
-    }
+  let lessequal t1 t2 = compare (join t1 t2) t2 = 0
 
-  let meet t1 t2 =
-    if t1.anything_else_may_allocate
-    then t2
-    else if t2.anything_else_may_allocate
-    then t1
-    else
-      { arguments_that_may_allocate =
-          Numbers.Int.Map.merge
-            (fun _ left right ->
-              match left, right with
-              | Some left, Some right ->
-                let outcomes = left land right in
-                if outcomes = 0 then None else Some outcomes
-              | None, _ | _, None -> None)
-            t1.arguments_that_may_allocate t2.arguments_that_may_allocate;
-        anything_else_may_allocate = false
-      }
+  let meet t1 t2 = match t1, t2 with
+    | ( Allocation_other_than_calling_arguments,
+        Allocation_other_than_calling_arguments ) ->
+      Allocation_other_than_calling_arguments
+    | ( No_allocation_other_than_calling_arguments a1,
+        No_allocation_other_than_calling_arguments a2 ) ->
+      No_allocation_other_than_calling_arguments
+        ( Numbers.Int.Map.merge
+            ( fun _ lhs rhs ->
+                match lhs, rhs with
+                | Some lhs, Some rhs ->
+                  let outcomes = lhs land rhs in
+                  if outcomes = 0 then None else Some outcomes
+                | None, _ | _, None -> None )
+            a1 a2 )
+    | ( No_allocation_other_than_calling_arguments arguments_called,
+        Allocation_other_than_calling_arguments )
+    | ( Allocation_other_than_calling_arguments,
+        No_allocation_other_than_calling_arguments arguments_called )
+      -> No_allocation_other_than_calling_arguments arguments_called
 
   let print ppf t =
     let print_paths ppf (argument, outcomes) =
@@ -109,13 +102,16 @@ module Allocation_sources = struct
             Format.pp_print_string )
         paths
     in
-    Format.fprintf ppf
-      "@[<hov 1>{arguments_that_may_allocate = {@[<hov>%a@]};@ anything_else_may_allocate = %b}@]"
-      (Format.pp_print_list
-         ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ ")
-         print_paths)
-      (Numbers.Int.Map.bindings t.arguments_that_may_allocate)
-      t.anything_else_may_allocate
+    match t with
+    | Allocation_other_than_calling_arguments ->
+      Format.fprintf ppf "Allocation_other_than_calling_arguments"
+    | No_allocation_other_than_calling_arguments arguments_called ->
+      Format.fprintf ppf
+        "No_allocation_other_than_calling_arguments {@[<hov>%a@]}"
+        (Format.pp_print_list
+           ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ ")
+           print_paths)
+        (Numbers.Int.Map.bindings arguments_called)
 end
 
 type component =
@@ -144,14 +140,17 @@ let merge src ~into:dst =
   let join key _ _ = Misc.fatal_errorf "Unexpected merge %s" key in
   dst.zero_alloc <- String.Map.union join dst.zero_alloc src.zero_alloc
 
+(* Tag 0: [Top Allocation_other_than_calling_arguments]
+ * Tag 1: [Safe]
+ * Tag 2: [Bot]
+ * Tag 3: [Top (No_allocation_other_than_calling_arguments ...)] *)
 let encode_component index component (components, calls) =
+  let with_tag tag = components lor (tag lsl (2 * index)) in
   match component with
-  | Top sources ->
-    let components =
-      if sources.anything_else_may_allocate
-      then components
-      else components lor (1 lsl (6 + index))
-    in
+  | Top Allocation_other_than_calling_arguments -> with_tag 0, calls
+  | Safe -> with_tag 1, calls
+  | Bot -> with_tag 2, calls
+  | Top (No_allocation_other_than_calling_arguments arguments_called) ->
     let calls =
       Numbers.Int.Map.fold
         (fun argument outcomes calls ->
@@ -160,18 +159,16 @@ let encode_component index component (components, calls) =
               Some
                 (Option.value previous ~default:0 lor (outcomes lsl (3 * index))))
             calls)
-        sources.arguments_that_may_allocate calls
+        arguments_called calls
     in
-    components, calls
-  | Safe -> components lor (1 lsl (2 * index)), calls
-  | Bot -> components lor (2 lsl (2 * index)), calls
+    with_tag 3, calls
 
 let encode { nor; exn; div } =
   let components, calls =
     (0, Numbers.Int.Map.empty) |> encode_component 0 nor
     |> encode_component 1 exn |> encode_component 2 div
   in
-  if components = 0 && Numbers.Int.Map.is_empty calls
+  if components = 0
   then None
   else
     Some
@@ -181,8 +178,11 @@ let encode { nor; exn; div } =
 
 let decode_component index value =
   match (value.components lsr (2 * index)) land 3 with
-  | 0 ->
-    let arguments_that_may_allocate =
+  | 0 -> Top Allocation_other_than_calling_arguments
+  | 1 -> Safe
+  | 2 -> Bot
+  | 3 ->
+    let arguments_called =
       List.fold_left
         (fun calls (argument, outcomes) ->
           let outcomes = (outcomes lsr (3 * index)) land Call_outcomes.all in
@@ -191,17 +191,11 @@ let decode_component index value =
           else Numbers.Int.Map.add argument outcomes calls)
         Numbers.Int.Map.empty value.arguments_that_may_allocate
     in
-    Top
-      { arguments_that_may_allocate;
-        anything_else_may_allocate =
-          value.components land (1 lsl (6 + index)) = 0
-      }
-  | 1 -> Safe
-  | 2 -> Bot
+    Top (No_allocation_other_than_calling_arguments arguments_called)
   | n -> Misc.fatal_errorf "Zero_alloc_info cannot decode component %d" n
 
 let decode value =
-  if value.components = 0 && List.is_empty value.arguments_that_may_allocate
+  if value.components = 0
   then Misc.fatal_error "Zero_alloc_info unexpected empty encoding";
   { nor = decode_component 0 value;
     exn = decode_component 1 value;
