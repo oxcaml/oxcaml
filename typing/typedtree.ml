@@ -63,6 +63,9 @@ type attributes = attribute list
 type value = Value_pattern
 type computation = Computation_pattern
 
+type index = Index_access
+type deref = Deref_access
+
 type _ pattern_category =
 | Value : value pattern_category
 | Computation : computation pattern_category
@@ -270,6 +273,9 @@ and 'k pattern_desc =
       mutability * Jkind.sort * value general_pattern list -> value pattern_desc
   | Tpat_addr :
       mutability * Jkind.sort * value general_pattern -> value pattern_desc
+  | Tpat_deref :
+      mutability * deref block_access * deref unboxed_access list
+      * value general_pattern -> value pattern_desc
   | Tpat_lazy : value general_pattern -> value pattern_desc
   (* computation patterns *)
   | Tpat_value : tpat_value_argument -> computation pattern_desc
@@ -398,7 +404,7 @@ and expression_desc =
       newval : expression;
     }
   | Texp_array of mutability * Jkind.Sort.t * expression list * locality_mode_r
-  | Texp_idx of block_access * unboxed_access list
+  | Texp_idx of index block_access * index unboxed_access list
   | Texp_list_comprehension of comprehension
   | Texp_array_comprehension of mutability * Jkind.sort * comprehension
   | Texp_ifthenelse of expression * expression * expression option
@@ -466,15 +472,23 @@ and meth =
   | Tmeth_val of Ident.t
   | Tmeth_ancestor of Ident.t * Path.t
 
-and block_access =
-  | Baccess_field of
+and 'k block_access =
+  | Baccess_field :
       Longident.t loc * label_description * Types.record_representation
-  | Baccess_block of access_flag * expression
+      -> 'k block_access
+  | Baccess_block : access_flag * expression -> index block_access
+  | Baccess_tuple_element : int -> deref block_access
+  | Baccess_address : Jkind.sort -> deref block_access
 
-and unboxed_access =
-  | Uaccess_unboxed_field of
+and 'k unboxed_access =
+  | Uaccess_unboxed_field :
       Longident.t loc * unboxed_label_description
       * Types.record_unboxed_product_representation
+      -> 'k unboxed_access
+  | Uaccess_unboxed_tuple_element : int -> deref unboxed_access
+  | Uaccess_unboxed_record_field :
+      Longident.t loc * label_description * Types.record_representation
+      -> deref unboxed_access
 
 and comprehension =
   {
@@ -1187,6 +1201,7 @@ let rec classify_pattern_desc : type k . k pattern_desc -> k pattern_category =
   | Tpat_record_unboxed_product _ -> Value
   | Tpat_array _ -> Value
   | Tpat_addr _ -> Value
+  | Tpat_deref _ -> Value
   | Tpat_lazy _ -> Value
   | Tpat_any -> Value
   | Tpat_var _ -> Value
@@ -1222,7 +1237,7 @@ let shallow_iter_pattern_desc
   | Tpat_record_unboxed_product (lbl_pat_list, _, _) ->
       List.iter (fun (_, _, pat) -> f.f pat) lbl_pat_list
   | Tpat_array (_, _, patl) -> List.iter f.f patl
-  | Tpat_addr (_, _, p) | Tpat_lazy p -> f.f p
+  | Tpat_addr (_, _, p) | Tpat_deref (_, _, _, p) | Tpat_lazy p -> f.f p
   | Tpat_any
   | Tpat_var _
   | Tpat_constant _
@@ -1258,6 +1273,7 @@ let shallow_map_pattern_desc
   | Tpat_array (am, arg_sort, pats) ->
       Tpat_array (am, arg_sort, List.map f.f pats)
   | Tpat_addr (mut, arg_sort, p1) -> Tpat_addr (mut, arg_sort, f.f p1)
+  | Tpat_deref (mut, ba, uas, p1) -> Tpat_deref (mut, ba, uas, f.f p1)
   | Tpat_lazy p1 -> Tpat_lazy (f.f p1)
   | Tpat_variant (x1, Some p1, x2) ->
       Tpat_variant (x1, Some (f.f p1), x2)
@@ -1387,7 +1403,8 @@ let iter_pattern_full ~of_sort ~of_const_sort:_ ~both_sides_of_or f pat =
         List.iter (fun (_, pat, _) -> loop f pat) patl
       | Tpat_array (_, _, patl) ->
         List.iter (loop f) patl
-      | Tpat_addr (_, _, p) | Tpat_lazy p | Tpat_exception p -> loop f p
+      | Tpat_addr (_, _, p) | Tpat_deref (_, _, _, p) | Tpat_lazy p
+      | Tpat_exception p -> loop f p
       | Tpat_any | Tpat_constant _ | Tpat_unboxed_unit | Tpat_unboxed_bool _ ->
         ()
   in

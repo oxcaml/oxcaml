@@ -392,6 +392,10 @@ let pat
         Tpat_fun_layout { id; name = map_loc sub name; uid; sort; mode;
                           lpoly; env_locality_mode }
     | Tpat_addr (mut, arg_sort, p) -> Tpat_addr (mut, arg_sort, sub.pat sub p)
+    | Tpat_deref (mut, ba, uas, p) ->
+      (* The accesses duplicate the labels of the surrounding patterns, which
+         are mapped there. *)
+      Tpat_deref (mut, ba, uas, sub.pat sub p)
     | Tpat_lazy p -> Tpat_lazy (sub.pat sub p)
     | Tpat_value p ->
        (as_computation_pattern (sub.pat sub (p :> pattern))).pat_desc
@@ -530,13 +534,13 @@ let expr sub x =
           label, sort, Overridden (map_loc_lid sub lid, sub.expr sub exp))
       fields
   in
-  let map_block_access sub = function
+  let map_block_access sub : index block_access -> _ = function
     | Baccess_field (lid, ld, r) ->
       Baccess_field (map_loc_lid sub lid, ld, r)
     | Baccess_block (mut, idx) ->
       Baccess_block (mut, sub.expr sub idx)
   in
-  let map_unboxed_access sub = function
+  let map_unboxed_access sub : index unboxed_access -> _ = function
     | Uaccess_unboxed_field (lid, ld, r) ->
       Uaccess_unboxed_field (map_loc_lid sub lid, ld, r)
   in

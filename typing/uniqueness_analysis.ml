@@ -2136,6 +2136,9 @@ and pattern_match_barrier pat paths : UF.t =
        forcing a lazy expression is like calling a nullary-function *)
     consume_memory_address Lazy
   | Tpat_addr _ -> borrow_memory_address ()
+  | Tpat_deref _ ->
+    Misc.fatal_error
+      "Uniqueness_analysis: dereference patterns are not supported yet"
   | Tpat_tuple pats ->
     borrow_fields_memory_address
       (List.concat
@@ -2228,6 +2231,9 @@ and pattern_match_single pat paths : Ienv.Extension.t * UF.t =
     | Tpat_addr (mut, _, arg) ->
       let paths = Paths.address_load mut paths in
       pattern_match_single arg paths
+    | Tpat_deref _ ->
+      Misc.fatal_error
+        "Uniqueness_analysis: dereference patterns are not supported yet"
     | Tpat_tuple args ->
       List.mapi
         (fun i (_, arg, _) ->
@@ -2649,7 +2655,9 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
     in
     (* All unboxed accesses are unused, but we include the below match in case
        we add new unboxed access types *)
-    let _unboxed_access = function Uaccess_unboxed_field _ -> UF.unused in
+    let _unboxed_access : index unboxed_access -> _ = function
+      | Uaccess_unboxed_field _ -> UF.unused
+    in
     block_access ba
   | Texp_ifthenelse (if_, then_, else_opt) ->
     (* if' is only borrowed, not used; but probably doesn't matter because of
