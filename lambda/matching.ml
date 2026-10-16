@@ -179,6 +179,25 @@ let map_on_rows f = List.map (map_on_row f)
 
 module Non_empty_row = Patterns.Non_empty_row
 
+let raise_unsupported_pattern loc msg =
+  let sloc =
+    Scoped_location.of_location ~scopes:Scoped_location.empty_scopes loc
+  in
+  let slot =
+    transl_extension_path sloc
+      (Lazy.force Env.initial) Predef.path_invalid_argument
+  in
+  Lprim
+    ( Praise Raise_regular,
+      [ Lprim
+          ( Pmakeblock (0, Immutable, All_value, alloc_heap),
+            [ slot;
+              Lconst (Const_base (Const_string (msg, loc, None)))
+            ],
+            sloc )
+      ],
+      sloc )
+
 let fatal_var_lpoly lpoly =
   let n = List.length (Types.Lpoly.get_exn lpoly) in
   Misc.fatal_errorf
@@ -281,7 +300,10 @@ end = struct
           | other_view -> continue orpat other_view
         )
       | `Deref _ ->
-          Misc.fatal_error "Matching: dereference patterns are not supported yet"
+          (* CR address-patterns: compile dereference patterns. *)
+          (({ p with pat_desc = `Any }, patl),
+           raise_unsupported_pattern p.pat_loc
+             "dereference patterns are not supported yet")
       | ( `Constant _ | `Unboxed_unit | `Unboxed_bool _ | `Tuple _
         | `Unboxed_tuple _ | `Construct _ | `Variant _ | `Array _ | `Addr _
         | `Lazy _ )
@@ -385,7 +407,11 @@ end = struct
             aliases rem
       | `Fun_layout (_, _, _, _, _, lpoly, _) -> fatal_var_lpoly lpoly
       | `Deref _ ->
-          Misc.fatal_error "Matching: dereference patterns are not supported yet"
+          (* CR address-patterns: compile dereference patterns *)
+          ({ p with pat_desc = `Any },
+           raise_unsupported_pattern p.pat_loc
+             "dereference patterns are not supported yet")
+          :: rem
       | #view as view ->
           (* We are doing two things here:
              - we freshen the variables of the pattern, to

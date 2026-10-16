@@ -2018,6 +2018,16 @@ let conjuncts_pattern_match l =
   let exts, ufs = List.split l in
   Ienv.Extension.conjuncts exts, UF.pars ufs
 
+let unboxed_access_projection : deref unboxed_access -> Projection.t = function
+  | Uaccess_unboxed_field (_, l, _) -> Record_unboxed_product_field l.lbl_name
+  | Uaccess_unboxed_tuple_element i -> Tuple_field i
+  | Uaccess_unboxed_record_field (_, l, _) -> Record_field l.lbl_name
+
+(* The paths of the position reached by an unboxed access from a position with
+   paths [paths]. *)
+let unboxed_access_paths paths ua =
+  Paths.child (unboxed_access_projection ua) paths
+
 (* The projection to the part of the memory storing the field [l], if [l] is
    stored in a block. *)
 let field_memory_projection (l : label_description) : Projection.t option =
@@ -2027,6 +2037,54 @@ let field_memory_projection (l : label_description) : Projection.t option =
     Some (Record_field l.lbl_name)
   | Record_unboxed | Record_dummy _ -> None
 
+(* An address ['a addr] owns both:
+
+   1. the value ['a] itself, and
+   2. the memory ['a] is stored at.
+
+   These are different. Say we have
+   {[
+     val x : { foo : string } @ unique
+     let y : string addr_imm @ unique = match x with { foo = deref_ y } -> y
+   ]}
+   Then [y] owns both the memory the [string] is stored in, as well as one word
+   of memory, initially owned by [x], that stores the address of the string.
+   Hence, during uniqueness checking, [y] needs to be associated with both the
+   value [string] and part of the memory of [x]:
+   {[
+     let _ =
+       match x with
+       | { foo = deref_ y as z } -> ...
+                                    ^^^
+   ]}
+   In this position, consuming the string z (i.e. [x.foo], or [Paths.child proj
+   paths] below) or the address y ([Paths.child proj (Paths.memory_address
+   paths)] below) should consume x, too.
+
+   So the paths of an address are the paths of the value it points to, together
+   with the paths of that part of the memory. Loading from an address
+   ([Paths.address_load]) returns the address' paths unchanged: the loaded
+   value keeps the memory paths of the address. This is imprecise but sound.
+   For example, this is rejected:
+   {[
+     match x with
+     | { foo = deref_ y } ->
+       let addr_imm_ s = y in
+       consume s;
+       match x with { foo = _ } -> ()
+   ]}
+   Consuming [s] uses [x.<memory>.foo], and the second match reads the memory
+   of [x], although [s] is just the string [x.foo] and does not own any of
+   [x]'s memory. With [{ foo = s }] instead of [deref_ y], it is accepted.
+
+   The memory of a block is tracked per field (see [field_memory_projection]):
+   [y] owns the part of [x]'s memory storing [foo], [x.<memory>.foo]. If [x]
+   had other fields, consuming [y] would not conflict with reading them, but
+   it would conflict with reading [foo] again or overwriting [x]. *)
+let deref_base_paths proj paths =
+  Paths.choose (Paths.child proj paths)
+    (Paths.child proj (Paths.memory_address paths))
+
 let rec pattern_match_tuple pat values =
   match pat.pat_desc with
   | Tpat_or (pat0, pat1, _) ->
@@ -2035,7 +2093,20 @@ let rec pattern_match_tuple pat values =
     let ext1, uf1 = pattern_match_tuple pat1 values in
     Ienv.Extension.disjunct ext0 ext1, UF.choose uf0 uf1
   | Tpat_tuple pats ->
-    (* No read: the tuple does not exist in memory *)
+    (* We're in a top-level tuple destruct pattern on a syntactic tuple that
+       doesn't keep a reference to the overall tuple. (Indeed, the tuple might
+       not even be allocated.) We treat this as a special case: since the
+       overall tuple allocation cannot be accessed, we can ignore it for the
+       purpose of the uniqueness analysis and treat all subpatterns as accessing
+       the values directly.
+
+       A [deref_] pattern, however, might actually refer to the tuple's
+       allocation: the address owns both the value and the part of the
+       allocation storing it. Fortunately, that part of the allocation can only
+       be accessed through [deref_] patterns, and only to read the value, since
+       tuple elements are immutable. Hence, we identify the address with the
+       value itself ([~base_paths:paths]), and don't need any additional special
+       casing for [deref_] patterns. *)
     Unique_barrier.enable pat.pat_unique_barrier;
     List.map2
       (fun (_, pat, _) value ->
@@ -2044,7 +2115,7 @@ let rec pattern_match_tuple pat values =
           | None -> Paths.fresh ()
           | Some paths -> paths
         in
-        pattern_match_single pat paths)
+        pattern_match_single ~base_paths:paths pat paths)
       pats values
     |> conjuncts_pattern_match
   | Tpat_any ->
@@ -2137,8 +2208,8 @@ and pattern_match_barrier pat paths : UF.t =
     consume_memory_address Lazy
   | Tpat_addr _ -> borrow_memory_address ()
   | Tpat_deref _ ->
-    Misc.fatal_error
-      "Uniqueness_analysis: dereference patterns are not supported yet"
+    (* taking the address of a position does not read it *)
+    no_memory_access ()
   | Tpat_tuple pats ->
     borrow_fields_memory_address
       (List.concat
@@ -2159,7 +2230,11 @@ and pattern_match_barrier pat paths : UF.t =
     (* unboxed records are not allocations *)
     no_memory_access ()
 
-and pattern_match_single pat paths : Ienv.Extension.t * UF.t =
+(* [base_paths] are the paths of the boxed position a [deref_] pattern at this
+   position would consume: the value stored there and the part of the memory
+   storing it (see [deref_base_paths]). Unboxed accesses below that position are
+   added in [Tpat_deref]. *)
+and pattern_match_single ?base_paths pat paths : Ienv.Extension.t * UF.t =
   let uf_read = pattern_match_barrier pat paths in
   let ext, uf_pats =
     match pat.pat_desc with
@@ -2172,7 +2247,7 @@ and pattern_match_single pat paths : Ienv.Extension.t * UF.t =
     | Tpat_fun_layout { id; _ } -> Ienv.Extension.singleton id paths, UF.unused
     | Tpat_alias { pattern = pat'; id; _ } ->
       let ext0 = Ienv.Extension.singleton id paths in
-      let ext1, uf = pattern_match_single pat' paths in
+      let ext1, uf = pattern_match_single ?base_paths pat' paths in
       Ienv.Extension.conjunct ext0 ext1, uf
     | Tpat_constant _ -> Ienv.Extension.empty, UF.unused
     | Tpat_unboxed_unit -> Ienv.Extension.empty, UF.unused
@@ -2198,11 +2273,19 @@ and pattern_match_single pat paths : Ienv.Extension.t * UF.t =
         let paths = Paths.variant_field lbl paths in
         pattern_match_single arg paths
       | None -> Ienv.Extension.empty, UF.unused)
-    | Tpat_record (pats, _, _) ->
+    | Tpat_record (pats, rep, _) ->
       List.map
         (fun (_, l, pat) ->
+          let base_paths =
+            match rep with
+            | Record_unboxed -> base_paths
+            | Record_inlined _ | Record_boxed | Record_float | Record_ufloat
+            | Record_mixed _ | Record_dummy _ | Record_undetermined
+            | Record_variable _ ->
+              Some (deref_base_paths (Projection.Record_field l.lbl_name) paths)
+          in
           let paths = Paths.record_field l.lbl_modalities l.lbl_name paths in
-          pattern_match_single pat paths)
+          pattern_match_single ?base_paths pat paths)
         pats
       |> conjuncts_pattern_match
     | Tpat_record_unboxed_product (pats, _, _) ->
@@ -2211,7 +2294,7 @@ and pattern_match_single pat paths : Ienv.Extension.t * UF.t =
           let paths =
             Paths.record_unboxed_product_field l.lbl_modalities l.lbl_name paths
           in
-          pattern_match_single pat paths)
+          pattern_match_single ?base_paths pat paths)
         pats
       |> conjuncts_pattern_match
     | Tpat_array (mut, _, pats) ->
@@ -2229,16 +2312,27 @@ and pattern_match_single pat paths : Ienv.Extension.t * UF.t =
       let ext, uf_arg = pattern_match_single arg (Paths.fresh ()) in
       ext, UF.par uf_force uf_arg
     | Tpat_addr (mut, _, arg) ->
+      (* CR address-patterns: this is slightly imprecise. See also the comment
+         on [deref_base_paths]. *)
+      let base_paths = Paths.choose paths (Paths.memory_address paths) in
       let paths = Paths.address_load mut paths in
+      pattern_match_single ~base_paths arg paths
+    | Tpat_deref (_, _, uas, arg) ->
+      let paths =
+        match base_paths with
+        | None ->
+          Misc.fatal_error
+            "Uniqueness_analysis.pattern_match_single: dereference pattern \
+             without base paths"
+        | Some base_paths -> List.fold_left unboxed_access_paths base_paths uas
+      in
       pattern_match_single arg paths
-    | Tpat_deref _ ->
-      Misc.fatal_error
-        "Uniqueness_analysis: dereference patterns are not supported yet"
     | Tpat_tuple args ->
       List.mapi
         (fun i (_, arg, _) ->
+          let base_paths = deref_base_paths (Projection.Tuple_field i) paths in
           let paths = Paths.tuple_field i paths in
-          pattern_match_single arg paths)
+          pattern_match_single ~base_paths arg paths)
         args
       |> conjuncts_pattern_match
     | Tpat_unboxed_tuple args ->
@@ -2246,7 +2340,7 @@ and pattern_match_single pat paths : Ienv.Extension.t * UF.t =
       List.mapi
         (fun i (_, arg, _) ->
           let paths = Paths.tuple_field i paths in
-          pattern_match_single arg paths)
+          pattern_match_single ?base_paths arg paths)
         args
       |> conjuncts_pattern_match
   in
