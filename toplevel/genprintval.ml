@@ -839,7 +839,23 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                 if first then tree_of_unboxed_product_label env path name
                 else tree_of_name name
               and v =
-                match print_sort_option ld_sort with
+                let sort =
+                  match ld_sort with
+                  | Some _ -> ld_sort
+                  | None -> begin
+                      (* The declaration leaves the sort undetermined, e.g. for
+                         a field whose type is an [('a : any)] parameter, so
+                         compute it from the instantiated field type. *)
+                      match
+                        Ctype.type_sort env ty_arg ~fixed:true
+                          ~why:Field_projection
+                      with
+                      | Ok sort ->
+                          Some (Jkind.Sort.default_for_transl_and_get sort)
+                      | Error _ -> None
+                    end
+                in
+                match print_sort_option sort with
                 | Print_as msg -> Oval_stuff msg
                 | Print_as_value ->
                   match lbl_list with
